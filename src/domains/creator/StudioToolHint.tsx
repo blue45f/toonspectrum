@@ -60,9 +60,27 @@ const FALLBACK_WIDTH = 240;
 const FALLBACK_HEIGHT = 92;
 const FALLBACK_GAP = 10;
 const VIEWPORT_PADDING = 10;
-const ANCHOR_READ_RETRY_COUNT = 1;
+const ANCHOR_READ_RETRY_COUNT = 4;
+const ANCHOR_READ_RETRY_DELAY_MS = 14;
+const ANCHOR_READ_RETRY_BACKOFF_FACTOR = 2;
 
 export const STUDIO_TOOL_HINT_SCROLL_HOVER_SUPPRESSION_MS = 720;
+
+function isUsableRect(value: DOMRect | null): value is DOMRect {
+  return (
+    value !== null
+    && Number.isFinite(value.left)
+    && Number.isFinite(value.top)
+    && Number.isFinite(value.right)
+    && Number.isFinite(value.bottom)
+    && Number.isFinite(value.width)
+    && Number.isFinite(value.height)
+  );
+}
+
+function hasUsableArea(value: DOMRect | null): boolean {
+  return isUsableRect(value) && value.width > 0 && value.height > 0;
+}
 
 type StudioToolHintInteractionManager = {
   suppressHover: (now?: number) => void;
@@ -545,6 +563,7 @@ export function StudioToolHintTarget({
   const observedDismissEpoch = useRef(dismissEpoch);
   const [expanded, setExpanded] = useState(false);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const lastValidAnchor = useRef<DOMRect | null>(null);
 
   function scheduleHintRevealWithDelay(delayMs: number) {
     if (showTimer.current) {
@@ -601,7 +620,13 @@ export function StudioToolHintTarget({
 
   function readAnchor(): DOMRect | null {
     const el = wrapRef.current;
-    return el ? el.getBoundingClientRect() : null;
+    const rootRect = el?.getBoundingClientRect() ?? null;
+    if (isUsableRect(rootRect)) return rootRect;
+
+    const childRect = el?.firstElementChild?.getBoundingClientRect() ?? null;
+    if (isUsableRect(childRect)) return childRect;
+
+    return null;
   }
 
   function reveal(
@@ -637,16 +662,40 @@ export function StudioToolHintTarget({
       hideTimer.current = 0;
     }
     const nextAnchor = readAnchor();
-    if (!nextAnchor) {
+    const fallbackAnchor = isUsableRect(lastValidAnchor.current)
+      ? lastValidAnchor.current
+      : null;
+
+    if (!isUsableRect(nextAnchor)) {
+      if (fallbackAnchor) {
+        setAnchor(fallbackAnchor);
+      }
+      if (fallbackAnchor && anchorRetryRemaining <= 0) {
+        // Continue with last known geometry rather than dropping the tooltip
+        // when the layout briefly reports a zero-sized rect.
+      } else {
       if (anchorRetryRemaining <= 0) return;
-      requestAnimationFrame(() => {
-        // If geometry is being recalculated right as the control remounts,
-        // retry once before dropping the hint intent.
-        reveal(expandImmediately, intent, anchorRetryRemaining - 1);
-      });
-      return;
+      const retryDelay = ANCHOR_READ_RETRY_DELAY_MS
+        * ANCHOR_READ_RETRY_BACKOFF_FACTOR ** (ANCHOR_READ_RETRY_COUNT - anchorRetryRemaining);
+        showTimer.current = globalThis.setTimeout(() => {
+          showTimer.current = 0;
+          // If geometry is being recalculated right as the control remounts,
+          // retry before dropping the hint intent.
+          reveal(expandImmediately, intent, anchorRetryRemaining - 1);
+        }, retryDelay) as unknown as number;
+        return;
+      }
     }
-    setAnchor(nextAnchor);
+
+    const anchorToUse = isUsableRect(nextAnchor)
+      ? nextAnchor
+      : fallbackAnchor && hasUsableArea(fallbackAnchor)
+        ? fallbackAnchor
+        : null;
+    if (!anchorToUse) return;
+
+    lastValidAnchor.current = anchorToUse;
+    setAnchor(anchorToUse);
     activeRevealIntent.current = effectiveIntent;
     interaction.markReveal(tipId, effectiveIntent);
     const previousHintId = coordinator.claim(tipId);
@@ -970,7 +1019,12 @@ export function StudioToolHintTarget({
       globalThis.cancelAnimationFrame?.(frame);
       frame = globalThis.requestAnimationFrame?.(() => {
         const nextAnchor = readAnchor();
-        if (nextAnchor) setAnchor(nextAnchor);
+        if (nextAnchor) {
+          lastValidAnchor.current = nextAnchor;
+          setAnchor(nextAnchor);
+        } else if (lastValidAnchor.current) {
+          setAnchor(lastValidAnchor.current);
+        }
       }) ?? 0;
     }
     globalThis.addEventListener("resize", updatePosition);

@@ -7,26 +7,20 @@ import {
   Film,
   Folder,
   GanttChartSquare,
-  History as HistoryIcon,
   ImagePlus,
   LayoutGrid,
-  Maximize2,
   MessageCircle,
-  Minimize2,
-  Minus,
   Mountain,
   MousePointer2,
   PaintBucket,
   Palette,
+  Plus,
   Pencil,
   PictureInPicture2,
-  Plus,
-  Redo2,
   PersonStanding,
   Smartphone,
   SquareSplitHorizontal,
   Type as TypeIcon,
-  Undo2,
   UsersRound,
   Video,
   WandSparkles,
@@ -35,7 +29,6 @@ import { Suspense, memo, type ComponentProps } from "react";
 
 import {
   StudioFloatingToolPopover,
-  StudioQuickActionsBar,
   StudioToolbarCluster,
   StudioToolbarDivider,
   studioChromeIconClass,
@@ -64,13 +57,10 @@ import {
 import { studioToolHintFromLabel, type StudioToolHintSpec } from "./studio-tool-hints";
 import { studioUiDensityAllows } from "./studio-ui-density";
 import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
-import {
-  STUDIO_VIEW_ZOOM_MAX,
-  STUDIO_VIEW_ZOOM_MIN,
-  stepStudioViewZoom,
-} from "./studio-view-controls";
 import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
+import { StudioToolBeltCanvasControls } from "./StudioToolBeltCanvasControls";
+import { StudioToolBeltQuickActions } from "./StudioToolBeltQuickActions";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type {
@@ -843,958 +833,73 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     undo,
     openFrameAnimationForSelected,
   } = stableHandlers;
+
+  const fitCanvasToWidthWithFocus = () => {
+    fitCanvasToWidth();
+    if (!isWorkspaceWideMode && !presentationPanelsHidden) {
+      toggleWorkspaceWideMode();
+    }
+  };
+
   return (
     <>
         {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
         <span aria-hidden className="pointer-events-none sticky left-0 -ml-1 h-8 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel to-transparent lg:hidden" />
         {/* Quick Actions — undo/redo/history always near the left of the top bar */}
         {studioUiDensityAllows(uiDensityMode, "quick-actions") ? (
-          <StudioQuickActionsBar>
-            <StudioToolBeltHintTarget
-              hint={TOOL_BELT_HINTS.undo}
-              disabled={isUndoDisabled}
-              unavailableReason={
-                collaborationDocumentLocked
-                  ? collaborationLockMessage()
-                  : hi === 0
-                    ? "되돌릴 이전 작업이 없습니다."
-                    : undefined
-              }
-            >
-              <button
-                type="button"
-                onClick={undo}
-                disabled={isUndoDisabled}
-                className={cn(toolBtn(false), iconToolBtnTouch, "h-8 px-1.5 disabled:opacity-40")}
-                aria-label="실행취소"
-              >
-                <Undo2
-                  size={STUDIO_ICON_SIZE.toolCompact}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioChromeIconClass({
-                    tone: isUndoDisabled ? "muted" : "default",
-                    disabled: isUndoDisabled,
-                  })}
-                />
-              </button>
-            </StudioToolBeltHintTarget>
-            <StudioToolBeltHintTarget
-              hint={TOOL_BELT_HINTS.redo}
-              disabled={isRedoDisabled}
-              unavailableReason={
-                collaborationDocumentLocked
-                  ? collaborationLockMessage()
-                  : hi >= history.length - 1
-                    ? "다시 적용할 작업이 없습니다."
-                    : undefined
-              }
-            >
-              <button
-                type="button"
-                onClick={redo}
-                disabled={isRedoDisabled}
-                className={cn(toolBtn(false), iconToolBtnTouch, "h-8 px-1.5 disabled:opacity-40")}
-                aria-label="다시실행"
-              >
-                <Redo2
-                  size={STUDIO_ICON_SIZE.toolCompact}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioChromeIconClass({
-                    tone: isRedoDisabled ? "muted" : "default",
-                    disabled: isRedoDisabled,
-                  })}
-                />
-              </button>
-            </StudioToolBeltHintTarget>
-            <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.history}>
-              <button
-                type="button"
-                onClick={() => setHistoryPanelOpen((v) => !v)}
-                aria-pressed={historyPanelOpen}
-                className={cn(toolBtn(historyPanelOpen), iconToolBtnTouch, "h-8 px-1.5")}
-                aria-label="작업 내역"
-              >
-                <HistoryIcon
-                  size={STUDIO_ICON_SIZE.toolCompact}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioChromeIconClass({
-                    tone: historyPanelOpen ? "accent" : "default",
-                    active: historyPanelOpen,
-                  })}
-                />
-              </button>
-            </StudioToolBeltHintTarget>
-          </StudioQuickActionsBar>
+          <StudioToolBeltQuickActions
+            collaborationDocumentLocked={collaborationDocumentLocked}
+            collaborationLockMessage={collaborationLockMessage}
+            buttonClass={iconToolBtnTouch}
+            hi={hi}
+            history={history}
+            historyPanelOpen={historyPanelOpen}
+            isRedoDisabled={isRedoDisabled}
+            isUndoDisabled={isUndoDisabled}
+            redo={redo}
+            setHistoryPanelOpen={setHistoryPanelOpen}
+            toolBtn={toolBtn}
+            undo={undo}
+          />
         ) : null}
         <StudioToolbarDivider />
-        {/* Main-menu can open these groups even when density hides the belt trigger — keep host mounted.
-            트리거만 sr-hide: 클러스터 전체에 lg:sr-only 를 주면 fixed 팝오버까지 잘려 메뉴가 안 보인다. */}
-        {(studioUiDensityAllows(uiDensityMode, "toolbar-assets") || activeToolbarGroup === "assetGroup") ? (
-        <StudioToolbarCluster
-          label="에셋 라이브러리"
-          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "border-0 bg-transparent p-0 shadow-none")}
-        >
-        <div ref={activeToolbarGroup === "assetGroup" ? menuRef : undefined} className="relative">
-          <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.assets}>
-            <button
-              type="button"
-              onClick={() => {
-                preloadStudioAssetMenuPanel();
-                setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
-              }}
-              onPointerEnter={() => {
-                preloadStudioAssetToolPopoverBody();
-                preloadStudioAssetMenuPanel();
-              }}
-              onPointerDown={preloadStudioAssetToolPopoverBody}
-              onFocus={() => {
-                preloadStudioAssetToolPopoverBody();
-                preloadStudioAssetMenuPanel();
-              }}
-              aria-haspopup="menu"
-              aria-expanded={activeToolbarGroup === "assetGroup"}
-              className={cn(
-                toolBtn(activeToolbarGroup === "assetGroup"),
-                !studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "sr-only"
-              )}
-            >
-              <Folder
-                size={STUDIO_ICON_SIZE.toolCompact}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={studioToolIconClass({
-                  tone: activeToolbarGroup === "assetGroup" ? "accent" : "default",
-                  active: activeToolbarGroup === "assetGroup",
-                })}
-              /> 템플릿·에셋
-              <ChevronDown size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "assetGroup" && "rotate-180")} />
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioFloatingToolPopover
-            open={activeToolbarGroup === "assetGroup"}
-            id="asset-group"
-            className={cn(groupPopoverClass("w-80"), "lg:w-[22rem] lg:max-w-[min(24rem,calc(100vw-1.5rem))]")}
-          >
-            <Suspense fallback={<StudioPanelLoading label="에셋 메뉴를 여는 중..." />}>
-              <LazyStudioAssetToolPopoverBody toolBelt={props} />
-            </Suspense>
-          </StudioFloatingToolPopover>
-        </div>
-        </StudioToolbarCluster>
-        ) : null}
-
-        {studioUiDensityAllows(uiDensityMode, "toolbar-cut") ? (
-        <>
-        <StudioToolbarDivider label="컷" />
-        <StudioToolbarCluster label="컷 배치">
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.panelAdd}>
-            <button type="button" onClick={addFrame} className={toolBtn(false)}>
-              <Plus
-                size={STUDIO_ICON_SIZE.toolCompact}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={studioToolIconClass()}
-              /> 패널
-            </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.panelSplit}>
-          <button type="button" onClick={addDiagonalSplit} className={toolBtn(false)}>
-            <SquareSplitHorizontal
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass()}
-            /> 사선 컷
-          </button>
-        </StudioToolBeltHintTarget>
-        {selected?.type === "frame" && (
-          <StudioToolBeltHintTarget
-            hint={selected.points ? TOOL_BELT_HINTS.panelStraighten : TOOL_BELT_HINTS.panelDiagonalize}
-          >
-            <button
-              type="button"
-              onClick={toggleSelectedFrameDiagonal}
-              className={toolBtn(Boolean(selected.points))}
-            >
-              <SquareSplitHorizontal
-                size={STUDIO_ICON_SIZE.toolCompact}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={cn(studioToolIconClass({ active: Boolean(selected?.points) }), "opacity-90")}
-              />
-              {selected.points ? "직선화" : "사선화"}
-            </button>
-          </StudioToolBeltHintTarget>
-        )}
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {/* 모바일 가로 벨트: 데스크톱은 좌측 세로 레일로 이동 (lg:hidden). */}
-        {studioUiDensityAllows(uiDensityMode, "toolbar-draw") ? (
-        <>
-        <StudioToolbarDivider label="도구" className="lg:hidden" />
-        <StudioToolbarCluster label="그리기 도구" className="lg:hidden">
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.select}>
-          <button
-            type="button"
-            onClick={() => {
-              activatePrimaryCanvasTool("select");
-              setMenu(null);
-            }}
-            className={toolBtn(tool === "select")}
-            aria-pressed={tool === "select"}
-          >
-            <MousePointer2
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ active: tool === "select" })}
-            /> 선택
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget
-          hint={TOOL_BELT_HINTS.pen}
-          disabled={activeSurfaceReviewLocked}
-          unavailableReason={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요." : undefined}
-        >
-          <button
-            type="button"
-            disabled={activeSurfaceReviewLocked}
-            onClick={() => {
-              activatePrimaryCanvasTool("draw", "pen");
-              setMenu(null);
-            }}
-            className={cn(toolBtn(tool === "draw" && drawMode === "pen"), "disabled:cursor-not-allowed disabled:opacity-40")}
-            aria-pressed={tool === "draw" && drawMode === "pen"}
-          >
-            <Pencil
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ active: tool === "draw" && drawMode === "pen" })}
-            /> 펜
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget
-          hint={TOOL_BELT_HINTS.eraser}
-          disabled={activeSurfaceReviewLocked}
-          unavailableReason={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요." : undefined}
-        >
-          <button
-            type="button"
-            disabled={activeSurfaceReviewLocked}
-            onClick={() => {
-              activatePrimaryCanvasTool("draw", "eraser");
-              setMenu(null);
-            }}
-            className={cn(toolBtn(tool === "draw" && drawMode === "eraser"), "disabled:cursor-not-allowed disabled:opacity-40")}
-            aria-pressed={tool === "draw" && drawMode === "eraser"}
-          >
-            <Eraser
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ active: tool === "draw" && drawMode === "eraser" })}
-            /> 지우개
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget
-          hint={TOOL_BELT_HINTS.fill}
-          unavailableReason={advancedFillUnsupportedReason
-            ? `${advancedFillUnsupportedReason} 채우기를 누르면 안전한 단일 래스터 후보를 찾거나 필요한 조건을 안내합니다.`
-            : undefined}
-        >
-          <button
-            type="button"
-            onClick={toggleAdvancedFill}
-            className={toolBtn(advancedFillActive)}
-            aria-pressed={advancedFillActive}
-          >
-            <PaintBucket
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ active: advancedFillActive })}
-            /> 채우기
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget
-          hint={TOOL_BELT_HINTS.frameAnimation}
-          disabled={selected?.type !== "image"}
-          unavailableReason={selected?.type !== "image" ? "애니메이션으로 만들 이미지를 먼저 선택하세요." : undefined}
-        >
-          <button
-            type="button"
-            onClick={openFrameAnimationForSelected}
-            disabled={selected?.type !== "image"}
-            className={cn(toolBtn(frameAnimOpen && frameAnimTargetId === selected?.id), "disabled:opacity-40")}
-          >
-            <Film
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ disabled: selected?.type !== "image" })}
-            /> 프레임
-          </button>
-        </StudioToolBeltHintTarget>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
-        <>
-        <StudioToolbarDivider label="참조" />
-        <StudioToolbarCluster label="참조·3D">
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.character3d}>
-          <button
-            type="button"
-            onClick={() => setPoserVrmOpen(true)}
-            className={cn(toolBtn(poserVrmOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-          >
-            <UsersRound
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ tone: "accent" })}
-            /> 3D 캐릭터
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.mannequin3d}>
-          <button
-            type="button"
-            onClick={() => setMannequinPoserOpen(true)}
-            className={cn(toolBtn(mannequinPoserOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-          >
-            <PersonStanding
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ tone: "accent" })}
-            /> 3D 데생 인형
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.bg3d}>
-          <button
-            type="button"
-            onClick={() => setBg3dOpen(true)}
-            className={cn(toolBtn(bg3dOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-          >
-            <Boxes
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ tone: "accent" })}
-            /> 3D 배경
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.reference}>
-          <button
-            type="button"
-            onClick={() => setReferencePanelOpen((v) => !v)}
-            onMouseEnter={preloadStudioReferencePanel}
-            onFocus={preloadStudioReferencePanel}
-            className={cn(toolBtn(referencePanelOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-            aria-pressed={referencePanelOpen}
-          >
-            <PictureInPicture2
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ tone: "accent" })}
-            /> 참고
-          </button>
-        </StudioToolBeltHintTarget>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {(studioUiDensityAllows(uiDensityMode, "toolbar-scene") || activeToolbarGroup === "bgGroup") ? (
-        <>
-        {studioUiDensityAllows(uiDensityMode, "toolbar-scene") ? <StudioToolbarDivider label="장면" /> : null}
-        <StudioToolbarCluster
-          label="배경·톤"
-          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "border-0 bg-transparent p-0 shadow-none")}
-        >
-        <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
-          <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.background}>
-            <button
-              type="button"
-              onClick={() => setMenu(activeToolbarGroup === "bgGroup" ? null : "bgFill")}
-              onPointerEnter={preloadStudioSceneToolPopoverBody}
-              onPointerDown={preloadStudioSceneToolPopoverBody}
-              onFocus={preloadStudioSceneToolPopoverBody}
-              aria-haspopup="menu"
-              aria-expanded={activeToolbarGroup === "bgGroup"}
-              className={cn(
-                toolBtn(activeToolbarGroup === "bgGroup"),
-                !studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "sr-only"
-              )}
-            >
-              <Mountain
-                size={STUDIO_ICON_SIZE.toolCompact}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={studioToolIconClass({
-                  tone: activeToolbarGroup === "bgGroup" ? "accent" : "default",
-                  active: activeToolbarGroup === "bgGroup",
-                })}
-              /> 배경
-              <ChevronDown size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "bgGroup" && "rotate-180")} />
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioFloatingToolPopover
-            open={activeToolbarGroup === "bgGroup"}
-            id="bg-group"
-            className={groupPopoverClass("w-80")}
-          >
-            <Suspense fallback={<StudioPanelLoading label="배경 메뉴를 여는 중..." />}>
-              <LazyStudioSceneToolPopoverBody toolBelt={props} />
-            </Suspense>
-          </StudioFloatingToolPopover>
-        </div>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {(studioUiDensityAllows(uiDensityMode, "toolbar-style") || activeToolbarGroup === "styleGroup") ? (
-        <StudioToolbarCluster
-          label="스타일"
-          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-style") && "border-0 bg-transparent p-0 shadow-none")}
-        >
-        <div ref={activeToolbarGroup === "styleGroup" ? menuRef : undefined} className="relative">
-          <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.style}>
-            <button
-              type="button"
-              onClick={() => setMenu(activeToolbarGroup === "styleGroup" ? null : "palette")}
-              onPointerEnter={() => {
-                preloadStudioStyleToolPopoverBody();
-                preloadStudioPaletteLibraryPanel();
-              }}
-              onPointerDown={() => {
-                preloadStudioStyleToolPopoverBody();
-                preloadStudioPaletteLibraryPanel();
-              }}
-              onFocus={() => {
-                preloadStudioStyleToolPopoverBody();
-                preloadStudioPaletteLibraryPanel();
-              }}
-              aria-haspopup="menu"
-              aria-expanded={activeToolbarGroup === "styleGroup"}
-              className={cn(
-                toolBtn(activeToolbarGroup === "styleGroup"),
-                !studioUiDensityAllows(uiDensityMode, "toolbar-style") && "sr-only"
-              )}
-            >
-              <Palette
-                size={STUDIO_ICON_SIZE.toolCompact}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={studioToolIconClass({
-                  tone: activeToolbarGroup === "styleGroup" ? "accent" : "default",
-                  active: activeToolbarGroup === "styleGroup",
-                })}
-              /> 스타일
-              <ChevronDown size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "styleGroup" && "rotate-180")} />
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioFloatingToolPopover
-            open={activeToolbarGroup === "styleGroup"}
-            id="style-group"
-            className={groupPopoverClass("w-72")}
-          >
-            <Suspense fallback={<StudioPanelLoading label="스타일 메뉴를 여는 중..." />}>
-              <LazyStudioStyleToolPopoverBody toolBelt={props} />
-            </Suspense>
-          </StudioFloatingToolPopover>
-        </div>
-        </StudioToolbarCluster>
-        ) : null}
-
-        {(studioUiDensityAllows(uiDensityMode, "toolbar-ai") || activeToolbarGroup === "aiGroup") ? (
-        <>
-        {studioUiDensityAllows(uiDensityMode, "toolbar-ai") ? <StudioToolbarDivider label="AI" /> : null}
-        <StudioToolbarCluster
-          label="AI 연동"
-          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "border-0 bg-transparent p-0 shadow-none")}
-        >
-        <div ref={activeToolbarGroup === "aiGroup" ? menuRef : undefined} className="relative">
-          <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.ai}>
-            <button
-              type="button"
-              onClick={() => setMenu(activeToolbarGroup === "aiGroup" ? null : "aiAssist")}
-              onPointerEnter={preloadStudioAiToolPopoverBody}
-              onPointerDown={preloadStudioAiToolPopoverBody}
-              onFocus={preloadStudioAiToolPopoverBody}
-              aria-haspopup="menu"
-              aria-expanded={activeToolbarGroup === "aiGroup"}
-              className={cn(
-                toolBtn(activeToolbarGroup === "aiGroup"),
-                !studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "sr-only"
-              )}
-            >
-              <WandSparkles
-                size={STUDIO_ICON_SIZE.toolCompact}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={studioToolIconClass({
-                  tone: activeToolbarGroup === "aiGroup" ? "accent" : "default",
-                  active: activeToolbarGroup === "aiGroup",
-                })}
-              /> AI
-              <ChevronDown size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "aiGroup" && "rotate-180")} />
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioFloatingToolPopover
-            open={activeToolbarGroup === "aiGroup"}
-            id="ai-group"
-            className={cn(
-              groupPopoverClass("w-80"),
-              // Fixed flex column: nested max-heights previously clipped generate buttons.
-              "flex h-[min(78dvh,36rem)] max-h-[min(78dvh,36rem)] flex-col overflow-hidden lg:w-96 lg:max-w-[min(24rem,calc(100vw-1.5rem))]"
-            )}
-          >
-            <Suspense fallback={<StudioPanelLoading label="AI 메뉴를 여는 중..." />}>
-              <LazyStudioAiToolPopoverBody toolBelt={props} />
-            </Suspense>
-          </StudioFloatingToolPopover>
-        </div>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {/* 삽입 코어 — 밀도 모드와 무관하게 항상 노출(텍스트·말풍선은 예전에 AI 클러스터에 묶여
-            simple/focus 에서 통째로 사라지던 회귀를 분리). */}
-        {studioUiDensityAllows(uiDensityMode, "toolbar-insert") ? (
-        <>
-        <StudioToolbarDivider label="삽입" />
-        <StudioToolbarCluster label="삽입·대사">
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.text}>
-          <button
-            type="button"
-            onClick={() => addText()}
-            draggable
-            onDragStart={(event) => {
-              writeStudioInsertDragPayload(event.dataTransfer, { kind: "text" });
-            }}
-            className={toolBtn(false)}
-          >
-            <TypeIcon
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass()}
-            /> 텍스트
-          </button>
-        </StudioToolBeltHintTarget>
-        <div ref={menu === "bubble" ? menuRef : undefined} className="relative">
-          <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.bubble}>
-            <button
-              type="button"
-              onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
-              onPointerEnter={preloadStudioBubbleToolPopoverBody}
-              onPointerDown={preloadStudioBubbleToolPopoverBody}
-              onFocus={preloadStudioBubbleToolPopoverBody}
-              aria-haspopup="menu"
-              aria-expanded={menu === "bubble"}
-              className={toolBtn(menu === "bubble")}
-            >
-              <MessageCircle
-                size={STUDIO_ICON_SIZE.toolCompact}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={studioToolIconClass({ active: menu === "bubble" })}
-              /> 말풍선
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioFloatingToolPopover
-            open={menu === "bubble"}
-            id="bubble-menu"
-            className="fixed inset-x-2 top-[4.5rem] z-[70] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-2xl border border-line/70 bg-panel p-0 shadow-xl lg:inset-x-auto lg:left-3 lg:top-[4.5rem] lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-[22rem] lg:max-w-[calc(100vw-1.5rem)]"
-          >
-            <Suspense fallback={<StudioPanelLoading label="말풍선 메뉴를 여는 중..." />}>
-              <LazyStudioBubbleToolPopoverBody toolBelt={props} />
-            </Suspense>
-          </StudioFloatingToolPopover>
-        </div>
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.image}>
-          <label
-            className={cn(
-              toolBtn(false),
-              "cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent"
-            )}
-          >
-            <ImagePlus
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioChromeIconClass({ tone: "default" })}
-            />
-            이미지
-            <input
-              type="file"
-              accept={STUDIO_CANVAS_IMAGE_ACCEPT}
-              className="sr-only"
-              onChange={onPickImage}
-            />
-          </label>
-        </StudioToolBeltHintTarget>
-        <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2 text-xs text-fg-2 pointer-coarse:h-11">
-          <Palette size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className="text-fg-3" />
-          <span className="sr-only sm:not-sr-only sm:inline">색</span>
-          <LazyStudioColorPopover
-            value={color}
-            onChange={setColor}
-            recentColors={recentColors}
-            onUseColor={rememberColor}
-            onLoadRecentColors={ensureRecentColorsLoaded}
-            label="브러시·도형 색상"
-            purpose="brush-shape"
-          />
-        </span>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-        {/* 펜 옵션은 캔버스 하단 StudioDrawOptionsBar 한 곳에서만 제공합니다. */}
-        <span className="mx-0.5 h-5 w-px bg-line" />
-        <StudioToolBeltHintTarget
-          hint={TOOL_BELT_HINTS.timelapse}
-          disabled={masterEditMode}
-          unavailableReason={masterEditMode ? "마스터 편집 중에는 타임랩스를 녹화할 수 없습니다." : undefined}
-        >
-          <button
-            type="button"
-            onClick={() => setTimelapseOpen(true)}
-            disabled={masterEditMode}
-            aria-label="타임랩스 녹화"
-            className={cn(toolBtn(false), iconToolBtnTouch, "disabled:opacity-40")}
-          >
-            <Video
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ disabled: masterEditMode })}
-            />
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.storyboard}>
-          <button
-            type="button"
-            onClick={() => setStoryboardGridOpen(true)}
-            aria-label="스토리보드 그리드 보기"
-            className={cn(toolBtn(false), iconToolBtnTouch)}
-          >
-            <LayoutGrid
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass()}
-            />
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget
-          hint={
-            pageEditLocked
-              ? { ...TOOL_BELT_HINTS.review, tip: "현재 페이지가 검토 잠금 상태예요." }
-              : TOOL_BELT_HINTS.review
-          }
-        >
-          <button
-            type="button"
-            onClick={() => setPageReviewOpen(true)}
-            aria-pressed={pageReviewOpen}
-            aria-label={pageEditLocked ? "페이지 검토, 현재 편집 잠금" : "페이지 검토와 편집 잠금"}
-            className={cn(toolBtn(pageReviewOpen || pageEditLocked), iconToolBtnTouch)}
-          >
-            <ClipboardCheck
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ active: pageReviewOpen || pageEditLocked })}
-            />
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolHintTarget
-          preferredSide="bottom"
-          disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
-          unavailableReason={
-            collaborationDocumentLocked && !sharedDocument?.capabilities.view
-              ? collaborationLockMessage()
-              : undefined
-          }
-          hint={{
-            id: "toolbelt-comment-inbox",
-            title: "문서 댓글",
-            description:
-              sharedDocument?.access === "view"
-                ? "팀 댓글을 읽고 연결된 페이지·컷·요소 위치로 바로 이동합니다."
-                : `페이지·컷·요소에 ${sharedDocument ? "팀 댓글을 남기고 서버로 동기화합니다." : "댓글을 남겨 프로젝트와 함께 저장합니다."}`,
-            preview: "comment-inbox",
-            tip:
-              openStudioCommentCount > 0
-                ? `아직 해결되지 않은 댓글이 ${openStudioCommentCount}개 있어요.`
-                : "캔버스 위치를 지정해 댓글을 남기면 검토자가 맥락을 바로 이해할 수 있어요.",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              setTeamPanelOpen(false);
-              setCommentsOpen((current) => !current);
-            }}
-            disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
-            aria-expanded={commentsOpen}
-            aria-haspopup="dialog"
-            aria-controls="studio-comments-review-dialog"
-            aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
-            className={cn(toolBtn(commentsOpen), iconToolBtnTouch, "relative disabled:cursor-not-allowed disabled:opacity-50")}
-          >
-            <MessageCircle
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ active: commentsOpen })}
-            />
-            {openStudioCommentCount > 0 ? (
-              <span
-                aria-hidden
-                className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-accent px-1 text-[0.58rem] font-bold leading-4 text-on-accent"
-              >
-                {openStudioCommentCount > 99 ? "99+" : openStudioCommentCount}
-              </span>
-            ) : null}
-          </button>
-        </StudioToolHintTarget>
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.team}>
-          <button
-            type="button"
-            data-studio-team-share-btn="true"
-            onClick={() => {
-              setCommentsOpen(false);
-              setTeamPanelOpen((prev) => !prev);
-            }}
-            aria-pressed={teamPanelOpen}
-            aria-label="팀 작업 공간"
-            className={cn(
-              toolBtn(teamPanelOpen),
-              iconToolBtnTouch,
-              "relative gap-1 px-2.5 font-medium text-xs text-accent hover:bg-accent/15 border border-accent/30 rounded-full transition-all shadow-sm"
-            )}
-          >
-            <UsersRound
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ tone: "accent" })}
-            />
-            <span className="hidden sm:inline font-semibold text-[0.7rem] text-accent">팀 & 실시간 공유</span>
-            <span className="relative flex size-2 shrink-0">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-75" />
-              <span className="relative inline-flex size-2 rounded-full bg-accent" />
-            </span>
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.continuity}>
-          <button
-            type="button"
-            onClick={() => setContinuityOpen(true)}
-            aria-pressed={continuityOpen}
-            aria-label="이야기 연속성 검사"
-            className={cn(toolBtn(continuityOpen), iconToolBtnTouch)}
-          >
-            <CheckCircle2
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ active: continuityOpen })}
-            />
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.scrollPreview}>
-          <button
-            type="button"
-            onClick={() => setScrollPreviewOpen(true)}
-            aria-label="세로 스크롤 미리보기"
-            className={cn(toolBtn(false), iconToolBtnTouch)}
-          >
-            <Smartphone
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass()}
-            />
-          </button>
-        </StudioToolBeltHintTarget>
-        <StudioToolBeltHintTarget
-          hint={TOOL_BELT_HINTS.timeline}
-          disabled={masterEditMode}
-          unavailableReason={masterEditMode ? "마스터 편집 중에는 타임라인을 열 수 없습니다." : undefined}
-        >
-          <button
-            type="button"
-            onClick={() => setTimelineOpen((v) => !v)}
-            disabled={masterEditMode}
-            aria-pressed={timelineOpen}
-            aria-label="다중 레이어 타임라인"
-            className={cn(toolBtn(timelineOpen), iconToolBtnTouch, "disabled:opacity-40")}
-          >
-            <GanttChartSquare
-              size={STUDIO_ICON_SIZE.toolCompact}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioToolIconClass({ active: timelineOpen })}
-            />
-          </button>
-        </StudioToolBeltHintTarget>
-        <span className="mx-0.5 hidden h-5 w-px bg-line lg:block" />
+        <StudioToolBeltCreateModeGroups
+          hints={TOOL_BELT_HINTS}
+          studioCanvasImageAccept={STUDIO_CANVAS_IMAGE_ACCEPT}
+          toolBelt={props}
+        />
         {/* 줌·화면 맞춤·캔버스 최대화 — 모바일은 하단 도구막대가 대체 */}
-        <StudioToolbarCluster label="화면·캔버스" className="ml-auto hidden lg:flex">
-          <StudioToolBeltHintTarget
-            hint={TOOL_BELT_HINTS.zoomOut}
-            disabled={zoom <= STUDIO_VIEW_ZOOM_MIN}
-            unavailableReason={zoom <= STUDIO_VIEW_ZOOM_MIN ? "최소 축소 배율에 도달했습니다." : undefined}
-          >
-            <button
-              type="button"
-              onClick={() => setZoom((current) => stepStudioViewZoom(current, -1))}
-              disabled={zoom <= STUDIO_VIEW_ZOOM_MIN}
-              className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
-              aria-label="축소"
-            >
-              <Minus
-                size={STUDIO_ICON_SIZE.contextMenu}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={studioToolIconClass({ disabled: zoom <= STUDIO_VIEW_ZOOM_MIN })}
-              />
-            </button>
-          </StudioToolBeltHintTarget>
-          <span className="w-9 text-center text-[0.62rem] font-bold tabular-nums text-fg-3">
-            {Math.round(zoom * 100)}%
-          </span>
-          <StudioToolBeltHintTarget
-            hint={TOOL_BELT_HINTS.zoomIn}
-            disabled={zoom >= STUDIO_VIEW_ZOOM_MAX}
-            unavailableReason={zoom >= STUDIO_VIEW_ZOOM_MAX ? "최대 확대 배율에 도달했습니다." : undefined}
-          >
-            <button
-              type="button"
-              onClick={() => setZoom((current) => stepStudioViewZoom(current, 1))}
-              disabled={zoom >= STUDIO_VIEW_ZOOM_MAX}
-              className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
-              aria-label="확대"
-            >
-              <Plus
-                size={STUDIO_ICON_SIZE.contextMenu}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={studioToolIconClass({ disabled: zoom >= STUDIO_VIEW_ZOOM_MAX })}
-              />
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.actualSize}>
-            <button
-              type="button"
-              onClick={setActualPixelView}
-              className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
-            >
-              100%
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.fitWidth}>
-            <button
-              type="button"
-              onClick={fitCanvasToWidth}
-              className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
-            >
-              맞춤
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.resetView}>
-            <button
-              type="button"
-              onClick={resetView}
-              className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
-            >
-              리셋
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioToolbarDivider />
-          <StudioToolBeltHintTarget
-            hint={
-              isWorkspaceWideMode
-                ? TOOL_BELT_HINTS.workspaceRestore
-                : TOOL_BELT_HINTS.workspaceFocus
-            }
-            disabled={presentationPanelsHidden}
-            unavailableReason={
-              presentationPanelsHidden
-                ? "전체화면·브라우저 맞춤에서는 작업 패널을 임시로 숨깁니다."
-                : undefined
-            }
-          >
-            <button
-              type="button"
-              onClick={toggleWorkspaceWideMode}
-              disabled={presentationPanelsHidden}
-              aria-pressed={isWorkspaceWideMode}
-              className={cn(
-                toolBtn(isWorkspaceWideMode),
-                "h-8 gap-1 px-1.5 text-[0.62rem] font-semibold disabled:cursor-not-allowed disabled:opacity-45"
-              )}
-            >
-              <Maximize2
-                size={STUDIO_ICON_SIZE.contextMenu}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={studioToolIconClass({ active: isWorkspaceWideMode })}
-              />
-              <span>{isWorkspaceWideMode ? "패널 펼치기" : "패널 접어 넓게"}</span>
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioToolBeltHintTarget
-            hint={maximized ? TOOL_BELT_HINTS.restoreWindow : TOOL_BELT_HINTS.maximizeWindow}
-          >
-            <button
-              type="button"
-              onClick={toggleMaximize}
-              aria-pressed={maximized}
-              className={cn(toolBtn(maximized), "h-8 px-1.5 text-[0.62rem] font-semibold")}
-            >
-              {maximized ? "복원" : "맞춤창"}
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioToolBeltHintTarget
-            hint={isFullscreen ? TOOL_BELT_HINTS.exitFullscreen : TOOL_BELT_HINTS.fullscreen}
-          >
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              aria-pressed={isFullscreen}
-              className={cn(toolBtn(isFullscreen), "h-8 px-1.5 text-[0.62rem] font-semibold")}
-            >
-              {isFullscreen ? "창" : "전체"}
-            </button>
-          </StudioToolBeltHintTarget>
-          <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.canvasOnly}>
-            <button
-              type="button"
-              onClick={enterCanvasOnlyMode}
-              aria-pressed={canvasOnlyMode}
-              className={cn(toolBtn(canvasOnlyMode), "h-8 gap-1 px-1.5 text-[0.62rem] font-semibold")}
-            >
-              <Minimize2
-                size={STUDIO_ICON_SIZE.contextMenu}
-                strokeWidth={STUDIO_ICON_STROKE}
-                aria-hidden
-                className={studioToolIconClass({ active: canvasOnlyMode })}
-              /> 캔버스
-            </button>
-          </StudioToolBeltHintTarget>
-        </StudioToolbarCluster>
+        <StudioToolBeltCanvasControls
+          canvasOnlyMode={canvasOnlyMode}
+          isFullscreen={isFullscreen}
+          maximized={maximized}
+          presentationPanelsHidden={presentationPanelsHidden}
+          zoom={zoom}
+          isWorkspaceWideMode={isWorkspaceWideMode}
+          toolBtn={toolBtn}
+          setZoom={setZoom}
+          enterCanvasOnlyMode={enterCanvasOnlyMode}
+          onFitCanvasToWidth={fitCanvasToWidthWithFocus}
+          resetView={resetView}
+          setActualPixelView={setActualPixelView}
+          toggleWorkspaceWideMode={toggleWorkspaceWideMode}
+          toggleMaximize={toggleMaximize}
+          toggleFullscreen={toggleFullscreen}
+          hints={{
+            zoomOut: TOOL_BELT_HINTS.zoomOut,
+            zoomIn: TOOL_BELT_HINTS.zoomIn,
+            actualSize: TOOL_BELT_HINTS.actualSize,
+            fitWidth: TOOL_BELT_HINTS.fitWidth,
+            resetView: TOOL_BELT_HINTS.resetView,
+            workspaceFocus: TOOL_BELT_HINTS.workspaceFocus,
+            workspaceRestore: TOOL_BELT_HINTS.workspaceRestore,
+            maximizeWindow: TOOL_BELT_HINTS.maximizeWindow,
+            restoreWindow: TOOL_BELT_HINTS.restoreWindow,
+            fullscreen: TOOL_BELT_HINTS.fullscreen,
+            exitFullscreen: TOOL_BELT_HINTS.exitFullscreen,
+            canvasOnly: TOOL_BELT_HINTS.canvasOnly,
+          }}
+        />
     </>
   );
 });

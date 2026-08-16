@@ -98,6 +98,12 @@ export interface StudioCc0MypaintStampTuning {
   readonly opaqueLinearize: number;
   readonly dabsPerPixel: number;
   /**
+   * Knife class: this preset scrapes a LOAD of paint rather than laying ink, so its mark carries
+   * standing paint along the blade's two edges. Opt-in and absent everywhere else, which keeps
+   * every other preset's plan structurally identical.
+   */
+  readonly reliefBody?: boolean;
+  /**
    * Flat-nib geometry, verbatim from `elliptical_dab_ratio` / `elliptical_dab_angle`.
    * Optional - a round preset omits both and keeps a byte-identical dab plan.
    */
@@ -144,6 +150,8 @@ export interface StudioCc0MypaintDabDynamicsStyle {
    * measured on mypaint-cc0--knife it lightened the mark about five-fold.
    */
   readonly linearizeDabsPerPixel: number | null;
+  /** Knife class — the ink ribbon adds edge relief bands for it. See the tuning field. */
+  readonly reliefBody?: boolean;
   /**
    * Flow multiplier sampled at pressure 0…1 in 1/16 steps, normalised to 1 at half pressure.
    * Absent when the preset's deposit does not vary with pressure, which keeps its dab plan
@@ -313,6 +321,7 @@ export function resolveStudioCc0MypaintDabDynamicsStyle(
     radiusJitter: tuning.radiusJitter,
     linearizedFlow,
     linearizeDabsPerPixel,
+    ...(tuning.reliefBody === true ? { reliefBody: true } : {}),
     // Only forwarded when the preset actually declares a flat nib, so a round preset's dab plan
     // stays byte-identical.
     ...(tuning.ellipticalRatio && tuning.ellipticalRatio > 1
@@ -922,6 +931,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
         scatter: 0, scatterPressureResponse: 0.0, radiusJitter: 0,
         opaqueLinearize: 0.9, dabsPerPixel: 11.5,
         ellipticalRatio: 6.52, ellipticalAngleDegrees: 90.0,
+        reliefBody: true,
       },
       "smudge/colour pickup is recorded and unexecuted (the stamp walker deposits stroke colour); the flat blade geometry IS executed.",
     ),

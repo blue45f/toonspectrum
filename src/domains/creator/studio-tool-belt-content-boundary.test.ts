@@ -255,8 +255,8 @@ describe("Studio ToolBelt content module boundary", () => {
     ).toSorted();
     const wiredPropNames = findToolBeltJsxAttributes(page).toSorted();
 
-    expect(propNames).toHaveLength(206);
-    expect(wiredPropNames).toHaveLength(206);
+    expect(propNames).toHaveLength(205);
+    expect(wiredPropNames).toHaveLength(205);
     expect(wiredPropNames).toEqual(propNames);
   });
 
@@ -279,6 +279,8 @@ describe("Studio ToolBelt content module boundary", () => {
 
   it("stays canvas-runtime-free and uses the neutral view helpers", () => {
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
+    const canvasControls = moduleShape("./StudioToolBeltCanvasControls.tsx");
+    const viewHelpers = `${toolBelt.source}\n${canvasControls.source}`;
 
     expect(
       toolBelt.allImports.some((specifier) =>
@@ -289,9 +291,9 @@ describe("Studio ToolBelt content module boundary", () => {
         || specifier.startsWith("three/")
       )
     ).toBe(false);
-    expect(toolBelt.source).toContain("stepStudioViewZoom");
-    expect(toolBelt.source).toContain("STUDIO_VIEW_ZOOM_MIN");
-    expect(toolBelt.source).toContain("STUDIO_VIEW_ZOOM_MAX");
+    expect(viewHelpers).toContain("stepStudioViewZoom");
+    expect(viewHelpers).toContain("STUDIO_VIEW_ZOOM_MIN");
+    expect(viewHelpers).toContain("STUDIO_VIEW_ZOOM_MAX");
     expect(toolBelt.source).not.toMatch(/\bclampZoom\b/u);
     expect(toolBelt.source).not.toMatch(/\bZOOM_(?:MIN|MAX)\b/u);
   });

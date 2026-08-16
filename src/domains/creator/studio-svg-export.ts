@@ -2106,7 +2106,14 @@ function serializeStampBrushDabs(
     const path = ribbon.polygons.map((polygon) => (
       pointsToPathD(polygon.points, true)
     )).join(" ");
-    return `<path data-stamp-brush="ink" data-stamp-ink-ribbon="${ribbon.version}" data-stamp-ink-coverage="${ribbon.coverageOperation}" data-stamp-ink-cap="${ribbon.cap}" d="${path}" fill="${color}" fill-rule="${ribbon.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbon.opacity)}"/>`;
+    const slab = `<path data-stamp-brush="ink" data-stamp-ink-ribbon="${ribbon.version}" data-stamp-ink-coverage="${ribbon.coverageOperation}" data-stamp-ink-cap="${ribbon.cap}" d="${path}" fill="${color}" fill-rule="${ribbon.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbon.opacity)}"/>`;
+    // Knife edge relief — plain alpha, deliberately NOT `mix-blend-mode`. White over the slab is
+    // the lit crest, the pigment itself is the shaded flank, and both composite the same way in
+    // every rasteriser, so what is measured is what ships (see STUDIO_STAMP_KNIFE_RELIEF_VERSION).
+    const relief = (ribbon.reliefBands ?? []).map((band) => (
+      `<path data-stamp-knife-relief="${band.kind}" data-stamp-knife-relief-version="${ribbon.reliefVersion}" d="${band.runs.map((run) => pointsToPathD(run)).join(" ")}" fill="none" stroke="${band.kind === "highlight" ? "#ffffff" : color}" stroke-width="${fmt(band.lineWidth)}" stroke-linecap="butt" stroke-linejoin="round" opacity="${fmtDabOpacity(band.opacity)}"/>`
+    )).join("");
+    return relief ? `<g data-stamp-brush="ink-knife">${slab}${relief}</g>` : slab;
   }
 
   if (style.kind === "pencil") {

@@ -240,6 +240,26 @@ export function drawStudioStampStrokeWithSymmetry(
       context.beginPath();
       traceStudioStampInkRibbon(context, inkRibbon);
       context.fill();
+      // Knife edge relief, in the SVG serializer's paint order and with its colours: plain alpha,
+      // no composite operation, so the artboard and the exported file cannot disagree.
+      // Butt, not round: a bead of paint ends where the blade left it, and a dome cap put a
+      // visible white dot past the end of every short band.
+      context.lineCap = "butt";
+      context.lineJoin = "round";
+      for (const band of inkRibbon.reliefBands ?? []) {
+        context.globalAlpha = band.opacity;
+        context.strokeStyle = band.kind === "highlight" ? "#ffffff" : style.color;
+        context.lineWidth = band.lineWidth;
+        for (const run of band.runs) {
+          if (run.length < 4) continue;
+          context.beginPath();
+          context.moveTo(run[0]!, run[1]!);
+          for (let index = 2; index + 1 < run.length; index += 2) {
+            context.lineTo(run[index]!, run[index + 1]!);
+          }
+          context.stroke();
+        }
+      }
       context.restore();
     }
     return plan;
