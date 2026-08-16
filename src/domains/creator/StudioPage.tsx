@@ -3805,16 +3805,24 @@ function StudioCuttoonEditor({
   useEffect(() => {
     let disposed = false;
     const openedPromise = import("./studio-autosave-opfs-session")
-      .then(({
-        openStudioAutosaveDocumentSession,
-        withStudioAutosaveDocumentLeadership,
-      }) => {
+      .then((studioAutosaveOpfsSessionModule) => {
+        const {
+          openStudioAutosaveDocumentSession,
+          reopenStudioAutosaveDocumentSessionForLeadership,
+          withStudioAutosaveDocumentLeadership,
+        } = studioAutosaveOpfsSessionModule;
         if (!disposed) {
           autosaveLeadershipGuardRef.current = withStudioAutosaveDocumentLeadership;
         }
-        return openStudioAutosaveDocumentSession(autosaveKey);
+        return Promise.resolve(openStudioAutosaveDocumentSession(autosaveKey)).then((opened) => ({
+          opened,
+          reopenStudioAutosaveDocumentSessionForLeadership,
+        }));
       })
-      .then((opened) => {
+      .then(({
+        opened,
+        reopenStudioAutosaveDocumentSessionForLeadership,
+      }) => {
         if (!disposed) {
           autosaveDocumentLeaseRef.current = opened.lease;
           setAutosaveDocumentLeadership({
@@ -3822,12 +3830,33 @@ function StudioCuttoonEditor({
             basis: opened.lease.basis,
           });
           if (opened.role === "follower") {
-            void opened.lease.waitForLeadership().then((promoted) => {
+            void opened.lease.waitForLeadership().then(async (promoted) => {
               if (!promoted || disposed) return;
-              setAutosaveDocumentLeadership({
-                role: opened.lease.role,
-                basis: opened.lease.basis,
-              });
+              try {
+                const promotedSessionPromise =
+                  reopenStudioAutosaveDocumentSessionForLeadership({
+                    session: opened.session,
+                    autosaveKey,
+                  });
+                autosaveOpfsSessionRef.current = promotedSessionPromise;
+                const promotedSession = await promotedSessionPromise;
+                if (
+                  disposed
+                  || autosaveOpfsSessionRef.current !== promotedSessionPromise
+                  || autosaveDocumentLeaseRef.current !== opened.lease
+                ) {
+                  await promotedSession?.dispose();
+                  return;
+                }
+                setAutosaveDocumentLeadership({
+                  role: opened.lease.role,
+                  basis: opened.lease.basis,
+                });
+              } catch (cause: unknown) {
+                if (import.meta.env.DEV) {
+                  console.warn("Studio OPFS autosave leadership migration failed.", cause);
+                }
+              }
             });
           }
         }
@@ -3843,14 +3872,18 @@ function StudioCuttoonEditor({
     autosaveOpfsSessionRef.current = sessionPromise;
     return () => {
       disposed = true;
+      const activeSessionPromise = autosaveOpfsSessionRef.current;
       if (autosaveOpfsSessionRef.current === sessionPromise) {
         autosaveOpfsSessionRef.current = null;
       }
       autosaveDocumentLeaseRef.current = null;
-      void openedPromise.then(async (opened) => {
+      void Promise.all([openedPromise, activeSessionPromise]).then(async ([opened, activeSession]) => {
         // 세션을 먼저 정리하고 임차권을 나중에 놓는다. 순서가 뒤집히면 대기 중인 follower 가
         // 아직 살아 있는 writer 위로 승격해 같은 문서에 두 저장 권위가 생긴다.
-        await opened?.session?.dispose();
+        if (opened?.session !== activeSession) {
+          await opened?.session?.dispose();
+        }
+        await activeSession?.dispose();
         await opened?.lease.release();
       });
     };

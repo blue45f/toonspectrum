@@ -9,6 +9,7 @@ import {
 import {
   StudioAutosaveDurabilityError,
   StudioAutosaveOpfsSession,
+  reopenStudioAutosaveDocumentSessionForLeadership,
   persistStudioAutosaveWithOpfsPrimary,
   reconcileStudioAutosaveWithOpfsPrimary,
   type StudioAutosaveOpfsJournalPort,
@@ -205,6 +206,32 @@ function session(
 }
 
 describe("StudioAutosaveOpfsSession", () => {
+  it("releases a previously read-only session before reopening for leadership", async () => {
+    const original = {
+      dispose: vi.fn(async () => undefined),
+    } as unknown as StudioAutosaveOpfsSession;
+
+    const reopened = await reopenStudioAutosaveDocumentSessionForLeadership({
+      session: original,
+      autosaveKey: "toonspectrum-studio-autosave:v12:guest:new",
+    });
+    if (reopened !== null) {
+      expect(reopened).toHaveProperty("dispose");
+      expect(reopened).toHaveProperty("write");
+      await reopened.dispose();
+    }
+    expect(original.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null when there is no existing OPFS session", async () => {
+    await expect(
+      reopenStudioAutosaveDocumentSessionForLeadership({
+        session: null,
+        autosaveKey: "toonspectrum-studio-autosave:v12:guest:new",
+      }),
+    ).resolves.toBeNull();
+  });
+
   it("writes one compacted checkpoint and restores the newest complete Studio payload", async () => {
     const journal = new FakeAutosaveJournal();
     const target = session(journal);
