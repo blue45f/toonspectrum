@@ -73,7 +73,7 @@ describe("Studio live gesture preview viewport wiring", () => {
       "studioLiveGesturePreviewReservedElementIds,\n  );",
     );
     expect(viewportSource).toContain(
-      ": studioLiveGesturePreviewAuthoritativeElements.map((element) => element.id)",
+      ": studioLiveGesturePreviewAuthoritativeElementIds",
     );
   });
 

@@ -846,7 +846,7 @@ export interface StudioCanvasViewportProps {
   studioCrdtDocument: StudioCrdtDocument | null;
   studioCrdtOperationSyncReady: boolean;
   studioLiveGesturePreviewAdapter: StudioLiveGesturePreviewRoomAdapter;
-  studioLiveGesturePreviewAuthoritativeElements: El[];
+  studioLiveGesturePreviewAuthoritativeElementIds: ReadonlySet<string> | readonly string[];
   studioLiveRoomRef: import("react").RefObject<StudioLiveRoom | null>;
   studioRasterAuthorizedAuthorityKey: string | null;
   studioRasterHandoffBaseKey: string;
@@ -1148,7 +1148,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   studioCrdtDocument,
   studioCrdtOperationSyncReady,
   studioLiveGesturePreviewAdapter,
-  studioLiveGesturePreviewAuthoritativeElements,
+  studioLiveGesturePreviewAuthoritativeElementIds,
   studioLiveRoomRef,
   studioRasterAuthorizedAuthorityKey,
   studioRasterHandoffBaseKey,
@@ -1371,7 +1371,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     : [];
   const studioLiveGesturePreviewReservedElementIds =
     studioLiveGesturePreviewRenderSnapshot.length > 0
-      ? new Set(studioLiveGesturePreviewAuthoritativeElements.map((element) => element.id))
+      ? studioLiveGesturePreviewAuthoritativeElementIds instanceof Set
+        ? studioLiveGesturePreviewAuthoritativeElementIds
+        : new Set(studioLiveGesturePreviewAuthoritativeElementIds)
       : undefined;
   const studioLiveGesturePreviewRenderPlan = planStudioLiveGesturePreviewRenderElements(
     studioLiveGesturePreviewPaintElements,
@@ -1411,10 +1413,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
       studioLiveGesturePreviewPageId,
       studioLiveGesturePreviewPageId === null
         ? []
-        : studioLiveGesturePreviewAuthoritativeElements.map((element) => element.id),
+        : studioLiveGesturePreviewAuthoritativeElementIds,
     );
   }, [
-    studioLiveGesturePreviewAuthoritativeElements,
+    studioLiveGesturePreviewAuthoritativeElementIds,
     studioLiveGesturePreviewAdapter,
     studioLiveGesturePreviewPageId,
   ]);

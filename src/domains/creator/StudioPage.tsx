@@ -45526,7 +45526,7 @@ function clearSelectionForEdit() {
           effScale={effScale}
           elementById={elementById}
           elements={studioBrushR8GrainRenderElements}
-          studioLiveGesturePreviewAuthoritativeElements={elements}
+          studioLiveGesturePreviewAuthoritativeElementIds={elements.map((element) => element.id)}
           studioFilterPageComposite={
             studioFilterSession?.target === "page-composite" &&
             studioFilterSession.pageId === activePage.id &&
