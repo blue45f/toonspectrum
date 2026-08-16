@@ -3257,8 +3257,16 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         seed: 331,
       },
       spacingRatio: 0.12,
+      // Spacing follows CONTACT as well as speed. Without a pressure term a feather touch lays
+      // exactly as many stations per pixel as a hard press - measured, the stamp overlap along the
+      // centreline sat at 27 boxes at both 0.12 and 0.90 - so every dab landed on an already
+      // saturated pixel and the per-dab alpha had nothing left to say. A stick barely touching
+      // skips; this is that. It also gives the light end the broken tooth a soft stick should have.
       spacing: {
-        mappings: [{ source: "speed", from: 0.94, to: 1.08 }],
+        mappings: [
+          { source: "pressure", from: 1.75, to: 0.92 },
+          { source: "speed", from: 0.94, to: 1.08 },
+        ],
         jitter: null,
       },
       scatterRatio: 0.04,
@@ -3321,8 +3329,12 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         seed: 337,
       },
       spacingRatio: 0.1,
+      // Same missing contact term as pastel above, same effect on the mark.
       spacing: {
-        mappings: [{ source: "speed", from: 0.96, to: 1.06 }],
+        mappings: [
+          { source: "pressure", from: 1.7, to: 0.94 },
+          { source: "speed", from: 0.96, to: 1.06 },
+        ],
         jitter: null,
       },
       scatterRatio: 0.025,
