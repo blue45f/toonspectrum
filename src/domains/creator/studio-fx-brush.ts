@@ -1165,6 +1165,43 @@ export function traceStudioFxLuminousRibbonPass(
  * always previewed neon as a three-layer tube; sharing this deterministic plan with Canvas/SVG
  * prevents the selected brush from collapsing into an ordinary single line at playback/export.
  */
+/**
+ * How far the luminous core is pushed toward white.
+ *
+ * It used to be pushed all the way: the core pass painted literal #fff. On a dark canvas that is
+ * right — a neon tube's centre blows out — but the default canvas here is WHITE, and on white
+ * paper a white core is not a core, it is a hole. The brush rendered as a hollow grey tube whose
+ * middle was the page, which is the one thing a luminous brush must never be.
+ *
+ * Nothing can be brighter than the paper, so on a light ground the honest reading of "hottest part
+ * of the tube" is the most saturated part, not the whitest. Mixing most of the way to white keeps
+ * the core clearly hotter than its halo on a dark ground while leaving it visible on a light one.
+ */
+const LUMINOUS_CORE_WHITE_MIX = 0.55;
+
+/**
+ * The colour a luminous lane's core pass paints, given the stroke colour.
+ *
+ * Shared by both surfaces on purpose: this used to be the literal string "#fff" written out at
+ * four separate render sites, which is exactly the shape of drift the glow shells were moved into
+ * the planner to avoid.
+ */
+export function studioLuminousCoreColor(stroke: unknown): string {
+  const hex = typeof stroke === "string" ? stroke.trim() : "";
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/iu.exec(hex);
+  if (!match) return "#ffffff";
+  const digits = match[1]!;
+  const full = digits.length === 3
+    ? digits.split("").map((d) => d + d).join("")
+    : digits;
+  const channel = (index: number): number => {
+    const value = Number.parseInt(full.slice(index * 2, index * 2 + 2), 16);
+    const mixed = Math.round(value + (255 - value) * LUMINOUS_CORE_WHITE_MIX);
+    return Math.max(0, Math.min(255, mixed));
+  };
+  return `#${[0, 1, 2].map((index) => channel(index).toString(16).padStart(2, "0")).join("")}`;
+}
+
 export function planNeonBrushPasses(baseWidth: number): FxNeonPass[] {
   const w = clamp(finiteNumber(baseWidth, 12), 0.5, 2048);
   const outer = w < 6 ? 3.1 : 2.7;

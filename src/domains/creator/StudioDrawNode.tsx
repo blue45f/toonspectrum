@@ -81,6 +81,7 @@ import {
   resolveStudioFxBrushTapPressureResponse,
   resolveStudioFxPressurePassResponse,
   traceStudioFxLuminousRibbonPass,
+  studioLuminousCoreColor,
 } from "./studio-fx-brush";
 import { konvaGradientProps } from "./studio-gradient-engine";
 import {
@@ -1883,7 +1884,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 <Group key={index} opacity={opacity} listening={false}>
                   {passes.map((pass, passIndex) => {
                     const passColor = pass.tone === "white-core"
-                      ? "#ffffff"
+                      ? studioLuminousCoreColor(stroke)
                       : stroke;
                     const passWidth = Math.max(
                       0.5,
@@ -1935,7 +1936,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             return (
               <Group key={index} opacity={opacity} listening={false}>
                 {passes.map((pass, passIndex) => {
-                  const passColor = pass.tone === "white-core" ? "#ffffff" : stroke;
+                  const passColor = pass.tone === "white-core" ? studioLuminousCoreColor(stroke) : stroke;
                   const luminousCore = pass.tone === "white-core";
                   const tapPassPressure = resolveStudioFxPressurePassResponse(
                     tapPressure,

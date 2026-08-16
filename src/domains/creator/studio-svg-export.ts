@@ -165,6 +165,7 @@ import {
   resolveStudioFxBrushTapPressureResponse,
   resolveStudioFxPressurePassResponse,
   type StudioFxLuminousRibbonPassPlan,
+  studioLuminousCoreColor,
 } from "./studio-fx-brush";
 import {
   estimateTextGradientBBox,
@@ -2863,12 +2864,12 @@ function serializeFreehand(
     ) {
       const layers = renderPath.points.length === 2
         ? passes.map((pass) => (
-            `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`
+            `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${escapeXml(pass.tone === "white-core" ? studioLuminousCoreColor(stroke) : stroke)}" opacity="${fmtDabOpacity(pass.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`
           )).join("")
         : (() => {
             const pathD = tensionPathD(renderPath.points, renderPath.tension);
             return passes.map((pass) => (
-              `<path d="${pathD}" fill="none" stroke="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(pass.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`
+              `<path d="${pathD}" fill="none" stroke="${escapeXml(pass.tone === "white-core" ? studioLuminousCoreColor(stroke) : stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(pass.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`
             )).join("");
           })();
       return `<g data-brush-engine="neon-halo" data-luminous-composite="${STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}">${layers}</g>`;
@@ -2894,7 +2895,7 @@ function serializeFreehand(
             pass.widthScale,
             pass.tone === "white-core",
           );
-          return `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale) * strokeOpacity)}" style="mix-blend-mode:normal"/>`;
+          return `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${escapeXml(pass.tone === "white-core" ? studioLuminousCoreColor(stroke) : stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale) * strokeOpacity)}" style="mix-blend-mode:normal"/>`;
         }).join("")
       : passes.map((pass) => {
           const luminousCore = pass.tone === "white-core";
@@ -2906,7 +2907,7 @@ function serializeFreehand(
             passOpacity: pass.opacity,
             luminousCore,
           });
-          return `<path data-luminous-ribbon="single-fill" data-luminous-cap="${ribbonPlan.cap}" data-luminous-composite="${ribbonPlan.compositeOperation}" d="${studioFxLuminousRibbonPathD(ribbonPlan)}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" fill-rule="${ribbonPlan.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbonPlan.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`;
+          return `<path data-luminous-ribbon="single-fill" data-luminous-cap="${ribbonPlan.cap}" data-luminous-composite="${ribbonPlan.compositeOperation}" d="${studioFxLuminousRibbonPathD(ribbonPlan)}" fill="${escapeXml(pass.tone === "white-core" ? studioLuminousCoreColor(stroke) : stroke)}" fill-rule="${ribbonPlan.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbonPlan.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`;
         }).join("");
     return `<g data-brush-engine="neon-halo" data-luminous-composite="${STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}">${layers}</g>`;
   }

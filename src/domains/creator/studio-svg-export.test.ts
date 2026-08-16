@@ -38,7 +38,11 @@ import {
   type StudioDynamicBrushCoverageMark,
 } from "./studio-dynamic-brush-coverage-renderer";
 import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
-import { planGlowBrushPasses, planNeonBrushPasses } from "./studio-fx-brush";
+import {
+  planGlowBrushPasses,
+  planNeonBrushPasses,
+  studioLuminousCoreColor,
+} from "./studio-fx-brush";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import {
   captureStudioOutlineStrokeContractV1,
@@ -2710,7 +2714,7 @@ describe("도형 직렬화", () => {
     expect(legacy).toContain('data-brush-engine="highlighter-wash-ribbon-v2"');
   });
 
-  it("네온 — 미리보기와 같은 2중 컬러 할로 + 흰색 코어를 내보낸다", () => {
+  it("네온 — 미리보기와 같은 2중 컬러 할로 + 밝힌 코어를 내보낸다", () => {
     const neon = rectEl({
       id: "neon-1",
       kind: "freehand",
@@ -2731,7 +2735,14 @@ describe("도형 직렬화", () => {
       .toHaveLength(1);
     expect(svg).not.toContain("mix-blend-mode:screen");
     expect((svg.match(/fill="#39ff14"/g) ?? [])).toHaveLength(2);
-    expect(svg).toContain('fill="#fff"');
+    // 코어는 예전에 리터럴 #fff 였고, 그게 결함이었다. 기본 캔버스가 흰 종이라 흰 코어는 코어가
+    // 아니라 구멍이었고, 네온이 속이 뚫린 회색 관으로 그려졌다. 이제 코어는 획 색을 흰색 쪽으로
+    // 섞은 색이며, 그 색은 플래너가 소유한다 — 여기서 리터럴을 다시 핀하면 렌더러 4곳에 상수가
+    // 흩어져 있던 원래 상태로 되돌아간다. 프리뷰(StudioDrawNode)도 같은 함수를 쓴다.
+    const core = studioLuminousCoreColor("#39ff14");
+    expect(core).not.toBe("#39ff14");
+    expect(svg).toContain(`fill="${core}"`);
+    expect(svg).not.toContain('fill="#fff"');
     expect(svg.match(/data-luminous-ribbon="single-fill"/g)).toHaveLength(3);
     expect(svg).not.toContain("stroke-linecap=");
   });
