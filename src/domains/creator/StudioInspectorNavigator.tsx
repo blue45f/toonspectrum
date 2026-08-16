@@ -74,9 +74,9 @@ const IMAGE_TABS: readonly {
 }[] = [
   { id: "quick", label: "빠른 수정", icon: Sparkles },
   { id: "fill", label: "채우기·선화", icon: PaintBucket },
+  { id: "transform", label: "변형", icon: Map },
   { id: "retouch", label: "선택·리터치", icon: SlidersHorizontal },
   { id: "mask", label: "마스크", icon: Layers3 },
-  { id: "transform", label: "변형", icon: Map },
 ];
 
 const DOCUMENT_TABS: readonly {

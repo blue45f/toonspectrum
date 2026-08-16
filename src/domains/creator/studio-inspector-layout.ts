@@ -205,6 +205,13 @@ const IMAGE_ACTIONS: readonly StudioInspectorAction[] = [
     route: { primary: "properties", image: "fill" },
   },
   {
+    id: "image-transform",
+    label: "크롭·변형",
+    description: "이미지 크롭과 퍼펫 워프를 엽니다.",
+    keywords: ["transform", "crop", "warp", "크롭", "자르기", "퍼펫", "변형"],
+    route: { primary: "properties", image: "transform" },
+  },
+  {
     id: "image-retouch",
     label: "선택·리터치",
     description: "선택, 마술봉, 스머지, 복제와 복원 브러시를 엽니다.",
@@ -217,13 +224,6 @@ const IMAGE_ACTIONS: readonly StudioInspectorAction[] = [
     description: "비파괴 마스크 추가, 반전과 페인팅을 엽니다.",
     keywords: ["mask", "마스크", "비파괴", "반전", "페인팅"],
     route: { primary: "properties", image: "mask" },
-  },
-  {
-    id: "image-transform",
-    label: "크롭·변형",
-    description: "이미지 크롭과 퍼펫 워프를 엽니다.",
-    keywords: ["transform", "crop", "warp", "크롭", "자르기", "퍼펫", "변형"],
-    route: { primary: "properties", image: "transform" },
   },
 ];
 

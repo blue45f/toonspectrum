@@ -632,14 +632,14 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
     id: "csp-migration",
     name: "클립 스튜디오형",
     description:
-      "CSP·클립 스튜디오에서 넘어온 손에 맞춰 레이어 중심 동선을 유지하되, 좌우 도크를 줄여 캔버스 중심 작업으로 시작합니다.",
+      "CSP·클립 스튜디오에서 넘어온 손에 맞춰 레이어 중심 동선을 유지하되, 좌우 도크를 더 줄여 캔버스 중심으로 바로 작업할 수 있습니다.",
     layout: createBuiltinLayout(
       { primary: "layers", image: "fill", document: "navigator" },
       {
         leftPanelOpen: true,
         rightPanelOpen: true,
         leftPanelWidth: 176,
-        rightPanelWidth: 296,
+        rightPanelWidth: 272,
       },
       ["undo", "redo", "pen", "advanced-fill", "eyedropper", "select"],
       DRAWING_DEVICE_OVERRIDES,

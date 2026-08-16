@@ -139,11 +139,11 @@ const CATEGORY_ITEMS: readonly {
   Icon: typeof Sparkles;
 }[] = [
   { id: "presets", label: "빠른 설정", description: "용도별 시작점", Icon: Sparkles },
-  { id: "engines", label: "엔진 조합", description: "붓자국을 쌓는 패스", Icon: Layers },
-  { id: "response", label: "반응", description: "필압·도포량", Icon: Activity },
-  { id: "stamp", label: "도장", description: "간격·산포", Icon: Stamp },
-  { id: "tip", label: "촉", description: "각도·원형도", Icon: CircleDot },
-  { id: "input", label: "입력", description: "전역 필압 보정", Icon: Gauge },
+  { id: "tip", label: "펜촉", description: "형상·각도·원형도", Icon: CircleDot },
+  { id: "response", label: "동적 반응", description: "필압·속도·도포량", Icon: Activity },
+  { id: "stamp", label: "도장", description: "간격·산포·노이즈", Icon: Stamp },
+  { id: "engines", label: "엔진 조합", description: "패스·레이어를 직접 제어", Icon: Layers },
+  { id: "input", label: "전역 입력", description: "도구 간 필압 보정", Icon: Gauge },
 ] as const;
 
 export interface StudioBrushStudioProps {
@@ -1521,7 +1521,7 @@ export function StudioBrushStudio({
       />
       <div
         ref={dialogRef}
-        className="relative z-10 flex h-[calc(100dvh-env(safe-area-inset-bottom))] max-h-full w-full flex-col overflow-hidden overscroll-contain rounded-t-2xl border border-line bg-panel shadow-2xl sm:h-[min(44rem,calc(100dvh-2rem))] sm:max-w-5xl sm:rounded-2xl"
+        className="relative z-10 flex h-[calc(100dvh-env(safe-area-inset-bottom))] max-h-full w-full flex-col overflow-hidden overscroll-contain rounded-t-2xl border border-line bg-panel shadow-2xl sm:h-[min(44rem,calc(100dvh-2rem))] sm:max-w-[min(74rem,calc(100vw-1.5rem))] sm:rounded-2xl"
       >
         <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-line px-3 sm:px-4">
           <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
@@ -1550,7 +1550,7 @@ export function StudioBrushStudio({
           <StudioBrushDynamicsPreview settings={settings} strokeWidth={strokeWidth} color={color} />
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col sm:grid sm:grid-cols-[10.5rem_minmax(0,1fr)_17rem]">
+        <div className="flex min-h-0 flex-1 flex-col sm:grid sm:grid-cols-[10rem_minmax(0,1fr)_14rem]">
           <div
             role="tablist"
             aria-label="브러시 스튜디오 설정 분류"
