@@ -3053,8 +3053,8 @@ function StudioCuttoonEditor({
       studioLiveCommentRoomUnsubscribeRef.current = null;
       studioLiveCommentEventHandlerRef.current = () => undefined;
       // React StrictMode replays setup→cleanup→setup on the same state object. Defer terminal
-      // disposal by one microtask so that replay can reacquire this adapter; a real unmount has no
-      // following setup generation and therefore still releases the Room/store deterministically.
+      // disposal by one microtask so that replay can reacquire this adapter. Compare setup generation
+      // to ensure that only the final unmount performs hard disposal.
       globalThis.queueMicrotask(() => {
         if (lifecycle.generation !== lifecycleGeneration) return;
         studioLiveGesturePreviewAdapter.dispose();

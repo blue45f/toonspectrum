@@ -3229,14 +3229,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       tip: { shape: "sponge", softness: 0.62 },
       width: {
         base: 20,
-        // Was `from: 0.62`, a 2.0x swing, which is why a pastel feather touch looked like a pressed
-        // one. Contact collapse is the lever with real authority here, not the deposition alpha:
-        // with the narrow swing the stamp overlap along the centreline measured 27 boxes at BOTH
-        // 0.12 and 0.90 pressure, so every dab landed on an already-saturated pixel and the per-dab
-        // alpha had nothing left to say. crayon is the working reference in this family - the only
-        // dry medium whose light touch reads correctly (peakInk 201.5 against pastel's 224.0 of a
-        // possible 227.5) - and its mapping is 0.26 -> 1.38 curve 0.78, a 5.3x swing.
-        mappings: [{ source: "pressure", from: 0.30, to: 1.30, curve: 0.78 }],
+        mappings: [{ source: "pressure", from: 0.62, to: 1.24 }],
         jitter: { mode: "multiply", amount: 0.08 },
       },
       opacity: {
@@ -3257,16 +3250,8 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         seed: 331,
       },
       spacingRatio: 0.12,
-      // Spacing follows CONTACT as well as speed. Without a pressure term a feather touch lays
-      // exactly as many stations per pixel as a hard press - measured, the stamp overlap along the
-      // centreline sat at 27 boxes at both 0.12 and 0.90 - so every dab landed on an already
-      // saturated pixel and the per-dab alpha had nothing left to say. A stick barely touching
-      // skips; this is that. It also gives the light end the broken tooth a soft stick should have.
       spacing: {
-        mappings: [
-          { source: "pressure", from: 1.75, to: 0.92 },
-          { source: "speed", from: 0.94, to: 1.08 },
-        ],
+        mappings: [{ source: "speed", from: 0.94, to: 1.08 }],
         jitter: null,
       },
       scatterRatio: 0.04,
@@ -3305,10 +3290,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       tip: { shape: "bristle", softness: 0.38 },
       width: {
         base: 18,
-        // Same collapse as pastel above, same reason. An oil pastel is genuinely occlusive so it
-        // should still lay a dense film when pressed - this widens the range it travels, it does
-        // not lighten the pressed end.
-        mappings: [{ source: "pressure", from: 0.32, to: 1.24, curve: 0.78 }],
+        mappings: [{ source: "pressure", from: 0.58, to: 1.18 }],
         jitter: { mode: "multiply", amount: 0.06 },
       },
       opacity: {
@@ -3329,12 +3311,8 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         seed: 337,
       },
       spacingRatio: 0.1,
-      // Same missing contact term as pastel above, same effect on the mark.
       spacing: {
-        mappings: [
-          { source: "pressure", from: 1.7, to: 0.94 },
-          { source: "speed", from: 0.96, to: 1.06 },
-        ],
+        mappings: [{ source: "speed", from: 0.96, to: 1.06 }],
         jitter: null,
       },
       scatterRatio: 0.025,
