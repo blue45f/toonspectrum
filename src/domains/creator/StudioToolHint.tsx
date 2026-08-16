@@ -822,6 +822,13 @@ export function StudioToolHintTarget({
       // Ignore synthetic leave events while traversal stays inside target DOM.
       return;
     }
+    if (
+      nextTarget instanceof Element &&
+      nextTarget.closest('[data-studio-tool-hint="true"]') !== null
+    ) {
+      // Don't dismiss while moving into the currently rendered bubble itself.
+      return;
+    }
     const rect = wrapRef.current?.getBoundingClientRect();
     if (
       rect &&
