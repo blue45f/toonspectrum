@@ -681,6 +681,16 @@ export async function openStudioAutosaveDocumentSession(
   }
 }
 
+export async function reopenStudioAutosaveDocumentSessionForLeadership(input: {
+  readonly session: StudioAutosaveOpfsSession | null;
+  readonly autosaveKey: string;
+  readonly scope?: StudioAutosaveBrowserScope;
+}): Promise<StudioAutosaveOpfsSession | null> {
+  if (input.session === null) return null;
+  await input.session.dispose();
+  return createStudioAutosaveOpfsSession(input.autosaveKey, input.scope);
+}
+
 /**
  * Withholds the second persistence authority from a follower tab.
  *
