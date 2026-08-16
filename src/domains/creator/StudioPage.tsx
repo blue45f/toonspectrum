@@ -990,6 +990,15 @@ import {
 } from "./studio-oncanvas-command-surfaces";
 import { useStudioPageDnd } from "./studio-page-dnd";
 import {
+  loadStudioBrushLibrarySqliteRepository,
+  loadStudioBrushQuickSlotsSqliteRepository,
+  loadStudioLiquifyBrowserRuntime,
+  loadStudioPixelEditBrushRuntime,
+  readAllProductBrushes,
+  type ProductBrushLibraryRepository,
+  type StudioBrushQuickSlotsSnapshot,
+} from "./studio-page-editor-runtime-loaders";
+import {
   isDefaultPageGrade,
   normalizePageGrade,
   pageGradeToCssFilter,
@@ -2714,79 +2723,6 @@ export function LegacyStudioEditorAdapter({
     <Profiler id="studio:editor" onRender={recordStudioRenderProfile}>
       <StudioCuttoonEditor remixId={remixId} studioRoute={studioRoute} />
     </Profiler>
-  );
-}
-
-type StudioPixelEditBrushRuntime = typeof import("./studio-pixel-edit-brush-runtime");
-type StudioBrushLibrarySqliteRepositoryModule = typeof import(
-  "./studio-brush-library-sqlite-repository"
-);
-type StudioBrushQuickSlotsSqliteRepositoryModule = typeof import(
-  "./studio-brush-slots-sqlite-repository"
-);
-type ProductStudioBrushQuickSlotsRepository = ReturnType<
-  StudioBrushQuickSlotsSqliteRepositoryModule["getProductStudioBrushQuickSlotsSqliteRepository"]
->;
-type StudioBrushQuickSlotsSnapshot = Awaited<
-  ReturnType<ProductStudioBrushQuickSlotsRepository["load"]>
->;
-type ProductBrushLibraryRepository =
-  StudioBrushLibrarySqliteRepositoryModule["openProductBrushLibraryRepository"] extends (
-    ...args: never[]
-  ) => Promise<infer Repository>
-    ? Repository
-    : never;
-type StudioLiquifyBrowserRuntime = typeof import("./studio-liquify-browser");
-
-let studioPixelEditBrushRuntimePromise: Promise<StudioPixelEditBrushRuntime> | null = null;
-let studioBrushLibrarySqliteRepositoryPromise:
-  Promise<StudioBrushLibrarySqliteRepositoryModule> | null = null;
-let studioBrushQuickSlotsSqliteRepositoryPromise:
-  Promise<StudioBrushQuickSlotsSqliteRepositoryModule> | null = null;
-let studioLiquifyBrowserRuntimePromise: Promise<StudioLiquifyBrowserRuntime> | null = null;
-
-function loadStudioPixelEditBrushRuntime(): Promise<StudioPixelEditBrushRuntime> {
-  return studioPixelEditBrushRuntimePromise ??= import("./studio-pixel-edit-brush-runtime").catch(
-    (error: unknown) => {
-      studioPixelEditBrushRuntimePromise = null;
-      throw error;
-    }
-  );
-}
-
-function loadStudioBrushLibrarySqliteRepository(): Promise<StudioBrushLibrarySqliteRepositoryModule> {
-  return studioBrushLibrarySqliteRepositoryPromise ??= import(
-    "./studio-brush-library-sqlite-repository"
-  ).catch((error: unknown) => {
-    studioBrushLibrarySqliteRepositoryPromise = null;
-    throw error;
-  });
-}
-
-function loadStudioBrushQuickSlotsSqliteRepository():
-Promise<StudioBrushQuickSlotsSqliteRepositoryModule> {
-  return studioBrushQuickSlotsSqliteRepositoryPromise ??= import(
-    "./studio-brush-slots-sqlite-repository"
-  ).catch((error: unknown) => {
-    studioBrushQuickSlotsSqliteRepositoryPromise = null;
-    throw error;
-  });
-}
-
-async function readAllProductBrushes(
-  product: ProductBrushLibraryRepository,
-): Promise<StudioSavedBrush[]> {
-  const { readAllBrushesFromRepository } =
-    await loadStudioBrushLibrarySqliteRepository();
-  return readAllBrushesFromRepository(product.repository);
-}
-
-function loadStudioLiquifyBrowserRuntime(): Promise<StudioLiquifyBrowserRuntime> {
-  return studioLiquifyBrowserRuntimePromise ??= import("./studio-liquify-browser").catch(
-    (error: unknown) => {
-      studioLiquifyBrowserRuntimePromise = null;
-      throw error;
-    }
   );
 }
 

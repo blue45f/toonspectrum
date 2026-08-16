@@ -6,6 +6,10 @@ const studioPageSource = readFileSync(
   new URL("./StudioPage.tsx", import.meta.url),
   "utf8",
 );
+const studioPageLoaderSource = readFileSync(
+  new URL("./studio-page-editor-runtime-loaders.ts", import.meta.url),
+  "utf8",
+);
 const inspectorSource = readFileSync(
   new URL("./StudioInspectorAside.tsx", import.meta.url),
   "utf8",
@@ -26,7 +30,7 @@ const vrmPreferencesSource = readFileSync(
 describe("Studio brush-library SQLite product boundary", () => {
   it("hydrates the quick shelf from the same paged product repository as the library panel", () => {
     expect(studioPageSource).toContain("openProductBrushLibraryRepository");
-    expect(studioPageSource).toContain("readAllBrushesFromRepository");
+    expect(studioPageLoaderSource).toContain("readAllBrushesFromRepository");
     expect(studioPageSource).toContain("productBrushRepository()");
   });
 

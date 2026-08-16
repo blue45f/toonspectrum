@@ -79,18 +79,26 @@ const BROWSER_ORCHESTRATORS = [
 describe("Studio pixel-edit brush runtime boundary", () => {
   it("keeps one cached intent boundary out of the Studio static graph", () => {
     const page = moduleEdges("./StudioPage.tsx");
+    const runtimeLoaders = moduleEdges("./studio-page-editor-runtime-loaders.ts");
     const runtime = moduleEdges("./studio-pixel-edit-brush-runtime.ts");
 
+    expect(page.valueImports).toContain("./studio-page-editor-runtime-loaders");
     expect(page.dynamicImports.filter(
       (specifier) => specifier === "./studio-pixel-edit-brush-runtime"
-    )).toEqual(["./studio-pixel-edit-brush-runtime"]);
+    )).toEqual([]);
     expect(page.valueImports).not.toContain("./studio-pixel-edit-brush-runtime");
     for (const specifier of BROWSER_ORCHESTRATORS) {
       expect(page.valueImports).not.toContain(specifier);
     }
+    expect(runtimeLoaders.dynamicImports.toSorted()).toEqual([
+      "./studio-brush-library-sqlite-repository",
+      "./studio-brush-slots-sqlite-repository",
+      "./studio-liquify-browser",
+      "./studio-pixel-edit-brush-runtime",
+    ]);
     expect(runtime.valueImports.toSorted()).toEqual(BROWSER_ORCHESTRATORS.toSorted());
     expect(runtime.dynamicImports).toEqual([]);
-    expect(page.source).toContain(
+    expect(runtimeLoaders.source).toContain(
       "studioPixelEditBrushRuntimePromise ??= import(\"./studio-pixel-edit-brush-runtime\")"
     );
   });
