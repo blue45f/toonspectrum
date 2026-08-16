@@ -62,6 +62,18 @@ export const STUDIO_ROUTE_MANIFEST = Object.freeze([
     ownsDocumentTitle: false,
     pattern: "/studio/(assets|join|present|projects|review|share|versions)",
   },
+  {
+    id: "studio-work-placeholder",
+    kind: "placeholder",
+    ownsDocumentTitle: false,
+    pattern: "/studio/work/:workId/:surface",
+  },
+  {
+    id: "studio-remix-placeholder",
+    kind: "placeholder",
+    ownsDocumentTitle: false,
+    pattern: "/studio/remix/:sourceWorkId/:surface",
+  },
 ] as const satisfies readonly StudioRouteManifestEntry[]);
 
 export interface StudioRouteLocationInput extends StudioWorkspaceLocationInput {
