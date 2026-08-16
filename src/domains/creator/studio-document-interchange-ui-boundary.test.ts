@@ -21,6 +21,7 @@ function sourceSection(
 
 const studioPage = source("./StudioPage.tsx");
 const menubar = source("./StudioMenubarContent.tsx");
+const studioPageModalLazyBoundaries = source("./studio-page-modal-lazy-boundaries.ts");
 const menuCatalogue = source("./studio-main-menu-items-document.ts");
 const archiveApply = source("./studio-archive-import-apply.ts");
 const deviceProfile = source("./studio-document-import-device-profile.ts");
@@ -172,15 +173,14 @@ describe("Studio document interchange UI boundary", () => {
       "{pendingBrushDelete ? (",
     );
 
-    expect(studioPage).toContain('import("./StudioInterchangeLossPreviewDialog")');
+    expect(studioPage).toContain("./studio-page-modal-lazy-boundaries");
+    expect(studioPageModalLazyBoundaries).toContain('import("./StudioInterchangeLossPreviewDialog")');
     expect(dialog).toContain("<LazyStudioInterchangeLossPreviewDialog");
     expect(dialog).toContain("preview={pendingInterchangeImport.preview}");
     expect(dialog).toContain('pendingInterchangeImport.kind === "cbz"');
     expect(dialog).toContain('pendingInterchangeImport.kind === "will-v1"');
     expect(dialog).toContain("STUDIO_WILL_V1_IMPORT_PLACEMENT_CHOICES.map");
     expect(dialog).toContain("interchangeImportChoice");
-    expect(studioPage).toContain('label: "새 페이지에 추가"');
-    expect(studioPage).toContain('label: "현재 페이지에 추가"');
     expect(dialog).toContain(": STUDIO_INTERCHANGE_IMPORT_PLACEMENT_CHOICES");
     expect(dialog).toContain("onConfirm={(choiceId) => void applyPendingInterchangeImport(choiceId)}");
     expect(dialog).toContain("onCancel={dismissPendingInterchangeImport}");

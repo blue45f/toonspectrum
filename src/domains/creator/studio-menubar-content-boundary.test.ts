@@ -62,12 +62,19 @@ describe("Studio menubar ownership boundary", () => {
   it("keeps StudioPage as the single lazy parent and forbids a reverse dependency", () => {
     const page = moduleEdges("./StudioPage.tsx");
     const menubar = moduleEdges("./StudioMenubarContent.tsx");
+    const modalLazyBoundary = moduleEdges("./studio-page-modal-lazy-boundaries.ts");
 
     expect(
       page.valueImports.filter((specifier) => specifier === "./StudioMenubarContent")
     ).toEqual([]);
     expect(
       page.dynamicImports.filter((specifier) => specifier === "./StudioMenubarContent")
+    ).toEqual([]);
+    expect(
+      page.valueImports.filter((specifier) => specifier === "./studio-page-modal-lazy-boundaries")
+    ).toEqual(["./studio-page-modal-lazy-boundaries"]);
+    expect(
+      modalLazyBoundary.dynamicImports.filter((specifier) => specifier === "./StudioMenubarContent")
     ).toEqual(["./StudioMenubarContent"]);
     expect(page.source.match(/<LazyStudioMenubarContent\b/g)).toHaveLength(1);
     expect(page.source).toContain('data-studio-menubar-loading="true"');

@@ -7,7 +7,7 @@ import {
   SlidersHorizontal,
   Undo2,
 } from "lucide-react";
-import { Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { flushSync } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -1084,6 +1084,19 @@ import {
   type StudioClipboardPayload,
 } from "./studio-page-meta";
 import {
+  LazyStudioAnimaticTimelineDialog,
+  LazyStudioAssetRightsAuditDialog,
+  LazyStudioHybridDccDialog,
+  LazyStudioInterchangeLossPreviewDialog,
+  LazyStudioLeftToolRail,
+  LazyStudioMenubarContent,
+  LazyStudioPageListPane,
+  LazyStudioProductionBibleWorkspace,
+  LazyStudioQuickAccessSurface,
+  LazyStudioQuickComicWizard,
+  LazyStudioSceneSnapshotDialog,
+} from "./studio-page-modal-lazy-boundaries";
+import {
   findChangedLockedPageId,
   isPageReviewLocked,
   normalizePageReviewState,
@@ -2087,78 +2100,6 @@ type StudioLivingInkCanonicalHandoff = Readonly<{
   pngHash: `sha256:${string}`;
   strokeId: string | null;
 }>;
-
-const LazyStudioMenubarContent = lazy(() =>
-  import("./StudioMenubarContent").then(({ StudioMenubarContent }) => ({
-    default: StudioMenubarContent,
-  }))
-);
-
-const LazyStudioInterchangeLossPreviewDialog = lazy(() =>
-  import("./StudioInterchangeLossPreviewDialog").then(({ StudioInterchangeLossPreviewDialog }) => ({
-    default: StudioInterchangeLossPreviewDialog,
-  }))
-);
-
-const LazyStudioQuickComicWizard = lazy(() =>
-  import("./StudioQuickComicWizard").then(({ StudioQuickComicWizard }) => ({
-    default: StudioQuickComicWizard,
-  }))
-);
-
-const LazyStudioSceneSnapshotDialog = lazy(() =>
-  import("./StudioSceneSnapshotDialog").then(({ StudioSceneSnapshotDialog }) => ({
-    default: StudioSceneSnapshotDialog,
-  }))
-);
-
-const LazyStudioProductionBibleWorkspace = lazy(() =>
-  import("./StudioProductionBibleWorkspace").then(
-    ({ StudioProductionBibleWorkspace }) => ({
-      default: StudioProductionBibleWorkspace,
-    })
-  )
-);
-
-const LazyStudioAssetRightsAuditDialog = lazy(() =>
-  import("./StudioAssetRightsAuditDialog").then(
-    ({ StudioAssetRightsAuditDialog }) => ({
-      default: StudioAssetRightsAuditDialog,
-    })
-  )
-);
-
-const LazyStudioAnimaticTimelineDialog = lazy(() =>
-  import("./StudioAnimaticTimelineDialog").then(
-    ({ StudioAnimaticTimelineDialog }) => ({
-      default: StudioAnimaticTimelineDialog,
-    })
-  )
-);
-
-const LazyStudioHybridDccDialog = lazy(() =>
-  import("./StudioHybridDccDialog").then(({ StudioHybridDccDialog }) => ({
-    default: StudioHybridDccDialog,
-  }))
-);
-
-const LazyStudioQuickAccessSurface = lazy(() =>
-  import("./StudioQuickAccessSurface").then(({ StudioQuickAccessSurface }) => ({
-    default: StudioQuickAccessSurface,
-  }))
-);
-
-const LazyStudioPageListPane = lazy(() =>
-  import("./StudioPageListPane").then(({ StudioPageListPane }) => ({
-    default: StudioPageListPane,
-  }))
-);
-
-const LazyStudioLeftToolRail = lazy(() =>
-  import("./StudioLeftToolRail").then(({ StudioLeftToolRail }) => ({
-    default: StudioLeftToolRail,
-  }))
-);
 
 export { StudioCuttoonEditor };
 

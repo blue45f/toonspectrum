@@ -97,11 +97,15 @@ describe("Studio page-list pane module boundary", () => {
   it("keeps StudioPage as the one-way orchestration owner", () => {
     const page = moduleShape("./StudioPage.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");
+    const modalLazyBoundary = moduleShape("./studio-page-modal-lazy-boundaries.ts");
 
     expect(page.valueImports).not.toContain("./StudioPageListPane");
     expect(page.dynamicImports.filter((specifier) => specifier === "./StudioPageListPane")).toEqual([
-      "./StudioPageListPane",
     ]);
+    expect(page.valueImports).toContain("./studio-page-modal-lazy-boundaries");
+    expect(
+      modalLazyBoundary.dynamicImports.filter((specifier) => specifier === "./StudioPageListPane")
+    ).toEqual(["./StudioPageListPane"]);
     expect(pane.allImports).not.toContain("./StudioPage");
     expect(pane.dynamicImports).not.toContain("./StudioPage");
     expect(page.source).toContain("useStudioStableHandlers<StudioPageListPaneHandlers>({");
