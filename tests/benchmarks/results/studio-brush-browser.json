@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "measuredAt": "2026-08-15T23:59:01.841Z",
+  "measuredAt": "2026-08-16T01:10:01.585Z",
   "command": "pnpm run verify:studio-brushes",
   "status": "pass",
   "catalog": {
@@ -9,12 +9,12 @@
     "pro": 160,
     "paint": 328,
     "erase": 2,
-    "quarantined": 3
+    "quarantined": 5
   },
   "desktop": {
-    "selectedAndRendered": 327,
-    "undoPassed": 327,
-    "redoPassed": 327,
+    "selectedAndRendered": 325,
+    "undoPassed": 325,
+    "redoPassed": 325,
     "uiCatalogMatchSkipped": false,
     "surveyMode": false,
     "errorCount": 0,
@@ -27,26 +27,26 @@
       "kneaded-eraser": {
         "operation": "erase",
         "liveRetainedLayerActive": true,
-        "residualEnergyRatio": 0.6204658527764474
+        "residualEnergyRatio": 0.6205199381822836
       }
     }
   },
   "longRouteCore": {
-    "passed": 167,
-    "total": 167,
+    "passed": 165,
+    "total": 165,
     "totalSegmentsPerTool": 6,
-    "continuousPolicyTools": 154,
-    "discretePolicyTools": 13,
+    "continuousPolicyTools": 153,
+    "discretePolicyTools": 12,
     "continuousMinimumVisibleSegments": 6,
     "discreteMinimumVisibleSegments": 4,
     "toolsBelowFullCoverage": 1,
     "continuousPolicyFailures": 0,
-    "undoPassed": 167,
+    "undoPassed": 165,
     "representativePersistedPathDistancePx": 392.7396173371252,
     "qualityPolicyCounts": {
-      "strict-continuous": 140,
+      "strict-continuous": 139,
       "soft-wet-continuous": 14,
-      "record-only-discrete": 13
+      "record-only-discrete": 12
     },
     "errorCount": 0
   },
@@ -57,9 +57,9 @@
     "errorCount": 0
   },
   "mobile": {
-    "paintSelections": 325,
+    "paintSelections": 323,
     "eraserSelections": 2,
-    "interactiveTargets": 667,
+    "interactiveTargets": 663,
     "minimumTargetWidthPx": 44,
     "minimumTargetHeightPx": 44,
     "undersizedTargets": 0,
@@ -67,12 +67,12 @@
   },
   "pointerUpDurability": {
     "receiptMarkerReason": "pointerup",
-    "receiptSettledInMs": 7.12,
+    "receiptSettledInMs": 8.81,
     "receiptStrokeCount": 1,
     "survivorMarkerReason": "pointerup",
     "survivorStrokeCount": 2,
     "unloadPromptHeldMs": 150,
-    "navigationIssuedInMs": 0.16,
+    "navigationIssuedInMs": 0.17,
     "unloadGuardShown": true,
     "payloadContainsEveryStroke": true,
     "recoveryBannerShown": true,

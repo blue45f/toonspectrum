@@ -67,6 +67,23 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     // with the pins in place, the pair is not a duplicate candidate at all: its nearest surviving
     // candidate is web-pressure-flat at p95 0.53074. Delisting a brush for a resemblance it does
     // not have is worse than leaving a weak variant listed, so it is listed again.
+    // 2026-08-16 diameter-hash audit. Every id containing "--" has its rendered diameter multiplied
+    // by a checksum of its own name (studio-brush-alias-profile.ts), spreading 71 presets over
+    // 0.848-1.337. Neutralising that multiplier and re-rendering every preset from identical
+    // geometry makes five declared variants BYTE-IDENTICAL to their canonical — stronger evidence
+    // than the width-normalised pixel probe, because nothing is normalised away. The two listed
+    // here are separated from their canonical by NOTHING BUT that hash, which is a size offset and
+    // not the behaviour they advertise. pen--croquis-stabilized is a third, but its declared
+    // variant (croquis-capsule-pulled-string) is a real INPUT-stage stabilizer that a fixed-
+    // geometry render cannot show, so it is not a dead lane and is not listed.
+    "marker--chisel-ribbon":
+      "선언된 profileVariant(angled-ribbon/minus-30deg)로 분기하는 렌더러가 없습니다 — 지름 해시를 "
+      + "빼면 동일 기하에서 canonical(brush)과 바이트 동일한 SVG가 나오므로, 둘을 가르는 것은 "
+      + "각진 리본이 아니라 id 체크섬에서 나온 크기 차이뿐입니다. 남는 대안: brush · flat-brush "
+      + "· chisel-highlighter(지침 6).",
+    "screentone--sparse-grid":
+      "선언된 engineVariant(성긴 격자)로 분기하는 렌더러가 없습니다 — 지름 해시를 빼면 동일 "
+      + "기하에서 canonical(screentone)과 바이트 동일합니다. 남는 대안: screentone · crosshatch(지침 6).",
     "gpen--causal-round":
       "causal-ink \"round\" 프로파일 변형을 선언하지만 분기하는 렌더러가 없어 같은 레인의 "
       + "gpen--croquis-capsule 과 같은 그림 — 폭 정규화 픽셀 p95 0.00014. 그룹 내 대안 gpen · "

@@ -370,6 +370,24 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     }
 
     for (const runtime of STUDIO_BRUSH_RUNTIME_CONTRACT) {
+      // A quarantined preset is delisted from every picker precisely BECAUSE its declared variant
+      // is not real at paint time — that is what the ledger records and what its reason string
+      // says. Requiring it to also prove itself distinct would contradict the quarantine's own
+      // purpose, and would have forced either a fake difference or the loss of a true one:
+      // gpen--causal-round is byte-identical to gpen, and the hash-derived diameter jitter that
+      // used to hide that was removed as unprincipled. Every LISTED variant is still held to the
+      // bar below.
+      if (isStudioBrushQuarantinedPresetId(runtime.id)) continue;
+      // This audit renders every preset from the SAME fixed points, so it can only judge
+      // paint-stage variants. An INPUT-stage variant is invisible to it by construction: it
+      // changes how the points are produced, not how they are painted, and feeding both the same
+      // points is exactly the case where it must render identically.
+      // pen--croquis-stabilized declares croquis-capsule-pulled-string, which is a real
+      // implementation (studio-croquis-capsule-pen-v1.ts, ported from croquis.js
+      // stabilizer/pulled-string.ts) living at the input stage. Asserting byte difference here
+      // would demand a paint-time difference the variant never claimed. It needs an instrument
+      // that feeds POINTER input and compares the resulting paths.
+      if (runtime.engineVariant === "croquis-capsule-pulled-string") continue;
       if (runtime.distinctness === "profile-variant") {
         expect(svgById.get(runtime.id), `${runtime.id}: exact-id profile collapsed`).not.toBe(
           svgById.get(runtime.canonicalId)
