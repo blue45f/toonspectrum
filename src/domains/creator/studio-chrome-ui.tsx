@@ -61,9 +61,9 @@ export const STUDIO_ICON_STROKE = 1.85;
 
 const STUDIO_ICON_CLASS = "shrink-0 transition-colors duration-150";
 
-type StudioChromeIconTone = "default" | "muted" | "accent" | "danger";
+type StudioChromeIconTone = "default" | "muted" | "accent" | "danger" | "warn" | "good";
 
-function studioChromeIconClass({
+export function studioChromeIconClass({
   tone = "default",
   active = false,
   disabled = false,
@@ -75,10 +75,12 @@ function studioChromeIconClass({
   return cn(
     STUDIO_ICON_CLASS,
     tone === "default" && "text-fg-2",
-    tone === "muted" && "text-fg-3",
+    tone === "muted" && "text-fg/55",
     tone === "accent" && "text-accent",
     tone === "danger" && "text-bad",
-    active && "text-accent",
+    tone === "warn" && "text-warn",
+    tone === "good" && "text-good",
+    active && !disabled && "text-accent",
     disabled && "opacity-60"
   );
 }

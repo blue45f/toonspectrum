@@ -315,9 +315,12 @@ import {
   type StudioCheckpoint,
 } from "./studio-checkpoint-loader";
 import {
+  STUDIO_ICON_SIZE,
+  STUDIO_ICON_STROKE,
   StudioAppMenubar,
   StudioEdgeRailButton,
   StudioToolBelt,
+  studioChromeIconClass,
 } from "./studio-chrome-ui";
 import { deleteSavedClipInMemory, upsertSavedClipInMemory } from "./studio-clips";
 import { shouldOwnStudioCoalescedBatchDraft } from "./studio-coalesced-batch-mutation";
@@ -40612,7 +40615,12 @@ function clearSelectionForEdit() {
       aria-label={`퀵 메뉴 · ${workspaceControlSide === "left" ? "왼쪽" : "오른쪽"} 엄지 위치`}
       className={mobileBarBtn(quickActionsOpen)}
     >
-      <Command size={17} aria-hidden />
+      <Command
+        size={STUDIO_ICON_SIZE.nav}
+        strokeWidth={STUDIO_ICON_STROKE}
+        aria-hidden
+        className={studioChromeIconClass({ tone: "default" })}
+      />
       <span>퀵 메뉴</span>
     </button>
   ), [quickActionsOpen, workspaceControlSide]);
@@ -44080,7 +44088,13 @@ function clearSelectionForEdit() {
           onClick={() => void undoBrushDelete(pendingBrushDelete)}
           className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-warn/15 px-3 font-bold text-warn hover:bg-warn/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <Undo2 size={14} aria-hidden /> 삭제 취소
+          <Undo2
+            size={STUDIO_ICON_SIZE.context}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "warn" })}
+          />
+          삭제 취소
         </button>
       </div>
     ) : null}
@@ -44235,7 +44249,12 @@ function clearSelectionForEdit() {
                   : "댓글 검토함 열기 · 검색, 필터, 읽음 상태 관리"
             }
           >
-            <MessageCircle size={14} aria-hidden />
+            <MessageCircle
+              size={STUDIO_ICON_SIZE.subtab}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             <span className="max-xl:sr-only">댓글</span>
             {openStudioCommentCount > 0 ? (
               <span
@@ -44284,10 +44303,23 @@ function clearSelectionForEdit() {
             )}
           >
             {collaborationDocumentLocked ? (
-              <Lock size={17} className="mt-0.5 shrink-0 text-warn" aria-hidden />
-            ) : (
-              <UsersRound size={17} className="mt-0.5 shrink-0 text-good" aria-hidden />
-            )}
+            <Lock
+              size={STUDIO_ICON_SIZE.nav}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={cn(
+                "mt-0.5 shrink-0",
+                studioChromeIconClass({ tone: collaborationDocumentLocked ? "warn" : "good" })
+              )}
+            />
+          ) : (
+            <UsersRound
+              size={STUDIO_ICON_SIZE.nav}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={cn("mt-0.5 shrink-0", studioChromeIconClass({ tone: "good" }))}
+            />
+          )}
             <span className="min-w-0 flex-1">
               <strong className="block text-sm font-semibold">
                 {!sharedDocument
@@ -44331,7 +44363,15 @@ function clearSelectionForEdit() {
             aria-atomic="true"
             className="my-1 flex min-h-9 items-start gap-2 rounded-lg border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-xs text-fg-2"
           >
-            <Undo2 size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden />
+            <Undo2
+              size={STUDIO_ICON_SIZE.context}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={cn(
+                "mt-0.5 shrink-0",
+                studioChromeIconClass({ tone: "warn" })
+              )}
+            />
             <span className="min-w-0 flex-1 leading-relaxed">
               {studioHistoryRetention.notice.message}
             </span>
@@ -46242,7 +46282,12 @@ function clearSelectionForEdit() {
           className="pointer-events-auto inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-panel/95 px-3 text-xs font-semibold text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           title="일반 편집 화면으로 복원 (Esc)"
         >
-          <Maximize2 size={14} aria-hidden />
+          <Maximize2
+            size={STUDIO_ICON_SIZE.context}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "accent" })}
+          />
           도구막대 복원
           <kbd className="rounded border border-line bg-card px-1.5 py-0.5 text-[0.65rem] font-medium text-fg-3">Esc</kbd>
         </button>
