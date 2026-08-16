@@ -100,6 +100,11 @@ const IN_PAGE = `(svg, scale, windowY, stepFloor, topSteps) => new Promise((reso
     if (run >= Math.max(3, Math.round(band.length / 12))) plateaus += 1;
     resolve({
       thicknessPx: band.length / scale,
+      // stepShare 는 비율이라 척도가 없다 — 작은 계단을 없애기만 해도 올라간다. 그래서 절대값을
+      // 같이 낸다: maxStep 은 단면에서 가장 큰 한 계단(이게 눈에 띄는 경계의 크기고), totalVar 는
+      // 단면 전체의 변동량이다. 밴딩이 줄었다고 말하려면 maxStep 이 내려가야 한다.
+      maxStep: sorted[0] ?? 0,
+      totalVariation: total,
       stepShare: total > 0 ? top / total : 0,
       hardSteps: deltas.filter((v) => v >= stepFloor).length,
       plateaus,
@@ -144,6 +149,7 @@ async function main(): Promise<void> {
     rows.push({ brush, ...result });
     console.log(
       `${brush.padEnd(30)} stepShare=${(result.stepShare as number).toFixed(3)}`
+      + `  maxStep=${(result.maxStep as number).toFixed(1)}`
       + `  hardSteps=${String(result.hardSteps).padStart(3)}`
       + `  plateaus=${String(result.plateaus).padStart(2)}`
       + `  thickness=${(result.thicknessPx as number).toFixed(1)}px`
