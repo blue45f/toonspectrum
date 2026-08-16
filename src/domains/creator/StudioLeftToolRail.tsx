@@ -632,7 +632,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               setAppSettingsOpen(true);
             }}
           >
-            <Settings2 className="size-3.5" aria-hidden />
+            <Settings2
+              size={STUDIO_ICON_SIZE.subtab}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+            />
             {localizeStudioRailShellText("애플리케이션 설정", railLang, railT)}
           </button>
         </div>
