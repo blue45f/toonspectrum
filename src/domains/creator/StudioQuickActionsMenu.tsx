@@ -24,6 +24,11 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
+  STUDIO_ICON_SIZE,
+  STUDIO_ICON_STROKE,
+  studioChromeIconClass,
+} from "./studio-chrome-ui";
+import {
   clampStudioQuickActionsCenter,
   QUICK_ACTION_IDS,
   QUICK_ACTION_SLOTS,
@@ -141,7 +146,12 @@ export function StudioQuickActionsCustomizationSheet({
     >
       <header className="flex items-start gap-3 border-b border-line px-4 py-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
-          <Settings2 size={18} aria-hidden />
+          <Settings2
+            size={STUDIO_ICON_SIZE.dock}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "accent" })}
+          />
         </span>
         <div className="min-w-0 flex-1">
           <h2 id="quick-actions-customize-title" className="text-sm font-bold text-fg">
@@ -157,7 +167,12 @@ export function StudioQuickActionsCustomizationSheet({
           aria-label="퀵 액션 구성 닫기"
           className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <X size={17} aria-hidden />
+          <X
+            size={STUDIO_ICON_SIZE.toolCompact}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "default" })}
+          />
         </button>
       </header>
 
@@ -496,7 +511,12 @@ export function StudioQuickActionsMenu({
                     onClick={() => executeAction(action)}
                     className={slotButtonClass(highlighted, disabled)}
                   >
-                    <Icon size={20} strokeWidth={2} aria-hidden />
+                    <Icon
+                      size={STUDIO_ICON_SIZE.dock}
+                      strokeWidth={STUDIO_ICON_STROKE}
+                      aria-hidden
+                      className={studioChromeIconClass({ tone: "default" })}
+                    />
                     <span className="max-w-full truncate text-[0.68rem] font-bold leading-tight">
                       {actionPresentation.label}
                     </span>
@@ -528,7 +548,12 @@ export function StudioQuickActionsMenu({
             style={{ left: center.x, top: center.y }}
           >
             <span className="flex flex-col items-center gap-0.5">
-              <Move size={20} aria-hidden />
+              <Move
+                size={STUDIO_ICON_SIZE.dock}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioChromeIconClass({ tone: "accent" })}
+              />
               <span className="text-[0.6rem] font-bold">드래그</span>
             </span>
           </button>
@@ -547,7 +572,13 @@ export function StudioQuickActionsMenu({
             style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
             aria-label="퀵 액션 구성 열기"
           >
-            <Settings2 size={16} aria-hidden /> 퀵 액션 구성
+            <Settings2
+              size={STUDIO_ICON_SIZE.toolCompact}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "accent" })}
+            />
+            퀵 액션 구성
           </button>
         </>
       )}

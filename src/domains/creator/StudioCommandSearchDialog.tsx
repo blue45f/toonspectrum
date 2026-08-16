@@ -16,6 +16,7 @@ import { Ban, ChevronRight, HelpCircle, Search, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
 import { searchStudio } from "./studio-command-search";
 
 import type {
@@ -368,7 +369,12 @@ export function StudioCommandSearchDialog({
         className="flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl"
       >
         <div className="flex items-center gap-2 border-b border-line px-3">
-          <Search size={16} aria-hidden className="shrink-0 text-fg-3" />
+          <Search
+            size={STUDIO_ICON_SIZE.context}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "muted" })}
+          />
           <h2 id={titleId} className="sr-only">
             명령·속성 통합 검색
           </h2>
@@ -403,7 +409,12 @@ export function StudioCommandSearchDialog({
             title="닫기 (Esc)"
             className="flex size-8 shrink-0 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            <X size={16} aria-hidden />
+            <X
+              size={STUDIO_ICON_SIZE.context}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             <span className="sr-only">검색 닫기</span>
           </button>
         </div>
@@ -511,9 +522,10 @@ export function StudioCommandSearchDialog({
                                   {action.badge}
                                 </span>
                                 <ActionIcon
-                                  size={14}
+                                  size={STUDIO_ICON_SIZE.subtab}
+                                  strokeWidth={STUDIO_ICON_STROKE}
                                   aria-hidden
-                                  className="text-fg-3"
+                                  className={studioChromeIconClass({ tone: "muted" })}
                                 />
                               </span>
                             </button>

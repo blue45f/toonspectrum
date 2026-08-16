@@ -23,7 +23,12 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { StudioKbdBadge } from "./studio-chrome-ui";
+import {
+  STUDIO_ICON_SIZE,
+  STUDIO_ICON_STROKE,
+  StudioKbdBadge,
+  studioChromeIconClass,
+} from "./studio-chrome-ui";
 import { STUDIO_COLOR_VISION_HINTS } from "./studio-color-vision-coach";
 import { STUDIO_MENU_GROUP_SPEC } from "./studio-main-menu-group-spec";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
@@ -510,13 +515,27 @@ function MenuDropdown({
                       )}
                     >
                       {Icon ? (
-                        <Icon size={15} strokeWidth={1.75} aria-hidden className="shrink-0 opacity-80" />
+                        <Icon
+                          size={STUDIO_ICON_SIZE.subtab}
+                          strokeWidth={STUDIO_ICON_STROKE}
+                          aria-hidden
+                          className={studioChromeIconClass({
+                            tone: item.disabled ? "muted" : item.checked ? "accent" : "default",
+                            active: item.checked,
+                            disabled: item.disabled,
+                          })}
+                        />
                       ) : (
                         <span aria-hidden className="size-[15px] shrink-0" />
                       )}
                       <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
                       {item.checked ? (
-                        <Check size={13} strokeWidth={2.25} aria-hidden className="shrink-0 text-accent" />
+                        <Check
+                          size={STUDIO_ICON_SIZE.subtab}
+                          strokeWidth={STUDIO_ICON_STROKE}
+                          aria-hidden
+                          className={studioChromeIconClass({ tone: "accent", active: true })}
+                        />
                       ) : null}
                       {item.shortcut ? <StudioKbdBadge>{item.shortcut}</StudioKbdBadge> : null}
                     </button>
@@ -639,7 +658,7 @@ function MenuDropdown({
         >
           {group.label}
           <ChevronDown
-            size={13}
+            size={STUDIO_ICON_SIZE.contextMenu}
             aria-hidden
             data-studio-main-menu-chevron="true"
             className={cn(

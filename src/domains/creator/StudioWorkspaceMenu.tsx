@@ -56,6 +56,11 @@ import {
 import { createPortal } from "react-dom";
 
 import {
+  STUDIO_ICON_SIZE,
+  STUDIO_ICON_STROKE,
+  studioChromeIconClass,
+} from "./studio-chrome-ui";
+import {
   QUICK_ACTION_SLOTS,
   type StudioQuickActionId,
 } from "./studio-quick-actions";
@@ -263,7 +268,12 @@ function StudioWorkspaceQuickAccessPreview({
             title={`${index + 1}. ${presentation.label}`}
             aria-label={`${index + 1}. ${presentation.label}`}
           >
-            <Icon size={12} aria-hidden className="shrink-0" />
+            <Icon
+              size={STUDIO_ICON_SIZE.subtab}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             <span className="max-[359px]:sr-only">{presentation.label}</span>
           </span>
         );
@@ -289,20 +299,35 @@ function StudioWorkspaceLayoutPreview({
     >
       <span className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-1 text-[0.6875rem] text-fg-3">
         <span className="inline-flex min-w-0 items-center gap-1">
-          <PanelLeft size={12} aria-hidden className="shrink-0" />
+          <PanelLeft
+            size={STUDIO_ICON_SIZE.subtab}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "default" })}
+          />
           <span className="truncate">
             페이지 {desktop.leftPanelOpen ? `${desktop.leftPanelWidth}px` : "접힘"}
           </span>
         </span>
         <span className="inline-flex min-w-0 items-center gap-1">
-          <PanelRight size={12} aria-hidden className="shrink-0" />
+          <PanelRight
+            size={STUDIO_ICON_SIZE.subtab}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "default" })}
+          />
           <span className="truncate">
             {INSPECTOR_PRIMARY_LABELS[layout.inspector.primary]}{" "}
             {desktop.rightPanelOpen ? `${desktop.rightPanelWidth}px` : "접힘"}
           </span>
         </span>
         <span className="col-span-2 inline-flex min-w-0 items-center gap-1">
-          <Smartphone size={12} aria-hidden className="shrink-0" />
+          <Smartphone
+            size={STUDIO_ICON_SIZE.subtab}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "default" })}
+          />
           <span className="truncate">
             모바일은 캔버스 우선 · 페이지/속성 시트 · {mobileSide} 주요 도구
           </span>
@@ -1161,7 +1186,12 @@ export function StudioWorkspaceMenu({
           focusClass
         )}
       >
-        <LayoutPanelTop size={15} aria-hidden className="shrink-0" />
+        <LayoutPanelTop
+          size={STUDIO_ICON_SIZE.toolCompact}
+          strokeWidth={STUDIO_ICON_STROKE}
+          aria-hidden
+          className={studioChromeIconClass({ tone: "default" })}
+        />
         <span className="min-w-0 truncate">{activeWorkspace?.name ?? "작업공간"}</span>
         {dirty ? (
           <span className="shrink-0 rounded-full bg-warn/15 px-1.5 py-0.5 text-[0.6875rem] font-bold text-warn">
@@ -1174,9 +1204,14 @@ export function StudioWorkspaceMenu({
           </span>
         ) : null}
         <ChevronDown
-          size={13}
+          size={STUDIO_ICON_SIZE.contextMenu}
+          strokeWidth={STUDIO_ICON_STROKE}
           aria-hidden
-          className={cn("ml-auto shrink-0 transition-transform", open && "rotate-180")}
+          className={cn(
+            "ml-auto shrink-0 transition-transform",
+            open && "rotate-180",
+            studioChromeIconClass({ tone: "default" })
+          )}
         />
       </button>
 
@@ -1232,7 +1267,12 @@ export function StudioWorkspaceMenu({
                 focusClass
               )}
             >
-              <ChevronLeft size={18} aria-hidden />
+              <ChevronLeft
+                size={STUDIO_ICON_SIZE.rail}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioChromeIconClass({ tone: "default" })}
+              />
             </button>
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
@@ -1264,7 +1304,12 @@ export function StudioWorkspaceMenu({
                 focusClass
               )}
             >
-              <X size={17} aria-hidden />
+              <X
+                size={STUDIO_ICON_SIZE.nav}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioChromeIconClass({ tone: "default" })}
+              />
             </button>
           </header>
 
@@ -1301,7 +1346,12 @@ export function StudioWorkspaceMenu({
                     focusClass
                   )}
                 >
-                  <Icon size={14} aria-hidden className="shrink-0" />
+                  <Icon
+                    size={STUDIO_ICON_SIZE.subtab}
+                    strokeWidth={STUDIO_ICON_STROKE}
+                    aria-hidden
+                    className={studioChromeIconClass({ tone: "default" })}
+                  />
                   <span className="truncate">{label}</span>
                 </button>
               );
@@ -1349,7 +1399,12 @@ export function StudioWorkspaceMenu({
               >
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="grid size-8 shrink-0 place-items-center rounded-md bg-raised text-accent">
-                    <LayoutPanelTop size={16} aria-hidden />
+                    <LayoutPanelTop
+                      size={STUDIO_ICON_SIZE.context}
+                      strokeWidth={STUDIO_ICON_STROKE}
+                      aria-hidden
+                      className={studioChromeIconClass({ tone: "accent" })}
+                    />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-bold text-fg">
@@ -1359,7 +1414,12 @@ export function StudioWorkspaceMenu({
                       {activeIsCustom ? "내 작업공간" : "기본 작업공간"} · {dirty ? "저장 전 변경 있음" : "저장된 배치와 같음"}
                     </span>
                   </span>
-                  <Check size={15} aria-hidden className="shrink-0 text-accent" />
+                  <Check
+                    size={STUDIO_ICON_SIZE.contextMenu}
+                    strokeWidth={STUDIO_ICON_STROKE}
+                    aria-hidden
+                    className={studioChromeIconClass({ tone: "accent" })}
+                  />
                 </div>
                 <StudioWorkspaceLayoutPreview
                   layout={syncedState.liveLayout}
@@ -1435,9 +1495,13 @@ export function StudioWorkspaceMenu({
                 </label>
                 <div className="relative">
                   <Search
-                    size={15}
+                    size={STUDIO_ICON_SIZE.contextMenu}
+                    strokeWidth={STUDIO_ICON_STROKE}
                     aria-hidden
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
+                    className={cn(
+                      "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2",
+                      studioChromeIconClass({ tone: "muted" })
+                    )}
                   />
                   <input
                     id={`${dialogId}-search`}
@@ -1462,7 +1526,12 @@ export function StudioWorkspaceMenu({
                         focusClass
                       )}
                     >
-                      <X size={15} aria-hidden />
+                      <X
+                        size={STUDIO_ICON_SIZE.contextMenu}
+                        strokeWidth={STUDIO_ICON_STROKE}
+                        aria-hidden
+                        className={studioChromeIconClass({ tone: "default" })}
+                      />
                     </button>
                   ) : null}
                 </div>
@@ -1484,10 +1553,29 @@ export function StudioWorkspaceMenu({
                     focusClass
                   )}
                 >
-                  {builtinListExpanded ? <ChevronDown size={15} aria-hidden /> : <ChevronRight size={15} aria-hidden />}
+                  {builtinListExpanded ? (
+                    <ChevronDown
+                      size={STUDIO_ICON_SIZE.contextMenu}
+                      strokeWidth={STUDIO_ICON_STROKE}
+                      aria-hidden
+                      className={studioChromeIconClass({ tone: "default" })}
+                    />
+                  ) : (
+                    <ChevronRight
+                      size={STUDIO_ICON_SIZE.contextMenu}
+                      strokeWidth={STUDIO_ICON_STROKE}
+                      aria-hidden
+                      className={studioChromeIconClass({ tone: "default" })}
+                    />
+                  )}
                   <span className="min-w-0 flex-1 truncate">기본 작업공간</span>
                   <span className={cn("inline-flex shrink-0 items-center gap-1 font-normal text-fg-3", AUXILIARY_TEXT_CLASS)}>
-                    <LockKeyhole size={12} aria-hidden /> {filteredBuiltins.length}개 · 수정 불가
+                    <LockKeyhole
+                      size={STUDIO_ICON_SIZE.subtab}
+                      strokeWidth={STUDIO_ICON_STROKE}
+                      aria-hidden
+                      className={studioChromeIconClass({ tone: "muted" })}
+                    /> {filteredBuiltins.length}개 · 수정 불가
                   </span>
                 </button>
               </h3>
@@ -1522,14 +1610,26 @@ export function StudioWorkspaceMenu({
                         "disabled:cursor-default disabled:opacity-100",
                         focusClass
                       )}
-                    >
+                      >
                       <span className={cn("grid size-8 shrink-0 place-items-center rounded-md bg-raised", active && "text-accent")}>
-                        <Icon size={16} aria-hidden />
+                        <Icon
+                          size={STUDIO_ICON_SIZE.context}
+                          strokeWidth={STUDIO_ICON_STROKE}
+                          aria-hidden
+                          className={studioChromeIconClass({ tone: "default" })}
+                        />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold">
                           <span className="truncate">{workspace.name}</span>
-                          {active ? <Check size={13} aria-hidden className="shrink-0 text-accent" /> : null}
+                          {active ? (
+                            <Check
+                              size={STUDIO_ICON_SIZE.contextMenu}
+                              strokeWidth={STUDIO_ICON_STROKE}
+                              aria-hidden
+                              className={studioChromeIconClass({ tone: "accent" })}
+                            />
+                          ) : null}
                         </span>
                         <span className="mt-0.5 block line-clamp-2 text-[0.6875rem] leading-snug text-fg-3">
                           {workspace.description}
@@ -1561,9 +1661,19 @@ export function StudioWorkspaceMenu({
                   )}
                 >
                   {customListExpanded ? (
-                    <ChevronDown size={15} aria-hidden />
+                    <ChevronDown
+                      size={STUDIO_ICON_SIZE.contextMenu}
+                      strokeWidth={STUDIO_ICON_STROKE}
+                      aria-hidden
+                      className={studioChromeIconClass({ tone: "default" })}
+                    />
                   ) : (
-                    <ChevronRight size={15} aria-hidden />
+                    <ChevronRight
+                      size={STUDIO_ICON_SIZE.contextMenu}
+                      strokeWidth={STUDIO_ICON_STROKE}
+                      aria-hidden
+                      className={studioChromeIconClass({ tone: "default" })}
+                    />
                   )}
                   <span className="min-w-0 flex-1 truncate">내 작업공간</span>
                   <span className={cn("shrink-0 tabular-nums font-normal text-fg-3", AUXILIARY_TEXT_CLASS)}>
@@ -1611,14 +1721,25 @@ export function StudioWorkspaceMenu({
                         )}
                       >
                         <LayoutPanelTop
-                          size={15}
+                          size={STUDIO_ICON_SIZE.toolCompact}
+                          strokeWidth={STUDIO_ICON_STROKE}
                           aria-hidden
-                          className={cn("shrink-0 text-fg-3", active && "text-accent")}
+                          className={studioChromeIconClass({
+                            tone: "default",
+                            active,
+                          })}
                         />
                         <span className="min-w-0 flex-1 truncate text-xs font-bold">
                           {workspace.name}
                         </span>
-                        {active ? <Check size={14} aria-hidden className="shrink-0 text-accent" /> : null}
+                        {active ? (
+                          <Check
+                            size={STUDIO_ICON_SIZE.contextMenu}
+                            strokeWidth={STUDIO_ICON_STROKE}
+                            aria-hidden
+                            className={studioChromeIconClass({ tone: "accent", active: true })}
+                          />
+                        ) : null}
                       </button>
                     );
                   })
@@ -1642,7 +1763,21 @@ export function StudioWorkspaceMenu({
                     focusClass
                   )}
                 >
-                  {customListExpanded ? <ChevronDown size={15} aria-hidden /> : <ChevronRight size={15} aria-hidden />}
+                  {customListExpanded ? (
+                    <ChevronDown
+                      size={STUDIO_ICON_SIZE.contextMenu}
+                      strokeWidth={STUDIO_ICON_STROKE}
+                      aria-hidden
+                      className={studioChromeIconClass({ tone: "default" })}
+                    />
+                  ) : (
+                    <ChevronRight
+                      size={STUDIO_ICON_SIZE.contextMenu}
+                      strokeWidth={STUDIO_ICON_STROKE}
+                      aria-hidden
+                      className={studioChromeIconClass({ tone: "default" })}
+                    />
+                  )}
                   <span className="min-w-0 flex-1 truncate">내 작업공간</span>
                   <span className={cn("shrink-0 tabular-nums font-normal text-fg-3", AUXILIARY_TEXT_CLASS)}>
                     {query
@@ -1674,7 +1809,12 @@ export function StudioWorkspaceMenu({
                     focusClass
                   )}
                 >
-                  <Save size={14} aria-hidden /> 현재 배치를 새 작업공간으로 저장
+                  <Save
+                    size={STUDIO_ICON_SIZE.toolCompact}
+                    strokeWidth={STUDIO_ICON_STROKE}
+                    aria-hidden
+                    className={studioChromeIconClass({ tone: "default" })}
+                  /> 현재 배치를 새 작업공간으로 저장
                 </button>
 
                 <form
@@ -1766,7 +1906,15 @@ export function StudioWorkspaceMenu({
                                 focusClass
                               )}
                             >
-                              <LayoutPanelTop size={15} aria-hidden className={cn("shrink-0 text-fg-3", active && "text-accent")} />
+                              <LayoutPanelTop
+                                size={STUDIO_ICON_SIZE.toolCompact}
+                                strokeWidth={STUDIO_ICON_STROKE}
+                                aria-hidden
+                                className={studioChromeIconClass({
+                                  tone: "default",
+                                  active,
+                                })}
+                              />
                               <span className="min-w-0 flex-1 truncate text-xs font-bold text-fg-2">
                                 {workspace.name}
                               </span>
@@ -1795,7 +1943,12 @@ export function StudioWorkspaceMenu({
                                 focusClass
                               )}
                             >
-                              <MoreHorizontal size={17} aria-hidden />
+                              <MoreHorizontal
+                                size={STUDIO_ICON_SIZE.nav}
+                                strokeWidth={STUDIO_ICON_STROKE}
+                                aria-hidden
+                                className={studioChromeIconClass({ tone: "default" })}
+                              />
                             </button>
                           </div>
 
@@ -1812,14 +1965,24 @@ export function StudioWorkspaceMenu({
                                     onClick={() => overwriteWorkspace(workspace.id)}
                                     className={cn("inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-raised px-2 text-center text-[0.6875rem] font-bold leading-tight text-fg-2 hover:text-fg", focusClass)}
                                   >
-                                    <Save size={13} aria-hidden className="shrink-0" /> 변경 저장
+                                    <Save
+                                      size={STUDIO_ICON_SIZE.contextMenu}
+                                      strokeWidth={STUDIO_ICON_STROKE}
+                                      aria-hidden
+                                      className={studioChromeIconClass({ tone: "default" })}
+                                    /> 변경 저장
                                   </button>
                                   <button
                                     type="button"
                                     onClick={(event) => reloadWorkspace(workspace.id, event.currentTarget)}
                                     className={cn("inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-raised px-2 text-center text-[0.6875rem] font-bold leading-tight text-fg-2 hover:text-fg", focusClass)}
                                   >
-                                    <RotateCcw size={13} aria-hidden className="shrink-0" /> 다시 불러오기
+                                    <RotateCcw
+                                      size={STUDIO_ICON_SIZE.contextMenu}
+                                      strokeWidth={STUDIO_ICON_STROKE}
+                                      aria-hidden
+                                      className={studioChromeIconClass({ tone: "default" })}
+                                    /> 다시 불러오기
                                   </button>
                                 </>
                               ) : (
@@ -1828,7 +1991,12 @@ export function StudioWorkspaceMenu({
                                   onClick={(event) => requestWorkspaceSwitch(workspace.id, event.currentTarget)}
                                   className={cn("col-span-2 inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-raised px-2 text-center text-[0.6875rem] font-bold leading-tight text-fg-2 hover:text-fg", focusClass)}
                                 >
-                                  <LayoutPanelTop size={13} aria-hidden className="shrink-0" /> 이 배치로 전환
+                                  <LayoutPanelTop
+                                    size={STUDIO_ICON_SIZE.contextMenu}
+                                    strokeWidth={STUDIO_ICON_STROKE}
+                                    aria-hidden
+                                    className={studioChromeIconClass({ tone: "default" })}
+                                  /> 이 배치로 전환
                                 </button>
                               )}
                               <button
@@ -1836,7 +2004,12 @@ export function StudioWorkspaceMenu({
                                 onClick={() => beginRename(workspace.id, workspace.name)}
                                 className={cn("inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-raised px-2 text-center text-[0.6875rem] font-bold leading-tight text-fg-2 hover:text-fg", focusClass)}
                               >
-                                <PencilLine size={13} aria-hidden className="shrink-0" /> 이름 변경
+                                <PencilLine
+                                  size={STUDIO_ICON_SIZE.contextMenu}
+                                  strokeWidth={STUDIO_ICON_STROKE}
+                                  aria-hidden
+                                  className={studioChromeIconClass({ tone: "default" })}
+                                /> 이름 변경
                               </button>
                               <button
                                 type="button"
@@ -1848,7 +2021,12 @@ export function StudioWorkspaceMenu({
                                   focusClass
                                 )}
                               >
-                                <Copy size={13} aria-hidden className="shrink-0" /> 저장 배치 복제
+                                <Copy
+                                  size={STUDIO_ICON_SIZE.contextMenu}
+                                  strokeWidth={STUDIO_ICON_STROKE}
+                                  aria-hidden
+                                  className={studioChromeIconClass({ tone: "default" })}
+                                /> 저장 배치 복제
                               </button>
                               <button
                                 type="button"
@@ -1861,7 +2039,12 @@ export function StudioWorkspaceMenu({
                                   focusClass
                                 )}
                               >
-                                <ArrowUp size={13} aria-hidden className="shrink-0" /> 위로
+                                <ArrowUp
+                                  size={STUDIO_ICON_SIZE.contextMenu}
+                                  strokeWidth={STUDIO_ICON_STROKE}
+                                  aria-hidden
+                                  className={studioChromeIconClass({ tone: "default" })}
+                                /> 위로
                               </button>
                               <button
                                 type="button"
@@ -1874,7 +2057,12 @@ export function StudioWorkspaceMenu({
                                   focusClass
                                 )}
                               >
-                                <ArrowDown size={13} aria-hidden className="shrink-0" /> 아래로
+                                <ArrowDown
+                                  size={STUDIO_ICON_SIZE.contextMenu}
+                                  strokeWidth={STUDIO_ICON_STROKE}
+                                  aria-hidden
+                                  className={studioChromeIconClass({ tone: "default" })}
+                                /> 아래로
                               </button>
                               <button
                                 type="button"
@@ -1885,7 +2073,12 @@ export function StudioWorkspaceMenu({
                                 }}
                                 className={cn("col-span-2 inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-bad/10 px-2 text-center text-[0.6875rem] font-bold leading-tight text-bad hover:bg-bad/15", focusClass)}
                               >
-                                <Trash2 size={13} aria-hidden className="shrink-0" /> 삭제
+                                <Trash2
+                                  size={STUDIO_ICON_SIZE.contextMenu}
+                                  strokeWidth={STUDIO_ICON_STROKE}
+                                  aria-hidden
+                                  className={studioChromeIconClass({ tone: "danger" })}
+                                /> 삭제
                               </button>
                             </div>
 
@@ -1968,7 +2161,12 @@ export function StudioWorkspaceMenu({
               data-workspace-view="manage-preferences"
             >
               <div className="mb-1.5 flex items-center gap-1.5 text-fg-2">
-                <Settings2 size={14} aria-hidden />
+                <Settings2
+                  size={STUDIO_ICON_SIZE.subtab}
+                  strokeWidth={STUDIO_ICON_STROKE}
+                  aria-hidden
+                  className={studioChromeIconClass({ tone: "default" })}
+                />
                 <h3 id={`${titleId}-preferences`} className="text-[0.6875rem] font-bold">
                   전환 설정
                 </h3>
@@ -2035,7 +2233,12 @@ export function StudioWorkspaceMenu({
                             focusClass
                           )}
                         >
-                          <Icon size={14} aria-hidden /> {side === "left" ? "왼쪽" : "오른쪽"}
+                          <Icon
+                            size={STUDIO_ICON_SIZE.subtab}
+                            strokeWidth={STUDIO_ICON_STROKE}
+                            aria-hidden
+                            className={studioChromeIconClass({ tone: "default" })}
+                          /> {side === "left" ? "왼쪽" : "오른쪽"}
                         </button>
                       );
                     })}
@@ -2081,7 +2284,12 @@ export function StudioWorkspaceMenu({
                             focusClass
                           )}
                         >
-                          <Icon size={14} aria-hidden />
+                          <Icon
+                            size={STUDIO_ICON_SIZE.subtab}
+                            strokeWidth={STUDIO_ICON_STROKE}
+                            aria-hidden
+                            className={studioChromeIconClass({ tone: "default" })}
+                          />
                           {overridden ? (
                             <span
                               aria-hidden
@@ -2164,7 +2372,12 @@ export function StudioWorkspaceMenu({
                         focusClass
                       )}
                     >
-                      <Save size={13} aria-hidden /> 지금 도크로
+                      <Save
+                        size={STUDIO_ICON_SIZE.contextMenu}
+                        strokeWidth={STUDIO_ICON_STROKE}
+                        aria-hidden
+                        className={studioChromeIconClass({ tone: "default" })}
+                      /> 지금 도크로
                     </button>
                     <button
                       type="button"
@@ -2181,7 +2394,12 @@ export function StudioWorkspaceMenu({
                         focusClass
                       )}
                     >
-                      <RotateCcw size={13} aria-hidden /> 조정 지우기
+                      <RotateCcw
+                        size={STUDIO_ICON_SIZE.contextMenu}
+                        strokeWidth={STUDIO_ICON_STROKE}
+                        aria-hidden
+                        className={studioChromeIconClass({ tone: "default" })}
+                      /> 조정 지우기
                     </button>
                   </div>
                 </div>
@@ -2210,9 +2428,19 @@ export function StudioWorkspaceMenu({
                 focusClass
               )}
             >
-              <Settings2 size={15} aria-hidden className="shrink-0" />
+              <Settings2
+                size={STUDIO_ICON_SIZE.toolCompact}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioChromeIconClass({ tone: "default" })}
+              />
               <span className="min-w-0 flex-1 truncate">작업공간 관리</span>
-              <ChevronRight size={15} aria-hidden className="shrink-0" />
+              <ChevronRight
+                size={STUDIO_ICON_SIZE.contextMenu}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioChromeIconClass({ tone: "default" })}
+              />
             </button>
             <p
               role="status"
@@ -2246,7 +2474,12 @@ export function StudioWorkspaceMenu({
         >
           <div className="w-full max-w-sm rounded-lg border border-line-strong bg-panel p-4 shadow-xl">
             <span className="grid size-9 place-items-center rounded-lg bg-warn/15 text-warn">
-              <Save size={17} aria-hidden />
+              <Save
+                size={STUDIO_ICON_SIZE.nav}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                                  className={studioChromeIconClass({ tone: "danger" })}
+              />
             </span>
             <h3 id={switchGuardTitleId} className="mt-3 text-sm font-bold text-fg">
               변경을 저장하고 전환할까요?

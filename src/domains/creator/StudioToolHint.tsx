@@ -817,6 +817,11 @@ export function StudioToolHintTarget({
   }
 
   function handleMouseLeave(event: ReactMouseEvent<HTMLSpanElement>) {
+    const nextTarget = event.relatedTarget;
+    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) {
+      // Ignore synthetic leave events while traversal stays inside target DOM.
+      return;
+    }
     const rect = wrapRef.current?.getBoundingClientRect();
     if (
       rect &&
