@@ -60,6 +60,7 @@ const FALLBACK_WIDTH = 240;
 const FALLBACK_HEIGHT = 92;
 const FALLBACK_GAP = 10;
 const VIEWPORT_PADDING = 10;
+const ANCHOR_READ_RETRY_COUNT = 1;
 
 export const STUDIO_TOOL_HINT_SCROLL_HOVER_SUPPRESSION_MS = 720;
 
@@ -582,6 +583,13 @@ export function StudioToolHintTarget({
     touchHoldStart.current = null;
   }
 
+  function clearHideTimer() {
+    if (hideTimer.current) {
+      globalThis.clearTimeout(hideTimer.current);
+      hideTimer.current = 0;
+    }
+  }
+
   function hideRenderedTooltipImmediately(hintId = tipId) {
     hideRenderedToolHintElement(hintId);
   }
@@ -596,7 +604,11 @@ export function StudioToolHintTarget({
     return el ? el.getBoundingClientRect() : null;
   }
 
-  function reveal(expandImmediately: boolean, intent: StudioToolHintRevealIntent) {
+  function reveal(
+    expandImmediately: boolean,
+    intent: StudioToolHintRevealIntent,
+    anchorRetryRemaining = ANCHOR_READ_RETRY_COUNT
+  ) {
     if (!hint || preferences.mode === "off") return;
     const alreadyOpen = coordinator.getActiveHintId() === tipId;
     const previousIntent = interaction.getRevealIntent(tipId);
@@ -625,7 +637,15 @@ export function StudioToolHintTarget({
       hideTimer.current = 0;
     }
     const nextAnchor = readAnchor();
-    if (!nextAnchor) return;
+    if (!nextAnchor) {
+      if (anchorRetryRemaining <= 0) return;
+      requestAnimationFrame(() => {
+        // If geometry is being recalculated right as the control remounts,
+        // retry once before dropping the hint intent.
+        reveal(expandImmediately, intent, anchorRetryRemaining - 1);
+      });
+      return;
+    }
     setAnchor(nextAnchor);
     activeRevealIntent.current = effectiveIntent;
     interaction.markReveal(tipId, effectiveIntent);
@@ -666,6 +686,9 @@ export function StudioToolHintTarget({
       reveal(false, "hover");
       return;
     }
+
+    clearHideTimer();
+
     const now = Date.now();
     const pointerSuppressionRemaining = getPointerSuppressionRemainingForTip(tipId, now);
     if (pointerSuppressionRemaining !== null) {
@@ -679,10 +702,6 @@ export function StudioToolHintTarget({
     }
     if (!open && !unavailableReason && !exposure.canReveal(hint.id, "hover")) return;
     preloadStudioToolHintBubbleModule();
-    if (hideTimer.current) {
-      globalThis.clearTimeout(hideTimer.current);
-      hideTimer.current = 0;
-    }
     scheduleHintRevealWithDelay(SHOW_DELAY_MS);
   }
 
@@ -842,6 +861,7 @@ export function StudioToolHintTarget({
       dismissCoordinatedHintsImmediately();
       return;
     }
+    clearHideTimer();
     if (pointerDismissed.current || preferences.mode === "off") return;
     // Pointer focus is already filtered by pointerdown suppression. Opening on
     // every remaining focus path clears any suppression left by a previously

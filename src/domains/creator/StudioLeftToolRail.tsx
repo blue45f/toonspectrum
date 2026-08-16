@@ -635,6 +635,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             <Settings2
               size={STUDIO_ICON_SIZE.subtab}
               strokeWidth={STUDIO_ICON_STROKE}
+              className={studioChromeIconClass({ tone: "accent" })}
               aria-hidden
             />
             {localizeStudioRailShellText("애플리케이션 설정", railLang, railT)}
@@ -1095,7 +1096,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                   "relative grid size-10 place-items-center rounded-2xl border border-transparent text-fg-2 xl:size-11",
                   activeSurfaceReviewLocked
                     ? "cursor-not-allowed opacity-35"
-                    : "cursor-pointer hover:border-line hover:bg-raised hover:text-fg"
+                    : "cursor-pointer hover:border-line hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 )}
               >
                 <ImagePlus
