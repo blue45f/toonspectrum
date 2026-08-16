@@ -21,8 +21,6 @@ import {
   Square,
 } from "lucide-react";
 
-import { resolveStudioWorkspaceWidePanelToggle } from "./studio-workspace-wide-mode";
-
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
 
@@ -38,13 +36,6 @@ export function buildStudioWindowMenuItems({
   const visibleRightPanelOpen = isPresentationSuppressed
     ? false
     : (state.visibleRightPanelOpen ?? state.rightPanelOpen);
-  const workspaceWideMode = resolveStudioWorkspaceWidePanelToggle({
-    leftPanelOpen: state.leftPanelOpen,
-    rightPanelOpen: state.rightPanelOpen,
-    visibleLeftPanelOpen,
-    visibleRightPanelOpen,
-    presentationPanelsHidden: isPresentationSuppressed,
-  });
   const isWorkspaceWideMode = !visibleLeftPanelOpen && !visibleRightPanelOpen;
 
   return [
@@ -110,8 +101,7 @@ export function buildStudioWindowMenuItems({
       onSelect: () => {
         if (isPresentationSuppressed) return;
         if (isWorkspaceWideMode) ui.expandSidePanels();
-        else if (!workspaceWideMode.leftPanelOpen) ui.collapseSidePanels();
-        else ui.expandSidePanels();
+        else ui.collapseSidePanels();
       },
     },
     {
