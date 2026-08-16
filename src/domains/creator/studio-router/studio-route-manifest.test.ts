@@ -126,6 +126,13 @@ describe("Studio route manifest", () => {
       "/studio/work:work-1/review",
     ],
     [
+      "/studio/remix/source-1/present",
+      "",
+      "placeholder",
+      "/studio/remix/source-1/present",
+      "/studio/remix:source-1/present",
+    ],
+    [
       "/studio/work/work-1/versions",
       "?tab=history",
       "placeholder",
