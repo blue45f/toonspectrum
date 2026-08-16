@@ -5912,7 +5912,6 @@ function StudioCuttoonEditor({
     resolveStudioWorkspaceCanvasDockInsets({
       leftPanelWidth: leftResize.width,
       rightPanelWidth: rightResize.width,
-      presentationPanelsHidden,
       uiDensityMode,
       visibleLeftPanelOpen,
       visibleRightPanelOpen,

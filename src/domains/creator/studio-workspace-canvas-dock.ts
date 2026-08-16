@@ -13,7 +13,6 @@ export interface StudioWorkspaceCanvasDockInsetsInput {
   readonly rightPanelWidth: number;
   readonly visibleLeftPanelOpen: boolean;
   readonly visibleRightPanelOpen: boolean;
-  readonly presentationPanelsHidden: boolean;
   readonly uiDensityMode: StudioUiDensityMode;
 }
 
@@ -23,15 +22,14 @@ export function resolveStudioWorkspaceCanvasDockInsets(
   const toolRailInset = studioUiDensityAllows(input.uiDensityMode, "tool-rail")
     ? STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH
     : 0;
-  const closedPanelDockInset = input.presentationPanelsHidden ? 0 : 0;
 
   return {
     left:
       (input.visibleLeftPanelOpen
         ? input.leftPanelWidth + STUDIO_CANVAS_DOCK_GAP_OPEN
-        : closedPanelDockInset) + toolRailInset,
+        : 0) + toolRailInset,
     right: input.visibleRightPanelOpen
       ? input.rightPanelWidth + STUDIO_CANVAS_DOCK_GAP_OPEN
-      : closedPanelDockInset,
+      : 0,
   };
 }

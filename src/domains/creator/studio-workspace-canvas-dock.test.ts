@@ -11,7 +11,6 @@ describe("studio workspace canvas dock insets", () => {
     rightPanelWidth: 280,
     visibleLeftPanelOpen: false,
     visibleRightPanelOpen: false,
-    presentationPanelsHidden: false,
     uiDensityMode: "full",
   };
 
@@ -35,17 +34,6 @@ describe("studio workspace canvas dock insets", () => {
     ).toEqual({ left: 52, right: 0 });
   });
 
-  it("keeps the same wide fallback even in presentation-only modes", () => {
-    expect(
-      resolveStudioWorkspaceCanvasDockInsets({
-        ...baseInput,
-        presentationPanelsHidden: true,
-        visibleLeftPanelOpen: false,
-        visibleRightPanelOpen: false,
-      })
-    ).toEqual({ left: 52, right: 0 });
-  });
-
   it("applies right-side dock width only when the right dock is visible", () => {
     expect(
       resolveStudioWorkspaceCanvasDockInsets({
@@ -54,5 +42,27 @@ describe("studio workspace canvas dock insets", () => {
         visibleRightPanelOpen: true,
       })
     ).toEqual({ left: 52, right: 288 });
+  });
+
+  it("keeps current tool-rail reserve when panels are hidden under simple mode", () => {
+    expect(
+      resolveStudioWorkspaceCanvasDockInsets({
+        ...baseInput,
+        uiDensityMode: "simple",
+        visibleLeftPanelOpen: false,
+        visibleRightPanelOpen: false,
+      })
+    ).toEqual({ left: 52, right: 0 });
+  });
+
+  it("keeps tool rail inset in focus mode even when panels are hidden", () => {
+    expect(
+      resolveStudioWorkspaceCanvasDockInsets({
+        ...baseInput,
+        uiDensityMode: "focus",
+        visibleLeftPanelOpen: false,
+        visibleRightPanelOpen: false,
+      })
+    ).toEqual({ left: 52, right: 0 });
   });
 });
