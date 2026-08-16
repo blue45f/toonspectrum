@@ -498,13 +498,13 @@ function createBuiltinLayout(
 const PEN_DISPLAY_DESKTOP: BuiltinDesktop = {
   leftPanelOpen: false,
   rightPanelOpen: true,
-  rightPanelWidth: 240,
+  rightPanelWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum,
 };
 const HANDHELD_DESKTOP: BuiltinDesktop = {
   leftPanelOpen: false,
   rightPanelOpen: false,
-  leftPanelWidth: 128,
-  rightPanelWidth: 240,
+  leftPanelWidth: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.minimum,
+  rightPanelWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum,
 };
 /** Keyboard navigation wants every landmark present so Tab order reaches the whole editor. */
 const KEYBOARD_DESKTOP: BuiltinDesktop = { leftPanelOpen: true, rightPanelOpen: true };
