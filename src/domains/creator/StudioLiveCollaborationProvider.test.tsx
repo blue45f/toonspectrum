@@ -756,6 +756,38 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     });
   });
 
+  it("does not trigger hard reload while synced", async () => {
+    lifecycle.roomStart = "resolve";
+    lifecycle.bindingStatusOnStart = {
+      state: "ready",
+      message: "팀 원고와 로컬 복구 저장소가 동기화됩니다.",
+      pendingCount: 0,
+      persistenceDurability: "durable",
+      transportReady: true,
+      lastAckAt: 1_234,
+      lastAckServerSequence: "27",
+    };
+
+    const reloadSpy = vi.fn();
+    vi.stubGlobal("location", { reload: reloadSpy } as unknown as Location);
+    const onCrdtDocumentChange = vi.fn();
+    const options = { onCrdtDocumentChange };
+    renderProvider(options);
+
+    await vi.waitFor(() => {
+      expect(lifecycle.bindings).toHaveLength(1);
+      expect(onCrdtDocumentChange).toHaveBeenCalledWith(expect.anything(), expect.anything());
+    });
+
+    const live = renderProvider(options);
+    await vi.waitFor(() => {
+      expect(live.sync.phase).toBe("synced");
+    });
+
+    live.reloadAuthoritative();
+    expect(reloadSpy).not.toHaveBeenCalled();
+  });
+
   it("exposes a same-generation authoritative save barrier and revokes it on teardown", async () => {
     lifecycle.roomStart = "resolve";
     const onAuthoritativeSaveBarrierChange = vi.fn();
