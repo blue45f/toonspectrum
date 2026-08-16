@@ -5907,9 +5907,14 @@ function StudioCuttoonEditor({
   const {
     presentationPanelsHidden,
     densityShowsStatusRail,
+    densityHidesLeftPanel,
+    rightPanelDensityAllows,
     visibleLeftPanelOpen,
     visibleRightPanelOpen,
   } = panelLayout;
+  const compactCanvasDockInset = !presentationPanelsHidden && !densityHidesLeftPanel;
+  const compactRightDockInset =
+    !presentationPanelsHidden && !rightPanelDensityAllows;
   // useMemo: 렌더마다 새 정규화 객체가 메뉴바 memo 자식(작업공간 메뉴)을 재렌더시키지 않게.
   //
   // 화면 기하를 그대로 담지 않고 captureStudioWorkspaceDeviceLayout으로 되돌린다. 화면은 기기
@@ -43167,15 +43172,19 @@ function clearSelectionForEdit() {
         left:
           (visibleLeftPanelOpen
             ? leftResize.width + 8
-            : presentationPanelsHidden
+            : compactCanvasDockInset
               ? 0
-              : 32) +
+              : presentationPanelsHidden
+                ? 0
+                : 32) +
           (studioUiDensityAllows(uiDensityMode, "tool-rail") ? 52 : 0),
         right: visibleRightPanelOpen
           ? rightResize.width + 8
-          : presentationPanelsHidden
-            ? 0
-            : 32,
+            : compactRightDockInset
+              ? 0
+              : presentationPanelsHidden
+                ? 0
+                : 32,
       },
       drawMode:
         drawMode === "shape"
@@ -43268,6 +43277,8 @@ function clearSelectionForEdit() {
       symmetryType,
       tool,
       uiDensityMode,
+      compactCanvasDockInset,
+      compactRightDockInset,
       visibleLeftPanelOpen,
       visibleRightPanelOpen,
     ]

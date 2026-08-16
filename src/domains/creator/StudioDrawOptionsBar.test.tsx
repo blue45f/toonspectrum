@@ -835,6 +835,32 @@ describe("StudioDrawOptionsBar", () => {
     );
   });
 
+  it("widens the dock when chrome is intentionally hidden", () => {
+    const html = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        docked
+        dockInsets={{ left: 0, right: 0 }}
+        drawMode="pen"
+        brushId="pen"
+        strokeWidth={6}
+        brushOpacity={1}
+        stabilizer={4}
+        color="#112233"
+        quickShapeActive={false}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+    expect(html).toContain('data-studio-draw-options-dock-left="0"');
+    expect(html).toContain('data-studio-draw-options-dock-right="0"');
+    expect(html).toContain("100vw - 24px");
+    expect(html).toContain("max(calc(100vw - 24px), 20rem)");
+  });
+
   it("keeps the brush library a keyboard-friendly non-modal popover", () => {
     const html = renderToStaticMarkup(
       <StudioBrushLibrarySheet
