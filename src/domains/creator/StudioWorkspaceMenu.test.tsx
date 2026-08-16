@@ -109,7 +109,7 @@ describe("StudioWorkspaceMenu selector and built-in workspaces", () => {
     expect(html).toContain("3 페이지");
     expect(html).toContain("4 소재·빠른 실행");
     expect(html).toContain(
-      "왼쪽 페이지 216px · 오른쪽 도구 속성 344px · 모바일은 캔버스 우선 시트"
+      "왼쪽 페이지 176px · 오른쪽 도구 속성 304px · 모바일은 캔버스 우선 시트"
     );
     expect(html).toContain('title="1. 되돌리기"');
     expect(html).toContain('title="2. 다시 실행"');

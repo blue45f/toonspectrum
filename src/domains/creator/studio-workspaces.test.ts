@@ -205,8 +205,8 @@ describe("built-in Studio workspaces", () => {
         desktop: {
           leftPanelOpen: true,
           rightPanelOpen: true,
-          leftPanelWidth: 216,
-          rightPanelWidth: 344,
+          leftPanelWidth: 176,
+          rightPanelWidth: 304,
         },
         drawingPalettes: DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
         quickActions: {
@@ -517,8 +517,8 @@ describe("Studio workspace owner-scoped persistence", () => {
     expect(loaded.state.liveLayout.desktop).toEqual({
       leftPanelOpen: true,
       rightPanelOpen: true,
-      leftPanelWidth: 216,
-      rightPanelWidth: 344,
+      leftPanelWidth: 176,
+      rightPanelWidth: 304,
     });
     expect(
       QUICK_ACTION_SLOTS.map(

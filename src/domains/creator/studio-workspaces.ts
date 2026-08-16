@@ -595,14 +595,14 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
     id: "pro-comic",
     name: "프로 만화",
     description:
-      "도구 속성·레이어·페이지 동선을 유지하고 자주 쓰는 제작 명령을 가까이 둡니다.",
+      "도구 속성·레이어·페이지 동선을 유지하면서 좌우 도크를 줄여 캔버스 면적을 우선 확보합니다.",
     layout: createBuiltinLayout(
       { primary: "properties", image: "fill", document: "navigator" },
       {
         leftPanelOpen: true,
         rightPanelOpen: true,
-        leftPanelWidth: 216,
-        rightPanelWidth: 344,
+        leftPanelWidth: 176,
+        rightPanelWidth: 304,
       },
       ["undo", "redo", "pen", "advanced-fill", "add-bubble", "fit-width"],
       DRAWING_DEVICE_OVERRIDES,
@@ -624,14 +624,14 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
     id: "csp-migration",
     name: "클립 스튜디오형",
     description:
-      "CSP·클립 스튜디오에서 넘어온 손에 맞춰 좌우 도크를 넓게 펼치고 서브 도구·도구 속성 동선을 유지합니다.",
+      "CSP·클립 스튜디오에서 넘어온 손에 맞춰 레이어 중심 동선을 유지하되, 좌우 도크를 줄여 캔버스 중심 작업으로 시작합니다.",
     layout: createBuiltinLayout(
       { primary: "layers", image: "fill", document: "navigator" },
       {
         leftPanelOpen: true,
         rightPanelOpen: true,
-        leftPanelWidth: 240,
-        rightPanelWidth: 360,
+        leftPanelWidth: 176,
+        rightPanelWidth: 296,
       },
       ["undo", "redo", "pen", "advanced-fill", "eyedropper", "select"],
       DRAWING_DEVICE_OVERRIDES,

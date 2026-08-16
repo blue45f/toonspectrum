@@ -7,8 +7,9 @@ import type {
 export const STUDIO_CLIP_WORKSPACE_RECOMMENDATION = Object.freeze({
   id: "clip-studio-layout",
   workspaceId: "csp-migration",
-  description: "클립 스튜디오에서 익숙했던 넓은 좌우 도크와 레이어 중심 동선으로 바로 시작합니다.",
-  detail: "왼쪽 페이지 · 오른쪽 레이어·속성 · 넓은 도크",
+  description:
+    "클립 스튜디오에서 익숙했던 레이어 중심 동선을 유지하면서 좌우 도크를 줄여 캔버스 우선 환경으로 바로 시작합니다.",
+  detail: "왼쪽 페이지 · 오른쪽 레이어·속성 · 캔버스 우선 배치",
   actionLabel: "이 배치 사용",
   searchAliases: Object.freeze([
     "CSP",

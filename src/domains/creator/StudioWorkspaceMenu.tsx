@@ -321,6 +321,7 @@ function StudioProComicPresetPreview({
 }: {
   readonly layout: StudioWorkspaceLayout;
 }) {
+  const desktop = layout.desktop;
   return (
     <span
       className="mt-2 block border-t border-accent/25 pt-2"
@@ -348,7 +349,7 @@ function StudioProComicPresetPreview({
         ))}
       </span>
       <span className="mt-1.5 block text-[0.6875rem] leading-relaxed text-fg-3">
-        왼쪽 페이지 216px · 오른쪽 도구 속성 344px · 모바일은 캔버스 우선 시트
+        {`왼쪽 페이지 ${desktop.leftPanelWidth}px · 오른쪽 ${INSPECTOR_PRIMARY_LABELS[layout.inspector.primary]} ${desktop.rightPanelWidth}px · 모바일은 캔버스 우선 시트`}
       </span>
       <StudioWorkspaceQuickAccessPreview layout={layout} compact />
     </span>
