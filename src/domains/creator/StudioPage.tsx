@@ -1507,6 +1507,14 @@ import {
   type StudioToolOperationMemory,
 } from "./studio-tool-operation-memory";
 import {
+  loadStudioCompanionReferenceCaptureRuntime,
+  openStudioToolsCompanionForMenu,
+  type StudioCompanionReferenceCaptureRuntime,
+  type StudioToolsCompanionPrimaryRuntime,
+  type StudioToolsCompanionReviewProjectionInput,
+  startStudioToolsCompanionPrimaryRuntime,
+} from "./studio-tools-companion-runtime";
+import {
   bootStudioTournamentPersistence,
   peekBootedStudioTournamentRuntime,
 } from "./studio-tournament-persistence-bootstrap";
@@ -1846,7 +1854,6 @@ import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutati
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type {
   StudioCompanionCommandName,
-  StudioCompanionPrimaryRuntime,
 } from "./studio-tools-companion";
 import type { StudioUiBooleanPreferenceKey } from "./studio-ui-preferences-sqlite";
 import type { StudioVelocityPressureState } from "./studio-velocity-pressure-response";
@@ -2901,18 +2908,6 @@ export function LegacyStudioEditorAdapter({
   );
 }
 
-type StudioToolsCompanionProtocol = typeof import("./studio-tools-companion");
-type StudioCompanionReferenceCaptureRuntimeModule = typeof import(
-  "@/components/studio/runtime/studio-companion-reference-capture-runtime"
-);
-type StudioCompanionReferenceCaptureRuntime = ReturnType<
-  StudioCompanionReferenceCaptureRuntimeModule["createStudioCompanionReferenceCaptureRuntime"]
->;
-
-type StudioToolsCompanionPrimaryRuntime = StudioCompanionPrimaryRuntime & {
-  protocol: StudioToolsCompanionProtocol;
-};
-
 type StudioPixelEditBrushRuntime = typeof import("./studio-pixel-edit-brush-runtime");
 type StudioBrushLibrarySqliteRepositoryModule = typeof import(
   "./studio-brush-library-sqlite-repository"
@@ -2984,157 +2979,6 @@ function loadStudioLiquifyBrowserRuntime(): Promise<StudioLiquifyBrowserRuntime>
       throw error;
     }
   );
-}
-
-type StudioToolsCompanionReviewProjectionInput = Parameters<
-  StudioToolsCompanionProtocol["createStudioCompanionReviewProjectionFromSource"]
->[0];
-
-type StudioToolsCompanionRuntimeInput = Omit<
-  Parameters<StudioToolsCompanionProtocol["startStudioCompanionPrimaryRuntimeFromSources"]>[0],
-  "getReviewProjectionInput"
-> & { getReviewProjectionInput?: () => StudioToolsCompanionReviewProjectionInput };
-
-let studioToolsCompanionProtocolPromise: Promise<StudioToolsCompanionProtocol> | null = null;
-let studioCompanionReferenceCaptureRuntimePromise:
-  Promise<StudioCompanionReferenceCaptureRuntimeModule> | null = null;
-
-function loadStudioToolsCompanionProtocol(): Promise<StudioToolsCompanionProtocol> {
-  return studioToolsCompanionProtocolPromise ??= import("./studio-tools-companion");
-}
-
-function loadStudioCompanionReferenceCaptureRuntime(): Promise<
-  StudioCompanionReferenceCaptureRuntimeModule
-> {
-  return studioCompanionReferenceCaptureRuntimePromise ??= import(
-    "@/components/studio/runtime/studio-companion-reference-capture-runtime"
-  ).catch((error: unknown) => {
-    studioCompanionReferenceCaptureRuntimePromise = null;
-    throw error;
-  });
-}
-
-async function startStudioToolsCompanionPrimaryRuntime(
-  input: StudioToolsCompanionRuntimeInput
-): Promise<StudioToolsCompanionPrimaryRuntime | null> {
-  const protocol = await loadStudioToolsCompanionProtocol();
-  const runtime = protocol.startStudioCompanionPrimaryRuntimeFromSources(input);
-  return runtime ? { protocol, ...runtime } : null;
-}
-
-const STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES =
-  "popup=yes,width=520,height=820,menubar=no,toolbar=no,location=no,status=no";
-
-function openStudioToolsCompanionForMenu(input: {
-  ensureRuntime: () => Promise<StudioToolsCompanionPrimaryRuntime | null>;
-  runtimeRef: { current: StudioToolsCompanionPrimaryRuntime | null };
-  windowRef: { current: Window | null };
-  announce: (message: string) => void;
-  workId: string | null;
-  t: (key: string) => string;
-}): void {
-  const localize = (key: string, fallback: string) => {
-    const translated = input.t(key);
-    return translated === key ? fallback : translated;
-  };
-  const ready = input.runtimeRef.current;
-  if (ready) {
-    ready.protocol.openReadyStudioToolsCompanionForMenu({
-      sessionId: ready.sessionId,
-      binding: ready.binding,
-      windowRef: input.windowRef,
-      announce: input.announce,
-      workId: input.workId,
-      t: input.t,
-    });
-    return;
-  }
-
-  const existingReservation = input.windowRef.current;
-  if (existingReservation && !existingReservation.closed) {
-    try {
-      existingReservation.focus();
-    } catch {
-      // Browsers may deny focus while the reserved popup is still loading.
-    }
-    input.announce(
-      localize(
-        "studio.toolsCompanion.open.readyMessage",
-        "도구 창을 준비 중입니다 · 잠시만 기다려 주세요",
-      ),
-    );
-    return;
-  }
-
-  let reservation: Window | null = null;
-  try {
-    reservation = window.open("", "_blank", STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES);
-  } catch {
-    reservation = null;
-  }
-  if (!reservation) {
-    input.announce(
-      localize(
-        "studio.toolsCompanion.open.popupBlocked",
-        "팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.",
-      ),
-    );
-    return;
-  }
-  try {
-    reservation.opener = null;
-  } catch {
-    // The lazy companion protocol retries this before navigation; keep the popup usable here.
-  }
-  input.windowRef.current = reservation;
-  input.announce(
-    localize(
-      "studio.toolsCompanion.open.readyToOpen",
-      "도구 창을 준비 중입니다 · 연결이 끝나면 자동으로 열립니다",
-    ),
-  );
-
-  const abandonReservation = (message: string) => {
-    try {
-      reservation?.close();
-    } catch {
-      // Ignore a reservation already closed by the browser.
-    }
-    if (input.windowRef.current !== reservation) return;
-    input.windowRef.current = null;
-    input.announce(message);
-  };
-  const reservationTimeout = globalThis.setTimeout(() => {
-    abandonReservation(
-      localize(
-        "studio.toolsCompanion.open.prepareTimeout",
-        "도구 창 준비 시간이 초과됐습니다. 다시 시도해 주세요.",
-      ),
-    );
-  }, 8_000);
-  const unavailableMessage = localize(
-    "studio.toolsCompanion.open.unavailable",
-    "도구 창을 사용할 수 없습니다. 다시 시도해 주세요.",
-  );
-
-  void input.ensureRuntime().then((runtime) => {
-    globalThis.clearTimeout(reservationTimeout);
-    if (!runtime) {
-      abandonReservation(unavailableMessage);
-      return;
-    }
-    runtime.protocol.completeReservedStudioToolsCompanionWindow({
-      sessionId: runtime.sessionId,
-      reservation,
-      windowRef: input.windowRef,
-      announce: input.announce,
-      workId: input.workId,
-      t: input.t,
-    });
-  }).catch(() => {
-    globalThis.clearTimeout(reservationTimeout);
-    abandonReservation(unavailableMessage);
-  });
 }
 
 interface StudioLayerLiftUiState {
