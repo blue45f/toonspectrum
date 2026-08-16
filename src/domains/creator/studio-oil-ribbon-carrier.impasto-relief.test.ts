@@ -215,12 +215,20 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
     // The canonical <30ms budget case is the 2000-station stroke above; this blob-shaped
     // scribble maximises grid area AND splat density, so it only guards pathological blowup.
     //
-    // Held at 45 through a 7 -> 20 hair bed on this stroke. The bed scaling alone took it to 65ms;
-    // every millisecond of that came back out as redundancy rather than as texture, and the ridge
-    // count is unchanged at twenty: runs are quantised once instead of once per shell they appear
-    // in, the ridges and flank stripes stride the bed so hairs finer than the field's own cell are
-    // not splatted twice, and each ridge segment is one capsule distance field instead of a chain
-    // of overlapping discs that was quadrature for exactly that field. Measured 33-38ms.
-    expect(elapsed).toBeLessThan(45);
+    // Held through a 7 -> 20 hair bed on this stroke. The bed scaling alone took it to 65ms; every
+    // millisecond of that came back out as redundancy rather than as texture, and the ridge count
+    // is unchanged at twenty: runs are quantised once instead of once per shell they appear in,
+    // the ridges and flank stripes stride the bed so hairs finer than the field's own cell are not
+    // splatted twice, and each ridge segment is one capsule distance field instead of a chain of
+    // overlapping discs that was quadrature for exactly that field.
+    //
+    // The bound is 60, not 45, and that is a correction rather than slack. 45 was set from a clean
+    // 33-38ms reading and is FLAKY: re-measured fastest-of-5 on a working machine this scribble
+    // spans 36.5-48.9ms, and the suite itself failed one run in four at 47.53ms. A guard that
+    // fires on scheduler noise gets raised in a hurry by whoever it blocks, which is worse than a
+    // guard with honest headroom. 60 still catches the regression class this exists for - the
+    // re-splat multiplier that produced 65ms - and the canonical case above keeps the tight
+    // budget, measured 8.3-15.5ms against its 30.
+    expect(elapsed).toBeLessThan(60);
   });
 });
