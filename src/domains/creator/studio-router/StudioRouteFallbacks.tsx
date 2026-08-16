@@ -46,8 +46,10 @@ export function StudioRouteFailure({
 
 const PLACEHOLDER_LABELS: Readonly<Record<StudioPlaceholderRouteId, string>> = {
   assets: "에셋",
+  review: "리뷰",
   join: "공동 작업 참여",
   present: "프레젠테이션",
+  versions: "버전",
   projects: "프로젝트",
   share: "공유",
 };

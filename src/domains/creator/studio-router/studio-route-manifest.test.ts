@@ -97,6 +97,41 @@ describe("Studio route manifest", () => {
       "/studio/projects",
       "/studio/projects",
     ],
+    [
+      "/studio/review",
+      "",
+      "placeholder",
+      "/studio/review",
+      "/studio/review",
+    ],
+    [
+      "/studio/versions",
+      "?tab=history",
+      "placeholder",
+      "/studio/versions?tab=history",
+      "/studio/versions",
+    ],
+    [
+      "/studio/work/work-1/present",
+      "",
+      "placeholder",
+      "/studio/work/work-1/present",
+      "/studio/work:work-1/present",
+    ],
+    [
+      "/studio/work/work-1/review",
+      "",
+      "placeholder",
+      "/studio/work/work-1/review",
+      "/studio/work:work-1/review",
+    ],
+    [
+      "/studio/work/work-1/versions",
+      "?tab=history",
+      "placeholder",
+      "/studio/work/work-1/versions?tab=history",
+      "/studio/work:work-1/versions",
+    ],
   ] as const)(
     "resolves %s%s to its canonical route",
     (pathname, search, kind, canonicalHref, lifecycleKey) => {
@@ -116,6 +151,7 @@ describe("Studio route manifest", () => {
     ["/studio/work/work-1/publish", "?id=work-2", "work-id-conflict"],
     ["/studio/companion/unknown", "", "invalid-path"],
     ["/studio/avatar", "", "invalid-path"],
+    ["/studio/work/work-1/history", "", "invalid-path"],
   ] as const)("fails closed for %s%s", (pathname, search, errorCode) => {
     expect(resolveStudioRoute({ pathname, search })).toMatchObject({
       errorCode,

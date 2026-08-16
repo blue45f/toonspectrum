@@ -35,6 +35,8 @@ describe("AppRouter document title ownership", () => {
     ["/studio/work/work-1/canvas", "?id=work-2"],
     ["/studio/work/work-1/canvas", "?id=work-1&id=work-1"],
     ["/studio/projects", ""],
+    ["/studio/work/work-1/versions", ""],
+    ["/studio/review", ""],
   ])("keeps generic ownership for non-child or invalid route %s%s", (pathname, search) => {
     expect(shouldAppRouterOwnDocumentTitle({ pathname, search })).toBe(true);
   });

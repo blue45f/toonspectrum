@@ -60,7 +60,7 @@ export const STUDIO_ROUTE_MANIFEST = Object.freeze([
     id: "studio-placeholder",
     kind: "placeholder",
     ownsDocumentTitle: false,
-    pattern: "/studio/(projects|assets|join|share|present)",
+    pattern: "/studio/(assets|join|present|projects|review|share|versions)",
   },
 ] as const satisfies readonly StudioRouteManifestEntry[]);
 
@@ -93,7 +93,9 @@ export interface StudioCompanionRouteResolution extends StudioResolvedRouteBase 
 
 export type StudioPlaceholderRouteId =
   | "assets"
+  | "review"
   | "join"
+  | "versions"
   | "present"
   | "projects"
   | "share";
@@ -119,10 +121,19 @@ export type StudioRouteResolution =
 
 const PLACEHOLDER_IDS = new Set<StudioPlaceholderRouteId>([
   "assets",
+  "review",
   "join",
+  "versions",
   "present",
   "projects",
   "share",
+]);
+
+const WORK_SCOPE_PLACEHOLDER_SURFACES = new Set<Omit<StudioPlaceholderRouteId, "join" | "projects" | "share">>([
+  "assets",
+  "present",
+  "review",
+  "versions",
 ]);
 
 function queryParams(search: string | URLSearchParams | undefined): URLSearchParams {
@@ -302,6 +313,39 @@ function resolvePlaceholder(
   });
 }
 
+function resolveWorkScopedPlaceholder(
+  pathname: string,
+  search: string | URLSearchParams | undefined,
+): StudioPlaceholderRouteResolution | null {
+  const segments = normalizedSegments(pathname);
+  if (segments === null || segments.length !== 4) return null;
+  const [_, scope, encodedIdentity, candidateSurface] = segments;
+  if (scope !== "work" && scope !== "remix") return null;
+  if (!WORK_SCOPE_PLACEHOLDER_SURFACES.has(candidateSurface as StudioPlaceholderRouteId)) return null;
+
+  const probePathname = `/studio/${scope}/${encodedIdentity}/canvas`;
+  const parsed = parseStudioWorkspaceRoute({ pathname: probePathname });
+  if (!parsed.valid) return null;
+  const surface = candidateSurface as Exclude<
+    StudioPlaceholderRouteId,
+    "projects" | "join" | "share"
+  >;
+  const canonicalPathname = scope === "work"
+    ? `/studio/work/${encodeURIComponent(parsed.workId ?? "")}/${surface}`
+    : `/studio/remix/${encodeURIComponent(parsed.remixSourceWorkId ?? "")}/${surface}`;
+
+  return Object.freeze({
+    canonicalHref: href(canonicalPathname, queryParams(search)),
+    canonicalPathname,
+    kind: "placeholder",
+    lifecycleKey: `/studio/${scope === "work"
+      ? `work:${encodeURIComponent(parsed.workId ?? "")}`
+      : `remix:${encodeURIComponent(parsed.remixSourceWorkId ?? "")}`}/${surface}`,
+    ownsDocumentTitle: false,
+    placeholderId: surface,
+  });
+}
+
 export function resolveStudioRoute({
   pathname,
   search,
@@ -312,6 +356,8 @@ export function resolveStudioRoute({
   if (companion !== null) return companion;
   const placeholder = resolvePlaceholder(pathname, search);
   if (placeholder !== null) return placeholder;
+  const workScopedPlaceholder = resolveWorkScopedPlaceholder(pathname, search);
+  if (workScopedPlaceholder !== null) return workScopedPlaceholder;
 
   const workspaceRoute = parseStudioWorkspaceRoute({ pathname, search });
   if (!workspaceRoute.valid) return invalidResolution(pathname, search, workspaceRoute);
