@@ -60,7 +60,6 @@ import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
 import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
 import { isStudioBrushEraserAliasId } from "../src/domains/creator/studio-brush-alias-profile";
 import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-brush-carrier-quality";
-import { studioBrushCatalogIdIsIntentionallyDiscontinuous } from "../src/domains/creator/studio-brush-continuity-audit";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
@@ -70,6 +69,7 @@ import {
   STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/studio-brush-catalog";
+import { studioBrushCatalogIdIsIntentionallyDiscontinuous } from "../src/domains/creator/studio-brush-continuity-audit";
 import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/studio-brush-dynamics";
 import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "../src/domains/creator/studio-brush-library";
 import { studioBrushPackDescriptorById } from "../src/domains/creator/studio-brush-pack-index";
