@@ -12,6 +12,7 @@ import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSeedFromKey,
   studioBrushDynamicsSettingsForBrushId,
   studioDryMediaUnionComposableProgramPin,
   type StudioDynamicBrushDab,
@@ -65,6 +66,10 @@ import {
   type SvgExportPageInput,
   type SvgExportResult,
 } from "./studio-svg-export";
+import {
+  planStudioWebDrawingKitOwnedDabs,
+  STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS,
+} from "./studio-web-drawing-stroke-bridge";
 import { STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT } from "./studio-wet-ribbon-carrier";
 
 import type { StudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
@@ -2742,6 +2747,93 @@ describe("도형 직렬화", () => {
 
     expect(plain).toBeGreaterThan(0);
     expect(mirrored).toBeGreaterThan(plain);
+  });
+
+  it("kit-owned web brushes export kit geometry; mirror and kaleido stay on the page fold", () => {
+    const marks = (svg: string) => (svg.match(/<(?:path|use|circle|ellipse)/gu) ?? []).length;
+    const ownedId = STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS[0];
+    expect(ownedId).toBeDefined();
+    const ownedCatalog = studioBrushDynamicsSettingsForBrushId(ownedId!);
+    expect(ownedCatalog).not.toBeNull();
+    const owned = rectEl({
+      id: "kit-owned-export",
+      kind: "freehand",
+      brush: ownedId,
+      points: [40, 40, 90, 70, 140, 50],
+      pressures: [0.6, 0.8, 0.5],
+      stroke: "#1b1b1f",
+      strokeWidth: 8,
+      fill: undefined,
+      brushDynamics: ownedCatalog!,
+    });
+    const exported = exportPageToSvg(page([owned]));
+    expect(exported.skipped.filter((skip) => skip.id === owned.id)).toEqual([]);
+    expect(marks(exported.svg)).toBeGreaterThan(0);
+
+    const seed = studioBrushDynamicsSeedFromKey(`${owned.id}:${ownedCatalog!.seed}`);
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      ...ownedCatalog!,
+      seed,
+      width: { ...ownedCatalog!.width, base: 8 },
+    });
+    const kitDabs = planStudioWebDrawingKitOwnedDabs(
+      {
+        brushId: ownedId,
+        points: owned.points,
+        pressures: owned.pressures,
+        baseWidth: 8,
+        baseOpacity: dynamics.opacity.base,
+        seed,
+      },
+      dynamics,
+    );
+    expect(kitDabs).not.toBeNull();
+    expect(kitDabs!.length).toBeGreaterThan(0);
+    const exportedPoints = [...exported.svg.matchAll(/cx="([^"]+)" cy="([^"]+)"/g)].map((match) => ({
+      x: Number(match[1]),
+      y: Number(match[2]),
+    }));
+    expect(exportedPoints.length).toBeGreaterThan(0);
+    // Stamp serialization paints samples around each kit station, not the station center itself.
+    expect(exportedPoints.some((point) => kitDabs!.some((dab) => (
+      Math.hypot(point.x - dab.x, point.y - dab.y) <= Math.max(dab.size, 4)
+    )))).toBe(true);
+
+    const pageCenter = { type: "none" as const, centerX: 360, centerY: 500, radialCount: 6 };
+    for (const brushId of ["web-mirror-ink", "web-kaleido-ink"] as const) {
+      const catalog = studioBrushDynamicsSettingsForBrushId(brushId);
+      expect(catalog, brushId).not.toBeNull();
+      const foldSettings = studioBrushDynamicsSettingsForBrushId(brushId)!;
+      expect(planStudioWebDrawingKitOwnedDabs(
+        {
+          brushId,
+          points: [40, 40, 90, 70, 140, 50],
+          pressures: [0.6, 0.8, 0.5],
+          baseWidth: 8,
+          seed: 7,
+        },
+        foldSettings,
+      ), brushId).toBeNull();
+
+      const base = rectEl({
+        id: `${brushId}-export`,
+        kind: "freehand",
+        brush: brushId,
+        points: [40, 40, 90, 70, 140, 50],
+        pressures: [0.6, 0.8, 0.5],
+        stroke: "#1b1b1f",
+        strokeWidth: 8,
+        fill: undefined,
+        brushDynamics: catalog!,
+      });
+      const plain = marks(exportPageToSvg(page([base])).svg);
+      const folded = marks(exportPageToSvg(page([{
+        ...base,
+        symmetry: resolveStudioStrokeSymmetry(pageCenter, brushId),
+      }])).svg);
+      expect(plain, brushId).toBeGreaterThan(0);
+      expect(folded, brushId).toBeGreaterThan(plain);
+    }
   });
 
   it("네온 — 미리보기와 같은 2중 컬러 할로 + 밝힌 코어를 내보낸다", () => {

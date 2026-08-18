@@ -7,6 +7,7 @@
  * pipeline (no parallel renderer).
  */
 
+import { resolveStudioBrushIntrinsicSymmetry } from "./studio-brush-intrinsic-symmetry";
 import {
   isStudioWebAssistBrushId,
   planStudioWebAssistSamplesForBrush,
@@ -66,6 +67,32 @@ export function classifyStudioWebDrawingBrushFamily(
   if (isStudioWebAssistBrushId(brushId)) return "assist";
   return "none";
 }
+
+/**
+ * True when the KIT authors this stroke's geometry, so every surface must plan from kit samples
+ * rather than from the ordinary deposition planner.
+ *
+ * Two kit presets are deliberately excluded. `web-mirror-ink` and `web-kaleido-ink` already get
+ * their second mark from `studio-brush-intrinsic-symmetry`, which records the fold on the stroke
+ * and is honoured identically by the committed Konva plan, the SVG export and the live overlay,
+ * centred on the PAGE. Their kit planners take a `centerX`/`centerY` that no caller supplies, so
+ * routing them here would fold them a SECOND time about the origin and throw those copies
+ * off-canvas. Excluding them is that repair: the fold they render is the page-centred one.
+ *
+ * Everything outside the kit answers false, which is what keeps this change byte-identical for the
+ * rest of the catalogue.
+ */
+export function studioWebDrawingKitOwnsStrokeGeometry(
+  brushId: unknown,
+): brushId is StudioWebDrawingBrushId {
+  return isStudioWebDrawingBrushId(brushId)
+    && resolveStudioBrushIntrinsicSymmetry(brushId) === null;
+}
+
+/** Kit ids whose geometry the kit owns — for governance tests and audits. */
+export const STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS: readonly string[] = Object.freeze(
+  STUDIO_WEB_DRAWING_ALL_BRUSH_IDS.filter(studioWebDrawingKitOwnsStrokeGeometry),
+);
 
 export interface StudioWebDrawingBridgePlanAudit {
   readonly family: StudioWebDrawingBrushFamily;
@@ -301,6 +328,23 @@ export function planStudioWebDrawingDynamicDabs(
     if (dabs.length >= maxDabs) break;
   }
   return dabs;
+}
+
+/**
+ * The dabs every surface must paint for a kit-owned brush, or null to keep the ordinary planner.
+ *
+ * This is the entry point the committed Konva plan, the SVG export and the live overlay all call.
+ * They used to diverge by construction: all 25 kit presets normalise to `causal-deposit-v3-segmented`,
+ * and each surface's causal branch returns before its dab planner is ever consulted, so the kit's
+ * rays, strands and double contours reached NO surface — including live, whose kit call sat below
+ * that early return. Routing every surface through one function is what stops that from recurring.
+ */
+export function planStudioWebDrawingKitOwnedDabs(
+  input: StudioWebDrawingBridgeInput,
+  settings: NormalizedStudioBrushDynamicsSettings,
+): StudioDynamicBrushDab[] | null {
+  if (!studioWebDrawingKitOwnsStrokeGeometry(input.brushId)) return null;
+  return planStudioWebDrawingDynamicDabs(input, settings);
 }
 
 /**

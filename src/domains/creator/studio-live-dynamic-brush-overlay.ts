@@ -89,8 +89,8 @@ import {
 } from "./studio-splatter-origin-anchor";
 import { isStudioBoundedFlowPaintModelCompatible } from "./studio-stroke-paint-model";
 import {
-  isStudioWebDrawingBrushId,
-  planStudioWebDrawingDynamicDabs,
+  studioWebDrawingKitOwnsStrokeGeometry,
+  planStudioWebDrawingKitOwnedDabs,
   recommendStudioWebDrawingLiveMaxDabs,
   sliceStudioDynamicDabsForLiveFrame,
 } from "./studio-web-drawing-stroke-bridge";
@@ -1812,8 +1812,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       seed: style.seed,
     };
     const planWebDabs = (maxDabs: number): StudioDynamicBrushDab[] | null => {
-      if (!isStudioWebDrawingBrushId(style.brushId)) return null;
-      return planStudioWebDrawingDynamicDabs(
+      return planStudioWebDrawingKitOwnedDabs(
         {
           brushId: style.brushId,
           points: planInput.points,
@@ -1822,13 +1821,15 @@ export class StudioLiveDynamicBrushOverlayRenderer {
           baseOpacity: planInput.baseOpacity,
           seed: planInput.seed,
           maxDabs,
+          centerX: style.symmetry.centerX,
+          centerY: style.symmetry.centerY,
         },
         style.dynamics,
       );
     };
     // Web kits can explode sample counts (swarm/kaleido). Cap the first live plan to the
     // mark budget before render-budget planning so pointer frames stay allocation-light.
-    const webLiveCap = isStudioWebDrawingBrushId(style.brushId)
+    const webLiveCap = studioWebDrawingKitOwnsStrokeGeometry(style.brushId)
       ? recommendStudioWebDrawingLiveMaxDabs({
           brushId: style.brushId,
           points: planInput.points,

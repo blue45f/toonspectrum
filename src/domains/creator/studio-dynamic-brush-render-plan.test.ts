@@ -5,15 +5,21 @@ import {
   studioBrushDynamicsSettingsForBrushId,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
 } from "./studio-brush-dynamics";
+import { resolveStudioStrokeSymmetry } from "./studio-brush-intrinsic-symmetry";
 import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
 import {
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
 } from "./studio-brush-render-budget";
+import { studioBrushSymmetryTransforms } from "./studio-brush-symmetry";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
 import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
 import { exportPageToSvg } from "./studio-svg-export";
+import {
+  planStudioWebDrawingKitOwnedDabs,
+  STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS,
+} from "./studio-web-drawing-stroke-bridge";
 
 import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
 import type { DrawEl } from "./studio-element-model";
@@ -300,6 +306,75 @@ describe("studio dynamic brush render plan", () => {
       status: "rejected",
       reason: "deposit-plan",
     });
+  });
+
+  it("plans kit-owned web brushes through kit dabs and leaves intrinsic-symmetry folds on the ordinary path", () => {
+    const ownedId = STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS[0];
+    expect(ownedId).toBeDefined();
+    const ownedCatalog = studioBrushDynamicsSettingsForBrushId(ownedId!);
+    expect(ownedCatalog).not.toBeNull();
+    const ownedElement = drawElement("kit-owned-stroke", {
+      brush: ownedId,
+      brushDynamics: ownedCatalog!,
+    });
+    const ownedPlan = requireReady(
+      planStudioDynamicBrushRender(ownedElement, ownedId!, false),
+    );
+    expect(ownedPlan.usesCausalDepositPlan).toBe(false);
+
+    const kitDabs = planStudioWebDrawingKitOwnedDabs(
+      {
+        brushId: ownedId,
+        points: ownedElement.points,
+        pressures: ownedElement.pressures,
+        baseWidth: Math.max(1, ownedElement.strokeWidth),
+        baseOpacity: ownedPlan.dynamics.opacity.base,
+        seed: ownedPlan.seed,
+        maxDabs: ownedPlan.renderBudget.maxDabsPerVariation,
+      },
+      ownedPlan.dynamics,
+    );
+    expect(kitDabs).not.toBeNull();
+    expect(kitDabs!.length).toBeGreaterThan(0);
+
+    const ownedVariation = requireLegacyVariation(ownedPlan, 0);
+    expect(ownedVariation.map((dab) => ({ x: dab.x, y: dab.y }))).toEqual(
+      kitDabs!.map((dab) => ({ x: dab.x, y: dab.y })),
+    );
+
+    const pageCenter = {
+      type: "none" as const,
+      centerX: 50,
+      centerY: 30,
+      radialCount: 6,
+    };
+    for (const brushId of ["web-mirror-ink", "web-kaleido-ink"] as const) {
+      const catalog = studioBrushDynamicsSettingsForBrushId(brushId);
+      expect(catalog, brushId).not.toBeNull();
+      const symmetry = resolveStudioStrokeSymmetry(pageCenter, brushId);
+      expect(symmetry, brushId).toBeDefined();
+      const element = drawElement(`${brushId}-ordinary`, {
+        brush: brushId,
+        brushDynamics: catalog!,
+        symmetry,
+      });
+      const plan = requireReady(planStudioDynamicBrushRender(element, brushId, false));
+      expect(planStudioWebDrawingKitOwnedDabs(
+        {
+          brushId,
+          points: element.points,
+          pressures: element.pressures,
+          baseWidth: Math.max(1, element.strokeWidth),
+          baseOpacity: plan.dynamics.opacity.base,
+          seed: plan.seed,
+          maxDabs: plan.renderBudget.maxDabsPerVariation,
+        },
+        plan.dynamics,
+      ), brushId).toBeNull();
+      expect(plan.dabVariations, brushId).toHaveLength(
+        studioBrushSymmetryTransforms(symmetry).length,
+      );
+    }
   });
 });
 

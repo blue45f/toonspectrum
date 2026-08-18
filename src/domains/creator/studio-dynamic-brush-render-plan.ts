@@ -52,6 +52,9 @@ import {
 import {
   studioSplatterOriginAnchorMarkCount,
 } from "./studio-splatter-origin-anchor";
+import {
+  planStudioWebDrawingKitOwnedDabs,
+} from "./studio-web-drawing-stroke-bridge";
 
 import type {
   NormalizedStudioBrushDynamicsSettings,
@@ -208,51 +211,71 @@ export function planStudioDynamicBrushRender(
     baseOpacity: dynamics.opacity.base,
     seed,
   };
-  const causalDepositPlan = isStudioDynamicBrushCausalDepositPipeline(
-    dynamics.depositPipeline,
-  )
-    ? studioDynamicBrushDepositPipelineUsesContinuation(dynamics.depositPipeline)
-      ? planStudioCausalDynamicBrushDepositSegmentsV3({
-          points: element.points,
-          pressures: element.pressures,
-          tangentialPressures: element.tangentialPressures,
-          speeds: element.speeds,
-          tiltXs: element.tiltXs,
-          tiltYs: element.tiltYs,
-          twists: element.twists,
-          settings: dynamics,
-        })
-      : planStudioCausalDynamicBrushDepositsV2({
-          points: element.points,
-          pressures: element.pressures,
-          tangentialPressures: element.tangentialPressures,
-          speeds: element.speeds,
-          tiltXs: element.tiltXs,
-          tiltYs: element.tiltYs,
-          twists: element.twists,
-          settings: dynamics,
-          maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-        })
-    : null;
-  if (causalDepositPlan && !causalDepositPlan.ok) {
-    return Object.freeze({ status: "rejected", reason: "deposit-plan" });
-  }
-
-  const usesCausalDepositPlan = causalDepositPlan?.ok === true;
+  const kitPlanInput = {
+    brushId: typeof element.brush === "string" && element.brush
+      ? element.brush
+      : dynamicBrushId,
+    points: dabPlanInput.points,
+    pressures: dabPlanInput.pressures,
+    baseWidth: dabPlanInput.baseWidth,
+    baseOpacity: dabPlanInput.baseOpacity,
+    seed: dabPlanInput.seed,
+    centerX: element.symmetry?.centerX,
+    centerY: element.symmetry?.centerY,
+  };
+  const webKitDabs = planStudioWebDrawingKitOwnedDabs(
+    { ...kitPlanInput, maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS },
+    dynamics,
+  );
+  let usesCausalDepositPlan = false;
   let causalDabSegments:
     | readonly (readonly StudioDynamicBrushDab[])[]
-    | null =
-    causalDepositPlan?.ok === true && "segments" in causalDepositPlan
+    | null = null;
+  let baseDabs = webKitDabs ?? ([] as readonly StudioDynamicBrushDab[]);
+  if (webKitDabs === null) {
+    const causalDepositPlan = isStudioDynamicBrushCausalDepositPipeline(
+      dynamics.depositPipeline,
+    )
+      ? studioDynamicBrushDepositPipelineUsesContinuation(dynamics.depositPipeline)
+        ? planStudioCausalDynamicBrushDepositSegmentsV3({
+            points: element.points,
+            pressures: element.pressures,
+            tangentialPressures: element.tangentialPressures,
+            speeds: element.speeds,
+            tiltXs: element.tiltXs,
+            tiltYs: element.tiltYs,
+            twists: element.twists,
+            settings: dynamics,
+          })
+        : planStudioCausalDynamicBrushDepositsV2({
+            points: element.points,
+            pressures: element.pressures,
+            tangentialPressures: element.tangentialPressures,
+            speeds: element.speeds,
+            tiltXs: element.tiltXs,
+            tiltYs: element.tiltYs,
+            twists: element.twists,
+            settings: dynamics,
+            maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+          })
+      : null;
+    if (causalDepositPlan && !causalDepositPlan.ok) {
+      return Object.freeze({ status: "rejected", reason: "deposit-plan" });
+    }
+
+    usesCausalDepositPlan = causalDepositPlan?.ok === true;
+    causalDabSegments = causalDepositPlan?.ok === true && "segments" in causalDepositPlan
       ? causalDepositPlan.segments.map((segment) => segment.dabs)
       : null;
-  let baseDabs = causalDabSegments
-    ? [] as readonly StudioDynamicBrushDab[]
-    : causalDepositPlan?.ok === true && "dabs" in causalDepositPlan
-      ? causalDepositPlan.dabs
-      : planNormalizedStudioDynamicBrushDabs(
-          { ...dabPlanInput, maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS },
-          dynamics,
-        );
+    baseDabs = causalDabSegments
+      ? [] as readonly StudioDynamicBrushDab[]
+      : causalDepositPlan?.ok === true && "dabs" in causalDepositPlan
+        ? causalDepositPlan.dabs
+        : planNormalizedStudioDynamicBrushDabs(
+            { ...dabPlanInput, maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS },
+            dynamics,
+          );
+  }
   const baseDabCount = causalDabSegments
     ? segmentedDabCount(causalDabSegments)
     : baseDabs.length;
@@ -291,10 +314,17 @@ export function planStudioDynamicBrushRender(
     }
   }
   if (!usesCausalDepositPlan && renderBudget.maxDabsPerVariation < baseDabCount) {
-    baseDabs = planNormalizedStudioDynamicBrushDabs(
-      { ...dabPlanInput, maxDabs: renderBudget.maxDabsPerVariation },
-      dynamics,
-    );
+    if (webKitDabs !== null) {
+      baseDabs = planStudioWebDrawingKitOwnedDabs(
+        { ...kitPlanInput, maxDabs: renderBudget.maxDabsPerVariation },
+        dynamics,
+      ) ?? webKitDabs.slice(0, renderBudget.maxDabsPerVariation);
+    } else {
+      baseDabs = planNormalizedStudioDynamicBrushDabs(
+        { ...dabPlanInput, maxDabs: renderBudget.maxDabsPerVariation },
+        dynamics,
+      );
+    }
   }
 
   const paperResponse = resolveStudioPaperBrushResponse(

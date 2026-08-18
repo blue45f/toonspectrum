@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,9 +12,12 @@ import {
   isStudioWebDrawingBrushId,
   planStudioWebAwareDynamicBrushDabs,
   planStudioWebDrawingDynamicDabs,
+  planStudioWebDrawingKitOwnedDabs,
   recommendStudioWebDrawingLiveMaxDabs,
   sliceStudioDynamicDabsForLiveFrame,
+  studioWebDrawingKitOwnsStrokeGeometry,
   STUDIO_WEB_DRAWING_ALL_BRUSH_IDS,
+  STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS,
   STUDIO_WEB_DRAWING_LIVE_MARK_BUDGET_DEFAULT,
 } from "./studio-web-drawing-stroke-bridge";
 
@@ -226,5 +231,94 @@ describe("studio web drawing stroke bridge", () => {
     expect(tipOnly.dabs).toHaveLength(1);
     expect(tipOnly.dabs[0]).toBe(dabs[dabs.length - 1]);
     expect(tipOnly.preservedEndpoint).toBe(true);
+  });
+
+  it("owns kit geometry except intrinsic-symmetry folds and non-web brushes", () => {
+    const ownedId = STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS[0];
+    expect(ownedId).toBeDefined();
+    expect(studioWebDrawingKitOwnsStrokeGeometry(ownedId)).toBe(true);
+    expect(studioWebDrawingKitOwnsStrokeGeometry("web-mirror-ink")).toBe(false);
+    expect(studioWebDrawingKitOwnsStrokeGeometry("web-kaleido-ink")).toBe(false);
+    expect(studioWebDrawingKitOwnsStrokeGeometry("pen")).toBe(false);
+
+    expect(
+      STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS.every((id) =>
+        (STUDIO_WEB_DRAWING_ALL_BRUSH_IDS as readonly string[]).includes(id),
+      ),
+    ).toBe(true);
+    expect(STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS).not.toContain("web-mirror-ink");
+    expect(STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS).not.toContain("web-kaleido-ink");
+
+    const ownedSettings = studioBrushDynamicsSettingsForBrushId(ownedId!)!;
+    const owned = planStudioWebDrawingKitOwnedDabs(
+      {
+        brushId: ownedId,
+        points: POINTS,
+        pressures: PRESSURES,
+        baseWidth: 10,
+        baseOpacity: 1,
+        seed: 7,
+        maxDabs: 512,
+      },
+      ownedSettings,
+    );
+    expect(owned).not.toBeNull();
+    expect(owned!.length).toBeGreaterThan(0);
+    expect(owned!.every((dab) => dab.size > 0 && dab.opacity > 0)).toBe(true);
+
+    const mirrorSettings = studioBrushDynamicsSettingsForBrushId("web-mirror-ink")!;
+    expect(planStudioWebDrawingKitOwnedDabs(
+      {
+        brushId: "web-mirror-ink",
+        points: POINTS,
+        pressures: PRESSURES,
+        baseWidth: 10,
+        seed: 7,
+      },
+      mirrorSettings,
+    )).toBeNull();
+
+    const kaleidoSettings = studioBrushDynamicsSettingsForBrushId("web-kaleido-ink")!;
+    expect(planStudioWebDrawingKitOwnedDabs(
+      {
+        brushId: "web-kaleido-ink",
+        points: POINTS,
+        pressures: PRESSURES,
+        baseWidth: 10,
+        seed: 7,
+      },
+      kaleidoSettings,
+    )).toBeNull();
+
+    const penSettings = studioBrushDynamicsSettingsForBrushId("pen")!;
+    expect(planStudioWebDrawingKitOwnedDabs(
+      {
+        brushId: "pen",
+        points: POINTS,
+        pressures: PRESSURES,
+        baseWidth: 10,
+        seed: 7,
+      },
+      penSettings,
+    )).toBeNull();
+  });
+
+  it("routes committed, live, and SVG surfaces through the kit-owned planner", () => {
+    for (const [path, expected] of [
+      ["./studio-dynamic-brush-render-plan.ts", "planStudioWebDrawingKitOwnedDabs"],
+      ["./studio-live-dynamic-brush-overlay.ts", "planStudioWebDrawingKitOwnedDabs"],
+      ["./studio-svg-export.ts", "planStudioWebDrawingKitOwnedDabs"],
+    ] as const) {
+      const source = readFileSync(new URL(path, import.meta.url), "utf8");
+      expect(source, path).toContain(expected);
+      expect(source, path).not.toMatch(
+        /planStudioWebDrawingDynamicDabs\(/,
+      );
+    }
+    const live = readFileSync(
+      new URL("./studio-live-dynamic-brush-overlay.ts", import.meta.url),
+      "utf8",
+    );
+    expect(live).toContain("studioWebDrawingKitOwnsStrokeGeometry");
   });
 });

@@ -281,6 +281,9 @@ import {
   watercolorBrushSeedFromKey,
 } from "./studio-watercolor-brush";
 import {
+  planStudioWebDrawingKitOwnedDabs,
+} from "./studio-web-drawing-stroke-bridge";
+import {
   planStudioWetRibbonCarrier,
   studioWetRibbonCarrierBatchPathData,
 } from "./studio-wet-ribbon-carrier";
@@ -1727,35 +1730,60 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           settings: dynamics,
           seed,
         };
-        const usesCausalDepositPlan =
-          isStudioDynamicBrushCausalDepositPipeline(dynamics.depositPipeline);
+        const kitPlanInput = {
+          brushId: el.brush,
+          points: dabPlanInput.points,
+          pressures: dabPlanInput.pressures,
+          baseWidth: dabPlanInput.baseWidth,
+          baseOpacity: dabPlanInput.baseOpacity,
+          seed: dabPlanInput.seed,
+          centerX: el.symmetry?.centerX,
+          centerY: el.symmetry?.centerY,
+        };
+        const webKitDabs = planStudioWebDrawingKitOwnedDabs(
+          { ...kitPlanInput, maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS },
+          dynamics,
+        );
+        let usesCausalDepositPlan = false;
         const usesContinuation =
           studioDynamicBrushDepositPipelineUsesContinuation(dynamics.depositPipeline);
-        const causalDepositPlan = usesCausalDepositPlan && !usesContinuation
-          ? planStudioCausalDynamicBrushDepositsV2({
-              points: el.points,
-              pressures: el.pressures,
-              tangentialPressures: el.tangentialPressures,
-              speeds: el.speeds,
-              tiltXs: el.tiltXs,
-              tiltYs: el.tiltYs,
-              twists: el.twists,
-              settings: dynamics,
-              maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-            })
-          : null;
-        const continuationPlan = usesContinuation
-          ? planStudioCausalDynamicBrushDepositSegmentsV3({
-              points: el.points,
-              pressures: el.pressures,
-              tangentialPressures: el.tangentialPressures,
-              speeds: el.speeds,
-              tiltXs: el.tiltXs,
-              tiltYs: el.tiltYs,
-              twists: el.twists,
-              settings: dynamics,
-            })
-          : null;
+        let causalDepositPlan:
+          | ReturnType<typeof planStudioCausalDynamicBrushDepositSegmentsV3>
+          | ReturnType<typeof planStudioCausalDynamicBrushDepositsV2>
+          | null = null;
+        let continuationPlan:
+          | ReturnType<typeof planStudioCausalDynamicBrushDepositSegmentsV3>
+          | null = null;
+        if (webKitDabs === null) {
+          usesCausalDepositPlan = isStudioDynamicBrushCausalDepositPipeline(
+            dynamics.depositPipeline,
+          );
+          causalDepositPlan = usesCausalDepositPlan && !usesContinuation
+            ? planStudioCausalDynamicBrushDepositsV2({
+                points: el.points,
+                pressures: el.pressures,
+                tangentialPressures: el.tangentialPressures,
+                speeds: el.speeds,
+                tiltXs: el.tiltXs,
+                tiltYs: el.tiltYs,
+                twists: el.twists,
+                settings: dynamics,
+                maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+              })
+            : null;
+          continuationPlan = usesContinuation
+            ? planStudioCausalDynamicBrushDepositSegmentsV3({
+                points: el.points,
+                pressures: el.pressures,
+                tangentialPressures: el.tangentialPressures,
+                speeds: el.speeds,
+                tiltXs: el.tiltXs,
+                tiltYs: el.tiltYs,
+                twists: el.twists,
+                settings: dynamics,
+              })
+            : null;
+        }
         if (
           (causalDepositPlan && !causalDepositPlan.ok)
           || (continuationPlan && !continuationPlan.ok)
@@ -1768,14 +1796,16 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           | null = continuationPlan?.ok
             ? continuationPlan.segments.map((segment) => segment.dabs)
             : null;
-        let baseDabs: readonly StudioDynamicBrushDab[] = continuationSegments
-          ? []
-          : causalDepositPlan?.ok
-            ? [...causalDepositPlan.dabs]
-            : planStudioDynamicBrushDabs({
-                ...dabPlanInput,
-                maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
-              });
+        let baseDabs: readonly StudioDynamicBrushDab[] = webKitDabs === null
+          ? continuationSegments
+            ? []
+            : causalDepositPlan?.ok
+              ? [...causalDepositPlan.dabs]
+              : planStudioDynamicBrushDabs({
+                  ...dabPlanInput,
+                  maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
+                })
+          : webKitDabs;
         const baseDabCount = continuationSegments
           ? svgSegmentedDynamicDabCount(continuationSegments)
           : baseDabs.length;
@@ -1814,10 +1844,17 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           !usesCausalDepositPlan
           && renderBudget.maxDabsPerVariation < baseDabCount
         ) {
-          baseDabs = planStudioDynamicBrushDabs({
-            ...dabPlanInput,
-            maxDabs: renderBudget.maxDabsPerVariation,
-          });
+          if (webKitDabs !== null) {
+            baseDabs = planStudioWebDrawingKitOwnedDabs(
+              { ...kitPlanInput, maxDabs: renderBudget.maxDabsPerVariation },
+              dynamics,
+            ) ?? webKitDabs.slice(0, renderBudget.maxDabsPerVariation);
+          } else {
+            baseDabs = planStudioDynamicBrushDabs({
+              ...dabPlanInput,
+              maxDabs: renderBudget.maxDabsPerVariation,
+            });
+          }
         }
         const symmetryTransforms = studioBrushSymmetryTransforms(el.symmetry);
         const ordinaryDabVariations =
