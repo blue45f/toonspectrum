@@ -2,11 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BRUSH_PRESETS } from "./studio-brush";
 import {
+  isStudioDynamicBrushCausalDepositPipeline,
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
-  studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSeedFromKey,
+  studioBrushDynamicsSettingsForBrushId,
   studioDryMediaUnionComposableProgramPin,
 } from "./studio-brush-dynamics";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
@@ -25,7 +27,10 @@ import {
 } from "./studio-brush-render-budget";
 import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import { clearStudioBrushTextureStampCache } from "./studio-brush-textured-stamp";
-import { STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS } from "./studio-causal-dynamic-brush-deposit-v2";
+import {
+  planStudioCausalDynamicBrushDepositSegmentsV3,
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+} from "./studio-causal-dynamic-brush-deposit-v2";
 import { STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION } from "./studio-dry-media-union-ribbon-carrier";
 import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
@@ -43,6 +48,12 @@ import {
 } from "./studio-live-dynamic-brush-overlay";
 import { STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS } from "./studio-low-latency-canvas";
 import { sha256HexPortable } from "./studio-sha256";
+import {
+  planStudioWebDrawingKitOwnedDabs,
+  recommendStudioWebDrawingLiveMaxDabs,
+  STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS,
+  studioWebDrawingKitOwnsStrokeGeometry,
+} from "./studio-web-drawing-stroke-bridge";
 
 import type { DrawEl } from "./studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
@@ -665,6 +676,100 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       }]);
     },
   );
+
+  it("plans kit-owned catalog brushes through kit dabs on the live overlay, not causal stations", () => {
+    const ownedId = STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS[0];
+    expect(ownedId).toBeDefined();
+    expect(studioWebDrawingKitOwnsStrokeGeometry(ownedId)).toBe(true);
+    const catalog = studioBrushDynamicsSettingsForBrushId(ownedId!);
+    expect(catalog).not.toBeNull();
+    // Catalogue snapshots are causal-v3. The live overlay must still skip that branch.
+    expect(isStudioDynamicBrushCausalDepositPipeline(catalog!.depositPipeline)).toBe(true);
+
+    const points = [12, 30, 25, 31, 40, 35, 58, 43, 79, 50, 103, 47];
+    const { activeCanvas, renderer } = attachedRenderer();
+    const element = drawElement("live-kit-owned", points, {
+      brush: ownedId,
+      brushDynamics: catalog!,
+      strokeWidth: 10,
+      opacity: 1,
+    });
+
+    const started = renderer.begin(element);
+    expect(started.status === "fallback" ? started.reason : started.status).toBe("started");
+    const appended = renderer.appendFrom(element);
+    expect(appended.status === "fallback" ? appended.reason : appended.status)
+      .toBe("appended");
+    expect(activeCanvas.recordedMarks.length).toBeGreaterThan(0);
+
+    const seed = studioBrushDynamicsSeedFromKey(`${element.id}:${catalog!.seed}`);
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      ...catalog!,
+      seed,
+      width: { ...catalog!.width, base: Math.max(1, element.strokeWidth) },
+    });
+    const liveCap = recommendStudioWebDrawingLiveMaxDabs({
+      brushId: ownedId,
+      points: element.points,
+      pressures: element.pressures,
+      baseWidth: Math.max(1, element.strokeWidth),
+      seed,
+      markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+    }).maxDabs;
+    const kitDabs = planStudioWebDrawingKitOwnedDabs(
+      {
+        brushId: ownedId,
+        points: element.points,
+        pressures: element.pressures,
+        baseWidth: Math.max(1, element.strokeWidth),
+        baseOpacity: dynamics.opacity.base,
+        seed,
+        maxDabs: liveCap,
+      },
+      dynamics,
+    );
+    expect(kitDabs).not.toBeNull();
+    expect(kitDabs!.length).toBeGreaterThan(0);
+
+    const causal = planStudioCausalDynamicBrushDepositSegmentsV3({
+      points: element.points,
+      pressures: element.pressures,
+      tangentialPressures: element.tangentialPressures,
+      speeds: element.speeds,
+      tiltXs: element.tiltXs,
+      tiltYs: element.tiltYs,
+      twists: element.twists,
+      settings: dynamics,
+    });
+    expect(causal.ok).toBe(true);
+    const causalDabs = causal.ok && "segments" in causal
+      ? causal.segments.flatMap((segment) => segment.dabs)
+      : [];
+    expect(causalDabs.length).toBeGreaterThan(0);
+    expect(
+      kitDabs!.map((dab) => ({ x: dab.x, y: dab.y })),
+    ).not.toEqual(
+      causalDabs.slice(0, kitDabs!.length).map((dab) => ({ x: dab.x, y: dab.y })),
+    );
+
+    const liveMarks = activeCanvas.recordedMarks;
+    expect(liveMarks.some((mark) => kitDabs!.some((dab) => (
+      Math.hypot(mark.x - dab.x, mark.y - dab.y) <= Math.max(dab.size, 8)
+    )))).toBe(true);
+    const nearerToKit = liveMarks.filter((mark) => {
+      const kitDist = Math.min(
+        ...kitDabs!.map((dab) => Math.hypot(mark.x - dab.x, mark.y - dab.y)),
+      );
+      const causalDist = Math.min(
+        ...causalDabs.map((dab) => Math.hypot(mark.x - dab.x, mark.y - dab.y)),
+      );
+      return kitDist <= causalDist;
+    });
+    expect(nearerToKit.length).toBeGreaterThan(liveMarks.length / 2);
+
+    const sealed = renderer.end(element);
+    expect(sealed.status === "fallback" ? sealed.reason : sealed.status).toBe("settled");
+  });
 
   it("keeps a long causal G-pen on the append-only surface beyond the old 1,024-dab ceiling", () => {
     const { activeCanvas, renderer, settledCanvas } = attachedRenderer();

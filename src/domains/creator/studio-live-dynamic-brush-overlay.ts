@@ -842,11 +842,7 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
 }
 
 function initialStampGrid(style: DetachedDynamicStrokeStyle): StudioDynamicBrushRenderStampGrid {
-  if (
-    isStudioDynamicBrushCausalDepositPipeline(
-      style.dynamics.depositPipeline,
-    )
-  ) {
+  if (liveUsesCausalDepositPipeline(style)) {
     // A causal stroke cannot lower its stamp lattice after marks have already been accepted:
     // doing so would require an O(N) clear/replay and would make the live prefix differ from the
     // retained result. Start authored streaming snapshots on the bounded three-sample lattice.
@@ -879,6 +875,14 @@ function causalMarkBudget(
   )
     ? STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET
     : STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET;
+}
+
+/** Kit-owned web brushes keep the shared kit planner, even when the catalogue snapshot is causal. */
+function liveUsesCausalDepositPipeline(
+  style: Pick<DetachedDynamicStrokeStyle, "brushId" | "dynamics">,
+): boolean {
+  return isStudioDynamicBrushCausalDepositPipeline(style.dynamics.depositPipeline)
+    && !studioWebDrawingKitOwnsStrokeGeometry(style.brushId);
 }
 
 function liveDynamicDevicePixelRatio(surface: StudioLiveInkSurface): number {
@@ -1002,9 +1006,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       twists: [],
     };
     appendSourceSample(source, first);
-    const causalBegin = !isStudioDynamicBrushCausalDepositPipeline(
-      style.dynamics.depositPipeline,
-    )
+    const causalBegin = !liveUsesCausalDepositPipeline(style)
       ? null
       : studioDynamicBrushDepositPipelineUsesContinuation(
           style.dynamics.depositPipeline,
@@ -1024,7 +1026,10 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       };
     }
     const exactInitial = causalBegin?.ok ? null : this.exactPlan(style, source);
-    if (!causalBegin?.ok && (!exactInitial || exactInitial.dabCount !== 1)) {
+    const kitOwnedPrefix = studioWebDrawingKitOwnsStrokeGeometry(style.brushId)
+      && exactInitial
+      && exactInitial.dabCount > 0;
+    if (!causalBegin?.ok && !kitOwnedPrefix && (!exactInitial || exactInitial.dabCount !== 1)) {
       return { status: "fallback", reason: "material-plan" };
     }
     const initialDab = causalBegin?.ok
@@ -1033,6 +1038,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     const initialSpacing = causalBegin?.ok
       ? causalBegin.state.lastSpacing
       : Math.max(0.25, initialDab.spacing);
+    const startedDabCount = causalBegin?.ok ? 1 : exactInitial!.dabCount;
     const active: ActiveDynamicStroke = {
       style,
       source,
@@ -1041,7 +1047,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       previousSample: first,
       totalDistance: 0,
       distanceSinceLastDab: 0,
-      nextDabIndex: 1,
+      nextDabIndex: startedDabCount,
       lastSpacing: initialSpacing,
       markCount: 0,
       r8AlphaMapBytes: 0,
@@ -1070,7 +1076,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     this.fallbackReason = null;
     return {
       status: "started",
-      dabCount: 1,
+      dabCount: startedDabCount,
       markCount: initialMarkCount,
     };
   }
@@ -1235,14 +1241,10 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         appendedMarks: 0,
       };
     }
-    const markBudget = isStudioDynamicBrushCausalDepositPipeline(
-      active.style.dynamics.depositPipeline,
-    )
+    const markBudget = liveUsesCausalDepositPipeline(active.style)
       ? causalMarkBudget(active.style.dynamics)
       : STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET;
-    const causal = isStudioDynamicBrushCausalDepositPipeline(
-      active.style.dynamics.depositPipeline,
-    );
+    const causal = liveUsesCausalDepositPipeline(active.style);
     const coverageBudget = causal
       ? resolveStudioDynamicBrushCoverageBudgetContract(
           active.style.materialIdentity,
@@ -1700,11 +1702,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     style: DetachedDynamicStrokeStyle,
     source: DynamicStrokeSource,
   ): ExactDynamicPlan | null {
-    if (
-      isStudioDynamicBrushCausalDepositPipeline(
-        style.dynamics.depositPipeline,
-      )
-    ) {
+    if (liveUsesCausalDepositPipeline(style)) {
       const causalInput = {
         points: source.points,
         pressures: source.pressures,
