@@ -343,7 +343,14 @@ describe("StudioLeftToolRail", () => {
     fireEvent.click(screen.getByRole("button", { name: "말풍선 추가" }));
     expect(props.stableHandlers.addBubble).toHaveBeenCalledWith("speech", undefined, true);
 
-    fireEvent.change(screen.getByLabelText("이미지 추가"), {
+    const imageFileInput = document.querySelector<HTMLInputElement>(
+      'input[type="file"][accept]',
+    );
+    expect(imageFileInput).not.toBeNull();
+    const openPicker = vi.spyOn(imageFileInput!, "click");
+    fireEvent.click(screen.getByRole("button", { name: "이미지 추가" }));
+    expect(openPicker).toHaveBeenCalledOnce();
+    fireEvent.change(imageFileInput!, {
       target: { files: [new File(["image"], "image.png", { type: "image/png" })] },
     });
     expect(props.stableHandlers.onPickImage).toHaveBeenCalledOnce();
@@ -780,7 +787,8 @@ describe("StudioLeftToolRail", () => {
     ]) {
       expect(screen.getByRole<HTMLButtonElement>("button", { name }).disabled).toBe(true);
     }
-    expect(screen.getByLabelText<HTMLInputElement>("이미지 추가").disabled).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "이미지 추가" }).disabled).toBe(true);
+    expect(document.querySelector<HTMLInputElement>('input[type="file"][accept]')?.disabled).toBe(true);
   });
 
   it("keeps toolbar settings outside the independently scrolling tool list", () => {

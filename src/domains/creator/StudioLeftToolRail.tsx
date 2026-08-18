@@ -320,6 +320,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   stableHandlers,
 }: StudioLeftToolRailProps) {
   const railMoreDialogId = useId();
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
   const railMoreTriggerId = `${railMoreDialogId}-trigger`;
   // 도구 버튼 라벨은 `StudioRailToolButton` 안에서 도구 id 로 번역된다. 여기서 쓰는 건 도구가
   // 아닌 레일 셸 문구(더보기 버튼, 숨긴 도구 목록, 설정 진입)뿐이다.
@@ -1058,38 +1059,41 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 tip: "클립보드의 이미지는 ⌘V 또는 Ctrl+V로 바로 붙여넣을 수도 있어요.",
               }}
             >
-              <label
-                data-studio-rail-tool-id="image"
-                aria-disabled={activeSurfaceReviewLocked}
-                className={cn(
-                  "relative grid size-10 place-items-center rounded-2xl border border-transparent text-fg-2 xl:size-11",
-                  activeSurfaceReviewLocked
-                    ? "cursor-not-allowed opacity-35"
-                    : "cursor-pointer hover:border-line hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                )}
-              >
-                <ImagePlus
-                  size={STUDIO_ICON_SIZE.rail}
-                  strokeWidth={STUDIO_ICON_STROKE}
-                  aria-hidden
-                  className={studioChromeIconClass({
-                    tone: activeSurfaceReviewLocked ? "muted" : "default",
-                    disabled: activeSurfaceReviewLocked,
-                  })}
-                />
-                <span className="sr-only">이미지 추가</span>
-                <input
-                  type="file"
-                  accept={STUDIO_CANVAS_IMAGE_ACCEPT}
-                  className={cn(
-                    "absolute inset-0 opacity-0",
-                    activeSurfaceReviewLocked ? "cursor-not-allowed" : "cursor-pointer"
-                  )}
-                  onChange={onPickImage}
+              <span className="relative inline-flex">
+                <button
+                  type="button"
+                  onClick={() => imageFileInputRef.current?.click()}
+                  data-studio-rail-tool-id="image"
                   aria-label="이미지 추가"
                   disabled={activeSurfaceReviewLocked}
-                />
-              </label>
+                  className={cn(
+                    "relative grid size-10 place-items-center rounded-2xl border border-transparent text-fg-2 xl:size-11",
+                    activeSurfaceReviewLocked
+                      ? "cursor-not-allowed opacity-35"
+                      : "cursor-pointer hover:border-line hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  )}
+                >
+                  <ImagePlus
+                    size={STUDIO_ICON_SIZE.rail}
+                    strokeWidth={STUDIO_ICON_STROKE}
+                    aria-hidden
+                    className={studioChromeIconClass({
+                      tone: activeSurfaceReviewLocked ? "muted" : "default",
+                      disabled: activeSurfaceReviewLocked,
+                    })}
+                  />
+                  <span className="sr-only">이미지 추가</span>
+                </button>
+              </span>
+              <input
+                ref={imageFileInputRef}
+                type="file"
+                accept={STUDIO_CANVAS_IMAGE_ACCEPT}
+                className="sr-only"
+                tabIndex={-1}
+                onChange={onPickImage}
+                disabled={activeSurfaceReviewLocked}
+              />
             </StudioToolHintTarget>
             ) : null}
 {isRailToolVisible("comment") ? (

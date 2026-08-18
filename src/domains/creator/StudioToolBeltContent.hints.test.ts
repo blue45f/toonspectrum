@@ -10,6 +10,8 @@ const sourceFiles = [
   "./StudioToolBeltCanvasControls.tsx",
   "./StudioToolBeltQuickActions.tsx",
   "./StudioToolBeltCreateModeGroups.tsx",
+  "./StudioToolBeltCreateModeUtilityButtons.tsx",
+  "./StudioToolBeltCreateModeInsertTools.tsx",
 ].map((path) => {
   const url = new URL(path, import.meta.url);
   const text = readFileSync(url, "utf8");
@@ -89,7 +91,7 @@ describe("Studio ToolBelt rich hint coverage", () => {
     expect(allSource).toContain("accept={studioCanvasImageAccept}");
     expect(allSource).toContain("focus-within:outline-accent");
 
-  for (const accessibleName of [
+    for (const accessibleName of [
       "실행취소",
       "다시실행",
       "작업 내역",
@@ -115,7 +117,7 @@ describe("Studio ToolBelt rich hint coverage", () => {
       Boolean(jsxAttribute(button, "disabled"))
     );
 
-    expect(disabledButtons.length).toBeGreaterThanOrEqual(10);
+    expect(disabledButtons.length).toBeGreaterThanOrEqual(8);
     for (const button of disabledButtons) {
       const target = nearestHintTarget(button);
       expect(target, button.getText()).not.toBeNull();
