@@ -15,8 +15,8 @@ import {
   type PoseVec3,
   type StudioPosePreset,
 } from "./studio-pose-presets";
-import { POSE_PRESETS } from "./studio-vrm-poser-utils";
-import { computeLightingUniforms, serializeFullVrmState, type BodyScale, type LightingParams } from "./studio-vrm-poser-utils";
+import { POSE_PRESETS } from "./vrm/studio-vrm-poser-utils";
+import { computeLightingUniforms, serializeFullVrmState, type BodyScale, type LightingParams } from "./vrm/studio-vrm-poser-utils";
 
 import type { VRMHumanBoneName } from "@pixiv/three-vrm";
 

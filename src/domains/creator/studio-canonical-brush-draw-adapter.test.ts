@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
-import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
+import { normalizeStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
+import { encodeStudioBrushTipAlphaMapBase64 } from "./brush/studio-brush-tip-stamp";
+import { sampleStudioEngineTexturedBrushTipCpu } from "./render/studio-engine-webgpu-textured-brush-plan";
 import { adaptStudioDrawElementToCanonicalBrushPlan } from "./studio-canonical-brush-draw-adapter";
 import { hashStudioCanonicalBrushPlan } from "./studio-canonical-brush-plan";
-import { sampleStudioEngineTexturedBrushTipCpu } from "./studio-engine-webgpu-textured-brush-plan";
 import { sha256HexPortable } from "./studio-sha256";
 
-import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import type { NormalizedStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
 import type {
   StudioCanonicalBrushDrawAdapterReady,
   StudioCanonicalBrushDrawAdapterRequest,

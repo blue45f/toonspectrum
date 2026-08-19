@@ -292,8 +292,7 @@ describe("Studio Manifold mesh provider", () => {
 
   it("executes a real Manifold WASM union without exposing vendor handles", async () => {
     const factory = await import("manifold-3d");
-    const wasmPath = new URL(
-      "../../../node_modules/manifold-3d/manifold.wasm",
+    const wasmPath = new URL("../../../node_modules/manifold-3d/manifold.wasm",
       import.meta.url,
     ).pathname;
     const module = await factory.default({ locateFile: () => wasmPath });

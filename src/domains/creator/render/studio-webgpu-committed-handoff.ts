@@ -1,18 +1,19 @@
 import {
-  processFreehandPoints,
-  resampleStrokePressures,
-  strokeRenderDistance,
-} from "./studio-brush";
-import {
   mapStudioBrushAliasPressureSamples,
   studioBrushAliasEffectiveDiameter,
-} from "./studio-brush-alias-profile";
-import { selectStudioCausalInkSamples } from "./studio-causal-ink";
+} from "../brush/studio-brush-alias-profile";
 import {
   studioInkFallbackPressure,
   resolveStudioInkPressureSamples,
   type StudioInkPressureModel,
-} from "./studio-ink-pressure-model";
+} from "../brush/studio-ink-pressure-model";
+import {
+  processFreehandPoints,
+  resampleStrokePressures,
+  strokeRenderDistance,
+} from "../studio-brush";
+import { selectStudioCausalInkSamples } from "../studio-causal-ink";
+
 import {
   planStudioWebGpuCommittedSuffix,
   type StudioWebGpuCommittedElementInput,

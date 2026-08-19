@@ -7,6 +7,11 @@
  * Canvas and SVG consume the same quantized geometry.
  */
 
+import { parseStudioGpuColor } from "../render/studio-webgpu-color";
+import {
+  computeStudioImpastoReliefShading,
+} from "../studio-impasto-relief-shading-v1";
+
 import {
   planStudioBristlePhysicsOil,
   type StudioBristlePhysicsOilPlan,
@@ -16,16 +21,13 @@ import {
   type StudioBrushOilProgramSet,
 } from "./studio-brush-engine-program-set";
 import {
-  computeStudioImpastoReliefShading,
-} from "./studio-impasto-relief-shading-v1";
-import {
   planStudioOilBristleLoadDynamics,
   type StudioOilBristleLoadDynamicsPlan,
 } from "./studio-oil-bristle-load-dynamics-v1";
 import { applyStudioOilWetIntoWetStroke } from "./studio-oil-wet-into-wet";
-import { parseStudioGpuColor } from "./studio-webgpu-color";
 
-import type { FxOilBristle, FxOilDab } from "./studio-fx-brush";
+
+import type { FxOilBristle, FxOilDab } from "../studio-fx-brush";
 
 export { applyStudioOilWetIntoWetStroke };
 
@@ -154,6 +156,11 @@ export interface StudioOilRibbonCarrierOptions {
   readonly bristleLoadDynamics?: StudioOilRibbonCarrierBristleLoadDynamicsOptions;
   readonly impastoRelief?: StudioOilRibbonCarrierImpastoReliefOptions;
   readonly bristlePhysics?: StudioOilRibbonCarrierBristlePhysicsOptions;
+  /**
+   * Interactive Studio paints only need the film body. Planning 16 load-bands × 5 hairs
+   * is a 50–150ms main-thread stall and is reserved for export / explicit quality passes.
+   */
+  readonly bodyOnly?: boolean;
 }
 
 /**
@@ -203,6 +210,15 @@ export function studioOilRibbonProgramsForBrush(
       return { bristlePhysics };
     case "oil--impasto-ribbon":
       return { bristlePhysics, impastoRelief: { enabled: true } };
+    case "oil":
+    case "acrylic":
+    case "fluid-paint":
+    case "fluid-paint-fine":
+    case "fluid-paint-load":
+    case "fluid-paint-rake":
+    case "oil--fluid-paint-splat":
+    case "oil--fluid-paint-rake":
+      return { bristlePhysics, bristleLoadDynamics: { enabled: true, seed }, impastoRelief: { enabled: true } };
     default:
       return undefined;
   }
@@ -1638,19 +1654,20 @@ export function planStudioOilRibbonCarrier(
   const dabs = normalizedDabs(Array.isArray(inputDabs) ? inputDabs : []);
   const stations = collectStations(dabs);
   const averageOpacity = mean(stations.map((station) => station.opacity));
+  const bodyOnly = options?.bodyOnly === true;
   const loadDynamicsOptions = options?.bristleLoadDynamics;
-  const dynamics = loadDynamicsOptions?.enabled === true
+  const dynamics = !bodyOnly && loadDynamicsOptions?.enabled === true
     ? planLoadDynamics(stations, loadDynamicsOptions)
     : undefined;
   // v1 bristle physics touches ONLY the bristle lanes: body geometry/opacity
   // stay byte-identical so the pinned lane inherits the settled silhouette.
   const bristlePhysicsOptions = options?.bristlePhysics;
-  const physics = bristlePhysicsOptions?.enabled === true
+  const physics = !bodyOnly && bristlePhysicsOptions?.enabled === true
     ? planBristlePhysics(stations, bristlePhysicsOptions)
     : undefined;
   // The relief overlay is additive only: enabling it must never change the base plan fields, and
   // NOT enabling it must not even add the key (legacy plans stay structurally identical).
-  const impastoReliefLanes = options?.impastoRelief?.enabled === true
+  const impastoReliefLanes = !bodyOnly && options?.impastoRelief?.enabled === true
     ? planImpastoReliefOverlayLanes(stations)
     : undefined;
   return Object.freeze({
@@ -1668,7 +1685,7 @@ export function planStudioOilRibbonCarrier(
     // is exactly how the bed was reported. One overlap is the film itself, and it leaves the whole
     // band range visible against it.
     bodyOpacity: quantize(accumulatedOpacity(averageOpacity, 1)),
-    bristleLanes: planBristleLanes(stations, dynamics, physics),
+    bristleLanes: bodyOnly ? Object.freeze([]) : planBristleLanes(stations, dynamics, physics),
     repeatedBodyStampCount: 0,
     ...(impastoReliefLanes ? { impastoReliefLanes } : {}),
   });
@@ -1786,6 +1803,16 @@ export interface StudioOilRibbonPaintInput {
   };
   /** When true, never read back the native canvas (Konva hit pass). */
   readonly hitPass?: boolean;
+  /**
+   * Interactive Konva paints must not `getImageData` the growing stroke bbox. That readback is a
+   * 50–150ms main-thread stall on a webtoon-sized page. Wet-into-wet stays available when the
+   * caller supplies an explicit `destination` buffer (tests, export, workers).
+   */
+  readonly skipDestinationReadback?: boolean;
+  /** Live drafts paint the film body only; committed/export keep bristle and impasto overlays. */
+  readonly includeBristleOverlay?: boolean;
+  /** david.li Fluid Paint subtractive mix. Default stays spectral-WGM oil. */
+  readonly mixModel?: "spectral-wgm" | "ryb";
 }
 
 export interface StudioOilRibbonPaintReceipt {
@@ -1829,6 +1856,7 @@ function strokePaintColor(stroke: string): { r: number; g: number; b: number } {
 function oilWetIntoWetSettings(
   radiusPx: number,
   paintColor: { r: number; g: number; b: number },
+  mixModel?: "spectral-wgm" | "ryb",
 ) {
   return {
     radiusPx: Number.isFinite(radiusPx) && radiusPx > 0 ? radiusPx : 8,
@@ -1837,6 +1865,7 @@ function oilWetIntoWetSettings(
     wetness: 0.65,
     pickup: 0.55,
     paintColor,
+    mixModel: mixModel ?? "spectral-wgm",
   };
 }
 
@@ -1852,13 +1881,16 @@ export function paintStudioOilRibbonCarrier(
   const radiusPx = Number.isFinite(input.radiusPx) && input.radiusPx > 0
     ? input.radiusPx
     : 8;
-  const settings = oilWetIntoWetSettings(radiusPx, paintColor);
+  const settings = oilWetIntoWetSettings(radiusPx, paintColor, input.mixModel);
   const hitPass = studioOilRibbonPaintIsHitPass(context, input.hitPass === true);
   let usedLiveDestination = false;
 
   if (hitPass) {
     // Path-only: never read or write the hit canvas. Body fill below stamps
     // the ribbon silhouette so selection/hit tests keep a closed shape.
+  } else if (input.skipDestinationReadback === true) {
+    // Live/committed scene paints stay on the ribbon paths. Pixel wet-into-wet
+    // is reserved for an explicit destination buffer.
   } else if (input.destination) {
     const originX = input.destination.originX ?? 0;
     const originY = input.destination.originY ?? 0;
@@ -1940,7 +1972,7 @@ export function paintStudioOilRibbonCarrier(
     }
   }
 
-  if (!usedLiveDestination && !hitPass) {
+  if (!usedLiveDestination && !hitPass && input.skipDestinationReadback !== true) {
     const scratch = new Uint8ClampedArray(16 * 16 * 4);
     applyStudioOilWetIntoWetStroke(
       scratch,
@@ -1951,6 +1983,22 @@ export function paintStudioOilRibbonCarrier(
     );
   }
 
+  return paintStudioOilRibbonCarrierOverlay(context, input, usedLiveDestination, hitPass);
+}
+
+/**
+ * Body fill + bristle/impasto overlay after wet-into-wet. Shared by the one-shot painter and the
+ * live incremental suffix so both surfaces keep identical ridges.
+ */
+export function paintStudioOilRibbonCarrierOverlay(
+  context: StudioOilRibbonPaintContext,
+  input: Pick<
+    StudioOilRibbonPaintInput,
+    "carrier" | "stroke" | "opacity" | "includeBristleOverlay"
+  >,
+  usedLiveDestination: boolean,
+  hitPass = false,
+): StudioOilRibbonPaintReceipt {
   if (!input.carrier.body) {
     return { wetIntoWetApplied: true, usedLiveDestination, hitPass };
   }
@@ -1968,6 +2016,11 @@ export function paintStudioOilRibbonCarrier(
   if (hitPass) {
     context.restore();
     return { wetIntoWetApplied: true, usedLiveDestination: false, hitPass };
+  }
+
+  if (input.includeBristleOverlay === false) {
+    context.restore();
+    return { wetIntoWetApplied: true, usedLiveDestination, hitPass };
   }
 
   context.globalCompositeOperation = "multiply";

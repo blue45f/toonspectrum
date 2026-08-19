@@ -5,13 +5,13 @@ import {
   planNormalizedStudioDynamicBrushDabs,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
-} from "./studio-brush-dynamics";
-import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
+} from "./brush/studio-brush-dynamics";
+import { materializeStudioBrushPackSelection } from "./brush/studio-brush-pack-runtime";
 import {
   countStudioDynamicBrushMarksPerDab,
   planStudioDynamicBrushRenderBudget,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
-} from "./studio-brush-render-budget";
+} from "./brush/studio-brush-render-budget";
 import {
   appendStudioCausalDynamicBrushDepositsV2,
   appendStudioCausalDynamicBrushDepositsV3,

@@ -1,38 +1,38 @@
 import {
-  buildCalligraphySegments,
-} from "../src/domains/creator/studio-brush";
-import {
   mapStudioBrushAliasPressureSamples,
   studioBrushAliasEffectiveDiameter,
-} from "../src/domains/creator/studio-brush-alias-profile";
+} from "../src/domains/creator/brush/studio-brush-alias-profile";
 import {
   STUDIO_BRUSH_CATALOG_COUNTS,
-} from "../src/domains/creator/studio-brush-catalog-core";
+} from "../src/domains/creator/brush/studio-brush-catalog-core";
 import {
   auditStudioBrushContinuity,
   type StudioBrushContinuityAuditResult,
   type StudioBrushContinuityRenderStrategy,
-} from "../src/domains/creator/studio-brush-continuity-audit";
+} from "../src/domains/creator/brush/studio-brush-continuity-audit";
 import {
   planNormalizedStudioDynamicBrushDabs,
   studioDynamicBrushDepositPipelineUsesContinuation,
   type StudioDynamicBrushDab,
-} from "../src/domains/creator/studio-brush-dynamics";
+} from "../src/domains/creator/brush/studio-brush-dynamics";
 import {
   profileStudioBrushMaterialResponse,
-} from "../src/domains/creator/studio-brush-material-response";
+} from "../src/domains/creator/brush/studio-brush-material-response";
 import {
   type StudioBrushPlannerQualityCandidate,
-} from "../src/domains/creator/studio-brush-planner-quality-audit";
+} from "../src/domains/creator/brush/studio-brush-planner-quality-audit";
 import {
   planStudioStampBrushDabs,
   resolveStudioStampBrushKind,
   resolveStudioStampBrushStyle,
   type StudioStampBrushDab,
-} from "../src/domains/creator/studio-brush-stamp-engine";
+} from "../src/domains/creator/brush/studio-brush-stamp-engine";
 import {
   planStudioCalligraphyRibbon,
-} from "../src/domains/creator/studio-calligraphy-ribbon";
+} from "../src/domains/creator/brush/studio-calligraphy-ribbon";
+import {
+  buildCalligraphySegments,
+} from "../src/domains/creator/studio-brush";
 import {
   appendStudioCausalDynamicBrushDepositsV2,
   appendStudioCausalDynamicBrushDepositsV3,

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_SCENE_LAYER_LIFT_BUDGETS,
   STUDIO_SCENE_LAYER_LIFT_CONTRACT_KIND,
@@ -15,7 +17,6 @@ import {
   parseStudioSceneLayerLiftResult,
   parseStudioSceneLayerLiftSourceDescriptor,
 } from "./studio-layer-lift-contract";
-import { sha256HexPortable } from "./studio-sha256";
 
 const digest = (character: string) => `sha256:${character.repeat(64)}`;
 const hashBytes = (bytes: Uint8Array) =>

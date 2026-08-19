@@ -12,7 +12,7 @@
  * 사용자 노출 문자열은 한글.
  */
 
-import { MAX_CANVAS_DIM, canvasToBlob, downloadBlob, exportMimeType, exportQuality } from "./studio-export";
+import { MAX_CANVAS_DIM, canvasToBlob, downloadBlob, exportMimeType, exportQuality } from "../studio-export";
 import {
   downscaleForExport,
   loadVipsForExport,
@@ -20,8 +20,8 @@ import {
   type StudioVipsExportLimits,
   type StudioVipsExportRuntime,
   type StudioVipsRaster,
-} from "./studio-vips-export";
-import { shouldDrawWatermark, watermarkPlacement, type WatermarkSettings } from "./studio-watermark";
+} from "../studio-vips-export";
+import { shouldDrawWatermark, watermarkPlacement, type WatermarkSettings } from "../studio-watermark";
 
 export type ExportFormat = "png" | "jpg" | "webp";
 

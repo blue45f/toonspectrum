@@ -150,6 +150,10 @@ export interface StudioEditAvailabilityInput {
   sidecarUndoAvailable?: boolean;
   /** 위와 대칭 — 다음 ⇧⌘Z 대상이 사이드카 편집인가. */
   sidecarRedoAvailable?: boolean;
+  /** 미확정(지연 커밋) 오버레이 획이 있어 ⌘Z 로 되돌릴 수 있는가. */
+  pendingCommitAvailable?: boolean;
+  /** 방금 ⌘Z 로 되돌린 미확정 오버레이 획이 있어 ⇧⌘Z 로 다시 적용할 수 있는가. */
+  pendingUndoneAvailable?: boolean;
   documentEmpty: boolean;
   hasElementSelection: boolean;
   hasSingleElementSelection: boolean;
@@ -196,10 +200,14 @@ export function resolveStudioEditAvailability(
   const hasAnySelection = input.hasElementSelection || input.hasPixelSelection;
   const historyLocked = input.mutationLocked || input.masterEditMode;
   return {
-    undoDisabled: historyLocked || (input.historyIndex <= 0 && !input.sidecarUndoAvailable),
+    undoDisabled:
+      historyLocked
+      || (input.historyIndex <= 0 && !input.sidecarUndoAvailable && !input.pendingCommitAvailable),
     redoDisabled:
       historyLocked
-      || (input.historyIndex >= input.historyLength - 1 && !input.sidecarRedoAvailable),
+      || (input.historyIndex >= input.historyLength - 1
+        && !input.sidecarRedoAvailable
+        && !input.pendingUndoneAvailable),
     cutDisabled: input.mutationLocked || !input.hasElementSelection,
     copyDisabled: input.interactionLocked || !input.hasElementSelection,
     pasteDisabled: input.mutationLocked,

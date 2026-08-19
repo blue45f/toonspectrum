@@ -1,4 +1,4 @@
-import type { DeletedBrushRecord } from "./studio-brush-library";
+import type { DeletedBrushRecord } from "./brush/studio-brush-library";
 import type { LayerGroup } from "./studio-layers";
 import type { NodeEditHandle } from "./studio-node-edit";
 import type { StudioWorkspaceState } from "./studio-workspaces";

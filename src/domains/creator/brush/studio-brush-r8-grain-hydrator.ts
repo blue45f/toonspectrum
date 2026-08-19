@@ -1,3 +1,6 @@
+import { sha256HexPortable } from "../studio-sha256";
+import { downloadStudioWorkAsset } from "../studio-work-asset-client";
+
 import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
@@ -10,10 +13,8 @@ import {
   resolveStudioBrushR8GrainSampler,
   type StudioBrushR8GrainHydrationResult,
 } from "./studio-brush-r8-grain-runtime";
-import { sha256HexPortable } from "./studio-sha256";
-import { downloadStudioWorkAsset } from "./studio-work-asset-client";
 
-import type { DownloadedStudioWorkAsset } from "./studio-work-asset-client";
+import type { DownloadedStudioWorkAsset } from "../studio-work-asset-client";
 
 export interface StudioBrushR8GrainPageLike {
   readonly elements: readonly unknown[];

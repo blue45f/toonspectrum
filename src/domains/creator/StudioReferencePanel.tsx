@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { loadImageFileForCanvas } from "./canvas/studio-canvas-image-io";
 import {
   canonicalizeStudioAssetContentHash,
   ensureStudioAssetContentHash,
@@ -30,7 +31,6 @@ import {
   saveAsset,
   type StudioAsset,
 } from "./studio-asset-library";
-import { loadImageFileForCanvas } from "./studio-canvas-image-io";
 import {
   addStudioReferenceBoardItem,
   createStudioReferenceBoardItem,

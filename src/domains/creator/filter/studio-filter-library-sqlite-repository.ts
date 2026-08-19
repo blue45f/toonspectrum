@@ -13,16 +13,17 @@ import {
   isStudioCreatorInstalledFilterPreset,
   type StudioCreatorInstalledFilterPreset,
   type StudioCreatorPackStorage,
-} from "./studio-creator-filter-preset-reader";
-import { isStudioFilterPackKind } from "./studio-filter-pack";
+} from "../studio-creator-filter-preset-reader";
 import {
   requireStudioFilterLibraryDatabase,
   SqliteUnavailableError,
   type StudioFilterLibrarySqlCursor,
   type StudioFilterLibrarySqlRecord,
   type StudioLocalDatabase,
-} from "./studio-local-database";
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+} from "../studio-local-database";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+
+import { isStudioFilterPackKind } from "./studio-filter-pack";
 
 export const FILTER_LIBRARY_LEGACY_MIGRATION_NAMESPACE =
   "studio-filter-library-explicit-imports";

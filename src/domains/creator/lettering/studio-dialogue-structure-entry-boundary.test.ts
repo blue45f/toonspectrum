@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import studioCanvasViewportSource from "./StudioCanvasViewport.tsx?raw";
+import studioCanvasViewportSource from "../canvas/StudioCanvasViewport.tsx?raw";
 
 describe("Studio dialogue structure entry boundary", () => {
   it("connects split, merge, move, copy, text→bubble, multi-format, and ruby to the shipped story panel", () => {

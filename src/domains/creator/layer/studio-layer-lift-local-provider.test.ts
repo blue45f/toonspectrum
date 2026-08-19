@@ -6,6 +6,8 @@ import {
   vi,
 } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION,
   STUDIO_SCENE_LAYER_LIFT_REQUEST_KIND,
@@ -22,7 +24,6 @@ import {
   type StudioLayerLiftLocalForegroundInferenceEngine,
   type StudioLayerLiftLocalForegroundInferenceInput,
 } from "./studio-layer-lift-local-provider";
-import { sha256HexPortable } from "./studio-sha256";
 
 const hashBytes = (bytes: Uint8Array) =>
   `sha256:${sha256HexPortable(bytes)}` as const;

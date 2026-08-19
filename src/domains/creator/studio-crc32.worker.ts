@@ -1,3 +1,4 @@
+import { createStudioPersistentCrc32Executor } from "./render/studio-wasm-crc32-kernel";
 import {
   STUDIO_CRC32_WORKER_PROTOCOL_VERSION,
   studioCrc32SuccessTransfers,
@@ -6,7 +7,6 @@ import {
   type StudioCrc32WorkerRunMessage,
   type StudioCrc32WorkerSuccessMessage,
 } from "./studio-crc32-worker-protocol";
-import { createStudioPersistentCrc32Executor } from "./studio-wasm-crc32-kernel";
 
 interface StudioCrc32WorkerScope {
   onmessage: ((event: MessageEvent<StudioCrc32WorkerRunMessage>) => void) | null;

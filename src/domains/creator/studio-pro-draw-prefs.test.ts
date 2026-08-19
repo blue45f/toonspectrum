@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./brush/studio-brush-pack-id";
 import { BRUSH_PRESETS } from "./studio-brush";
-import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
 import {
   applyBrushPresetWithLocks,
   cycleStudioStabilizerStrength,

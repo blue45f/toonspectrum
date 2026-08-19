@@ -20,7 +20,7 @@
  *  - ACES 는 Narkowicz 근사(RRT+ODT fit)라 실제 ACES 파이프라인과 다르다.
  */
 
-import type { StudioBg3dToneMapping } from "./studio-bg3d-scene-document";
+import type { StudioBg3dToneMapping } from "./bg3d/studio-bg3d-scene-document";
 
 export type StudioPathtraceToneMap = "none" | "reinhard" | "aces";
 

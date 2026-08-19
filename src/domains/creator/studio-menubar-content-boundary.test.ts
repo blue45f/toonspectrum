@@ -61,6 +61,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 describe("Studio menubar ownership boundary", () => {
   it("keeps StudioPage as the single lazy parent and forbids a reverse dependency", () => {
     const page = moduleEdges("./StudioPage.tsx");
+    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const menubar = moduleEdges("./StudioMenubarContent.tsx");
     const modalLazyBoundary = moduleEdges("./studio-page-modal-lazy-boundaries.ts");
 
@@ -71,13 +72,13 @@ describe("Studio menubar ownership boundary", () => {
       page.dynamicImports.filter((specifier) => specifier === "./StudioMenubarContent")
     ).toEqual([]);
     expect(
-      page.valueImports.filter((specifier) => specifier === "./studio-page-modal-lazy-boundaries")
-    ).toEqual(["./studio-page-modal-lazy-boundaries"]);
+      editorView.valueImports.filter((specifier) => specifier === "../studio-page-modal-lazy-boundaries")
+    ).toEqual(["../studio-page-modal-lazy-boundaries"]);
     expect(
       modalLazyBoundary.dynamicImports.filter((specifier) => specifier === "./StudioMenubarContent")
     ).toEqual(["./StudioMenubarContent"]);
-    expect(page.source.match(/<LazyStudioMenubarContent\b/g)).toHaveLength(1);
-    expect(page.source).toContain('data-studio-menubar-loading="true"');
+    expect(editorView.source.match(/<LazyStudioMenubarContent\b/g)).toHaveLength(1);
+    expect(editorView.source).toContain('data-studio-menubar-loading="true"');
     expect(page.source).not.toContain("interface StudioMenubarContentProps");
     expect(page.source).not.toContain("interface StudioMenubarContentHandlers");
     expect(menubar.allImports).not.toContain("./StudioPage");
@@ -98,7 +99,7 @@ describe("Studio menubar ownership boundary", () => {
     const menubar = moduleEdges("./StudioMenubarContent.tsx");
     const registry = moduleEdges("./studio-page-lazy-ui.ts");
 
-    for (const optionalModule of ["./StudioMainMenu", "./StudioExportMenuPanel"] as const) {
+    for (const optionalModule of ["./StudioMainMenu", "./export/StudioExportMenuPanel"] as const) {
       expect(page.valueImports).not.toContain(optionalModule);
       expect(page.dynamicImports).not.toContain(optionalModule);
       expect(menubar.valueImports).not.toContain(optionalModule);
@@ -137,6 +138,7 @@ describe("Studio menubar ownership boundary", () => {
 
   it("keeps handler identity stable while render-time lock copy remains a normal prop", () => {
     const page = moduleEdges("./StudioPage.tsx").source;
+    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx").source;
     const menubar = moduleEdges("./StudioMenubarContent.tsx").source;
     const handlerContract = menubar.slice(
       menubar.indexOf("export interface StudioMenubarContentHandlers"),
@@ -146,8 +148,8 @@ describe("Studio menubar ownership boundary", () => {
     expect(page).toContain(
       "const studioMenubarContentHandlers = useStudioStableHandlers<StudioMenubarContentHandlers>({"
     );
-    expect(page).toContain("stableHandlers={studioMenubarContentHandlers}");
-    expect(page).toContain("collaborationLockMessage={collaborationLockMessage}");
+    expect(editorView).toContain("stableHandlers={studioMenubarContentHandlers}");
+    expect(editorView).toContain("collaborationLockMessage={collaborationLockMessage}");
     expect(handlerContract).not.toContain("collaborationLockMessage");
     expect(page).not.toMatch(
       /useStudioStableHandlers<StudioMenubarContentHandlers>\(\{[\s\S]{0,800}collaborationLockMessage/
@@ -159,7 +161,7 @@ describe("Studio menubar ownership boundary", () => {
     const menubar = moduleEdges("./StudioMenubarContent.tsx").source;
     const rasterIntent = moduleEdges("./useStudioRasterExportOrchestration.ts").source;
     const rasterRuntime = moduleEdges(
-      "./studio-raster-export-orchestration-runtime.ts"
+      "./render/studio-raster-export-orchestration-runtime.ts"
     ).source;
     const handlerContract = menubar.slice(
       menubar.indexOf("export interface StudioMenubarContentHandlers"),

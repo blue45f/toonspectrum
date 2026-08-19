@@ -17,7 +17,7 @@ import {
   starPathPoints,
   type ShapeParams,
   type StrokeShapeKind,
-} from "./studio-stroke-shapes";
+} from "./brush/studio-stroke-shapes";
 
 import type { Op as RoughOp, Options as RoughOptions } from "roughjs/bin/core";
 import type { RoughGenerator } from "roughjs/bin/generator";

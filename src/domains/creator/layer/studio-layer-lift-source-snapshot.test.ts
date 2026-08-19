@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION,
   STUDIO_SCENE_LAYER_LIFT_REQUEST_KIND,
@@ -9,9 +11,8 @@ import {
   createStudioLayerLiftSourceSnapshot,
   type StudioLayerLiftSourceSnapshotRuntime,
 } from "./studio-layer-lift-source-snapshot";
-import { sha256HexPortable } from "./studio-sha256";
 
-import type { El } from "./studio-element-model";
+import type { El } from "../studio-element-model";
 
 const INLINE_PNG = "data:image/png;base64,AA==";
 

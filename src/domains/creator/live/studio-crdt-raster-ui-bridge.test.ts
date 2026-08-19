@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+} from "../brush/studio-ink-pressure-model";
+
 import { StudioCrdtDocument } from "./studio-crdt-document";
 import {
   STUDIO_RASTER_TEST_SEMANTIC_SHA256,
@@ -10,11 +16,6 @@ import {
   studioRasterDrawPromotionSourceMatches,
   studioRasterBrushSurface,
 } from "./studio-crdt-raster-ui-bridge";
-import {
-  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
-  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
-  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
-} from "./studio-ink-pressure-model";
 
 import {
   STUDIO_RASTER_CRDT_VERSION,

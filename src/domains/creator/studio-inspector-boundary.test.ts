@@ -79,13 +79,14 @@ function moduleShape(relativePath: string): ModuleShape {
 describe("Studio inspector module boundary", () => {
   it("keeps StudioPage as the orchestration owner while deferring the heavy inspector surface", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const inspector = moduleShape("./StudioInspectorAside.tsx");
     const loader = moduleShape("./studio-inspector-aside-loader.ts");
     const registry = moduleShape("./studio-page-lazy-ui.ts");
 
     expect(page.valueImports).not.toContain("./StudioInspectorAside");
     expect(page.allImports).toContain("./StudioInspectorAside");
-    expect(page.valueImports).toContain("./studio-inspector-aside-loader");
+    expect(editorView.valueImports).toContain("../studio-inspector-aside-loader");
     expect(page.dynamicImports).not.toContain("./StudioInspectorAside");
     expect(loader.dynamicImports).toEqual(["./StudioInspectorAside"]);
     expect(loader.valueImports).toContain("./studio-page-lazy-ui");
@@ -101,6 +102,7 @@ describe("Studio inspector module boundary", () => {
 
   it("moves the handler contract and component while leaving page orchestration behind", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const inspector = moduleShape("./StudioInspectorAside.tsx");
 
     expect(inspector.exportedDeclarations).toContain("StudioInspectorAsideHandlers");
@@ -109,12 +111,12 @@ describe("Studio inspector module boundary", () => {
     expect(page.topLevelDeclarations).not.toContain("StudioInspectorAsideHandlers");
     expect(page.topLevelDeclarations).not.toContain("StudioInspectorAsideProps");
     expect(page.topLevelDeclarations).not.toContain("StudioInspectorAside");
-    expect(page.source).toContain("<LazyStudioInspectorAside");
-    expect(page.source).toContain('mobileSheet === "props"');
-    expect(page.source).toContain("<StudioInspectorAsideFallback");
+    expect(editorView.source).toContain("<LazyStudioInspectorAside");
+    expect(editorView.source).toContain('mobileSheet === "props"');
+    expect(editorView.source).toContain("<StudioInspectorAsideFallback");
     expect(page.source).toContain('useState<StudioMobileSheetSnap>("medium")');
-    expect(page.source).toContain("mobileInspectorSnap={mobileInspectorSnap}");
-    expect(page.source).toContain("setMobileInspectorSnap={setMobileInspectorSnap}");
+    expect(editorView.source).toContain("mobileInspectorSnap={mobileInspectorSnap}");
+    expect(editorView.source).toContain("setMobileInspectorSnap={setMobileInspectorSnap}");
     expect(inspector.source).not.toContain('useState<StudioMobileSheetSnap>("medium")');
   });
 

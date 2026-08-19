@@ -149,7 +149,7 @@ describe("Studio advanced fill entry boundary", () => {
   it("projects linked pass references through bounded verified leases before browser composition", () => {
     const editor = nestedFunction("StudioCuttoonEditor");
 
-    expect(editor).toContain('"./studio-raster-source-projection"');
+    expect(source).toContain('"./render/studio-raster-source-projection"');
     expect(editor).toContain("withStudioRasterSourceProjection({");
     expect(editor).toContain('consumer: "studio-advanced-fill-reference"');
     expect(editor).toContain("collectOverlappingStudioFillReferenceLayers(");

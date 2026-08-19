@@ -26,7 +26,7 @@ export type StudioProductionSemanticNodeKind =
   (typeof STUDIO_PRODUCTION_SEMANTIC_NODE_KINDS)[number];
 
 export const STUDIO_PRODUCTION_SEMANTIC_EDGE_KINDS = [
-  "derives-from",
+  "derives-from ",
   "story-flow",
   "character-reference",
   "dialogue-render",
@@ -423,7 +423,7 @@ function validEdgeContract(
   fromKind: StudioProductionSemanticNodeKind,
   toKind: StudioProductionSemanticNodeKind
 ): boolean {
-  if (edgeKind === "derives-from") {
+  if (edgeKind === "derives-from ") {
     return fromKind === toKind && SAME_KIND_DERIVATIONS.has(fromKind);
   }
   if (edgeKind === "story-flow") return STORY_FLOW_PAIRS.has(`${fromKind}>${toKind}`);

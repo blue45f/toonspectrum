@@ -5,6 +5,7 @@
  * Can live on image elements as `smartFilters` or on a dedicated adjustment layer record.
  */
 
+import type { InkWash } from "./brush/studio-ink-wash";
 import type {
   StudioFieldIrisBlurOptions,
   StudioLensBlurOptions,
@@ -28,7 +29,6 @@ import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
 import type { Halftone } from "./studio-halftone";
-import type { InkWash } from "./studio-ink-wash";
 import type { LineArtCleanupOptions } from "./studio-line-cleanup";
 import type {
   StudioDifferenceOfGaussiansOptions,

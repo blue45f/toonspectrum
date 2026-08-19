@@ -8,23 +8,23 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_BRUSH_BACKEND_INTEGRATION_AUDIT,
-} from "./studio-brush-backend-quality-policy";
-import {
-  STUDIO_V11_NON_PROVIDER_BACKENDS,
-  deriveStudioV11BackendDescriptors,
-} from "./studio-engine-provider-bridge";
+} from "./brush/studio-brush-backend-quality-policy";
 import {
   studioStrokeRouteBucket,
   studioStrokeRouteProviderId,
   type StudioStrokeRouteWorkloadTraits,
-} from "./studio-stroke-route-tournament";
+} from "./brush/studio-stroke-route-tournament";
 import {
   STUDIO_STROKE_SURFACE_ROUTE_PRIORITY,
   type StudioHokusaiStrokeSurfaceSupport,
   type StudioStrokeSurfaceProviderState,
   type StudioStrokeSurfaceRouteKind,
   type StudioStrokeSurfaceRouteSnapshotInput,
-} from "./studio-stroke-surface-route";
+} from "./brush/studio-stroke-surface-route";
+import {
+  STUDIO_V11_NON_PROVIDER_BACKENDS,
+  deriveStudioV11BackendDescriptors,
+} from "./render/studio-engine-provider-bridge";
 import {
   admittedLanes,
   planStudioStrokeSurfaceShadow,

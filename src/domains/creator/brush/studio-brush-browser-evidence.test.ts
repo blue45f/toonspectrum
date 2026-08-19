@@ -87,8 +87,7 @@ interface StudioBrushBrowserEvidence {
 
 describe("Studio brush browser evidence", () => {
   it("pins a passing production-browser receipt for the exact shipped catalogue", () => {
-    const evidence = JSON.parse(readFileSync(new URL(
-      "../../../tests/benchmarks/results/studio-brush-browser.json",
+    const evidence = JSON.parse(readFileSync(new URL("../../../../tests/benchmarks/results/studio-brush-browser.json",
       import.meta.url,
     ), "utf8")) as StudioBrushBrowserEvidence;
     const coreCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(

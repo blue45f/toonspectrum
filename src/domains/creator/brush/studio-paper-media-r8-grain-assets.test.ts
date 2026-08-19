@@ -14,6 +14,8 @@ import { inflateSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import { StudioBrushR8GrainRegistry } from "./studio-brush-r8-grain-runtime";
 import { STUDIO_PAPER_PRESET_IDS_V1 } from "./studio-paper-media-profile-v1";
 import {
@@ -23,7 +25,6 @@ import {
   STUDIO_PAPER_MEDIA_R8_ASSET_ID_PREFIX_V1,
   STUDIO_PAPER_MEDIA_R8_TILE_SIZE_V1,
 } from "./studio-paper-media-r8-grain-assets";
-import { sha256HexPortable } from "./studio-sha256";
 
 const SIZE = STUDIO_PAPER_MEDIA_R8_TILE_SIZE_V1;
 

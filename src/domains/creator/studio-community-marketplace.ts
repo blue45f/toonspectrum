@@ -1,10 +1,10 @@
 import {
   STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID,
-} from "./studio-bg3d-procedural-starter-pack";
+} from "./bg3d/studio-bg3d-procedural-starter-pack";
 import {
   sanitizeBrushSnapshot,
   type StudioSavedBrush,
-} from "./studio-brush-library";
+} from "./brush/studio-brush-library";
 import {
   type StudioCreatorInstalledFilterPreset,
   type StudioCreatorPackStorage,

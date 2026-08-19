@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   hasValidStudioBg3dCanonicalGeometryNumbers,
   isStudioBg3dCanonicalGeometryPayload,
-} from "./studio-bg3d-geometry-worker-protocol";
+} from "./bg3d/studio-bg3d-geometry-worker-protocol";
 import {
   createStudioGeometryMesh,
   STUDIO_GEOMETRY_DEFAULT_BUDGETS,

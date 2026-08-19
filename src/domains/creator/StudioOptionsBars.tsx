@@ -1,13 +1,19 @@
 import { memo, Suspense } from "react";
 
-import { DRAW_COLOR_SWATCHES } from "./studio-draw-color-swatches";
+import { DRAW_COLOR_SWATCHES } from "./brush/studio-draw-color-swatches";
 import {
   StudioDrawOptionsBar,
   StudioSelectOptionsBar,
 } from "./studio-page-lazy-ui";
 
-import type { StudioBrushStampTuning } from "./studio-brush-library";
-import type { StudioBrushSlot } from "./studio-brush-slots";
+import type { StudioBrushStampTuning } from "./brush/studio-brush-library";
+import type { StudioBrushSlot } from "./brush/studio-brush-slots";
+import type {
+  StudioDrawModeUi,
+  StudioPressureCurveUi,
+  StudioStabilizerModeUi,
+  StudioSymmetryUi,
+} from "./brush/StudioDrawOptionsBar";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type { DrawShapeKind } from "./studio-editor-tool-model";
 import type { StudioLivingInkMaterialControls } from "./studio-living-ink-gpu-protocol";
@@ -15,12 +21,6 @@ import type {
   StudioLivingInkStrokeMode,
   StudioLivingInkStudioState,
 } from "./studio-living-ink-studio-coordinator";
-import type {
-  StudioDrawModeUi,
-  StudioPressureCurveUi,
-  StudioStabilizerModeUi,
-  StudioSymmetryUi,
-} from "./StudioDrawOptionsBar";
 
 import { useIsMobile } from "@/components/use-media-query";
 

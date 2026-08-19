@@ -32,8 +32,7 @@ const artifact = JSON.parse(
 ) as TextCacheCjkArtifact;
 const rejectedAllUnique = JSON.parse(
   readFileSync(
-    new URL(
-      "../benchmarks/results/text-cache-cjk-all-unique-rejected.json",
+    new URL("../benchmarks/results/text-cache-cjk-all-unique-rejected.json",
       import.meta.url,
     ),
     "utf8",

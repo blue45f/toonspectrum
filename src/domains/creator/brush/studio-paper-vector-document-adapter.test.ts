@@ -11,7 +11,7 @@ import {
   type StudioPaperVectorRefinementProvider,
 } from "./studio-paper-vector-refinement-provider";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 interface NodeModuleLoader {
   _load(request: string, parent: unknown, isMain: boolean): unknown;

@@ -2,7 +2,7 @@ import {
   hashStudioCanonicalBrushPlan,
   parseStudioCanonicalBrushPlan,
   type StudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
 
 export const STUDIO_ENGINE_VNEXT_BRUSH_PROVIDER_ROUTER_VERSION = 1 as const;
 

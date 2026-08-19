@@ -1,4 +1,4 @@
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_ENGINE_WEBGPU_PRESENTATION_SURFACE_REVISION = 2 as const;
 export const STUDIO_ENGINE_WEBGPU_PRESENTATION_SURFACE_FORMAT = "rgba16float" as const;

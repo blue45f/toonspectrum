@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { resolveStudioTiledDocPrimarySurfaceOwner } from "./studio-tiledoc-primary-surface-owner";
+import { resolveStudioTiledDocPrimarySurfaceOwner } from "./render/studio-tiledoc-primary-surface-owner";
 import {
   StudioTiledDocWebGpuSurface,
 } from "./StudioTiledDocWebGpuSurface";

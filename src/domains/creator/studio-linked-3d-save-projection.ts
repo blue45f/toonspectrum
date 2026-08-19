@@ -3,8 +3,7 @@ import {
   validateStudioLinked3dRenderDocumentAgainstPage,
   validateStudioLinked3dReservedPageState,
 } from "./studio-linked-3d-render-document";
-import { migrateStudioShared3dStageCollectionDocument } from
-  "./studio-shared-3d-stage-collection";
+import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
 
 import type { El } from "./studio-element-model";
 import type { PageState } from "./studio-page-state";

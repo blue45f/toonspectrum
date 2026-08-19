@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
 import {
   classifyStudioBrushBackendQuality,
-} from "./studio-brush-backend-quality-policy";
+} from "./brush/studio-brush-backend-quality-policy";
 import {
   STUDIO_BRUSH_CATALOG_COUNTS,
   studioBrushCatalogItemById,
-} from "./studio-brush-catalog";
+} from "./brush/studio-brush-catalog";
 import {
   planNormalizedStudioDynamicBrushDabs,
   studioBrushDynamicsSettingsForBrushId,
-} from "./studio-brush-dynamics";
-import { studioBrushIconId } from "./studio-brush-icons";
+} from "./brush/studio-brush-dynamics";
+import { studioBrushIconId } from "./brush/studio-brush-icons";
 import {
   resolveStudioBrushRuntimeContract,
-} from "./studio-brush-runtime-contract";
+} from "./brush/studio-brush-runtime-contract";
+import { BRUSH_PRESETS } from "./studio-brush";
 import {
   expandStudioSketchpadMirrorPath,
   isStudioSketchpadSpecialtyBrushId,

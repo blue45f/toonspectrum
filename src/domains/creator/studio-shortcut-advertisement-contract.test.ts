@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { resolveStudioDrawingShortcut } from "./studio-drawing-shortcuts";
+import { resolveStudioDrawingShortcut } from "./brush/studio-drawing-shortcuts";
 import { resolveStudioViewShortcut } from "./studio-view-controls";
 
 /**

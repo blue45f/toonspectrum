@@ -7,7 +7,7 @@ import {
   publishStudioCrdtSceneGraphDiff,
 } from "./studio-crdt-scene-publisher";
 
-import type { StudioPaperSurfaceSettings } from "./studio-paper-granulation-runtime";
+import type { StudioPaperSurfaceSettings } from "../brush/studio-paper-granulation-runtime";
 
 interface TestElement {
   id: string;

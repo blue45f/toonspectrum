@@ -1,10 +1,11 @@
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_BRUSH_R8_GRAIN_ASSET_LIMITS,
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
   type StudioBrushR8TextureGrainSource,
 } from "./studio-brush-r8-grain-asset-contract";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type { NormalizedStudioBrushGrainSettings } from "./studio-brush-material-dynamics";
 import type { StudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";

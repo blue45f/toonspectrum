@@ -3,10 +3,10 @@
  * Id: `{base}--{lane}` e.g. oil--filbert-ribbon, watercolor--granular.
  */
 import type { StudioStampPaperProgramId } from "./studio-brush-stamp-engine";
-import type { StudioCroquisCapsulePenProgramId } from "./studio-croquis-capsule-pen-v1";
-import type { StudioLivingInkSettledBakeProgramId } from "./studio-living-ink-settled-bake-v1";
+import type { StudioCroquisCapsulePenProgramId } from "../studio-croquis-capsule-pen-v1";
+import type { StudioLivingInkSettledBakeProgramId } from "../studio-living-ink-settled-bake-v1";
 import type { StudioPaperPresetIdV1 } from "./studio-paper-media-profile-v1";
-import type { StudioSpectralWgmColorMixProgramId } from "./studio-spectral-wgm-mix-v1";
+import type { StudioSpectralWgmColorMixProgramId } from "../studio-spectral-wgm-mix-v1";
 import type { StudioWetEdgeBloomProgramId } from "./studio-wet-edge-bloom-v1";
 
 export const STUDIO_BRUSH_ENGINE_LANE_CATALOG_VERSION =

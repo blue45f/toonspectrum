@@ -14,6 +14,7 @@ import path from "node:path";
 import { CommandRegistry } from "@toonspectrum/studio-command-registry";
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_FILTER_PACK_KINDS } from "./filter/studio-filter-pack-registry";
 import { STUDIO_SHORTCUT_ACTIONS } from "./studio-app-settings";
 import {
   catalogNativeIds,
@@ -27,7 +28,6 @@ import {
   STUDIO_MENU_ITEM_INVENTORY,
 } from "./studio-command-catalog";
 import { STUDIO_EDIT_MENU_COMMAND_ORDER } from "./studio-edit-controls";
-import { STUDIO_FILTER_PACK_KINDS } from "./studio-filter-pack-registry";
 import { STUDIO_QUICK_ACCESS_COMMAND_IDS } from "./studio-quick-access-integration";
 import { QUICK_ACTION_IDS } from "./studio-quick-actions";
 
@@ -120,7 +120,7 @@ describe("studio command catalog — identity", () => {
     }
   });
 
-  it("every entry names at least one source list it came from", () => {
+  it("every entry names at least one source list it came from ", () => {
     const orphans = STUDIO_COMMAND_CATALOG.filter(
       (entry) => entry.origins.length === 0,
     ).map((entry) => entry.id);

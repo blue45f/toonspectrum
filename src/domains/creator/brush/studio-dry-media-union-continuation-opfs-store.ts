@@ -1,4 +1,12 @@
 import {
+  StudioOpfsSyncAccessError,
+  probeStudioOpfsSyncAccessCapability,
+  type StudioOpfsSyncAccessHandleLike,
+  type StudioOpfsSyncDirectoryHandleLike,
+} from "../studio-opfs-sync-access-store";
+import { sha256HexPortable } from "../studio-sha256";
+
+import {
   createStudioDryMediaUnionCasLifecycle,
   type StudioDryMediaUnionCasBlobReference,
   type StudioDryMediaUnionCasLifecyclePublication,
@@ -6,18 +14,11 @@ import {
   type StudioDryMediaUnionCasLifecycleTransaction,
   type StudioDryMediaUnionLifecycleManagedCas,
 } from "./studio-dry-media-union-continuation-cas-lifecycle";
-import {
-  StudioOpfsSyncAccessError,
-  probeStudioOpfsSyncAccessCapability,
-  type StudioOpfsSyncAccessHandleLike,
-  type StudioOpfsSyncDirectoryHandleLike,
-} from "./studio-opfs-sync-access-store";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type {
   StudioFreehandInputBinaryCasStore,
   StudioFreehandInputCasBlobKind,
-} from "./studio-freehand-input-binary-spool-opfs-store";
+} from "../studio-freehand-input-binary-spool-opfs-store";
 
 export const STUDIO_DRY_MEDIA_UNION_CAS_ROOT_NAME =
   "toonspectrum-studio-dry-media-union-v1";

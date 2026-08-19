@@ -2,12 +2,12 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { STUDIO_RASTER_ASSETS } from "./render/studio-raster-assets";
 import {
   createStudioAssetFavoriteId,
   type StudioAssetFavoriteId,
   type StudioAssetFavoriteState,
 } from "./studio-asset-favorites";
-import { STUDIO_RASTER_ASSETS } from "./studio-raster-assets";
 import { StudioRasterAssetGrid, type StudioRasterAssetGridProps } from "./StudioRasterAssetGrid";
 
 const [CAFE_ASSET, SCHOOL_ASSET, FANTASY_ASSET] = STUDIO_RASTER_ASSETS;

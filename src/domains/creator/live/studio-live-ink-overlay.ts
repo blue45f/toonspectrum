@@ -20,6 +20,11 @@
  */
 
 import {
+  resolveStudioInkPressure,
+  studioInkUsesResidualDabSpacing,
+  type StudioInkPressureModel,
+} from "../brush/studio-ink-pressure-model";
+import {
   advanceStudioResidualInk,
   planStudioCausalInkDabs,
   selectStudioCausalInkSamples,
@@ -29,23 +34,18 @@ import {
   type StudioCausalInkDab,
   type StudioCausalInkSample,
   type StudioResidualInkState,
-} from "./studio-causal-ink";
-import {
-  resolveStudioInkPressure,
-  studioInkUsesResidualDabSpacing,
-  type StudioInkPressureModel,
-} from "./studio-ink-pressure-model";
+} from "../studio-causal-ink";
 import {
   acquireStudioLowLatencyCanvas2dContext,
   decideStudioNativeLiveSurfaceResolution,
   type StudioNativeLiveSurfaceResolutionDecision,
-} from "./studio-low-latency-canvas";
+} from "../studio-low-latency-canvas";
 
+import type { StudioStrokePaintModel } from "../brush/studio-stroke-paint-model";
 import type {
   StudioPredictedInkSample,
   StudioPredictedInkSurfaceUpdate,
-} from "./studio-predicted-ink-tail";
-import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
+} from "../studio-predicted-ink-tail";
 
 export interface StudioLiveInkSurface {
   /** 스케일된 문서 안에서 표면의 CSS 배치(px). planStudioWebGpuViewportSurface.surface 와 동일. */

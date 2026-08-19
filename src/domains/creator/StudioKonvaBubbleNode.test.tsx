@@ -13,11 +13,11 @@ import {
   scaredBubblePathData,
   thoughtBubbleBodyPath,
   type BubbleTailSpec,
-} from "./studio-bubble-path";
+} from "./lettering/studio-bubble-path";
 import {
   bubbleHorizontalPadding,
   bubbleVerticalPadding,
-} from "./studio-bubble-text-fit";
+} from "./lettering/studio-bubble-text-fit";
 import { StudioKonvaBubbleNode } from "./StudioKonvaBubbleNode";
 
 import type { El } from "./studio-element-model";

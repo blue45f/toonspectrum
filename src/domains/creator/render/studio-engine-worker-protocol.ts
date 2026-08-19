@@ -7,7 +7,7 @@ import {
   STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S,
   STUDIO_SHARED_POINTER_RING_VERSION,
   type StudioSharedPointerRingDescriptor,
-} from "./studio-shared-pointer-ring-buffer";
+} from "../studio-shared-pointer-ring-buffer";
 
 /**
  * Pure structured-clone protocol boundary for a future OffscreenCanvas engine

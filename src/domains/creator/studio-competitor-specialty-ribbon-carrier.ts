@@ -18,10 +18,10 @@ import {
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
   type StudioDynamicBrushSegmentStartFrame,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 
-import type { StudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
-import type { StudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
+import type { StudioBrushTipAlphaMap } from "./brush/studio-brush-tip-stamp";
+import type { StudioDynamicBrushMaterialIdentity } from "./brush/studio-dry-media-dynamic-bridge";
 
 export const STUDIO_COMPETITOR_SPECIALTY_RIBBON_CARRIER_VERSION =
   "competitor-specialty-ribbon-carrier-v1" as const;

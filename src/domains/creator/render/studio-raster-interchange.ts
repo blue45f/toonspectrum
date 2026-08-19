@@ -8,7 +8,7 @@ import {
   decodeStudioTiffInterchange,
   encodeStudioTiffInterchange,
   sniffStudioTiffInterchange,
-} from "./studio-tiff-interchange";
+} from "../studio-tiff-interchange";
 
 export type StudioRasterInterchangeFormat = "bmp" | "tga" | "ppm" | "pam" | "qoi" | "tiff";
 

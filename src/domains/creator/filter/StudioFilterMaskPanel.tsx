@@ -19,13 +19,14 @@
 import { Blend, Contrast, Eye, EyeOff, Loader2, Plus, Trash2 } from "lucide-react";
 import { useId } from "react";
 
+import { PANEL_CHIP_CLASS, StudioSliderRow, StudioToggleChip } from "../studio-panel-ui";
+
 import {
   FILTER_MASK_BRUSH_HARDNESS_RANGE,
   FILTER_MASK_BRUSH_RADIUS_RANGE,
   FILTER_MASK_BRUSH_STRENGTH_RANGE,
   type FilterMaskPaintMode,
 } from "./studio-filter-mask";
-import { PANEL_CHIP_CLASS, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 
 import type { ReactElement } from "react";
 

@@ -2,12 +2,12 @@
 import {
   resolveStudioHokusaiProductLiveAdmission,
   type StudioHokusaiProductLivePresetId,
-} from "./studio-brush-backend-quality-policy";
+} from "./brush/studio-brush-backend-quality-policy";
 import { studioLivingInkAdmitsBrush } from "./studio-living-ink-brush-admission";
 import { loadStudioPixelEditBrushRuntime } from "./studio-page-editor-runtime-loaders";
 
+import type { StudioHokusaiLiveSampleLike } from "./render/studio-hokusai-live-brush-protocol";
 import type { DrawEl, El } from "./studio-element-model";
-import type { StudioHokusaiLiveSampleLike } from "./studio-hokusai-live-brush-protocol";
 import type { StudioLivingInkAuthoritativeSample } from "./studio-living-ink-studio-coordinator";
 
 
@@ -42,8 +42,7 @@ export async function acquireProductStudioUiPreferencesRepository() {
 
 export function loadStudioWatermarkPreferencesSqliteModule():
   Promise<StudioWatermarkPreferencesSqliteModule> {
-  studioWatermarkPreferencesSqliteModulePromise ??= import(
-    "./studio-watermark-preferences-sqlite"
+  studioWatermarkPreferencesSqliteModulePromise ??= import("./studio-watermark-preferences-sqlite"
   );
   studioWatermarkPreferencesSqliteModulePromise.catch(() => {
     studioWatermarkPreferencesSqliteModulePromise = null;
@@ -240,5 +239,5 @@ export function readyStudioWorkAssetImageSources(
 }
 
 function loadStudioCanvasImageIo() {
-  return import("./studio-canvas-image-io");
+  return import( "./canvas/studio-canvas-image-io");
 }

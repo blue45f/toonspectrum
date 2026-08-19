@@ -5,19 +5,18 @@
 // docs/studio-bg3d-custom-model-upload.md).
 import * as THREE from "three";
 
-import { loadStudioBg3dMeshoptDecoder } from "./studio-bg3d-meshopt";
+import { loadStudioBg3dMeshoptDecoder } from "./bg3d/studio-bg3d-meshopt";
 import {
   computeStudioBg3dAutoFitScale,
   STUDIO_BG3D_AUTO_FIT_TARGET_SIZE,
-} from "./studio-bg3d-model-scale-contract";
-import { bakeStudioBg3dRigPoseLayer } from "./studio-bg3d-rig-pose-bake";
-import { isStudioBg3dThreeAnalyticIkMatrixSupported } from "./studio-bg3d-three-hierarchy";
+} from "./bg3d/studio-bg3d-model-scale-contract";
+import { bakeStudioBg3dRigPoseLayer } from "./bg3d/studio-bg3d-rig-pose-bake";
+import { isStudioBg3dThreeAnalyticIkMatrixSupported } from "./bg3d/studio-bg3d-three-hierarchy";
 import { solveTwoBoneTarget } from "./studio-rig-two-bone-ik";
 
-import type { Bg3dModelFormat } from "./bg3d-model-library";
-import type { BgPrimitive } from "./studio-background-3d-primitives";
-import type { StudioBg3dGlbValidationSuccess } from "./studio-bg3d-glb-validation";
-import type { StudioBg3dKtx2RendererRuntime } from "./studio-bg3d-ktx2-renderer-runtime";
+import type { Bg3dModelFormat } from "./bg3d/bg3d-model-library";
+import type { StudioBg3dGlbValidationSuccess } from "./bg3d/studio-bg3d-glb-validation";
+import type { StudioBg3dKtx2RendererRuntime } from "./bg3d/studio-bg3d-ktx2-renderer-runtime";
 import type {
   StudioBg3dAnimationPlayback,
   StudioBg3dConstraintLayer,
@@ -27,7 +26,8 @@ import type {
   StudioBg3dQuaternion,
   StudioBg3dMorphLayer,
   StudioBg3dSceneBudgets,
-} from "./studio-bg3d-scene-document";
+} from "./bg3d/studio-bg3d-scene-document";
+import type { BgPrimitive } from "./studio-background-3d-primitives";
 
 export interface BgCustomModelInstance {
   id: string;
@@ -1801,7 +1801,7 @@ export async function loadVerifiedStudioBg3dGlbWithThree(
     // Optional KHR_texture_basisu assets deliberately use their core PNG/JPEG source. Three only
     // selects that standards-defined fallback when no KTX2Loader is attached.
     const ktx2RuntimePromise = verification.requiresBasisTextures
-      ? import("./studio-bg3d-ktx2-renderer-runtime").then(({ createStudioBg3dKtx2RendererRuntime }) =>
+      ? import("./bg3d/studio-bg3d-ktx2-renderer-runtime").then(({ createStudioBg3dKtx2RendererRuntime }) =>
           createStudioBg3dKtx2RendererRuntime({ renderer: options.renderer as THREE.WebGLRenderer })
         )
       : Promise.resolve(null);

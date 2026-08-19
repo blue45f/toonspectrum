@@ -58,7 +58,7 @@ describe("VelloHub canvas target", () => {
     expect(target.activeBackendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
     expect(target.cpuCanvas.style.display).toBe("block");
     expect(target.cpuCanvas.dataset.studioVelloHubPrimary).toBe("true");
-    expect(target.gpuCanvas.style.display).toBe("none");
+    expect(target.gpuCanvas).toBe(target.cpuCanvas);
 
     target.holdLastGood("device-lost");
     expect(target.cpuCanvas.style.display).toBe("block");
@@ -76,12 +76,14 @@ describe("VelloHub canvas target", () => {
         ? { configure, getCurrentTexture }
         : null) as never,
     );
-    vi.stubGlobal("GPUTextureUsage", { COPY_DST: 2, RENDER_ATTACHMENT: 16 });
+    vi.stubGlobal("GPUTextureUsage", { COPY_DST: 2, COPY_SRC: 4, RENDER_ATTACHMENT: 16 });
+    const retained = { width: 8, height: 8 } as GPUTexture;
     const copyTextureToTexture = vi.fn();
     const finish = vi.fn(() => ({}) as GPUCommandBuffer);
     const submit = vi.fn();
     const release = vi.fn();
     const device = {
+      createTexture: vi.fn(() => retained),
       createCommandEncoder: vi.fn(() => ({ copyTextureToTexture, finish })),
       queue: {
         submit,
@@ -109,13 +111,24 @@ describe("VelloHub canvas target", () => {
     }));
     expect(copyTextureToTexture).toHaveBeenCalledWith(
       { texture: source },
+      { texture: retained },
+      { width: 8, height: 8, depthOrArrayLayers: 1 },
+    );
+    expect(copyTextureToTexture).toHaveBeenCalledWith(
+      { texture: retained },
       { texture: destination },
       { width: 8, height: 8, depthOrArrayLayers: 1 },
     );
-    expect(submit).toHaveBeenCalledOnce();
+    expect(submit).toHaveBeenCalled();
     expect(target.activeBackendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
     expect(target.gpuCanvas.style.display).toBe("block");
-    expect(target.cpuCanvas.style.display).toBe("none");
     await vi.waitFor(() => expect(release).toHaveBeenCalledOnce());
+
+    target.park();
+    expect(target.canvas.style.display).toBe("none");
+    expect(target.canvas.width).toBe(1);
+    expect(target.canvas.height).toBe(1);
+    expect(target.canvas.dataset.studioVelloPresentNodes).toBe("0");
+    target.destroy();
   });
 });

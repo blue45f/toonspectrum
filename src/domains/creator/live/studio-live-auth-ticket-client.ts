@@ -3,7 +3,7 @@ import {
   STUDIO_LIVE_AUTH_TICKET_VERSION,
   StudioLiveAuthTicketResponseSchema,
   type StudioLiveAuthTicketResponse,
-} from "../../../lib/studio-live-auth-ticket";
+} from "../../../../lib/studio-live-auth-ticket";
 
 import { readOrCreateStudioLiveGuestCredential } from "./studio-live-client-identity";
 

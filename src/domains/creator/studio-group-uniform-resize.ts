@@ -10,9 +10,9 @@
  * therefore detect an applied resize with the same reference comparison used by the group
  * translation planner, while unsupported/invalid input can never tear a mixed group.
  */
-import { BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT } from "./studio-bubble-text-fit";
+import { BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT } from "./lettering/studio-bubble-text-fit";
 
-import type { BubbleTailSpec } from "./studio-bubble-path";
+import type { BubbleTailSpec } from "./lettering/studio-bubble-path";
 import type { El } from "./studio-element-model";
 
 export interface StudioGroupUniformResizeBounds {

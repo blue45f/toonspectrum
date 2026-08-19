@@ -1,7 +1,7 @@
 import { memo, useLayoutEffect, useRef } from "react";
 
-import type { StudioInkMeshLivePreviewRuntime } from "./studio-ink-mesh-live-preview-loader";
-import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
+import type { StudioInkMeshLivePreviewRuntime } from "./brush/studio-ink-mesh-live-preview-loader";
+import type { StudioLiveInkSurface } from "./live/studio-live-ink-overlay";
 
 export const StudioInkMeshLivePreviewHost = memo(
   function StudioInkMeshLivePreviewHost({

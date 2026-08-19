@@ -1,5 +1,5 @@
-import type { StudioRasterReplayTileFilterInput } from "./studio-crdt-raster-replay-runtime";
 import type { StudioWebGpuViewportSurfacePlan } from "./studio-webgpu-viewport";
+import type { StudioRasterReplayTileFilterInput } from "../live/studio-crdt-raster-replay-runtime";
 import type {
   StudioRasterOperation,
   StudioRasterSurfaceSpec,

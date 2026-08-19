@@ -49,10 +49,10 @@ describe("Studio 공용 MediaPipe Vision 자산", () => {
 
   it("마네킹·VRM 얼굴/손/포즈·전경 분리가 모두 공용 로컬 자산 권위를 사용한다", () => {
     const consumers = [
-      "studio-mannequin-webcam-tracking.ts",
-      "studio-vrm-webcam-tracking.ts",
-      "studio-bg-remove.ts",
-    ].map((fileName) => readFileSync(new URL(`./${fileName}`, import.meta.url), "utf8"));
+      "./scene-3d/studio-mannequin-webcam-tracking.ts",
+      "./vrm/studio-vrm-webcam-tracking.ts",
+      "./studio-bg-remove.ts",
+    ].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8"));
 
     for (const source of consumers) {
       expect(source).toContain("resolveStudioMediaPipeVisionWasmFileset");

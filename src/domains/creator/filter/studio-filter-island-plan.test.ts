@@ -5,17 +5,18 @@ import { afterEach, describe, expect, it } from "vitest";
 
 
 import {
+  createStudioTournamentRuntime,
+  installStudioTournamentRuntime,
+  peekStudioTournamentRuntime,
+} from "../studio-renderer-tournament-runtime";
+
+import {
   installStudioFilterTournamentBootstrap,
   planStudioFilterIslandLanes,
   studioFilterIslandBucket,
   studioFilterLaneProviderId,
 } from "./studio-filter-island-plan";
 import { STUDIO_FILTER_LANE_COST_SEED } from "./studio-filter-lane-cost-model";
-import {
-  createStudioTournamentRuntime,
-  installStudioTournamentRuntime,
-  peekStudioTournamentRuntime,
-} from "./studio-renderer-tournament-runtime";
 
 /**
  * First real-path V11 delegation gate (ADR 0001 2차 개정 step c): the image
@@ -82,11 +83,11 @@ describe("V11 filter island plan", () => {
 
   it("StudioKonvaImageNode consumes the plan for its lane decision (wiring contract)", () => {
     const source = readFileSync(
-      new URL("./StudioKonvaImageNode.tsx", import.meta.url),
+      new URL("../StudioKonvaImageNode.tsx", import.meta.url),
       "utf8",
     );
     expect(source).toMatch(
-      /import \{[\s\S]*?planStudioFilterIslandLanes[\s\S]*?\} from "\.\/studio-filter-island-plan";/u,
+      /import \{[\s\S]*?planStudioFilterIslandLanes[\s\S]*?\} from "\.\/filter\/studio-filter-island-plan";/u,
     );
     expect(source).toMatch(
       /const filterIslandPlan = planStudioFilterIslandLanes\(filterIslandInput\);/u,
@@ -528,6 +529,6 @@ describe("filter island planning never touches persistence (wasm budget)", () =>
     // A static import would put the 865 KB wasm glue in the filter chunk even
     // if the call itself were deferred.
     expect(source).not.toMatch(/^import .*studio-tournament-sqlite-persistence/mu);
-    expect(source).toMatch(/import\("\.\/studio-tournament-sqlite-persistence"\)/u);
+    expect(source).toMatch(/import\("\.\.\/studio-tournament-sqlite-persistence"\)/u);
   });
 });

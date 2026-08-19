@@ -21,7 +21,85 @@ import {
   screentoneDotRadius,
   screentoneDotsForStroke,
   strokeRenderDistance,
-} from "./studio-brush";
+} from "../studio-brush";
+import {
+  DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
+  planCausalWatercolorBrushDabs,
+} from "../studio-causal-watercolor-brush";
+import {
+  planStudioDynamicBrushCoverageAndLegacyMarks,
+  renderStudioDynamicBrushCoverage,
+  renderStudioDynamicBrushCoverageMark,
+  renderStudioDynamicBrushLegacyMarks,
+} from "../studio-dynamic-brush-coverage-renderer";
+import { planStudioDynamicBrushRender } from "../studio-dynamic-brush-render-plan";
+import {
+  FX_OIL_DAB_CAP,
+  FX_PASTEL_DAB_CAP,
+  STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION,
+  fxBrushSeedFromKey,
+  isStudioFxPressureBrushId,
+  planGlitterBrushParticles,
+  planGlowBrushPasses,
+  planNeonBrushPasses,
+  planOilBrushDabs,
+  studioOilPaintBodyForBrush,
+  studioOilTipProfileForBrush,
+  planPastelBrushDabs,
+  planStudioFxBrushPressurePath,
+  planStudioFxLuminousRibbonPass,
+  resolveStudioFxBrushTapPressureResponse,
+  resolveStudioFxPressurePassResponse,
+  traceStudioFxLuminousRibbonPass,
+  studioLuminousCoreColor,
+} from "../studio-fx-brush";
+import { konvaGradientProps } from "../studio-gradient-engine";
+import {
+  planStudioHighlighterWashRibbon,
+  planStudioHighlighterWashTap,
+  resolveStudioHighlighterWashBrushId,
+  traceStudioHighlighterWashDetail,
+  traceStudioHighlighterWashPlan,
+} from "../studio-highlighter-wash-ribbon";
+import {
+  requestStudioLivingInkSettledBakeDabs,
+  resolveStudioLivingInkSettledBakeProgram,
+} from "../studio-living-ink-settled-bake-v1";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
+import { planStudioPerfectFreehandRender } from "../studio-outline-stroke-contract";
+import {
+  konvaPatternProps,
+  loadPatternTileImage,
+  patternDataUrl,
+} from "../studio-pattern-fill";
+import {
+  buildStudioPerfectFreehandOutline,
+  loadStudioPerfectFreehandStroker,
+  peekStudioPerfectFreehandStroker,
+  studioPerfectFreehandOutlineToPathData,
+  resolveStudioPerfectFreehandProfile,
+} from "../studio-perfect-freehand";
+import {
+  fillStudioPixelPencilCells,
+  isStudioPixelPencilRenderMode,
+  planStudioPixelPencilCells,
+} from "../studio-pixel-pencil";
+import {
+  planStudioRetainedMediaPressureCurve,
+  planStudioRetainedMediaTapDab,
+  resolveStudioRetainedMediaPressure,
+  resolveStudioRetainedMediaPressureProfileId,
+} from "../studio-retained-media-pressure";
+import { planStudioRetainedMediaRibbon } from "../studio-retained-media-ribbon";
+import {
+  buildStudioRoughShapeRenderPlan,
+  loadStudioRoughGenerator,
+  peekStudioRoughGenerator,
+  studioRoughSeedFromElementId,
+  studioSketchStyleOfElement,
+} from "../studio-rough-shape";
+import { StudioStampDrawShape } from "../StudioStampDrawShape";
+
 import {
   applyStudioBrushAliasWatercolorMaterial,
   isStudioBrushEraserAliasId,
@@ -46,10 +124,6 @@ import {
 import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import {
-  DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
-  planCausalWatercolorBrushDabs,
-} from "./studio-causal-watercolor-brush";
-import {
   drawBounds,
   drawFreehandPenSegments,
   drawStudioCausalInkContract,
@@ -57,83 +131,17 @@ import {
   resolveStudioCausalInkDrawContract,
 } from "./studio-draw-rendering";
 import {
-  planStudioDynamicBrushCoverageAndLegacyMarks,
-  renderStudioDynamicBrushCoverage,
-  renderStudioDynamicBrushCoverageMark,
-  renderStudioDynamicBrushLegacyMarks,
-} from "./studio-dynamic-brush-coverage-renderer";
-import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
-import {
-  FX_OIL_DAB_CAP,
-  FX_PASTEL_DAB_CAP,
-  STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION,
-  fxBrushSeedFromKey,
-  isStudioFxPressureBrushId,
-  planGlitterBrushParticles,
-  planGlowBrushPasses,
-  planNeonBrushPasses,
-  planOilBrushDabs,
-  studioOilPaintBodyForBrush,
-  studioOilTipProfileForBrush,
-  planPastelBrushDabs,
-  planStudioFxBrushPressurePath,
-  planStudioFxLuminousRibbonPass,
-  resolveStudioFxBrushTapPressureResponse,
-  resolveStudioFxPressurePassResponse,
-  traceStudioFxLuminousRibbonPass,
-  studioLuminousCoreColor,
-} from "./studio-fx-brush";
-import { konvaGradientProps } from "./studio-gradient-engine";
-import {
-  planStudioHighlighterWashRibbon,
-  planStudioHighlighterWashTap,
-  resolveStudioHighlighterWashBrushId,
-  traceStudioHighlighterWashDetail,
-  traceStudioHighlighterWashPlan,
-} from "./studio-highlighter-wash-ribbon";
-import {
-  requestStudioLivingInkSettledBakeDabs,
-  resolveStudioLivingInkSettledBakeProgram,
-} from "./studio-living-ink-settled-bake-v1";
-import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
+  isStudioFluidPaintBrushId,
+  studioFluidPaintStationSpacingRatio,
+} from "./studio-fluid-paint-reference";
+import { resolveStudioDrawTapRadius } from "./studio-live-visible-tap";
 import {
   paintStudioOilRibbonCarrier,
   paintStudioOilRibbonHit,
   planStudioOilRibbonCarrier,
   studioOilRibbonProgramsForBrush,
 } from "./studio-oil-ribbon-carrier";
-import { planStudioPerfectFreehandRender } from "./studio-outline-stroke-contract";
-import {
-  konvaPatternProps,
-  loadPatternTileImage,
-  patternDataUrl,
-} from "./studio-pattern-fill";
-import {
-  buildStudioPerfectFreehandOutline,
-  loadStudioPerfectFreehandStroker,
-  peekStudioPerfectFreehandStroker,
-  studioPerfectFreehandOutlineToPathData,
-  resolveStudioPerfectFreehandProfile,
-} from "./studio-perfect-freehand";
-import {
-  fillStudioPixelPencilCells,
-  isStudioPixelPencilRenderMode,
-  planStudioPixelPencilCells,
-} from "./studio-pixel-pencil";
-import {
-  planStudioRetainedMediaPressureCurve,
-  planStudioRetainedMediaTapDab,
-  resolveStudioRetainedMediaPressure,
-  resolveStudioRetainedMediaPressureProfileId,
-} from "./studio-retained-media-pressure";
-import { planStudioRetainedMediaRibbon } from "./studio-retained-media-ribbon";
-import {
-  buildStudioRoughShapeRenderPlan,
-  loadStudioRoughGenerator,
-  peekStudioRoughGenerator,
-  studioRoughSeedFromElementId,
-  studioSketchStyleOfElement,
-} from "./studio-rough-shape";
+import { paintStudioOilRibbonCarrierIncremental } from "./studio-oil-ribbon-incremental-paint";
 import { rasterizeStudioCoverageBands } from "./studio-stroke-coverage-raster";
 import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
 import {
@@ -159,14 +167,14 @@ import {
   planStudioWetRibbonCarrier,
   traceStudioWetRibbonCarrierBatch,
 } from "./studio-wet-ribbon-carrier";
-import { StudioStampDrawShape } from "./StudioStampDrawShape";
 
-import type { CalligraphyStylusInput } from "./studio-brush";
-import type { DrawEl } from "./studio-element-model";
+
+import type { CalligraphyStylusInput } from "../studio-brush";
+import type { DrawEl } from "../studio-element-model";
 import type { StudioPaperSurfaceSettings } from "./studio-paper-granulation-runtime";
-import type { StudioPatternSpec } from "./studio-pattern-fill";
-import type { StudioPerfectFreehandStroker } from "./studio-perfect-freehand";
-import type { StudioRoughGeneratorHandle } from "./studio-rough-shape";
+import type { StudioPatternSpec } from "../studio-pattern-fill";
+import type { StudioPerfectFreehandStroker } from "../studio-perfect-freehand";
+import type { StudioRoughGeneratorHandle } from "../studio-rough-shape";
 
 type PerfectInkDebugState = {
   brush: string;
@@ -387,7 +395,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const dynamicCoverageMarkPlan = dynamicCoverageAndLegacyMarkPlan?.coveragePlan ?? null;
 
   return (
-    <Group studioElementId={el.id} listening={false}>
+    <Group
+      studioElementId={el.id}
+      globalCompositeOperation={isEraserOperation ? "destination-out" : undefined}
+      listening={false}
+    >
       {symmetricVariations.map((points, index) => {
         // 손그림(스케치) 모드 — 모든 도형 종류를 rough.js 패스로 그린다. generator 로드 전이나
         // 지오메트리 부족으로 계획이 비면 아래 깨끗한 프리미티브 분기로 그대로 폴백한다.
@@ -853,12 +865,15 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     key={pass.role}
                     x={points[0]}
                     y={points[1]}
-                    radius={Math.max(
-                      0.35,
-                      aliasStrokeWidth
-                      * pass.widthScale
-                      * pressureResponse.sizeScale
-                      / 2,
+                    radius={resolveStudioDrawTapRadius(
+                      activeDraft,
+                      Math.max(
+                        0.35,
+                        aliasStrokeWidth
+                        * pass.widthScale
+                        * pressureResponse.sizeScale
+                        / 2,
+                      ),
                     )}
                     fill={stroke}
                     opacity={Math.min(
@@ -990,7 +1005,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 key={index}
                 x={points[0]}
                 y={points[1]}
-                radius={Math.max(0.35, width / 2)}
+                radius={resolveStudioDrawTapRadius(activeDraft, Math.max(0.35, width / 2))}
                 fill={stroke}
                 opacity={opacity}
                 globalCompositeOperation={composite}
@@ -1038,7 +1053,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 key={index}
                 x={points[0]}
                 y={points[1]}
-                radius={Math.max(0.35, width / 2)}
+                radius={resolveStudioDrawTapRadius(activeDraft, Math.max(0.35, width / 2))}
                 fill={stroke}
                 opacity={opacity}
                 globalCompositeOperation={composite}
@@ -1691,7 +1706,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                           key={pass.role}
                           x={legacyTapDab.x}
                           y={legacyTapDab.y}
-                          radius={Math.max(0.25, passWidth / 2)}
+                          radius={resolveStudioDrawTapRadius(
+                            activeDraft,
+                            Math.max(0.25, passWidth / 2),
+                          )}
                           fill={stroke}
                           opacity={pass.opacityScale}
                           globalCompositeOperation={composite}
@@ -1723,7 +1741,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   key={index}
                   x={legacyTapDab.x}
                   y={legacyTapDab.y}
-                  radius={Math.max(0.25, strokeWidth / 2)}
+                  radius={resolveStudioDrawTapRadius(
+                    activeDraft,
+                    Math.max(0.25, strokeWidth / 2),
+                  )}
                   fill={stroke}
                   opacity={opacity}
                   globalCompositeOperation={composite}
@@ -1771,11 +1792,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       key={pass.role}
                       x={tapDab.x}
                       y={tapDab.y}
-                      radius={Math.max(
-                        0.35,
-                        Math.max(0.5, aliasStrokeWidth * pass.widthScale)
-                        * tapDab.sizeScale
-                        / 2,
+                      radius={resolveStudioDrawTapRadius(
+                        activeDraft,
+                        Math.max(
+                          0.35,
+                          Math.max(0.5, aliasStrokeWidth * pass.widthScale)
+                          * tapDab.sizeScale
+                          / 2,
+                        ),
                       )}
                       fill={stroke}
                       opacity={Math.min(
@@ -2222,6 +2246,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               maxDabs: FX_OIL_DAB_CAP,
               paintBody: studioOilPaintBodyForBrush(brush),
               tipProfile: studioOilTipProfileForBrush(brush),
+              stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
             });
             // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
             // dli GGX 릴리프 오버레이는 brush--impasto-relief 와 oil--impasto-ribbon 두 레인이 켠다,
@@ -2236,7 +2261,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               <Shape
                 key={index}
                 sceneFunc={(context) => {
-                  paintStudioOilRibbonCarrier(context, {
+                  const paintInput = {
                     carrier,
                     stroke,
                     opacity,
@@ -2246,7 +2271,18 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       dabs.reduce((sum, dab) => sum + dab.radiusY, 0)
                       / Math.max(1, dabs.length),
                     ),
-                  });
+                    mixModel: isStudioFluidPaintBrushId(brush) || brush.startsWith("oil--fluid-paint")
+                      ? ("ryb" as const)
+                      : undefined,
+                  };
+                  if (activeDraft) {
+                    paintStudioOilRibbonCarrierIncremental(context, {
+                      ...paintInput,
+                      incrementalKey: el.id,
+                    });
+                    return;
+                  }
+                  paintStudioOilRibbonCarrier(context, paintInput);
                 }}
                 hitFunc={(context, shape) => {
                   paintStudioOilRibbonHit(context, carrier, shape);
@@ -2343,6 +2379,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               <Shape
                 key={index}
                 sceneFunc={(context) => {
+                  if (causalContract.composite !== "source-over") {
+                    context.globalCompositeOperation = causalContract.composite;
+                  }
                   drawStudioCausalInkContract(context, causalContract);
                 }}
                 opacity={causalContract.opacity}
@@ -2378,6 +2417,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 key={index}
                 sceneFunc={(context) => {
                   if (smoothed.length < 4) return;
+                  if (composite !== "source-over") {
+                    context.globalCompositeOperation = composite;
+                  }
                   if (freehandFill && smoothed.length >= 6) {
                     context.beginPath();
                     context.moveTo(smoothed[0]!, smoothed[1]!);

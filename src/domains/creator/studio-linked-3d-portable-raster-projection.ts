@@ -1,7 +1,7 @@
 import type {
   StudioRasterSourceLease,
   StudioRasterSourceLeaseOptions,
-} from "./studio-raster-source-lease";
+} from "./render/studio-raster-source-lease";
 
 export const STUDIO_LINKED_3D_PORTABLE_RASTER_MAX_SOURCE_BYTES = 64 * 1024 * 1024;
 export const STUDIO_LINKED_3D_PORTABLE_RASTER_MAX_EMBEDDED_BYTES = 96 * 1024 * 1024;
@@ -39,7 +39,7 @@ async function acquireDefaultLease(
   source: string,
   options: StudioRasterSourceLeaseOptions,
 ): Promise<StudioRasterSourceLease> {
-  const { acquireStudioRasterSourceLease } = await import("./studio-raster-source-lease");
+  const { acquireStudioRasterSourceLease } = await import("./render/studio-raster-source-lease");
   return await acquireStudioRasterSourceLease(source, options);
 }
 

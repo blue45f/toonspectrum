@@ -4,7 +4,33 @@ import {
   buildCalligraphySegments,
   BRUSH_PRESETS,
   screentoneDotsForStroke,
-} from "./studio-brush";
+} from "../studio-brush";
+import { planStudioCausalInk } from "../studio-causal-ink";
+import {
+  applyStudioCroquisPulledStringPrefilter,
+  buildStudioCroquisCapsuleStrokeLoops,
+  resolveStudioCroquisCapsulePenProgram,
+  studioCroquisCapsuleRadiiFromPressures,
+} from "../studio-croquis-capsule-pen-v1";
+import {
+  isStudioFxPressureBrushId,
+  planGlitterBrushParticles,
+  planOilBrushDabs,
+  planPastelBrushDabs,
+  planStudioFxBrushPressurePath,
+} from "../studio-fx-brush";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
+import {
+  buildStudioPerfectFreehandOutline,
+  loadStudioPerfectFreehandStroker,
+  resolveStudioPerfectFreehandProfile,
+  type StudioPerfectFreehandStroker,
+} from "../studio-perfect-freehand";
+import {
+  planStudioRetainedMediaPressureCurve,
+  resolveStudioRetainedMediaPressureProfileId,
+} from "../studio-retained-media-pressure";
+
 import {
   mapStudioBrushAliasPressureSamples,
   resolveStudioBrushAliasWatercolorPlanSettings,
@@ -29,35 +55,10 @@ import {
   resolveStudioStampBrushKind,
   resolveStudioStampBrushStyle,
 } from "./studio-brush-stamp-engine";
-import { planStudioCausalInk } from "./studio-causal-ink";
-import {
-  applyStudioCroquisPulledStringPrefilter,
-  buildStudioCroquisCapsuleStrokeLoops,
-  resolveStudioCroquisCapsulePenProgram,
-  studioCroquisCapsuleRadiiFromPressures,
-} from "./studio-croquis-capsule-pen-v1";
-import {
-  isStudioFxPressureBrushId,
-  planGlitterBrushParticles,
-  planOilBrushDabs,
-  planPastelBrushDabs,
-  planStudioFxBrushPressurePath,
-} from "./studio-fx-brush";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
-import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import { planStudioOilRibbonCarrier } from "./studio-oil-ribbon-carrier";
-import {
-  buildStudioPerfectFreehandOutline,
-  loadStudioPerfectFreehandStroker,
-  resolveStudioPerfectFreehandProfile,
-  type StudioPerfectFreehandStroker,
-} from "./studio-perfect-freehand";
-import {
-  planStudioRetainedMediaPressureCurve,
-  resolveStudioRetainedMediaPressureProfileId,
-} from "./studio-retained-media-pressure";
 import {
   planStudioAngledNibStrokeLocalCoverage,
   studioStrokeLocalCoverageSignedArea,

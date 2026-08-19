@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  StudioCrdtRecoverySqlCapacityError,
+  openStudioLocalDatabase,
+  requireStudioCrdtRecoveryDatabase,
+} from "../studio-local-database";
+
+import {
   STUDIO_CRDT_PROTOCOL_VERSION,
   encodeStudioCrdtUpdate,
   type StudioCrdtUpdateRequest,
@@ -11,17 +17,12 @@ import {
   StudioCrdtRecoveryDurabilityError,
   createStudioCrdtRecoverySqlitePersistence,
 } from "./studio-crdt-recovery-vault";
-import {
-  StudioCrdtRecoverySqlCapacityError,
-  openStudioLocalDatabase,
-  requireStudioCrdtRecoveryDatabase,
-} from "./studio-local-database";
 
 import type {
   StudioLocalDatabase,
   StudioSqliteApiHandle,
   StudioSqliteDatabaseHandle,
-} from "./studio-local-database";
+} from "../studio-local-database";
 
 let sqlite3: StudioSqliteApiHandle;
 const opened: StudioLocalDatabase[] = [];

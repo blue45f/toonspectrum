@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  captureStudioOutlineStrokeContractV1,
+} from "../studio-outline-stroke-contract";
+
+import {
   STUDIO_HOKUSAI_NATURAL_MEDIA_CONTRACT_VERSION,
   STUDIO_HOKUSAI_NATURAL_MEDIA_LIMITS,
   planStudioHokusaiNaturalMediaRender,
   studioHokusaiSourceRevision,
 } from "./studio-hokusai-natural-media-contract";
-import {
-  captureStudioOutlineStrokeContractV1,
-} from "./studio-outline-stroke-contract";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 function stroke(patch: Partial<DrawEl> = {}): DrawEl {
   return {

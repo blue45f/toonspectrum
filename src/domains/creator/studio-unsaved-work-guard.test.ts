@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  allowStudioProgrammaticReload,
+  hasStudioUnloadPromptWork,
   hasUnsavedStudioWork,
   installStudioUnloadGuard,
   studioPendingStrokeFingerprint,
@@ -55,6 +57,28 @@ describe("studio unsaved work signal", () => {
           durablePendingStrokeFingerprint: "",
         }),
       ),
+    ).toBe(true);
+  });
+
+  it("does not use brush-slot dirt alone for the native leave dialog", () => {
+    expect(
+      hasStudioUnloadPromptWork(signals({
+        toolOperationMemoryDirty: true,
+        editGeneration: 4,
+        durableGeneration: 4,
+      })),
+    ).toBe(false);
+  });
+
+  it("still prompts while a document generation or deferred stroke is not durable", () => {
+    expect(
+      hasStudioUnloadPromptWork(signals({ editGeneration: 5, durableGeneration: 4 })),
+    ).toBe(true);
+    expect(
+      hasStudioUnloadPromptWork(signals({
+        pendingStrokeFingerprint: "page-1:stroke-a",
+        durablePendingStrokeFingerprint: "",
+      })),
     ).toBe(true);
   });
 
@@ -117,6 +141,14 @@ describe("studio unload guard", () => {
 
     expect(harness.fire().prevented).toBe(true);
     expect(harness.fire().prevented).toBe(false);
+  });
+
+  it("lets an app or HMR reload through without the leave dialog", () => {
+    const harness = fakeTarget();
+    installStudioUnloadGuard({ target: harness.target, hasUnsavedWork: () => true });
+    allowStudioProgrammaticReload();
+    expect(harness.fire().prevented).toBe(false);
+    expect(harness.fire().prevented).toBe(true);
   });
 
   it("detaches so a closed studio cannot keep prompting", () => {

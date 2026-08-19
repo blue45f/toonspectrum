@@ -7,7 +7,7 @@ import {
   STUDIO_STAMP_BRUSH_DEFAULTS,
   type StudioStampBrushDab,
   type StudioStampBrushStyle,
-} from "./studio-brush-stamp-engine";
+} from "./brush/studio-brush-stamp-engine";
 import {
   isStudioCc0MypaintPresetBrushId,
   listStudioCc0MypaintPresetImports,

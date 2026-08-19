@@ -11,12 +11,13 @@
  * fallback result so StudioDrawNode can retain its frozen dab renderer.
  */
 
+import { parseStudioGpuColor } from "../render/studio-webgpu-color";
+
 import {
   mapStudioBrushAliasPressureSamples,
   resolveStudioBrushAliasWatercolorPlanSettings,
 } from "./studio-brush-alias-profile";
 import { watercolorBrushSeedFromKey } from "./studio-watercolor-brush";
-import { parseStudioGpuColor } from "./studio-webgpu-color";
 import {
   createStudioWetInkField,
   depositStudioWetInkStroke,
@@ -26,7 +27,7 @@ import {
   type StudioWetInkTileUpload,
 } from "./studio-wet-ink-field";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 export const STUDIO_WET_INK_BRUSH_RUNTIME_VERSION =
   "wet-ink-brush-runtime-v1" as const;
@@ -406,64 +407,68 @@ function fieldMaterial(
   if (brushId === "inkwash-water-brush") {
     return {
       absorption: 0.005,
-      bleed: 0.52,
+      bleed: 0.58,
+      chromatography: 0.5,
       dryingRate: 0.022,
-      edgeDarkening: 0.25,
+      edgeDarkening: 0.42,
       fixationRate: 0.04,
-      granulation: 0.35,
+      granulation: 0.55,
       hardness: 0.2,
-      paperRoughness: 0.45,
-      pigmentLoad: 0.05,
-      waterLoad: 1.5,
-      wetnessLoad: 1.5,
+      paperRoughness: 0.62,
+      pigmentLoad: 0.08,
+      waterLoad: 1.55,
+      wetnessLoad: 1,
       spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["indigo-wash"],
     };
   }
   if (brushId === "inkwash-bleed-wash") {
     return {
       absorption: 0.032,
-      bleed: 0.48,
+      bleed: 0.62,
+      chromatography: 0.72,
       dryingRate: 0.028,
-      edgeDarkening: 0.75,
+      edgeDarkening: 0.92,
       fixationRate: 0.12,
-      granulation: 0.72,
+      granulation: 0.82,
       hardness: 0.38,
-      paperRoughness: 0.8,
-      pigmentLoad: 1.25,
-      waterLoad: 1.2,
-      wetnessLoad: 1.25,
+      paperRoughness: 0.86,
+      pigmentLoad: 1.28,
+      waterLoad: 1.25,
+      wetnessLoad: 1,
       spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["sumi-black"],
     };
   }
   if (brushId === "inkwash-pen") {
     return {
       absorption: 0.04,
-      bleed: 0.22,
+      bleed: 0.28,
+      chromatography: 0.5,
       dryingRate: 0.05,
-      edgeDarkening: 0.82,
+      edgeDarkening: 0.88,
       fixationRate: 0.25,
-      granulation: 0.25,
+      granulation: 0.38,
       hardness: 0.75,
-      paperRoughness: 0.5,
-      pigmentLoad: 1.4,
-      waterLoad: 0.4,
-      wetnessLoad: 0.45,
+      paperRoughness: 0.58,
+      pigmentLoad: 1.45,
+      waterLoad: 0.32,
+      wetnessLoad: 0.22,
       spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["sumi-black"],
     };
   }
   if (brushId === "inkwash-white-ink") {
     return {
       absorption: 0.015,
-      bleed: 0.28,
+      bleed: 0.3,
+      chromatography: 0.2,
       dryingRate: 0.04,
-      edgeDarkening: 0.35,
+      edgeDarkening: 0.4,
       fixationRate: 0.2,
-      granulation: 0.3,
+      granulation: 0.34,
       hardness: 0.5,
-      paperRoughness: 0.5,
-      pigmentLoad: 1.2,
-      waterLoad: 0.6,
-      wetnessLoad: 0.65,
+      paperRoughness: 0.55,
+      pigmentLoad: 1.22,
+      waterLoad: 0.62,
+      wetnessLoad: 0.66,
       spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["white-highlight"],
     };
   }
@@ -488,16 +493,17 @@ function fieldMaterial(
   }
   return {
     absorption: 0.021,
-    bleed: 0.34,
+    bleed: 0.36,
+    chromatography: 0.5,
     dryingRate: 0.034,
-    edgeDarkening: 0.46,
+    edgeDarkening: 0.58,
     fixationRate: 0.112,
-    granulation: 0.4,
+    granulation: 0.52,
     hardness: 0.3,
-    paperRoughness: 0.54,
-    pigmentLoad: 0.76,
-    waterLoad: 0.98,
-    wetnessLoad: 0.96,
+    paperRoughness: 0.62,
+    pigmentLoad: 0.78,
+    waterLoad: 1.02,
+    wetnessLoad: 1.0,
     spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["indigo-wash"],
   };
 }

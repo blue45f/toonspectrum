@@ -20,6 +20,16 @@ import {
 import { useEffect, useRef, useState, type FormEvent, type Ref } from "react";
 
 import {
+  StudioScreenShareController,
+  isStudioScreenShareSupported,
+  studioScreenShareErrorMessage,
+  type StudioRemoteScreenShare,
+  type StudioScreenShareRequest,
+  type StudioScreenShareState,
+  type StudioScreenShareViewer,
+} from "../studio-screen-share";
+
+import {
   useStudioLiveCollaboration,
   type StudioLiveAvailability,
   type StudioLiveRecoveryState,
@@ -30,15 +40,6 @@ import {
   presentStudioLiveSyncSnapshot,
   type StudioLiveSyncSnapshot,
 } from "./studio-live-sync-safety";
-import {
-  StudioScreenShareController,
-  isStudioScreenShareSupported,
-  studioScreenShareErrorMessage,
-  type StudioRemoteScreenShare,
-  type StudioScreenShareRequest,
-  type StudioScreenShareState,
-  type StudioScreenShareViewer,
-} from "./studio-screen-share";
 
 import type {
   StudioLiveChatMessage,
@@ -48,8 +49,8 @@ import type { StudioLiveTransportMode } from "./studio-live-collaboration-transp
 import type {
   StudioScreenIcePolicyMode,
   StudioScreenIcePolicySession,
-} from "./studio-screen-ice-policy";
-import type { StudioTeamRole } from "./studio-team-client";
+} from "../studio-screen-ice-policy";
+import type { StudioTeamRole } from "../studio-team-client";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -925,7 +926,7 @@ export function StudioLiveCollaborationPanel({ workId }: { workId: string }) {
     if (live.mode !== "server") return true;
     let entry = screenIceSessionRef.current;
     if (!entry || entry.controller !== controller) {
-      const { StudioScreenIcePolicySession } = await import("./studio-screen-ice-policy");
+      const { StudioScreenIcePolicySession } = await import("../studio-screen-ice-policy");
       if (screenControllerRef.current !== controller || !live.room) return false;
       entry = screenIceSessionRef.current;
       if (!entry || entry.controller !== controller) {
@@ -1073,7 +1074,7 @@ export function StudioLiveCollaborationPanel({ workId }: { workId: string }) {
   async function handleCopyInviteLink() {
     setInviteLinkNotice(null);
     try {
-      const { buildStudioLiveShareHref } = await import("./creator-studio-links");
+      const { buildStudioLiveShareHref } = await import("../creator-studio-links");
       await navigator.clipboard.writeText(
         buildStudioLiveShareHref(workId, window.location.origin, workId)
       );

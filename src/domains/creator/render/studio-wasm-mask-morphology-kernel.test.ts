@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  checkStudioWasm64Capability,
+  createStudioWasmMemoryRuntime,
+  STUDIO_WASM_PAGE_BYTES,
+} from "../studio-wasm64-memory-governor";
+
+import {
   applyStudioMaskMorphology3x3Reference,
   buildStudioWasmMaskMorphologyModule,
   createStudioPersistentMaskMorphologyExecutor,
@@ -10,11 +16,6 @@ import {
   type StudioWasmMaskMorphologyKernelCreationResult,
   type StudioWasmMaskMorphologyKernelLike,
 } from "./studio-wasm-mask-morphology-kernel";
-import {
-  checkStudioWasm64Capability,
-  createStudioWasmMemoryRuntime,
-  STUDIO_WASM_PAGE_BYTES,
-} from "./studio-wasm64-memory-governor";
 
 function createKernel(
   addressType: "i64" | "i32",

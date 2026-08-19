@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const PRODUCT_PREFERENCE_CONSUMERS = [
   "StudioBackgroundPanel.tsx",
-  "StudioFilterDialog.tsx",
+  "filter/StudioFilterDialog.tsx",
   "StudioElementsPanel.tsx",
   "StudioPageListPane.tsx",
 ] as const;
@@ -28,7 +28,7 @@ describe("Studio product UI preference authority", () => {
       "utf8",
     );
     const viewport = readFileSync(
-      resolve(process.cwd(), "src/domains/creator/StudioCanvasViewport.tsx"),
+      resolve(process.cwd(), "src/domains/creator/canvas/StudioCanvasViewport.tsx"),
       "utf8",
     );
 

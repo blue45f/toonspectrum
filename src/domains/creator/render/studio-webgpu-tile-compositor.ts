@@ -1,4 +1,5 @@
-import { studioHighBitSrgbToLinear } from "./studio-highbit-transfer";
+import { studioHighBitSrgbToLinear } from "../studio-highbit-transfer";
+
 import { studioGpuStrokeFeedPointCount } from "./studio-webgpu-stroke-feed";
 import {
   fingerprintStudioGpuStroke,

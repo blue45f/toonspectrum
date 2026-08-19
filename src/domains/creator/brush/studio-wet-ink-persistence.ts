@@ -8,7 +8,8 @@
  * OPFS, CRDT blob storage or a Worker boundary.
  */
 
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   createStudioWetInkField,
   studioWetInkFieldDigest,

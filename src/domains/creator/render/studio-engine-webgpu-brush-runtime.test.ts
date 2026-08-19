@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { studioHighBitSrgbToLinear } from "../studio-highbit-transfer";
+
 import {
   adaptLoweredStudioCanonicalBrushWebGpuDabs,
   convertLegacyStudioGpuDabPlanToWebGpuDiagnosticOracle,
@@ -17,13 +19,12 @@ import {
   type StudioEngineWebGpuBrushPlan,
   type StudioEngineWebGpuBrushRuntime,
 } from "./studio-engine-webgpu-brush-runtime";
-import { studioHighBitSrgbToLinear } from "./studio-highbit-transfer";
 
 import type {
   LoweredStudioCanonicalBrushWebGpuDabs,
   StudioCanonicalBrushWebGpuLoweringResult,
   StudioCanonicalWebGpuAnalyticDab,
-} from "./studio-canonical-brush-webgpu-lowering";
+} from "../studio-canonical-brush-webgpu-lowering";
 import type {
   StudioGpuDab,
   StudioGpuDabRenderUpdate,

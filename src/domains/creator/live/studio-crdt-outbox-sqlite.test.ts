@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
+  openStudioLocalDatabase,
+  requireStudioCrdtOutboxDatabase,
+} from "../studio-local-database";
+
+import {
   STUDIO_CRDT_OUTBOX_MAX_ENTRIES_PER_WORK,
   SqliteStudioCrdtOutbox,
   StudioCrdtOutboxCapacityError,
@@ -13,17 +18,13 @@ import {
   encodeStudioCrdtUpdate,
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
-import {
-  openStudioLocalDatabase,
-  requireStudioCrdtOutboxDatabase,
-} from "./studio-local-database";
 
 import type {
   StudioCrdtOutboxDatabase,
   StudioLocalDatabase,
   StudioSqliteApiHandle,
   StudioSqliteDatabaseHandle,
-} from "./studio-local-database";
+} from "../studio-local-database";
 
 let sqlite3: StudioSqliteApiHandle;
 const opened: StudioLocalDatabase[] = [];

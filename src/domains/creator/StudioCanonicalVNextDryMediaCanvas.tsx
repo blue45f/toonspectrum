@@ -1,23 +1,23 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
 import {
+  createStudioEngineWebGpuPresentationSurface,
+  type StudioEngineWebGpuPresentationLayout,
+  type StudioEngineWebGpuPresentationSurface,
+} from "./render/studio-engine-webgpu-presentation-surface";
+import {
+  createStudioEngineWebGpuTexturedBrushRuntime,
+  type StudioEngineWebGpuTexturedBrushRuntime,
+} from "./render/studio-engine-webgpu-textured-brush-runtime";
+import {
   StudioCanonicalVNextDryMediaPresentationController,
   type StudioCanonicalVNextDryMediaFinalParityResult,
 } from "./studio-canonical-vnext-dry-media-presentation-controller";
 import { compileStudioCanonicalVNextDryMediaProductFrame } from "./studio-canonical-vnext-dry-media-product-adapter";
-import {
-  createStudioEngineWebGpuPresentationSurface,
-  type StudioEngineWebGpuPresentationLayout,
-  type StudioEngineWebGpuPresentationSurface,
-} from "./studio-engine-webgpu-presentation-surface";
-import {
-  createStudioEngineWebGpuTexturedBrushRuntime,
-  type StudioEngineWebGpuTexturedBrushRuntime,
-} from "./studio-engine-webgpu-textured-brush-runtime";
 import { resolveStudioLiveSurfaceDevicePixelRatio } from "./studio-low-latency-canvas";
 
+import type { StudioWebGpuSurfaceBounds } from "./render/studio-webgpu-viewport";
 import type { DrawEl } from "./studio-element-model";
-import type { StudioWebGpuSurfaceBounds } from "./studio-webgpu-viewport";
 
 import { cn } from "@/lib/utils";
 

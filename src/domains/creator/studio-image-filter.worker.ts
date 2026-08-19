@@ -1,3 +1,4 @@
+import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./render/studio-konva-filters";
 import {
   STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
   assertStudioImageFilterImageData,
@@ -10,7 +11,6 @@ import {
   type StudioImageFilterWorkerSourceSuccessMessage,
   type StudioImageFilterWorkerSuccessMessage,
 } from "./studio-image-filter-worker-protocol";
-import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
 
 interface StudioImageFilterWorkerScope {
   onmessage: ((event: MessageEvent<StudioImageFilterWorkerRequestMessage>) => void) | null;

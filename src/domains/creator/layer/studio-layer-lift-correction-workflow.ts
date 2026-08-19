@@ -7,6 +7,8 @@
  * authority, and returns a fresh review session for the caller.
  */
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   isStudioLayerLiftTrustedArtifactPair,
 } from "./studio-layer-lift-artifact";
@@ -40,7 +42,6 @@ import {
   doesStudioLayerLiftCompositionReceiptMatchOperation,
   doesStudioSceneLayerLiftResultMatchOperation,
 } from "./studio-layer-lift-operation-context";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type {
   StudioLayerLiftTrustedWorkerComposition,

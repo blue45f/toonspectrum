@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { StudioBrushR8GrainRegistry } from "./studio-brush-r8-grain-runtime";
-import { sha256HexPortable } from "./studio-sha256";
+import { StudioBrushR8GrainRegistry } from "../brush/studio-brush-r8-grain-runtime";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   StudioWebGpuR8GrainTextureCache,
   packStudioWebGpuR8GrainNativeUniform,
@@ -12,8 +13,8 @@ import {
   type StudioWebGpuR8GrainNativeInput,
 } from "./studio-webgpu-r8-grain-native";
 
-import type { StudioBrushR8TextureGrainSource } from "./studio-brush-r8-grain-asset-contract";
-import type { StudioBrushR8GrainTransferSnapshotEntry } from "./studio-brush-r8-grain-runtime";
+import type { StudioBrushR8TextureGrainSource } from "../brush/studio-brush-r8-grain-asset-contract";
+import type { StudioBrushR8GrainTransferSnapshotEntry } from "../brush/studio-brush-r8-grain-runtime";
 
 interface FakeTexture {
   readonly descriptor: GPUTextureDescriptor;

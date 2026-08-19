@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const fileUrl = new URL("./StudioPage.tsx", import.meta.url);
-const viewportUrl = new URL("./StudioCanvasViewport.tsx", import.meta.url);
+const fileUrl = new URL("../StudioPage.tsx", import.meta.url);
+const viewportUrl = new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url);
 const source = readFileSync(fileUrl, "utf8");
 const viewportSource = readFileSync(viewportUrl, "utf8");
 const file = ts.createSourceFile(

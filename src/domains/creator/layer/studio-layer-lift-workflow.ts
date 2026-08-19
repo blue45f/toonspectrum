@@ -57,7 +57,7 @@ import {
   type StudioLayerLiftSourceSnapshotSuccess,
 } from "./studio-layer-lift-source-snapshot";
 
-import type { StudioEditorMutationTicket } from "./studio-editor-scope";
+import type { StudioEditorMutationTicket } from "../studio-editor-scope";
 import type { StudioLayerLiftAvailabilityInput } from "./studio-layer-lift-availability";
 import type {
   StudioLayerLiftLocalForegroundAnalyzeOptions,

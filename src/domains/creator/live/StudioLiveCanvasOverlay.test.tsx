@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   addStudioCommentThread,
   createEmptyStudioCommentsDocument,
-} from "./studio-comments";
+} from "../studio-comments";
+
 import {
   projectStudioCanvasCommentPins,
   STUDIO_LIVE_PARTICIPANT_COLORS,

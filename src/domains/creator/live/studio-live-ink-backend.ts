@@ -1,5 +1,5 @@
-import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
-import type { StudioGpuLiveStrokePreparation } from "./studio-webgpu-live-stroke-plan";
+import type { StudioGpuBackend } from "../render/studio-webgpu-frame-contract";
+import type { StudioGpuLiveStrokePreparation } from "../render/studio-webgpu-live-stroke-plan";
 
 /**
  * `auto` is the production default: use the already-warmed WebGPU surface when the browser

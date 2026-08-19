@@ -32,7 +32,7 @@ describe("Studio asset placement UI boundary", () => {
 
   it("uses one drag writer for image-backed elements and native insertions", () => {
     const elementPanel = read("./StudioElementsPanel.tsx");
-    const bubbleMenu = read("./StudioBubbleToolPopoverBody.tsx");
+    const bubbleMenu = read("./lettering/StudioBubbleToolPopoverBody.tsx");
     const assetMenu = read("./StudioAssetMenuPanel.tsx");
 
     expect(elementPanel).toContain("writeStudioAssetDragPayload(");

@@ -8,7 +8,7 @@ import {
 } from "./studio-oil-ribbon-carrier";
 import { StudioDrawNode } from "./StudioDrawNode";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 interface CapturedKonvaNode {
   kind: string;

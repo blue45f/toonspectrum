@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const viewportSource = readFileSync(
-  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
 

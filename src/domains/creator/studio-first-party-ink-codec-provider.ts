@@ -15,6 +15,11 @@
  */
 
 import {
+  STUDIO_INK_ENVELOPE_LIMITS,
+  decodeStudioInkEnvelope,
+  encodeStudioInkEnvelope,
+} from "./brush/studio-ink-envelope-codec";
+import {
   STUDIO_CODEC_PROVIDER_CONTRACT_VERSION,
   type StudioCodecLicenseScope,
   type StudioCodecProvider,
@@ -29,11 +34,6 @@ import {
   serializeCanonicalStudioDocumentEnvelope,
   type CanonicalStudioDocumentEnvelope,
 } from "./studio-document-envelope";
-import {
-  STUDIO_INK_ENVELOPE_LIMITS,
-  decodeStudioInkEnvelope,
-  encodeStudioInkEnvelope,
-} from "./studio-ink-envelope-codec";
 import {
   STUDIO_INKML_LIMITS,
   STUDIO_INKML_MEDIA_TYPE,

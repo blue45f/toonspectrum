@@ -6,7 +6,7 @@ import {
   type StudioLayerLiftUnavailableCode,
 } from "./studio-layer-lift-availability";
 
-import type { El } from "./studio-element-model";
+import type { El } from "../studio-element-model";
 
 const INLINE_PNG = "data:image/png;base64,AA==";
 

@@ -7,6 +7,8 @@
  * one guarded reload before any Studio route is mounted.
  */
 
+import { allowStudioProgrammaticReload } from "../domains/creator/studio-unsaved-work-guard";
+
 export const STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS = Object.freeze({
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "credentialless",
@@ -131,10 +133,10 @@ function isViteStudioWorkerAssetUrl(url: string | null | undefined): boolean {
     ) {
       return true;
     }
-    return (
-      /(?:^|\/)studio-[^/]+\.worker\.[cm]?[jt]sx?$/.test(parsed.pathname)
-      && parsed.searchParams.has("worker_file")
-    );
+    // Dev-server module workers and service-worker re-fetches of the same file
+    // both use the `studio-*.worker.ts` stem. Vite may add `?worker_file`; a
+    // controlling SW often drops that query and sends `Sec-Fetch-Dest: empty`.
+    return /(?:^|\/)studio-[^/]+\.worker\.[cm]?[jt]sx?$/.test(parsed.pathname);
   } catch {
     return false;
   }
@@ -410,6 +412,7 @@ export function requestStudioCrossOriginIsolationReload(
   }
 
   try {
+    allowStudioProgrammaticReload();
     location.reload();
     return {
       diagnostic: diagnostic(

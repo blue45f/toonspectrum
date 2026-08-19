@@ -59,9 +59,9 @@ function moduleEdges(relativePath: string): ModuleEdges {
 }
 
 const STACK_OPTIONAL_MODULES = [
-  "./StudioAiProvenancePanel",
+  "./ai/StudioAiProvenancePanel",
   "./StudioAutoActionsPanel",
-  "./StudioBackground3D",
+  "./bg3d/StudioBackground3D",
   "./StudioCharacterBiblePanel",
   "./StudioCheckpointPanel",
   "./StudioColorWheelOverlay",
@@ -79,7 +79,7 @@ const STACK_OPTIONAL_MODULES = [
   "./StudioStoryboardGridPanel",
   "./StudioTeamPanel",
   "./StudioTimelapsePanel",
-  "./StudioVrmPoser",
+  "./vrm/StudioVrmPoser",
   "./StudioWriterRoomPanel",
   "./WorkFxPanel",
 ] as const;
@@ -87,13 +87,14 @@ const STACK_OPTIONAL_MODULES = [
 describe("Studio lazy panel stack boundary", () => {
   it("keeps one-way static ownership from StudioPage", () => {
     const page = moduleEdges("./StudioPage.tsx");
+    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const stack = moduleEdges("./StudioLazyPanelStack.tsx");
     const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx");
 
     expect(
-      page.valueImports.filter((specifier) => specifier === "./StudioLazyPanelStack")
-    ).toEqual(["./StudioLazyPanelStack"]);
-    expect(page.source.match(/<StudioLazyPanelStack\b/g)).toHaveLength(1);
+      editorView.valueImports.filter((specifier) => specifier === "../StudioLazyPanelStack")
+    ).toEqual(["../StudioLazyPanelStack"]);
+    expect(editorView.source.match(/<StudioLazyPanelStack\b/g)).toHaveLength(1);
     expect(page.source).not.toContain("interface StudioLazyPanelStackProps");
     expect(page.source).not.toContain("interface StudioLazyPanelStackHandlers");
     expect(stack.allImports).not.toContain("./StudioPage");
@@ -144,7 +145,7 @@ describe("Studio lazy panel stack boundary", () => {
       expect(previewStack.valueImports, `${optionalModule} must not be eager`).not.toContain(optionalModule);
       expect(previewStack.dynamicImports, `${optionalModule} must not bypass the registry`).not.toContain(optionalModule);
       expect(registry.valueImports, `${optionalModule} must remain optional`).not.toContain(optionalModule);
-      if (optionalModule === "./StudioBackground3D") {
+      if (optionalModule === "./bg3d/StudioBackground3D") {
         expect(registry.valueImports).toContain("./studio-background-3d-loader");
         expect(
           background3dLoader.dynamicImports.filter((specifier) => specifier === optionalModule)
@@ -156,7 +157,7 @@ describe("Studio lazy panel stack boundary", () => {
         ).toEqual([optionalModule]);
       }
     }
-    expect(stack.valueImports).not.toContain("./StudioVrmPoser");
+    expect(stack.valueImports).not.toContain("./vrm/StudioVrmPoser");
     expect(commentsSession.valueImports).toContain("./StudioCommentsPanel");
     expect(commentsSession.dynamicImports).toEqual([]);
     expect(commentsSession.valueImports).not.toContain("./studio-page-lazy-ui");
@@ -166,11 +167,12 @@ describe("Studio lazy panel stack boundary", () => {
 
   it("preserves semantic 3D transactions and initial-scene cleanup", () => {
     const page = moduleEdges("./StudioPage.tsx").source;
+    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx").source;
     const stack = moduleEdges("./StudioLazyPanelStack.tsx").source;
     const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
-    const stackUseStart = page.indexOf("<StudioLazyPanelStack");
-    const stackUseEnd = page.indexOf("/>", stackUseStart);
-    const stackUse = page.slice(stackUseStart, stackUseEnd);
+    const stackUseStart = editorView.indexOf("<StudioLazyPanelStack");
+    const stackUseEnd = editorView.indexOf("/>", stackUseStart);
+    const stackUse = editorView.slice(stackUseStart, stackUseEnd);
 
     expect(stackUseStart).toBeGreaterThan(-1);
     expect(stackUseEnd).toBeGreaterThan(stackUseStart);
@@ -181,7 +183,7 @@ describe("Studio lazy panel stack boundary", () => {
       "const studioCommentSharedReplyHandlers = useStudioStableHandlers<Pick<"
     );
     expect(page).toContain("const studioCommentSharedReplyController = useMemo<");
-    expect(page).toContain("stableHandlers={studioLazyPanelStackHandlers}");
+    expect(editorView).toContain("stableHandlers={studioLazyPanelStackHandlers}");
     expect(page).toContain("setCurrentPageId,");
     expect(stackUse).not.toContain("setCurrentPageId={setCurrentPageId}");
     expect(page).toContain("insertVrmResult: (result) => applyStudioVrmInsertResult({");
@@ -207,10 +209,11 @@ describe("Studio lazy panel stack boundary", () => {
 
   it("keeps durable BG3D recovery behind current server access and persisted target proof", () => {
     const page = moduleEdges("./StudioPage.tsx").source;
-    const accessGate = moduleEdges("./studio-bg3d-recovery-access-lease.ts").source;
-    const helperStart = page.indexOf("function hasStudioBg3dServerPersistedTarget(");
-    const helperEnd = page.indexOf("function isStudioBg3dRecoveryScopeLocallyCurrent(", helperStart);
-    const helper = page.slice(helperStart, helperEnd);
+    const contracts = moduleEdges("./studio-page-editor-runtime-contracts.ts").source;
+    const accessGate = moduleEdges("./bg3d/studio-bg3d-recovery-access-lease.ts").source;
+    const helperStart = contracts.indexOf("function hasStudioBg3dServerPersistedTarget(");
+    const helperEnd = contracts.indexOf("function isStudioBg3dRecoveryScopeLocallyCurrent(", helperStart);
+    const helper = contracts.slice(helperStart, helperEnd);
     const validatorStart = page.indexOf("const validateRecoveryAccess = useCallback(async (");
     const validatorEnd = page.indexOf("const poserMutationTicketRef", validatorStart);
     const validator = page.slice(validatorStart, validatorEnd);
@@ -225,7 +228,7 @@ describe("Studio lazy panel stack boundary", () => {
     expect(page).toContain("bg3dServerPersistedTargetExists");
     expect(page).toContain("authorizedWorkAssetScopeId === workId");
     expect(page).toContain('durability: "memory"');
-    expect(page).toContain("scope !== snapshot.recoveryScope");
+    expect(contracts).toContain("scope !== snapshot.recoveryScope");
     expect(page).toContain("sharedDocument?.revision,");
     expect(validatorStart).toBeGreaterThanOrEqual(0);
     expect(validatorEnd).toBeGreaterThan(validatorStart);
@@ -245,7 +248,7 @@ describe("Studio lazy panel stack boundary", () => {
 
   it("keeps all seven modal loading overlays colocated with their Suspense owners", () => {
     const stack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
-    const retainedBg3dHost = moduleEdges("./StudioBg3dRetainedOwnerHost.tsx").source;
+    const retainedBg3dHost = moduleEdges("./bg3d/StudioBg3dRetainedOwnerHost.tsx").source;
     const contracts = [
       ["PoserLoadingOverlay", "포저를 여는 중"],
       ["MannequinLoadingOverlay", "3D 데생 인형을 여는 중"],

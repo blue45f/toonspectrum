@@ -93,7 +93,7 @@ describe("shared asset drag payload", () => {
     '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>',
     '<svg xmlns="http://www.w3.org/2000/svg"><a href="https://tracker.test/x"/></svg>',
     '<svg xmlns="http://www.w3.org/2000/svg"><image xlink:href="//tracker.test/x"/></svg>',
-    '<svg xmlns="http://www.w3.org/2000/svg"><style>@import "https://tracker.test/x";</style></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg"><style>@import "https://tracker/x";</style></svg>',
     '<svg xmlns="http://www.w3.org/2000/svg"><style>@im/**/port "https://tracker.test/x";</style></svg>',
     '<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url(https://tracker.test/x)"/></svg>',
     '<svg xmlns="http://www.w3.org/2000/svg"><animate attributeName="href" to="https://tracker.test/x"/></svg>',

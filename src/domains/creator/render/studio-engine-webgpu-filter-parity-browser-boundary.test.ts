@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const root = resolve(import.meta.dirname, "../../..");
+const root = resolve(import.meta.dirname, "../../../..");
 const browserEntry = readFileSync(
   resolve(root, "scripts/studio-engine-webgpu-filter-parity-browser.ts"),
   "utf8",
@@ -16,10 +16,10 @@ const verifier = readFileSync(
 describe("Studio Engine real WebGPU filter parity browser boundary", () => {
   it("loads only the canonical CPU oracle and RGBA16F WebGPU runtime", () => {
     expect(browserEntry).toContain(
-      'from "../src/domains/creator/studio-engine-canonical-filter-plan"',
+      'from "../src/domains/creator/render/studio-engine-canonical-filter-plan"',
     );
     expect(browserEntry).toContain(
-      'from "../src/domains/creator/studio-engine-webgpu-filter-runtime"',
+      'from "../src/domains/creator/render/studio-engine-webgpu-filter-runtime"',
     );
     expect(browserEntry).toContain("applyStudioCanonicalFilterRecipeCpu");
     expect(browserEntry).toContain("new StudioEngineWebGpuFilterRuntime");

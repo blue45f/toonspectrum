@@ -1,4 +1,4 @@
-import type { DrawMode } from "./studio-editor-tool-model";
+import type { DrawMode } from "../studio-editor-tool-model";
 
 export interface StudioBrushModeWidthState {
   readonly drawMode: DrawMode;

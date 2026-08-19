@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./render/studio-konva-filters";
 import {
   createStudioImageFilterResidentWorkerSession,
   createStudioImageFilterWorkerSession,
@@ -18,9 +19,8 @@ import {
   type StudioImageFilterWorkerSourceSuccessMessage,
   type StudioImageFilterWorkerSuccessMessage,
 } from "./studio-image-filter-worker-protocol";
-import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
 
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 
 function makeImageData(width: number, height: number): { data: Uint8ClampedArray; width: number; height: number } {
   const data = new Uint8ClampedArray(width * height * 4);

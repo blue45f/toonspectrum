@@ -18,7 +18,22 @@
 import {
   normalizeStudioBrushDynamicsSettings,
   serializeStudioBrushDynamicsSettingsCanonical,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
+import { classifyStudioDryMediaCatalogIdV1 } from "./brush/studio-dry-media-anisotropic-grain-v1";
+import {
+  bridgeStudioDynamicDabVariationToDryMediaV1,
+  type StudioDryMediaDynamicDabVariation,
+} from "./brush/studio-dry-media-dynamic-bridge";
+import { STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2 } from "./brush/studio-stroke-paint-model";
+import {
+  buildStudioEngineWebGpuTexturedBrushPlan,
+  fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
+  STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS,
+  type StudioEngineWebGpuTexturedBrushAssetPayload,
+  type StudioEngineWebGpuTexturedBrushAssetResolver,
+  type StudioEngineWebGpuTexturedBrushDab,
+  type StudioEngineWebGpuTexturedBrushPlan,
+} from "./render/studio-engine-webgpu-textured-brush-plan";
 import { adaptStudioDrawElementToCanonicalBrushPlan } from "./studio-canonical-brush-draw-adapter";
 import {
   hashStudioCanonicalBrushPlan,
@@ -30,29 +45,14 @@ import {
   validateStudioCanonicalVNextDryMediaCompiledFrame,
   type StudioCanonicalVNextDryMediaCompiledFrame,
 } from "./studio-canonical-vnext-dry-media-presentation-controller";
-import { classifyStudioDryMediaCatalogIdV1 } from "./studio-dry-media-anisotropic-grain-v1";
-import {
-  bridgeStudioDynamicDabVariationToDryMediaV1,
-  type StudioDryMediaDynamicDabVariation,
-} from "./studio-dry-media-dynamic-bridge";
 import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
-import {
-  buildStudioEngineWebGpuTexturedBrushPlan,
-  fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
-  STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS,
-  type StudioEngineWebGpuTexturedBrushAssetPayload,
-  type StudioEngineWebGpuTexturedBrushAssetResolver,
-  type StudioEngineWebGpuTexturedBrushDab,
-  type StudioEngineWebGpuTexturedBrushPlan,
-} from "./studio-engine-webgpu-textured-brush-plan";
 import { parseStudioProfessionalBrushDynamicsPlan } from "./studio-professional-brush-dynamics";
 import { sha256HexPortable } from "./studio-sha256";
-import { STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2 } from "./studio-stroke-paint-model";
 
 import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import type { StudioCanonicalBrushPlan } from "./studio-canonical-brush-plan";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioProfessionalBrushDynamicsPlan } from "./studio-professional-brush-dynamics";

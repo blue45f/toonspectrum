@@ -9,16 +9,16 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Line, Rect } from "react-konva/lib/ReactKonvaCore";
 
 import {
+  getSymmetricPoints,
+  studioLiveBrushEffectiveDiameter,
+} from "./brush/studio-draw-rendering";
+import {
   cropHandlePoints,
   cropRectLocalPx,
   cropShadeRects,
   cropThirdsLines,
   type CropRect,
 } from "./studio-crop";
-import {
-  getSymmetricPoints,
-  studioLiveBrushEffectiveDiameter,
-} from "./studio-draw-rendering";
 import {
   pressureAt,
   type NodeEditHandle,

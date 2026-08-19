@@ -6,7 +6,7 @@ import {
   type StudioWasmByteViewFailureReason,
   type StudioWasmMemoryGrowFailureReason,
   StudioWasmLinearMemoryRuntime,
-} from "./studio-wasm64-memory-governor";
+} from "../studio-wasm64-memory-governor";
 
 /**
  * One bounded resident mask window. Documents larger than this are expected to

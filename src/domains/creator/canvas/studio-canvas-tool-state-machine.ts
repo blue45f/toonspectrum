@@ -1,5 +1,5 @@
-import type { DrawMode, Tool } from "./studio-editor-tool-model";
-import type { SelectionToolKind } from "./studio-selection-tools";
+import type { DrawMode, Tool } from "../studio-editor-tool-model";
+import type { SelectionToolKind } from "../studio-selection-tools";
 
 /**
  * `wand` is a StudioPage-local extension of the shared pixel-selection tools. Keeping it in this

@@ -7,8 +7,8 @@ import {
   type StudioGpuPendingDrawAuthority,
 } from "./studio-webgpu-pending-authority";
 
-import type { StudioCommittedInkSurfaceHandoff } from "./studio-committed-ink-handoff-coordinator";
-import type { DrawEl } from "./studio-element-model";
+import type { StudioCommittedInkSurfaceHandoff } from "../studio-committed-ink-handoff-coordinator";
+import type { DrawEl } from "../studio-element-model";
 
 function draw(id: string): DrawEl {
   return {

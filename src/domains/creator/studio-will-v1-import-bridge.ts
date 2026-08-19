@@ -7,8 +7,8 @@
  * Wacom certification, or a claim of arbitrary vendor `.will` interoperability.
  */
 
+import { STUDIO_INK_MAX_BRUSH_SIZE } from "./brush/studio-ink-pressure-model";
 import { catmullRomPoint } from "./studio-curve-smoothing";
-import { STUDIO_INK_MAX_BRUSH_SIZE } from "./studio-ink-pressure-model";
 import {
   summarizeStudioInterchangeLoss,
   type StudioInterchangeLossConstraint,

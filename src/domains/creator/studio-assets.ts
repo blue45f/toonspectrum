@@ -1,7 +1,7 @@
 // 창작 스튜디오 "쉽게 만들기" 프리셋 — 컷 레이아웃 템플릿·말풍선 종류·만화 효과·배경.
 // 라이선스 이슈 없는 자체 벡터/텍스트 프리셋만 사용(외부 아트 에셋 없음).
 
-import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
+import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 
 export const CANVAS_W = STUDIO_CANVAS_WIDTH;
 
@@ -331,4 +331,4 @@ export function filterBgSceneSections<T extends { label: string }>(
 export {
   BUBBLE_STYLE_PRESETS,
   type BubbleStylePreset,
-} from "./studio-bubble-style-presets";
+} from "./lettering/studio-bubble-style-presets";

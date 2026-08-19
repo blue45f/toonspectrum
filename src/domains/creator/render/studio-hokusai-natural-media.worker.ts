@@ -154,8 +154,7 @@ function disposeHandle(
 }
 
 async function loadRuntime(): Promise<StudioHokusaiRuntimeModule> {
-  const runtime = await import(
-    "../../../packages/studio-hokusai-wasm/pkg/studio_hokusai_wasm.js"
+  const runtime = await import("../../../../packages/studio-hokusai-wasm/pkg/studio_hokusai_wasm.js"
   ) as unknown as StudioHokusaiRuntimeModule;
   if (
     typeof runtime.default !== "function"

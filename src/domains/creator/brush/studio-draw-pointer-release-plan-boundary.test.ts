@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 interface ModuleFacts {
   imports: string[];
   source: string;
@@ -10,10 +12,13 @@ interface ModuleFacts {
 
 function moduleFacts(fileName: string): ModuleFacts {
   const fileUrl = new URL(fileName, import.meta.url);
-  const source = readFileSync(fileUrl, "utf8");
+  const rawSource = readFileSync(fileUrl, "utf8");
+  const source = fileName.endsWith("StudioPage.tsx")
+    ? readStudioCuttoonEditorSource()
+    : rawSource;
   const file = ts.createSourceFile(
     fileUrl.pathname,
-    source,
+    rawSource,
     ts.ScriptTarget.Latest,
     true,
     fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
@@ -41,12 +46,12 @@ describe("studio draw pointer-release planning ownership boundary", () => {
     const planner = moduleFacts("./studio-draw-pointer-release-plan.ts");
 
     expect(planner.imports).toEqual([
-      "./studio-brush",
+      "../studio-brush",
+      "../studio-pixel-pencil",
+      "../studio-quickshape-release-promotion",
       "./studio-draw-completion",
-      "./studio-pixel-pencil",
-      "./studio-quickshape-release-promotion",
-      "./studio-element-model",
-      "./studio-smart-shape-brush-effect",
+      "../studio-element-model",
+      "../studio-smart-shape-brush-effect",
     ]);
     expect(planner.source).not.toMatch(/from\s+["'](?:react|konva|react-konva)/u);
     expect(planner.source).not.toMatch(
@@ -72,7 +77,7 @@ describe("studio draw pointer-release planning ownership boundary", () => {
   });
 
   it("leaves release capture, CRDT sealing, surfaces, commit recovery, and cleanup in StudioPage", () => {
-    const page = moduleFacts("./StudioPage.tsx").source;
+    const page = moduleFacts("../StudioPage.tsx").source;
     const start = page.indexOf("function finishDrawingPointer");
     const end = page.indexOf("function onStagePointerCancel", start);
     const finish = page.slice(start, end);
@@ -82,7 +87,7 @@ describe("studio draw pointer-release planning ownership boundary", () => {
     const specialistEnd = page.indexOf("function finishDrawingPointer", sealEnd);
     const specialistRelease = page.slice(sealEnd, specialistEnd);
 
-    expect(page).toContain('from "./studio-draw-pointer-release-plan"');
+    expect(page).toMatch(/from ["'].*brush\/studio-draw-pointer-release-plan["']/);
     expect(finish).toContain("planStudioDrawPointerRelease({");
     expect(finish).not.toContain("promoteFreehandQuickShapeOnRelease(");
     expect(finish).not.toContain("smoothStrokePoints(");
@@ -132,7 +137,7 @@ describe("studio draw pointer-release planning ownership boundary", () => {
   });
 
   it("keeps a short Living Ink stroke visible until canonical handoff without leaking its shadow", () => {
-    const page = moduleFacts("./StudioPage.tsx").source;
+    const page = moduleFacts("../StudioPage.tsx").source;
     const showStart = page.indexOf("function showStudioLivingInkVectorShadow");
     const clearStart = page.indexOf("function clearStudioLivingInkVectorShadow", showStart);
     const failStart = page.indexOf("function failStudioLivingInkStroke", clearStart);

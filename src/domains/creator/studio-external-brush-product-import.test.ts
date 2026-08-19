@@ -8,17 +8,17 @@ import {
   BRUSH_LIBRARY_KEY,
   BRUSH_LIBRARY_STORAGE_VERSION,
   type BrushLibraryStorage,
-} from "./studio-brush-library";
+} from "./brush/studio-brush-library";
 import {
   openProductBrushLibraryRepository,
   readAllBrushesFromRepository,
-} from "./studio-brush-library-sqlite-repository";
+} from "./brush/studio-brush-library-sqlite-repository";
 import {
   importAndCommitStudioBrushProgramFile,
   commitStudioBrushPackImport,
   importStudioCspToolBytes,
   studioBrushPackImportNotes,
-} from "./studio-brush-pack-import";
+} from "./brush/studio-brush-pack-import";
 import {
   createBrowserCspSutSqliteReader,
   type StudioCspSutSqliteWorkerLike,

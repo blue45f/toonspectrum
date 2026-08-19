@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const page = readStudioCuttoonEditorSource();
 
 describe("Studio causal velocity-pressure integration", () => {
   it("advances one dedicated pressure state from authoritative pointer coordinates", () => {

@@ -8,6 +8,11 @@
  */
 
 import {
+  createStudioInkEnvelopeWebCryptoAttester,
+  createStudioInkEnvelopeWebCryptoVerifier,
+  type StudioInkEnvelopeWebCryptoAlgorithm,
+} from "./brush/studio-ink-envelope-webcrypto-attestation";
+import {
   STUDIO_CODEC_PROVIDER_CONTRACT_VERSION,
   STUDIO_CODEC_PROVIDER_LIMITS,
   type StudioCodecDirection,
@@ -16,11 +21,6 @@ import {
   type StudioCodecLicenseScope,
   type StudioCodecProviderMode,
 } from "./studio-codec-provider-contract";
-import {
-  createStudioInkEnvelopeWebCryptoAttester,
-  createStudioInkEnvelopeWebCryptoVerifier,
-  type StudioInkEnvelopeWebCryptoAlgorithm,
-} from "./studio-ink-envelope-webcrypto-attestation";
 import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_PRODUCT_CODEC_CERTIFICATE_VERSION = 1 as const;

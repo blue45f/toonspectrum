@@ -1,16 +1,17 @@
 import {
-  studioHokusaiMaterialProfileIsCompatible,
-  type StudioHokusaiMaterialProfileId,
-  type StudioHokusaiNaturalMediaPresetId,
-  type StudioHokusaiNaturalMediaRenderPlan,
-} from "./studio-hokusai-natural-media-contract";
-import {
   studioOssApplyMaterialColorChannel,
   studioOssDirectionalWaxSample,
   studioOssKlecksChalkCoverage,
   studioOssMaterialColorModeForProfile,
   studioOssOilBristleFilm,
-} from "./studio-oss-brush-kernels";
+} from "../studio-oss-brush-kernels";
+
+import {
+  studioHokusaiMaterialProfileIsCompatible,
+  type StudioHokusaiMaterialProfileId,
+  type StudioHokusaiNaturalMediaPresetId,
+  type StudioHokusaiNaturalMediaRenderPlan,
+} from "./studio-hokusai-natural-media-contract";
 
 export const STUDIO_HOKUSAI_NATURAL_MEDIA_TEXTURE_VERSION =
   "studio-hokusai-material-texture-v2" as const;

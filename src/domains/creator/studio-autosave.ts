@@ -1,13 +1,13 @@
 import {
   hydrateStudioAiImageReferenceDocument,
   type StudioAiImageReferenceDocument,
-} from "./studio-ai-image-reference-roles";
+} from "./ai/studio-ai-image-reference-roles";
 import {
   normalizeStudioAiProvenanceDocument,
   type StudioAiProvenanceDocument,
-} from "./studio-ai-provenance";
-import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
-import { studioDrawingAssistHasContent } from "./studio-drawing-assist-document";
+} from "./ai/studio-ai-provenance";
+import { studioDrawingAssistHasContent } from "./brush/studio-drawing-assist-document";
+import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 import { normalizeStudioPublishPackageSettings } from "./studio-publish-package";
 import { normalizeStudioPublishPackSettings } from "./studio-publish-preflight";
 import {
@@ -15,8 +15,7 @@ import {
   studioReferenceBoardHasContent,
   type StudioReferenceBoardDocument,
 } from "./studio-reference-board";
-import { migrateStudioShared3dStageCollectionDocument } from
-  "./studio-shared-3d-stage-collection";
+import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
 
 export const LEGACY_STUDIO_AUTOSAVE_KEY = "toonspectrum-studio-autosave";
 const STUDIO_AUTOSAVE_PREFIX = "toonspectrum-studio-autosave:v12";

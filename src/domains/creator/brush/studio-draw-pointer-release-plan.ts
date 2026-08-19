@@ -7,18 +7,19 @@
  * geometry stored by the commit path plus whether that path may use the deferred batch.
  */
 
-import { smoothStrokePoints } from "./studio-brush";
-import { isStudioImmediateFreehandCommit } from "./studio-draw-completion";
-import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
+import { smoothStrokePoints } from "../studio-brush";
+import { isStudioPixelPencilRenderMode } from "../studio-pixel-pencil";
 import {
   planStudioQuickShapeRelease,
   type StudioQuickShapeBrushEffectMode,
   type StudioQuickShapeBrushEffectStatus,
   type StudioQuickShapeReleaseTransition,
-} from "./studio-quickshape-release-promotion";
+} from "../studio-quickshape-release-promotion";
 
-import type { DrawEl } from "./studio-element-model";
-import type { StudioSmartShapeBrushEffectFallbackReason } from "./studio-smart-shape-brush-effect";
+import { isStudioImmediateFreehandCommit } from "./studio-draw-completion";
+
+import type { DrawEl } from "../studio-element-model";
+import type { StudioSmartShapeBrushEffectFallbackReason } from "../studio-smart-shape-brush-effect";
 
 export type StudioDrawReleaseShapeKind = Exclude<
   NonNullable<DrawEl["kind"]>,
@@ -97,16 +98,14 @@ export function planStudioDrawPointerRelease(
     postCorrectionApplied = true;
   }
 
+  const eraserKeepsLivePreview = stroke.mode === "eraser" && input.commit.directLiveDraft;
   const canKeepDeferredInkVisible = input.commit.directLiveDraft
-    ? input.commit.directInkSurfaceAvailable
-    : true;
+    ? input.commit.directInkSurfaceAvailable || eraserKeepsLivePreview
+    : stroke.mode !== "eraser";
   const deferred =
     !input.commit.masterEditMode
-    && stroke.mode !== "eraser"
     // Taps and short flicks must become undo/autosave-authoritative in the pointerup task.
     && !isStudioImmediateFreehandCommit(stroke)
-    // A translucent settled preview overlapping its committed node would briefly double-darken.
-    && (stroke.opacity ?? 1) === 1
     // The live direct surface still contains the pre-snap gesture/primitive, not the rebuilt
     // brush outline. Commit it synchronously so an incorrect preview is never preserved.
     && quickShape.brushEffectStatus !== "applied"

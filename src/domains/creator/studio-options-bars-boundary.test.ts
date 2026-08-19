@@ -85,10 +85,11 @@ function moduleShape(relativePath: string): ModuleShape {
 describe("Studio options-bars module boundary", () => {
   it("keeps StudioPage as the one-way static orchestration owner", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const optionsBars = moduleShape("./StudioOptionsBars.tsx");
 
     expect(
-      page.valueImports.filter((specifier) => specifier === "./StudioOptionsBars")
+      page.allImports.filter((specifier) => specifier === "./StudioOptionsBars")
     ).toEqual(["./StudioOptionsBars"]);
     expect(page.dynamicImports).not.toContain("./StudioOptionsBars");
     expect(optionsBars.allImports).not.toContain("./StudioPage");
@@ -98,7 +99,7 @@ describe("Studio options-bars module boundary", () => {
     expect(page.source).toContain("useMemo<StudioOptionsBarsSelectionModel>(() =>");
     expect(page.source).toContain("const selectionOptionsSuppressed =");
     expect(page.source).toContain("!selectionOptionsSuppressed");
-    expect(page.source).toContain("<StudioOptionsBars");
+    expect(editorView.source).toContain("<StudioOptionsBars");
   });
 
   it("moves the component and presentation contracts out of the page monolith", () => {
@@ -122,7 +123,7 @@ describe("Studio options-bars module boundary", () => {
 
     expect(optionsBars.valueImports).toEqual([
       "react",
-      "./studio-draw-color-swatches",
+      "./brush/studio-draw-color-swatches",
       "./studio-page-lazy-ui",
       "@/components/use-media-query",
     ]);
@@ -142,8 +143,8 @@ describe("Studio options-bars module boundary", () => {
     const registry = moduleShape("./studio-page-lazy-ui.ts");
 
     expect(
-      registry.dynamicImports.filter((specifier) => specifier === "./StudioDrawOptionsBar")
-    ).toEqual(["./StudioDrawOptionsBar"]);
+      registry.dynamicImports.filter((specifier) => specifier === "./brush/StudioDrawOptionsBar")
+    ).toEqual(["./brush/StudioDrawOptionsBar"]);
     expect(
       registry.dynamicImports.filter((specifier) => specifier === "./StudioSelectOptionsBar")
     ).toEqual(["./StudioSelectOptionsBar"]);
@@ -165,7 +166,7 @@ describe("Studio options-bars module boundary", () => {
       "commitStudioBrushSlotsMutation(",
       "failureMessage: `슬롯 ${index + 1}을 SQLite에 저장하지 못했어요.`,",
       "studioBrushSlotAt(brushSlotsState, index)",
-      "void loadStudioBrushStudio();",
+      "loadStudioBrushStudio();",
       "setMobileSheet(",
       "setColor(secondaryColor);",
       "setSecondaryColor(color);",

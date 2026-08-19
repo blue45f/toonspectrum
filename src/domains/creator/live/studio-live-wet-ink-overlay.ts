@@ -8,18 +8,8 @@
  * seed, runtime version and digest are byte-identical to StudioDrawNode's committed snapshot.
  */
 
-import { mapStudioBrushAliasPressure } from "./studio-brush-alias-profile";
-import {
-  appendCausalWatercolorBrush,
-  beginCausalWatercolorBrush,
-  type StudioCausalWatercolorState,
-} from "./studio-causal-watercolor-brush";
-import {
-  acquireStudioLowLatencyCanvas2dContext,
-  decideStudioNativeLiveSurfaceResolution,
-  STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS,
-} from "./studio-low-latency-canvas";
-import { studioWetInkInteractiveBackendSupportsElement } from "./studio-wet-ink-backend-capability";
+import { mapStudioBrushAliasPressure } from "../brush/studio-brush-alias-profile";
+import { studioWetInkInteractiveBackendSupportsElement } from "../brush/studio-wet-ink-backend-capability";
 import {
   planStudioWetInkBrushReplay,
   resolveStudioWetInkBrushPhysicalRecipe,
@@ -29,7 +19,7 @@ import {
   type StudioWetInkBrushReplayPlan,
   type StudioWetInkBrushSurface,
   type StudioWetInkBrushSurfaceFactory,
-} from "./studio-wet-ink-brush-runtime";
+} from "../brush/studio-wet-ink-brush-runtime";
 import {
   consumeStudioWetInkDirtyBounds,
   createStudioWetInkField,
@@ -39,11 +29,21 @@ import {
   type StudioWetInkBounds,
   type StudioWetInkField,
   type StudioWetInkTileUpload,
-} from "./studio-wet-ink-field";
+} from "../brush/studio-wet-ink-field";
+import {
+  appendCausalWatercolorBrush,
+  beginCausalWatercolorBrush,
+  type StudioCausalWatercolorState,
+} from "../studio-causal-watercolor-brush";
+import {
+  acquireStudioLowLatencyCanvas2dContext,
+  decideStudioNativeLiveSurfaceResolution,
+  STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS,
+} from "../studio-low-latency-canvas";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
-import type { WatercolorBrushDab } from "./studio-watercolor-brush";
+import type { WatercolorBrushDab } from "../brush/studio-watercolor-brush";
 
 const MAX_LIVE_DABS = 4_096;
 const MAX_LIVE_TILES = 4_096;

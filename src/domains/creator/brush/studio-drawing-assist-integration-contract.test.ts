@@ -2,12 +2,14 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
-const viewportSource = readFileSync(new URL("./StudioCanvasViewport.tsx", import.meta.url), "utf8");
-const guideSource = readFileSync(new URL("./StudioCanvasGuideLayers.tsx", import.meta.url), "utf8");
-const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const source = readStudioCuttoonEditorSource();
+const viewportSource = readFileSync(new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url), "utf8");
+const guideSource = readFileSync(new URL("../canvas/StudioCanvasGuideLayers.tsx", import.meta.url), "utf8");
+const inspectorSource = readFileSync(new URL("../StudioInspectorAside.tsx", import.meta.url), "utf8");
 const isometricPanelSource = readFileSync(
-  new URL("./StudioIsometricGridPanel.tsx", import.meta.url),
+  new URL("../StudioIsometricGridPanel.tsx", import.meta.url),
   "utf8"
 );
 
@@ -91,7 +93,7 @@ describe("StudioPage drawing-assist integration contract", () => {
 
   it("keeps heavy primitive geometry behind one literal activation-time import", () => {
     expect(source).toContain('await import("./studio-isometric-solid")');
-    expect(source).not.toMatch(/from "\.\/studio-isometric-solid"/u);
+    expect(source).not.toMatch(/from "\.\.\/studio-isometric-solid"/u);
     expect(inspectorSource).not.toMatch(/from "\.\/studio-isometric-solid"/u);
     expect(isometricPanelSource).not.toMatch(/from "\.\/studio-isometric-solid"/u);
     expect(isometricPanelSource).toContain('from "./studio-isometric-primitive-contract"');

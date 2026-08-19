@@ -7,7 +7,7 @@ import {
   STUDIO_LIVING_INK_SETTLED_BAKE_PROGRAMS,
 } from "./studio-living-ink-settled-bake-v1";
 
-import type { WatercolorBrushDab } from "./studio-watercolor-brush";
+import type { WatercolorBrushDab } from "./brush/studio-watercolor-brush";
 
 /**
  * Adversarial-review regression (Lens 3, major — living-ink settled-bake stall).

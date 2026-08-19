@@ -5,29 +5,29 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt,
-} from "./studio-brush-material-dynamics";
-import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
-import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
+} from "./brush/studio-brush-material-dynamics";
+import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./brush/studio-brush-pack-id";
+import { materializeStudioBrushPackDynamics } from "./brush/studio-brush-pack-runtime";
 import {
   hydrateStudioBrushR8GrainAsset,
   resetStudioBrushR8GrainRegistry,
   studioBrushR8GrainRegistryStats,
-} from "./studio-brush-r8-grain-runtime";
+} from "./brush/studio-brush-r8-grain-runtime";
 import {
   clearStudioBrushSoftFalloffStampCache,
   studioBrushSoftFalloffStampCacheStats,
-} from "./studio-brush-soft-falloff-stamp";
+} from "./brush/studio-brush-soft-falloff-stamp";
 import {
   clearStudioBrushTextureStampCache,
   studioBrushTextureStampCacheStats,
-} from "./studio-brush-textured-stamp";
-import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
+} from "./brush/studio-brush-textured-stamp";
+import { encodeStudioBrushTipAlphaMapBase64 } from "./brush/studio-brush-tip-stamp";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
-} from "./studio-dry-media-dynamic-bridge";
+} from "./brush/studio-dry-media-dynamic-bridge";
 import {
   clearStudioDynamicCoverageCommittedCache,
   disposeStudioDynamicCoverageCommittedCache,
@@ -48,7 +48,7 @@ import {
 } from "./studio-dynamic-brush-coverage-renderer";
 import { sha256HexPortable } from "./studio-sha256";
 
-import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
+import type { StudioDynamicBrushDab } from "./brush/studio-brush-dynamics";
 
 interface RecordedGradient {
   readonly args: readonly number[];
@@ -1261,9 +1261,7 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       "utf8",
     );
 
-    expect(studioPageSource).toContain(
-      "<StudioCuttoonEditor key={editorScopeKey} studioRoute={studioRoute} />",
-    );
+    expect(studioPageSource).toContain("function StudioCuttoonEditor(");
     expect(studioPageSource).toContain(
       "disposeStudioDynamicCoverageCommittedCache();",
     );

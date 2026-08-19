@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { planWatercolorBrushDabs, type WatercolorBrushDab } from "./brush/studio-watercolor-brush";
 import { planCausalWatercolorBrushDabs } from "./studio-causal-watercolor-brush";
 import {
   augmentStudioLivingInkSettledBakeDabs,
@@ -14,7 +15,6 @@ import {
   STUDIO_LIVING_INK_SETTLED_BAKE_RANGES,
   STUDIO_LIVING_INK_SETTLED_BAKE_STEPS,
 } from "./studio-living-ink-settled-bake-v1";
-import { planWatercolorBrushDabs, type WatercolorBrushDab } from "./studio-watercolor-brush";
 
 const SUMI = STUDIO_LIVING_INK_SETTLED_BAKE_PROGRAMS["sumi-flow-bake"];
 

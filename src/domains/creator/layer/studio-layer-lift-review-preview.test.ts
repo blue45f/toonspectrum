@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import { composeStudioLayerLiftBeta } from "./studio-layer-lift-compositor";
 import {
   STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION,
@@ -16,7 +18,6 @@ import {
   type StudioLayerLiftReviewPreviewEncodeInput,
   type StudioLayerLiftReviewPreviewRuntime,
 } from "./studio-layer-lift-review-preview";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type { StudioLayerLiftWorkflowSession } from "./studio-layer-lift-workflow";
 

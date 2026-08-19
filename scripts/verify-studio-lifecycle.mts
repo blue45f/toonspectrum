@@ -40,7 +40,7 @@ import {
   type Page,
 } from "playwright";
 
-import { STUDIO_CANVAS_WIDTH } from "../src/domains/creator/studio-canvas-constants";
+import { STUDIO_CANVAS_WIDTH } from "../src/domains/creator/canvas/studio-canvas-constants";
 import { DEFAULT_CANVAS_H } from "../src/domains/creator/studio-pages";
 
 import {

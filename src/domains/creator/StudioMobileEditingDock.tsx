@@ -41,18 +41,18 @@ import {
   type ReactNode,
 } from "react";
 
+import { DRAW_COLOR_SWATCHES } from "./brush/studio-draw-color-swatches";
+import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./brush/studio-draw-hud";
+import {
+  STUDIO_BRUSH_OPACITY_RANGE,
+  STUDIO_BRUSH_SIZE_RANGE,
+} from "./brush/studio-draw-ux";
 import { resolveStudioBrushPresetOperation } from "./studio-brush";
 import {
   StudioContextActionButton,
   StudioDockButton,
   StudioDockNavButton,
 } from "./studio-chrome-ui";
-import { DRAW_COLOR_SWATCHES } from "./studio-draw-color-swatches";
-import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./studio-draw-hud";
-import {
-  STUDIO_BRUSH_OPACITY_RANGE,
-  STUDIO_BRUSH_SIZE_RANGE,
-} from "./studio-draw-ux";
 import { elementLabel } from "./studio-element-label";
 import { preloadStudioInspectorDrawingSurface } from "./studio-inspector-aside-loader";
 import { localizeStudioText } from "./studio-localize-text";
@@ -80,22 +80,28 @@ import {
 } from "./StudioLivingInkControls";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 
-import type { BrushPreset } from "./studio-brush";
 import type {
   StudioBrushDefaultRestoreDirection,
   StudioBrushDefaultRestoreTransaction,
-} from "./studio-brush-default-restore";
+} from "./brush/studio-brush-default-restore";
 import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioBrushDynamicsPresetId,
-} from "./studio-brush-dynamics";
-import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
+} from "./brush/studio-brush-dynamics";
+import type { StudioBrushEngineProgramSet } from "./brush/studio-brush-engine-program-set";
 import type {
   DeletedBrushRecord,
   StudioBrushSnapshot,
   StudioBrushStampTuning,
   StudioSavedBrush,
-} from "./studio-brush-library";
+} from "./brush/studio-brush-library";
+import type {
+  StudioBrushCatalogCloseReason,
+  StudioBrushCatalogPlacement,
+} from "./brush/StudioBrushLibrarySheet";
+import type { StudioBrushDefaultRestoreViewState } from "./brush/useStudioBrushBaselineController";
+import type { StudioFilterKind } from "./filter/studio-filter-menu";
+import type { BrushPreset } from "./studio-brush";
 import type { CvdMode } from "./studio-color-vision-model";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type {
@@ -105,16 +111,10 @@ import type {
   Tool,
 } from "./studio-editor-tool-model";
 import type { El } from "./studio-element-model";
-import type { StudioFilterKind } from "./studio-filter-menu";
 import type { StudioInspectorRoute } from "./studio-inspector-layout";
 import type { PageState } from "./studio-page-state";
 import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
 import type { StudioWorkspaceState } from "./studio-workspaces";
-import type {
-  StudioBrushCatalogCloseReason,
-  StudioBrushCatalogPlacement,
-} from "./StudioBrushLibrarySheet";
-import type { StudioBrushDefaultRestoreViewState } from "./useStudioBrushBaselineController";
 
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -444,7 +444,7 @@ export interface StudioMobileEditingDockProps {
   savedBrushes: StudioSavedBrush[];
   /** Page-owned product authority shared with imports and the desktop projection. */
   openBrushLibraryRepository?: () => Promise<
-    import("./studio-brush-library-sqlite-repository").ProductBrushLibraryRepository
+    import("./brush/studio-brush-library-sqlite-repository").ProductBrushLibraryRepository
   >;
   selected: El | null;
   /**

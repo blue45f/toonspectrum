@@ -5,18 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_HOKUSAI_LIVE_DOCUMENT_RECEIPT_VERSION,
-} from "./studio-hokusai-live-brush-document-receipt";
+} from "./render/studio-hokusai-live-brush-document-receipt";
 import {
   STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
   STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
-} from "./studio-hokusai-live-brush-protocol";
-import { STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION } from "./studio-living-ink-execution-protocol";
-import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
+} from "./render/studio-hokusai-live-brush-protocol";
 import {
   clearStudioRasterEditSurfaces,
   rememberStudioRasterEditSurface,
-} from "./studio-raster-edit-surface-cache";
-import { STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION } from "./studio-raster-image-presentation";
+} from "./render/studio-raster-edit-surface-cache";
+import { STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION } from "./render/studio-raster-image-presentation";
+import { STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION } from "./studio-living-ink-execution-protocol";
+import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
 import { sha256HexPortable } from "./studio-sha256";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 
@@ -126,11 +126,11 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
   return { Image };
 });
 
-vi.mock("./studio-konva-runtime", () => ({
+vi.mock("./render/studio-konva-runtime", () => ({
   studioKonvaRuntime: { Filters: {} },
 }));
 
-vi.mock("./studio-konva-filters", () => ({
+vi.mock("./render/studio-konva-filters", () => ({
   buildImageFilters: filterCapture.build,
   registerStudioKonvaFilters: filterCapture.register,
 }));
@@ -141,11 +141,11 @@ vi.mock("./studio-image-filter-worker-client", () => ({
   studioImageFilterRequiresWorker: () => false,
 }));
 
-vi.mock("./studio-filter-render-tournament", () => ({
+vi.mock("./filter/studio-filter-render-tournament", () => ({
   scheduleStudioFilterRenderTournament: tournamentCapture.schedule,
 }));
 
-vi.mock("./studio-gpu-filter-apply", () => ({
+vi.mock("./render/studio-gpu-filter-apply", () => ({
   applyGpuFilterChain: vi.fn(async () => null),
   isStudioGpuFilterChainEligible: () => false,
 }));

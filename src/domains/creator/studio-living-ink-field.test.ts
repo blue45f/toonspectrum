@@ -28,7 +28,7 @@ import {
 import type {
   StudioWetMediaTileFieldPaper,
   StudioWetMediaTileFieldSettings,
-} from "./studio-wet-media-tile-field";
+} from "./brush/studio-wet-media-tile-field";
 
 function settings(width = 12, height = 12): StudioWetMediaTileFieldSettings {
   return {

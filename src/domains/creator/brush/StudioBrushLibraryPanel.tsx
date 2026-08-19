@@ -30,7 +30,10 @@ import {
   type KeyboardEvent,
 } from "react";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+import { downloadBlob } from "../studio-export";
+import { useStudioInspectorFocusScroll } from "../studio-inspector-focus-effect";
+
 import { studioCoreBrushCatalogItemById } from "./studio-brush-catalog-core";
 import {
   brushFileName,
@@ -66,8 +69,6 @@ import {
   studioBrushPreviewRibbonD,
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
-import { downloadBlob } from "./studio-export";
-import { useStudioInspectorFocusScroll } from "./studio-inspector-focus-effect";
 import { STUDIO_STABILIZER_MODES } from "./studio-stroke-stabilizer";
 
 import { cx } from "@/lib/cx";
@@ -607,7 +608,7 @@ export function StudioBrushLibraryPanel({
         importAndCommitStudioBrushProgramFile,
         studioBrushPackFormatLabel,
         studioBrushPackImportNotes,
-      } = await import("./studio-brush-pack-import");
+      } = await import( "./studio-brush-pack-import");
       const product = await productRepository();
       const committed = await importAndCommitStudioBrushProgramFile(
         file,
@@ -664,7 +665,7 @@ export function StudioBrushLibraryPanel({
     if (format === "abr") {
       setImporting(true);
       try {
-        const { importStudioAbrFile } = await import("./studio-abr-import-client");
+        const { importStudioAbrFile } = await import("../studio-abr-import-client");
         const result = await importStudioAbrFile(file);
         const imported = result.brushes.map((candidate) => createBrush(candidate.name, candidate.snapshot));
         const product = await productRepository();

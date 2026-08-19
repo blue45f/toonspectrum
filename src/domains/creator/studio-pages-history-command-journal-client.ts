@@ -70,8 +70,7 @@ async function loadDefaultRuntime(
     status: StudioPagesHistoryCommandJournalDurabilityStatus
   ) => void
 ): Promise<StudioPagesHistoryCommandJournalRuntime> {
-  const { createDefaultStudioPagesHistoryDurableRuntime } = await import(
-    "./studio-pages-history-durable-runtime"
+  const { createDefaultStudioPagesHistoryDurableRuntime } = await import("./studio-pages-history-durable-runtime"
   );
   return createDefaultStudioPagesHistoryDurableRuntime({
     initialTarget,

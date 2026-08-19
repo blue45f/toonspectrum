@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./brush/studio-brush-catalog";
 import { BRUSH_PRESETS } from "./studio-brush";
-import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import {
   listStudioBrushTrayItems,
   listStudioQuickBrushTrayItems,

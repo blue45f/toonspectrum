@@ -24,13 +24,13 @@ describe("Studio AI on-demand codec boundary", () => {
     );
 
     expect(source).toContain(
-      'import type { ScenarioScenesPlan } from "./studio-scenario-scenes";',
+      'import type { ScenarioScenesPlan } from "../studio-scenario-scenes";',
     );
     expect(source).not.toMatch(
       /import\s*{[\s\S]*?buildScenarioScenesPrompt[\s\S]*?}\s*from\s*"\.\/studio-scenario-scenes"/,
     );
     expect(generateScenario).toContain(
-      'import("./studio-scenario-scenes")',
+      'import("../studio-scenario-scenes")',
     );
     expect(generateScenario.indexOf("if (!trimmed)")).toBeLessThan(
       generateScenario.indexOf("loadOptionalStudioAiCodec(importScenarioCodec"),
@@ -57,13 +57,13 @@ describe("Studio AI on-demand codec boundary", () => {
     );
 
     expect(source).toContain(
-      'import type { PaletteSuggestion } from "./studio-palette-suggest";',
+      'import type { PaletteSuggestion } from "../studio-palette-suggest";',
     );
     expect(source).not.toMatch(
       /import\s*{[\s\S]*?buildPaletteSuggestPrompt[\s\S]*?}\s*from\s*"\.\/studio-palette-suggest"/,
     );
     expect(suggestPalette).toContain(
-      'import("./studio-palette-suggest")',
+      'import("../studio-palette-suggest")',
     );
     expect(suggestPalette.indexOf("if (!trimmed)")).toBeLessThan(
       suggestPalette.indexOf("loadOptionalStudioAiCodec(importPaletteCodec"),

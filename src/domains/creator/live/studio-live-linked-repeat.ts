@@ -1,7 +1,7 @@
 import {
   transformStudioBrushSymmetryPoint,
   type StudioBrushSymmetryTransform,
-} from "./studio-brush-symmetry";
+} from "../brush/studio-brush-symmetry";
 
 /**
  * Clean-room live-repeat planner.

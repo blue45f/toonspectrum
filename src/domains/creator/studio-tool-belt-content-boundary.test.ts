@@ -168,7 +168,7 @@ function findToolBeltJsxAttributes(shape: ModuleShape): string[] {
 }
 
 const REPRESENTATIVE_OPTIONAL_SURFACES = [
-  "./StudioAiAssistHub",
+  "./ai/StudioAiAssistHub",
   "./StudioAssetMenuPanel",
   "./StudioBackgroundPanel",
   "./StudioPaletteLibraryPanel",
@@ -178,13 +178,14 @@ const REPRESENTATIVE_OPTIONAL_SURFACES = [
 
 describe("Studio ToolBelt content module boundary", () => {
   it("keeps StudioPage as the one-way static owner", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const _page = moduleShape("./StudioPage.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
 
     expect(
-      page.valueImports.filter((specifier) => specifier === "./StudioToolBeltContent")
-    ).toEqual(["./StudioToolBeltContent"]);
-    expect(page.source.match(/<StudioToolBeltContent\b/gu)).toHaveLength(1);
+      editorView.valueImports.filter((specifier) => specifier === "../StudioToolBeltContent")
+    ).toEqual(["../StudioToolBeltContent"]);
+    expect(editorView.source.match(/<StudioToolBeltContent\b/gu)).toHaveLength(1);
     expect(toolBelt.allImports).not.toContain("./StudioPage");
     expect(toolBelt.dynamicImports).not.toContain("./StudioPage");
     expect(toolBelt.source).not.toContain('from "./StudioPage"');
@@ -227,7 +228,7 @@ describe("Studio ToolBelt content module boundary", () => {
     expect(handlerNames).toHaveLength(75);
     expect(wiredHandlerNames).toHaveLength(75);
     expect(wiredHandlerNames).toEqual(handlerNames);
-    expect(page.source).toContain("stableHandlers={studioToolBeltContentHandlers}");
+    expect(page.source).toContain("studioToolBeltContentHandlers={studioToolBeltContentHandlers}");
   });
 
   // 계약 변경(2026-08, docs/rewrite/ux-audit-v5.md §2.4): 벨트가 disarm+setTool 을 직접 조합하면
@@ -235,25 +236,26 @@ describe("Studio ToolBelt content module boundary", () => {
   it("routes mobile select, pen, and eraser through the stroke-safe primary transition", () => {
     const page = moduleShape("./StudioPage.tsx").source;
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx").source;
+    const createModeGroups = moduleShape("./StudioToolBeltCreateModeGroups.tsx").source;
 
     expect(page).toContain("activatePrimaryCanvasTool,");
     expect(toolBelt).toContain(
       'activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;',
     );
-    expect(toolBelt.match(/activatePrimaryCanvasTool\("select"\)/gu)).toHaveLength(1);
-    expect(toolBelt.match(/activatePrimaryCanvasTool\("draw", "(?:pen|eraser)"\)/gu))
+    expect(createModeGroups.match(/activatePrimaryCanvasTool\("select"\)/gu)).toHaveLength(1);
+    expect(createModeGroups.match(/activatePrimaryCanvasTool\("draw", "(?:pen|eraser)"\)/gu))
       .toHaveLength(2);
-    expect(toolBelt).not.toContain('setTool("select")');
-    expect(toolBelt).not.toContain('setTool("draw")');
+    expect(createModeGroups).not.toContain('setTool("select")');
+    expect(createModeGroups).not.toContain('setTool("draw")');
   });
 
   it("preserves all 203 props at the single Page call site", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
     const propNames = propertyNames(
       findInterface(toolBelt, "StudioToolBeltContentProps").members
     ).toSorted();
-    const wiredPropNames = findToolBeltJsxAttributes(page).toSorted();
+    const wiredPropNames = findToolBeltJsxAttributes(editorView).toSorted();
 
     expect(propNames).toHaveLength(205);
     expect(wiredPropNames).toHaveLength(205);
@@ -263,6 +265,9 @@ describe("Studio ToolBelt content module boundary", () => {
   it("keeps menu ownership and the body-portal dismissal contract in StudioPage", () => {
     const page = moduleShape("./StudioPage.tsx").source;
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx").source;
+    const createModeGroups = moduleShape("./StudioToolBeltCreateModeGroups.tsx").source;
+    const insertTools = moduleShape("./StudioToolBeltCreateModeInsertTools.tsx").source;
+    const beltSources = `${toolBelt}\n${createModeGroups}\n${insertTools}`;
 
     expect(page).toContain("const menuRef = useRef<HTMLDivElement>(null)");
     expect(page).toContain('target.closest("[data-studio-tool-popover]")');
@@ -270,11 +275,11 @@ describe("Studio ToolBelt content module boundary", () => {
       "const activeToolbarGroup: StudioToolbarGroupId | null = resolveStudioToolbarGroup(menu);"
     );
     expect(page).toContain("menuRef={menuRef}");
-    expect(toolBelt).toContain('id="asset-group"');
-    expect(toolBelt).toContain('id="bg-group"');
-    expect(toolBelt).toContain('id="style-group"');
-    expect(toolBelt).toContain('id="ai-group"');
-    expect(toolBelt).toContain('id="bubble-menu"');
+    expect(beltSources).toContain('id="asset-group"');
+    expect(beltSources).toContain('id="bg-group"');
+    expect(beltSources).toContain('id="style-group"');
+    expect(beltSources).toContain('id="ai-group"');
+    expect(beltSources).toContain('id="bubble-menu"');
   });
 
   it("stays canvas-runtime-free and uses the neutral view helpers", () => {
@@ -300,12 +305,15 @@ describe("Studio ToolBelt content module boundary", () => {
 
   it("loads optional popup leaves only through the neutral lazy registry", () => {
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
+    const createModeGroups = moduleShape("./StudioToolBeltCreateModeGroups.tsx");
     const registry = moduleShape("./studio-page-lazy-ui.ts");
 
-    expect(toolBelt.valueImports).toContain("./studio-page-lazy-ui");
+    expect(createModeGroups.valueImports).toContain("./studio-page-lazy-ui");
     for (const optionalModule of REPRESENTATIVE_OPTIONAL_SURFACES) {
       expect(toolBelt.valueImports).not.toContain(optionalModule);
       expect(toolBelt.dynamicImports).not.toContain(optionalModule);
+      expect(createModeGroups.valueImports).not.toContain(optionalModule);
+      expect(createModeGroups.dynamicImports).not.toContain(optionalModule);
       expect(registry.valueImports).not.toContain(optionalModule);
       expect(
         registry.dynamicImports.filter((specifier) => specifier === optionalModule)

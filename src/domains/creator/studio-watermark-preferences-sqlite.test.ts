@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { DEFAULT_WATERMARK, type WatermarkSettings } from "./studio-watermark";
 import {
   createStudioWatermarkPreferenceRuntime,
@@ -334,10 +335,10 @@ describe("Studio watermark persistence runtime", () => {
 
 describe("Studio watermark and OPFS product authority boundary", () => {
   const here = dirname(fileURLToPath(import.meta.url));
-  const studioPageSource = readFileSync(resolve(here, "StudioPage.tsx"), "utf8");
+  const studioPageSource = readStudioCuttoonEditorSource();
   const menubarSource = readFileSync(resolve(here, "StudioMenubarContent.tsx"), "utf8");
   const rasterExportSource = readFileSync(
-    resolve(here, "studio-raster-export-orchestration-runtime.ts"),
+    resolve(here, "render/studio-raster-export-orchestration-runtime.ts"),
     "utf8",
   );
   const opfsSource = readFileSync(resolve(here, "studio-opfs-filesystem.ts"), "utf8");

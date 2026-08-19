@@ -33,9 +33,9 @@ import {
   normalizeShapeParams,
   polygonPathPointsInBounds,
   starPathPoints,
-} from "./studio-stroke-shapes";
+} from "./brush/studio-stroke-shapes";
 
-import type { StudioPortablePathGeometryContour } from "./studio-canvaskit-adapter";
+import type { StudioPortablePathGeometryContour } from "./render/studio-canvaskit-adapter";
 import type { DrawEl, El } from "./studio-element-model";
 
 // ---------------------------------------------------------------------------

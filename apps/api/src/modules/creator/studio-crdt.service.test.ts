@@ -21,15 +21,15 @@ import {
   type StudioRasterUndoOperation,
 } from "../../../../../lib/studio-crdt-raster-ops";
 import {
+  studioBrushDynamicsSettingsForBrushId,
+} from "../../../../../src/domains/creator/brush/studio-brush-dynamics";
+import {
+  isStudioStrokePaintModelCompatible as hasValidBrowserStrokePaintContract,
+} from "../../../../../src/domains/creator/brush/studio-stroke-paint-model";
+import {
   BRUSH_PRESETS,
   STUDIO_BRUSH_RENDER_FAMILY,
 } from "../../../../../src/domains/creator/studio-brush";
-import {
-  studioBrushDynamicsSettingsForBrushId,
-} from "../../../../../src/domains/creator/studio-brush-dynamics";
-import {
-  isStudioStrokePaintModelCompatible as hasValidBrowserStrokePaintContract,
-} from "../../../../../src/domains/creator/studio-stroke-paint-model";
 
 import { StudioCrdtRasterCheckpointCoordinator } from "./studio-crdt-raster-checkpoint.coordinator";
 import {

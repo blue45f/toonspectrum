@@ -1,9 +1,9 @@
 import {
   resolveStudioOutlineStrokeContract,
   type StudioOutlineStrokeContractV1,
-} from "./studio-outline-stroke-contract";
+} from "../studio-outline-stroke-contract";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 export const STUDIO_HOKUSAI_NATURAL_MEDIA_CONTRACT_VERSION =
   "studio-hokusai-natural-media-v2" as const;

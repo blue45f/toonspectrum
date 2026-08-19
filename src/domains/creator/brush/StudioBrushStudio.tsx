@@ -28,7 +28,13 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+import {
+  STUDIO_FOCUS_RING,
+  StudioContextPill,
+  StudioSectionHeader,
+} from "../studio-panel-ui";
+
 import {
   createStudioBuiltInBrushDefaultRestoreProfile,
   createStudioSavedBrushDefaultRestoreProfile,
@@ -89,11 +95,6 @@ import {
   type StudioBrushTipShapeId,
 } from "./studio-brush-tip-stamp";
 import {
-  STUDIO_FOCUS_RING,
-  StudioContextPill,
-  StudioSectionHeader,
-} from "./studio-panel-ui";
-import {
   StudioBrushDynamicsInputMatrix,
   StudioBrushGrainControls,
   StudioBrushTaperAdvancedControls,
@@ -143,7 +144,7 @@ const CATEGORY_ITEMS: readonly {
   { id: "response", label: "동적 반응", description: "필압·속도·도포량", Icon: Activity },
   { id: "stamp", label: "도장", description: "간격·산포·노이즈", Icon: Stamp },
   { id: "engines", label: "엔진 조합", description: "패스·레이어를 직접 제어", Icon: Layers },
-  { id: "input", label: "전역 입력", description: "도구 간 필압 보정", Icon: Gauge },
+  { id: "input", label: "입력", description: "도구 간 필압 보정", Icon: Gauge },
 ] as const;
 
 export interface StudioBrushStudioProps {

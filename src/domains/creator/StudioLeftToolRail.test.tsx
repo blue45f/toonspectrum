@@ -24,7 +24,7 @@ beforeEach(() => {
 
 const preloadRasterRetouchRuntime = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 
-vi.mock("./studio-raster-retouch-preload", () => ({
+vi.mock("./render/studio-raster-retouch-preload", () => ({
   preloadStudioRasterRetouchRuntime: preloadRasterRetouchRuntime,
 }));
 

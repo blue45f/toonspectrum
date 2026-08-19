@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 interface ModuleFacts {
   imports: string[];
   source: string;
@@ -10,10 +12,13 @@ interface ModuleFacts {
 
 function moduleFacts(fileName: string): ModuleFacts {
   const fileUrl = new URL(fileName, import.meta.url);
-  const source = readFileSync(fileUrl, "utf8");
+  const rawSource = readFileSync(fileUrl, "utf8");
+  const source = fileName.endsWith("StudioPage.tsx")
+    ? readStudioCuttoonEditorSource()
+    : rawSource;
   const file = ts.createSourceFile(
     fileUrl.pathname,
-    source,
+    rawSource,
     ts.ScriptTarget.Latest,
     true,
     fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
@@ -79,7 +84,7 @@ describe("studio draw pointer-start planning ownership boundary", () => {
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {
-    const page = moduleFacts("./StudioPage.tsx").source;
+    const page = moduleFacts("../StudioPage.tsx").source;
     const start = page.indexOf("function onStageDown");
     const end = page.indexOf("// 복구 브러시/도장 호버 커서", start);
     const onStageDown = page.slice(start, end);
@@ -88,7 +93,7 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     const pointCommentStart = page.indexOf("function handleStudioPointCommentStageDown");
     const pointCommentHandler = page.slice(pointCommentStart, start);
 
-    expect(page).toContain('from "./studio-draw-pointer-start-plan"');
+    expect(page).toMatch(/from ["'].*brush\/studio-draw-pointer-start-plan["']/);
     expect(onStageDown).toContain(
       "if (handleStudioPointCommentStageDown(e, stagePointerEvent)) return;"
     );

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
 import {
   resolveStudioHokusaiProductLiveAdmission,
-} from "./studio-brush-backend-quality-policy";
-import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
-import { materializeAllStudioBrushPackSelections } from "./studio-brush-pack-runtime";
+} from "../brush/studio-brush-backend-quality-policy";
+import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "../brush/studio-brush-pack-index";
+import { materializeAllStudioBrushPackSelections } from "../brush/studio-brush-pack-runtime";
+import { BRUSH_PRESETS } from "../studio-brush";
+
 import {
   STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
   type StudioHokusaiLiveBrushCapabilities,
@@ -29,7 +30,7 @@ import {
   STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
 } from "./studio-hokusai-natural-media-worker-protocol";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 const EXPECTED_CORE_AUTO_ROUTE = new Map<string, StudioHokusaiNaturalMediaPresetId>([
   ["pencil", "pencil"],

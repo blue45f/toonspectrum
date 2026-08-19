@@ -11,8 +11,8 @@ const { completeStudioServerTextMock } = vi.hoisted(() => ({
   completeStudioServerTextMock: vi.fn(),
 }));
 
-vi.mock("./studio-server-ai-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./studio-server-ai-client")>();
+vi.mock("../studio-server-ai-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../studio-server-ai-client")>();
   return {
     ...actual,
     completeStudioServerText: completeStudioServerTextMock,

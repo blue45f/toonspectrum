@@ -19,7 +19,7 @@ import type {
   StudioPathOpsResult,
   StudioQualityPathOp,
   StudioStrokeToPathStyle,
-} from "./studio-canvaskit-adapter";
+} from "./render/studio-canvaskit-adapter";
 
 export const STUDIO_QUALITY_WORKER_DEFAULT_INIT_TIMEOUT_MS = 15_000;
 export const STUDIO_QUALITY_WORKER_DEFAULT_RUN_TIMEOUT_MS = 30_000;

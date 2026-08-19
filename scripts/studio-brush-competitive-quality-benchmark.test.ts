@@ -1,12 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
 import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
-} from "../src/domains/creator/studio-brush-dynamics";
-import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "../src/domains/creator/studio-brush-pack-index";
-import { materializeAllStudioBrushPackSelections } from "../src/domains/creator/studio-brush-pack-runtime";
-import { studioCoreBrushCatalogSelection } from "../src/domains/creator/studio-brush-selection";
+} from "../src/domains/creator/brush/studio-brush-dynamics";
+import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "../src/domains/creator/brush/studio-brush-pack-index";
+import { materializeAllStudioBrushPackSelections } from "../src/domains/creator/brush/studio-brush-pack-runtime";
+import { studioCoreBrushCatalogSelection } from "../src/domains/creator/brush/studio-brush-selection";
+import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
 
 import {
   benchmarkStudioCompetitiveBrushQuality,

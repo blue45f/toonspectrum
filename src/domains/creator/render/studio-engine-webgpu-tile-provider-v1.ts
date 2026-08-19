@@ -12,7 +12,8 @@
 
 import {
   lowerStudioCanonicalBrushPlanToWebGpuDabs,
-} from "./studio-canonical-brush-webgpu-lowering";
+} from "../studio-canonical-brush-webgpu-lowering";
+
 import {
   STUDIO_ENGINE_TILE_AUTHORITY_VERSION,
   STUDIO_ENGINE_TILE_ENCODING,

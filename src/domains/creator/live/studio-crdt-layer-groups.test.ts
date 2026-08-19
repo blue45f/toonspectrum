@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { isEffectivelyHidden, isEffectivelyLocked } from "../studio-layers";
+
 import {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   StudioCrdtDocument,
@@ -14,7 +16,6 @@ import {
 } from "./studio-crdt-page-bridge";
 import { publishStudioCrdtSceneGraphDiff } from "./studio-crdt-scene-publisher";
 import { studioCrdtLayerGroupKey } from "./studio-crdt-scene-schema";
-import { isEffectivelyHidden, isEffectivelyLocked } from "./studio-layers";
 
 function group(
   pageId: string,

@@ -13,8 +13,8 @@ import { describe, expect, it } from "vitest";
 import {
   planStudioDynamicBrushDabs,
   studioBrushDynamicsSettingsForBrushId,
-} from "./studio-brush-dynamics";
-import { materializeAllStudioBrushPackSelections } from "./studio-brush-pack-runtime";
+} from "./brush/studio-brush-dynamics";
+import { materializeAllStudioBrushPackSelections } from "./brush/studio-brush-pack-runtime";
 import { studioDynamicBrushUsesSplatterOriginAnchor } from "./studio-splatter-origin-anchor";
 
 /** The gate's flick: short enough that dab zero dominates, fast enough to maximise scatter. */

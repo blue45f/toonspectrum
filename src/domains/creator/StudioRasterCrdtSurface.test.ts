@@ -4,7 +4,7 @@ import {
   studioRasterOperationIntersectsDocumentRect,
   studioRasterTileIntersectsDocumentRect,
   studioRasterVisibleDocumentRectFromViewport,
-} from "./studio-raster-visible-rect";
+} from "./render/studio-raster-visible-rect";
 
 import type { StudioRasterOperation } from "@/lib/studio-crdt-raster-ops";
 

@@ -5,8 +5,8 @@
 
 import { sha256HexPortable } from "./studio-sha256";
 
-import type { StudioHybridDccPersistedSnapshot, StudioRightsBomRecord  } from "./studio-hybrid-dcc-document";
-import type { StudioLiveBridgeDocument } from "./studio-live-2d3d-bridge";
+import type { StudioHybridDccPersistedSnapshot, StudioRightsBomRecord  } from "./hybrid-dcc/studio-hybrid-dcc-document";
+import type { StudioLiveBridgeDocument } from "./live/studio-live-2d3d-bridge";
 
 export const STUDIO_TOON3D_PACKAGE_REVISION = 1 as const;
 export const STUDIO_TOON3D_PACKAGE_FORMAT = "toonspectrum.toon3d" as const;

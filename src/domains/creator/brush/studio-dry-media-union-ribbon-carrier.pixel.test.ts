@@ -3,7 +3,12 @@ import { createRequire } from "node:module";
 
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+import {
+  planStudioDynamicBrushCoverageMarks,
+  type StudioDynamicBrushCoverageMark,
+} from "../studio-dynamic-brush-coverage-renderer";
+
 import {
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
@@ -14,10 +19,6 @@ import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
-import {
-  planStudioDynamicBrushCoverageMarks,
-  type StudioDynamicBrushCoverageMark,
-} from "./studio-dynamic-brush-coverage-renderer";
 
 type ResvgWasmModule = typeof import("@resvg/resvg-wasm");
 

@@ -15,6 +15,15 @@ import {
 import { useState, type ReactElement } from "react";
 
 import {
+  MAGIC_RESIZE_PRESETS,
+  MAGIC_RESIZE_STRATEGIES,
+  presetCanvasSize,
+  type MagicResizePreset,
+  type MagicResizeStrategy,
+} from "../studio-magic-resize";
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+
+import {
   adjustStudioCanvasHeight,
   clampStudioCanvasHeight,
   nearestStudioCanvasHeightPresetId,
@@ -25,14 +34,6 @@ import {
   studioCanvasAspectPreviewRect,
   studioCanvasSizeSummary,
 } from "./studio-canvas-size";
-import {
-  MAGIC_RESIZE_PRESETS,
-  MAGIC_RESIZE_STRATEGIES,
-  presetCanvasSize,
-  type MagicResizePreset,
-  type MagicResizeStrategy,
-} from "./studio-magic-resize";
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 
 import { cn } from "@/lib/utils";
 

@@ -20,7 +20,7 @@
  * "하나라도 모르면 통째로 원문" 원칙을 그대로 지킨다.
  */
 
-import type { StudioInspectorRasterToolPolicy } from "./studio-inspector-raster-tool-policy";
+import type { StudioInspectorRasterToolPolicy } from "../studio-inspector-raster-tool-policy";
 import type {
   StudioRasterToolAvailability,
   StudioRasterToolGate,

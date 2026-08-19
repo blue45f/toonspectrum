@@ -3,8 +3,8 @@
 import { act, cleanup, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { resolveStudioDraftPreviewActiveLane } from "./brush/studio-draw-rendering";
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
-import { resolveStudioDraftPreviewActiveLane } from "./studio-draw-rendering";
 import { StudioDraftPreviewLayers } from "./StudioDraftPreviewLayers";
 
 import type { StudioDraftPreviewSource } from "./studio-draft-preview-store";
@@ -55,7 +55,7 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
   };
 });
 
-vi.mock("./StudioDrawNode", async () => {
+vi.mock("./brush/StudioDrawNode", async () => {
   const { createElement } = await import("react");
   return {
     StudioDrawNode: ({ activeDraft, el }: { activeDraft?: boolean; el: DrawEl }) => createElement(

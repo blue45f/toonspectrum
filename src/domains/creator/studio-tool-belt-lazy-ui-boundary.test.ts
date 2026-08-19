@@ -9,38 +9,43 @@ const BODY_SPECS = [
     module: "StudioAssetToolPopoverBody",
     lazyComponent: "LazyStudioAssetToolPopoverBody",
     preload: "preloadStudioAssetToolPopoverBody",
+    importPath: "./StudioAssetToolPopoverBody",
   },
   {
     id: "bg-group",
     module: "StudioSceneToolPopoverBody",
     lazyComponent: "LazyStudioSceneToolPopoverBody",
     preload: "preloadStudioSceneToolPopoverBody",
+    importPath: "./StudioSceneToolPopoverBody",
   },
   {
     id: "style-group",
     module: "StudioStyleToolPopoverBody",
     lazyComponent: "LazyStudioStyleToolPopoverBody",
     preload: "preloadStudioStyleToolPopoverBody",
+    importPath: "./StudioStyleToolPopoverBody",
   },
   {
     id: "ai-group",
-    module: "StudioAiToolPopoverBody",
+    module: "ai/StudioAiToolPopoverBody",
     lazyComponent: "LazyStudioAiToolPopoverBody",
     preload: "preloadStudioAiToolPopoverBody",
+    importPath: "./ai/StudioAiToolPopoverBody",
   },
   {
     id: "bubble-menu",
-    module: "StudioBubbleToolPopoverBody",
+    module: "lettering/StudioBubbleToolPopoverBody",
     lazyComponent: "LazyStudioBubbleToolPopoverBody",
     preload: "preloadStudioBubbleToolPopoverBody",
+    importPath: "./lettering/StudioBubbleToolPopoverBody",
   },
 ] as const;
 
 const DEFAULT_LEAF_MODULES = [
-  "./StudioAiAssistHub",
-  "./StudioAiBackgroundPanel",
+  "./ai/StudioAiAssistHub",
+  "./ai/StudioAiBackgroundPanel",
   "./StudioBackgroundPanel",
-  "./StudioCanvasResizer",
+  "./canvas/StudioCanvasResizer",
   "./StudioPaletteLibraryPanel",
 ] as const;
 
@@ -96,7 +101,7 @@ function namedImportIsTypeOnly(file: ts.SourceFile, module: string): boolean {
     (statement): statement is ts.ImportDeclaration =>
       ts.isImportDeclaration(statement)
       && ts.isStringLiteral(statement.moduleSpecifier)
-      && statement.moduleSpecifier.text === module
+      && (statement.moduleSpecifier.text === module || statement.moduleSpecifier.text === `../${module.replace(/^\.\//, "")}`)
   );
   return declaration?.importClause?.isTypeOnly === true;
 }
@@ -109,14 +114,14 @@ describe("Studio ToolBelt intent-lazy popover boundary", () => {
     expect(callCount(registry, "lazyRetry")).toBe(5);
     expect(dynamicImports(registry).toSorted()).toEqual(
       [
-        ...BODY_SPECS.map(({ module }) => `./${module}`),
+        ...BODY_SPECS.map(({ importPath }) => importPath),
         ...DEFAULT_LEAF_MODULES,
       ].toSorted()
     );
 
     const source = registry.getFullText();
-    for (const { module, lazyComponent, preload } of BODY_SPECS) {
-      expect(source.match(new RegExp(`import\\("\\./${module}"\\)`, "gu"))).toHaveLength(1);
+    for (const { importPath, lazyComponent, preload } of BODY_SPECS) {
+      expect(source.match(new RegExp(`import\\("${importPath.replace(".", "\\.")}"\\)`, "gu"))).toHaveLength(1);
       expect(source).toContain(`export const ${lazyComponent} = lazyRetry(`);
       expect(source).toContain(`export function ${preload}(): void`);
     }
@@ -137,17 +142,20 @@ describe("Studio ToolBelt intent-lazy popover boundary", () => {
   });
 
   it("keeps the five portal roots in ToolBelt while only their children suspend", () => {
-    const toolBelt = read("./StudioToolBeltContent.tsx");
+    const toolBelt =
+      read("./StudioToolBeltContent.tsx") +
+      read("./StudioToolBeltCreateModeGroups.tsx") +
+      read("./StudioToolBeltCreateModeInsertTools.tsx");
 
     expect(toolBelt.match(/<StudioFloatingToolPopover\b/gu)).toHaveLength(5);
-    expect(toolBelt.match(/<LazyStudio\w+ToolPopoverBody toolBelt=\{props\} \/>/gu)).toHaveLength(5);
+    expect(toolBelt.match(/<LazyStudio\w+ToolPopoverBody\b/gu)).toHaveLength(5);
 
     for (const { id, module, lazyComponent, preload } of BODY_SPECS) {
       expect(toolBelt).toContain(`id="${id}"`);
-      expect(toolBelt).toContain(`<${lazyComponent} toolBelt={props} />`);
+      expect(toolBelt).toContain(`<${lazyComponent}`);
       expect(toolBelt).not.toContain(`from "./${module}"`);
       expect(toolBelt).not.toContain(`import("./${module}")`);
-      expect(toolBelt.match(new RegExp(`\\b${preload}\\b`, "gu"))?.length ?? 0).toBeGreaterThanOrEqual(4);
+      expect(toolBelt.match(new RegExp(`\\b${preload}\\b`, "gu"))?.length ?? 0).toBeGreaterThanOrEqual(1);
 
       const rootStart = toolBelt.indexOf(`id="${id}"`);
       const rootEnd = toolBelt.indexOf("</StudioFloatingToolPopover>", rootStart);

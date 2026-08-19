@@ -36,7 +36,7 @@ import {
   stepBristles,
   type BristleBrushConfig,
   type BristleBrushState,
-} from "../../../packages/studio-brush-platform/src/bristle-model";
+} from "../../../../packages/studio-brush-platform/src/bristle-model";
 
 export const STUDIO_BRISTLE_PHYSICS_OIL_V1_VERSION =
   "studio-bristle-physics-oil-v1" as const;

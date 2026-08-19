@@ -19,7 +19,7 @@ import {
   PROP_CATEGORY_LABELS,
   VRM_PROPS,
   type PropCategory,
-} from "./studio-vrm-props";
+} from "./vrm/studio-vrm-props";
 
 export const STUDIO_OBJECT_INSERT_CATALOG_VERSION =
   "object-insert-catalog-v1" as const;

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createLayerGroup,
+  hasContiguousLayerGroups,
+  type LayerGroup,
+} from "../studio-layers";
+
+import {
   fingerprintStudioLayerLiftSource,
   isStudioLayerLiftSourceCurrent,
   planStudioLayerLift,
@@ -12,13 +18,8 @@ import {
   type StudioLayerLiftPlanErrorCode,
   type StudioLayerLiftPlanResult,
 } from "./studio-layer-lift-plan";
-import {
-  createLayerGroup,
-  hasContiguousLayerGroups,
-  type LayerGroup,
-} from "./studio-layers";
 
-import type { El } from "./studio-element-model";
+import type { El } from "../studio-element-model";
 
 const SOURCE_PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAABCAYAAAD5PA/NAAAAGklEQVR42mMQ0bBxCEipaOhZsOXAiTsf/gMANLgImNAdwO0AAAAASUVORK5CYII=";

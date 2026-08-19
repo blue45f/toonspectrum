@@ -36,6 +36,16 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 
+import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-context";
+import {
+  reuseOrBuildStudioLiveLayerOwnershipByItemId,
+  studioLiveSelectionEditGate,
+  summarizeStudioLiveSelectionOwnership,
+  type StudioLiveLayerOwnership,
+} from "../live/studio-live-layer-ownership";
+import { useStudioStableHandlers } from "../studio-stable-handlers";
+import { StudioToolHintTarget } from "../StudioToolHint";
+
 import { studioLayerSourcesBakeToSingleLayer } from "./studio-layer-merge";
 import {
   DEFAULT_STUDIO_LAYER_NAVIGATOR_FILTERS,
@@ -67,21 +77,13 @@ import {
   STUDIO_LAYER_NAVIGATOR_KIND_ICONS as KIND_ICONS,
   studioLayerNavigatorItemStatusLabel as itemStatusLabel,
 } from "./studio-layer-navigator-row-ui";
-import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
-import {
-  reuseOrBuildStudioLiveLayerOwnershipByItemId,
-  studioLiveSelectionEditGate,
-  summarizeStudioLiveSelectionOwnership,
-  type StudioLiveLayerOwnership,
-} from "./studio-live-layer-ownership";
-import { useStudioStableHandlers } from "./studio-stable-handlers";
 import {
   StudioLayerNavigatorItemRow as LayerNavigatorItemRow,
   type LayerNavigatorRowHandlers,
 } from "./StudioLayerNavigatorItemRow";
-import { StudioToolHintTarget } from "./StudioToolHint";
 
-import type { LayerGroup } from "./studio-layers";
+
+import type { LayerGroup } from "../studio-layers";
 
 import { cn } from "@/lib/utils";
 

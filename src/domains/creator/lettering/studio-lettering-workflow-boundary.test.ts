@@ -7,9 +7,9 @@ const read = (fileName: string) =>
 
 describe("Studio lettering workflow boundary", () => {
   it("keeps the advertised T shortcut connected to the shipped lettering handler", () => {
-    const settings = read("./studio-app-settings.ts");
-    const page = read("./StudioPage.tsx");
-    const help = read("./StudioShortcutsHelp.tsx");
+    const settings = read("../studio-app-settings.ts");
+    const page = read("../StudioPage.tsx");
+    const help = read("../StudioShortcutsHelp.tsx");
 
     expect(settings).toContain('{ id: "tool-lettering", label: "레터링(텍스트·말풍선)", labelKey: "studio.settings.shortcut.toolLettering", defaultKeys: "T" }');
     expect(page).toContain('matchStudioShortcut(sc["tool-lettering"], e)');
@@ -25,7 +25,7 @@ describe("Studio lettering workflow boundary", () => {
 
   it("starts inline editing from click insertion but leaves drag-and-drop placement uninterrupted", () => {
     const bubblePopover = read("./StudioBubbleToolPopoverBody.tsx");
-    const rail = read("./StudioLeftToolRail.tsx");
+    const rail = read("../StudioLeftToolRail.tsx");
 
     expect(bubblePopover).toContain("addBubble(v.id, undefined, true)");
     expect(bubblePopover).toContain('data-studio-shortcut-boundary="true"');

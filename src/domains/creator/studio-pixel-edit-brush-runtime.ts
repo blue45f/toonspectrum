@@ -17,5 +17,5 @@ export {
 export {
   planStudioRasterRetouchRegion,
   translateStudioRasterRetouchPoints,
-} from "./studio-raster-retouch-region";
+} from "./render/studio-raster-retouch-region";
 export { smudgeStrokeImage } from "./studio-smudge-browser";

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
-const viewportSource = readFileSync(new URL("./StudioCanvasViewport.tsx", import.meta.url), "utf8");
+const viewportSource = readFileSync(new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url), "utf8");
 const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
 // The minimap scroll-window box moved out of the inspector into its own leaf so a
 // pan frame re-renders one element instead of the whole aside. The invariant this
@@ -12,7 +12,12 @@ const minimapViewportBoxSource = readFileSync(
   new URL("./StudioMinimapViewportBox.tsx", import.meta.url),
   "utf8",
 );
-const leftToolRailSource = readFileSync(new URL("./StudioLeftToolRail.tsx", import.meta.url), "utf8");
+const leftToolRailSource = [
+  new URL("./StudioLeftToolRail.tsx", import.meta.url),
+  new URL("./StudioLeftToolRailViewToolsCluster.tsx", import.meta.url),
+]
+  .map((url) => readFileSync(url, "utf8"))
+  .join("\n");
 const viewHudLoaderSource = readFileSync(
   new URL("./studio-view-tools-hud-loader.ts", import.meta.url),
   "utf8",
@@ -71,10 +76,10 @@ describe("StudioPage view integration contract", () => {
 
   it("loads the optional view HUD only after a zoom or rotate intent", () => {
     expect(viewportSource).toContain(
-      'import { StudioViewToolsHud } from "./studio-view-tools-hud-loader";',
+      'import { StudioViewToolsHud } from "../studio-view-tools-hud-loader";',
     );
     expect(viewportSource).not.toContain(
-      'import { StudioViewToolsHud } from "./StudioViewToolsHud";',
+      'import { StudioViewToolsHud } from "../StudioViewToolsHud";',
     );
     expect(viewHudLoaderSource).toContain('import("./StudioViewToolsHud")');
     expect(viewportSource).toMatch(

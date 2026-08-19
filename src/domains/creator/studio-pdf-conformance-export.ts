@@ -7,7 +7,7 @@
  * certification.
  */
 
-import { buildVectorPdf } from "./studio-canvaskit-pdf-vector";
+import { buildVectorPdf } from "./render/studio-canvaskit-pdf-vector";
 import { auditStudioIccProfilePolicy } from "./studio-icc-profile-policy";
 import {
   preflightStudioPdfConformance,
@@ -15,7 +15,7 @@ import {
   verifyStudioPdfConformanceReceipt,
 } from "./studio-pdf-conformance-profile";
 
-import type { StudioPdfDocument } from "./studio-canvaskit-pdf-vector";
+import type { StudioPdfDocument } from "./render/studio-canvaskit-pdf-vector";
 import type {
   StudioIccProfilePolicyReceipt,
   StudioIccProviderManifest,

@@ -1,4 +1,11 @@
 import {
+  STUDIO_POINTER_SAMPLE_ROLE_PREDICTED,
+  attachStudioSharedPointerRingConsumer,
+  type StudioPointerSampleRole,
+  type StudioSharedPointerRingConsumer,
+} from "../studio-shared-pointer-ring-buffer";
+
+import {
   STUDIO_ENGINE_EXECUTION_PROFILE,
   STUDIO_ENGINE_WORKER_BUDGETS,
   STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
@@ -16,12 +23,6 @@ import {
   type StudioEngineToolCommand,
   type StudioEngineWorkerMessage,
 } from "./studio-engine-worker-protocol";
-import {
-  STUDIO_POINTER_SAMPLE_ROLE_PREDICTED,
-  attachStudioSharedPointerRingConsumer,
-  type StudioPointerSampleRole,
-  type StudioSharedPointerRingConsumer,
-} from "./studio-shared-pointer-ring-buffer";
 
 export const STUDIO_ENGINE_POINTER_FLAG_BEGIN = 1;
 export const STUDIO_ENGINE_POINTER_FLAG_END = 1 << 1;

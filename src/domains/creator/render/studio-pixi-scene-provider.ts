@@ -13,7 +13,7 @@ import {
   type StudioSceneRendererReceipt,
   type StudioSceneSelectableOverlay,
   type StudioSceneViewportMetrics,
-} from "./studio-scene-provider";
+} from "../studio-scene-provider";
 
 import type {
   Application,

@@ -35,7 +35,7 @@ import {
   type DialoguePageLike,
   type DialogueReplacePlan,
   type DialogueReplaceScope,
-} from "./studio-dialogue-batch";
+} from "./lettering/studio-dialogue-batch";
 import {
   parseStudioDialogueInterchange,
   serializeStudioDialogueInterchange,
@@ -45,7 +45,7 @@ import {
   type StudioDialogueInterchangeDocument,
   type StudioDialogueInterchangeFormat,
   type StudioDialogueInterchangeResult,
-} from "./studio-dialogue-interchange";
+} from "./lettering/studio-dialogue-interchange";
 import {
   buildDialogueReadAloudQueue,
   choosePreferredDialogueVoice,
@@ -56,11 +56,11 @@ import {
   listDialogueSpeechVoices,
   type DialogueReadAloudPlaybackState,
   type DialogueSpeechAdapter,
-} from "./studio-dialogue-read-aloud";
+} from "./lettering/studio-dialogue-read-aloud";
 import {
   formatDialogueTextWithRubyPreview,
   type DialogueRubySpan,
-} from "./studio-dialogue-ruby";
+} from "./lettering/studio-dialogue-ruby";
 import { downloadBlob } from "./studio-export";
 
 import { cx } from "@/lib/cx";

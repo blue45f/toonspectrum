@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
 
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import { normalizeStudioBrushDynamicsSettings } from "../brush/studio-brush-dynamics";
+
 import {
   STUDIO_ENGINE_VNEXT_BRUSH_PROVIDER_ROUTER_BUDGETS,
   StudioEngineVNextBrushProviderRouter,

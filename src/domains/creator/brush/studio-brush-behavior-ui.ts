@@ -9,7 +9,7 @@
 import {
   resolveStudioBrushRenderFamily,
   type StudioBrushRenderFamily,
-} from "./studio-brush";
+} from "../studio-brush";
 
 export type StudioBrushBehaviorKind =
   | "line"

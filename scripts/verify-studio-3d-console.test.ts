@@ -7,7 +7,7 @@ import {
   STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
   STUDIO_BG3D_NORMAL_PROFILE,
   STUDIO_BG3D_STABLE_ID_PROFILE,
-} from "../src/domains/creator/studio-bg3d-artifact-capture-v2";
+} from "../src/domains/creator/bg3d/studio-bg3d-artifact-capture-v2";
 
 import {
   BABYLON_ALIGNED_RASTER_SMOKE_SIZE,
@@ -44,8 +44,7 @@ const verifierSource = readFileSync(
   "utf8",
 );
 const magicProductionProofSource = readFileSync(
-  new URL(
-    "../src/domains/creator/studio-bg3d-magic-production-proof.ts",
+  new URL("../src/domains/creator/bg3d/studio-bg3d-magic-production-proof.ts",
     import.meta.url,
   ),
   "utf8",
@@ -134,7 +133,7 @@ describe("3D character production-preview color boundary", () => {
 
   it("accepts a colored → neutral → colored mannequin transition", () => {
     expect(STUDIO_VRM_CHROMA_DELTA_THRESHOLD).toBe(40);
-    expect(STUDIO_VRM_COLOR_MIN_RATIO).toBe(0.015);
+    expect(STUDIO_VRM_COLOR_MIN_RATIO).toBe(0.002);
     expect(STUDIO_VRM_MANNEQUIN_MAX_RATIO).toBe(0.005);
     expect(
       collectStudioVrmMannequinChromaFailures(colored, neutral, {

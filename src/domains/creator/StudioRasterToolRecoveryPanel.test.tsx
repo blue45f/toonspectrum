@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resolveStudioRasterToolAvailability } from "./studio-raster-tool-availability";
+import { resolveStudioRasterToolAvailability } from "./render/studio-raster-tool-availability";
 import {
   StudioInspectorFilterLauncher,
   StudioInspectorPixelSelectionLauncher,
@@ -16,7 +16,7 @@ const preloadRasterRetouchRuntime = vi.hoisted(() =>
   vi.fn(() => Promise.resolve()),
 );
 
-vi.mock("./studio-raster-retouch-preload", () => ({
+vi.mock("./render/studio-raster-retouch-preload", () => ({
   preloadStudioRasterRetouchRuntime: preloadRasterRetouchRuntime,
 }));
 

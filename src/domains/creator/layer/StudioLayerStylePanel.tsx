@@ -14,19 +14,20 @@
 import { RotateCcw } from "lucide-react";
 
 import {
+  DEFAULT_OUTLINE_SECOND_COLOR,
+  isIdentityOutline,
+  normalizeOutline,
+  OUTLINE_WIDTH_RANGE,
+  type Outline,
+} from "../studio-outline";
+
+import {
   COMBO_LAYER_STYLE_PRESETS,
   LAYER_STYLE_PRESETS,
   LAYER_STYLE_RANGES,
   layerStyleResetPatch,
   type LayerStylePatch,
 } from "./studio-layer-styles";
-import {
-  DEFAULT_OUTLINE_SECOND_COLOR,
-  isIdentityOutline,
-  normalizeOutline,
-  OUTLINE_WIDTH_RANGE,
-  type Outline,
-} from "./studio-outline";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";

@@ -10,15 +10,15 @@ import {
   type DialogueBatchItem,
   type DialogueElementLike,
   type DialoguePageLike,
-} from "./studio-dialogue-batch";
+} from "../lettering/studio-dialogue-batch";
 import {
   serializeStudioDialogueInterchange,
   studioDialogueItemsToInterchange,
-} from "./studio-dialogue-interchange";
+} from "../lettering/studio-dialogue-interchange";
 import {
   formatDialogueTextWithRubyPreview,
   type DialogueRubySpan,
-} from "./studio-dialogue-ruby";
+} from "../lettering/studio-dialogue-ruby";
 
 export type StudioExportPageRange = {
   /** Inclusive 0-based index into the page list. */

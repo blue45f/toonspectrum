@@ -18,8 +18,8 @@ import {
   type StudioEngineVectorGeometryProviderLimits,
   type StudioEngineVectorGeometryResult,
   type StudioEngineVectorGeometrySmoothingType,
-} from "./studio-engine-vector-geometry-provider";
-import { sha256HexPortable } from "./studio-sha256";
+} from "../render/studio-engine-vector-geometry-provider";
+import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_PAPER_VECTOR_REFINEMENT_PROVIDER_VERSION = 1 as const;
 

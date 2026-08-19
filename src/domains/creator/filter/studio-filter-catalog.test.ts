@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_ADJUSTMENT_ENGINE_IDS } from "./studio-adjustment-stack";
+import { STUDIO_ADJUSTMENT_ENGINE_IDS } from "../studio-adjustment-stack";
+
 import {
   STUDIO_FILTER_CATALOG,
   STUDIO_FILTER_DIALOG_CATALOG,

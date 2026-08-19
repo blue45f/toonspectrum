@@ -5,7 +5,8 @@ import {
   STUDIO_STAMP_BRUSH_DEFAULTS,
   type StudioStampBrushKind,
   type StudioStampBrushStyle,
-} from "./studio-brush-stamp-engine";
+} from "../brush/studio-brush-stamp-engine";
+
 import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
 
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";

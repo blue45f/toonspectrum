@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   encodeStudioInkEnvelope,
   type StudioInkEnvelopeAttestationVerifier,
-} from "./studio-ink-envelope-codec";
+} from "./brush/studio-ink-envelope-codec";
 import {
   STUDIO_TOONINK_CONFORMANCE_CAPABILITIES,
   STUDIO_TOONINK_SELF_CERTIFICATION_ID,

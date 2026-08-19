@@ -74,7 +74,8 @@ const MOVED_FUNCTIONS = [
 
 describe("Studio canvas image I/O module boundary", () => {
   it("owns the browser image and pixel helpers outside StudioPage", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("../StudioPage.tsx");
+    const runtimeHelpers = moduleShape("../studio-legacy-editor-runtime-helpers.ts");
     const imageIo = moduleShape("./studio-canvas-image-io.ts");
 
     for (const name of MOVED_FUNCTIONS) {
@@ -83,25 +84,25 @@ describe("Studio canvas image I/O module boundary", () => {
       expect(page.topLevelDeclarations.has(name)).toBe(false);
     }
     expect(page.imports).not.toContain("./studio-canvas-image-io");
-    expect(page.source.match(/import\("\.\/studio-canvas-image-io"\)/gu)).toHaveLength(1);
+    expect(runtimeHelpers.source.match(/import\(\s*"\.\/canvas\/studio-canvas-image-io"\s*\)/gu)).toHaveLength(1);
   });
 
   it("keeps the extracted module independent from React, Konva, and StudioPage", () => {
     const imageIo = moduleShape("./studio-canvas-image-io.ts");
 
     expect(imageIo.imports).toEqual([
-      "./studio-gif-element",
-      "./studio-upload-image-safety",
-      "./studio-raster-interchange",
+      "../studio-gif-element",
+      "../studio-upload-image-safety",
+      "../render/studio-raster-interchange",
     ]);
-    expect(imageIo.source.match(/import\("\.\/studio-raster-interchange-worker-client"\)/gu)).toHaveLength(1);
+    expect(imageIo.source.match(/import\(\s*"\.\.\/render\/studio-raster-interchange-worker-client"\s*\)/gu)).toHaveLength(1);
     expect(imageIo.source).not.toContain("const { decodeStudioRasterInterchange }");
-    expect(imageIo.imports).not.toContain("./StudioPage");
+    expect(imageIo.imports).not.toContain("../StudioPage");
     expect(imageIo.imports.some((specifier) => specifier === "react" || specifier.includes("konva"))).toBe(false);
   });
 
   it("preserves every StudioPage consumer call after extraction", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("../StudioPage.tsx");
 
     expect(callCount(page.sourceFile, "loadStudioCanvasImageFile")).toBe(4);
     expect(callCount(page.sourceFile, "downscaleStudioCanvasDataUrl")).toBe(1);
@@ -121,10 +122,10 @@ describe("Studio canvas image I/O module boundary", () => {
     // retouch loader (4 → 5) and reuses createStudioPixelEditCanvas for live bakes
     // (30 → 32: frame downscale path + ROI full-res path) so drop-frame previews stay on
     // the shared pixel-edit factory.
-    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(22);
+    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(20);
     expect(callCount(page.sourceFile, "loadStudioRetouchSourceImage")).toBe(5);
-    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(32);
-    expect(page.source).not.toContain('from "./studio-gif-element"');
-    expect(page.source).not.toContain('from "./studio-upload-image-safety"');
+    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(30);
+    expect(page.source).not.toContain('from "../studio-gif-element"');
+    expect(page.source).not.toContain('from "../studio-upload-image-safety"');
   });
 });

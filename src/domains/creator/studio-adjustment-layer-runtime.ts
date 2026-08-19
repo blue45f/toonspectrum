@@ -1,21 +1,22 @@
 import {
-  studioAdjustmentOperationToFilterFields,
-  type StudioAdjustmentFilterOperation,
-} from "./studio-adjustment-stack";
-import {
   applyGpuFilterChain,
-} from "./studio-gpu-filter-apply";
-import {
-  runStudioImageFilterWorker,
-  type StudioImageFilterWorkerClientOptions,
-} from "./studio-image-filter-worker-client";
+} from "./render/studio-gpu-filter-apply";
 import {
   applyImageFilters,
   buildImageFilters,
   registerStudioKonvaFilters,
   type KonvaLike,
-} from "./studio-konva-filters";
+} from "./render/studio-konva-filters";
+import {
+  studioAdjustmentOperationToFilterFields,
+  type StudioAdjustmentFilterOperation,
+} from "./studio-adjustment-stack";
+import {
+  runStudioImageFilterWorker,
+  type StudioImageFilterWorkerClientOptions,
+} from "./studio-image-filter-worker-client";
 
+import type { StudioGpuFilterRuntimeOptions } from "./render/studio-gpu-filter-runtime";
 import type {
   StudioAdjustmentLayerBlendMode,
   StudioAdjustmentLayerCompositorPlan,
@@ -24,7 +25,6 @@ import type {
   StudioAdjustmentLayerRenderKind,
 } from "./studio-adjustment-layer-plan";
 import type { StudioImageDataLike } from "./studio-filters";
-import type { StudioGpuFilterRuntimeOptions } from "./studio-gpu-filter-runtime";
 
 /**
  * Pixel execution boundary for first-class adjustment layers.

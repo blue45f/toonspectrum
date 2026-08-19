@@ -17,14 +17,14 @@ import {
 } from "lucide-react";
 import { useRef } from "react";
 
-import { presentStudioAutosaveDocumentLeadership } from "./studio-autosave-document-leader";
-import { StudioReliabilityStatusRail } from "./StudioReliabilityStatusRail";
-import { StudioToolHintTarget } from "./StudioToolHint";
+import { presentStudioAutosaveDocumentLeadership } from "../studio-autosave-document-leader";
+import { StudioReliabilityStatusRail } from "../StudioReliabilityStatusRail";
+import { StudioToolHintTarget } from "../StudioToolHint";
 
 import type {
   StudioAutosaveDocumentLeadershipBasis,
   StudioAutosaveDocumentRole,
-} from "./studio-autosave-document-leader";
+} from "../studio-autosave-document-leader";
 import type { ReactNode } from "react";
 
 import { useIsMobile } from "@/components/use-media-query";

@@ -665,8 +665,7 @@ async function completeCanonicalStroke(stroke: ActiveStroke): Promise<void> {
 }
 
 async function loadRuntime(): Promise<HokusaiRuntimeModule> {
-  const runtime = await import(
-    "../../../packages/studio-hokusai-wasm/pkg/studio_hokusai_wasm.js"
+  const runtime = await import("../../../../packages/studio-hokusai-wasm/pkg/studio_hokusai_wasm.js"
   ) as unknown as HokusaiRuntimeModule;
   if (
     typeof runtime.default !== "function"

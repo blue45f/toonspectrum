@@ -10,9 +10,9 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { StudioHudPill } from "./studio-chrome-ui";
-import { studioPressureHudRatio } from "./studio-draw-hud";
-import { STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY } from "./studio-wet-ink-backend-capability";
+import { studioPressureHudRatio } from "../brush/studio-draw-hud";
+import { STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY } from "../brush/studio-wet-ink-backend-capability";
+import { StudioHudPill } from "../studio-chrome-ui";
 
 import type { StudioLiveDynamicBrushOverlayRenderer } from "./studio-live-dynamic-brush-overlay";
 import type {
@@ -20,13 +20,14 @@ import type {
   StudioLiveInkPredictionRenderer,
   StudioLiveInkSurface,
 } from "./studio-live-ink-overlay";
+import type { StudioLiveRetainedMediaOverlayRenderer } from "./studio-live-retained-media-overlay";
 import type { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
 import type { StudioLiveWetInkOverlayRenderer } from "./studio-live-wet-ink-overlay";
 
 import { lazyRetry } from "@/lib/lazy-retry";
 
 const StudioPressureHudMeter = lazyRetry(
-  () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioPressureHudMeter })),
+  () => import("../studio-creative-visuals").then((mod) => ({ default: mod.StudioPressureHudMeter })),
   "StudioPressureHudMeter"
 );
 
@@ -63,6 +64,51 @@ export const StudioLiveInkOverlayHost = memo(function StudioLiveInkOverlayHost({
     />
   );
 });
+
+export const StudioLiveRetainedMediaOverlayHost = memo(
+  function StudioLiveRetainedMediaOverlayHost({
+    renderer,
+    left,
+    top,
+    width,
+    height,
+    documentScale,
+    documentWidth,
+    flipX,
+  }: StudioLiveInkSurface & { renderer: StudioLiveRetainedMediaOverlayRenderer }) {
+    const activeCanvasRef = useRef<HTMLCanvasElement>(null);
+    const settledCanvasRef = useRef<HTMLCanvasElement>(null);
+    useLayoutEffect(() => {
+      if (!activeCanvasRef.current || !settledCanvasRef.current) return undefined;
+      renderer.attach({
+        activeCanvas: activeCanvasRef.current,
+        settledCanvas: settledCanvasRef.current,
+      });
+      return () => renderer.attach(null);
+    }, [renderer]);
+    useLayoutEffect(() => {
+      renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
+    });
+    return (
+      <>
+        <canvas
+          ref={settledCanvasRef}
+          aria-hidden="true"
+          data-studio-live-retained-settled="true"
+          className="pointer-events-none absolute z-10"
+          style={{ left, top, width, height }}
+        />
+        <canvas
+          ref={activeCanvasRef}
+          aria-hidden="true"
+          data-studio-live-retained-active="true"
+          className="pointer-events-none absolute z-[11]"
+          style={{ left, top, width, height }}
+        />
+      </>
+    );
+  },
+);
 
 export const StudioLiveStampOverlayHost = memo(function StudioLiveStampOverlayHost({
   renderer,

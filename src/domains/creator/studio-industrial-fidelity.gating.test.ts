@@ -4,15 +4,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createStudioUnitCubeMesh,
-} from "./studio-editable-half-edge-mesh";
-import {
   createStudioHybridDccWorkspace,
   workspaceAddUnitCube,
   workspaceDynatopoActive,
   workspaceOcctBox,
   workspaceRetopoActive,
-} from "./studio-hybrid-dcc-workspace";
+} from "./hybrid-dcc/studio-hybrid-dcc-workspace";
+import {
+  createStudioUnitCubeMesh,
+} from "./studio-editable-half-edge-mesh";
 import { importStudioIfcShell } from "./studio-mesh-format-adapters";
 import {
   autoRetopoStudioMeshBasic,

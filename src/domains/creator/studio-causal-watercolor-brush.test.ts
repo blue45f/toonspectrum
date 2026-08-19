@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyStudioBrushAliasWatercolorMaterial,
   resolveStudioBrushAliasWatercolorPlanSettings,
-} from "./studio-brush-alias-profile";
+} from "./brush/studio-brush-alias-profile";
 import {
   appendCausalWatercolorBrush,
   beginCausalWatercolorBrush,

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyImageFilters,
+  buildImageFilters,
+  registerStudioKonvaFilters,
+  type KonvaLike,
+} from "./render/studio-konva-filters";
+import {
   applyStudioAdvancedBlurFilter,
   type StudioAdvancedBlurKernelId,
 } from "./studio-advanced-blur-filter-kernels";
@@ -8,15 +14,9 @@ import {
   STUDIO_ADVANCED_BLUR_DIRECT_MAX_SOURCE_SAMPLES,
   studioAdvancedBlurRequiresWorker,
 } from "./studio-advanced-blur-filters";
-import {
-  applyImageFilters,
-  buildImageFilters,
-  registerStudioKonvaFilters,
-  type KonvaLike,
-} from "./studio-konva-filters";
 
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type { StudioImageDataLike } from "./studio-filters";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 const registry: KonvaLike = { Filters: {} };
 registerStudioKonvaFilters(registry);

@@ -1,6 +1,7 @@
 import { AlertTriangle, Download, Monitor, RefreshCw, WifiOff } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
+import { allowStudioProgrammaticReload } from "../../lib/programmatic-reload";
 import { classifyError, type ErrorAnalysis } from "../compat/browser-check";
 
 import { BrowserCompatModal } from "./browser-compat-modal";
@@ -47,6 +48,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.analysis?.type === "chunk_load" && !hasAttemptedChunkReload()) {
       markChunkReloadAttempted();
       this.setState({ autoReloading: true });
+      allowStudioProgrammaticReload();
       window.location.reload();
     }
   }
@@ -54,6 +56,7 @@ export class ErrorBoundary extends Component<Props, State> {
   reloadPage = () => {
     // 사용자가 직접 누르는 재시도는 항상 캐시 문제를 실제로 해결하는 전체 새로고침이어야 한다
     // (setState로 컴포넌트만 리셋하면 오래된 index.html을 계속 붙들고 있어 같은 실패가 반복된다).
+    allowStudioProgrammaticReload();
     window.location.reload();
   };
 

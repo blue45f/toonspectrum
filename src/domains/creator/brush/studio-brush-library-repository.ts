@@ -25,7 +25,7 @@ import {
 } from "./studio-brush-library";
 import { STUDIO_BRUSH_RUNTIME_CONTRACT } from "./studio-brush-runtime-contract";
 
-import type { StudioBrushRenderFamily } from "./studio-brush";
+import type { StudioBrushRenderFamily } from "../studio-brush";
 
 export const DEFAULT_BRUSH_LIBRARY_PAGE_SIZE = 64;
 export const BRUSH_LIBRARY_CURSOR_VERSION = 1 as const;

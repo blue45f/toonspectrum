@@ -1,8 +1,8 @@
 import type {
   StudioRasterOverlaySourceElement,
   StudioRasterOverlaySourceOperation,
-} from "./studio-crdt-raster-ui-bridge";
-import type { Tool } from "./studio-editor-tool-model";
+} from "../live/studio-crdt-raster-ui-bridge";
+import type { Tool } from "../studio-editor-tool-model";
 import type { StudioWebGpuCommittedPlanGates } from "./studio-webgpu-committed-plan";
 import type { StudioWebGpuViewportSurfacePlan } from "./studio-webgpu-viewport";
 

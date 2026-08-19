@@ -9,11 +9,11 @@
  * Product code uses studio-pro-draw-preferences-sqlite.ts and never opens this legacy key.
  */
 
-import { BRUSH_PRESETS } from "./studio-brush";
 import {
   STUDIO_BRUSH_PACK_CATALOG_IDS,
   isStudioBrushPackCatalogId,
-} from "./studio-brush-pack-id";
+} from "./brush/studio-brush-pack-id";
+import { BRUSH_PRESETS } from "./studio-brush";
 
 export const STUDIO_PRO_DRAW_PREFS_KEY = "toonspectrum-studio-pro-draw-prefs:v1";
 export const STUDIO_RECENT_BRUSH_LIMIT = 6;

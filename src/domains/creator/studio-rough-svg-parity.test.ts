@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { DEFAULT_SHAPE_PARAMS } from "./brush/studio-stroke-shapes";
 import {
   buildStudioRoughShapeRenderPlan,
   loadStudioRoughGenerator,
@@ -11,7 +12,6 @@ import {
   buildStudioRoughSvgParityPlan,
   studioRoughCanvasSvgVariationSeed,
 } from "./studio-rough-svg-parity";
-import { DEFAULT_SHAPE_PARAMS } from "./studio-stroke-shapes";
 
 describe("Studio Rough Canvas/SVG parity bridge", () => {
   let canvasGenerator: StudioRoughGeneratorHandle;

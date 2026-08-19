@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { acquireStudioLinked3dPassProductAuthority } from
-  "./studio-linked-3d-pass-product-authority";
+import { acquireStudioLinked3dPassProductAuthority } from "./studio-linked-3d-pass-product-authority";
 
 afterEach(() => {
   vi.unstubAllGlobals();

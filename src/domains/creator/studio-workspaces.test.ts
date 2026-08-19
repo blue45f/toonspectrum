@@ -6,7 +6,7 @@ import {
   resizeStudioDrawingPalettes,
   setStudioDrawingPaletteLock,
   toggleStudioDrawingPalette,
-} from "./studio-drawing-palettes";
+} from "./brush/studio-drawing-palettes";
 import { STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY } from "./studio-inspector-layout";
 import {
   QUICK_ACTION_IDS,

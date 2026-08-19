@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { exportPageToSvg } from "./studio-svg-export";
+import { exportPageToSvg } from "./export/studio-svg-export";
 import {
   describeStudioAdvancedFillVectorReferenceExclusion,
   fingerprintStudioVectorReference,

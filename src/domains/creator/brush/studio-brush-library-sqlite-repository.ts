@@ -11,6 +11,15 @@
  */
 
 import {
+  requireStudioBrushLibraryDatabase,
+  SqliteUnavailableError,
+  type StudioBrushLibraryDatabase,
+  type StudioBrushLibrarySqlRecord,
+  type StudioLocalDatabase,
+} from "../studio-local-database";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+
+import {
   BRUSH_LIBRARY_KEY,
   BRUSH_LIBRARY_STORAGE_VERSION,
   browserBrushLibraryStorage,
@@ -32,16 +41,8 @@ import {
   type BrushLibraryRepositoryPort,
 } from "./studio-brush-library-repository";
 import { STUDIO_BRUSH_RUNTIME_CONTRACT } from "./studio-brush-runtime-contract";
-import {
-  requireStudioBrushLibraryDatabase,
-  SqliteUnavailableError,
-  type StudioBrushLibraryDatabase,
-  type StudioBrushLibrarySqlRecord,
-  type StudioLocalDatabase,
-} from "./studio-local-database";
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 
-import type { StudioBrushRenderFamily } from "./studio-brush";
+import type { StudioBrushRenderFamily } from "../studio-brush";
 
 export const BRUSH_LIBRARY_LEGACY_MIGRATION_NAMESPACE =
   "studio-brush-library-migrations";

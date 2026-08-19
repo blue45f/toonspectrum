@@ -8,13 +8,12 @@
  * testable without introducing a half-wired renderer into the pointer path.
  */
 
-import { hashStudioCanonicalBrushPlan } from "./studio-canonical-brush-plan";
 import {
   fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
   type StudioEngineWebGpuTexturedBrushPlan,
-} from "./studio-engine-webgpu-textured-brush-plan";
+} from "./render/studio-engine-webgpu-textured-brush-plan";
+import { hashStudioCanonicalBrushPlan } from "./studio-canonical-brush-plan";
 
-import type { StudioCanonicalBrushPlan } from "./studio-canonical-brush-plan";
 import type {
   StudioEngineWebGpuPresentationFrameLease,
   StudioEngineWebGpuPresentationFrameRequest,
@@ -23,12 +22,13 @@ import type {
   StudioEngineWebGpuPresentationResult,
   StudioEngineWebGpuPresentationSurface,
   StudioEngineWebGpuPresentationSurfaceStats,
-} from "./studio-engine-webgpu-presentation-surface";
+} from "./render/studio-engine-webgpu-presentation-surface";
 import type {
   StudioEngineWebGpuTexturedBrushExecutionResult,
   StudioEngineWebGpuTexturedBrushFrame,
   StudioEngineWebGpuTexturedBrushReceipt,
-} from "./studio-engine-webgpu-textured-brush-runtime";
+} from "./render/studio-engine-webgpu-textured-brush-runtime";
+import type { StudioCanonicalBrushPlan } from "./studio-canonical-brush-plan";
 
 export const STUDIO_CANONICAL_VNEXT_DRY_MEDIA_PRESENTATION_CONTROLLER_VERSION =
   1 as const;

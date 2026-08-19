@@ -1,4 +1,4 @@
-import { isCompleteStudioDrawOp } from "./studio-draw-completion";
+import { isCompleteStudioDrawOp } from "./brush/studio-draw-completion";
 
 import type { DrawEl } from "./studio-element-model";
 

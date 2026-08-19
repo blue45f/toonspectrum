@@ -1,7 +1,7 @@
 import {
   STUDIO_LARGE_DOCUMENT_DEFAULT_SHARD_BYTES,
   STUDIO_LARGE_DOCUMENT_MAX_LOGICAL_BYTES,
-} from "./studio-large-document-address-space";
+} from "../studio-large-document-address-space";
 
 import type {
   StudioEngineTileStorageWorkerV2File,

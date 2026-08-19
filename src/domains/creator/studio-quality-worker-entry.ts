@@ -1,4 +1,4 @@
-import { loadStudioCanvasKitQualityEngine } from "./studio-canvaskit-quality-engine";
+import { loadStudioCanvasKitQualityEngine } from "./render/studio-canvaskit-quality-engine";
 import {
   createStudioQualityWorkerRuntime,
 } from "./studio-quality-worker-runtime";

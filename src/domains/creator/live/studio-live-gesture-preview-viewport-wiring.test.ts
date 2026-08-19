@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 const viewportSource = readFileSync(
-  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
 const liveOverlaySource = readFileSync(
@@ -12,7 +12,7 @@ const liveOverlaySource = readFileSync(
   "utf8",
 );
 const lazyUiSource = readFileSync(
-  new URL("./studio-page-lazy-ui.ts", import.meta.url),
+  new URL("../studio-page-lazy-ui.ts", import.meta.url),
   "utf8",
 );
 

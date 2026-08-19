@@ -8,7 +8,7 @@ function source(path: string): string {
 
 describe("Studio native live-surface quality integration", () => {
   it("lets only a native-DPR Canvas overlay with a successful begin own the draft", () => {
-    const page = source("./StudioPage.tsx");
+    const page = source("../StudioPage.tsx");
     const start = page.slice(
       page.indexOf("const overlayCandidate ="),
       page.indexOf("const predictionTailEligible ="),
@@ -40,27 +40,27 @@ describe("Studio native live-surface quality integration", () => {
     );
   });
 
-  it("keeps the exact Konva eraser draft on the main retained layer", () => {
-    const page = source("./StudioPage.tsx");
-    const viewport = source("./StudioCanvasViewport.tsx");
+  it("paints the live eraser draft on the main layer with destination-out for real pixel lifting", () => {
+    const page = source("../StudioPage.tsx");
+    const viewport = source("../canvas/StudioCanvasViewport.tsx");
     const flushStart = page.indexOf("const flushDirectLiveDraft =");
     const flushEnd = page.indexOf("const flushDirectLiveDraftNow =", flushStart);
     const flush = page.slice(flushStart, flushEnd);
-    const eraserSceneStart = viewport.indexOf("{/* 지우개 초안만 메인 레이어에 남는다:");
-    const eraserSceneEnd = viewport.indexOf("{/* 그룹 및 다중 선택은", eraserSceneStart);
-    const eraserScene = viewport.slice(eraserSceneStart, eraserSceneEnd);
+    const mainLayerStart = viewport.indexOf("<Layer ref={mainLayerRef}>");
+    const mainLayer = viewport.slice(
+      mainLayerStart,
+      viewport.indexOf("</Layer>", mainLayerStart),
+    );
 
     expect(flush).toContain(
       '(next.mode === "eraser" ? mainLayerRef.current : liveDraftLayerRef.current)?.batchDraw();',
     );
-    expect(eraserScene).toContain(
-      'if (!el || el.mode !== "eraser" || !liveDraftDirectRef.current) return;',
-    );
-    expect(eraserScene).toContain("drawLiveFreehandDraftToContext(context, el);");
+    expect(mainLayer).toContain('el.mode !== "eraser"');
+    expect(mainLayer).toContain("drawLiveFreehandDraftToContext(context, el);");
   });
 
   it("does not admit prediction or block the exact dynamic fallback from a mere candidate", () => {
-    const page = source("./StudioPage.tsx");
+    const page = source("../StudioPage.tsx");
     const start = page.slice(
       page.indexOf("const overlayCandidate ="),
       page.indexOf("armTransientPenInkSurfaces({"),

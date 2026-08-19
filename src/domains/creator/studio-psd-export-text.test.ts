@@ -3,7 +3,7 @@
 import { readPsd } from "ag-psd";
 import { describe, expect, it, vi } from "vitest";
 
-import { parseDialogueRubyExportXmp } from "./studio-dialogue-ruby-export";
+import { parseDialogueRubyExportXmp } from "./lettering/studio-dialogue-ruby-export";
 import {
   exportPagePsd,
   planPsdEditableTextDescriptor,

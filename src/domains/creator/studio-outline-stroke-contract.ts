@@ -9,9 +9,9 @@
  * `unsupported` and must be surfaced to the caller instead of silently changing pixels.
  */
 
+import { resolveStudioBrushAliasProfile } from "./brush/studio-brush-alias-profile";
+import { resolveStudioBrushEngineLaneCroquisCapsuleProgramId } from "./brush/studio-brush-engine-lane-catalog";
 import { resolveStudioFreehandRenderPath } from "./studio-brush";
-import { resolveStudioBrushAliasProfile } from "./studio-brush-alias-profile";
-import { resolveStudioBrushEngineLaneCroquisCapsuleProgramId } from "./studio-brush-engine-lane-catalog";
 import {
   STUDIO_CROQUIS_CAPSULE_PEN_ALGORITHM,
   applyStudioCroquisPulledStringPrefilter,

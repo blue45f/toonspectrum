@@ -9,10 +9,10 @@ function source(relativePath: string): string {
 describe("studio collaboration cost boundary", () => {
   it("keeps microphone calling out of all reachable collaboration surfaces", () => {
     const reachableSource = [
-      "./StudioLiveCollaborationProvider.tsx",
-      "./studio-live-collaboration-context.ts",
-      "./StudioLiveCollaborationPanel.tsx",
-      "./StudioLiveCanvasOverlay.tsx",
+      "./live/StudioLiveCollaborationProvider.tsx",
+      "./live/studio-live-collaboration-context.ts",
+      "./live/StudioLiveCollaborationPanel.tsx",
+      "./live/StudioLiveCanvasOverlay.tsx",
     ].map(source).join("\n");
 
     expect(reachableSource).not.toMatch(/StudioVoiceCall|studio-voice-call|getUserMedia/u);

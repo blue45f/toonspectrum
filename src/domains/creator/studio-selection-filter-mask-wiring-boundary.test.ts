@@ -1,12 +1,8 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(
-  resolve(process.cwd(), "src/domains/creator/StudioPage.tsx"),
-  "utf8",
-);
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const pageSource = readStudioCuttoonEditorSource();
 
 describe("selection filter-mask StudioPage wiring boundary", () => {
   it("captures the selection at dialog open and exposes the explicit scope controls", () => {

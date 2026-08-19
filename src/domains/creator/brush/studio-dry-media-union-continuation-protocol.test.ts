@@ -26,7 +26,7 @@ import {
   type StudioDryMediaUnionComposableGroup,
 } from "./studio-dry-media-union-ribbon-carrier";
 
-import type { StudioDynamicBrushCoverageMark } from "./studio-dynamic-brush-coverage-renderer";
+import type { StudioDynamicBrushCoverageMark } from "../studio-dynamic-brush-coverage-renderer";
 
 function polygon(stationIndex: number, scalarCount = 6): number[] {
   return Array.from({ length: scalarCount }, (_, index) => (

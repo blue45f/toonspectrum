@@ -13,21 +13,22 @@
  * (Klecks multi-octave spray/chalk DNA + equal-area scatter), not pure CSS gradients.
  */
 
-import { resolveStudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
 import {
   isStudioCc0MypaintPresetBrushId,
   resolveStudioCc0MypaintDabDynamicsStyle,
   resolveStudioCc0MypaintStampBrushKind,
   studioLibmypaintLinearizedDabAlpha,
   resolveStudioCc0MypaintStampTuning,
-} from "./studio-cc0-mypaint-preset-import-v1";
+} from "../studio-cc0-mypaint-preset-import-v1";
 import {
   STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
   studioOssDirectionalWaxSample,
   studioOssKlecksChalkCoverage,
   studioOssSprayTipCoverage,
   studioOssWatercolorTipCoverage,
-} from "./studio-oss-brush-kernels";
+} from "../studio-oss-brush-kernels";
+
+import { resolveStudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
 import {
   getStudioPaperPresetV1,
   isStudioPaperPresetIdV1,
@@ -35,7 +36,7 @@ import {
 } from "./studio-paper-media-profile-v1";
 
 import type { StudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
-import type { StudioCc0MypaintDabDynamicsStyle } from "./studio-cc0-mypaint-preset-import-v1";
+import type { StudioCc0MypaintDabDynamicsStyle } from "../studio-cc0-mypaint-preset-import-v1";
 import type {
   StudioPaperMediumV1,
   StudioPaperPresetIdV1,

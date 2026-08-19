@@ -1,7 +1,9 @@
 import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
-} from "./studio-brush-r8-grain-asset-contract";
+} from "../brush/studio-brush-r8-grain-asset-contract";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   acquireStudioEngineWebGpuPresentationProducerWrite,
   fingerprintStudioEngineWebGpuPresentationContent,
@@ -24,7 +26,6 @@ import {
   type StudioEngineWebGpuTexturedBrushPlan,
   type StudioEngineWebGpuTexturedBrushResolvedAsset,
 } from "./studio-engine-webgpu-textured-brush-plan";
-import { sha256HexPortable } from "./studio-sha256";
 import {
   StudioWebGpuR8GrainTextureCache,
   studioWebGpuR8GrainDabCenterUv,

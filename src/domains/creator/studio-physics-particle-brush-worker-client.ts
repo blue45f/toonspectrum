@@ -109,8 +109,7 @@ function validTimeout(value: unknown): value is number {
 
 function defaultWorkerFactory(): StudioPhysicsParticleWorkerLike {
   return new Worker(
-    new URL(
-      "./studio-physics-particle-brush-provider.worker.ts",
+    new URL("./studio-physics-particle-brush-provider.worker.ts",
       import.meta.url,
     ),
     {

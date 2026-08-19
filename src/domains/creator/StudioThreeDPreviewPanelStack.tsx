@@ -1,7 +1,8 @@
 import { Loader2 } from "lucide-react";
 import { Suspense, memo, useMemo } from "react";
 
-import { isStudioAiConfigured } from "./studio-ai-client";
+import { isStudioAiConfigured } from "./ai/studio-ai-client";
+import { StudioBg3dRetainedOwnerRouteBridge } from "./bg3d/StudioBg3dRetainedOwnerRouteBridge";
 import {
   StudioBackground3D,
   StudioPageReviewPanel,
@@ -26,7 +27,6 @@ import {
   studioShared3dStageOwnedCharacterElementIds,
   studioShared3dStageReusableHiddenCharacterElementIds,
 } from "./studio-shared-3d-stage-collection";
-import { StudioBg3dRetainedOwnerRouteBridge } from "./StudioBg3dRetainedOwnerRouteBridge";
 
 import type { BgPrimitiveKind } from "./studio-background-3d-metadata";
 import type {

@@ -10,10 +10,11 @@
 import {
   resolveStudioBrushRenderFamily,
   type StudioBrushRenderFamily,
-} from "./studio-brush";
+} from "../studio-brush";
+
 import { resolveStudioInkPressureSamples } from "./studio-ink-pressure-model";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 import type {
   StudioPaperVectorRefinementFailureReason,
   StudioPaperVectorRefinementResult,

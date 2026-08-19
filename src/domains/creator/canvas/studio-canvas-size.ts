@@ -4,12 +4,12 @@
  * Pure — no React/DOM.
  */
 
-import { CANVAS_W } from "./studio-assets";
+import { CANVAS_W } from "../studio-assets";
 import {
   MAGIC_RESIZE_PRESETS,
   presetCanvasSize,
   type MagicResizePreset,
-} from "./studio-magic-resize";
+} from "../studio-magic-resize";
 
 export const STUDIO_CANVAS_H_RANGE = { min: 360, max: 6000 } as const;
 export const STUDIO_CANVAS_H_STEP = 40;

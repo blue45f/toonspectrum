@@ -1,6 +1,8 @@
 import { Image, encodePng } from "image-js";
 import { describe, expect, it, vi } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import { isStudioLayerLiftTrustedArtifactPair } from "./studio-layer-lift-artifact";
 import { isTrustedStudioLayerLiftCompositionReceipt } from "./studio-layer-lift-composition-receipt";
 import {
@@ -9,7 +11,6 @@ import {
   composeStudioLayerLiftBeta,
   isStudioLayerLiftTrustedComposition,
 } from "./studio-layer-lift-compositor";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type {
   StudioLayerLiftCompositorInput,

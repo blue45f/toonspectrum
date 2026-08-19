@@ -14,7 +14,7 @@ import sqliteWasm from "@sqlite.org/sqlite-wasm";
 import {
   createSqliteFilterLibraryRepository,
   type StudioFilterLibraryPreset,
-} from "../../../src/domains/creator/studio-filter-library-sqlite-repository";
+} from "../../../src/domains/creator/filter/studio-filter-library-sqlite-repository";
 import {
   openStudioLocalDatabase,
   type StudioSqliteApiHandle,

@@ -16,7 +16,7 @@
  * tip — under inspector control.
  */
 
-import type { CalligraphyTipSettings } from "./studio-brush";
+import type { CalligraphyTipSettings } from "../studio-brush";
 
 export interface StudioCalligraphyNibProfile extends CalligraphyTipSettings {
   readonly id: string;

@@ -12,7 +12,7 @@ import {
   type StudioWetInkBrushSurfaceFactory,
 } from "./studio-wet-ink-brush-runtime";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 function stroke(overrides: Partial<DrawEl> = {}): DrawEl {
   return {

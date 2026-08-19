@@ -1,17 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { dodgeBurnStroke } from "./studio-dodge-burn";
+import { wetMixStroke } from "./brush/studio-wet-mix";
 import {
   clearStudioRasterEditSurfaces,
   getStudioRasterEditSurfaceSnapshot,
-} from "./studio-raster-edit-surface-cache";
+} from "./render/studio-raster-edit-surface-cache";
+import { dodgeBurnStroke } from "./studio-dodge-burn";
 import {
   encodeStudioRetouchCanvasPng,
   loadStudioRetouchSourceImage,
   runStudioDodgeBurnRetouch,
   runStudioWetMixRetouch,
 } from "./studio-retouch-browser";
-import { wetMixStroke } from "./studio-wet-mix";
 
 class FakeFileReader {
   error: DOMException | null = null;

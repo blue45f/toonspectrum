@@ -16,7 +16,7 @@ import {
   createStudioQualityWorkerRuntime,
 } from "./studio-quality-worker-runtime";
 
-import type { StudioQualityEngine } from "./studio-canvaskit-adapter";
+import type { StudioQualityEngine } from "./render/studio-canvaskit-adapter";
 
 function fakeProvider(
   pathOp = vi.fn(() => ({ ok: true, pathData: "M0 0H10Z" } as const)),

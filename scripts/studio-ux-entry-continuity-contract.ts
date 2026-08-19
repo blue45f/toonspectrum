@@ -384,14 +384,14 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "prerequisite-explained",
         clauses: [{
-          file: "src/domains/creator/StudioBrushStudio.tsx",
+          file: "src/domains/creator/brush/StudioBrushStudio.tsx",
           allOf: ["입자 브러시를 먼저 선택하세요", "빠른 설정에서 잉크 입자"],
         }],
       },
       {
         id: "prerequisite-cta-available",
         clauses: [{
-          file: "src/domains/creator/StudioBrushStudio.tsx",
+          file: "src/domains/creator/brush/StudioBrushStudio.tsx",
           allOf: [
             "onRequestCompatibleBrush",
             "호환 브러시 선택하기",
@@ -402,7 +402,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "cta-changed-state",
         clauses: [{
-          file: "src/domains/creator/StudioBrushStudio.tsx",
+          file: "src/domains/creator/brush/StudioBrushStudio.tsx",
           allOf: [
             "function onRequestCompatibleBrush(): void",
             "onSelectDynamicsPreset(",
@@ -414,14 +414,14 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "target-selectable-after-cta",
         clauses: [{
-          file: "src/domains/creator/StudioBrushStudio.tsx",
+          file: "src/domains/creator/brush/StudioBrushStudio.tsx",
           allOf: ["DynamicsRequiredNotice", "studioBrushDynamicsPresetSettings"],
         }],
       },
       {
         id: "entry-visible-after-target-selection",
         clauses: [{
-          file: "src/domains/creator/StudioBrushStudio.tsx",
+          file: "src/domains/creator/brush/StudioBrushStudio.tsx",
           allOf: ["StudioBrushStudio", "currentSnapshot", "onSettingsChange"],
         }],
       },
@@ -435,14 +435,14 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "prerequisite-explained",
         clauses: [{
-          file: "src/domains/creator/StudioAiCharacterConsistencyPanel.tsx",
+          file: "src/domains/creator/ai/StudioAiCharacterConsistencyPanel.tsx",
           allOf: ["캐릭터 이미지", "선택하세요."],
         }],
       },
       {
         id: "prerequisite-cta-available",
         clauses: [{
-          file: "src/domains/creator/StudioAiCharacterConsistencyPanel.tsx",
+          file: "src/domains/creator/ai/StudioAiCharacterConsistencyPanel.tsx",
           allOf: [
             "onRequestSelectReference",
             "기준 이미지 선택하기",
@@ -453,7 +453,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "cta-changed-state",
         clauses: [{
-          file: "src/domains/creator/StudioAiToolPopoverBody.tsx",
+          file: "src/domains/creator/ai/StudioAiToolPopoverBody.tsx",
           allOf: [
             "onRequestSelectReference={() => {",
             'setTool("select")',
@@ -464,14 +464,14 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "target-selectable-after-cta",
         clauses: [{
-          file: "src/domains/creator/StudioAiCharacterConsistencyPanel.tsx",
+          file: "src/domains/creator/ai/StudioAiCharacterConsistencyPanel.tsx",
           allOf: ["hasReference", "referenceThumbnail"],
         }],
       },
       {
         id: "entry-visible-after-target-selection",
         clauses: [{
-          file: "src/domains/creator/StudioAiCharacterConsistencyPanel.tsx",
+          file: "src/domains/creator/ai/StudioAiCharacterConsistencyPanel.tsx",
           allOf: ["hasReference && referenceThumbnail"],
           anyOf: ["같은 캐릭터로 생성", "AI 캐릭터 일관성 생성"],
         }],

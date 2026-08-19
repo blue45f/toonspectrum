@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
 import {
   isStudioDynamicBrushCausalDepositPipeline,
   normalizeStudioBrushDynamicsSettings,
@@ -10,13 +9,13 @@ import {
   studioBrushDynamicsSeedFromKey,
   studioBrushDynamicsSettingsForBrushId,
   studioDryMediaUnionComposableProgramPin,
-} from "./studio-brush-dynamics";
-import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
-import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
+} from "../brush/studio-brush-dynamics";
+import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "../brush/studio-brush-pack-index";
+import { materializeStudioBrushPackSelection } from "../brush/studio-brush-pack-runtime";
 import {
   hydrateStudioBrushR8GrainAsset,
   resetStudioBrushR8GrainRegistry,
-} from "./studio-brush-r8-grain-runtime";
+} from "../brush/studio-brush-r8-grain-runtime";
 import {
   planStudioDynamicBrushRenderBudget,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
@@ -24,21 +23,31 @@ import {
   STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS,
-} from "./studio-brush-render-budget";
-import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
-import { clearStudioBrushTextureStampCache } from "./studio-brush-textured-stamp";
+} from "../brush/studio-brush-render-budget";
+import { studioCoreBrushCatalogSelection } from "../brush/studio-brush-selection";
+import { clearStudioBrushTextureStampCache } from "../brush/studio-brush-textured-stamp";
+import { STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION } from "../brush/studio-dry-media-union-ribbon-carrier";
+import { BRUSH_PRESETS } from "../studio-brush";
 import {
   planStudioCausalDynamicBrushDepositSegmentsV3,
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-} from "./studio-causal-dynamic-brush-deposit-v2";
-import { STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION } from "./studio-dry-media-union-ribbon-carrier";
+} from "../studio-causal-dynamic-brush-deposit-v2";
 import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
   renderStudioDynamicBrushCoverageMark,
   STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
   type StudioDynamicBrushCoverageMark,
-} from "./studio-dynamic-brush-coverage-renderer";
-import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
+} from "../studio-dynamic-brush-coverage-renderer";
+import { planStudioDynamicBrushRender } from "../studio-dynamic-brush-render-plan";
+import { STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS } from "../studio-low-latency-canvas";
+import { sha256HexPortable } from "../studio-sha256";
+import {
+  planStudioWebDrawingKitOwnedDabs,
+  recommendStudioWebDrawingLiveMaxDabs,
+  STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS,
+  studioWebDrawingKitOwnsStrokeGeometry,
+} from "../studio-web-drawing-stroke-bridge";
+
 import {
   appendDryMediaUnionAccumulator,
   createDryMediaUnionAccumulator,
@@ -46,16 +55,8 @@ import {
   StudioLiveDynamicBrushOverlayRenderer,
   studioLiveDynamicBrushOverlaySupportsElement,
 } from "./studio-live-dynamic-brush-overlay";
-import { STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS } from "./studio-low-latency-canvas";
-import { sha256HexPortable } from "./studio-sha256";
-import {
-  planStudioWebDrawingKitOwnedDabs,
-  recommendStudioWebDrawingLiveMaxDabs,
-  STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS,
-  studioWebDrawingKitOwnsStrokeGeometry,
-} from "./studio-web-drawing-stroke-bridge";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
 
 interface RecordedEllipse {
@@ -1160,9 +1161,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     numericReads.length = 0;
 
     expect(renderer.appendFrom(extended).status).toBe("appended");
-    // Non-causal snapshots must clear exactly once to replay taper/stations/stamp density from the
-    // same canonical plan pointer-up uses. Causal-v2 brushes retain the append-only fast path.
-    expect(activeCanvas.clearCount()).toBe(clearsAfterPrefix + 1);
+    // Suffix-only live paint keeps already-accepted pixels. A whole-prefix clear here is a long task.
+    expect(activeCanvas.clearCount()).toBe(clearsAfterPrefix);
     expect(Math.min(...numericReads)).toBe(4);
     numericReads.length = 0;
     const clearsAfterExtension = activeCanvas.clearCount();

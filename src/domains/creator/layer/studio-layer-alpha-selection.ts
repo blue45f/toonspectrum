@@ -45,15 +45,15 @@
  *
  * DOM 의존성 0 · 전부 결정적(랜덤/Date 없음) — node 환경에서 그대로 유닛 테스트한다.
  */
-import { flipMagicWandRegion, MAGIC_WAND_MAX_LOOPS, MAGIC_WAND_TRACE_MAX_DIM } from "./studio-magic-wand";
-import { traceMaskRegions } from "./studio-quick-mask";
+import { flipMagicWandRegion, MAGIC_WAND_MAX_LOOPS, MAGIC_WAND_TRACE_MAX_DIM } from "../studio-magic-wand";
+import { traceMaskRegions } from "../studio-quick-mask";
 import {
   addSelectionSubpath,
   isSelectionUsable,
   SELECTION_FEATHER_RANGE,
   type PixelSelection,
   type SelPoint,
-} from "./studio-selection-tools";
+} from "../studio-selection-tools";
 
 // ---------------------------------------------------------------------------
 // (A) 상수 · 타입

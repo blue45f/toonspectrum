@@ -13,7 +13,7 @@ import {
   nativePixelate,
 } from "./studio-konva-native-filters";
 
-import type { StudioImageDataLike } from "./studio-filters";
+import type { StudioImageDataLike } from "../studio-filters";
 
 // 두 포팅이 동일 입력에서 픽셀 단위로 일치하는지 검증한다 — nativeXxx는 Worker(DOM 없음)에서도
 // 도는 attrs 기반 버전, 실제 konva 함수는 Konva 노드의 getter 메서드(this.blurRadius() 등)를 읽는다.

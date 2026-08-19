@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
 
-import { planStudioAngledNibStrokeLocalCoverage } from "../../../src/domains/creator/studio-stroke-local-coverage";
+import { planStudioAngledNibStrokeLocalCoverage } from "../../../src/domains/creator/brush/studio-stroke-local-coverage";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(HERE, "../results/nib-shell-raster-cost.json");

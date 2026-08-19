@@ -1,11 +1,8 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const pageSource = readStudioCuttoonEditorSource();
 
 function functionBody(name: string, nextName: string): string {
   const start = pageSource.indexOf(`function ${name}`);

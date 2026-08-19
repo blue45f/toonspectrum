@@ -1,13 +1,14 @@
 import {
-  advanceStudioResidualInk,
-  planStudioCausalInkDabs,
-  startStudioResidualInk,
-} from "./studio-causal-ink";
-import {
   isStudioInkPressureModel,
   resolveStudioInkPressure,
   studioInkUsesResidualDabSpacing,
-} from "./studio-ink-pressure-model";
+} from "../brush/studio-ink-pressure-model";
+import {
+  advanceStudioResidualInk,
+  planStudioCausalInkDabs,
+  startStudioResidualInk,
+} from "../studio-causal-ink";
+
 import { parseStudioGpuColor } from "./studio-webgpu-color";
 import {
   STUDIO_GPU_STROKE_FEED_REVISION,

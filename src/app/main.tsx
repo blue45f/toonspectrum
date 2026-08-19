@@ -23,7 +23,7 @@ function loadStudioBg3dMagicProductionProofFromExplicitDiagnosticQuery(): void {
   if (!import.meta.env.PROD) return;
   const search = new URLSearchParams(globalThis.location.search);
   if (search.get(STUDIO_BG3D_MAGIC_PRODUCTION_PROOF_QUERY) !== "1") return;
-  void import("../domains/creator/studio-bg3d-magic-production-proof");
+  void import("../domains/creator/bg3d/studio-bg3d-magic-production-proof");
 }
 
 // API 카탈로그 모드(기본): /api/* 서버 경로에서 KMAS 병합/런타임 정책을 적용한다.

@@ -3,7 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   parseStudioCanonicalBrushPlan,
   type StudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
+import {
+  parseStudioProfessionalBrushDynamicsPlan,
+  type StudioProfessionalBrushDynamicsPlan,
+} from "../studio-professional-brush-dynamics";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   buildStudioEngineWebGpuTexturedBrushPlan,
   compositeStudioEngineTexturedBrushPixelCpu,
@@ -13,11 +19,6 @@ import {
   type StudioEngineWebGpuTexturedBrushAssetRequest,
   type StudioEngineWebGpuTexturedBrushAssetResolver,
 } from "./studio-engine-webgpu-textured-brush-plan";
-import {
-  parseStudioProfessionalBrushDynamicsPlan,
-  type StudioProfessionalBrushDynamicsPlan,
-} from "./studio-professional-brush-dynamics";
-import { sha256HexPortable } from "./studio-sha256";
 
 const TIP_BYTES = new Uint8Array([0, 64, 128, 255]);
 const GRAIN_BYTES = new Uint8Array([255, 0, 0, 255]);

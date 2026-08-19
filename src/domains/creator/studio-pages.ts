@@ -10,7 +10,7 @@
 import {
   mirrorStudioDrawingAssistDocument,
   parseStudioDrawingAssistDocument,
-} from "./studio-drawing-assist-document";
+} from "./brush/studio-drawing-assist-document";
 import {
   remapStudioLinked3dRenderDocumentElementIds,
   studioLinked3dRenderElementIds,

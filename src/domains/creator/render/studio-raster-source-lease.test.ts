@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   acquireStudioRasterSourceLease,
   createStudioRasterSourceResidentBudget,
@@ -10,7 +12,6 @@ import {
   type StudioRasterSourceBudgetReservation,
   type StudioRasterSourceReceipt,
 } from "./studio-raster-source-lease";
-import { sha256HexPortable } from "./studio-sha256";
 
 const ONE_PIXEL_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zcy8AAAAASUVORK5CYII=";

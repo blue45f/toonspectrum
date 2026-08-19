@@ -1,14 +1,17 @@
+import type { InkWash } from "../brush/studio-ink-wash";
+import type { StudioGlitchFx, StudioVignetteFx } from "../filter/studio-filter-pack";
+import type { StudioFilterUnionWave } from "../filter/studio-filter-union-wave";
 import type {
   StudioAdjustmentEngineId,
   StudioAdjustmentFilterOperation,
   StudioAdjustmentStack,
-} from "./studio-adjustment-stack";
+} from "../studio-adjustment-stack";
 import type {
   StudioFieldIrisBlurOptions,
   StudioLensBlurOptions,
   StudioSelectiveGaussianBlurOptions,
   StudioTiltShiftBlurOptions,
-} from "./studio-advanced-blur-filter-kernels";
+} from "../studio-advanced-blur-filter-kernels";
 import type {
   StudioClouds,
   StudioConvolution,
@@ -16,43 +19,40 @@ import type {
   StudioMorphology,
   StudioPixelOffset,
   StudioUnsharpMask,
-} from "./studio-advanced-pixel-filters";
-import type { AutoAdjust } from "./studio-auto-adjust";
-import type { BlurFx } from "./studio-blur";
-import type { ChannelMixer } from "./studio-channel-mixer";
-import type { Clarity } from "./studio-clarity";
-import type { ColorBalance } from "./studio-color-balance";
-import type { ColorToAlpha } from "./studio-color-to-alpha";
-import type { CurvePoint, CurveRgbChannels } from "./studio-curves";
-import type { Detail } from "./studio-detail";
-import type { Distort } from "./studio-distort";
-import type { StudioGlitchFx, StudioVignetteFx } from "./studio-filter-pack";
-import type { StudioFilterUnionWave } from "./studio-filter-union-wave";
-import type { Glow } from "./studio-glow";
-import type { GradientMap } from "./studio-gradient-map";
-import type { Grain } from "./studio-grain";
-import type { Halftone } from "./studio-halftone";
-import type { InkWash } from "./studio-ink-wash";
-import type { LevelsRgbChannels } from "./studio-levels";
-import type { Light } from "./studio-light";
-import type { LineArtCleanupOptions } from "./studio-line-cleanup";
-import type { Outline } from "./studio-outline";
-import type { PhotoFilter } from "./studio-photo-filter";
+} from "../studio-advanced-pixel-filters";
+import type { AutoAdjust } from "../studio-auto-adjust";
+import type { BlurFx } from "../studio-blur";
+import type { ChannelMixer } from "../studio-channel-mixer";
+import type { Clarity } from "../studio-clarity";
+import type { ColorBalance } from "../studio-color-balance";
+import type { ColorToAlpha } from "../studio-color-to-alpha";
+import type { CurvePoint, CurveRgbChannels } from "../studio-curves";
+import type { Detail } from "../studio-detail";
+import type { Distort } from "../studio-distort";
+import type { Glow } from "../studio-glow";
+import type { GradientMap } from "../studio-gradient-map";
+import type { Grain } from "../studio-grain";
+import type { Halftone } from "../studio-halftone";
+import type { LevelsRgbChannels } from "../studio-levels";
+import type { Light } from "../studio-light";
+import type { LineArtCleanupOptions } from "../studio-line-cleanup";
+import type { Outline } from "../studio-outline";
+import type { PhotoFilter } from "../studio-photo-filter";
 import type {
   StudioDifferenceOfGaussiansOptions,
   StudioDustScratchesOptions,
   StudioTileableBlurOptions,
-} from "./studio-professional-filter-kernels";
-import type { SelectiveHsl } from "./studio-selective-hsl";
-import type { ShadowHighlight } from "./studio-shadow-highlight";
-import type { Sketch } from "./studio-sketch";
-import type { Stylize } from "./studio-stylize";
+} from "../studio-professional-filter-kernels";
+import type { SelectiveHsl } from "../studio-selective-hsl";
+import type { ShadowHighlight } from "../studio-shadow-highlight";
+import type { Sketch } from "../studio-sketch";
+import type { Stylize } from "../studio-stylize";
 import type {
   StudioEdgeAwareDenoiseOptions,
   StudioJpegArtifactReductionOptions,
   StudioScreentoneRemovalOptions,
-} from "./studio-tone-artifact-filter-kernels";
-import type { Vibrance } from "./studio-vibrance";
+} from "../studio-tone-artifact-filter-kernels";
+import type { Vibrance } from "../studio-vibrance";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합).
 // type-only import와 가벼운 판정만 담아 /studio 첫 청크가 픽셀 필터 엔진을 당겨오지 않게 한다.

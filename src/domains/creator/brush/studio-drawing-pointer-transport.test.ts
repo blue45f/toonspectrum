@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  beginStudioStrokePointerSession,
+  type StudioPointerEventLike,
+} from "../canvas/studio-pointer-input";
+
+import {
   createStudioDrawingPointerTransportController,
   resolveStudioDrawingPointerCaptureTarget,
   type StudioDrawingPointerEventTarget,
@@ -8,10 +13,6 @@ import {
   type StudioDrawingPointerTransportPorts,
   type StudioDrawingPointerVisibilityTarget,
 } from "./studio-drawing-pointer-transport";
-import {
-  beginStudioStrokePointerSession,
-  type StudioPointerEventLike,
-} from "./studio-pointer-input";
 
 function captureOption(options?: boolean | AddEventListenerOptions | EventListenerOptions): boolean {
   return typeof options === "boolean" ? options : options?.capture === true;

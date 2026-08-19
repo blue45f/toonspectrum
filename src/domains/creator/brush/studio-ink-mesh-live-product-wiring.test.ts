@@ -2,14 +2,17 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 function source(file: string): string {
+  if (file.endsWith("StudioPage.tsx")) return readStudioCuttoonEditorSource();
   return readFileSync(new URL(file, import.meta.url), "utf8");
 }
 
 describe("Google Ink mesh actual /studio product wiring", () => {
-  const page = source("./StudioPage.tsx");
-  const viewport = source("./StudioCanvasViewport.tsx");
-  const host = source("./StudioInkMeshLivePreviewHost.tsx");
+  const page = source("../StudioPage.tsx");
+  const viewport = source("../canvas/StudioCanvasViewport.tsx");
+  const host = source("../StudioInkMeshLivePreviewHost.tsx");
   const runtime = source("./studio-ink-mesh-live-preview.ts");
 
   it("starts from the existing pointerdown live-ink admission without changing its owner route", () => {
@@ -47,7 +50,7 @@ describe("Google Ink mesh actual /studio product wiring", () => {
 
   it("loads the optional mesh island after mount without blocking the synchronous stroke route", () => {
     const loader = source("./studio-ink-mesh-live-preview-loader.ts");
-    expect(page).toContain('from "./studio-ink-mesh-live-preview-loader"');
+    expect(page).toContain('from "./brush/studio-ink-mesh-live-preview-loader"');
     expect(page).not.toMatch(/from\s+["']\.\/studio-ink-mesh-live-preview["']/u);
     expect(viewport).not.toMatch(/from\s+["']\.\/studio-ink-mesh-live-preview["']/u);
     expect(host).not.toMatch(/from\s+["']\.\/studio-ink-mesh-live-preview["']/u);

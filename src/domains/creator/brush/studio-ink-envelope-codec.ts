@@ -28,7 +28,7 @@ import {
   type CanonicalStudioDocumentEnvelope,
   type StudioDocumentEnvelopeLimits,
   type StudioDocumentEnvelopeOptions,
-} from "./studio-document-envelope";
+} from "../studio-document-envelope";
 
 export const STUDIO_INK_ENVELOPE_CODEC_ID =
   "toonspectrum.ink-envelope" as const;

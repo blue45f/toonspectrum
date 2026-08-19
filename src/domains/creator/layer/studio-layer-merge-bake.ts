@@ -297,7 +297,7 @@ export async function bakeStudioMergeComposite(input: {
 async function defaultEncodeMergePng(canvas: StudioMergeBakeCanvas): Promise<string> {
   if (typeof canvas.toBlob === "function" || typeof (canvas as HTMLCanvasElement).toDataURL === "function") {
     try {
-      const { encodeStudioPixelEditCanvasPng } = await import("./studio-pixel-edit-async");
+      const { encodeStudioPixelEditCanvasPng } = await import("../studio-pixel-edit-async");
       return encodeStudioPixelEditCanvasPng(canvas as HTMLCanvasElement);
     } catch {
       // Fall through to synchronous toDataURL for test fakes / restricted runtimes.

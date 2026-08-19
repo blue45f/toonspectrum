@@ -3,14 +3,16 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   StudioInspectorBrushCatalogButton,
   StudioInspectorDrawColorControls,
 } from "./StudioInspectorUtilityPanels";
 import { StudioUnifiedBrushPicker } from "./StudioUnifiedBrushPicker";
 
+
 const pickerSource = readFileSync(new URL("./StudioUnifiedBrushPicker.tsx", import.meta.url), "utf8");
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readStudioCuttoonEditorSource();
 const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
 const inspectorUtilitySource = readFileSync(
   new URL("./StudioInspectorUtilityPanels.tsx", import.meta.url),

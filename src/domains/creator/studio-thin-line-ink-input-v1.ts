@@ -13,7 +13,7 @@ import {
   flushStudioStrokeOneEuroV1Endpoint,
   type StudioStrokeOneEuroV1Options,
   type StudioStrokeOneEuroV1State,
-} from "./studio-stroke-one-euro-v1";
+} from "./brush/studio-stroke-one-euro-v1";
 
 export const STUDIO_THIN_LINE_INK_INPUT_V1 = "studio-thin-line-ink-input-v1" as const;
 

@@ -24,6 +24,13 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { planGlowBrushPasses, planNeonBrushPasses } from "../studio-fx-brush";
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import {
+  StudioEraserQuickPicker,
+  type StudioEraserQuickPickerId,
+} from "../StudioEraserQuickPicker";
+
 import {
   filterStudioBrushCatalogItems,
   STUDIO_BRUSH_CATALOG_COUNTS,
@@ -49,18 +56,13 @@ import {
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 import { STUDIO_BRUSH_LIBRARY_TABS } from "./studio-draw-ux";
-import { planGlowBrushPasses, planNeonBrushPasses } from "./studio-fx-brush";
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
-import {
-  StudioEraserQuickPicker,
-  type StudioEraserQuickPickerId,
-} from "./StudioEraserQuickPicker";
 
-import type { StudioToolOperation } from "./studio-brush";
+
+import type { StudioToolOperation } from "../studio-brush";
 import type { StudioBrushCatalogItem } from "./studio-brush-catalog";
 import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
-import type { StudioBrushTrayItem } from "./studio-creative-ux";
+import type { StudioBrushTrayItem } from "../studio-creative-ux";
 
 import { cn } from "@/lib/utils";
 

@@ -12,7 +12,7 @@
 import {
   STUDIO_WEBGL_STABLE_FLUID_CORE_VERSION,
   STUDIO_WEBGL_STABLE_FLUID_PROVENANCE,
-} from "./studio-webgl-stable-fluid-core";
+} from "./render/studio-webgl-stable-fluid-core";
 
 export const STUDIO_FLUID_DEMO_EVALUATION_VERSION =
   "studio-fluid-demo-evaluation-v1" as const;

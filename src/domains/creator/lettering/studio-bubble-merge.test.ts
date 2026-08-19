@@ -7,7 +7,7 @@ import {
   mergeStudioBubbles,
 } from "./studio-bubble-merge";
 
-import type { BubbleEl, El } from "./studio-element-model";
+import type { BubbleEl, El } from "../studio-element-model";
 
 function bubble(id: string, x: number, y: number, extra?: Partial<BubbleEl>): BubbleEl {
   return {

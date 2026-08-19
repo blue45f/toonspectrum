@@ -2,8 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const RESULT_PATH = new URL(
-  "../benchmarks/results/studio-v12-browser-qa.json",
+const RESULT_PATH = new URL("../benchmarks/results/studio-v12-browser-qa.json",
   import.meta.url,
 );
 

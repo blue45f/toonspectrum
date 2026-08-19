@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   STUDIO_WORKSPACE_DEVICE_KINDS,
   listStudioWorkspaces,
@@ -9,8 +8,9 @@ import {
   type StudioWorkspaceState,
 } from "./studio-workspaces";
 
+
 function studioPageSource(): string {
-  return readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+  return readStudioCuttoonEditorSource();
 }
 
 /**
@@ -23,7 +23,7 @@ describe("workspace device overrides reach the studio", () => {
     const source = studioPageSource();
     expect(source).toContain("resolveStudioWorkspaceDeviceLayout(layout, deviceKind)");
     // The docks must be seeded from the resolved layout, not from the authored one beside it.
-    expect(source).toContain("setLeftPanelOpen(presented.desktop.leftPanelOpen)");
+    expect(source).toContain("setLeftPanelOpenWithOverride(presented.desktop.leftPanelOpen)");
     expect(source).toContain("setRightPanelOpenWithOverride(presented.desktop.rightPanelOpen)");
     expect(source).toContain("leftResizeSetWidthRef.current(presented.desktop.leftPanelWidth)");
     expect(source).toContain("rightResizeSetWidthRef.current(presented.desktop.rightPanelWidth)");

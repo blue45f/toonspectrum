@@ -17,13 +17,14 @@
  * - 등록은 명시 호출로만 일어난다 — 이 모듈은 어떤 기본값에도 배선하지 않는다(F1 계약).
  */
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import { hydrateStudioBrushR8GrainAsset } from "./studio-brush-r8-grain-runtime";
 import {
   STUDIO_PAPER_PRESET_IDS_V1,
   getStudioPaperPresetV1,
   samplePaperHeightV1,
 } from "./studio-paper-media-profile-v1";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type { StudioBrushR8TextureGrainSource } from "./studio-brush-r8-grain-asset-contract";
 import type {

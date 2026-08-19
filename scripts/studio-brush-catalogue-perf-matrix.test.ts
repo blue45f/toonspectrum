@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_PAINT_BRUSH_CATALOG_ITEMS } from "../src/domains/creator/studio-brush-catalog";
+import { STUDIO_PAINT_BRUSH_CATALOG_ITEMS } from "../src/domains/creator/brush/studio-brush-catalog";
 import {
   resolveStudioBrushDynamics,
   resolveStudioBrushDynamicsForNormalizedSettings,
   type StudioBrushDynamicsRecipe,
-} from "../src/domains/creator/studio-brush-dynamics";
-import { materializeAllStudioBrushPackSelections } from "../src/domains/creator/studio-brush-pack-runtime";
+} from "../src/domains/creator/brush/studio-brush-dynamics";
+import { materializeAllStudioBrushPackSelections } from "../src/domains/creator/brush/studio-brush-pack-runtime";
 import {
   computeStudioBrushPlanDigest,
   computeStudioBrushQualityReceiptSkeleton,
-} from "../src/domains/creator/studio-brush-variant-group-manifest";
+} from "../src/domains/creator/brush/studio-brush-variant-group-manifest";
 
 import {
   STUDIO_BRUSH_CATALOGUE_SOAK_IDS,

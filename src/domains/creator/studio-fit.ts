@@ -17,7 +17,7 @@ import {
   createCanvasBubbleTextMeasurer,
   fitBubbleBoxHeightToText,
   type BubbleTextMeasurer,
-} from "./studio-bubble-text-fit";
+} from "./lettering/studio-bubble-text-fit";
 
 export interface FitBox {
   x: number;

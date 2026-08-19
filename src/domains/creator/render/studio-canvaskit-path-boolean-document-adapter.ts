@@ -4,12 +4,12 @@ import {
   type StudioPathBooleanCombineResult,
   type StudioPathBooleanOp,
   type StudioPathBooleanShapeSpec,
-} from "./studio-path-boolean";
+} from "../studio-path-boolean";
 
 import type {
   StudioQualityWorkerClientResult,
   StudioQualityWorkerRunOptions,
-} from "./studio-quality-worker-client";
+} from "../studio-quality-worker-client";
 
 export const STUDIO_CANVASKIT_PATH_BOOLEAN_DOCUMENT_ADAPTER_VERSION =
   1 as const;

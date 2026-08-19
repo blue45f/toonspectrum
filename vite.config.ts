@@ -156,6 +156,27 @@ function isStudioCoreIconModule(id: string) {
   return Boolean(moduleName && (STUDIO_CORE_ICON_MODULES.has(moduleName) || Boolean(moduleName)));
 }
 
+/**
+ * Folder-move leftovers sometimes leave production specifiers pointing at `*.test.ts`.
+ * Resolve the sibling implementation when one exists so the studio bundle never binds
+ * runtime exports (e.g. STUDIO_RASTER_CRDT_VERSION) from a test module.
+ */
+function preferImplementationOverTestModulePlugin(): Plugin {
+  return {
+    name: "toonspectrum-prefer-implementation-over-test-module",
+    apply: "serve",
+    enforce: "pre",
+    async resolveId(source, importer, options) {
+      if (process.env.VITEST || !importer) return null;
+      if (!source.includes(".test.")) return null;
+      if (/\.test\.tsx?(?:\?|$)/.test(importer)) return null;
+      if (!/\.test\.tsx?(?:\?|$)/.test(source)) return null;
+      const rewritten = source.replace(/\.test\.(tsx?)(?=\?|$)/, ".$1");
+      return this.resolve(rewritten, importer, { ...options, skipSelf: true });
+    },
+  };
+}
+
 function studioCrossOriginIsolationPlugin(): Plugin {
   const applyHeaders = (
     request: {
@@ -214,6 +235,7 @@ function studioCrossOriginIsolationPlugin(): Plugin {
 
 export default defineConfig(({ mode }) => ({
   plugins: [
+    preferImplementationOverTestModulePlugin(),
     studioCrossOriginIsolationPlugin(),
     react(),
     babel({ presets: [reactCompilerPreset()] }),
@@ -265,7 +287,7 @@ export default defineConfig(({ mode }) => ({
           // only pays when the merged modules carry nothing behind them.
           if (
             id.endsWith("/src/domains/creator/studio-workspaces.ts")
-            || id.endsWith("/src/domains/creator/studio-drawing-palettes.ts")
+            || id.endsWith("/src/domains/creator/brush/studio-drawing-palettes.ts")
           ) {
             // Drawing-palette layout is part of the synchronously restored workspace envelope.
             // Co-locate both small models so Studio startup does not pay a separate shared-chunk
@@ -295,9 +317,9 @@ export default defineConfig(({ mode }) => ({
             id.endsWith("/lib/studio-raster-asset-admission.ts")
             || id.endsWith("/src/domains/creator/studio-background-gradient-color-stops.ts")
             || id.endsWith("/src/domains/creator/studio-characters.ts")
-            || id.endsWith("/src/domains/creator/studio-brush-pack-format.ts")
-            || id.endsWith("/src/domains/creator/studio-brush-pack-id.ts")
-            || id.endsWith("/src/domains/creator/studio-brush-selection.ts")
+            || id.endsWith("/src/domains/creator/brush/studio-brush-pack-format.ts")
+            || id.endsWith("/src/domains/creator/brush/studio-brush-pack-id.ts")
+            || id.endsWith("/src/domains/creator/brush/studio-brush-selection.ts")
             || id.endsWith("/src/domains/creator/studio-help-center-channel.ts")
             || id.endsWith("/src/domains/creator/studio-inspector-focus.ts")
             || id.endsWith("/src/domains/creator/studio-liquify-contract.ts")
@@ -305,7 +327,7 @@ export default defineConfig(({ mode }) => ({
             || id.endsWith("/src/domains/creator/studio-similar-style.ts")
             || id.endsWith("/src/domains/creator/studio-story-beats.ts")
             || id.endsWith("/src/domains/creator/studio-element-model.ts")
-            || id.endsWith("/src/domains/creator/studio-raster-image-presentation.ts")
+            || id.endsWith("/src/domains/creator/render/studio-raster-image-presentation.ts")
           ) {
             // These lightweight contracts are shared by several Studio lazy entries. Similar-style
             // and story-beat helpers are also synchronously needed by StudioPage, so leaving their
@@ -317,8 +339,8 @@ export default defineConfig(({ mode }) => ({
             return "studio-core-micro-contracts";
           }
           if (
-            id.endsWith("/src/domains/creator/studio-paper-brush-response.ts")
-            || id.endsWith("/src/domains/creator/studio-paper-texture.ts")
+            id.endsWith("/src/domains/creator/brush/studio-paper-brush-response.ts")
+            || id.endsWith("/src/domains/creator/brush/studio-paper-texture.ts")
           ) {
             // Paper texture is an unconditional dependency of the eager brush-response model.
             // Keep the tiny texture helper in the same request instead of paying a second chunk.

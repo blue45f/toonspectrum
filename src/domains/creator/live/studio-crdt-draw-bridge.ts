@@ -1,35 +1,36 @@
 import {
   isStudioDynamicBrushMinimumDiameterRatio,
   studioDynamicBrushDepositPipelineUsesContinuation,
-} from "./studio-brush-dynamics";
-import { normalizeStudioBrushR8TextureGrainSource } from "./studio-brush-r8-grain-asset-contract";
+} from "../brush/studio-brush-dynamics";
+import { normalizeStudioBrushR8TextureGrainSource } from "../brush/studio-brush-r8-grain-asset-contract";
+import {
+  isStudioInkPressureModel,
+  studioInkFallbackPressure,
+  type StudioInkPressureModel,
+} from "../brush/studio-ink-pressure-model";
+import {
+  isStudioStrokePaintModel,
+  isStudioStrokePaintModelCompatible,
+  type StudioStrokePaintModel,
+} from "../brush/studio-stroke-paint-model";
+import { normalizeStudioBrushCatalogIdentityMetadata } from "../studio-element-model";
+import {
+  isStudioMaterialMinimumDiameterRatio,
+  isStudioMaterialPressureModel,
+  type StudioMaterialMinimumDiameterRatio,
+  type StudioMaterialPressureModel,
+} from "../studio-material-pressure-model";
+import {
+  normalizeStudioOutlineStrokeContract,
+  type StudioOutlineStrokeContractV1,
+} from "../studio-outline-stroke-contract";
+
 import {
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
-import { normalizeStudioBrushCatalogIdentityMetadata } from "./studio-element-model";
-import {
-  isStudioInkPressureModel,
-  studioInkFallbackPressure,
-  type StudioInkPressureModel,
-} from "./studio-ink-pressure-model";
-import {
-  isStudioMaterialMinimumDiameterRatio,
-  isStudioMaterialPressureModel,
-  type StudioMaterialMinimumDiameterRatio,
-  type StudioMaterialPressureModel,
-} from "./studio-material-pressure-model";
-import {
-  normalizeStudioOutlineStrokeContract,
-  type StudioOutlineStrokeContractV1,
-} from "./studio-outline-stroke-contract";
-import {
-  isStudioStrokePaintModel,
-  isStudioStrokePaintModelCompatible,
-  type StudioStrokePaintModel,
-} from "./studio-stroke-paint-model";
 
 import type {
   StudioCrdtDrawStrokePayload,

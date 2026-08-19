@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { StudioBrushQuickSlotsSqliteRepositoryError } from "./studio-brush-slots-sqlite-repository";
+import { StudioBrushQuickSlotsSqliteRepositoryError } from "./brush/studio-brush-slots-sqlite-repository";
 import { SqliteUnavailableError } from "./studio-local-database";
 import {
   isStudioLocalDatabaseOwnershipBusyError,

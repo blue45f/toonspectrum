@@ -2,7 +2,13 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const studioPage = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPage = [
+  new URL("../StudioPage.tsx", import.meta.url),
+  new URL("../studio-page-editor-runtime-loaders.ts", import.meta.url),
+  new URL("../studio-page-shell-runtime.ts", import.meta.url),
+]
+  .map((url) => readFileSync(url, "utf8"))
+  .join("\n");
 
 describe("StudioPage brush quick slots SQLite product boundary", () => {
   it("removes localStorage v1/v2 from the live product call path", () => {
@@ -15,7 +21,7 @@ describe("StudioPage brush quick slots SQLite product boundary", () => {
 
   it("loads the product singleton behind the lazy SQLite module boundary", () => {
     expect(studioPage).toMatch(
-      /import\(\s*"\.\/studio-brush-slots-sqlite-repository"\s*\)/u,
+      /import\(\s*"\.\/(?:brush\/)?studio-brush-slots-sqlite-repository"\s*\)/u,
     );
     expect(studioPage).toContain("getProductStudioBrushQuickSlotsSqliteRepository().load(");
     expect(studioPage).toContain("repository.save(");

@@ -7,7 +7,7 @@ import {
   type StudioLayerLiftMediaPipeRaster,
 } from "./studio-layer-lift-mediapipe-inference";
 
-import type { StudioLocalForegroundSegmenterRuntime } from "./studio-bg-remove";
+import type { StudioLocalForegroundSegmenterRuntime } from "../studio-bg-remove";
 
 function mask(
   values: readonly number[],
@@ -52,7 +52,7 @@ describe("Studio Layer Lift MediaPipe inference bridge", () => {
     expect(source).not.toMatch(
       /import\s+\{[^}]*getStudioLocalForegroundSegmenterRuntime[^}]*\}\s+from\s+["']\.\/studio-bg-remove["']/u,
     );
-    expect(source).toContain('await import("./studio-bg-remove")');
+    expect(source).toContain('await import("../studio-bg-remove")');
   });
 
   it("keeps raw RGBA local, returns a defensive mask, and disposes resources", async () => {

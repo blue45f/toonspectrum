@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  planCausalWatercolorBrushDabs,
+} from "../studio-causal-watercolor-brush";
+
+import {
   applyStudioBrushAliasWatercolorMaterial,
   mapStudioBrushAliasPressureSamples,
   resolveStudioBrushAliasWatercolorPlanSettings,
 } from "./studio-brush-alias-profile";
-import {
-  planCausalWatercolorBrushDabs,
-} from "./studio-causal-watercolor-brush";
 import {
   DEFAULT_STUDIO_WET_RIBBON_MAX_FOOTPRINTS,
   planStudioWetRibbonCarrier,

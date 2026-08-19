@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  validateStudioEngineWebGpuBrushPlan,
+} from "./render/studio-engine-webgpu-brush-runtime";
+import {
   parseStudioCanonicalBrushPlan,
   type StudioCanonicalBrushPlan,
 } from "./studio-canonical-brush-plan";
-import {
-  validateStudioEngineWebGpuBrushPlan,
-} from "./studio-engine-webgpu-brush-runtime";
 import {
   parseStudioProfessionalBrushDynamicsPlan,
   type StudioProfessionalBrushChannelName,

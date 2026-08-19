@@ -32,7 +32,7 @@ import {
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
-} from "../src/domains/creator/studio-brush-catalog";
+} from "../src/domains/creator/brush/studio-brush-catalog";
 
 import {
   analyzeStudioBrushMediaPixelQuality,
@@ -60,6 +60,7 @@ const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
 const OPTIONAL_STATIC_PREVIEW_PATHS = [
+  "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
   "/socket.io/",

@@ -12,7 +12,7 @@
  */
 import { Group, Line, Rect } from "react-konva/lib/ReactKonvaCore";
 
-import { brushStrokePreview, type SelectionFrame, type SelPoint } from "./studio-selection-tools";
+import { brushStrokePreview, type SelectionFrame, type SelPoint } from "../studio-selection-tools";
 
 import type { LayerMaskPaintMode } from "./studio-layer-mask";
 import type { ReactElement } from "react";

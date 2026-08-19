@@ -10,7 +10,7 @@ import {
   type StudioDialogueBatchPanelProps,
 } from "./StudioDialogueBatchPanel";
 
-import type { DialogueSpeechAdapter, DialogueSpeechVoice } from "./studio-dialogue-read-aloud";
+import type { DialogueSpeechAdapter, DialogueSpeechVoice } from "./lettering/studio-dialogue-read-aloud";
 
 const noop = () => {
   // Static render never invokes event handlers.

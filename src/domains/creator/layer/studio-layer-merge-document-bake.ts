@@ -8,10 +8,6 @@
  */
 
 import {
-  applyStudioLayerMergePlan,
-  type StudioLayerMergePlan,
-} from "./studio-layer-merge";
-import {
   materializeStudioEditableRasterCopy,
   planStudioEditableRasterCopy,
   renderStudioEditableRasterCopy,
@@ -19,16 +15,21 @@ import {
   type StudioEditableRasterCopyPlan,
   type StudioEditableRasterCopyPlanResult,
   type StudioEditableRasterCopyRenderer,
-} from "./studio-raster-edit-preparation";
+} from "../render/studio-raster-edit-preparation";
 
-import type { El, ImageEl } from "./studio-element-model";
-import type { LayerGroup } from "./studio-layers";
-import type { SvgExportTheme } from "./studio-svg-export";
+import {
+  applyStudioLayerMergePlan,
+  type StudioLayerMergePlan,
+} from "./studio-layer-merge";
+
+import type { SvgExportTheme } from "../export/studio-svg-export";
+import type { El, ImageEl } from "../studio-element-model";
+import type { LayerGroup } from "../studio-layers";
 import type {
   StudioVectorReferenceBudgets,
   StudioVectorReferenceRenderOptions,
   StudioVectorReferenceResult,
-} from "./studio-vector-fill-reference";
+} from "../studio-vector-fill-reference";
 
 export interface StudioDocumentMergeBakeInput {
   readonly plan: StudioLayerMergePlan;

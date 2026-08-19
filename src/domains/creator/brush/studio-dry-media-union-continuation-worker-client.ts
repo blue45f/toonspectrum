@@ -2,7 +2,8 @@ import {
   snapshotMemory64CrossRealmAllocationAck,
   snapshotMemory64CrossRealmReservationToken,
   type Memory64CrossRealmReservationToken,
-} from "./kernel/Memory64CrossRealmProtocol";
+} from "../kernel/Memory64CrossRealmProtocol";
+
 import {
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
@@ -27,9 +28,9 @@ import {
   STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_WINDOW_BYTE_LENGTH,
 } from "./studio-dry-media-union-continuation-scratch-arena";
 
-import type { Memory64WorkloadCoordinator } from "./kernel/Memory64WorkloadCoordinator";
-import type { WasmScratchRuntimeBudget } from "./kernel/WasmMemory64Capability";
-import type { StudioDynamicBrushCoverageMark } from "./studio-dynamic-brush-coverage-renderer";
+import type { Memory64WorkloadCoordinator } from "../kernel/Memory64WorkloadCoordinator";
+import type { WasmScratchRuntimeBudget } from "../kernel/WasmMemory64Capability";
+import type { StudioDynamicBrushCoverageMark } from "../studio-dynamic-brush-coverage-renderer";
 
 interface MessageEventLike {
   readonly data: unknown;

@@ -1,7 +1,8 @@
 import {
   STUDIO_FEATURE_ROLLOUT_BUCKET_COUNT,
   resolveStudioFeatureRollout,
-} from "./studio-feature-rollout";
+} from "../studio-feature-rollout";
+
 import {
   resolveStudioLiveInkBackendPreference,
   type StudioLiveInkBackendPreference,

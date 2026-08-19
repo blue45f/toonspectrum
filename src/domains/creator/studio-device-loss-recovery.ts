@@ -1,9 +1,9 @@
-import { studioFilterLaneProviderId } from "./studio-filter-island-plan";
+import { studioStrokeRouteProviderId } from "./brush/studio-stroke-route-tournament";
+import { studioFilterLaneProviderId } from "./filter/studio-filter-island-plan";
 import {
   getStudioTournamentRuntime,
   type StudioRendererTournamentRuntime,
 } from "./studio-renderer-tournament-runtime";
-import { studioStrokeRouteProviderId } from "./studio-stroke-route-tournament";
 
 import type { WinnerCacheEntry } from "@toonspectrum/studio-engine-registry";
 

@@ -4,18 +4,19 @@ import {
   isStudioBrushEraserAliasId,
   mapStudioBrushAliasPressure,
   studioBrushAliasEffectiveDiameter,
-} from "./studio-brush-alias-profile";
+} from "../brush/studio-brush-alias-profile";
 import {
   studioBrushSymmetryTransforms,
   type StudioBrushSymmetrySpec,
   type StudioBrushSymmetryTransform,
-} from "./studio-brush-symmetry";
-import { selectStudioCausalInkSamples } from "./studio-causal-ink";
+} from "../brush/studio-brush-symmetry";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
   studioInkFallbackPressure,
-} from "./studio-ink-pressure-model";
+} from "../brush/studio-ink-pressure-model";
+import { selectStudioCausalInkSamples } from "../studio-causal-ink";
+
 import {
   STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_ADVANCE_SOURCE_POINTS,
   STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_VARIATION_POINTS,

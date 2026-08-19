@@ -1,9 +1,9 @@
 import { ChevronDown } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
+import { type LayerStylePatch } from "./layer/studio-layer-styles";
 import { isIdentityCurveChannels, normalizeCurve, type CurvePoint, type CurveRgbChannels } from "./studio-curves";
 import { createStudioEffectId, type StudioEffectFavoriteState, type StudioEffectId } from "./studio-effect-favorites";
-import { type LayerStylePatch } from "./studio-layer-styles";
 import {
   isIdentityLevelsChannels,
   normalizeLevels,
@@ -14,8 +14,8 @@ import { extractFilterFields, looksResetPatch, type StudioLook } from "./studio-
 import { applyPhotoWebtoonPreset, resetPhotoWebtoonPreset } from "./studio-photo-webtoon-preset";
 import { useStudioHistogramSource } from "./useStudioHistogramSource";
 
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type { El, ImageEl } from "./studio-element-model";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 import { useT } from "@/lib/i18n";
 
@@ -33,7 +33,7 @@ const StudioImageFilterPanel = lazy(() =>
   import("./StudioImageFilterPanel").then((mod) => ({ default: mod.StudioImageFilterPanel }))
 );
 const StudioLayerStylePanel = lazy(() =>
-  import("./StudioLayerStylePanel").then((mod) => ({ default: mod.StudioLayerStylePanel }))
+  import( "./layer/StudioLayerStylePanel").then((mod) => ({ default: mod.StudioLayerStylePanel }))
 );
 const StudioLevelsPanel = lazy(() =>
   import("./StudioLevelsPanel").then((mod) => ({ default: mod.StudioLevelsPanel }))
@@ -395,7 +395,7 @@ const StudioGrainSection = lazy(async () => {
 const StudioInkWashSection = lazy(async () => {
   const [panelMod, inkWash] = await Promise.all([
     import("./StudioInkWashPanel"),
-    import("./studio-ink-wash"),
+    import("./brush/studio-ink-wash"),
   ]);
   const Panel = panelMod.StudioInkWashPanel;
   function StudioInkWashSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {

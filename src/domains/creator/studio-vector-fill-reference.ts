@@ -26,15 +26,15 @@ import {
 import { adoptStudioOffscreenBitmap } from "./studio-offscreen-raster-worker-protocol";
 import { readStudioVectorReferenceSourceBudgetReceipt } from "./studio-vector-reference-source-budget-receipt";
 
-import type { El } from "./studio-element-model";
-import type { SelectionFrame } from "./studio-selection-tools";
 import type {
   SvgExportEl,
   SvgExportPageInput,
   SvgExportResult,
   SvgExportTheme,
-} from "./studio-svg-export";
-import type { StudioSvgExportWorkerFactory } from "./studio-svg-export-worker-client";
+} from "./export/studio-svg-export";
+import type { StudioSvgExportWorkerFactory } from "./export/studio-svg-export-worker-client";
+import type { El } from "./studio-element-model";
+import type { SelectionFrame } from "./studio-selection-tools";
 import type { StudioVectorReferenceSourceBudgetReceipt } from "./studio-vector-reference-source-budget-receipt";
 
 export const STUDIO_VECTOR_REFERENCE_MAX_SOURCE_BYTES = 16 * 1024 * 1024;

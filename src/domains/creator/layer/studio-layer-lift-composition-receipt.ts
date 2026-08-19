@@ -1,8 +1,9 @@
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_SCENE_LAYER_LIFT_BUDGETS,
   STUDIO_SCENE_LAYER_LIFT_SEMANTIC_LAYER_ROLES,
 } from "./studio-layer-lift-contract";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type {
   StudioSceneLayerLiftSemanticLayerRole,

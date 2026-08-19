@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   studioBrushDynamicsSettingsForBrushId,
   type StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
+import { resolveStudioDynamicBrushMaterialIdentity } from "./brush/studio-dry-media-dynamic-bridge";
+import { exportPageToSvg } from "./export/studio-svg-export";
 import {
   appendStudioCausalDynamicBrushDepositsV3,
   beginStudioCausalDynamicBrushDepositV3,
@@ -21,13 +23,11 @@ import {
   type StudioCompetitorSpecialtyRibbonCatalogId,
   type StudioCompetitorSpecialtyRibbonSourceMark,
 } from "./studio-competitor-specialty-ribbon-carrier";
-import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
 import {
   planStudioDynamicBrushCoverageMarks,
   renderStudioDynamicBrushCoverageMark,
   type StudioDynamicBrushLegacyDestinationContext,
 } from "./studio-dynamic-brush-coverage-renderer";
-import { exportPageToSvg } from "./studio-svg-export";
 
 const EXPECTED_PROFILE = Object.freeze({
   "hard-airbrush": ["hard-airbrush-envelope", 1],

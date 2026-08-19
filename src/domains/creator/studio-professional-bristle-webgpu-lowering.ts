@@ -1,14 +1,14 @@
 import {
-  parseStudioCanonicalBrushPlan,
-  STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS,
-} from "./studio-canonical-brush-plan";
-import {
   STUDIO_ENGINE_WEBGPU_BRUSH_COLOR_MODEL,
   STUDIO_ENGINE_WEBGPU_BRUSH_DEFAULT_MAX_DABS,
   STUDIO_ENGINE_WEBGPU_BRUSH_INPUT_COLOR_ENCODING,
   STUDIO_ENGINE_WEBGPU_BRUSH_TEXTURE_FORMAT,
   validateStudioEngineWebGpuBrushPlan,
-} from "./studio-engine-webgpu-brush-runtime";
+} from "./render/studio-engine-webgpu-brush-runtime";
+import {
+  parseStudioCanonicalBrushPlan,
+  STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS,
+} from "./studio-canonical-brush-plan";
 import {
   parseStudioProfessionalBristleDynamicsPlan,
   resolveStudioProfessionalBristleDynamics,
@@ -16,6 +16,9 @@ import {
   STUDIO_PROFESSIONAL_BRISTLE_DYNAMICS_VERSION,
 } from "./studio-professional-bristle-dynamics";
 
+import type {
+  StudioEngineWebGpuBrushPlan,
+} from "./render/studio-engine-webgpu-brush-runtime";
 import type {
   StudioCanonicalBrushPlan,
   StudioCanonicalBrushResponseCurve,
@@ -25,11 +28,7 @@ import type {
   StudioCanonicalWebGpuAnalyticDab,
   StudioCanonicalWebGpuComposite,
 } from "./studio-canonical-brush-webgpu-lowering";
-import type {
-  StudioEngineWebGpuBrushPlan,
-} from "./studio-engine-webgpu-brush-runtime";
-import type { StudioProfessionalBristleResolveOptions } from
-  "./studio-professional-bristle-dynamics";
+import type { StudioProfessionalBristleResolveOptions } from "./studio-professional-bristle-dynamics";
 
 /**
  * Clean-room bridge from provider-neutral bristle depositions into the existing RGBA16F analytic

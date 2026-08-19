@@ -5,7 +5,29 @@ import { pathToFileURL } from "node:url";
 
 import {
   materializeStudioBrushPackSelection,
-} from "../src/domains/creator/studio-brush-pack-runtime";
+} from "../src/domains/creator/brush/studio-brush-pack-runtime";
+import {
+  createStudioStrokeOneEuroV1State,
+  filterStudioStrokeOneEuroV1,
+  flushStudioStrokeOneEuroV1Endpoint,
+  type StudioStrokeOneEuroV1Options,
+} from "../src/domains/creator/brush/studio-stroke-one-euro-v1";
+import {
+  createStudioStrokeStabilizerBridge,
+  createStudioStrokeStabilizerState,
+  flushStudioStrokeStabilizerEndpoint,
+  stabilizeStudioStrokeSample,
+  type StudioStabilizerMode,
+} from "../src/domains/creator/brush/studio-stroke-stabilizer";
+import {
+  planStudioWetInkBrushReplay,
+} from "../src/domains/creator/brush/studio-wet-ink-brush-runtime";
+import {
+  beginStudioStrokePointerSession,
+  collectStudioStrokePointerBatch,
+  type StudioPointerEventLike,
+  type StudioStrokePointerSession,
+} from "../src/domains/creator/canvas/studio-pointer-input";
 import {
   beginStudioCausalDynamicBrushDepositV3,
   appendStudioCausalDynamicBrushDepositsV3,
@@ -17,33 +39,11 @@ import {
   peekStudioPerfectFreehandStroker,
   resolveStudioPerfectFreehandProfile,
 } from "../src/domains/creator/studio-perfect-freehand";
-import {
-  beginStudioStrokePointerSession,
-  collectStudioStrokePointerBatch,
-  type StudioPointerEventLike,
-  type StudioStrokePointerSession,
-} from "../src/domains/creator/studio-pointer-input";
-import {
-  createStudioStrokeOneEuroV1State,
-  filterStudioStrokeOneEuroV1,
-  flushStudioStrokeOneEuroV1Endpoint,
-  type StudioStrokeOneEuroV1Options,
-} from "../src/domains/creator/studio-stroke-one-euro-v1";
-import {
-  createStudioStrokeStabilizerBridge,
-  createStudioStrokeStabilizerState,
-  flushStudioStrokeStabilizerEndpoint,
-  stabilizeStudioStrokeSample,
-  type StudioStabilizerMode,
-} from "../src/domains/creator/studio-stroke-stabilizer";
-import {
-  planStudioWetInkBrushReplay,
-} from "../src/domains/creator/studio-wet-ink-brush-runtime";
 
 import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
-} from "../src/domains/creator/studio-brush-dynamics";
+} from "../src/domains/creator/brush/studio-brush-dynamics";
 import type { DrawEl } from "../src/domains/creator/studio-element-model";
 
 export const STUDIO_BRUSH_ENGINE_SELECTION_REPORT_SCHEMA_VERSION = 1 as const;

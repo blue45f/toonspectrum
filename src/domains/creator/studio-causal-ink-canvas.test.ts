@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { fillStudioCausalInkDabs, type StudioCausalInkFillContext } from "./studio-causal-ink-canvas";
 
+import type { StudioStrokePaintModel } from "./brush/studio-stroke-paint-model";
 import type { StudioCausalInkDab } from "./studio-causal-ink";
-import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
 
 class RecordingFillContext implements StudioCausalInkFillContext {
   fillStyle: string | CanvasGradient | CanvasPattern = "";

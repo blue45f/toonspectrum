@@ -1,12 +1,12 @@
 import {
-  resolveStudioBrushPresetOperation,
-  type StudioToolOperation,
-} from "./studio-brush";
-import {
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   sanitizeBrushSnapshot,
   type StudioBrushSnapshot,
-} from "./studio-brush-library";
+} from "./brush/studio-brush-library";
+import {
+  resolveStudioBrushPresetOperation,
+  type StudioToolOperation,
+} from "./studio-brush";
 
 import type {
   StudioAsyncKeyValueStore,
@@ -157,8 +157,7 @@ export function createStudioToolOperationMemorySqlitePersistence(
   options: StudioToolOperationMemorySqlitePersistenceOptions = {},
 ): StudioToolOperationMemoryPersistencePort {
   const acquireDatabase = options.acquireDatabase ?? (async () => {
-    const { acquireStudioLocalDatabase } = await import(
-      "./studio-local-database-runtime"
+    const { acquireStudioLocalDatabase } = await import("./studio-local-database-runtime"
     );
     return acquireStudioLocalDatabase();
   });

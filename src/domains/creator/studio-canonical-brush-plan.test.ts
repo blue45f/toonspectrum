@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import { normalizeStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
 import {
   encodeStudioCanonicalBrushPlan,
   hashStudioCanonicalBrushPlan,

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { normalizeStudioAiProvenanceDocument } from "./studio-ai-provenance";
+import { normalizeStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 
 import type { StudioLocalDatabase } from "./studio-local-database";

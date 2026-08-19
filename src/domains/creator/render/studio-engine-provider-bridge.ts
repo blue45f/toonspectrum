@@ -9,7 +9,7 @@ import {
   STUDIO_BRUSH_BACKEND_INTEGRATION_AUDIT,
   type StudioBrushBackendId,
   type StudioBrushBackendIntegrationAudit,
-} from "./studio-brush-backend-quality-policy";
+} from "../brush/studio-brush-backend-quality-policy";
 
 /**
  * V11 strangler bridge, step (a) of ADR 0001(개정): the existing studio's

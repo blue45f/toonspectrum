@@ -97,8 +97,7 @@ interface ActiveOperation {
 
 function defaultWorkerFactory(): StudioMultiLightSurfaceWorkerLike {
   return new Worker(
-    new URL(
-      "./studio-multi-light-surface-provider.worker.ts",
+    new URL("./studio-multi-light-surface-provider.worker.ts",
       import.meta.url,
     ),
     {

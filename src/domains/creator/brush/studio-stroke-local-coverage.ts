@@ -12,8 +12,8 @@
 import {
   resolveStudioRetainedMediaPressureSeries,
   type StudioRetainedMediaPressureProfileId,
-} from "./studio-retained-media-pressure";
-import { planStudioTonalBands } from "./studio-tonal-band-plan";
+} from "../studio-retained-media-pressure";
+import { planStudioTonalBands } from "../studio-tonal-band-plan";
 
 export const STUDIO_STROKE_LOCAL_COVERAGE_VERSION = 2 as const;
 

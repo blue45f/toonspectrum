@@ -2,7 +2,7 @@
 
 import {
   createStudioP5BrushStandaloneAdapterLoader,
-} from "../src/domains/creator/studio-p5-brush-standalone-runtime-adapter";
+} from "../src/domains/creator/brush/studio-p5-brush-standalone-runtime-adapter";
 
 
 import {

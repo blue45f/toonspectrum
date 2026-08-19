@@ -25,7 +25,7 @@ function source(fileName: string): string {
  */
 describe("blend modes composite once per element", () => {
   it("routes every non-source-over composite through the isolating cache group", () => {
-    const viewport = source("./StudioCanvasViewport.tsx");
+    const viewport = source("./canvas/StudioCanvasViewport.tsx");
     expect(viewport).toContain("BlendIsolationGroup");
     expect(viewport).toContain('const isolatedComposite = composite !== "source-over"');
     // The bare-Group fallback must carry clipping only. If `globalCompositeOperation` ever appears
@@ -49,18 +49,17 @@ describe("blend modes composite once per element", () => {
   });
 
   it("re-caches when the element's rendered result changes", () => {
-    const viewport = source("./StudioCanvasViewport.tsx");
+    const viewport = source("./canvas/StudioCanvasViewport.tsx");
     const group = source("./BlendIsolationGroup.tsx");
     // A cache that never invalidates would freeze the stroke at its first painted state.
     expect(group).toContain("[cacheKey]");
-    // The key has to move when the document edits, the bounds change, or the mode itself changes.
-    expect(viewport).toContain(
-      '[el.id, composite, pagesHi, JSON.stringify(elBounds(el))].join("|")',
+    expect(viewport).toMatch(
+      /\[\s*el\.id,\s*composite,\s*pagesHi,\s*previewSequence\s*\?\?\s*"authoritative",\s*JSON\.stringify\(elBounds\(el\)\),\s*\]\.join\("\|"\)/u,
     );
   });
 
   it("keeps the alpha-clipping arrangement intact", () => {
-    const viewport = source("./StudioCanvasViewport.tsx");
+    const viewport = source("./canvas/StudioCanvasViewport.tsx");
     // `source-in` must stay a child of ClipMaskGroup so it intersects the mask sibling rather than
     // the whole layer. Isolation fixes the repetition; it must not relocate the operand.
     expect(viewport).toContain('renderWithOwnMask({ compositeOverride: "source-in" })');

@@ -2,26 +2,26 @@ import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
   type StudioBrushR8TextureGrainSource,
-} from "./studio-brush-r8-grain-asset-contract";
+} from "../brush/studio-brush-r8-grain-asset-contract";
 import {
   STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS,
   STUDIO_CANONICAL_BRUSH_PLAN_VERSION,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
 import {
   parseStudioProfessionalBrushDynamicsPlan,
   resolveStudioProfessionalBrushDynamics,
-} from "./studio-professional-brush-dynamics";
-import { sha256HexPortable } from "./studio-sha256";
+} from "../studio-professional-brush-dynamics";
+import { sha256HexPortable } from "../studio-sha256";
 
 import type {
   StudioCanonicalBrushGrain,
   StudioCanonicalBrushPlan,
   StudioCanonicalBrushTextureTip,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
 import type {
   StudioProfessionalBrushDynamicsPlan,
   StudioProfessionalBrushResolveProgress,
-} from "./studio-professional-brush-dynamics";
+} from "../studio-professional-brush-dynamics";
 
 /**
  * Clean-room textured brush specialist plan.

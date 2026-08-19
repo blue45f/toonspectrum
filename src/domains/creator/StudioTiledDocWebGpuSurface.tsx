@@ -1,15 +1,15 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
-import { resolveStudioTiledDocPrimarySurfaceOwner } from "./studio-tiledoc-primary-surface-owner";
+import { resolveStudioTiledDocPrimarySurfaceOwner } from "./render/studio-tiledoc-primary-surface-owner";
 import {
   STUDIO_TILEDOC_PRODUCT_RASTER_LAYER_ID,
   StudioTileDocProductIslandStore,
-} from "./studio-tiledoc-product-island";
-import { StudioTileDocWebGpuRuntime } from "./studio-tiledoc-webgpu-runtime";
+} from "./render/studio-tiledoc-product-island";
+import { StudioTileDocWebGpuRuntime } from "./render/studio-tiledoc-webgpu-runtime";
 import { StudioRasterCrdtCanvas } from "./StudioRasterCrdtCanvas";
 
-import type { StudioRasterImmutableTileFrame } from "./studio-crdt-raster-replay-runtime";
-import type { StudioTileDocRect } from "./studio-tiledoc-geometry";
+import type { StudioRasterImmutableTileFrame } from "./live/studio-crdt-raster-replay-runtime";
+import type { StudioTileDocRect } from "./render/studio-tiledoc-geometry";
 import type { StudioRasterCrdtCanvasProps } from "./StudioRasterCrdtCanvas";
 import type { StudioRasterSurfaceSpec } from "@/lib/studio-crdt-raster-ops";
 

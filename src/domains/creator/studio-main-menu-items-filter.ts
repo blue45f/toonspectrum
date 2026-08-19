@@ -58,9 +58,9 @@ import {
 import {
   STUDIO_FILTER_PACK_KINDS,
   STUDIO_FILTER_PACK_LABELS,
-} from "./studio-filter-pack-registry";
+} from "./filter/studio-filter-pack-registry";
 
-import type { StudioFilterPackKind } from "./studio-filter-pack-registry";
+import type { StudioFilterPackKind } from "./filter/studio-filter-pack-registry";
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
 import type { LucideIcon } from "lucide-react";

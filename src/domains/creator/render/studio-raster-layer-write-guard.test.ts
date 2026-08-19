@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { canPublishStudioRasterLayer } from "./studio-raster-layer-write-guard";
 
-import type { PageState } from "./studio-page-state";
+import type { PageState } from "../studio-page-state";
 
 function page(overrides: Partial<PageState> = {}): PageState {
   return {

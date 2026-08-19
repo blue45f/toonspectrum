@@ -45,7 +45,7 @@ export const LazyStudioAnimaticTimelineDialog = lazy(() =>
 );
 
 export const LazyStudioHybridDccDialog = lazy(() =>
-  import("./StudioHybridDccDialog").then(({ StudioHybridDccDialog }) => ({
+  import("./hybrid-dcc/StudioHybridDccDialog").then(({ StudioHybridDccDialog }) => ({
     default: StudioHybridDccDialog,
   }))
 );

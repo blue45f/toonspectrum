@@ -5,7 +5,7 @@ import {
   preloadStudioBackground3D,
 } from "./studio-background-3d-loader";
 
-vi.mock("./StudioBackground3D", () => ({
+vi.mock("./bg3d/StudioBackground3D", () => ({
   StudioBackground3D: function MockStudioBackground3D() {
     return null;
   },

@@ -8,6 +8,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { planOilBrushDabs } from "../studio-fx-brush";
+
 import {
   mapStudioBrushAliasPressure,
   resolveStudioBrushAliasWatercolorPlanSettings,
@@ -30,13 +32,12 @@ import {
   studioDryMediaDynamicBridgeMarkMultiplier,
 } from "./studio-dry-media-dynamic-bridge";
 import { planStudioDryMediaUnionRibbonCarrier } from "./studio-dry-media-union-ribbon-carrier";
-import { planOilBrushDabs } from "./studio-fx-brush";
 import { planStudioOilRibbonCarrier } from "./studio-oil-ribbon-carrier";
 import {
   resolveStudioWetInkBrushPhysicalRecipe,
 } from "./studio-wet-ink-brush-runtime";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 function mean(values: readonly number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);

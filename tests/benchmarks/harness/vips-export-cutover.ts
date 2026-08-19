@@ -28,7 +28,7 @@ import {
   planPresetSliceExport,
   prepareVipsRoutedPresetPages,
   type ExportPreset,
-} from "../../../src/domains/creator/studio-export-presets";
+} from "../../../src/domains/creator/export/studio-export-presets";
 import {
   downscaleForExport,
   loadVipsForExport,

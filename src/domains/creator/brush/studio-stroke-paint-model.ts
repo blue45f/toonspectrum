@@ -1,4 +1,5 @@
-import { resolveStudioBrushRenderFamily } from "./studio-brush";
+import { resolveStudioBrushRenderFamily } from "../studio-brush";
+
 import { isStudioBrushEraserAliasId } from "./studio-brush-alias-profile";
 import { resolveStudioCapturedBrushDynamicsPresetId } from "./studio-brush-dynamics";
 import { isStudioInkPressureModel } from "./studio-ink-pressure-model";

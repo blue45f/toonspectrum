@@ -2,7 +2,7 @@
 import {
   STUDIO_BG3D_PROCEDURAL_STARTER_PACK,
   STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID,
-} from "./studio-bg3d-procedural-starter-pack";
+} from "./bg3d/studio-bg3d-procedural-starter-pack";
 import {
   BRUSH_LIBRARY_KEY,
   MAX_BRUSHES,
@@ -11,7 +11,7 @@ import {
   sanitizeBrushSnapshot,
   saveBrushBatchWithResult,
   type StudioSavedBrush,
-} from "./studio-brush-library";
+} from "./brush/studio-brush-library";
 import {
   STUDIO_FILTER_PACK_DEFS,
   isStudioFilterPackKind,
@@ -20,7 +20,7 @@ import {
   type StudioFilterPackKind,
   type StudioFilterPackPatch,
   type StudioFilterPackValues,
-} from "./studio-filter-pack";
+} from "./filter/studio-filter-pack";
 import {
   STUDIO_MARKETPLACE_LIBRARY_STORAGE_KEY,
   cloneStudioMarketplacePackageToLibrary,

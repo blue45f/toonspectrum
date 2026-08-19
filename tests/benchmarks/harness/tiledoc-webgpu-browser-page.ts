@@ -4,13 +4,13 @@ import {
   acquireStudioGpuDevice,
   activeStudioGpuDeviceLeaseCount,
   disposeStudioGpuFabric,
-} from "../../../src/domains/creator/studio-gpu-fabric";
-import { StudioTiledDocumentStore } from "../../../src/domains/creator/studio-tiledoc-store";
-import { StudioTileDocWebGpuRuntime } from "../../../src/domains/creator/studio-tiledoc-webgpu-runtime";
+} from "../../../src/domains/creator/render/studio-gpu-fabric";
+import { StudioTiledDocumentStore } from "../../../src/domains/creator/render/studio-tiledoc-store";
+import { StudioTileDocWebGpuRuntime } from "../../../src/domains/creator/render/studio-tiledoc-webgpu-runtime";
 
-import type { StudioTileDocCompositeLayer } from "../../../src/domains/creator/studio-tiledoc-composite-plan";
-import type { StudioTileDocRect } from "../../../src/domains/creator/studio-tiledoc-geometry";
-import type { StudioTileDocWebGpuCompositeConsumerStats } from "../../../src/domains/creator/studio-tiledoc-webgpu-composite-consumer";
+import type { StudioTileDocCompositeLayer } from "../../../src/domains/creator/render/studio-tiledoc-composite-plan";
+import type { StudioTileDocRect } from "../../../src/domains/creator/render/studio-tiledoc-geometry";
+import type { StudioTileDocWebGpuCompositeConsumerStats } from "../../../src/domains/creator/render/studio-tiledoc-webgpu-composite-consumer";
 
 const RESULT_GLOBAL = "__TOONSPECTRUM_TILEDOC_WEBGPU_BROWSER_RESULT__";
 const LAYER_COUNT = 100;

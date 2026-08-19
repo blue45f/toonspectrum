@@ -14,9 +14,9 @@ import {
   type StudioRasterTilePresenterBackend,
   type StudioRasterTileSha256,
   type StudioRasterTileViewport,
-} from "./studio-raster-tile-presenter";
+} from "./render/studio-raster-tile-presenter";
 
-import type { StudioRasterImmutableTileFrame } from "./studio-crdt-raster-replay-runtime";
+import type { StudioRasterImmutableTileFrame } from "./live/studio-crdt-raster-replay-runtime";
 import type { StudioRasterSurfaceSpec } from "@/lib/studio-crdt-raster-ops";
 
 export interface StudioRasterCrdtCanvasProps {

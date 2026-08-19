@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 interface ModuleEdges {
   readonly dynamicImports: readonly string[];
   readonly source: string;
@@ -11,10 +13,13 @@ interface ModuleEdges {
 
 function moduleEdges(relativePath: string): ModuleEdges {
   const fileUrl = new URL(relativePath, import.meta.url);
-  const source = readFileSync(fileUrl, "utf8");
+  const rawSource = readFileSync(fileUrl, "utf8");
+  const source = relativePath.endsWith("StudioPage.tsx")
+    ? readStudioCuttoonEditorSource()
+    : rawSource;
   const file = ts.createSourceFile(
     fileUrl.pathname,
-    source,
+    rawSource,
     ts.ScriptTarget.Latest,
     true,
     relativePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
@@ -71,7 +76,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 const BROWSER_ORCHESTRATORS = [
   "./studio-heal-clone-browser",
   "./studio-magic-wand-browser",
-  "./studio-raster-retouch-region",
+  "./render/studio-raster-retouch-region",
   "./studio-retouch-browser",
   "./studio-smudge-browser",
 ] as const;
@@ -91,8 +96,8 @@ describe("Studio pixel-edit brush runtime boundary", () => {
       expect(page.valueImports).not.toContain(specifier);
     }
     expect(runtimeLoaders.dynamicImports.toSorted()).toEqual([
-      "./studio-brush-library-sqlite-repository",
-      "./studio-brush-slots-sqlite-repository",
+      "./brush/studio-brush-library-sqlite-repository",
+      "./brush/studio-brush-slots-sqlite-repository",
       "./studio-liquify-browser",
       "./studio-pixel-edit-brush-runtime",
     ]);
@@ -117,7 +122,7 @@ describe("Studio pixel-edit brush runtime boundary", () => {
     expect(source).toContain("runStudioWetMixRetouch");
     expect(source).toContain("encodeStudioRetouchCanvasPng");
     expect(source).not.toContain('await import("./studio-dodge-burn")');
-    expect(source).not.toContain('await import("./studio-wet-mix")');
+    expect(source).not.toContain('await import("./brush/studio-wet-mix")');
   });
 
   it("keeps heal/clone completion cancellable and its pointer-move preview off React state", () => {

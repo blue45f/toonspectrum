@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_BRUSH_RENDER_FAMILY } from "./studio-brush";
+import { STUDIO_BRUSH_RENDER_FAMILY } from "../studio-brush";
+
 import {
   STUDIO_PAPER_BRUSH_RESPONSE,
   applyStudioPaperPhysicsToBrushResponse,

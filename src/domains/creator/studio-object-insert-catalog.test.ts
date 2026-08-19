@@ -9,7 +9,7 @@ import {
   planStudioObjectInsertPlacement,
   STUDIO_OBJECT_INSERT_CATALOG_VERSION,
 } from "./studio-object-insert-catalog";
-import { VRM_PROPS } from "./studio-vrm-props";
+import { VRM_PROPS } from "./vrm/studio-vrm-props";
 
 describe("studio object insert catalog (Canva-style 3D elements)", () => {
   it("lists primitives, props, and scene templates with unique ids", () => {

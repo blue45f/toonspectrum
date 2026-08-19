@@ -3,22 +3,22 @@ import { useLayoutEffect, useRef, useState } from "react";
 import {
   createStudioRasterHandoffAuthorityKey,
   type StudioRasterHandoffCandidate,
-} from "./studio-raster-handoff-authority";
+} from "./render/studio-raster-handoff-authority";
 import {
   studioRasterOperationIntersectsDocumentRect,
   studioRasterTileIntersectsDocumentRect,
   type StudioRasterVisibleDocumentRect,
-} from "./studio-raster-visible-rect";
+} from "./render/studio-raster-visible-rect";
 import { StudioTiledDocWebGpuSurface } from "./StudioTiledDocWebGpuSurface";
 
-import type { StudioCrdtDocument } from "./studio-crdt-document";
-import type { StudioRasterReplayRuntimeResult } from "./studio-crdt-raster-replay-runtime";
+import type { StudioCrdtDocument } from "./live/studio-crdt-document";
+import type { StudioRasterReplayRuntimeResult } from "./live/studio-crdt-raster-replay-runtime";
 import type {
   StudioRasterOverlaySourceElement,
   StudioRasterOverlaySourceOperation,
-} from "./studio-crdt-raster-ui-bridge";
-import type { StudioWebGpuCommittedPlanGates } from "./studio-webgpu-committed-plan";
-import type { StudioWebGpuViewportSurfacePlan } from "./studio-webgpu-viewport";
+} from "./live/studio-crdt-raster-ui-bridge";
+import type { StudioWebGpuCommittedPlanGates } from "./render/studio-webgpu-committed-plan";
+import type { StudioWebGpuViewportSurfacePlan } from "./render/studio-webgpu-viewport";
 
 export interface StudioRasterCrdtHandoffInput {
   /** Exact scene/gate/viewport identity owned by StudioPage. */
@@ -195,10 +195,10 @@ export function StudioRasterCrdtSurface({
     // import들과 나란히 Promise.all에 넣어 병렬로 대기한다(순차 대기보다 빠르거나 최소 동일).
     void Promise.all([
       document.getRasterOperationLogAsync(surfaceId, { signal: controller.signal }),
-      import("./studio-crdt-raster-replay-runtime"),
-      import("./studio-raster-asset-client"),
-      import("./studio-crdt-raster-ui-bridge"),
-      import("./studio-raster-server-authority"),
+      import( "./live/studio-crdt-raster-replay-runtime"),
+      import("./render/studio-raster-asset-client"),
+      import( "./live/studio-crdt-raster-ui-bridge"),
+      import("./render/studio-raster-server-authority"),
     ]).then(async ([log, runtime, assetClient, bridge, serverAuthority]) => {
       if (!log) return;
       const planned = handoffSnapshot

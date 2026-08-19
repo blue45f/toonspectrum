@@ -22,7 +22,7 @@ import {
   type StudioAnimKeyframe,
 } from "./studio-anim-tracks";
 import { STUDIO_UPLOAD_DESKTOP_MAX_DECODED_PIXELS } from "./studio-upload-image-safety";
-import { serializeStudioVrmSceneDocument } from "./studio-vrm-scene-document";
+import { serializeStudioVrmSceneDocument } from "./vrm/studio-vrm-scene-document";
 
 import type { LayerGroup } from "./studio-layers";
 

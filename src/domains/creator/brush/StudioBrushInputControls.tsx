@@ -1,4 +1,4 @@
-import { StudioPressureCurveGraph } from "./StudioPressureCurveGraph";
+import { StudioPressureCurveGraph } from "../StudioPressureCurveGraph";
 
 import { cx } from "@/lib/cx";
 

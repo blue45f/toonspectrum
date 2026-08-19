@@ -9,10 +9,10 @@
 import {
   serializeStudioBg3dSceneDocument,
   type StudioBg3dSceneDocument,
-} from "./studio-bg3d-scene-document";
+} from "./bg3d/studio-bg3d-scene-document";
 import { sha256HexPortable } from "./studio-sha256";
 
-import type { StudioBackground3DLtLayer } from "./studio-3d-insert-contract";
+import type { StudioBackground3DLtLayer } from "./scene-3d/studio-3d-insert-contract";
 import type { StudioOpfsAssetStore } from "./studio-opfs-asset-store";
 
 export const STUDIO_LINKED_3D_PASS_CAS_ROOT =
@@ -334,8 +334,7 @@ export interface PrepareStudioLinked3dLinePassInput {
 export async function prepareStudioLinked3dLinePass(
   input: PrepareStudioLinked3dLinePassInput,
 ): Promise<StudioLinked3dPreparedPass> {
-  const { prepareStudioLinked3dLinePassRuntime } = await import(
-    "./studio-linked-3d-pass-transaction-runtime"
+  const { prepareStudioLinked3dLinePassRuntime } = await import("./studio-linked-3d-pass-transaction-runtime"
   );
   return await prepareStudioLinked3dLinePassRuntime(input);
 }
@@ -345,8 +344,7 @@ export async function sequenceStudioLinked3dPassOwnerMutation<T>(
   ownerId: string,
   task: () => Promise<T>,
 ): Promise<T> {
-  const { sequenceStudioLinked3dPassOwnerMutationRuntime } = await import(
-    "./studio-linked-3d-pass-transaction-runtime"
+  const { sequenceStudioLinked3dPassOwnerMutationRuntime } = await import("./studio-linked-3d-pass-transaction-runtime"
   );
   return await sequenceStudioLinked3dPassOwnerMutationRuntime(authority, ownerId, task);
 }
@@ -365,8 +363,7 @@ export interface CommitStudioLinked3dPreparedPassInput<T> {
 export async function commitStudioLinked3dPreparedPass<T>(
   input: CommitStudioLinked3dPreparedPassInput<T>,
 ): Promise<T> {
-  const { commitStudioLinked3dPreparedPassRuntime } = await import(
-    "./studio-linked-3d-pass-transaction-runtime"
+  const { commitStudioLinked3dPreparedPassRuntime } = await import("./studio-linked-3d-pass-transaction-runtime"
   );
   return await commitStudioLinked3dPreparedPassRuntime(input);
 }

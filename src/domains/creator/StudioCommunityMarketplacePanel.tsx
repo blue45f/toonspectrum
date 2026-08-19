@@ -28,7 +28,13 @@ import {
 import {
   openProductBrushLibraryRepository,
   readAllBrushesFromRepository,
-} from "./studio-brush-library-sqlite-repository";
+} from "./brush/studio-brush-library-sqlite-repository";
+import {
+  acquireProductFilterLibraryRepository,
+  readAllFilterPresetsFromRepository,
+  subscribeStudioFilterLibraryChanges,
+  type StudioFilterLibraryPreset,
+} from "./filter/studio-filter-library-sqlite-repository";
 import {
   createStudioCommunityPublishManifest,
   listStudioCommunityShareCandidates,
@@ -48,12 +54,6 @@ import {
   type StudioCreatorPackInstallState,
 } from "./studio-creator-pack-runtime";
 import {
-  acquireProductFilterLibraryRepository,
-  readAllFilterPresetsFromRepository,
-  subscribeStudioFilterLibraryChanges,
-  type StudioFilterLibraryPreset,
-} from "./studio-filter-library-sqlite-repository";
-import {
   STUDIO_MARKETPLACE_REDISTRIBUTION_NOTICE,
 } from "./studio-marketplace-packages";
 import {
@@ -63,8 +63,8 @@ import {
   getProductStudioPaletteSqliteRepository,
 } from "./studio-palette-sqlite-repository";
 
+import type { StudioSavedBrush } from "./brush/studio-brush-library";
 import type { StudioAsset } from "./studio-asset-library";
-import type { StudioSavedBrush } from "./studio-brush-library";
 import type { StudioNamedPalette } from "./studio-palette-library";
 import type {
   CreatorMarketplaceResourceKind,

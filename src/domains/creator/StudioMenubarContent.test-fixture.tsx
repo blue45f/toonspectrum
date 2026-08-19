@@ -9,7 +9,7 @@
  */
 import { vi } from "vitest";
 
-import type { StudioAiProvenanceDocument } from "./studio-ai-provenance";
+import type { StudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import type { StudioCharacterBible } from "./studio-character-bible";
 import type { WatermarkSettings } from "./studio-watermark";
 import type { StudioWriterRoomDocument } from "./studio-writer-room";

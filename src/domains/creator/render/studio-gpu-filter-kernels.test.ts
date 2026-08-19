@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { applyColorBalance } from "./studio-color-balance";
-import { buildCurveChannelLuts, normalizeCurve } from "./studio-curves";
+import { applyColorBalance } from "../studio-color-balance";
+import { buildCurveChannelLuts, normalizeCurve } from "../studio-curves";
+import { buildChannelLevelsLuts } from "../studio-levels";
+
 import {
   STUDIO_GPU_COLOR_BALANCE_OFFSETS,
   STUDIO_GPU_COLOR_BALANCE_UNIFORM_BYTES,
@@ -24,7 +26,6 @@ import {
   patchStudioGpuFilterPixelCount,
 } from "./studio-gpu-filter-kernels";
 import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
-import { buildChannelLevelsLuts } from "./studio-levels";
 
 import type { StudioGpuFilterKernelId } from "./studio-gpu-filter-kernels";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";

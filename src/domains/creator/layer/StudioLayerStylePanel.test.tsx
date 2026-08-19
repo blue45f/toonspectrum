@@ -3,12 +3,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { normalizeOutline } from "../studio-outline";
+
 import {
   COMBO_LAYER_STYLE_PRESETS,
   LAYER_STYLE_PRESETS,
   layerStyleResetPatch,
 } from "./studio-layer-styles";
-import { normalizeOutline } from "./studio-outline";
 import { StudioLayerStylePanel } from "./StudioLayerStylePanel";
 
 type PanelProps = Parameters<typeof StudioLayerStylePanel>[0];

@@ -1,13 +1,13 @@
 import { Droplets, Eraser, LockKeyhole, Paintbrush, Power, Waves } from "lucide-react";
 
-import { STUDIO_WASH_INK_PRODUCT_LABEL_KO } from "./studio-brush-behavior-ui";
-import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
+import { STUDIO_WASH_INK_PRODUCT_LABEL_KO } from "./brush/studio-brush-behavior-ui";
 import {
   livingInkMaterialPatchForPaper,
   matchPaperKindFromLivingInkMaterial,
   STUDIO_PAPER_SURFACE_CATALOG,
-} from "./studio-paper-surface-catalog";
+} from "./brush/studio-paper-surface-catalog";
+import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { studioToolHintFromLabel } from "./studio-tool-hints";
 import { StudioToolHintTarget } from "./StudioToolHint";
 

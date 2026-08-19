@@ -233,11 +233,11 @@ const REFERENCE_DISPLAY = "./StudioCompanionReferenceDisplay";
 
 describe("Studio companion Reference runtime boundaries", () => {
   it("keeps the capture coordinator behind one analyzable StudioPage dynamic import", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const runtime = moduleEdges("./studio-tools-companion-runtime.ts");
 
-    expect(page.allStaticImports).not.toContain(CAPTURE_RUNTIME);
-    expect(page.valueImports).not.toContain(CAPTURE_RUNTIME);
-    expect(page.dynamicImports.filter((specifier) => specifier === CAPTURE_RUNTIME)).toEqual([
+    expect(runtime.allStaticImports).not.toContain(CAPTURE_RUNTIME);
+    expect(runtime.valueImports).not.toContain(CAPTURE_RUNTIME);
+    expect(runtime.dynamicImports.filter((specifier) => specifier === CAPTURE_RUNTIME)).toEqual([
       CAPTURE_RUNTIME,
     ]);
   });

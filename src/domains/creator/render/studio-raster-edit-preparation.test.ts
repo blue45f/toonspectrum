@@ -3,6 +3,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  prepareStudioVectorReferenceExport,
+  renderPreparedStudioVectorReference,
+  renderStudioVectorReference,
+} from "../studio-vector-fill-reference";
+
+import {
   applyStudioEditableRasterCopy,
   createStudioEditablePageRasterContext,
   describeStudioEditableRasterSelectionSurface,
@@ -14,14 +20,9 @@ import {
   STUDIO_EDITABLE_RASTER_SELECTION_TOOL_KINDS,
   summarizeStudioRasterPreparationSources,
 } from "./studio-raster-edit-preparation";
-import {
-  prepareStudioVectorReferenceExport,
-  renderPreparedStudioVectorReference,
-  renderStudioVectorReference,
-} from "./studio-vector-fill-reference";
 
-import type { El } from "./studio-element-model";
-import type { StudioVectorReferencePreparedExport } from "./studio-vector-fill-reference";
+import type { El } from "../studio-element-model";
+import type { StudioVectorReferencePreparedExport } from "../studio-vector-fill-reference";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 const PAGE_COMPOSITE_MAX_BYTES = 4 * 1024 * 1024;

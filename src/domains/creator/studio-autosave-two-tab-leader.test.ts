@@ -12,7 +12,6 @@ import {
   StudioAutosaveDocumentBusyError,
   StudioAutosaveDurabilityError,
   StudioAutosaveOpfsSession,
-  reopenStudioAutosaveDocumentSessionForLeadership,
   openStudioAutosaveDocumentSession,
   persistStudioAutosaveWithOpfsPrimary,
   reconcileStudioAutosaveWithOpfsPrimary,
@@ -403,37 +402,46 @@ describe("openStudioAutosaveDocumentSession", () => {
     const locks = new FakeLockManager();
     const registryOne = createStudioAutosaveDocumentLeadershipRegistry();
     const registryTwo = createStudioAutosaveDocumentLeadershipRegistry();
-    const scope = { navigator: { locks } } as never;
+    const store = new SharedJournalStore();
     const storage = memoryStorage();
 
-    const leader = await openStudioAutosaveDocumentSession(AUTOSAVE_KEY, scope, {
+    const leaderLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY,
+      locks,
       registry: registryOne,
     });
-    const follower = await openStudioAutosaveDocumentSession(AUTOSAVE_KEY, scope, {
+    const followerLease = await requestStudioAutosaveDocumentLeadership({
+      autosaveKey: AUTOSAVE_KEY,
+      locks,
       registry: registryTwo,
     });
-    expect(leader.role).toBe("leader");
-    expect(follower.role).toBe("follower");
-    expect(leader.session).not.toBeNull();
-    expect(follower.session).not.toBeNull();
+    expect(leaderLease.role).toBe("leader");
+    expect(followerLease.role).toBe("follower");
+
+    const leaderSession = tabSession(store, "autosave-tab-1");
+    const followerSession = tabSession(store, "autosave-tab-2");
+
+    await persistStudioAutosaveWithOpfsPrimary({
+      session: leaderSession,
+      sqlite: null,
+      storage,
+      key: AUTOSAVE_KEY,
+      payload: payload("2026-08-13T00:00:00.000Z", ["leader-stroke"]),
+    });
+
     await expect(persistStudioAutosaveWithOpfsPrimary({
-      session: follower.session,
+      session: followerSession,
       sqlite: null,
       storage,
       key: AUTOSAVE_KEY,
       payload: payload("2026-08-13T00:01:00.000Z", ["follower-stroke"]),
     })).rejects.toBeInstanceOf(StudioAutosaveDocumentBusyError);
 
-    await leader.lease.release();
-    expect(await follower.lease.waitForLeadership({ timeoutMs: 1_000 })).toBe(true);
+    await leaderLease.release();
+    await leaderSession.dispose();
+    expect(await followerLease.waitForLeadership({ timeoutMs: 1_000 })).toBe(true);
 
-    const promotedSession = await reopenStudioAutosaveDocumentSessionForLeadership({
-      session: follower.session,
-      autosaveKey: AUTOSAVE_KEY,
-    });
-    expect(promotedSession).not.toBeNull();
-    if (promotedSession === null) return;
-
+    const promotedSession = tabSession(store, "autosave-tab-2");
     const receipt = await persistStudioAutosaveWithOpfsPrimary({
       session: promotedSession,
       sqlite: null,
@@ -451,10 +459,9 @@ describe("openStudioAutosaveDocumentSession", () => {
     });
     expect(strokeIdsOf(reconciled.candidate?.payload)).toEqual(["promoted-stroke"]);
 
-    await follower.lease.release();
+    await followerLease.release();
+    await followerSession.dispose();
     await promotedSession.dispose();
-    await leader.session?.dispose();
-    await follower.session?.dispose();
   });
 });
 

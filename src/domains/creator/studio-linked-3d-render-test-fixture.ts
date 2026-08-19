@@ -1,4 +1,4 @@
-import { createDefaultStudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
+import { createDefaultStudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
 import {
   computeStudioLinked3dPassRootHash,
   computeStudioLinked3dSceneRevisionSignatures,
@@ -9,8 +9,7 @@ import {
   ensureStudioLinked3dRenderShot,
   upsertStudioLinked3dRenderLink,
 } from "./studio-linked-3d-render-document";
-import { migrateStudioShared3dStageCollectionDocument } from
-  "./studio-shared-3d-stage-collection";
+import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
 import { createStudioShared3dStageDocument } from "./studio-shared-3d-stage-document";
 
 import type { El } from "./studio-element-model";

@@ -1,4 +1,17 @@
 import {
+  renderStudioDualBrushTip,
+  STUDIO_DUAL_TIP_CONTRACT_VERSION,
+  type StudioDualTipCombineMode,
+  type StudioDualTipDynamics,
+  type StudioDualTipAlphaField,
+  type StudioDualTipJitter,
+  type StudioDualTipOutputSurface,
+  type StudioDualTipResult,
+  type StudioDualTipStrokeSample,
+  type StudioDualTipTransform,
+} from "../studio-dual-brush-tip-engine";
+
+import {
   applyStudioBrushContinuousCarrierQualityPolicy,
 } from "./studio-brush-carrier-quality";
 import {
@@ -32,23 +45,11 @@ import {
   type StudioBrushTipSettings,
   type StudioBrushTipShapeId,
 } from "./studio-brush-tip-stamp";
-import {
-  renderStudioDualBrushTip,
-  STUDIO_DUAL_TIP_CONTRACT_VERSION,
-  type StudioDualTipCombineMode,
-  type StudioDualTipDynamics,
-  type StudioDualTipAlphaField,
-  type StudioDualTipJitter,
-  type StudioDualTipOutputSurface,
-  type StudioDualTipResult,
-  type StudioDualTipStrokeSample,
-  type StudioDualTipTransform,
-} from "./studio-dual-brush-tip-engine";
 
 import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
 import type { StudioBrushTipLayerSettings } from "./studio-brush-tip-composition";
 import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
-import type { StudioBrushMediaGroup } from "./studio-creative-ux";
+import type { StudioBrushMediaGroup } from "../studio-creative-ux";
 
 export const STUDIO_BRUSH_PACK_CUSTOM_TIP_MOTIFS = [
   "square",

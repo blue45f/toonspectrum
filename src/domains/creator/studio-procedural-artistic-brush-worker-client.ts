@@ -116,8 +116,7 @@ function defaultWorkerFactory():
   StudioProceduralArtisticBrushWorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(
-    new URL(
-      "./studio-procedural-artistic-brush.worker.ts",
+    new URL("./studio-procedural-artistic-brush.worker.ts",
       import.meta.url,
     ),
     {

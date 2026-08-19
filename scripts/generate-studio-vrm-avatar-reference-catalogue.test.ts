@@ -5,7 +5,7 @@ import { gzipSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-import { AVATAR_FORGE_PRESETS } from "../src/domains/creator/studio-vrm-avatar-forge";
+import { AVATAR_FORGE_PRESETS } from "../src/domains/creator/vrm/studio-vrm-avatar-forge";
 
 import {
   STUDIO_VRM_AVATAR_REFERENCE_ARTIFACT_PATH,
@@ -118,7 +118,9 @@ describe("Avatar Forge reference catalogue generator", () => {
       STUDIO_VRM_AVATAR_REFERENCE_ROOT,
       "scripts/studio-vrm-avatar-reference-catalogue-browser.tsx",
     ), "utf8");
-    expect(source).toContain('from "../src/domains/creator/StudioVrmAvatarForge"');
+    expect(source).toMatch(
+      /from\s+["']\.\.\/src\/domains\/creator\/vrm\/StudioVrmAvatarForge(?:\.tsx)?["']/,
+    );
     expect(source).toContain("<StudioVrmAvatarForge");
     expect(source).toContain("createAvatarForgeState(presetId)");
     expect(source).toContain("ImageEmbedder.createFromOptions");

@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 interface ModuleEdges {
   readonly allImports: readonly string[];
   readonly dynamicImports: readonly string[];
@@ -13,10 +15,13 @@ interface ModuleEdges {
 
 function moduleEdges(relativePath: string): ModuleEdges {
   const fileUrl = new URL(relativePath, import.meta.url);
-  const source = readFileSync(fileUrl, "utf8");
+  const rawSource = readFileSync(fileUrl, "utf8");
+  const source = relativePath.endsWith("StudioPage.tsx")
+    ? readStudioCuttoonEditorSource()
+    : rawSource;
   const file = ts.createSourceFile(
     fileUrl.pathname,
-    source,
+    rawSource,
     ts.ScriptTarget.Latest,
     true,
     relativePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
@@ -74,13 +79,13 @@ const EXTRACTED_FUNCTIONS = [
 
 describe("studio draw rendering ownership boundary", () => {
   it("keeps one-way ownership from StudioPage to the pure Canvas2D helper module", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("../StudioPage.tsx");
     const rendering = moduleEdges("./studio-draw-rendering.ts");
 
     expect(
-      page.valueImports.filter((specifier) => specifier === "./studio-draw-rendering"),
-    ).toEqual(["./studio-draw-rendering"]);
-    expect(rendering.allImports).not.toContain("./StudioPage");
+      page.valueImports.filter((specifier) => specifier === "./brush/studio-draw-rendering"),
+    ).toEqual(["./brush/studio-draw-rendering"]);
+    expect(rendering.allImports).not.toContain("../StudioPage");
     expect(rendering.dynamicImports).toEqual([]);
 
     for (const functionName of EXTRACTED_FUNCTIONS) {
@@ -92,11 +97,11 @@ describe("studio draw rendering ownership boundary", () => {
   it("keeps DrawEl and Konva as whole-clause type-only dependencies", () => {
     const rendering = moduleEdges("./studio-draw-rendering.ts");
 
-    expect(rendering.typeImports).toContain("./studio-element-model");
+    expect(rendering.typeImports).toContain("../studio-element-model");
     expect(rendering.typeImports).toContain("konva");
-    expect(rendering.valueImports).not.toContain("./studio-element-model");
+    expect(rendering.valueImports).not.toContain("../studio-element-model");
     expect(rendering.valueImports).not.toContain("konva");
-    expect(rendering.source).toContain('import type { DrawEl } from "./studio-element-model";');
+    expect(rendering.source).toContain('import type { DrawEl } from "../studio-element-model";');
     expect(rendering.source).toContain('import type Konva from "konva";');
   });
 
@@ -113,44 +118,44 @@ describe("studio draw rendering ownership boundary", () => {
   });
 
   it("keeps the React-Konva node and draft preview runtime in one-way modules", () => {
-    const page = moduleEdges("./StudioPage.tsx");
-    const viewport = moduleEdges("./StudioCanvasViewport.tsx");
+    const page = moduleEdges("../StudioPage.tsx");
+    const viewport = moduleEdges("../canvas/StudioCanvasViewport.tsx");
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
-    const previewLayers = moduleEdges("./StudioDraftPreviewLayers.tsx");
-    const previewStore = moduleEdges("./studio-draft-preview-store.ts");
+    const previewLayers = moduleEdges("../StudioDraftPreviewLayers.tsx");
+    const previewStore = moduleEdges("../studio-draft-preview-store.ts");
     const rendering = moduleEdges("./studio-draw-rendering.ts");
 
     expect(
-      viewport.valueImports.filter((specifier) => specifier === "./StudioDrawNode"),
-    ).toEqual(["./StudioDrawNode"]);
+      viewport.valueImports.filter((specifier) => specifier === "../brush/StudioDrawNode"),
+    ).toEqual(["../brush/StudioDrawNode"]);
     expect(page.source).not.toContain("const StudioDrawNode = memo(function StudioDrawNode(");
     expect(viewport.source).not.toContain("const StudioDrawNode = memo(function StudioDrawNode(");
     expect(drawNode.source).toContain(
       "export const StudioDrawNode = memo(function StudioDrawNode(",
     );
-    expect(drawNode.allImports).not.toContain("./StudioPage");
+    expect(drawNode.allImports).not.toContain("../StudioPage");
     expect(drawNode.dynamicImports).toEqual([]);
-    expect(drawNode.valueImports).toContain("./StudioStampDrawShape");
-    expect(drawNode.typeImports).toContain("./studio-element-model");
-    expect(drawNode.valueImports).not.toContain("./studio-element-model");
+    expect(drawNode.valueImports).toContain("../StudioStampDrawShape");
+    expect(drawNode.typeImports).toContain("../studio-element-model");
+    expect(drawNode.valueImports).not.toContain("../studio-element-model");
     expect(drawNode.valueImports).toContain("./studio-draw-rendering");
     expect(drawNode.valueImports).toContain("react-konva/lib/ReactKonvaCore");
 
     expect(page.valueImports.filter((specifier) => specifier === "./studio-draft-preview-store"))
       .toEqual(["./studio-draft-preview-store"]);
-    expect(viewport.valueImports.filter((specifier) => specifier === "./StudioDraftPreviewLayers"))
-      .toEqual(["./StudioDraftPreviewLayers"]);
+    expect(viewport.valueImports.filter((specifier) => specifier === "../StudioDraftPreviewLayers"))
+      .toEqual(["../StudioDraftPreviewLayers"]);
     expect(page.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
     expect(page.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewLayers\b/);
     expect(viewport.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
     expect(viewport.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewLayers\b/);
-    expect(viewport.typeImports).toContain("./studio-draft-preview-store");
-    expect(viewport.valueImports).not.toContain("./studio-draft-preview-store");
+    expect(viewport.typeImports).toContain("../studio-draft-preview-store");
+    expect(viewport.valueImports).not.toContain("../studio-draft-preview-store");
 
     expect(previewStore.source).toContain("export class StudioDraftPreviewStore");
     expect(previewStore.typeImports).toContain("./studio-element-model");
     expect(previewStore.valueImports).not.toContain("./studio-element-model");
-    expect(previewStore.allImports).not.toContain("./StudioPage");
+    expect(previewStore.allImports).not.toContain("../StudioPage");
     expect(previewStore.allImports.some((specifier) => specifier.startsWith("react"))).toBe(false);
 
     expect(previewLayers.source).toContain(
@@ -158,9 +163,9 @@ describe("studio draw rendering ownership boundary", () => {
     );
     expect(previewLayers.typeImports).toContain("./studio-draft-preview-store");
     expect(previewLayers.valueImports).not.toContain("./studio-draft-preview-store");
-    expect(previewLayers.valueImports).toContain("./StudioDrawNode");
+    expect(previewLayers.valueImports).toContain("./brush/StudioDrawNode");
     expect(previewLayers.valueImports).toContain("react-konva/lib/ReactKonvaCore");
-    expect(previewLayers.allImports).not.toContain("./StudioPage");
+    expect(previewLayers.allImports).not.toContain("../StudioPage");
     expect(previewLayers.source).toContain('canvas.style.mixBlendMode = mode === "backdrop-multiply"');
     expect(previewLayers.source).toContain("getNativeCanvasElement()");
     expect(previewLayers.source).not.toContain("._canvas");
@@ -173,9 +178,9 @@ describe("studio draw rendering ownership boundary", () => {
   });
 
   it("synchronizes retained DOM ink before admitting the next backdrop sample and bounds canvases", () => {
-    const page = moduleEdges("./StudioPage.tsx");
-    const viewport = moduleEdges("./StudioCanvasViewport.tsx");
-    const previewLayers = moduleEdges("./StudioDraftPreviewLayers.tsx");
+    const page = moduleEdges("../StudioPage.tsx");
+    const viewport = moduleEdges("../canvas/StudioCanvasViewport.tsx");
+    const previewLayers = moduleEdges("../StudioDraftPreviewLayers.tsx");
     const onStageDownStart = page.source.indexOf("function onStageDown(");
     const drawBranchStart = page.source.indexOf('if (tool === "draw")', onStageDownStart);
     const drawBranchEnd = page.source.indexOf("// 선택 모드:", drawBranchStart);
@@ -226,13 +231,13 @@ describe("studio draw rendering ownership boundary", () => {
 
   it("locks the stamp, watercolor, pattern, and memo routing seams in the extracted node", () => {
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
-    const stampShape = moduleEdges("./StudioStampDrawShape.tsx");
+    const stampShape = moduleEdges("../StudioStampDrawShape.tsx");
 
     expect(drawNode.source).toContain("const tileSrc = pattern ? patternDataUrl(pattern) : null;");
     expect(drawNode.source).toContain("if (active) setImage(img);");
     expect(drawNode.source).toContain("const symmetricVariations = stampBrushKind");
     expect(drawNode.source).toContain("<StudioStampDrawShape");
-    expect(drawNode.valueImports).toContain("./StudioStampDrawShape");
+    expect(drawNode.valueImports).toContain("../StudioStampDrawShape");
     expect(stampShape.source).toContain('el.stampPipeline === "causal-walker-v2"');
     expect(stampShape.source).toContain("resolveStudioFreehandRenderPath(el.points");
     expect(stampShape.source).toContain("const sourceAligned = causalStamp || stampPoints === el.points");
@@ -248,10 +253,10 @@ describe("studio draw rendering ownership boundary", () => {
 
   it("keeps dynamic live drafts on the single-normalization bounded-compositor path", () => {
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
-    const renderPlan = moduleEdges("./studio-dynamic-brush-render-plan.ts");
+    const renderPlan = moduleEdges("../studio-dynamic-brush-render-plan.ts");
 
     expect(drawNode.source).toContain("const symmetricVariations = stampBrushKind || dynamicBrushId");
-    expect(drawNode.valueImports).toContain("./studio-dynamic-brush-render-plan");
+    expect(drawNode.valueImports).toContain("../studio-dynamic-brush-render-plan");
     expect(drawNode.source).toContain("planStudioDynamicBrushRender(");
     expect(drawNode.source).not.toContain("planNormalizedStudioDynamicBrushDabs(");
     expect(drawNode.source).not.toContain("planStudioDynamicBrushDabs(");

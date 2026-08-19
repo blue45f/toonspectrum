@@ -55,11 +55,8 @@ import {
   type Page,
 } from "playwright";
 
-import { STUDIO_APP_SETTINGS_STORAGE_KEY } from "../src/domains/creator/studio-app-settings";
-import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
-import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
-import { isStudioBrushEraserAliasId } from "../src/domains/creator/studio-brush-alias-profile";
-import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-brush-carrier-quality";
+import { isStudioBrushEraserAliasId } from "../src/domains/creator/brush/studio-brush-alias-profile";
+import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/brush/studio-brush-carrier-quality";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
@@ -68,24 +65,27 @@ import {
   STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
-} from "../src/domains/creator/studio-brush-catalog";
-import { studioBrushCatalogIdIsIntentionallyDiscontinuous } from "../src/domains/creator/studio-brush-continuity-audit";
-import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/studio-brush-dynamics";
-import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "../src/domains/creator/studio-brush-library";
-import { studioBrushPackDescriptorById } from "../src/domains/creator/studio-brush-pack-index";
+} from "../src/domains/creator/brush/studio-brush-catalog";
+import { studioBrushCatalogIdIsIntentionallyDiscontinuous } from "../src/domains/creator/brush/studio-brush-continuity-audit";
+import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/brush/studio-brush-dynamics";
+import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "../src/domains/creator/brush/studio-brush-library";
+import { studioBrushPackDescriptorById } from "../src/domains/creator/brush/studio-brush-pack-index";
 import {
   resolveStudioBrushRuntimeContract,
-} from "../src/domains/creator/studio-brush-runtime-contract";
+} from "../src/domains/creator/brush/studio-brush-runtime-contract";
 import {
   materializeStudioBrushCatalogSelection,
   type StudioBrushCatalogSelection,
-} from "../src/domains/creator/studio-brush-selection";
+} from "../src/domains/creator/brush/studio-brush-selection";
+import { captureStudioDrawPointerPressureContract } from "../src/domains/creator/brush/studio-draw-pointer-pressure-contract";
+import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/brush/studio-dry-media-anisotropic-grain-v1";
+import { STUDIO_APP_SETTINGS_STORAGE_KEY } from "../src/domains/creator/studio-app-settings";
+import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
+import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
 import {
   resolveStudioCc0MypaintStampTuning,
   studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
 } from "../src/domains/creator/studio-cc0-mypaint-preset-import-v1";
-import { captureStudioDrawPointerPressureContract } from "../src/domains/creator/studio-draw-pointer-pressure-contract";
-import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/studio-dry-media-anisotropic-grain-v1";
 
 import {
   analyzeStudioLongBrushQuality,
@@ -1867,7 +1867,13 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       const eraseLift = operation === "erase" && emptyBefore
         ? await measureEraserLiftRatio(page, emptyBefore, before, after)
         : null;
+      if (operation === "erase" && emptyBefore && DEBUG_BRUSH_VERIFIER) {
+        writeFileSync(join(SCRATCH, `settled-diag-${preset.id}-after.png`), after);
+        writeFileSync(join(SCRATCH, `settled-diag-${preset.id}-before.png`), before);
+        writeFileSync(join(SCRATCH, `settled-diag-${preset.id}-empty.png`), emptyBefore);
+      }
       if (eraseLift) {
+        log(`[ERASE LIFT ${preset.id}] affectedPixels=${eraseLift.affectedPixels} ratio=${eraseLift.residualEnergyRatio}`);
         invariant(
           eraseLift.affectedPixels >= 4,
           `${preset.id}: eraser had no measurable baseline overlap`,

@@ -5,14 +5,15 @@
  * ids and commit the returned page array as one undo step. Locked elements are skippable
  * (fail-closed for that id) and no-op inputs return the original pages reference.
  */
+import { isEffectivelyLocked } from "../studio-layers";
+
 import {
   isDialogueElement,
   type DialogueElementLike,
   type DialoguePageLike,
 } from "./studio-dialogue-batch";
-import { isEffectivelyLocked } from "./studio-layers";
 
-import type { BubbleVariant } from "./studio-assets";
+import type { BubbleVariant } from "../studio-assets";
 
 export type DialogueFormatAlign = "left" | "center" | "right";
 export type DialogueFormatFontStyle = "normal" | "bold" | "italic" | "bold italic";

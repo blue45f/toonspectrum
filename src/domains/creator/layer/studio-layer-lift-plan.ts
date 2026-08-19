@@ -10,9 +10,9 @@ import {
   createLayerGroup,
   hasContiguousLayerGroups,
   type LayerGroup,
-} from "./studio-layers";
+} from "../studio-layers";
 
-import type { El, ImageEl } from "./studio-element-model";
+import type { El, ImageEl } from "../studio-element-model";
 
 export const STUDIO_LAYER_LIFT_DEFAULT_GROUP_NAME = "컷 레이어 분리";
 export const STUDIO_LAYER_LIFT_OUTPUT_BASIS =

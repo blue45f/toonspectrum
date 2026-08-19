@@ -23,6 +23,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { StudioInlineScrubber } from "../StudioInlineScrubber";
+
 import {
   STUDIO_LAYER_COLOR_LABELS,
   STUDIO_LAYER_ROLE_LABELS,
@@ -43,9 +45,8 @@ import {
   visibleStudioLayerPaletteStatuses,
   type StudioLayerPaletteStatusKind,
 } from "./studio-layer-palette-visual";
-import { StudioInlineScrubber } from "./StudioInlineScrubber";
 
-import type { StudioLiveLayerOwnership } from "./studio-live-layer-ownership";
+import type { StudioLiveLayerOwnership } from "../live/studio-live-layer-ownership";
 
 import { cn } from "@/lib/utils";
 

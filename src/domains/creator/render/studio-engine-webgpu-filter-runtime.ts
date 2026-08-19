@@ -1,3 +1,5 @@
+import { announceStudioGpuDeviceLoss } from "../studio-safe-mode-runtime";
+
 import {
   STUDIO_CANONICAL_FILTER_CURVE_LUT_SIZE,
   buildStudioCanonicalFilterCurveLut,
@@ -6,7 +8,6 @@ import {
   parseStudioCanonicalFilterRecipe,
   planStudioCanonicalFilterExecution,
 } from "./studio-engine-canonical-filter-plan";
-import { announceStudioGpuDeviceLoss } from "./studio-safe-mode-runtime";
 
 import type {
   StudioCanonicalFilterExecutionPlan,

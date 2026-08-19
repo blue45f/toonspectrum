@@ -11,7 +11,7 @@ import {
 } from "./studio-ai-provenance";
 
 import type { StudioAiErrorCode, StudioAiSettings, StudioTextAiTransport } from "./studio-ai-client";
-import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
+import type { StudioPublishAiProvenance } from "../studio-publish-preflight";
 
 export type StudioAiPendingOperationInput = Omit<
   StudioAiOperationInput,

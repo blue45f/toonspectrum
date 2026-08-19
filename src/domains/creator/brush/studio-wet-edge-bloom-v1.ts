@@ -36,7 +36,8 @@
 import {
   studioOssUnitHash,
   studioOssValueNoise2d,
-} from "./studio-oss-brush-kernels";
+} from "../studio-oss-brush-kernels";
+
 import {
   getStudioPaperPresetV1,
   isStudioPaperPresetIdV1,

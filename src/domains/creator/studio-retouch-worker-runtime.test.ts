@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { wetMixStroke } from "./brush/studio-wet-mix";
 import { dodgeBurnStroke } from "./studio-dodge-burn";
 import { applyStudioRetouchWorkerRequest } from "./studio-retouch-worker-runtime";
-import { wetMixStroke } from "./studio-wet-mix";
 
 function pixels(): Uint8ClampedArray {
   const data = new Uint8ClampedArray(12 * 12 * 4);

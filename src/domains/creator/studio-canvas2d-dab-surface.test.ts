@@ -9,7 +9,7 @@ import {
 import type {
   StudioGpuDab,
   StudioGpuDabRenderUpdate,
-} from "./studio-webgpu-dab-plan-contract";
+} from "./render/studio-webgpu-dab-plan-contract";
 
 interface RecordingCanvas2d {
   readonly context: CanvasRenderingContext2D;

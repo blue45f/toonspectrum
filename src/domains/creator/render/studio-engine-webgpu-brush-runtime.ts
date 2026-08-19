@@ -1,4 +1,4 @@
-import { studioHighBitSrgbToLinear } from "./studio-highbit-transfer";
+import { studioHighBitSrgbToLinear } from "../studio-highbit-transfer";
 
 import type {
   StudioCanonicalBrushSpecialistLoweringRequirement,
@@ -9,7 +9,7 @@ import type {
   StudioCanonicalWebGpuAnalyticShape,
   StudioCanonicalWebGpuLinearColorSpace,
   StudioCanonicalWebGpuPorterDuff,
-} from "./studio-canonical-brush-webgpu-lowering";
+} from "../studio-canonical-brush-webgpu-lowering";
 import type {
   StudioGpuDab,
   StudioGpuDabRenderUpdate,

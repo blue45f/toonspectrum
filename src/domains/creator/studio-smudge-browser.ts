@@ -1,9 +1,9 @@
 /** Browser orchestration for the pure Smudge engine. */
-import { flipNormalizedPoint } from "./studio-magic-wand";
 import {
   planStudioRasterRetouchRegion,
   translateStudioRasterRetouchPoints,
-} from "./studio-raster-retouch-region";
+} from "./render/studio-raster-retouch-region";
+import { flipNormalizedPoint } from "./studio-magic-wand";
 import {
   encodeStudioRetouchCanvasPng,
   loadStudioRetouchSourceImage,

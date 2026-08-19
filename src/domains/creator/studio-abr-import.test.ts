@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { decodeStudioBrushTipAlphaMapBase64 } from "./brush/studio-brush-tip-stamp";
 import {
   STUDIO_ABR_IMPORT_LIMITS,
   StudioAbrImportError,
@@ -7,7 +8,6 @@ import {
   convertStudioAbrDocument,
   convertStudioAbrSampleToTip,
 } from "./studio-abr-import";
-import { decodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
 
 import type { Abr, Brush, SampleInfo } from "ag-psd";
 

@@ -6,7 +6,7 @@ import {
   type StudioLiveInkBackendDecisionInput,
 } from "./studio-live-ink-backend";
 
-import type { StudioGpuLiveStrokePreparation } from "./studio-webgpu-live-stroke-plan";
+import type { StudioGpuLiveStrokePreparation } from "../render/studio-webgpu-live-stroke-plan";
 
 function eligible(
   overrides: Partial<StudioLiveInkBackendDecisionInput> = {}

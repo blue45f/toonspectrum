@@ -25,8 +25,8 @@
  *    적분이 아니다(델타로 취급 → MIS 대상 아님).
  */
 
-import type { StudioBg3dCanonicalGeometryPayload } from "./studio-bg3d-geometry-worker-protocol";
-import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
+import type { StudioBg3dCanonicalGeometryPayload } from "./bg3d/studio-bg3d-geometry-worker-protocol";
+import type { StudioBg3dCameraSettings } from "./bg3d/studio-bg3d-scene-document";
 
 export type StudioPathtraceVec3 = readonly [number, number, number];
 

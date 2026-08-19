@@ -13,8 +13,8 @@ describe("studio Canvas2D dab surface ownership boundary", () => {
       .map((match) => match[1]);
 
     expect(dependencies).toEqual([
-      "./studio-webgpu-dab-plan-contract",
-      "./studio-webgpu-viewport-contract",
+      "./render/studio-webgpu-dab-plan-contract",
+      "./render/studio-webgpu-viewport-contract",
     ]);
     expect(surface).not.toContain("studio-webgpu-engine");
     expect(surface).not.toMatch(/\b(?:StudioWebGpuEngine|StudioGpuFrameReceipt|frameGeneration|requestId)\b/u);
@@ -23,9 +23,9 @@ describe("studio Canvas2D dab surface ownership boundary", () => {
   });
 
   it("leaves lifecycle, planning, and frame authority inside the engine", () => {
-    const engine = source("./studio-webgpu-engine.ts");
+    const engine = source("./render/studio-webgpu-engine.ts");
 
-    expect(engine).toContain('from "./studio-canvas2d-dab-surface"');
+    expect(engine).toContain('from "../studio-canvas2d-dab-surface"');
     expect(engine).toContain("const update = this.planRenderUpdate(strokes)");
     expect(engine).toContain("const complete = this.recordRenderedFrame(strokes, update)");
     expect(engine).toContain("const receipt = this.createFrameReceipt(strokes, requestId)");

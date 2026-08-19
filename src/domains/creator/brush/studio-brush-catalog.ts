@@ -6,6 +6,13 @@
  * demand. The heavier procedural dynamics remain in `studio-brush-pack-runtime.ts`.
  */
 import {
+  listStudioQuickBrushTrayItems,
+  type StudioBrushTrayCategory,
+  type StudioBrushTrayItem,
+  type StudioQuickBrushTrayItem,
+} from "../studio-creative-ux";
+
+import {
   STUDIO_BRUSH_CATALOG_COUNTS,
   STUDIO_CORE_BRUSH_CATALOG_ITEMS,
   listStudioCoreBrushCatalogItems,
@@ -14,15 +21,9 @@ import {
 } from "./studio-brush-catalog-core";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
 import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
-import {
-  listStudioQuickBrushTrayItems,
-  type StudioBrushTrayCategory,
-  type StudioBrushTrayItem,
-  type StudioQuickBrushTrayItem,
-} from "./studio-creative-ux";
 import { filterStudioBrushLibraryItems } from "./studio-draw-ux";
 
-import type { StudioToolOperation } from "./studio-brush";
+import type { StudioToolOperation } from "../studio-brush";
 
 export {
   STUDIO_BRUSH_CATALOG_COUNTS,

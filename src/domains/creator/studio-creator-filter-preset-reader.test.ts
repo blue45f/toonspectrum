@@ -10,7 +10,7 @@ import {
 } from "./studio-creator-filter-preset-reader";
 
 const dialogSource = readFileSync(
-  new URL("./StudioFilterDialog.tsx", import.meta.url),
+  new URL("./filter/StudioFilterDialog.tsx", import.meta.url),
   "utf8",
 );
 const readerSource = readFileSync(

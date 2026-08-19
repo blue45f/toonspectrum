@@ -5,14 +5,15 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
-} from "./studio-brush-dynamics";
+} from "../brush/studio-brush-dynamics";
 import {
   hydrateStudioBrushR8GrainAsset,
   resetStudioBrushR8GrainRegistry,
   resolveStudioBrushR8GrainSampler,
   studioBrushR8GrainRegistryStats,
-} from "./studio-brush-r8-grain-runtime";
-import { sha256HexPortable } from "./studio-sha256";
+} from "../brush/studio-brush-r8-grain-runtime";
+import { sha256HexPortable } from "../studio-sha256";
+
 import { exportPageToSvg } from "./studio-svg-export";
 import {
   disposeStudioSvgExportPrewarmedWorker,
@@ -28,12 +29,12 @@ import {
   type StudioSvgExportWorkerRunMessage,
 } from "./studio-svg-export-worker-protocol";
 
-import type { StudioBrushR8TextureGrainSource } from "./studio-brush-r8-grain-asset-contract";
 import type {
   SvgDrawElLike,
   SvgExportPageInput,
   SvgExportResult,
 } from "./studio-svg-export";
+import type { StudioBrushR8TextureGrainSource } from "../brush/studio-brush-r8-grain-asset-contract";
 
 const decodedBytes = new Uint8Array([
   0, 64,

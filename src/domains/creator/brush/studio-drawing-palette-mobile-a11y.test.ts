@@ -3,11 +3,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const inspectorSource = readFileSync(
-  new URL("./StudioInspectorAside.tsx", import.meta.url),
+  new URL("../StudioInspectorAside.tsx", import.meta.url),
   "utf8",
 );
 const utilitySource = readFileSync(
-  new URL("./StudioInspectorUtilityPanels.tsx", import.meta.url),
+  new URL("../StudioInspectorUtilityPanels.tsx", import.meta.url),
   "utf8",
 );
 

@@ -24,6 +24,7 @@
 import { CheckCircle2, Eye, EyeOff, ExternalLink, Images } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { StudioAiSettingsPanel } from "./ai/StudioAiSettingsPanel";
 import {
   discardLegacyStudioStockImageAccessKey,
   isStudioStockImageConfigured,
@@ -31,9 +32,8 @@ import {
   saveStudioStockImageAccessKey,
   STUDIO_STOCK_IMAGE_DEVELOPER_SIGNUP_URL,
 } from "./studio-stock-image-client";
-import { StudioAiSettingsPanel } from "./StudioAiSettingsPanel";
 
-import type { StudioAiSettings } from "./studio-ai-client";
+import type { StudioAiSettings } from "./ai/studio-ai-client";
 
 const LABEL = "block text-[0.65rem] font-medium text-fg-2";
 const INPUT =

@@ -86,10 +86,11 @@ function moduleShape(relativePath: string): ModuleShape {
 describe("Studio left tool rail module boundary", () => {
   it("keeps StudioPage as the one-way lazy orchestration owner", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const lazyUi = moduleShape("./studio-page-modal-lazy-boundaries.ts");
     const rail = moduleShape("./StudioLeftToolRail.tsx");
 
     expect(page.valueImports).not.toContain("./StudioLeftToolRail");
-    expect(page.dynamicImports.filter((specifier) => specifier === "./StudioLeftToolRail")).toEqual([
+    expect(lazyUi.dynamicImports.filter((specifier) => specifier === "./StudioLeftToolRail")).toEqual([
       "./StudioLeftToolRail",
     ]);
     expect(rail.allImports).not.toContain("./StudioPage");

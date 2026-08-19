@@ -33,10 +33,10 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(source("./studio-renderer-tournament-runtime.ts")).toContain(
       '"toonspectrum-studio-v12-tournament-winners-v1"',
     );
-    expect(source("./studio-brush-library-sqlite-repository.ts")).toContain(
+    expect(source("./brush/studio-brush-library-sqlite-repository.ts")).toContain(
       '"toonspectrum-studio-v12-brush-library-fallback"',
     );
-    expect(source("./studio-filter-library-sqlite-repository.ts")).toContain(
+    expect(source("./filter/studio-filter-library-sqlite-repository.ts")).toContain(
       '"toonspectrum.studio-filter-library.v12.fallback"',
     );
     expect(source("./studio-animatic-timeline.ts")).toContain(
@@ -60,13 +60,13 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(source("./studio-scene-snapshot-sqlite-repository.ts")).toContain(
       'STUDIO_SCENE_SNAPSHOT_SQLITE_NAMESPACE = "studio-scene-snapshots-v12"',
     );
-    expect(source("./studio-vrm-creative-sqlite-repository.ts")).toContain(
+    expect(source("./vrm/studio-vrm-creative-sqlite-repository.ts")).toContain(
       'STUDIO_VRM_CUSTOM_POSE_SQLITE_NAMESPACE = "studio-vrm-custom-poses-v12"',
     );
-    expect(source("./studio-vrm-creative-sqlite-repository.ts")).toContain(
+    expect(source("./vrm/studio-vrm-creative-sqlite-repository.ts")).toContain(
       'STUDIO_VRM_FULL_STATE_SQLITE_NAMESPACE = "studio-vrm-full-poser-states-v12"',
     );
-    expect(source("./studio-vrm-pose-material-sqlite-repository.ts")).toContain(
+    expect(source("./vrm/studio-vrm-pose-material-sqlite-repository.ts")).toContain(
       '"studio-vrm-pose-materials-v12"',
     );
     expect(source("./studio-palette-sqlite-repository.ts")).toContain(
@@ -78,16 +78,16 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(source("./studio-saved-clip-sqlite-repository.ts")).toContain(
       'STUDIO_SAVED_CLIP_SQLITE_NAMESPACE = "studio-saved-clips-v12"',
     );
-    expect(source("./studio-bg3d-shot-batch-recovery-store.ts")).toContain(
+    expect(source("./bg3d/studio-bg3d-shot-batch-recovery-store.ts")).toContain(
       '"studio-bg3d-shot-batch-recovery-v12"',
     );
-    expect(source("./studio-crdt-recovery-vault.ts")).toContain(
+    expect(source("./live/studio-crdt-recovery-vault.ts")).toContain(
       "requireStudioCrdtRecoveryDatabase",
     );
-    expect(source("./studio-mannequin-bg3d-preset-sqlite-repository.ts")).toContain(
+    expect(source("./scene-3d/studio-mannequin-bg3d-preset-sqlite-repository.ts")).toContain(
       '"studio-mannequin-state-v12"',
     );
-    expect(source("./studio-mannequin-bg3d-preset-sqlite-repository.ts")).toContain(
+    expect(source("./scene-3d/studio-mannequin-bg3d-preset-sqlite-repository.ts")).toContain(
       '"studio-bg3d-lt-user-presets-v12"',
     );
     expect(source("./studio-marketplace-library-sqlite-repository.ts")).toContain(
@@ -96,22 +96,22 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(source("./studio-asset-library-sqlite-opfs-repository.ts")).toContain(
       'STUDIO_ASSET_LIBRARY_SQLITE_NAMESPACE = "studio-asset-library-v12"',
     );
-    expect(source("./studio-vrm-asset-sqlite-opfs-repository.ts")).toContain(
+    expect(source("./vrm/studio-vrm-asset-sqlite-opfs-repository.ts")).toContain(
       'STUDIO_VRM_MODEL_SQLITE_NAMESPACE = "studio-vrm-model-assets-v12"',
     );
-    expect(source("./studio-vrm-asset-sqlite-opfs-repository.ts")).toContain(
+    expect(source("./vrm/studio-vrm-asset-sqlite-opfs-repository.ts")).toContain(
       'STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE = "studio-vrm-texture-paint-assets-v12"',
     );
-    expect(source("./studio-bg3d-libraries-sqlite-opfs-authority.ts")).toContain(
+    expect(source("./bg3d/studio-bg3d-libraries-sqlite-opfs-authority.ts")).toContain(
       '"studio-bg3d-libraries-v12"',
     );
   });
 
   it("requires explicit developer policy before any legacy import helper runs", () => {
-    const brush = source("./studio-brush-library-sqlite-repository.ts");
+    const brush = source("./brush/studio-brush-library-sqlite-repository.ts");
     const workspace = source("./studio-workspaces.ts");
     const page = source("./StudioPage.tsx");
-    const filter = source("./studio-filter-library-sqlite-repository.ts");
+    const filter = source("./filter/studio-filter-library-sqlite-repository.ts");
     expect(brush).toContain('options.legacyDataPolicy === "import-explicit"');
     expect(workspace).toContain(
       'options.legacyDataPolicy !== "import-explicit"',
@@ -157,10 +157,10 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(sceneSnapshotPanel).not.toContain(
       "studioSceneSnapshotIndexedDbLibrary",
     );
-    const vrmPoser = source("./StudioVrmPoser.tsx");
+    const vrmPoser = source("./vrm/StudioVrmPoser.tsx");
     expect(vrmPoser).toContain("createStudioVrmCreativeSqliteRepository");
     expect(vrmPoser).not.toContain('localStorage.getItem("studio_vrm_full_states")');
-    const vrmPoseMaterials = source("./StudioVrmPoseMaterialPanel.tsx");
+    const vrmPoseMaterials = source("./vrm/StudioVrmPoseMaterialPanel.tsx");
     expect(vrmPoseMaterials).toContain(
       "createStudioVrmPoseMaterialSqliteRepository",
     );
@@ -171,10 +171,10 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(brandKitPanel).toContain("getProductStudioBrandKitSqliteRepository");
     const studioPage = source("./StudioPage.tsx");
     expect(studioPage).toContain("getProductStudioSavedClipSqliteRepository");
-    const crdtOutbox = source("./studio-crdt-outbox.ts");
+    const crdtOutbox = source("./live/studio-crdt-outbox.ts");
     expect(crdtOutbox).toContain("acquireStudioLocalDatabase");
     expect(crdtOutbox).toContain("LegacyIndexedDbStudioCrdtOutbox");
-    const crdtRecoveryVault = source("./studio-crdt-recovery-vault.ts");
+    const crdtRecoveryVault = source("./live/studio-crdt-recovery-vault.ts");
     expect(crdtRecoveryVault).toContain(
       "createStudioCrdtRecoverySqlitePersistence()",
     );
@@ -183,7 +183,7 @@ describe("V12 in-place cutover data-discard policy", () => {
     );
     expect(crdtRecoveryVault).not.toContain("localStorage");
     expect(crdtRecoveryVault).not.toContain("indexedDB");
-    const shotRecovery = source("./studio-bg3d-shot-batch-recovery-store.ts");
+    const shotRecovery = source("./bg3d/studio-bg3d-shot-batch-recovery-store.ts");
     expect(shotRecovery).toContain("SqliteOpfsStudioBg3dShotBatchRecoveryStore");
     expect(shotRecovery).toContain(
       'Object.prototype.hasOwnProperty.call(options, "indexedDB")',
@@ -216,10 +216,10 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(communityProjection).not.toContain(
       "input.brushes ?? listBrushes(browserBrushLibraryStorage())",
     );
-    const mannequin = source("./StudioMannequinPoserPanel.tsx");
+    const mannequin = source("./scene-3d/StudioMannequinPoserPanel.tsx");
     expect(mannequin).toContain("getProductStudioMannequinStateSqliteRepository");
     expect(mannequin).not.toContain("localStorage.setItem(");
-    const background3d = source("./StudioBackground3D.tsx");
+    const background3d = source("./bg3d/StudioBackground3D.tsx");
     expect(background3d).toContain("getProductStudioBg3dLtPresetSqliteRepository");
     expect(background3d).not.toContain("studio-bg3d-lt-preset-storage");
     const originalMarketplace = source("./StudioOriginalAssetMarketplacePanel.tsx");
@@ -231,10 +231,10 @@ describe("V12 in-place cutover data-discard policy", () => {
     const assetRepository = source("./studio-asset-library-sqlite-opfs-repository.ts");
     expect(assetRepository).toContain("acquireStudioLocalDatabase");
     expect(assetRepository).not.toContain("globalThis.indexedDB");
-    const vrmAssetRepository = source("./studio-vrm-asset-sqlite-opfs-repository.ts");
+    const vrmAssetRepository = source("./vrm/studio-vrm-asset-sqlite-opfs-repository.ts");
     expect(vrmAssetRepository).toContain("acquireStudioLocalDatabase");
     expect(vrmAssetRepository).not.toContain("globalThis.indexedDB");
-    const bg3dAuthority = source("./studio-bg3d-libraries-sqlite-opfs-authority.ts");
+    const bg3dAuthority = source("./bg3d/studio-bg3d-libraries-sqlite-opfs-authority.ts");
     expect(bg3dAuthority).toContain("acquireStudioLocalDatabase");
     expect(bg3dAuthority).not.toContain("globalThis.indexedDB");
   });

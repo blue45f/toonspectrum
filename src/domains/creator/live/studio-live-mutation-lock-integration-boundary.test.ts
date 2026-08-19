@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 
 function sourceBetween(startToken: string, endToken: string): string {
   const start = pageSource.indexOf(startToken);

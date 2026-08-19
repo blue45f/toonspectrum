@@ -9,6 +9,9 @@ import {
 } from "./studio-professional-brush-dynamics";
 
 import type {
+  StudioEngineWebGpuBrushPlan,
+} from "./render/studio-engine-webgpu-brush-runtime";
+import type {
   StudioCanonicalBrushPlan,
 } from "./studio-canonical-brush-plan";
 import type {
@@ -16,9 +19,6 @@ import type {
   StudioCanonicalWebGpuAnalyticDab,
   StudioCanonicalWebGpuComposite,
 } from "./studio-canonical-brush-webgpu-lowering";
-import type {
-  StudioEngineWebGpuBrushPlan,
-} from "./studio-engine-webgpu-brush-runtime";
 import type {
   StudioProfessionalBrushDynamicsPlan,
   StudioProfessionalBrushResolveProgress,

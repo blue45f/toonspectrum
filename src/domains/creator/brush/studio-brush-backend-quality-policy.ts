@@ -11,6 +11,16 @@
  */
 
 import {
+  STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
+  STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+} from "../render/studio-hokusai-live-brush-protocol";
+import { resolveStudioHokusaiLivePreset } from "../render/studio-hokusai-live-brush-router";
+import {
+  STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
+} from "../render/studio-hokusai-natural-media-worker-protocol";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "../studio-pixel-pencil";
+
+import {
   STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS,
   resolveStudioBrushEngineLaneBaseId,
 } from "./studio-brush-engine-lane-catalog";
@@ -22,15 +32,6 @@ import {
   STUDIO_BRUSH_RUNTIME_CONTRACT,
   type StudioBrushRuntimePresetId,
 } from "./studio-brush-runtime-contract";
-import {
-  STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
-  STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
-} from "./studio-hokusai-live-brush-protocol";
-import { resolveStudioHokusaiLivePreset } from "./studio-hokusai-live-brush-router";
-import {
-  STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
-} from "./studio-hokusai-natural-media-worker-protocol";
-import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
 export const STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION = 8 as const;
 

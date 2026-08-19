@@ -1,18 +1,17 @@
 import { z } from "zod";
 
-import { hydrateStudioAiImageReferenceDocument } from
-  "./studio-ai-image-reference-roles";
+import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import {
   normalizeStudioAiProvenanceDocument,
   type StudioAiProvenanceDocument,
-} from "./studio-ai-provenance";
+} from "./ai/studio-ai-provenance";
 import {
   STUDIO_BG3D_SCENE_DOCUMENT_KIND,
   migrateStudioBg3dSceneDocument,
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
-} from "./studio-bg3d-scene-document";
-import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+} from "./bg3d/studio-bg3d-scene-document";
+import { parseStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
 import {
   parseStudioLinked3dRenderDocument,
   validateStudioLinked3dRenderDocumentAgainstPage,
@@ -21,14 +20,13 @@ import {
 } from "./studio-linked-3d-render-document";
 import { normalizePageReviewState } from "./studio-page-review";
 import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
-import { migrateStudioShared3dStageCollectionDocument } from
-  "./studio-shared-3d-stage-collection";
+import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
 import {
   STUDIO_VRM_SCENE_DOCUMENT_KIND,
   migrateStudioVrmSceneDocument,
   parseStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
-} from "./studio-vrm-scene-document";
+} from "./vrm/studio-vrm-scene-document";
 
 const STUDIO_PROJECT_MAX_ELEMENTS_PER_PAGE_OR_MASTER = 10_000;
 

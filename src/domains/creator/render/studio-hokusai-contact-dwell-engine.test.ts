@@ -6,7 +6,7 @@ import {
   HokusaiBrush,
   HokusaiCanvas,
   initSync,
-} from "../../../packages/studio-hokusai-wasm/pkg/studio_hokusai_wasm.js";
+} from "../../../../packages/studio-hokusai-wasm/pkg/studio_hokusai_wasm.js";
 
 import {
   planStudioHokusaiContactDwell,
@@ -25,8 +25,7 @@ import {
  * the planned dwell — so the regression this closes cannot silently return.
  */
 initSync({
-  module: new WebAssembly.Module(readFileSync(new URL(
-    "../../../packages/studio-hokusai-wasm/pkg/studio_hokusai_wasm_bg.wasm",
+  module: new WebAssembly.Module(readFileSync(new URL("../../../../packages/studio-hokusai-wasm/pkg/studio_hokusai_wasm_bg.wasm",
     import.meta.url,
   ))),
 });

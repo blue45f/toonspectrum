@@ -62,14 +62,14 @@ function moduleEdges(relativePath: string): ModuleEdges {
 
 const STUDIO_LAZY_UI_OPTIONAL_MODULES = [
   "./StudioColorPalettePanel",
-  "./StudioFilterDialog",
+  "./filter/StudioFilterDialog",
   "./StudioFloodFillPanel",
   "./StudioHealCloneOverlay",
   "./StudioHistoryBrushOverlay",
   "./StudioImageAdjustmentsPanel",
   "./StudioIsometricGridOverlay",
-  "./StudioLayerMaskOverlay",
-  "./StudioLayerNavigator",
+  "./layer/StudioLayerMaskOverlay",
+  "./layer/StudioLayerNavigator",
   "./StudioPaletteLibraryPanel",
   "./StudioPanelSplitTool",
   "./StudioPerspectiveOverlay",
@@ -145,8 +145,8 @@ describe("Studio optional UI bundle boundaries", () => {
   });
 
   it("uses local passive Suspense boundaries for lazy Konva overlays", () => {
-    const source = moduleEdges("./StudioCanvasViewport.tsx").source;
-    const guideSource = moduleEdges("./StudioCanvasGuideLayers.tsx").source;
+    const source = moduleEdges("./canvas/StudioCanvasViewport.tsx").source;
+    const guideSource = moduleEdges("./canvas/StudioCanvasGuideLayers.tsx").source;
 
     for (const component of [
       "StudioPanelSplitOverlay",

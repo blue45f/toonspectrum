@@ -11,11 +11,26 @@ import { Grayscale } from "konva/lib/filters/Grayscale";
 import { Invert } from "konva/lib/filters/Invert";
 import { Sepia } from "konva/lib/filters/Sepia";
 
+import { inkWashKonvaFilter, normalizeInkWash, isIdentityInkWash } from "../brush/studio-ink-wash";
+import {
+  glitchFxKonvaFilter,
+  isIdentityGlitchFx,
+  isIdentityVignetteFx,
+  normalizeGlitchFx,
+  normalizeVignetteFx,
+  vignetteFxKonvaFilter,
+} from "../filter/studio-filter-pack";
+import {
+  isIdentityStudioFilterUnionWave,
+  normalizeStudioFilterUnionWave,
+  studioFilterUnionWaveKonvaFilter,
+  type StudioFilterUnionWave,
+} from "../filter/studio-filter-union-wave";
 import {
   listEnabledStudioAdjustmentOperations,
   normalizeStudioAdjustmentFilterOperations,
   studioAdjustmentOperationToFilterFields,
-} from "./studio-adjustment-stack";
+} from "../studio-adjustment-stack";
 import {
   fieldIrisBlurKonvaFilter,
   lensBlurKonvaFilter,
@@ -26,7 +41,7 @@ import {
   selectiveGaussianBlurKonvaFilter,
   tiltShiftBlurKonvaFilter,
   type StudioAdvancedBlurExecution,
-} from "./studio-advanced-blur-filters";
+} from "../studio-advanced-blur-filters";
 import {
   cloudsKonvaFilter,
   convolutionKonvaFilter,
@@ -46,71 +61,49 @@ import {
   normalizeStudioUnsharpMask,
   pixelOffsetKonvaFilter,
   unsharpMaskKonvaFilter,
-} from "./studio-advanced-pixel-filters";
-import { autoAdjustKonvaFilter, normalizeAutoAdjust, isIdentityAutoAdjust } from "./studio-auto-adjust";
-import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx } from "./studio-blur";
-import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat } from "./studio-channel-mixer";
-import { clarityKonvaFilter, normalizeClarity, isIdentityClarity } from "./studio-clarity";
-import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance } from "./studio-color-balance";
-import { normalizeColorToAlpha, isIdentityColorToAlpha } from "./studio-color-to-alpha";
-import { curveKonvaFilter, normalizeCurve, normalizeCurveChannels, isIdentityCurve, isIdentityCurveChannels, curveToFlat } from "./studio-curves";
-import { detailKonvaFilter, normalizeDetail, isIdentityDetail } from "./studio-detail";
-import { distortKonvaFilter, normalizeDistort, isIdentityDistort } from "./studio-distort";
-import {
-  glitchFxKonvaFilter,
-  isIdentityGlitchFx,
-  isIdentityVignetteFx,
-  normalizeGlitchFx,
-  normalizeVignetteFx,
-  vignetteFxKonvaFilter,
-} from "./studio-filter-pack";
-import {
-  isIdentityStudioFilterUnionWave,
-  normalizeStudioFilterUnionWave,
-  studioFilterUnionWaveKonvaFilter,
-  type StudioFilterUnionWave,
-} from "./studio-filter-union-wave";
-import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters";
-import { glowKonvaFilter, normalizeGlow, isIdentityGlow } from "./studio-glow";
-import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat } from "./studio-gradient-map";
-import { grainKonvaFilter, normalizeGrain, isIdentityGrain } from "./studio-grain";
-import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone } from "./studio-halftone";
-import { inkWashKonvaFilter, normalizeInkWash, isIdentityInkWash } from "./studio-ink-wash";
-import {
-  nativeBlur,
-  nativeBrighten,
-  nativeContrast,
-  nativeHSL,
-  nativePixelate,
-} from "./studio-konva-native-filters";
-import { levelsKonvaFilter, normalizeLevels, normalizeLevelsChannels, isIdentityLevels, isIdentityLevelsChannels, levelsToFlat } from "./studio-levels";
-import { lightKonvaFilter, normalizeLight, isIdentityLight } from "./studio-light";
+} from "../studio-advanced-pixel-filters";
+import { autoAdjustKonvaFilter, normalizeAutoAdjust, isIdentityAutoAdjust } from "../studio-auto-adjust";
+import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx } from "../studio-blur";
+import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat } from "../studio-channel-mixer";
+import { clarityKonvaFilter, normalizeClarity, isIdentityClarity } from "../studio-clarity";
+import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance } from "../studio-color-balance";
+import { normalizeColorToAlpha, isIdentityColorToAlpha } from "../studio-color-to-alpha";
+import { curveKonvaFilter, normalizeCurve, normalizeCurveChannels, isIdentityCurve, isIdentityCurveChannels, curveToFlat } from "../studio-curves";
+import { detailKonvaFilter, normalizeDetail, isIdentityDetail } from "../studio-detail";
+import { distortKonvaFilter, normalizeDistort, isIdentityDistort } from "../studio-distort";
+import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "../studio-filters";
+import { glowKonvaFilter, normalizeGlow, isIdentityGlow } from "../studio-glow";
+import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat } from "../studio-gradient-map";
+import { grainKonvaFilter, normalizeGrain, isIdentityGrain } from "../studio-grain";
+import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone } from "../studio-halftone";
+import { levelsKonvaFilter, normalizeLevels, normalizeLevelsChannels, isIdentityLevels, isIdentityLevelsChannels, levelsToFlat } from "../studio-levels";
+import { lightKonvaFilter, normalizeLight, isIdentityLight } from "../studio-light";
 import {
   lineArtCleanupKonvaFilter,
   normalizeLineArtCleanup,
-} from "./studio-line-cleanup";
-import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad } from "./studio-outline";
-import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter } from "./studio-photo-filter";
+} from "../studio-line-cleanup";
+import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad } from "../studio-outline";
+import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter } from "../studio-photo-filter";
 import {
   normalizeStudioDifferenceOfGaussiansOptions,
   normalizeStudioDustScratchesOptions,
   normalizeStudioTileableBlurOptions,
-} from "./studio-professional-filter-kernels";
+} from "../studio-professional-filter-kernels";
 import {
   differenceOfGaussiansKonvaFilter,
   dustScratchesKonvaFilter,
   professionalColorToAlphaKonvaFilter,
   tileableBlurKonvaFilter,
-} from "./studio-professional-filters";
-import { selectiveHslKonvaFilter, normalizeSelectiveHsl, isIdentitySelectiveHsl, selectiveHslToFlat } from "./studio-selective-hsl";
-import { shadowHighlightKonvaFilter, normalizeShadowHighlight, isIdentityShadowHighlight } from "./studio-shadow-highlight";
-import { sketchKonvaFilter, normalizeSketch, isIdentitySketch } from "./studio-sketch";
-import { stylizeKonvaFilter, normalizeStylize, isIdentityStylize } from "./studio-stylize";
+} from "../studio-professional-filters";
+import { selectiveHslKonvaFilter, normalizeSelectiveHsl, isIdentitySelectiveHsl, selectiveHslToFlat } from "../studio-selective-hsl";
+import { shadowHighlightKonvaFilter, normalizeShadowHighlight, isIdentityShadowHighlight } from "../studio-shadow-highlight";
+import { sketchKonvaFilter, normalizeSketch, isIdentitySketch } from "../studio-sketch";
+import { stylizeKonvaFilter, normalizeStylize, isIdentityStylize } from "../studio-stylize";
 import {
   normalizeStudioEdgeAwareDenoiseOptions,
   normalizeStudioJpegArtifactReductionOptions,
   normalizeStudioScreentoneRemovalOptions,
-} from "./studio-tone-artifact-filter-kernels";
+} from "../studio-tone-artifact-filter-kernels";
 import {
   edgeAwareDenoiseKonvaFilter,
   isIdentityStudioEdgeAwareDenoise,
@@ -118,8 +111,16 @@ import {
   isIdentityStudioScreentoneRemoval,
   jpegArtifactReductionKonvaFilter,
   screentoneRemovalKonvaFilter,
-} from "./studio-tone-artifact-filters";
-import { vibranceKonvaFilter, normalizeVibrance, isIdentityVibrance } from "./studio-vibrance";
+} from "../studio-tone-artifact-filters";
+import { vibranceKonvaFilter, normalizeVibrance, isIdentityVibrance } from "../studio-vibrance";
+
+import {
+  nativeBlur,
+  nativeBrighten,
+  nativeContrast,
+  nativeHSL,
+  nativePixelate,
+} from "./studio-konva-native-filters";
 
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 

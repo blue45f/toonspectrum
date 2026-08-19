@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+} from "./brush/studio-ink-pressure-model";
+import { planStudioGpuDabs } from "./render/studio-webgpu-dab-planner";
+import { studioGpuPressureRadius } from "./render/studio-webgpu-stroke";
+import {
   advanceStudioResidualInk,
   planStudioCausalInk,
   planStudioCausalInkDabs,
@@ -9,13 +16,6 @@ import {
   startStudioResidualInk,
   STUDIO_CAUSAL_INK_DEFAULT_PRESSURE,
 } from "./studio-causal-ink";
-import {
-  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
-  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
-  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
-} from "./studio-ink-pressure-model";
-import { planStudioGpuDabs } from "./studio-webgpu-dab-planner";
-import { studioGpuPressureRadius } from "./studio-webgpu-stroke";
 
 function expectDabsClose(
   actual: readonly { x: number; y: number; pressure: number; radius: number }[],

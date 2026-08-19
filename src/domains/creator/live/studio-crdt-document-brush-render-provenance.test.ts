@@ -5,7 +5,8 @@ import {
   createStudioBrushRenderProvenanceCrdtSidecar,
   type StudioBrushRenderProvenance,
   type StudioBrushRenderProvenanceCrdtSidecar,
-} from "./studio-brush-render-provenance";
+} from "../brush/studio-brush-render-provenance";
+
 import {
   STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_CONTENT_INDEX_ROOT,
   STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_BYTES,

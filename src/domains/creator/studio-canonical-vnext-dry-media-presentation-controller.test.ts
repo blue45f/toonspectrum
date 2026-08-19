@@ -2,7 +2,15 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import { normalizeStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
+import {
+  fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
+  STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_DUAL_TIP_CAPABILITY,
+  STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_LOWERING_VERSION,
+  STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_PLAN_VERSION,
+  type StudioEngineWebGpuTexturedBrushDab,
+  type StudioEngineWebGpuTexturedBrushPlan,
+} from "./render/studio-engine-webgpu-textured-brush-plan";
 import { adaptStudioDrawElementToCanonicalBrushPlan } from "./studio-canonical-brush-draw-adapter";
 import { hashStudioCanonicalBrushPlan } from "./studio-canonical-brush-plan";
 import {
@@ -12,25 +20,17 @@ import {
   type StudioCanonicalVNextDryMediaPresentationSurfaceBoundary,
   type StudioCanonicalVNextDryMediaTexturedRuntimeBoundary,
 } from "./studio-canonical-vnext-dry-media-presentation-controller";
-import {
-  fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
-  STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_DUAL_TIP_CAPABILITY,
-  STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_LOWERING_VERSION,
-  STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_PLAN_VERSION,
-  type StudioEngineWebGpuTexturedBrushDab,
-  type StudioEngineWebGpuTexturedBrushPlan,
-} from "./studio-engine-webgpu-textured-brush-plan";
 
-import type { DrawEl } from "./studio-element-model";
 import type {
   StudioEngineWebGpuPresentationFrameLease,
   StudioEngineWebGpuPresentationReceipt,
   StudioEngineWebGpuPresentationSurfaceStats,
-} from "./studio-engine-webgpu-presentation-surface";
+} from "./render/studio-engine-webgpu-presentation-surface";
 import type {
   StudioEngineWebGpuTexturedBrushFrame,
   StudioEngineWebGpuTexturedBrushReceipt,
-} from "./studio-engine-webgpu-textured-brush-runtime";
+} from "./render/studio-engine-webgpu-textured-brush-runtime";
+import type { DrawEl } from "./studio-element-model";
 
 function element(): DrawEl {
   return {
@@ -536,7 +536,7 @@ describe("canonical vNext dry-media presentation controller", () => {
   it("stays unmounted until a product host can atomically gate fallback visibility", () => {
     const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
     const viewport = readFileSync(
-      new URL("./StudioCanvasViewport.tsx", import.meta.url),
+      new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
       "utf8",
     );
     expect(page).not.toContain("StudioCanonicalVNextDryMediaPresentationController");

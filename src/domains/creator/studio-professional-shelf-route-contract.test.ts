@@ -4,8 +4,8 @@ import {
   STUDIO_BRUSH_BACKEND_INTEGRATION_AUDIT,
   type StudioBrushBackendAvailability,
   type StudioBrushBackendId,
-} from "./studio-brush-backend-quality-policy";
-import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
+} from "./brush/studio-brush-backend-quality-policy";
+import { studioBrushPackDescriptorById } from "./brush/studio-brush-pack-index";
 import {
   STUDIO_PROFESSIONAL_SHELF_GENERIC_RUNTIME_CARRIERS,
   STUDIO_PROFESSIONAL_SHELF_ROUTE_CONTRACTS,

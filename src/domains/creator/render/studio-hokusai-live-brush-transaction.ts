@@ -3,7 +3,7 @@ import {
 } from "./studio-hokusai-live-brush-document-receipt";
 import { studioHokusaiSourceRevision } from "./studio-hokusai-natural-media-contract";
 
-import type { DrawEl, El, ImageEl } from "./studio-element-model";
+import type { DrawEl, El, ImageEl } from "../studio-element-model";
 import type { StudioHokusaiLiveCanonicalResult } from "./studio-hokusai-live-brush-runtime";
 
 const PNG_SIGNATURE = Object.freeze([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);

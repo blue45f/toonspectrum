@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { STUDIO_SCREEN_SHARE_DISCOVERY_ID } from "../studio-screen-share";
+
 import {
   STUDIO_CRDT_PROTOCOL_VERSION,
   type StudioCrdtSyncRequest,
@@ -22,7 +24,6 @@ import {
 import {
   applyStudioRealtimePurposeRouting,
 } from "./studio-live-socket-transport";
-import { STUDIO_SCREEN_SHARE_DISCOVERY_ID } from "./studio-screen-share";
 
 import type {
   StudioLiveTransport,
@@ -36,10 +37,10 @@ import type {
   StudioRealtimeOutboundEvent,
   StudioRealtimePublishAck,
   StudioRealtimeWorkload,
-} from "./studio-realtime-provider-protocol";
+} from "../studio-realtime-provider-protocol";
 import type {
   StudioRealtimeWorkloadStatus,
-} from "./studio-realtime-workload-coordinator";
+} from "../studio-realtime-workload-coordinator";
 
 const NOW = Date.parse("2026-07-31T05:00:00.000Z");
 const LOCAL: StudioLiveParticipant = {

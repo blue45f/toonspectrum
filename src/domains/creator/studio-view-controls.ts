@@ -7,7 +7,7 @@ import {
   planStudioStageViewportClipBox,
   type StudioStageViewportClipBox,
   type StudioStageViewportClipViewport,
-} from "./studio-stage-viewport-clip";
+} from "./canvas/studio-stage-viewport-clip";
 
 export const STUDIO_VIEW_ZOOM_MIN = 0.2;
 export const STUDIO_VIEW_ZOOM_MAX = 5;

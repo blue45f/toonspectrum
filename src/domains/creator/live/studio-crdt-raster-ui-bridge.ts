@@ -1,28 +1,28 @@
 import {
-  processFreehandPoints,
-  resampleStrokePressures,
-  strokeRenderDistance,
-} from "./studio-brush";
-import { selectStudioCausalInkSamples } from "./studio-causal-ink";
-import {
   resolveStudioInkPressureSamples,
   studioInkFallbackPressure,
   studioInkUsesPathResidualDabSpacing,
   type StudioInkPressureModel,
-} from "./studio-ink-pressure-model";
+} from "../brush/studio-ink-pressure-model";
 import {
   planStudioWebGpuCommittedSuffix,
   studioWebGpuCommittedBarrierReason,
   type StudioWebGpuCommittedElementInput,
   type StudioWebGpuCommittedPlanGates,
-} from "./studio-webgpu-committed-plan";
+} from "../render/studio-webgpu-committed-plan";
+import {
+  processFreehandPoints,
+  resampleStrokePressures,
+  strokeRenderDistance,
+} from "../studio-brush";
+import { selectStudioCausalInkSamples } from "../studio-causal-ink";
 
 import type { StudioCrdtDocument } from "./studio-crdt-document";
+import type { StudioGpuStroke } from "../render/studio-webgpu-stroke";
 import type {
   StudioMaterialMinimumDiameterRatio,
   StudioMaterialPressureModel,
-} from "./studio-material-pressure-model";
-import type { StudioGpuStroke } from "./studio-webgpu-stroke";
+} from "../studio-material-pressure-model";
 
 import {
   STUDIO_RASTER_CRDT_VERSION,

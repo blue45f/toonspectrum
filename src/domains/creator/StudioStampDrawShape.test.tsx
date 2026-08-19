@@ -12,7 +12,7 @@ const stampRendererCapture = vi.hoisted(() => ({
   draw: vi.fn(),
 }));
 
-vi.mock("./studio-stamp-symmetry-rendering", () => ({
+vi.mock("./brush/studio-stamp-symmetry-rendering", () => ({
   drawStudioStampStrokeWithSymmetry: stampRendererCapture.draw,
 }));
 

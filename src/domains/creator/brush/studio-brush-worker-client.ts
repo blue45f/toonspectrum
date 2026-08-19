@@ -1,7 +1,8 @@
 /**
  * Web Worker client for asynchronous brush stroke calculation.
  */
-import { processFreehandPoints } from "./studio-brush";
+import { processFreehandPoints } from "../studio-brush";
+
 import {
   STUDIO_BRUSH_WORKER_PROTOCOL_VERSION,
   type StudioBrushWorkerPlanRequest,

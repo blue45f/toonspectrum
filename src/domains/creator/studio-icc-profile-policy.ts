@@ -10,7 +10,7 @@
 import {
   parseIccProfile,
   type StudioIccProfile,
-} from "./studio-canvaskit-icc-profile";
+} from "./render/studio-canvaskit-icc-profile";
 
 export const STUDIO_ICC_PROFILE_POLICY_VERSION = 1 as const;
 export const STUDIO_ICC_PROFILE_POLICY_SCHEMA =

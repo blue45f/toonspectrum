@@ -2,8 +2,7 @@
  * Page-side orchestrator for the real Chromium Dedicated Worker OPFS v2 verifier.
  */
 
-const WORKER_URL = new URL(
-  "./studio-engine-tile-storage-opfs-v2-worker-browser.ts",
+const WORKER_URL = new URL("./studio-engine-tile-storage-opfs-v2-worker-browser.ts",
   import.meta.url,
 );
 const COMMAND_TIMEOUT_MS = 30_000;

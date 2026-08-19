@@ -11,12 +11,12 @@
  * above this authoritative surface without ever rewriting retained pigment.
  */
 
-import { hash2 } from "./studio-grain";
 import {
   normalizeWatercolorBrushPlanSettings,
   type WatercolorBrushDab,
   type WatercolorBrushPlanSettings,
-} from "./studio-watercolor-brush";
+} from "./brush/studio-watercolor-brush";
+import { hash2 } from "./studio-grain";
 
 const DEFAULT_PRESSURE = 0.55;
 const MAX_COORDINATE_ABS = 1_000_000;

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { layoutVerticalText } from "../studio-vertical-text";
+
 import {
   estimateDialogueGlyphWidth,
   estimateDialogueTextAdvanceWidth,
@@ -8,7 +10,6 @@ import {
   planDialogueVerticalRubyOverlayPlacements,
   readDialogueRubySpans,
 } from "./studio-dialogue-ruby-layout";
-import { layoutVerticalText } from "./studio-vertical-text";
 
 const VERTICAL_MEASURER = {
   measureWidth(text: string, fontPx: number) {

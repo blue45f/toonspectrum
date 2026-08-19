@@ -15,12 +15,12 @@ import {
   walkStampSegment,
   type StudioStampBrushStyle,
   type StudioStampWalkerState,
-} from "./studio-brush-stamp-engine";
+} from "../brush/studio-brush-stamp-engine";
 import {
   acquireStudioLowLatencyCanvas2dContext,
   decideStudioNativeLiveSurfaceResolution,
   type StudioNativeLiveSurfaceResolutionDecision,
-} from "./studio-low-latency-canvas";
+} from "../studio-low-latency-canvas";
 
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
 

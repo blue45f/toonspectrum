@@ -43,7 +43,7 @@ interface FilterLaneBenchmark {
 
 const benchmark = JSON.parse(
   readFileSync(
-    new URL("../../../tests/benchmarks/results/filter-lanes.json", import.meta.url),
+    new URL("../../../../tests/benchmarks/results/filter-lanes.json", import.meta.url),
     "utf8",
   ),
 ) as FilterLaneBenchmark;

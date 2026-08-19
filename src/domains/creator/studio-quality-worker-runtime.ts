@@ -1,4 +1,4 @@
-import { snapshotStudioPortablePathGeometry } from "./studio-canvaskit-portable-geometry";
+import { snapshotStudioPortablePathGeometry } from "./render/studio-canvaskit-portable-geometry";
 import {
   STUDIO_QUALITY_WORKER_BUDGETS,
   STUDIO_QUALITY_WORKER_PROTOCOL_REVISION,
@@ -17,7 +17,7 @@ import type {
   StudioPathOpsResult,
   StudioQualityEngine,
   StudioStrokeToPathStyle,
-} from "./studio-canvaskit-adapter";
+} from "./render/studio-canvaskit-adapter";
 
 export interface StudioQualityWorkerPort {
   postMessage(message: StudioQualityWorkerResponseMessage): void;

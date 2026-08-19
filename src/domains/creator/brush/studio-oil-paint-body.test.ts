@@ -14,7 +14,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { planOilBrushDabs, studioOilPaintBodyForBrush } from "./studio-fx-brush";
+import { planOilBrushDabs, studioOilPaintBodyForBrush } from "../studio-fx-brush";
 
 function serpentine(): { points: number[]; pressures: number[] } {
   const points: number[] = [];

@@ -1,5 +1,5 @@
-import { normalizeStudioUiDensityMode, type StudioUiDensityMode } from "./studio-ui-density";
-import { type StudioWorkspaceId } from "./studio-workspaces";
+import { normalizeStudioUiDensityMode, type StudioUiDensityMode } from "../studio-ui-density";
+import { type StudioWorkspaceId } from "../studio-workspaces";
 
 const STUDIO_CANVAS_WIDE_WORKSPACES = [
   "storyboard",

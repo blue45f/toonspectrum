@@ -9,8 +9,8 @@ import {
   type StudioRasterExportIntentLock,
 } from "./useStudioRasterExportOrchestration";
 
+import type { StudioRasterExportOrchestration } from "./render/studio-raster-export-orchestration-runtime";
 import type { StudioProjectArchiveOrchestration } from "./studio-project-archive-orchestration-runtime";
-import type { StudioRasterExportOrchestration } from "./studio-raster-export-orchestration-runtime";
 import type { ChangeEvent } from "react";
 
 function deferred<Value>() {

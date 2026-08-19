@@ -3,17 +3,18 @@
  * Pure, no React.
  */
 
-import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
+import { BRUSH_PRESETS, type BrushPreset } from "../studio-brush";
+import {
+  listStudioBrushTrayItems,
+  type StudioBrushTrayCategory,
+  type StudioBrushTrayItem,
+} from "../studio-creative-ux";
+
 import { isStudioBrushEngineLaneId } from "./studio-brush-engine-lane-catalog";
 import {
   isStudioBrushPackCatalogId,
   STUDIO_BRUSH_PACK_CATALOG_IDS,
 } from "./studio-brush-pack-id";
-import {
-  listStudioBrushTrayItems,
-  type StudioBrushTrayCategory,
-  type StudioBrushTrayItem,
-} from "./studio-creative-ux";
 
 export const STUDIO_BRUSH_SIZE_RANGE = { min: 1, max: 80 } as const;
 export const STUDIO_BRUSH_OPACITY_RANGE = { min: 0.05, max: 1 } as const;

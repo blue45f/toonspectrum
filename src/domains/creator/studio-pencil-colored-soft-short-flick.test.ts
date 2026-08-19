@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { planNormalizedStudioDynamicBrushDabs } from "./studio-brush-dynamics";
-import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
-import { bridgeStudioDynamicDabsToDryMediaV1 } from "./studio-dry-media-dynamic-bridge";
+import { planNormalizedStudioDynamicBrushDabs } from "./brush/studio-brush-dynamics";
+import { materializeStudioBrushPackSelection } from "./brush/studio-brush-pack-runtime";
+import { bridgeStudioDynamicDabsToDryMediaV1 } from "./brush/studio-dry-media-dynamic-bridge";
 
 const SEED = 0x13ad_beef;
 

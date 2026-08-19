@@ -27,13 +27,13 @@
  * Konva/DOM 의존 없음 — node 구조 테스트와 브라우저 GPU 경로가 공유한다.
  */
 
-import { normalizeColorBalance } from "./studio-color-balance";
-import { buildCurveChannelLuts, normalizeCurve } from "./studio-curves";
-import { buildChannelLevelsLuts } from "./studio-levels";
+import { normalizeColorBalance } from "../studio-color-balance";
+import { buildCurveChannelLuts, normalizeCurve } from "../studio-curves";
+import { buildChannelLevelsLuts } from "../studio-levels";
 
-import type { ColorBalance } from "./studio-color-balance";
-import type { CurvePoint, CurveRgbChannels } from "./studio-curves";
-import type { LevelsParams, LevelsRgbChannels } from "./studio-levels";
+import type { ColorBalance } from "../studio-color-balance";
+import type { CurvePoint, CurveRgbChannels } from "../studio-curves";
+import type { LevelsParams, LevelsRgbChannels } from "../studio-levels";
 
 // ---------------------------------------------------------------------------
 // 공용 상수 — 디스패치 좌표계·바인딩 인덱스·uniform 레이아웃 오프셋

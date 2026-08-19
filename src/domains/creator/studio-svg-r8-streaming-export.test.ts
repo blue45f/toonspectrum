@@ -7,12 +7,12 @@ import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   studioBrushDynamicsSeedFromKey,
   type StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   hydrateStudioBrushR8GrainAsset,
   resetStudioBrushR8GrainRegistry,
-} from "./studio-brush-r8-grain-runtime";
-import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
+} from "./brush/studio-brush-r8-grain-runtime";
+import { resolveStudioDynamicBrushMaterialIdentity } from "./brush/studio-dry-media-dynamic-bridge";
 import {
   STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
   planStudioDynamicBrushCoverageMarks,
@@ -24,7 +24,7 @@ import {
   type StudioSvgR8StreamingCoverageMark,
 } from "./studio-svg-r8-streaming-export";
 
-import type { StudioBrushR8TextureGrainSource } from "./studio-brush-r8-grain-asset-contract";
+import type { StudioBrushR8TextureGrainSource } from "./brush/studio-brush-r8-grain-asset-contract";
 
 const paperBytes = new Uint8Array([
   0, 64, 128, 255,

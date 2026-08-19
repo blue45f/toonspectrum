@@ -8,9 +8,9 @@
  * Pure types only — no React, no browser, no page state.
  */
 
+import type { StudioFilterDraft, StudioFilterKind } from "./filter/studio-filter-menu";
 import type { CvdMode } from "./studio-color-vision-model";
 import type { DrawMode, StudioMenu } from "./studio-editor-tool-model";
-import type { StudioFilterDraft, StudioFilterKind } from "./studio-filter-menu";
 import type {
   StudioMainMenuSurfaceActions,
   StudioMainMenuSurfaceState,

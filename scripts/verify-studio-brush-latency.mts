@@ -24,7 +24,7 @@ import { chromium, type Browser, type Page } from "playwright";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
-} from "../src/domains/creator/studio-brush-catalog";
+} from "../src/domains/creator/brush/studio-brush-catalog";
 
 import {
   STUDIO_BRUSH_COMPETITIVE_DESKTOP_VIEWPORT,
@@ -236,17 +236,26 @@ function escapeRegExp(value: string): string {
 
 async function selectBrush(
   page: Page,
-  brush: Pick<StudioBrushCatalogItem, "id" | "name">,
+  brush: Pick<StudioBrushCatalogItem, "id" | "name" | "operation">,
 ): Promise<void> {
   const toolbar = page.getByRole("toolbar", { name: /그리기 옵션/u });
-  await toolbar.getByRole("button", { name: /브러시 선택 열기$/u }).click();
-  const catalog = page.getByRole("dialog", { name: "브러시 전체 라이브러리" });
-  await catalog.waitFor({ state: "visible" });
-  await catalog.getByRole("searchbox", { name: "전체 브러시 검색" }).fill(brush.id);
-  await catalog.getByRole("button", {
-    name: `${brush.name} 선택`,
-    exact: true,
+  if (brush.operation === "erase") {
+    const eraser = toolbar.getByRole("button", { name: "지우개", exact: true });
+    if (await eraser.getAttribute("aria-pressed") !== "true") await eraser.click();
+  } else {
+    const pen = toolbar.getByRole("button", { name: "펜", exact: true });
+    if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+  }
+  await toolbar.getByRole("button", {
+    name: brush.operation === "erase" ? /지우개 선택 열기$/u : /브러시 선택 열기$/u,
   }).click();
+  const catalog = page.getByRole("dialog", {
+    name: brush.operation === "erase" ? "지우개 선택" : "브러시 전체 라이브러리",
+  });
+  await catalog.waitFor({ state: "visible" });
+  const searchName = brush.operation === "erase" ? "전체 지우개 검색" : "전체 브러시 검색";
+  await catalog.getByRole("searchbox", { name: searchName }).fill(brush.id);
+  await catalog.locator(`[data-studio-brush-select="${brush.id}"]`).click();
   await catalog.waitFor({ state: "detached" });
   await toolbar.getByRole("button", {
     name: new RegExp(`^현재 도구 ${escapeRegExp(brush.name)},`, "u"),

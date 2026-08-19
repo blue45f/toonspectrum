@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  studioAdjustmentDefaultParams,
-  studioAdjustmentOperationToFilterFields,
-  type StudioAdjustmentEngineId,
-} from "./studio-adjustment-stack";
-import {
   applyImageFilters,
   buildImageFilters,
   registerStudioKonvaFilters,
   type KonvaLike,
-} from "./studio-konva-filters";
+} from "../render/studio-konva-filters";
+import {
+  studioAdjustmentDefaultParams,
+  studioAdjustmentOperationToFilterFields,
+  type StudioAdjustmentEngineId,
+} from "../studio-adjustment-stack";
 
 const COMPOSITE_ENGINES = [
   "surface-blur",

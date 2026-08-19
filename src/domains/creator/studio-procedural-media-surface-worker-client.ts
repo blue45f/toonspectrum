@@ -182,8 +182,7 @@ function safelyRemoveRuntimeAbortListener(
 
 function defaultWorkerFactory(): StudioProceduralMediaSurfaceWorkerLike {
   return new Worker(
-    new URL(
-      "./studio-procedural-media-surface-provider.worker.ts",
+    new URL("./studio-procedural-media-surface-provider.worker.ts",
       import.meta.url,
     ),
     {

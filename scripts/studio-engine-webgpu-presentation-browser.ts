@@ -8,14 +8,14 @@ import {
   createStudioEngineWebGpuPresentationSurface,
   type StudioEngineWebGpuPresentationFrameLease,
   type StudioEngineWebGpuPresentationLayout,
-} from "../src/domains/creator/studio-engine-webgpu-presentation-surface";
+} from "../src/domains/creator/render/studio-engine-webgpu-presentation-surface";
 import {
   fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
   type StudioEngineWebGpuTexturedBrushPlan,
-} from "../src/domains/creator/studio-engine-webgpu-textured-brush-plan";
+} from "../src/domains/creator/render/studio-engine-webgpu-textured-brush-plan";
 import {
   createStudioEngineWebGpuTexturedBrushRuntime,
-} from "../src/domains/creator/studio-engine-webgpu-textured-brush-runtime";
+} from "../src/domains/creator/render/studio-engine-webgpu-textured-brush-runtime";
 import { sha256HexPortable } from "../src/domains/creator/studio-sha256";
 
 const INITIAL_DEVICE_EPOCH = 1;

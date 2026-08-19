@@ -6,7 +6,7 @@ import {
   createStudioGeneric3dProxyTransformCommand,
 } from "./studio-generic-3d-pose-proxy";
 
-import type { StudioBg3dGlbValidationSuccess } from "./studio-bg3d-glb-validation";
+import type { StudioBg3dGlbValidationSuccess } from "./bg3d/studio-bg3d-glb-validation";
 
 function validation(patch: Partial<StudioBg3dGlbValidationSuccess["metrics"]> = {}): StudioBg3dGlbValidationSuccess {
   const metrics = {

@@ -414,13 +414,13 @@ describe("studio-production-semantic-graph", () => {
         edges: [
           {
             id: "derive-a-b",
-            kind: "derives-from",
+            kind: "derives-from ",
             fromNodeId: "panel-a",
             toNodeId: "panel-b",
           },
           {
             id: "derive-b-a",
-            kind: "derives-from",
+            kind: "derives-from ",
             fromNodeId: "panel-b",
             toNodeId: "panel-a",
           },

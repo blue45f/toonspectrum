@@ -54,7 +54,7 @@
  * 기준이어야 화면 표시(el.width/height로 스케일)에서 1:1로 정렬된다 — 크롭처럼 el.src의 자연
  * 해상도 자체가 바뀌는 편집을 하면 기존 maskSrc는 좌표계가 어긋난다(§design 문서의 알려진 한계 참고).
  */
-import type { MaskCanvasLike, MaskCtx2DLike, MaskImageSource, SelectionCanvasFactory } from "./studio-selection-tools";
+import type { MaskCanvasLike, MaskCtx2DLike, MaskImageSource, SelectionCanvasFactory } from "../studio-selection-tools";
 
 // ---------------------------------------------------------------------------
 // (A) 타입 · 술어(predicate)

@@ -1,15 +1,13 @@
+import type { StudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
+import type { StudioPaperSurfaceSettings } from "./brush/studio-paper-granulation-runtime";
+import type { DialogueLocaleMap } from "./lettering/studio-dialogue-translate";
 import type { AnimationTimelineDoc } from "./studio-anim-tracks";
-import type { DialogueLocaleMap } from "./studio-dialogue-translate";
-import type { StudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 import type { El } from "./studio-element-model";
 import type { LayerGroup } from "./studio-layers";
-import type { StudioLinked3dRenderDocument } from
-  "./studio-linked-3d-render-document";
+import type { StudioLinked3dRenderDocument } from "./studio-linked-3d-render-document";
 import type { PageGrade } from "./studio-page-grade";
 import type { PageReviewState } from "./studio-page-review";
-import type { StudioPaperSurfaceSettings } from "./studio-paper-granulation-runtime";
-import type { StudioShared3dStagePersistedState } from
-  "./studio-shared-3d-stage-collection";
+import type { StudioShared3dStagePersistedState } from "./studio-shared-3d-stage-collection";
 
 export interface PageState {
   id: string;

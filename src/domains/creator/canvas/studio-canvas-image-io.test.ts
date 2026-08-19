@@ -2,6 +2,17 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { decodeStudioRasterInterchange, encodeStudioRasterInterchange } from "../render/studio-raster-interchange";
+import {
+  STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
+  type StudioRasterInterchangeWorkerRequest,
+  type StudioRasterInterchangeWorkerResponse,
+} from "../render/studio-raster-interchange-worker-protocol";
+import {
+  STUDIO_UPLOAD_DESKTOP_MAX_DECODED_PIXELS,
+  STUDIO_UPLOAD_MOBILE_MAX_DECODED_PIXELS,
+} from "../studio-upload-image-safety";
+
 import {
   STUDIO_CANVAS_IMAGE_ACCEPT,
   assertStudioCanvasDecodedImageSize,
@@ -13,16 +24,6 @@ import {
   studioCanvasDecodedPixelLimit,
   studioOpenRasterFormatForFile,
 } from "./studio-canvas-image-io";
-import { decodeStudioRasterInterchange, encodeStudioRasterInterchange } from "./studio-raster-interchange";
-import {
-  STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
-  type StudioRasterInterchangeWorkerRequest,
-  type StudioRasterInterchangeWorkerResponse,
-} from "./studio-raster-interchange-worker-protocol";
-import {
-  STUDIO_UPLOAD_DESKTOP_MAX_DECODED_PIXELS,
-  STUDIO_UPLOAD_MOBILE_MAX_DECODED_PIXELS,
-} from "./studio-upload-image-safety";
 
 interface ControlledImage {
   crossOrigin: string | null;

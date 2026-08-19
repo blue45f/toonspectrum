@@ -10,10 +10,11 @@
 import {
   hashStudioCanonicalBrushPlan,
   parseStudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
 import {
   lowerStudioCanonicalBrushPlanToWebGpuDabs,
-} from "./studio-canonical-brush-webgpu-lowering";
+} from "../studio-canonical-brush-webgpu-lowering";
+
 import {
   isStudioEngineVNextBrushProviderGpuPresentation,
   STUDIO_ENGINE_VNEXT_BRUSH_PROVIDER_GPU_BOUNDARY_VERSION,
@@ -32,11 +33,11 @@ import {
 import type {
   StudioCanonicalBrushPlan,
   StudioCanonicalBrushPlanFailureReason,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
 import type {
   StudioCanonicalBrushSpecialistLoweringRequirement,
   StudioCanonicalBrushWebGpuLoweringResult,
-} from "./studio-canonical-brush-webgpu-lowering";
+} from "../studio-canonical-brush-webgpu-lowering";
 import type {
   StudioEngineTileCommitFailureReason,
   StudioEngineTileCommitReceipt,

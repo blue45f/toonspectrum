@@ -1,5 +1,5 @@
-import type { StudioGpuDabRenderUpdate } from "./studio-webgpu-dab-plan-contract";
-import type { StudioGpuViewport } from "./studio-webgpu-viewport-contract";
+import type { StudioGpuDabRenderUpdate } from "./render/studio-webgpu-dab-plan-contract";
+import type { StudioGpuViewport } from "./render/studio-webgpu-viewport-contract";
 
 export type StudioCanvas2dDabViewport = Required<Pick<
   StudioGpuViewport,

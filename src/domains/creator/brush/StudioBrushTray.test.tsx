@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioBrushTray } from "./StudioBrushTray";
 
 const traySource = readFileSync(
-  resolve(process.cwd(), "src/domains/creator/StudioBrushTray.tsx"),
+  resolve(process.cwd(), "src/domains/creator/brush/StudioBrushTray.tsx"),
   "utf8"
 );
 

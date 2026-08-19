@@ -2,9 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const studioPageSource = readStudioCuttoonEditorSource();
 const studioCanvasViewportSource = readFileSync(
-  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
 

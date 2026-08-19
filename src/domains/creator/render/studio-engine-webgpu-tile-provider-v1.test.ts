@@ -18,7 +18,7 @@ import {
   type StudioEngineWebGpuTileProviderV1,
 } from "./studio-engine-webgpu-tile-provider-v1";
 
-import type { StudioCanonicalBrushPlan } from "./studio-canonical-brush-plan";
+import type { StudioCanonicalBrushPlan } from "../studio-canonical-brush-plan";
 
 interface Deferred<Value> {
   readonly promise: Promise<Value>;

@@ -8,11 +8,11 @@
  * 전부 불변 · 부수효과 없음(스냅샷 불변성을 이용한 내부 라벨 메모만). Konva/React/DOM 의존 없음.
  */
 
-import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
 import {
   areStudioDrawingAssistDocumentsEqual,
   normalizeStudioDrawingAssistDocument,
-} from "./studio-drawing-assist-document";
+} from "./brush/studio-drawing-assist-document";
+import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 
 // StudioPage 의 El 과 구조 호환되는 최소 형태 — diff 휴리스틱에 쓰는 필드만 선언한다.
 export interface HistoryElementLike {

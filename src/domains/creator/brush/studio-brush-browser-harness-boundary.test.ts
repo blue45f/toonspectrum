@@ -3,10 +3,11 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+
 import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 
-const root = resolve(import.meta.dirname, "../../..");
+const root = resolve(import.meta.dirname, "../../../..");
 const harness = readFileSync(resolve(root, "scripts/verify-studio-brushes.mts"), "utf8");
 
 describe("Studio brush browser harness catalogue boundary", () => {

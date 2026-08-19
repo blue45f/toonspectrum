@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveStudioBrushRenderFamily } from "./studio-brush";
+import { resolveStudioBrushRenderFamily } from "../studio-brush";
+
 import {
   resolveStudioBrushBehaviorKind,
   resolveStudioBrushBehaviorPresentation,

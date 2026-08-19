@@ -9,7 +9,7 @@ import {
   type StudioAssetFavoriteState,
 } from "./studio-asset-favorites";
 
-import type { StudioRasterAsset } from "./studio-raster-assets";
+import type { StudioRasterAsset } from "./render/studio-raster-assets";
 import type { Dispatch, SetStateAction } from "react";
 
 import { resolveAssetUrl } from "@/src/catalog-static";

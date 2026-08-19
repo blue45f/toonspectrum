@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveStudioHybridPressureSample } from "../hybrid-dcc/studio-hybrid-pressure-profile";
+
 import {
   advanceStudioBrushVelocityPressure,
   resolveStudioBrushReleasePressure,
   type StudioBrushVelocityPressureSettings,
 } from "./studio-brush-velocity-pressure";
-import { resolveStudioHybridPressureSample } from "./studio-hybrid-pressure-profile";
 
 const base: StudioBrushVelocityPressureSettings = {
   brushId: "pen",

@@ -19,7 +19,7 @@ function sourceSection(
   return contents.slice(start, end);
 }
 
-const contract = source("./studio-scene-provider.ts");
+const contract = source("../studio-scene-provider.ts");
 const implementation = source("./studio-pixi-scene-provider.ts");
 
 describe("Studio Pixi scene provider source boundary", () => {

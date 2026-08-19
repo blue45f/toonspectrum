@@ -1,6 +1,6 @@
 import {
   StudioLiveGuestCredentialSchema,
-} from "../../../lib/studio-live-auth-ticket";
+} from "../../../../lib/studio-live-auth-ticket";
 
 export const STUDIO_LIVE_GUEST_CREDENTIAL_STORAGE_KEY =
   "toonspectrum-studio-live-guest-credential-v1";

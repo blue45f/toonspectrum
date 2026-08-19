@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { admitStudioLayerLiftArtifactPair } from "./studio-layer-lift-artifact";
+import { admitStudioLayerLiftArtifactPair } from "./layer/studio-layer-lift-artifact";
 import {
   deleteUnreferencedStudioWorkAssetUpload,
   downloadStudioWorkAsset,

@@ -16,12 +16,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { studioKonvaRuntime } from "./studio-konva-runtime";
+import { studioKonvaRuntime } from "../render/studio-konva-runtime";
 import {
   findStudioDrawWrapperNode,
   mirrorStudioDrawElementTranslation,
   mirrorStudioDrawSelectionIndicators,
-} from "./studio-selection-chrome-mirror";
+} from "../studio-selection-chrome-mirror";
 
 import type Konva from "konva";
 

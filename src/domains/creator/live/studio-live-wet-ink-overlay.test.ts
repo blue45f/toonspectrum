@@ -1,21 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  planStudioWetInkBrushReplay,
+  STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
+} from "../brush/studio-wet-ink-brush-runtime";
+
+import {
   resolveStudioLiveWetInkSimulationSteps,
   StudioLiveWetInkOverlayRenderer,
   studioLiveWetInkOverlaySupportsElement,
 } from "./studio-live-wet-ink-overlay";
-import {
-  planStudioWetInkBrushReplay,
-  STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
-} from "./studio-wet-ink-brush-runtime";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
 import type {
   StudioWetInkBrushSurface,
   StudioWetInkBrushSurfaceFactory,
-} from "./studio-wet-ink-brush-runtime";
+} from "../brush/studio-wet-ink-brush-runtime";
 
 interface RecordingCanvas extends HTMLCanvasElement {
   readonly clears: Array<readonly number[]>;

@@ -13,7 +13,7 @@
  * existing one-fill contract: overlap raises the winding magnitude but never cancels coverage or
  * applies stroke opacity twice.
  */
-import type { CalligraphySegment } from "./studio-brush";
+import type { CalligraphySegment } from "../studio-brush";
 
 export interface StudioCalligraphyRibbonCap {
   readonly x: number;

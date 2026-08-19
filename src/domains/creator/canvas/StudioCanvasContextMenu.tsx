@@ -21,7 +21,7 @@ import {
   STUDIO_ICON_SIZE,
   STUDIO_ICON_STROKE,
   studioChromeIconClass,
-} from "./studio-chrome-ui";
+} from "../studio-chrome-ui";
 
 export type StudioCanvasLayerReorder = "front" | "forward" | "backward" | "back";
 

@@ -8,17 +8,18 @@ import {
 } from "@toonspectrum/studio-engine-registry";
 
 import {
+  getStudioTournamentRuntime,
+  peekStudioTournamentRuntime,
+  selectFilterLane,
+} from "../studio-renderer-tournament-runtime";
+
+import {
   chooseLaneByCost,
   gpuDispatchCountForChainSteps,
   megapixelsOf,
   type StudioFilterLane,
   type StudioFilterLaneCostRanking,
 } from "./studio-filter-lane-cost-model";
-import {
-  getStudioTournamentRuntime,
-  peekStudioTournamentRuntime,
-  selectFilterLane,
-} from "./studio-renderer-tournament-runtime";
 
 /**
  * V11 strangler step (c) — first real-path delegation (ADR 0001 2차 개정).
@@ -166,7 +167,7 @@ const DEFAULT_TOURNAMENT_BOOTSTRAP: StudioFilterTournamentBootstrap = {
     if (typeof idle === "function") idle(() => task(), { timeout: 4_000 });
     else globalThis.setTimeout(task, 0);
   },
-  loadPersistence: () => import("./studio-tournament-sqlite-persistence"),
+  loadPersistence: () => import("../studio-tournament-sqlite-persistence"),
 };
 
 let tournamentBootstrap = DEFAULT_TOURNAMENT_BOOTSTRAP;

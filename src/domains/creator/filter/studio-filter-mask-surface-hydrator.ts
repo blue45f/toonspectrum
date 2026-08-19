@@ -2,10 +2,10 @@ import {
   replayStudioRasterCrdtPixels,
   type StudioRasterReplayRuntimeDependencies,
   type StudioRasterReplayRuntimeResult,
-} from "./studio-crdt-raster-replay-runtime";
-import { downloadStudioRasterAsset } from "./studio-raster-asset-client";
+} from "../live/studio-crdt-raster-replay-runtime";
+import { downloadStudioRasterAsset } from "../render/studio-raster-asset-client";
 
-import type { StudioCrdtDocument } from "./studio-crdt-document";
+import type { StudioCrdtDocument } from "../live/studio-crdt-document";
 import type {
   StudioRasterOperationLog,
   StudioRasterSurfaceSpec,

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { hydrateStudioAiImageReferenceDocument } from
-  "./studio-ai-image-reference-roles";
+import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
-} from "./studio-ai-provenance";
+} from "./ai/studio-ai-provenance";
+import { createDefaultStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
+import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
   parseStudioAutosave,
@@ -17,13 +18,9 @@ import {
   studioSharedAutosaveCompatibility,
   writeStudioLifecycleAutosave,
 } from "./studio-autosave";
-import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
-import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 import { createStudioReferenceBoardDocument } from "./studio-reference-board";
-import { migrateStudioShared3dStageCollectionDocument } from
-  "./studio-shared-3d-stage-collection";
-import { createNativePluralShared3dStageFixture } from
-  "./studio-shared-3d-stage-test-fixture";
+import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
+import { createNativePluralShared3dStageFixture } from "./studio-shared-3d-stage-test-fixture";
 
 const PRIVATE_PROMPT = "공개하면 안 되는 반전 프롬프트";
 const AI_IMAGE_REFERENCES = hydrateStudioAiImageReferenceDocument({

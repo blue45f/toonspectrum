@@ -3,7 +3,7 @@
  * mini illustrations for tools, not brand clones. Pure presentation.
  */
 /* eslint-disable react-refresh/only-export-components -- shape kind maps + picker kinds shared with StudioPage / options bar */
-import { STUDIO_DRAW_SHAPE_PICKER_KINDS as DRAW_SHAPE_PICKER_KINDS } from "./studio-draw-hud";
+import { STUDIO_DRAW_SHAPE_PICKER_KINDS as DRAW_SHAPE_PICKER_KINDS } from "./brush/studio-draw-hud";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioToolHintSpec } from "./studio-tool-hints";

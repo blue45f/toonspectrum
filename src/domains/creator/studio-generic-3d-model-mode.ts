@@ -1,13 +1,13 @@
 import type {
   StudioBg3dAssetMetadata,
   StudioBg3dAssetRightsReceipt,
-} from "./studio-bg3d-asset-metadata";
+} from "./bg3d/studio-bg3d-asset-metadata";
 import type {
   StudioBg3dGlbMetrics,
   StudioBg3dGlbValidationResult,
-} from "./studio-bg3d-glb-validation";
-import type { StudioBg3dObjWorkerCanonicalResult } from "./studio-bg3d-obj-worker-protocol";
-import type { StudioBg3dAttachmentRights } from "./studio-bg3d-scene-document";
+} from "./bg3d/studio-bg3d-glb-validation";
+import type { StudioBg3dObjWorkerCanonicalResult } from "./bg3d/studio-bg3d-obj-worker-protocol";
+import type { StudioBg3dAttachmentRights } from "./bg3d/studio-bg3d-scene-document";
 
 /**
  * Renderer-neutral product boundary for imported models which are not VRM avatars.

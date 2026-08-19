@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   StudioLayerLiftArtifactError,
   admitStudioLayerLiftArtifactPair,
@@ -9,7 +11,6 @@ import {
   type StudioLayerLiftArtifactPairInput,
   type StudioLayerLiftPngDecoder,
 } from "./studio-layer-lift-artifact";
-import { sha256HexPortable } from "./studio-sha256";
 
 const BACKGROUND_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAQAAAABCAYAAAD5PA/NAAAAGklEQVR42mMQ0bBxCEipaOhZsOXAiTsf/gMANLgImNAdwO0AAAAASUVORK5CYII=";

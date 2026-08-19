@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { exerciseStudioDccCatalogFeature } from "./studio-dcc-catalog-feature-dispatch";
+import { exerciseStudioDccCatalogFeature } from "./hybrid-dcc/studio-dcc-catalog-feature-dispatch";
 
 const CONFIGURED_SCRATCH = process.env.GROK_SCRATCH ?? process.env.SCRATCH;
 const SCRATCH = CONFIGURED_SCRATCH

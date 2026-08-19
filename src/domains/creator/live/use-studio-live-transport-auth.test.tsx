@@ -11,7 +11,7 @@ import {
 
 import type { StudioLiveTransportFactory } from "./studio-live-collaboration-transport";
 import type { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
-import type { StudioLiveAuthTicketResponse } from "../../../lib/studio-live-auth-ticket";
+import type { StudioLiveAuthTicketResponse } from "../../../../lib/studio-live-auth-ticket";
 
 function ticket(sequence: number): StudioLiveAuthTicketResponse {
   const issuedAt = new Date(1_800_000_000_000 + sequence * 60_000);

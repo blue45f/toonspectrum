@@ -11,19 +11,19 @@ import {
   AVATAR_FORGE_VERSION,
   createAvatarForgeState,
   parseAvatarForgeState,
-} from "./studio-vrm-avatar-forge";
+} from "./vrm/studio-vrm-avatar-forge";
 import {
   createStudioVrmLinkedAppearanceProjectionPlan,
   type StudioVrmLinkedAppearanceProjectionPlan,
-} from "./studio-vrm-linked-appearance-projection-plan";
-import { STUDIO_VRM_PROPORTION_KEYS } from "./studio-vrm-proportion-core";
+} from "./vrm/studio-vrm-linked-appearance-projection-plan";
+import { STUDIO_VRM_PROPORTION_KEYS } from "./vrm/studio-vrm-proportion-core";
 import {
   parseStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
   type StudioVrmCanonicalData,
   type StudioVrmSceneDocument,
   type StudioVrmVec3,
-} from "./studio-vrm-scene-document";
+} from "./vrm/studio-vrm-scene-document";
 
 /**
  * A page may contain many raster layers, but loading every linked avatar into one WebGL scene can

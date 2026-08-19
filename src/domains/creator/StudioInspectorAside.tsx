@@ -24,26 +24,49 @@ import {
 } from "lucide-react";
 import { Suspense, memo, useEffect, useMemo, useState } from "react";
 
-import { type StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
-import { DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS, type StudioAdvancedFillSettings } from "./studio-advanced-fill-settings";
-import { isStudioAiConfigured, type StudioAiSettings } from "./studio-ai-client";
-import { CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
-import { preloadStudioBackground3D } from "./studio-background-3d-loader";
-import { parseStudio3dTool } from "./studio-background-3d-metadata";
-import { type StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
-import { BRAND_KIT_FONTS, DEFAULT_BRAND_KIT_FONT } from "./studio-brand-kit";
-import { BRUSH_PRESETS } from "./studio-brush";
+import { isStudioAiConfigured, type StudioAiSettings } from "./ai/studio-ai-client";
+import { type StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
 import {
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsPresetId,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   type DeletedBrushRecord,
   type StudioBrushSnapshot,
   type StudioSavedBrush,
-} from "./studio-brush-library";
-import { hasCustomBubbleShape } from "./studio-bubble-custom-shape";
-import { normalizeExtraTails } from "./studio-bubble-path";
+} from "./brush/studio-brush-library";
+import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./brush/studio-draw-hud";
+import { STUDIO_BRUSH_OPACITY_RANGE, STUDIO_BRUSH_SIZE_RANGE } from "./brush/studio-draw-ux";
+import { toggleStudioDrawingPalette, type StudioDrawingPaletteLayout } from "./brush/studio-drawing-palettes";
+import { normalizeShapeParams, normalizeStrokeStyle } from "./brush/studio-stroke-shapes";
+import { type FilterMaskPaintMode } from "./filter/studio-filter-mask";
+import { type LayerMaskPaintMode } from "./layer/studio-layer-mask";
+import {
+  type StudioLayerColor,
+  type StudioLayerNavigatorItem,
+  type StudioLayerRole,
+} from "./layer/studio-layer-navigator";
+import { hasCustomBubbleShape } from "./lettering/studio-bubble-custom-shape";
+import { normalizeExtraTails } from "./lettering/studio-bubble-path";
+import { normalizeTextPath, type TextPathConfig } from "./lettering/studio-text-path";
+import { type ImageFilterFields } from "./render/studio-konva-filter-fields";
+import { summarizeStudioRasterPreparationSources } from "./render/studio-raster-edit-preparation";
+import {
+  resolveStudioRasterToolAvailability,
+  type StudioRasterToolAvailabilityContext,
+  type StudioRasterToolId,
+} from "./render/studio-raster-tool-availability";
+import {
+  localizeStudioInspectorRasterPolicy,
+  localizeStudioRasterToolAvailability,
+} from "./render/studio-raster-tool-reason-localization";
+import { type StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
+import { DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS, type StudioAdvancedFillSettings } from "./studio-advanced-fill-settings";
+import { CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
+import { preloadStudioBackground3D } from "./studio-background-3d-loader";
+import { parseStudio3dTool } from "./studio-background-3d-metadata";
+import { BRAND_KIT_FONTS, DEFAULT_BRAND_KIT_FONT } from "./studio-brand-kit";
+import { BRUSH_PRESETS } from "./studio-brush";
 import { type ColorRangeSample } from "./studio-color-range";
 import {
   applyCropAspect,
@@ -58,9 +81,6 @@ import {
   type DodgeBurnRange,
   type DodgeBurnSpongeMode,
 } from "./studio-dodge-burn";
-import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./studio-draw-hud";
-import { STUDIO_BRUSH_OPACITY_RANGE, STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
-import { toggleStudioDrawingPalette, type StudioDrawingPaletteLayout } from "./studio-drawing-palettes";
 import { type DrawMode, type DrawShapeKind, type StudioMenu, type Tool } from "./studio-editor-tool-model";
 import { type StudioEffectFavoriteState, type StudioEffectId } from "./studio-effect-favorites";
 import { containingPanel, elBounds } from "./studio-element-geometry";
@@ -81,7 +101,6 @@ import {
   selectStudioFigmaDesignTargets,
   type StudioFigmaSelectionLayoutPatch,
 } from "./studio-figma-selection-ux";
-import { type FilterMaskPaintMode } from "./studio-filter-mask";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { openStudioHelpCenter } from "./studio-help-center-channel";
@@ -100,13 +119,6 @@ import {
   type StudioInspectorTransientState,
 } from "./studio-inspector-tool-transition";
 import { type StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
-import { type ImageFilterFields } from "./studio-konva-filter-fields";
-import { type LayerMaskPaintMode } from "./studio-layer-mask";
-import {
-  type StudioLayerColor,
-  type StudioLayerNavigatorItem,
-  type StudioLayerRole,
-} from "./studio-layer-navigator";
 import {
   groupOfItem,
   isEffectivelyHidden,
@@ -173,16 +185,6 @@ import {
 } from "./studio-puppet-warp";
 import { type QuickMaskBrushMode } from "./studio-quick-mask";
 import { QUICKSHAPE_KIND_LABELS } from "./studio-quickshape-labels";
-import { summarizeStudioRasterPreparationSources } from "./studio-raster-edit-preparation";
-import {
-  resolveStudioRasterToolAvailability,
-  type StudioRasterToolAvailabilityContext,
-  type StudioRasterToolId,
-} from "./studio-raster-tool-availability";
-import {
-  localizeStudioInspectorRasterPolicy,
-  localizeStudioRasterToolAvailability,
-} from "./studio-raster-tool-reason-localization";
 import {
   DEFAULT_STUDIO_SKETCH_STYLE,
   studioSketchStyleOfElement,
@@ -208,8 +210,6 @@ import {
   type SelectionToolKind,
 } from "./studio-selection-tools";
 import { normalizeSkewPatch } from "./studio-skew";
-import { normalizeShapeParams, normalizeStrokeStyle } from "./studio-stroke-shapes";
-import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import { type StudioViewRotation } from "./studio-view-controls";
 import { STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH } from "./studio-workspaces";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
@@ -251,21 +251,20 @@ import {
   type StudioRasterRecoveryRequest,
 } from "./StudioRasterToolRecoveryPanel";
 import { StudioSkewPanel } from "./StudioSkewPanel";
-import { useStudioRasterSourcePresentation } from
-  "./use-studio-raster-source-presentation";
+import { useStudioRasterSourcePresentation } from "./use-studio-raster-source-presentation";
 
+import type {
+  StudioBrushDefaultRestoreDirection,
+  StudioBrushDefaultRestoreTransaction,
+} from "./brush/studio-brush-default-restore";
+import type { StudioBrushEngineProgramSet } from "./brush/studio-brush-engine-program-set";
+import type { StudioFilterKind } from "./filter/studio-filter-menu"; // keep type-only: inline `import { type X }` still emits a live import and drags the filter pack into launch
+import type { StudioLayerNavigatorAction } from "./layer/StudioLayerNavigator";
 import type {
   StudioAdvancedRuler,
   StudioAdvancedRulerDocument,
 } from "./studio-advanced-ruler-document";
-import type {
-  StudioBrushDefaultRestoreDirection,
-  StudioBrushDefaultRestoreTransaction,
-} from "./studio-brush-default-restore";
-import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
-import type { StudioFilterKind } from "./studio-filter-menu"; // keep type-only: inline `import { type X }` still emits a live import and drags the filter pack into launch
 import type { StudioScrollViewportStore } from "./studio-scroll-viewport-store";
-import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 
 import { buttonClass } from "@/components/ui/button-utils";
@@ -365,7 +364,7 @@ export interface StudioInspectorAsideHandlers {
   setBg: (newBg: string | ((prev: string) => string)) => void;
   setBgGrad: (newGrad: string[] | null | ((prev: string[] | null) => string[] | null)) => void;
   setCanvasH: (newH: number | ((prev: number) => number)) => void;
-  setPaperGrainKind: (kind: import("./studio-paper-texture").PaperGrainKind) => void;
+  setPaperGrainKind: (kind: import("./brush/studio-paper-texture").PaperGrainKind) => void;
   setPaperGrainVisible: (visible: boolean) => void;
   applyPaperTintBackground: () => void;
   setDescription: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
@@ -426,7 +425,7 @@ interface StudioInspectorAsideProps {
   canvasH: number;
   canvasRotation: StudioViewRotation;
   collaborationDocumentLocked: boolean;
-  paperGrainKind: import("./studio-paper-texture").PaperGrainKind;
+  paperGrainKind: import("./brush/studio-paper-texture").PaperGrainKind;
   paperGrainVisible: boolean;
   color: string;
   colorRangeFuzziness: number;
@@ -546,7 +545,7 @@ interface StudioInspectorAsideProps {
   savedBrushes: StudioSavedBrush[];
   /** Page-owned product authority shared with imports and the mobile projection. */
   openBrushLibraryRepository?: () => Promise<
-    import("./studio-brush-library-sqlite-repository").ProductBrushLibraryRepository
+    import("./brush/studio-brush-library-sqlite-repository").ProductBrushLibraryRepository
   >;
   saving: boolean;
   studioFilterPreparationBusy: boolean;
@@ -559,7 +558,7 @@ interface StudioInspectorAsideProps {
   scrollViewportStore: StudioScrollViewportStore;
   selected: El | null;
   selectedBg3dEditSource: { readonly scene?: StudioBg3dSceneDocument; readonly legacyDataUrl?: string; } | null;
-  selectedBubbleTailGeometry: import("./studio-bubble-custom-shape").BubbleShapeGeometry | null;
+  selectedBubbleTailGeometry: import( "./lettering/studio-bubble-custom-shape").BubbleShapeGeometry | null;
   selectedContentMutationLocked: boolean;
   selectedId: string | null;
   selectedRasterSource: string | null;
@@ -2827,8 +2826,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                             }}
                             onPlanImageSize={onAutoColorPlanImageSize}
                             onRun={async (request) => {
-                              const { runStudioAutoColorHintsWorker } = await import(
-                                "./studio-auto-color-hints-worker-client"
+                              const { runStudioAutoColorHintsWorker } = await import("./studio-auto-color-hints-worker-client"
                               );
                               return runStudioAutoColorHintsWorker(request);
                             }}

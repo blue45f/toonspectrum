@@ -27,9 +27,9 @@ const ROOT = path.resolve(HERE, "../../..");
 
 /** Durable render surfaces: retained Canvas, SVG export, and the shared alias/bake boundary. */
 const ROUTE_ROOTS = [
-  "src/domains/creator/StudioDrawNode.tsx",
-  "src/domains/creator/studio-svg-export.ts",
-  "src/domains/creator/studio-brush-alias-profile.ts",
+  "src/domains/creator/brush/StudioDrawNode.tsx",
+  "src/domains/creator/export/studio-svg-export.ts",
+  "src/domains/creator/brush/studio-brush-alias-profile.ts",
   "src/domains/creator/studio-living-ink-settled-bake-v1.ts",
 ] as const;
 

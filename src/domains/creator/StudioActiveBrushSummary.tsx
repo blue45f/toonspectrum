@@ -1,18 +1,18 @@
 import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 
-import { resolveStudioBrushBehaviorPresentation } from "./studio-brush-behavior-ui";
+import { resolveStudioBrushBehaviorPresentation } from "./brush/studio-brush-behavior-ui";
 import {
   studioCoreBrushCatalogItemById,
   studioBrushCatalogKindLabel,
-} from "./studio-brush-catalog-core";
-import { loadStudioBrushCatalogItemById } from "./studio-brush-catalog-loader";
-import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
-import { STUDIO_STABILIZER_MODES } from "./studio-stroke-stabilizer";
-import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
+} from "./brush/studio-brush-catalog-core";
+import { loadStudioBrushCatalogItemById } from "./brush/studio-brush-catalog-loader";
+import { isStudioBrushPackCatalogId } from "./brush/studio-brush-pack-id";
+import { STUDIO_STABILIZER_MODES } from "./brush/studio-stroke-stabilizer";
+import { StudioBrushPresetIcon } from "./brush/StudioBrushPresetIcon";
 
-import type { StudioBrushCatalogItem } from "./studio-brush-catalog-core";
+import type { StudioBrushCatalogItem } from "./brush/studio-brush-catalog-core";
+import type { StudioStabilizerMode } from "./brush/studio-stroke-stabilizer";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
-import type { StudioStabilizerMode } from "./studio-stroke-stabilizer";
 
 import { cn } from "@/lib/utils";
 

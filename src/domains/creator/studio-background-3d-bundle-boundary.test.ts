@@ -120,9 +120,9 @@ describe("Studio background 3D bundle boundary", () => {
   });
 
   it("keeps the room-builder metadata path independent of Three.js geometry", () => {
-    const imports = moduleImports("./studio-bg3d-room-builder.ts");
+    const imports = moduleImports("./bg3d/studio-bg3d-room-builder.ts");
 
-    expect(imports.valueImports).toContain("./studio-id");
+    expect(imports.valueImports).toContain("../studio-id");
     expect(imports.valueImports).not.toContain("./studio-background-3d-primitives");
     expect(imports.valueImports).not.toContain("three");
   });
@@ -132,21 +132,21 @@ describe("Studio background 3D bundle boundary", () => {
 
     expect(imports.valueImports).toContain("./studio-background-3d-metadata");
     expect(imports.valueImports).not.toContain("./studio-background-3d-primitives");
-    expect(imports.valueImports).not.toContain("./StudioBackground3D");
+    expect(imports.valueImports).not.toContain("./bg3d/StudioBackground3D");
   });
 
   it("loads the 3D editor from one analyzable dynamic-import boundary", () => {
     const imports = moduleImports("./studio-background-3d-loader.ts");
 
-    expect(imports.valueImports).not.toContain("./StudioBackground3D");
-    expect(imports.dynamicImports).toEqual(["./StudioBackground3D"]);
+    expect(imports.valueImports).not.toContain("./bg3d/StudioBackground3D");
+    expect(imports.dynamicImports).toEqual(["./bg3d/StudioBackground3D"]);
   });
 
   it("loads durable shot production only after the user starts a batch", () => {
-    const imports = moduleImports("./StudioBackground3D.tsx");
-    const loaderImports = moduleImports("./studio-bg3d-shot-batch-runtime-loader.ts");
+    const imports = moduleImports("./bg3d/StudioBackground3D.tsx");
+    const loaderImports = moduleImports("./bg3d/studio-bg3d-shot-batch-runtime-loader.ts");
     const runtimeSource = readFileSync(
-      new URL("./studio-bg3d-shot-batch-runtime.ts", import.meta.url),
+      new URL("./bg3d/studio-bg3d-shot-batch-runtime.ts", import.meta.url),
       "utf8",
     );
 
@@ -178,10 +178,10 @@ describe("Studio background 3D bundle boundary", () => {
   });
 
   it("loads Babylon exactly once from its named explicit diagnostic loader", () => {
-    const { file, source } = parseModule("./StudioBackground3D.tsx");
-    const imports = moduleImports("./StudioBackground3D.tsx");
+    const { file, source } = parseModule("./bg3d/StudioBackground3D.tsx");
+    const imports = moduleImports("./bg3d/StudioBackground3D.tsx");
     const specialistImports = moduleImports(
-      "./studio-bg3d-babylon-specialist-entry.ts",
+      "./bg3d/studio-bg3d-babylon-specialist-entry.ts",
     );
     const babylonDynamicImports: ts.CallExpression[] = [];
     const loaderCalls: ts.CallExpression[] = [];

@@ -1,3 +1,24 @@
+import type { StudioTextAiProvenance } from "./ai/studio-ai-client";
+import type {
+  StudioBg3dLtLayerRole,
+  StudioBg3dLtRenderMode,
+} from "./bg3d/studio-bg3d-lt-layer-plan";
+import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
+import type { NormalizedStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
+import type { StudioBrushEngineProgramSet } from "./brush/studio-brush-engine-program-set";
+import type { StudioStampBrushTuning } from "./brush/studio-brush-stamp-engine";
+import type { StudioInkPressureModel } from "./brush/studio-ink-pressure-model";
+import type { InkWash } from "./brush/studio-ink-wash";
+import type { StudioStrokePaintModel } from "./brush/studio-stroke-paint-model";
+import type { ShapeParams, StrokeStyle } from "./brush/studio-stroke-shapes";
+import type {
+  StudioLayerColor,
+  StudioLayerRole,
+} from "./layer/studio-layer-navigator";
+import type { BubbleTailSpec } from "./lettering/studio-bubble-path";
+import type { TextPathConfig } from "./lettering/studio-text-path";
+import type { StudioHokusaiLiveDocumentReceipt } from "./render/studio-hokusai-live-brush-document-receipt";
+import type { StudioRasterAsset } from "./render/studio-raster-assets";
 import type { StudioAdjustmentStack } from "./studio-adjustment-stack";
 import type {
   StudioFieldIrisBlurOptions,
@@ -5,19 +26,9 @@ import type {
   StudioSelectiveGaussianBlurOptions,
   StudioTiltShiftBlurOptions,
 } from "./studio-advanced-blur-filter-kernels";
-import type { StudioTextAiProvenance } from "./studio-ai-client";
 import type { BubbleVariant } from "./studio-assets";
 import type { AutoAdjust } from "./studio-auto-adjust";
-import type {
-  StudioBg3dLtLayerRole,
-  StudioBg3dLtRenderMode,
-} from "./studio-bg3d-lt-layer-plan";
-import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import type { BlurFx } from "./studio-blur";
-import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
-import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
-import type { StudioStampBrushTuning } from "./studio-brush-stamp-engine";
-import type { BubbleTailSpec } from "./studio-bubble-path";
 import type { ChannelMixer } from "./studio-channel-mixer";
 import type { Clarity } from "./studio-clarity";
 import type { ColorBalance } from "./studio-color-balance";
@@ -34,13 +45,6 @@ import type { StudioGradientSpec } from "./studio-gradient-engine";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
 import type { Halftone } from "./studio-halftone";
-import type { StudioHokusaiLiveDocumentReceipt } from "./studio-hokusai-live-brush-document-receipt";
-import type { StudioInkPressureModel } from "./studio-ink-pressure-model";
-import type { InkWash } from "./studio-ink-wash";
-import type {
-  StudioLayerColor,
-  StudioLayerRole,
-} from "./studio-layer-navigator";
 import type { Light } from "./studio-light";
 import type { LineArtCleanupOptions } from "./studio-line-cleanup";
 import type { StudioLinked3dCorrectionProvenance } from "./studio-linked-3d-render-document";
@@ -59,24 +63,20 @@ import type {
   StudioTileableBlurOptions,
 } from "./studio-professional-filter-kernels";
 import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
-import type { StudioRasterAsset } from "./studio-raster-assets";
 import type { StudioSketchStyle } from "./studio-rough-shape";
 import type { SelectiveHsl } from "./studio-selective-hsl";
 import type { ShadowHighlight } from "./studio-shadow-highlight";
 import type { Sketch } from "./studio-sketch";
 import type { StudioStockImageCredit } from "./studio-stock-image-client";
 import type { ScenarioBeatType } from "./studio-story-beats";
-import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
-import type { ShapeParams, StrokeStyle } from "./studio-stroke-shapes";
 import type { Stylize } from "./studio-stylize";
-import type { TextPathConfig } from "./studio-text-path";
 import type {
   StudioEdgeAwareDenoiseOptions,
   StudioJpegArtifactReductionOptions,
   StudioScreentoneRemovalOptions,
 } from "./studio-tone-artifact-filter-kernels";
 import type { Vibrance } from "./studio-vibrance";
-import type { StudioVrmSceneDocument } from "./studio-vrm-scene-document";
+import type { StudioVrmSceneDocument } from "./vrm/studio-vrm-scene-document";
 import type { StudioFilterMaskSurfaceId } from "@/lib/studio-filter-mask-surface-contract";
 import type { StudioInkInputContract } from "@/lib/studio-ink-input-contract";
 

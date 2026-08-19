@@ -3,12 +3,12 @@ import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
   type StudioBrushR8TextureGrainSource,
-} from "./studio-brush-r8-grain-asset-contract";
+} from "../brush/studio-brush-r8-grain-asset-contract";
 import {
   snapshotStudioBrushR8GrainAssetForTransfer,
   type StudioBrushR8GrainTransferSnapshotEntry,
-} from "./studio-brush-r8-grain-runtime";
-import { sha256HexPortable } from "./studio-sha256";
+} from "../brush/studio-brush-r8-grain-runtime";
+import { sha256HexPortable } from "../studio-sha256";
 
 /**
  * Exact native WebGPU bridge for the durable R8 paper-grain contract.

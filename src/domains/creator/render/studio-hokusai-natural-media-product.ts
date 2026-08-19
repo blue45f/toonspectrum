@@ -21,7 +21,7 @@ import {
   type StudioHokusaiWorkerResultMessage,
 } from "./studio-hokusai-natural-media-worker-protocol";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 export const STUDIO_HOKUSAI_PRODUCT_ENGINE_EPOCH = 1 as const;
 export const STUDIO_HOKUSAI_PRODUCT_STARTUP_TIMEOUT_MS = 30_000 as const;

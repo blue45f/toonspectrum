@@ -38,7 +38,7 @@
  * 한 글자도 바뀌지 않는다(하위호환).
  */
 
-import { layoutVerticalText, type VerticalBlockAlign } from "./studio-vertical-text";
+import { layoutVerticalText, type VerticalBlockAlign } from "../studio-vertical-text";
 
 export interface BubbleTextMeasurer {
   /** text를 (fontPx, fontFamily, fontStyle)로 그렸을 때의 렌더 폭(px). 자간은 포함하지 않는다 —

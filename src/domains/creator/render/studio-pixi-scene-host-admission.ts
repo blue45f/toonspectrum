@@ -5,10 +5,10 @@
  * brush or document authority. Pure helpers only — no pixi.js import here.
  */
 
-import { elBounds } from "./studio-element-geometry";
+import { elBounds } from "../studio-element-geometry";
 
-import type { El } from "./studio-element-model";
-import type { StudioSceneSelectableOverlay } from "./studio-scene-provider";
+import type { El } from "../studio-element-model";
+import type { StudioSceneSelectableOverlay } from "../studio-scene-provider";
 
 export const STUDIO_PIXI_SCENE_HOST_PRODUCT_ID =
   "studio-pixi-scene-overlay-host" as const;

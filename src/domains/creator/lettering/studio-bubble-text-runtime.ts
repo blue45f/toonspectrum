@@ -1,17 +1,18 @@
+import { layoutVerticalText, verticalBlockAlign, verticalTextItemGeometry } from "../studio-vertical-text";
+
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
   createCanvasBubbleTextMeasurer,
   fitBubbleFontSize,
 } from "./studio-bubble-text-fit";
-import { layoutVerticalText, verticalBlockAlign, verticalTextItemGeometry } from "./studio-vertical-text";
 
-import type { BubbleEl } from "./studio-element-model";
+import type { BubbleEl } from "../studio-element-model";
 import type {
   VerticalBlockAlign,
   VerticalTextItem,
   VerticalTextLayout,
   VerticalTextLayoutInput,
-} from "./studio-vertical-text";
+} from "../studio-vertical-text";
 
 export type { VerticalBlockAlign, VerticalTextItem, VerticalTextLayout };
 // 렌더러(Konva/SVG)가 같은 지오메트리 규약을 공유하도록 코어의 순수 헬퍼를 그대로 다시 내보낸다.

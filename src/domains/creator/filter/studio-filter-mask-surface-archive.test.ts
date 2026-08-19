@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  buildStudioProjectArchive,
+  importStudioProjectArchive,
+} from "../studio-project-archive";
+
+import {
   hasStudioFilterMaskSurfaceArchiveReferences,
   prepareStudioFilterMaskSurfaceArchiveExport,
   StudioFilterMaskSurfaceArchiveError,
   type StudioFilterMaskSurfaceArchiveDependencies,
 } from "./studio-filter-mask-surface-archive";
-import {
-  buildStudioProjectArchive,
-  importStudioProjectArchive,
-} from "./studio-project-archive";
 
 import {
   STUDIO_RASTER_CRDT_VERSION,

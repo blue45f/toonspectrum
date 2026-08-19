@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { studioHighBitSrgbToLinear } from "./studio-highbit-transfer";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
-} from "./studio-ink-pressure-model";
+} from "../brush/studio-ink-pressure-model";
+import { studioHighBitSrgbToLinear } from "../studio-highbit-transfer";
+
 import {
   isValidStudioGpuStroke,
   planStudioGpuDabUpdate,

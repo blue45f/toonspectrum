@@ -6,8 +6,8 @@ import {
 import type {
   Memory64CrossRealmAllocationAck,
   Memory64CrossRealmReservationToken,
-} from "./kernel/Memory64CrossRealmProtocol";
-import type { StudioDynamicBrushCoverageMark } from "./studio-dynamic-brush-coverage-renderer";
+} from "../kernel/Memory64CrossRealmProtocol";
+import type { StudioDynamicBrushCoverageMark } from "../studio-dynamic-brush-coverage-renderer";
 
 export const STUDIO_DRY_MEDIA_UNION_CONTINUATION_PROTOCOL_VERSION = 1 as const;
 export const STUDIO_DRY_MEDIA_UNION_CONTINUATION_PAGE_TARGET_BYTES = 1024 * 1024;

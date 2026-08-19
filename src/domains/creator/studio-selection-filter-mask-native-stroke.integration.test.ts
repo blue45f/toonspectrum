@@ -8,27 +8,27 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   applyFilterMaskToPixels,
   computeFilterMaskCoverage,
-} from "./studio-filter-mask";
+} from "./filter/studio-filter-mask";
 import {
   applyStudioInlineFilterMaskMutation,
-} from "./studio-filter-mask-surface-projection";
+} from "./filter/studio-filter-mask-surface-projection";
+import {
+  alphaBitmapFromRgba,
+  layerAlphaToPixelSelection,
+} from "./layer/studio-layer-alpha-selection";
 import {
   applyImageFilters,
   buildImageFilters,
   registerStudioKonvaFilters,
   type KonvaLike,
-} from "./studio-konva-filters";
-import {
-  alphaBitmapFromRgba,
-  layerAlphaToPixelSelection,
-} from "./studio-layer-alpha-selection";
-import { selectionToMask } from "./studio-quick-mask";
+} from "./render/studio-konva-filters";
 import {
   applyStudioEditableRasterCopy,
   materializeStudioEditableRasterCopy,
   planStudioEditableRasterCopy,
   renderStudioEditableRasterCopy,
-} from "./studio-raster-edit-preparation";
+} from "./render/studio-raster-edit-preparation";
+import { selectionToMask } from "./studio-quick-mask";
 import {
   commitStudioSelectionFilterMaskTransaction,
   createStudioSelectionFilterMaskTransaction,

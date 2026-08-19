@@ -1,4 +1,4 @@
-import { planDialogueVerticalRubyOverlayPlacements } from "../../../src/domains/creator/studio-dialogue-ruby-layout";
+import { planDialogueVerticalRubyOverlayPlacements } from "../../../src/domains/creator/lettering/studio-dialogue-ruby-layout";
 import {
   classifyVerticalPunctuation,
   isVerticalNoBreakAfter,
@@ -7,7 +7,7 @@ import {
   verticalTextItemGeometry,
 } from "../../../src/domains/creator/studio-vertical-text";
 
-import type { StudioRubySpanInput } from "../../../src/domains/creator/studio-dialogue-ruby-layout";
+import type { StudioRubySpanInput } from "../../../src/domains/creator/lettering/studio-dialogue-ruby-layout";
 import type {
   VerticalTextItem,
   VerticalTextLayout,

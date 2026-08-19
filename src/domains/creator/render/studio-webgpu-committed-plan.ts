@@ -1,5 +1,6 @@
-import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
-import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
+import { isStudioInkPressureModel } from "../brush/studio-ink-pressure-model";
+import { isStudioStrokePaintModelCompatible } from "../brush/studio-stroke-paint-model";
+
 import { isStudioGpuColorSupported } from "./studio-webgpu-color";
 
 /**

@@ -1,13 +1,13 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const source = readStudioCuttoonEditorSource();
 
 describe("Studio live gesture preview publisher wiring", () => {
   it("publishes exactly one begin from the authoritative pointer-start path", () => {
     expect(source).toContain(
-      'import { StudioLiveGesturePreviewPublisher } from "./studio-live-gesture-preview-publisher";',
+      'import { StudioLiveGesturePreviewPublisher } from "./live/studio-live-gesture-preview-publisher";',
     );
     expect(source.match(/drawingGesturePreviewPublisherRef\.current\.begin\(\{/g)).toHaveLength(1);
 

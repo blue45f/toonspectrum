@@ -3,7 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   MEMORY64_CROSS_REALM_PROTOCOL_VERSION,
   type Memory64CrossRealmReservationToken,
-} from "./kernel/Memory64CrossRealmProtocol";
+} from "../kernel/Memory64CrossRealmProtocol";
+import {
+  STUDIO_WASM_PAGE_BYTES,
+  StudioWasmLinearMemoryRuntime,
+} from "../studio-wasm64-memory-governor";
+
 import {
   createStudioDryMediaUnionContinuationScratchArena,
   STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_MAX_TILE_EDGE,
@@ -12,10 +17,6 @@ import {
   STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_WINDOW_BYTE_LENGTH,
   type StudioDryMediaUnionContinuationScratchArena,
 } from "./studio-dry-media-union-continuation-scratch-arena";
-import {
-  STUDIO_WASM_PAGE_BYTES,
-  StudioWasmLinearMemoryRuntime,
-} from "./studio-wasm64-memory-governor";
 
 const WINDOW_PAGES = BigInt(
   STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_WINDOW_BYTE_LENGTH,

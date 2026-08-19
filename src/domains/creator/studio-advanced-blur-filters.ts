@@ -20,8 +20,8 @@ import {
   type StudioTiltShiftBlurOptions,
 } from "./studio-advanced-blur-filter-kernels";
 
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type { StudioImageDataLike } from "./studio-filters";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 export type StudioAdvancedBlurExecution = "direct" | "worker";
 

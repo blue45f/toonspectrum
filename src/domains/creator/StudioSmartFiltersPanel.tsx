@@ -12,6 +12,12 @@ import {
 import { useId, useState } from "react";
 
 import {
+  STUDIO_FILTER_GROUP_ORDER,
+  searchStudioFilterCatalog,
+  studioFilterCatalogEntry,
+  studioFilterGroupLabel,
+} from "./filter/studio-filter-catalog";
+import {
   STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
   STUDIO_ADJUSTMENT_ENGINE_IDS,
   admitStudioAdjustmentStack,
@@ -26,12 +32,6 @@ import {
   type StudioAdjustmentEntry,
   type StudioAdjustmentStack,
 } from "./studio-adjustment-stack";
-import {
-  STUDIO_FILTER_GROUP_ORDER,
-  searchStudioFilterCatalog,
-  studioFilterCatalogEntry,
-  studioFilterGroupLabel,
-} from "./studio-filter-catalog";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import { buttonClass } from "@/components/ui/button-utils";

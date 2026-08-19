@@ -8,6 +8,8 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { planOilBrushDabs } from "../studio-fx-brush";
+
 import {
   normalizeStudioBrushEngineProgramSet,
   STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION,
@@ -18,7 +20,6 @@ import {
   studioOilRibbonProgramsFromSet,
   type StudioBrushOilProgramSet,
 } from "./studio-brush-engine-program-set";
-import { planOilBrushDabs } from "./studio-fx-brush";
 import {
   planStudioOilRibbonCarrier,
   studioOilRibbonProgramsForBrush,
@@ -198,7 +199,7 @@ describe("엔진 프로그램 세트", () => {
  */
 describe("엔진 프로그램 세트 · SVG 내보내기 패리티", () => {
   it("임파스토를 켠 커스텀 조합이 내보내기에서도 릴리프 레인을 낸다", async () => {
-    const { exportPageToSvg } = await import("./studio-svg-export");
+    const { exportPageToSvg } = await import("../export/studio-svg-export");
     const base = {
       id: "custom-oil",
       type: "draw" as const,

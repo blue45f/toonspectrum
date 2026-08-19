@@ -13,16 +13,16 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { STUDIO_ADJUSTMENT_ENGINE_IDS } from "./studio-adjustment-stack";
-import { STUDIO_COMMAND_CATALOG } from "./studio-command-catalog";
-import { STUDIO_FILTER_CATALOG, STUDIO_FILTER_DIALOG_CATALOG } from "./studio-filter-catalog";
-import { STUDIO_FILTER_LABELS, STUDIO_FILTER_MENU_KINDS } from "./studio-filter-menu";
-import { STUDIO_FILTER_PACK_DEFS } from "./studio-filter-pack";
+import { STUDIO_FILTER_CATALOG, STUDIO_FILTER_DIALOG_CATALOG } from "./filter/studio-filter-catalog";
+import { STUDIO_FILTER_LABELS, STUDIO_FILTER_MENU_KINDS } from "./filter/studio-filter-menu";
+import { STUDIO_FILTER_PACK_DEFS } from "./filter/studio-filter-pack";
 import {
   STUDIO_FILTER_ALL_KINDS,
   STUDIO_FILTER_PACK_KINDS,
   STUDIO_FILTER_PACK_LABELS,
-} from "./studio-filter-pack-registry";
+} from "./filter/studio-filter-pack-registry";
+import { STUDIO_ADJUSTMENT_ENGINE_IDS } from "./studio-adjustment-stack";
+import { STUDIO_COMMAND_CATALOG } from "./studio-command-catalog";
 import { buildStudioFilterMenuItems } from "./studio-main-menu-items-filter";
 
 import type {

@@ -1,7 +1,7 @@
-import { normalizeStudioPersistedPointerChannels } from "./studio-persisted-pointer-channels";
+import { normalizeStudioPersistedPointerChannels } from "../studio-persisted-pointer-channels";
 
-import type { NormalizedCalligraphyStylusInput } from "./studio-brush";
-import type { DrawEl } from "./studio-element-model";
+import type { NormalizedCalligraphyStylusInput } from "../studio-brush";
+import type { DrawEl } from "../studio-element-model";
 
 import { captureStudioInkInputContractV2 } from "@/lib/studio-ink-input-contract";
 

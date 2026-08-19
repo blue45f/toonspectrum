@@ -5,7 +5,7 @@ import {
 } from "./studio-brush-pack-id";
 
 import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
-import type { StudioBrushMediaGroup } from "./studio-creative-ux";
+import type { StudioBrushMediaGroup } from "../studio-creative-ux";
 
 export type StudioBrushPackRuntimeBrushId = "ink-particle" | "airbrush" | "dry-media";
 

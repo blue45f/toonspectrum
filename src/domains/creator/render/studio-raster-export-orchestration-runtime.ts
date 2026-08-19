@@ -1,23 +1,23 @@
-import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { confirmStudioDestructiveAction } from "../studio-destructive-action-preview";
 import {
   studioExportSplitChoiceRequest,
   studioExportSplitRequiredRequest,
-} from "./studio-destructive-command-catalog";
+} from "../studio-destructive-command-catalog";
 import {
   drawVignette,
   isDefaultPageGrade,
   normalizePageGrade,
   pageGradeToCssFilter,
   type PageGrade,
-} from "./studio-page-grade";
+} from "../studio-page-grade";
 
-import type { ExportFormat } from "./studio-export";
-import type { PageState } from "./studio-page-state";
+import type { ExportFormat } from "../studio-export";
+import type { PageState } from "../studio-page-state";
 import type {
   StudioRasterEncoded,
   StudioRasterInterchangeFormat,
 } from "./studio-raster-interchange";
-import type { WatermarkSettings } from "./studio-watermark";
+import type { WatermarkSettings } from "../studio-watermark";
 import type Konva from "konva";
 
 export function bakeStudioPageGradeIntoCanvas(
@@ -142,7 +142,7 @@ export function createStudioRasterExportOrchestration({
         exportMimeType,
         exportQuality,
         pageExportFileName,
-      } = await import("./studio-export");
+      } = await import("../studio-export");
       const blob = await canvasToBlob(
         canvas,
         exportMimeType(exportFormat),
@@ -199,8 +199,7 @@ export function createStudioRasterExportOrchestration({
       const context = canvas.getContext("2d", { willReadFrequently: true });
       if (!context) throw new Error("출력 픽셀을 읽을 수 없습니다.");
       const image = context.getImageData(0, 0, canvas.width, canvas.height);
-      const { encodeStudioRasterInterchangeAsync } = await import(
-        "./studio-raster-interchange-worker-client"
+      const { encodeStudioRasterInterchangeAsync } = await import( "./studio-raster-interchange-worker-client"
       );
       const encoded = await encodeStudioRasterInterchangeAsync(format, {
         width: image.width,
@@ -228,7 +227,7 @@ export function createStudioRasterExportOrchestration({
       const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
       const canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
       drawWatermarkOnCanvas(canvas, watermarkForExport);
-      const { copyCanvasToClipboard } = await import("./studio-export");
+      const { copyCanvasToClipboard } = await import("../studio-export");
       await copyCanvasToClipboard(canvas);
       setError(null);
     } catch (error) {
@@ -253,7 +252,7 @@ export function createStudioRasterExportOrchestration({
       splitPagesForExport,
       stripExportFileName,
       stripTotalHeight,
-    } = await import("./studio-export");
+    } = await import("../studio-export");
     const pageHeights = pages.map((page) => page.canvasH);
     let scale = exportScale;
     let split = false;

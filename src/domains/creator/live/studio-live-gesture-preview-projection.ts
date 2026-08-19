@@ -2,9 +2,9 @@ import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsEqual,
   studioBrushDynamicsPresetSettings,
-} from "./studio-brush-dynamics";
+} from "../brush/studio-brush-dynamics";
 
-import type { DrawEl, El } from "./studio-element-model";
+import type { DrawEl, El } from "../studio-element-model";
 import type { StudioLiveGesturePreviewRendererSnapshot } from "./studio-live-gesture-preview";
 import type {
   StudioLiveGesturePreviewSnapshot,

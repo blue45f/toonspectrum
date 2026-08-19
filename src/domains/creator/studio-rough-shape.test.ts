@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { DEFAULT_SHAPE_PARAMS } from "./brush/studio-stroke-shapes";
 import {
   buildStudioRoughShapeRenderPlan,
   DEFAULT_STUDIO_SKETCH_STYLE,
@@ -16,7 +17,6 @@ import {
   type StudioRoughShapeInput,
   type StudioSketchStyle,
 } from "./studio-rough-shape";
-import { DEFAULT_SHAPE_PARAMS } from "./studio-stroke-shapes";
 
 import type { Op as RoughOp } from "roughjs/bin/core";
 

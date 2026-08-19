@@ -8,7 +8,9 @@
 //
 // 저장소(localStorage 호환 인터페이스)를 주입받아 순수하게 동작한다(studio-palette-library.ts와 동일).
 
-import { STABILIZER_MAX } from "./studio-brush";
+import { STABILIZER_MAX } from "../studio-brush";
+import { normalizeHexColor } from "../studio-color-utils";
+
 import {
   DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
   normalizeStudioBrushDynamicsSettings,
@@ -24,7 +26,6 @@ import {
   resolveStudioStampBrushKind,
   STUDIO_STAMP_BRUSH_DEFAULTS,
 } from "./studio-brush-stamp-engine";
-import { normalizeHexColor } from "./studio-color-utils";
 import {
   isStudioStabilizerMode,
   normalizeStudioStabilizerMode,

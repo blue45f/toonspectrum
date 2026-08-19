@@ -1,18 +1,19 @@
 import {
+  StudioCrdtOutboxSqlCapacityError,
+  requireStudioCrdtOutboxDatabase,
+} from "../studio-local-database";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+
+import {
   parsePersistedStudioCrdtUpdateRequest,
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
-import {
-  StudioCrdtOutboxSqlCapacityError,
-  requireStudioCrdtOutboxDatabase,
-} from "./studio-local-database";
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 
 import type {
   StudioCrdtOutboxDatabase,
   StudioCrdtOutboxSqlCandidate,
   StudioLocalDatabase,
-} from "./studio-local-database";
+} from "../studio-local-database";
 
 const LEGACY_DATABASE_NAME = "toonspectrum-studio-crdt-outbox";
 const LEGACY_DATABASE_VERSION = 1;

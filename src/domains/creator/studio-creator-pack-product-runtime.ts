@@ -3,12 +3,24 @@
 import {
   sanitizeBrushSnapshot,
   type StudioSavedBrush,
-} from "./studio-brush-library";
+} from "./brush/studio-brush-library";
 import {
   notifyStudioBrushLibraryChanged,
   openProductBrushLibraryRepository,
   type ProductBrushLibraryRepository,
-} from "./studio-brush-library-sqlite-repository";
+} from "./brush/studio-brush-library-sqlite-repository";
+import {
+  acquireProductFilterLibraryRepository,
+  notifyStudioFilterLibraryChanged,
+  normalizeStudioFilterLibraryPreset,
+  type ProductFilterLibraryRepository,
+  type StudioFilterLibraryPreset,
+} from "./filter/studio-filter-library-sqlite-repository";
+import {
+  normalizeStudioFilterPackValues,
+  type StudioFilterPackKind,
+  type StudioFilterPackValues,
+} from "./filter/studio-filter-pack";
 import {
   browserStudioCreatorPackStorage,
   inspectStudioCreatorPackInstallState,
@@ -19,18 +31,6 @@ import {
   type StudioCreatorPackInstallState,
   type StudioCreatorPackStorage,
 } from "./studio-creator-pack-runtime";
-import {
-  acquireProductFilterLibraryRepository,
-  notifyStudioFilterLibraryChanged,
-  normalizeStudioFilterLibraryPreset,
-  type ProductFilterLibraryRepository,
-  type StudioFilterLibraryPreset,
-} from "./studio-filter-library-sqlite-repository";
-import {
-  normalizeStudioFilterPackValues,
-  type StudioFilterPackKind,
-  type StudioFilterPackValues,
-} from "./studio-filter-pack";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import { compareStudioMarketplaceVersions } from "./studio-marketplace-packages";
 import {

@@ -12,13 +12,13 @@
 
 import {
   planCausalWatercolorBrush,
-} from "./studio-causal-watercolor-brush";
-import { hash2 } from "./studio-grain";
+} from "../studio-causal-watercolor-brush";
+import { hash2 } from "../studio-grain";
 import {
   resolveStudioHandFeelMediaLoadV1,
   studioHandFeelTravelSpeedV1,
-} from "./studio-hand-feel-media-load-v1";
-import { studioLivingInkChromaBleedMultipliers } from "./studio-living-ink-field";
+} from "../studio-hand-feel-media-load-v1";
+import { studioLivingInkChromaBleedMultipliers } from "../studio-living-ink-field";
 
 import type { WatercolorBrushDab } from "./studio-watercolor-brush";
 
@@ -237,7 +237,7 @@ export const DEFAULT_STUDIO_WET_INK_FIELD_CONFIG = Object.freeze({
   maxUploadBytes: 16 * 1024 * 1024,
   waterDiffusion: 0.18,
   pigmentDiffusion: 0.105,
-  chromatography: 0.45,
+  chromatography: 0.5,
   bleed: 0.32,
   absorption: 0.022,
   evaporation: 0.012,
@@ -249,6 +249,30 @@ export const DEFAULT_STUDIO_WET_INK_FIELD_CONFIG = Object.freeze({
   inkColor: Object.freeze({ r: 30, g: 37, b: 42 }),
   spectralAbsorption: Object.freeze({ r: 1.0, g: 0.96, b: 0.88 }),
 });
+
+/**
+ * InkWash §08 display contract (Johno Whitaker, 2026).
+ * Applied when rasterizing wet-ink tiles so a wash reads as paper + optical density,
+ * not as flat alpha-over mud.
+ */
+export const STUDIO_WET_INK_INKWASH_DISPLAY = Object.freeze({
+  beerLambertStrength: 1.9,
+  edgeDarkeningGain: 1.35,
+  granulationGain: 0.55,
+  fiberAmplitude: 0.05,
+  toothAmplitude: 0.022,
+  wetSheen: Object.freeze({ r: 0.16, g: 0.15, b: 0.11 }),
+  wetSheenGate: Object.freeze({ lo: 0.02, hi: 0.6 }),
+  mobility: Object.freeze({ lo: 0.02, hi: 0.45 }),
+  capillaryCreep: 0.12,
+});
+
+/** InkWash §04: pigment only moves where the paper is wet. */
+export function studioWetInkWetMobility(wetness: number): number {
+  const { lo, hi } = STUDIO_WET_INK_INKWASH_DISPLAY.mobility;
+  const t = clamp01((wetness - lo) / Math.max(1e-8, hi - lo));
+  return t * t * (3 - 2 * t);
+}
 
 function failure<T>(
   code: StudioWetInkFailureCode,
@@ -1209,8 +1233,15 @@ export function simulateStudioWetInkField(
         nextWetness = Math.max(nextWater * 0.72, nextWetness);
         nextWetness = nextWetness <= FIELD_EPSILON ? 0 : Math.fround(clamp01(nextWetness));
 
-        const wetMobility = Math.max(nextWetness, Math.min(1, nextWater));
+        const wetMobility = studioWetInkWetMobility(
+          Math.max(nextWetness, Math.min(1, nextWater)),
+        );
         const mobileFactor = wetMobility <= FIELD_EPSILON ? 0 : wetMobility;
+        nextWater = nextWater
+          + (waterAverage - nextWater)
+            * STUDIO_WET_INK_INKWASH_DISPLAY.capillaryCreep
+            * mobileFactor;
+        nextWater = nextWater <= FIELD_EPSILON ? 0 : fieldValue(nextWater);
         const outwardWater = Math.max(0, waterAverage - water);
         const bleedTransport = mobileFactor <= 0
           ? 0
@@ -1386,6 +1417,18 @@ function clampByte(value: number): number {
   return value <= 0 ? 0 : value >= 255 ? 255 : Math.round(value);
 }
 
+function tileScalarAt(
+  values: Float32Array,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+): number {
+  const cx = x <= 0 ? 0 : x >= width - 1 ? width - 1 : x;
+  const cy = y <= 0 ? 0 : y >= height - 1 ? height - 1 : y;
+  return values[cy * width + cx] ?? 0;
+}
+
 function renderTileRgba(
   field: StudioWetInkField,
   tile: StudioWetInkTile,
@@ -1395,11 +1438,29 @@ function renderTileRgba(
   const spec = field.config.spectralAbsorption ?? { r: 1.0, g: 0.96, b: 0.88 };
   const paperRoughness = field.config.paperRoughness ?? 0.72;
   const edgeDarkening = field.config.edgeDarkening ?? 0.68;
-  const chromatography = field.config.chromatography ?? 0.45;
-
+  const chromatography = field.config.chromatography ?? 0.5;
+  const granulation = field.config.granulation ?? 0.36;
+  const display = STUDIO_WET_INK_INKWASH_DISPLAY;
+  const channelDensity = ensurePigmentOpticalDensity(tile, spec);
   const isWhiteHighlight = spec.r < 0 || spec.g < 0 || spec.b < 0;
+  const { width, height } = tile;
 
-  for (let index = 0; index < tile.width * tile.height; index += 1) {
+  const luminanceAt = (x: number, y: number): number => {
+    const index = (
+      (y <= 0 ? 0 : y >= height - 1 ? height - 1 : y) * width
+      + (x <= 0 ? 0 : x >= width - 1 ? width - 1 : x)
+    );
+    return (
+      (channelDensity[0][index] ?? 0)
+      + (channelDensity[1][index] ?? 0)
+      + (channelDensity[2][index] ?? 0)
+      + (tile.stain[index] ?? 0)
+    );
+  };
+
+  for (let index = 0; index < width * height; index += 1) {
+    const lx = index % width;
+    const ly = Math.floor(index / width);
     const paper = tile.paper[index]!;
     const wetness = tile.wetness[index]!;
     const mobile = tile.pigment[index]! * (0.62 + wetness * 0.2);
@@ -1407,9 +1468,26 @@ function renderTileRgba(
     const grainBump = (paper - 0.5) * paperRoughness * 0.55;
     const wetEdgeContrast = Math.pow(Math.max(0, wetness), 1.35) * edgeDarkening * 0.35;
     const density = Math.max(0, mobile + fixed + wetEdgeContrast) * (0.92 + grainBump);
-    const channelDensity = ensurePigmentOpticalDensity(tile, spec);
     const mobileGain = 0.62 + wetness * 0.2;
     const odScale = 0.92 + grainBump;
+    const pigmentAmount = clamp01(density * 2);
+    const fiber = paper;
+    const tooth = tileScalarAt(tile.paper, width, height, lx + 1, ly);
+    const grain = 0.5 + (paper - 0.5) * 0.7 + (tooth - 0.5) * 0.3;
+    const edge = Math.hypot(
+      luminanceAt(lx + 1, ly) - luminanceAt(lx - 1, ly),
+      luminanceAt(lx, ly + 1) - luminanceAt(lx, ly - 1),
+    );
+    const granulationMod = 1
+      + (grain - 0.5) * display.granulationGain * granulation * pigmentAmount;
+    const fiberMod = 1 + (fiber - 0.5) * display.fiberAmplitude * paperRoughness;
+    const toothMod = 1 + (tooth - 0.5) * display.toothAmplitude * paperRoughness;
+    const edgeMod = 1 + edge * display.edgeDarkeningGain * edgeDarkening;
+    const extinction = display.beerLambertStrength * granulationMod * fiberMod * toothMod * edgeMod;
+    const wetGate = studioWetInkWetMobility(wetness);
+    const sheenR = 1 - wetGate * display.wetSheen.r;
+    const sheenG = 1 - wetGate * display.wetSheen.g;
+    const sheenB = 1 - wetGate * display.wetSheen.b;
 
     let r: number;
     let g: number;
@@ -1417,7 +1495,7 @@ function renderTileRgba(
     let a: number;
 
     if (isWhiteHighlight) {
-      const scattering = clamp01(1 - Math.exp(-density * 2.2));
+      const scattering = clamp01(1 - Math.exp(-density * extinction * (2.2 / 1.9)));
       r = 255;
       g = 255;
       b = 255;
@@ -1436,9 +1514,9 @@ function renderTileRgba(
         0,
         channelDensity[2][index]! * mobileGain + fixed * spec.b + wetEdgeContrast * spec.b,
       ) * odScale;
-      const transR = Math.exp(-densityR * 1.7 * (1.0 + chromFringe));
-      const transG = Math.exp(-densityG * 1.7);
-      const transB = Math.exp(-densityB * 1.7 * (1.0 - chromFringe));
+      const transR = Math.exp(-densityR * extinction * (1.0 + chromFringe)) * sheenR;
+      const transG = Math.exp(-densityG * extinction) * sheenG;
+      const transB = Math.exp(-densityB * extinction * (1.0 - chromFringe)) * sheenB;
 
       r = clampByte(color.r * transR);
       g = clampByte(color.g * transG);

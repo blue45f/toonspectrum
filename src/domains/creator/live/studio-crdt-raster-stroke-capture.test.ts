@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "../brush/studio-ink-pressure-model";
+
 import {
   STUDIO_RASTER_STROKE_CAPTURE_MAX_PIXELS,
   StudioRasterStrokeCaptureError,
   captureStudioRasterStroke,
   planStudioRasterStrokeCapture,
 } from "./studio-crdt-raster-stroke-capture";
-import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 
-import type { StudioGpuStroke } from "./studio-webgpu-stroke";
+import type { StudioGpuStroke } from "../render/studio-webgpu-stroke";
 
 function stroke(patch: Partial<StudioGpuStroke> = {}): StudioGpuStroke {
   return {

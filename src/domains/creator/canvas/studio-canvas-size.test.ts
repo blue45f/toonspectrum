@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { CANVAS_W } from "./studio-assets";
+import { CANVAS_W } from "../studio-assets";
+
 import {
   adjustStudioCanvasHeight,
   clampStudioCanvasHeight,

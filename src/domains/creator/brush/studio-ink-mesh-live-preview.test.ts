@@ -23,7 +23,7 @@ import {
   type StudioInkMeshStrokeLike,
 } from "./studio-ink-mesh-live-preview";
 
-import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
+import type { StudioLiveInkSurface } from "../live/studio-live-ink-overlay";
 
 const SURFACE = {
   left: 0,

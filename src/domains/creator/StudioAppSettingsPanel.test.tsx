@@ -8,6 +8,7 @@ import {
   type StudioAppSettings,
   type StudioAppSettingsTab,
 } from "./studio-app-settings";
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   MAX_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
   MIN_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
@@ -15,6 +16,7 @@ import {
 import { StudioAppSettingsPanel } from "./StudioAppSettingsPanel";
 
 import { useI18n } from "@/lib/i18n";
+
 
 const { createPortalMock } = vi.hoisted(() => ({
   createPortalMock: vi.fn((children: unknown, _container: unknown) => children),
@@ -24,9 +26,9 @@ vi.mock("react-dom", () => ({
   createPortal: createPortalMock,
 }));
 
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readStudioCuttoonEditorSource();
 const studioCanvasViewportSource = readFileSync(
-  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
 const appSettingsPanelSource = readFileSync(

@@ -6,7 +6,7 @@
  * cloning Figma's branding.
  */
 
-import { planStudioDrawObjectTransform } from "./studio-draw-object-transform";
+import { planStudioDrawObjectTransform } from "./brush/studio-draw-object-transform";
 import { elBounds, type StudioElementBounds } from "./studio-element-geometry";
 import {
   normalizeStudioViewRotation,

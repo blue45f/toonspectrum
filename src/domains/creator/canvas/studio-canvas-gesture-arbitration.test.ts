@@ -8,7 +8,7 @@ import {
   type StudioCanvasGestureDisposition,
 } from "./studio-canvas-gesture-arbitration";
 
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 
 function sourceBetween(startMarker: string, endMarker: string): string {
   const start = studioPageSource.indexOf(startMarker);

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { exportPageToSvg } from "../export/studio-svg-export";
+
 import {
   planStudioStampBrushDabs,
   resolveStudioStampBrushStyle,
@@ -11,9 +13,8 @@ import {
   type StudioStampInkRibbonPolygon,
 } from "./studio-stamp-ink-ribbon";
 import { drawStudioStampStrokeWithSymmetry } from "./studio-stamp-symmetry-rendering";
-import { exportPageToSvg } from "./studio-svg-export";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 const POINTS = [
   0, 0,

@@ -1,5 +1,4 @@
 import {
-  STUDIO_VELLO_CLASSIC_BACKEND_ID,
   type StudioVelloBackendFrame,
   type StudioVelloHubBackendId,
   type StudioVelloHubPresentationTarget,
@@ -9,10 +8,15 @@ import {
 
 export interface StudioVelloHubCanvasTarget
   extends StudioVelloHubPresentationTarget {
+  readonly canvas: HTMLCanvasElement;
+  /** @deprecated V13 uses a single canvas; alias of `canvas`. */
   readonly gpuCanvas: HTMLCanvasElement;
+  /** @deprecated V13 uses a single canvas; alias of `canvas`. */
   readonly cpuCanvas: HTMLCanvasElement;
   readonly activeBackendId: StudioVelloHubBackendId | null;
   setIsland(island: StudioVelloSceneIsland): void;
+  /** Stop the retain-present loop and release the swapchain when nothing is shown. */
+  park(): void;
   destroy(): void;
 }
 
@@ -30,32 +34,33 @@ function applyCanvasPlacement(
   canvas.style.height = `${placement.height}px`;
 }
 
-function styleHubCanvas(
-  canvas: HTMLCanvasElement,
-  backend: "classic" | "cpu",
-): void {
+function styleHubCanvas(canvas: HTMLCanvasElement): void {
   canvas.setAttribute("aria-hidden", "true");
-  canvas.dataset.studioVelloHubSurface = backend;
+  canvas.dataset.studioVelloHubSurface = "frame-graph";
   canvas.style.background = "transparent";
   canvas.style.display = "none";
   canvas.style.pointerEvents = "none";
   canvas.style.position = "absolute";
-  canvas.style.zIndex = "18";
 }
 
 /**
- * Two internal canvases form one VelloHub-owned surface. Only a completed
- * backend frame becomes visible; holdLastGood never clears the current one.
+ * One visible canvas. GPU frames copy on-device; CPU recovery uploads pixels
+ * into the same WebGPU swapchain so a second DOM canvas is never created.
+ * Empty mixed pages call `park()` so the retain-present rAF loop does not
+ * copy a viewport-sized swapchain every frame.
  */
 export function createStudioVelloHubCanvasTarget(
   ownerDocument: Document,
   mountParent: HTMLElement,
 ): StudioVelloHubCanvasTarget {
-  const gpuCanvas = ownerDocument.createElement("canvas");
-  const cpuCanvas = ownerDocument.createElement("canvas");
-  styleHubCanvas(gpuCanvas, "classic");
-  styleHubCanvas(cpuCanvas, "cpu");
-  mountParent.append(gpuCanvas, cpuCanvas);
+  const canvas = ownerDocument.createElement("canvas");
+  styleHubCanvas(canvas);
+  const content = mountParent.querySelector(".konvajs-content");
+  if (content?.firstElementChild) {
+    content.insertBefore(canvas, content.children[1] ?? null);
+  } else {
+    mountParent.append(canvas);
+  }
 
   let island: StudioVelloSceneIsland | null = null;
   let activeBackendId: StudioVelloHubBackendId | null = null;
@@ -63,28 +68,144 @@ export function createStudioVelloHubCanvasTarget(
   let configuredDevice: GPUDevice | null = null;
   let configuredWidth = 0;
   let configuredHeight = 0;
+  let retainedTexture: GPUTexture | null = null;
+  let presentFrame = 0;
+  let loopDevice: GPUDevice | null = null;
+  let loopContext: GPUCanvasContext | null = null;
 
-  const makePrimary = (
-    backendId: StudioVelloHubBackendId,
-    primary: HTMLCanvasElement,
-    secondary: HTMLCanvasElement,
-  ) => {
-    primary.style.display = "block";
-    primary.dataset.studioVelloHubPrimary = "true";
-    secondary.style.display = "none";
-    delete secondary.dataset.studioVelloHubPrimary;
+  const markPrimary = (backendId: StudioVelloHubBackendId) => {
+    canvas.style.display = "block";
+    canvas.dataset.studioVelloHubPrimary = "true";
     activeBackendId = backendId;
+    canvas.dataset.studioVelloPresentNodes = String(island?.scene.nodes.length ?? 0);
+  };
+
+  const destroyRetainedTexture = () => {
+    try {
+      retainedTexture?.destroy();
+    } catch {
+      // Lost devices may already have invalidated the retained texture.
+    }
+    retainedTexture = null;
+  };
+
+  const stopPresentLoop = () => {
+    const view = ownerDocument.defaultView;
+    if (presentFrame && view) view.cancelAnimationFrame(presentFrame);
+    presentFrame = 0;
+  };
+
+  const blitRetained = (device: GPUDevice, context: GPUCanvasContext) => {
+    if (!retainedTexture) return;
+    const encoder = device.createCommandEncoder({
+      label: "studio-frame-graph-retain-present",
+    });
+    encoder.copyTextureToTexture(
+      { texture: retainedTexture },
+      { texture: context.getCurrentTexture() },
+      {
+        width: retainedTexture.width,
+        height: retainedTexture.height,
+        depthOrArrayLayers: 1,
+      },
+    );
+    device.queue.submit([encoder.finish()]);
+  };
+
+  const startPresentLoop = (device: GPUDevice, context: GPUCanvasContext) => {
+    const view = ownerDocument.defaultView;
+    if (!view) return;
+    loopDevice = device;
+    loopContext = context;
+    stopPresentLoop();
+    if (ownerDocument.hidden) return;
+    const tick = () => {
+      presentFrame = 0;
+      if (destroyed || !retainedTexture || ownerDocument.hidden) return;
+      try {
+        blitRetained(device, context);
+      } catch {
+        // Device loss or a missing swapchain image; the next present restarts.
+      }
+      if (!destroyed && retainedTexture && !ownerDocument.hidden) {
+        presentFrame = view.requestAnimationFrame(tick);
+      }
+    };
+    presentFrame = view.requestAnimationFrame(tick);
+  };
+
+  const onVisibilityChange = () => {
+    if (destroyed) return;
+    if (ownerDocument.hidden) {
+      stopPresentLoop();
+      return;
+    }
+    if (loopDevice && loopContext && retainedTexture) {
+      startPresentLoop(loopDevice, loopContext);
+    }
+  };
+  ownerDocument.addEventListener("visibilitychange", onVisibilityChange);
+
+  const park = () => {
+    stopPresentLoop();
+    destroyRetainedTexture();
+    loopDevice = null;
+    loopContext = null;
+    configuredDevice = null;
+    configuredWidth = 0;
+    configuredHeight = 0;
+    if (canvas.width !== 1) canvas.width = 1;
+    if (canvas.height !== 1) canvas.height = 1;
+    canvas.style.display = "none";
+    delete canvas.dataset.studioVelloHubPrimary;
+    canvas.dataset.studioVelloPresentNodes = "0";
+  };
+
+  const retainTexture = (device: GPUDevice, width: number, height: number) => {
+    if (
+      retainedTexture
+      && retainedTexture.width === width
+      && retainedTexture.height === height
+    ) {
+      return retainedTexture;
+    }
+    destroyRetainedTexture();
+    retainedTexture = device.createTexture({
+      label: "studio-frame-graph-retained",
+      size: { width, height },
+      format: "rgba8unorm",
+      usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
+    });
+    return retainedTexture;
+  };
+
+  const presentPixelsOnGpu = (
+    frame: Extract<StudioVelloBackendFrame, { kind: "pixels" }>,
+    device: GPUDevice,
+    context: GPUCanvasContext,
+  ) => {
+    const retained = retainTexture(device, frame.width, frame.height);
+    device.queue.writeTexture(
+      { texture: retained },
+      frame.pixels,
+      { bytesPerRow: frame.width * 4 },
+      { width: frame.width, height: frame.height },
+    );
+    blitRetained(device, context);
+    startPresentLoop(device, context);
   };
 
   const target: StudioVelloHubCanvasTarget = {
-    gpuCanvas,
-    cpuCanvas,
+    canvas,
+    gpuCanvas: canvas,
+    cpuCanvas: canvas,
     get activeBackendId() {
       return activeBackendId;
     },
     setIsland(nextIsland) {
       island = nextIsland;
     },
+    park,
     async present(frame: StudioVelloBackendFrame) {
       if (destroyed || !island) {
         if (frame.kind === "texture") frame.release();
@@ -98,90 +219,88 @@ export function createStudioVelloHubCanvasTarget(
         );
       }
 
-      if (frame.kind === "pixels") {
-        applyCanvasPlacement(
-          cpuCanvas,
-          island.placement,
-          frame.width,
-          frame.height,
-        );
-        const context = cpuCanvas.getContext("2d");
-        if (!context) throw new Error("VelloHub CPU canvas 2D context unavailable");
-        const ImageDataConstructor = ownerDocument.defaultView?.ImageData
-          ?? globalThis.ImageData;
-        if (!ImageDataConstructor) {
-          throw new Error("VelloHub CPU ImageData constructor unavailable");
+      applyCanvasPlacement(canvas, island.placement, frame.width, frame.height);
+
+      if (frame.kind === "texture") {
+        const context = canvas.getContext("webgpu");
+        if (!context || typeof GPUTextureUsage === "undefined") {
+          frame.release();
+          throw new Error("VelloHub WebGPU canvas context unavailable");
         }
-        const pixels = new Uint8ClampedArray(frame.pixels);
-        context.putImageData(
-          new ImageDataConstructor(pixels, frame.width, frame.height),
-          0,
-          0,
-        );
-        makePrimary(frame.backendId, cpuCanvas, gpuCanvas);
+        try {
+          if (
+            configuredDevice !== frame.device
+            || configuredWidth !== frame.width
+            || configuredHeight !== frame.height
+          ) {
+            context.configure({
+              device: frame.device,
+              format: "rgba8unorm",
+              alphaMode: "premultiplied",
+              usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+            });
+            configuredDevice = frame.device;
+            configuredWidth = frame.width;
+            configuredHeight = frame.height;
+          }
+          const retained = retainTexture(frame.device, frame.width, frame.height);
+          const encoder = frame.device.createCommandEncoder({
+            label: "studio-vello-hub-present",
+          });
+          encoder.copyTextureToTexture(
+            { texture: frame.texture },
+            { texture: retained },
+            { width: frame.width, height: frame.height, depthOrArrayLayers: 1 },
+          );
+          frame.device.queue.submit([encoder.finish()]);
+          blitRetained(frame.device, context);
+          startPresentLoop(frame.device, context);
+          markPrimary(frame.backendId);
+          void frame.device.queue.onSubmittedWorkDone().then(
+            frame.release,
+            frame.release,
+          );
+        } catch (error) {
+          frame.release();
+          throw error;
+        }
         return;
       }
 
-      applyCanvasPlacement(
-        gpuCanvas,
-        island.placement,
-        frame.width,
-        frame.height,
+      if (configuredDevice && typeof GPUTextureUsage !== "undefined") {
+        const context = canvas.getContext("webgpu");
+        if (!context) throw new Error("VelloHub WebGPU canvas context unavailable");
+        presentPixelsOnGpu(frame, configuredDevice, context);
+        markPrimary(frame.backendId);
+        return;
+      }
+
+      const context2d = canvas.getContext("2d");
+      if (!context2d) throw new Error("VelloHub canvas 2D context unavailable");
+      const ImageDataConstructor = ownerDocument.defaultView?.ImageData
+        ?? globalThis.ImageData;
+      if (!ImageDataConstructor) {
+        throw new Error("VelloHub CPU ImageData constructor unavailable");
+      }
+      context2d.putImageData(
+        new ImageDataConstructor(new Uint8ClampedArray(frame.pixels), frame.width, frame.height),
+        0,
+        0,
       );
-      const context = gpuCanvas.getContext("webgpu");
-      if (!context || typeof GPUTextureUsage === "undefined") {
-        frame.release();
-        throw new Error("VelloHub WebGPU canvas context unavailable");
-      }
-      try {
-        if (
-          configuredDevice !== frame.device
-          || configuredWidth !== frame.width
-          || configuredHeight !== frame.height
-        ) {
-          context.configure({
-            device: frame.device,
-            format: "rgba8unorm",
-            alphaMode: "premultiplied",
-            usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-          });
-          configuredDevice = frame.device;
-          configuredWidth = frame.width;
-          configuredHeight = frame.height;
-        }
-        const destination = context.getCurrentTexture();
-        const encoder = frame.device.createCommandEncoder({
-          label: "studio-vello-hub-present",
-        });
-        encoder.copyTextureToTexture(
-          { texture: frame.texture },
-          { texture: destination },
-          { width: frame.width, height: frame.height, depthOrArrayLayers: 1 },
-        );
-        frame.device.queue.submit([encoder.finish()]);
-        makePrimary(frame.backendId, gpuCanvas, cpuCanvas);
-        void frame.device.queue.onSubmittedWorkDone().then(
-          frame.release,
-          frame.release,
-        );
-      } catch (error) {
-        frame.release();
-        throw error;
-      }
+      markPrimary(frame.backendId);
     },
     holdLastGood(reason) {
-      const active = activeBackendId === STUDIO_VELLO_CLASSIC_BACKEND_ID
-        ? gpuCanvas
-        : activeBackendId
-          ? cpuCanvas
-          : null;
-      if (active) active.dataset.studioVelloHubHoldReason = reason;
+      if (activeBackendId) canvas.dataset.studioVelloHubHoldReason = reason;
     },
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      gpuCanvas.remove();
-      cpuCanvas.remove();
+      ownerDocument.removeEventListener("visibilitychange", onVisibilityChange);
+      stopPresentLoop();
+      destroyRetainedTexture();
+      loopDevice = null;
+      loopContext = null;
+      canvas.remove();
       island = null;
       activeBackendId = null;
     },

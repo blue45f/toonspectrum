@@ -3,8 +3,8 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { StudioDrawNode } from "./brush/StudioDrawNode";
 import { applyStudioSmartShapeBrushEffect } from "./studio-smart-shape-brush-effect";
-import { StudioDrawNode } from "./StudioDrawNode";
 
 import type { DrawEl } from "./studio-element-model";
 

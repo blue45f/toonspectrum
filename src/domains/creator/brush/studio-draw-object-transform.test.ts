@@ -7,13 +7,14 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { planStudioGroupUniformResize } from "../studio-group-uniform-resize";
+
 import {
   planStudioDrawObjectTransform,
   studioDrawObjectTransformScale,
 } from "./studio-draw-object-transform";
-import { planStudioGroupUniformResize } from "./studio-group-uniform-resize";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 function drawEl(overrides: Partial<DrawEl> = {}): DrawEl {
   return {

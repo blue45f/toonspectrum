@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { applyStudioBrushAliasWatercolorMaterial } from "./studio-brush-alias-profile";
+import { applyStudioBrushAliasWatercolorMaterial } from "./brush/studio-brush-alias-profile";
+import {
+  createStudioWetInkField,
+  depositStudioWetInkStroke,
+  readStudioWetInkCell,
+} from "./brush/studio-wet-ink-field";
 import {
   resolveStudioHandFeelMediaLoadV1,
   studioHandFeelTravelSpeedV1,
   STUDIO_HAND_FEEL_MEDIA_LOAD_V1,
 } from "./studio-hand-feel-media-load-v1";
-import {
-  createStudioWetInkField,
-  depositStudioWetInkStroke,
-  readStudioWetInkCell,
-} from "./studio-wet-ink-field";
 
 
 describe("studio hand-feel media load v1", () => {

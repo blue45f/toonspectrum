@@ -18,8 +18,8 @@ import {
   type StudioTileableBlurOptions,
 } from "./studio-professional-filter-kernels";
 
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type { StudioImageDataLike } from "./studio-filters";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 export type StudioProfessionalFilterExecution = "direct" | "worker";
 

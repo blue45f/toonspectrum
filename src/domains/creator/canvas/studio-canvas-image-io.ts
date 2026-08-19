@@ -1,11 +1,11 @@
-import { isAnimatedGifDataUrl, isGifFile } from "./studio-gif-element";
+import { isAnimatedGifDataUrl, isGifFile } from "../studio-gif-element";
 import {
   inspectStudioUploadSourceImage,
   selectStudioUploadDecodedPixelLimit,
   STUDIO_UPLOAD_MAX_SOURCE_FILE_BYTES,
-} from "./studio-upload-image-safety";
+} from "../studio-upload-image-safety";
 
-import type { StudioRasterInterchangeFormat, StudioRgbaBitmap } from "./studio-raster-interchange";
+import type { StudioRasterInterchangeFormat, StudioRgbaBitmap } from "../render/studio-raster-interchange";
 
 export const STUDIO_CANVAS_IMAGE_ACCEPT =
   "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff" as const;
@@ -152,7 +152,7 @@ async function loadOpenRasterFileForCanvas(
     throw new Error("BMP/TGA/PPM/PAM/QOI/TIFF 원본은 64MB 이하여야 합니다.");
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const { decodeStudioRasterInterchangeAsync } = await import("./studio-raster-interchange-worker-client");
+  const { decodeStudioRasterInterchangeAsync } = await import( "../render/studio-raster-interchange-worker-client");
   const decoded = await decodeStudioRasterInterchangeAsync(bytes, format);
   const converted = studioRasterBitmapToCanvasDataUrl(decoded.decoded.bitmap);
   return { ...converted, isAnimatedGif: false };

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { exportPageToSvg } from "../export/studio-svg-export";
+import {
+  mixStudioSpectralWgm,
+  STUDIO_SPECTRAL_WGM_COLOR_MIX_PAINT_MODE,
+  STUDIO_SPECTRAL_WGM_COLOR_MIX_PROGRAM_ID,
+} from "../studio-spectral-wgm-mix-v1";
+
 import {
   serializeStudioBrushDynamicsSettingsCanonical,
   studioBrushDynamicsSettingsForBrushId,
@@ -13,12 +20,6 @@ import {
   resolveNormalizedStudioBrushDabColor,
   studioBrushColorDynamicsIsActive,
 } from "./studio-brush-material-dynamics";
-import {
-  mixStudioSpectralWgm,
-  STUDIO_SPECTRAL_WGM_COLOR_MIX_PAINT_MODE,
-  STUDIO_SPECTRAL_WGM_COLOR_MIX_PROGRAM_ID,
-} from "./studio-spectral-wgm-mix-v1";
-import { exportPageToSvg } from "./studio-svg-export";
 
 const WGM_LANE_ID = "oil-pastel--wgm-mix";
 const SIBLING_LANE_ID = "oil-pastel--waxy-film";

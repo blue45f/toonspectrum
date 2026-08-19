@@ -8,7 +8,6 @@
  * immutable session. The same operation vocabulary is consumed by the GPU pass protocol.
  */
 
-import { sha256HexPortable } from "./studio-sha256";
 import {
   advanceStudioWetMediaTileField,
   applyStudioWetMediaTileFieldDepositions,
@@ -22,7 +21,8 @@ import {
   type StudioWetMediaTileFieldPaper,
   type StudioWetMediaTileFieldSettings,
   type StudioWetMediaTileFieldState,
-} from "./studio-wet-media-tile-field";
+} from "./brush/studio-wet-media-tile-field";
+import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_LIVING_INK_FIELD_VERSION = 1 as const;
 export const STUDIO_LIVING_INK_FIELD_KIND = "toonspectrum.living-ink-field" as const;

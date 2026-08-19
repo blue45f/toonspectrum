@@ -11,8 +11,8 @@ import {
   collectDialogueItems,
   type DialogueBatchItem,
   type DialoguePageLike,
-} from "./studio-dialogue-batch";
-import { DIALOGUE_LOCALE_PRESETS, SOURCE_LOCALE, localeLabel } from "./studio-dialogue-translate";
+} from "./lettering/studio-dialogue-batch";
+import { DIALOGUE_LOCALE_PRESETS, SOURCE_LOCALE, localeLabel } from "./lettering/studio-dialogue-translate";
 
 import { cx } from "@/lib/cx";
 

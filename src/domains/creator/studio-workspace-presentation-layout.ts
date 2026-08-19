@@ -1,4 +1,4 @@
-import { resolveStudioCanvasWideDensityMode } from "./studio-canvas-wide-density";
+import { resolveStudioCanvasWideDensityMode } from "./canvas/studio-canvas-wide-density";
 import { studioUiDensityAllows } from "./studio-ui-density";
 import { type StudioUiDensityMode } from "./studio-ui-density";
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveStudioRasterToolAvailability } from "./render/studio-raster-tool-availability";
 import { resolveStudioInspectorRasterToolPolicy } from "./studio-inspector-raster-tool-policy";
-import { resolveStudioRasterToolAvailability } from "./studio-raster-tool-availability";
 
 describe("Studio Inspector raster entry policy", () => {
   it("keeps a direct image target immediately selectable", () => {

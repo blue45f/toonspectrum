@@ -7,6 +7,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { listStudioBrushTrayItems } from "../studio-creative-ux";
+
 import {
   filterStudioBrushCatalogItems,
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
@@ -15,14 +17,13 @@ import {
   STUDIO_PRO_BRUSH_CATALOG_ITEMS,
 } from "./studio-brush-catalog";
 import { STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE } from "./studio-brush-tip-stamp";
-import { listStudioBrushTrayItems } from "./studio-creative-ux";
 import {
   LargeBrushPreview,
   StudioBrushCatalogPortal,
   StudioBrushLibrarySheet,
 } from "./StudioBrushLibrarySheet";
 
-import type { StudioBrushTrayItem } from "./studio-creative-ux";
+import type { StudioBrushTrayItem } from "../studio-creative-ux";
 
 const catalog = new Map(listStudioBrushTrayItems("all").map((item) => [item.id, item]));
 const proceduralCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
@@ -41,11 +42,11 @@ const paintCoreCatalogCount = STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter(
   (item) => item.operation === "paint",
 ).length;
 const sheetSource = readFileSync(
-  resolve(process.cwd(), "src/domains/creator/StudioBrushLibrarySheet.tsx"),
+  resolve(process.cwd(), "src/domains/creator/brush/StudioBrushLibrarySheet.tsx"),
   "utf8"
 );
 const selectionSource = readFileSync(
-  resolve(process.cwd(), "src/domains/creator/studio-brush-selection.ts"),
+  resolve(process.cwd(), "src/domains/creator/brush/studio-brush-selection.ts"),
   "utf8"
 );
 

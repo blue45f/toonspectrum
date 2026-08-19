@@ -9,11 +9,11 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { probeBlenderVrmGenerateMcp } from "../src/domains/creator/studio-vrm-generate-blender-mcp";
+import { probeBlenderVrmGenerateMcp } from "../src/domains/creator/vrm/studio-vrm-generate-blender-mcp";
 import {
   generateStudioVrmCharacter,
   resolveStudioVrmGenerateMcpHost,
-} from "../src/domains/creator/studio-vrm-generate-mcp";
+} from "../src/domains/creator/vrm/studio-vrm-generate-mcp";
 
 function readFlag(args: readonly string[], name: string): string | null {
   const index = args.indexOf(name);

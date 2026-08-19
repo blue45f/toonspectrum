@@ -8,7 +8,7 @@ import {
   normalizeTextPath,
   textPathAdvanceWidth,
   textPathLength,
-} from "./studio-text-path";
+} from "./lettering/studio-text-path";
 import {
   StudioKonvaStickerNode,
   StudioKonvaTextNode,

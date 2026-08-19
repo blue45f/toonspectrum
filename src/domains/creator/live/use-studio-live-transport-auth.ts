@@ -8,7 +8,7 @@ import {
 import { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
 
 import type { StudioLiveTransportFactory } from "./studio-live-collaboration-transport";
-import type { StudioLiveAuthTicketResponse } from "../../../lib/studio-live-auth-ticket";
+import type { StudioLiveAuthTicketResponse } from "../../../../lib/studio-live-auth-ticket";
 
 const INITIAL_RETRY_DELAY_MS = 500;
 const MAX_RETRY_DELAY_MS = 8_000;

@@ -1,4 +1,4 @@
-import type { StudioBackground3DInsertResult } from "./studio-3d-insert-contract";
+import type { StudioBackground3DInsertResult } from "./scene-3d/studio-3d-insert-contract";
 
 export type StudioShared3dStageMutationKind = NonNullable<
   StudioBackground3DInsertResult["sharedStageMutation"]

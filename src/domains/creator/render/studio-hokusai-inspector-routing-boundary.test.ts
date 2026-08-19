@@ -3,15 +3,15 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const inspectorSource = readFileSync(
-  new URL("./StudioInspectorAside.tsx", import.meta.url),
+  new URL("../StudioInspectorAside.tsx", import.meta.url),
   "utf8",
 );
 const mountSource = readFileSync(
-  new URL("./StudioHokusaiNaturalMediaInspectorMount.tsx", import.meta.url),
+  new URL("../StudioHokusaiNaturalMediaInspectorMount.tsx", import.meta.url),
   "utf8",
 );
 const freehandControlsSource = readFileSync(
-  new URL("./StudioInspectorFreehandPathControls.tsx", import.meta.url),
+  new URL("../StudioInspectorFreehandPathControls.tsx", import.meta.url),
   "utf8",
 );
 

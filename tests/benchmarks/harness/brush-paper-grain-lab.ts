@@ -74,13 +74,8 @@ import {
   studioBrushDynamicsSettingsForBrushId,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
-} from "../../../src/domains/creator/studio-brush-dynamics";
-import {
-  planStudioDynamicBrushCoverageMarks,
-  renderStudioDynamicBrushCoverageMark,
-  type StudioDynamicBrushCoverageMark,
-} from "../../../src/domains/creator/studio-dynamic-brush-coverage-renderer";
-import { resolveStudioPaperBrushResponse } from "../../../src/domains/creator/studio-paper-brush-response";
+} from "../../../src/domains/creator/brush/studio-brush-dynamics";
+import { resolveStudioPaperBrushResponse } from "../../../src/domains/creator/brush/studio-paper-brush-response";
 import {
   acquireStudioPaperGranulationTile,
   clearStudioPaperGranulationTileCache,
@@ -90,7 +85,12 @@ import {
   DEFAULT_STUDIO_PAPER_SURFACE,
   type StudioPaperGranulationSettings,
   type StudioPaperSurfaceSettings,
-} from "../../../src/domains/creator/studio-paper-granulation-runtime";
+} from "../../../src/domains/creator/brush/studio-paper-granulation-runtime";
+import {
+  planStudioDynamicBrushCoverageMarks,
+  renderStudioDynamicBrushCoverageMark,
+  type StudioDynamicBrushCoverageMark,
+} from "../../../src/domains/creator/studio-dynamic-brush-coverage-renderer";
 
 import {
   PRESSURE_LANE,

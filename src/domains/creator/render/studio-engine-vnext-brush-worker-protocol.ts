@@ -8,11 +8,11 @@
 
 import {
   parseStudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
 
 import type {
   StudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
 import type {
   StudioEngineDurableBrushReceipt,
 } from "./studio-engine-durable-brush-controller";

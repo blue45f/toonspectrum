@@ -1,18 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { hydrateStudioAiImageReferenceDocument } from
-  "./studio-ai-image-reference-roles";
+import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
-} from "./studio-ai-provenance";
+} from "./ai/studio-ai-provenance";
 import {
   STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
   createDefaultStudioBg3dSceneDocument,
-} from "./studio-bg3d-scene-document";
-import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
-import { createStudioLinked3dRenderPageFixture } from
-  "./studio-linked-3d-render-test-fixture";
+} from "./bg3d/studio-bg3d-scene-document";
+import { createDefaultStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
+import { createStudioLinked3dRenderPageFixture } from "./studio-linked-3d-render-test-fixture";
 import {
   parseStudioProjectFile,
   resetStudioAiProvenanceForRemix,
@@ -24,8 +22,7 @@ import { createStudioReferenceBoardDocument } from "./studio-reference-board";
 import {
   createStudioShared3dStageCollectionDocument,
   migrateStudioShared3dStageCollectionDocument,
-} from
-  "./studio-shared-3d-stage-collection";
+} from "./studio-shared-3d-stage-collection";
 import {
   STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND,
   STUDIO_SHARED_3D_STAGE_DOCUMENT_VERSION,
@@ -34,7 +31,7 @@ import {
   STUDIO_VRM_SCENE_DOCUMENT_VERSION,
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
-} from "./studio-vrm-scene-document";
+} from "./vrm/studio-vrm-scene-document";
 
 const page = { id: "p1", elements: [], bg: "#ffffff", bgGrad: null, canvasH: 1080 };
 const PRIVATE_PROMPT = "원작자의 비공개 결말 프롬프트";

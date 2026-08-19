@@ -11,70 +11,83 @@ import {
   isStudioDynamicBrushCausalDepositPipeline,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   resolveNormalizedStudioBrushDabColor,
   resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt,
   resolveNormalizedStudioBrushGrainAlphaMultiplierAt,
-} from "./studio-brush-material-dynamics";
+} from "./brush/studio-brush-material-dynamics";
 import {
   composeStudioBrushR8TipPaperAlphaMap,
   resetStudioBrushR8GrainRegistry,
   resolveStudioBrushR8GrainSampler,
-} from "./studio-brush-r8-grain-runtime";
+} from "./brush/studio-brush-r8-grain-runtime";
 import {
   planStudioDynamicBrushRenderBudget,
   type StudioDynamicBrushAcceptedPrefixReceipt,
   type StudioDynamicBrushRenderStampGrid,
-} from "./studio-brush-render-budget";
+} from "./brush/studio-brush-render-budget";
 import {
   clearStudioBrushSoftFalloffStampCache,
   prepareStudioBrushSoftFalloffTintedStampSurface,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
-} from "./studio-brush-soft-falloff-stamp";
+} from "./brush/studio-brush-soft-falloff-stamp";
 import {
   acquireStudioBrushTextureStampSurface,
   clearStudioBrushTextureStampCache,
   studioBrushTextureAlphaMapIsValid,
   type StudioBrushTextureStampSurfaceFactory,
-} from "./studio-brush-textured-stamp";
+} from "./brush/studio-brush-textured-stamp";
 import {
   composeNormalizedStudioBrushTipLayerDab,
   composeStudioBrushDualTipAlphaMap,
   studioBrushDualBrushIsActive,
   studioBrushDualTipUsesSolidEllipse,
   type StudioBrushComposableDab,
-} from "./studio-brush-tip-composition";
+} from "./brush/studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
   studioBrushTipUsesSolidEllipse,
   visitStudioBrushTipStampSamples,
   type NormalizedStudioBrushTipSettings,
   type StudioBrushTipAlphaMap,
-} from "./studio-brush-tip-stamp";
+} from "./brush/studio-brush-tip-stamp";
+import {
+  bridgeStudioDynamicDabVariationToDryMediaV1,
+  studioDryMediaDynamicBridgeMarkMultiplier,
+  type StudioDynamicBrushMaterialIdentity,
+} from "./brush/studio-dry-media-dynamic-bridge";
+import {
+  linearizeStudioDryMediaKernelDepositionAlpha,
+  resolveStudioDryMediaKernelTipAlphaMap,
+  studioDryMediaKernelDabPathOwnsMaterial,
+  studioDryMediaKernelStrokeToothMultiplier,
+} from "./brush/studio-dry-media-kernel-tip";
+import {
+  planStudioDryMediaUnionRibbonCarrier,
+  studioDryMediaUnionRibbonCarrierOwnsMaterial,
+  type StudioDryMediaUnionRibbonPolygon,
+} from "./brush/studio-dry-media-union-ribbon-carrier";
+import {
+  acquireStudioPaperGranulationTile,
+  resolveStudioDocumentPaperSurface,
+  resolveStudioPaperGranulationAlphaMultiplierAt,
+  studioPaperGranulationIsActive,
+  type StudioPaperGranulationSettings,
+  type StudioPaperGranulationTile,
+  type StudioPaperSurfaceSettings,
+} from "./brush/studio-paper-granulation-runtime";
+import {
+  composeStudioPaperTipAlphaMap,
+  STUDIO_PAPER_TIP_COMPOSITION_BYTE_BUDGET,
+} from "./brush/studio-paper-tip-composition";
 import {
   planStudioCompetitorSpecialtyRibbonCarrier,
   studioCompetitorSpecialtyRibbonCarrierOwnsMaterial,
   studioCompetitorSpecialtyRibbonCarrierWorkMultiplier,
   type StudioCompetitorSpecialtyRibbonPolygon,
 } from "./studio-competitor-specialty-ribbon-carrier";
-import {
-  bridgeStudioDynamicDabVariationToDryMediaV1,
-  studioDryMediaDynamicBridgeMarkMultiplier,
-  type StudioDynamicBrushMaterialIdentity,
-} from "./studio-dry-media-dynamic-bridge";
-import {
-  linearizeStudioDryMediaKernelDepositionAlpha,
-  resolveStudioDryMediaKernelTipAlphaMap,
-  studioDryMediaKernelDabPathOwnsMaterial,
-  studioDryMediaKernelStrokeToothMultiplier,
-} from "./studio-dry-media-kernel-tip";
-import {
-  planStudioDryMediaUnionRibbonCarrier,
-  studioDryMediaUnionRibbonCarrierOwnsMaterial,
-  type StudioDryMediaUnionRibbonPolygon,
-} from "./studio-dry-media-union-ribbon-carrier";
 import {
   planStudioFlatNibRibbonCarrier,
   type StudioFlatNibRibbonPolygon,
@@ -84,19 +97,6 @@ import {
   studioPaintRollerRibbonCarrierOwnsMaterial,
   type StudioPaintRollerRibbonPolygon,
 } from "./studio-paint-roller-ribbon-carrier";
-import {
-  acquireStudioPaperGranulationTile,
-  resolveStudioDocumentPaperSurface,
-  resolveStudioPaperGranulationAlphaMultiplierAt,
-  studioPaperGranulationIsActive,
-  type StudioPaperGranulationSettings,
-  type StudioPaperGranulationTile,
-  type StudioPaperSurfaceSettings,
-} from "./studio-paper-granulation-runtime";
-import {
-  composeStudioPaperTipAlphaMap,
-  STUDIO_PAPER_TIP_COMPOSITION_BYTE_BUDGET,
-} from "./studio-paper-tip-composition";
 import {
   planStudioProfessionalShelfRibbonCarrier,
   studioProfessionalShelfRibbonCarrierOwnsMaterial,

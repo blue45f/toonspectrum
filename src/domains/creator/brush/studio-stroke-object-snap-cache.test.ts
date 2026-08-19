@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { resolveStudioStrokeObjectSnapTargets } from "./studio-stroke-object-snap-cache";
 
-import type { GuideBox } from "./studio-smart-guides";
+import type { GuideBox } from "../studio-smart-guides";
 
 const box = (id: string): GuideBox => ({
   id,

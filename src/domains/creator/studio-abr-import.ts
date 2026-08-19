@@ -4,12 +4,12 @@ import {
   type NormalizedStudioBrushDynamicsMapping,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsSource,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   type StudioBrushSnapshot,
-} from "./studio-brush-library";
-import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
+} from "./brush/studio-brush-library";
+import { encodeStudioBrushTipAlphaMapBase64 } from "./brush/studio-brush-tip-stamp";
 
 import type { Abr, Brush, BrushDynamics, BrushShape, SampleInfo } from "ag-psd";
 

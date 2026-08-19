@@ -46,14 +46,14 @@ function receipt(requestId: number): StudioVelloHubRenderReceipt {
   return {
     requestId,
     primarySurfaceOwner: "vello-hub",
-    islandScope: "accelerated-selection-overlay",
+    islandScope: "document-vector-hybrid",
     backendId: "vello-cpu",
     decision: "initial-reference",
     expectedGainPct: null,
     fallback: null,
     preservedLastGoodFrame: false,
     visualGate: null,
-    admissionMode: "scene-local-shadow-candidate",
+    admissionMode: "gpu-first-shadow-candidate",
     productWidePromoted: false,
   };
 }

@@ -11,16 +11,6 @@
  * exact submission observed for that receipt.
  */
 import {
-  parseStudioCanonicalBrushPlan,
-  type StudioCanonicalBrushAffineTransform,
-} from "../src/domains/creator/studio-canonical-brush-plan";
-import {
-  lowerStudioCanonicalBrushPlanToWebGpuDabs,
-  type StudioCanonicalWebGpuAnalyticDab,
-  type StudioCanonicalWebGpuAnalyticShape,
-  type StudioCanonicalWebGpuPorterDuff,
-} from "../src/domains/creator/studio-canonical-brush-webgpu-lowering";
-import {
   adaptLoweredStudioCanonicalBrushWebGpuDabs,
   convertLegacyStudioGpuDabPlanToWebGpuDiagnosticOracle,
   createStudioEngineWebGpuBrushRuntime,
@@ -36,12 +26,22 @@ import {
   type StudioEngineWebGpuBrushReceipt,
   type StudioEngineWebGpuBrushRuntime,
   type StudioEngineWebGpuBrushSurface,
-} from "../src/domains/creator/studio-engine-webgpu-brush-runtime";
+} from "../src/domains/creator/render/studio-engine-webgpu-brush-runtime";
+import {
+  parseStudioCanonicalBrushPlan,
+  type StudioCanonicalBrushAffineTransform,
+} from "../src/domains/creator/studio-canonical-brush-plan";
+import {
+  lowerStudioCanonicalBrushPlanToWebGpuDabs,
+  type StudioCanonicalWebGpuAnalyticDab,
+  type StudioCanonicalWebGpuAnalyticShape,
+  type StudioCanonicalWebGpuPorterDuff,
+} from "../src/domains/creator/studio-canonical-brush-webgpu-lowering";
 
 import type {
   StudioGpuDab,
   StudioGpuDabRenderUpdate,
-} from "../src/domains/creator/studio-webgpu-dab-plan-contract";
+} from "../src/domains/creator/render/studio-webgpu-dab-plan-contract";
 
 const WIDTH = 96;
 const HEIGHT = 72;

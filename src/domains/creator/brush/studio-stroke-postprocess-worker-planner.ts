@@ -1,4 +1,5 @@
-import { STABILIZER_MAX } from "./studio-brush";
+import { STABILIZER_MAX } from "../studio-brush";
+
 import {
   STUDIO_STROKE_POSTPROCESS_MAX_COORDINATE_BYTES,
   STUDIO_STROKE_POSTPROCESS_MAX_POINTS,

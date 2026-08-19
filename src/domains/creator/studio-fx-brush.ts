@@ -839,16 +839,16 @@ function fxLuminousInterpolatedScale(
   responses: readonly FxLuminousSegmentResponse[],
   segments: readonly StudioFxPressurePathSegment[],
   segmentIndex: number,
-  edge: "from" | "to",
+  edge: "from " | "to",
   key: keyof FxLuminousSegmentResponse,
 ): number {
   const current = responses[segmentIndex]![key];
-  const adjacentIndex = edge === "from" ? segmentIndex - 1 : segmentIndex + 1;
+  const adjacentIndex = edge === "from " ? segmentIndex - 1 : segmentIndex + 1;
   const adjacent = responses[adjacentIndex];
   const adjacentSegment = segments[adjacentIndex];
   const segment = segments[segmentIndex]!;
   if (!adjacent || !adjacentSegment) return current;
-  const continuous = edge === "from"
+  const continuous = edge === "from "
     ? fxLuminousSamePoint(
         { x: adjacentSegment.endX, y: adjacentSegment.endY },
         { x: segment.moveX, y: segment.moveY },
@@ -887,7 +887,7 @@ function flattenFxLuminousRibbon(
       responses,
       pressurePath.segments,
       segmentIndex,
-      "from",
+      "from ",
       "widthScale",
     );
     const toWidthScale = fxLuminousInterpolatedScale(
@@ -901,7 +901,7 @@ function flattenFxLuminousRibbon(
       responses,
       pressurePath.segments,
       segmentIndex,
-      "from",
+      "from ",
       "opacityScale",
     );
     const toOpacityScale = fxLuminousInterpolatedScale(
@@ -1478,6 +1478,11 @@ export type FxOilPlanInput = {
   paintBody?: FxOilPaintBody;
   /** Defaults to "bristle", the historical behaviour. */
   tipProfile?: FxOilTipProfile;
+  /**
+   * Override station pitch as a fraction of head width. Fluid Paint walks the
+   * tuft at 1/8 the default 0.068 pitch (8 capsules per bristle segment).
+   */
+  stationSpacingRatio?: number;
 };
 
 /**
@@ -1729,7 +1734,11 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   // lattice. Long strokes remain bounded by sampleStations' whole-path redistribution.
   const paintBody: FxOilPaintBody = input.paintBody === "acrylic" ? "acrylic" : "oil";
   const tipProfile: FxOilTipProfile = input.tipProfile === "hard" ? "hard" : "bristle";
-  const spacing = Math.max(0.5, baseWidth * OIL_STATION_SPACING_RATIO);
+  const spacingRatio = Number.isFinite(input.stationSpacingRatio)
+    && (input.stationSpacingRatio ?? 0) > 0
+    ? Math.min(0.2, Math.max(0.004, input.stationSpacingRatio!))
+    : OIL_STATION_SPACING_RATIO;
+  const spacing = Math.max(0.5, baseWidth * spacingRatio);
   const stations = sampleStations(points, spacing, maxDabs);
   const bristleOffsets = bristleBedOffsets(baseWidth, seed);
   const dabs: FxOilDab[] = [];

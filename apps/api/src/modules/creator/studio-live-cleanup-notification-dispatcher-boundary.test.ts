@@ -10,7 +10,7 @@ const gatewayPath = fileURLToPath(new URL("./studio-live.gateway.ts", import.met
 const creatorModulePath = fileURLToPath(new URL("./creator.module.ts", import.meta.url));
 const clientTransportPath = fileURLToPath(
   new URL(
-    "../../../../../src/domains/creator/studio-live-socket-transport.ts",
+    "../../../../../src/domains/creator/live/studio-live-socket-transport.ts",
     import.meta.url
   )
 );

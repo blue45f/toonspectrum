@@ -35,6 +35,7 @@ import {
 import { memo, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { preloadStudioRasterRetouchRuntime } from "./render/studio-raster-retouch-preload";
 import {
   DEFAULT_STUDIO_RAIL_TOOL_ORDER,
   formatStudioShortcutChord,
@@ -68,7 +69,6 @@ import {
   isKoreanUiLocale,
   localizeStudioRailShellText,
 } from "./studio-rail-tool-localization";
-import { preloadStudioRasterRetouchRuntime } from "./studio-raster-retouch-preload";
 import {
   STUDIO_RETOUCH_EDITABLE_COPY_NOTE,
   studioRetouchToolHelp,

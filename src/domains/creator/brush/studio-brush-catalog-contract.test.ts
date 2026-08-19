@@ -2,11 +2,15 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { exportPageToSvg } from "../export/studio-svg-export";
 import {
   BRUSH_PRESETS,
   STUDIO_BRUSH_RENDER_FAMILY,
   resolveStudioBrushRenderFamily,
-} from "./studio-brush";
+} from "../studio-brush";
+import { listStudioBrushTrayItems } from "../studio-creative-ux";
+import { loadStudioPerfectFreehandStroker } from "../studio-perfect-freehand";
+
 import {
   filterStudioBrushCatalogItems,
   listStudioCoreBrushCatalogItems,
@@ -33,10 +37,7 @@ import {
   studioBrushRuntimeExecutionSignature,
 } from "./studio-brush-runtime-contract";
 import { resolveStudioStampBrushKind } from "./studio-brush-stamp-engine";
-import { listStudioBrushTrayItems } from "./studio-creative-ux";
 import { filterStudioBrushLibraryItems } from "./studio-draw-ux";
-import { loadStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
-import { exportPageToSvg } from "./studio-svg-export";
 import { LargeBrushPreview } from "./StudioBrushLibrarySheet";
 
 const SUPPORTED_PREVIEW_KINDS = new Set([

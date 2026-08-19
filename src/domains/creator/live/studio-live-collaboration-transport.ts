@@ -21,7 +21,7 @@ import type {
   StudioLiveParticipant,
   StudioLiveLockRequest,
 } from "./studio-live-collaboration-protocol";
-import type { StudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
+import type { StudioTeamCommentLiveEvent } from "../studio-team-comment-live-event";
 
 export type StudioLiveTransportMode = "local" | "server";
 

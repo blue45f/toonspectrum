@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { STUDIO_CANONICAL_BRUSH_PLAN_VERSION } from "./studio-canonical-brush-plan";
+import { STUDIO_CANONICAL_BRUSH_PLAN_VERSION } from "../studio-canonical-brush-plan";
+
 import {
   createStudioEngineSettledTileRasterAdapter,
 } from "./studio-engine-settled-tile-raster-adapter";
@@ -29,7 +30,7 @@ import type {
   StudioOffscreenRasterRunInput,
   StudioOffscreenRasterRunOptions,
   StudioOffscreenRasterRunResult,
-} from "./studio-offscreen-raster-worker-client";
+} from "../studio-offscreen-raster-worker-client";
 
 const PNG_OUTPUT = Object.freeze({
   kind: "encoded",

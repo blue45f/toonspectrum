@@ -1,8 +1,8 @@
-import { loadStudioSvgExportWorkerClientModule } from "./studio-document-export-loaders";
+import { loadStudioSvgExportWorkerClientModule } from "../studio-document-export-loaders";
 
 interface StudioRasterRetouchPreloadedModules {
-  readonly svgWorkerClient: typeof import("./studio-svg-export-worker-client");
-  readonly vectorReference: typeof import("./studio-vector-fill-reference");
+  readonly svgWorkerClient: typeof import("../export/studio-svg-export-worker-client");
+  readonly vectorReference: typeof import("../studio-vector-fill-reference");
 }
 
 let commonRasterRetouchPreload: Promise<StudioRasterRetouchPreloadedModules> | null = null;
@@ -38,9 +38,9 @@ export function preloadStudioRasterRetouchRuntime(options: {
     async () => {
       const [svgWorkerClient, vectorReference] = await Promise.all([
         loadStudioSvgExportWorkerClientModule(),
-        import("./studio-vector-fill-reference"),
+        import("../studio-vector-fill-reference"),
         import("./studio-raster-edit-preparation"),
-        import("./studio-pixel-edit-brush-runtime"),
+        import("../studio-pixel-edit-brush-runtime"),
       ]);
       return { svgWorkerClient, vectorReference };
     },
@@ -56,7 +56,7 @@ export function preloadStudioRasterRetouchRuntime(options: {
     liquifyRasterRetouchPreload,
     (promise) => { liquifyRasterRetouchPreload = promise; },
     async () => {
-      await import("./studio-liquify-browser");
+      await import("../studio-liquify-browser");
     },
   );
   return Promise.all([common, liquify]).then(() => undefined);

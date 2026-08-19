@@ -18,8 +18,8 @@
  * 브라우저를 만진다(테스트 주입 가능). 사용자 노출 문자열은 한글.
  */
 
+import { drawWatermarkOnSlice } from "./export/studio-export-presets";
 import { JPEG_QUALITY, canvasToBlob, downloadBlob } from "./studio-export";
-import { drawWatermarkOnSlice } from "./studio-export-presets";
 
 import type { WatermarkSettings } from "./studio-watermark";
 

@@ -1,4 +1,4 @@
-import { parseStudioCrdtRasterDocumentRoots } from "../../../lib/studio-crdt-raster-document-contract";
+import { parseStudioCrdtRasterDocumentRoots } from "../../../../lib/studio-crdt-raster-document-contract";
 
 import {
   STUDIO_CRDT_RASTER_WORKER_PROTOCOL_VERSION,

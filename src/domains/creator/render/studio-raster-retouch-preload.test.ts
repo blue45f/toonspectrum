@@ -6,19 +6,18 @@ const mocks = vi.hoisted(() => ({
   preloadVectorRasterizer: vi.fn(),
 }));
 
-vi.mock("./studio-document-export-loaders", () => ({
+vi.mock("../studio-document-export-loaders", () => ({
   loadStudioSvgExportWorkerClientModule: mocks.loadSvgWorkerClient,
 }));
-vi.mock("./studio-vector-fill-reference", () => ({
+vi.mock("../studio-vector-fill-reference", () => ({
   preloadStudioVectorReferenceRasterizer: mocks.preloadVectorRasterizer,
 }));
 vi.mock("./studio-raster-edit-preparation", () => ({}));
-vi.mock("./studio-pixel-edit-brush-runtime", () => ({}));
-vi.mock("./studio-liquify-browser", () => ({}));
+vi.mock("../studio-pixel-edit-brush-runtime", () => ({}));
+vi.mock("../studio-liquify-browser", () => ({}));
 
 describe("Studio raster retouch intent preload", () => {
-  let preloadStudioRasterRetouchRuntime: typeof import(
-    "./studio-raster-retouch-preload"
+  let preloadStudioRasterRetouchRuntime: typeof import("./studio-raster-retouch-preload"
   )["preloadStudioRasterRetouchRuntime"];
 
   beforeEach(async () => {

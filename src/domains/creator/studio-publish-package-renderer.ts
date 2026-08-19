@@ -1,5 +1,5 @@
+import { drawWatermarkOnSlice } from "./export/studio-export-presets";
 import { canvasToBlob } from "./studio-export";
-import { drawWatermarkOnSlice } from "./studio-export-presets";
 import {
   getStudioPublishPlatformPreset,
   planStudioPublishCanvasSlices,

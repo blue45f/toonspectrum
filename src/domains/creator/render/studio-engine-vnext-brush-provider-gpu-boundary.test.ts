@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import { normalizeStudioBrushDynamicsSettings } from "../brush/studio-brush-dynamics";
 import {
   hashStudioCanonicalBrushPlan,
   parseStudioCanonicalBrushPlan,
   type StudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
+
 import {
   createStudioEngineVNextBrushProviderGpuCompletion,
   STUDIO_ENGINE_VNEXT_BRUSH_PROVIDER_GPU_BOUNDARY_VERSION,

@@ -8,15 +8,16 @@
  * fails closed until the compositor has an explicit parity contract for it.
  */
 
-import { hasActiveImageFilters } from "./studio-konva-filter-fields";
+import { hasActiveImageFilters } from "../render/studio-konva-filter-fields";
+
 import {
   STUDIO_SCENE_LAYER_LIFT_BUDGETS,
   type StudioSceneLayerLiftSourceMimeType,
 } from "./studio-layer-lift-contract";
 import { fingerprintStudioLayerLiftSource } from "./studio-layer-lift-plan";
 
-import type { El, ImageEl } from "./studio-element-model";
-import type { LayerGroup } from "./studio-layers";
+import type { El, ImageEl } from "../studio-element-model";
+import type { LayerGroup } from "../studio-layers";
 
 const SOURCE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@+-]*$/u;
 const NORMAL_BLEND_MODES = new Set(["normal", "source-over"]);

@@ -1,3 +1,4 @@
+import { DEFAULT_SHAPE_PARAMS } from "./brush/studio-stroke-shapes";
 import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
 import {
   promoteFreehandQuickShapeOnRelease,
@@ -9,7 +10,6 @@ import {
   stripStudioSmartShapeBrushEffect,
   type StudioSmartShapeBrushEffectFallbackReason,
 } from "./studio-smart-shape-brush-effect";
-import { DEFAULT_SHAPE_PARAMS } from "./studio-stroke-shapes";
 
 import type { DrawEl } from "./studio-element-model";
 import type { QuickShapeKind } from "./studio-quickshape";

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createStudioLinked3dRenderPageFixture } from
-  "./studio-linked-3d-render-test-fixture";
+import { createStudioLinked3dRenderPageFixture } from "./studio-linked-3d-render-test-fixture";
 import {
   adoptMissingPage,
   appendPageState,
@@ -24,10 +23,8 @@ import {
   reorderPages,
   type PageLike,
 } from "./studio-pages";
-import { migrateStudioShared3dStageCollectionDocument } from
-  "./studio-shared-3d-stage-collection";
-import { createNativePluralShared3dStageFixture } from
-  "./studio-shared-3d-stage-test-fixture";
+import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
+import { createNativePluralShared3dStageFixture } from "./studio-shared-3d-stage-test-fixture";
 
 const CANVAS_W = 720;
 let idCounter = 0;

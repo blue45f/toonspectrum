@@ -71,10 +71,31 @@ export default defineConfig(
   // v7 컴파일러 기반 진단 두 개는 탈락 컴포넌트의 수동 메모를 "보존 불가"로, 이벤트 핸들러의
   // Date.now 등을 "렌더 중 불순 호출"로 오탐하므로 이 파일에서만 끈다(다른 파일은 그대로).
   {
-    files: ['src/domains/creator/StudioPage.tsx'],
+    files: [
+      'src/domains/creator/StudioPage.tsx',
+      'src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers.ts',
+      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorView.tsx',
+    ],
     rules: {
       'react-hooks/preserve-manual-memoization': 'off',
       'react-hooks/purity': 'off',
+      'import-x/order': 'off',
+    },
+  },
+
+  // Mechanical extract of StudioCuttoonEditor closures: host/session bags are `any`
+  // so the original identifiers stay intact. Unused destructure slots are kept
+  // because the next handler pass still closes over the same bag.
+  {
+    files: [
+      'src/domains/creator/studio-cuttoon-editor/studio-cuttoon-stage-pointers.ts',
+      'src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorView.tsx',
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off',
+      'import-x/order': 'off',
     },
   },
 

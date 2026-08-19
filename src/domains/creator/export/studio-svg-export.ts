@@ -26,26 +26,13 @@
  */
 
 import {
-  buildCalligraphySegments,
-  processFreehandPoints,
-  processPencilPoints,
-  resampleStrokePressures,
-  resolveStudioFreehandRenderPath,
-  resolveStudioBrushRenderFamily,
-  screentoneDotRadius,
-  screentoneDotsForStroke,
-  strokeRenderDistance,
-  type CalligraphyStylusInput,
-  type CalligraphyTipSettings,
-} from "./studio-brush";
-import {
   applyStudioBrushAliasWatercolorMaterial,
   mapStudioBrushAliasPressure,
   mapStudioBrushAliasPressureSamples,
   resolveStudioBrushAliasPencilPasses,
   resolveStudioBrushAliasWatercolorPlanSettings,
   studioBrushAliasEffectiveDiameter,
-} from "./studio-brush-alias-profile";
+} from "../brush/studio-brush-alias-profile";
 import {
   DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
   isStudioDynamicBrushCausalDepositPipeline,
@@ -58,25 +45,25 @@ import {
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
   type StudioBrushDynamicsSettings,
-} from "./studio-brush-dynamics";
+} from "../brush/studio-brush-dynamics";
 import {
   resolveNormalizedStudioBrushDabColor,
   resolveNormalizedStudioBrushGrainAlphaMultiplier,
   studioBrushGrainIsActive,
-} from "./studio-brush-material-dynamics";
+} from "../brush/studio-brush-material-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
   type StudioDynamicBrushRenderStampGrid,
-} from "./studio-brush-render-budget";
-import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
+} from "../brush/studio-brush-render-budget";
+import { resolveStudioBrushSinglePointRoute } from "../brush/studio-brush-runtime-contract";
 import {
   rasterizeStudioBrushSoftFalloffMaskRgba,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
-} from "./studio-brush-soft-falloff-stamp";
+} from "../brush/studio-brush-soft-falloff-stamp";
 import {
   planStudioStampBrushDabs,
   resolveStudioStampBrushKind,
@@ -85,26 +72,84 @@ import {
   type StudioStampBrushDab,
   type StudioStampBrushStyle,
   type StudioStampBrushTuning,
-} from "./studio-brush-stamp-engine";
+} from "../brush/studio-brush-stamp-engine";
 import {
   studioDynamicBrushDabVariationsFromTransforms,
   studioBrushSymmetryTransforms,
   transformStudioBrushSymmetryPoint,
   type StudioBrushSymmetryTransform,
-} from "./studio-brush-symmetry";
-import { rasterizeStudioBrushTextureMaskRgba } from "./studio-brush-textured-stamp";
+} from "../brush/studio-brush-symmetry";
+import { rasterizeStudioBrushTextureMaskRgba } from "../brush/studio-brush-textured-stamp";
 import {
   composeStudioBrushDualTipAlphaMap,
   planNormalizedStudioBrushTipComposition,
   studioBrushDualTipUsesSolidEllipse,
-} from "./studio-brush-tip-composition";
+} from "../brush/studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
   encodeStudioBrushTipAlphaMapBase64,
   planStudioBrushTipStampWorldSamples,
   studioBrushTipUsesSolidEllipse,
   type StudioBrushTipAlphaMap,
-} from "./studio-brush-tip-stamp";
+} from "../brush/studio-brush-tip-stamp";
+import { resolveStudioCalligraphyRenderTip } from "../brush/studio-calligraphy-nib-profile";
+import { planStudioCalligraphyRibbon } from "../brush/studio-calligraphy-ribbon";
+import {
+  resolveStudioDynamicBrushMaterialIdentity,
+  type StudioDynamicBrushMaterialIdentity,
+} from "../brush/studio-dry-media-dynamic-bridge";
+import { studioFluidPaintStationSpacingRatio } from "../brush/studio-fluid-paint-reference";
+import {
+  resolveStudioInkPressure,
+  studioInkFallbackPressure,
+  studioInkPressureDiameter,
+  studioInkPressureRadius,
+  type StudioInkPressureModel,
+} from "../brush/studio-ink-pressure-model";
+import {
+  planStudioOilRibbonCarrier,
+  studioOilRibbonProgramsForBrush,
+  STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR,
+  STUDIO_OIL_IMPASTO_RELIEF_OVERLAY_VERSION,
+  studioOilRibbonPathData,
+} from "../brush/studio-oil-ribbon-carrier";
+import { resolveStudioPaperBrushResponse } from "../brush/studio-paper-brush-response";
+import {
+  resolveStudioDocumentPaperSurface,
+  studioPaperGranulationIsActive,
+} from "../brush/studio-paper-granulation-runtime";
+import {
+  planStudioStampInkRibbon,
+  studioStampInkRibbonOptions,
+} from "../brush/studio-stamp-ink-ribbon";
+import {
+  planStudioAngledNibStrokeLocalCoverage,
+  type StudioStrokeLocalCoveragePolygon,
+} from "../brush/studio-stroke-local-coverage";
+import {
+  isStudioBoundedFlowPaintModelCompatible,
+  isStudioStrokePaintModelCompatible,
+  type StudioStrokePaintModel,
+} from "../brush/studio-stroke-paint-model";
+import {
+  effectiveCornerRadius,
+  lineArrowHeadGeoms,
+  normalizeShapeParams,
+  normalizeStrokeStyle,
+  polygonPathPointsInBounds,
+  starPathPoints,
+  strokeDashArray,
+  type ShapeParams,
+  type StrokeStyle,
+} from "../brush/studio-stroke-shapes";
+import {
+  planWatercolorBrushDabs,
+  watercolorBrushSeedFromKey,
+} from "../brush/studio-watercolor-brush";
+import {
+  planStudioWetRibbonCarrier,
+  studioWetRibbonCarrierBatchPathData,
+} from "../brush/studio-wet-ribbon-carrier";
 import {
   bubblePathData,
   bubblePathDataMulti,
@@ -115,20 +160,7 @@ import {
   scaredBubblePathData,
   thoughtBubbleBodyPath,
   type BubbleTailSpec,
-} from "./studio-bubble-path";
-import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
-import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
-import {
-  planStudioCausalDynamicBrushDepositsV2,
-  planStudioCausalDynamicBrushDepositSegmentsV3,
-  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-} from "./studio-causal-dynamic-brush-deposit-v2";
-import { planStudioCausalInk } from "./studio-causal-ink";
-import {
-  DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
-  planCausalWatercolorBrushDabs,
-} from "./studio-causal-watercolor-brush";
-import { calculateStudioCrc32 } from "./studio-crc32";
+} from "../lettering/studio-bubble-path";
 import {
   planDialogueRubyOverlayPlacements,
   planDialogueVerticalRubyOverlayPlacements,
@@ -136,17 +168,39 @@ import {
   type StudioRubyOverlayPlacement,
   type StudioRubySpanInput,
   type StudioVerticalRubyLayoutPlan,
-} from "./studio-dialogue-ruby-layout";
+} from "../lettering/studio-dialogue-ruby-layout";
+import { buildTextPathData, isFlatTextPath, normalizeTextPath, type TextPathConfig } from "../lettering/studio-text-path";
+import { hasActiveImageFilters, type ImageFilterFields } from "../render/studio-konva-filter-fields";
 import {
-  resolveStudioDynamicBrushMaterialIdentity,
-  type StudioDynamicBrushMaterialIdentity,
-} from "./studio-dry-media-dynamic-bridge";
+  buildCalligraphySegments,
+  processFreehandPoints,
+  processPencilPoints,
+  resampleStrokePressures,
+  resolveStudioFreehandRenderPath,
+  resolveStudioBrushRenderFamily,
+  screentoneDotRadius,
+  screentoneDotsForStroke,
+  strokeRenderDistance,
+  type CalligraphyStylusInput,
+  type CalligraphyTipSettings,
+} from "../studio-brush";
+import {
+  planStudioCausalDynamicBrushDepositsV2,
+  planStudioCausalDynamicBrushDepositSegmentsV3,
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+} from "../studio-causal-dynamic-brush-deposit-v2";
+import { planStudioCausalInk } from "../studio-causal-ink";
+import {
+  DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
+  planCausalWatercolorBrushDabs,
+} from "../studio-causal-watercolor-brush";
+import { calculateStudioCrc32 } from "../studio-crc32";
 import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
   resolveStudioDynamicBrushCoverageBudgetContract,
   type StudioDynamicBrushCoverageMark,
   type StudioDynamicBrushSegmentedDabVariation,
-} from "./studio-dynamic-brush-coverage-renderer";
+} from "../studio-dynamic-brush-coverage-renderer";
 import {
   FX_OIL_DAB_CAP,
   FX_PASTEL_DAB_CAP,
@@ -166,7 +220,7 @@ import {
   resolveStudioFxPressurePassResponse,
   type StudioFxLuminousRibbonPassPlan,
   studioLuminousCoreColor,
-} from "./studio-fx-brush";
+} from "../studio-fx-brush";
 import {
   estimateTextGradientBBox,
   legacyTextGradientToSpec,
@@ -175,99 +229,54 @@ import {
   radialGradientGeometry,
   type GradientBBox,
   type StudioGradientSpec,
-} from "./studio-gradient-engine";
+} from "../studio-gradient-engine";
 import {
   planStudioHighlighterWashRibbon,
   planStudioHighlighterWashTap,
   resolveStudioHighlighterWashBrushId,
   studioHighlighterWashDetailPathData,
   studioHighlighterWashPlanPathData,
-} from "./studio-highlighter-wash-ribbon";
-import {
-  resolveStudioInkPressure,
-  studioInkFallbackPressure,
-  studioInkPressureDiameter,
-  studioInkPressureRadius,
-  type StudioInkPressureModel,
-} from "./studio-ink-pressure-model";
-import { hasActiveImageFilters, type ImageFilterFields } from "./studio-konva-filter-fields";
-import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
+} from "../studio-highlighter-wash-ribbon";
+import { isEffectivelyHidden, type LayerGroup } from "../studio-layers";
 import {
   STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
   type StudioMaterialMinimumDiameterRatio,
   type StudioMaterialPressureModel,
-} from "./studio-material-pressure-model";
-import {
-  planStudioOilRibbonCarrier,
-  studioOilRibbonProgramsForBrush,
-  STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR,
-  STUDIO_OIL_IMPASTO_RELIEF_OVERLAY_VERSION,
-  studioOilRibbonPathData,
-} from "./studio-oil-ribbon-carrier";
+} from "../studio-material-pressure-model";
 import {
   STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE,
   planStudioPerfectFreehandRender,
   type StudioPerfectFreehandRenderPlan,
-} from "./studio-outline-stroke-contract";
-import { resolveStudioPaperBrushResponse } from "./studio-paper-brush-response";
-import {
-  resolveStudioDocumentPaperSurface,
-  studioPaperGranulationIsActive,
-} from "./studio-paper-granulation-runtime";
-import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "./studio-pattern-fill";
+} from "../studio-outline-stroke-contract";
+import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "../studio-pattern-fill";
 import {
   buildStudioPerfectFreehandPathData,
   loadStudioPerfectFreehandStroker,
   peekStudioPerfectFreehandStroker,
   resolveStudioPerfectFreehandProfile,
-} from "./studio-perfect-freehand";
+} from "../studio-perfect-freehand";
 import {
   isStudioPixelPencilRenderMode,
   planStudioPixelPencilCells,
-} from "./studio-pixel-pencil";
+} from "../studio-pixel-pencil";
 import {
   planStudioRetainedMediaPressureCurve,
   resolveStudioRetainedMediaPressure,
   resolveStudioRetainedMediaPressureProfileId,
-} from "./studio-retained-media-pressure";
-import { planStudioRetainedMediaRibbon } from "./studio-retained-media-ribbon";
+} from "../studio-retained-media-pressure";
+import { planStudioRetainedMediaRibbon } from "../studio-retained-media-ribbon";
 import {
   studioSketchStyleOfElement,
   type StudioSketchStyle,
-} from "./studio-rough-shape";
-import { buildStudioRoughSvgParityPlan } from "./studio-rough-svg-parity";
-import { skewDegToKonva, type SkewFields } from "./studio-skew";
-import {
-  planStudioStampInkRibbon,
-  studioStampInkRibbonOptions,
-} from "./studio-stamp-ink-ribbon";
-import {
-  planStudioAngledNibStrokeLocalCoverage,
-  type StudioStrokeLocalCoveragePolygon,
-} from "./studio-stroke-local-coverage";
-import {
-  isStudioBoundedFlowPaintModelCompatible,
-  isStudioStrokePaintModelCompatible,
-  type StudioStrokePaintModel,
-} from "./studio-stroke-paint-model";
-import {
-  effectiveCornerRadius,
-  lineArrowHeadGeoms,
-  normalizeShapeParams,
-  normalizeStrokeStyle,
-  polygonPathPointsInBounds,
-  starPathPoints,
-  strokeDashArray,
-  type ShapeParams,
-  type StrokeStyle,
-} from "./studio-stroke-shapes";
+} from "../studio-rough-shape";
+import { buildStudioRoughSvgParityPlan } from "../studio-rough-svg-parity";
+import { skewDegToKonva, type SkewFields } from "../studio-skew";
 import {
   STUDIO_SVG_R8_STREAMING_RGBA_BYTE_BUDGET,
   visitStudioSvgR8StreamingCoverage,
   type StudioSvgR8DabVariation,
   type StudioSvgR8StreamingCoverageMark,
-} from "./studio-svg-r8-streaming-export";
-import { buildTextPathData, isFlatTextPath, normalizeTextPath, type TextPathConfig } from "./studio-text-path";
+} from "../studio-svg-r8-streaming-export";
 import {
   layoutVerticalText,
   verticalBlockAlign,
@@ -275,21 +284,13 @@ import {
   type VerticalTextItem,
   type VerticalTextLayout,
   type VerticalTextMeasurer,
-} from "./studio-vertical-text";
-import {
-  planWatercolorBrushDabs,
-  watercolorBrushSeedFromKey,
-} from "./studio-watercolor-brush";
+} from "../studio-vertical-text";
 import {
   planStudioWebDrawingKitOwnedDabs,
-} from "./studio-web-drawing-stroke-bridge";
-import {
-  planStudioWetRibbonCarrier,
-  studioWetRibbonCarrierBatchPathData,
-} from "./studio-wet-ribbon-carrier";
+} from "../studio-web-drawing-stroke-bridge";
 
-import type { BubbleVariant } from "./studio-assets";
-import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
+import type { StudioBrushEngineProgramSet } from "../brush/studio-brush-engine-program-set";
+import type { BubbleVariant } from "../studio-assets";
 
 // ---------------------------------------------------------------------------
 // 요소 구조 타입 — StudioPage 의 El 유니온과 구조 호환(필드 부분집합, 전부 옵셔널 위주).
@@ -3077,6 +3078,7 @@ function serializeFreehand(
       maxDabs: FX_OIL_DAB_CAP,
       paintBody: studioOilPaintBodyForBrush(brush),
       tipProfile: studioOilTipProfileForBrush(brush),
+      stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
     });
     // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다, brush--bristle-physics 레인만
     // WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3) — Canvas 렌더러(StudioDrawNode)의 유화

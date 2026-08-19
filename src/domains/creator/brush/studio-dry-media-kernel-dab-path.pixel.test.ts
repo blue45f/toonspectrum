@@ -18,6 +18,12 @@ import { createRequire } from "node:module";
 
 import { describe, expect, it } from "vitest";
 
+import { planStudioCausalDynamicBrushDepositSegmentsV3 } from "../studio-causal-dynamic-brush-deposit-v2";
+import {
+  planStudioDynamicBrushCoverageMarks,
+  type StudioDynamicBrushCoverageMark,
+} from "../studio-dynamic-brush-coverage-renderer";
+
 import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsForBrushId,
@@ -26,13 +32,9 @@ import {
 } from "./studio-brush-dynamics";
 import { STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID } from "./studio-brush-render-budget";
 import { sampleStudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
-import { planStudioCausalDynamicBrushDepositSegmentsV3 } from "./studio-causal-dynamic-brush-deposit-v2";
 import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
 import { STUDIO_DRY_MEDIA_CORE_IDS } from "./studio-dry-media-kernel-tip";
-import {
-  planStudioDynamicBrushCoverageMarks,
-  type StudioDynamicBrushCoverageMark,
-} from "./studio-dynamic-brush-coverage-renderer";
+
 
 type ResvgWasmModule = typeof import("@resvg/resvg-wasm");
 

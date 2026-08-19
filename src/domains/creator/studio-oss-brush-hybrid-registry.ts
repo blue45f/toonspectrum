@@ -14,7 +14,7 @@
 import {
   resolveStudioBrushEngineLaneBaseId,
   studioBrushEngineLaneRowById,
-} from "./studio-brush-engine-lane-catalog";
+} from "./brush/studio-brush-engine-lane-catalog";
 import {
   STUDIO_OSS_BRUSH_KERNELS_VERSION,
   STUDIO_OSS_BRUSH_PROVENANCE,
@@ -514,6 +514,10 @@ const CORE_BRUSH_TEXTURE_KIND: Readonly<Record<string, StudioBrushTextureKind>> 
     oil: "paint-oil",
     acrylic: "paint-acrylic",
     "paint-tube": "paint-oil",
+    "fluid-paint": "paint-oil",
+    "fluid-paint-fine": "paint-oil",
+    "fluid-paint-load": "paint-oil",
+    "fluid-paint-rake": "paint-oil",
     airbrush: "spray-airbrush",
     "hard-airbrush": "spray-airbrush",
     "airbrush-fine": "spray-airbrush",

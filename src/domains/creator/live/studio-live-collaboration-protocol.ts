@@ -1,10 +1,11 @@
+import { STUDIO_TEAM_ROLES, type StudioTeamRole } from "../studio-team-client";
+
 import {
   STUDIO_LIVE_GESTURE_PREVIEW_KIND,
   STUDIO_LIVE_GESTURE_PREVIEW_MAX_BYTES,
   parseStudioLiveGesturePreviewPayload,
   type StudioLiveGesturePreviewPayload,
 } from "./studio-live-gesture-preview";
-import { STUDIO_TEAM_ROLES, type StudioTeamRole } from "./studio-team-client";
 
 /**
  * Ephemeral collaboration protocol shared by local BroadcastChannel and future server transports.

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
 import {
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
-} from "./studio-brush-dynamics";
-import { studioBrushIconId } from "./studio-brush-icons";
-import { resolveStudioBrushRuntimeContract } from "./studio-brush-runtime-contract";
+} from "./brush/studio-brush-dynamics";
+import { studioBrushIconId } from "./brush/studio-brush-icons";
+import { resolveStudioBrushRuntimeContract } from "./brush/studio-brush-runtime-contract";
+import { BRUSH_PRESETS } from "./studio-brush";
 import {
   STUDIO_WEB_ASSIST_BRUSH_IDS,
 } from "./studio-web-drawing-assist-kit";

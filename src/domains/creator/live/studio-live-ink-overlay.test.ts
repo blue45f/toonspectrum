@@ -1,15 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { planStudioCausalInk } from "./studio-causal-ink";
 import {
   resolveStudioCausalInkDrawContract,
   resolveStudioLiveInkStrokeStyle,
-} from "./studio-draw-rendering";
+} from "../brush/studio-draw-rendering";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
-} from "./studio-ink-pressure-model";
+} from "../brush/studio-ink-pressure-model";
+import { planStudioCausalInk } from "../studio-causal-ink";
+
 import {
   StudioLiveInkOverlayRenderer,
   StudioLiveInkPredictionRenderer,
@@ -18,7 +19,7 @@ import {
   type StudioLiveInkSurface,
 } from "./studio-live-ink-overlay";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 interface RecordedDab {
   readonly x: number;

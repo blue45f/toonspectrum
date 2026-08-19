@@ -12,8 +12,8 @@
  * 소유한다(studio-node-edit 의 beginNodeDrag/updateNodeDragMove 와 동일한 분업 — 엔진은 기하만,
  * 상위가 제스처/시간을 해석해 엔진을 호출한다).
  */
+import { SHAPE_PARAM_RANGES, type StrokeShapeKind } from "./brush/studio-stroke-shapes";
 import { polylineLength } from "./studio-brush";
-import { SHAPE_PARAM_RANGES, type StrokeShapeKind } from "./studio-stroke-shapes";
 
 export type QuickShapeKind = Extract<StrokeShapeKind, "line" | "rect" | "ellipse" | "triangle" | "polygon">;
 

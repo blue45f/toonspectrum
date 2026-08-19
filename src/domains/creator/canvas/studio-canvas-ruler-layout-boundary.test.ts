@@ -1,12 +1,8 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(
-  fileURLToPath(new URL("./StudioPage.tsx", import.meta.url)),
-  "utf8"
-);
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const pageSource = readStudioCuttoonEditorSource();
 
 describe("Studio canvas ruler layout boundary", () => {
   it("scopes ruler chrome to the canvas shell instead of the inspector row", () => {

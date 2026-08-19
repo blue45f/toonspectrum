@@ -7,15 +7,16 @@
  */
 
 import {
+  parseStudioProfessionalBrushDynamicsPlan,
+  type StudioProfessionalBrushDynamicsPlan,
+} from "../studio-professional-brush-dynamics";
+import { sha256HexPortable } from "../studio-sha256";
+
+import {
   normalizeStudioBrushR8TextureGrainSource,
   type StudioBrushR8GrainAssetReference,
   type StudioBrushR8TextureGrainSource,
 } from "./studio-brush-r8-grain-asset-contract";
-import {
-  parseStudioProfessionalBrushDynamicsPlan,
-  type StudioProfessionalBrushDynamicsPlan,
-} from "./studio-professional-brush-dynamics";
-import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_BRUSH_RENDER_PROVENANCE_VERSION = 1 as const;
 export const STUDIO_BRUSH_RENDER_PROVENANCE_CRDT_VERSION = 1 as const;

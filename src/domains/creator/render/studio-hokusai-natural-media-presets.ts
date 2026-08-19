@@ -1,7 +1,7 @@
 import {
   STUDIO_OSS_DRY_CARRIER_RECIPE,
   STUDIO_OSS_OIL_FILM_RECIPE,
-} from "./studio-oss-brush-kernels";
+} from "../studio-oss-brush-kernels";
 
 import type {
   StudioHokusaiNaturalMediaPresetId,

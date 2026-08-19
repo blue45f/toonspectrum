@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
+import { materializeStudioBrushPackSelection } from "./brush/studio-brush-pack-runtime";
 import { planStudioDynamicBrushCoverageMarks } from "./studio-dynamic-brush-coverage-renderer";
 import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
 

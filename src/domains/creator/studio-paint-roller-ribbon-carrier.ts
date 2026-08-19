@@ -17,9 +17,9 @@ import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
   StudioDynamicBrushSegmentStartFrame,
-} from "./studio-brush-dynamics";
-import type { StudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
-import type { StudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
+} from "./brush/studio-brush-dynamics";
+import type { StudioBrushTipAlphaMap } from "./brush/studio-brush-tip-stamp";
+import type { StudioDynamicBrushMaterialIdentity } from "./brush/studio-dry-media-dynamic-bridge";
 
 export const STUDIO_PAINT_ROLLER_RIBBON_CARRIER_VERSION =
   "paint-roller-ribbon-carrier-v2" as const;

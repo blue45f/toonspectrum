@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const studioPageSource = readStudioCuttoonEditorSource();
 
 describe("Living Ink Studio wiring boundary", () => {
   it("revokes a loading coordinator when explicit physical mode is turned off", () => {

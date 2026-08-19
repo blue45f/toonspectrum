@@ -9,7 +9,7 @@ import {
   type PhotoWebtoonPreset,
 } from "./studio-photo-webtoon-preset";
 
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 
 // ---------------------------------------------------------------------------
 

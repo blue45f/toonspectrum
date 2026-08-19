@@ -2,7 +2,7 @@ import type {
   StudioCanonicalStrokeSampleV2,
   StudioCanonicalStrokeV2,
   StudioCanonicalStrokePointerTypeV2,
-} from "./studio-canonical-stroke-v2";
+} from "../studio-canonical-stroke-v2";
 
 /**
  * Deterministic curve geometry for StudioCanonicalStrokeV2.

@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { useId, useRef } from "react";
 
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+
 import {
   presetsForAssistTool,
   recentPromptsForTool,
@@ -29,7 +31,6 @@ import {
   type StudioAiRecentPromptsState,
 } from "./studio-ai-assist-ux";
 import { planStudioAiExecutionPreflight } from "./studio-ai-execution-preflight";
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 
 import type { ReactElement, ReactNode } from "react";
 

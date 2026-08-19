@@ -1,25 +1,25 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 
-import { resolveStudioLiveSurfaceDevicePixelRatio } from "./studio-low-latency-canvas";
-import { resolveStudioWebGpuCanvasStrokes } from "./studio-webgpu-canvas-authority";
-import { isStudioWebGpuCanvasActive } from "./studio-webgpu-dab-planner";
+import { resolveStudioWebGpuCanvasStrokes } from "./render/studio-webgpu-canvas-authority";
+import { isStudioWebGpuCanvasActive } from "./render/studio-webgpu-dab-planner";
 import {
   StudioWebGpuEngine,
   type StudioGpuStrokeJournalSuffixBatchPatch,
   type StudioGpuStrokeJournalSuffixPatch,
   type StudioWebGpuResizeOutcome,
-} from "./studio-webgpu-engine";
+} from "./render/studio-webgpu-engine";
 import {
   sameStudioGpuStrokes,
   snapshotStudioGpuStrokes,
   type StudioGpuStroke,
-} from "./studio-webgpu-stroke";
+} from "./render/studio-webgpu-stroke";
 import {
   planStudioGpuPinnedStrokeFeedUpdate,
   type StudioGpuStrokeOperationsAppendPatch,
   type StudioGpuStrokeSuffixBatchPatch,
   type StudioGpuStrokeSuffixPatch,
-} from "./studio-webgpu-stroke-feed";
+} from "./render/studio-webgpu-stroke-feed";
+import { resolveStudioLiveSurfaceDevicePixelRatio } from "./studio-low-latency-canvas";
 
 import type {
   StudioGpuBackend,
@@ -27,9 +27,9 @@ import type {
   StudioGpuFrameReadbackResult,
   StudioGpuFrameReceipt,
   StudioGpuPerformanceMetrics,
-} from "./studio-webgpu-frame-contract";
-import type { StudioWebGpuSurfaceBounds } from "./studio-webgpu-viewport";
-import type { StudioGpuViewTransform } from "./studio-webgpu-viewport-contract";
+} from "./render/studio-webgpu-frame-contract";
+import type { StudioWebGpuSurfaceBounds } from "./render/studio-webgpu-viewport";
+import type { StudioGpuViewTransform } from "./render/studio-webgpu-viewport-contract";
 
 import { cn } from "@/lib/utils";
 

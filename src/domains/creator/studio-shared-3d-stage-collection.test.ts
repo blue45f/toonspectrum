@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
-import { createStudioShared3dSceneSessionFromElements } from
-  "./studio-shared-3d-scene-bridge";
+import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./bg3d/studio-bg3d-scene-document";
+import { createStudioShared3dSceneSessionFromElements } from "./studio-shared-3d-scene-bridge";
 import {
   createStudioShared3dSceneSessionForStage,
   createStudioShared3dStageCollectionDocument,
@@ -32,7 +31,7 @@ import {
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
-} from "./studio-vrm-scene-document";
+} from "./vrm/studio-vrm-scene-document";
 
 function sceneElements(): StudioShared3dStageElementSource[] {
   return [

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  planStudioDynamicBrushCoverageMarks,
+  type StudioDynamicBrushDabVariation,
+} from "../studio-dynamic-brush-coverage-renderer";
+
+import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   type StudioDynamicBrushDab,
@@ -10,10 +15,6 @@ import {
   resolveStudioDynamicBrushMaterialIdentity,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
-import {
-  planStudioDynamicBrushCoverageMarks,
-  type StudioDynamicBrushDabVariation,
-} from "./studio-dynamic-brush-coverage-renderer";
 
 const DYNAMICS = normalizeStudioBrushDynamicsSettings({
   depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,

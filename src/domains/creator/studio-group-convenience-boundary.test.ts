@@ -2,12 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const pageSource = readStudioCuttoonEditorSource();
 const viewportSource = readFileSync(
-  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
 
@@ -210,7 +209,7 @@ describe("Studio PPT-style group convenience boundary", () => {
 
   it("commits mixed draw and coordinate groups through one atomic translation plan", () => {
     const start = pageSource.indexOf("function onStageDragEnd");
-    const end = pageSource.indexOf("async function startEditText", start);
+    const end = pageSource.indexOf("\n  return {\n    onStageDown", start);
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     const source = pageSource.slice(start, end);
@@ -222,7 +221,7 @@ describe("Studio PPT-style group convenience boundary", () => {
   it("settles committed draw wrapper previews once the new document elements reach layout", () => {
     const dragEndStart = pageSource.indexOf("function onStageDragEnd");
     const dragEndEnd = pageSource.indexOf(
-      "function startCanvasEditText",
+      "\n  return {\n    onStageDown",
       dragEndStart,
     );
     const dragEndSource = pageSource.slice(dragEndStart, dragEndEnd);
@@ -363,7 +362,7 @@ describe("Studio PPT-style group convenience boundary", () => {
   it("claims and releases the complete group lease around one stage commit", () => {
     const beginSource = functionBody("canvasInteractionUnitIds", "startMacroRecord");
     const dragEndStart = pageSource.indexOf("function onStageDragEnd");
-    const dragEndEnd = pageSource.indexOf("function startCanvasEditText", dragEndStart);
+    const dragEndEnd = pageSource.indexOf("\n  return {\n    onStageDown", dragEndStart);
     const dragEndSource = pageSource.slice(dragEndStart, dragEndEnd);
 
     expect(beginSource).toContain("canvasInteractionUnitIds(elementId)");

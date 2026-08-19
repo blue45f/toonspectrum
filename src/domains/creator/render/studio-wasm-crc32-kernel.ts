@@ -1,5 +1,5 @@
-import { calculateStudioCrc32 } from "./studio-crc32";
-import { STUDIO_CRC32_WORKER_MAX_BYTES } from "./studio-crc32-worker-protocol";
+import { calculateStudioCrc32 } from "../studio-crc32";
+import { STUDIO_CRC32_WORKER_MAX_BYTES } from "../studio-crc32-worker-protocol";
 import {
   createStudioWasmMemoryRuntime,
   STUDIO_WASM_PAGE_BYTES,
@@ -7,7 +7,7 @@ import {
   type StudioWasmByteViewFailureReason,
   type StudioWasmMemoryGrowFailureReason,
   StudioWasmLinearMemoryRuntime,
-} from "./studio-wasm64-memory-governor";
+} from "../studio-wasm64-memory-governor";
 
 /** Small payloads remain in the already-hot JS table loop to avoid copy/call overhead. */
 export const STUDIO_WASM_CRC32_MINIMUM_INPUT_BYTES = 1024 * 1024;

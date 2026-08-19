@@ -10,6 +10,8 @@
  * commit provenance.
  */
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_LAYER_LIFT_ARTIFACT_LIMITS,
   isStudioLayerLiftTrustedArtifactPair,
@@ -24,7 +26,6 @@ import {
   doesStudioLayerLiftCompositionReceiptMatchOperation,
   doesStudioSceneLayerLiftResultMatchOperation,
 } from "./studio-layer-lift-operation-context";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type { StudioSceneLayerLiftRequest } from "./studio-layer-lift-contract";
 import type { StudioLayerLiftWorkflowSession } from "./studio-layer-lift-workflow";

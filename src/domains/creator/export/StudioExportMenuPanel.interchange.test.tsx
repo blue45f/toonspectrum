@@ -4,14 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioExportMenuPanel } from "./StudioExportMenuPanel";
 
-vi.mock("./studio-cbz-interchange", () => ({
+vi.mock("../studio-cbz-interchange", () => ({
   buildStudioCbzBlob: vi.fn(async () => ({
     blob: new Blob(["cbz"], { type: "application/vnd.comicbook+zip" }),
     warnings: [],
   })),
 }));
 
-vi.mock("./studio-openraster-interchange", () => ({
+vi.mock("../studio-openraster-interchange", () => ({
   buildStudioOpenRasterBlob: vi.fn(async () => ({
     blob: new Blob(["ora"], { type: "image/openraster" }),
     warnings: [],

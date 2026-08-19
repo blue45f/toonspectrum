@@ -35,7 +35,7 @@
 import type {
   StudioBg3dCanonicalGeometryAttribute,
   StudioBg3dCanonicalGeometryPayload,
-} from "./studio-bg3d-geometry-worker-protocol";
+} from "./bg3d/studio-bg3d-geometry-worker-protocol";
 
 // ---------------------------------------------------------------------------
 // 예산 · 상수

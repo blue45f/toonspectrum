@@ -1,16 +1,17 @@
 import {
-  parsePersistedStudioCrdtUpdateRequest,
-  parseStudioCrdtUpdateRequest,
-  type StudioCrdtUpdateRequest,
-} from "./studio-crdt-protocol";
-import {
   requireStudioCrdtRecoveryDatabase,
   type StudioCrdtRecoveryDatabase,
   type StudioCrdtRecoverySqlCandidate,
   type StudioCrdtRecoverySqlRowKind,
   type StudioLocalDatabase,
-} from "./studio-local-database";
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+} from "../studio-local-database";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+
+import {
+  parsePersistedStudioCrdtUpdateRequest,
+  parseStudioCrdtUpdateRequest,
+  type StudioCrdtUpdateRequest,
+} from "./studio-crdt-protocol";
 
 const LEGACY_MAX_FRONTIER_UPDATES = 4_096;
 const RECOVERY_CHUNK_MAX_UPDATES = 128;

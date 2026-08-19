@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   validateStudioEngineWebGpuBrushPlan,
-} from "./studio-engine-webgpu-brush-runtime";
+} from "./render/studio-engine-webgpu-brush-runtime";
 import {
   resolveStudioProfessionalBristleDynamics,
 } from "./studio-professional-bristle-dynamics";

@@ -2,7 +2,8 @@ import {
   BRUSH_PRESETS,
   type BrushPreset,
   type StudioToolOperation,
-} from "./studio-brush";
+} from "../studio-brush";
+
 import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsForBrushId,

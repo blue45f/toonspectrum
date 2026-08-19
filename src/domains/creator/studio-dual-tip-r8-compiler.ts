@@ -2,7 +2,7 @@ import { sha256HexPortable } from "./studio-sha256";
 
 import type {
   StudioEngineWebGpuTexturedBrushAssetPayload,
-} from "./studio-engine-webgpu-textured-brush-plan";
+} from "./render/studio-engine-webgpu-textured-brush-plan";
 
 /**
  * Clean-room, worker-friendly compiler for a baked dual-tip mask.

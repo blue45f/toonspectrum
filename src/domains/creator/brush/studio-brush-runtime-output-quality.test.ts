@@ -1,6 +1,14 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
+  buildStudioPerfectFreehandOutline,
+  buildStudioPerfectFreehandPathData,
+  loadStudioPerfectFreehandStroker,
+  STUDIO_PERFECT_FREEHAND_PROFILES,
+  type StudioPerfectFreehandStroker,
+} from "../studio-perfect-freehand";
+
+import {
   planNormalizedStudioDynamicBrushDabs,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsPresetSettings,
@@ -10,13 +18,6 @@ import { resolveNormalizedStudioBrushGrainAlphaMultiplierAt } from "./studio-bru
 import { profileStudioBrushMaterialResponse } from "./studio-brush-material-response";
 import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
 import { sampleStudioBrushTipProceduralAlpha } from "./studio-brush-tip-stamp";
-import {
-  buildStudioPerfectFreehandOutline,
-  buildStudioPerfectFreehandPathData,
-  loadStudioPerfectFreehandStroker,
-  STUDIO_PERFECT_FREEHAND_PROFILES,
-  type StudioPerfectFreehandStroker,
-} from "./studio-perfect-freehand";
 
 function sampleGpenCurve(count: number): {
   points: number[];

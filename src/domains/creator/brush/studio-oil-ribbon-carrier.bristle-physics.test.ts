@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { planOilBrushDabs } from "./studio-fx-brush";
+import { planOilBrushDabs } from "../studio-fx-brush";
+
 import {
   planStudioOilRibbonCarrier,
   studioOilRibbonPathData,

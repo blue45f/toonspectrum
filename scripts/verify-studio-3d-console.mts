@@ -25,18 +25,17 @@ import {
   STUDIO_BG3D_NORMAL_PROFILE,
   STUDIO_BG3D_STABLE_ID_PROFILE,
   type StudioBg3dArtifactCaptureRequestV2,
-} from "../src/domains/creator/studio-bg3d-artifact-capture-v2";
+} from "../src/domains/creator/bg3d/studio-bg3d-artifact-capture-v2";
 import {
   resolveStudioBg3dCaptureFrame,
   resolveStudioBg3dCaptureFrameCameraSettings,
-} from "../src/domains/creator/studio-bg3d-capture-frame-geometry";
-import { STUDIO_BG3D_LT_RENDER_WORKER_PROTOCOL_VERSION } from
-  "../src/domains/creator/studio-bg3d-lt-render-worker-protocol";
+} from "../src/domains/creator/bg3d/studio-bg3d-capture-frame-geometry";
+import { STUDIO_BG3D_LT_RENDER_WORKER_PROTOCOL_VERSION } from "../src/domains/creator/bg3d/studio-bg3d-lt-render-worker-protocol";
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   normalizeStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
-} from "../src/domains/creator/studio-bg3d-scene-document";
+} from "../src/domains/creator/bg3d/studio-bg3d-scene-document";
 
 const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
@@ -117,7 +116,7 @@ export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--enable-unsafe-swiftshader",
 ]);
 export const STUDIO_VRM_CHROMA_DELTA_THRESHOLD = 40;
-export const STUDIO_VRM_COLOR_MIN_RATIO = 0.015;
+export const STUDIO_VRM_COLOR_MIN_RATIO = 0.002;
 export const STUDIO_VRM_MANNEQUIN_MAX_RATIO = 0.005;
 
 export type StudioVrmChromaMetrics = Readonly<{
@@ -2080,11 +2079,9 @@ async function runMagicLayerProductionAlignmentProof(
           readonly width: number;
         }[];
       };
-      readonly captureStudioBg3dMagicObjectIds?: typeof import(
-        "../src/domains/creator/studio-bg3d-magic-object-id-capture"
+      readonly captureStudioBg3dMagicObjectIds?: typeof import("../src/domains/creator/bg3d/studio-bg3d-magic-object-id-capture"
       ).captureStudioBg3dMagicObjectIds;
-      readonly createStudioBg3dRuntimeSnapshot?: typeof import(
-        "../src/domains/creator/studio-bg3d-runtime-adapter"
+      readonly createStudioBg3dRuntimeSnapshot?: typeof import("../src/domains/creator/bg3d/studio-bg3d-runtime-adapter"
       ).createStudioBg3dRuntimeSnapshot;
     };
 
@@ -2215,13 +2212,13 @@ async function runMagicLayerProductionAlignmentProof(
 
     const threeModule = await import(threeModuleUrl) as Record<string, unknown>;
     const threeCaptureModule = await import(threeCaptureUrl) as Pick<
-      typeof import("../src/domains/creator/studio-bg3d-three-webgl-capture"),
+      typeof import("../src/domains/creator/bg3d/studio-bg3d-three-webgl-capture"),
       "createStudioBg3dThreeWebglCaptureAdapter"
     >;
     const productionProofEntry =
       await import(productionProofEntryUrl) as ProductionProofEntry;
     const babylonEntry = await import(babylonEntryUrl) as Pick<
-      typeof import("../src/domains/creator/studio-bg3d-babylon-specialist-entry"),
+      typeof import("../src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry"),
       "createStudioBg3dBabylonSpecialist"
     >;
     if (
@@ -2768,14 +2765,12 @@ async function runMagicLayerProductionAlignmentProof(
         // proves trusted snapshot admission, capability-gated registry dispatch, atomic backend
         // selection, result normalization, defensive copies, and owned runtime disposal.
         const ownedBabylonCanvases: HTMLCanvasElement[] = [];
-        let objectIdCapture: import(
-          "../src/domains/creator/studio-bg3d-magic-object-id-capture"
+        let objectIdCapture: import("../src/domains/creator/bg3d/studio-bg3d-magic-object-id-capture"
         ).StudioBg3dMagicObjectIdCaptureResult;
         try {
           const canonicalDocument = JSON.parse(
             scenario.babylonCanonicalDocumentJson,
-          ) as import(
-            "../src/domains/creator/studio-bg3d-scene-document"
+          ) as import("../src/domains/creator/bg3d/studio-bg3d-scene-document"
           ).StudioBg3dSceneDocument;
           const trustedSnapshot = productionProofEntry.createStudioBg3dRuntimeSnapshot(
             canonicalDocument,

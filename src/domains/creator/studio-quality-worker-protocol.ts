@@ -1,10 +1,10 @@
-import { snapshotStudioPortablePathGeometry } from "./studio-canvaskit-portable-geometry";
+import { snapshotStudioPortablePathGeometry } from "./render/studio-canvaskit-portable-geometry";
 
 import type {
   StudioPathOpsResult,
   StudioQualityPathOp,
   StudioStrokeToPathStyle,
-} from "./studio-canvaskit-adapter";
+} from "./render/studio-canvaskit-adapter";
 
 /**
  * Structured-clone-only boundary for quality geometry specialists.

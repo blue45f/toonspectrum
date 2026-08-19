@@ -7,7 +7,7 @@ import {
   type SetStateAction,
 } from "react";
 
-import { createEmptyStudioAiProvenanceDocument } from "./studio-ai-provenance";
+import { createEmptyStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { selectWheelColors } from "./studio-color-wheel";
 import {
   StudioAiProvenancePanel,
@@ -35,24 +35,25 @@ import {
   StudioThreeDPreviewPanelStack,
 } from "./StudioThreeDPreviewPanelStack";
 
+import type { StudioAiSettings, StudioTextAiProvenance } from "./ai/studio-ai-client";
+import type { StudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
+import type { StudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
+import type { StudioAiImageReferenceAssetOption } from "./ai/StudioAiImageReferencePackEditor";
+import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
+import type { StudioBg3dShotBatchRecoveryScope } from "./bg3d/studio-bg3d-shot-batch-plan";
 import type {
   StudioBg3dAiMethodReferenceCapture,
-} from "./studio-3d-ai-reference-handoff";
+} from "./scene-3d/studio-3d-ai-reference-handoff";
 import type {
   StudioBg3dInsertHandler,
   StudioVrmInsertHandler,
-} from "./studio-3d-insert-controller";
-import type { StudioAiSettings, StudioTextAiProvenance } from "./studio-ai-client";
-import type { StudioAiImageReferenceDocument } from "./studio-ai-image-reference-roles";
-import type { StudioAiProvenanceDocument } from "./studio-ai-provenance";
+} from "./scene-3d/studio-3d-insert-controller";
 import type {
   StudioAutoActionExecutionProgress,
   StudioAutoActionPlan,
   StudioAutoActionScope,
   StudioAutoActionSet,
 } from "./studio-auto-actions";
-import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
-import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-plan";
 import type { StudioCharacterBible } from "./studio-character-bible";
 import type { StudioCheckpoint } from "./studio-checkpoints";
 import type {
@@ -104,7 +105,6 @@ import type {
   StudioWriterRoomStage,
 } from "./studio-writer-room";
 import type { StudioWriterRoomCanvasProjectionResult } from "./studio-writer-room-canvas-projection";
-import type { StudioAiImageReferenceAssetOption } from "./StudioAiImageReferencePackEditor";
 import type { StudioCommentsPanelSharedReplyController } from "./StudioCommentsPanel";
 import type {
   WorkDetail,

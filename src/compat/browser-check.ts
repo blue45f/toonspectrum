@@ -175,35 +175,35 @@ export function classifyError(error: unknown): ErrorAnalysis {
     };
   }
 
-  // C. 브라우저 호환성/미지원 API 관련 오류 인자 검출
-  const compatKeywords = [
-    "is not a function",
-    "is undefined",
-    "is not defined",
-    "can't find variable",
+  // C. 브라우저 호환성 — 앱 내부 메서드 누락(target.park is not a function)을
+  // 브라우저 미지원으로 오인하면 스튜디오 전체가 호환성 모달에 막힌다.
+  const browserApiKeywords = [
+    "webgpu",
+    "webgl",
+    "offscreencanvas",
+    "sharedarraybuffer",
+    "wasm",
+    "webassembly",
+    "gpuadapter",
+    "gpudevice",
     "not supported",
     "unsupported",
-    "webgl",
     "illegal invocation",
-    "invalid character",
-    "unexpected token",
-    "syntaxerror",
     "object doesn't support property or method",
   ];
-
-  const hasCompatKeyword = compatKeywords.some(
-    (kw) => lowerMsg.includes(kw) || lowerName.includes(kw)
+  const hasBrowserApiKeyword = browserApiKeywords.some(
+    (kw) => lowerMsg.includes(kw) || lowerName.includes(kw) || lowerStack.includes(kw)
   );
 
-  // 미지원 기능이 감지되었거나, 호환성 키워드가 포함된 TypeError/ReferenceError/SyntaxError일 때
-  const isCompatErrType =
-    errName === "TypeError" ||
-    errName === "ReferenceError" ||
-    errName === "SyntaxError" ||
-    errName === "NotSupportedError" ||
-    lowerStack.includes("polyfill");
-
-  if (compatResult.missingFeatures.length > 0 || compatResult.isLegacy || (hasCompatKeyword && isCompatErrType)) {
+  if (
+    compatResult.missingFeatures.length > 0
+    || compatResult.isLegacy
+    || (hasBrowserApiKeyword && (
+      errName === "TypeError"
+      || errName === "ReferenceError"
+      || errName === "NotSupportedError"
+    ))
+  ) {
     const missingInfo = compatResult.missingFeatures.length > 0
       ? `미지원 주요 기능: ${compatResult.missingFeatures.join(", ")}`
       : `${compatResult.browserInfo.name} ${compatResult.browserInfo.version} 환경`;

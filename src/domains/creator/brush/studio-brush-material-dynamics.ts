@@ -7,16 +7,17 @@
  */
 
 import {
-  normalizeStudioBrushR8TextureGrainSource,
-  type StudioBrushR8TextureGrainSource,
-} from "./studio-brush-r8-grain-asset-contract";
-import {
   isStudioSpectralWgmColorMixProgramId,
   mixStudioSpectralWgm,
   STUDIO_SPECTRAL_WGM_COLOR_MIX_PAINT_MODE,
   STUDIO_SPECTRAL_WGM_COLOR_MIX_PROGRAM_ID,
   type StudioSpectralWgmColorMixProgramId,
-} from "./studio-spectral-wgm-mix-v1";
+} from "../studio-spectral-wgm-mix-v1";
+
+import {
+  normalizeStudioBrushR8TextureGrainSource,
+  type StudioBrushR8TextureGrainSource,
+} from "./studio-brush-r8-grain-asset-contract";
 
 export type {
   StudioBrushR8GrainAssetReference,

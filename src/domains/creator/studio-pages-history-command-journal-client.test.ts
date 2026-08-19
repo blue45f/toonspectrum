@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   createStudioPagesHistoryCommandJournalClient,
   STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS,
@@ -414,13 +415,13 @@ describe("Studio pages history command journal lazy client", () => {
   });
 
   it("keeps the production journal status observable with a retry control", () => {
-    const studioPage = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const studioPage = readStudioCuttoonEditorSource();
+    const shellRuntime = readFileSync(new URL("./studio-page-shell-runtime.ts", import.meta.url), "utf8");
 
-    expect(studioPage).toContain("observeDurabilityStatus(");
-    expect(studioPage).toContain("onError: (cause) =>");
-    expect(studioPage).toContain("if (studioAutosaveDocumentBusy(cause)) return;");
-    expect(studioPage.indexOf("if (studioAutosaveDocumentBusy(cause)) return;")).toBeLessThan(
-      studioPage.indexOf("console.error(\"Studio command journal durability degraded.\""),
+    expect(shellRuntime).toContain("onError: (cause) =>");
+    expect(shellRuntime).toContain("if (studioAutosaveDocumentBusy(cause)) return;");
+    expect(shellRuntime.indexOf("if (studioAutosaveDocumentBusy(cause)) return;")).toBeLessThan(
+      shellRuntime.indexOf('console.error("Studio command journal durability degraded."'),
     );
     expect(studioPage).toContain("setPagesHistoryDurabilityStatus");
     expect(studioPage).toContain("retryDurability()");

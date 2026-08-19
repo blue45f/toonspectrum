@@ -5,7 +5,7 @@ import {
   studioInkUsesPathResidualDabSpacing,
   studioInkUsesResidualDabSpacing,
   type StudioInkPressureModel,
-} from "./studio-ink-pressure-model";
+} from "./brush/studio-ink-pressure-model";
 
 /** Nominal-width pressure used by the live mouse/touch and GPU stroke contracts. */
 export const STUDIO_CAUSAL_INK_DEFAULT_PRESSURE = 0.5;

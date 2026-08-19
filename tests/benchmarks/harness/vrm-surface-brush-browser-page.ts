@@ -6,17 +6,17 @@ import {
   SurfaceBrushCancelledError,
 } from "../../../packages/studio-brush-platform/src/brush-composition";
 import { createStudioThreeMeshBvhProvider } from "../../../src/domains/creator/studio-three-mesh-bvh-provider";
-import { disposeStudioVrmAsset, loadStudioVrmAsset } from "../../../src/domains/creator/studio-vrm-asset-runtime";
+import { disposeStudioVrmAsset, loadStudioVrmAsset } from "../../../src/domains/creator/vrm/studio-vrm-asset-runtime";
 import {
   executeStudioVrmSurfaceBrushStroke,
   prepareStudioVrmSurfaceProjectionProvider,
-} from "../../../src/domains/creator/studio-vrm-surface-brush-provider";
+} from "../../../src/domains/creator/vrm/studio-vrm-surface-brush-provider";
 import {
   createStudioVrmTexturePaintRuntime,
   type StudioVrmTexturePaintCanvasFactory,
   type StudioVrmTexturePaintRayHit,
   type StudioVrmTexturePaintRuntime,
-} from "../../../src/domains/creator/studio-vrm-texture-paint-runtime";
+} from "../../../src/domains/creator/vrm/studio-vrm-texture-paint-runtime";
 
 import type { VRM } from "@pixiv/three-vrm";
 import type { BrushProgramIR, StrokeIR } from "@toonspectrum/studio-project-model";

@@ -13,7 +13,7 @@ const studioSceneToolPopoverBodyLoader = createStudioIntentLazyLoader(() => {
   // bgFill is the initial scene tab. Start its leaves alongside the body so the
   // second Suspense boundary does not create a body -> panel network waterfall.
   warmStudioToolPopoverChunk(() => import("./StudioBackgroundPanel"));
-  warmStudioToolPopoverChunk(() => import("./StudioCanvasResizer"));
+  warmStudioToolPopoverChunk(() => import("./canvas/StudioCanvasResizer"));
   return import("./StudioSceneToolPopoverBody");
 });
 const studioStyleToolPopoverBodyLoader = createStudioIntentLazyLoader(() => {
@@ -25,12 +25,12 @@ const studioStyleToolPopoverBodyLoader = createStudioIntentLazyLoader(() => {
 const studioAiToolPopoverBodyLoader = createStudioIntentLazyLoader(() => {
   // The AI hub opens on the background tool by default. Warm both leaves in
   // parallel with the body while retaining their independent lazy chunks.
-  warmStudioToolPopoverChunk(() => import("./StudioAiAssistHub"));
-  warmStudioToolPopoverChunk(() => import("./StudioAiBackgroundPanel"));
-  return import("./StudioAiToolPopoverBody");
+  warmStudioToolPopoverChunk(() => import("./ai/StudioAiAssistHub"));
+  warmStudioToolPopoverChunk(() => import("./ai/StudioAiBackgroundPanel"));
+  return import("./ai/StudioAiToolPopoverBody");
 });
 const studioBubbleToolPopoverBodyLoader = createStudioIntentLazyLoader(() =>
-  import("./StudioBubbleToolPopoverBody")
+  import("./lettering/StudioBubbleToolPopoverBody")
 );
 
 export const LazyStudioAssetToolPopoverBody = lazyRetry(

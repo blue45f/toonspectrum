@@ -21,9 +21,9 @@
  * any new code path. Static data only — determinism is trivial.
  */
 
-import { STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE } from "./studio-brush-tip-stamp";
+import { STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE } from "./brush/studio-brush-tip-stamp";
 
-import type { StudioBrushTipSettings } from "./studio-brush-tip-stamp";
+import type { StudioBrushTipSettings } from "./brush/studio-brush-tip-stamp";
 
 export const STUDIO_CC0_KRITA_RGBA_TIP_IMPORT_VERSION_V1 = 1 as const;
 

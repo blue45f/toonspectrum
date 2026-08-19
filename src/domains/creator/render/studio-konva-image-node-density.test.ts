@@ -25,7 +25,7 @@ vi.mock("./studio-konva-runtime", () => ({ studioKonvaRuntime: { Filters: {} } }
 const {
   STUDIO_DENSITY_INVARIANT_FILTER_ATTRS,
   studioImageFilterSupersampleDensity,
-} = await import("./StudioKonvaImageNode");
+} = await import("../StudioKonvaImageNode");
 
 const registry: KonvaLike = { Filters: {} };
 registerStudioKonvaFilters(registry);

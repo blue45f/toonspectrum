@@ -1,8 +1,9 @@
+import { resolveStudioInkPressure } from "../brush/studio-ink-pressure-model";
 import {
   clearStudioCanvas2dDabSurface,
   renderStudioCanvas2dDabSurface,
-} from "./studio-canvas2d-dab-surface";
-import { resolveStudioInkPressure } from "./studio-ink-pressure-model";
+} from "../studio-canvas2d-dab-surface";
+
 import {
   isValidStudioGpuStroke,
   planStudioGpuDabs,

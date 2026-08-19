@@ -3,13 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   combineStudioShapesWithCanvasKit,
   type StudioCanvasKitPathBooleanClient,
-} from "./studio-canvaskit-path-boolean-document-adapter";
+} from "./render/studio-canvaskit-path-boolean-document-adapter";
 import {
   studioPathBooleanOutputFromPortableContours,
   studioPathBooleanShapeToSvgPathData,
 } from "./studio-path-boolean";
 
-import type { StudioPortablePathGeometry } from "./studio-canvaskit-adapter";
+import type { StudioPortablePathGeometry } from "./render/studio-canvaskit-adapter";
 
 function geometry(
   contours: StudioPortablePathGeometry["contours"],

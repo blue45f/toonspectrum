@@ -7,8 +7,7 @@ export type StudioToolsCompanionReviewProjectionInput = Parameters<
 export type StudioToolsCompanionPrimaryRuntime = StudioCompanionPrimaryRuntime & {
   protocol: StudioToolsCompanionProtocol;
 };
-type StudioCompanionReferenceCaptureRuntimeModule = typeof import(
-  "@/components/studio/runtime/studio-companion-reference-capture-runtime"
+type StudioCompanionReferenceCaptureRuntimeModule = typeof import("@/components/studio/runtime/studio-companion-reference-capture-runtime"
 );
 export type StudioCompanionReferenceCaptureRuntime = ReturnType<
   StudioCompanionReferenceCaptureRuntimeModule["createStudioCompanionReferenceCaptureRuntime"]
@@ -38,8 +37,7 @@ Promise<StudioToolsCompanionProtocolModule> {
 
 function loadStudioCompanionReferenceCaptureRuntimeModule():
 Promise<StudioCompanionReferenceCaptureRuntimeModule> {
-  return studioCompanionReferenceCaptureRuntimePromise ??= import(
-    "@/components/studio/runtime/studio-companion-reference-capture-runtime"
+  return studioCompanionReferenceCaptureRuntimePromise ??= import("@/components/studio/runtime/studio-companion-reference-capture-runtime"
   ).catch((error: unknown) => {
     studioCompanionReferenceCaptureRuntimePromise = null;
     throw error;

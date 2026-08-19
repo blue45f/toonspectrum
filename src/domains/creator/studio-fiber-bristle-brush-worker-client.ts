@@ -91,8 +91,7 @@ function validTimeout(value: unknown): value is number {
 
 function defaultWorkerFactory(): StudioFiberBristleWorkerLike {
   return new Worker(
-    new URL(
-      "./studio-fiber-bristle-brush-provider.worker.ts",
+    new URL("./studio-fiber-bristle-brush-provider.worker.ts",
       import.meta.url,
     ),
     {

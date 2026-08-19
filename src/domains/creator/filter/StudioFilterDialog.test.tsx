@@ -8,13 +8,14 @@ import { createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createStudioUiPreferencesRepository } from "../studio-ui-preferences-sqlite";
+
 import { STUDIO_FILTER_DIALOG_CATALOG } from "./studio-filter-catalog";
 import {
   STUDIO_FILTER_LIBRARY_DATA_POLICY,
   type ProductFilterLibraryRepository,
   type StudioFilterLibraryPreset,
 } from "./studio-filter-library-sqlite-repository";
-import { createStudioUiPreferencesRepository } from "./studio-ui-preferences-sqlite";
 import { StudioFilterDialog } from "./StudioFilterDialog";
 
 const filterDialogCatalogCount = STUDIO_FILTER_DIALOG_CATALOG.length;
@@ -23,7 +24,7 @@ const transformFilterCount = STUDIO_FILTER_DIALOG_CATALOG.filter(
 ).length;
 
 const filterDialogSource = readFileSync(
-  resolve(process.cwd(), "src/domains/creator/StudioFilterDialog.tsx"),
+  resolve(process.cwd(), "src/domains/creator/filter/StudioFilterDialog.tsx"),
   "utf8",
 );
 

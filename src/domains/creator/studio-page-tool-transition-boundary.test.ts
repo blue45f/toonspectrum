@@ -2,12 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const studioPageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const studioPageSource = readStudioCuttoonEditorSource();
 const brushBaselineControllerSource = readFileSync(
-  new URL("./useStudioBrushBaselineController.ts", import.meta.url),
+  new URL("./brush/useStudioBrushBaselineController.ts", import.meta.url),
   "utf8",
 );
 const leftToolRailSource = readFileSync(
@@ -23,7 +22,7 @@ const inspectorSource = readFileSync(
   "utf8",
 );
 const canvasViewportSource = readFileSync(
-  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
 const companionToolExecutorSource = readFileSync(
@@ -328,7 +327,7 @@ describe("StudioPage tool transition boundary", () => {
 
   it("delegates brush baseline ownership while preserving fresh one-step undo validation", () => {
     expect(studioPageSource).toContain(
-      'import { useStudioBrushBaselineController } from "./useStudioBrushBaselineController";',
+      'import { useStudioBrushBaselineController } from "./brush/useStudioBrushBaselineController";',
     );
     expect(studioPageSource).toContain(
       "const brushBaselineController = useStudioBrushBaselineController({",
@@ -337,7 +336,7 @@ describe("StudioPage tool transition boundary", () => {
       "void brushBaselineController.restoreDefaults();",
     );
     expect(studioPageSource).not.toContain(
-      'import("./studio-brush-baseline-contract")',
+      'import("./brush/studio-brush-baseline-contract")',
     );
     expect(
       brushBaselineControllerSource.match(
@@ -398,7 +397,7 @@ describe("StudioPage tool transition boundary", () => {
     const brushSettings = options.slice(brushSettingsStart, brushSettingsEnd);
     expect(brushSettingsStart).toBeGreaterThanOrEqual(0);
     expect(brushSettingsEnd).toBeGreaterThan(brushSettingsStart);
-    expect(brushSettings).toContain("void loadStudioBrushStudio();");
+    expect(brushSettings).toContain("loadStudioBrushStudio();");
     expect(brushSettings).toContain("openInspectorRoute(");
     expect(brushSettings).not.toContain("disarmAllPixelTools();");
     expect(brushSettings).not.toContain('setTool("draw");');

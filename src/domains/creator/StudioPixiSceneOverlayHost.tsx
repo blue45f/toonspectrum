@@ -26,10 +26,10 @@ import {
   planStudioPixiOverlaySync,
   studioPixiSceneHostIsAlwaysOn,
   type StudioPixiHostElementLike,
-} from "./studio-pixi-scene-host-admission";
+} from "./render/studio-pixi-scene-host-admission";
 import {
   createStudioPixiSceneProvider,
-} from "./studio-pixi-scene-provider";
+} from "./render/studio-pixi-scene-provider";
 
 import type {
   StudioSceneDocumentTransform,

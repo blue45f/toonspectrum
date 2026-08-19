@@ -116,10 +116,10 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
     expect(read("./studio-autosave-opfs-session.ts")).toContain(
       '"toonspectrum-studio-autosave-v3"',
     );
-    expect(read("./studio-engine-tile-storage-opfs-v2-backend.ts")).toContain(
+    expect(read("./render/studio-engine-tile-storage-opfs-v2-backend.ts")).toContain(
       '"toonspectrum-studio-engine-storage-v2"',
     );
-    expect(read("./studio-hybrid-dcc-workspace-persistence.ts")).toContain(
+    expect(read("./hybrid-dcc/studio-hybrid-dcc-workspace-persistence.ts")).toContain(
       'STUDIO_HYBRID_DCC_WORKSPACE_PERSISTENCE_ROOT = "dcc-workspaces"',
     );
     expect(
@@ -142,10 +142,10 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
     expect(read("./studio-pages-history-durable-runtime.ts")).toContain(
       'rootName: "toonspectrum-studio-history-recovery"',
     );
-    expect(read("./studio-vrm-asset-sqlite-opfs-repository.ts")).toContain(
+    expect(read("./vrm/studio-vrm-asset-sqlite-opfs-repository.ts")).toContain(
       'STUDIO_VRM_ASSET_OPFS_ROOT = "toonspectrum-studio-vrm-assets-v12"',
     );
-    expect(read("./studio-bg3d-libraries-sqlite-opfs-authority.ts")).toContain(
+    expect(read("./bg3d/studio-bg3d-libraries-sqlite-opfs-authority.ts")).toContain(
       '"toonspectrum-studio-bg3d-libraries-v12"',
     );
     expect(read("./studio-storage-recovery-runtime.ts")).toContain(
@@ -162,10 +162,10 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
   });
 
   it("IndexedDB names match the library modules", () => {
-    expect(read("./vrm-library.ts")).toContain('"toonspectrum-studio-vrm-library"');
-    expect(read("./studio-crdt-outbox.ts")).toContain("toonspectrum-studio-crdt-outbox");
+    expect(read("./vrm/vrm-library.ts")).toContain('"toonspectrum-studio-vrm-library"');
+    expect(read("./live/studio-crdt-outbox.ts")).toContain("toonspectrum-studio-crdt-outbox");
     expect(read("./studio-checkpoints.ts")).toContain("toonspectrum-studio-checkpoints");
-    expect(read("./studio-crdt-recovery-vault.ts")).toContain(
+    expect(read("./live/studio-crdt-recovery-vault.ts")).toContain(
       "createStudioCrdtRecoverySqlitePersistence",
     );
     // The old IndexedDB authority is no longer opened by product code, but its
@@ -173,7 +173,7 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
     expect(STUDIO_INDEXED_DB_DATABASES).toContain(
       "toonspectrum-studio-crdt-recovery-vault",
     );
-    expect(read("./bg3d-model-library.ts")).toContain(
+    expect(read("./bg3d/bg3d-model-library.ts")).toContain(
       '"toonspectrum-studio-bg3d-model-library"',
     );
     expect(read("./studio-asset-library.ts")).toContain(
@@ -182,19 +182,19 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
     expect(read("./studio-scene-snapshot-library.ts")).toContain(
       '"toonspectrum-studio-scene-snapshot-library"',
     );
-    expect(read("./bg3d-template-library.ts")).toContain(
+    expect(read("./bg3d/bg3d-template-library.ts")).toContain(
       '"toonspectrum-studio-bg3d-template-library"',
     );
     expect(read("./studio-production-bible.ts")).toContain(
       '"toonspectrum-studio-production-bible"',
     );
-    expect(read("./studio-bg3d-asset-metadata-store.ts")).toContain(
+    expect(read("./bg3d/studio-bg3d-asset-metadata-store.ts")).toContain(
       '"toonspectrum-studio-bg3d-asset-metadata"',
     );
-    expect(read("./studio-bg3d-shot-batch-recovery-store.ts")).toContain(
+    expect(read("./bg3d/studio-bg3d-shot-batch-recovery-store.ts")).toContain(
       '"toonspectrum-studio-bg3d-shot-batch-recovery"',
     );
-    expect(read("./studio-vrm-texture-paint-library.ts")).toContain(
+    expect(read("./vrm/studio-vrm-texture-paint-library.ts")).toContain(
       '"toonspectrum-studio-vrm-texture-paint-library"',
     );
     expect(STUDIO_INDEXED_DB_DATABASES).toEqual(
@@ -208,7 +208,7 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
   });
 
   it("covers the V12 localStorage fallback without reopening legacy data", () => {
-    const brushRepository = read("./studio-brush-library-sqlite-repository.ts");
+    const brushRepository = read("./brush/studio-brush-library-sqlite-repository.ts");
     const fallbackKey = "toonspectrum-studio-v12-brush-library-fallback";
     expect(brushRepository).toContain(`"${fallbackKey}"`);
     expect(STUDIO_LOCAL_STORAGE_PREFIXES.some((prefix) => fallbackKey.startsWith(prefix)))

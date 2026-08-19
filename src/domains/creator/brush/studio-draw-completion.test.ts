@@ -28,6 +28,14 @@ describe("isCompleteStudioDrawOp", () => {
     expect(isStudioImmediateFreehandCommit({ points: [0, 0, 2, 3] })).toBe(true);
     expect(isStudioImmediateFreehandCommit({ kind: "freehand", points: [0, 0, 2, 3, 5, 8] })).toBe(true);
     expect(isStudioImmediateFreehandCommit({ kind: "freehand", points: [0, 0, 12, 0, 25, 0] })).toBe(false);
+    expect(isStudioImmediateFreehandCommit({
+      kind: "freehand",
+      points: Array.from({ length: 16 }, (_, index) => (index % 2 === 0 ? index * 0.4 : 0)),
+    })).toBe(false);
+    expect(isStudioImmediateFreehandCommit({
+      kind: "freehand",
+      points: Array.from({ length: 18 }, (_, index) => (index % 2 === 0 ? index * 8 : 0)),
+    })).toBe(false);
     expect(isStudioImmediateFreehandCommit({ kind: "freehand", points: [0, 0, Number.NaN, 1, 2, 2] })).toBe(false);
     expect(isStudioImmediateFreehandCommit({ kind: "line", points: [0, 0, 2, 3] })).toBe(false);
     expect(isStudioImmediateFreehandCommit({ kind: "freehand", points: [] })).toBe(false);

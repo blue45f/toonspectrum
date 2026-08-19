@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { hasActiveImageFilters as hasLightweightActiveImageFilters } from "../render/studio-konva-filter-fields";
+import {
+  applyImageFilters,
+  buildImageFilters,
+  hasActiveImageFilters,
+  registerStudioKonvaFilters,
+} from "../render/studio-konva-filters";
+
 import {
   createStudioFilterDraft,
   studioFilterDraftToPatch,
@@ -18,17 +26,10 @@ import {
   normalizeStudioFilterUnionWave,
   studioFilterUnionWaveKonvaFilter,
 } from "./studio-filter-union-wave";
-import { hasActiveImageFilters as hasLightweightActiveImageFilters } from "./studio-konva-filter-fields";
-import {
-  applyImageFilters,
-  buildImageFilters,
-  hasActiveImageFilters,
-  registerStudioKonvaFilters,
-} from "./studio-konva-filters";
 
 import type { StudioFilterUnionWaveKind } from "./studio-filter-union-wave";
-import type { StudioImageDataLike } from "./studio-filters";
-import type { ImageFilterFields, KonvaLike } from "./studio-konva-filters";
+import type { ImageFilterFields, KonvaLike } from "../render/studio-konva-filters";
+import type { StudioImageDataLike } from "../studio-filters";
 
 function patternedImage(width = 31, height = 23): StudioImageDataLike {
   const data = new Uint8ClampedArray(width * height * 4);

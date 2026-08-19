@@ -134,8 +134,7 @@ export function createStudioFirstPartyRasterCodecModuleWorker():
   StudioFirstPartyRasterCodecWorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(
-    new URL(
-      "./studio-first-party-raster-codec.worker.ts",
+    new URL("./studio-first-party-raster-codec.worker.ts",
       import.meta.url,
     ),
     {

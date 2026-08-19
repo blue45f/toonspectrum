@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { dodgeBurnStroke } from "./studio-dodge-burn";
+import { wetMixStroke } from "../brush/studio-wet-mix";
+import { dodgeBurnStroke } from "../studio-dodge-burn";
+import { smudgeStroke } from "../studio-smudge";
+
 import {
   planStudioRasterRetouchRegion,
   translateStudioRasterRetouchPoints,
   type StudioRasterRetouchRegion,
 } from "./studio-raster-retouch-region";
-import { smudgeStroke } from "./studio-smudge";
-import { wetMixStroke } from "./studio-wet-mix";
 
 function texturedPixels(width: number, height: number): Uint8ClampedArray {
   const pixels = new Uint8ClampedArray(width * height * 4);

@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   lowerStudioCanonicalBrushPlanToWebGpuDabs,
-} from "./studio-canonical-brush-webgpu-lowering";
+} from "../studio-canonical-brush-webgpu-lowering";
+
 import {
   StudioEngineFutureBrushController,
   type StudioEngineFutureBrushGpuBoundary,
@@ -31,7 +32,7 @@ import {
   STUDIO_ENGINE_WEBGPU_BRUSH_WORKING_COLOR_SPACE,
 } from "./studio-engine-webgpu-brush-runtime";
 
-import type { StudioCanonicalBrushPlan } from "./studio-canonical-brush-plan";
+import type { StudioCanonicalBrushPlan } from "../studio-canonical-brush-plan";
 import type {
   StudioEngineTileCommitReceipt,
   StudioEngineTileCommitResult,

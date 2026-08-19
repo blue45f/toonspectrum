@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  planStudioDynamicBrushCoverageAndLegacyMarks,
+  type StudioDynamicBrushCoverageMark,
+} from "../studio-dynamic-brush-coverage-renderer";
+
+import {
   studioBrushPresetUsesIntentionalDiscreteCarrier,
 } from "./studio-brush-carrier-quality";
 import {
@@ -15,10 +20,6 @@ import {
 import {
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
 } from "./studio-brush-render-budget";
-import {
-  planStudioDynamicBrushCoverageAndLegacyMarks,
-  type StudioDynamicBrushCoverageMark,
-} from "./studio-dynamic-brush-coverage-renderer";
 
 const SELECTED_PIGMENT = "#315f9b";
 const OVERLAP_PATH = [

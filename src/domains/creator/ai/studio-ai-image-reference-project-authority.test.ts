@@ -3,43 +3,43 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
+  parseStudioAutosave,
+  serializeStudioAutosave,
+} from "../studio-autosave";
+import { createEmptyStudioCharacterBible } from "../studio-character-bible";
+import { createEmptyStudioCommentsDocument } from "../studio-comments";
+import {
+  parseStudioProjectFile,
+  serializeStudioProjectFile,
+} from "../studio-project-file";
+import {
+  buildStudioProjectFileSnapshot,
+  type BuildStudioProjectFileSnapshotInput,
+} from "../studio-project-snapshot";
+import { createEmptyStudioPublicationAnalyticsDocument } from "../studio-publication-analytics";
+import { normalizeStudioPublishCompliance } from "../studio-publish-compliance";
+import { DEFAULT_STUDIO_PUBLISH_PACKAGE_SETTINGS } from "../studio-publish-package";
+import { createDefaultStudioReferenceBoardDocument } from "../studio-reference-board";
+import { createEmptyStudioReleaseSchedule } from "../studio-release-schedule";
+import { buildStudioSavePayload } from "../studio-save-payload";
+import { createEmptyStudioWriterRoomDocument } from "../studio-writer-room";
+
+import {
   createEmptyStudioAiImageReferenceDocument,
   hydrateStudioAiImageReferenceDocument,
   serializeStudioAiImageReferenceDocument,
   type StudioAiImageReferenceDocument,
 } from "./studio-ai-image-reference-roles";
 import { createEmptyStudioAiProvenanceDocument } from "./studio-ai-provenance";
-import {
-  parseStudioAutosave,
-  serializeStudioAutosave,
-} from "./studio-autosave";
-import { createEmptyStudioCharacterBible } from "./studio-character-bible";
-import { createEmptyStudioCommentsDocument } from "./studio-comments";
-import {
-  parseStudioProjectFile,
-  serializeStudioProjectFile,
-} from "./studio-project-file";
-import {
-  buildStudioProjectFileSnapshot,
-  type BuildStudioProjectFileSnapshotInput,
-} from "./studio-project-snapshot";
-import { createEmptyStudioPublicationAnalyticsDocument } from
-  "./studio-publication-analytics";
-import { normalizeStudioPublishCompliance } from "./studio-publish-compliance";
-import { DEFAULT_STUDIO_PUBLISH_PACKAGE_SETTINGS } from "./studio-publish-package";
-import { createDefaultStudioReferenceBoardDocument } from "./studio-reference-board";
-import { createEmptyStudioReleaseSchedule } from "./studio-release-schedule";
-import { buildStudioSavePayload } from "./studio-save-payload";
-import { createEmptyStudioWriterRoomDocument } from "./studio-writer-room";
 
-import type { PageState } from "./studio-page-state";
+import type { PageState } from "../studio-page-state";
 
 const SAVED_AT = "2026-08-10T09:00:00.000Z";
 const LEGACY_REFERENCE_STORAGE_PREFIX =
   "toonspectrum-studio-ai-image-references:v1";
 
 const studioPageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
+  new URL("../StudioPage.tsx", import.meta.url),
   "utf8",
 );
 const legacyStorageSource = readFileSync(

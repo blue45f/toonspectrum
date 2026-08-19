@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   StudioBrushR8GrainRegistry,
   composeStudioBrushR8TipPaperAlphaMap,
 } from "./studio-brush-r8-grain-runtime";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type { NormalizedStudioBrushGrainSettings } from "./studio-brush-material-dynamics";
 import type { StudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";

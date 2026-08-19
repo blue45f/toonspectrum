@@ -19,15 +19,15 @@
 import { Droplets } from "lucide-react";
 import { useId } from "react";
 
-import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
-import { studioRetouchToolHelp } from "./studio-retouch-help";
 import {
   WET_MIX_HARDNESS_RANGE,
   WET_MIX_PICKUP_RANGE,
   WET_MIX_RADIUS_RANGE,
   WET_MIX_STRENGTH_RANGE,
   WET_MIX_WETNESS_RANGE,
-} from "./studio-wet-mix";
+} from "./brush/studio-wet-mix";
+import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 
 import type { ReactElement } from "react";

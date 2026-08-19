@@ -70,7 +70,7 @@
 import type {
   StudioBg3dCanonicalGeometryPayload,
   StudioBg3dGeometryWorkerFormat,
-} from "./studio-bg3d-geometry-worker-protocol";
+} from "./bg3d/studio-bg3d-geometry-worker-protocol";
 
 // ---------------------------------------------------------------------------
 // 예산 · 타입

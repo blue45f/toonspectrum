@@ -56,7 +56,7 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
   };
 });
 
-vi.mock("./studio-page-lazy-ui", () => ({
+vi.mock("../studio-page-lazy-ui", () => ({
   StudioPerspectiveOverlay: (props: Record<string, unknown>) => {
     capture.perspective.push(props);
     return null;

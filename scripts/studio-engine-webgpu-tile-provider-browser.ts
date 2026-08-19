@@ -7,10 +7,6 @@
  */
 
 import {
-  lowerStudioCanonicalBrushPlanToWebGpuDabs,
-  type StudioCanonicalWebGpuAnalyticDab,
-} from "../src/domains/creator/studio-canonical-brush-webgpu-lowering";
-import {
   STUDIO_ENGINE_TILE_AUTHORITY_VERSION,
   STUDIO_ENGINE_TILE_ENCODING,
   studioEngineRgba16FloatTileDigest,
@@ -18,7 +14,7 @@ import {
   type StudioEngineTileProviderBaseTile,
   type StudioEngineTileProviderDelta,
   type StudioEngineTileProviderInput,
-} from "../src/domains/creator/studio-engine-tile-authority";
+} from "../src/domains/creator/render/studio-engine-tile-authority";
 import {
   STUDIO_ENGINE_WEBGPU_TILE_BYTE_LENGTH,
   STUDIO_ENGINE_WEBGPU_TILE_PROVIDER_VERSION,
@@ -28,7 +24,11 @@ import {
   type StudioEngineWebGpuTileProviderRequest,
   type StudioEngineWebGpuTileProviderResult,
   type StudioEngineWebGpuTileProviderV1,
-} from "../src/domains/creator/studio-engine-webgpu-tile-provider-v1";
+} from "../src/domains/creator/render/studio-engine-webgpu-tile-provider-v1";
+import {
+  lowerStudioCanonicalBrushPlanToWebGpuDabs,
+  type StudioCanonicalWebGpuAnalyticDab,
+} from "../src/domains/creator/studio-canonical-brush-webgpu-lowering";
 
 import type { StudioCanonicalBrushPlan } from "../src/domains/creator/studio-canonical-brush-plan";
 

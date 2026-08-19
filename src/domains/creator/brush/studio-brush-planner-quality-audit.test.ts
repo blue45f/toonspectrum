@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
 import { materializeAllStudioBrushPackSelections } from "./studio-brush-pack-runtime";
 import {

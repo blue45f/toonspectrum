@@ -4,24 +4,24 @@ import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsForBrushId,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
-} from "./studio-brush-dynamics";
-import { resolveStudioStrokeSymmetry } from "./studio-brush-intrinsic-symmetry";
-import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
+} from "./brush/studio-brush-dynamics";
+import { resolveStudioStrokeSymmetry } from "./brush/studio-brush-intrinsic-symmetry";
+import { materializeStudioBrushPackDynamics } from "./brush/studio-brush-pack-runtime";
 import {
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
-} from "./studio-brush-render-budget";
-import { studioBrushSymmetryTransforms } from "./studio-brush-symmetry";
-import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
+} from "./brush/studio-brush-render-budget";
+import { studioBrushSymmetryTransforms } from "./brush/studio-brush-symmetry";
+import { encodeStudioBrushTipAlphaMapBase64 } from "./brush/studio-brush-tip-stamp";
+import { exportPageToSvg } from "./export/studio-svg-export";
 import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
-import { exportPageToSvg } from "./studio-svg-export";
 import {
   planStudioWebDrawingKitOwnedDabs,
   STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS,
 } from "./studio-web-drawing-stroke-bridge";
 
-import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
+import type { StudioDynamicBrushDab } from "./brush/studio-brush-dynamics";
 import type { DrawEl } from "./studio-element-model";
 
 const ROUTE = [

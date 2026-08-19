@@ -12,7 +12,7 @@ import {
   simulateStudioWetInkField,
 } from "./studio-wet-ink-field";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 function inkWashStroke(overrides: Partial<DrawEl> = {}): DrawEl {
   return {

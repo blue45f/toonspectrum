@@ -1,9 +1,9 @@
 import {
   STUDIO_BG3D_PROCEDURAL_STARTER_PACK,
   STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID,
-} from "./studio-bg3d-procedural-starter-pack";
-import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./studio-brush-library";
-import { STUDIO_FILTER_PACK_DEFS } from "./studio-filter-pack";
+} from "./bg3d/studio-bg3d-procedural-starter-pack";
+import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./brush/studio-brush-library";
+import { STUDIO_FILTER_PACK_DEFS } from "./filter/studio-filter-pack";
 
 import type {
   StudioMarketplacePackage,

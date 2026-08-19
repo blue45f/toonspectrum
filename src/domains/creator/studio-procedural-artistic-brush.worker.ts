@@ -2,7 +2,7 @@
 
 import {
   createStudioP5BrushStandaloneAdapterLoader,
-} from "./studio-p5-brush-standalone-runtime-adapter";
+} from "./brush/studio-p5-brush-standalone-runtime-adapter";
 import {
   createStudioProceduralArtisticBrushProvider,
   type StudioProceduralArtisticSurfaceFactory,

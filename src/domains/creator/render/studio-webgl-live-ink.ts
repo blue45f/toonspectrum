@@ -1,8 +1,9 @@
 import {
   resolveStudioInkPressure,
   studioInkPressureRadius,
-} from "./studio-ink-pressure-model";
-import { resolveStudioLiveSurfaceDevicePixelRatio } from "./studio-low-latency-canvas";
+} from "../brush/studio-ink-pressure-model";
+import { resolveStudioLiveSurfaceDevicePixelRatio } from "../studio-low-latency-canvas";
+
 import { parseStudioGpuColor, type StudioGpuRgba } from "./studio-webgpu-color";
 import { isValidStudioGpuStroke } from "./studio-webgpu-dab-planner";
 import {

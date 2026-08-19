@@ -2,7 +2,7 @@ import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
   type StudioBrushR8TextureGrainSource,
-} from "./studio-brush-r8-grain-asset-contract";
+} from "../brush/studio-brush-r8-grain-asset-contract";
 
 import type { SvgExportPageInput, SvgExportResult } from "./studio-svg-export";
 

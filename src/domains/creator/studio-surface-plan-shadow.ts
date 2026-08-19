@@ -11,13 +11,13 @@ import {
   type SelectStudioStrokeRouteResult,
   type StudioStrokeRouteTournamentState,
   type StudioStrokeRouteWorkloadTraits,
-} from "./studio-stroke-route-tournament";
+} from "./brush/studio-stroke-route-tournament";
 import {
   STUDIO_STROKE_SURFACE_ROUTE_PRIORITY,
   resolveStudioStrokeSurfaceRoute,
   type StudioStrokeSurfaceRouteKind,
   type StudioStrokeSurfaceRouteSnapshotInput,
-} from "./studio-stroke-surface-route";
+} from "./brush/studio-stroke-surface-route";
 
 /**
  * V11 strangler bridge, step (b) of ADR 0001(개정): a shadow

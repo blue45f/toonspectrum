@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyImageFilters,
+  buildImageFilters,
+  hasActiveImageFilters,
+  registerStudioKonvaFilters,
+  type ImageFilterFields,
+  type KonvaLike,
+} from "../render/studio-konva-filters";
+import { hexToRgb, type StudioImageDataLike } from "../studio-filters";
+import {
+  denoiseStudioRgba,
+  reduceStudioJpegArtifacts,
+  removeStudioScreentoneArtifacts,
+  type StudioToneArtifactAppliedResult,
+} from "../studio-tone-artifact-filter-kernels";
+
+import {
   STUDIO_FILTER_LABELS,
   STUDIO_FILTER_MENU_KINDS,
   cloneStudioFilterDraft,
@@ -28,21 +44,6 @@ import {
   studioFilterPackValuesToPatch,
   vignetteFxKonvaFilter,
 } from "./studio-filter-pack";
-import { hexToRgb, type StudioImageDataLike } from "./studio-filters";
-import {
-  applyImageFilters,
-  buildImageFilters,
-  hasActiveImageFilters,
-  registerStudioKonvaFilters,
-  type ImageFilterFields,
-  type KonvaLike,
-} from "./studio-konva-filters";
-import {
-  denoiseStudioRgba,
-  reduceStudioJpegArtifacts,
-  removeStudioScreentoneArtifacts,
-  type StudioToneArtifactAppliedResult,
-} from "./studio-tone-artifact-filter-kernels";
 
 // ---------------------------------------------------------------------------
 // 헬퍼 — 순수 가짜 ImageData(테스트는 node 환경, Konva/DOM 없음)

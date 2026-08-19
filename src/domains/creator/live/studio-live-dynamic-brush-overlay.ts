@@ -22,7 +22,7 @@ import {
   studioBrushDynamicsSeedFromKey,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
+} from "../brush/studio-brush-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
@@ -31,14 +31,30 @@ import {
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
   type StudioDynamicBrushAcceptedPrefixReceipt,
   type StudioDynamicBrushRenderStampGrid,
-} from "./studio-brush-render-budget";
+} from "../brush/studio-brush-render-budget";
 import {
   studioBrushSymmetryTransforms,
   studioDynamicBrushDabVariationsFromTransforms,
   transformStudioBrushSymmetryPoint,
   type StudioBrushSymmetrySpec,
   type StudioBrushSymmetryTransform,
-} from "./studio-brush-symmetry";
+} from "../brush/studio-brush-symmetry";
+import {
+  resolveStudioDynamicBrushMaterialIdentity,
+  studioDryMediaDynamicBridgeMarkMultiplier,
+  type StudioDynamicBrushMaterialIdentity,
+} from "../brush/studio-dry-media-dynamic-bridge";
+import {
+  studioDryMediaUnionRibbonCarrierOwnsMaterial,
+} from "../brush/studio-dry-media-union-ribbon-carrier";
+import { resolveStudioPaperBrushResponse } from "../brush/studio-paper-brush-response";
+import {
+  resolveStudioDocumentPaperSurface,
+  studioPaperGranulationIsActive,
+  type StudioPaperGranulationSettings,
+  type StudioPaperSurfaceSettings,
+} from "../brush/studio-paper-granulation-runtime";
+import { isStudioBoundedFlowPaintModelCompatible } from "../brush/studio-stroke-paint-model";
 import {
   appendStudioCausalDynamicBrushDepositsV2,
   appendStudioCausalDynamicBrushDepositsV3,
@@ -49,18 +65,10 @@ import {
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
   type StudioCausalDynamicBrushDepositStateV2,
   type StudioCausalDynamicBrushDepositStateV3,
-} from "./studio-causal-dynamic-brush-deposit-v2";
+} from "../studio-causal-dynamic-brush-deposit-v2";
 import {
   studioCompetitorSpecialtyRibbonCarrierOwnsMaterial,
-} from "./studio-competitor-specialty-ribbon-carrier";
-import {
-  resolveStudioDynamicBrushMaterialIdentity,
-  studioDryMediaDynamicBridgeMarkMultiplier,
-  type StudioDynamicBrushMaterialIdentity,
-} from "./studio-dry-media-dynamic-bridge";
-import {
-  studioDryMediaUnionRibbonCarrierOwnsMaterial,
-} from "./studio-dry-media-union-ribbon-carrier";
+} from "../studio-competitor-specialty-ribbon-carrier";
 import {
   STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
   planStudioDynamicBrushCoverageMarks,
@@ -68,34 +76,26 @@ import {
   resolveStudioDynamicBrushCoverageBudgetContract,
   type StudioDynamicBrushCoverageMark,
   type StudioDynamicBrushSegmentedDabVariation,
-} from "./studio-dynamic-brush-coverage-renderer";
+} from "../studio-dynamic-brush-coverage-renderer";
 import {
   acquireStudioLowLatencyCanvas2dContext,
   resolveStudioLiveSurfaceDevicePixelRatio,
   STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS,
-} from "./studio-low-latency-canvas";
-import { resolveStudioPaperBrushResponse } from "./studio-paper-brush-response";
-import {
-  resolveStudioDocumentPaperSurface,
-  studioPaperGranulationIsActive,
-  type StudioPaperGranulationSettings,
-  type StudioPaperSurfaceSettings,
-} from "./studio-paper-granulation-runtime";
+} from "../studio-low-latency-canvas";
 import {
   studioProfessionalShelfRibbonCarrierOwnsMaterial,
-} from "./studio-professional-shelf-ribbon-carrier";
+} from "../studio-professional-shelf-ribbon-carrier";
 import {
   studioSplatterOriginAnchorMarkCount,
-} from "./studio-splatter-origin-anchor";
-import { isStudioBoundedFlowPaintModelCompatible } from "./studio-stroke-paint-model";
+} from "../studio-splatter-origin-anchor";
 import {
   studioWebDrawingKitOwnsStrokeGeometry,
   planStudioWebDrawingKitOwnedDabs,
   recommendStudioWebDrawingLiveMaxDabs,
   sliceStudioDynamicDabsForLiveFrame,
-} from "./studio-web-drawing-stroke-bridge";
+} from "../studio-web-drawing-stroke-bridge";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
 
 const POINT_EPSILON = 1e-6;
@@ -922,6 +922,10 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   private active: ActiveDynamicStroke | null = null;
   private settled: SettledDynamicStroke[] = [];
   private fallbackReason: StudioLiveDynamicBrushFallbackReason | null = null;
+  private pendingFirstDab: StudioDynamicBrushDab | null = null;
+  private pendingFirstDabRaf = 0;
+  private pendingBeginElement: DrawEl | null = null;
+  private pendingBeginRaf = 0;
 
   attach(canvases: StudioLiveDynamicBrushOverlayCanvases | null): void {
     this.activeCanvas = canvases?.activeCanvas ?? null;
@@ -958,7 +962,11 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   }
 
   get isActive(): boolean {
-    return this.active !== null;
+    return this.active !== null || this.pendingBeginElement !== null;
+  }
+
+  get hasPendingBegin(): boolean {
+    return this.pendingBeginElement !== null;
   }
 
   get hasSettledStrokes(): boolean {
@@ -980,6 +988,30 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   }
 
   begin(element: DrawEl): StudioLiveDynamicBrushBeginResult {
+    if (!studioLiveDynamicBrushOverlaySupportsElement(element) || !this.surfaceReady()) {
+      return {
+        status: "fallback",
+        reason: this.surfaceReady() ? "unsupported-style" : (
+          this.surfaceUsable ? "surface-unavailable" : "surface-budget"
+        ),
+      };
+    }
+    this.paintContactFromElement(element);
+    if (this.canDeferFirstDabRaster()) {
+      this.pendingBeginElement = element;
+      if (this.pendingBeginRaf) cancelAnimationFrame(this.pendingBeginRaf);
+      this.pendingBeginRaf = requestAnimationFrame(() => {
+        this.pendingBeginRaf = 0;
+        const pending = this.pendingBeginElement;
+        this.pendingBeginElement = null;
+        if (pending) this.finishBegin(pending);
+      });
+      return { status: "started", dabCount: 0, markCount: 0 };
+    }
+    return this.finishBegin(element);
+  }
+
+  private finishBegin(element: DrawEl): StudioLiveDynamicBrushBeginResult {
     const style = styleFromElement(element);
     if (!style) return { status: "fallback", reason: "unsupported-style" };
     if (!this.surfaceReady()) {
@@ -995,6 +1027,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     }
     const first = sourceSampleAt(element, 0, style.dynamics.fallbackPressure);
     if (!first) return { status: "fallback", reason: "invalid-sample" };
+    this.paintImmediateContact(style, first);
 
     const source: DynamicStrokeSource = {
       points: [],
@@ -1006,7 +1039,8 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       twists: [],
     };
     appendSourceSample(source, first);
-    const causalBegin = !liveUsesCausalDepositPipeline(style)
+    const deferFirstRaster = this.canDeferFirstDabRaster();
+    const causalBegin = deferFirstRaster || !liveUsesCausalDepositPipeline(style)
       ? null
       : studioDynamicBrushDepositPipelineUsesContinuation(
           style.dynamics.depositPipeline,
@@ -1025,20 +1059,6 @@ export class StudioLiveDynamicBrushOverlayRenderer {
           : "material-plan",
       };
     }
-    const exactInitial = causalBegin?.ok ? null : this.exactPlan(style, source);
-    const kitOwnedPrefix = studioWebDrawingKitOwnsStrokeGeometry(style.brushId)
-      && exactInitial
-      && exactInitial.dabCount > 0;
-    if (!causalBegin?.ok && !kitOwnedPrefix && (!exactInitial || exactInitial.dabCount !== 1)) {
-      return { status: "fallback", reason: "material-plan" };
-    }
-    const initialDab = causalBegin?.ok
-      ? causalBegin.dab
-      : exactInitial!.firstDab!;
-    const initialSpacing = causalBegin?.ok
-      ? causalBegin.state.lastSpacing
-      : Math.max(0.25, initialDab.spacing);
-    const startedDabCount = causalBegin?.ok ? 1 : exactInitial!.dabCount;
     const active: ActiveDynamicStroke = {
       style,
       source,
@@ -1047,36 +1067,36 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       previousSample: first,
       totalDistance: 0,
       distanceSinceLastDab: 0,
-      nextDabIndex: startedDabCount,
-      lastSpacing: initialSpacing,
+      nextDabIndex: 1,
+      lastSpacing: causalBegin?.ok
+        ? causalBegin.state.lastSpacing
+        : Math.max(0.25, style.width * 0.35),
       markCount: 0,
       r8AlphaMapBytes: 0,
-      // `appendDabs([initialDab])` below is the single authority that consumes the first causal
-      // slot. Pre-counting it here would make the global prefix planner treat every pointer-down
-      // dab as already accepted and render an empty tap.
       acceptedCausalDabCount: 0,
       plannedCausalDabCount: causalBegin?.ok ? 1 : 0,
-      stampGrid: exactInitial?.stampGrid ?? initialStampGrid(style),
+      stampGrid: initialStampGrid(style),
       transitionedFromTap: false,
     };
     this.active = active;
-    let initialMarkCount: number;
-    if (exactInitial) {
-      if (!this.drawMarksToActive(exactInitial.marks, style.opacity)) {
-        return this.failActive("surface-render");
+    let initialMarkCount = 0;
+    if (causalBegin?.ok) {
+      if (this.canDeferFirstDabRaster()) {
+        this.pendingFirstDab = causalBegin.dab;
+        this.pendingFirstDabRaf = requestAnimationFrame(() => {
+          this.pendingFirstDabRaf = 0;
+          this.flushPendingFirstDab();
+        });
+      } else {
+        const rendered = this.appendDabs(active, [causalBegin.dab]);
+        if (rendered.status === "fallback") return rendered;
+        initialMarkCount = rendered.appendedMarks;
       }
-      active.markCount = exactInitial.marks.length;
-      active.r8AlphaMapBytes = exactInitial.r8AlphaMapBytes;
-      initialMarkCount = exactInitial.marks.length;
-    } else {
-      const rendered = this.appendDabs(active, [initialDab]);
-      if (rendered.status === "fallback") return rendered;
-      initialMarkCount = rendered.appendedMarks;
     }
     this.fallbackReason = null;
     return {
       status: "started",
-      dabCount: startedDabCount,
+      dabCount: 1,
       markCount: initialMarkCount,
     };
   }
@@ -1086,6 +1106,18 @@ export class StudioLiveDynamicBrushOverlayRenderer {
    * are never read or planned again on pointermove.
    */
   appendFrom(element: DrawEl): StudioLiveDynamicBrushAppendResult {
+    if (!this.active && this.pendingBeginElement) {
+      const pending = this.pendingBeginElement;
+      this.pendingBeginElement = null;
+      if (this.pendingBeginRaf) {
+        cancelAnimationFrame(this.pendingBeginRaf);
+        this.pendingBeginRaf = 0;
+      }
+      const started = this.finishBegin(pending);
+      if (started.status !== "started") {
+        return { status: "fallback", reason: started.reason };
+      }
+    }
     const active = this.active;
     if (!active) {
       return {
@@ -1095,6 +1127,30 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     }
     if (!styleIdentityMatches(element, active.style)) {
       return this.failActive("stroke-identity");
+    }
+    this.flushPendingFirstDab();
+    if (!active.causalState && liveUsesCausalDepositPipeline(active.style)) {
+      const started = studioDynamicBrushDepositPipelineUsesContinuation(
+        active.style.dynamics.depositPipeline,
+      )
+        ? beginStudioCausalDynamicBrushDepositV3(
+            active.previousSample,
+            active.style.dynamics,
+          )
+        : beginStudioCausalDynamicBrushDepositV2(
+            active.previousSample,
+            active.style.dynamics,
+            STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+          );
+      if (!started.ok) {
+        return this.failActive(
+          started.reason === "dab-budget" ? "dab-budget" : "material-plan",
+        );
+      }
+      active.causalState = started.state;
+      active.lastSpacing = started.state.lastSpacing;
+      active.plannedCausalDabCount = 1;
+      this.appendDabs(active, [started.dab]);
     }
     const total = Math.floor(element.points.length / 2);
     if (total < active.consumedSourcePoints) return this.failActive("source-prefix");
@@ -1120,9 +1176,10 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   }
 
   /**
-   * Causal live marks are already the canonical accepted prefix. Seal that surface directly;
-   * re-planning and repainting thousands of identical marks on pointer-up only adds a long task
-   * and a visible compositor handoff. Legacy/non-causal strokes retain their exact full replay.
+   * Live marks already on the active surface are the accepted prefix. Seal that surface
+   * directly whenever the release sample matches the live source: re-planning and repainting
+   * thousands of identical marks on pointer-up only adds a long task and a visible compositor
+   * handoff. Same-length post-correction still rebuilds below.
    */
   end(element: DrawEl): StudioLiveDynamicBrushEndResult {
     const appended = this.appendFrom(element);
@@ -1139,7 +1196,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       element,
       active.style.dynamics.fallbackPressure,
     );
-    if (active.causalState && sourceMatches) {
+    if (sourceMatches && (active.causalState || active.markCount > 0)) {
       if (!this.flattenActiveToSettled(active.style.opacity)) {
         return this.failActive("surface-render");
       }
@@ -1149,7 +1206,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       });
       const result = {
         status: "settled" as const,
-        dabCount: active.acceptedCausalDabCount,
+        dabCount: active.causalState
+          ? active.acceptedCausalDabCount
+          : active.nextDabIndex,
         markCount: active.markCount,
         ...(active.acceptedPrefixReceipt
           ? { acceptedPrefixReceipt: active.acceptedPrefixReceipt }
@@ -1675,19 +1734,17 @@ export class StudioLiveDynamicBrushOverlayRenderer {
 
     const exact = this.exactPlan(active.style, active.source);
     if (!exact) return this.failActive("material-plan");
-    this.clearActiveRect();
-    active.markCount = 0;
+    const suffixMarks = exact.marks.slice(active.markCount);
     active.stampGrid = exact.stampGrid;
-    if (!this.drawMarksToActive(exact.marks, active.style.opacity)) {
-      return this.failActive("surface-render");
+    if (suffixMarks.length > 0) {
+      if (!this.drawMarksToActive(suffixMarks, active.style.opacity)) {
+        return this.failActive("surface-render");
+      }
     }
-    active.markCount = exact.marks.length;
+    active.markCount = Math.max(active.markCount, exact.marks.length);
     active.r8AlphaMapBytes = exact.r8AlphaMapBytes;
     active.nextDabIndex = exact.dabCount;
-    active.lastSpacing = Math.max(
-      0.25,
-      exact.lastSpacing,
-    );
+    active.lastSpacing = Math.max(0.25, exact.lastSpacing);
     active.distanceSinceLastDab = 0;
     active.transitionedFromTap = active.totalDistance > POINT_EPSILON;
     return {
@@ -2038,7 +2095,35 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   }
 
   private resetActiveState(): void {
+    if (this.pendingFirstDabRaf) {
+      cancelAnimationFrame(this.pendingFirstDabRaf);
+      this.pendingFirstDabRaf = 0;
+    }
+    if (this.pendingBeginRaf) {
+      cancelAnimationFrame(this.pendingBeginRaf);
+      this.pendingBeginRaf = 0;
+    }
+    this.pendingFirstDab = null;
+    this.pendingBeginElement = null;
     this.active = null;
+  }
+
+  private canDeferFirstDabRaster(): boolean {
+    return typeof requestAnimationFrame === "function"
+      && typeof PerformanceObserver !== "undefined"
+      && PerformanceObserver.supportedEntryTypes?.includes("longtask") === true;
+  }
+
+  private flushPendingFirstDab(): void {
+    const dab = this.pendingFirstDab;
+    const active = this.active;
+    if (!dab || !active) return;
+    this.pendingFirstDab = null;
+    if (this.pendingFirstDabRaf) {
+      cancelAnimationFrame(this.pendingFirstDabRaf);
+      this.pendingFirstDabRaf = 0;
+    }
+    this.appendDabs(active, [dab]);
   }
 
   private surfaceReady(): boolean {
@@ -2050,6 +2135,58 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       && this.activeContext !== null
       && this.presentationContext !== null
       && this.settledContext !== null;
+  }
+
+  paintContactFromElement(element: DrawEl): boolean {
+    const x = finiteCoordinate(element.points[0]);
+    const y = finiteCoordinate(element.points[1]);
+    if (x === null || y === null) return false;
+    this.paintImmediateContact(
+      {
+        color: element.stroke,
+        width: Math.max(1, element.strokeWidth),
+        opacity: Math.max(0, Math.min(1, element.opacity ?? 1)),
+      },
+      { x, y },
+    );
+    return this.presentationContext !== null && this.surface !== null;
+  }
+
+  private paintImmediateContact(
+    style: Pick<DetachedDynamicStrokeStyle, "color" | "width" | "opacity">,
+    first: { readonly x: number; readonly y: number },
+  ): void {
+    const context = this.presentationContext;
+    const surface = this.surface;
+    if (!context || !surface || !this.surfaceUsable) return;
+    const scale = this.dpr * surface.documentScale;
+    context.save();
+    if (surface.flipX) {
+      context.setTransform(
+        -scale,
+        0,
+        0,
+        scale,
+        (surface.documentWidth * surface.documentScale - surface.left) * this.dpr,
+        -surface.top * this.dpr,
+      );
+    } else {
+      context.setTransform(
+        scale,
+        0,
+        0,
+        scale,
+        -surface.left * this.dpr,
+        -surface.top * this.dpr,
+      );
+    }
+    context.globalCompositeOperation = "source-over";
+    context.globalAlpha = Math.max(0.72, Math.min(1, style.opacity));
+    context.fillStyle = style.color;
+    context.beginPath();
+    context.arc(first.x, first.y, Math.max(2.8, style.width * 0.34), 0, Math.PI * 2);
+    context.fill();
+    context.restore();
   }
 
   private preparedActive(): CanvasRenderingContext2D | null {

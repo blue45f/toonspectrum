@@ -12,8 +12,7 @@ import type {
   StudioDraftCollaborationIdentity,
   StudioDraftCollaborationTemporaryRoom,
 } from "./studio-draft-collaboration";
-import type { StudioLinked3dPassCloudUploadReceipt } from
-  "./studio-linked-3d-pass-cloud-sync";
+import type { StudioLinked3dPassCloudUploadReceipt } from "./studio-linked-3d-pass-cloud-sync";
 import type {
   CreateWorkInput,
   UpdateWorkInput,

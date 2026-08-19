@@ -1,4 +1,4 @@
-import { localizeStudioFilterUnavailableReason } from "./studio-filter-unavailable-reason-localization";
+import { localizeStudioFilterUnavailableReason } from "./filter/studio-filter-unavailable-reason-localization";
 
 import type {
   StudioMainMenuGroup,

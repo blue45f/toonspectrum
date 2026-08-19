@@ -34,7 +34,7 @@ import type { StudioBrushSnapshot } from "./studio-brush-library";
 
 function corpusBytes(relative: string): Uint8Array {
   return new Uint8Array(
-    readFileSync(fileURLToPath(new URL(`../../../tests/corpus/brushes/${relative}`, import.meta.url))),
+    readFileSync(fileURLToPath(new URL(`../../../../tests/corpus/brushes/${relative}`, import.meta.url))),
   );
 }
 

@@ -3,7 +3,13 @@ import * as Y from "yjs";
 
 import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
-} from "./studio-brush-dynamics";
+} from "../brush/studio-brush-dynamics";
+import {
+  STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
+  STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
+} from "../studio-element-model";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
+
 import {
   STUDIO_CRDT_APPEND_MAX_SAMPLES,
   STUDIO_CRDT_DELETION_ACKS_ROOT,
@@ -34,11 +40,6 @@ import {
   encodeStudioCrdtStateVector,
   encodeStudioCrdtSyncChunks,
 } from "./studio-crdt-protocol";
-import {
-  STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
-  STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
-} from "./studio-element-model";
-import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 
 function payload(
   points: number[] = [10, 20],

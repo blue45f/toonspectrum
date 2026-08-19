@@ -228,15 +228,15 @@ describe("WILL v1 OPC packed transport codec", () => {
         expect(() => unpackStudioWillV1OpcImportResultWithMetrics(packet, {
           willLimits: { maxTotalPoints: 200_000 },
         })).toThrowError(expect.objectContaining({ code: "RESOURCE_LIMIT" }));
-        const requestedPointSlots = arrayFrom.mock.calls.reduce(
+        const requestedPointSlots = (arrayFrom.mock.calls as unknown as [unknown][]).reduce(
           (total, [value]) => {
             if (
               value !== null
               && typeof value === "object"
               && "length" in value
-              && typeof value.length === "number"
+              && typeof (value as { length: unknown }).length === "number"
             ) {
-              return total + value.length;
+              return total + (value as { length: number }).length;
             }
             return total;
           },

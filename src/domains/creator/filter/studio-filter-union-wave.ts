@@ -12,7 +12,7 @@
 import { STUDIO_FILTER_UNION_WAVE_KINDS } from "./studio-filter-pack-registry";
 
 import type { StudioFilterUnionWaveKind } from "./studio-filter-pack-registry";
-import type { StudioImageDataLike } from "./studio-filters";
+import type { StudioImageDataLike } from "../studio-filters";
 
 export { STUDIO_FILTER_UNION_WAVE_KINDS };
 export type { StudioFilterUnionWaveKind };

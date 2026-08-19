@@ -26,6 +26,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { StudioLiveCollaborationPanel } from "./live/StudioLiveCollaborationPanel";
 import {
   STUDIO_TEAM_ASSIGNABLE_ROLES,
   getStudioTeam,
@@ -53,7 +54,6 @@ import {
   type StudioTeamSnapshot,
   type StudioTeamStatus,
 } from "./studio-team-client";
-import { StudioLiveCollaborationPanel } from "./StudioLiveCollaborationPanel";
 import { StudioSharedWorksPanel } from "./StudioSharedWorksPanel";
 
 import type { StudioDraftCollaborationReadiness } from "./studio-draft-collaboration";

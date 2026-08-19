@@ -3,8 +3,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const fileUrl = new URL(
-  "./studio-procedural-media-surface-provider.ts",
+const fileUrl = new URL("./studio-procedural-media-surface-provider.ts",
   import.meta.url,
 );
 const source = readFileSync(fileUrl, "utf8");

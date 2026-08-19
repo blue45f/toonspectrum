@@ -8,23 +8,23 @@
  * after an explicit confirmation or an operation whose contract says it creates a merged copy.
  */
 
-import { isEffectivelyHidden, isEffectivelyLocked } from "./studio-layers";
 import {
   exportPageToSvg,
-} from "./studio-svg-export";
-import { createStudioVectorReferenceSourceBudgetReceipt } from "./studio-vector-reference-source-budget-receipt";
+} from "../export/studio-svg-export";
+import { isEffectivelyHidden, isEffectivelyLocked } from "../studio-layers";
+import { createStudioVectorReferenceSourceBudgetReceipt } from "../studio-vector-reference-source-budget-receipt";
 
-import type { El, ImageEl } from "./studio-element-model";
-import type { LayerGroup } from "./studio-layers";
-import type { SvgExportResult, SvgExportTheme } from "./studio-svg-export";
+import type { SvgExportResult, SvgExportTheme } from "../export/studio-svg-export";
+import type { El, ImageEl } from "../studio-element-model";
+import type { LayerGroup } from "../studio-layers";
 import type {
   StudioVectorReferenceInput,
   StudioVectorReferenceBudgets,
   StudioVectorReferencePreparedExport,
   StudioVectorReferenceRenderOptions,
   StudioVectorReferenceResult,
-} from "./studio-vector-fill-reference";
-import type { StudioVectorReferenceSourceBudgetReceipt } from "./studio-vector-reference-source-budget-receipt";
+} from "../studio-vector-fill-reference";
+import type { StudioVectorReferenceSourceBudgetReceipt } from "../studio-vector-reference-source-budget-receipt";
 
 const EDITABLE_RASTER_COPY_NAMESPACE = "editable-raster-copy-v1";
 const PNG_BASE64_PREFIX = "data:image/png;base64,";

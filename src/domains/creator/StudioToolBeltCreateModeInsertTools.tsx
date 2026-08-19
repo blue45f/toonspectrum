@@ -1,5 +1,5 @@
 import { MessageCircle, Palette, Type as TypeIcon, ImagePlus } from "lucide-react";
-import { memo, type ComponentProps } from "react";
+import { memo, Suspense, type ComponentProps } from "react";
 
 import {
   StudioFloatingToolPopover,
@@ -16,6 +16,7 @@ import {
   preloadStudioBubbleToolPopoverBody,
 } from "./studio-tool-belt-lazy-ui";
 import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
+import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioToolBeltContentProps, StudioToolBeltHintMap } from "./StudioToolBeltContent";
@@ -96,9 +97,11 @@ export const StudioToolBeltCreateModeInsertTools = memo(function StudioToolBeltC
             id="bubble-menu"
             className="fixed inset-x-2 top-[4.5rem] z-[70] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-2xl border border-line/70 bg-panel p-0 shadow-xl lg:inset-x-auto lg:left-3 lg:top-[4.5rem] lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-[22rem] lg:max-w-[calc(100vw-1.5rem)]"
           >
-            <LazyStudioBubbleToolPopoverBody
-              toolBelt={toolBelt}
-            />
+            <Suspense fallback={<StudioPanelLoading label="말풍선 메뉴를 여는 중..." />}>
+              <LazyStudioBubbleToolPopoverBody
+                toolBelt={toolBelt}
+              />
+            </Suspense>
           </StudioFloatingToolPopover>
         </div>
         <StudioToolBeltHintTarget hint={hints.image}>

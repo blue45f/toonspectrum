@@ -1,7 +1,7 @@
 import {
   isStudioStrokePaintModel,
   type StudioStrokePaintModel,
-} from "./studio-stroke-paint-model";
+} from "./brush/studio-stroke-paint-model";
 
 import type { StudioCausalInkDab } from "./studio-causal-ink";
 import type { StudioCausalInkNib } from "./studio-marker-nib-profile";

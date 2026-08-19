@@ -1,12 +1,13 @@
 import {
   STUDIO_VELLO_CURRENT_CANDIDATE_EVALUATION,
   STUDIO_VELLO_PROMOTION_GATES,
-} from "../src/domains/creator/studio-vello-candidate-promotion";
+} from "../src/domains/creator/render/studio-vello-candidate-promotion";
 import {
   STUDIO_VELLO_HUB_PRODUCT_CAPABILITY,
+  STUDIO_VELLO_HYBRID_COMPOSITOR,
   STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE,
   resolveStudioVelloHubProductCapability,
-} from "../src/domains/creator/studio-vello-hub-capability";
+} from "../src/domains/creator/render/studio-vello-hub-capability";
 import {
   STUDIO_VELLO_CHROME_PAGE_REPEATABILITY,
   STUDIO_VELLO_OBSERVED_FRAME_RUNS,
@@ -14,7 +15,7 @@ import {
   STUDIO_VELLO_OBSERVED_POC_LIMITATIONS,
   STUDIO_VELLO_OBSERVED_SOURCE,
   STUDIO_VELLO_RECORDED_OBSERVATION_CONSISTENCY,
-} from "../src/domains/creator/studio-vello-observed-poc";
+} from "../src/domains/creator/render/studio-vello-observed-poc";
 
 function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -68,8 +69,8 @@ function main(): void {
   invariant(
     STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.enabledByDefault
       && productCapability.enabled
-      && productCapability.scope === "accelerated-selection-overlay",
-    "The measured bounded VelloHub product seam must be enabled by default",
+      && productCapability.scope === "document-vector-hybrid",
+    "The V13 document-vector Hybrid product seam must be enabled by default",
   );
   invariant(
     STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.brushPixelAuthority === false
@@ -83,6 +84,11 @@ function main(): void {
       && STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE.status
         === "unavailable-upstream-api",
     "Hybrid/Sparse GPU must remain an explicit unavailable candidate until its API exists",
+  );
+  invariant(
+    STUDIO_VELLO_HYBRID_COMPOSITOR.eligible === true
+      && STUDIO_VELLO_HYBRID_COMPOSITOR.status === "production-compositor",
+    "V13 Hybrid compositor must be the eligible Classic+texture production lane",
   );
   invariant(
     STUDIO_VELLO_PROMOTION_GATES.every(({ hard }) => hard),

@@ -16,7 +16,7 @@ import {
 } from "./studio-hokusai-live-brush-transaction";
 import { studioHokusaiSourceRevision } from "./studio-hokusai-natural-media-contract";
 
-import type { DrawEl, El } from "./studio-element-model";
+import type { DrawEl, El } from "../studio-element-model";
 import type { StudioHokusaiLiveCanonicalResult } from "./studio-hokusai-live-brush-runtime";
 
 const HASH = `sha256:${"a".repeat(64)}` as const;

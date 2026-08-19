@@ -18,7 +18,7 @@ import {
   type PaperGrainKind,
 } from "./studio-paper-texture";
 
-import type { StudioLivingInkMaterialControls } from "./studio-living-ink-gpu-protocol";
+import type { StudioLivingInkMaterialControls } from "../studio-living-ink-gpu-protocol";
 
 export type StudioPaperSurfaceGroup =
   | "watercolor"

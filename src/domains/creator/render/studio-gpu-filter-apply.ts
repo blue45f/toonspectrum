@@ -26,10 +26,12 @@ import {
   isIdentityStudioMorphology,
   normalizeStudioConvolution,
   normalizeStudioMorphology,
-} from "./studio-advanced-pixel-filters";
-import { isIdentityBlurFx, normalizeBlurFx } from "./studio-blur";
-import { isIdentityColorBalance, normalizeColorBalance } from "./studio-color-balance";
-import { isIdentityCurve, isIdentityCurveChannels, normalizeCurve } from "./studio-curves";
+} from "../studio-advanced-pixel-filters";
+import { isIdentityBlurFx, normalizeBlurFx } from "../studio-blur";
+import { isIdentityColorBalance, normalizeColorBalance } from "../studio-color-balance";
+import { isIdentityCurve, isIdentityCurveChannels, normalizeCurve } from "../studio-curves";
+import { isIdentityLevels, isIdentityLevelsChannels, normalizeLevels } from "../studio-levels";
+
 import {
   acquireStudioGpuDevice,
   acquireStudioGpuFilterRuntimeOnFabric,
@@ -60,9 +62,8 @@ import {
   studioGpuGaussianBoxRadii,
 } from "./studio-gpu-filter-spatial-kernels";
 import { hasActiveImageFilters } from "./studio-konva-filter-fields";
-import { isIdentityLevels, isIdentityLevelsChannels, normalizeLevels } from "./studio-levels";
 
-import type { StudioImageDataLike } from "./studio-filters";
+import type { StudioImageDataLike } from "../studio-filters";
 import type { StudioGpuFilterKernelId } from "./studio-gpu-filter-kernels";
 import type {
   StudioGpuFilterPresentationCanvas,

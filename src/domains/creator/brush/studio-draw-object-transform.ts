@@ -26,7 +26,7 @@
  * A rejected transform returns `null` rather than a partially transformed stroke: callers treat
  * that as "leave the document untouched", the same all-or-nothing discipline the group planner uses.
  */
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 export interface StudioDrawObjectTransformBounds {
   readonly x: number;

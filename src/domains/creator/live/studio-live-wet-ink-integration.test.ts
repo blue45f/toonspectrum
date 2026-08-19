@@ -2,12 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const studioPageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const studioPageSource = readStudioCuttoonEditorSource();
 const viewportSource = readFileSync(
-  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
 const hostSource = readFileSync(
@@ -15,7 +14,7 @@ const hostSource = readFileSync(
   "utf8",
 );
 const lazyUiSource = readFileSync(
-  new URL("./studio-page-lazy-ui.ts", import.meta.url),
+  new URL("../studio-page-lazy-ui.ts", import.meta.url),
   "utf8",
 );
 const overlaySource = readFileSync(
@@ -30,7 +29,7 @@ describe("live wet-ink product boundary", () => {
     expect(hostSource).toContain('data-studio-live-wet-ink-settled="true"');
     expect(lazyUiSource).toContain("mod.StudioLiveWetInkOverlayHost");
     expect(viewportSource).toContain(
-      "liveWetInkOverlayRenderer: import(\"./studio-live-wet-ink-overlay\")",
+      "liveWetInkOverlayRenderer: import(\"../live/studio-live-wet-ink-overlay\")",
     );
     expect(viewportSource).toContain(
       "<StudioLiveWetInkOverlayHost",

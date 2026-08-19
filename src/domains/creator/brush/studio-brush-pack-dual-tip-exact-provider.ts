@@ -7,16 +7,17 @@
  */
 
 import {
+  STUDIO_DUAL_TIP_PACKED_LAYOUT,
+  STUDIO_DUAL_TIP_PACKED_STRIDE,
+} from "../studio-dual-brush-tip-engine";
+
+import {
   materializeStudioBrushPackDualTipR8,
   renderStudioBrushPackDualTipIfConfigured,
 } from "./studio-brush-pack-runtime";
 import {
   encodeStudioBrushTipAlphaMapBase64,
 } from "./studio-brush-tip-stamp";
-import {
-  STUDIO_DUAL_TIP_PACKED_LAYOUT,
-  STUDIO_DUAL_TIP_PACKED_STRIDE,
-} from "./studio-dual-brush-tip-engine";
 
 import type {
   StudioBrushPackDualTipRenderInput,
@@ -27,13 +28,13 @@ import type {
   StudioDualTipExactPorterDuff,
   StudioDualTipPackedCommands,
   StudioDualTipReceipt,
-} from "./studio-dual-brush-tip-engine";
+} from "../studio-dual-brush-tip-engine";
 import type {
   StudioDynamicDualTipExactPlanV2,
   StudioDynamicDualTipExactR8AssetInputV2,
   StudioDynamicDualTipExactWebGpuReceiptV2,
   StudioDynamicDualTipExactWebGpuRuntimeV2,
-} from "./studio-dynamic-dual-tip-webgpu-runtime-v2";
+} from "../studio-dynamic-dual-tip-webgpu-runtime-v2";
 
 export const STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_PROVIDER_VERSION = 1 as const;
 export const STUDIO_BRUSH_PACK_DUAL_TIP_EXACT_REPLAY_VERSION = 1 as const;
@@ -43,7 +44,7 @@ const MAX_REPLAY_BASE64_CODE_UNITS = 32 * 1024 * 1024;
 const MAX_REPLAY_DEPOSITIONS = 65_536;
 const MAX_IDENTIFIER_CHARACTERS = 256;
 
-type ExactRuntimeModule = typeof import("./studio-dynamic-dual-tip-webgpu-runtime-v2");
+type ExactRuntimeModule = typeof import("../studio-dynamic-dual-tip-webgpu-runtime-v2");
 
 export interface StudioBrushPackDualTipExactProviderOptions {
   readonly device: GPUDevice | null;
@@ -733,7 +734,7 @@ export async function createStudioBrushPackDualTipExactProvider(
   let module: ExactRuntimeModule;
   try {
     module = await (options.moduleLoader
-      ?? (() => import("./studio-dynamic-dual-tip-webgpu-runtime-v2")))();
+      ?? (() => import("../studio-dynamic-dual-tip-webgpu-runtime-v2")))();
   } catch {
     return Object.freeze({
       status: "ready",

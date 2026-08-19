@@ -1,7 +1,8 @@
-import { BUBBLE_STYLE_PRESETS, type BubbleStylePreset } from "./studio-bubble-style-presets";
-import { normalizeStrokeStyle, type StrokeStyle } from "./studio-stroke-shapes";
+import { normalizeStrokeStyle, type StrokeStyle } from "../brush/studio-stroke-shapes";
 
-import type { BubbleVariant } from "./studio-assets";
+import { BUBBLE_STYLE_PRESETS, type BubbleStylePreset } from "./studio-bubble-style-presets";
+
+import type { BubbleVariant } from "../studio-assets";
 
 import { cx } from "@/lib/cx";
 

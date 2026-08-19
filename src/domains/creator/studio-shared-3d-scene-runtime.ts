@@ -11,7 +11,7 @@ import type {
 import type {
   StudioVrmSceneDocument,
   StudioVrmVec3,
-} from "./studio-vrm-scene-document";
+} from "./vrm/studio-vrm-scene-document";
 
 /**
  * Renderer-safe shared-stage primitives. Keep this module free of character document parsing,

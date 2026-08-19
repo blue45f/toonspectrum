@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
-import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
+import { normalizeStudioBrushDynamicsSettings } from "../brush/studio-brush-dynamics";
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "../brush/studio-ink-pressure-model";
+
 import {
   createStudioRasterHandoffAuthorityKey,
   createStudioRasterHandoffBaseKey,
@@ -14,7 +15,7 @@ import {
   type StudioRasterHandoffCandidate,
 } from "./studio-raster-handoff-authority";
 
-import type { Tool } from "./studio-editor-tool-model";
+import type { Tool } from "../studio-editor-tool-model";
 
 const viewport = {
   surface: { left: 10, top: 20, width: 300, height: 400 },
@@ -305,7 +306,7 @@ describe("studio raster handoff authority", () => {
   });
 
   it("pins the StudioPage gate matrix wiring for the M2 view-tool slice", () => {
-    const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const source = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
     const memoStart = source.indexOf("const studioRasterHandoffGates = useMemo");
     expect(memoStart).toBeGreaterThan(-1);
     const memo = source.slice(memoStart, source.indexOf("]);", memoStart));
@@ -351,7 +352,7 @@ describe("studio raster handoff authority", () => {
   });
 
   it("pins the raster surface inside the page grade + colour vision filter wrapper (M2b)", () => {
-    const source = readFileSync(new URL("./StudioCanvasViewport.tsx", import.meta.url), "utf8");
+    const source = readFileSync(new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url), "utf8");
 
     // Stable anchor: the single post-processing filter wrapper carries an inert data attribute.
     // Moving the attribute, the filter style or either presentation breaks this contract, which

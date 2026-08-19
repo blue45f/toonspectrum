@@ -2,7 +2,15 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import {
+  STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
+  STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+} from "../render/studio-hokusai-live-brush-protocol";
+import {
+  STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
+} from "../render/studio-hokusai-natural-media-worker-protocol";
+import { BRUSH_PRESETS } from "../studio-brush";
+
 import {
   STUDIO_BRUSH_BACKEND_FAMILY_POLICIES,
   STUDIO_BRUSH_BACKEND_INTEGRATION_AUDIT,
@@ -30,13 +38,6 @@ import {
   STUDIO_BRUSH_RUNTIME_CONTRACT,
   resolveStudioBrushRuntimeContract,
 } from "./studio-brush-runtime-contract";
-import {
-  STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
-  STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
-} from "./studio-hokusai-live-brush-protocol";
-import {
-  STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
-} from "./studio-hokusai-natural-media-worker-protocol";
 
 function availabilitySnapshot(
   availability: StudioBrushBackendAvailability,
@@ -412,7 +413,7 @@ describe("Hokusai .myb provider admission", () => {
 
   it("pins the failed full-size verdict and blocks identity-only product promotion", () => {
     const raw = JSON.parse(readFileSync(
-      new URL("../../../tests/benchmarks/results/libmypaint-fullsize.json", import.meta.url),
+      new URL("../../../../tests/benchmarks/results/libmypaint-fullsize.json", import.meta.url),
       "utf8",
     )) as {
       gate: {

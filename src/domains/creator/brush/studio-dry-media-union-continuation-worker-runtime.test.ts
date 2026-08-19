@@ -4,7 +4,16 @@ import {
   MEMORY64_CROSS_REALM_PROTOCOL_VERSION,
   type Memory64CrossRealmAllocationAck,
   type Memory64CrossRealmReservationToken,
-} from "./kernel/Memory64CrossRealmProtocol";
+} from "../kernel/Memory64CrossRealmProtocol";
+import {
+  createStudioFreehandInputMemoryBinaryCasState,
+  createStudioFreehandInputMemoryBinaryCasStore,
+} from "../studio-freehand-input-binary-spool-opfs-store";
+import {
+  STUDIO_WASM_PAGE_BYTES,
+  StudioWasmLinearMemoryRuntime,
+} from "../studio-wasm64-memory-governor";
+
 import {
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
@@ -32,16 +41,8 @@ import {
   type StudioDryMediaUnionContinuationRasterSurface,
 } from "./studio-dry-media-union-continuation-worker-runtime";
 import { STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION } from "./studio-dry-media-union-ribbon-carrier";
-import {
-  createStudioFreehandInputMemoryBinaryCasState,
-  createStudioFreehandInputMemoryBinaryCasStore,
-} from "./studio-freehand-input-binary-spool-opfs-store";
-import {
-  STUDIO_WASM_PAGE_BYTES,
-  StudioWasmLinearMemoryRuntime,
-} from "./studio-wasm64-memory-governor";
 
-import type { StudioDynamicBrushCoverageMark } from "./studio-dynamic-brush-coverage-renderer";
+import type { StudioDynamicBrushCoverageMark } from "../studio-dynamic-brush-coverage-renderer";
 
 const ATLAS_RESIDENT_BYTES = 1024 * 1024 * 4;
 const SCRATCH_PAGE_COUNT = BigInt(

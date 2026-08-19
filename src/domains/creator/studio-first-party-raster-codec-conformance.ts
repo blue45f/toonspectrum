@@ -26,7 +26,7 @@ import { sha256HexPortable } from "./studio-sha256";
 import type {
   StudioRasterInterchangeFormat,
   StudioRgbaBitmap,
-} from "./studio-raster-interchange";
+} from "./render/studio-raster-interchange";
 
 export const STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_SCHEMA =
   "toonspectrum.first-party-raster-codec-conformance" as const;

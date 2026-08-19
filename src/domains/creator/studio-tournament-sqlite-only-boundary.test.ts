@@ -24,10 +24,10 @@ describe("Studio tournament product boundary", () => {
 
   it("wires accepted non-test GPU and Worker completions into the bounded tournament", () => {
     const node = source("./StudioKonvaImageNode.tsx");
-    const timing = source("./studio-filter-render-tournament.ts");
+    const timing = source("./filter/studio-filter-render-tournament.ts");
 
     expect(node).toContain(
-      'import { scheduleStudioFilterRenderTournament } from "./studio-filter-render-tournament";',
+      'import { scheduleStudioFilterRenderTournament } from "./filter/studio-filter-render-tournament";',
     );
     expect(node).toMatch(
       /scheduleAcceptedFilterTournament\(\{\s*provider: "worker"/u,
@@ -51,7 +51,7 @@ describe("Studio tournament product boundary", () => {
   });
 
   it("keeps challenger rendering/readback behind an injected idle scheduler", () => {
-    const timing = source("./studio-filter-render-tournament.ts");
+    const timing = source("./filter/studio-filter-render-tournament.ts");
     const schedulerIndex = timing.indexOf("scheduler(() => {");
     const challengerIndex = timing.indexOf("input.challenger.render(controller.signal)");
     const persistIndex = timing.indexOf("void runtime.persist()");

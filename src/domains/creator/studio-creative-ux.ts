@@ -14,14 +14,14 @@
  * Pure data + presentation helpers; no document state.
  */
 
+import { resolveStudioBrushRuntimeContract } from "./brush/studio-brush-runtime-contract";
 import {
   BRUSH_PRESETS,
   type BrushPreset,
   type StudioToolOperation,
 } from "./studio-brush";
-import { resolveStudioBrushRuntimeContract } from "./studio-brush-runtime-contract";
 
-import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
+import type { StudioBrushPreviewStyle } from "./brush/studio-brush-visual";
 
 /** Canva/Express style “simple draw” kit — first tools a beginner sees. */
 export const STUDIO_BEGINNER_BRUSH_IDS = [
@@ -64,7 +64,15 @@ export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
   "erodible-pencil",
   "watercolor",
   "ink-wash",
+  "inkwash-pen",
+  "inkwash-water-brush",
+  "inkwash-bleed-wash",
+  "inkwash-white-ink",
   "oil",
+  "fluid-paint",
+  "fluid-paint-fine",
+  "fluid-paint-load",
+  "fluid-paint-rake",
   "paint-tube",
   "pastel",
   "airbrush",
@@ -204,7 +212,15 @@ const MEDIA_GROUP: Record<string, StudioBrushMediaGroup> = {
   brush: "paint",
   watercolor: "paint",
   "ink-wash": "paint",
+  "inkwash-pen": "paint",
+  "inkwash-water-brush": "paint",
+  "inkwash-bleed-wash": "paint",
+  "inkwash-white-ink": "paint",
   oil: "paint",
+  "fluid-paint": "paint",
+  "fluid-paint-fine": "paint",
+  "fluid-paint-load": "paint",
+  "fluid-paint-rake": "paint",
   "paint-tube": "paint",
   airbrush: "paint",
   "hard-airbrush": "paint",
@@ -276,7 +292,15 @@ const SHORT_NAMES: Record<string, string> = {
   brush: "붓",
   watercolor: "수채",
   "ink-wash": "수묵",
+  "inkwash-pen": "잉크펜",
+  "inkwash-water-brush": "물붓",
+  "inkwash-bleed-wash": "번짐워",
+  "inkwash-white-ink": "흰잉크",
   oil: "유화",
+  "fluid-paint": "유체붓",
+  "fluid-paint-fine": "유체세",
+  "fluid-paint-load": "유체두",
+  "fluid-paint-rake": "유체갈",
   "paint-tube": "튜브물감",
   pastel: "파스텔",
   "ink-particle": "잉크",
@@ -357,7 +381,15 @@ const HINTS: Record<string, string> = {
   brush: "일반 붓 스트로크",
   watercolor: "번지는 수채 느낌",
   "ink-wash": "수묵·먹 번짐",
+  "inkwash-pen": "유체 잉크 딥펜 — 필압으로 굵어지고 젖은 가장자리가 남청색으로 갈라짐",
+  "inkwash-water-brush": "물붓 — 먹선을 문지르면 번지고 소용돌이치며 마른 자국이 남음",
+  "inkwash-bleed-wash": "번짐 워시 — 입자 침착과 가장자리 암화, 염료가 채널별로 갈라짐",
+  "inkwash-white-ink": "화이트 과슈 — 말리면 아래 먹을 덮고 그 위에 다시 그을 수 있음",
   oil: "두꺼운 유화 붓터치",
+  "fluid-paint": "강모가 액체를 밀어 섞는 유체 페인트 — 속도 스플랫과 임파스토 하이라이트",
+  "fluid-paint-fine": "가는 강모 유체 — 세필로 물감을 문지르며 섞음",
+  "fluid-paint-load": "두꺼운 로드 유체 — 많이 묻혀 높이 있는 물감이 흐름",
+  "fluid-paint-rake": "갈퀴 강모 유체 — 갈필처럼 갈라지며 아래 색을 긁어 올림",
   "paint-tube": "튜브에서 짜낸 물감처럼 몸체와 능선이 이어지는 입체 압출 획",
   pastel: "부드러운 파스텔 쌓임",
   "ink-particle": "잉크 입자 텍스처",

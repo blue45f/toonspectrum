@@ -12,7 +12,7 @@ import {
   normalizeStudioFilterLibraryPreset,
   studioFilterPresetToSqlRecord,
   type StudioFilterLibraryPreset,
-} from "../../../src/domains/creator/studio-filter-library-sqlite-repository";
+} from "../../../src/domains/creator/filter/studio-filter-library-sqlite-repository";
 import {
   openStudioLocalDatabase,
   probeSqliteSupport,

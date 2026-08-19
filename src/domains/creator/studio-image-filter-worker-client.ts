@@ -1,3 +1,4 @@
+import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./render/studio-konva-filters";
 import {
   listEnabledStudioAdjustmentOperations,
   normalizeStudioAdjustmentFilterOperations,
@@ -18,7 +19,6 @@ import {
   type StudioImageFilterWorkerRunRequest,
   type StudioImageFilterWorkerRunSourceMessage,
 } from "./studio-image-filter-worker-protocol";
-import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
 import {
   StudioProfessionalFilterWorkerRequiredError,
   studioProfessionalFilterRequiresWorker,
@@ -28,8 +28,8 @@ import {
   studioToneArtifactRequiresWorker,
 } from "./studio-tone-artifact-filters";
 
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type { StudioImageDataLike } from "./studio-filters";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 export interface StudioImageFilterWorkerLike {
   onmessage: ((event: MessageEvent<StudioImageFilterWorkerResponseMessage>) => void) | null;

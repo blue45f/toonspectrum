@@ -2,8 +2,9 @@
 // Presentation only; generate + notice gate owned by StudioPage.
 import { ImageIcon, Loader2, Sparkles } from "lucide-react";
 
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+
 import { STUDIO_AI_IMAGE_SIZES, type StudioAiImageSize } from "./studio-ai-client";
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 
 import { cn } from "@/lib/utils";
 

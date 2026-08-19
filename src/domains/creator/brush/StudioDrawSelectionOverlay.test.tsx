@@ -11,13 +11,14 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { studioLiveBrushEffectiveDiameter } from "./studio-draw-rendering";
 import {
   drawSelectionIndicatorBox,
   StudioDrawSelectionOverlay,
-} from "./StudioSelectionOverlays";
+} from "../StudioSelectionOverlays";
 
-import type { DrawEl } from "./studio-element-model";
+import { studioLiveBrushEffectiveDiameter } from "./studio-draw-rendering";
+
+import type { DrawEl } from "../studio-element-model";
 
 interface CapturedKonvaNode {
   kind: string;

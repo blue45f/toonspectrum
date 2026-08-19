@@ -5,7 +5,7 @@ import {
   StudioTileDocProductIslandStore,
 } from "./studio-tiledoc-product-island";
 
-import type { StudioRasterImmutableTileFrame } from "./studio-crdt-raster-replay-runtime";
+import type { StudioRasterImmutableTileFrame } from "../live/studio-crdt-raster-replay-runtime";
 
 const surface = {
   version: 1,

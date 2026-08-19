@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bubbleVerticalPadding } from "./studio-bubble-text-fit";
 import StudioTextEditOverlay, { StudioTextEditFallbackModal } from "./StudioTextEditOverlay";
 
-import type { El } from "./studio-element-model";
+import type { El } from "../studio-element-model";
 import type Konva from "konva";
 
 /**

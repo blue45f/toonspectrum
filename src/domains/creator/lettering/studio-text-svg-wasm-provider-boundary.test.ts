@@ -88,9 +88,9 @@ function moduleEdges(relativePath: string): ModuleEdges {
   };
 }
 
-const harfbuzz = moduleEdges("./studio-harfbuzz-shaping-provider.ts");
-const resvg = moduleEdges("./studio-resvg-svg-provider.ts");
-const registry = moduleEdges("./studio-wasm-provider-registry.ts");
+const harfbuzz = moduleEdges("../studio-harfbuzz-shaping-provider.ts");
+const resvg = moduleEdges("../studio-resvg-svg-provider.ts");
+const registry = moduleEdges("../render/studio-wasm-provider-registry.ts");
 const productionModules = [harfbuzz, resvg, registry];
 
 describe("Studio text and SVG WASM provider source boundary", () => {

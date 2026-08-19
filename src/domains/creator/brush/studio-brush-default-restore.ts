@@ -1,4 +1,5 @@
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+
 import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsEqual,

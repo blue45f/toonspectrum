@@ -6,7 +6,7 @@ import {
   type StudioLiveMessageKind,
   type StudioLiveParticipant,
   type StudioLivePayloadMap,
-} from "./studio-live-collaboration-protocol";
+} from "./live/studio-live-collaboration-protocol";
 import {
   STUDIO_SCREEN_SHARE_MAX_VIEWERS,
   StudioScreenShareController,
@@ -19,7 +19,7 @@ import type {
   StudioLivePeer,
   StudioLiveRoomEvent,
   StudioLiveSignalEnvelope,
-} from "./studio-live-collaboration-room";
+} from "./live/studio-live-collaboration-room";
 
 const local: StudioLiveParticipant = {
   sessionId: "session-local",

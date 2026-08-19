@@ -24,23 +24,25 @@ import { readFileSync } from "node:fs";
 
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { DEFAULT_PAGE_GRADE } from "./studio-page-grade";
-import { createStudioRasterExportOrchestration } from "./studio-raster-export-orchestration-runtime";
+import { createStudioRasterExportOrchestration } from "../render/studio-raster-export-orchestration-runtime";
+import { DEFAULT_PAGE_GRADE } from "../studio-page-grade";
+import { planStudioCanvasStageLayout, type StudioViewStageLayout } from "../studio-view-controls";
+
 import {
   planStudioStageDocumentViewBox,
   readStudioStageInDocumentView,
   type StudioDocumentViewStage,
 } from "./studio-stage-document-view";
-import { planStudioCanvasStageLayout, type StudioViewStageLayout } from "./studio-view-controls";
 
-import type { PageState } from "./studio-page-state";
-import type { WatermarkSettings } from "./studio-watermark";
+
+import type { PageState } from "../studio-page-state";
+import type { WatermarkSettings } from "../studio-watermark";
 import type Konva from "konva";
 
 // Encoders and file sinks are not the subject here; the capture geometry is. Keeping the real
 // modules would only add DOM/worker requirements between the Stage read and the assertion.
-vi.mock("./studio-export", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./studio-export")>();
+vi.mock("../studio-export", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../studio-export")>();
   return {
     ...actual,
     canvasToBlob: async () => new Blob([]),
@@ -49,7 +51,7 @@ vi.mock("./studio-export", async (importOriginal) => {
   };
 });
 
-vi.mock("./studio-raster-interchange-worker-client", () => ({
+vi.mock("../render/studio-raster-interchange-worker-client", () => ({
   encodeStudioRasterInterchangeAsync: async () => ({
     encoded: { format: "qoi", bytes: new Uint8Array(), width: 1, height: 1 },
   }),
@@ -614,7 +616,7 @@ describe("readStudioStageInDocumentView", () => {
  * ships a silently cropped export, and it is invisible to every behavioural test in the repo.
  */
 describe("every stage raster read goes through a choke point", () => {
-  const editorSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+  const editorSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 
   it("routes each StudioPage stage read through a document-view restore or a capture render", () => {
     const lines = editorSource.split("\n");
@@ -646,7 +648,7 @@ describe("every stage raster read goes through a choke point", () => {
 
   it("keeps the export orchestration runtime on captureReadyStageForPage", () => {
     const runtimeSource = readFileSync(
-      new URL("./studio-raster-export-orchestration-runtime.ts", import.meta.url),
+      new URL("../render/studio-raster-export-orchestration-runtime.ts", import.meta.url),
       "utf8"
     );
     const reads = runtimeSource.match(/\bstage\.toCanvas\(/gu) ?? [];

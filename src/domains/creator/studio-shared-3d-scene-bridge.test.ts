@@ -12,14 +12,14 @@ import {
   selectStudioShared3dVisibleSceneElements,
   studioShared3dCharacterWorldTransform,
 } from "./studio-shared-3d-scene-bridge";
-import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
-import { createPropInstance, serializeVrmProps } from "./studio-vrm-props";
+import { createAvatarForgeState } from "./vrm/studio-vrm-avatar-forge";
+import { createPropInstance, serializeVrmProps } from "./vrm/studio-vrm-props";
 import {
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
-} from "./studio-vrm-scene-document";
-import { createWardrobeEquip, serializeWardrobe } from "./studio-vrm-wardrobe";
+} from "./vrm/studio-vrm-scene-document";
+import { createWardrobeEquip, serializeWardrobe } from "./vrm/studio-vrm-wardrobe";
 
 describe("studio shared 3D scene bridge", () => {
   it("links canonical VRM authorities without projecting them into the background schema", () => {

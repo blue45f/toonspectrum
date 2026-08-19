@@ -1,6 +1,6 @@
 import { Check, Pin, SlidersHorizontal } from "lucide-react";
 
-import { selectQuickBrushes, type StudioSavedBrush } from "./studio-brush-library";
+import { selectQuickBrushes, type StudioSavedBrush } from "./brush/studio-brush-library";
 
 import type { MouseEventHandler } from "react";
 

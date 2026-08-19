@@ -534,7 +534,7 @@ describe("StudioPaperVectorRefinementProvider", () => {
       "utf8",
     );
     const delegatedGeometrySource = readFileSync(
-      new URL("./studio-engine-vector-geometry-provider.ts", import.meta.url),
+      new URL("../render/studio-engine-vector-geometry-provider.ts", import.meta.url),
       "utf8",
     );
 

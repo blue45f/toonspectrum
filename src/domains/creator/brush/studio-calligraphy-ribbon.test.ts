@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 
-import type { CalligraphySegment } from "./studio-brush";
+import type { CalligraphySegment } from "../studio-brush";
 
 function segment(
   x0: number,

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { BLENDER_PROP_GLTF_URLS } from "./studio-vrm-props";
+import { BLENDER_PROP_GLTF_URLS } from "./vrm/studio-vrm-props";
 
 type JsonRecord = Record<string, unknown>;
 type QualityClass = "handheld" | "headwear" | "large-body";

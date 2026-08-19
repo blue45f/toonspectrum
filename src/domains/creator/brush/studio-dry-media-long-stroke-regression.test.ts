@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { planStudioCausalDynamicBrushDepositSegmentsV3 } from "../studio-causal-dynamic-brush-deposit-v2";
+import { planStudioDynamicBrushCoverageMarks } from "../studio-dynamic-brush-coverage-renderer";
+
 import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsForBrushId,
@@ -11,7 +14,6 @@ import {
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
 } from "./studio-brush-render-budget";
-import { planStudioCausalDynamicBrushDepositSegmentsV3 } from "./studio-causal-dynamic-brush-deposit-v2";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
   type StudioDynamicBrushMaterialIdentity,
@@ -23,7 +25,7 @@ import {
   studioDryMediaKernelTipCacheSizeForTests,
   studioDryMediaKernelTipWorkingSet,
 } from "./studio-dry-media-kernel-tip";
-import { planStudioDynamicBrushCoverageMarks } from "./studio-dynamic-brush-coverage-renderer";
+
 
 const CORE_DRY_MEDIA = [
   "crayon",

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { STUDIO_CANONICAL_BRUSH_PLAN_VERSION } from "./studio-canonical-brush-plan";
+import { STUDIO_CANONICAL_BRUSH_PLAN_VERSION } from "../studio-canonical-brush-plan";
+
 import {
   StudioEngineTileAuthority,
   STUDIO_ENGINE_TILE_AUTHORITY_VERSION,

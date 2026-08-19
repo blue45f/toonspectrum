@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import { composeStudioLayerLiftBeta } from "./studio-layer-lift-compositor";
 import {
   applyStudioLayerLiftCorrectionWorkflow,
@@ -18,10 +20,9 @@ import {
   type StudioLayerLiftWorkflowCompositor,
   type StudioLayerLiftWorkflowSession,
 } from "./studio-layer-lift-workflow";
-import { sha256HexPortable } from "./studio-sha256";
 
-import type { StudioEditorMutationTicket } from "./studio-editor-scope";
-import type { El } from "./studio-element-model";
+import type { StudioEditorMutationTicket } from "../studio-editor-scope";
+import type { El } from "../studio-element-model";
 import type {
   StudioLayerLiftSourceSnapshotSuccess,
 } from "./studio-layer-lift-source-snapshot";

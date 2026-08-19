@@ -7,7 +7,7 @@ const pageSource = readFileSync(
   "utf8",
 );
 const layerLiftCompositorSource = readFileSync(
-  new URL("./studio-layer-lift-compositor.ts", import.meta.url),
+  new URL("./layer/studio-layer-lift-compositor.ts", import.meta.url),
   "utf8",
 );
 
@@ -30,7 +30,7 @@ describe("Studio content-aware fill bundle boundary", () => {
       /import\s+\{[^}]*contentAwareFillPixels[^}]*\}\s+from\s+["']\.\/studio-content-aware-fill["']/u,
     );
     expect(layerLiftCompositorSource).toContain(
-      'await import("./studio-content-aware-fill")',
+      'await import("../studio-content-aware-fill")',
     );
   });
 

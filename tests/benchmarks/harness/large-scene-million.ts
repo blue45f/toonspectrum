@@ -24,12 +24,12 @@ import { extname, join, normalize, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
-import { sceneIRSchema } from "../../../packages/studio-project-model/src/ir/scene.ts";
+import { sceneIRSchema } from "../../../packages/studio-project-model/src/ir/scene";
 
 import type {
   SceneIR,
   StrokePathNodeIR,
-} from "../../../packages/studio-project-model/src/ir/scene.ts";
+} from "../../../packages/studio-project-model/src/ir/scene";
 import type { Server } from "node:http";
 import type { Browser, Page } from "playwright";
 

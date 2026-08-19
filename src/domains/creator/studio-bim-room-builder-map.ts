@@ -11,7 +11,7 @@ import {
 } from "./studio-build-generators";
 import { importStudioIfcShell } from "./studio-mesh-format-adapters";
 
-import type { StudioBg3dRoomOpening, StudioBg3dRoomSpec } from "./studio-bg3d-room-builder";
+import type { StudioBg3dRoomOpening, StudioBg3dRoomSpec } from "./bg3d/studio-bg3d-room-builder";
 
 export const STUDIO_BIM_ROOM_MAP_REVISION = 2 as const;
 

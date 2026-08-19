@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  emptyPixelSelection,
+  isSelectionUsable,
+  pointInSelection,
+  rectSelectionPolygon,
+  type PixelSelection,
+} from "../studio-selection-tools";
+
+import {
   alphaBitmapFromRgba,
   alphaRingsToPixelSelection,
   downsampleAlphaBitmap,
@@ -10,13 +18,6 @@ import {
   LAYER_ALPHA_TRACE_MAX_DIM,
   type AlphaBitmap,
 } from "./studio-layer-alpha-selection";
-import {
-  emptyPixelSelection,
-  isSelectionUsable,
-  pointInSelection,
-  rectSelectionPolygon,
-  type PixelSelection,
-} from "./studio-selection-tools";
 
 /** 알파 비트맵 생성 헬퍼 — fn(x,y) → 0..255. */
 function makeBitmap(width: number, height: number, fn: (x: number, y: number) => number): AlphaBitmap {

@@ -18,12 +18,12 @@ import type {
   StudioOffscreenRasterRunInput,
   StudioOffscreenRasterRunOptions,
   StudioOffscreenRasterRunResult,
-} from "./studio-offscreen-raster-worker-client";
+} from "../studio-offscreen-raster-worker-client";
 import type {
   StudioOffscreenRasterFailureCode,
   StudioOffscreenRasterOutput,
   StudioOffscreenRasterResultPayload,
-} from "./studio-offscreen-raster-worker-protocol";
+} from "../studio-offscreen-raster-worker-protocol";
 
 export const STUDIO_ENGINE_SETTLED_TILE_RASTER_VERSION = 1 as const;
 export const STUDIO_ENGINE_SETTLED_TILE_RASTER_BACKEND =

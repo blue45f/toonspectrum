@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const source = readStudioCuttoonEditorSource();
 
 describe("StudioPage R8 grain hydration boundary", () => {
   it("owns, observes, subscribes, projects, and disposes the verified grain lifecycle", () => {
@@ -15,8 +15,8 @@ describe("StudioPage R8 grain hydration boundary", () => {
     expect(source).toContain("currentPages: pages");
     expect(source).toContain("history: pagesHistory");
     expect(source).toContain("extraElements: master.elements");
-    expect(source).toContain(
-      "projectStudioBrushR8GrainRenderElements(\n      elements,\n      studioBrushR8GrainHydrationRevision"
+    expect(source).toMatch(
+      /projectStudioBrushR8GrainRenderElements\(\s*elements,\s*studioBrushR8GrainHydrationRevision/u
     );
     expect(source).toContain(
       "elements={studioBrushR8GrainRenderElements}"

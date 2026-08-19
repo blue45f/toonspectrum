@@ -93,39 +93,39 @@ function moduleShape(relativePath: string): ModuleShape {
 }
 
 const OPTIONAL_VIEWPORT_SURFACES = [
-  "./StudioAppSettingsPanel",
-  "./StudioDialogueBatchPanel",
-  "./StudioDialogueTranslatePanel",
-  "./StudioFeatureTutorialHub",
-  "./StudioFrameAnimationPanel",
-  "./StudioHealCloneOverlay",
-  "./StudioHistoryBrushOverlay",
-  "./StudioHistoryPanel",
-  "./StudioLayerMaskOverlay",
-  "./StudioMasterPagePanel",
-  "./StudioPanelSplitTool",
-  "./StudioPuppetWarpOverlay",
-  "./StudioQuickMaskOverlay",
-  "./StudioShortcutsHelp",
-  "./StudioWebGpuCanvas",
+  "../StudioAppSettingsPanel",
+  "../StudioDialogueBatchPanel",
+  "../StudioDialogueTranslatePanel",
+  "../StudioFeatureTutorialHub",
+  "../StudioFrameAnimationPanel",
+  "../StudioHealCloneOverlay",
+  "../StudioHistoryBrushOverlay",
+  "../StudioHistoryPanel",
+  "../layer/StudioLayerMaskOverlay",
+  "../StudioMasterPagePanel",
+  "../StudioPanelSplitTool",
+  "../StudioPuppetWarpOverlay",
+  "../StudioQuickMaskOverlay",
+  "../StudioShortcutsHelp",
+  "../StudioWebGpuCanvas",
 ] as const;
 
 describe("Studio canvas viewport module boundary", () => {
   it("keeps the core canvas on one static, one-way ownership edge", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const editor = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(
-      page.runtimeImports.filter((specifier) => specifier === "./StudioCanvasViewport"),
-    ).toEqual(["./StudioCanvasViewport"]);
-    expect(page.dynamicImports).not.toContain("./StudioCanvasViewport");
-    expect(viewport.runtimeImports).not.toContain("./StudioPage");
-    expect(viewport.dynamicImports).not.toContain("./StudioPage");
-    expect(page.source).toContain("<StudioCanvasViewport");
+      editor.runtimeImports.filter((specifier) => specifier === "../canvas/StudioCanvasViewport"),
+    ).toEqual(["../canvas/StudioCanvasViewport"]);
+    expect(editor.dynamicImports).not.toContain("../canvas/StudioCanvasViewport");
+    expect(viewport.runtimeImports).not.toContain("../StudioPage");
+    expect(viewport.dynamicImports).not.toContain("../StudioPage");
+    expect(editor.source).toContain("<StudioCanvasViewport");
   });
 
   it("moves the renderer and both public contracts out of the page monolith", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("../StudioPage.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(viewport.exportedDeclarations).toContain("StudioCanvasViewportHandlers");
@@ -138,7 +138,7 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("preserves the existing memoized Stage hot-surface contract", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("../StudioPage.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(page.source).toContain(
@@ -151,7 +151,8 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("stabilizes compiler-opted-out viewport projections and event bridges", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("../StudioPage.tsx");
+    const editor = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(page.source).toContain(
@@ -164,10 +165,10 @@ describe("Studio canvas viewport module boundary", () => {
     expect(page.source).toContain("const studioRasterHiddenOperationIds = useMemo(");
     expect(page.source).toContain("const sharedGutters = useMemo(");
     expect(page.source).toContain("const pixelOverlayFrame: SelectionFrame | null = useMemo(");
-    expect(page.source).toContain(
+    expect(editor.source).toContain(
       "closeViewToolWithFocus={studioCanvasViewportHandlers.closeViewToolWithFocus}",
     );
-    expect(page.source).toContain(
+    expect(editor.source).toContain(
       "setCurrentPageId={studioCanvasViewportHandlers.setCurrentPageId}",
     );
     expect(page.source).toContain(
@@ -179,7 +180,7 @@ describe("Studio canvas viewport module boundary", () => {
     expect(page.source).not.toContain(
       "setDrawMode={studioCanvasViewportHandlers.setDrawMode}",
     );
-    expect(page.source).toContain(
+    expect(editor.source).toContain(
       "setRightPanelOpen={studioCanvasViewportHandlers.setRightPanelOpen}",
     );
     expect(viewport.source).toContain(
@@ -188,7 +189,7 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("keeps transient shortcut notices below the memoized Stage boundary", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("../StudioPage.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(page.source).toContain(
@@ -214,7 +215,7 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("keeps the viewport and right inspector in one desktop row without collapsing canvas height", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const workspaceMarker = "중앙: 캔버스 + 우측 인스펙터";
     const workspaceIndex = page.source.indexOf(workspaceMarker);
@@ -253,8 +254,8 @@ describe("Studio canvas viewport module boundary", () => {
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(
-      viewport.runtimeImports.filter((specifier) => specifier === "./studio-page-lazy-ui"),
-    ).toEqual(["./studio-page-lazy-ui"]);
+      viewport.runtimeImports.filter((specifier) => specifier === "../studio-page-lazy-ui"),
+    ).toEqual(["../studio-page-lazy-ui"]);
     expect(viewport.dynamicImports).toEqual([]);
     for (const specifier of OPTIONAL_VIEWPORT_SURFACES) {
       expect(
@@ -265,20 +266,20 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("shares only leaf utilities with the orchestration owner", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("../StudioPage.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const shared = moduleShape("./studio-canvas-shared-runtime.ts");
 
-    expect(page.runtimeImports).toContain("./studio-canvas-shared-runtime");
+    expect(page.runtimeImports).toContain("./canvas/studio-canvas-shared-runtime");
     expect(viewport.runtimeImports).toContain("./studio-canvas-shared-runtime");
-    expect(shared.runtimeImports).not.toContain("./StudioPage");
+    expect(shared.runtimeImports).not.toContain("../StudioPage");
     expect(shared.runtimeImports).not.toContain("./StudioCanvasViewport");
     expect(shared.runtimeImports).not.toContain("react");
     expect(shared.runtimeImports).not.toContain("react-konva/lib/ReactKonvaCore");
   });
 
   it("keeps paper grain an opt-in editor preview on unset pages", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(viewport.source).toContain(

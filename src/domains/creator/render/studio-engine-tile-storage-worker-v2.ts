@@ -16,7 +16,8 @@ import {
   canonicalStudioCommandJson,
   studioCommandPayloadChecksum,
   type StudioCommandJsonValue,
-} from "./studio-command-journal";
+} from "../studio-command-journal";
+
 import {
   STUDIO_ENGINE_TILE_AUTHORITY_VERSION,
   STUDIO_ENGINE_TILE_ENCODING,

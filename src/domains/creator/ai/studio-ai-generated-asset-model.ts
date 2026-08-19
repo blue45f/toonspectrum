@@ -1,4 +1,4 @@
-import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
+import type { StudioPublishAiProvenance } from "../studio-publish-preflight";
 
 export type StudioAiGeneratedAssetAction = Extract<
   StudioPublishAiProvenance["action"],

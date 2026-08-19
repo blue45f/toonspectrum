@@ -3,12 +3,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_SHAPE_PARAMS, DEFAULT_STROKE_STYLE } from "./brush/studio-stroke-shapes";
 import { DEFAULT_STUDIO_SKETCH_STYLE } from "./studio-rough-shape";
-import { DEFAULT_SHAPE_PARAMS, DEFAULT_STROKE_STYLE } from "./studio-stroke-shapes";
 import { StudioStrokeShapePanel } from "./StudioStrokeShapePanel";
 
+import type { ShapeParams, StrokeShapeKind, StrokeStyle } from "./brush/studio-stroke-shapes";
 import type { StudioSketchStyle } from "./studio-rough-shape";
-import type { ShapeParams, StrokeShapeKind, StrokeStyle } from "./studio-stroke-shapes";
 
 afterEach(cleanup);
 

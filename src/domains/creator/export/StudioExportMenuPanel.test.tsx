@@ -3,19 +3,20 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  readStudioExportResolutionDpi,
+  resetStudioExportResolutionDpi,
+} from "../render/studio-raster-resolution-metadata";
+import { STUDIO_Z } from "../studio-z-index";
+
 import { resetStudioExportGeometryDraft } from "./studio-export-geometry-draft";
 import {
   formatExportPageRangeLabel,
   planMultiPageExportCapture,
 } from "./studio-export-package-preflight";
-import {
-  readStudioExportResolutionDpi,
-  resetStudioExportResolutionDpi,
-} from "./studio-raster-resolution-metadata";
-import { STUDIO_Z } from "./studio-z-index";
 import { StudioExportMenuPanel } from "./StudioExportMenuPanel";
 
-vi.mock("./studio-cbz-interchange", () => ({
+vi.mock("../studio-cbz-interchange", () => ({
   buildStudioCbzBlob: vi.fn(async () => ({
     blob: new Blob(["cbz"], { type: "application/vnd.comicbook+zip" }),
     warnings: [],

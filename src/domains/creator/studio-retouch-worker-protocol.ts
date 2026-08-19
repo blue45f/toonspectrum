@@ -1,11 +1,11 @@
 import {
+  type WetMixPixelPoint,
+  type WetMixSettings,
+} from "./brush/studio-wet-mix";
+import {
   type DodgeBurnPixelPoint,
   type DodgeBurnSettings,
 } from "./studio-dodge-burn";
-import {
-  type WetMixPixelPoint,
-  type WetMixSettings,
-} from "./studio-wet-mix";
 
 export const STUDIO_RETOUCH_WORKER_PROTOCOL_VERSION = 1 as const;
 export const STUDIO_RETOUCH_MAX_IMAGE_PIXELS = 64 * 1024 * 1024;

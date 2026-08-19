@@ -13,7 +13,8 @@
  */
 import { Layers, RotateCcw } from "lucide-react";
 
-import { resolveStudioBrushRenderFamily } from "./studio-brush";
+import { resolveStudioBrushRenderFamily } from "../studio-brush";
+
 import {
   STUDIO_BRUSH_OIL_PROGRAM_KEYS,
   studioBrushEngineProgramSetFromOil,

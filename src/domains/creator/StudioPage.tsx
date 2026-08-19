@@ -1,60 +1,15 @@
-import {
-  Maximize2,
-  Command,
-  Lock,
-  MessageCircle,
-  UsersRound,
-  SlidersHorizontal,
-  Undo2,
-} from "lucide-react";
-import { Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Command } from "lucide-react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { flushSync } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { buildStudioLiveShareHref, studioCreationLinkParams } from "./creator-studio-links";
-import { applyStudioBg3dAiMethodReference } from "./studio-3d-ai-reference-application";
-import {
-  applyStudioBg3dInsertResult,
-  applyStudioVrmInsertResult,
-  mapStudioBg3dPerspectiveGuidesToAnchor,
-} from "./studio-3d-insert-controller";
-import {
-  planStudioActiveStrokeUnmountRecovery,
-  runStudioDrawingUnmountLifecycle,
-  studioActiveStrokeRecoveryFingerprint,
-  type StudioActiveStrokePointerType,
-} from "./studio-active-stroke-lifecycle";
-import { resolveStudioActiveToolCommandId } from "./studio-active-tool-command";
-import { resolveStudioAdvancedFillEntry } from "./studio-advanced-fill-entry";
-import {
-  DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS,
-  type StudioAdvancedFillSettings,
-} from "./studio-advanced-fill-settings";
-import {
-  beginStudioAdvancedFillTap,
-  endStudioAdvancedFillTap,
-  moveStudioAdvancedFillTap,
-  type StudioAdvancedFillTapGesture,
-} from "./studio-advanced-fill-tap";
-import {
-  createStudioAdvancedRulerOfType,
-  normalizeStudioAdvancedRulerDocument,
-  resolveActiveStudioAdvancedRuler,
-  STUDIO_ADVANCED_RULER_NAME_PREFIXES,
-  type StudioAdvancedRuler,
-  type StudioAdvancedRulerDocument,
-} from "./studio-advanced-ruler-document";
-import {
-  snapStudioAdvancedRulerStrokePoint,
-  type StudioAdvancedRulerSnapState,
-} from "./studio-advanced-ruler-snap";
 import {
   loadStudioAiRecentPrompts,
   pushStudioAiRecentPrompt,
   STUDIO_AI_RECENT_PROMPTS_KEY,
   type StudioAiAssistToolId,
   type StudioAiRecentPromptsState,
-} from "./studio-ai-assist-ux";
+} from "./ai/studio-ai-assist-ux";
 import {
   colorizeLineArt,
   DEFAULT_STUDIO_AI_IMAGE_SIZE,
@@ -78,23 +33,23 @@ import {
   type StudioAiSettings,
   type StudioTextAiProvenance,
   type StudioTextAiTransport,
-} from "./studio-ai-client";
+} from "./ai/studio-ai-client";
 import {
   captureStudioAiGeneratedAssetProvenance,
   finalizeStudioAiGeneratedAssetProvenance,
-} from "./studio-ai-generated-asset-model";
-import { resolveStudioAiImageReferences } from "./studio-ai-image-reference-resolution";
+} from "./ai/studio-ai-generated-asset-model";
+import { resolveStudioAiImageReferences } from "./ai/studio-ai-image-reference-resolution";
 import {
   createEmptyStudioAiImageReferenceDocument,
   hydrateStudioAiImageReferenceDocument,
   type StudioAiImageReferenceDocument,
-} from "./studio-ai-image-reference-roles";
+} from "./ai/studio-ai-image-reference-roles";
 import {
   createEmptyStudioAiProvenanceDocument,
   normalizeStudioAiProvenanceDocument,
   projectStudioAiProvenanceForPublish,
   type StudioAiProvenanceDocument,
-} from "./studio-ai-provenance";
+} from "./ai/studio-ai-provenance";
 import {
   parseStudioAiRequestedSize,
   recordPendingStudioAiOperation,
@@ -105,7 +60,117 @@ import {
   type SettleStudioAiOperationOptions,
   type StudioAiObservableResult,
   type StudioAiPendingOperationInput,
-} from "./studio-ai-provenance-recorder";
+} from "./ai/studio-ai-provenance-recorder";
+import {
+  planStudioBg3dEditableCompositeDetach,
+} from "./bg3d/studio-bg3d-editable-composite-detach-plan";
+import {
+  planStudioBg3dLtLayers,
+  preserveStudioBg3dLtSceneAnchorAfterRemoval,
+} from "./bg3d/studio-bg3d-lt-layer-plan";
+import {
+  attachStudioBg3dMagicFilterMaskToLtPlan,
+} from "./bg3d/studio-bg3d-magic-layer-attach";
+import {
+  StudioBg3dRecoveryAccessGate,
+} from "./bg3d/studio-bg3d-recovery-access-lease";
+import {
+  isStudioBrushAliasId,
+  isStudioBrushEraserAliasId,
+} from "./brush/studio-brush-alias-profile";
+import {
+  normalizeStudioBrushDynamicsSettings,
+  studioBrushDynamicsSettingsForBrushId,
+  type NormalizedStudioBrushDynamicsSettings,
+  type StudioBrushDynamicsPresetId,
+} from "./brush/studio-brush-dynamics";
+import {
+  type DeletedBrushRecord,
+  type StudioBrushStampTuning,
+  type StudioBrushSnapshot,
+  type StudioSavedBrush,
+} from "./brush/studio-brush-library";
+import {
+  planStudioDrawModeChange,
+  planStudioStrokeWidthChange,
+} from "./brush/studio-brush-mode-width";
+import {
+  studioBrushPackFormatOf,
+} from "./brush/studio-brush-pack-format";
+import { isStudioBrushPackCatalogId } from "./brush/studio-brush-pack-id";
+import {
+  StudioBrushR8GrainHydrator,
+  collectStudioBrushR8GrainSources,
+  projectStudioBrushR8GrainRenderElements,
+} from "./brush/studio-brush-r8-grain-hydrator";
+import {
+  materializeStudioBrushCatalogSelection,
+  studioCoreBrushCatalogSelection,
+  type StudioBrushCatalogSelection,
+} from "./brush/studio-brush-selection";
+import {
+  assignStudioBrushSlot,
+  emptyStudioBrushSlots,
+  rememberStudioBrushSlot,
+  STUDIO_BRUSH_SLOT_COUNT,
+  studioBrushSlotAt,
+  type StudioBrushSlot,
+  type StudioBrushSlotsState,
+} from "./brush/studio-brush-slots";
+import {
+  resolveStudioStampBrushKind,
+  resolveStudioStampBrushStyle,
+} from "./brush/studio-brush-stamp-engine";
+import { studioBrushSymmetryTransforms } from "./brush/studio-brush-symmetry";
+import { planStudioDrawObjectTransform } from "./brush/studio-draw-object-transform";
+import {
+  isDirectLiveDraftEl,
+  isDirectLiveStampDraftEl,
+  resolveStudioDraftPreviewActiveLane,
+  resolveStudioLiveInkStrokeStyle,
+  studioLiveBrushEffectiveDiameter,
+  studioLiveBrushPressure,
+  studioLiveBrushPressureSamples,
+} from "./brush/studio-draw-rendering";
+import {
+  isStudioCanvasInteractionBlocked,
+} from "./canvas/studio-canvas-cursor";
+import { buildStudioLiveShareHref, studioCreationLinkParams } from "./creator-studio-links";
+import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
+import { StudioCuttoonEditorView } from "./studio-cuttoon-editor/StudioCuttoonEditorView";
+
+
+import { applyStudioBg3dAiMethodReference } from "./scene-3d/studio-3d-ai-reference-application";
+import {
+  applyStudioBg3dInsertResult,
+  applyStudioVrmInsertResult,
+  mapStudioBg3dPerspectiveGuidesToAnchor,
+} from "./scene-3d/studio-3d-insert-controller";
+import {
+  planStudioActiveStrokeUnmountRecovery,
+  runStudioDrawingUnmountLifecycle,
+  studioActiveStrokeRecoveryFingerprint,
+  type StudioActiveStrokePointerType,
+} from "./studio-active-stroke-lifecycle";
+import { resolveStudioActiveToolCommandId } from "./studio-active-tool-command";
+import { resolveStudioAdvancedFillEntry } from "./studio-advanced-fill-entry";
+import {
+  DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS,
+  type StudioAdvancedFillSettings,
+} from "./studio-advanced-fill-settings";
+import {
+  type StudioAdvancedFillTapGesture,
+} from "./studio-advanced-fill-tap";
+import {
+  createStudioAdvancedRulerOfType,
+  normalizeStudioAdvancedRulerDocument,
+  STUDIO_ADVANCED_RULER_NAME_PREFIXES,
+  type StudioAdvancedRuler,
+  type StudioAdvancedRulerDocument,
+} from "./studio-advanced-ruler-document";
+import {
+  type StudioAdvancedRulerSnapState,
+} from "./studio-advanced-ruler-snap";
 import { shouldClipToExistingAlpha } from "./studio-alpha-lock";
 import {
   clampGlobalFrameIndex,
@@ -149,12 +214,6 @@ import {
   type FrameSpec,
 } from "./studio-assets";
 import {
-  mapStudioDocumentPointToAutoColorSeed,
-  sampleStudioAutoColorStrokeSeeds,
-  shouldKeepStudioAutoColorStrokeSample,
-  STUDIO_AUTO_COLOR_STROKE_MIN_DISTANCE_DOC_DEFAULT,
-} from "./studio-auto-color-hints-canvas-seed";
-import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
   readStudioAutosave,
   serializeStudioAutosave,
@@ -166,103 +225,29 @@ import {
 } from "./studio-autosave";
 import { studioAutosaveLeadershipAllowsLocalEdit } from "./studio-autosave-document-leader";
 import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
-import {
-  preloadStudioBackground3D,
-} from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
-import {
-  planStudioBg3dEditableCompositeDetach,
-} from "./studio-bg3d-editable-composite-detach-plan";
-import {
-  planStudioBg3dLtLayers,
-  preserveStudioBg3dLtSceneAnchorAfterRemoval,
-} from "./studio-bg3d-lt-layer-plan";
-import {
-  attachStudioBg3dMagicFilterMaskToLtPlan,
-} from "./studio-bg3d-magic-layer-attach";
-import {
-  StudioBg3dRecoveryAccessGate,
-} from "./studio-bg3d-recovery-access-lease";
 import { BRAND_KIT_LOGO_MASTER_ID, placeBrandKitLogo, type BrandKit } from "./studio-brand-kit";
 import {
   BRUSH_PRESETS,
-  normalizeCalligraphyStylusInput,
   pressureCurvePresetId,
   pressureCurveValueForPreset,
   resolveStudioBrushPresetDrawMode,
   resolveStudioBrushPresetOperation,
-  strokeSampleDistanceForScale,
   type BrushPreset,
   type StudioToolOperation,
 } from "./studio-brush";
-import {
-  isStudioBrushAliasId,
-  isStudioBrushEraserAliasId,
-} from "./studio-brush-alias-profile";
-import {
-  normalizeStudioBrushDynamicsSettings,
-  resolveStudioCapturedBrushDynamicsPresetId,
-  studioBrushDynamicsSettingsForBrushId,
-  type NormalizedStudioBrushDynamicsSettings,
-  type StudioBrushDynamicsPresetId,
-} from "./studio-brush-dynamics";
-import {
-  type DeletedBrushRecord,
-  type StudioBrushStampTuning,
-  type StudioBrushSnapshot,
-  type StudioSavedBrush,
-} from "./studio-brush-library";
-import {
-  planStudioDrawModeChange,
-  planStudioStrokeWidthChange,
-} from "./studio-brush-mode-width";
-import {
-  STUDIO_BRUSH_PACK_ACCEPT,
-  studioBrushPackFormatOf,
-} from "./studio-brush-pack-format";
-import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
-import {
-  StudioBrushR8GrainHydrator,
-  collectStudioBrushR8GrainSources,
-  projectStudioBrushR8GrainRenderElements,
-} from "./studio-brush-r8-grain-hydrator";
-import {
-  materializeStudioBrushCatalogSelection,
-  studioCoreBrushCatalogSelection,
-  type StudioBrushCatalogSelection,
-} from "./studio-brush-selection";
-import {
-  assignStudioBrushSlot,
-  emptyStudioBrushSlots,
-  rememberStudioBrushSlot,
-  STUDIO_BRUSH_SLOT_COUNT,
-  studioBrushSlotAt,
-  type StudioBrushSlot,
-  type StudioBrushSlotsState,
-} from "./studio-brush-slots";
-import {
-  resolveStudioStampBrushKind,
-  resolveStudioStampBrushStyle,
-} from "./studio-brush-stamp-engine";
-import { studioBrushSymmetryTransforms } from "./studio-brush-symmetry";
-import {
-  advanceStudioBrushVelocityPressure,
-  initializeStudioBrushVelocityPressure,
-  resolveStudioBrushReleasePressure,
-} from "./studio-brush-velocity-pressure";
 import {
   bubbleShapeCanvasPointToLocal,
   bubbleShapePointHandles,
   computeBubbleShapeGeometry,
   hasCustomBubbleShape,
   insertBubbleShapePointAtClosestSegment,
-  moveBubbleShapePoint,
   removeBubbleShapePoint,
-} from "./studio-bubble-custom-shape";
+} from "./lettering/studio-bubble-custom-shape";
 import {
   bubbleMergeUnavailableReason,
   mergeStudioBubbles,
-} from "./studio-bubble-merge";
+} from "./lettering/studio-bubble-merge";
 import {
   bubbleLetterSpacing,
   bubbleTextBoxWidth,
@@ -272,26 +257,15 @@ import {
   resolveBubbleFontSize,
   resolveBubbleFontStyle,
   resolveBubbleLineHeight,
-} from "./studio-bubble-text-fit";
-import {
-  hasStudioCanonicalVNextQualityShadowRuntime,
-  submitStudioCanonicalVNextQualityShadowFinalParity,
-} from "./studio-canonical-vnext-quality-shadow";
-import {
-  isStudioBrushCursorMode,
-  isStudioCanvasInteractionBlocked,
-  shouldShowStudioBrushCursor,
-} from "./studio-canvas-cursor";
-import { resolveStudioCanvasGestureDisposition } from "./studio-canvas-gesture-arbitration";
+} from "./lettering/studio-bubble-text-fit";
+import { resolveStudioCanvasGestureDisposition } from "./canvas/studio-canvas-gesture-arbitration";
 import {
   recordStudioHotPathRender,
-  studioElementIdOf,
-} from "./studio-canvas-shared-runtime";
-import { clampStudioCanvasHeight } from "./studio-canvas-size";
-import { combineStudioShapesWithCanvasKit } from "./studio-canvaskit-path-boolean-document-adapter";
+} from "./canvas/studio-canvas-shared-runtime";
+import { clampStudioCanvasHeight } from "./canvas/studio-canvas-size";
+import { combineStudioShapesWithCanvasKit } from "./render/studio-canvaskit-path-boolean-document-adapter";
 import {
   selectStudioCausalInkSamples,
-  shouldAppendStudioCausalInkSample,
 } from "./studio-causal-ink";
 import {
   appendStudioCausalPostCorrection,
@@ -317,19 +291,15 @@ import {
 import {
   STUDIO_ICON_SIZE,
   STUDIO_ICON_STROKE,
-  StudioAppMenubar,
-  StudioEdgeRailButton,
-  StudioToolBelt,
   studioChromeIconClass,
 } from "./studio-chrome-ui";
 import { deleteSavedClipInMemory, upsertSavedClipInMemory } from "./studio-clips";
-import { shouldOwnStudioCoalescedBatchDraft } from "./studio-coalesced-batch-mutation";
 import {
   COLOR_RANGE_FUZZINESS_DEFAULT,
   COLOR_RANGE_MAX_SAMPLES,
   type ColorRangeSample,
 } from "./studio-color-range";
-import { COLOR_WHEEL_LONG_PRESS_MS, clampWheelCenter, shouldCancelLongPress } from "./studio-color-wheel";
+import { clampWheelCenter } from "./studio-color-wheel";
 import { projectStudioPointCommentToScreen } from "./studio-comment-screen-projection";
 import {
   createStudioCommentThreadSessionState,
@@ -382,36 +352,23 @@ import {
   type StudioContinuityIssue,
   type StudioStoryBeat,
 } from "./studio-continuity";
-import {
-  studioDrawElementSampleSlice,
-  studioDrawElementToCrdtStroke,
-} from "./studio-crdt-draw-bridge";
-import { StudioCrdtLiveStrokePublisher } from "./studio-crdt-live-stroke-publisher";
-import { STUDIO_CRDT_ORIGIN_LOCAL } from "./studio-crdt-protocol";
+import { StudioCrdtLiveStrokePublisher } from "./live/studio-crdt-live-stroke-publisher";
+import { STUDIO_CRDT_ORIGIN_LOCAL } from "./live/studio-crdt-protocol";
 import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
 import {
-  beginCropDrag,
-  cropAspectRatio,
-  cropHitTolerance,
-  hitTestCropHandle,
   initialCropRect,
   isCropRectNoop,
   planCropApply,
-  updateCropDrag,
   type CropAspectId,
   type CropDragSession,
   type CropRect,
 } from "./studio-crop";
 import {
   NODE_SMOOTH_DEFAULT_STRENGTH,
-  NODE_SMOOTH_DRAG_RANGE_PX,
-  smoothPointsAroundIndex,
-  updateSmoothStrengthDrag,
 } from "./studio-curve-smoothing";
-import { resolveStudioDccRouteAccess } from "./studio-dcc-route-access";
+import { resolveStudioDccRouteAccess } from "./hybrid-dcc/studio-dcc-route-access";
 import {
   STUDIO_DEFERRED_STROKE_POSTPROCESS_TIMEOUT_MS,
-  planStudioDeferredStrokePostprocess,
   replaceStudioPendingStrokePostprocess,
 } from "./studio-deferred-stroke-postprocess";
 import {
@@ -437,12 +394,12 @@ import {
   applyReplacePlanToPages,
   collectDialogueItems,
   type DialogueReplacePlan,
-} from "./studio-dialogue-batch";
+} from "./lettering/studio-dialogue-batch";
 import {
   formatDialogueSuggestionLine,
   joinDialogueContextLines,
   type DialogueSuggestionCandidate,
-} from "./studio-dialogue-suggest";
+} from "./lettering/studio-dialogue-suggest";
 import {
   applyDialogueTranslations,
   chunkDialogueItemsForTranslation,
@@ -450,7 +407,7 @@ import {
   switchDialogueLocale,
   DIALOGUE_LOCALE_PRESETS,
   SOURCE_LOCALE,
-} from "./studio-dialogue-translate";
+} from "./lettering/studio-dialogue-translate";
 import { attachStudioDismissableSurface } from "./studio-dismissable-surface";
 import {
   loadStudioPsdExportModule,
@@ -466,36 +423,24 @@ import {
   type DodgeBurnSpongeMode,
 } from "./studio-dodge-burn";
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
-import { isCompleteStudioDrawOp } from "./studio-draw-completion";
-import { planStudioDrawObjectTransform } from "./studio-draw-object-transform";
-import { planStudioDrawPointerRelease } from "./studio-draw-pointer-release-plan";
-import { planStudioDrawPointerStart } from "./studio-draw-pointer-start-plan";
-import {
-  executeStudioDraftPreviewBackdropBoundary,
-  isDirectLiveDraftEl,
-  isDirectLiveStampDraftEl,
-  planStudioDraftPreviewBackdropBoundary,
-  resolveStudioDraftPreviewActiveLane,
-  resolveStudioLiveInkStrokeStyle,
-  studioLiveBrushEffectiveDiameter,
-  studioLiveBrushPressure,
-  studioLiveBrushPressureSamples,
-} from "./studio-draw-rendering";
 import {
   areStudioDrawingAssistDocumentsEqual,
   normalizeStudioDrawingAssistDocument,
   resolveStudioDrawingAssistPreviewDocument,
   studioDrawingAssistHasContent,
   type StudioDrawingAssistDocument,
-} from "./studio-drawing-assist-document";
-import { createStudioDrawingPointerTransportController } from "./studio-drawing-pointer-transport";
-import { createStudioDrawingShortcutNoticeStore } from "./studio-drawing-shortcut-notice-store";
+} from "./brush/studio-drawing-assist-document";
+import {
+  createStudioDrawingPointerTransportController,
+  requireStudioDrawingPointerTransport,
+} from "./brush/studio-drawing-pointer-transport";
+import { createStudioDrawingShortcutNoticeStore } from "./brush/studio-drawing-shortcut-notice-store";
 import {
   adjustStudioBrushOpacity,
   adjustStudioBrushWidth,
   resolveStudioDrawingShortcut,
   shouldPreserveStudioTabNavigation,
-} from "./studio-drawing-shortcuts";
+} from "./brush/studio-drawing-shortcuts";
 import { disposeStudioDynamicCoverageCommittedCache } from "./studio-dynamic-brush-coverage-renderer";
 import {
   isStudioPasteScopeCurrent,
@@ -546,9 +491,8 @@ import {
   FILTER_MASK_BRUSH_RADIUS_DEFAULT,
   FILTER_MASK_BRUSH_STRENGTH_DEFAULT,
   type FilterMaskPaintMode,
-} from "./studio-filter-mask";
-import { attachStudioFilterMaskSurfaceAcrossHistory } from "./studio-filter-mask-surface-admission";
-import { StudioFilterMaskSurfaceHydrator } from "./studio-filter-mask-surface-hydrator";
+} from "./filter/studio-filter-mask";
+import { StudioFilterMaskSurfaceHydrator } from "./filter/studio-filter-mask-surface-hydrator";
 import {
   applyStudioInlineFilterMaskMutation,
   collectStudioFilterMaskSurfaceIds,
@@ -556,22 +500,15 @@ import {
   projectStudioFilterMaskPagesForServerSave,
   projectStudioFilterMaskSurfacesForRender,
   type StudioInlineFilterMaskMutationPatch,
-} from "./studio-filter-mask-surface-projection";
+} from "./filter/studio-filter-mask-surface-projection";
 import { hexToRgb } from "./studio-filters";
 import {
-  createFixedRateStrokeFilter,
-  quantizeFixedRateStrokeSample,
-  transitionFixedRateStrokeFilter,
   type FixedRateStrokeFilterState,
-  type FixedRateStrokeFilteredSample,
 } from "./studio-fixed-rate-stroke-filter";
 import {
-  advanceFixedRateStrokeFrameClock,
-  advanceFixedRateStrokeSampleClockFloor,
   createFixedRateStrokeFrameClock,
   createFixedRateStrokeFramePump,
   createFixedRateStrokeSampleClock,
-  normalizeFixedRateStrokeSampleTimeStamps,
   type FixedRateStrokeFrameClockState,
   type FixedRateStrokeFramePump,
   type FixedRateStrokeSampleClockState,
@@ -604,8 +541,6 @@ import {
   type StudioGroupUniformResizeBounds,
 } from "./studio-group-uniform-resize";
 import {
-  computeHealCloneSourceOffset,
-  healCloneSourcePoint,
   planHealCloneDabs,
   HEAL_CLONE_HARDNESS_DEFAULT,
   HEAL_CLONE_OPACITY_DEFAULT,
@@ -638,26 +573,22 @@ import {
 } from "./studio-history-retention-ui";
 import {
   StudioHokusaiLiveOverlayRenderer,
-} from "./studio-hokusai-live-brush-overlay";
+} from "./render/studio-hokusai-live-brush-overlay";
 import {
   type StudioHokusaiLiveSampleLike,
-} from "./studio-hokusai-live-brush-protocol";
+} from "./render/studio-hokusai-live-brush-protocol";
 import {
   type StudioHokusaiLiveRouteResult,
-} from "./studio-hokusai-live-brush-router";
+} from "./render/studio-hokusai-live-brush-router";
 import {
   StudioHokusaiLiveBrushProvider,
-  type StudioHokusaiLiveCanonicalResult,
   type StudioHokusaiLiveStrokeSession,
-} from "./studio-hokusai-live-brush-runtime";
-import {
-  createStudioHokusaiLiveCanonicalTransaction,
-} from "./studio-hokusai-live-brush-transaction";
+} from "./render/studio-hokusai-live-brush-runtime";
 import {
   studioHokusaiSourceRevision,
-} from "./studio-hokusai-natural-media-contract";
-import { createStudioHybridDccLatestTaskQueue } from "./studio-hybrid-dcc-latest-task-queue";
-import { resolveStudioHybridDccPersistenceAuthGate } from "./studio-hybrid-dcc-persistence-auth-gate";
+} from "./render/studio-hokusai-natural-media-contract";
+import { createStudioHybridDccLatestTaskQueue } from "./hybrid-dcc/studio-hybrid-dcc-latest-task-queue";
+import { resolveStudioHybridDccPersistenceAuthGate } from "./hybrid-dcc/studio-hybrid-dcc-persistence-auth-gate";
 import { uid } from "./studio-id";
 import {
   cascadeCanvasPlacementAnchor,
@@ -668,17 +599,13 @@ import {
   loadStudioInkMeshLivePreviewModule,
   type StudioInkMeshLivePreviewModule,
   type StudioInkMeshLivePreviewRuntime,
-} from "./studio-ink-mesh-live-preview-loader";
-import {
-  studioInkFallbackPressure,
-} from "./studio-ink-pressure-model";
+} from "./brush/studio-ink-mesh-live-preview-loader";
 import {
   consumeStudioInsertDropTransfer,
   resolveStudioInsertTarget,
   STUDIO_ASSET_DRAG_MIME,
   STUDIO_INSERT_DRAG_MIME,
 } from "./studio-insert-drag-core";
-import { LazyStudioInspectorAside } from "./studio-inspector-aside-loader";
 import { requestStudioInspectorFocus } from "./studio-inspector-focus";
 import {
   navigateStudioInspector,
@@ -690,39 +617,35 @@ import {
   clampIsometricAngleDeg,
   clampIsometricCellSize,
   defaultIsometricOrigin,
-  resolveIsometricAxisRay,
-  shouldSnapStrokeToIsometricAxis,
-  snapStrokePointToIsometricGrid,
   type IsometricAxisRay,
 } from "./studio-isometric-grid";
 import {
-  hasActiveImageFilters,
   type ImageFilterFields,
-} from "./studio-konva-filter-fields";
-import { studioKonvaRuntime as KonvaRuntime } from "./studio-konva-runtime";
-import { inspectStudioLayerLiftAvailability } from "./studio-layer-lift-availability";
-import { StudioLayerLiftComposeWorkerClient } from "./studio-layer-lift-compose-worker-client";
+} from "./render/studio-konva-filter-fields";
+import { studioKonvaRuntime as KonvaRuntime } from "./render/studio-konva-runtime";
+import { inspectStudioLayerLiftAvailability } from "./layer/studio-layer-lift-availability";
+import { StudioLayerLiftComposeWorkerClient } from "./layer/studio-layer-lift-compose-worker-client";
 import {
   applyStudioLayerLiftCorrectionWorkflow,
-} from "./studio-layer-lift-correction-workflow";
+} from "./layer/studio-layer-lift-correction-workflow";
 import {
   createStudioLayerLiftLocalForegroundProvider,
-} from "./studio-layer-lift-local-provider";
+} from "./layer/studio-layer-lift-local-provider";
 import {
   loadStudioLayerLiftMediaPipeInference,
-} from "./studio-layer-lift-mediapipe-inference";
+} from "./layer/studio-layer-lift-mediapipe-inference";
 import {
   StudioLayerLiftOperationRegistry,
   type StudioLayerLiftOperationCurrentState,
-} from "./studio-layer-lift-operation-context";
+} from "./layer/studio-layer-lift-operation-context";
 import {
   createStudioLayerLiftReviewPreviewResource,
   type StudioLayerLiftReviewPreviewResource,
-} from "./studio-layer-lift-review-preview";
+} from "./layer/studio-layer-lift-review-preview";
 import {
   analyzeStudioLayerLiftWorkflow,
   finalizeStudioLayerLiftWorkflow,
-} from "./studio-layer-lift-workflow";
+} from "./layer/studio-layer-lift-workflow";
 import {
   bakeLayerMaskStroke,
   canLayerMask,
@@ -732,23 +655,23 @@ import {
   LAYER_MASK_BRUSH_RADIUS_DEFAULT,
   LAYER_MASK_BRUSH_STRENGTH_DEFAULT,
   type LayerMaskPaintMode,
-} from "./studio-layer-mask";
+} from "./layer/studio-layer-mask";
 import {
   applyStudioLayerMergePlan,
   planStudioLayerFlattenVisible,
   planStudioLayerMergeDown,
   planStudioLayerMergeSelected,
   type StudioLayerMergePlan,
-} from "./studio-layer-merge";
+} from "./layer/studio-layer-merge";
 import {
   normalizeStudioLayerColor,
   normalizeStudioLayerRole,
-} from "./studio-layer-navigator";
+} from "./layer/studio-layer-navigator";
 import {
   EMPTY_STUDIO_LAYER_SOLO_STATE,
   clearStudioLayerSolo,
   toggleStudioLayerSolo,
-} from "./studio-layer-solo";
+} from "./layer/studio-layer-solo";
 import {
   createLayerGroup,
   emptyGroupIds,
@@ -766,7 +689,6 @@ import {
   type LayerItemReorderDirection,
 } from "./studio-layers";
 import {
-  STUDIO_CANVAS_IMAGE_ACCEPT,
   acquireProductStudioUiPreferencesRepository,
   createStudioPixelEditCanvas,
   downscaleStudioCanvasDataUrl,
@@ -780,7 +702,6 @@ import {
   studioHokusaiProductLivePreset,
   studioHokusaiSamplesFromDrawElement,
   studioHokusaiStrokeSeed,
-  studioInkGestureTimeOrigin,
   studioLivingInkLinearColor,
   studioLivingInkSamplesFromDrawElement,
   studioLivingInkSupportsElement,
@@ -795,7 +716,6 @@ import {
   studioLinked3dPassSourceReplacementReason,
 } from "./studio-linked-3d-raster-edit-policy";
 import {
-  createStudioLinked3dCorrectionProvenance,
   detachStudioLinked3dCorrections,
   ensureStudioLinked3dRenderShot,
   materializeStudioLinked3dLinePassLocator,
@@ -812,39 +732,39 @@ import {
   planStudioLiquifyLivePreview,
 } from "./studio-liquify-live-preview";
 import {
-  appendStudioLiquifyPointerPoint,
-  beginStudioLiquifyPointerSession,
   endStudioLiquifyPointerSession,
   isStudioLiquifyPointerOwner,
   type StudioLiquifyPointerSession,
 } from "./studio-liquify-pointer";
 import {
-  studioLiquifyDragMinDistance,
   thinStudioLiquifyPointsForApply,
 } from "./studio-liquify-stroke-sampling";
 import {
   gateStudioCanvasMutation,
   type StudioCanvasMutationIntent,
-} from "./studio-live-canvas-mutation-gate";
+} from "./live/studio-live-canvas-mutation-gate";
 import {
   projectStudioCanvasCommentPins,
-  resolveStudioLivePublishedCursorTool,
-} from "./studio-live-canvas-overlay-model";
+} from "./live/studio-live-canvas-overlay-model";
 import {
   StudioLiveDynamicBrushOverlayRenderer,
   studioLiveDynamicBrushOverlaySupportsElement,
-} from "./studio-live-dynamic-brush-overlay";
-import { StudioLiveGesturePreviewPublisher } from "./studio-live-gesture-preview-publisher";
-import { StudioLiveGesturePreviewRoomAdapter } from "./studio-live-gesture-preview-room-adapter";
+} from "./live/studio-live-dynamic-brush-overlay";
+import {
+  StudioLiveRetainedMediaOverlayRenderer,
+  studioLiveRetainedMediaOverlaySupportsElement,
+} from "./live/studio-live-retained-media-overlay";
+import { StudioLiveGesturePreviewPublisher } from "./live/studio-live-gesture-preview-publisher";
+import { StudioLiveGesturePreviewRoomAdapter } from "./live/studio-live-gesture-preview-room-adapter";
 import {
   decideStudioLiveInkBackend,
-} from "./studio-live-ink-backend";
+} from "./live/studio-live-ink-backend";
 import {
   StudioLiveInkOverlayRenderer,
   StudioLiveInkPredictionRenderer,
   studioLiveInkFastOverlaySupportsStyle,
   type StudioLiveInkStrokeStyle,
-} from "./studio-live-ink-overlay";
+} from "./live/studio-live-ink-overlay";
 import {
   createStudioLiveInstantWorkId,
   readStudioLiveRoomQuery,
@@ -855,27 +775,27 @@ import {
   shouldSeedStudioLiveSharedBootstrapPage,
   studioLiveSharedBootstrapPageId,
   withStudioLiveJamRoom,
-} from "./studio-live-jam-session";
+} from "./live/studio-live-jam-session";
 import {
   planStudioLiveHeldResourceReplace,
   selfHoldsStudioLiveLock,
   studioLiveMutationResources,
-} from "./studio-live-mutation-guard";
+} from "./live/studio-live-mutation-guard";
 import {
   releaseStudioLiveMutationLocks,
   replaceStudioLiveMutationLocks,
-} from "./studio-live-mutation-lock-coordinator";
-import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
+} from "./live/studio-live-mutation-lock-coordinator";
+import { StudioLiveStampOverlayRenderer } from "./live/studio-live-stamp-overlay";
 import {
   StudioLiveStrokeRenderBackendCoordinator,
   type StudioLiveStrokeCanonicalCanvasToken,
   type StudioLiveStrokeGpuFailureReason,
   type StudioLiveStrokeGpuRequestToken,
-} from "./studio-live-stroke-render-backend";
+} from "./live/studio-live-stroke-render-backend";
 import {
   StudioLiveWetInkOverlayRenderer,
   studioLiveWetInkOverlaySupportsElement,
-} from "./studio-live-wet-ink-overlay";
+} from "./live/studio-live-wet-ink-overlay";
 import {
   STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED,
   studioLivingInkExplicitBrushKey,
@@ -899,7 +819,6 @@ import {
 } from "./studio-living-ink-input-routing";
 import {
   StudioLivingInkOverlayRenderer,
-  studioLivingInkCoverageIntersectsStroke,
   type StudioLivingInkOverlayPresentationReceipt,
 } from "./studio-living-ink-overlay";
 import {
@@ -915,7 +834,6 @@ import {
 } from "./studio-living-ink-product-policy";
 import {
   StudioLivingInkStudioCoordinator,
-  type StudioLivingInkFinishedWork,
   type StudioLivingInkStrokeMode,
   type StudioLivingInkStudioState,
 } from "./studio-living-ink-studio-coordinator";
@@ -967,9 +885,7 @@ import {
   type StudioMenuSessionState,
   type StudioWorkspaceLayoutSource,
 } from "./studio-menu-session-model";
-import { StudioInspectorAsideFallback } from "./studio-mobile-dock-presets";
 import { STUDIO_MOBILE_EDITING_DOCK_UI } from "./studio-mobile-dock-presets-config";
-import { StudioMobileEditingDock } from "./studio-mobile-editing-dock-loader";
 import {
   saveStudioMobileImmersivePreference,
   shouldStartStudioMobileImmersive,
@@ -982,16 +898,10 @@ import {
   isNodeEditableKind,
   NODE_EDIT_DEFAULT_MAX_HANDLES,
   NODE_EDIT_DEFAULT_MIN_SPACING_PX,
-  NODE_EDIT_WIDTH_DRAG_RANGE_PX,
-  updateNodeDragMove,
-  updateNodeDragWidth,
-  withPointMoved,
-  withPressureEdited,
   type NodeDragSession,
   type NodeEditHandle,
   type NodeEditTool,
 } from "./studio-node-edit";
-import { snapStudioObjectDragPosition } from "./studio-object-drag-snap";
 import {
   parseStudioObjectInsertDragPayload,
   resolveStudioObjectInsertOpenSeed,
@@ -1005,9 +915,7 @@ import { useStudioPageDnd } from "./studio-page-dnd";
 import {
   BRUSH_DELETE_UNDO_MS,
   STUDIO_FILTER_SHORTCUTS,
-  STUDIO_INTERCHANGE_IMPORT_PLACEMENT_CHOICES,
   STUDIO_SERVER_AUTOSAVE_IDLE_MS,
-  STUDIO_WILL_V1_IMPORT_PLACEMENT_CHOICES,
   defaultStampTuningForBrushId,
   filterSfxPresets,
   hasStudioBg3dServerPersistedTarget,
@@ -1044,13 +952,6 @@ import {
   type PageGrade,
 } from "./studio-page-grade";
 import {
-  StudioBrushCatalogPortal,
-  StudioCreativeCompetitorModesPanel,
-  StudioFilterDialog,
-  StudioLayerLiftDialog,
-  StudioPublishContextBanner,
-  StudioCommentThreadPopover,
-  StudioPointCommentComposer,
   loadStudioCaptureReadinessRuntime,
   loadStudioComipoAssembly,
   loadStudioComipoShipped,
@@ -1066,7 +967,6 @@ import {
   preloadStudioReferencePanel,
   preloadStudioSavePayloadRuntime,
   preloadStudioTextEditOverlay,
-  StudioCanvasRulerBars,
   type StudioComipoAssemblyModule,
   type StudioWebtoonGuidesModule,
 } from "./studio-page-lazy-ui";
@@ -1086,19 +986,6 @@ import {
   writeClipboardFallback,
   type StudioClipboardPayload,
 } from "./studio-page-meta";
-import {
-  LazyStudioAnimaticTimelineDialog,
-  LazyStudioAssetRightsAuditDialog,
-  LazyStudioHybridDccDialog,
-  LazyStudioInterchangeLossPreviewDialog,
-  LazyStudioLeftToolRail,
-  LazyStudioMenubarContent,
-  LazyStudioPageListPane,
-  LazyStudioProductionBibleWorkspace,
-  LazyStudioQuickAccessSurface,
-  LazyStudioQuickComicWizard,
-  LazyStudioSceneSnapshotDialog,
-} from "./studio-page-modal-lazy-boundaries";
 import {
   findChangedLockedPageId,
   isPageReviewLocked,
@@ -1127,7 +1014,6 @@ import {
   STUDIO_LAYER_LIFT_DEFAULT_REVIEW_OPTIONS,
   STUDIO_POINTER_PREDICTION_ENABLED,
   STUDIO_RAW_PEN_INK_PREVIEW_ENABLED,
-  STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED,
   STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
   withStudioLinked3dCloudSaveRecoveryState,
 } from "./studio-page-shell-runtime";
@@ -1155,9 +1041,6 @@ import {
 import { createPalette } from "./studio-palette-library";
 import { withShotTag } from "./studio-panel-shot-tags";
 import {
-  beginPanelSplitDrag,
-  planPanelSplit,
-  previewPanelSplit,
   type PanelSplitLine,
   type PanelSplitPreview,
 } from "./studio-panel-split";
@@ -1165,15 +1048,15 @@ import {
   DEFAULT_STUDIO_PAPER_SURFACE,
   normalizeStudioPaperSurfaceSettings,
   setStudioDocumentPaperSurface,
-} from "./studio-paper-granulation-runtime";
+} from "./brush/studio-paper-granulation-runtime";
 import {
   getStudioPaperSurfaceCatalogEntry,
   planStudioPaperSurfaceApply,
-} from "./studio-paper-surface-catalog";
+} from "./brush/studio-paper-surface-catalog";
 import {
   refineStudioDrawElementWithPaper,
   studioPaperVectorDocumentIneligibilityReason,
-} from "./studio-paper-vector-document-adapter";
+} from "./brush/studio-paper-vector-document-adapter";
 import {
   combineStudioShapes,
   drawElToStudioPathBooleanSpec,
@@ -1189,7 +1072,6 @@ import {
   projectStudioPendingStrokes,
   type StudioPagesHistoryAppendResult,
 } from "./studio-pending-stroke-durability";
-import { normalizeStudioPersistedPointerChannels } from "./studio-persisted-pointer-channels";
 import {
   addVanishingPoint,
   alignVanishingPointsToEyeLevel,
@@ -1198,8 +1080,6 @@ import {
   movePerspectiveEyeLevel,
   moveVanishingPointWithEyeLevel,
   removeVanishingPoint,
-  resolvePerspectiveRay,
-  snapStrokePointToPerspective,
   type PerspectiveRay,
   type VanishingPoint,
 } from "./studio-perspective-guide";
@@ -1210,7 +1090,6 @@ import {
 } from "./studio-pixel-art-mode";
 import {
   isStudioPixelPencilRenderMode,
-  shouldAppendStudioPixelPencilSample,
 } from "./studio-pixel-pencil";
 import {
   bindPixelSelectionHistory,
@@ -1224,26 +1103,12 @@ import {
   type PixelSelectionHistoryOperation,
 } from "./studio-pixel-selection-session-history";
 import {
-  beginStudioStrokePointerSession,
-  collectStudioStrokePointerBatch,
-  isStudioStrokePointerEvent,
-  shouldCommitStudioStrokeOnPointerCancel,
-  shouldEndStudioStrokeForReleasedContact,
-  shouldCancelStudioFingerStrokeForAdditionalContact,
-} from "./studio-pointer-input";
-import {
-  canCollectStudioPointerPredictionsForActiveTail,
   canUseStudioPointerPredictionForSession,
-} from "./studio-pointer-prediction-capability";
-import {
-  planStudioPointerReleaseEndpoint,
-  type StudioPointerReleaseEndpointSample,
-} from "./studio-pointer-release-endpoint-plan";
+} from "./canvas/studio-pointer-prediction-capability";
 import {
   appendStudioAuthoritativeInk,
   createStudioPredictedInkTailState,
   endStudioPredictedInkTail,
-  planStudioPredictedInkSuffixDraft,
   replaceStudioPredictedInkTail,
   type StudioPredictedInkTailState,
 } from "./studio-predicted-ink-tail";
@@ -1295,7 +1160,6 @@ import {
 } from "./studio-publish-package";
 import { normalizeStudioPublishPackSettings, validateStudioPublishPreflight } from "./studio-publish-preflight";
 import {
-  addPuppetPin,
   bakePuppetWarpToCanvas,
   isPuppetWarpNoop,
   type PuppetPin,
@@ -1305,7 +1169,6 @@ import {
   type StudioQuickActionsPreferences,
 } from "./studio-quick-actions";
 import {
-  applyMaskStrokeDabs,
   buildQuickMaskTintPixels,
   invertMask,
   maskToSelection,
@@ -1327,38 +1190,33 @@ import {
   QUICKSHAPE_STILL_RADIUS_PX,
   type QuickShapeKind,
 } from "./studio-quickshape";
-import { QUICKSHAPE_KIND_LABELS } from "./studio-quickshape-labels";
 import {
   filterStudioRasterAssets,
   STUDIO_RASTER_ASSETS,
   type StudioRasterAsset,
-} from "./studio-raster-assets";
+} from "./render/studio-raster-assets";
 import {
   createStudioRasterHandoffBaseKey,
   isStudioRasterHandoffViewNavigationTool,
   readStudioAuthoritativeStageFrame,
   studioRasterAuthorizedOperationIds,
   type StudioRasterHandoffCandidate,
-} from "./studio-raster-handoff-authority";
-import { expectStudioRasterImagePresentation } from "./studio-raster-image-presentation";
-import { canPublishStudioRasterLayer } from "./studio-raster-layer-write-guard";
-import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-publication-feature";
+} from "./render/studio-raster-handoff-authority";
+import { expectStudioRasterImagePresentation } from "./render/studio-raster-image-presentation";
+import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./render/studio-raster-publication-feature";
 import {
   projectStudioRasterOverlayElements,
   resolveStudioRasterHandoffProjection,
-} from "./studio-raster-publication-projection";
+} from "./render/studio-raster-publication-projection";
 import {
-  appendStudioRasterRetouchDragPoint,
   thinStudioRasterRetouchPointsForApply,
-} from "./studio-raster-retouch-stroke-sampling";
-import { resolveStudioRasterToolResumePlan } from "./studio-raster-tool-resume-plan";
-import { studioRasterVisibleDocumentRectFromViewport } from "./studio-raster-visible-rect";
+} from "./render/studio-raster-retouch-stroke-sampling";
+import { resolveStudioRasterToolResumePlan } from "./render/studio-raster-tool-resume-plan";
+import { studioRasterVisibleDocumentRectFromViewport } from "./render/studio-raster-visible-rect";
 import {
   createStudioRawPenInkPreviewState,
   endStudioRawPenInkPreview,
   isStudioRawPenInkPreviewEligible,
-  replaceStudioRawPenInkPreview,
-  syncStudioRawPenInkPreviewAuthority,
   type StudioRawPenInkPreviewEligibility,
   type StudioRawPenInkPreviewState,
 } from "./studio-raw-pen-ink-preview";
@@ -1375,7 +1233,6 @@ import {
 import { studioSafeModeQuality } from "./studio-reliability-status-store";
 import { publishStudioRenderBackend } from "./studio-render-backend-beacon";
 import {
-  appendStudioPendingRasterRetouchGesturePoint,
   beginStudioPendingRasterRetouchGesture,
   canApplyStudioPendingRasterRetouchGesture,
   endStudioPendingRasterRetouchGesture,
@@ -1399,17 +1256,10 @@ import {
   clampCanvasPlacementCenter,
   computeAlignDeltas,
   computeDistributeDeltas,
-  normalizeMarqueeRect,
-  selectIdsByMarquee,
   unionBounds,
   viewportSpawnCenter,
 } from "./studio-selection";
 import {
-  commitStudioSelectionFilterMaskTransaction,
-} from "./studio-selection-filter-mask-transaction";
-import {
-  appendBrushPoint,
-  appendPolyLassoVertex,
   applySelectionAdjustToCanvas,
   applySelectionContentTransformToCanvas,
   beginPolyLassoSession,
@@ -1426,8 +1276,6 @@ import {
   isSelectionUsable,
   normalizedPointToCanvas,
   planSelectionAdjust,
-  pointInSelection,
-  polyLassoCloseToStart,
   rasterizeSelectionMask,
   resolvePixelSelectionAutoTarget,
   resolveSelectionCombineOverride,
@@ -1436,8 +1284,6 @@ import {
   selectionOperationBase,
   selectionBoundsNorm,
   SELECTION_BRUSH_RADIUS_DEFAULT,
-  shouldMoveSelectionMarquee,
-  snapLassoPointToEdge,
   toggleSelectionInvert,
   transformSelectionMarquee,
   translateSelection,
@@ -1487,72 +1333,46 @@ import { sameCategoryItems } from "./studio-similar-style";
 import {
   EMPTY_FREEHAND_OBJECT_SNAP_LATCH,
   EMPTY_SMART_GUIDE_OVERLAY,
-  SMART_GUIDE_EPSILON,
-  SMART_SNAP_THRESHOLD,
-  buildPointObjectSnapOverlay,
-  buildSmartGuideOverlay,
-  buildSmartGuideOverlayPreview,
-  computeSmartSnap,
-  planFreehandObjectSnapPoint,
-  shouldApplyStrokeObjectSnap,
-  shouldMutateStrokeWithObjectSnap,
   smartGuideOverlaysEqual,
-  snapPointToObjectGuides,
   type FreehandObjectSnapLatch,
-  type GuideBox,
   type SmartGuideOverlay,
 } from "./studio-smart-guides";
 import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT } from "./studio-smudge";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
-import { readStudioStageInDocumentView } from "./studio-stage-document-view";
+import { readStudioStageInDocumentView } from "./canvas/studio-stage-document-view";
 import {
   acquireStudioStagePointerFrameMapperCache,
-  shouldSynchronizeStudioStagePointerPosition,
-  snapshotStudioStagePointerBatchMapper,
-  type StudioStagePointerBatchMapper,
   type StudioStagePointerFrameMapperCache,
-} from "./studio-stage-pointer-coordinate";
+} from "./canvas/studio-stage-pointer-coordinate";
 import { createStudioStickyNoteElement } from "./studio-sticky-note";
 import {
   noteStudioSaveSucceeded,
   reportStudioAutosaveFailure,
   reportStudioSaveAuthorityDegraded,
 } from "./studio-storage-recovery-runtime";
-import { resolveShiftFreehandTransition } from "./studio-stroke-constrain";
 import {
-  normalizeStudioStrokeGuideScale,
-  shouldShowStudioStrokeGuide,
-} from "./studio-stroke-guide";
-import {
-  resolveStudioStrokeObjectSnapTargets,
   type StudioStrokeObjectSnapCache,
-} from "./studio-stroke-object-snap-cache";
-import { StudioStrokePostprocessWorkerClient } from "./studio-stroke-postprocess-worker-client";
+} from "./brush/studio-stroke-object-snap-cache";
+import { StudioStrokePostprocessWorkerClient } from "./brush/studio-stroke-postprocess-worker-client";
 import {
   STUDIO_STROKE_ROUTE_TOURNAMENT_LANES,
   resolveStudioStrokeRoutePointerDownGate,
-} from "./studio-stroke-route-tournament";
+} from "./brush/studio-stroke-route-tournament";
 import {
   DEFAULT_SHAPE_PARAMS,
-} from "./studio-stroke-shapes";
+} from "./brush/studio-stroke-shapes";
 import {
-  createStudioPointerVelocityState,
-  createStudioStrokeStabilizerBridge,
-  createStudioStrokeStabilizerState,
-  flushStudioStrokeStabilizerEndpoint,
-  sampleStudioPointerVelocity,
-  stabilizeStudioStrokeSample,
   type StudioPointerVelocityState,
   type StudioStabilizerMode,
   type StudioStrokeStabilizerBridge,
   type StudioStrokeStabilizerState,
-} from "./studio-stroke-stabilizer";
+} from "./brush/studio-stroke-stabilizer";
 import {
   claimStudioStrokeSurfaceLifecycle,
   resolveStudioStrokeSurfaceRoute,
   studioStrokeSurfaceRouteSuppressesDraft,
   type StudioStrokeSurfaceRoute,
-} from "./studio-stroke-surface-route";
+} from "./brush/studio-stroke-surface-route";
 import {
   decideStudioTeamCommentLiveResponse,
   mergeStudioTeamCommentMutationReceipt,
@@ -1565,9 +1385,6 @@ import {
 } from "./studio-team-comment-refresh-session";
 import {
   createStudioThinLineInkInputState,
-  filterStudioThinLineInkInput,
-  flushStudioThinLineInkInput,
-  shouldFilterStudioThinLineInkInput,
 } from "./studio-thin-line-ink-input-v1";
 import { suppressNextStudioToolHintFocus } from "./studio-tool-hint-focus-suppression";
 import {
@@ -1591,7 +1408,7 @@ import {
 } from "./studio-tournament-persistence-bootstrap";
 import { type StudioUiDensityMode } from "./studio-ui-density";
 import {
-  hasUnsavedStudioWork,
+  hasStudioUnloadPromptWork,
   installStudioUnloadGuard,
   studioPendingStrokeFingerprint,
 } from "./studio-unsaved-work-guard";
@@ -1640,7 +1457,7 @@ import {
   isStudioWebGpuAuthorityCurrent,
   snapshotStudioWebGpuAuthority,
   type StudioWebGpuAuthorityFrame,
-} from "./studio-webgpu-authority";
+} from "./render/studio-webgpu-authority";
 import {
   advanceStudioGpuLiveSourceJournal,
   createStudioGpuLiveSourceJournal,
@@ -1648,22 +1465,22 @@ import {
   type StudioGpuLiveSourceJournalAdvance,
   type StudioGpuLiveSourceJournalIdentity,
   type StudioGpuLiveSourceJournalState,
-} from "./studio-webgpu-live-source-journal";
+} from "./render/studio-webgpu-live-source-journal";
 import {
   promoteStudioGpuPendingAuthority,
   reconcileStudioGpuPendingAuthorityToCanvas,
   releaseStudioGpuPendingAuthorityPrefix,
   type StudioGpuPendingDrawAuthority,
-} from "./studio-webgpu-pending-authority";
-import { StudioGpuPinReceiptWatchdog } from "./studio-webgpu-pin-receipt-watchdog";
-import { planStudioWebGpuViewportSurface } from "./studio-webgpu-viewport";
+} from "./render/studio-webgpu-pending-authority";
+import { StudioGpuPinReceiptWatchdog } from "./render/studio-webgpu-pin-receipt-watchdog";
+import { planStudioWebGpuViewportSurface } from "./render/studio-webgpu-viewport";
 import {
   WET_MIX_HARDNESS_DEFAULT,
   WET_MIX_PICKUP_DEFAULT,
   WET_MIX_RADIUS_DEFAULT,
   WET_MIX_STRENGTH_DEFAULT,
   WET_MIX_WETNESS_DEFAULT,
-} from "./studio-wet-mix";
+} from "./brush/studio-wet-mix";
 import { exportStudioPageToWillV1 } from "./studio-will-v1-export-bridge";
 import {
   StudioWorkAssetAdmissionCoordinator,
@@ -1731,45 +1548,31 @@ import {
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
-import { StudioBrushHud } from "./StudioBrushHud";
-import { StudioCanvasContextMenu } from "./StudioCanvasContextMenu";
 import {
-  StudioCanvasViewport,
   type StudioCanvasViewportHandlers,
   type StudioHokusaiLiveOverlaySurfaceBinding,
   type StudioLivingInkOverlaySurfaceBinding,
-} from "./StudioCanvasViewport";
+} from "./canvas/StudioCanvasViewport";
 import {
   type CvdMode,
 } from "./StudioColorBlindPreview";
-import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
-import { StudioHelpCenterHost } from "./StudioHelpCenterHost";
-import { StudioHybridDccRouteGate } from "./StudioHybridDccRouteGate";
 import {
-  StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,
   type StudioLazyPanelStackProps,
 } from "./StudioLazyPanelStack";
 import {
-  StudioLiveCollaborationProvider,
   type StudioCrdtAuthoritativeSaveBarrier,
   type StudioCrdtSceneGraphRuntime,
-} from "./StudioLiveCollaborationProvider";
+} from "./live/StudioLiveCollaborationProvider";
 import {
-  StudioOptionsBars,
   type StudioOptionsBarsDrawModel,
   type StudioOptionsBarsHandlers,
   type StudioOptionsBarsSelectionModel,
 } from "./StudioOptionsBars";
-import { StudioPanelResizeHandle } from "./StudioPanelResizeHandle";
-import { StudioScrollViewportSubscriber } from "./StudioScrollViewportSubscriber";
 import {
-  StudioSelectionContextBar,
   type StudioSelectionAlignMode,
 } from "./StudioSelectionContextBar";
-import { StudioSurfaceErrorBoundary } from "./StudioSurfaceErrorBoundary";
 import {
-  StudioToolBeltContent,
   type FxPickerSection,
   type StudioBgScene,
   type StudioEmeresTemplate,
@@ -1778,27 +1581,74 @@ import {
   type StudioSfxPacks,
   type StudioToolBeltContentHandlers,
 } from "./StudioToolBeltContent";
-import {
-  StudioToolHintPreferencesProvider,
-  StudioToolHintTarget,
-} from "./StudioToolHint";
-import {
-  requestStudioVrmProjectArchiveUseContext,
-  StudioVrmProjectArchiveAttestationHost,
-} from "./StudioVrmProjectArchiveAttestationHost";
-import { useStudioLiveTransportAuth } from "./use-studio-live-transport-auth";
 import { useStudioAutosaveDocumentRuntime } from "./useStudioAutosaveDocumentRuntime";
-import { useStudioBrushBaselineController } from "./useStudioBrushBaselineController";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 import { useStudioProDrawPrefs } from "./useStudioProDrawPrefs";
 import { useStudioProjectArchiveOrchestration } from "./useStudioProjectArchiveOrchestration";
 import { useStudioRasterExportOrchestration } from "./useStudioRasterExportOrchestration";
+import {
+  requestStudioVrmProjectArchiveUseContext,
+} from "./vrm/StudioVrmProjectArchiveAttestationHost";
+import { useStudioLiveTransportAuth } from "./live/use-studio-live-transport-auth";
+import { useStudioBrushBaselineController } from "./brush/useStudioBrushBaselineController";
 
-import type { StudioBg3dAiMethodReferenceCapture } from "./studio-3d-ai-reference-handoff";
+import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
+import type { StudioBg3dShotBatchRecoveryScope } from "./bg3d/studio-bg3d-shot-batch-plan";
+import type {
+  StudioBrushDefaultRestoreDirection,
+  StudioBrushDefaultRestoreTransaction,
+} from "./brush/studio-brush-default-restore";
+import type { StudioBrushEngineProgramSet } from "./brush/studio-brush-engine-program-set";
+import type { StudioDrawingPaletteLayout } from "./brush/studio-drawing-palettes";
+import type { PaperGrainKind } from "./brush/studio-paper-texture";
+import type { SvgExportEl, SvgExportResult } from "./export/studio-svg-export";
+import type {
+  StudioFilterDraft,
+  StudioFilterKind,
+  StudioFilterPreview,
+} from "./filter/studio-filter-menu";
+import type { StudioHybridDccWorkspace } from "./hybrid-dcc/studio-hybrid-dcc-workspace";
+import type {
+  StudioLayerLiftCorrectionStroke,
+} from "./layer/studio-layer-lift-correction";
+import type {
+  StudioLayerNavigatorItem,
+} from "./layer/studio-layer-navigator";
+import type {
+  StudioLayerLiftReviewOptions,
+} from "./layer/StudioLayerLiftDialog";
+import type { StudioLayerNavigatorAction } from "./layer/StudioLayerNavigator";
+import type {
+  StudioDialogueImportApplyResult,
+  StudioDialogueImportMatchMode,
+  StudioDialogueInterchangeDocument,
+} from "./lettering/studio-dialogue-interchange";
+import type { StudioCrdtDocument } from "./live/studio-crdt-document";
+import type { StudioRasterOverlaySourceElement } from "./live/studio-crdt-raster-ui-bridge";
+import type { StudioLiveRoom } from "./live/studio-live-collaboration-room";
+import type {
+  StudioCommentPinClickPayload,
+  StudioCommentPinReanchorPayload,
+} from "./live/StudioLiveCanvasOverlay";
+import type { StudioLivePressureStore } from "./live/StudioLiveInkHosts";
+import type {
+  StudioEditableRasterCopyPlan,
+} from "./render/studio-raster-edit-preparation";
+import type { StudioRasterServerAuthoritySnapshot } from "./render/studio-raster-server-authority";
+import type { StudioRasterToolId } from "./render/studio-raster-tool-availability";
+import type {
+  StudioGpuBackend,
+  StudioGpuFrameReceipt,
+} from "./render/studio-webgpu-frame-contract";
+import type {
+  StudioGpuLiveStrokePlan,
+  StudioGpuLiveStrokePlanner,
+} from "./render/studio-webgpu-live-stroke-plan";
+import type { StudioGpuStroke } from "./render/studio-webgpu-stroke";
+import type { StudioBg3dAiMethodReferenceCapture } from "./scene-3d/studio-3d-ai-reference-handoff";
 import type {
   StudioBackground3DInsertResult,
-  StudioBackground3DMagicFilterMask,
-} from "./studio-3d-insert-contract";
+} from "./scene-3d/studio-3d-insert-contract";
 import type { AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import type {
@@ -1811,13 +1661,6 @@ import type {
   StudioAutoActionScope,
   StudioAutoActionSet,
 } from "./studio-auto-actions";
-import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
-import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-plan";
-import type {
-  StudioBrushDefaultRestoreDirection,
-  StudioBrushDefaultRestoreTransaction,
-} from "./studio-brush-default-restore";
-import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 import type { StudioClip } from "./studio-clips";
 import type {
   ComipoAssemblyInput,
@@ -1829,13 +1672,6 @@ import type {
   StudioPageSelectedFrame,
 } from "./studio-comipo-shipped";
 import type { StudioCompanionReviewControl } from "./studio-companion-review-projection";
-import type { StudioCrdtDocument } from "./studio-crdt-document";
-import type { StudioRasterOverlaySourceElement } from "./studio-crdt-raster-ui-bridge";
-import type {
-  StudioDialogueImportApplyResult,
-  StudioDialogueImportMatchMode,
-  StudioDialogueInterchangeDocument,
-} from "./studio-dialogue-interchange";
 import type {
   PendingStudioInterchangeImport,
   StudioInterchangeImportChoice,
@@ -1844,7 +1680,6 @@ import type {
   StudioDraftCollaborationProvisionGate,
   StudioDraftCollaborationReadiness,
 } from "./studio-draft-collaboration";
-import type { StudioDrawingPaletteLayout } from "./studio-drawing-palettes";
 import type {
   DrawMode,
   DrawShapeKind,
@@ -1861,21 +1696,8 @@ import type {
 import type { StudioEmeresLibraryItem } from "./studio-emeres-library";
 import type { StudioExtendedBlendModeId } from "./studio-extended-blend";
 import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
-import type {
-  StudioFilterDraft,
-  StudioFilterKind,
-  StudioFilterPreview,
-} from "./studio-filter-menu";
-import type { StudioHybridDccWorkspace } from "./studio-hybrid-dcc-workspace";
 import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
 import type { StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
-import type {
-  StudioLayerLiftCorrectionStroke,
-} from "./studio-layer-lift-correction";
-import type {
-  StudioLayerNavigatorItem,
-} from "./studio-layer-navigator";
-import type { StudioLiveRoom } from "./studio-live-collaboration-room";
 import type {
   StudioLivingInkExecutionConfig,
 } from "./studio-living-ink-execution-protocol";
@@ -1891,7 +1713,6 @@ import type { StudioBg3dRecoveryAccessSnapshot } from "./studio-page-editor-runt
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
-import type { PaperGrainKind } from "./studio-paper-texture";
 import type { StudioProjectDocumentSessionProvenance } from "./studio-project-document-session";
 import type { PsdExportEl, PsdExportResult } from "./studio-psd-export";
 import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
@@ -1909,18 +1730,12 @@ import type {
 import type {
   StudioQuickAccessCommandAvailability,
 } from "./studio-quick-access-integration";
-import type {
-  StudioEditableRasterCopyPlan,
-} from "./studio-raster-edit-preparation";
-import type { StudioRasterServerAuthoritySnapshot } from "./studio-raster-server-authority";
-import type { StudioRasterToolId } from "./studio-raster-tool-availability";
 import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { SceneTemplate } from "./studio-scene-templates";
 import type { SfxPreset } from "./studio-sfx-presets";
 import type { StudioSharedDocument } from "./studio-shared-document-client";
 import type { StudioStockPhoto } from "./studio-stock-image-client";
 import type { ScenarioBeatType } from "./studio-story-beats";
-import type { SvgExportEl, SvgExportResult } from "./studio-svg-export";
 import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client";
 import type { StudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
 import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutation-plan";
@@ -1934,15 +1749,6 @@ import type {
   StudioWatermarkPreferenceRuntime,
   StudioWatermarkPreferenceSnapshot,
 } from "./studio-watermark-preferences-sqlite";
-import type {
-  StudioGpuBackend,
-  StudioGpuFrameReceipt,
-} from "./studio-webgpu-frame-contract";
-import type {
-  StudioGpuLiveStrokePlan,
-  StudioGpuLiveStrokePlanner,
-} from "./studio-webgpu-live-stroke-plan";
-import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
 import type {
@@ -1955,16 +1761,7 @@ import type {
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
 import type { StudioInspectorAsideHandlers } from "./StudioInspectorAside";
-import type {
-  StudioLayerLiftReviewOptions,
-} from "./StudioLayerLiftDialog";
-import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioLeftToolRailHandlers } from "./StudioLeftToolRail";
-import type {
-  StudioCommentPinClickPayload,
-  StudioCommentPinReanchorPayload,
-} from "./StudioLiveCanvasOverlay";
-import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { StudioMenubarContentHandlers } from "./StudioMenubarContent";
 import type {
   StudioBrushCatalogHandlers,
@@ -1988,13 +1785,10 @@ import type {
 import type Konva from "konva";
 
 import { scheduleIdle } from "@/components/auth/schedule-idle";
-import { Container } from "@/components/container";
-import { buttonClass } from "@/components/ui/button-utils";
 import { useIsMobile } from "@/components/use-media-query";
 import { useResizable } from "@/components/use-resizable";
 import { loadChunkWithReloadRecovery } from "@/lib/chunk-load-recovery";
 import { useT } from "@/lib/i18n";
-import { isStudioInkInputContractV2 } from "@/lib/studio-ink-input-contract";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-contract";
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
@@ -2008,12 +1802,12 @@ type StudioPageHistorySidecarEntry = StudioHistoryJournalSidecarEntry<
 >;
 
 type StudioHybridDccWorkspacePersistence = ReturnType<
-  typeof import("./studio-hybrid-dcc-workspace-persistence")
+  typeof import("./hybrid-dcc/studio-hybrid-dcc-workspace-persistence")
     .createStudioHybridDccWorkspacePersistenceFromFileSystem
 >;
 
 type StudioHybridDccPersistenceStatus =
-  import("./StudioHybridDccPanel").StudioHybridDccPersistenceStatus;
+  import("./hybrid-dcc/StudioHybridDccPanel").StudioHybridDccPersistenceStatus;
 
 interface StudioHybridDccPersistenceUiState {
   readonly scope: string;
@@ -2104,20 +1898,6 @@ type StudioLivingInkCanonicalHandoff = Readonly<{
 }>;
 
 export { StudioCuttoonEditor };
-
-type StudioDrawingPointerTransport = ReturnType<
-  typeof createStudioDrawingPointerTransportController
->;
-
-function requireStudioDrawingPointerTransport(ref: {
-  current: StudioDrawingPointerTransport | null;
-}): StudioDrawingPointerTransport {
-  const transport = ref.current;
-  if (transport === null) {
-    throw new Error("Studio drawing pointer transport is not initialized");
-  }
-  return transport;
-}
 
 /**
  * handleSave가 페이지마다 스테이지를 재캡처하는 무거운 경로라 손을 놓은 지 한참 지난 뒤에만
@@ -3241,9 +3021,15 @@ function StudioCuttoonEditor({
     readStudioHistoryJournalUndoEntry(historyJournal)?.kind === "sidecar";
   const studioHistorySidecarRedoAvailable =
     readStudioHistoryJournalRedoEntry(historyJournal)?.kind === "sidecar";
-  const studioHistoryCanUndo = pagesHi > 0 || studioHistorySidecarUndoAvailable;
+  const [hasPendingOverlayCommit, setHasPendingOverlayCommit] = useState(false);
+  const [hasUndonePendingOverlay, setHasUndonePendingOverlay] = useState(false);
+  const studioHistoryCanUndo = pagesHi > 0
+    || studioHistorySidecarUndoAvailable
+    || hasPendingOverlayCommit;
   const studioHistoryCanRedo =
-    pagesHi < pagesHistory.length - 1 || studioHistorySidecarRedoAvailable;
+    pagesHi < pagesHistory.length - 1
+    || studioHistorySidecarRedoAvailable
+    || hasUndonePendingOverlay;
   const [pagesHistoryDurabilityStatus, setPagesHistoryDurabilityStatus] =
     useState<StudioPagesHistoryCommandJournalDurabilityStatus>(
       STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS
@@ -4552,7 +4338,7 @@ function StudioCuttoonEditor({
     }, STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS);
     const persistencePromise = Promise.all([
       import("./studio-opfs-filesystem"),
-      import("./studio-hybrid-dcc-workspace-persistence"),
+      import("./hybrid-dcc/studio-hybrid-dcc-workspace-persistence"),
     ]).then(async ([{ selectStudioOpfsFileSystem }, {
       createStudioHybridDccWorkspacePersistenceFromFileSystem,
     }]) => {
@@ -6597,6 +6383,11 @@ function StudioCuttoonEditor({
     timer: ReturnType<typeof setTimeout> | null;
     retryCount: number;
   } | null>(null);
+  const pendingUndoneStrokeCommitsRef = useRef<{
+    pageId: string;
+    strokes: DrawEl[];
+    retryCount: number;
+  } | null>(null);
   const deferredStrokePostprocessClientRef = useRef<StudioStrokePostprocessWorkerClient | null>(null);
   const deferredStrokePostprocessControllersRef = useRef<Map<string, AbortController>>(new Map());
   useEffect(() => () => {
@@ -7804,7 +7595,7 @@ function StudioCuttoonEditor({
     toggleProDrawFavorite,
   } = useStudioProDrawPrefs();
   const [brushCatalogSession, setBrushCatalogSession] = useState<{
-    placement: import("./StudioBrushLibrarySheet").StudioBrushCatalogPlacement;
+    placement: import( "./brush/StudioBrushLibrarySheet").StudioBrushCatalogPlacement;
     trigger: HTMLButtonElement;
   } | null>(null);
   const [drawShape, setDrawShape] = useState<DrawShapeKind>("line");
@@ -8335,7 +8126,7 @@ function StudioCuttoonEditor({
   }
 
   function toggleBuiltInBrushCatalog(
-    placement: import("./StudioBrushLibrarySheet").StudioBrushCatalogPlacement,
+    placement: import( "./brush/StudioBrushLibrarySheet").StudioBrushCatalogPlacement,
     trigger: HTMLButtonElement
   ) {
     setBrushCatalogSession((current) =>
@@ -8467,7 +8258,7 @@ function StudioCuttoonEditor({
     }
     setBrushPackImporting(true);
     try {
-      const importer = await import("./studio-brush-pack-import");
+      const importer = await import("./brush/studio-brush-pack-import");
       const product = await productBrushRepository();
       // Keep each external format as an explicit product route. This prevents a
       // future MYB/KPP-only parser signature from silently accepting a CSP or
@@ -8523,7 +8314,7 @@ function StudioCuttoonEditor({
   }
 
   function closeBuiltInBrushCatalog(
-    reason: import("./StudioBrushLibrarySheet").StudioBrushCatalogCloseReason
+    reason: import( "./brush/StudioBrushLibrarySheet").StudioBrushCatalogCloseReason
   ) {
     const returnTarget = brushCatalogSession?.trigger;
     setBrushCatalogSession(null);
@@ -13376,7 +13167,7 @@ function StudioCuttoonEditor({
     // 진단 패널이 "지금 무엇으로 그리고 있나"를 실측으로 읽는 유일한 경로.
     publishStudioRenderBackend(backend);
     if (backend !== "webgpu" || gpuLiveStrokePlannerRef.current) return;
-    void import("./studio-webgpu-live-stroke-plan")
+    void import("./render/studio-webgpu-live-stroke-plan")
       .then(({ planStudioGpuLiveStroke }) => {
         gpuLiveStrokePlannerRef.current = planStudioGpuLiveStroke;
       })
@@ -13750,6 +13541,10 @@ function StudioCuttoonEditor({
   const liveDynamicBrushOverlayRendererRef =
     useRef<StudioLiveDynamicBrushOverlayRenderer>(null as never);
   liveDynamicBrushOverlayRendererRef.current ??= new StudioLiveDynamicBrushOverlayRenderer();
+  const liveRetainedMediaDraftDirectRef = useRef(false);
+  const liveRetainedMediaOverlayRendererRef =
+    useRef<StudioLiveRetainedMediaOverlayRenderer>(null as never);
+  liveRetainedMediaOverlayRendererRef.current ??= new StudioLiveRetainedMediaOverlayRenderer();
   /** causal watercolor/ink-wash uses an append-only sparse 4x physical field. */
   const liveWetInkDraftDirectRef = useRef(false);
   const liveWetInkOverlayRendererRef =
@@ -13774,11 +13569,12 @@ function StudioCuttoonEditor({
   // so multi-megapixel canvases cannot outlive the route.
   useEffect(() => {
     return () => {
-      void import("./studio-raster-edit-surface-cache").then((mod) => {
+      void import( "./render/studio-raster-edit-surface-cache").then((mod) => {
         mod.clearStudioRasterEditSurfaces();
       });
       try {
         liveDynamicBrushOverlayRendererRef.current?.clear?.();
+        liveRetainedMediaOverlayRendererRef.current?.clear?.();
         liveStampOverlayRendererRef.current?.clear?.();
         liveWetInkOverlayRendererRef.current?.clear?.();
         liveInkOverlayRendererRef.current?.clear?.();
@@ -13924,14 +13720,14 @@ function StudioCuttoonEditor({
       : Object.freeze([]));
     setStudioRasterHandoffCandidate(null);
     let active = true;
-    let coordinator: import("./studio-raster-server-authority")
+    let coordinator: import("./render/studio-raster-server-authority")
       .StudioRasterServerAuthorityCoordinator | null = null;
     const document = studioCrdtDocument;
     const workScope = authorizedWorkAssetScopeId;
     const authScope = studioAuthUserId;
     let unsubscribe: (() => void) | null = null;
 
-    void import("./studio-raster-server-authority").then(({ StudioRasterServerAuthorityCoordinator }) => {
+    void import("./render/studio-raster-server-authority").then(({ StudioRasterServerAuthorityCoordinator }) => {
       if (!active) return;
       coordinator = new StudioRasterServerAuthorityCoordinator({
         readLogs: () => document.getRasterOperationLogs(),
@@ -14712,6 +14508,27 @@ function StudioCuttoonEditor({
       liveDraftVisualRef.current = next;
       return;
     }
+    if (liveRetainedMediaDraftDirectRef.current) {
+      const renderer = liveRetainedMediaOverlayRendererRef.current;
+      if (!studioLiveRetainedMediaOverlaySupportsElement(next) || !renderer.isActive) {
+        liveRetainedMediaDraftDirectRef.current = false;
+        liveDraftDirectRef.current = false;
+        renderer.resetActive();
+        draftPreviewStoreRef.current.setActive(next);
+        draftPreviewNormalLayerRef.current?.drawScene();
+        return;
+      }
+      const outcome = renderer.appendFrom(next);
+      if (outcome.status === "fallback") {
+        liveRetainedMediaDraftDirectRef.current = false;
+        liveDraftDirectRef.current = false;
+        draftPreviewStoreRef.current.setActive(next);
+        draftPreviewNormalLayerRef.current?.drawScene();
+        return;
+      }
+      liveDraftVisualRef.current = next;
+      return;
+    }
     if (liveStampDraftDirectRef.current) {
       if (!isDirectLiveStampDraftEl(next) || !liveStampOverlayRendererRef.current.isActive) {
         return;
@@ -14760,6 +14577,8 @@ function StudioCuttoonEditor({
     const directStamp = liveStampDraftDirectRef.current && isDirectLiveStampDraftEl(next);
     const directDynamic = liveDynamicBrushDraftDirectRef.current
       && studioLiveDynamicBrushOverlaySupportsElement(next);
+    const directRetainedMedia = liveRetainedMediaDraftDirectRef.current
+      && studioLiveRetainedMediaOverlaySupportsElement(next);
     const directWetInk = liveWetInkDraftDirectRef.current
       && studioLiveWetInkOverlaySupportsElement(next);
     if (
@@ -14767,6 +14586,7 @@ function StudioCuttoonEditor({
       && !directInk
       && !directStamp
       && !directDynamic
+      && !directRetainedMedia
       && !directWetInk
     ) return;
     liveDraftPendingRef.current = next;
@@ -14782,11 +14602,13 @@ function StudioCuttoonEditor({
       !liveDraftDirectRef.current
       && !liveStampDraftDirectRef.current
       && !liveDynamicBrushDraftDirectRef.current
+      && !liveRetainedMediaDraftDirectRef.current
       && !liveWetInkDraftDirectRef.current
     ) return;
     liveDraftDirectRef.current = false;
     liveStampDraftDirectRef.current = false;
     liveDynamicBrushDraftDirectRef.current = false;
+    liveRetainedMediaDraftDirectRef.current = false;
     liveWetInkDraftDirectRef.current = false;
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
@@ -14809,6 +14631,7 @@ function StudioCuttoonEditor({
     liveInkOverlayRendererRef.current.resetActive();
     liveStampOverlayRendererRef.current.resetActive();
     liveDynamicBrushOverlayRendererRef.current.resetActive();
+    liveRetainedMediaOverlayRendererRef.current.resetActive();
     liveWetInkOverlayRendererRef.current.resetActive();
     if (gpuLiveInkPinnedRef.current) {
       // Leaving direct mode ends the physical GPU epoch. A post-contact baseline has no legal
@@ -14875,6 +14698,19 @@ function StudioCuttoonEditor({
     }
     if (next && liveDynamicBrushDraftDirectRef.current) {
       if (studioLiveDynamicBrushOverlaySupportsElement(next)) {
+        liveDraftPendingRef.current = next;
+        if (liveDraftRafRef.current === null) {
+          liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
+            liveDraftRafRef.current = null;
+            flushDirectLiveDraft();
+          });
+        }
+        return;
+      }
+      exitDirectLiveDraft();
+    }
+    if (next && liveRetainedMediaDraftDirectRef.current) {
+      if (studioLiveRetainedMediaOverlaySupportsElement(next)) {
         liveDraftPendingRef.current = next;
         if (liveDraftRafRef.current === null) {
           liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
@@ -14979,19 +14815,28 @@ function StudioCuttoonEditor({
     }
     const wasStampDirect = liveStampDraftDirectRef.current;
     const wasDynamicBrushDirect = liveDynamicBrushDraftDirectRef.current;
+    const wasRetainedMediaDirect = liveRetainedMediaDraftDirectRef.current;
     const wasWetInkDirect = liveWetInkDraftDirectRef.current;
     const finalDynamicBrushStroke = wasDynamicBrushDirect
       ? liveDraftVisualRef.current
       : null;
+    const finalRetainedMediaStroke = wasRetainedMediaDirect
+      ? liveDraftVisualRef.current
+      : null;
     const finalWetInkStroke = wasWetInkDirect
+      ? liveDraftVisualRef.current
+      : null;
+    const finalStampStroke = wasStampDirect
       ? liveDraftVisualRef.current
       : null;
     const wasDirect =
       liveDraftDirectRef.current
       || wasStampDirect
       || wasDynamicBrushDirect
+      || wasRetainedMediaDirect
       || wasWetInkDirect;
     const wasEraser = liveDraftVisualRef.current?.mode === "eraser";
+    const finalEraserStroke = wasEraser ? liveDraftVisualRef.current : null;
     endPredictedInkTail();
     pendingDraftRef.current = null;
     if (draftRafRef.current !== null) {
@@ -15007,6 +14852,7 @@ function StudioCuttoonEditor({
     liveDraftDirectRef.current = false;
     liveStampDraftDirectRef.current = false;
     liveDynamicBrushDraftDirectRef.current = false;
+    liveRetainedMediaDraftDirectRef.current = false;
     liveWetInkDraftDirectRef.current = false;
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
@@ -15025,21 +14871,42 @@ function StudioCuttoonEditor({
         else overlay.resetActive();
       }
     }
-    // 스탬프는 pointerup에서 exact raw replay를 draft settled layer로 원자 교체한다. 저투명
-    // dab을 두 표면에 동시에 남기면 농도가 두 배가 되므로 active overlay는 즉시 제거한다.
-    if (wasStampDirect) liveStampOverlayRendererRef.current.resetActive();
+    // 스탬프는 pointerup에서 settled overlay를 draft FIFO로 원자 교체한다. 저투명 dab을
+    // 두 표면에 동시에 남기면 농도가 두 배가 되므로, layout-draw 영수증 뒤에 overlay만 제거한다.
+    if (wasStampDirect) {
+      const renderer = liveStampOverlayRendererRef.current;
+      if (preserveInk && finalStampStroke) {
+        renderer.end();
+        // Stamp dabs are translucent. The overlay must stay until the draft FIFO has a
+        // layout-draw receipt, then leave in the same task so the two copies never composite.
+        flushSync(() => {
+          draftPreviewStoreRef.current.settle(finalStampStroke);
+        });
+        if (renderer.settledStrokeCount > 0) renderer.releaseSettledPrefix(1);
+        else renderer.resetActive();
+      } else {
+        renderer.resetActive();
+      }
+    }
     if (wasDynamicBrushDirect) {
       const renderer = liveDynamicBrushOverlayRendererRef.current;
       if (preserveInk && finalDynamicBrushStroke) {
         const seal = renderer.end(finalDynamicBrushStroke);
-        // `settle` replaces the active dynamic layer with a settled-run layer. Commit that mount
-        // synchronously; its layout draw is the receipt that allows the transient canvas to go.
-        // The existing draft FIFO then holds it until the main-layer committed-draw receipt.
-        flushSync(() => {
-          draftPreviewStoreRef.current.settle(finalDynamicBrushStroke);
-        });
-        if (seal.status === "settled") renderer.releaseSettledPrefix(1);
-        else renderer.resetActive();
+        // Overlay keeps accepted coverage until the committed main-layer draw receipt.
+        // flushSync remesh of paint-tube / calligraphy / highlighter is a 80–100ms long task.
+        if (seal.status !== "settled") renderer.resetActive();
+      } else {
+        renderer.resetActive();
+      }
+    }
+    if (wasRetainedMediaDirect) {
+      const renderer = liveRetainedMediaOverlayRendererRef.current;
+      if (preserveInk && finalRetainedMediaStroke) {
+        const seal = renderer.end(finalRetainedMediaStroke);
+        // Overlay keeps the exact live pixels until the committed main-layer draw
+        // receipt. Immediate release remeshes thin pencil through Konva and blanks
+        // the compositor before that receipt exists.
+        if (seal.status !== "settled") renderer.resetActive();
       } else {
         renderer.resetActive();
       }
@@ -15087,7 +14954,6 @@ function StudioCuttoonEditor({
       liveDraftLayerRef.current?.batchDraw();
       // 메인 레이어 전체 재래스터는 지우개 프리뷰 정리에만 필요하다 — 펜 계열까지 매번 돌리면
       // 문서가 커질수록 펜업마다 커밋 획 전부(스탬프 dab·수채 계획 포함)를 다시 그리게 된다.
-      if (wasEraser) mainLayerRef.current?.batchDraw();
     } else if (
       wasDirect
       && preserveInk
@@ -15098,12 +14964,25 @@ function StudioCuttoonEditor({
       // they cannot composite for a frame when handoff releases the overlay.
       liveDraftLayerRef.current?.batchDraw();
     }
+    if (wasEraser) {
+      if (preserveInk && finalEraserStroke) {
+        liveDraftVisualRef.current = finalEraserStroke;
+        liveDraftDirectRef.current = true;
+      } else {
+        liveDraftVisualRef.current = null;
+        liveDraftDirectRef.current = false;
+      }
+      liveDraftLayerRef.current?.batchDraw();
+      mainLayerRef.current?.batchDraw();
+    }
     // 비다이렉트 활성 초안 정리 — settled(커밋 대기 잉크)는 flush 의 표면 정리가 담당한다.
     draftPreviewStoreRef.current.setActive(null);
     setLiveDraftShapeKind(null);
   };
-  /** 마지막 획 후 이 유휴가 지나면 대기 배치를 한 번의 React 커밋으로 동기화한다. */
-  const DEFERRED_STROKE_COMMIT_IDLE_MS = 200;
+  /** 마지막 획 후 이 유휴가 지나면 대기 배치를 한 번의 React 커밋으로 동기화한다.
+   *  Keep this longer than a follow-up pointerdown (verify warmup + next stroke arming) so the
+   *  39k-line page render cannot overlap the next stroke as a >=50ms long task. */
+  const DEFERRED_STROKE_COMMIT_IDLE_MS = 2_000;
   const DEFERRED_STROKE_COMMIT_RETRY_MS = 500;
   const DEFERRED_STROKE_COMMIT_MAX_RETRIES = 4;
   type PendingStrokeCommitBatch = {
@@ -15194,7 +15073,10 @@ function StudioCuttoonEditor({
     const reserved = sumStudioCommittedInkHandoffSurfaceCounts(pending);
     const overlaySettledCount = Math.max(
       0,
-      liveInkOverlayRendererRef.current.settledStrokeCount - reserved.overlay
+      liveInkOverlayRendererRef.current.settledStrokeCount
+        + liveRetainedMediaOverlayRendererRef.current.settledStrokeCount
+        + liveDynamicBrushOverlayRendererRef.current.settledStrokeCount
+        - reserved.overlay
     );
     const draftSettledCount = Math.max(
       0,
@@ -15232,7 +15114,16 @@ function StudioCuttoonEditor({
     batch.strokes.push(finished);
     batch.retryCount = 0;
     if (batch.timer) globalThis.clearTimeout(batch.timer);
-    batch.timer = globalThis.setTimeout(() => {
+    batch.timer = globalThis.setTimeout(function flushDeferredStrokeCommitWhenIdle() {
+      const current = pendingStrokeCommitsRef.current;
+      if (!current) return;
+      if (drawingRef.current) {
+        current.timer = globalThis.setTimeout(
+          flushDeferredStrokeCommitWhenIdle,
+          DEFERRED_STROKE_COMMIT_IDLE_MS,
+        );
+        return;
+      }
       flushPendingStrokeCommitsRef.current();
     }, DEFERRED_STROKE_COMMIT_IDLE_MS);
     // This stroke is authoritative on the live surface but intentionally remains outside React
@@ -15240,6 +15131,8 @@ function StudioCuttoonEditor({
     // durable SQLite/OPFS snapshot at the microtask checkpoint before a browser navigation task
     // can tear down this document and its Dedicated Worker.
     setUnloadGuardArmed(true);
+    setHasPendingOverlayCommit(true);
+    setHasUndonePendingOverlay(false);
     globalThis.queueMicrotask(() => {
       const pending = pendingStrokeCommitsRef.current;
       if (!pending || !pending.strokes.some((stroke) => stroke.id === finished.id)) return;
@@ -15342,7 +15235,7 @@ function StudioCuttoonEditor({
     hasUnsavedStudioWorkNow: () => boolean;
   }>({
     hasUnsavedStudioWorkNow: () =>
-      hasUnsavedStudioWork({
+      hasStudioUnloadPromptWork({
         toolOperationMemoryDirty: toolOperationMemoryPersistenceDirty,
         hydrated: workHydrated,
         editGeneration: studioRevisionProjectGenerationRef.current,
@@ -19807,8 +19700,7 @@ const puppetWarpArmed =
     } catch (err) {
       console.error("Failed to load custom assets:", err);
       if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
-      const repositoryModule = await import(
-        "./studio-asset-library-sqlite-opfs-repository"
+      const repositoryModule = await import("./studio-asset-library-sqlite-opfs-repository"
       ).catch(() => null);
       if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
       const failClosed = repositoryModule
@@ -19848,8 +19740,7 @@ const puppetWarpArmed =
   }
 
   async function canKeepAssetMutationInMemory(cause: unknown): Promise<boolean> {
-    const repositoryModule = await import(
-      "./studio-asset-library-sqlite-opfs-repository"
+    const repositoryModule = await import("./studio-asset-library-sqlite-opfs-repository"
     ).catch(() => null);
     return repositoryModule === null
       || repositoryModule.isStudioAssetLibraryMemoryFallbackError(cause);
@@ -21345,8 +21236,21 @@ const puppetWarpArmed =
   // 상태(commit/pages/elements)로 실행되도록 렌더마다 ref 에 재바인딩한다(updateScrollPosRef 패턴).
   useEffect(() => {
     flushPendingStrokeCommitsRef.current = () => {
+      if (drawingRef.current) {
+        const current = pendingStrokeCommitsRef.current;
+        if (current && !current.timer) {
+          current.timer = globalThis.setTimeout(() => {
+            flushPendingStrokeCommitsRef.current();
+          }, DEFERRED_STROKE_COMMIT_IDLE_MS);
+        }
+        return true;
+      }
       const batch = takePendingStrokeCommits();
-      if (!batch || batch.strokes.length === 0) return true;
+      if (!batch || batch.strokes.length === 0) {
+        setHasPendingOverlayCommit(false);
+        return true;
+      }
+      setHasPendingOverlayCommit(false);
       const currentHistory = pagesHistoryRef.current;
       const currentIndex = Math.max(
         0,
@@ -21404,6 +21308,11 @@ const puppetWarpArmed =
         batch.pageId,
         batch.strokes.map((stroke) => stroke.id)
       );
+      if (liveDraftVisualRef.current?.mode === "eraser") {
+        liveDraftVisualRef.current = null;
+        liveDraftDirectRef.current = false;
+        mainLayerRef.current?.batchDraw();
+      }
       return true;
     };
     discardPendingStrokeCommitsRef.current = () => {
@@ -21416,8 +21325,15 @@ const puppetWarpArmed =
       // 아직 히스토리 밖인 대기 획 폐기(펜 리프트 직후의 undo) — 표면에서 즉시 지운다.
       liveInkOverlayClearGenRef.current += 1;
       liveInkOverlayRendererRef.current.clear();
+      liveRetainedMediaOverlayRendererRef.current.clear();
+      liveDynamicBrushOverlayRendererRef.current.clear();
       liveWetInkOverlayRendererRef.current.clear();
       draftPreviewStoreRef.current.clearSettled();
+      if (liveDraftVisualRef.current?.mode === "eraser") {
+        liveDraftVisualRef.current = null;
+        liveDraftDirectRef.current = false;
+        mainLayerRef.current?.batchDraw();
+      }
       pendingGpuStrokesRef.current = [];
       pendingGpuDrawAuthoritiesRef.current = [];
       gpuHandleBaselineRecoveryPendingRef.current = false;
@@ -21509,9 +21425,13 @@ const puppetWarpArmed =
     }
 
     const overlayRenderer = liveInkOverlayRendererRef.current;
+    const retainedMediaOverlayRenderer = liveRetainedMediaOverlayRendererRef.current;
+    const dynamicBrushOverlayRenderer = liveDynamicBrushOverlayRendererRef.current;
     const draftPreviewStore = draftPreviewStoreRef.current;
     if (
       released.overlay > overlayRenderer.settledStrokeCount
+        + retainedMediaOverlayRenderer.settledStrokeCount
+        + dynamicBrushOverlayRenderer.settledStrokeCount
       || released.draft > draftPreviewStore.settledCount
     ) {
       // A ready handoff cannot consume a partial FIFO. Keep the original handoff queue and every
@@ -21599,6 +21519,8 @@ const puppetWarpArmed =
     // graph instead of leaving an already-sliced queue behind.
     if (
       released.overlay > overlayRenderer.settledStrokeCount
+        + retainedMediaOverlayRenderer.settledStrokeCount
+        + dynamicBrushOverlayRenderer.settledStrokeCount
       || released.draft > draftPreviewStore.settledCount
     ) {
       // Imperative GPU adapters are allowed to synchronously publish receipts while accepting a
@@ -21610,7 +21532,17 @@ const puppetWarpArmed =
         ? { status: "promoted" }
         : { status: "retained", reason: "surface-count-before-release" };
     }
-    const releasedOverlayCount = overlayRenderer.releaseSettledPrefix(released.overlay);
+    const retainedOverlayBudget = Math.max(
+      0,
+      released.overlay - overlayRenderer.settledStrokeCount,
+    );
+    const dynamicOverlayBudget = Math.max(
+      0,
+      retainedOverlayBudget - retainedMediaOverlayRenderer.settledStrokeCount,
+    );
+    const releasedOverlayCount = overlayRenderer.releaseSettledPrefix(released.overlay)
+      + retainedMediaOverlayRenderer.releaseSettledPrefix(retainedOverlayBudget)
+      + dynamicBrushOverlayRenderer.releaseSettledPrefix(dynamicOverlayBudget);
     const releasedDraftCount = draftPreviewStore.releaseSettledPrefix(released.draft);
     if (
       releasedOverlayCount !== released.overlay
@@ -21675,6 +21607,8 @@ const puppetWarpArmed =
       released,
       [...completeGpuElementIds].sort(),
       liveInkOverlayRendererRef.current.settledStrokeCount,
+      liveRetainedMediaOverlayRendererRef.current.settledStrokeCount,
+      liveDynamicBrushOverlayRendererRef.current.settledStrokeCount,
       draftPreviewStoreRef.current.settledCount,
       pendingGpuStrokesRef.current.map((stroke) => stroke.id),
       pendingGpuDrawAuthoritiesRef.current.map((authority) => [
@@ -23062,7 +22996,7 @@ const puppetWarpArmed =
       const {
         bakeStudioMergeComposite,
         planStudioMergeBakeMode,
-      } = await import("./studio-layer-merge-bake");
+      } = await import("./layer/studio-layer-merge-bake");
       const sources = plan.removeIds
         .map((id) => elements.find((element) => element.id === id))
         .filter((element): element is El => Boolean(element))
@@ -23146,7 +23080,7 @@ const puppetWarpArmed =
     setLayerMergeBusy(true);
     try {
       const plan = result.plan;
-      const { studioMergeBoundsFromSources } = await import("./studio-layer-merge-bake");
+      const { studioMergeBoundsFromSources } = await import("./layer/studio-layer-merge-bake");
       const { blendExtended, extendedBlendModeLabel } = await import("./studio-extended-blend");
       const sources = plan.removeIds
         .map((id) => elements.find((element) => element.id === id))
@@ -23292,7 +23226,7 @@ const puppetWarpArmed =
     try {
       const {
         getStudioPaperVectorRefinementWorkerClient,
-      } = await import("./studio-paper-vector-refinement-worker-client");
+      } = await import("./brush/studio-paper-vector-refinement-worker-client");
       if (
         controller.signal.aborted
         || !paperVectorRefinementActiveRef.current
@@ -24392,8 +24326,7 @@ const puppetWarpArmed =
         return false;
       }
       try {
-        const { acquireStudioLinked3dPassProductAuthority } = await import(
-          "./studio-linked-3d-pass-product-authority"
+        const { acquireStudioLinked3dPassProductAuthority } = await import("./studio-linked-3d-pass-product-authority"
         );
         const authority = await acquireStudioLinked3dPassProductAuthority();
         const previousPass = currentLinkedRender?.links.find(
@@ -25486,6 +25419,34 @@ const puppetWarpArmed =
     // 들어가므로 아래 일반 undo 가 **마지막 한 획만** 되돌린다(그리고 redo 로 되살아난다).
     // 예전에는 대기 배치를 통째로 폐기해, 200ms 안에 그은 해칭 40획이 ⌘Z 한 번에 사라졌다.
     // 저널 조회보다 **먼저** 해야 방금 안착한 획이 최신 항목으로 보인다.
+    // Retained overlay strokes stay out of Konva until idle flush. Flushing them on undo makes
+    // redo restore the committed remesh, which can diverge from the still-visible overlay.
+    const pendingRetained = pendingStrokeCommitsRef.current;
+    if (
+      pendingRetained
+      && pendingRetained.strokes.length > 0
+      && pendingRetained.strokes.every((stroke) => (
+        studioLiveRetainedMediaOverlaySupportsElement(stroke)
+      ))
+    ) {
+      const taken = takePendingStrokeCommits();
+      if (taken) {
+        pendingUndoneStrokeCommitsRef.current = {
+          pageId: taken.pageId,
+          strokes: taken.strokes,
+          retryCount: taken.retryCount,
+        };
+        liveRetainedMediaOverlayRendererRef.current.hideSettledPixels();
+        if (liveDraftVisualRef.current?.mode === "eraser") {
+          liveDraftVisualRef.current = null;
+          liveDraftDirectRef.current = false;
+          mainLayerRef.current?.batchDraw();
+        }
+        setHasPendingOverlayCommit(false);
+        setHasUndonePendingOverlay(true);
+      }
+      return;
+    }
     if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) {
       // 잠금·저장 중이라 히스토리에 못 넣는 배치는 예전 계약대로 폐기가 유일한 되돌림이다.
       discardPendingStrokeCommitsRef.current();
@@ -25555,6 +25516,22 @@ const puppetWarpArmed =
     }
     if (hokusaiStroke?.transactionCommitted) {
       releaseStudioHokusaiLivePresentation(hokusaiStroke);
+    }
+    const undoneRetained = pendingUndoneStrokeCommitsRef.current;
+    if (undoneRetained) {
+      pendingUndoneStrokeCommitsRef.current = null;
+      setHasUndonePendingOverlay(false);
+      setHasPendingOverlayCommit(true);
+      for (const stroke of undoneRetained.strokes) {
+        queueDeferredStrokeCommit(stroke);
+        if (stroke.mode === "eraser") {
+          liveDraftVisualRef.current = stroke;
+          liveDraftDirectRef.current = true;
+          mainLayerRef.current?.batchDraw();
+        }
+      }
+      liveRetainedMediaOverlayRendererRef.current.showSettledPixels();
+      return;
     }
     // 대기 획을 먼저 히스토리에 안착시킨다 — 이번 redo 입력은 동기화로 소비된다.
     if (pendingStrokeCommitsRef.current) {
@@ -28251,8 +28228,7 @@ const puppetWarpArmed =
         suggestion.name,
         suggestion.colors.map((c) => c.hex)
       );
-      const { getProductStudioPaletteSqliteRepository } = await import(
-        "./studio-palette-sqlite-repository"
+      const { getProductStudioPaletteSqliteRepository } = await import("./studio-palette-sqlite-repository"
       );
       await getProductStudioPaletteSqliteRepository().save(palette);
       if (!editorMountedRef.current || generation !== aiPaletteSaveGenerationRef.current) return;
@@ -28652,7 +28628,7 @@ const puppetWarpArmed =
       };
     }
     const mutationTicket = captureStudioMutationTicket();
-    const { applyStudioDialogueInterchangeToPages } = await import("./studio-dialogue-interchange");
+    const { applyStudioDialogueInterchangeToPages } = await import("./lettering/studio-dialogue-interchange");
     if (!canApplyStudioMutation(mutationTicket)) {
       return {
         pages: sourcePages,
@@ -31312,8 +31288,7 @@ const puppetWarpArmed =
             rasterTarget.id,
             ...scopedRasterReferences.map(({ id }) => id),
           ]);
-          const { withStudioRasterSourceProjection } = await import(
-            "./studio-raster-source-projection"
+          const { withStudioRasterSourceProjection } = await import("./render/studio-raster-source-projection"
           );
           const composed = await withStudioRasterSourceProjection({
             consumer: "studio-advanced-fill-reference",
@@ -31850,6 +31825,7 @@ const puppetWarpArmed =
     liveDraftDirectRef.current = false;
     liveStampDraftDirectRef.current = false;
     liveDynamicBrushDraftDirectRef.current = false;
+    liveRetainedMediaDraftDirectRef.current = false;
     liveWetInkDraftDirectRef.current = false;
     gpuLiveInkPinnedRef.current = false;
     gpuLiveSourceJournalRef.current = null;
@@ -31861,6 +31837,7 @@ const puppetWarpArmed =
     liveInkOverlayRendererRef.current.resetActive();
     liveStampOverlayRendererRef.current.resetActive();
     liveDynamicBrushOverlayRendererRef.current.resetActive();
+    liveRetainedMediaOverlayRendererRef.current.resetActive();
     liveWetInkOverlayRendererRef.current.resetActive();
     endPredictedInkTail();
     if (liveDrawPressureRafRef.current) {
@@ -32237,6 +32214,8 @@ const puppetWarpArmed =
         globalThis.clearTimeout(pendingBatch.timer);
         pendingBatch.timer = null;
       }
+      pendingUndoneStrokeCommitsRef.current = null;
+      setHasUndonePendingOverlay(false);
       // Pointer contact always shows the raw append-only stroke. The fixed-lag engine remains
       // gated for future experiments, while production post-correction runs once on release.
       // Translucent/specialty paths stay isolated because retained overlap can flash alpha.
@@ -32415,6 +32394,16 @@ const puppetWarpArmed =
           pageEpoch: currentPageId,
           hidden: next.hidden === true,
         }).status === "started";
+      const retainedMediaDirect = !pixelDirect
+        && !livingInkAdmitted
+        && !hokusaiPinned
+        && !stampDirect
+        && !liveInkOverlayStarted
+        && !wetInkOverlayStarted
+        && !gpuPin
+        && (next.mode !== "eraser" || liveRetainedMediaOverlayRendererRef.current.hasSettledStrokes)
+        && studioLiveRetainedMediaOverlaySupportsElement(next)
+        && liveRetainedMediaOverlayRendererRef.current.begin(next).status === "started";
       const dynamicBrushDirect = (strokeRouteTournamentGate?.admits("dynamic") ?? true)
         && !pixelDirect
         && !livingInkAdmitted
@@ -32423,6 +32412,7 @@ const puppetWarpArmed =
         && !liveInkOverlayStarted
         && !wetInkOverlayStarted
         && !gpuPin
+        && !retainedMediaDirect
         && studioLiveDynamicBrushOverlaySupportsElement(next)
         && liveDynamicBrushOverlayRendererRef.current.begin(next).status === "started";
       let strokeSurfaceRoute = resolveStudioStrokeSurfaceRoute({
@@ -32511,18 +32501,21 @@ const puppetWarpArmed =
         || liveInkOverlayStarted
         || wetInkOverlayStarted
         || gpuPin
-        || dynamicBrushDirect;
+        || dynamicBrushDirect
+        || retainedMediaDirect;
       liveDraftDirectRef.current = direct;
       liveStampDraftDirectRef.current = strokeSurfaceRoute.kind === "stamp";
       liveDynamicBrushDraftDirectRef.current = strokeSurfaceRoute.kind === "dynamic";
+      liveRetainedMediaDraftDirectRef.current = retainedMediaDirect;
       liveWetInkDraftDirectRef.current = strokeSurfaceRoute.kind === "wet-fallback";
       gpuLiveInkPinnedRef.current = strokeSurfaceRoute.kind === "gpu";
       if (!stampDirect) liveStampOverlayRendererRef.current.resetActive();
       if (!dynamicBrushDirect) liveDynamicBrushOverlayRendererRef.current.resetActive();
+      if (!retainedMediaDirect) liveRetainedMediaOverlayRendererRef.current.resetActive();
       if (!wetInkOverlayStarted) liveWetInkOverlayRendererRef.current.resetActive();
       liveDraftVisualRef.current = direct || stampDirect ? next : null;
       liveDraftPendingRef.current = direct || stampDirect ? next : null;
-      if (stampDirect || dynamicBrushDirect || wetInkOverlayStarted) {
+      if (stampDirect || dynamicBrushDirect || wetInkOverlayStarted || retainedMediaDirect) {
         // A generic retained tap can be painted during the pointer-down transition before the
         // specialist overlay wins authority. Clear that one-purpose layer synchronously; the
         // specialist native canvas already contains its exact tap and otherwise both remain
@@ -32569,5642 +32562,460 @@ const puppetWarpArmed =
         gpuLingerRafRef.current = 0;
       }
       if (direct || stampDirect) {
-        // Emit the initial tap immediately. In particular, a WebGPU pin suppresses the Konva
-        // draft, and the stamp renderer owns its dot at begin, so neither waits for pointermove.
-        flushDirectLiveDraftNow(next);
+        // Dynamic brushes paint a first-pixel contact in begin() and finish material setup on
+        // the next frame. Flushing now would pull that planner back onto the pointerdown task.
+        if (liveDynamicBrushOverlayRendererRef.current.hasPendingBegin) {
+          liveDraftPendingRef.current = next;
+          if (liveDraftRafRef.current === null) {
+            liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
+              liveDraftRafRef.current = null;
+              flushDirectLiveDraft();
+            });
+          }
+        } else {
+          // Emit the initial tap immediately. In particular, a WebGPU pin suppresses the Konva
+          // draft, and the stamp renderer owns its dot at begin, so neither waits for pointermove.
+          flushDirectLiveDraftNow(next);
+        }
       } else {
         // 비다이렉트 시작도 격리 스토어로 — 이후 프레임은 scheduleDraft 가 스토어만 갱신한다.
+        // Avoid flushSync here: it can join a pending pages-history render into the pointerdown
+        // long task. The live tap floor plus the next isolated draft commit still first-paints.
         draftPreviewStoreRef.current.setActive(next);
         setLiveDraftShapeKind(next.kind && next.kind !== "freehand" ? next.kind : null);
       }
     }
   }
-  function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
-    if (
-      e.target.name() === "symmetry-handle"
-      || e.target.name() === "guide-line-handle"
-      || e.target.name() === "vp-handle"
-      || e.target.name() === "isometric-origin-handle"
-    ) {
-      return;
-    }
-    const stagePointerEvent = e.evt as PointerEvent;
-    // One contact owns a liquify gesture. A second finger is ignored and cannot cancel or replace it.
-    if (liquifyDragRef.current) return;
-    // One contact also owns a pixel-selection drag; a palm/second finger cannot replace it.
-    if (pixelDragRef.current) return;
-    // Raster preparation journals the first vector-only selection contact with the same ownership
-    // rule; a second touch/palm cannot replace its start point or release owner.
-    if (pendingPixelSelectionRasterGestureRef.current) return;
-    // The same one-contact rule protects the first smudge/dodge/wet-mix/liquify gesture while a
-    // vector-only page is being rendered into its non-destructive editable raster copy.
-    if (pendingRasterRetouchGestureRef.current) return;
-    // The first contact owns a bubble point drag. A palm/second finger cannot replace its owner.
-    if (bubbleShapeDragRef.current) return;
-    if (handleStudioPointCommentStageDown(e, stagePointerEvent)) return;
-    if (canvasInteractionBlocked && !commentPinArmed) return;
-    const pendingRetouchPreparation = studioRasterRetouchPreparationRef.current;
-    const pendingSelectionPreparation = pixelMarqueeRasterPreparationActivationRef.current;
-    if (pendingSelectionPreparation && !isSpacePressed) {
-      const position = e.target.getStage()?.getRelativePointerPosition();
-      if (position) {
-        journalPendingPixelSelectionRasterGesture({
-          captureFallback: e.target.getStage()?.container() ?? null,
-          event: stagePointerEvent,
-          forceCircle: pendingSelectionPreparation.forceCircle,
-          position,
-          tool: pendingSelectionPreparation.tool,
-        });
-      }
-      // The requested pixel tool may not have reached this render's closure yet. Preparation owns
-      // the contact through its synchronous ref so the first fast drag cannot move a source vector.
-      return;
-    }
-    if (pendingRetouchPreparation && !isSpacePressed) {
-      const position = e.target.getStage()?.getRelativePointerPosition();
-      if (position) {
-        journalPendingRasterRetouchGesture({
-          captureFallback: e.target.getStage()?.container() ?? null,
-          event: stagePointerEvent,
-          position,
-        });
-      }
-      // During preparation, never let the same contact select/move the source vectors behind the
-      // pending editable copy, even when a secondary contact was deliberately rejected.
-      return;
-    }
-    // 색상 휠 롱프레스 무장 — 조건을 전부 만족할 때만 타이머를 건다. 이 블록은 return하지
-    // 않는다(관찰만 함) — 아래 기존 분기들(스포이드/크롭/드로잉/마퀴 등)은 오늘과 동일하게
-    // 그대로 실행된다. 타이머가 실제로 발화(450ms 정지 유지)했을 때만 openColorWheelAt 이
-    // disarmAllPixelTools 로 그 사이 진행된 제스처(마퀴 시작 등)를 되돌린다.
-    if (
-      tool === "select" &&
-      !isSpacePressed &&
-      !cropRect &&
-      !panelSplitActive &&
-      !nodeEditTool &&
-      !smudgeActive &&
-      !dodgeBurnActive &&
-      !wetMixActive &&
-      !healCloneTool &&
-      !advancedFillActive &&
-      !eyedropperActive &&
-      !bubbleAnchorPickActive &&
-      !pixelTool &&
-      !quickShapeActive &&
-      !colorWheelOpen &&
-      recentColors.length > 0 &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const clientPoint = getClientPointFromKonvaEvent(e.evt);
-      if (clientPoint) {
-        colorWheelPressRef.current = clientPoint;
-        colorWheelTimerRef.current = setTimeout(() => {
-          colorWheelTimerRef.current = null;
-          openColorWheelAt(clientPoint.x, clientPoint.y);
-        }, COLOR_WHEEL_LONG_PRESS_MS);
-      }
-    }
-    // 스포이드: 토글 버튼으로 무장했거나(한 번 뽑으면 자동 해제), 펜 도구 중 Alt 를 누른 momentary
-    // 방식(CSP/Photoshop 관례) — 다른 어떤 캔버스 제스처보다 항상 최우선으로 가로챈다.
-    if (eyedropperActive || (tool === "draw" && e.evt.altKey && !healCloneArmed)) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const hex = pickCanvasColorAt(pos);
-        if (hex) applyStudioDrawingColor(hex);
-      }
-      if (eyedropperActive) setEyedropperActive(false);
-      return;
-    }
-    // CSP 교점까지 지우기 — 지우개 + 토글 시 자유선 클릭 한 번으로 교차 구간을 정리한다.
-    if (tool === "draw" && drawMode === "eraser" && eraseToIntersection) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos && applyVectorEraseToIntersectionAt(pos.x, pos.y)) return;
-    }
-    // Auto-color canvas scribble — armed panel places color seeds on the selected line-art image
-    // (click starts a freehand path; move/up sample the stroke).
-    if (autoColorScribbleCanvasArmed && selected?.type === "image") {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      const planSize = autoColorPlanImageSizeRef.current;
-      if (pos && planSize) {
-        const imageFrame = {
-          x: selected.x,
-          y: selected.y,
-          width: selected.width,
-          height: selected.height,
-          rotation: selected.rotation,
-          flipped: selected.flipped,
-          flippedY: selected.flippedY,
-        };
-        const sample = mapStudioDocumentPointToAutoColorSeed({
-          documentX: pos.x,
-          documentY: pos.y,
-          image: imageFrame,
-          pixelWidth: planSize.width,
-          pixelHeight: planSize.height,
-        });
-        if (sample) {
-          autoColorScribbleStrokeRef.current = {
-            points: [pos.x, pos.y],
-            lastDocX: pos.x,
-            lastDocY: pos.y,
-          };
-          autoColorCanvasSeedNonceRef.current += 1;
-          setAutoColorCanvasSeedHits(null);
-          setAutoColorCanvasSeedHit({
-            x: sample.x,
-            y: sample.y,
-            nonce: autoColorCanvasSeedNonceRef.current,
-          });
-          return;
-        }
-        setError("선화 이미지 안을 드래그해 시드를 찍어 주세요.");
-        return;
-      }
-      if (pos && !planSize) {
-        setError("먼저 자동 채색 힌트 계획을 한 번 실행해 선화 크기를 맞춰 주세요.");
-        return;
-      }
-    }
-    // 색상 범위 샘플 pick — 스포이드와 달리 다중 샘플 도구라 1회성 해제하지 않는다.
-    // 무장 중엔 다른 스테이지 제스처를 차단한다(crop/heal-clone 정책과 동일).
-    if (colorRangePickActive && selected?.type === "image") {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const frame: SelectionFrame = {
-          x: selected.x,
-          y: selected.y,
-          width: selected.width,
-          height: selected.height,
-          rotation: selected.rotation,
-        };
-        const p = canvasPointToNormalized(pos.x, pos.y, frame);
-        if (p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1) void runColorRangeSample(p);
-      }
-      return;
-    }
-    // 말풍선 꼬리 자동 부착 — 대상 픽커 무장 중: 다음 클릭으로 부착 대상(요소 또는 빈 좌표)을
-    // 고른다. 스포이드와 동일하게 항상 1회성으로 해제.
-    if (bubbleAnchorPickActive) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      setBubbleAnchorPickActive(false);
-      if (pos && selected?.type === "bubble") {
-        const clickedId = studioElementIdOf(e.target);
-        if (activeSurfaceReviewLocked || isEffectivelyLocked(selected, groups)) {
-          setError("말풍선 또는 상위 그룹의 잠금을 해제한 뒤 꼬리 대상을 지정해 주세요.");
-        } else if (clickedId && clickedId === selected.id) {
-          setError("말풍선 자기 자신은 부착 대상으로 고를 수 없어요.");
-        } else if (clickedId) {
-          patchEl(selected.id, { tailAnchorId: clickedId, tailAnchorPoint: undefined } as Partial<El>);
-        } else {
-          patchEl(selected.id, { tailAnchorPoint: { x: pos.x, y: pos.y }, tailAnchorId: undefined } as Partial<El>);
-        }
-      }
-      return;
-    }
-    // 고급 채우기 — pointerdown에서는 탭 후보만 보관한다. pointerup까지 8px 이내의 단일 주 포인터
-    // 탭일 때만 실행해 긴 캔버스 한 손가락 스크롤과 두 손가락 핀치를 채우기로 오인하지 않는다.
-    if (advancedFillArmed) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos && !isSpacePressed && !(e.target.getParent() instanceof KonvaRuntime.Transformer)) {
-        const clientPoint = getClientPointFromKonvaEvent(e.evt);
-        const pointerEvent = e.evt as PointerEvent;
-        const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
-        const frame: SelectionFrame | null = advancedFillVirtualTarget?.frame ?? (
-          selected?.type === "image"
-            ? {
-                x: selected.x,
-                y: selected.y,
-                width: selected.width,
-                height: selected.height,
-                rotation: selected.rotation,
-              }
-            : null
-        );
-        if (!frame) return;
-        if (clientPoint) {
-          const gesture = beginStudioAdvancedFillTap(advancedFillTapGestureRef.current, {
-            pointerId,
-            point: clientPoint,
-            button: pointerEvent.button,
-            isPrimary: pointerEvent.isPrimary,
-          });
-          advancedFillTapGestureRef.current = gesture;
-          if (
-            pointerEvent.pointerType === "touch" &&
-            gesture.primaryPointerId === pointerId &&
-            gesture.activePointerIds.length === 1 &&
-            !gesture.blocked
-          ) {
-            advancedFillTouchPanRef.current = { pointerId, last: clientPoint };
-          } else if (gesture.activePointerIds.length > 1) {
-            advancedFillTouchPanRef.current = null;
-          }
-          if (
-            gesture.primaryPointerId === pointerId &&
-            gesture.activePointerIds.length === 1 &&
-            !gesture.blocked
-          ) {
-            advancedFillTapPayloadRef.current = { position: pos, frame };
-          }
-        }
-      }
-      return;
-    }
-    // 크롭 모드 무장 중: 스테이지 드래그를 크롭 rect 조작(핸들 리사이즈/이동)으로 가로챈다.
-    // 아래 픽셀 선택보다 먼저 검사한다 — 크롭 진입 시 픽셀 도구를 끄지만, 혹시 겹치면 크롭 우선.
-    // 트랜스포머 앵커·Space 팬은 픽셀 선택과 동일하게 예외(크롭 rect 는 정규화라 리사이즈를 따라간다).
-    if (
-      cropRect &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const p = canvasPointToNormalized(pos.x, pos.y, frame);
-      const handle = hitTestCropHandle(p, cropRect, cropHitTolerance(frame, 14 / effScale));
-      if (handle) {
-        cropDragRef.current = { elId: selected.id, frame, session: beginCropDrag(cropRect, handle, p) };
-      }
-      return; // 핸들 밖이어도 크롭 모드 중엔 마퀴·드로잉 등 다른 스테이지 제스처를 막는다.
-    }
-    // 패널 손그림 컷 무장 중: 스테이지 드래그를 절단선 그리기로 가로챈다. FrameEl 은 회전이
-    // 없으므로(항상 캔버스 절대좌표) crop 처럼 정규화 좌표 변환이 필요 없다.
-    if (panelSplitArmed && !isSpacePressed && !(e.target.getParent() instanceof KonvaRuntime.Transformer)) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      panelSplitDragRef.current = beginPanelSplitDrag(selected.id, { x: pos.x, y: pos.y });
-      panelSplitLastLineRef.current = null;
-      setPanelSplitHint(null);
-      return; // 크롭/픽셀 선택과 동일하게 다른 스테이지 제스처(마퀴·드로잉 등)를 막는다.
-    }
-    // 벡터 노드 편집 무장 중: 핸들 히트테스트 후 드래그 세션을 연다. 무장 중엔 핸들 밖 클릭도
-    // 마퀴 등 다른 제스처를 막는다 — crop/pixel 과 동일 정책.
-    if (
-      nodeEditArmed &&
-      selected?.type === "draw" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const tolerance = 14 / effScale; // 화면 14px, crop 의 hitTolerance 관례와 동일
-      const hitIdx = hitTestNodeHandle(pos, nodeEditHandles, tolerance);
-      if (hitIdx !== null) {
-        const session = beginNodeDrag(selected.points, selected.pressures, hitIdx, nodeEditTool!, pos);
-        if (session) {
-          nodeEditDragRef.current = { elId: selected.id, session };
-          // "스무딩" 드래그의 강도 기준선을 스냅샷(다른 도구에선 참조되지 않아 무해).
-          nodeSmoothStrengthAtDragStartRef.current = nodeSmoothStrength;
-        }
-      }
-      return;
-    }
-    // 말풍선 커스텀 모양 점 편집 무장 중: 포인터를 말풍선 로컬좌표로 변환해(회전 포함)
-    // 노드 편집과 동일한 히트테스트/드래그 개시 로직을 재사용한다. 무장 중엔 핸들 밖 클릭도
-    // 다른 제스처를 막는다 — crop/node-edit과 동일 정책.
-    if (handleBubbleShapePointerDown(e, stagePointerEvent)) return;
-    // 문지르기 브러시 무장 중: 스테이지 드래그를 문지르기 스트로크 좌표 누적으로 가로챈다.
-    if (
-      smudgeArmed &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const first = canvasPointToNormalized(pos.x, pos.y, frame);
-      const radiusNorm = smudgeRadius / Math.max(1, frame.width);
-      smudgeDragRef.current = {
-        elId: selected.id,
-        frame,
-        points: [first],
-        radiusNorm,
-      };
-      schedulePaintRetouchStrokePreview(smudgeDragRef.current);
-      return;
-    }
-    // 닷지/번 무장 중: 스테이지 드래그를 보정 스트로크 좌표 누적으로 가로챈다.
-    if (
-      dodgeBurnArmed &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const first = canvasPointToNormalized(pos.x, pos.y, frame);
-      const radiusNorm = dodgeBurnRadius / Math.max(1, frame.width);
-      dodgeBurnDragRef.current = {
-        elId: selected.id,
-        frame,
-        points: [first],
-        radiusNorm,
-      };
-      schedulePaintRetouchStrokePreview(dodgeBurnDragRef.current);
-      return;
-    }
-    // 혼색 브러시 무장 중: 스테이지 드래그를 혼색 스트로크 좌표 누적으로 가로챈다.
-    if (
-      wetMixArmed &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const first = canvasPointToNormalized(pos.x, pos.y, frame);
-      const radiusNorm = wetMixRadius / Math.max(1, frame.width);
-      wetMixDragRef.current = {
-        elId: selected.id,
-        frame,
-        points: [first],
-        radiusNorm,
-      };
-      schedulePaintRetouchStrokePreview(wetMixDragRef.current);
-      return;
-    }
-    // 리퀴파이 — 이미지를 드래그하면 픽셀을 밀어 왜곡한다.
-    if (
-      liquifyArmed &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      tool !== "hand" &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      if (stagePointerEvent.isPrimary === false) return;
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const session = beginStudioLiquifyPointerSession({
-        elId: selected.id,
-        frame,
-        mode: liquifyMode,
-        point: canvasPointToNormalized(pos.x, pos.y, frame),
-        pointer: stagePointerEvent,
-      });
-      if (!session) return;
-      liquifyDragRef.current = session;
-      const radiusNorm = liquifyRadius / Math.max(1, frame.width);
-      schedulePaintRetouchStrokePreview({
-        frame,
-        radiusNorm,
-        points: session.points,
-      });
-      // Twirl/pinch/bloat can be a single dab — kick a preview immediately on down.
-      scheduleLiquifyLivePreview();
-      const captureTarget = stagePointerEvent.target instanceof Element
-        ? stagePointerEvent.target
-        : e.target.getStage()?.container() ?? null;
-      liquifyCaptureTargetRef.current = captureTarget;
-      try {
-        captureTarget?.setPointerCapture(session.pointerId);
-      } catch {
-        // Global capture-phase pointerup remains the safety net on browsers without capture.
-      }
-      return;
-    }
-    // 퀵 마스크 무장 중: 스테이지 드래그를 마스크 브러시 좌표 누적으로 가로챈다(레이어 마스크 미러).
-    if (
-      quickMaskArmed &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const p = canvasPointToNormalized(pos.x, pos.y, frame);
-      quickMaskDragRef.current = { elId: selected.id, frame, points: [p] };
-      scheduleQuickMaskDragPreview({ points: [p] });
-      return;
-    }
-    // 레이어 마스크 브러시 무장 중: 스테이지 드래그를 마스크 스트로크 좌표 누적으로 가로챈다.
-    // maskSrc가 아직 없어도 드래그를 시작할 수 있다(bakeLayerMaskStroke가 없으면 "전체 보임"
-    // 흰 마스크를 자동으로 베이스 삼는다 — Photoshop이 마스크 없는 레이어에 처음 브러시를 대면
-    // 자동으로 흰 마스크를 추가하는 관례와 동일).
-    if (
-      layerMaskPaintArmed &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const p = canvasPointToNormalized(pos.x, pos.y, frame);
-      layerMaskDragRef.current = { elId: selected.id, frame, points: [p] };
-      scheduleLayerMaskDragPreview({ points: [p] });
-      return;
-    }
-    // 필터 마스크 브러시 무장 중: 레이어 마스크와 동일하게 스테이지 드래그를 마스크 스트로크
-    // 좌표 누적으로 가로챈다(filterMaskSrc가 없으면 bakeLayerMaskStroke가 흰 마스크를 자동 베이스로).
-    if (
-      filterMaskPaintArmed &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const p = canvasPointToNormalized(pos.x, pos.y, frame);
-      filterMaskDragRef.current = { elId: selected.id, frame, points: [p] };
-      scheduleFilterMaskDragPreview({ points: [p] });
-      return;
-    }
-    // 복구 브러시/도장 무장 중: Alt(Option)+클릭은 소스 앵커 지정, 일반 드래그는 페인트 스트로크.
-    // crop/픽셀 선택과 동일한 정책 — 무장 중엔 다른 캔버스 제스처를 막는다. healCloneBusy 가드는
-    // 직전 스트로크의 비동기 굽기가 끝나기 전에 새 스트로크를 시작해 patchEl 갱신이 서로를 덮어쓰는
-    // (lost-update) 경쟁을 막는다.
-    if (
-      healCloneArmed &&
-      !healCloneBusy &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const p = canvasPointToNormalized(pos.x, pos.y, frame);
-      if (e.evt.altKey) {
-        setHealCloneSourceAnchor(p);
-        healCloneOffsetRef.current = null; // 새 앵커 지정 시 정렬 오프셋을 다음 스트로크에서 재계산.
-        return;
-      }
-      if (!healCloneSourceAnchor) return; // 패널 상태 문구가 이미 "Alt+클릭으로 지정" 안내 중.
-      const offset =
-        healCloneAligned && healCloneOffsetRef.current
-          ? healCloneOffsetRef.current
-          : computeHealCloneSourceOffset(healCloneSourceAnchor, p);
-      healCloneOffsetRef.current = offset;
-      const radiusNorm = healCloneRadius / Math.max(1, selected.width);
-      const session = { elId: selected.id, frame, offset, radiusNorm, points: [p] };
-      healCloneDragRef.current = session;
-      // 오버레이 마운트는 제스처당 한 번만 React에 알리고, 이후 move는 Line ref만 갱신한다.
-      setHealCloneDragPreview({ points: [p], lineRef: healClonePreviewLineRef });
-      scheduleHealCloneDragPreview(session);
-      return;
-    }
-    // 히스토리 브러시 무장 중: 소스가 지정돼 있으면 일반 드래그로 스트로크 좌표를 누적한다(오프셋
-    // 없음 — heal-clone 과 달리 Alt+클릭 지정 단계가 없다, 소스는 작업 내역 패널에서 이미 골랐다).
-    if (
-      historyBrushArmed &&
-      !historyBrushBusy &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      if (!historyBrushSourceSrc) return; // 패널 상태 문구가 이미 "작업 내역에서 먼저 지정하세요" 안내 중.
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const p = canvasPointToNormalized(pos.x, pos.y, frame);
-      const radiusNorm = historyBrushRadius / Math.max(1, selected.width);
-      historyBrushDragRef.current = { elId: selected.id, frame, radiusNorm, points: [p] };
-      scheduleHistoryBrushDragPreview({ points: [p] });
-      return;
-    }
-    // 퍼펫 워프 무장 중: 빈 자리 클릭 = 새 핀 추가(그 자리에서 세션 없이 즉시 커밋). 기존 핀
-    // 위 클릭은 오버레이의 Konva 네이티브 draggable(onDragMove)이 처리하므로 여기서는
-    // "puppet-pin-handle" 이름으로 걸러 무시한다 — 안 걸러내면 핀을 클릭할 때마다 그 자리에 또
-    // 새 핀이 추가돼 버린다(Konva 이벤트가 핀 Circle → Stage 로 버블링되기 때문).
-    if (
-      puppetWarpArmed &&
-      !puppetWarpBusy &&
-      selected?.type === "image" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer) &&
-      e.target.name() !== "puppet-pin-handle"
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
-      };
-      const p = canvasPointToNormalized(pos.x, pos.y, frame);
-      setPuppetWarpPins((pins) => addPuppetPin(pins, { id: uid(), x: p.x, y: p.y }));
-      return; // 무장 중엔 다른 스테이지 제스처(마퀴 등)를 막는다 — crop/heal-clone과 동일 정책.
-    }
-    // 픽셀 선택 도구 무장 중: 스테이지 드래그를 픽셀 선택 그리기로 가로챈다(요소 이동·마퀴·
-    // 드로잉보다 우선). 트랜스포머 앵커는 예외(선택이 정규화 좌표라 리사이즈/회전을 따라간다),
-    // Space/Hand 팬도 예외. 시작점은 이미지 밖이어도 된다(rect/ellipse 는 0..1 로 클램프).
-    if (
-      pixelToolGestureArmed &&
-      !isSpacePressed &&
-      tool !== "hand" &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      if (pixelToolRasterPreparationArmed && pixelTool) {
-        // The artist began before the vector-only page copy finished rasterizing. Capture this
-        // pointer now instead of dropping the gesture or letting it move a vector element. The
-        // async preparation continuation replays the normalized drag once the full-page image is
-        // atomically committed; pointermove/up below only update this bounded intent record.
-        journalPendingPixelSelectionRasterGesture({
-          event: stagePointerEvent,
-          position: pos,
-          tool: pixelTool,
-          forceCircle: pixelForceCircle,
-          captureFallback: e.target.getStage()?.container() ?? null,
-        });
-        return;
-      }
-      // 대상 이미지 해석 — 이미 편집 가능한 이미지가 선택돼 있으면 그대로, 아니면(arm-anytime)
-      // 포인터 아래 최상단 이미지를 자동 획득해 선택하고 이번 제스처를 그 위에서 시작한다.
-      // 자동 획득 id 를 ref 에 남겨 선택 변경 이펙트가 진행 중 제스처를 살려 두게 한다.
-      let pixelTarget: ImageEl | null =
-        pixelToolArmed && selected?.type === "image" ? selected : null;
-      // 대상 재획득(2026-07-24) — 이미지 A가 선택된 채로 다른 이미지 B 위에서 드래그를 시작하면,
-      // 예전에는 마퀴가 A의 좌표계로 계산돼 면적이 무의미해지고 아무 선택도 생기지 않았다("선택이
-      // 됐다 안 됐다"의 원인). 시작점이 선택된 이미지 "밖"이면서 그 자리에 다른 편집 가능한
-      // 이미지가 있을 때만 대상을 옮긴다 — 사각/타원은 이미지 밖에서 시작하는 것도 정상이므로
-      // (좌표를 0..1 로 클램프한다) 아무것도 없는 빈 곳에서 시작하는 기존 동작은 그대로 둔다.
-      if (pixelTarget) {
-        const local = canvasPointToNormalized(pos.x, pos.y, {
-          x: pixelTarget.x,
-          y: pixelTarget.y,
-          width: pixelTarget.width,
-          height: pixelTarget.height,
-          rotation: pixelTarget.rotation,
-        });
-        if (local.x < 0 || local.x > 1 || local.y < 0 || local.y > 1) {
-          const under = acquirePixelSelectionAutoTarget(pos);
-          const retarget = under.kind === "target" && under.id !== pixelTarget.id
-            ? elementById.get(under.id) ?? null
-            : null;
-          if (retarget?.type === "image") {
-            pixelTarget = retarget;
-            pixelSelectionAutoTargetRef.current = retarget.id;
-            setMarqueeIds([]);
-            setSelectedId(retarget.id);
-          }
-        }
-      }
-      if (!pixelTarget) {
-        const resolution = acquirePixelSelectionAutoTarget(pos);
-        if (resolution.kind === "locked") {
-          setError("이 위치의 이미지 레이어는 편집이 잠겨 있어요. 잠금을 먼저 해제하세요.");
-          return;
-        }
-        const acquired =
-          resolution.kind === "target" ? elementById.get(resolution.id) ?? null : null;
-        if (!acquired || acquired.type !== "image") {
-          const editableRasterCount = elements.filter(
-            (element) =>
-              element.type === "image"
-              && !isEffectivelyHidden(element, groups)
-              && !isEffectivelyLocked(element, groups)
-              && !studioWorkAssetDestructiveEditReason(element)
-              && !studioLinked3dPassDestructiveEditReason(element)
-              && !element.isAnimatedGif
-              && (element.frames?.length ?? 0) <= 1,
-          ).length;
-          if (editableRasterCount === 0 && pixelTool) {
-            const activation: PixelSelectionActivationKind =
-              pixelTool === "ellipse" && pixelForceCircle
-                ? "circle"
-                : pixelTool;
-            // This call reaches its first dynamic-import await synchronously, so the preparation
-            // controller/run id already exist when the pointer journal is attached immediately
-            // below. Empty/locked/unsupported pages fail closed inside the same preparation seam.
-            void preparePixelMarqueeRasterTarget(activation);
-            if (pixelMarqueeRasterPreparationAbortRef.current) {
-              journalPendingPixelSelectionRasterGesture({
-                event: stagePointerEvent,
-                position: pos,
-                tool: pixelTool,
-                forceCircle: pixelForceCircle,
-                captureFallback: e.target.getStage()?.container() ?? null,
-              });
-              return;
-            }
-          }
-          setError("픽셀을 고를 이미지가 이 위치에 없어요. 이미지 레이어 위에서 다시 시작하세요.");
-          return;
-        }
-        pixelTarget = acquired;
-        pixelSelectionAutoTargetRef.current = acquired.id;
-        setMarqueeIds([]);
-        setSelectedId(acquired.id);
-      }
-      const frame: SelectionFrame = {
-        x: pixelTarget.x,
-        y: pixelTarget.y,
-        width: pixelTarget.width,
-        height: pixelTarget.height,
-        rotation: pixelTarget.rotation,
-      };
-      if (pixelTool === "wand") {
-        void runMagicWandSelect(pos, frame);
-        return;
-      }
-      // 제스처 시작 결합 모드 — 기존 선택이 있을 때만 Shift=합치기/Alt=빼기/둘 다=교집합으로
-      // 덮어쓴다(Photoshop/CSP 관례). 선택이 없으면 base(add) + Shift/Alt 는 정원/중심 제약 의미.
-      const effectiveCombine = resolveSelectionCombineOverride(
-        pixelCombine,
-        { shift: e.evt.shiftKey, alt: e.evt.altKey },
-        isSelectionUsable(pixelSelRef.current)
-      );
-      const startNorm = canvasPointToNormalized(pos.x, pos.y, frame);
-      const existingSelection = pixelSelRef.current;
-      const frameAspect = frame.height / Math.max(1, frame.width);
-      // Magma: drag inside the marching-ants marquee (without Shift/Alt combine) moves the
-      // outline only. Content moves via Transform / content-transform actions.
-      if (
-        (pixelTool as string) !== "wand"
-        && pixelTool !== "poly-lasso"
-        && shouldMoveSelectionMarquee({
-          hasUsableSelection: isSelectionUsable(existingSelection),
-          pointInside: pointInSelection(existingSelection, startNorm, { aspect: frameAspect }),
-          operationMode: effectiveCombine,
-        })
-        && existingSelection
-      ) {
-        const pointerId = Number.isFinite(stagePointerEvent.pointerId)
-          ? stagePointerEvent.pointerId
-          : 1;
-        const stubDrag = beginSelectionDrag(
-          pixelTool,
-          selectionCombineModeForOperation(effectiveCombine),
-          startNorm,
-          0,
-        );
-        pixelDragRef.current = {
-          elId: pixelTarget.id,
-          frame,
-          drag: stubDrag,
-          operation: effectiveCombine,
-          pointerId,
-          magneticField: null,
-          marqueeMove: {
-            startNorm,
-            baseSelection: existingSelection,
-          },
-        };
-        const captureTarget = stagePointerEvent.target instanceof Element
-          ? stagePointerEvent.target
-          : e.target.getStage()?.container() ?? null;
-        pixelSelectionCaptureTargetRef.current = captureTarget;
-        try {
-          captureTarget?.setPointerCapture(pointerId);
-        } catch {
-          // Global capture-phase pointerup remains the safety net on browsers without capture.
-        }
-        return;
-      }
-      // 다각형 올가미 — 클릭마다 꼭짓점. 시작점 근처 재클릭·더블클릭으로 닫기(드래그 세션 아님).
-      if (pixelTool === "poly-lasso") {
-        const raw = canvasPointToNormalized(pos.x, pos.y, frame);
-        // 자석이 켜지고 휘도장이 로드됐으면 클릭 꼭짓점도 가까운 가장자리로 끌어당긴다.
-        const magneticField = currentMagneticLassoField();
-        const p = magneticField ? snapLassoPointToEdge(raw, magneticField) : raw;
-        const existing = polyLassoSessionRef.current;
-        const detail = "detail" in e.evt ? e.evt.detail : 1;
-        if (existing && (detail >= 2 || polyLassoCloseToStart(existing, p))) {
-          finishPolyLassoSession();
-          return;
-        }
-        if (!existing) {
-          polyLassoOperationRef.current = effectiveCombine;
-          const next = beginPolyLassoSession(
-            selectionCombineModeForOperation(effectiveCombine),
-            p,
-          );
-          polyLassoSessionRef.current = next;
-          setPolyLassoSession(next);
-          setPolyLassoHover(null);
-        } else {
-          const next = appendPolyLassoVertex(existing, p);
-          polyLassoSessionRef.current = next;
-          setPolyLassoSession(next);
-          setPolyLassoHover(null);
-        }
-        return;
-      }
-      // 브러시는 캔버스 px 반경을 요소 폭 기준 정규화 반경으로 넘긴다(다른 도구는 무시됨).
-      const brushRadiusNorm = pixelBrushRadius / Math.max(1, pixelTarget.width);
-      const drag = beginSelectionDrag(
-        pixelTool,
-        selectionCombineModeForOperation(effectiveCombine),
-        canvasPointToNormalized(pos.x, pos.y, frame),
-        brushRadiusNorm,
-        { forceCircle: pixelForceCircle || (pixelTool === "ellipse" && e.evt.shiftKey) }
-      );
-      const pointerId = Number.isFinite(stagePointerEvent.pointerId)
-        ? stagePointerEvent.pointerId
-        : 1;
-      pixelDragRef.current = {
-        elId: pixelTarget.id,
-        frame,
-        drag,
-        operation: effectiveCombine,
-        pointerId,
-        magneticField: currentMagneticLassoField(),
-      };
-      const captureTarget = stagePointerEvent.target instanceof Element
-        ? stagePointerEvent.target
-        : e.target.getStage()?.container() ?? null;
-      pixelSelectionCaptureTargetRef.current = captureTarget;
-      try {
-        captureTarget?.setPointerCapture(pointerId);
-      } catch {
-        // Global capture-phase pointerup remains the safety net on browsers without capture.
-      }
-      schedulePixelDragPreview(drag);
-      return;
-    }
-    if (tool === "draw") {
-      if (livingInkFinalizingRef.current) {
-        announceDrawingShortcut("수채 번짐 프레임을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
-        return;
-      }
-      if (hokusaiLiveFinalizingRef.current) {
-        announceDrawingShortcut("자연매체 획을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
-        return;
-      }
-      const pointerSample = e.evt as PointerEvent;
-      // Capture the frame-clock anchor alongside pointerdown, before CRDT/render setup can add
-      // device-dependent latency. The pump later maps this elapsed time back to the event clock.
-      const pointerDownFrameTimeStamp = globalThis.performance?.now?.() ?? pointerSample.timeStamp;
-      // 터치 정책: one-finger drag = draw | pan | none. Palm rejection ignores touch while pen preferred.
-      const touchPrefs = appSettingsRef.current.touch;
-      if (pointerSample.pointerType === "touch") {
-        if (touchPrefs.oneFingerDrag !== "draw") return;
-        if (touchPrefs.palmRejection && requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()?.pointerType === "pen") return;
-      }
-      const activePointerSession = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
-      if (activePointerSession || drawingRef.current) {
-        if (drawingRef.current) {
-          if (isStudioStrokePointerEvent(activePointerSession, pointerSample)) return;
-          if (shouldCancelStudioFingerStrokeForAdditionalContact(activePointerSession, pointerSample)) {
-            // Two fingers mean navigation, not two simultaneous brush tips. Cancel the unfinished
-            // finger stroke before the existing wrap-level pinch/undo gesture consumes both touches.
-            // A pen plus a touch is deliberately different: the touch is treated as palm input.
-            discardDrawingPointerSession();
-          }
-          return;
-        }
-        // Dangling transport state should never permanently block a new stroke.
-        // If drawingRef is already null, drop the stale stroke session and allow this input to proceed.
-        discardDrawingPointerSession();
-      }
-      if (zoomGestureRef.current) {
-        // A wheel/pinch preview owns a temporary CSS transform for up to 170ms. Commit that view
-        // synchronously before reading the stroke origin so the transform cannot settle halfway
-        // through this contact and change the captured document coordinate system.
-        flushSync(() => settleZoomGestureRef.current());
-        stageRef.current?.setPointersPositions(pointerSample);
-      }
-      const pendingBatch = pendingStrokeCommitsRef.current;
-      if (
-        pendingBatch
-        && pendingBatch.pageId !== activePage.id
-        && !flushPendingStrokeCommitsRef.current()
-      ) {
-        setError(
-          "이전 페이지의 마지막 획을 확정하지 못해 새 획을 시작하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요."
-        );
-        return;
-      }
-      const backdropPendingBatch = pendingStrokeCommitsRef.current;
-      const backdropBoundary = planStudioDraftPreviewBackdropBoundary({
-        incoming: {
-          brush: drawMode === "pen" ? brush : undefined,
-          fill:
-            drawMode === "lasso-fill"
-              ? color
-              : drawMode === "shape" && shapeFill && drawShape !== "line"
-                ? color
-                : undefined,
-          kind: drawMode === "shape" ? drawShape : "freehand",
-          mode: drawMode === "eraser" ? "eraser" : "pen",
-        },
-        pending: backdropPendingBatch?.pageId === activePage.id
-          ? backdropPendingBatch.strokes
-          : [],
-        hasRetainedDomBackdrop: backdropPendingBatch !== null && (
-          liveInkOverlayRendererRef.current.hasSettledStrokes
-          || liveStampOverlayRendererRef.current.hasSettledStrokes
-          || liveDynamicBrushOverlayRendererRef.current.hasSettledStrokes
-          || liveWetInkOverlayRendererRef.current.hasSettledStrokes
-          || pendingGpuStrokesRef.current.length > 0
-        ),
-      });
-      const backdropBoundaryExecution = executeStudioDraftPreviewBackdropBoundary({
-        plan: backdropBoundary,
-        flushSynchronously: flushSync,
-        flushPending: () => flushPendingStrokeCommitsRef.current(),
-        restorePointerPosition: () => stageRef.current?.setPointersPositions(pointerSample),
-      });
-      if (!backdropBoundaryExecution.ready) {
-        setError(
-          "앞선 획의 합성 순서를 확정하지 못해 새 획을 시작하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요."
-        );
-        return;
-      }
-      // A CRDT stroke has its own conflict-free operation stream, so it must not claim the old
-      // page-wide lease that prevented two artists from drawing at once. Keep the lease fallback
-      // only while the durable document is not connected.
-      if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit()) return;
-      const pointerSession = beginStudioStrokePointerSession(pointerSample);
-      // A second contact cannot replace a live pen stroke. Right-click/barrel-button presses also
-      // remain available to the context menu instead of leaving a one-point draft behind.
-      if (!pointerSession) {
-        endLiveResourceEdit();
-        return;
-      }
-      const pos = stageRef.current?.getRelativePointerPosition()
-        ?? e.target.getStage()?.getRelativePointerPosition();
-      // Every early exit after a successful begin must release — stranded claimLock is collab-unsafe.
-      if (!pos) {
-        endLiveResourceEdit();
-        return;
-      }
-      updateBrushCursor(e.target.getStage(), pointerSample);
-      // One pointer contact owns one immutable input contract. Toolbar shortcuts can re-render
-      // while a pen is still down; those new preferences apply to the next stroke, never halfway
-      // through the current filter/pressure/post-correction pipeline.
-      const strokeAdvancedRuler = resolveActiveStudioAdvancedRuler(
-        drawingAssistDocument.advanced,
-        selected?.groupId ?? null
-      );
-      drawingInputSettingsRef.current = {
-        version: 1,
-        stabilizer,
-        stabilizerMode,
-        postCorrection,
-        preserveCorners,
-        pressureCurve,
-        pressureMinSize,
-        useVelocityPressure,
-        velocitySensitivity,
-        coordinateScale: effScale,
-        perspectiveActive: !strokeAdvancedRuler && perspectiveRulerActive,
-        vanishingPoints: vanishingPoints.map((point) => ({ ...point })),
-        isometricActive: !strokeAdvancedRuler && isometricGridActive,
-        isometricAngleDeg,
-        advancedRuler: strokeAdvancedRuler ? structuredClone(strokeAdvancedRuler) : null,
-      };
-      setSelectedId(null);
-
-      const drawStartPlan = planStudioDrawPointerStart({
-        id: uid(),
-        position: pos,
-        pointer: pointerSample,
-        drawMode,
-        drawShape,
-        shapeFill,
-        color,
-        strokeWidth,
-        brushOpacity,
-        brush,
-        brushCatalogId: activeCatalogBrush.id, brushCatalogName: activeCatalogBrush.name,
-        stampTuning, brushDynamics,
-        brushEnginePrograms,
-        stabilizer,
-        stabilizerMode,
-        velocitySensitivity,
-        pressureCurve,
-        pressureMinSize,
-        positionScale: effScale,
-        brushTip: { tiltEnabled, angleDeg: tipAngle, roundness: tipRoundness },
-        symmetry: {
-          type: symmetryType,
-          centerX: symmetryCenterX,
-          centerY: symmetryCenterY,
-          radialCount: symmetryRadialCount,
-        },
-      });
-      const {
-        causalInitialSample,
-        causalInputPlan,
-        pressure,
-        stylus,
-      } = drawStartPlan;
-      let { element: next, strokeOrigin } = drawStartPlan;
-      const linked3dCorrection = !isRealtimeTeamSession && drawMode === "pen"
-        ? createStudioLinked3dCorrectionProvenance(
-            activePage.linked3dRender,
-            selected?.id,
-          )
-        : null;
-      if (linked3dCorrection) next = { ...next, linked3dCorrection };
-      // Snap explicit shape origins to neighboring object edges when no directional ruler is
-      // active. Freehand coordinates must remain untouched so acquiring a guide cannot kink ink.
-      {
-        const directionalRulerActive = Boolean(
-          strokeAdvancedRuler
-          || (!strokeAdvancedRuler && perspectiveRulerActive && vanishingPoints.length > 0)
-          || (
-            !strokeAdvancedRuler
-            && shouldSnapStrokeToIsometricAxis({
-              active: isometricGridActive,
-              mode: next.mode,
-              kind: next.kind ?? "freehand",
-            })
-          )
-        );
-        if (
-          shouldApplyStrokeObjectSnap({
-            snapEnabled,
-            showAlignmentGuides,
-            mode: next.mode,
-            kind: next.kind ?? "freehand",
-            sampleIndex: 0,
-            directionalRulerActive,
-          })
-        ) {
-          const snapped = applyStrokeObjectSnapToPoint(strokeOrigin.x, strokeOrigin.y, {
-            mode: next.mode,
-            kind: next.kind ?? "freehand",
-            sampleIndex: 0,
-            directionalRulerActive,
-            excludeId: next.id,
-          });
-          if (snapped.x !== strokeOrigin.x || snapped.y !== strokeOrigin.y) {
-            strokeOrigin = { x: snapped.x, y: snapped.y };
-            const points = next.points.slice();
-            if (points.length >= 2) {
-              points[0] = snapped.x;
-              points[1] = snapped.y;
-            }
-            // Shape origin is duplicated as the initial endpoint until the drag moves.
-            if ((next.kind ?? "freehand") !== "freehand" && points.length >= 4) {
-              points[2] = snapped.x;
-              points[3] = snapped.y;
-            }
-            next = { ...next, points };
-          }
-        }
-      }
-      if (drawMode === "pen") scheduleLiveDrawPressure(pressure);
-      // Pointer-up is a lifecycle signal, not a new freehand coordinate. Retain pointer-down now
-      // so a tap and a stroke with no delivered move still have authoritative release metadata.
-      drawingLastAuthoritativePointerRef.current = pointerSample;
-      const pointerTransportStart = requireStudioDrawingPointerTransport(drawingPointerTransportRef).start({
-        pointerEvent: pointerSample,
-        session: pointerSession,
-        stage: e.target.getStage(),
-      });
-      if (!pointerTransportStart.started) {
-        drawingLastAuthoritativePointerRef.current = null;
-        drawingInkTimeOriginRef.current = null;
-        drawingInputSettingsRef.current = null;
-        scheduleLiveDrawPressure(null);
-        endLiveResourceEdit();
-        return;
-      }
-      drawingImmediateCausalInputRef.current = causalInputPlan.quantizeImmediately;
-      drawingThinLineInkInputRef.current = shouldFilterStudioThinLineInkInput({
-        brushId: next.brush,
-        immediateCausalInput: causalInputPlan.quantizeImmediately,
-      })
-        ? createStudioThinLineInkInputState({
-            x: strokeOrigin.x,
-            y: strokeOrigin.y,
-            timeStamp: pointerSample.timeStamp,
-          })
-        : null;
-      // Pixel pencil bypasses stabilizers; positive standard strength keeps the exact 5ms cascade.
-      drawingFixedRateFilterRef.current = causalInputPlan.usesFixedRateClock
-        ? createFixedRateStrokeFilter({
-            x: strokeOrigin.x, y: strokeOrigin.y, positionScale: effScale, pressure,
-            tiltX: causalInitialSample?.tiltX ?? stylus.tiltX,
-            tiltY: causalInitialSample?.tiltY ?? stylus.tiltY,
-            timeStamp: pointerSample.timeStamp,
-          }, stabilizer).state
-        : null;
-      drawingStabilizerRef.current =
-        drawMode === "shape" || drawMode === "pixel" || causalInputPlan.sampleSpacing === 0
-          ? null
-          : createStudioStrokeStabilizerState({
-              x: strokeOrigin.x,
-              y: strokeOrigin.y,
-              timeStamp: pointerSample.timeStamp,
-            });
-      drawingPrecisionStabilizerBridgeRef.current?.reset();
-      drawingPrecisionStabilizerBridgeRef.current = null;
-      if (
-        drawingStabilizerRef.current
-        && drawingFixedRateFilterRef.current === null
-        && stabilizerMode === "precision"
-        && stabilizer > 0
-      ) {
-        const bridge = createStudioStrokeStabilizerBridge();
-        const first = bridge.commit(
-          {
-            x: strokeOrigin.x,
-            y: strokeOrigin.y,
-            timeStamp: pointerSample.timeStamp,
-            pointerType:
-              pointerSample.pointerType === "mouse"
-              || pointerSample.pointerType === "pen"
-              || pointerSample.pointerType === "touch"
-                ? pointerSample.pointerType
-                : "unknown",
-            pointerId: pointerSample.pointerId,
-          },
-          {
-            strength: stabilizer,
-            mode: "precision",
-            coordinateScale: effScale,
-            useLazyPrecision: true,
-            lazyPointerPolicy: "all",
-          }
-        );
-        drawingStabilizerRef.current = first.state;
-        drawingPrecisionStabilizerBridgeRef.current = bridge;
-      }
-      drawingVelocityRef.current =
-        drawMode === "shape" || drawMode === "pixel"
-          ? null
-          : createStudioPointerVelocityState(pointerSample);
-      drawingVelocityPressureRef.current = initializeStudioBrushVelocityPressure(
-        drawMode, pointerSample, next, drawingInputSettingsRef.current
-      );
-      drawingInkTimeOriginRef.current = studioInkGestureTimeOrigin(next.inkInput, pointerSample.timeStamp);
-      drawingRef.current = next;
-      drawingGesturePreviewPublisherRef.current.begin({
-        pageId: activePage.id,
-        documentGeneration: collaborationAccessRef.current.documentGeneration,
-        element: next,
-      });
-      // The active cursor is outline-only, so it can track the contact without darkening stable
-      // pixels or becoming part of the live-ink/commit receipt.
-      perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
-      isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
-      advancedRulerSnapRef.current = null;
-      beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin);
-      drawingCrdtPublisherRef.current.cancel();
-      drawingCrdtStrokeActiveRef.current = false;
-      const crdtDocument = studioCrdtDocumentRef.current;
-      if (crdtDocument) {
-        try {
-          const crdtStroke = studioDrawElementToCrdtStroke(activePage.id, next);
-          drawingCrdtStrokeActiveRef.current = true;
-          drawingCrdtPublisherRef.current.begin(next.id, () => {
-            if (
-              !drawingCrdtStrokeActiveRef.current
-              || studioCrdtDocumentRef.current !== crdtDocument
-            ) {
-              throw new Error("실시간 협업 문서가 획 시작 전에 변경되었습니다.");
-            }
-            crdtDocument.beginStroke(crdtStroke);
-          });
-        } catch (cause) {
-          drawingCrdtPublisherRef.current.cancel(next.id);
-          drawingCrdtPublishErrorRef.current(cause);
-        }
-      }
-      startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp);
-      if (drawMode === "pen" && quickShapeActive) startQuickShapeTracking(strokeOrigin);
-      else stopQuickShapeTracking(); // 방어적 — 이전 스트로크 타이머 잔존 방지
-      return;
-    }
-    // 선택 모드: 빈 영역에서 드래그하면 마퀴(PPT식 박스) 다중선택, 그냥 클릭이면 선택 해제.
-    if (e.target === e.target.getStage() || e.target.name() === "bg") {
-      setSelectedId(null);
-      setMarqueeIds([]);
-      // 빈 영역 클릭은 그룹 진입 상태도 함께 빠져나온다(PPT/Figma: 그룹 밖 클릭 = 그룹에서 나가기).
-      activeGroupIdRef.current = null;
-      setActiveGroupId(null);
-      if (!isSpacePressed) {
-        const pos = e.target.getStage()?.getRelativePointerPosition();
-        if (pos) {
-          marqueeStartRef.current = { x: pos.x, y: pos.y };
-          clearMarqueePreview();
-        }
-      }
-    }
-  }
-  // 복구 브러시/도장 호버 커서(브러시 원 + 소스 크로스헤어) — brushCursorRef 와 동일하게
-  // ref 를 직접 갱신해 리렌더 없이 따라오게 한다. 드래그 중에도 계속 호출된다.
-  function updateHealCloneCursorNodes(destNorm: SelPoint, frame: SelectionFrame) {
-    const cursor = healCloneCursorRef.current;
-    const srcCursor = healCloneSourceCursorRef.current;
-    if (!cursor) return;
-    const destCanvas = normalizedPointToCanvas(destNorm, frame);
-    cursor.position(destCanvas);
-    cursor.radius(healCloneRadius / effScale);
-    if (!cursor.visible()) cursor.visible(true);
-    if (srcCursor) {
-      if (healCloneOffsetRef.current) {
-        const srcNorm = healCloneSourcePoint(healCloneOffsetRef.current, destNorm);
-        srcCursor.position(normalizedPointToCanvas(srcNorm, frame));
-        if (!srcCursor.visible()) srcCursor.visible(true);
-      } else {
-        srcCursor.visible(false);
-      }
-    }
-    cursor.getLayer()?.batchDraw();
-  }
-  // 히스토리 브러시 호버 커서(브러시 원) — healCloneCursorRef 와 동일하게 ref 를 직접 갱신해
-  // 리렌더 없이 따라오게 한다.
-  function updateHistoryBrushCursorNode(destNorm: SelPoint, frame: SelectionFrame) {
-    const cursor = historyBrushCursorRef.current;
-    if (!cursor) return;
-    cursor.position(normalizedPointToCanvas(destNorm, frame));
-    cursor.radius(historyBrushRadius / effScale);
-    if (!cursor.visible()) cursor.visible(true);
-    cursor.getLayer()?.batchDraw();
-  }
-
-  function snapPointToAdvancedRuler(
-    ruler: StudioAdvancedRuler,
-    start: { x: number; y: number },
-    target: { x: number; y: number }
-  ): { x: number; y: number } | null {
-    const snapped = snapStudioAdvancedRulerStrokePoint(
-      advancedRulerSnapRef.current,
-      ruler,
-      start,
-      target
-    );
-    if (!snapped) return null;
-    advancedRulerSnapRef.current = snapped.state;
-    return snapped.point;
-  }
-
-  /** Element bboxes used as object-snap targets while placing strokes/shapes (excludes active draft). */
-  function collectStrokeObjectSnapTargets(excludeId?: string | null): GuideBox[] {
-    const targets: GuideBox[] = [];
-    for (const el of elements) {
-      if (excludeId && el.id === excludeId) continue;
-      if (isEffectivelyHidden(el, groups)) continue;
-      const node = nodeRefsRef.current[el.id];
-      if (node && mainLayerRef.current) {
-        try {
-          const rect = node.getClientRect({ relativeTo: mainLayerRef.current });
-          if (Number.isFinite(rect.width) && Number.isFinite(rect.height)) {
-            targets.push({
-              id: el.id,
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: rect.height,
-            });
-            continue;
-          }
-        } catch {
-          // Fall through to document bounds when the node is mid-detach.
-        }
-      }
-      const bounds = elBounds(el);
-      targets.push({
-        id: el.id,
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.w,
-        height: bounds.h,
-      });
-    }
-    return targets;
-  }
-
-  /**
-   * One getClientRect walk per stroke contact. Other layers are static while the pointer owns
-   * the stroke, so reusing the frozen target list keeps shape-endpoint moves O(1) in element count.
-   */
-  function strokeObjectSnapTargetsFor(strokeId: string, excludeId?: string | null): readonly GuideBox[] {
-    const resolved = resolveStudioStrokeObjectSnapTargets({
-      cache: strokeObjectSnapCacheRef.current,
-      strokeId,
-      collect: () => collectStrokeObjectSnapTargets(excludeId ?? strokeId),
-    });
-    strokeObjectSnapCacheRef.current = resolved.cache;
-    return resolved.targets;
-  }
-
-  function applyStrokeObjectSnapToPoint(
-    x: number,
-    y: number,
-    options: {
-      mode?: string;
-      kind?: string;
-      sampleIndex: number;
-      directionalRulerActive: boolean;
-      excludeId?: string | null;
-    }
-  ): { x: number; y: number } {
-    if (
-      !shouldApplyStrokeObjectSnap({
-        snapEnabled,
-        showAlignmentGuides,
-        mode: options.mode,
-        kind: options.kind,
-        sampleIndex: options.sampleIndex,
-        directionalRulerActive: options.directionalRulerActive,
-      })
-    ) {
-      return { x, y };
-    }
-    const strokeId = options.excludeId ?? drawingRef.current?.id;
-    if (!strokeId) return { x, y };
-    const others = strokeObjectSnapTargetsFor(strokeId, options.excludeId);
-    if (others.length === 0) return { x, y };
-    const threshold = SMART_SNAP_THRESHOLD / Math.max(effScale, 1e-6);
-    const kind = options.kind ?? "freehand";
-    // Freehand uses latch-based edge following so continuous samples do not zigzag between
-    // nearby object edges. Shapes/lines use nearest-edge capture for explicit placement.
-    const snap = kind === "freehand"
-      ? (() => {
-          const planned = planFreehandObjectSnapPoint({
-            x,
-            y,
-            others,
-            latch: freehandObjectSnapLatchRef.current,
-            threshold,
-          });
-          freehandObjectSnapLatchRef.current = planned.latch;
-          return planned;
-        })()
-      : snapPointToObjectGuides(x, y, others, { threshold });
-    if (showAlignmentGuides && (snap.snappedX || snap.snappedY)) {
-      applySmartGuides(buildPointObjectSnapOverlay(
-        snap.x,
-        snap.y,
-        others,
-        snap,
-        { epsilon: SMART_GUIDE_EPSILON / Math.max(effScale, 1e-6) }
-      ));
-    } else {
-      applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
-    }
-    // Guide-only mode (alignment guides on, snap master off): preview guides without bending ink.
-    if (!shouldMutateStrokeWithObjectSnap({ snapEnabled })) {
-      return { x, y };
-    }
-    return { x: snap.x, y: snap.y };
-  }
-
-  function updateActiveShapeEndpoint(
-    stage: Konva.Stage,
-    pointerEvent: PointerEvent,
-    schedulePreview: boolean
-  ): boolean {
-    const current = drawingRef.current;
-    const kind = current?.kind ?? "freehand";
-    if (
-      !current
-      || kind === "freehand"
-      || !isStudioStrokePointerEvent(requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession(), pointerEvent)
-    ) return false;
-
-    // Capture-phase pointerup runs before Konva updates its pointer position. Feed the native event
-    // through Konva's public coordinate path so a fast drag commits the actual lift point.
-    stage.setPointersPositions(pointerEvent);
-    const pos = stage.getRelativePointerPosition();
-    if (!pos) return false;
-    const x0 = current.points[0] ?? pos.x;
-    const y0 = current.points[1] ?? pos.y;
-    const livePointerOffset = quickShapeConvertedRef.current
-      ? quickShapeLivePointerOffsetRef.current
-      : null;
-    let x1 = pos.x + (livePointerOffset?.x ?? 0);
-    let y1 = pos.y + (livePointerOffset?.y ?? 0);
-    const inputSettings = drawingInputSettingsRef.current;
-    // Shift is the explicit gesture and therefore wins over perspective/isometric ruler locks.
-    let directionalRulerActive = false;
-    if (inputSettings?.advancedRuler && kind === "line" && !pointerEvent.shiftKey) {
-      const snapped = snapPointToAdvancedRuler(
-        inputSettings.advancedRuler,
-        { x: x0, y: y0 },
-        { x: x1, y: y1 }
-      );
-      if (snapped) {
-        x1 = snapped.x;
-        y1 = snapped.y;
-        directionalRulerActive = true;
-      }
-    } else if (perspectiveRulerActive && kind === "line" && !pointerEvent.shiftKey && vanishingPoints.length > 0) {
-      if (!perspectiveRayRef.current) {
-        perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, x0, y0, x1, y1);
-      }
-      [x1, y1] = snapStrokePointToPerspective(x1, y1, perspectiveRayRef.current);
-      directionalRulerActive = perspectiveRayRef.current !== null;
-    } else if (
-      shouldSnapStrokeToIsometricAxis({
-        active: isometricGridActive,
-        mode: current.mode,
-        kind,
-      })
-      && !pointerEvent.shiftKey
-    ) {
-      if (!isometricAxisRayRef.current) {
-        isometricAxisRayRef.current = resolveIsometricAxisRay(isometricAngleDeg, x0, y0, x1, y1);
-      }
-      [x1, y1] = snapStrokePointToIsometricGrid(x1, y1, isometricAxisRayRef.current);
-      directionalRulerActive = isometricAxisRayRef.current !== null;
-    }
-    if (!directionalRulerActive && !pointerEvent.shiftKey) {
-      const snapped = applyStrokeObjectSnapToPoint(x1, y1, {
-        mode: current.mode,
-        kind,
-        sampleIndex: 1,
-        directionalRulerActive: false,
-        excludeId: current.id,
-      });
-      x1 = snapped.x;
-      y1 = snapped.y;
-    }
-    if (pointerEvent.shiftKey) {
-      const dx = x1 - x0;
-      const dy = y1 - y0;
-      if (kind === "line") {
-        if (Math.abs(dx) > Math.abs(dy) * 2) y1 = y0;
-        else if (Math.abs(dy) > Math.abs(dx) * 2) x1 = x0;
-        else {
-          const size = Math.max(Math.abs(dx), Math.abs(dy));
-          x1 = x0 + Math.sign(dx || 1) * size;
-          y1 = y0 + Math.sign(dy || 1) * size;
-        }
-      } else {
-        const size = Math.max(Math.abs(dx), Math.abs(dy));
-        x1 = x0 + Math.sign(dx || 1) * size;
-        y1 = y0 + Math.sign(dy || 1) * size;
-      }
-    }
-    const next = { ...current, points: [x0, y0, x1, y1] };
-    drawingRef.current = next;
-    drawingGesturePreviewPublisherRef.current.replaceShape(next);
-    if (schedulePreview) scheduleDraft(next);
-    return true;
-  }
-
-  function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
-    const stagePointerEvent = e.evt as PointerEvent;
-    const stageActiveDrawing = drawingRef.current;
-    const nativeFreehandMoveOwnsStage = Boolean(
-      stageActiveDrawing
-      && (stageActiveDrawing.kind ?? "freehand") === "freehand"
-      && isStudioStrokePointerEvent(
-        requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession(),
-        stagePointerEvent
-      )
-    );
-    // Figma-style multiplayer cursor publication must run before every tool-specific early return.
-    // Throttle before reading Stage coordinates or copying the recent stroke tail.
-    if (!isExporting && canvasH > 0) {
-      studioLiveRoomRef.current?.publishCursorWhenDue(() => {
-        const pointer = e.target.getStage()?.getRelativePointerPosition();
-        if (!pointer) return null;
-        const activeDrawing = stageActiveDrawing;
-        const isDrawing = Boolean(activeDrawing && (activeDrawing.kind ?? "freehand") === "freehand");
-        const publishedTool = resolveStudioLivePublishedCursorTool({
-          tool,
-          drawMode,
-          drawingMode: activeDrawing?.mode,
-        });
-        const isEraserPreview = publishedTool === "eraser";
-        const strokeColor = activeDrawing?.stroke ?? color;
-        const strokeWidthVal = activeDrawing?.strokeWidth ?? strokeWidth;
-        const strokeOpacity = activeDrawing?.opacity ?? 1;
-        const pts = activeDrawing?.points;
-
-        return {
-          x: Math.max(0, Math.min(1, pointer.x / CANVAS_W)),
-          y: Math.max(0, Math.min(1, pointer.y / canvasH)),
-          pageId: activePage.id,
-          tool: publishedTool,
-          drawing: isDrawing,
-          strokeColor: isEraserPreview ? undefined : strokeColor,
-          strokeWidth: strokeWidthVal,
-          strokeOpacity,
-          points: isDrawing && pts && pts.length >= 2 ? pts.slice(-64) : undefined,
-        };
-      });
-    }
-    // Auto-color freehand scribble stroke — append document points while armed.
-    const scribbleStroke = autoColorScribbleStrokeRef.current;
-    if (scribbleStroke && autoColorScribbleCanvasArmed) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        if (
-          shouldKeepStudioAutoColorStrokeSample({
-            lastDocX: scribbleStroke.lastDocX,
-            lastDocY: scribbleStroke.lastDocY,
-            nextDocX: pos.x,
-            nextDocY: pos.y,
-            minDistanceDoc: STUDIO_AUTO_COLOR_STROKE_MIN_DISTANCE_DOC_DEFAULT,
-          })
-        ) {
-          scribbleStroke.points.push(pos.x, pos.y);
-          scribbleStroke.lastDocX = pos.x;
-          scribbleStroke.lastDocY = pos.y;
-        }
-      }
-      return;
-    }
-    // 색상 휠 롱프레스 타이머가 아직 대기 중인데 임계값(6px) 넘게 움직였으면 드래그/클릭으로
-    // 보고 취소한다. colorWheelOpen 이 이미 true 인 동안은 오버레이가 캔버스를 덮어 이 핸들러
-    // 자체가 더 안 불리므로 별도 가드가 필요 없다.
-    if (colorWheelTimerRef.current && colorWheelPressRef.current) {
-      const clientPoint = getClientPointFromKonvaEvent(e.evt);
-      if (clientPoint) {
-        const dx = clientPoint.x - colorWheelPressRef.current.x;
-        const dy = clientPoint.y - colorWheelPressRef.current.y;
-        if (shouldCancelLongPress(dx, dy)) {
-          clearTimeout(colorWheelTimerRef.current);
-          colorWheelTimerRef.current = null;
-        }
-      }
-    }
-    // Window capture already consumed and previewed this active freehand delivery.
-    if (nativeFreehandMoveOwnsStage) return;
-    const pendingRasterGesture = pendingPixelSelectionRasterGestureRef.current;
-    if (pendingRasterGesture) {
-      const pointerId = Number.isFinite(stagePointerEvent.pointerId)
-        ? stagePointerEvent.pointerId
-        : 1;
-      if (pendingRasterGesture.pointerId !== pointerId) return;
-      const position = e.target.getStage()?.getRelativePointerPosition();
-      if (position) {
-        pendingRasterGesture.current = { x: position.x, y: position.y };
-        pendingRasterGesture.shift = stagePointerEvent.shiftKey;
-        pendingRasterGesture.alt = stagePointerEvent.altKey;
-      }
-      return;
-    }
-    const pendingRetouchGesture = pendingRasterRetouchGestureRef.current;
-    if (pendingRetouchGesture) {
-      const pointerId = Number.isFinite(stagePointerEvent.pointerId)
-        ? stagePointerEvent.pointerId
-        : 1;
-      if (pendingRetouchGesture.pointerId !== pointerId) return;
-      const position = e.target.getStage()?.getRelativePointerPosition();
-      if (position) {
-        pendingRasterRetouchGestureRef.current =
-          appendStudioPendingRasterRetouchGesturePoint(
-            pendingRetouchGesture,
-            stagePointerEvent,
-            position,
-          );
-      }
-      return;
-    }
-    if (advancedFillTapGestureRef.current) {
-      const clientPoint = getClientPointFromKonvaEvent(e.evt);
-      const pointerEvent = e.evt as PointerEvent;
-      const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
-      if (clientPoint) {
-        const gesture = moveStudioAdvancedFillTap(
-          advancedFillTapGestureRef.current,
-          pointerId,
-          clientPoint,
-        );
-        advancedFillTapGestureRef.current = gesture;
-        const pan = advancedFillTouchPanRef.current;
-        if (
-          pointerEvent.pointerType === "touch" &&
-          pan?.pointerId === pointerId &&
-          gesture.blocked &&
-          gesture.activePointerIds.length === 1
-        ) {
-          const wrap = wrapRef.current;
-          if (wrap) {
-            wrap.scrollLeft -= clientPoint.x - pan.last.x;
-            wrap.scrollTop -= clientPoint.y - pan.last.y;
-            updateScrollPos();
-          }
-        }
-        if (pan?.pointerId === pointerId) pan.last = clientPoint;
-      }
-      return;
-    }
-    // A cancelled scroll/pinch may still emit more pointermove events before the final pointerup.
-    // While the bucket remains armed, never let those events fall through to selection/drawing.
-    if (advancedFillArmed) return;
-    // 크롭 드래그 중이면 rect 를 갱신한다(시작 시점 스냅샷 기준 — 증분 오차 없음, RAF 합침).
-    if (cropDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = cropDragRef.current;
-        const next = updateCropDrag(session.session, canvasPointToNormalized(pos.x, pos.y, session.frame), {
-          ratio: cropAspectRatio(cropAspect),
-          frameAspect: session.frame.height > 0 ? session.frame.width / session.frame.height : 1,
-        });
-        scheduleCropRect(next);
-      }
-      return;
-    }
-    // 패널 손그림 컷 드래그 중이면 절단선 미리보기를 갱신한다.
-    if (panelSplitDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      const session = panelSplitDragRef.current;
-      const frame = elements.find((el) => el.id === session.targetFrameId);
-      if (pos && frame && frame.type === "frame") {
-        const line: PanelSplitLine = { a: session.start, b: { x: pos.x, y: pos.y } };
-        panelSplitLastLineRef.current = line;
-        const preview = previewPanelSplit({ frame, line, gutterPx: panelGutter });
-        schedulePanelSplitPreview(preview);
-      }
-      return;
-    }
-    // 벡터 노드 편집 드래그 중이면 점 위치/굵기 초안을 갱신한다. 매 틱마다 커밋된 el.points/
-    // pressures 기준으로 재계산한다(직전 draft 가 아니라) — updateNodeDragMove 의 "시작 스냅샷+델타"
-    // 설계와 일치, crop 의 updateCropDrag 와 동일한 무누적오차 패턴.
-    if (nodeEditDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const { elId, session } = nodeEditDragRef.current;
-        const el = elementById.get(elId);
-        if (el && el.type === "draw") {
-          if (session.tool === "move") {
-            const { x, y } = updateNodeDragMove(session, pos);
-            scheduleNodeEditDraft({
-              elId,
-              points: withPointMoved(el.points, session.pointIndex, x, y),
-              pressures: el.pressures ?? [],
-            });
-          } else if (session.tool === "width") {
-            const pressure = updateNodeDragWidth(session, pos, NODE_EDIT_WIDTH_DRAG_RANGE_PX / effScale);
-            scheduleNodeEditDraft({
-              elId,
-              points: el.points,
-              pressures: withPressureEdited(el.pressures, Math.floor(el.points.length / 2), session.pointIndex, pressure),
-            });
-          } else {
-            // "smooth" — 세로 드래그는 위치가 아니라 강도(0..1)를 조절한다("굵기"와 동일한 부호
-            // 규약: 위로 끌수록 값 증가). 드래그 시작 시점 강도(nodeSmoothStrengthAtDragStartRef)를
-            // 기준선으로 매 틱 다시 계산한다 — updateNodeDragWidth 가 session.startPressure 를
-            // 기준선으로 삼는 것과 동일한 "무누적오차" 패턴(el.points 도 매 틱 커밋된 원본에서
-            // 다시 계산하므로 스무딩이 이전 틱의 결과 위에 누적되지 않는다).
-            const strength = updateSmoothStrengthDrag(
-              nodeSmoothStrengthAtDragStartRef.current,
-              session.startPointerY,
-              pos.y,
-              NODE_SMOOTH_DRAG_RANGE_PX / effScale
-            );
-            setNodeSmoothStrength(strength); // 패널 슬라이더도 실시간으로 같은 값을 보여준다.
-            scheduleNodeEditDraft({
-              elId,
-              points: smoothPointsAroundIndex(el.points, session.pointIndex, strength),
-              pressures: el.pressures ?? [],
-            });
-          }
-        }
-      }
-      return;
-    }
-    // 말풍선 커스텀 모양 점 드래그 중이면 위치 초안을 갱신한다. nodeEdit과 동일하게 "커밋된
-    // el.customShapePoints 기준 매 틱 재계산"(직전 draft 아님) — updateNodeDragMove의 시작
-    // 스냅샷+델타 설계와 일치, 무누적오차.
-    if (bubbleShapeDragRef.current) {
-      const pointerEvent = e.evt as PointerEvent;
-      const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
-      if (bubbleShapeDragRef.current.pointerId !== pointerId) return;
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const { elId, session } = bubbleShapeDragRef.current;
-        const el = elementById.get(elId);
-        if (el && el.type === "bubble" && hasCustomBubbleShape(el.customShapePoints)) {
-          const local = bubbleShapeCanvasPointToLocal(pos.x, pos.y, { x: el.x, y: el.y, rotation: el.rotation });
-          const { x, y } = updateNodeDragMove(session, local);
-          scheduleBubbleShapeDraft({ elId, points: withPointMoved(el.customShapePoints, session.pointIndex, x, y) });
-        }
-      }
-      return;
-    }
-    // 픽셀 선택 드래그 중이면 궤적/박스를 갱신한다(시작 시점 프레임 스냅샷 기준 좌표 변환).
-    // 올가미는 최소 간격 미만이면 같은 상태를 돌려주므로 그때는 RAF 예약도 건너뛴다.
-    // Magma 마퀴 이동: 선택 안 드래그는 아웃라인만 평행 이동(픽셀 변형은 Transform/내용 변형).
-    if (pixelDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = pixelDragRef.current;
-        const norm = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        if (session.marqueeMove) {
-          const dx = norm.x - session.marqueeMove.startNorm.x;
-          const dy = norm.y - session.marqueeMove.startNorm.y;
-          const moved =
-            translateSelection(session.marqueeMove.baseSelection, dx, dy)
-            ?? session.marqueeMove.baseSelection;
-          pixelSelRef.current = moved;
-          setPixelSel(moved);
-        } else {
-          const aspect = session.frame.height / Math.max(1, session.frame.width);
-          const next = updateSelectionDrag(
-            session.drag,
-            norm,
-            {
-              shift: e.evt.shiftKey,
-              alt: e.evt.altKey,
-              aspect,
-              magneticField: session.magneticField,
-            }
-          );
-          if (next !== session.drag) {
-            session.drag = next;
-            schedulePixelDragPreview(next);
-          }
-        }
-      }
-      return;
-    }
-    // 다각형 올가미 초안 중 — 마지막 꼭짓점→커서 고무줄 미리보기.
-    if (polyLassoSessionRef.current && selected?.type === "image" && pixelTool === "poly-lasso") {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const frame: SelectionFrame = {
-          x: selected.x,
-          y: selected.y,
-          width: selected.width,
-          height: selected.height,
-          rotation: selected.rotation,
-        };
-        setPolyLassoHover(canvasPointToNormalized(pos.x, pos.y, frame));
-      }
-      return;
-    }
-    // 문지르기 드래그 — 반경 기반 O(1) 샘플링 + rAF 미리보기(heal/clone과 동일 핫패스).
-    if (smudgeDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = smudgeDragRef.current;
-        const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        if (appendStudioRasterRetouchDragPoint(session.points, next, session.radiusNorm)) {
-          schedulePaintRetouchStrokePreview(session);
-        }
-      }
-      return;
-    }
-    // 닷지/번 드래그 — 동일 샘플링/미리보기 핫패스.
-    if (dodgeBurnDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = dodgeBurnDragRef.current;
-        const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        if (appendStudioRasterRetouchDragPoint(session.points, next, session.radiusNorm)) {
-          schedulePaintRetouchStrokePreview(session);
-        }
-      }
-      return;
-    }
-    // 혼색 브러시 드래그 — 동일 샘플링/미리보기 핫패스.
-    if (wetMixDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = wetMixDragRef.current;
-        const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        if (appendStudioRasterRetouchDragPoint(session.points, next, session.radiusNorm)) {
-          schedulePaintRetouchStrokePreview(session);
-        }
-      }
-      return;
-    }
-    if (liquifyDragRef.current) {
-      const pointerEvent = e.evt as PointerEvent;
-      if (!isStudioLiquifyPointerOwner(liquifyDragRef.current, pointerEvent)) return;
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = liquifyDragRef.current;
-        const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        const radiusNorm = liquifyRadius / Math.max(1, session.frame.width);
-        liquifyDragRef.current = appendStudioLiquifyPointerPoint(
-          session,
-          pointerEvent,
-          next,
-          studioLiquifyDragMinDistance(radiusNorm),
-        );
-        schedulePaintRetouchStrokePreview({
-          frame: session.frame,
-          radiusNorm,
-          points: liquifyDragRef.current.points,
-        });
-        scheduleLiquifyLivePreview();
-      }
-      return;
-    }
-    // 퀵 마스크 브러시 드래그 중이면 좌표를 누적한다(레이어 마스크와 동일한 appendBrushPoint).
-    if (quickMaskDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = quickMaskDragRef.current;
-        const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        const radiusNorm = quickMaskRadius / Math.max(1, session.frame.width);
-        const nextPoints = appendBrushPoint(session.points, p, radiusNorm);
-        if (nextPoints !== session.points) {
-          session.points = nextPoints;
-          scheduleQuickMaskDragPreview({ points: nextPoints });
-        }
-      }
-      return;
-    }
-    // 레이어 마스크 브러시 드래그 중이면 좌표를 누적한다(브러시 간격 기반 최소 거리 필터 —
-    // heal-clone과 동일한 appendBrushPoint 재사용).
-    if (layerMaskDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = layerMaskDragRef.current;
-        const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        const radiusNorm = layerMaskRadius / Math.max(1, session.frame.width);
-        const nextPoints = appendBrushPoint(session.points, p, radiusNorm);
-        if (nextPoints !== session.points) {
-          session.points = nextPoints;
-          scheduleLayerMaskDragPreview({ points: nextPoints });
-        }
-      }
-      return;
-    }
-    // 필터 마스크 브러시 드래그 중이면 좌표를 누적한다(레이어 마스크와 동일한 appendBrushPoint 재사용).
-    if (filterMaskDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = filterMaskDragRef.current;
-        const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        const radiusNorm = filterMaskRadius / Math.max(1, session.frame.width);
-        const nextPoints = appendBrushPoint(session.points, p, radiusNorm);
-        if (nextPoints !== session.points) {
-          session.points = nextPoints;
-          scheduleFilterMaskDragPreview({ points: nextPoints });
-        }
-      }
-      return;
-    }
-    // 복구 브러시/도장 드래그 중이면 좌표를 누적한다(브러시 간격 기반 최소 거리 필터).
-    if (healCloneDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = healCloneDragRef.current;
-        const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        updateHealCloneCursorNodes(p, session.frame);
-        // appendBrushPoint에 마지막 점 하나만 넘겨 동일한 sanitize/간격 규약을 O(1)로 재사용한다.
-        // 허용된 점만 mutable session에 push하므로 growing-array spread의 누적 O(n²)를 피한다.
-        const last = session.points[session.points.length - 1];
-        const tail = appendBrushPoint(last ? [last] : [], p, session.radiusNorm);
-        const appended = tail[last ? 1 : 0];
-        if (appended) {
-          session.points.push(appended);
-          scheduleHealCloneDragPreview(session);
-        }
-      }
-      return;
-    }
-    // 히스토리 브러시 드래그 중이면 좌표를 누적한다(브러시 간격 기반 최소 거리 필터 —
-    // appendBrushPoint 재사용, heal-clone과 동일 패턴).
-    if (historyBrushDragRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const session = historyBrushDragRef.current;
-        const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        updateHistoryBrushCursorNode(p, session.frame);
-        const nextPoints = appendBrushPoint(session.points, p, session.radiusNorm);
-        if (nextPoints !== session.points) {
-          session.points = nextPoints;
-          scheduleHistoryBrushDragPreview({ points: nextPoints });
-        }
-      }
-      return;
-    }
-    // 마퀴 드래그 중이면 선택 박스를 갱신한다.
-    if (marqueeStartRef.current) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const s = marqueeStartRef.current;
-        scheduleMarqueeRect(normalizeMarqueeRect(s.x, s.y, pos.x, pos.y));
-      }
-      return;
-    }
-    // 커서 프리뷰: 드로잉/문지르기/복구브러시 세 무장 상태는 disarmAllPixelTools로 서로
-    // 상호배제되지만 tool("select"|"draw")은 독립된 축이라(이미지 선택 + 스머지 켬 + tool="draw"가
-    // 동시에 성립 가능), 셋 다 조건이 참일 수 있는 경우를 else if 로 묶어 한 프레임에 커서 하나만
-    // (그리고 batchDraw 한 번만) 갱신되게 한다 — onStageDown 의 armed 우선순위(smudge/healClone이
-    // draw 브러시보다 우선)와 동일 순서.
-    if (smudgeArmed || liquifyArmed || dodgeBurnArmed || wetMixArmed) {
-      const cursorPos = e.target.getStage()?.getRelativePointerPosition();
-      const cursorNode = smudgeCursorRef.current;
-      if (cursorPos && cursorNode) {
-        cursorNode.position(cursorPos);
-        if (!cursorNode.visible()) cursorNode.visible(true);
-        cursorNode.getLayer()?.batchDraw();
-      }
-    } else if (layerMaskPaintArmed || quickMaskArmed) {
-      const cursorPos = e.target.getStage()?.getRelativePointerPosition();
-      const cursorNode = layerMaskCursorRef.current;
-      if (cursorPos && cursorNode) {
-        cursorNode.position(cursorPos);
-        if (!cursorNode.visible()) cursorNode.visible(true);
-        cursorNode.getLayer()?.batchDraw();
-      }
-    } else if (filterMaskPaintArmed) {
-      const cursorPos = e.target.getStage()?.getRelativePointerPosition();
-      const cursorNode = filterMaskCursorRef.current;
-      if (cursorPos && cursorNode) {
-        cursorNode.position(cursorPos);
-        if (!cursorNode.visible()) cursorNode.visible(true);
-        cursorNode.getLayer()?.batchDraw();
-      }
-    } else if (healCloneArmed && selected?.type === "image") {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const frame: SelectionFrame = {
-          x: selected.x,
-          y: selected.y,
-          width: selected.width,
-          height: selected.height,
-          rotation: selected.rotation,
-        };
-        updateHealCloneCursorNodes(canvasPointToNormalized(pos.x, pos.y, frame), frame);
-      }
-    } else if (historyBrushArmed && selected?.type === "image") {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (pos) {
-        const frame: SelectionFrame = {
-          x: selected.x,
-          y: selected.y,
-          width: selected.width,
-          height: selected.height,
-          rotation: selected.rotation,
-        };
-        updateHistoryBrushCursorNode(canvasPointToNormalized(pos.x, pos.y, frame), frame);
-      }
-    } else if (tool === "draw" && isStudioBrushCursorMode(drawMode)) {
-      const brushPointerEvent = e.evt as PointerEvent;
-      updateBrushCursor(e.target.getStage(), brushPointerEvent);
-    }
-    if (tool !== "draw" || !drawingRef.current) return;
-    const pointerEvent = e.evt as PointerEvent;
-    if (!isStudioStrokePointerEvent(requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession(), pointerEvent)) return;
-    // Mouse: buttons can report 0 mid-drag when release is lost (capture fail / leave window).
-    // Pen/touch must not end on buttons alone — drivers often omit a reliable mask mid-stroke.
-    if (shouldEndStudioStrokeForReleasedContact(requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession(), pointerEvent)) {
-      // Do not stop QuickShape before finish — finishDrawingPointer snapshots hold/lock first.
-      if (colorWheelTimerRef.current) {
-        clearTimeout(colorWheelTimerRef.current);
-        colorWheelTimerRef.current = null;
-      }
-      // This is a non-contact hover event used only to detect a lost mouse release. Consuming its
-      // current coordinates would connect the last ink sample to wherever the mouse re-entered.
-      finishDrawingPointer(e.target.getStage(), pointerEvent, { consumeReleaseSample: false });
-      return;
-    }
-    const kind = drawingRef.current.kind ?? "freehand";
-    if (drawMode === "pen") {
-      // QuickShape 정지-감지용 포인터 위치 — freehand 누적 경로와 도형-드래그 경로 둘 다에서
-      // 실행돼야 하므로 kind 분기 이전에 넣는다(각 분기가 이후 자체적으로 위치를 다시 얻는 것과
-      // 별개 — getRelativePointerPosition 은 가벼운 조회라 중복 호출 비용은 무시할 만하다).
-      const qsPos = e.target.getStage()?.getRelativePointerPosition();
-      if (qsPos) noteQuickShapePointerMoved(qsPos);
-    }
-    if (kind === "freehand") {
-      // Active freehand ink is consumed once by the native capture listener. This Stage event is
-      // the processed duplicate and remains responsible only for cursor/presence/QuickShape UI.
-      return;
-    }
-    const stage = e.target.getStage();
-    if (stage) updateActiveShapeEndpoint(stage, pointerEvent, true);
-  }
-  function appendFixedRateStrokeSamples(
-    samples: readonly FixedRateStrokeFilteredSample[],
-    pointerSample: PointerEvent,
-    speed: number
-  ) {
-    const current = drawingRef.current;
-    if (!current || samples.length === 0) return;
-    const capturePointerDynamics = current.mode === "pen"
-      && resolveStudioCapturedBrushDynamicsPresetId(current) !== null;
-    const captureInkSensorChannels =
-      current.mode === "pen" && current.inkInput !== undefined;
-    const captureExtendedInkSensorChannels =
-      current.mode === "pen" && isStudioInkInputContractV2(current.inkInput);
-    const captureStylus = current.mode === "pen"
-      && (
-        current.brush === "calligraphy"
-        || capturePointerDynamics
-        || captureInkSensorChannels
-      );
-    const captureMotionChannels =
-      capturePointerDynamics || captureInkSensorChannels;
-    const stylus = captureStylus ? normalizeCalligraphyStylusInput(pointerSample) : null;
-    const tangentialPressure = Number.isFinite(pointerSample.tangentialPressure)
-      ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
-      : 0;
-    const mutateDirectly = (
-      (liveDraftDirectRef.current && liveInkOverlayRendererRef.current.isActive)
-      || (liveStampDraftDirectRef.current && liveStampOverlayRendererRef.current.isActive)
-      || (
-        liveDynamicBrushDraftDirectRef.current
-        && liveDynamicBrushOverlayRendererRef.current.isActive
-      )
-      || (
-        liveWetInkDraftDirectRef.current
-        && liveWetInkOverlayRendererRef.current.isActive
-      )
-    )
-      && !gpuLiveInkPinnedRef.current
-      && (
-        !drawingPredictionPreviewRef.current
-        || drawingPredictionBatchMutationRef.current
-      );
-    // current.points가 지난 호출에서 우리가 만든 배열이면 같은 스트로크 동안 그대로 이어붙인다.
-    // WebGPU journal은 매 프레임 동결된 새 접미사만 보관하고 이 원본 배열을 노출하지 않으므로,
-    // GPU 파인 중에도 전체 prefix 복제 없이 O(새 샘플 수)로 진행할 수 있다. 바깥 DrawEl(next)은
-    // 매 호출 새 객체라 scheduleDraft의 참조 기반 변경 감지는 그대로 유지된다.
-    const ownsCurrentArrays = !mutateDirectly
-      && current.points === drawingFixedRateOwnedPointsRef.current;
-    const reuseOrClone = <T,>(shouldTrack: boolean, arr: T[] | undefined): T[] | undefined => {
-      if (!shouldTrack || !arr) return arr;
-      return ownsCurrentArrays ? arr : [...arr];
-    };
-    const next: DrawEl = mutateDirectly
-      ? current
-      : {
-          ...current,
-          points: ownsCurrentArrays ? current.points : [...current.points],
-          pressures: reuseOrClone(true, current.pressures),
-          tiltXs: reuseOrClone(captureStylus, current.tiltXs),
-          tiltYs: reuseOrClone(captureStylus, current.tiltYs),
-          twists: reuseOrClone(captureStylus, current.twists),
-          speeds: reuseOrClone(captureMotionChannels, current.speeds),
-          tangentialPressures: reuseOrClone(
-            captureMotionChannels,
-            current.tangentialPressures,
-          ),
-          altitudeAngles: reuseOrClone(
-            captureExtendedInkSensorChannels,
-            current.altitudeAngles,
-          ),
-          azimuthAngles: reuseOrClone(
-            captureExtendedInkSensorChannels,
-            current.azimuthAngles,
-          ),
-          contactWidths: reuseOrClone(
-            captureExtendedInkSensorChannels,
-            current.contactWidths,
-          ),
-          contactHeights: reuseOrClone(
-            captureExtendedInkSensorChannels,
-            current.contactHeights,
-          ),
-          sampleTimeOffsets: reuseOrClone(
-            captureExtendedInkSensorChannels,
-            current.sampleTimeOffsets,
-          ),
-        };
-    if (!mutateDirectly) {
-      drawingFixedRateOwnedPointsRef.current = next.points;
-    }
-    let appended = false;
-    const appendAligned = (
-      values: number[] | undefined,
-      count: number,
-      value: number,
-      fallback: number
-    ): number[] => {
-      const aligned = values ?? [];
-      while (aligned.length < count) aligned.push(fallback);
-      if (aligned.length > count) aligned.length = count;
-      aligned.push(value);
-      return aligned;
-    };
-    for (const sample of samples) {
-      const lastX = next.points[next.points.length - 2] ?? sample.x;
-      const lastY = next.points[next.points.length - 1] ?? sample.y;
-      const pointCount = Math.floor(next.points.length / 2);
-      const lastPressure = next.pressures?.[pointCount - 1]
-        ?? studioInkFallbackPressure(next.pressureModel);
-      const minimumDistance = next.sampleSpacing ?? strokeSampleDistanceForScale(effScale);
-      if (!shouldAppendStudioCausalInkSample({
-        lastX,
-        lastY,
-        lastPressure,
-        nextX: sample.x,
-        nextY: sample.y,
-        nextPressure: sample.pressure,
-        minDistance: minimumDistance,
-        pressureModel: next.pressureModel,
-      })) continue;
-      next.points.push(sample.x, sample.y);
-      next.pressures = appendAligned(
-        next.pressures,
-        pointCount,
-        sample.pressure,
-        studioInkFallbackPressure(next.pressureModel)
-      );
-      if (captureStylus && stylus) {
-        next.tiltXs = appendAligned(next.tiltXs, pointCount, sample.tiltX, 0);
-        next.tiltYs = appendAligned(next.tiltYs, pointCount, sample.tiltY, 0);
-        next.twists = appendAligned(next.twists, pointCount, stylus.twist, 0);
-      }
-      if (captureMotionChannels) {
-        next.speeds = appendAligned(next.speeds, pointCount, speed, 0);
-        next.tangentialPressures = appendAligned(
-          next.tangentialPressures,
-          pointCount,
-          tangentialPressure,
-          0
-        );
-      }
-      if (captureExtendedInkSensorChannels) {
-        const persistedPointerChannels = normalizeStudioPersistedPointerChannels(
-          pointerSample,
-          {
-            timeOriginMilliseconds:
-              drawingInkTimeOriginRef.current ?? pointerSample.timeStamp,
-            previousTimeOffsetMilliseconds: next.sampleTimeOffsets?.at(-1) ?? 0,
-            sourceTimeMilliseconds: sample.sourceTimeStamp,
-          },
-        );
-        next.altitudeAngles = appendAligned(
-          next.altitudeAngles,
-          pointCount,
-          persistedPointerChannels.altitudeAngle,
-          Math.PI / 2,
-        );
-        next.azimuthAngles = appendAligned(
-          next.azimuthAngles,
-          pointCount,
-          persistedPointerChannels.azimuthAngle,
-          0,
-        );
-        next.contactWidths = appendAligned(
-          next.contactWidths,
-          pointCount,
-          persistedPointerChannels.contactWidth,
-          1,
-        );
-        next.contactHeights = appendAligned(
-          next.contactHeights,
-          pointCount,
-          persistedPointerChannels.contactHeight,
-          1,
-        );
-        next.sampleTimeOffsets = appendAligned(
-          next.sampleTimeOffsets,
-          pointCount,
-          persistedPointerChannels.timeOffsetMilliseconds,
-          0,
-        );
-      }
-      appended = true;
-    }
-    if (!appended) return;
-    drawingRef.current = next;
-    if (!drawingPredictionPreviewRef.current) scheduleDraft(next);
-  }
-  // 자유선 스트로크에 점 하나를 추가한다(압력 계산 + 원근 스냅 + 손떨림 보정 + 최소간격 필터) —
-  // native capture pointermove 배치의 coalesced event마다 이 함수를 반복 호출해 여러 점을
-  // 한 번에 누적한다(단일 pointermove 당 한 번 호출해도 기존과 동일하게 동작).
-  function appendFreehandStrokePoint(
-    pos: { x: number; y: number },
-    pointerSample: PointerEvent,
-    pressureOverride?: number,
-    canonicalTimeStamp?: number
-  ) {
-    const current = drawingRef.current;
-    if (!current) return;
-    const inputSettings = drawingInputSettingsRef.current;
-    const rawLastX = current.points[current.points.length - 2] ?? pos.x;
-    const rawLastY = current.points[current.points.length - 1] ?? pos.y;
-    const sampleTimeStamp = typeof canonicalTimeStamp === "number" && Number.isFinite(canonicalTimeStamp)
-      ? canonicalTimeStamp
-      : pointerSample.timeStamp;
-    const timingSample = {
-      clientX: pointerSample.clientX,
-      clientY: pointerSample.clientY,
-      timeStamp: sampleTimeStamp,
-    };
-    const previousVelocity = drawingVelocityRef.current ?? createStudioPointerVelocityState(timingSample);
-    const velocitySample = sampleStudioPointerVelocity(previousVelocity, timingSample);
-    drawingVelocityRef.current = velocitySample.state;
-    const velocityPressure = advanceStudioBrushVelocityPressure(
-      drawingVelocityPressureRef.current,
-      {
-        x: pointerSample.clientX,
-        y: pointerSample.clientY,
-        timeMs: sampleTimeStamp,
-        pointerType: pointerSample.pointerType,
-        pressure: pointerSample.pressure,
-      },
-      {
-        brushId: current.brush,
-        pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
-        pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
-        useVelocityPressure: inputSettings?.useVelocityPressure ?? useVelocityPressure,
-        velocitySensitivity:
-          inputSettings?.velocitySensitivity ?? velocitySensitivity,
-        fallbackPressure: studioInkFallbackPressure(current.pressureModel),
-      }
-    );
-    drawingVelocityPressureRef.current = velocityPressure.state;
-    let pressure = typeof pressureOverride === "number" && Number.isFinite(pressureOverride)
-      ? Math.min(1, Math.max(0, pressureOverride))
-      : velocityPressure.pressure;
-    let targetX = pos.x;
-    let targetY = pos.y;
-    if (
-      drawingThinLineInkInputRef.current
-      && shouldFilterStudioThinLineInkInput({
-        brushId: current.brush,
-        immediateCausalInput: drawingImmediateCausalInputRef.current,
-      })
-    ) {
-      const filtered = filterStudioThinLineInkInput(
-        drawingThinLineInkInputRef.current,
-        { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
-        inputSettings?.coordinateScale ?? effScale,
-      );
-      if (!drawingPredictionPreviewRef.current) {
-        drawingThinLineInkInputRef.current = filtered.state;
-      }
-      targetX = filtered.x;
-      targetY = filtered.y;
-    }
-    if (
-      drawingImmediateCausalInputRef.current
-      || drawingFixedRateFilterRef.current !== null
-    ) {
-      const stylus = normalizeCalligraphyStylusInput(pointerSample);
-      const quantized = quantizeFixedRateStrokeSample({
-        x: targetX,
-        y: targetY,
-        positionScale: inputSettings?.coordinateScale ?? effScale,
-        pressure,
-        tiltX: stylus.tiltX,
-        tiltY: stylus.tiltY,
-        timeStamp: sampleTimeStamp,
-      });
-      targetX = quantized.x;
-      targetY = quantized.y;
-      pressure = quantized.pressure;
-    }
-    if (!drawingPredictionPreviewRef.current) scheduleLiveDrawPressure(pressure);
-
-    // Commercial freehand + Shift: force a clean straight line from stroke origin (0/45/90°).
-    // Applied before perspective/isometric so the artist's explicit Shift intent wins.
-    if (pointerSample.shiftKey && current.mode !== "eraser" && current.points.length >= 2) {
-      const transition = resolveShiftFreehandTransition({
-        currentPoints: current.points,
-        currentPressures: current.pressures,
-        endX: targetX,
-        endY: targetY,
-        pressure,
-      });
-      const shiftPersistsExtendedChannels = isStudioInkInputContractV2(
-        current.inkInput,
-      );
-      const shiftPointerChannels = normalizeStudioPersistedPointerChannels(
-        pointerSample,
-        {
-          timeOriginMilliseconds:
-            drawingInkTimeOriginRef.current ?? pointerSample.timeStamp,
-          previousTimeOffsetMilliseconds: current.sampleTimeOffsets?.[0] ?? 0,
-          sourceTimeMilliseconds: pointerSample.timeStamp,
-        },
-      );
-      const shiftStylus = shiftPersistsExtendedChannels
-        ? normalizeCalligraphyStylusInput(pointerSample)
-        : null;
-      const shiftTangentialPressure =
-        Number.isFinite(pointerSample.tangentialPressure)
-          ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
-          : 0;
-      const nextShift: DrawEl = {
-        ...current,
-        points: transition.points,
-        pressures: transition.pressures,
-        // A v2 retained-input stroke remains exactly aligned even while Shift replaces its whole
-        // path with a two-point segment. Legacy contracts keep their historical omitted arrays.
-        tiltXs: shiftStylus
-          ? [current.tiltXs?.[0] ?? 0, shiftStylus.tiltX]
-          : undefined,
-        tiltYs: shiftStylus
-          ? [current.tiltYs?.[0] ?? 0, shiftStylus.tiltY]
-          : undefined,
-        twists: shiftStylus
-          ? [current.twists?.[0] ?? 0, shiftStylus.twist]
-          : undefined,
-        speeds: shiftPersistsExtendedChannels
-          ? [current.speeds?.[0] ?? 0, velocitySample.speed]
-          : undefined,
-        tangentialPressures: shiftPersistsExtendedChannels
-          ? [
-              current.tangentialPressures?.[0] ?? 0,
-              shiftTangentialPressure,
-            ]
-          : undefined,
-        altitudeAngles: shiftPersistsExtendedChannels
-          ? [
-              current.altitudeAngles?.[0] ?? Math.PI / 2,
-              shiftPointerChannels.altitudeAngle,
-            ]
-          : undefined,
-        azimuthAngles: shiftPersistsExtendedChannels
-          ? [
-              current.azimuthAngles?.[0] ?? 0,
-              shiftPointerChannels.azimuthAngle,
-            ]
-          : undefined,
-        contactWidths: shiftPersistsExtendedChannels
-          ? [
-              current.contactWidths?.[0] ?? 1,
-              shiftPointerChannels.contactWidth,
-            ]
-          : undefined,
-        contactHeights: shiftPersistsExtendedChannels
-          ? [
-              current.contactHeights?.[0] ?? 1,
-              shiftPointerChannels.contactHeight,
-            ]
-          : undefined,
-        sampleTimeOffsets: shiftPersistsExtendedChannels
-          ? [
-              current.sampleTimeOffsets?.[0] ?? 0,
-              shiftPointerChannels.timeOffsetMilliseconds,
-            ]
-          : undefined,
-      };
-      // Shift replaces the endpoint instead of appending samples. Retained Canvas/WebGPU surfaces
-      // cannot erase the previous preview safely, so hand this gesture to the replaceable draft
-      // layer before publishing its first constrained line.
-      if (
-        (liveDraftDirectRef.current || liveStampDraftDirectRef.current)
-        && !drawingPredictionPreviewRef.current
-      ) exitDirectLiveDraft();
-      // The Shift gesture replaces the whole freehand suffix. A pre-constraint stabilizer still
-      // points at the old raw sample and would be flushed after the snapped endpoint on pointer-up,
-      // making the stroke run backwards. Recreate it lazily only if a later unconstrained move
-      // resumes the freehand gesture.
-      drawingStabilizerRef.current = transition.stabilizerState;
-      drawingThinLineInkInputRef.current = null;
-      drawingPrecisionStabilizerBridgeRef.current?.reset();
-      drawingPrecisionStabilizerBridgeRef.current = null;
-      // A replace-in-place Shift gesture cannot retain the old fixed-clock history. If the artist
-      // releases Shift within the same contact, continue on the causal immediate path instead of
-      // silently switching to the unrelated legacy stabilizer engine.
-      if (drawingFixedRateFilterRef.current) drawingImmediateCausalInputRef.current = true;
-      drawingFixedRateFilterRef.current = null;
-      stopFixedRateStrokePump();
-      drawingRef.current = nextShift;
-      if (!drawingPredictionPreviewRef.current) scheduleDraft(nextShift);
-      return;
-    }
-    const strokeVanishingPoints = inputSettings?.vanishingPoints ?? vanishingPoints;
-    const strokeAdvancedRuler = inputSettings?.advancedRuler;
-    if (strokeAdvancedRuler && current.mode !== "eraser") {
-      const snapped = snapPointToAdvancedRuler(
-        strokeAdvancedRuler,
-        {
-          x: current.points[0] ?? pos.x,
-          y: current.points[1] ?? pos.y,
-        },
-        { x: targetX, y: targetY }
-      );
-      if (snapped) {
-        targetX = snapped.x;
-        targetY = snapped.y;
-      }
-    } else if (
-      (inputSettings?.perspectiveActive ?? perspectiveRulerActive)
-      && current.mode !== "eraser"
-      && strokeVanishingPoints.length > 0
-    ) {
-      // 스트로크 시작점 기준으로 소실점 하나를 골라(가장 가까운 방향) 락을 걸고, 이후 포인트를
-      // 그 직선 위로 투영한다. 락은 onStageDown/onStageUp에서 스트로크 경계마다 초기화된다.
-      if (!perspectiveRayRef.current) {
-        const startX = current.points[0] ?? pos.x;
-        const startY = current.points[1] ?? pos.y;
-        perspectiveRayRef.current = resolvePerspectiveRay(strokeVanishingPoints, startX, startY, pos.x, pos.y);
-      }
-      [targetX, targetY] = snapStrokePointToPerspective(targetX, targetY, perspectiveRayRef.current);
-    } else if (
-      shouldSnapStrokeToIsometricAxis({
-        active: inputSettings?.isometricActive ?? isometricGridActive,
-        mode: current.mode,
-        kind: current.kind ?? "freehand",
-      })
-    ) {
-      if (!isometricAxisRayRef.current) {
-        const startX = current.points[0] ?? pos.x;
-        const startY = current.points[1] ?? pos.y;
-        isometricAxisRayRef.current = resolveIsometricAxisRay(
-          inputSettings?.isometricAngleDeg ?? isometricAngleDeg,
-          startX,
-          startY,
-          pos.x,
-          pos.y
-        );
-      }
-      [targetX, targetY] = snapStrokePointToIsometricGrid(targetX, targetY, isometricAxisRayRef.current);
-    } else if (current.mode !== "eraser" && !pointerSample.shiftKey) {
-      // Freehand uses latch-based object-edge following when snap and/or alignment guides are on.
-      // Guide-only mode paints overlays without rewriting ink coordinates.
-      const sampleIndex = Math.max(0, Math.floor(current.points.length / 2));
-      const snapped = applyStrokeObjectSnapToPoint(targetX, targetY, {
-        mode: current.mode,
-        kind: current.kind ?? "freehand",
-        sampleIndex,
-        directionalRulerActive: false,
-        excludeId: current.id,
-      });
-      targetX = snapped.x;
-      targetY = snapped.y;
-    }
-    const fixedRateState = drawingFixedRateFilterRef.current;
-    if (fixedRateState) {
-      const stylus = normalizeCalligraphyStylusInput(pointerSample);
-      const transition = transitionFixedRateStrokeFilter(fixedRateState, {
-        type: "append",
-        samples: [{
-          x: targetX,
-          y: targetY,
-          positionScale: inputSettings?.coordinateScale ?? effScale,
-          pressure,
-          tiltX: stylus.tiltX,
-          tiltY: stylus.tiltY,
-          timeStamp: sampleTimeStamp,
-        }],
-      });
-      drawingFixedRateFilterRef.current = transition.state;
-      appendFixedRateStrokeSamples(transition.emitted, pointerSample, velocitySample.speed);
-      return;
-    }
-    // Pixel pencil is a raw grid tool: stabilizer strength must never bend or trail its cells.
-    // `null` at pointerdown means intentionally disabled for pixel, not "lazy-create on move".
-    if (drawMode !== "pixel" && !drawingImmediateCausalInputRef.current) {
-      const strokeStabilizerStrength = inputSettings?.stabilizer ?? stabilizer;
-      const strokeStabilizerMode = inputSettings?.stabilizerMode ?? stabilizerMode;
-      const strokeCoordinateScale = inputSettings?.coordinateScale ?? effScale;
-      const liveStabilizerState = drawingStabilizerRef.current
-        ?? createStudioStrokeStabilizerState({
-          x: rawLastX,
-          y: rawLastY,
-          timeStamp: sampleTimeStamp,
-        });
-      let stabilized: ReturnType<typeof stabilizeStudioStrokeSample>;
-      if (strokeStabilizerMode === "precision" && strokeStabilizerStrength > 0) {
-        const precisionBridgeOptions = {
-          strength: strokeStabilizerStrength,
-          mode: "precision" as const,
-          coordinateScale: strokeCoordinateScale,
-          useLazyPrecision: true,
-          lazyPointerPolicy: "all" as const,
-        };
-        const precisionPointerType =
-          pointerSample.pointerType === "mouse"
-          || pointerSample.pointerType === "pen"
-          || pointerSample.pointerType === "touch"
-            ? pointerSample.pointerType
-            : "unknown";
-        let precisionBridge = drawingPrecisionStabilizerBridgeRef.current;
-        if (!precisionBridge && !drawingPredictionPreviewRef.current) {
-          // Shift replacement deliberately resets the provider. If freehand resumes within the
-          // same contact, re-anchor once at the retained endpoint before committing actual input.
-          precisionBridge = createStudioStrokeStabilizerBridge();
-          const first = precisionBridge.commit(
-            {
-              x: rawLastX,
-              y: rawLastY,
-              timeStamp: liveStabilizerState.timeStamp,
-              pointerType: precisionPointerType,
-              pointerId: pointerSample.pointerId,
-            },
-            precisionBridgeOptions
-          );
-          drawingStabilizerRef.current = first.state;
-          drawingPrecisionStabilizerBridgeRef.current = precisionBridge;
-        }
-        stabilized = precisionBridge
-          ? drawingPredictionPreviewRef.current
-            ? precisionBridge.preview(
-                {
-                  x: targetX,
-                  y: targetY,
-                  timeStamp: sampleTimeStamp,
-                  pointerType: precisionPointerType,
-                  pointerId: pointerSample.pointerId,
-                },
-                precisionBridgeOptions
-              )
-            : precisionBridge.commit(
-                {
-                  x: targetX,
-                  y: targetY,
-                  timeStamp: sampleTimeStamp,
-                  pointerType: precisionPointerType,
-                  pointerId: pointerSample.pointerId,
-                },
-                precisionBridgeOptions
-              )
-          : stabilizeStudioStrokeSample(
-              liveStabilizerState,
-              { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
-              {
-                strength: strokeStabilizerStrength,
-                mode: strokeStabilizerMode,
-                coordinateScale: strokeCoordinateScale,
-              }
-            );
-      } else {
-        stabilized = stabilizeStudioStrokeSample(
-          liveStabilizerState,
-          { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
-          {
-            strength: strokeStabilizerStrength,
-            mode: strokeStabilizerMode,
-            coordinateScale: strokeCoordinateScale,
-          }
-        );
-      }
-      if (!drawingPredictionPreviewRef.current) {
-        drawingStabilizerRef.current = stabilized.state;
-      }
-      [targetX, targetY] = stabilized.point;
-    }
-
-    const lastX = current.points[current.points.length - 2] ?? targetX;
-    const lastY = current.points[current.points.length - 1] ?? targetY;
-    const lastPressure = current.pressures?.at(-1)
-      ?? studioInkFallbackPressure(current.pressureModel);
-    // Repeated browser samples that collapse to the same 1/32 coordinate and 10-bit pressure add
-    // no information. A pressure-only change is retained so the incremental dab walker can update
-    // interpolation state without repainting the stationary prefix.
-    const shouldAppend = isStudioPixelPencilRenderMode(current.brush)
-      ? shouldAppendStudioPixelPencilSample({
-          lastX,
-          lastY,
-          nextX: targetX,
-          nextY: targetY,
-        })
-      : shouldAppendStudioCausalInkSample({
-          lastX,
-          lastY,
-          lastPressure,
-          nextX: targetX,
-          nextY: targetY,
-          nextPressure: pressure,
-          minDistance: current.sampleSpacing
-            ?? strokeSampleDistanceForScale(inputSettings?.coordinateScale ?? effScale),
-          pressureModel: current.pressureModel,
-        });
-    if (!shouldAppend) return;
-    const capturePointerDynamics = current.mode === "pen"
-      && resolveStudioCapturedBrushDynamicsPresetId(current) !== null;
-    const captureInkSensorChannels =
-      current.mode === "pen" && current.inkInput !== undefined;
-    const captureExtendedInkSensorChannels =
-      current.mode === "pen" && isStudioInkInputContractV2(current.inkInput);
-    const captureStylus = current.mode === "pen" && (
-      current.brush === "calligraphy"
-      || capturePointerDynamics
-      || captureInkSensorChannels
-    );
-    const captureMotionChannels =
-      capturePointerDynamics || captureInkSensorChannels;
-    const previousPointCount = Math.floor(current.points.length / 2);
-    const stylus = captureStylus ? normalizeCalligraphyStylusInput(pointerSample) : null;
-    const tangentialPressure = Number.isFinite(pointerSample.tangentialPressure)
-      ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
-      : 0;
-    const persistedPointerChannels = normalizeStudioPersistedPointerChannels(
-      pointerSample,
-      {
-        timeOriginMilliseconds:
-          drawingInkTimeOriginRef.current ?? pointerSample.timeStamp,
-        previousTimeOffsetMilliseconds: current.sampleTimeOffsets?.at(-1) ?? 0,
-        sourceTimeMilliseconds: pointerSample.timeStamp,
-      },
-    );
-    const appendStylusValue = (values: number[] | undefined, value: number): number[] => {
-      const aligned = Array.from(
-        { length: previousPointCount },
-        (_, index) => values?.[index] ?? 0
-      );
-      return [...aligned, value];
-    };
-    const appendMutableStylusValue = (
-      values: number[] | undefined,
-      value: number
-    ): number[] => {
-      const aligned = values ?? [];
-      if (aligned.length > previousPointCount) aligned.length = previousPointCount;
-      while (aligned.length < previousPointCount) aligned.push(0);
-      aligned.push(value);
-      return aligned;
-    };
-    // Canvas2D authoritative overlay와 compact GPU journal은 ref 전용 draft를 소비한다. GPU도
-    // 동결한 접미사만 큐에 넘기므로 원본 배열 참조는 외부에 게시되지 않는다. 두 경로 모두 새
-    // 샘플을 제자리 추가해 긴 획의 매 포인트 전체 points/pressure 복사(O(N²))를 없앤다.
-    const canAppendDirectly = (
-      (
-        (
-          (liveDraftDirectRef.current && liveInkOverlayRendererRef.current.isActive)
-          || (liveDraftDirectRef.current && isStudioPixelPencilRenderMode(current.brush))
-          || (liveStampDraftDirectRef.current && liveStampOverlayRendererRef.current.isActive)
-          || (
-            liveDynamicBrushDraftDirectRef.current
-            && liveDynamicBrushOverlayRendererRef.current.isActive
-          )
-          || (
-            liveWetInkDraftDirectRef.current
-            && liveWetInkOverlayRendererRef.current.isActive
-          )
-          || (
-            liveDraftDirectRef.current
-            && gpuLiveInkPinnedRef.current
-            && gpuLiveSourceJournalRef.current !== null
-          )
-        )
-      )
-      // These batches already cloned one private draft before their loop. Reusing that owned
-      // array turns N coalesced hardware samples into one prefix copy for non-journal paths.
-      || drawingImmediateBatchMutationRef.current
-      || drawingPredictionBatchMutationRef.current
-    )
-      && (
-        !drawingPredictionPreviewRef.current
-        || drawingPredictionBatchMutationRef.current
-      );
-    if (canAppendDirectly) {
-      current.points.push(targetX, targetY);
-      if (!current.pressures) {
-        current.pressures = Array.from(
-          { length: previousPointCount },
-          () => studioInkFallbackPressure(current.pressureModel)
-        );
-      }
-      current.pressures.push(pressure);
-      if (stylus) {
-        current.tiltXs = appendMutableStylusValue(current.tiltXs, stylus.tiltX);
-        current.tiltYs = appendMutableStylusValue(current.tiltYs, stylus.tiltY);
-        current.twists = appendMutableStylusValue(current.twists, stylus.twist);
-      }
-      if (captureMotionChannels) {
-        current.speeds = appendMutableStylusValue(current.speeds, velocitySample.speed);
-        current.tangentialPressures = appendMutableStylusValue(
-          current.tangentialPressures,
-          tangentialPressure
-        );
-      }
-      if (captureExtendedInkSensorChannels) {
-        current.altitudeAngles = appendMutableStylusValue(
-          current.altitudeAngles,
-          persistedPointerChannels.altitudeAngle,
-        );
-        current.azimuthAngles = appendMutableStylusValue(
-          current.azimuthAngles,
-          persistedPointerChannels.azimuthAngle,
-        );
-        current.contactWidths = appendMutableStylusValue(
-          current.contactWidths,
-          persistedPointerChannels.contactWidth,
-        );
-        current.contactHeights = appendMutableStylusValue(
-          current.contactHeights,
-          persistedPointerChannels.contactHeight,
-        );
-        current.sampleTimeOffsets = appendMutableStylusValue(
-          current.sampleTimeOffsets,
-          persistedPointerChannels.timeOffsetMilliseconds,
-        );
-      }
-      drawingRef.current = current;
-      // A predicted batch owns this private mutable clone only for the replaceable prediction
-      // surface below. Publishing it through scheduleDraft would leave liveDraftPendingRef/rAF
-      // pointing at future samples and append those estimates to the authoritative live overlay.
-      if (
-        !drawingImmediateBatchMutationRef.current
-        && !drawingPredictionPreviewRef.current
-      ) scheduleDraft(current);
-      return;
-    }
-    const next: DrawEl = {
-      ...current,
-      points: [...current.points, targetX, targetY],
-      pressures: current.pressures ? [...current.pressures, pressure] : [pressure],
-      tiltXs: stylus ? appendStylusValue(current.tiltXs, stylus.tiltX) : current.tiltXs,
-      tiltYs: stylus ? appendStylusValue(current.tiltYs, stylus.tiltY) : current.tiltYs,
-      twists: stylus ? appendStylusValue(current.twists, stylus.twist) : current.twists,
-      speeds: captureMotionChannels
-        ? appendStylusValue(current.speeds, velocitySample.speed)
-        : current.speeds,
-      tangentialPressures: captureMotionChannels
-        ? appendStylusValue(current.tangentialPressures, tangentialPressure)
-        : current.tangentialPressures,
-      altitudeAngles: captureExtendedInkSensorChannels
-        ? appendStylusValue(
-            current.altitudeAngles,
-            persistedPointerChannels.altitudeAngle,
-          )
-        : current.altitudeAngles,
-      azimuthAngles: captureExtendedInkSensorChannels
-        ? appendStylusValue(
-            current.azimuthAngles,
-            persistedPointerChannels.azimuthAngle,
-          )
-        : current.azimuthAngles,
-      contactWidths: captureExtendedInkSensorChannels
-        ? appendStylusValue(
-            current.contactWidths,
-            persistedPointerChannels.contactWidth,
-          )
-        : current.contactWidths,
-      contactHeights: captureExtendedInkSensorChannels
-        ? appendStylusValue(
-            current.contactHeights,
-            persistedPointerChannels.contactHeight,
-          )
-        : current.contactHeights,
-      sampleTimeOffsets: captureExtendedInkSensorChannels
-        ? appendStylusValue(
-            current.sampleTimeOffsets,
-            persistedPointerChannels.timeOffsetMilliseconds,
-          )
-        : current.sampleTimeOffsets,
-    };
-    drawingRef.current = next;
-    if (!drawingPredictionPreviewRef.current) scheduleDraft(next);
-  }
-  function appendDrawingCrdtSampleSuffix(drawing: DrawEl, startSample: number): void {
-    const crdtDocument = studioCrdtDocumentRef.current;
-    if (!crdtDocument || !drawingCrdtStrokeActiveRef.current) return;
-    drawingCrdtPublisherRef.current.append(drawing.id, {
-      snapshot: drawing,
-      startSample,
-      publish: (latestDrawing, earliestSample) => {
-        if (
-          !drawingCrdtStrokeActiveRef.current
-          || studioCrdtDocumentRef.current !== crdtDocument
-        ) {
-          throw new Error("실시간 협업 문서가 획 전송 전에 변경되었습니다.");
-        }
-        const samples = studioDrawElementSampleSlice(latestDrawing, earliestSample);
-        if (samples) crdtDocument.appendStrokeSamples(latestDrawing.id, samples);
-      },
-    });
-  }
-  function consumeFreehandPointerBatch(
-    stage: Konva.Stage,
-    pointerEvent: PointerEvent,
-    includePredicted: boolean,
-    options: {
-      dispatchedPressureOverride?: number;
-      authoritativeSource?: "coalesced-or-parent" | "parent-only";
-      coordinateMapper?: StudioStagePointerBatchMapper;
-    } = {}
-  ): boolean {
-    const session = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
-    if (!session || !isStudioStrokePointerEvent(session, pointerEvent)) return false;
-
-    // Predictions are always routed to a physically separate replaceable surface. Shift gestures
-    // replace the whole path rather than a suffix, so they intentionally stay hardware-only.
-    const predictionIsReplaceable = includePredicted && !pointerEvent.shiftKey;
-    const batch = collectStudioStrokePointerBatch(session, pointerEvent, {
-      includePredicted: predictionIsReplaceable,
-      authoritativeSource: options.authoritativeSource,
-    });
-    requireStudioDrawingPointerTransport(drawingPointerTransportRef).replaceSession(batch.session);
-    // Exact duplicate hardware deliveries have no document or preview work.
-    if (batch.authoritative.length === 0 && batch.predicted.length === 0) return false;
-    const sampleClock = drawingFixedRateSampleClockRef.current;
-    const sampleClockTransition = sampleClock && batch.authoritative.length > 0
-      ? normalizeFixedRateStrokeSampleTimeStamps(
-          sampleClock,
-          batch.authoritative.map((sample) => (
-            typeof sample.timeStamp === "number" ? sample.timeStamp : pointerEvent.timeStamp
-          )),
-          globalThis.performance?.now?.() ?? pointerEvent.timeStamp
-        )
-      : null;
-    if (sampleClockTransition) {
-      drawingFixedRateSampleClockRef.current = sampleClockTransition.state;
-    }
-    // One browser delivery shares one layout/Stage transform. Mapping the full coalesced and
-    // predicted batch from one snapshot avoids a DOM read plus transform inversion per sample.
-    const coordinateMapper = options.coordinateMapper
-      ?? stagePointerFrameMapperCacheRef.current?.mapperFor(stage)
-      ?? snapshotStudioStagePointerBatchMapper(stage);
-    const crdtSampleStart = Math.floor((drawingRef.current?.points.length ?? 0) / 2);
-    const activeDrawing = drawingRef.current;
-    const mutableDirectSurfaceActive = (
-      (
-        liveDraftDirectRef.current
-        && (
-          liveInkOverlayRendererRef.current.isActive
-          || (activeDrawing !== null && isStudioPixelPencilRenderMode(activeDrawing.brush))
-        )
-      )
-      || (
-        liveStampDraftDirectRef.current
-        && liveStampOverlayRendererRef.current.isActive
-      )
-      || (
-        liveDynamicBrushDraftDirectRef.current
-        && liveDynamicBrushOverlayRendererRef.current.isActive
-      )
-      || (
-        liveWetInkDraftDirectRef.current
-        && liveWetInkOverlayRendererRef.current.isActive
-      )
-    );
-    const compactGpuSourceJournalActive = gpuLiveInkPinnedRef.current
-      && gpuLiveSourceJournalRef.current !== null;
-    const immediateBatchMutation = !compactGpuSourceJournalActive
-      && shouldOwnStudioCoalescedBatchDraft({
-        authoritativeSampleCount: batch.authoritative.length,
-        gpuPinned: gpuLiveInkPinnedRef.current,
-        fixedRateFilterActive: drawingFixedRateFilterRef.current !== null,
-        immediateCausalInput: drawingImmediateCausalInputRef.current,
-        mutableDirectSurfaceActive,
-    });
-    if (immediateBatchMutation && drawingRef.current) {
-      const current = drawingRef.current;
-      // Clone once per browser delivery, then append every coalesced sample into that private
-      // draft. Non-overlay eraser/watercolor and legacy outline/material brushes therefore stay
-      // O(events × points), not O(hardwareSamples × points), while the previously published draft
-      // remains immutable.
-      drawingRef.current = {
-        ...current,
-        points: [...current.points],
-        pressures: current.pressures ? [...current.pressures] : undefined,
-        tiltXs: current.tiltXs ? [...current.tiltXs] : undefined,
-        tiltYs: current.tiltYs ? [...current.tiltYs] : undefined,
-        twists: current.twists ? [...current.twists] : undefined,
-        speeds: current.speeds ? [...current.speeds] : undefined,
-        tangentialPressures: current.tangentialPressures
-          ? [...current.tangentialPressures]
-          : undefined,
-        altitudeAngles: current.altitudeAngles
-          ? [...current.altitudeAngles]
-          : undefined,
-        azimuthAngles: current.azimuthAngles
-          ? [...current.azimuthAngles]
-          : undefined,
-        contactWidths: current.contactWidths
-          ? [...current.contactWidths]
-          : undefined,
-        contactHeights: current.contactHeights
-          ? [...current.contactHeights]
-          : undefined,
-        sampleTimeOffsets: current.sampleTimeOffsets
-          ? [...current.sampleTimeOffsets]
-          : undefined,
-      };
-      drawingImmediateBatchMutationRef.current = true;
-    }
-    try {
-      for (const [sampleIndex, sample] of batch.authoritative.entries()) {
-        const point = coordinateMapper.pointFor(sample);
-        if (point) {
-          drawingLastAuthoritativePointerRef.current = sample;
-          appendFreehandStrokePoint(
-            point,
-            sample,
-            sample === pointerEvent ? options.dispatchedPressureOverride : undefined,
-            sampleClockTransition?.timeStamps[sampleIndex]
-          );
-        }
-      }
-      drawingImmediateBatchMutationRef.current = false;
-
-      const authoritativeDrawing = batch.authoritative.length > 0
-        ? publishAuthoritativeFreehandSuffix(crdtSampleStart)
-        : drawingRef.current;
-      const authoritativePointCount = Math.floor((authoritativeDrawing?.points.length ?? 0) / 2);
-      const rawPreviewState = rawPenInkPreviewStateRef.current;
-      const canonicalPredictionTail = predictedInkTailStateRef.current;
-      if (
-        authoritativeDrawing
-        && rawPreviewState
-        && canonicalPredictionTail
-        && session.pointerId === rawPreviewState.pointerId
-      ) {
-        const rawSync = syncStudioRawPenInkPreviewAuthority(rawPreviewState, {
-          pointerId: rawPreviewState.pointerId,
-          generation: rawPreviewState.generation,
-          authoritativeTail: canonicalPredictionTail,
-        });
-        rawPenInkPreviewStateRef.current = rawSync.state;
-        // The canonical append has already cleared the old transient tail. Applying the same
-        // bounded command here keeps the wrapper lifecycle explicit before native predictions win.
-        liveInkPredictionRendererRef.current.apply(
-          rawSync.predictionSurface,
-          liveInkStyleFor(authoritativeDrawing),
-        );
-      }
-      if (
-        immediateBatchMutation
-        && authoritativePointCount > crdtSampleStart
-        && !liveDraftDirectRef.current
-        && !liveStampDraftDirectRef.current
-      ) {
-        scheduleDraft(authoritativeDrawing);
-      }
-      if (
-        authoritativeDrawing
-        && batch.predicted.length > 0
-        && !liveStampDraftDirectRef.current
-      ) {
-        // Predictions make the tip feel closer to the pen, but never advance drawingRef/history.
-        // Ruler locks are also restored so an estimate cannot choose the permanent perspective ray.
-        const authoritativePerspectiveRay = perspectiveRayRef.current;
-        const authoritativeIsometricRay = isometricAxisRayRef.current;
-        const authoritativeAdvancedRulerSnap = advancedRulerSnapRef.current;
-        const authoritativeFixedRateFilter = drawingFixedRateFilterRef.current;
-        const authoritativeStabilizer = drawingStabilizerRef.current;
-        const authoritativeVelocity = drawingVelocityRef.current;
-        const authoritativeVelocityPressure = drawingVelocityPressureRef.current;
-        try {
-          drawingPredictionPreviewRef.current = true;
-          const suffixDraftCandidate = liveDraftDirectRef.current && predictedInkTailStateRef.current
-            ? planStudioPredictedInkSuffixDraft({
-                points: authoritativeDrawing.points,
-                pressures: authoritativeDrawing.pressures,
-                tiltXs: authoritativeDrawing.tiltXs,
-                tiltYs: authoritativeDrawing.tiltYs,
-                twists: authoritativeDrawing.twists,
-                speeds: authoritativeDrawing.speeds,
-                tangentialPressures: authoritativeDrawing.tangentialPressures,
-                fallbackPressure: studioInkFallbackPressure(authoritativeDrawing.pressureModel),
-              })
-            : null;
-          const suffixDraft = suffixDraftCandidate?.authoritativeSampleCount === authoritativePointCount
-            ? suffixDraftCandidate
-            : null;
-          const predictionStartSampleIndex = suffixDraft?.draftPredictionStartSampleIndex
-            ?? authoritativePointCount;
-          // Direct replaceable-tail rendering needs only origin + current endpoint, so its work is
-          // independent of an already-long stroke. Causal correction and Konva fallbacks retain the
-          // complete private clone because those paths still render or compare the whole preview.
-          drawingRef.current = {
-            ...authoritativeDrawing,
-            points: suffixDraft?.points ?? [...authoritativeDrawing.points],
-            pressures: suffixDraft
-              ? suffixDraft.pressures
-              : authoritativeDrawing.pressures ? [...authoritativeDrawing.pressures] : undefined,
-            tiltXs: suffixDraft
-              ? suffixDraft.tiltXs
-              : authoritativeDrawing.tiltXs ? [...authoritativeDrawing.tiltXs] : undefined,
-            tiltYs: suffixDraft
-              ? suffixDraft.tiltYs
-              : authoritativeDrawing.tiltYs ? [...authoritativeDrawing.tiltYs] : undefined,
-            twists: suffixDraft
-              ? suffixDraft.twists
-              : authoritativeDrawing.twists ? [...authoritativeDrawing.twists] : undefined,
-            speeds: suffixDraft
-              ? suffixDraft.speeds
-              : authoritativeDrawing.speeds ? [...authoritativeDrawing.speeds] : undefined,
-            tangentialPressures: suffixDraft
-              ? suffixDraft.tangentialPressures
-              : authoritativeDrawing.tangentialPressures
-                ? [...authoritativeDrawing.tangentialPressures]
-                : undefined,
-            altitudeAngles: authoritativeDrawing.altitudeAngles
-              ? [...authoritativeDrawing.altitudeAngles]
-              : undefined,
-            azimuthAngles: authoritativeDrawing.azimuthAngles
-              ? [...authoritativeDrawing.azimuthAngles]
-              : undefined,
-            contactWidths: authoritativeDrawing.contactWidths
-              ? [...authoritativeDrawing.contactWidths]
-              : undefined,
-            contactHeights: authoritativeDrawing.contactHeights
-              ? [...authoritativeDrawing.contactHeights]
-              : undefined,
-            sampleTimeOffsets: authoritativeDrawing.sampleTimeOffsets
-              ? [...authoritativeDrawing.sampleTimeOffsets]
-              : undefined,
-          };
-          drawingPredictionBatchMutationRef.current = true;
-          for (const sample of batch.predicted) {
-            const point = coordinateMapper.pointFor(sample);
-            if (point) appendFreehandStrokePoint(point, sample);
-          }
-          const predictedPreview = drawingRef.current;
-          drawingRef.current = authoritativeDrawing;
-          if (predictedPreview && predictedPreview !== authoritativeDrawing) {
-            if (liveDraftDirectRef.current && causalPostCorrectionStateRef.current) {
-              previewCausalPostCorrectionTail(predictedPreview, authoritativePointCount);
-            } else if (liveDraftDirectRef.current && predictedInkTailStateRef.current) {
-              replacePredictedInkTail(predictedPreview, predictionStartSampleIndex);
-            } else {
-              scheduleDraft(predictedPreview);
-            }
-            const inkMeshModule = inkMeshLivePreviewModuleRef.current;
-            const inkMeshRuntime = inkMeshLivePreviewRuntimeRef.current;
-            if (inkMeshModule && inkMeshRuntime) {
-              try {
-                const meshPreview = suffixDraft
-                  ? inkMeshModule.expandStudioInkMeshPredictedSuffix(
-                      authoritativeDrawing,
-                      predictedPreview,
-                      predictionStartSampleIndex,
-                    )
-                  : predictedPreview;
-                const meshReceipt = inkMeshRuntime.previewPredicted(
-                  meshPreview,
-                  authoritativePointCount,
-                  studioLiveBrushPressureSamples(meshPreview),
-                );
-                if (inkMeshModule.isStudioInkMeshRenderedReceipt(meshReceipt)) {
-                  // Canvas prediction remains the fail-visible CPU path, but exactly one transient
-                  // tail is visible in this frame. Its state stays intact so device loss can resume
-                  // on the next browser delivery without touching DrawEl/history.
-                  liveInkPredictionRendererRef.current.clear();
-                }
-              } catch {
-                // A malformed compact preview is non-authoritative. Drop only the mesh island and
-                // leave the already-rendered Canvas2D prediction + Perfect Freehand path untouched.
-                inkMeshRuntime.cancel();
-              }
-            }
-          }
-        } finally {
-          drawingPredictionBatchMutationRef.current = false;
-          drawingPredictionPreviewRef.current = false;
-          drawingRef.current = authoritativeDrawing;
-          perspectiveRayRef.current = authoritativePerspectiveRay;
-          isometricAxisRayRef.current = authoritativeIsometricRay;
-          advancedRulerSnapRef.current = authoritativeAdvancedRulerSnap;
-          // Predicted timestamps are in the future by definition. They may draw only on the
-          // replaceable preview surface and must never advance the authoritative 5ms filter clock,
-          // otherwise the following real samples are clamped to that future tick and visibly stall.
-          drawingFixedRateFilterRef.current = authoritativeFixedRateFilter;
-          drawingStabilizerRef.current = authoritativeStabilizer;
-          drawingVelocityRef.current = authoritativeVelocity;
-          drawingVelocityPressureRef.current = authoritativeVelocityPressure;
-        }
-      }
-    } finally {
-      drawingImmediateBatchMutationRef.current = false;
-      drawingPredictionBatchMutationRef.current = false;
-      // Avoid a second Stage layout read unless the event route is outside Stage.
-      if (
-        shouldSynchronizeStudioStagePointerPosition(
-          stage.getContent(),
-          pointerEvent.target
-        )
-      ) {
-        stage.setPointersPositions(pointerEvent);
-      }
-    }
-    return true;
-  }
-
-  function publishAuthoritativeFreehandSuffix(startSample: number): DrawEl | null {
-    const authoritativeDrawing = drawingRef.current;
-    if (!authoritativeDrawing) return null;
-    // The same coalesced suffix that becomes DrawEl/CRDT authority advances Google Ink's retained
-    // InProgressStroke. Any previously displayed estimate is replaced by this exact prefix before
-    // the normal live surface flushes; no predicted sample enters this call.
-    inkMeshLivePreviewRuntimeRef.current?.synchronizeAuthoritative(
-      authoritativeDrawing,
-      liveBrushPressureSamplesFor(authoritativeDrawing),
-    );
-    appendStudioLivingInkAuthoritativeSuffix(authoritativeDrawing, startSample);
-    appendStudioHokusaiAuthoritativeSuffix(authoritativeDrawing, startSample);
-    drawingGesturePreviewPublisherRef.current.append(authoritativeDrawing, startSample);
-    if (liveDraftDirectRef.current || liveStampDraftDirectRef.current) {
-      if (causalPostCorrectionStateRef.current) {
-        appendCausalPostCorrectionState(authoritativeDrawing, startSample);
-      } else if (predictedInkTailStateRef.current) {
-        // Every real browser suffix invalidates the previous estimate first. Only the new durable
-        // suffix advances this state; the append-only live surface is never cleared or replaced.
-        appendAuthoritativePredictedInkState(authoritativeDrawing, startSample);
-      }
-      // The pointer task or frame pump already owns the earliest available presentation slot.
-      // Publish Canvas/WebGPU suffixes now instead of adding another display frame of latency.
-      flushDirectLiveDraftNow(authoritativeDrawing);
-    }
-    // Local ink is the interaction-critical path. Yjs encoding/broadcast is coalesced behind a
-    // paint opportunity; pointer release flushes the same queue before final CRDT reconciliation.
-    appendDrawingCrdtSampleSuffix(authoritativeDrawing, startSample);
-    return authoritativeDrawing;
-  }
-
-  drawingFixedRatePumpFrameRef.current = (frameTimeStamp) => {
-    const drawing = drawingRef.current;
-    const session = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
-    const filter = drawingFixedRateFilterRef.current;
-    const clock = drawingFixedRatePumpClockRef.current;
-    const pointerSample = drawingLastAuthoritativePointerRef.current;
-    if (
-      !drawing
-      || !session
-      || !filter
-      || !clock
-      || !pointerSample
-      || (drawing.kind ?? "freehand") !== "freehand"
-      || !isStudioStrokePointerEvent(session, pointerSample)
-    ) return false;
-
-    const frameClock = advanceFixedRateStrokeFrameClock(clock, frameTimeStamp);
-    drawingFixedRatePumpClockRef.current = frameClock.state;
-    const sampleClock = drawingFixedRateSampleClockRef.current;
-    if (sampleClock) {
-      drawingFixedRateSampleClockRef.current = advanceFixedRateStrokeSampleClockFloor(
-        sampleClock,
-        frameClock.watermark
-      );
-    }
-    const crdtSampleStart = Math.floor(drawing.points.length / 2);
-    const transition = transitionFixedRateStrokeFilter(filter, {
-      type: "advance",
-      timeStamp: frameClock.watermark,
-    });
-    drawingFixedRateFilterRef.current = transition.state;
-    appendFixedRateStrokeSamples(transition.emitted, pointerSample, 0);
-    const nextSampleCount = Math.floor((drawingRef.current?.points.length ?? 0) / 2);
-    if (nextSampleCount > crdtSampleStart) {
-      publishAuthoritativeFreehandSuffix(crdtSampleStart);
-    }
-    const stage = stageRef.current;
-    const pointerMapperCache = stagePointerFrameMapperCacheRef.current;
-    const strokeGuidePointer = stage && pointerMapperCache
-      ? pointerMapperCache.mapperFor(stage).pointFor(pointerSample)
-      : null;
-    updateStrokeGuide(
-      strokeGuidePointer?.x ?? Number.NaN,
-      strokeGuidePointer?.y ?? Number.NaN,
-      true,
-    );
-    return true;
-  };
-
-  // Native listeners stay mounted for one contact, while these ports always point at this render's
-  // drawing settings, document, draft surfaces and finish coordinator.
-  requireStudioDrawingPointerTransport(drawingPointerTransportRef).updatePorts({
-    getLastAuthoritativePointer: () => drawingLastAuthoritativePointerRef.current,
-    onAuthoritativeMove: (pointerEvent) => {
-      const session = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
-      const drawing = drawingRef.current;
-      if (
-        tool !== "draw"
-        || !session
-        || !drawing
-        || (drawing.kind ?? "freehand") !== "freehand"
-        || !isStudioStrokePointerEvent(session, pointerEvent)
-      ) return;
-      const stage = stageRef.current;
-      if (!stage) return;
-      if (!consumeFreehandPointerBatch(
-        stage,
-        pointerEvent,
-        canCollectStudioPointerPredictionsForActiveTail(
-          STUDIO_POINTER_PREDICTION_ENABLED,
-          session,
-          predictedInkTailStateRef.current !== null
-        ),
-      )) return;
-      const pointerMapperCache = stagePointerFrameMapperCacheRef.current;
-      if (!pointerMapperCache) return;
-      // Reuse the mapper acquired while consuming the batch.
-      const contactPoint = pointerMapperCache.mapperFor(stage).pointFor(pointerEvent);
-      // Authoritative ink wins the native pointer task. The cursor keeps only the latest position
-      // and paints once on the next frame, so a high-Hz pen cannot make a cosmetic layer delay ink.
-      updateBrushCursor(stage, pointerEvent, contactPoint, true);
-      updateStrokeGuide(
-        contactPoint?.x ?? Number.NaN,
-        contactPoint?.y ?? Number.NaN,
-        true,
-      );
-      if (drawMode === "pen" && contactPoint) noteQuickShapePointerMoved(contactPoint);
-    },
-    onRawPreviewMove: (pointerEvent) => {
-      const session = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
-      const drawing = drawingRef.current;
-      if (
-        tool !== "draw"
-        || !session
-        || session.pointerType !== "pen"
-        || !drawing
-        || (drawing.kind ?? "freehand") !== "freehand"
-        || !isStudioStrokePointerEvent(session, pointerEvent)
-      ) return;
-      const rawState = rawPenInkPreviewStateRef.current;
-      const rawCursorWanted = (
-        brushCursorRef.current !== null
-        && isStudioBrushCursorMode(drawMode)
-        && appSettingsRef.current.general.brushCursorStyle !== "none"
-      );
-      const rawGuideWanted = (
-        strokeGuideRef.current !== null
-        && appSettingsRef.current.general.showStrokeGuide
-        && (drawingInputSettingsRef.current?.stabilizer ?? stabilizer) > 0
-      );
-      // pointerrawupdate may run at 120–240 Hz. If no prediction surface or visible cosmetic
-      // consumer exists, avoid even the stage/layout coordinate snapshot on this native path.
-      if (!rawState && !rawCursorWanted && !rawGuideWanted) return;
-      const stage = stageRef.current;
-      if (!stage) return;
-      const pointerMapperCache = stagePointerFrameMapperCacheRef.current;
-      if (!pointerMapperCache) return;
-      const coordinateMapper = pointerMapperCache.mapperFor(stage);
-      const contactPoint = coordinateMapper.pointFor(pointerEvent);
-      if (rawState && contactPoint) {
-        const settings = drawingInputSettingsRef.current;
-        // Raw updates are replace-only previews. Branch from (but never publish) the latest
-        // authoritative pressure state so pencil, marker, dry-media and every other family show
-        // the same hardware-pressure curve before the processed pointer event commits it.
-        const previewPressure = advanceStudioBrushVelocityPressure(
-          drawingVelocityPressureRef.current,
-          {
-            x: pointerEvent.clientX,
-            y: pointerEvent.clientY,
-            timeMs: pointerEvent.timeStamp,
-            pointerType: pointerEvent.pointerType,
-            pressure: pointerEvent.pressure,
-          },
-          {
-            brushId: drawing.brush,
-            pressureCurve: settings?.pressureCurve ?? pressureCurve,
-            pressureMinSize: settings?.pressureMinSize ?? pressureMinSize,
-            useVelocityPressure: settings?.useVelocityPressure ?? useVelocityPressure,
-            velocitySensitivity: settings?.velocitySensitivity ?? velocitySensitivity,
-            fallbackPressure: studioInkFallbackPressure(drawing.pressureModel),
-          }
-        ).pressure;
-        const rawTransition = replaceStudioRawPenInkPreview(rawState, {
-          pointerId: pointerEvent.pointerId,
-          generation: rawState.generation,
-          eligibility: currentRawPenInkPreviewEligibility(pointerEvent, drawing),
-          point: {
-            x: contactPoint.x,
-            y: contactPoint.y,
-            pressure: studioLiveBrushPressure(drawing, previewPressure),
-          },
-        });
-        rawPenInkPreviewStateRef.current = rawTransition.state;
-        liveInkPredictionRendererRef.current.apply(
-          rawTransition.predictionSurface,
-          liveInkStyleFor(drawing),
-        );
-      }
-      // Raw ink is transient and replace-only. Durable geometry, history, CRDT, ruler locks,
-      // QuickShape recognition, and the pointer-session signature still wait for processed input.
-      updateBrushCursor(stage, pointerEvent, contactPoint, true);
-      updateStrokeGuide(
-        contactPoint?.x ?? Number.NaN,
-        contactPoint?.y ?? Number.NaN,
-        true,
-      );
-    },
-    onDiscard: () => {
-      if (!drawingRef.current && !requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) return;
-      discardDrawingPointerSession();
-    },
-    onFinish: (pointerEvent, request) => {
-      // Snapshot + stop happen inside finishDrawingPointer; clearing QuickShape here would wipe
-      // the hold/lock state used by release promotion.
-      if (!request.cancelled && colorWheelTimerRef.current) {
-        clearTimeout(colorWheelTimerRef.current);
-        colorWheelTimerRef.current = null;
-      }
-      finishDrawingPointer(stageRef.current, pointerEvent, {
-        consumeReleaseSample: request.consumeReleaseSample,
-      });
-    },
+  const {
+    onStageDown,
+    onStageMove,
+    onStagePointerCancel,
+    onStageUp,
+    onStageDragMove,
+    onStageDragEnd,
+    hideStrokeGuide,
+    hideBrushCursor,
+    hideFilterMaskCursor,
+    hideHealCloneCursors,
+    hideHistoryBrushCursor,
+    hideLayerMaskCursor,
+    hideSmudgeCursor,
+    cancelCanvasGroupDrag,
+    queueStudioRasterDrawPromotion,
+    queueStudioBg3dMagicFilterMaskPublication,
+    studioPageElementsFromHistory,
+  } = bindStudioCuttoonStagePointers({
+    activeCatalogBrush,
+    activeGroupId,
+    activeGroupIdRef,
+    activeSurfaceReviewLockedRef,
+    advancedFillAbortRef,
+    advancedFillActive,
+    advancedFillTapGestureRef,
+    advancedFillTapPayloadRef,
+    advancedFillTouchPanRef,
+    advancedFillVirtualTarget,
+    advancedRulerSnapRef,
+    announceDrawingShortcut,
+    appSettingsRef,
+    appendStudioHokusaiAuthoritativeSuffix,
+    appendStudioLivingInkAuthoritativeSuffix,
+    applyDodgeBurnStroke,
+    applyGroupSelectionState,
+    applySmudgeStroke,
+    applyStudioDrawingColor,
+    applyVectorEraseToIntersectionAt,
+    applyWetMixStroke,
+    armStudioLivingInkCanonicalHandoffTimeout,
+    autoColorCanvasSeedNonceRef,
+    autoColorPlanImageSizeRef,
+    autoColorScribbleCanvasArmed,
+    autoColorScribbleStrokeRef,
+    bakeFilterMaskPaintStroke,
+    bakeHealCloneDragStroke,
+    bakeHistoryBrushDragStroke,
+    bakeLayerMaskPaintStroke,
+    beginLiveResourceEdit,
+    beginStudioDrawLiveSurfaces,
+    brush,
+    brushCursorDrawRafRef,
+    brushCursorRef,
+    brushDynamics,
+    brushEnginePrograms,
+    brushOpacity,
+    bubbleAnchorPickActive,
+    bubbleShapeDragRef,
+    bubbleShapeRafRef,
+    cancelCanvasSelectionResize,
+    canvasInteractionUnitIds,
+    causalPostCorrectionStateRef,
+    clearStudioHokusaiVectorShadow,
+    clearStudioLivingInkVectorShadow,
+    collaborationAccessRef,
+    color,
+    colorRangePickActive,
+    colorWheelOpen,
+    colorWheelPressRef,
+    colorWheelTimerRef,
+    commit,
+    companionRuntimeRef,
+    cropAspect,
+    cropDragRef,
+    cropRect,
+    currentPageIdRef,
+    currentRawPenInkPreviewEligibility,
+    disarmAllPixelTools,
+    discardDrawingPointerSession,
+    documentSaveInFlightRef,
+    dodgeBurnActive,
+    dodgeBurnDragRef,
+    dodgeBurnRadius,
+    draftPreviewStoreRef,
+    drawMode,
+    drawShape,
+    drawingCrdtPublishErrorRef,
+    drawingCrdtPublisherRef,
+    drawingCrdtStrokeActiveRef,
+    drawingFixedRateFilterRef,
+    drawingFixedRateOwnedPointsRef,
+    drawingFixedRatePumpClockRef,
+    drawingFixedRatePumpFrameRef,
+    drawingFixedRateSampleClockRef,
+    drawingGesturePreviewPublisherRef,
+    drawingImmediateBatchMutationRef,
+    drawingImmediateCausalInputRef,
+    drawingInkTimeOriginRef,
+    drawingInputSettingsRef,
+    drawingLastAuthoritativePointerRef,
+    drawingPointerTransportRef,
+    drawingPrecisionStabilizerBridgeRef,
+    drawingPredictionBatchMutationRef,
+    drawingPredictionPreviewRef,
+    drawingRef,
+    drawingStabilizerRef,
+    drawingThinLineInkInputRef,
+    drawingVelocityPressureRef,
+    drawingVelocityRef,
+    editing,
+    editorMountedRef,
+    endLiveResourceEdit,
+    eraseToIntersection,
+    error,
+    eyedropperActive,
+    filterMaskCursorRef,
+    filterMaskDragRef,
+    filterMaskRadius,
+    finalizeLiveStrokeBackendAudit,
+    finishLiquifyPointerSession,
+    finishPendingRasterRetouchGesture,
+    finishPixelSelectionPointerSession,
+    finishPolyLassoSession,
+    flushPendingStrokeCommitsRef,
+    freehandObjectSnapLatchRef,
+    getClientPointFromKonvaEvent,
+    gpuFinalFallbackOrderIdsRef,
+    gpuLiveInkPinnedRef,
+    gpuLiveSourceJournalRef,
+    gridSize,
+    groupDragRef,
+    groupResizeRef,
+    guides,
+    handleBubbleShapePointerDown,
+    handleStudioPointCommentStageDown,
+    healCloneAligned,
+    healCloneBusy,
+    healCloneCursorRef,
+    healCloneDragRef,
+    healCloneOffsetRef,
+    healClonePreviewLineRef,
+    healCloneRadius,
+    healCloneSourceAnchor,
+    healCloneSourceCursorRef,
+    healCloneTool,
+    historyBrushBusy,
+    historyBrushCursorRef,
+    historyBrushDragRef,
+    historyBrushRadius,
+    historyBrushSourceSrc,
+    hokusaiLiveFinalizingRef,
+    hokusaiLiveOverlaySurfaceRef,
+    hokusaiLiveOverlayVisibleRef,
+    hokusaiLiveStrokeRef,
+    inkMeshLivePreviewModuleRef,
+    inkMeshLivePreviewRuntimeRef,
+    isExporting,
+    isPanning,
+    isSpacePressed,
+    isometricAxisRayRef,
+    journalPendingPixelSelectionRasterGesture,
+    journalPendingRasterRetouchGesture,
+    layerMaskCursorRef,
+    layerMaskDragRef,
+    layerMaskRadius,
+    liquifyCaptureTargetRef,
+    liquifyDragRef,
+    liquifyHandledNativeEndEventsRef,
+    liquifyMode,
+    liquifyRadius,
+    liveDraftDirectRef,
+    liveDraftLayerRef,
+    liveDraftPendingRef,
+    liveDraftVisualRef,
+    liveDynamicBrushDraftDirectRef,
+    liveDynamicBrushOverlayRendererRef,
+    liveRetainedMediaDraftDirectRef,
+    liveRetainedMediaOverlayRendererRef,
+    liveInkOverlayRendererRef,
+    liveInkPredictionRendererRef,
+    liveStampDraftDirectRef,
+    liveStampOverlayRendererRef,
+    liveWetInkDraftDirectRef,
+    liveWetInkOverlayRendererRef,
+    livingInkAcceptedAuthorityRef,
+    livingInkCanonicalHandoffRef,
+    livingInkConfigRef,
+    livingInkCoordinatorRef,
+    livingInkFinalizingRef,
+    livingInkOverlaySurfaceRef,
+    livingInkOverlayVisibleRef,
+    livingInkRejectedAuthorityRef,
+    livingInkStrokeRef,
+    livingInkWaterNoopStrokeIdsRef,
+    mainLayerRef,
+    markStudioDocumentChanged,
+    marqueeStartRef,
+    master,
+    masterEditMode,
+    masterEditModeRef,
+    nodeEditDraft,
+    nodeEditDragRef,
+    nodeEditRafRef,
+    nodeEditTool,
+    nodeRefsRef,
+    nodeSmoothStrength,
+    nodeSmoothStrengthAtDragStartRef,
+    noteQuickShapePointerMoved,
+    onStudioLivingInkOverlayPresented,
+    openColorWheelAt,
+    pagesHiRef,
+    pagesHistoryRef,
+    panelGutter,
+    panelSplitActive,
+    panelSplitDragRef,
+    panelSplitLastLineRef,
+    panelSplitPreview,
+    patchEl,
+    pendingBubbleShapeDraftRef,
+    pendingCommittedGroupDrawResetRef,
+    pendingGpuStrokesRef,
+    pendingMarqueeRectRef,
+    pendingNodeEditDraftRef,
+    pendingPixelSelectionRasterGestureRef,
+    pendingRasterRetouchGestureRef,
+    pendingStrokeCommitsRef,
+    perspectiveRayRef,
+    pickCanvasColorAt,
+    pixelBrushRadius,
+    pixelCombine,
+    pixelDragRef,
+    pixelForceCircle,
+    pixelMarqueeRasterPreparationAbortRef,
+    pixelMarqueeRasterPreparationActivationRef,
+    pixelSelRef,
+    pixelSelectionAutoTargetRef,
+    pixelSelectionCaptureTargetRef,
+    pixelSelectionHandledNativeEndEventsRef,
+    pixelTool,
+    polyLassoOperationRef,
+    polyLassoSessionRef,
+    postCorrection,
+    predictedInkTailStateRef,
+    preserveCorners,
+    pressureCurve,
+    pressureMinSize,
+    publishStudioCrdtSceneTransitionRef,
+    puppetWarpBusy,
+    queueCommittedStrokeSurfaceHandoff,
+    queueDeferredStrokeCommit,
+    queueDeferredStrokePostprocess,
+    quickMaskBrushMode,
+    quickMaskDragRef,
+    quickMaskHardness,
+    quickMaskOpacity,
+    quickMaskRadius,
+    quickMaskSessionRef,
+    quickShapeActive,
+    quickShapeConvertedRef,
+    quickShapeLivePointerOffsetRef,
+    rawPenInkPreviewStateRef,
+    rebaseStudioHistoryJournal,
+    recentColors,
+    refreshQuickMaskTint,
+    refreshStudioHokusaiVectorTailShadow,
+    releaseBubbleShapePointerCapture,
+    releaseDrawingPointerSession,
+    releaseLivingInkInputPointer,
+    restorePendingStrokeCommits,
+    runAdvancedFillAt,
+    runColorRangeSample,
+    runMagicWandSelect,
+    scheduleLiquifyLivePreview,
+    session,
+    setActiveGroupId,
+    setAutoColorCanvasSeedHit,
+    setAutoColorCanvasSeedHits,
+    setBubbleAnchorPickActive,
+    setBubbleShapeDraft,
+    setBubbleShapeSelectedPointIndex,
+    setError,
+    setEyedropperActive,
+    setHealCloneDragPreview,
+    setHealCloneSourceAnchor,
+    setLivingInkBusy,
+    setLivingInkScope,
+    setMarqueeIds,
+    setNodeEditDraft,
+    setNodeSmoothStrength,
+    setPagesHistoryState,
+    setPanelSplitHint,
+    setPanelSplitPreview,
+    setPixelSel,
+    setPolyLassoHover,
+    setPolyLassoSession,
+    setPuppetWarpPins,
+    setSelectedId,
+    settleZoomGestureRef,
+    shapeFill,
+    shared,
+    showAlignmentGuides,
+    showStudioHokusaiVectorShadow,
+    showStudioLivingInkVectorShadow,
+    smudgeActive,
+    smudgeCursorRef,
+    smudgeDragRef,
+    smudgeRadius,
+    snapEnabled,
+    snapshotQuickShapeTracking,
+    stabilizer,
+    stabilizerMode,
+    stagePointerFrameMapperCacheRef,
+    stageRef,
+    stampTuning,
+    startFixedRateStrokePump,
+    startQuickShapeTracking,
+    stopFixedRateStrokePump,
+    stopQuickShapeTracking,
+    strokeGuideMetricsNodeRef,
+    strokeGuideMetricsScaleRef,
+    strokeGuideRef,
+    strokeObjectSnapCacheRef,
+    strokeWidth,
+    studioCrdtAuthoritativeSaveBarrierRef,
+    studioCrdtDocumentRef,
+    studioCrdtSceneRuntimeRef,
+    studioFilterMaskPublicationGenerationRef,
+    studioLiveRoomRef,
+    studioRasterPublicationControllersRef,
+    studioRasterPublicationTailRef,
+    studioRasterRetouchPreparationRef,
+    studioStrokeSurfaceRouteRef,
+    symmetryCenterX,
+    symmetryCenterY,
+    symmetryRadialCount,
+    symmetryType,
+    takePendingStrokeCommits,
+    tiltEnabled,
+    tipAngle,
+    tipRoundness,
+    tool,
+    useVelocityPressure,
+    userGuides,
+    velocitySensitivity,
+    wetMixActive,
+    wetMixDragRef,
+    wetMixRadius,
+    wrapRef,
+    zoomGestureRef,
+    acquirePixelSelectionAutoTarget,
+    activePage,
+    activeSurfaceReviewLocked,
+    advancedFillArmed,
+    appendAuthoritativePredictedInkState,
+    appendCausalPostCorrectionState,
+    applyGuides,
+    applySmartGuides,
+    authorizedWorkAssetScopeId,
+    canvasH,
+    canvasInteractionBlocked,
+    clearDraftPreview,
+    clearFilterMaskDragPreview,
+    clearHealCloneDragPreview,
+    clearHistoryBrushDragPreview,
+    clearLayerMaskDragPreview,
+    clearMarqueePreview,
+    clearPaintRetouchStrokePreview,
+    clearQuickMaskDragPreview,
+    commentPinArmed,
+    currentMagneticLassoField,
+    DEFERRED_STROKE_COMMIT_IDLE_MS,
+    dodgeBurnArmed,
+    drawingAssistDocument,
+    effScale,
+    elementById,
+    elements,
+    exitDirectLiveDraft,
+    filterMaskPaintArmed,
+    flushCropRect,
+    flushDirectLiveDraftNow,
+    flushPanelSplitPreview,
+    groups,
+    healCloneArmed,
+    historyBrushArmed,
+    isRealtimeTeamSession,
+    isometricAngleDeg,
+    isometricGridActive,
+    layerMaskPaintArmed,
+    liquifyArmed,
+    liveBrushPressureSamplesFor,
+    liveInkStyleFor,
+    nodeEditArmed,
+    nodeEditHandles,
+    pages,
+    panelSplitArmed,
+    perspectiveRulerActive,
+    pixelToolArmed,
+    pixelToolGestureArmed,
+    pixelToolRasterPreparationArmed,
+    preparePixelMarqueeRasterTarget,
+    previewCausalPostCorrectionTail,
+    puppetWarpArmed,
+    quickMaskArmed,
+    replacePredictedInkTail,
+    scheduleBubbleShapeDraft,
+    scheduleCropRect,
+    scheduleDraft,
+    scheduleFilterMaskDragPreview,
+    scheduleHealCloneDragPreview,
+    scheduleHistoryBrushDragPreview,
+    scheduleLayerMaskDragPreview,
+    scheduleLiveDrawPressure,
+    scheduleMarqueeRect,
+    scheduleNodeEditDraft,
+    schedulePaintRetouchStrokePreview,
+    schedulePanelSplitPreview,
+    schedulePixelDragPreview,
+    scheduleQuickMaskDragPreview,
+    sealCausalPostCorrectionState,
+    selected,
+    settleGpuLiveStroke,
+    smudgeArmed,
+    studioAuthUserId,
+    studioCrdtOperationSyncReady,
+    updateScrollPos,
+    vanishingPoints,
+    wetMixArmed,
   });
 
-  function queueStudioBg3dMagicFilterMaskPublication(input: {
-    readonly pageId: string;
-    readonly layerId: string;
-    readonly targetElementId: string;
-    readonly mask: StudioBackground3DMagicFilterMask;
-    readonly workId: string;
-    readonly actorId: string;
-    readonly document: StudioCrdtDocument;
-    readonly runtime: StudioCrdtSceneGraphRuntime;
-    readonly accessGeneration: number;
-    readonly publicationGeneration: number;
-  }): void {
-    const controller = new AbortController();
-    studioRasterPublicationControllersRef.current.add(controller);
-    const scopeIsCurrent = () => {
-      const access = collaborationAccessRef.current;
-      return (
-        editorMountedRef.current
-        && !documentSaveInFlightRef.current
-        && !access.locked
-        && access.authScopeKey === input.actorId
-        && access.workId === input.workId
-        && access.accessGeneration === input.accessGeneration
-        && (
-          studioFilterMaskPublicationGenerationRef.current.get(input.targetElementId)
-          === input.publicationGeneration
-        )
-        && studioCrdtDocumentRef.current === input.document
-        && studioCrdtSceneRuntimeRef.current === input.runtime
-      );
-    };
-    const currentTarget = (): ImageEl | null => {
-      const history = pagesHistoryRef.current;
-      const currentIndex = Math.max(0, Math.min(pagesHiRef.current, history.length - 1));
-      const page = history[currentIndex]?.find(({ id }) => id === input.pageId) ?? null;
-      const target = page?.elements.find(({ id }) => id === input.targetElementId) ?? null;
-      if (
-        !page
-        || target?.type !== "image"
-        || target.filterMaskSrc !== input.mask.pngDataUrl
-        || target.filterMaskSurfaceId !== undefined
-        || (target.groupId ?? "page-root") !== input.layerId
-        || isEffectivelyLocked(target, page.groups ?? [])
-      ) {
-        return null;
-      }
-      return target;
-    };
-    const abortForStaleScope = (): never => {
-      throw new DOMException(
-        "3D Magic Layer 또는 공동 편집 권한이 변경되었습니다.",
-        "AbortError"
-      );
-    };
-
-    const run = async () => {
-      if (!scopeIsCurrent() || !currentTarget()) abortForStaleScope();
-      const [
-        publicationModule,
-        rasterPublisherModule,
-        assetClientModule,
-        maskImage,
-      ] = await Promise.all([
-        import("./studio-filter-mask-surface-publisher"),
-        import("./studio-crdt-raster-patch-publisher"),
-        import("./studio-raster-asset-client"),
-        loadStudioPixelEditImage(input.mask.pngDataUrl, controller.signal),
-      ]);
-      if (!scopeIsCurrent() || !currentTarget()) abortForStaleScope();
-      const width = maskImage.naturalWidth || maskImage.width;
-      const height = maskImage.naturalHeight || maskImage.height;
-      if (width !== input.mask.width || height !== input.mask.height) {
-        throw new Error("3D Magic Layer 마스크의 디코드 크기가 캡처 계약과 다릅니다.");
-      }
-      const made = createStudioPixelEditCanvas(width, height);
-      if (!made) throw new Error("3D Magic Layer 게시용 픽셀 표면을 만들 수 없습니다.");
-      made.ctx.clearRect(0, 0, width, height);
-      made.ctx.drawImage(maskImage, 0, 0);
-      const pixels = made.ctx.getImageData(0, 0, width, height).data;
-      const sourceIdentity = await input.runtime.sha256RasterSemanticParameters(
-        input.mask.pngDataUrl,
-        controller.signal
-      );
-      if (!scopeIsCurrent() || !currentTarget()) abortForStaleScope();
-      const encoder = rasterPublisherModule.createStudioRasterBrowserPngEncoder();
-
-      await publicationModule.publishStudioFilterMaskSurface({
-        workId: input.workId,
-        actorId: input.actorId,
-        pageId: input.pageId,
-        layerId: input.layerId,
-        targetElementId: input.targetElementId,
-        sourceIdentity,
-        selectedObjectStableId: input.mask.selectedObjectStableId,
-        generation: input.publicationGeneration,
-        width,
-        height,
-        pixels,
-        signal: controller.signal,
-      }, {
-        encode: encoder,
-        upload: (workId, { reference, bytes, signal }) => {
-          if (workId !== input.workId) abortForStaleScope();
-          return assetClientModule.uploadStudioRasterAsset(
-            workId,
-            reference,
-            bytes,
-            signal
-          );
-        },
-        append: (log) => {
-          if (!scopeIsCurrent() || !currentTarget()) abortForStaleScope();
-          input.document.mergeRasterOperationLog(log);
-        },
-        compensate: (workId, { reference, signal }) => {
-          if (workId !== input.workId) return Promise.resolve(false);
-          return assetClientModule.deleteUnreferencedStudioRasterAssetUpload(
-            workId,
-            reference,
-            signal
-          );
-        },
-        canWriteLayer: (guardInput) => (
-          guardInput.actorId === input.actorId
-          && guardInput.pageId === input.pageId
-          && guardInput.layerId === input.layerId
-          && guardInput.intent === "paint"
-          && scopeIsCurrent()
-          && currentTarget() !== null
-        ),
-        isCurrent: () => scopeIsCurrent() && currentTarget() !== null,
-        nextLogicalClock: () =>
-          input.runtime.nextRasterLogicalClock(input.document.getRasterOperationLogs()),
-        sha256SemanticParameters: (canonicalParameters, signal) =>
-          input.runtime.sha256RasterSemanticParameters(canonicalParameters, signal),
-        waitForAuthoritativeAck: async ({ signal }) => {
-          const barrier = studioCrdtAuthoritativeSaveBarrierRef.current;
-          if (!barrier) {
-            throw new DOMException(
-              "3D Magic Layer 서버 승인 경계가 준비되지 않았습니다.",
-              "AbortError"
-            );
-          }
-          if (!scopeIsCurrent() || signal.aborted) abortForStaleScope();
-          return barrier(10_000);
-        },
-        attachSceneReference: ({ filterMaskSurfaceId }) => {
-          if (!scopeIsCurrent() || !currentTarget()) abortForStaleScope();
-          const history = pagesHistoryRef.current;
-          const currentIndex = Math.max(0, Math.min(pagesHiRef.current, history.length - 1));
-          const admitted = attachStudioFilterMaskSurfaceAcrossHistory<El, PageState>({
-            history,
-            currentIndex,
-            targetElementId: input.targetElementId,
-            expectedInlineSource: input.mask.pngDataUrl,
-            surfaceId: filterMaskSurfaceId,
-          });
-          if (!admitted.changed || !markStudioDocumentChanged()) abortForStaleScope();
-          if (!publishStudioCrdtSceneTransitionRef.current(
-            admitted.previousCurrentPages,
-            admitted.nextCurrentPages
-          )) {
-            throw new Error("승인된 3D Magic Layer 참조를 팀 문서에 반영하지 못했습니다.");
-          }
-          pagesHistoryRef.current = admitted.history;
-          rebaseStudioHistoryJournal(
-            admitted.nextCurrentPages,
-            currentIndex,
-            "Magic filter-mask surface admission"
-          );
-          setPagesHistoryState(admitted.history);
-        },
-      });
-    };
-
-    const task = studioRasterPublicationTailRef.current
-      .catch(() => undefined)
-      .then(run);
-    studioRasterPublicationTailRef.current = task.then(
-      () => undefined,
-      () => undefined
-    );
-    void task.catch((cause: unknown) => {
-      if (
-        controller.signal.aborted
-        || (cause instanceof DOMException && cause.name === "AbortError")
-        || !scopeIsCurrent()
-      ) {
-        return;
-      }
-      setError(
-        cause instanceof Error
-          ? `3D Magic Layer 공유 표면 게시: ${cause.message} 인라인 마스크는 안전하게 유지됩니다.`
-          : "3D Magic Layer 공유 표면을 게시하지 못해 인라인 마스크를 유지했습니다."
-      );
-    }).finally(() => {
-      studioRasterPublicationControllersRef.current.delete(controller);
-      if (
-        studioFilterMaskPublicationGenerationRef.current.get(input.targetElementId)
-        === input.publicationGeneration
-      ) {
-        studioFilterMaskPublicationGenerationRef.current.delete(input.targetElementId);
-      }
-    });
-  }
-
-  function queueStudioRasterDrawPromotion(input: {
-    plan: NonNullable<ReturnType<StudioCrdtSceneGraphRuntime["planRasterDrawPromotion"]>>;
-    pageId: string;
-    layerId: string;
-    workId: string;
-    actorId: string;
-    document: StudioCrdtDocument;
-    runtime: StudioCrdtSceneGraphRuntime;
-    accessGeneration: number;
-  }): void {
-    const controller = new AbortController();
-    studioRasterPublicationControllersRef.current.add(controller);
-    const scopeIsCurrent = () => {
-      const access = collaborationAccessRef.current;
-      return editorMountedRef.current &&
-        !documentSaveInFlightRef.current &&
-        !access.locked &&
-        access.authScopeKey === input.actorId &&
-        access.workId === input.workId &&
-        access.accessGeneration === input.accessGeneration &&
-        studioCrdtDocumentRef.current === input.document &&
-        studioCrdtSceneRuntimeRef.current === input.runtime;
-    };
-    const abortForStaleScope = (): never => {
-      throw new DOMException("작품 또는 공동 편집 권한이 변경되었습니다.", "AbortError");
-    };
-    const sourceVectorIsCurrent = () => {
-      const history = pagesHistoryRef.current;
-      const currentIndex = Math.max(0, Math.min(pagesHiRef.current, history.length - 1));
-      const page = history[currentIndex]?.find(({ id }) => id === input.pageId);
-      const element = page?.elements.find(({ id }) => id === input.plan.operationId) ?? null;
-      return input.runtime.rasterDrawPromotionSourceMatches({
-        plan: input.plan,
-        element: element?.type === "draw" ? element : null,
-        pageId: input.pageId,
-        layerId: input.layerId,
-        documentWidth: CANVAS_W,
-        documentHeight: page?.canvasH ?? input.plan.surface.height,
-        panelClipped: Boolean(
-          element?.type === "draw" && page && containingPanel(element, page.elements)
-        ),
-      });
-    };
-
-    const run = async () => {
-      if (!scopeIsCurrent()) abortForStaleScope();
-      if (input.document.getRasterOperationLogs().some((log) =>
-        log.operations.some(({ operationId }) => operationId === input.plan.operationId)
-      )) return;
-
-      const [captureModule, publisherModule, assetClientModule, semanticParametersSha256] =
-        await Promise.all([
-          import("./studio-crdt-raster-stroke-capture"),
-          import("./studio-crdt-raster-patch-publisher"),
-          import("./studio-raster-asset-client"),
-          input.runtime.sha256RasterSemanticParameters(
-            input.plan.semanticParameters,
-            controller.signal
-          ),
-      ]);
-      if (!scopeIsCurrent()) abortForStaleScope();
-      if (!sourceVectorIsCurrent()) {
-        throw new DOMException("원본 벡터 획이 게시 전에 변경되었습니다.", "AbortError");
-      }
-      const captured = captureModule.captureStudioRasterStroke({
-        stroke: input.plan.stroke,
-        documentWidth: input.plan.surface.width,
-        documentHeight: input.plan.surface.height,
-      });
-      const encoder = publisherModule.createStudioRasterBrowserPngEncoder();
-      const logicalClock = input.runtime.nextRasterLogicalClock(
-        input.document.getRasterOperationLogs()
-      );
-      await publisherModule.publishStudioRasterPatch({
-        surface: input.plan.surface,
-        operationId: input.plan.operationId,
-        actorId: input.actorId,
-        logicalClock,
-        pageId: input.pageId,
-        layerId: input.layerId,
-        intent: input.plan.intent,
-        semanticParametersSha256,
-        rect: captured.bounds,
-        pixels: captured.pixels,
-      }, {
-        encode: encoder,
-        upload: ({ reference, bytes, signal }) =>
-          assetClientModule.uploadStudioRasterAsset(
-            input.workId,
-            reference,
-            bytes,
-            signal
-          ),
-        append: (log) => {
-          if (!scopeIsCurrent()) abortForStaleScope();
-          if (!sourceVectorIsCurrent()) {
-            throw new DOMException("원본 벡터 획이 게시 중 변경되었습니다.", "AbortError");
-          }
-          input.document.mergeRasterOperationLog(log);
-        },
-        canWriteLayer: (guardInput) => {
-          if (
-            guardInput.operationId !== input.plan.operationId
-            || guardInput.actorId !== input.actorId
-            || guardInput.pageId !== input.pageId
-            || guardInput.layerId !== input.layerId
-            || guardInput.intent !== input.plan.intent
-            || !scopeIsCurrent()
-          ) return false;
-          const history = pagesHistoryRef.current;
-          const currentIndex = Math.max(0, Math.min(pagesHiRef.current, history.length - 1));
-          const page = history[currentIndex]?.find(({ id }) => id === input.pageId) ?? null;
-          return sourceVectorIsCurrent() && canPublishStudioRasterLayer({
-            page,
-            pageId: input.pageId,
-            operationId: input.plan.operationId,
-            layerId: input.layerId,
-          });
-        },
-        compensate: ({ reference, signal }) =>
-          assetClientModule.deleteUnreferencedStudioRasterAssetUpload(
-            input.workId,
-            reference,
-            signal
-          ),
-      }, { signal: controller.signal });
-    };
-
-    const task = studioRasterPublicationTailRef.current
-      .catch(() => undefined)
-      .then(run);
-    studioRasterPublicationTailRef.current = task.then(
-      () => undefined,
-      () => undefined
-    );
-    void task.catch((cause: unknown) => {
-      if (
-        controller.signal.aborted ||
-        (cause instanceof DOMException && cause.name === "AbortError") ||
-        !scopeIsCurrent()
-      ) return;
-      setError(
-        cause instanceof Error
-          ? `실시간 픽셀 획 게시: ${cause.message} 기존 벡터 획은 안전하게 유지됩니다.`
-          : "실시간 픽셀 획을 게시하지 못해 기존 벡터 획을 유지했습니다."
-      );
-    }).finally(() => {
-      studioRasterPublicationControllersRef.current.delete(controller);
-    });
-  }
-
-  function releaseEndpointPointerSample(
-    pointerEvent: PointerEvent,
-    current: DrawEl,
-  ): StudioPointerReleaseEndpointSample {
-    const channels = normalizeStudioPersistedPointerChannels(pointerEvent, {
-      timeOriginMilliseconds:
-        drawingInkTimeOriginRef.current ?? pointerEvent.timeStamp,
-      previousTimeOffsetMilliseconds:
-        current.sampleTimeOffsets?.at(-1) ?? 0,
-      sourceTimeMilliseconds: pointerEvent.timeStamp,
-    });
-    return {
-      pointerType: pointerEvent.pointerType,
-      pressure: pointerEvent.pressure,
-      tiltX: pointerEvent.tiltX,
-      tiltY: pointerEvent.tiltY,
-      twist: pointerEvent.twist,
-      tangentialPressure: pointerEvent.tangentialPressure,
-      altitudeAngle: pointerEvent.altitudeAngle,
-      azimuthAngle: pointerEvent.azimuthAngle,
-      width: pointerEvent.width,
-      height: pointerEvent.height,
-      sampleTimeOffset: channels.timeOffsetMilliseconds,
-    };
-  }
-
-  function studioPageElementsFromHistory(pageId: string): El[] {
-    const history = pagesHistoryRef.current;
-    const index = Math.max(0, Math.min(pagesHiRef.current, Math.max(0, history.length - 1)));
-    return [...(
-      history[index]?.find((page) => page.id === pageId)?.elements
-      ?? pages.find((page) => page.id === pageId)?.elements
-      ?? []
-    )];
-  }
-
-  function withStudioHokusaiSource(
-    baseElements: readonly El[],
-    source: DrawEl,
-  ): El[] {
-    const next = [...baseElements];
-    const index = next.findIndex(({ id }) => id === source.id);
-    if (index >= 0) next[index] = source;
-    else next.push(source);
-    return next;
-  }
-
-  function commitStudioHokusaiFallbackVector(
-    state: StudioHokusaiPinnedLiveStroke,
-    finished: DrawEl,
-    reason: string,
-  ): void {
-    const fallbackElements = withStudioHokusaiSource(
-      studioPageElementsFromHistory(state.pageId),
-      finished,
-    );
-    const currentPage = currentPageIdRef.current === state.pageId;
-    if (currentPage) {
-      // The pointerup finally-block has already cleared the direct DrawEl refs. Install an exact
-      // settled copy before removing the material overlay so async Worker failure never flashes a
-      // blank frame while the React history commit reaches the main layer.
-      flushSync(() => {
-        draftPreviewStoreRef.current.settle(finished);
-      });
-    }
-    const committed = commit(fallbackElements, undefined, state.pageId);
-    hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
-    hokusaiLiveOverlayVisibleRef.current = false;
-    hokusaiLiveStrokeRef.current = null;
-    hokusaiLiveFinalizingRef.current = false;
-    clearStudioHokusaiVectorShadow(state);
-    if (committed) {
-      if (currentPage) {
-        setSelectedId(finished.id);
-        queueCommittedStrokeSurfaceHandoff(state.pageId, [finished.id]);
-      }
-      announceDrawingShortcut("자연매체 표면 복구 · 원본 벡터 획 저장");
-      setError(`자연매체 획을 원본 벡터로 저장했습니다. ${reason}`);
-    } else {
-      restorePendingStrokeCommits({
-        pageId: state.pageId,
-        strokes: [finished],
-        retryCount: 0,
-      });
-      // There is no active surface for an inactive page. Its bounded recovery queue remains the
-      // sole authority until that page is opened and the commit retry succeeds.
-      setError(`자연매체 결과와 벡터 저장을 즉시 확정하지 못했습니다. 복구 큐에 보존했습니다. ${reason}`);
-    }
-    liveDraftLayerRef.current?.drawScene();
-  }
-
-  function completeStudioLivingInkWaterNoop(strokeId: string, reason: string): void {
-    livingInkWaterNoopStrokeIdsRef.current.delete(strokeId);
-    const state = livingInkStrokeRef.current;
-    if (state?.strokeId === strokeId) livingInkStrokeRef.current = null;
-    livingInkOverlaySurfaceRef.current?.renderer.clear();
-    livingInkOverlayVisibleRef.current = false;
-    livingInkFinalizingRef.current = false;
-    studioStrokeSurfaceRouteRef.current = null;
-    liveDraftVisualRef.current = null;
-    liveDraftPendingRef.current = null;
-    liveDraftDirectRef.current = false;
-    setLivingInkBusy(false);
-    void livingInkCoordinatorRef.current.cancelStroke(strokeId);
-    liveDraftLayerRef.current?.drawScene();
-    announceDrawingShortcut("수채 번짐 물 도구 · 변경 없음");
-    setError(`수채 번짐 물 도구를 적용하지 못해 기존 PNG와 문서를 그대로 보존했습니다. ${reason}`);
-  }
-
-  function commitStudioLivingInkFallbackVector(
-    state: StudioLivingInkPinnedStroke,
-    finished: DrawEl,
-    reason: string,
-  ): void {
-    if (studioLivingInkFailureDisposition(state.mode) === "preserve-document-noop") {
-      completeStudioLivingInkWaterNoop(state.strokeId, reason);
-      return;
-    }
-    const cancelClaim = claimStudioStrokeSurfaceLifecycle(state.route, {
-      phase: "cancel",
-      routeKey: state.route.routeKey,
-      strokeId: state.strokeId,
-      kind: "living-ink",
-    });
-    if (cancelClaim.status !== "owned") return;
-    const fallbackElements = withStudioHokusaiSource(
-      studioPageElementsFromHistory(state.pageId),
-      finished,
-    );
-    const currentPage = currentPageIdRef.current === state.pageId;
-    if (currentPage) {
-      // A failed/blank physical frame must transfer to the newly mounted settled-run layer before
-      // the Worker canvas is cleared. Merely mutating the external store is not a paint receipt.
-      flushSync(() => {
-        draftPreviewStoreRef.current.settle(finished);
-      });
-      clearStudioLivingInkVectorShadow(state);
-    }
-    const committed = commit(fallbackElements, undefined, state.pageId);
-    livingInkOverlaySurfaceRef.current?.renderer.clear();
-    livingInkOverlayVisibleRef.current = false;
-    livingInkStrokeRef.current = null;
-    releaseLivingInkInputPointer();
-    livingInkFinalizingRef.current = false;
-    studioStrokeSurfaceRouteRef.current = null;
-    setLivingInkBusy(false);
-    void livingInkCoordinatorRef.current.cancelStroke(state.strokeId);
-    if (committed) {
-      if (currentPage) {
-        setSelectedId(finished.id);
-        queueCommittedStrokeSurfaceHandoff(state.pageId, [finished.id]);
-      }
-      announceDrawingShortcut("수채 번짐 복구 · 원본 벡터 획 저장");
-      setError(`수채 번짐 결과를 원본 벡터로 저장했습니다. ${reason}`);
-    } else {
-      restorePendingStrokeCommits({
-        pageId: state.pageId,
-        strokes: [finished],
-        retryCount: 0,
-      });
-      setError(`수채 번짐 결과를 즉시 저장하지 못해 복구 큐에 보존했습니다. ${reason}`);
-    }
-    liveDraftLayerRef.current?.drawScene();
-  }
-
-  async function finishStudioLivingInkStroke(
-    state: StudioLivingInkPinnedStroke,
-    finished: DrawEl,
-  ): Promise<void> {
-    let work: StudioLivingInkFinishedWork | null = null;
-    try {
-      const claim = claimStudioStrokeSurfaceLifecycle(state.route, {
-        phase: "finish",
-        routeKey: state.route.routeKey,
-        strokeId: state.strokeId,
-        kind: "living-ink",
-      });
-      if (claim.status !== "owned") throw new Error("pointer-down 물리 route 소유권이 바뀌었습니다.");
-      const surface = livingInkOverlaySurfaceRef.current;
-      const config = livingInkConfigRef.current;
-      if (
-        !surface
-        || surface.binding.surfaceKey !== state.surfaceKey
-        || !config
-        || livingInkStrokeRef.current !== state
-      ) throw new Error("Living Ink 최종 표면이 캔버스 좌표계와 일치하지 않습니다.");
-      work = await livingInkCoordinatorRef.current.finishStroke(
-        state.strokeId,
-        state.route.routeKey,
-      );
-      const presentation = await surface.renderer.presentCanonical(
-        work.frame,
-        state.route.routeKey,
-        surface.binding.projection,
-        (receipt) => onStudioLivingInkOverlayPresented(state, receipt),
-      );
-      if (!studioLivingInkCoverageIntersectsStroke({
-        coverage: presentation.alphaCoverage,
-        outputWidth: presentation.width,
-        outputHeight: presentation.height,
-        documentWidth: CANVAS_W,
-        documentHeight: canvasH,
-        points: finished.points,
-        diameter: studioLiveBrushEffectiveDiameter(finished),
-      })) {
-        throw new Error(
-          "Living Ink canonical PNG가 원본 획의 위치에 표시 가능한 안료를 만들지 못해 원본 벡터를 유지합니다.",
-        );
-      }
-      const result: StudioLivingInkCanonicalResult = Object.freeze({
-        src: presentation.src,
-        pngSha256: presentation.pngSha256,
-        routeKey: state.route.routeKey,
-        pageId: state.pageId,
-        documentWidth: CANVAS_W,
-        documentHeight: canvasH,
-        config,
-        journal: work.journal,
-        finalExecutionReceipt: work.frame.receipt,
-      });
-      const baseElements = withStudioHokusaiSource(
-        studioPageElementsFromHistory(state.pageId),
-        finished,
-      );
-      const existingImage = baseElements.find((element) =>
-        element.type === "image" && element.livingInkReceipt?.pageId === state.pageId
-      );
-      const transaction = createStudioLivingInkCanonicalTransaction({
-        elements: baseElements,
-        sourceElementId: finished.id,
-        canonicalImageId: existingImage?.id ?? uid(),
-        result,
-        mutationLocked:
-          collaborationAccessRef.current.locked
-          || activeSurfaceReviewLockedRef.current,
-      });
-      if (!transaction.ok) throw new Error(transaction.message);
-      const handoffClaim = claimStudioStrokeSurfaceLifecycle(state.route, {
-        phase: "handoff",
-        routeKey: state.route.routeKey,
-        strokeId: state.strokeId,
-        kind: "living-ink",
-      });
-      if (handoffClaim.status !== "owned") {
-        throw new Error("canonical 이미지 인계 route가 pointer-down 영수증과 다릅니다.");
-      }
-      const committed = commit(
-        [...transaction.transaction.nextElements],
-        undefined,
-        state.pageId,
-      );
-      if (!committed) throw new Error("문서가 잠겨 Living Ink 단일 트랜잭션을 확정하지 못했습니다.");
-      state.canonicalImageId = transaction.transaction.canonicalImageId;
-      state.canonicalPngHash = presentation.pngSha256;
-      state.transactionCommitted = true;
-      livingInkCanonicalHandoffRef.current = Object.freeze({
-        token: `${state.route.routeKey}:canonical`,
-        kind: "stroke",
-        pageId: state.pageId,
-        imageId: transaction.transaction.canonicalImageId,
-        pngHash: presentation.pngSha256,
-        strokeId: state.strokeId,
-      });
-      armStudioLivingInkCanonicalHandoffTimeout();
-      const committedCanonicalImage = transaction.transaction.nextElements.find(
-        (element): element is ImageEl =>
-          element.type === "image"
-          && element.id === transaction.transaction.canonicalImageId,
-      );
-      const committedAuthority = committedCanonicalImage?.livingInkReceipt
-        ? Object.freeze({
-            pageId: state.pageId,
-            replayToken: studioLivingInkReceiptReplayToken(committedCanonicalImage.livingInkReceipt),
-            canonicalSrc: committedCanonicalImage.src,
-          })
-        : null;
-      if (!livingInkCoordinatorRef.current.acceptFinishedStroke(work)) {
-        livingInkAcceptedAuthorityRef.current = null;
-        livingInkRejectedAuthorityRef.current = committedAuthority;
-        const message =
-          "수채 번짐 PNG는 저장됐지만 Worker 상태 고정에 실패해, 저장 영수증 재검증 전에는 물리 편집을 비활성화합니다.";
-        setError(message);
-        void livingInkCoordinatorRef.current.failClosed(message);
-      } else {
-        livingInkRejectedAuthorityRef.current = null;
-        livingInkAcceptedAuthorityRef.current = committedAuthority;
-      }
-      if (currentPageIdRef.current === state.pageId) {
-        // Automatic materialization is still part of the drawing gesture. Selecting the new
-        // page-sized image would mount image-editing chrome and move the canvas host between the
-        // live/released frame and the canonical handoff. The pixels and document coordinates are
-        // already identical; keep the drawing context stable and let the artist explicitly select
-        // the materialized layer afterward (same contract as Hokusai below).
-        setSelectedId(null);
-        setLivingInkScope("all");
-      }
-      announceDrawingShortcut("수채 번짐 · 입력·놓을 때 물리 계산, 손을 떼면 2초 고정 settle");
-      // The exact live pixels stay visible until StudioKonvaImageNode synchronously draws the same
-      // PNG hash into the main layer. No guessed requestAnimationFrame handoff is allowed.
-    } catch (cause) {
-      if (state.transactionCommitted || livingInkStrokeRef.current !== state) return;
-      if (work) await livingInkCoordinatorRef.current.rollbackFinishedStroke(work).catch(() => undefined);
-      commitStudioLivingInkFallbackVector(
-        state,
-        finished,
-        cause instanceof Error ? cause.message : "최종 물리 프레임을 검증하지 못했습니다.",
-      );
-    }
-  }
-
-  async function finishStudioHokusaiLiveStroke(
-    state: StudioHokusaiPinnedLiveStroke,
-    finished: DrawEl,
-  ): Promise<void> {
-    try {
-      const session = state.session ?? await state.beginPromise;
-      if (!session || state.failed || hokusaiLiveStrokeRef.current !== state) {
-        throw new Error("라이브 자연매체 세션이 최종화 전에 해제되었습니다.");
-      }
-      state.session = session;
-      if (state.queuedSamples.length > 0) {
-        const queued = state.queuedSamples;
-        state.queuedSamples = [];
-        state.lastAppendedSequence = session.append(queued);
-      }
-      const result: StudioHokusaiLiveCanonicalResult = await session.finish();
-      if (state.failed || hokusaiLiveStrokeRef.current !== state) {
-        throw new Error("최종 질감 결과가 도착하기 전에 문서 표면이 변경되었습니다.");
-      }
-      const expectedSourceRevision = studioHokusaiSourceRevision(finished);
-      const transaction = createStudioHokusaiLiveCanonicalTransaction({
-        elements: withStudioHokusaiSource(
-          studioPageElementsFromHistory(state.pageId),
-          finished,
-        ),
-        sourceElementId: finished.id,
-        expectedSourceRevision,
-        canonicalImageId: uid(),
-        result,
-        mutationLocked:
-          collaborationAccessRef.current.locked
-          || activeSurfaceReviewLockedRef.current,
-      });
-      if (!transaction.ok) throw new Error(transaction.message);
-      state.canonicalImageId = transaction.transaction.canonicalImageId;
-      state.canonicalPngHash = result.receipt.pngHash;
-      state.transactionCommitted = true;
-      const committed = commit(
-        [...transaction.transaction.nextElements],
-        undefined,
-        state.pageId,
-      );
-      if (!committed) {
-        state.transactionCommitted = false;
-        state.canonicalImageId = null;
-        state.canonicalPngHash = null;
-        throw new Error("문서가 저장 중이거나 잠겨 있어 단일 Hokusai 트랜잭션을 확정하지 못했습니다.");
-      }
-      if (currentPageIdRef.current === state.pageId) {
-        // Automatic brush materialization must not switch the editor into image-selection chrome.
-        // That contextual row changes the viewport's DOM offset while the pointer-up frame is
-        // being handed to the canonical PNG, making a stationary stroke appear to jump. Keep the
-        // drawing context stable; artists can explicitly select the materialized image afterward.
-        setSelectedId(null);
-      }
-      announceDrawingShortcut("Hokusai 자연매체 획 저장 완료");
-      // StudioKonvaImageNode will release the material overlay only after the exact PNG is decoded
-      // and synchronously painted into the main layer. Until then the receipted live pixels stay
-      // visible; there is deliberately no requestAnimationFrame timeout handoff here.
-    } catch (cause) {
-      // Explicit cancel, route unmount, or an already committed transaction must never be turned
-      // into a late second history entry by the async rejection path.
-      if (
-        (state.abortController.signal.aborted && hokusaiLiveStrokeRef.current !== state)
-        || state.transactionCommitted
-      ) return;
-      commitStudioHokusaiFallbackVector(
-        state,
-        finished,
-        cause instanceof Error ? cause.message : "최종 질감 결과를 검증하지 못했습니다.",
-      );
-    }
-  }
-
-  function sealStudioDrawReleaseInput(
-    stage: Konva.Stage | null,
-    pointerEvent: PointerEvent,
-    consumeReleaseSample: boolean,
-  ): DrawEl | null {
-    const inputSettings = drawingInputSettingsRef.current;
-    let authoritativeLiveStroke: DrawEl | null = null;
-    if (
-      consumeReleaseSample
-      && drawingRef.current
-      && (drawingRef.current.kind ?? "freehand") !== "freehand"
-      && stage
-    ) {
-      updateActiveShapeEndpoint(stage, pointerEvent, false);
-    }
-    const releaseLastContactPressure = drawingRef.current?.pressures?.at(-1)
-      ?? studioInkFallbackPressure(drawingRef.current?.pressureModel);
-    if (
-      consumeReleaseSample
-      && drawingRef.current
-      && (drawingRef.current.kind ?? "freehand") === "freehand"
-      && stage
-    ) {
-      consumeFreehandPointerBatch(stage, pointerEvent, false, {
-        dispatchedPressureOverride: pointerEvent.pointerType === "pen"
-          ? resolveStudioBrushReleasePressure({
-              brushId: drawingRef.current.brush,
-              pointerType: "pen",
-              rawPressure: pointerEvent.pressure,
-              lastContactPressure: releaseLastContactPressure,
-              pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
-              pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
-              fallbackPressure: releaseLastContactPressure,
-            })
-          : undefined,
-        authoritativeSource: "parent-only",
-      });
-    }
-    if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand") {
-      // The release coordinate above has already been published. Stabilizer endpoint/drain
-      // samples are locally generated, so publish only that suffix before finalizing the stroke.
-      const crdtReleaseSampleStart = Math.floor(drawingRef.current.points.length / 2);
-      const fixedRateState = drawingFixedRateFilterRef.current;
-      if (fixedRateState) {
-        const released = transitionFixedRateStrokeFilter(fixedRateState, { type: "release" });
-        drawingFixedRateFilterRef.current = released.state;
-        // Geometry and paint complete in the pointerup task. Deferring only the pixels across
-        // rAF made a released stroke continue changing while the next stroke had already begun.
-        appendFixedRateStrokeSamples(released.emitted, pointerEvent, 0);
-      } else {
-        const liveState = drawingStabilizerRef.current;
-        const flushed =
-          drawingPrecisionStabilizerBridgeRef.current?.flush()
-          ?? (liveState ? flushStudioStrokeStabilizerEndpoint(liveState) : null);
-        if (flushed) {
-          drawingStabilizerRef.current = flushed.state;
-          const current = drawingRef.current;
-          const endpointPlan = planStudioPointerReleaseEndpoint({
-            stroke: current,
-            endpoint: { x: flushed.point[0], y: flushed.point[1] },
-            pointer: releaseEndpointPointerSample(pointerEvent, current),
-            pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
-            pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
-          });
-          if (endpointPlan.appended) drawingRef.current = endpointPlan.stroke;
-        } else if (drawingThinLineInkInputRef.current) {
-          const thinLineFlush = flushStudioThinLineInkInput(drawingThinLineInkInputRef.current);
-          drawingThinLineInkInputRef.current = thinLineFlush.state;
-          const current = drawingRef.current;
-          const endpointPlan = planStudioPointerReleaseEndpoint({
-            stroke: current,
-            endpoint: { x: thinLineFlush.x, y: thinLineFlush.y },
-            pointer: releaseEndpointPointerSample(pointerEvent, current),
-            pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
-            pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
-          });
-          if (endpointPlan.appended) drawingRef.current = endpointPlan.stroke;
-        }
-      }
-      if (drawingRef.current) {
-        appendDrawingCrdtSampleSuffix(drawingRef.current, crdtReleaseSampleStart);
-        appendStudioLivingInkAuthoritativeSuffix(
-          drawingRef.current,
-          crdtReleaseSampleStart,
-        );
-        appendStudioHokusaiAuthoritativeSuffix(
-          drawingRef.current,
-          crdtReleaseSampleStart,
-        );
-      }
-      const causalPostCorrection = causalPostCorrectionStateRef.current;
-      if (drawingRef.current && causalPostCorrection?.phase === "active") {
-        const sourceSampleCount = Math.floor(drawingRef.current.points.length / 2);
-        if (sourceSampleCount > causalPostCorrection.sourceSampleCount) {
-          appendCausalPostCorrectionState(
-            drawingRef.current,
-            causalPostCorrection.sourceSampleCount
-          );
-        }
-        drawingRef.current = sealCausalPostCorrectionState(drawingRef.current);
-      }
-      authoritativeLiveStroke = drawingRef.current;
-      // release/coalesced sample과 stabilizer endpoint를 live surface에 동기적으로 반영한다.
-      // clearDraftPreview가 예약 rAF를 취소하기 전에 이 호출이 반드시 완료되어야 한다.
-      flushDirectLiveDraftNow(authoritativeLiveStroke);
-      drawingCrdtPublisherRef.current.flush(authoritativeLiveStroke.id);
-    }
-    // Shapes do not append freehand suffixes, but their deferred begin must still precede the
-    // final scene publication (or deletion of an intentionally incomplete gesture).
-    if (drawingRef.current) {
-      drawingCrdtPublisherRef.current.flush(drawingRef.current.id);
-    }
-    return authoritativeLiveStroke;
-  }
-  function finishStudioSpecialistStroke(
-    finished: DrawEl,
-  ): "ordinary" | "handled" | "handled-preserve-ink" {
-    const livingInkStroke = livingInkStrokeRef.current;
-    if (livingInkStroke?.strokeId === finished.id) {
-      if (!livingInkStroke.failed) {
-        appendStudioLivingInkAuthoritativeSuffix(
-          finished,
-          livingInkStroke.forwardedSampleCount,
-        );
-        livingInkStroke.finalDrawing = finished;
-        livingInkStroke.finishing = true;
-        livingInkFinalizingRef.current = true;
-        setLivingInkBusy(true);
-        void finishStudioLivingInkStroke(livingInkStroke, finished);
-        return "handled-preserve-ink";
-      }
-      if (studioLivingInkFailureDisposition(livingInkStroke.mode) === "preserve-document-noop") {
-        completeStudioLivingInkWaterNoop(
-          livingInkStroke.strokeId,
-          "물리 계산 또는 표시 영수증이 중단되었습니다.",
-        );
-        return "handled";
-      }
-      livingInkStrokeRef.current = null;
-      livingInkOverlayVisibleRef.current = false;
-      studioStrokeSurfaceRouteRef.current = null;
-    }
-    const hokusaiStroke = hokusaiLiveStrokeRef.current;
-    if (hokusaiStroke?.strokeId === finished.id) {
-      if (!hokusaiStroke.failed) {
-        appendStudioHokusaiAuthoritativeSuffix(
-          finished,
-          hokusaiStroke.forwardedSampleCount,
-        );
-        hokusaiStroke.finalDrawing = finished;
-        hokusaiStroke.finishing = true;
-        hokusaiLiveFinalizingRef.current = true;
-        // session.finish() waits for the latest appended sequence to be presented and acknowledged
-        // before it posts the canonical finish. The bounded vector tail remains fail-visible during
-        // that async handshake, including a stabilizer endpoint appended on pointer-up.
-        void finishStudioHokusaiLiveStroke(hokusaiStroke, finished);
-        return "handled-preserve-ink";
-      }
-      // A boundary/Worker/surface failure already restored the exact retained DrawEl. From
-      // here the ordinary synchronous commit path owns this whole stroke.
-      hokusaiLiveStrokeRef.current = null;
-      hokusaiLiveOverlayVisibleRef.current = false;
-    }
-    return "ordinary";
-  }
-  function finishDrawingPointer(
-    stage: Konva.Stage | null,
-    pointerEvent: PointerEvent,
-    options: { consumeReleaseSample?: boolean } = {}
-  ) {
-    if (!drawingRef.current && !requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) return;
-    const finishingStrokeId = drawingRef.current?.id ?? null;
-    let completedLiveStrokeBackendAudit = false;
-    let gesturePreviewFinished = false;
-    const inputSettings = drawingInputSettingsRef.current;
-    stopFixedRateStrokePump();
-    if (
-      options.consumeReleaseSample !== false
-      && quickShapeActive
-      && (drawingRef.current?.kind ?? "freehand") === "freehand"
-      && stage
-    ) {
-      stage.setPointersPositions(pointerEvent);
-      const releasePoint = stage.getRelativePointerPosition();
-      if (releasePoint) noteQuickShapePointerMoved(releasePoint);
-    }
-    const quickShapeSnapshot = snapshotQuickShapeTracking();
-    // 지연 커밋 경로에서만 true — finally 의 초안 정리가 라이브 잉크를 표면에 남기게 한다.
-        let deferInkCleanup = false;
-        // GPU 지연 표면에는 후보정 이전의, 실제 라이브 표면과 동일한 권위 획을 유지한다.
-        let authoritativeLiveStroke: DrawEl | null;
-        // Release-planner geometry used to reauthor settled live ink before handoff (anti-flicker).
-        let releaseAuthoritativeStroke: DrawEl | null = null;
-        let immediateSurfaceHandoff: { pageId: string; strokeIds: string[] } | null = null;
-        try {
-      authoritativeLiveStroke = sealStudioDrawReleaseInput(
-        stage,
-        pointerEvent,
-        options.consumeReleaseSample !== false,
-      );
-      if (authoritativeLiveStroke) {
-        // Seal the upstream InProgressStroke from hardware-backed DrawEl samples only. The mesh
-        // canvas is cleared immediately afterwards; normal release planning still owns document
-        // commit, anti-flicker handoff, and every settled pixel.
-        inkMeshLivePreviewRuntimeRef.current?.finish(
-          authoritativeLiveStroke,
-          liveBrushPressureSamplesFor(authoritativeLiveStroke),
-        );
-      } else {
-        inkMeshLivePreviewRuntimeRef.current?.cancel();
-      }
-      if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
-        const completedDrawing = drawingRef.current;
-        completedLiveStrokeBackendAudit = true;
-        const overlayRenderer = liveInkOverlayRendererRef.current;
-        const releasePostCorrectionStrength = inputSettings?.postCorrection ?? postCorrection;
-        const releasePreserveCorners = inputSettings?.preserveCorners ?? preserveCorners;
-        const releaseCausalStateSealed = causalPostCorrectionStateRef.current?.phase === "sealed";
-        const deferredPostprocessPlan = planStudioDeferredStrokePostprocess({
-          stroke: completedDrawing,
-          strength: releasePostCorrectionStrength,
-          causalStateSealed: releaseCausalStateSealed,
-          quickShapeActive,
-          workerAvailable: typeof Worker === "function",
-        });
-        const planRelease = (postCorrectionStrength: number) => planStudioDrawPointerRelease({
-          stroke: completedDrawing,
-          quickShape: {
-            active: quickShapeActive,
-            ...quickShapeSnapshot,
-          },
-          postCorrection: {
-            strength: postCorrectionStrength,
-            preserveCorners: releasePreserveCorners,
-            causalStateSealed: releaseCausalStateSealed,
-          },
-          commit: {
-            masterEditMode,
-            directLiveDraft: liveDraftDirectRef.current,
-            directInkSurfaceAvailable:
-              overlayRenderer.isActive
-              || gpuLiveInkPinnedRef.current
-              || liveDynamicBrushOverlayRendererRef.current.isActive
-              || liveWetInkOverlayRendererRef.current.isActive,
-          },
-        });
-        // Worker-worthy post-correction can leave pointerup only when the exact live draft already
-        // owns the 200ms deferred-commit window. Immediate tools retain synchronous semantics.
-        let releasePlan = planRelease(deferredPostprocessPlan ? 0 : releasePostCorrectionStrength);
-        if (deferredPostprocessPlan && releasePlan.commitMode !== "deferred") {
-          releasePlan = planRelease(releasePostCorrectionStrength);
-        }
-        const finished = releasePlan.stroke;
-        gesturePreviewFinished = drawingGesturePreviewPublisherRef.current.end(finished);
-        if (livingInkWaterNoopStrokeIdsRef.current.has(finished.id)) {
-          completeStudioLivingInkWaterNoop(
-            finished.id,
-            "물리 route가 시작 전에 거부되었습니다.",
-          );
-          return;
-        }
-        if (hasStudioCanonicalVNextQualityShadowRuntime()) {
-          // Explicitly opted-in material providers receive the exact final DrawEl once for a
-          // non-authoritative parity audit. Existing retained Studio pixels stay authoritative:
-          // this shadow returns no presentation payload and cannot perform a renderer handoff.
-          void submitStudioCanonicalVNextQualityShadowFinalParity({
-            element: finished,
-          }).catch(() => undefined);
-        }
-        releaseAuthoritativeStroke = finished;
-        if (liveWetInkDraftDirectRef.current) {
-          // Pointer-up post-correction may replace geometry after the last live append. Seal the
-          // physical overlay from the exact DrawEl that will be committed, not the pre-correction
-          // pointer snapshot, so handoff digest/endpoint cannot pop.
-          liveDraftVisualRef.current = finished;
-        }
-        if (releasePlan.quickShapeAnnouncementKind) {
-          const kind = releasePlan.quickShapeAnnouncementKind;
-          announceDrawingShortcut(`스마트 도형 · ${QUICKSHAPE_KIND_LABELS[kind] ?? kind}`);
-        }
-        const specialistRelease = finishStudioSpecialistStroke(finished);
-        if (specialistRelease !== "ordinary") {
-          deferInkCleanup = specialistRelease === "handled-preserve-ink";
-          return;
-        }
-        const deferCommit = releasePlan.commitMode === "deferred";
-        if (deferCommit) {
-          deferInkCleanup = true;
-          if (!liveDraftDirectRef.current) {
-            // 최종 형태(postCorrection·스마트도형 반영)를 settled 프리뷰로 유지한 채 커밋을 미룬다.
-            draftPreviewStoreRef.current.settle(finished);
-          }
-          if (gpuLiveInkPinnedRef.current) {
-            // Publish the sealed endpoint before preserveInk releases the active draft. Without
-            // this sync, a short final stabilizer sample would exist only in the later Konva
-            // commit and visibly pop in after the deferred interval.
-            settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
-          }
-          queueDeferredStrokeCommit(finished);
-          if (deferredPostprocessPlan) {
-            queueDeferredStrokePostprocess(
-              finished,
-              deferredPostprocessPlan.normalizedStrength,
-              releasePreserveCorners,
-            );
-          }
-        } else {
-          // Plan the bounded raster equivalent before the React commit, but keep the vector as a
-          // durable fallback until a verified replay frame is ready. Panel-clipped/complex brushes
-          // stay entirely on Konva so the migration never changes compositing semantics.
-          const rasterWorkId = authorizedWorkAssetScopeId;
-          const rasterDocument = studioCrdtDocumentRef.current;
-          const rasterRuntime = studioCrdtSceneRuntimeRef.current;
-          const rasterActorId = studioAuthUserId;
-          const rasterPlan =
-            STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
-            !masterEditMode && rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
-            studioCrdtOperationSyncReady &&
-            !containingPanel(finished, elements)
-              ? rasterRuntime.planRasterDrawPromotion({
-                  element: finished,
-                  pageId: activePage.id,
-                  documentWidth: CANVAS_W,
-                  documentHeight: canvasH,
-                })
-              : null;
-          // 즉시 커밋 앞에 대기 배치가 있으면(같은 페이지) 같은 커밋에 합쳐 유실을 막는다.
-          if (
-            pendingStrokeCommitsRef.current
-            && pendingStrokeCommitsRef.current.pageId !== activePage.id
-          ) {
-            flushPendingStrokeCommitsRef.current();
-          }
-          const merged = takePendingStrokeCommits();
-          const baseElements = merged ? [...elements, ...merged.strokes] : elements;
-          const committed = commit([...baseElements, finished]);
-          if (committed && !masterEditMode && finished.mode !== "eraser") {
-            if (liveDraftDirectRef.current) {
-              deferInkCleanup = overlayRenderer.isActive
-                || gpuLiveInkPinnedRef.current
-                || liveDynamicBrushOverlayRendererRef.current.isActive
-                || liveWetInkOverlayRendererRef.current.isActive;
-              if (gpuLiveInkPinnedRef.current) {
-                settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
-              }
-              if (!deferInkCleanup) {
-                // The live Canvas/WebGPU surface can be briefly unavailable during initial layout,
-                // resize, or device fallback. Keep an exact settled Konva copy until the committed
-                // main-layer draw receipt arrives instead of exposing a blank handoff frame.
-                draftPreviewStoreRef.current.settle(finished);
-                deferInkCleanup = true;
-              }
-            } else {
-              // 불투명도·도형 등 즉시 커밋 경로도 최종 초안을 실제 draw 영수증까지 유지한다.
-              draftPreviewStoreRef.current.settle(finished);
-              deferInkCleanup = true;
-            }
-          }
-          if (!committed) {
-            // A transient save/lock/CRDT publication race must not destroy the only completed
-            // stroke. Requeue the new stroke together with any batch consumed above and retain its
-            // exact live pixels until a later flush succeeds.
-            restorePendingStrokeCommits({
-              pageId: activePage.id,
-              strokes: [...(merged?.strokes ?? []), finished],
-              retryCount: merged?.retryCount ?? 0,
-            });
-            if (liveDraftDirectRef.current) {
-              deferInkCleanup = true;
-              if (gpuLiveInkPinnedRef.current) {
-                settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
-              } else if (
-                !overlayRenderer.isActive
-                && !liveDynamicBrushOverlayRendererRef.current.isActive
-                && !liveWetInkOverlayRendererRef.current.isActive
-                && finished.mode !== "eraser"
-              ) {
-                draftPreviewStoreRef.current.settle(finished);
-              }
-            } else {
-              draftPreviewStoreRef.current.settle(finished);
-              deferInkCleanup = true;
-            }
-          }
-          if (committed && (merged || deferInkCleanup)) {
-            immediateSurfaceHandoff = {
-              pageId: activePage.id,
-              strokeIds: [
-                ...(merged?.strokes.map((stroke) => stroke.id) ?? []),
-                finished.id,
-              ],
-            };
-          }
-          if (
-            committed && rasterPlan && rasterWorkId && rasterDocument &&
-            rasterRuntime && rasterActorId
-          ) {
-            queueStudioRasterDrawPromotion({
-              plan: rasterPlan,
-              pageId: activePage.id,
-              layerId: (finished as DrawEl & { groupId?: string }).groupId ?? "page-root",
-              workId: rasterWorkId,
-              actorId: rasterActorId,
-              document: rasterDocument,
-              runtime: rasterRuntime,
-              accessGeneration: collaborationAccessRef.current.accessGeneration,
-            });
-          }
-          if (
-            committed && merged &&
-            STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
-            !masterEditMode && rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
-            studioCrdtOperationSyncReady
-          ) {
-            for (const strokeEl of merged.strokes) {
-              if (containingPanel(strokeEl, elements)) continue;
-              const plan = rasterRuntime.planRasterDrawPromotion({
-                element: strokeEl,
-                pageId: activePage.id,
-                documentWidth: CANVAS_W,
-                documentHeight: canvasH,
-              });
-              if (!plan) continue;
-              queueStudioRasterDrawPromotion({
-                plan,
-                pageId: activePage.id,
-                layerId: (strokeEl as DrawEl & { groupId?: string }).groupId ?? "page-root",
-                workId: rasterWorkId,
-                actorId: rasterActorId,
-                document: rasterDocument,
-                runtime: rasterRuntime,
-                accessGeneration: collaborationAccessRef.current.accessGeneration,
-              });
-            }
-          }
-        }
-      } else if (drawingRef.current && drawingCrdtStrokeActiveRef.current) {
-        // Tiny geometric gestures below the intentional completion threshold are discarded locally.
-        // Remove their streaming CRDT draft as well so a hidden `drawing` record cannot reappear on
-        // reconnect or pollute the shared frontier.
-        try {
-          studioCrdtDocumentRef.current?.deleteStroke(drawingRef.current.id);
-        } catch (cause) {
-          setError(
-            cause instanceof Error
-              ? `미완성 획 정리: ${cause.message}`
-              : "미완성 실시간 획을 정리하지 못했습니다."
-          );
-        }
-      }
-    } finally {
-      if (!gesturePreviewFinished) {
-        drawingGesturePreviewPublisherRef.current.cancel(finishingStrokeId ?? undefined);
-      }
-      // Always clear the hold timer after commit/promote so a second pointerup cannot re-use it.
-      stopQuickShapeTracking();
-      if (finishingStrokeId) livingInkWaterNoopStrokeIdsRef.current.delete(finishingStrokeId);
-      // No error or stale tool ref may strand DOM capture or a predicted RAF after the stroke ends.
-      releaseDrawingPointerSession();
-      drawingRef.current = null;
-      companionRuntimeRef.current?.schedulePublish();
-      perspectiveRayRef.current = null;
-      isometricAxisRayRef.current = null;
-      advancedRulerSnapRef.current = null;
-      scheduleLiveDrawPressure(null);
-      applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
-      strokeObjectSnapCacheRef.current = null;
-      freehandObjectSnapLatchRef.current = EMPTY_FREEHAND_OBJECT_SNAP_LATCH;
-      gpuFinalFallbackOrderIdsRef.current = immediateSurfaceHandoff?.strokeIds ?? null;
-      finalizeLiveStrokeBackendAudit(
-        finishingStrokeId,
-        completedLiveStrokeBackendAudit && deferInkCleanup
-      );
-      clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
-      const finishingLivingInk = livingInkStrokeRef.current;
-      if (
-        deferInkCleanup
-        && finishingLivingInk?.finishing
-        && finishingLivingInk.finalDrawing
-        && !finishingLivingInk.overlayPresented
-      ) {
-        // A short contact can finish before the Worker presents even its first material frame.
-        // Restore the exact vector in the same pointer-up task and retire it only on a real frame
-        // or canonical-image receipt; otherwise the async finish window contains a blank canvas.
-        showStudioLivingInkVectorShadow(
-          finishingLivingInk.finalDrawing,
-          finishingLivingInk.pageId,
-        );
-      }
-      const finishingHokusai = hokusaiLiveStrokeRef.current;
-      if (
-        deferInkCleanup
-        && finishingHokusai?.finishing
-        && finishingHokusai.finalDrawing
-      ) {
-        if (!finishingHokusai.overlayPresented) {
-          // A fast pointer-up can outrun Hokusai's first dirty frame. Restore the exact retained
-          // vector synchronously, then relinquish it only when a real material frame owns pixels.
-          showStudioHokusaiVectorShadow(
-            finishingHokusai.finalDrawing,
-            finishingHokusai.pageId,
-          );
-        } else {
-          refreshStudioHokusaiVectorTailShadow(
-            finishingHokusai,
-            finishingHokusai.finalDrawing,
-          );
-        }
-      }
-      // Re-rasterize the newest settled overlay stroke from the release-planner geometry so the
-      // live Canvas footprint matches Konva/causal planning before committed-ink handoff. Without
-      // this, residual thinning / endpoint promotion can leave a one-frame pop when settled ink is
-      // released after mainLayer.draw().
-      // Pressures must use the same brush-alias live channel as appendFrom / Konva causal dabs —
-      // raw DrawEl.pressures make alias brushes flash a different radius at pointerup.
-      if (
-        deferInkCleanup
-        && releaseAuthoritativeStroke
-        && releaseAuthoritativeStroke.mode !== "eraser"
-        && liveInkOverlayRendererRef.current.hasSettledStrokes
-      ) {
-        liveInkOverlayRendererRef.current.reauthorLastSettledFromDocumentPoints({
-          style: liveInkStyleFor(releaseAuthoritativeStroke),
-          points: releaseAuthoritativeStroke.points,
-          pressures: liveBrushPressureSamplesFor(releaseAuthoritativeStroke),
-        });
-      }
-      if (immediateSurfaceHandoff) {
-        queueCommittedStrokeSurfaceHandoff(
-          immediateSurfaceHandoff.pageId,
-          immediateSurfaceHandoff.strokeIds
-        );
-      }
-      endLiveResourceEdit();
-      // 획 시작이 보류시킨 배치 타이머를 반드시 복원한다(불완전 획으로 끝나도 배치가
-      // 영원히 대기하지 않도록). 큐잉이 방금 타이머를 잡았다면 여기서는 건드리지 않는다.
-      const strandedBatch = pendingStrokeCommitsRef.current;
-      if (strandedBatch && strandedBatch.timer === null) {
-        strandedBatch.timer = globalThis.setTimeout(() => {
-          flushPendingStrokeCommitsRef.current();
-        }, DEFERRED_STROKE_COMMIT_IDLE_MS);
-      }
-    }
-  }
-  function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
-    const pointerEvent = e.evt as PointerEvent;
-    hideBrushCursor();
-    if (groupResizeRef.current) {
-      cancelCanvasSelectionResize();
-      return;
-    }
-    if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
-    if (pixelSelectionHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
-    if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
-    if (pendingRasterRetouchGestureRef.current) {
-      if (!finishPendingRasterRetouchGesture(pointerEvent, true, e.target.getStage())) return;
-      return;
-    }
-    const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
-    // Drawing owns its matching cancel before any stale tool session can early-return. A foreign
-    // pointer (typically a palm) cannot cancel the pen that opened the stroke.
-    const drawingPointerSession = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
-    if (drawingRef.current || drawingPointerSession) {
-      if (drawingPointerSession && !isStudioStrokePointerEvent(drawingPointerSession, pointerEvent)) {
-        return;
-      }
-      if (
-        drawingPointerSession
-        && shouldCommitStudioStrokeOnPointerCancel(drawingPointerSession, pointerEvent)
-      ) {
-        finishDrawingPointer(e.target.getStage(), pointerEvent, { consumeReleaseSample: false });
-      } else {
-        discardDrawingPointerSession();
-      }
-      return;
-    }
-    if (liquifyDragRef.current) {
-      if (!isStudioLiquifyPointerOwner(liquifyDragRef.current, pointerEvent)) return;
-      finishLiquifyPointerSession(pointerEvent, true, e.target.getStage());
-      return;
-    }
-    if (pixelDragRef.current) {
-      if (!finishPixelSelectionPointerSession(pointerEvent, true)) return;
-      return;
-    }
-    if (bubbleShapeDragRef.current) {
-      if (bubbleShapeDragRef.current.pointerId !== pointerId) return;
-      releaseBubbleShapePointerCapture(bubbleShapeDragRef.current);
-      bubbleShapeDragRef.current = null;
-      pendingBubbleShapeDraftRef.current = null;
-      if (bubbleShapeRafRef.current !== null) {
-        globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
-        bubbleShapeRafRef.current = null;
-      }
-      setBubbleShapeDraft(null);
-      return;
-    }
-    const current = advancedFillTapGestureRef.current;
-    if (current) {
-      const outcome = endStudioAdvancedFillTap(current, pointerId, true);
-      advancedFillTapGestureRef.current = outcome.gesture;
-      if (advancedFillTouchPanRef.current?.pointerId === pointerId) {
-        advancedFillTouchPanRef.current = null;
-      }
-      if (!outcome.gesture) advancedFillTapPayloadRef.current = null;
-      return;
-    }
-    if (cancelCanvasGroupDrag()) return;
-  }
-
-  function onStageUp(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
-    const pointerEvent = e.evt as PointerEvent;
-    // Flush freehand auto-color scribble samples collected during the drag.
-    const scribbleStroke = autoColorScribbleStrokeRef.current;
-    if (scribbleStroke) {
-      autoColorScribbleStrokeRef.current = null;
-      const planSize = autoColorPlanImageSizeRef.current;
-      const image = selected?.type === "image" ? selected : null;
-      if (planSize && image && scribbleStroke.points.length >= 4) {
-        const samples = sampleStudioAutoColorStrokeSeeds({
-          documentPoints: scribbleStroke.points,
-          image: {
-            x: image.x,
-            y: image.y,
-            width: image.width,
-            height: image.height,
-            rotation: image.rotation,
-            flipped: image.flipped,
-            flippedY: image.flippedY,
-          },
-          pixelWidth: planSize.width,
-          pixelHeight: planSize.height,
-        });
-        // Skip the first sample (already emitted on pointerdown as a single hit).
-        const rest = samples.slice(1);
-        if (rest.length > 0) {
-          const hits = rest.map((sample) => {
-            autoColorCanvasSeedNonceRef.current += 1;
-            return {
-              x: sample.x,
-              y: sample.y,
-              nonce: autoColorCanvasSeedNonceRef.current,
-            };
-          });
-          setAutoColorCanvasSeedHit(null);
-          setAutoColorCanvasSeedHits(hits);
-        }
-      }
-      return;
-    }
-    if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
-    if (pixelSelectionHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
-    if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
-    if (pendingRasterRetouchGestureRef.current) {
-      if (!finishPendingRasterRetouchGesture(pointerEvent, false, e.target.getStage())) return;
-      return;
-    }
-    const drawingPointerSession = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
-    if (drawingRef.current || drawingPointerSession) {
-      if (!drawingPointerSession) {
-        // Defensive HMR/legacy state: ownership is unknown, so discard rather than committing an
-        // arbitrary pointer's draft. Normal sessions always have both refs.
-        discardDrawingPointerSession();
-        return;
-      }
-      if (!isStudioStrokePointerEvent(drawingPointerSession, pointerEvent)) {
-        // A secondary touch ending must not stop QuickShape, commit, or discard the active pen.
-        return;
-      }
-      if (colorWheelTimerRef.current) {
-        clearTimeout(colorWheelTimerRef.current);
-        colorWheelTimerRef.current = null;
-      }
-      // Handle drawing before every other tool's early-return branch. Even a stale marquee/crop ref
-      // cannot intercept pointerup and leak capture; finishDrawingPointer always cleans up in finally
-      // (including QuickShape timer stop after promote snapshot).
-      finishDrawingPointer(e.target.getStage(), pointerEvent);
-      updateBrushCursor(e.target.getStage(), pointerEvent);
-      return;
-    }
-    if (liquifyDragRef.current) {
-      if (!isStudioLiquifyPointerOwner(liquifyDragRef.current, pointerEvent)) return;
-      finishLiquifyPointerSession(pointerEvent, false, e.target.getStage());
-      return;
-    }
-    if (pixelDragRef.current) {
-      if (!finishPixelSelectionPointerSession(pointerEvent, false)) return;
-      return;
-    }
-    stopQuickShapeTracking(); // 드로잉이 아닌 경로 — 잔여 인터벌만 정리.
-    // 색상 휠 롱프레스 타이머가 아직 안 터졌는데 포인터를 뗐다 — 평범한 클릭/드래그였다는 뜻이니
-    // 타이머만 정리한다(이미 열려 있었다면 오버레이가 이벤트를 가로채서 애초에 여기까지 안 온다).
-    if (colorWheelTimerRef.current) {
-      clearTimeout(colorWheelTimerRef.current);
-      colorWheelTimerRef.current = null;
-    }
-    if (advancedFillTapGestureRef.current) {
-      const pointerEvent = e.evt as PointerEvent;
-      const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
-      const clientPoint = getClientPointFromKonvaEvent(e.evt);
-      const moved = clientPoint
-        ? moveStudioAdvancedFillTap(advancedFillTapGestureRef.current, pointerId, clientPoint)
-        : advancedFillTapGestureRef.current;
-      const outcome = endStudioAdvancedFillTap(moved, pointerId);
-      advancedFillTapGestureRef.current = outcome.gesture;
-      if (advancedFillTouchPanRef.current?.pointerId === pointerId) {
-        advancedFillTouchPanRef.current = null;
-      }
-      const payload = advancedFillTapPayloadRef.current;
-      if (!outcome.gesture) advancedFillTapPayloadRef.current = null;
-      if (outcome.execute && payload && !advancedFillAbortRef.current) {
-        void runAdvancedFillAt(payload.position, payload.frame);
-      }
-      return;
-    }
-    if (advancedFillArmed) return;
-    // 크롭 드래그 종료 — 마지막 RAF 대기분을 반영하고 세션만 닫는다(rect 는 적용 전까지 유지).
-    if (cropDragRef.current) {
-      cropDragRef.current = null;
-      flushCropRect();
-      return;
-    }
-    // 패널 손그림 컷 드래그 종료 — 마지막 절단선으로 실제 분할을 확정한다. 도구는 계속 무장된
-    // 채로 둔다(크롭과 달리 의도적 — 연속으로 여러 컷을 이어서 그릴 수 있게).
-    if (panelSplitDragRef.current) {
-      const session = panelSplitDragRef.current;
-      panelSplitDragRef.current = null;
-      flushPanelSplitPreview();
-      const line = panelSplitLastLineRef.current;
-      const frame = elements.find((el) => el.id === session.targetFrameId);
-      if (
-        line &&
-        frame &&
-        frame.type === "frame" &&
-        !activeSurfaceReviewLocked &&
-        !isEffectivelyLocked(frame, groups)
-      ) {
-        const plan = planPanelSplit({ frame, line, gutterPx: panelGutter });
-        if (plan) {
-          // frame 을 먼저 펼치고 plan.shape* 로 덮어써야 shapeA/B 의 항상-존재하는 points 키(뒤집힌
-          // 사각형일 때도 undefined 로 명시)가 원본 frame 의 남은 points 를 확실히 지운다.
-          const shapeA = { ...frame, ...plan.shapeA, id: uid() };
-          const shapeB = { ...frame, ...plan.shapeB, id: uid() };
-          commit([...elements.filter((e) => e.id !== frame.id), shapeA, shapeB]);
-          setSelectedId(shapeA.id);
-        } else {
-          setPanelSplitHint(
-            panelSplitPreview
-              ? "여백을 적용하면 한쪽 칸이 너무 작아져요. 여백을 줄이거나 더 넓게 갈라보세요."
-              : "선이 패널을 가로지르지 않았어요. 패널 양쪽 변을 관통하도록 다시 그어보세요."
-          );
-        }
-      }
-      panelSplitLastLineRef.current = null;
-      setPanelSplitPreview(null);
-      return;
-    }
-    // 벡터 노드 편집 드래그 종료 — 커밋은 이 pointerup 틱에서 바로 일어나므로(리렌더를 기다리는
-    // crop 의 "적용" 버튼과 다름) nodeEditDraft state 가 아니라 항상-최신인 ref 를 읽는다. state 를
-    // 읽으면 React 의 비동기 업데이트 때문에 드래그의 마지막 프레임을 놓칠 수 있다.
-    if (nodeEditDragRef.current) {
-      const { elId } = nodeEditDragRef.current;
-      nodeEditDragRef.current = null;
-      if (nodeEditRafRef.current !== null) {
-        globalThis.cancelAnimationFrame(nodeEditRafRef.current);
-        nodeEditRafRef.current = null;
-      }
-      const finalDraft = pendingNodeEditDraftRef.current;
-      pendingNodeEditDraftRef.current = null;
-      setNodeEditDraft(null);
-      const current = elementById.get(elId);
-      if (
-        finalDraft &&
-        finalDraft.elId === elId &&
-        current?.type === "draw" &&
-        !activeSurfaceReviewLocked &&
-        !isEffectivelyLocked(current, groups)
-      ) {
-        patchEl(elId, { points: finalDraft.points, pressures: finalDraft.pressures } as Partial<El>);
-      }
-      return;
-    }
-    // 말풍선 커스텀 모양 점 드래그 종료 — nodeEdit과 동일하게 이 pointerup 틱에서 ref로 바로
-    // 커밋한다(state는 비동기라 마지막 프레임을 놓칠 수 있다).
-    if (bubbleShapeDragRef.current) {
-      const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
-      if (bubbleShapeDragRef.current.pointerId !== pointerId) return;
-      const { elId, session } = bubbleShapeDragRef.current;
-      releaseBubbleShapePointerCapture(bubbleShapeDragRef.current);
-      bubbleShapeDragRef.current = null;
-      if (bubbleShapeRafRef.current !== null) {
-        globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
-        bubbleShapeRafRef.current = null;
-      }
-      const finalDraft = pendingBubbleShapeDraftRef.current;
-      pendingBubbleShapeDraftRef.current = null;
-      setBubbleShapeDraft(null);
-      const current = elementById.get(elId);
-      if (
-        finalDraft &&
-        finalDraft.elId === elId &&
-        current?.type === "bubble" &&
-        !activeSurfaceReviewLocked &&
-        !isEffectivelyLocked(current, groups)
-      ) {
-        const pointOffset = session.pointIndex * 2;
-        const moved = moveBubbleShapePoint(
-          current.customShapePoints ?? [],
-          session.pointIndex,
-          finalDraft.points[pointOffset],
-          finalDraft.points[pointOffset + 1]
-        );
-        if (moved.changed) {
-          patchEl(elId, { customShapePoints: moved.points } as Partial<El>);
-          setBubbleShapeSelectedPointIndex(session.pointIndex);
-        }
-      }
-      return;
-    }
-    // 문지르기 드래그 종료 — 누적된 좌표로 실제 픽셀 스트로크를 적용한다.
-    if (smudgeDragRef.current) {
-      const session = smudgeDragRef.current;
-      smudgeDragRef.current = null;
-      clearPaintRetouchStrokePreview();
-      if (session.points.length >= 2) {
-        void applySmudgeStroke(
-          session.elId,
-          thinStudioRasterRetouchPointsForApply(session.points),
-        );
-      }
-      return;
-    }
-    // 닷지/번 드래그 종료 — 누적된 좌표로 실제 픽셀 보정을 적용한다(탭 1점도 도장 1개로 유효).
-    if (dodgeBurnDragRef.current) {
-      const session = dodgeBurnDragRef.current;
-      dodgeBurnDragRef.current = null;
-      clearPaintRetouchStrokePreview();
-      if (session.points.length >= 1) {
-        void applyDodgeBurnStroke(
-          session.elId,
-          thinStudioRasterRetouchPointsForApply(session.points),
-        );
-      }
-      return;
-    }
-    // 혼색 브러시 드래그 종료 — 누적된 좌표로 혼색 스트로크를 적용한다(탭 1점도 도장 1개).
-    if (wetMixDragRef.current) {
-      const session = wetMixDragRef.current;
-      wetMixDragRef.current = null;
-      clearPaintRetouchStrokePreview();
-      if (session.points.length >= 1) {
-        void applyWetMixStroke(
-          session.elId,
-          thinStudioRasterRetouchPointsForApply(session.points),
-        );
-      }
-      return;
-    }
-    // 퀵 마스크 드래그 종료 — 스트로크당 1회만 마스크에 굽고 틴트 캔버스를 교체(핫패스 계약).
-    if (quickMaskDragRef.current) {
-      const session = quickMaskDragRef.current;
-      quickMaskDragRef.current = null;
-      clearQuickMaskDragPreview();
-      const qm = quickMaskSessionRef.current;
-      if (qm && session.elId === qm.elId && session.points.length > 0) {
-        applyMaskStrokeDabs(
-          qm.mask,
-          qm.maskW,
-          qm.maskH,
-          session.points.map((p) => ({ x: p.x * qm.maskW, y: p.y * qm.maskH })),
-          {
-            radius: Math.max(1, quickMaskRadius * qm.featherScale),
-            hardness: quickMaskHardness,
-            opacity: quickMaskOpacity,
-            mode: quickMaskBrushMode,
-          }
-        );
-        refreshQuickMaskTint();
-      }
-      return;
-    }
-    // 레이어 마스크 브러시 드래그 종료 — 누적된 좌표로 실제 마스크 스트로크를 굽는다.
-    if (layerMaskDragRef.current) {
-      const session = layerMaskDragRef.current;
-      layerMaskDragRef.current = null;
-      clearLayerMaskDragPreview();
-      if (session.points.length > 0) void bakeLayerMaskPaintStroke(session);
-      return;
-    }
-    // 필터 마스크 브러시 드래그 종료 — 누적된 좌표로 실제 마스크 스트로크를 굽는다.
-    if (filterMaskDragRef.current) {
-      const session = filterMaskDragRef.current;
-      filterMaskDragRef.current = null;
-      clearFilterMaskDragPreview();
-      if (session.points.length > 0) void bakeFilterMaskPaintStroke(session);
-      return;
-    }
-    // 복구 브러시/도장 드래그 종료 — 누적된 좌표로 dab 목록을 계산해 굽는다.
-    if (healCloneDragRef.current) {
-      const session = healCloneDragRef.current;
-      healCloneDragRef.current = null;
-      clearHealCloneDragPreview();
-      if (session.points.length > 0) void bakeHealCloneDragStroke(session);
-      return;
-    }
-    // 히스토리 브러시 드래그 종료 — 누적된 좌표로 dab 목록을 계산해 굽는다.
-    if (historyBrushDragRef.current) {
-      const session = historyBrushDragRef.current;
-      historyBrushDragRef.current = null;
-      clearHistoryBrushDragPreview();
-      if (session.points.length > 0) void bakeHistoryBrushDragStroke(session);
-      return;
-    }
-    // 마퀴 드래그 종료: 박스와 겹치는(숨김·아닌) 요소를 한꺼번에 선택.
-    if (marqueeStartRef.current) {
-      const rect = pendingMarqueeRectRef.current;
-      marqueeStartRef.current = null;
-      clearMarqueePreview();
-      if (rect && rect.w > 3 && rect.h > 3) {
-        const hitIds = selectIdsByMarquee(
-          elements,
-          (el) => elBounds(el),
-          rect,
-          { include: (el) => !isEffectivelyHidden(el, groups) }
-        );
-        const ids = expandSelectionIdsToGroupUnits(
-          elements,
-          groups,
-          hitIds,
-          activeGroupIdRef.current
-        );
-        applyGroupSelectionState({
-          ...selectionShapeForIds(ids),
-          activeGroupId: activeGroupIdRef.current,
-        });
-      }
-      return;
-    }
-  }
-  function drawBrushCursorLayer(deferToFrame: boolean) {
-    if (!deferToFrame) {
-      if (brushCursorDrawRafRef.current !== null) {
-        globalThis.cancelAnimationFrame(brushCursorDrawRafRef.current);
-        brushCursorDrawRafRef.current = null;
-      }
-      (brushCursorRef.current?.getLayer() ?? strokeGuideRef.current?.getLayer())?.drawScene();
-      return;
-    }
-    if (brushCursorDrawRafRef.current !== null) return;
-    brushCursorDrawRafRef.current = globalThis.requestAnimationFrame(() => {
-      brushCursorDrawRafRef.current = null;
-      (brushCursorRef.current?.getLayer() ?? strokeGuideRef.current?.getLayer())?.drawScene();
-    });
-  }
-  function hideStrokeGuide(deferToFrame = false) {
-    const guideNode = strokeGuideRef.current;
-    if (!guideNode || !guideNode.visible()) return;
-    guideNode.visible(false);
-    drawBrushCursorLayer(deferToFrame);
-  }
-  function hideBrushCursorVisual(deferToFrame = false) {
-    const cursorNode = brushCursorRef.current;
-    if (cursorNode && cursorNode.visible()) {
-      cursorNode.visible(false);
-      drawBrushCursorLayer(deferToFrame);
-    }
-  }
-  // 포인터가 캔버스를 벗어나면 브러시 커서와 안정화 보조선을 함께 숨긴다.
-  function hideBrushCursor(deferToFrame = false) {
-    const cursorNode = brushCursorRef.current;
-    const guideNode = strokeGuideRef.current;
-    let changed = false;
-    if (cursorNode?.visible()) {
-      cursorNode.visible(false);
-      changed = true;
-    }
-    if (guideNode?.visible()) {
-      guideNode.visible(false);
-      changed = true;
-    }
-    if (changed) drawBrushCursorLayer(deferToFrame);
-  }
-  function updateStrokeGuide(
-    pointerX: number,
-    pointerY: number,
-    deferToFrame = false,
-  ) {
-    const guideNode = strokeGuideRef.current;
-    if (!guideNode) return;
-    const drawing = drawingRef.current;
-    const points = drawing?.points;
-    const inputSettings = drawingInputSettingsRef.current;
-    if (
-      !drawing
-      || !points
-      || points.length < 2
-      || !Number.isFinite(pointerX)
-      || !Number.isFinite(pointerY)
-      || pointerX < 0
-      || pointerX > CANVAS_W
-      || pointerY < 0
-      || pointerY > canvasH
-      || tool !== "draw"
-      || !isStudioBrushCursorMode(drawing.mode ?? drawMode)
-      || (drawing.kind ?? "freehand") !== "freehand"
-      || isExporting
-      || isSpacePressed
-      || isPanning
-    ) {
-      hideStrokeGuide(deferToFrame);
-      return;
-    }
-    const inkX = points[points.length - 2]!;
-    const inkY = points[points.length - 1]!;
-    const activeStabilizer = inputSettings?.stabilizer ?? stabilizer;
-    const activeScale = normalizeStudioStrokeGuideScale(
-      inputSettings?.coordinateScale ?? effScale,
-    );
-    if (!shouldShowStudioStrokeGuide(
-      appSettingsRef.current.general.showStrokeGuide,
-      true,
-      activeStabilizer,
-      activeScale,
-      inkX,
-      inkY,
-      pointerX,
-      pointerY,
-    )) {
-      hideStrokeGuide(deferToFrame);
-      return;
-    }
-
-    let changed = false;
-    if (
-      strokeGuideMetricsNodeRef.current !== guideNode
-      || strokeGuideMetricsScaleRef.current !== activeScale
-    ) {
-      guideNode.strokeWidth(1.15 / activeScale);
-      const dash = guideNode.dash();
-      if (dash.length >= 2) {
-        dash[0] = 4 / activeScale;
-        dash[1] = 3 / activeScale;
-        dash.length = 2;
-      } else {
-        // Defensive one-time repair for a host node created without the component's 2-value dash.
-        guideNode.dash([4 / activeScale, 3 / activeScale]);
-      }
-      strokeGuideMetricsNodeRef.current = guideNode;
-      strokeGuideMetricsScaleRef.current = activeScale;
-      changed = true;
-    }
-    const geometry = guideNode.points();
-    if (
-      geometry.length !== 4
-      || geometry[0] !== inkX
-      || geometry[1] !== inkY
-      || geometry[2] !== pointerX
-      || geometry[3] !== pointerY
-    ) {
-      if (geometry.length === 4) {
-        geometry[0] = inkX;
-        geometry[1] = inkY;
-        geometry[2] = pointerX;
-        geometry[3] = pointerY;
-      } else {
-        // Defensive one-time repair; normal StudioBrushCursor nodes always start with four values.
-        guideNode.points([inkX, inkY, pointerX, pointerY]);
-      }
-      changed = true;
-    }
-    if (!guideNode.visible()) {
-      guideNode.visible(true);
-      changed = true;
-    }
-    if (changed) drawBrushCursorLayer(deferToFrame);
-  }
-  function updateBrushCursor(
-    stage: Konva.Stage | null,
-    pointerEvent: PointerEvent,
-    mappedPoint?: { x: number; y: number } | null,
-    deferToFrame = false
-  ) {
-    const cursorNode = brushCursorRef.current;
-    if (!cursorNode) return;
-    if (
-      tool !== "draw"
-      || !isStudioBrushCursorMode(drawMode)
-      || isSpacePressed
-      || isPanning
-    ) {
-      hideBrushCursor(deferToFrame);
-      return;
-    }
-    if (
-      appSettingsRef.current.general.brushCursorStyle === "none"
-      || !shouldShowStudioBrushCursor(pointerEvent.pointerType)
-    ) {
-      hideBrushCursorVisual(deferToFrame);
-      return;
-    }
-    if (mappedPoint === undefined) stage?.setPointersPositions(pointerEvent);
-    const cursorPos = mappedPoint === undefined
-      ? stage?.getRelativePointerPosition()
-      : mappedPoint;
-    if (
-      !cursorPos
-      || cursorPos.x < 0
-      || cursorPos.x > CANVAS_W
-      || cursorPos.y < 0
-      || cursorPos.y > canvasH
-    ) {
-      hideBrushCursor(deferToFrame);
-      return;
-    }
-    cursorNode.position(cursorPos);
-    if (!cursorNode.visible()) cursorNode.visible(true);
-    drawBrushCursorLayer(deferToFrame);
-  }
-  function hideSmudgeCursor() {
-    const cursorNode = smudgeCursorRef.current;
-    if (cursorNode && cursorNode.visible()) {
-      cursorNode.visible(false);
-      cursorNode.getLayer()?.batchDraw();
-    }
-  }
-  function hideHealCloneCursors() {
-    const cursor = healCloneCursorRef.current;
-    const srcCursor = healCloneSourceCursorRef.current;
-    if (cursor?.visible()) cursor.visible(false);
-    if (srcCursor?.visible()) srcCursor.visible(false);
-    cursor?.getLayer()?.batchDraw();
-  }
-  function hideHistoryBrushCursor() {
-    const cursor = historyBrushCursorRef.current;
-    if (cursor?.visible()) cursor.visible(false);
-    cursor?.getLayer()?.batchDraw();
-  }
-  function hideLayerMaskCursor() {
-    const cursorNode = layerMaskCursorRef.current;
-    if (cursorNode && cursorNode.visible()) {
-      cursorNode.visible(false);
-      cursorNode.getLayer()?.batchDraw();
-    }
-  }
-  function hideFilterMaskCursor() {
-    const cursorNode = filterMaskCursorRef.current;
-    if (cursorNode && cursorNode.visible()) {
-      cursorNode.visible(false);
-      cursorNode.getLayer()?.batchDraw();
-    }
-  }
-
-  function restoreGroupDragPreview(
-    session: {
-      id: string;
-      x0: number;
-      y0: number;
-      selectedIds: string[];
-    },
-    deltaX: number,
-    deltaY: number
-  ) {
-    const anchor = nodeRefsRef.current[session.id];
-    if (!anchor) return;
-    anchor.position({ x: session.x0, y: session.y0 });
-    for (const id of session.selectedIds) {
-      if (id === session.id) continue;
-      const peer = nodeRefsRef.current[id];
-      if (peer) {
-        peer.x(peer.x() - deltaX);
-        peer.y(peer.y() - deltaY);
-      }
-    }
-    const layer = anchor.getLayer();
-    const selectionOverlay = layer?.findOne(".studio-group-selection-overlay");
-    if (selectionOverlay) {
-      selectionOverlay.position({ x: 0, y: 0 });
-    }
-    const resizeProxy = layer?.findOne(".studio-group-uniform-resize-proxy");
-    if (resizeProxy) {
-      resizeProxy.x(resizeProxy.x() - deltaX);
-      resizeProxy.y(resizeProxy.y() - deltaY);
-    }
-    layer?.batchDraw();
-  }
-
-  function cancelCanvasGroupDrag(): boolean {
-    const session = groupDragRef.current;
-    if (!session) return false;
-    const anchor = nodeRefsRef.current[session.id];
-    const deltaX = anchor ? anchor.x() - session.x0 : 0;
-    const deltaY = anchor ? anchor.y() - session.y0 : 0;
-    // Restore before invalidating/stopping the Konva drag. stopDrag() may synchronously emit the
-    // child and Stage dragend handlers; at the authoritative origin those handlers can only make
-    // a no-op patch, while the cleared session prevents the Stage from publishing a group commit.
-    restoreGroupDragPreview(session, deltaX, deltaY);
-    groupDragRef.current = null;
-    anchor?.stopDrag();
-    applyGuides([], []);
-    applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
-    endLiveResourceEdit();
-    return true;
-  }
-
-  function liveCanvasElementRect(
-    element: El
-  ): { x: number; y: number; width: number; height: number } {
-    const fallback = elBounds(element);
-    const node = nodeRefsRef.current[element.id];
-    if (element.type === "draw") {
-      // draw wrapper에는 scene-less hit Shape가 있어 getClientRect가 원점(0,0)을 포함할 수 있다.
-      // 권위 points bounds에 wrapper의 imperative drag offset만 더해야 group snap union이 정확하다.
-      return {
-        x: fallback.x + (node?.x() ?? 0),
-        y: fallback.y + (node?.y() ?? 0),
-        width: fallback.w,
-        height: fallback.h,
-      };
-    }
-    if (node) {
-      // A single coordinate object may be temporarily lifted to the sibling drag Layer. Measuring
-      // every peer relative to the moving node's Layer mixes sibling coordinate systems under a
-      // transformed Stage. Each direct Stage Layer shares document coordinates, so normalize each
-      // node against its own Layer instead.
-      const nodeLayer = node.getLayer();
-      const rect = nodeLayer
-        ? node.getClientRect({ relativeTo: nodeLayer })
-        : node.getClientRect();
-      if (
-        Number.isFinite(rect.x) &&
-        Number.isFinite(rect.y) &&
-        Number.isFinite(rect.width) &&
-        Number.isFinite(rect.height)
-      ) {
-        return rect;
-      }
-    }
-    return {
-      x: fallback.x,
-      y: fallback.y,
-      width: fallback.w,
-      height: fallback.h,
-    };
-  }
-
-  // 드래그 중 정렬 스냅: 요소의 좌/중앙/우(상/중앙/하) 가장자리를 캔버스·들어있는 패널의
-  // 같은 기준선에 끌어붙이고, 맞은 기준선을 가이드로 그린다. (Stage로 버블된 단일 핸들러)
-  function onStageDragMove(e: Konva.KonvaEventObject<DragEvent>) {
-    const node = e.target;
-    const stage = node.getStage();
-    if (!node || node === stage) return;
-    if (
-      node instanceof KonvaRuntime.Transformer
-      || node.getParent() instanceof KonvaRuntime.Transformer
-    ) return; // 트랜스포머 proxy/앵커는 작성 객체와 별도 drag 이벤트를 내므로 제외.
-    const draggedId = studioElementIdOf(node);
-    if (!draggedId) return;
-    const layer = node.getLayer();
-    if (!layer) return;
-
-    let activeGroupDrag = groupDragRef.current;
-    const candidateGroupIds = canvasInteractionUnitIds(draggedId);
-    const canStartGroupDrag =
-      draggedId !== null &&
-      candidateGroupIds.length > 1 &&
-      candidateGroupIds.includes(draggedId) &&
-      candidateGroupIds.every((id) => {
-        const element = elementById.get(id);
-        return Boolean(element && !isEffectivelyLocked(element, groups));
-      });
-
-    const translateGroupPreview = (
-      anchorId: string,
-      selectedIds: readonly string[],
-      deltaX: number,
-      deltaY: number
-    ) => {
-      if (deltaX === 0 && deltaY === 0) return;
-      for (const id of selectedIds) {
-        if (id === anchorId) continue;
-        const other = nodeRefsRef.current[id];
-        if (other) {
-          other.x(other.x() + deltaX);
-          other.y(other.y() + deltaY);
-        }
-      }
-      const selectionOverlay = layer.findOne(".studio-group-selection-overlay");
-      if (selectionOverlay) {
-        selectionOverlay.x(selectionOverlay.x() + deltaX);
-        selectionOverlay.y(selectionOverlay.y() + deltaY);
-      }
-      const resizeProxy = layer.findOne(".studio-group-uniform-resize-proxy");
-      if (resizeProxy) {
-        resizeProxy.x(resizeProxy.x() + deltaX);
-        resizeProxy.y(resizeProxy.y() + deltaY);
-      }
-    };
-
-    // 다중선택 그룹 이동: 좌표형과 draw wrapper, 전체 선택 경계를 함께 움직이고 문서에는
-    // Stage drag-end에서 한 스냅샷만 커밋한다. 첫 dragmove 전에도 클릭한 그룹 단위를 다시 해석해
-    // selection state 렌더 타이밍과 무관하게 전체 lease/preview를 동일한 멤버 집합으로 유지한다.
-    if (draggedId && canStartGroupDrag) {
-      const draggedEl = elementById.get(draggedId);
-      if (draggedEl) {
-        if (!activeGroupDrag || activeGroupDrag.id !== draggedId) {
-          const x0 = draggedEl.type === "draw" ? 0 : draggedEl.x;
-          const y0 = draggedEl.type === "draw" ? 0 : draggedEl.y;
-          const currentX = node.x();
-          const currentY = node.y();
-          activeGroupDrag = {
-            id: draggedId,
-            x0,
-            y0,
-            lastX: currentX,
-            lastY: currentY,
-            selectedIds: [...candidateGroupIds],
-          };
-          groupDragRef.current = activeGroupDrag;
-          const initialDx = currentX - x0;
-          const initialDy = currentY - y0;
-          translateGroupPreview(
-            draggedId,
-            activeGroupDrag.selectedIds,
-            initialDx,
-            initialDy
-          );
-        } else {
-          const ddx = node.x() - activeGroupDrag.lastX;
-          const ddy = node.y() - activeGroupDrag.lastY;
-          if (ddx !== 0 || ddy !== 0) {
-            translateGroupPreview(
-              draggedId,
-              activeGroupDrag.selectedIds,
-              ddx,
-              ddy
-            );
-            activeGroupDrag.lastX = node.x();
-            activeGroupDrag.lastY = node.y();
-          }
-        }
-      }
-    }
-
-    const liveSelectionRect = () => {
-      const selectedIds = activeGroupDrag?.selectedIds;
-      if (!selectedIds || selectedIds.length < 2) {
-        return node.getClientRect({ relativeTo: layer });
-      }
-      const rects = selectedIds
-        .map((id) => elementById.get(id))
-        .filter((candidate): candidate is El => Boolean(candidate))
-        .map((candidate) => liveCanvasElementRect(candidate));
-      if (rects.length === 0) return node.getClientRect({ relativeTo: layer });
-      const left = Math.min(...rects.map((rect) => rect.x));
-      const top = Math.min(...rects.map((rect) => rect.y));
-      const right = Math.max(...rects.map((rect) => rect.x + rect.width));
-      const bottom = Math.max(...rects.map((rect) => rect.y + rect.height));
-      return { x: left, y: top, width: right - left, height: bottom - top };
-    };
-    const liveMovingSelectionIds = new Set(
-      activeGroupDrag?.selectedIds ?? (draggedId ? [draggedId] : [])
-    );
-
-    if (!snapEnabled) {
-      applyGuides([], []);
-      // "정렬선 표시"와 "위치 스냅"은 서로 다른 설정이다. 스냅을 끈 상태에서도
-      // PPT/Figma처럼 가까운 엣지·중앙·균등 간격 후보를 ghost 위치로 계산해 선만 보여 준다.
-      // 실제 Konva node 좌표는 이 분기에서 절대 바꾸지 않는다.
-      if (showAlignmentGuides && draggedId) {
-        const previewBoxRect = liveSelectionRect();
-        const previewOthers: GuideBox[] = [];
-        for (const element of elements) {
-          if (
-            liveMovingSelectionIds.has(element.id) ||
-            isEffectivelyHidden(element, groups)
-          ) {
-            continue;
-          }
-          const rect = liveCanvasElementRect(element);
-          previewOthers.push({
-            id: element.id,
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height,
-          });
-        }
-        const movingBox: GuideBox = {
-          id:
-            activeGroupDrag?.selectedIds.length
-              ? `selection:${activeGroupDrag.selectedIds.join(",")}`
-              : draggedId,
-          x: previewBoxRect.x,
-          y: previewBoxRect.y,
-          width: previewBoxRect.width,
-          height: previewBoxRect.height,
-        };
-        const suggestion = computeSmartSnap(movingBox, previewOthers, {
-          threshold: SMART_SNAP_THRESHOLD / effScale,
-        });
-        const preview = buildSmartGuideOverlayPreview(
-          movingBox,
-          previewOthers,
-          suggestion,
-          { epsilon: SMART_GUIDE_EPSILON / effScale },
-        );
-        applySmartGuides(preview?.overlay ?? EMPTY_SMART_GUIDE_OVERLAY);
-      } else {
-        applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
-      }
-      return;
-    }
-
-    const box = liveSelectionRect();
-    const snap = 8 / effScale; // 화면상 ~8px
-
-    // 스냅 기준선: 캔버스 가장자리·중앙 + (있으면)들어있는 패널 가장자리·중앙
-    const vLines = [0, CANVAS_W / 2, CANVAS_W];
-    const hLines = [0, canvasH / 2, canvasH];
-
-    // 작가 수동 가이드선 추가
-    for (const guide of userGuides) {
-      if (guide.type === "v") vLines.push(guide.pos);
-      else hLines.push(guide.pos);
-    }
-
-    let panel: FrameEl | null = null;
-    const boxCenterX = box.x + box.width / 2;
-    const boxCenterY = box.y + box.height / 2;
-    for (const candidate of elements) {
-      if (
-        candidate.type === "frame" &&
-        !candidate.hidden &&
-        boxCenterX >= candidate.x &&
-        boxCenterX <= candidate.x + candidate.width &&
-        boxCenterY >= candidate.y &&
-        boxCenterY <= candidate.y + candidate.height
-      ) {
-        panel = candidate;
-        break;
-      }
-    }
-    if (panel) {
-      vLines.push(panel.x, panel.x + panel.width / 2, panel.x + panel.width);
-      hLines.push(panel.y, panel.y + panel.height / 2, panel.y + panel.height);
-    }
-
-    const edgesX = [box.x, box.x + box.width / 2, box.x + box.width];
-    const edgesY = [box.y, box.y + box.height / 2, box.y + box.height];
-    let dx = 0;
-    let gx: number | null = null;
-    let bestX = snap;
-    for (const line of vLines)
-      for (const edge of edgesX) {
-        const dist = Math.abs(line - edge);
-        if (dist < bestX) {
-          bestX = dist;
-          dx = line - edge;
-          gx = line;
-        }
-      }
-    let dy = 0;
-    let gy: number | null = null;
-    let bestY = snap;
-    for (const line of hLines)
-      for (const edge of edgesY) {
-        const dist = Math.abs(line - edge);
-        if (dist < bestY) {
-          bestY = dist;
-          dy = line - edge;
-          gy = line;
-        }
-      }
-    // Grid visibility is presentation-only: hidden grid lines remain valid placement targets.
-    // Snap one visual anchor (the live bounding box's top-left), not all three edges plus the node
-    // origin. With a 40px grid, three independent 8px attraction bands covered most positions and
-    // made free movement feel like a sequence of tiny jumps.
-    const gridAnchor = snapStudioObjectDragPosition({
-      position: { x: box.x, y: box.y },
-      enabled: snapEnabled,
-      gridSize,
-      viewportScale: effScale,
-    });
-    const gridDx = gridAnchor.x - box.x;
-    const gridDy = gridAnchor.y - box.y;
-    if (gridDx !== 0 && Math.abs(gridDx) < bestX) {
-      dx = gridDx;
-      gx = gridAnchor.x;
-      bestX = Math.abs(gridDx);
-    }
-    if (gridDy !== 0 && Math.abs(gridDy) < bestY) {
-      dy = gridDy;
-      gy = gridAnchor.y;
-      bestY = Math.abs(gridDy);
-    }
-    // ── 요소 간 스마트 가이드(PPT급): 엣지/센터 정렬 + 균등 간격 스냅 ──
-    // 다른 요소들의 bbox를 O(n)으로 모아(숨김·함께 끌리는 다중선택군 제외) 후보를 구하고,
-    // 축별로 캔버스/그리드 라인 스냅과 요소 스냅 중 더 가까운 쪽을 채택한다(동률이면 요소 우선).
-    let smartOthers: GuideBox[] | null = null;
-    if (draggedId) {
-      smartOthers = [];
-      for (const el of elements) {
-        if (
-          liveMovingSelectionIds.has(el.id) ||
-          isEffectivelyHidden(el, groups)
-        ) {
-          continue;
-        }
-        const r = liveCanvasElementRect(el);
-        smartOthers.push({
-          id: el.id,
-          x: r.x,
-          y: r.y,
-          width: r.width,
-          height: r.height,
-        });
-      }
-      const movingBox: GuideBox = {
-        id:
-          activeGroupDrag?.selectedIds.length
-            ? `selection:${activeGroupDrag.selectedIds.join(",")}`
-            : draggedId,
-        x: box.x,
-        y: box.y,
-        width: box.width,
-        height: box.height,
-      };
-      const smart = computeSmartSnap(movingBox, smartOthers, { threshold: SMART_SNAP_THRESHOLD / effScale });
-      if (smart.x && smart.x.dist <= bestX) {
-        dx = smart.x.delta;
-        gx = null;
-      }
-      if (smart.y && smart.y.dist <= bestY) {
-        dy = smart.y.delta;
-        gy = null;
-      }
-    }
-    if (dx !== 0) node.x(node.x() + dx);
-    if (dy !== 0) node.y(node.y() + dy);
-    if (activeGroupDrag && draggedId) {
-      translateGroupPreview(
-        draggedId,
-        activeGroupDrag.selectedIds,
-        dx,
-        dy
-      );
-      activeGroupDrag.lastX = node.x();
-      activeGroupDrag.lastY = node.y();
-    }
-    // 스냅 확정 위치 기준으로 요소 정렬 선분·균등 간격 배지를 그린다(그리드/캔버스 스냅
-    // 결과가 우연히 요소와 정렬된 경우도 함께 드러난다 — PPT 동작).
-    if (smartOthers && draggedId && showAlignmentGuides) {
-      const movedBox: GuideBox = {
-        id:
-          activeGroupDrag?.selectedIds.length
-            ? `selection:${activeGroupDrag.selectedIds.join(",")}`
-            : draggedId,
-        x: box.x + dx,
-        y: box.y + dy,
-        width: box.width,
-        height: box.height,
-      };
-      applySmartGuides(buildSmartGuideOverlay(movedBox, smartOthers, { epsilon: SMART_GUIDE_EPSILON / effScale }));
-    } else {
-      applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
-    }
-    applyGuides(
-      showAlignmentGuides && gx != null ? [gx] : [],
-      showAlignmentGuides && gy != null ? [gy] : []
-    );
-  }
-  function onStageDragEnd() {
-    applyGuides([], []);
-    applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
-    // 그룹 이동 확정: child onDragEnd의 anchor patch는 patchEl에서 소비했고, 여기서 좌표형 요소와
-    // points 기반 draw를 같은 delta로 계산해 히스토리/CRDT에 정확히 한 번만 커밋한다.
-    const g = groupDragRef.current;
-    groupDragRef.current = null;
-    if (!g) return;
-    const dnode = nodeRefsRef.current[g.id];
-    let dx = 0;
-    let dy = 0;
-    let committed = false;
-    try {
-      if (dnode && g.selectedIds.length > 1) {
-        dx = dnode.x() - g.x0;
-        dy = dnode.y() - g.y0;
-        if (dx === 0 && dy === 0) {
-          committed = true;
-          return;
-        }
-        const next = planAtomicSelectionTranslation({
-          items: elements,
-          selectedIds: g.selectedIds,
-          deltaX: dx,
-          deltaY: dy,
-          isLocked: (element) => isEffectivelyLocked(element, groups),
-        });
-        const changed = next.some((element, index) => element !== elements[index]);
-        committed = changed && commit(next);
-        if (committed) {
-          const drawIds = g.selectedIds.filter(
-            (id) => elementById.get(id)?.type === "draw"
-          );
-          if (drawIds.length > 0) {
-            pendingCommittedGroupDrawResetRef.current = {
-              drawIds,
-              sourceElements: elements,
-              pageId: currentPageIdRef.current,
-              masterEditMode: masterEditModeRef.current,
-            };
-          }
-        }
-        if (!changed) {
-          setError("그룹 전체를 이동할 수 없어요. 잠금 또는 지원하지 않는 멤버를 확인하세요.");
-        }
-      }
-    } finally {
-      if (!committed && dnode && (dx !== 0 || dy !== 0)) {
-        // 실패한 commit의 imperative preview가 화면에 남지 않게 원점으로 복구한다.
-        restoreGroupDragPreview(g, dx, dy);
-      }
-      // 성공 commit 뒤 selection overlay는 새 문서 bounds를 자식으로 다시 그리므로 부모 preview
-      // offset만 제거한다. resize proxy는 독립 absolute 노드라 이미 새 bounds 위치에 있다. 여기서
-      // 되돌리면 다음 React layout 전까지 이전 위치가 한 프레임 노출되므로 성공 경로에서는 유지한다.
-      const overlayLayer = dnode?.getLayer();
-      const selectionOverlay = overlayLayer?.findOne(
-        ".studio-group-selection-overlay"
-      );
-      if (selectionOverlay) {
-        selectionOverlay.position({ x: 0, y: 0 });
-      }
-      overlayLayer?.batchDraw();
-      endLiveResourceEdit();
-    }
-  }
 
   function startCanvasEditText(id: string) {
     const element = elementById.get(id);
@@ -38573,8 +33384,7 @@ const puppetWarpArmed =
       if (!canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })) return;
       if (serverSavePages.some((page) => page.linked3dRender !== undefined)) {
         const canonicalSaveProject = creatorWorkSnapshotToStudioProject(payload);
-        const { ensureStudioLinked3dPassCloudProject } = await import(
-          "./studio-linked-3d-pass-cloud-project"
+        const { ensureStudioLinked3dPassCloudProject } = await import("./studio-linked-3d-pass-cloud-project"
         );
         if (workId) {
           linkedCloudUploadReceipts = await ensureStudioLinked3dPassCloudProject({
@@ -38597,8 +33407,7 @@ const puppetWarpArmed =
           }
           let draftIdentity = draftCollaboration?.identity;
           if (!draftIdentity) {
-            const { loadOrCreateStudioDraftCollaborationIdentity } = await import(
-              "./studio-draft-collaboration"
+            const { loadOrCreateStudioDraftCollaborationIdentity } = await import("./studio-draft-collaboration"
             );
             draftIdentity = await loadOrCreateStudioDraftCollaborationIdentity({
               documentScopeKey: autosaveKey,
@@ -38655,8 +33464,7 @@ const puppetWarpArmed =
                   });
                 },
                 compensateCloudArtifacts: async (provisionalWorkId, receipts) => {
-                  const { compensateStudioLinked3dPassCloudUploads } = await import(
-                    "./studio-linked-3d-pass-cloud-sync"
+                  const { compensateStudioLinked3dPassCloudUploads } = await import("./studio-linked-3d-pass-cloud-sync"
                   );
                   await compensateStudioLinked3dPassCloudUploads({
                     workId: provisionalWorkId,
@@ -38931,8 +33739,7 @@ const puppetWarpArmed =
         && linkedCloudUploadReceipts.length > 0
       ) {
         try {
-          const { compensateStudioLinked3dPassCloudUploads } = await import(
-            "./studio-linked-3d-pass-cloud-sync"
+          const { compensateStudioLinked3dPassCloudUploads } = await import("./studio-linked-3d-pass-cloud-sync"
           );
           await compensateStudioLinked3dPassCloudUploads({
             workId: linkedCloudUploadWorkId,
@@ -39121,7 +33928,7 @@ function clearSelectionForEdit() {
     announceDrawingShortcut("벡터 원본을 보존하며 픽셀 선택 대상을 준비하고 있어요");
 
     try {
-      const rasterRuntime = await import("./studio-raster-edit-preparation");
+      const rasterRuntime = await import("./render/studio-raster-edit-preparation");
       if (
         runId !== pixelMarqueeRasterPreparationRunIdRef.current
         || controller.signal.aborted
@@ -39629,7 +34436,7 @@ function clearSelectionForEdit() {
 
   function currentStudioEditablePageRasterContext(
     name: string,
-    rasterRuntime: typeof import("./studio-raster-edit-preparation"),
+    rasterRuntime: typeof import("./render/studio-raster-edit-preparation"),
     purpose: "page-filter" | "pixel-selection",
     options?: { readonly sourceIds?: readonly string[] },
   ) {
@@ -39681,7 +34488,7 @@ function clearSelectionForEdit() {
 
   function currentStudioFilterPageRasterContext(
     name: string,
-    rasterRuntime: typeof import("./studio-raster-edit-preparation"),
+    rasterRuntime: typeof import("./render/studio-raster-edit-preparation"),
   ) {
     return currentStudioEditablePageRasterContext(name, rasterRuntime, "page-filter");
   }
@@ -39755,7 +34562,7 @@ function clearSelectionForEdit() {
     );
 
     try {
-      const rasterRuntime = await import("./studio-raster-edit-preparation");
+      const rasterRuntime = await import("./render/studio-raster-edit-preparation");
       if (runId !== studioFilterPreparationRunIdRef.current || controller.signal.aborted) return;
       const initialContext = layerScopedFilter
         ? currentStudioEditablePageRasterContext(
@@ -39877,7 +34684,7 @@ function clearSelectionForEdit() {
     );
 
     try {
-      const rasterRuntime = await import("./studio-raster-edit-preparation");
+      const rasterRuntime = await import("./render/studio-raster-edit-preparation");
       if (runId !== studioFilterPreparationRunIdRef.current || controller.signal.aborted) return;
       const layerOptions = options?.sourceIds?.length
         ? { sourceIds: options.sourceIds }
@@ -40164,6 +34971,8 @@ function clearSelectionForEdit() {
   } = resolveStudioEditAvailability({
     historyIndex: pagesHi,
     historyLength: pagesHistory.length,
+    pendingCommitAvailable: hasPendingOverlayCommit,
+    pendingUndoneAvailable: hasUndonePendingOverlay,
     // 사이드카 편집도 되돌릴 수 있는 작업이다 — 스냅샷 인덱스만 보면 메뉴가 동작하는 ⌘Z 를 막는다.
     sidecarUndoAvailable: studioHistorySidecarUndoAvailable,
     sidecarRedoAvailable: studioHistorySidecarRedoAvailable,
@@ -40226,7 +35035,7 @@ function clearSelectionForEdit() {
     const handle = globalThis.setTimeout(() => {
       // 아직 획을 긋는 중이면 건너뛴다. 획이 끝나면 문서가 다시 바뀌면서 이 효과가 재실행된다.
       if (cancelled || drawingRef.current) return;
-      void import("./studio-raster-edit-preparation")
+      void import("./render/studio-raster-edit-preparation")
         .then((rasterRuntime) => {
           if (cancelled) return;
           const buildContext = studioFilterPreflightContextRef.current;
@@ -41754,11 +36563,11 @@ function clearSelectionForEdit() {
         document: studioCrdtDocument,
         download: async (
           reference: Parameters<
-            typeof import("./studio-raster-asset-client").downloadStudioRasterAsset
+            typeof import("./render/studio-raster-asset-client").downloadStudioRasterAsset
           >[1],
           signal?: AbortSignal,
         ) => {
-          const { downloadStudioRasterAsset } = await import("./studio-raster-asset-client");
+          const { downloadStudioRasterAsset } = await import("./render/studio-raster-asset-client");
           const downloaded = await downloadStudioRasterAsset(workId, reference, signal);
           return downloaded.bytes;
         },
@@ -41845,8 +36654,7 @@ function clearSelectionForEdit() {
     });
     try {
       if (extension === ".will") {
-        const { inspectStudioWillV1Import } = await import(
-          "./studio-will-v1-import-bridge"
+        const { inspectStudioWillV1Import } = await import("./studio-will-v1-import-bridge"
         );
         const inspected = await inspectStudioWillV1Import(file, file.name, {
           canvasWidth: CANVAS_W,
@@ -42076,8 +36884,7 @@ function clearSelectionForEdit() {
     };
     try {
       if (pending.kind === "will-v1") {
-        const { prepareStudioWillV1ImportCommit } = await import(
-          "./studio-will-v1-import-bridge"
+        const { prepareStudioWillV1ImportCommit } = await import("./studio-will-v1-import-bridge"
         );
         const draft = prepareStudioWillV1ImportCommit(pending, {
           destination: applyChoice,
@@ -42864,7 +37671,7 @@ function clearSelectionForEdit() {
         return;
       }
       if (!isStudioBrushPackCatalogId(brushId)) return;
-      void import("./studio-brush-pack-runtime")
+      void import( "./brush/studio-brush-pack-runtime")
         .then(({ materializeStudioBrushPackSelection }) => {
           const selection = materializeStudioBrushPackSelection(brushId);
           if (selection) applyStudioBrushCatalogSelection(selection);
@@ -43464,6 +38271,7 @@ function clearSelectionForEdit() {
   const liveInkPredictionRenderer = liveInkPredictionRendererRef.current;
   const liveStampOverlayRenderer = liveStampOverlayRendererRef.current;
   const liveDynamicBrushOverlayRenderer = liveDynamicBrushOverlayRendererRef.current;
+  const liveRetainedMediaOverlayRenderer = liveRetainedMediaOverlayRendererRef.current;
   const liveWetInkOverlayRenderer = liveWetInkOverlayRendererRef.current;
   const nodeEditActiveHandleIndex = nodeEditDragRef.current?.session.pointIndex ?? null;
   const bubbleShapeActiveHandleIndex =
@@ -43624,2781 +38432,1106 @@ function clearSelectionForEdit() {
     : [];
 
   return (
-    <StudioLiveCollaborationProvider
-      workId={effectiveWorkId}
-      participant={studioLiveParticipant}
-      currentPageId={activePage.id}
-      currentTool={tool}
-      outboxScope={studioAuthUserId}
-      transportFactory={studioLiveTransportFactory}
-      serverRequired={Boolean(studioLiveParticipant && requiresStudioLiveServer)}
-      onRoomChange={handleStudioLiveRoomChange}
-      onCrdtDocumentChange={handleStudioCrdtDocumentChange}
-      onEditSafetyChange={handleStudioLiveEditSafetyChange}
-      onAuthoritativeSaveBarrierChange={handleStudioCrdtAuthoritativeSaveBarrierChange}
-    >
-    <StudioToolHintPreferencesProvider
-      mode={appSettings.general.toolHintMode}
-      touchHoldDelayMs={appSettings.touch.toolHintHoldMs}
-      reduceMotion={appSettings.other.reduceMotion}
-    >
-    <div
-      ref={studioRootRef}
-      data-studio-mobile-immersive={mobileImmersive ? "true" : "false"}
-      data-studio-editor="true"
-      data-studio-app-shell="true"
-      data-studio-watermark-persistence={watermarkPreferenceSnapshot.state}
-      data-studio-history-entry-count={pagesHistory.length}
-      data-studio-history-undo-depth={pagesHi}
-      data-studio-history-last-measured-retained-bytes={
-        studioHistoryRetention.lastMeasuredRetainedBytes
-      }
-      data-studio-history-last-measured-budget-bytes={
-        studioHistoryRetention.lastMeasuredBudgetBytes
-      }
-      data-studio-history-last-measured-entry-bytes={
-        studioHistoryRetention.lastMeasuredEntryBytes
-      }
-      data-studio-history-budget-evicted-steps={
-        studioHistoryRetention.totalBudgetEvictedSteps
-      }
-      className={cn(
-        // Default draw-app shell: fill the viewport without site chrome padding.
-        "flex min-h-0 flex-col bg-canvas text-fg",
-        // 전체화면도 평소와 같은 "뷰포트 높이 고정 + 내부만 스크롤" 셸을 쓴다. 예전에는
-        // min-h-screen + overflow-y-auto 였는데, 높이 상한이 없어 콘텐츠가 넘치면 셸 자체가
-        // 스크롤되면서 상단 메뉴바가 화면 밖으로 밀려났다(전체화면에서 메뉴 사라짐 버그).
-        !maximized && !canvasOnlyMode && !mobileImmersive &&
-          "h-[100dvh] max-h-[100dvh] overflow-hidden",
-        isFullscreen && "bg-canvas",
-        maximized && !isMobile && !mobileImmersive &&
-          "fixed inset-0 z-[60] overflow-y-auto bg-canvas",
-        canvasOnlyMode && !isMobile &&
-          "fixed inset-0 z-[70] h-[100dvh] overflow-hidden overscroll-none bg-canvas",
-        mobileImmersive &&
-          "fixed inset-0 z-[75] h-[100dvh] overflow-hidden overscroll-none bg-canvas"
-      )}
-      style={
-        mobileImmersive
-          ? {
-              paddingTop: "env(safe-area-inset-top)",
-              paddingLeft: "env(safe-area-inset-left)",
-              paddingRight: "env(safe-area-inset-right)",
-            }
-          : undefined
-      }
-    >
-    {/* 파괴적 명령 승인 표면. body 로 포털되므로 위치는 자유롭지만, 스튜디오 셸 안에 두어
-        스튜디오가 살아 있는 동안에만 seam 을 소유하게 한다. */}
-    <StudioDestructiveConfirmHost />
-    <StudioVrmProjectArchiveAttestationHost />
-    {pagesHistoryDurabilityStatus.state === "memory-only" ? (
-      <div
-        data-studio-pages-history-durability="memory-only"
-        role="alert"
-        aria-live="assertive"
-        className="mx-3 mt-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-danger/40 bg-danger-soft/20 px-3 py-2 text-xs text-danger"
-      >
-        <span className="min-w-0 flex-1 font-medium leading-relaxed">
-          페이지 실행 취소 기록을 영구 저장하지 못하고 있습니다. 편집은 이 탭의 메모리에서
-          계속되지만, 탭을 닫기 전에 프로젝트를 저장하거나 JSON 백업을 만들어 주세요.
-        </span>
-        <button
-          type="button"
-          onClick={retryStudioHistoryDurability}
-          className="min-h-11 shrink-0 rounded-lg bg-danger/15 px-3 py-2 font-bold hover:bg-danger/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
-        >
-          복구 기록 저장소 다시 연결
-        </button>
-      </div>
-    ) : pagesHistoryDurabilityStatus.state === "retrying" ? (
-      <div
-        data-studio-pages-history-durability="retrying"
-        role="status"
-        aria-live="polite"
-        className="mx-3 mt-2 shrink-0 rounded-xl border border-warning/35 bg-warning-soft/20 px-3 py-2 text-xs font-medium text-warning"
-      >
-        복구 기록 저장소에 다시 연결하는 중입니다. 편집은 계속할 수 있습니다.
-      </div>
-    ) : null}
-    {watermarkPreferenceSnapshot.state === "memory-only" ? (
-      <div
-        data-studio-watermark-persistence-warning="memory-only"
-        role="alert"
-        aria-live="assertive"
-        className="mx-3 mt-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-danger/40 bg-danger-soft/20 px-3 py-2 text-xs text-danger"
-      >
-        <span className="min-w-0 flex-1 font-medium leading-relaxed">
-          {watermarkPreferenceSnapshot.message}
-        </span>
-        <button
-          type="button"
-          onClick={() => void retryWatermarkPreferenceRuntime()}
-          className="min-h-11 shrink-0 rounded-lg bg-danger/15 px-3 py-2 font-bold hover:bg-danger/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
-        >
-          워터마크 저장소 다시 연결
-        </button>
-      </div>
-    ) : null}
-    <input
-      ref={editMenuImageInputRef}
-      type="file"
-      accept={STUDIO_CANVAS_IMAGE_ACCEPT}
-      className="hidden"
-      aria-label="편집 메뉴에서 이미지 파일 붙여넣기"
-      onChange={onPickImage}
+    <StudioCuttoonEditorView
+      activatePrimaryCanvasTool={activatePrimaryCanvasTool}
+      activeCatalogBrush={activeCatalogBrush}
+      activeCommentAnchor={activeCommentAnchor}
+      activeDialogueLocale={activeDialogueLocale}
+      activeGroupId={activeGroupId}
+      activePage={activePage}
+      activePageIndex={activePageIndex}
+      activeSavedBrushId={activeSavedBrushId}
+      activeServerAiProviderLabel={activeServerAiProviderLabel}
+      activeSurfaceReviewLocked={activeSurfaceReviewLocked}
+      activeToolbarGroup={activeToolbarGroup}
+      addBubble={addBubble}
+      addPage={addPage}
+      addText={addText}
+      admittedBg3dOpen={admittedBg3dOpen}
+      admittedMannequinPoserOpen={admittedMannequinPoserOpen}
+      admittedPoserVrmOpen={admittedPoserVrmOpen}
+      advancedFillActive={advancedFillActive}
+      advancedFillArmed={advancedFillArmed}
+      advancedFillBusy={advancedFillBusy}
+      advancedFillPreview={advancedFillPreview}
+      advancedFillReferenceLayerCount={advancedFillReferenceLayerCount}
+      advancedFillSettings={advancedFillSettings}
+      advancedFillStatus={advancedFillStatus}
+      advancedFillUnsupportedReason={advancedFillUnsupportedReason}
+      advancedFillVisibleRasterCount={advancedFillVisibleRasterCount}
+      advancedRulers={advancedRulers}
+      aiAssistTool={aiAssistTool}
+      aiBgBusy={aiBgBusy}
+      aiBgError={aiBgError}
+      aiBgPrompt={aiBgPrompt}
+      aiBgSize={aiBgSize}
+      aiCharacterBusy={aiCharacterBusy}
+      aiCharacterError={aiCharacterError}
+      aiCharacterPrompt={aiCharacterPrompt}
+      aiColorizeBusy={aiColorizeBusy}
+      aiColorizeError={aiColorizeError}
+      aiColorizePrompt={aiColorizePrompt}
+      aiCompositionDraft={aiCompositionDraft}
+      aiDialogueSuggestBusy={aiDialogueSuggestBusy}
+      aiDialogueSuggestCandidates={aiDialogueSuggestCandidates}
+      aiDialogueSuggestError={aiDialogueSuggestError}
+      aiDialogueSuggestIncludeContext={aiDialogueSuggestIncludeContext}
+      aiDialogueSuggestSituation={aiDialogueSuggestSituation}
+      aiNoticeOpen={aiNoticeOpen}
+      aiPaletteSuggestBusy={aiPaletteSuggestBusy}
+      aiPaletteSuggestError={aiPaletteSuggestError}
+      aiPaletteSuggestMood={aiPaletteSuggestMood}
+      aiPaletteSuggestSavedMsg={aiPaletteSuggestSavedMsg}
+      aiPaletteSuggestion={aiPaletteSuggestion}
+      aiProvenance={aiProvenance}
+      aiProvenanceOpen={aiProvenanceOpen}
+      aiRecentPrompts={aiRecentPrompts}
+      aiSettings={aiSettings}
+      animTimeline={animTimeline}
+      animaticTimelineOpen={animaticTimelineOpen}
+      announceDrawingShortcut={announceDrawingShortcut}
+      appSettings={appSettings}
+      appSettingsInitialTab={appSettingsInitialTab}
+      appSettingsOpen={appSettingsOpen}
+      appSettingsPersistenceState={appSettingsPersistenceState}
+      applyExtendedBlendMergeDown={applyExtendedBlendMergeDown}
+      applyPaperVectorRefinement={applyPaperVectorRefinement}
+      applyPathBooleanCombine={applyPathBooleanCombine}
+      applyPendingInterchangeImport={applyPendingInterchangeImport}
+      applyPixelSelectionHistoryCommand={applyPixelSelectionHistoryCommand}
+      applyQuickComicInput={applyQuickComicInput}
+      applySceneSnapshot={applySceneSnapshot}
+      applyStudioBrushCatalogSelection={applyStudioBrushCatalogSelection}
+      applyStudioLayerLift={applyStudioLayerLift}
+      assetFavoriteOnly={assetFavoriteOnly}
+      assetFavoriteState={assetFavoriteState}
+      assetGenerating={assetGenerating}
+      assetPrompt={assetPrompt}
+      assetPromptName={assetPromptName}
+      assetPromptQuality={assetPromptQuality}
+      assetPromptSize={assetPromptSize}
+      assetRightsAuditOpen={assetRightsAuditOpen}
+      assetSearchQuery={assetSearchQuery}
+      assetSortOrder={assetSortOrder}
+      assetTab={assetTab}
+      assets={assets}
+      assetsLoaded={assetsLoaded}
+      assetsLoading={assetsLoading}
+      authorizedWorkAssetScopeId={authorizedWorkAssetScopeId}
+      autoActionBusy={autoActionBusy}
+      autoActionError={autoActionError}
+      autoActionPlan={autoActionPlan}
+      autoActionProgress={autoActionProgress}
+      autoActionScope={autoActionScope}
+      autoActionSelectedPageIds={autoActionSelectedPageIds}
+      autoActionSet={autoActionSet}
+      autoActionStatus={autoActionStatus}
+      autoActionsOpen={autoActionsOpen}
+      autoColorCanvasSeedHit={autoColorCanvasSeedHit}
+      autoColorCanvasSeedHits={autoColorCanvasSeedHits}
+      autoColorPlanImageSizeRef={autoColorPlanImageSizeRef}
+      autoColorScribbleCanvasArmed={autoColorScribbleCanvasArmed}
+      autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
+      bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
+      bg3dDccShotMappingsRef={bg3dDccShotMappingsRef}
+      bg3dDccSourceRef={bg3dDccSourceRef}
+      bg3dInitialDataUrl={bg3dInitialDataUrl}
+      bg3dInitialElementId={bg3dInitialElementId}
+      bg3dInitialScene={bg3dInitialScene}
+      bg3dOpen={bg3dOpen}
+      bg3dSeedPrimitiveKind={bg3dSeedPrimitiveKind}
+      bg3dSeedTemplateId={bg3dSeedTemplateId}
+      bg3dTargetBundleId={bg3dTargetBundleId}
+      bgGrad={bgGrad}
+      bgSceneGenreFilter={bgSceneGenreFilter}
+      bgSceneSearchQuery={bgSceneSearchQuery}
+      bgSceneSectionsFiltered={bgSceneSectionsFiltered}
+      brush={brush}
+      brushBaselineController={brushBaselineController}
+      brushCatalogSession={brushCatalogSession}
+      brushCursorRef={brushCursorRef}
+      brushDynamics={brushDynamics}
+      brushManagerSheetRef={brushManagerSheetRef}
+      brushOpacity={brushOpacity}
+      brushPackImportInputRef={brushPackImportInputRef}
+      brushPackImporting={brushPackImporting}
+      brushUndoButtonRef={brushUndoButtonRef}
+      brushUndoToastRef={brushUndoToastRef}
+      bubbleAnchorPickActive={bubbleAnchorPickActive}
+      bubbleShapeActiveHandleIndex={bubbleShapeActiveHandleIndex}
+      bubbleShapeArmed={bubbleShapeArmed}
+      bubbleShapeDraft={bubbleShapeDraft}
+      bubbleShapeEditActive={bubbleShapeEditActive}
+      bubbleShapeHandles={bubbleShapeHandles}
+      bubbleShapeSelectedPointIndex={bubbleShapeSelectedPointIndex}
+      builtinRasterBusyId={builtinRasterBusyId}
+      canApplyStudioMutation={canApplyStudioMutation}
+      cancelPaperVectorRefinement={cancelPaperVectorRefinement}
+      cancelStudioPointCommentComposer={cancelStudioPointCommentComposer}
+      canvasFlipH={canvasFlipH}
+      canvasGuides={canvasGuides}
+      canvasH={canvasH}
+      canvasInteractionBlocked={canvasInteractionBlocked}
+      canvasOnlyMode={canvasOnlyMode}
+      canvasRotation={canvasRotation}
+      captureStudioMutationTicket={captureStudioMutationTicket}
+      changeStudioCommentThreadReplyDraft={changeStudioCommentThreadReplyDraft}
+      changeStudioCommentThreadResolution={changeStudioCommentThreadResolution}
+      changeStudioQuickAccessState={changeStudioQuickAccessState}
+      changeStudioSymmetryType={changeStudioSymmetryType}
+      characterBible={characterBible}
+      characterBibleOpen={characterBibleOpen}
+      checkpointError={checkpointError}
+      checkpointPanelOpen={checkpointPanelOpen}
+      checkpoints={checkpoints}
+      clearStudioObjectInsertSeeds={clearStudioObjectInsertSeeds}
+      clips={clips}
+      closeStudioCommentThreadPopover={closeStudioCommentThreadPopover}
+      closeStudioFilterDialog={closeStudioFilterDialog}
+      closeStudioLayerLift={closeStudioLayerLift}
+      closeViewToolWithFocus={closeViewToolWithFocus}
+      collaborationDocumentLocked={collaborationDocumentLocked}
+      collaborationDocumentUnavailable={collaborationDocumentUnavailable}
+      collaborationLockMessage={collaborationLockMessage}
+      collaborationOperationSyncPending={collaborationOperationSyncPending}
+      collaborationReadOnly={collaborationReadOnly}
+      collaborationRoleLabel={collaborationRoleLabel}
+      color={color}
+      colorBlindPreview={colorBlindPreview}
+      colorRangeFuzziness={colorRangeFuzziness}
+      colorRangePickActive={colorRangePickActive}
+      colorRangePreviewEnabled={colorRangePreviewEnabled}
+      colorRangeSamples={colorRangeSamples}
+      colorVisionSheetRef={colorVisionSheetRef}
+      colorWheelCenter={colorWheelCenter}
+      colorWheelOpen={colorWheelOpen}
+      commentPinArmed={commentPinArmed}
+      commentPlacementActive={commentPlacementActive}
+      commentsOpen={commentsOpen}
+      commentsPanelMounted={commentsPanelMounted}
+      commit={commit}
+      commitPixelSelectionState={commitPixelSelectionState}
+      commitQuickMask={commitQuickMask}
+      commitSavedBrushProjection={commitSavedBrushProjection}
+      completeSelectedGroupId={completeSelectedGroupId}
+      composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
+      configuredServerAiProviders={configuredServerAiProviders}
+      contextMenu={contextMenu}
+      contextMenuBg3dEditSource={contextMenuBg3dEditSource}
+      contextMenuEl={contextMenuEl}
+      continuityIssues={continuityIssues}
+      continuityOpen={continuityOpen}
+      continuityScenes={continuityScenes}
+      correctStudioLayerLift={correctStudioLayerLift}
+      creativeModesCloseLabel={creativeModesCloseLabel}
+      creativeModesLabel={creativeModesLabel}
+      creativeModesOpen={creativeModesOpen}
+      creativeModesPanelRef={creativeModesPanelRef}
+      creativeModesTriggerRef={creativeModesTriggerRef}
+      cropArmed={cropArmed}
+      cropAspect={cropAspect}
+      cropBusy={cropBusy}
+      cropRect={cropRect}
+      currentBrushSnapshot={currentBrushSnapshot}
+      currentCanvasSelectionCount={currentCanvasSelectionCount}
+      currentPageId={currentPageId}
+      currentPageIdRef={currentPageIdRef}
+      currentPublishPackageCreditsText={currentPublishPackageCreditsText}
+      currentStudioFilterPageRasterContext={currentStudioFilterPageRasterContext}
+      currentStudioWorkspaceDeviceKind={currentStudioWorkspaceDeviceKind}
+      currentTemplate={currentTemplate}
+      currentWorkspaceOwnerScope={currentWorkspaceOwnerScope}
+      description={description}
+      dialogueBatchOpen={dialogueBatchOpen}
+      dialogueScript={dialogueScript}
+      dialogueTranslateOpen={dialogueTranslateOpen}
+      dismissActiveMobileSheet={dismissActiveMobileSheet}
+      dismissPendingInterchangeImport={dismissPendingInterchangeImport}
+      displayLinkedTitleId={displayLinkedTitleId}
+      document={document}
+      dodgeBurnActive={dodgeBurnActive}
+      dodgeBurnArmed={dodgeBurnArmed}
+      dodgeBurnBusy={dodgeBurnBusy}
+      dodgeBurnExposure={dodgeBurnExposure}
+      dodgeBurnHardness={dodgeBurnHardness}
+      dodgeBurnMode={dodgeBurnMode}
+      dodgeBurnRadius={dodgeBurnRadius}
+      dodgeBurnRange={dodgeBurnRange}
+      dodgeBurnSponge={dodgeBurnSponge}
+      draftCollaboration={draftCollaboration}
+      draftPreviewDynamicLayerRef={draftPreviewDynamicLayerRef}
+      draftPreviewNormalLayerRef={draftPreviewNormalLayerRef}
+      draftPreviewStore={draftPreviewStore}
+      drawMode={drawMode}
+      drawShape={drawShape}
+      drawSheetRef={drawSheetRef}
+      drawingPaletteCancelEpoch={drawingPaletteCancelEpoch}
+      drawingPaletteLayout={drawingPaletteLayout}
+      drawingRef={drawingRef}
+      duplicateSelected={duplicateSelected}
+      editMenuImageInputRef={editMenuImageInputRef}
+      editing={editing}
+      effScale={effScale}
+      effectFavoriteState={effectFavoriteState}
+      effectivePublishPackageSettings={effectivePublishPackageSettings}
+      effectiveWorkId={effectiveWorkId}
+      elementById={elementById}
+      elements={elements}
+      emeresCategoryFilter={emeresCategoryFilter}
+      emeresFlatCatalog={emeresFlatCatalog}
+      emeresSearchQuery={emeresSearchQuery}
+      emeresSectionsFiltered={emeresSectionsFiltered}
+      emeresSimilarAnchor={emeresSimilarAnchor}
+      emeresSimilarSiblings={emeresSimilarSiblings}
+      emeresTab={emeresTab}
+      emeresUnderlayCount={emeresUnderlayCount}
+      enterQuickMask={enterQuickMask}
+      eraseToIntersection={eraseToIntersection}
+      error={error}
+      executeStudioQuickAccessCommand={executeStudioQuickAccessCommand}
+      exitQuickMask={exitQuickMask}
+      expectsSharedDocument={expectsSharedDocument}
+      exportFormat={exportFormat}
+      exportMenuOpen={exportMenuOpen}
+      exportMenuRef={exportMenuRef}
+      exportPresetId={exportPresetId}
+      exportScale={exportScale}
+      exportTransparent={exportTransparent}
+      extendedBlendMode={extendedBlendMode}
+      extendedBlendOpacity={extendedBlendOpacity}
+      eyedropperActive={eyedropperActive}
+      filterClipboard={filterClipboard}
+      filterMaskBusy={filterMaskBusy}
+      filterMaskCursorRef={filterMaskCursorRef}
+      filterMaskDragPreview={filterMaskDragPreview}
+      filterMaskHardness={filterMaskHardness}
+      filterMaskPaintActive={filterMaskPaintActive}
+      filterMaskPaintArmed={filterMaskPaintArmed}
+      filterMaskPaintMode={filterMaskPaintMode}
+      filterMaskRadius={filterMaskRadius}
+      filterMaskStrength={filterMaskStrength}
+      followingStudioSessionId={followingStudioSessionId}
+      frameAnimEl={frameAnimEl}
+      frameAnimOpen={frameAnimOpen}
+      frameAnimTargetId={frameAnimTargetId}
+      fxComicFiltered={fxComicFiltered}
+      fxCreatureFiltered={fxCreatureFiltered}
+      fxEmojisFiltered={fxEmojisFiltered}
+      fxLinePresetsFiltered={fxLinePresetsFiltered}
+      fxOverlaysFiltered={fxOverlaysFiltered}
+      fxPanelLoading={fxPanelLoading}
+      fxPanelOpen={fxPanelOpen}
+      fxPickerHasResults={fxPickerHasResults}
+      fxPickerSection={fxPickerSection}
+      fxPropFiltered={fxPropFiltered}
+      fxQuery={fxQuery}
+      fxRasterFiltered={fxRasterFiltered}
+      fxSearchQuery={fxSearchQuery}
+      fxSectionVisible={fxSectionVisible}
+      fxSfxFiltered={fxSfxFiltered}
+      gpuCanvasShadowVisibleRef={gpuCanvasShadowVisibleRef}
+      gpuLiveInkPinnedRef={gpuLiveInkPinnedRef}
+      gridSize={gridSize}
+      groups={groups}
+      guides={guides}
+      handleBrushPackImportFromMenu={handleBrushPackImportFromMenu}
+      handleImportInterchangeArchive={handleImportInterchangeArchive}
+      handleImportProject={handleImportProject}
+      handleImportProjectArchive={handleImportProjectArchive}
+      handleImportPsd={handleImportPsd}
+      handleStudioCrdtAuthoritativeSaveBarrierChange={handleStudioCrdtAuthoritativeSaveBarrierChange}
+      handleStudioCrdtDocumentChange={handleStudioCrdtDocumentChange}
+      handleStudioLiveEditSafetyChange={handleStudioLiveEditSafetyChange}
+      handleStudioLiveRoomChange={handleStudioLiveRoomChange}
+      hardCanvasInteractionBlock={hardCanvasInteractionBlock}
+      hasAutosave={hasAutosave}
+      healCloneAligned={healCloneAligned}
+      healCloneArmed={healCloneArmed}
+      healCloneBusy={healCloneBusy}
+      healCloneCursorRef={healCloneCursorRef}
+      healCloneDragPreview={healCloneDragPreview}
+      healCloneHardness={healCloneHardness}
+      healCloneOpacity={healCloneOpacity}
+      healCloneRadius={healCloneRadius}
+      healCloneSourceAnchor={healCloneSourceAnchor}
+      healCloneSourceCursorRef={healCloneSourceCursorRef}
+      healCloneTool={healCloneTool}
+      history={history}
+      historyBrushActive={historyBrushActive}
+      historyBrushArmed={historyBrushArmed}
+      historyBrushBusy={historyBrushBusy}
+      historyBrushCursorRef={historyBrushCursorRef}
+      historyBrushDragPreview={historyBrushDragPreview}
+      historyBrushHardness={historyBrushHardness}
+      historyBrushOpacity={historyBrushOpacity}
+      historyBrushRadius={historyBrushRadius}
+      historyBrushSourceIndex={historyBrushSourceIndex}
+      historyBrushSourceSrc={historyBrushSourceSrc}
+      historyPanelOpen={historyPanelOpen}
+      hybridDccOpen={hybridDccOpen}
+      hybridDccPersistenceStatus={hybridDccPersistenceStatus}
+      hybridDccReturnFocusRef={hybridDccReturnFocusRef}
+      hybridDccRouteAccess={hybridDccRouteAccess}
+      hybridDccRouteRequested={hybridDccRouteRequested}
+      hybridDccWorkspaceDocumentId={hybridDccWorkspaceDocumentId}
+      hybridDccWorkspaceScope={hybridDccWorkspaceScope}
+      inkMeshLivePreviewRuntime={inkMeshLivePreviewRuntime}
+      insertStudioStickyNote={insertStudioStickyNote}
+      inspectorLayout={inspectorLayout}
+      interchangeImportBusy={interchangeImportBusy}
+      interchangeImportChoice={interchangeImportChoice}
+      interchangeImportInputRef={interchangeImportInputRef}
+      interchangeImportStatus={interchangeImportStatus}
+      invertQuickMask={invertQuickMask}
+      isExporting={isExporting}
+      isFullscreen={isFullscreen}
+      isLatestLayerContentMutationLocked={isLatestLayerContentMutationLocked}
+      isMobile={isMobile}
+      isPanning={isPanning}
+      isRailToolVisible={isRailToolVisible}
+      isSpacePressed={isSpacePressed}
+      isStudioCommentAnchorValid={isStudioCommentAnchorValid}
+      isometricAngleDeg={isometricAngleDeg}
+      isometricCellSize={isometricCellSize}
+      isometricGridActive={isometricGridActive}
+      isometricOriginX={isometricOriginX}
+      isometricOriginY={isometricOriginY}
+      layerMaskBusy={layerMaskBusy}
+      layerMaskCursorRef={layerMaskCursorRef}
+      layerMaskDragPreview={layerMaskDragPreview}
+      layerMaskHardness={layerMaskHardness}
+      layerMaskPaintActive={layerMaskPaintActive}
+      layerMaskPaintArmed={layerMaskPaintArmed}
+      layerMaskPaintMode={layerMaskPaintMode}
+      layerMaskRadius={layerMaskRadius}
+      layerMaskStrength={layerMaskStrength}
+      layerMergeBusy={layerMergeBusy}
+      layerNavigatorItems={layerNavigatorItems}
+      layerSoloState={layerSoloState}
+      leftResize={leftResize}
+      liquifyActive={liquifyActive}
+      liquifyArmed={liquifyArmed}
+      liquifyBusy={liquifyBusy}
+      liquifyMode={liquifyMode}
+      liquifyPreviewImageRef={liquifyPreviewImageRef}
+      liquifyRadius={liquifyRadius}
+      liquifyStrength={liquifyStrength}
+      liveDraftDirectRef={liveDraftDirectRef}
+      liveDraftLayerRef={liveDraftLayerRef}
+      liveDraftShapeKind={liveDraftShapeKind}
+      liveDraftVisualRef={liveDraftVisualRef}
+      liveDrawPressureStore={liveDrawPressureStore}
+      liveDynamicBrushOverlayRenderer={liveDynamicBrushOverlayRenderer}
+      liveRetainedMediaOverlayRenderer={liveRetainedMediaOverlayRenderer}
+      liveInkOverlayRenderer={liveInkOverlayRenderer}
+      liveInkOverlayRendererRef={liveInkOverlayRendererRef}
+      liveInkPredictionRenderer={liveInkPredictionRenderer}
+      liveStampOverlayRenderer={liveStampOverlayRenderer}
+      liveWetInkOverlayRenderer={liveWetInkOverlayRenderer}
+      liveWorkspaceLayout={liveWorkspaceLayout}
+      livingInkOverlayVisibleRef={livingInkOverlayVisibleRef}
+      loadedWork={loadedWork}
+      localHiddenElementIds={localHiddenElementIds}
+      location={location}
+      loggedIn={loggedIn}
+      macroSession={macroSession}
+      magicResizeStrategy={magicResizeStrategy}
+      mainLayerRef={mainLayerRef}
+      mannequinPoserOpen={mannequinPoserOpen}
+      marqueeIds={marqueeIds}
+      marqueeIdsRef={marqueeIdsRef}
+      marqueeRectNodeRef={marqueeRectNodeRef}
+      master={master}
+      masterEditMode={masterEditMode}
+      masterPanelOpen={masterPanelOpen}
+      masterRenderEls={masterRenderEls}
+      maximized={maximized}
+      menu={menu}
+      menuFilterDisabled={menuFilterDisabled}
+      menuRef={menuRef}
+      metaEditPageId={metaEditPageId}
+      mobileBrushDockButtonRef={mobileBrushDockButtonRef}
+      mobileImmersive={mobileImmersive}
+      mobileInspectorSnap={mobileInspectorSnap}
+      mobileKeyboardInset={mobileKeyboardInset}
+      mobileQuickActionsButton={mobileQuickActionsButton}
+      mobileSelectionLocked={mobileSelectionLocked}
+      mobileSheet={mobileSheet}
+      modalMobileSheet={modalMobileSheet}
+      name={name}
+      navigate={navigate}
+      navigateStudioCommentPinCluster={navigateStudioCommentPinCluster}
+      nodeEditActiveHandleIndex={nodeEditActiveHandleIndex}
+      nodeEditArmed={nodeEditArmed}
+      nodeEditDraft={nodeEditDraft}
+      nodeEditHandles={nodeEditHandles}
+      nodeEditTool={nodeEditTool}
+      nodeRefsRef={nodeRefsRef}
+      nodeSmoothStrength={nodeSmoothStrength}
+      onPickImage={onPickImage}
+      onionSkin={onionSkin}
+      openHybridDccWorkspace={openHybridDccWorkspace}
+      openStudioCommentCount={openStudioCommentCount}
+      openStudioCommentInbox={openStudioCommentInbox}
+      openStudioCommentThreadInReview={openStudioCommentThreadInReview}
+      pageDnd={pageDnd}
+      pageEditLocked={pageEditLocked}
+      pageGrade={pageGrade}
+      pageGradeActive={pageGradeActive}
+      pageGradeCss={pageGradeCss}
+      pageGradePanelOpen={pageGradePanelOpen}
+      pageReviewOpen={pageReviewOpen}
+      pageSequenceOpen={pageSequenceOpen}
+      pages={pages}
+      pagesHi={pagesHi}
+      pagesHiRef={pagesHiRef}
+      pagesHistory={pagesHistory}
+      pagesHistoryDurabilityStatus={pagesHistoryDurabilityStatus}
+      pagesSheetRef={pagesSheetRef}
+      paintRetouchStrokeLineRef={paintRetouchStrokeLineRef}
+      panelGutter={panelGutter}
+      panelLayoutPresets={panelLayoutPresets}
+      panelLayoutsError={panelLayoutsError}
+      panelLayoutsLoading={panelLayoutsLoading}
+      panelSplitActive={panelSplitActive}
+      panelSplitArmed={panelSplitArmed}
+      panelSplitHint={panelSplitHint}
+      panelSplitPreview={panelSplitPreview}
+      panelSplitRatio={panelSplitRatio}
+      paperGrainKind={paperGrainKind}
+      paperVectorRefinementBusy={paperVectorRefinementBusy}
+      paperVectorRefinementUnavailableReason={paperVectorRefinementUnavailableReason}
+      patchEl={patchEl}
+      pathBooleanBusy={pathBooleanBusy}
+      pendingBrushDelete={pendingBrushDelete}
+      pendingBrushDeletes={pendingBrushDeletes}
+      pendingInterchangeImport={pendingInterchangeImport}
+      perspectiveEyeLevelY={perspectiveEyeLevelY}
+      perspectiveLockHorizon={perspectiveLockHorizon}
+      perspectiveRulerActive={perspectiveRulerActive}
+      pixelArtMode={pixelArtMode}
+      pixelBrushRadius={pixelBrushRadius}
+      pixelBusy={pixelBusy}
+      pixelCombine={pixelCombine}
+      pixelDragPreview={pixelDragPreview}
+      pixelForceCircle={pixelForceCircle}
+      pixelMagneticLasso={pixelMagneticLasso}
+      pixelOverlayFrame={pixelOverlayFrame}
+      pixelOverlaySel={pixelOverlaySel}
+      pixelSel={pixelSel}
+      pixelSelectionHistory={pixelSelectionHistory}
+      pixelTool={pixelTool}
+      pixelToolArmed={pixelToolArmed}
+      pixelToolTargetAvailable={pixelToolTargetAvailable}
+      pointCommentComposer={pointCommentComposer}
+      polyLassoHover={polyLassoHover}
+      polyLassoSession={polyLassoSession}
+      poserInitialDataUrl={poserInitialDataUrl}
+      poserInitialElementId={poserInitialElementId}
+      poserSeedPropId={poserSeedPropId}
+      poserVrmOpen={poserVrmOpen}
+      postCorrection={postCorrection}
+      preserveCorners={preserveCorners}
+      pressureCurve={pressureCurve}
+      pressureMinSize={pressureMinSize}
+      productBrushRepository={productBrushRepository}
+      productionBibleAssetOptions={productionBibleAssetOptions}
+      productionBibleOpen={productionBibleOpen}
+      productionInsightsOpen={productionInsightsOpen}
+      productionInsightsResult={productionInsightsResult}
+      projectActionsOpen={projectActionsOpen}
+      projectActionsRef={projectActionsRef}
+      projectArchiveBusy={projectArchiveBusy}
+      projectArchiveImportInputRef={projectArchiveImportInputRef}
+      projectArchiveStatus={projectArchiveStatus}
+      projectImportInputRef={projectImportInputRef}
+      propsSheetRef={propsSheetRef}
+      psdImportBusy={psdImportBusy}
+      psdImportInputRef={psdImportInputRef}
+      psdImportStatus={psdImportStatus}
+      publicationAnalytics={publicationAnalytics}
+      publicationOperationsOpen={publicationOperationsOpen}
+      publishAiDisclosure={publishAiDisclosure}
+      publishAiUsage={publishAiUsage}
+      publishCompliance={publishCompliance}
+      publishComplianceResult={publishComplianceResult}
+      publishContext={publishContext}
+      publishPackageExportBusy={publishPackageExportBusy}
+      publishPackageExportProgress={publishPackageExportProgress}
+      publishPackageExportStatus={publishPackageExportStatus}
+      publishPackageOpen={publishPackageOpen}
+      publishPackagePlan={publishPackagePlan}
+      publishPreflightOpen={publishPreflightOpen}
+      publishPreflightResult={publishPreflightResult}
+      publishProfile={publishProfile}
+      publishingId={publishingId}
+      puppetWarpActive={puppetWarpActive}
+      puppetWarpArmed={puppetWarpArmed}
+      puppetWarpBusy={puppetWarpBusy}
+      puppetWarpPins={puppetWarpPins}
+      quickAccessCatalog={quickAccessCatalog}
+      quickAccessIntegration={quickAccessIntegration}
+      quickAccessPaletteOpen={quickAccessPaletteOpen}
+      quickAccessState={quickAccessState}
+      quickActionsAnchor={quickActionsAnchor}
+      quickActionsDisabledActions={quickActionsDisabledActions}
+      quickActionsOpen={quickActionsOpen}
+      quickActionsPreferences={quickActionsPreferences}
+      quickComicOpen={quickComicOpen}
+      quickMaskActive={quickMaskActive}
+      quickMaskArmed={quickMaskArmed}
+      quickMaskBrushMode={quickMaskBrushMode}
+      quickMaskDragPreview={quickMaskDragPreview}
+      quickMaskHardness={quickMaskHardness}
+      quickMaskOpacity={quickMaskOpacity}
+      quickMaskRadius={quickMaskRadius}
+      quickMaskTintCanvas={quickMaskTintCanvas}
+      quickMaskTintColor={quickMaskTintColor}
+      quickMaskTintOpacity={quickMaskTintOpacity}
+      quickShapeActive={quickShapeActive}
+      railMoreOpen={railMoreOpen}
+      rasterFavoriteOnly={rasterFavoriteOnly}
+      rasterRetouchTargetAvailable={rasterRetouchTargetAvailable}
+      recentColors={recentColors}
+      redo={redo}
+      referenceBoard={referenceBoard}
+      referencePanelOpen={referencePanelOpen}
+      refreshQuickMaskTint={refreshQuickMaskTint}
+      releaseSchedule={releaseSchedule}
+      removeSelected={removeSelected}
+      renamingAssetId={renamingAssetId}
+      renamingAssetName={renamingAssetName}
+      reorder={reorder}
+      requiresStudioLiveServer={requiresStudioLiveServer}
+      resetPixelSelectionHistoryState={resetPixelSelectionHistoryState}
+      retryStudioHistoryDurability={retryStudioHistoryDurability}
+      retryWatermarkPreferenceRuntime={retryWatermarkPreferenceRuntime}
+      rightResize={rightResize}
+      runColorRangeApply={runColorRangeApply}
+      runStudioLayerLiftAnalysis={runStudioLayerLiftAnalysis}
+      saveElementAsEmeresLibraryItem={saveElementAsEmeresLibraryItem}
+      savedBrushes={savedBrushes}
+      saving={saving}
+      scale={scale}
+      scenarioApplyTarget={scenarioApplyTarget}
+      scenarioBusy={scenarioBusy}
+      scenarioError={scenarioError}
+      scenarioImageReferenceAssetOptions={scenarioImageReferenceAssetOptions}
+      scenarioImageReferenceDocument={scenarioImageReferenceDocument}
+      scenarioImageReferenceResolution={scenarioImageReferenceResolution}
+      scenarioOpen={scenarioOpen}
+      scenarioProgress={scenarioProgress}
+      scenarioRegeneratingIndex={scenarioRegeneratingIndex}
+      scenarioResult={scenarioResult}
+      scenarioSceneCountHint={scenarioSceneCountHint}
+      scenarioStageLabel={scenarioStageLabel}
+      scenarioStoryText={scenarioStoryText}
+      sceneSimilarAnchor={sceneSimilarAnchor}
+      sceneSimilarSiblings={sceneSimilarSiblings}
+      sceneSnapshotOpen={sceneSnapshotOpen}
+      sceneTemplates={sceneTemplates}
+      sceneTemplatesError={sceneTemplatesError}
+      sceneTemplatesLoading={sceneTemplatesLoading}
+      scheduleHybridDccWorkspacePersistence={scheduleHybridDccWorkspacePersistence}
+      scopedHybridDccWorkspace={scopedHybridDccWorkspace}
+      scrollPos={scrollPos}
+      scrollPreviewOpen={scrollPreviewOpen}
+      scrollViewportStore={scrollViewportStore}
+      selectOptionsLaneReserved={selectOptionsLaneReserved}
+      selectOptionsStripArmed={selectOptionsStripArmed}
+      selected={selected}
+      selectedBg3dEditSource={selectedBg3dEditSource}
+      selectedBubbleTailGeometry={selectedBubbleTailGeometry}
+      selectedContentMutationLocked={selectedContentMutationLocked}
+      selectedForInspector={selectedForInspector}
+      selectedId={selectedId}
+      selectedIdRef={selectedIdRef}
+      selectedImageMutationLocked={selectedImageMutationLocked}
+      selectedProjectedImageSource={selectedProjectedImageSource}
+      selectedWorkAssetDestructiveEditReason={selectedWorkAssetDestructiveEditReason}
+      serverAiProvider={serverAiProvider}
+      serverAiStatus={serverAiStatus}
+      serverCurrentRevision={serverCurrentRevision}
+      serverRevisionError={serverRevisionError}
+      serverRevisionLoading={serverRevisionLoading}
+      serverRevisions={serverRevisions}
+      session={session}
+      setAdvancedFillPreview={setAdvancedFillPreview}
+      setAdvancedFillStatus={setAdvancedFillStatus}
+      setAiAssistTool={setAiAssistTool}
+      setAiBgPrompt={setAiBgPrompt}
+      setAiBgSize={setAiBgSize}
+      setAiCharacterPrompt={setAiCharacterPrompt}
+      setAiColorizePrompt={setAiColorizePrompt}
+      setAiCompositionDraft={setAiCompositionDraft}
+      setAiDialogueSuggestIncludeContext={setAiDialogueSuggestIncludeContext}
+      setAiDialogueSuggestSituation={setAiDialogueSuggestSituation}
+      setAiPaletteSuggestMood={setAiPaletteSuggestMood}
+      setAiProvenanceOpen={setAiProvenanceOpen}
+      setAiRecentPrompts={setAiRecentPrompts}
+      setAlignmentGuidesVisible={setAlignmentGuidesVisible}
+      setAnimaticTimelineOpen={setAnimaticTimelineOpen}
+      setAppSettingsInitialTab={setAppSettingsInitialTab}
+      setAppSettingsOpen={setAppSettingsOpen}
+      setAssetFavoriteOnly={setAssetFavoriteOnly}
+      setAssetPrompt={setAssetPrompt}
+      setAssetPromptName={setAssetPromptName}
+      setAssetPromptQuality={setAssetPromptQuality}
+      setAssetPromptSize={setAssetPromptSize}
+      setAssetRightsAuditOpen={setAssetRightsAuditOpen}
+      setAssetSearchQuery={setAssetSearchQuery}
+      setAssetSortOrder={setAssetSortOrder}
+      setAssetTab={setAssetTab}
+      setAutoActionsOpen={setAutoActionsOpen}
+      setAutoColorCanvasSeedHit={setAutoColorCanvasSeedHit}
+      setAutoColorCanvasSeedHits={setAutoColorCanvasSeedHits}
+      setAutoColorScribbleCanvasArmed={setAutoColorScribbleCanvasArmed}
+      setBg3dInitialDataUrl={setBg3dInitialDataUrl}
+      setBg3dInitialElementId={setBg3dInitialElementId}
+      setBg3dInitialScene={setBg3dInitialScene}
+      setBg3dOpen={setBg3dOpen}
+      setBgSceneGenreFilter={setBgSceneGenreFilter}
+      setBgSceneSearchQuery={setBgSceneSearchQuery}
+      setBrushDynamics={setBrushDynamics}
+      setBrushOpacity={setBrushOpacity}
+      setBubbleShapeEditActive={setBubbleShapeEditActive}
+      setCanvasGuides={setCanvasGuides}
+      setCanvasOnlyMode={setCanvasOnlyMode}
+      setCharacterBibleOpen={setCharacterBibleOpen}
+      setCheckpointPanelOpen={setCheckpointPanelOpen}
+      setColor={setColor}
+      setColorBlindPreview={setColorBlindPreview}
+      setColorRangeFuzziness={setColorRangeFuzziness}
+      setColorRangePickActive={setColorRangePickActive}
+      setColorRangePreviewEnabled={setColorRangePreviewEnabled}
+      setColorRangeSamples={setColorRangeSamples}
+      setColorWheelOpen={setColorWheelOpen}
+      setCommentsOpen={setCommentsOpen}
+      setContextMenu={setContextMenu}
+      setContinuityOpen={setContinuityOpen}
+      setCreativeModesOpen={setCreativeModesOpen}
+      setCropAspect={setCropAspect}
+      setCropRect={setCropRect}
+      setCurrentPageId={setCurrentPageId}
+      setDialogueBatchOpen={setDialogueBatchOpen}
+      setDialogueScript={setDialogueScript}
+      setDialogueTranslateOpen={setDialogueTranslateOpen}
+      setDodgeBurnExposure={setDodgeBurnExposure}
+      setDodgeBurnHardness={setDodgeBurnHardness}
+      setDodgeBurnMode={setDodgeBurnMode}
+      setDodgeBurnRadius={setDodgeBurnRadius}
+      setDodgeBurnRange={setDodgeBurnRange}
+      setDodgeBurnSponge={setDodgeBurnSponge}
+      setDrawMode={setDrawMode}
+      setDrawShape={setDrawShape}
+      setEmeresCategoryFilter={setEmeresCategoryFilter}
+      setEmeresSearchQuery={setEmeresSearchQuery}
+      setEmeresSimilarAnchorId={setEmeresSimilarAnchorId}
+      setEmeresTab={setEmeresTab}
+      setEraseToIntersection={setEraseToIntersection}
+      setError={setError}
+      setExportFormat={setExportFormat}
+      setExportMenuOpen={setExportMenuOpen}
+      setExportPresetId={setExportPresetId}
+      setExportScale={setExportScale}
+      setExportTransparent={setExportTransparent}
+      setExtendedBlendMode={setExtendedBlendMode}
+      setExtendedBlendOpacity={setExtendedBlendOpacity}
+      setEyedropperActive={setEyedropperActive}
+      setFilterClipboard={setFilterClipboard}
+      setFilterMaskHardness={setFilterMaskHardness}
+      setFilterMaskPaintActive={setFilterMaskPaintActive}
+      setFilterMaskPaintMode={setFilterMaskPaintMode}
+      setFilterMaskRadius={setFilterMaskRadius}
+      setFilterMaskStrength={setFilterMaskStrength}
+      setFollowingStudioSessionId={setFollowingStudioSessionId}
+      setFrameAnimOpen={setFrameAnimOpen}
+      setFrameAnimTargetId={setFrameAnimTargetId}
+      setFxPanelOpen={setFxPanelOpen}
+      setFxPickerSection={setFxPickerSection}
+      setFxSearchQuery={setFxSearchQuery}
+      setGridSize={setGridSize}
+      setHealCloneAligned={setHealCloneAligned}
+      setHealCloneHardness={setHealCloneHardness}
+      setHealCloneOpacity={setHealCloneOpacity}
+      setHealCloneRadius={setHealCloneRadius}
+      setHealCloneTool={setHealCloneTool}
+      setHistoryBrushActive={setHistoryBrushActive}
+      setHistoryBrushHardness={setHistoryBrushHardness}
+      setHistoryBrushOpacity={setHistoryBrushOpacity}
+      setHistoryBrushRadius={setHistoryBrushRadius}
+      setHistoryBrushSourceIndex={setHistoryBrushSourceIndex}
+      setHistoryBrushSourceSrc={setHistoryBrushSourceSrc}
+      setHistoryPanelOpen={setHistoryPanelOpen}
+      setHybridDccOpen={setHybridDccOpen}
+      setHybridDccWorkbenchMode={setHybridDccWorkbenchMode}
+      setHybridDccWorkspaceState={setHybridDccWorkspaceState}
+      setInterchangeImportChoice={setInterchangeImportChoice}
+      setLastStudioFilterDraft={setLastStudioFilterDraft}
+      setLayerMaskHardness={setLayerMaskHardness}
+      setLayerMaskPaintActive={setLayerMaskPaintActive}
+      setLayerMaskPaintMode={setLayerMaskPaintMode}
+      setLayerMaskRadius={setLayerMaskRadius}
+      setLayerMaskStrength={setLayerMaskStrength}
+      setLeftPanelOpen={setLeftPanelOpen}
+      setLeftPanelOpenWithOverride={setLeftPanelOpenWithOverride}
+      setLiquifyMode={setLiquifyMode}
+      setLiquifyRadius={setLiquifyRadius}
+      setLiquifyStrength={setLiquifyStrength}
+      setLivingInkMode={setLivingInkMode}
+      setLivingInkScope={setLivingInkScope}
+      setLoadedWork={setLoadedWork}
+      setMagicResizeStrategy={setMagicResizeStrategy}
+      setMannequinPoserOpen={setMannequinPoserOpen}
+      setMarqueeIds={setMarqueeIds}
+      setMasterEditMode={setMasterEditMode}
+      setMasterPanelOpen={setMasterPanelOpen}
+      setMenu={setMenu}
+      setMetaEditPageId={setMetaEditPageId}
+      setMobileInspectorSnap={setMobileInspectorSnap}
+      setMobileSheet={setMobileSheet}
+      setNodeEditTool={setNodeEditTool}
+      setNodeSmoothStrength={setNodeSmoothStrength}
+      setOnionSkin={setOnionSkin}
+      setPageGradePanelOpen={setPageGradePanelOpen}
+      setPageReviewOpen={setPageReviewOpen}
+      setPageSequenceOpen={setPageSequenceOpen}
+      setPanelSplitActive={setPanelSplitActive}
+      setPanelSplitHint={setPanelSplitHint}
+      setPanelSplitRatio={setPanelSplitRatio}
+      setPausedBrushDeleteId={setPausedBrushDeleteId}
+      setPerspectiveRulerActive={setPerspectiveRulerActive}
+      setPixelArtMode={setPixelArtMode}
+      setPixelBrushRadius={setPixelBrushRadius}
+      setPixelCombine={setPixelCombine}
+      setPixelForceCircle={setPixelForceCircle}
+      setPixelMagneticLasso={setPixelMagneticLasso}
+      setPixelTool={setPixelTool}
+      setPointCommentComposer={setPointCommentComposer}
+      setPoserInitialDataUrl={setPoserInitialDataUrl}
+      setPoserInitialElementId={setPoserInitialElementId}
+      setPoserVrmOpen={setPoserVrmOpen}
+      setPostCorrection={setPostCorrection}
+      setPreserveCorners={setPreserveCorners}
+      setPressureCurve={setPressureCurve}
+      setPressureMinSize={setPressureMinSize}
+      setProductionBibleOpen={setProductionBibleOpen}
+      setProductionInsightsOpen={setProductionInsightsOpen}
+      setProjectActionsOpen={setProjectActionsOpen}
+      setPublicationOperationsOpen={setPublicationOperationsOpen}
+      setPublishPackageOpen={setPublishPackageOpen}
+      setPublishPreflightOpen={setPublishPreflightOpen}
+      setPuppetWarpActive={setPuppetWarpActive}
+      setPuppetWarpPins={setPuppetWarpPins}
+      setQuickAccessPaletteOpen={setQuickAccessPaletteOpen}
+      setQuickActionsOpen={setQuickActionsOpen}
+      setQuickActionsPreferences={setQuickActionsPreferences}
+      setQuickComicOpen={setQuickComicOpen}
+      setQuickMaskBrushMode={setQuickMaskBrushMode}
+      setQuickMaskHardness={setQuickMaskHardness}
+      setQuickMaskOpacity={setQuickMaskOpacity}
+      setQuickMaskRadius={setQuickMaskRadius}
+      setQuickMaskTintColor={setQuickMaskTintColor}
+      setQuickMaskTintOpacity={setQuickMaskTintOpacity}
+      setQuickShapeActive={setQuickShapeActive}
+      setQuickStartOpen={setQuickStartOpen}
+      setRailMoreOpen={setRailMoreOpen}
+      setRasterFavoriteOnly={setRasterFavoriteOnly}
+      setReferencePanelOpen={setReferencePanelOpen}
+      setRenamingAssetId={setRenamingAssetId}
+      setRenamingAssetName={setRenamingAssetName}
+      setRightPanelOpen={setRightPanelOpen}
+      setRightPanelOpenWithOverride={setRightPanelOpenWithOverride}
+      setSavedBrushes={setSavedBrushes}
+      setScale={setScale}
+      setScenarioImageReferenceDocument={setScenarioImageReferenceDocument}
+      setScenarioOpen={setScenarioOpen}
+      setScenarioSceneCountHint={setScenarioSceneCountHint}
+      setScenarioStoryText={setScenarioStoryText}
+      setSceneSimilarAnchorId={setSceneSimilarAnchorId}
+      setSceneSnapshotOpen={setSceneSnapshotOpen}
+      setScrollPreviewOpen={setScrollPreviewOpen}
+      setSelectedId={setSelectedId}
+      setShapeFill={setShapeFill}
+      setSharedDocumentNotice={setSharedDocumentNotice}
+      setSharedDocumentScope={setSharedDocumentScope}
+      setShortcutsOpen={setShortcutsOpen}
+      setShowAlignmentGuides={setShowAlignmentGuides}
+      setShowGrid={setShowGrid}
+      setShowWebtoonGuides={setShowWebtoonGuides}
+      setSilkGenerativeSpec={setSilkGenerativeSpec}
+      setSmudgeRadius={setSmudgeRadius}
+      setSmudgeStrength={setSmudgeStrength}
+      setSnapEnabled={setSnapEnabled}
+      setSnapEnabledVisible={setSnapEnabledVisible}
+      setStabilizer={setStabilizer}
+      setStabilizerMode={setStabilizerMode}
+      setStampTuning={setStampTuning}
+      setStoryboardGridOpen={setStoryboardGridOpen}
+      setStrokeWidth={setStrokeWidth}
+      setStudioCommentFocusRequest={setStudioCommentFocusRequest}
+      setStudioCommentPinsHidden={setStudioCommentPinsHidden}
+      setStudioFilterApplying={setStudioFilterApplying}
+      setStudioFilterPreview={setStudioFilterPreview}
+      setStudioFilterSession={setStudioFilterSession}
+      setStudioLayerLiftOptions={setStudioLayerLiftOptions}
+      setStudioRasterHandoffCandidate={setStudioRasterHandoffCandidate}
+      setSymmetryCenterX={setSymmetryCenterX}
+      setSymmetryCenterY={setSymmetryCenterY}
+      setSymmetryRadialCount={setSymmetryRadialCount}
+      setSymmetryType={setSymmetryType}
+      setTeamPanelOpen={setTeamPanelOpen}
+      setTiltEnabled={setTiltEnabled}
+      setTimelapseOpen={setTimelapseOpen}
+      setTimelineFocusedTrackId={setTimelineFocusedTrackId}
+      setTimelineOpen={setTimelineOpen}
+      setTimelinePlayhead={setTimelinePlayhead}
+      setTimelinePlaying={setTimelinePlaying}
+      setTipAngle={setTipAngle}
+      setTipRoundness={setTipRoundness}
+      setToneSearchQuery={setToneSearchQuery}
+      setTool={setTool}
+      setTranslateDraft={setTranslateDraft}
+      setTranslateGlossary={setTranslateGlossary}
+      setTranslateTargetLocale={setTranslateTargetLocale}
+      setTutorialHubOpen={setTutorialHubOpen}
+      setUseVelocityPressure={setUseVelocityPressure}
+      setUserGuides={setUserGuides}
+      setVelocitySensitivity={setVelocitySensitivity}
+      setViewTool={setViewTool}
+      setWandTolerance={setWandTolerance}
+      setWetMixHardness={setWetMixHardness}
+      setWetMixPickup={setWetMixPickup}
+      setWetMixRadius={setWetMixRadius}
+      setWetMixStrength={setWetMixStrength}
+      setWetMixWetness={setWetMixWetness}
+      setWillImportChoice={setWillImportChoice}
+      setWriterRoomAiDirection={setWriterRoomAiDirection}
+      setWriterRoomAiReview={setWriterRoomAiReview}
+      setWriterRoomOpen={setWriterRoomOpen}
+      setZoom={setZoom}
+      setZoomLocked={setZoomLocked}
+      sfxError={sfxError}
+      sfxLoading={sfxLoading}
+      sfxPacks={sfxPacks}
+      shapeFill={shapeFill}
+      shared={shared}
+      sharedDocument={sharedDocument}
+      sharedDocumentNotice={sharedDocumentNotice}
+      sharedError={sharedError}
+      sharedGutters={sharedGutters}
+      sharedLoading={sharedLoading}
+      sharedLoadingMore={sharedLoadingMore}
+      sharedNextOffset={sharedNextOffset}
+      shortcutsOpen={shortcutsOpen}
+      showAlignmentGuides={showAlignmentGuides}
+      showGrid={showGrid}
+      showMobileHint={showMobileHint}
+      showQuickStart={showQuickStart}
+      showRulers={showRulers}
+      showWebtoonGuides={showWebtoonGuides}
+      silkGenerativeSpec={silkGenerativeSpec}
+      smartGuides={smartGuides}
+      smudgeActive={smudgeActive}
+      smudgeArmed={smudgeArmed}
+      smudgeBusy={smudgeBusy}
+      smudgeCursorRef={smudgeCursorRef}
+      smudgeRadius={smudgeRadius}
+      smudgeStrength={smudgeStrength}
+      snapEnabled={snapEnabled}
+      sourceHydrationPending={sourceHydrationPending}
+      stabilizer={stabilizer}
+      stabilizerMode={stabilizerMode}
+      stageRef={stageRef}
+      stampTuning={stampTuning}
+      startStudioCommentPlacementSession={startStudioCommentPlacementSession}
+      storyboardGridOpen={storyboardGridOpen}
+      strokeGuideRef={strokeGuideRef}
+      strokeWidth={strokeWidth}
+      studioAuthUserId={studioAuthUserId}
+      studioBgSceneAssetsError={studioBgSceneAssetsError}
+      studioBgSceneAssetsLoaded={studioBgSceneAssetsLoaded}
+      studioBgSceneAssetsLoading={studioBgSceneAssetsLoading}
+      studioBrushCatalogHandlers={studioBrushCatalogHandlers}
+      studioBrushR8GrainRenderElements={studioBrushR8GrainRenderElements}
+      studioCanvasCommentPins={studioCanvasCommentPins}
+      studioCanvasViewportHandlers={studioCanvasViewportHandlers}
+      studioCanvasWorkAssetRenderProjection={studioCanvasWorkAssetRenderProjection}
+      studioCommentActor={studioCommentActor}
+      studioCommentAnchorOptions={studioCommentAnchorOptions}
+      studioCommentFocusRequest={studioCommentFocusRequest}
+      studioCommentInteractionNotice={studioCommentInteractionNotice}
+      studioCommentPinReanchorDisabledReason={studioCommentPinReanchorDisabledReason}
+      studioCommentPinReanchorableThreadIds={studioCommentPinReanchorableThreadIds}
+      studioCommentPinsHidden={studioCommentPinsHidden}
+      studioCommentSharedReplyController={studioCommentSharedReplyController}
+      studioCommentSyncError={studioCommentSyncError}
+      studioCommentThreadPopoverScreenProjectionHandlers={studioCommentThreadPopoverScreenProjectionHandlers}
+      studioCommentThreadPopoverTarget={studioCommentThreadPopoverTarget}
+      studioCommentThreadSession={studioCommentThreadSession}
+      studioCommentThreadSessionView={studioCommentThreadSessionView}
+      studioCommentViewDocument={studioCommentViewDocument}
+      studioComments={studioComments}
+      studioCrdtDocument={studioCrdtDocument}
+      studioCrdtOperationSyncReady={studioCrdtOperationSyncReady}
+      studioEmeresAssetsError={studioEmeresAssetsError}
+      studioEmeresAssetsLoaded={studioEmeresAssetsLoaded}
+      studioEmeresAssetsLoading={studioEmeresAssetsLoading}
+      studioFilterApplyBusyRef={studioFilterApplyBusyRef}
+      studioFilterApplying={studioFilterApplying}
+      studioFilterDialogImage={studioFilterDialogImage}
+      studioFilterDialogMutationLockReason={studioFilterDialogMutationLockReason}
+      studioFilterDialogMutationLocked={studioFilterDialogMutationLocked}
+      studioFilterMaskMasterRenderElements={studioFilterMaskMasterRenderElements}
+      studioFilterPreparationBusy={studioFilterPreparationBusy}
+      studioFilterPreview={studioFilterPreview}
+      studioFilterSession={studioFilterSession}
+      studioFilterSessionIdRef={studioFilterSessionIdRef}
+      studioFilterTargetLabel={studioFilterTargetLabel}
+      studioFilterUnavailableReason={studioFilterUnavailableReason}
+      studioHistoryRetention={studioHistoryRetention}
+      studioHistorySidecarRedoAvailable={studioHistorySidecarRedoAvailable}
+      studioHistorySidecarUndoAvailable={studioHistorySidecarUndoAvailable}
+      studioInspectorAsideHandlers={studioInspectorAsideHandlers}
+      studioLayerLiftDisabledReason={studioLayerLiftDisabledReason}
+      studioLayerLiftOptions={studioLayerLiftOptions}
+      studioLayerLiftUi={studioLayerLiftUi}
+      studioLayerLiftUiRef={studioLayerLiftUiRef}
+      studioLazyPanelStackHandlers={studioLazyPanelStackHandlers}
+      studioLeftToolRailHandlers={studioLeftToolRailHandlers}
+      studioLegacyCommentThreadIdSet={studioLegacyCommentThreadIdSet}
+      studioLiveJam={studioLiveJam}
+      studioLiveParticipant={studioLiveParticipant}
+      studioLiveRoomRef={studioLiveRoomRef}
+      studioLiveTransportFactory={studioLiveTransportFactory}
+      studioMainMenuGroups={studioMainMenuGroups}
+      studioMenubarActivePageLabel={studioMenubarActivePageLabel}
+      studioMenubarContentHandlers={studioMenubarContentHandlers}
+      studioMenubarPageLabels={studioMenubarPageLabels}
+      studioMobileEditingDockHandlers={studioMobileEditingDockHandlers}
+      studioOnCanvasSurfaceHandlers={studioOnCanvasSurfaceHandlers}
+      studioOptionalAssets={studioOptionalAssets}
+      studioOptionsBarsDrawModel={studioOptionsBarsDrawModel}
+      studioOptionsBarsHandlers={studioOptionsBarsHandlers}
+      studioOptionsBarsSelectionModel={studioOptionsBarsSelectionModel}
+      studioPageListPaneHandlers={studioPageListPaneHandlers}
+      studioPointCommentScreenProjectionHandlers={studioPointCommentScreenProjectionHandlers}
+      studioRasterAuthorizedAuthorityKey={studioRasterAuthorizedAuthorityKey}
+      studioRasterHandoffBlocked={studioRasterHandoffBlocked}
+      studioRasterHandoffGates={studioRasterHandoffGates}
+      studioRasterHiddenOperationIds={studioRasterHiddenOperationIds}
+      studioRasterOverlayElements={studioRasterOverlayElements}
+      studioRevisionProjectGenerationRef={studioRevisionProjectGenerationRef}
+      studioRootRef={studioRootRef}
+      studioSfx={studioSfx}
+      studioStickerAssetsError={studioStickerAssetsError}
+      studioStickerAssetsLoaded={studioStickerAssetsLoaded}
+      studioStickerAssetsLoading={studioStickerAssetsLoading}
+      studioTeamCommentCapabilities={studioTeamCommentCapabilities}
+      studioTeamCommentsSyncing={studioTeamCommentsSyncing}
+      studioTeamCommentsWorkId={studioTeamCommentsWorkId}
+      studioTeamUnreadCommentIdSet={studioTeamUnreadCommentIdSet}
+      studioToolBeltContentHandlers={studioToolBeltContentHandlers}
+      studioWorkAssetRenderPlaceholders={studioWorkAssetRenderPlaceholders}
+      studioWorkAssetRenderProjection={studioWorkAssetRenderProjection}
+      submitStudioCommentThreadReply={submitStudioCommentThreadReply}
+      submitStudioPointComment={submitStudioPointComment}
+      symmetryCenterX={symmetryCenterX}
+      symmetryCenterY={symmetryCenterY}
+      symmetryRadialCount={symmetryRadialCount}
+      symmetryType={symmetryType}
+      tagsText={tagsText}
+      teamPanelOpen={teamPanelOpen}
+      textAiConfigured={textAiConfigured}
+      textAiTransport={textAiTransport}
+      tiltEnabled={tiltEnabled}
+      timelapseCapturing={timelapseCapturing}
+      timelapseOpen={timelapseOpen}
+      timelineFocusedTrackId={timelineFocusedTrackId}
+      timelineOpen={timelineOpen}
+      timelinePlayhead={timelinePlayhead}
+      timelinePlaying={timelinePlaying}
+      timelinePreviewFrame={timelinePreviewFrame}
+      tipAngle={tipAngle}
+      tipRoundness={tipRoundness}
+      title={title}
+      titleInputRef={titleInputRef}
+      toggleCanvasWideMode={toggleCanvasWideMode}
+      toggleSelectedElementsLocked={toggleSelectedElementsLocked}
+      toneSearchQuery={toneSearchQuery}
+      tool={tool}
+      trRef={trRef}
+      translateBusy={translateBusy}
+      translateDraft={translateDraft}
+      translateError={translateError}
+      translateGlossary={translateGlossary}
+      translateProgress={translateProgress}
+      translateTargetLocale={translateTargetLocale}
+      tutorialHubOpen={tutorialHubOpen}
+      tutorialInitialId={tutorialInitialId}
+      uiDensityMode={uiDensityMode}
+      undo={undo}
+      undoBrushDelete={undoBrushDelete}
+      useVelocityPressure={useVelocityPressure}
+      userGuides={userGuides}
+      validateRecoveryAccess={validateRecoveryAccess}
+      vanishingPoints={vanishingPoints}
+      velocitySensitivity={velocitySensitivity}
+      viewTool={viewTool}
+      viewTransformSuppressed={viewTransformSuppressed}
+      wandTolerance={wandTolerance}
+      watermark={watermark}
+      watermarkPreferenceSnapshot={watermarkPreferenceSnapshot}
+      webGpuPreviewAuthorized={webGpuPreviewAuthorized}
+      webGpuPreviewStrokes={webGpuPreviewStrokes}
+      webGpuViewportSurface={webGpuViewportSurface}
+      webtoonGuides={webtoonGuides}
+      webtoonTheme={webtoonTheme}
+      wetMixActive={wetMixActive}
+      wetMixArmed={wetMixArmed}
+      wetMixBusy={wetMixBusy}
+      wetMixHardness={wetMixHardness}
+      wetMixPickup={wetMixPickup}
+      wetMixRadius={wetMixRadius}
+      wetMixStrength={wetMixStrength}
+      wetMixWetness={wetMixWetness}
+      willImportChoice={willImportChoice}
+      workHydrated={workHydrated}
+      workHydrationFailed={workHydrationFailed}
+      workHydrationUnsupportedFormat={workHydrationUnsupportedFormat}
+      workId={workId}
+      workspaceControlSide={workspaceControlSide}
+      workspaceMenuEpoch={workspaceMenuEpoch}
+      workspacePersistence={workspacePersistence}
+      workspaceState={workspaceState}
+      workspaceSyncNotice={workspaceSyncNotice}
+      wrapRef={wrapRef}
+      writerRoom={writerRoom}
+      writerRoomAiBusy={writerRoomAiBusy}
+      writerRoomAiDirection={writerRoomAiDirection}
+      writerRoomAiError={writerRoomAiError}
+      writerRoomAiReview={writerRoomAiReview}
+      writerRoomCanvasPlan={writerRoomCanvasPlan}
+      writerRoomOpen={writerRoomOpen}
+      zoom={zoom}
+      zoomHostRef={zoomHostRef}
+      zoomLocked={zoomLocked}
+      autosaveDocumentLeadership={autosaveDocumentLeadership}
+      bg={bg}
+      densityShowsStatusRail={densityShowsStatusRail}
+      drawingShortcutNoticeStore={drawingShortcutNoticeStore}
+      hi={hi}
+      menuEditRedoDisabled={menuEditRedoDisabled}
+      menuEditUndoDisabled={menuEditUndoDisabled}
+      presentationPanelsHidden={presentationPanelsHidden}
+      proDrawPrefs={proDrawPrefs}
+      remixId={remixId}
+      studioLiveGesturePreviewAdapter={studioLiveGesturePreviewAdapter}
+      studioRasterHandoffBaseKey={studioRasterHandoffBaseKey}
+      studioRasterVisibleDocumentRect={studioRasterVisibleDocumentRect}
+      studioRoute={studioRoute}
+      visibleLeftPanelOpen={visibleLeftPanelOpen}
+      visibleRightPanelOpen={visibleRightPanelOpen}
     />
-    {/* File-menu import pickers must live outside LazyStudioMenubarContent so clicks work
-        even while the menubar chunk is still loading or canvas-only chrome is remounting.
-        Same refs are still used by Menubar buttons. */}
-    <div data-studio-document-import-inputs="true" className="hidden" aria-hidden>
-      <input
-        ref={projectImportInputRef}
-        type="file"
-        accept=".json"
-        className="hidden"
-        disabled={collaborationDocumentLocked}
-        onChange={(event) => {
-          void handleImportProject(event);
-        }}
-        aria-label="프로젝트 JSON 가져오기"
-      />
-      <input
-        ref={projectArchiveImportInputRef}
-        type="file"
-        accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
-        className="hidden"
-        disabled={projectArchiveBusy || collaborationDocumentLocked}
-        onChange={(event) => void handleImportProjectArchive(event)}
-        aria-label="프로젝트 아카이브 가져오기"
-      />
-      <input
-        ref={brushPackImportInputRef}
-        type="file"
-        accept={STUDIO_BRUSH_PACK_ACCEPT}
-        className="hidden"
-        disabled={brushPackImporting}
-        onChange={(event) => void handleBrushPackImportFromMenu(event)}
-        aria-label="브러시 가져오기 (ABR · MYB · KPP · SUT · SUTG · Krita 번들 · JSON)"
-      />
-      <input
-        ref={psdImportInputRef}
-        type="file"
-        accept=".psd,image/vnd.adobe.photoshop"
-        className="hidden"
-        disabled={psdImportBusy || interchangeImportBusy || collaborationDocumentLocked}
-        onChange={(event) => void handleImportPsd(event)}
-        aria-label="PSD 가져오기"
-      />
-      <input
-        ref={interchangeImportInputRef}
-        type="file"
-        accept=".ora,.cbz,.will,image/openraster,application/vnd.comicbook+zip,application/vnd.toonspectrum.will-v1-bounded+zip"
-        className="hidden"
-        disabled={interchangeImportBusy || psdImportBusy || collaborationDocumentLocked}
-        onChange={(event) => void handleImportInterchangeArchive(event)}
-        aria-label="OpenRaster, CBZ 또는 WILL v1 가져오기"
-      />
-    </div>
-    {quickAccessPaletteOpen && quickAccessState && quickAccessIntegration ? (
-      <Suspense
-        fallback={(
-          <div
-            role="status"
-            aria-live="polite"
-            className="fixed right-3 top-16 z-[70] rounded-lg border border-line bg-panel px-3 py-2 text-xs font-semibold text-fg shadow-lg"
-          >
-            빠른 액세스를 여는 중…
-          </div>
-        )}
-      >
-        <LazyStudioQuickAccessSurface
-          state={quickAccessState}
-          catalog={quickAccessCatalog}
-          isMobile={isMobile}
-          onStateChange={changeStudioQuickAccessState}
-          onExecute={executeStudioQuickAccessCommand}
-          onClose={() => setQuickAccessPaletteOpen(false)}
-        />
-      </Suspense>
-    ) : null}
-    {quickComicOpen ? (
-      <Suspense
-        fallback={(
-          <div
-            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
-            role="status"
-            aria-live="polite"
-          >
-            빠른 웹툰 조립 화면을 여는 중…
-          </div>
-        )}
-      >
-        <LazyStudioQuickComicWizard
-          onApply={(input) => void applyQuickComicInput(input)}
-          onCancel={() => setQuickComicOpen(false)}
-        />
-      </Suspense>
-    ) : null}
-    {sceneSnapshotOpen ? (
-      <Suspense
-        fallback={(
-          <div
-            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
-            role="status"
-            aria-live="polite"
-          >
-            장면 스냅샷 라이브러리를 여는 중…
-          </div>
-        )}
-      >
-        <LazyStudioSceneSnapshotDialog
-          sourcePage={activePage}
-          sourceWorkId={workId}
-          theme={webtoonTheme}
-          onApply={applySceneSnapshot}
-          onClose={() => setSceneSnapshotOpen(false)}
-        />
-      </Suspense>
-    ) : null}
-    {animaticTimelineOpen ? (
-      <Suspense
-        fallback={(
-          <div
-            className="fixed inset-0 z-[120] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
-            role="status"
-            aria-live="polite"
-          >
-            애니매틱 타임라인을 여는 중…
-          </div>
-        )}
-      >
-        <LazyStudioAnimaticTimelineDialog
-          open
-          workScope={effectiveWorkId}
-          pages={pages}
-          reducedMotion={appSettings.other.reduceMotion}
-          onClose={() => setAnimaticTimelineOpen(false)}
-        />
-      </Suspense>
-    ) : null}
-    {productionBibleOpen ? (
-      <Suspense
-        fallback={(
-          <div
-            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
-            role="status"
-            aria-live="polite"
-          >
-            제작 바이블을 여는 중…
-          </div>
-        )}
-      >
-        <LazyStudioProductionBibleWorkspace
-          open
-          onClose={() => setProductionBibleOpen(false)}
-          userId={studioAuthUserId}
-          workId={workId}
-          characterOptions={characterBible.characters.map((character) => ({
-            id: character.id,
-            label: character.name.trim() || character.id,
-          }))}
-          assetOptions={productionBibleAssetOptions}
-        />
-      </Suspense>
-    ) : null}
-    {!creativeModesOpen ? (
-    <button
-      ref={creativeModesTriggerRef}
-      type="button"
-      data-studio-creative-modes-trigger="true"
-      // 모바일에서는 도크(z-55) 위 여백에 앉힌다. bottom-4 로 두면 도크 좌측 도구를 덮어
-      // 선택·펜 탭이 이 필로 흘러간다. 데스크톱은 도크가 없으므로 lg 에서 원래 자리로 돌아온다.
-      className="fixed left-4 bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4rem)] z-[52] min-h-11 rounded-full border border-accent/50 bg-accent px-3 text-[0.72rem] font-bold text-on-accent shadow-xl lg:bottom-4 lg:z-[69]"
-      onClick={() => setCreativeModesOpen(true)}
-    >
-      {creativeModesLabel}
-    </button>
-  ) : null}
-  {creativeModesOpen ? (
-    <div
-      ref={creativeModesPanelRef}
-      role="dialog"
-      aria-label={creativeModesLabel}
-      data-studio-creative-modes-panel="true"
-      // 뷰포트보다 큰 내용을 안고 화면 밖으로 밀려나지 않도록 높이를 잘라 시트 자체가 스크롤한다.
-      // 모바일에서는 도크 위에서 멈춰 도구막대를 계속 쓸 수 있게 두고, 데스크톱 배치는 그대로다.
-      className="fixed inset-x-3 bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+0.5rem)] z-[70] flex max-h-[calc(100dvh-var(--studio-canvas-bottom-inset,7rem)-4rem)] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl lg:inset-x-auto lg:left-1/2 lg:bottom-4 lg:max-h-[calc(100dvh-5rem)] lg:w-[min(22rem,calc(100vw-1.5rem))] lg:-translate-x-1/2"
-    >
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-2 py-1">
-        <p className="min-w-0 truncate px-1 text-[0.72rem] font-bold text-fg">{creativeModesLabel}</p>
-        <button
-          type="button"
-          data-studio-creative-modes-close="true"
-          data-autofocus
-          aria-label={creativeModesCloseLabel}
-          className="grid size-11 shrink-0 place-items-center rounded-xl text-[0.9rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-          onClick={() => setCreativeModesOpen(false)}
-        >
-          <span aria-hidden>✕</span>
-        </button>
-      </div>
-      <div
-        data-studio-creative-modes-scroll="true"
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-      >
-      <Suspense fallback={null}>
-        <StudioCreativeCompetitorModesPanel
-          pixelArtMode={pixelArtMode}
-          onPixelArtModeChange={setPixelArtMode}
-          silkSpec={silkGenerativeSpec}
-          onSilkSpecChange={(spec) => {
-            setSilkGenerativeSpec(spec);
-            changeStudioSymmetryType("silk");
-            setSymmetryRadialCount(spec.arms);
-          }}
-          onAddStickyNote={insertStudioStickyNote}
-          onOpenSculpt={() => {
-            setCreativeModesOpen(false);
-            openHybridDccWorkspace("sculpt");
-          }}
-          onStartEphemeralBoard={(session) => {
-            // Ephemeral board: focus canvas and keep share path in session for HUD.
-            setCreativeModesOpen(false);
-            console.info("[studio-ephemeral-board]", session.roomCode, session.title);
-          }}
-        />
-      </Suspense>
-      </div>
-    </div>
-  ) : null}
-  {hybridDccRouteRequested && !hybridDccOpen ? (
-    <StudioHybridDccRouteGate
-      detail={hybridDccRouteAccess === "pending"
-        ? "권한·원고·협업 경계를 확인한 뒤 같은 작품의 3D 작업을 엽니다. 기다리는 동안 캔버스와 로컬 3D 원본은 변경되지 않습니다."
-        : "이 작품의 3D 원본을 편집할 수 없어 안전하게 캔버스로 돌아갑니다."}
-      label={hybridDccRouteAccess === "pending"
-        ? "3D 작업 권한을 확인하는 중입니다."
-        : "3D 편집 권한을 확인하지 못했습니다."}
-      onClose={() => setHybridDccOpen(false)}
-      returnFocus={hybridDccReturnFocusRef.current}
-    />
-  ) : null}
-  {hybridDccOpen ? (
-    <StudioSurfaceErrorBoundary
-      detail="3D 도구 화면만 안전하게 닫았습니다. 현재 캔버스, 문서 변경, 공동작업 연결과 실행 취소 기록은 그대로 보존되어 있습니다."
-      onExit={() => setHybridDccOpen(false)}
-      resetKey={JSON.stringify([
-        hybridDccWorkspaceScope,
-        studioRoute.dccMode ?? "model",
-      ])}
-      returnFocus={hybridDccReturnFocusRef.current}
-      surfaceLabel="전문 3D 제작 도구"
-    >
-      <Suspense
-        fallback={(
-          <StudioHybridDccRouteGate
-            detail="편집 권한과 로컬 복구 범위는 확인됐습니다. 무거운 3D 편집 모듈만 불러오는 중입니다."
-            label="전문 3D 제작 도구를 여는 중입니다."
-            onClose={() => setHybridDccOpen(false)}
-            returnFocus={hybridDccReturnFocusRef.current}
-          />
-        )}
-      >
-        <LazyStudioHybridDccDialog
-          key={hybridDccWorkspaceScope}
-          loading={hybridDccPersistenceStatus === "checking"}
-          open
-          onClose={() => setHybridDccOpen(false)}
-          initialWorkspace={scopedHybridDccWorkspace}
-          onWorkbenchModeChange={setHybridDccWorkbenchMode}
-          persistenceStatus={hybridDccPersistenceStatus}
-          presentation="workspace"
-          returnFocus={hybridDccReturnFocusRef.current}
-          workbenchMode={studioRoute.dccMode ?? "model"}
-          workspaceDocumentId={hybridDccWorkspaceDocumentId}
-          onWorkspaceChange={(workspace) => {
-            setHybridDccWorkspaceState((current) => (
-              current?.scope === hybridDccWorkspaceScope && current?.workspace === workspace
-                ? current
-                : {
-                    scope: hybridDccWorkspaceScope,
-                    workspace,
-                  }
-            ));
-            scheduleHybridDccWorkspacePersistence(workspace);
-          }}
-          onOpenInBackground3D={(result) => {
-            announceDrawingShortcut(
-              result.losses.length > 0
-                ? `3D 장면을 열었습니다 · 파생 손실 ${result.losses.length}건은 DCC 원본에 보존됨`
-                : `3D 장면을 열었습니다 · ${result.assets.length}개 메시, ${result.shots.length}개 Shot`,
-            );
-            bg3dDccSourceRef.current = {
-              sourceDocumentId: result.sourceDocumentId,
-              sourceStateHash: result.sourceStateHash,
-              sourceWorkspaceHash: result.sourceWorkspaceHash,
-              sourceBridgeSetHash: result.sourceBridgeSetHash,
-              sourceCommandCount: result.sourceCommandCount,
-              sourceBridgeCommandSequence: result.sourceBridgeCommandSequence,
-            };
-            bg3dDccShotMappingsRef.current = result.shots.map((shot) => ({
-              sourceShotId: shot.sourceShotId,
-              sceneShotId: shot.sceneShotId,
-            }));
-            setHybridDccOpen(false);
-            setBg3dInitialDataUrl(undefined);
-            setBg3dInitialElementId(undefined);
-            setBg3dInitialScene(result.scene);
-            setBg3dOpen(true);
-          }}
-        />
-      </Suspense>
-    </StudioSurfaceErrorBoundary>
-    ) : null}
-    {assetRightsAuditOpen ? (
-      <Suspense
-        fallback={(
-          <div
-            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
-            role="status"
-            aria-live="polite"
-          >
-            에셋 권리 대장을 만드는 중…
-          </div>
-        )}
-      >
-        <LazyStudioAssetRightsAuditDialog
-          open
-          onClose={() => setAssetRightsAuditOpen(false)}
-          workId={workId}
-          pages={pages}
-        />
-      </Suspense>
-    ) : null}
-    {pendingInterchangeImport ? (
-      <Suspense fallback={null}>
-        <LazyStudioInterchangeLossPreviewDialog
-          open
-          preview={pendingInterchangeImport.preview}
-          busy={interchangeImportBusy}
-          confirmLabel={
-            pendingInterchangeImport.kind === "cbz"
-              ? `${pendingInterchangeImport.result.pages.length}페이지 추가`
-              : pendingInterchangeImport.kind === "will-v1"
-                ? "선택한 위치에 WILL v1 추가"
-              : "선택한 위치로 가져오기"
-          }
-          choices={
-            pendingInterchangeImport.kind === "cbz"
-              ? undefined
-              : pendingInterchangeImport.kind === "will-v1"
-                ? STUDIO_WILL_V1_IMPORT_PLACEMENT_CHOICES.map((choice) => {
-                    const available = choice.id === "new-page"
-                      ? pendingInterchangeImport.newPageAllowed
-                        && pages.length < STUDIO_PROJECT_MAX_PAGES
-                      : pendingInterchangeImport.currentPageAllowed;
-                    return available
-                      ? choice
-                      : {
-                          ...choice,
-                          disabled: true,
-                          description: choice.id === "new-page"
-                            ? `프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지 또는 페이지당 요소 한도에 도달했습니다.`
-                            : "현재 페이지에 추가하면 페이지당 요소 저장 한도를 넘습니다.",
-                        };
-                  })
-                : STUDIO_INTERCHANGE_IMPORT_PLACEMENT_CHOICES.map((choice) =>
-                    choice.id === "new-page" && pages.length >= STUDIO_PROJECT_MAX_PAGES
-                      ? {
-                          ...choice,
-                          disabled: true,
-                          description: `프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지에 도달해 현재 페이지 배치만 사용할 수 있습니다.`,
-                        }
-                      : choice
-                  )
-          }
-          selectedChoiceId={
-            pendingInterchangeImport.kind === "cbz"
-              ? undefined
-              : pendingInterchangeImport.kind === "will-v1"
-                ? willImportChoice ?? undefined
-                : interchangeImportChoice
-          }
-          onSelectedChoiceChange={(choiceId) => {
-            if (pendingInterchangeImport.kind === "will-v1") {
-              if (
-                (choiceId === "current-page" && pendingInterchangeImport.currentPageAllowed) ||
-                (
-                  choiceId === "new-page" &&
-                  pendingInterchangeImport.newPageAllowed &&
-                  pages.length < STUDIO_PROJECT_MAX_PAGES
-                )
-              ) {
-                setWillImportChoice(choiceId);
-              }
-              return;
-            }
-            if (
-              choiceId === "current-page" ||
-              (choiceId === "new-page" && pages.length < STUDIO_PROJECT_MAX_PAGES)
-            ) {
-              setInterchangeImportChoice(choiceId);
-            }
-          }}
-          onConfirm={(choiceId) => void applyPendingInterchangeImport(choiceId)}
-          onCancel={dismissPendingInterchangeImport}
-        />
-      </Suspense>
-    ) : null}
-    {pendingBrushDelete ? (
-      <div
-        ref={brushUndoToastRef}
-        className="fixed left-1/2 z-[90] flex w-[min(calc(100vw-1.5rem),28rem)] -translate-x-1/2 items-center gap-2 rounded-2xl border border-warn/40 bg-panel/95 p-2 pl-3 text-xs text-fg shadow-2xl backdrop-blur"
-        style={{
-          bottom: isMobile
-            ? `calc(7.5rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`
-            : "1.5rem",
-        }}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        onPointerEnter={() => setPausedBrushDeleteId(pendingBrushDelete.id)}
-        onPointerLeave={() => {
-          if (!brushUndoToastRef.current?.contains(document.activeElement)) {
-            setPausedBrushDeleteId(null);
-          }
-        }}
-        onFocusCapture={() => setPausedBrushDeleteId(pendingBrushDelete.id)}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-            setPausedBrushDeleteId(null);
-          }
-        }}
-      >
-        <span className="min-w-0 flex-1 leading-relaxed">
-          <strong className="font-semibold">“{pendingBrushDelete.deleted.brush.name}” 삭제됨</strong>
-          {pendingBrushDeletes.length > 1 ? ` · 복구 가능 ${pendingBrushDeletes.length}건` : ""}
-        </span>
-        <button
-          ref={brushUndoButtonRef}
-          type="button"
-          onClick={() => void undoBrushDelete(pendingBrushDelete)}
-          className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-warn/15 px-3 font-bold text-warn hover:bg-warn/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <Undo2
-            size={STUDIO_ICON_SIZE.context}
-            strokeWidth={STUDIO_ICON_STROKE}
-            aria-hidden
-            className={studioChromeIconClass({ tone: "warn" })}
-          />
-          삭제 취소
-        </button>
-      </div>
-    ) : null}
-    <Container
-      size="wide"
-      className={cn(
-        // Canvas-max draw-app shell: full-bleed, no marketing padding or max-width cap.
-        "flex min-h-0 flex-1 flex-col !max-w-none !px-0 py-0",
-        (isFullscreen || maximized) && "min-h-0"
-      )}
-    >
-      <StudioAppMenubar
-        aria-label="문서 메뉴"
-        className={cn(
-          canvasOnlyMode && "hidden",
-          mobileImmersive &&
-            "h-auto min-h-11 border-0 bg-transparent shadow-none"
-        )}
-      >
-        <Suspense
-          fallback={(
-            <div
-              aria-hidden
-              data-studio-menubar-loading="true"
-              className="h-9 min-w-0 flex-1 animate-pulse rounded-lg bg-raised/45 motion-reduce:animate-none"
-            />
-          )}
-        >
-          <LazyStudioMenubarContent
-            activePageLabel={studioMenubarActivePageLabel}
-          activeToolbarGroup={activeToolbarGroup}
-          aiProvenance={aiProvenance}
-          canvasH={canvasH}
-          characterBible={characterBible}
-          collaborationDocumentLocked={collaborationDocumentLocked}
-          collaborationLockMessage={collaborationLockMessage}
-          currentWorkspaceOwnerScope={currentWorkspaceOwnerScope}
-          displayLinkedTitleId={displayLinkedTitleId}
-          exportFormat={exportFormat}
-          exportMenuOpen={exportMenuOpen}
-          exportMenuRef={exportMenuRef}
-          exportPresetId={exportPresetId}
-          exportScale={exportScale}
-          exportTransparent={exportTransparent}
-          fxPanelLoading={fxPanelLoading}
-          isExporting={isExporting}
-          isMobile={isMobile}
-          liveWorkspaceLayout={liveWorkspaceLayout}
-          resolveWorkspaceDeviceKind={currentStudioWorkspaceDeviceKind}
-          loadedWork={loadedWork}
-          masterEditMode={masterEditMode}
-          menu={menu}
-          mobileImmersive={mobileImmersive}
-          historyPanelOpen={historyPanelOpen}
-          openStudioCommentCount={openStudioCommentCount}
-          pageCount={studioMenubarPageLabels.length}
-          pageEditLocked={pageEditLocked}
-          pageLabels={studioMenubarPageLabels}
-          dialoguePages={pages}
-          projectActionsOpen={projectActionsOpen}
-          projectActionsRef={projectActionsRef}
-          projectArchiveBusy={projectArchiveBusy}
-          projectArchiveImportInputRef={projectArchiveImportInputRef}
-          projectArchiveStatus={projectArchiveStatus}
-          projectImportInputRef={projectImportInputRef}
-          interchangeImportBusy={interchangeImportBusy}
-          interchangeImportInputRef={interchangeImportInputRef}
-          interchangeImportStatus={interchangeImportStatus}
-          psdImportBusy={psdImportBusy}
-          psdImportInputRef={psdImportInputRef}
-          psdImportStatus={psdImportStatus}
-          redoDisabled={menuEditRedoDisabled}
-          saving={saving}
-          setAiProvenanceOpen={setAiProvenanceOpen}
-          setAnimaticTimelineOpen={setAnimaticTimelineOpen}
-          setAssetRightsAuditOpen={setAssetRightsAuditOpen}
-          setCharacterBibleOpen={setCharacterBibleOpen}
-          setCheckpointPanelOpen={setCheckpointPanelOpen}
-          setProductionBibleOpen={setProductionBibleOpen}
-          setHybridDccOpen={setHybridDccOpen}
-          setSceneSnapshotOpen={setSceneSnapshotOpen}
-          setExportFormat={setExportFormat}
-          setExportMenuOpen={setExportMenuOpen}
-          setExportPresetId={setExportPresetId}
-          setExportScale={setExportScale}
-          setExportTransparent={setExportTransparent}
-          setMenu={setMenu}
-          setProductionInsightsOpen={setProductionInsightsOpen}
-          setProjectActionsOpen={setProjectActionsOpen}
-          setPublicationOperationsOpen={setPublicationOperationsOpen}
-          setPublishPackageOpen={setPublishPackageOpen}
-          setPublishPreflightOpen={setPublishPreflightOpen}
-          setWriterRoomOpen={setWriterRoomOpen}
-          sharedDocument={sharedDocument}
-          studioMainMenuGroups={studioMainMenuGroups}
-          title={title}
-          undoDisabled={menuEditUndoDisabled}
-          watermark={watermark}
-          workId={workId}
-          workspaceMenuEpoch={workspaceMenuEpoch}
-          workspacePersistence={workspacePersistence}
-          workspaceState={workspaceState}
-          workspaceSyncNotice={workspaceSyncNotice}
-          writerRoom={writerRoom}
-            stableHandlers={studioMenubarContentHandlers}
-          />
-        </Suspense>
-        <StudioToolHintTarget
-          preferredSide="bottom"
-          className="hidden shrink-0 lg:inline-flex"
-          disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
-          unavailableReason={
-            collaborationDocumentLocked && !sharedDocument?.capabilities.view
-              ? collaborationLockMessage()
-              : undefined
-          }
-          hint={{
-            id: "menubar-comment-inbox",
-            title: "댓글 검토함",
-            description: "문서 댓글을 검색·필터링하고 읽음·해결 상태를 관리하며 연결된 캔버스 위치로 이동합니다.",
-            preview: "comment-inbox",
-            tip:
-              openStudioCommentCount > 0
-                ? `아직 해결되지 않은 댓글이 ${openStudioCommentCount}개 있어요.`
-                : "댓글 핀을 남기면 검토자가 정확한 페이지·컷·요소 맥락을 바로 확인할 수 있어요.",
-          }}
-        >
-          <button
-            type="button"
-            data-studio-comments-inbox="true"
-            onClick={() => {
-              if (commentsOpen) {
-                setCommentsOpen(false);
-                return;
-              }
-              openStudioCommentInbox();
-            }}
-            disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
-            aria-expanded={commentsOpen}
-            aria-haspopup="dialog"
-            aria-controls="studio-comments-review-dialog"
-            aria-label={`댓글 검토함${openStudioCommentCount > 0 ? `, 열린 댓글 ${openStudioCommentCount}개` : ""}`}
-            className={cn(
-              buttonClass({ size: "sm", variant: commentsOpen ? "solid" : "quiet" }),
-              "relative min-h-9 shrink-0 gap-1.5 px-2.5 text-[0.72rem] disabled:cursor-not-allowed disabled:opacity-50"
-            )}
-            title={
-              collaborationDocumentLocked && !sharedDocument?.capabilities.view
-                ? collaborationLockMessage()
-                : commentsOpen
-                  ? "댓글 검토함 닫기"
-                  : "댓글 검토함 열기 · 검색, 필터, 읽음 상태 관리"
-            }
-          >
-            <MessageCircle
-              size={STUDIO_ICON_SIZE.subtab}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={studioChromeIconClass({ tone: "default" })}
-            />
-            <span className="max-xl:sr-only">댓글</span>
-            {openStudioCommentCount > 0 ? (
-              <span
-                aria-hidden
-                className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-[0.6rem] font-bold tabular-nums text-on-accent"
-              >
-                {openStudioCommentCount > 99 ? "99+" : openStudioCommentCount}
-              </span>
-            ) : null}
-          </button>
-        </StudioToolHintTarget>
-      </StudioAppMenubar>
-
-      <div
-        data-studio-global-status-rail
-        className={cn(
-          "shrink-0 px-2",
-          mobileImmersive
-            ? "max-h-[min(24dvh,10rem)] overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
-            : "empty:hidden"
-        )}
-      >
-        {densityShowsStatusRail && error ? (
-          <div role="status" className="my-1 rounded-lg border border-bad/40 bg-bad/10 px-2.5 py-1.5 text-xs text-bad">{error}</div>
-        ) : null}
-        {densityShowsStatusRail && layerMergeBusy ? (
-          <div role="status" className="my-1 rounded-lg border border-accent/35 bg-accent-soft/30 px-2.5 py-1.5 text-xs text-fg-2">
-            레이어를 병합하는 중…
-          </div>
-        ) : null}
-        {densityShowsStatusRail && macroSession.recording ? (
-          <div role="status" className="my-1 rounded-lg border border-bad/30 bg-bad/10 px-2.5 py-1.5 text-xs font-semibold text-bad">
-            매크로 녹음 중 · {macroSession.commands.length}단계
-          </div>
-        ) : null}
-        {densityShowsStatusRail && expectsSharedDocument && (!mobileImmersive || collaborationDocumentLocked) ? (
-          <div
-            role="status"
-            aria-live="polite"
-            aria-busy={!workHydrated || collaborationOperationSyncPending}
-            className={cn(
-              "my-1 flex min-h-9 items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs",
-              collaborationDocumentLocked
-                ? "border-warn/40 bg-warn/10 text-fg"
-                : "border-good/35 bg-good/10 text-fg"
-            )}
-          >
-            {collaborationDocumentLocked ? (
-            <Lock
-              size={STUDIO_ICON_SIZE.nav}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={cn(
-                "mt-0.5 shrink-0",
-                studioChromeIconClass({ tone: collaborationDocumentLocked ? "warn" : "good" })
-              )}
-            />
-          ) : (
-            <UsersRound
-              size={STUDIO_ICON_SIZE.nav}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={cn("mt-0.5 shrink-0", studioChromeIconClass({ tone: "good" }))}
-            />
-          )}
-            <span className="min-w-0 flex-1">
-              <strong className="block text-sm font-semibold">
-                {!sharedDocument
-                  ? workHydrated
-                    ? "공동 문서를 열지 못했어요"
-                    : "공동 문서 권한을 확인하고 있어요"
-                  : collaborationOperationSyncPending
-                    ? "동시 편집 연산 동기화 중"
-                    : collaborationReadOnly
-                    ? `${collaborationRoleLabel()} · 읽기 전용`
-                    : `${collaborationRoleLabel()} · 공동 편집 가능`}
-              </strong>
-              <span className="mt-0.5 block text-xs leading-relaxed text-fg-2">
-                {collaborationDocumentLocked
-                  ? collaborationLockMessage()
-                  : sharedDocumentNotice ??
-                    `서버 revision ${sharedDocument?.revision ?? "—"} 기준으로 안전하게 저장합니다.`}
-              </span>
-            </span>
-            {sharedDocument ? (
-              <span className="shrink-0 rounded-full border border-line bg-card px-2 py-1 text-[0.6875rem] font-semibold tabular-nums text-fg-2">
-                r{sharedDocument.revision}
-              </span>
-            ) : workHydrated ? (
-              <button
-                type="button"
-                onClick={() => globalThis.location.reload()}
-                className="min-h-11 shrink-0 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              >
-                다시 시도
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-        {studioHistoryRetention.notice && !mobileImmersive && !canvasOnlyMode ? (
-          <div
-            key={studioHistoryRetention.notice.id}
-            data-studio-history-budget-notice="true"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            className="my-1 flex min-h-9 items-start gap-2 rounded-lg border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-xs text-fg-2"
-          >
-            <Undo2
-              size={STUDIO_ICON_SIZE.context}
-              strokeWidth={STUDIO_ICON_STROKE}
-              aria-hidden
-              className={cn(
-                "mt-0.5 shrink-0",
-                studioChromeIconClass({ tone: "warn" })
-              )}
-            />
-            <span className="min-w-0 flex-1 leading-relaxed">
-              {studioHistoryRetention.notice.message}
-            </span>
-          </div>
-        ) : null}
-        {/* 게시·로그인 안내는 드로잉 크롬에 띄우지 않음 — 저장/게시 액션 시점에만 노출. */}
-        {(publishContext.series || publishContext.challenge) && !mobileImmersive && !canvasOnlyMode ? (
-          <Suspense fallback={null}>
-            <StudioPublishContextBanner
-              context={publishContext}
-              className="my-1 mb-1 px-2.5 py-1.5 text-xs"
-            />
-          </Suspense>
-        ) : null}
-      </div>
-
-      {/*
-        선택 옵션 줄의 자리를 미리 확보한다 — 선택이 생겨도 스트립이 새로 flow 에
-        끼어들지 않으므로 캔버스 원점이 0px 이동한다. 빈 줄로 두면 고장처럼 보여서
-        같은 높이의 안내 줄을 세워 둔다(오버레이가 아니라 예약이라 캔버스를 가리지도
-        않는다).
-      */}
-      {selectOptionsLaneReserved && !studioOptionsBarsSelectionModel.visible ? (
-        <div
-          data-studio-select-options-reserve="true"
-          data-studio-select-options-armed={selectOptionsStripArmed ? "true" : "false"}
-          data-studio-icon-first="true"
-          className="relative z-[40] flex h-11 min-h-11 shrink-0 items-center gap-1.5 overflow-hidden border-b border-line bg-panel/70 px-2.5 text-[0.7rem] text-fg-3"
-        >
-          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-line" />
-          <span className="truncate">
-            {selectOptionsStripArmed
-              ? "요소를 클릭하면 선택 옵션이 여기에 표시됩니다 · 드래그로 여러 개 선택"
-              : "선택 도구(V)로 요소를 고르면 복제·정렬·잠금 옵션이 여기에 표시됩니다"}
-          </span>
-        </div>
-      ) : null}
-      <StudioOptionsBars
-        draw={studioOptionsBarsDrawModel}
-        selection={studioOptionsBarsSelectionModel}
-        stableHandlers={studioOptionsBarsHandlers}
-      />
-
-      {brushCatalogSession ? (
-        <Suspense fallback={null}>
-          <StudioBrushCatalogPortal
-            open
-            placement={brushCatalogSession.placement}
-            triggerElement={brushCatalogSession.trigger}
-            activeBrushId={activeCatalogBrush.id}
-            operation={drawMode === "eraser" ? "erase" : "paint"}
-            favoriteIds={proDrawPrefs.favoriteBrushIds}
-            recentIds={proDrawPrefs.recentBrushIds}
-            mobileKeyboardInset={mobileKeyboardInset}
-            onClose={studioBrushCatalogHandlers.close}
-            onSelect={applyStudioBrushCatalogSelection}
-            onToggleFavorite={studioBrushCatalogHandlers.toggleFavorite}
-          />
-        </Suspense>
-      ) : null}
-
-      {/* Legacy tool belt: primary on mobile. Desktop menubar/rail own discovery. Keep the
-          component mounted so its body portals can serve rail-triggered panels, but hide its DOM
-          host completely on desktop; a zero-size overflow-visible host still painted children at
-          y < 0 and widened the editor scroll geometry. */}
-      <StudioToolBelt
-        inert={!isMobile}
-        aria-hidden={!isMobile}
-        className={cn(
-          canvasOnlyMode && "hidden",
-          // Immersive mobile already exposes the same frequent actions in its 44px thumb dock.
-          // Removing the 4.7x-wide belt restores canvas height and eliminates undiscoverable scroll.
-          mobileImmersive && "max-lg:hidden",
-          // Portalled popovers attach to body, so display:none on this host does not clip them.
-          "lg:hidden",
-          // 모바일은 정상 클릭.
-          "max-lg:pointer-events-auto"
-        )}
-      >
-        <StudioToolBeltContent
-          activePage={activePage}
-          activeServerAiProviderLabel={activeServerAiProviderLabel}
-          activeSurfaceReviewLocked={activeSurfaceReviewLocked}
-          activeToolbarGroup={activeToolbarGroup}
-          advancedFillActive={advancedFillActive}
-          advancedFillUnsupportedReason={advancedFillUnsupportedReason}
-          aiAssistTool={aiAssistTool}
-          aiBgBusy={aiBgBusy}
-          aiBgError={aiBgError}
-          aiBgPrompt={aiBgPrompt}
-          aiBgSize={aiBgSize}
-          aiCharacterBusy={aiCharacterBusy}
-          aiCharacterError={aiCharacterError}
-          aiCharacterPrompt={aiCharacterPrompt}
-          aiCompositionDraft={aiCompositionDraft}
-          aiDialogueSuggestBusy={aiDialogueSuggestBusy}
-          aiDialogueSuggestCandidates={aiDialogueSuggestCandidates}
-          aiDialogueSuggestError={aiDialogueSuggestError}
-          aiDialogueSuggestIncludeContext={aiDialogueSuggestIncludeContext}
-          aiDialogueSuggestSituation={aiDialogueSuggestSituation}
-          aiPaletteSuggestBusy={aiPaletteSuggestBusy}
-          aiPaletteSuggestError={aiPaletteSuggestError}
-          aiPaletteSuggestion={aiPaletteSuggestion}
-          aiPaletteSuggestMood={aiPaletteSuggestMood}
-          aiPaletteSuggestSavedMsg={aiPaletteSuggestSavedMsg}
-          aiRecentPrompts={aiRecentPrompts}
-          aiSettings={aiSettings}
-          assetFavoriteOnly={assetFavoriteOnly}
-          assetFavoriteState={assetFavoriteState}
-          assetGenerating={assetGenerating}
-          assetPrompt={assetPrompt}
-          assetPromptName={assetPromptName}
-          assetPromptQuality={assetPromptQuality}
-          assetPromptSize={assetPromptSize}
-          assets={assets}
-          assetSearchQuery={assetSearchQuery}
-          assetsLoading={assetsLoading}
-          assetSortOrder={assetSortOrder}
-          assetTab={assetTab}
-          bg={bg}
-          bg3dOpen={admittedBg3dOpen}
-          bgGrad={bgGrad}
-          bgSceneGenreFilter={bgSceneGenreFilter}
-          bgSceneSearchQuery={bgSceneSearchQuery}
-          bgSceneSectionsFiltered={bgSceneSectionsFiltered}
-          builtinRasterBusyId={builtinRasterBusyId}
-          canvasH={canvasH}
-          canvasOnlyMode={canvasOnlyMode}
-          clips={clips}
-          collaborationDocumentLocked={collaborationDocumentLocked}
-          collaborationLockMessage={collaborationLockMessage}
-          color={color}
-          commentsOpen={commentsOpen}
-          configuredServerAiProviders={configuredServerAiProviders}
-          continuityOpen={continuityOpen}
-          dialogueScript={dialogueScript}
-          drawMode={drawMode}
-          elements={elements}
-          emeresCategoryFilter={emeresCategoryFilter}
-          emeresFlatCatalog={emeresFlatCatalog}
-          emeresSearchQuery={emeresSearchQuery}
-          emeresSectionsFiltered={emeresSectionsFiltered}
-          emeresSimilarAnchor={emeresSimilarAnchor}
-          emeresSimilarSiblings={emeresSimilarSiblings}
-          emeresTab={emeresTab}
-          emeresUnderlayCount={emeresUnderlayCount}
-          frameAnimOpen={frameAnimOpen}
-          frameAnimTargetId={frameAnimTargetId}
-          fxComicFiltered={fxComicFiltered}
-          fxCreatureFiltered={fxCreatureFiltered}
-          fxEmojisFiltered={fxEmojisFiltered}
-          fxLinePresetsFiltered={fxLinePresetsFiltered}
-          fxOverlaysFiltered={fxOverlaysFiltered}
-          fxPickerHasResults={fxPickerHasResults}
-          fxPickerSection={fxPickerSection}
-          fxPropFiltered={fxPropFiltered}
-          fxQuery={fxQuery}
-          fxRasterFiltered={fxRasterFiltered}
-          fxSearchQuery={fxSearchQuery}
-          fxSectionVisible={fxSectionVisible}
-          fxSfxFiltered={fxSfxFiltered}
-          hi={hi}
-          history={history}
-          historyPanelOpen={historyPanelOpen}
-          isFullscreen={isFullscreen}
-          toggleWorkspaceWideMode={toggleCanvasWideMode}
-          magicResizeStrategy={magicResizeStrategy}
-          masterEditMode={masterEditMode}
-          maximized={maximized}
-          menu={menu}
-          menuRef={menuRef}
-          openStudioCommentCount={openStudioCommentCount}
-          pageEditLocked={pageEditLocked}
-          pageReviewOpen={pageReviewOpen}
-          panelLayoutPresets={panelLayoutPresets}
-          panelLayoutsError={panelLayoutsError}
-          panelLayoutsLoading={panelLayoutsLoading}
-          mannequinPoserOpen={admittedMannequinPoserOpen}
-          setMannequinPoserOpen={setMannequinPoserOpen}
-          poserVrmOpen={admittedPoserVrmOpen}
-          presentationPanelsHidden={presentationPanelsHidden}
-          publishingId={publishingId}
-          rasterFavoriteOnly={rasterFavoriteOnly}
-          recentColors={recentColors}
-          referencePanelOpen={referencePanelOpen}
-          renamingAssetId={renamingAssetId}
-          renamingAssetName={renamingAssetName}
-          sceneSimilarAnchor={sceneSimilarAnchor}
-          sceneSimilarSiblings={sceneSimilarSiblings}
-          sceneTemplates={sceneTemplates}
-          sceneTemplatesError={sceneTemplatesError}
-          sceneTemplatesLoading={sceneTemplatesLoading}
-          selected={selectedForInspector}
-          serverAiProvider={serverAiProvider}
-          serverAiStatus={serverAiStatus}
-          setAiAssistTool={setAiAssistTool}
-          setAiBgPrompt={setAiBgPrompt}
-          setAiBgSize={setAiBgSize}
-          setAiCharacterPrompt={setAiCharacterPrompt}
-          setAiCompositionDraft={setAiCompositionDraft}
-          setAiDialogueSuggestIncludeContext={setAiDialogueSuggestIncludeContext}
-          setAiDialogueSuggestSituation={setAiDialogueSuggestSituation}
-          setAiPaletteSuggestMood={setAiPaletteSuggestMood}
-          setAiRecentPrompts={setAiRecentPrompts}
-          setAssetFavoriteOnly={setAssetFavoriteOnly}
-          setAssetPrompt={setAssetPrompt}
-          setAssetPromptName={setAssetPromptName}
-          setAssetPromptQuality={setAssetPromptQuality}
-          setAssetPromptSize={setAssetPromptSize}
-          setAssetSearchQuery={setAssetSearchQuery}
-          setAssetSortOrder={setAssetSortOrder}
-          setAssetTab={setAssetTab}
-          setBg3dInitialDataUrl={setBg3dInitialDataUrl}
-          setBg3dInitialElementId={setBg3dInitialElementId}
-          setBg3dInitialScene={setBg3dInitialScene}
-          setBg3dOpen={setBg3dOpen}
-          setBgSceneGenreFilter={setBgSceneGenreFilter}
-          setBgSceneSearchQuery={setBgSceneSearchQuery}
-          setColor={setColor}
-          setCommentsOpen={setCommentsOpen}
-          setContinuityOpen={setContinuityOpen}
-          setDialogueBatchOpen={setDialogueBatchOpen}
-          setDialogueScript={setDialogueScript}
-          setDialogueTranslateOpen={setDialogueTranslateOpen}
-          setDrawMode={setDrawMode}
-          setEmeresCategoryFilter={setEmeresCategoryFilter}
-          setEmeresSearchQuery={setEmeresSearchQuery}
-          setEmeresSimilarAnchorId={setEmeresSimilarAnchorId}
-          setEmeresTab={setEmeresTab}
-          setFxPickerSection={setFxPickerSection}
-          setFxSearchQuery={setFxSearchQuery}
-          setHistoryPanelOpen={setHistoryPanelOpen}
-          setLeftPanelOpen={setLeftPanelOpenWithOverride}
-          setMagicResizeStrategy={setMagicResizeStrategy}
-          setMenu={setMenu}
-          setPageReviewOpen={setPageReviewOpen}
-          setPoserVrmOpen={setPoserVrmOpen}
-          setRasterFavoriteOnly={setRasterFavoriteOnly}
-          setReferencePanelOpen={setReferencePanelOpen}
-          setRenamingAssetId={setRenamingAssetId}
-          setRenamingAssetName={setRenamingAssetName}
-          setRightPanelOpen={setRightPanelOpenWithOverride}
-          setScale={setScale}
-          setScenarioOpen={setScenarioOpen}
-          setSceneSimilarAnchorId={setSceneSimilarAnchorId}
-          setScrollPreviewOpen={setScrollPreviewOpen}
-          setStoryboardGridOpen={setStoryboardGridOpen}
-          setTeamPanelOpen={setTeamPanelOpen}
-          setTimelapseOpen={setTimelapseOpen}
-          setTimelineOpen={setTimelineOpen}
-          setToneSearchQuery={setToneSearchQuery}
-          setTool={setTool}
-          setZoom={setZoom}
-          sfxError={sfxError}
-          sfxLoading={sfxLoading}
-          sfxPacks={sfxPacks}
-          shared={shared}
-          sharedDocument={sharedDocument}
-          sharedError={sharedError}
-          sharedHasMore={sharedNextOffset !== null}
-          sharedLoading={sharedLoading}
-          sharedLoadingMore={sharedLoadingMore}
-          studioBgSceneAssetsError={studioBgSceneAssetsError}
-          studioBgSceneAssetsLoaded={studioBgSceneAssetsLoaded}
-          studioBgSceneAssetsLoading={studioBgSceneAssetsLoading}
-          studioEmeresAssetsError={studioEmeresAssetsError}
-          studioEmeresAssetsLoaded={studioEmeresAssetsLoaded}
-          studioEmeresAssetsLoading={studioEmeresAssetsLoading}
-          studioOptionalAssets={studioOptionalAssets}
-          studioSfx={studioSfx}
-          studioStickerAssetsError={studioStickerAssetsError}
-          studioStickerAssetsLoaded={studioStickerAssetsLoaded}
-          studioStickerAssetsLoading={studioStickerAssetsLoading}
-          teamPanelOpen={teamPanelOpen}
-          textAiConfigured={textAiConfigured}
-          textAiTransport={textAiTransport}
-          timelineOpen={timelineOpen}
-          toneSearchQuery={toneSearchQuery}
-          tool={tool}
-          uiDensityMode={uiDensityMode}
-          visibleLeftPanelOpen={visibleLeftPanelOpen}
-          visibleRightPanelOpen={visibleRightPanelOpen}
-          wrapRef={wrapRef}
-          zoom={zoom}
-          stableHandlers={studioToolBeltContentHandlers}
-        />
-      </StudioToolBelt>
-
-      {pageEditLocked && !masterEditMode ? (
-        <div
-          role="status"
-          className={cn(
-            "mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/35 bg-warning-soft/20 px-3 py-2 text-xs text-warning",
-            mobileImmersive &&
-              "max-h-[min(20dvh,7rem)] shrink-0 overflow-y-auto overscroll-contain"
-          )}
-        >
-          <span className="inline-flex items-center gap-1.5 font-semibold">
-            <Lock size={13} aria-hidden /> 현재 페이지는 검토 잠금 상태라 콘텐츠 변경이 차단됩니다.
-          </span>
-          <button
-            type="button"
-            onClick={() => setPageReviewOpen(true)}
-            className="rounded-lg border border-warning/35 bg-panel/70 px-2.5 py-1 font-bold hover:bg-panel"
-          >
-            검토 설정 열기
-          </button>
-        </div>
-      ) : null}
-
-      <div
-        data-studio-mobile-canvas-workspace={isMobile ? "true" : undefined}
-        className={cn(
-          // Edge-dock workspace: the mobile dock overlays the scrollport instead of shrinking this
-          // flex lane. StudioCanvasViewport owns the matching scroll-safe inset, so the final canvas
-          // pixels remain reachable while the full dynamic viewport stays available for drawing.
-          "flex min-h-0 flex-1 flex-col gap-0 pb-0 lg:flex-row lg:overflow-hidden",
-          canvasOnlyMode && "overflow-hidden",
-          mobileImmersive && "overflow-hidden"
-        )}
-      >
-        {/* 모달 시트 전용 스크림. 브러시 설정(draw)은 캔버스를 계속 만질 수 있는 비모달이다. */}
-        {isMobile && modalMobileSheet && (
-          <div
-            aria-hidden
-            data-studio-modal-backdrop="true"
-            onPointerDown={(event) => {
-              // The scrim itself is not a focus target. Prevent the pointer's default focus move
-              // from overriding the modal controller's launcher-focus restoration during unmount.
-              event.preventDefault();
-              dismissActiveMobileSheet();
-            }}
-            className="fixed inset-0 z-[59] bg-black/45 backdrop-blur-sm lg:hidden"
-          />
-        )}
-        {/* 왼쪽: 페이지 목록 — 접히면 아이콘 엣지 레일 */}
-        <Suspense
-          fallback={(
-            <div
-              aria-hidden="true"
-              data-studio-page-list-loading="true"
-              className="hidden w-12 shrink-0 border-r border-line bg-panel lg:block"
-            />
-          )}
-        >
-          <LazyStudioPageListPane
-            collaborationDocumentLocked={collaborationDocumentLocked}
-            collaborationLockMessage={collaborationLockMessage}
-            composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
-            currentPageId={currentPageId}
-            isMobile={isMobile}
-            leftResize={leftResize}
-            master={master}
-            masterEditMode={masterEditMode}
-            masterPanelOpen={masterPanelOpen}
-            metaEditPageId={metaEditPageId}
-            mobileKeyboardInset={mobileKeyboardInset}
-            mobileSheet={mobileSheet}
-            pageDnd={pageDnd}
-            pages={pages}
-            pagesSheetRef={pagesSheetRef}
-            presentationPanelsHidden={presentationPanelsHidden}
-            setCurrentPageId={setCurrentPageId}
-            setLeftPanelOpen={setLeftPanelOpenWithOverride}
-            setMasterPanelOpen={setMasterPanelOpen}
-            setMetaEditPageId={setMetaEditPageId}
-            setMobileSheet={setMobileSheet}
-            visibleLeftPanelOpen={visibleLeftPanelOpen}
-            stableHandlers={studioPageListPaneHandlers}
-          />
-        </Suspense>
-
-        {/* Left vertical toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
-        <Suspense
-          fallback={(
-            <div
-              aria-hidden="true"
-              data-studio-left-tool-rail-loading="true"
-              className="hidden w-12 shrink-0 border-r border-line bg-panel lg:block"
-            />
-          )}
-        >
-        <LazyStudioLeftToolRail
-          activeSurfaceReviewLocked={activeSurfaceReviewLocked}
-          pixelToolTargetAvailable={pixelToolTargetAvailable}
-          rasterRetouchTargetAvailable={rasterRetouchTargetAvailable}
-          advancedFillActive={advancedFillActive}
-          advancedFillUnsupportedReason={advancedFillUnsupportedReason}
-          appSettings={appSettings}
-          appSettingsOpen={appSettingsOpen}
-          canvasOnlyMode={canvasOnlyMode}
-          commentPinArmed={commentPlacementActive}
-          cropActive={cropRect !== null}
-          drawMode={drawMode}
-          drawShape={drawShape}
-          eyedropperActive={eyedropperActive}
-          frameAnimOpen={frameAnimOpen}
-          frameAnimTargetId={frameAnimTargetId}
-          isRailToolVisible={isRailToolVisible}
-          liquifyActive={liquifyActive}
-          mobileImmersive={mobileImmersive}
-          perspectiveRulerActive={perspectiveRulerActive}
-          pixelForceCircle={pixelForceCircle}
-          pixelSel={pixelSel}
-          pixelTool={pixelTool}
-          quickShapeActive={quickShapeActive}
-          railMoreOpen={railMoreOpen}
-          referencePanelOpen={referencePanelOpen}
-          mannequinPoserOpen={admittedMannequinPoserOpen}
-          poserVrmOpen={admittedPoserVrmOpen}
-          bg3dOpen={admittedBg3dOpen}
-          hybridDccOpen={hybridDccOpen}
-          selected={selected}
-          selectedImageMutationLocked={selectedImageMutationLocked}
-          setAppSettingsInitialTab={setAppSettingsInitialTab}
-          setAppSettingsOpen={setAppSettingsOpen}
-          setDrawShape={setDrawShape}
-          setEyedropperActive={setEyedropperActive}
-          setMenu={setMenu}
-          setPerspectiveRulerActive={setPerspectiveRulerActive}
-          setPixelForceCircle={setPixelForceCircle}
-          setPixelTool={setPixelTool}
-          setQuickShapeActive={setQuickShapeActive}
-          setRailMoreOpen={setRailMoreOpen}
-          setReferencePanelOpen={setReferencePanelOpen}
-          setMannequinPoserOpen={setMannequinPoserOpen}
-          setPoserVrmOpen={setPoserVrmOpen}
-          setBg3dOpen={setBg3dOpen}
-          setHybridDccOpen={setHybridDccOpen}
-          setStrokeWidth={setStrokeWidth}
-          setTool={setTool}
-          setViewTool={setViewTool}
-          dodgeBurnActive={dodgeBurnActive}
-          wetMixActive={wetMixActive}
-          smudgeActive={smudgeActive}
-          tool={tool}
-          uiDensityMode={uiDensityMode}
-          viewTransformSuppressed={viewTransformSuppressed}
-          viewTool={viewTool}
-          stableHandlers={studioLeftToolRailHandlers}
-        />
-        </Suspense>
-
-        {/* 중앙: 캔버스 + 우측 인스펙터 — 데스크톱에서는 한 행으로 남은 높이를 공유한다. */}
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
-          <div
-            className={cn(
-              "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
-              showRulers && !canvasOnlyMode && "lg:pl-[22px] lg:pt-[22px]"
-            )}
-            data-studio-canvas-ruler-layout={
-              showRulers && !canvasOnlyMode ? "inset-top-left" : "off"
-            }
-          >
-          {showRulers && !canvasOnlyMode ? (
-            <Suspense fallback={null}>
-              {/* 룰러 눈금은 스크롤 오프셋을 프레임 단위로 따라가야 한다. 스토어를 구독해
-                  이 서브트리만 다시 그리고, 페이지 커밋은 만들지 않는다. */}
-              <StudioScrollViewportSubscriber
-                store={scrollViewportStore}
-                render={(viewport) => (
-                  <StudioCanvasRulerBars
-                    visible
-                    scale={effScale}
-                    scrollLeft={viewport.left}
-                    scrollTop={viewport.top}
-                    canvasWidth={CANVAS_W}
-                    canvasHeight={canvasH}
-                    guides={canvasGuides}
-                    onAddGuide={(axis, pos) => {
-                      setCanvasGuides((g) => ({
-                        ...g,
-                        [axis === "h" ? "horizontal" : "vertical"]: [
-                          ...g[axis === "h" ? "horizontal" : "vertical"],
-                          pos,
-                        ],
-                      }));
-                    }}
-                  />
-                )}
-              />
-            </Suspense>
-          ) : null}
-          <StudioCanvasViewport
-          liveDynamicBrushOverlayRenderer={liveDynamicBrushOverlayRenderer}
-          liveWetInkOverlayRenderer={liveWetInkOverlayRenderer}
-          inkMeshLivePreviewRuntime={inkMeshLivePreviewRuntime}
-          liveInkPredictionRenderer={liveInkPredictionRenderer}
-          liveStampOverlayRenderer={liveStampOverlayRenderer}
-          bubbleShapeActiveHandleIndex={bubbleShapeActiveHandleIndex}
-          draftPreviewStore={draftPreviewStore}
-          liveDrawPressureStore={liveDrawPressureStore}
-          liveInkOverlayRenderer={liveInkOverlayRenderer}
-          nodeEditActiveHandleIndex={nodeEditActiveHandleIndex}
-          activeDialogueLocale={activeDialogueLocale}
-          activeCatalogBrushName={activeCatalogBrush.name}
-          activePage={activePage}
-          activePageIndex={activePageIndex}
-          activeSurfaceReviewLocked={activeSurfaceReviewLocked}
-          activeServerAiProviderLabel={activeServerAiProviderLabel}
-          advancedFillActive={advancedFillActive}
-          advancedFillArmed={advancedFillArmed}
-          advancedFillBusy={advancedFillBusy}
-          advancedFillPreview={advancedFillPreview}
-          advancedRulers={advancedRulers}
-          aiNoticeOpen={aiNoticeOpen}
-          animTimeline={animTimeline}
-          appSettings={appSettings}
-          appSettingsInitialTab={appSettingsInitialTab}
-          appSettingsOpen={appSettingsOpen}
-          appSettingsPersistenceState={appSettingsPersistenceState}
-          authorizedWorkAssetScopeId={authorizedWorkAssetScopeId}
-          autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
-          bg={bg}
-          bgGrad={bgGrad}
-          brush={brush}
-          brushCursorRef={brushCursorRef}
-          strokeGuideRef={strokeGuideRef}
-          brushOpacity={brushOpacity}
-          bubbleShapeArmed={bubbleShapeArmed}
-          bubbleShapeDraft={bubbleShapeDraft}
-          bubbleShapeHandles={bubbleShapeHandles}
-          canvasFlipH={canvasFlipH}
-          canvasRotation={canvasRotation}
-          canvasH={canvasH}
-          canvasOnlyMode={canvasOnlyMode}
-          canvasInteractionBlocked={canvasInteractionBlocked}
-          canvasScrollViewport={scrollPos}
-          scrollViewportStore={scrollViewportStore}
-          hardCanvasInteractionBlock={hardCanvasInteractionBlock}
-          collaborationDocumentLocked={collaborationDocumentLocked}
-          collaborationDocumentUnavailable={collaborationDocumentUnavailable}
-          collaborationLockMessage={collaborationLockMessage}
-          closeViewToolWithFocus={studioCanvasViewportHandlers.closeViewToolWithFocus}
-          colorBlindPreview={colorBlindPreview}
-          commentPinArmed={commentPinArmed}
-          commentQuickReplyActive={
-            studioCommentThreadSession.surface === "pin-quick-reply"
-            && studioCommentThreadPopoverTarget !== null
-          }
-          cropArmed={cropArmed}
-          cropRect={cropRect}
-          dialogueBatchOpen={dialogueBatchOpen}
-          dialogueTranslateOpen={dialogueTranslateOpen}
-          drawingRef={drawingRef}
-          drawingShortcutNoticeStore={drawingShortcutNoticeStore}
-          drawMode={drawMode}
-          drawShape={drawShape}
-          editing={editing}
-          eyedropperActive={eyedropperActive}
-          effScale={effScale}
-          elementById={elementById}
-          elements={studioBrushR8GrainRenderElements}
-          studioLiveGesturePreviewAuthoritativeElementIds={elements.map((element) => element.id)}
-          studioFilterPageComposite={
-            studioFilterSession?.target === "page-composite" &&
-            studioFilterSession.pageId === activePage.id &&
-            studioFilterSession.historyIndex === pagesHi &&
-            !masterEditMode
-              ? studioFilterSession.image
-              : null
-          }
-          studioFilterPreview={studioFilterPreview}
-          followingStudioSessionId={followingStudioSessionId}
-          frameAnimEl={frameAnimEl}
-          frameAnimOpen={frameAnimOpen}
-          frameAnimTargetId={frameAnimTargetId}
-          gpuCanvasShadowVisibleRef={gpuCanvasShadowVisibleRef}
-          gpuLiveInkPinnedRef={gpuLiveInkPinnedRef}
-          livingInkOverlayVisibleRef={livingInkOverlayVisibleRef}
-          gridSize={gridSize}
-          groups={groups}
-          guides={guides}
-          hasAutosave={hasAutosave}
-          autosaveDocumentLeadership={autosaveDocumentLeadership}
-          autosaveLiveJam={studioLiveJam}
-          healCloneArmed={healCloneArmed}
-          healCloneCursorRef={healCloneCursorRef}
-          healCloneDragPreview={healCloneDragPreview}
-          healCloneRadius={healCloneRadius}
-          healCloneSourceAnchor={healCloneSourceAnchor}
-          healCloneSourceCursorRef={healCloneSourceCursorRef}
-          healCloneTool={healCloneTool}
-          historyBrushArmed={historyBrushArmed}
-          historyBrushCursorRef={historyBrushCursorRef}
-          historyBrushDragPreview={historyBrushDragPreview}
-          historyBrushRadius={historyBrushRadius}
-          historyBrushSourceIndex={historyBrushSourceIndex}
-          historyPanelOpen={historyPanelOpen}
-          isExporting={isExporting}
-          isMobile={isMobile}
-          isometricAngleDeg={isometricAngleDeg}
-          isometricCellSize={isometricCellSize}
-          isometricGridActive={isometricGridActive}
-          isometricOriginX={isometricOriginX}
-          isometricOriginY={isometricOriginY}
-          isPanning={isPanning}
-          isSpacePressed={isSpacePressed}
-          filterMaskCursorRef={filterMaskCursorRef}
-          filterMaskDragPreview={filterMaskDragPreview}
-          filterMaskPaintArmed={filterMaskPaintArmed}
-          filterMaskPaintMode={filterMaskPaintMode}
-          filterMaskRadius={filterMaskRadius}
-          layerMaskCursorRef={layerMaskCursorRef}
-          layerMaskDragPreview={layerMaskDragPreview}
-          layerMaskPaintArmed={layerMaskPaintArmed}
-          layerMaskPaintMode={layerMaskPaintMode}
-          layerMaskRadius={layerMaskRadius}
-          quickMaskArmed={quickMaskArmed}
-          quickMaskBrushMode={quickMaskBrushMode}
-          quickMaskDragPreview={quickMaskDragPreview}
-          quickMaskRadius={quickMaskRadius}
-          quickMaskTintCanvas={quickMaskTintCanvas}
-          quickMaskTintColor={quickMaskTintColor}
-          quickMaskTintOpacity={quickMaskTintOpacity}
-          localHiddenElementIds={localHiddenElementIds}
-          liveDraftDirectRef={liveDraftDirectRef}
-          draftPreviewDynamicLayerRef={draftPreviewDynamicLayerRef}
-          draftPreviewNormalLayerRef={draftPreviewNormalLayerRef}
-          liveDraftLayerRef={liveDraftLayerRef}
-          liveDraftVisualRef={liveDraftVisualRef}
-          liveInkOverlayRendererRef={liveInkOverlayRendererRef}
-          mainLayerRef={mainLayerRef}
-          marqueeIds={marqueeIds}
-          activeGroupId={activeGroupId}
-          marqueeRectNodeRef={marqueeRectNodeRef}
-          master={master}
-          masterEditMode={masterEditMode}
-          masterPanelOpen={masterPanelOpen}
-          masterRenderEls={studioFilterMaskMasterRenderElements}
-          mobileImmersive={mobileImmersive}
-          mobileKeyboardInset={mobileKeyboardInset}
-          navigate={navigate}
-          nodeEditArmed={nodeEditArmed}
-          nodeEditDraft={nodeEditDraft}
-          nodeEditHandles={nodeEditHandles}
-          nodeEditTool={nodeEditTool}
-          nodeRefsRef={nodeRefsRef}
-          onionSkin={onionSkin}
-          pageGrade={pageGrade}
-          pageGradeCss={pageGradeCss}
-          pages={pages}
-          pageSequenceOpen={pageSequenceOpen}
-          pagesHi={pagesHi}
-          pagesHistory={pagesHistory}
-          panelGutter={panelGutter}
-          panelSplitArmed={panelSplitArmed}
-          panelSplitPreview={panelSplitPreview}
-          perspectiveRulerActive={perspectiveRulerActive}
-          pixelDragPreview={pixelDragPreview}
-          pixelOverlayFrame={pixelOverlayFrame}
-          pixelOverlaySel={pixelOverlaySel}
-          pixelToolArmed={pixelToolArmed}
-          polyLassoHover={polyLassoHover}
-          polyLassoSession={polyLassoSession}
-          pressureCurve={pressureCurve}
-          puppetWarpArmed={puppetWarpArmed}
-          puppetWarpBusy={puppetWarpBusy}
-          puppetWarpPins={puppetWarpPins}
-          quickShapeActive={quickShapeActive}
-          remixId={remixId}
-          saving={saving}
-          scale={scale}
-          selected={selected}
-          selectedId={selectedId}
-          setAppSettingsInitialTab={setAppSettingsInitialTab}
-          setAppSettingsOpen={setAppSettingsOpen}
-          setBg3dOpen={setBg3dOpen}
-          setCanvasOnlyMode={setCanvasOnlyMode}
-          setContextMenu={setContextMenu}
-          setCurrentPageId={studioCanvasViewportHandlers.setCurrentPageId}
-          setDialogueBatchOpen={setDialogueBatchOpen}
-          setDialogueTranslateOpen={setDialogueTranslateOpen}
-          setError={setError}
-          setEyedropperActive={setEyedropperActive}
-          setFollowingStudioSessionId={setFollowingStudioSessionId}
-          setFrameAnimOpen={setFrameAnimOpen}
-          setFrameAnimTargetId={setFrameAnimTargetId}
-          setHistoryPanelOpen={setHistoryPanelOpen}
-          setLeftPanelOpen={setLeftPanelOpenWithOverride}
-          setMarqueeIds={setMarqueeIds}
-          setMasterEditMode={setMasterEditMode}
-          setMasterPanelOpen={setMasterPanelOpen}
-          setOnionSkin={setOnionSkin}
-          setPageSequenceOpen={setPageSequenceOpen}
-          setPoserVrmOpen={setPoserVrmOpen}
-          setPuppetWarpPins={setPuppetWarpPins}
-          setQuickShapeActive={setQuickShapeActive}
-          setQuickStartOpen={setQuickStartOpen}
-          setRightPanelOpen={studioCanvasViewportHandlers.setRightPanelOpen}
-          setSelectedId={setSelectedId}
-          setSharedDocumentNotice={setSharedDocumentNotice}
-          setShortcutsOpen={setShortcutsOpen}
-          setStudioRasterHandoffCandidate={setStudioRasterHandoffCandidate}
-          setSymmetryCenterX={setSymmetryCenterX}
-          setSymmetryCenterY={setSymmetryCenterY}
-          setTeamPanelOpen={setTeamPanelOpen}
-          setTimelineFocusedTrackId={setTimelineFocusedTrackId}
-          setTimelineOpen={setTimelineOpen}
-          setTimelinePlayhead={setTimelinePlayhead}
-          setTimelinePlaying={setTimelinePlaying}
-          setTool={setTool}
-          setTranslateDraft={setTranslateDraft}
-          setTranslateGlossary={setTranslateGlossary}
-          setTranslateTargetLocale={setTranslateTargetLocale}
-          setTutorialHubOpen={setTutorialHubOpen}
-          setUserGuides={setUserGuides}
-          setZoom={setZoom}
-          shapeFill={shapeFill}
-          shortcutsOpen={shortcutsOpen}
-          showGrid={showGrid}
-          showQuickStart={showQuickStart}
-          showWebtoonGuides={showWebtoonGuides}
-          smartGuides={smartGuides}
-          sharedGutters={sharedGutters}
-          smudgeArmed={smudgeArmed}
-          dodgeBurnArmed={dodgeBurnArmed}
-          dodgeBurnRadius={dodgeBurnRadius}
-          wetMixArmed={wetMixArmed}
-          wetMixRadius={wetMixRadius}
-          liquifyArmed={liquifyArmed}
-          liquifyRadius={liquifyRadius}
-          smudgeCursorRef={smudgeCursorRef}
-          paintRetouchStrokeLineRef={paintRetouchStrokeLineRef}
-          liquifyPreviewImageRef={liquifyPreviewImageRef}
-          smudgeRadius={smudgeRadius}
-          sourceHydrationPending={sourceHydrationPending}
-          stabilizer={stabilizer}
-          stabilizerMode={stabilizerMode}
-          stageRef={stageRef}
-          strokeWidth={strokeWidth}
-          tipAngle={tipAngle}
-          tipRoundness={tipRoundness}
-          studioCanvasCommentPins={studioCanvasCommentPins}
-          studioCommentPinReanchorableThreadIds={studioCommentPinReanchorableThreadIds}
-          studioCommentPinReanchorDisabledReason={studioCommentPinReanchorDisabledReason}
-          studioCrdtDocument={studioCrdtDocument}
-          studioCrdtOperationSyncReady={studioCrdtOperationSyncReady}
-          studioLiveGesturePreviewAdapter={studioLiveGesturePreviewAdapter}
-          studioLiveRoomRef={studioLiveRoomRef}
-          studioRasterAuthorizedAuthorityKey={studioRasterAuthorizedAuthorityKey}
-          studioRasterHandoffBaseKey={studioRasterHandoffBaseKey}
-          studioRasterHandoffBlocked={studioRasterHandoffBlocked}
-          studioRasterHandoffGates={studioRasterHandoffGates}
-          studioRasterHiddenOperationIds={studioRasterHiddenOperationIds}
-          studioRasterOverlayElements={studioRasterOverlayElements}
-          studioRasterVisibleDocumentRect={studioRasterVisibleDocumentRect}
-          studioWorkAssetRenderPlaceholders={studioWorkAssetRenderPlaceholders}
-          studioWorkAssetRenderProjection={studioCanvasWorkAssetRenderProjection}
-          symmetryCenterX={symmetryCenterX}
-          symmetryCenterY={symmetryCenterY}
-          symmetryRadialCount={symmetryRadialCount}
-          symmetryType={symmetryType}
-          textAiConfigured={textAiConfigured}
-          timelapseCapturing={timelapseCapturing}
-          timelineFocusedTrackId={timelineFocusedTrackId}
-          timelineOpen={timelineOpen}
-          timelinePlayhead={timelinePlayhead}
-          timelinePlaying={timelinePlaying}
-          timelinePreviewFrame={timelinePreviewFrame}
-          title={title}
-          tool={tool}
-          viewTool={viewTool}
-          viewTransformSuppressed={viewTransformSuppressed}
-          translateBusy={translateBusy}
-          translateDraft={translateDraft}
-          translateError={translateError}
-          translateGlossary={translateGlossary}
-          translateProgress={translateProgress}
-          translateTargetLocale={translateTargetLocale}
-          trRef={trRef}
-          tutorialHubOpen={tutorialHubOpen}
-          tutorialInitialId={tutorialInitialId}
-          uiDensityMode={uiDensityMode}
-          userGuides={userGuides}
-          vanishingPoints={vanishingPoints}
-          perspectiveEyeLevelY={perspectiveEyeLevelY}
-          perspectiveLockHorizon={perspectiveLockHorizon}
-          webGpuPreviewAuthorized={webGpuPreviewAuthorized}
-          webGpuPreviewStrokes={webGpuPreviewStrokes}
-          webGpuViewportSurface={webGpuViewportSurface}
-          transientPenInkSurfaceEnabled={STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED}
-          webtoonGuides={webtoonGuides}
-          webtoonTheme={webtoonTheme}
-          workHydrationFailed={workHydrationFailed}
-          workHydrationUnsupportedFormat={workHydrationUnsupportedFormat}
-          workId={workId}
-          wrapRef={wrapRef}
-          zoom={zoom}
-          zoomLocked={zoomLocked}
-          setZoomLocked={setZoomLocked}
-          zoomHostRef={zoomHostRef}
-          stableHandlers={studioCanvasViewportHandlers}
-        />
-
-        <StudioBrushHud
-          visible={
-            tool === "draw"
-            && isStudioBrushCursorMode(drawMode)
-            && !canvasOnlyMode
-            && !canvasInteractionBlocked
-            && !isExporting
-            && !colorWheelOpen
-          }
-          strokeWidth={strokeWidth}
-          brushOpacity={brushOpacity}
-          color={color}
-          eraserActive={drawMode === "eraser"}
-          handedness={workspaceControlSide === "left" ? "left" : "right"}
-          canvasHostRef={wrapRef}
-          stableHandlers={studioOnCanvasSurfaceHandlers}
-        />
-        <StudioSelectionContextBar
-          visible={
-            tool === "select"
-            && currentCanvasSelectionCount > 0
-            && !canvasOnlyMode
-            && !canvasInteractionBlocked
-            && !isExporting
-          }
-          selectionCount={currentCanvasSelectionCount}
-          readOnly={activeSurfaceReviewLocked || pageEditLocked}
-          canDelete={!activeSurfaceReviewLocked && !pageEditLocked}
-          stableHandlers={studioOnCanvasSurfaceHandlers}
-        />
-
-        {pointCommentComposer ? (
-          <Suspense fallback={null}>
-            <StudioPointCommentComposer
-              key={pointCommentComposer.commentId}
-              anchor={pointCommentComposer.anchor}
-              authorName={studioCommentActor.displayName}
-              screenPoint={pointCommentComposer.screenPoint}
-              getScreenPoint={studioPointCommentScreenProjectionHandlers.getScreenPoint}
-              onCancel={cancelStudioPointCommentComposer}
-              onOpenReview={() => {
-                setPointCommentComposer(null);
-                openStudioCommentInbox();
-              }}
-              onSubmit={submitStudioPointComment}
-            />
-          </Suspense>
-        ) : null}
-
-        {studioCommentThreadPopoverTarget
-        && studioCommentThreadSession.surface === "pin-quick-reply"
-        && studioCommentThreadSessionView.selectedThread ? (
-          <Suspense fallback={null}>
-            <StudioCommentThreadPopover
-              key={studioCommentThreadPopoverTarget.pinKey}
-              thread={studioCommentThreadSessionView.selectedThread}
-              screenPoint={studioCommentThreadPopoverTarget.screenPoint}
-              anchorElement={studioCommentThreadPopoverTarget.anchorElement}
-              getScreenPoint={
-                studioCommentThreadPopoverScreenProjectionHandlers.getScreenPoint
-              }
-              fallbackFocusTarget={wrapRef.current}
-              unread={studioCommentThreadSessionView.selectedUnread}
-              replyBody={studioCommentThreadSessionView.selectedDraft?.body ?? ""}
-              submitting={studioCommentThreadSession.submittingMutationId !== null}
-              syncing={studioTeamCommentsSyncing}
-              syncError={studioCommentInteractionNotice ?? studioCommentSyncError}
-              capabilities={{
-                reply: studioTeamCommentsWorkId
-                  ? studioTeamCommentCapabilities?.comment === true
-                    && !studioLegacyCommentThreadIdSet.has(
-                      studioCommentThreadSessionView.selectedThread.id
-                    )
-                  : !collaborationDocumentLocked,
-                resolve: studioTeamCommentsWorkId
-                  ? studioTeamCommentCapabilities?.resolve === true
-                    && !studioLegacyCommentThreadIdSet.has(
-                      studioCommentThreadSessionView.selectedThread.id
-                    )
-                  : !collaborationDocumentLocked,
-              }}
-              mutationDisabledReason={
-                studioLegacyCommentThreadIdSet.has(
-                  studioCommentThreadSessionView.selectedThread.id
-                )
-                  ? "이전 문서에 보관된 댓글이라 전체 검토함에서 읽기 전용으로 확인할 수 있어요."
-                  : studioCommentThreadSessionView.replyBlockedReason === "draft-target-mismatch"
-                    ? "다른 댓글에 작성 중인 답글이 있어요. 해당 핀에서 먼저 마무리해 주세요."
-                    : undefined
-              }
-              clusterIndex={studioCommentThreadSessionView.selectedClusterIndex}
-              clusterCount={studioCommentThreadSessionView.clusterThreads.length}
-              unreadClusterCount={studioCommentThreadSessionView.unreadClusterCount}
-              onNavigateCluster={navigateStudioCommentPinCluster}
-              onReplyBodyChange={changeStudioCommentThreadReplyDraft}
-              onSubmitReply={submitStudioCommentThreadReply}
-              onResolveChange={changeStudioCommentThreadResolution}
-              onOpenReview={openStudioCommentThreadInReview}
-              onClose={closeStudioCommentThreadPopover}
-            />
-          </Suspense>
-        ) : null}
-          </div>
-
-        {/* 캔버스 ↔ 속성 패널 너비 스플리터(데스크톱) */}
-        {visibleRightPanelOpen && (
-          <StudioPanelResizeHandle handleProps={rightResize.handleProps} dragging={rightResize.dragging} label="속성 패널 너비 조절" />
-        )}
-
-        {/* 사이드: 속성 + 게시 — 접히면 아이콘 엣지 레일 */}
-        {!visibleRightPanelOpen && !presentationPanelsHidden && (
-          <StudioEdgeRailButton
-            side="right"
-            label="속성"
-            icon={SlidersHorizontal}
-            onClick={() => setRightPanelOpenWithOverride(true)}
-            title="속성 패널 펼치기"
-          />
-        )}
-        {!isMobile || mobileSheet === "props" ? (
-          <Suspense
-            fallback={(
-              <StudioInspectorAsideFallback
-                isMobile={isMobile}
-                keyboardInset={mobileKeyboardInset}
-                propsSheetRef={propsSheetRef}
-                snap={mobileInspectorSnap}
-                visible={visibleRightPanelOpen}
-                width={rightResize.width}
-              />
-            )}
-          >
-          <LazyStudioInspectorAside
-          activeSavedBrushId={activeSavedBrushId}
-          advancedRulers={advancedRulers}
-          activeSurfaceReviewLocked={activeSurfaceReviewLocked}
-          advancedFillActive={advancedFillActive}
-          advancedFillBusy={advancedFillBusy}
-          advancedFillPreview={advancedFillPreview}
-          advancedFillReferenceLayerCount={advancedFillReferenceLayerCount}
-          advancedFillSettings={advancedFillSettings}
-          advancedFillStatus={advancedFillStatus}
-          advancedFillUnsupportedReason={advancedFillUnsupportedReason}
-          advancedFillVisibleRasterCount={advancedFillVisibleRasterCount}
-          aiColorizeBusy={aiColorizeBusy}
-          aiColorizeError={aiColorizeError}
-          aiColorizePrompt={aiColorizePrompt}
-          aiSettings={aiSettings}
-          bg={bg}
-          bgGrad={bgGrad}
-          brush={brush}
-          brushDynamics={brushDynamics}
-          brushOpacity={brushOpacity}
-          bubbleAnchorPickActive={bubbleAnchorPickActive}
-          bubbleShapeArmed={bubbleShapeArmed}
-          bubbleShapeEditActive={bubbleShapeEditActive}
-          bubbleShapeHandles={bubbleShapeHandles}
-          bubbleShapeSelectedPointIndex={bubbleShapeSelectedPointIndex}
-          canvasFlipH={canvasFlipH}
-          canvasH={canvasH}
-          canvasRotation={canvasRotation}
-          collaborationDocumentLocked={collaborationDocumentLocked}
-          paperGrainKind={paperGrainKind}
-          paperGrainVisible={activePage.paperGrainVisible === true}
-          color={color}
-          colorRangeFuzziness={colorRangeFuzziness}
-          colorRangePickActive={colorRangePickActive}
-          colorRangePreviewEnabled={colorRangePreviewEnabled}
-          colorRangeSamples={colorRangeSamples}
-          quickMaskActive={quickMaskActive}
-          quickMaskBrushMode={quickMaskBrushMode}
-          quickMaskHardness={quickMaskHardness}
-          quickMaskOpacity={quickMaskOpacity}
-          quickMaskRadius={quickMaskRadius}
-          quickMaskTintColor={quickMaskTintColor}
-          quickMaskTintOpacity={quickMaskTintOpacity}
-          enterQuickMask={enterQuickMask}
-          commitQuickMask={commitQuickMask}
-          exitQuickMask={exitQuickMask}
-          invertQuickMask={invertQuickMask}
-          onQuickMaskTintColorChange={(c) => {
-            setQuickMaskTintColor(c);
-            refreshQuickMaskTint(c, quickMaskTintOpacity);
-          }}
-          onQuickMaskTintOpacityChange={(v) => {
-            setQuickMaskTintOpacity(v);
-            refreshQuickMaskTint(quickMaskTintColor, v);
-          }}
-          setQuickMaskBrushMode={setQuickMaskBrushMode}
-          setQuickMaskRadius={setQuickMaskRadius}
-          setQuickMaskHardness={setQuickMaskHardness}
-          setQuickMaskOpacity={setQuickMaskOpacity}
-          cropAspect={cropAspect}
-          cropBusy={cropBusy}
-          cropRect={cropRect}
-          currentBrushSnapshot={currentBrushSnapshot}
-          currentPageId={currentPageId}
-          currentTemplate={currentTemplate}
-          description={description}
-          drawMode={drawMode}
-          drawShape={drawShape}
-          drawingPaletteCancelEpoch={drawingPaletteCancelEpoch}
-          drawingPaletteLayout={drawingPaletteLayout}
-          effectFavoriteState={effectFavoriteState}
-          effScale={effScale}
-          elementById={elementById}
-          elements={elements}
-          eyedropperActive={eyedropperActive}
-          filterClipboard={filterClipboard}
-          gridSize={gridSize}
-          groups={groups}
-          healCloneAligned={healCloneAligned}
-          healCloneBusy={healCloneBusy}
-          healCloneHardness={healCloneHardness}
-          healCloneOpacity={healCloneOpacity}
-          healCloneRadius={healCloneRadius}
-          healCloneSourceAnchor={healCloneSourceAnchor}
-          healCloneTool={healCloneTool}
-          historyBrushActive={historyBrushActive}
-          historyBrushBusy={historyBrushBusy}
-          historyBrushHardness={historyBrushHardness}
-          historyBrushOpacity={historyBrushOpacity}
-          historyBrushRadius={historyBrushRadius}
-          historyBrushSourceSrc={historyBrushSourceSrc}
-          historyPanelOpen={historyPanelOpen}
-          inspectorLayout={inspectorLayout}
-          isMobile={isMobile}
-          isometricAngleDeg={isometricAngleDeg}
-          isometricCellSize={isometricCellSize}
-          isometricGridActive={isometricGridActive}
-          isometricOriginX={isometricOriginX}
-          isometricOriginY={isometricOriginY}
-          filterMaskBusy={filterMaskBusy}
-          filterMaskHardness={filterMaskHardness}
-          filterMaskPaintActive={filterMaskPaintActive}
-          filterMaskPaintMode={filterMaskPaintMode}
-          filterMaskRadius={filterMaskRadius}
-          filterMaskStrength={filterMaskStrength}
-          selectedImageHasActiveFilters={
-            selected?.type === "image" ? hasActiveImageFilters(selected) : false
-          }
-          layerMaskBusy={layerMaskBusy}
-          layerMaskHardness={layerMaskHardness}
-          layerMaskPaintActive={layerMaskPaintActive}
-          layerMaskPaintMode={layerMaskPaintMode}
-          layerMaskRadius={layerMaskRadius}
-          layerMaskStrength={layerMaskStrength}
-          layerNavigatorItems={layerNavigatorItems}
-          localHiddenElementIds={localHiddenElementIds}
-          soloLayerId={layerSoloState.soloId}
-          liquifyActive={liquifyActive}
-          liquifyBusy={liquifyBusy}
-          liquifyMode={liquifyMode}
-          liquifyRadius={liquifyRadius}
-          liquifyStrength={liquifyStrength}
-          liveDraftShapeKind={liveDraftShapeKind}
-          magicResizeStrategy={magicResizeStrategy}
-          marqueeIds={marqueeIds}
-          masterEditMode={masterEditMode}
-          mobileKeyboardInset={mobileKeyboardInset}
-          mobileInspectorSnap={mobileInspectorSnap}
-          mobileSheet={mobileSheet}
-          nodeEditHandles={nodeEditHandles}
-          nodeEditTool={nodeEditTool}
-          nodeSmoothStrength={nodeSmoothStrength}
-          pageGrade={pageGrade}
-          pageGradeActive={pageGradeActive}
-          pageGradePanelOpen={pageGradePanelOpen}
-          panelGutter={panelGutter}
-          panelSplitActive={panelSplitActive}
-          panelSplitHint={panelSplitHint}
-          panelSplitRatio={panelSplitRatio}
-          perspectiveRulerActive={perspectiveRulerActive}
-          perspectiveEyeLevelY={perspectiveEyeLevelY}
-          perspectiveLockHorizon={perspectiveLockHorizon}
-          pixelBrushRadius={pixelBrushRadius}
-          pixelBusy={pixelBusy}
-          pixelCombine={pixelCombine}
-          pixelMagneticLasso={pixelMagneticLasso}
-          onTogglePixelMagneticLasso={() => setPixelMagneticLasso((v) => !v)}
-          pixelForceCircle={pixelForceCircle}
-          pixelSel={pixelSel}
-          pixelSelectionCanRedo={canRedoPixelSelectionHistory(
-            pixelSelectionHistory,
-            selected?.type === "image" ? selected.id : null
-          )}
-          pixelSelectionCanUndo={canUndoPixelSelectionHistory(
-            pixelSelectionHistory,
-            selected?.type === "image" ? selected.id : null
-          )}
-          pixelTool={pixelTool}
-          polyLassoSession={polyLassoSession}
-          postCorrection={postCorrection}
-          preserveCorners={preserveCorners}
-          pressureCurve={pressureCurve}
-          propsSheetRef={propsSheetRef}
-          puppetWarpActive={puppetWarpActive}
-          puppetWarpBusy={puppetWarpBusy}
-          puppetWarpPins={puppetWarpPins}
-          quickShapeActive={quickShapeActive}
-          recentColors={recentColors}
-          rightResize={rightResize}
-          savedBrushes={savedBrushes}
-          openBrushLibraryRepository={productBrushRepository}
-          saving={saving}
-          studioFilterPreparationBusy={studioFilterPreparationBusy}
-          studioLayerLiftDisabledReason={studioLayerLiftDisabledReason}
-          scrollViewportStore={scrollViewportStore}
-          selected={selected}
-          selectedBg3dEditSource={selectedBg3dEditSource}
-          selectedBubbleTailGeometry={selectedBubbleTailGeometry}
-          selectedContentMutationLocked={selectedContentMutationLocked}
-          selectedId={selectedId}
-          selectedRasterSource={selectedProjectedImageSource}
-          selectedWorkAssetDestructiveEditReason={selectedWorkAssetDestructiveEditReason}
-          setSelectedId={setSelectedId}
-          autoColorScribbleCanvasArmed={autoColorScribbleCanvasArmed}
-          setAutoColorScribbleCanvasArmed={setAutoColorScribbleCanvasArmed}
-          autoColorCanvasSeedHit={autoColorCanvasSeedHit}
-          setAutoColorCanvasSeedHit={setAutoColorCanvasSeedHit}
-          autoColorCanvasSeedHits={autoColorCanvasSeedHits}
-          setAutoColorCanvasSeedHits={setAutoColorCanvasSeedHits}
-          onAutoColorPlanImageSize={(size: { width: number; height: number } | null) => {
-            autoColorPlanImageSizeRef.current = size;
-          }}
-          setAdvancedFillPreview={setAdvancedFillPreview}
-          setAdvancedFillStatus={setAdvancedFillStatus}
-          setAiColorizePrompt={setAiColorizePrompt}
-          setBg3dInitialDataUrl={setBg3dInitialDataUrl}
-          setBg3dInitialElementId={setBg3dInitialElementId}
-          setBg3dInitialScene={setBg3dInitialScene}
-          setBg3dOpen={setBg3dOpen}
-          setBrushDynamics={setBrushDynamics}
-          setBrushOpacity={setBrushOpacity}
-          setBubbleShapeEditActive={setBubbleShapeEditActive}
-          setColor={setColor}
-          setCropAspect={setCropAspect}
-          setCropRect={setCropRect}
-          setDrawShape={setDrawShape}
-          setEyedropperActive={setEyedropperActive}
-          setFilterClipboard={setFilterClipboard}
-          setGridSize={setGridSize}
-          setHealCloneAligned={setHealCloneAligned}
-          setHealCloneHardness={setHealCloneHardness}
-          setHealCloneOpacity={setHealCloneOpacity}
-          setHealCloneRadius={setHealCloneRadius}
-          setHealCloneTool={setHealCloneTool}
-          setHistoryBrushActive={setHistoryBrushActive}
-          setHistoryBrushHardness={setHistoryBrushHardness}
-          setHistoryBrushOpacity={setHistoryBrushOpacity}
-          setHistoryBrushRadius={setHistoryBrushRadius}
-          setHistoryBrushSourceIndex={setHistoryBrushSourceIndex}
-          setHistoryBrushSourceSrc={setHistoryBrushSourceSrc}
-          setHistoryPanelOpen={setHistoryPanelOpen}
-          setFilterMaskHardness={setFilterMaskHardness}
-          setFilterMaskPaintActive={setFilterMaskPaintActive}
-          setFilterMaskPaintMode={setFilterMaskPaintMode}
-          setFilterMaskRadius={setFilterMaskRadius}
-          setFilterMaskStrength={setFilterMaskStrength}
-          setLayerMaskHardness={setLayerMaskHardness}
-          setLayerMaskPaintActive={setLayerMaskPaintActive}
-          setLayerMaskPaintMode={setLayerMaskPaintMode}
-          setLayerMaskRadius={setLayerMaskRadius}
-          setLayerMaskStrength={setLayerMaskStrength}
-          setLiquifyRadius={setLiquifyRadius}
-          setLiquifyMode={setLiquifyMode}
-          setLiquifyStrength={setLiquifyStrength}
-          setMagicResizeStrategy={setMagicResizeStrategy}
-          setMenu={setMenu}
-          setMobileInspectorSnap={setMobileInspectorSnap}
-          setMobileSheet={setMobileSheet}
-          setNodeEditTool={setNodeEditTool}
-          setNodeSmoothStrength={setNodeSmoothStrength}
-          setPageGradePanelOpen={setPageGradePanelOpen}
-          setPanelSplitActive={setPanelSplitActive}
-          setPanelSplitHint={setPanelSplitHint}
-          setPanelSplitRatio={setPanelSplitRatio}
-          setPerspectiveRulerActive={setPerspectiveRulerActive}
-          setPixelBrushRadius={setPixelBrushRadius}
-          setPixelCombine={setPixelCombine}
-          setPixelForceCircle={setPixelForceCircle}
-          commitPixelSelectionState={commitPixelSelectionState}
-          resetPixelSelectionState={(selection) => resetPixelSelectionHistoryState(
-            selected?.type === "image" ? selected.id : null,
-            selection
-          )}
-          undoPixelSelectionState={() => {
-            applyPixelSelectionHistoryCommand("undo");
-          }}
-          redoPixelSelectionState={() => {
-            applyPixelSelectionHistoryCommand("redo");
-          }}
-          runColorRangeApply={runColorRangeApply}
-          setColorRangeFuzziness={setColorRangeFuzziness}
-          setColorRangePickActive={setColorRangePickActive}
-          setColorRangePreviewEnabled={setColorRangePreviewEnabled}
-          setColorRangeSamples={setColorRangeSamples}
-          setPixelTool={setPixelTool}
-          setPoserInitialDataUrl={setPoserInitialDataUrl}
-          setPoserInitialElementId={setPoserInitialElementId}
-          setPoserVrmOpen={setPoserVrmOpen}
-          setPostCorrection={setPostCorrection}
-          setPreserveCorners={setPreserveCorners}
-          setPressureCurve={setPressureCurve}
-          pressureMinSize={pressureMinSize}
-          setPressureMinSize={setPressureMinSize}
-          setPuppetWarpActive={setPuppetWarpActive}
-          setPuppetWarpPins={setPuppetWarpPins}
-          setQuickShapeActive={setQuickShapeActive}
-          setRightPanelOpen={setRightPanelOpenWithOverride}
-          setSavedBrushes={commitSavedBrushProjection}
-          setShapeFill={setShapeFill}
-          setSharedDocumentNotice={setSharedDocumentNotice}
-          setShowGrid={setShowGrid}
-          setShowAlignmentGuides={setAlignmentGuidesVisible}
-          setShowWebtoonGuides={setShowWebtoonGuides}
-          setSmudgeRadius={setSmudgeRadius}
-          setSmudgeStrength={setSmudgeStrength}
-          setDodgeBurnExposure={setDodgeBurnExposure}
-          setDodgeBurnHardness={setDodgeBurnHardness}
-          setDodgeBurnMode={setDodgeBurnMode}
-          setDodgeBurnRadius={setDodgeBurnRadius}
-          setDodgeBurnRange={setDodgeBurnRange}
-          setDodgeBurnSponge={setDodgeBurnSponge}
-          setWetMixHardness={setWetMixHardness}
-          setWetMixPickup={setWetMixPickup}
-          setWetMixRadius={setWetMixRadius}
-          setWetMixStrength={setWetMixStrength}
-          setWetMixWetness={setWetMixWetness}
-          setSnapEnabled={setSnapEnabledVisible}
-          setStabilizer={setStabilizer}
-          setStabilizerMode={setStabilizerMode}
-          setStampTuning={setStampTuning}
-          setStrokeWidth={setStrokeWidth}
-          setSymmetryCenterX={setSymmetryCenterX}
-          setSymmetryCenterY={setSymmetryCenterY}
-          setSymmetryRadialCount={setSymmetryRadialCount}
-          setSymmetryType={changeStudioSymmetryType}
-          setTiltEnabled={setTiltEnabled}
-          setTipAngle={setTipAngle}
-          setTipRoundness={setTipRoundness}
-          setTool={setTool}
-          setUserGuides={setUserGuides}
-          setUseVelocityPressure={setUseVelocityPressure}
-          setVelocitySensitivity={setVelocitySensitivity}
-          setWandTolerance={setWandTolerance}
-          shapeFill={shapeFill}
-          showGrid={showGrid}
-          showWebtoonGuides={showWebtoonGuides}
-          smudgeActive={smudgeActive}
-          smudgeBusy={smudgeBusy}
-          smudgeRadius={smudgeRadius}
-          smudgeStrength={smudgeStrength}
-          extendedBlendBusy={layerMergeBusy}
-          extendedBlendMode={extendedBlendMode}
-          extendedBlendOpacity={extendedBlendOpacity}
-          extendedBlendUnavailableReason={(() => {
-            if (selected?.type !== "image") return "이미지 요소를 선택하세요.";
-            const index = elements.findIndex((element) => element.id === selected.id);
-            const below = index > 0 ? elements[index - 1] : undefined;
-            if (below?.type !== "image") return "바로 아래에 이미지 레이어가 있어야 합니다.";
-            return null;
-          })()}
-          applyExtendedBlendMergeDown={applyExtendedBlendMergeDown}
-          setExtendedBlendMode={setExtendedBlendMode}
-          setExtendedBlendOpacity={setExtendedBlendOpacity}
-          pathBooleanBusy={pathBooleanBusy}
-          pathBooleanUnavailableReason={studioPathBooleanUnavailableReason(
-            marqueeIds.map((id) => elementById.get(id)).filter((el): el is El => Boolean(el))
-          )}
-          applyPathBooleanCombine={(op) => void applyPathBooleanCombine(op)}
-          paperVectorRefinementBusy={paperVectorRefinementBusy}
-          paperVectorRefinementUnavailableReason={
-            paperVectorRefinementUnavailableReason
-          }
-          applyPaperVectorRefinement={(operation) => {
-            void applyPaperVectorRefinement(operation);
-          }}
-          cancelPaperVectorRefinement={cancelPaperVectorRefinement}
-          dodgeBurnActive={dodgeBurnActive}
-          dodgeBurnBusy={dodgeBurnBusy}
-          dodgeBurnExposure={dodgeBurnExposure}
-          dodgeBurnHardness={dodgeBurnHardness}
-          dodgeBurnMode={dodgeBurnMode}
-          dodgeBurnRadius={dodgeBurnRadius}
-          dodgeBurnRange={dodgeBurnRange}
-          dodgeBurnSponge={dodgeBurnSponge}
-          wetMixActive={wetMixActive}
-          wetMixBusy={wetMixBusy}
-          wetMixHardness={wetMixHardness}
-          wetMixPickup={wetMixPickup}
-          wetMixRadius={wetMixRadius}
-          wetMixStrength={wetMixStrength}
-          wetMixWetness={wetMixWetness}
-          snapEnabled={snapEnabled}
-          showAlignmentGuides={showAlignmentGuides}
-          stabilizer={stabilizer}
-          stabilizerMode={stabilizerMode}
-          stampTuning={stampTuning}
-          strokeWidth={strokeWidth}
-          symmetryCenterX={symmetryCenterX}
-          symmetryCenterY={symmetryCenterY}
-          symmetryRadialCount={symmetryRadialCount}
-          symmetryType={symmetryType}
-          tagsText={tagsText}
-          timelinePlaying={timelinePlaying}
-          tiltEnabled={tiltEnabled}
-          tipAngle={tipAngle}
-          tipRoundness={tipRoundness}
-          title={title}
-          titleInputRef={titleInputRef}
-          tool={tool}
-          userGuides={userGuides}
-          useVelocityPressure={useVelocityPressure}
-          vanishingPoints={vanishingPoints}
-          velocitySensitivity={velocitySensitivity}
-          visibleRightPanelOpen={visibleRightPanelOpen}
-          wandTolerance={wandTolerance}
-          webtoonGuides={webtoonGuides}
-          webtoonTheme={webtoonTheme}
-            stableHandlers={studioInspectorAsideHandlers}
-          />
-          </Suspense>
-        ) : null}
-
-        {isMobile ? (
-          <Suspense fallback={null}>
-            <StudioMobileEditingDock
-          activeCatalogBrushId={activeCatalogBrush.id}
-          activeCatalogBrushName={activeCatalogBrush.name}
-          activeSavedBrushId={activeSavedBrushId}
-          activeSurfaceReviewLocked={activeSurfaceReviewLocked}
-          advancedFillActive={advancedFillActive}
-          advancedFillUnsupportedReason={advancedFillUnsupportedReason}
-          brush={brush}
-          brushCatalogHandlers={studioBrushCatalogHandlers}
-          brushCatalogOpen={brushCatalogSession?.placement === "mobile-sheet"}
-          brushDefaultRestore={brushBaselineController.restoreState}
-          brushDynamics={brushDynamics}
-          brushManagerSheetRef={brushManagerSheetRef}
-          brushOpacity={brushOpacity}
-          collaborationDocumentLocked={collaborationDocumentLocked}
-          commentPinArmed={commentPlacementActive}
-          color={color}
-          colorBlindPreview={colorBlindPreview}
-          colorVisionSheetRef={colorVisionSheetRef}
-          currentBrushSnapshot={currentBrushSnapshot}
-          drawMode={drawMode}
-          drawShape={drawShape}
-          drawSheetRef={drawSheetRef}
-          eraseToIntersection={eraseToIntersection}
-          filterMutationLocked={menuFilterDisabled}
-          filterPreparationBusy={studioFilterPreparationBusy}
-          filterTargetLabel={studioFilterTargetLabel}
-          filterUnavailableReason={studioFilterUnavailableReason}
-          hi={hi}
-          history={history}
-          sidecarUndoAvailable={studioHistorySidecarUndoAvailable}
-          sidecarRedoAvailable={studioHistorySidecarRedoAvailable}
-          isMobile={isMobile}
-          livingInk={{
-            ...studioOptionsBarsDrawModel.livingInk,
-            onPhysicalModeEnabledChange:
-              studioOptionsBarsHandlers.setLivingInkPhysicalModeEnabled,
-            onModeChange: studioOptionsBarsHandlers.setLivingInkMode,
-            onScopeChange: studioOptionsBarsHandlers.setLivingInkScope,
-            onFix: studioOptionsBarsHandlers.applyLivingInkFix,
-            onClear: studioOptionsBarsHandlers.applyLivingInkClear,
-            onMaterialChange: studioOptionsBarsHandlers.patchLivingInkMaterial,
-          }}
-          marqueeIds={marqueeIds}
-          mobileBrushDockButtonRef={mobileBrushDockButtonRef}
-          mobileKeyboardInset={mobileKeyboardInset}
-          mobileQuickActionsButton={mobileQuickActionsButton}
-          mobileSheet={mobileSheet}
-          postCorrection={postCorrection}
-          preserveCorners={preserveCorners}
-          pressureCurve={pressureCurve}
-          proDrawPrefs={proDrawPrefs}
-          quickActionsOpen={quickActionsOpen}
-          savedBrushes={savedBrushes}
-          openBrushLibraryRepository={productBrushRepository}
-          selected={selected}
-          selectionLocked={mobileSelectionLocked}
-          selectionTextEditLabel={studioOptionsBarsSelectionModel.textEditLabel}
-          setBrushDynamics={setBrushDynamics}
-          setBrushOpacity={setBrushOpacity}
-          setColor={setColor}
-          setColorBlindPreview={setColorBlindPreview}
-          setDrawMode={setDrawMode}
-          setDrawShape={setDrawShape}
-          setEraseToIntersection={setEraseToIntersection}
-          setMarqueeIds={setMarqueeIds}
-          setMenu={setMenu}
-          setMobileSheet={setMobileSheet}
-          setPostCorrection={setPostCorrection}
-          setPreserveCorners={setPreserveCorners}
-          setPressureCurve={setPressureCurve}
-          pressureMinSize={pressureMinSize}
-          setPressureMinSize={setPressureMinSize}
-          setQuickStartOpen={setQuickStartOpen}
-          setSavedBrushes={commitSavedBrushProjection}
-          setSelectedId={setSelectedId}
-          setShapeFill={setShapeFill}
-          setStampTuning={setStampTuning}
-          setStabilizer={setStabilizer}
-          setStabilizerMode={setStabilizerMode}
-          setStrokeWidth={setStrokeWidth}
-          setTiltEnabled={setTiltEnabled}
-          setTipAngle={setTipAngle}
-          setTipRoundness={setTipRoundness}
-          setTool={setTool}
-          setUseVelocityPressure={setUseVelocityPressure}
-          setVelocitySensitivity={setVelocitySensitivity}
-          setZoom={setZoom}
-          shapeFill={shapeFill}
-          showMobileHint={showMobileHint}
-          stabilizer={stabilizer}
-          stabilizerMode={stabilizerMode}
-          stampTuning={stampTuning}
-          strokeWidth={strokeWidth}
-          tiltEnabled={tiltEnabled}
-          tipAngle={tipAngle}
-          tipRoundness={tipRoundness}
-          tool={tool}
-          ui={STUDIO_MOBILE_EDITING_DOCK_UI}
-          useVelocityPressure={useVelocityPressure}
-          velocitySensitivity={velocitySensitivity}
-          workspaceState={workspaceState}
-          zoom={zoom}
-              stableHandlers={studioMobileEditingDockHandlers}
-            />
-          </Suspense>
-        ) : null}
-      </div>
-
-        <StudioLazyPanelStack
-          activeCommentAnchor={activeCommentAnchor}
-          activePage={activePage}
-          aiProvenance={aiProvenance}
-          aiProvenanceOpen={aiProvenanceOpen}
-          aiSettings={aiSettings}
-          autoActionBusy={autoActionBusy}
-          autoActionError={autoActionError}
-          autoActionPlan={autoActionPlan}
-          autoActionProgress={autoActionProgress}
-          autoActionScope={autoActionScope}
-          autoActionSelectedPageIds={autoActionSelectedPageIds}
-          autoActionSet={autoActionSet}
-          autoActionsOpen={autoActionsOpen}
-          autoActionStatus={autoActionStatus}
-          bg3dInitialDataUrl={bg3dInitialDataUrl}
-          bg3dInitialScene={bg3dInitialScene}
-          bg3dOperation={bg3dInitialElementId ? "update" : "insert"}
-          bg3dTargetBundleId={bg3dTargetBundleId}
-          bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
-          validateRecoveryAccess={validateRecoveryAccess}
-          bg3dOpen={admittedBg3dOpen}
-          bg3dSeedTemplateId={bg3dSeedTemplateId}
-          bg3dSeedPrimitiveKind={bg3dSeedPrimitiveKind}
-          onSeedObjectInsertConsumed={clearStudioObjectInsertSeeds}
-          characterBible={characterBible}
-          characterBibleOpen={characterBibleOpen}
-          checkpointError={checkpointError}
-          checkpointPanelOpen={checkpointPanelOpen}
-          checkpoints={checkpoints}
-          collaborationDocumentLocked={collaborationDocumentLocked}
-          colorWheelCenter={colorWheelCenter}
-          colorWheelOpen={colorWheelOpen}
-          commentsOpen={commentsOpen}
-          commentsPanelMounted={commentsPanelMounted}
-          studioCommentFocusRequest={studioCommentFocusRequest}
-          studioCommentSharedReply={studioCommentSharedReplyController}
-          studioCommentSyncError={studioCommentInteractionNotice ?? studioCommentSyncError}
-          studioCommentPinsHidden={studioCommentPinsHidden}
-          studioLegacyCommentThreadIdSet={studioLegacyCommentThreadIdSet}
-          studioTeamCommentCapabilities={studioTeamCommentCapabilities}
-          studioTeamCommentsSyncing={studioTeamCommentsSyncing}
-          studioTeamCommentsWorkId={studioTeamCommentsWorkId}
-          studioTeamUnreadCommentIdSet={studioTeamUnreadCommentIdSet}
-          composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
-          continuityIssues={continuityIssues}
-          continuityOpen={continuityOpen}
-          continuityScenes={continuityScenes}
-          currentPageId={currentPageId}
-          currentPublishPackageCreditsText={currentPublishPackageCreditsText}
-          draftCollaboration={draftCollaboration}
-          effectivePublishPackageSettings={effectivePublishPackageSettings}
-          elementById={elementById}
-          fxPanelOpen={fxPanelOpen}
-          isMobile={isMobile}
-          loadedWork={loadedWork}
-          loggedIn={loggedIn}
-          macroSession={macroSession}
-          masterEditMode={masterEditMode}
-          pageDnd={pageDnd}
-          pageReviewOpen={pageReviewOpen}
-          pages={pages}
-          pagesHi={pagesHi}
-          pagesHistory={pagesHistory}
-          mannequinPoserOpen={admittedMannequinPoserOpen}
-          poserInitialDataUrl={poserInitialDataUrl}
-          poserInitialElementId={poserInitialElementId}
-          poserSeedPropId={poserSeedPropId}
-          poserVrmOpen={admittedPoserVrmOpen}
-          productionInsightsOpen={productionInsightsOpen}
-          productionInsightsResult={productionInsightsResult}
-          publicationAnalytics={publicationAnalytics}
-          publicationOperationsOpen={publicationOperationsOpen}
-          publishAiDisclosure={publishAiDisclosure}
-          publishAiUsage={publishAiUsage}
-          publishCompliance={publishCompliance}
-          publishComplianceResult={publishComplianceResult}
-          publishPackageExportBusy={publishPackageExportBusy}
-          publishPackageExportProgress={publishPackageExportProgress}
-          publishPackageExportStatus={publishPackageExportStatus}
-          publishPackageOpen={publishPackageOpen}
-          publishPackagePlan={publishPackagePlan}
-          publishPreflightOpen={publishPreflightOpen}
-          publishPreflightResult={publishPreflightResult}
-          publishProfile={publishProfile}
-          quickActionsAnchor={quickActionsAnchor}
-          quickActionsDisabledActions={quickActionsDisabledActions}
-          quickActionsOpen={quickActionsOpen}
-          quickActionsPreferences={quickActionsPreferences}
-          recentColors={recentColors}
-          referencePanelOpen={referencePanelOpen}
-          referenceBoard={referenceBoard}
-          releaseSchedule={releaseSchedule}
-          scenarioApplyTarget={scenarioApplyTarget}
-          scenarioBusy={scenarioBusy}
-          scenarioError={scenarioError}
-          scenarioImageReferenceAssetOptions={scenarioImageReferenceAssetOptions}
-          scenarioImageReferenceDocument={scenarioImageReferenceDocument}
-          scenarioImageReferenceMissingCount={
-            assetsLoaded ? scenarioImageReferenceResolution.missing.length : 0
-          }
-          scenarioImageReferencesLoading={assetsLoading || (scenarioOpen && !assetsLoaded)}
-          scenarioOpen={scenarioOpen}
-          scenarioProgress={scenarioProgress}
-          scenarioRegeneratingIndex={scenarioRegeneratingIndex}
-          scenarioResult={scenarioResult}
-          scenarioSceneCountHint={scenarioSceneCountHint}
-          scenarioStageLabel={scenarioStageLabel}
-          scenarioStoryText={scenarioStoryText}
-          scrollPreviewOpen={scrollPreviewOpen}
-          serverCurrentRevision={serverCurrentRevision}
-          serverRevisionError={serverRevisionError}
-          serverRevisionLoading={serverRevisionLoading}
-          serverRevisions={serverRevisions}
-          setAiProvenanceOpen={setAiProvenanceOpen}
-          setAutoActionsOpen={setAutoActionsOpen}
-          setBg3dInitialDataUrl={setBg3dInitialDataUrl}
-          setBg3dInitialElementId={setBg3dInitialElementId}
-          setBg3dInitialScene={setBg3dInitialScene}
-          setBg3dOpen={setBg3dOpen}
-          setCharacterBibleOpen={setCharacterBibleOpen}
-          setCheckpointPanelOpen={setCheckpointPanelOpen}
-          setColor={setColor}
-          setColorWheelOpen={setColorWheelOpen}
-          onArmCommentPinPlacement={startStudioCommentPlacementSession}
-          setCommentsOpen={setCommentsOpen}
-          isStudioCommentAnchorValid={isStudioCommentAnchorValid}
-          setStudioCommentFocusRequest={setStudioCommentFocusRequest}
-          setStudioCommentPinsHidden={setStudioCommentPinsHidden}
-          setContinuityOpen={setContinuityOpen}
-          setFxPanelOpen={setFxPanelOpen}
-          setLoadedWork={setLoadedWork}
-          setPageReviewOpen={setPageReviewOpen}
-          setPoserInitialDataUrl={setPoserInitialDataUrl}
-          setMannequinPoserOpen={setMannequinPoserOpen}
-          setPoserInitialElementId={setPoserInitialElementId}
-          setPoserVrmOpen={setPoserVrmOpen}
-          setProductionInsightsOpen={setProductionInsightsOpen}
-          setPublicationOperationsOpen={setPublicationOperationsOpen}
-          setPublishPackageOpen={setPublishPackageOpen}
-          setPublishPreflightOpen={setPublishPreflightOpen}
-          setQuickActionsOpen={setQuickActionsOpen}
-          setQuickActionsPreferences={setQuickActionsPreferences}
-          setReferencePanelOpen={setReferencePanelOpen}
-          setScenarioOpen={setScenarioOpen}
-          setScenarioImageReferenceDocument={setScenarioImageReferenceDocument}
-          setScenarioSceneCountHint={setScenarioSceneCountHint}
-          setScenarioStoryText={setScenarioStoryText}
-          setScrollPreviewOpen={setScrollPreviewOpen}
-          setSelectedId={setSelectedId}
-          setSharedDocumentNotice={setSharedDocumentNotice}
-          setSharedDocumentScope={setSharedDocumentScope}
-          setStoryboardGridOpen={setStoryboardGridOpen}
-          setTeamPanelOpen={setTeamPanelOpen}
-          setTimelapseOpen={setTimelapseOpen}
-          setTool={setTool}
-          setWriterRoomAiDirection={setWriterRoomAiDirection}
-          setWriterRoomAiReview={setWriterRoomAiReview}
-          setWriterRoomOpen={setWriterRoomOpen}
-          sharedDocument={sharedDocument}
-          storyboardGridOpen={storyboardGridOpen}
-          studioAuthUserId={studioAuthUserId}
-          studioCommentActor={studioCommentActor}
-          studioCommentAnchorOptions={studioCommentAnchorOptions}
-          studioComments={studioCommentViewDocument}
-          studioRevisionProjectGenerationRef={studioRevisionProjectGenerationRef}
-          teamPanelOpen={teamPanelOpen}
-          textAiConfigured={textAiConfigured}
-          timelapseOpen={timelapseOpen}
-          title={title}
-          workId={workId}
-          writerRoom={writerRoom}
-          writerRoomAiBusy={writerRoomAiBusy}
-          writerRoomAiDirection={writerRoomAiDirection}
-          writerRoomAiError={writerRoomAiError}
-          writerRoomAiReview={writerRoomAiReview}
-          writerRoomCanvasPlan={writerRoomCanvasPlan}
-          writerRoomOpen={writerRoomOpen}
-          stableHandlers={studioLazyPanelStackHandlers}
-        />
-
-      {studioFilterSession && studioFilterDialogImage?.type === "image" ? (
-        <Suspense fallback={null}>
-          <StudioFilterDialog
-            key={studioFilterSession.id}
-            activeKey={`filter:${studioFilterSession.id}`}
-            kind={studioFilterSession.kind}
-            image={studioFilterDialogImage}
-            imageSrc={studioFilterDialogImage.src}
-            targetKind={studioFilterSession.target}
-            {...(studioFilterSession.initialDraft
-              ? { initialDraft: studioFilterSession.initialDraft }
-              : {})}
-            rootRef={studioRootRef}
-            mutationLocked={studioFilterDialogMutationLocked}
-            {...(studioFilterDialogMutationLockReason
-              ? { mutationLockReason: studioFilterDialogMutationLockReason }
-              : {})}
-            applying={studioFilterApplying}
-            selectionAvailable={
-              studioFilterSession.target === "image" && !!studioFilterSession.selection
-            }
-            selectionFeatherPx={
-              studioFilterSession.target === "image"
-                ? studioFilterSession.selection?.featherPx
-                : undefined
-            }
-            selectionInverted={
-              studioFilterSession.target === "image"
-                ? studioFilterSession.selection?.invert
-                : undefined
-            }
-            onPreview={(patch) => {
-              setStudioFilterPreview(
-                patch
-                  ? { elementId: studioFilterSession.elementId, patch }
-                  : null,
-              );
-            }}
-            onApply={async (patch, draft, applicationScope) => {
-              if (studioFilterApplyBusyRef.current) return;
-              if (studioFilterSession.target === "image") {
-                if (applicationScope === "whole") {
-                  if (!patchEl(studioFilterSession.elementId, patch as Partial<El>)) return;
-                  setStudioFilterPreview(null);
-                  setLastStudioFilterDraft(draft);
-                  setStudioFilterApplying(false);
-                  setStudioFilterSession(null);
-                  return;
-                }
-                const selection = studioFilterSession.selection;
-                if (!selection) {
-                  setError("필터를 적용할 픽셀 영역을 먼저 선택하세요.");
-                  return;
-                }
-                const target = elementById.get(studioFilterSession.elementId);
-                if (!target || target.type !== "image") {
-                  setError("필터 대상 이미지가 현재 페이지에 없습니다. 다시 선택해 주세요.");
-                  return;
-                }
-                const applySessionId = studioFilterSession.id;
-                const mutationTicket = captureStudioMutationTicket();
-                studioFilterApplyBusyRef.current = true;
-                setStudioFilterApplying(true);
-                try {
-                  const source = await loadStudioPixelEditImage(target.src);
-                  if (
-                    applySessionId !== studioFilterSessionIdRef.current
-                    || !canApplyStudioMutation(mutationTicket)
-                    || isLatestLayerContentMutationLocked(target.id)
-                  ) return;
-                  const { createStudioSelectionFilterMaskTransactionAsync } = await import(
-                    "./studio-selection-filter-mask-transaction"
-                  );
-                  const result = await createStudioSelectionFilterMaskTransactionAsync({
-                    target,
-                    selection,
-                    scope: applicationScope,
-                    imageWidth: source.naturalWidth || source.width,
-                    imageHeight: source.naturalHeight || source.height,
-                    filterPatch: patch,
-                    createCanvas: createStudioPixelEditCanvas,
-                    serializeMask: async (mask) =>
-                      encodeStudioPixelEditResultPng(mask as HTMLCanvasElement),
-                    mutationLocked:
-                      activeSurfaceReviewLocked || isEffectivelyLocked(target, groups),
-                  });
-                  if (!result.ok) {
-                    setError(result.message);
-                    return;
-                  }
-                  const committed = commitStudioSelectionFilterMaskTransaction(
-                    result.transaction,
-                    (transaction) => patchEl(
-                      transaction.targetId,
-                      transaction.patch as Partial<El>,
-                    ),
-                  );
-                  if (!committed) return;
-                  setStudioFilterPreview(null);
-                  setLastStudioFilterDraft(draft);
-                  setError(null);
-                  setStudioFilterSession(null);
-                  announceDrawingShortcut(
-                    applicationScope === "inside"
-                      ? "필터를 선택 안에 적용하고 마스크로 저장했어요"
-                      : "필터를 선택 밖에 적용하고 마스크로 저장했어요",
-                  );
-                } catch (selectionFilterError) {
-                  setError(
-                    selectionFilterError instanceof Error
-                      ? selectionFilterError.message
-                      : "선택 영역 필터 마스크를 만들지 못했습니다.",
-                  );
-                } finally {
-                  if (applySessionId === studioFilterSessionIdRef.current) {
-                    studioFilterApplyBusyRef.current = false;
-                    setStudioFilterApplying(false);
-                  }
-                }
-                return;
-              }
-              studioFilterApplyBusyRef.current = true;
-              setStudioFilterApplying(true);
-              const applySessionId = studioFilterSession.id;
-              try {
-                if (
-                  applySessionId !== studioFilterSessionIdRef.current ||
-                  studioFilterSession.pageId !== currentPageIdRef.current ||
-                  studioFilterSession.historyIndex !== pagesHiRef.current ||
-                  !canApplyStudioMutation(studioFilterSession.mutationTicket)
-                ) {
-                  closeStudioFilterDialog();
-                  return;
-                }
-                const rasterRuntime = await import("./studio-raster-edit-preparation");
-                if (applySessionId !== studioFilterSessionIdRef.current) return;
-                const currentContext = currentStudioFilterPageRasterContext(
-                  studioFilterSession.plan.name,
-                  rasterRuntime,
-                );
-                const composite = {
-                  ...studioFilterSession.image,
-                  ...patch,
-                  locked: false,
-                  noClip: true,
-                } as ImageEl & El;
-                const applied = rasterRuntime.applyStudioEditableRasterCopy({
-                  plan: studioFilterSession.plan,
-                  current: currentContext.input,
-                  composite,
-                  destinationElements: currentContext.destinationElements,
-                });
-                if (!applied.ok) {
-                  setError(applied.reason);
-                  closeStudioFilterDialog();
-                  return;
-                }
-                if (
-                  applySessionId !== studioFilterSessionIdRef.current ||
-                  studioFilterSession.pageId !== currentPageIdRef.current ||
-                  studioFilterSession.historyIndex !== pagesHiRef.current ||
-                  !canApplyStudioMutation(studioFilterSession.mutationTicket)
-                ) {
-                  closeStudioFilterDialog();
-                  return;
-                }
-                if (!commit(applied.elements, undefined, studioFilterSession.pageId)) return;
-                setMarqueeIds([]);
-                setSelectedId(composite.id);
-                setTool("select");
-                setStudioFilterPreview(null);
-                setLastStudioFilterDraft(draft);
-                setStudioFilterSession(null);
-                setError(null);
-                announceDrawingShortcut("원본을 보존한 페이지 필터 레이어를 추가했어요");
-              } catch (filterApplyError) {
-                setError(
-                  filterApplyError instanceof Error
-                    ? filterApplyError.message
-                    : "페이지 필터 레이어를 적용하지 못했습니다."
-                );
-              } finally {
-                if (applySessionId === studioFilterSessionIdRef.current) {
-                  studioFilterApplyBusyRef.current = false;
-                  setStudioFilterApplying(false);
-                }
-              }
-            }}
-            onClose={closeStudioFilterDialog}
-          />
-        </Suspense>
-      ) : null}
-
-      {studioLayerLiftUi.open ? (
-        <Suspense fallback={null}>
-          <StudioLayerLiftDialog
-            open
-            activeKey={studioLayerLiftUi.activeKey}
-            sourceName={studioLayerLiftUi.sourceName}
-            sourceSrc={studioLayerLiftUi.sourceSrc}
-            phase={studioLayerLiftUi.phase}
-            progressLabel={studioLayerLiftUi.progressLabel}
-            error={studioLayerLiftUi.error}
-            preview={studioLayerLiftUi.preview}
-            options={studioLayerLiftOptions}
-            mutationLocked={studioLayerLiftDisabledReason !== null}
-            mutationLockReason={studioLayerLiftDisabledReason}
-            onOptionsChange={setStudioLayerLiftOptions}
-            onAnalyze={() => {
-              const sourceId = studioLayerLiftUiRef.current.sourceId;
-              if (sourceId) {
-                void runStudioLayerLiftAnalysis(
-                  sourceId,
-                  studioLayerLiftOptions,
-                );
-              }
-            }}
-            onCorrectionCommit={correctStudioLayerLift}
-            onApply={() => void applyStudioLayerLift()}
-            onCancel={closeStudioLayerLift}
-          />
-        </Suspense>
-      ) : null}
-        </div>
-
-      <StudioCanvasContextMenu
-        open={contextMenu.visible}
-        x={contextMenu.x}
-        y={contextMenu.y}
-        hasElement={contextMenu.elId !== null}
-        locked={
-          contextMenuEl
-            ? isEffectivelyLocked(contextMenuEl, groups)
-            : false
-        }
-        onEditVrm={
-          contextMenuEl?.type === "image" &&
-          (contextMenuEl.vrmScene || parseStudio3dTool(contextMenuEl.src) === "vrm-poser")
-            ? () => {
-                setPoserInitialDataUrl(contextMenuEl.src);
-                setPoserInitialElementId(contextMenuEl.id);
-                setPoserVrmOpen(true);
-              }
-            : undefined
-        }
-        onEditBackground3d={
-          contextMenuEl?.type === "image" && contextMenuBg3dEditSource
-            ? () => {
-                setBg3dInitialScene(contextMenuBg3dEditSource.scene);
-                setBg3dInitialDataUrl(contextMenuBg3dEditSource.legacyDataUrl);
-                setBg3dInitialElementId(contextMenuEl.id);
-                setBg3dOpen(true);
-              }
-            : undefined
-        }
-        onPreloadBackground3d={preloadStudioBackground3D}
-        onSaveAsEmeres={() => {
-          if (contextMenu.elId) void saveElementAsEmeresLibraryItem(contextMenu.elId);
-        }}
-        onDuplicate={duplicateSelected}
-        onReorder={reorder}
-        onToggleLock={() => {
-          if (contextMenuEl) {
-            const contextTargetSelected =
-              selectedIdRef.current === contextMenuEl.id ||
-              marqueeIdsRef.current.includes(contextMenuEl.id);
-            if (contextTargetSelected && completeSelectedGroupId()) {
-              toggleSelectedElementsLocked();
-            } else {
-              patchEl(contextMenuEl.id, {
-                locked: !isEffectivelyLocked(contextMenuEl, groups),
-              });
-            }
-          }
-        }}
-        onDelete={removeSelected}
-        onSelectPen={() => {
-          activatePrimaryCanvasTool("draw", "pen");
-        }}
-        onAddSpeechBubble={() => addBubble("speech")}
-        onAddText={() => addText()}
-        onAddPage={addPage}
-        onEnableQuickShape={() => {
-          activatePrimaryCanvasTool("draw", "pen");
-          setQuickShapeActive(true);
-        }}
-        onClose={() => setContextMenu((prev) => ({ ...prev, visible: false }))}
-      />
-    </Container>
-    {canvasOnlyMode ? (
-      <div className="pointer-events-none fixed inset-x-0 top-[max(0.5rem,env(safe-area-inset-top))] z-[45] flex justify-center px-3">
-        <button
-          type="button"
-          onClick={() => setCanvasOnlyMode(false)}
-          className="pointer-events-auto inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-panel/95 px-3 text-xs font-semibold text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          title="일반 편집 화면으로 복원 (Esc)"
-        >
-          <Maximize2
-            size={STUDIO_ICON_SIZE.context}
-            strokeWidth={STUDIO_ICON_STROKE}
-            aria-hidden
-            className={studioChromeIconClass({ tone: "accent" })}
-          />
-          도구막대 복원
-          <kbd className="rounded border border-line bg-card px-1.5 py-0.5 text-[0.65rem] font-medium text-fg-3">Esc</kbd>
-        </button>
-      </div>
-    ) : null}
-    {/*
-      §15.3 Help 그룹의 다섯 표면(현재 도구·용어 사전·진단·복구·라이선스·버그
-      리포트) 호스트. 자기 상태만 들고 채널로 요청을 받으므로 prop 이 없고, 열기
-      전에는 아무것도 렌더하지 않는다. 캔버스만 모드에서도 살아 있어야 해서
-      Container 밖 최상단에 둔다.
-    */}
-    <StudioHelpCenterHost />
-    </div>
-    </StudioToolHintPreferencesProvider>
-    </StudioLiveCollaborationProvider>
   );
 }

@@ -3,7 +3,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./brush/studio-brush-catalog";
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
 import {
   StudioOptionsBars,
@@ -13,7 +13,7 @@ import {
   type StudioOptionsBarsSelectionModel,
 } from "./StudioOptionsBars";
 
-import type { StudioDrawOptionsBarProps } from "./StudioDrawOptionsBar";
+import type { StudioDrawOptionsBarProps } from "./brush/StudioDrawOptionsBar";
 import type { StudioSelectOptionsBarProps } from "./StudioSelectOptionsBar";
 
 const capturedLazyProps = vi.hoisted(() => ({

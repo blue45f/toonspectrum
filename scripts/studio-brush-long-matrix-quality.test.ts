@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-brush-carrier-quality";
-import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "../src/domains/creator/studio-brush-catalog";
-import { studioBrushPackDescriptorById } from "../src/domains/creator/studio-brush-pack-index";
-import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/studio-dry-media-anisotropic-grain-v1";
+import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/brush/studio-brush-carrier-quality";
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "../src/domains/creator/brush/studio-brush-catalog";
+import { studioBrushPackDescriptorById } from "../src/domains/creator/brush/studio-brush-pack-index";
+import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/brush/studio-dry-media-anisotropic-grain-v1";
 
 import {
   analyzeStudioLongBrushQuality,

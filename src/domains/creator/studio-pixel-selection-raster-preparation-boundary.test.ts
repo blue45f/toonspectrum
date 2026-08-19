@@ -1,19 +1,17 @@
-import { readFileSync } from "node:fs";
-
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import {
   describeStudioEditableRasterSelectionSurface,
   planStudioEditableRasterCopy,
-} from "./studio-raster-edit-preparation";
+} from "./render/studio-raster-edit-preparation";
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 import type { El } from "./studio-element-model";
 
-const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
-const source = readFileSync(pageUrl, "utf8");
+const source = readStudioCuttoonEditorSource();
 const file = ts.createSourceFile(
-  pageUrl.pathname,
+  "StudioCuttoonEditor.tsx",
   source,
   ts.ScriptTarget.Latest,
   true,
@@ -93,7 +91,7 @@ describe("Studio pixel marquee vector-only raster preparation boundary", () => {
 
     expect(toggle).toContain("activatePixelSelectionToolFromInspector(kind)");
     expect(activate).toContain("preparePixelMarqueeRasterTarget(kind)");
-    expect(prepare).toContain('import("./studio-raster-edit-preparation")');
+    expect(prepare).toContain('import("./render/studio-raster-edit-preparation")');
     expect(prepare).toContain("planStudioEditableRasterCopy(");
     expect(prepare).toContain("renderStudioEditableRasterCopy(");
     expect(prepare).toContain("renderStudioVectorReference");

@@ -50,7 +50,7 @@ import {
 } from "./studio-living-ink-fluid-reference";
 import { studioOssUnitHash } from "./studio-oss-brush-kernels";
 
-import type { WatercolorBrushDab } from "./studio-watercolor-brush";
+import type { WatercolorBrushDab } from "./brush/studio-watercolor-brush";
 
 export const STUDIO_LIVING_INK_SETTLED_BAKE_VERSION_V1 = 1 as const;
 

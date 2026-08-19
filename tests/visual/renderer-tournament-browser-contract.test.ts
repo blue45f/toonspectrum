@@ -27,16 +27,13 @@ import {
   RENDERER_TOURNAMENT_BROWSER_WARMUPS,
 } from "../benchmarks/harness/renderer-tournament-browser-page";
 
-const RESULT_URL = new URL(
-  "../benchmarks/results/renderer-tournament-browser.json",
+const RESULT_URL = new URL("../benchmarks/results/renderer-tournament-browser.json",
   import.meta.url,
 );
-const PAGE_URL = new URL(
-  "../benchmarks/harness/renderer-tournament-browser-page.ts",
+const PAGE_URL = new URL("../benchmarks/harness/renderer-tournament-browser-page.ts",
   import.meta.url,
 );
-const ORCHESTRATOR_URL = new URL(
-  "../benchmarks/harness/renderer-tournament-browser.ts",
+const ORCHESTRATOR_URL = new URL("../benchmarks/harness/renderer-tournament-browser.ts",
   import.meta.url,
 );
 

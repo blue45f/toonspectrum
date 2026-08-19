@@ -11,7 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { studioCanvasAspectPreviewRect } from "./studio-canvas-size";
+import { studioCanvasAspectPreviewRect } from "./canvas/studio-canvas-size";
 import {
   MAGIC_RESIZE_PRESETS,
   MAGIC_RESIZE_STRATEGIES,

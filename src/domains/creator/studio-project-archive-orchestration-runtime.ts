@@ -1,7 +1,7 @@
 import { sanitizeStudioPublishFileStem } from "./studio-publish-package";
 
+import type { StudioFilterMaskSurfaceArchiveDependencies } from "./filter/studio-filter-mask-surface-archive";
 import type { StudioEditorMutationTicket } from "./studio-editor-scope";
-import type { StudioFilterMaskSurfaceArchiveDependencies } from "./studio-filter-mask-surface-archive";
 import type { StudioProjectDocumentSessionProvenance } from "./studio-project-document-session";
 import type { StudioProjectFile } from "./studio-project-file";
 import type { StudioProjectSnapshot } from "./studio-project-snapshot";
@@ -11,7 +11,7 @@ import type { StudioReleaseScheduleRuntime } from "./studio-release-schedule-loa
 import type {
   StudioVrmProjectArchiveAttestationPlan,
   StudioVrmProjectArchiveUseContextInput,
-} from "./studio-vrm-license-product-gate";
+} from "./vrm/studio-vrm-license-product-gate";
 import type { MutableRefObject } from "react";
 
 const MOBILE_PROJECT_ARCHIVE_LIMITS = Object.freeze({
@@ -235,7 +235,7 @@ export function createStudioProjectArchiveOrchestration({
         import("./studio-project-document"),
         import("./studio-document-envelope"),
         import("./studio-project-document-session"),
-        import("./studio-vrm-texture-paint-project-library"),
+        import( "./vrm/studio-vrm-texture-paint-project-library"),
       ]);
       const exportedAt = new Date().toISOString();
       const documentId = workId
@@ -328,12 +328,12 @@ export function createStudioProjectArchiveOrchestration({
         { parseStudioProjectFile },
         { downloadBlob },
       ] = await Promise.all([
-        import("./studio-bg3d-project-library"),
+        import( "./bg3d/studio-bg3d-project-library"),
         import("./studio-reference-board-archive"),
-        import("./studio-vrm-project-library"),
-        import("./studio-vrm-license-product-gate"),
-        import("./studio-vrm-texture-paint-project-library"),
-        import("./studio-filter-mask-surface-archive"),
+        import( "./vrm/studio-vrm-project-library"),
+        import( "./vrm/studio-vrm-license-product-gate"),
+        import( "./vrm/studio-vrm-texture-paint-project-library"),
+        import( "./filter/studio-filter-mask-surface-archive"),
         import("./studio-linked-3d-pass-project-archive"),
         import("./studio-linked-3d-pass-product-authority"),
         import("./studio-project-file"),
@@ -534,7 +534,7 @@ export function createStudioProjectArchiveOrchestration({
       ] = await Promise.all([
         import("./studio-project-document"),
         import("./studio-project-document-session"),
-        import("./studio-vrm-texture-paint-project-library"),
+        import( "./vrm/studio-vrm-texture-paint-project-library"),
         import("./studio-linked-3d-pass-project-archive"),
       ]);
       if (!canApplyStudioMutation(mutationTicket)) return;
@@ -612,10 +612,10 @@ export function createStudioProjectArchiveOrchestration({
         { normalizeStudioReleaseSchedule },
       ] = await Promise.all([
         import("./studio-project-archive"),
-        import("./studio-bg3d-project-library"),
+        import( "./bg3d/studio-bg3d-project-library"),
         import("./studio-reference-board-archive"),
-        import("./studio-vrm-project-library"),
-        import("./studio-vrm-texture-paint-project-library"),
+        import( "./vrm/studio-vrm-project-library"),
+        import( "./vrm/studio-vrm-texture-paint-project-library"),
         import("./studio-linked-3d-pass-project-archive"),
         import("./studio-linked-3d-pass-product-authority"),
         import("./studio-project-archive-final-install-lock"),

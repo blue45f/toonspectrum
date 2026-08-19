@@ -1,19 +1,19 @@
 import {
-  STUDIO_BRUSH_RENDER_FAMILY,
-  resolveStudioBrushRenderFamily,
-  type StudioBrushRenderFamily,
-} from "./studio-brush";
-import {
   resolveStudioCapturedBrushDynamicsPresetId,
-} from "./studio-brush-dynamics";
-import { resolveStudioStampBrushKind } from "./studio-brush-stamp-engine";
-import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
-import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
+} from "./brush/studio-brush-dynamics";
+import { resolveStudioStampBrushKind } from "./brush/studio-brush-stamp-engine";
+import { isStudioStrokePaintModelCompatible } from "./brush/studio-stroke-paint-model";
 import {
   DEFAULT_SHAPE_PARAMS,
   normalizeShapeParams,
   polygonPathPointsInBounds,
-} from "./studio-stroke-shapes";
+} from "./brush/studio-stroke-shapes";
+import {
+  STUDIO_BRUSH_RENDER_FAMILY,
+  resolveStudioBrushRenderFamily,
+  type StudioBrushRenderFamily,
+} from "./studio-brush";
+import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
 
 import type { DrawEl } from "./studio-element-model";
 import type { QuickShapeKind } from "./studio-quickshape";

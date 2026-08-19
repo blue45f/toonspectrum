@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { hasContiguousLayerGroups, type LayerGroup } from "../studio-layers";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION,
   STUDIO_SCENE_LAYER_LIFT_REQUEST_KIND,
@@ -12,10 +15,8 @@ import {
   isStudioLayerLiftSourceCurrent,
   planStudioLayerLift,
 } from "./studio-layer-lift-plan";
-import { hasContiguousLayerGroups, type LayerGroup } from "./studio-layers";
-import { sha256HexPortable } from "./studio-sha256";
 
-import type { El } from "./studio-element-model";
+import type { El } from "../studio-element-model";
 
 const SOURCE_RGBA = Uint8Array.from([
   20, 40, 60, 64,

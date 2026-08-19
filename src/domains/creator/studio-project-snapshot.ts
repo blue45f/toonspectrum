@@ -2,8 +2,8 @@ import {
   createEmptyStudioAiImageReferenceDocument,
   hydrateStudioAiImageReferenceDocument,
   type StudioAiImageReferenceDocument,
-} from "./studio-ai-image-reference-roles";
-import { studioDrawingAssistHasContent } from "./studio-drawing-assist-document";
+} from "./ai/studio-ai-image-reference-roles";
+import { studioDrawingAssistHasContent } from "./brush/studio-drawing-assist-document";
 import {
   serializeDocumentMaster,
   type DocumentMaster,
@@ -24,7 +24,7 @@ import {
   type StudioWriterRoomDocument,
 } from "./studio-writer-room";
 
-import type { StudioAiProvenanceDocument } from "./studio-ai-provenance";
+import type { StudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import type { StudioCharacterBible } from "./studio-character-bible";
 import type { StudioCommentsDocument } from "./studio-comments";
 import type { El } from "./studio-element-model";

@@ -1,4 +1,4 @@
-import type { BubbleVariant } from "./studio-assets";
+import type { BubbleVariant } from "../studio-assets";
 
 interface StudioBubbleVariantGlyphProps {
   variant: BubbleVariant;

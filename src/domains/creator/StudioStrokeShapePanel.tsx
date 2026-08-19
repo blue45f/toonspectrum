@@ -8,14 +8,6 @@
  */
 import { RotateCcw } from "lucide-react";
 
-import { PANEL_LABEL_ROW, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
-import {
-  DEFAULT_STUDIO_SKETCH_STYLE,
-  isDefaultStudioSketchStyle,
-  STUDIO_SKETCH_FILL_STYLES,
-  STUDIO_SKETCH_RANGES,
-  type StudioSketchStyle,
-} from "./studio-rough-shape";
 import {
   DEFAULT_SHAPE_PARAMS,
   DEFAULT_STROKE_STYLE,
@@ -33,7 +25,15 @@ import {
   type StrokeArrowHead,
   type StrokeShapeKind,
   type StrokeStyle,
-} from "./studio-stroke-shapes";
+} from "./brush/studio-stroke-shapes";
+import { PANEL_LABEL_ROW, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import {
+  DEFAULT_STUDIO_SKETCH_STYLE,
+  isDefaultStudioSketchStyle,
+  STUDIO_SKETCH_FILL_STYLES,
+  STUDIO_SKETCH_RANGES,
+  type StudioSketchStyle,
+} from "./studio-rough-shape";
 
 import { buttonClass } from "@/components/ui/button-utils";
 

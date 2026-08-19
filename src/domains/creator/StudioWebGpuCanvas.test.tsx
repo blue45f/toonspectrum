@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { resolveStudioWebGpuCanvasStrokes } from "./studio-webgpu-canvas-authority";
-import { isStudioWebGpuCanvasActive } from "./studio-webgpu-dab-planner";
+import { resolveStudioWebGpuCanvasStrokes } from "./render/studio-webgpu-canvas-authority";
+import { isStudioWebGpuCanvasActive } from "./render/studio-webgpu-dab-planner";
 import { StudioWebGpuCanvas } from "./StudioWebGpuCanvas";
 
 const supportedStroke = {

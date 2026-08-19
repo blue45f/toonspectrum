@@ -1,4 +1,12 @@
 import {
+  createStudioSharedPointerRingBuffer,
+  type StudioSharedPointerRingEnvironment,
+  type StudioSharedPointerRingProducer,
+  type StudioSharedPointerSample,
+  type StudioSharedPointerWriteResult,
+} from "../studio-shared-pointer-ring-buffer";
+
+import {
   STUDIO_ENGINE_EXECUTION_PROFILE,
   STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
   describeStudioEngineCommandTransport,
@@ -14,13 +22,6 @@ import {
   type StudioEngineWorkerMessage,
   type StudioEngineWorkerValidationState,
 } from "./studio-engine-worker-protocol";
-import {
-  createStudioSharedPointerRingBuffer,
-  type StudioSharedPointerRingEnvironment,
-  type StudioSharedPointerRingProducer,
-  type StudioSharedPointerSample,
-  type StudioSharedPointerWriteResult,
-} from "./studio-shared-pointer-ring-buffer";
 
 import type {
   StudioEngineOffscreenSurface,
@@ -120,7 +121,7 @@ export interface StudioEngineWorkerSession {
 
 function defaultWorkerFactory(): StudioEngineWorkerLike | null {
   if (typeof Worker !== "function") return null;
-  return new Worker(new URL("./studio-engine.worker.ts", import.meta.url), {
+  return new Worker(new URL("../studio-engine.worker.ts", import.meta.url), {
     type: "module",
     name: "toonspectrum-studio-engine",
   });

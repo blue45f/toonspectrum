@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 import {
   STUDIO_LIVE_INK_DEFAULT_ROLLOUT_PERCENT,
   STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY,
@@ -11,7 +13,7 @@ import {
   type StudioLiveInkRolloutStorage,
 } from "./studio-live-ink-rollout";
 
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readStudioCuttoonEditorSource();
 const rolloutSource = readFileSync(
   new URL("./studio-live-ink-rollout.ts", import.meta.url),
   "utf8",

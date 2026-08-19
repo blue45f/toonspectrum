@@ -50,10 +50,10 @@ const LAYOUT_MODULES = [
 
 describe("Studio companion layout bundle boundary", () => {
   it("keeps one analyzable companion protocol import behind the StudioPage lazy boundary", () => {
-    const page = readModuleImports("./StudioPage.tsx");
+    const runtime = readModuleImports("./studio-tools-companion-runtime.ts");
 
     expect(
-      page.dynamic.filter((specifier) => specifier === "./studio-tools-companion")
+      runtime.dynamic.filter((specifier) => specifier === "./studio-tools-companion")
     ).toEqual(["./studio-tools-companion"]);
   });
 

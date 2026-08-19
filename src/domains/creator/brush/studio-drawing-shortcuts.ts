@@ -2,7 +2,8 @@ import {
   matchStudioShortcut,
   normalizeStudioShortcutChordKey,
   type StudioShortcutActionId,
-} from "./studio-app-settings";
+} from "../studio-app-settings";
+
 import {
   BRUSH_OPACITY_RANGE,
   BRUSH_STROKE_WIDTH_RANGE,

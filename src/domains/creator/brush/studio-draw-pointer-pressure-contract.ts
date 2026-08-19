@@ -5,16 +5,17 @@
  * lookup and dynamics normalization together so the planner remains a small orchestration boundary.
  */
 
-import {
-  normalizeStudioBrushDynamicsSettings,
-} from "./studio-brush-dynamics";
-import { isStudioFxPressureBrushId } from "./studio-fx-brush";
-import { resolveStudioHybridPressureProfile } from "./studio-hybrid-pressure-profile";
+import { resolveStudioHybridPressureProfile } from "../hybrid-dcc/studio-hybrid-pressure-profile";
+import { isStudioFxPressureBrushId } from "../studio-fx-brush";
 import {
   STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
   snapshotStudioMaterialMinimumDiameterRatio,
-} from "./studio-material-pressure-model";
-import { resolveStudioRetainedMediaPressureProfileId } from "./studio-retained-media-pressure";
+} from "../studio-material-pressure-model";
+import { resolveStudioRetainedMediaPressureProfileId } from "../studio-retained-media-pressure";
+
+import {
+  normalizeStudioBrushDynamicsSettings,
+} from "./studio-brush-dynamics";
 
 export interface StudioDrawPointerPressureContractInput {
   readonly drawMode: string;

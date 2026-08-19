@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  planStudioStrokeCurveV2,
+  type StudioStrokeCurvePlanV2,
+} from "./brush/studio-stroke-curve-resampler-v2";
+import {
   planStudioCanonicalInkDepositsV2,
   STUDIO_CANONICAL_INK_DEPOSIT_PLAN_V2_VERSION,
   type StudioCanonicalInkDepositPlanV2,
@@ -12,10 +16,6 @@ import {
   type StudioCanonicalStrokeSampleCandidateV2,
   type StudioCanonicalStrokeV2,
 } from "./studio-canonical-stroke-v2";
-import {
-  planStudioStrokeCurveV2,
-  type StudioStrokeCurvePlanV2,
-} from "./studio-stroke-curve-resampler-v2";
 
 function sample(
   sequence: number,

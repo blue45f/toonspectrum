@@ -31,7 +31,7 @@
  *   변조({1, 0, 0})로 fail-closed 한다.
  */
 
-import { studioOssUnitHash } from "./studio-oss-brush-kernels";
+import { studioOssUnitHash } from "../studio-oss-brush-kernels";
 
 export const STUDIO_PAPER_MEDIA_PROFILE_VERSION_V1 = 1 as const;
 

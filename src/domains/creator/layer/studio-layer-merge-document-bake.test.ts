@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { renderStudioVectorReference } from "../studio-vector-fill-reference";
+
 import { planStudioLayerMergeSelected } from "./studio-layer-merge";
 import {
   applyStudioDocumentMergeBake,
@@ -8,9 +10,8 @@ import {
   planStudioDocumentMergeBake,
   renderStudioDocumentMergeBake,
 } from "./studio-layer-merge-document-bake";
-import { renderStudioVectorReference } from "./studio-vector-fill-reference";
 
-import type { El } from "./studio-element-model";
+import type { El } from "../studio-element-model";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 

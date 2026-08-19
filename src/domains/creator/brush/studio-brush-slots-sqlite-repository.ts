@@ -1,5 +1,7 @@
 /** SQLite/OPFS product authority for device-scoped brush quick slots. */
 
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+
 import {
   emptyStudioBrushSlots,
   normalizeStudioBrushSlot,
@@ -7,13 +9,12 @@ import {
   STUDIO_BRUSH_SLOT_COUNT,
   STUDIO_BRUSH_SLOTS_LEGACY_AUTO_MIGRATION,
 } from "./studio-brush-slots";
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 
 import type {
   StudioBrushSlot,
   StudioBrushSlotsState,
 } from "./studio-brush-slots";
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 export const STUDIO_BRUSH_QUICK_SLOTS_SQLITE_NAMESPACE =
   "studio-brush-quick-slots-v12";

@@ -1,5 +1,6 @@
 
-import { selectFilterLane } from "./studio-renderer-tournament-runtime";
+import { selectFilterLane } from "../studio-renderer-tournament-runtime";
+
 import {
   STUDIO_STROKE_SURFACE_ROUTE_PRIORITY,
   type StudioStrokeSurfaceRouteKind,

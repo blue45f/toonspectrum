@@ -6,26 +6,42 @@
  * retained-dynamics capabilities must reject it instead of approximating round Canvas dabs.
  */
 
-import { resolveStudioBrushRenderFamily } from "./studio-brush";
 import {
   isStudioBrushEraserAliasId,
   resolveStudioBrushAliasProfile,
   studioBrushAliasEffectiveDiameter,
-} from "./studio-brush-alias-profile";
+} from "./brush/studio-brush-alias-profile";
 import {
   normalizeStudioBrushDynamicsSettings,
   resolveStudioCapturedBrushDynamicsPresetId,
   studioBrushDynamicsSeedFromKey,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   composeStudioBrushDualTipAlphaMap,
   planNormalizedStudioBrushTipComposition,
-} from "./studio-brush-tip-composition";
+} from "./brush/studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
   sampleStudioBrushTipAlphaMap,
   studioBrushTipUsesSolidEllipse,
-} from "./studio-brush-tip-stamp";
+} from "./brush/studio-brush-tip-stamp";
+import {
+  isStudioInkPressureModel,
+  studioInkFallbackPressure,
+  studioInkUsesResidualDabSpacing,
+} from "./brush/studio-ink-pressure-model";
+import {
+  isStudioStrokePaintModelCompatible,
+  STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
+  STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
+} from "./brush/studio-stroke-paint-model";
+import {
+  STUDIO_WET_INK_BRUSH_FIXED_RATE_HZ,
+  STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
+  resolveStudioWetInkBrushPhysicalRecipe,
+  studioWetInkBrushRuntimeSupportsElement,
+} from "./brush/studio-wet-ink-brush-runtime";
+import { resolveStudioBrushRenderFamily } from "./studio-brush";
 import {
   parseStudioCanonicalBrushPlan,
   STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS,
@@ -34,33 +50,18 @@ import {
   STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION,
 } from "./studio-canonical-brush-plan";
 import { parseStudioColorToLinear } from "./studio-color-quality-engine";
-import {
-  isStudioInkPressureModel,
-  studioInkFallbackPressure,
-  studioInkUsesResidualDabSpacing,
-} from "./studio-ink-pressure-model";
 import { sha256HexPortable } from "./studio-sha256";
-import {
-  isStudioStrokePaintModelCompatible,
-  STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
-  STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
-} from "./studio-stroke-paint-model";
-import {
-  STUDIO_WET_INK_BRUSH_FIXED_RATE_HZ,
-  STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
-  resolveStudioWetInkBrushPhysicalRecipe,
-  studioWetInkBrushRuntimeSupportsElement,
-} from "./studio-wet-ink-brush-runtime";
 
 import type {
   NormalizedStudioBrushDynamicsMapping,
   NormalizedStudioBrushDynamicsProperty,
   NormalizedStudioBrushDynamicsSettings,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import type {
   NormalizedStudioBrushTipSettings,
   StudioBrushTipAlphaMap,
-} from "./studio-brush-tip-stamp";
+} from "./brush/studio-brush-tip-stamp";
+import type { StudioEngineWebGpuTexturedBrushAssetPayload } from "./render/studio-engine-webgpu-textured-brush-plan";
 import type {
   StudioCanonicalBrushAffineTransform,
   StudioCanonicalBrushColor,
@@ -78,7 +79,6 @@ import type {
 import type { StudioCanonicalBrushSpecialistLoweringRequirement } from "./studio-canonical-brush-webgpu-lowering";
 import type { StudioLinearColorSpace } from "./studio-color-quality-engine";
 import type { DrawEl } from "./studio-element-model";
-import type { StudioEngineWebGpuTexturedBrushAssetPayload } from "./studio-engine-webgpu-textured-brush-plan";
 
 export const STUDIO_CANONICAL_BRUSH_DRAW_ADAPTER_VERSION = 2 as const;
 

@@ -7,9 +7,7 @@ import {
 } from "lucide-react";
 import { Suspense } from "react";
 
-import { pushStudioAiRecentPrompt } from "./studio-ai-assist-ux";
-import { isStudioAiConfigured } from "./studio-ai-client";
-import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "./studio-chrome-ui";
+import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "../studio-chrome-ui";
 import {
   StudioAiAssistHub,
   StudioAiBackgroundPanel,
@@ -21,12 +19,15 @@ import {
   StudioStockImagePanel,
   preloadStudioIntegrationsSettingsPanel,
   preloadStudioStockImagePanel,
-} from "./studio-page-lazy-ui";
-import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
+} from "../studio-page-lazy-ui";
+import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
-import type { StudioMenu } from "./studio-editor-tool-model";
-import type { StudioServerAiProviderPreference } from "./studio-server-ai-client";
-import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
+import { pushStudioAiRecentPrompt } from "./studio-ai-assist-ux";
+import { isStudioAiConfigured } from "./studio-ai-client";
+
+import type { StudioMenu } from "../studio-editor-tool-model";
+import type { StudioServerAiProviderPreference } from "../studio-server-ai-client";
+import type { StudioToolBeltContentProps } from "../StudioToolBeltContent";
 
 import { useT } from "@/lib/i18n";
 

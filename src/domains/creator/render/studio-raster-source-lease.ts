@@ -10,8 +10,8 @@ import {
   parseStudioLinked3dPassLocator,
   STUDIO_LINKED_3D_PASS_MAX_PNG_BYTES,
   type StudioLinked3dPassCasAuthority,
-} from "./studio-linked-3d-pass-transaction";
-import { sha256HexPortable } from "./studio-sha256";
+} from "../studio-linked-3d-pass-transaction";
+import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_RASTER_SOURCE_DEFAULT_MAX_SOURCE_BYTES =
   STUDIO_LINKED_3D_PASS_MAX_PNG_BYTES;
@@ -697,7 +697,7 @@ export async function acquireStudioRasterSourceLease(
   try {
     authority = options.authority
       ?? await waitForSignal(
-        import("./studio-linked-3d-pass-product-authority").then(
+        import("../studio-linked-3d-pass-product-authority").then(
           ({ acquireStudioLinked3dPassProductAuthority }) =>
             acquireStudioLinked3dPassProductAuthority(),
         ),

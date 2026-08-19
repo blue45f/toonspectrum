@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+
 import {
   createStudioCatalogBrushBaseline,
   createStudioSavedBrushBaseline,

@@ -1,4 +1,4 @@
-import type { StudioFreehandInputCasBlobKind } from "./studio-freehand-input-binary-spool-opfs-store";
+import type { StudioFreehandInputCasBlobKind } from "../studio-freehand-input-binary-spool-opfs-store";
 
 const SHA256_HEX = /^[a-f0-9]{64}$/u;
 const MAX_REFERENCES = 65_536;

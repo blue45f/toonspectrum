@@ -7,7 +7,7 @@
 import { normalizeCustomShapePoints } from "./studio-bubble-custom-shape";
 import { normalizeExtraTails } from "./studio-bubble-path";
 
-import type { BubbleEl } from "./studio-element-model";
+import type { BubbleEl } from "../studio-element-model";
 
 export type BubbleQuickTransformAction =
   | "widen"

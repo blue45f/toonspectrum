@@ -28,36 +28,43 @@ import { crc32, deflateSync, inflateSync } from "node:zlib";
 import { initializeCanvas, writePsdBuffer } from "ag-psd";
 import { describe, expect, it } from "vitest";
 
-import { parseStudioAbrBuffer, StudioAbrImportError } from "./studio-abr-import";
 import {
   DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
   STUDIO_BG3D_GLB_MAX_BYTES,
   STUDIO_BG3D_GLB_MIME_TYPE,
   validateStudioBg3dGlb,
   type StudioBg3dGlbValidationOptions,
-} from "./studio-bg3d-glb-validation";
+} from "./bg3d/studio-bg3d-glb-validation";
 import {
   planStudioBg3dModelImports,
   STUDIO_BG3D_IMPORT_COMPANION_FORMATS,
   STUDIO_BG3D_IMPORT_PRIMARY_FORMATS,
   StudioBg3dModelImportError,
-} from "./studio-bg3d-model-import";
+} from "./bg3d/studio-bg3d-model-import";
 import {
   buildStudioBrushTipAlphaMask,
   importStudioBrushTipPng,
   parseStudioBrushTipPngHeader,
   StudioBrushTipImportError,
   type StudioBrushTipDecodedPixels,
-} from "./studio-brush-tip-import";
+} from "./brush/studio-brush-tip-import";
 import {
   STUDIO_CANVAS_IMAGE_ACCEPT,
   studioOpenRasterFormatForFile,
-} from "./studio-canvas-image-io";
+} from "./canvas/studio-canvas-image-io";
+import {
+  decodeStudioRasterInterchange,
+  encodeStudioRasterInterchange,
+  StudioRasterInterchangeError,
+  type StudioRasterInterchangeFormat,
+} from "./render/studio-raster-interchange";
+import { parseStudioAbrBuffer, StudioAbrImportError } from "./studio-abr-import";
 import {
   buildStudioCbzBytes,
   importStudioCbz,
   StudioCbzError,
 } from "./studio-cbz-interchange";
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { isAnimatedGifBytes, isAnimatedGifDataUrl, isGifFile } from "./studio-gif-element";
 import {
   buildStudioOpenRasterBytes,
@@ -77,12 +84,6 @@ import {
 import { parseStudioProjectFile, serializeStudioProjectFile } from "./studio-project-file";
 import { importPsdFile } from "./studio-psd-import";
 import {
-  decodeStudioRasterInterchange,
-  encodeStudioRasterInterchange,
-  StudioRasterInterchangeError,
-  type StudioRasterInterchangeFormat,
-} from "./studio-raster-interchange";
-import {
   assertStudioReferenceGifSignature,
   assertStudioReferenceImportBatch,
   isStudioReferenceImportFile,
@@ -90,7 +91,7 @@ import {
   STUDIO_REFERENCE_IMPORT_ACCEPT,
 } from "./studio-reference-import";
 import { readStudioZipArchive, StudioZipReaderError } from "./studio-zip-reader";
-import { validateVrmGlbBytes } from "./vrm-library";
+import { validateVrmGlbBytes } from "./vrm/vrm-library";
 
 const encoder = new TextEncoder();
 
@@ -1237,7 +1238,7 @@ describe("팔레트 라이브러리 가져오기 왕복", () => {
 
 describe("가져오기 UI accept ↔ 디코더 경계", () => {
   it("캔버스 이미지 accept 사본 3곳이 canonical 상수와 동일하다", () => {
-    for (const fileName of ["StudioPage.tsx", "StudioLeftToolRail.tsx", "StudioToolBeltContent.tsx"]) {
+    for (const fileName of ["studio-legacy-editor-runtime-helpers.ts", "StudioLeftToolRail.tsx", "StudioToolBeltContent.tsx"]) {
       expect(componentSource(fileName), `${fileName}의 accept 사본이 canonical과 어긋났다`)
         .toContain(`"${STUDIO_CANVAS_IMAGE_ACCEPT}"`);
     }
@@ -1248,14 +1249,14 @@ describe("가져오기 UI accept ↔ 디코더 경계", () => {
       .map((token) => token.slice(1))
       .sort();
     const dropRegex = /const STUDIO_OPEN_RASTER_FILE_EXTENSION = \/\\\.\(\?::?([^)]+)\)\$\/iu;/u
-      .exec(componentSource("StudioPage.tsx"));
+      .exec(readStudioCuttoonEditorSource());
     expect(dropRegex).not.toBeNull();
     expect(dropRegex![1]!.split("|").sort()).toEqual(acceptExtensions);
   });
 
   it("문서 가져오기 파일 입력의 accept가 각 디코더 게이트와 일치한다", () => {
     // Inputs live on StudioPage root (data-studio-document-import-inputs), not lazy menubar.
-    const page = componentSource("StudioPage.tsx");
+    const page = readStudioCuttoonEditorSource();
     expect(page).toContain('data-studio-document-import-inputs="true"');
     expect(page).toContain('accept=".json"');
     expect(page).toContain(
@@ -1268,24 +1269,23 @@ describe("가져오기 UI accept ↔ 디코더 경계", () => {
   });
 
   it("브러시 팁·브러시 팩·VRM 입력의 accept가 해당 디코더와 일치한다", () => {
-    expect(componentSource("StudioBrushStudio.tsx")).toContain('accept=".png,image/png"');
+    expect(componentSource("./brush/StudioBrushStudio.tsx")).toContain('accept=".png,image/png"');
     // 브러시 팩 accept 는 라이브러리 패널과 그리기 메뉴가 같은 상수를 쓴다. 한쪽만
     // 확장자를 늘리면 "파서는 있는데 고를 수 없는 포맷"이 다시 생기므로 상수 자체를 검사한다.
     const accept = /export const STUDIO_BRUSH_PACK_ACCEPT =\s*"([^"]+)"/u.exec(
-      componentSource("studio-brush-pack-format.ts")
+      componentSource("./brush/studio-brush-pack-format.ts")
     );
     expect(accept).not.toBeNull();
     for (const extension of [".json", ".abr", ".myb", ".kpp"]) {
       expect(accept![1]!).toContain(extension);
     }
-    for (const consumer of ["StudioBrushLibraryPanel.tsx", "StudioPage.tsx"]) {
-      expect(componentSource(consumer), consumer).toContain("accept={STUDIO_BRUSH_PACK_ACCEPT}");
-    }
-    expect(componentSource("StudioVrmCharacterLibraryPanel.tsx")).toContain('accept=".vrm"');
+    expect(componentSource("./brush/StudioBrushLibraryPanel.tsx")).toContain("accept={STUDIO_BRUSH_PACK_ACCEPT}");
+    expect(readStudioCuttoonEditorSource()).toContain("accept={STUDIO_BRUSH_PACK_ACCEPT}");
+    expect(componentSource("./vrm/StudioVrmCharacterLibraryPanel.tsx")).toContain('accept=".vrm"');
   });
 
   it("3D 모델 패널 accept 확장자가 플래너의 주/동반 포맷 집합과 일치한다", () => {
-    const source = componentSource("StudioBg3dAssetLibraryPanel.tsx");
+    const source = componentSource("./bg3d/StudioBg3dAssetLibraryPanel.tsx");
     const match = /const MODEL_FILE_ACCEPT =\s*"([^"]+)"/u.exec(source);
     expect(match).not.toBeNull();
     const extensions = match![1]!

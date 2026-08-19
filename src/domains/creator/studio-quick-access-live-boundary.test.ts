@@ -2,8 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const studioPageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const studioPageSource = readStudioCuttoonEditorSource();
+const modalBoundariesSource = readFileSync(
+  new URL("./studio-page-modal-lazy-boundaries.ts", import.meta.url),
   "utf8",
 );
 const integrationSource = readFileSync(
@@ -20,7 +23,7 @@ describe("Studio Quick Access live boundary", () => {
     expect(studioPageSource).toContain(
       'import("./studio-quick-access-integration")',
     );
-    expect(studioPageSource).toContain(
+    expect(modalBoundariesSource).toContain(
       'import("./StudioQuickAccessSurface")',
     );
     expect(studioPageSource).not.toMatch(

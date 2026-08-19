@@ -24,8 +24,8 @@ describe("studio WebGPU frame contract boundary", () => {
 
   it("leaves engine behavior in place while removing consumer type back-edges", () => {
     const engine = source("./studio-webgpu-engine.ts");
-    const canvas = source("./StudioWebGpuCanvas.tsx");
-    const page = source("./StudioPage.tsx");
+    const canvas = source("../StudioWebGpuCanvas.tsx");
+    const page = source("../StudioPage.tsx");
 
     expect(engine).toContain('from "./studio-webgpu-frame-contract"');
     expect(engine).toMatch(
@@ -35,15 +35,15 @@ describe("studio WebGPU frame contract boundary", () => {
     expect(engine).not.toContain("export interface StudioGpuFrameReceipt");
     expect(engine).not.toContain("export interface StudioGpuPerformanceMetrics");
     expect(engine).not.toContain("export interface StudioGpuFrameReadbackRequest");
-    expect(canvas).toContain('from "./studio-webgpu-frame-contract"');
+    expect(canvas).toContain('from "./render/studio-webgpu-frame-contract"');
     expect(canvas).not.toMatch(
-      /import \{[\s\S]{0,320}type StudioGpuBackend[\s\S]{0,320}\} from "\.\/studio-webgpu-engine"/u
+      /import \{[\s\S]{0,320}type StudioGpuBackend[\s\S]{0,320}\} from "\.\/render\/studio-webgpu-engine"/u
     );
     expect(page).toMatch(
-      /import type \{[\s\S]{0,320}\bStudioGpuBackend\b[\s\S]{0,320}\} from "\.\/studio-webgpu-frame-contract"/u
+      /import type \{[\s\S]{0,320}\bStudioGpuBackend\b[\s\S]{0,320}\} from "\.\/render\/studio-webgpu-frame-contract"/u
     );
     expect(page).not.toContain(
-      'import type { StudioGpuBackend } from "./studio-webgpu-engine"'
+      'import type { StudioGpuBackend } from "./render/studio-webgpu-engine"'
     );
   });
 });

@@ -1,14 +1,15 @@
-import { STUDIO_BRUSH_MAX_SYMMETRY_VARIATIONS } from "./studio-brush-symmetry";
+import { STUDIO_BRUSH_MAX_SYMMETRY_VARIATIONS } from "../brush/studio-brush-symmetry";
+import {
+  resolveStudioInkPressure,
+  studioInkUsesResidualDabSpacing,
+} from "../brush/studio-ink-pressure-model";
 import {
   advanceStudioResidualInk,
   startStudioResidualInk,
   STUDIO_CAUSAL_INK_MAX_DABS,
   type StudioResidualInkState,
-} from "./studio-causal-ink";
-import {
-  resolveStudioInkPressure,
-  studioInkUsesResidualDabSpacing,
-} from "./studio-ink-pressure-model";
+} from "../studio-causal-ink";
+
 import {
   STUDIO_GPU_STROKE_FEED_REVISION,
   isTrustedStudioGpuStrokeFeedStroke,

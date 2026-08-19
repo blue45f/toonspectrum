@@ -2,7 +2,8 @@
 /**
  * Dedicated Web Worker for background brush stroke calculation & smoothing.
  */
-import { processFreehandPoints } from "./studio-brush";
+import { processFreehandPoints } from "../studio-brush";
+
 import {
   STUDIO_BRUSH_WORKER_PROTOCOL_VERSION,
   type StudioBrushWorkerPlanRequest,

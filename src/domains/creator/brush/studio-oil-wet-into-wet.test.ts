@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { planOilBrushDabs } from "./studio-fx-brush";
+import { planOilBrushDabs } from "../studio-fx-brush";
+
 import {
   paintStudioOilRibbonCarrier,
   paintStudioOilRibbonHit,
@@ -254,5 +255,63 @@ describe("oil wet-into-wet feel", () => {
     paintStudioOilRibbonHit(hit, carrier, { colorKey: "#000001" });
     expect(hit.beginPathCount).toBe(1);
     expect(hit.fillStroke).toBe(1);
+  });
+
+  it("skips live canvas readback when the interactive painter asks for a path-only draft", () => {
+    const width = 64;
+    const height = 24;
+    const destination = makeImageData(width, height, () => BLUE_CANVAS);
+    const before = destination.slice();
+    let getCount = 0;
+    const native = {
+      canvas: { width, height },
+      getImageData: () => {
+        getCount += 1;
+        return { data: destination, width, height };
+      },
+      putImageData: () => {
+        throw new Error("live oil must not putImageData during a path-only draft");
+      },
+      getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    };
+    const dabs = planOilBrushDabs({
+      points: [6, 12, 58, 12],
+      pressures: [0.7, 0.7],
+      baseWidth: 14,
+      seed: 3,
+    });
+    const carrier = planStudioOilRibbonCarrier(dabs);
+    const fills: string[] = [];
+    const receipt = paintStudioOilRibbonCarrier({
+      save() {},
+      restore() {},
+      beginPath() {},
+      fill() {
+        fills.push(String(this.fillStyle));
+      },
+      stroke() {},
+      moveTo() {},
+      lineTo() {},
+      fillStyle: "",
+      strokeStyle: "",
+      globalAlpha: 1,
+      globalCompositeOperation: "source-over",
+      lineCap: "butt",
+      lineJoin: "miter",
+      lineWidth: 1,
+      _context: native,
+    }, {
+      carrier,
+      stroke: "#fcd300",
+      opacity: 1,
+      points: dabs.map((dab) => ({ x: dab.x, y: dab.y })),
+      radiusPx: 8,
+      skipDestinationReadback: true,
+      includeBristleOverlay: false,
+    });
+    expect(receipt.usedLiveDestination).toBe(false);
+    expect(getCount).toBe(0);
+    expect(Array.from(destination)).toEqual(Array.from(before));
+    expect(fills[0]).toBe("#fcd300");
   });
 });

@@ -1,9 +1,9 @@
-import { isStudioDynamicBrushCausalDepositPipeline } from "./studio-brush-dynamics";
-import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
+import { isStudioDynamicBrushCausalDepositPipeline } from "./brush/studio-brush-dynamics";
 import {
   planStudioStrokePostprocess,
   type StudioStrokePostprocessPlan,
-} from "./studio-stroke-postprocess-worker-planner";
+} from "./brush/studio-stroke-postprocess-worker-planner";
+import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
 
 import type { DrawEl } from "./studio-element-model";
 

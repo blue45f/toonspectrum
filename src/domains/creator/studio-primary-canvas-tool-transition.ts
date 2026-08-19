@@ -1,4 +1,4 @@
-import { planStudioCanvasToolTransition } from "./studio-canvas-tool-state-machine";
+import { planStudioCanvasToolTransition } from "./canvas/studio-canvas-tool-state-machine";
 
 import type { DrawMode } from "./studio-editor-tool-model";
 

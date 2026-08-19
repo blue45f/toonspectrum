@@ -6,16 +6,17 @@
  *
  * Counts are derived from the live catalogues — never hardcode "229"/"231" in product copy.
  */
-import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
 import {
   listStudioBrushTrayItems,
   listStudioQuickBrushTrayItems,
   type StudioBrushMediaGroup,
   type StudioBrushTrayItem,
   type StudioQuickBrushTrayItem,
-} from "./studio-creative-ux";
+} from "../studio-creative-ux";
 
-import type { StudioToolOperation } from "./studio-brush";
+import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
+
+import type { StudioToolOperation } from "../studio-brush";
 
 export interface StudioBrushCatalogItem extends StudioBrushTrayItem {
   source: "core" | "pro";

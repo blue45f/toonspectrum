@@ -137,12 +137,12 @@ const PAGE_PROPS = ["key", "el", ...INTERACTION_PROPS] as const;
 
 describe("Studio Konva lettering node boundary", () => {
   it("moves text, text-path, and sticker rendering out of StudioPage", () => {
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
-    const nodes = moduleShape("./StudioKonvaTextNodes.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const nodes = moduleShape("../StudioKonvaTextNodes.tsx");
 
     expect(
-      viewport.valueImports.filter((specifier) => specifier === "./StudioKonvaTextNodes"),
-    ).toEqual(["./StudioKonvaTextNodes"]);
+      viewport.valueImports.filter((specifier) => specifier === "../StudioKonvaTextNodes"),
+    ).toEqual(["../StudioKonvaTextNodes"]);
     expect(viewport.source.match(/<StudioKonvaTextNode\b/gu)).toHaveLength(1);
     expect(viewport.source.match(/<StudioKonvaStickerNode\b/gu)).toHaveLength(1);
     expect(viewport.source).not.toContain("<KTextPath");
@@ -159,12 +159,12 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("moves the complete bubble renderer behind one clipped Page call site", () => {
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
-    const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const bubbleNode = moduleShape("../StudioKonvaBubbleNode.tsx");
 
     expect(
-      viewport.valueImports.filter((specifier) => specifier === "./StudioKonvaBubbleNode"),
-    ).toEqual(["./StudioKonvaBubbleNode"]);
+      viewport.valueImports.filter((specifier) => specifier === "../StudioKonvaBubbleNode"),
+    ).toEqual(["../StudioKonvaBubbleNode"]);
     expect(viewport.source.match(/<StudioKonvaBubbleNode\b/gu)).toHaveLength(1);
     expect(viewport.source).not.toContain("const avgSize = (el.width + el.height) / 2;");
     expect(viewport.source).not.toContain("const tailHandle =");
@@ -177,8 +177,8 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("locks the shared interaction contract, Extract element types, and both Page call sites", () => {
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
-    const nodes = moduleShape("./StudioKonvaTextNodes.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const nodes = moduleShape("../StudioKonvaTextNodes.tsx");
 
     expect(propertyNames(findInterface(nodes, "StudioKonvaTextInteractionProps").members)).toEqual(
       INTERACTION_PROPS,
@@ -196,7 +196,7 @@ describe("Studio Konva lettering node boundary", () => {
       expect(attributes.get("innerRef")).toBe("{setRef}");
       expect(attributes.get("onSelect")).toBe("{onSelect}");
       expect(attributes.get("onEdit")).toBe("{startEditText}");
-      expect(attributes.get("onPatch")).toBe("{patchEl}");
+      expect(attributes.get("onPatch")).toBe("{patchElementAfterDragRestore}");
       expect(attributes.get("dragBoundFunc")).toBe("{snapBoundFunc}");
       expect(attributes.get("onInteractionBegin")).toContain("nodeInteractionBegin(el.id)");
       expect(attributes.get("onInteractionEnd")).toBe("{endLiveResourceEdit}");
@@ -205,18 +205,17 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("keeps the module one-way, statically light, and independent from SFX authoring catalogs", () => {
-    const nodes = moduleShape("./StudioKonvaTextNodes.tsx");
+    const nodes = moduleShape("../StudioKonvaTextNodes.tsx");
 
-    expect(nodes.dynamicImports).toEqual([]);
     expect(nodes.valueImports).toEqual([
       "react-konva/lib/ReactKonvaCore",
-      "./studio-bubble-text-runtime",
+      "./lettering/studio-bubble-text-runtime",
       // Shared horizontal + vertical-rl ruby overlay planners.
-      "./studio-dialogue-ruby-layout",
+      "./lettering/studio-dialogue-ruby-layout",
+      "./lettering/studio-text-path",
       "./studio-gradient-engine",
       "./studio-node-props",
       "./studio-skew",
-      "./studio-text-path",
     ]);
     expect(nodes.allImports).toContain("./studio-element-model");
     expect(nodes.allImports).toContain("konva");
@@ -230,8 +229,8 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("locks the minimal bubble props and resolves the live draft at the Page boundary", () => {
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
-    const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const bubbleNode = moduleShape("../StudioKonvaBubbleNode.tsx");
     const expectedProps = [
       "el",
       "theme",
@@ -268,32 +267,32 @@ describe("Studio Konva lettering node boundary", () => {
     expect(attributes.get("dragBoundFunc")).toBe("{snapBoundFunc}");
     expect(attributes.get("onSelect")).toBe("{onSelect}");
     expect(attributes.get("onEdit")).toContain("startEditText(el.id)");
-    expect(attributes.get("onChange")).toContain("patchEl(el.id, patch)");
+    expect(attributes.get("onChange")).toContain("patchElementAfterDragRestore(el.id, patch)");
     expect(attributes.get("onInteractionBegin")).toContain("nodeInteractionBegin(el.id)");
     expect(attributes.get("onInteractionEnd")).toBe("{endLiveResourceEdit}");
   });
 
   it("keeps bubble rendering one-way and shares the collaboration interaction guards", () => {
-    const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
+    const bubbleNode = moduleShape("../StudioKonvaBubbleNode.tsx");
 
     expect(bubbleNode.dynamicImports).toEqual([]);
     expect(bubbleNode.valueImports).toEqual([
       "react-konva/lib/ReactKonvaCore",
-      "./studio-bubble-custom-shape",
+      "./brush/studio-stroke-shapes",
+      "./lettering/studio-bubble-custom-shape",
       // 의도적 변경(2026-07-24): 말풍선 손그림 외곽선(rough/wobbly) 스타일 엔진 도입.
-      "./studio-bubble-outline-style",
-      "./studio-bubble-path",
-      "./studio-bubble-text-fit",
-      "./studio-bubble-text-runtime",
+      "./lettering/studio-bubble-outline-style",
+      "./lettering/studio-bubble-path",
+      "./lettering/studio-bubble-text-fit",
+      "./lettering/studio-bubble-text-runtime",
       // Shared horizontal + vertical-rl ruby overlay planners.
-      "./studio-dialogue-ruby-layout",
+      "./lettering/studio-dialogue-ruby-layout",
       "./studio-gradient-engine",
       "./studio-node-props",
-      "./studio-stroke-shapes",
     ]);
     expect(bubbleNode.allImports).toContain("./studio-element-model");
     expect(bubbleNode.allImports).toContain("konva");
-    expect(bubbleNode.allImports).not.toContain("./StudioPage");
+    expect(bubbleNode.allImports).not.toContain("../StudioPage");
     expect(bubbleNode.allImports).toContain("./studio-node-props");
     expect(bubbleNode.allImports).not.toContain("react-router-dom");
     expect(bubbleNode.allImports.some((specifier) => /(?:crdt|collaboration|gpu)/u.test(specifier))).toBe(false);
@@ -313,8 +312,8 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("keeps the transform commit and unconditional live-lock release in the parent", () => {
-    const page = moduleShape("./StudioPage.tsx");
-    const nodes = moduleShape("./StudioKonvaTextNodes.tsx");
+    const page = moduleShape("../StudioPage.tsx");
+    const nodes = moduleShape("../StudioKonvaTextNodes.tsx");
 
     expect(page.source).toContain("function commitTextTransformEnd(");
     expect(page.source).toMatch(
@@ -327,23 +326,23 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("paints horizontal and vertical-rl ruby overlays in both product lettering mounts", () => {
-    const nodes = moduleShape("./StudioKonvaTextNodes.tsx");
-    const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
-    const layout = moduleShape("./studio-dialogue-ruby-layout.ts");
+    const nodes = moduleShape("../StudioKonvaTextNodes.tsx");
+    const bubbleNode = moduleShape("../StudioKonvaBubbleNode.tsx");
+    const layout = moduleShape("../lettering/studio-dialogue-ruby-layout.ts");
 
     // Layout planner is a pure export used by both paint sites (not reimplemented in nodes).
     expect(layout.exportedDeclarations.has("planDialogueRubyOverlayPlacements")).toBe(true);
     expect(layout.exportedDeclarations.has("planDialogueVerticalRubyOverlayPlacements")).toBe(true);
     expect(layout.exportedDeclarations.has("planDialogueRubyRuns")).toBe(true);
 
-    expect(nodes.valueImports).toContain("./studio-dialogue-ruby-layout");
+    expect(nodes.valueImports).toContain("./lettering/studio-dialogue-ruby-layout");
     expect(nodes.source).toContain("readDialogueRubySpans(");
     expect(nodes.source).toContain("planDialogueRubyOverlayPlacements(");
     expect(nodes.source).toContain("planDialogueVerticalRubyOverlayPlacements(");
     expect(nodes.source).toContain('name="studio-vertical-ruby"');
     expect(nodes.source).toMatch(/rubyOverlays\.length\s*>\s*0/u);
 
-    expect(bubbleNode.valueImports).toContain("./studio-dialogue-ruby-layout");
+    expect(bubbleNode.valueImports).toContain("./lettering/studio-dialogue-ruby-layout");
     expect(bubbleNode.source).toContain("readDialogueRubySpans(");
     expect(bubbleNode.source).toContain("planDialogueRubyOverlayPlacements(");
     expect(bubbleNode.source).toContain("planDialogueVerticalRubyOverlayPlacements(");

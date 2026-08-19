@@ -3,7 +3,8 @@ import { createRequire } from "node:module";
 
 import { describe, expect, it } from "vitest";
 
-import { planOilBrushDabs } from "./studio-fx-brush";
+import { planOilBrushDabs } from "../studio-fx-brush";
+
 import {
   planStudioOilRibbonCarrier,
   STUDIO_OIL_BRISTLE_WIDTH_GAUGES,

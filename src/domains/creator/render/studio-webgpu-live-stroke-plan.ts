@@ -3,7 +3,8 @@ import {
   studioBrushSymmetryTransforms,
   type StudioBrushSymmetrySpec,
   type StudioBrushSymmetryTransform,
-} from "./studio-brush-symmetry";
+} from "../brush/studio-brush-symmetry";
+
 import { isStudioGpuColorSupported } from "./studio-webgpu-color";
 import {
   buildStudioGpuLiveStroke,
@@ -14,7 +15,7 @@ import {
   type StudioGpuStroke,
 } from "./studio-webgpu-stroke";
 
-import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
+import type { StudioStrokePaintModel } from "../brush/studio-stroke-paint-model";
 
 /** Bounded imported symmetry fan; malformed presets cannot exhaust the live GPU dab budget. */
 export const STUDIO_GPU_MAX_LIVE_SYMMETRY_DIRECTIONS =

@@ -21,7 +21,7 @@
  * Konva/DOM 의존 없음. 전부 순수·결정적.
  */
 
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 
 // ---------------------------------------------------------------------------
 // 타입

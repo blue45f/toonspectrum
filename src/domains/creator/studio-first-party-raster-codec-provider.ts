@@ -9,6 +9,13 @@
  */
 
 import {
+  decodeStudioRasterInterchange,
+  encodeStudioRasterInterchange,
+  STUDIO_RASTER_INTERCHANGE_LIMITS,
+  type StudioRasterInterchangeFormat,
+  type StudioRgbaBitmap,
+} from "./render/studio-raster-interchange";
+import {
   STUDIO_CODEC_PROVIDER_CONTRACT_VERSION,
   type StudioCodecProvider,
   type StudioCodecProviderExecution,
@@ -16,13 +23,6 @@ import {
   type StudioCodecProviderManifest,
   type StudioCodecProviderRawResult,
 } from "./studio-codec-provider-contract";
-import {
-  decodeStudioRasterInterchange,
-  encodeStudioRasterInterchange,
-  STUDIO_RASTER_INTERCHANGE_LIMITS,
-  type StudioRasterInterchangeFormat,
-  type StudioRgbaBitmap,
-} from "./studio-raster-interchange";
 import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_FIRST_PARTY_RASTER_CODEC_PROFILE =

@@ -11,8 +11,10 @@
 import {
   createPixelEditCanvas,
   loadPixelEditImage,
-} from "./studio-canvas-image-io";
-import { hasActiveImageFilters } from "./studio-konva-filter-fields";
+} from "../canvas/studio-canvas-image-io";
+import { hasActiveImageFilters } from "../render/studio-konva-filter-fields";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   inspectStudioLayerLiftAvailability,
   type StudioLayerLiftAvailabilityFailure,
@@ -25,9 +27,8 @@ import {
   type StudioSceneLayerLiftSourceDescriptor,
 } from "./studio-layer-lift-contract";
 import { fingerprintStudioLayerLiftSource } from "./studio-layer-lift-plan";
-import { sha256HexPortable } from "./studio-sha256";
 
-import type { El, ImageEl } from "./studio-element-model";
+import type { El, ImageEl } from "../studio-element-model";
 
 export const STUDIO_LAYER_LIFT_SOURCE_SNAPSHOT_ERROR_CODES = Object.freeze([
   "aborted",
@@ -245,8 +246,7 @@ async function defaultApplyFilters(
   source: Readonly<StudioLayerLiftImage>,
   signal: AbortSignal | undefined,
 ): Promise<StudioLayerLiftFilterResult> {
-  const { runStudioImageFilterWorker } = await import(
-    "./studio-image-filter-worker-client"
+  const { runStudioImageFilterWorker } = await import("../studio-image-filter-worker-client"
   );
   const result = await runStudioImageFilterWorker({
     imageData: {

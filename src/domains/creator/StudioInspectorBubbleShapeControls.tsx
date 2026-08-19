@@ -1,13 +1,13 @@
 import {
   computeCustomShapePointsForBubble,
   hasCustomBubbleShape,
-} from "./studio-bubble-custom-shape";
-import { normalizeExtraTails } from "./studio-bubble-path";
+} from "./lettering/studio-bubble-custom-shape";
+import { normalizeExtraTails } from "./lettering/studio-bubble-path";
 import {
   applyBubbleQuickTransform,
   bubbleQuickTransformUnavailableReason,
-} from "./studio-bubble-quick-transform";
-import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
+} from "./lettering/studio-bubble-quick-transform";
+import { StudioBubbleShapePanel } from "./lettering/StudioBubbleShapePanel";
 
 import type { BubbleEl } from "./studio-element-model";
 

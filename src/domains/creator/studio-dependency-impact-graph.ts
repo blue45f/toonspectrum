@@ -51,7 +51,7 @@ export type StudioDependencyNodeKind =
 export const STUDIO_DEPENDENCY_RELATIONS = [
   "uses",
   "contains",
-  "derives-from",
+  "derives-from ",
   "styles-with",
   "renders-with",
   "localizes",

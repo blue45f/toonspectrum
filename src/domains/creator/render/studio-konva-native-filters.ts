@@ -9,7 +9,7 @@
  * 순수 { attrs } 객체든 동일하게 동작하고, konva 패키지를 전혀 import하지 않아 Worker
  * 모듈 그래프에 안전하게 들어간다.
  */
-import type { StudioImageDataLike } from "./studio-filters";
+import type { StudioImageDataLike } from "../studio-filters";
 
 type NativeFilterThis = { attrs?: Record<string, unknown> };
 

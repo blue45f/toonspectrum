@@ -17,13 +17,13 @@ import {
   type StudioBrushBackendId,
   type StudioBrushBackendQualityFamily,
   type StudioBrushBackendRouteProfile,
-} from "./studio-brush-backend-quality-policy";
+} from "./brush/studio-brush-backend-quality-policy";
 import {
   studioBrushPackDescriptorById,
   type StudioBrushPackRuntimeBrushId,
-} from "./studio-brush-pack-index";
+} from "./brush/studio-brush-pack-index";
 
-import type { StudioBrushPackCatalogId } from "./studio-brush-pack-id";
+import type { StudioBrushPackCatalogId } from "./brush/studio-brush-pack-id";
 
 export const STUDIO_PROFESSIONAL_SHELF_ROUTE_CONTRACT_VERSION = 1 as const;
 

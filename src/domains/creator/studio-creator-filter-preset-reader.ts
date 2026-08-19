@@ -4,7 +4,7 @@ import {
   normalizeStudioFilterPackValues,
   type StudioFilterPackKind,
   type StudioFilterPackValues,
-} from "./studio-filter-pack";
+} from "./filter/studio-filter-pack";
 
 export const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY =
   "toonspectrum.studio-creator-filter-presets.v1" as const;

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateStudioCrc32 } from "./studio-crc32";
+import { calculateStudioCrc32 } from "../studio-crc32";
+import {
+  checkStudioWasm64Capability,
+  createStudioWasmMemoryRuntime,
+  STUDIO_WASM_PAGE_BYTES,
+} from "../studio-wasm64-memory-governor";
+
 import {
   buildStudioWasmCrc32Module,
   createStudioPersistentCrc32Executor,
@@ -8,11 +14,6 @@ import {
   STUDIO_WASM_CRC32_INPUT_OFFSET,
   type StudioWasmCrc32KernelCreationResult,
 } from "./studio-wasm-crc32-kernel";
-import {
-  checkStudioWasm64Capability,
-  createStudioWasmMemoryRuntime,
-  STUDIO_WASM_PAGE_BYTES,
-} from "./studio-wasm64-memory-governor";
 
 function deterministicBytes(byteLength: number, seed: number): Uint8Array {
   const bytes = new Uint8Array(byteLength);

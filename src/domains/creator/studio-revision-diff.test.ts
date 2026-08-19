@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createStudioLinked3dRenderPageFixture } from
-  "./studio-linked-3d-render-test-fixture";
+import { createStudioLinked3dRenderPageFixture } from "./studio-linked-3d-render-test-fixture";
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
 import {
   diffStudioProjectRevisions,

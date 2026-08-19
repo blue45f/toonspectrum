@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type {
   StudioRasterSourceLease,
   StudioRasterSourceLeaseOptions,
-} from "./studio-raster-source-lease";
+} from "./render/studio-raster-source-lease";
 
 const LINKED_CAS_PREFIX = "studio-opfs-cas:sha256:";
 
@@ -22,7 +22,7 @@ async function acquireDefaultStudioRasterSourceLease(
   source: string,
   options: StudioRasterSourceLeaseOptions,
 ): Promise<StudioRasterSourceLease> {
-  const { acquireStudioRasterSourceLease } = await import("./studio-raster-source-lease");
+  const { acquireStudioRasterSourceLease } = await import("./render/studio-raster-source-lease");
   return await acquireStudioRasterSourceLease(source, options);
 }
 

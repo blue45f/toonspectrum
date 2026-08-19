@@ -10,7 +10,7 @@ import {
   snapshotStudioHokusaiWorkerResultMessage,
 } from "./studio-hokusai-natural-media-worker-protocol";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 function request() {
   const planned = planStudioHokusaiNaturalMediaRender(

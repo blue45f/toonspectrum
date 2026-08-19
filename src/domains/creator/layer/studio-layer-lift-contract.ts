@@ -4,7 +4,7 @@
  * 이 모듈은 정규화된 RGBA 입력과 로컬 provider 결과의 신뢰 경계만 정의한다.
  * DOM, React, 모델 실행, Worker 수명주기, 네트워크 정책은 의도적으로 포함하지 않는다.
  */
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_SCENE_LAYER_LIFT_CONTRACT_KIND =
   "toonspectrum.scene-layer-lift" as const;

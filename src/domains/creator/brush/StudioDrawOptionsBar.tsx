@@ -35,8 +35,8 @@ import {
   nearestStudioBrushOpacityChip,
   nearestStudioBrushSizeChip,
   resolveStudioBrushPresetOperation,
-} from "./studio-brush";
-import { studioBrushTrayItem } from "./studio-creative-ux";
+} from "../studio-brush";
+import { studioBrushTrayItem } from "../studio-creative-ux";
 import {
   StudioOpacityGlyph,
   StudioPostCorrectGlyph,
@@ -46,25 +46,26 @@ import {
   StudioStabilizerGlyph,
   StudioStabilizerModeGlyph,
   StudioSymmetryGlyph,
-} from "./studio-creative-visuals";
-import { STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
-import { studioToolHintFromLabel } from "./studio-tool-hints";
+} from "../studio-creative-visuals";
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import { studioToolHintFromLabel } from "../studio-tool-hints";
 import {
   STUDIO_ERASE_TO_INTERSECTION_LABEL,
   STUDIO_ERASE_TO_INTERSECTION_TIP,
-} from "./studio-vector-erase-to-intersection-apply";
-import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
-import { StudioBrushTray } from "./StudioBrushTray";
-import { StudioDualColorWell } from "./StudioDualColorWell";
+} from "../studio-vector-erase-to-intersection-apply";
+import { StudioDualColorWell } from "../StudioDualColorWell";
 import {
   StudioLivingInkControls,
   type StudioLivingInkControlsProps,
-} from "./StudioLivingInkControls";
-import { StudioToolHintTarget } from "./StudioToolHint";
+} from "../StudioLivingInkControls";
+import { StudioToolHintTarget } from "../StudioToolHint";
+
+import { STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
+import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
+import { StudioBrushTray } from "./StudioBrushTray";
 
 import type { StudioBrushSlot } from "./studio-brush-slots";
-import type { StudioBrushTrayItem } from "./studio-creative-ux";
+import type { StudioBrushTrayItem } from "../studio-creative-ux";
 
 import { cn } from "@/lib/utils";
 

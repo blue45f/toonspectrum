@@ -4,19 +4,19 @@
  */
 
 import {
+  hashStudioHybridDccObjectTransform,
+  normalizeStudioHybridDccObjectTransform,
+  type StudioHybridDccObjectTransform,
+} from "../hybrid-dcc/studio-hybrid-dcc-object-transform";
+import {
   appendStudioArtistCorrection,
   createStudioArtistCorrectionStore,
   reprojectStudioArtistCorrections,
   type StudioArtistCorrectionStore,
   type StudioArtistStrokeDelta,
   type StudioToonPassKind,
-} from "./studio-artist-correction-delta";
-import {
-  hashStudioHybridDccObjectTransform,
-  normalizeStudioHybridDccObjectTransform,
-  type StudioHybridDccObjectTransform,
-} from "./studio-hybrid-dcc-object-transform";
-import { sha256HexPortable } from "./studio-sha256";
+} from "../studio-artist-correction-delta";
+import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_LIVE_2D3D_BRIDGE_REVISION = 2 as const;
 

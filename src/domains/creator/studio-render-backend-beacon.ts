@@ -13,7 +13,7 @@
  * 표시해야 하고, "canvas2d" 로 추정해서는 안 된다.
  */
 
-import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
+import type { StudioGpuBackend } from "./render/studio-webgpu-frame-contract";
 
 let current: StudioGpuBackend | null = null;
 const listeners = new Set<() => void>();

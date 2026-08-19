@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { parseSfntEmbeddingPolicy, type StudioPdfFontResource } from "./studio-canvaskit-pdf-font";
-import { buildVectorPdf } from "./studio-canvaskit-pdf-vector";
+import { parseSfntEmbeddingPolicy, type StudioPdfFontResource } from "../render/studio-canvaskit-pdf-font";
+import { buildVectorPdf } from "../render/studio-canvaskit-pdf-vector";
+
 import {
   buildDialogueRubyExportXmp,
   createDialogueRubyMetadataRecord,

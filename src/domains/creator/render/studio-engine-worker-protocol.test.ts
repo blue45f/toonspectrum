@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createStudioSharedPointerRingBuffer,
+  STUDIO_POINTER_SAMPLE_ROLE_AUTHORITATIVE,
+  STUDIO_POINTER_SAMPLE_ROLE_PREDICTED,
+  STUDIO_SHARED_POINTER_RING_HEADER_BYTES,
+  STUDIO_SHARED_POINTER_RING_SAMPLE_BYTES,
+  STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S,
+} from "../studio-shared-pointer-ring-buffer";
+
+import {
   describeStudioEngineCommandTransport,
   missingStudioEngineFutureCapabilities,
   parseStudioEngineCommand,
@@ -18,14 +27,6 @@ import {
   type StudioEngineCommandMessage,
   type StudioEngineWorkerValidationState,
 } from "./studio-engine-worker-protocol";
-import {
-  createStudioSharedPointerRingBuffer,
-  STUDIO_POINTER_SAMPLE_ROLE_AUTHORITATIVE,
-  STUDIO_POINTER_SAMPLE_ROLE_PREDICTED,
-  STUDIO_SHARED_POINTER_RING_HEADER_BYTES,
-  STUDIO_SHARED_POINTER_RING_SAMPLE_BYTES,
-  STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S,
-} from "./studio-shared-pointer-ring-buffer";
 
 const ULTRA_CAPABILITIES: StudioEngineCapabilitySnapshot = {
   offscreenCanvas: true,

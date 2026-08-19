@@ -2,14 +2,17 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const pageSource = readStudioCuttoonEditorSource();
+const modalBoundariesSource = readFileSync(
+  new URL("./studio-page-modal-lazy-boundaries.ts", import.meta.url),
   "utf8"
 );
 
 describe("scene snapshot Studio integration boundary", () => {
   it("keeps the library lazy and applies the full page through document history", () => {
-    expect(pageSource).toContain('import("./StudioSceneSnapshotDialog")');
+    expect(modalBoundariesSource).toContain('import("./StudioSceneSnapshotDialog")');
     expect(pageSource).toContain("const [sceneSnapshotOpen, setSceneSnapshotOpen]");
     expect(pageSource).toMatch(
       /const restoredPage: PageState = \{\s+\.\.\.snapshot\.page,\s+id: activePage\.id,/u

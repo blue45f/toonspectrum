@@ -1,11 +1,12 @@
 import { RemoteKillSwitch } from "@toonspectrum/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
-import { INK_DEFAULT_PARAMS } from "../../../packages/studio-brush-platform/src/ink-modeler";
+import { INK_DEFAULT_PARAMS } from "../../../../packages/studio-brush-platform/src/ink-modeler";
 import {
   STABILIZER_BACKEND_IDS,
   selectStabilizerBackend,
-} from "../../../packages/studio-brush-platform/src/stabilizer-provider";
+} from "../../../../packages/studio-brush-platform/src/stabilizer-provider";
+import { studioStrokeRouteBrushFamilyKey } from "../brush/studio-stroke-route-tournament";
 
 import {
   STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY,
@@ -26,7 +27,6 @@ import {
   studioLiveInkStabilizerRateBand,
   type StudioLiveInkStabilizerPlanInput,
 } from "./studio-live-ink-stabilizer-plan";
-import { studioStrokeRouteBrushFamilyKey } from "./studio-stroke-route-tournament";
 
 import type { ModeledSampleIR, StabilizerGraphIR } from "@toonspectrum/studio-project-model";
 

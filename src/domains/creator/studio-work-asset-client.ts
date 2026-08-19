@@ -1,8 +1,8 @@
-import { readBoundedStudioAssetResponse } from "./studio-bounded-asset-response";
 import {
   verifyStudioLayerLiftArtifactPairReceipt,
   type StudioLayerLiftTrustedArtifactPair,
-} from "./studio-layer-lift-artifact";
+} from "./layer/studio-layer-lift-artifact";
+import { readBoundedStudioAssetResponse } from "./studio-bounded-asset-response";
 
 import type {
   StudioWorkAssetDescriptor,

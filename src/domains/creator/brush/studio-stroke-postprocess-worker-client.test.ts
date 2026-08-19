@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { smoothStrokePoints } from "./studio-brush";
+import { smoothStrokePoints } from "../studio-brush";
+
 import {
   STUDIO_STROKE_POSTPROCESS_WORKER_MAX_TIMEOUT_MS,
   StudioStrokePostprocessWorkerClient,

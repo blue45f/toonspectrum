@@ -33,7 +33,7 @@ describe("studio WebGPU dab-plan ownership boundary", () => {
 
   it("keeps CPU planning and raster capture outside concrete renderer runtimes", () => {
     const planner = source("./studio-webgpu-dab-planner.ts");
-    const capture = source("./studio-crdt-raster-stroke-capture.ts");
+    const capture = source("../live/studio-crdt-raster-stroke-capture.ts");
     const engine = source("./studio-webgpu-engine.ts");
     const captureDependencies = [...capture.matchAll(/from "([^"]+)"/gu)]
       .map((match) => match[1]);
@@ -49,9 +49,9 @@ describe("studio WebGPU dab-plan ownership boundary", () => {
       /\b(?:HTMLCanvasElement|CanvasRenderingContext2D|OffscreenCanvas|GPUDevice|GPUBuffer|GPUTexture|GPUCanvasContext|React|useEffect|useState)\b/u
     );
     expect(captureDependencies).toEqual([
-      "./studio-webgpu-dab-planner",
-      "./studio-webgpu-dab-plan-contract",
-      "./studio-webgpu-stroke",
+      "../render/studio-webgpu-dab-planner",
+      "../render/studio-webgpu-dab-plan-contract",
+      "../render/studio-webgpu-stroke",
     ]);
     expect(capture).not.toContain("studio-webgpu-engine");
     expect(engine).toContain('from "./studio-webgpu-dab-planner"');

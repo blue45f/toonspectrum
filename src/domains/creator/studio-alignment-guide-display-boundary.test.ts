@@ -1,12 +1,11 @@
-import { readFileSync } from "node:fs";
-
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
-const source = readFileSync(pageUrl, "utf8");
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const source = readStudioCuttoonEditorSource();
 const file = ts.createSourceFile(
-  pageUrl.pathname,
+  "StudioCuttoonEditor.tsx",
   source,
   ts.ScriptTarget.Latest,
   true,

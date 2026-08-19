@@ -4,7 +4,7 @@ import {
   captureStudioBg3dShot,
   createDefaultStudioBg3dSceneDocument,
   type StudioBg3dSceneDocument,
-} from "./studio-bg3d-scene-document";
+} from "./bg3d/studio-bg3d-scene-document";
 import {
   STUDIO_LINKED_3D_RENDER_DOCUMENT_KIND,
   STUDIO_LINKED_3D_RENDER_DOCUMENT_VERSION,
@@ -22,13 +22,11 @@ import {
   type StudioLinked3dRenderDocument,
   type StudioLinked3dRenderElementLike,
 } from "./studio-linked-3d-render-document";
-import { createStudioLinked3dPassRevisionFixture } from
-  "./studio-linked-3d-render-test-fixture";
+import { createStudioLinked3dPassRevisionFixture } from "./studio-linked-3d-render-test-fixture";
 import { createStudioShared3dStageDocument } from "./studio-shared-3d-stage-document";
 
-import type { StudioBg3dLtLayerRole } from "./studio-bg3d-lt-layer-plan";
-import type { StudioLinked3dPassRevisionDescriptor } from
-  "./studio-linked-3d-pass-transaction";
+import type { StudioBg3dLtLayerRole } from "./bg3d/studio-bg3d-lt-layer-plan";
+import type { StudioLinked3dPassRevisionDescriptor } from "./studio-linked-3d-pass-transaction";
 
 const ROLES = ["tone", "texture-line", "main-line"] as const satisfies readonly StudioBg3dLtLayerRole[];
 

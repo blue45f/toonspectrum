@@ -5,8 +5,8 @@ import { useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildAuthoredSutFixture } from "../../../tests/corpus/formats/csp-sut-fixtures";
-import { buildKritaBundleFixture } from "../../../tests/corpus/formats/krita-bundle-fixtures";
+import { buildAuthoredSutFixture } from "../../../../tests/corpus/formats/csp-sut-fixtures";
+import { buildKritaBundleFixture } from "../../../../tests/corpus/formats/krita-bundle-fixtures";
 
 import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
 import {

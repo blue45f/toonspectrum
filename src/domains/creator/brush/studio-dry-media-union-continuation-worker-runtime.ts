@@ -1,4 +1,5 @@
-import { snapshotMemory64CrossRealmReservationToken } from "./kernel/Memory64CrossRealmProtocol";
+import { snapshotMemory64CrossRealmReservationToken } from "../kernel/Memory64CrossRealmProtocol";
+
 import {
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,

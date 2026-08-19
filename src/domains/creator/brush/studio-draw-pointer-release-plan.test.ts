@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { smoothStrokePoints } from "./studio-brush";
-import { studioDrawElementToCrdtStroke } from "./studio-crdt-draw-bridge";
+import { studioDrawElementToCrdtStroke } from "../live/studio-crdt-draw-bridge";
+import { smoothStrokePoints } from "../studio-brush";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "../studio-pixel-pencil";
+
 import {
   planStudioDrawPointerRelease,
   type StudioDrawPointerReleasePlanInput,
 } from "./studio-draw-pointer-release-plan";
-import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
-import type { DrawEl } from "./studio-element-model";
+
+import type { DrawEl } from "../studio-element-model";
 
 import { captureStudioInkInputContractV2 } from "@/lib/studio-ink-input-contract";
 
@@ -92,11 +94,6 @@ describe("planStudioDrawPointerRelease", () => {
       commit: {},
     },
     {
-      label: "translucent ink",
-      stroke: stroke({ opacity: 0.55 }),
-      commit: {},
-    },
-    {
       label: "master edit mode",
       stroke: stroke(),
       commit: { masterEditMode: true },
@@ -108,6 +105,19 @@ describe("planStudioDrawPointerRelease", () => {
     },
   ])("forces $label through the immediate commit path", ({ stroke: completed, commit }) => {
     expect(plan({ stroke: completed, commit }).commitMode).toBe("immediate");
+  });
+
+  it("defers a long translucent stroke so pointerup does not re-render the editor", () => {
+    expect(plan({
+      stroke: stroke({ opacity: 0.55 }),
+    }).commitMode).toBe("deferred");
+  });
+
+  it("defers a direct eraser while the live draft preview remains visible", () => {
+    expect(plan({
+      stroke: stroke({ mode: "eraser" }),
+      commit: { directLiveDraft: true, directInkSurfaceAvailable: false },
+    }).commitMode).toBe("deferred");
   });
 
   it("allows direct ink to defer only while its Canvas or GPU surface remains available", () => {

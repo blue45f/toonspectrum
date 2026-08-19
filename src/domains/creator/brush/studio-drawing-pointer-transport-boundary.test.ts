@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 interface ModuleFacts {
   imports: string[];
   source: string;
@@ -10,10 +12,13 @@ interface ModuleFacts {
 
 function moduleFacts(fileName: string): ModuleFacts {
   const fileUrl = new URL(fileName, import.meta.url);
-  const source = readFileSync(fileUrl, "utf8");
+  const rawSource = readFileSync(fileUrl, "utf8");
+  const source = fileName.endsWith("StudioPage.tsx")
+    ? readStudioCuttoonEditorSource()
+    : rawSource;
   const file = ts.createSourceFile(
     fileUrl.pathname,
-    source,
+    rawSource,
     ts.ScriptTarget.Latest,
     true,
     ts.ScriptKind.TS
@@ -31,7 +36,7 @@ describe("studio drawing pointer transport ownership boundary", () => {
   it("keeps the imperative transport React-, Konva-, CRDT-, and document-model-free", () => {
     const transport = moduleFacts("./studio-drawing-pointer-transport.ts");
 
-    expect(transport.imports).toEqual(["./studio-pointer-input"]);
+    expect(transport.imports).toEqual(["../canvas/studio-pointer-input"]);
     expect(transport.source).not.toMatch(/from\s+["'](?:react|konva|react-konva)["']/u);
     for (const domainOwner of [
       "finishDrawingPointer",
@@ -48,9 +53,9 @@ describe("studio drawing pointer transport ownership boundary", () => {
 
   it("moves drawing session, capture, safety listeners, and native-end dedupe out of StudioPage", () => {
     const transport = moduleFacts("./studio-drawing-pointer-transport.ts").source;
-    const page = moduleFacts("./StudioPage.tsx").source;
+    const page = moduleFacts("../StudioPage.tsx").source;
 
-    expect(page).toContain('from "./studio-drawing-pointer-transport"');
+    expect(page).toContain('from "./brush/studio-drawing-pointer-transport"');
     for (const formerPageOwner of [
       "drawingPointerSessionRef",
       "drawingPointerCaptureTargetRef",
@@ -82,7 +87,7 @@ describe("studio drawing pointer transport ownership boundary", () => {
   });
 
   it("leaves Stage facades and the full finish/CRDT/draft/pending/lease coordinator in the Page", () => {
-    const page = moduleFacts("./StudioPage.tsx").source;
+    const page = moduleFacts("../StudioPage.tsx").source;
 
     for (const pageOwner of [
       "function onStageDown",
@@ -111,7 +116,7 @@ describe("studio drawing pointer transport ownership boundary", () => {
   });
 
   it("restores the authoritative fixed-rate clock after previewing future pen samples", () => {
-    const page = moduleFacts("./StudioPage.tsx").source;
+    const page = moduleFacts("../StudioPage.tsx").source;
     const predictionStart = page.indexOf("const authoritativePerspectiveRay =");
     const predictionEnd = page.indexOf("drawingVelocityRef.current = authoritativeVelocity", predictionStart);
     const predictionBlock = page.slice(predictionStart, predictionEnd);

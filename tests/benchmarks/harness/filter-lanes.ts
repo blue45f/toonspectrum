@@ -43,16 +43,16 @@ import { Worker } from "node:worker_threads";
 import {
   planStudioGpuFilterChain,
   isStudioGpuFilterChainEligible,
-} from "../../../src/domains/creator/studio-gpu-filter-apply";
-import { STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION } from "../../../src/domains/creator/studio-image-filter-worker-protocol";
+} from "../../../src/domains/creator/render/studio-gpu-filter-apply";
 import {
   applyImageFilters,
   buildImageFilters,
   registerStudioKonvaFilters,
   type KonvaLike,
-} from "../../../src/domains/creator/studio-konva-filters";
+} from "../../../src/domains/creator/render/studio-konva-filters";
+import { STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION } from "../../../src/domains/creator/studio-image-filter-worker-protocol";
 
-import type { ImageFilterFields } from "../../../src/domains/creator/studio-konva-filter-fields";
+import type { ImageFilterFields } from "../../../src/domains/creator/render/studio-konva-filter-fields";
 
 const REPO_ROOT = new URL("../../..", import.meta.url);
 const RESULTS_DIR = join(REPO_ROOT.pathname, "tests", "benchmarks", "results");
@@ -300,8 +300,7 @@ function runKonvaLane(
 // 계산·에러 직렬화)은 손대지 않는다.
 // ---------------------------------------------------------------------------
 
-const WORKER_MODULE_URL = new URL(
-  "src/domains/creator/studio-image-filter.worker.ts",
+const WORKER_MODULE_URL = new URL("src/domains/creator/studio-image-filter.worker.ts",
   REPO_ROOT,
 ).href;
 

@@ -9,6 +9,20 @@
  */
 
 import {
+  createStudioOffscreenRasterSession,
+  type StudioOffscreenRasterRunResult,
+} from "../studio-offscreen-raster-worker-client";
+import {
+  STUDIO_OFFSCREEN_RASTER_MAX_DIMENSION,
+  STUDIO_OFFSCREEN_RASTER_MAX_JOB_KEY_CHARS,
+  STUDIO_OFFSCREEN_RASTER_MAX_PIXELS,
+  STUDIO_OFFSCREEN_RASTER_MAX_SOURCES,
+  adoptStudioOffscreenPixelBuffer,
+  type StudioOffscreenRasterOutput,
+  type StudioOffscreenRasterPixelSource,
+} from "../studio-offscreen-raster-worker-protocol";
+
+import {
   STUDIO_ENGINE_SETTLED_TILE_RASTER_BACKEND,
   STUDIO_ENGINE_SETTLED_TILE_RASTER_COMPOSITE,
   STUDIO_ENGINE_SETTLED_TILE_RASTER_CONVERSION,
@@ -28,19 +42,6 @@ import {
   type StudioEngineTileDeviceLossReplaySource,
   type StudioEngineTileReadResult,
 } from "./studio-engine-tile-authority";
-import {
-  createStudioOffscreenRasterSession,
-  type StudioOffscreenRasterRunResult,
-} from "./studio-offscreen-raster-worker-client";
-import {
-  STUDIO_OFFSCREEN_RASTER_MAX_DIMENSION,
-  STUDIO_OFFSCREEN_RASTER_MAX_JOB_KEY_CHARS,
-  STUDIO_OFFSCREEN_RASTER_MAX_PIXELS,
-  STUDIO_OFFSCREEN_RASTER_MAX_SOURCES,
-  adoptStudioOffscreenPixelBuffer,
-  type StudioOffscreenRasterOutput,
-  type StudioOffscreenRasterPixelSource,
-} from "./studio-offscreen-raster-worker-protocol";
 
 const MAX_AUTHORITY_LAYERS = 4_096;
 const MAX_AUTHORITY_TILES = 262_144;

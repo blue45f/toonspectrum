@@ -2,20 +2,19 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const studioPageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const studioPageSource = readStudioCuttoonEditorSource();
 const studioPageLoaderSource = readFileSync(
-  new URL("./studio-page-editor-runtime-loaders.ts", import.meta.url),
+  new URL("../studio-page-editor-runtime-loaders.ts", import.meta.url),
   "utf8",
 );
 const inspectorSource = readFileSync(
-  new URL("./StudioInspectorAside.tsx", import.meta.url),
+  new URL("../StudioInspectorAside.tsx", import.meta.url),
   "utf8",
 );
 const mobileDockSource = readFileSync(
-  new URL("./StudioMobileEditingDock.tsx", import.meta.url),
+  new URL("../StudioMobileEditingDock.tsx", import.meta.url),
   "utf8",
 );
 const panelSource = readFileSync(
@@ -23,7 +22,7 @@ const panelSource = readFileSync(
   "utf8",
 );
 const vrmPreferencesSource = readFileSync(
-  new URL("./studio-vrm-poser-preferences-sqlite.ts", import.meta.url),
+  new URL("../vrm/studio-vrm-poser-preferences-sqlite.ts", import.meta.url),
   "utf8",
 );
 

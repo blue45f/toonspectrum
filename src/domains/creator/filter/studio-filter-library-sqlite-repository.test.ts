@@ -4,7 +4,15 @@ import {
   STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY,
   type StudioCreatorInstalledFilterPreset,
   type StudioCreatorPackStorage,
-} from "./studio-creator-filter-preset-reader";
+} from "../studio-creator-filter-preset-reader";
+import {
+  SqliteUnavailableError,
+  openStudioLocalDatabase,
+  requireStudioFilterLibraryDatabase,
+  type StudioLocalDatabase,
+  type StudioSqliteApiHandle,
+} from "../studio-local-database";
+
 import {
   FILTER_LIBRARY_LEGACY_MIGRATION_KEY,
   FILTER_LIBRARY_LEGACY_MIGRATION_NAMESPACE,
@@ -17,13 +25,6 @@ import {
   studioFilterPresetToSqlRecord,
   type StudioFilterLibraryPreset,
 } from "./studio-filter-library-sqlite-repository";
-import {
-  SqliteUnavailableError,
-  openStudioLocalDatabase,
-  requireStudioFilterLibraryDatabase,
-  type StudioLocalDatabase,
-  type StudioSqliteApiHandle,
-} from "./studio-local-database";
 
 let sqlite3: StudioSqliteApiHandle;
 const opened: StudioLocalDatabase[] = [];

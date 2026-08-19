@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import { admitStudioLayerLiftArtifactPair } from "./studio-layer-lift-artifact";
 import { createStudioLayerLiftCompositionReceipt } from "./studio-layer-lift-composition-receipt";
 import {
@@ -14,9 +16,8 @@ import {
   type StudioLayerLiftOperationCurrentState,
 } from "./studio-layer-lift-operation-context";
 import { fingerprintStudioLayerLiftSource } from "./studio-layer-lift-plan";
-import { sha256HexPortable } from "./studio-sha256";
 
-import type { El } from "./studio-element-model";
+import type { El } from "../studio-element-model";
 import type {
   StudioLayerLiftArtifactPairReceipt,
   StudioLayerLiftTrustedArtifactPair,

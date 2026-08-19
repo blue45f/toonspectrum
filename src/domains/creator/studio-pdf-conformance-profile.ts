@@ -21,7 +21,7 @@ import {
   dictRefArray,
   readPdf,
   type StudioPdfReadDocument,
-} from "./studio-canvaskit-pdf-reader";
+} from "./render/studio-canvaskit-pdf-reader";
 import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_PDF_CONFORMANCE_SCANNER_ID =

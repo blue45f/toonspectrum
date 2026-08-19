@@ -9,7 +9,7 @@ import {
   studioWetInkInteractiveBackendSupportsElement,
 } from "./studio-wet-ink-backend-capability";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 function wetStroke(id: string): DrawEl {
   return {

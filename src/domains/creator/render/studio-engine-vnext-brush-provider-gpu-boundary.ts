@@ -10,7 +10,8 @@ import {
   hashStudioCanonicalBrushPlan,
   parseStudioCanonicalBrushPlan,
   STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
+
 import {
   STUDIO_ENGINE_VNEXT_BRUSH_PROVIDER_ROUTER_VERSION,
   type StudioEngineVNextBrushProviderCapability,
@@ -31,10 +32,10 @@ import {
 
 import type {
   StudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
 import type {
   StudioCanonicalBrushSpecialistLoweringRequirement,
-} from "./studio-canonical-brush-webgpu-lowering";
+} from "../studio-canonical-brush-webgpu-lowering";
 import type {
   StudioEngineWebGpuBrushRasterRect,
   StudioEngineWebGpuBrushReceipt,

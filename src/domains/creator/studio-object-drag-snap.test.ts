@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   STUDIO_OBJECT_DRAG_SNAP_TOLERANCE_PX,
   snapStudioObjectDragPosition,
 } from "./studio-object-drag-snap";
-import studioPageSource from "./StudioPage.tsx?raw";
+
+const studioPageSource = readStudioCuttoonEditorSource();
 
 describe("studio object drag snap", () => {
   it("keeps free movement continuous away from a grid line", () => {

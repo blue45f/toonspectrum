@@ -15,16 +15,13 @@ import { parseSvgToScene } from "../../packages/studio-format-gateway/src/svg";
 
 const SIZE = 128;
 const SAMPLES = 20;
-const FIXTURE_ROOT = new URL(
-  "../../crates/studio-engine-vello/tests/fixtures/svg/",
+const FIXTURE_ROOT = new URL("../../crates/studio-engine-vello/tests/fixtures/svg/",
   import.meta.url,
 );
-const NATIVE_WASM = new URL(
-  "../../crates/studio-engine-vello/pkg-gpu/studio_engine_vello_bg.wasm",
+const NATIVE_WASM = new URL("../../crates/studio-engine-vello/pkg-gpu/studio_engine_vello_bg.wasm",
   import.meta.url,
 );
-const RESVG_WASM = new URL(
-  "../../node_modules/@resvg/resvg-wasm/index_bg.wasm",
+const RESVG_WASM = new URL("../../node_modules/@resvg/resvg-wasm/index_bg.wasm",
   import.meta.url,
 );
 

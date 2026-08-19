@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 function source(fileName: string): string {
   return readFileSync(new URL(fileName, import.meta.url), "utf8");
 }
@@ -19,7 +21,7 @@ function sourceSection(
   return contents.slice(start, end);
 }
 
-const studioPage = source("./StudioPage.tsx");
+const studioPage = readStudioCuttoonEditorSource();
 const menubar = source("./StudioMenubarContent.tsx");
 const studioPageModalLazyBoundaries = source("./studio-page-modal-lazy-boundaries.ts");
 const menuCatalogue = source("./studio-main-menu-items-document.ts");

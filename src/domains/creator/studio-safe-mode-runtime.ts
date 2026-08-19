@@ -19,6 +19,7 @@
  * 획득하지 않는다. 설치만으로 없던 GPUDevice 가 생기지 않는다.
  */
 
+import { acquireStudioGpuDevice, onStudioGpuDeviceLost } from "./render/studio-gpu-fabric";
 import {
   createDeviceLossRecovery,
   type StudioDeviceLossClock,
@@ -26,7 +27,6 @@ import {
   type StudioDeviceLossState,
   type StudioGpuDeviceLike,
 } from "./studio-device-loss-recovery";
-import { acquireStudioGpuDevice, onStudioGpuDeviceLost } from "./studio-gpu-fabric";
 import {
   clearStudioReliabilityChannel,
   enterStudioSafeMode,

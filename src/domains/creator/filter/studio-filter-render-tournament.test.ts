@@ -1,17 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  resetStudioFilterRenderTournamentForTests,
-  scheduleStudioFilterRenderTournament,
-} from "./studio-filter-render-tournament";
-import { openStudioLocalDatabase } from "./studio-local-database";
+import { openStudioLocalDatabase } from "../studio-local-database";
 import {
   createStudioTournamentRuntime,
   installStudioTournamentRuntime,
   type PersistedTournamentStateV1,
   type TournamentPersistencePort,
-} from "./studio-renderer-tournament-runtime";
-import { createSqliteTournamentPersistence } from "./studio-tournament-sqlite-persistence";
+} from "../studio-renderer-tournament-runtime";
+import { createSqliteTournamentPersistence } from "../studio-tournament-sqlite-persistence";
+
+import {
+  resetStudioFilterRenderTournamentForTests,
+  scheduleStudioFilterRenderTournament,
+} from "./studio-filter-render-tournament";
 
 const GPU = "filter-lane-gpu-chain";
 const WORKER = "filter-lane-worker";

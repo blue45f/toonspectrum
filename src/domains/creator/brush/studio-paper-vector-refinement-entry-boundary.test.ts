@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 interface ModuleEdges {
   readonly dynamicImports: readonly string[];
   readonly source: string;
@@ -47,11 +49,11 @@ function moduleEdges(relativePath: string): ModuleEdges {
 
 describe("Paper vector refinement production entry boundary", () => {
   it("keeps the Paper Worker graph behind one analyzable StudioPage dynamic import", () => {
-    const page = moduleEdges("./StudioPage.tsx");
-    const workerClient = "./studio-paper-vector-refinement-worker-client";
+    const page = moduleEdges("../StudioPage.tsx");
+    const workerClient = "./brush/studio-paper-vector-refinement-worker-client";
 
     expect(page.valueImports).toContain(
-      "./studio-paper-vector-document-adapter",
+      "./brush/studio-paper-vector-document-adapter",
     );
     expect(page.valueImports).not.toContain(workerClient);
     expect(
@@ -60,7 +62,7 @@ describe("Paper vector refinement production entry boundary", () => {
   });
 
   it("captures authority before await and revalidates source identity before one canonical commit", () => {
-    const page = moduleEdges("./StudioPage.tsx").source;
+    const page = moduleEdges("../StudioPage.tsx").source;
     const start = page.indexOf("async function applyPaperVectorRefinement(");
     const end = page.indexOf(
       "// 벡터 패스 불리언 결합",
@@ -69,7 +71,7 @@ describe("Paper vector refinement production entry boundary", () => {
     const handler = page.slice(start, end);
     const ticketAt = handler.indexOf("captureStudioMutationTicket()");
     const importAt = handler.indexOf(
-      'await import("./studio-paper-vector-refinement-worker-client")',
+      'await import("./brush/studio-paper-vector-refinement-worker-client")',
     );
     const refineAt = handler.indexOf(
       "await refineStudioDrawElementWithPaper({",
@@ -98,9 +100,9 @@ describe("Paper vector refinement production entry boundary", () => {
   });
 
   it("owns cancellation, epoch invalidation and the Inspector controls in Studio", () => {
-    const page = moduleEdges("./StudioPage.tsx").source;
-    const inspector = moduleEdges("./StudioInspectorAside.tsx").source;
-    const panel = moduleEdges("./StudioNodeEditPanel.tsx").source;
+    const page = readStudioCuttoonEditorSource();
+    const inspector = moduleEdges("../StudioInspectorAside.tsx").source;
+    const panel = moduleEdges("../StudioNodeEditPanel.tsx").source;
 
     expect(page).toContain("paperVectorRefinementAbortRef.current?.abort()");
     expect(page).toContain(
@@ -127,7 +129,7 @@ describe("Paper vector refinement production entry boundary", () => {
   });
 
   it("does not recycle the Paper Worker for an outer history-array identity change", () => {
-    const page = moduleEdges("./StudioPage.tsx").source;
+    const page = moduleEdges("../StudioPage.tsx").source;
     const effectStart = page.indexOf(
       "if (pathBooleanActiveRef.current) {",
     );

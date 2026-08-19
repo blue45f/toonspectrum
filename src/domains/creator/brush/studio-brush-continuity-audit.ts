@@ -18,7 +18,8 @@ import {
   resolveStudioBrushRenderFamily,
   strokeSampleDistanceForBrushFamily,
   type StudioBrushRenderFamily,
-} from "./studio-brush";
+} from "../studio-brush";
+
 import {
   planNormalizedStudioDynamicBrushDabs,
   type NormalizedStudioBrushDynamicsSettings,

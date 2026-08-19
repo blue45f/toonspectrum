@@ -86,7 +86,7 @@ describe("sculpt core — 결정성 경계", () => {
   });
 
   it("코어의 상대 임포트는 스컬프트 모듈과 타입 전용 계약 파일로만 향한다", () => {
-    const allowedNonSculpt = new Set(["./studio-bg3d-geometry-worker-protocol"]);
+    const allowedNonSculpt = new Set(["./bg3d/studio-bg3d-geometry-worker-protocol"]);
     const offenders: string[] = [];
     for (const name of sculptCoreFiles()) {
       const source = readSource(name);

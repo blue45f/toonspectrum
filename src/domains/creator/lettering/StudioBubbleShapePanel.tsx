@@ -22,8 +22,9 @@ import {
   Undo2,
 } from "lucide-react";
 
+import { StudioToggleChip } from "../studio-panel-ui";
+
 import { type BubbleQuickTransformAction } from "./studio-bubble-quick-transform";
-import { StudioToggleChip } from "./studio-panel-ui";
 
 import type { ReactElement } from "react";
 

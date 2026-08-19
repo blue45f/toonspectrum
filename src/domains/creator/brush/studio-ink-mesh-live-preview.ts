@@ -27,10 +27,10 @@ import {
   acquireStudioGpuDevice,
   onStudioGpuDeviceLost,
   type StudioGpuDeviceLossEvent,
-} from "./studio-gpu-fabric";
+} from "../render/studio-gpu-fabric";
 
-import type { DrawEl } from "./studio-element-model";
-import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
+import type { StudioLiveInkSurface } from "../live/studio-live-ink-overlay";
+import type { DrawEl } from "../studio-element-model";
 
 export const STUDIO_INK_MESH_LIVE_PREVIEW_LIMITS = Object.freeze({
   maxPoints: 32_768,

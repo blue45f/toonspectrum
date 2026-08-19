@@ -13,8 +13,8 @@ import {
 } from "./studio-product-codec-certification";
 import { sha256HexPortable } from "./studio-sha256";
 
+import type { StudioInkEnvelopeWebCryptoAlgorithm } from "./brush/studio-ink-envelope-webcrypto-attestation";
 import type { StudioCodecExecutionReceipt } from "./studio-codec-provider-contract";
-import type { StudioInkEnvelopeWebCryptoAlgorithm } from "./studio-ink-envelope-webcrypto-attestation";
 
 const SCOPE = "toonspectrum.product.codec-conformance.png-encode";
 const EVIDENCE_MEDIA_TYPE =

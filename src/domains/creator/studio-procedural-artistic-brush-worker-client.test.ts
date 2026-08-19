@@ -628,8 +628,8 @@ describe("renderStudioProceduralArtisticBrushInWorker", () => {
       "src/domains/creator/studio-procedural-artistic-brush.worker.ts",
     ), "utf8");
 
-    expect(client).toContain(
-      'new URL(\n      "./studio-procedural-artistic-brush.worker.ts",',
+    expect(client).toMatch(
+      /new URL\(\s*["']\.\/studio-procedural-artistic-brush\.worker\.ts["']/u,
     );
     expect(client).toContain('type: "module"');
     expect(client).not.toContain(

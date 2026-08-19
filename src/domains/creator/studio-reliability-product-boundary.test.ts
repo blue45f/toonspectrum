@@ -11,8 +11,12 @@ import { describe, expect, it } from "vitest";
  */
 
 const studioPage = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioCuttoonEditorView = readFileSync(
+  new URL("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx", import.meta.url),
+  "utf8",
+);
 const statusRail = readFileSync(
-  new URL("./StudioCanvasStatusRail.tsx", import.meta.url),
+  new URL("./canvas/StudioCanvasStatusRail.tsx", import.meta.url),
   "utf8",
 );
 const autosaveSession = readFileSync(
@@ -20,7 +24,7 @@ const autosaveSession = readFileSync(
   "utf8",
 );
 const webgpuFilterRuntime = readFileSync(
-  new URL("./studio-engine-webgpu-filter-runtime.ts", import.meta.url),
+  new URL("./render/studio-engine-webgpu-filter-runtime.ts", import.meta.url),
   "utf8",
 );
 const destructivePreview = readFileSync(
@@ -32,7 +36,7 @@ const confirmHost = readFileSync(
   "utf8",
 );
 const vrmArchiveAttestationHost = readFileSync(
-  new URL("./StudioVrmProjectArchiveAttestationHost.tsx", import.meta.url),
+  new URL("./vrm/StudioVrmProjectArchiveAttestationHost.tsx", import.meta.url),
   "utf8",
 );
 const createWorkPage = readFileSync(
@@ -101,7 +105,7 @@ describe("Studio reliability product boundary", () => {
 
   it("mounts the reliability notices inside the existing canvas status rail", () => {
     expect(statusRail).toContain(
-      'import { StudioReliabilityStatusRail } from "./StudioReliabilityStatusRail"',
+      'import { StudioReliabilityStatusRail } from "../StudioReliabilityStatusRail"',
     );
     expect(statusRail).toContain("<StudioReliabilityStatusRail />");
     const railIndex = statusRail.indexOf("<StudioReliabilityStatusRail />");
@@ -152,13 +156,13 @@ describe("Studio reliability product boundary", () => {
     // 호스트가 사라질 때 대기 중인 승인은 반드시 닫힌다 — 미해결 프라미스는 조용한 정지다.
     expect(confirmHost).toContain("pending.settle(false)");
     // 스튜디오와 /create 라우트 양쪽에 표면이 있어야 네이티브 fallback 으로 떨어지지 않는다.
-    for (const mount of [studioPage, createWorkPage, createSeriesPage]) {
+    for (const mount of [studioCuttoonEditorView, createWorkPage, createSeriesPage]) {
       expect(mount).toContain("<StudioDestructiveConfirmHost />");
     }
   });
 
   it("routes VRM archive attestations through a bounded on-canvas presenter", () => {
-    expect(studioPage).toContain("<StudioVrmProjectArchiveAttestationHost />");
+    expect(studioCuttoonEditorView).toContain("<StudioVrmProjectArchiveAttestationHost />");
     expect(studioPage).toContain("requestStudioVrmProjectArchiveUseContext,");
     expect(vrmArchiveAttestationHost).not.toMatch(
       /(?:globalThis|window)\s*\.\s*(?:confirm|prompt)\s*(?:\?\.)?\s*\(/u,
@@ -180,7 +184,7 @@ describe("Studio reliability product boundary", () => {
 
   it("warns before the tab closes, but only while work is actually unsaved", () => {
     expect(studioPage).toContain("installStudioUnloadGuard({");
-    expect(studioPage).toContain("hasUnsavedStudioWork({");
+    expect(studioPage).toContain("hasStudioUnloadPromptWork({");
     // 자동저장과 종료 경고가 같은 지문 규칙을 봐야 한다(둘이 갈라지면 판정이 조용히 어긋난다).
     const fingerprints = studioPage.match(/studioPendingStrokeFingerprint\(/g) ?? [];
     expect(fingerprints.length).toBeGreaterThanOrEqual(2);

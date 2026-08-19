@@ -7,14 +7,14 @@ import {
 } from "lucide-react";
 import { Suspense, type RefObject } from "react";
 
-import { DRAW_COLOR_SWATCHES } from "./studio-draw-color-swatches";
+import { DRAW_COLOR_SWATCHES } from "./brush/studio-draw-color-swatches";
 import { StudioPageGradePanel } from "./studio-page-lazy-ui";
 import { StudioActiveBrushSummary } from "./StudioActiveBrushSummary";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 
+import type { StudioStabilizerMode } from "./brush/studio-stroke-stabilizer";
 import type { StudioInspectorInteractionGate } from "./studio-inspector-interaction-policy";
 import type { PageGrade } from "./studio-page-grade";
-import type { StudioStabilizerMode } from "./studio-stroke-stabilizer";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";

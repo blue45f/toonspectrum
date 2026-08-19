@@ -1,4 +1,4 @@
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "../studio-sha256";
 
 /**
  * Clean-room, non-destructive live surface effects.

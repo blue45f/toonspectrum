@@ -404,8 +404,7 @@ describe("StudioLiveSocketTransport", () => {
   });
 
   it("uses a server-mode signaling shell when only Cloudflare realtime is configured", async () => {
-    const { createStudioLiveSignalingServerTransport } = await import(
-      "./studio-live-signaling-server-transport"
+    const { createStudioLiveSignalingServerTransport } = await import("./studio-live-signaling-server-transport"
     );
     const transport = createStudioLiveSignalingServerTransport();
     expect(transport.mode).toBe("server");

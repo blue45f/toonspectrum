@@ -16,7 +16,7 @@ vi.mock("@/components/use-media-query", () => ({
   useIsMobile: () => viewportState.mobile,
 }));
 
-vi.mock("./StudioToolHint", () => ({
+vi.mock("../StudioToolHint", () => ({
   StudioToolHintTarget: ({
     hint,
     children,

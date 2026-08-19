@@ -12,11 +12,11 @@ import {
   solidPaint,
 } from "@toonspectrum/studio-project-model";
 
-import { StudioCrdtDocument } from "../../src/domains/creator/studio-crdt-document";
+import { StudioCrdtDocument } from "../../src/domains/creator/live/studio-crdt-document";
 import {
   SerializedStudioCrdtOutbox,
   SqliteStudioCrdtOutbox,
-} from "../../src/domains/creator/studio-crdt-outbox";
+} from "../../src/domains/creator/live/studio-crdt-outbox";
 import {
   STUDIO_CRDT_PROTOCOL_VERSION,
   decodeStudioCrdtStateVector,
@@ -28,36 +28,36 @@ import {
   type StudioCrdtTransportMessage,
   type StudioCrdtUpdateAck,
   type StudioCrdtUpdateRequest,
-} from "../../src/domains/creator/studio-crdt-protocol";
+} from "../../src/domains/creator/live/studio-crdt-protocol";
 import {
   PersistentStudioCrdtRecoveryVault,
   createStudioCrdtRecoverySqlitePersistence,
-} from "../../src/domains/creator/studio-crdt-recovery-vault";
-import { StudioCrdtRoomBinding } from "../../src/domains/creator/studio-crdt-room-binding";
-import {
-  createDeviceLossRecovery,
-  type StudioDeviceLossClock,
-  type StudioDeviceLossTournamentPort,
-  type StudioGpuDeviceLike,
-} from "../../src/domains/creator/studio-device-loss-recovery";
+} from "../../src/domains/creator/live/studio-crdt-recovery-vault";
+import { StudioCrdtRoomBinding } from "../../src/domains/creator/live/studio-crdt-room-binding";
+import { StudioLiveRoom } from "../../src/domains/creator/live/studio-live-collaboration-room";
 import {
   createStudioEngineWorkerSession,
   type StudioEngineWorkerLike,
-} from "../../src/domains/creator/studio-engine-worker-client";
+} from "../../src/domains/creator/render/studio-engine-worker-client";
 import {
   STUDIO_ENGINE_EXECUTION_PROFILE,
   STUDIO_ENGINE_WORKER_BUDGETS,
   STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
   type StudioEngineCapabilitySnapshot,
   type StudioEngineHelloAckMessage,
-} from "../../src/domains/creator/studio-engine-worker-protocol";
+} from "../../src/domains/creator/render/studio-engine-worker-protocol";
 import {
   acquireStudioGpuDevice,
   activeStudioGpuDeviceLeaseCount,
   disposeStudioGpuFabric,
   onStudioGpuDeviceLost,
-} from "../../src/domains/creator/studio-gpu-fabric";
-import { StudioLiveRoom } from "../../src/domains/creator/studio-live-collaboration-room";
+} from "../../src/domains/creator/render/studio-gpu-fabric";
+import {
+  createDeviceLossRecovery,
+  type StudioDeviceLossClock,
+  type StudioDeviceLossTournamentPort,
+  type StudioGpuDeviceLike,
+} from "../../src/domains/creator/studio-device-loss-recovery";
 import {
   requireStudioCrdtOutboxDatabase,
   openStudioLocalDatabase,
@@ -76,13 +76,13 @@ import {
   createStudioVrmTexturePaintGpuUploadPlan,
   executeStudioVrmTexturePaintGpuUpload,
   type StudioVrmTexturePaintGpuUploadExecutionResult,
-} from "../../src/domains/creator/studio-vrm-texture-paint-gpu-upload";
+} from "../../src/domains/creator/vrm/studio-vrm-texture-paint-gpu-upload";
 
-import type { StudioCrdtDrawStrokePayload } from "../../src/domains/creator/studio-crdt-document";
+import type { StudioCrdtDrawStrokePayload } from "../../src/domains/creator/live/studio-crdt-document";
 import type {
   StudioLiveTransport,
   StudioLiveTransportControlEvent,
-} from "../../src/domains/creator/studio-live-collaboration-transport";
+} from "../../src/domains/creator/live/studio-live-collaboration-transport";
 import type {
   CommandIR,
   SceneNodeIR,

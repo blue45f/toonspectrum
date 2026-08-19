@@ -8,7 +8,7 @@
 
 import { StudioTiledDocumentStore } from "./studio-tiledoc-store";
 
-import type { StudioRasterImmutableTileFrame } from "./studio-crdt-raster-replay-runtime";
+import type { StudioRasterImmutableTileFrame } from "../live/studio-crdt-raster-replay-runtime";
 import type { StudioRasterSurfaceSpec } from "@/lib/studio-crdt-raster-ops";
 
 export const STUDIO_TILEDOC_PRODUCT_RASTER_LAYER_ID = "studio-raster-crdt";

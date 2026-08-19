@@ -8,7 +8,7 @@
 import {
   appendBrushPoint,
   type SelPoint,
-} from "./studio-selection-tools";
+} from "../studio-selection-tools";
 
 /** Hard cap on journaled drag samples (matches pending-retouch gesture budget). */
 export const STUDIO_RASTER_RETOUCH_DRAG_MAX_POINTS = 8_192;

@@ -8,8 +8,9 @@
  * StudioPage.tsx가 담당하고, 이 패널은 계산된 결과(effectiveFontSize/overflow)를 그대로
  * 표시만 한다.
  */
+import { PANEL_LABEL_ROW, StudioSliderRow } from "../studio-panel-ui";
+
 import { BUBBLE_AUTO_SHRINK_MIN_FONT_RANGE } from "./studio-bubble-text-fit";
-import { PANEL_LABEL_ROW, StudioSliderRow } from "./studio-panel-ui";
 
 import type { ReactElement } from "react";
 

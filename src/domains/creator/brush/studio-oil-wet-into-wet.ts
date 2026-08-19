@@ -10,8 +10,9 @@
  * call the same `wetMixStroke` body.
  */
 
+import { STUDIO_OSS_OIL_FILM_RECIPE } from "../studio-oss-brush-kernels";
+
 import { planStudioOilBristleLoadDynamics } from "./studio-oil-bristle-load-dynamics-v1";
-import { STUDIO_OSS_OIL_FILM_RECIPE } from "./studio-oss-brush-kernels";
 import {
   wetMixStroke,
   type WetMixColor,

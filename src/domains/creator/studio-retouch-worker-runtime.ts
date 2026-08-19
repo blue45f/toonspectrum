@@ -1,9 +1,9 @@
+import { wetMixStroke } from "./brush/studio-wet-mix";
 import { dodgeBurnStroke } from "./studio-dodge-burn";
 import {
   assertStudioRetouchWorkerRequest,
   type StudioRetouchWorkerRunRequest,
 } from "./studio-retouch-worker-protocol";
-import { wetMixStroke } from "./studio-wet-mix";
 
 export interface StudioRetouchWorkerRuntimeResult {
   readonly kind: StudioRetouchWorkerRunRequest["kind"];

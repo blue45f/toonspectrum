@@ -341,7 +341,7 @@ describe("studio figma selection ux", () => {
   it("carries a numeric resize through the same bake the handles use", async () => {
     // Not "similar maths" — the identical planner. A number typed into W and a handle dragged to
     // the same box must not be able to drift apart.
-    const { planStudioDrawObjectTransform } = await import("./studio-draw-object-transform");
+    const { planStudioDrawObjectTransform } = await import("./brush/studio-draw-object-transform");
     const stroke = draw({ id: "s", points: [4, 4, 84, 44], strokeWidth: 10 });
     const shown = unionStudioSelectionBounds([stroke])!;
     const patch = planStudioSelectionLayoutPatch(stroke, {

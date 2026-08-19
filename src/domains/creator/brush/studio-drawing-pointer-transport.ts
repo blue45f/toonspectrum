@@ -10,7 +10,7 @@ import {
   tryReleaseStudioStrokePointer,
   type StudioPointerCaptureTarget,
   type StudioStrokePointerSession,
-} from "./studio-pointer-input";
+} from "../canvas/studio-pointer-input";
 
 export interface StudioDrawingPointerEventTarget {
   addEventListener(
@@ -460,4 +460,16 @@ export function createStudioDrawingPointerTransportController(
   environment: StudioDrawingPointerTransportEnvironment = {}
 ): StudioDrawingPointerTransportController {
   return new StudioDrawingPointerTransportController(environment);
+}
+
+export type StudioDrawingPointerTransport = StudioDrawingPointerTransportController;
+
+export function requireStudioDrawingPointerTransport(ref: {
+  current: StudioDrawingPointerTransport | null;
+}): StudioDrawingPointerTransport {
+  const transport = ref.current;
+  if (transport === null) {
+    throw new Error("Studio drawing pointer transport is not initialized");
+  }
+  return transport;
 }

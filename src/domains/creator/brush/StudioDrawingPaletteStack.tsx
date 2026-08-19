@@ -18,6 +18,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+
 import {
   DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
   STUDIO_DRAWING_PALETTE_IDS,
@@ -32,7 +34,6 @@ import {
   type StudioDrawingPaletteLayout,
   type StudioDrawingPaletteLockKind,
 } from "./studio-drawing-palettes";
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import {
   STUDIO_DRAWING_PALETTES,
   StudioDrawingPaletteOverlayPortal,

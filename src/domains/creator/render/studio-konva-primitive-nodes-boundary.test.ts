@@ -121,9 +121,9 @@ const RESIZABLE_PROPS = [
 
 describe("Studio Konva primitive node boundary", () => {
   it("owns every primitive implementation outside StudioPage", () => {
-    const page = moduleShape("./StudioPage.tsx");
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
-    const primitives = moduleShape("./StudioKonvaPrimitiveNodes.tsx");
+    const page = moduleShape("../StudioPage.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const primitives = moduleShape("../StudioKonvaPrimitiveNodes.tsx");
 
     for (const name of MOVED_FUNCTIONS) {
       expect(primitives.topLevelDeclarations.has(name)).toBe(true);
@@ -139,12 +139,12 @@ describe("Studio Konva primitive node boundary", () => {
       expect(viewport.source).not.toMatch(new RegExp(`<${name}\\b`, "u"));
     }
     expect(
-      viewport.imports.filter((specifier) => specifier === "./StudioKonvaPrimitiveNodes"),
-    ).toEqual(["./StudioKonvaPrimitiveNodes"]);
+      viewport.imports.filter((specifier) => specifier === "../StudioKonvaPrimitiveNodes"),
+    ).toEqual(["../StudioKonvaPrimitiveNodes"]);
   });
 
   it("keeps the module independent from StudioPage and imports Konva only as a type", () => {
-    const primitives = moduleShape("./StudioKonvaPrimitiveNodes.tsx");
+    const primitives = moduleShape("../StudioKonvaPrimitiveNodes.tsx");
 
     expect(primitives.imports).toEqual([
       "react",
@@ -154,14 +154,14 @@ describe("Studio Konva primitive node boundary", () => {
       "./studio-work-asset-render-projection",
       "konva",
     ]);
-    expect(primitives.imports).not.toContain("./StudioPage");
+    expect(primitives.imports).not.toContain("../StudioPage");
     expect(primitives.source).toContain('import type Konva from "konva";');
     expect(primitives.source).not.toContain('from "konva/lib/Core"');
   });
 
   it("locks the exported component prop contracts and all four Page call sites", () => {
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
-    const primitives = moduleShape("./StudioKonvaPrimitiveNodes.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const primitives = moduleShape("../StudioKonvaPrimitiveNodes.tsx");
 
     expect(componentPropNames(primitives, "StudioWorkAssetPlaceholderNode")).toEqual([
       "placeholder",
@@ -197,7 +197,7 @@ describe("Studio Konva primitive node boundary", () => {
   });
 
   it("preserves the frame, focus-line, speed-line, and placeholder branch order", () => {
-    const source = moduleShape("./StudioCanvasViewport.tsx").source;
+    const source = moduleShape("../canvas/StudioCanvasViewport.tsx").source;
     const frame = source.indexOf("<StudioFramePanel");
     const focus = source.indexOf("<StudioFocusLinesNode");
     const speed = source.indexOf("<StudioSpeedLinesNode");

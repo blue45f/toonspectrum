@@ -4,7 +4,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   planStudioDeferredStrokePostprocess,
   replaceStudioPendingStrokePostprocess,

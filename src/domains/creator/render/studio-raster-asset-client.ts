@@ -124,7 +124,7 @@ export async function downloadStudioRasterAsset(
     // Keep the experimental raster contract out of the Studio startup graph:
     // this bounded reader is already shared by ordinary work assets and can be
     // resolved on demand when raster hydration is actually requested.
-    const { readBoundedStudioAssetResponse } = await import("./studio-bounded-asset-response");
+    const { readBoundedStudioAssetResponse } = await import("../studio-bounded-asset-response");
     const bytes = await readBoundedStudioAssetResponse(
       response,
       manifest.byteLength,

@@ -1,8 +1,16 @@
 import {
   isStudioDynamicBrushMinimumDiameterRatio,
   studioDynamicBrushDepositPipelineUsesContinuation,
-} from "./studio-brush-dynamics";
-import { serializeStudioBrushR8TextureGrainSourceCanonical } from "./studio-brush-r8-grain-asset-contract";
+} from "../brush/studio-brush-dynamics";
+import { serializeStudioBrushR8TextureGrainSourceCanonical } from "../brush/studio-brush-r8-grain-asset-contract";
+import { isStudioInkPressureModel } from "../brush/studio-ink-pressure-model";
+import { isStudioStrokePaintModelCompatible } from "../brush/studio-stroke-paint-model";
+import {
+  isStudioMaterialMinimumDiameterRatio,
+  isStudioMaterialPressureModel,
+} from "../studio-material-pressure-model";
+import { normalizeStudioOutlineStrokeContract } from "../studio-outline-stroke-contract";
+
 import {
   STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
@@ -22,13 +30,6 @@ import {
   type StudioCrdtJsonValue,
   type StudioCrdtPayloadSceneElementType,
 } from "./studio-crdt-scene-schema";
-import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
-import {
-  isStudioMaterialMinimumDiameterRatio,
-  isStudioMaterialPressureModel,
-} from "./studio-material-pressure-model";
-import { normalizeStudioOutlineStrokeContract } from "./studio-outline-stroke-contract";
-import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
 import type {
   StudioCrdtLayerGroupInput,
@@ -39,8 +40,8 @@ import type {
   StudioCrdtStrokeRecord,
 } from "./studio-crdt-document";
 import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
-import type { StudioDrawingAssistDocument } from "./studio-drawing-assist-document";
-import type { StudioPaperSurfaceSettings } from "./studio-paper-granulation-runtime";
+import type { StudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
+import type { StudioPaperSurfaceSettings } from "../brush/studio-paper-granulation-runtime";
 
 import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,

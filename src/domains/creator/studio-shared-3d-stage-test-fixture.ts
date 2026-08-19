@@ -1,5 +1,4 @@
-import type { StudioShared3dStageCollectionDocument } from
-  "./studio-shared-3d-stage-collection";
+import type { StudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
 
 /** Native plural fixture shared by the independent persistence gates. */
 export function createNativePluralShared3dStageFixture():

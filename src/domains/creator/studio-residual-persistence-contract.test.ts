@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  parseStudioAutosave,
-  serializeStudioAutosave,
-  type StudioAutosavePayload,
-} from "./studio-autosave";
+  createDefaultStudioDrawingAssistDocument,
+} from "./brush/studio-drawing-assist-document";
 import {
   studioCrdtElementToSceneElement,
   studioCrdtStrokeToDrawElement,
   studioDrawElementToCrdtStroke,
   studioElementToCrdtSceneElement,
   studioPageToCrdtPage,
-} from "./studio-crdt-page-bridge";
-import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
+} from "./live/studio-crdt-page-bridge";
 import {
-  createDefaultStudioDrawingAssistDocument,
-} from "./studio-drawing-assist-document";
+  parseStudioAutosave,
+  serializeStudioAutosave,
+  type StudioAutosavePayload,
+} from "./studio-autosave";
+import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
 import {
   createStudioIsometricPrimitiveElements,
   planStudioIsometricPrimitive,
@@ -46,13 +46,13 @@ import {
 import {
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
-} from "./studio-vrm-scene-document";
+} from "./vrm/studio-vrm-scene-document";
 
-import type { StudioAsset } from "./studio-asset-library";
 import type {
   StudioCrdtSceneElementRecord,
   StudioCrdtStrokeRecord,
-} from "./studio-crdt-document";
+} from "./live/studio-crdt-document";
+import type { StudioAsset } from "./studio-asset-library";
 import type { DrawEl, El, ImageEl } from "./studio-element-model";
 
 const SAVED_AT = "2026-07-20T00:00:00.000Z";

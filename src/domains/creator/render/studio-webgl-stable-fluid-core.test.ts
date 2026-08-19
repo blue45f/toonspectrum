@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   resolveStudioFluidDemoAdoptionPlan,
   studioFluidDemoEvaluationById,
-} from "./studio-fluid-demo-evaluation";
+} from "../studio-fluid-demo-evaluation";
+
 import {
   createStudioStableFluidState,
   splatStudioStableFluid,

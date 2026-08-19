@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { planStudioCausalDynamicBrushDepositSegmentsV3 } from "../studio-causal-dynamic-brush-deposit-v2";
+import { planStudioDynamicBrushCoverageMarks } from "../studio-dynamic-brush-coverage-renderer";
+
 import {
   applyStudioBrushContinuousCarrierQualityPolicy,
   STUDIO_BRUSH_CONTINUOUS_CARRIER_POLICY_VERSION,
@@ -12,9 +15,8 @@ import {
 import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
 import { STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET } from "./studio-brush-render-budget";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
-import { planStudioCausalDynamicBrushDepositSegmentsV3 } from "./studio-causal-dynamic-brush-deposit-v2";
 import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
-import { planStudioDynamicBrushCoverageMarks } from "./studio-dynamic-brush-coverage-renderer";
+
 
 describe("continuous brush carrier quality policy", () => {
   it("bounds soft continuous station/scatter envelopes without changing pressure mappings", () => {

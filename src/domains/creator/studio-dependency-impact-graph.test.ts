@@ -45,7 +45,7 @@ describe("studio dependency impact graph", () => {
         edge("asset-a", "shot-a"),
         edge("asset-a", "shot-a"),
         edge("shot-a", "panel-a", "contains"),
-        edge("panel-a", "shot-a", "derives-from"),
+        edge("panel-a", "shot-a", "derives-from "),
         edge("asset-a", "asset-a"),
         edge("missing", "panel-a"),
         edge("asset-a", "missing"),
@@ -96,7 +96,7 @@ describe("studio dependency impact graph", () => {
       edges: [
         edge("costume:hero:v2", "component:hero", "uses"),
         edge("component:hero", "shot:12", "renders-with"),
-        edge("shot:12", "panel:38", "derives-from"),
+        edge("shot:12", "panel:38", "derives-from "),
       ],
     });
 
@@ -128,7 +128,7 @@ describe("studio dependency impact graph", () => {
           "shot:12",
           "panel:38",
         ],
-        relations: ["uses", "renders-with", "derives-from"],
+        relations: ["uses", "renders-with", "derives-from "],
       },
     ]);
     expect(preview.approvedImpactCount).toBe(1);

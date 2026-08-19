@@ -3,14 +3,31 @@ import * as Y from "yjs";
 import {
   isStudioDynamicBrushMinimumDiameterRatio,
   studioDynamicBrushDepositPipelineUsesContinuation,
-} from "./studio-brush-dynamics";
-import { serializeStudioBrushR8TextureGrainSourceCanonical } from "./studio-brush-r8-grain-asset-contract";
+} from "../brush/studio-brush-dynamics";
+import { serializeStudioBrushR8TextureGrainSourceCanonical } from "../brush/studio-brush-r8-grain-asset-contract";
 import {
   STUDIO_BRUSH_RENDER_PROVENANCE_LIMITS,
   parseStudioBrushRenderProvenanceCrdtSidecar,
   serializeStudioBrushRenderProvenanceCrdtSidecarCanonical,
   type StudioBrushRenderProvenanceCrdtSidecar,
-} from "./studio-brush-render-provenance";
+} from "../brush/studio-brush-render-provenance";
+import {
+  isStudioInkPressureModel,
+  studioInkFallbackPressure,
+  type StudioInkPressureModel,
+} from "../brush/studio-ink-pressure-model";
+import { isStudioStrokePaintModelCompatible } from "../brush/studio-stroke-paint-model";
+import {
+  STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
+  STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
+  normalizeStudioBrushCatalogIdentityMetadata,
+} from "../studio-element-model";
+import {
+  isStudioMaterialMinimumDiameterRatio,
+  isStudioMaterialPressureModel,
+} from "../studio-material-pressure-model";
+import { normalizeStudioOutlineStrokeContract } from "../studio-outline-stroke-contract";
+
 import {
   decodeStudioCrdtStateVector,
   decodeStudioCrdtSyncChunks,
@@ -48,22 +65,6 @@ import {
   type StudioCrdtPagePayload,
   type StudioCrdtSceneElementPayload,
 } from "./studio-crdt-scene-schema";
-import {
-  STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
-  STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
-  normalizeStudioBrushCatalogIdentityMetadata,
-} from "./studio-element-model";
-import {
-  isStudioInkPressureModel,
-  studioInkFallbackPressure,
-  type StudioInkPressureModel,
-} from "./studio-ink-pressure-model";
-import {
-  isStudioMaterialMinimumDiameterRatio,
-  isStudioMaterialPressureModel,
-} from "./studio-material-pressure-model";
-import { normalizeStudioOutlineStrokeContract } from "./studio-outline-stroke-contract";
-import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
 import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
 

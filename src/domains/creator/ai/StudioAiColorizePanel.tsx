@@ -2,8 +2,9 @@
 // Presentation only; colorize + notice gate owned by parent.
 import { Loader2, Wand2 } from "lucide-react";
 
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+
 import { STUDIO_AI_COLORIZE_PRESETS } from "./studio-ai-assist-ux";
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 
 import { cn } from "@/lib/utils";
 

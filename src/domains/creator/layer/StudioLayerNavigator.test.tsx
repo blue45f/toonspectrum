@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { createLayerGroup, type LayerGroup } from "./studio-layers";
+import { createLayerGroup, type LayerGroup } from "../studio-layers";
+
 import { StudioLayerNavigator, type StudioLayerNavigatorProps } from "./StudioLayerNavigator";
 
 import type { StudioLayerNavigatorItem } from "./studio-layer-navigator";

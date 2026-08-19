@@ -1,3 +1,5 @@
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   verifyStudioLayerLiftArtifactPairReceipt,
 } from "./studio-layer-lift-artifact";
@@ -20,7 +22,6 @@ import {
   admitStudioLayerLiftCompositorInput,
   calculateStudioLayerLiftCompositorParitySha256,
 } from "./studio-layer-lift-compositor";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type {
   StudioLayerLiftTrustedArtifactPair,

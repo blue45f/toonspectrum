@@ -7,7 +7,7 @@
  * the pointer, so one collection per strokeId is correct and much cheaper on dense pages.
  */
 
-import type { GuideBox } from "./studio-smart-guides";
+import type { GuideBox } from "../studio-smart-guides";
 
 export interface StudioStrokeObjectSnapCache {
   readonly strokeId: string;

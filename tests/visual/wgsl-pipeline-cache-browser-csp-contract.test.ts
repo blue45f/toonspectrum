@@ -13,16 +13,13 @@ import {
   validateWgslPipelineCacheArtifact,
 } from "../benchmarks/harness/wgsl-pipeline-cache-browser";
 
-const ORCHESTRATOR_URL = new URL(
-  "../benchmarks/harness/wgsl-pipeline-cache-browser.ts",
+const ORCHESTRATOR_URL = new URL("../benchmarks/harness/wgsl-pipeline-cache-browser.ts",
   import.meta.url,
 );
-const PAGE_URL = new URL(
-  "../benchmarks/harness/wgsl-pipeline-cache-browser-page.ts",
+const PAGE_URL = new URL("../benchmarks/harness/wgsl-pipeline-cache-browser-page.ts",
   import.meta.url,
 );
-const RESULT_URL = new URL(
-  "../benchmarks/results/wgsl-pipeline-cache.json",
+const RESULT_URL = new URL("../benchmarks/results/wgsl-pipeline-cache.json",
   import.meta.url,
 );
 

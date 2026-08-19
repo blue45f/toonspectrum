@@ -7,6 +7,7 @@
  * pointer-move and replay pipelines from seeing a partially configured stroke.
  */
 
+import { resolveStudioHybridPressureSample } from "../hybrid-dcc/studio-hybrid-pressure-profile";
 import {
   normalizeCalligraphyStylusInput,
   resolveBrushPressureSample,
@@ -15,7 +16,19 @@ import {
   strokeSampleDistanceForBrushFamily,
   strokeSampleDistanceForScale,
   type NormalizedCalligraphyStylusInput,
-} from "./studio-brush";
+} from "../studio-brush";
+import { normalizeStudioBrushCatalogIdentityMetadata, type DrawEl } from "../studio-element-model";
+import {
+  resolveStudioCausalInkInputPlan,
+  type StudioCausalInkInputPlan,
+} from "../studio-fixed-rate-input-eligibility";
+import {
+  quantizeFixedRateStrokeSample,
+  type FixedRateStrokeQuantizedSample,
+} from "../studio-fixed-rate-stroke-filter";
+import { captureStudioOutlineStrokeContractV1 } from "../studio-outline-stroke-contract";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "../studio-pixel-pencil";
+
 import { isStudioBrushEraserAliasId } from "./studio-brush-alias-profile";
 import { resolveStudioBrushDynamicsSelectionPresetId } from "./studio-brush-dynamics";
 import { resolveStudioStrokeSymmetry } from "./studio-brush-intrinsic-symmetry";
@@ -26,22 +39,10 @@ import {
 import { resolveStudioCalligraphyAuthoringTip } from "./studio-calligraphy-nib-profile";
 import { captureStudioDrawPointerPressureContract } from "./studio-draw-pointer-pressure-contract";
 import { captureStudioPointerStartInkChannels } from "./studio-draw-pointer-start-ink-channels";
-import { normalizeStudioBrushCatalogIdentityMetadata, type DrawEl } from "./studio-element-model";
-import {
-  resolveStudioCausalInkInputPlan,
-  type StudioCausalInkInputPlan,
-} from "./studio-fixed-rate-input-eligibility";
-import {
-  quantizeFixedRateStrokeSample,
-  type FixedRateStrokeQuantizedSample,
-} from "./studio-fixed-rate-stroke-filter";
-import { resolveStudioHybridPressureSample } from "./studio-hybrid-pressure-profile";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
-import { captureStudioOutlineStrokeContractV1 } from "./studio-outline-stroke-contract";
-import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import {
   STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
   STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
@@ -49,7 +50,7 @@ import {
 } from "./studio-stroke-paint-model";
 
 import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
-import type { DrawMode, DrawShapeKind } from "./studio-editor-tool-model";
+import type { DrawMode, DrawShapeKind } from "../studio-editor-tool-model";
 import type { StudioStabilizerMode } from "./studio-stroke-stabilizer";
 
 export interface StudioDrawPointerStartSample {

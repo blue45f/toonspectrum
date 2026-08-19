@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  checkStudioWasm64Capability,
+  createStudioWasmMemoryRuntime,
+  STUDIO_WASM_PAGE_BYTES,
+} from "../studio-wasm64-memory-governor";
+
+import {
   buildStudioWasmConnectedComponentsModule,
   createStudioPersistentBinaryMaskScanner,
   createStudioWasmConnectedComponentsKernel,
@@ -9,11 +15,6 @@ import {
   STUDIO_WASM_COMPONENT_SCAN_WINDOW_BYTES,
   type StudioWasmConnectedComponentsKernelCreationResult,
 } from "./studio-wasm-connected-components-kernel";
-import {
-  checkStudioWasm64Capability,
-  createStudioWasmMemoryRuntime,
-  STUDIO_WASM_PAGE_BYTES,
-} from "./studio-wasm64-memory-governor";
 
 function createMemory32Kernel(maximumPages = BigInt(8)) {
   const runtime = createStudioWasmMemoryRuntime({

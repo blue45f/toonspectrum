@@ -96,8 +96,7 @@ interface ActiveOperation {
 
 function defaultWorkerFactory(): StudioWeightedDeformationWorkerLike {
   return new Worker(
-    new URL(
-      "./studio-weighted-deformation-provider.worker.ts",
+    new URL("./studio-weighted-deformation-provider.worker.ts",
       import.meta.url,
     ),
     {

@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 interface ModuleFacts {
   imports: string[];
   source: string;
@@ -10,10 +12,13 @@ interface ModuleFacts {
 
 function moduleFacts(fileName: string): ModuleFacts {
   const fileUrl = new URL(fileName, import.meta.url);
-  const source = readFileSync(fileUrl, "utf8");
+  const rawSource = readFileSync(fileUrl, "utf8");
+  const source = fileName.endsWith("StudioPage.tsx")
+    ? readStudioCuttoonEditorSource()
+    : rawSource;
   const file = ts.createSourceFile(
     fileUrl.pathname,
-    source,
+    rawSource,
     ts.ScriptTarget.Latest,
     true,
     fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
@@ -41,12 +46,12 @@ describe("studio pointer-release endpoint planning ownership boundary", () => {
     const planner = moduleFacts("./studio-pointer-release-endpoint-plan.ts");
 
     expect(planner.imports).toEqual([
-      "./studio-brush",
-      "./studio-brush-dynamics",
-      "./studio-brush-velocity-pressure",
-      "./studio-ink-pressure-model",
-      "./studio-persisted-pointer-channels",
-      "./studio-element-model",
+      "../brush/studio-brush-dynamics",
+      "../brush/studio-brush-velocity-pressure",
+      "../brush/studio-ink-pressure-model",
+      "../studio-brush",
+      "../studio-persisted-pointer-channels",
+      "../studio-element-model",
       "@/lib/studio-ink-input-contract",
     ]);
     expect(planner.source).not.toMatch(/from\s+["'](?:react|konva|react-konva)/u);
@@ -70,7 +75,7 @@ describe("studio pointer-release endpoint planning ownership boundary", () => {
   });
 
   it("leaves stabilizer ownership, ref replacement, CRDT publication, and finalization in StudioPage", () => {
-    const page = moduleFacts("./StudioPage.tsx").source;
+    const page = moduleFacts("../StudioPage.tsx").source;
     const sealStart = page.indexOf("function sealStudioDrawReleaseInput");
     const sealEnd = page.indexOf("function finishStudioSpecialistStroke", sealStart);
     const sealInput = page.slice(sealStart, sealEnd);
@@ -78,7 +83,7 @@ describe("studio pointer-release endpoint planning ownership boundary", () => {
     const end = page.indexOf("function onStagePointerCancel", start);
     const finish = page.slice(start, end);
 
-    expect(page).toContain('from "./studio-pointer-release-endpoint-plan"');
+    expect(page).toMatch(/from ["'].*canvas\/studio-pointer-release-endpoint-plan["']/);
     expect(sealStart).toBeGreaterThan(-1);
     expect(sealEnd).toBeGreaterThan(sealStart);
     expect(sealInput).toContain("planStudioPointerReleaseEndpoint({");

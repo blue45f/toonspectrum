@@ -5,7 +5,8 @@ import {
   replaceStudioCanonicalStrokePredictedSuffixV2,
   type StudioCanonicalStrokeSampleCandidateV2,
   type StudioCanonicalStrokeV2,
-} from "./studio-canonical-stroke-v2";
+} from "../studio-canonical-stroke-v2";
+
 import {
   planStudioStrokeCurveV2,
   type StudioStrokeCurvePlanV2,

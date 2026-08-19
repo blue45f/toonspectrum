@@ -1,10 +1,11 @@
 import { MessageCircle } from "lucide-react";
 
-import { groupBubbleVariants } from "./studio-assets";
-import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
+import { groupBubbleVariants } from "../studio-assets";
+import { writeStudioInsertDragPayload } from "../studio-insert-drag-writer";
+
 import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 
-import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
+import type { StudioToolBeltContentProps } from "../StudioToolBeltContent";
 
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";

@@ -3,8 +3,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const sourceUrl = new URL(
-  "./studio-p5-brush-standalone-runtime-adapter.ts",
+const sourceUrl = new URL("./studio-p5-brush-standalone-runtime-adapter.ts",
   import.meta.url,
 );
 const source = readFileSync(sourceUrl, "utf8");
@@ -39,7 +38,7 @@ describe("Studio p5.brush standalone adapter bundle boundary", () => {
   it("uses one literal lazy standalone import and never loads the p5 addon entry", () => {
     expect(dynamicPackages).toEqual(["p5.brush/standalone"]);
     expect(staticPackages).toEqual([
-      "./studio-procedural-artistic-brush-provider",
+      "../studio-procedural-artistic-brush-provider",
     ]);
     expect(source).not.toMatch(
       /(?:from|import\s*\()\s*["'](?:p5|p5\.brush)["']/u,

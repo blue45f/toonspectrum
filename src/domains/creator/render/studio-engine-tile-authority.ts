@@ -27,12 +27,13 @@ import {
   hashStudioCanonicalBrushPlan,
   parseStudioCanonicalBrushPlan,
   type StudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
 import {
   canonicalStudioCommandJson,
   studioCommandPayloadChecksum,
   type StudioCommandJsonValue,
-} from "./studio-command-journal";
+} from "../studio-command-journal";
+
 import { studioTileDocDigest } from "./studio-tiledoc-digest";
 import {
   StudioTileDocDirtyTracker,

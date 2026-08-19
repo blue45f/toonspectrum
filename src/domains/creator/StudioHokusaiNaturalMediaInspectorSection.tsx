@@ -24,14 +24,14 @@ import {
   studioHokusaiMaterialProfileIsCompatible,
   type StudioHokusaiMaterialProfileId,
   type StudioHokusaiNaturalMediaPresetId,
-} from "./studio-hokusai-natural-media-contract";
+} from "./render/studio-hokusai-natural-media-contract";
 import {
   STUDIO_FOCUS_RING,
   StudioSliderRow,
 } from "./studio-panel-ui";
 
+import type { StudioHokusaiNaturalMediaProductResult } from "./render/studio-hokusai-natural-media-product";
 import type { DrawEl, El } from "./studio-element-model";
-import type { StudioHokusaiNaturalMediaProductResult } from "./studio-hokusai-natural-media-product";
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
 
@@ -210,7 +210,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
     setCapability("checking");
     setCapabilityMessage(null);
     setError(null);
-    void import("./studio-hokusai-natural-media-product")
+    void import("./render/studio-hokusai-natural-media-product")
       .then(({ probeStudioHokusaiNaturalMediaProduct }) =>
         probeStudioHokusaiNaturalMediaProduct(controller.signal))
       .then((result) => {
@@ -252,7 +252,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
     setBusy(true);
     setError(null);
     setMessage(null);
-    void import("./studio-hokusai-natural-media-product")
+    void import("./render/studio-hokusai-natural-media-product")
       .then(({ generateStudioHokusaiNaturalMediaProduct }) =>
         generateStudioHokusaiNaturalMediaProduct(
           sourceSnapshot,

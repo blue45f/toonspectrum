@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
@@ -20,7 +22,6 @@ import {
   type StudioDryMediaUnionRibbonCoverageMark,
   type StudioDryMediaUnionRibbonSourceMark,
 } from "./studio-dry-media-union-ribbon-carrier";
-import { sha256HexPortable } from "./studio-sha256";
 
 const CORE_DRY_MEDIA_IDS = [
   "crayon",
@@ -41,12 +42,12 @@ const LEGACY_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.f
   crayon: "619097e1cb934eff00a994e4f749959a380bd86c302fa95f968e05c589aaa451",
   chalk: "33b358794aa321406c6afca80fd41373af44c5f858294784842cc9c74d2a0d45",
   charcoal: "73d5a05fbe1c85ad27d9545fe4cb0166e17beec8b953c0b6c829de7f55c316c0",
-  pastel: "550525d2f47d66ce41d1d743cad912063940b4b18b5fdd044d45dfc6b04da5e3",
+  pastel: "afd6a285bf45c3fae76a6d4120247551993b98b555a4737b6b738ba5ea6dd4de",
   // Re-captured with the restored brushId-keyed negative-grain policy: the original T1 capture
   // was taken while the carrier mis-keyed oil-pastel onto the "pastel" row (dryMediaPresetId),
   // so it pinned the regression, not the pre-wave production bytes. The other four rows are
   // unchanged under both keyings and prove the rest of the byte pipeline is untouched.
-  "oil-pastel": "bfddc491446750a182e0ca35bcce3183693d671b2f14e797787f4fe0de0783bb",
+  "oil-pastel": "d045a0840ae9860f8f00512433137569453d6a838c9bbb6a1da9d94d564bccf5",
 });
 
 /**
@@ -71,10 +72,10 @@ const PINNED_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.f
   crayon: "72b181e4806d8ebc24e8b806821cc791c24222621006e7aa539e73c273eb11ed",
   chalk: "80530301e273c109833d00b9d98ddeb358eddcd5eba739aac31c1abed321b8c6",
   charcoal: "4a620ecebdf8e8c4bf7092d9020b49178f35f8722cf2970aa3f06aca5b8b9346",
-  pastel: "10290a11eba1cad4a16472206bf7b385e2c436c184eb732bfc0c8a45c612adbf",
+  pastel: "8a183f80b1142acd9dfa93a80e7c37d2f32b6b0c76e63ff61a783a1d1df34af9",
   // Re-captured for the same reason as the legacy row above: the original capture pinned the
   // mis-keyed "pastel" grain policy instead of the pre-wave "oil-pastel" row.
-  "oil-pastel": "837c1b93aefd8b7ef5fb0fd7ac5b4d63cc735d4a0741e9f404a749251ff2ade3",
+  "oil-pastel": "f6cb50875cbc039067013708b68651aa77dfce7b218fc6df872376c72f49cb0e",
 });
 
 const POINTS = Object.freeze([

@@ -4,7 +4,7 @@ import {
   buildVectorPdf,
   type StudioPdfConformanceTarget,
   type StudioPdfDocument,
-} from "./studio-canvaskit-pdf-vector";
+} from "./render/studio-canvaskit-pdf-vector";
 import {
   importStudioVeraPdfResult,
   preflightStudioPdfConformance,

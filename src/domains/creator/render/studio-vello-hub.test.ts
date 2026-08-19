@@ -215,31 +215,31 @@ describe("VelloHub product capability and SceneIR island", () => {
   it("enables only the bounded product island by default and supports an emergency kill", () => {
     expect(resolveStudioVelloHubProductCapability({ globalObject: {} })).toEqual({
       enabled: true,
-      capabilityId: "studio-vello-hub-selection-overlay-v1",
-      scope: "accelerated-selection-overlay",
+      capabilityId: "studio-vello-hub-document-hybrid-v13",
+      scope: "document-vector-hybrid",
       reason: "product-default",
     });
     expect(resolveStudioVelloHubProductCapability({
       globalObject: { __TOONSPECTRUM_STUDIO_VELLO_HUB_DISABLED__: true },
     })).toMatchObject({ enabled: false, reason: "emergency-disabled" });
     expect(STUDIO_VELLO_HUB_PRODUCT_CAPABILITY).toMatchObject({
-      documentAuthority: false,
+      documentAuthority: true,
       inputAuthority: false,
       brushPixelAuthority: false,
-      primarySurfaceOwnership: "exclusive-within-island",
-      admissionMode: "scene-local-shadow-candidate",
+      primarySurfaceOwnership: "frame-graph-compositor",
+      admissionMode: "gpu-first-shadow-candidate",
       persistentWinnerStorage: false,
       productWidePromotionRequiresSoak: true,
     });
   });
 
-  it("keeps Hybrid/Sparse GPU explicitly unavailable instead of aliasing CPU sparse strips", () => {
+  it("keeps Hybrid/Sparse GPU explicitly unavailable and uses the compositor Hybrid lane", () => {
     expect(STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE).toMatchObject({
       eligible: false,
       status: "unavailable-upstream-api",
     });
     expect(STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE.reason).toContain(
-      "Classic browser WebGPU",
+      "vello_hybrid 0.2",
     );
   });
 
@@ -305,42 +305,41 @@ describe("VelloHub product capability and SceneIR island", () => {
 });
 
 describe("VelloHub runtime tournament", () => {
-  it("starts on CPU, visual-gates Classic, holds pen-down, then switches above 12%", async () => {
+  it("starts on Classic GPU, shadows CPU, and holds the GPU path while pen-down", async () => {
     const runtime = harness();
     const first = await runtime.hub.render(scene());
     expect(first).toMatchObject({
-      backendId: STUDIO_VELLO_CPU_BACKEND_ID,
-      decision: "initial-reference",
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      decision: "gpu-first",
       primarySurfaceOwner: "vello-hub",
-      admissionMode: "scene-local-shadow-candidate",
+      admissionMode: "gpu-first-shadow-candidate",
       productWidePromoted: false,
     });
     await runtime.hub.flushShadowWork();
 
-    const warmReference = await runtime.hub.render(scene());
-    expect(warmReference.backendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
+    const warm = await runtime.hub.render(scene());
+    expect(warm.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
     await runtime.hub.flushShadowWork();
 
     const penDown = await runtime.hub.render(scene(), { penDown: true });
     expect(penDown).toMatchObject({
-      backendId: STUDIO_VELLO_CPU_BACKEND_ID,
-      decision: "hysteresis-hold",
-    });
-    expect(penDown.expectedGainPct).toBe(75);
-
-    const switched = await runtime.hub.render(scene(), { penDown: false });
-    expect(switched).toMatchObject({
       backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-      decision: "switched",
+      decision: "cached",
+    });
+
+    const held = await runtime.hub.render(scene(), { penDown: false });
+    expect(held).toMatchObject({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
       visualGate: { pass: true, mismatchPct: 0 },
     });
     expect(runtime.presentation.activeBackendId).toBe(
       STUDIO_VELLO_CLASSIC_BACKEND_ID,
     );
     expect(runtime.hub.snapshot()).toMatchObject({
-      admissionMode: "scene-local-shadow-candidate",
+      admissionMode: "gpu-first-shadow-candidate",
       persistentWinnerStorage: false,
       productWidePromoted: false,
+      hybridCompositor: expect.objectContaining({ eligible: true }),
     });
     runtime.hub.dispose();
   });
@@ -355,15 +354,14 @@ describe("VelloHub runtime tournament", () => {
 
     const held = await runtime.hub.render(scene(), { penDown: false });
     expect(held).toMatchObject({
-      backendId: STUDIO_VELLO_CPU_BACKEND_ID,
-      decision: "hysteresis-hold",
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      decision: "cached",
     });
 
     livePenDown = false;
-    const switched = await runtime.hub.render(scene(), { penDown: false });
-    expect(switched).toMatchObject({
+    const next = await runtime.hub.render(scene(), { penDown: false });
+    expect(next).toMatchObject({
       backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-      decision: "switched",
     });
     runtime.hub.dispose();
   });
@@ -374,13 +372,11 @@ describe("VelloHub runtime tournament", () => {
     await runtime.hub.flushShadowWork();
     await runtime.hub.render(scene());
     const snapshot = runtime.hub.snapshot();
-    expect(snapshot.killedBackends).toEqual([
-      expect.objectContaining({
-        providerId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-        reason: expect.stringContaining("visual-gate-failed"),
-      }),
-    ]);
     expect(snapshot.lastGoodFrame?.backendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
+    expect(snapshot.killedBackends.some((entry) =>
+      entry.providerId === STUDIO_VELLO_CLASSIC_BACKEND_ID
+      && entry.reason.includes("visual-gate-failed"),
+    )).toBe(true);
     runtime.hub.dispose();
   });
 
@@ -388,15 +384,20 @@ describe("VelloHub runtime tournament", () => {
     const runtime = harness();
     runtime.classicControl.available = false;
     const first = await runtime.hub.render(scene());
+    expect(first.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
     await runtime.hub.flushShadowWork();
 
-    expect(first.backendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
-    expect(runtime.hub.snapshot().killedBackends).toEqual([
-      {
-        providerId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-        reason: "backend-unavailable:fake-unavailable",
-      },
-    ]);
+    expect(runtime.hub.snapshot().lastGoodFrame?.backendId).toBe(
+      STUDIO_VELLO_CPU_BACKEND_ID,
+    );
+    expect(runtime.hub.snapshot().killedBackends).toEqual(
+      expect.arrayContaining([
+        {
+          providerId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+          reason: "backend-unavailable:fake-unavailable",
+        },
+      ]),
+    );
     expect(runtime.presentation.activeBackendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
     runtime.hub.dispose();
   });
@@ -455,15 +456,16 @@ describe("VelloHub runtime tournament", () => {
     await promoteClassic(runtime);
     runtime.classicControl.compareError = "shadow-readback-failed";
     const unvalidatedScene = await runtime.hub.render(scene("new-shape"));
-    expect(unvalidatedScene.backendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
+    expect(unvalidatedScene.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
     await runtime.hub.flushShadowWork();
     expect(runtime.hub.snapshot().lastGoodFrame).toMatchObject({
       backendId: STUDIO_VELLO_CPU_BACKEND_ID,
-      fallback: null,
     });
-    expect(runtime.hub.snapshot().killedBackends).toEqual([
-      expect.objectContaining({ reason: "shadow-readback-failed" }),
-    ]);
+    expect(runtime.hub.snapshot().killedBackends).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ reason: "shadow-readback-failed" }),
+      ]),
+    );
     runtime.hub.dispose();
   });
 

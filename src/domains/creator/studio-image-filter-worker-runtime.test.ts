@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
+import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./render/studio-konva-filters";
 
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type {
   StudioImageFilterWorkerRequestMessage,
   StudioImageFilterWorkerResponseMessage,
   StudioImageFilterWorkerRunMessage,
 } from "./studio-image-filter-worker-protocol";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 interface WorkerScopeHarness {
   onmessage: ((event: MessageEvent<StudioImageFilterWorkerRequestMessage>) => void) | null;

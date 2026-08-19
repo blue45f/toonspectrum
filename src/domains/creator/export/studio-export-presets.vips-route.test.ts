@@ -11,6 +11,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_VIPS_EXPORT_SINGLE_SURFACE_EDGE_PX,
+  loadVipsForExport,
+  type StudioVipsExportLimits,
+  type StudioVipsExportRuntime,
+  type StudioVipsRaster,
+} from "../studio-vips-export";
+
+import {
   PRESET_VIPS_LOAD_FALLBACK_WARNING,
   PRESET_VIPS_OUT_OF_CORE_WARNING,
   PRESET_VIPS_PAGE_FALLBACK_WARNING,
@@ -22,13 +30,6 @@ import {
   type ExportPreset,
   type PresetSliceExportOptions,
 } from "./studio-export-presets";
-import {
-  STUDIO_VIPS_EXPORT_SINGLE_SURFACE_EDGE_PX,
-  loadVipsForExport,
-  type StudioVipsExportLimits,
-  type StudioVipsExportRuntime,
-  type StudioVipsRaster,
-} from "./studio-vips-export";
 
 const naver = findExportPreset("naver-challenge") as ExportPreset;
 const EDGE = STUDIO_VIPS_EXPORT_SINGLE_SURFACE_EDGE_PX; // 8192

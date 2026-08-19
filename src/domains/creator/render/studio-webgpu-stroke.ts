@@ -3,9 +3,9 @@ import {
   resolveStudioInkPressure,
   studioInkPressureRadius,
   type StudioInkPressureModel,
-} from "./studio-ink-pressure-model";
+} from "../brush/studio-ink-pressure-model";
 
-import type { StudioResidualInkState } from "./studio-causal-ink";
+import type { StudioResidualInkState } from "../studio-causal-ink";
 
 export type StudioGpuComposite = "normal" | "erase";
 

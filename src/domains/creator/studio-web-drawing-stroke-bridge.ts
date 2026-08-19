@@ -7,7 +7,7 @@
  * pipeline (no parallel renderer).
  */
 
-import { resolveStudioBrushIntrinsicSymmetry } from "./studio-brush-intrinsic-symmetry";
+import { resolveStudioBrushIntrinsicSymmetry } from "./brush/studio-brush-intrinsic-symmetry";
 import {
   isStudioWebAssistBrushId,
   planStudioWebAssistSamplesForBrush,
@@ -30,7 +30,7 @@ import {
 import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 
 export const STUDIO_WEB_DRAWING_STROKE_BRIDGE_VERSION =
   "web-drawing-stroke-bridge-v1" as const;

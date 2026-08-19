@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createStudioImpastoHeightProvider,
-  type StudioImpastoHeightFieldInput,
-} from "./studio-impasto-height-provider";
-import {
   createStudioLiveSurfaceFilterRecipe,
   renderStudioLiveSurfaceFilterCpuOracle,
   STUDIO_LIVE_SURFACE_FILTER_COLOR_CONTRACT,
   type StudioLiveSurfaceImage,
-} from "./studio-live-surface-filter-provider";
+} from "./live/studio-live-surface-filter-provider";
+import {
+  createStudioImpastoHeightProvider,
+  type StudioImpastoHeightFieldInput,
+} from "./studio-impasto-height-provider";
 import {
   createStudioMultiLightSurfaceRecipe,
   renderStudioMultiLightSurfaceCpuOracle,

@@ -21,7 +21,7 @@ import {
 import type {
   StudioQualityPathOp,
   StudioStrokeToPathStyle,
-} from "../src/domains/creator/studio-canvaskit-adapter";
+} from "../src/domains/creator/render/studio-canvaskit-adapter";
 
 const MAIN_WORKER_EPOCH = 7_001;
 const INVALID_WORKER_EPOCH = 7_002;

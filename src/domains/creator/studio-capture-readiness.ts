@@ -12,7 +12,7 @@ import {
   snapshotStudioMountedRasterImagePresentations,
   waitForStudioRasterImagePresentations,
   type StudioRasterImagePresentationIdentity,
-} from "./studio-raster-image-presentation";
+} from "./render/studio-raster-image-presentation";
 
 import type { StudioLinked3dPassCasAuthority } from "./studio-linked-3d-pass-transaction";
 
@@ -158,8 +158,7 @@ async function defaultResolveLinked3dPassRasterSource(
   authority?: StudioLinked3dPassCasAuthority,
   signal?: AbortSignal,
 ): Promise<StudioCaptureResolvedRasterSource | null> {
-  const { acquireStudioRasterSourceLease } = await import(
-    "./studio-raster-source-lease"
+  const { acquireStudioRasterSourceLease } = await import("./render/studio-raster-source-lease"
   );
   const lease = await acquireStudioRasterSourceLease(locator, {
     authority,

@@ -12,12 +12,13 @@
  * have per-dab/per-pass pigment multipliers because those are part of the brush material itself.
  */
 
-import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
 import {
   augmentStudioLivingInkSettledBakeDabs,
   resolveStudioLivingInkSettledBakeProgram,
   type StudioLivingInkSettledBakePhase,
-} from "./studio-living-ink-settled-bake-v1";
+} from "../studio-living-ink-settled-bake-v1";
+
+import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
 import {
   augmentStudioWetEdgeBloomDabs,
   resolveStudioWetEdgeBloomProgram,

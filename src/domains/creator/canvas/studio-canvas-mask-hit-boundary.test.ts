@@ -23,8 +23,8 @@ describe("Studio canvas mask hit isolation boundary", () => {
     );
 
     expect(renderElement).toContain("const isNonInteractiveRender =");
-    expect(renderElement).toContain(
-      "opts.asMask === true || isAdvancedFillVirtualPreview",
+    expect(renderElement).toMatch(
+      /opts\.asMask === true[\s\S]*?\|\|\s*isAdvancedFillVirtualPreview/u,
     );
     expect(renderElement).toContain("const wrapRenderInteraction =");
     expect(renderElement).toMatch(
@@ -33,8 +33,8 @@ describe("Studio canvas mask hit isolation boundary", () => {
     expect(renderElement).toContain(
       "return wrapRenderInteraction(clippedNode)",
     );
-    expect(renderElement).toContain(
-      'if (el.type === "frame") {\n                  return wrapRenderInteraction(',
+    expect(renderElement).toMatch(
+      /if \(el\.type === "frame"\) \{\s*return wrapRenderInteraction\(/u,
     );
     expect(renderElement).toContain("!isNonInteractiveRender &&");
     expect(renderElement).toContain(

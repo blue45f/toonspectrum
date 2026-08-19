@@ -3,16 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   createEmptyStudioAiImageReferenceDocument,
   hydrateStudioAiImageReferenceDocument,
-} from "./studio-ai-image-reference-roles";
-import { createEmptyStudioAiProvenanceDocument } from "./studio-ai-provenance";
+} from "./ai/studio-ai-image-reference-roles";
+import { createEmptyStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
+import { createDefaultStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
 import {
   createEmptyStudioCharacterBible,
   normalizeStudioCharacterBible,
 } from "./studio-character-bible";
 import { createEmptyStudioCommentsDocument } from "./studio-comments";
-import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
-import { createStudioLinked3dRenderPageFixture } from
-  "./studio-linked-3d-render-test-fixture";
+import { createStudioLinked3dRenderPageFixture } from "./studio-linked-3d-render-test-fixture";
 import { parseStudioProjectFile, serializeStudioProjectFile } from "./studio-project-file";
 import {
   buildStudioProjectFileSnapshot,

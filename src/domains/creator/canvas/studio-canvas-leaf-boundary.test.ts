@@ -37,15 +37,15 @@ function moduleEdges(relativePath: string): ModuleEdges {
 
 describe("Studio canvas leaf boundaries", () => {
   it("statically imports each leaf exactly once from StudioPage", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const viewport = moduleEdges("./StudioCanvasViewport.tsx");
 
     expect(
       viewport.valueImports.filter((specifier) => specifier === "./StudioCanvasStatusRail")
     ).toEqual(["./StudioCanvasStatusRail"]);
     expect(
-      page.valueImports.filter((specifier) => specifier === "./StudioCanvasContextMenu")
-    ).toEqual(["./StudioCanvasContextMenu"]);
+      page.valueImports.filter((specifier) => specifier === "../canvas/StudioCanvasContextMenu")
+    ).toEqual(["../canvas/StudioCanvasContextMenu"]);
   });
 
   it("keeps GPU, CRDT, brush, Konva, and editor ownership out of both leaves", () => {
@@ -64,7 +64,7 @@ describe("Studio canvas leaf boundaries", () => {
   });
 
   it("keeps context-menu state, outside-click lifecycle, and 3D parsing in StudioPage", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("../StudioPage.tsx");
     const viewport = moduleEdges("./StudioCanvasViewport.tsx");
     const menu = moduleEdges("./StudioCanvasContextMenu.tsx");
 
@@ -72,9 +72,9 @@ describe("Studio canvas leaf boundaries", () => {
     expect(page.source).toContain('globalThis.addEventListener("click", handleCloseMenu)');
     expect(page.source).toContain("parseStudio3dTool");
     expect(viewport.source).toContain("onContextMenu={(e) =>");
-    expect(menu.valueImports).not.toContain("./studio-background-3d-metadata");
-    expect(menu.valueImports).not.toContain("./studio-background-3d-loader");
-    expect(menu.valueImports).not.toContain("./studio-element-model");
+    expect(menu.valueImports).not.toContain("../studio-background-3d-metadata");
+    expect(menu.valueImports).not.toContain("../studio-background-3d-loader");
+    expect(menu.valueImports).not.toContain("../studio-element-model");
     expect(menu.source).not.toContain("parseStudio3dTool");
   });
 

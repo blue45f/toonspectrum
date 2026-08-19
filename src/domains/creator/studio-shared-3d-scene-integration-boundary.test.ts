@@ -2,20 +2,22 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 const stackSource = readFileSync(
   new URL("./StudioThreeDPreviewPanelStack.tsx", import.meta.url),
   "utf8",
 );
 const backgroundSource = readFileSync(
-  new URL("./StudioBackground3D.tsx", import.meta.url),
+  new URL("./bg3d/StudioBackground3D.tsx", import.meta.url),
   "utf8",
 );
 const characterSceneContentSource = readFileSync(
-  new URL("./StudioBg3dSharedCharacterSceneContent.tsx", import.meta.url),
+  new URL("./bg3d/StudioBg3dSharedCharacterSceneContent.tsx", import.meta.url),
   "utf8",
 );
 const characterStatusSource = readFileSync(
-  new URL("./StudioBg3dSharedCharacterStatusOverlay.tsx", import.meta.url),
+  new URL("./bg3d/StudioBg3dSharedCharacterStatusOverlay.tsx", import.meta.url),
   "utf8",
 );
 const characterStatusHookSource = readFileSync(
@@ -23,7 +25,7 @@ const characterStatusHookSource = readFileSync(
   "utf8",
 );
 const characterPlacementPanelSource = readFileSync(
-  new URL("./StudioBg3dSharedCharacterPlacementPanel.tsx", import.meta.url),
+  new URL("./bg3d/StudioBg3dSharedCharacterPlacementPanel.tsx", import.meta.url),
   "utf8",
 );
 const sharedSceneRuntimeSource = readFileSync(
@@ -31,25 +33,23 @@ const sharedSceneRuntimeSource = readFileSync(
   "utf8",
 );
 const characterSource = readFileSync(
-  new URL("./StudioBg3dSharedVrmCharacter.tsx", import.meta.url),
+  new URL("./bg3d/StudioBg3dSharedVrmCharacter.tsx", import.meta.url),
   "utf8",
 );
 const appearanceRuntimeSource = readFileSync(
-  new URL("./StudioBg3dSharedVrmAppearanceRuntime.tsx", import.meta.url),
+  new URL("./bg3d/StudioBg3dSharedVrmAppearanceRuntime.tsx", import.meta.url),
   "utf8",
 );
 const characterRuntimeSource = readFileSync(
-  new URL("./studio-bg3d-shared-vrm-runtime.ts", import.meta.url),
+  new URL("./bg3d/studio-bg3d-shared-vrm-runtime.ts", import.meta.url),
   "utf8",
 );
 const appearancePlanSource = readFileSync(
-  new URL("./studio-vrm-linked-appearance-projection-plan.ts", import.meta.url),
+  new URL("./vrm/studio-vrm-linked-appearance-projection-plan.ts", import.meta.url),
   "utf8",
 );
-const pageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
-  "utf8",
-);
+
+const pageSource = readStudioCuttoonEditorSource();
 
 describe("shared character/background 3D scene integration boundary", () => {
   it("derives a bounded session from live page elements and hands it to the BG3D stage", () => {
@@ -98,13 +98,13 @@ describe("shared character/background 3D scene integration boundary", () => {
 
   it("keeps the initial background renderer on the lightweight shared-stage runtime", () => {
     expect(backgroundSource).toContain(
-      'from "./studio-shared-3d-scene-runtime";',
+      'from "../studio-shared-3d-scene-runtime";',
     );
     expect(characterStatusHookSource).toContain(
       'from "./studio-shared-3d-scene-runtime";',
     );
     expect(characterPlacementPanelSource).toContain(
-      'from "./studio-shared-3d-scene-runtime";',
+      'from "../studio-shared-3d-scene-runtime";',
     );
     expect(sharedSceneRuntimeSource).not.toContain("studio-vrm-avatar-forge");
     expect(sharedSceneRuntimeSource).not.toContain(

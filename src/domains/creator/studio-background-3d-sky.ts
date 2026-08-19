@@ -1,7 +1,7 @@
 // Engine-neutral allowlist for Studio's procedural 360° sky. Documents persist only these ids and
 // a finite rotation; no URL, upload handle, Blob, or local storage key crosses this boundary.
 
-import type { StudioBg3dSkyPresetId } from "./studio-bg3d-scene-document";
+import type { StudioBg3dSkyPresetId } from "./bg3d/studio-bg3d-scene-document";
 
 export interface BgSkyPreset {
   readonly id: StudioBg3dSkyPresetId;

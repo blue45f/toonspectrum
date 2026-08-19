@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+
 import {
   classifyStudioBrushBackendQuality,
 } from "./studio-brush-backend-quality-policy";

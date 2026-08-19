@@ -3,8 +3,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resetStudioBg3dRetainedOwnerForTests } from "./studio-bg3d-retained-owner";
-import { StudioBg3dRetainedOwnerHost } from "./StudioBg3dRetainedOwnerHost";
+import { resetStudioBg3dRetainedOwnerForTests } from "./bg3d/studio-bg3d-retained-owner";
+import { StudioBg3dRetainedOwnerHost } from "./bg3d/StudioBg3dRetainedOwnerHost";
 import {
   StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,

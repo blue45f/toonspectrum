@@ -11,8 +11,8 @@
 import {
   resolveStudioInkPressureSamples,
   studioInkPressureDiameter,
-} from "./studio-ink-pressure-model";
-import { parseStudioGpuColor } from "./studio-webgpu-color";
+} from "./brush/studio-ink-pressure-model";
+import { parseStudioGpuColor } from "./render/studio-webgpu-color";
 
 import type { DrawEl } from "./studio-element-model";
 import type {

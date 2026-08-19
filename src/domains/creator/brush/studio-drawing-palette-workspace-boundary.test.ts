@@ -2,9 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const pageSource = readStudioCuttoonEditorSource();
 const inspectorSource = readFileSync(
-  new URL("./StudioInspectorAside.tsx", import.meta.url),
+  new URL("../StudioInspectorAside.tsx", import.meta.url),
   "utf8",
 );
 const stackSource = readFileSync(
@@ -12,15 +14,15 @@ const stackSource = readFileSync(
   "utf8",
 );
 const lazyRegistrySource = readFileSync(
-  new URL("./studio-page-lazy-ui.ts", import.meta.url),
+  new URL("../studio-page-lazy-ui.ts", import.meta.url),
   "utf8",
 );
 const workspaceSource = readFileSync(
-  new URL("./studio-workspaces.ts", import.meta.url),
+  new URL("../studio-workspaces.ts", import.meta.url),
   "utf8",
 );
 const viteSource = readFileSync(
-  new URL("../../../vite.config.ts", import.meta.url),
+  new URL("../../../../vite.config.ts", import.meta.url),
   "utf8",
 );
 
@@ -48,7 +50,7 @@ describe("Studio drawing palette workspace integration boundary", () => {
     );
 
     expect(workspaceChunk).toContain(
-      'id.endsWith("/src/domains/creator/studio-drawing-palettes.ts")',
+      'id.endsWith("/src/domains/creator/brush/studio-drawing-palettes.ts")',
     );
   });
 
@@ -164,7 +166,7 @@ describe("Studio drawing palette workspace integration boundary", () => {
 
     expect(ownerSync).toContain("createStudioWorkspacePersistenceRuntime({");
     expect(ownerSync).toContain('import("./studio-workspace-sqlite-runtime")');
-    expect(ownerSync).toContain("runtime.subscribeInvalidation((invalidation)");
+    expect(ownerSync).toContain("runtime.subscribeInvalidation((invalidation) => {");
     expect(ownerSync).toContain("await runtime.hydrate({");
     expect(ownerSync).toContain('result.failure === "ownership-busy"');
     expect(ownerSync).toContain("getDirtyRevision: () => workspaceDirtyRevisionRef.current");
@@ -319,7 +321,7 @@ describe("Studio drawing palette workspace integration boundary", () => {
     );
     expect(
       lazyRegistrySource.match(
-        /import\("\.\/StudioDrawingPaletteStack"\)/gu,
+        /import\("\.\/brush\/StudioDrawingPaletteStack"\)/gu,
       ),
     ).toHaveLength(1);
     expect(lazyRegistrySource).toContain(

@@ -19,6 +19,11 @@ import type {
 
 const source = readFileSync(resolve("src/domains/creator/StudioCommentsPanel.tsx"), "utf8");
 const studioPageSource = readFileSync(resolve("src/domains/creator/StudioPage.tsx"), "utf8");
+const studioEditorViewSource = readFileSync(
+  resolve("src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorView.tsx"),
+  "utf8",
+);
+const studioShellSource = `${studioPageSource}\n${studioEditorViewSource}`;
 const studioLazyPanelStackSource = readFileSync(
   resolve("src/domains/creator/StudioLazyPanelStack.tsx"),
   "utf8"
@@ -28,7 +33,7 @@ const studioCommentsPanelSessionSource = readFileSync(
   "utf8"
 );
 const studioCanvasOverlaySource = readFileSync(
-  resolve("src/domains/creator/StudioLiveCanvasOverlay.tsx"),
+  resolve("src/domains/creator/live/StudioLiveCanvasOverlay.tsx"),
   "utf8"
 );
 const studioPointCommentComposerSource = readFileSync(
@@ -160,7 +165,7 @@ describe("StudioCommentsPanel review rail contract", () => {
 
     expect(studioPageSource).toContain("commentPlacementPhaseRef");
     expect(studioPageSource).toContain('const commentPlacementActive = commentPlacementPhase !== "idle"');
-    expect(studioPageSource.match(/commentPinArmed=\{commentPlacementActive\}/gu)).toHaveLength(2);
+    expect(studioShellSource.match(/commentPinArmed=\{commentPlacementActive\}/gu)).toHaveLength(2);
     expect(studioPageSource).toContain('setStudioCommentPlacementPhase("placing")');
     expect(studioPageSource).toContain('setStudioCommentPlacementPhase("composing")');
     expect(studioPageSource).toContain("stopStudioCommentPlacementSession");
@@ -210,7 +215,7 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(reanchorSource).toContain("studioTeamCommentReanchorQueueRef.current.set");
     expect(reanchorSource).toContain("previousUpdatedAt");
     expect(reanchorSource).toContain("void reanchorStudioCommentPin(queued)");
-    expect(studioPageSource).toContain(
+    expect(studioShellSource).toContain(
       "studioCommentThreadPopoverScreenProjectionHandlers.getScreenPoint"
     );
   });
@@ -253,7 +258,7 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(studioPageLazyUiSource).toContain("studioPointCommentComposerLoader.load");
     expect(studioPageLazyUiSource).toContain("studioPointCommentComposerLoader.preload()");
     expect(studioPageLazyUiSource).not.toContain(
-      'import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioPointCommentComposer }))'
+      'import("./live/StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioPointCommentComposer }))'
     );
     expect(studioCanvasOverlaySource).not.toContain("StudioPointCommentComposer");
     expect(toggleSource).toContain("preloadStudioPointCommentComposer();");
@@ -264,16 +269,16 @@ describe("StudioCommentsPanel review rail contract", () => {
   });
 
   it("exposes one permission-aware desktop inbox trigger tied to the review dialog", () => {
-    expect(studioPageSource).toContain('data-studio-comments-inbox="true"');
-    expect(studioPageSource).toContain('aria-controls="studio-comments-review-dialog"');
-    expect(studioPageSource).toContain(
+    expect(studioShellSource).toContain('data-studio-comments-inbox="true"');
+    expect(studioShellSource).toContain('aria-controls="studio-comments-review-dialog"');
+    expect(studioShellSource).toContain(
       "disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}"
     );
-    expect(studioPageSource).toContain("lg:inline-flex");
-    expect(studioPageSource).toMatch(/commentsOpen\s*\?\s*"댓글 검토함 닫기"/u);
-    expect(studioPageSource).toContain('id: "menubar-comment-inbox"');
-    expect(studioPageSource).toContain('preview: "comment-inbox"');
-    expect(studioPageSource).toContain('openStudioCommentCount > 99 ? "99+" : openStudioCommentCount');
+    expect(studioShellSource).toContain("lg:inline-flex");
+    expect(studioShellSource).toMatch(/commentsOpen\s*\?\s*"댓글 검토함 닫기"/u);
+    expect(studioShellSource).toContain('id: "menubar-comment-inbox"');
+    expect(studioShellSource).toContain('preview: "comment-inbox"');
+    expect(studioShellSource).toContain('openStudioCommentCount > 99 ? "99+" : openStudioCommentCount');
   });
 
   it("keeps the inbox dense until the user explicitly composes and restores anchor context", () => {
@@ -401,7 +406,7 @@ describe("StudioCommentsPanel review rail contract", () => {
 
   it("keeps server review state out of the persisted project comment document", () => {
     expect(studioPageSource).toContain("const [studioTeamComments, setStudioTeamCommentsState]");
-    expect(studioPageSource).toContain("studioComments={studioCommentViewDocument}");
+    expect(studioShellSource).toContain("studioComments={studioCommentViewDocument}");
     expect(studioPageSource).toContain("comments: studioComments");
     expect(studioPageSource).not.toContain("comments: studioCommentViewDocument");
   });
@@ -414,7 +419,7 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(studioCommentsPanelSessionSource).toContain(
       "isAnchorValid={isStudioCommentAnchorValid}"
     );
-    expect(studioPageSource).toContain("commentsPanelMounted={commentsPanelMounted}");
+    expect(studioShellSource).toContain("commentsPanelMounted={commentsPanelMounted}");
     expect(studioPageSource).toContain("const isStudioCommentAnchorValid = useCallback");
   });
 

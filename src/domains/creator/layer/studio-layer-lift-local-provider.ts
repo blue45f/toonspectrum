@@ -6,6 +6,8 @@
  * ImageSegmenter or by the product ONNX provider, but this adapter never claims
  * general object understanding, background reconstruction, or editable text.
  */
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_SCENE_LAYER_LIFT_BUDGETS,
   STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION,
@@ -26,7 +28,6 @@ import {
   prepareStudioLayerLiftMask,
   type StudioLayerLiftPreparedMask,
 } from "./studio-layer-lift-mask";
-import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_LAYER_LIFT_LOCAL_FOREGROUND_CAPABILITY =
   "person-character-foreground-beta-v1" as const;

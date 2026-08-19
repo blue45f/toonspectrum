@@ -1,6 +1,14 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
+  SqliteUnavailableError,
+  openStudioLocalDatabase,
+  requireStudioBrushLibraryDatabase,
+  type StudioLocalDatabase,
+  type StudioSqliteApiHandle,
+} from "../studio-local-database";
+
+import {
   BRUSH_LIBRARY_KEY,
   BRUSH_LIBRARY_STORAGE_VERSION,
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
@@ -20,19 +28,12 @@ import {
   resetProductBrushLibraryRepositoryRuntime,
   studioBrushToSqlRecord,
 } from "./studio-brush-library-sqlite-repository";
-import {
-  SqliteUnavailableError,
-  openStudioLocalDatabase,
-  requireStudioBrushLibraryDatabase,
-  type StudioLocalDatabase,
-  type StudioSqliteApiHandle,
-} from "./studio-local-database";
 
 const localDatabaseRuntime = vi.hoisted(() => ({
   acquire: vi.fn<() => Promise<StudioLocalDatabase>>(),
 }));
 
-vi.mock("./studio-local-database-runtime", () => ({
+vi.mock("../studio-local-database-runtime", () => ({
   acquireStudioLocalDatabase: localDatabaseRuntime.acquire,
 }));
 

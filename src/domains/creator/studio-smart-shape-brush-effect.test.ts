@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { exportPageToSvg } from "./export/studio-svg-export";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import {
   applyStudioSmartShapeBrushEffect,
   studioSmartShapeBrushOutline,
 } from "./studio-smart-shape-brush-effect";
-import { exportPageToSvg } from "./studio-svg-export";
 
 import type { DrawEl } from "./studio-element-model";
 

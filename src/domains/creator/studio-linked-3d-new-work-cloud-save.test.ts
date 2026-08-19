@@ -9,14 +9,15 @@ import type { CreatorDraftCollaborationRoomResponse } from "./creator-draft-coll
 import type { StudioDraftCollaborationIdentity } from "./studio-draft-collaboration";
 import type { CreateWorkInput } from "@/src/infrastructure/creator-client";
 
+const now = Date.now();
 const identity: StudioDraftCollaborationIdentity = {
   version: 1,
   draftDocumentId: "draft_12345678-1234-4234-8234-123456789abc",
   documentScopeKey: "studio:new",
   ownerScopeKey: "12345678-1234-4234-8234-123456789abc",
-  createdAt: "2026-08-11T00:00:00.000Z",
-  lastOpenedAt: "2026-08-11T00:00:00.000Z",
-  expiresAt: "2026-08-18T00:00:00.000Z",
+  createdAt: new Date(now - 3600_000).toISOString(),
+  lastOpenedAt: new Date(now - 3600_000).toISOString(),
+  expiresAt: new Date(now + 14 * 86400_000).toISOString(),
   persistence: "persistent",
 };
 
@@ -43,9 +44,9 @@ function room(status: "active" | "promoted" = "active"): CreatorDraftCollaborati
     graphRevision: status === "promoted" ? 1 : 0,
     initialSnapshotByteLength: 1_024,
     provisionIntent: "cloud-save",
-    provisionedAt: "2026-08-11T00:01:00.000Z",
-    expiresAt: "2026-08-17T00:00:00.000Z",
-    promotedAt: status === "promoted" ? "2026-08-11T00:02:00.000Z" : null,
+    provisionedAt: new Date(now - 3600_000).toISOString(),
+    expiresAt: new Date(now + 3 * 86400_000).toISOString(),
+    promotedAt: status === "promoted" ? new Date(now - 1800_000).toISOString() : null,
   };
 }
 

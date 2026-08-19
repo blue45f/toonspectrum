@@ -145,8 +145,7 @@ export function createStudioFirstPartyWillV1DocumentCodecModuleWorker():
   StudioFirstPartyWillV1DocumentCodecWorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(
-    new URL(
-      "./studio-first-party-will-v1-document-codec.worker.ts",
+    new URL("./studio-first-party-will-v1-document-codec.worker.ts",
       import.meta.url,
     ),
     {

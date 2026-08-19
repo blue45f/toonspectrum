@@ -5,7 +5,9 @@ import {
   DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
   DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS,
   DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
-} from "./studio-advanced-blur-filter-kernels";
+} from "../studio-advanced-blur-filter-kernels";
+import { STUDIO_CURVE_MAX_CONTROL_POINTS } from "../studio-curves";
+
 import {
   STUDIO_CRDT_MAX_RUBY_READING_LENGTH,
   STUDIO_CRDT_MAX_RUBY_SPANS,
@@ -18,7 +20,6 @@ import {
   type StudioCrdtJsonObject,
   type StudioCrdtJsonValue,
 } from "./studio-crdt-scene-schema";
-import { STUDIO_CURVE_MAX_CONTROL_POINTS } from "./studio-curves";
 
 import { STUDIO_WORK_ASSET_MAX_CURVE_POINTS } from "@/lib/studio-work-asset-contract";
 

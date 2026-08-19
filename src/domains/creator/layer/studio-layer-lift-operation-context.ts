@@ -1,4 +1,6 @@
-import { isStudioEditorMutationContinuationAllowed } from "./studio-editor-scope";
+import { isStudioEditorMutationContinuationAllowed } from "../studio-editor-scope";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_LAYER_LIFT_ARTIFACT_MAX_AXIS_PIXELS,
   STUDIO_LAYER_LIFT_ARTIFACT_MAX_PIXELS,
@@ -8,10 +10,9 @@ import {
 import { isTrustedStudioLayerLiftCompositionReceipt } from "./studio-layer-lift-composition-receipt";
 import { isStudioSceneLayerLiftTrustedSuccess } from "./studio-layer-lift-contract";
 import { isStudioLayerLiftSourceCurrent } from "./studio-layer-lift-plan";
-import { sha256HexPortable } from "./studio-sha256";
 
-import type { StudioEditorMutationState, StudioEditorMutationTicket } from "./studio-editor-scope";
-import type { El } from "./studio-element-model";
+import type { StudioEditorMutationState, StudioEditorMutationTicket } from "../studio-editor-scope";
+import type { El } from "../studio-element-model";
 import type {
   StudioLayerLiftArtifactPairReceipt,
   StudioLayerLiftTrustedArtifactPair,
@@ -21,7 +22,7 @@ import type {
   StudioSceneLayerLiftResult,
   StudioSceneLayerLiftSuccess,
 } from "./studio-layer-lift-contract";
-import type { LayerGroup } from "./studio-layers";
+import type { LayerGroup } from "../studio-layers";
 
 const MAXIMUM_OPERATION_EPOCH = 0x7fff_ffff;
 const MAXIMUM_AUTHORITY_ID_LENGTH = 160;

@@ -7,7 +7,7 @@ import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioPaperSurfacePicker } from "./StudioPaperSurfacePicker";
 import { StudioPercentGuideControls } from "./StudioPercentGuideControls";
 
-import type { PaperGrainKind } from "./studio-paper-texture";
+import type { PaperGrainKind } from "./brush/studio-paper-texture";
 
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";

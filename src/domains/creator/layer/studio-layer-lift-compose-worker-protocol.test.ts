@@ -1,6 +1,8 @@
 import { Image, encodePng } from "image-js";
 import { describe, expect, it } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   StudioLayerLiftComposeWorkerProtocolError,
   createStudioLayerLiftComposeWorkerRequest,
@@ -18,7 +20,6 @@ import {
 import {
   composeStudioLayerLiftBeta,
 } from "./studio-layer-lift-compositor";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type {
   StudioLayerLiftComposeWorkerRequest,

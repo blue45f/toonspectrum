@@ -8,7 +8,7 @@ const files = {
   protocol: "studio-paper-vector-refinement-worker-protocol.ts",
   worker: "studio-paper-vector-refinement.worker.ts",
   provider: "studio-paper-vector-refinement-provider.ts",
-  geometry: "studio-engine-vector-geometry-provider.ts",
+  geometry: "../render/studio-engine-vector-geometry-provider.ts",
 } as const;
 
 function source(name: keyof typeof files): string {

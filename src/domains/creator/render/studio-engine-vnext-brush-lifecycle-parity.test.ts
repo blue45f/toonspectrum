@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
-import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
-import { studioCrdtStrokeToDrawElement, studioDrawElementToCrdtStroke } from "./studio-crdt-page-bridge";
-import { planStudioDrawPointerStart } from "./studio-draw-pointer-start-plan";
-import { verifyStudioEngineVNextBrushLifecycleParity } from "./studio-engine-vnext-brush-lifecycle-parity";
-import { exportPageToSvg } from "./studio-svg-export";
+import { studioCoreBrushCatalogSelection } from "../brush/studio-brush-selection";
+import { planStudioDrawPointerStart } from "../brush/studio-draw-pointer-start-plan";
+import { exportPageToSvg } from "../export/studio-svg-export";
+import { studioCrdtStrokeToDrawElement, studioDrawElementToCrdtStroke } from "../live/studio-crdt-page-bridge";
+import { BRUSH_PRESETS } from "../studio-brush";
 
-import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
-import type { DrawEl } from "./studio-element-model";
+import { verifyStudioEngineVNextBrushLifecycleParity } from "./studio-engine-vnext-brush-lifecycle-parity";
+
+import type { StudioBrushCatalogSelection } from "../brush/studio-brush-selection";
+import type { DrawEl } from "../studio-element-model";
 
 const REPRESENTATIVE_CATALOG_IDS = [
   "pen",

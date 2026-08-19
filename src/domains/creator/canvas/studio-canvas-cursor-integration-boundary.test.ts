@@ -2,14 +2,16 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const studioPageSource = readStudioCuttoonEditorSource();
 const studioCanvasViewportSource = readFileSync(
   new URL("./StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
-const globalsSource = readFileSync(new URL("../../styles/globals.css", import.meta.url), "utf8");
-const perspectiveSource = readFileSync(new URL("./StudioPerspectiveOverlay.tsx", import.meta.url), "utf8");
-const isometricSource = readFileSync(new URL("./StudioIsometricGridOverlay.tsx", import.meta.url), "utf8");
+const globalsSource = readFileSync(new URL("../../../styles/globals.css", import.meta.url), "utf8");
+const perspectiveSource = readFileSync(new URL("../StudioPerspectiveOverlay.tsx", import.meta.url), "utf8");
+const isometricSource = readFileSync(new URL("../StudioIsometricGridOverlay.tsx", import.meta.url), "utf8");
 const guideSource = readFileSync(new URL("./StudioCanvasGuideLayers.tsx", import.meta.url), "utf8");
 
 function studioPageSourceBetween(startMarker: string, endMarker: string): string {

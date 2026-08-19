@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   SRGB_ICC_BUILD_OPTIONS,
   buildMatrixTrcIccProfile,
-} from "./studio-canvaskit-icc-profile";
+} from "./render/studio-canvaskit-icc-profile";
 import {
   STUDIO_BUNDLED_SRGB_ICC_MANIFEST,
   STUDIO_ICC_MAX_PROFILE_BYTES,

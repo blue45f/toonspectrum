@@ -45,7 +45,7 @@ import {
   type StudioProductCodecCertificateVerificationResult,
 } from "./studio-product-codec-certification";
 
-import type { StudioRasterInterchangeFormat } from "./studio-raster-interchange";
+import type { StudioRasterInterchangeFormat } from "./render/studio-raster-interchange";
 
 export const STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_EVIDENCE_MEDIA_TYPE =
   "application/vnd.toonspectrum.raster-codec-conformance+json" as const;

@@ -30,8 +30,7 @@ describe("authentication runtime schema assertions", () => {
       .spyOn(dbClient, "execute")
       .mockRejectedValueOnce(failure)
       .mockResolvedValue(EMPTY_EXECUTE_RESULT);
-    const { ensureUserLifecycleSchema } = await import(
-      "../server/user-lifecycle"
+    const { ensureUserLifecycleSchema } = await import("../server/user-lifecycle"
     );
 
     await expect(ensureUserLifecycleSchema()).rejects.toBe(failure);

@@ -9,11 +9,11 @@ import { join, resolve } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { exerciseStudioDccCatalogFeature } from "./studio-dcc-catalog-feature-dispatch";
+import { exerciseStudioDccCatalogFeature } from "./hybrid-dcc/studio-dcc-catalog-feature-dispatch";
 import {
   STUDIO_DCC_SECTION6_CATALOG,
   type StudioSection6CatalogEntry,
-} from "./studio-dcc-section6-full-catalog";
+} from "./hybrid-dcc/studio-dcc-section6-full-catalog";
 
 const CONFIGURED_SCRATCH = process.env.GROK_SCRATCH ?? process.env.SCRATCH;
 const SCRATCH = CONFIGURED_SCRATCH

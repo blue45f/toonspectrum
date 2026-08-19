@@ -13,8 +13,7 @@ import {
 
 function artifact(): VrmAssetSqliteOpfsArtifact {
   return JSON.parse(readFileSync(
-    new URL(
-      "../benchmarks/results/vrm-asset-sqlite-opfs-browser.json",
+    new URL("../benchmarks/results/vrm-asset-sqlite-opfs-browser.json",
       import.meta.url,
     ),
     "utf8",
@@ -56,12 +55,10 @@ describe("VRM asset Chromium SQLite/OPFS promotion evidence", () => {
   });
 
   it("keeps the browser probe on product defaults, Dedicated Workers, and explicit termination", () => {
-    const page = readFileSync(new URL(
-      "../benchmarks/harness/vrm-asset-sqlite-opfs-browser-page.ts",
+    const page = readFileSync(new URL("../benchmarks/harness/vrm-asset-sqlite-opfs-browser-page.ts",
       import.meta.url,
     ), "utf8");
-    const worker = readFileSync(new URL(
-      "../benchmarks/harness/vrm-asset-sqlite-opfs-browser-client.ts",
+    const worker = readFileSync(new URL("../benchmarks/harness/vrm-asset-sqlite-opfs-browser-client.ts",
       import.meta.url,
     ), "utf8");
     expect(page).toContain("new Worker(");

@@ -49,7 +49,7 @@ vi.mock("./studio-asset-library", async (importOriginal) => {
   };
 });
 
-vi.mock("./studio-canvas-image-io", () => ({
+vi.mock("./canvas/studio-canvas-image-io", () => ({
   loadImageFileForCanvas: canvasImageIoMock.loadImageFileForCanvas,
 }));
 

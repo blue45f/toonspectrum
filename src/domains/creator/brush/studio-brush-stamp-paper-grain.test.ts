@@ -12,6 +12,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { exportPageToSvg } from "../export/studio-svg-export";
+
 import { resolveStudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
 import {
   drawStampStroke,
@@ -25,7 +27,6 @@ import {
 } from "./studio-brush-stamp-engine";
 import { transformStudioBrushSymmetryPoint } from "./studio-brush-symmetry";
 import { drawStudioStampStrokeWithSymmetry } from "./studio-stamp-symmetry-rendering";
-import { exportPageToSvg } from "./studio-svg-export";
 
 const BASE = { color: "#1f6feb", size: 14, opacity: 0.85 } as const;
 

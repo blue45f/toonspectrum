@@ -12,6 +12,11 @@ import {
 import { sha256HexPortable } from "./studio-sha256";
 
 import type {
+  StudioEngineWebGpuTexturedBrushAssetPayload,
+  StudioEngineWebGpuTexturedBrushAssetRequest,
+  StudioEngineWebGpuTexturedBrushAssetResolver,
+} from "./render/studio-engine-webgpu-textured-brush-plan";
+import type {
   StudioCanonicalBrushPlan,
 } from "./studio-canonical-brush-plan";
 import type {
@@ -19,11 +24,6 @@ import type {
   StudioDynamicDualTipExtension,
   StudioDynamicDualTipPlanResult,
 } from "./studio-dynamic-dual-tip-plan";
-import type {
-  StudioEngineWebGpuTexturedBrushAssetPayload,
-  StudioEngineWebGpuTexturedBrushAssetRequest,
-  StudioEngineWebGpuTexturedBrushAssetResolver,
-} from "./studio-engine-webgpu-textured-brush-plan";
 import type {
   StudioProfessionalBrushAcceptedSample,
   StudioProfessionalBrushDynamicsPlan,

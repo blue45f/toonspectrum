@@ -2,8 +2,8 @@ import { Suspense, type ReactElement } from "react";
 
 import { StudioHokusaiNaturalMediaInspectorSection } from "./studio-page-lazy-ui";
 
+import type { StudioHokusaiNaturalMediaProductResult } from "./render/studio-hokusai-natural-media-product";
 import type { El } from "./studio-element-model";
-import type { StudioHokusaiNaturalMediaProductResult } from "./studio-hokusai-natural-media-product";
 
 export type StudioHokusaiNaturalMediaReplaceHandler = (
   result: StudioHokusaiNaturalMediaProductResult,

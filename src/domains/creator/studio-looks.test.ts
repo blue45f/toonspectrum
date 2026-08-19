@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { normalizeInkWash } from "./brush/studio-ink-wash";
 import {
   DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
   DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
@@ -13,7 +14,6 @@ import { normalizeGlow } from "./studio-glow";
 import { normalizeGradientMap } from "./studio-gradient-map";
 import { normalizeGrain } from "./studio-grain";
 import { normalizeHalftone } from "./studio-halftone";
-import { normalizeInkWash } from "./studio-ink-wash";
 import { normalizeLight } from "./studio-light";
 import { normalizeLineArtCleanup } from "./studio-line-cleanup";
 import {
@@ -35,7 +35,7 @@ import {
 } from "./studio-tone-artifact-filter-kernels";
 import { normalizeVibrance } from "./studio-vibrance";
 
-import type { ImageFilterFields } from "./studio-konva-filters";
+import type { ImageFilterFields } from "./render/studio-konva-filters";
 
 // 유효 카테고리 집합 — 룩 category 검증용.
 const VALID_CATEGORIES: StudioLookCategory[] = ["만화", "시네마틱", "빈티지", "감성", "흑백", "실험"];

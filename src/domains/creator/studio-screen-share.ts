@@ -1,12 +1,12 @@
 import type {
   StudioLiveParticipant,
   StudioLiveWebRtcIcePayload,
-} from "./studio-live-collaboration-protocol";
+} from "./live/studio-live-collaboration-protocol";
 import type {
   StudioLivePeer,
   StudioLiveRoomEvent,
   StudioLiveSignalEnvelope,
-} from "./studio-live-collaboration-room";
+} from "./live/studio-live-collaboration-room";
 
 export interface StudioScreenShareRoom {
   readonly participant: StudioLiveParticipant;

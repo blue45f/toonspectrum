@@ -14,7 +14,7 @@ import {
   type StudioLiveGesturePreviewShape,
 } from "./studio-live-gesture-preview";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 export const STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS = 40;
 export const STUDIO_LIVE_GESTURE_PREVIEW_BYTE_REFILL_PER_SECOND = 512 * 1_024;

@@ -9,7 +9,7 @@ function source(relative: string): string {
 describe("Studio CRDT recovery SQLite product boundary", () => {
   it("constructs product recovery through the shared local database and structured v6 surface", () => {
     const vault = source("./studio-crdt-recovery-vault.ts");
-    const localDatabase = source("./studio-local-database.ts");
+    const localDatabase = source("../studio-local-database.ts");
 
     expect(vault).toContain("acquireStudioLocalDatabase");
     expect(vault).toContain("requireStudioCrdtRecoveryDatabase");

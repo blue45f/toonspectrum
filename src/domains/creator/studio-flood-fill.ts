@@ -164,8 +164,7 @@ export async function floodFillImage(
   }
 
   // Yield once after decode/draw so pointer-up UI can paint before the BFS.
-  const { encodeStudioPixelEditCanvasPng, yieldStudioMainThread } = await import(
-    "./studio-pixel-edit-async"
+  const { encodeStudioPixelEditCanvasPng, yieldStudioMainThread } = await import("./studio-pixel-edit-async"
   );
   await yieldStudioMainThread();
 

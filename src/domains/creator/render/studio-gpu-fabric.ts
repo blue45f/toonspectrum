@@ -361,3 +361,83 @@ export function disposeStudioGpuFabric(): void {
   lossListeners.clear();
   if (state) safeDestroyDevice(state.device);
 }
+
+export interface StudioGpuTextureRecord {
+  readonly id: string;
+  readonly texture: GPUTexture;
+  readonly width: number;
+  readonly height: number;
+  readonly epoch: number;
+  revision: number;
+}
+
+/**
+ * TextureRegistry for the single-fabric FrameGraph. Providers look up handles
+ * by id; GPUTexture objects never enter DocumentSceneIR.
+ */
+export class StudioGpuTextureRegistry {
+  private readonly records = new Map<string, StudioGpuTextureRecord>();
+
+  get(id: string): StudioGpuTextureRecord | null {
+    return this.records.get(id) ?? null;
+  }
+
+  put(record: StudioGpuTextureRecord): void {
+    const existing = this.records.get(record.id);
+    if (existing && existing.texture !== record.texture) {
+      try {
+        existing.texture.destroy();
+      } catch {
+        // A lost-device texture may already be invalid.
+      }
+    }
+    this.records.set(record.id, record);
+  }
+
+  evict(id: string): void {
+    const existing = this.records.get(id);
+    if (!existing) return;
+    try {
+      existing.texture.destroy();
+    } catch {
+      // Best-effort eviction.
+    }
+    this.records.delete(id);
+  }
+
+  dispose(): void {
+    for (const id of [...this.records.keys()]) this.evict(id);
+  }
+}
+
+export interface StudioGpuPass {
+  readonly id: string;
+  readonly dependencies: readonly string[];
+  readonly reads: readonly string[];
+  readonly writes: readonly string[];
+  encode(context: { readonly device: GPUDevice; readonly epoch: number }): void | Promise<void>;
+}
+
+/**
+ * Central submit epoch. Providers encode into this scheduler instead of
+ * calling queue.submit() independently.
+ */
+export class StudioGpuSubmitScheduler {
+  private readonly pending: GPUCommandBuffer[] = [];
+  private epoch = 0;
+
+  enqueue(buffer: GPUCommandBuffer): void {
+    this.pending.push(buffer);
+  }
+
+  submit(device: GPUDevice): number {
+    if (this.pending.length === 0) return this.epoch;
+    device.queue.submit(this.pending.splice(0, this.pending.length));
+    this.epoch += 1;
+    return this.epoch;
+  }
+
+  get submitEpoch(): number {
+    return this.epoch;
+  }
+}

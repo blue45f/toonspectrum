@@ -20,23 +20,23 @@ import {
 import {
   disposeStudioVrmAsset,
   loadStudioVrmAsset,
-} from "../src/domains/creator/studio-vrm-asset-runtime";
+} from "../src/domains/creator/vrm/studio-vrm-asset-runtime.test.ts";
+import {
+  createStudioVrmAvatarForgeFaceController,
+} from "../src/domains/creator/vrm/studio-vrm-avatar-forge-face-controller.ts";
 import {
   AVATAR_FORGE_PRESETS,
   createAvatarForgeState,
   type AvatarForgeState,
-} from "../src/domains/creator/studio-vrm-avatar-forge";
-import {
-  createStudioVrmAvatarForgeFaceController,
-} from "../src/domains/creator/studio-vrm-avatar-forge-face-controller";
+} from "../src/domains/creator/vrm/studio-vrm-avatar-forge.ts";
 import {
   STUDIO_VRM_AVATAR_REFERENCE_MODEL_BYTE_LENGTH,
   STUDIO_VRM_AVATAR_REFERENCE_MODEL_SHA256,
   type StudioVrmAvatarReferenceEmbedding,
-} from "../src/domains/creator/studio-vrm-avatar-reference-recommendation";
+} from "../src/domains/creator/vrm/studio-vrm-avatar-reference-recommendation.ts";
 import {
   StudioVrmAvatarForge,
-} from "../src/domains/creator/StudioVrmAvatarForge";
+} from "../src/domains/creator/vrm/StudioVrmAvatarForge.tsx";
 
 import type { ImageEmbedder as MediaPipeImageEmbedder } from "@mediapipe/tasks-vision";
 import type { VRM } from "@pixiv/three-vrm";

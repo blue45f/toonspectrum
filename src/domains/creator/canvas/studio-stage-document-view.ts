@@ -27,7 +27,7 @@
  * not.
  */
 
-import { planStudioCanvasStageLayout, type StudioCanvasStageLayout } from "./studio-view-controls";
+import { planStudioCanvasStageLayout, type StudioCanvasStageLayout } from "../studio-view-controls";
 
 /** Unscaled document size plus the display scale the Stage is currently rendered at. */
 export interface StudioStageDocumentGeometry {

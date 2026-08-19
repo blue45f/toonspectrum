@@ -6,12 +6,12 @@
  * 레이어를 참조하면서 별도 채색 레이어를 칠하는 워크플로에도 사용할 수 있다.
  */
 
-import { createStudioPersistentBinaryMaskScanner } from "./studio-wasm-connected-components-kernel";
+import { createStudioPersistentBinaryMaskScanner } from "./render/studio-wasm-connected-components-kernel";
 import {
   createStudioPersistentMaskMorphologyExecutor,
   STUDIO_WASM_MASK_MORPHOLOGY_DEFAULT_MINIMUM_INPUT_BYTES,
   type StudioMaskMorphologyOperation,
-} from "./studio-wasm-mask-morphology-kernel";
+} from "./render/studio-wasm-mask-morphology-kernel";
 
 export const ADVANCED_FILL_MAX_PIXELS = 32 * 1024 * 1024;
 export const ADVANCED_FILL_MAX_CLOSE_GAP_RADIUS = 32;

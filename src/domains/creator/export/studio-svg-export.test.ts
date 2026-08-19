@@ -4,8 +4,6 @@ import { inflateSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-import { parsePngChunks } from "./studio-apng-encoder";
-import { screentoneDotsForStroke } from "./studio-brush";
 import {
   normalizeStudioBrushDynamicsSettings,
   resolveStudioBrushDynamicsPresetId,
@@ -17,45 +15,53 @@ import {
   studioDryMediaUnionComposableProgramPin,
   type StudioDynamicBrushDab,
   type StudioBrushDynamicsPresetId,
-} from "./studio-brush-dynamics";
-import { resolveStudioStrokeSymmetry } from "./studio-brush-intrinsic-symmetry";
+} from "../brush/studio-brush-dynamics";
+import { resolveStudioStrokeSymmetry } from "../brush/studio-brush-intrinsic-symmetry";
 import {
   planStudioDynamicBrushRenderBudget,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
-} from "./studio-brush-render-budget";
-import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
+} from "../brush/studio-brush-render-budget";
+import { studioDynamicBrushDabVariations } from "../brush/studio-brush-symmetry";
 import {
   encodeStudioBrushTipAlphaMapBase64,
   studioBrushTipAlphaMapToBase64,
-} from "./studio-brush-tip-stamp";
-import { bubblePathData, doubleBubblePathData } from "./studio-bubble-path";
+} from "../brush/studio-brush-tip-stamp";
+import { STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT } from "../brush/studio-wet-ribbon-carrier";
+import { bubblePathData, doubleBubblePathData } from "../lettering/studio-bubble-path";
+import { parsePngChunks } from "../studio-apng-encoder";
+import { screentoneDotsForStroke } from "../studio-brush";
 import {
   planStudioCausalDynamicBrushDepositSegmentsV3,
   planStudioCausalDynamicBrushDepositsV2,
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-} from "./studio-causal-dynamic-brush-deposit-v2";
+} from "../studio-causal-dynamic-brush-deposit-v2";
 import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
   type StudioDynamicBrushCoverageMark,
-} from "./studio-dynamic-brush-coverage-renderer";
-import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
+} from "../studio-dynamic-brush-coverage-renderer";
+import { planStudioDynamicBrushRender } from "../studio-dynamic-brush-render-plan";
 import {
   planGlowBrushPasses,
   planNeonBrushPasses,
   studioLuminousCoreColor,
-} from "./studio-fx-brush";
-import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
+} from "../studio-fx-brush";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
 import {
   captureStudioOutlineStrokeContractV1,
   planStudioPerfectFreehandRender,
-} from "./studio-outline-stroke-contract";
-import { peekStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
+} from "../studio-outline-stroke-contract";
+import { peekStudioPerfectFreehandStroker } from "../studio-perfect-freehand";
 import {
   planStudioPixelPencilCells,
   STUDIO_PIXEL_PENCIL_RENDER_MODE,
-} from "./studio-pixel-pencil";
-import { buildStudioRoughSvgParityPlan } from "./studio-rough-svg-parity";
+} from "../studio-pixel-pencil";
+import { buildStudioRoughSvgParityPlan } from "../studio-rough-svg-parity";
+import {
+  planStudioWebDrawingKitOwnedDabs,
+  STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS,
+} from "../studio-web-drawing-stroke-bridge";
+
 import {
   SVG_EXPORT_MIME,
   escapeXml,
@@ -66,14 +72,10 @@ import {
   type SvgExportPageInput,
   type SvgExportResult,
 } from "./studio-svg-export";
-import {
-  planStudioWebDrawingKitOwnedDabs,
-  STUDIO_WEB_DRAWING_KIT_OWNED_BRUSH_IDS,
-} from "./studio-web-drawing-stroke-bridge";
-import { STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT } from "./studio-wet-ribbon-carrier";
 
-import type { StudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
-import type { DrawEl, El } from "./studio-element-model";
+
+import type { StudioDynamicBrushMaterialIdentity } from "../brush/studio-dry-media-dynamic-bridge";
+import type { DrawEl, El } from "../studio-element-model";
 
 // ---------------------------------------------------------------------------
 // 헬퍼 — 페이지 입력/요소 빌더
@@ -1070,7 +1072,7 @@ describe("도형 직렬화", () => {
   });
 
   it("G펜 4종을 첫 화면과 같은 단일 가변 폭 outline으로 결정적 내보내기한다", async () => {
-    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    const { loadStudioPerfectFreehandStroker } = await import("../studio-perfect-freehand");
     await loadStudioPerfectFreehandStroker();
     const brushes = ["gpen", "mapping-pen", "kaburapen", "liner"] as const;
     const points = [4, 28, 14, 8, 30, 2, 48, 12, 56, 30, 48, 48, 28, 55, 10, 44];
@@ -1103,7 +1105,7 @@ describe("도형 직렬화", () => {
   });
 
   it("누락된 레거시 G펜 필압은 명시적 0.6 배열과 같은 SVG를 만든다", async () => {
-    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    const { loadStudioPerfectFreehandStroker } = await import("../studio-perfect-freehand");
     await loadStudioPerfectFreehandStroker();
     const points = [0, 8, 16, 0, 32, 5, 48, 18, 64, 12];
     const base = rectEl({

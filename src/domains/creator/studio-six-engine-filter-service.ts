@@ -10,12 +10,12 @@
  *  6. Perfect Freehand: Streamline Smoothing & Tapering Filters
  */
 
+import { StudioVelloVectorEngine, type StudioVelloPathSegment, type StudioVelloStrokeStyle, type StudioVelloTile } from "./render/studio-vello-vector-engine";
 import { StudioGlanceEngine, type StudioGlanceFilterParams } from "./studio-glance-engine";
 import { StudioKritaCoreEngine, type StudioKritaDualBlendMode, type StudioKritaParametricTipConfig } from "./studio-krita-core-engine";
 import { StudioLibmypaintEngine, type StudioLibmypaintBrushSettings } from "./studio-libmypaint-engine";
 import { StudioPathfinderVectorEngine, type StudioPathfinderPoint, type StudioPathfinderPolygon } from "./studio-pathfinder-vector-engine";
 import { STUDIO_PERFECT_FREEHAND_PROFILES } from "./studio-perfect-freehand";
-import { StudioVelloVectorEngine, type StudioVelloPathSegment, type StudioVelloStrokeStyle, type StudioVelloTile } from "./studio-vello-vector-engine";
 
 export const STUDIO_SIX_ENGINE_FILTER_SERVICE_VERSION = "studio-six-engine-filter-service-v1" as const;
 

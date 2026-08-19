@@ -1,3 +1,8 @@
+import {
+  allowStudioProgrammaticReload,
+  consumeStudioProgrammaticReloadAllowance,
+} from "../../../lib/programmatic-reload";
+
 /**
  * 탭 종료 경고 — "닫기 전에 물어보기"가 없던 마지막 조용한 실패를 막는다.
  *
@@ -58,6 +63,26 @@ export function hasUnsavedStudioWork(signals: StudioUnsavedWorkSignals): boolean
   );
 }
 
+/**
+ * What the native leave/reload dialog is allowed to interrupt.
+ *
+ * Brush-slot SQLite dirt is retried in the background and is not worth a browser confirm.
+ * The prompt exists for the short window where a document generation or deferred stroke has
+ * not yet reached OPFS/SQLite. Once that receipt lands, sitting idle must stay silent.
+ */
+export function hasStudioUnloadPromptWork(signals: StudioUnsavedWorkSignals): boolean {
+  if (!signals.hydrated) return false;
+  if (signals.editGeneration > signals.durableGeneration) return true;
+  return (
+    signals.pendingStrokeFingerprint !== signals.durablePendingStrokeFingerprint
+  );
+}
+
+export {
+  allowStudioProgrammaticReload,
+  consumeStudioProgrammaticReloadAllowance,
+};
+
 export interface StudioUnloadGuardTarget {
   addEventListener(
     type: "beforeunload",
@@ -85,6 +110,7 @@ export function installStudioUnloadGuard(
   options: StudioUnloadGuardOptions,
 ): () => void {
   const listener = (event: BeforeUnloadEvent): void => {
+    if (consumeStudioProgrammaticReloadAllowance()) return;
     if (!options.hasUnsavedWork()) return;
     event.preventDefault();
     // 구형 브라우저 호환 — 최신 브라우저는 preventDefault 만으로 확인 창을 띄운다.

@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 function readStudioSource(fileName: string): string {
-  return readFileSync(new URL(`./${fileName}`, import.meta.url), "utf8");
+  const relativePath = fileName === "StudioDrawOptionsBar.tsx" ? `./brush/${fileName}` : `./${fileName}`;
+  return readFileSync(new URL(relativePath, import.meta.url), "utf8");
 }
 
 function expectNearby(source: string, anchor: string, expected: string, span = 800): void {
@@ -120,8 +121,8 @@ describe("Studio rich-hint consumer mappings", () => {
   it("distinguishes mobile direct shapes, export settings, file workflows, insertion, and comments", () => {
     const mobile = readStudioSource("StudioMobileEditingDock.tsx");
     const menubar = readStudioSource("StudioMenubarContent.tsx");
-    const studioPage = readStudioSource("StudioPage.tsx");
-    const toolBelt = readStudioSource("StudioToolBeltContent.tsx");
+    const studioPage = readStudioSource("studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const toolBelt = readStudioSource("StudioToolBeltCreateModeUtilityButtons.tsx");
 
     expectNearby(mobile, "const shapeHintPreviewProps", 'hintPreview: "shape" as const');
     expectNearby(mobile, "const shapeHintPreviewProps", "hintPreviewVariant: drawShape");

@@ -20,7 +20,7 @@ const catalogSource = readFileSync(
   "utf8",
 );
 const statusRailSource = readFileSync(
-  new URL("./StudioCanvasStatusRail.tsx", import.meta.url),
+  new URL("./canvas/StudioCanvasStatusRail.tsx", import.meta.url),
   "utf8",
 );
 

@@ -1,8 +1,9 @@
-import { planStudioCausalInkDabs } from "./studio-causal-ink";
 import {
   resolveStudioInkPressure,
   studioInkUsesResidualDabSpacing,
-} from "./studio-ink-pressure-model";
+} from "../brush/studio-ink-pressure-model";
+import { planStudioCausalInkDabs } from "../studio-causal-ink";
+
 import {
   STUDIO_GPU_STROKE_FEED_REVISION,
   orderStudioGpuStrokes,

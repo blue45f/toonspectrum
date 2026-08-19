@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   pickObjectIdAtPoint,
   selectIdsByMarquee,
@@ -43,7 +44,7 @@ describe("selection hit helpers used by product marquee / pick paths", () => {
   });
 
   it("StudioPage marquee completion calls selectIdsByMarquee", () => {
-    const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const page = readStudioCuttoonEditorSource();
     expect(page).toContain("selectIdsByMarquee");
     expect(page).toMatch(/const hitIds = selectIdsByMarquee\(/u);
     const selection = readFileSync(new URL("./studio-selection.ts", import.meta.url), "utf8");
@@ -53,10 +54,10 @@ describe("selection hit helpers used by product marquee / pick paths", () => {
 
   it("large-doc spatial index remains available on the hybrid object-pick path", () => {
     const hybrid = readFileSync(
-      new URL("./studio-hybrid-brush-filter-edit-runtime.ts", import.meta.url),
+      new URL("./hybrid-dcc/studio-hybrid-brush-filter-edit-runtime.ts", import.meta.url),
       "utf8",
     );
-    expect(hybrid).toContain('from "./studio-engine-scene-spatial-index"');
+    expect(hybrid).toContain('from "../render/studio-engine-scene-spatial-index"');
     expect(hybrid).toContain("createStudioEngineSceneSpatialIndex");
     expect(hybrid).toContain("hitTestPoint");
   });

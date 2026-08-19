@@ -8,7 +8,7 @@ function source(path: string): string {
 
 describe("Studio live dynamic brush integration boundary", () => {
   it("arms the suffix renderer at pointer-down and routes pointer frames through appendFrom", () => {
-    const page = source("./StudioPage.tsx");
+    const page = source("../StudioPage.tsx");
     const pointerStart = page.slice(
       page.indexOf("const dynamicBrushDirect ="),
       page.indexOf("const predictionTailEligible =", page.indexOf("const dynamicBrushDirect =")),
@@ -21,7 +21,7 @@ describe("Studio live dynamic brush integration boundary", () => {
       'liveDynamicBrushDraftDirectRef.current = strokeSurfaceRoute.kind === "dynamic"',
     );
     expect(pointerStart).toContain(
-      "if (stampDirect || dynamicBrushDirect || wetInkOverlayStarted)",
+      "if (stampDirect || dynamicBrushDirect || wetInkOverlayStarted || retainedMediaDirect)",
     );
     expect(pointerStart).toContain("liveDraftLayerRef.current?.drawScene()");
 
@@ -34,29 +34,55 @@ describe("Studio live dynamic brush integration boundary", () => {
     expect(flush).toContain("draftPreviewDynamicLayerRef.current?.drawScene()");
   });
 
-  it("seals exact material before synchronously transferring authority to the draft FIFO", () => {
-    const page = source("./StudioPage.tsx");
+  it("seals exact material on the overlay until the committed-draw receipt", () => {
+    const page = source("../StudioPage.tsx");
     const clear = page.slice(
       page.indexOf("const clearDraftPreview ="),
       page.indexOf("const DEFERRED_STROKE_COMMIT_IDLE_MS"),
     );
-    const seal = clear.indexOf("renderer.end(finalDynamicBrushStroke)");
-    const settle = clear.indexOf(
-      "draftPreviewStoreRef.current.settle(finalDynamicBrushStroke)",
+    const dynamicStart = clear.indexOf("if (wasDynamicBrushDirect)");
+    const dynamic = clear.slice(
+      dynamicStart,
+      clear.indexOf("if (wasRetainedMediaDirect)", dynamicStart),
     );
-    const flushReceipt = clear.lastIndexOf("flushSync(() => {", settle);
-    const release = clear.indexOf("renderer.releaseSettledPrefix(1)");
+    const seal = dynamic.indexOf("renderer.end(finalDynamicBrushStroke)");
     expect(seal).toBeGreaterThan(0);
-    expect(flushReceipt).toBeGreaterThan(seal);
-    expect(settle).toBeGreaterThan(seal);
+    expect(dynamic).not.toContain("draftPreviewStoreRef.current.settle(finalDynamicBrushStroke)");
+    expect(dynamic).not.toContain("renderer.releaseSettledPrefix(1)");
+  });
+
+  it("seals stamp overlay pixels before the draft FIFO so pointer-up cannot blank the stroke", () => {
+    const page = source("../StudioPage.tsx");
+    const clear = page.slice(
+      page.indexOf("const clearDraftPreview ="),
+      page.indexOf("const DEFERRED_STROKE_COMMIT_IDLE_MS"),
+    );
+    const stamp = clear.slice(clear.indexOf("if (wasStampDirect)"));
+    const end = stamp.indexOf("renderer.end()");
+    const settle = stamp.indexOf(
+      "draftPreviewStoreRef.current.settle(finalStampStroke)",
+    );
+    const flushReceipt = stamp.lastIndexOf("flushSync(() => {", settle);
+    const release = stamp.indexOf("renderer.releaseSettledPrefix(1)");
+    expect(end).toBeGreaterThan(-1);
+    expect(flushReceipt).toBeGreaterThan(end);
     expect(settle).toBeGreaterThan(flushReceipt);
     expect(release).toBeGreaterThan(settle);
+    const flush = page.slice(
+      page.indexOf("flushPendingStrokeCommitsRef.current = () => {"),
+      page.indexOf("discardPendingStrokeCommitsRef.current = () => {"),
+    );
+    const commit = flush.indexOf(
+      "committed = commit([...baseElements, ...batch.strokes]",
+    );
+    expect(commit).toBeGreaterThan(-1);
+    expect(flush.slice(0, commit)).not.toContain("suppressSettledPrefix(");
   });
 
   it("mounts both active and settled native-density canvases through Viewport", () => {
     const hosts = source("./StudioLiveInkHosts.tsx");
-    const viewport = source("./StudioCanvasViewport.tsx");
-    const lazyUi = source("./studio-page-lazy-ui.ts");
+    const viewport = source("../canvas/StudioCanvasViewport.tsx");
+    const lazyUi = source("../studio-page-lazy-ui.ts");
     expect(hosts).toContain('data-studio-live-dynamic-active="true"');
     expect(hosts).toContain('data-studio-live-dynamic-settled="true"');
     expect(hosts).toContain("renderer.attach({");

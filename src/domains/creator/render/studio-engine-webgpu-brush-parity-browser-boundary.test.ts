@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const root = resolve(import.meta.dirname, "../../..");
+const root = resolve(import.meta.dirname, "../../../..");
 const browserEntry = readFileSync(
   resolve(root, "scripts/studio-engine-webgpu-brush-parity-browser.ts"),
   "utf8",
@@ -16,7 +16,7 @@ const verifier = readFileSync(
 describe("Studio Engine real WebGPU brush parity browser boundary", () => {
   it("loads the new worker-compatible runtime through an isolated literal browser entry", () => {
     expect(browserEntry).toContain(
-      'from "../src/domains/creator/studio-engine-webgpu-brush-runtime"',
+      'from "../src/domains/creator/render/studio-engine-webgpu-brush-runtime"',
     );
     expect(verifier).toContain(
       'const HARNESS_ENTRY = "/scripts/studio-engine-webgpu-brush-parity-browser.ts";',

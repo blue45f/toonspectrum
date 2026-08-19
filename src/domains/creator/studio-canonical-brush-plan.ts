@@ -10,17 +10,17 @@
 import {
   normalizeStudioBrushDynamicsSettings,
   type NormalizedStudioBrushDynamicsSettings,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   normalizeStudioBrushDualBrushSettings,
   normalizeStudioBrushTipLayers,
   type NormalizedStudioBrushDualBrushSettings,
   type NormalizedStudioBrushTipLayerSettings,
-} from "./studio-brush-tip-composition";
+} from "./brush/studio-brush-tip-composition";
 import {
   normalizeStudioBrushTipSettings,
   type NormalizedStudioBrushTipSettings,
-} from "./studio-brush-tip-stamp";
+} from "./brush/studio-brush-tip-stamp";
 import { canonicalStudioCommandJson } from "./studio-command-journal";
 
 export const STUDIO_CANONICAL_BRUSH_PLAN_VERSION = 1 as const;

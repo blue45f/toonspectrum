@@ -1,8 +1,6 @@
-import { hasStudioLinked3dPassProjectArchiveReferences } from
-  "./studio-linked-3d-pass-project-archive";
+import { hasStudioLinked3dPassProjectArchiveReferences } from "./studio-linked-3d-pass-project-archive";
 
-import type { StudioLinked3dPassCloudUploadReceipt } from
-  "./studio-linked-3d-pass-cloud-sync";
+import type { StudioLinked3dPassCloudUploadReceipt } from "./studio-linked-3d-pass-cloud-sync";
 import type { StudioProjectFile } from "./studio-project-file";
 
 export class StudioLinked3dPassCloudProjectError extends Error {

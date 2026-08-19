@@ -5,7 +5,7 @@ import {
   decodeStudioBrushTipAlphaMapBase64,
   normalizeStudioBrushTipSettings,
   STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE,
-} from "./studio-brush-tip-stamp";
+} from "./brush/studio-brush-tip-stamp";
 import {
   listStudioCc0KritaRgbaTipImports,
   resolveStudioCc0KritaRgbaTipImport,

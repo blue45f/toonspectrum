@@ -1,7 +1,9 @@
 import {
   CONTENT_AWARE_FILL_TILE_PX_DEFAULT,
   CONTENT_AWARE_FILL_TILE_PX_RANGE,
-} from "./studio-content-aware-fill-contract";
+} from "../studio-content-aware-fill-contract";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_LAYER_LIFT_ARTIFACT_LIMITS,
   StudioLayerLiftArtifactError,
@@ -17,7 +19,6 @@ import {
   STUDIO_SCENE_LAYER_LIFT_BUDGETS,
   STUDIO_SCENE_LAYER_LIFT_SEMANTIC_LAYER_ROLES,
 } from "./studio-layer-lift-contract";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type {
   StudioLayerLiftPngDecoder,
@@ -620,7 +621,7 @@ function createBackground(
   width: number,
   height: number,
   fillTilePixels: number,
-  fillPixels: typeof import("./studio-content-aware-fill")["contentAwareFillPixels"],
+  fillPixels: typeof import("../studio-content-aware-fill")["contentAwareFillPixels"],
 ): Uint8ClampedArray<ArrayBuffer> {
   const filled = fillPixels(
     { data: source, width, height },
@@ -829,7 +830,7 @@ export async function composeStudioLayerLiftBeta(
   throwIfAborted(options.signal);
   // The fill kernel is used only by an explicit Layer Lift composition. Its tile search and
   // pixel helpers must remain outside the Studio page/client graph.
-  const { contentAwareFillPixels } = await import("./studio-content-aware-fill");
+  const { contentAwareFillPixels } = await import("../studio-content-aware-fill");
   throwIfAborted(options.signal);
   const backgroundBytes = createBackground(
     input.sourceRgba,

@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-import { deriveStudioBg3dGlbBudgetProfiles } from "./studio-bg3d-device-quality";
+import { deriveStudioBg3dGlbBudgetProfiles } from "./bg3d/studio-bg3d-device-quality";
 import {
   type StudioBg3dGlbBudgetProfiles,
   type StudioBg3dGlbValidationSuccess,
-} from "./studio-bg3d-glb-validation";
-import { validateStudioBg3dGlbOffMainThread } from "./studio-bg3d-glb-validation-worker-client";
-import { STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS } from "./studio-bg3d-meshopt";
+} from "./bg3d/studio-bg3d-glb-validation";
+import { validateStudioBg3dGlbOffMainThread } from "./bg3d/studio-bg3d-glb-validation-worker-client";
+import { STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS } from "./bg3d/studio-bg3d-meshopt";
 import {
   STUDIO_BG3D_GLB_MIME,
   STUDIO_BG3D_PRIMITIVE_KINDS,
@@ -15,7 +15,7 @@ import {
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
   type StudioBg3dModelAttachment,
-} from "./studio-bg3d-scene-document";
+} from "./bg3d/studio-bg3d-scene-document";
 import {
   assertStudioLinked3dPassProjectArchiveEvidence,
   StudioLinked3dPassProjectArchiveError,
@@ -32,8 +32,7 @@ import {
   STUDIO_SHARED_3D_STAGE_COLLECTION_KIND,
   migrateStudioShared3dStageCollectionDocument,
 } from "./studio-shared-3d-stage-collection";
-import { STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND } from
-  "./studio-shared-3d-stage-document";
+import { STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND } from "./studio-shared-3d-stage-document";
 import {
   STUDIO_VRM_SCENE_DOCUMENT_KIND,
   STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES,
@@ -42,14 +41,14 @@ import {
   parseStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
   type StudioVrmSurfacePaintTexture,
-} from "./studio-vrm-scene-document";
+} from "./vrm/studio-vrm-scene-document";
 import {
   STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_KIND,
   STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_MIME,
   STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_SCHEMA_VERSION,
   verifyStudioVrmTexturePaintArtifact,
-} from "./studio-vrm-texture-paint-artifact";
-import { SAMPLE_VRMS } from "./vrm-library";
+} from "./vrm/studio-vrm-texture-paint-artifact";
+import { SAMPLE_VRMS } from "./vrm/vrm-library";
 
 /**
  * Self-contained ToonSpectrum project archive.

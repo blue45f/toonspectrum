@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createEmptyStudioAiImageReferenceDocument } from
-  "./studio-ai-image-reference-roles";
-import { createEmptyStudioAiProvenanceDocument } from "./studio-ai-provenance";
+import { createEmptyStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
+import { createEmptyStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import { createEmptyStudioCharacterBible } from "./studio-character-bible";
 import { createEmptyStudioCommentsDocument } from "./studio-comments";
 import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
-import { createStudioLinked3dRenderPageFixture } from
-  "./studio-linked-3d-render-test-fixture";
+import { createStudioLinked3dRenderPageFixture } from "./studio-linked-3d-render-test-fixture";
 import { createEmptyStudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
 import { DEFAULT_STUDIO_PUBLISH_COMPLIANCE } from "./studio-publish-compliance";
 import { DEFAULT_STUDIO_PUBLISH_PACKAGE_SETTINGS } from "./studio-publish-package";
@@ -20,10 +18,8 @@ import {
   normalizeStudioSaveTags,
   type BuildStudioSavePayloadInput,
 } from "./studio-save-payload";
-import { migrateStudioShared3dStageCollectionDocument } from
-  "./studio-shared-3d-stage-collection";
-import { createNativePluralShared3dStageFixture } from
-  "./studio-shared-3d-stage-test-fixture";
+import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
+import { createNativePluralShared3dStageFixture } from "./studio-shared-3d-stage-test-fixture";
 import { createEmptyStudioWriterRoomDocument } from "./studio-writer-room";
 
 function saveInput(

@@ -380,8 +380,7 @@ describe("StudioLiveRoom", () => {
   });
 
   it("syncs presence and CRDT between two signaling-server rooms in one origin", async () => {
-    const { createStudioLiveSignalingServerTransportFactory } = await import(
-      "./studio-live-signaling-server-transport"
+    const { createStudioLiveSignalingServerTransportFactory } = await import("./studio-live-signaling-server-transport"
     );
     const workId = `work-instant-${Date.now().toString(36)}-jam1`;
     const roomA = new StudioLiveRoom({

@@ -22,7 +22,7 @@
 import { recordStudioDestructiveOutcome } from "./studio-destructive-action-preview";
 
 import type { StudioDestructiveActionRequest } from "./studio-destructive-action-preview";
-import type { StudioVrmRenderedPoseUseContextInput } from "./studio-vrm-license-product-gate";
+import type { StudioVrmRenderedPoseUseContextInput } from "./vrm/studio-vrm-license-product-gate";
 
 const PAGE_ELEMENTS_LABEL = "현재 페이지의 요소";
 

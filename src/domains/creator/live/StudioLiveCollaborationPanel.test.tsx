@@ -16,7 +16,7 @@ import type {
   StudioLivePeer,
 } from "./studio-live-collaboration-room";
 import type { StudioLiveSyncSnapshot } from "./studio-live-sync-safety";
-import type { StudioScreenShareState } from "./studio-screen-share";
+import type { StudioScreenShareState } from "../studio-screen-share";
 
 const noop = () => undefined;
 

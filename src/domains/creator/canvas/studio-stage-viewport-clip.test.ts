@@ -12,6 +12,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { planStudioCanvasStageLayout } from "../studio-view-controls";
+
 import {
   applyStudioStageViewportClip,
   planStudioStageViewportClipBox,
@@ -24,9 +26,8 @@ import {
   STUDIO_STAGE_VIEWPORT_CLIP_RELEASE_PIXELS,
   type StudioStageViewportClipRuntime,
 } from "./studio-stage-viewport-clip";
-import { planStudioCanvasStageLayout } from "./studio-view-controls";
 
-import type { StudioViewStageLayout } from "./studio-view-controls";
+import type { StudioViewStageLayout } from "../studio-view-controls";
 
 const DOCUMENT_WIDTH = 924;
 const DOCUMENT_HEIGHT = 1386;

@@ -1,12 +1,12 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const page = readStudioCuttoonEditorSource();
 
 describe("studio stroke object-snap cache boundary", () => {
   it("wires the pure per-stroke cache into StudioPage object-snap hot path", () => {
-    expect(page).toContain('from "./studio-stroke-object-snap-cache"');
+    expect(page).toMatch(/from\s+["'](?:\.\/brush|\.\.\/brush|\.)\/studio-stroke-object-snap-cache["']/u);
     expect(page).toContain("resolveStudioStrokeObjectSnapTargets");
     expect(page).toContain("strokeObjectSnapCacheRef");
     expect(page).toContain("strokeObjectSnapTargetsFor(");

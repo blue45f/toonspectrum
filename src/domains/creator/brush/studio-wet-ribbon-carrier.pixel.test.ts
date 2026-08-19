@@ -3,12 +3,13 @@ import { createRequire } from "node:module";
 
 import { describe, expect, it } from "vitest";
 
+import { planCausalWatercolorBrushDabs } from "../studio-causal-watercolor-brush";
+
 import {
   applyStudioBrushAliasWatercolorMaterial,
   mapStudioBrushAliasPressureSamples,
   resolveStudioBrushAliasWatercolorPlanSettings,
 } from "./studio-brush-alias-profile";
-import { planCausalWatercolorBrushDabs } from "./studio-causal-watercolor-brush";
 import {
   planStudioWetRibbonCarrier,
   studioWetRibbonCarrierBatchPathData,

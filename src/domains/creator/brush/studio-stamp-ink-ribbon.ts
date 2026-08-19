@@ -13,7 +13,7 @@
  * document pixels — bodies, caps, opacity and determinism are untouched.
  */
 
-import { computeStudioImpastoReliefShading } from "./studio-impasto-relief-shading-v1";
+import { computeStudioImpastoReliefShading } from "../studio-impasto-relief-shading-v1";
 
 import type {
   StudioStampBrushDab,

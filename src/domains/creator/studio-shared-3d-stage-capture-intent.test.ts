@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldCaptureStudioShared3dStageCharacters } from
-  "./studio-shared-3d-stage-capture-intent";
+import { shouldCaptureStudioShared3dStageCharacters } from "./studio-shared-3d-stage-capture-intent";
 
 describe("Studio Shared 3D Stage capture intent", () => {
   it.each([

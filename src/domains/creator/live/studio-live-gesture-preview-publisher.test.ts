@@ -15,7 +15,7 @@ import {
   type StudioLiveGesturePreviewPublisherScheduler,
 } from "./studio-live-gesture-preview-publisher";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 class ManualScheduler implements StudioLiveGesturePreviewPublisherScheduler {
   #now = 1_000;

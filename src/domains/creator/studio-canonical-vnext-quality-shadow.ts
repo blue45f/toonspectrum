@@ -12,7 +12,7 @@ import {
   resolveStudioBrushBackendQualityRoute,
   type StudioBrushBackendId,
   type StudioBrushBackendQualityFamily,
-} from "./studio-brush-backend-quality-policy";
+} from "./brush/studio-brush-backend-quality-policy";
 import {
   adaptStudioDrawElementToCanonicalBrushPlan,
   type StudioCanonicalBrushDrawAdapterRequirement,

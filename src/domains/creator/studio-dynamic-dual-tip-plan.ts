@@ -1,25 +1,25 @@
 import {
+  buildStudioEngineWebGpuTexturedBrushPlan,
+  STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS,
+} from "./render/studio-engine-webgpu-textured-brush-plan";
+import {
   STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS,
   STUDIO_CANONICAL_BRUSH_PLAN_VERSION,
 } from "./studio-canonical-brush-plan";
-import {
-  buildStudioEngineWebGpuTexturedBrushPlan,
-  STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS,
-} from "./studio-engine-webgpu-textured-brush-plan";
 import {
   parseStudioProfessionalBrushDynamicsPlan,
 } from "./studio-professional-brush-dynamics";
 import { sha256HexPortable } from "./studio-sha256";
 
 import type {
-  StudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
-import type {
   StudioEngineWebGpuTexturedBrushAssetRequest,
   StudioEngineWebGpuTexturedBrushAssetResolver,
   StudioEngineWebGpuTexturedBrushPlan,
   StudioEngineWebGpuTexturedBrushResolvedAsset,
-} from "./studio-engine-webgpu-textured-brush-plan";
+} from "./render/studio-engine-webgpu-textured-brush-plan";
+import type {
+  StudioCanonicalBrushPlan,
+} from "./studio-canonical-brush-plan";
 import type {
   StudioProfessionalBrushAcceptedSample,
   StudioProfessionalBrushDynamicsPlan,

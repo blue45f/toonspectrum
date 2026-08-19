@@ -1,5 +1,5 @@
-import type { StudioCommittedInkSurfaceHandoff } from "./studio-committed-ink-handoff-coordinator";
-import type { DrawEl } from "./studio-element-model";
+import type { StudioCommittedInkSurfaceHandoff } from "../studio-committed-ink-handoff-coordinator";
+import type { DrawEl } from "../studio-element-model";
 
 /** One document stroke can fan out to several GPU operations when symmetry is enabled. */
 export interface StudioGpuPendingDrawAuthority {

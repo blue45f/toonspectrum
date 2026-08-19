@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_DUAL_TIP_CONTRACT_VERSION } from "../studio-dual-brush-tip-engine";
+
 import { serializeStudioBrushDynamicsSettingsCanonical } from "./studio-brush-dynamics";
 import {
   materializeStudioBrushPackSelection,
@@ -13,7 +15,6 @@ import {
   type StudioBrushPackDualTipRenderInput,
   type StudioBrushPackSelection,
 } from "./studio-brush-pack-runtime";
-import { STUDIO_DUAL_TIP_CONTRACT_VERSION } from "./studio-dual-brush-tip-engine";
 
 const CATALOG_ID = "g-pen-flex";
 

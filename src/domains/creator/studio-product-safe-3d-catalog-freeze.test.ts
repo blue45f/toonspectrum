@@ -1,25 +1,25 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  resolveStudioBg3dLightingStudioPreset,
+  STUDIO_BG3D_LIGHTING_STUDIO_PRESETS,
+} from "./bg3d/studio-bg3d-lighting-studio";
 import { COMPOSITE_PRESETS } from "./studio-background-3d-composites";
 import {
   BG_SCENE_TEMPLATES,
   instantiateSceneTemplate,
 } from "./studio-background-3d-scene-templates";
 import {
-  resolveStudioBg3dLightingStudioPreset,
-  STUDIO_BG3D_LIGHTING_STUDIO_PRESETS,
-} from "./studio-bg3d-lighting-studio";
-import {
   EXTRA_POSE_PRESETS,
   POSER_KNOWN_BONES,
   type PoseDirectionTarget,
 } from "./studio-pose-presets";
-import { VRM_PROPS } from "./studio-vrm-props";
+import { VRM_PROPS } from "./vrm/studio-vrm-props";
 import {
   WARDROBE_FABRICS,
   WARDROBE_ITEMS,
   WARDROBE_SETS,
-} from "./studio-vrm-wardrobe";
+} from "./vrm/studio-vrm-wardrobe";
 
 const ACCEPTED_CATALOG_MANIFEST = Object.freeze({
   lighting: Object.freeze(["cinematic-3point"]),

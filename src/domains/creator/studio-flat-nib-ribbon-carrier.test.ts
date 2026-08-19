@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
-import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
-import { buildStudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
-import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
+} from "./brush/studio-brush-dynamics";
+import { materializeStudioBrushPackDynamics } from "./brush/studio-brush-pack-runtime";
+import { buildStudioBrushTipAlphaMap } from "./brush/studio-brush-tip-stamp";
+import { resolveStudioDynamicBrushMaterialIdentity } from "./brush/studio-dry-media-dynamic-bridge";
+import { exportPageToSvg } from "./export/studio-svg-export";
 import {
   planStudioDynamicBrushCoverageMarks,
   renderStudioDynamicBrushCoverageMark,
@@ -17,7 +18,6 @@ import {
   STUDIO_FLAT_NIB_RIBBON_CARRIER_VERSION,
   type StudioFlatNibRibbonSourceMark,
 } from "./studio-flat-nib-ribbon-carrier";
-import { exportPageToSvg } from "./studio-svg-export";
 
 const ELIGIBLE = [
   "line-block",

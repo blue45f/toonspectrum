@@ -1,15 +1,15 @@
 import { useId, useLayoutEffect, useRef } from "react";
 
-import { getStudioPaperBrushResponseSummaries } from "./studio-paper-surface-brush-response";
+import { getStudioPaperBrushResponseSummaries } from "./brush/studio-paper-surface-brush-response";
 import {
   getStudioPaperSurfaceCatalogEntry,
   getStudioPaperSurfaceCharacteristics,
   listStudioPaperSurfaceCatalogByGroup,
   studioPaperSurfaceSwatchStyle,
-} from "./studio-paper-surface-catalog";
-import { getStudioPaperSurfacePreviewTile } from "./studio-paper-surface-preview";
+} from "./brush/studio-paper-surface-catalog";
+import { getStudioPaperSurfacePreviewTile } from "./brush/studio-paper-surface-preview";
 
-import type { PaperGrainKind } from "./studio-paper-texture";
+import type { PaperGrainKind } from "./brush/studio-paper-texture";
 
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";

@@ -169,8 +169,7 @@ export function attachStudioLocalDatabaseWorkerHost(
         const value = await Reflect.apply(method, database, request.args);
         postSuccessOrTransportFailure(request, value);
       } catch (error) {
-        const { isStudioSqliteCorruption, wipeStudioSqliteOpfsDirectory } = await import(
-          "./studio-local-database"
+        const { isStudioSqliteCorruption, wipeStudioSqliteOpfsDirectory } = await import("./studio-local-database"
         );
         if (!isStudioSqliteCorruption(error) || request.kind !== "call") throw error;
         try {

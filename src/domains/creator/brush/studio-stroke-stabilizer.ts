@@ -7,11 +7,11 @@
  * behavior without a DOM or Konva dependency.
  */
 
-import { STABILIZER_MAX } from "./studio-brush";
+import { STABILIZER_MAX } from "../studio-brush";
 import {
   FIXED_RATE_STROKE_FILTER_TICK_MS,
   resolveFixedRateStrokeFilterParameters,
-} from "./studio-fixed-rate-stroke-filter";
+} from "../studio-fixed-rate-stroke-filter";
 import {
   createStudioLazyBrushStabilizer,
   normalizeStudioLazyBrushOptions,
@@ -19,7 +19,7 @@ import {
   type StudioLazyBrushPointerPolicyInput,
   type StudioLazyBrushPointerType,
   type StudioLazyBrushStabilizer,
-} from "./studio-lazy-brush-stabilizer";
+} from "../studio-lazy-brush-stabilizer";
 
 export const STUDIO_STABILIZER_MODES = [
   {

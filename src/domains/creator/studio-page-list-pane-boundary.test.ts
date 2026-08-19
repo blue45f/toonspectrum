@@ -96,20 +96,21 @@ function moduleShape(relativePath: string): ModuleShape {
 describe("Studio page-list pane module boundary", () => {
   it("keeps StudioPage as the one-way orchestration owner", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");
     const modalLazyBoundary = moduleShape("./studio-page-modal-lazy-boundaries.ts");
 
     expect(page.valueImports).not.toContain("./StudioPageListPane");
     expect(page.dynamicImports.filter((specifier) => specifier === "./StudioPageListPane")).toEqual([
     ]);
-    expect(page.valueImports).toContain("./studio-page-modal-lazy-boundaries");
+    expect(editorView.valueImports).toContain("../studio-page-modal-lazy-boundaries");
     expect(
       modalLazyBoundary.dynamicImports.filter((specifier) => specifier === "./StudioPageListPane")
     ).toEqual(["./StudioPageListPane"]);
     expect(pane.allImports).not.toContain("./StudioPage");
     expect(pane.dynamicImports).not.toContain("./StudioPage");
     expect(page.source).toContain("useStudioStableHandlers<StudioPageListPaneHandlers>({");
-    expect(page.source).toContain("<LazyStudioPageListPane");
+    expect(editorView.source).toContain("<LazyStudioPageListPane");
   });
 
   it("wires multi-page bulk move/delete through pure studio-pages helpers", () => {
@@ -156,10 +157,11 @@ describe("Studio page-list pane module boundary", () => {
 
   it("keeps resize handles accessible without creating a shared startup chunk", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");
     const resizeHandle = moduleShape("./StudioPanelResizeHandle.tsx");
 
-    expect(page.valueImports).toContain("./StudioPanelResizeHandle");
+    expect(editorView.valueImports).toContain("../StudioPanelResizeHandle");
     expect(pane.valueImports).not.toContain("./StudioPanelResizeHandle");
     expect(pane.topLevelDeclarations).toContain("StudioPageListResizeHandle");
     expect(resizeHandle.exportedDeclarations).toContain("StudioPanelResizeHandle");

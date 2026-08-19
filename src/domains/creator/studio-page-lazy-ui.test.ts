@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 interface ModuleEdges {
   readonly dynamicImports: readonly string[];
   readonly source: string;
@@ -46,24 +48,24 @@ function moduleEdges(relativePath: string): ModuleEdges {
 }
 
 const REPRESENTATIVE_OPTIONAL_SURFACES = [
-  "./StudioAiAssistHub",
+  "./ai/StudioAiAssistHub",
   "./StudioAppSettingsPanel",
-  "./StudioBrushStudio",
+  "./brush/StudioBrushStudio",
   "./StudioHokusaiNaturalMediaInspectorSection",
   "./StudioProceduralArtisticBrushController",
   "./StudioColorPalettePanel",
   "./StudioCommentsPanelSession",
-  "./StudioDrawingPaletteStack",
-  "./StudioFilterDialog",
+  "./brush/StudioDrawingPaletteStack",
+  "./filter/StudioFilterDialog",
   "./StudioFloodFillPanel",
   "./StudioFrameAnimationPanel",
   "./StudioImageAdjustmentsPanel",
-  "./StudioLayerNavigator",
+  "./layer/StudioLayerNavigator",
   "./StudioPanelSplitTool",
   "./StudioPageThumbnails",
   "./StudioQuickStartPanel",
   "./StudioTeamPanel",
-  "./StudioTextEditOverlay",
+  "./lettering/StudioTextEditOverlay",
   "./StudioWebGpuCanvas",
 ] as const;
 
@@ -136,10 +138,11 @@ describe("StudioPage optional UI registry", () => {
   });
 
   it("keeps the mobile Inspector modal boundary active while its lazy chunk loads", () => {
-    const page = moduleEdges("./StudioPage.tsx").source;
-    const fallbackStart = page.indexOf("function StudioInspectorAsideFallback");
-    const fallbackEnd = page.indexOf("const LazyStudioMobileSheetHandle", fallbackStart);
-    const fallback = page.slice(fallbackStart, fallbackEnd);
+    const page = readStudioCuttoonEditorSource();
+    const presets = moduleEdges("./studio-mobile-dock-presets.tsx").source;
+    const fallbackStart = presets.indexOf("export function StudioInspectorAsideFallback");
+    const fallbackEnd = presets.length;
+    const fallback = presets.slice(fallbackStart, fallbackEnd);
     const usageStart = page.indexOf("<StudioInspectorAsideFallback");
     const usageEnd = page.indexOf("/>", usageStart);
     const usage = page.slice(usageStart, usageEnd);
@@ -164,12 +167,12 @@ describe("StudioPage optional UI registry", () => {
 
     expect(
       registry.dynamicImports.filter(
-        (specifier) => specifier === "./StudioDrawingPaletteStack"
+        (specifier) => specifier === "./brush/StudioDrawingPaletteStack"
       )
-    ).toEqual(["./StudioDrawingPaletteStack"]);
-    expect(registry.valueImports).not.toContain("./StudioDrawingPaletteStack");
+    ).toEqual(["./brush/StudioDrawingPaletteStack"]);
+    expect(registry.valueImports).not.toContain("./brush/StudioDrawingPaletteStack");
     expect(registry.source).toMatch(
-      /const studioDrawingPaletteStackLoader = createStudioIntentLazyLoader\(\(\) =>[\s\S]*?import\("\.\/StudioDrawingPaletteStack"\)[\s\S]*?default: mod\.StudioDrawingPaletteStack/u
+      /const studioDrawingPaletteStackLoader = createStudioIntentLazyLoader\(\(\) =>[\s\S]*?import\("\.\/brush\/StudioDrawingPaletteStack"\)[\s\S]*?default: mod\.StudioDrawingPaletteStack/u
     );
     expect(registry.source).toMatch(
       /const StudioDrawingPaletteStack = lazyRetry\(\s*studioDrawingPaletteStackLoader\.load,\s*"StudioDrawingPaletteStack"\s*\)/u

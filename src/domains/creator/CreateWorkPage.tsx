@@ -17,11 +17,11 @@ import {
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { STUDIO_RASTER_ASSETS } from "./render/studio-raster-assets";
 import { BUBBLE_VARIANTS } from "./studio-assets";
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
 import { studioDeleteWorkRequest } from "./studio-destructive-command-catalog";
 import { readWorkFx } from "./studio-motion-fx";
-import { STUDIO_RASTER_ASSETS } from "./studio-raster-assets";
 import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 import { WebtoonFxPlayer } from "./WebtoonFxPlayer";
 import { WorkFxPanel } from "./WorkFxPanel";

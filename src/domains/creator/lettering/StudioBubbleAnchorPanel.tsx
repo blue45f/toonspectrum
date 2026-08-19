@@ -23,7 +23,7 @@ import {
   Unlink2,
 } from "lucide-react";
 
-import { StudioToggleChip } from "./studio-panel-ui";
+import { StudioToggleChip } from "../studio-panel-ui";
 
 import type { ReactElement } from "react";
 

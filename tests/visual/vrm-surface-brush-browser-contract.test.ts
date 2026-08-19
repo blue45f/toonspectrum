@@ -12,16 +12,13 @@ import {
   type VrmSurfaceBrushBrowserArtifact,
 } from "../benchmarks/harness/vrm-surface-brush-browser";
 
-const RESULT_URL = new URL(
-  "../benchmarks/results/vrm-surface-brush-browser.json",
+const RESULT_URL = new URL("../benchmarks/results/vrm-surface-brush-browser.json",
   import.meta.url,
 );
-const PAGE_URL = new URL(
-  "../benchmarks/harness/vrm-surface-brush-browser-page.ts",
+const PAGE_URL = new URL("../benchmarks/harness/vrm-surface-brush-browser-page.ts",
   import.meta.url,
 );
-const ORCHESTRATOR_URL = new URL(
-  "../benchmarks/harness/vrm-surface-brush-browser.ts",
+const ORCHESTRATOR_URL = new URL("../benchmarks/harness/vrm-surface-brush-browser.ts",
   import.meta.url,
 );
 

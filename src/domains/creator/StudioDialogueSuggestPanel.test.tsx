@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import { StudioDialogueSuggestPanel } from "./StudioDialogueSuggestPanel";
 
-import type { DialogueSuggestionCandidate } from "./studio-dialogue-suggest";
+import type { DialogueSuggestionCandidate } from "./lettering/studio-dialogue-suggest";
 
 const noop = () => {
   // 이 스위트는 정적 마운트 렌더만 검증한다 — 이벤트 콜백은 절대 호출되지 않는다.

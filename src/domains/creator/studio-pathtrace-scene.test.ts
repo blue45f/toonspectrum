@@ -14,7 +14,7 @@ import {
   validateStudioPathtraceScene,
 } from "./studio-pathtrace-scene";
 
-import type { StudioBg3dCanonicalGeometryPayload } from "./studio-bg3d-geometry-worker-protocol";
+import type { StudioBg3dCanonicalGeometryPayload } from "./bg3d/studio-bg3d-geometry-worker-protocol";
 import type {
   StudioPathtraceLight,
   StudioPathtraceScene,

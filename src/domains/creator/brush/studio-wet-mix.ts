@@ -26,14 +26,19 @@
  * 오케스트레이션(이미지 로드 → getImageData → wetMixStroke → PNG 재인코딩)은 호출부(StudioPage 의
  * applyWetMixStroke)가 담당한다 — applyDodgeBurnStroke 와 동일 분리.
  */
-import { dodgeBurnBrushFalloff } from "./studio-dodge-burn";
+import { dodgeBurnBrushFalloff } from "../studio-dodge-burn";
 import {
   resolveStudioHandFeelMediaLoadV1,
   studioHandFeelTravelSpeedV1,
-} from "./studio-hand-feel-media-load-v1";
-import { STUDIO_OSS_OIL_FILM_RECIPE } from "./studio-oss-brush-kernels";
-import { resampleSmudgePath, type SmudgePixelPoint } from "./studio-smudge";
-import { mixStudioSpectralWgmSrgb8 } from "./studio-spectral-wgm-mix-v1";
+} from "../studio-hand-feel-media-load-v1";
+import { STUDIO_OSS_OIL_FILM_RECIPE } from "../studio-oss-brush-kernels";
+import { resampleSmudgePath, type SmudgePixelPoint } from "../studio-smudge";
+import { mixStudioSpectralWgmSrgb8 } from "../studio-spectral-wgm-mix-v1";
+
+import {
+  studioFluidPaintRgbToRyb,
+  studioFluidPaintRybToRgb,
+} from "./studio-fluid-paint-reference";
 
 // 픽셀 공간(원본 자연 해상도) 좌표 — smudge/dodge-burn 과 같은 개념이라 타입을 공유한다.
 export type WetMixPixelPoint = SmudgePixelPoint;
@@ -62,7 +67,7 @@ export type WetMixSettings = {
   /** 0..1 스트로크 시작 로드. 기본 1(가득). */
   initialLoad?: number;
   /** `spectral-wgm` 은 유화 경로의 감산 혼색. 기본 `lerp` 는 기존 혼색 브러시. */
-  mixModel?: "lerp" | "spectral-wgm";
+  mixModel?: "lerp" | "spectral-wgm" | "ryb";
 };
 
 // 표시 px 기준 범위 — DODGE_BURN_RADIUS_RANGE 와 동일 관례(자연 해상도 환산은 호출자 몫).
@@ -275,6 +280,7 @@ export function wetMixStroke(
   const depletion = clamp01(settings.loadDepletion ?? 0);
   let load = clamp01(settings.initialLoad ?? 1);
   const spectralMix = settings.mixModel === "spectral-wgm";
+  const rybMix = settings.mixModel === "ryb";
 
   const step = safeRadius * WET_MIX_STEP_RATIO;
   const resampled = resampleSmudgePath(points, step).slice(0, WET_MIX_MAX_DABS);
@@ -320,6 +326,17 @@ export function wetMixStroke(
         depR = mixed.r;
         depG = mixed.g;
         depB = mixed.b;
+      } else if (rybMix) {
+        const paintRyb = studioFluidPaintRgbToRyb(paintR / 255, paintG / 255, paintB / 255);
+        const wellRyb = studioFluidPaintRgbToRyb(wellR / 255, wellG / 255, wellB / 255);
+        const mixed = studioFluidPaintRybToRgb(
+          paintRyb[0] + (wellRyb[0] - paintRyb[0]) * wetness,
+          paintRyb[1] + (wellRyb[1] - paintRyb[1]) * wetness,
+          paintRyb[2] + (wellRyb[2] - paintRyb[2]) * wetness,
+        );
+        depR = mixed[0] * 255;
+        depG = mixed[1] * 255;
+        depB = mixed[2] * 255;
       } else {
         depR = paintR + (wellR - paintR) * wetness;
         depG = paintG + (wellG - paintG) * wetness;

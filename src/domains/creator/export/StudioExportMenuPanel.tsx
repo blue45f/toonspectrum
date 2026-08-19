@@ -2,11 +2,15 @@ import { Copy, FileImage, FileText, Layers, Scissors } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
+  publishStudioExportPrintBoxMm,
+  publishStudioExportResolutionDpi,
+} from "../render/studio-raster-resolution-metadata";
+import {
   loadStudioPsdExportModule,
   loadStudioSvgExportModule,
   preloadStudioPsdExportModule,
   preloadStudioSvgExportModule,
-} from "./studio-document-export-loaders";
+} from "../studio-document-export-loaders";
 import {
   EXPORT_FORMATS,
   EXPORT_SCALES,
@@ -16,7 +20,18 @@ import {
   exportFormatLabel,
   exportQuality,
   type ExportFormat,
-} from "./studio-export";
+} from "../studio-export";
+import {
+  CONTACT_SHEET_PAGE_PRESETS,
+  contactSheetResultMessage,
+  DEFAULT_CONTACT_SHEET_COLUMNS,
+  DEFAULT_CONTACT_SHEET_ROWS,
+  exportContactSheetPdf,
+} from "../studio-pdf-contact-sheet";
+import { exportPagesToPdf, pdfExportResultMessage } from "../studio-pdf-export";
+import { WATERMARK_POSITIONS, type WatermarkSettings } from "../studio-watermark";
+import { StudioContactSheetPanel } from "../StudioContactSheetPanel";
+
 import {
   readStudioExportGeometryDraft,
   writeStudioExportGeometryDraft,
@@ -41,29 +56,15 @@ import {
   validateExport,
   type PresetExportScope,
 } from "./studio-export-presets";
-import {
-  CONTACT_SHEET_PAGE_PRESETS,
-  contactSheetResultMessage,
-  DEFAULT_CONTACT_SHEET_COLUMNS,
-  DEFAULT_CONTACT_SHEET_ROWS,
-  exportContactSheetPdf,
-} from "./studio-pdf-contact-sheet";
-import { exportPagesToPdf, pdfExportResultMessage } from "./studio-pdf-export";
-import {
-  publishStudioExportPrintBoxMm,
-  publishStudioExportResolutionDpi,
-} from "./studio-raster-resolution-metadata";
-import { WATERMARK_POSITIONS, type WatermarkSettings } from "./studio-watermark";
-import { StudioContactSheetPanel } from "./StudioContactSheetPanel";
 
-import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
-import type { PsdExportResult } from "./studio-psd-export";
 import type {
   StudioRasterEncoded,
   StudioRasterInterchangeFormat,
-} from "./studio-raster-interchange";
+} from "../render/studio-raster-interchange";
+import type { StudioInkMlExportResult } from "../studio-inkml-interchange";
+import type { PsdExportResult } from "../studio-psd-export";
 import type { SvgExportResult } from "./studio-svg-export";
-import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
+import type { StudioWillV1PageExportResult } from "../studio-will-v1-export-bridge";
 import type { Dispatch, SetStateAction } from "react";
 
 import { cx } from "@/lib/cx";
@@ -122,7 +123,7 @@ export interface StudioExportMenuPanelProps {
   exportTrimHeightMm?: number;
   exportBleedMm?: number;
   /** When provided, enables 대사 TXT package export for the selected page range. */
-  dialoguePages?: readonly import("./studio-dialogue-batch").DialoguePageLike[] | null;
+  dialoguePages?: readonly import( "../lettering/studio-dialogue-batch").DialoguePageLike[] | null;
   setExportScale: Dispatch<SetStateAction<number>>;
   setExportFormat: Dispatch<SetStateAction<ExportFormat>>;
   setExportTransparent: Dispatch<SetStateAction<boolean>>;
@@ -496,7 +497,7 @@ export function StudioExportMenuPanel({
       if (!mountedRef.current) return;
       const safeTitle = safeExportBaseName(exportTitle);
       if (kind === "cbz") {
-        const { buildStudioCbzBlob } = await import("./studio-cbz-interchange");
+        const { buildStudioCbzBlob } = await import("../studio-cbz-interchange");
         const result = await buildStudioCbzBlob({
           pages: pngPages.map((image) => ({ image })),
           metadata: {
@@ -514,7 +515,7 @@ export function StudioExportMenuPanel({
           ].join(" "),
         });
       } else {
-        const { buildStudioOpenRasterBlob } = await import("./studio-openraster-interchange");
+        const { buildStudioOpenRasterBlob } = await import("../studio-openraster-interchange");
         const canvas = canvases[0]!;
         const image = pngPages[0]!;
         const result = await buildStudioOpenRasterBlob({

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { createLayerGroup, type LayerGroup } from "../studio-layers";
+
 import {
   DEFAULT_STUDIO_LAYER_NAVIGATOR_FILTERS,
   buildStudioLayerNavigatorNodes,
@@ -17,7 +19,6 @@ import {
   type StudioLayerNavigatorFilters,
   type StudioLayerNavigatorItem,
 } from "./studio-layer-navigator";
-import { createLayerGroup, type LayerGroup } from "./studio-layers";
 
 function layer(
   id: string,

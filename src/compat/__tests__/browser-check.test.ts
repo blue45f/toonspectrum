@@ -34,6 +34,14 @@ describe("browser-check compat module", () => {
   it("should classify general error when environment is fully supported", () => {
     const err = new Error("Custom business logic crash");
     const analysis = classifyError(err);
-    expect(["general", "compatibility"]).includes(analysis.type);
+    expect(analysis.type).toBe("general");
+    expect(analysis.isCompatibilityIssue).toBe(false);
+  });
+
+  it("does not treat app method TypeErrors as a browser-update wall", () => {
+    const err = new TypeError("target_0.park is not a function");
+    const analysis = classifyError(err);
+    expect(analysis.type).toBe("general");
+    expect(analysis.isCompatibilityIssue).toBe(false);
   });
 });

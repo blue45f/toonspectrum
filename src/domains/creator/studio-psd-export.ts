@@ -50,8 +50,8 @@ import {
   type DialogueRubyExportIssue,
   type DialogueRubyExportWarning,
   type DialogueRubyExportMetadataRecord,
-} from "./studio-dialogue-ruby-export";
-import { readStudioExportResolutionDpi } from "./studio-raster-resolution-metadata";
+} from "./lettering/studio-dialogue-ruby-export";
+import { readStudioExportResolutionDpi } from "./render/studio-raster-resolution-metadata";
 
 import type {
   PsdInterchangeLossDecision,

@@ -9,7 +9,7 @@ import {
   type StudioBg3dSharedStageEditorStateUpdater,
   type StudioBg3dSharedStageMaterializationKind,
   type StudioBg3dSharedStageMutationKind,
-} from "./studio-bg3d-shared-stage-editor-session";
+} from "./bg3d/studio-bg3d-shared-stage-editor-session";
 import {
   STUDIO_SHARED_3D_CHARACTER_TRANSFORM_RECEIPT_KIND,
   STUDIO_SHARED_3D_CHARACTER_TRANSFORM_RECEIPT_VERSION,
@@ -17,11 +17,9 @@ import {
   parseStudioShared3dCharacterStageTransform,
   studioShared3dCharacterStageTransformHash,
 } from "./studio-shared-3d-scene-runtime";
-import { shouldCaptureStudioShared3dStageCharacters } from
-  "./studio-shared-3d-stage-capture-intent";
+import { shouldCaptureStudioShared3dStageCharacters } from "./studio-shared-3d-stage-capture-intent";
 
-import type { StudioBg3dSharedCharacterGroundingResult } from
-  "./studio-bg3d-shared-character-grounding";
+import type { StudioBg3dSharedCharacterGroundingResult } from "./bg3d/studio-bg3d-shared-character-grounding";
 import type {
   StudioShared3dCharacterRuntimeStatus,
   StudioShared3dCharacterTransformCommitHandler,

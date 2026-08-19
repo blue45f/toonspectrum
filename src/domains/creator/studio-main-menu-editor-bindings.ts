@@ -14,8 +14,8 @@
  * Pure types + delegation only — no React, no browser, no page state.
  */
 
+import type { StudioFilterDraft, StudioFilterKind } from "./filter/studio-filter-menu";
 import type { CvdMode } from "./studio-color-vision-model";
-import type { StudioFilterDraft, StudioFilterKind } from "./studio-filter-menu";
 import type {
   StudioCanvasRotationDirection,
   StudioLayerReorder,

@@ -1,4 +1,4 @@
-import { normalizeBlurFx } from "./studio-blur";
+import { normalizeBlurFx } from "../studio-blur";
 import {
   isIdentityCurve,
   isIdentityCurveChannels,
@@ -6,7 +6,8 @@ import {
   normalizeCurveChannels,
   type CurvePoint,
   type CurveRgbChannels,
-} from "./studio-curves";
+} from "../studio-curves";
+
 import {
   STUDIO_FILTER_PACK_KINDS,
   STUDIO_FILTER_PACK_LABELS,
@@ -18,7 +19,7 @@ import {
   type StudioFilterPackValues,
 } from "./studio-filter-pack";
 
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
+import type { ImageFilterFields } from "../render/studio-konva-filter-fields";
 
 /** 초기 5개 필터 — 각자 전용 드래프트 모양을 가진 하드코드 종류. */
 export type StudioFilterCoreKind =

@@ -71,7 +71,7 @@ export async function closeStudioLocalDatabaseRuntime(
     // The dynamic edge avoids making the shared DB authority depend statically on
     // one of its consumers.
     try {
-      const brushLibrary = await import("./studio-brush-library-sqlite-repository");
+      const brushLibrary = await import("./brush/studio-brush-library-sqlite-repository");
       await brushLibrary.reconcileProductBrushLibraryRepositoryForDatabaseClose({
         preserveMemorySession: options.preserveBrushMemorySession,
       });

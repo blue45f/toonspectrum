@@ -180,15 +180,15 @@ const MOVED_DECLARATIONS = [
 
 describe("Studio Konva image node boundary", () => {
   it("moves the image renderer and its cache ownership out of StudioPage", () => {
-    const page = moduleShape("./StudioPage.tsx");
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
-    const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
+    const page = moduleShape("../StudioPage.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const imageNode = moduleShape("../StudioKonvaImageNode.tsx");
 
     expect(
-      viewport.valueImports.filter((specifier) => specifier === "./StudioKonvaImageNode")
-    ).toEqual(["./StudioKonvaImageNode"]);
+      viewport.valueImports.filter((specifier) => specifier === "../StudioKonvaImageNode")
+    ).toEqual(["../StudioKonvaImageNode"]);
     expect(viewport.source.match(/<StudioKonvaImageNode\b/gu)).toHaveLength(1);
-    expect(imageNode.allImports).not.toContain("./StudioPage");
+    expect(imageNode.allImports).not.toContain("../StudioPage");
     for (const declaration of MOVED_DECLARATIONS) {
       expect(imageNode.topLevelDeclarations.has(declaration)).toBe(true);
       expect(page.topLevelDeclarations.has(declaration)).toBe(false);
@@ -199,8 +199,8 @@ describe("Studio Konva image node boundary", () => {
   });
 
   it("preserves the effective image call contract and its optional status observer", () => {
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
-    const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const imageNode = moduleShape("../StudioKonvaImageNode.tsx");
     const contract = propertyNames(
       findInterface(imageNode, "StudioKonvaImageNodeProps").members
     );
@@ -212,7 +212,7 @@ describe("Studio Konva image node boundary", () => {
     expect(attributes.get("draggable")).toBe("{draggable}");
     expect(attributes.get("innerRef")).toBe("{setRef}");
     expect(attributes.get("onSelect")).toBe("{onSelect}");
-    expect(attributes.get("onChange")).toContain("patchEl(el.id, patch)");
+    expect(attributes.get("onChange")).toContain("patchElementAfterDragRestore(el.id, patch)");
     expect(attributes.get("dragBoundFunc")).toBe("{snapBoundFunc}");
     expect(attributes.get("autoFitFrames")).toBe("{autoFitFrames}");
     expect(attributes.get("onInteractionBegin")).toContain("nodeInteractionBegin(el.id)");
@@ -227,23 +227,23 @@ describe("Studio Konva image node boundary", () => {
   });
 
   it("keeps filters and the worker behind literal image-node intent boundaries", () => {
-    const page = moduleShape("./StudioPage.tsx");
-    const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
+    const page = moduleShape("../StudioPage.tsx");
+    const imageNode = moduleShape("../StudioKonvaImageNode.tsx");
 
     expect(imageNode.dynamicImports).toEqual([
-      "./studio-konva-filters",
-      "./studio-raster-source-lease",
+      "./render/studio-konva-filters",
+      "./render/studio-raster-source-lease",
       "./studio-image-filter-worker-client",
       // M1 GPU 필터 경로 — Worker 디스패치 앞에서 시도하는 지연 청크(폴백은 기존 Worker).
-      "./studio-gpu-filter-apply",
+      "./render/studio-gpu-filter-apply",
     ]);
     expect(
       page.dynamicImports.filter((specifier) =>
-        specifier === "./studio-konva-filters"
+        specifier === "./render/studio-konva-filters"
         || specifier === "./studio-image-filter-worker-client"
       )
     ).toEqual([]);
-    expect(imageNode.valueImports).toContain("./studio-konva-runtime");
+    expect(imageNode.valueImports).toContain("./render/studio-konva-runtime");
     expect(imageNode.valueImports).toContain("react-konva/lib/ReactKonvaCore");
     expect(imageNode.valueImports).not.toContain("konva/lib/Core");
     expect(
@@ -252,7 +252,7 @@ describe("Studio Konva image node boundary", () => {
   });
 
   it("retains cache, worker abort, GIF, retained-source flip, and auto-fit mechanics", () => {
-    const source = moduleShape("./StudioKonvaImageNode.tsx").source;
+    const source = moduleShape("../StudioKonvaImageNode.tsx").source;
 
     expect(source).toContain("const IMAGE_FILTER_BUILD_CACHE_LIMIT = 200;");
     expect(source).toContain("const imageFilterBuildCache = new Map<string, ImageFilterBuild>();");
@@ -294,7 +294,7 @@ describe("Studio Konva image node boundary", () => {
   });
 
   it("keeps the HiDPI supersample density gated by the explicit invariant-attr allowlist", () => {
-    const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
+    const imageNode = moduleShape("../StudioKonvaImageNode.tsx");
 
     // 밀도 결정은 default-deny 화이트리스트 + 순수 함수로만 이뤄지고, 둘 다 export 되어
     // 단위 테스트(studio-konva-image-node-density.test.ts)가 실제 buildImageFilters 출력과

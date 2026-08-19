@@ -4,11 +4,11 @@ import {
   StudioCrdtDocument,
   type StudioCrdtJsonObject,
   type StudioCrdtStrokeRecord,
-} from "./studio-crdt-document";
+} from "../live/studio-crdt-document";
 import {
   studioCrdtStrokeToDrawElement,
   studioDrawElementToCrdtStroke,
-} from "./studio-crdt-page-bridge";
+} from "../live/studio-crdt-page-bridge";
 
 import {
   captureStudioInkInputContractV1,

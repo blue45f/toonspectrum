@@ -8,16 +8,17 @@ import {
   Text as KText,
 } from "react-konva/lib/ReactKonvaCore";
 
+import { normalizeStrokeStyle, strokeDashArray } from "./brush/studio-stroke-shapes";
 import {
   computeBubbleShapeGeometry,
   hasCustomBubbleShape,
   normalizeCustomShapePoints,
-} from "./studio-bubble-custom-shape";
+} from "./lettering/studio-bubble-custom-shape";
 import {
   normalizeBubbleOutlineStyle,
   styledBubblePathData,
   styledBubblePolygonPathData,
-} from "./studio-bubble-outline-style";
+} from "./lettering/studio-bubble-outline-style";
 import {
   BURST_STAR_VARIANT_PARAMS,
   bubblePathData,
@@ -30,7 +31,7 @@ import {
   scaredBubblePathData,
   thoughtBubbleBodyPath,
   thoughtTailDots,
-} from "./studio-bubble-path";
+} from "./lettering/studio-bubble-path";
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
   bubbleHorizontalPadding,
@@ -44,21 +45,20 @@ import {
   resolveBubbleFontSize,
   resolveBubbleFontStyle,
   resolveBubbleLineHeight,
-} from "./studio-bubble-text-fit";
+} from "./lettering/studio-bubble-text-fit";
 import {
   BUBBLE_TEXT_MEASURER,
   verticalBlockAlign,
   verticalTextItemGeometry,
   verticalTextLayout,
-} from "./studio-bubble-text-runtime";
+} from "./lettering/studio-bubble-text-runtime";
 import {
   planDialogueRubyOverlayPlacements,
   planDialogueVerticalRubyOverlayPlacements,
   readDialogueRubySpans,
-} from "./studio-dialogue-ruby-layout";
+} from "./lettering/studio-dialogue-ruby-layout";
 import { konvaGradientProps } from "./studio-gradient-engine";
 import { withStudioNodeInteractionGuards } from "./studio-node-props";
-import { normalizeStrokeStyle, strokeDashArray } from "./studio-stroke-shapes";
 
 import type { El } from "./studio-element-model";
 import type Konva from "konva";

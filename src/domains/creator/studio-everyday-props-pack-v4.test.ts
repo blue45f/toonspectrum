@@ -9,18 +9,18 @@ import { describe, expect, it } from "vitest";
 import {
   applyStudioVrmPropTint,
   supportsStudioVrmPropTint,
-} from "./studio-vrm-prop-material";
+} from "./vrm/studio-vrm-prop-material";
 import {
   measureVrmPropRigMetrics,
   resolvePropAttachment,
-} from "./studio-vrm-prop-rig";
+} from "./vrm/studio-vrm-prop-rig";
 import {
   BLENDER_PROP_GLTF_URLS,
   createPropInstance,
   propDefById,
   type PropAnchorDef,
   type VrmPropId,
-} from "./studio-vrm-props";
+} from "./vrm/studio-vrm-props";
 
 (globalThis as unknown as { self: typeof globalThis }).self = globalThis;
 

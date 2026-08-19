@@ -20,7 +20,7 @@ describe("studio WebGPU viewport contract boundary", () => {
   it("removes viewport consumers' type back-edge into the concrete engine", () => {
     const engine = source("./studio-webgpu-engine.ts");
     const viewport = source("./studio-webgpu-viewport.ts");
-    const canvas = source("./StudioWebGpuCanvas.tsx");
+    const canvas = source("../StudioWebGpuCanvas.tsx");
 
     expect(engine).toContain('from "./studio-webgpu-viewport-contract"');
     expect(engine).toMatch(
@@ -30,6 +30,6 @@ describe("studio WebGPU viewport contract boundary", () => {
     expect(engine).not.toContain("export interface StudioGpuViewport");
     expect(viewport).toContain('from "./studio-webgpu-viewport-contract"');
     expect(viewport).not.toContain('from "./studio-webgpu-engine"');
-    expect(canvas).toContain('from "./studio-webgpu-viewport-contract"');
+    expect(canvas).toContain('from "./render/studio-webgpu-viewport-contract"');
   });
 });

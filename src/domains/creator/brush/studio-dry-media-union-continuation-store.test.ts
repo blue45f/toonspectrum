@@ -1,18 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createStudioFreehandInputMemoryBinaryCasState,
+  createStudioFreehandInputMemoryBinaryCasStore,
+} from "../studio-freehand-input-binary-spool-opfs-store";
+
+import {
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
 } from "./studio-brush-dynamics";
 import { packStudioDryMediaUnionContinuationPages } from "./studio-dry-media-union-continuation-protocol";
 import { createStudioDryMediaUnionContinuationStore } from "./studio-dry-media-union-continuation-store";
 import { STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION } from "./studio-dry-media-union-ribbon-carrier";
-import {
-  createStudioFreehandInputMemoryBinaryCasState,
-  createStudioFreehandInputMemoryBinaryCasStore,
-} from "./studio-freehand-input-binary-spool-opfs-store";
 
-import type { StudioDynamicBrushCoverageMark } from "./studio-dynamic-brush-coverage-renderer";
+import type { StudioDynamicBrushCoverageMark } from "../studio-dynamic-brush-coverage-renderer";
 
 function mark(): StudioDynamicBrushCoverageMark {
   const groups = Object.freeze(Array.from({ length: 96 }, (_, stationIndex) => Object.freeze({

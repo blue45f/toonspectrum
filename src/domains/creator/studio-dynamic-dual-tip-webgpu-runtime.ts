@@ -1,28 +1,28 @@
 import {
-  STUDIO_DYNAMIC_DUAL_TIP_BUDGETS,
-  STUDIO_DYNAMIC_DUAL_TIP_PLAN_VERSION,
-} from "./studio-dynamic-dual-tip-plan";
-import {
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_DUAL_TIP_CAPABILITY,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_PLAN_VERSION,
-} from "./studio-engine-webgpu-textured-brush-plan";
+} from "./render/studio-engine-webgpu-textured-brush-plan";
 import {
   packStudioEngineWebGpuTexturedBrushDabs,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_INSTANCE_BYTES,
-} from "./studio-engine-webgpu-textured-brush-runtime";
+} from "./render/studio-engine-webgpu-textured-brush-runtime";
+import {
+  STUDIO_DYNAMIC_DUAL_TIP_BUDGETS,
+  STUDIO_DYNAMIC_DUAL_TIP_PLAN_VERSION,
+} from "./studio-dynamic-dual-tip-plan";
 import { sha256HexPortable } from "./studio-sha256";
 
+import type {
+  StudioEngineWebGpuTexturedBrushBatch,
+  StudioEngineWebGpuTexturedBrushPlan,
+  StudioEngineWebGpuTexturedBrushResolvedAsset,
+} from "./render/studio-engine-webgpu-textured-brush-plan";
 import type {
   StudioDynamicDualTipBlendFamily,
   StudioDynamicDualTipPlan,
   StudioDynamicDualTipSecondaryInstance,
 } from "./studio-dynamic-dual-tip-plan";
-import type {
-  StudioEngineWebGpuTexturedBrushBatch,
-  StudioEngineWebGpuTexturedBrushPlan,
-  StudioEngineWebGpuTexturedBrushResolvedAsset,
-} from "./studio-engine-webgpu-textured-brush-plan";
 
 export const STUDIO_DYNAMIC_DUAL_TIP_WEBGPU_RUNTIME_REVISION = 1 as const;
 export const STUDIO_DYNAMIC_DUAL_TIP_WEBGPU_TEXTURE_FORMAT = "rgba16float" as const;

@@ -73,38 +73,38 @@ function moduleEdges(relativePath: string) {
 
 describe("Studio layer navigator bundle boundary", () => {
   it("keeps the optional layer navigator behind one registry-owned lazyRetry import", () => {
-    const page = moduleEdges("./StudioPage.tsx");
-    const inspector = moduleEdges("./StudioInspectorAside.tsx");
+    const page = moduleEdges("../StudioPage.tsx");
+    const inspector = moduleEdges("../StudioInspectorAside.tsx");
     const navigator = moduleEdges("./StudioLayerNavigator.tsx");
     const itemRow = moduleEdges("./StudioLayerNavigatorItemRow.tsx");
     const itemRowUi = moduleEdges("./studio-layer-navigator-row-ui.ts");
-    const registry = moduleEdges("./studio-page-lazy-ui.ts");
+    const registry = moduleEdges("../studio-page-lazy-ui.ts");
 
-    expect(page.valueImports).not.toContain("./StudioLayerNavigator");
-    expect(inspector.valueImports).not.toContain("./StudioLayerNavigator");
+    expect(page.valueImports).not.toContain("./layer/StudioLayerNavigator");
+    expect(inspector.valueImports).not.toContain("./layer/StudioLayerNavigator");
     expect(
-      inspector.wholeClauseTypeImports.filter((specifier) => specifier === "./StudioLayerNavigator"),
-    ).toEqual(["./StudioLayerNavigator"]);
-    expect(page.dynamicImports).not.toContain("./StudioLayerNavigator");
-    expect(inspector.dynamicImports).not.toContain("./StudioLayerNavigator");
-    expect(registry.dynamicImports.filter((specifier) => specifier === "./StudioLayerNavigator")).toEqual([
-      "./StudioLayerNavigator",
+      inspector.wholeClauseTypeImports.filter((specifier) => specifier === "./layer/StudioLayerNavigator"),
+    ).toEqual(["./layer/StudioLayerNavigator"]);
+    expect(page.dynamicImports).not.toContain("./layer/StudioLayerNavigator");
+    expect(inspector.dynamicImports).not.toContain("./layer/StudioLayerNavigator");
+    expect(registry.dynamicImports.filter((specifier) => specifier === "./layer/StudioLayerNavigator")).toEqual([
+      "./layer/StudioLayerNavigator",
     ]);
     expect(registry.layerNavigatorUsesLazyRetry).toBe(true);
     expect(navigator.valueImports).toContain("./StudioLayerNavigatorItemRow");
     expect(navigator.dynamicImports).not.toContain("./StudioLayerNavigatorItemRow");
     expect(itemRow.valueImports).not.toContain("./StudioLayerNavigator");
-    expect(itemRow.valueImports).not.toContain("./StudioPage");
-    expect(itemRow.valueImports).not.toContain("./StudioInspectorAside");
+    expect(itemRow.valueImports).not.toContain("../StudioPage");
+    expect(itemRow.valueImports).not.toContain("../StudioInspectorAside");
     expect(itemRow.dynamicImports).toEqual([]);
     expect(itemRowUi.valueImports).not.toContain("./StudioLayerNavigator");
-    expect(itemRowUi.valueImports).not.toContain("./StudioPage");
-    expect(itemRowUi.valueImports).not.toContain("./StudioInspectorAside");
+    expect(itemRowUi.valueImports).not.toContain("../StudioPage");
+    expect(itemRowUi.valueImports).not.toContain("../StudioInspectorAside");
     expect(itemRowUi.dynamicImports).toEqual([]);
   });
 
   it("mounts the navigator only for the visible inspector layer tab with an accessible fallback", () => {
-    const source = moduleEdges("./StudioInspectorAside.tsx").source;
+    const source = moduleEdges("../StudioInspectorAside.tsx").source;
 
     expect(source).toMatch(
       /aria-label="레이어"[\s\S]*?\{inspectorLayout\.primary === "layers" \? \([\s\S]*?<Suspense/,

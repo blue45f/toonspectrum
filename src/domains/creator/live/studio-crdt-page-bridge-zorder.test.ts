@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { groupItems, moveLayerGroup, ungroupItems } from "../studio-layers";
+
 import { StudioCrdtDocument } from "./studio-crdt-document";
 import { reconcileStudioCrdtSceneGraphHistory } from "./studio-crdt-history";
 import { reconcileStudioCrdtSceneGraphPages } from "./studio-crdt-page-bridge";
 import { publishStudioCrdtSceneGraphDiff } from "./studio-crdt-scene-publisher";
-import { groupItems, moveLayerGroup, ungroupItems } from "./studio-layers";
 
 interface TestElement {
   id: string;

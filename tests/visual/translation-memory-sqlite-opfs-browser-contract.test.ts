@@ -10,8 +10,7 @@ import {
 function artifact(): TranslationMemorySqliteOpfsArtifact {
   return JSON.parse(
     readFileSync(
-      new URL(
-        "../benchmarks/results/translation-memory-sqlite-opfs-browser.json",
+      new URL("../benchmarks/results/translation-memory-sqlite-opfs-browser.json",
         import.meta.url,
       ),
       "utf8",
@@ -35,15 +34,13 @@ describe("translation-memory Chromium SQLite OPFS evidence", () => {
 
   it("keeps the production probe on a Dedicated Worker and V12-only authority", () => {
     const page = readFileSync(
-      new URL(
-        "../benchmarks/harness/translation-memory-sqlite-opfs-browser-page.ts",
+      new URL("../benchmarks/harness/translation-memory-sqlite-opfs-browser-page.ts",
         import.meta.url,
       ),
       "utf8",
     );
     const worker = readFileSync(
-      new URL(
-        "../benchmarks/harness/translation-memory-sqlite-opfs-browser-client.ts",
+      new URL("../benchmarks/harness/translation-memory-sqlite-opfs-browser-client.ts",
         import.meta.url,
       ),
       "utf8",

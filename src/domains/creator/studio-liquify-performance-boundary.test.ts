@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 function source(relativePath: string): string {
   return readFileSync(new URL(relativePath, import.meta.url), "utf8");
 }
@@ -29,7 +31,7 @@ describe("studio liquify performance boundaries", () => {
   });
 
   it("pointerup bake thins the journal so long strokes stay bounded", () => {
-    const page = source("./StudioPage.tsx");
+    const page = readStudioCuttoonEditorSource();
     const sampling = source("./studio-liquify-stroke-sampling.ts");
 
     expect(sampling).toContain("STUDIO_LIQUIFY_APPLY_MAX_POINTS = 384");
@@ -38,10 +40,10 @@ describe("studio liquify performance boundaries", () => {
   });
 
   it("keeps a drop-frame live warp preview path during drag", () => {
-    const page = source("./StudioPage.tsx");
+    const page = readStudioCuttoonEditorSource();
     const preview = source("./studio-liquify-live-preview.ts");
     const browser = source("./studio-liquify-browser.ts");
-    const viewport = source("./StudioCanvasViewport.tsx");
+    const viewport = source("./canvas/StudioCanvasViewport.tsx");
 
     expect(preview).toContain("planStudioLiquifyLivePreview");
     expect(preview).toContain("roi-full-res");

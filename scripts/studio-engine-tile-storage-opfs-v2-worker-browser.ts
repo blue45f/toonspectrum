@@ -7,21 +7,16 @@
  */
 
 import {
-  canonicalStudioCommandJson,
-  studioCommandPayloadChecksum,
-  type StudioCommandJsonValue,
-} from "../src/domains/creator/studio-command-journal";
-import {
   STUDIO_ENGINE_TILE_AUTHORITY_VERSION,
   STUDIO_ENGINE_TILE_ENCODING,
   studioEngineRgba16FloatTileDigest,
-} from "../src/domains/creator/studio-engine-tile-authority";
+} from "../src/domains/creator/render/studio-engine-tile-authority";
 import {
   STUDIO_ENGINE_TILE_STORAGE_PROTOCOL_VERSION,
   STUDIO_ENGINE_TILE_STORAGE_REQUEST_KIND,
   type StudioEngineTileStorageCommitAck,
   type StudioEngineTileStorageCommitRequest,
-} from "../src/domains/creator/studio-engine-tile-storage-bridge";
+} from "../src/domains/creator/render/studio-engine-tile-storage-bridge";
 import {
   createStudioEngineTileStorageOpfsV2Backend,
   STUDIO_ENGINE_TILE_STORAGE_OPFS_V2_ROOT_NAME,
@@ -29,7 +24,7 @@ import {
   type StudioEngineTileStorageOpfsV2DirectoryHandleLike,
   type StudioEngineTileStorageOpfsV2FileHandleLike,
   type StudioEngineTileStorageOpfsV2SyncAccessHandleLike,
-} from "../src/domains/creator/studio-engine-tile-storage-opfs-v2-backend";
+} from "../src/domains/creator/render/studio-engine-tile-storage-opfs-v2-backend";
 import {
   StudioEngineTileStorageWorkerV2,
   type StudioEngineTileStorageWorkerV2FaultStage,
@@ -37,8 +32,13 @@ import {
   type StudioEngineTileStorageWorkerV2Lease,
   type StudioEngineTileStorageWorkerV2LeasePort,
   type StudioEngineTileStorageWorkerV2RecoveryResult,
-} from "../src/domains/creator/studio-engine-tile-storage-worker-v2";
-import { studioTileDocDigest } from "../src/domains/creator/studio-tiledoc-digest";
+} from "../src/domains/creator/render/studio-engine-tile-storage-worker-v2";
+import { studioTileDocDigest } from "../src/domains/creator/render/studio-tiledoc-digest";
+import {
+  canonicalStudioCommandJson,
+  studioCommandPayloadChecksum,
+  type StudioCommandJsonValue,
+} from "../src/domains/creator/studio-command-journal";
 
 const workerScope = self as DedicatedWorkerGlobalScope;
 const encoder = new TextEncoder();

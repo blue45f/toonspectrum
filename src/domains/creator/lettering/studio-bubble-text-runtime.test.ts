@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { layoutVerticalText } from "../studio-vertical-text";
+
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
   fitBubbleFontSize,
@@ -12,9 +14,8 @@ import {
   verticalTextItemGeometry,
   verticalTextLayout,
 } from "./studio-bubble-text-runtime";
-import { layoutVerticalText } from "./studio-vertical-text";
 
-import type { BubbleEl } from "./studio-element-model";
+import type { BubbleEl } from "../studio-element-model";
 
 function bubble(overrides: Partial<BubbleEl> = {}): BubbleEl {
   return {

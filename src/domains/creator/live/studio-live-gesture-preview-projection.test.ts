@@ -7,7 +7,7 @@ import {
   studioLiveGesturePreviewAuthoritativeReceiptIds,
 } from "./studio-live-gesture-preview-projection";
 
-import type { DrawEl, El } from "./studio-element-model";
+import type { DrawEl, El } from "../studio-element-model";
 import type {
   StudioLiveGesturePreviewSnapshot,
   StudioLiveGesturePreviewSnapshotEntry,

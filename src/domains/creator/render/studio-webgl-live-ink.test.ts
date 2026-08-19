@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "../brush/studio-ink-pressure-model";
+
 import {
   planStudioWebGlLiveInkGeometry,
   resolveStudioWebGlLiveInkSurface,

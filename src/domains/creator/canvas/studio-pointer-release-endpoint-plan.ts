@@ -7,17 +7,17 @@
  */
 
 import {
-  normalizeCalligraphyStylusInput,
-} from "./studio-brush";
-import {
   resolveStudioBrushDynamicsPresetId,
   resolveStudioCapturedBrushDynamicsPresetId,
-} from "./studio-brush-dynamics";
-import { resolveStudioBrushReleasePressure } from "./studio-brush-velocity-pressure";
-import { studioInkFallbackPressure } from "./studio-ink-pressure-model";
-import { normalizeStudioPersistedPointerChannels } from "./studio-persisted-pointer-channels";
+} from "../brush/studio-brush-dynamics";
+import { resolveStudioBrushReleasePressure } from "../brush/studio-brush-velocity-pressure";
+import { studioInkFallbackPressure } from "../brush/studio-ink-pressure-model";
+import {
+  normalizeCalligraphyStylusInput,
+} from "../studio-brush";
+import { normalizeStudioPersistedPointerChannels } from "../studio-persisted-pointer-channels";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 import { isStudioInkInputContractV2 } from "@/lib/studio-ink-input-contract";
 

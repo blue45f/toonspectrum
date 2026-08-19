@@ -1,9 +1,9 @@
-import { sha256HexPortable } from "./studio-sha256";
 import {
   STUDIO_SPECIALIST_PROVIDER_REGISTRY_REVISION,
   type StudioLoadedSpecialistProvider,
   type StudioSpecialistProviderDescriptor,
-} from "./studio-wasm-provider-registry";
+} from "./render/studio-wasm-provider-registry";
+import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_HARFBUZZ_SHAPING_PROVIDER_REVISION = 1 as const;
 

@@ -11,7 +11,7 @@
  * Konva/DOM 의존 없음 — StudioPage와 단위 테스트가 함께 쓴다. 전부 순수·결정적(랜덤 없음).
  */
 
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 
 // ---------------------------------------------------------------------------
 // 타입 — 룩 카테고리와 룩 자체

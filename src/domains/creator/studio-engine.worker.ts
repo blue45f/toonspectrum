@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { createStudioEngineWorkerRuntime } from "./studio-engine-worker-runtime";
+import { createStudioEngineWorkerRuntime } from "./render/studio-engine-worker-runtime";
 
 const scope = self as DedicatedWorkerGlobalScope;
 

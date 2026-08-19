@@ -1,18 +1,18 @@
 import { Suspense } from "react";
 
-import { BUBBLE_VARIANTS } from "./studio-assets";
 import {
   BUBBLE_OUTLINE_STYLE_OPTIONS,
   normalizeBubbleOutlineStyle,
-} from "./studio-bubble-outline-style";
-import { BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT } from "./studio-bubble-text-fit";
-import { bubbleAutoShrinkPreview } from "./studio-bubble-text-runtime";
+} from "./lettering/studio-bubble-outline-style";
+import { BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT } from "./lettering/studio-bubble-text-fit";
+import { bubbleAutoShrinkPreview } from "./lettering/studio-bubble-text-runtime";
+import { StudioBubbleVariantGlyph } from "./lettering/StudioBubbleVariantGlyph";
+import { BUBBLE_VARIANTS } from "./studio-assets";
 import {
   StudioBubbleAutoShrinkPanel,
   StudioBubbleStylePresetPanel,
   StudioGradientEnginePanel,
 } from "./studio-page-lazy-ui";
-import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 

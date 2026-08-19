@@ -26,6 +26,12 @@
  */
 
 import {
+  STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
+  studioOssDirectionalWaxSample,
+  studioOssValueNoise2d,
+} from "../studio-oss-brush-kernels";
+
+import {
   isStudioDryMediaKernelDabProgramPin,
   isStudioDryMediaUnionComposableProgramPin,
   isStudioDynamicBrushCausalDepositPipeline,
@@ -34,11 +40,6 @@ import {
 } from "./studio-brush-dynamics";
 import { studioStampOssTipCoverage } from "./studio-brush-stamp-engine";
 import { STUDIO_DRY_MEDIA_ANISOTROPIC_PRESETS_V1 } from "./studio-dry-media-anisotropic-grain-v1";
-import {
-  STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
-  studioOssDirectionalWaxSample,
-  studioOssValueNoise2d,
-} from "./studio-oss-brush-kernels";
 
 import type {
   NormalizedStudioBrushTipSettings,

@@ -5,16 +5,16 @@ import {
   normalizeStudioAdvancedRulerDocument,
   parseStudioAdvancedRulerDocument,
   type StudioAdvancedRulerDocument,
-} from "./studio-advanced-ruler-document";
+} from "../studio-advanced-ruler-document";
 import {
   DEFAULT_ISOMETRIC_ANGLE_DEG,
   DEFAULT_ISOMETRIC_CELL_SIZE,
   clampIsometricAngleDeg,
   clampIsometricCellSize,
   defaultIsometricOrigin,
-} from "./studio-isometric-grid";
+} from "../studio-isometric-grid";
 
-import type { VanishingPoint } from "./studio-perspective-guide";
+import type { VanishingPoint } from "../studio-perspective-guide";
 
 /**
  * Page-owned drawing-assist state.

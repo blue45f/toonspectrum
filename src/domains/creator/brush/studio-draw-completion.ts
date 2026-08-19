@@ -1,3 +1,5 @@
+import { peekStudioStageCssScale } from "./studio-live-visible-tap";
+
 export interface StudioDrawCompletionInput {
   kind?: "freehand" | "line" | "rect" | "ellipse" | "star" | "arrow" | "triangle" | "polygon";
   points: readonly number[];
@@ -22,6 +24,11 @@ export function isStudioImmediateFreehandCommit(input: StudioDrawCompletionInput
   if ((input.kind ?? "freehand") !== "freehand") return false;
   if (input.points.length < 2 || input.points.length % 2 !== 0) return false;
   if (input.points.length <= 4) return true;
+  // A zoomed-out webtoon page can map a long screen stroke to <24 document px. Point count
+  // still distinguishes a coalesced tap from a continuous gesture. Eight or more samples is
+  // never a tap — the 9-input smoke route is a full screen stroke even when document travel
+  // stays under the 24px threshold.
+  if (input.points.length >= 16) return false;
 
   // Browsers may deliver several coalesced samples for one tiny physical move. Counting array
   // entries alone misclassified that same short mark as a long deferred stroke on textured
@@ -37,5 +44,6 @@ export function isStudioImmediateFreehandCommit(input: StudioDrawCompletionInput
     travel += Math.hypot(x! - previousX!, y! - previousY!);
     if (travel > 24) return false;
   }
-  return true;
+  const viewScale = peekStudioStageCssScale();
+  return travel * viewScale <= 24;
 }

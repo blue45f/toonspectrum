@@ -12,27 +12,28 @@ import { StudioToolBeltQuickActions } from "./StudioToolBeltQuickActions";
 import type {
   StudioAiAssistToolId,
   StudioAiRecentPromptsState,
-} from "./studio-ai-assist-ux";
+} from "./ai/studio-ai-assist-ux";
 import type {
   StudioAiImageSize,
   StudioAiSettings,
   StudioTextAiProvenance,
   StudioTextAiTransport,
-} from "./studio-ai-client";
+} from "./ai/studio-ai-client";
 import type {
   StudioAiObservableResult,
   StudioAiPendingOperationInput,
-} from "./studio-ai-provenance-recorder";
+} from "./ai/studio-ai-provenance-recorder";
+import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
+import type { DialogueSuggestionCandidate } from "./lettering/studio-dialogue-suggest";
+import type { StudioRasterAsset } from "./render/studio-raster-assets";
 import type {
   StudioAssetFavoriteId,
   StudioAssetFavoriteState,
 } from "./studio-asset-favorites";
 import type { StudioAsset } from "./studio-asset-library";
 import type { BubbleVariant, TemplateSpec } from "./studio-assets";
-import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import type { BrandKit } from "./studio-brand-kit";
 import type { StudioClip } from "./studio-clips";
-import type { DialogueSuggestionCandidate } from "./studio-dialogue-suggest";
 import type { DrawMode, StudioMenu, Tool } from "./studio-editor-tool-model";
 import type { El, ImageEl } from "./studio-element-model";
 import type { StudioEmeresLibraryItem } from "./studio-emeres-library";
@@ -44,7 +45,6 @@ import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
 import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
-import type { StudioRasterAsset } from "./studio-raster-assets";
 import type { SceneTemplate } from "./studio-scene-templates";
 import type {
   StudioServerAiProviderPreference,
@@ -443,7 +443,7 @@ export interface StudioToolBeltContentHandlers {
   onUploadAsset: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   onUseSharedAsset: (asset: SharedAssetCatalogItem) => Promise<void>;
   openFeatureTutorial: (tutorialId?: string | null) => void;
-  pendingTextAiProviderContext: () => import("./studio-ai-provenance-recorder").StudioAiOperationProviderContext;
+  pendingTextAiProviderContext: () => import( "./ai/studio-ai-provenance-recorder").StudioAiOperationProviderContext;
   redo: () => void;
   rememberColor: (c: string) => void;
   removeEmeresUnderlays: () => void;

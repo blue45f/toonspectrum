@@ -1,12 +1,12 @@
 import {
-  resolveStudioBrushPresetOperation,
-  type StudioToolOperation,
-} from "./studio-brush";
-import {
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   sanitizeBrushSnapshot,
   type StudioBrushSnapshot,
-} from "./studio-brush-library";
+} from "./brush/studio-brush-library";
+import {
+  resolveStudioBrushPresetOperation,
+  type StudioToolOperation,
+} from "./studio-brush";
 
 export const STUDIO_TOOL_OPERATION_MEMORY_VERSION = 1 as const;
 

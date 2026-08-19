@@ -4,12 +4,18 @@ import {
   verticalBlockAlign,
   verticalTextItemGeometry,
   verticalTextLayout,
-} from "./studio-bubble-text-runtime";
+} from "./lettering/studio-bubble-text-runtime";
 import {
   planDialogueRubyOverlayPlacements,
   planDialogueVerticalRubyOverlayPlacements,
   readDialogueRubySpans,
-} from "./studio-dialogue-ruby-layout";
+} from "./lettering/studio-dialogue-ruby-layout";
+import {
+  buildTextPathData,
+  isFlatTextPath,
+  normalizeTextPath,
+  textPathAdvanceWidth,
+} from "./lettering/studio-text-path";
 import {
   estimateTextGradientBBox,
   konvaGradientProps,
@@ -17,12 +23,6 @@ import {
 } from "./studio-gradient-engine";
 import { textNodeProps } from "./studio-node-props";
 import { toKonvaSkewAttrs } from "./studio-skew";
-import {
-  buildTextPathData,
-  isFlatTextPath,
-  normalizeTextPath,
-  textPathAdvanceWidth,
-} from "./studio-text-path";
 
 import type { El } from "./studio-element-model";
 import type Konva from "konva";

@@ -3,23 +3,24 @@ import {
   isStudioBrushAliasId,
   mapStudioBrushAliasPressure,
   studioBrushAliasEffectiveDiameter,
-} from "./studio-brush-alias-profile";
+} from "../brush/studio-brush-alias-profile";
 import {
   STUDIO_BRUSH_MAX_SYMMETRY_VARIATIONS,
   type StudioBrushSymmetryTransform,
-} from "./studio-brush-symmetry";
+} from "../brush/studio-brush-symmetry";
 import {
   isStudioInkPressureModel,
   resolveStudioInkPressure,
   studioInkFallbackPressure,
   studioInkUsesPathResidualDabSpacing,
-} from "./studio-ink-pressure-model";
+} from "../brush/studio-ink-pressure-model";
+
 import { isStudioGpuColorSupported } from "./studio-webgpu-color";
 import { STUDIO_GPU_MAX_BRUSH_SIZE } from "./studio-webgpu-stroke";
 
-import type { StudioBrushAliasId } from "./studio-brush-alias-profile";
-import type { StudioInkPressureModel } from "./studio-ink-pressure-model";
 import type { StudioGpuComposite } from "./studio-webgpu-stroke";
+import type { StudioBrushAliasId } from "../brush/studio-brush-alias-profile";
+import type { StudioInkPressureModel } from "../brush/studio-ink-pressure-model";
 
 /** The live planner already caps kaleidoscope expansion at 32 rotations plus 32 reflections. */
 export const STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_VARIATIONS =

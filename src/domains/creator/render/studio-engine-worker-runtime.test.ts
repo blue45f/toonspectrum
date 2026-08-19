@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_POINTER_SAMPLE_ROLE_AUTHORITATIVE,
+  STUDIO_POINTER_SAMPLE_ROLE_PREDICTED,
+  createStudioSharedPointerRingBuffer,
+} from "../studio-shared-pointer-ring-buffer";
+
+import {
   STUDIO_ENGINE_EXECUTION_PROFILE,
   STUDIO_ENGINE_WORKER_BUDGETS,
   STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
@@ -17,11 +23,6 @@ import {
   type StudioEngineRuntimeOutboundMessage,
   type StudioEngineTransientContext2d,
 } from "./studio-engine-worker-runtime";
-import {
-  STUDIO_POINTER_SAMPLE_ROLE_AUTHORITATIVE,
-  STUDIO_POINTER_SAMPLE_ROLE_PREDICTED,
-  createStudioSharedPointerRingBuffer,
-} from "./studio-shared-pointer-ring-buffer";
 
 const CAPABILITIES: StudioEngineCapabilitySnapshot = {
   offscreenCanvas: true,

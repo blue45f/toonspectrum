@@ -15,8 +15,7 @@ import {
 
 import type { WgslFilterOpSpec } from "../../../packages/studio-engine-registry/src/wgsl-variants";
 
-const RESULT_URL = new URL(
-  "../results/wgsl-pipeline-cache.json",
+const RESULT_URL = new URL("../results/wgsl-pipeline-cache.json",
   import.meta.url,
 );
 

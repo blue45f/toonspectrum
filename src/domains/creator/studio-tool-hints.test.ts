@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_ADJUSTMENT_ENGINE_IDS } from "./studio-adjustment-stack";
 import {
   STUDIO_FILTER_CATALOG,
   studioFilterCatalogEntry,
   studioFilterGroupLabel,
-} from "./studio-filter-catalog";
+} from "./filter/studio-filter-catalog";
+import { STUDIO_ADJUSTMENT_ENGINE_IDS } from "./studio-adjustment-stack";
 import { studioToolHintPreview } from "./studio-tool-hint-preview-routing";
 import {
   studioToolHint,

@@ -106,19 +106,19 @@ describe("Studio cross-origin isolation headers", () => {
 
   it("opts dedicated Worker responses into COEP without classifying scripts as workers", () => {
     expect(isStudioCrossOriginIsolationWorkerRequest({
-      url: "/src/domains/creator/studio-procedural-artistic-brush.worker.ts?worker_file&type=module",
+      url: "/src/domains/creator/studio-procedural-artistic-brush.worker.ts",
       method: "GET",
       accept: "*/*",
       secFetchDest: "worker",
     })).toBe(true);
     expect(isStudioCrossOriginIsolationWorkerRequest({
-      url: "/src/domains/creator/studio-paper-vector-refinement.worker.ts?worker_file&type=module",
+      url: "/src/domains/creator/brush/studio-paper-vector-refinement.worker.ts",
       method: "GET",
       accept: "*/*",
       secFetchDest: "empty",
     })).toBe(true);
     expect(isStudioCrossOriginIsolationWorkerRequest({
-      url: "/src/domains/creator/studio-paper-vector-refinement.worker.ts?worker_file&type=module",
+      url: "/src/domains/creator/brush/studio-paper-vector-refinement.worker.ts",
       method: "GET",
       accept: "*/*",
     })).toBe(true);

@@ -31,7 +31,7 @@ import {
   type ClipboardElementLike,
   type StudioClipboardPayload,
 } from "./studio-page-meta";
-import { createStudioVrmSceneDocument } from "./studio-vrm-scene-document";
+import { createStudioVrmSceneDocument } from "./vrm/studio-vrm-scene-document";
 
 // 결정적 id 생성기 (uuid 대체)
 function seqId(prefix = "id") {

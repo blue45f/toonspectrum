@@ -3,7 +3,19 @@ import {
   resampleStrokePressures,
   resolveStudioBrushRenderFamily,
   strokeRenderDistance,
-} from "./studio-brush";
+} from "../studio-brush";
+import { planStudioCausalInk } from "../studio-causal-ink";
+import { fillStudioCausalInkDabs } from "../studio-causal-ink-canvas";
+import {
+  resolveStudioCausalInkNib,
+  type StudioCausalInkNib,
+} from "../studio-marker-nib-profile";
+import {
+  fillStudioPixelPencilCells,
+  isStudioPixelPencilRenderMode,
+  planStudioPixelPencilCells,
+} from "../studio-pixel-pencil";
+
 import {
   isStudioBrushEraserAliasId,
   mapStudioBrushAliasPressure,
@@ -20,27 +32,16 @@ import {
 import {
   studioBrushSymmetryTransforms,
 } from "./studio-brush-symmetry";
-import { planStudioCausalInk } from "./studio-causal-ink";
-import { fillStudioCausalInkDabs } from "./studio-causal-ink-canvas";
 import {
   studioInkFallbackPressure,
 } from "./studio-ink-pressure-model";
-import {
-  resolveStudioCausalInkNib,
-  type StudioCausalInkNib,
-} from "./studio-marker-nib-profile";
-import {
-  fillStudioPixelPencilCells,
-  isStudioPixelPencilRenderMode,
-  planStudioPixelPencilCells,
-} from "./studio-pixel-pencil";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
 import type { StudioBrushSymmetrySpec } from "./studio-brush-symmetry";
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 import type { StudioInkPressureModel } from "./studio-ink-pressure-model";
-import type { StudioLiveInkStrokeStyle } from "./studio-live-ink-overlay";
 import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
+import type { StudioLiveInkStrokeStyle } from "../live/studio-live-ink-overlay";
 import type Konva from "konva";
 
 export type StudioDraftPreviewCompositeMode = "source-over" | "backdrop-multiply";
@@ -64,6 +65,7 @@ export interface StudioDraftPreviewBackdropBoundaryPlan {
     | "eraser-backdrop"
     | "within-layer-bound"
     | "retained-dom-backdrop"
+    | "overlay-owned-fifo"
     | "third-blend-run";
 }
 
@@ -109,6 +111,7 @@ function collectStudioDraftPreviewCompositeRuns(
     mode: StudioDraftPreviewCompositeMode;
   }> = [];
   for (const element of elements) {
+    if (element.mode === "eraser") continue;
     const mode = resolveStudioDraftPreviewCompositeMode(element);
     const previous = runs.at(-1);
     if (previous?.mode === mode) {
@@ -136,7 +139,12 @@ export function planStudioDraftPreviewBackdropBoundary(input: {
   readonly incoming: Pick<DrawEl, "brush" | "fill" | "kind" | "mode">;
   readonly pending: readonly DrawEl[];
   readonly hasRetainedDomBackdrop: boolean;
+  /** Pending FIFO already lives on the native overlay that will also own this gesture. */
+  readonly overlayOwnsPendingAndIncoming?: boolean;
 }): StudioDraftPreviewBackdropBoundaryPlan {
+  if (input.overlayOwnsPendingAndIncoming) {
+    return { action: "continue", reason: "overlay-owned-fifo" };
+  }
   // A destination-out preview must share the retained main canvas with every pixel it can erase.
   // Commit the bounded 200 ms preview FIFO first, otherwise the live gesture cannot affect those
   // newer sibling canvases and they disappear only at pointer-up when the document catches up.
@@ -373,9 +381,17 @@ export function drawFreehandPenSegments(
   smoothed: number[],
   sampledPressures: readonly number[] | null,
   strokeColor: string,
-  strokeWidth: number
+  strokeWidth: number,
+  composite?: GlobalCompositeOperation,
 ): void {
   if (smoothed.length < 4) return;
+  if (composite && composite !== "source-over") {
+    if (typeof (context as { setAttr?: unknown }).setAttr === "function") {
+      context.setAttr("globalCompositeOperation", composite);
+    }
+    context.globalCompositeOperation = composite;
+    if (context._context) context._context.globalCompositeOperation = composite;
+  }
   context.lineCap = "round";
   context.lineJoin = "round";
   context.strokeStyle = strokeColor;
@@ -440,6 +456,13 @@ export function drawStudioCausalInkContract(
   context: Konva.Context,
   contract: StudioCausalInkDrawContract
 ): void {
+  if (contract.composite && contract.composite !== "source-over") {
+    if (typeof (context as { setAttr?: unknown }).setAttr === "function") {
+      context.setAttr("globalCompositeOperation", contract.composite);
+    }
+    context.globalCompositeOperation = contract.composite;
+    if (context._context) context._context.globalCompositeOperation = contract.composite;
+  }
   drawStudioCausalInkDabs(
     context,
     contract.points,

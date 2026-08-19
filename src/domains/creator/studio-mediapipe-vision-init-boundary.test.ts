@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import mannequinTrackingSource from "./scene-3d/studio-mannequin-webcam-tracking.ts?raw";
 import backgroundRemovalSource from "./studio-bg-remove.ts?raw";
-import mannequinTrackingSource from "./studio-mannequin-webcam-tracking.ts?raw";
-import vrmTrackingSource from "./studio-vrm-webcam-tracking.ts?raw";
+import vrmTrackingSource from "./vrm/studio-vrm-webcam-tracking.ts?raw";
 
 const sources = [
   ["VRM live/photo tracking", vrmTrackingSource],

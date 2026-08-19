@@ -9,7 +9,7 @@ import {
 import type {
   StudioRasterExportOrchestration,
   StudioRasterExportOrchestrationInput,
-} from "./studio-raster-export-orchestration-runtime";
+} from "./render/studio-raster-export-orchestration-runtime";
 
 type StudioRasterExportIntentInput = Omit<
   StudioRasterExportOrchestrationInput,

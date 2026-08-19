@@ -1,10 +1,10 @@
-import { resolveStudioStampBrushKind, STUDIO_STAMP_BRUSH_DEFAULTS } from "./studio-brush-stamp-engine";
+import { resolveStudioStampBrushKind, STUDIO_STAMP_BRUSH_DEFAULTS } from "./brush/studio-brush-stamp-engine";
 import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
 
-import type { StudioAiImageSize } from "./studio-ai-client";
-import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-plan";
-import type { StudioBrushStampTuning } from "./studio-brush-library";
-import type { StudioFilterKind } from "./studio-filter-menu";
+import type { StudioAiImageSize } from "./ai/studio-ai-client";
+import type { StudioBg3dShotBatchRecoveryScope } from "./bg3d/studio-bg3d-shot-batch-plan";
+import type { StudioBrushStampTuning } from "./brush/studio-brush-library";
+import type { StudioFilterKind } from "./filter/studio-filter-menu";
 import type { ScenarioPanelAspect } from "./studio-scenario-layout";
 import type { SfxPreset } from "./studio-sfx-presets";
 import type { StudioSharedDocument } from "./studio-shared-document-client";

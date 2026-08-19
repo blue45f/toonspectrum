@@ -32,7 +32,7 @@
 import {
   STUDIO_OSS_OIL_FILM_RECIPE,
   studioOssUnitHash,
-} from "./studio-oss-brush-kernels";
+} from "../studio-oss-brush-kernels";
 
 export const STUDIO_OIL_BRISTLE_LOAD_DYNAMICS_V1_VERSION =
   "studio-oil-bristle-load-dynamics-v1" as const;

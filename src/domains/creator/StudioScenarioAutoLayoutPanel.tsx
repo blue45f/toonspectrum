@@ -36,17 +36,17 @@ import {
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { SCENARIO_SCENE_COUNT_MAX, SCENARIO_SCENE_COUNT_MIN } from "./studio-scenario-scenes";
-import { SCENARIO_BEAT_LABELS, SCENARIO_BEAT_TYPES, type ScenarioBeatType } from "./studio-story-beats";
 import {
   StudioAiImageReferencePackEditor,
   STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX,
   type StudioAiImageReferenceAssetOption,
-} from "./StudioAiImageReferencePackEditor";
+} from "./ai/StudioAiImageReferencePackEditor";
+import { SCENARIO_SCENE_COUNT_MAX, SCENARIO_SCENE_COUNT_MIN } from "./studio-scenario-scenes";
+import { SCENARIO_BEAT_LABELS, SCENARIO_BEAT_TYPES, type ScenarioBeatType } from "./studio-story-beats";
 import { StudioContinuityMetadataEditor } from "./StudioContinuityMetadataEditor";
 
-import type { StudioTextAiProvenance } from "./studio-ai-client";
-import type { StudioAiImageReferenceDocument } from "./studio-ai-image-reference-roles";
+import type { StudioTextAiProvenance } from "./ai/studio-ai-client";
+import type { StudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import type { ScenarioPreviewItem } from "./studio-scenario-layout";
 
 import { cn } from "@/lib/utils";

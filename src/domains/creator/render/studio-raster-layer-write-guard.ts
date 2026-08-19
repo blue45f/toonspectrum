@@ -1,6 +1,6 @@
-import { isEffectivelyLocked } from "./studio-layers";
+import { isEffectivelyLocked } from "../studio-layers";
 
-import type { PageState } from "./studio-page-state";
+import type { PageState } from "../studio-page-state";
 
 export interface StudioRasterLayerWriteGuardState {
   readonly page: PageState | null;

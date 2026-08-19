@@ -1,12 +1,11 @@
-import { serializeStudioBg3dSceneDocument, type StudioBg3dSceneDocument } from
-  "./studio-bg3d-scene-document";
+import { serializeStudioBg3dSceneDocument, type StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
 import { sha256HexPortable } from "./studio-sha256";
 import {
   createStudioShared3dSceneSessionFromElements,
   type StudioShared3dElementSource,
 } from "./studio-shared-3d-scene-bridge";
 
-import type { StudioVrmSceneDocument } from "./studio-vrm-scene-document";
+import type { StudioVrmSceneDocument } from "./vrm/studio-vrm-scene-document";
 
 export const STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND =
   "toonspectrum.studio-shared-3d-stage" as const;

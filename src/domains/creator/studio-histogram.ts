@@ -15,7 +15,7 @@
  * 이미지 로드는 기존 studio-canvas-image-io의 abort 안전 로더(loadPixelEditImage)를 재사용한다.
  */
 
-import { loadPixelEditImage } from "./studio-canvas-image-io";
+import { loadPixelEditImage } from "./canvas/studio-canvas-image-io";
 
 import type { StudioImageDataLike } from "./studio-filters";
 

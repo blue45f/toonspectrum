@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { exportPageToSvg } from "../export/studio-svg-export";
+import { BRUSH_PRESETS } from "../studio-brush";
+import {
+  describeStudioOssBrushHybridStack,
+  hasStudioBrushTextureKindExactPin,
+  resolveStudioBrushTextureKind,
+} from "../studio-oss-brush-hybrid-registry";
+import {
+  STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE,
+  captureStudioOutlineStrokeContractV1,
+} from "../studio-outline-stroke-contract";
+import { loadStudioPerfectFreehandStroker } from "../studio-perfect-freehand";
+
 import { applyStudioBrushAliasWatercolorMaterial } from "./studio-brush-alias-profile";
 import {
   STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS,
@@ -17,17 +29,6 @@ import {
   studioBrushRuntimeExecutionSignature,
 } from "./studio-brush-runtime-contract";
 import { filterStudioBrushLibraryItems } from "./studio-draw-ux";
-import {
-  describeStudioOssBrushHybridStack,
-  hasStudioBrushTextureKindExactPin,
-  resolveStudioBrushTextureKind,
-} from "./studio-oss-brush-hybrid-registry";
-import {
-  STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE,
-  captureStudioOutlineStrokeContractV1,
-} from "./studio-outline-stroke-contract";
-import { loadStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
-import { exportPageToSvg } from "./studio-svg-export";
 
 function exportBrushSvg(brushId: string): string {
   const runtime = resolveStudioBrushRuntimeContract(brushId)!;

@@ -1,9 +1,9 @@
 import { loadStudioBackground3DModule } from "./studio-background-3d-loader";
 import { createStudioIntentLazyLoader } from "./studio-intent-lazy-loader";
 
+import type { StudioExportMenuPanelProps } from "./export/StudioExportMenuPanel";
 import type { StudioAssetMenuPanelProps } from "./StudioAssetMenuPanel";
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
-import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
 import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsSettingsPanel";
 import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
 import type { ComponentType } from "react";
@@ -69,11 +69,11 @@ const StudioUploadPublish = lazyRetry(
   "StudioUploadPublish"
 );
 const StudioLivePresenceDockConnected = lazyRetry(
-  () => import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioLivePresenceDockConnected })),
+  () => import("./live/StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioLivePresenceDockConnected })),
   "StudioLivePresenceDockConnected"
 );
 const StudioRemoteCursorOverlay = lazyRetry(
-  () => import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioRemoteCursorOverlay })),
+  () => import("./live/StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioRemoteCursorOverlay })),
   "StudioRemoteCursorOverlay"
 );
 const studioPointCommentComposerLoader = createStudioIntentLazyLoader(() =>
@@ -109,11 +109,11 @@ const StudioImageAdjustmentsPanel = lazyRetry(
   "StudioImageAdjustmentsPanel"
 );
 const StudioFilterDialog = lazyRetry(
-  () => import("./StudioFilterDialog").then((mod) => ({ default: mod.StudioFilterDialog })),
+  () => import( "./filter/StudioFilterDialog").then((mod) => ({ default: mod.StudioFilterDialog })),
   "StudioFilterDialog"
 );
 const StudioLayerLiftDialog = lazyRetry(
-  () => import("./StudioLayerLiftDialog").then((mod) => ({ default: mod.StudioLayerLiftDialog })),
+  () => import( "./layer/StudioLayerLiftDialog").then((mod) => ({ default: mod.StudioLayerLiftDialog })),
   "StudioLayerLiftDialog"
 );
 const StudioColorPalettePanel = lazyRetry(
@@ -148,11 +148,11 @@ const StudioAdvancedRulerOverlay = lazyRetry(
   "StudioAdvancedRulerOverlay"
 );
 export const StudioCanvasRulerBars = lazyRetry(
-  () => import("./StudioCanvasRulerBars").then((mod) => ({ default: mod.StudioCanvasRulerBars })),
+  () => import("./canvas/StudioCanvasRulerBars").then((mod) => ({ default: mod.StudioCanvasRulerBars })),
   "StudioCanvasRulerBars"
 );
 const StudioLayerMaskOverlay = lazyRetry(
-  () => import("./StudioLayerMaskOverlay").then((mod) => ({ default: mod.StudioLayerMaskOverlay })),
+  () => import("./layer/StudioLayerMaskOverlay").then((mod) => ({ default: mod.StudioLayerMaskOverlay })),
   "StudioLayerMaskOverlay"
 );
 const StudioQuickMaskOverlay = lazyRetry(
@@ -179,7 +179,7 @@ const StudioPuppetWarpOverlay = lazyRetry(
   "StudioPuppetWarpOverlay"
 );
 const StudioLayerNavigator = lazyRetry(
-  () => import("./StudioLayerNavigator").then((mod) => ({ default: mod.StudioLayerNavigator })),
+  () => import("./layer/StudioLayerNavigator").then((mod) => ({ default: mod.StudioLayerNavigator })),
   "StudioLayerNavigator"
 );
 const studioPaletteLibraryPanelLoader = createStudioIntentLazyLoader(() =>
@@ -196,11 +196,11 @@ function preloadStudioPaletteLibraryPanel(): void {
   studioPaletteLibraryPanelLoader.preload();
 }
 const StudioBubbleStylePresetPanel = lazyRetry(
-  () => import("./StudioBubbleStylePresetPanel").then((mod) => ({ default: mod.StudioBubbleStylePresetPanel })),
+  () => import("./lettering/StudioBubbleStylePresetPanel").then((mod) => ({ default: mod.StudioBubbleStylePresetPanel })),
   "StudioBubbleStylePresetPanel"
 );
 const StudioBubbleAutoShrinkPanel = lazyRetry(
-  () => import("./StudioBubbleAutoShrinkPanel").then((mod) => ({ default: mod.StudioBubbleAutoShrinkPanel })),
+  () => import("./lettering/StudioBubbleAutoShrinkPanel").then((mod) => ({ default: mod.StudioBubbleAutoShrinkPanel })),
   "StudioBubbleAutoShrinkPanel"
 );
 const StudioDialogueBatchPanel = lazyRetry(
@@ -208,7 +208,7 @@ const StudioDialogueBatchPanel = lazyRetry(
   "StudioDialogueBatchPanel"
 );
 const studioTextEditOverlayLoader = createStudioIntentLazyLoader(
-  () => import("./StudioTextEditOverlay")
+  () => import("./lettering/StudioTextEditOverlay")
 );
 const StudioTextEditOverlay = lazyRetry(
   () => studioTextEditOverlayLoader.load().then((mod) => ({ default: mod.default })),
@@ -250,7 +250,7 @@ const StudioWriterRoomPanel = lazyRetry(
 );
 const StudioAiProvenancePanel = lazyRetry(
   () =>
-    import("./StudioAiProvenancePanel").then((mod) => ({
+    import("./ai/StudioAiProvenancePanel").then((mod) => ({
       default: mod.StudioAiProvenancePanel,
     })),
   "StudioAiProvenancePanel"
@@ -300,7 +300,7 @@ const StudioBackgroundPanel = lazyRetry(
   "StudioBackgroundPanel"
 );
 const StudioCanvasResizer = lazyRetry(
-  () => import("./StudioCanvasResizer").then((mod) => ({ default: mod.StudioCanvasResizer })),
+  () => import("./canvas/StudioCanvasResizer").then((mod) => ({ default: mod.StudioCanvasResizer })),
   "StudioCanvasResizer"
 );
 const StudioRasterAssetGrid = lazyRetry(
@@ -308,7 +308,7 @@ const StudioRasterAssetGrid = lazyRetry(
   "StudioRasterAssetGrid"
 );
 const StudioTextEffectPanel = lazyRetry(
-  () => import("./StudioTextEffectPanel").then((mod) => ({ default: mod.StudioTextEffectPanel })),
+  () => import("./lettering/StudioTextEffectPanel").then((mod) => ({ default: mod.StudioTextEffectPanel })),
   "StudioTextEffectPanel"
 );
 const StudioGradientEnginePanel = lazyRetry(
@@ -320,7 +320,7 @@ const StudioPatternFillPanel = lazyRetry(
   "StudioPatternFillPanel"
 );
 const StudioTextPathPanel = lazyRetry(
-  () => import("./StudioTextPathPanel").then((mod) => ({ default: mod.StudioTextPathPanel })),
+  () => import("./lettering/StudioTextPathPanel").then((mod) => ({ default: mod.StudioTextPathPanel })),
   "StudioTextPathPanel"
 );
 const StudioTonePanel = lazyRetry(
@@ -352,11 +352,11 @@ const StudioAdvancedRulerPanel = lazyRetry(
   "StudioAdvancedRulerPanel"
 );
 const StudioVrmPoser = lazyRetry(
-  () => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })),
+  () => import( "./vrm/StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })),
   "StudioVrmPoser"
 );
 const StudioMannequinPoserPanel = lazyRetry(
-  () => import("./StudioMannequinPoserPanel").then((mod) => ({ default: mod.StudioMannequinPoserPanel })),
+  () => import("./scene-3d/StudioMannequinPoserPanel").then((mod) => ({ default: mod.StudioMannequinPoserPanel })),
   "StudioMannequinPoserPanel"
 );
 const StudioBackground3D = lazyRetry(
@@ -376,11 +376,11 @@ const StudioBrandKitPanel = lazyRetry(
   "StudioBrandKitPanel"
 );
 const StudioBubbleAnchorPanel = lazyRetry(
-  () => import("./StudioBubbleAnchorPanel").then((mod) => ({ default: mod.StudioBubbleAnchorPanel })),
+  () => import("./lettering/StudioBubbleAnchorPanel").then((mod) => ({ default: mod.StudioBubbleAnchorPanel })),
   "StudioBubbleAnchorPanel"
 );
 const StudioBubbleTailControls = lazyRetry(
-  () => import("./StudioBubbleTailControls").then((mod) => ({ default: mod.StudioBubbleTailControls })),
+  () => import("./lettering/StudioBubbleTailControls").then((mod) => ({ default: mod.StudioBubbleTailControls })),
   "StudioBubbleTailControls"
 );
 const StudioSmudgePanel = lazyRetry(
@@ -416,11 +416,11 @@ const StudioHistoryBrushPanel = lazyRetry(
   "StudioHistoryBrushPanel"
 );
 const StudioLayerMaskPanel = lazyRetry(
-  () => import("./StudioLayerMaskPanel").then((mod) => ({ default: mod.StudioLayerMaskPanel })),
+  () => import( "./layer/StudioLayerMaskPanel").then((mod) => ({ default: mod.StudioLayerMaskPanel })),
   "StudioLayerMaskPanel"
 );
 const StudioFilterMaskPanel = lazyRetry(
-  () => import("./StudioFilterMaskPanel").then((mod) => ({ default: mod.StudioFilterMaskPanel })),
+  () => import( "./filter/StudioFilterMaskPanel").then((mod) => ({ default: mod.StudioFilterMaskPanel })),
   "StudioFilterMaskPanel"
 );
 // Inspector sections that only exist for one selection or tool state. They used to ride into the
@@ -455,11 +455,11 @@ const StudioMainMenu = lazyRetry(
   "StudioMainMenu"
 );
 const StudioDrawOptionsBar = lazyRetry(
-  () => import("./StudioDrawOptionsBar").then((mod) => ({ default: mod.StudioDrawOptionsBar })),
+  () => import("./brush/StudioDrawOptionsBar").then((mod) => ({ default: mod.StudioDrawOptionsBar })),
   "StudioDrawOptionsBar"
 );
 const studioDrawingPaletteStackLoader = createStudioIntentLazyLoader(() =>
-  import("./StudioDrawingPaletteStack").then((mod) => ({
+  import("./brush/StudioDrawingPaletteStack").then((mod) => ({
     default: mod.StudioDrawingPaletteStack,
   }))
 );
@@ -475,7 +475,7 @@ const StudioUnifiedBrushPicker = lazyRetry(
   "StudioUnifiedBrushPicker"
 );
 const StudioBrushCatalogPortal = lazyRetry(
-  () => import("./StudioBrushLibrarySheet").then((mod) => ({ default: mod.StudioBrushCatalogPortal })),
+  () => import( "./brush/StudioBrushLibrarySheet").then((mod) => ({ default: mod.StudioBrushCatalogPortal })),
   "StudioBrushCatalogPortal"
 );
 const StudioSelectionAntsOverlay = lazyRetry(
@@ -507,30 +507,36 @@ const StudioOnionSkinImage = lazyRetry(
   "StudioOnionSkinImage"
 );
 const StudioLiveInkOverlayHost = lazyRetry(
-  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkOverlayHost })),
+  () => import("./live/StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkOverlayHost })),
   "StudioLiveInkOverlayHost"
 );
 const StudioLiveStampOverlayHost = lazyRetry(
-  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveStampOverlayHost })),
+  () => import("./live/StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveStampOverlayHost })),
   "StudioLiveStampOverlayHost"
 );
+const StudioLiveRetainedMediaOverlayHost = lazyRetry(
+  () => import("./live/StudioLiveInkHosts").then((mod) => ({
+    default: mod.StudioLiveRetainedMediaOverlayHost,
+  })),
+  "StudioLiveRetainedMediaOverlayHost"
+);
 const StudioLiveDynamicBrushOverlayHost = lazyRetry(
-  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveDynamicBrushOverlayHost })),
+  () => import("./live/StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveDynamicBrushOverlayHost })),
   "StudioLiveDynamicBrushOverlayHost"
 );
 const StudioLiveWetInkOverlayHost = lazyRetry(
-  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveWetInkOverlayHost })),
+  () => import("./live/StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveWetInkOverlayHost })),
   "StudioLiveWetInkOverlayHost"
 );
 const StudioLiveInkPredictionHost = lazyRetry(
-  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkPredictionHost })),
+  () => import("./live/StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkPredictionHost })),
   "StudioLiveInkPredictionHost"
 );
 const StudioLivePressureHudPill = lazyRetry(
-  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLivePressureHudPill })),
+  () => import("./live/StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLivePressureHudPill })),
   "StudioLivePressureHudPill"
 );
-const loadStudioBrushStudio = () => import("./StudioBrushStudio");
+const loadStudioBrushStudio = () => import( "./brush/StudioBrushStudio");
 const StudioBrushStudio = lazyRetry(
   () => loadStudioBrushStudio().then((mod) => ({ default: mod.StudioBrushStudio })),
   "StudioBrushStudio"
@@ -565,7 +571,7 @@ const StudioSelectOptionsBar = lazyRetry(
   "StudioSelectOptionsBar"
 );
 const StudioBrushLibraryPanel = lazyRetry(
-  () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
+  () => import( "./brush/StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
   "StudioBrushLibraryPanel"
 );
 
@@ -578,24 +584,24 @@ const StudioEmeresLibraryPanel = lazyRetry(
   "StudioEmeresLibraryPanel"
 );
 const StudioAiAssistHub = lazyRetry(
-  () => import("./StudioAiAssistHub").then((mod) => ({ default: mod.StudioAiAssistHub })),
+  () => import("./ai/StudioAiAssistHub").then((mod) => ({ default: mod.StudioAiAssistHub })),
   "StudioAiAssistHub"
 );
 const StudioAiBackgroundPanel = lazyRetry(
-  () => import("./StudioAiBackgroundPanel").then((mod) => ({ default: mod.StudioAiBackgroundPanel })),
+  () => import("./ai/StudioAiBackgroundPanel").then((mod) => ({ default: mod.StudioAiBackgroundPanel })),
   "StudioAiBackgroundPanel"
 );
 const StudioAiColorizePanel = lazyRetry(
-  () => import("./StudioAiColorizePanel").then((mod) => ({ default: mod.StudioAiColorizePanel })),
+  () => import("./ai/StudioAiColorizePanel").then((mod) => ({ default: mod.StudioAiColorizePanel })),
   "StudioAiColorizePanel"
 );
 const StudioAiCompositionPanel = lazyRetry(
-  () => import("./StudioAiCompositionPanel").then((mod) => ({ default: mod.StudioAiCompositionPanel })),
+  () => import( "./ai/StudioAiCompositionPanel").then((mod) => ({ default: mod.StudioAiCompositionPanel })),
   "StudioAiCompositionPanel"
 );
 const StudioAiCharacterConsistencyPanel = lazyRetry(
   () =>
-    import("./StudioAiCharacterConsistencyPanel").then((mod) => ({
+    import( "./ai/StudioAiCharacterConsistencyPanel").then((mod) => ({
       default: mod.StudioAiCharacterConsistencyPanel,
     })),
   "StudioAiCharacterConsistencyPanel"
@@ -745,7 +751,7 @@ type StudioExportMenuPanelModule = { default: ComponentType<StudioExportMenuPane
 let studioExportMenuPanelPromise: Promise<StudioExportMenuPanelModule> | null = null;
 
 function loadStudioExportMenuPanel(): Promise<StudioExportMenuPanelModule> {
-  studioExportMenuPanelPromise ??= import("./StudioExportMenuPanel").then((mod) => ({
+  studioExportMenuPanelPromise ??= import( "./export/StudioExportMenuPanel").then((mod) => ({
     default: mod.StudioExportMenuPanel,
   }));
   return studioExportMenuPanelPromise;
@@ -884,6 +890,7 @@ export {
   StudioLiveInkPredictionHost,
   StudioLivePresenceDockConnected,
   StudioLivePressureHudPill,
+  StudioLiveRetainedMediaOverlayHost,
   StudioLiveStampOverlayHost,
   StudioMainMenu,
   StudioMasterPagePanel,

@@ -7,7 +7,7 @@ import {
   thinStudioRasterRetouchPointsForApply,
 } from "./studio-raster-retouch-stroke-sampling";
 
-import type { SelPoint } from "./studio-selection-tools";
+import type { SelPoint } from "../studio-selection-tools";
 
 function point(x: number, y: number): SelPoint {
   return { x, y };

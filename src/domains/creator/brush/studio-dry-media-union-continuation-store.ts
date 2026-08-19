@@ -1,3 +1,5 @@
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
@@ -10,9 +12,8 @@ import {
   type StudioDryMediaUnionContinuationPage,
   type StudioDryMediaUnionPagedRootReceipt,
 } from "./studio-dry-media-union-continuation-protocol";
-import { sha256HexPortable } from "./studio-sha256";
 
-import type { StudioFreehandInputBinaryCasStore } from "./studio-freehand-input-binary-spool-opfs-store";
+import type { StudioFreehandInputBinaryCasStore } from "../studio-freehand-input-binary-spool-opfs-store";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder("utf-8", { fatal: true });

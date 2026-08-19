@@ -762,8 +762,7 @@ export async function listSharedAssetCatalog(
 }
 
 export async function publishAsset(input: PublishAssetInput, signal?: AbortSignal): Promise<SharedAsset> {
-  const { createStudioSharedAssetPreview } = await import(
-    "@/src/domains/creator/studio-shared-asset-preview"
+  const { createStudioSharedAssetPreview } = await import("@/src/domains/creator/studio-shared-asset-preview"
   );
   const preview = await createStudioSharedAssetPreview(input.dataUrl);
   return callOrThrow(

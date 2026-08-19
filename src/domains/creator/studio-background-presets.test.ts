@@ -74,8 +74,7 @@ describe("studio-background-presets", () => {
   });
 
   it("builds horizontal gradient SVG", async () => {
-    const { buildStudioBackgroundGradientSvg, isStudioBackgroundFillLayerName } = await import(
-      "./studio-background-presets"
+    const { buildStudioBackgroundGradientSvg, isStudioBackgroundFillLayerName } = await import("./studio-background-presets"
     );
     const svg = buildStudioBackgroundGradientSvg(100, 50, ["#ff0000", "#0000ff"], "horizontal");
     expect(svg).toContain("linearGradient");

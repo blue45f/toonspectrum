@@ -1,4 +1,4 @@
-import { STUDIO_FILTER_CATALOG } from "./studio-filter-catalog";
+import { STUDIO_FILTER_CATALOG } from "./filter/studio-filter-catalog";
 import {
   normalizeStudioToolHintStableId,
   studioToolHint,

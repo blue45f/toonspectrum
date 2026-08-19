@@ -378,11 +378,9 @@ describe("buildStudioPerfectFreehandOutline / PathData (실제 getStroke 주입)
  */
 describe("perfect-outline 레인 계약", () => {
   it("perfect-outline 로 선언된 모든 레인이 canonical 프로필을 실제로 해석한다", async () => {
-    const { STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS } = await import(
-      "./studio-brush-engine-lane-catalog"
+    const { STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS } = await import("./brush/studio-brush-engine-lane-catalog"
     );
-    const { STUDIO_BRUSH_RUNTIME_CONTRACT } = await import(
-      "./studio-brush-runtime-contract"
+    const { STUDIO_BRUSH_RUNTIME_CONTRACT } = await import("./brush/studio-brush-runtime-contract"
     );
     const rows = [
       ...STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS,

@@ -12,7 +12,7 @@
 // 값을 따로 들고 동기화해야 하는 이중 소유가 생긴다.
 import { Loader2, MessageSquareQuote, Plus, Sparkles } from "lucide-react";
 
-import { formatDialogueSuggestionLine, type DialogueSuggestionCandidate } from "./studio-dialogue-suggest";
+import { formatDialogueSuggestionLine, type DialogueSuggestionCandidate } from "./lettering/studio-dialogue-suggest";
 
 export function StudioDialogueSuggestPanel({
   configured,

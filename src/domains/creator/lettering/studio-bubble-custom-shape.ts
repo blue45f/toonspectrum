@@ -22,7 +22,6 @@
  * 담당한다(값 자체는 스케일 불변 — normalizedPointToCanvas 류와 달리 width/height 로 나누지
  * 않는다). DOM/Konva 의존성 없음 — Konva 오버레이·포인터 배선은 호출자(StudioPage)가 담당한다.
  */
-import { bubblePathData, bubblePathDataMulti, type BubbleTailSpec, type BubbleTailDirection } from "./studio-bubble-path";
 import {
   beginNodeDrag,
   hitTestNodeHandle,
@@ -32,8 +31,10 @@ import {
   withPointMoved,
   type NodeDragSession,
   type NodeEditHandle,
-} from "./studio-node-edit";
-import { canvasPointToNormalized, normalizedPointToCanvas, type SelPoint } from "./studio-selection-tools";
+} from "../studio-node-edit";
+import { canvasPointToNormalized, normalizedPointToCanvas, type SelPoint } from "../studio-selection-tools";
+
+import { bubblePathData, bubblePathDataMulti, type BubbleTailSpec, type BubbleTailDirection } from "./studio-bubble-path";
 
 // 재수출 — 호출자가 이 모듈 하나만 보고도 점 편집 세션을 열 수 있게(round-trip import 축소).
 export { beginNodeDrag, hitTestNodeHandle, updateNodeDragMove, withPointMoved, type NodeDragSession, type NodeEditHandle };

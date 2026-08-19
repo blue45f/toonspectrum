@@ -2,11 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { buildStudioLiveShareHref } from "./creator-studio-links";
+import { buildStudioLiveShareHref } from "../creator-studio-links";
 import {
   presentStudioAutosaveDocumentLeadership,
   studioAutosaveLeadershipAllowsLocalEdit,
-} from "./studio-autosave-document-leader";
+} from "../studio-autosave-document-leader";
+
 import {
   StudioCrdtDocument,
   type StudioCrdtDrawStrokePayload,
@@ -349,16 +350,20 @@ describe("Studio Magma/Figma live collaboration session", () => {
   });
 
   it("wires the Studio work page to the shipped live-collaboration host and share URL", () => {
-    const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+    const editorViewSource = readFileSync(
+      new URL("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx", import.meta.url),
+      "utf8",
+    );
     const panelSource = readFileSync(
       new URL("./StudioLiveCollaborationPanel.tsx", import.meta.url),
       "utf8"
     );
-    expect(pageSource).toContain("StudioLiveCollaborationProvider");
-    expect(pageSource).toContain("workId={effectiveWorkId}");
-    expect(pageSource).toContain("participant={studioLiveParticipant}");
+    expect(editorViewSource).toContain("StudioLiveCollaborationProvider");
+    expect(editorViewSource).toContain("workId={effectiveWorkId}");
+    expect(editorViewSource).toContain("participant={studioLiveParticipant}");
     expect(pageSource).toContain("shouldPublishStudioLiveJamRoom");
-    expect(pageSource).toContain("serverRequired={Boolean(studioLiveParticipant && requiresStudioLiveServer)}");
+    expect(editorViewSource).toContain("serverRequired={Boolean(studioLiveParticipant && requiresStudioLiveServer)}");
     expect(pageSource).toMatch(/buildStudioLiveShareHref\(provisionalWorkId/u);
     expect(pageSource).toContain("buildStudioLiveShareHref");
     expect(panelSource).toContain("buildStudioLiveShareHref");
@@ -367,8 +372,8 @@ describe("Studio Magma/Figma live collaboration session", () => {
     );
     expect(pageSource).toContain("studioAutosaveLeadershipAllowsLocalEdit");
     expect(pageSource).toContain("!persistLeadershipAllowsDraw");
-    expect(pageSource).toContain("autosaveLiveJam={studioLiveJam}");
-    expect(pageSource).not.toContain("autosaveLiveJam={!requiresStudioLiveServer}");
+    expect(editorViewSource).toContain("autosaveLiveJam={studioLiveJam}");
+    expect(editorViewSource).not.toContain("autosaveLiveJam={!requiresStudioLiveServer}");
   });
 
   it("lets a persist-follower apply a local stroke on the shipped document path", async () => {

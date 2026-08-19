@@ -1,5 +1,5 @@
-import type { StudioRasterImmutableTileFrame } from "./studio-crdt-raster-replay-runtime";
 import type { StudioWebGpuSurfaceBounds } from "./studio-webgpu-viewport";
+import type { StudioRasterImmutableTileFrame } from "../live/studio-crdt-raster-replay-runtime";
 
 import {
   STUDIO_RASTER_MAX_ASSET_BYTES,

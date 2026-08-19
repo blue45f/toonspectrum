@@ -9,7 +9,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, afterEach } from "vitest";
 
-import { STUDIO_AI_DEFAULT_SETTINGS, type StudioAiSettings } from "./studio-ai-client";
+import { STUDIO_AI_DEFAULT_SETTINGS, type StudioAiSettings } from "./ai/studio-ai-client";
 import { STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY } from "./studio-stock-image-client";
 import { StudioIntegrationsSettingsPanel } from "./StudioIntegrationsSettingsPanel";
 

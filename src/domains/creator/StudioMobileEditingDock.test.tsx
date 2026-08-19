@@ -19,8 +19,8 @@ import {
 } from "./StudioMobileEditingDock";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 
-import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
-import type { StudioBrushSnapshot } from "./studio-brush-library";
+import type { NormalizedStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
+import type { StudioBrushSnapshot } from "./brush/studio-brush-library";
 import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
 import type { StudioWorkspaceState } from "./studio-workspaces";
 

@@ -18,12 +18,6 @@ import {
 } from "@toonspectrum/studio-project-model";
 
 import {
-  acquireStudioGpuDevice,
-  onStudioGpuDeviceLost,
-  type StudioGpuDeviceLease,
-  type StudioGpuDeviceLossEvent,
-} from "./studio-gpu-fabric";
-import {
   projectStudioSceneDocumentPoint,
   resolveStudioSceneDocumentTransform,
   validateStudioSceneSelectableOverlay,
@@ -32,9 +26,17 @@ import {
   type StudioScenePoint,
   type StudioSceneSelectableOverlay,
   type StudioSceneViewportMetrics,
-} from "./studio-scene-provider";
+} from "../studio-scene-provider";
+
+import {
+  acquireStudioGpuDevice,
+  onStudioGpuDeviceLost,
+  type StudioGpuDeviceLease,
+  type StudioGpuDeviceLossEvent,
+} from "./studio-gpu-fabric";
 import {
   STUDIO_VELLO_HUB_PRODUCT_CAPABILITY,
+  STUDIO_VELLO_HYBRID_COMPOSITOR,
   STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE,
 } from "./studio-vello-hub-capability";
 
@@ -43,29 +45,39 @@ import type { GpuCpuComparison } from "@toonspectrum/studio-engine-vello";
 export {
   resolveStudioVelloHubProductCapability,
   STUDIO_VELLO_HUB_PRODUCT_CAPABILITY,
+  STUDIO_VELLO_HYBRID_COMPOSITOR,
   STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE,
   type StudioVelloHubCapabilityDecision,
 } from "./studio-vello-hub-capability";
 
 /**
- * Product Vello Hub for the first in-place SceneIR-owned Studio island.
+ * Product Vello Hub (V13).
  *
- * Scope is deliberately bounded to accelerated selection chrome. Konva keeps
- * document/input authority, while the previous Pixi overlay and this hub are
- * mutually exclusive owners of this one renderer-neutral island. This makes
- * Vello a real product surface without claiming parity for the rest of Studio.
+ * Visible first frames are Vello Classic or Hybrid GPU. Vello CPU is a
+ * quality reference and GPU-loss recovery lane — never the general first
+ * paint. FrameGraphCompositor owns the swapchain; this hub renders islands
+ * onto fabric textures.
  */
 
 export const STUDIO_VELLO_CLASSIC_BACKEND_ID =
   "vello-gpu-browser" as const;
+export const STUDIO_VELLO_HYBRID_BACKEND_ID =
+  "vello-hybrid-wgpu" as const;
 export const STUDIO_VELLO_CPU_BACKEND_ID = "vello-cpu" as const;
 export const STUDIO_VELLO_HUB_ENGINE_HASH =
-  "vello-hub-v1:vello-0.9.0:vello_cpu-0.2.0" as const;
+  "vello-hub-v13:vello-0.9.0:hybrid-compositor:vello_cpu-0.2.0" as const;
 const STUDIO_VELLO_VALIDATED_SCENE_LIMIT = 128;
 
 export type StudioVelloHubBackendId =
   | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
+  | typeof STUDIO_VELLO_HYBRID_BACKEND_ID
   | typeof STUDIO_VELLO_CPU_BACKEND_ID;
+
+export function isStudioVelloGpuBackendId(
+  id: StudioVelloHubBackendId,
+): id is typeof STUDIO_VELLO_CLASSIC_BACKEND_ID | typeof STUDIO_VELLO_HYBRID_BACKEND_ID {
+  return id === STUDIO_VELLO_CLASSIC_BACKEND_ID || id === STUDIO_VELLO_HYBRID_BACKEND_ID;
+}
 
 export interface StudioVelloIslandPlacement {
   readonly left: number;
@@ -375,7 +387,9 @@ export interface StudioVelloCpuFrame {
 }
 
 export interface StudioVelloGpuFrame {
-  readonly backendId: typeof STUDIO_VELLO_CLASSIC_BACKEND_ID;
+  readonly backendId:
+    | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
+    | typeof STUDIO_VELLO_HYBRID_BACKEND_ID;
   readonly kind: "texture";
   readonly width: number;
   readonly height: number;
@@ -534,6 +548,26 @@ export function createStudioVelloClassicBrowserBackend(options: {
   };
 }
 
+export function createStudioVelloHybridBrowserBackend(
+  classic: StudioVelloHubBackend = createStudioVelloClassicBrowserBackend(),
+): StudioVelloHubBackend {
+  return {
+    id: STUDIO_VELLO_HYBRID_BACKEND_ID,
+    availability: () => classic.availability(),
+    async render(scene) {
+      const frame = await classic.render(scene);
+      if (frame.kind === "pixels") return frame;
+      return { ...frame, backendId: STUDIO_VELLO_HYBRID_BACKEND_ID };
+    },
+    compareToReference: classic.compareToReference
+      ? (scene) => classic.compareToReference!(scene)
+      : undefined,
+    dispose() {
+      // The Classic backend owns the fabric lease when the facade wraps it.
+    },
+  };
+}
+
 export interface StudioVelloHubPresentationTarget {
   /** Atomically makes a completed frame primary; the target consumes the frame. */
   present(frame: StudioVelloBackendFrame): Promise<void>;
@@ -542,6 +576,7 @@ export interface StudioVelloHubPresentationTarget {
 }
 
 export type StudioVelloHubDecision =
+  | "gpu-first"
   | "initial-reference"
   | "cached"
   | "hysteresis-hold"
@@ -549,7 +584,9 @@ export type StudioVelloHubDecision =
   | "fallback";
 
 export interface StudioVelloHubFallback {
-  readonly from: typeof STUDIO_VELLO_CLASSIC_BACKEND_ID;
+  readonly from:
+    | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
+    | typeof STUDIO_VELLO_HYBRID_BACKEND_ID;
   readonly to: typeof STUDIO_VELLO_CPU_BACKEND_ID;
   readonly reason: string;
 }
@@ -578,6 +615,7 @@ export interface StudioVelloHubSnapshot {
   readonly killedBackends: ReadonlyArray<{ providerId: string; reason: string }>;
   readonly pendingShadowCount: number;
   readonly hybridSparseCandidate: typeof STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE;
+  readonly hybridCompositor: typeof STUDIO_VELLO_HYBRID_COMPOSITOR;
   readonly admissionMode: typeof STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.admissionMode;
   readonly persistentWinnerStorage: false;
   readonly productWidePromoted: false;
@@ -587,6 +625,7 @@ export interface StudioVelloHubOptions {
   readonly target: StudioVelloHubPresentationTarget;
   readonly cpuBackend?: StudioVelloHubBackend;
   readonly classicBackend?: StudioVelloHubBackend;
+  readonly hybridBackend?: StudioVelloHubBackend;
   readonly now?: () => number;
   readonly deviceHash?: string;
   /** Live input-state reader. A read failure is treated as pen-down (fail-closed). */
@@ -627,16 +666,16 @@ function discardFrame(frame: StudioVelloBackendFrame): void {
 }
 
 /**
- * Scene-local runtime tournament for the product island. CPU is the quality
- * authority; Classic can be admitted only after an asynchronous δ48 visual
- * shadow passes and measured warm p50 clears 12%. A switch is impossible while
- * pen-down. Winner evidence is deliberately in-memory and cannot be persisted
- * or represented as a product-wide PromotionRegistry approval without soak.
+ * GPU-first runtime tournament. Classic/Hybrid paint immediately; CPU shadow
+ * is reference-only. A switch is impossible while pen-down. Visual-gate
+ * failure kills the GPU backends and recovers on CPU without a second canvas.
  */
 export class StudioVelloHub {
   private readonly target: StudioVelloHubPresentationTarget;
   private readonly cpuBackend: StudioVelloHubBackend;
   private readonly classicBackend: StudioVelloHubBackend;
+  private readonly hybridBackend: StudioVelloHubBackend;
+  private readonly ownsHybridBackend: boolean;
   private readonly now: () => number;
   private readonly deviceHash: string;
   private readonly isPenDown: (() => boolean) | undefined;
@@ -665,6 +704,9 @@ export class StudioVelloHub {
     this.cpuBackend = options.cpuBackend ?? createStudioVelloCpuReferenceBackend();
     this.classicBackend = options.classicBackend
       ?? createStudioVelloClassicBrowserBackend();
+    this.ownsHybridBackend = options.hybridBackend !== undefined;
+    this.hybridBackend = options.hybridBackend
+      ?? createStudioVelloHybridBrowserBackend(this.classicBackend);
     this.now = options.now ?? (() => performance.now());
     this.deviceHash = `${options.deviceHash ?? defaultDeviceHash()}|${STUDIO_VELLO_HUB_ENGINE_HASH}`;
     this.isPenDown = options.isPenDown;
@@ -723,34 +765,63 @@ export class StudioVelloHub {
     }
   }
 
-  private chooseBackend(scene: SceneIR, penDown: boolean): {
+  private preferredGpuBackend(
+    scene: SceneIR,
+    preferred?: StudioVelloHubBackendId,
+  ): typeof STUDIO_VELLO_CLASSIC_BACKEND_ID | typeof STUDIO_VELLO_HYBRID_BACKEND_ID {
+    if (preferred === STUDIO_VELLO_HYBRID_BACKEND_ID) return STUDIO_VELLO_HYBRID_BACKEND_ID;
+    if (preferred === STUDIO_VELLO_CLASSIC_BACKEND_ID) return STUDIO_VELLO_CLASSIC_BACKEND_ID;
+    const fingerprint = computeSceneFingerprint(scene);
+    return fingerprint.textCount > 0 || fingerprint.gradientCount > 2
+      ? STUDIO_VELLO_HYBRID_BACKEND_ID
+      : STUDIO_VELLO_CLASSIC_BACKEND_ID;
+  }
+
+  private liveGpuBackend(
+    preferred: typeof STUDIO_VELLO_CLASSIC_BACKEND_ID | typeof STUDIO_VELLO_HYBRID_BACKEND_ID,
+  ): typeof STUDIO_VELLO_CLASSIC_BACKEND_ID | typeof STUDIO_VELLO_HYBRID_BACKEND_ID | null {
+    if (!this.killSwitch.isKilled(preferred)) return preferred;
+    const other = preferred === STUDIO_VELLO_CLASSIC_BACKEND_ID
+      ? STUDIO_VELLO_HYBRID_BACKEND_ID
+      : STUDIO_VELLO_CLASSIC_BACKEND_ID;
+    return this.killSwitch.isKilled(other) ? null : other;
+  }
+
+  private chooseBackend(
+    scene: SceneIR,
+    penDown: boolean,
+    preferred?: StudioVelloHubBackendId,
+  ): {
     backendId: StudioVelloHubBackendId;
     decision: Exclude<StudioVelloHubDecision, "fallback">;
     expectedGainPct: number | null;
   } {
     const bucket = computeSceneFingerprint(scene).bucket;
-    const key = sceneKey(scene);
-    const cached = this.winnerCache.get(bucket, this.deviceHash);
-    if (!cached) {
+    const visual = this.visualEvidence.get(bucket);
+    const gpuId = this.liveGpuBackend(this.preferredGpuBackend(scene, preferred));
+    if (!gpuId || visual?.pass === false) {
       return {
         backendId: STUDIO_VELLO_CPU_BACKEND_ID,
         decision: "initial-reference",
         expectedGainPct: null,
       };
     }
-    const visual = this.visualEvidence.get(bucket);
-    const classicEligible =
-      visual?.pass === true
-      && this.validatedScenes.has(key)
-      && !this.killSwitch.isKilled(STUDIO_VELLO_CLASSIC_BACKEND_ID);
-    const incumbentId = cached.providerId === STUDIO_VELLO_CLASSIC_BACKEND_ID
-      && classicEligible
-      ? STUDIO_VELLO_CLASSIC_BACKEND_ID
-      : STUDIO_VELLO_CPU_BACKEND_ID;
-    const challengerId = incumbentId === STUDIO_VELLO_CPU_BACKEND_ID
-      ? STUDIO_VELLO_CLASSIC_BACKEND_ID
-      : STUDIO_VELLO_CPU_BACKEND_ID;
-    if (challengerId === STUDIO_VELLO_CLASSIC_BACKEND_ID && !classicEligible) {
+    const cached = this.winnerCache.get(bucket, this.deviceHash);
+    if (!cached || !isStudioVelloGpuBackendId(
+      cached.providerId as StudioVelloHubBackendId,
+    )) {
+      return { backendId: gpuId, decision: "gpu-first", expectedGainPct: null };
+    }
+    const incumbentId = this.killSwitch.isKilled(cached.providerId)
+      ? gpuId
+      : cached.providerId as StudioVelloHubBackendId;
+    if (!isStudioVelloGpuBackendId(incumbentId)) {
+      return { backendId: gpuId, decision: "gpu-first", expectedGainPct: null };
+    }
+    const challengerId = incumbentId === STUDIO_VELLO_CLASSIC_BACKEND_ID
+      ? STUDIO_VELLO_HYBRID_BACKEND_ID
+      : STUDIO_VELLO_CLASSIC_BACKEND_ID;
+    if (this.killSwitch.isKilled(challengerId) || incumbentId === gpuId) {
       return { backendId: incumbentId, decision: "cached", expectedGainPct: null };
     }
     const incumbentMs = this.costModel.estimate(incumbentId, bucket)?.warmP50Ms;
@@ -798,13 +869,51 @@ export class StudioVelloHub {
 
   async render(
     scene: SceneIR,
-    options: { readonly penDown?: boolean } = {},
+    options: {
+      readonly penDown?: boolean;
+      readonly preferredBackend?: StudioVelloHubBackendId;
+    } = {},
   ): Promise<StudioVelloHubRenderReceipt> {
     return this.renderInternal(sceneIRSchema.parse(scene), {
       penDown: this.resolvePenDown(options.penDown ?? false),
       forceCpu: false,
       fallback: null,
+      preferredBackend: options.preferredBackend,
     });
+  }
+
+  private killGpuBackends(reason: string): void {
+    this.killSwitch.kill(STUDIO_VELLO_CLASSIC_BACKEND_ID, reason);
+    this.killSwitch.kill(STUDIO_VELLO_HYBRID_BACKEND_ID, reason);
+    this.winnerCache.evictProvider(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+    this.winnerCache.evictProvider(STUDIO_VELLO_HYBRID_BACKEND_ID);
+  }
+
+  private async recoverGpuIslandToCpu(reason: string): Promise<void> {
+    const from = this.lastGoodFrame && isStudioVelloGpuBackendId(this.lastGoodFrame.backendId)
+      ? this.lastGoodFrame.backendId
+      : STUDIO_VELLO_CLASSIC_BACKEND_ID;
+    this.killGpuBackends(reason);
+    if (!this.lastGoodFrame || !isStudioVelloGpuBackendId(this.lastGoodFrame.backendId)) {
+      return;
+    }
+    this.target.holdLastGood(reason);
+    if (!this.latestScene) return;
+    await this.renderInternal(this.latestScene, {
+      penDown: this.resolvePenDown(this.latestPenDown),
+      forceCpu: true,
+      fallback: {
+        from,
+        to: STUDIO_VELLO_CPU_BACKEND_ID,
+        reason,
+      },
+    });
+  }
+
+  private backendFor(id: StudioVelloHubBackendId): StudioVelloHubBackend {
+    if (id === STUDIO_VELLO_CLASSIC_BACKEND_ID) return this.classicBackend;
+    if (id === STUDIO_VELLO_HYBRID_BACKEND_ID) return this.hybridBackend;
+    return this.cpuBackend;
   }
 
   private async renderInternal(
@@ -813,6 +922,7 @@ export class StudioVelloHub {
       readonly penDown: boolean;
       readonly forceCpu: boolean;
       readonly fallback: StudioVelloHubFallback | null;
+      readonly preferredBackend?: StudioVelloHubBackendId;
     },
   ): Promise<StudioVelloHubRenderReceipt> {
     if (this.disposed) throw new Error("StudioVelloHub is disposed");
@@ -828,27 +938,25 @@ export class StudioVelloHub {
           decision: "fallback" as const,
           expectedGainPct: null,
         }
-      : this.chooseBackend(scene, penDown);
-    const backend = selection.backendId === STUDIO_VELLO_CLASSIC_BACKEND_ID
-      ? this.classicBackend
-      : this.cpuBackend;
+      : this.chooseBackend(scene, penDown, options.preferredBackend);
+    const backend = this.backendFor(selection.backendId);
     let frame: StudioVelloBackendFrame;
     try {
       frame = await this.renderBackend(backend, scene, fingerprint.bucket);
     } catch (error) {
-      if (backend.id !== STUDIO_VELLO_CLASSIC_BACKEND_ID) throw error;
+      if (!isStudioVelloGpuBackendId(backend.id)) throw error;
       const reason = error instanceof Error ? error.message : String(error);
-      this.killSwitch.kill(STUDIO_VELLO_CLASSIC_BACKEND_ID, reason);
-      this.winnerCache.evictProvider(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+      this.killGpuBackends(reason);
       this.target.holdLastGood(reason);
       return this.renderInternal(scene, {
         penDown,
         forceCpu: true,
         fallback: {
-          from: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+          from: backend.id,
           to: STUDIO_VELLO_CPU_BACKEND_ID,
           reason,
         },
+        preferredBackend: options.preferredBackend,
       });
     }
 
@@ -860,19 +968,19 @@ export class StudioVelloHub {
       await this.target.present(frame);
     } catch (error) {
       discardFrame(frame);
-      if (backend.id !== STUDIO_VELLO_CLASSIC_BACKEND_ID) throw error;
+      if (!isStudioVelloGpuBackendId(backend.id)) throw error;
       const reason = error instanceof Error ? error.message : String(error);
-      this.killSwitch.kill(STUDIO_VELLO_CLASSIC_BACKEND_ID, reason);
-      this.winnerCache.evictProvider(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+      this.killGpuBackends(reason);
       this.target.holdLastGood(reason);
       return this.renderInternal(scene, {
         penDown,
         forceCpu: true,
         fallback: {
-          from: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+          from: backend.id,
           to: STUDIO_VELLO_CPU_BACKEND_ID,
           reason,
         },
+        preferredBackend: options.preferredBackend,
       });
     }
 
@@ -935,19 +1043,14 @@ export class StudioVelloHub {
       availability = await this.classicBackend.availability();
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      this.killSwitch.kill(
-        STUDIO_VELLO_CLASSIC_BACKEND_ID,
-        `availability-probe-failed:${reason}`,
-      );
-      this.winnerCache.evictProvider(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+      await this.recoverGpuIslandToCpu(`availability-probe-failed:${reason}`);
       return;
     }
     if (!availability.available || !this.classicBackend.compareToReference) {
       const reason = availability.available
         ? "shadow-comparison-unavailable"
         : `backend-unavailable:${availability.reason ?? "unknown"}`;
-      this.killSwitch.kill(STUDIO_VELLO_CLASSIC_BACKEND_ID, reason);
-      this.winnerCache.evictProvider(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+      await this.recoverGpuIslandToCpu(reason);
       return;
     }
     let timingFrame: StudioVelloBackendFrame | null = null;
@@ -989,16 +1092,15 @@ export class StudioVelloHub {
           pass: false,
           mismatchPct: report.gate?.mismatchPct ?? Number.POSITIVE_INFINITY,
         });
-        this.killSwitch.kill(STUDIO_VELLO_CLASSIC_BACKEND_ID, reason);
-        this.winnerCache.evictProvider(STUDIO_VELLO_CLASSIC_BACKEND_ID);
-        if (this.lastGoodFrame?.backendId === STUDIO_VELLO_CLASSIC_BACKEND_ID) {
+        this.killGpuBackends(reason);
+        if (this.lastGoodFrame && isStudioVelloGpuBackendId(this.lastGoodFrame.backendId)) {
           this.target.holdLastGood(reason);
           if (this.latestScene) {
             await this.renderInternal(this.latestScene, {
               penDown: this.resolvePenDown(this.latestPenDown),
               forceCpu: true,
               fallback: {
-                from: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+                from: this.lastGoodFrame.backendId,
                 to: STUDIO_VELLO_CPU_BACKEND_ID,
                 reason,
               },
@@ -1012,9 +1114,8 @@ export class StudioVelloHub {
     } catch (error) {
       if (timingFrame) discardFrame(timingFrame);
       const reason = error instanceof Error ? error.message : String(error);
-      this.killSwitch.kill(STUDIO_VELLO_CLASSIC_BACKEND_ID, reason);
-      this.winnerCache.evictProvider(STUDIO_VELLO_CLASSIC_BACKEND_ID);
-      if (this.lastGoodFrame?.backendId === STUDIO_VELLO_CLASSIC_BACKEND_ID) {
+      this.killGpuBackends(reason);
+      if (this.lastGoodFrame && isStudioVelloGpuBackendId(this.lastGoodFrame.backendId)) {
         this.target.holdLastGood(reason);
         if (this.latestScene) {
           await this.renderInternal(this.latestScene, {
@@ -1033,8 +1134,7 @@ export class StudioVelloHub {
 
   async handleDeviceLoss(reason: string): Promise<StudioVelloHubRenderReceipt | null> {
     if (this.disposed) return null;
-    this.killSwitch.kill(STUDIO_VELLO_CLASSIC_BACKEND_ID, reason);
-    this.winnerCache.evictProvider(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+    this.killGpuBackends(reason);
     this.target.holdLastGood(reason);
     if (!this.latestScene) return null;
     return this.renderInternal(this.latestScene, {
@@ -1061,6 +1161,7 @@ export class StudioVelloHub {
       killedBackends: this.killSwitch.listKilled(),
       pendingShadowCount: this.shadowFlights.size,
       hybridSparseCandidate: STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE,
+      hybridCompositor: STUDIO_VELLO_HYBRID_COMPOSITOR,
       admissionMode: STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.admissionMode,
       persistentWinnerStorage: false,
       productWidePromoted: false,
@@ -1074,6 +1175,7 @@ export class StudioVelloHub {
     this.unsubscribeDeviceLoss();
     this.cpuBackend.dispose();
     this.classicBackend.dispose();
+    if (this.ownsHybridBackend) this.hybridBackend.dispose();
   }
 }
 

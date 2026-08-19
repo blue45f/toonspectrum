@@ -23,11 +23,11 @@ import {
   type SaveStudioVrmModelAssetInput,
   type StudioVrmAssetHash,
   type StudioVrmAssetSqliteOpfsRepository,
-} from "../../../src/domains/creator/studio-vrm-asset-sqlite-opfs-repository";
+} from "../../../src/domains/creator/vrm/studio-vrm-asset-sqlite-opfs-repository";
 import {
   createStudioVrmTexturePaintArtifact,
   type StudioVrmTexturePaintArtifactMetadata,
-} from "../../../src/domains/creator/studio-vrm-texture-paint-artifact";
+} from "../../../src/domains/creator/vrm/studio-vrm-texture-paint-artifact";
 
 const REPORT_SCHEMA_VERSION = 1;
 const SMALL_MODEL_BYTES = 1 * 1024 * 1024;

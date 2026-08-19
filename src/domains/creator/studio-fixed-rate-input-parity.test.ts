@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  beginStudioStrokePointerSession,
+  collectStudioStrokePointerBatch,
+  type StudioPointerEventLike,
+  type StudioStrokePointerSession,
+} from "./canvas/studio-pointer-input";
+import {
   resolveBrushPressureSample,
   resolveBrushReleasePressureSample,
 } from "./studio-brush";
@@ -12,12 +18,6 @@ import {
   type FixedRateStrokeFilterState,
   type FixedRateStrokeQuantizedSample,
 } from "./studio-fixed-rate-stroke-filter";
-import {
-  beginStudioStrokePointerSession,
-  collectStudioStrokePointerBatch,
-  type StudioPointerEventLike,
-  type StudioStrokePointerSession,
-} from "./studio-pointer-input";
 
 type TestPointerType = "mouse" | "pen";
 

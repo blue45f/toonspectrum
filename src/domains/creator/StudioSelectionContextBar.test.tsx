@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { STUDIO_POINTER_DISTANCE_BUDGETS_PX } from "./studio-oncanvas-command-surfaces";
 import {
   StudioSelectionContextBar,
@@ -227,10 +225,7 @@ describe("StudioSelectionContextBar", () => {
  * 도구·픽셀도구 무장과 분리해 캔버스 기하가 도구 전환에 반응하지 않게 한다.
  */
 describe("StudioSelectionContextBar layout site (StudioPage)", () => {
-  const pageSource = readFileSync(
-    join(process.cwd(), "src/domains/creator/StudioPage.tsx"),
-    "utf8"
-  );
+  const pageSource = readStudioCuttoonEditorSource();
 
   it("keeps the select-options strip armed by tool, not by selection count", () => {
     expect(pageSource).toContain("const selectionOptionsSuppressed =");

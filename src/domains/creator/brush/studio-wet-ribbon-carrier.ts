@@ -11,7 +11,7 @@
  * documents never enter this module.
  */
 
-import { hash2 } from "./studio-grain";
+import { hash2 } from "../studio-grain";
 
 export const STUDIO_WET_RIBBON_CARRIER_VERSION = "wet-ribbon-carrier-v2" as const;
 

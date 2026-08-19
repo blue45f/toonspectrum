@@ -15,8 +15,8 @@
  *    기본적으로 치환 대상에서 제외한다(includeLocked 로 해제 가능).
  */
 
-import { BUBBLE_VARIANTS } from "./studio-assets";
-import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "./studio-layers";
+import { BUBBLE_VARIANTS } from "../studio-assets";
+import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "../studio-layers";
 
 // ── 구조 타입 — StudioPage 의 El/PageState 최소 부분집합(임포트 순환 방지) ──────
 

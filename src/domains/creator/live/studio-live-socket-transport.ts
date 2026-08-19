@@ -1,6 +1,11 @@
 import { io } from "socket.io-client";
 
 import {
+  resolveStudioCloudflareRealtimeOrigin,
+} from "../studio-realtime-provider-cloudflare-adapter";
+import { parseStudioTeamCommentLiveEvent } from "../studio-team-comment-live-event";
+
+import {
   createStudioCrdtBinarySelectionRequest,
   createStudioCrdtBinarySyncRequest,
   createStudioCrdtBinaryUpdateRequest,
@@ -97,10 +102,6 @@ import {
   type ServerParticipant,
   type ServerVoiceMember,
 } from "./studio-live-socket-wire";
-import {
-  resolveStudioCloudflareRealtimeOrigin,
-} from "./studio-realtime-provider-cloudflare-adapter";
-import { parseStudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
 
 import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
 

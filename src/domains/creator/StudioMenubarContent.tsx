@@ -46,7 +46,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { STUDIO_CANVAS_WIDTH as CANVAS_W } from "./studio-canvas-constants";
+import { STUDIO_CANVAS_WIDTH as CANVAS_W } from "./canvas/studio-canvas-constants";
 import { createStudioMainMenuPresentation } from "./studio-main-menu-presentation";
 import {
   StudioExportMenuPanel,
@@ -59,19 +59,19 @@ import { StudioProjectReviewActions } from "./StudioProjectReviewActions";
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
 
-import type { StudioAiProvenanceDocument } from "./studio-ai-provenance";
+import type { StudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
+import type { SvgExportResult } from "./export/studio-svg-export";
+import type {
+  StudioRasterEncoded,
+  StudioRasterInterchangeFormat,
+} from "./render/studio-raster-interchange";
 import type { StudioCharacterBible } from "./studio-character-bible";
 import type { StudioMenu } from "./studio-editor-tool-model";
 import type { ExportFormat } from "./studio-export";
 import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
 import type { StudioProjectReviewActionHandlers } from "./studio-project-review-actions";
 import type { PsdExportResult } from "./studio-psd-export";
-import type {
-  StudioRasterEncoded,
-  StudioRasterInterchangeFormat,
-} from "./studio-raster-interchange";
 import type { StudioSharedDocument } from "./studio-shared-document-client";
-import type { SvgExportResult } from "./studio-svg-export";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { WatermarkSettings } from "./studio-watermark";
@@ -496,7 +496,7 @@ export interface StudioMenubarContentProps {
   pageEditLocked: boolean;
   pageLabels: string[];
   /** Optional story pages for dialogue TXT package export preflight. */
-  dialoguePages?: readonly import("./studio-dialogue-batch").DialoguePageLike[] | null;
+  dialoguePages?: readonly import( "./lettering/studio-dialogue-batch").DialoguePageLike[] | null;
   projectActionsOpen: boolean;
   projectActionsRef: RefObject<HTMLDivElement | null>;
   projectArchiveBusy: boolean;

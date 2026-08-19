@@ -21,17 +21,17 @@ import {
 import {
   STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
   STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION,
-} from "./studio-hokusai-natural-media-worker-protocol";
+} from "./render/studio-hokusai-natural-media-worker-protocol";
 import {
   StudioHokusaiNaturalMediaInspectorSection,
 } from "./StudioHokusaiNaturalMediaInspectorSection";
 
-import type { DrawEl } from "./studio-element-model";
 import type {
   StudioHokusaiMaterialProfileId,
   StudioHokusaiNaturalMediaPresetId,
-} from "./studio-hokusai-natural-media-contract";
-import type { StudioHokusaiNaturalMediaProductResult } from "./studio-hokusai-natural-media-product";
+} from "./render/studio-hokusai-natural-media-contract";
+import type { StudioHokusaiNaturalMediaProductResult } from "./render/studio-hokusai-natural-media-product";
+import type { DrawEl } from "./studio-element-model";
 
 const probeProduct = vi.fn(async () => ({
   available: true as const,
@@ -50,7 +50,7 @@ const probeProduct = vi.fn(async () => ({
 }));
 const generateProduct = vi.fn();
 
-vi.mock("./studio-hokusai-natural-media-product", () => ({
+vi.mock("./render/studio-hokusai-natural-media-product", () => ({
   probeStudioHokusaiNaturalMediaProduct: probeProduct,
   generateStudioHokusaiNaturalMediaProduct: generateProduct,
 }));

@@ -116,7 +116,7 @@ vi.mock("./studio-canonical-vnext-dry-media-presentation-controller", () => ({
   },
 }));
 
-vi.mock("./studio-engine-webgpu-presentation-surface", () => ({
+vi.mock("./render/studio-engine-webgpu-presentation-surface", () => ({
   createStudioEngineWebGpuPresentationSurface(options: {
     onDeviceLost: (info: GPUDeviceLostInfo) => void;
   }) {
@@ -144,7 +144,7 @@ vi.mock("./studio-engine-webgpu-presentation-surface", () => ({
   },
 }));
 
-vi.mock("./studio-engine-webgpu-textured-brush-runtime", () => ({
+vi.mock("./render/studio-engine-webgpu-textured-brush-runtime", () => ({
   createStudioEngineWebGpuTexturedBrushRuntime() {
     harness.createRuntimeCalls += 1;
     return {

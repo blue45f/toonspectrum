@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_BRUSH_CATALOG_COUNTS,

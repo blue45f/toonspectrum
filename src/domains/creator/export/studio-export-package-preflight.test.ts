@@ -18,7 +18,7 @@ import {
   validateStudioExportGeometry,
 } from "./studio-export-package-preflight";
 
-import type { DialoguePageLike } from "./studio-dialogue-batch";
+import type { DialoguePageLike } from "../lettering/studio-dialogue-batch";
 
 const dialoguePages: DialoguePageLike[] = [
   {

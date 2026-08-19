@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { planStudioRasterRetouchRegion } from "./render/studio-raster-retouch-region";
 import {
   HEAL_CLONE_HARDNESS_DEFAULT,
   HEAL_CLONE_HARDNESS_RANGE,
@@ -23,7 +24,6 @@ import {
   type HealCloneCanvasFactory,
   type HealCloneCtx2DLike,
 } from "./studio-heal-clone-browser";
-import { planStudioRasterRetouchRegion } from "./studio-raster-retouch-region";
 
 import type { StudioImageDataLike } from "./studio-filters";
 import type { StudioHealCloneWorkerLike } from "./studio-heal-clone-worker-client";

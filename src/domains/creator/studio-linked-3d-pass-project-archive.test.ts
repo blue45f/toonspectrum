@@ -16,8 +16,7 @@ import {
   parseStudioLinked3dRenderDocument,
   upsertStudioLinked3dRenderLink,
 } from "./studio-linked-3d-render-document";
-import { createStudioLinked3dRenderPageFixture } from
-  "./studio-linked-3d-render-test-fixture";
+import { createStudioLinked3dRenderPageFixture } from "./studio-linked-3d-render-test-fixture";
 import {
   buildStudioProjectArchive,
   importStudioProjectArchive,

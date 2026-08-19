@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   planStudioDraftPreviewCompositeRuns,
   resolveStudioDraftPreviewCompositeMode,
-} from "./studio-draw-rendering";
+} from "./brush/studio-draw-rendering";
 import { planStudioFxBrushPressurePath } from "./studio-fx-brush";
 import {
   planStudioHighlighterWashRibbon,

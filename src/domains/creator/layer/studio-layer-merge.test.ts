@@ -7,7 +7,7 @@ import {
   planStudioLayerMergeSelected,
 } from "./studio-layer-merge";
 
-import type { LayerItemLike } from "./studio-layers";
+import type { LayerItemLike } from "../studio-layers";
 
 const items: LayerItemLike[] = [
   { id: "a" },

@@ -1,7 +1,7 @@
 import {
   type StudioRasterToolAvailability,
   type StudioRasterToolGate,
-} from "./studio-raster-tool-availability";
+} from "./render/studio-raster-tool-availability";
 
 export type StudioInspectorRasterToolState =
   | "ready"

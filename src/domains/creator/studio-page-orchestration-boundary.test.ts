@@ -7,7 +7,7 @@ const studioPageSource = readFileSync(
   "utf8",
 );
 const rasterExportSource = readFileSync(
-  new URL("./studio-raster-export-orchestration-runtime.ts", import.meta.url),
+  new URL("./render/studio-raster-export-orchestration-runtime.ts", import.meta.url),
   "utf8",
 );
 const projectArchiveSource = readFileSync(
@@ -60,16 +60,16 @@ describe("StudioPage user-action orchestration boundary", () => {
   });
 
   it("keeps heavy export and archive codecs behind analyzable action boundaries", () => {
-    expect(rasterExportSource).toContain('await import("./studio-export")');
+    expect(rasterExportSource).toContain('await import("../studio-export")');
     expect(rasterExportSource).toContain(
       '"./studio-raster-interchange-worker-client"',
     );
     expect(projectArchiveSource).toContain('import("./studio-project-archive")');
-    expect(projectArchiveSource).toContain(
-      'import("./studio-vrm-texture-paint-project-library")',
+    expect(projectArchiveSource).toMatch(
+      /import\(\s*["']\.\/vrm\/studio-vrm-texture-paint-project-library["']\)/,
     );
     expect(studioPageSource).toContain(
-      'await import("./studio-raster-asset-client")',
+      'await import("./render/studio-raster-asset-client")',
     );
     expect(studioPageSource).toContain(
       "filterMaskSurfaceArchiveDependencies,",
@@ -105,7 +105,7 @@ describe("StudioPage user-action orchestration boundary", () => {
       'import("./studio-page-orchestration-runtime")',
     );
     expect(sharedRuntimeSource).toContain(
-      'from "./studio-raster-export-orchestration-runtime"',
+      'from "./render/studio-raster-export-orchestration-runtime"',
     );
     expect(sharedRuntimeSource).toContain(
       'from "./studio-project-archive-orchestration-runtime"',

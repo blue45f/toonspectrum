@@ -21,6 +21,8 @@
  *
  * 순수·결정적 — DOM/Konva/난수/시간 의존 없음. polygon-clipping 로드만 비동기다.
  */
+import { unionStudioPolygons, type StudioPathPolygon, type StudioPathRing } from "../studio-path-boolean";
+
 import {
   bubbleShapeLocalPointToCanvas,
   computeBubbleShapeGeometry,
@@ -40,9 +42,8 @@ import {
   scaredBubblePathData,
   thoughtBubbleBodyPath,
 } from "./studio-bubble-path";
-import { unionStudioPolygons, type StudioPathPolygon, type StudioPathRing } from "./studio-path-boolean";
 
-import type { BubbleEl, El } from "./studio-element-model";
+import type { BubbleEl, El } from "../studio-element-model";
 
 export const BUBBLE_MERGE_MIN_COUNT = 2;
 export const BUBBLE_MERGE_MAX_COUNT = 6;

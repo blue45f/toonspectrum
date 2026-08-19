@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { resetStudioReliabilityStatus } from "../studio-reliability-status-store";
+import { disposeStudioSafeModeRuntime } from "../studio-safe-mode-runtime";
+
 import {
   STUDIO_CANONICAL_FILTER_CURVE_INTERPOLATION,
   STUDIO_CANONICAL_FILTER_CURVE_LUT_SIZE,
@@ -19,8 +22,6 @@ import {
   STUDIO_ENGINE_WEBGPU_FILTER_UNSHARP_WGSL,
   StudioEngineWebGpuFilterRuntime,
 } from "./studio-engine-webgpu-filter-runtime";
-import { resetStudioReliabilityStatus } from "./studio-reliability-status-store";
-import { disposeStudioSafeModeRuntime } from "./studio-safe-mode-runtime";
 
 import type {
   StudioCanonicalFilterExecutionPlan,

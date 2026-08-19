@@ -1,23 +1,23 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  studioAdjustmentOperationToFilterFields,
-  type StudioAdjustmentEntry,
-} from "./studio-adjustment-stack";
-import {
   applyImageFilters,
   buildImageFilters,
   registerStudioKonvaFilters,
   type KonvaLike,
-} from "./studio-konva-filters";
+} from "./render/studio-konva-filters";
+import {
+  studioAdjustmentOperationToFilterFields,
+  type StudioAdjustmentEntry,
+} from "./studio-adjustment-stack";
 import { applyStudioProfessionalFilter } from "./studio-professional-filter-kernels";
 import {
   STUDIO_PROFESSIONAL_FILTER_DIRECT_MAX_WORK_UNITS,
   studioProfessionalFilterRequiresWorker,
 } from "./studio-professional-filters";
 
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type { StudioImageDataLike } from "./studio-filters";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 function patternedImage(width = 11, height = 9): StudioImageDataLike {
   const data = new Uint8ClampedArray(width * height * 4);

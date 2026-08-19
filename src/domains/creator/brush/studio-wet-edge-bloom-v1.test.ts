@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { applyStudioBrushAliasWatercolorMaterial } from "./studio-brush-alias-profile";
-import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
 import {
   appendCausalWatercolorBrush,
   beginCausalWatercolorBrush,
   planCausalWatercolorBrushDabs,
   type StudioCausalWatercolorSample,
-} from "./studio-causal-watercolor-brush";
+} from "../studio-causal-watercolor-brush";
+
+import { applyStudioBrushAliasWatercolorMaterial } from "./studio-brush-alias-profile";
+import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
 import {
   getStudioPaperPresetV1,
   resolveStudioPaperMediaModulationV1,

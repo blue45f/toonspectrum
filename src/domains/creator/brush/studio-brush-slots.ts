@@ -8,7 +8,8 @@
  * automatically imports either key (LEGACY_DATA_MIGRATION=false).
  */
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+
 import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsEqual,

@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 
+import type { StudioGpuFilterPreviewFrame } from "./render/studio-gpu-filter-apply";
 import type { ImageEl } from "./studio-element-model";
-import type { StudioGpuFilterPreviewFrame } from "./studio-gpu-filter-apply";
 
 interface WorkerRun {
   reject: (reason?: unknown) => void;
@@ -89,14 +89,14 @@ const gpuHarness = vi.hoisted(() => ({
   present: vi.fn(async (): Promise<StudioGpuFilterPreviewFrame | null> => null),
 }));
 
-vi.mock("./studio-gpu-filter-apply", () => ({
+vi.mock("./render/studio-gpu-filter-apply", () => ({
   applyGpuFilterChain: gpuHarness.apply,
   createStudioGpuFilterPresentationSurface: gpuHarness.createSurface,
   isStudioGpuFilterChainEligible: gpuHarness.isEligible,
   presentGpuFilterChain: gpuHarness.present,
 }));
 
-vi.mock("./studio-konva-filters", () => ({
+vi.mock("./render/studio-konva-filters", () => ({
   buildImageFilters: (el: ImageEl) => ({
     attrs: { brightness: el.brightness ?? 0 },
     cachePad: 0,

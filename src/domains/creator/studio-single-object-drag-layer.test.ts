@@ -2,12 +2,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { studioKonvaRuntime } from "./studio-konva-runtime";
+import studioCanvasViewportSource from "./canvas/StudioCanvasViewport.tsx?raw";
+import { studioKonvaRuntime } from "./render/studio-konva-runtime";
 import {
   beginStudioSingleObjectDragLayer,
   restoreStudioSingleObjectDragLayer,
 } from "./studio-single-object-drag-layer";
-import studioCanvasViewportSource from "./StudioCanvasViewport.tsx?raw";
 
 import type Konva from "konva";
 

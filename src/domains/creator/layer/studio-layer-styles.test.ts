@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { isIdentityOutline, normalizeOutline } from "../studio-outline";
+
 import {
   COMBO_LAYER_STYLE_PRESETS,
   hasActiveLayerStyle,
@@ -8,7 +10,6 @@ import {
   layerStyleResetPatch,
   type LayerStylePatch,
 } from "./studio-layer-styles";
-import { isIdentityOutline, normalizeOutline } from "./studio-outline";
 
 // LayerStylePatch의 전체 키 집합(layerStyleResetPatch가 빠짐없이 채워야 하는 6개 키).
 const ALL_PATCH_KEYS = [

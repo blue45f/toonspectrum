@@ -2,7 +2,7 @@ import {
   DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
   normalizeStudioDrawingPaletteLayout,
   type StudioDrawingPaletteLayout,
-} from "./studio-drawing-palettes";
+} from "./brush/studio-drawing-palettes";
 import {
   DEFAULT_STUDIO_INSPECTOR_LAYOUT,
   STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY,
@@ -38,7 +38,7 @@ export {
   normalizeStudioDrawingPaletteLayout,
   resizeStudioDrawingPalettes,
   toggleStudioDrawingPalette,
-} from "./studio-drawing-palettes";
+} from "./brush/studio-drawing-palettes";
 export type {
   StudioCanonicalDrawingPaletteLayout,
   StudioDrawingPaletteId,
@@ -47,7 +47,7 @@ export type {
   StudioDrawingPaletteLocks,
   StudioDrawingPaletteLockState,
   StudioDrawingPaletteMoveDirection,
-} from "./studio-drawing-palettes";
+} from "./brush/studio-drawing-palettes";
 
 /**
  * Studio workspace persistence intentionally contains UI layout only.

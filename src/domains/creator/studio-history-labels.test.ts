@@ -2,8 +2,8 @@
 // StudioPage 커밋 경로(요소 패치는 map 으로 새 배열, 무변화 요소는 참조 유지)를 그대로 흉내 낸다.
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
-import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+import { createDefaultStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
+import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 import {
   HISTORY_INITIAL_LABEL,
   HISTORY_PANEL_MAX_VISIBLE,

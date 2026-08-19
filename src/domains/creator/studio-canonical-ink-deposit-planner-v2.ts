@@ -1,7 +1,7 @@
 import type {
   StudioStrokeCurvePlanV2,
   StudioStrokeCurveStationV2,
-} from "./studio-stroke-curve-resampler-v2";
+} from "./brush/studio-stroke-curve-resampler-v2";
 
 /**
  * Renderer-neutral analytic ink deposition for Studio stroke v2.

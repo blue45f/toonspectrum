@@ -9,8 +9,8 @@
  * preview-only round dot.
  */
 
-import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
-import type { StudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
+import type { StudioDynamicBrushDab } from "./brush/studio-brush-dynamics";
+import type { StudioDynamicBrushMaterialIdentity } from "./brush/studio-dry-media-dynamic-bridge";
 
 export const STUDIO_SPLATTER_ORIGIN_ANCHOR_MARKS_PER_VARIATION = 1 as const;
 export const STUDIO_SPLATTER_ORIGIN_ANCHOR_DIAMETER_RATIO = 0.32 as const;

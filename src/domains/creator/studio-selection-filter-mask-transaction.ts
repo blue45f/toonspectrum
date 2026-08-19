@@ -16,7 +16,7 @@ import {
   type SelectionMaskPlan,
 } from "./studio-selection-tools";
 
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 
 export type StudioSelectionFilterMaskScope = "inside" | "outside";
 

@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   hashStudioCanonicalBrushPlan,
   parseStudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
+
 import {
   STUDIO_ENGINE_VNEXT_BRUSH_WORKER_PROTOCOL_REVISION,
   type StudioEngineVNextBrushWorkerHelloMessage,

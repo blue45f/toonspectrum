@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createDefaultStudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
+import { createDefaultStudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
 import {
   commitStudioLinked3dPreparedPass,
   isStudioLinked3dPassRevisionForScene,
@@ -9,8 +9,7 @@ import {
   type StudioLinked3dPassCasAuthority,
   type StudioLinked3dPreparedPass,
 } from "./studio-linked-3d-pass-transaction";
-import { createStudioLinked3dPassRevisionFixture } from
-  "./studio-linked-3d-render-test-fixture";
+import { createStudioLinked3dPassRevisionFixture } from "./studio-linked-3d-render-test-fixture";
 import { sha256HexPortable } from "./studio-sha256";
 import { hashStudioShared3dStageBackground } from "./studio-shared-3d-stage-document";
 

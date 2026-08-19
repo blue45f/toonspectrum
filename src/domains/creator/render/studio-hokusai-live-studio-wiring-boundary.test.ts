@@ -2,13 +2,19 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const PAGE_SOURCE = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const PAGE_SOURCE = readStudioCuttoonEditorSource();
+const HOKUSAI_HELPER_SOURCE = readFileSync(
+  new URL("../studio-legacy-editor-runtime-helpers.ts", import.meta.url),
+  "utf8",
+);
 const VIEWPORT_SOURCE = readFileSync(
-  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
 const IMAGE_NODE_SOURCE = readFileSync(
-  new URL("./StudioKonvaImageNode.tsx", import.meta.url),
+  new URL("../StudioKonvaImageNode.tsx", import.meta.url),
   "utf8",
 );
 
@@ -28,9 +34,9 @@ function sourceSection(
 describe("Studio Hokusai live UI authority wiring", () => {
   it("keeps Hokusai live behind the failed full-size promotion gate", () => {
     const admission = sourceSection(
-      PAGE_SOURCE,
-      "function studioHokusaiProductLivePreset(",
-      "function studioHokusaiColor(",
+      HOKUSAI_HELPER_SOURCE,
+      "export function studioHokusaiProductLivePreset(",
+      "export function studioHokusaiColor(",
     );
     expect(admission).toContain("resolveStudioHokusaiProductLiveAdmission({ brushId, catalogId })");
     expect(admission).not.toContain("explicitExperimentalOptIn: true");
@@ -142,7 +148,7 @@ describe("Studio Hokusai live UI authority wiring", () => {
     const directDraft = sourceSection(
       VIEWPORT_SOURCE,
       "const el = liveDraftVisualRef.current;",
-      "drawLiveFreehandDraftToContext(context, el);",
+      "drawLiveFreehandDraftToContext(",
     );
     expect(directDraft).not.toContain("hokusaiLiveOverlayVisibleRef.current");
 

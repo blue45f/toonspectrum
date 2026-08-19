@@ -1,11 +1,11 @@
 import { useId } from "react";
 
-import { STABILIZER_MAX } from "./studio-brush";
 import {
   describeStudioStabilizerLatency,
   STUDIO_STABILIZER_MODES,
   type StudioStabilizerMode,
-} from "./studio-stroke-stabilizer";
+} from "./brush/studio-stroke-stabilizer";
+import { STABILIZER_MAX } from "./studio-brush";
 
 import { cx } from "@/lib/cx";
 

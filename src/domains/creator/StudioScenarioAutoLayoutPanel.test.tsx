@@ -7,7 +7,7 @@ import {
   createEmptyStudioAiImageReferenceDocument,
   hydrateStudioAiImageReferenceDocument,
   type StudioAiImageReferenceDocument,
-} from "./studio-ai-image-reference-roles";
+} from "./ai/studio-ai-image-reference-roles";
 import {
   StudioScenarioAutoLayoutPanel,
   type StudioScenarioAutoLayoutPanelProps,

@@ -4,147 +4,150 @@ import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Line, Transformer, Shape, Text, Image as KImage } from "react-konva/lib/ReactKonvaCore";
 // Paper grain still uses fillPatternImage on Rect; KImage is for live liquify warp preview.
 
-import { BlendIsolationGroup } from "./BlendIsolationGroup";
-import { ClipMaskGroup } from "./ClipMaskGroup";
-import { studioAdjustmentStackToFilterFields } from "./studio-adjustment-stack";
-import { type StudioAdvancedRuler, type StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
-import { moveKeyframe, removeKeyframe, removeTrack, resolveTimelineComposite, resolveTimelineTransforms, type AnimationTimelineDoc } from "./studio-anim-tracks";
-import { defaultStudioAppSettings, type StudioAppSettings, type StudioAppSettingsTab } from "./studio-app-settings";
-import { CANVAS_W } from "./studio-assets";
-import { studioBackgroundGradientColorStops } from "./studio-background-gradient-color-stops";
+import { BlendIsolationGroup } from "../BlendIsolationGroup";
+import {
+  isStudioBrushEraserAliasId,
+  studioBrushAliasEffectiveDiameter,
+} from "../brush/studio-brush-alias-profile";
+import { studioDrawHudToolLabel, studioPressureCurveHudLabel, studioShapeFillHudLabel, studioShapeKindLabel, studioStabilizerHudLabel, studioSymmetryHudLabel } from "../brush/studio-draw-hud";
+import { drawLiveFreehandDraftToContext, getSymmetricPoints } from "../brush/studio-draw-rendering";
+import { type StudioInkMeshLivePreviewRuntime } from "../brush/studio-ink-mesh-live-preview-loader";
+import {
+  normalizeStudioPaperSurfaceSettings,
+} from "../brush/studio-paper-granulation-runtime";
+import {
+  getStudioPaperSurfacePreviewTile,
+  studioPaperSurfacePreviewOpacity,
+} from "../brush/studio-paper-surface-preview";
+import { normalizeShapeParams } from "../brush/studio-stroke-shapes";
+import { StudioBrushCursor } from "../brush/StudioBrushCursor";
+import { StudioDrawNode } from "../brush/StudioDrawNode";
+import { ClipMaskGroup } from "../ClipMaskGroup";
+import { type FilterMaskPaintMode } from "../filter/studio-filter-mask";
+import { shouldApplyLayerMask, type LayerMaskPaintMode } from "../layer/studio-layer-mask";
+import { BUBBLE_MERGE_MIN_COUNT, bubbleMergeUnavailableReason } from "../lettering/studio-bubble-merge";
+import { type DialogueReplacePlan } from "../lettering/studio-dialogue-batch";
+import { applyDialogueFormatPatch, convertTextElementsToBubbles } from "../lettering/studio-dialogue-format";
+import { applyDialogueRubySpan, clearDialogueRubyRange } from "../lettering/studio-dialogue-ruby";
+import { mergeDialogueWithNext, splitDialogueElement, transferDialogueElement } from "../lettering/studio-dialogue-structure";
+import { dialogueLocalesForPages, dialogueTranslationCoverage } from "../lettering/studio-dialogue-translate";
+import {
+  planStudioLiveGesturePreviewRenderElements,
+} from "../live/studio-live-gesture-preview-projection";
+import { StudioLiveInkOverlayRenderer, StudioLiveInkPredictionRenderer } from "../live/studio-live-ink-overlay";
+import { StudioLiveStampOverlayRenderer } from "../live/studio-live-stamp-overlay";
+import { studioDocumentAllowsKonvaHide } from "../render/studio-document-scene-lower";
+import { type StudioHokusaiLiveOverlayProjection } from "../render/studio-hokusai-live-brush-overlay";
+import { imageFilterCacheKey } from "../render/studio-konva-filter-fields";
+import { type StudioRasterHandoffCandidate } from "../render/studio-raster-handoff-authority";
+import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "../render/studio-raster-publication-feature";
+import { resolveStudioVelloHubProductCapability } from "../render/studio-vello-hub";
+import {
+  StudioRenderSurface,
+  type StudioRenderSurfaceAuthority,
+} from "../render/StudioRenderSurface";
+import { studioAdjustmentStackToFilterFields } from "../studio-adjustment-stack";
+import { type StudioAdvancedRuler, type StudioAdvancedRulerDocument } from "../studio-advanced-ruler-document";
+import { moveKeyframe, removeKeyframe, removeTrack, resolveTimelineComposite, resolveTimelineTransforms, type AnimationTimelineDoc } from "../studio-anim-tracks";
+import { defaultStudioAppSettings, type StudioAppSettings, type StudioAppSettingsTab } from "../studio-app-settings";
+import { CANVAS_W } from "../studio-assets";
+import { studioBackgroundGradientColorStops } from "../studio-background-gradient-color-stops";
 import {
   BRUSH_PRESETS,
   resolveStudioBrushPresetOperation,
   type BrushPreset,
-} from "./studio-brush";
+} from "../studio-brush";
+import { StudioHudPill, StudioStatusBar } from "../studio-chrome-ui";
+import { type CropRect } from "../studio-crop";
+import { containingPanel, elBounds } from "../studio-element-geometry";
+import { elementLabel } from "../studio-element-label";
+import { unionStudioSelectionBounds } from "../studio-figma-selection-ux";
+import { clampFrameIndex, frameIndexOf, MAX_ANIM_FRAMES, onionSkinLayers, type OnionSkinSettings } from "../studio-frame-animation";
+import { type SharedGutterSegment } from "../studio-frame-folder";
+import { planGroupClickSelectionRelease } from "../studio-group-selection";
+import { type HealCloneMode } from "../studio-heal-clone";
+import { computeHistoryBrushAvailability } from "../studio-history-brush";
+import { uid } from "../studio-id";
+import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "../studio-layers";
+import { type StudioLivingInkOverlayProjection } from "../studio-living-ink-overlay";
+import { MASTER_EDIT_GHOST_OPACITY, createEmptyDocumentMaster, togglePageHideMaster, type DocumentMaster } from "../studio-master-page";
+import { type NodeEditHandle, type NodeEditTool } from "../studio-node-edit";
+import { vignetteCss, type PageGrade } from "../studio-page-grade";
+import { StudioAnimTimelinePanel, StudioAppSettingsPanel, StudioBubbleShapeOverlay, StudioCanonicalVNextDryMediaCanvas, StudioCropOverlay, StudioDialogueBatchPanel, StudioDialogueTranslatePanel, StudioFeatureTutorialHub, StudioFrameAnimationPanel, StudioHealCloneOverlay, StudioHistoryBrushOverlay, StudioHistoryPanel, StudioLayerMaskOverlay, StudioQuickMaskOverlay, StudioLiveDynamicBrushOverlayHost, StudioLiveInkOverlayHost, StudioLiveInkPredictionHost, StudioLivePresenceDockConnected, StudioLivePressureHudPill, StudioLiveRetainedMediaOverlayHost, StudioLiveStampOverlayHost, StudioLiveWetInkOverlayHost, StudioMasterPagePanel, StudioDrawSelectionOverlay, StudioNodeEditOverlay, StudioOnionSkinImage, StudioPanelSplitOverlay, StudioPuppetWarpOverlay, StudioRasterCrdtSurface, StudioRemoteCursorOverlay, StudioSelectionAntsOverlay, StudioShortcutsHelp, StudioTextEditFallbackModal, StudioTextEditOverlay, QuickStartPanel, StudioWebGpuCanvas, preloadStudioCommentThreadPopover } from "../studio-page-lazy-ui";
+import { pageDisplayName } from "../studio-page-meta";
+import { adoptMissingPage } from "../studio-pages";
+import { isEligibleForPanelAutoFit } from "../studio-panel-autofit";
+import { type PanelSplitPreview } from "../studio-panel-split";
+import { type VanishingPoint } from "../studio-perspective-guide";
+import { movePuppetPin, type PuppetPin } from "../studio-puppet-warp";
+import { type QuickMaskBrushMode } from "../studio-quick-mask";
+import { type StudioScrollViewport, type StudioScrollViewportStore } from "../studio-scroll-viewport-store";
+import { unionBounds } from "../studio-selection";
+import { type PixelSelection, type PolyLassoSession, type SelectionDragState, type SelectionFrame, type SelPoint } from "../studio-selection-tools";
 import {
-  isStudioBrushEraserAliasId,
-  studioBrushAliasEffectiveDiameter,
-} from "./studio-brush-alias-profile";
-import { BUBBLE_MERGE_MIN_COUNT, bubbleMergeUnavailableReason } from "./studio-bubble-merge";
+  beginStudioSingleObjectDragLayer,
+  restoreStudioSingleObjectDragLayer,
+  type StudioSingleObjectDragLayerSession,
+} from "../studio-single-object-drag-layer";
+import { type SmartGuideOverlay } from "../studio-smart-guides";
+import { studioUiDensityDescription, studioUiDensityLabel, type StudioUiDensityMode } from "../studio-ui-density";
+import { materializeStudioAdvancedFillVectorTarget } from "../studio-vector-fill-reference";
+import { STUDIO_VIEW_ACTION_HINTS } from "../studio-view-action-hints";
+import { planStudioCanvasStageLayout, stepStudioViewZoom, toggleStudioCanvasWheelMode, type StudioViewRotation } from "../studio-view-controls";
+import { StudioViewToolsHud } from "../studio-view-tools-hud-loader";
+import { type StudioWorkAssetRenderPlaceholder } from "../studio-work-asset-render-projection";
+import { colorBlindFilterStyle, StudioColorBlindFilterDefs, type CvdMode } from "../StudioColorBlindPreview";
+import { StudioDraftPreviewLayers } from "../StudioDraftPreviewLayers";
+import { StudioGroupUniformResizeProxy } from "../StudioGroupUniformResizeProxy";
+import { StudioInkMeshLivePreviewHost } from "../StudioInkMeshLivePreviewHost";
+import { StudioKonvaBubbleNode } from "../StudioKonvaBubbleNode";
+import { StudioKonvaImageNode } from "../StudioKonvaImageNode";
+import { StudioFocusLinesNode, StudioFramePanel, StudioSpeedLinesNode, StudioWorkAssetPlaceholderNode } from "../StudioKonvaPrimitiveNodes";
+import { StudioKonvaStickerNode, StudioKonvaTextNode } from "../StudioKonvaTextNodes";
+import { StudioPageSequenceStrip } from "../StudioPageSequenceStrip";
+import { StudioPixiSceneOverlayHost } from "../StudioPixiSceneOverlayHost";
+import { StudioToolHintTarget } from "../StudioToolHint";
+
 import { isStudioBrushCursorMode, studioCanvasCursorClassName, studioCanvasViewportCursorClassName } from "./studio-canvas-cursor";
 import {
   recordStudioHotPathRender,
   recordStudioRenderProfile,
   studioElementIdOf,
 } from "./studio-canvas-shared-runtime";
-import { StudioHudPill, StudioStatusBar } from "./studio-chrome-ui";
-import { type CropRect } from "./studio-crop";
-import { type DialogueReplacePlan } from "./studio-dialogue-batch";
-import { applyDialogueFormatPatch, convertTextElementsToBubbles } from "./studio-dialogue-format";
-import { applyDialogueRubySpan, clearDialogueRubyRange } from "./studio-dialogue-ruby";
-import { mergeDialogueWithNext, splitDialogueElement, transferDialogueElement } from "./studio-dialogue-structure";
-import { dialogueLocalesForPages, dialogueTranslationCoverage } from "./studio-dialogue-translate";
-import { studioDrawHudToolLabel, studioPressureCurveHudLabel, studioShapeFillHudLabel, studioShapeKindLabel, studioStabilizerHudLabel, studioSymmetryHudLabel } from "./studio-draw-hud";
-import { drawLiveFreehandDraftToContext, getSymmetricPoints } from "./studio-draw-rendering";
-import { containingPanel, elBounds } from "./studio-element-geometry";
-import { elementLabel } from "./studio-element-label";
-import { unionStudioSelectionBounds } from "./studio-figma-selection-ux";
-import { type FilterMaskPaintMode } from "./studio-filter-mask";
-import { clampFrameIndex, frameIndexOf, MAX_ANIM_FRAMES, onionSkinLayers, type OnionSkinSettings } from "./studio-frame-animation";
-import { type SharedGutterSegment } from "./studio-frame-folder";
-import { planGroupClickSelectionRelease } from "./studio-group-selection";
-import { type HealCloneMode } from "./studio-heal-clone";
-import { computeHistoryBrushAvailability } from "./studio-history-brush";
-import { type StudioHokusaiLiveOverlayProjection } from "./studio-hokusai-live-brush-overlay";
-import { uid } from "./studio-id";
-import { type StudioInkMeshLivePreviewRuntime } from "./studio-ink-mesh-live-preview-loader";
-import { imageFilterCacheKey } from "./studio-konva-filter-fields";
-import { shouldApplyLayerMask, type LayerMaskPaintMode } from "./studio-layer-mask";
-import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "./studio-layers";
-import {
-  planStudioLiveGesturePreviewRenderElements,
-} from "./studio-live-gesture-preview-projection";
-import { StudioLiveInkOverlayRenderer, StudioLiveInkPredictionRenderer } from "./studio-live-ink-overlay";
-import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
-import { type StudioLivingInkOverlayProjection } from "./studio-living-ink-overlay";
-import { MASTER_EDIT_GHOST_OPACITY, createEmptyDocumentMaster, togglePageHideMaster, type DocumentMaster } from "./studio-master-page";
-import { type NodeEditHandle, type NodeEditTool } from "./studio-node-edit";
-import { vignetteCss, type PageGrade } from "./studio-page-grade";
-import { StudioAnimTimelinePanel, StudioAppSettingsPanel, StudioBubbleShapeOverlay, StudioCanonicalVNextDryMediaCanvas, StudioCropOverlay, StudioDialogueBatchPanel, StudioDialogueTranslatePanel, StudioFeatureTutorialHub, StudioFrameAnimationPanel, StudioHealCloneOverlay, StudioHistoryBrushOverlay, StudioHistoryPanel, StudioLayerMaskOverlay, StudioQuickMaskOverlay, StudioLiveDynamicBrushOverlayHost, StudioLiveInkOverlayHost, StudioLiveInkPredictionHost, StudioLivePresenceDockConnected, StudioLivePressureHudPill, StudioLiveStampOverlayHost, StudioLiveWetInkOverlayHost, StudioMasterPagePanel, StudioDrawSelectionOverlay, StudioNodeEditOverlay, StudioOnionSkinImage, StudioPanelSplitOverlay, StudioPuppetWarpOverlay, StudioRasterCrdtSurface, StudioRemoteCursorOverlay, StudioSelectionAntsOverlay, StudioShortcutsHelp, StudioTextEditFallbackModal, StudioTextEditOverlay, QuickStartPanel, StudioWebGpuCanvas, preloadStudioCommentThreadPopover } from "./studio-page-lazy-ui";
-import { pageDisplayName } from "./studio-page-meta";
-import { adoptMissingPage } from "./studio-pages";
-import { isEligibleForPanelAutoFit } from "./studio-panel-autofit";
-import { type PanelSplitPreview } from "./studio-panel-split";
-import {
-  normalizeStudioPaperSurfaceSettings,
-} from "./studio-paper-granulation-runtime";
-import {
-  getStudioPaperSurfacePreviewTile,
-  studioPaperSurfacePreviewOpacity,
-} from "./studio-paper-surface-preview";
-import { type VanishingPoint } from "./studio-perspective-guide";
-import { movePuppetPin, type PuppetPin } from "./studio-puppet-warp";
-import { type QuickMaskBrushMode } from "./studio-quick-mask";
-import { type StudioRasterHandoffCandidate } from "./studio-raster-handoff-authority";
-import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-publication-feature";
-import { type StudioScrollViewport, type StudioScrollViewportStore } from "./studio-scroll-viewport-store";
-import { unionBounds } from "./studio-selection";
-import { type PixelSelection, type PolyLassoSession, type SelectionDragState, type SelectionFrame, type SelPoint } from "./studio-selection-tools";
-import {
-  beginStudioSingleObjectDragLayer,
-  restoreStudioSingleObjectDragLayer,
-  type StudioSingleObjectDragLayerSession,
-} from "./studio-single-object-drag-layer";
-import { type SmartGuideOverlay } from "./studio-smart-guides";
 import {
   applyStudioStageViewportClip,
   resolveStudioStageViewportClipArmed,
   studioStageBackingPixels,
   type StudioStageViewportClipRuntime,
 } from "./studio-stage-viewport-clip";
-import { normalizeShapeParams } from "./studio-stroke-shapes";
-import { studioUiDensityDescription, studioUiDensityLabel, type StudioUiDensityMode } from "./studio-ui-density";
-import { materializeStudioAdvancedFillVectorTarget } from "./studio-vector-fill-reference";
-import { resolveStudioVelloHubProductCapability } from "./studio-vello-hub";
-import {
-  StudioVelloHubSurface,
-  type StudioVelloHubAuthority,
-} from "./studio-vello-hub-surface";
-import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
-import { planStudioCanvasStageLayout, stepStudioViewZoom, toggleStudioCanvasWheelMode, type StudioViewRotation } from "./studio-view-controls";
-import { StudioViewToolsHud } from "./studio-view-tools-hud-loader";
-import { type StudioWorkAssetRenderPlaceholder } from "./studio-work-asset-render-projection";
-import { StudioBrushCursor } from "./StudioBrushCursor";
 import { StudioCanvasGuideOverlayLayers, StudioCanvasGuideUnderlay } from "./StudioCanvasGuideLayers";
 import { StudioCanvasStatusRail } from "./StudioCanvasStatusRail";
-import { colorBlindFilterStyle, StudioColorBlindFilterDefs, type CvdMode } from "./StudioColorBlindPreview";
-import { StudioDraftPreviewLayers } from "./StudioDraftPreviewLayers";
-import { StudioDrawNode } from "./StudioDrawNode";
-import { StudioGroupUniformResizeProxy } from "./StudioGroupUniformResizeProxy";
-import { StudioInkMeshLivePreviewHost } from "./StudioInkMeshLivePreviewHost";
-import { StudioKonvaBubbleNode } from "./StudioKonvaBubbleNode";
-import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
-import { StudioFocusLinesNode, StudioFramePanel, StudioSpeedLinesNode, StudioWorkAssetPlaceholderNode } from "./StudioKonvaPrimitiveNodes";
-import { StudioKonvaStickerNode, StudioKonvaTextNode } from "./StudioKonvaTextNodes";
-import { StudioPageSequenceStrip } from "./StudioPageSequenceStrip";
-import { StudioPixiSceneOverlayHost } from "./StudioPixiSceneOverlayHost";
-import { StudioToolHintTarget } from "./StudioToolHint";
 
-import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
-import type { StudioCrdtDocument } from "./studio-crdt-document";
-import type { StudioRasterOverlaySourceElement } from "./studio-crdt-raster-ui-bridge";
-import type { StudioDialogueImportApplyResult, StudioDialogueImportMatchMode, StudioDialogueInterchangeDocument } from "./studio-dialogue-interchange";
-import type { StudioDraftPreviewStore } from "./studio-draft-preview-store";
-import type { StudioDrawingShortcutNoticeStore } from "./studio-drawing-shortcut-notice-store";
-import type { DrawMode, DrawShapeKind, StudioMenu, Tool } from "./studio-editor-tool-model";
-import type { DrawEl, El, FrameEl, ImageEl } from "./studio-element-model";
-import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
-import type { StudioFilterPreview } from "./studio-filter-menu";
-import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
-import type { StudioLiveRoom } from "./studio-live-collaboration-room";
-import type { StudioLiveDynamicBrushOverlayRenderer } from "./studio-live-dynamic-brush-overlay";
-import type { StudioLiveGesturePreviewRoomAdapter } from "./studio-live-gesture-preview-room-adapter";
-import type { PageState } from "./studio-page-state";
-import type { StudioGpuBackend, StudioGpuFrameReceipt } from "./studio-webgpu-frame-contract";
-import type { StudioGpuStroke } from "./studio-webgpu-stroke";
-import type { StudioCanonicalVNextDryMediaCanvasAuthority } from "./StudioCanonicalVNextDryMediaCanvas";
-import type { StudioCommentPinClickPayload, StudioCommentPinReanchorPayload } from "./StudioLiveCanvasOverlay";
-import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
+import type { StudioDrawingShortcutNoticeStore } from "../brush/studio-drawing-shortcut-notice-store";
+import type { StudioFilterPreview } from "../filter/studio-filter-menu";
+import type { StudioDialogueImportApplyResult, StudioDialogueImportMatchMode, StudioDialogueInterchangeDocument } from "../lettering/studio-dialogue-interchange";
+import type { StudioCrdtDocument } from "../live/studio-crdt-document";
+import type { StudioRasterOverlaySourceElement } from "../live/studio-crdt-raster-ui-bridge";
+import type { StudioLiveRoom } from "../live/studio-live-collaboration-room";
+import type { StudioLiveDynamicBrushOverlayRenderer } from "../live/studio-live-dynamic-brush-overlay";
+import type { StudioLiveGesturePreviewRoomAdapter } from "../live/studio-live-gesture-preview-room-adapter";
+import type { StudioLiveRetainedMediaOverlayRenderer } from "../live/studio-live-retained-media-overlay";
+import type { StudioCommentPinClickPayload, StudioCommentPinReanchorPayload } from "../live/StudioLiveCanvasOverlay";
+import type { StudioLivePressureStore } from "../live/StudioLiveInkHosts";
+import type { StudioGpuBackend, StudioGpuFrameReceipt } from "../render/studio-webgpu-frame-contract";
+import type { StudioGpuStroke } from "../render/studio-webgpu-stroke";
+import type { StudioAdvancedFillPreview } from "../studio-advanced-fill-preview";
+import type { StudioDraftPreviewStore } from "../studio-draft-preview-store";
+import type { DrawMode, DrawShapeKind, StudioMenu, Tool } from "../studio-editor-tool-model";
+import type { DrawEl, El, FrameEl, ImageEl } from "../studio-element-model";
+import type { StudioTutorialTryAction } from "../studio-feature-tutorials";
+import type { StudioGroupUniformResizeBounds } from "../studio-group-uniform-resize";
+import type { PageState } from "../studio-page-state";
+import type { StudioCanonicalVNextDryMediaCanvasAuthority } from "../StudioCanonicalVNextDryMediaCanvas";
 import type {
   StudioWebGpuCanvasHandle,
   StudioWebGpuSurfaceFrameRequest,
-} from "./StudioWebGpuCanvas";
+} from "../StudioWebGpuCanvas";
 import type Konva from "konva";
 
 import { useMediaQuery } from "@/components/use-media-query";
@@ -587,9 +590,10 @@ export interface StudioLivingInkOverlaySurfaceBinding {
 
 export interface StudioCanvasViewportProps {
   liveDynamicBrushOverlayRenderer: StudioLiveDynamicBrushOverlayRenderer;
-  liveWetInkOverlayRenderer: import("./studio-live-wet-ink-overlay").StudioLiveWetInkOverlayRenderer;
+  liveWetInkOverlayRenderer: import("../live/studio-live-wet-ink-overlay").StudioLiveWetInkOverlayRenderer;
   inkMeshLivePreviewRuntime: StudioInkMeshLivePreviewRuntime | null;
   liveInkPredictionRenderer: StudioLiveInkPredictionRenderer;
+  liveRetainedMediaOverlayRenderer: StudioLiveRetainedMediaOverlayRenderer;
   liveStampOverlayRenderer: StudioLiveStampOverlayRenderer;
   bubbleShapeActiveHandleIndex: number | null;
   draftPreviewStore: StudioDraftPreviewStore;
@@ -840,7 +844,7 @@ export interface StudioCanvasViewportProps {
   strokeWidth: number;
   tipAngle: number;
   tipRoundness: number;
-  studioCanvasCommentPins: import("./studio-live-canvas-overlay-model").StudioCanvasCommentPin[];
+  studioCanvasCommentPins: import("../live/studio-live-canvas-overlay-model").StudioCanvasCommentPin[];
   studioCommentPinReanchorableThreadIds: ReadonlySet<string>;
   studioCommentPinReanchorDisabledReason?: string;
   studioCrdtDocument: StudioCrdtDocument | null;
@@ -854,9 +858,9 @@ export interface StudioCanvasViewportProps {
   studioRasterHandoffGates: { readonly exportActive: boolean; readonly masterEditActive: boolean; readonly editActive: boolean; readonly specialDraftActive: boolean; readonly postProcessingActive: boolean; };
   studioRasterHiddenOperationIds: ReadonlySet<string>;
   studioRasterOverlayElements: readonly StudioRasterOverlaySourceElement[];
-  studioRasterVisibleDocumentRect: import("./studio-raster-visible-rect").StudioRasterVisibleDocumentRect | null;
+  studioRasterVisibleDocumentRect: import("../render/studio-raster-visible-rect").StudioRasterVisibleDocumentRect | null;
   studioWorkAssetRenderPlaceholders: StudioWorkAssetRenderPlaceholder[];
-  studioWorkAssetRenderProjection: import("./studio-work-asset-render-projection").StudioWorkAssetRenderProjection<El>;
+  studioWorkAssetRenderProjection: import("../studio-work-asset-render-projection").StudioWorkAssetRenderProjection<El>;
   symmetryCenterX: number;
   symmetryCenterY: number;
   symmetryRadialCount: number;
@@ -888,9 +892,9 @@ export interface StudioCanvasViewportProps {
   perspectiveLockHorizon: boolean;
   webGpuPreviewAuthorized: boolean;
   webGpuPreviewStrokes: readonly StudioGpuStroke[];
-  webGpuViewportSurface: import("./studio-webgpu-viewport").StudioWebGpuViewportSurfacePlan | null;
+  webGpuViewportSurface: import("../render/studio-webgpu-viewport").StudioWebGpuViewportSurfacePlan | null;
   transientPenInkSurfaceEnabled: boolean;
-  webtoonGuides: typeof import("./studio-webtoon-guides") | null;
+  webtoonGuides: typeof import("../studio-webtoon-guides") | null;
   webtoonTheme: "classic" | "soft" | "vivid";
   workHydrationFailed: boolean;
   workHydrationUnsupportedFormat: boolean;
@@ -909,6 +913,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   liveWetInkOverlayRenderer,
   inkMeshLivePreviewRuntime,
   liveInkPredictionRenderer,
+  liveRetainedMediaOverlayRenderer,
   liveStampOverlayRenderer,
   bubbleShapeActiveHandleIndex,
   draftPreviewStore,
@@ -1327,11 +1332,13 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   ] = useState<StudioCanonicalVNextDryMediaCanvasAuthority | null>(null);
   const velloHubCapability = resolveStudioVelloHubProductCapability();
   const [velloHubAuthority, setVelloHubAuthority] =
-    useState<StudioVelloHubAuthority>(() => ({
+    useState<StudioRenderSurfaceAuthority>(() => ({
       status: velloHubCapability.enabled ? "idle" : "disabled",
       backendId: null,
       decision: null,
       reason: velloHubCapability.reason,
+      ownedDocumentIds: [],
+      visibleCanvasCount: 0,
     }));
   const [pixiMountParent, setPixiMountParent] = useState<HTMLDivElement | null>(null);
   const hokusaiLiveCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1899,6 +1906,33 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     () => drawingRef.current !== null,
     [drawingRef],
   );
+  const frameGraphOwnsDocumentPixels =
+    velloHubAuthority.status === "active"
+    && velloHubAuthority.backendId !== null
+    && velloHubAuthority.backendId !== "vello-cpu"
+    && studioDocumentAllowsKonvaHide(elements, velloHubAuthority.ownedDocumentIds);
+  useLayoutEffect(() => {
+    const layer = mainLayerRef.current;
+    if (!layer) return undefined;
+    const sceneCanvas = (
+      layer as unknown as {
+        getNativeCanvasElement?: () => HTMLCanvasElement | undefined;
+        getCanvas?: () => { _canvas?: HTMLCanvasElement };
+      }
+    );
+    const canvas = sceneCanvas.getNativeCanvasElement?.()
+      ?? sceneCanvas.getCanvas?.()?._canvas
+      ?? null;
+    if (!canvas) return undefined;
+    canvas.style.opacity = frameGraphOwnsDocumentPixels ? "0" : "1";
+    canvas.dataset.studioKonvaDocumentShadow = frameGraphOwnsDocumentPixels
+      ? "true"
+      : "false";
+    return () => {
+      canvas.style.opacity = "1";
+      delete canvas.dataset.studioKonvaDocumentShadow;
+    };
+  }, [frameGraphOwnsDocumentPixels, mainLayerRef]);
   const stageClipRuntimeRef = useRef<StudioStageViewportClipRuntime | null>(null);
   // React 는 정착된 스크롤 스냅샷으로 Stage 를 커밋하므로, 커밋 직후 살아 있는 스크롤 값으로
   // 다시 맞춘다. 컨테이너 transform 과 stage.x/y 는 크기가 같고 부호가 반대라, 둘 중 하나만
@@ -2821,6 +2855,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             data-studio-comment-placement-active={commentPinArmed ? "true" : undefined}
             data-studio-vello-hub-authority={velloHubAuthority.status}
             data-studio-vello-hub-backend={velloHubAuthority.backendId ?? undefined}
+            data-studio-frame-graph-document={
+              frameGraphOwnsDocumentPixels ? "vello-skia" : "konva-shadow"
+            }
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
               canvasCursorClassName,
@@ -2862,6 +2899,26 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onPointerMove={onStageMove}
             onPointerUp={onStageUp}
             onPointerCancel={cancelSingleObjectDragLayer}
+            onPointerLeave={() => {
+              studioLiveRoomRef.current?.clearCursor();
+              clearAdvancedFillTapGesture();
+              hideBrushCursor();
+              hideSmudgeCursor();
+              hideHealCloneCursors();
+              hideHistoryBrushCursor();
+              hideLayerMaskCursor();
+              hideFilterMaskCursor();
+            }}
+            onPointerOut={() => {
+              studioLiveRoomRef.current?.clearCursor();
+              clearAdvancedFillTapGesture();
+              hideBrushCursor();
+              hideSmudgeCursor();
+              hideHealCloneCursors();
+              hideHistoryBrushCursor();
+              hideLayerMaskCursor();
+              hideFilterMaskCursor();
+            }}
             onClick={narrowCanvasSelectionOnRelease}
             onTap={narrowCanvasSelectionOnRelease}
             onDblClick={enterGroupFromCanvasGesture}
@@ -3126,7 +3183,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   // 실측: 단일 탭(fill 1회) 곱하기는 이론값과 1/255 일치하는데 30스탬프 획은
                   // 검정으로 붕괴했다. BlendIsolationGroup이 획을 비트맵 한 장으로 만든 뒤
                   // 합성을 정확히 한 번 적용한다.
-                  const isolatedComposite = composite !== "source-over";
+                  const isolatedComposite = composite !== "source-over" && composite !== "destination-out";
                   const previewSequence =
                     studioLiveGesturePreviewRenderPlan.previewSequenceByElementId.get(el.id);
                   const blendCacheKey = isolatedComposite
@@ -3336,6 +3393,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       ref={setRef}
                       x={0}
                       y={0}
+                      globalCompositeOperation={el.mode === "eraser" ? "destination-out" : undefined}
                       draggable={draggable}
                       dragBoundFunc={snapBoundFunc}
                       onMouseDown={onSelect}
@@ -3670,21 +3728,6 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   </>
                 );
               })()}
-              {/* 지우개 초안만 메인 레이어에 남는다: destination-out 은 이 레이어의 커밋 픽셀과
-                  합성되어야 지워지는 미리보기가 보인다. 나머지 초안은 아래 전용 레이어에서 그린다.
-                  다이렉트 초안 노드는 상시 마운트 — 스트로크 시작이 렌더를 요구하지 않도록
-                  sceneFunc 이 ref 로 스스로 게이트한다. */}
-              {tool === "draw" && (
-                <Shape
-                  sceneFunc={(context) => {
-                    const el = liveDraftVisualRef.current;
-                    if (!el || el.mode !== "eraser" || !liveDraftDirectRef.current) return;
-                    drawLiveFreehandDraftToContext(context, el);
-                  }}
-                  listening={false}
-                  perfectDrawEnabled={false}
-                />
-              )}
               {/* 그룹 및 다중 선택은 구성 타입(draw + image/text 등)이 섞여도 하나의 union bounds를
                   항상 보여준다. 아직 전용 affine proxy가 없는 혼합 선택에서도 PPT/Figma처럼 무엇이
                   한 이동 단위인지 명확해야 한다. 잠금/혼합 상태는 amber 점선으로 즉시 구분하며
@@ -3936,6 +3979,18 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   />
                 );
               })()}
+              {/* 지우개 다이렉트 라이브 초안: destination-out 으로 메인 레이어 콘텐츠를 직접 실시간 소거 */}
+              {tool === "draw" && (
+                <Shape
+                  sceneFunc={(context) => {
+                    const el = liveDraftVisualRef.current;
+                    if (!el || !liveDraftDirectRef.current || el.mode !== "eraser") return;
+                    drawLiveFreehandDraftToContext(context, el);
+                  }}
+                  listening={false}
+                  perfectDrawEnabled={false}
+                />
+              )}
             </Layer>
             {/* A selected coordinate object is lifted here only while it is being dragged. Konva
                 then repaints this tiny layer per pointer frame instead of rasterizing every
@@ -3958,17 +4013,20 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     const el = liveDraftVisualRef.current;
                     if (
                       !el
-                      || el.mode === "eraser"
                       || !liveDraftDirectRef.current
-                      || (
-                        gpuLiveInkPinnedRef.current
-                        && !gpuCanvasShadowVisibleRef.current
-                      )
-                      || livingInkOverlayVisibleRef.current
-                      || liveInkOverlayRendererRef.current.isActive
-                      || liveStampOverlayRenderer.isActive
+                      || el.mode === "eraser"
+                      || liveRetainedMediaOverlayRenderer.isActive
                       || liveDynamicBrushOverlayRenderer.isActive
-                      || liveWetInkOverlayRenderer.isActive
+                      || (
+                        (
+                          gpuLiveInkPinnedRef.current
+                          && !gpuCanvasShadowVisibleRef.current
+                        )
+                        || livingInkOverlayVisibleRef.current
+                        || liveInkOverlayRendererRef.current.isActive
+                        || liveStampOverlayRenderer.isActive
+                        || liveWetInkOverlayRenderer.isActive
+                      )
                     ) {
                       return;
                     }
@@ -4383,6 +4441,18 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               />
             ) : null}
             {webGpuViewportSurface ? (
+              <StudioLiveRetainedMediaOverlayHost
+                renderer={liveRetainedMediaOverlayRenderer}
+                left={webGpuViewportSurface.surface.left}
+                top={webGpuViewportSurface.surface.top}
+                width={webGpuViewportSurface.surface.width}
+                height={webGpuViewportSurface.surface.height}
+                documentScale={effScale}
+                documentWidth={CANVAS_W}
+                flipX={canvasFlipH}
+              />
+            ) : null}
+            {webGpuViewportSurface ? (
               <StudioLiveWetInkOverlayHost
                 renderer={liveWetInkOverlayRenderer}
                 left={webGpuViewportSurface.surface.left}
@@ -4419,7 +4489,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               />
             ) : null}
           </Suspense>
-          <StudioVelloHubSurface
+          <StudioRenderSurface
             enabled={velloHubCapability.enabled}
             mountParent={pixiMountParent}
             width={stageViewLayout.hostWidth}

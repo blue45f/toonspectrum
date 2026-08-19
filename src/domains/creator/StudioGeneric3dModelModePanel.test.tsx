@@ -13,7 +13,7 @@ import { StudioGeneric3dModelModePanel } from "./StudioGeneric3dModelModePanel";
 import type {
   StudioBg3dGlbValidationFailure,
   StudioBg3dGlbValidationSuccess,
-} from "./studio-bg3d-glb-validation";
+} from "./bg3d/studio-bg3d-glb-validation";
 import type { ComponentProps } from "react";
 
 function validation(): StudioBg3dGlbValidationSuccess {

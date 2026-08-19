@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_POINTER_SAMPLE_ROLE_AUTHORITATIVE } from "../studio-shared-pointer-ring-buffer";
+
 import {
   createStudioEngineWorkerSession,
   type StudioEngineWorkerLike,
@@ -15,7 +17,6 @@ import {
   type StudioEngineOffscreenSurface,
   type StudioEngineTransientContext2d,
 } from "./studio-engine-worker-runtime";
-import { STUDIO_POINTER_SAMPLE_ROLE_AUTHORITATIVE } from "./studio-shared-pointer-ring-buffer";
 
 interface MessageEventLike {
   readonly data: unknown;

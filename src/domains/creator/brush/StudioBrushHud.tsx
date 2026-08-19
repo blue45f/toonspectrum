@@ -2,7 +2,6 @@ import { Eraser, PenTool } from "lucide-react";
 import { memo, useEffect, useRef, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
-import { STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
 import {
   planStudioBrushHudPlacement,
   stepStudioBrushHudTether,
@@ -16,8 +15,10 @@ import {
   type StudioBrushHudTetherState,
   type StudioPointerHandedness,
   type StudioSurfaceRect,
-} from "./studio-oncanvas-command-surfaces";
-import { StudioInlineScrubber } from "./StudioInlineScrubber";
+} from "../studio-oncanvas-command-surfaces";
+import { StudioInlineScrubber } from "../StudioInlineScrubber";
+
+import { STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
 
 import { cn } from "@/lib/utils";
 

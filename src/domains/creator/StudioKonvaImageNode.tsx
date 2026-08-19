@@ -2,15 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { Image as KImage } from "react-konva/lib/ReactKonvaCore";
 
 import {
-  evaluateStudioAnimatedImageFilterCapability,
-  startStudioAnimatedImageFilterFrameLoop,
-  type StudioAnimatedImageFilterStatus,
-} from "./studio-animated-image-filter-runtime";
-import {
   planStudioFilterIslandLanes,
   studioFilterIslandBucket,
   studioFilterLaneProviderId,
-} from "./studio-filter-island-plan";
+} from "./filter/studio-filter-island-plan";
 import {
   applyFilterMaskToPixels,
   computeFilterMaskCoverage,
@@ -18,33 +13,38 @@ import {
   wrapKonvaFiltersWithFilterMask,
   type FilterMaskCoverage,
   type FilterMaskKonvaFilterFn,
-} from "./studio-filter-mask";
-import { scheduleStudioFilterRenderTournament } from "./studio-filter-render-tournament";
+} from "./filter/studio-filter-mask";
+import { scheduleStudioFilterRenderTournament } from "./filter/studio-filter-render-tournament";
 import {
   hasActiveImageFilters,
   imageFilterCacheKey,
   type ImageFilterFields,
-} from "./studio-konva-filter-fields";
-import { studioKonvaRuntime as KonvaRuntime } from "./studio-konva-runtime";
-import { resizableNodeProps } from "./studio-node-props";
-import { computePanelAutoFitPatch } from "./studio-panel-autofit";
+} from "./render/studio-konva-filter-fields";
+import { studioKonvaRuntime as KonvaRuntime } from "./render/studio-konva-runtime";
 import {
   getStudioRasterEditSurfaceSnapshot,
   subscribeStudioRasterEditSurfaces,
-} from "./studio-raster-edit-surface-cache";
+} from "./render/studio-raster-edit-surface-cache";
 import {
   acknowledgeStudioRasterImagePresentation,
   acknowledgeStudioRasterImagePresentationDraw,
   expectedStudioRasterImagePresentation,
   registerStudioMountedRasterImagePresentation,
   type StudioRasterImagePresentationExpectation,
-} from "./studio-raster-image-presentation";
+} from "./render/studio-raster-image-presentation";
+import {
+  evaluateStudioAnimatedImageFilterCapability,
+  startStudioAnimatedImageFilterFrameLoop,
+  type StudioAnimatedImageFilterStatus,
+} from "./studio-animated-image-filter-runtime";
+import { resizableNodeProps } from "./studio-node-props";
+import { computePanelAutoFitPatch } from "./studio-panel-autofit";
 import { sha256HexPortable } from "./studio-sha256";
 import { toKonvaSkewAttrs } from "./studio-skew";
 
+import type { StudioGpuFilterPreviewFrame } from "./render/studio-gpu-filter-apply";
+import type { StudioGpuFilterPresentationSurface } from "./render/studio-gpu-filter-presentation";
 import type { FrameEl, ImageEl } from "./studio-element-model";
-import type { StudioGpuFilterPreviewFrame } from "./studio-gpu-filter-apply";
-import type { StudioGpuFilterPresentationSurface } from "./studio-gpu-filter-presentation";
 import type Konva from "konva";
 
 import { toast } from "@/lib/toast-store";
@@ -225,9 +225,9 @@ export function studioImageFilterSupersampleDensity(input: {
   }
   return Math.min(IMAGE_FILTER_SUPERSAMPLE_MAX, dpr);
 }
-type StudioKonvaFiltersModule = typeof import("./studio-konva-filters");
+type StudioKonvaFiltersModule = typeof import( "./render/studio-konva-filters");
 type StudioImageFilterWorkerClientModule = typeof import("./studio-image-filter-worker-client");
-type StudioGpuFilterApplyModule = typeof import("./studio-gpu-filter-apply");
+type StudioGpuFilterApplyModule = typeof import("./render/studio-gpu-filter-apply");
 type StudioImageFilterWorkerSession = ReturnType<
   StudioImageFilterWorkerClientModule["createStudioImageFilterResidentWorkerSession"]
 >;
@@ -376,7 +376,7 @@ function trimWorkerResultCache(
 
 function loadStudioKonvaFilters(): Promise<StudioKonvaFiltersModule> {
   if (!studioKonvaFiltersPromise) {
-    studioKonvaFiltersPromise = import("./studio-konva-filters")
+    studioKonvaFiltersPromise = import( "./render/studio-konva-filters")
       .then((mod) => {
         mod.registerStudioKonvaFilters(KonvaRuntime);
         return mod;
@@ -532,7 +532,7 @@ export function StudioKonvaImageNode({
     // lease only for decode/presentation; ordinary sources retain their synchronous assignment
     // path. The lease owns both the bounded CAS read and the ref-counted Blob URL lifetime.
     if (src.startsWith("studio-opfs-cas:sha256:")) {
-      void import("./studio-raster-source-lease")
+      void import("./render/studio-raster-source-lease")
         .then(({ acquireStudioRasterSourceLease }) =>
           acquireStudioRasterSourceLease(src, {
             consumer: "studio-konva-image-node",
@@ -786,7 +786,7 @@ export function StudioKonvaImageNode({
   useEffect(() => {
     if (!hasFilters || gpuFilterModuleSettled) return;
     let active = true;
-    import("./studio-gpu-filter-apply")
+    import("./render/studio-gpu-filter-apply")
       .then((mod) => {
         if (!active) return;
         // One state transition keeps "settled" and the module namespace causally atomic. A split

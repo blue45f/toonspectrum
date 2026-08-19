@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./studio-brush-library";
+import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./brush/studio-brush-library";
 import {
   createStudioCommunityPublishManifest,
   listStudioCommunityShareCandidates,

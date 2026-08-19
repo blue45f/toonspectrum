@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
-} from "./studio-ai-provenance";
+} from "./ai/studio-ai-provenance";
 import {
   createCanonicalStudioDocumentEnvelope,
   serializeCanonicalStudioDocumentEnvelope,

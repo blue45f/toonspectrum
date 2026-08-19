@@ -154,23 +154,23 @@ describe("Studio canvas guide layer ownership boundary", () => {
 
     expect(viewport.valueImports.filter((specifier) => specifier === "./StudioCanvasGuideLayers"))
       .toEqual(["./StudioCanvasGuideLayers"]);
-    expect(guides.allImports).not.toContain("./StudioPage");
+    expect(guides.allImports).not.toContain("../StudioPage");
     expect(guides.dynamicImports).toEqual([]);
     expect(guides.valueImports).toEqual([
       "react",
       "react-konva/lib/ReactKonvaCore",
-      "./studio-kaleidoscope",
-      "./studio-page-lazy-ui",
+      "../studio-kaleidoscope",
+      "../studio-page-lazy-ui",
     ]);
     expect(guides.typeImports).toEqual([
-      "./studio-advanced-ruler-document",
-      "./studio-frame-folder",
-      "./studio-isometric-grid",
-      "./studio-perspective-guide",
-      "./studio-smart-guides",
+      "../studio-advanced-ruler-document",
+      "../studio-frame-folder",
+      "../studio-isometric-grid",
+      "../studio-perspective-guide",
+      "../studio-smart-guides",
     ]);
-    expect(guides.valueImports).not.toContain("./studio-webtoon-guides");
-    expect(guides.source).toContain('typeof import("./studio-webtoon-guides")');
+    expect(guides.valueImports).not.toContain("../studio-webtoon-guides");
+    expect(guides.source).toContain('typeof import("../studio-webtoon-guides")');
     expect(guides.source).not.toMatch(/(?:studio-crdt|studio-webgpu|react-router|StudioPage)/u);
   });
 
@@ -188,7 +188,7 @@ describe("Studio canvas guide layer ownership boundary", () => {
     const source = moduleShape("./StudioCanvasViewport.tsx").source;
     const mainLayer = source.indexOf("<Layer ref={mainLayerRef}>");
     const underlay = source.indexOf("<StudioCanvasGuideUnderlay", mainLayer);
-    const authoredDocument = source.indexOf("const authoredCanvasRenderElements", underlay);
+    const authoredDocument = source.indexOf("const canvasRenderElements", underlay);
     const lastToolOverlay = source.indexOf("<StudioLayerMaskOverlay", authoredDocument);
     const overlay = source.indexOf("<StudioCanvasGuideOverlayLayers", lastToolOverlay);
     const stageClose = source.indexOf("</Stage>", overlay);
@@ -203,7 +203,8 @@ describe("Studio canvas guide layer ownership boundary", () => {
   });
 
   it("moves every guide node implementation while retaining Stage pointer guards", () => {
-    const page = moduleShape("./StudioPage.tsx").source;
+    const page = moduleShape("../StudioPage.tsx").source;
+    const stagePointers = moduleShape("../studio-cuttoon-editor/studio-cuttoon-stage-pointers.ts").source;
     const guides = moduleShape("./StudioCanvasGuideLayers.tsx").source;
 
     for (const marker of ["grid-v-", "sgseg-", "kaleido-wedge-"] as const) {
@@ -215,8 +216,8 @@ describe("Studio canvas guide layer ownership boundary", () => {
     expect(page).not.toContain("<StudioPerspectiveOverlay");
     expect(page).not.toContain("<StudioIsometricGridOverlay");
     expect(page).not.toContain("<StudioAdvancedRulerOverlay");
-    expect(page).toContain('e.target.name() === "guide-line-handle"');
-    expect(page).toContain('e.target.name() === "symmetry-handle"');
+    expect(stagePointers).toContain('e.target.name() === "guide-line-handle"');
+    expect(stagePointers).toContain('e.target.name() === "symmetry-handle"');
     expect(guides).toContain('name="guide-line-handle"');
     expect(guides).toContain('name="symmetry-handle"');
     expect(guides).toMatch(/<Suspense fallback=\{null\}>[\s\S]{0,700}<StudioPerspectiveOverlay/u);

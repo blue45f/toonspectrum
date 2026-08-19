@@ -10,18 +10,18 @@ import {
   Text as KText,
 } from "react-konva/lib/ReactKonvaCore";
 
-import { mirrorAxisAngle, wedgeBoundaryAngle } from "./studio-kaleidoscope";
+import { mirrorAxisAngle, wedgeBoundaryAngle } from "../studio-kaleidoscope";
 import {
   StudioAdvancedRulerOverlay,
   StudioIsometricGridOverlay,
   StudioPerspectiveOverlay,
-} from "./studio-page-lazy-ui";
+} from "../studio-page-lazy-ui";
 
-import type { StudioAdvancedRuler, StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
-import type { SharedGutterSegment } from "./studio-frame-folder";
-import type { IsometricGridConfig } from "./studio-isometric-grid";
-import type { VanishingPoint } from "./studio-perspective-guide";
-import type { SmartGuideOverlay } from "./studio-smart-guides";
+import type { StudioAdvancedRuler, StudioAdvancedRulerDocument } from "../studio-advanced-ruler-document";
+import type { SharedGutterSegment } from "../studio-frame-folder";
+import type { IsometricGridConfig } from "../studio-isometric-grid";
+import type { VanishingPoint } from "../studio-perspective-guide";
+import type { SmartGuideOverlay } from "../studio-smart-guides";
 
 const EMPTY_ADVANCED_RULERS: StudioAdvancedRulerDocument = {
   version: 1,
@@ -32,7 +32,7 @@ const EMPTY_ADVANCED_RULERS: StudioAdvancedRulerDocument = {
 const NOOP_ADVANCED_RULER_CHANGE = (): void => undefined;
 
 type StudioWebtoonGuideRuntime = Pick<
-  typeof import("./studio-webtoon-guides"),
+  typeof import("../studio-webtoon-guides"),
   "safeAreaMargin" | "webtoonWidthGuides"
 >;
 

@@ -40,16 +40,17 @@ import {
 import { createPortal } from "react-dom";
 
 import {
+  STUDIO_EASE,
+  STUDIO_FOCUS_RING,
+} from "../studio-panel-ui";
+import { useStudioModalSheet } from "../useStudioModalSheet";
+
+import {
   STUDIO_LAYER_LIFT_CORRECTION_MAX_POINTS,
   type StudioLayerLiftCorrectionMode,
   type StudioLayerLiftCorrectionPoint,
   type StudioLayerLiftCorrectionStroke,
 } from "./studio-layer-lift-correction";
-import {
-  STUDIO_EASE,
-  STUDIO_FOCUS_RING,
-} from "./studio-panel-ui";
-import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import { cn } from "@/lib/utils";
 

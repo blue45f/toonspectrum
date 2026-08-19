@@ -3,8 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   studioAdjustmentDefaultParams,
   type StudioAdjustmentEngineId,
-} from "./studio-adjustment-stack";
-import { IMAGE_FILTER_PRESETS, type StudioImageDataLike } from "./studio-filters";
+} from "../studio-adjustment-stack";
+import { IMAGE_FILTER_PRESETS, type StudioImageDataLike } from "../studio-filters";
+
 import {
   hasActiveImageFilters as hasLightweightActiveImageFilters,
   imageFilterCacheKey,

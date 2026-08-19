@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_OIL_IMPASTO_RELIEF_OVERLAY_VERSION } from "./studio-oil-ribbon-carrier";
+import { STUDIO_OIL_IMPASTO_RELIEF_OVERLAY_VERSION } from "../brush/studio-oil-ribbon-carrier";
+
 import {
   exportPageToSvg,
   type SvgExportEl,
@@ -65,7 +66,7 @@ describe("SVG export — brush--impasto-relief GGX 릴리프 오버레이 직렬
   it("프로그램에 핀되지 않은 유화 형제 레인은 오버레이 없이 기존 바이트를 유지한다", () => {
     // oil--impasto-ribbon 은 2026-08-15 에 릴리프 프로그램에 합류해 이 목록에서 빠졌다 —
     // 이름만 임파스토였던 레인이라 릴리프 없이는 oil--filbert-ribbon 과 선언 필드가 동일했다.
-    for (const brush of ["acrylic", "brush--oil-lanes", "brush--bristle-depletion"]) {
+    for (const brush of ["oil--filbert-ribbon", "brush--oil-lanes", "brush--bristle-depletion"]) {
       const { svg } = exportPageToSvg(page([oilStroke(brush)]));
       expect(svg, brush).toContain('data-brush-engine="oil-ribbon-carrier-v1"');
       expect(svg, brush).not.toContain(OVERLAY_MARKER);

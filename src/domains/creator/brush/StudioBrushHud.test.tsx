@@ -4,7 +4,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_POINTER_DISTANCE_BUDGETS_PX } from "./studio-oncanvas-command-surfaces";
+import { STUDIO_POINTER_DISTANCE_BUDGETS_PX } from "../studio-oncanvas-command-surfaces";
+
 import { StudioBrushHud, type StudioBrushHudHandlers } from "./StudioBrushHud";
 
 function handlers(overrides: Partial<StudioBrushHudHandlers> = {}): StudioBrushHudHandlers {

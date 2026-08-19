@@ -92,25 +92,25 @@ function moduleShape(relativePath: string): ModuleShape {
 describe("Studio mobile editing dock module boundary", () => {
   it("keeps StudioPage as the one-way orchestration owner behind a mobile-only lazy boundary", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
     const loader = moduleShape("./studio-mobile-editing-dock-loader.ts");
 
     expect(
       page.valueImports.filter((specifier) => specifier === "./StudioMobileEditingDock"),
     ).toEqual([]);
-    expect(page.allImports).toContain("./StudioMobileEditingDock");
     expect(page.dynamicImports).not.toContain("./StudioMobileEditingDock");
-    expect(page.namedValueImports.get("StudioMobileEditingDock")).toBe(
-      "./studio-mobile-editing-dock-loader",
+    expect(editorView.namedValueImports.get("StudioMobileEditingDock")).toBe(
+      "../studio-mobile-editing-dock-loader",
     );
     expect(loader.dynamicImports).toEqual(["./StudioMobileEditingDock"]);
     expect(loader.valueImports).not.toContain("./studio-page-lazy-ui");
     expect(dock.allImports).not.toContain("./StudioPage");
     expect(dock.dynamicImports).not.toContain("./StudioPage");
     expect(page.source).toContain("useStudioStableHandlers<StudioMobileEditingDockHandlers>({");
-    expect(page.source).toContain("{isMobile ? (");
-    expect(page.source).toContain("<Suspense fallback={null}>");
-    expect(page.source).toContain("<StudioMobileEditingDock");
+    expect(editorView.source).toContain("{isMobile ? (");
+    expect(editorView.source).toContain("<Suspense fallback={null}>");
+    expect(editorView.source).toContain("<StudioMobileEditingDock");
   });
 
   it("moves the dock and its presentation contracts out of the page monolith", () => {
@@ -131,6 +131,7 @@ describe("Studio mobile editing dock module boundary", () => {
 
   it("preserves the lazy registry and excludes canvas runtime dependencies", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
     const dockUi = moduleShape("./studio-mobile-dock-presets-config.ts");
     const dockPresets = moduleShape("./studio-mobile-dock-presets.tsx");
@@ -154,8 +155,8 @@ describe("Studio mobile editing dock module boundary", () => {
     for (const directModule of [
       "./studio-page-lazy-ui",
       "./StudioMobileSheetHandle",
-      "./StudioBrushLibraryPanel",
-      "./StudioBrushStudio",
+      "./brush/StudioBrushLibraryPanel",
+      "./brush/StudioBrushStudio",
       "./StudioShapePickerGrid",
       "./StudioUnifiedBrushPicker",
       "konva",
@@ -166,7 +167,7 @@ describe("Studio mobile editing dock module boundary", () => {
     }
     expect(dock.dynamicImports).toEqual([]);
     expect(dock.source).not.toContain("lazyRetry(");
-    expect(page.source).toContain("ui={STUDIO_MOBILE_EDITING_DOCK_UI}");
+    expect(editorView.source).toContain("ui={STUDIO_MOBILE_EDITING_DOCK_UI}");
   });
 
   it("warms both lazy properties surfaces from every mobile Work intent path", () => {
@@ -193,9 +194,10 @@ describe("Studio mobile editing dock module boundary", () => {
 
   it("routes mobile brush default restore through the page-owned baseline controller", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
 
-    expect(page.source).toContain(
+    expect(editorView.source).toContain(
       "brushDefaultRestore={brushBaselineController.restoreState}",
     );
     expect(page.source).toMatch(

@@ -13,7 +13,7 @@ import {
 import type {
   StudioPathOpsResult,
   StudioQualityEngine,
-} from "./studio-canvaskit-adapter";
+} from "./render/studio-canvaskit-adapter";
 
 function fakeProvider(
   overrides: Partial<StudioQualityEngine> = {},

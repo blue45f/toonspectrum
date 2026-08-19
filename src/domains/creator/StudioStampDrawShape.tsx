@@ -1,13 +1,13 @@
 import { Shape } from "react-konva/lib/ReactKonvaCore";
 
+import { resolveStudioStampBrushStyle } from "./brush/studio-brush-stamp-engine";
+import { drawStudioStampStrokeWithSymmetry } from "./brush/studio-stamp-symmetry-rendering";
 import {
   resampleStrokePressures,
   resolveStudioFreehandRenderPath,
 } from "./studio-brush";
-import { resolveStudioStampBrushStyle } from "./studio-brush-stamp-engine";
-import { drawStudioStampStrokeWithSymmetry } from "./studio-stamp-symmetry-rendering";
 
-import type { StudioStampBrushKind } from "./studio-brush-stamp-engine";
+import type { StudioStampBrushKind } from "./brush/studio-brush-stamp-engine";
 import type { DrawEl } from "./studio-element-model";
 
 interface StudioStampDrawShapeProps {

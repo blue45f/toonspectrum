@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { smoothStrokePoints } from "./studio-brush";
+import { smoothStrokePoints } from "../studio-brush";
+
 import {
   STUDIO_STROKE_POSTPROCESS_MAX_COORDINATES,
   STUDIO_STROKE_POSTPROCESS_WORKER_PROTOCOL_VERSION,

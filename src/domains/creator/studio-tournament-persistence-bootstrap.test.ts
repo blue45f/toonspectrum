@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   createStudioTournamentPersistenceBootstrap,
   type StudioTournamentPersistenceModule,
@@ -159,7 +160,7 @@ describe("Studio tournament persistence bootstrap", () => {
   });
 
   it("keeps SQLite persistence outside the StudioPage static graph", () => {
-    const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const page = readStudioCuttoonEditorSource();
     const bootstrap = readFileSync(
       new URL("./studio-tournament-persistence-bootstrap.ts", import.meta.url),
       "utf8",
@@ -176,15 +177,15 @@ describe("Studio tournament persistence bootstrap", () => {
       /^import .*studio-tournament-sqlite-persistence/mu,
     );
     expect(page).not.toMatch(
-      /from\s+["']\.\/studio-brush-library-sqlite-repository["']/u,
+      /from\s+["']\.\/(?:brush\/)?studio-brush-library-sqlite-repository["']/u,
     );
     expect(page).toMatch(
-      /import\(\s*["']\.\/studio-brush-library-sqlite-repository["']\s*\)/u,
+      /import\(\s*["']\.\/(?:brush\/)?studio-brush-library-sqlite-repository["']\s*\)/u,
     );
   });
 
   it("keeps search indexing out of the active-tool and pen-down startup paths", () => {
-    const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const page = readStudioCuttoonEditorSource();
 
     expect(page).toContain(
       'from "./studio-active-tool-command"',

@@ -1,6 +1,13 @@
 import * as THREE from "three";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resolveStudioBg3dAnimationTime } from "./bg3d/studio-bg3d-animation-time";
+import {
+  DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
+  STUDIO_BG3D_GLB_MIME_TYPE,
+  validateStudioBg3dGlb,
+} from "./bg3d/studio-bg3d-glb-validation";
+import { DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE } from "./bg3d/studio-bg3d-scene-document";
 import {
   applyBg3dFallbackMaterial,
   checkStudioBg3dThreeBudgets,
@@ -22,17 +29,10 @@ import {
   sampleStudioBg3dAnimationActionAtTime,
 } from "./studio-background-3d-model";
 import { createPrimitive, encodeBg3dSceneHash } from "./studio-background-3d-primitives";
-import { resolveStudioBg3dAnimationTime } from "./studio-bg3d-animation-time";
-import {
-  DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
-  STUDIO_BG3D_GLB_MIME_TYPE,
-  validateStudioBg3dGlb,
-} from "./studio-bg3d-glb-validation";
-import { DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE } from "./studio-bg3d-scene-document";
 
+import type { StudioBg3dGlbValidationSuccess } from "./bg3d/studio-bg3d-glb-validation";
+import type { StudioBg3dParsedGlbMetrics, StudioBg3dSceneBudgets } from "./bg3d/studio-bg3d-scene-document";
 import type { BgCustomModelInstance } from "./studio-background-3d-model";
-import type { StudioBg3dGlbValidationSuccess } from "./studio-bg3d-glb-validation";
-import type { StudioBg3dParsedGlbMetrics, StudioBg3dSceneBudgets } from "./studio-bg3d-scene-document";
 
 const threeLoaderMocks = vi.hoisted(() => ({
   parseAsync: vi.fn(),
@@ -65,7 +65,7 @@ vi.mock("three/examples/jsm/loaders/GLTFLoader.js", () => ({
   },
 }));
 
-vi.mock("./studio-bg3d-ktx2-renderer-runtime", () => ({
+vi.mock("./bg3d/studio-bg3d-ktx2-renderer-runtime", () => ({
   createStudioBg3dKtx2RendererRuntime: ktx2RuntimeMocks.create,
 }));
 

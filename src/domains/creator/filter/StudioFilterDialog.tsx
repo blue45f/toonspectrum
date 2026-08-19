@@ -24,7 +24,20 @@ import {
   normalizeStudioEffectFavoriteState,
   toggleStudioEffectFavorite,
   type StudioEffectFavoriteState,
-} from "./studio-effect-favorites";
+} from "../studio-effect-favorites";
+import {
+  STUDIO_EASE,
+  STUDIO_FOCUS_RING,
+  studioSegmentChipClass,
+} from "../studio-panel-ui";
+import {
+  acquireProductStudioUiPreferencesRepository,
+  type StudioUiPreferencesRepository,
+} from "../studio-ui-preferences-sqlite";
+import { StudioCurvePanel } from "../StudioCurvePanel";
+import { useStudioHistogramSource } from "../useStudioHistogramSource";
+import { useStudioModalSheet } from "../useStudioModalSheet";
+
 import {
   STUDIO_FILTER_DIALOG_CATALOG,
   STUDIO_FILTER_GROUP_ORDER,
@@ -58,22 +71,10 @@ import {
   type StudioFilterPackValues,
 } from "./studio-filter-pack";
 import { isStudioFilterUnionWaveKind } from "./studio-filter-union-wave";
-import {
-  STUDIO_EASE,
-  STUDIO_FOCUS_RING,
-  studioSegmentChipClass,
-} from "./studio-panel-ui";
-import {
-  acquireProductStudioUiPreferencesRepository,
-  type StudioUiPreferencesRepository,
-} from "./studio-ui-preferences-sqlite";
-import { StudioCurvePanel } from "./StudioCurvePanel";
-import { useStudioHistogramSource } from "./useStudioHistogramSource";
-import { useStudioModalSheet } from "./useStudioModalSheet";
 
-import type { CurvePoint, CurveRgbChannels } from "./studio-curves";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
-import type { StudioSelectionFilterMaskScope } from "./studio-selection-filter-mask-transaction";
+import type { ImageFilterFields } from "../render/studio-konva-filter-fields";
+import type { CurvePoint, CurveRgbChannels } from "../studio-curves";
+import type { StudioSelectionFilterMaskScope } from "../studio-selection-filter-mask-transaction";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";

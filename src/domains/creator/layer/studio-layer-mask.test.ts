@@ -14,7 +14,7 @@ import {
   type LayerMaskLike,
 } from "./studio-layer-mask";
 
-import type { MaskCanvasLike, MaskCtx2DLike, SelectionCanvasFactory } from "./studio-selection-tools";
+import type { MaskCanvasLike, MaskCtx2DLike, SelectionCanvasFactory } from "../studio-selection-tools";
 
 // ---------------------------------------------------------------------------
 // 테스트 픽스처 — studio-alpha-lock.test.ts/studio-selection-tools.test.ts와 동일 패턴의 로컬

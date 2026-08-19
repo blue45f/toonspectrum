@@ -2,13 +2,14 @@ import {
   replayStudioRasterCrdtPixels,
   type StudioRasterReplayRuntimeDependencies,
   type StudioRasterReplayRuntimeResult,
-} from "./studio-crdt-raster-replay-runtime";
-import { materializeStudioFilterMaskReplayPng } from "./studio-filter-mask-surface-hydrator";
+} from "../live/studio-crdt-raster-replay-runtime";
 import {
   STUDIO_PROJECT_ARCHIVE_LIMITS,
   type StudioProjectArchiveLimits,
-} from "./studio-project-archive";
-import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
+} from "../studio-project-archive";
+import { parseStudioProjectFile, type StudioProjectFile } from "../studio-project-file";
+
+import { materializeStudioFilterMaskReplayPng } from "./studio-filter-mask-surface-hydrator";
 
 import type { StudioRasterOperationLog } from "@/lib/studio-crdt-raster-ops";
 

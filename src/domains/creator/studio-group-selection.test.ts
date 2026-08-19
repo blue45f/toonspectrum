@@ -763,7 +763,7 @@ describe("planAtomicSelectionAffineTransform — 혼합 그룹 전체 변형", (
  */
 describe("캔버스 배선 계약 — 뗌 단계 좁히기", () => {
   const viewportSource = readFileSync(
-    new URL("./StudioCanvasViewport.tsx", import.meta.url),
+    new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
     "utf8",
   );
 

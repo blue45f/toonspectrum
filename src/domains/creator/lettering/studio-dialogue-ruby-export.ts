@@ -14,6 +14,14 @@
  */
 
 import {
+  layoutVerticalText,
+  verticalBlockAlign,
+  verticalTextItemGeometry,
+  type VerticalTextLayout,
+  type VerticalTextMeasurer,
+} from "../studio-vertical-text";
+
+import {
   estimateDialogueTextAdvanceWidth,
   planDialogueRubyOverlayPlacements,
   planDialogueVerticalRubyOverlayPlacements,
@@ -22,15 +30,8 @@ import {
   type StudioVerticalRubyIssue,
   type StudioVerticalRubyWarning,
 } from "./studio-dialogue-ruby-layout";
-import {
-  layoutVerticalText,
-  verticalBlockAlign,
-  verticalTextItemGeometry,
-  type VerticalTextLayout,
-  type VerticalTextMeasurer,
-} from "./studio-vertical-text";
 
-import type { StudioPdfColor, StudioPdfOp } from "./studio-canvaskit-pdf-vector";
+import type { StudioPdfColor, StudioPdfOp } from "../render/studio-canvaskit-pdf-vector";
 
 export const DIALOGUE_RUBY_EXPORT_METADATA_VERSION = 1;
 export const DIALOGUE_RUBY_EXPORT_XMP_NAMESPACE = "https://toonspectrum.com/ns/dialogue-ruby/1.0/";

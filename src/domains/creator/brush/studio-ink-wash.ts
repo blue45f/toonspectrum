@@ -23,7 +23,8 @@
  * Math.random/DOM/Konva에 의존하지 않아 같은 입력·설정·seed는 항상 같은 결과를 낸다.
  */
 
-import { hexToRgb } from "./studio-filters";
+import { hexToRgb } from "../studio-filters";
+
 import {
   DEFAULT_PAPER_GRAIN_KIND,
   accumulateEdgeDarkening,
@@ -35,7 +36,7 @@ import {
   type PaperHeightField,
 } from "./studio-paper-texture";
 
-import type { StudioImageDataLike } from "./studio-filters";
+import type { StudioImageDataLike } from "../studio-filters";
 
 // ---------------------------------------------------------------------------
 // 파라미터 타입·기본값·범위

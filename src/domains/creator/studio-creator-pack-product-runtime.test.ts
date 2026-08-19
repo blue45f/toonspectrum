@@ -1,10 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { BRUSH_LIBRARY_KEY } from "./studio-brush-library";
+import { BRUSH_LIBRARY_KEY } from "./brush/studio-brush-library";
 import {
   openProductBrushLibraryRepository,
   type ProductBrushLibraryRepository,
-} from "./studio-brush-library-sqlite-repository";
+} from "./brush/studio-brush-library-sqlite-repository";
+import {
+  openProductFilterLibraryRepository,
+  type ProductFilterLibraryRepository,
+} from "./filter/studio-filter-library-sqlite-repository";
 import {
   STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY,
   type StudioCreatorPackStorage,
@@ -16,10 +20,6 @@ import {
   installStudioCreatorPackProduct,
   uninstallStudioCreatorPackProduct,
 } from "./studio-creator-pack-product-runtime";
-import {
-  openProductFilterLibraryRepository,
-  type ProductFilterLibraryRepository,
-} from "./studio-filter-library-sqlite-repository";
 import {
   openStudioLocalDatabase,
   type StudioLocalDatabase,

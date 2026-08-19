@@ -30,7 +30,7 @@ const SiteFooter = lazy(() =>
   })),
 );
 const StudioBg3dRetainedOwnerHost = lazy(() =>
-  import("../domains/creator/StudioBg3dRetainedOwnerHost").then((mod) => ({
+  import("../domains/creator/bg3d/StudioBg3dRetainedOwnerHost").then((mod) => ({
     default: mod.StudioBg3dRetainedOwnerHost,
   })),
 );

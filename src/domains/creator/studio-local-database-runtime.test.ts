@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./studio-brush-library";
-import { openProductBrushLibraryRepository } from
-  "./studio-brush-library-sqlite-repository";
+import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./brush/studio-brush-library";
+import { openProductBrushLibraryRepository } from "./brush/studio-brush-library-sqlite-repository";
 import {
   SqliteUnavailableError,
   type StudioLocalDatabase,

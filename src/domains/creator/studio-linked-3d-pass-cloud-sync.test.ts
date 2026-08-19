@@ -7,8 +7,7 @@ import {
   hydrateStudioLinked3dPassCloudArtifacts,
   studioLinked3dPassCloudAssetReference,
 } from "./studio-linked-3d-pass-cloud-sync";
-import { collectStudioLinked3dPassProjectArchiveReferences } from
-  "./studio-linked-3d-pass-project-archive";
+import { collectStudioLinked3dPassProjectArchiveReferences } from "./studio-linked-3d-pass-project-archive";
 import {
   computeStudioLinked3dPassRootHash,
   prepareStudioLinked3dLinePass,
@@ -21,8 +20,7 @@ import {
   parseStudioLinked3dRenderDocument,
   upsertStudioLinked3dRenderLink,
 } from "./studio-linked-3d-render-document";
-import { createStudioLinked3dRenderPageFixture } from
-  "./studio-linked-3d-render-test-fixture";
+import { createStudioLinked3dRenderPageFixture } from "./studio-linked-3d-render-test-fixture";
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
 import { sha256HexPortable } from "./studio-sha256";
 import { studioShared3dStageEntryAsDocument } from "./studio-shared-3d-stage-collection";

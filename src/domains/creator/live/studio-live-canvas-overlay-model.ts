@@ -2,7 +2,7 @@ import {
   canonicalStudioCommentAnchorKey,
   type StudioCommentAnchor,
   type StudioCommentThread,
-} from "./studio-comments";
+} from "../studio-comments";
 
 export const STUDIO_LIVE_PARTICIPANT_COLORS = [
   "#6d28d9",

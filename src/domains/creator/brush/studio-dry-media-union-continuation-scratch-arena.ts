@@ -1,13 +1,13 @@
 import {
   allocateMemory64CrossRealmWorkerLease,
   type Memory64CrossRealmWorkerAllocationOptions,
-} from "./kernel/Memory64CrossRealmWorker";
+} from "../kernel/Memory64CrossRealmWorker";
 
 import type {
   Memory64CrossRealmAllocationAck,
   Memory64CrossRealmReservationToken,
-} from "./kernel/Memory64CrossRealmProtocol";
-import type { StudioWasmLinearMemoryRuntime } from "./studio-wasm64-memory-governor";
+} from "../kernel/Memory64CrossRealmProtocol";
+import type { StudioWasmLinearMemoryRuntime } from "../studio-wasm64-memory-governor";
 
 export const STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_SLOT_BYTE_LENGTH =
   64 * 1024;

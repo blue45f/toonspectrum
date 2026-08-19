@@ -1,4 +1,9 @@
 import {
+  parseStudioTeamCommentLiveEvent,
+  type StudioTeamCommentLiveEvent,
+} from "../studio-team-comment-live-event";
+
+import {
   STUDIO_LIVE_LOCK_MAX_LEASE_MS,
   assertStudioLiveCursorPayload,
   createStudioLiveEnvelope,
@@ -44,10 +49,6 @@ import {
   type StudioLiveGesturePreviewPayload,
 } from "./studio-live-gesture-preview";
 import { isStudioLiveP2pMeshShareId } from "./studio-live-p2p-overlay-transport";
-import {
-  parseStudioTeamCommentLiveEvent,
-  type StudioTeamCommentLiveEvent,
-} from "./studio-team-comment-live-event";
 
 import type {
   StudioCrdtSyncRequest,
@@ -378,7 +379,7 @@ export class StudioLiveRoom {
     return this.transport?.mode ?? null;
   }
 
-  get crdtFanout(): import("./studio-live-collaboration-transport").StudioLiveCrdtFanout | undefined {
+  get crdtFanout(): import( "./studio-live-collaboration-transport").StudioLiveCrdtFanout | undefined {
     return this.transport?.crdtFanout;
   }
 

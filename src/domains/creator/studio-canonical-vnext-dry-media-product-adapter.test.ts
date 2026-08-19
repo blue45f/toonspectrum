@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
-import { materializeAllStudioBrushPackSelections } from "./studio-brush-pack-runtime";
+import { normalizeStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
+import { materializeAllStudioBrushPackSelections } from "./brush/studio-brush-pack-runtime";
 import { validateStudioCanonicalVNextDryMediaCompiledFrame } from "./studio-canonical-vnext-dry-media-presentation-controller";
 import {
   compileStudioCanonicalVNextDryMediaProductFrame,

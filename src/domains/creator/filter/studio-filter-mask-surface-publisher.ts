@@ -16,7 +16,7 @@ import {
   type StudioRasterPatchPublishResult,
   type StudioRasterPatchUploadInput,
   type StudioRasterRgbaPixels,
-} from "./studio-crdt-raster-patch-publisher";
+} from "../live/studio-crdt-raster-patch-publisher";
 
 import {
   canonicalStudioRasterJson,

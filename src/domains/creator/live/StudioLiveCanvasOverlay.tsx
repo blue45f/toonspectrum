@@ -27,13 +27,14 @@ import { createPortal } from "react-dom";
 import {
   nudgeStudioCommentPointAnchor,
   projectStudioCommentPointerToPointAnchor,
-} from "./studio-comment-pin-reanchor";
+} from "../studio-comment-pin-reanchor";
 import {
   studioLivePresenceAlwaysVisible,
   studioPresenceConnectionLabel,
   studioPresenceOverflowLabel,
   studioPresenceVisiblePeerCount,
-} from "./studio-commercial-residuals";
+} from "../studio-commercial-residuals";
+
 import {
   planStudioCommentPinPreviewPosition,
   studioLiveCursorActivityLabel,
@@ -57,7 +58,7 @@ import {
   type StudioLiveSyncSnapshot,
 } from "./studio-live-sync-safety";
 
-import type { StudioCommentAnchor } from "./studio-comments";
+import type { StudioCommentAnchor } from "../studio-comments";
 import type { StudioLivePeer } from "./studio-live-collaboration-room";
 
 import { cn } from "@/lib/utils";

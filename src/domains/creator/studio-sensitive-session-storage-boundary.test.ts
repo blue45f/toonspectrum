@@ -27,7 +27,7 @@ describe("sensitive Studio browser state stays session-scoped", () => {
 
   it("keeps recent AI prompts in the current tab and never imports the old durable value", () => {
     const page = source("./StudioPage.tsx");
-    const toolPopover = source("./StudioAiToolPopoverBody.tsx");
+    const toolPopover = source("./ai/StudioAiToolPopoverBody.tsx");
     expect(page).toContain(
       "loadStudioAiRecentPrompts(globalThis.sessionStorage)",
     );
@@ -48,7 +48,7 @@ describe("sensitive Studio browser state stays session-scoped", () => {
   });
 
   it("keeps fallback pose clipboards in sessionStorage and removes legacy copies", () => {
-    const poser = source("./StudioVrmPoser.tsx");
+    const poser = source("./vrm/StudioVrmPoser.tsx");
     for (const key of ["studio_pose_clipboard", "studio_vrm_full_clip"]) {
       expect(poser).toContain(`sessionStorage.setItem("${key}"`);
       expect(poser).toContain(`localStorage.removeItem("${key}")`);
@@ -57,8 +57,8 @@ describe("sensitive Studio browser state stays session-scoped", () => {
   });
 
   it("keeps webcam UI consent in the current tab and never reads or writes its legacy key", () => {
-    const poser = source("./StudioVrmPoser.tsx");
-    const preferences = source("./studio-vrm-poser-preferences-sqlite.ts");
+    const poser = source("./vrm/StudioVrmPoser.tsx");
+    const preferences = source("./vrm/studio-vrm-poser-preferences-sqlite.ts");
 
     expect(preferences).toContain(
       "globalThis.sessionStorage.getItem(STUDIO_VRM_WEBCAM_CONSENT_SESSION_KEY)",
@@ -74,8 +74,8 @@ describe("sensitive Studio browser state stays session-scoped", () => {
   });
 
   it("routes VRM recents to SQLite/OPFS with observable memory-only recovery", () => {
-    const poser = source("./StudioVrmPoser.tsx");
-    const preferences = source("./studio-vrm-poser-preferences-sqlite.ts");
+    const poser = source("./vrm/StudioVrmPoser.tsx");
+    const preferences = source("./vrm/studio-vrm-poser-preferences-sqlite.ts");
 
     expect(poser).toContain("createStudioVrmPoserPreferencesRuntime");
     expect(poser).toContain("recentPreferencesRuntime.hydrate()");

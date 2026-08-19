@@ -14,8 +14,8 @@ import sqliteWasm from "@sqlite.org/sqlite-wasm";
 import {
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   type StudioSavedBrush,
-} from "../../../src/domains/creator/studio-brush-library";
-import { createSqliteBrushLibraryRepository } from "../../../src/domains/creator/studio-brush-library-sqlite-repository";
+} from "../../../src/domains/creator/brush/studio-brush-library";
+import { createSqliteBrushLibraryRepository } from "../../../src/domains/creator/brush/studio-brush-library-sqlite-repository";
 import {
   openStudioLocalDatabase,
   type StudioSqliteApiHandle,

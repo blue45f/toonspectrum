@@ -1,4 +1,4 @@
-import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
+import type { StudioGpuBackend } from "../render/studio-webgpu-frame-contract";
 
 const MAX_IDENTITY_LENGTH = 1_024;
 

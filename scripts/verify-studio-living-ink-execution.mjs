@@ -16,8 +16,7 @@ import { createServer as createViteServer } from "vite";
 
 const EVIDENCE_ROOT = process.env.TOONSPECTRUM_LIVING_INK_VERIFY_DIR
   ?? join(tmpdir(), `toonspectrum-living-ink-${Date.now()}`);
-const PROBE_RESULTS_PATH = new URL(
-  "../tests/benchmarks/results/living-ink-probe.json",
+const PROBE_RESULTS_PATH = new URL("../tests/benchmarks/results/living-ink-probe.json",
   import.meta.url,
 );
 const HARNESS_PATH = "/__studio_living_ink_execution__";

@@ -4,6 +4,20 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 
+import { exportPageToSvg } from "../export/studio-svg-export";
+import {
+  planStudioCausalDynamicBrushDepositSegmentsV3,
+  planStudioCausalDynamicBrushDepositsV2,
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+} from "../studio-causal-dynamic-brush-deposit-v2";
+import { planGlowBrushPasses, planNeonBrushPasses } from "../studio-fx-brush";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
+import {
+  captureStudioOutlineStrokeContractV1,
+  planStudioPerfectFreehandRender,
+} from "../studio-outline-stroke-contract";
+import { peekStudioPerfectFreehandStroker } from "../studio-perfect-freehand";
+
 import {
   applyStudioBrushAliasWatercolorMaterial,
   mapStudioBrushAliasPressureSamples,
@@ -23,24 +37,11 @@ import {
 } from "./studio-brush-render-budget";
 import { clearStudioBrushTextureStampCache } from "./studio-brush-textured-stamp";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
-import {
-  planStudioCausalDynamicBrushDepositSegmentsV3,
-  planStudioCausalDynamicBrushDepositsV2,
-  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-} from "./studio-causal-dynamic-brush-deposit-v2";
-import { planGlowBrushPasses, planNeonBrushPasses } from "./studio-fx-brush";
-import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
-import {
-  captureStudioOutlineStrokeContractV1,
-  planStudioPerfectFreehandRender,
-} from "./studio-outline-stroke-contract";
-import { peekStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
-import { exportPageToSvg } from "./studio-svg-export";
 import { STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT, planStudioWetRibbonCarrier  } from "./studio-wet-ribbon-carrier";
 import { StudioDrawNode } from "./StudioDrawNode";
 
-import type { DrawEl } from "./studio-element-model";
-import type { StudioPatternSpec } from "./studio-pattern-fill";
+import type { DrawEl } from "../studio-element-model";
+import type { StudioPatternSpec } from "../studio-pattern-fill";
 
 interface CapturedKonvaNode {
   kind: string;
@@ -282,8 +283,8 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
   };
 });
 
-vi.mock("./studio-pattern-fill", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./studio-pattern-fill")>();
+vi.mock("../studio-pattern-fill", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../studio-pattern-fill")>();
   return {
     ...actual,
     // Scale is applied through Konva props and intentionally does not change the tile bitmap URL.
@@ -295,8 +296,8 @@ vi.mock("./studio-pattern-fill", async (importOriginal) => {
   };
 });
 
-vi.mock("./studio-causal-watercolor-brush", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./studio-causal-watercolor-brush")>();
+vi.mock("../studio-causal-watercolor-brush", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../studio-causal-watercolor-brush")>();
   return {
     ...actual,
     planCausalWatercolorBrushDabs: watercolorCapture.causalPlan,
@@ -361,7 +362,7 @@ function captured(kind: string): CapturedKonvaNode[] {
 
 async function flushStampRenderer(): Promise<void> {
   await act(async () => {
-    await import("./StudioStampDrawShape");
+    await import("../StudioStampDrawShape");
   });
 }
 
@@ -627,7 +628,7 @@ describe("StudioDrawNode orchestration", () => {
   });
 
   it("renders G-pen aliases as distinct single-outline curves instead of capped segments", async () => {
-    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    const { loadStudioPerfectFreehandStroker } = await import("../studio-perfect-freehand");
     await act(async () => {
       await loadStudioPerfectFreehandStroker();
     });
@@ -690,7 +691,7 @@ describe("StudioDrawNode orchestration", () => {
     penView.unmount();
     konvaCapture.nodes.length = 0;
 
-    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    const { loadStudioPerfectFreehandStroker } = await import("../studio-perfect-freehand");
     await act(async () => {
       await loadStudioPerfectFreehandStroker();
     });
@@ -2529,7 +2530,7 @@ describe("StudioDrawNode perfect-freehand outline brush", () => {
   it("falls back to a clean Line before the stroker chunk loads, then swaps to a filled Path", async () => {
     // 로더 상태는 모듈 전역이라 이 파일에서는 아직 로드 전이다 — 폴백 계약을 먼저 검증한다.
     const { peekStudioPerfectFreehandStroker, loadStudioPerfectFreehandStroker } =
-      await import("./studio-perfect-freehand");
+      await import("../studio-perfect-freehand");
     const alreadyLoaded = peekStudioPerfectFreehandStroker() !== null;
     if (alreadyLoaded) {
       return;
@@ -2558,7 +2559,7 @@ describe("StudioDrawNode perfect-freehand outline brush", () => {
   });
 
   it("keeps very short perfect strokes on Line fallback even after stroker loads", async () => {
-    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    const { loadStudioPerfectFreehandStroker } = await import("../studio-perfect-freehand");
     await act(async () => {
       await loadStudioPerfectFreehandStroker();
     });
@@ -2578,7 +2579,7 @@ describe("StudioDrawNode perfect-freehand outline brush", () => {
   });
 
   it("keeps pressure geometry for a very short G-pen flick", async () => {
-    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    const { loadStudioPerfectFreehandStroker } = await import("../studio-perfect-freehand");
     await act(async () => {
       await loadStudioPerfectFreehandStroker();
     });
@@ -2597,7 +2598,7 @@ describe("StudioDrawNode perfect-freehand outline brush", () => {
   });
 
   it("keeps legacy missing-pressure G-pen at the historical 0.6 fallback without draft drift", async () => {
-    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    const { loadStudioPerfectFreehandStroker } = await import("../studio-perfect-freehand");
     await act(async () => {
       await loadStudioPerfectFreehandStroker();
     });
@@ -2621,7 +2622,7 @@ describe("StudioDrawNode perfect-freehand outline brush", () => {
   });
 
   it("renders both perfect profiles as distinct deterministic outlines once loaded", async () => {
-    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    const { loadStudioPerfectFreehandStroker } = await import("../studio-perfect-freehand");
     await act(async () => {
       await loadStudioPerfectFreehandStroker();
     });

@@ -1,5 +1,5 @@
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type { StudioImageDataLike } from "./studio-filters";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 export const STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION = 1 as const;
 

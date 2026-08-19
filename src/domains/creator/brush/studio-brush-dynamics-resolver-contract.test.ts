@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { exportPageToSvg, type SvgExportEl, type SvgExportPageInput } from "../export/studio-svg-export";
+import { planStudioDynamicBrushRender } from "../studio-dynamic-brush-render-plan";
+
 import {
   normalizeStudioBrushDynamicsSettings,
   resolveStudioBrushDynamicsPresetId,
@@ -13,11 +16,10 @@ import {
   planStudioDrawPointerStart,
   type StudioDrawPointerStartInput,
 } from "./studio-draw-pointer-start-plan";
-import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
 import { isStudioBoundedFlowPaintModelCompatible } from "./studio-stroke-paint-model";
-import { exportPageToSvg, type SvgExportEl, type SvgExportPageInput } from "./studio-svg-export";
 
-import type { DrawEl } from "./studio-element-model";
+
+import type { DrawEl } from "../studio-element-model";
 
 /**
  * Adversarial-review regression suite for the dynamics resolver contract (wave FX1).

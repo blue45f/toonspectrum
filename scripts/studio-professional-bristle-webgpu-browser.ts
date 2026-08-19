@@ -18,7 +18,7 @@ import {
   type StudioEngineWebGpuBrushReceipt,
   type StudioEngineWebGpuBrushRuntime,
   type StudioEngineWebGpuBrushSurface,
-} from "../src/domains/creator/studio-engine-webgpu-brush-runtime";
+} from "../src/domains/creator/render/studio-engine-webgpu-brush-runtime";
 import {
   resolveStudioProfessionalBristleDynamics,
   type StudioProfessionalBristleResolveResult,

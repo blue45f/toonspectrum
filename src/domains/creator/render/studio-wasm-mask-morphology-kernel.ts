@@ -5,7 +5,7 @@ import {
   type StudioWasmByteViewFailureReason,
   type StudioWasmMemoryGrowFailureReason,
   StudioWasmLinearMemoryRuntime,
-} from "./studio-wasm64-memory-governor";
+} from "../studio-wasm64-memory-governor";
 
 /**
  * Morphology is deliberately bounded to one 64 MiB resident working set. Large

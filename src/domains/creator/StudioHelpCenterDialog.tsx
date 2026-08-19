@@ -32,6 +32,7 @@ import { createPortal } from "react-dom";
 
 import { checkBrowserCompatibility, getBrowserInfo } from "../../compat/browser-check";
 
+import { getStudioGpuFabricCapabilities } from "./render/studio-gpu-fabric";
 import {
   buildStudioBugReportPackage,
   formatStudioBugReportJson,
@@ -46,7 +47,6 @@ import {
   formatStudioDiagnosticsText,
 } from "./studio-device-diagnostics";
 import { readStudioErrorJournal } from "./studio-error-journal";
-import { getStudioGpuFabricCapabilities } from "./studio-gpu-fabric";
 import { STUDIO_HELP_CENTER_SECTIONS } from "./studio-help-center-channel";
 import { studioRecoveryActions, scanStudioRecoveryStorage } from "./studio-recovery-guide";
 import { getStudioRenderBackend } from "./studio-render-backend-beacon";

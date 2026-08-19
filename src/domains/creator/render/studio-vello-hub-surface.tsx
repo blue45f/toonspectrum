@@ -15,7 +15,7 @@ import {
 } from "./studio-vello-hub-canvas-target";
 
 import type { StudioPixiHostElementLike } from "./studio-pixi-scene-host-admission";
-import type { StudioSceneDocumentTransform } from "./studio-scene-provider";
+import type { StudioSceneDocumentTransform } from "../studio-scene-provider";
 
 export type StudioVelloHubAuthorityStatus =
   | "disabled"

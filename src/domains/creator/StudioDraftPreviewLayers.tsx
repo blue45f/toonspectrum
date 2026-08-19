@@ -4,11 +4,11 @@ import { Layer } from "react-konva/lib/ReactKonvaCore";
 import {
   planStudioDraftPreviewCompositeRuns,
   resolveStudioDraftPreviewActiveLane,
-} from "./studio-draw-rendering";
-import { StudioDrawNode } from "./StudioDrawNode";
+} from "./brush/studio-draw-rendering";
+import { StudioDrawNode } from "./brush/StudioDrawNode";
 
+import type { StudioDraftPreviewCompositeRun } from "./brush/studio-draw-rendering";
 import type { StudioDraftPreviewSource } from "./studio-draft-preview-store";
-import type { StudioDraftPreviewCompositeRun } from "./studio-draw-rendering";
 import type { DrawEl } from "./studio-element-model";
 import type Konva from "konva";
 

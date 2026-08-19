@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./studio-brush-library";
+import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./brush/studio-brush-library";
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { openStudioLocalDatabase } from "./studio-local-database";
 import {
   mergeHydratedStudioToolOperationMemory,
@@ -611,8 +612,8 @@ describe("studio tool operation memory SQLite controller", () => {
     expect(persistenceSource).not.toContain("openStudioLocalDatabase(");
     expect(persistenceSource).not.toContain('vfs: "memory"');
     expect(persistenceSource).toContain("acquireStudioLocalDatabase");
-    expect(persistenceSource).toContain(
-      'import(\n      "./studio-local-database-runtime"',
+    expect(persistenceSource).toMatch(
+      /import\(\s*["']\.\/studio-local-database-runtime["']\s*\)/u,
     );
     expect(persistenceSource).not.toMatch(
       /import\s+\{[\s\S]*acquireStudioLocalDatabase[\s\S]*\}\s+from\s+["']\.\/studio-local-database-runtime["']/,
@@ -623,10 +624,7 @@ describe("studio tool operation memory SQLite controller", () => {
   });
 
   it("pins dynamic loading, bounded pre-load coalescing, race merge, and later warnings", () => {
-    const pageSource = readFileSync(
-      new URL("./StudioPage.tsx", import.meta.url),
-      "utf8",
-    );
+    const pageSource = readStudioCuttoonEditorSource();
     const hydrationStart = pageSource.indexOf(
       'const loading = import("./studio-tool-operation-memory-sqlite")',
     );

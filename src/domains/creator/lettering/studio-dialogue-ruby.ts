@@ -5,14 +5,15 @@
  * `rubySpans` array on dialogue elements so save/reload and undo stay lossless without
  * inventing a full rich-text engine. Rendering can map spans to <rt> or stacked glyphs.
  */
+import { isEffectivelyLocked } from "../studio-layers";
+
 import {
   isDialogueElement,
   type DialogueElementLike,
   type DialoguePageLike,
 } from "./studio-dialogue-batch";
-import { isEffectivelyLocked } from "./studio-layers";
 
-import type { StudioDialogueRubySpan } from "./studio-element-model";
+import type { StudioDialogueRubySpan } from "../studio-element-model";
 
 export type DialogueRubySpan = StudioDialogueRubySpan;
 

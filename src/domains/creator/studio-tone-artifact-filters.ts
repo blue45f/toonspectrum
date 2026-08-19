@@ -18,8 +18,8 @@ import {
   type StudioToneArtifactAppliedResult,
 } from "./studio-tone-artifact-filter-kernels";
 
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type { StudioImageDataLike } from "./studio-filters";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 type FilterThis = { attrs?: Record<string, unknown> };
 

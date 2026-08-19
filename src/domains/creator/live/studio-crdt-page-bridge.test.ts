@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  normalizeStudioBrushDynamicsSettings,
+} from "../brush/studio-brush-dynamics";
+import { createDefaultStudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
+import {
   DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
   DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
   DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS,
   DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
-} from "./studio-advanced-blur-filter-kernels";
-import { parseStudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
-import {
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
-  normalizeStudioBrushDynamicsSettings,
-} from "./studio-brush-dynamics";
+} from "../studio-advanced-blur-filter-kernels";
+import { parseStudioAdvancedRulerDocument } from "../studio-advanced-ruler-document";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
+import { captureStudioOutlineStrokeContractV1 } from "../studio-outline-stroke-contract";
+import { createStudioWorkAssetInitialImageDescriptor } from "../studio-work-asset-admission";
+
 import {
   StudioCrdtDocument,
   type StudioCrdtPageRecord,
@@ -38,10 +43,7 @@ import {
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
-import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
-import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
-import { captureStudioOutlineStrokeContractV1 } from "./studio-outline-stroke-contract";
-import { createStudioWorkAssetInitialImageDescriptor } from "./studio-work-asset-admission";
+
 
 import {
   captureStudioInkInputContractV1,

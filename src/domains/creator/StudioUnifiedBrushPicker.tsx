@@ -8,14 +8,14 @@
 import { Bookmark } from "lucide-react";
 import { type ReactElement } from "react";
 
+import { StudioBrushTray } from "./brush/StudioBrushTray";
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
 import { StudioActiveBrushSummary } from "./StudioActiveBrushSummary";
-import { StudioBrushTray } from "./StudioBrushTray";
 
-import type { StudioBrushStampTuning } from "./studio-brush-library";
+import type { StudioBrushStampTuning } from "./brush/studio-brush-library";
+import type { StudioStabilizerMode } from "./brush/studio-stroke-stabilizer";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
-import type { StudioStabilizerMode } from "./studio-stroke-stabilizer";
 
 import { cn } from "@/lib/utils";
 

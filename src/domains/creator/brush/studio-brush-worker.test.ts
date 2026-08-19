@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { processFreehandPoints } from "./studio-brush";
+import { processFreehandPoints } from "../studio-brush";
+
 import { processFreehandPointsInWorker } from "./studio-brush-worker-client";
 import { STUDIO_BRUSH_WORKER_PROTOCOL_VERSION } from "./studio-brush-worker-protocol";
 

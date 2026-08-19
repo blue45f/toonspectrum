@@ -8,7 +8,7 @@
 import {
   STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS,
   listStudioBrushEngineLanePresets,
-} from "./studio-brush-engine-lane-catalog";
+} from "./brush/studio-brush-engine-lane-catalog";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
 /** Artist-facing operation. Render families may be shared, but paint and erase never are. */
@@ -119,6 +119,10 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   oil: "oil",
   acrylic: "oil",
   "paint-tube": "oil",
+  "fluid-paint": "oil",
+  "fluid-paint-fine": "oil",
+  "fluid-paint-load": "oil",
+  "fluid-paint-rake": "oil",
   pastel: "pastel",
   "oil-pastel": "pastel",
   "ink-particle": "ink-particle",
@@ -196,7 +200,7 @@ export function resolveStudioBrushRenderFamily(brushId: unknown): StudioBrushRen
     if (id.includes("pencil")) return "pencil";
     return "dry-media";
   }
-  if (/(?:oil|acrylic|paint-tube)/u.test(id)) return "oil";
+  if (/(?:oil|acrylic|paint-tube|fluid-paint)/u.test(id)) return "oil";
   if (/(?:marker|highlighter|felt-tip)/u.test(id)) {
     return id.includes("highlighter") ? "highlighter" : "marker";
   }

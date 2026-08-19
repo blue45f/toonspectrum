@@ -9,16 +9,7 @@
 import {
   buildStudioBg3dRoomParts,
   getStudioBg3dRoomPreset,
-} from "./studio-bg3d-room-builder";
-import {
-  bevelStudioEditableMeshEdges,
-  createStudioUnitCubeMesh,
-  extrudeStudioEditableMeshFaces,
-  hashStudioEditableMesh,
-  knifeStudioEditableMesh,
-  studioEditableMeshToTriangleSoup,
-  type StudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
+} from "./bg3d/studio-bg3d-room-builder";
 import {
   createStudioHybridDccOpfsPorts,
   createStudioHybridDccSession,
@@ -26,7 +17,7 @@ import {
   hybridDccRecoverFromJournal,
   hybridDccRegisterAsset,
   type StudioHybridDccSession,
-} from "./studio-hybrid-dcc-document";
+} from "./hybrid-dcc/studio-hybrid-dcc-document";
 import {
   addStudioArtistDelta,
   applyStudioShotOverride,
@@ -37,7 +28,16 @@ import {
   studioLiveBridgeDirtySummary,
   STUDIO_TOON_PASS_KINDS,
   type StudioLiveBridgeDocument,
-} from "./studio-live-2d3d-bridge";
+} from "./live/studio-live-2d3d-bridge";
+import {
+  bevelStudioEditableMeshEdges,
+  createStudioUnitCubeMesh,
+  extrudeStudioEditableMeshFaces,
+  hashStudioEditableMesh,
+  knifeStudioEditableMesh,
+  studioEditableMeshToTriangleSoup,
+  type StudioEditableMesh,
+} from "./studio-editable-half-edge-mesh";
 import {
   createStudioMeshModifierStack,
   evaluateStudioMeshModifierStack,

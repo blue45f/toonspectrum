@@ -1,8 +1,6 @@
-import { readFileSync } from "node:fs";
-
 import { afterEach, describe, expect, it } from "vitest";
 
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import { normalizeStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
 import {
   createStudioCanonicalVNextGpuQualityShadowRuntime,
 } from "./studio-canonical-vnext-gpu-quality-shadow-runtime";
@@ -14,12 +12,13 @@ import {
   type StudioCanonicalVNextQualityShadowRuntime,
   type StudioCanonicalVNextQualityShadowRuntimeLease,
 } from "./studio-canonical-vnext-quality-shadow";
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
-import type { DrawEl } from "./studio-element-model";
 import type {
   StudioEngineVNextBrushProviderGpuExecutionBoundary,
   StudioEngineVNextBrushProviderGpuRequest,
-} from "./studio-engine-vnext-brush-provider-gpu-boundary";
+} from "./render/studio-engine-vnext-brush-provider-gpu-boundary";
+import type { DrawEl } from "./studio-element-model";
 
 let lease: StudioCanonicalVNextQualityShadowRuntimeLease | null = null;
 
@@ -149,13 +148,13 @@ function install(runtime: StudioCanonicalVNextQualityShadowRuntime): void {
 
 describe("Studio canonical vNext quality shadow", () => {
   it("is reachable from the normal Studio release path but absent from the pointer hot loop", () => {
-    const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const page = readStudioCuttoonEditorSource();
     const releaseStart = page.indexOf("function finishDrawingPointer(");
     const releaseEnd = page.indexOf("function onStagePointerCancel", releaseStart);
     const release = page.slice(releaseStart, releaseEnd);
 
-    expect(page).toContain(
-      'from "./studio-canonical-vnext-quality-shadow"',
+    expect(page).toMatch(
+      /from ["'].*studio-canonical-vnext-quality-shadow["']/,
     );
     expect(release).toContain("const finished = releasePlan.stroke");
     expect(release).toContain("if (hasStudioCanonicalVNextQualityShadowRuntime())");

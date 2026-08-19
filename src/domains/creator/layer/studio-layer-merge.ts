@@ -6,7 +6,7 @@
  * BACK = index 0, FRONT = last (matches studio-layers.ts).
  */
 
-import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup, type LayerItemLike } from "./studio-layers";
+import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup, type LayerItemLike } from "../studio-layers";
 
 export type StudioLayerMergeKind = "merge-down" | "merge-selected" | "flatten-visible";
 

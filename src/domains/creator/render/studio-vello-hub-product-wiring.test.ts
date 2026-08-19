@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const viewportSource = readFileSync(
-  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
 const canvasTargetSource = readFileSync(
@@ -11,16 +11,16 @@ const canvasTargetSource = readFileSync(
   "utf8",
 );
 const verifierSource = readFileSync(
-  new URL("../../../scripts/verify-studio-vello-candidate.mts", import.meta.url),
+  new URL("../../../../scripts/verify-studio-vello-candidate.mts", import.meta.url),
   "utf8",
 );
 
 describe("VelloHub /studio product wiring", () => {
   it("mounts the hub from the real StudioCanvasViewport call site", () => {
     expect(viewportSource).toContain(
-      'import {\n  StudioVelloHubSurface,',
+      'import {\n  StudioRenderSurface,',
     );
-    expect(viewportSource).toContain("<StudioVelloHubSurface");
+    expect(viewportSource).toContain("<StudioRenderSurface");
     expect(viewportSource).toContain("elements={elements}");
     expect(viewportSource).toContain(
       "documentTransform={pixiSceneDocumentTransform}",
@@ -39,14 +39,19 @@ describe("VelloHub /studio product wiring", () => {
     expect(canvasTargetSource).toContain(
       'dataset.studioVelloHubPrimary = "true"',
     );
-    expect(canvasTargetSource).toContain('secondary.style.display = "none"');
     expect(canvasTargetSource).toContain("holdLastGood(reason)");
     expect(canvasTargetSource).not.toContain("getImageData(");
     expect(canvasTargetSource).not.toContain("readPixels");
+    expect(canvasTargetSource).toContain("One visible canvas");
+    expect(canvasTargetSource).toContain("studio-frame-graph-retained");
+    expect(canvasTargetSource).toContain("requestAnimationFrame");
+    expect(canvasTargetSource).not.toContain('style.zIndex = "6"');
   });
 
-  it("does not grant Vello document or pointer authority", () => {
+  it("gives FrameGraph document pixels while Konva keeps pointer routing", () => {
     expect(canvasTargetSource).toContain('canvas.style.pointerEvents = "none"');
+    expect(viewportSource).toContain("data-studio-frame-graph-document");
+    expect(viewportSource).toContain("frameGraphOwnsDocumentPixels");
     expect(viewportSource).toContain("<Stage");
     expect(viewportSource).toContain("onPointerDown={onStageDown}");
     expect(viewportSource).toContain("onPointerMove={onStageMove}");

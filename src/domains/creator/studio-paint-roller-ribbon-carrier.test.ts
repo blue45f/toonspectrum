@@ -5,15 +5,16 @@ import {
   planStudioDynamicBrush,
   type StudioDynamicBrushDab,
   type StudioDynamicBrushSegmentStartFrame,
-} from "./studio-brush-dynamics";
-import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
-import { transformStudioDynamicBrushDab } from "./studio-brush-symmetry";
-import { buildStudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
+} from "./brush/studio-brush-dynamics";
+import { materializeStudioBrushPackDynamics } from "./brush/studio-brush-pack-runtime";
+import { transformStudioDynamicBrushDab } from "./brush/studio-brush-symmetry";
+import { buildStudioBrushTipAlphaMap } from "./brush/studio-brush-tip-stamp";
+import { resolveStudioDynamicBrushMaterialIdentity } from "./brush/studio-dry-media-dynamic-bridge";
+import { exportPageToSvg } from "./export/studio-svg-export";
 import {
   planStudioCausalDynamicBrushDepositsV2,
   planStudioCausalDynamicBrushDepositsV3,
 } from "./studio-causal-dynamic-brush-deposit-v2";
-import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
 import {
   planStudioDynamicBrushCoverageMarks,
   renderStudioDynamicBrushCoverageMark,
@@ -25,7 +26,6 @@ import {
   STUDIO_PAINT_ROLLER_RIBBON_MAX_STATIONS,
   type StudioPaintRollerRibbonSourceMark,
 } from "./studio-paint-roller-ribbon-carrier";
-import { exportPageToSvg } from "./studio-svg-export";
 
 function settings() {
   const result = materializeStudioBrushPackDynamics("paint-roller");

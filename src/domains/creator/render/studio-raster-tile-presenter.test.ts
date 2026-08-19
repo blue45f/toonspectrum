@@ -10,7 +10,7 @@ import {
   type StudioRasterTilePresentationPlan,
 } from "./studio-raster-tile-presenter";
 
-import type { StudioRasterImmutableTileFrame } from "./studio-crdt-raster-replay-runtime";
+import type { StudioRasterImmutableTileFrame } from "../live/studio-crdt-raster-replay-runtime";
 
 import {
   STUDIO_RASTER_CRDT_VERSION,

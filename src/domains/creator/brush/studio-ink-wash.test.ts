@@ -19,7 +19,7 @@ import {
 } from "./studio-ink-wash";
 import { PAPER_REFERENCE_TILE, createPaperHeightField } from "./studio-paper-texture";
 
-import type { StudioImageDataLike } from "./studio-filters";
+import type { StudioImageDataLike } from "../studio-filters";
 
 function makeImage(width: number, height: number, pixels: number[][]): StudioImageDataLike {
   const data = new Uint8ClampedArray(width * height * 4);

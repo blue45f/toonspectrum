@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
+
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 /**
  * The creative-modes pill and its panel are the only bottom-anchored Studio chrome that is not
@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
  * These are source-shape assertions on purpose: the surface lives inside a 42k-line component that
  * no unit test renders, and the rules it must keep are structural.
  */
-const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const source = readStudioCuttoonEditorSource();
 
 function classNameOf(marker: string): string {
   const anchor = source.indexOf(marker);

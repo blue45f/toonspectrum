@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   listBrushes,
   saveBrushBatchWithResult,
-} from "./studio-brush-library";
+} from "./brush/studio-brush-library";
 import {
   STUDIO_CREATOR_PACK_CATALOG,
   type StudioCreatorPackDefinition,

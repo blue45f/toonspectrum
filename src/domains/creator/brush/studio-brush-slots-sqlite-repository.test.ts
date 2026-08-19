@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { openStudioLocalDatabase } from "../studio-local-database";
+
 import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import {
   assignStudioBrushSlot,
@@ -15,11 +17,10 @@ import {
   STUDIO_BRUSH_QUICK_SLOTS_SQLITE_NAMESPACE,
   studioBrushQuickSlotsSqliteKey,
 } from "./studio-brush-slots-sqlite-repository";
-import { openStudioLocalDatabase } from "./studio-local-database";
 
 import type { StudioBrushSlotsState } from "./studio-brush-slots";
 import type { StudioBrushQuickSlotsScope } from "./studio-brush-slots-sqlite-repository";
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 const databases: StudioLocalDatabase[] = [];
 const scope: StudioBrushQuickSlotsScope = {

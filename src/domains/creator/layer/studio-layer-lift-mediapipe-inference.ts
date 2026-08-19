@@ -3,7 +3,7 @@
  * on-device MediaPipe foreground segmenter. Source pixels stay inside the
  * browser; only the versioned model and WASM runtime are downloaded.
  */
-import type { StudioLocalForegroundSegmenterRuntime } from "./studio-bg-remove";
+import type { StudioLocalForegroundSegmenterRuntime } from "../studio-bg-remove";
 import type {
   StudioLayerLiftLocalForegroundInferenceEngine,
   StudioLayerLiftLocalForegroundInferenceInput,
@@ -97,7 +97,7 @@ function modelIdentity(
 function createInferenceEngine(
   runtime: StudioLocalForegroundSegmenterRuntime,
   createRaster: StudioLayerLiftMediaPipeRasterFactory,
-  segmentRaster: typeof import("./studio-bg-remove")["segmentStudioLocalForegroundRasterSource"],
+  segmentRaster: typeof import("../studio-bg-remove")["segmentStudioLocalForegroundRasterSource"],
 ): StudioLayerLiftLocalForegroundInferenceEngine {
   return Object.freeze({
     model: modelIdentity(runtime),
@@ -139,7 +139,7 @@ export function createStudioLayerLiftMediaPipeInferenceLoader(
     throwIfAborted(signal);
     // Layer Lift is explicit user work. Importing the segmenter here keeps the MediaPipe
     // arbiter, WASM resolver, and foreground compositor outside the Studio startup graph.
-    const foreground = await import("./studio-bg-remove");
+    const foreground = await import("../studio-bg-remove");
     const loadRuntime =
       options.loadRuntime ?? foreground.getStudioLocalForegroundSegmenterRuntime;
     const runtime = await loadRuntime();

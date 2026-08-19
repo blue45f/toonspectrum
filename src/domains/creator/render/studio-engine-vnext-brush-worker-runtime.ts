@@ -1,7 +1,8 @@
 import {
   hashStudioCanonicalBrushPlan,
   parseStudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
+} from "../studio-canonical-brush-plan";
+
 import {
   STUDIO_ENGINE_VNEXT_BRUSH_WORKER_BUDGETS,
   STUDIO_ENGINE_VNEXT_BRUSH_WORKER_PROFILE,

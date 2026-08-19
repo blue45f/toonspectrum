@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   studioBrushDynamicsSettingsForBrushId,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
-} from "./studio-brush-render-budget";
+} from "./brush/studio-brush-render-budget";
 import {
   planStudioDynamicBrushCoverageMarks,
   type StudioDynamicBrushSegmentedDabVariation,
@@ -20,7 +20,7 @@ import {
   STUDIO_SPLATTER_ORIGIN_ANCHOR_MIN_DIAMETER,
 } from "./studio-splatter-origin-anchor";
 
-import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
+import type { StudioDynamicBrushDab } from "./brush/studio-brush-dynamics";
 import type { DrawEl } from "./studio-element-model";
 
 function element(

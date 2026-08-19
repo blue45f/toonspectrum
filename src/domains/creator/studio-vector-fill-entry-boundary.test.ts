@@ -4,7 +4,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
-const viewportUrl = new URL("./StudioCanvasViewport.tsx", import.meta.url);
+const viewportUrl = new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url);
 const previewUrl = new URL("./studio-advanced-fill-preview.ts", import.meta.url);
 const source = readFileSync(pageUrl, "utf8");
 const viewportSource = readFileSync(viewportUrl, "utf8");
@@ -80,7 +80,7 @@ describe("Studio vector line-art advanced fill entry boundary", () => {
   it("keeps preview paint-only and applies exactly one image layer in one history commit", () => {
     const apply = nestedFunction("applyAdvancedFillPreview");
     const cancel = nestedFunction("cancelAdvancedFillPreview");
-    const renderStart = viewportSource.indexOf("const authoredCanvasRenderElements =");
+    const renderStart = viewportSource.indexOf("const canvasRenderElements: El[] =");
     const renderEnd = viewportSource.indexOf("const timelineComposite =", renderStart);
     const paintProjection = viewportSource.slice(renderStart, renderEnd);
     const renderEl = viewportSource.slice(
@@ -93,8 +93,8 @@ describe("Studio vector line-art advanced fill entry boundary", () => {
     expect(paintProjection).toContain("canvasRenderElements.splice(insertionIndex, 0, virtualFillPreviewElement)");
     expect(renderEl).toContain("isAdvancedFillVirtualPreview");
     expect(renderEl).toContain("const isNonInteractiveRender =");
-    expect(renderEl).toContain(
-      "opts.asMask === true || isAdvancedFillVirtualPreview",
+    expect(renderEl).toMatch(
+      /opts\.asMask === true\s*\|\|\s*isAdvancedFillVirtualPreview/u,
     );
     expect(renderEl).not.toContain(
       "opts.asMask || isAdvancedFillVirtualPreview",

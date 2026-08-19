@@ -13,18 +13,18 @@ import {
   resolveStudioBrushDynamicsForNormalizedSettings,
   studioBrushTaperFactors,
   STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_SEGMENTS,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET,
-} from "./studio-brush-render-budget";
+} from "./brush/studio-brush-render-budget";
 
 import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
   StudioDynamicBrushSegmentStartFrame,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 
 export const STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION = 2 as const;
 export const STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V3_VERSION = 3 as const;

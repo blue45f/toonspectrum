@@ -1009,8 +1009,7 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
           /\/src\/domains\/creator\/studio-autosave-opfs-session\.ts(?:\?.*)?$/u.test(url)
         ) ?? null;
         if (!moduleUrl && resourceUrls.some((url) => url.includes("/@vite/client"))) {
-          moduleUrl = new URL(
-            "/src/domains/creator/studio-autosave-opfs-session.ts",
+          moduleUrl = new URL("/src/domains/creator/studio-autosave-opfs-session.ts",
             window.location.origin,
           ).href;
         }

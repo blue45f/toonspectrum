@@ -6,6 +6,10 @@
  */
 
 import {
+  STUDIO_ENGINE_VNEXT_BRUSH_PROVIDER_GPU_BOUNDARY_VERSION,
+  type StudioEngineVNextBrushProviderGpuExecutionBoundary,
+} from "./render/studio-engine-vnext-brush-provider-gpu-boundary";
+import {
   STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_BRIDGE_VERSION,
   type StudioCanonicalVNextQualityShadowBackend,
   type StudioCanonicalVNextQualityShadowCapability,
@@ -13,13 +17,9 @@ import {
   type StudioCanonicalVNextQualityShadowProviderRequest,
   type StudioCanonicalVNextQualityShadowRuntime,
 } from "./studio-canonical-vnext-quality-shadow";
-import {
-  STUDIO_ENGINE_VNEXT_BRUSH_PROVIDER_GPU_BOUNDARY_VERSION,
-  type StudioEngineVNextBrushProviderGpuExecutionBoundary,
-} from "./studio-engine-vnext-brush-provider-gpu-boundary";
 
-import type { StudioBrushBackendQualityFamily } from "./studio-brush-backend-quality-policy";
-import type { StudioEngineWebGpuBrushRasterRect } from "./studio-engine-webgpu-brush-runtime";
+import type { StudioBrushBackendQualityFamily } from "./brush/studio-brush-backend-quality-policy";
+import type { StudioEngineWebGpuBrushRasterRect } from "./render/studio-engine-webgpu-brush-runtime";
 
 export interface StudioCanonicalVNextGpuQualityShadowRuntimeOptions {
   readonly runtimeId: string;

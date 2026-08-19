@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
+import { createEmptyStudioWriterRoomDocument } from "../studio-writer-room";
+
 import {
   buildCharacterConsistencyPrompt,
   colorizeLineArt,
@@ -27,7 +29,6 @@ import {
   type StudioAiStorage,
   type StudioAiResolvedImageReference,
 } from "./studio-ai-client";
-import { createEmptyStudioWriterRoomDocument } from "./studio-writer-room";
 
 // 인메모리 storage — studio-brand-kit.test.ts 계열과 동일하게 localStorage 인터페이스만 흉내낸다.
 function createMemoryStorage(): StudioAiStorage & { data: Map<string, string> } {
@@ -1138,7 +1139,7 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
         if (importScenarioCodec.mock.calls.length === 1) {
           throw new Error("scenario chunk temporarily unavailable");
         }
-        return import("./studio-scenario-scenes");
+        return import("../studio-scenario-scenes");
       });
       globalThis.fetch = mockFetch as unknown as typeof fetch;
 
@@ -1182,7 +1183,7 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
 
     it("does not load the scenario chunk for invalid, unconfigured, or already-aborted work", async () => {
       const mockFetch = vi.fn();
-      const importScenarioCodec = vi.fn(() => import("./studio-scenario-scenes"));
+      const importScenarioCodec = vi.fn(() => import("../studio-scenario-scenes"));
       const controller = new AbortController();
       controller.abort();
       globalThis.fetch = mockFetch as unknown as typeof fetch;
@@ -1557,7 +1558,7 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
         if (importPaletteCodec.mock.calls.length === 1) {
           throw new Error("palette chunk temporarily unavailable");
         }
-        return import("./studio-palette-suggest");
+        return import("../studio-palette-suggest");
       });
       globalThis.fetch = mockFetch as unknown as typeof fetch;
 
@@ -1579,7 +1580,7 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
         .fn()
         .mockRejectedValueOnce(new Error("palette chunk offline"))
         .mockRejectedValueOnce(new Error("palette chunk still offline"));
-      const unusedImport = vi.fn(() => import("./studio-palette-suggest"));
+      const unusedImport = vi.fn(() => import("../studio-palette-suggest"));
       globalThis.fetch = mockFetch as unknown as typeof fetch;
 
       const failed = await suggestColorPalette(

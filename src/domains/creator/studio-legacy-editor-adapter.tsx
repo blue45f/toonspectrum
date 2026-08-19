@@ -1,6 +1,6 @@
 import { Profiler } from "react";
 
-import { recordStudioRenderProfile } from "./studio-canvas-shared-runtime";
+import { recordStudioRenderProfile } from "./canvas/studio-canvas-shared-runtime";
 import { StudioCuttoonEditor } from "./StudioPage";
 
 import type { StudioWorkspaceRoute } from "./studio-workspace-route";

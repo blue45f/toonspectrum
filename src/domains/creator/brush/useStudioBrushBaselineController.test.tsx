@@ -6,7 +6,8 @@ import { resolve } from "node:path";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+
 import * as brushBaselineContract from "./studio-brush-baseline-contract";
 import {
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
@@ -128,7 +129,7 @@ describe("useStudioBrushBaselineController", () => {
     const source = readFileSync(
       resolve(
         process.cwd(),
-        "src/domains/creator/useStudioBrushBaselineController.ts",
+        "src/domains/creator/brush/useStudioBrushBaselineController.ts",
       ),
       "utf8",
     );

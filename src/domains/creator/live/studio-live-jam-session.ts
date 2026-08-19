@@ -1,12 +1,11 @@
-import { STUDIO_LIVE_JAM_WORK_ID_PREFIX } from "../../../lib/studio-live-jam-scope";
-
-import { buildStudioLiveShareHref } from "./creator-studio-links";
+import { STUDIO_LIVE_JAM_WORK_ID_PREFIX } from "../../../../lib/studio-live-jam-scope";
+import { buildStudioLiveShareHref } from "../creator-studio-links";
 
 export {
   isStudioLiveJamScope,
   isStudioLiveJamWorkId,
   STUDIO_LIVE_JAM_WORK_ID_PREFIX,
-} from "../../../lib/studio-live-jam-scope";
+} from "../../../../lib/studio-live-jam-scope";
 
 export const STUDIO_LIVE_ROOM_SEARCH_PARAM = "room";
 

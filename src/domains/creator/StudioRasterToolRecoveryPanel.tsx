@@ -21,19 +21,19 @@ import { useId, type ReactElement } from "react";
 import {
   STUDIO_FILTER_ALL_KINDS,
   STUDIO_FILTER_ALL_LABELS,
-} from "./studio-filter-pack-registry";
+} from "./filter/studio-filter-pack-registry";
+import { preloadStudioRasterRetouchRuntime } from "./render/studio-raster-retouch-preload";
 import {
   resolveStudioInspectorRasterToolPolicy,
   type StudioInspectorRasterToolPolicy,
 } from "./studio-inspector-raster-tool-policy";
 import { STUDIO_EASE, STUDIO_FOCUS_RING, StudioContextPill } from "./studio-panel-ui";
-import { preloadStudioRasterRetouchRuntime } from "./studio-raster-retouch-preload";
 
-import type { StudioFilterKind } from "./studio-filter-menu";
+import type { StudioFilterKind } from "./filter/studio-filter-menu";
 import type {
   StudioRasterRecoveryAction,
   StudioRasterToolAvailability,
-} from "./studio-raster-tool-availability";
+} from "./render/studio-raster-tool-availability";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";

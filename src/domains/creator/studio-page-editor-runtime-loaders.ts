@@ -1,11 +1,9 @@
-import type { StudioSavedBrush } from "./studio-brush-library";
+import type { StudioSavedBrush } from "./brush/studio-brush-library";
 
 export type StudioPixelEditBrushRuntime = typeof import("./studio-pixel-edit-brush-runtime");
-export type StudioBrushLibrarySqliteRepositoryModule = typeof import(
-  "./studio-brush-library-sqlite-repository"
+export type StudioBrushLibrarySqliteRepositoryModule = typeof import("./brush/studio-brush-library-sqlite-repository"
 );
-export type StudioBrushQuickSlotsSqliteRepositoryModule = typeof import(
-  "./studio-brush-slots-sqlite-repository"
+export type StudioBrushQuickSlotsSqliteRepositoryModule = typeof import("./brush/studio-brush-slots-sqlite-repository"
 );
 export type ProductStudioBrushQuickSlotsRepository = ReturnType<
   StudioBrushQuickSlotsSqliteRepositoryModule["getProductStudioBrushQuickSlotsSqliteRepository"]
@@ -38,8 +36,7 @@ export function loadStudioPixelEditBrushRuntime(): Promise<StudioPixelEditBrushR
 }
 
 export function loadStudioBrushLibrarySqliteRepository(): Promise<StudioBrushLibrarySqliteRepositoryModule> {
-  return studioBrushLibrarySqliteRepositoryPromise ??= import(
-    "./studio-brush-library-sqlite-repository"
+  return studioBrushLibrarySqliteRepositoryPromise ??= import("./brush/studio-brush-library-sqlite-repository"
   ).catch((error: unknown) => {
     studioBrushLibrarySqliteRepositoryPromise = null;
     throw error;
@@ -48,8 +45,7 @@ export function loadStudioBrushLibrarySqliteRepository(): Promise<StudioBrushLib
 
 export function loadStudioBrushQuickSlotsSqliteRepository():
 Promise<StudioBrushQuickSlotsSqliteRepositoryModule> {
-  return studioBrushQuickSlotsSqliteRepositoryPromise ??= import(
-    "./studio-brush-slots-sqlite-repository"
+  return studioBrushQuickSlotsSqliteRepositoryPromise ??= import("./brush/studio-brush-slots-sqlite-repository"
   ).catch((error: unknown) => {
     studioBrushQuickSlotsSqliteRepositoryPromise = null;
     throw error;

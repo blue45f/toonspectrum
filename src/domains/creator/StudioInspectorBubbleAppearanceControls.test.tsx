@@ -10,10 +10,10 @@ import {
   type StudioInspectorBubbleAppearanceControlsProps,
 } from "./StudioInspectorBubbleAppearanceControls";
 
+import type { BubbleStylePresetPatch } from "./lettering/StudioBubbleStylePresetPanel";
 import type { BubbleEl } from "./studio-element-model";
-import type { BubbleStylePresetPatch } from "./StudioBubbleStylePresetPanel";
 
-vi.mock("./StudioBubbleVariantGlyph", () => ({
+vi.mock("./lettering/StudioBubbleVariantGlyph", () => ({
   StudioBubbleVariantGlyph: ({ variant }: { variant: string }) => (
     <span aria-hidden>{variant}</span>
   ),

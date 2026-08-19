@@ -18,8 +18,21 @@ import {
   normalizeStudioLensBlurOptions,
   normalizeStudioSelectiveGaussianBlurOptions,
   normalizeStudioTiltShiftBlurOptions,
-} from "./studio-advanced-blur-filters";
-import { normalizeColorToAlpha } from "./studio-color-to-alpha";
+} from "../studio-advanced-blur-filters";
+import { normalizeColorToAlpha } from "../studio-color-to-alpha";
+import { hash2 } from "../studio-grain";
+import { normalizeLineArtCleanup } from "../studio-line-cleanup";
+import {
+  normalizeStudioDifferenceOfGaussiansOptions,
+  normalizeStudioDustScratchesOptions,
+  normalizeStudioTileableBlurOptions,
+} from "../studio-professional-filter-kernels";
+import {
+  normalizeStudioEdgeAwareDenoiseOptions,
+  normalizeStudioJpegArtifactReductionOptions,
+  normalizeStudioScreentoneRemovalOptions,
+} from "../studio-tone-artifact-filter-kernels";
+
 import {
   STUDIO_FILTER_PACK_KINDS,
   STUDIO_FILTER_PACK_LABELS,
@@ -31,21 +44,9 @@ import {
   type StudioFilterUnionWave,
   type StudioFilterUnionWaveKind,
 } from "./studio-filter-union-wave";
-import { hash2 } from "./studio-grain";
-import { normalizeLineArtCleanup } from "./studio-line-cleanup";
-import {
-  normalizeStudioDifferenceOfGaussiansOptions,
-  normalizeStudioDustScratchesOptions,
-  normalizeStudioTileableBlurOptions,
-} from "./studio-professional-filter-kernels";
-import {
-  normalizeStudioEdgeAwareDenoiseOptions,
-  normalizeStudioJpegArtifactReductionOptions,
-  normalizeStudioScreentoneRemovalOptions,
-} from "./studio-tone-artifact-filter-kernels";
 
-import type { StudioImageDataLike } from "./studio-filters";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
+import type { ImageFilterFields } from "../render/studio-konva-filter-fields";
+import type { StudioImageDataLike } from "../studio-filters";
 
 // ---------------------------------------------------------------------------
 // 공통 유틸

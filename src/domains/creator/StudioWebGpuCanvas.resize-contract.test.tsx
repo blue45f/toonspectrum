@@ -10,8 +10,8 @@ import {
   type StudioWebGpuSurfaceFrameRequest,
 } from "./StudioWebGpuCanvas";
 
-import type { StudioGpuFrameReceipt } from "./studio-webgpu-frame-contract";
-import type { StudioGpuStroke } from "./studio-webgpu-stroke";
+import type { StudioGpuFrameReceipt } from "./render/studio-webgpu-frame-contract";
+import type { StudioGpuStroke } from "./render/studio-webgpu-stroke";
 
 const engineHarness = vi.hoisted(() => ({
   instances: [] as Array<{
@@ -24,7 +24,7 @@ const engineHarness = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("./studio-webgpu-engine", () => {
+vi.mock("./render/studio-webgpu-engine", () => {
   class StudioWebGpuEngineMock {
     public readonly options: {
       onFrameInvalid?: () => void;

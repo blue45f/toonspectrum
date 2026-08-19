@@ -231,8 +231,7 @@ export async function restoreStudioServerRevision({
     }
 
     const restoredProject = creatorWorkSnapshotToStudioProject(restoredWork);
-    const { hydrateStudioLinked3dPassCloudProject } = await import(
-      "./studio-linked-3d-pass-cloud-project"
+    const { hydrateStudioLinked3dPassCloudProject } = await import("./studio-linked-3d-pass-cloud-project"
     );
     documentSaveInFlightRef.current = false;
     const applied = await hydrateStudioLinked3dPassCloudProject({

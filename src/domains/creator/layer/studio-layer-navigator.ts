@@ -1,5 +1,5 @@
 import type { StudioLayerSemanticKind } from "./studio-layer-palette-visual";
-import type { LayerGroup } from "./studio-layers";
+import type { LayerGroup } from "../studio-layers";
 
 export const STUDIO_LAYER_KINDS = [
   "all",

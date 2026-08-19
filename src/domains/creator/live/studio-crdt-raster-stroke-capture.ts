@@ -1,7 +1,7 @@
-import { planStudioGpuDabs } from "./studio-webgpu-dab-planner";
+import { planStudioGpuDabs } from "../render/studio-webgpu-dab-planner";
 
-import type { StudioGpuDab } from "./studio-webgpu-dab-plan-contract";
-import type { StudioGpuStroke } from "./studio-webgpu-stroke";
+import type { StudioGpuDab } from "../render/studio-webgpu-dab-plan-contract";
+import type { StudioGpuStroke } from "../render/studio-webgpu-stroke";
 
 export const STUDIO_RASTER_STROKE_CAPTURE_MAX_PIXELS = 16_777_216;
 

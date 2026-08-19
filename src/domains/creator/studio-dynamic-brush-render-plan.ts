@@ -14,7 +14,7 @@ import {
   studioBrushDynamicsSeedFromKey,
   studioReplaySafeBrushDynamicsSettingsForBrushId,
   studioDynamicBrushDepositPipelineUsesContinuation,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
@@ -22,33 +22,33 @@ import {
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
   type StudioDynamicBrushRenderBudgetPlan,
-} from "./studio-brush-render-budget";
+} from "./brush/studio-brush-render-budget";
 import {
   studioBrushSymmetryTransforms,
   studioDynamicBrushDabVariationsFromTransforms,
   type StudioBrushSymmetryTransform,
-} from "./studio-brush-symmetry";
-import {
-  planStudioCausalDynamicBrushDepositSegmentsV3,
-  planStudioCausalDynamicBrushDepositsV2,
-  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-} from "./studio-causal-dynamic-brush-deposit-v2";
+} from "./brush/studio-brush-symmetry";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
   type StudioDynamicBrushMaterialIdentity,
-} from "./studio-dry-media-dynamic-bridge";
-import {
-  resolveStudioDynamicBrushCoverageBudgetContract,
-  type StudioDynamicBrushSegmentedDabVariation,
-} from "./studio-dynamic-brush-coverage-renderer";
-import { resolveStudioPaperBrushResponse } from "./studio-paper-brush-response";
+} from "./brush/studio-dry-media-dynamic-bridge";
+import { resolveStudioPaperBrushResponse } from "./brush/studio-paper-brush-response";
 import {
   normalizeStudioPaperSurfaceSettings,
   resolveStudioDocumentPaperSurface,
   studioPaperGranulationIsActive,
   type StudioPaperGranulationSettings,
   type StudioPaperSurfaceSettings,
-} from "./studio-paper-granulation-runtime";
+} from "./brush/studio-paper-granulation-runtime";
+import {
+  planStudioCausalDynamicBrushDepositSegmentsV3,
+  planStudioCausalDynamicBrushDepositsV2,
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+} from "./studio-causal-dynamic-brush-deposit-v2";
+import {
+  resolveStudioDynamicBrushCoverageBudgetContract,
+  type StudioDynamicBrushSegmentedDabVariation,
+} from "./studio-dynamic-brush-coverage-renderer";
 import {
   studioSplatterOriginAnchorMarkCount,
 } from "./studio-splatter-origin-anchor";
@@ -59,7 +59,7 @@ import {
 import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import type { DrawEl } from "./studio-element-model";
 
 const dynamicsBySnapshot = new WeakMap<object, NormalizedStudioBrushDynamicsSettings>();

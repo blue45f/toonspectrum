@@ -1,9 +1,10 @@
-import { serializeStudioBrushR8TextureGrainSourceCanonical } from "./studio-brush-r8-grain-asset-contract";
+import { serializeStudioBrushR8TextureGrainSourceCanonical } from "../brush/studio-brush-r8-grain-asset-contract";
 import {
   hydrateStudioBrushR8GrainAsset,
   resetStudioBrushR8GrainRegistry,
-} from "./studio-brush-r8-grain-runtime";
-import { loadStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
+} from "../brush/studio-brush-r8-grain-runtime";
+import { loadStudioPerfectFreehandStroker } from "../studio-perfect-freehand";
+
 import { exportPageToSvg } from "./studio-svg-export";
 import {
   collectStudioSvgExportReferencedR8GrainSources,

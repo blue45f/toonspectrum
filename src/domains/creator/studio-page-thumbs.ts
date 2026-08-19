@@ -21,7 +21,7 @@ import {
   thoughtBubbleBodyPath,
   type BubbleTailDirection,
   type BubbleTailSpec,
-} from "./studio-bubble-path";
+} from "./lettering/studio-bubble-path";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 
 // ── 입력 — 느슨한 구조 타입(StudioPage 의 El/PageState 가 그대로 대입 가능) ────────────

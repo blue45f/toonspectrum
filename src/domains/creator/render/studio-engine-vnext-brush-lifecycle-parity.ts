@@ -14,23 +14,23 @@
  * byte-identical after canonical adaptation. Unsupported retained semantics remain fail-closed.
  */
 
-import { isStudioBrushCatalogSelection } from "./studio-brush-selection";
+import { isStudioBrushCatalogSelection } from "../brush/studio-brush-selection";
 import {
   adaptStudioDrawElementToCanonicalBrushPlan,
   type StudioCanonicalBrushDrawAdapterReady,
   type StudioCanonicalBrushDrawAdapterRequirement,
-} from "./studio-canonical-brush-draw-adapter";
+} from "../studio-canonical-brush-draw-adapter";
 import {
   hashStudioCanonicalBrushPlan,
   type StudioCanonicalBrushAffineTransform,
   type StudioCanonicalBrushPlan,
-} from "./studio-canonical-brush-plan";
-import { canonicalStudioCommandJson } from "./studio-command-journal";
-import { sha256HexPortable } from "./studio-sha256";
+} from "../studio-canonical-brush-plan";
+import { canonicalStudioCommandJson } from "../studio-command-journal";
+import { sha256HexPortable } from "../studio-sha256";
 
-import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
-import type { StudioLinearColorSpace } from "./studio-color-quality-engine";
-import type { DrawEl } from "./studio-element-model";
+import type { StudioBrushCatalogSelection } from "../brush/studio-brush-selection";
+import type { StudioLinearColorSpace } from "../studio-color-quality-engine";
+import type { DrawEl } from "../studio-element-model";
 import type { StudioEngineWebGpuTexturedBrushAssetPayload } from "./studio-engine-webgpu-textured-brush-plan";
 
 export const STUDIO_ENGINE_VNEXT_BRUSH_LIFECYCLE_PARITY_VERSION = 1 as const;

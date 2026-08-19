@@ -8,15 +8,13 @@ const migrationSource = readFileSync(
 );
 const serverSource = readFileSync(new URL("./server/creator.ts", import.meta.url), "utf8");
 const preflightSource = readFileSync(
-  new URL(
-    "../apps/api/src/modules/creator/creator-asset-schema-preflight.ts",
+  new URL("../apps/api/src/modules/creator/creator-asset-schema-preflight.ts",
     import.meta.url
   ),
   "utf8"
 );
 const checkFingerprintSource = readFileSync(
-  new URL(
-    "../apps/api/src/common/postgres-check-definition.ts",
+  new URL("../apps/api/src/common/postgres-check-definition.ts",
     import.meta.url
   ),
   "utf8"
@@ -27,8 +25,7 @@ const creatorModuleSource = readFileSync(
 );
 const ciSource = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
 const productionMigrationManifestSource = readFileSync(
-  new URL(
-    "../scripts/production-database-migrations.manifest",
+  new URL("../scripts/production-database-migrations.manifest",
     import.meta.url
   ),
   "utf8"

@@ -14,9 +14,9 @@
 import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
-import type { StudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
-import type { StudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
+} from "./brush/studio-brush-dynamics";
+import type { StudioBrushTipAlphaMap } from "./brush/studio-brush-tip-stamp";
+import type { StudioDynamicBrushMaterialIdentity } from "./brush/studio-dry-media-dynamic-bridge";
 
 export const STUDIO_FLAT_NIB_RIBBON_CARRIER_VERSION =
   "flat-nib-ribbon-carrier-v1" as const;

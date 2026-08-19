@@ -1,6 +1,8 @@
 import { Image, encodePng } from "image-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   StudioBrushR8GrainHydrator,
   collectStudioBrushR8GrainSources,
@@ -12,10 +14,9 @@ import {
   resetStudioBrushR8GrainRegistry,
   resolveStudioBrushR8GrainSampler,
 } from "./studio-brush-r8-grain-runtime";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type { StudioBrushR8TextureGrainSource } from "./studio-brush-r8-grain-asset-contract";
-import type { DownloadedStudioWorkAsset } from "./studio-work-asset-client";
+import type { DownloadedStudioWorkAsset } from "../studio-work-asset-client";
 
 function sourceForPng(
   assetId: string,

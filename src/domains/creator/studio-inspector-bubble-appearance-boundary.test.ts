@@ -80,10 +80,10 @@ describe("Studio inspector bubble-appearance boundary", () => {
     expect(inspector).toContain("<StudioBubbleTailControls");
     expect(inspector).toContain("<StudioBubbleAnchorPanel");
     for (const forbiddenImport of [
-      "./StudioBubbleShapePanel",
-      "./StudioBubbleTailControls",
-      "./studio-bubble-custom-shape",
-      "./studio-bubble-path",
+      "./lettering/StudioBubbleShapePanel",
+      "./lettering/StudioBubbleTailControls",
+      "./lettering/studio-bubble-custom-shape",
+      "./lettering/studio-bubble-path",
     ]) {
       expect(leaf.imports).not.toContain(forbiddenImport);
     }
@@ -94,8 +94,8 @@ describe("Studio inspector bubble-appearance boundary", () => {
     const leaf = moduleEdges("./StudioInspectorBubbleAppearanceControls.tsx");
 
     expect(leaf.imports).toContain("./studio-page-lazy-ui");
-    expect(leaf.source).not.toContain("./StudioBubbleAutoShrinkPanel");
-    expect(leaf.source).not.toContain("./StudioBubbleStylePresetPanel");
+    expect(leaf.source).not.toContain("./lettering/StudioBubbleAutoShrinkPanel");
+    expect(leaf.source).not.toContain("./lettering/StudioBubbleStylePresetPanel");
     expect(leaf.source.split("\n").length).toBeLessThanOrEqual(450);
     // 의도적 변경(2026-07-24): auto-color 새 채색 레이어 onApplyNewLayer 배선(3_400 → 3_480).
     // 의도적 변경(2026-07-25): live collaboration overlay & fallback glue (3_500 → 3_600).

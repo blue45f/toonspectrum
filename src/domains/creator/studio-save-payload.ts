@@ -1,5 +1,4 @@
-import { normalizeStudioLinked3dSaveProjection } from
-  "./studio-linked-3d-save-projection";
+import { normalizeStudioLinked3dSaveProjection } from "./studio-linked-3d-save-projection";
 
 import type { StudioProjectSnapshot } from "./studio-project-snapshot";
 import type { UpdateStudioSharedDocumentInput } from "./studio-shared-document-client";

@@ -8,7 +8,7 @@
  * Konva/DOM 의존 없음 — StudioPage 인스펙터와 단위 테스트가 공유한다.
  */
 
-import { normalizeOutline, type Outline } from "./studio-outline";
+import { normalizeOutline, type Outline } from "../studio-outline";
 
 // ---------------------------------------------------------------------------
 // 레이어 스타일 패치 — Konva.Image가 네이티브로 지원하는 그림자/모서리 속성에 대응.

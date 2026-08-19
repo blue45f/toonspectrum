@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
 
+import { isStudioGpuFilterChainEligible } from "../render/studio-gpu-filter-apply";
+import {
+  applyImageFilters,
+  buildImageFilters,
+  registerStudioKonvaFilters,
+  type KonvaLike,
+} from "../render/studio-konva-filters";
 import {
   STUDIO_ADJUSTMENT_ENGINE_IDS,
   studioAdjustmentDefaultParams,
   studioAdjustmentOperationToFilterFields,
   type StudioAdjustmentEngineId,
-} from "./studio-adjustment-stack";
+} from "../studio-adjustment-stack";
+import {
+  runStudioImageFilterWorker,
+  type StudioImageFilterWorkerLike,
+} from "../studio-image-filter-worker-client";
+import {
+  studioImageFilterSuccessTransfers,
+  type StudioImageFilterWorkerResponseMessage,
+  type StudioImageFilterWorkerRunMessage,
+  type StudioImageFilterWorkerSuccessMessage,
+} from "../studio-image-filter-worker-protocol";
+
 import { STUDIO_FILTER_CATALOG } from "./studio-filter-catalog";
 import {
   STUDIO_FILTER_PACK_DEFS,
@@ -15,26 +33,9 @@ import {
   STUDIO_FILTER_UNION_WAVE_KINDS,
   type StudioFilterUnionWaveKind,
 } from "./studio-filter-union-wave";
-import { isStudioGpuFilterChainEligible } from "./studio-gpu-filter-apply";
-import {
-  runStudioImageFilterWorker,
-  type StudioImageFilterWorkerLike,
-} from "./studio-image-filter-worker-client";
-import {
-  studioImageFilterSuccessTransfers,
-  type StudioImageFilterWorkerResponseMessage,
-  type StudioImageFilterWorkerRunMessage,
-  type StudioImageFilterWorkerSuccessMessage,
-} from "./studio-image-filter-worker-protocol";
-import {
-  applyImageFilters,
-  buildImageFilters,
-  registerStudioKonvaFilters,
-  type KonvaLike,
-} from "./studio-konva-filters";
 
-import type { StudioImageDataLike } from "./studio-filters";
-import type { ImageFilterFields } from "./studio-konva-filter-fields";
+import type { ImageFilterFields } from "../render/studio-konva-filter-fields";
+import type { StudioImageDataLike } from "../studio-filters";
 
 type CatalogEngineId = StudioAdjustmentEngineId | StudioFilterUnionWaveKind;
 type FixtureKind = "line-art" | "photo";

@@ -759,8 +759,7 @@ describe("studio procedural artistic brush browser bridge", () => {
 
   it("keeps the browser bridge non-authoritative and never transfers caller pixels", () => {
     const source = readFileSync(
-      new URL(
-        "./studio-procedural-artistic-brush-browser.ts",
+      new URL("./studio-procedural-artistic-brush-browser.ts",
         import.meta.url,
       ),
       "utf8",

@@ -29,38 +29,39 @@
  */
 
 import {
-  STUDIO_AI_IMAGE_REFERENCE_LIMITS,
-  compileStudioAiImageReferencePromptContexts,
-  normalizeStudioAiImageReferences,
-  type StudioAiImageReference,
-  type StudioAiImageReferenceRole,
-} from "./studio-ai-image-reference-roles";
-import {
   buildDialogueSuggestPrompt,
   parseDialogueSuggestResponse,
   type DialogueSuggestionCandidate,
-} from "./studio-dialogue-suggest";
+} from "../lettering/studio-dialogue-suggest";
 import {
   buildTranslationPrompt,
   parseTranslationResponse,
   type DialogueTranslatableItem,
-} from "./studio-dialogue-translate";
+} from "../lettering/studio-dialogue-translate";
 import {
   completeStudioServerText,
   parseStudioServerAiFailoverMetadata,
   type StudioServerAiFailoverMetadata,
   type StudioServerAiTask,
   type StudioServerAiProviderPreference,
-} from "./studio-server-ai-client";
+} from "../studio-server-ai-client";
 import {
   buildStudioWriterRoomAiPrompt,
   parseStudioWriterRoomAiDraft,
   type StudioWriterRoomAiDraft,
-} from "./studio-writer-room-ai";
+} from "../studio-writer-room-ai";
 
-import type { PaletteSuggestion } from "./studio-palette-suggest";
-import type { ScenarioScenesPlan } from "./studio-scenario-scenes";
-import type { StudioWriterRoomStage } from "./studio-writer-room";
+import {
+  STUDIO_AI_IMAGE_REFERENCE_LIMITS,
+  compileStudioAiImageReferencePromptContexts,
+  normalizeStudioAiImageReferences,
+  type StudioAiImageReference,
+  type StudioAiImageReferenceRole,
+} from "./studio-ai-image-reference-roles";
+
+import type { PaletteSuggestion } from "../studio-palette-suggest";
+import type { ScenarioScenesPlan } from "../studio-scenario-scenes";
+import type { StudioWriterRoomStage } from "../studio-writer-room";
 
 // ── 설정 저장 ──────────────────────────────────────────────────────────────
 
@@ -1340,8 +1341,8 @@ export async function generateScenarioScenes(
   storyText: string,
   opts: { sceneCountHint?: number; characterContext?: string; signal?: AbortSignal } = {},
   transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT,
-  importScenarioCodec: () => Promise<typeof import("./studio-scenario-scenes")> = () =>
-    import("./studio-scenario-scenes")
+  importScenarioCodec: () => Promise<typeof import("../studio-scenario-scenes")> = () =>
+    import("../studio-scenario-scenes")
 ): Promise<StudioAiResult<StudioTextAiData<ScenarioScenesPlan>>> {
   const trimmed = storyText.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "스토리 아이디어를 입력하세요." };
@@ -1349,7 +1350,7 @@ export async function generateScenarioScenes(
     return { ok: false, code: "not_configured", error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요." };
   }
   const signal = opts.signal ?? transport.signal;
-  let scenarioCodec: typeof import("./studio-scenario-scenes");
+  let scenarioCodec: typeof import("../studio-scenario-scenes");
   try {
     scenarioCodec = await loadOptionalStudioAiCodec(importScenarioCodec, signal);
   } catch (error) {
@@ -1529,15 +1530,15 @@ export async function suggestColorPalette(
   settings: StudioAiSettings,
   moodText: string,
   transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT,
-  importPaletteCodec: () => Promise<typeof import("./studio-palette-suggest")> = () =>
-    import("./studio-palette-suggest")
+  importPaletteCodec: () => Promise<typeof import("../studio-palette-suggest")> = () =>
+    import("../studio-palette-suggest")
 ): Promise<StudioAiResult<StudioTextAiData<PaletteSuggestion>>> {
   const trimmed = moodText.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "장르/무드를 입력하세요." };
   if (!isStudioTextAiConfigured(settings, transport)) {
     return { ok: false, code: "not_configured", error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요." };
   }
-  let paletteCodec: typeof import("./studio-palette-suggest");
+  let paletteCodec: typeof import("../studio-palette-suggest");
   try {
     paletteCodec = await loadOptionalStudioAiCodec(importPaletteCodec, transport.signal);
   } catch (error) {

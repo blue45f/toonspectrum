@@ -16,7 +16,7 @@ import {
   StudioInkEnvelopeError,
   assertStudioInkEnvelopeConformance,
   type StudioInkEnvelopeDecodeOptions,
-} from "./studio-ink-envelope-codec";
+} from "./brush/studio-ink-envelope-codec";
 
 export const STUDIO_TOONINK_SELF_CERTIFICATION_ID =
   "toonspectrum.toonink.self-certification" as const;

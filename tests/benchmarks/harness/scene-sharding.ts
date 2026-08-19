@@ -27,12 +27,12 @@ import { cpus, platform, arch } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { loadVelloNode } from "../../../packages/studio-engine-vello/src/node/index.ts";
-import { renderSceneToPixels } from "../../../packages/studio-engine-vello/src/render.ts";
+import { loadVelloNode } from "../../../packages/studio-engine-vello/src/node/index";
+import { renderSceneToPixels } from "../../../packages/studio-engine-vello/src/render";
 import {
   renderShardedScene,
   renderSceneToPixelsWithFragments,
-} from "../../../packages/studio-engine-vello/src/scene-sharding.ts";
+} from "../../../packages/studio-engine-vello/src/scene-sharding";
 import {
   createEmptyScene,
   createSceneFragmentCache,
@@ -40,9 +40,9 @@ import {
   polylineToPath,
   shardSceneByGrid,
   solidPaint,
-} from "../../../packages/studio-project-model/src/index.ts";
+} from "../../../packages/studio-project-model/src/index";
 
-import type { SceneIR } from "../../../packages/studio-project-model/src/index.ts";
+import type { SceneIR } from "../../../packages/studio-project-model/src/index";
 
 const REPO_ROOT = new URL("../../..", import.meta.url).pathname;
 const RESULTS_DIR = join(REPO_ROOT, "tests", "benchmarks", "results");

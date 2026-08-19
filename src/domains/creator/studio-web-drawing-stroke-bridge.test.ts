@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   planNormalizedStudioDynamicBrushDabs,
   studioBrushDynamicsSettingsForBrushId,
-} from "./studio-brush-dynamics";
+} from "./brush/studio-brush-dynamics";
 import {
   auditStudioWebDrawingBridgePlan,
   classifyStudioWebDrawingBrushFamily,
@@ -306,8 +306,8 @@ describe("studio web drawing stroke bridge", () => {
   it("routes committed, live, and SVG surfaces through the kit-owned planner", () => {
     for (const [path, expected] of [
       ["./studio-dynamic-brush-render-plan.ts", "planStudioWebDrawingKitOwnedDabs"],
-      ["./studio-live-dynamic-brush-overlay.ts", "planStudioWebDrawingKitOwnedDabs"],
-      ["./studio-svg-export.ts", "planStudioWebDrawingKitOwnedDabs"],
+      ["./live/studio-live-dynamic-brush-overlay.ts", "planStudioWebDrawingKitOwnedDabs"],
+      ["./export/studio-svg-export.ts", "planStudioWebDrawingKitOwnedDabs"],
     ] as const) {
       const source = readFileSync(new URL(path, import.meta.url), "utf8");
       expect(source, path).toContain(expected);
@@ -316,7 +316,7 @@ describe("studio web drawing stroke bridge", () => {
       );
     }
     const live = readFileSync(
-      new URL("./studio-live-dynamic-brush-overlay.ts", import.meta.url),
+      new URL("./live/studio-live-dynamic-brush-overlay.ts", import.meta.url),
       "utf8",
     );
     expect(live).toContain("studioWebDrawingKitOwnsStrokeGeometry");

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
-import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
-import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
+import { studioBrushPackDescriptorById } from "./brush/studio-brush-pack-index";
+import { materializeStudioBrushPackDynamics } from "./brush/studio-brush-pack-runtime";
+import { resolveStudioDynamicBrushMaterialIdentity } from "./brush/studio-dry-media-dynamic-bridge";
+import { exportPageToSvg } from "./export/studio-svg-export";
 import { planStudioDynamicBrushCoverageMarks } from "./studio-dynamic-brush-coverage-renderer";
 import {
   planStudioProfessionalShelfRibbonCarrier,
@@ -15,9 +16,8 @@ import {
   type StudioProfessionalShelfRibbonCatalogId,
   type StudioProfessionalShelfRibbonSourceMark,
 } from "./studio-professional-shelf-ribbon-carrier";
-import { exportPageToSvg } from "./studio-svg-export";
 
-import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
+import type { StudioDynamicBrushDab } from "./brush/studio-brush-dynamics";
 
 const RUNTIME_BY_ID = Object.freeze({
   "bristle-round-loaded": "ink-particle",

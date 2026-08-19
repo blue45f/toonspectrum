@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { exportPageToSvg } from "./export/studio-svg-export";
 import {
   STUDIO_ISOMETRIC_COORDINATE_MAX,
   createStudioIsometricPrimitiveElements,
@@ -9,7 +10,6 @@ import {
   planStudioIsometricSolid,
   projectStudioIsometricPoint,
 } from "./studio-isometric-solid";
-import { exportPageToSvg } from "./studio-svg-export";
 
 describe("studio isometric solid", () => {
   it("projects the three drafting axes deterministically", () => {

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { planStudioCausalInk } from "../studio-causal-ink";
+import { fillStudioCausalInkDabs } from "../studio-causal-ink-canvas";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "../studio-pixel-pencil";
+
 import { drawStampStroke } from "./studio-brush-stamp-engine";
-import { planStudioCausalInk } from "./studio-causal-ink";
-import { fillStudioCausalInkDabs } from "./studio-causal-ink-canvas";
 import {
   drawBounds,
   drawFreehandPenSegments,
@@ -22,14 +24,13 @@ import {
   studioLiveBrushPressure,
   studioLiveBrushPressureSamples,
 } from "./studio-draw-rendering";
-import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import {
   drawStudioStampStrokeWithSymmetry,
   planStudioStampSymmetryRender,
 } from "./studio-stamp-symmetry-rendering";
 
 import type { StudioStampBrushStyle } from "./studio-brush-stamp-engine";
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
 import type Konva from "konva";
 
@@ -341,6 +342,18 @@ describe("studio draft preview destination-aware composition", () => {
       pending: [wash],
       hasRetainedDomBackdrop: false,
     })).toEqual({ action: "continue", reason: "within-layer-bound" });
+    expect(planStudioDraftPreviewBackdropBoundary({
+      incoming: wash,
+      pending: [wash],
+      hasRetainedDomBackdrop: true,
+      overlayOwnsPendingAndIncoming: true,
+    })).toEqual({ action: "continue", reason: "overlay-owned-fifo" });
+    expect(planStudioDraftPreviewBackdropBoundary({
+      incoming: eraser,
+      pending: [pen],
+      hasRetainedDomBackdrop: true,
+      overlayOwnsPendingAndIncoming: true,
+    })).toEqual({ action: "continue", reason: "overlay-owned-fifo" });
   });
 
   it("flushes before restoring the pointer and never admits a first sample after failure", () => {

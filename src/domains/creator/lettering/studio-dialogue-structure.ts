@@ -5,13 +5,14 @@
  * 다른 페이지로 이동·복사할 수 있도록 순수 변환만 제공한다. UI와 히스토리 커밋은
  * StudioPage가 맡으며, 이 모듈은 입력을 절대 변경하지 않고 무변경 시 원본 참조를 돌려준다.
  */
+import { isEffectivelyLocked } from "../studio-layers";
+
 import {
   collectDialogueItems,
   isDialogueElement,
   type DialogueElementLike,
   type DialoguePageLike,
 } from "./studio-dialogue-batch";
-import { isEffectivelyLocked } from "./studio-layers";
 
 export type DialogueSplitRequest = {
   pageId: string;

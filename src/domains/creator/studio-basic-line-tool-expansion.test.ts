@@ -2,32 +2,32 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
 import {
   classifyStudioBrushBackendQuality,
-} from "./studio-brush-backend-quality-policy";
+} from "./brush/studio-brush-backend-quality-policy";
 import {
   filterStudioBrushCatalogItems,
   studioBrushCatalogItemById,
-} from "./studio-brush-catalog";
-import { studioBrushIconId } from "./studio-brush-icons";
+} from "./brush/studio-brush-catalog";
+import { studioBrushIconId } from "./brush/studio-brush-icons";
 import {
   resolveStudioBrushRuntimeContract,
-} from "./studio-brush-runtime-contract";
+} from "./brush/studio-brush-runtime-contract";
 import {
   materializeStudioBrushCatalogSelection,
-} from "./studio-brush-selection";
+} from "./brush/studio-brush-selection";
+import {
+  resolveStudioCausalInkDrawContract,
+} from "./brush/studio-draw-rendering";
+import { LargeBrushPreview } from "./brush/StudioBrushLibrarySheet";
+import { exportPageToSvg } from "./export/studio-svg-export";
+import { BRUSH_PRESETS } from "./studio-brush";
 import {
   adaptStudioDrawElementToCanonicalBrushPlan,
   type StudioCanonicalBrushDrawAdapterRequest,
 } from "./studio-canonical-brush-draw-adapter";
-import {
-  resolveStudioCausalInkDrawContract,
-} from "./studio-draw-rendering";
 import { loadStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import { normalizeStudioProDrawPrefs } from "./studio-pro-draw-prefs";
-import { exportPageToSvg } from "./studio-svg-export";
-import { LargeBrushPreview } from "./StudioBrushLibrarySheet";
 
 import type { DrawEl } from "./studio-element-model";
 

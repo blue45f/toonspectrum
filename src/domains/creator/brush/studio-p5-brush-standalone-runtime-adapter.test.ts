@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createStudioProceduralArtisticBrushProvider,
+  type StudioProceduralArtisticBrushRequest,
+} from "../studio-procedural-artistic-brush-provider";
+
+import {
   STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION,
   STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES,
   createStudioP5BrushStandaloneAdapterLoader,
   type StudioP5BrushStandaloneEnvironment,
 } from "./studio-p5-brush-standalone-runtime-adapter";
-import {
-  createStudioProceduralArtisticBrushProvider,
-  type StudioProceduralArtisticBrushRequest,
-} from "./studio-procedural-artistic-brush-provider";
 
 interface FakeModule {
   readonly calls: string[];

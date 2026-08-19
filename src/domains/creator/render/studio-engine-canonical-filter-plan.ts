@@ -1,4 +1,4 @@
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "../studio-sha256";
 
 /**
  * Renderer-neutral, future-only non-destructive filter recipe.

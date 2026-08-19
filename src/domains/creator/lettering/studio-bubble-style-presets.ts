@@ -1,5 +1,5 @@
-import type { BubbleVariant } from "./studio-assets";
-import type { StrokeStyle } from "./studio-stroke-shapes";
+import type { StrokeStyle } from "../brush/studio-stroke-shapes";
+import type { BubbleVariant } from "../studio-assets";
 
 export interface BubbleStylePreset {
   id: string;

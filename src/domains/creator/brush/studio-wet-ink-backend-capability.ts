@@ -10,8 +10,9 @@
  * carrier. Persisted legacy watercolor remains on its exact historical representation.
  */
 
-import { STUDIO_LIVING_INK_FIELD_VERSION } from "./studio-living-ink-field";
-import { STUDIO_LIVING_INK_GPU_PROTOCOL_VERSION } from "./studio-living-ink-gpu-protocol";
+import { STUDIO_LIVING_INK_FIELD_VERSION } from "../studio-living-ink-field";
+import { STUDIO_LIVING_INK_GPU_PROTOCOL_VERSION } from "../studio-living-ink-gpu-protocol";
+
 import {
   planStudioWetInkBrushReplay,
   studioWetInkBrushRuntimeSupportsElement,
@@ -19,7 +20,7 @@ import {
   type StudioWetInkBrushReplayPlanResult,
 } from "./studio-wet-ink-brush-runtime";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 export const STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY_VERSION =
   "wet-ink-interactive-backend-capability-v1" as const;

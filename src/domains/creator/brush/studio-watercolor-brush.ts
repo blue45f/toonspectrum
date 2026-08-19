@@ -17,7 +17,7 @@
  * `hash2`는 기존 grain 엔진의 검증된 결정적 좌표 해시를 재사용한다. Math.random/DOM/Konva는 없다.
  */
 
-import { hash2 } from "./studio-grain";
+import { hash2 } from "../studio-grain";
 
 // ---------------------------------------------------------------------------
 // 공개 타입·기본값

@@ -257,7 +257,7 @@ function wgslFloat(value: number): string {
  */
 export const STUDIO_LIVING_INK_WGSL_RESERVED_IDENTIFIERS: readonly string[] = Object.freeze([
   "as", "auto", "await", "become", "cast", "catch", "class", "crate", "delete", "do", "enum",
-  "explicit", "export", "extern", "external", "filter", "final", "from", "get", "goto", "handle",
+  "explicit", "export", "extern", "external", "filter", "final", "from ", "get", "goto", "handle",
   "impl", "implements", "import", "inline", "interface", "layout", "match", "meta", "mod", "module",
   "move", "mut", "namespace", "new", "nil", "null", "of", "operator", "package", "partition", "pass",
   "precise", "precision", "priv", "protected", "pub", "public", "readonly", "ref", "regardless",

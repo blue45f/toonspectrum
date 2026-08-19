@@ -51,7 +51,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 }
 
 function pathBooleanHandler(): string {
-  const page = moduleEdges("./StudioPage.tsx").source;
+  const page = moduleEdges("../StudioPage.tsx").source;
   const start = page.indexOf(
     "async function applyPathBooleanCombine(op: StudioPathBooleanOp)",
   );
@@ -66,11 +66,11 @@ function pathBooleanHandler(): string {
 
 describe("CanvasKit PathOps product entry boundary", () => {
   it("keeps the heavy Worker client graph behind one analyzable dynamic import", () => {
-    const page = moduleEdges("./StudioPage.tsx");
+    const page = moduleEdges("../StudioPage.tsx");
     const workerClient = "./studio-quality-worker-client";
 
     expect(page.valueImports).toContain(
-      "./studio-canvaskit-path-boolean-document-adapter",
+      "./render/studio-canvaskit-path-boolean-document-adapter",
     );
     expect(page.valueImports).not.toContain(workerClient);
     expect(page.typeOnlyImports).toContain(workerClient);
@@ -124,7 +124,7 @@ describe("CanvasKit PathOps product entry boundary", () => {
   });
 
   it("owns cancellation, Worker lifetime, timeline cleanup, and selection ref synchronization", () => {
-    const page = moduleEdges("./StudioPage.tsx").source;
+    const page = moduleEdges("../StudioPage.tsx").source;
     const handler = pathBooleanHandler();
 
     expect(page).toContain("pathBooleanAbortRef.current?.abort()");

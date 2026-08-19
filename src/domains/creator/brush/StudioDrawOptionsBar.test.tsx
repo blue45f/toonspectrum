@@ -12,7 +12,7 @@ import { StudioBrushLibrarySheet } from "./StudioBrushLibrarySheet";
 import { StudioDrawOptionsBar } from "./StudioDrawOptionsBar";
 
 const drawOptionsSource = readFileSync(
-  resolve(process.cwd(), "src/domains/creator/StudioDrawOptionsBar.tsx"),
+  resolve(process.cwd(), "src/domains/creator/brush/StudioDrawOptionsBar.tsx"),
   "utf8"
 );
 const studioGlobalsSource = readFileSync(resolve(process.cwd(), "src/styles/globals.css"), "utf8");

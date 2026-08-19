@@ -3,8 +3,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const fileUrl = new URL(
-  "./studio-live-surface-filter-provider.ts",
+const fileUrl = new URL("./studio-live-surface-filter-provider.ts",
   import.meta.url,
 );
 const source = readFileSync(fileUrl, "utf8");
@@ -85,7 +84,7 @@ const analysis = moduleAnalysis();
 
 describe("Studio live surface filter clean-room AST boundary", () => {
   it("is isolated from existing canonical filters and renderer-specific runtimes", () => {
-    expect(analysis.staticImports).toEqual(["./studio-sha256"]);
+    expect(analysis.staticImports).toEqual(["../studio-sha256"]);
     expect(analysis.dynamicImports).toEqual([]);
     expect(analysis.staticImports.some(
       (specifier) => (

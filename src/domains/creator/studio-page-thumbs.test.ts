@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { doubleBubblePathData } from "./studio-bubble-path";
+import { doubleBubblePathData } from "./lettering/studio-bubble-path";
 import {
   buildThumbNodes,
   bubbleTailSpecOf,

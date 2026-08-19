@@ -5,12 +5,13 @@ import { gzipSync } from "node:zlib";
 
 const outputDirectory = path.resolve(process.env.STUDIO_BUNDLE_DIR ?? "dist");
 const manifestPath = path.join(outputDirectory, ".vite", "manifest.json");
-const studioEntry = "src/domains/creator/StudioPage.tsx";
+const studioEntry =
+  "src/domains/creator/studio-legacy-editor-adapter.tsx";
 const appEntry = "index.html";
 // This is the sole production exception to the engine-lab ban. Its transitive Babylon chunks may
 // be emitted only behind this analyzable BG3D dynamic import and may not be shared by another owner.
 const approvedBabylonSpecialistEntry =
-  "src/domains/creator/studio-bg3d-babylon-specialist-entry.ts";
+  "src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts";
 const approvedBabylonRuntimeChunkName = "studio-bg3d-babylon-runtime";
 const babylonManifestPattern = /(?:@babylonjs|babylon(?:\.js)?)/i;
 
@@ -607,7 +608,7 @@ if (!fs.existsSync(manifestPath)) {
       ["optional heal/clone overlay", /src\/domains\/creator\/StudioHealCloneOverlay\.tsx/],
       ["optional history brush overlay", /src\/domains\/creator\/StudioHistoryBrushOverlay\.tsx/],
       ["optional isometric overlay", /src\/domains\/creator\/StudioIsometricGridOverlay\.tsx/],
-      ["optional layer mask overlay", /src\/domains\/creator\/StudioLayerMaskOverlay\.tsx/],
+      ["optional layer mask overlay", /src\/domains\/creator\/(?:layer\/)?StudioLayerMaskOverlay\.tsx/],
       ["optional perspective overlay", /src\/domains\/creator\/StudioPerspectiveOverlay\.tsx/],
       ["optional puppet warp overlay", /src\/domains\/creator\/StudioPuppetWarpOverlay\.tsx/],
     ];
@@ -674,11 +675,11 @@ if (!fs.existsSync(manifestPath)) {
 
     checkDynamicBoundary(
       "optional 3D background editor",
-      /src\/domains\/creator\/StudioBackground3D\.tsx/,
+      /src\/domains\/creator\/(?:bg3d\/)?StudioBackground3D\.tsx/,
       studioKeys,
     );
     const background3dEntries = matchingManifestEntries(
-      /src\/domains\/creator\/StudioBackground3D\.tsx/,
+      /src\/domains\/creator\/(?:bg3d\/)?StudioBackground3D\.tsx/,
     );
     if (background3dEntries.length !== 1) {
       fail(`expected one StudioBackground3D manifest entry, found ${background3dEntries.length}`);
@@ -706,11 +707,11 @@ if (!fs.existsSync(manifestPath)) {
       );
       checkDynamicBoundary(
         "optional BG3D shot-batch runtime",
-        /src\/domains\/creator\/studio-bg3d-shot-batch-runtime\.ts/,
+        /src\/domains\/creator\/(?:bg3d\/)?studio-bg3d-shot-batch-runtime\.ts/,
         background3dKeys,
       );
       const shotBatchRuntimeEntries = matchingManifestEntries(
-        /src\/domains\/creator\/studio-bg3d-shot-batch-runtime\.ts/,
+        /src\/domains\/creator\/(?:bg3d\/)?studio-bg3d-shot-batch-runtime\.ts/,
       ).filter((key) => manifest[key].isDynamicEntry === true);
       if (shotBatchRuntimeEntries.length !== 1) {
         fail(`expected one BG3D shot-batch runtime entry, found ${shotBatchRuntimeEntries.length}`);
@@ -755,7 +756,7 @@ if (!fs.existsSync(manifestPath)) {
       }
       const eagerPsdRuntime = matchingEntries(
         background3dKeys,
-        /(?:src\/domains\/creator\/studio-bg3d-shot-psd\.ts|node_modules.*ag-psd)/,
+        /(?:src\/domains\/creator\/(?:bg3d\/)?studio-bg3d-shot-psd\.ts|node_modules.*ag-psd)/,
       );
       if (eagerPsdRuntime.length > 0) {
         fail(
@@ -764,7 +765,7 @@ if (!fs.existsSync(manifestPath)) {
       }
       const eagerContactSheetRuntime = matchingEntries(
         background3dKeys,
-        /src\/domains\/creator\/studio-bg3d-shot-contact-sheet\.ts/,
+        /src\/domains\/creator\/(?:bg3d\/)?studio-bg3d-shot-contact-sheet\.ts/,
       );
       if (eagerContactSheetRuntime.length > 0) {
         fail(
@@ -773,7 +774,7 @@ if (!fs.existsSync(manifestPath)) {
       }
       checkDynamicBoundary(
         "optional BG3D physics runtime",
-        /src\/domains\/creator\/studio-bg3d-physics-worker-client\.ts/,
+        /src\/domains\/creator\/(?:bg3d\/)?studio-bg3d-physics-worker-client\.ts/,
         background3dKeys,
       );
     }

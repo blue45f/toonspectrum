@@ -15,19 +15,21 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import { STUDIO_PROJECT_REVIEW_ACTION_IDS } from "./studio-project-review-actions";
+
 
 function source(fileName: string): string {
   return readFileSync(new URL(fileName, import.meta.url), "utf8");
 }
 
-const page = source("./StudioPage.tsx");
+const page = readStudioCuttoonEditorSource();
 const menubar = source("./StudioMenubarContent.tsx");
 const reviewActions = source("./StudioProjectReviewActions.tsx");
 
 /** `<StudioToolBelt …>` 여는 태그 전체 (호스트의 뷰포트 게이트가 여기에 있다). */
 function toolBeltHostTag(): string {
-  const start = page.indexOf("<StudioToolBelt\n");
+  const start = page.indexOf("<StudioToolBelt");
   expect(start, "StudioToolBelt 호스트를 찾지 못했습니다").toBeGreaterThan(-1);
   const end = page.indexOf(">", start);
   return page.slice(start, end);

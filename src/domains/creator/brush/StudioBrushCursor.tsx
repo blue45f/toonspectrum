@@ -11,9 +11,9 @@ import {
 import {
   planStudioBrushCursorVisual,
   type StudioBrushCursorMode,
-} from "./studio-canvas-cursor";
+} from "../canvas/studio-canvas-cursor";
 
-import type { StudioBrushCursorStyle } from "./studio-app-settings";
+import type { StudioBrushCursorStyle } from "../studio-app-settings";
 import type Konva from "konva";
 import type { RefObject } from "react";
 

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS } from "../studio-brush";
+import {
+  STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
+  STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
+} from "../studio-element-model";
+import { quantizeFixedRateStrokeSample } from "../studio-fixed-rate-stroke-filter";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "../studio-pixel-pencil";
+
 import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
 import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import {
@@ -12,16 +20,9 @@ import {
   type StudioDrawPointerStartInput,
 } from "./studio-draw-pointer-start-plan";
 import {
-  STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
-  STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
-} from "./studio-element-model";
-import { quantizeFixedRateStrokeSample } from "./studio-fixed-rate-stroke-filter";
-import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
-import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
-import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import {
   STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
   STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,

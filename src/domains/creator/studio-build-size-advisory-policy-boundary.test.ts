@@ -70,7 +70,7 @@ describe("Studio quality-first build-size policy", () => {
 
   it("allows Babylon only through one exact lazy specialist boundary", () => {
     expect(bundleCheckSource).toContain(
-      '"src/domains/creator/studio-bg3d-babylon-specialist-entry.ts"',
+      '"src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts"',
     );
     expect(bundleCheckSource).toContain(
       "const babylonManifestPattern = /(?:@babylonjs|babylon(?:\\.js)?)/i",

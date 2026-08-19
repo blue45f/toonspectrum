@@ -1,4 +1,5 @@
-import { smoothStrokePoints } from "./studio-brush";
+import { smoothStrokePoints } from "../studio-brush";
+
 import {
   planStudioStrokePostprocess,
   type StudioStrokePostprocessPlan,
@@ -16,7 +17,7 @@ import {
   type StudioStrokePostprocessWorkerRunMessage,
 } from "./studio-stroke-postprocess-worker-protocol";
 
-import type { SmoothStrokeOptions } from "./studio-brush";
+import type { SmoothStrokeOptions } from "../studio-brush";
 
 export const STUDIO_STROKE_POSTPROCESS_WORKER_DEFAULT_TIMEOUT_MS = 1_500;
 export const STUDIO_STROKE_POSTPROCESS_WORKER_MAX_TIMEOUT_MS = 5_000;

@@ -13,7 +13,7 @@ const gateSource = readFileSync(
   "utf8",
 );
 const sharedRuntimeSource = readFileSync(
-  new URL("./studio-canvas-shared-runtime.ts", import.meta.url),
+  new URL("./canvas/studio-canvas-shared-runtime.ts", import.meta.url),
   "utf8",
 );
 

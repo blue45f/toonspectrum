@@ -13,21 +13,23 @@
  * apply this adapter again.
  */
 
-import { resolveBrushReleasePressureSample } from "./studio-brush";
 import {
   resolveStudioHybridPressureProfile,
   resolveStudioHybridPressureSample,
-} from "./studio-hybrid-pressure-profile";
-import {
-  studioInkFallbackPressure,
-  type StudioInkPressureModel,
-} from "./studio-ink-pressure-model";
+} from "../hybrid-dcc/studio-hybrid-pressure-profile";
+import { resolveBrushReleasePressureSample } from "../studio-brush";
 import {
   advanceStudioVelocityPressure,
   type StudioVelocityPressurePointerSample,
   type StudioVelocityPressureSample,
   type StudioVelocityPressureState,
-} from "./studio-velocity-pressure-response";
+} from "../studio-velocity-pressure-response";
+
+import {
+  studioInkFallbackPressure,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
+
 
 export const STUDIO_BRUSH_VELOCITY_PRESSURE_ADAPTER_VERSION =
   "brush-velocity-pressure-adapter-v1" as const;

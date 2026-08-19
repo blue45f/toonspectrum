@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
+import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./bg3d/studio-bg3d-scene-document";
 import {
   STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND,
   STUDIO_SHARED_3D_STAGE_DOCUMENT_VERSION,
@@ -16,7 +16,7 @@ import {
 import {
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
-} from "./studio-vrm-scene-document";
+} from "./vrm/studio-vrm-scene-document";
 
 function elements(): StudioShared3dStageElementSource[] {
   return [

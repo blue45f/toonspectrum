@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { StudioBrushR8GrainRegistry } from "./studio-brush-r8-grain-runtime";
+import { StudioBrushR8GrainRegistry } from "../brush/studio-brush-r8-grain-runtime";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   createStudioEngineWebGpuPresentationSurface,
   type StudioEngineWebGpuPresentationFrameLease,
@@ -17,7 +19,6 @@ import {
   packStudioEngineWebGpuTexturedBrushViewportUniform,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_INSTANCE_FLOATS,
 } from "./studio-engine-webgpu-textured-brush-runtime";
-import { sha256HexPortable } from "./studio-sha256";
 import {
   planStudioWebGpuR8GrainNative,
   StudioWebGpuR8GrainTextureCache,

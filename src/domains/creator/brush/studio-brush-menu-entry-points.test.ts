@@ -11,27 +11,25 @@
  *    boundary tests use, because StudioPage cannot be imported in a unit test).
  */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, it, vi } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   STUDIO_INSPECTOR_FOCUS_TARGETS,
   requestStudioInspectorFocus,
   studioInspectorFocusTokenFor,
   subscribeStudioInspectorFocus,
-} from "./studio-inspector-focus";
-import { buildStudioBrushMenuItems } from "./studio-main-menu-items-brush";
+} from "../studio-inspector-focus";
+import { buildStudioBrushMenuItems } from "../studio-main-menu-items-brush";
 
 import type {
   StudioMainMenuBuilderState,
   StudioMainMenuEditorActions,
   StudioMainMenuUiActions,
-} from "./studio-main-menu-contract";
+} from "../studio-main-menu-contract";
 
 function pageSource(): string {
-  return readFileSync(fileURLToPath(new URL("./StudioPage.tsx", import.meta.url)), "utf8");
+  return readStudioCuttoonEditorSource();
 }
 
 function brushItems() {
@@ -123,7 +121,7 @@ describe("StudioPage wires the Brush rows to real surfaces", () => {
     expect(source).toContain("accept={STUDIO_BRUSH_PACK_ACCEPT}");
     expect(source).toContain("handleBrushPackImportFromMenu(event)");
     // Dynamic: the format-gateway parsers must not enter the eager Studio graph.
-    expect(source).toContain('await import("./studio-brush-pack-import")');
+    expect(source).toContain('await import("./brush/studio-brush-pack-import")');
   });
 });
 

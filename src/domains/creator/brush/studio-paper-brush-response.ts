@@ -11,7 +11,8 @@
  * 물성이다. 문서가 소유하는 것은 *어떤 종이를 깔았는가*(`StudioPaperSurfaceSettings`)뿐이다.
  */
 
-import { resolveStudioBrushRenderFamily, type StudioBrushRenderFamily } from "./studio-brush";
+import { resolveStudioBrushRenderFamily, type StudioBrushRenderFamily } from "../studio-brush";
+
 import {
   STUDIO_PAPER_GRANULATION_IDENTITY,
   normalizeStudioPaperGranulationSettings,

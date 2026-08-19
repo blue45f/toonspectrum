@@ -20,9 +20,9 @@ import type {
   StudioDynamicDualTipExactPlanV2,
   StudioDynamicDualTipExactWebGpuExecutionResultV2,
   StudioDynamicDualTipExactWebGpuRuntimeV2,
-} from "./studio-dynamic-dual-tip-webgpu-runtime-v2";
+} from "../studio-dynamic-dual-tip-webgpu-runtime-v2";
 
-const exactModulePromise = import("./studio-dynamic-dual-tip-webgpu-runtime-v2");
+const exactModulePromise = import("../studio-dynamic-dual-tip-webgpu-runtime-v2");
 
 function selection(): StudioBrushPackSelection {
   const result = materializeStudioBrushPackSelectionWithDualTip("g-pen-flex", {

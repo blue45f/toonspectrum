@@ -1,6 +1,6 @@
-import { copyStudioAdvancedRulerAsJson, type StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
-import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
-import { PAPER_GRAIN_KINDS } from "./studio-paper-texture";
+import { parseStudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
+import { PAPER_GRAIN_KINDS } from "../brush/studio-paper-texture";
+import { copyStudioAdvancedRulerAsJson, type StudioAdvancedRulerDocument } from "../studio-advanced-ruler-document";
 
 import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,

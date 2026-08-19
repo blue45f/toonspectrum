@@ -14,8 +14,8 @@ import type {
   StudioBg3dGlbMetrics,
   StudioBg3dGlbValidationFailure,
   StudioBg3dGlbValidationSuccess,
-} from "./studio-bg3d-glb-validation";
-import type { StudioBg3dObjWorkerCanonicalResult } from "./studio-bg3d-obj-worker-protocol";
+} from "./bg3d/studio-bg3d-glb-validation";
+import type { StudioBg3dObjWorkerCanonicalResult } from "./bg3d/studio-bg3d-obj-worker-protocol";
 
 function metrics(patch: Partial<StudioBg3dGlbMetrics> = {}): StudioBg3dGlbMetrics {
   return {

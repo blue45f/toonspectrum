@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   Memory64WorkloadCoordinator,
-} from "./kernel/Memory64WorkloadCoordinator";
+} from "../kernel/Memory64WorkloadCoordinator";
 import {
   probeWasmMemory64Capability,
   type WasmMemory64CapabilityReceipt,
-} from "./kernel/WasmMemory64Capability";
+} from "../kernel/WasmMemory64Capability";
+
 import {
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
@@ -30,7 +31,7 @@ import {
   STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION,
 } from "./studio-dry-media-union-ribbon-carrier";
 
-import type { StudioDynamicBrushCoverageMark } from "./studio-dynamic-brush-coverage-renderer";
+import type { StudioDynamicBrushCoverageMark } from "../studio-dynamic-brush-coverage-renderer";
 
 type BeginRequest = Extract<
   StudioDryMediaUnionContinuationRequest,

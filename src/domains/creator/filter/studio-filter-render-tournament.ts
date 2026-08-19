@@ -2,7 +2,7 @@ import {
   peekStudioTournamentRuntime,
   type StudioMeasuredTournamentResult,
   type StudioRendererTournamentRuntime,
-} from "./studio-renderer-tournament-runtime";
+} from "../studio-renderer-tournament-runtime";
 
 /**
  * Product filter tournament orchestration.
@@ -86,7 +86,7 @@ async function resolveProductRuntime(): Promise<StudioRendererTournamentRuntime 
   const existing = peekStudioTournamentRuntime();
   if (existing) return existing;
   try {
-    const bootstrap = await import("./studio-tournament-persistence-bootstrap");
+    const bootstrap = await import("../studio-tournament-persistence-bootstrap");
     await bootstrap.bootStudioTournamentPersistence();
   } catch {
     // The bootstrap owns explicit persistence status/reporting. No alternate

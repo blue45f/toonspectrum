@@ -16,12 +16,12 @@
 import { STUDIO_CAPABILITY_TIER_LABELS } from "./studio-capability-messages";
 import { describeStudioSafeModeReason } from "./studio-reliability-status-store";
 
+import type { StudioGpuFabricCapabilities } from "./render/studio-gpu-fabric";
+import type { StudioGpuBackend } from "./render/studio-webgpu-frame-contract";
 import type { StudioCapabilityClassification } from "./studio-capability-tier";
-import type { StudioGpuFabricCapabilities } from "./studio-gpu-fabric";
 import type { StudioSqliteSupportProbe } from "./studio-local-database";
 import type { StudioOpfsQuotaEstimate } from "./studio-opfs-asset-store";
 import type { StudioReliabilityStatusSnapshot } from "./studio-reliability-status-store";
-import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
 
 /* ------------------------------------------------------------------ types */
 

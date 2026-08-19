@@ -15,7 +15,8 @@
 import {
   normalizeStudioConvolution,
   normalizeStudioMorphology,
-} from "./studio-advanced-pixel-filters";
+} from "../studio-advanced-pixel-filters";
+
 import {
   STUDIO_GPU_FILTER_DISPATCH_ROW_THREADS,
   STUDIO_GPU_FILTER_WORKGROUP_SIZE,
@@ -24,7 +25,7 @@ import {
 import type {
   StudioConvolution,
   StudioMorphology,
-} from "./studio-advanced-pixel-filters";
+} from "../studio-advanced-pixel-filters";
 import type { StudioGpuFilterShaderSource } from "./studio-gpu-filter-runtime";
 
 export type StudioGpuSpatialFilterKernelId =

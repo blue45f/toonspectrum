@@ -3,15 +3,26 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_FILTER_MENU_KINDS } from "./studio-filter-menu";
+import { STUDIO_FILTER_MENU_KINDS } from "./filter/studio-filter-menu";
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
-const viewportUrl = new URL("./StudioCanvasViewport.tsx", import.meta.url);
-const pageSource = readFileSync(pageUrl, "utf8");
+const viewportUrl = new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url);
+const editorViewUrl = new URL("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx", import.meta.url);
+const pageSource = readStudioCuttoonEditorSource();
+const rawPageSource = readFileSync(pageUrl, "utf8");
 const viewportSource = readFileSync(viewportUrl, "utf8");
+const editorViewSource = readFileSync(editorViewUrl, "utf8");
 const pageFile = ts.createSourceFile(
   pageUrl.pathname,
-  pageSource,
+  rawPageSource,
+  ts.ScriptTarget.Latest,
+  true,
+  ts.ScriptKind.TSX,
+);
+const editorViewFile = ts.createSourceFile(
+  editorViewUrl.pathname,
+  editorViewSource,
   ts.ScriptTarget.Latest,
   true,
   ts.ScriptKind.TSX,
@@ -70,26 +81,30 @@ function nestedVariableInitializer(functionName: string, variableName: string): 
   return match;
 }
 
-function jsxCallback(tagName: string, attributeName: string): ts.Expression {
-  let match: ts.Expression | null = null;
-  function visit(node: ts.Node): void {
-    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(pageFile) === tagName) {
+function jsxCallback(tagName: string, attributeName: string): { expression: ts.Expression; sourceFile: ts.SourceFile } {
+  let match: { expression: ts.Expression; sourceFile: ts.SourceFile } | null = null;
+  function visit(node: ts.Node, sourceFile: ts.SourceFile): void {
+    if (
+      (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node))
+      && node.tagName.getText(sourceFile) === tagName
+    ) {
       const attribute = node.attributes.properties.find(
         (property): property is ts.JsxAttribute =>
-          ts.isJsxAttribute(property) && property.name.getText(pageFile) === attributeName,
+          ts.isJsxAttribute(property) && property.name.getText(sourceFile) === attributeName,
       );
       const expression = attribute?.initializer
         && ts.isJsxExpression(attribute.initializer)
         ? attribute.initializer.expression
         : null;
       if (expression) {
-        match = expression;
+        match = { expression, sourceFile };
         return;
       }
     }
-    ts.forEachChild(node, visit);
+    ts.forEachChild(node, (child) => visit(child, sourceFile));
   }
-  visit(pageFile);
+  visit(pageFile, pageFile);
+  if (!match) visit(editorViewFile, editorViewFile);
   if (!match) throw new Error(`Missing ${tagName}.${attributeName} JSX callback`);
   return match;
 }
@@ -186,7 +201,7 @@ describe("StudioPage page-composite filter integration boundary", () => {
     }
     visit(open);
 
-    expect(dynamicImports).toEqual(["./studio-raster-edit-preparation"]);
+    expect(dynamicImports).toEqual(["./render/studio-raster-edit-preparation"]);
     expect(text).toContain(
       'prepareStudioDocumentReplacement("필터 미리보기를 준비", { flushPending: true })',
     );
@@ -260,12 +275,12 @@ describe("StudioPage page-composite filter integration boundary", () => {
 
   it("projects the composite as a locked virtual ImageEl without mutating authored arrays", () => {
     const projection = viewportSourceBetween(
-      "const authoredCanvasRenderElements =",
+      "const canvasRenderElements: El[] = studioFilterPreview",
       "const virtualFillPreviewTarget =",
     );
 
     expect(projection).toContain("const canvasRenderElements: El[] = studioFilterPreview");
-    expect(projection).toContain(": [...authoredCanvasRenderElements]");
+    expect(projection).toContain(": [...studioLiveGesturePreviewRenderPlan.elements]");
     expect(projection).toContain("if (studioFilterPageComposite)");
     expect(projection).toContain("studioFilterPreview?.elementId === studioFilterPageComposite.id");
     expect(projection).toContain("canvasRenderElements.push({");
@@ -277,10 +292,11 @@ describe("StudioPage page-composite filter integration boundary", () => {
   });
 
   it("applies one editable raster copy into destination elements with one history commit", () => {
-    const apply = jsxCallback("StudioFilterDialog", "onApply").getText(pageFile);
+    const applyCallback = jsxCallback("StudioFilterDialog", "onApply");
+    const apply = applyCallback.expression.getText(applyCallback.sourceFile);
 
     expect(apply).toContain('if (studioFilterSession.target === "image")');
-    expect(apply).toContain('await import("./studio-raster-edit-preparation")');
+    expect(apply).toMatch(/import\(["'].*render\/studio-raster-edit-preparation["']\)/);
     expect(apply).toContain("rasterRuntime.applyStudioEditableRasterCopy({");
     expect(apply).toContain("destinationElements: currentContext.destinationElements");
     expect(apply).toContain("const composite = {");
@@ -294,7 +310,8 @@ describe("StudioPage page-composite filter integration boundary", () => {
 
   it("invalidates cancel and stale sessions without committing a virtual preview", () => {
     const close = nestedFunction("closeStudioFilterDialog").getText(pageFile);
-    const apply = jsxCallback("StudioFilterDialog", "onApply").getText(pageFile);
+    const applyCallback = jsxCallback("StudioFilterDialog", "onApply");
+    const apply = applyCallback.expression.getText(applyCallback.sourceFile);
     const staleSessionEffect = sourceBetween(
       "useEffect(() => {\n    if (!studioFilterSession) return;",
       "const selectedWorkAssetDestructiveEditReason =",

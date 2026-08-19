@@ -1,5 +1,5 @@
-import { calculateStudioCrc32 } from "./studio-crc32";
-import { sha256HexPortable } from "./studio-sha256";
+import { calculateStudioCrc32 } from "../studio-crc32";
+import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_LAYER_LIFT_ARTIFACT_KIND =
   "toonspectrum.scene-layer-lift/png-artifact-pair" as const;

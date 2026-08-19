@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { bubbleTextFitsInBox, type BubbleTextMeasurer } from "./studio-bubble-text-fit";
+import { bubbleTextFitsInBox, type BubbleTextMeasurer } from "./lettering/studio-bubble-text-fit";
 import { containFitInFrame, coverFitInFrame, estimateBubbleHeight } from "./studio-fit";
 
 const frame = { x: 100, y: 200, width: 400, height: 300 };

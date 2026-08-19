@@ -1,14 +1,14 @@
-import { resolveStudioBrushRenderFamily } from "./studio-brush";
 import {
   resolveStudioBrushAliasProfile,
-} from "./studio-brush-alias-profile";
+} from "../brush/studio-brush-alias-profile";
+import { resolveStudioBrushRenderFamily } from "../studio-brush";
 import {
   planGlowBrushPasses,
   planNeonBrushPasses,
-} from "./studio-fx-brush";
+} from "../studio-fx-brush";
 
-import type { StudioBrushCursorStyle } from "./studio-app-settings";
-import type { DrawMode, Tool } from "./studio-editor-tool-model";
+import type { StudioBrushCursorStyle } from "../studio-app-settings";
+import type { DrawMode, Tool } from "../studio-editor-tool-model";
 
 export type StudioCanvasCursorClassName =
   | "cursor-crosshair"

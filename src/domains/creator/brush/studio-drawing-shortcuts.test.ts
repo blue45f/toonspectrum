@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultStudioAppSettings } from "./studio-app-settings";
+import { defaultStudioAppSettings } from "../studio-app-settings";
+
 import {
   adjustStudioBrushOpacity,
   adjustStudioBrushWidth,

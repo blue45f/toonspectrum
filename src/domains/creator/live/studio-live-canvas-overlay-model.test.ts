@@ -9,7 +9,8 @@ import {
   type StudioCommentActor,
   type StudioCommentAnchor,
   type StudioCommentsDocument,
-} from "./studio-comments";
+} from "../studio-comments";
+
 import {
   planStudioCommentPinPreviewPosition,
   projectStudioCanvasCommentPins,

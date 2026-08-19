@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
-} from "./studio-ai-provenance";
-import { createStudioBg3dMeshoptCompressedTriangleGlbFixture } from "./studio-bg3d-meshopt.test-fixture";
+} from "./ai/studio-ai-provenance";
+import { createStudioBg3dMeshoptCompressedTriangleGlbFixture } from "./bg3d/studio-bg3d-meshopt.test-fixture";
 import {
   STUDIO_BG3D_GLB_MIME,
   createDefaultStudioBg3dSceneDocument,
-} from "./studio-bg3d-scene-document";
+} from "./bg3d/studio-bg3d-scene-document";
 import {
   buildStudioPackageArchiveBlob,
 } from "./studio-package-archive";
@@ -24,16 +24,14 @@ import {
   type StudioProjectArchiveAttachmentInput,
   type StudioProjectArchiveManifest,
 } from "./studio-project-archive";
-import { migrateStudioShared3dStageCollectionDocument } from
-  "./studio-shared-3d-stage-collection";
-import { createNativePluralShared3dStageFixture } from
-  "./studio-shared-3d-stage-test-fixture";
-import { buildVrmPoseDataUrlMetadata } from "./studio-vrm-poser-utils";
+import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
+import { createNativePluralShared3dStageFixture } from "./studio-shared-3d-stage-test-fixture";
+import { buildVrmPoseDataUrlMetadata } from "./vrm/studio-vrm-poser-utils";
 import {
   STUDIO_VRM_SCENE_DOCUMENT_VERSION,
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
-} from "./studio-vrm-scene-document";
+} from "./vrm/studio-vrm-scene-document";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
