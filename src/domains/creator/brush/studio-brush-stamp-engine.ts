@@ -297,6 +297,10 @@ export interface StudioStampBrushStyle {
    * 계획이 이 배선 이전과 비트 단위로 동일하다(기존 브러시 byte-identity 계약).
    */
   readonly mypaintCc0Dynamics?: StudioCc0MypaintDabDynamicsStyle;
+  /** Brush tip texture rotation mode. */
+  readonly tipRotation?: "fixed" | "stroke-direction" | "random-jitter";
+  /** Maximum jitter in radians for random-jitter mode. */
+  readonly tipRotationJitter?: number;
 }
 
 /** dab 지름 대비 스탬프 간격 비율 — 종류별 질감을 만드는 1차 변수. */
@@ -654,6 +658,8 @@ export interface StudioStampBrushDab {
   readonly radiusY?: number;
   /** 장축 방향(라디안). `radiusY` 와 함께만 존재한다. */
   readonly angleRadians?: number;
+  /** Brush tip texture rotation */
+  readonly tipRotationRadians?: number;
 }
 
 export function beginStampWalker(x: number, y: number, pressure: number): StudioStampWalkerState {
@@ -749,11 +755,18 @@ function stampDotPlan(
         angleRadians: (cc0Dynamics.ellipticalAngleDegrees ?? 0) * Math.PI / 180,
       }
     : null;
+    
+  let tipRotationRadians: number | undefined;
+  if (style.tipRotation === "random-jitter") {
+    tipRotationRadians = (stampJitter(index, 101) - 0.5) * (style.tipRotationJitter ?? 0);
+  }
+  
   return {
     x: dabX,
     y: dabY,
     radius,
     ...(chisel ?? {}),
+    ...(tipRotationRadians !== undefined ? { tipRotationRadians } : {}),
     // 종이 프로그램을 핀한 레인만 W7 peak-catch 침착을 곱한다(planner 레벨 — Canvas·SVG 공유).
     alpha: style.paperGrain
       ? clamp01(
@@ -867,7 +880,8 @@ function drawDab(
   y: number,
   radius: number,
   alpha: number,
-  index: number
+  index: number,
+  tipRotationRadians?: number
 ): void {
   // 납작 촉은 dab 종류마다 따로 구현하지 않고 한 번의 변환으로 처리한다: 원점으로 옮겨 장축 방향으로
   // 회전한 뒤 단축을 눌러 그리면 pencil·gradient 등 아래의 모든 분기가 그대로 타원이 된다. ratio 와
@@ -879,11 +893,11 @@ function drawDab(
     context.translate(x, y);
     context.rotate(angle);
     context.scale(1, 1 / chiselRatio);
-    drawRoundDab(context, style, 0, 0, radius, alpha, index);
+    drawRoundDab(context, style, 0, 0, radius, alpha, index, tipRotationRadians);
     context.restore();
     return;
   }
-  drawRoundDab(context, style, x, y, radius, alpha, index);
+  drawRoundDab(context, style, x, y, radius, alpha, index, tipRotationRadians);
 }
 
 function drawRoundDab(
@@ -893,7 +907,8 @@ function drawRoundDab(
   y: number,
   radius: number,
   alpha: number,
-  index: number
+  index: number,
+  tipRotationRadians?: number
 ): void {
   const kind = style.kind;
   const hardness = clamp01(style.hardness);
@@ -950,7 +965,15 @@ function drawRoundDab(
       else if (kind === "charcoal") dabAlpha = alpha * 0.9;
       else if (kind === "pastel") dabAlpha = alpha * 0.9;
       context.globalAlpha = dabAlpha;
-      context.drawImage(cachedTip, x - cachedTip.width / 2, y - cachedTip.height / 2);
+      if (tipRotationRadians && typeof context.translate === "function") {
+        context.save();
+        context.translate(x, y);
+        context.rotate(tipRotationRadians);
+        context.drawImage(cachedTip, -cachedTip.width / 2, -cachedTip.height / 2);
+        context.restore();
+      } else {
+        context.drawImage(cachedTip, x - cachedTip.width / 2, y - cachedTip.height / 2);
+      }
       // Spray grit is baked into the OSS tip raster (Klecks multi-octave coverage).
       // Extra micro-arcs would break plan/render dab-count parity contracts.
       return;
@@ -1058,6 +1081,12 @@ function walkStampSegmentPlan(
   const distance = Math.hypot(dx, dy);
   if (!Number.isFinite(distance) || distance <= 0) return;
   const normalizedSpeed = style.kind === "ink" ? distance / Math.max(1, style.size) : 0;
+  
+  const isStrokeDirection = style.tipRotation === "stroke-direction";
+  const isRandomJitter = style.tipRotation === "random-jitter";
+  const strokeAngle = isStrokeDirection ? Math.atan2(dy, dx) : 0;
+  const tipRotationJitter = style.tipRotationJitter ?? 0;
+
   // Per-DAB, not per-segment: the deposit follows the interpolated pressure `p` below, so this can
   // no longer be hoisted out of the loop. It was hoisted, which is why a cc0 preset's recorded
   // opaque/opaque_multiply pressure curve could not reach a pixel on this path even after the
@@ -1102,6 +1131,14 @@ function walkStampSegmentPlan(
         radius *= Math.exp((stampJitter(state.stampIndex, 97) - 0.5) * cc0Dynamics.radiusJitter);
       }
     }
+    
+    let tipRotationRadians: number | undefined;
+    if (isStrokeDirection) {
+      tipRotationRadians = strokeAngle;
+    } else if (isRandomJitter) {
+      tipRotationRadians = (stampJitter(state.stampIndex, 101) - 0.5) * tipRotationJitter;
+    }
+
     emit({
       x: px,
       y: py,
@@ -1114,6 +1151,7 @@ function walkStampSegmentPlan(
             angleRadians: (cc0Dynamics.ellipticalAngleDegrees ?? 0) * Math.PI / 180,
           }
         : {}),
+      ...(tipRotationRadians !== undefined ? { tipRotationRadians } : {}),
       // 종이 스테이션 샘플: 핀된 레인만 dab 위치의 W7 peak-catch 침착을 곱한다. 저필압은
       // 봉우리만 받아 이빨이 드러나고, 고필압은 골까지 잠겨 스케일이 1로 수렴한다.
       alpha: paperGrain

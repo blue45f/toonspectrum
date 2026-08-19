@@ -227,13 +227,17 @@ interface PreparedRequest {
   readonly source: ValidImage;
   readonly options: StudioAdvancedBlurNormalizedOptions;
   readonly work: StudioAdvancedBlurWorkReceipt;
+  /** Pre-computed spatial gaussian weight LUT for selective-gaussian-blur. */
+  spatialLut?: Float32Array;
+  /** Pre-computed range weight LUT (256 entries) for selective-gaussian-blur. */
+  rangeLut?: Float32Array;
 }
 
 interface PremultipliedSample {
-  readonly red: number;
-  readonly green: number;
-  readonly blue: number;
-  readonly alpha: number;
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
 }
 
 type Rgb = readonly [number, number, number];
@@ -646,7 +650,8 @@ function bilinearPremultipliedSample(
   source: ValidImage,
   xValue: number,
   yValue: number,
-): PremultipliedSample {
+  out: PremultipliedSample,
+): void {
   const x = clamp(xValue, 0, source.width - 1);
   const y = clamp(yValue, 0, source.height - 1);
   const x0 = Math.floor(x);
@@ -655,32 +660,49 @@ function bilinearPremultipliedSample(
   const y1 = Math.min(source.height - 1, y0 + 1);
   const tx = x - x0;
   const ty = y - y0;
-  const weights = [
-    (1 - tx) * (1 - ty),
-    tx * (1 - ty),
-    (1 - tx) * ty,
-    tx * ty,
-  ] as const;
-  const coordinates = [
-    [x0, y0],
-    [x1, y0],
-    [x0, y1],
-    [x1, y1],
-  ] as const;
+  
+  const w00 = (1 - tx) * (1 - ty);
+  const w10 = tx * (1 - ty);
+  const w01 = (1 - tx) * ty;
+  const w11 = tx * ty;
+  
   let red = 0;
   let green = 0;
   let blue = 0;
   let alpha = 0;
-  for (let index = 0; index < 4; index += 1) {
-    const [sampleX, sampleY] = coordinates[index]!;
-    const offset = (sampleY * source.width + sampleX) * 4;
-    const weightedAlpha = (source.data[offset + 3]! / 255) * weights[index]!;
-    red += source.data[offset]! * weightedAlpha;
-    green += source.data[offset + 1]! * weightedAlpha;
-    blue += source.data[offset + 2]! * weightedAlpha;
-    alpha += weightedAlpha;
-  }
-  return { red, green, blue, alpha };
+
+  let offset = (y0 * source.width + x0) * 4;
+  let weightedAlpha = (source.data[offset + 3]! / 255) * w00;
+  red += source.data[offset]! * weightedAlpha;
+  green += source.data[offset + 1]! * weightedAlpha;
+  blue += source.data[offset + 2]! * weightedAlpha;
+  alpha += weightedAlpha;
+
+  offset = (y0 * source.width + x1) * 4;
+  weightedAlpha = (source.data[offset + 3]! / 255) * w10;
+  red += source.data[offset]! * weightedAlpha;
+  green += source.data[offset + 1]! * weightedAlpha;
+  blue += source.data[offset + 2]! * weightedAlpha;
+  alpha += weightedAlpha;
+
+  offset = (y1 * source.width + x0) * 4;
+  weightedAlpha = (source.data[offset + 3]! / 255) * w01;
+  red += source.data[offset]! * weightedAlpha;
+  green += source.data[offset + 1]! * weightedAlpha;
+  blue += source.data[offset + 2]! * weightedAlpha;
+  alpha += weightedAlpha;
+
+  offset = (y1 * source.width + x1) * 4;
+  weightedAlpha = (source.data[offset + 3]! / 255) * w11;
+  red += source.data[offset]! * weightedAlpha;
+  green += source.data[offset + 1]! * weightedAlpha;
+  blue += source.data[offset + 2]! * weightedAlpha;
+  alpha += weightedAlpha;
+
+  out.red = red;
+  out.green = green;
+  out.blue = blue;
+  out.alpha = alpha;
 }
 
 function polygonApertureRadiusScale(angle: number, blades: number): number {
@@ -703,6 +725,7 @@ function apertureBlurRgb(
   let green = 0;
   let blue = 0;
   let alpha = 0;
+  const sample: PremultipliedSample = { red: 0, green: 0, blue: 0, alpha: 0 };
   for (let index = 0; index < sampleCount; index += 1) {
     const angle = index * GOLDEN_ANGLE + rotation;
     const normalizedRadius = index === 0
@@ -710,10 +733,11 @@ function apertureBlurRgb(
       : Math.sqrt((index - 0.5) / Math.max(1, sampleCount - 1));
     const apertureScale = polygonApertureRadiusScale(angle, apertureBlades);
     const sampleRadius = radius * normalizedRadius * apertureScale;
-    const sample = bilinearPremultipliedSample(
+    bilinearPremultipliedSample(
       source,
       x + Math.cos(angle) * sampleRadius,
       y + Math.sin(angle) * sampleRadius,
+      sample,
     );
     red += sample.red;
     green += sample.green;
@@ -739,13 +763,15 @@ function lineBlurRgb(
   let green = 0;
   let blue = 0;
   let alpha = 0;
+  const sample: PremultipliedSample = { red: 0, green: 0, blue: 0, alpha: 0 };
   for (let index = 0; index < sampleCount; index += 1) {
     const position = sampleCount === 1 ? 0 : index / (sampleCount - 1) * 2 - 1;
     const gaussianWeight = Math.exp(-0.5 * (position * 2.35) ** 2);
-    const sample = bilinearPremultipliedSample(
+    bilinearPremultipliedSample(
       source,
       x + perpendicularX * position * radius,
       y + perpendicularY * position * radius,
+      sample,
     );
     red += sample.red * gaussianWeight;
     green += sample.green * gaussianWeight;
@@ -769,37 +795,33 @@ function selectiveGaussianRgb(
     StudioAdvancedBlurNormalizedOptions,
     { readonly kernel: "selective-gaussian-blur" }
   >,
+  spatialLut: Float32Array,
+  rangeLut: Float32Array,
 ): Rgb {
   const center = sourceRgb(source, x, y);
   const centerLuma = luma(center[0], center[1], center[2]);
-  const spatialDenominator = 2 * options.spatialSigma * options.spatialSigma;
-  const rangeSigma = Math.max(0.5, options.edgeThreshold * options.edgeSoftness);
+  const centerLumaInt = Math.round(centerLuma);
+  const radius = options.radius;
+  const diameter = radius * 2 + 1;
   let red = 0;
   let green = 0;
   let blue = 0;
   let totalWeight = 0;
 
-  for (let offsetY = -options.radius; offsetY <= options.radius; offsetY += 1) {
+  for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
     const sampleY = clamp(y + offsetY, 0, source.height - 1);
-    for (let offsetX = -options.radius; offsetX <= options.radius; offsetX += 1) {
+    const spatialRow = (offsetY + radius) * diameter;
+    for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
       const sampleX = clamp(x + offsetX, 0, source.width - 1);
       const offset = (sampleY * source.width + sampleX) * 4;
       const sampleRed = source.data[offset]!;
       const sampleGreen = source.data[offset + 1]!;
       const sampleBlue = source.data[offset + 2]!;
       const alphaWeight = source.data[offset + 3]! / 255;
-      const spatialDistanceSquared = offsetX * offsetX + offsetY * offsetY;
-      const spatialWeight = Math.exp(-spatialDistanceSquared / spatialDenominator);
-      const difference = Math.abs(luma(sampleRed, sampleGreen, sampleBlue) - centerLuma);
-      let rangeWeight = 1;
-      if (difference > options.edgeThreshold) {
-        if (options.edgeSoftness === 0) {
-          rangeWeight = 0;
-        } else {
-          const excess = difference - options.edgeThreshold;
-          rangeWeight = Math.exp(-0.5 * (excess / rangeSigma) ** 2);
-        }
-      }
+      const spatialWeight = spatialLut[spatialRow + offsetX + radius]!;
+      const sampleLumaInt = Math.round(luma(sampleRed, sampleGreen, sampleBlue));
+      const difference = Math.abs(sampleLumaInt - centerLumaInt);
+      const rangeWeight = rangeLut[Math.min(difference, 255)]!;
       const weight = spatialWeight * rangeWeight * alphaWeight;
       red += sampleRed * weight;
       green += sampleGreen * weight;
@@ -869,7 +891,7 @@ function filteredRgb(prepared: PreparedRequest, x: number, y: number): Rgb {
       perpendicularY,
     );
   }
-  return selectiveGaussianRgb(source, x, y, options);
+  return selectiveGaussianRgb(source, x, y, options, prepared.spatialLut!, prepared.rangeLut!);
 }
 
 function fnv1aBytes(data: Uint8ClampedArray, seed = 0x811c9dc5): number {
@@ -980,6 +1002,36 @@ export function applyStudioAdvancedBlurFilter(
   let minimumY = prepared.source.height;
   let maximumX = -1;
   let maximumY = -1;
+
+  // Pre-compute LUTs for selective-gaussian-blur to eliminate per-pixel Math.exp calls.
+  // Spatial LUT: (2R+1)×(2R+1) entries, computed once. Range LUT: 256 integer luma differences.
+  if (prepared.options.kernel === "selective-gaussian-blur") {
+    const opts = prepared.options;
+    const radius = opts.radius;
+    const diameter = radius * 2 + 1;
+    const spatialDenominator = 2 * opts.spatialSigma * opts.spatialSigma;
+    const spatialLut = new Float32Array(diameter * diameter);
+    for (let oy = -radius; oy <= radius; oy += 1) {
+      for (let ox = -radius; ox <= radius; ox += 1) {
+        spatialLut[(oy + radius) * diameter + ox + radius] =
+          Math.exp(-(ox * ox + oy * oy) / spatialDenominator);
+      }
+    }
+    const rangeSigma = Math.max(0.5, opts.edgeThreshold * opts.edgeSoftness);
+    const rangeLut = new Float32Array(256);
+    for (let d = 0; d < 256; d += 1) {
+      if (d <= opts.edgeThreshold) {
+        rangeLut[d] = 1;
+      } else if (opts.edgeSoftness === 0) {
+        rangeLut[d] = 0;
+      } else {
+        const excess = d - opts.edgeThreshold;
+        rangeLut[d] = Math.exp(-0.5 * (excess / rangeSigma) ** 2);
+      }
+    }
+    prepared.spatialLut = spatialLut;
+    prepared.rangeLut = rangeLut;
+  }
 
   for (let y = 0; y < prepared.source.height; y += 1) {
     for (let x = 0; x < prepared.source.width; x += 1) {
