@@ -3576,7 +3576,7 @@ export function normalizeStudioBrushDynamicsSample(
   const speed = clamp(finiteNumber(sample?.speed, 0), 0, MAX_POINTER_SPEED);
   const tiltX = clamp(finiteNumber(sample?.tiltX, 0), -90, 90);
   const tiltY = clamp(finiteNumber(sample?.tiltY, 0), -90, 90);
-  const tiltMagnitude = clamp01(Math.hypot(tiltX, tiltY) / 90);
+  const tiltMagnitude = clamp01(Math.sqrt(tiltX * tiltX + tiltY * tiltY) / 90);
   const hasTilt = tiltMagnitude > Number.EPSILON;
   const rawDirection = finiteNumber(sample?.direction, Number.NaN);
   const hasDirection = Number.isFinite(rawDirection);
@@ -3779,20 +3779,25 @@ function sanitizeStrokePoints(value: unknown): SanitizedStrokePoint[] {
   if (!Array.isArray(value)) return [];
   const sourcePairCount = Math.floor(value.length / 2);
   const points: SanitizedStrokePoint[] = [];
+  const epsilonSq = POINT_EPSILON * POINT_EPSILON;
   for (let pairIndex = 0; pairIndex < sourcePairCount; pairIndex++) {
     const x = safeCoordinate(value[pairIndex * 2]);
     const y = safeCoordinate(value[pairIndex * 2 + 1]);
     if (x === null || y === null) continue;
     const sourceProgress = sourcePairCount <= 1 ? 0 : pairIndex / (sourcePairCount - 1);
     const previous = points.at(-1);
-    if (previous && Math.hypot(x - previous.x, y - previous.y) <= POINT_EPSILON) {
-      // Keep the most recent exact endpoint and associated stylus progress for zero-length runs.
-      previous.x = x;
-      previous.y = y;
-      previous.sourceProgress = sourceProgress;
-    } else {
-      points.push({ x, y, sourceProgress });
+    if (previous) {
+      const dx = x - previous.x;
+      const dy = y - previous.y;
+      if (dx * dx + dy * dy <= epsilonSq) {
+        // Keep the most recent exact endpoint and associated stylus progress for zero-length runs.
+        previous.x = x;
+        previous.y = y;
+        previous.sourceProgress = sourceProgress;
+        continue;
+      }
     }
+    points.push({ x, y, sourceProgress });
   }
   return points;
 }
@@ -3802,7 +3807,9 @@ function cumulativeLengths(points: readonly SanitizedStrokePoint[]): Float64Arra
   for (let index = 1; index < points.length; index++) {
     const previous = points[index - 1]!;
     const current = points[index]!;
-    cumulative[index] = cumulative[index - 1]! + Math.hypot(current.x - previous.x, current.y - previous.y);
+    const dx = current.x - previous.x;
+    const dy = current.y - previous.y;
+    cumulative[index] = cumulative[index - 1]! + Math.sqrt(dx * dx + dy * dy);
   }
   return cumulative;
 }

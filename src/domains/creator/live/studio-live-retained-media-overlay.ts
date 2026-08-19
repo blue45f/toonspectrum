@@ -15,9 +15,10 @@ import { planStudioCalligraphyRibbon } from "../brush/studio-calligraphy-ribbon"
 import { studioFluidPaintStationSpacingRatio } from "../brush/studio-fluid-paint-reference";
 import { studioLiveVisibleTapDocumentRadius } from "../brush/studio-live-visible-tap";
 import {
-  paintStudioOilRibbonCarrierOverlay,
+  paintStudioOilRibbonCarrier,
   planStudioOilRibbonCarrier,
   studioOilRibbonProgramsForBrush,
+  type StudioOilRibbonPaintContext,
 } from "../brush/studio-oil-ribbon-carrier";
 import { applyStudioOilWetIntoWetStroke } from "../brush/studio-oil-wet-into-wet";
 import { parseStudioGpuColor } from "../render/studio-webgpu-color";
@@ -60,7 +61,6 @@ import { paintStudioLiveRetainedRoundStroke } from "./studio-live-retained-strok
 
 import type { DrawEl } from "../studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
-import type { StudioOilRibbonPaintContext } from "../brush/studio-oil-ribbon-carrier";
 
 export type StudioLiveRetainedMediaKind =
   | "oil"
@@ -256,8 +256,25 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   }
 
   end(element: DrawEl): { readonly status: "settled" | "fallback" } {
-    const appended = this.appendFrom(element);
-    if (appended.status === "fallback" || !this.active) return { status: "fallback" };
+    if (!this.active || !this.isNativeSurfaceReady) return { status: "fallback" };
+    this.active.element = element;
+    if (this.active.kind === "highlighter") {
+      this.clearCanvas(this.activeContext, this.activeCanvas);
+      const fullActive: ActiveRetainedStroke = {
+        id: element.id,
+        kind: this.active.kind,
+        element,
+        paintedDabs: 0,
+        paintedPencilMarks: 0,
+        paintedSourceSegments: 0,
+      };
+      if (!this.paintSuffix(fullActive, element, this.activeContext)) {
+        return { status: "fallback" };
+      }
+    } else {
+      const appended = this.appendFrom(element);
+      if (appended.status === "fallback") return { status: "fallback" };
+    }
     if (!this.activePaintedOntoSettled && !this.flattenActiveToSettled()) {
       return { status: "fallback" };
     }
@@ -342,37 +359,43 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
       });
       if (dabs.length === 0) return true;
-      const start = Math.max(0, active.paintedDabs === 0 ? 0 : active.paintedDabs - 1);
-      const suffix = dabs.slice(start);
+      const newDabs = dabs.slice(active.paintedDabs);
+      const radiusPx = Math.max(
+        1,
+        dabs.reduce((sum, dab) => sum + dab.radiusY, 0) / Math.max(1, dabs.length),
+      );
+      if (newDabs.length > 0 && target === this.activeContext) {
+        this.wetMixPoints(
+          context,
+          newDabs.map((dab) => ({ x: dab.x, y: dab.y })),
+          radiusPx,
+          element.stroke,
+        );
+      }
+      if (target === this.activeContext) {
+        this.clearCanvas(this.activeContext, this.activeCanvas);
+      }
       const carrier = planStudioOilRibbonCarrier(
-        suffix,
+        dabs,
         studioOilRibbonProgramsForBrush(
           brush,
           fxBrushSeedFromKey(element.id),
           element.brushEnginePrograms?.oil,
         ),
       );
-      const newDabs = dabs.slice(active.paintedDabs);
-      const radiusPx = Math.max(
-        1,
-        suffix.reduce((sum, dab) => sum + dab.radiusY, 0) / Math.max(1, suffix.length),
-      );
-      const wet = this.wetMixPoints(
-        context,
-        newDabs.map((dab) => ({ x: dab.x, y: dab.y })),
-        radiusPx,
-        element.stroke,
-      );
-      paintStudioOilRibbonCarrierOverlay(
+      paintStudioOilRibbonCarrier(
         context as unknown as StudioOilRibbonPaintContext,
         {
           carrier,
           stroke: element.stroke,
           opacity: element.opacity ?? 1,
+          points: dabs.map((dab) => ({ x: dab.x, y: dab.y })),
+          radiusPx,
+          skipDestinationReadback: true,
         },
-        wet,
       );
       active.paintedDabs = dabs.length;
+      if (target === this.settledContext) this.settledHasPixels = true;
       return true;
     } finally {
       context.restore();
@@ -561,7 +584,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     element: DrawEl,
     target: CanvasRenderingContext2D | null,
   ): boolean {
-    const ontoSettled = this.settledHasPixels;
+    const ontoSettled = this.settledHasPixels && target === this.settledContext;
     const context = this.prepared(ontoSettled ? this.settledContext : target);
     if (!context) return false;
     try {
@@ -570,11 +593,13 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       const brush = element.brush ?? "highlighter";
       const width = studioBrushAliasEffectiveDiameter(brush, Math.max(1, element.strokeWidth));
       const brushId = resolveStudioHighlighterWashBrushId(brush);
+      if (target === this.activeContext) {
+        this.clearCanvas(this.activeContext, this.activeCanvas);
+      }
       const composite = ontoSettled ? "multiply" : "source-over";
       context.globalCompositeOperation = composite;
       context.fillStyle = element.stroke;
       if (pairs.length === 1) {
-        if (active.paintedSourceSegments > 0 || active.paintedPencilMarks > 0) return true;
         const tap = planStudioHighlighterWashTap({
           brushId,
           x: pairs[0]!.x,
@@ -591,11 +616,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         this.markSettledPaint(ontoSettled, context);
         return true;
       }
-      const start = active.paintedSourceSegments === 0
-        ? 0
-        : Math.max(0, active.paintedSourceSegments - 1);
-      const suffixPairs = pairs.slice(start);
-      const renderPath = resolveStudioFreehandRenderPath(flatPairs(suffixPairs), {
+      const renderPath = resolveStudioFreehandRenderPath(flatPairs(pairs), {
         sampleSpacing: element.sampleSpacing,
         acceptedTension: 0.35,
         legacyMinDistance: strokeRenderDistance(element.sampleSpacing),
@@ -604,7 +625,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       const pressurePath = planStudioFxBrushPressurePath({
         brushId: isStudioFxPressureBrushId(brush) ? brush : "highlighter",
         points: renderPath.points,
-        pressures: element.pressures?.slice(start),
+        pressures: element.pressures,
         pressureModel: element.materialPressureModel,
         minimumDiameterRatio: element.materialMinimumDiameterRatio,
         tension: renderPath.tension,
@@ -755,10 +776,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         }),
         {
           radiusPx,
-          hardness: 0.55,
-          strength: 0.88,
-          wetness: 0.65,
-          pickup: 0.55,
+          hardness: 0.68,
+          strength: 0.82,
+          wetness: 0.62,
+          pickup: 0.48,
+          loadDepletion: 0,
           paintColor: strokePaintColor(stroke),
         },
       );
@@ -776,7 +798,9 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     try {
       context.save();
       context.setTransform(1, 0, 0, 1, 0, 0);
-      context.globalCompositeOperation = "source-over";
+      context.globalCompositeOperation = this.active?.kind === "highlighter" && this.settledHasPixels
+        ? "multiply"
+        : "source-over";
       context.globalAlpha = 1;
       context.drawImage(canvas, 0, 0);
       context.restore();

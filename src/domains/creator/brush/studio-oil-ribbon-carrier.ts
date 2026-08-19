@@ -285,16 +285,18 @@ function normalizedDabs(dabs: readonly FxOilDab[]): readonly FxOilDab[] {
 }
 
 function weightedMovingAverage(
-  values: readonly number[],
+  values: ArrayLike<number>,
   index: number,
   radius: number,
 ): number {
   let weighted = 0;
   let totalWeight = 0;
-  for (let offset = -radius; offset <= radius; offset += 1) {
-    const sample = values[index + offset];
-    if (sample === undefined) continue;
-    const weight = radius + 1 - Math.abs(offset);
+  const len = values.length;
+  const start = Math.max(0, index - radius);
+  const end = Math.min(len - 1, index + radius);
+  for (let pos = start; pos <= end; pos += 1) {
+    const sample = values[pos]!;
+    const weight = radius + 1 - Math.abs(pos - index);
     weighted += sample * weight;
     totalWeight += weight;
   }
@@ -302,24 +304,37 @@ function weightedMovingAverage(
 }
 
 function smoothGeometry(dabs: readonly FxOilDab[]): readonly SmoothedOilCarrierGeometry[] {
-  const xs = dabs.map(({ x }) => x);
-  const ys = dabs.map(({ y }) => y);
-  const radiusXs = dabs.map(({ radiusX }) => radiusX);
-  const radiusYs = dabs.map(({ radiusY }) => radiusY);
-  return Object.freeze(dabs.map((dab, index) => Object.freeze({
-    // Normal-offset jitter belonged to the old overlapping-dab texture. Smooth it out of the
-    // silhouette; the five explicit bristle lanes now own all high-frequency material detail.
-    x: index === 0 || index === dabs.length - 1
-      ? dab.x
-      : weightedMovingAverage(xs, index, 3),
-    y: index === 0 || index === dabs.length - 1
-      ? dab.y
-      : weightedMovingAverage(ys, index, 3),
-    radiusX: weightedMovingAverage(radiusXs, index, 4),
-    // Radius jitter is intentionally filtered more strongly than the centreline. Without this
-    // separation a one-pixel sawtooth appears on both edges of an otherwise continuous ribbon.
-    radiusY: weightedMovingAverage(radiusYs, index, 6),
-  })));
+  const len = dabs.length;
+  const xs = new Float64Array(len);
+  const ys = new Float64Array(len);
+  const radiusXs = new Float64Array(len);
+  const radiusYs = new Float64Array(len);
+  for (let i = 0; i < len; i += 1) {
+    const dab = dabs[i]!;
+    xs[i] = dab.x;
+    ys[i] = dab.y;
+    radiusXs[i] = dab.radiusX;
+    radiusYs[i] = dab.radiusY;
+  }
+  const result: SmoothedOilCarrierGeometry[] = new Array(len);
+  for (let index = 0; index < len; index += 1) {
+    const dab = dabs[index]!;
+    result[index] = Object.freeze({
+      // Normal-offset jitter belonged to the old overlapping-dab texture. Smooth it out of the
+      // silhouette; the five explicit bristle lanes now own all high-frequency material detail.
+      x: index === 0 || index === len - 1
+        ? dab.x
+        : weightedMovingAverage(xs, index, 3),
+      y: index === 0 || index === len - 1
+        ? dab.y
+        : weightedMovingAverage(ys, index, 3),
+      radiusX: weightedMovingAverage(radiusXs, index, 4),
+      // Radius jitter is intentionally filtered more strongly than the centreline. Without this
+      // separation a one-pixel sawtooth appears on both edges of an otherwise continuous ribbon.
+      radiusY: weightedMovingAverage(radiusYs, index, 6),
+    });
+  }
+  return Object.freeze(result);
 }
 
 function tangentAt(
@@ -332,11 +347,11 @@ function tangentAt(
   const after = geometry[Math.min(geometry.length - 1, index + 2)] ?? current;
   let dx = after.x - before.x;
   let dy = after.y - before.y;
-  let length = Math.hypot(dx, dy);
+  let length = Math.sqrt(dx * dx + dy * dy);
   if (length <= POINT_EPSILON) {
     dx = Math.cos(finite(fallbackAngle, 0));
     dy = Math.sin(finite(fallbackAngle, 0));
-    length = Math.max(POINT_EPSILON, Math.hypot(dx, dy));
+    length = Math.max(POINT_EPSILON, Math.sqrt(dx * dx + dy * dy));
   }
   return [dx / length, dy / length];
 }
@@ -1865,6 +1880,7 @@ function oilWetIntoWetSettings(
     wetness: 0.65,
     pickup: 0.55,
     paintColor,
+    loadDepletion: 0,
     mixModel: mixModel ?? "spectral-wgm",
   };
 }

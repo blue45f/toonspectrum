@@ -339,28 +339,43 @@ export const STUDIO_STAMP_BRUSH_DEFAULTS: Record<
   pastel: { flow: 0.48, hardness: 0.35, minSizeRatio: 0.5 },
 };
 
+const PARSED_COLOR_CACHE = new Map<string, Readonly<{ r: number; g: number; b: number }>>();
+
 function parseCssRgbColor(
   color: string,
 ): Readonly<{ r: number; g: number; b: number }> | null {
+  const cached = PARSED_COLOR_CACHE.get(color);
+  if (cached) return cached;
   const hex = /^#([\da-f]{3}|[\da-f]{6})$/iu.exec(color.trim());
+  let result: { r: number; g: number; b: number } | null = null;
   if (hex) {
     const raw = hex[1]!;
     const full = raw.length === 3
-      ? [...raw].map((c) => `${c}${c}`).join("")
+      ? `${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`
       : raw;
-    return {
+    result = {
       r: Number.parseInt(full.slice(0, 2), 16),
       g: Number.parseInt(full.slice(2, 4), 16),
       b: Number.parseInt(full.slice(4, 6), 16),
     };
+  } else {
+    const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/iu.exec(color);
+    if (rgb) {
+      result = {
+        r: Math.round(Number(rgb[1])),
+        g: Math.round(Number(rgb[2])),
+        b: Math.round(Number(rgb[3])),
+      };
+    }
   }
-  const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/iu.exec(color);
-  if (!rgb) return null;
-  return {
-    r: Math.round(Number(rgb[1])),
-    g: Math.round(Number(rgb[2])),
-    b: Math.round(Number(rgb[3])),
-  };
+  if (result) {
+    if (PARSED_COLOR_CACHE.size >= 128) {
+      const firstKey = PARSED_COLOR_CACHE.keys().next().value;
+      if (firstKey !== undefined) PARSED_COLOR_CACHE.delete(firstKey);
+    }
+    PARSED_COLOR_CACHE.set(color, result);
+  }
+  return result;
 }
 
 /** OSS 질감 팁을 굽는 스탬프 종류(잉크·mypaint·krita-auto 는 그라디언트 팁을 유지한다). */
@@ -399,7 +414,7 @@ export function studioStampOssTipCoverage(
   hardness: number,
 ): number {
   const hard = clamp01(hardness);
-  const radial = Math.hypot(normalizedX, normalizedY);
+  const radial = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
   if (kind === "airbrush") {
     return studioOssSprayTipCoverage(normalizedX, normalizedY, seed, hard);
   }
@@ -464,16 +479,17 @@ function rasterizeOssTexturedTip(
   const cy = (size - 1) / 2;
   const invR = 1 / Math.max(1e-6, radius);
   const data = image.data;
+  let offset = 0;
   for (let y = 0; y < size; y += 1) {
+    const ny = (y - cy) * invR;
     for (let x = 0; x < size; x += 1) {
       const nx = (x - cx) * invR;
-      const ny = (y - cy) * invR;
       const coverage = studioStampOssTipCoverage(kind, nx, ny, seed, hardness);
-      const offset = (y * size + x) * 4;
       data[offset] = channels.r;
       data[offset + 1] = channels.g;
       data[offset + 2] = channels.b;
-      data[offset + 3] = Math.round(clamp01(coverage) * 255);
+      data[offset + 3] = (clamp01(coverage) * 255 + 0.5) | 0;
+      offset += 4;
     }
   }
   if (typeof ctx.putImageData !== "function") return false;

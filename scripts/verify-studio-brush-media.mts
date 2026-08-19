@@ -1102,7 +1102,14 @@ async function main(): Promise<void> {
   const catalogById = new Map(
     STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((brush) => [brush.id, brush]),
   );
-  const representativeCases = STUDIO_BRUSH_MEDIA_CASES.map((policy) => {
+  const filterIds = process.env.TOONSPECTRUM_BRUSH_VERIFY_IDS
+    ?.split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const filteredCases = filterIds && filterIds.length > 0
+    ? STUDIO_BRUSH_MEDIA_CASES.filter((policy) => filterIds.includes(policy.id))
+    : STUDIO_BRUSH_MEDIA_CASES;
+  const representativeCases = filteredCases.map((policy) => {
     const brush = catalogById.get(policy.id);
     invariant(brush, `${policy.id}: representative medium is missing from the shipped catalogue`);
     return { policy, brush };
