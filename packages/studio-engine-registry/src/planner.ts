@@ -32,6 +32,10 @@ export interface IslandRequest {
   requiredCapabilities: Capability[];
   /** Transport available between this island's output and the primary surface. */
   availableTransports: CopyCost[];
+  /** Optional V13 provider preference (classic / hybrid / skia). */
+  preferredProviderIds?: readonly string[];
+  /** When set, the planner scores WebGPU path-heavy providers above CPU. */
+  preferAccelerator?: "webgpu" | "webgl" | "cpu";
 }
 
 export interface SurfacePlanRequest {
@@ -65,6 +69,40 @@ export class PlanUnsatisfiableError extends Error {
     super(message);
     this.name = "PlanUnsatisfiableError";
   }
+}
+
+function acceleratorRank(runtime: string): number {
+  if (runtime === "webgpu") return 3;
+  if (runtime === "webgl") return 2;
+  return 1;
+}
+
+function chooseProvider(
+  candidates: readonly RegisteredProvider[],
+  island: IslandRequest,
+): RegisteredProvider | null {
+  if (candidates.length === 0) return null;
+  const preferred = island.preferredProviderIds;
+  if (preferred && preferred.length > 0) {
+    for (const id of preferred) {
+      const match = candidates.find((candidate) => candidate.descriptor.id === id);
+      if (match) return match;
+    }
+  }
+  let best = candidates[0]!;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index]!;
+    let score = acceleratorRank(candidate.descriptor.runtime) * 100 - index;
+    if (island.preferAccelerator && candidate.descriptor.runtime === island.preferAccelerator) {
+      score += 250;
+    }
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 function cheapestAllowedTransport(
@@ -101,7 +139,7 @@ export class HybridExecutionPlanner {
     const islands: PlannedIsland[] = [];
     for (const island of request.islands) {
       const candidates = this.registry.query(island.kind, island.requiredCapabilities);
-      const chosen = candidates[0] ?? null;
+      const chosen = chooseProvider(candidates, island);
       if (!chosen) {
         violations.push(
           `island ${island.islandId}: no ${island.kind} provider offers [${island.requiredCapabilities.join(", ")}]`,

@@ -1,6 +1,9 @@
 export {
+  velloClassicWgpuProviderDescriptor,
   velloCpuProviderDescriptor,
+  velloCpuReferenceProviderDescriptor,
   velloGpuBrowserProviderDescriptor,
+  velloHybridWgpuProviderDescriptor,
   velloSvgNativeProviderDescriptor,
 } from "./descriptor";
 export {

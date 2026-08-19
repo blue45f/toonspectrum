@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { applyColorBalance } from "../../../../src/domains/creator/studio-color-balance";
-import { buildCurveChannelLuts, normalizeCurve } from "../../../../src/domains/creator/studio-curves";
 import {
   STUDIO_GPU_FILTER_BINDINGS,
   STUDIO_GPU_FILTER_DISPATCH_ROW_THREADS,
@@ -9,8 +7,10 @@ import {
   packStudioGpuBrightnessContrastLut,
   packStudioGpuColorBalanceParams,
   packStudioGpuHslParams,
-} from "../../../../src/domains/creator/studio-gpu-filter-kernels";
-import { nativeHSL } from "../../../../src/domains/creator/studio-konva-native-filters";
+} from "../../../../src/domains/creator/render/studio-gpu-filter-kernels";
+import { nativeHSL } from "../../../../src/domains/creator/render/studio-konva-native-filters";
+import { applyColorBalance } from "../../../../src/domains/creator/studio-color-balance";
+import { buildCurveChannelLuts, normalizeCurve } from "../../../../src/domains/creator/studio-curves";
 import { buildChannelLevelsLuts } from "../../../../src/domains/creator/studio-levels";
 import { EffectCompileError } from "../effect-compiler";
 import {

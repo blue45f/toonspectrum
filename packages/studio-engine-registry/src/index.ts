@@ -1,4 +1,7 @@
 export * from "./descriptor";
+export * from "./feature-contract";
+export * from "./workload-fingerprint";
+export * from "./island-compiler";
 export * from "./registry";
 export * from "./planner";
 export * from "./manifest";

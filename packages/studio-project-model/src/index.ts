@@ -2,6 +2,8 @@ export * from "./ir/color";
 export * from "./ir/path";
 export * from "./ir/path-transform";
 export * from "./ir/scene";
+export * from "./ir/render-scene";
+export * from "./ir/frame-graph";
 export * from "./ir/scene-features";
 export * from "./ir/scene-sharding";
 export * from "./ir/stroke";

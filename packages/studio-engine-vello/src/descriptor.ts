@@ -56,13 +56,15 @@ export const velloGpuBrowserProviderDescriptor: ProviderDescriptor =
       "render.gpu.webgpu",
       "render.lottie.frame",
       "render.text.vertical",
+      "render.text.simple",
       "surface.island.selection-overlay",
+      "surface.island.document-vector",
     ],
     limitations: [
       "requires navigator.gpu — load/probe surface explicit errors when WebGPU is absent (no silent downgrade)",
       "bounded single-style vertical glyph-path shaping uses HarfRust TTB vert/vrt2 plus Skrifa (including tate-chu-yoko); rich paragraph editing still routes to Parley/CanvasKit",
-      "readback (render-to-pixels) is an evidence/parity surface; the product selection island presents the adopted fabric texture on-GPU",
-      "product authority is limited to the bounded selection-overlay island; Konva retains document and input authority",
+      "readback (render-to-pixels) is an evidence/parity surface; the product document/selection islands present the adopted fabric texture on-GPU",
+      "product path-heavy document islands are Vello Classic; FrameGraphCompositor owns the swapchain, not this provider",
       "tolerance determinism only — parity vs vello_cpu gated by the δ48 fuzzy metric, not bit-equality",
       "lottie lane covers the velato 0.11 subset — text/image layers, split transforms and Add/HardMix blends reject with explicit lottie-* errors (no silent frame drop)",
     ],
@@ -141,11 +143,12 @@ export const velloCpuProviderDescriptor: ProviderDescriptor =
       "render.text.vertical",
       "export.deterministic",
       "surface.island.selection-overlay",
+      "surface.island.document-vector",
     ],
     limitations: [
       "bounded single-style vertical glyph-path shaping uses HarfRust TTB vert/vrt2 plus Skrifa (including tate-chu-yoko); rich paragraph editing still routes to Parley/CanvasKit",
       "single-threaded baseline SIMD level pinned for bit-stable golden images",
-      "product surface ownership is limited to CPU fallback/reference for the bounded selection-overlay island",
+      "V13 quality reference / GPU-loss recovery only — not the visible first frame when WebGPU is available",
     ],
     previewQuality: "production",
     finalQuality: "reference",
@@ -156,3 +159,57 @@ export const velloCpuProviderDescriptor: ProviderDescriptor =
       "upstream vello repository declares alpha status; adapter pins vello_cpu 0.2.0",
     ],
   });
+
+/** Alias used by V13 planner keys — same artifact as `vello-gpu-browser`. */
+export const velloClassicWgpuProviderDescriptor: ProviderDescriptor = {
+  ...velloGpuBrowserProviderDescriptor,
+  id: "vello-classic-wgpu",
+  displayName: "Vello Classic GPU (path-heavy)",
+};
+
+/**
+ * FrameGraph Hybrid compositor provider. Uses the Classic WebGPU renderer for
+ * vector subsets and binds external textures in the same fabric device.
+ * This is not the upstream vello_hybrid sparse-strip GPU API.
+ */
+export const velloHybridWgpuProviderDescriptor: ProviderDescriptor =
+  providerDescriptorSchema.parse({
+    id: "vello-hybrid-wgpu",
+    kind: "vector-renderer",
+    displayName: "Vello Hybrid compositor (WebGPU)",
+    version: "vello 0.9.0 / frame-graph hybrid / crate 0.1.0",
+    license: "MIT / Apache-2.0",
+    attribution: "Linebender Vello project + ToonSpectrum FrameGraph",
+    maturity: "conditional",
+    runtime: "webgpu",
+    capabilities: [
+      "render.vector.fill",
+      "render.vector.stroke",
+      "render.vector.gradient",
+      "render.vector.gradient.sweep",
+      "render.group.opacity",
+      "render.group.clip",
+      "render.gpu.webgpu",
+      "render.text.simple",
+      "render.image",
+      "render.external-texture",
+      "surface.island.document-vector",
+    ],
+    limitations: [
+      "Hybrid here is compositor + Classic path islands + external texture binding",
+      "upstream vello_hybrid 0.2 sparse GPU remains a separate unavailable candidate",
+      "paragraph, complex mask, ImageFilter and backdrop blends route to Skia islands",
+    ],
+    previewQuality: "production",
+    finalQuality: "preview",
+    determinism: "tolerance",
+    memoryEstimateMb: 80,
+    fallbackProviderId: "vello-gpu-browser",
+    knownIssues: [],
+  });
+
+export const velloCpuReferenceProviderDescriptor: ProviderDescriptor = {
+  ...velloCpuProviderDescriptor,
+  id: "vello-cpu-reference",
+  displayName: "Vello CPU reference",
+};

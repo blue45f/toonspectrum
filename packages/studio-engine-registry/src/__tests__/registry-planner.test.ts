@@ -172,6 +172,41 @@ describe("HybridExecutionPlanner", () => {
     expect(lineart?.transport).toBe("image-bitmap");
   });
 
+  it("prefers a WebGPU vector provider over a CPU one when both can stroke", () => {
+    const registry = EngineCapabilityRegistry.forTestFixtures();
+    registry.registerTestFixture(
+      descriptor({
+        id: "canvaskit",
+        runtime: "wasm",
+        capabilities: ["render.vector.stroke", "surface.primary"],
+      }),
+    );
+    registry.registerTestFixture(
+      descriptor({
+        id: "vello-gpu-browser",
+        runtime: "webgpu",
+        capabilities: ["render.vector.stroke"],
+      }),
+    );
+    const planner = new HybridExecutionPlanner(registry);
+    const plan = planner.plan({
+      surfaceId: "main",
+      mode: "interactive",
+      primaryCandidates: ["canvaskit"],
+      islands: [
+        {
+          islandId: "lineart",
+          kind: "vector-renderer",
+          requiredCapabilities: ["render.vector.stroke"],
+          availableTransports: ["same-gpu-texture", "image-bitmap"],
+          preferAccelerator: "webgpu",
+        },
+      ],
+    });
+    expect(plan.islands[0]?.providerId).toBe("vello-gpu-browser");
+    expect(plan.islands[0]?.transport).toBe("same-gpu-texture");
+  });
+
   it("forbids cpu-readback transports on the interactive hot path (rule 8)", () => {
     const planner = new HybridExecutionPlanner(registryWithRenderers());
     const request = {
