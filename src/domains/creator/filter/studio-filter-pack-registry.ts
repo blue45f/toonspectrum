@@ -35,6 +35,7 @@ export const STUDIO_FILTER_UNION_WAVE_KINDS = [
   "photocopy",
   "normal-map",
   "god-rays",
+  "polar-coordinates",
 ] as const;
 
 export type StudioFilterUnionWaveKind = (typeof STUDIO_FILTER_UNION_WAVE_KINDS)[number];
@@ -122,6 +123,7 @@ export const STUDIO_FILTER_PACK_LABELS: Readonly<Record<StudioFilterPackKind, st
   photocopy: "고대비 포토카피",
   "normal-map": "노멀 맵 변환",
   "god-rays": "볼류메트릭 광선",
+  "polar-coordinates": "극좌표 변환",
 };
 
 /** The five hand-rolled filters that predate the pack; each still owns a bespoke draft shape. */

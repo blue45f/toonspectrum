@@ -157,6 +157,7 @@ const CORE_DISCRETE_BRUSH_IDS: ReadonlySet<string> = new Set([
   "crosshatch",
   "sketchpad-tile",
   "web-multi-agent",
+  "web-rough-ink",
   "web-gravity-drip",
   "web-scatter-stamp",
   "web-dot-tone",
@@ -164,6 +165,8 @@ const CORE_DISCRETE_BRUSH_IDS: ReadonlySet<string> = new Set([
   "web-fur-strand",
   "web-radial-burst",
   "web-spiro-orbit",
+  "web-zigzag-edge",
+  "web-cross-hatch-pen",
   // The product promise is a repeated dash/stitch motif, not an unbroken pen carrier.
   "web-dash-stitch",
 ]);

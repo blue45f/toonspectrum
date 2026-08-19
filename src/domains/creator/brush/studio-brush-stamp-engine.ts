@@ -301,6 +301,14 @@ export interface StudioStampBrushStyle {
   readonly tipRotation?: "fixed" | "stroke-direction" | "random-jitter";
   /** Maximum jitter in radians for random-jitter mode. */
   readonly tipRotationJitter?: number;
+  readonly inkDepletion?: {
+    /** Initial ink charge, 0-1. Default 1 (fully loaded). */
+    initialCharge: number;
+    /** Rate of ink drain per unit arc-length spacing. 0 = no depletion. */
+    drainRate: number;
+    /** Minimum opacity multiplier when ink is depleted. 0-1. */
+    minimumFlow: number;
+  };
 }
 
 /** dab 지름 대비 스탬프 간격 비율 — 종류별 질감을 만드는 1차 변수. */
@@ -727,8 +735,14 @@ function stampDotPlan(
   index: number
 ): StudioStampBrushDab {
   const safePressure = normalizedPressure(pressure);
+  const spacing = Math.max(0.5, pressureRadius(style, safePressure) * 2 * (style.spacingRatio ?? STAMP_SPACING_RATIO[style.kind]));
+  let currentCharge = 1;
+  if (style.inkDepletion) {
+    const { initialCharge, drainRate, minimumFlow } = style.inkDepletion;
+    currentCharge = Math.max(minimumFlow, initialCharge - index * spacing * drainRate);
+  }
   const baseAlpha = stampFlowAlpha(style, stampFlowPressureScale(style, safePressure))
-    * clamp01(style.opacity);
+    * clamp01(style.opacity) * currentCharge;
   let dabX = x;
   let dabY = y;
   let radius = pressureRadius(style, pressure);
@@ -1139,6 +1153,14 @@ function walkStampSegmentPlan(
       tipRotationRadians = (stampJitter(state.stampIndex, 101) - 0.5) * tipRotationJitter;
     }
 
+    let currentCharge = 1;
+    if (style.inkDepletion) {
+      const { initialCharge, drainRate, minimumFlow } = style.inkDepletion;
+      const spacing = spacingOf(p);
+      currentCharge = Math.max(minimumFlow, initialCharge - state.stampIndex * spacing * drainRate);
+    }
+    const dabAlpha = alphaAt(p) * currentCharge;
+
     emit({
       x: px,
       y: py,
@@ -1155,8 +1177,8 @@ function walkStampSegmentPlan(
       // 종이 스테이션 샘플: 핀된 레인만 dab 위치의 W7 peak-catch 침착을 곱한다. 저필압은
       // 봉우리만 받아 이빨이 드러나고, 고필압은 골까지 잠겨 스케일이 1로 수렴한다.
       alpha: paperGrain
-        ? clamp01(alphaAt(p) * stampPaperDepositScale(paperGrain, px, py, p))
-        : alphaAt(p),
+        ? clamp01(dabAlpha * stampPaperDepositScale(paperGrain, px, py, p))
+        : dabAlpha,
       index: state.stampIndex,
     });
     state.stampIndex += 1;

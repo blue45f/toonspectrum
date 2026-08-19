@@ -68,9 +68,9 @@ function defaultEffect(kind: StudioFilterUnionWaveKind) {
 }
 
 describe("studio filter union wave", () => {
-  it("adds sixteen real engines with schema-driven defaults and active non-destructive patches", () => {
-    expect(STUDIO_FILTER_UNION_WAVE_KINDS).toHaveLength(16);
-    expect(new Set(STUDIO_FILTER_UNION_WAVE_KINDS).size).toBe(16);
+  it("adds seventeen real engines with schema-driven defaults and active non-destructive patches", () => {
+    expect(STUDIO_FILTER_UNION_WAVE_KINDS).toHaveLength(17);
+    expect(new Set(STUDIO_FILTER_UNION_WAVE_KINDS).size).toBe(17);
     for (const kind of STUDIO_FILTER_UNION_WAVE_KINDS) {
       const definition = STUDIO_FILTER_PACK_DEFS[kind];
       expect(definition.kind).toBe(kind);
@@ -194,6 +194,8 @@ describe("studio filter union wave", () => {
       centerX: 0,
       centerY: 100,
       angle: 180,
+      mode: "rectangular-to-polar",
+      interpolation: "bilinear",
     });
 
     const image = patternedImage();

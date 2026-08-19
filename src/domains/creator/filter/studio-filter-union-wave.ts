@@ -32,6 +32,10 @@ export type StudioFilterUnionWave = {
   centerY: number;
   /** Phase or optical rotation in degrees. */
   angle: number;
+  /** Mode for polar coordinates. */
+  mode?: "rectangular-to-polar" | "polar-to-rectangular";
+  /** Interpolation method for coordinate mapping. */
+  interpolation?: "bilinear" | "nearest";
 };
 
 export const STUDIO_FILTER_UNION_WAVE_EDGE_POLICY = "clamp-to-edge" as const;
@@ -65,6 +69,7 @@ const WORK_UNITS_BY_KIND: Readonly<Record<StudioFilterUnionWaveKind, number>> = 
   photocopy: 7,
   "normal-map": 9,
   "god-rays": 10,
+  "polar-coordinates": 2,
 };
 
 type FilterThis = { attrs?: Record<string, unknown> };
@@ -154,6 +159,8 @@ export function normalizeStudioFilterUnionWave(
       -180,
       180,
     ),
+    mode: source.mode === "polar-to-rectangular" ? "polar-to-rectangular" : "rectangular-to-polar",
+    interpolation: source.interpolation === "nearest" ? "nearest" : "bilinear",
   };
 }
 
@@ -233,6 +240,23 @@ function sampleRgbBilinear(
       source[bottomRight + channel]! * tx;
     target[targetOffset + channel] = top * (1 - ty) + bottom * ty;
   }
+}
+
+function sampleRgbNearest(
+  source: Uint8ClampedArray,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  target: Uint8ClampedArray,
+  targetOffset: number,
+): void {
+  const safeX = clamp(Math.round(x), 0, width - 1);
+  const safeY = clamp(Math.round(y), 0, height - 1);
+  const sourceOffset = (safeY * width + safeX) * 4;
+  target[targetOffset] = source[sourceOffset]!;
+  target[targetOffset + 1] = source[sourceOffset + 1]!;
+  target[targetOffset + 2] = source[sourceOffset + 2]!;
 }
 
 function applyInverseWarp(
@@ -317,11 +341,35 @@ function applyInverseWarp(
           sourceY = centerY + dy * factor;
           break;
         }
+        case "polar-coordinates": {
+          let targetX: number;
+          let targetY: number;
+          if (effect.mode === "polar-to-rectangular") {
+            const theta = (x / Math.max(1, width - 1)) * Math.PI * 2 - Math.PI / 2 + phase;
+            const r = (y / Math.max(1, height - 1)) * (minDimension / 2);
+            targetX = centerX + r * Math.cos(theta);
+            targetY = centerY + r * Math.sin(theta);
+          } else {
+            const r = Math.sqrt(dx * dx + dy * dy);
+            let theta = Math.atan2(dy, dx) - phase + Math.PI / 2;
+            while (theta < 0) theta += Math.PI * 2;
+            theta = theta % (Math.PI * 2);
+            targetX = (theta / (Math.PI * 2)) * Math.max(0, width - 1);
+            targetY = (r / (minDimension / 2)) * Math.max(0, height - 1);
+          }
+          sourceX = x + (targetX - x) * strength;
+          sourceY = y + (targetY - y) * strength;
+          break;
+        }
         default:
           return;
       }
       const offset = (y * width + x) * 4;
-      sampleRgbBilinear(source, width, height, sourceX, sourceY, data, offset);
+      if (effect.interpolation === "nearest") {
+        sampleRgbNearest(source, width, height, sourceX, sourceY, data, offset);
+      } else {
+        sampleRgbBilinear(source, width, height, sourceX, sourceY, data, offset);
+      }
     }
   }
 }
@@ -705,6 +753,7 @@ export function applyStudioFilterUnionWave(
     case "twirl":
     case "pinch-bloat":
     case "lens-distortion":
+    case "polar-coordinates":
       applyInverseWarp(image, effect);
       break;
     case "film-grain-pro":
@@ -751,6 +800,8 @@ export function studioFilterUnionWaveKonvaFilter(
     centerX: attrNumber(attrs.filterUnionCenterX),
     centerY: attrNumber(attrs.filterUnionCenterY),
     angle: attrNumber(attrs.filterUnionAngle),
+    mode: attrs.filterUnionMode,
+    interpolation: attrs.filterUnionInterpolation,
   });
   applyStudioFilterUnionWave(imageData, effect);
 }

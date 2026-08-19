@@ -1286,6 +1286,16 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
     ],
     { amount: 68, scale: 7, detail: 152, centerX: 28, centerY: 20 },
   ),
+  "polar-coordinates": unionWaveDef(
+    "polar-coordinates",
+    "극좌표 변환",
+    [
+      slider("amount", "변환 강도", 0, 100, "%"),
+      slider("centerX", "중심 X", 0, 100, "%"),
+      slider("centerY", "중심 Y", 0, 100, "%"),
+    ],
+    { amount: 100, centerX: 50, centerY: 50 },
+  ),
 };
 
 /** 상단 메뉴 등록 순서 카탈로그 — studio-main-menu-groups가 이 배열을 그대로 항목화한다. */

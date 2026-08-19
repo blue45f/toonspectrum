@@ -19,6 +19,7 @@ import {
   Camera,
   CircleDot,
   Cloudy,
+  Compass,
   Contrast,
   Copy,
   Droplet,
@@ -113,6 +114,7 @@ const STUDIO_FILTER_PACK_MENU_ICONS: Readonly<Record<StudioFilterPackKind, Lucid
   photocopy: Printer,
   "normal-map": Mountain,
   "god-rays": Sunrise,
+  "polar-coordinates": Compass,
 };
 
 /**

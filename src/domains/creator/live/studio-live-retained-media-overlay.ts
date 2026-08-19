@@ -359,6 +359,9 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
       });
       if (dabs.length === 0) return true;
+      if (active.paintedDabs === dabs.length && target === this.activeContext) {
+        return true;
+      }
       const newDabs = dabs.slice(active.paintedDabs);
       const radiusPx = Math.max(
         1,

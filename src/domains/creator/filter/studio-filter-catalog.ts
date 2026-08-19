@@ -42,7 +42,8 @@ export type StudioFilterPreviewKind =
   | "glass"
   | "edges"
   | "normal"
-  | "rays";
+  | "rays"
+  | "transform";
 
 export type StudioFilterDialogCatalogEntry = StudioFilterCatalogEntry & {
   /** Dialog kind that can be previewed and applied through StudioFilterDialog. */
@@ -617,6 +618,13 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     keywords: ["normal map", "surface", "3d", "노멀 맵", "표면", "기울기", "조명"],
   },
   {
+    engine: "polar-coordinates",
+    title: "극좌표 변환",
+    description: "직교좌표와 극좌표를 상호 변환하여 파노라마나 만화경 효과를 만듭니다.",
+    group: "transform",
+    keywords: ["polar", "coordinates", "극좌표", "파노라마"],
+  },
+  {
     engine: "god-rays",
     title: "볼류메트릭 광선",
     description: "광원 방향으로 밝은 픽셀을 제한 샘플링해 장면을 가르는 따뜻한 빛줄기를 더합니다.",
@@ -772,6 +780,7 @@ const STUDIO_FILTER_DIALOG_CATALOG_SOURCES: readonly StudioFilterDialogCatalogSo
   { kind: "photocopy", engine: "photocopy", preview: "threshold" },
   { kind: "normal-map", engine: "normal-map", preview: "normal" },
   { kind: "god-rays", engine: "god-rays", preview: "rays" },
+  { kind: "polar-coordinates", engine: "polar-coordinates", preview: "transform" },
 ];
 
 /**
@@ -846,6 +855,10 @@ export function studioFilterDialogPreviewStyle(
       return {
         background: `conic-gradient(from 90deg, ${accent} 25%, ${accentSoft} 0 50%, hsl(${hue} 28% 24%) 0 75%, hsl(${hue} 38% 82%) 0)`,
         backgroundSize: "18px 18px",
+      };
+    case "transform":
+      return {
+        background: `repeating-conic-gradient(from 0deg, ${accent} 0 10deg, transparent 10deg 20deg), radial-gradient(circle, ${ink} 0 40%, ${accentSoft} 100%)`,
       };
     case "channels":
       return {

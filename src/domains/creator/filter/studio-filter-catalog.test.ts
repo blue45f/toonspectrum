@@ -17,7 +17,7 @@ describe("studio filter catalog", () => {
   it("covers every smart-filter engine and the deterministic union wave exactly once", () => {
     const catalogIds = STUDIO_FILTER_CATALOG.map((entry) => entry.engine);
     expect(new Set(catalogIds).size).toBe(catalogIds.length);
-    expect(catalogIds.length).toBeGreaterThanOrEqual(76);
+    expect(catalogIds.length).toBeGreaterThanOrEqual(77);
     expect([...catalogIds].sort()).toEqual(
       [...STUDIO_ADJUSTMENT_ENGINE_IDS, ...STUDIO_FILTER_UNION_WAVE_KINDS].sort(),
     );
@@ -80,7 +80,7 @@ describe("studio filter catalog", () => {
 
     expect(new Set(kinds).size).toBe(kinds.length);
     expect([...kinds].sort()).toEqual([...STUDIO_FILTER_MENU_KINDS].sort());
-    expect(kinds.length).toBeGreaterThanOrEqual(44);
+    expect(kinds.length).toBeGreaterThanOrEqual(45);
   });
 
   it("searches dialog aliases and synthetic filter metadata without a network dependency", () => {

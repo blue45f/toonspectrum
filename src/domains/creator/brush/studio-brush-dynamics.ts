@@ -231,6 +231,8 @@ export interface StudioBrushDynamicsMappingSettings {
   to?: number;
   amount?: number;
   curve?: number;
+  curveMode?: "power" | "bezier";
+  curveControlPoints?: readonly [number, number, number, number];
   invert?: boolean;
 }
 
@@ -561,6 +563,9 @@ export interface NormalizedStudioBrushDynamicsMapping {
   to: number;
   amount: number;
   curve: number;
+  curveMode?: "power" | "bezier";
+  curveControlPoints?: readonly [number, number, number, number];
+  curveLUT?: Float32Array | null;
   invert: boolean;
 }
 
@@ -1035,7 +1040,16 @@ function uint32(value: unknown, fallback: number): number {
 }
 
 function cloneMapping(mapping: NormalizedStudioBrushDynamicsMapping): NormalizedStudioBrushDynamicsMapping {
-  return { ...mapping };
+  const result = { ...mapping };
+  if (mapping.curveLUT) {
+    Object.defineProperty(result, 'curveLUT', {
+      value: mapping.curveLUT,
+      enumerable: false,
+      configurable: true,
+      writable: true
+    });
+  }
+  return result;
 }
 
 function cloneProperty(property: NormalizedStudioBrushDynamicsProperty): NormalizedStudioBrushDynamicsProperty {
@@ -1197,6 +1211,37 @@ function isDynamicsSource(value: unknown): value is StudioBrushDynamicsSource {
     || value === "direction";
 }
 
+function getBezierCoordinate(t: number, c1: number, c2: number): number {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  return 3 * c1 * mt2 * t + 3 * c2 * mt * t2 + t3;
+}
+
+function getBezierDerivative(t: number, c1: number, c2: number): number {
+  const mt = 1 - t;
+  return 3 * mt * mt * c1 + 6 * mt * t * (c2 - c1) + 3 * t * t * (1 - c2);
+}
+
+export function evaluateCubicBezierCurve(x: number, p1x: number, p1y: number, p2x: number, p2y: number): number {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  if (p1x === p1y && p2x === p2y) return x;
+
+  let t = x;
+  for (let i = 0; i < 8; i++) {
+    const currentX = getBezierCoordinate(t, p1x, p2x);
+    const dx = getBezierDerivative(t, p1x, p2x);
+    if (Math.abs(currentX - x) < 1e-6) break;
+    if (dx === 0) break;
+    t -= (currentX - x) / dx;
+  }
+  
+  t = clamp01(t);
+  return getBezierCoordinate(t, p1y, p2y);
+}
+
 function normalizeMapping(value: unknown): NormalizedStudioBrushDynamicsMapping | null {
   const source = asRecord(value);
   if (!source || !isDynamicsSource(source.source)) return null;
@@ -1204,7 +1249,28 @@ function normalizeMapping(value: unknown): NormalizedStudioBrushDynamicsMapping 
   const mode: StudioBrushDynamicsMappingMode = source.mode === "add" ? "add" : "multiply";
   const mappingLimit = mode === "multiply" ? 8 : MAX_ADDITIVE_MAPPING;
   const mappingMin = mode === "multiply" ? 0 : -mappingLimit;
-  return {
+  
+  const curveMode = source.curveMode === "bezier" ? "bezier" : "power";
+  let curveControlPoints: readonly [number, number, number, number] = [0.25, 0.1, 0.25, 1];
+  let curveLUT: Float32Array | null = null;
+  
+  if (curveMode === "bezier") {
+    if (Array.isArray(source.curveControlPoints) && source.curveControlPoints.length >= 4) {
+      curveControlPoints = [
+        clamp(finiteNumber(source.curveControlPoints[0], 0), 0, 1),
+        finiteNumber(source.curveControlPoints[1], 0),
+        clamp(finiteNumber(source.curveControlPoints[2], 1), 0, 1),
+        finiteNumber(source.curveControlPoints[3], 1),
+      ] as const;
+    }
+    
+    curveLUT = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      curveLUT[i] = evaluateCubicBezierCurve(i / 255, curveControlPoints[0], curveControlPoints[1], curveControlPoints[2], curveControlPoints[3]);
+    }
+  }
+
+  const result: NormalizedStudioBrushDynamicsMapping = {
     source: source.source,
     mode,
     from: clamp(finiteNumber(source.from, 0), mappingMin, mappingLimit),
@@ -1213,6 +1279,21 @@ function normalizeMapping(value: unknown): NormalizedStudioBrushDynamicsMapping 
     curve: clamp(finiteNumber(source.curve, 1), 0.05, 8),
     invert: typeof source.invert === "boolean" ? source.invert : false,
   };
+
+  if (curveMode === "bezier") {
+    result.curveMode = "bezier";
+    result.curveControlPoints = curveControlPoints;
+    if (curveLUT) {
+      Object.defineProperty(result, 'curveLUT', {
+        value: curveLUT,
+        enumerable: false, // Prevents JSON.stringify from including it, and keeps deep equality clean
+        configurable: true,
+        writable: true
+      });
+    }
+  }
+
+  return result;
 }
 
 function normalizeJitter(value: unknown): NormalizedStudioBrushDynamicsJitter | null {
@@ -3644,7 +3725,14 @@ function resolveProperty(
     const input = sourceValue(mapping.source, sample);
     if (!input.active || mapping.amount <= 0) continue;
     const linearResponse = mapping.invert ? 1 - input.value : input.value;
-    const response = Math.pow(clamp01(linearResponse), mapping.curve);
+    const clampedLinear = clamp01(linearResponse);
+    let response: number;
+    if (mapping.curveMode === "bezier" && mapping.curveLUT) {
+      const idx = Math.round(clampedLinear * 255);
+      response = mapping.curveLUT[idx];
+    } else {
+      response = Math.pow(clampedLinear, mapping.curve);
+    }
     const target = mapping.from + (mapping.to - mapping.from) * response;
     if (mapping.mode === "multiply") value *= 1 + (target - 1) * mapping.amount;
     else value += target * mapping.amount;
