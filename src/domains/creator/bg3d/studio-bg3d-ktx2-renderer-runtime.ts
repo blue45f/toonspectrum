@@ -154,8 +154,7 @@ export async function createStudioBg3dKtx2RendererRuntime(
 
   let Ktx2LoaderConstructor: typeof KTX2Loader;
   try {
-    ({ KTX2Loader: Ktx2LoaderConstructor } = await import(
-      "three/examples/jsm/loaders/KTX2Loader.js"
+    ({ KTX2Loader: Ktx2LoaderConstructor } = await import("three/examples/jsm/loaders/KTX2Loader.js"
     ));
   } catch {
     throw new StudioBg3dKtx2RendererRuntimeError("runtime-init");

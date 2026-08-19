@@ -12,8 +12,8 @@
  * The function is DOM-free and pure: identical inputs always produce identical plans.
  */
 
-import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
-import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
+import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "../bg3d/studio-bg3d-lt-render";
+import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "../bg3d/studio-bg3d-shot-batch-limits";
 
 /** Extra density beyond devicePixelRatio so a moderate scale-up on canvas stays crisp. */
 export const STUDIO_3D_INSERT_CAPTURE_SUPERSAMPLE = 2;

@@ -1,13 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalStudioCommandJson } from "./studio-command-journal";
-import { calculateStudioCrc32 } from "./studio-crc32";
+import { canonicalStudioCommandJson } from "../studio-command-journal";
+import { calculateStudioCrc32 } from "../studio-crc32";
 import {
   createStudioUnitCubeMesh,
   hashStudioEditableMesh,
   serializeStudioEditableMesh,
   studioEditableMeshToTriangleSoup,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
+import {
+  createStudioMeshModifierStack,
+  deserializeStudioMeshModifierStack,
+  evaluateStudioMeshModifierStack,
+  hashStudioMeshModifierStack,
+  serializeStudioMeshModifierStack,
+  type StudioMeshModifier,
+  type StudioMeshModifierStack,
+} from "../studio-mesh-modifier-stack";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   createStudioHybridDccSession,
   hybridDccApplyModifierStack,
@@ -28,16 +39,6 @@ import {
   decodeStudioHybridDccWorkspacePersistenceEnvelope,
   encodeStudioHybridDccWorkspacePersistenceEnvelope,
 } from "./studio-hybrid-dcc-workspace-persistence";
-import {
-  createStudioMeshModifierStack,
-  deserializeStudioMeshModifierStack,
-  evaluateStudioMeshModifierStack,
-  hashStudioMeshModifierStack,
-  serializeStudioMeshModifierStack,
-  type StudioMeshModifier,
-  type StudioMeshModifierStack,
-} from "./studio-mesh-modifier-stack";
-import { sha256HexPortable } from "./studio-sha256";
 
 const RIGHTS = {
   source: "primitive",

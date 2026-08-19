@@ -6,7 +6,7 @@ import {
   type SfxTextPreset,
   type SpatialSfxTypographyConfig,
   type SpatialSpeedLineConfig,
-} from "./studio-3d-spatial-fx";
+} from "../scene-3d/studio-3d-spatial-fx";
 
 export interface StudioBg3dSpatialFxPanelProps {
   readonly onInsertSpeedLines?: (config: SpatialSpeedLineConfig) => void;

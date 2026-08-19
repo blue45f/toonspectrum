@@ -9,7 +9,7 @@ import type {
   StudioWebXrSessionErrorCode,
   StudioWebXrSessionState,
   StudioWebXrSupportSnapshot,
-} from "./studio-webxr-session";
+} from "../studio-webxr-session";
 import type { ComponentProps } from "react";
 
 const SUPPORTED: StudioWebXrSupportSnapshot = Object.freeze({

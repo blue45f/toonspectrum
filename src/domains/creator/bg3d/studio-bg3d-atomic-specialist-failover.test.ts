@@ -4,8 +4,7 @@ import {
   StudioBg3dAtomicSpecialistError,
   runStudioBg3dAtomicSpecialist,
 } from "./studio-bg3d-atomic-specialist-failover";
-import { StudioBg3dBabylonSpecialistError } from
-  "./studio-bg3d-babylon-specialist-runtime";
+import { StudioBg3dBabylonSpecialistError } from "./studio-bg3d-babylon-specialist-runtime";
 import {
   StudioBg3dRuntimeBoundaryError,
   StudioBg3dRuntimeAdapterRegistry,

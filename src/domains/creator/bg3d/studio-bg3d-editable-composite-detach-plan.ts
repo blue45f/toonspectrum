@@ -18,7 +18,7 @@ import {
   type StudioBg3dLtPageElementLike,
 } from "./studio-bg3d-lt-layer-plan";
 
-import type { LayerGroup } from "./studio-layers";
+import type { LayerGroup } from "../studio-layers";
 
 const ID_PATTERN = /^\S{1,256}$/u;
 const ROLE_SET = new Set<string>(STUDIO_BG3D_LT_LAYER_ROLES);

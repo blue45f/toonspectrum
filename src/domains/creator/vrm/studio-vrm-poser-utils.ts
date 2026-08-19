@@ -3,8 +3,9 @@ import * as THREE from "three";
 import {
   STUDIO_HUMANOID_BONE_NAMES,
   isStudioHumanoidBoneName,
-} from "./studio-humanoid-bones";
-import { POSER_FINGER_BONES } from "./studio-pose-presets";
+} from "../studio-humanoid-bones";
+import { POSER_FINGER_BONES } from "../studio-pose-presets";
+
 import { classifyMeshName } from "./studio-vrm-costume";
 import {
   cloneStudioVrmIkConstraints,

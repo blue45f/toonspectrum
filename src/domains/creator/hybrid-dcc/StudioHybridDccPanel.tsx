@@ -104,7 +104,7 @@ import {
 import { StudioHybridDccViewport } from "./StudioHybridDccViewport";
 
 import type { StudioHybridDccBg3dHandoffResult } from "./studio-hybrid-dcc-bg3d-handoff";
-import type { StudioDccWorkbenchMode } from "./studio-workspace-route";
+import type { StudioDccWorkbenchMode } from "../studio-workspace-route";
 
 const STUDIO_HYBRID_DCC_WORKBENCH_MODES = [
   { id: "model", label: "모델링", accessibleLabel: "모델링 작업 모드" },
@@ -593,8 +593,7 @@ export function StudioHybridDccPanel({
     handoffAbortRef.current = controller;
     setBusy(true);
     try {
-      const { handoffStudioHybridDccWorkspaceToBg3d } = await import(
-        "./studio-hybrid-dcc-bg3d-handoff"
+      const { handoffStudioHybridDccWorkspaceToBg3d } = await import( "./studio-hybrid-dcc-bg3d-handoff"
       );
       const result = await handoffStudioHybridDccWorkspaceToBg3d(ws, {
         signal: controller.signal,

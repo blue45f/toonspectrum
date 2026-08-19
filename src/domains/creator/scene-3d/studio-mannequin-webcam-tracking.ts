@@ -9,12 +9,12 @@
 import {
   resolveStudioMediaPipeVisionWasmFileset,
   type StudioMediaPipeVisionWasmSelection,
-} from "./studio-mediapipe-vision-assets";
+} from "../studio-mediapipe-vision-assets";
 import {
   loadStudioMediaPipeVisionModule,
   runStudioMediaPipeVisionTaskCreation,
-} from "./studio-mediapipe-vision-init-arbiter";
-import { solvePoseToVrmBones, type PoseLandmark } from "./studio-vrm-pose-solver";
+} from "../studio-mediapipe-vision-init-arbiter";
+import { solvePoseToVrmBones, type PoseLandmark } from "../vrm/studio-vrm-pose-solver";
 
 import type { StudioMannequinJointId } from "./studio-mannequin-model";
 

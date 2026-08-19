@@ -6,8 +6,9 @@
  * bounded, strict, canonical document so a malformed member cannot be loaded as a partial library.
  */
 
-import { isStudioHumanoidBoneName } from "./studio-humanoid-bones";
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+import { isStudioHumanoidBoneName } from "../studio-humanoid-bones";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+
 import {
   EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
   cloneStudioVrmPoseTranslations,
@@ -20,7 +21,7 @@ import {
   type PoseBoneMap,
 } from "./studio-vrm-poser-utils";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 import type { StudioVrmPoseTranslations } from "./studio-vrm-scene-document";
 
 export const STUDIO_VRM_CUSTOM_POSE_SQLITE_NAMESPACE = "studio-vrm-custom-poses-v12";

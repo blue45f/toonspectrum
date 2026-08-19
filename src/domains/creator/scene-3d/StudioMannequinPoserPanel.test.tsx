@@ -7,7 +7,8 @@ import {
   resetStudioDestructiveActionLedger,
   setStudioDestructiveConfirmPresenter,
   type StudioDestructiveActionRequest,
-} from "./studio-destructive-action-preview";
+} from "../studio-destructive-action-preview";
+
 import { STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS } from "./studio-mannequin-model";
 import { STUDIO_MANNEQUIN_POSE_PRESETS } from "./studio-mannequin-poses";
 
@@ -134,7 +135,7 @@ vi.mock("./studio-mannequin-bg3d-preset-sqlite-repository", () => ({
   }),
 }));
 
-vi.mock("./StudioVrmPhotoPoseScanner", async () => {
+vi.mock("../vrm/StudioVrmPhotoPoseScanner", async () => {
   const { createElement } = await import("react");
   return {
     StudioVrmPhotoPoseScanner: ({

@@ -6,12 +6,24 @@
  * the stack is an explicit atomic authority change and clears the stack in the same undo step.
  */
 
-import { studioEditableMeshToTriangleSoup } from "./studio-editable-half-edge-mesh";
+import { mutateStudioSharedObjectGeometry } from "../live/studio-live-2d3d-bridge";
+import { studioEditableMeshToTriangleSoup } from "../studio-editable-half-edge-mesh";
 import {
   contentAddressStudioGeometryBytes,
   materializeStudioGeometryRenderCache,
   type StudioGeometryAuthorityRecord,
-} from "./studio-geometry-authority";
+} from "../studio-geometry-authority";
+import {
+  createStudioMeshModifierStack,
+  evaluateStudioMeshModifierStack,
+  hashStudioMeshModifierStack,
+  STUDIO_MESH_MODIFIER_STACK_LIMITS,
+  type StudioMeshModifier,
+  type StudioMeshModifierKind,
+  type StudioMeshModifierStack,
+} from "../studio-mesh-modifier-stack";
+import { createStudioDefaultSolidBooleanBackend } from "../studio-solid-boolean-backend";
+
 import {
   hybridDccApplyModifierStack,
   hybridDccSetModifierStack,
@@ -29,17 +41,6 @@ import {
   workspaceUndo,
   type StudioHybridDccWorkspace,
 } from "./studio-hybrid-dcc-workspace";
-import { mutateStudioSharedObjectGeometry } from "./studio-live-2d3d-bridge";
-import {
-  createStudioMeshModifierStack,
-  evaluateStudioMeshModifierStack,
-  hashStudioMeshModifierStack,
-  STUDIO_MESH_MODIFIER_STACK_LIMITS,
-  type StudioMeshModifier,
-  type StudioMeshModifierKind,
-  type StudioMeshModifierStack,
-} from "./studio-mesh-modifier-stack";
-import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
 
 export type StudioHybridDccModifierMoveDirection = "up" | "down";
 

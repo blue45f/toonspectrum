@@ -6,14 +6,27 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { createStudioUnitCubeMesh } from "../studio-editable-half-edge-mesh";
+import { importStudioGradeAAsset } from "../studio-grade-a-import-pipeline";
+import {
+  importStudioDaeMinimal,
+  importStudioDxfPlan,
+  importStudioPlyAscii,
+  importStudioStl,
+} from "../studio-mesh-format-adapters";
+import { unpackStudioToon3dPackage } from "../studio-toon3d-package";
+import {
+  packStudioUvIslands,
+  unwrapStudioMeshBox,
+  unwrapStudioMeshPlanar,
+} from "../studio-uv-unwrap-lite";
+
 import {
   assertWebtoonObjectCreatorV1KernelCoverage,
   studioKernelCatalogByPriority,
   STUDIO_DCC_KERNEL_COVERAGE_REGISTRY,
   STUDIO_WEBTOON_OBJECT_CREATOR_V1_KERNEL_REQUIRED_IDS,
 } from "./studio-dcc-catalog-registry";
-import { createStudioUnitCubeMesh } from "./studio-editable-half-edge-mesh";
-import { importStudioGradeAAsset } from "./studio-grade-a-import-pipeline";
 import {
   createStudioHybridDccWorkspace,
   workspaceAddArtistInk,
@@ -27,18 +40,6 @@ import {
   workspaceSelectAsset,
   workspaceUndo,
 } from "./studio-hybrid-dcc-workspace";
-import {
-  importStudioDaeMinimal,
-  importStudioDxfPlan,
-  importStudioPlyAscii,
-  importStudioStl,
-} from "./studio-mesh-format-adapters";
-import { unpackStudioToon3dPackage } from "./studio-toon3d-package";
-import {
-  packStudioUvIslands,
-  unwrapStudioMeshBox,
-  unwrapStudioMeshPlanar,
-} from "./studio-uv-unwrap-lite";
 
 describe("§12.1 callable-kernel compatibility coverage", () => {
   it("every required v1 id exposes a kernel or an explicit partial with apis", () => {

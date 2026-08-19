@@ -1,9 +1,9 @@
 import { User, Smile, Film, Sparkles, MessageSquare, Download, Layers } from "lucide-react";
 import { useState } from "react";
 
-import type { CharacterArchetype } from "./studio-3d-shaper-toon-maker";
-import type { CutAspectRatio } from "./studio-3d-storyboard-cut-strip";
-import type { TooningEmotionPreset, EmoteSfxKind } from "./studio-3d-tooning-emotion-fx";
+import type { CharacterArchetype } from "../scene-3d/studio-3d-shaper-toon-maker";
+import type { CutAspectRatio } from "../scene-3d/studio-3d-storyboard-cut-strip";
+import type { TooningEmotionPreset, EmoteSfxKind } from "../scene-3d/studio-3d-tooning-emotion-fx";
 
 export interface StudioBg3dShaperTooningStudioPanelProps {
   readonly onExportPsd?: () => void;

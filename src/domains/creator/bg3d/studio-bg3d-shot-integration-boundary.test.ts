@@ -36,11 +36,11 @@ describe("Studio BG3D shot UI integration boundary", () => {
   it("loads the asset writer only after the user starts a guarded library save", () => {
     const handler = functionSlice("handleSaveToLibrary", "handleInsert");
 
-    expect(source).not.toContain('import { saveAsset } from "./studio-asset-library";');
+    expect(source).not.toContain('import { saveAsset } from "../studio-asset-library";');
     expectInOrder(handler, [
       "captureInFlightRef.current = true",
       "setIsCapturing(true)",
-      'const { saveAsset } = await import("./studio-asset-library")',
+      'const { saveAsset } = await import("../studio-asset-library")',
       "const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({",
       "const captured = await captureStudioBg3dRaster(captureAdapter",
       "await saveAsset({",

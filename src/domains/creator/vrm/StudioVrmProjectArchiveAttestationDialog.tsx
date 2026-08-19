@@ -2,14 +2,15 @@ import { FileArchive, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { useId, useRef, useState, type FormEvent, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import { STUDIO_Z_CLASS } from "../studio-z-index";
+import { useStudioModalSheet } from "../useStudioModalSheet";
+
 import {
   type StudioVrmAttestedContentClassification,
   type StudioVrmProjectArchiveAttestationPlan,
   type StudioVrmProjectArchiveUseContextInput,
 } from "./studio-vrm-license-product-gate";
-import { STUDIO_Z_CLASS } from "./studio-z-index";
-import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import { cn } from "@/lib/utils";
 

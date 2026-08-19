@@ -7,11 +7,11 @@ const backgroundSource = readFileSync(
   "utf8",
 );
 const pageSource = readFileSync(
-  new URL("./StudioPage.tsx", import.meta.url),
+  new URL("../StudioPage.tsx", import.meta.url),
   "utf8",
 );
 const previewStackSource = readFileSync(
-  new URL("./StudioThreeDPreviewPanelStack.tsx", import.meta.url),
+  new URL("../StudioThreeDPreviewPanelStack.tsx", import.meta.url),
   "utf8",
 );
 

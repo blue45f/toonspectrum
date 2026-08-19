@@ -17,7 +17,8 @@ import {
   type StudioStampBrushKind,
   type StudioStampBrushStyle,
   type StudioStampWalkerState,
-} from "./studio-brush-stamp-engine";
+} from "../brush/studio-brush-stamp-engine";
+
 import {
   isStudioVrmTextureStrokeSeamBreak,
   resolveStudioVrmTextureStrokeBrush,

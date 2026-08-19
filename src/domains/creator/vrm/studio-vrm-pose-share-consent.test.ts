@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   studioVrmPoseShareUseContextConsentRequest,
   type StudioVrmPoseShareUseContextDisclosure,
-} from "./studio-destructive-command-catalog";
+} from "../studio-destructive-command-catalog";
 
 const PRODUCT_DISCLOSURE = {
   avatarPermissionBasis: "other",

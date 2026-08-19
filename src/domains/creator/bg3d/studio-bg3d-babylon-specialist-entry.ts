@@ -10,8 +10,7 @@ import "@babylonjs/core/Engines/WebGPU/Extensions/engine.multiRender";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { Scene } from "@babylonjs/core/scene";
 
-import { executeStudioBg3dBabylonCapture } from
-  "./studio-bg3d-babylon-artifact-capture";
+import { executeStudioBg3dBabylonCapture } from "./studio-bg3d-babylon-artifact-capture";
 import {
   createStudioBg3dBabylonSpecialistRuntime,
   sanitizeStudioBg3dBabylonAdapterDiagnostic,

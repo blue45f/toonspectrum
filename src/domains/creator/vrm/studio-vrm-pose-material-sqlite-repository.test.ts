@@ -1,18 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { openStudioLocalDatabase } from "./studio-local-database";
+import { openStudioLocalDatabase } from "../studio-local-database";
 import {
   STUDIO_POSE_MATERIAL_KIND,
   STUDIO_POSE_MATERIAL_VERSION,
   STUDIO_POSE_ROTATION_CONVENTION,
   parseStudioPoseMaterial,
   type StudioPoseMaterial,
-} from "./studio-pose-material";
+} from "../studio-pose-material";
 import {
   STUDIO_POSE_MATERIAL_LIBRARY_KIND,
   STUDIO_POSE_MATERIAL_LIBRARY_VERSION,
   type StudioPoseMaterialLibraryPayload,
-} from "./studio-pose-material-library";
+} from "../studio-pose-material-library";
+
 import {
   createStudioVrmPoseMaterialSqliteRepository,
   parseCanonicalStudioVrmPoseMaterialLibrary,
@@ -20,7 +21,7 @@ import {
   STUDIO_VRM_POSE_MATERIAL_SQLITE_NAMESPACE,
 } from "./studio-vrm-pose-material-sqlite-repository";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 const opened: StudioLocalDatabase[] = [];
 

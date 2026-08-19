@@ -1,9 +1,9 @@
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "../studio-sha256";
 
 import type {
   StudioVectorInkCubicSegment,
   StudioVectorInkGeometryArtifact,
-} from "./studio-vector-ink-geometry";
+} from "../studio-vector-ink-geometry";
 
 export const STUDIO_HYBRID_TEXTURED_VECTOR_INK_PROVIDER_REVISION = 1 as const;
 

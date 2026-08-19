@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { PRIMITIVE_DEFS, type BgPrimitiveKind } from "./studio-background-3d-metadata";
+import { PRIMITIVE_DEFS, type BgPrimitiveKind } from "../studio-background-3d-metadata";
+
 import {
   buildStudioBg3dRoomParts,
   clampStudioBg3dRoomSpec,

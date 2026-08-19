@@ -694,7 +694,7 @@ describe("자동 손 그립과 양손 보조 target", () => {
     const targetHandQuaternion = new THREE.Quaternion(...result.targetHandWorldQuaternion);
     const reconstructedPalm = new THREE.Vector3(...result.wristWorldPosition).add(
       new THREE.Vector3(...handSocket.position)
-        .multiply(new THREE.Vector3(1.1, 0.9, 1.1))
+        .multiplyScalar(Math.cbrt(1.1 * 0.9 * 1.1))
         .applyQuaternion(targetHandQuaternion)
     );
 

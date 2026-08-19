@@ -76,9 +76,9 @@ describe("Studio BG3D control-field ownership boundary", () => {
     expect(imports.dynamicImports).toEqual([]);
     expect(imports.valueImports).toEqual([
       "react",
-      "./studio-background-3d-sky",
+      "../studio-background-3d-sky",
       "./studio-bg3d-animation-time",
-      "./StudioThreeDToggle",
+      "../StudioThreeDToggle",
     ]);
     expect(imports.valueImports).not.toContain("three");
     expect(imports.valueImports.some((source) => source.startsWith("@react-three/"))).toBe(false);
@@ -87,10 +87,10 @@ describe("Studio BG3D control-field ownership boundary", () => {
 
   it("preserves the single lazy editor boundary and renderer ownership", () => {
     const editorSource = moduleSource("./StudioBackground3D.tsx");
-    const loaderImports = moduleImports("./studio-background-3d-loader.ts");
+    const loaderImports = moduleImports("../studio-background-3d-loader.ts");
 
-    expect(loaderImports.valueImports).not.toContain("./StudioBackground3D");
-    expect(loaderImports.dynamicImports).toEqual(["./StudioBackground3D"]);
+    expect(loaderImports.valueImports).not.toContain("./bg3d/StudioBackground3D");
+    expect(loaderImports.dynamicImports).toEqual(["./bg3d/StudioBackground3D"]);
     expect(editorSource).toContain("function CaptureBridge(");
     expect(editorSource).toContain("function BgCustomModelMesh(");
     expect(editorSource).toContain("function BgCustomModelInstanceBatch(");

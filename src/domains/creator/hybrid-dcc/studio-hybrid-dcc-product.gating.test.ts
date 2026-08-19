@@ -6,7 +6,39 @@ import { resolve } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_CLOTH_XPBD_V2_BUDGETS } from "./studio-cloth-xpbd-kernel-v2";
+
+import { STUDIO_CLOTH_XPBD_V2_BUDGETS } from "../studio-cloth-xpbd-kernel-v2";
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+import {
+  createStudioEditableMeshFromPolygons,
+  createStudioUnitCubeMesh,
+  type StudioEditableMesh,
+} from "../studio-editable-half-edge-mesh";
+import {
+  importStudioFbxDocument,
+  isStudioFbxBinary,
+} from "../studio-fbx-ascii-import";
+import {
+  buildStudioGeoNodesPrimitive,
+  evaluateStudioGeoNodesStarterGraph,
+} from "../studio-geometry-nodes-workspace-bridge";
+import {
+  bomEstimateMassKg,
+  bomRollupByMaterial,
+} from "../studio-manufacturing-bom-lite";
+import {
+  exportStudioMeshObj,
+  exportStudioMeshStlAscii,
+} from "../studio-mesh-export-adapters";
+import {
+  importStudio3mfMinimal,
+  importStudioBvhMotion,
+  importStudioIfcShell,
+  importStudioMeshByExtension,
+  importStudioOff,
+  importStudioStepShell,
+} from "../studio-mesh-format-adapters";
+
 import {
   STUDIO_DCC_KERNEL_COVERAGE_REGISTRY,
   STUDIO_DCC_KERNEL_COVERAGE_REVISION,
@@ -19,19 +51,6 @@ import {
   createStudioDccCollabRoom,
   STUDIO_DCC_COLLAB_SHELL_REVISION,
 } from "./studio-dcc-collab-shell";
-import {
-  createStudioEditableMeshFromPolygons,
-  createStudioUnitCubeMesh,
-  type StudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
-import {
-  importStudioFbxDocument,
-  isStudioFbxBinary,
-} from "./studio-fbx-ascii-import";
-import {
-  buildStudioGeoNodesPrimitive,
-  evaluateStudioGeoNodesStarterGraph,
-} from "./studio-geometry-nodes-workspace-bridge";
 import { hybridDccCommitGeometry } from "./studio-hybrid-dcc-document";
 import { transformStudioHybridDccPoint } from "./studio-hybrid-dcc-object-transform";
 import {
@@ -61,22 +80,6 @@ import {
   workspaceUvUnwrapActive,
   workspaceVoxelRemeshActive,
 } from "./studio-hybrid-dcc-workspace";
-import {
-  bomEstimateMassKg,
-  bomRollupByMaterial,
-} from "./studio-manufacturing-bom-lite";
-import {
-  exportStudioMeshObj,
-  exportStudioMeshStlAscii,
-} from "./studio-mesh-export-adapters";
-import {
-  importStudio3mfMinimal,
-  importStudioBvhMotion,
-  importStudioIfcShell,
-  importStudioMeshByExtension,
-  importStudioOff,
-  importStudioStepShell,
-} from "./studio-mesh-format-adapters";
 
 const root = resolve(import.meta.dirname, "../..");
 
@@ -200,12 +203,9 @@ afterEach(() => {
 
 describe("product UI wiring", () => {
   it("StudioPage lazy-mounts Hybrid DCC dialog and menubar exposes open control", () => {
-    const page = readFileSync(
-      resolve(import.meta.dirname, "./StudioPage.tsx"),
-      "utf8",
-    );
+    const page = readStudioCuttoonEditorSource();
     const menubar = readFileSync(
-      resolve(import.meta.dirname, "./StudioMenubarContent.tsx"),
+      resolve(import.meta.dirname, "../StudioMenubarContent.tsx"),
       "utf8",
     );
     const handoff = readFileSync(

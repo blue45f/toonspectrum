@@ -1,8 +1,9 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { clampPanoramaRotationDegrees } from "./studio-background-3d-sky";
+import { clampPanoramaRotationDegrees } from "../studio-background-3d-sky";
+import { StudioThreeDToggleControl } from "../StudioThreeDToggle";
+
 import { resolveStudioBg3dAnimationDisplayTime } from "./studio-bg3d-animation-time";
-import { StudioThreeDToggleControl } from "./StudioThreeDToggle";
 
 import type { StudioBg3dAnimationPlayback } from "./studio-bg3d-scene-document";
 

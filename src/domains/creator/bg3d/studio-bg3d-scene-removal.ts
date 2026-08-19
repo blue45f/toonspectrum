@@ -4,8 +4,8 @@ import {
   type StudioBg3dThreeLocalTransform,
 } from "./studio-bg3d-three-hierarchy";
 
-import type { BgCustomModelInstance } from "./studio-background-3d-model";
-import type { BgPrimitive } from "./studio-background-3d-primitives";
+import type { BgCustomModelInstance } from "../studio-background-3d-model";
+import type { BgPrimitive } from "../studio-background-3d-primitives";
 import type {
   StudioBg3dSceneDocument,
   StudioBg3dSceneNode,

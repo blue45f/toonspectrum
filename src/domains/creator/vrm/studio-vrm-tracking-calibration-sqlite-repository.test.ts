@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { openStudioLocalDatabase } from "./studio-local-database";
+import { openStudioLocalDatabase } from "../studio-local-database";
+
 import {
   serializeCalibration,
   type TrackingCalibration,
@@ -11,7 +12,7 @@ import {
   STUDIO_VRM_TRACKING_CALIBRATION_SQLITE_NAMESPACE,
 } from "./studio-vrm-tracking-calibration-sqlite-repository";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 const databases: StudioLocalDatabase[] = [];
 

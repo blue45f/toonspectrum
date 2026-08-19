@@ -1,7 +1,7 @@
 import type { StudioBg3dLtPresetPayload } from "./studio-bg3d-lt-presets";
 
 type StudioBg3dLtPresetRepositoryModule =
-  typeof import("./studio-mannequin-bg3d-preset-sqlite-repository");
+  typeof import("../scene-3d/studio-mannequin-bg3d-preset-sqlite-repository");
 
 export interface LazyStudioBg3dLtPresetSqliteRepository {
   readonly authority: "sqlite";
@@ -13,8 +13,7 @@ let repositoryModulePromise: Promise<StudioBg3dLtPresetRepositoryModule> | null 
 let productRepository: LazyStudioBg3dLtPresetSqliteRepository | null = null;
 
 function loadRepositoryModule(): Promise<StudioBg3dLtPresetRepositoryModule> {
-  repositoryModulePromise ??= import(
-    "./studio-mannequin-bg3d-preset-sqlite-repository"
+  repositoryModulePromise ??= import("../scene-3d/studio-mannequin-bg3d-preset-sqlite-repository"
   ).catch((cause: unknown) => {
     repositoryModulePromise = null;
     throw cause;

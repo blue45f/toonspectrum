@@ -13,7 +13,7 @@ import {
   normalizeStudioVrmRigProfile,
 } from "./studio-vrm-rig-profile";
 
-import type { TwoBoneTargetSolution } from "./studio-rig-two-bone-ik";
+import type { TwoBoneTargetSolution } from "../studio-rig-two-bone-ik";
 import type { StudioVrmFloorContactResult } from "./studio-vrm-contact-solver";
 import type { StudioVrmJointRotation } from "./studio-vrm-joint-limits";
 import type {

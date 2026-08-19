@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { buildStudioPackageArchiveBlob } from "../studio-package-archive";
+
 import {
   STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
   STUDIO_BG3D_SHOT_BATCH_ARCHIVE_PROFILE_V1,
@@ -12,7 +14,6 @@ import {
 } from "./studio-bg3d-shot-batch";
 import { verifyStudioBg3dShotBatchArchiveBlob } from "./studio-bg3d-shot-batch-archive-verifier";
 import { computeStudioBg3dShotBatchRenderDigest } from "./studio-bg3d-shot-batch-plan";
-import { buildStudioPackageArchiveBlob } from "./studio-package-archive";
 
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 

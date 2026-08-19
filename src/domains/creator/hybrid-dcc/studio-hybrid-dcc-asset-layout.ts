@@ -7,7 +7,8 @@
  * inspection layout for callers that do not yet provide transforms. It never mutates geometry.
  */
 
-import { STUDIO_GEOMETRY_MAX_ABSOLUTE_COORDINATE } from "./studio-geometry-authority";
+import { STUDIO_GEOMETRY_MAX_ABSOLUTE_COORDINATE } from "../studio-geometry-authority";
+
 import {
   hashStudioHybridDccObjectTransform,
   normalizeStudioHybridDccObjectTransform,
@@ -15,7 +16,7 @@ import {
   type StudioHybridDccObjectTransform,
 } from "./studio-hybrid-dcc-object-transform";
 
-import type { StudioEditableMesh } from "./studio-editable-half-edge-mesh";
+import type { StudioEditableMesh } from "../studio-editable-half-edge-mesh";
 
 export const STUDIO_HYBRID_DCC_ASSET_LAYOUT_REVISION = 1 as const;
 export const STUDIO_HYBRID_DCC_ASSET_LAYOUT_KIND = "derived-inspection-grid" as const;

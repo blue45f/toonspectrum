@@ -1,10 +1,10 @@
-import { calculateStudioCrc32 } from "./studio-crc32";
+import { calculateStudioCrc32 } from "../studio-crc32";
 import {
   STUDIO_EDITABLE_MESH_LIMITS,
   STUDIO_EDITABLE_MESH_REVISION,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
 
-import type { StudioEditableMesh } from "./studio-editable-half-edge-mesh";
+import type { StudioEditableMesh } from "../studio-editable-half-edge-mesh";
 import type { StudioHybridDccMeshGlbExportInput } from "./studio-hybrid-dcc-glb-export";
 
 export const STUDIO_HYBRID_DCC_PACKED_MESH_FORMAT =

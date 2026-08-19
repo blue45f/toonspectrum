@@ -2,7 +2,7 @@
 // 라운드 판정·점수·결정적 AI·묵찌빠 전이 등 순수 엔진은 @toonspectrum/play-core 로
 // 이동했고, 여기서는 그것을 그대로 재-export 해 기존 import 경로를 유지한다.
 
-import type { FingerEulerMap } from "@/src/domains/creator/studio-vrm-hand-solver";
+import type { FingerEulerMap } from "@/src/domains/creator/vrm/studio-vrm-hand-solver";
 import type { Hand } from "@toonspectrum/play-core";
 
 export {

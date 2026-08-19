@@ -2,14 +2,11 @@ import { useEffect, useState } from "react";
 import * as THREE from "three";
 
 import { registerStudioBg3dDepthExcludedObject } from "./studio-bg3d-capture-exclusion";
-import { createStudioBg3dContactShadowAlphaTexture } from
-  "./studio-bg3d-contact-shadow-texture";
-import { planStudioBg3dSharedCharacterContactShadows } from
-  "./studio-bg3d-shared-character-contact-shadow";
+import { createStudioBg3dContactShadowAlphaTexture } from "./studio-bg3d-contact-shadow-texture";
+import { planStudioBg3dSharedCharacterContactShadows } from "./studio-bg3d-shared-character-contact-shadow";
 
-import type { StudioBg3dSharedCharacterGroundingResult } from
-  "./studio-bg3d-shared-character-grounding";
-import type { StudioShared3dCharacterSource } from "./studio-shared-3d-scene-bridge";
+import type { StudioBg3dSharedCharacterGroundingResult } from "./studio-bg3d-shared-character-grounding";
+import type { StudioShared3dCharacterSource } from "../studio-shared-3d-scene-bridge";
 
 const EMPTY_GROUNDING_RESULTS = Object.freeze({}) as Readonly<
   Record<string, StudioBg3dSharedCharacterGroundingResult>

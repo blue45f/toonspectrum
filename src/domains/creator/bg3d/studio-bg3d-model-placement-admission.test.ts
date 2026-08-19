@@ -10,7 +10,7 @@ import {
 import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
 
 import type { Bg3dVerifiedStoredRecord } from "./bg3d-model-library";
-import type { BgCustomModelInstance } from "./studio-background-3d-model";
+import type { BgCustomModelInstance } from "../studio-background-3d-model";
 import type {
   StudioBg3dModelAttachment,
   StudioBg3dParsedGlbMetrics,

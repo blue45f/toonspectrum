@@ -9,11 +9,12 @@
 //  - TrackingChannels는 "카메라 좌표계"(미러 전)이고,
 //    convertChannelsToVrmData에서 mirrorMode·gazeLock·sensitivity를 반영한다.
 
-import { resolveStudioMediaPipeVisionWasmFileset } from "./studio-mediapipe-vision-assets";
+import { resolveStudioMediaPipeVisionWasmFileset } from "../studio-mediapipe-vision-assets";
 import {
   loadStudioMediaPipeVisionModule,
   runStudioMediaPipeVisionTaskCreation,
-} from "./studio-mediapipe-vision-init-arbiter";
+} from "../studio-mediapipe-vision-init-arbiter";
+
 import { TrackingChannelFilterBank } from "./studio-vrm-one-euro";
 import { solvePoseToVrmBones } from "./studio-vrm-pose-solver";
 

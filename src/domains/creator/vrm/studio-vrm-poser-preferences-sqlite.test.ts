@@ -10,7 +10,7 @@ import {
   type StudioVrmPoserPreferencesRepository,
 } from "./studio-vrm-poser-preferences-sqlite";
 
-import type { StudioAsyncKeyValueStore } from "./studio-local-database";
+import type { StudioAsyncKeyValueStore } from "../studio-local-database";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

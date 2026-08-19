@@ -7,17 +7,17 @@
  * explicit error that the UI can surface as unsaved/session-only state.
  */
 
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
-import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
-import { createStudioOpfsNativeFileSystem } from "./studio-opfs-filesystem";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+import { createStudioOpfsAssetStore } from "../studio-opfs-asset-store";
+import { createStudioOpfsNativeFileSystem } from "../studio-opfs-filesystem";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 import type {
   StudioOpfsAssetRef,
   StudioOpfsAssetStore,
   StudioOpfsContentHash,
-} from "./studio-opfs-asset-store";
-import type { StudioOpfsStorageManagerLike } from "./studio-opfs-filesystem";
+} from "../studio-opfs-asset-store";
+import type { StudioOpfsStorageManagerLike } from "../studio-opfs-filesystem";
 
 export const STUDIO_BG3D_LIBRARIES_SQLITE_NAMESPACE =
   "studio-bg3d-libraries-v12";

@@ -4,8 +4,7 @@ import {
 import {
   loadStudioBg3dBundledEnvironmentSource,
   releaseStudioBg3dBundledEnvironmentSource,
-} from
-  "./studio-bg3d-bundled-environment-loader";
+} from "./studio-bg3d-bundled-environment-loader";
 import {
   STUDIO_BG3D_ENVIRONMENT_ASSETS,
   getStudioBg3dEnvironmentAsset,
@@ -44,7 +43,7 @@ import type {
   StudioBg3dLibrariesAuthority,
   StudioBg3dLibraryBlobReceipt,
 } from "./studio-bg3d-libraries-sqlite-opfs-authority";
-import type { StudioOpfsContentHash } from "./studio-opfs-asset-store";
+import type { StudioOpfsContentHash } from "../studio-opfs-asset-store";
 
 const DB_NAME = "toonspectrum-studio-bg3d-model-library";
 export const BG3D_MODEL_LIBRARY_DB_VERSION = 3;

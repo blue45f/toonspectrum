@@ -6,7 +6,8 @@ import {
   createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
   hashStudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
+
 import { exportStudioHybridDccMeshGlb } from "./studio-hybrid-dcc-glb-export";
 import { STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_ISSUE_IDS } from "./studio-hybrid-dcc-glb-export-diagnostic-limits";
 import {

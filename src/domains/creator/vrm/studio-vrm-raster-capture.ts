@@ -1,15 +1,15 @@
 import * as THREE from "three";
 
-import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
-import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
+import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "../bg3d/studio-bg3d-lt-render";
+import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "../bg3d/studio-bg3d-shot-batch-limits";
 import {
   encodeStudioBg3dShotPngInWorker,
   isStudioBg3dShotPngFallbackEligibleError,
-} from "./studio-bg3d-shot-png-worker-client";
-import { STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES } from "./studio-bg3d-shot-png-worker-protocol";
-import { createStudioBg3dStraightAlphaOutputPass } from "./studio-bg3d-straight-alpha-output-pass";
+} from "../bg3d/studio-bg3d-shot-png-worker-client";
+import { STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES } from "../bg3d/studio-bg3d-shot-png-worker-protocol";
+import { createStudioBg3dStraightAlphaOutputPass } from "../bg3d/studio-bg3d-straight-alpha-output-pass";
 
-import type { StudioBg3dLtRasterLayer } from "./studio-bg3d-lt-render";
+import type { StudioBg3dLtRasterLayer } from "../bg3d/studio-bg3d-lt-render";
 
 // The compatibility encoder only runs when Worker/OffscreenCanvas creation is unavailable. A
 // one-off insert capture at devicePixelRatio × supersample density must still encode there, so

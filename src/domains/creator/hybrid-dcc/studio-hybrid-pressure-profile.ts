@@ -20,7 +20,7 @@
 import {
   resolveBrushPressureSample,
   studioBrushPressureWithMinSize,
-} from "./studio-brush";
+} from "../studio-brush";
 
 export const STUDIO_HYBRID_PRESSURE_PROFILE_VERSION = "hybrid-pressure-profile-v1" as const;
 

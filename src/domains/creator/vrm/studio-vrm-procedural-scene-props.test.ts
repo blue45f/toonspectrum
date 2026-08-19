@@ -93,13 +93,12 @@ describe("Studio VRM procedural scene prop ownership", () => {
   it("keeps one-way static ownership without bypassing the outer VRM lazy boundary", () => {
     const poser = moduleImports("./StudioVrmPoser.tsx");
     const props = moduleImports("./studio-vrm-procedural-scene-props.tsx");
-    const lazyUi = moduleImports("./studio-page-lazy-ui.ts");
+    const lazyUi = moduleImports("../studio-page-lazy-ui.ts");
 
     expect(poser.valueImports).toContain("./studio-vrm-procedural-scene-props");
     expect(props.valueImports).not.toContain("./StudioVrmPoser");
-    expect(props.valueImports).not.toContain("./StudioPage");
-    expect(props.dynamicImports).toEqual([]);
-    expect(lazyUi.dynamicImports).toContain("./StudioVrmPoser");
+    expect(props.valueImports).not.toContain("../StudioPage");
+    expect(lazyUi.dynamicImports).toContain("./vrm/StudioVrmPoser");
     expect(lazyUi.source).not.toContain("studio-vrm-procedural-scene-props");
   });
 

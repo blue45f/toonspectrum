@@ -1,8 +1,6 @@
-import { StudioBg3dSharedCharacterPlacementPanel } from
-  "./StudioBg3dSharedCharacterPlacementPanel";
+import { StudioBg3dSharedCharacterPlacementPanel } from "./StudioBg3dSharedCharacterPlacementPanel";
 
-import type { StudioBg3dSharedCharacterGroundingResult } from
-  "./studio-bg3d-shared-character-grounding";
+import type { StudioBg3dSharedCharacterGroundingResult } from "./studio-bg3d-shared-character-grounding";
 import type {
   StudioBg3dSharedStageMaterializationKind,
   StudioBg3dSharedStageMutationKind,
@@ -11,8 +9,8 @@ import type {
   StudioShared3dCharacterRuntimeStatus,
   StudioShared3dCharacterSource,
   StudioShared3dCharacterTransformCommitHandler,
-} from "./studio-shared-3d-scene-bridge";
-import type { StudioShared3dStageResolution } from "./studio-shared-3d-stage-document";
+} from "../studio-shared-3d-scene-bridge";
+import type { StudioShared3dStageResolution } from "../studio-shared-3d-stage-document";
 
 import { cx } from "@/lib/cx";
 

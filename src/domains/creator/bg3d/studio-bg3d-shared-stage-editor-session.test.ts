@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { createStudioShared3dSceneSession } from "../studio-shared-3d-scene-bridge";
+import {
+  createStudioVrmSceneDocument,
+  normalizeStudioVrmSceneDocument,
+} from "../vrm/studio-vrm-scene-document";
+
 import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
 import {
   createStudioBg3dSharedStageEditorState,
@@ -8,15 +14,9 @@ import {
   updateStudioBg3dSharedStageEditorStateForSession,
   type StudioBg3dSharedStageEditorSessionInput,
 } from "./studio-bg3d-shared-stage-editor-session";
-import { createStudioShared3dSceneSession } from "./studio-shared-3d-scene-bridge";
-import {
-  createStudioVrmSceneDocument,
-  normalizeStudioVrmSceneDocument,
-} from "./studio-vrm-scene-document";
 
-import type { StudioBg3dSharedCharacterGroundingResult } from
-  "./studio-bg3d-shared-character-grounding";
-import type { StudioShared3dStageResolution } from "./studio-shared-3d-stage-document";
+import type { StudioBg3dSharedCharacterGroundingResult } from "./studio-bg3d-shared-character-grounding";
+import type { StudioShared3dStageResolution } from "../studio-shared-3d-stage-document";
 
 const GROUNDING_FAILURE = Object.freeze({
   ok: false as const,

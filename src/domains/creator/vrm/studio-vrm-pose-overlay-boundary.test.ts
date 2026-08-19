@@ -2,20 +2,20 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { formatStudioDestructivePreview } from "./studio-destructive-action-preview";
+import { formatStudioDestructivePreview } from "../studio-destructive-action-preview";
 import {
   studioSharePoseConsentRequest,
   studioVrmPoseShareUseContextConsentRequest,
-} from "./studio-destructive-command-catalog";
+} from "../studio-destructive-command-catalog";
 
 const source = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 const studioLazyPanelStackSource = readFileSync(
-  new URL("./StudioThreeDPreviewPanelStack.tsx", import.meta.url),
+  new URL("../StudioThreeDPreviewPanelStack.tsx", import.meta.url),
   "utf8"
 );
 const destructiveCatalogSource = readFileSync(
-  new URL("./studio-destructive-command-catalog.ts", import.meta.url),
+  new URL("../studio-destructive-command-catalog.ts", import.meta.url),
   "utf8"
 );
 

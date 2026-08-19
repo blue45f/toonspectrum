@@ -7,8 +7,8 @@ import {
 } from "./studio-bg3d-scene-removal";
 import { calculateStudioBg3dThreeWorldMatrix } from "./studio-bg3d-three-hierarchy";
 
-import type { BgCustomModelInstance } from "./studio-background-3d-model";
-import type { BgPrimitive } from "./studio-background-3d-primitives";
+import type { BgCustomModelInstance } from "../studio-background-3d-model";
+import type { BgPrimitive } from "../studio-background-3d-primitives";
 import type {
   StudioBg3dModelAttachment,
   StudioBg3dSceneDocument,

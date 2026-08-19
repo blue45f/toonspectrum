@@ -3,7 +3,7 @@ import { localHalfExtentsForPrimitiveKind } from "./studio-bg3d-object-ops";
 import type {
   BgPrimitive,
   BgPrimitiveKind,
-} from "./studio-background-3d-metadata";
+} from "../studio-background-3d-metadata";
 
 export type StudioBg3dPushPullAxis = "x" | "y" | "z";
 export type StudioBg3dPushPullFace = "negative" | "positive";

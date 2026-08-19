@@ -64,12 +64,10 @@ import {
   StudioBg3dBabylonStableIdCaptureError,
   type StudioBg3dBabylonStableIdRenderable,
 } from "./studio-bg3d-babylon-stable-id-capture";
-import { resolveStudioBg3dCameraNearClip, resolveStudioBg3dCameraUpVector } from
-  "./studio-bg3d-camera-orientation";
+import { resolveStudioBg3dCameraNearClip, resolveStudioBg3dCameraUpVector } from "./studio-bg3d-camera-orientation";
 import { parseStudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 
-import type { StudioBg3dStableIdDescriptor } from
-  "./studio-bg3d-babylon-stable-id-packing";
+import type { StudioBg3dStableIdDescriptor } from "./studio-bg3d-babylon-stable-id-packing";
 import type {
   StudioBg3dRuntimeAdapterJob,
   StudioBg3dSpecialistResult,

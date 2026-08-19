@@ -1,7 +1,8 @@
 import {
   disposeStudioBg3dThreeResources,
   measureStudioBg3dThreeMetrics,
-} from "./studio-background-3d-model";
+} from "../studio-background-3d-model";
+
 import {
   STUDIO_BG3D_GEOMETRY_WORKER_SMALL_FALLBACK_MAX_BYTES,
   StudioBg3dGeometryWorkerClientError,
@@ -1399,8 +1400,7 @@ async function parseObjImport(
         const {
           StudioBg3dObjWorkerRuntimeError,
           parseStudioBg3dObjWorkerRequest,
-        } = await import(
-          "./studio-bg3d-obj-worker-runtime"
+        } = await import( "./studio-bg3d-obj-worker-runtime"
         );
         let fallbackResult: StudioBg3dObjWorkerCanonicalResult;
         try {

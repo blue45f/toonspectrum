@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { studioEditableMeshToTriangleSoup } from "./studio-editable-half-edge-mesh";
+import { studioEditableMeshToTriangleSoup } from "../studio-editable-half-edge-mesh";
+
 import { restoreStudioHybridDccStateFromSnapshot, snapshotStudioHybridDccState } from "./studio-hybrid-dcc-document";
 import {
   workspaceAddActiveModifier,

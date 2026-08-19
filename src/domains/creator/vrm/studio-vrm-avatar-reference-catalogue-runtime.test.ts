@@ -100,8 +100,7 @@ describe("Avatar reference catalogue runtime loader", () => {
     vi.doUnmock(PRODUCT_MODULE);
     vi.resetModules();
     const runtime = await import(RUNTIME_MODULE);
-    const bytes = new Uint8Array(readFileSync(new URL(
-      "../../../public/catalog/studio-vrm-avatar-reference-catalogue-v1.json",
+    const bytes = new Uint8Array(readFileSync(new URL("../../../../public/catalog/studio-vrm-avatar-reference-catalogue-v1.json",
       import.meta.url,
     )));
 

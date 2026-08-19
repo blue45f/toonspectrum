@@ -18,7 +18,7 @@ const FRONT_CAMERA = {
 };
 
 const backgroundSource = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 
 describe("studio-bg3d-perspective-bridge", () => {
   it("derives a one-point guide for a camera aligned to the world z axis", () => {

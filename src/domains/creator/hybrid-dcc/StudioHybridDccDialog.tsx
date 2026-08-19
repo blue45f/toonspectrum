@@ -6,12 +6,13 @@ import { ArrowLeft, X } from "lucide-react";
 import { useEffectEvent, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
+import { activateStudioModalSheet } from "../useStudioModalSheet";
+
 import { StudioHybridDccPanel } from "./StudioHybridDccPanel";
-import { activateStudioModalSheet } from "./useStudioModalSheet";
 
 import type { StudioHybridDccBg3dHandoffResult } from "./studio-hybrid-dcc-bg3d-handoff";
 import type { StudioHybridDccWorkspace } from "./studio-hybrid-dcc-workspace";
-import type { StudioDccWorkbenchMode } from "./studio-workspace-route";
+import type { StudioDccWorkbenchMode } from "../studio-workspace-route";
 import type { StudioHybridDccPersistenceStatus } from "./StudioHybridDccPanel";
 
 export type StudioHybridDccPresentation = "modal" | "workspace";

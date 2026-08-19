@@ -98,12 +98,12 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     expect(editorImports.valueImports).not.toContain("./bg3d-model-library");
     expect(editorImports.valueImports).not.toContain("./bg3d-template-library");
     expect(editorImports.valueImports).not.toContain(
-      "./studio-mannequin-bg3d-preset-sqlite-repository",
+      "../scene-3d/studio-mannequin-bg3d-preset-sqlite-repository",
     );
     expect(modelLoaderImports.dynamicImports).toEqual(["./bg3d-model-library"]);
     expect(templateLoaderImports.dynamicImports).toEqual(["./bg3d-template-library"]);
     expect(presetLoaderImports.dynamicImports).toEqual([
-      "./studio-mannequin-bg3d-preset-sqlite-repository",
+      "../scene-3d/studio-mannequin-bg3d-preset-sqlite-repository",
     ]);
     expect(editorSource).toContain("if (!open || !modelsPanelActivated) return;");
     expect(editorSource).toContain("if (!open || !ltPresetPanelActivated) return;");
@@ -154,9 +154,9 @@ describe("Studio BG3D asset-library ownership boundary", () => {
   });
 
   it("preserves the single analyzable lazy editor boundary", () => {
-    const loaderImports = moduleImports("./studio-background-3d-loader.ts");
+    const loaderImports = moduleImports("../studio-background-3d-loader.ts");
 
-    expect(loaderImports.valueImports).not.toContain("./StudioBackground3D");
-    expect(loaderImports.dynamicImports).toEqual(["./StudioBackground3D"]);
+    expect(loaderImports.valueImports).not.toContain("./bg3d/StudioBackground3D");
+    expect(loaderImports.dynamicImports).toEqual(["./bg3d/StudioBackground3D"]);
   });
 });

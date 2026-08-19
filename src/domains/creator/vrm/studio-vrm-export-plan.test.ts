@@ -5,7 +5,8 @@ import {
   STUDIO_BG3D_GLB_MIME_TYPE,
   validateStudioBg3dGlb,
   type StudioBg3dGlbValidationResult,
-} from "./studio-bg3d-glb-validation";
+} from "../bg3d/studio-bg3d-glb-validation";
+
 import { StudioVrmExportError } from "./studio-vrm-export-error";
 import { readStudioVrmExportGlb } from "./studio-vrm-export-glb-container";
 import {

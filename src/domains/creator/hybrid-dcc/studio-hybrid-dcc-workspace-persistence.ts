@@ -10,19 +10,40 @@
 import {
   buildStudioBg3dRoomParts,
   getStudioBg3dRoomPreset,
-} from "./studio-bg3d-room-builder";
+} from "../bg3d/studio-bg3d-room-builder";
+import {
+  STUDIO_LIVE_2D3D_BRIDGE_REVISION,
+  STUDIO_TOON_PASS_KINDS,
+  createStudioSharedSet,
+  type StudioLiveBridgeDocument,
+  type StudioSharedSetObject,
+} from "../live/studio-live-2d3d-bridge";
 import {
   canonicalStudioCommandJson,
   restoreStudioCommandJournal,
   serializeStudioCommandJournal,
   StudioCommandJournalError,
-} from "./studio-command-journal";
-import { calculateStudioCrc32 } from "./studio-crc32";
+} from "../studio-command-journal";
+import { calculateStudioCrc32 } from "../studio-crc32";
 import {
   deserializeStudioEditableMesh,
   serializeStudioEditableMesh,
   type StudioEditableMeshSnapshot,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
+import { serializeStudioMeshModifierStack } from "../studio-mesh-modifier-stack";
+import {
+  createStudioOpfsRecoveryJournal,
+  createStudioOpfsRecoveryJournalAdapter,
+  StudioOpfsRecoveryJournalError,
+  type StudioOpfsRecoveryJournal,
+  type StudioOpfsRecoveryJournalAdapter,
+  type StudioOpfsRecoveryJournalLimits,
+  type StudioOpfsRecoveryLockManagerLike,
+  type StudioOpfsRecoveryQuotaEstimatorLike,
+  type StudioOpfsRecoveryWriterLease,
+} from "../studio-opfs-recovery-journal";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_HYBRID_DCC_DOCUMENT_VERSION,
   STUDIO_HYBRID_DCC_LEGACY_DOCUMENT_VERSION,
@@ -42,34 +63,14 @@ import {
   type StudioHybridDccWorkspace,
   type StudioOcctSolidResult,
 } from "./studio-hybrid-dcc-workspace";
-import {
-  STUDIO_LIVE_2D3D_BRIDGE_REVISION,
-  STUDIO_TOON_PASS_KINDS,
-  createStudioSharedSet,
-  type StudioLiveBridgeDocument,
-  type StudioSharedSetObject,
-} from "./studio-live-2d3d-bridge";
-import { serializeStudioMeshModifierStack } from "./studio-mesh-modifier-stack";
-import {
-  createStudioOpfsRecoveryJournal,
-  createStudioOpfsRecoveryJournalAdapter,
-  StudioOpfsRecoveryJournalError,
-  type StudioOpfsRecoveryJournal,
-  type StudioOpfsRecoveryJournalAdapter,
-  type StudioOpfsRecoveryJournalLimits,
-  type StudioOpfsRecoveryLockManagerLike,
-  type StudioOpfsRecoveryQuotaEstimatorLike,
-  type StudioOpfsRecoveryWriterLease,
-} from "./studio-opfs-recovery-journal";
-import { sha256HexPortable } from "./studio-sha256";
 
 
-import type { StudioRetargetReport, StudioSpringBone } from "./studio-character-animation-p2";
+import type { StudioRetargetReport, StudioSpringBone } from "../studio-character-animation-p2";
 import type { StudioDccCollabRoom } from "./studio-dcc-collab-shell";
-import type { StudioManufacturingBom } from "./studio-manufacturing-bom-lite";
-import type { StudioMeshExportResult } from "./studio-mesh-export-adapters";
-import type { StudioOpfsFileSystem } from "./studio-opfs-filesystem";
-import type { StudioUvMap } from "./studio-uv-unwrap-lite";
+import type { StudioManufacturingBom } from "../studio-manufacturing-bom-lite";
+import type { StudioMeshExportResult } from "../studio-mesh-export-adapters";
+import type { StudioOpfsFileSystem } from "../studio-opfs-filesystem";
+import type { StudioUvMap } from "../studio-uv-unwrap-lite";
 
 export const STUDIO_HYBRID_DCC_WORKSPACE_PERSISTENCE_FORMAT =
   "toonspectrum.hybrid-dcc-workspace-persistence" as const;

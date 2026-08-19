@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createStudioVectorInkGeometry,
+  type StudioVectorInkGeometryArtifact,
+  type StudioVectorInkSampleCandidate,
+} from "../studio-vector-ink-geometry";
+
+import {
   createStudioHybridTexturedVectorInkProvider,
   StudioHybridTexturedVectorInkProviderError,
   type StudioHybridTexturedVectorInkR8AssetInput,
 } from "./studio-hybrid-textured-vector-ink-provider";
-import {
-  createStudioVectorInkGeometry,
-  type StudioVectorInkGeometryArtifact,
-  type StudioVectorInkSampleCandidate,
-} from "./studio-vector-ink-geometry";
 
 function geometry(
   samples: readonly StudioVectorInkSampleCandidate[] = Array.from(

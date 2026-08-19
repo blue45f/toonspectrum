@@ -12,13 +12,13 @@ import {
 } from "./studio-bg3d-lt-layer-plan";
 
 import type {
-  StudioBackground3DInsertResult,
-  StudioBackground3DMagicFilterMask,
-} from "./studio-3d-insert-contract";
-import type {
   StudioBg3dLtLayerPlanSuccess,
   StudioBg3dLtPageElementLike,
 } from "./studio-bg3d-lt-layer-plan";
+import type {
+  StudioBackground3DInsertResult,
+  StudioBackground3DMagicFilterMask,
+} from "../scene-3d/studio-3d-insert-contract";
 
 const OBJECT_STABLE_ID_PATTERN = /^obj\/[A-Za-z0-9][A-Za-z0-9._~-]{0,79}$/u;
 const FORBIDDEN_NODE_ID_SET = new Set(["constructor", "prototype", "__proto__"]);

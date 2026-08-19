@@ -1,4 +1,5 @@
-import { STUDIO_EDITABLE_MESH_LIMITS } from "./studio-editable-half-edge-mesh";
+import { STUDIO_EDITABLE_MESH_LIMITS } from "../studio-editable-half-edge-mesh";
+
 import {
   STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_ISSUE_IDS,
   STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_REPORT_ISSUES,

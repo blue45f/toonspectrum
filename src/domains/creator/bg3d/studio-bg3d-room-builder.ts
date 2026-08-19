@@ -14,9 +14,9 @@
 // (지붕처럼 X/Z축이 이미 튼 파츠가 없다는 것이 이 단순화의 전제 — 카탈로그에 그런 파츠를 추가하려면
 // scene-templates의 rotateEulerYaw 방식으로 바꿔야 한다).
 
-import { uid } from "./studio-id";
+import { uid } from "../studio-id";
 
-import type { BgPrimitive, BgPrimitiveKind } from "./studio-background-3d-metadata";
+import type { BgPrimitive, BgPrimitiveKind } from "../studio-background-3d-metadata";
 
 export const STUDIO_BG3D_ROOM_WALL_IDS = ["north", "south", "west", "east"] as const;
 export type StudioBg3dRoomWallId = (typeof STUDIO_BG3D_ROOM_WALL_IDS)[number];

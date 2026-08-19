@@ -6,7 +6,8 @@ import {
   diagnoseStudioEditableMesh,
   type StudioEditableMesh,
   type StudioMeshDiagnostic,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
+
 import { normalizeStudioHybridDccObjectTransform } from "./studio-hybrid-dcc-object-transform";
 
 import type { StudioHybridDccDocumentState } from "./studio-hybrid-dcc-document";

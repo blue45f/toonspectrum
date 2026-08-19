@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import { applyStudioBg3dRuntimeAssetQuality } from "./studio-bg3d-runtime-asset-quality";
+import { applyStudioBg3dRuntimeAssetQuality } from "../bg3d/studio-bg3d-runtime-asset-quality";
 
 import type { PropGltfGeometrySource } from "./studio-vrm-props";
 

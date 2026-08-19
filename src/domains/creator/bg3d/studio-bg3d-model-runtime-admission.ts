@@ -9,7 +9,13 @@ import {
   type StudioBg3dThreeJointDescriptor,
   type StudioBg3dThreeLoadSuccess,
   type StudioBg3dThreeMorphDescriptor,
-} from "./studio-background-3d-model";
+} from "../studio-background-3d-model";
+import { inspectStudioGeneric3dRuntimeHints } from "../studio-generic-3d-runtime-hints";
+import {
+  attachStudioGeneric3dWorkflowMetadata,
+  parseStudioGeneric3dWorkflowMetadata,
+} from "../studio-generic-3d-workflow-metadata";
+
 import {
   deriveStudioBg3dGlbValidationPolicy,
   type StudioBg3dResolvedDeviceQuality,
@@ -24,30 +30,23 @@ import {
   admitStoredBg3dModelForRenderingV12 as admitStoredBg3dModelForRendering,
   type Bg3dVerifiedStoredRecord,
 } from "./studio-bg3d-model-library-loader";
-import { assertStudioBg3dModelPlacementAdmission } from
-  "./studio-bg3d-model-placement-admission";
+import { assertStudioBg3dModelPlacementAdmission } from "./studio-bg3d-model-placement-admission";
 import { applyStudioBg3dRuntimeAssetQuality } from "./studio-bg3d-runtime-asset-quality";
 import {
   classifyStudioBg3dThreeSemanticMaterials,
 } from "./studio-bg3d-three-semantic-materials";
-import { inspectStudioGeneric3dRuntimeHints } from "./studio-generic-3d-runtime-hints";
-import {
-  attachStudioGeneric3dWorkflowMetadata,
-  parseStudioGeneric3dWorkflowMetadata,
-} from "./studio-generic-3d-workflow-metadata";
 
 import type {
   StudioBg3dModelAttachment,
   StudioBg3dSceneBudgets,
   StudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
-import type { StudioBg3dSemanticMaterialClassificationResult } from
-  "./studio-bg3d-semantic-materials";
+import type { StudioBg3dSemanticMaterialClassificationResult } from "./studio-bg3d-semantic-materials";
 import type {
   StudioGeneric3dClassification,
   StudioGeneric3dManifestHints,
   StudioGeneric3dSourceFormat,
-} from "./studio-generic-3d-model-mode";
+} from "../studio-generic-3d-model-mode";
 import type { WebGLRenderer } from "three";
 
 export type StudioBg3dModelRootCacheEntry = Pick<

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { getStudioBg3dRoomPreset, buildStudioBg3dRoomParts } from "./studio-bg3d-room-builder";
-import { createStudioUnitCubeMesh } from "./studio-editable-half-edge-mesh";
+import { getStudioBg3dRoomPreset, buildStudioBg3dRoomParts } from "../bg3d/studio-bg3d-room-builder";
+import { createStudioUnitCubeMesh } from "../studio-editable-half-edge-mesh";
+
 import { hybridDccRegisterAssets } from "./studio-hybrid-dcc-document";
 import { createStudioHybridDccIdentityTransform } from "./studio-hybrid-dcc-object-transform";
 import { parseStudioHybridDccRoomPartMetadata } from "./studio-hybrid-dcc-room-authority";

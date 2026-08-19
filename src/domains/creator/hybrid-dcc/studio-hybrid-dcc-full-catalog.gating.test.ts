@@ -14,7 +14,7 @@ import {
   measureStudioCadExtrusion,
   orderStudioCadFeatureTree,
   revolveStudioCadProfile,
-} from "./studio-cad-kernel-lite";
+} from "../studio-cad-kernel-lite";
 import {
   createStudioIdleClip,
   clampStudioJointRotation,
@@ -22,8 +22,8 @@ import {
   retargetStudioMotionReport,
   sampleStudioAnimationClip,
   stepStudioSpringBone,
-} from "./studio-character-animation-p2";
-import { createStudioDefaultBodyPose } from "./studio-character-ik-fk";
+} from "../studio-character-animation-p2";
+import { createStudioDefaultBodyPose } from "../studio-character-ik-fk";
 import {
   createStudioClothGrid,
   createStudioClothPatternPanel,
@@ -31,7 +31,30 @@ import {
   stepStudioClothXpbd,
   STUDIO_CLOTH_FABRIC_PRESETS,
   validateStudioClothSeam,
-} from "./studio-cloth-pattern-kernel";
+} from "../studio-cloth-pattern-kernel";
+import { createStudioUnitCubeMesh } from "../studio-editable-half-edge-mesh";
+import { importStudioGlbDocument } from "../studio-glb-scene-ir";
+import {
+  bisectStudioEditableMesh,
+  bridgeStudioFaceLoops,
+  decimateStudioMesh,
+  deformStudioMeshBend,
+  repairStudioMesh,
+  retopoSnapStudioMeshToPlane,
+  shrinkwrapStudioMesh,
+  subdivideStudioMeshCatmullLite,
+} from "../studio-mesh-ops-advanced";
+import {
+  applyStudioClonerField,
+  arrayStudioAlongCurve,
+  scatterStudioInstances,
+} from "../studio-procedural-scatter";
+import {
+  buildStudioAnimaticTimeline,
+  diffStudioShotContinuity,
+  studioCameraFovY,
+} from "../studio-shot-continuity";
+
 import {
   assertNoProprietaryInBrowserCore,
   lookupStudioFormat,
@@ -39,8 +62,6 @@ import {
   studioFormatsByGrade,
   studioFormatsByPriority,
 } from "./studio-dcc-format-matrix";
-import { createStudioUnitCubeMesh } from "./studio-editable-half-edge-mesh";
-import { importStudioGlbDocument } from "./studio-glb-scene-ir";
 import {
   createStudioHybridDccSession,
   hybridDccRegisterAsset,
@@ -53,26 +74,6 @@ import {
   polypaintStudioMesh,
   voxelRemeshStudioMesh,
 } from "./studio-hybrid-sculpt-kernel";
-import {
-  bisectStudioEditableMesh,
-  bridgeStudioFaceLoops,
-  decimateStudioMesh,
-  deformStudioMeshBend,
-  repairStudioMesh,
-  retopoSnapStudioMeshToPlane,
-  shrinkwrapStudioMesh,
-  subdivideStudioMeshCatmullLite,
-} from "./studio-mesh-ops-advanced";
-import {
-  applyStudioClonerField,
-  arrayStudioAlongCurve,
-  scatterStudioInstances,
-} from "./studio-procedural-scatter";
-import {
-  buildStudioAnimaticTimeline,
-  diffStudioShotContinuity,
-  studioCameraFovY,
-} from "./studio-shot-continuity";
 
 describe("P2 mesh advanced ops", () => {
   it("bisect, bridge, subdiv, decimate, bend, shrinkwrap, repair, retopo snap", () => {

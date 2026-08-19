@@ -333,7 +333,7 @@ function applyThumbnailRendererState(
 }
 
 async function cloneCachedRoot(root: THREE.Object3D): Promise<THREE.Object3D> {
-  const { cloneStudioBg3dThreeObject } = await import("./studio-background-3d-model");
+  const { cloneStudioBg3dThreeObject } = await import("../studio-background-3d-model");
   return cloneStudioBg3dThreeObject(root);
 }
 

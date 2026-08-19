@@ -2,7 +2,8 @@ import { VRMHumanoid, type VRM, type VRMHumanBones } from "@pixiv/three-vrm";
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 
-import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
+import { STUDIO_HUMANOID_BONE_NAMES } from "../studio-humanoid-bones";
+
 import { STUDIO_VRM_REFERENCE_BONE_SNAPSHOT } from "./studio-vrm-proportion-core";
 import {
   createStudioVrmProportionVrmAdapter,

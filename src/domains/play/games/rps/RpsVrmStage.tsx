@@ -13,7 +13,7 @@ import {
   POSE_PRESETS,
   type FingerRotationMap,
   type PoseBoneMap,
-} from "@/src/domains/creator/studio-vrm-poser-utils";
+} from "@/src/domains/creator/vrm/studio-vrm-poser-utils";
 
 // 정적 자산 경로 헬퍼를 거쳐 VRM URL 규약을 한 곳에서 유지합니다.
 const VRM_URL = "/vrm/sample.vrm";

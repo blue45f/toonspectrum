@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import { loadVerifiedStudioBg3dGlbWithThree } from "./studio-background-3d-model";
+import { loadVerifiedStudioBg3dGlbWithThree } from "../studio-background-3d-model";
+
 import {
   DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
   STUDIO_BG3D_GLB_MIME_TYPE,

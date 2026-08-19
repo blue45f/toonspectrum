@@ -72,14 +72,14 @@ import * as THREE from "three";
 import {
   createStudioBg3dAiMethodReferenceCapture,
   type StudioBg3dAiMethodReferenceCapture,
-} from "./studio-3d-ai-reference-handoff";
+} from "../scene-3d/studio-3d-ai-reference-handoff";
 import {
   COMPOSITE_CATEGORIES,
   COMPOSITE_CATEGORY_LABELS,
   COMPOSITE_PRESETS,
   instantiateCompositePreset,
   type BgCompositeCategory,
-} from "./studio-background-3d-composites";
+} from "../studio-background-3d-composites";
 import {
   cloneBgCustomModelInstances,
   createStudioBg3dEditableThreeClone,
@@ -94,7 +94,7 @@ import {
   type StudioBg3dEditableThreeClone,
   type StudioBg3dThreeJointDescriptor,
   type StudioBg3dThreeMorphDescriptor,
-} from "./studio-background-3d-model";
+} from "../studio-background-3d-model";
 import {
   clonePrimitives,
   createPrimitive,
@@ -102,17 +102,42 @@ import {
   PRIMITIVE_DEFS,
   type BgPrimitive,
   type BgPrimitiveKind,
-} from "./studio-background-3d-primitives";
+} from "../studio-background-3d-primitives";
 import {
   BG_SCENE_TEMPLATES,
   instantiateSceneTemplate,
   type BgSceneTemplateCategory,
-} from "./studio-background-3d-scene-templates";
+} from "../studio-background-3d-scene-templates";
 import {
   BG_SKY_PRESETS,
   getSkyPreset,
   normalizePanoramaRotationDegrees,
-} from "./studio-background-3d-sky";
+} from "../studio-background-3d-sky";
+import {
+  createStudioGeneric3dRightsFromAttachment,
+  createStudioGeneric3dVerifiedManifest,
+  type StudioGeneric3dClassification,
+  type StudioGeneric3dSourceFormat,
+} from "../studio-generic-3d-model-mode";
+import { createStudioGeneric3dPoseProxies } from "../studio-generic-3d-pose-proxy";
+import {
+  mergeStudioGeneric3dWorkflowMaps,
+  normalizeStudioGeneric3dClassification,
+  normalizeStudioGeneric3dSourceFormat,
+  parseStudioGeneric3dWorkflowMetadata,
+} from "../studio-generic-3d-workflow-metadata";
+import { createTwoBoneDefaultPoleTarget } from "../studio-rig-two-bone-ik";
+import {
+  createStudioShared3dCharacterShadowEntity,
+} from "../studio-shared-3d-scene-runtime";
+import {
+  StudioGeneric3dModelModePanel,
+  type StudioGeneric3dControlMode,
+} from "../StudioGeneric3dModelModePanel";
+import { StudioToolHintTarget } from "../StudioToolHint";
+import { useStudioBg3dSharedCharacterStatus } from "../useStudioBg3dSharedCharacterStatus";
+import { useStudioModalSheet } from "../useStudioModalSheet";
+
 import { resolveStudioBg3dAnimationSchedule } from "./studio-bg3d-animation-scheduler";
 import {
   isStudioBg3dAnimationOnceComplete,
@@ -127,8 +152,7 @@ import {
   STUDIO_BG3D_STABLE_ID_PROFILE,
   normalizeStudioBg3dArtifactCaptureResultV2,
 } from "./studio-bg3d-artifact-capture-v2";
-import { copyStudioBg3dBundledEnvironmentLibraryEntries } from
-  "./studio-bg3d-bundled-environment-library";
+import { copyStudioBg3dBundledEnvironmentLibraryEntries } from "./studio-bg3d-bundled-environment-library";
 import {
   applyStudioBg3dProjectionAwareZoom,
   applyStudioBg3dViewportAfterTransition,
@@ -527,23 +551,6 @@ import {
 } from "./studio-bg3d-three-instancing";
 import { resolveStudioBg3dThreeCenterGroundLocalPosition } from "./studio-bg3d-three-model-alignment";
 import { applyStudioBg3dThreeWebglRenderSettings } from "./studio-bg3d-three-render-settings";
-import {
-  createStudioGeneric3dRightsFromAttachment,
-  createStudioGeneric3dVerifiedManifest,
-  type StudioGeneric3dClassification,
-  type StudioGeneric3dSourceFormat,
-} from "./studio-generic-3d-model-mode";
-import { createStudioGeneric3dPoseProxies } from "./studio-generic-3d-pose-proxy";
-import {
-  mergeStudioGeneric3dWorkflowMaps,
-  normalizeStudioGeneric3dClassification,
-  normalizeStudioGeneric3dSourceFormat,
-  parseStudioGeneric3dWorkflowMetadata,
-} from "./studio-generic-3d-workflow-metadata";
-import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
-import {
-  createStudioShared3dCharacterShadowEntity,
-} from "./studio-shared-3d-scene-runtime";
 import { StudioBg3dActionFooter } from "./StudioBg3dActionFooter";
 import { StudioBg3dDirectionalShadowLight } from "./StudioBg3dDirectionalShadowLight";
 import { StudioBg3dImmersivePanel } from "./StudioBg3dImmersivePanel";
@@ -572,17 +579,8 @@ import {
   StudioBg3dImmersiveRenderBridge,
   StudioBg3dWebXrSessionBridge,
 } from "./StudioBg3dWebXrSessionBridge";
-import {
-  StudioGeneric3dModelModePanel,
-  type StudioGeneric3dControlMode,
-} from "./StudioGeneric3dModelModePanel";
-import { StudioToolHintTarget } from "./StudioToolHint";
-import { useStudioBg3dSharedCharacterStatus } from "./useStudioBg3dSharedCharacterStatus";
-import { useStudioModalSheet } from "./useStudioModalSheet";
 
-import type {
-  StudioBackground3DInsertResult,
-} from "./studio-3d-insert-contract";
+
 import type {
   StudioBg3dCaptureAdapter,
   StudioBg3dCaptureRequest,
@@ -614,23 +612,26 @@ import type {
 } from "./studio-bg3d-shot-batch-recovery-store";
 import type { StudioBg3dShotBatchRuntime } from "./studio-bg3d-shot-batch-runtime-loader";
 import type { StudioBg3dShotContactSheetImage } from "./studio-bg3d-shot-contact-sheet-contract";
-import type { StudioShared3dSceneSession } from "./studio-shared-3d-scene-bridge";
-import type { StudioShared3dStageResolution } from "./studio-shared-3d-stage-document";
-import type { StudioToolHintSpec } from "./studio-tool-hints";
+import type {
+  StudioBackground3DInsertResult,
+} from "../scene-3d/studio-3d-insert-contract";
+import type { StudioShared3dSceneSession } from "../studio-shared-3d-scene-bridge";
+import type { StudioShared3dStageResolution } from "../studio-shared-3d-stage-document";
+import type { StudioToolHintSpec } from "../studio-tool-hints";
 import type {
   StudioWebXrMode,
   StudioWebXrSessionController,
   StudioWebXrSessionState,
   StudioWebXrSupportSnapshot,
-} from "./studio-webxr-session";
+} from "../studio-webxr-session";
 
 export type {
   StudioBackground3DInsertResult,
   StudioBackground3DLtLayer,
-} from "./studio-3d-insert-contract";
+} from "../scene-3d/studio-3d-insert-contract";
 
 const LazyStudioBg3dAssetLibraryPanel = lazy(() =>
-  import("./StudioBg3dAssetLibraryPanel").then(({ StudioBg3dAssetLibraryPanel }) => ({
+  import( "./StudioBg3dAssetLibraryPanel").then(({ StudioBg3dAssetLibraryPanel }) => ({
     default: StudioBg3dAssetLibraryPanel,
   }))
 );
@@ -775,7 +776,7 @@ interface ModelThumbnailGpuLease {
 }
 
 type StudioBg3dModelThumbnailCaptureControllerConstructor =
-  typeof import("./studio-bg3d-model-thumbnail-capture").StudioBg3dModelThumbnailCaptureController;
+  typeof import( "./studio-bg3d-model-thumbnail-capture").StudioBg3dModelThumbnailCaptureController;
 
 interface StudioBg3dModelThumbnailRuntime {
   readonly CaptureController: StudioBg3dModelThumbnailCaptureControllerConstructor;
@@ -7215,7 +7216,7 @@ export function StudioBackground3D({
     setIsCapturing(true);
     try {
       // Load the asset writer only on explicit save while the capture guard excludes re-entry.
-      const { saveAsset } = await import("./studio-asset-library");
+      const { saveAsset } = await import("../studio-asset-library");
       const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
         isActive: () => componentActiveRef.current,
         readAdapter: () => captureRef.current.adapter,

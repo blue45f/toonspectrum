@@ -42,7 +42,7 @@
  * 포즈(회전 기반)는 변경 이후에도 그대로 적용된다.
  */
 
-import { STUDIO_HUMANOID_BONE_NAMES, type StudioHumanoidBoneName } from "./studio-humanoid-bones";
+import { STUDIO_HUMANOID_BONE_NAMES, type StudioHumanoidBoneName } from "../studio-humanoid-bones";
 
 export const STUDIO_VRM_PROPORTION_VERSION = 1 as const;
 

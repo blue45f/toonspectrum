@@ -73,7 +73,7 @@ describe("Studio 3D insert controller boundary", () => {
 
     expect(controller.allImports).toEqual([
       "./studio-3d-insert-contract",
-      "./studio-editor-scope",
+      "../studio-editor-scope",
     ]);
     expect(controller.wholeClauseTypeImports).toEqual(controller.allImports);
     expect(controller.valueImports).toEqual([]);
@@ -87,14 +87,14 @@ describe("Studio 3D insert controller boundary", () => {
 
   it("owns insert payloads in a renderer-neutral type-only leaf with compatibility re-exports", () => {
     const contract = moduleShape("./studio-3d-insert-contract.ts");
-    const background = moduleShape("./StudioBackground3D.tsx");
-    const poser = moduleShape("./StudioVrmPoser.tsx");
-    const ltRender = moduleShape("./studio-bg3d-lt-render.ts");
+    const background = moduleShape("../bg3d/StudioBackground3D.tsx");
+    const poser = moduleShape("../vrm/StudioVrmPoser.tsx");
+    const ltRender = moduleShape("../bg3d/studio-bg3d-lt-render.ts");
 
     expect(contract.allImports).toEqual([
-      "./studio-bg3d-scene-document",
-      "./studio-shared-3d-insert-contract",
-      "./studio-vrm-scene-document",
+      "../bg3d/studio-bg3d-scene-document",
+      "../studio-shared-3d-insert-contract",
+      "../vrm/studio-vrm-scene-document",
     ]);
     expect(contract.wholeClauseTypeImports).toEqual(contract.allImports);
     expect(contract.valueImports).toEqual([]);
@@ -111,44 +111,44 @@ describe("Studio 3D insert controller boundary", () => {
     expect(contract.source.split("\n").length).toBeLessThanOrEqual(70);
 
     expect(background.source).toContain(
-      'import type {\n  StudioBackground3DInsertResult,\n} from "./studio-3d-insert-contract";'
+      'import type {\n  StudioBackground3DInsertResult,\n} from "../scene-3d/studio-3d-insert-contract";'
     );
     expect(background.source).toContain(
-      'export type {\n  StudioBackground3DInsertResult,\n  StudioBackground3DLtLayer,\n} from "./studio-3d-insert-contract";'
+      'export type {\n  StudioBackground3DInsertResult,\n  StudioBackground3DLtLayer,\n} from "../scene-3d/studio-3d-insert-contract";'
     );
     expect(background.source).not.toContain("export interface StudioBackground3DLtLayer");
     expect(background.source).not.toContain("export interface StudioBackground3DInsertResult");
     expect(poser.source).toContain(
-      'import type { StudioVrmPoserInsertResult } from "./studio-3d-insert-contract";'
+      'import type { StudioVrmPoserInsertResult } from "../scene-3d/studio-3d-insert-contract";'
     );
     expect(poser.source).toContain(
-      'export type { StudioVrmPoserInsertResult } from "./studio-3d-insert-contract";'
+      'export type { StudioVrmPoserInsertResult } from "../scene-3d/studio-3d-insert-contract";'
     );
     expect(poser.source).not.toContain("export type StudioVrmPoserInsertResult =");
     expect(ltRender.source).toContain(
-      'import type { StudioBg3dLtRasterLayerRole } from "./studio-3d-insert-contract";'
+      'import type { StudioBg3dLtRasterLayerRole } from "../scene-3d/studio-3d-insert-contract";'
     );
     expect(ltRender.source).toContain(
-      'export type { StudioBg3dLtRasterLayerRole } from "./studio-3d-insert-contract";'
+      'export type { StudioBg3dLtRasterLayerRole } from "../scene-3d/studio-3d-insert-contract";'
     );
     expect(ltRender.source).not.toContain("export type StudioBg3dLtRasterLayerRole =");
   });
 
   it("keeps StudioPage as the single static orchestration owner", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const page = moduleShape("../StudioPage.tsx");
     const controllerTest = moduleShape("./studio-3d-insert-controller.test.ts");
 
     expect(
       page.valueImports.filter(
-        (specifier) => specifier === "./studio-3d-insert-controller"
+        (specifier) => specifier === "./scene-3d/studio-3d-insert-controller"
       )
-    ).toEqual(["./studio-3d-insert-controller"]);
-    expect(page.dynamicImports).not.toContain("./studio-3d-insert-controller");
-    expect(page.wholeClauseTypeImports).toContain("./studio-3d-insert-contract");
-    expect(page.allImports).not.toContain("./StudioBackground3D");
+    ).toEqual(["./scene-3d/studio-3d-insert-controller"]);
+    expect(page.dynamicImports).not.toContain("./scene-3d/studio-3d-insert-controller");
+    expect(page.wholeClauseTypeImports).toContain("./scene-3d/studio-3d-insert-contract");
+    expect(page.allImports).not.toContain("../bg3d/StudioBackground3D");
     expect(controllerTest.wholeClauseTypeImports).toContain("./studio-3d-insert-contract");
-    expect(controllerTest.allImports).not.toContain("./StudioBackground3D");
-    expect(controllerTest.allImports).not.toContain("./StudioVrmPoser");
+    expect(controllerTest.allImports).not.toContain("../bg3d/StudioBackground3D");
+    expect(controllerTest.allImports).not.toContain("../vrm/StudioVrmPoser");
     expect(page.source).toContain(
       "function captureStudioMutationTicket(): StudioEditorMutationTicket"
     );
@@ -162,8 +162,8 @@ describe("Studio 3D insert controller boundary", () => {
   });
 
   it("exposes only semantic boolean insert transactions to the lazy modal stack", () => {
-    const stack = moduleShape("./StudioLazyPanelStack.tsx").source;
-    const previewStack = moduleShape("./StudioThreeDPreviewPanelStack.tsx").source;
+    const stack = moduleShape("../StudioLazyPanelStack.tsx").source;
+    const previewStack = moduleShape("../StudioThreeDPreviewPanelStack.tsx").source;
     const handlersStart = stack.indexOf("export interface StudioLazyPanelStackHandlers");
     const propsStart = stack.indexOf("export interface StudioLazyPanelStackProps", handlersStart);
     const componentStart = stack.indexOf("export const StudioLazyPanelStack =", propsStart);
@@ -189,7 +189,7 @@ describe("Studio 3D insert controller boundary", () => {
     expect(previewStack).not.toContain("applyBg3dRenderedImage");
     expect(previewStack).not.toContain("addRenderedImage");
     expect(previewStack).not.toContain("patchEl");
-    const page = moduleShape("./StudioPage.tsx").source;
+    const page = moduleShape("../StudioPage.tsx").source;
     const insertHandlerStart = page.indexOf("insertBg3dResult: (result) => {");
     const insertHandlerEnd = page.indexOf("insertVrmResult:", insertHandlerStart);
     const insertHandler = page.slice(insertHandlerStart, insertHandlerEnd);
@@ -202,7 +202,7 @@ describe("Studio 3D insert controller boundary", () => {
   });
 
   it("wires fail-closed commit results before selection, tool, and guide side effects", () => {
-    const page = moduleShape("./StudioPage.tsx").source;
+    const page = moduleShape("../StudioPage.tsx").source;
     const addStart = page.indexOf("function addEl(el: El): boolean");
     const addEnd = page.indexOf("// ── 레이어 그룹", addStart);
     const addElement = page.slice(addStart, addEnd);

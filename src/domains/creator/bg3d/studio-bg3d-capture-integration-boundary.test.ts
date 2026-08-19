@@ -7,9 +7,9 @@ const actionFooterSource = readFileSync(
   new URL("./StudioBg3dActionFooter.tsx", import.meta.url),
   "utf8",
 );
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 const studioLazyPanelStackSource = readFileSync(
-  new URL("./StudioThreeDPreviewPanelStack.tsx", import.meta.url),
+  new URL("../StudioThreeDPreviewPanelStack.tsx", import.meta.url),
   "utf8"
 );
 

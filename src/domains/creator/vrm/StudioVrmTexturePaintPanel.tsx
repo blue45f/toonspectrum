@@ -9,12 +9,12 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import type { StudioVrmTextureFillScope } from "./studio-vrm-texture-fill";
+import type { StudioVrmTexturePaintBlendMode } from "./studio-vrm-texture-paint-ops";
 import type {
   StudioStampBrushKind,
   StudioStampBrushTuning,
-} from "./studio-brush-stamp-engine";
-import type { StudioVrmTextureFillScope } from "./studio-vrm-texture-fill";
-import type { StudioVrmTexturePaintBlendMode } from "./studio-vrm-texture-paint-ops";
+} from "../brush/studio-brush-stamp-engine";
 
 import { cn } from "@/lib/utils";
 

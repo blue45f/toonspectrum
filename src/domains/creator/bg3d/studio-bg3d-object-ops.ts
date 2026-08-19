@@ -3,7 +3,7 @@
  * Engine-free so unit tests and UI can share one contract.
  */
 
-import type { BgPrimitiveKind } from "./studio-background-3d-metadata";
+import type { BgPrimitiveKind } from "../studio-background-3d-metadata";
 
 export type Bg3dVec3 = readonly [number, number, number];
 export type Bg3dMutableVec3 = [number, number, number];

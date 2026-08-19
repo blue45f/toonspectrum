@@ -12,7 +12,7 @@ import {
   serializeStudioCommandJournal,
   type StudioCommandJournal,
   type StudioCommandJsonValue,
-} from "./studio-command-journal";
+} from "../studio-command-journal";
 import {
   STUDIO_EDITABLE_MESH_LIMITS,
   deserializeStudioEditableMesh,
@@ -23,7 +23,7 @@ import {
   type StudioEditableMesh,
   type StudioEditableMeshExtrudeRegionReceipt,
   type StudioEditableMeshSnapshot,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
 import {
   applyStudioGeometryAuthorityModifierStack,
   commitStudioGeometryAuthorityMesh,
@@ -31,13 +31,7 @@ import {
   registerStudioGeometryAuthority,
   setStudioGeometryAuthorityModifierStack,
   type StudioGeometryAuthorityRegistry,
-} from "./studio-geometry-authority";
-import {
-  createStudioHybridDccIdentityTransform,
-  hashStudioHybridDccObjectTransform,
-  normalizeStudioHybridDccObjectTransform,
-  type StudioHybridDccObjectTransform,
-} from "./studio-hybrid-dcc-object-transform";
+} from "../studio-geometry-authority";
 import {
   createStudioMeshModifierStack,
   deserializeStudioMeshModifierStack,
@@ -46,14 +40,21 @@ import {
   type StudioMeshModifier,
   type StudioMeshModifierStack,
   type StudioMeshModifierStackDto,
-} from "./studio-mesh-modifier-stack";
+} from "../studio-mesh-modifier-stack";
 import {
   createStudioOpfsRecoveryJournal,
   type StudioOpfsRecoveryJournal,
   type StudioOpfsRecoveryJournalAdapter,
   type StudioOpfsRecoveryWriterLease,
-} from "./studio-opfs-recovery-journal";
-import { sha256HexPortable } from "./studio-sha256";
+} from "../studio-opfs-recovery-journal";
+import { sha256HexPortable } from "../studio-sha256";
+
+import {
+  createStudioHybridDccIdentityTransform,
+  hashStudioHybridDccObjectTransform,
+  normalizeStudioHybridDccObjectTransform,
+  type StudioHybridDccObjectTransform,
+} from "./studio-hybrid-dcc-object-transform";
 
 export const STUDIO_HYBRID_DCC_DOCUMENT_VERSION = 3 as const;
 export const STUDIO_HYBRID_DCC_PREVIOUS_DOCUMENT_VERSION = 2 as const;

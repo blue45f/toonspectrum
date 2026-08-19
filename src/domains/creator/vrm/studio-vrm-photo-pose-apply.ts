@@ -2,7 +2,7 @@ import {
   getStudioHumanoidBoneDescriptor,
   isStudioHumanoidBoneName,
   type StudioHumanoidBoneName,
-} from "./studio-humanoid-bones";
+} from "../studio-humanoid-bones";
 
 import type { FingerRotationMap, PoseBoneMap, Vec3 } from "./studio-vrm-poser-utils";
 

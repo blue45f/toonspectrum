@@ -10,8 +10,7 @@ import { Constants } from "@babylonjs/core/Engines/constants";
 import { Material } from "@babylonjs/core/Materials/material";
 import { ShaderLanguage } from "@babylonjs/core/Materials/shaderLanguage";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
-import { RenderTargetTexture } from
-  "@babylonjs/core/Materials/Textures/renderTargetTexture";
+import { RenderTargetTexture } from "@babylonjs/core/Materials/Textures/renderTargetTexture";
 import { Color4 } from "@babylonjs/core/Maths/math.color";
 import { VertexBuffer } from "@babylonjs/core/Meshes/buffer";
 import "@babylonjs/core/Shaders/picking.vertex";
@@ -25,8 +24,7 @@ import {
   type StudioBg3dStableIdPackingPlan,
 } from "./studio-bg3d-babylon-stable-id-packing";
 
-import type { StudioBg3dStableIdLegendEntry } from
-  "./studio-bg3d-artifact-capture-v2";
+import type { StudioBg3dStableIdLegendEntry } from "./studio-bg3d-artifact-capture-v2";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Scene } from "@babylonjs/core/scene";
 

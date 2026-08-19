@@ -5,7 +5,7 @@ import {
   studioHumanoidBonesForScope,
   type StudioHumanoidBoneName,
   type StudioPoseScope,
-} from "./studio-humanoid-bones";
+} from "../studio-humanoid-bones";
 import {
   createStudioPoseMaterialMergePlan,
   parseStudioPoseMaterial,
@@ -13,8 +13,9 @@ import {
   STUDIO_POSE_MATERIAL_VERSION,
   STUDIO_POSE_ROTATION_CONVENTION,
   type StudioPoseMaterial,
-} from "./studio-pose-material";
-import { blendStudioPoseMaterialMergePlan } from "./studio-pose-material-blend";
+} from "../studio-pose-material";
+import { blendStudioPoseMaterialMergePlan } from "../studio-pose-material-blend";
+
 import { bakeStudioVrmRuntimeBoneRotation } from "./studio-vrm-pose-bake";
 
 import type { FingerRotationMap, PoseBoneMap } from "./studio-vrm-poser-utils";

@@ -1,4 +1,4 @@
-import type { StudioShared3dStageResolution } from "./studio-shared-3d-stage-document";
+import type { StudioShared3dStageResolution } from "../studio-shared-3d-stage-document";
 
 import { cx } from "@/lib/cx";
 

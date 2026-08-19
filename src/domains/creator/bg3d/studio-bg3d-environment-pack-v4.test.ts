@@ -10,8 +10,7 @@ import {
   getStoredBg3dModelV12,
   resolveStudioBg3dModelAttachmentSource,
 } from "./bg3d-model-library";
-import { loadStudioBg3dBundledEnvironmentSource } from
-  "./studio-bg3d-bundled-environment-loader";
+import { loadStudioBg3dBundledEnvironmentSource } from "./studio-bg3d-bundled-environment-loader";
 import {
   STUDIO_BG3D_ENVIRONMENT_ASSETS,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_V3,
@@ -21,8 +20,7 @@ import {
   getStudioBg3dEnvironmentAssetByHash,
   isStudioBg3dEnvironmentAssetId,
 } from "./studio-bg3d-environment-catalog";
-import { resolveStudioBg3dModelNormalizationScale } from
-  "./studio-bg3d-model-runtime-admission";
+import { resolveStudioBg3dModelNormalizationScale } from "./studio-bg3d-model-runtime-admission";
 
 const JSON_CHUNK_TYPE = 0x4e4f534a;
 const MAX_ENVIRONMENT_BYTES = 5 * 1024 * 1024;
@@ -84,7 +82,7 @@ const EXPECTED_METRICS = Object.freeze({
 } as const);
 
 function publicAssetPath(url: string): string {
-  return fileURLToPath(new URL(`../../../public${url}`, import.meta.url));
+  return fileURLToPath(new URL(`../../../../public${url}`, import.meta.url));
 }
 
 function parseEnvironmentGlb(url: string) {
@@ -299,7 +297,7 @@ describe("Studio BG3D Blender 5.2 Wave 4 environment pack", () => {
 
   it("keeps the reproducible generator safe for background or MCP-hosted Blender sessions", () => {
     const generator = readFileSync(
-      fileURLToPath(new URL("../../../scripts/blender/generate_environment_pack_v4.py", import.meta.url)),
+      fileURLToPath(new URL("../../../../scripts/blender/generate_environment_pack_v4.py", import.meta.url)),
       "utf8",
     );
     for (const asset of STUDIO_BG3D_ENVIRONMENT_ASSETS_V4) {

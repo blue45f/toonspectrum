@@ -24,7 +24,7 @@ const xpbdSkirtAttachmentSource = readFileSync(
   new URL("./StudioVrmXpbdSkirtAttachment.tsx", import.meta.url),
   "utf8",
 );
-const lazyUiSource = readFileSync(new URL("./studio-page-lazy-ui.ts", import.meta.url), "utf8");
+const lazyUiSource = readFileSync(new URL("../studio-page-lazy-ui.ts", import.meta.url), "utf8");
 const proportionFitSource = readFileSync(
   new URL("./studio-vrm-proportion-fit-transaction.ts", import.meta.url),
   "utf8",
@@ -116,7 +116,7 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
     expect(xpbdSkirtAttachmentSource).not.toMatch(
       /from ["']\.\/(?:StudioVrmPoser|StudioPage)["']/u,
     );
-    expect(lazyUiSource).toContain('() => import("./StudioVrmPoser")');
+    expect(lazyUiSource).toMatch(/\(\)\s*=>\s*import\(\s*["']\.\/(?:vrm\/)?StudioVrmPoser["']\)/u);
     expect(lazyUiSource).not.toContain("StudioVrmWardrobePropsProjection");
   });
 

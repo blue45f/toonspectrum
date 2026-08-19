@@ -7,20 +7,21 @@
  */
 
 import {
-  runHybridSelectionMaskMorphology,
-  type StudioHybridObjectPickCandidate,
-} from "./studio-hybrid-brush-filter-edit-runtime";
-import {
   createStudioOpenCvImageProvider,
   type StudioOpenCvImageProviderOptions,
   type StudioOpenCvImageResult,
-} from "./studio-opencv-image-provider";
+} from "../studio-opencv-image-provider";
 import {
   expandContractSelection,
   isSelectionUsable,
   pointInSelection,
   type PixelSelection,
-} from "./studio-selection-tools";
+} from "../studio-selection-tools";
+
+import {
+  runHybridSelectionMaskMorphology,
+  type StudioHybridObjectPickCandidate,
+} from "./studio-hybrid-brush-filter-edit-runtime";
 
 
 export const STUDIO_HYBRID_PIXEL_SELECTION_BOUNDARY_VERSION = 1 as const;

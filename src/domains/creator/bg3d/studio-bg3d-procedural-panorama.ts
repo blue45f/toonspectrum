@@ -2,7 +2,7 @@
 
 import * as THREE from "three";
 
-import { getSkyPreset, normalizePanoramaRotationDegrees } from "./studio-background-3d-sky";
+import { getSkyPreset, normalizePanoramaRotationDegrees } from "../studio-background-3d-sky";
 
 import type { StudioBg3dSkyPresetId } from "./studio-bg3d-scene-document";
 

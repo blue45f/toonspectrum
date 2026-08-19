@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const backgroundSource = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
-const vrmSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+const backgroundSource = readFileSync(new URL("../bg3d/StudioBackground3D.tsx", import.meta.url), "utf8");
+const vrmSource = readFileSync(new URL("../vrm/StudioVrmPoser.tsx", import.meta.url), "utf8");
 
 function sliceBetween(source: string, startToken: string, endToken: string): string {
   const start = source.indexOf(startToken);

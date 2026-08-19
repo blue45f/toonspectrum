@@ -1,44 +1,43 @@
 import { useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
-import { parseAvatarForgeState } from "./studio-vrm-avatar-forge";
-import { createStudioVrmAvatarForgeFaceController } from "./studio-vrm-avatar-forge-face-controller";
-import { parseCostumeState } from "./studio-vrm-costume";
+import { parseAvatarForgeState } from "../vrm/studio-vrm-avatar-forge";
+import { createStudioVrmAvatarForgeFaceController } from "../vrm/studio-vrm-avatar-forge-face-controller";
+import { parseCostumeState } from "../vrm/studio-vrm-costume";
 import {
   applyStudioVrmCostumeState,
   type StudioVrmCostumeMeshEntry,
-} from "./studio-vrm-costume-runtime";
-import { inspectStudioVrmGarmentFit } from "./studio-vrm-garment-fit";
+} from "../vrm/studio-vrm-costume-runtime";
+import { inspectStudioVrmGarmentFit } from "../vrm/studio-vrm-garment-fit";
 import {
   applyStudioVrmLinkedAppearanceReadinessReceipt,
   type StudioVrmLinkedAppearanceReadinessReceipt,
   type StudioVrmLinkedAppearanceReadinessState,
-} from "./studio-vrm-linked-appearance-readiness";
-import { createStudioVrmLinkedAppearanceReadinessPlan } from
-  "./studio-vrm-linked-appearance-readiness-plan";
+} from "../vrm/studio-vrm-linked-appearance-readiness";
+import { createStudioVrmLinkedAppearanceReadinessPlan } from "../vrm/studio-vrm-linked-appearance-readiness-plan";
 import {
   scaleVrmPropRigMetrics,
-} from "./studio-vrm-prop-rig";
+} from "../vrm/studio-vrm-prop-rig";
 import {
   WARDROBE_SLOTS,
   mergeWardrobeCostumeVisibility,
   type WardrobeSlot,
   type WardrobeState,
-} from "./studio-vrm-wardrobe";
-import { StudioVrmAvatarForge } from "./StudioVrmAvatarForge";
+} from "../vrm/studio-vrm-wardrobe";
+import { StudioVrmAvatarForge } from "../vrm/StudioVrmAvatarForge";
 import {
   StudioVrmPropAttachment,
   StudioVrmRuntimeCommit,
   StudioVrmWardrobeAttachment,
   type StudioVrmProjectionAttachmentStatus,
   type StudioVrmWardrobeSurfaceReceipt,
-} from "./StudioVrmWardrobePropsProjection";
+} from "../vrm/StudioVrmWardrobePropsProjection";
 
 import type {
   StudioBg3dLinkedVrmPreparedState,
   StudioBg3dLinkedVrmRuntimeOwner,
 } from "./studio-bg3d-shared-vrm-runtime";
-import type { StudioShared3dCharacterSource } from "./studio-shared-3d-scene-bridge";
+import type { StudioShared3dCharacterSource } from "../studio-shared-3d-scene-bridge";
 import type { VRM } from "@pixiv/three-vrm";
 
 type ProjectionStatus = "loading" | "ready" | "unavailable";

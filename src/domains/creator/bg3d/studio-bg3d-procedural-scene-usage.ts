@@ -3,7 +3,7 @@ import {
   type StudioBg3dProceduralBudgetUsage,
 } from "./studio-bg3d-procedural-starter-pack";
 
-import type { BgPrimitive } from "./studio-background-3d-metadata";
+import type { BgPrimitive } from "../studio-background-3d-metadata";
 import type { StudioBg3dParsedGlbMetrics } from "./studio-bg3d-scene-document";
 
 export interface StudioBg3dProceduralSceneModelInstance {

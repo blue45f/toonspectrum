@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { createStudioShared3dSceneSession } from "../studio-shared-3d-scene-bridge";
+import { createStudioVrmSceneDocument } from "../vrm/studio-vrm-scene-document";
+
 import {
   createStudioBg3dLinkedCharacterCapture,
   resolveStudioBg3dSharedStageMutationBlockedReason,
 } from "./studio-bg3d-shared-stage-projection";
-import { createStudioShared3dSceneSession } from "./studio-shared-3d-scene-bridge";
-import { createStudioVrmSceneDocument } from "./studio-vrm-scene-document";
 
 describe("Studio BG3D Shared Stage projection", () => {
   it("blocks both a first connection and an update when appearance fields are preview-only", () => {

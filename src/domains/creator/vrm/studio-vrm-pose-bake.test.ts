@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
+import { STUDIO_HUMANOID_BONE_NAMES } from "../studio-humanoid-bones";
+
 import {
   STUDIO_VRM_DIRECT_EDIT_BONES,
   bakeStudioVrmRuntimeBoneRotation,

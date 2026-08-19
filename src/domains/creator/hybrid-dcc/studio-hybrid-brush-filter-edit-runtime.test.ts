@@ -7,7 +7,11 @@ import {
   createStudioCanonicalFilterRecipe,
   studioCanonicalFilterGaussianRadius,
   STUDIO_CANONICAL_FILTER_GAUSSIAN_TRUNCATE,
-} from "./studio-engine-canonical-filter-plan";
+} from "../render/studio-engine-canonical-filter-plan";
+import {
+  createStudioOpenCvImageProvider,
+} from "../studio-opencv-image-provider";
+
 import {
   createHybridPixiEditOverlayHost,
   runHybridBrushOutlineStroke,
@@ -19,9 +23,6 @@ import {
   STUDIO_HYBRID_BRUSH_FILTER_EDIT_ROUTES,
   STUDIO_HYBRID_BRUSH_FILTER_EDIT_RUNTIME_VERSION,
 } from "./studio-hybrid-brush-filter-edit-runtime";
-import {
-  createStudioOpenCvImageProvider,
-} from "./studio-opencv-image-provider";
 
 import type { CV, Mat } from "@techstark/opencv-js";
 
@@ -317,7 +318,7 @@ describe("Studio hybrid brush/filter/edit runtime", () => {
 
   it("exposes a Pixi edit-overlay host entry that reuses the shipped scene provider", () => {
     const source = readFileSync(new URL("./studio-hybrid-brush-filter-edit-runtime.ts", import.meta.url), "utf8");
-    expect(source).toContain('from "./studio-pixi-scene-provider"');
+    expect(source).toContain('from "../render/studio-pixi-scene-provider"');
     expect(source).toContain("createStudioPixiSceneProvider");
     expect(source).toContain("export async function createHybridPixiEditOverlayHost");
     expect(typeof createHybridPixiEditOverlayHost).toBe("function");

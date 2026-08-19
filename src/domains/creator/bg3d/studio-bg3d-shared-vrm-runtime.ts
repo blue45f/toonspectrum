@@ -1,12 +1,11 @@
 import * as THREE from "three";
 
-import { applyStudioBg3dRuntimeAssetQuality } from "./studio-bg3d-runtime-asset-quality";
 import {
   STUDIO_VRM_BASE_ROTATION_Y_KEY,
   loadStudioVrmAsset,
-} from "./studio-vrm-asset-runtime";
-import { resolveStudioVrmFingerAuthority } from "./studio-vrm-auto-grip-authority";
-import { parseAvatarForgeState } from "./studio-vrm-avatar-forge";
+} from "../vrm/studio-vrm-asset-runtime";
+import { resolveStudioVrmFingerAuthority } from "../vrm/studio-vrm-auto-grip-authority";
+import { parseAvatarForgeState } from "../vrm/studio-vrm-avatar-forge";
 import {
   applyBodyScale,
   applyExpressionWeightsToVrm,
@@ -17,34 +16,35 @@ import {
   type FingerRotationMap,
   type PoseBoneMap,
   type VrmMaterialFx,
-} from "./studio-vrm-poser-utils";
+} from "../vrm/studio-vrm-poser-utils";
 import {
   createAutoGripFingerOverrides,
   inspectAutoGripReadiness,
   scaleVrmPropRigMetrics,
   type VrmPropRigMetrics,
-} from "./studio-vrm-prop-rig";
-import { createStudioVrmProportionFitTransaction } from
-  "./studio-vrm-proportion-fit-transaction";
+} from "../vrm/studio-vrm-prop-rig";
+import { createStudioVrmProportionFitTransaction } from "../vrm/studio-vrm-proportion-fit-transaction";
 import {
   createStudioVrmProportionRigRuntime,
   type StudioVrmProportionRigApplyResult,
   type StudioVrmProportionRigReceipt,
   type StudioVrmProportionRigRuntime,
-} from "./studio-vrm-proportion-rig-runtime";
+} from "../vrm/studio-vrm-proportion-rig-runtime";
 import {
   createStudioVrmProportionVrmAdapter,
   measureStudioVrmProportionHeadLength,
-} from "./studio-vrm-proportion-vrm-adapter";
-import { propDefById } from "./studio-vrm-props";
-import { STUDIO_VRM_FINGER_BONES } from "./studio-vrm-scene-document";
+} from "../vrm/studio-vrm-proportion-vrm-adapter";
+import { propDefById } from "../vrm/studio-vrm-props";
+import { STUDIO_VRM_FINGER_BONES } from "../vrm/studio-vrm-scene-document";
 import {
   getStoredVrmModelByHash,
   selectableSampleVrmUrl,
-} from "./vrm-library";
+} from "../vrm/vrm-library";
 
-import type { StudioShared3dCharacterSource } from "./studio-shared-3d-scene-bridge";
-import type { WardrobeMetrics } from "./studio-vrm-wardrobe";
+import { applyStudioBg3dRuntimeAssetQuality } from "./studio-bg3d-runtime-asset-quality";
+
+import type { StudioShared3dCharacterSource } from "../studio-shared-3d-scene-bridge";
+import type { WardrobeMetrics } from "../vrm/studio-vrm-wardrobe";
 import type { VRM } from "@pixiv/three-vrm";
 
 export interface StudioBg3dLinkedVrmPreparedState {

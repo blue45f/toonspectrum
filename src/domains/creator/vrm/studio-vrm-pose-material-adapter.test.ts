@@ -5,14 +5,15 @@ import {
   STUDIO_HUMANOID_BONE_NAMES,
   studioHumanoidBonesForScope,
   type StudioHumanoidBoneName,
-} from "./studio-humanoid-bones";
+} from "../studio-humanoid-bones";
 import {
   parseStudioPoseMaterial,
   STUDIO_POSE_MATERIAL_KIND,
   STUDIO_POSE_MATERIAL_VERSION,
   STUDIO_POSE_ROTATION_CONVENTION,
   type StudioPoseMaterial,
-} from "./studio-pose-material";
+} from "../studio-pose-material";
+
 import {
   applyStudioVrmPoseMaterial,
   captureStudioVrmPoseMaterial,

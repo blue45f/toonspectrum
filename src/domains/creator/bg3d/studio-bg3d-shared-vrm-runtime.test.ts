@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createStudioShared3dSceneSession } from "./studio-shared-3d-scene-bridge";
-import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
-import { createStudioVrmSceneDocument } from "./studio-vrm-scene-document";
+import { createStudioShared3dSceneSession } from "../studio-shared-3d-scene-bridge";
+import { createAvatarForgeState } from "../vrm/studio-vrm-avatar-forge";
+import { createStudioVrmSceneDocument } from "../vrm/studio-vrm-scene-document";
 
-import type { StudioShared3dCharacterSource } from "./studio-shared-3d-scene-bridge";
+import type { StudioShared3dCharacterSource } from "../studio-shared-3d-scene-bridge";
 
 const runtimeMocks = vi.hoisted(() => ({
   activeAdapter: null as null | {
@@ -21,17 +21,17 @@ const runtimeMocks = vi.hoisted(() => ({
   pose: vi.fn(() => true),
 }));
 
-vi.mock("./studio-vrm-asset-runtime", () => ({
+vi.mock("../vrm/studio-vrm-asset-runtime", () => ({
   STUDIO_VRM_BASE_ROTATION_Y_KEY: "studioVrmBaseRotationY",
   loadStudioVrmAsset: vi.fn(),
 }));
 
-vi.mock("./vrm-library", () => ({
+vi.mock("../vrm/vrm-library", () => ({
   getStoredVrmModelByHash: vi.fn(),
   selectableSampleVrmUrl: vi.fn(),
 }));
 
-vi.mock("./studio-vrm-poser-utils", () => ({
+vi.mock("../vrm/studio-vrm-poser-utils", () => ({
   applyBodyScale: (...args: unknown[]) => {
     runtimeMocks.order.push("legacy-body-scale");
     runtimeMocks.bodyScale(...args);
@@ -49,13 +49,13 @@ vi.mock("./studio-vrm-poser-utils", () => ({
   applyVrmMaterialFx: vi.fn(),
 }));
 
-vi.mock("./studio-vrm-prop-rig", () => ({
+vi.mock("../vrm/studio-vrm-prop-rig", () => ({
   createAutoGripFingerOverrides: vi.fn(() => ({})),
   inspectAutoGripReadiness: vi.fn(() => ({ kind: "ready" })),
   scaleVrmPropRigMetrics: (metrics: unknown) => metrics,
 }));
 
-vi.mock("./studio-vrm-proportion-vrm-adapter", () => ({
+vi.mock("../vrm/studio-vrm-proportion-vrm-adapter", () => ({
   createStudioVrmProportionVrmAdapter: (input: {
     getCurrentModelGeneration: () => string | number;
     reapplyAuthoredPose: () => boolean | void;
@@ -75,7 +75,7 @@ vi.mock("./studio-vrm-proportion-vrm-adapter", () => ({
   }),
 }));
 
-vi.mock("./studio-vrm-proportion-fit-transaction", () => ({
+vi.mock("../vrm/studio-vrm-proportion-fit-transaction", () => ({
   createStudioVrmProportionFitTransaction: (
     _vrm: unknown,
     reapplyAuthoredState: () => boolean | void,
@@ -96,7 +96,7 @@ vi.mock("./studio-vrm-proportion-fit-transaction", () => ({
   },
 }));
 
-vi.mock("./studio-vrm-proportion-rig-runtime", () => ({
+vi.mock("../vrm/studio-vrm-proportion-rig-runtime", () => ({
   createStudioVrmProportionRigRuntime: (adapter: {
     getModelGeneration: () => string | number;
     reapplyAuthoredPose: () => boolean | void;

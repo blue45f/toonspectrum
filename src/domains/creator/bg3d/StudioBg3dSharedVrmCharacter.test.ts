@@ -3,14 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createStudioShared3dSceneSession,
-} from "./studio-shared-3d-scene-bridge";
+} from "../studio-shared-3d-scene-bridge";
 import {
   DEFAULT_VRM_PROP_RIG_METRICS,
   type VrmPropMetricBone,
   type VrmPropRigMetrics,
-} from "./studio-vrm-prop-rig";
-import { createPropInstance, serializeVrmProps } from "./studio-vrm-props";
-import { createStudioVrmSceneDocument, normalizeStudioVrmSceneDocument } from "./studio-vrm-scene-document";
+} from "../vrm/studio-vrm-prop-rig";
+import { createPropInstance, serializeVrmProps } from "../vrm/studio-vrm-props";
+import { createStudioVrmSceneDocument, normalizeStudioVrmSceneDocument } from "../vrm/studio-vrm-scene-document";
 
 const loadStudioVrmAsset = vi.fn();
 const getStoredVrmModelByHash = vi.fn();
@@ -22,16 +22,16 @@ const applyExpressionWeightsToVrm = vi.fn();
 const applyVrmCustomColors = vi.fn();
 const applyVrmMaterialFx = vi.fn();
 
-vi.mock("./studio-vrm-asset-runtime", () => ({
+vi.mock("../vrm/studio-vrm-asset-runtime", () => ({
   STUDIO_VRM_BASE_ROTATION_Y_KEY: "studioVrmBaseRotationY",
   disposeStudioVrmAsset: vi.fn(),
   loadStudioVrmAsset,
 }));
-vi.mock("./vrm-library", () => ({
+vi.mock("../vrm/vrm-library", () => ({
   getStoredVrmModelByHash,
   selectableSampleVrmUrl,
 }));
-vi.mock("./studio-vrm-poser-utils", () => ({
+vi.mock("../vrm/studio-vrm-poser-utils", () => ({
   applyBodyScale,
   applyExpressionWeightsToVrm,
   applyFingerRotations,

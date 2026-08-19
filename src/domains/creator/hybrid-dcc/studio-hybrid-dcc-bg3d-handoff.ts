@@ -9,13 +9,13 @@
 import {
   createStudioBg3dModelAttachment,
   importVerifiedBg3dModelsAtomicallyV12 as importVerifiedBg3dModelsAtomically,
-} from "./bg3d-model-library";
-import { fitStudioBg3dCameraToBounds } from "./studio-bg3d-camera-framing";
-import { computeStudioBg3dAutoFitScale } from "./studio-bg3d-model-scale-contract";
+} from "../bg3d/bg3d-model-library";
+import { fitStudioBg3dCameraToBounds } from "../bg3d/studio-bg3d-camera-framing";
+import { computeStudioBg3dAutoFitScale } from "../bg3d/studio-bg3d-model-scale-contract";
 import {
   buildStudioBg3dRoomParts,
   getStudioBg3dRoomPreset,
-} from "./studio-bg3d-room-builder";
+} from "../bg3d/studio-bg3d-room-builder";
 import {
   captureStudioBg3dShot,
   createDefaultStudioBg3dSceneDocument,
@@ -31,17 +31,18 @@ import {
   type StudioBg3dPrimitiveNode,
   type StudioBg3dSceneDocument,
   type StudioBg3dSceneNode,
-} from "./studio-bg3d-scene-document";
-import { attachStudioGeneric3dWorkflowMetadata } from "./studio-generic-3d-workflow-metadata";
+} from "../bg3d/studio-bg3d-scene-document";
+import { attachStudioGeneric3dWorkflowMetadata } from "../studio-generic-3d-workflow-metadata";
 import {
   assertRenderCacheIsNotAuthority,
   type StudioGeometryAuthorityRecord,
-} from "./studio-geometry-authority";
+} from "../studio-geometry-authority";
+import { evaluateStudioMeshModifierStack } from "../studio-mesh-modifier-stack";
+import { sha256HexPortable } from "../studio-sha256";
+import { createStudioDefaultSolidBooleanBackend } from "../studio-solid-boolean-backend";
+
 import { deriveStudioHybridDccAssetLayout } from "./studio-hybrid-dcc-asset-layout";
 import { exportStudioHybridDccGlbBatch } from "./studio-hybrid-dcc-glb-export-worker-client";
-import { evaluateStudioMeshModifierStack } from "./studio-mesh-modifier-stack";
-import { sha256HexPortable } from "./studio-sha256";
-import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
 
 import type {
   StudioHybridDccGlbIssue,

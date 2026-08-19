@@ -7,15 +7,15 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { planStudioBg3dPushPull } from "./studio-bg3d-push-pull";
-import { offsetStudioFloorPlanPolygon } from "./studio-build-generators";
+import { planStudioBg3dPushPull } from "../bg3d/studio-bg3d-push-pull";
+import { offsetStudioFloorPlanPolygon } from "../studio-build-generators";
 import {
   createStudioDefaultBodyPose,
   poseStudioBodyChainFk,
   poseStudioBodyChainIk,
   setStudioChainSolveMode,
   solveStudioTwoBoneIk,
-} from "./studio-character-ik-fk";
+} from "../studio-character-ik-fk";
 import {
   bevelStudioEditableMeshEdges,
   createStudioUnitCubeMesh,
@@ -28,8 +28,23 @@ import {
   deserializeStudioEditableMesh,
   studioEditableMeshStats,
   studioEditableMeshToTriangleSoup,
-} from "./studio-editable-half-edge-mesh";
-import { importStudioGlbDocument, parseStudioGlbToSceneIR } from "./studio-glb-scene-ir";
+} from "../studio-editable-half-edge-mesh";
+import { importStudioGlbDocument, parseStudioGlbToSceneIR } from "../studio-glb-scene-ir";
+import {
+  parseStudioObjToSceneIR,
+  buildStudioImportCompatibilityReport,
+  commitStudioImportToDocument,
+} from "../studio-import-compatibility-report";
+import {
+  createStudioAabbSolidBooleanBackend,
+  createStudioMeshModifierStack,
+  evaluateStudioMeshModifierStack,
+  withStudioMeshModifier,
+} from "../studio-mesh-modifier-stack";
+import {
+  type StudioOpfsRecoveryJournalAdapter,
+} from "../studio-opfs-recovery-journal";
+
 import {
   repairStudioHybridOrphanRights,
   scanStudioHybridDccCorruption,
@@ -48,22 +63,8 @@ import {
   snapshotStudioHybridDccState,
   restoreStudioHybridDccStateFromSnapshot,
 } from "./studio-hybrid-dcc-document";
-import {
-  parseStudioObjToSceneIR,
-  buildStudioImportCompatibilityReport,
-  commitStudioImportToDocument,
-} from "./studio-import-compatibility-report";
-import {
-  createStudioAabbSolidBooleanBackend,
-  createStudioMeshModifierStack,
-  evaluateStudioMeshModifierStack,
-  withStudioMeshModifier,
-} from "./studio-mesh-modifier-stack";
-import {
-  type StudioOpfsRecoveryJournalAdapter,
-} from "./studio-opfs-recovery-journal";
 
-import type { BgPrimitive } from "./studio-background-3d-metadata";
+import type { BgPrimitive } from "../studio-background-3d-metadata";
 
 // ── Fake OPFS adapter (same contract as studio-opfs-recovery-journal tests) ──
 

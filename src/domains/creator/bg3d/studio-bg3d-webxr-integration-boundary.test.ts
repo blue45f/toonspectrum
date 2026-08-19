@@ -7,7 +7,7 @@ const EDITOR_SOURCE_PATH = fileURLToPath(
   new URL("./StudioBackground3D.tsx", import.meta.url),
 );
 const PANEL_STACK_SOURCE_PATH = fileURLToPath(
-  new URL("./StudioThreeDPreviewPanelStack.tsx", import.meta.url),
+  new URL("../StudioThreeDPreviewPanelStack.tsx", import.meta.url),
 );
 const RETAINED_HOST_SOURCE_PATH = fileURLToPath(
   new URL("./StudioBg3dRetainedOwnerHost.tsx", import.meta.url),

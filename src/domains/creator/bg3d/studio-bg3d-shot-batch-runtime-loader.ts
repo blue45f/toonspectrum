@@ -1,6 +1,6 @@
 type StudioBg3dShotBatchCoreRuntime = typeof import("./studio-bg3d-shot-batch-runtime");
 type StudioBg3dShotBatchRecoveryRuntime =
-  typeof import("./studio-bg3d-shot-batch-recovery-store");
+  typeof import( "./studio-bg3d-shot-batch-recovery-store");
 
 export type StudioBg3dShotBatchRuntime = StudioBg3dShotBatchCoreRuntime & Pick<
   StudioBg3dShotBatchRecoveryRuntime,
@@ -18,7 +18,7 @@ function createAbortError(): Error {
 async function importStudioBg3dShotBatchRuntime(): Promise<StudioBg3dShotBatchRuntime> {
   const [core, recovery] = await Promise.all([
     import("./studio-bg3d-shot-batch-runtime"),
-    import("./studio-bg3d-shot-batch-recovery-store"),
+    import( "./studio-bg3d-shot-batch-recovery-store"),
   ]);
   return Object.freeze({
     ...core,

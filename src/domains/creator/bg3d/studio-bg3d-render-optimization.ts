@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import { makeGeometry, type BgPrimitiveKind } from "./studio-background-3d-primitives";
+import { makeGeometry, type BgPrimitiveKind } from "../studio-background-3d-primitives";
 
 export interface StudioBg3dPrimitiveGeometryResources {
   readonly geometry: THREE.BufferGeometry;

@@ -1,7 +1,8 @@
 import {
   getSkyPreset,
   normalizePanoramaRotationDegrees,
-} from "./studio-background-3d-sky";
+} from "../studio-background-3d-sky";
+
 import {
   resolveStudioBg3dInsertBackgroundMode,
   toStudioBg3dInsertCaptureBackground,

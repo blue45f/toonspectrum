@@ -5,7 +5,7 @@ import {
   Studio3DAtmosphereEngine,
   type Studio3DAtmospherePreset,
   type WeatherPresetId,
-} from "./studio-3d-atmosphere-weather";
+} from "../scene-3d/studio-3d-atmosphere-weather";
 
 export interface StudioBg3dAtmospherePanelProps {
   readonly currentPresetId?: WeatherPresetId;

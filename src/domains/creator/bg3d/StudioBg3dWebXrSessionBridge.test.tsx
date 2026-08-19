@@ -12,7 +12,7 @@ describe("StudioBg3dWebXrSessionBridge boundary", () => {
     const source = await readFile(SOURCE_PATH, "utf8");
 
     expect(source).toContain("state.gl.xr");
-    expect(source).toContain('import("./studio-webxr-session")');
+    expect(source).toContain('import("../studio-webxr-session")');
     expect(source).not.toMatch(/new\s+THREE\.WebGLRenderer/);
     expect(source).not.toMatch(/@babylonjs|new\s+Engine\s*\(/);
     expect(source).not.toMatch(/requestAnimationFrame/);

@@ -1,15 +1,14 @@
 /// <reference lib="webworker" />
 
-import studioMediaPipeVisionModuleLoaderUrl from
-  "@mediapipe/tasks-vision/vision_wasm_module_internal.js?url";
-import studioMediaPipeVisionModuleWasmUrl from
-  "@mediapipe/tasks-vision/vision_wasm_module_internal.wasm?url";
+import studioMediaPipeVisionModuleLoaderUrl from "@mediapipe/tasks-vision/vision_wasm_module_internal.js?url";
+import studioMediaPipeVisionModuleWasmUrl from "@mediapipe/tasks-vision/vision_wasm_module_internal.wasm?url";
 
 import {
   loadStudioMediaPipeVisionModule,
   runStudioMediaPipeVisionTaskCreation,
-} from "./studio-mediapipe-vision-init-arbiter";
-import { createSha256Portable, sha256HexPortable } from "./studio-sha256";
+} from "../studio-mediapipe-vision-init-arbiter";
+import { createSha256Portable, sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_VRM_AVATAR_REFERENCE_LIMITS,
   STUDIO_VRM_AVATAR_REFERENCE_MODEL_BYTE_LENGTH,

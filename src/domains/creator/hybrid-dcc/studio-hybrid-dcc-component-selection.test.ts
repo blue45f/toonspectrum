@@ -6,7 +6,8 @@ import {
   extrudeStudioEditableMeshFacesWithReceipt,
   hashStudioEditableMesh,
   type StudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
+
 import {
   createStudioHybridDccComponentSelection,
   decodeStudioHybridDccComponentSelectionSnapshot,

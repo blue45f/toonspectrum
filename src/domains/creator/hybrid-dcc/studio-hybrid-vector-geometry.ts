@@ -11,9 +11,9 @@
  * No vendor Drawable, option type, function or class crosses the returned artifact boundary.
  */
 
-import { loadStudioGeometryNodesPlanarBooleanBackend } from "./studio-geometry-nodes-boolean";
-import { loadStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
-import { loadStudioRoughGenerator } from "./studio-rough-shape";
+import { loadStudioGeometryNodesPlanarBooleanBackend } from "../studio-geometry-nodes-boolean";
+import { loadStudioPerfectFreehandStroker } from "../studio-perfect-freehand";
+import { loadStudioRoughGenerator } from "../studio-rough-shape";
 
 export const STUDIO_HYBRID_VECTOR_CONTRACT_ID = "toonspectrum.hybrid-vector-geometry";
 export const STUDIO_HYBRID_VECTOR_CONTRACT_VERSION = 1 as const;

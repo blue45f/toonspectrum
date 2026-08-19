@@ -6,14 +6,15 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createStudioUnitCubeMesh } from "./studio-editable-half-edge-mesh";
-import { disposeStudioOcctWorker } from "./studio-occt-worker-client";
+import { createStudioUnitCubeMesh } from "../studio-editable-half-edge-mesh";
+import { disposeStudioOcctWorker } from "../studio-occt-worker-client";
+
 import { StudioHybridDccPanel } from "./StudioHybridDccPanel";
 
 import type {
   StudioOcctWorkerRequest,
   StudioOcctWorkerResponse,
-} from "./studio-occt-worker-protocol";
+} from "../studio-occt-worker-protocol";
 
 /**
  * Deterministic browser transport for this UI integration gate. The dedicated

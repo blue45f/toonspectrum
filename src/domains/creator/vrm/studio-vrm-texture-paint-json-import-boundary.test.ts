@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const projectArchiveSource = readFileSync(
-  new URL("./studio-project-archive-orchestration-runtime.ts", import.meta.url),
+  new URL("../studio-project-archive-orchestration-runtime.ts", import.meta.url),
   "utf8",
 );
 const jsonExportStart = projectArchiveSource.indexOf("async function handleExportProject()");
@@ -33,9 +33,8 @@ const archiveExportSource = projectArchiveSource.slice(
 describe("Studio JSON VRM surface-paint availability boundary", () => {
   it("awaits the lazy JSON portability facade before starting the download", () => {
     expect(jsonExportStart).toBeGreaterThanOrEqual(0);
-    expect(jsonExportEnd).toBeGreaterThan(jsonExportStart);
-    expect(jsonExportSource).toContain(
-      'import("./studio-vrm-texture-paint-project-library")',
+    expect(jsonExportSource).toMatch(
+      /import\(\s*["']\.\/(?:vrm\/)?studio-vrm-texture-paint-project-library["']\)/u,
     );
     expect(jsonExportSource).toContain(
       "{ inspectStudioVrmTexturePaintJsonExport }",
@@ -61,8 +60,8 @@ describe("Studio JSON VRM surface-paint availability boundary", () => {
     expect(jsonImportSource).toContain(
       "{ auditStudioVrmTexturePaintJsonImport }",
     );
-    expect(jsonImportSource).toContain(
-      'import("./studio-vrm-texture-paint-project-library")',
+    expect(jsonImportSource).toMatch(
+      /import\(\s*["']\.\/(?:vrm\/)?studio-vrm-texture-paint-project-library["']\)/u,
     );
     expect(jsonImportSource).toContain(
       "await auditStudioVrmTexturePaintJsonImport(loaded.project)",

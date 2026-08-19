@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { openStudioLocalDatabase } from "./studio-local-database";
-import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
-import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
+import { openStudioLocalDatabase } from "../studio-local-database";
+import { createStudioOpfsAssetStore } from "../studio-opfs-asset-store";
+import { createStudioOpfsMemoryFileSystem } from "../studio-opfs-filesystem";
+
 import {
   STUDIO_VRM_ASSET_CAS_OWNER,
   createStudioVrmAssetSqliteOpfsRepository,
@@ -30,8 +31,8 @@ import {
   saveVerifiedVrmBlobWithDisposition,
 } from "./vrm-library";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
-import type { StudioOpfsFileSystem } from "./studio-opfs-filesystem";
+import type { StudioLocalDatabase } from "../studio-local-database";
+import type { StudioOpfsFileSystem } from "../studio-opfs-filesystem";
 
 const opened: StudioLocalDatabase[] = [];
 

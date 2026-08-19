@@ -2,6 +2,13 @@ import { useThree } from "@react-three/fiber";
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
+import { studioShared3dCharacterWorldTransform } from "../studio-shared-3d-scene-bridge";
+import { disposeStudioVrmAsset } from "../vrm/studio-vrm-asset-runtime";
+import {
+  collectStudioVrmCostumeMeshes,
+  type StudioVrmCostumeMeshEntry,
+} from "../vrm/studio-vrm-costume-runtime";
+
 import { registerStudioBg3dCaptureExcludedObject } from "./studio-bg3d-capture-exclusion";
 import {
   resolveStudioBg3dSharedCharacterGrounding,
@@ -14,19 +21,12 @@ import {
   loadStudioBg3dLinkedVrm,
   type StudioBg3dLinkedVrmRuntimeOwner,
 } from "./studio-bg3d-shared-vrm-runtime";
-import { studioShared3dCharacterWorldTransform } from "./studio-shared-3d-scene-bridge";
-import { disposeStudioVrmAsset } from "./studio-vrm-asset-runtime";
-import {
-  collectStudioVrmCostumeMeshes,
-  type StudioVrmCostumeMeshEntry,
-} from "./studio-vrm-costume-runtime";
-import { StudioBg3dSharedVrmAppearanceRuntime } from
-  "./StudioBg3dSharedVrmAppearanceRuntime";
+import { StudioBg3dSharedVrmAppearanceRuntime } from "./StudioBg3dSharedVrmAppearanceRuntime";
 
 import type {
   StudioShared3dCharacterRuntimeStatus,
   StudioShared3dCharacterSource,
-} from "./studio-shared-3d-scene-bridge";
+} from "../studio-shared-3d-scene-bridge";
 import type { VRM } from "@pixiv/three-vrm";
 
 export interface StudioBg3dSharedVrmCharacterProps {

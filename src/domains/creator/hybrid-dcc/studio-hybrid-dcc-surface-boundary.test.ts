@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const studioPage = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+const studioPage = readStudioCuttoonEditorSource();
 
 describe("Studio Hybrid DCC surface fault boundary", () => {
   it("keeps the lazy DCC subtree inside a surface-local error boundary", () => {

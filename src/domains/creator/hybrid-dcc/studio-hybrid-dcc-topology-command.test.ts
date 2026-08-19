@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { serializeStudioCommandJournal } from "./studio-command-journal";
+import { serializeStudioCommandJournal } from "../studio-command-journal";
 import {
   createStudioUnitCubeMesh,
   extrudeStudioEditableMeshFacesWithReceipt,
   matchesStudioEditableMeshPersistedHash,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
+
 import {
   createStudioHybridDccSession,
   hybridDccCommitTopologyMutation,

@@ -115,7 +115,7 @@ describe("VRM 소품 카탈로그", () => {
 
     for (const [id, url] of Object.entries(expected)) {
       expect(propDefById(id)?.geometrySource, id).toEqual({ kind: "gltf", url });
-      const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
+      const bytes = readFileSync(new URL(`../../../../public${url}`, import.meta.url));
       expect(bytes.subarray(0, 4).toString("ascii"), url).toBe("glTF");
     }
   });
@@ -133,7 +133,7 @@ describe("VRM 소품 카탈로그", () => {
   it("매핑된 first-party GLB 34개가 실제 mesh scene으로 파싱된다", async () => {
     const loader = new GLTFLoader();
     for (const url of Object.values(BLENDER_PROP_GLTF_URLS)) {
-      const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
+      const bytes = readFileSync(new URL(`../../../../public${url}`, import.meta.url));
       const arrayBuffer = bytes.buffer.slice(
         bytes.byteOffset,
         bytes.byteOffset + bytes.byteLength,
@@ -165,7 +165,7 @@ describe("VRM 소품 카탈로그", () => {
     for (const gate of gates) {
       const def = propDefById(gate.id)!;
       const url = BLENDER_PROP_GLTF_URLS[gate.id];
-      const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
+      const bytes = readFileSync(new URL(`../../../../public${url}`, import.meta.url));
       const arrayBuffer = bytes.buffer.slice(
         bytes.byteOffset,
         bytes.byteOffset + bytes.byteLength,
@@ -208,7 +208,7 @@ describe("VRM 소품 카탈로그", () => {
       expect(def.anchors[0].position[2], gate.id).toBeCloseTo(gate.anchorZ, 6);
 
       const url = BLENDER_PROP_GLTF_URLS[gate.id];
-      const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
+      const bytes = readFileSync(new URL(`../../../../public${url}`, import.meta.url));
       const arrayBuffer = bytes.buffer.slice(
         bytes.byteOffset,
         bytes.byteOffset + bytes.byteLength,
@@ -239,7 +239,7 @@ describe("VRM 소품 카탈로그", () => {
       const def = propDefById(gate.id)!;
       const anchor = def.anchors.find((candidate) => candidate.role === "surface")!;
       const url = BLENDER_PROP_GLTF_URLS[gate.id];
-      const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
+      const bytes = readFileSync(new URL(`../../../../public${url}`, import.meta.url));
       const arrayBuffer = bytes.buffer.slice(
         bytes.byteOffset,
         bytes.byteOffset + bytes.byteLength,

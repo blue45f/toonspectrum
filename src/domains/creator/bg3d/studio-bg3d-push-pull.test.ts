@@ -5,7 +5,7 @@ import {
   studioBg3dPushPullAxes,
 } from "./studio-bg3d-push-pull";
 
-import type { BgPrimitive } from "./studio-background-3d-metadata";
+import type { BgPrimitive } from "../studio-background-3d-metadata";
 
 function box(overrides: Partial<BgPrimitive> = {}): BgPrimitive {
   return {

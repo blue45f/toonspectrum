@@ -8,6 +8,8 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { getStudioPublishPlatformPreset } from "../studio-publish-package";
+
 import {
   exerciseAllStudioDccCatalogFeatures,
   exerciseStudioDccCatalogFeature,
@@ -39,11 +41,10 @@ import {
   studioSection6ById,
   studioSection6CoverageStats,
 } from "./studio-dcc-section6-full-catalog";
-import { getStudioPublishPlatformPreset } from "./studio-publish-package";
 
 const ARCH_DOC = resolve(
   __dirname,
-  "../../../docs/reference/studio-hybrid-dcc-section6-ids.md",
+  "../../../../docs/reference/studio-hybrid-dcc-section6-ids.md",
 );
 
 function extractDocSection6Ids(markdown: string): string[] {
@@ -146,15 +147,15 @@ describe("§6 full catalog SSOT", () => {
       resolve(__dirname, "studio-dcc-catalog-feature-dispatch.ts"),
       "utf8",
     );
-    const cadSrc = readFileSync(resolve(__dirname, "studio-cad-kernel-lite.ts"), "utf8");
-    const meshOpsSrc = readFileSync(resolve(__dirname, "studio-mesh-ops-advanced.ts"), "utf8");
+    const cadSrc = readFileSync(resolve(__dirname, "../studio-cad-kernel-lite.ts"), "utf8");
+    const meshOpsSrc = readFileSync(resolve(__dirname, "../studio-mesh-ops-advanced.ts"), "utf8");
     const matSrc = readFileSync(
       resolve(__dirname, "studio-dcc-material-publish-draw-lite.ts"),
       "utf8",
     );
-    const rhinoSrc = readFileSync(resolve(__dirname, "studio-rhino3dm-lite.ts"), "utf8");
-    const bimSrc = readFileSync(resolve(__dirname, "studio-bim-room-builder-map.ts"), "utf8");
-    const occtSrc = readFileSync(resolve(__dirname, "studio-occt-wasm-facade.ts"), "utf8");
+    const rhinoSrc = readFileSync(resolve(__dirname, "../studio-rhino3dm-lite.ts"), "utf8");
+    const bimSrc = readFileSync(resolve(__dirname, "../studio-bim-room-builder-map.ts"), "utf8");
+    const occtSrc = readFileSync(resolve(__dirname, "../studio-occt-wasm-facade.ts"), "utf8");
     const combined = [
       coreSrc,
       domainSrc,

@@ -32,8 +32,20 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
-import { studioDiscardUnpersistedMannequinStateRequest } from "./studio-destructive-command-catalog";
+import { confirmStudioDestructiveAction } from "../studio-destructive-action-preview";
+import { studioDiscardUnpersistedMannequinStateRequest } from "../studio-destructive-command-catalog";
+import {
+  StudioPanelChip,
+  StudioSectionHeader,
+  StudioSliderRow,
+  StudioToggleChip,
+  studioSegmentChipClass,
+} from "../studio-panel-ui";
+import {
+  StudioVrmPhotoPoseScanner,
+  type StudioVrmPhotoPoseApplyPayload,
+} from "../vrm/StudioVrmPhotoPoseScanner";
+
 import { getProductStudioMannequinStateSqliteRepository } from "./studio-mannequin-bg3d-preset-sqlite-repository";
 import {
   STUDIO_MANNEQUIN_BODY_PRESETS,
@@ -83,17 +95,6 @@ import {
   type StudioMannequinPoseLandmarker,
   type StudioMannequinWebcamErrorStage,
 } from "./studio-mannequin-webcam-tracking";
-import {
-  StudioPanelChip,
-  StudioSectionHeader,
-  StudioSliderRow,
-  StudioToggleChip,
-  studioSegmentChipClass,
-} from "./studio-panel-ui";
-import {
-  StudioVrmPhotoPoseScanner,
-  type StudioVrmPhotoPoseApplyPayload,
-} from "./StudioVrmPhotoPoseScanner";
 
 import type { ReactElement } from "react";
 

@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import { NATURAL_IDLE_POSES, pickNaturalIdlePose } from "./studio-pose-presets";
+import { NATURAL_IDLE_POSES, pickNaturalIdlePose } from "../studio-pose-presets";
+
 import {
   applyPoseToVrm,
   POSE_PRESETS,

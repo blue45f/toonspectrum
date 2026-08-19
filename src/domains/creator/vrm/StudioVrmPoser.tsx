@@ -5,9 +5,9 @@ import { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
 
-import { planStudio3dInsertCaptureSize } from "./studio-3d-insert-capture-plan";
-import { STUDIO_STAMP_BRUSH_DEFAULTS } from "./studio-brush-stamp-engine";
-import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { STUDIO_STAMP_BRUSH_DEFAULTS } from "../brush/studio-brush-stamp-engine";
+import { planStudio3dInsertCaptureSize } from "../scene-3d/studio-3d-insert-capture-plan";
+import { confirmStudioDestructiveAction } from "../studio-destructive-action-preview";
 import {
   studioDeleteCustomPoseRequest,
   studioDeleteSharedPoseRequest,
@@ -15,14 +15,16 @@ import {
   studioSharePoseConsentRequest,
   studioVrmPoseShareUseContextConsentRequest,
   type StudioVrmPoseShareUseContextDisclosure,
-} from "./studio-destructive-command-catalog";
+} from "../studio-destructive-command-catalog";
 import {
   isStudioHumanoidBoneName,
   type StudioHumanoidBoneName,
   type StudioPoseScope,
-} from "./studio-humanoid-bones";
-import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "./studio-pose-presets";
-import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
+} from "../studio-humanoid-bones";
+import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "../studio-pose-presets";
+import { createTwoBoneDefaultPoleTarget } from "../studio-rig-two-bone-ik";
+import { StudioToolHintTarget } from "../StudioToolHint";
+
 import {
   STUDIO_VRM_BASE_ROTATION_Y_KEY as BASE_ROTATION_Y_KEY,
   STUDIO_VRM_HTML_FALLBACK_ERROR as HTML_FALLBACK_VRM_ERROR,
@@ -344,7 +346,6 @@ import {
   type TrackingChannels,
   type VrmTrackingData,
 } from "./studio-vrm-webcam-tracking";
-import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioVrmAvatarForge, countDetectedVrmHairMeshes } from "./StudioVrmAvatarForge";
 import { StudioVrmAvatarForgePanel } from "./StudioVrmAvatarForgePanel";
 import {
@@ -409,9 +410,9 @@ import {
   type VrmStoredModelWithContentIdentity,
 } from "./vrm-library";
 
-import type { StudioVrmPoserInsertResult } from "./studio-3d-insert-contract";
-import type { StudioPoseMaterial } from "./studio-pose-material";
-import type { StudioToolHintSpec } from "./studio-tool-hints";
+import type { StudioVrmPoserInsertResult } from "../scene-3d/studio-3d-insert-contract";
+import type { StudioPoseMaterial } from "../studio-pose-material";
+import type { StudioToolHintSpec } from "../studio-tool-hints";
 import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
@@ -426,7 +427,7 @@ import {
   type SharedAssetCatalogPage,
 } from "@/src/infrastructure/creator-client";
 
-export type { StudioVrmPoserInsertResult } from "./studio-3d-insert-contract";
+export type { StudioVrmPoserInsertResult } from "../scene-3d/studio-3d-insert-contract";
 
 type StudioVrmPoserProps = {
   open: boolean;

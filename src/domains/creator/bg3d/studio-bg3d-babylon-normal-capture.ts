@@ -7,8 +7,7 @@
  */
 
 import { Constants } from "@babylonjs/core/Engines/constants";
-import { GeometryBufferRenderer } from
-  "@babylonjs/core/Rendering/geometryBufferRenderer";
+import { GeometryBufferRenderer } from "@babylonjs/core/Rendering/geometryBufferRenderer";
 import "@babylonjs/core/Rendering/geometryBufferRendererSceneComponent";
 
 import {

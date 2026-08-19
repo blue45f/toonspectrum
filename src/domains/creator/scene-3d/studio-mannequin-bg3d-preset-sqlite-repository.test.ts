@@ -3,13 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD,
   createStudioBg3dLtUserPreset,
-} from "./studio-bg3d-lt-preset-library";
+} from "../bg3d/studio-bg3d-lt-preset-library";
 import {
   STUDIO_BG3D_LT_BUILT_IN_PRESETS,
   STUDIO_BG3D_LT_PRESET_MAX_BYTES,
   type StudioBg3dLtPresetPayload,
-} from "./studio-bg3d-lt-presets";
-import { openStudioLocalDatabase } from "./studio-local-database";
+} from "../bg3d/studio-bg3d-lt-presets";
+import { openStudioLocalDatabase } from "../studio-local-database";
+
 import {
   STUDIO_BG3D_LT_PRESET_SQLITE_KEY,
   STUDIO_BG3D_LT_PRESET_SQLITE_NAMESPACE,
@@ -33,7 +34,7 @@ import {
   type StudioMannequinPersistentState,
 } from "./studio-mannequin-poses";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 const databases: StudioLocalDatabase[] = [];
 

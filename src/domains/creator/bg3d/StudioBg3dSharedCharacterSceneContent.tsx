@@ -2,12 +2,11 @@ import { lazy, Suspense } from "react";
 
 import { registerStudioBg3dCaptureExcludedObject } from "./studio-bg3d-capture-exclusion";
 
-import type { StudioBg3dSharedCharacterGroundingResult } from
-  "./studio-bg3d-shared-character-grounding";
+import type { StudioBg3dSharedCharacterGroundingResult } from "./studio-bg3d-shared-character-grounding";
 import type {
   StudioShared3dCharacterRuntimeStatus,
   StudioShared3dCharacterSource,
-} from "./studio-shared-3d-scene-bridge";
+} from "../studio-shared-3d-scene-bridge";
 
 const LazyStudioBg3dSharedVrmCharacter = lazy(
   () => import("./StudioBg3dSharedVrmCharacter"),

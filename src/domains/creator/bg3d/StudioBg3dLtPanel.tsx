@@ -1,9 +1,10 @@
+import { StudioThreeDToggleIndicator } from "../StudioThreeDToggle";
+
 import {
   STUDIO_BG3D_CONTROL_BUTTON as CONTROL_BUTTON,
   roundStudioBg3dNumber as round,
   studioBg3dClassNames as cx,
 } from "./studio-bg3d-editor-ui";
-import { StudioThreeDToggleIndicator } from "./StudioThreeDToggle";
 
 import type {
   StudioBg3dLtPreset,
@@ -63,12 +64,12 @@ interface StudioBg3dLtPanelContext {
   readonly LT_EXPORT_HEIGHTS: readonly [640, 1080, 1440, 2160, 4096];
   readonly ltExportAspectRatio: number | null;
   readonly ltCaptureAspectPresetId: string;
-  readonly ltCaptureAspectPresets: readonly import("./studio-bg3d-capture-frame-geometry").StudioBg3dCaptureAspectPreset[];
+  readonly ltCaptureAspectPresets: readonly import( "./studio-bg3d-capture-frame-geometry").StudioBg3dCaptureAspectPreset[];
   readonly updateLtExportAspectRatio: (exportAspectRatio: number | null) => void;
   readonly ltLineSettings: StudioBg3dLineOutputSettings;
-  readonly LT_TONE_MODE_LABELS: Record<import("./studio-bg3d-scene-document").StudioBg3dToneMode, string>;
+  readonly LT_TONE_MODE_LABELS: Record<import( "./studio-bg3d-scene-document").StudioBg3dToneMode, string>;
   readonly ltToneSettings: StudioBg3dToneOutputSettings;
-  readonly LT_TONE_TYPE_LABELS: Record<import("./studio-bg3d-scene-document").StudioBg3dToneOutputType, string>;
+  readonly LT_TONE_TYPE_LABELS: Record<import( "./studio-bg3d-scene-document").StudioBg3dToneOutputType, string>;
   readonly lineArtPreview: boolean;
   readonly setLineArtPreview: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   readonly ltTonePreviewStyle: (tone: StudioBg3dToneOutputSettings) => CSSProperties;
@@ -78,7 +79,7 @@ interface StudioBg3dLtPanelContext {
   readonly updateLtLineSettings: (patch: Partial<StudioBg3dLineOutputSettings>) => void;
   readonly LtRangeControl: typeof import("./studio-bg3d-control-fields").LtRangeControl;
   readonly updateLtToneSettings: (patch: Partial<StudioBg3dToneOutputSettings>) => void;
-  readonly LT_TONE_PATTERN_LABELS: Record<import("./studio-bg3d-scene-document").StudioBg3dTonePattern, string>;
+  readonly LT_TONE_PATTERN_LABELS: Record<import( "./studio-bg3d-scene-document").StudioBg3dTonePattern, string>;
 }
 
 interface StudioBg3dMagicLayerControlProps {

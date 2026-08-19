@@ -6,10 +6,8 @@ import {
   createStudioVrmLinkedAppearanceProjectionPlan,
   type StudioVrmLinkedAppearanceProjectionPlan,
 } from "./studio-vrm-linked-appearance-projection-plan";
-import { snapshotStudioVrmLinkedAppearanceReadiness } from
-  "./studio-vrm-linked-appearance-readiness";
-import { createStudioVrmLinkedAppearanceReadinessPlan } from
-  "./studio-vrm-linked-appearance-readiness-plan";
+import { snapshotStudioVrmLinkedAppearanceReadiness } from "./studio-vrm-linked-appearance-readiness";
+import { createStudioVrmLinkedAppearanceReadinessPlan } from "./studio-vrm-linked-appearance-readiness-plan";
 import { createPropInstance, serializeVrmProps } from "./studio-vrm-props";
 import {
   createStudioVrmSceneDocument,

@@ -3,19 +3,19 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resolveStudioBg3dSharedCharacterGrounding } from
-  "./studio-bg3d-shared-character-grounding";
-import { createStudioShared3dSceneSession } from "./studio-shared-3d-scene-bridge";
+import { createStudioShared3dSceneSession } from "../studio-shared-3d-scene-bridge";
 import {
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
-} from "./studio-vrm-scene-document";
+} from "../vrm/studio-vrm-scene-document";
+
+import { resolveStudioBg3dSharedCharacterGrounding } from "./studio-bg3d-shared-character-grounding";
 import { StudioBg3dSharedCharacterPlacementPanel } from "./StudioBg3dSharedCharacterPlacementPanel";
 
 import type {
   StudioShared3dCharacterTransformCommitHandler,
   StudioShared3dCharacterTransformUpdateRequest,
-} from "./studio-shared-3d-scene-bridge";
+} from "../studio-shared-3d-scene-bridge";
 
 afterEach(cleanup);
 

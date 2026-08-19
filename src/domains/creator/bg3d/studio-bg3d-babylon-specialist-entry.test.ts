@@ -4,8 +4,7 @@ import {
   attachStudioBg3dBabylonDeviceLossSignal,
   initializeStudioBg3dBabylonWebGpuEngine,
   STUDIO_BG3D_BABYLON_DELEGATES_CONTEXT_LOSS_TO_RUNTIME,
-} from
-  "./studio-bg3d-babylon-specialist-entry";
+} from "./studio-bg3d-babylon-specialist-entry";
 import {
   STUDIO_BG3D_BABYLON_ADAPTER_DIAGNOSTIC,
   STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL,

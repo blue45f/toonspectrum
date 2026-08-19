@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { classifyGesture, stabilizeGesture } from "./rps-logic";
 
-import type { FingerEulerMap } from "@/src/domains/creator/studio-vrm-hand-solver";
+import type { FingerEulerMap } from "@/src/domains/creator/vrm/studio-vrm-hand-solver";
 
 // 손가락별 컬 합(rad)을 주면 3마디로 분배한 FingerEulerMap 생성(우측 손).
 function curls(totals: { index: number; middle: number; ring: number; little: number }): FingerEulerMap {

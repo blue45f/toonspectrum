@@ -30,7 +30,7 @@ describe("VRM durable creative product authority", () => {
   it("keeps product pose materials on SQLite while retaining storage only as an explicit seam", () => {
     const panel = source("./StudioVrmPoseMaterialPanel.tsx");
     const repository = source("./studio-vrm-pose-material-sqlite-repository.ts");
-    const legacy = source("./studio-pose-material-library.ts");
+    const legacy = source("../studio-pose-material-library.ts");
 
     expect(panel).toContain("createStudioVrmPoseMaterialSqliteRepository");
     expect(panel).toContain("repository.load()");

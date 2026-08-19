@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { loadVerifiedStudioBg3dGlbWithThree } from "../studio-background-3d-model";
+
 import {
   SAMPLE_BG3D_MODEL_ENTRIES,
   admitStoredBg3dModelForRenderingV12,
@@ -12,9 +14,7 @@ import {
   getStoredBg3dModelV12,
   resolveStudioBg3dModelAttachmentSource,
 } from "./bg3d-model-library";
-import { loadVerifiedStudioBg3dGlbWithThree } from "./studio-background-3d-model";
-import { STUDIO_BG3D_BUNDLED_ENVIRONMENT_LIBRARY_ENTRIES } from
-  "./studio-bg3d-bundled-environment-library";
+import { STUDIO_BG3D_BUNDLED_ENVIRONMENT_LIBRARY_ENTRIES } from "./studio-bg3d-bundled-environment-library";
 import {
   STUDIO_BG3D_ENVIRONMENT_ASSETS,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_V3,
@@ -25,8 +25,7 @@ import {
   isStudioBg3dEnvironmentAssetId,
   type StudioBg3dEnvironmentAsset,
 } from "./studio-bg3d-environment-catalog";
-import { resolveStudioBg3dModelNormalizationScale } from
-  "./studio-bg3d-model-runtime-admission";
+import { resolveStudioBg3dModelNormalizationScale } from "./studio-bg3d-model-runtime-admission";
 import { measureStudioBg3dPhysicsModelLocalBounds } from "./studio-bg3d-physics-three";
 import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
 
@@ -157,7 +156,7 @@ const EXPECTED_METRICS = Object.freeze({
 } as const);
 
 function publicAssetPath(url: string): string {
-  return fileURLToPath(new URL(`../../../public${url}`, import.meta.url));
+  return fileURLToPath(new URL(`../../../../public${url}`, import.meta.url));
 }
 
 function parseEnvironmentGlb(asset: StudioBg3dEnvironmentAsset) {
@@ -541,8 +540,7 @@ describe("Studio BG3D Blender 5.2 Wave 5 environment pack", () => {
 
   it("keeps the Blender generator scene-safe and documents exact CC0 provenance", () => {
     const generator = readFileSync(
-      fileURLToPath(new URL(
-        "../../../scripts/blender/generate_environment_pack_v5.py",
+      fileURLToPath(new URL("../../../../scripts/blender/generate_environment_pack_v5.py",
         import.meta.url,
       )),
       "utf8",
@@ -564,7 +562,7 @@ describe("Studio BG3D Blender 5.2 Wave 5 environment pack", () => {
     expect(generator).not.toContain("bpy.ops.wm.read_homefile");
 
     const licenses = readFileSync(
-      fileURLToPath(new URL("../../../public/assets/3d/ENVIRONMENT_LICENSES.md", import.meta.url)),
+      fileURLToPath(new URL("../../../../public/assets/3d/ENVIRONMENT_LICENSES.md", import.meta.url)),
       "utf8",
     );
     expect(licenses).toContain("generate_environment_pack_v5.py");

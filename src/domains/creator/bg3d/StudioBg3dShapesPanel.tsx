@@ -13,16 +13,16 @@ import {
 } from "./studio-bg3d-push-pull";
 import { StudioBg3dProceduralStarterPanel } from "./StudioBg3dProceduralStarterPanel";
 
-import type { BgCompositeCategory } from "./studio-background-3d-composites";
+import type { BgCompositeCategory } from "../studio-background-3d-composites";
 import type {
   BgCustomModelInstance,
   StudioBg3dThreeJointDescriptor,
   StudioBg3dThreeMorphDescriptor,
-} from "./studio-background-3d-model";
+} from "../studio-background-3d-model";
 import type {
   BgPrimitive,
   BgPrimitiveKind,
-} from "./studio-background-3d-primitives";
+} from "../studio-background-3d-primitives";
 import type {
   StudioBg3dLayerListItem,
   StudioBg3dSnapSettings,
@@ -53,12 +53,12 @@ interface StudioBg3dShapesPanelContext {
   readonly Boxes: typeof import("lucide-react").Boxes;
   readonly ADD_BUTTONS: { kind: BgPrimitiveKind; label: string; icon: typeof import("lucide-react").Boxes; }[];
   readonly addPrimitive: (kind: BgPrimitiveKind) => void;
-  readonly PRIMITIVE_DEFS: Record<BgPrimitiveKind, import("./studio-background-3d-metadata").BgPrimitiveDef>;
+  readonly PRIMITIVE_DEFS: Record<BgPrimitiveKind, import("../studio-background-3d-metadata").BgPrimitiveDef>;
   readonly compositeCategory: BgCompositeCategory | null;
   readonly setCompositeCategory: import("react").Dispatch<import("react").SetStateAction<BgCompositeCategory | null>>;
   readonly COMPOSITE_CATEGORIES: BgCompositeCategory[];
   readonly COMPOSITE_CATEGORY_LABELS: Record<BgCompositeCategory, string>;
-  readonly COMPOSITE_PRESETS: import("./studio-background-3d-composites").BgCompositePreset[];
+  readonly COMPOSITE_PRESETS: import("../studio-background-3d-composites").BgCompositePreset[];
   readonly addComposite: (presetId: string) => void;
   readonly addProceduralStarterAsset: (
     assetId: string,
@@ -93,7 +93,7 @@ interface StudioBg3dShapesPanelContext {
   readonly Trash2: typeof import("lucide-react").Trash2;
   readonly reparentSceneEntity: (id: string, nextParentId: string | null) => void;
   readonly layerListItems: StudioBg3dLayerListItem[];
-  readonly canSetStudioBg3dParent: (entities: readonly import("./studio-bg3d-hierarchy").StudioBg3dHierarchyEntity[], childId: string, proposedParentId: string | null) => boolean;
+  readonly canSetStudioBg3dParent: (entities: readonly import( "./studio-bg3d-hierarchy").StudioBg3dHierarchyEntity[], childId: string, proposedParentId: string | null) => boolean;
   readonly Vec3Field: typeof import("./studio-bg3d-control-fields").Vec3Field;
   readonly updateTransform: (id: string, patch: Partial<Pick<BgPrimitive, "position" | "rotation" | "scale">>, options?: { readonly snap?: boolean; }) => void;
   readonly radToDeg: (rad: number) => number;
@@ -109,19 +109,19 @@ interface StudioBg3dShapesPanelContext {
   readonly updateCustomModelMaterial: (id: string, update: StudioBg3dMaterialOverride | null | ((current: StudioBg3dMaterialOverride) => StudioBg3dMaterialOverride)) => void;
   readonly DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE: StudioBg3dMaterialOverride;
   readonly selectedSemanticMaterials: StudioBg3dSemanticMaterialClassificationResult | null;
-  readonly selectedCharacterPassPlan: import("./studio-bg3d-semantic-materials").StudioBg3dSemanticRenderPassResult | null;
-  readonly selectedBackgroundPassPlan: import("./studio-bg3d-semantic-materials").StudioBg3dSemanticRenderPassResult | null;
-  readonly selectedSemanticAssignments: readonly import("./studio-bg3d-semantic-materials").StudioBg3dSemanticMaterialAssignment[];
+  readonly selectedCharacterPassPlan: import( "./studio-bg3d-semantic-materials").StudioBg3dSemanticRenderPassResult | null;
+  readonly selectedBackgroundPassPlan: import( "./studio-bg3d-semantic-materials").StudioBg3dSemanticRenderPassResult | null;
+  readonly selectedSemanticAssignments: readonly import( "./studio-bg3d-semantic-materials").StudioBg3dSemanticMaterialAssignment[];
   readonly SEMANTIC_MATERIAL_SLOT_LABELS: Record<"skin" | "hair" | "eyes" | "clothes" | "accessory" | "background" | "unknown", string>;
   readonly SEMANTIC_MATERIAL_CONFIDENCE_LABELS: Record<StudioBg3dSemanticMaterialConfidence, string>;
   readonly selectedModelJoints: readonly StudioBg3dThreeJointDescriptor[];
   readonly updateCustomModelConstraints: (id: string, update: StudioBg3dConstraintLayer | null | ((current: StudioBg3dConstraintLayer) => StudioBg3dConstraintLayer)) => void;
   readonly DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER: StudioBg3dConstraintLayer;
-  readonly selectedAimConstraints: readonly import("./studio-bg3d-scene-document").StudioBg3dJointAimConstraint[];
-  readonly selectedTwoBoneIkConstraints: readonly import("./studio-bg3d-scene-document").StudioBg3dTwoBoneIkConstraint[];
+  readonly selectedAimConstraints: readonly import( "./studio-bg3d-scene-document").StudioBg3dJointAimConstraint[];
+  readonly selectedTwoBoneIkConstraints: readonly import( "./studio-bg3d-scene-document").StudioBg3dTwoBoneIkConstraint[];
   readonly selectedPoseJointKey: string;
   readonly setPoseJointSelection: import("react").Dispatch<import("react").SetStateAction<StudioBg3dRigSelectionState | null>>;
-  readonly selectedAimConstraint: import("./studio-bg3d-scene-document").StudioBg3dJointAimConstraint | undefined;
+  readonly selectedAimConstraint: import( "./studio-bg3d-scene-document").StudioBg3dJointAimConstraint | undefined;
   readonly commitSelectedAimConstraint: (next: Omit<StudioBg3dConstraintLayer["aims"][number], "jointKey"> | null) => void;
   readonly selectedAimSuppressedByIk: boolean;
   readonly selectedIkEndCandidates: StudioBg3dThreeJointDescriptor[];
@@ -130,7 +130,7 @@ interface StudioBg3dShapesPanelContext {
   readonly selectedIkUpperJoint: StudioBg3dThreeJointDescriptor | undefined;
   readonly selectedIkMiddleJoint: StudioBg3dThreeJointDescriptor | undefined;
   readonly selectedIkEndJoint: StudioBg3dThreeJointDescriptor | undefined;
-  readonly selectedTwoBoneIkConstraint: import("./studio-bg3d-scene-document").StudioBg3dTwoBoneIkConstraint | undefined;
+  readonly selectedTwoBoneIkConstraint: import( "./studio-bg3d-scene-document").StudioBg3dTwoBoneIkConstraint | undefined;
   readonly selectedIkLimitReached: boolean;
   readonly selectedIkHasOverlap: boolean;
   readonly selectedIkTransformSupported: boolean;
@@ -151,7 +151,7 @@ interface StudioBg3dShapesPanelContext {
   readonly modelAnimationTimeReadersRef: import("react").RefObject<Map<string, () => number>>;
   readonly updateCustomModelPose: (id: string, update: StudioBg3dPoseLayer | null | ((current: StudioBg3dPoseLayer) => StudioBg3dPoseLayer)) => void;
   readonly DEFAULT_STUDIO_BG3D_POSE_LAYER: StudioBg3dPoseLayer;
-  readonly selectedPoseJoint: import("./studio-bg3d-scene-document").StudioBg3dJointPoseOverride | undefined;
+  readonly selectedPoseJoint: import( "./studio-bg3d-scene-document").StudioBg3dJointPoseOverride | undefined;
   readonly commitSelectedPoseOverride: (next: Omit<StudioBg3dPoseLayer["joints"][number], "jointKey"> | null) => void;
   readonly selectedPoseEulerDegrees: [number, number, number];
   readonly eulerDegreesToQuaternion: (rotation: readonly [number, number, number]) => StudioBg3dQuaternion;
@@ -160,7 +160,7 @@ interface StudioBg3dShapesPanelContext {
   readonly DEFAULT_STUDIO_BG3D_MORPH_LAYER: StudioBg3dMorphLayer;
   readonly selectedMorphTargetKey: string;
   readonly setMorphTargetSelection: import("react").Dispatch<import("react").SetStateAction<{ readonly modelId: string; readonly key: string; } | null>>;
-  readonly selectedMorphOverride: import("./studio-bg3d-scene-document").StudioBg3dMorphWeightOverride | undefined;
+  readonly selectedMorphOverride: import( "./studio-bg3d-scene-document").StudioBg3dMorphWeightOverride | undefined;
 }
 
 export interface StudioBg3dShapesPanelProps {

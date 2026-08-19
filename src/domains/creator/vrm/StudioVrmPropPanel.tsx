@@ -15,6 +15,8 @@ import {
   type RefObject,
 } from "react";
 
+import { StudioThreeDToggleControl } from "../StudioThreeDToggle";
+
 import {
   inspectAutoGripReadiness,
   type AutoGripReadiness,
@@ -39,7 +41,6 @@ import {
   type PropRigV2,
   type Vec3,
 } from "./studio-vrm-props";
-import { StudioThreeDToggleControl } from "./StudioThreeDToggle";
 
 import { cn } from "@/lib/utils";
 

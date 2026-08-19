@@ -15,9 +15,9 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
-import { STUDIO_Z_CLASS } from "./studio-z-index";
-import { useStudioModalSheet } from "./useStudioModalSheet";
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
+import { STUDIO_Z_CLASS } from "../studio-z-index";
+import { useStudioModalSheet } from "../useStudioModalSheet";
 
 import type {
   StudioVrmProjectArchiveAttestationPlan,
@@ -59,7 +59,7 @@ export interface StudioVrmProjectArchiveAttestationHostProps {
 let presenterRegistration: PresenterRegistration | null = null;
 
 const loadDefaultDialog: StudioVrmProjectArchiveAttestationDialogLoader = () =>
-  import("./StudioVrmProjectArchiveAttestationDialog").then((module) => ({
+  import( "./StudioVrmProjectArchiveAttestationDialog").then((module) => ({
     default: module.StudioVrmProjectArchiveAttestationDialog,
   }));
 

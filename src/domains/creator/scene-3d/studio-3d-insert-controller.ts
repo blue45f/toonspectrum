@@ -2,7 +2,7 @@ import type {
   StudioBackground3DInsertResult,
   StudioVrmPoserInsertResult,
 } from "./studio-3d-insert-contract";
-import type { StudioEditorMutationTicket } from "./studio-editor-scope";
+import type { StudioEditorMutationTicket } from "../studio-editor-scope";
 
 export type Studio3dInsertMutationAdmission = (
   ticket: StudioEditorMutationTicket

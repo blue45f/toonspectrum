@@ -12,8 +12,7 @@ import {
 import type { StudioBg3dKtx2TranscoderAssets } from "./studio-bg3d-ktx2-transcoder-contract";
 import type * as THREE from "three";
 
-const INSTALLED_BASIS_DIRECTORY = new URL(
-  "../../../node_modules/three/examples/jsm/libs/basis/",
+const INSTALLED_BASIS_DIRECTORY = new URL("../../../../node_modules/three/examples/jsm/libs/basis/",
   import.meta.url,
 );
 

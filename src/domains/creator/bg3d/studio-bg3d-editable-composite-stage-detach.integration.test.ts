@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { planStudioBg3dEditableCompositeDetach } from
-  "./studio-bg3d-editable-composite-detach-plan";
+import { createLayerGroup } from "../studio-layers";
+import { createStudioShared3dSceneSessionFromElements } from "../studio-shared-3d-scene-bridge";
+import {
+  planStudioShared3dStageCollectionRemoval,
+  planStudioShared3dStageCollectionUpsert,
+} from "../studio-shared-3d-stage-collection";
+import {
+  createStudioShared3dStageDocument,
+  type StudioShared3dStageElementSource,
+} from "../studio-shared-3d-stage-document";
+import { createStudioVrmSceneDocument } from "../vrm/studio-vrm-scene-document";
+
+import { planStudioBg3dEditableCompositeDetach } from "./studio-bg3d-editable-composite-detach-plan";
 import {
   planStudioBg3dLtLayers,
   type StudioBg3dLtImageElementLike,
@@ -11,18 +22,6 @@ import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   type StudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
-import { createLayerGroup } from "./studio-layers";
-import { createStudioShared3dSceneSessionFromElements } from
-  "./studio-shared-3d-scene-bridge";
-import {
-  planStudioShared3dStageCollectionRemoval,
-  planStudioShared3dStageCollectionUpsert,
-} from "./studio-shared-3d-stage-collection";
-import {
-  createStudioShared3dStageDocument,
-  type StudioShared3dStageElementSource,
-} from "./studio-shared-3d-stage-document";
-import { createStudioVrmSceneDocument } from "./studio-vrm-scene-document";
 
 type TestImage = StudioBg3dLtImageElementLike<StudioBg3dSceneDocument>
 & StudioShared3dStageElementSource & {

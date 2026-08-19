@@ -12,7 +12,7 @@ import {
   studioEditableMeshToTriangleSoup,
   type StudioEditableMesh,
   type StudioMeshVec3,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
 
 export const STUDIO_SCULPT_KERNEL_REVISION = 1 as const;
 

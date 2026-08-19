@@ -1,7 +1,7 @@
 import { VRMHumanoid, type VRM } from "@pixiv/three-vrm";
 import * as THREE from "three";
 
-import type { StudioHumanoidBoneName } from "./studio-humanoid-bones";
+import type { StudioHumanoidBoneName } from "../studio-humanoid-bones";
 import type {
   StudioVrmProportionModelGeneration,
   StudioVrmProportionRigAdapter,

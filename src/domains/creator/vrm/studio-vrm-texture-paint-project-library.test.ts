@@ -7,7 +7,8 @@ import {
   type StudioProjectArchiveImportedAttachment,
   type StudioProjectArchiveManifest,
   type StudioProjectArchiveManifestAttachment,
-} from "./studio-project-archive";
+} from "../studio-project-archive";
+
 import {
   createDefaultStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,

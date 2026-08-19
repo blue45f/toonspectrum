@@ -15,7 +15,12 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
+import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "../bg3d/studio-bg3d-lt-render";
+import {
+  captureStudioVrmRgba,
+  encodeStudioVrmCapturePngDataUrl,
+} from "../vrm/studio-vrm-raster-capture";
+
 import { solveStudioMannequinTwoBoneIk } from "./studio-mannequin-ik";
 import {
   buildStudioMannequinSpec,
@@ -35,10 +40,6 @@ import {
   normalizeStudioMannequinPose,
   type StudioMannequinPose,
 } from "./studio-mannequin-poses";
-import {
-  captureStudioVrmRgba,
-  encodeStudioVrmCapturePngDataUrl,
-} from "./studio-vrm-raster-capture";
 
 export type StudioMannequinProjection = "perspective" | "orthographic";
 

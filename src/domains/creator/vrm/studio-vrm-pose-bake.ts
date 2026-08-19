@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
+import { STUDIO_HUMANOID_BONE_NAMES } from "../studio-humanoid-bones";
 
 import type { PoseBoneMap, Vec3 } from "./studio-vrm-poser-utils";
 import type { VRMHumanBoneName } from "@pixiv/three-vrm";

@@ -1,4 +1,5 @@
-import { createSha256Portable } from "./studio-sha256";
+import { createSha256Portable } from "../studio-sha256";
+
 import {
   STUDIO_VRM_AVATAR_REFERENCE_CATALOGUE_BYTE_LENGTH,
   STUDIO_VRM_AVATAR_REFERENCE_CATALOGUE_MAX_BYTES,

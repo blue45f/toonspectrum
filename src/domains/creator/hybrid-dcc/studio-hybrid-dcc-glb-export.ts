@@ -12,11 +12,7 @@ import {
   hashStudioEditableMesh,
   STUDIO_EDITABLE_MESH_LIMITS,
   STUDIO_EDITABLE_MESH_REVISION,
-} from "./studio-editable-half-edge-mesh";
-import {
-  STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_ISSUE_IDS,
-  STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_REPORT_ISSUES,
-} from "./studio-hybrid-dcc-glb-export-diagnostic-limits";
+} from "../studio-editable-half-edge-mesh";
 import {
   STUDIO_VRM_EXPORT_BIN_CHUNK_TYPE,
   STUDIO_VRM_EXPORT_GLB_MAGIC,
@@ -24,7 +20,12 @@ import {
   STUDIO_VRM_EXPORT_JSON_CHUNK_TYPE,
   STUDIO_VRM_EXPORT_MIME_TYPE,
   writeStudioVrmExportGlb,
-} from "./studio-vrm-export-glb-container";
+} from "../vrm/studio-vrm-export-glb-container";
+
+import {
+  STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_ISSUE_IDS,
+  STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_REPORT_ISSUES,
+} from "./studio-hybrid-dcc-glb-export-diagnostic-limits";
 
 import type {
   StudioEditableFace,
@@ -32,8 +33,8 @@ import type {
   StudioEditableMesh,
   StudioEditableVertex,
   StudioMeshVec3,
-} from "./studio-editable-half-edge-mesh";
-import type { StudioGeometryAuthorityRecord } from "./studio-geometry-authority";
+} from "../studio-editable-half-edge-mesh";
+import type { StudioGeometryAuthorityRecord } from "../studio-geometry-authority";
 
 export const STUDIO_HYBRID_DCC_GLB_EXPORT_REVISION = 1 as const;
 export const STUDIO_HYBRID_DCC_GLB_EXPORT_FORMAT =

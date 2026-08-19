@@ -4,8 +4,9 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { useLayoutEffect, useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createStudioWebXrSessionController } from "../studio-webxr-session";
+
 import { resetStudioBg3dRetainedOwnerForTests } from "./studio-bg3d-retained-owner";
-import { createStudioWebXrSessionController } from "./studio-webxr-session";
 import {
   BG3D_RETAINED_OWNER_STALE_RELEASE_MS,
   StudioBg3dRetainedOwnerHost,
@@ -15,7 +16,7 @@ import { StudioBg3dRetainedOwnerRouteBridge } from "./StudioBg3dRetainedOwnerRou
 import type {
   StudioWebXrRendererPort,
   StudioWebXrSessionController,
-} from "./studio-webxr-session";
+} from "../studio-webxr-session";
 
 function sessionEndEvent(session: XRSession): XRSessionEvent {
   const event = new Event("end") as XRSessionEvent;

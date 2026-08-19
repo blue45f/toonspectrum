@@ -1,18 +1,18 @@
 import { Download, Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 
-import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
-import { studioDeletePoseMaterialRequest } from "./studio-destructive-command-catalog";
+import { confirmStudioDestructiveAction } from "../studio-destructive-action-preview";
+import { studioDeletePoseMaterialRequest } from "../studio-destructive-command-catalog";
 import {
   STUDIO_POSE_SCOPES,
   isStudioHumanoidBoneInScope,
   type StudioPoseScope,
-} from "./studio-humanoid-bones";
+} from "../studio-humanoid-bones";
 import {
   STUDIO_POSE_MATERIAL_MAX_NAME_LENGTH,
   serializeStudioPoseMaterial,
   type StudioPoseMaterial,
-} from "./studio-pose-material";
+} from "../studio-pose-material";
 import {
   EMPTY_STUDIO_POSE_MATERIAL_LIBRARY,
   STUDIO_POSE_MATERIAL_LIBRARY_MAX_BYTES,
@@ -25,7 +25,8 @@ import {
   type StudioPoseMaterialLibraryLoadStatus,
   type StudioPoseMaterialLibraryPayload,
   type StudioPoseMaterialStorage,
-} from "./studio-pose-material-library";
+} from "../studio-pose-material-library";
+
 import {
   createStudioVrmPoseMaterialSqliteRepository,
   type StudioVrmPoseMaterialSqliteRepository,

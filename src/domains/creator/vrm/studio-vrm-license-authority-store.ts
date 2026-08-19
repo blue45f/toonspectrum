@@ -1,11 +1,12 @@
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+
 import {
   inspectStudioVrmLicenseAuthority,
   unknownStudioVrmLicenseAuthority,
   type StudioVrmLicenseAuthority,
 } from "./studio-vrm-license-product-gate";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 import type { StudioVrmLicenseMetadataFailureCode } from "./studio-vrm-license-metadata";
 
 export const STUDIO_VRM_LICENSE_AUTHORITY_NAMESPACE =

@@ -1,13 +1,12 @@
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
-import type { StudioBg3dSharedCharacterGroundingResult } from
-  "./studio-bg3d-shared-character-grounding";
+import type { StudioBg3dSharedCharacterGroundingResult } from "./studio-bg3d-shared-character-grounding";
 import type {
   StudioShared3dCharacterSource,
   StudioShared3dCharacterRuntimeStatus,
   StudioShared3dCharacterStageTransform,
   StudioShared3dSceneSession,
-} from "./studio-shared-3d-scene-bridge";
-import type { StudioShared3dStageResolution } from "./studio-shared-3d-stage-document";
+} from "../studio-shared-3d-scene-bridge";
+import type { StudioShared3dStageResolution } from "../studio-shared-3d-stage-document";
 
 export type StudioBg3dSharedStageMutationKind =
   | "background-only"

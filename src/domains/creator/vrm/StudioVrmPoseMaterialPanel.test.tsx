@@ -7,25 +7,26 @@ import {
   resetStudioDestructiveActionLedger,
   setStudioDestructiveConfirmPresenter,
   type StudioDestructiveActionRequest,
-} from "./studio-destructive-action-preview";
+} from "../studio-destructive-action-preview";
 import {
   parseStudioPoseMaterial,
   STUDIO_POSE_MATERIAL_KIND,
   STUDIO_POSE_MATERIAL_VERSION,
   STUDIO_POSE_ROTATION_CONVENTION,
   type StudioPoseMaterial,
-} from "./studio-pose-material";
+} from "../studio-pose-material";
 import {
   EMPTY_STUDIO_POSE_MATERIAL_LIBRARY,
   STUDIO_POSE_MATERIAL_LIBRARY_KIND,
   STUDIO_POSE_MATERIAL_LIBRARY_STORAGE_KEY,
   STUDIO_POSE_MATERIAL_LIBRARY_VERSION,
   type StudioPoseMaterialStorage,
-} from "./studio-pose-material-library";
+} from "../studio-pose-material-library";
+
 import { StudioVrmPoseMaterialPanel } from "./StudioVrmPoseMaterialPanel";
 
 
-import type { StudioPoseScope } from "./studio-humanoid-bones";
+import type { StudioPoseScope } from "../studio-humanoid-bones";
 import type {
   StudioVrmPoseMaterialApplyResult,
   StudioVrmPoseMaterialCaptureOptions,

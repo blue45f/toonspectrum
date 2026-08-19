@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { openStudioLocalDatabase } from "./studio-local-database";
+import { openStudioLocalDatabase } from "../studio-local-database";
+
 import {
   createStudioVrmCreativeSqliteRepository,
   parseCanonicalStudioVrmCustomPoseLibrary,
@@ -17,7 +18,7 @@ import {
 import { EMPTY_STUDIO_VRM_POSE_TRANSLATIONS } from "./studio-vrm-pose-translations";
 import { serializeFullVrmState, type FullVrmState } from "./studio-vrm-poser-utils";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 const opened: StudioLocalDatabase[] = [];
 

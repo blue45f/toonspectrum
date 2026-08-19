@@ -1,5 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
+import { createLayerGroup, type LayerGroup } from "../studio-layers";
+
 import {
   planStudioBg3dEditableCompositeDetach,
   type StudioBg3dEditableCompositeDetachFailure,
@@ -14,7 +16,6 @@ import {
   type StudioBg3dLtPageElementLike,
   type StudioBg3dLtRenderOutput,
 } from "./studio-bg3d-lt-layer-plan";
-import { createLayerGroup, type LayerGroup } from "./studio-layers";
 
 interface TestScene {
   readonly sceneId: string;

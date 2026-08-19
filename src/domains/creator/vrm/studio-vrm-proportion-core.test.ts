@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_HUMANOID_BONE_NAMES, type StudioHumanoidBoneName } from "./studio-humanoid-bones";
+import { STUDIO_HUMANOID_BONE_NAMES, type StudioHumanoidBoneName } from "../studio-humanoid-bones";
+
 import {
   NEUTRAL_STUDIO_VRM_PROPORTIONS,
   STUDIO_VRM_PROPORTION_KEYS,

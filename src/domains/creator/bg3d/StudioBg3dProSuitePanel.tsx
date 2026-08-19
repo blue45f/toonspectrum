@@ -1,10 +1,10 @@
 import { Grab, Camera, EyeOff, Sun, Scissors, Sparkles } from "lucide-react";
 import { useState } from "react";
 
-import type { CameraLensPreset, PerspectiveGuideMode } from "./studio-3d-camera-perspective-lens";
-import type { HairCrossSectionProfile } from "./studio-3d-procedural-hair-strand";
-import type { HandGripArchetype, CharacterSocketSlot } from "./studio-3d-prop-hand-grip-solver";
-import type { TimeOfDayPreset } from "./studio-3d-scene-auto-culling";
+import type { CameraLensPreset, PerspectiveGuideMode } from "../scene-3d/studio-3d-camera-perspective-lens";
+import type { HairCrossSectionProfile } from "../scene-3d/studio-3d-procedural-hair-strand";
+import type { HandGripArchetype, CharacterSocketSlot } from "../scene-3d/studio-3d-prop-hand-grip-solver";
+import type { TimeOfDayPreset } from "../scene-3d/studio-3d-scene-auto-culling";
 
 export interface StudioBg3dProSuitePanelProps {
   readonly disabled?: boolean;

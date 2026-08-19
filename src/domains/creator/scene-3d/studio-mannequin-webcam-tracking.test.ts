@@ -58,7 +58,7 @@ describe("studio-mannequin-webcam-tracking", () => {
       "utf8",
     );
     const assetSource = readFileSync(
-      new URL("./studio-mediapipe-vision-assets.ts", import.meta.url),
+      new URL("../studio-mediapipe-vision-assets.ts", import.meta.url),
       "utf8",
     );
 

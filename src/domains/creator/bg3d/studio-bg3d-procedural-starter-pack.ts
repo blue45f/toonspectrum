@@ -9,7 +9,7 @@
 import type {
   BgPrimitive,
   BgPrimitiveKind,
-} from "./studio-background-3d-metadata";
+} from "../studio-background-3d-metadata";
 import type { StudioBg3dComplexityBudget } from "./studio-bg3d-scene-document";
 
 export const STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID =

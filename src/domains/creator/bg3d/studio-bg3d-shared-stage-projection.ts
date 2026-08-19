@@ -1,14 +1,12 @@
-import type { BgCustomModelInstance } from "./studio-background-3d-model";
-import type { BgPrimitive } from "./studio-background-3d-primitives";
-import type { StudioBg3dSharedStageMutationKind } from
-  "./studio-bg3d-shared-stage-editor-session";
-import type { StudioBg3dSharedStageInsertProjection } from
-  "./studio-shared-3d-insert-contract";
+import type { BgCustomModelInstance } from "../studio-background-3d-model";
+import type { BgPrimitive } from "../studio-background-3d-primitives";
+import type { StudioBg3dSharedStageMutationKind } from "./studio-bg3d-shared-stage-editor-session";
+import type { StudioBg3dSharedStageInsertProjection } from "../studio-shared-3d-insert-contract";
 import type {
   StudioShared3dCaptureReadiness,
   StudioShared3dCharacterSource,
-} from "./studio-shared-3d-scene-bridge";
-import type { StudioShared3dStageResolution } from "./studio-shared-3d-stage-document";
+} from "../studio-shared-3d-scene-bridge";
+import type { StudioShared3dStageResolution } from "../studio-shared-3d-stage-document";
 
 interface SharedStageMutationBlockInput {
   readonly operation: "insert" | "update";

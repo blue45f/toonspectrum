@@ -1,8 +1,9 @@
 import basisJavascriptSource from "three/examples/jsm/libs/basis/basis_transcoder.js?raw";
 import basisWasmUrl from "three/examples/jsm/libs/basis/basis_transcoder.wasm?url";
 
+import { readBoundedStudioAssetResponse } from "../studio-bounded-asset-response";
+
 import { STUDIO_BG3D_KTX2_TRANSCODER_ASSET_MANIFEST } from "./studio-bg3d-ktx2-transcoder-contract";
-import { readBoundedStudioAssetResponse } from "./studio-bounded-asset-response";
 
 import type { StudioBg3dKtx2TranscoderAssets } from "./studio-bg3d-ktx2-transcoder-contract";
 

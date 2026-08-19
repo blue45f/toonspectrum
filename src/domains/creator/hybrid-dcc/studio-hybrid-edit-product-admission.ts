@@ -6,6 +6,8 @@
  * product handlers (not only unit tests).
  */
 
+import { pickObjectIdAtPoint, selectIdsByMarquee } from "../studio-selection";
+
 import {
   createHybridPixiEditOverlayHost,
   runHybridBrushOutlineStroke,
@@ -21,7 +23,6 @@ import {
   applyHybridPixelSelectionBoundaryChangeSync,
   rasterizePixelSelectionToAlphaMask,
 } from "./studio-hybrid-pixel-selection-boundary";
-import { pickObjectIdAtPoint, selectIdsByMarquee } from "./studio-selection";
 
 export {
   applyHybridPixelSelectionBoundaryChange,

@@ -2,6 +2,14 @@ import { IDBFactory, IDBObjectStore as FakeIDBObjectStore } from "fake-indexeddb
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  openStudioLocalDatabase,
+  type StudioLocalDatabase,
+  type StudioSqliteApiHandle,
+} from "../studio-local-database";
+import { createStudioOpfsAssetStore } from "../studio-opfs-asset-store";
+import { createStudioOpfsMemoryFileSystem } from "../studio-opfs-filesystem";
+
+import {
   STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
   STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
 } from "./studio-bg3d-capture-adapter";
@@ -31,13 +39,6 @@ import {
   type StudioBg3dShotBatchRecoveryAuthorizationReceipt,
   type StudioBg3dShotBatchRecoveryRunExclusive,
 } from "./studio-bg3d-shot-batch-recovery-store";
-import {
-  openStudioLocalDatabase,
-  type StudioLocalDatabase,
-  type StudioSqliteApiHandle,
-} from "./studio-local-database";
-import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
-import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
 
 let fixtureSequence = 0;
 

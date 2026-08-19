@@ -1,7 +1,7 @@
-type StudioBg3dTemplateLibraryModule = typeof import("./bg3d-template-library");
+type StudioBg3dTemplateLibraryModule = typeof import( "./bg3d-template-library");
 
 export type Bg3dTemplateLibraryEntry =
-  import("./bg3d-template-library").Bg3dTemplateLibraryEntry;
+  import( "./bg3d-template-library").Bg3dTemplateLibraryEntry;
 
 let studioBg3dTemplateLibraryModulePromise:
   Promise<StudioBg3dTemplateLibraryModule> | null = null;
@@ -12,7 +12,7 @@ let studioBg3dTemplateLibraryModulePromise:
  */
 export function loadStudioBg3dTemplateLibraryModule():
 Promise<StudioBg3dTemplateLibraryModule> {
-  studioBg3dTemplateLibraryModulePromise ??= import("./bg3d-template-library").catch(
+  studioBg3dTemplateLibraryModulePromise ??= import( "./bg3d-template-library").catch(
     (cause: unknown) => {
       studioBg3dTemplateLibraryModulePromise = null;
       throw cause;

@@ -1,12 +1,13 @@
 import {
+  studioShared3dCharacterWorldTransform,
+  type StudioShared3dCharacterSource,
+} from "../studio-shared-3d-scene-bridge";
+
+import {
   STUDIO_BG3D_SHARED_CHARACTER_GROUNDING_RECEIPT_KIND,
   STUDIO_BG3D_SHARED_CHARACTER_GROUNDING_RECEIPT_VERSION,
   type StudioBg3dSharedCharacterGroundingResult,
 } from "./studio-bg3d-shared-character-grounding";
-import {
-  studioShared3dCharacterWorldTransform,
-  type StudioShared3dCharacterSource,
-} from "./studio-shared-3d-scene-bridge";
 
 export const STUDIO_BG3D_SHARED_CHARACTER_CONTACT_SHADOW_LIMITS = Object.freeze({
   maximumAbsoluteWorldCoordinate: 10_000,

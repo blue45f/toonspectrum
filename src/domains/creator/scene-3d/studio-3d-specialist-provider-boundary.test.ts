@@ -107,9 +107,9 @@ function interfaceSource(
   return match!.getText(analysis.file);
 }
 
-const bvh = analyze("./studio-three-mesh-bvh-provider.ts");
-const gltf = analyze("./studio-gltf-transform-provider.ts");
-const manifold = analyze("./studio-manifold-mesh-provider.ts");
+const bvh = analyze("../studio-three-mesh-bvh-provider.ts");
+const gltf = analyze("../studio-gltf-transform-provider.ts");
+const manifold = analyze("../studio-manifold-mesh-provider.ts");
 const productionModules = [bvh, gltf, manifold];
 
 describe("Studio 3D specialist provider source boundary", () => {

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import type { StudioEditableMesh } from "./studio-editable-half-edge-mesh";
+import type { StudioEditableMesh } from "../studio-editable-half-edge-mesh";
 
 const meshVertexByIdCache = new WeakMap<
   StudioEditableMesh,

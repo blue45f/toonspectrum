@@ -16,7 +16,7 @@ import {
   type StudioEditableMeshExtrudeRegionReceipt,
   type StudioEditableHalfEdge,
   type StudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
 
 export const STUDIO_HYBRID_DCC_COMPONENT_SELECTION_REVISION = 1 as const;
 export const STUDIO_HYBRID_DCC_COMPONENT_SELECTION_SNAPSHOT_VERSION = 1 as const;

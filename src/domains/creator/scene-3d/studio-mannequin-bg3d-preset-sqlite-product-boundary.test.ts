@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import bg3dSource from "../bg3d/StudioBackground3D.tsx?raw";
+import ltPanelSource from "../bg3d/StudioBg3dLtPanel.tsx?raw";
+
 import repositorySource from "./studio-mannequin-bg3d-preset-sqlite-repository.ts?raw";
-import bg3dSource from "./StudioBackground3D.tsx?raw";
-import ltPanelSource from "./StudioBg3dLtPanel.tsx?raw";
 import mannequinSource from "./StudioMannequinPoserPanel.tsx?raw";
 
 describe("mannequin and BG3D LT V12 product persistence boundary", () => {

@@ -4,22 +4,22 @@ import { act, cleanup, render } from "@testing-library/react";
 import * as THREE from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createStudioShared3dSceneSession } from "./studio-shared-3d-scene-bridge";
-import { DEFAULT_VRM_PROP_RIG_METRICS } from "./studio-vrm-prop-rig";
-import { createPropInstance, serializeVrmProps } from "./studio-vrm-props";
+import { createStudioShared3dSceneSession } from "../studio-shared-3d-scene-bridge";
+import { DEFAULT_VRM_PROP_RIG_METRICS } from "../vrm/studio-vrm-prop-rig";
+import { createPropInstance, serializeVrmProps } from "../vrm/studio-vrm-props";
 import {
   createStudioVrmSceneDocument,
   type StudioVrmCanonicalData,
-} from "./studio-vrm-scene-document";
+} from "../vrm/studio-vrm-scene-document";
 import {
   FALLBACK_WARDROBE_METRICS,
   createWardrobeEquip,
   serializeWardrobe,
-} from "./studio-vrm-wardrobe";
-import { StudioBg3dSharedVrmAppearanceRuntime } from
-  "./StudioBg3dSharedVrmAppearanceRuntime";
+} from "../vrm/studio-vrm-wardrobe";
 
-import type { StudioShared3dCharacterSource } from "./studio-shared-3d-scene-bridge";
+import { StudioBg3dSharedVrmAppearanceRuntime } from "./StudioBg3dSharedVrmAppearanceRuntime";
+
+import type { StudioShared3dCharacterSource } from "../studio-shared-3d-scene-bridge";
 
 const runtimeMocks = vi.hoisted(() => ({
   prepare: vi.fn(),
@@ -47,11 +47,11 @@ vi.mock("@react-three/fiber", () => ({
     selector({ invalidate: runtimeMocks.invalidate }),
 }));
 
-vi.mock("./studio-vrm-costume-runtime", () => ({
+vi.mock("../vrm/studio-vrm-costume-runtime", () => ({
   applyStudioVrmCostumeState: runtimeMocks.applyCostume,
 }));
 
-vi.mock("./StudioVrmWardrobePropsProjection", async () => {
+vi.mock("../vrm/StudioVrmWardrobePropsProjection", async () => {
   const { useLayoutEffect } = await import("react");
   return {
     StudioVrmPropAttachment: (props: {

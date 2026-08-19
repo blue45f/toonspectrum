@@ -92,9 +92,9 @@ const provider = analyze(
 describe("Studio hybrid textured-vector ink provider source boundary", () => {
   it("uses the existing vector-ink artifact only as a type-level input authority", () => {
     expect(provider.typeOnlyStaticImports).toEqual([
-      "./studio-vector-ink-geometry",
+      "../studio-vector-ink-geometry",
     ]);
-    expect(provider.runtimeStaticImports).toEqual(["./studio-sha256"]);
+    expect(provider.runtimeStaticImports).toEqual(["../studio-sha256"]);
     expect(provider.dynamicImports).toEqual([]);
     expect(provider.source).toContain(
       "geometry: StudioVectorInkGeometryArtifact",

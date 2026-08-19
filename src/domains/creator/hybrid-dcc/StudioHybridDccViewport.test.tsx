@@ -7,12 +7,14 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createStudioSharedSet } from "../live/studio-live-2d3d-bridge";
 import {
   createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
   studioEditableMeshToTriangleSoup,
   type StudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
+
 import {
   deriveStudioHybridDccAssetLayout,
   STUDIO_HYBRID_DCC_ASSET_LAYOUT_LIMITS,
@@ -33,13 +35,12 @@ import {
   workspaceSetAssetVisibility,
   type StudioHybridDccWorkspace,
 } from "./studio-hybrid-dcc-workspace";
-import { createStudioSharedSet } from "./studio-live-2d3d-bridge";
 import {
   deriveStudioHybridDccViewportSnapshot,
   StudioHybridDccViewport,
 } from "./StudioHybridDccViewport";
 
-import type { StudioRenderMeshCache } from "./studio-geometry-authority";
+import type { StudioRenderMeshCache } from "../studio-geometry-authority";
 import type { ReactNode } from "react";
 
 const fiberHarness = vi.hoisted(() => ({

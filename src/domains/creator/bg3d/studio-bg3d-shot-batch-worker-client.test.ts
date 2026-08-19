@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { buildStudioPackageArchiveBlob } from "../studio-package-archive";
+
 import {
   STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
   STUDIO_BG3D_SHOT_BATCH_ARCHIVE_PROFILE_V1,
@@ -20,7 +22,6 @@ import {
   isStudioBg3dShotBatchWorkerResponse,
   type StudioBg3dShotBatchWorkerRequest,
 } from "./studio-bg3d-shot-batch-worker-protocol";
-import { buildStudioPackageArchiveBlob } from "./studio-package-archive";
 
 const PNG_BYTES = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
 const ZIP_PREFIX_ONLY = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x6a, 0x75, 0x6e, 0x6b]);

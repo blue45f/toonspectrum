@@ -20,7 +20,7 @@ import {
   type SurfaceTextureCommitReceipt,
   type SurfaceTextureDabOperation,
   type SurfaceTextureTransaction,
-} from "../../../packages/studio-brush-platform/src/brush-composition";
+} from "../../../../packages/studio-brush-platform/src/brush-composition";
 
 import type { StudioVrmTexturePaintOp } from "./studio-vrm-texture-paint-ops";
 import type {

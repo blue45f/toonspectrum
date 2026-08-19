@@ -3,16 +3,17 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
-  applyHybridPixelSelectionBoundaryChange,
-  applyHybridPixelSelectionBoundaryChangeSync,
-  rasterizePixelSelectionToAlphaMask,
-} from "./studio-hybrid-pixel-selection-boundary";
-import {
   addSelectionSubpath,
   emptyPixelSelection,
   expandContractSelection,
   rectSelectionPolygon,
-} from "./studio-selection-tools";
+} from "../studio-selection-tools";
+
+import {
+  applyHybridPixelSelectionBoundaryChange,
+  applyHybridPixelSelectionBoundaryChangeSync,
+  rasterizePixelSelectionToAlphaMask,
+} from "./studio-hybrid-pixel-selection-boundary";
 
 import type { CV, Mat } from "@techstark/opencv-js";
 

@@ -7,7 +7,7 @@
  * next arrays; a failed result contains no partial state.
  */
 
-import { createLayerGroup, type LayerGroup } from "./studio-layers";
+import { createLayerGroup, type LayerGroup } from "../studio-layers";
 
 export const STUDIO_BG3D_LT_LAYER_ROLES = ["color", "tone", "texture-line", "main-line"] as const;
 

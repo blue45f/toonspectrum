@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { openStudioLocalDatabase } from "./studio-local-database";
-import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
+import { openStudioLocalDatabase } from "../studio-local-database";
+import { createStudioOpfsMemoryFileSystem } from "../studio-opfs-filesystem";
+
 import { createStudioVrmAssetSqliteOpfsRepository } from "./studio-vrm-asset-sqlite-opfs-repository";
 import { createStudioVrmLicenseAuthorityStore } from "./studio-vrm-license-authority-store";
 import { STUDIO_VRM_1_PUBLIC_LICENSE_URL } from "./studio-vrm-license-metadata";
@@ -15,7 +16,7 @@ import {
   saveVerifiedVrmBlob,
 } from "./vrm-library";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 const opened: StudioLocalDatabase[] = [];
 

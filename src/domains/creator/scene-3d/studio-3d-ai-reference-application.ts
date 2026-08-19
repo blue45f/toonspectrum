@@ -2,10 +2,10 @@ import {
   STUDIO_AI_IMAGE_REFERENCE_LIMITS,
   hydrateStudioAiImageReferenceDocument,
   type StudioAiImageReferenceDocument,
-} from "./studio-ai-image-reference-roles";
+} from "../ai/studio-ai-image-reference-roles";
 
 import type { StudioBg3dAiMethodReferenceCapture } from "./studio-3d-ai-reference-handoff";
-import type { StudioAssetWithContentHash } from "./studio-asset-library";
+import type { StudioAssetWithContentHash } from "../studio-asset-library";
 
 export const STUDIO_BG3D_AI_METHOD_REFERENCE_ID =
   "bg3d-current-shot-method" as const;

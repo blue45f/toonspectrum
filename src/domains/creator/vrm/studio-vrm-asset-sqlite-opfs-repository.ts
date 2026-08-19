@@ -7,19 +7,20 @@
  * durable authority transition. Anything left before that transition is recoverable staging data.
  */
 
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
 import {
   createStudioOpfsAssetStore,
   type StudioOpfsAssetStore,
   type StudioOpfsDigest,
   type StudioOpfsPutResult,
-} from "./studio-opfs-asset-store";
+} from "../studio-opfs-asset-store";
 import {
   createStudioOpfsNativeFileSystem,
   isStudioOpfsError,
   type StudioOpfsFileSystem,
   type StudioOpfsStorageManagerLike,
-} from "./studio-opfs-filesystem";
+} from "../studio-opfs-filesystem";
+
 import {
   STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_KIND,
   STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_MIME,
@@ -27,7 +28,7 @@ import {
   type StudioVrmTexturePaintArtifactMetadata,
 } from "./studio-vrm-texture-paint-artifact";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 export const STUDIO_VRM_ASSET_OPFS_ROOT = "toonspectrum-studio-vrm-assets-v12";
 export const STUDIO_VRM_MODEL_SQLITE_NAMESPACE = "studio-vrm-model-assets-v12";

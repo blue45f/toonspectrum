@@ -4,9 +4,10 @@ import {
   STUDIO_BG3D_ROOM_PRESETS,
   buildStudioBg3dRoomParts,
   getStudioBg3dRoomPreset,
-} from "./studio-bg3d-room-builder";
-import { STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS } from "./studio-bg3d-scene-document";
-import { hashStudioEditableMesh } from "./studio-editable-half-edge-mesh";
+} from "../bg3d/studio-bg3d-room-builder";
+import { STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS } from "../bg3d/studio-bg3d-scene-document";
+import { hashStudioEditableMesh } from "../studio-editable-half-edge-mesh";
+
 import {
   buildStudioHybridDccRoomAuthority,
   buildStudioHybridDccRoomPresetAuthority,

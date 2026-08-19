@@ -5,11 +5,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createStudioEditableMeshFromPolygons,
-  createStudioUnitCubeMesh,
-  studioEditableMeshToTriangleSoup,
-} from "./studio-editable-half-edge-mesh";
-import {
   createStudioHybridDccWorkspace,
   workspaceAddUnitCube,
   workspaceBooleanBetweenAssets,
@@ -29,8 +24,13 @@ import {
   workspaceOcctStepRoundTrip,
   workspaceOcctThickShell,
   workspaceOcctWedge,
-} from "./studio-hybrid-dcc-workspace";
-import { orientStudioMeshOutward } from "./studio-mesh-ops-advanced";
+} from "../hybrid-dcc/studio-hybrid-dcc-workspace";
+import {
+  createStudioEditableMeshFromPolygons,
+  createStudioUnitCubeMesh,
+  studioEditableMeshToTriangleSoup,
+} from "../studio-editable-half-edge-mesh";
+import { orientStudioMeshOutward } from "../studio-mesh-ops-advanced";
 import {
   occtCircularPatternBox,
   occtDraftPrismOnBox,
@@ -48,10 +48,10 @@ import {
   occtSolidWorksGradeSuite,
   occtStepRoundTripBox,
   STUDIO_OCCT_WASM_FACADE_REVISION,
-} from "./studio-occt-wasm-facade";
+} from "../studio-occt-wasm-facade";
 import {
   createStudioPureConvexSolidBooleanBackend,
-} from "./studio-solid-boolean-backend";
+} from "../studio-solid-boolean-backend";
 
 describe("3D engine upgrades", () => {
   it("OCCT loft uses real ThruSections (not fuse-stack rename)", async () => {

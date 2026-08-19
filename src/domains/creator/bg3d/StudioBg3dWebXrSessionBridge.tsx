@@ -13,7 +13,7 @@ import type {
   StudioWebXrSessionController,
   StudioWebXrSessionState,
   StudioWebXrSupportSnapshot,
-} from "./studio-webxr-session";
+} from "../studio-webxr-session";
 
 export interface StudioBg3dWebXrSessionBridgeProps {
   readonly domOverlayRootRef: RefObject<HTMLElement | null>;
@@ -64,7 +64,7 @@ export function StudioBg3dWebXrSessionBridge({
     publishController(null);
     publishSupport(null);
 
-    void import("./studio-webxr-session").then(async (runtime) => {
+    void import("../studio-webxr-session").then(async (runtime) => {
       if (disposed) return;
       const rendererPort = {
         get enabled() {

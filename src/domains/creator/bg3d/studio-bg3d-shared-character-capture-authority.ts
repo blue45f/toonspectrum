@@ -1,4 +1,4 @@
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_BG3D_SHARED_CHARACTER_CAPTURE_AUTHORITY_SNAPSHOT_KIND =
   "toonspectrum.studio-bg3d-shared-character-capture-authority-snapshot" as const;

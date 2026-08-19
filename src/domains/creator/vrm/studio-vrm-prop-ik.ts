@@ -1,11 +1,11 @@
 import * as THREE from "three";
 
-import { solveTwoBoneTarget } from "./studio-rig-two-bone-ik";
+import { solveTwoBoneTarget } from "../studio-rig-two-bone-ik";
 
 import type {
   TwoBoneLengths,
   TwoBoneTargetSolution,
-} from "./studio-rig-two-bone-ik";
+} from "../studio-rig-two-bone-ik";
 import type { Vec3 } from "./studio-vrm-props";
 import type { VRM } from "@pixiv/three-vrm";
 

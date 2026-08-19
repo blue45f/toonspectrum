@@ -2,6 +2,11 @@ import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  applyStudioShotOverride,
+  mutateStudioSharedObjectGeometry,
+} from "../live/studio-live-2d3d-bridge";
+
+import {
   handoffStudioHybridDccWorkspaceToBg3d,
   StudioHybridDccBg3dHandoffError,
   type StudioHybridDccBg3dHandoffPorts,
@@ -17,10 +22,6 @@ import {
   workspaceEnsureShots,
   workspaceLoadRoomPreset,
 } from "./studio-hybrid-dcc-workspace";
-import {
-  applyStudioShotOverride,
-  mutateStudioSharedObjectGeometry,
-} from "./studio-live-2d3d-bridge";
 
 function testPorts(
   transform?: (request: StudioHybridDccBg3dPersistRequest) => StudioHybridDccBg3dPersistRequest,

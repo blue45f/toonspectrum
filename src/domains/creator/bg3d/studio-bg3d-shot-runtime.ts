@@ -5,8 +5,8 @@
  * destructive.
  */
 
-import type { BgCustomModelInstance } from "./studio-background-3d-model";
-import type { BgPrimitive } from "./studio-background-3d-primitives";
+import type { BgCustomModelInstance } from "../studio-background-3d-model";
+import type { BgPrimitive } from "../studio-background-3d-primitives";
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 
 export interface StudioBg3dShotRuntimeProjection {

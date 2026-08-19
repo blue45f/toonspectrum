@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
+import { STUDIO_HUMANOID_BONE_NAMES } from "../studio-humanoid-bones";
+
 import { StudioVrmExportError } from "./studio-vrm-export-error";
 import {
   buildStudioVrmcMToonExtension,

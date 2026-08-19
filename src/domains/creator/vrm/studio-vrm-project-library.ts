@@ -3,8 +3,9 @@ import {
   type StudioProjectArchiveAttachmentInput,
   type StudioProjectArchiveDocumentReference,
   type StudioProjectArchiveImportedAttachment,
-} from "./studio-project-archive";
-import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
+} from "../studio-project-archive";
+import { parseStudioProjectFile, type StudioProjectFile } from "../studio-project-file";
+
 import {
   evaluateStudioVrmLicenseAuthority,
   inspectStudioVrmLicenseAuthority,

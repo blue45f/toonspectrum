@@ -4,12 +4,23 @@
  * into one callable surface for UI / companion tooling without React coupling.
  */
 
-import { getStudioBg3dRoomPreset, buildStudioBg3dRoomParts } from "./studio-bg3d-room-builder";
+import { getStudioBg3dRoomPreset, buildStudioBg3dRoomParts } from "../bg3d/studio-bg3d-room-builder";
+import {
+  createStudioLiveBridgeDocument,
+  createStudioSharedSet,
+  applyStudioShotOverride,
+  addStudioArtistDelta,
+  mutateStudioSharedObjectGeometry,
+  mutateStudioSharedObjectVisibility,
+  generateStudioToonPass,
+  STUDIO_TOON_PASS_KINDS,
+  type StudioLiveBridgeDocument,
+} from "../live/studio-live-2d3d-bridge";
 import {
   createStudioCadSketch,
   extrudeStudioCadProfile,
   revolveStudioCadProfile,
-} from "./studio-cad-kernel-lite";
+} from "../studio-cad-kernel-lite";
 import {
   createStudioIdleClip,
   retargetStudioMotionReport,
@@ -17,7 +28,7 @@ import {
   stepStudioSpringBone,
   type StudioRetargetReport,
   type StudioSpringBone,
-} from "./studio-character-animation-p2";
+} from "../studio-character-animation-p2";
 import {
   compileStudioClothXpbdModelV2,
   createStudioClothXpbdRuntimeV2,
@@ -25,14 +36,7 @@ import {
   stepStudioClothXpbdV2,
   type StudioClothXpbdCapsuleFrameV2,
   type StudioClothXpbdVec3V2,
-} from "./studio-cloth-xpbd-kernel-v2";
-import {
-  collabAppendOp,
-  collabJoin,
-  collabConflictReport,
-  createStudioDccCollabRoom,
-  type StudioDccCollabRoom,
-} from "./studio-dcc-collab-shell";
+} from "../studio-cloth-xpbd-kernel-v2";
 import {
   bevelStudioEditableMeshEdges,
   createStudioEditableMeshFromPolygons,
@@ -50,14 +54,55 @@ import {
   type StudioEditableMesh,
   type StudioEditableMeshExtrudeRegionMutation,
   type StudioEditableMeshExtrudeRegionReceipt,
-} from "./studio-editable-half-edge-mesh";
-import { assertRenderCacheIsNotAuthority } from "./studio-geometry-authority";
+} from "../studio-editable-half-edge-mesh";
+import { assertRenderCacheIsNotAuthority } from "../studio-geometry-authority";
 import {
   buildStudioGeoNodesPrimitive,
   evaluateStudioGeoNodesStarterGraph,
   type StudioGeoNodesPrimitiveKind,
-} from "./studio-geometry-nodes-workspace-bridge";
-import { importStudioGradeAAsset } from "./studio-grade-a-import-pipeline";
+} from "../studio-geometry-nodes-workspace-bridge";
+import { importStudioGradeAAsset } from "../studio-grade-a-import-pipeline";
+import {
+  bomFromAssetParts,
+  type StudioManufacturingBom,
+} from "../studio-manufacturing-bom-lite";
+import {
+  exportStudioMeshByFormat,
+  type StudioMeshExportFormat,
+  type StudioMeshExportResult,
+} from "../studio-mesh-export-adapters";
+import { importStudioMeshByExtension } from "../studio-mesh-format-adapters";
+import {
+  createStudioMeshModifierStack,
+  evaluateStudioMeshModifierStack,
+  withStudioMeshModifier,
+} from "../studio-mesh-modifier-stack";
+import {
+  autoRetopoStudioMeshBasic,
+  decimateStudioMesh,
+  deformStudioMeshBend,
+  dynatopoStudioMeshBrushLocal,
+  orientStudioMeshOutward,
+  repairStudioMesh,
+  shrinkwrapStudioMesh,
+  subdivideStudioMeshCatmullLite,
+} from "../studio-mesh-ops-advanced";
+import { sha256HexPortable } from "../studio-sha256";
+import { createStudioDefaultSolidBooleanBackend } from "../studio-solid-boolean-backend";
+import { packStudioToon3dPackage, type StudioToon3dPackage } from "../studio-toon3d-package";
+import {
+  unwrapStudioMeshBox,
+  unwrapStudioMeshPlanar,
+  type StudioUvMap,
+} from "../studio-uv-unwrap-lite";
+
+import {
+  collabAppendOp,
+  collabJoin,
+  collabConflictReport,
+  createStudioDccCollabRoom,
+  type StudioDccCollabRoom,
+} from "./studio-dcc-collab-shell";
 import {
   createStudioHybridDccComponentSelection,
   mutateStudioHybridDccComponentSelection,
@@ -97,62 +142,18 @@ import {
   applyStudioSculptStroke,
   voxelRemeshStudioMesh,
 } from "./studio-hybrid-sculpt-kernel";
-import {
-  createStudioLiveBridgeDocument,
-  createStudioSharedSet,
-  applyStudioShotOverride,
-  addStudioArtistDelta,
-  mutateStudioSharedObjectGeometry,
-  mutateStudioSharedObjectVisibility,
-  generateStudioToonPass,
-  STUDIO_TOON_PASS_KINDS,
-  type StudioLiveBridgeDocument,
-} from "./studio-live-2d3d-bridge";
-import {
-  bomFromAssetParts,
-  type StudioManufacturingBom,
-} from "./studio-manufacturing-bom-lite";
-import {
-  exportStudioMeshByFormat,
-  type StudioMeshExportFormat,
-  type StudioMeshExportResult,
-} from "./studio-mesh-export-adapters";
-import { importStudioMeshByExtension } from "./studio-mesh-format-adapters";
-import {
-  createStudioMeshModifierStack,
-  evaluateStudioMeshModifierStack,
-  withStudioMeshModifier,
-} from "./studio-mesh-modifier-stack";
-import {
-  autoRetopoStudioMeshBasic,
-  decimateStudioMesh,
-  deformStudioMeshBend,
-  dynatopoStudioMeshBrushLocal,
-  orientStudioMeshOutward,
-  repairStudioMesh,
-  shrinkwrapStudioMesh,
-  subdivideStudioMeshCatmullLite,
-} from "./studio-mesh-ops-advanced";
-import { sha256HexPortable } from "./studio-sha256";
-import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
-import { packStudioToon3dPackage, type StudioToon3dPackage } from "./studio-toon3d-package";
-import {
-  unwrapStudioMeshBox,
-  unwrapStudioMeshPlanar,
-  type StudioUvMap,
-} from "./studio-uv-unwrap-lite";
 
 /** OCCT result shape (lazy-loaded; browser fetch or Node loader). */
 export type StudioOcctSolidResult = {
   readonly ok: true;
-  readonly bodyKind: import("./studio-occt-wasm-facade").StudioOcctBodyKind;
+  readonly bodyKind: import("../studio-occt-wasm-facade").StudioOcctBodyKind;
   readonly mesh: StudioEditableMesh;
   readonly faceCount: number;
   readonly triangleCount: number;
   readonly vertexCount: number;
   readonly volumeApprox: number;
-  readonly topology: import("./studio-occt-wasm-facade").StudioOcctTopologyReceipt;
-  readonly massProperties: import("./studio-occt-wasm-facade").StudioOcctMassProperties;
+  readonly topology: import("../studio-occt-wasm-facade").StudioOcctTopologyReceipt;
+  readonly massProperties: import("../studio-occt-wasm-facade").StudioOcctMassProperties;
   readonly backend: "opencascade-wasm";
   readonly operation: string;
   readonly loadPath?: "browser" | "node";
@@ -2177,7 +2178,7 @@ export async function workspaceOpenNurbsSphere(
   assetId = "opennurbs-sphere",
   radius = 1,
 ): Promise<StudioHybridDccWorkspace> {
-  const { evaluateStudioNurbsSurfaceSphere } = await import("./studio-rhino3dm-nurbs");
+  const { evaluateStudioNurbsSurfaceSphere } = await import("../studio-rhino3dm-nurbs");
   const surf = await evaluateStudioNurbsSurfaceSphere(radius, 16, 12);
   let session = ws.session;
   if (!session.state.geometry.records[assetId]) {
@@ -2199,7 +2200,7 @@ export async function workspaceImportIfcCity(
   ws: StudioHybridDccWorkspace,
   ifcText?: string,
 ): Promise<StudioHybridDccWorkspace> {
-  const { createStudioIfcCityFixture, importStudioIfcCity } = await import("./studio-web-ifc-city");
+  const { createStudioIfcCityFixture, importStudioIfcCity } = await import("../studio-web-ifc-city");
   const city = await importStudioIfcCity(
     ifcText ?? createStudioIfcCityFixture({ buildings: 2, storeysPerBuilding: 3 }),
   );
@@ -2230,7 +2231,7 @@ export async function workspaceOcctBox(
   assetId = "occt-box",
   size: readonly [number, number, number] = [1, 1, 1],
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({ kind: "box", size });
   return commitOcctResult(ws, assetId, "occt-wasm", result);
 }
@@ -2240,7 +2241,7 @@ export async function workspaceOcctBooleanCut(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-cut",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "cut-boxes",
     a: { dx: 2, dy: 2, dz: 2 },
@@ -2253,12 +2254,12 @@ async function commitOcctResult(
   ws: StudioHybridDccWorkspace,
   assetId: string,
   source: string,
-  result: import("./studio-occt-wasm-facade").StudioOcctSolidResult,
+  result: import("../studio-occt-wasm-facade").StudioOcctSolidResult,
 ): Promise<StudioHybridDccWorkspace> {
   const {
     studioOcctTopologyReceiptMatchesMesh,
     validateStudioOcctBodyReceipt,
-  } = await import("./studio-occt-wasm-facade");
+  } = await import("../studio-occt-wasm-facade");
   if (!studioOcctTopologyReceiptMatchesMesh(result.mesh, result.topology)) {
     throw new Error(
       `OCCT refused a mesh/receipt topology mismatch: ${result.operation}`,
@@ -2300,7 +2301,7 @@ export async function workspaceOcctRevolve(
   radius = 0.5,
   height = 1,
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({ kind: "revolve", radius, height });
   return commitOcctResult(ws, assetId, "occt-wasm-revolve", result);
 }
@@ -2311,7 +2312,7 @@ export async function workspaceOcctSphere(
   assetId = "occt-sphere",
   radius = 0.75,
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({ kind: "sphere", radius });
   return commitOcctResult(ws, assetId, "occt-wasm-sphere", result);
 }
@@ -2323,7 +2324,7 @@ export async function workspaceOcctTorus(
   majorRadius = 0.8,
   minorRadius = 0.2,
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "torus",
     majorRadius,
@@ -2339,7 +2340,7 @@ export async function workspaceOcctPipe(
   length = 1.5,
   radius = 0.12,
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({ kind: "pipe", length, radius });
   return commitOcctResult(ws, assetId, "occt-wasm-pipe", result);
 }
@@ -2349,7 +2350,7 @@ export async function workspaceOcctMirror(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-mirror",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "mirror-box",
     size: [0.8, 0.5, 0.4],
@@ -2362,7 +2363,7 @@ export async function workspaceOcctThickShell(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-thick",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "thick-shell-box",
     size: [1, 1, 0.5],
@@ -2378,7 +2379,7 @@ export async function workspaceOcctWedge(
   size: readonly [number, number, number] = [1, 1, 1],
   ltx = 0.3,
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "wedge",
     size,
@@ -2394,7 +2395,7 @@ export async function workspaceOcctOffsetShape(
   size: readonly [number, number, number] = [1, 1, 1],
   offset = 0.08,
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "offset-shape-box",
     size,
@@ -2408,7 +2409,7 @@ export async function workspaceOcctFillet2dExtrude(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-fillet2d",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "fillet2d-extrude",
     width: 1,
@@ -2426,7 +2427,7 @@ export async function workspaceOcctPipeShell(
   length = 2,
   radius = 0.15,
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({ kind: "pipe-shell", length, radius });
   return commitOcctResult(ws, assetId, "occt-wasm-pipeshell", result);
 }
@@ -2436,7 +2437,7 @@ export async function workspaceOcctSection(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-section",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "section-box",
     size: [1, 1, 1],
@@ -2449,7 +2450,7 @@ export async function workspaceOcctDraftPrism(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-dprism",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "draft-prism",
     baseSize: 2,
@@ -2465,7 +2466,7 @@ export async function workspaceOcctLinearPattern(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-pattern",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "linear-pattern-box",
     size: [0.8, 0.5, 0.4],
@@ -2480,7 +2481,7 @@ export async function workspaceOcctCircularPattern(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-circular",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "circular-pattern-box",
     size: [0.4, 0.3, 0.2],
@@ -2495,7 +2496,7 @@ export async function workspaceOcctStepRoundTrip(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-step",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "step-roundtrip-box",
     size: [1, 1, 1],
@@ -2558,7 +2559,7 @@ export async function workspaceOcctFillet(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-fillet",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "fillet-box",
     size: [1, 1, 1],
@@ -2572,7 +2573,7 @@ export async function workspaceOcctLoft(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-loft",
 ): Promise<StudioHybridDccWorkspace> {
-  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const { runStudioOcctOperation } = await import("../studio-occt-worker-client");
   const result = await runStudioOcctOperation({
     kind: "loft",
     levels: [

@@ -1,5 +1,7 @@
 /** Strict integrity boundary for one atomically committed shot-batch result. */
 
+import { compareStudioValidationStrings } from "../studio-validation-string-order";
+
 import {
   verifyStudioBg3dLayeredPsdFile,
   verifyStudioBg3dRgba8PngFile,
@@ -16,7 +18,6 @@ import {
   STUDIO_BG3D_SHOT_PSD_MAX_OUTPUT_BYTES,
   STUDIO_BG3D_SHOT_PSD_MIME,
 } from "./studio-bg3d-shot-psd-contract";
-import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
 import type {
   StudioBg3dShotBatchPlan,

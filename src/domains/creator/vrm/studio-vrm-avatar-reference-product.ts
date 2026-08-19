@@ -1,4 +1,5 @@
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   AVATAR_FORGE_PRESETS,
   createAvatarForgeState,

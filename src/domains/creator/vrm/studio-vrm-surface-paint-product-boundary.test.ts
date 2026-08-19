@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
-const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 const toolSource = readFileSync(
   new URL("./studio-vrm-surface-paint-tool.ts", import.meta.url),
   "utf8",

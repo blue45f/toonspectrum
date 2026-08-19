@@ -5,8 +5,8 @@
  * PNG data URLs, so this narrowly scoped module owns only the final canvas encoding boundary.
  */
 
-import type { StudioBackground3DLtLayer } from "./studio-3d-insert-contract";
 import type { StudioBg3dLtRasterLayer } from "./studio-bg3d-lt-render";
+import type { StudioBackground3DLtLayer } from "../scene-3d/studio-3d-insert-contract";
 
 /**
  * Interactive insert compatibility encoder. LT detection runs in a Worker, while this bounded

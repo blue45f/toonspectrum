@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { openStudioLocalDatabase } from "../studio-local-database";
+import { StudioLocalDatabaseCommitOutcomeUnknownError } from "../studio-local-database-commit-outcome";
+import { createStudioOpfsAssetStore } from "../studio-opfs-asset-store";
+import { createStudioOpfsMemoryFileSystem } from "../studio-opfs-filesystem";
+
 import {
   compensateImportedBg3dModelsIfCreationMatchesV12,
   deleteStoredBg3dModelV12,
@@ -33,20 +38,16 @@ import {
   type StudioBg3dLibrariesRunExclusive,
 } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 import { createDefaultStudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
-import { openStudioLocalDatabase } from "./studio-local-database";
-import { StudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
-import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
-import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
 
 import type {
   StudioLocalDatabase,
   StudioSqliteApiHandle,
-} from "./studio-local-database";
+} from "../studio-local-database";
 import type {
   StudioOpfsAssetStore,
   StudioOpfsContentHash,
-} from "./studio-opfs-asset-store";
-import type { StudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
+} from "../studio-opfs-asset-store";
+import type { StudioOpfsMemoryFileSystem } from "../studio-opfs-filesystem";
 
 const JSON_CHUNK = 0x4e4f534a;
 const databases = new Set<StudioLocalDatabase>();
@@ -712,7 +713,7 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
       "./studio-bg3d-project-library.ts",
       "./studio-bg3d-canonical-glb-download.ts",
       "./studio-bg3d-model-thumbnail-capture.ts",
-      "./studio-hybrid-dcc-bg3d-handoff.ts",
+      "../hybrid-dcc/studio-hybrid-dcc-bg3d-handoff.ts",
       "./studio-bg3d-asset-metadata-store.ts",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")));
     expect(studio).toContain(

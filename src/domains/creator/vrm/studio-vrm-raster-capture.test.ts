@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { StudioBg3dShotPngWorkerError } from "./studio-bg3d-shot-png-worker-client";
+import { StudioBg3dShotPngWorkerError } from "../bg3d/studio-bg3d-shot-png-worker-client";
+
 import {
   captureStudioVrmRgba,
   encodeStudioVrmCapturePngBlob,
@@ -11,7 +12,7 @@ import {
   type StudioVrmRasterCaptureDependencies,
 } from "./studio-vrm-raster-capture";
 
-import type { StudioBg3dLtRasterLayer } from "./studio-bg3d-lt-render";
+import type { StudioBg3dLtRasterLayer } from "../bg3d/studio-bg3d-lt-render";
 
 function png(width: number, height: number): Blob {
   const bytes = new Uint8Array(33);

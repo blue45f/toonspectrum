@@ -4,7 +4,13 @@
  * outputs — not ID-hash theater.
  */
 
-import { mapStudioBimIfcToRoomBuilder } from "./studio-bim-room-builder-map";
+import {
+  createStudioLiveBridgeDocument,
+  createStudioSharedSet,
+  generateStudioToonPass,
+  STUDIO_TOON_PASS_KINDS,
+} from "../live/studio-live-2d3d-bridge";
+import { mapStudioBimIfcToRoomBuilder } from "../studio-bim-room-builder-map";
 import {
   buildStudioCadRectangleSketch,
   diagnoseStudioCadConstraints,
@@ -17,7 +23,7 @@ import {
   solveStudioCadAssemblyMates,
   sweepStudioCadProfile,
   type StudioCadSketch,
-} from "./studio-cad-kernel-lite";
+} from "../studio-cad-kernel-lite";
 import {
   clampStudioJointRotation,
   createStudioIdleClip,
@@ -25,8 +31,8 @@ import {
   retargetStudioMotionReport,
   sampleStudioAnimationClip,
   stepStudioSpringBone,
-} from "./studio-character-animation-p2";
-import { createStudioDefaultBodyPose } from "./studio-character-ik-fk";
+} from "../studio-character-animation-p2";
+import { createStudioDefaultBodyPose } from "../studio-character-ik-fk";
 import {
   createStudioClothGrid,
   createStudioClothPatternPanel,
@@ -34,7 +40,56 @@ import {
   stepStudioClothXpbd,
   STUDIO_CLOTH_FABRIC_PRESETS,
   validateStudioClothSeam,
-} from "./studio-cloth-pattern-kernel";
+} from "../studio-cloth-pattern-kernel";
+import {
+  createStudioUnitCubeMesh,
+  createStudioEditableMeshFromPolygons,
+  hashStudioEditableMesh,
+  weldStudioEditableMesh,
+  type StudioEditableMesh,
+  type StudioMeshVec3,
+} from "../studio-editable-half-edge-mesh";
+import { bomFromAssetParts, bomRollupByMaterial, bomEstimateMassKg } from "../studio-manufacturing-bom-lite";
+import { importStudioDxfPlan, importStudioIfcShell } from "../studio-mesh-format-adapters";
+import {
+  autoRetopoStudioMeshBasic,
+  bakeStudioMeshMaps,
+  decimateStudioMesh,
+  deformStudioMeshBend,
+  dynatopoStudioMeshBrushLocal,
+  repairStudioMesh,
+  retopoSnapStudioMeshToPlane,
+  shrinkwrapStudioMesh,
+  subdivideStudioMeshCatmullLite,
+} from "../studio-mesh-ops-advanced";
+import { occtSolidWorksGradeSuite } from "../studio-occt-wasm-facade";
+import {
+  applyStudioClonerField,
+  arrayStudioAlongCurve,
+  scatterStudioInstances,
+} from "../studio-procedural-scatter";
+import {
+  createStudioRhino3dmBinaryFixture,
+  parseStudioRhino3dmLite,
+} from "../studio-rhino3dm-lite";
+import {
+  createStudioRhino3dmNurbsFixture,
+  evaluateStudioNurbsCurve,
+  evaluateStudioNurbsSurfaceSuite,
+  evaluateStudioRationalNurbsCircle,
+  parseStudioRhino3dmOpenNurbs,
+} from "../studio-rhino3dm-nurbs";
+import {
+  buildStudioAnimaticTimeline,
+  diffStudioShotContinuity,
+  studioCameraFovY,
+} from "../studio-shot-continuity";
+import { packStudioUvIslands, unwrapStudioMeshBox } from "../studio-uv-unwrap-lite";
+import {
+  createStudioIfcCityFixture,
+  importStudioIfcCity,
+} from "../studio-web-ifc-city";
+
 import {
   arrangeStudioGarmentOnAvatar,
   assignStudioSculptFaceSetPolygroup,
@@ -82,66 +137,12 @@ import {
   applyStudioSculptSymmetryRadial,
 } from "./studio-dcc-domain-ops";
 import {
-  createStudioUnitCubeMesh,
-  createStudioEditableMeshFromPolygons,
-  hashStudioEditableMesh,
-  weldStudioEditableMesh,
-  type StudioEditableMesh,
-  type StudioMeshVec3,
-} from "./studio-editable-half-edge-mesh";
-import {
   applyStudioSculptStroke,
   createStudioSculptMask,
   invertStudioSculptMask,
   polypaintStudioMesh,
   voxelRemeshStudioMesh,
 } from "./studio-hybrid-sculpt-kernel";
-import {
-  createStudioLiveBridgeDocument,
-  createStudioSharedSet,
-  generateStudioToonPass,
-  STUDIO_TOON_PASS_KINDS,
-} from "./studio-live-2d3d-bridge";
-import { bomFromAssetParts, bomRollupByMaterial, bomEstimateMassKg } from "./studio-manufacturing-bom-lite";
-import { importStudioDxfPlan, importStudioIfcShell } from "./studio-mesh-format-adapters";
-import {
-  autoRetopoStudioMeshBasic,
-  bakeStudioMeshMaps,
-  decimateStudioMesh,
-  deformStudioMeshBend,
-  dynatopoStudioMeshBrushLocal,
-  repairStudioMesh,
-  retopoSnapStudioMeshToPlane,
-  shrinkwrapStudioMesh,
-  subdivideStudioMeshCatmullLite,
-} from "./studio-mesh-ops-advanced";
-import { occtSolidWorksGradeSuite } from "./studio-occt-wasm-facade";
-import {
-  applyStudioClonerField,
-  arrayStudioAlongCurve,
-  scatterStudioInstances,
-} from "./studio-procedural-scatter";
-import {
-  createStudioRhino3dmBinaryFixture,
-  parseStudioRhino3dmLite,
-} from "./studio-rhino3dm-lite";
-import {
-  createStudioRhino3dmNurbsFixture,
-  evaluateStudioNurbsCurve,
-  evaluateStudioNurbsSurfaceSuite,
-  evaluateStudioRationalNurbsCircle,
-  parseStudioRhino3dmOpenNurbs,
-} from "./studio-rhino3dm-nurbs";
-import {
-  buildStudioAnimaticTimeline,
-  diffStudioShotContinuity,
-  studioCameraFovY,
-} from "./studio-shot-continuity";
-import { packStudioUvIslands, unwrapStudioMeshBox } from "./studio-uv-unwrap-lite";
-import {
-  createStudioIfcCityFixture,
-  importStudioIfcCity,
-} from "./studio-web-ifc-city";
 
 export const STUDIO_DCC_SECTION6_DOMAIN_KERNELS_REVISION = 1 as const;
 

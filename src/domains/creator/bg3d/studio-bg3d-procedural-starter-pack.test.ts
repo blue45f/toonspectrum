@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { makeGeometry } from "./studio-background-3d-primitives";
+import { makeGeometry } from "../studio-background-3d-primitives";
+
 import {
   STUDIO_BG3D_PRIMITIVE_TRIANGLE_COUNTS,
   STUDIO_BG3D_PROCEDURAL_STARTER_ASSETS,
@@ -18,7 +19,7 @@ import {
 } from "./studio-bg3d-scene-document";
 import { adaptStudioBg3dRuntimeToDocument } from "./studio-bg3d-scene-runtime";
 
-import type { BgPrimitive } from "./studio-background-3d-metadata";
+import type { BgPrimitive } from "../studio-background-3d-metadata";
 
 const EMPTY_USAGE: StudioBg3dProceduralBudgetUsage = {
   nodes: 0,

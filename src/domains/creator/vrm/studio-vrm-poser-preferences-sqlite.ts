@@ -4,7 +4,7 @@ import {
   type StudioVrmRecentState,
 } from "./studio-vrm-poser-ux";
 
-import type { StudioAsyncKeyValueStore } from "./studio-local-database";
+import type { StudioAsyncKeyValueStore } from "../studio-local-database";
 
 export const STUDIO_VRM_POSER_PREFERENCES_SQLITE_NAMESPACE =
   "studio-vrm-poser-preferences-v12";
@@ -135,7 +135,7 @@ export async function acquireProductStudioVrmPoserPreferencesRepository(): Promi
   StudioVrmPoserPreferencesRepository
 > {
   sharedRepository ??= (async () => {
-    const databaseRuntime = await import("./studio-local-database-runtime");
+    const databaseRuntime = await import("../studio-local-database-runtime");
     const database = await databaseRuntime.acquireStudioLocalDatabase().catch(async (cause: unknown) => {
       // The shared DB runtime memoizes its open promise. Reset only when opening itself failed so
       // the visible retry action can recover from a transient OPFS/worker startup failure.

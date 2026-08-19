@@ -1,19 +1,18 @@
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   STUDIO_VRM_LINKED_APPEARANCE_MAX_HAND_PROPS,
   STUDIO_VRM_LINKED_APPEARANCE_PROJECTION_PLAN_KIND,
   STUDIO_VRM_LINKED_APPEARANCE_PROJECTION_PLAN_VERSION,
   createStudioVrmLinkedAppearanceProjectionPlan,
 } from "./studio-vrm-linked-appearance-projection-plan";
-import { createStudioVrmLinkedAppearanceReadiness } from
-  "./studio-vrm-linked-appearance-readiness";
+import { createStudioVrmLinkedAppearanceReadiness } from "./studio-vrm-linked-appearance-readiness";
 
 import type {
   StudioVrmLinkedAppearanceProjectionPlan,
   StudioVrmLinkedAppearanceProjectionUnsupportedReason,
 } from "./studio-vrm-linked-appearance-projection-plan";
-import type { StudioVrmLinkedAppearanceReadinessState } from
-  "./studio-vrm-linked-appearance-readiness";
+import type { StudioVrmLinkedAppearanceReadinessState } from "./studio-vrm-linked-appearance-readiness";
 
 export interface StudioVrmLinkedAppearanceReadinessPlanIdentityInput {
   readonly runtimeKey: string;

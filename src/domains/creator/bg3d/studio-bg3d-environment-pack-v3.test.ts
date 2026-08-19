@@ -8,16 +8,14 @@ import {
   SAMPLE_BG3D_MODEL_ENTRIES,
   getStoredBg3dModelV12,
 } from "./bg3d-model-library";
-import { loadStudioBg3dBundledEnvironmentSource } from
-  "./studio-bg3d-bundled-environment-loader";
+import { loadStudioBg3dBundledEnvironmentSource } from "./studio-bg3d-bundled-environment-loader";
 import {
   STUDIO_BG3D_ENVIRONMENT_ASSETS_V3,
   getStudioBg3dEnvironmentAsset,
   getStudioBg3dEnvironmentAssetByHash,
   isStudioBg3dEnvironmentAssetId,
 } from "./studio-bg3d-environment-catalog";
-import { resolveStudioBg3dModelNormalizationScale } from
-  "./studio-bg3d-model-runtime-admission";
+import { resolveStudioBg3dModelNormalizationScale } from "./studio-bg3d-model-runtime-admission";
 
 const JSON_CHUNK_TYPE = 0x4e4f534a;
 const MAX_ENVIRONMENT_BYTES = 5 * 1024 * 1024;
@@ -70,7 +68,7 @@ const REQUIRED_NODE_TOKENS: Readonly<Record<string, readonly string[]>> = Object
 });
 
 function publicAssetPath(url: string): string {
-  return fileURLToPath(new URL(`../../../public${url}`, import.meta.url));
+  return fileURLToPath(new URL(`../../../../public${url}`, import.meta.url));
 }
 
 function parseEnvironmentGlb(url: string): ParsedEnvironmentGlb {

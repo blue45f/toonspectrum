@@ -2,14 +2,15 @@
 
 import {
   EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD,
-} from "./studio-bg3d-lt-preset-library";
+} from "../bg3d/studio-bg3d-lt-preset-library";
 import {
   STUDIO_BG3D_LT_PRESET_MAX_BYTES,
   parseStudioBg3dLtPresetPayload,
   serializeStudioBg3dLtPresetPayload,
   type StudioBg3dLtPresetPayload,
-} from "./studio-bg3d-lt-presets";
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+} from "../bg3d/studio-bg3d-lt-presets";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+
 import {
   STUDIO_MANNEQUIN_STATE_DOC_MAX_BYTES,
   normalizeStudioMannequinPose,
@@ -18,7 +19,7 @@ import {
   type StudioMannequinPersistentState,
 } from "./studio-mannequin-poses";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 export const STUDIO_MANNEQUIN_STATE_SQLITE_NAMESPACE =
   "studio-mannequin-state-v12" as const;

@@ -5,10 +5,9 @@
  * controller. Keep this leaf type-only so insertion policy never points back at those components.
  */
 
-import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
-import type { StudioBg3dSharedStageInsertProjection } from
-  "./studio-shared-3d-insert-contract";
-import type { StudioVrmSceneDocument } from "./studio-vrm-scene-document";
+import type { StudioBg3dSceneDocument } from "../bg3d/studio-bg3d-scene-document";
+import type { StudioBg3dSharedStageInsertProjection } from "../studio-shared-3d-insert-contract";
+import type { StudioVrmSceneDocument } from "../vrm/studio-vrm-scene-document";
 
 export type StudioBg3dLtRasterLayerRole =
   | "color" | "main-line" | "texture-line" | "tone";

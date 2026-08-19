@@ -4,14 +4,14 @@
 // "추가" 액션은 모두 부모(StudioBackground3D.tsx)가 소유한다(설계 문서 §2 통합 지점 참고).
 import { Building2, Coffee, Trees } from "lucide-react";
 
-import { COMPOSITE_PRESETS } from "./studio-background-3d-composites";
+import { COMPOSITE_PRESETS } from "../studio-background-3d-composites";
 import {
   BG_SCENE_TEMPLATE_CATEGORIES,
   BG_SCENE_TEMPLATE_CATEGORY_LABELS,
   BG_SCENE_TEMPLATES,
   type BgSceneTemplate,
   type BgSceneTemplateCategory,
-} from "./studio-background-3d-scene-templates";
+} from "../studio-background-3d-scene-templates";
 
 import { cx } from "@/lib/cx";
 

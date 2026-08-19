@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createStudioShared3dSceneSession,
+  type StudioShared3dCharacterSource,
+} from "../studio-shared-3d-scene-bridge";
+import {
+  createStudioVrmSceneDocument,
+  normalizeStudioVrmSceneDocument,
+} from "../vrm/studio-vrm-scene-document";
+
+import {
   STUDIO_BG3D_SHARED_CHARACTER_CONTACT_SHADOW_LIMITS,
   planStudioBg3dSharedCharacterContactShadows,
   type StudioBg3dSharedCharacterContactShadowQuaternion,
@@ -10,14 +19,6 @@ import {
   resolveStudioBg3dSharedCharacterGrounding,
   type StudioBg3dSharedCharacterGroundingResult,
 } from "./studio-bg3d-shared-character-grounding";
-import {
-  createStudioShared3dSceneSession,
-  type StudioShared3dCharacterSource,
-} from "./studio-shared-3d-scene-bridge";
-import {
-  createStudioVrmSceneDocument,
-  normalizeStudioVrmSceneDocument,
-} from "./studio-vrm-scene-document";
 
 const STALE_PLACEMENT_HASH = `sha256:${"f".repeat(64)}` as const;
 

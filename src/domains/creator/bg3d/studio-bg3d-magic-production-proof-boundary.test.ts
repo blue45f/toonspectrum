@@ -14,7 +14,7 @@ interface NamedReExport {
 }
 
 const PROOF_ENTRY_SPECIFIER =
-  "../domains/creator/studio-bg3d-magic-production-proof";
+  "../domains/creator/bg3d/studio-bg3d-magic-production-proof";
 const PROOF_ENTRY_FILE_NAME = "./studio-bg3d-magic-production-proof.ts";
 const PROOF_LOADER_NAME =
   "loadStudioBg3dMagicProductionProofFromExplicitDiagnosticQuery";
@@ -132,7 +132,7 @@ describe("Studio BG3D Magic production proof boundary", () => {
   });
 
   it("emits one literal Vite lazy entry behind an explicit production diagnostic query", () => {
-    const { file, source } = parseModule("../../app/main.tsx");
+    const { file, source } = parseModule("../../../app/main.tsx");
     const proofImports = dynamicImports(file).filter((node) => (
       ts.isStringLiteral(node.arguments[0]) &&
       node.arguments[0].text === PROOF_ENTRY_SPECIFIER
@@ -153,11 +153,11 @@ describe("Studio BG3D Magic production proof boundary", () => {
   it("keeps the proof entry out of every BG3D modal, preload, and capture path", () => {
     const forbiddenProductPaths = [
       "./StudioBackground3D.tsx",
-      "./StudioInspectorAside.tsx",
-      "./StudioLazyPanelStack.tsx",
-      "./StudioThreeDPreviewPanelStack.tsx",
-      "./studio-background-3d-loader.ts",
-      "./studio-page-lazy-ui.ts",
+      "../StudioInspectorAside.tsx",
+      "../StudioLazyPanelStack.tsx",
+      "../StudioThreeDPreviewPanelStack.tsx",
+      "../studio-background-3d-loader.ts",
+      "../studio-page-lazy-ui.ts",
     ] as const;
 
     for (const fileName of forbiddenProductPaths) {

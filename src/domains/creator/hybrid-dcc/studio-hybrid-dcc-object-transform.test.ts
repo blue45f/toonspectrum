@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createStudioUnitCubeMesh } from "./studio-editable-half-edge-mesh";
+import { createStudioUnitCubeMesh } from "../studio-editable-half-edge-mesh";
+
 import {
   hybridDccCommitObjectTransform,
   hybridDccRedo,

@@ -1,15 +1,15 @@
 /** V12 SQLite/OPFS authority for the engine-neutral VRM pose-material library. */
 
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
 import {
   EMPTY_STUDIO_POSE_MATERIAL_LIBRARY,
   parseStudioPoseMaterialLibraryPayload,
   serializeStudioPoseMaterialLibraryPayload,
   STUDIO_POSE_MATERIAL_LIBRARY_MAX_BYTES,
   type StudioPoseMaterialLibraryPayload,
-} from "./studio-pose-material-library";
+} from "../studio-pose-material-library";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 export const STUDIO_VRM_POSE_MATERIAL_SQLITE_NAMESPACE =
   "studio-vrm-pose-materials-v12";

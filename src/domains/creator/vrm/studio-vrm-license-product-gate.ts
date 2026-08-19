@@ -13,7 +13,7 @@ import {
   type StudioVrmPublisherKind,
 } from "./studio-vrm-license-policy";
 
-import type { CreatorAssetLicenseId } from "../../../lib/creator-asset-contract";
+import type { CreatorAssetLicenseId } from "../../../../lib/creator-asset-contract";
 
 export type StudioVrmLicenseAuthority =
   | {

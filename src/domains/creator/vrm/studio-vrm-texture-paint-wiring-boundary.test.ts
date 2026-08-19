@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
 const projectArchiveSource = readFileSync(
-  new URL("./studio-project-archive-orchestration-runtime.ts", import.meta.url),
+  new URL("../studio-project-archive-orchestration-runtime.ts", import.meta.url),
   "utf8",
 );
 

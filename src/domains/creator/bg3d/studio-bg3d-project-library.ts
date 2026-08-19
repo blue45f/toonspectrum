@@ -1,4 +1,16 @@
 import {
+  buildStudioProjectArchive,
+  collectStudioBg3dProjectArchivePlan,
+  type BuildStudioProjectArchiveInput,
+  type BuildStudioProjectArchiveResult,
+  type ImportStudioProjectArchiveResult,
+  type StudioBg3dProjectArchivePlan,
+  type StudioProjectArchiveAttachmentInput,
+  type StudioProjectArchiveLimits,
+  type StudioProjectArchiveOptions,
+} from "../studio-project-archive";
+
+import {
   compensateImportedBg3dModelsIfCreationMatchesV12 as compensateImportedBg3dModelsIfCreationMatches,
   getStoredBg3dModelByHashV12 as getStoredBg3dModelByHash,
   importVerifiedBg3dModelsAtomicallyV12 as importVerifiedBg3dModelsAtomically,
@@ -14,19 +26,8 @@ import {
   serializeStudioBg3dSceneDocument,
   type StudioBg3dAttachmentRights,
 } from "./studio-bg3d-scene-document";
-import {
-  buildStudioProjectArchive,
-  collectStudioBg3dProjectArchivePlan,
-  type BuildStudioProjectArchiveInput,
-  type BuildStudioProjectArchiveResult,
-  type ImportStudioProjectArchiveResult,
-  type StudioBg3dProjectArchivePlan,
-  type StudioProjectArchiveAttachmentInput,
-  type StudioProjectArchiveLimits,
-  type StudioProjectArchiveOptions,
-} from "./studio-project-archive";
 
-import type { StudioProjectFile } from "./studio-project-file";
+import type { StudioProjectFile } from "../studio-project-file";
 
 /**
  * Private SQLite/OPFS storage identities stay outside project and archive documents. This bridge resolves a

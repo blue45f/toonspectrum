@@ -4,7 +4,12 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 function source(fileName: string): string {
-  return readFileSync(join(process.cwd(), "src/domains/creator", fileName), "utf8");
+  const pathInVrm = join(process.cwd(), "src/domains/creator/vrm", fileName);
+  try {
+    return readFileSync(pathInVrm, "utf8");
+  } catch {
+    return readFileSync(join(process.cwd(), "src/domains/creator", fileName), "utf8");
+  }
 }
 
 describe("VRM asset SQLite/OPFS product boundary", () => {

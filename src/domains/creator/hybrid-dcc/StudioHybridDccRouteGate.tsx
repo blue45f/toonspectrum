@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { useEffectEvent, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
-import { activateStudioModalSheet } from "./useStudioModalSheet";
+import { activateStudioModalSheet } from "../useStudioModalSheet";
 
 export interface StudioHybridDccRouteGateProps {
   readonly detail: string;

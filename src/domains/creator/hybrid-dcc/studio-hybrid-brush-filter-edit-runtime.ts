@@ -14,31 +14,31 @@ import {
   type StudioCanonicalFilterPlanResult,
   type StudioCanonicalFilterPlannerOptions,
   type StudioCanonicalFilterRecipe,
-} from "./studio-engine-canonical-filter-plan";
+} from "../render/studio-engine-canonical-filter-plan";
 import {
   createStudioEngineSceneSpatialIndex,
   type StudioEngineSceneSpatialEntry,
   type StudioEngineSceneSpatialEntryCandidate,
   type StudioEngineSceneSpatialPointHitOptions,
-} from "./studio-engine-scene-spatial-index";
+} from "../render/studio-engine-scene-spatial-index";
+import { createStudioPixiSceneProvider } from "../render/studio-pixi-scene-provider";
 import {
   createStudioLazyBrushStabilizer,
   type StudioLazyBrushStabilizerResult,
-} from "./studio-lazy-brush-stabilizer";
+} from "../studio-lazy-brush-stabilizer";
 import {
   createStudioOpenCvImageProvider,
   type StudioOpenCvImageProvider,
   type StudioOpenCvImageResult,
   type StudioOpenCvMorphologyMode,
-} from "./studio-opencv-image-provider";
+} from "../studio-opencv-image-provider";
 import {
   buildStudioPerfectFreehandOutline,
   resolveStudioPerfectFreehandProfile,
   type StudioPerfectFreehandStroker,
-} from "./studio-perfect-freehand";
-import { createStudioPixiSceneProvider } from "./studio-pixi-scene-provider";
+} from "../studio-perfect-freehand";
 
-import type { StudioSceneProvider } from "./studio-scene-provider";
+import type { StudioSceneProvider } from "../studio-scene-provider";
 
 export const STUDIO_HYBRID_BRUSH_FILTER_EDIT_RUNTIME_VERSION = 1 as const;
 
@@ -315,36 +315,36 @@ export const STUDIO_HYBRID_BRUSH_FILTER_EDIT_ROUTES = Object.freeze([
     role: "brush" as const,
     library: "perfect-freehand",
     entry: "runHybridBrushOutlineStroke",
-    shippedModule: "studio-perfect-freehand.ts",
+    shippedModule: "../studio-perfect-freehand.ts",
   }),
   Object.freeze({
     role: "brush" as const,
     library: "lazy-brush",
     entry: "runHybridPrecisionStabilizeSample",
-    shippedModule: "studio-lazy-brush-stabilizer.ts",
+    shippedModule: "../studio-lazy-brush-stabilizer.ts",
   }),
   Object.freeze({
     role: "edit" as const,
     library: "rbush",
     entry: "runHybridObjectPickAtPoint",
-    shippedModule: "studio-engine-scene-spatial-index.ts",
+    shippedModule: "../render/studio-engine-scene-spatial-index.ts",
   }),
   Object.freeze({
     role: "filter" as const,
     library: "@techstark/opencv-js",
     entry: "runHybridSelectionMaskMorphology",
-    shippedModule: "studio-opencv-image-provider.ts",
+    shippedModule: "../studio-opencv-image-provider.ts",
   }),
   Object.freeze({
     role: "filter" as const,
     library: "webgpu-canonical-filter",
     entry: "runHybridFilterPlan",
-    shippedModule: "studio-engine-canonical-filter-plan.ts",
+    shippedModule: "../render/studio-engine-canonical-filter-plan.ts",
   }),
   Object.freeze({
     role: "edit" as const,
     library: "pixi.js",
     entry: "createHybridPixiEditOverlayHost",
-    shippedModule: "studio-pixi-scene-provider.ts",
+    shippedModule: "../render/studio-pixi-scene-provider.ts",
   }),
 ] as const);

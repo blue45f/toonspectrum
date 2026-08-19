@@ -6,6 +6,11 @@
  * opened only through the explicit `indexedDB` legacy/test seam and is never read on product boot.
  */
 
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+import { createStudioOpfsAssetStore } from "../studio-opfs-asset-store";
+import { createStudioOpfsNativeFileSystem } from "../studio-opfs-filesystem";
+import { compareStudioValidationStrings } from "../studio-validation-string-order";
+
 import {
   STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
   type StudioBg3dShotBatchImage,
@@ -34,14 +39,10 @@ import {
   type StudioBg3dShotBatchFailureCode,
   type StudioBg3dShotBatchQueue,
 } from "./studio-bg3d-shot-batch-queue";
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
-import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
-import { createStudioOpfsNativeFileSystem } from "./studio-opfs-filesystem";
-import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
-import type { StudioOpfsAssetStore } from "./studio-opfs-asset-store";
-import type { StudioOpfsStorageManagerLike } from "./studio-opfs-filesystem";
+import type { StudioLocalDatabase } from "../studio-local-database";
+import type { StudioOpfsAssetStore } from "../studio-opfs-asset-store";
+import type { StudioOpfsStorageManagerLike } from "../studio-opfs-filesystem";
 
 export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_DATABASE_NAME =
   "toonspectrum-studio-bg3d-shot-batch-recovery";

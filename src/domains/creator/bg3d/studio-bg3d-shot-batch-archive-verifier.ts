@@ -1,3 +1,5 @@
+import { compareStudioValidationStrings } from "../studio-validation-string-order";
+
 import {
   STUDIO_BG3D_SHOT_BATCH_MAX_ARCHIVE_ARTIFACTS,
   STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
@@ -16,7 +18,6 @@ import {
   computeStudioBg3dShotBatchRenderDigest,
   type StudioBg3dShotBatchPass,
 } from "./studio-bg3d-shot-batch-plan";
-import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
 const ZIP_LOCAL_SIGNATURE = 0x0403_4b50;
 const ZIP_CENTRAL_SIGNATURE = 0x0201_4b50;

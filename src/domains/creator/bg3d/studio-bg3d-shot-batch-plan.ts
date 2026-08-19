@@ -7,6 +7,8 @@
  * dimensions/background/depth request recorded here instead of re-deriving them after a restart.
  */
 
+import { compareStudioValidationStrings } from "../studio-validation-string-order";
+
 import { getStudioBg3dCaptureBackendIdentity } from "./studio-bg3d-capture-adapter";
 import {
   createStudioBg3dCaptureBackgroundSnapshot,
@@ -24,7 +26,6 @@ import {
   serializeStudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
 import { STUDIO_BG3D_SHOT_BATCH_PASSES } from "./studio-bg3d-shot-batch-pass-catalog";
-import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
 import type {
   StudioBg3dCaptureBackend,

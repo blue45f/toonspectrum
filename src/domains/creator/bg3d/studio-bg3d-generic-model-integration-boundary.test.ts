@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
 const runtimeHintsSource = readFileSync(
-  new URL("./studio-generic-3d-runtime-hints.ts", import.meta.url),
+  new URL("../studio-generic-3d-runtime-hints.ts", import.meta.url),
   "utf8",
 );
 const admissionSource = readFileSync(
@@ -40,7 +40,7 @@ describe("Studio BG3D generic model mode integration boundary", () => {
     expect(source).toContain("<StudioGeneric3dModelModePanel");
     expect(source).toContain("VRM 별도");
     expect(source).toContain("VRM 아바타의 humanoid·표정·이용 조건과 섞지 않고");
-    expect(source).not.toContain('from "./StudioVrmPoser"');
+    expect(source).not.toContain('from "../vrm/StudioVrmPoser"');
     expect(source).not.toContain('from "./studio-vrm');
   });
 
@@ -65,7 +65,7 @@ describe("Studio BG3D generic model mode integration boundary", () => {
       "mergeStudioGeneric3dWorkflowMaps(previous, importedFormats)",
       "uploadCommitted = true",
     ]);
-    expect(source).toContain('from "./studio-generic-3d-workflow-metadata"');
+    expect(source).toContain('from "../studio-generic-3d-workflow-metadata"');
     expect(admissionSource).toContain("attachStudioGeneric3dWorkflowMetadata");
     expect(source).toContain("parseStudioGeneric3dWorkflowMetadata");
   });
@@ -77,7 +77,7 @@ describe("Studio BG3D generic model mode integration boundary", () => {
       "export function disposeStudioBg3dModelCache(",
     );
 
-    expect(admissionSource).toContain('from "./studio-generic-3d-runtime-hints"');
+    expect(admissionSource).toContain('from "../studio-generic-3d-runtime-hints"');
     expect(runtimeHintsSource).toContain("function inspectStudioGeneric3dRuntimeHints(");
     expect(runtimeHintsSource).toContain("partTransformsSupported: false");
     expect(runtimeHintsSource).toContain("renderable.isSkinnedMesh === true");

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 
-import { StudioThreeDToggleControl } from "./StudioThreeDToggle";
+import { StudioThreeDToggleControl } from "../StudioThreeDToggle";
 
 import { cn } from "@/lib/utils";
 

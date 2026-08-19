@@ -5,11 +5,11 @@ import { useEffect, useRef, useState } from "react";
 
 import { classifyGesture, stabilizeGesture, type Hand } from "./rps-logic";
 
-import { solveHandToFingerBones } from "@/src/domains/creator/studio-vrm-hand-solver";
+import { solveHandToFingerBones } from "@/src/domains/creator/vrm/studio-vrm-hand-solver";
 import {
   disposeHandLandmarker,
   initHandLandmarker,
-} from "@/src/domains/creator/studio-vrm-webcam-tracking";
+} from "@/src/domains/creator/vrm/studio-vrm-webcam-tracking";
 
 
 export type GestureStatus = "idle" | "loading" | "ready" | "denied" | "error";

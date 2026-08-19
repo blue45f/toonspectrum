@@ -12,13 +12,14 @@ import {
   getStudioBg3dRoomPreset,
   type StudioBg3dRoomPart,
   type StudioBg3dRoomSpec,
-} from "./studio-bg3d-room-builder";
+} from "../bg3d/studio-bg3d-room-builder";
 import {
   createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
   type StudioEditableMesh,
   type StudioMeshVec3,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
+
 import {
   STUDIO_HYBRID_DCC_OBJECT_TRANSFORM_REVISION,
   type StudioHybridDccObjectTransform,

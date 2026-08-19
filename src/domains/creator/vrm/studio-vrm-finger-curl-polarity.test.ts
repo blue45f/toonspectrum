@@ -6,7 +6,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { describe, expect, it } from "vitest";
 
-import { POSER_FINGER_BONES, pickNaturalIdlePose } from "./studio-pose-presets";
+import { POSER_FINGER_BONES, pickNaturalIdlePose } from "../studio-pose-presets";
+
 import {
   applyFingerRotations,
   applyPoseToVrm,

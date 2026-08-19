@@ -92,7 +92,7 @@ interface StudioBg3dViewPanelContext {
   readonly duplicateActiveShot: () => void;
   readonly Copy: typeof import("lucide-react").Copy;
   readonly shotBatchSelectedIds: string[];
-  readonly savedShots: readonly import("./studio-bg3d-scene-document").StudioBg3dShot[];
+  readonly savedShots: readonly import( "./studio-bg3d-scene-document").StudioBg3dShot[];
   readonly setShotBatchExcludedIds: import("react").Dispatch<import("react").SetStateAction<Set<string>>>;
   readonly shotBatchExportHeight: number | "per-shot";
   readonly setShotBatchExportHeight: import("react").Dispatch<import("react").SetStateAction<number | "per-shot">>;
@@ -156,16 +156,16 @@ interface StudioBg3dViewPanelContext {
   readonly applySunRigConfig: (patch: Partial<StudioBg3dSunRigConfig>) => void;
   readonly formatBg3dSunTime: (hours: number) => string;
   readonly Globe: typeof import("lucide-react").Globe;
-  readonly BG_SKY_PRESETS: readonly import("./studio-background-3d-sky").BgSkyPreset[];
+  readonly BG_SKY_PRESETS: readonly import("../studio-background-3d-sky").BgSkyPreset[];
   readonly skyPresetId: "blank" | "clear_day" | "sunset" | "night";
   readonly updateBackgroundSettings: (patch: Partial<StudioBg3dBackgroundSettings>) => void;
-  readonly selectedSky: import("./studio-background-3d-sky").BgSkyPreset;
+  readonly selectedSky: import("../studio-background-3d-sky").BgSkyPreset;
   readonly panoramaRotation: number;
   readonly normalizePanoramaRotationDegrees: (value: unknown) => number;
   readonly PanoramaRotationNumberField: typeof import("./studio-bg3d-control-fields").PanoramaRotationNumberField;
   readonly CircleDashed: typeof import("lucide-react").CircleDashed;
   readonly STUDIO_BG3D_FOG_PRESETS: readonly [{ readonly id: "air"; readonly label: "공기감"; readonly near: 18; readonly far: 80; }, { readonly id: "depth"; readonly label: "거리감"; readonly near: 8; readonly far: 40; }, { readonly id: "mist"; readonly label: "짙게"; readonly near: 2; readonly far: 22; }];
-  readonly getSkyPreset: (id: unknown) => import("./studio-background-3d-sky").BgSkyPreset;
+  readonly getSkyPreset: (id: unknown) => import("../studio-background-3d-sky").BgSkyPreset;
   readonly fogNear: number;
   readonly fogSliderMax: number;
   readonly STUDIO_BG3D_FOG_MIN_GAP: number;

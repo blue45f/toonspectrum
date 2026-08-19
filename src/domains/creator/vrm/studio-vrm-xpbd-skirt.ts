@@ -6,8 +6,8 @@ import {
   type StudioClothXpbdCompiledModelV2,
   type StudioClothXpbdFailureCodeV2,
   type StudioClothXpbdKinematicPinV2,
-} from "./studio-cloth-xpbd-kernel-v2";
-import { sha256HexPortable } from "./studio-sha256";
+} from "../studio-cloth-xpbd-kernel-v2";
+import { sha256HexPortable } from "../studio-sha256";
 
 import type { StudioVrmProportionMetrics } from "./studio-vrm-proportion-core";
 

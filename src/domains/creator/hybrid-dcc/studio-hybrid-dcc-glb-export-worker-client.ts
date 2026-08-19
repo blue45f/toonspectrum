@@ -156,7 +156,7 @@ async function exportSynchronously(
 ): Promise<readonly StudioHybridDccMeshGlbExportResult[]> {
   await Promise.resolve();
   if (signal?.aborted) throw new StudioHybridDccGlbExportClientError("aborted");
-  const { exportStudioHybridDccMeshGlb } = await import("./studio-hybrid-dcc-glb-export");
+  const { exportStudioHybridDccMeshGlb } = await import( "./studio-hybrid-dcc-glb-export");
   const results: StudioHybridDccMeshGlbExportResult[] = [];
   let totalByteLength = 0;
   for (const payload of request.payloads) {

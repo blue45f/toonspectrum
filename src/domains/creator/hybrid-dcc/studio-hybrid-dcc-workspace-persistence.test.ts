@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createStudioSharedSet,
+  type StudioLiveBridgeDocument,
+} from "../live/studio-live-2d3d-bridge";
+import {
   canonicalStudioCommandJson,
   serializeStudioCommandJournal,
-} from "./studio-command-journal";
-import { calculateStudioCrc32 } from "./studio-crc32";
+} from "../studio-command-journal";
+import { calculateStudioCrc32 } from "../studio-crc32";
 import {
   hashStudioEditableMesh,
   studioEditableMeshStats,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
+import { createStudioOpfsMemoryFileSystem } from "../studio-opfs-filesystem";
+import { sha256HexPortable } from "../studio-sha256";
+
 import {
   createStudioHybridDccComponentSelection,
   mutateStudioHybridDccComponentSelection,
@@ -51,15 +58,9 @@ import {
   StudioHybridDccWorkspacePersistenceError,
   type StudioHybridDccWorkspacePersistenceScope,
 } from "./studio-hybrid-dcc-workspace-persistence";
-import {
-  createStudioSharedSet,
-  type StudioLiveBridgeDocument,
-} from "./studio-live-2d3d-bridge";
-import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
-import { sha256HexPortable } from "./studio-sha256";
 
 import type { StudioHybridDccPersistedSnapshot } from "./studio-hybrid-dcc-document";
-import type { StudioOpfsRecoveryJournalAdapter } from "./studio-opfs-recovery-journal";
+import type { StudioOpfsRecoveryJournalAdapter } from "../studio-opfs-recovery-journal";
 
 class FakeWorkspaceOpfsAdapter implements StudioOpfsRecoveryJournalAdapter {
   readonly kind = "fake-opfs" as const;

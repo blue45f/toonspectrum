@@ -24,8 +24,7 @@ import {
   type StudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
 
-import type { StudioBg3dBabylonSpecialistExecutionContext } from
-  "./studio-bg3d-babylon-specialist-runtime";
+import type { StudioBg3dBabylonSpecialistExecutionContext } from "./studio-bg3d-babylon-specialist-runtime";
 import type {
   StudioBg3dRuntimeAssetSnapshot,
   StudioBg3dSpecialistResult,

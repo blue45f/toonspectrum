@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  collectStudioBg3dProjectArchivePlan,
+  type ImportStudioProjectArchiveResult,
+  type StudioProjectArchiveImportedAttachment,
+  type StudioProjectArchiveManifest,
+} from "../studio-project-archive";
+
+import {
   buildStudioProjectArchiveWithVerifiedBg3dModels,
   installPreparedStudioBg3dProjectArchiveModelsAndApply,
   installStudioBg3dProjectArchiveModelsAndApply,
@@ -14,19 +21,13 @@ import {
   createDefaultStudioBg3dSceneDocument,
   type StudioBg3dAttachmentRights,
 } from "./studio-bg3d-scene-document";
-import {
-  collectStudioBg3dProjectArchivePlan,
-  type ImportStudioProjectArchiveResult,
-  type StudioProjectArchiveImportedAttachment,
-  type StudioProjectArchiveManifest,
-} from "./studio-project-archive";
 
 import type {
   Bg3dModelAtomicImportDispositionV12,
   Bg3dModelImportItem,
   Bg3dVerifiedStoredRecord,
 } from "./bg3d-model-library";
-import type { StudioProjectFile } from "./studio-project-file";
+import type { StudioProjectFile } from "../studio-project-file";
 
 const HASH_A = "1".repeat(64);
 const HASH_B = "2".repeat(64);

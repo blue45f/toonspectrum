@@ -24,11 +24,11 @@ import {
   type StudioBg3dSceneNode,
 } from "./studio-bg3d-scene-document";
 
-import type { BgCustomModelInstance } from "./studio-background-3d-model";
+import type { BgCustomModelInstance } from "../studio-background-3d-model";
 import type {
   BgPrimitive,
   BgPrimitiveKind,
-} from "./studio-background-3d-primitives";
+} from "../studio-background-3d-primitives";
 
 export const STUDIO_BG3D_RUNTIME_ADAPTER_MAX_SCAN_ITEMS =
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES * 4;

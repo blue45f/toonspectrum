@@ -1,9 +1,9 @@
 import { Glasses, Box, Volume2, Hand, Sparkles } from "lucide-react";
 import { useState, useId } from "react";
 
-import type { SpatialSfxPresetKind } from "./studio-3d-spatial-audio";
-import type { ArPlaneOrientation } from "./studio-3d-spatial-webtoon-ar";
-import type { VrStoryLayoutTopology } from "./studio-3d-spatial-webtoon-vr";
+import type { SpatialSfxPresetKind } from "../scene-3d/studio-3d-spatial-audio";
+import type { ArPlaneOrientation } from "../scene-3d/studio-3d-spatial-webtoon-ar";
+import type { VrStoryLayoutTopology } from "../scene-3d/studio-3d-spatial-webtoon-vr";
 
 export interface StudioBg3dSpatialWebtoonPanelProps {
   readonly onModeChange?: (mode: "ar" | "vr" | "audio" | "hands") => void;

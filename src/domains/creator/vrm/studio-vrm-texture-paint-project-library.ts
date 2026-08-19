@@ -6,11 +6,12 @@ import {
   type StudioProjectArchiveManifestAttachment,
   type StudioProjectArchiveAttachmentInput,
   type StudioProjectArchiveLimits,
-} from "./studio-project-archive";
+} from "../studio-project-archive";
 import {
   parseStudioProjectFile,
   type StudioProjectFile,
-} from "./studio-project-file";
+} from "../studio-project-file";
+
 import {
   STUDIO_VRM_SCENE_DOCUMENT_KIND,
   parseStudioVrmSceneDocument,

@@ -99,7 +99,7 @@ function completeEnvelope() {
 
 describe("Avatar reference recommendation product authority", () => {
   it("pins the tracked canonical VRM to its real repository bytes", () => {
-    const bytes = readFileSync(new URL("../../../public/vrm/TS_Minseo_Campus.vrm", import.meta.url));
+    const bytes = readFileSync(new URL("../../../../public/vrm/TS_Minseo_Campus.vrm", import.meta.url));
     expect(bytes.byteLength).toBe(
       STUDIO_VRM_AVATAR_REFERENCE_CANONICAL_RENDER_AUTHORITY.sourceByteLength,
     );
@@ -114,8 +114,7 @@ describe("Avatar reference recommendation product authority", () => {
   });
 
   it("pins and admits the real public catalogue artifact", () => {
-    const bytes = readFileSync(new URL(
-      "../../../public/catalog/studio-vrm-avatar-reference-catalogue-v1.json",
+    const bytes = readFileSync(new URL("../../../../public/catalog/studio-vrm-avatar-reference-catalogue-v1.json",
       import.meta.url,
     ));
     expect(bytes.byteLength).toBe(STUDIO_VRM_AVATAR_REFERENCE_CATALOGUE_BYTE_LENGTH);

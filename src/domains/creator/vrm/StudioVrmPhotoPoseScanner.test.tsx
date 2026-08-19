@@ -91,7 +91,7 @@ vi.mock("./studio-vrm-webcam-tracking", () => ({
 }));
 
 const source = readFileSync(
-  resolve(process.cwd(), "src/domains/creator/StudioVrmPhotoPoseScanner.tsx"),
+  resolve(process.cwd(), "src/domains/creator/vrm/StudioVrmPhotoPoseScanner.tsx"),
   "utf8",
 );
 

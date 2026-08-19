@@ -39,12 +39,13 @@ import {
   hashStudioEditableMesh,
   studioEditableMeshToTriangleSoup,
   type StudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
 import {
   assertRenderCacheIsNotAuthority,
   type StudioGeometryAuthorityRecord,
   type StudioRenderMeshCache,
-} from "./studio-geometry-authority";
+} from "../studio-geometry-authority";
+
 import {
   deriveStudioHybridDccAssetLayout,
   STUDIO_HYBRID_DCC_ASSET_LAYOUT_LIMITS,

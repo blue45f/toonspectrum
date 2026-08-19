@@ -27,7 +27,8 @@ import {
   type StudioStampBrushKind,
   type StudioStampBrushStyle,
   type StudioStampBrushTuning,
-} from "./studio-brush-stamp-engine";
+} from "../brush/studio-brush-stamp-engine";
+
 import {
   resolveStudioVrmTexelPoint,
   type StudioVrmTexelPoint,

@@ -19,8 +19,8 @@ import {
   tryAdaptStudioBg3dRuntimeToDocument,
 } from "./studio-bg3d-scene-runtime";
 
-import type { BgCustomModelInstance } from "./studio-background-3d-model";
-import type { BgPrimitive } from "./studio-background-3d-primitives";
+import type { BgCustomModelInstance } from "../studio-background-3d-model";
+import type { BgPrimitive } from "../studio-background-3d-primitives";
 
 function hash(index: number): string {
   return `sha256:${index.toString(16).padStart(64, "0")}`;

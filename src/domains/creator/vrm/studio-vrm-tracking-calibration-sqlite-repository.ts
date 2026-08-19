@@ -1,13 +1,14 @@
 /** SQLite/OPFS authority for device-specific VRM tracking calibration. */
 
-import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
+
 import {
   deserializeCalibration,
   serializeCalibration,
   type TrackingCalibration,
 } from "./studio-vrm-tracking-calibration";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabase } from "../studio-local-database";
 
 export const STUDIO_VRM_TRACKING_CALIBRATION_SQLITE_NAMESPACE =
   "studio-vrm-tracking-calibration-v12";

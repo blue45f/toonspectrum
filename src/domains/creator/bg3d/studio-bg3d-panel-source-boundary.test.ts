@@ -64,9 +64,9 @@ describe("Studio BG3D panel source boundary", () => {
       "./StudioBg3dLtPanel",
     ]));
 
-    const loaderImports = moduleImports("./studio-background-3d-loader.ts");
-    expect(loaderImports.staticImports).not.toContain("./StudioBackground3D");
-    expect(loaderImports.dynamicImports).toEqual(["./StudioBackground3D"]);
+    const loaderImports = moduleImports("../studio-background-3d-loader.ts");
+    expect(loaderImports.staticImports).not.toContain("./bg3d/StudioBackground3D");
+    expect(loaderImports.dynamicImports).toEqual(["./bg3d/StudioBackground3D"]);
   });
 
   it("does not create renderer back-edges or nested lazy boundaries in UI-only panels", () => {

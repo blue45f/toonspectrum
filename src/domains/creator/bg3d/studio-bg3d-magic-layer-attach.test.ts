@@ -5,7 +5,6 @@ import {
   attachStudioBg3dMagicFilterMaskToLtPlan,
 } from "./studio-bg3d-magic-layer-attach";
 
-import type { StudioBackground3DInsertResult } from "./studio-3d-insert-contract";
 import type {
   StudioBg3dLtImageElementLike,
   StudioBg3dLtLayerPlanSuccess,
@@ -13,6 +12,7 @@ import type {
   StudioBg3dLtPageElementLike,
 } from "./studio-bg3d-lt-layer-plan";
 import type { StudioBg3dMagicLayerAttachResult } from "./studio-bg3d-magic-layer-attach";
+import type { StudioBackground3DInsertResult } from "../scene-3d/studio-3d-insert-contract";
 
 interface TestScene {
   readonly sceneId: string;

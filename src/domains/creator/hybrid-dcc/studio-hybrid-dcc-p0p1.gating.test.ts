@@ -7,32 +7,42 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  createStudioArtistCorrectionStore,
-  reprojectStudioArtistCorrections,
-} from "./studio-artist-correction-delta";
-import { planStudioBg3dPushPull } from "./studio-bg3d-push-pull";
+import { planStudioBg3dPushPull } from "../bg3d/studio-bg3d-push-pull";
 import {
   buildStudioBg3dRoomParts,
   getStudioBg3dRoomPreset,
   STUDIO_BG3D_ROOM_PRESETS,
-} from "./studio-bg3d-room-builder";
+} from "../bg3d/studio-bg3d-room-builder";
+import {
+  addStudioArtistDelta,
+  applyStudioShotOverride,
+  createStudioLiveBridgeDocument,
+  createStudioSharedSet,
+  generateStudioToonPass,
+  mutateStudioSharedObjectGeometry,
+  studioLiveBridgeDirtySummary,
+  STUDIO_TOON_PASS_KINDS,
+} from "../live/studio-live-2d3d-bridge";
+import {
+  createStudioArtistCorrectionStore,
+  reprojectStudioArtistCorrections,
+} from "../studio-artist-correction-delta";
 import {
   buildStudioWallsFromFloorPlan,
   createStudioDimension,
   generateStudioSlab,
   generateStudioStairs,
-} from "./studio-build-generators";
+} from "../studio-build-generators";
 import {
   cycleStudioInferenceAxisLock,
   resolveStudioBuildInferenceSnap,
-} from "./studio-build-inference-snap";
+} from "../studio-build-inference-snap";
 import {
   createStudioTagsOutlinerDocument,
   resolveStudioOutlinerVisibility,
   setStudioTagVisibility,
-} from "./studio-build-tags-outliner";
-import { resolveStudioCameraWallHide } from "./studio-camera-wall-hide";
+} from "../studio-build-tags-outliner";
+import { resolveStudioCameraWallHide } from "../studio-camera-wall-hide";
 import {
   createStudioDecalPlacement,
   createStudioLookAt,
@@ -42,12 +52,12 @@ import {
   mixStudioExpressions,
   STUDIO_HAND_POSE_LIBRARY,
   studioKtx2DerivativeForProfile,
-} from "./studio-character-pose-p1";
+} from "../studio-character-pose-p1";
 import {
   createStudioComponentDocument,
   planStudioComponentMakeUnique,
   STUDIO_COMPONENT_DOCUMENT_VERSION,
-} from "./studio-component-instance-core";
+} from "../studio-component-instance-core";
 import {
   bevelStudioEditableMeshEdges,
   createStudioUnitCubeMesh,
@@ -63,7 +73,7 @@ import {
   studioEditableMeshToTriangleSoup,
   transformStudioEditableMesh,
   weldStudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
 import {
   assertRenderCacheIsNotAuthority,
   commitStudioGeometryAuthorityMesh,
@@ -71,8 +81,20 @@ import {
   createStudioGeometryAuthorityRegistry,
   materializeStudioGeometryRenderCache,
   registerStudioGeometryAuthority,
-} from "./studio-geometry-authority";
-import { importStudioGlbDocument } from "./studio-glb-scene-ir";
+} from "../studio-geometry-authority";
+import { importStudioGlbDocument } from "../studio-glb-scene-ir";
+import {
+  buildStudioImportCompatibilityReport,
+  commitStudioImportToDocument,
+  parseStudioObjToSceneIR,
+} from "../studio-import-compatibility-report";
+import {
+  createStudioAabbSolidBooleanBackend,
+  createStudioMeshModifierStack,
+  evaluateStudioMeshModifierStack,
+  withStudioMeshModifier,
+} from "../studio-mesh-modifier-stack";
+
 import {
   createStudioHybridDccOpfsPorts,
   createStudioHybridDccSession,
@@ -87,30 +109,9 @@ import {
   hybridDccUndo,
   hybridDccWriteOpfsCheckpoint,
 } from "./studio-hybrid-dcc-document";
-import {
-  buildStudioImportCompatibilityReport,
-  commitStudioImportToDocument,
-  parseStudioObjToSceneIR,
-} from "./studio-import-compatibility-report";
-import {
-  addStudioArtistDelta,
-  applyStudioShotOverride,
-  createStudioLiveBridgeDocument,
-  createStudioSharedSet,
-  generateStudioToonPass,
-  mutateStudioSharedObjectGeometry,
-  studioLiveBridgeDirtySummary,
-  STUDIO_TOON_PASS_KINDS,
-} from "./studio-live-2d3d-bridge";
-import {
-  createStudioAabbSolidBooleanBackend,
-  createStudioMeshModifierStack,
-  evaluateStudioMeshModifierStack,
-  withStudioMeshModifier,
-} from "./studio-mesh-modifier-stack";
 
-import type { BgPrimitive } from "./studio-background-3d-metadata";
-import type { StudioOpfsRecoveryJournalAdapter } from "./studio-opfs-recovery-journal";
+import type { BgPrimitive } from "../studio-background-3d-metadata";
+import type { StudioOpfsRecoveryJournalAdapter } from "../studio-opfs-recovery-journal";
 
 // ---------------------------------------------------------------------------
 // Catalog map — every gating ID must be exercised by at least one test name.

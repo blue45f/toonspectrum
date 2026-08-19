@@ -3,41 +3,49 @@
  * Complements studio-dcc-section6-domain-kernels for formerly fake IDs.
  */
 
+import { planStudioBg3dPushPull } from "../bg3d/studio-bg3d-push-pull";
+import { getStudioBg3dRoomPreset, buildStudioBg3dRoomParts } from "../bg3d/studio-bg3d-room-builder";
+import {
+  addStudioArtistDelta,
+  applyStudioShotOverride,
+  createStudioLiveBridgeDocument,
+  createStudioSharedSet,
+  generateStudioToonPass,
+  STUDIO_TOON_PASS_KINDS,
+} from "../live/studio-live-2d3d-bridge";
 import {
   appendStudioArtistCorrection,
   createStudioArtistCorrectionStore,
   reprojectStudioArtistCorrections,
-} from "./studio-artist-correction-delta";
-import { planStudioBg3dPushPull } from "./studio-bg3d-push-pull";
-import { getStudioBg3dRoomPreset, buildStudioBg3dRoomParts } from "./studio-bg3d-room-builder";
+} from "../studio-artist-correction-delta";
 import {
   buildStudioWallsFromFloorPlan,
   createStudioDimension,
   generateStudioSlab,
   generateStudioStairs,
   offsetStudioFloorPlanPolygon,
-} from "./studio-build-generators";
+} from "../studio-build-generators";
 import {
   resolveStudioBuildInferenceSnap,
   cycleStudioInferenceAxisLock,
-} from "./studio-build-inference-snap";
+} from "../studio-build-inference-snap";
 import {
   createStudioTagsOutlinerDocument,
   resolveStudioOutlinerVisibility,
-} from "./studio-build-tags-outliner";
+} from "../studio-build-tags-outliner";
 import {
   buildStudioCadRectangleSketch,
   diagnoseStudioCadConstraints,
   exerciseStudioCad001SketchPrimitives,
   exportStudioCadStepAscii,
   extrudeStudioCadProfile,
-} from "./studio-cad-kernel-lite";
-import { resolveStudioCameraWallHide } from "./studio-camera-wall-hide";
+} from "../studio-cad-kernel-lite";
+import { resolveStudioCameraWallHide } from "../studio-camera-wall-hide";
 import {
   createStudioDefaultBodyPose,
   poseStudioBodyChainFk,
   poseStudioBodyChainIk,
-} from "./studio-character-ik-fk";
+} from "../studio-character-ik-fk";
 import {
   createStudioLookAt,
   createStudioPoseAssetMetadata,
@@ -47,28 +55,15 @@ import {
   createStudioDecalPlacement,
   mirrorStudioHandPose,
   studioKtx2DerivativeForProfile,
-} from "./studio-character-pose-p1";
+} from "../studio-character-pose-p1";
 import {
   createStudioClothGrid,
   stepStudioClothXpbd,
-} from "./studio-cloth-pattern-kernel";
+} from "../studio-cloth-pattern-kernel";
 import {
   createStudioComponentDocument,
   planStudioComponentMakeUnique,
-} from "./studio-component-instance-core";
-import {
-  collabCanEdit,
-  collabJoin,
-  createStudioDccCollabRoom,
-} from "./studio-dcc-collab-shell";
-import {
-  createStudioDccYjsSceneMetadataDoc,
-  encodeStudioDccYjsSceneUpdate,
-  exerciseStudioDccYjsSceneMetadataConvergence,
-  mergeStudioDccYjsSceneMetadata,
-  studioDccYjsSceneSetTitle,
-  studioDccYjsSceneUpsertLayer,
-} from "./studio-dcc-yjs-scene-metadata";
+} from "../studio-component-instance-core";
 import {
   bevelStudioEditableMeshEdges,
   createStudioUnitCubeMesh,
@@ -85,13 +80,43 @@ import {
   transformStudioEditableMesh,
   weldStudioEditableMesh,
   diagnoseStudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
 import {
   importStudioFbxDocument,
   parseStudioFbxBinaryMeshLite,
   sniffStudioFbxBinaryHeader,
-} from "./studio-fbx-ascii-import";
-import { importStudioGradeAAsset } from "./studio-grade-a-import-pipeline";
+} from "../studio-fbx-ascii-import";
+import { importStudioGradeAAsset } from "../studio-grade-a-import-pipeline";
+import { importStudioIfcShell, importStudioStepShell } from "../studio-mesh-format-adapters";
+import {
+  createStudioMeshModifierStack,
+  evaluateStudioMeshModifierStack,
+  withStudioMeshModifier,
+} from "../studio-mesh-modifier-stack";
+import {
+  bridgeStudioFaceLoops,
+  subdivideStudioMeshCatmullLite,
+} from "../studio-mesh-ops-advanced";
+import { studioCameraFovY } from "../studio-shot-continuity";
+import {
+  createStudioDefaultSolidBooleanBackend,
+  createStudioManifoldSolidBooleanBackend,
+} from "../studio-solid-boolean-backend";
+import { unwrapStudioMeshBox } from "../studio-uv-unwrap-lite";
+
+import {
+  collabCanEdit,
+  collabJoin,
+  createStudioDccCollabRoom,
+} from "./studio-dcc-collab-shell";
+import {
+  createStudioDccYjsSceneMetadataDoc,
+  encodeStudioDccYjsSceneUpdate,
+  exerciseStudioDccYjsSceneMetadataConvergence,
+  mergeStudioDccYjsSceneMetadata,
+  studioDccYjsSceneSetTitle,
+  studioDccYjsSceneUpsertLayer,
+} from "./studio-dcc-yjs-scene-metadata";
 import { scanStudioHybridDccCorruption } from "./studio-hybrid-dcc-diagnostics";
 import {
   createStudioHybridDccOpfsPorts,
@@ -106,33 +131,9 @@ import {
   hybridDccRedo,
 } from "./studio-hybrid-dcc-document";
 import { applyStudioSculptStroke } from "./studio-hybrid-sculpt-kernel";
-import {
-  addStudioArtistDelta,
-  applyStudioShotOverride,
-  createStudioLiveBridgeDocument,
-  createStudioSharedSet,
-  generateStudioToonPass,
-  STUDIO_TOON_PASS_KINDS,
-} from "./studio-live-2d3d-bridge";
-import { importStudioIfcShell, importStudioStepShell } from "./studio-mesh-format-adapters";
-import {
-  createStudioMeshModifierStack,
-  evaluateStudioMeshModifierStack,
-  withStudioMeshModifier,
-} from "./studio-mesh-modifier-stack";
-import {
-  bridgeStudioFaceLoops,
-  subdivideStudioMeshCatmullLite,
-} from "./studio-mesh-ops-advanced";
-import { studioCameraFovY } from "./studio-shot-continuity";
-import {
-  createStudioDefaultSolidBooleanBackend,
-  createStudioManifoldSolidBooleanBackend,
-} from "./studio-solid-boolean-backend";
-import { unwrapStudioMeshBox } from "./studio-uv-unwrap-lite";
 
 import type { StudioDccKernelResult } from "./studio-dcc-section6-domain-kernels";
-import type { StudioOpfsRecoveryJournalAdapter } from "./studio-opfs-recovery-journal";
+import type { StudioOpfsRecoveryJournalAdapter } from "../studio-opfs-recovery-journal";
 
 /** In-memory OPFS adapter for DOC-004 journal recovery exercise. */
 class Section6CoreOpfsAdapter implements StudioOpfsRecoveryJournalAdapter {
@@ -448,7 +449,7 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
   },
   "MOD-014": async () => {
     const mesh = cube();
-    const soup = (await import("./studio-editable-half-edge-mesh")).studioEditableMeshToTriangleSoup(mesh);
+    const soup = (await import("../studio-editable-half-edge-mesh")).studioEditableMeshToTriangleSoup(mesh);
     let stack = createStudioMeshModifierStack(mesh);
     // Offset + scale for real difference volume (unit-cube cut by offset cube).
     const op = new Float32Array(soup.positions);
@@ -477,7 +478,7 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     }
     const faces = e.value.mesh.faces.length;
     const facesBefore = mesh.faces.length;
-    const soupOut = (await import("./studio-editable-half-edge-mesh")).studioEditableMeshToTriangleSoup(
+    const soupOut = (await import("../studio-editable-half-edge-mesh")).studioEditableMeshToTriangleSoup(
       e.value.mesh,
     );
     const tris = soupOut.indices.length / 3;

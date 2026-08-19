@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_AI_IMAGE_REFERENCE_LIMITS,
+  hydrateStudioAiImageReferenceDocument,
+} from "../ai/studio-ai-image-reference-roles";
+
+import {
   STUDIO_BG3D_AI_METHOD_REFERENCE_ID,
   applyStudioBg3dAiMethodReference,
 } from "./studio-3d-ai-reference-application";
-import {
-  STUDIO_AI_IMAGE_REFERENCE_LIMITS,
-  hydrateStudioAiImageReferenceDocument,
-} from "./studio-ai-image-reference-roles";
 
 import type { StudioBg3dAiMethodReferenceCapture } from "./studio-3d-ai-reference-handoff";
-import type { StudioAssetWithContentHash } from "./studio-asset-library";
+import type { StudioAssetWithContentHash } from "../studio-asset-library";
 
 const capture = {
   version: 1,

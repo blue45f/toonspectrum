@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "../bg3d/studio-bg3d-lt-render";
+import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "../bg3d/studio-bg3d-shot-batch-limits";
+
 import {
   planStudio3dInsertCaptureSize,
   STUDIO_3D_INSERT_CAPTURE_MAX_SCALE,
   STUDIO_3D_INSERT_CAPTURE_SUPERSAMPLE,
 } from "./studio-3d-insert-capture-plan";
-import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
-import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
 
 describe("studio 3D insert capture plan", () => {
   it("captures a typical HiDPI insert at devicePixelRatio × supersample density", () => {

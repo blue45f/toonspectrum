@@ -5,7 +5,8 @@ import {
   importStudioProjectArchive,
   type ImportStudioProjectArchiveResult,
   type StudioProjectArchiveAttachmentInput,
-} from "./studio-project-archive";
+} from "../studio-project-archive";
+
 import { STUDIO_VRM_1_PUBLIC_LICENSE_URL } from "./studio-vrm-license-metadata";
 import { createStudioVrmProjectArchiveUseContextReceipt } from "./studio-vrm-license-product-gate";
 import {

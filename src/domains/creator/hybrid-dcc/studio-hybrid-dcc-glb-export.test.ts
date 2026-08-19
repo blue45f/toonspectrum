@@ -6,18 +6,31 @@ import {
   DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
   STUDIO_BG3D_GLB_MAX_BYTES,
   validateStudioBg3dGlb,
-} from "./studio-bg3d-glb-validation";
+} from "../bg3d/studio-bg3d-glb-validation";
 import {
   createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
   hashStudioEditableMesh,
   type StudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
+} from "../studio-editable-half-edge-mesh";
 import {
   registerStudioGeometryAuthority,
   createStudioGeometryAuthorityRegistry,
   setStudioGeometryAuthorityModifierStack,
-} from "./studio-geometry-authority";
+} from "../studio-geometry-authority";
+import {
+  createStudioMeshModifierStack,
+  withStudioMeshModifier,
+} from "../studio-mesh-modifier-stack";
+import { sha256HexPortable } from "../studio-sha256";
+import {
+  readStudioVrmExportGlb,
+  STUDIO_VRM_EXPORT_BIN_CHUNK_TYPE,
+  STUDIO_VRM_EXPORT_GLB_MAGIC,
+  STUDIO_VRM_EXPORT_GLB_VERSION,
+  STUDIO_VRM_EXPORT_JSON_CHUNK_TYPE,
+} from "../vrm/studio-vrm-export-glb-container";
+
 import {
   exportStudioHybridDccAuthorityRecordGlb,
   exportStudioHybridDccMeshGlb,
@@ -30,18 +43,6 @@ import {
   STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_ISSUE_IDS,
   STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_REPORT_ISSUES,
 } from "./studio-hybrid-dcc-glb-export-diagnostic-limits";
-import {
-  createStudioMeshModifierStack,
-  withStudioMeshModifier,
-} from "./studio-mesh-modifier-stack";
-import { sha256HexPortable } from "./studio-sha256";
-import {
-  readStudioVrmExportGlb,
-  STUDIO_VRM_EXPORT_BIN_CHUNK_TYPE,
-  STUDIO_VRM_EXPORT_GLB_MAGIC,
-  STUDIO_VRM_EXPORT_GLB_VERSION,
-  STUDIO_VRM_EXPORT_JSON_CHUNK_TYPE,
-} from "./studio-vrm-export-glb-container";
 
 interface GltfAccessor {
   readonly bufferView: number;

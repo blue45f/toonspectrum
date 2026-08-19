@@ -11,7 +11,7 @@ import {
   applyPoseToVrm,
   estimateVrmPalmNormal,
   type PoseBoneMap,
-} from "./domains/creator/studio-vrm-poser-utils";
+} from "./domains/creator/vrm/studio-vrm-poser-utils";
 
 const statusEl = document.getElementById("status")!;
 

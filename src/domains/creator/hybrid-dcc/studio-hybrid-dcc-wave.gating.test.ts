@@ -8,7 +8,20 @@ import {
   createStudioCadSketch,
   diagnoseStudioCadConstraints,
   snapStudioCadSketchAxes,
-} from "./studio-cad-kernel-lite";
+} from "../studio-cad-kernel-lite";
+import {
+  createStudioAsciiFbxTriangleFixture,
+  importStudioFbxAsciiDocument,
+  importStudioFbxDocument,
+  parseStudioFbxAsciiHeader,
+  sniffStudioFbxBinaryHeader,
+} from "../studio-fbx-ascii-import";
+import {
+  importStudioIfcShell,
+  importStudioStepShell,
+} from "../studio-mesh-format-adapters";
+import { unpackStudioToon3dPackage } from "../studio-toon3d-package";
+
 import {
   STUDIO_DCC_KERNEL_COVERAGE_REGISTRY,
   STUDIO_DCC_KERNEL_COVERAGE_REVISION,
@@ -28,20 +41,9 @@ import {
   STUDIO_DCC_COLLAB_SHELL_REVISION,
 } from "./studio-dcc-collab-shell";
 import {
-  createStudioAsciiFbxTriangleFixture,
-  importStudioFbxAsciiDocument,
-  importStudioFbxDocument,
-  parseStudioFbxAsciiHeader,
-  sniffStudioFbxBinaryHeader,
-} from "./studio-fbx-ascii-import";
-import {
   runStudioHybridDccWaveProductLoop,
 } from "./studio-hybrid-dcc-workspace";
-import {
-  importStudioIfcShell,
-  importStudioStepShell,
-} from "./studio-mesh-format-adapters";
-import { unpackStudioToon3dPackage } from "./studio-toon3d-package";
+
 
 describe("collab shell deepenings", () => {
   it("locks, merges op logs, and reports concurrent geometry-hint conflicts", () => {

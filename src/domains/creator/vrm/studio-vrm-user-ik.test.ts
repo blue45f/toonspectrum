@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
-import { solveTwoBoneTarget } from "./studio-rig-two-bone-ik";
+import { solveTwoBoneTarget } from "../studio-rig-two-bone-ik";
+
 import { solveStudioVrmFloorContact } from "./studio-vrm-contact-solver";
 import {
   clampStudioVrmJointRotation,

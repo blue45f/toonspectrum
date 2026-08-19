@@ -23,7 +23,8 @@
 import {
   STUDIO_HUMANOID_BONE_NAMES,
   type StudioHumanoidBoneName,
-} from "./studio-humanoid-bones";
+} from "../studio-humanoid-bones";
+
 import { studioVrmExportError } from "./studio-vrm-export-error";
 
 export const STUDIO_VRM_EXPORT_SPEC_VERSION = "1.0" as const;

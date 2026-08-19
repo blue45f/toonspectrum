@@ -3,6 +3,8 @@
  * Never invents evidence from ID hashes.
  */
 
+import { getStudioPublishPlatformPreset } from "../studio-publish-package";
+
 import {
   applyStudioToneFilterAdjustment,
   bindStudioReferenceLayer,
@@ -39,7 +41,6 @@ import {
   STUDIO_DCC_SECTION6_IDS,
   studioSection6ById,
 } from "./studio-dcc-section6-full-catalog";
-import { getStudioPublishPlatformPreset } from "./studio-publish-package";
 
 export const STUDIO_DCC_CATALOG_FEATURE_DISPATCH_REVISION = 3 as const;
 

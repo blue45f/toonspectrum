@@ -28,7 +28,7 @@ import type {
   StudioWebXrSessionState,
   StudioWebXrSupportLevel,
   StudioWebXrSupportSnapshot,
-} from "./studio-webxr-session";
+} from "../studio-webxr-session";
 
 export interface StudioBg3dImmersivePanelProps {
   /** Last browser capability probe. Null keeps direct, user-activated requests possible. */

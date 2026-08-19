@@ -7,6 +7,12 @@
  */
 
 import {
+  attachStudioGeneric3dWorkflowMetadata,
+  parseStudioGeneric3dWorkflowMetadata,
+  type StudioGeneric3dWorkflowMetadataRecord,
+} from "../studio-generic-3d-workflow-metadata";
+
+import {
   STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
   STUDIO_BG3D_CAMERA_DEFAULT_UP,
   STUDIO_BG3D_CAMERA_MAX_NEAR_CLIP,
@@ -17,11 +23,6 @@ import {
 } from "./studio-bg3d-camera-orientation";
 import { normalizeStudioBg3dCaptureAspectRatio } from "./studio-bg3d-capture-frame-geometry";
 import { normalizeStudioBg3dHierarchyParents } from "./studio-bg3d-hierarchy";
-import {
-  attachStudioGeneric3dWorkflowMetadata,
-  parseStudioGeneric3dWorkflowMetadata,
-  type StudioGeneric3dWorkflowMetadataRecord,
-} from "./studio-generic-3d-workflow-metadata";
 
 export const STUDIO_BG3D_SCENE_DOCUMENT_KIND = "toonspectrum.bg3d-scene" as const;
 export const STUDIO_BG3D_SCENE_DOCUMENT_VERSION = 3 as const;

@@ -17,7 +17,8 @@ import {
   STUDIO_BG3D_GLB_MAX_BYTES,
   STUDIO_BG3D_GLB_MAX_JSON_BYTES,
   STUDIO_BG3D_GLB_MIME_TYPE,
-} from "./studio-bg3d-glb-validation";
+} from "../bg3d/studio-bg3d-glb-validation";
+
 import { StudioVrmExportError, studioVrmExportError } from "./studio-vrm-export-error";
 
 export const STUDIO_VRM_EXPORT_GLB_MAGIC = 0x46546c67;

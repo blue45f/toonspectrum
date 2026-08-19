@@ -7,14 +7,14 @@ import type {
   StudioBg3dLtRasterLayerRole,
   StudioVrmPoserInsertResult,
 } from "./studio-3d-insert-contract";
-import type { StudioBg3dLtRasterLayerRole as RenderLayerRole } from "./studio-bg3d-lt-render";
-import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
-import type { StudioVrmSceneDocument } from "./studio-vrm-scene-document";
+import type { StudioBg3dLtRasterLayerRole as RenderLayerRole } from "../bg3d/studio-bg3d-lt-render";
+import type { StudioBg3dSceneDocument } from "../bg3d/studio-bg3d-scene-document";
 import type {
   StudioBackground3DInsertResult as BackgroundCompatResult,
   StudioBackground3DLtLayer as BackgroundCompatLayer,
-} from "./StudioBackground3D";
-import type { StudioVrmPoserInsertResult as VrmCompatResult } from "./StudioVrmPoser";
+} from "../bg3d/StudioBackground3D";
+import type { StudioVrmSceneDocument } from "../vrm/studio-vrm-scene-document";
+import type { StudioVrmPoserInsertResult as VrmCompatResult } from "../vrm/StudioVrmPoser";
 
 const layerRoles = ["color", "tone", "texture-line", "main-line"] as const satisfies
   readonly StudioBg3dLtRasterLayerRole[];

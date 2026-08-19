@@ -1,3 +1,6 @@
+import { buildStudioPackageArchiveBlob } from "../studio-package-archive";
+import { compareStudioValidationStrings } from "../studio-validation-string-order";
+
 import {
   verifyStudioBg3dLayeredPsdFile,
   verifyStudioBg3dOpaqueRgb8PngFile,
@@ -27,8 +30,6 @@ import {
   STUDIO_BG3D_SHOT_PSD_MAX_OUTPUT_BYTES,
   STUDIO_BG3D_SHOT_PSD_MIME,
 } from "./studio-bg3d-shot-psd-contract";
-import { buildStudioPackageArchiveBlob } from "./studio-package-archive";
-import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
 export const STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS = 64;
 export const STUDIO_BG3D_SHOT_BATCH_MAX_ARTIFACTS = STUDIO_BG3D_SHOT_BATCH_MAX_FILES;
