@@ -74,6 +74,11 @@ import {
   parseStudioLiveGesturePreviewPayload,
   type StudioLiveGesturePreviewPayload,
 } from "./studio-live-gesture-preview";
+import {
+  isStudioLiveInkWireCandidate,
+  STUDIO_LIVE_INK_CAPABILITY,
+  type StudioLiveInkWireMessage,
+} from "./studio-live-ink-protocol";
 import { applyStudioLiveP2pOverlay } from "./studio-live-p2p-overlay-transport";
 import {
   createStudioCloudflarePurposeRoutedLiveTransportFactory,
@@ -108,6 +113,13 @@ import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource
 const SOCKET_PATH = "/socket.io";
 export const STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT =
   "studio:gesture:preview" as const;
+export const STUDIO_LIVE_INK_SOCKET_EVENT = "studio:ink" as const;
+/** Per-sender inbound budget for the binary ink lane, mirroring the gesture-preview windows. */
+export const STUDIO_LIVE_INK_SOCKET_INBOUND_WINDOW_MS = 3_000;
+/** LOW_FAST cadence is 8ms per payload packet → ≤375 payload packets per window, plus control frames. */
+export const STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_PACKETS = 480;
+export const STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_BYTES = 4 * 1024 * 1024;
+export const STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_SENDERS = 64;
 const CONNECT_TIMEOUT_MS = 15_000;
 const CRDT_ACK_TIMEOUT_MS = 10_000;
 const CRDT_WIRE_SELECT_ACK_TIMEOUT_MS = 8_000;
@@ -172,6 +184,25 @@ type PendingLockDelta =
       releaseRequestId: string | null;
       revision?: StudioLiveLockRevision;
     };
+
+const STUDIO_SOCKET_BINARY_LANES: readonly string[] = Object.freeze([
+  STUDIO_LIVE_INK_CAPABILITY,
+]);
+const STUDIO_SOCKET_NO_BINARY_LANES: readonly string[] = Object.freeze([]);
+
+interface InkInboundWindow {
+  startedAt: number;
+  packetCount: number;
+  byteCount: number;
+}
+
+/** Cheap pre-parse byte accounting for one untrusted ink-lane candidate. */
+function inkWirePayloadByteLength(value: Record<string, unknown>): number {
+  const message = value.message;
+  if (!isRecord(message)) return 0;
+  const payload = message.payload;
+  return payload instanceof ArrayBuffer ? payload.byteLength : 0;
+}
 
 type LockRevisionFamily = "acquired" | "destructive";
 
@@ -497,6 +528,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly listeners = new Set<(value: unknown) => void>();
   private readonly controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
   private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
+  private readonly inkListeners = new Set<(value: unknown) => void>();
+  private readonly inkInboundWindowBySender = new Map<string, InkInboundWindow>();
   private readonly seenCrdtUpdateIds = new Set<string>();
   private readonly pendingCrdtPublishes = new Map<string, Promise<StudioCrdtUpdateAck>>();
   private readonly pendingCrdtOperations = new Set<{
@@ -619,6 +652,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.on("studio:crdt:sync", this.onCrdtSync);
     this.socket.on("studio:crdt:update", this.onCrdtUpdate);
     this.socket.on(STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT, this.onCrdtBinaryUpdate);
+    this.socket.on(STUDIO_LIVE_INK_SOCKET_EVENT, this.onInk);
   }
 
   get ready(): boolean {
@@ -628,6 +662,18 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       this.selectedCrdtWireFormat !== null &&
       this.socket.connected
     );
+  }
+
+  /**
+   * The ink lane piggybacks on the join-time binary wire negotiation: a connection that selected
+   * the binary CRDT format has proven this Socket.IO path relays ArrayBuffer payloads end-to-end.
+   * A legacy-wire or unjoined connection advertises nothing — the V18 fail-closed contract keeps
+   * such peers cursor-only with no JSON re-encoding fallback.
+   */
+  get binaryLaneCapabilities(): readonly string[] {
+    return this.ready && this.selectedCrdtWireFormat === STUDIO_CRDT_BINARY_WIRE_FORMAT
+      ? STUDIO_SOCKET_BINARY_LANES
+      : STUDIO_SOCKET_NO_BINARY_LANES;
   }
 
   canonicalSessionId(transportSessionId: string): string {
@@ -711,6 +757,34 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (this.closed) return () => undefined;
     this.crdtListeners.add(listener);
     return () => this.crdtListeners.delete(listener);
+  }
+
+  /**
+   * Sends one pre-validated ink-v2 frame on the negotiated binary lane. Socket.IO carries the
+   * {header JSON, payload ArrayBuffer} wire frame natively as binary attachments, so no
+   * re-encoding happens here. Fails closed whenever the lane was not negotiated.
+   */
+  sendInk(message: StudioLiveInkWireMessage): boolean {
+    if (
+      !this.ready ||
+      this.selectedCrdtWireFormat !== STUDIO_CRDT_BINARY_WIRE_FORMAT ||
+      message.workId !== this.context.workId
+    ) {
+      return false;
+    }
+    try {
+      this.socket.emit(STUDIO_LIVE_INK_SOCKET_EVENT, message);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Delivers raw binary-lane candidates; subscribers must run the strict ink wire parser. */
+  subscribeInk(listener: (value: unknown) => void): () => void {
+    if (this.closed) return () => undefined;
+    this.inkListeners.add(listener);
+    return () => this.inkListeners.delete(listener);
   }
 
   requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
@@ -1473,6 +1547,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.off("studio:crdt:sync", this.onCrdtSync);
     this.socket.off("studio:crdt:update", this.onCrdtUpdate);
     this.socket.off(STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT, this.onCrdtBinaryUpdate);
+    this.socket.off(STUDIO_LIVE_INK_SOCKET_EVENT, this.onInk);
     this.rejectPendingCrdtOperations(createStudioCrdtRetryableError(
       "connection_closed",
       "팀 공동작업 연결이 종료되었습니다.",
@@ -1483,6 +1558,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.listeners.clear();
     this.controlListeners.clear();
     this.crdtListeners.clear();
+    this.inkListeners.clear();
+    this.inkInboundWindowBySender.clear();
     this.pendingCrdtPublishes.clear();
     this.seenCrdtUpdateIds.clear();
     this.participants.clear();
@@ -2720,6 +2797,64 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.rememberCrdtUpdateId(update.updateId);
   };
 
+  private readonly onInk = (value: unknown) => {
+    // Fail closed: the binary lane exists only on a joined, binary-selected connection. A frame
+    // arriving anywhere else is dropped — never re-routed to the JSON envelope listeners.
+    if (!this.ready || this.selectedCrdtWireFormat !== STUDIO_CRDT_BINARY_WIRE_FORMAT) return;
+    if (!isRecord(value) || !isStudioLiveInkWireCandidate(value)) return;
+    if (!this.acceptInkInbound(value, this.now())) return;
+    for (const listener of this.inkListeners) listener(value);
+  };
+
+  /** Per-sender byte/packet windows for the ink lane, mirroring the gesture-preview budget. */
+  private acceptInkInbound(value: Record<string, unknown>, receivedAt: number): boolean {
+    const senderSessionId = value.senderSessionId;
+    if (!safeIdentifier(senderSessionId, 160)) return false;
+    const byteLength = inkWirePayloadByteLength(value);
+    if (byteLength > STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_BYTES) return false;
+    const current = this.inkInboundWindowBySender.get(senderSessionId);
+    if (
+      !current ||
+      receivedAt < current.startedAt ||
+      receivedAt - current.startedAt >= STUDIO_LIVE_INK_SOCKET_INBOUND_WINDOW_MS
+    ) {
+      if (
+        !current &&
+        this.inkInboundWindowBySender.size >= STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_SENDERS
+      ) {
+        for (const [candidateSender, candidate] of this.inkInboundWindowBySender) {
+          if (receivedAt - candidate.startedAt < STUDIO_LIVE_INK_SOCKET_INBOUND_WINDOW_MS) {
+            continue;
+          }
+          this.inkInboundWindowBySender.delete(candidateSender);
+        }
+        if (
+          this.inkInboundWindowBySender.size >= STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_SENDERS
+        ) {
+          return false;
+        }
+      }
+      this.inkInboundWindowBySender.set(senderSessionId, {
+        startedAt: receivedAt,
+        packetCount: 1,
+        byteCount: byteLength,
+      });
+      return true;
+    }
+    if (
+      current.packetCount >= STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_PACKETS ||
+      current.byteCount + byteLength > STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_BYTES
+    ) {
+      return false;
+    }
+    this.inkInboundWindowBySender.set(senderSessionId, {
+      startedAt: current.startedAt,
+      packetCount: current.packetCount + 1,
+      byteCount: current.byteCount + byteLength,
+    });
+    return true;
+  }
+
   private beginJoin(): void {
     if (this.closed || !this.socket.connected || !this.sessionToken) return;
     this.clearJoinRetry(false);
@@ -2733,6 +2868,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.pendingVoiceByConnection.clear();
     this.pendingLockDeltas.length = 0;
     this.pendingLockDeltaOverflowed = false;
+    this.inkInboundWindowBySender.clear();
     this.emitStatus({
       state: "connecting",
       message: "작품 팀 권한을 확인하고 있습니다.",

@@ -23,6 +23,11 @@ import {
   type StudioLiveWebRtcDescriptionPayload,
   type StudioLiveWebRtcIcePayload,
 } from "./studio-live-collaboration-protocol";
+import {
+  isStudioLiveInkWireCandidate,
+  STUDIO_LIVE_INK_CAPABILITY,
+  type StudioLiveInkWireMessage,
+} from "./studio-live-ink-protocol";
 
 import type {
   StudioLiveTransport,
@@ -41,6 +46,18 @@ export const STUDIO_LIVE_P2P_CHANNEL_LABEL = "studio-live-p2p";
 export const STUDIO_LIVE_P2P_MAX_PEERS = 8;
 /** Keeps at most a few maximum-size preview packets queued per peer before using primary relay. */
 export const STUDIO_LIVE_P2P_PREVIEW_MAX_BUFFERED_BYTES = 256 * 1024;
+/** JSON control message announcing this peer's negotiated binary lanes (e.g. "ink-v2"). */
+export const STUDIO_LIVE_P2P_CAPS_WIRE = "studio-live-p2p-caps";
+/** Ink predictions are droppable, so a congested channel falls back instead of queueing deep. */
+export const STUDIO_LIVE_P2P_INK_MAX_BUFFERED_BYTES = 256 * 1024;
+/** Per-peer inbound budget for mesh ink frames, mirroring the socket lane's windows. */
+export const STUDIO_LIVE_P2P_INK_INBOUND_WINDOW_MS = 3_000;
+export const STUDIO_LIVE_P2P_INK_INBOUND_MAX_PACKETS = 480;
+export const STUDIO_LIVE_P2P_INK_INBOUND_MAX_BYTES = 4 * 1024 * 1024;
+
+const STUDIO_LIVE_P2P_MAX_ADVERTISED_LANES = 8;
+const STUDIO_LIVE_P2P_MAX_LANE_NAME_LENGTH = 64;
+const STUDIO_LIVE_P2P_NO_BINARY_LANES: readonly string[] = Object.freeze([]);
 
 const STUDIO_LIVE_P2P_EPHEMERAL_KINDS = new Set<StudioLiveMessageKind>([
   "presence:heartbeat",
@@ -70,11 +87,13 @@ export interface StudioLiveP2pRtcDataChannel {
   readonly label: string;
   readonly readyState: string;
   readonly bufferedAmount: number;
-  send(data: string): void;
+  /** Real RTCDataChannels are switched to "arraybuffer" so mesh ink frames avoid Blob hops. */
+  binaryType?: string;
+  send(data: string | ArrayBuffer): void;
   close(): void;
   onopen: ((event: Event) => void) | null;
   onclose: ((event: Event) => void) | null;
-  onmessage: ((event: MessageEvent<string>) => void) | null;
+  onmessage: ((event: MessageEvent<unknown>) => void) | null;
 }
 
 export interface StudioLiveP2pRtcPeerConnection {
@@ -133,6 +152,12 @@ function isMeshSignal(
   );
 }
 
+interface StudioLiveP2pInkInboundWindow {
+  startedAt: number;
+  packetCount: number;
+  byteCount: number;
+}
+
 interface StudioLiveP2pPeerLink {
   readonly sessionId: string;
   participant: StudioLiveParticipant;
@@ -140,16 +165,95 @@ interface StudioLiveP2pPeerLink {
   channel: StudioLiveP2pRtcDataChannel | null;
   remoteDescriptionSet: boolean;
   pendingIce: RTCIceCandidateInit[];
+  /** Binary lanes this peer announced over its channel; empty until a caps message arrives. */
+  peerBinaryLanes: readonly string[];
+  /** True once our own lane announcement reached this peer's channel. */
+  announcedBinaryLanes: boolean;
+  inkInboundWindow: StudioLiveP2pInkInboundWindow | null;
   closed: boolean;
 }
 
 type StudioLiveP2pEphemeralSendResult = "sent" | "fallback" | "rejected";
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseStudioLiveP2pCapsMessage(value: unknown): readonly string[] | null {
+  if (!isPlainRecord(value) || value.wire !== STUDIO_LIVE_P2P_CAPS_WIRE) return null;
+  const lanes = value.binaryLanes;
+  if (!Array.isArray(lanes) || lanes.length > STUDIO_LIVE_P2P_MAX_ADVERTISED_LANES) return null;
+  const parsed: string[] = [];
+  for (const lane of lanes) {
+    if (
+      typeof lane !== "string"
+      || lane.length === 0
+      || lane.length > STUDIO_LIVE_P2P_MAX_LANE_NAME_LENGTH
+    ) return null;
+    parsed.push(lane);
+  }
+  return Object.freeze(parsed);
+}
+
+/**
+ * Binary mesh frame for one ink wire message: u32(LE) header byte length, the UTF-8 JSON header
+ * ({header JSON} = the wire frame minus its ArrayBuffer), then the raw sample payload bytes.
+ * Control frames (begin/end/cancel) carry zero payload bytes.
+ */
+function encodeStudioLiveP2pInkFrame(wire: StudioLiveInkWireMessage): ArrayBuffer | null {
+  try {
+    const message = wire.message;
+    const payload =
+      message.kind === "ink:chunk" || message.kind === "ink:prediction"
+        ? message.payload
+        : null;
+    const headerBytes = new TextEncoder().encode(
+      JSON.stringify({
+        ...wire,
+        message: payload ? { ...message, payload: undefined } : message,
+      }),
+    );
+    const frame = new Uint8Array(4 + headerBytes.byteLength + (payload?.byteLength ?? 0));
+    new DataView(frame.buffer).setUint32(0, headerBytes.byteLength, true);
+    frame.set(headerBytes, 4);
+    if (payload) frame.set(new Uint8Array(payload), 4 + headerBytes.byteLength);
+    return frame.buffer;
+  } catch {
+    return null;
+  }
+}
+
+/** Reconstructs one raw ink-lane candidate; the strict wire parser still runs downstream. */
+function decodeStudioLiveP2pInkFrame(data: ArrayBuffer): Record<string, unknown> | null {
+  if (data.byteLength < 4) return null;
+  const headerLength = new DataView(data).getUint32(0, true);
+  if (headerLength === 0 || 4 + headerLength > data.byteLength) return null;
+  let header: unknown;
+  try {
+    header = JSON.parse(
+      new TextDecoder().decode(new Uint8Array(data, 4, headerLength)),
+    ) as unknown;
+  } catch {
+    return null;
+  }
+  if (!isPlainRecord(header) || !isStudioLiveInkWireCandidate(header)) return null;
+  const message = header.message;
+  if (!isPlainRecord(message)) return null;
+  if (message.kind === "ink:chunk" || message.kind === "ink:prediction") {
+    message.payload = data.slice(4 + headerLength);
+  } else if (data.byteLength !== 4 + headerLength) {
+    return null;
+  }
+  return header;
+}
 
 /**
  * Opportunistic STUN-only data-channel mesh on top of an authoritative server transport.
  * Cursor, presence heartbeat, chat, and gesture previews hop peer-to-peer once every known peer
  * has an open channel. Join, locks, and ICE signaling stay on the primary transport. CRDT stays
  * on the primary when it can persist updates; otherwise the mesh carries jam Yjs diffs.
+ * Binary ink: actual samples always ride the reliable primary lane (V18 — actuals are never
+ * lossy), while droppable predictions may hop the mesh to peers that announced ink-v2.
  * A missing WebRTC implementation or a failed ICE path falls back without shrinking features.
  */
 class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
@@ -165,6 +269,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   private readonly knownPeerSessionIds = new Set<string>();
   private readonly peers = new Map<string, StudioLiveP2pPeerLink>();
   private readonly listeners = new Set<(value: unknown) => void>();
+  private readonly inkListeners = new Set<(value: unknown) => void>();
   private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
   private readonly pendingCrdtSync = new Map<string, {
     resolve: (response: StudioCrdtSyncResponse | null) => void;
@@ -195,6 +300,14 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
 
   get ready(): boolean {
     return this.primary.ready;
+  }
+
+  /**
+   * The mesh alone cannot negotiate a binary lane it can honor — actual samples require the
+   * reliable authority path — so the overlay advertises exactly what the primary negotiated.
+   */
+  get binaryLaneCapabilities(): readonly string[] {
+    return this.primary.binaryLaneCapabilities ?? STUDIO_LIVE_P2P_NO_BINARY_LANES;
   }
 
   async connect(): Promise<void> {
@@ -322,6 +435,33 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     };
   }
 
+  /**
+   * V18 delivery contract: actual samples must never be lossy. The opportunistic mesh has no
+   * retransmit protocol, so a channel closing mid-stroke would tear an unrecoverable hole in the
+   * strictly-sequenced chunk stream. Actuals therefore always ride the reliable primary lane;
+   * only droppable predictions may hop the mesh, and only to peers that announced ink-v2.
+   */
+  sendInk(message: StudioLiveInkWireMessage): boolean {
+    if (this.closed) return false;
+    const sendPrimary = this.primary.sendInk;
+    if (typeof sendPrimary !== "function" || !this.inkLaneNegotiated()) return false;
+    if (message.message.kind === "ink:prediction" && this.sendMeshInkPrediction(message)) {
+      return true;
+    }
+    return sendPrimary.call(this.primary, message);
+  }
+
+  /** Delivers raw ink-lane candidates from primary and mesh; subscribers run the strict parser. */
+  subscribeInk(listener: (value: unknown) => void): () => void {
+    if (this.closed) return () => undefined;
+    this.inkListeners.add(listener);
+    const unsubscribePrimary = this.primary.subscribeInk?.(listener);
+    return () => {
+      this.inkListeners.delete(listener);
+      unsubscribePrimary?.();
+    };
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
@@ -334,6 +474,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     this.pendingCrdtSync.clear();
     this.seenCrdtUpdateIds.clear();
     this.crdtListeners.clear();
+    this.inkListeners.clear();
     for (const sessionId of [...this.peers.keys()]) this.teardownPeer(sessionId);
     this.knownPeerSessionIds.clear();
     this.listeners.clear();
@@ -535,11 +676,24 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     const channel = peer.channel;
     if (peer.closed || channel?.readyState !== "open") return false;
     if (!enforcePreviewLimits) return true;
+    return this.channelCanCarry(
+      peer,
+      serializedBytes,
+      STUDIO_LIVE_P2P_PREVIEW_MAX_BUFFERED_BYTES,
+    );
+  }
+
+  private channelCanCarry(
+    peer: StudioLiveP2pPeerLink,
+    messageBytes: number,
+    maxBufferedBytes: number,
+  ): boolean {
+    const channel = peer.channel;
+    if (peer.closed || channel?.readyState !== "open") return false;
     if (
       !Number.isFinite(channel.bufferedAmount)
       || channel.bufferedAmount < 0
-      || channel.bufferedAmount + serializedBytes
-        > STUDIO_LIVE_P2P_PREVIEW_MAX_BUFFERED_BYTES
+      || channel.bufferedAmount + messageBytes > maxBufferedBytes
     ) return false;
     const maxMessageSize = peer.connection.sctp?.maxMessageSize;
     return maxMessageSize === undefined
@@ -547,7 +701,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       || maxMessageSize === Number.POSITIVE_INFINITY
       || (Number.isFinite(maxMessageSize)
         && maxMessageSize > 0
-        && serializedBytes <= maxMessageSize);
+        && messageBytes <= maxMessageSize);
   }
 
   private sendSerializedToPeer(peer: StudioLiveP2pPeerLink, serialized: string): boolean {
@@ -558,6 +712,98 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     } catch {
       return false;
     }
+  }
+
+  private sendBinaryToPeer(peer: StudioLiveP2pPeerLink, frame: ArrayBuffer): boolean {
+    if (peer.closed || peer.channel?.readyState !== "open") return false;
+    try {
+      peer.channel.send(frame);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** True only when the primary negotiated the ink-v2 binary lane for this connection. */
+  private inkLaneNegotiated(): boolean {
+    return (
+      typeof this.primary.sendInk === "function"
+      && (this.primary.binaryLaneCapabilities?.includes(STUDIO_LIVE_INK_CAPABILITY) ?? false)
+    );
+  }
+
+  /**
+   * Droppable prediction fan-out. Mirrors the ephemeral all-or-fallback policy: the mesh is used
+   * only when every known peer has an open channel, announced ink-v2 and can absorb the frame.
+   * A mid-fanout failure falls back whole to the primary — receivers sequence-reject duplicate
+   * predictions, so parity beats a partial mesh delivery.
+   */
+  private sendMeshInkPrediction(wire: StudioLiveInkWireMessage): boolean {
+    if (
+      this.knownPeerSessionIds.size === 0
+      || this.peers.size !== this.knownPeerSessionIds.size
+    ) return false;
+    const frame = encodeStudioLiveP2pInkFrame(wire);
+    if (!frame) return false;
+    const peers = [...this.peers.values()];
+    if (
+      peers.some(
+        (peer) =>
+          !peer.peerBinaryLanes.includes(STUDIO_LIVE_INK_CAPABILITY)
+          || !this.channelCanCarry(
+            peer,
+            frame.byteLength,
+            STUDIO_LIVE_P2P_INK_MAX_BUFFERED_BYTES,
+          ),
+      )
+    ) return false;
+    for (const peer of peers) {
+      if (!this.sendBinaryToPeer(peer, frame)) return false;
+    }
+    return true;
+  }
+
+  /** Announces our negotiated binary lanes so the peer can gate its mesh ink fan-out per-peer. */
+  private announceMeshBinaryLanes(link: StudioLiveP2pPeerLink): void {
+    if (link.closed || link.announcedBinaryLanes) return;
+    const lanes = this.primary.binaryLaneCapabilities ?? STUDIO_LIVE_P2P_NO_BINARY_LANES;
+    if (lanes.length === 0) return;
+    link.announcedBinaryLanes = this.sendSerializedToPeer(
+      link,
+      JSON.stringify({ wire: STUDIO_LIVE_P2P_CAPS_WIRE, binaryLanes: [...lanes] }),
+    );
+  }
+
+  private receiveMeshInk(link: StudioLiveP2pPeerLink, data: ArrayBuffer): void {
+    // Fail closed: without a locally negotiated ink-v2 lane the mesh frame is dropped outright,
+    // never approximated and never re-routed to the JSON envelope listeners.
+    if (!this.inkLaneNegotiated()) return;
+    if (!this.acceptMeshInkInbound(link, data.byteLength)) return;
+    const candidate = decodeStudioLiveP2pInkFrame(data);
+    // The frame must claim the sending link's verified presence identity — no mesh relaying.
+    if (!candidate || candidate.senderSessionId !== link.sessionId) return;
+    for (const listener of this.inkListeners) listener(candidate);
+  }
+
+  private acceptMeshInkInbound(link: StudioLiveP2pPeerLink, byteLength: number): boolean {
+    if (byteLength > STUDIO_LIVE_P2P_INK_INBOUND_MAX_BYTES) return false;
+    const now = this.now();
+    const window = link.inkInboundWindow;
+    if (
+      !window
+      || now < window.startedAt
+      || now - window.startedAt >= STUDIO_LIVE_P2P_INK_INBOUND_WINDOW_MS
+    ) {
+      link.inkInboundWindow = { startedAt: now, packetCount: 1, byteCount: byteLength };
+      return true;
+    }
+    if (
+      window.packetCount >= STUDIO_LIVE_P2P_INK_INBOUND_MAX_PACKETS
+      || window.byteCount + byteLength > STUDIO_LIVE_P2P_INK_INBOUND_MAX_BYTES
+    ) return false;
+    window.packetCount += 1;
+    window.byteCount += byteLength;
+    return true;
   }
 
   private handlePrimaryInbound(value: unknown): void {
@@ -613,6 +859,9 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       channel: null,
       remoteDescriptionSet: false,
       pendingIce: [],
+      peerBinaryLanes: STUDIO_LIVE_P2P_NO_BINARY_LANES,
+      announcedBinaryLanes: false,
+      inkInboundWindow: null,
       closed: false,
     };
     this.peers.set(sessionId, link);
@@ -713,20 +962,40 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       }
     }
     link.channel = channel;
+    link.announcedBinaryLanes = false;
+    channel.binaryType = "arraybuffer";
+    channel.onopen = () => {
+      if (link.closed || link.channel !== channel) return;
+      this.announceMeshBinaryLanes(link);
+    };
     channel.onmessage = (event) => {
       this.handleChannelMessage(link, event.data);
     };
     channel.onclose = () => {
       if (link.channel === channel) link.channel = null;
     };
+    if (channel.readyState === "open") this.announceMeshBinaryLanes(link);
   }
 
   private handleChannelMessage(link: StudioLiveP2pPeerLink, data: unknown): void {
-    if (this.closed || typeof data !== "string") return;
+    if (this.closed) return;
+    if (data instanceof ArrayBuffer) {
+      this.receiveMeshInk(link, data);
+      return;
+    }
+    if (typeof data !== "string") return;
     let parsed: unknown;
     try {
       parsed = JSON.parse(data) as unknown;
     } catch {
+      return;
+    }
+    const peerLanes = parseStudioLiveP2pCapsMessage(parsed);
+    if (peerLanes) {
+      link.peerBinaryLanes = peerLanes;
+      // Announcements can race the channel opening (the offerer's greeting may fire while the
+      // answerer is still connecting). Answer a peer's caps so the exchange always converges.
+      this.announceMeshBinaryLanes(link);
       return;
     }
     if (this.receiveMeshCrdt(parsed)) return;

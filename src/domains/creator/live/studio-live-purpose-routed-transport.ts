@@ -35,6 +35,7 @@ import type {
   StudioLiveTransportControlEvent,
   StudioLiveTransportFactory,
 } from "./studio-live-collaboration-transport";
+import type { StudioLiveInkWireMessage } from "./studio-live-ink-protocol";
 
 type StudioRealtimeCoordinatorPort = Pick<
   StudioRealtimeWorkloadCoordinator,
@@ -227,10 +228,26 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
       this.publishCrdtUpdate = undefined;
       this.subscribeCrdt = undefined;
     }
+    if (
+      typeof primary.sendInk !== "function" ||
+      typeof primary.subscribeInk !== "function"
+    ) {
+      this.sendInk = undefined;
+      this.subscribeInk = undefined;
+    }
   }
 
   get ready(): boolean {
     return !this.closed && this.primary.ready;
+  }
+
+  /**
+   * Binary lane negotiation is owned by the authority transport. The provider routing table
+   * (presence / comments / screen-signaling) has no ink workload or capability in protocol v1,
+   * so no lane is invented here — a primary without ink-v2 keeps this route cursor-only.
+   */
+  get binaryLaneCapabilities(): readonly string[] | undefined {
+    return this.primary.binaryLaneCapabilities;
   }
 
   canonicalSessionId(transportSessionId: string): string {
@@ -384,6 +401,22 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
     listener: (message: StudioCrdtTransportMessage) => void,
   ): () => void {
     return this.primary.subscribeCrdt?.call(this.primary, listener) ?? (() => undefined);
+  }
+
+  /**
+   * Ink purpose route: the primary authority lane. Like gesture previews, ink deliberately does
+   * not widen Cloudflare tickets or worker scope — routing quantized binary frames through the
+   * JSON provider protocol would silently degrade the V18 exact-replication guarantee.
+   */
+  sendInk?(message: StudioLiveInkWireMessage): boolean {
+    const operation = this.primary.sendInk;
+    if (!this.ready || typeof operation !== "function") return false;
+    return operation.call(this.primary, message);
+  }
+
+  subscribeInk?(listener: (value: unknown) => void): () => void {
+    if (this.closed) return () => undefined;
+    return this.primary.subscribeInk?.call(this.primary, listener) ?? (() => undefined);
   }
 
   close(): void {

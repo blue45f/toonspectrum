@@ -17,6 +17,12 @@ import {
   type StudioLiveParticipant,
   type StudioLivePayloadMap,
 } from "./studio-live-collaboration-protocol";
+import { encodeStudioLiveInkSamples } from "./studio-live-ink-codec";
+import {
+  createStudioLiveInkWireMessage,
+  STUDIO_LIVE_INK_CAPABILITY,
+  type StudioLiveInkWireMessage,
+} from "./studio-live-ink-protocol";
 import {
   createStudioPurposeRoutedLiveTransportFactory,
   type StudioPurposeRoutedLiveTransportFactoryOptions,
@@ -62,6 +68,10 @@ const CONTEXT: StudioLiveTransportContext = {
 class FakePrimaryTransport implements StudioLiveTransport {
   readonly mode = "server" as const;
   readonly sent: StudioLiveEnvelope[] = [];
+  readonly sentInk: StudioLiveInkWireMessage[] = [];
+  readonly binaryLaneCapabilities?: readonly string[];
+  readonly sendInk?: (message: StudioLiveInkWireMessage) => boolean;
+  readonly subscribeInk?: (listener: (value: unknown) => void) => () => void;
   readonly acquireLock = vi.fn(async () => ({
     status: "timeout" as const,
     resource: "page:1",
@@ -99,11 +109,30 @@ class FakePrimaryTransport implements StudioLiveTransport {
   private readonly crdtListeners = new Set<
     (message: StudioCrdtTransportMessage) => void
   >();
+  private readonly inkListeners = new Set<(value: unknown) => void>();
   ready = false;
   closed = false;
 
+  constructor(inkLane = true) {
+    if (!inkLane) return;
+    this.binaryLaneCapabilities = [STUDIO_LIVE_INK_CAPABILITY];
+    this.sendInk = (message: StudioLiveInkWireMessage) => {
+      if (!this.ready || this.closed) return false;
+      this.sentInk.push(message);
+      return true;
+    };
+    this.subscribeInk = (listener: (value: unknown) => void) => {
+      this.inkListeners.add(listener);
+      return () => this.inkListeners.delete(listener);
+    };
+  }
+
   async connect(): Promise<void> {
     this.ready = true;
+  }
+
+  emitInk(value: unknown): void {
+    for (const listener of this.inkListeners) listener(value);
   }
 
   send(envelope: StudioLiveEnvelope): boolean {
@@ -261,8 +290,8 @@ async function flushPromises(): Promise<void> {
 
 function harness(
   overrides: Partial<StudioPurposeRoutedLiveTransportFactoryOptions> = {},
+  primary = new FakePrimaryTransport(),
 ) {
-  const primary = new FakePrimaryTransport();
   const coordinator = new FakeCoordinator();
   let id = 0;
   const factory = createStudioPurposeRoutedLiveTransportFactory({
@@ -756,5 +785,66 @@ describe("Studio purpose-routed live transport", () => {
     );
     expect(routed).not.toBe(primaryFactory);
     expect(routed(CONTEXT).mode).toBe("server");
+  });
+
+  it("keeps the binary ink lane on the primary authority route", async () => {
+    const { primary, coordinator, transport } = harness();
+    await transport.connect();
+    coordinator.setReady("presence");
+    coordinator.setReady("comments");
+    coordinator.setReady("screen-signaling");
+
+    expect(transport.binaryLaneCapabilities).toContain(STUDIO_LIVE_INK_CAPABILITY);
+    const wire = createStudioLiveInkWireMessage({
+      workId: CONTEXT.workId,
+      senderSessionId: LOCAL.sessionId,
+      sentAt: NOW,
+      message: {
+        kind: "ink:chunk",
+        strokeId: "stroke-1",
+        chunkSequence: 1,
+        firstSampleIndex: 0,
+        sampleCount: 2,
+        payload: encodeStudioLiveInkSamples([
+          { x: 1, y: 2, pressure: 0.5 },
+          { x: 3, y: 4, pressure: 0.75 },
+        ]),
+      },
+    });
+    expect(transport.sendInk?.(wire)).toBe(true);
+    await flushPromises();
+
+    // Binary frames never widen the provider workloads — the coordinator saw nothing.
+    expect(primary.sentInk).toEqual([wire]);
+    expect(coordinator.published).toEqual([]);
+
+    const receivedInk: unknown[] = [];
+    transport.subscribeInk?.((value) => receivedInk.push(value));
+    const inbound = { wire: "studio-live-ink", senderSessionId: REMOTE.sessionId };
+    primary.emitInk(inbound);
+    expect(receivedInk).toEqual([inbound]);
+  });
+
+  it("refuses ink sends while the route is not ready", async () => {
+    const { primary, transport } = harness();
+    const wire = createStudioLiveInkWireMessage({
+      workId: CONTEXT.workId,
+      senderSessionId: LOCAL.sessionId,
+      sentAt: NOW,
+      message: { kind: "ink:cancel", strokeId: "stroke-1", reason: "user" },
+    });
+
+    expect(transport.sendInk?.(wire)).toBe(false);
+    expect(primary.sentInk).toEqual([]);
+  });
+
+  it("fails closed when the authority transport negotiated no ink lane", async () => {
+    const { transport } = harness({}, new FakePrimaryTransport(false));
+    await transport.connect();
+
+    // The lane surface is masked outright so publishers cannot even attempt binary traffic.
+    expect(transport.binaryLaneCapabilities).toBeUndefined();
+    expect(transport.sendInk).toBeUndefined();
+    expect(transport.subscribeInk).toBeUndefined();
   });
 });

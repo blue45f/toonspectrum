@@ -11,10 +11,22 @@ import {
   type StudioLivePayloadMap,
 } from "./studio-live-collaboration-protocol";
 import {
+  encodeStudioLiveInkSamples,
+  hashStudioLiveInkPayloads,
+} from "./studio-live-ink-codec";
+import {
+  createStudioLiveInkWireMessage,
+  STUDIO_LIVE_INK_CAPABILITY,
+  STUDIO_LIVE_INK_PROTOCOL_VERSION,
+  STUDIO_LIVE_INK_SAMPLE_SCHEMA,
+  type StudioLiveInkWireMessage,
+} from "./studio-live-ink-protocol";
+import {
   applyStudioLiveP2pOverlay,
   isStudioLiveP2pEphemeralKind,
   isStudioLiveP2pMeshShareId,
   STUDIO_LIVE_P2P_CHANNEL_LABEL,
+  STUDIO_LIVE_P2P_INK_INBOUND_MAX_PACKETS,
   STUDIO_LIVE_P2P_MESH_SHARE_ID,
   STUDIO_LIVE_P2P_PREVIEW_MAX_BUFFERED_BYTES,
   type StudioLiveP2pRtcDataChannel,
@@ -109,10 +121,11 @@ class MemoryDataChannel implements StudioLiveP2pRtcDataChannel {
   readonly label: string;
   readyState = "connecting";
   bufferedAmount = 0;
+  binaryType?: string;
   peer: MemoryDataChannel | null = null;
   onopen: ((event: Event) => void) | null = null;
   onclose: ((event: Event) => void) | null = null;
-  onmessage: ((event: MessageEvent<string>) => void) | null = null;
+  onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
 
   constructor(
     label: string,
@@ -121,12 +134,13 @@ class MemoryDataChannel implements StudioLiveP2pRtcDataChannel {
     this.label = label;
   }
 
-  send(data: string): void {
+  send(data: string | ArrayBuffer): void {
     if (this.readyState !== "open" || this.peer?.readyState !== "open") {
       throw new Error("data channel is not open");
     }
     this.beforeSend();
-    this.peer.onmessage?.({ data } as MessageEvent<string>);
+    const delivered = data instanceof ArrayBuffer ? data.slice(0) : data;
+    this.peer.onmessage?.({ data: delivered } as MessageEvent<unknown>);
   }
 
   close(): void {
@@ -303,11 +317,20 @@ class SignalingBus {
       primary.emit(envelope);
     }
   }
+
+  deliverInk(fromSessionId: string, wire: StudioLiveInkWireMessage): void {
+    for (const [sessionId, primary] of this.primaries) {
+      if (sessionId === fromSessionId) continue;
+      primary.emitInk(wire);
+    }
+  }
 }
 
 class FakePrimaryTransport implements StudioLiveTransport {
   readonly mode = "server" as const;
   readonly sent: StudioLiveEnvelope[] = [];
+  readonly sentInk: StudioLiveInkWireMessage[] = [];
+  binaryLaneCapabilities: readonly string[] = [STUDIO_LIVE_INK_CAPABILITY];
   readonly acquireLock = vi.fn(async () => ({
     status: "timeout" as const,
     resource: "page:1",
@@ -332,6 +355,7 @@ class FakePrimaryTransport implements StudioLiveTransport {
     (event: StudioLiveTransportControlEvent) => void
   >();
   private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
+  private readonly inkListeners = new Set<(value: unknown) => void>();
   ready = false;
   closed = false;
 
@@ -352,8 +376,24 @@ class FakePrimaryTransport implements StudioLiveTransport {
     return true;
   }
 
+  sendInk(message: StudioLiveInkWireMessage): boolean {
+    if (!this.ready || this.closed) return false;
+    this.sentInk.push(message);
+    this.bus.deliverInk(this.sessionId, message);
+    return true;
+  }
+
+  subscribeInk(listener: (value: unknown) => void): () => void {
+    this.inkListeners.add(listener);
+    return () => this.inkListeners.delete(listener);
+  }
+
   emit(value: unknown): void {
     for (const listener of this.listeners) listener(value);
+  }
+
+  emitInk(value: unknown): void {
+    for (const listener of this.inkListeners) listener(value);
   }
 
   subscribe(listener: (value: unknown) => void): () => void {
@@ -378,7 +418,10 @@ class FakePrimaryTransport implements StudioLiveTransport {
   }
 }
 
-async function connectedMesh(): Promise<{
+async function connectedMesh(options: {
+  localBinaryLanes?: readonly string[];
+  remoteBinaryLanes?: readonly string[];
+} = {}): Promise<{
   hub: MemoryRtcHub;
   localPrimary: FakePrimaryTransport;
   remotePrimary: FakePrimaryTransport;
@@ -390,6 +433,8 @@ async function connectedMesh(): Promise<{
   const bus = new SignalingBus();
   const localPrimary = bus.create(LOCAL);
   const remotePrimary = bus.create(REMOTE);
+  if (options.localBinaryLanes) localPrimary.binaryLaneCapabilities = options.localBinaryLanes;
+  if (options.remoteBinaryLanes) remotePrimary.binaryLaneCapabilities = options.remoteBinaryLanes;
   const local = applyStudioLiveP2pOverlay(() => localPrimary, {
     createPeerConnection: () => hub.create(),
     now: () => NOW,
@@ -944,5 +989,214 @@ describe("Studio live P2P overlay", () => {
     });
     expect(local.send(claim)).toBe(true);
     expect(localPrimary.sent.some((item) => item.kind === "lock:claim")).toBe(true);
+  });
+});
+
+function inkPayload(count: number, base = 0): ArrayBuffer {
+  return encodeStudioLiveInkSamples(
+    Array.from({ length: count }, (_, index) => ({
+      x: base + index,
+      y: base + index * 2,
+      pressure: 0.5,
+    })),
+  );
+}
+
+function inkBeginWire(
+  sender: StudioLiveParticipant,
+  strokeId = "stroke-1",
+): StudioLiveInkWireMessage {
+  return createStudioLiveInkWireMessage({
+    workId: "work-p2p",
+    senderSessionId: sender.sessionId,
+    sentAt: NOW,
+    message: {
+      kind: "ink:begin",
+      protocolVersion: STUDIO_LIVE_INK_PROTOCOL_VERSION,
+      strokeId,
+      pageId: "page-1",
+      layerId: "layer-1",
+      coordinateSpaceId: "space-1",
+      coordinateSpaceRevision: 0,
+      provider: {
+        providerId: "vello-hybrid",
+        providerVersion: "1.4.0",
+        buildHash: "9f2c11ab",
+      },
+      brushPresetId: "brush-gpen",
+      brushContractHash: "c0ffee42",
+      seed: 7,
+      mode: "pen",
+      blendMode: "normal",
+      color: "#112233",
+      width: 8,
+      opacity: 1,
+      sampleSchema: STUDIO_LIVE_INK_SAMPLE_SCHEMA,
+      startedAt: NOW,
+    },
+  });
+}
+
+function inkChunkWire(
+  sender: StudioLiveParticipant,
+  strokeId: string,
+  chunkSequence: number,
+  firstSampleIndex: number,
+  sampleCount = 2,
+): StudioLiveInkWireMessage {
+  return createStudioLiveInkWireMessage({
+    workId: "work-p2p",
+    senderSessionId: sender.sessionId,
+    sentAt: NOW,
+    message: {
+      kind: "ink:chunk",
+      strokeId,
+      chunkSequence,
+      firstSampleIndex,
+      sampleCount,
+      payload: inkPayload(sampleCount, firstSampleIndex),
+    },
+  });
+}
+
+function inkPredictionWire(
+  sender: StudioLiveParticipant,
+  strokeId: string,
+  predictionSequence: number,
+): StudioLiveInkWireMessage {
+  return createStudioLiveInkWireMessage({
+    workId: "work-p2p",
+    senderSessionId: sender.sessionId,
+    sentAt: NOW,
+    message: {
+      kind: "ink:prediction",
+      strokeId,
+      predictionSequence,
+      replacesFromSampleIndex: 0,
+      expiresAt: NOW + 500,
+      sampleCount: 2,
+      payload: inkPayload(2),
+    },
+  });
+}
+
+function inkEndWire(
+  sender: StudioLiveParticipant,
+  strokeId: string,
+  lastChunkSequence: number,
+  totalActualSamples: number,
+): StudioLiveInkWireMessage {
+  return createStudioLiveInkWireMessage({
+    workId: "work-p2p",
+    senderSessionId: sender.sessionId,
+    sentAt: NOW,
+    message: {
+      kind: "ink:end",
+      strokeId,
+      lastChunkSequence,
+      totalActualSamples,
+      sampleHash: hashStudioLiveInkPayloads([inkPayload(totalActualSamples)]),
+      crdtStrokeId: `crdt-${strokeId}`,
+    },
+  });
+}
+
+function collectInk(transport: StudioLiveTransport): unknown[] {
+  const received: unknown[] = [];
+  transport.subscribeInk?.((value) => received.push(value));
+  return received;
+}
+
+function inkKind(value: unknown): unknown {
+  return ((value as { message?: { kind?: unknown } }).message ?? {}).kind;
+}
+
+describe("Studio live P2P overlay binary ink lane (V18)", () => {
+  it("advertises exactly the primary's negotiated lanes and fails closed without them", async () => {
+    const { localPrimary, local } = await connectedMesh();
+    expect(local.binaryLaneCapabilities).toContain(STUDIO_LIVE_INK_CAPABILITY);
+
+    localPrimary.binaryLaneCapabilities = [];
+    expect(local.binaryLaneCapabilities).toEqual([]);
+    expect(local.sendInk?.(inkChunkWire(LOCAL, "stroke-closed", 1, 0))).toBe(false);
+    expect(localPrimary.sentInk).toEqual([]);
+  });
+
+  it("keeps every actual frame on the reliable primary lane even with an open mesh", async () => {
+    const { localPrimary, local, remote } = await connectedMesh();
+    const receivedInk = collectInk(remote);
+    const begin = inkBeginWire(LOCAL);
+    const chunk = inkChunkWire(LOCAL, "stroke-1", 1, 0);
+    const end = inkEndWire(LOCAL, "stroke-1", 1, 2);
+
+    expect(local.sendInk?.(begin)).toBe(true);
+    expect(local.sendInk?.(chunk)).toBe(true);
+    expect(local.sendInk?.(end)).toBe(true);
+
+    // The reliable authority path carried all three actual frames…
+    expect(localPrimary.sentInk).toEqual([begin, chunk, end]);
+    // …and the remote saw each exactly once (no lossy mesh duplication of actuals).
+    expect(receivedInk).toEqual([begin, chunk, end]);
+  });
+
+  it("hops droppable predictions over the mesh to peers that announced ink-v2", async () => {
+    const { localPrimary, local, remote } = await connectedMesh();
+    const receivedInk = collectInk(remote);
+    const begin = inkBeginWire(LOCAL);
+    const prediction = inkPredictionWire(LOCAL, "stroke-1", 1);
+
+    expect(local.sendInk?.(begin)).toBe(true);
+    expect(local.sendInk?.(prediction)).toBe(true);
+
+    // The prediction never touched the primary relay.
+    expect(localPrimary.sentInk.map((wire) => wire.message.kind)).toEqual(["ink:begin"]);
+    expect(receivedInk.map(inkKind)).toEqual(["ink:begin", "ink:prediction"]);
+    const meshPrediction = receivedInk[1] as {
+      senderSessionId: string;
+      message: { payload: ArrayBuffer };
+    };
+    expect(meshPrediction.senderSessionId).toBe(LOCAL.sessionId);
+    // The binary sample block round-trips byte-exact through the {header JSON, payload} frame.
+    expect([...new Uint8Array(meshPrediction.message.payload)]).toEqual([
+      ...new Uint8Array((prediction.message as { payload: ArrayBuffer }).payload),
+    ]);
+  });
+
+  it("falls back predictions to the reliable lane when a peer never announced ink-v2", async () => {
+    const { localPrimary, local } = await connectedMesh({ remoteBinaryLanes: [] });
+    const begin = inkBeginWire(LOCAL);
+    const prediction = inkPredictionWire(LOCAL, "stroke-1", 1);
+
+    expect(local.sendInk?.(begin)).toBe(true);
+    expect(local.sendInk?.(prediction)).toBe(true);
+    expect(localPrimary.sentInk.map((wire) => wire.message.kind)).toEqual([
+      "ink:begin",
+      "ink:prediction",
+    ]);
+  });
+
+  it("drops mesh frames that spoof another session's identity", async () => {
+    const { local, remote, remotePrimary } = await connectedMesh();
+    const receivedInk = collectInk(local);
+    const spoofed = inkPredictionWire(THIRD, "stroke-spoof", 1);
+
+    // The frame rides the mesh (remote knows local's lanes), so the per-link identity gate runs.
+    expect(remote.sendInk?.(spoofed)).toBe(true);
+    expect(remotePrimary.sentInk).toEqual([]);
+    expect(receivedInk).toEqual([]);
+  });
+
+  it("enforces the per-peer inbound packet budget on the mesh lane", async () => {
+    const { local, remote } = await connectedMesh();
+    const receivedInk = collectInk(local);
+
+    for (
+      let sequence = 1;
+      sequence <= STUDIO_LIVE_P2P_INK_INBOUND_MAX_PACKETS + 20;
+      sequence += 1
+    ) {
+      expect(remote.sendInk?.(inkPredictionWire(REMOTE, "stroke-budget", sequence))).toBe(true);
+    }
+    expect(receivedInk).toHaveLength(STUDIO_LIVE_P2P_INK_INBOUND_MAX_PACKETS);
   });
 });

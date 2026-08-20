@@ -29,7 +29,20 @@ import {
 } from "./studio-live-collaboration-protocol";
 import { StudioLiveRoom, type StudioLiveRoomEvent } from "./studio-live-collaboration-room";
 import {
+  decodeStudioLiveInkSamples,
+  encodeStudioLiveInkSamples,
+} from "./studio-live-ink-codec";
+import {
+  createStudioLiveInkWireMessage,
+  STUDIO_LIVE_INK_CAPABILITY,
+  type StudioLiveInkWireMessage,
+} from "./studio-live-ink-protocol";
+import {
   STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT,
+  STUDIO_LIVE_INK_SOCKET_EVENT,
+  STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_BYTES,
+  STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_PACKETS,
+  STUDIO_LIVE_INK_SOCKET_INBOUND_WINDOW_MS,
   STUDIO_LIVE_SOCKET_RETRY_POLICY,
   StudioLiveSocketTransport,
   createStudioServerLiveTransportFactory,
@@ -5763,6 +5776,187 @@ describe("StudioLiveSocketTransport", () => {
     });
     expect(received[0]?.sender.sessionId).toBe(remote.connectionId);
     expect(received[0]?.targetSessionId).toBeNull();
+    transport.close();
+  });
+});
+
+describe("StudioLiveSocketTransport binary ink lane (V18)", () => {
+  function binaryInkTransport(clock?: { value: number }) {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = binaryJoinSuccess();
+    socket.ackResponses.set(
+      STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+      binarySelectionSuccess()
+    );
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => (clock ? clock.value : NOW),
+    });
+    return { socket, transport };
+  }
+
+  function inkChunkWire(
+    senderSessionId: string,
+    workId = "work-1"
+  ): StudioLiveInkWireMessage {
+    return createStudioLiveInkWireMessage({
+      workId,
+      senderSessionId,
+      sentAt: NOW,
+      message: {
+        kind: "ink:chunk",
+        strokeId: "stroke-1",
+        chunkSequence: 1,
+        firstSampleIndex: 0,
+        sampleCount: 2,
+        payload: encodeStudioLiveInkSamples([
+          { x: 1, y: 2, pressure: 0.5 },
+          { x: 3, y: 4, pressure: 0.75 },
+        ]),
+      },
+    });
+  }
+
+  it("advertises ink-v2 only once the binary wire selection is correlated", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = binaryJoinSuccess();
+    socket.holdEvents.add(STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT);
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+
+    const connecting = transport.connect();
+    // Joined but not yet binary-selected: the lane must not exist and sends fail closed.
+    expect(transport.binaryLaneCapabilities).toEqual([]);
+    expect(transport.sendInk(inkChunkWire(localParticipant.sessionId))).toBe(false);
+    expect(
+      socket.emitted.some((record) => record.event === STUDIO_LIVE_INK_SOCKET_EVENT)
+    ).toBe(false);
+
+    socket.reply(STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT, binarySelectionSuccess());
+    await connecting;
+    expect(transport.binaryLaneCapabilities).toContain(STUDIO_LIVE_INK_CAPABILITY);
+
+    transport.close();
+    expect(transport.binaryLaneCapabilities).toEqual([]);
+  });
+
+  it("fails closed on a legacy-wire connection in both directions", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+    expect(transport.ready).toBe(true);
+    expect(transport.binaryLaneCapabilities).toEqual([]);
+    const inkReceived: unknown[] = [];
+    transport.subscribeInk((value) => inkReceived.push(value));
+
+    expect(transport.sendInk(inkChunkWire(localParticipant.sessionId))).toBe(false);
+    expect(
+      socket.emitted.some((record) => record.event === STUDIO_LIVE_INK_SOCKET_EVENT)
+    ).toBe(false);
+    // A server-relayed frame is dropped — never re-routed to the JSON envelope listeners.
+    socket.serverEmit(STUDIO_LIVE_INK_SOCKET_EVENT, inkChunkWire(remote.clientInstanceId));
+    expect(inkReceived).toEqual([]);
+    transport.close();
+  });
+
+  it("round-trips {header JSON, payload ArrayBuffer} frames on the ink event only", async () => {
+    const { socket, transport } = binaryInkTransport();
+    await transport.connect();
+    const envelopes: unknown[] = [];
+    const inkReceived: unknown[] = [];
+    transport.subscribe((value) => envelopes.push(value));
+    transport.subscribeInk((value) => inkReceived.push(value));
+
+    const outbound = inkChunkWire(localParticipant.sessionId);
+    expect(transport.sendInk(outbound)).toBe(true);
+    const emitted = socket.emitted.filter(
+      (record) => record.event === STUDIO_LIVE_INK_SOCKET_EVENT
+    );
+    expect(emitted).toHaveLength(1);
+    // The frame rides the socket untouched: header JSON plus the native ArrayBuffer payload.
+    expect(emitted[0]!.payload).toBe(outbound);
+    const sentMessage = (emitted[0]!.payload as StudioLiveInkWireMessage).message;
+    expect(sentMessage.kind).toBe("ink:chunk");
+    expect(
+      sentMessage.kind === "ink:chunk" && sentMessage.payload instanceof ArrayBuffer
+    ).toBe(true);
+
+    // Cross-work frames are refused before touching the socket.
+    expect(transport.sendInk(inkChunkWire(localParticipant.sessionId, "work-2"))).toBe(false);
+
+    const inbound = inkChunkWire(remote.clientInstanceId);
+    socket.serverEmit(STUDIO_LIVE_INK_SOCKET_EVENT, inbound);
+    expect(inkReceived).toEqual([inbound]);
+    const received = inkReceived[0] as StudioLiveInkWireMessage;
+    if (received.message.kind !== "ink:chunk") throw new Error("chunk expected");
+    const decoded = decodeStudioLiveInkSamples(received.message.payload);
+    expect(decoded.samples).toHaveLength(2);
+    expect(decoded.samples[0]).toMatchObject({ x: 1, y: 2 });
+    // Ink never leaks into the JSON envelope surface.
+    expect(envelopes).toEqual([]);
+    transport.close();
+  });
+
+  it("enforces per-sender inbound packet and byte windows", async () => {
+    const clock = { value: NOW };
+    const { socket, transport } = binaryInkTransport(clock);
+    await transport.connect();
+    const inkReceived: unknown[] = [];
+    transport.subscribeInk((value) => inkReceived.push(value));
+
+    const cancelFrame = (senderSessionId: string) => ({
+      wire: "studio-live-ink",
+      wireVersion: 1,
+      workId: "work-1",
+      senderSessionId,
+      sentAt: clock.value,
+      message: { kind: "ink:cancel", strokeId: "stroke-1", reason: "user" },
+    });
+    for (
+      let index = 0;
+      index < STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_PACKETS + 25;
+      index += 1
+    ) {
+      socket.serverEmit(STUDIO_LIVE_INK_SOCKET_EVENT, cancelFrame("flooding-sender"));
+    }
+    expect(inkReceived).toHaveLength(STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_PACKETS);
+
+    // The budget is per sender: an independent peer still has its own window.
+    socket.serverEmit(STUDIO_LIVE_INK_SOCKET_EVENT, cancelFrame("polite-sender"));
+    expect(inkReceived).toHaveLength(STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_PACKETS + 1);
+
+    // The flooding sender recovers after its window elapses.
+    clock.value += STUDIO_LIVE_INK_SOCKET_INBOUND_WINDOW_MS;
+    socket.serverEmit(STUDIO_LIVE_INK_SOCKET_EVENT, cancelFrame("flooding-sender"));
+    expect(inkReceived).toHaveLength(STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_PACKETS + 2);
+
+    // Byte window: the second 3MB payload in one window busts the 4MB per-sender budget.
+    const bulkFrame = (payloadBytes: number) => ({
+      ...cancelFrame("bulky-sender"),
+      message: {
+        kind: "ink:chunk",
+        strokeId: "stroke-1",
+        chunkSequence: 1,
+        firstSampleIndex: 0,
+        sampleCount: 1,
+        payload: new ArrayBuffer(payloadBytes),
+      },
+    });
+    socket.serverEmit(STUDIO_LIVE_INK_SOCKET_EVENT, bulkFrame(3 * 1024 * 1024));
+    socket.serverEmit(STUDIO_LIVE_INK_SOCKET_EVENT, bulkFrame(3 * 1024 * 1024));
+    expect(inkReceived).toHaveLength(STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_PACKETS + 3);
+
+    // A single frame above the byte budget is refused outright.
+    socket.serverEmit(STUDIO_LIVE_INK_SOCKET_EVENT, {
+      ...cancelFrame("oversized-sender"),
+      message: bulkFrame(STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_BYTES + 1).message,
+    });
+    expect(inkReceived).toHaveLength(STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_PACKETS + 3);
     transport.close();
   });
 });
