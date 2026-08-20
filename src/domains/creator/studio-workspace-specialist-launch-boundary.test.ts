@@ -27,9 +27,13 @@ describe("V5 specialist workspace product launch boundary", () => {
   });
 
   it("launches production vector, animation, and pose surfaces from the workspace apply path", () => {
+    // Intentional change (B-08 extraction): the persistence cluster (and its
+    // applyStudioWorkspaceLayoutFromEffect wrapper) moved to
+    // studio-page-workspace-persistence.ts, so the apply block in StudioPage now
+    // ends at the extracted hook's call site.
     const apply = sourceBetween(
       "function applyStudioWorkspaceLayout(",
-      "const applyStudioWorkspaceLayoutFromEffect",
+      "useStudioPageWorkspacePersistence(",
       "workspace apply function",
     );
     expect(apply).toContain("workspaceId?: StudioWorkspaceId");

@@ -26,6 +26,8 @@ export function readStudioCuttoonEditorSource(): string {
     resolve(baseDir, "./studio-deferred-stroke-commit.ts"),
     resolve(baseDir, "../studio-page-shortcut-dispatcher.ts"),
     resolve(baseDir, "../studio-page-comments-runtime.ts"),
+    resolve(baseDir, "../hybrid-dcc/studio-hybrid-dcc-persistence.ts"),
+    resolve(baseDir, "../studio-page-workspace-persistence.ts"),
     resolve(baseDir, "../StudioPage.tsx"),
     resolve(baseDir, "../studio-page-vector-ops.ts"),
     resolve(baseDir, "../ai/studio-scenario-image-generation.ts"),

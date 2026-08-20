@@ -117,10 +117,13 @@ describe("Studio drawing palette workspace integration boundary", () => {
       "function applyStudioWorkspaceLayout",
       "page palette drag controller",
     );
+    // Intentional change (B-08 extraction): the SQLite/OPFS persistence cluster moved to
+    // studio-page-workspace-persistence.ts, so the apply block in StudioPage now ends at the
+    // extracted hook's call site instead of the old inline snapshot helper.
     const applyLayout = sourceBetween(
       pageSource,
       "function applyStudioWorkspaceLayout",
-      "function updateWorkspacePersistenceSnapshot",
+      "useStudioPageWorkspacePersistence(",
       "workspace apply",
     );
     const ownerSync = sourceBetween(

@@ -584,8 +584,7 @@ import {
 import {
   studioHokusaiSourceRevision,
 } from "./render/studio-hokusai-natural-media-contract";
-import { createStudioHybridDccLatestTaskQueue } from "./hybrid-dcc/studio-hybrid-dcc-latest-task-queue";
-import { resolveStudioHybridDccPersistenceAuthGate } from "./hybrid-dcc/studio-hybrid-dcc-persistence-auth-gate";
+import { useStudioHybridDccPersistence } from "./hybrid-dcc/studio-hybrid-dcc-persistence";
 import { uid } from "./studio-id";
 import {
   cascadeCanvasPlacementAnchor,
@@ -821,7 +820,6 @@ import { studioLivingInkVectorShadowElement } from "./studio-living-ink-vector-s
 import {
   isStudioLocalDatabaseOwnershipBusyError,
   STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT,
-  STUDIO_LOCAL_DATABASE_OWNERSHIP_BUSY_SESSION_HINT,
   STUDIO_WATERMARK_PREFERENCES_OWNERSHIP_BUSY_HINT,
 } from "./studio-local-database-ownership";
 import { localizeStudioText } from "./studio-localize-text";
@@ -923,11 +921,8 @@ import {
   EMPTY_STUDIO_GPU_STROKES,
   STUDIO_GPU_LIVE_OPERATION_ORDER_PREFIX,
   STUDIO_GPU_LIVE_SOURCE_JOURNAL_STYLE_KEY,
-  STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS,
   type StudioHokusaiLiveOverlaySurfaceState,
   type StudioHokusaiPinnedLiveStroke,
-  type StudioHybridDccPersistenceUiState,
-  type StudioHybridDccWorkspacePersistence,
   type StudioLiveStrokeBackendAuditSession,
   type StudioLivingInkCanonicalHandoff,
   type StudioLivingInkOverlaySurfaceState,
@@ -1022,6 +1017,11 @@ import { useStudioCompanionRuntime } from "./studio-page-companion-runtime";
 import { useStudioMenuAssetLoader } from "./studio-page-menu-asset-loaders";
 import { buildStudioShortcutHandler } from "./studio-page-shortcut-dispatcher";
 import { createStudioPageVectorOps } from "./studio-page-vector-ops";
+import {
+  useStudioPageWorkspacePersistence,
+  useStudioUiBooleanPreferenceHydration,
+  useStudioWorkspacePanelOpenOverrides,
+} from "./studio-page-workspace-persistence";
 import {
   appendPageState,
   applyBackgroundToAllPages,
@@ -1484,7 +1484,6 @@ import {
   captureStudioWorkspaceDeviceLayout,
   createStudioWorkspaceDefaultState,
   normalizeStudioCommandBarPreferences,
-  normalizeStudioWorkspaceStateForOwner,
   normalizeStudioWorkspaceLayout,
   resolveStudioWorkspaceControlSide,
   resolveStudioWorkspaceDeviceKind,
@@ -1498,8 +1497,6 @@ import {
   type StudioWorkspaceId,
   type StudioWorkspaceLayout,
   type StudioWorkspaceLoadResult,
-  type StudioWorkspaceSaveResult,
-  type StudioWorkspaceState,
 } from "./studio-workspaces";
 import {
   createEmptyStudioWriterRoomDocument,
@@ -1570,7 +1567,6 @@ import type {
   StudioFilterKind,
   StudioFilterPreview,
 } from "./filter/studio-filter-menu";
-import type { StudioHybridDccWorkspace } from "./hybrid-dcc/studio-hybrid-dcc-workspace";
 import type {
   StudioLayerLiftCorrectionStroke,
 } from "./layer/studio-layer-lift-correction";
@@ -1710,7 +1706,6 @@ import type { StudioWillV1PageExportResult } from "./export/studio-will-v1-expor
 import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
 import type {
   StudioWorkspacePersistenceRuntime,
-  StudioWorkspaceRuntimeSaveResult,
 } from "./studio-workspace-sqlite-runtime";
 import type {
   StudioAssetShareOptions,
@@ -3953,334 +3948,22 @@ function StudioCuttoonEditor({
       surface,
     });
   }, [creativeModesOpen]);
-  const hybridDccDraftPersistenceIdentityRef = useRef<{
-    readonly ownerId: string;
-    readonly workScope: string;
-  } | null>(null);
-  if (studioAuthReady
-    && !workId
-    && !liveRoomQueryParam
-    && !hybridDccDraftPersistenceIdentityRef.current) {
-    hybridDccDraftPersistenceIdentityRef.current = {
-      ownerId: studioAuthUserId ?? "guest",
-      workScope: `draft:${autosaveKey}`,
-    };
-  }
-  const hybridDccPersistenceOwnerId = workId || liveRoomQueryParam
-    ? studioAuthUserId ?? "guest"
-    : hybridDccDraftPersistenceIdentityRef.current?.ownerId ?? "auth-pending";
-  const hybridDccPersistenceWorkScope = workId
-    ? `work:${workId}`
-    : liveRoomQueryParam
-      ? `room:${liveRoomQueryParam}`
-      : hybridDccDraftPersistenceIdentityRef.current?.workScope ?? "draft:auth-pending";
-  const hybridDccWorkspaceScope =
-    `${hybridDccPersistenceOwnerId}\u0000${hybridDccPersistenceWorkScope}`;
-  const hybridDccWorkspaceDocumentId = `hybrid-dcc-${hybridDccPersistenceWorkScope
-    .replace(/[^A-Za-z0-9._~-]/gu, "-")
-    .slice(0, 96)}`;
-  const [hybridDccWorkspaceState, setHybridDccWorkspaceState] = useState<{
-    readonly scope: string;
-    readonly workspace: StudioHybridDccWorkspace;
-  } | null>(null);
-  const hybridDccPersistenceRef =
-    useRef<Promise<StudioHybridDccWorkspacePersistence | null> | null>(null);
-  const hybridDccPersistenceTimerRef = useRef<number | null>(null);
-  const hybridDccPersistenceScopeGenerationRef = useRef(0);
-  const hybridDccPersistenceGenerationRef = useRef(0);
-  const hybridDccPersistenceSaveQueueRef = useRef(createStudioHybridDccLatestTaskQueue());
-  const hybridDccLatestWorkspaceRef = useRef<{
-    readonly scope: string;
-    readonly workspace: StudioHybridDccWorkspace;
-  } | null>(null);
-  const hybridDccAuthFallbackScopeRef = useRef<string | null>(null);
-  const hybridDccPreviousWorkspaceScopeRef = useRef(hybridDccWorkspaceScope);
-  const hybridDccScopeTransferRef = useRef<{
-    readonly fromScope: string;
-    readonly toScope: string;
-    readonly workspace: StudioHybridDccWorkspace;
-  } | null>(null);
-  const previousHybridDccWorkspaceScope = hybridDccPreviousWorkspaceScopeRef.current;
-  if (previousHybridDccWorkspaceScope !== hybridDccWorkspaceScope) {
-    if (hybridDccAuthFallbackScopeRef.current === previousHybridDccWorkspaceScope) {
-      const pendingWorkspace = hybridDccLatestWorkspaceRef.current?.scope
-        === previousHybridDccWorkspaceScope
-        ? hybridDccLatestWorkspaceRef.current.workspace
-        : hybridDccWorkspaceState?.scope === previousHybridDccWorkspaceScope
-          ? hybridDccWorkspaceState.workspace
-          : null;
-      if (pendingWorkspace) {
-        hybridDccScopeTransferRef.current = {
-          fromScope: previousHybridDccWorkspaceScope,
-          toScope: hybridDccWorkspaceScope,
-          workspace: pendingWorkspace,
-        };
-        // Re-key the live in-memory authority synchronously so an auth response arriving while the
-        // artist edits cannot make the remounted dialog flash or emit a blank replacement.
-        hybridDccLatestWorkspaceRef.current = {
-          scope: hybridDccWorkspaceScope,
-          workspace: pendingWorkspace,
-        };
-      }
-    }
-    hybridDccPreviousWorkspaceScopeRef.current = hybridDccWorkspaceScope;
-  }
-  const [hybridDccPersistenceUiState, setHybridDccPersistenceUiState] =
-    useState<StudioHybridDccPersistenceUiState>(() => ({
-      scope: hybridDccWorkspaceScope,
-      status: resolveStudioHybridDccPersistenceAuthGate(studioAuthReady).status,
-    }));
-  const hybridDccPersistenceStatus =
-    hybridDccPersistenceUiState.scope === hybridDccWorkspaceScope
-      ? hybridDccPersistenceUiState.status
-      : "checking";
-  const hybridDccPersistenceCurrentScopeRef = useRef(hybridDccWorkspaceScope);
-  hybridDccPersistenceCurrentScopeRef.current = hybridDccWorkspaceScope;
-  const hybridDccPersistenceEnabled = hybridDccOpen;
-
-  useEffect(() => {
-    let cancelled = false;
-    let recoveryTimedOut = false;
-    const scopeGeneration = ++hybridDccPersistenceScopeGenerationRef.current;
-    const authGate = resolveStudioHybridDccPersistenceAuthGate(studioAuthReady);
-    setHybridDccPersistenceUiState({
-      scope: hybridDccWorkspaceScope,
-      status: authGate.status,
-    });
-    if (!hybridDccPersistenceEnabled) {
-      hybridDccPersistenceRef.current = null;
-      return () => {
-        cancelled = true;
-      };
-    }
-    if (!authGate.shouldAttemptRecovery) {
-      hybridDccPersistenceRef.current = null;
-      // Session-only editing is available immediately, so transfer eligibility must become
-      // authoritative in the same effect. Delaying this marker allowed an auth response to cancel
-      // the old timeout and remount the DCC before its in-memory workspace moved to the new scope.
-      // Without an authored pending workspace the render-time handoff remains empty, so an older
-      // durable recovery can still load without being overwritten.
-      hybridDccAuthFallbackScopeRef.current = hybridDccWorkspaceScope;
-      return () => {
-        cancelled = true;
-      };
-    }
-    const persistenceSaveQueue = hybridDccPersistenceSaveQueueRef.current;
-    const recoveryTimeoutId = window.setTimeout(() => {
-      if (cancelled || scopeGeneration !== hybridDccPersistenceScopeGenerationRef.current) return;
-      recoveryTimedOut = true;
-      hybridDccPersistenceRef.current = null;
-      setHybridDccPersistenceUiState({
-        scope: hybridDccWorkspaceScope,
-        status: "error",
-      });
-    }, STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS);
-    const persistencePromise = Promise.all([
-      import("./studio-opfs-filesystem"),
-      import("./hybrid-dcc/studio-hybrid-dcc-workspace-persistence"),
-    ]).then(async ([{ selectStudioOpfsFileSystem }, {
-      createStudioHybridDccWorkspacePersistenceFromFileSystem,
-    }]) => {
-      const lockManager = typeof navigator === "undefined" ? null : navigator.locks ?? null;
-      if (!lockManager || typeof lockManager.request !== "function") {
-        if (!cancelled) setHybridDccPersistenceUiState({
-          scope: hybridDccWorkspaceScope,
-          status: "session-only",
-        });
-        return null;
-      }
-      const selection = await selectStudioOpfsFileSystem(globalThis, {
-        rootName: "toonspectrum-hybrid-dcc-v1",
-      });
-      if (recoveryTimedOut) return null;
-      if (selection.kind !== "opfs") {
-        if (!cancelled) setHybridDccPersistenceUiState({
-          scope: hybridDccWorkspaceScope,
-          status: "session-only",
-        });
-        return null;
-      }
-      const storage = typeof navigator === "undefined" ? null : navigator.storage;
-      const persistence = createStudioHybridDccWorkspacePersistenceFromFileSystem({
-        fileSystem: selection.fs,
-        lockManager,
-        quotaEstimator: storage && typeof storage.estimate === "function"
-          ? { estimate: () => storage.estimate() }
-          : null,
-        scope: {
-          userId: hybridDccPersistenceOwnerId,
-          workId: hybridDccPersistenceWorkScope,
-        },
-        ownerId: `hybrid-dcc-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
-      });
-      const loaded = await persistence.load();
-      if (recoveryTimedOut) return null;
-      if (cancelled || scopeGeneration !== hybridDccPersistenceScopeGenerationRef.current) {
-        return persistence;
-      }
-      const scopeTransfer = hybridDccScopeTransferRef.current?.toScope
-        === hybridDccWorkspaceScope
-        ? hybridDccScopeTransferRef.current
-        : null;
-      if (scopeTransfer) {
-        const pendingWorkspace = hybridDccLatestWorkspaceRef.current?.scope
-          === hybridDccWorkspaceScope
-          ? hybridDccLatestWorkspaceRef.current.workspace
-          : scopeTransfer.workspace;
-        setHybridDccWorkspaceState({
-          scope: hybridDccWorkspaceScope,
-          workspace: pendingWorkspace,
-        });
-        // `load()` has already admitted any prior durable authority. Saving the uninterrupted
-        // session-only edit now creates a newer checkpoint, so neither side of the auth transition
-        // is silently discarded.
-        await persistence.save(pendingWorkspace);
-        if (hybridDccScopeTransferRef.current === scopeTransfer) {
-          hybridDccScopeTransferRef.current = null;
-        }
-        if (hybridDccAuthFallbackScopeRef.current === scopeTransfer.fromScope) {
-          hybridDccAuthFallbackScopeRef.current = null;
-        }
-        setHybridDccPersistenceUiState({
-          scope: hybridDccWorkspaceScope,
-          status: "saved",
-        });
-        return persistence;
-      }
-      if (loaded.status === "restored") {
-        setHybridDccWorkspaceState((current) => (
-          current?.scope === hybridDccWorkspaceScope
-            ? current
-            : {
-                scope: hybridDccWorkspaceScope,
-                workspace: loaded.workspace,
-              }
-        ));
-        setHybridDccPersistenceUiState({
-          scope: hybridDccWorkspaceScope,
-          status: "saved",
-        });
-      } else {
-        setHybridDccPersistenceUiState({
-          scope: hybridDccWorkspaceScope,
-          status: "ready",
-        });
-      }
-      return persistence;
-    }).catch((cause: unknown) => {
-      if (!cancelled && !recoveryTimedOut
-        && scopeGeneration === hybridDccPersistenceScopeGenerationRef.current) {
-        setHybridDccPersistenceUiState({
-          scope: hybridDccWorkspaceScope,
-          status: "error",
-        });
-        console.warn("Hybrid DCC workspace recovery is unavailable.", cause);
-      }
-      // A corrupt or unsupported durable record must not be overwritten by a fresh workspace.
-      return null;
-    }).finally(() => window.clearTimeout(recoveryTimeoutId));
-    hybridDccPersistenceRef.current = persistencePromise;
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(recoveryTimeoutId);
-      hybridDccPersistenceGenerationRef.current += 1;
-      const pending = hybridDccLatestWorkspaceRef.current;
-      if (hybridDccPersistenceTimerRef.current !== null) {
-        window.clearTimeout(hybridDccPersistenceTimerRef.current);
-        hybridDccPersistenceTimerRef.current = null;
-      }
-      if (pending?.scope === hybridDccWorkspaceScope) {
-        persistenceSaveQueue.enqueue(pending.scope, {
-          run: async () => {
-            const persistence = await persistencePromise;
-            if (persistence) await persistence.save(pending.workspace);
-          },
-        });
-      }
-      if (hybridDccPersistenceRef.current === persistencePromise) {
-        hybridDccPersistenceRef.current = null;
-      }
-    };
-  }, [
-    hybridDccPersistenceOwnerId,
-    hybridDccPersistenceWorkScope,
+  const {
+    flushHybridDccWorkspacePersistence,
+    hybridDccPersistenceStatus,
+    hybridDccWorkspaceDocumentId,
     hybridDccWorkspaceScope,
-    hybridDccPersistenceEnabled,
+    scheduleHybridDccWorkspacePersistence,
+    scopedHybridDccWorkspace,
+    setHybridDccWorkspaceState,
+  } = useStudioHybridDccPersistence({
+    autosaveKey,
+    hybridDccOpen,
+    liveRoomQueryParam,
     studioAuthReady,
-  ]);
-
-  const persistHybridDccWorkspace = (
-    pending: { readonly scope: string; readonly workspace: StudioHybridDccWorkspace },
-    generation: number,
-    persistencePromise: Promise<StudioHybridDccWorkspacePersistence | null>,
-  ) => {
-    hybridDccPersistenceSaveQueueRef.current.enqueue(pending.scope, {
-      run: async () => {
-        const persistence = await persistencePromise;
-        if (!persistence) return;
-        if (generation === hybridDccPersistenceGenerationRef.current
-          && pending.scope === hybridDccPersistenceCurrentScopeRef.current) {
-          setHybridDccPersistenceUiState({
-            scope: pending.scope,
-            status: "saving",
-          });
-        }
-        await persistence.save(pending.workspace);
-        if (generation === hybridDccPersistenceGenerationRef.current
-          && pending.scope === hybridDccPersistenceCurrentScopeRef.current) {
-          setHybridDccPersistenceUiState({
-            scope: pending.scope,
-            status: "saved",
-          });
-        }
-      },
-      onError: (cause: unknown) => {
-        if (generation === hybridDccPersistenceGenerationRef.current
-          && pending.scope === hybridDccPersistenceCurrentScopeRef.current) {
-          setHybridDccPersistenceUiState({
-            scope: pending.scope,
-            status: "error",
-          });
-          console.warn("Hybrid DCC workspace autosave failed.", cause);
-        }
-      },
-    });
-  };
-
-  const scheduleHybridDccWorkspacePersistence = (workspace: StudioHybridDccWorkspace) => {
-    const pending = { scope: hybridDccWorkspaceScope, workspace } as const;
-    if (hybridDccLatestWorkspaceRef.current?.scope === pending.scope
-      && hybridDccLatestWorkspaceRef.current.workspace === workspace) return;
-    hybridDccLatestWorkspaceRef.current = pending;
-    const persistencePromise = hybridDccPersistenceRef.current;
-    if (!persistencePromise || hybridDccPersistenceStatus === "session-only") return;
-    if (hybridDccPersistenceTimerRef.current !== null) {
-      window.clearTimeout(hybridDccPersistenceTimerRef.current);
-    }
-    const generation = ++hybridDccPersistenceGenerationRef.current;
-    hybridDccPersistenceTimerRef.current = window.setTimeout(() => {
-      hybridDccPersistenceTimerRef.current = null;
-      persistHybridDccWorkspace(pending, generation, persistencePromise);
-    }, 900);
-  };
-
-  const flushHybridDccWorkspacePersistence = () => {
-    const pending = hybridDccLatestWorkspaceRef.current;
-    const persistencePromise = hybridDccPersistenceRef.current;
-    if (!pending || pending.scope !== hybridDccWorkspaceScope || !persistencePromise) return;
-    if (hybridDccPersistenceTimerRef.current !== null) {
-      window.clearTimeout(hybridDccPersistenceTimerRef.current);
-      hybridDccPersistenceTimerRef.current = null;
-    }
-    const generation = ++hybridDccPersistenceGenerationRef.current;
-    persistHybridDccWorkspace(pending, generation, persistencePromise);
-  };
-  const scopedHybridDccWorkspace = hybridDccWorkspaceState?.scope === hybridDccWorkspaceScope
-    ? hybridDccWorkspaceState.workspace
-    : hybridDccScopeTransferRef.current?.toScope === hybridDccWorkspaceScope
-      ? hybridDccScopeTransferRef.current.workspace
-      : undefined;
+    studioAuthUserId,
+    workId,
+  });
   const closeHybridDccWorkspace = () => {
     flushHybridDccWorkspacePersistence();
     const returnHref = studioWorkspaceReturnHref(location.state, studioRoute);
@@ -5079,60 +4762,6 @@ function StudioCuttoonEditor({
     brushManagerReturnFocusRef.current = launcher;
     setMobileSheet("brushes");
   }
-  const setRightPanelOpenWithOverride = useCallback((
-    next: SetStateAction<boolean>,
-    options: { preserveWideRestore?: boolean } = {}
-  ) => {
-    if (typeof next === "function") {
-      setRightPanelOpen((current) => {
-        const nextValue = next(current);
-        if (!options.preserveWideRestore) {
-          canvasWidePanelRestoreRef.current = {
-            left: leftPanelOpenRef.current,
-            right: nextValue,
-          };
-        }
-        setForceRightPanelOpen(nextValue);
-        return nextValue;
-      });
-      return;
-    }
-    if (!options.preserveWideRestore) {
-      canvasWidePanelRestoreRef.current = {
-        left: leftPanelOpenRef.current,
-        right: next,
-      };
-    }
-    setForceRightPanelOpen(next);
-    setRightPanelOpen(next);
-  }, []);
-  const setLeftPanelOpenWithOverride = useCallback((
-    next: SetStateAction<boolean>,
-    options: { preserveWideRestore?: boolean } = {}
-  ) => {
-    if (typeof next === "function") {
-      setLeftPanelOpen((current) => {
-        const nextValue = next(current);
-        if (!options.preserveWideRestore) {
-          canvasWidePanelRestoreRef.current = {
-            left: nextValue,
-            right: rightPanelOpenRef.current,
-          };
-        }
-        setForceLeftPanelOpen(nextValue);
-        return nextValue;
-      });
-      return;
-    }
-    if (!options.preserveWideRestore) {
-      canvasWidePanelRestoreRef.current = {
-        left: next,
-        right: rightPanelOpenRef.current,
-      };
-    }
-    setForceLeftPanelOpen(next);
-    setLeftPanelOpen(next);
-  }, []);
   function changeInspectorLayout(next: StudioInspectorLayout) {
     setInspectorLayout(next);
     // 탭마다 독립적인 짧은 작업면처럼 느껴지도록 이전 장문 패널의 스크롤 위치를 이어받지 않는다.
@@ -5366,6 +4995,17 @@ function StudioCuttoonEditor({
   visibleRightPanelOpenRef.current = visibleRightPanelOpen;
   presentationPanelsHiddenRef.current = presentationPanelsHidden;
 
+  const { setLeftPanelOpenWithOverride, setRightPanelOpenWithOverride } =
+    useStudioWorkspacePanelOpenOverrides({
+      canvasWidePanelRestoreRef,
+      leftPanelOpenRef,
+      rightPanelOpenRef,
+      setForceLeftPanelOpen,
+      setForceRightPanelOpen,
+      setLeftPanelOpen,
+      setRightPanelOpen,
+    });
+
   const toggleCanvasWideMode = useCallback(() => {
     if (presentationPanelsHiddenRef.current) return;
     const isWorkspaceWideMode =
@@ -5442,13 +5082,6 @@ function StudioCuttoonEditor({
   workspacePersistenceRef.current = workspacePersistence;
   liveWorkspaceLayoutRef.current = liveWorkspaceLayout;
 
-  function replacePendingExternalWorkspaceSync(
-    next: PendingStudioWorkspaceSync | null
-  ) {
-    pendingExternalWorkspaceSyncRef.current = next;
-    setPendingExternalWorkspaceSync(next);
-  }
-
   function changeDrawingPaletteDragging(next: boolean) {
     drawingPaletteDraggingRef.current = next;
     setDrawingPaletteDragging(next);
@@ -5495,386 +5128,34 @@ function StudioCuttoonEditor({
     if (clearSyncNotice) setWorkspaceSyncNotice(null);
     globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
   }
-  const applyStudioWorkspaceLayoutFromEffect = useEffectEvent(
-    applyStudioWorkspaceLayout
-  );
-
-  function updateWorkspacePersistenceSnapshot(next: StudioWorkspaceLoadResult): void {
-    workspacePersistenceRef.current = next;
-    setWorkspacePersistence(next);
-  }
-
-  function runtimeFailureNotice(
-    result: Pick<StudioWorkspaceRuntimeSaveResult, "failure" | "authority">,
-  ): string | null {
-    if (result.failure === "owner-mismatch") {
-      return "계정이 바뀌어 이전 작업공간 변경을 저장하지 않았어요.";
-    }
-    if (result.failure === "ownership-busy") {
-      return STUDIO_LOCAL_DATABASE_OWNERSHIP_BUSY_SESSION_HINT;
-    }
-    if (result.authority === "memory-only" || result.failure) {
-      return "SQLite/OPFS 저장을 사용할 수 없어 작업공간 변경을 현재 세션에 유지하고 있어요.";
-    }
-    return null;
-  }
-
-  function persistStudioWorkspaceState(nextState: StudioWorkspaceState): StudioWorkspaceSaveResult {
-    const ownerScope = currentWorkspaceOwnerScope;
-    const current = workspacePersistenceRef.current;
-    const scopedState = normalizeStudioWorkspaceStateForOwner(nextState, ownerScope);
-    const guardRevision = workspaceDirtyRevisionRef.current + 1;
-    workspaceDirtyRevisionRef.current = guardRevision;
-
-    const blockedByOwner = current.ownerScope !== ownerScope;
-    const blockedByExternalMerge = pendingExternalWorkspaceSyncRef.current !== null;
-    const optimistic: StudioWorkspaceLoadResult = {
-      ...current,
-      state: blockedByOwner ? current.state : scopedState,
-      ownerScope,
-      status: "session-only",
-      failure: blockedByOwner ? "owner-mismatch" : null,
-    };
-    if (!blockedByOwner) updateWorkspacePersistenceSnapshot(optimistic);
-
-    if (blockedByOwner || blockedByExternalMerge) {
-      setWorkspaceSyncNotice(
-        blockedByOwner
-          ? "계정 전환 중이라 이전 작업공간 변경을 저장하지 않았어요."
-          : "다른 탭의 변경과 안전하게 합치는 동안 이 작업공간 변경은 현재 세션에 유지돼요.",
-      );
-      return Object.freeze({
-        state: optimistic.state,
-        ownerScope,
-        status: "session-only" as const,
-        failure: blockedByOwner ? "owner-mismatch" as const : null,
-      });
-    }
-
-    const runtime = workspaceRuntimeRef.current;
-    if (!runtime || runtime.ownerScope !== ownerScope) {
-      setWorkspaceSyncNotice(
-        "SQLite/OPFS 작업공간 저장소를 준비하는 동안 변경을 현재 세션에 유지하고 있어요.",
-      );
-      return Object.freeze({
-        state: scopedState,
-        ownerScope,
-        status: "session-only" as const,
-        failure: "storage-unavailable" as const,
-      });
-    }
-
-    void runtime.save(scopedState, current.ownerScope, guardRevision).then((result) => {
-      if (
-        workspaceRuntimeRef.current !== runtime
-        || result.ownerScope !== currentWorkspaceOwnerScope
-        || result.guardRevision !== workspaceDirtyRevisionRef.current
-      ) {
-        return;
-      }
-      const nextPersistence: StudioWorkspaceLoadResult = {
-        ...workspacePersistenceRef.current,
-        state: result.state,
-        ownerScope: result.ownerScope,
-        source: result.status === "persisted" ? "current" : "default",
-        status: result.status,
-        failure: result.failure,
-      };
-      if (result.status === "persisted" && result.failure === null) {
-        workspaceSyncBaseStateRef.current = result.state;
-      }
-      updateWorkspacePersistenceSnapshot(nextPersistence);
-      setWorkspaceSyncNotice(runtimeFailureNotice(result));
-    }).catch(() => {
-      if (workspaceRuntimeRef.current !== runtime) return;
-      setWorkspaceSyncNotice(
-        "SQLite/OPFS 작업공간 저장을 확인하지 못해 변경을 현재 세션에 유지하고 있어요.",
-      );
-    });
-
-    return Object.freeze({
-      state: scopedState,
-      ownerScope,
-      status: "session-only" as const,
-      failure: null,
-    });
-  }
+  const { persistStudioWorkspaceState } = useStudioPageWorkspacePersistence({
+    applyStudioWorkspaceLayout,
+    currentWorkspaceOwnerScope,
+    drawingPaletteDragging,
+    drawingPaletteDraggingRef,
+    leftResize,
+    liveWorkspaceLayout,
+    liveWorkspaceLayoutRef,
+    pendingExternalWorkspaceSync,
+    pendingExternalWorkspaceSyncRef,
+    rightResize,
+    setPendingExternalWorkspaceSync,
+    setWorkspaceMenuEpoch,
+    setWorkspacePersistence,
+    setWorkspaceSyncNotice,
+    setWorkspaceSyncRetryEpoch,
+    studioAuthUserId,
+    workspaceDirtyRevisionRef,
+    workspaceHydrationGenerationRef,
+    workspacePersistenceRef,
+    workspaceRuntimeRef,
+    workspaceSyncBaseStateRef,
+    workspaceSyncRetryEpoch,
+    workspaceSyncSequenceRef,
+  });
   const persistStudioWorkspaceStateFromEffect = useEffectEvent(
     persistStudioWorkspaceState,
   );
-
-  // owner가 바뀔 때마다 별도의 SQLite/OPFS runtime을 열고, 늦은 hydration은 dirty revision
-  // fence로 막는다. BroadcastChannel은 상태를 운반하지 않고 revision invalidation만 전달한다.
-  useEffect(() => {
-    const generation = workspaceHydrationGenerationRef.current + 1;
-    workspaceHydrationGenerationRef.current = generation;
-    workspaceDirtyRevisionRef.current = 0;
-    const ownerScope = currentWorkspaceOwnerScope;
-    workspaceRuntimeRef.current?.close();
-    workspaceRuntimeRef.current = null;
-
-    const defaultState = createStudioWorkspaceDefaultState(studioAuthUserId);
-    const initialPersistence: StudioWorkspaceLoadResult = {
-      state: defaultState,
-      ownerScope,
-      source: "default",
-      status: "session-only",
-      failure: null,
-    };
-    workspaceSyncBaseStateRef.current = defaultState;
-    replacePendingExternalWorkspaceSync(null);
-    updateWorkspacePersistenceSnapshot(initialPersistence);
-    applyStudioWorkspaceLayoutFromEffect(
-      defaultState.liveLayout,
-      defaultState.activeWorkspaceId,
-      "owner-scope-change",
-      false,
-    );
-
-    let active = true;
-    let runtime: StudioWorkspacePersistenceRuntime | null = null;
-    let unsubscribe: () => void = () => undefined;
-    void import("./studio-workspace-sqlite-runtime").then(async (module) => {
-      if (!active || workspaceHydrationGenerationRef.current !== generation) return;
-      runtime = module.createStudioWorkspacePersistenceRuntime({
-        userId: studioAuthUserId,
-      });
-      workspaceRuntimeRef.current = runtime;
-      unsubscribe = runtime.subscribeInvalidation((invalidation) => {
-        if (
-          workspaceRuntimeRef.current !== runtime
-          || invalidation.ownerScope !== ownerScope
-        ) {
-          return;
-        }
-        const previous = pendingExternalWorkspaceSyncRef.current;
-        const sequence = workspaceSyncSequenceRef.current + 1;
-        workspaceSyncSequenceRef.current = sequence;
-        replacePendingExternalWorkspaceSync({
-          ownerScope,
-          authorityRevision: Math.max(
-            invalidation.revision,
-            previous?.ownerScope === ownerScope ? previous.authorityRevision : 0,
-          ),
-          sequence,
-          baseState:
-            previous?.ownerScope === ownerScope
-              ? previous.baseState
-              : workspaceSyncBaseStateRef.current,
-        });
-        if (drawingPaletteDraggingRef.current) {
-          setWorkspaceSyncNotice(
-            "팔레트 크기 조절 중이라 다른 탭의 작업공간 변경을 보류했어요.",
-          );
-        }
-      });
-
-      const result = await runtime.hydrate({
-        getCurrentState: () => {
-          const current = workspacePersistenceRef.current;
-          return current.ownerScope === ownerScope ? current.state : defaultState;
-        },
-        getDirtyRevision: () => workspaceDirtyRevisionRef.current,
-      });
-      if (
-        !active
-        || workspaceRuntimeRef.current !== runtime
-        || workspaceHydrationGenerationRef.current !== generation
-        || result.ownerScope !== ownerScope
-        || result.guardRevision !== workspaceDirtyRevisionRef.current
-      ) {
-        return;
-      }
-      workspaceSyncBaseStateRef.current = result.state;
-      updateWorkspacePersistenceSnapshot({
-        state: result.state,
-        ownerScope: result.ownerScope,
-        source: result.source,
-        status: result.status,
-        failure: result.failure,
-      });
-      applyStudioWorkspaceLayoutFromEffect(
-        result.state.liveLayout,
-        result.state.activeWorkspaceId,
-        "owner-scope-change",
-        false,
-      );
-      setWorkspaceSyncNotice(
-        result.failure === "ownership-busy"
-          ? null
-          : result.authority === "memory-only"
-            ? "SQLite/OPFS 작업공간 저장소를 열지 못해 현재 세션에서 계속 작업할 수 있어요."
-            : result.conflictPaths.length > 0
-              ? "초기 작업공간을 현재 세션 변경과 안전하게 합쳤어요."
-              : null,
-      );
-    }).catch(() => {
-      if (!active || workspaceHydrationGenerationRef.current !== generation) return;
-      setWorkspaceSyncNotice(
-        "SQLite/OPFS 작업공간 모듈을 열지 못해 변경을 현재 세션에 유지하고 있어요.",
-      );
-    });
-
-    return () => {
-      active = false;
-      unsubscribe();
-      if (runtime && workspaceRuntimeRef.current === runtime) {
-        workspaceRuntimeRef.current = null;
-      }
-      runtime?.close();
-    };
-  }, [currentWorkspaceOwnerScope, studioAuthUserId]);
-
-  // 드래그나 작업공간 메뉴 편집과 겹친 외부 revision은 상호작용 종료 뒤 SQLite에서 다시
-  // 읽고 base/local/external 3-way merge한다. 같은 경로 충돌만 현재 탭 우선으로 남긴다.
-  useEffect(() => {
-    if (
-      leftResize.dragging
-      || rightResize.dragging
-      || drawingPaletteDragging
-      || !pendingExternalWorkspaceSync
-    ) {
-      return;
-    }
-
-    const pendingSync = pendingExternalWorkspaceSync;
-    const ownerScope = currentWorkspaceOwnerScope;
-    const runtime = workspaceRuntimeRef.current;
-    if (
-      pendingSync.ownerScope !== ownerScope
-      || !runtime
-      || runtime.ownerScope !== ownerScope
-      || workspacePersistenceRef.current.ownerScope !== ownerScope
-    ) {
-      replacePendingExternalWorkspaceSync(null);
-      setWorkspaceSyncNotice(
-        "계정이 바뀌어 이전 탭에서 보류한 작업공간 변경을 반영하지 않았어요.",
-      );
-      return;
-    }
-
-    let cancelled = false;
-    let deferredWorkspaceMenu: HTMLElement | null = null;
-    let retryFrame: number | null = null;
-    const retryAfterWorkspaceMenu = () => {
-      if (retryFrame !== null) return;
-      retryFrame = globalThis.requestAnimationFrame(() => {
-        retryFrame = null;
-        setWorkspaceSyncRetryEpoch((current) => current + 1);
-      });
-    };
-    const deferWhileWorkspaceMenuOpen = () => {
-      const workspaceMenu = document.querySelector<HTMLElement>(
-        '[data-testid="studio-workspace-dialog"]:not([hidden])',
-      );
-      if (!workspaceMenu) return false;
-      setWorkspaceSyncNotice(
-        "작업공간 편집을 마치면 다른 탭의 변경과 자동으로 합칠게요.",
-      );
-      if (deferredWorkspaceMenu !== workspaceMenu) {
-        deferredWorkspaceMenu?.removeEventListener("focusout", retryAfterWorkspaceMenu);
-        deferredWorkspaceMenu = workspaceMenu;
-        workspaceMenu.addEventListener("focusout", retryAfterWorkspaceMenu, {
-          once: true,
-        });
-      }
-      return true;
-    };
-    const cancelPendingMerge = () => {
-      cancelled = true;
-      deferredWorkspaceMenu?.removeEventListener("focusout", retryAfterWorkspaceMenu);
-      if (retryFrame !== null) globalThis.cancelAnimationFrame(retryFrame);
-    };
-    if (deferWhileWorkspaceMenuOpen()) return cancelPendingMerge;
-
-    void runtime.reconcile({
-      sourceOwnerScope: ownerScope,
-      baseState: pendingSync.baseState,
-      getLocalState: () => {
-        const current = workspacePersistenceRef.current;
-        return updateStudioWorkspaceLiveLayout(
-          current.ownerScope === ownerScope ? current.state : pendingSync.baseState,
-          liveWorkspaceLayoutRef.current,
-        );
-      },
-      getDirtyRevision: () => workspaceDirtyRevisionRef.current,
-    }).then((result) => {
-      if (cancelled || workspaceRuntimeRef.current !== runtime) return;
-      const latestPending = pendingExternalWorkspaceSyncRef.current;
-      if (
-        !latestPending
-        || latestPending.sequence !== pendingSync.sequence
-        || latestPending.authorityRevision !== pendingSync.authorityRevision
-        || result.ownerScope !== ownerScope
-      ) {
-        return;
-      }
-      if (deferWhileWorkspaceMenuOpen()) return;
-      if (result.guardRevision !== workspaceDirtyRevisionRef.current) {
-        const sequence = workspaceSyncSequenceRef.current + 1;
-        workspaceSyncSequenceRef.current = sequence;
-        replacePendingExternalWorkspaceSync({ ...latestPending, sequence });
-        return;
-      }
-
-      workspaceSyncBaseStateRef.current = result.state;
-      replacePendingExternalWorkspaceSync(null);
-      updateWorkspacePersistenceSnapshot({
-        ...workspacePersistenceRef.current,
-        state: result.state,
-        ownerScope: result.ownerScope,
-        source: result.status === "persisted" ? "current" : "default",
-        status: result.status,
-        failure: result.failure,
-      });
-      applyStudioWorkspaceLayoutFromEffect(
-        result.state.liveLayout,
-        result.state.activeWorkspaceId,
-        "external-sync",
-        false,
-      );
-      setWorkspaceMenuEpoch((current) => current + 1);
-      setWorkspaceSyncNotice(
-        result.conflictPaths.length > 0
-          ? "다른 탭의 변경을 합쳤어요. 겹친 "
-            + result.conflictPaths.length
-            + "개 설정은 현재 탭을 유지했습니다."
-          : result.status === "persisted"
-            ? "다른 탭의 변경과 현재 배치를 안전하게 합쳤어요."
-            : runtimeFailureNotice(result),
-      );
-    }).catch(() => {
-      if (cancelled || workspaceRuntimeRef.current !== runtime) return;
-      const latestPending = pendingExternalWorkspaceSyncRef.current;
-      if (!latestPending || latestPending.sequence !== pendingSync.sequence) return;
-      const current = workspacePersistenceRef.current;
-      const localState = updateStudioWorkspaceLiveLayout(
-        current.state,
-        liveWorkspaceLayoutRef.current,
-      );
-      replacePendingExternalWorkspaceSync(null);
-      updateWorkspacePersistenceSnapshot({
-        ...current,
-        state: localState,
-        status: "session-only",
-        failure: "verification-failed",
-      });
-      setWorkspaceSyncNotice(
-        "다른 탭의 변경을 합치지 못해 현재 배치를 이 세션에 유지했어요.",
-      );
-    });
-    return cancelPendingMerge;
-  }, [
-    currentWorkspaceOwnerScope,
-    drawingPaletteDragging,
-    leftResize.dragging,
-    liveWorkspaceLayout,
-    pendingExternalWorkspaceSync,
-    rightResize.dragging,
-    studioAuthUserId,
-    workspaceSyncRetryEpoch,
-  ]);
-
   // 활성 프리셋 스냅샷은 그대로 두고 liveLayout만 저장한다. 패널 폭은 pointerup까지 기다려
   // 최종값 한 번만 SQLite에 기록한다.
   useEffect(() => {
@@ -8685,92 +7966,19 @@ function StudioCuttoonEditor({
   const aiNoticeAcknowledgedRef = useRef(aiNoticeAcknowledged);
   aiNoticeAcknowledgedRef.current = aiNoticeAcknowledged;
   const [uiBooleanPreferencesReady, setUiBooleanPreferencesReady] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    const revisionsAtStart = { ...uiBooleanPreferenceRevisionsRef.current };
-    void acquireProductStudioUiPreferencesRepository()
-      .then(async (repository) => {
-        const results = await Promise.allSettled([
-          repository.loadBooleanPreference("ai-notice-acknowledged"),
-          repository.loadBooleanPreference("quick-start-dismissed"),
-          repository.loadBooleanPreference("mobile-hint-dismissed"),
-          repository.loadBooleanPreference("comment-pins-hidden"),
-        ]);
-        if (cancelled) return;
-
-        let degraded = false;
-        const reconcile = async (
-          key: StudioUiBooleanPreferenceKey,
-          result: PromiseSettledResult<boolean>,
-          current: () => boolean,
-          apply: (value: boolean) => void,
-        ): Promise<void> => {
-          if (result.status === "fulfilled") {
-            if (uiBooleanPreferenceRevisionsRef.current[key] === revisionsAtStart[key]) {
-              apply(result.value);
-              return;
-            }
-          } else if (uiBooleanPreferenceRevisionsRef.current[key] === revisionsAtStart[key]) {
-            degraded = true;
-            return;
-          }
-          try {
-            await repository.saveBooleanPreference(key, current());
-          } catch {
-            degraded = true;
-          }
-        };
-
-        await reconcile(
-          "ai-notice-acknowledged",
-          results[0],
-          () => aiNoticeAcknowledgedRef.current,
-          (value) => {
-            aiNoticeAcknowledgedRef.current = value;
-            setAiNoticeAcknowledged(value);
-          },
-        );
-        await reconcile(
-          "quick-start-dismissed",
-          results[1],
-          () => quickStartDismissedRef.current,
-          (value) => {
-            quickStartDismissedRef.current = value;
-            setQuickStartDismissed(value);
-          },
-        );
-        await reconcile(
-          "mobile-hint-dismissed",
-          results[2],
-          () => mobileHintDismissedRef.current,
-          (value) => {
-            mobileHintDismissedRef.current = value;
-            setMobileHintDismissed(value);
-          },
-        );
-        await reconcile(
-          "comment-pins-hidden",
-          results[3],
-          () => studioCommentPinsHiddenRef.current,
-          (value) => {
-            studioCommentPinsHiddenRef.current = value;
-            setStudioCommentPinsHiddenState(value);
-          },
-        );
-        if (!cancelled) {
-          setUiBooleanPreferencesReady(true);
-          if (degraded) setAppSettingsPersistenceState("session-only");
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setUiBooleanPreferencesReady(true);
-        setAppSettingsPersistenceState("session-only");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  useStudioUiBooleanPreferenceHydration({
+    aiNoticeAcknowledgedRef,
+    mobileHintDismissedRef,
+    quickStartDismissedRef,
+    setAiNoticeAcknowledged,
+    setAppSettingsPersistenceState,
+    setMobileHintDismissed,
+    setQuickStartDismissed,
+    setStudioCommentPinsHiddenState,
+    setUiBooleanPreferencesReady,
+    studioCommentPinsHiddenRef,
+    uiBooleanPreferenceRevisionsRef,
+  });
 
   const [title, setTitleState] = useState("");
   const setTitle = (next: Parameters<typeof setTitleState>[0]) => {

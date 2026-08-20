@@ -37,7 +37,18 @@ describe("Studio product UI preference authority", () => {
     expect(page).toContain("repository.loadEffectFavorites()");
     expect(page).toContain("repository.loadAdvancedFillSettings()");
     expect(page).toContain("repository.loadAssetFavorites(studioAuthUserId)");
-    expect(page).toContain('repository.loadBooleanPreference("ai-notice-acknowledged")');
+    // Intentional change (B-08 extraction): boolean-preference hydration moved, revision
+    // fence intact, into studio-page-workspace-persistence.ts beside the page.
+    const workspacePersistence = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/domains/creator/studio-page-workspace-persistence.ts",
+      ),
+      "utf8",
+    );
+    expect(workspacePersistence).toContain(
+      'repository.loadBooleanPreference("ai-notice-acknowledged")',
+    );
     expect(page).toContain("repository.loadRecentColors()");
     expect(page).toContain("repository.loadServerAiProvider()");
     expect(page).toContain("appSettingsUserRevisionRef.current === settingsRevisionAtStart");
