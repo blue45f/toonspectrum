@@ -92,7 +92,9 @@ describe("Studio inspector canvas-controls boundary", () => {
     // 의도적 확장(2026-08-14): Page가 소유한 brush repository factory 전달(4_180 → 4_190).
     // 의도적 확장(2026-08-20): CSP식 서브 도구 팔레트 배선 — subTools 슬롯 마운트 +
     // applyBuiltInBrushPreset 계약(4_190 → 4_240).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_240);
+    // 의도적 확장(2026-08-20): CSP식 클릭 크기 프리셋 그리드 — StudioBrushSizePresetGrid +
+    // 최근 크기 상태·슬라이더 커밋 배선(4_240 → 4_340).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_340);
     expect(leaf).not.toContain('"use no memo"');
     expect(leaf).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf).toContain("export function StudioInspectorCanvasControls(");

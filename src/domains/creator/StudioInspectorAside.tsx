@@ -36,7 +36,7 @@ import {
   type StudioSavedBrush,
 } from "./brush/studio-brush-library";
 import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./brush/studio-draw-hud";
-import { STUDIO_BRUSH_OPACITY_RANGE, STUDIO_BRUSH_SIZE_RANGE } from "./brush/studio-draw-ux";
+import { adjustStudioBrushSize, STUDIO_BRUSH_OPACITY_RANGE, STUDIO_BRUSH_SIZE_RANGE } from "./brush/studio-draw-ux";
 import { toggleStudioDrawingPalette, type StudioDrawingPaletteLayout } from "./brush/studio-drawing-palettes";
 import { normalizeShapeParams, normalizeStrokeStyle } from "./brush/studio-stroke-shapes";
 import {
@@ -777,6 +777,81 @@ interface StudioInspectorAsideProps {
   stableHandlers: StudioInspectorAsideHandlers;
 }
 
+/** CSP식 크기 프리셋 후보 — 렌더 시 STUDIO_BRUSH_SIZE_RANGE로 클램프한 뒤 중복은 하나로 합친다. */
+const STUDIO_BRUSH_SIZE_PRESETS = [1, 2, 3, 5, 8, 10, 15, 20, 30, 50, 80, 100] as const;
+/** 그리드에 노출하는 "최근 크기" 최대 개수. */
+const STUDIO_BRUSH_SIZE_RECENT_LIMIT = 4;
+
+/**
+ * CSP식 클릭 크기 프리셋 그리드 — 크기 슬라이더 옆의 보조 진입점.
+ * 순수 표현 컴포넌트: 값 소유는 부모(strokeWidth)에 있고, 커밋은 onCommit 한 곳으로만
+ * 나간다. 범위 밖 프리셋(예: max 80에서 100)은 클램프 후 중복 제거되어 버튼이 겹치지 않는다.
+ */
+export function StudioBrushSizePresetGrid({
+  activeSize,
+  recentSizes,
+  onCommit,
+}: {
+  activeSize: number;
+  recentSizes: readonly number[];
+  onCommit: (size: number) => void;
+}) {
+  const presetSizes = [
+    ...new Set(STUDIO_BRUSH_SIZE_PRESETS.map((size) => adjustStudioBrushSize(size, 0))),
+  ];
+  const recentOnly = [
+    ...new Set(recentSizes.map((size) => adjustStudioBrushSize(size, 0))),
+  ]
+    .filter((size) => !presetSizes.includes(size))
+    .slice(0, STUDIO_BRUSH_SIZE_RECENT_LIMIT);
+  const sizeButtonClass = (active: boolean) =>
+    cn(
+      "h-7 min-w-7 rounded-md border px-1 text-[0.68rem] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+      active
+        ? "border-accent/60 bg-accent-soft/50 font-semibold text-accent"
+        : "border-line bg-card text-fg-2 hover:bg-raised"
+    );
+  return (
+    <div className="space-y-1" role="group" aria-label="브러시 크기 프리셋">
+      <div className="grid grid-cols-6 gap-1">
+        {presetSizes.map((size) => (
+          <button
+            key={size}
+            type="button"
+            aria-pressed={activeSize === size}
+            aria-label={`브러시 크기 ${size}px`}
+            title={`${size}px`}
+            onClick={() => onCommit(size)}
+            className={sizeButtonClass(activeSize === size)}
+          >
+            {size}
+          </button>
+        ))}
+      </div>
+      {recentOnly.length > 0 && (
+        <div className="flex items-center gap-1">
+          <span className="text-[0.62rem] text-fg-3">최근</span>
+          <span className="flex flex-wrap gap-1">
+            {recentOnly.map((size) => (
+              <button
+                key={size}
+                type="button"
+                aria-pressed={activeSize === size}
+                aria-label={`최근 브러시 크기 ${size}px`}
+                title={`${size}px`}
+                onClick={() => onCommit(size)}
+                className={sizeButtonClass(activeSize === size)}
+              >
+                {size}
+              </button>
+            ))}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const StudioInspectorAside = memo(function StudioInspectorAside({
   activeSavedBrushId,
   advancedRulers,
@@ -1260,6 +1335,20 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   const [subToolPaletteBrowsedCategory, setSubToolPaletteBrowsedCategory] = useState<
     string | null
   >(null);
+  // CSP식 크기 프리셋 그리드의 "최근 크기" — 슬라이더/그리드 커밋의 마지막 고유값만
+  // 컴포넌트 상태로 기억한다(별도 영속화 없음). 표시 개수 제한은 그리드가 담당한다.
+  const [recentBrushSizes, setRecentBrushSizes] = useState<readonly number[]>([]);
+  const rememberRecentBrushSize = (size: number) => {
+    const next = adjustStudioBrushSize(size, 0);
+    setRecentBrushSizes((prev) =>
+      prev[0] === next ? prev : [next, ...prev.filter((s) => s !== next)].slice(0, 8)
+    );
+  };
+  const commitBrushSizePreset = (size: number) => {
+    const next = adjustStudioBrushSize(size, 0);
+    setStrokeWidth(next);
+    rememberRecentBrushSize(next);
+  };
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;
@@ -3657,20 +3746,30 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               {/* 크기 슬라이더 */}
               <div className="space-y-1.5 pt-1.5 border-t border-line/35">
                 {drawMode !== "pixel" ? (
-                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                    <span>크기</span>
-                    <span className="flex items-center gap-1.5">
-                      <input
-                        type="range"
-                        min={STUDIO_BRUSH_SIZE_RANGE.min}
-                        max={STUDIO_BRUSH_SIZE_RANGE.max}
-                        value={strokeWidth}
-                        onChange={(e) => setStrokeWidth(Number(e.target.value))}
-                        className="w-24 accent-accent cursor-pointer"
-                      />
-                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{strokeWidth}px</span>
-                    </span>
-                  </label>
+                  <div className="space-y-1.5">
+                    <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                      <span>크기</span>
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="range"
+                          min={STUDIO_BRUSH_SIZE_RANGE.min}
+                          max={STUDIO_BRUSH_SIZE_RANGE.max}
+                          value={strokeWidth}
+                          onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                          onPointerUp={(e) => rememberRecentBrushSize(Number(e.currentTarget.value))}
+                          className="w-24 accent-accent cursor-pointer"
+                        />
+                        <span className="w-8 text-right text-xs tabular-nums text-fg-3">{strokeWidth}px</span>
+                      </span>
+                    </label>
+                    {/* CSP식 클릭 크기 프리셋 — 슬라이더와 같은 strokeWidth 하나만 갱신한다.
+                        브러시 `[`·`]` 단축키(brush.size-decrease/increase)와 공존. */}
+                    <StudioBrushSizePresetGrid
+                      activeSize={strokeWidth}
+                      recentSizes={recentBrushSizes}
+                      onCommit={commitBrushSizePreset}
+                    />
+                  </div>
                 ) : null}
 
                 {/* 불투명도 슬라이더 — 요소 인스펙터와 같은 명칭을 쓴다(V5 §15 "모드가 달라도 동일 명칭"). */}
