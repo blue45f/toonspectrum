@@ -169,6 +169,7 @@ function projectImageFilterFields(el: ImageFilterFields): ImageFilterFields {
     clarity: el.clarity,
     shadowHighlight: el.shadowHighlight,
     outline: el.outline,
+    borderEffect: el.borderEffect,
     glow: el.glow,
     halftone: el.halftone,
     grain: el.grain,

@@ -243,7 +243,7 @@ describe("studio command catalog — coverage of the five live lists", () => {
     expectSourceCoverage("edit-menu", STUDIO_EDIT_MENU_COMMAND_ORDER);
   });
 
-  it("covers the menu inventory (187) and the help inventory (37)", () => {
+  it("covers the menu inventory (188) and the help inventory (37)", () => {
     expectSourceCoverage("menu", STUDIO_MENU_ITEM_INVENTORY);
     expectSourceCoverage("help", STUDIO_HELP_ROW_INVENTORY);
   });

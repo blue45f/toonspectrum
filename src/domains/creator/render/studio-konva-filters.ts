@@ -121,6 +121,12 @@ import {
   nativeHSL,
   nativePixelate,
 } from "./studio-konva-native-filters";
+import {
+  hasActiveStudioLayerBorderEffect,
+  layerBorderEffectKonvaFilter,
+  studioLayerBorderEffectCachePad,
+  studioLayerBorderEffectFilterAttrs,
+} from "./studio-layer-border-effect-compositor";
 
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
@@ -610,6 +616,8 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.ShadowHighlight = shadowHighlightKonvaFilter;
   // 스티커 테두리 — this.attrs.outlineColor/outlineWidth/outlineOpacity 적용(studio-outline). 캐시 offset 패딩 필요.
   F.Outline = outlineKonvaFilter;
+  // CSP 경계 효과(fuchi) — this.attrs.layerBorder* 적용(studio-layer-border-effect-compositor). 캐시 offset 패딩 필요.
+  F.LayerBorderEffect = layerBorderEffectKonvaFilter;
   // 글로우/블룸 — this.attrs.glowStrength/glowSize/glowThreshold/glowColor 적용(studio-glow).
   F.Glow = glowKonvaFilter;
   // 컬러 하프톤 — this.attrs.htDot/htAngle/htMode/htStrength 적용(studio-halftone).
@@ -674,6 +682,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveClarity(el) ||
     hasActiveShadowHighlight(el) ||
     hasActiveOutline(el) ||
+    hasActiveStudioLayerBorderEffect(el) ||
     hasActiveGlow(el) ||
     hasActiveHalftone(el) ||
     hasActiveGrain(el) ||
@@ -1197,6 +1206,16 @@ export function buildImageFilters(
     if (ol.secondColor !== undefined) attrs.outlineSecondColor = ol.secondColor;
     if (ol.secondWidth !== undefined) attrs.outlineSecondWidth = ol.secondWidth;
     cachePad = outlineCachePad(ol); // 테두리가 실루엣 밖으로 자라도록 캐시 offset 패딩.
+  }
+  // CSP 경계 효과 — 최종 실루엣 알파의 EDT 거리에서 fuchi를 그리므로 테두리처럼 맨 마지막.
+  if (hasActiveStudioLayerBorderEffect(el)) {
+    filters.push(F.LayerBorderEffect!);
+    const border = studioLayerBorderEffectFilterAttrs(el.borderEffect);
+    attrs.layerBorderThickness = border.layerBorderThickness;
+    attrs.layerBorderColor = border.layerBorderColor;
+    attrs.layerBorderType = border.layerBorderType;
+    attrs.layerBorderAntiAliased = border.layerBorderAntiAliased;
+    cachePad = Math.max(cachePad, studioLayerBorderEffectCachePad(el.borderEffect));
   }
 
   // The ordinary image fields above keep their established category order. The non-destructive

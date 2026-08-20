@@ -117,7 +117,9 @@ describe("Studio inspector bubble-appearance boundary", () => {
     // applyBuiltInBrushPreset 계약(4_190 → 4_240).
     // 의도적 확장(2026-08-20): CSP식 클릭 크기 프리셋 그리드 — StudioBrushSizePresetGrid +
     // 최근 크기 상태·슬라이더 커밋 배선(4_240 → 4_340).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_340);
+    // 의도적 확장(2026-08-20): CSP 경계 효과 — 레이어 탭 StudioLayerBorderEffectPanel 마운트 +
+    // 메뉴 열기 이벤트 수신 배선(4_340 → 4_370).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_370);
     expect(leaf.source).not.toContain('"use no memo"');
     expect(leaf.source).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf.source).toContain(

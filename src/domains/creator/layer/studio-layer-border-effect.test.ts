@@ -2,6 +2,12 @@ import { describe, it, expect } from "vitest";
 
 import {
   applyStudioLayerBorderEffect,
+  applyStudioLayerBorderEffectInPlace,
+  DEFAULT_STUDIO_LAYER_BORDER_EFFECT,
+  isIdentityStudioLayerBorderEffect,
+  normalizeStudioLayerBorderEffect,
+  STUDIO_LAYER_BORDER_EFFECT_THICKNESS_RANGE,
+  studioLayerBorderEffectCachePad,
   type StudioLayerBorderEffectSettings,
 } from "./studio-layer-border-effect";
 
@@ -82,6 +88,69 @@ describe('StudioLayerBorderEffect', () => {
     expect(res.data[blockCornerIdx + 1]).toBe(255);
     expect(res.data[blockCornerIdx + 2]).toBe(0);
     expect(res.data[blockCornerIdx + 3]).toBe(255);
+  });
+
+  it("in-place variant matches the copying variant byte-for-byte", () => {
+    const data = new Uint8ClampedArray(4 * 4 * 4);
+    data[(1 * 4 + 1) * 4 + 3] = 255;
+    const settings: StudioLayerBorderEffectSettings = {
+      enabled: true,
+      thickness: 1,
+      color: '#ff0000',
+      type: 'outer'
+    };
+
+    const copied = applyStudioLayerBorderEffect(new ImageData(new Uint8ClampedArray(data), 4, 4), settings);
+    const surface = { width: 4, height: 4, data: new Uint8ClampedArray(data) };
+    applyStudioLayerBorderEffectInPlace(surface, settings);
+    expect(surface.data).toEqual(copied.data);
+  });
+
+  it("in-place variant is a no-op for disabled settings", () => {
+    const data = new Uint8ClampedArray(4 * 4 * 4);
+    data[(1 * 4 + 1) * 4 + 3] = 255;
+    const surface = { width: 4, height: 4, data: new Uint8ClampedArray(data) };
+    applyStudioLayerBorderEffectInPlace(surface, { ...DEFAULT_STUDIO_LAYER_BORDER_EFFECT });
+    expect(surface.data).toEqual(data);
+  });
+});
+
+describe('StudioLayerBorderEffect — normalize/identity/cachePad', () => {
+  it('normalizes thickness into the UI range and keeps invalid thickness as identity 0', () => {
+    expect(normalizeStudioLayerBorderEffect({ enabled: true, thickness: 500 }).thickness)
+      .toBe(STUDIO_LAYER_BORDER_EFFECT_THICKNESS_RANGE.max);
+    expect(normalizeStudioLayerBorderEffect({ enabled: true, thickness: 0.2 }).thickness)
+      .toBe(STUDIO_LAYER_BORDER_EFFECT_THICKNESS_RANGE.min);
+    for (const thickness of [0, -3, Number.NaN, Number.POSITIVE_INFINITY, undefined]) {
+      expect(normalizeStudioLayerBorderEffect({ enabled: true, thickness }).thickness).toBe(0);
+    }
+  });
+
+  it('falls back to safe color/type without inventing an enabled state', () => {
+    const normalized = normalizeStudioLayerBorderEffect({ color: ' ', type: 'diagonal' as never });
+    expect(normalized).toEqual({
+      enabled: false,
+      thickness: 0,
+      color: '#000000',
+      type: 'outer',
+      antiAliased: true,
+    });
+    expect(normalizeStudioLayerBorderEffect({ color: '' }).color).toBe('#000000');
+    expect(normalizeStudioLayerBorderEffect(null).enabled).toBe(false);
+  });
+
+  it('identity — disabled or no effective thickness', () => {
+    expect(isIdentityStudioLayerBorderEffect(undefined)).toBe(true);
+    expect(isIdentityStudioLayerBorderEffect(DEFAULT_STUDIO_LAYER_BORDER_EFFECT)).toBe(true);
+    expect(isIdentityStudioLayerBorderEffect({ enabled: true, thickness: 0 })).toBe(true);
+    expect(isIdentityStudioLayerBorderEffect({ enabled: true, thickness: 2 })).toBe(false);
+  });
+
+  it('cachePad pads silhouette-growing types only', () => {
+    expect(studioLayerBorderEffectCachePad({ enabled: true, thickness: 2.4, type: 'outer' })).toBe(4);
+    expect(studioLayerBorderEffectCachePad({ enabled: true, thickness: 2, type: 'center' })).toBe(3);
+    expect(studioLayerBorderEffectCachePad({ enabled: true, thickness: 2, type: 'inner' })).toBe(0);
+    expect(studioLayerBorderEffectCachePad({ enabled: false, thickness: 2, type: 'outer' })).toBe(0);
   });
 });
 

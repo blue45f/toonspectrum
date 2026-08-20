@@ -239,7 +239,8 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     ],
     declarationRef:
       "studio-main-menu-item-routing.ts (STUDIO_MENU_ITEM_BUILDERS) + studio-main-menu-items-*.ts",
-    measuredCount: 187,
+    // 2026-08-20: CSP 경계 효과 메뉴 진입점(layer/border-effect)으로 187 → 188.
+    measuredCount: 188,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -353,6 +354,8 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "layer/crop-layer",
   "layer/clipping-mask",
   "layer/mask",
+  // CSP 경계 효과(fuchi) 진입점 — 187 → 188 (2026-08-20).
+  "layer/border-effect",
   "layer/reset-local-visibility",
   // select (10) — the seven §15.3 tool rows (studio-main-menu-items-selection.ts)
   // come first, then the three commands lifted out of edit.
@@ -957,6 +960,17 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       ],
       origins: [menu("layer/mask")],
       note: "인스펙터 마스크 섹션으로 이동한다. 목적지 자체는 검색 코퍼스의 `property.layer-mask` 가 정본이다.",
+    }),
+    defineCommand({
+      id: "layer.border-effect",
+      labels: [ko("레이어 경계 효과"), en("Layer border effect")],
+      aliases: [
+        csp("경계 효과"),
+        cspEn("Border Effect"),
+        ours("레이어 테두리 효과"),
+      ],
+      origins: [menu("layer/border-effect")],
+      note: "레이어 탭의 경계 효과 패널을 연다. 픽셀 적용 정본은 render/studio-layer-border-effect-compositor 다(2026-08-20).",
     }),
 
     /* ---------------------------------------------------------------- view */

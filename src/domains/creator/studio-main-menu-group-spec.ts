@@ -207,6 +207,10 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       ours("layer/send-back", "레이어 · 맨 뒤로."),
       ours("layer/send-backward", "레이어 · 뒤로."),
       ours("layer/crop-layer", "레이어 자르기 — §15.3은 Canvas 의 Crop/Trim 만 정의한다."),
+      ours(
+        "layer/border-effect",
+        "레이어 경계 효과(CSP 境界効果/fuchi) — §15.3 에 대응 행이 없다. 이미지 레이어 실루엣의 비파괴 테두리로, 레이어 탭의 경계 효과 패널을 연다(2026-08-20).",
+      ),
     ],
   },
   {

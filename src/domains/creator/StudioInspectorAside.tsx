@@ -47,12 +47,14 @@ import {
 } from "./brush/studio-sub-tool-palette-data";
 import { StudioSubToolPalette } from "./brush/StudioSubToolPalette";
 import { type FilterMaskPaintMode } from "./filter/studio-filter-mask";
+import { STUDIO_LAYER_BORDER_EFFECT_OPEN_EVENT } from "./layer/studio-layer-border-effect";
 import { type LayerMaskPaintMode } from "./layer/studio-layer-mask";
 import {
   type StudioLayerColor,
   type StudioLayerNavigatorItem,
   type StudioLayerRole,
 } from "./layer/studio-layer-navigator";
+import { StudioLayerBorderEffectPanel } from "./layer/StudioLayerBorderEffectPanel";
 import { hasCustomBubbleShape } from "./lettering/studio-bubble-custom-shape";
 import { normalizeExtraTails } from "./lettering/studio-bubble-path";
 import { normalizeTextPath, type TextPathConfig } from "./lettering/studio-text-path";
@@ -1639,6 +1641,18 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
       return next;
     });
   }, [activeImageInspectorTab]);
+
+  // 메뉴 '레이어 ▸ 경계 효과…'의 열기 신호 — 호스트 시임(StudioPage) 없이
+  // studio-companion-add-text와 같은 창 이벤트 브리지로 받아 레이어 탭을 연다(2026-08-20).
+  useEffect(() => {
+    const openLayerBorderEffectPanel = () => {
+      changeInspectorLayout({ ...inspectorLayout, primary: "layers" });
+    };
+    window.addEventListener(STUDIO_LAYER_BORDER_EFFECT_OPEN_EVENT, openLayerBorderEffectPanel);
+    return () => {
+      window.removeEventListener(STUDIO_LAYER_BORDER_EFFECT_OPEN_EVENT, openLayerBorderEffectPanel);
+    };
+  }, [inspectorLayout, changeInspectorLayout]);
 
   const shouldMountImageInspectorTab = (tab: StudioImageInspectorSection) =>
     activeImageInspectorTab === tab || activatedImageInspectorTabs.has(tab);
@@ -4184,43 +4198,56 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             role="tabpanel"
             aria-label="레이어"
             hidden={inspectorLayout.primary !== "layers"}
-            className="h-[min(31rem,54dvh)] min-h-72 lg:h-[calc(100dvh-28rem)] lg:min-h-72 [&>section]:h-full"
+            className="flex h-[min(31rem,54dvh)] min-h-72 flex-col gap-2 lg:h-[calc(100dvh-28rem)] lg:min-h-72"
           >
             {inspectorLayout.primary === "layers" ? (
-              <Suspense
-                fallback={
-                  <div
-                    role="status"
-                    aria-live="polite"
-                    className="grid h-full min-h-72 place-items-center rounded-xl border border-line bg-panel/40 px-4 text-center"
+              <>
+                <div className="min-h-0 flex-1 [&>section]:h-full">
+                  <Suspense
+                    fallback={
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        className="grid h-full min-h-72 place-items-center rounded-xl border border-line bg-panel/40 px-4 text-center"
+                      >
+                        <span className="inline-flex items-center gap-2 text-xs font-semibold text-fg-3">
+                          <Loader2
+                            size={15}
+                            className="animate-spin motion-reduce:animate-none"
+                            aria-hidden
+                          />
+                          레이어 탐색기 불러오는 중
+                        </span>
+                      </div>
+                    }
                   >
-                    <span className="inline-flex items-center gap-2 text-xs font-semibold text-fg-3">
-                      <Loader2
-                        size={15}
-                        className="animate-spin motion-reduce:animate-none"
-                        aria-hidden
-                      />
-                      레이어 탐색기 불러오는 중
-                    </span>
-                  </div>
-                }
-              >
-                <StudioLayerNavigator
-                  items={layerNavigatorItems}
-                  groups={masterEditMode ? [] : groups}
-                  selectedIds={marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : []}
-                  pageKey={`${masterEditMode ? "master" : currentPageId}:${inspectorLayout.primary}`}
-                  livePageId={masterEditMode ? null : currentPageId}
-                  readOnly={inspectorInteractionPolicy.global.disabled}
-                  groupingDisabled={masterEditMode}
-                  localHiddenIds={localHiddenElementIds}
-                  onToggleLocalHidden={toggleLocalHidden}
-                  soloLayerId={soloLayerId}
-                  onToggleLayerSolo={toggleLayerSolo}
-                  onSelectionChange={selectLayersFromNavigator}
-                  onAction={handleLayerNavigatorAction}
-                />
-              </Suspense>
+                    <StudioLayerNavigator
+                      items={layerNavigatorItems}
+                      groups={masterEditMode ? [] : groups}
+                      selectedIds={marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : []}
+                      pageKey={`${masterEditMode ? "master" : currentPageId}:${inspectorLayout.primary}`}
+                      livePageId={masterEditMode ? null : currentPageId}
+                      readOnly={inspectorInteractionPolicy.global.disabled}
+                      groupingDisabled={masterEditMode}
+                      localHiddenIds={localHiddenElementIds}
+                      onToggleLocalHidden={toggleLocalHidden}
+                      soloLayerId={soloLayerId}
+                      onToggleLayerSolo={toggleLayerSolo}
+                      onSelectionChange={selectLayersFromNavigator}
+                      onAction={handleLayerNavigatorAction}
+                    />
+                  </Suspense>
+                </div>
+                {/* CSP 경계 효과(fuchi) — 선택 이미지 레이어의 비파괴 테두리. 문서 커밋은
+                    다른 레이어 속성(불투명도 등)과 같은 patchEl 시임 하나만 쓴다(2026-08-20). */}
+                {selected?.type === "image" ? (
+                  <StudioLayerBorderEffectPanel
+                    value={selected.borderEffect}
+                    disabled={inspectorInteractionPolicy.global.disabled}
+                    onChange={(next) => patchEl(selected.id, { borderEffect: next } as Partial<El>)}
+                  />
+                ) : null}
+              </>
             ) : null}
           </div>
 

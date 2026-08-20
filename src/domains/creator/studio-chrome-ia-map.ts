@@ -159,13 +159,17 @@ export const STUDIO_CHROME_EDIT_CORE_ACTION_IDS = [
   "duplicate",
 ] as const;
 
-/** §15.3 Layer: ordering and layer-scoped crop left Edit in Wave C. */
+/**
+ * §15.3 Layer: ordering and layer-scoped crop left Edit in Wave C.
+ * 2026-08-20: CSP 경계 효과 문(`border-effect`)을 핀 — 메뉴에서 사라지면 IA 감사가 잡는다.
+ */
 export const STUDIO_CHROME_LAYER_CORE_ACTION_IDS = [
   "bring-front",
   "bring-forward",
   "send-back",
   "send-backward",
   "crop-layer",
+  "border-effect",
 ] as const;
 
 /** §15.3 Select: the three selection commands left Edit in Wave C. */

@@ -124,3 +124,27 @@ describe("StudioInspectorAside — 크기 프리셋 그리드 배선", () => {
     expect(asideSource).not.toContain("recentBrushSizes\", JSON.stringify");
   });
 });
+
+describe("StudioInspectorAside — CSP 경계 효과 배선", () => {
+  it("mounts the border-effect panel inside the layers tabpanel for image layers only", () => {
+    expect(asideSource).toContain("<StudioLayerBorderEffectPanel");
+    expect(asideSource).toContain("{selected?.type === \"image\" ? (");
+    expect(asideSource).toContain("value={selected.borderEffect}");
+  });
+
+  it("commits through the shared patchEl layer-property seam (no new page closures)", () => {
+    expect(asideSource).toContain(
+      "onChange={(next) => patchEl(selected.id, { borderEffect: next } as Partial<El>)}"
+    );
+  });
+
+  it("listens for the menu open event and routes to the layers tab", () => {
+    expect(asideSource).toContain("STUDIO_LAYER_BORDER_EFFECT_OPEN_EVENT");
+    expect(asideSource).toContain(
+      "window.addEventListener(STUDIO_LAYER_BORDER_EFFECT_OPEN_EVENT, openLayerBorderEffectPanel)"
+    );
+    expect(asideSource).toContain(
+      "window.removeEventListener(STUDIO_LAYER_BORDER_EFFECT_OPEN_EVENT, openLayerBorderEffectPanel)"
+    );
+  });
+});

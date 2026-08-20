@@ -1,6 +1,7 @@
 import type { InkWash } from "../brush/studio-ink-wash";
 import type { StudioGlitchFx, StudioVignetteFx } from "../filter/studio-filter-pack";
 import type { StudioFilterUnionWave } from "../filter/studio-filter-union-wave";
+import type { StudioLayerBorderEffectSettings } from "../layer/studio-layer-border-effect";
 import type {
   StudioAdjustmentEngineId,
   StudioAdjustmentFilterOperation,
@@ -120,6 +121,8 @@ export type ImageFilterFields = {
   /** 섀도우/하이라이트 — 휘도 LUT 기반 명암 복구(studio-shadow-highlight). */
   shadowHighlight?: ShadowHighlight;
   outline?: Outline;
+  /** CSP 경계 효과(fuchi) — 실루엣 EDT 거리 기반 비파괴 레이어 테두리(2026-08-20). */
+  borderEffect?: StudioLayerBorderEffectSettings;
   glow?: Glow;
   halftone?: Halftone;
   /**
@@ -387,6 +390,16 @@ function hasActiveClarityCandidate(value: unknown): boolean {
     || (candidateFinite(source.dehaze) && source.dehaze > 0);
 }
 
+/**
+ * CSP 경계 효과 경량 판정 — normalize와 같은 결론(enabled === true && 유효 굵기 > 0)만
+ * 낸다. normalize는 무효 굵기를 0(항등)으로 두므로 여기서 기본값을 채우면 안 된다.
+ */
+function hasActiveBorderEffectCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  if (!source || source.enabled !== true) return false;
+  return candidateFinite(source.thickness) && source.thickness > 0;
+}
+
 function hasActiveOutlineCandidate(value: unknown): boolean {
   const source = candidateRecord(value);
   if (!source) return false;
@@ -581,6 +594,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveClarityCandidate(el.clarity) ||
     hasActiveShadowHighlightCandidate(el.shadowHighlight) ||
     hasActiveOutlineCandidate(el.outline) ||
+    hasActiveBorderEffectCandidate(el.borderEffect) ||
     hasActiveStrengthCandidate(el.glow) ||
     hasActiveStrengthCandidate(el.halftone) ||
     hasActiveAmountCandidate(el.grain) ||
@@ -685,6 +699,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.clarity ?? null,
     el.shadowHighlight ?? null,
     el.outline ?? null,
+    el.borderEffect ?? null,
     el.glow ?? null,
     el.halftone ?? null,
     el.grain ?? null,

@@ -28,11 +28,13 @@ import {
   Layers,
   LayoutGrid,
   Scaling,
+  Square,
   SquareDashed,
   SquareStack,
   X,
 } from "lucide-react";
 
+import { requestStudioLayerBorderEffectPanelOpen } from "./layer/studio-layer-border-effect";
 import { STUDIO_EDIT_MENU_COMMANDS } from "./studio-edit-controls";
 
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
@@ -175,9 +177,34 @@ export function buildStudioLayerMenuItems({
       unavailableReason: state.imageLayerSelected
         ? undefined
         : "마스크를 편집할 이미지 레이어를 먼저 선택하세요.",
-      separatorAfter: true,
       onSelect: () => {
         ui.openLayerMask();
+      },
+    },
+    // CSP 경계 효과(fuchi) — 레이어 탭의 경계 효과 패널을 연다. 호스트 ui 계약을
+    // 늘리는 대신 studio-companion-add-text와 같은 창 이벤트 브리지를 쓰고, 발신기는
+    // 순수 카탈로그 경계(브라우저 전역 금지)를 지키러 layer 모듈에 산다(2026-08-20).
+    {
+      id: "border-effect",
+      commandId: "layer.border-effect",
+      label: "경계 효과…",
+      icon: Square,
+      disabled: !state.imageLayerSelected,
+      unavailableReason: state.imageLayerSelected
+        ? undefined
+        : "경계 효과를 적용할 이미지 레이어를 먼저 선택하세요.",
+      separatorAfter: true,
+      // 힌트 id는 전역 유일 + 콜론 네임스페이스 — 메뉴 소스 드리프트 가드의 항목 id 리터럴
+      // 스캔(`\bid: "[a-z0-9-]+"`)에 잡히지 않게 항목 id 문법 밖에 둔다.
+      hint: {
+        id: "menu:layer-border-effect",
+        title: "레이어 경계 효과",
+        description:
+          "선택한 이미지 레이어의 실루엣을 따라 비파괴 테두리(CSP 경계 효과)를 켜고 굵기·색을 조절합니다.",
+        tip: "레이어 탭 아래쪽 '경계 효과' 패널에서 바깥/안쪽/중앙을 고를 수 있어요.",
+      },
+      onSelect: () => {
+        requestStudioLayerBorderEffectPanelOpen();
       },
     },
     {

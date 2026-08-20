@@ -11,6 +11,7 @@ import type { StudioInkPressureModel } from "./brush/studio-ink-pressure-model";
 import type { InkWash } from "./brush/studio-ink-wash";
 import type { StudioStrokePaintModel } from "./brush/studio-stroke-paint-model";
 import type { ShapeParams, StrokeStyle } from "./brush/studio-stroke-shapes";
+import type { StudioLayerBorderEffectSettings } from "./layer/studio-layer-border-effect";
 import type {
   StudioLayerColor,
   StudioLayerRole,
@@ -140,6 +141,8 @@ export interface ImageEl {
   clarity?: Clarity;
   shadowHighlight?: ShadowHighlight;
   outline?: Outline;
+  /** CSP 경계 효과(fuchi) — 실루엣 EDT 거리 기반 비파괴 레이어 테두리(2026-08-20). */
+  borderEffect?: StudioLayerBorderEffectSettings;
   glow?: Glow;
   halftone?: Halftone;
   grain?: Grain;
