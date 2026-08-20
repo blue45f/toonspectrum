@@ -9,13 +9,17 @@ import {
 import {
   countStudioDynamicBrushMarksPerDab,
   planStudioDynamicBrushRenderBudget,
+  selectStudioDynamicBrushCausalStampGrid,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+  STUDIO_DYNAMIC_BRUSH_MIN_DABS_PER_VARIATION,
+  studioDynamicBrushCausalStampGridRuleOf,
 } from "./studio-brush-render-budget";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
 
@@ -478,5 +482,124 @@ describe("studio dynamic brush render budget", () => {
       expect(dab.sourceX).toBeCloseTo(5_000 * index / 36, 10);
     }
     expect(replay).toEqual(cappedDabs);
+  });
+});
+
+describe("causal stamp grid rule v2", () => {
+  const v2 = STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2;
+
+  function causalSettingsWithBaseWidth(baseWidth: number) {
+    return normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      tip: fullAlphaTip(),
+      grain: { amount: 0.25 },
+      taper: { enabled: false },
+      width: { base: baseWidth, mappings: [] },
+    });
+  }
+
+  it("selects the width-adaptive grid from the authored base width", () => {
+    expect(selectStudioDynamicBrushCausalStampGrid({ rule: v2, baseWidth: 4 })).toBe(3);
+    expect(selectStudioDynamicBrushCausalStampGrid({ rule: v2, baseWidth: 23.9 })).toBe(3);
+    expect(selectStudioDynamicBrushCausalStampGrid({ rule: v2, baseWidth: 24 })).toBe(5);
+    expect(selectStudioDynamicBrushCausalStampGrid({ rule: v2, baseWidth: 63.9 })).toBe(5);
+    expect(selectStudioDynamicBrushCausalStampGrid({ rule: v2, baseWidth: 64 })).toBe(7);
+    expect(selectStudioDynamicBrushCausalStampGrid({ rule: v2, baseWidth: 300 })).toBe(7);
+  });
+
+  it("keeps every record without the exact rule pin on the legacy three-sample lattice", () => {
+    expect(selectStudioDynamicBrushCausalStampGrid({ baseWidth: 300 }))
+      .toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+    expect(selectStudioDynamicBrushCausalStampGrid({ rule: undefined, baseWidth: 300 }))
+      .toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+    expect(selectStudioDynamicBrushCausalStampGrid({ rule: "causal-stamp-grid-v3", baseWidth: 300 }))
+      .toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+    expect(selectStudioDynamicBrushCausalStampGrid({ rule: 2, baseWidth: 300 }))
+      .toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+    // Normalized snapshots strip unknown fields today, so persisted legacy records resolve to no
+    // rule at all — the byte-exact pin convention shared with depositPipeline/program pins.
+    expect(studioDynamicBrushCausalStampGridRuleOf(causalSettingsWithBaseWidth(300)))
+      .toBeUndefined();
+  });
+
+  it("clamps the pinned grid so grid-squared lattice work stays inside the live mark budget", () => {
+    // grid² × tips × 32 stations × symmetry ≤ 4,096 ⇔ grid² ≤ 4,096 / (32 × symmetry × tips).
+    const allowance = (symmetryCount: number, tipCount: number) => Math.floor(
+      STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
+        / (STUDIO_DYNAMIC_BRUSH_MIN_DABS_PER_VARIATION * symmetryCount * tipCount),
+    );
+    expect(allowance(1, 1)).toBe(128);
+    expect(allowance(3, 1)).toBe(42);
+    expect(allowance(6, 1)).toBe(21);
+
+    expect(selectStudioDynamicBrushCausalStampGrid({
+      rule: v2, baseWidth: 300, symmetryCount: 2,
+    })).toBe(7);
+    expect(selectStudioDynamicBrushCausalStampGrid({
+      rule: v2, baseWidth: 300, symmetryCount: 3,
+    })).toBe(5);
+    expect(selectStudioDynamicBrushCausalStampGrid({
+      rule: v2, baseWidth: 300, symmetryCount: 6,
+    })).toBe(3);
+    // Two enabled extra tip layers triple the worst-case lattice work per dab.
+    expect(selectStudioDynamicBrushCausalStampGrid({
+      rule: v2, baseWidth: 300, activeTipLayerCount: 2,
+    })).toBe(5);
+    // The clamp never drops below the legacy lattice even when the maths cannot fit grid 3.
+    expect(selectStudioDynamicBrushCausalStampGrid({
+      rule: v2, baseWidth: 300, symmetryCount: 64,
+    })).toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+  });
+
+  it("plans legacy causal snapshots on grid 3 and pinned rule-v2 snapshots on the width grid", () => {
+    const legacySettings = causalSettingsWithBaseWidth(100);
+    const pinnedSettings = {
+      ...legacySettings,
+      causalStampGridRule: v2,
+    };
+    const planFor = (settings: typeof legacySettings) =>
+      planStudioDynamicBrushRenderBudget({
+        settings,
+        dabCount: 1_024,
+        symmetryCount: 1,
+        markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+      });
+    const legacy = planFor(legacySettings);
+    const pinned = planFor(pinnedSettings);
+
+    expect(legacy.stampGrid).toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+    expect(pinned.stampGrid).toBe(7);
+    // Causal textures stay one affine command per tip, so the denser lattice never changes the
+    // admitted dab prefix — only how sampled-tip consumers lattice each accepted dab.
+    expect({ ...pinned, stampGrid: legacy.stampGrid }).toEqual(legacy);
+  });
+
+  it("replays the same stroke to the same pinned grid across live and committed budgets", () => {
+    const pinnedSettings = {
+      ...causalSettingsWithBaseWidth(48),
+      causalStampGridRule: v2,
+    };
+    const planFor = (markBudget: number) =>
+      planStudioDynamicBrushRenderBudget({
+        settings: pinnedSettings,
+        dabCount: 500,
+        symmetryCount: 2,
+        markBudget,
+      });
+    const live = planFor(STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET);
+    const committed = planFor(STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET);
+    const replayed = planFor(STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET);
+
+    // The clamp deliberately uses the fixed live constant, so live append and committed/export
+    // replay of one stroke can never lattice its accepted dabs differently.
+    expect(live.stampGrid).toBe(5);
+    expect(committed.stampGrid).toBe(5);
+    expect(replayed).toEqual(committed);
+    expect(selectStudioDynamicBrushCausalStampGrid({
+      rule: studioDynamicBrushCausalStampGridRuleOf(pinnedSettings),
+      baseWidth: pinnedSettings.width.base,
+      symmetryCount: 2,
+      activeTipLayerCount: 0,
+    })).toBe(committed.stampGrid);
   });
 });

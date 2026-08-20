@@ -25,10 +25,11 @@ import {
 } from "../brush/studio-brush-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
+  selectStudioDynamicBrushCausalStampGrid,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
-  STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+  studioDynamicBrushCausalStampGridRuleOf,
   type StudioDynamicBrushAcceptedPrefixReceipt,
   type StudioDynamicBrushRenderStampGrid,
 } from "../brush/studio-brush-render-budget";
@@ -857,18 +858,28 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
 }
 
 function initialStampGrid(style: DetachedDynamicStrokeStyle): StudioDynamicBrushRenderStampGrid {
-  if (liveUsesCausalDepositPipeline(style)) {
-    // A causal stroke cannot lower its stamp lattice after marks have already been accepted:
-    // doing so would require an O(N) clear/replay and would make the live prefix differ from the
-    // retained result. Start authored streaming snapshots on the bounded three-sample lattice.
-    // The same fixed grid is reused by append, pointer-up and retained replay, preserving material
-    // parity while keeping textured long strokes inside the live mark budget.
-    return STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID;
-  }
   const coverageBudget = resolveStudioDynamicBrushCoverageBudgetContract(
     style.materialIdentity,
     style.dynamics,
   );
+  if (liveUsesCausalDepositPipeline(style)) {
+    // A causal stroke cannot lower its stamp lattice after marks have already been accepted:
+    // doing so would require an O(N) clear/replay and would make the live prefix differ from the
+    // retained result. Select the lattice from the versioned rule ONCE here — legacy snapshots
+    // (no `causalStampGridRule` pin) keep the bounded three-sample lattice, rule-v2 snapshots take
+    // a width-adaptive 3/5/7 grid — and reuse the same pinned grid for append, pointer-up and
+    // retained replay, preserving material parity inside the live mark budget. The inputs
+    // (coverage-contract settings, symmetry count) match the render-budget planner's exactly so
+    // exact plans recompute the identical grid.
+    return selectStudioDynamicBrushCausalStampGrid({
+      rule: studioDynamicBrushCausalStampGridRuleOf(coverageBudget.settings),
+      baseWidth: coverageBudget.settings.width.base,
+      symmetryCount: style.transforms.length,
+      activeTipLayerCount: coverageBudget.settings.tipLayers.filter(
+        (layer) => layer.opacity > 0,
+      ).length,
+    });
+  }
   return planStudioDynamicBrushRenderBudget({
     settings: coverageBudget.settings,
     dabCount: 1,
