@@ -14,14 +14,20 @@
  * Run via: tsx scripts/verify-studio-launch.mts
  * Output is captured by caller to {SCRATCH}/studio-launch-*.log
  */
-import { spawn, type ChildProcess } from "node:child_process";
-import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
-import { createServer } from "node:net";
+import { type ChildProcess } from "node:child_process";
+import { appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { chromium, type Browser, type Locator, type Page } from "playwright";
+
+import {
+  cleanScratchDir,
+  findFreePort,
+  spawnVitePreview,
+  waitForServer,
+} from "./lib/studio-verify-preview-harness.mjs";
 
 const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-launch");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -280,34 +286,6 @@ function log(msg: string) {
   const line = `[verify-studio] ${msg}`;
   console.log(line);
   try { appendFileSync(join(SCRATCH, "studio-launch-verify.log"), line + "\n"); } catch {}
-}
-
-async function waitForServer(url: string, timeoutMs = 15000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await fetch(url, { method: "HEAD" });
-      if (res.ok || res.status < 500) return;
-    } catch {}
-    await new Promise(r => setTimeout(r, 250));
-  }
-  throw new Error("preview server did not become ready");
-}
-
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      if (!address || typeof address === "string") {
-        probe.close();
-        reject(new Error("could not allocate a preview port"));
-        return;
-      }
-      probe.close((error) => error ? reject(error) : resolve(address.port));
-    });
-  });
 }
 
 async function verifyWorkspaceMenuGate(
@@ -1481,29 +1459,24 @@ async function runMobileDockLayout(
 }
 
 async function main() {
-  mkdirSync(SCRATCH, { recursive: true });
+  // Clean stale artifacts at start of harness run (per strict gate)
+  cleanScratchDir({
+    directory: SCRATCH,
+    filePrefix: "studio-launch-",
+    extensions: [".png", ".log"],
+    ignoreListingErrors: true,
+  });
   const port = await findFreePort();
   const url = `http://127.0.0.1:${port}/studio`;
 
-  // Clean stale artifacts at start of harness run (per strict gate)
-  try {
-    const files = readdirSync(SCRATCH).filter(
-      (file) => file.startsWith("studio-launch-") && (file.endsWith(".png") || file.endsWith(".log"))
-    );
-    for (const f of files) {
-      try { unlinkSync(join(SCRATCH, f)); } catch {}
-    }
-  } catch {}
-
-  const server: ChildProcess = spawn(
-    process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-    ["exec", "vite", "preview", "--port", String(port), "--strictPort", "--host", "127.0.0.1"],
-    { stdio: "ignore" }
-  );
+  const server: ChildProcess = spawnVitePreview({ port, runner: "pnpm-exec" });
 
   let browser: Browser | null = null;
   try {
-    await waitForServer(url, 20000);
+    await waitForServer(url, {
+      timeoutMs: 20000,
+      notReadyMessage: "preview server did not become ready",
+    });
 
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     const results: RunResult[] = [];

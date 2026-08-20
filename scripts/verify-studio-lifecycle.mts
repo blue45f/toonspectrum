@@ -15,18 +15,14 @@
  *   TOONSPECTRUM_VERIFY_ORIGIN=http://127.0.0.1:4173 \
  *     pnpm exec tsx scripts/verify-studio-lifecycle.mts
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   appendFileSync,
   existsSync,
-  mkdirSync,
   readFileSync,
-  readdirSync,
-  unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -43,6 +39,13 @@ import {
 import { STUDIO_CANVAS_WIDTH } from "../src/domains/creator/canvas/studio-canvas-constants";
 import { DEFAULT_CANVAS_H } from "../src/domains/creator/studio-pages";
 
+import {
+  cleanScratchDir,
+  findFreePort,
+  spawnVitePreview,
+  stopChildProcess,
+  waitForServer,
+} from "./lib/studio-verify-preview-harness.mjs";
 import {
   inspectPngIntegrity,
   studioLifecycleVisualViolations,
@@ -444,63 +447,11 @@ async function captureDownload(
 }
 
 function cleanScratch(): void {
-  mkdirSync(SCRATCH, { recursive: true });
-  for (const file of readdirSync(SCRATCH)) {
-    if (!file.startsWith("studio-lifecycle-")) continue;
-    if (![".png", ".json", ".log"].some((extension) => file.endsWith(extension))) continue;
-    try {
-      unlinkSync(join(SCRATCH, file));
-    } catch {
-      // Stable artifact names are overwritten below if another process has the old file open.
-    }
-  }
-}
-
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("could not allocate a preview port"));
-        return;
-      }
-      server.close((error) => error ? reject(error) : resolve(address.port));
-    });
+  cleanScratchDir({
+    directory: SCRATCH,
+    filePrefix: "studio-lifecycle-",
+    extensions: [".png", ".json", ".log"],
   });
-}
-
-async function waitForServer(url: string, timeoutMs = 20_000): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(url, { method: "HEAD" });
-      if (response.ok || response.status < 500) return;
-    } catch {
-      // Preview is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error("Vite preview did not become ready");
-}
-
-async function stopChildProcess(child: ChildProcess): Promise<void> {
-  const waitForExit = (timeoutMs: number) => Promise.race([
-    new Promise<void>((resolve) => child.once("exit", () => resolve())),
-    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
-  ]);
-  if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGTERM");
-    await waitForExit(1_500);
-  }
-  if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGKILL");
-    await waitForExit(1_500);
-  }
-  child.stdout?.destroy();
-  child.stderr?.destroy();
 }
 
 async function runLifecycle(browser: Browser, origin: string): Promise<LifecycleResult> {
@@ -754,23 +705,9 @@ async function main(): Promise<void> {
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/u, "")}/`
     : `http://127.0.0.1:${port}/`;
-  const server: ChildProcess | null = externalOrigin
+  const server: ChildProcess | null = port === null
     ? null
-    : spawn(
-        process.execPath,
-        [
-          join(process.cwd(), "node_modules", "vite", "bin", "vite.js"),
-          "preview",
-          "--port",
-          String(port),
-          "--strictPort",
-          "--host",
-          "127.0.0.1",
-        ],
-        { stdio: ["ignore", "pipe", "pipe"] },
-      );
-  server?.stdout?.on("data", (chunk) => appendFileSync(LOG_PATH, String(chunk)));
-  server?.stderr?.on("data", (chunk) => appendFileSync(LOG_PATH, String(chunk)));
+    : spawnVitePreview({ port, runner: "node-vite-bin", logPath: LOG_PATH });
 
   let browser: Browser | null = null;
   try {
