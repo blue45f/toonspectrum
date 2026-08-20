@@ -18,10 +18,10 @@
  * 브라우저를 만진다(테스트 주입 가능). 사용자 노출 문자열은 한글.
  */
 
-import { drawWatermarkOnSlice } from "./export/studio-export-presets";
 import { JPEG_QUALITY, canvasToBlob, downloadBlob } from "./studio-export";
+import { drawWatermarkOnSlice } from "./studio-export-presets";
 
-import type { WatermarkSettings } from "./studio-watermark";
+import type { WatermarkSettings } from "../studio-watermark";
 
 /** px→pt 변환 계수 — CSS 96dpi 픽셀을 PDF 72dpi 포인트로(1px = 0.75pt). */
 export const PDF_PX_TO_PT = 0.75;

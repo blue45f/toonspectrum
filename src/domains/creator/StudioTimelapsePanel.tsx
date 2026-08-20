@@ -2,7 +2,7 @@ import { AlertTriangle, Loader2, Play, Square, Video, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { downloadBlob } from "./studio-export";
+import { downloadBlob } from "./export/studio-export";
 import {
   TIMELAPSE_DURATION_PRESETS,
   TIMELAPSE_RESOLUTION_PRESETS,
@@ -18,8 +18,8 @@ import {
 } from "./studio-timelapse";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
+import type { MotionCutImage } from "./export/studio-motion-export";
 import type { HistorySnapshot } from "./studio-history-labels";
-import type { MotionCutImage } from "./studio-motion-export";
 
 export type StudioTimelapsePanelProps = {
   open: boolean;

@@ -10,9 +10,13 @@ import {
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { cn } from "../../../lib/utils";
+import { cn } from "../../../../lib/utils";
+import { PANEL_LAYOUTS, type PanelLayoutPreset } from "../studio-panel-layouts";
+import {
+  SCENE_TEMPLATE_CATEGORIES,
+  SCENE_TEMPLATES,
+} from "../studio-scene-templates";
 
-import { PANEL_LAYOUTS, type PanelLayoutPreset } from "./studio-panel-layouts";
 import {
   clampQuickComicStep,
   createQuickComicDraft,
@@ -20,12 +24,8 @@ import {
   QUICK_COMIC_STEPS,
   type QuickComicDraft,
 } from "./studio-quick-comic-plan";
-import {
-  SCENE_TEMPLATE_CATEGORIES,
-  SCENE_TEMPLATES,
-} from "./studio-scene-templates";
 
-import type { ComipoAssemblyInput } from "./studio-comipo-assembly";
+import type { ComipoAssemblyInput } from "../studio-comipo-assembly";
 
 export interface StudioQuickComicWizardProps {
   onApply: (input: ComipoAssemblyInput) => void;

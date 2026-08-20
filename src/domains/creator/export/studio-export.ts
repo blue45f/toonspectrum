@@ -2,7 +2,7 @@
 // 브라우저 캔버스는 한 변이 대략 16k~32k px를 넘으면 조용히 빈 이미지를 내놓으므로
 // 합성 전에 총 높이를 검사해 배율 하향 또는 분할 저장으로 우회한다.
 
-import { tagStudioRasterBlobResolution } from "./render/studio-raster-resolution-metadata";
+import { tagStudioRasterBlobResolution } from "../render/studio-raster-resolution-metadata";
 
 export const EXPORT_SCALES = [1, 2, 3] as const;
 export type ExportScale = (typeof EXPORT_SCALES)[number];

@@ -6,8 +6,8 @@
 import {
   studioEditableMeshToTriangleSoup,
   type StudioEditableMesh,
-} from "./studio-editable-half-edge-mesh";
-import { sha256HexPortable } from "./studio-sha256";
+} from "../studio-editable-half-edge-mesh";
+import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_MESH_EXPORT_ADAPTERS_REVISION = 1 as const;
 

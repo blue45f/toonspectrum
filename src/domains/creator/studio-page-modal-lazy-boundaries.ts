@@ -15,7 +15,7 @@ export const LazyStudioInterchangeLossPreviewDialog = lazy(() =>
 );
 
 export const LazyStudioQuickComicWizard = lazy(() =>
-  import("./StudioQuickComicWizard").then(({ StudioQuickComicWizard }) => ({
+  import("./comic/StudioQuickComicWizard").then(({ StudioQuickComicWizard }) => ({
     default: StudioQuickComicWizard,
   }))
 );

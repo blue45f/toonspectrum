@@ -11,7 +11,7 @@ import {
   type PageGrade,
 } from "../studio-page-grade";
 
-import type { ExportFormat } from "../studio-export";
+import type { ExportFormat } from "../export/studio-export";
 import type { PageState } from "../studio-page-state";
 import type {
   StudioRasterEncoded,
@@ -142,7 +142,7 @@ export function createStudioRasterExportOrchestration({
         exportMimeType,
         exportQuality,
         pageExportFileName,
-      } = await import("../studio-export");
+      } = await import("../export/studio-export");
       const blob = await canvasToBlob(
         canvas,
         exportMimeType(exportFormat),
@@ -227,7 +227,7 @@ export function createStudioRasterExportOrchestration({
       const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
       const canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
       drawWatermarkOnCanvas(canvas, watermarkForExport);
-      const { copyCanvasToClipboard } = await import("../studio-export");
+      const { copyCanvasToClipboard } = await import("../export/studio-export");
       await copyCanvasToClipboard(canvas);
       setError(null);
     } catch (error) {
@@ -252,7 +252,7 @@ export function createStudioRasterExportOrchestration({
       splitPagesForExport,
       stripExportFileName,
       stripTotalHeight,
-    } = await import("../studio-export");
+    } = await import("../export/studio-export");
     const pageHeights = pages.map((page) => page.canvasH);
     let scale = exportScale;
     let split = false;

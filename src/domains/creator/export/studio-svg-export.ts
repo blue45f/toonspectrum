@@ -272,12 +272,6 @@ import {
 import { buildStudioRoughSvgParityPlan } from "../studio-rough-svg-parity";
 import { skewDegToKonva, type SkewFields } from "../studio-skew";
 import {
-  STUDIO_SVG_R8_STREAMING_RGBA_BYTE_BUDGET,
-  visitStudioSvgR8StreamingCoverage,
-  type StudioSvgR8DabVariation,
-  type StudioSvgR8StreamingCoverageMark,
-} from "../studio-svg-r8-streaming-export";
-import {
   layoutVerticalText,
   verticalBlockAlign,
   verticalTextItemGeometry,
@@ -288,6 +282,13 @@ import {
 import {
   planStudioWebDrawingKitOwnedDabs,
 } from "../studio-web-drawing-stroke-bridge";
+
+import {
+  STUDIO_SVG_R8_STREAMING_RGBA_BYTE_BUDGET,
+  visitStudioSvgR8StreamingCoverage,
+  type StudioSvgR8DabVariation,
+  type StudioSvgR8StreamingCoverageMark,
+} from "./studio-svg-r8-streaming-export";
 
 import type { StudioBrushEngineProgramSet } from "../brush/studio-brush-engine-program-set";
 import type { BubbleVariant } from "../studio-assets";

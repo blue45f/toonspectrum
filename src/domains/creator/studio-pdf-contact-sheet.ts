@@ -13,10 +13,10 @@
  * 주입 가능한 createCanvas/toJpeg/download)을 따른다.
  */
 
-import { JPEG_QUALITY, downloadBlob } from "./studio-export";
-import { buildPdfFromJpegPages, canvasToJpegBytes } from "./studio-pdf-export";
+import { JPEG_QUALITY, downloadBlob } from "./export/studio-export";
+import { buildPdfFromJpegPages, canvasToJpegBytes } from "./export/studio-pdf-export";
 
-import type { PdfJpegPage } from "./studio-pdf-export";
+import type { PdfJpegPage } from "./export/studio-pdf-export";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 칩 선택지 · 기본값 — EXPORT_SCALES/EXPORT_PRESETS 와 동일 관례.

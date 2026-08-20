@@ -41,8 +41,8 @@ import type Konva from "konva";
 
 // Encoders and file sinks are not the subject here; the capture geometry is. Keeping the real
 // modules would only add DOM/worker requirements between the Stage read and the assertion.
-vi.mock("../studio-export", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../studio-export")>();
+vi.mock("../export/studio-export", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../export/studio-export")>();
   return {
     ...actual,
     canvasToBlob: async () => new Blob([]),

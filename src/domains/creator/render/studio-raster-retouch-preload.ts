@@ -1,4 +1,4 @@
-import { loadStudioSvgExportWorkerClientModule } from "../studio-document-export-loaders";
+import { loadStudioSvgExportWorkerClientModule } from "../export/studio-document-export-loaders";
 
 interface StudioRasterRetouchPreloadedModules {
   readonly svgWorkerClient: typeof import("../export/studio-svg-export-worker-client");

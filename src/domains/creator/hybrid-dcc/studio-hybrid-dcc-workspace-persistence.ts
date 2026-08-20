@@ -67,8 +67,8 @@ import {
 
 import type { StudioRetargetReport, StudioSpringBone } from "../studio-character-animation-p2";
 import type { StudioDccCollabRoom } from "./studio-dcc-collab-shell";
+import type { StudioMeshExportResult } from "../export/studio-mesh-export-adapters";
 import type { StudioManufacturingBom } from "../studio-manufacturing-bom-lite";
-import type { StudioMeshExportResult } from "../studio-mesh-export-adapters";
 import type { StudioOpfsFileSystem } from "../studio-opfs-filesystem";
 import type { StudioUvMap } from "../studio-uv-unwrap-lite";
 

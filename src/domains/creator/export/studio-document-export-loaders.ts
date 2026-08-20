@@ -1,7 +1,7 @@
-type StudioSvgExportModule = typeof import("./export/studio-svg-export");
-type StudioSvgExportWorkerClientModule = typeof import("./export/studio-svg-export-worker-client");
+type StudioSvgExportModule = typeof import("./studio-svg-export");
+type StudioSvgExportWorkerClientModule = typeof import("./studio-svg-export-worker-client");
 type StudioPsdExportModule = typeof import("./studio-psd-export");
-type StudioPsdImportModule = typeof import("./studio-psd-import");
+type StudioPsdImportModule = typeof import("../studio-psd-import");
 
 let svgExportModulePromise: Promise<StudioSvgExportModule> | null = null;
 let svgExportWorkerClientModulePromise: Promise<StudioSvgExportWorkerClientModule> | null = null;
@@ -15,7 +15,7 @@ let psdImportModulePromise: Promise<StudioPsdImportModule> | null = null;
  * deployment instead of poisoning the tab for the rest of its lifetime.
  */
 export function loadStudioSvgExportModule(): Promise<StudioSvgExportModule> {
-  svgExportModulePromise ??= import("./export/studio-svg-export").catch((error: unknown) => {
+  svgExportModulePromise ??= import("./studio-svg-export").catch((error: unknown) => {
     svgExportModulePromise = null;
     throw error;
   });
@@ -26,7 +26,7 @@ export function loadStudioSvgExportModule(): Promise<StudioSvgExportModule> {
  * 메인 스레드에서 막지 않고, Worker를 못 만드는 환경에서는 클라이언트 내부에서 동일 엔진으로
  * 폴백한다. MIME/파일명 등 가벼운 메타데이터는 여전히 loadStudioSvgExportModule을 쓴다. */
 export function loadStudioSvgExportWorkerClientModule(): Promise<StudioSvgExportWorkerClientModule> {
-  svgExportWorkerClientModulePromise ??= import("./export/studio-svg-export-worker-client").catch((error: unknown) => {
+  svgExportWorkerClientModulePromise ??= import("./studio-svg-export-worker-client").catch((error: unknown) => {
     svgExportWorkerClientModulePromise = null;
     throw error;
   });
@@ -42,7 +42,7 @@ export function loadStudioPsdExportModule(): Promise<StudioPsdExportModule> {
 }
 
 export function loadStudioPsdImportModule(): Promise<StudioPsdImportModule> {
-  psdImportModulePromise ??= import("./studio-psd-import").catch((error: unknown) => {
+  psdImportModulePromise ??= import("../studio-psd-import").catch((error: unknown) => {
     psdImportModulePromise = null;
     throw error;
   });

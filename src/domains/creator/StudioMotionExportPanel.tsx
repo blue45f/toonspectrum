@@ -7,8 +7,7 @@
 import { Clapperboard, Download, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { findBgmMood } from "./studio-bgm";
-import { downloadBlob } from "./studio-export";
+import { downloadBlob } from "./export/studio-export";
 import {
   MOTION_HOLD_PRESETS,
   MOTION_RESOLUTION_PRESETS,
@@ -20,7 +19,8 @@ import {
   startMotionExport,
   type MotionExportHandle,
   type MotionExportProgress,
-} from "./studio-motion-export";
+} from "./export/studio-motion-export";
+import { findBgmMood } from "./studio-bgm";
 import { REVEAL_PRESETS, findAmbientPreset, readWorkFx } from "./studio-motion-fx";
 
 import type { WorkDetail } from "@/src/infrastructure/creator-client";

@@ -337,7 +337,7 @@ export function createStudioProjectArchiveOrchestration({
         import("./studio-linked-3d-pass-project-archive"),
         import("./studio-linked-3d-pass-product-authority"),
         import("./studio-project-file"),
-        import("./studio-export"),
+        import("./export/studio-export"),
       ]);
       const sourceVrmFingerprint = JSON.stringify(
         collectStudioVrmProjectArchiveReferences(sourceProject).map((reference) => ({

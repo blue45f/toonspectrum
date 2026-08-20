@@ -23,7 +23,7 @@ export type {
   MotionCutImage,
   MotionExportProgress,
   MotionExportResult,
-} from "./studio-frame-animation-export";
+} from "./export/studio-frame-animation-export";
 
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;

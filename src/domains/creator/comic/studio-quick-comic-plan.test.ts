@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { PANEL_LAYOUTS } from "./studio-panel-layouts";
+import { PANEL_LAYOUTS } from "../studio-panel-layouts";
+import { SCENE_TEMPLATES } from "../studio-scene-templates";
+
 import {
   clampQuickComicStep,
   createQuickComicDraft,
@@ -8,7 +10,6 @@ import {
   createQuickComicPreview,
   QUICK_COMIC_STEPS,
 } from "./studio-quick-comic-plan";
-import { SCENE_TEMPLATES } from "./studio-scene-templates";
 
 describe("studio quick comic plan", () => {
   it("starts with a valid, useful layout and no pretend character or scene", () => {

@@ -105,7 +105,7 @@ const analysis = analyzeModule();
 
 describe("Studio out-of-core export clean-room AST boundary", () => {
   it("depends only on the portable digest primitive", () => {
-    expect(analysis.staticImports).toEqual(["./studio-sha256"]);
+    expect(analysis.staticImports).toEqual(["../studio-sha256"]);
     expect(analysis.dynamicImports).toEqual([]);
   });
 

@@ -24,7 +24,7 @@ import {
 
 const { downloadBlobMock } = vi.hoisted(() => ({ downloadBlobMock: vi.fn() }));
 
-vi.mock("./studio-export", () => ({ downloadBlob: downloadBlobMock }));
+vi.mock("./export/studio-export", () => ({ downloadBlob: downloadBlobMock }));
 
 const panelSource = readFileSync(
   resolve(process.cwd(), "src/domains/creator/StudioPaletteLibraryPanel.tsx"),

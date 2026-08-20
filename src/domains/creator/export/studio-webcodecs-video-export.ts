@@ -12,9 +12,9 @@
  * 인코더로 전부 검증된다. 컨테이너 조립은 studio-webcodecs-webm의 순수 muxer가 담당한다.
  */
 
-import { muxWebm, webmMimeType, type WebmVideoCodecId } from "./studio-webcodecs-webm";
+import { muxWebm, webmMimeType, type WebmVideoCodecId } from "../studio-webcodecs-webm";
 
-import type { StudioVideoTimeline, StudioVideoTimelineFrame } from "./studio-webcodecs-timeline";
+import type { StudioVideoTimeline, StudioVideoTimelineFrame } from "../studio-webcodecs-timeline";
 
 // ── 주입 심(WebCodecs 최소 서브셋) ────────────────────────────────────────
 

@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { MAX_CANVAS_DIM } from "../studio-export";
-
+import { MAX_CANVAS_DIM } from "./studio-export";
 import {
   EXPORT_PRESETS,
   exportPresetSlices,

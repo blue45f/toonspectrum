@@ -6,11 +6,21 @@ import {
   publishStudioExportResolutionDpi,
 } from "../render/studio-raster-resolution-metadata";
 import {
+  CONTACT_SHEET_PAGE_PRESETS,
+  contactSheetResultMessage,
+  DEFAULT_CONTACT_SHEET_COLUMNS,
+  DEFAULT_CONTACT_SHEET_ROWS,
+  exportContactSheetPdf,
+} from "../studio-pdf-contact-sheet";
+import { WATERMARK_POSITIONS, type WatermarkSettings } from "../studio-watermark";
+import { StudioContactSheetPanel } from "../StudioContactSheetPanel";
+
+import {
   loadStudioPsdExportModule,
   loadStudioSvgExportModule,
   preloadStudioPsdExportModule,
   preloadStudioSvgExportModule,
-} from "../studio-document-export-loaders";
+} from "./studio-document-export-loaders";
 import {
   EXPORT_FORMATS,
   EXPORT_SCALES,
@@ -20,18 +30,7 @@ import {
   exportFormatLabel,
   exportQuality,
   type ExportFormat,
-} from "../studio-export";
-import {
-  CONTACT_SHEET_PAGE_PRESETS,
-  contactSheetResultMessage,
-  DEFAULT_CONTACT_SHEET_COLUMNS,
-  DEFAULT_CONTACT_SHEET_ROWS,
-  exportContactSheetPdf,
-} from "../studio-pdf-contact-sheet";
-import { exportPagesToPdf, pdfExportResultMessage } from "../studio-pdf-export";
-import { WATERMARK_POSITIONS, type WatermarkSettings } from "../studio-watermark";
-import { StudioContactSheetPanel } from "../StudioContactSheetPanel";
-
+} from "./studio-export";
 import {
   readStudioExportGeometryDraft,
   writeStudioExportGeometryDraft,
@@ -56,15 +55,16 @@ import {
   validateExport,
   type PresetExportScope,
 } from "./studio-export-presets";
+import { exportPagesToPdf, pdfExportResultMessage } from "./studio-pdf-export";
 
 import type {
   StudioRasterEncoded,
   StudioRasterInterchangeFormat,
 } from "../render/studio-raster-interchange";
 import type { StudioInkMlExportResult } from "../studio-inkml-interchange";
-import type { PsdExportResult } from "../studio-psd-export";
+import type { PsdExportResult } from "./studio-psd-export";
 import type { SvgExportResult } from "./studio-svg-export";
-import type { StudioWillV1PageExportResult } from "../studio-will-v1-export-bridge";
+import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type { Dispatch, SetStateAction } from "react";
 
 import { cx } from "@/lib/cx";

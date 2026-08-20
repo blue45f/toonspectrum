@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 
+import { downloadBlob } from "./export/studio-export";
 import {
   adjacentEditableDialogueItem,
   collectDialogueItems,
@@ -61,7 +62,6 @@ import {
   formatDialogueTextWithRubyPreview,
   type DialogueRubySpan,
 } from "./lettering/studio-dialogue-ruby";
-import { downloadBlob } from "./studio-export";
 
 import { cx } from "@/lib/cx";
 

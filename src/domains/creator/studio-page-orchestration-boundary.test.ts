@@ -60,7 +60,7 @@ describe("StudioPage user-action orchestration boundary", () => {
   });
 
   it("keeps heavy export and archive codecs behind analyzable action boundaries", () => {
-    expect(rasterExportSource).toContain('await import("../studio-export")');
+    expect(rasterExportSource).toContain('await import("../export/studio-export")');
     expect(rasterExportSource).toContain(
       '"./studio-raster-interchange-worker-client"',
     );

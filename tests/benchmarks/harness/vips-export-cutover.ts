@@ -34,7 +34,7 @@ import {
   loadVipsForExport,
   planVipsExportRoute,
   type StudioVipsRaster,
-} from "../../../src/domains/creator/studio-vips-export";
+} from "../../../src/domains/creator/export/studio-vips-export";
 
 const REPO_ROOT = new URL("../../..", import.meta.url).pathname;
 const RESULTS_DIR = join(REPO_ROOT, "tests", "benchmarks", "results");
@@ -337,9 +337,9 @@ async function main(): Promise<void> {
     },
     cutover: {
       wiring:
-        "src/domains/creator/studio-export-presets.ts exportPresetSlices → prepareVipsRoutedPresetPages",
+        "src/domains/creator/export/studio-export-presets.ts exportPresetSlices → prepareVipsRoutedPresetPages",
       routing:
-        "src/domains/creator/studio-vips-export.ts planVipsExportRoute (edge 8192 / area 8192² / input 16384²)",
+        "src/domains/creator/export/studio-vips-export.ts planVipsExportRoute (edge 8192 / area 8192² / input 16384²)",
       fallback:
         "vips 로드·리샘플 실패 시 기존 drawImage 경로 + PresetExportResult.qualityWarning 표면화",
     },

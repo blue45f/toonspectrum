@@ -12,29 +12,29 @@
  * cannot guarantee the verified CPU sampler's pixels across renderers.
  */
 
-import { resolveNormalizedStudioBrushDabColor } from "./brush/studio-brush-material-dynamics";
+import { resolveNormalizedStudioBrushDabColor } from "../brush/studio-brush-material-dynamics";
 import {
   composeStudioBrushR8TipPaperAlphaMap,
   resolveStudioBrushR8GrainSampler,
-} from "./brush/studio-brush-r8-grain-runtime";
+} from "../brush/studio-brush-r8-grain-runtime";
 import {
   composeNormalizedStudioBrushTipLayerDab,
   composeStudioBrushDualTipAlphaMap,
   type StudioBrushComposableDab,
-} from "./brush/studio-brush-tip-composition";
+} from "../brush/studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
   type StudioBrushTipAlphaMap,
-} from "./brush/studio-brush-tip-stamp";
+} from "../brush/studio-brush-tip-stamp";
 import {
   bridgeStudioDynamicDabVariationToDryMediaV1,
   type StudioDynamicBrushMaterialIdentity,
-} from "./brush/studio-dry-media-dynamic-bridge";
+} from "../brush/studio-dry-media-dynamic-bridge";
 
 import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
-} from "./brush/studio-brush-dynamics";
+} from "../brush/studio-brush-dynamics";
 
 /**
  * Bounds the deterministic, uncompressed RGBA payload represented by SVG mask images. Base64 and

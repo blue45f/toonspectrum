@@ -44,28 +44,28 @@ describe("Studio frame animation lazy export boundary", () => {
     const model = moduleEdges("./studio-frame-animation.ts");
     const timing = moduleEdges("./studio-frame-animation-timing.ts");
 
-    expect(model.valueImports).not.toContain("./studio-motion-export");
-    expect(model.valueReexports).not.toContain("./studio-frame-animation-export");
+    expect(model.valueImports).not.toContain("./export/studio-motion-export");
+    expect(model.valueReexports).not.toContain("./export/studio-frame-animation-export");
     expect(timing.valueImports).toEqual([]);
     expect(timing.valueReexports).toEqual([]);
   });
 
   it("isolates motion export in the panel-only runtime module", () => {
-    const runtime = moduleEdges("./studio-frame-animation-export.ts");
+    const runtime = moduleEdges("./export/studio-frame-animation-export.ts");
     const panel = moduleEdges("./StudioFrameAnimationPanel.tsx");
 
     expect(runtime.valueImports).toContain("./studio-motion-export");
-    expect(runtime.valueImports).toContain("./studio-frame-animation-timing");
-    expect(runtime.valueImports).not.toContain("./studio-frame-animation");
+    expect(runtime.valueImports).toContain("../studio-frame-animation-timing");
+    expect(runtime.valueImports).not.toContain("../studio-frame-animation");
     expect(panel.valueImports).toContain("./studio-frame-animation");
-    expect(panel.valueImports).toContain("./studio-frame-animation-export");
+    expect(panel.valueImports).toContain("./export/studio-frame-animation-export");
   });
 
   it("does not import the export runtime from the Studio route entry", () => {
     const studio = moduleEdges("./StudioPage.tsx");
 
     expect(studio.valueImports).toContain("./studio-frame-animation");
-    expect(studio.valueImports).not.toContain("./studio-frame-animation-export");
-    expect(studio.valueImports).not.toContain("./studio-motion-export");
+    expect(studio.valueImports).not.toContain("./export/studio-frame-animation-export");
+    expect(studio.valueImports).not.toContain("./export/studio-motion-export");
   });
 });

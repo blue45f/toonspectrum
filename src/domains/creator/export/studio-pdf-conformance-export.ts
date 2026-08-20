@@ -7,23 +7,23 @@
  * certification.
  */
 
-import { buildVectorPdf } from "./render/studio-canvaskit-pdf-vector";
-import { auditStudioIccProfilePolicy } from "./studio-icc-profile-policy";
+import { buildVectorPdf } from "../render/studio-canvaskit-pdf-vector";
+import { auditStudioIccProfilePolicy } from "../studio-icc-profile-policy";
 import {
   preflightStudioPdfConformance,
   scanStudioPdfConformanceEvidence,
   verifyStudioPdfConformanceReceipt,
-} from "./studio-pdf-conformance-profile";
+} from "../studio-pdf-conformance-profile";
 
-import type { StudioPdfDocument } from "./render/studio-canvaskit-pdf-vector";
+import type { StudioPdfDocument } from "../render/studio-canvaskit-pdf-vector";
 import type {
   StudioIccProfilePolicyReceipt,
   StudioIccProviderManifest,
-} from "./studio-icc-profile-policy";
+} from "../studio-icc-profile-policy";
 import type {
   StudioPdfConformanceProfileId,
   StudioPdfConformanceReceipt,
-} from "./studio-pdf-conformance-profile";
+} from "../studio-pdf-conformance-profile";
 
 export type StudioPdfConformanceExportProfile = Extract<
   StudioPdfConformanceProfileId,

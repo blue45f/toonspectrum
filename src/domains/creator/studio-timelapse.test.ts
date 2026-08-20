@@ -22,8 +22,8 @@ import {
   type TimelapseStepInfo,
 } from "./studio-timelapse";
 
+import type { MotionCutImage, MotionRecorderLike, MotionStreamLike, MotionTrackLike } from "./export/studio-motion-export";
 import type { HistoryElementLike, HistoryPageLike, HistorySnapshot } from "./studio-history-labels";
-import type { MotionCutImage, MotionRecorderLike, MotionStreamLike, MotionTrackLike } from "./studio-motion-export";
 
 // ── 픽스처 헬퍼(studio-history-labels.test.ts 관례 재사용) ────────────
 

@@ -2,7 +2,8 @@ import { deflateSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-import { pngChunkCrc32 } from "./studio-apng-encoder";
+import { pngChunkCrc32 } from "../studio-apng-encoder";
+
 import {
   FRAME_ANIM_MEDIA_MIME,
   frameAnimMediaFileName,

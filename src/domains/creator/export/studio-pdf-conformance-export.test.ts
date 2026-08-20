@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMatrixTrcIccProfile } from "./render/studio-canvaskit-icc-profile";
-import { STUDIO_BUNDLED_SRGB_ICC_MANIFEST } from "./studio-icc-profile-policy";
+import { buildMatrixTrcIccProfile } from "../render/studio-canvaskit-icc-profile";
+import { STUDIO_BUNDLED_SRGB_ICC_MANIFEST } from "../studio-icc-profile-policy";
+
 import { exportStudioPdfConformanceCandidate } from "./studio-pdf-conformance-export";
 
-import type { StudioPdfDocument } from "./render/studio-canvaskit-pdf-vector";
+import type { StudioPdfDocument } from "../render/studio-canvaskit-pdf-vector";
 
 const fileIdentifierHex = "00112233445566778899AABBCCDDEEFF";
 

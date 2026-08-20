@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { JPEG_QUALITY } from "./studio-export";
+import { JPEG_QUALITY } from "./export/studio-export";
 import {
   CONTACT_SHEET_PAGE_PRESETS,
   contactSheetFileName,

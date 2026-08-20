@@ -9,7 +9,6 @@
  * (setPagesHi → 렌더 대기 → stage.toCanvas)은 캡처 콜백으로 주입받는다(StudioPage 통합 담당).
  */
 
-import { describeHistoryStep, type HistoryPageLike, type HistorySnapshot } from "./studio-history-labels";
 import {
   MOTION_RESOLUTION_PRESETS,
   isMotionExportSupported,
@@ -19,7 +18,8 @@ import {
   type MotionCutImage,
   type MotionRecorderLike,
   type MotionStreamLike,
-} from "./studio-motion-export";
+} from "./export/studio-motion-export";
+import { describeHistoryStep, type HistoryPageLike, type HistorySnapshot } from "./studio-history-labels";
 
 function clamp(n: number, min: number, max: number): number {
   if (!Number.isFinite(n)) return min;

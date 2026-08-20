@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { planConstantRateTimeline, planVariableRateTimeline } from "./studio-webcodecs-timeline";
+import { planConstantRateTimeline, planVariableRateTimeline } from "../studio-webcodecs-timeline";
+
 import {
   isWebCodecsExportCancelled,
   startWebCodecsVideoExport,
@@ -17,7 +18,7 @@ import {
   type WebCodecsVideoExportProgress,
 } from "./studio-webcodecs-video-export";
 
-import type { StudioVideoTimelineFrame } from "./studio-webcodecs-timeline";
+import type { StudioVideoTimelineFrame } from "../studio-webcodecs-timeline";
 
 async function expectCancelled(promise: Promise<unknown>): Promise<void> {
   await expect(promise).rejects.toThrow();

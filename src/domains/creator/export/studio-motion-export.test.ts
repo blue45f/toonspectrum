@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { findBgmMood } from "./studio-bgm";
+import { findBgmMood } from "../studio-bgm";
+import { DEFAULT_WORK_FX, REVEAL_PRESETS, emphasisAnimation, findAmbientPreset } from "../studio-motion-fx";
+
 import {
   DEFAULT_MOTION_EXPORT_OPTIONS,
   MOTION_HOLD_PRESETS,
@@ -33,7 +35,6 @@ import {
   type MotionSynthNode,
   type MotionTrackLike,
 } from "./studio-motion-export";
-import { DEFAULT_WORK_FX, REVEAL_PRESETS, emphasisAnimation, findAmbientPreset } from "./studio-motion-fx";
 
 // ── 플래너 ───────────────────────────────────────────────────────────
 

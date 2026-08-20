@@ -11,15 +11,15 @@
  * review.pdf Blob에만 결과를 넣어야 한다.
  */
 
+import { renderPagesToPdf } from "./export/studio-pdf-export";
 import { normalizePageReviewState, PAGE_REVIEW_STATUS_LABELS } from "./studio-page-review";
 import { cameraAngleLabel, shotTypeLabel } from "./studio-panel-shot-tags";
-import { renderPagesToPdf } from "./studio-pdf-export";
 import {
   getStudioReviewPdfProfile,
   normalizeStudioReviewPdfProfileId,
 } from "./studio-review-pdf-profile";
 
-import type { PdfPagesRenderOptions, PdfRenderResult } from "./studio-pdf-export";
+import type { PdfPagesRenderOptions, PdfRenderResult } from "./export/studio-pdf-export";
 import type { StudioReviewPdfFields } from "./studio-review-pdf-profile";
 import type { WatermarkSettings } from "./studio-watermark";
 

@@ -8,19 +8,20 @@
  * node 테스트에서 가짜로 대체할 수 있다. 이 모듈은 이미 lazy한 Frame Animation 패널 청크
  * 뒤에만 로드된다(studio-frame-animation-export를 통해서만 재수출).
  */
-import { assembleApng, isApngEncodeCancelled } from "./studio-apng-encoder";
+import { assembleApng, isApngEncodeCancelled } from "../studio-apng-encoder";
 import {
   encodeGif,
   gifDelayCentiseconds,
   isGifEncodeCancelled,
   type GifDitherMode,
-} from "./studio-gif-encoder";
+} from "../studio-gif-encoder";
+
 import { MotionExportCancelledError } from "./studio-motion-export";
 
 import type { MotionCutImage } from "./studio-motion-export";
 
-export { GIF_DITHER_PRESETS } from "./studio-gif-encoder";
-export type { GifDitherMode } from "./studio-gif-encoder";
+export { GIF_DITHER_PRESETS } from "../studio-gif-encoder";
+export type { GifDitherMode } from "../studio-gif-encoder";
 
 export type FrameAnimMediaFormat = "apng" | "gif";
 

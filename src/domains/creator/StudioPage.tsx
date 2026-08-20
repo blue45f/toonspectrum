@@ -413,7 +413,7 @@ import {
   loadStudioPsdExportModule,
   loadStudioPsdImportModule,
   loadStudioSvgExportWorkerClientModule,
-} from "./studio-document-export-loaders";
+} from "./export/studio-document-export-loaders";
 import {
   DODGE_BURN_EXPOSURE_DEFAULT,
   DODGE_BURN_HARDNESS_DEFAULT,
@@ -469,7 +469,7 @@ import { containingPanel, elBounds } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
 import {
   type ExportFormat,
-} from "./studio-export";
+} from "./export/studio-export";
 import { pickColorFromImageData } from "./studio-eyedropper";
 import {
   planStudioSelectionFlip,
@@ -1481,7 +1481,7 @@ import {
   WET_MIX_STRENGTH_DEFAULT,
   WET_MIX_WETNESS_DEFAULT,
 } from "./brush/studio-wet-mix";
-import { exportStudioPageToWillV1 } from "./studio-will-v1-export-bridge";
+import { exportStudioPageToWillV1 } from "./export/studio-will-v1-export-bridge";
 import {
   StudioWorkAssetAdmissionCoordinator,
   replaceStudioWorkAssetSourceAcrossHistory,
@@ -1708,13 +1708,13 @@ import type {
   StudioPixelSelectionToolId,
 } from "./studio-main-menu-surface-contract";
 import type { StudioMobileSheetSnap } from "./studio-mobile-sheet-snap";
-import type { MotionCutImage } from "./studio-motion-export";
+import type { MotionCutImage } from "./export/studio-motion-export";
 import type { StudioBg3dRecoveryAccessSnapshot } from "./studio-page-editor-runtime-contracts";
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
 import type { StudioProjectDocumentSessionProvenance } from "./studio-project-document-session";
-import type { PsdExportEl, PsdExportResult } from "./studio-psd-export";
+import type { PsdExportEl, PsdExportResult } from "./export/studio-psd-export";
 import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
 import type {
   StudioPublishAiProvenance,
@@ -1749,7 +1749,7 @@ import type {
   StudioWatermarkPreferenceRuntime,
   StudioWatermarkPreferenceSnapshot,
 } from "./studio-watermark-preferences-sqlite";
-import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
+import type { StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
 import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
 import type {
   StudioWorkspacePersistenceRuntime,
@@ -35741,7 +35741,7 @@ function clearSelectionForEdit() {
           });
         },
       });
-      const { downloadBlob } = await import("./studio-export");
+      const { downloadBlob } = await import("./export/studio-export");
       const archiveName = `${sanitizeStudioPublishFileStem(title, {
         fallback: "toonspectrum",
         maxCodeUnits: 90,
@@ -35930,7 +35930,7 @@ function clearSelectionForEdit() {
       structuralResult: publishPreflightResult,
       complianceResult: publishComplianceResult,
     };
-    const { downloadBlob } = await import("./studio-export");
+    const { downloadBlob } = await import("./export/studio-export");
     downloadBlob(
       new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }),
       `${(title.trim() || "toonspectrum").replace(/[\\/:*?"<>|]+/g, "-")}-publish-preflight.json`
@@ -35944,7 +35944,7 @@ function clearSelectionForEdit() {
       { downloadBlob },
       { serializeStudioPublishPackageManifest },
     ] = await Promise.all([
-      import("./studio-export"),
+      import("./export/studio-export"),
       import("./studio-publish-package-manifest-runtime"),
     ]);
     downloadBlob(
@@ -35957,7 +35957,7 @@ function clearSelectionForEdit() {
 
   async function downloadAiPublicSummary(summary: unknown) {
     if (!ensureSharedDocumentAvailableForExport()) return;
-    const { downloadBlob } = await import("./studio-export");
+    const { downloadBlob } = await import("./export/studio-export");
     downloadBlob(
       new Blob([JSON.stringify(summary, null, 2)], { type: "application/json" }),
       `${(title.trim() || "toonspectrum").replace(/[\\/:*?"<>|]+/g, "-")}-ai-public-summary.json`
@@ -36464,7 +36464,7 @@ function clearSelectionForEdit() {
     try {
       const [{ exportStudioAutoActionSetJson }, { downloadBlob }] = await Promise.all([
         import("./studio-auto-actions"),
-        import("./studio-export"),
+        import("./export/studio-export"),
       ]);
       const fileStem = sanitizeStudioPublishFileStem(autoActionSet.name, { fallback: "auto-action" }).slice(0, 80);
       downloadBlob(

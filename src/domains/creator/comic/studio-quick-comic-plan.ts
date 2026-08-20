@@ -2,10 +2,10 @@ import {
   assembleComipoPage,
   type ComipoAssemblyInput,
   type ComipoAssemblyResult,
-} from "./studio-comipo-assembly";
-import { parseDialogueScript } from "./studio-dialogue";
-import { PANEL_LAYOUTS, type PanelLayoutPreset } from "./studio-panel-layouts";
-import { SCENE_TEMPLATES, type SceneTemplate } from "./studio-scene-templates";
+} from "../studio-comipo-assembly";
+import { parseDialogueScript } from "../studio-dialogue";
+import { PANEL_LAYOUTS, type PanelLayoutPreset } from "../studio-panel-layouts";
+import { SCENE_TEMPLATES, type SceneTemplate } from "../studio-scene-templates";
 
 export const QUICK_COMIC_STEPS = [
   { id: "layout", label: "컷 레이아웃" },

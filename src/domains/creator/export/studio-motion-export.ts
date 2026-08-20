@@ -15,7 +15,7 @@
  * 주의: MediaRecorder+captureStream은 실시간 녹화라 내보내기에 영상 길이만큼 시간이 걸린다.
  */
 
-import { buildProgression, findBgmMood, noteToFreq, type BgmMood } from "./studio-bgm";
+import { buildProgression, findBgmMood, noteToFreq, type BgmMood } from "../studio-bgm";
 import {
   buildAmbientParticles,
   cutFx,
@@ -26,7 +26,7 @@ import {
   type AmbientParticle,
   type AmbientPreset,
   type WorkFxSettings,
-} from "./studio-motion-fx";
+} from "../studio-motion-fx";
 
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;

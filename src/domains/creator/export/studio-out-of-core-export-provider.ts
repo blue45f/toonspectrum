@@ -1,4 +1,4 @@
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_OUT_OF_CORE_EXPORT_PROVIDER_REVISION = 1 as const;
 

@@ -7,6 +7,10 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 
+import {
+  exportStudioMeshObj,
+  exportStudioMeshStlAscii,
+} from "../export/studio-mesh-export-adapters";
 import { STUDIO_CLOTH_XPBD_V2_BUDGETS } from "../studio-cloth-xpbd-kernel-v2";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
@@ -26,10 +30,6 @@ import {
   bomEstimateMassKg,
   bomRollupByMaterial,
 } from "../studio-manufacturing-bom-lite";
-import {
-  exportStudioMeshObj,
-  exportStudioMeshStlAscii,
-} from "../studio-mesh-export-adapters";
 import {
   importStudio3mfMinimal,
   importStudioBvhMotion,

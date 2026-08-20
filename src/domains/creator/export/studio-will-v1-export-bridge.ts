@@ -11,16 +11,16 @@
 import {
   resolveStudioInkPressureSamples,
   studioInkPressureDiameter,
-} from "./brush/studio-ink-pressure-model";
-import { parseStudioGpuColor } from "./render/studio-webgpu-color";
+} from "../brush/studio-ink-pressure-model";
+import { parseStudioGpuColor } from "../render/studio-webgpu-color";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 import type {
   StudioWillV1LossReport,
   StudioWillV1PathInput,
-} from "./studio-will-v1-interchange";
-import type { StudioWillV1OpcBuildResult } from "./studio-will-v1-opc-interchange";
-import type { StudioWillV1OpcWorkerOptions } from "./studio-will-v1-opc-worker-client";
+} from "../studio-will-v1-interchange";
+import type { StudioWillV1OpcBuildResult } from "../studio-will-v1-opc-interchange";
+import type { StudioWillV1OpcWorkerOptions } from "../studio-will-v1-opc-worker-client";
 
 export const STUDIO_WILL_V1_EXPORT_PROFILE_LABEL =
   "ToonSpectrum bounded WILL v1 Annex B public-spec profile" as const;
@@ -267,8 +267,8 @@ export async function exportStudioPageToWillV1(
   const result = await runBoundedWillV1Export(
     async (signal) => {
       const [workerRuntime, interchange] = await Promise.all([
-        import("./studio-will-v1-opc-worker-client"),
-        import("./studio-will-v1-opc-interchange"),
+        import("../studio-will-v1-opc-worker-client"),
+        import("../studio-will-v1-opc-interchange"),
       ]);
       const { buildStudioWillV1OpcBytesInWorker } = workerRuntime;
       const {

@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   preloadVectorRasterizer: vi.fn(),
 }));
 
-vi.mock("../studio-document-export-loaders", () => ({
+vi.mock("../export/studio-document-export-loaders", () => ({
   loadStudioSvgExportWorkerClientModule: mocks.loadSvgWorkerClient,
 }));
 vi.mock("../studio-vector-fill-reference", () => ({

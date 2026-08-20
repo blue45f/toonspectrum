@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { planMotionExport } from "./studio-motion-export";
+import { planMotionExport } from "./export/studio-motion-export";
 import {
   AMBIENT_PRESETS,
   CUT_BGM_SILENCE,

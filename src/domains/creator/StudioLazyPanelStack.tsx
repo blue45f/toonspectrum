@@ -41,6 +41,7 @@ import type { StudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import type { StudioAiImageReferenceAssetOption } from "./ai/StudioAiImageReferencePackEditor";
 import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
 import type { StudioBg3dShotBatchRecoveryScope } from "./bg3d/studio-bg3d-shot-batch-plan";
+import type { MotionCutImage } from "./export/studio-motion-export";
 import type {
   StudioBg3dAiMethodReferenceCapture,
 } from "./scene-3d/studio-3d-ai-reference-handoff";
@@ -69,7 +70,6 @@ import type { StudioDraftCollaborationReadiness } from "./studio-draft-collabora
 import type { Tool } from "./studio-editor-tool-model";
 import type { El } from "./studio-element-model";
 import type { StudioMacroSession } from "./studio-macro-recorder";
-import type { MotionCutImage } from "./studio-motion-export";
 import type { StudioPageDnd } from "./studio-page-dnd";
 import type { PageReviewState } from "./studio-page-review";
 import type { PageState } from "./studio-page-state";

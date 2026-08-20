@@ -11,7 +11,7 @@ import {
   renderStudioReviewPdf,
 } from "./studio-review-pdf";
 
-import type { PdfPagesRenderOptions, PdfRenderResult } from "./studio-pdf-export";
+import type { PdfPagesRenderOptions, PdfRenderResult } from "./export/studio-pdf-export";
 
 function fakeCanvas(width: number, height: number, hasContext = true): HTMLCanvasElement {
   const context = hasContext

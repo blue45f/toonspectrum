@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  DEFAULT_FRAME_ANIMATION_EXPORT_OPTIONS,
+  frameAnimationExportFileName,
+  isMotionExportCancelled,
+  planFrameAnimationExport,
+  startFrameAnimationExport,
+  type FrameAnimationExportPlan,
+  type MotionCutImage,
+} from "./export/studio-frame-animation-export";
+import {
   DEFAULT_FRAME_FPS,
   DEFAULT_ONION_SKIN,
   MAX_ANIM_FRAMES,
@@ -21,17 +30,8 @@ import {
   type OnionSkinSettings,
   type StudioAnimFrame,
 } from "./studio-frame-animation";
-import {
-  DEFAULT_FRAME_ANIMATION_EXPORT_OPTIONS,
-  frameAnimationExportFileName,
-  isMotionExportCancelled,
-  planFrameAnimationExport,
-  startFrameAnimationExport,
-  type FrameAnimationExportPlan,
-  type MotionCutImage,
-} from "./studio-frame-animation-export";
 
-import type { MotionExportDeps } from "./studio-motion-export";
+import type { MotionExportDeps } from "./export/studio-motion-export";
 
 function frame(id: string, durationMs?: number): StudioAnimFrame {
   return durationMs === undefined ? { id, src: `data:${id}` } : { id, src: `data:${id}`, durationMs };

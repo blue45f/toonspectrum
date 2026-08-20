@@ -8,7 +8,8 @@
 import {
   frameDurationsMs,
   frameIndexAtElapsed,
-} from "./studio-frame-animation-timing";
+} from "../studio-frame-animation-timing";
+
 import {
   MotionExportCancelledError,
   createDefaultMotionExportDeps,
@@ -23,7 +24,7 @@ import {
   type MotionExportResult,
 } from "./studio-motion-export";
 
-import type { StudioAnimFrame } from "./studio-frame-animation";
+import type { StudioAnimFrame } from "../studio-frame-animation";
 
 export { isMotionExportCancelled, isMotionExportSupported, loadMotionCutImages };
 export type {

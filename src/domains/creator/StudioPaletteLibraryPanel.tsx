@@ -3,7 +3,7 @@
 import { AlertTriangle, CheckCircle2, Download, Pencil, Plus, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
-import { downloadBlob } from "./studio-export";
+import { downloadBlob } from "./export/studio-export";
 import {
   createPalette,
   deletePaletteInMemory,

@@ -11,13 +11,13 @@
  * excluded before serialization. The output is transient and guarded by source/SVG/PNG byte caps
  * plus the Advanced Fill canvas pixel cap.
  */
+import { loadStudioSvgExportWorkerClientModule } from "./export/studio-document-export-loaders";
 import {
   currentStudioAdvancedFillBrowserMaxPixels,
   formatStudioAdvancedFillRasterSizeError,
   STUDIO_ADVANCED_FILL_BROWSER_MAX_PIXELS,
   validateStudioAdvancedFillRasterDimensions,
 } from "./studio-advanced-fill-raster-safety";
-import { loadStudioSvgExportWorkerClientModule } from "./studio-document-export-loaders";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 import {
   createStudioOffscreenRasterSession,

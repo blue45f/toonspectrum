@@ -6,6 +6,11 @@
 
 import { getStudioBg3dRoomPreset, buildStudioBg3dRoomParts } from "../bg3d/studio-bg3d-room-builder";
 import {
+  exportStudioMeshByFormat,
+  type StudioMeshExportFormat,
+  type StudioMeshExportResult,
+} from "../export/studio-mesh-export-adapters";
+import {
   createStudioLiveBridgeDocument,
   createStudioSharedSet,
   applyStudioShotOverride,
@@ -66,11 +71,6 @@ import {
   bomFromAssetParts,
   type StudioManufacturingBom,
 } from "../studio-manufacturing-bom-lite";
-import {
-  exportStudioMeshByFormat,
-  type StudioMeshExportFormat,
-  type StudioMeshExportResult,
-} from "../studio-mesh-export-adapters";
 import { importStudioMeshByExtension } from "../studio-mesh-format-adapters";
 import {
   createStudioMeshModifierStack,

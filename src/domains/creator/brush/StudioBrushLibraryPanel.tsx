@@ -30,8 +30,8 @@ import {
   type KeyboardEvent,
 } from "react";
 
+import { downloadBlob } from "../export/studio-export";
 import { BRUSH_PRESETS } from "../studio-brush";
-import { downloadBlob } from "../studio-export";
 import { useStudioInspectorFocusScroll } from "../studio-inspector-focus-effect";
 
 import { studioCoreBrushCatalogItemById } from "./studio-brush-catalog-core";

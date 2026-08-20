@@ -50,14 +50,14 @@ import {
   type DialogueRubyExportIssue,
   type DialogueRubyExportWarning,
   type DialogueRubyExportMetadataRecord,
-} from "./lettering/studio-dialogue-ruby-export";
-import { readStudioExportResolutionDpi } from "./render/studio-raster-resolution-metadata";
+} from "../lettering/studio-dialogue-ruby-export";
+import { readStudioExportResolutionDpi } from "../render/studio-raster-resolution-metadata";
 
 import type {
   PsdInterchangeLossDecision,
   PsdInterchangeLossManifest,
   PsdInterchangeProfile,
-} from "./studio-psd-import";
+} from "../studio-psd-import";
 import type Konva from "konva";
 
 // ---------------------------------------------------------------------------

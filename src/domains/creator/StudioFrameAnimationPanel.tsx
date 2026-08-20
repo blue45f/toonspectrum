@@ -8,9 +8,26 @@
 import { ChevronLeft, ChevronRight, Copy, Download, Film, Ghost, Pause, Play, Square, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { downloadBlob } from "./export/studio-export";
+import {
+  FRAME_ANIM_EXPORT_SCALE_PRESETS,
+  FRAME_ANIM_LOOP_COUNT_PRESETS,
+  GIF_DITHER_PRESETS,
+  frameAnimMediaFileName,
+  frameAnimationExportFileName,
+  isFrameAnimMediaExportSupported,
+  isMotionExportCancelled,
+  isMotionExportSupported,
+  loadMotionCutImages,
+  planFrameAnimationExport,
+  startFrameAnimationExport,
+  startFrameAnimMediaExport,
+  type FrameAnimMediaProgress,
+  type GifDitherMode,
+  type MotionExportProgress,
+} from "./export/studio-frame-animation-export";
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
 import { studioRemoveFrameAnimationRequest } from "./studio-destructive-command-catalog";
-import { downloadBlob } from "./studio-export";
 import {
   DEFAULT_FRAME_FPS,
   MAX_ANIM_FRAMES,
@@ -28,23 +45,6 @@ import {
   type OnionSkinSettings,
   type StudioAnimFrame,
 } from "./studio-frame-animation";
-import {
-  FRAME_ANIM_EXPORT_SCALE_PRESETS,
-  FRAME_ANIM_LOOP_COUNT_PRESETS,
-  GIF_DITHER_PRESETS,
-  frameAnimMediaFileName,
-  frameAnimationExportFileName,
-  isFrameAnimMediaExportSupported,
-  isMotionExportCancelled,
-  isMotionExportSupported,
-  loadMotionCutImages,
-  planFrameAnimationExport,
-  startFrameAnimationExport,
-  startFrameAnimMediaExport,
-  type FrameAnimMediaProgress,
-  type GifDitherMode,
-  type MotionExportProgress,
-} from "./studio-frame-animation-export";
 import { PANEL_LABEL_ROW, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 import { StudioToolHintTarget } from "./StudioToolHint";
 

@@ -3,22 +3,23 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_WILL_V1_OPC_ASSURANCE,
+} from "../studio-will-v1-opc-interchange";
+
+import {
   exportStudioPageToWillV1,
   STUDIO_WILL_V1_EXPORT_DISCLAIMER,
 } from "./studio-will-v1-export-bridge";
-import {
-  STUDIO_WILL_V1_OPC_ASSURANCE,
-} from "./studio-will-v1-opc-interchange";
 
-import type { DrawEl } from "./studio-element-model";
+import type { DrawEl } from "../studio-element-model";
 
 const { buildStudioWillV1OpcBytesInWorker } = vi.hoisted(() => ({
   buildStudioWillV1OpcBytesInWorker: vi.fn(),
 }));
 
-vi.mock("./studio-will-v1-opc-worker-client", async (importOriginal) => {
+vi.mock("../studio-will-v1-opc-worker-client", async (importOriginal) => {
   const actual = await importOriginal<
-    typeof import("./studio-will-v1-opc-worker-client")
+    typeof import("../studio-will-v1-opc-worker-client")
   >();
   return {
     ...actual,
@@ -59,15 +60,15 @@ beforeEach(() => {
 describe("Studio WILL v1 page export bridge", () => {
   it("keeps the Studio click path on a static bridge import instead of an unbounded chunk request", () => {
     const studioPage = readFileSync(
-      new URL("./StudioPage.tsx", import.meta.url),
+      new URL("../StudioPage.tsx", import.meta.url),
       "utf8",
     );
 
     expect(studioPage).toMatch(
-      /import\s*\{\s*exportStudioPageToWillV1\s*\}\s*from\s*["']\.\/studio-will-v1-export-bridge["']/,
+      /import\s*\{\s*exportStudioPageToWillV1\s*\}\s*from\s*["']\.\/export\/studio-will-v1-export-bridge["']/,
     );
     expect(studioPage).not.toContain(
-      'await import("./studio-will-v1-export-bridge")',
+      'await import("./export/studio-will-v1-export-bridge")',
     );
   });
 
@@ -78,13 +79,13 @@ describe("Studio WILL v1 page export bridge", () => {
     );
 
     expect(bridgeSource).not.toMatch(
-      /import\s+\{[^}]*\}\s+from\s+["']\.\/studio-will-v1-opc-(?:interchange|worker-client)["']/u,
+      /import\s+\{[^}]*\}\s+from\s+["']\.\.\/studio-will-v1-opc-(?:interchange|worker-client)["']/u,
     );
     expect(bridgeSource).toContain(
-      'import("./studio-will-v1-opc-worker-client")',
+      'import("../studio-will-v1-opc-worker-client")',
     );
     expect(bridgeSource).toContain(
-      'import("./studio-will-v1-opc-interchange")',
+      'import("../studio-will-v1-opc-interchange")',
     );
   });
 

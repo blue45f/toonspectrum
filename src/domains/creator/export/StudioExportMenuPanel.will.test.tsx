@@ -4,12 +4,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_WILL_V1_OPC_ASSURANCE } from "../studio-will-v1-opc-interchange";
+
 import {
   STUDIO_WILL_V1_EXPORT_DISCLAIMER,
   STUDIO_WILL_V1_EXPORT_PROFILE_LABEL,
-} from "../studio-will-v1-export-bridge";
-import { STUDIO_WILL_V1_OPC_ASSURANCE } from "../studio-will-v1-opc-interchange";
-
+} from "./studio-will-v1-export-bridge";
 import { StudioExportMenuPanel } from "./StudioExportMenuPanel";
 
 afterEach(() => {
