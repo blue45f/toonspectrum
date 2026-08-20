@@ -1531,11 +1531,13 @@ import {
   areStudioWorkspaceLayoutsEqual,
   captureStudioWorkspaceDeviceLayout,
   createStudioWorkspaceDefaultState,
+  normalizeStudioCommandBarPreferences,
   normalizeStudioWorkspaceStateForOwner,
   normalizeStudioWorkspaceLayout,
   resolveStudioWorkspaceControlSide,
   resolveStudioWorkspaceDeviceKind,
   resolveStudioWorkspaceDeviceLayout,
+  setStudioCommandBarVisible,
   studioWorkspaceLaunchSurface,
   studioWorkspaceOwnerScope,
   updateStudioWorkspaceLiveLayout,
@@ -34695,6 +34697,17 @@ function clearSelectionForEdit() {
     toggleHorizontalCanvasView,
     togglePerspectiveGuideView,
     toggleSelectedClippingMask,
+    toggleStudioCommandBar: () => {
+      const state = workspacePersistenceRef.current.state;
+      const layout = state.liveLayout;
+      const prefs = normalizeStudioCommandBarPreferences(layout.commandBar);
+      persistStudioWorkspaceState(
+        updateStudioWorkspaceLiveLayout(state, {
+          ...layout,
+          commandBar: setStudioCommandBarVisible(prefs, !prefs.visible),
+        }),
+      );
+    },
     toggleStudioQuickAccessPalette,
     undo,
   });
@@ -34940,6 +34953,8 @@ function clearSelectionForEdit() {
       timelineOpen,
     ],
   );
+  const menuCommandBarVisible =
+    workspacePersistence.state.liveLayout.commandBar?.visible !== false;
   const studioMainMenuGroups = useMemo(
     () => {
       return buildStudioMainMenuGroups({
@@ -34992,6 +35007,7 @@ function clearSelectionForEdit() {
           clippingMaskDisabled: menuClippingMaskDisabled,
           imageLayerSelected: menuImageLayerSelected,
           activeToolCommandId: menuActiveToolCommandId,
+          commandBarVisible: menuCommandBarVisible,
         },
         // Name-for-name delegation; it carries no browser state, so it lives in
         // the pure layer (`studio-main-menu-editor-bindings.ts`).
@@ -35075,6 +35091,7 @@ function clearSelectionForEdit() {
           toggleQuickAccessPalette: studioMainMenuActions.toggleStudioQuickAccessPalette,
           toggleLeftPanel: () => setLeftPanelOpenWithOverride((current) => !current),
           toggleRightPanel: () => setRightPanelOpenWithOverride((current) => !current),
+          toggleCommandBar: studioMainMenuActions.toggleStudioCommandBar,
           openShortcuts: () => setShortcutsOpen(true),
           selectDrawMode: (mode) => {
             studioMainMenuActions.activatePrimaryCanvasTool("draw", mode);
@@ -35108,6 +35125,7 @@ function clearSelectionForEdit() {
       menuActiveToolCommandId,
       menuClippingMaskActive,
       menuClippingMaskDisabled,
+      menuCommandBarVisible,
       menuImageLayerSelected,
       menuEditClearDisabled,
       menuEditCopyDisabled,
@@ -37230,6 +37248,7 @@ function clearSelectionForEdit() {
     openOwnerFxPanel,
     redo,
     persistStudioWorkspaceState,
+    zoomToFit: fitCanvasToWidth,
     setWatermark,
     toggleHistoryPanel: () => setHistoryPanelOpen((open) => !open),
     undo,
