@@ -10,6 +10,7 @@ import {
 import { z } from "zod";
 
 import { BRUSH_PREVIEW_DEFAULTS } from "./brush-preview";
+import { flattenCenterline } from "./compile";
 import {
   layTextOnPath,
   simulateParticleSplats,
@@ -1503,60 +1504,8 @@ function requireEngine<T>(engine: T | undefined, stage: string, hint: string): T
   return engine;
 }
 
-/** Fixed subdivision per fitted segment — determinism over adaptive stepping. */
-const CENTERLINE_FLATTEN_STEPS = 16;
-
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
-}
-
-/** Deterministic fixed-step flattening of a fitted centerline PathIR. */
-function flattenCenterline(path: PathIR): Array<[number, number]> {
-  const points: Array<[number, number]> = [];
-  const push = (x: number, y: number): void => {
-    const last = points[points.length - 1];
-    if (!last || Math.abs(last[0] - x) > 1e-9 || Math.abs(last[1] - y) > 1e-9) {
-      points.push([x, y]);
-    }
-  };
-  let cx = 0;
-  let cy = 0;
-  for (const verb of path.verbs) {
-    if (verb.v === "Z") continue;
-    if (verb.v === "M") {
-      cx = verb.x;
-      cy = verb.y;
-      push(cx, cy);
-      continue;
-    }
-    for (let step = 1; step <= CENTERLINE_FLATTEN_STEPS; step += 1) {
-      const t = step / CENTERLINE_FLATTEN_STEPS;
-      if (verb.v === "L") {
-        push(lerp(cx, verb.x, t), lerp(cy, verb.y, t));
-      } else if (verb.v === "Q") {
-        const u = 1 - t;
-        push(
-          u * u * cx + 2 * u * t * verb.cx + t * t * verb.x,
-          u * u * cy + 2 * u * t * verb.cy + t * t * verb.y,
-        );
-      } else {
-        const u = 1 - t;
-        push(
-          u * u * u * cx +
-            3 * u * u * t * verb.c1x +
-            3 * u * t * t * verb.c2x +
-            t * t * t * verb.x,
-          u * u * u * cy +
-            3 * u * u * t * verb.c1y +
-            3 * u * t * t * verb.c2y +
-            t * t * t * verb.y,
-        );
-      }
-    }
-    cx = verb.x;
-    cy = verb.y;
-  }
-  return points;
 }
 
 /** Normalized cumulative arc length (0..1) of a point sequence. */

@@ -1,4 +1,10 @@
 import {
+  refitSettledCenterline,
+  type CenterlineFitEngine,
+  type SettledCenterlineRefitResult,
+} from "@toonspectrum/studio-brush-platform";
+
+import {
   requireStudioDrawingPointerTransport,
   type StudioDrawingPointerTransport,
 } from "./brush/studio-drawing-pointer-transport";
@@ -558,4 +564,75 @@ export function createStudioPageVectorOps(
   }
 
   return { applyPaperVectorRefinement, applyPathBooleanCombine };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Settled-stroke centerline refit — opt-in enhancer seam (V12 §12.2 "Kurbo
+ * centerline" in the product vector-path lane).
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Explicit product gate for the settled-phase Kurbo centerline refit. The
+ * capability ships default-OFF: with no options (or `enabled: false`) the seam
+ * is a pure no-op — it touches nothing, calls no engine, and existing vector
+ * ops stay byte-identical. Turning it on product-wide is an authority change
+ * that requires the visual-equivalence gate first; until then only explicit
+ * callers (tests, gated experiments) pass `enabled: true`.
+ */
+export interface StudioSettledCenterlineRefitOptions {
+  readonly enabled: boolean;
+  /** Injected Kurbo fitter (studio-engine-vello fitPolylineToPath). */
+  readonly fitEngine: CenterlineFitEngine;
+  /** Kurbo fit tolerance in px (package default 0.35). */
+  readonly accuracy?: number;
+  /** Deviation gate in px (package default accuracy × 2). */
+  readonly maxDeviationPx?: number;
+}
+
+export type StudioSettledCenterlineRefitOutcome =
+  | { readonly kind: "disabled" }
+  | { readonly kind: "ineligible"; readonly reason: string }
+  | { readonly kind: "refit"; readonly refit: SettledCenterlineRefitResult };
+
+/**
+ * Post-settle enhancer seam: refit a settled freehand stroke's CENTERLINE
+ * (never the outline polygon — the package guard throws a typed
+ * CenterlineRefitError on ring input; kurbo has measured non-termination on
+ * sliver outlines) to a smooth editable bezier.
+ *
+ * The outcome is a PathIR proposal plus its numeric receipt; the DrawEl is
+ * never mutated here. The document model has no fitted-centerline field yet,
+ * so the sample polyline stays the persistence authority until the visual
+ * gate and the model slice land — this seam ships the capability, not the
+ * authority change. Package invariant violations (endpoint drift, deviation
+ * beyond tolerance, degenerate fit) propagate as CenterlineRefitError: the
+ * caller keeps the original stroke, never a silent approximation.
+ */
+export function refitSettledStudioStrokeCenterline(
+  element: DrawEl,
+  options?: StudioSettledCenterlineRefitOptions,
+): StudioSettledCenterlineRefitOutcome {
+  if (options?.enabled !== true) return { kind: "disabled" };
+  if ((element.kind ?? "freehand") !== "freehand") {
+    return { kind: "ineligible", reason: "shape-stroke" };
+  }
+  if (element.mode === "eraser") {
+    // Refitting an eraser centerline would silently change erase coverage.
+    return { kind: "ineligible", reason: "eraser-stroke" };
+  }
+  const points = element.points;
+  if (points.length < 4 || points.length % 2 !== 0) {
+    return { kind: "ineligible", reason: "insufficient-points" };
+  }
+  const centerline: Array<readonly [number, number]> = [];
+  for (let at = 0; at < points.length; at += 2) {
+    centerline.push([points[at]!, points[at + 1]!] as const);
+  }
+  const refit = refitSettledCenterline(centerline, options.fitEngine, {
+    ...(options.accuracy !== undefined ? { accuracy: options.accuracy } : {}),
+    ...(options.maxDeviationPx !== undefined
+      ? { maxDeviationPx: options.maxDeviationPx }
+      : {}),
+  });
+  return { kind: "refit", refit };
 }
