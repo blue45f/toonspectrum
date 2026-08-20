@@ -122,10 +122,12 @@ export function renderStudioMangaLinesToCanvas(
   height: number,
   settings: StudioMangaFocusLinesSettings
 ): void {
+  ctx.save?.();
   const pathData = generateStudioMangaLinesPathData(width, height, settings);
   const path = new Path2D(pathData);
   ctx.fillStyle = settings.color;
   ctx.fill(path);
+  ctx.restore?.();
 }
 
 /**

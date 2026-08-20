@@ -107,40 +107,25 @@ describe('StudioMangaFocusLines', () => {
          })
        };
     } else if (typeof document !== 'undefined') {
-       // Mock for happy-dom/jsdom if canvas lacks full features
-       const originalCreateElement = document.createElement.bind(document);
-       vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
-         if (tag === 'canvas') {
-           return {
-             width: 10,
-             height: 10,
-             getContext: () => ({
-               putImageData: vi.fn(),
-               fill: vi.fn(),
-               getImageData: vi.fn().mockReturnValue(new ImageDataCtor(data, width, height))
-             })
-           } as any;
-         }
-         return originalCreateElement(tag);
-       });
-    }
-    
-    it('renders onto canvas context cleanly', () => {
-      const mockCtx = {
-        save: vi.fn(),
-        restore: vi.fn(),
-        beginPath: vi.fn(),
-        moveTo: vi.fn(),
-        lineTo: vi.fn(),
-        closePath: vi.fn(),
-        fill: vi.fn(),
-        fillStyle: '',
-      } as unknown as CanvasRenderingContext2D;
-
-      expect(() => renderStudioMangaLinesToCanvas(mockCtx, 800, 600, baseSettings)).not.toThrow();
-      expect(mockCtx.save).toHaveBeenCalled();
-      expect(mockCtx.restore).toHaveBeenCalled();
-    });
+        // Mock for happy-dom/jsdom if canvas lacks full features
+        const originalCreateElement = document.createElement.bind(document);
+        vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+          if (tag === 'canvas') {
+            return {
+              width: 10,
+              height: 10,
+              getContext: () => ({
+                save: vi.fn(),
+                restore: vi.fn(),
+                putImageData: vi.fn(),
+                fill: vi.fn(),
+                getImageData: vi.fn().mockReturnValue(new ImageDataCtor(data, width, height))
+              })
+            } as unknown as HTMLCanvasElement;
+          }
+          return originalCreateElement(tag);
+        });
+     }
 
     // We also mock Path2D to prevent errors in purely nodish environments without canvas polyfills
     if (typeof Path2D === 'undefined') {
@@ -153,5 +138,22 @@ describe('StudioMangaFocusLines', () => {
     expect(result).toBeDefined();
     expect(result.width).toBe(width);
     expect(result.height).toBe(height);
+  });
+
+  it('renders onto canvas context cleanly', () => {
+    const mockCtx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      fill: vi.fn(),
+      fillStyle: '',
+    } as unknown as CanvasRenderingContext2D;
+
+    expect(() => renderStudioMangaLinesToCanvas(mockCtx, 800, 600, baseSettings)).not.toThrow();
+    expect(mockCtx.save).toHaveBeenCalled();
+    expect(mockCtx.restore).toHaveBeenCalled();
   });
 });
