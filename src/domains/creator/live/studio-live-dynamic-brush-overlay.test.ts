@@ -2289,6 +2289,94 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     ]).toEqual([1, 1, 1, 1, 1, 1]);
   });
 
+  it("crops the settle flatten to the whole-stroke dirty union with pixel-identical coverage", () => {
+    const anchors = [
+      [24, 28],
+      [70, 52],
+      [122, 84],
+      [188, 122],
+    ] as const;
+    const elementAt = (count: number) => drawElement(
+      "settle-dirty-union",
+      anchors.slice(0, count).flat(),
+      {
+        brush: "ink-particle",
+        brushDynamics: segmentedCausalOverlayDynamics(),
+        strokeWidth: 2,
+        pressures: Array.from({ length: count }, () => 0.7),
+      },
+    );
+
+    const live = attachedRenderer();
+    expect(live.renderer.begin(elementAt(1)).status).toBe("started");
+    expect(live.renderer.appendFrom(elementAt(2)).status).toBe("appended");
+    expect(live.renderer.appendFrom(elementAt(4)).status).toBe("appended");
+    expect(live.renderer.end(elementAt(4)).status).toBe("settled");
+
+    // The settle flatten is one identity-mapped copy cropped strictly below the full surface.
+    expect(live.settledCanvas.recordedCopies).toHaveLength(1);
+    const settleCopy = live.settledCanvas.recordedCopies[0]!;
+    expect(settleCopy.sourceRect).toEqual(settleCopy.destinationRect);
+    const [cropX, cropY, cropWidth, cropHeight] = settleCopy.sourceRect;
+    expect(cropWidth).toBeGreaterThan(0);
+    expect(cropHeight).toBeGreaterThan(0);
+    expect(cropWidth).toBeLessThan(live.activeCanvas.width);
+    expect(cropHeight).toBeLessThan(live.activeCanvas.height);
+
+    // Pixel identity: every retained mark footprint sits inside the crop, so the pixels outside
+    // the crop that the flatten no longer copies were never painted on the active surface.
+    const retained = live.settledCanvas.recordedComposites;
+    expect(retained).toHaveLength(1);
+    expect(retained[0]!.marks.length).toBeGreaterThan(0);
+    for (const mark of retained[0]!.marks) {
+      const cosine = Math.cos(mark.angleRadians);
+      const sine = Math.sin(mark.angleRadians);
+      const extentX = Math.hypot(mark.radiusX * cosine, mark.radiusY * sine);
+      const extentY = Math.hypot(mark.radiusX * sine, mark.radiusY * cosine);
+      expect(mark.x - extentX).toBeGreaterThanOrEqual(cropX);
+      expect(mark.x + extentX).toBeLessThanOrEqual(cropX + cropWidth);
+      expect(mark.y - extentY).toBeGreaterThanOrEqual(cropY);
+      expect(mark.y + extentY).toBeLessThanOrEqual(cropY + cropHeight);
+    }
+
+    // With-crop/without-incremental-frames equivalence: a one-shot pointer-up reference produces
+    // the same retained composite and the same crop, because the per-frame rect union distributes
+    // over the one-shot whole-stroke rect.
+    const reference = attachedRenderer();
+    expect(reference.renderer.begin(elementAt(4)).status).toBe("started");
+    expect(reference.renderer.end(elementAt(4)).status).toBe("settled");
+    expect(reference.settledCanvas.recordedCopies).toHaveLength(1);
+    expect(reference.settledCanvas.recordedCopies[0]!.sourceRect)
+      .toEqual(settleCopy.sourceRect);
+    expect(live.settledCanvas.recordedComposites)
+      .toEqual(reference.settledCanvas.recordedComposites);
+  });
+
+  it("keeps the fail-safe full-surface settle copy when the dirty union is empty", () => {
+    // Every mark of this stroke lands outside the clipped live viewport, so no per-frame paint
+    // rect exists. The flatten must still settle through the legacy full-surface copy instead of
+    // calling drawImage with a degenerate crop.
+    const { renderer, settledCanvas } = attachedRenderer();
+    const element = drawElement(
+      "settle-empty-union",
+      [400, 300, 460, 320, 520, 340],
+      {
+        brush: "ink-particle",
+        brushDynamics: segmentedCausalOverlayDynamics(),
+        strokeWidth: 2,
+        pressures: [0.7, 0.7, 0.7],
+      },
+    );
+    expect(renderer.begin(element).status).toBe("started");
+    expect(renderer.appendFrom(element).status).toBe("appended");
+    expect(renderer.end(element).status).toBe("settled");
+
+    expect(settledCanvas.recordedCopies).toEqual([]);
+    expect(settledCanvas.recordedComposites).toHaveLength(1);
+    expect(settledCanvas.recordedComposites[0]!.opacity).toBe(element.opacity);
+    expect(renderer.lastFallbackReason).toBeNull();
+  });
+
   it("does not seal an active stroke after its backing surface is released", () => {
     vi.stubGlobal("devicePixelRatio", 1);
     const dimension = Math.floor(

@@ -568,6 +568,21 @@ function presentationRectForMarks(
     : null;
 }
 
+function unionPresentationPixelRects(
+  left: PresentationPixelRect | null,
+  right: PresentationPixelRect,
+): PresentationPixelRect {
+  if (!left) return right;
+  const minimumX = Math.min(left.x, right.x);
+  const minimumY = Math.min(left.y, right.y);
+  return {
+    x: minimumX,
+    y: minimumY,
+    width: Math.max(left.x + left.width, right.x + right.width) - minimumX,
+    height: Math.max(left.y + left.height, right.y + right.height) - minimumY,
+  };
+}
+
 function detachedSymmetry(value: DrawEl["symmetry"]): StudioBrushSymmetrySpec {
   return value
     ? {
@@ -926,6 +941,13 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   private pendingFirstDabRaf = 0;
   private pendingBeginElement: DrawEl | null = null;
   private pendingBeginRaf = 0;
+  /**
+   * Whole-stroke union of every per-frame active paint rect (physical pixels, same rect authority
+   * as {@link presentActiveRect}). The active surface is transparent outside this union, so the
+   * settle flatten crops its drawImage to it with byte-identical retained output. Reset whenever
+   * the active surface is cleared.
+   */
+  private settleFlattenUnionRect: PresentationPixelRect | null = null;
 
   attach(canvases: StudioLiveDynamicBrushOverlayCanvases | null): void {
     this.activeCanvas = canvases?.activeCanvas ?? null;
@@ -1967,6 +1989,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   ): boolean {
     const context = this.preparedActive();
     if (!context) return false;
+    // Union the frame's full paint rect before any mark lands so a mid-loop throw still leaves
+    // the settle-flatten crop a superset of every touched active pixel.
+    this.accumulateSettleFlattenUnion(marks);
     try {
       for (const mark of marks) {
         renderStudioDynamicBrushCoverageMark(context, mark);
@@ -2023,16 +2048,62 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     }
   }
 
+  /**
+   * Accumulates the whole-stroke union of per-frame active paint rects — the identical rect
+   * authority {@link presentActiveRect} already relies on for the visible dirty presentation copy.
+   */
+  private accumulateSettleFlattenUnion(
+    marks: readonly StudioDynamicBrushCoverageMark[],
+  ): void {
+    const surface = this.surface;
+    const canvas = this.activeCanvas;
+    if (!surface || !canvas) return;
+    const rect = presentationRectForMarks(marks, surface, this.dpr, canvas);
+    if (!rect) return;
+    this.settleFlattenUnionRect = unionPresentationPixelRects(
+      this.settleFlattenUnionRect,
+      rect,
+    );
+  }
+
   private flattenActiveToSettled(opacity: number): boolean {
     const context = this.settledContext;
     const canvas = this.activeCanvas;
     if (!context || !canvas) return false;
+    // Crop the settle copy to the whole-stroke dirty union. Every pixel outside the union is
+    // transparent on the active surface (no drawMarksToActive frame ever touched it), so the
+    // cropped copy is pixel-identical while short strokes stop paying a full-surface drawImage on
+    // pointer-up. A degenerate/absent union keeps the fail-safe legacy full-surface copy.
+    const union = this.settleFlattenUnionRect;
+    const crop = union
+      ? {
+          x: union.x,
+          y: union.y,
+          width: Math.min(union.width, canvas.width - union.x),
+          height: Math.min(union.height, canvas.height - union.y),
+        }
+      : null;
     try {
       context.save();
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.globalCompositeOperation = "source-over";
       context.globalAlpha = clamp01(opacity);
-      context.drawImage(canvas, 0, 0);
+      if (!crop) {
+        context.drawImage(canvas, 0, 0);
+      } else if (crop.width > 0 && crop.height > 0) {
+        context.drawImage(
+          canvas,
+          crop.x,
+          crop.y,
+          crop.width,
+          crop.height,
+          crop.x,
+          crop.y,
+          crop.width,
+          crop.height,
+        );
+      }
+      // A union fully clipped away by a surface change has no retained active pixel to settle.
       context.restore();
       return true;
     } catch {
@@ -2279,6 +2350,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   private clearActiveRect(): void {
     this.clearCanvas(this.activeContext, this.activeCanvas);
     this.clearCanvas(this.presentationContext, this.presentationCanvas);
+    this.settleFlattenUnionRect = null;
   }
 
   private clearSettledRect(): void {

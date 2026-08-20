@@ -10,6 +10,10 @@ import {
   planStudioCausalDynamicBrushDepositsV2,
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
 } from "../studio-causal-dynamic-brush-deposit-v2";
+import {
+  clearStudioDynamicCoverageCommittedCache,
+  studioDynamicCoverageCommittedCacheStats,
+} from "../studio-dynamic-brush-coverage-renderer";
 import { planGlowBrushPasses, planNeonBrushPasses } from "../studio-fx-brush";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
 import {
@@ -2435,6 +2439,86 @@ describe("StudioDrawNode orchestration", () => {
     />);
 
     expect(captured("Shape")).toHaveLength(1);
+  });
+
+  it("reuses committed coverage tiles across two CRDT replays of the same stroke identity", () => {
+    clearStudioDynamicCoverageCommittedCache();
+    let tileDeposits = 0;
+    class CountingCoverageSurface {
+      width: number;
+      height: number;
+      private readonly context = {
+        globalAlpha: 1,
+        globalCompositeOperation: "source-over" as GlobalCompositeOperation,
+        fillStyle: "",
+        save: () => undefined,
+        restore: () => undefined,
+        setTransform: () => undefined,
+        clearRect: () => undefined,
+        translate: () => undefined,
+        rotate: () => undefined,
+        scale: () => undefined,
+        beginPath: () => undefined,
+        ellipse: () => undefined,
+        fill: () => {
+          tileDeposits += 1;
+        },
+      };
+      constructor(width: number, height: number) {
+        this.width = width;
+        this.height = height;
+      }
+      getContext(): typeof this.context {
+        return this.context;
+      }
+    }
+    vi.stubGlobal("OffscreenCanvas", CountingCoverageSurface);
+    // A CRDT replay rebuilds the element object (fresh point/pressure arrays, fresh dynamics
+    // normalization) while retaining the stroke identity. The committed cache key derives from
+    // `el.id`, so the replayed render must reuse the retained tiles instead of re-depositing.
+    const replayedElement = () => drawEl({
+      id: "committed-crdt-replay-cache",
+      kind: "freehand",
+      brush: "ink-particle",
+      mode: "pen",
+      points: [8, 64, 120, 64],
+      pressures: [0.7, 0.7],
+      stroke: "#3257d6",
+      strokeWidth: 2,
+      opacity: 0.37,
+      sampleSpacing: 1,
+      paintModel: "bounded-flow-v2",
+      brushDynamics: segmentedCausalTestDynamics(),
+    });
+
+    render(<StudioDrawNode el={replayedElement()} />);
+    const firstScene = new StampSceneContext();
+    (captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D,
+    ) => void)(firstScene as unknown as CanvasRenderingContext2D);
+    const firstReplayDeposits = tileDeposits;
+    expect(firstReplayDeposits).toBeGreaterThan(0);
+    expect(firstScene.drawImages.length).toBeGreaterThan(0);
+    expect(studioDynamicCoverageCommittedCacheStats()).toMatchObject({
+      entries: 1,
+    });
+
+    cleanup();
+    konvaCapture.nodes.length = 0;
+    render(<StudioDrawNode el={replayedElement()} />);
+    const secondScene = new StampSceneContext();
+    (captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D,
+    ) => void)(secondScene as unknown as CanvasRenderingContext2D);
+
+    // Tile reuse: the replay deposits zero additional marks on offscreen tile surfaces while the
+    // destination still receives the identical composite sequence.
+    expect(tileDeposits).toBe(firstReplayDeposits);
+    expect(secondScene.drawImages).toEqual(firstScene.drawImages);
+    expect(studioDynamicCoverageCommittedCacheStats()).toMatchObject({
+      entries: 1,
+    });
+    clearStudioDynamicCoverageCommittedCache();
   });
 
   it("keeps pathological live multi-tip kaleidoscope work inside the shared mark budget", () => {
