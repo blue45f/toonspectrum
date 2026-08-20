@@ -31,8 +31,15 @@ export type StudioBrushDynamicsPropertyKey =
 export function studioBrushDynamicsPresetMatch(
   settings: unknown
 ): StudioBrushDynamicsPresetId | null {
+  const normalized = normalizeStudioBrushDynamicsSettings(settings);
+  // Toolbar and panel selection mint the causal stamp-grid v2 pin at the brush-id variant seam,
+  // while `STUDIO_BRUSH_DYNAMICS_PRESETS` stays unpinned. The pin marks a render lattice rule,
+  // not an authored tweak, so ignore it when deciding which preset lights up as active.
+  const comparable = normalized.causalStampGridRule === undefined
+    ? normalized
+    : normalizeStudioBrushDynamicsSettings({ ...normalized, causalStampGridRule: undefined });
   for (const preset of STUDIO_BRUSH_DYNAMICS_PRESETS) {
-    if (studioBrushDynamicsSettingsEqual(settings, studioBrushDynamicsPresetSettings(preset.id))) {
+    if (studioBrushDynamicsSettingsEqual(comparable, studioBrushDynamicsPresetSettings(preset.id))) {
       return preset.id;
     }
   }

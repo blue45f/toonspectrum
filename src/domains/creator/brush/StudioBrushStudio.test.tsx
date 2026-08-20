@@ -124,7 +124,23 @@ describe("StudioBrushStudio", () => {
 
     expect(onSelectDynamicsPreset).toHaveBeenCalledWith(
       "ink-particle",
-      studioBrushDynamicsPresetSettings("ink-particle"),
+      studioBrushDynamicsSettingsForBrushId("ink-particle"),
+    );
+  });
+
+  it("mints the same pinned snapshot from the presets panel as toolbar brush selection", async () => {
+    const onSelectDynamicsPreset = vi.fn();
+    render(<StudioBrushStudio {...props({ onSelectDynamicsPreset })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /드라이 미디어/ }));
+
+    const toolbarMinted = studioBrushDynamicsSettingsForBrushId("dry-media");
+    if (!toolbarMinted) throw new Error("missing dry-media dynamics");
+    expect(toolbarMinted.causalStampGridRule).toBe("causal-stamp-grid-v2");
+    expect(onSelectDynamicsPreset).toHaveBeenCalledWith("dry-media", toolbarMinted);
+    expect(onSelectDynamicsPreset.mock.calls[0]?.[1]).not.toEqual(
+      studioBrushDynamicsPresetSettings("dry-media"),
     );
   });
 

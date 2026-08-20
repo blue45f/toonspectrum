@@ -36,9 +36,9 @@ export interface StudioLiveLayerResourceScope {
 
 /**
  * Parse the layer resource grammar (`layer:<pageId>:<layerId>`). Non-layer ids return null so
- * legacy resources keep exact-match semantics. Mirrors the page/element parser in
- * `@/lib/studio-live-lock-resource`, which deliberately stays layer-agnostic until the
- * authoritative server adopts the extended grammar.
+ * legacy resources keep exact-match semantics. Kept in parity with the shared parser in
+ * `@/lib/studio-live-lock-resource`, which now understands the same layer grammar — this local
+ * copy stays only so the guard's conflict rules remain pure over the parsed scope.
  */
 export function parseStudioLiveLayerLockResource(
   resourceId: string

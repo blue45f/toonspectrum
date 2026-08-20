@@ -1070,6 +1070,37 @@ describe("StudioLiveRoom", () => {
     secondElementRoom.close();
   });
 
+  it("converges page and sibling-layer claims regardless of each room's delivery order", async () => {
+    const test = harness();
+    const carol = { sessionId: "session-carol", displayName: "지우 탭", role: "editor" } as const;
+    const pageRoom = test.room(alice, { randomId: () => "claim-m" });
+    const firstLayerRoom = test.room(bob, { randomId: () => "claim-a" });
+    const secondLayerRoom = test.room(carol, { randomId: () => "claim-z" });
+    await pageRoom.start();
+    await firstLayerRoom.start();
+    await secondLayerRoom.start();
+    test.hub.queued = true;
+
+    expect(pageRoom.claimLock("page:page-1")).toBe(true);
+    expect(firstLayerRoom.claimLock("layer:page-1:first")).toBe(true);
+    expect(secondLayerRoom.claimLock("layer:page-1:second")).toBe(true);
+    test.hub.queued = false;
+    test.hub.flush();
+
+    for (const room of [pageRoom, firstLayerRoom, secondLayerRoom]) {
+      expect(room.getLocks()).toEqual([
+        expect.objectContaining({
+          resource: "page:page-1",
+          claimId: "claim-m",
+          owner: alice,
+        }),
+      ]);
+    }
+    pageRoom.close();
+    firstLayerRoom.close();
+    secondLayerRoom.close();
+  });
+
   it("returns a denied result instead of throwing when request-id generation fails", async () => {
     const test = harness();
     const room = test.room(alice, {

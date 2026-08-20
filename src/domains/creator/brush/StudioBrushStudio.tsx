@@ -49,6 +49,7 @@ import {
   planStudioDynamicBrush,
   resolveStudioBrushDynamicsSelectionPresetId,
   studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSettingsForBrushId,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
@@ -118,6 +119,18 @@ type BrushStudioCategory =
   | "stamp"
   | "tip"
   | "input";
+
+/**
+ * Preset selection resolves through the same brush-id variant seam the toolbar uses: the
+ * canonical causal preset ids (`ink-particle`/`dry-media`) mint the causal stamp-grid v2 pin
+ * there, so the panel authors byte-identical snapshots to toolbar selection instead of unpinned
+ * copies of the raw preset table. Preset ids without a variant fall back to the table unchanged.
+ */
+function studioBrushDynamicsPresetSelectionSettings(
+  id: StudioBrushDynamicsPresetId,
+): NormalizedStudioBrushDynamicsSettings {
+  return studioBrushDynamicsSettingsForBrushId(id) ?? studioBrushDynamicsPresetSettings(id);
+}
 
 type BrushDefaultRestoreSession =
   | Readonly<{
@@ -984,7 +997,7 @@ export function StudioBrushStudio({
   function onRequestCompatibleBrush(): void {
     onSelectDynamicsPreset(
       "ink-particle",
-      studioBrushDynamicsPresetSettings("ink-particle"),
+      studioBrushDynamicsPresetSelectionSettings("ink-particle"),
     );
     setCategory("presets");
   }
@@ -1015,7 +1028,7 @@ export function StudioBrushStudio({
               key={preset.id}
               type="button"
               aria-pressed={active}
-              onClick={() => onSelectDynamicsPreset(preset.id, studioBrushDynamicsPresetSettings(preset.id))}
+              onClick={() => onSelectDynamicsPreset(preset.id, studioBrushDynamicsPresetSelectionSettings(preset.id))}
               className={cn(
                 "min-h-24 rounded-xl border p-3 text-left transition-colors duration-150",
                 STUDIO_FOCUS_RING,

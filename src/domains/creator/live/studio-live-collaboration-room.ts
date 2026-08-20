@@ -2239,8 +2239,12 @@ export class StudioLiveRoom {
         return lockPriority(candidate) >= lockPriority(lock);
       }
       const lockScope = parseStudioLiveLockResourceScope(lock.resource);
+      // Ancestor precedence: a page claim beats its descendant element and layer claims in every
+      // delivery order, so all rooms converge on the page lease instead of the claim-id order.
       if (candidateScope?.kind === "page" && lockScope?.kind === "element") return false;
       if (candidateScope?.kind === "element" && lockScope?.kind === "page") return true;
+      if (candidateScope?.kind === "page" && lockScope?.kind === "layer") return false;
+      if (candidateScope?.kind === "layer" && lockScope?.kind === "page") return true;
       return lockPriority(candidate) >= lockPriority(lock);
     });
     if (losesConflict) return;

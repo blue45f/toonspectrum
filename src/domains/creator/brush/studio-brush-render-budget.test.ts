@@ -516,8 +516,9 @@ describe("causal stamp grid rule v2", () => {
       .toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
     expect(selectStudioDynamicBrushCausalStampGrid({ rule: 2, baseWidth: 300 }))
       .toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
-    // Normalized snapshots strip unknown fields today, so persisted legacy records resolve to no
-    // rule at all — the byte-exact pin convention shared with depositPipeline/program pins.
+    // Normalization preserves the causalStampGridRule pin byte-for-byte and drops malformed
+    // values closed, so a snapshot that never carried the pin resolves to no rule at all — the
+    // byte-exact pin convention shared with depositPipeline/program pins.
     expect(studioDynamicBrushCausalStampGridRuleOf(causalSettingsWithBaseWidth(300)))
       .toBeUndefined();
   });

@@ -5,6 +5,7 @@ import {
   resolveStudioBrushDynamics,
   serializeStudioBrushDynamicsSettingsCanonical,
   studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSettingsForBrushId,
 } from "./studio-brush-dynamics";
 import {
   findStudioBrushDynamicsMapping,
@@ -25,6 +26,20 @@ describe("studio brush dynamics editor", () => {
     const preset = studioBrushDynamicsPresetSettings("ink-particle");
     expect(studioBrushDynamicsPresetMatch(preset)).toBe("ink-particle");
     expect(studioBrushDynamicsPresetMatch(updateStudioBrushDynamicsRatio(preset, "spacing", 0.31))).toBeNull();
+  });
+
+  it("keeps the active-preset highlight for snapshots carrying the causal stamp-grid pin", () => {
+    // Toolbar/panel selection of the canonical causal presets mints the v2 lattice pin at the
+    // brush-id variant seam; the highlight must ignore that render marker, not read it as a tweak.
+    const minted = studioBrushDynamicsSettingsForBrushId("dry-media");
+    if (!minted) throw new Error("missing dry-media dynamics");
+    expect(minted.causalStampGridRule).toBe("causal-stamp-grid-v2");
+    expect(studioBrushDynamicsPresetMatch(minted)).toBe("dry-media");
+    expect(studioBrushDynamicsPresetMatch(studioBrushDynamicsSettingsForBrushId("ink-particle")))
+      .toBe("ink-particle");
+    // A real authored edit on a pinned snapshot still reads as custom.
+    expect(studioBrushDynamicsPresetMatch(updateStudioBrushDynamicsRatio(minted, "spacing", 0.31)))
+      .toBeNull();
   });
 
   it("updates and removes one source mapping without mutating other properties", () => {
