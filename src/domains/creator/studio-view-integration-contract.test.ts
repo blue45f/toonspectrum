@@ -3,6 +3,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+// 의도된 변경(2026-08, B-06): 전역 keydown 디스패처(보기 리졸버·flip 화음 분기 포함)가
+// studio-page-shortcut-dispatcher.ts 로 추출되어, 단축키 분기 검증은 그 파일을 읽는다.
+const shortcutDispatcherSource = readFileSync(
+  new URL("./studio-page-shortcut-dispatcher.ts", import.meta.url),
+  "utf8",
+);
 const viewportSource = readFileSync(new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url), "utf8");
 const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
 // The minimap scroll-window box moved out of the inspector into its own leaf so a
@@ -99,14 +105,14 @@ describe("StudioPage view integration contract", () => {
     expect(source).toContain("if (!focusOwnedByHud || !restoreTarget) return;");
     expect(source).toContain("restoreTarget.focus({ preventScroll: true })");
     expect(source).toContain("closeViewToolWithFocusRef.current({ preferCanvas: true })");
-    expect(source).toContain('if (viewTool === "zoom") closeViewToolWithFocus();');
-    expect(source).toContain('if (viewTool === "rotate") closeViewToolWithFocus();');
+    expect(shortcutDispatcherSource).toContain('if (viewTool === "zoom") closeViewToolWithFocus();');
+    expect(shortcutDispatcherSource).toContain('if (viewTool === "rotate") closeViewToolWithFocus();');
     expect(viewportSource).toContain("onClose={closeViewToolWithFocus}");
   });
 
   it("keeps configurable flip dispatch before the hard-coded view resolver", () => {
-    const configuredFlip = source.indexOf('matchStudioShortcut(sc["flip-canvas"], e)');
-    const hardCodedViewResolver = source.indexOf("resolveStudioViewShortcut(e)");
+    const configuredFlip = shortcutDispatcherSource.indexOf('matchStudioShortcut(sc["flip-canvas"], e)');
+    const hardCodedViewResolver = shortcutDispatcherSource.indexOf("resolveStudioViewShortcut(e)");
     expect(configuredFlip).toBeGreaterThan(-1);
     expect(hardCodedViewResolver).toBeGreaterThan(configuredFlip);
   });

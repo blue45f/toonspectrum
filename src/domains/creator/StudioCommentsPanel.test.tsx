@@ -19,6 +19,18 @@ import type {
 
 const source = readFileSync(resolve("src/domains/creator/StudioCommentsPanel.tsx"), "utf8");
 const studioPageSource = readFileSync(resolve("src/domains/creator/StudioPage.tsx"), "utf8");
+// 의도된 변경(2026-08, B-06): 전역 keydown 디스패처(⇧C·tool-comment·Esc 캐스케이드)가
+// studio-page-shortcut-dispatcher.ts 로 추출되어, 단축키 분기 검증은 그 파일을 스캔한다.
+const studioShortcutDispatcherSource = readFileSync(
+  resolve("src/domains/creator/studio-page-shortcut-dispatcher.ts"),
+  "utf8"
+);
+// 의도된 변경(2026-08, B-06): 라이브 새로고침 큐 본문(queueStudioTeamCommentLiveRefresh)은
+// studio-page-comments-runtime.ts 로 추출 — StudioPage 는 팩토리 배선과 handler ref 대입만 가진다.
+const studioCommentsRuntimeSource = readFileSync(
+  resolve("src/domains/creator/studio-page-comments-runtime.ts"),
+  "utf8"
+);
 // Intentional change: the live-room comment subscription moved into the extracted
 // collaboration wiring hook, so the comment-changed gate is pinned against that file.
 const studioCollaborationWiringSource = readFileSync(
@@ -185,24 +197,27 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(cancelSource).toContain("stopStudioCommentPlacementSession()");
     expect(cancelSource).not.toContain('setStudioCommentPlacementPhase("placing")');
     expect(disarmSource).toContain("stopStudioCommentPlacementSession()");
-    expect(studioPageSource).toMatch(
+    expect(studioShortcutDispatcherSource).toMatch(
       /else if \(commentPinArmed\) \{[\s\S]*?stopStudioCommentPlacementSession\(\)/u
     );
     expect(studioPageSource).toMatch(
       /if \(viewTool !== null\) \{[\s\S]*?stopStudioCommentPlacementEffect\(\)/u
     );
-    expect(studioPageSource).toContain(
+    expect(studioShortcutDispatcherSource).toContain(
       'if (!e.repeat && matchStudioShortcut(sc["tool-comment"], e))'
     );
   });
 
   it("moves a single point pin directly with permission and activity-sequence fences", () => {
-    const reanchorStart = studioPageSource.indexOf("async function reanchorStudioCommentPin");
-    const reanchorEnd = studioPageSource.indexOf(
-      "function openStudioCommentThreadPopover",
+    // 의도된 변경(2026-08, B-06): 재앵커 본문은 화면 투영과 함께 comments-runtime 으로 추출됐다.
+    const reanchorStart = studioCommentsRuntimeSource.indexOf(
+      "async function reanchorStudioCommentPin"
+    );
+    const reanchorEnd = studioCommentsRuntimeSource.indexOf(
+      "return reanchorStudioCommentPin;",
       reanchorStart
     );
-    const reanchorSource = studioPageSource.slice(reanchorStart, reanchorEnd);
+    const reanchorSource = studioCommentsRuntimeSource.slice(reanchorStart, reanchorEnd);
 
     expect(reanchorStart).toBeGreaterThanOrEqual(0);
     expect(reanchorEnd).toBeGreaterThan(reanchorStart);
@@ -227,17 +242,21 @@ describe("StudioCommentsPanel review rail contract", () => {
   });
 
   it("refreshes only the changed live thread instead of polling every comment", () => {
-    const refreshStart = studioPageSource.indexOf(
+    const refreshStart = studioCommentsRuntimeSource.indexOf(
       "function queueStudioTeamCommentLiveRefresh"
     );
-    const refreshEnd = studioPageSource.indexOf(
-      "studioLiveCommentEventHandlerRef.current = queueStudioTeamCommentLiveRefresh",
+    const refreshEnd = studioCommentsRuntimeSource.indexOf(
+      "return { refreshStudioTeamComments, queueStudioTeamCommentLiveRefresh }",
       refreshStart
     );
-    const refreshSource = studioPageSource.slice(refreshStart, refreshEnd);
+    const refreshSource = studioCommentsRuntimeSource.slice(refreshStart, refreshEnd);
 
     expect(refreshStart).toBeGreaterThanOrEqual(0);
     expect(refreshEnd).toBeGreaterThan(refreshStart);
+    // 큐가 여전히 live comment-changed 이벤트 핸들러로 연결되는지는 StudioPage 배선으로 고정한다.
+    expect(studioPageSource).toContain(
+      "studioLiveCommentEventHandlerRef.current = queueStudioTeamCommentLiveRefresh"
+    );
     expect(studioCollaborationWiringSource).toContain('event.type !== "comment-changed"');
     expect(refreshSource).toContain("studioTeamCommentLiveTargetSequenceRef");
     expect(refreshSource).toContain("studioTeamCommentLiveRefreshFlightRef");
@@ -404,7 +423,8 @@ describe("StudioCommentsPanel review rail contract", () => {
   it("uses explicit event-driven refresh instead of polling the complete team history", () => {
     expect(studioPageSource).toContain("createStudioTeamCommentRefreshSession");
     expect(studioPageSource).toContain('request("panel-open")');
-    expect(studioPageSource).toContain('request("manual")');
+    // 의도된 변경(2026-08, B-06): manual 요청은 추출된 comments-runtime 의 refresh 본문이 보낸다.
+    expect(studioCommentsRuntimeSource).toContain('request("manual")');
     expect(studioPageSource).not.toContain("commentsOpen ? 5_000 : 30_000");
     expect(source).toContain("팀 댓글 새로고침");
     expect(source).toContain("motion-reduce:animate-none");
@@ -430,7 +450,8 @@ describe("StudioCommentsPanel review rail contract", () => {
   });
 
   it("cancels pin placement explicitly and never marks an entire clustered pin as read", () => {
-    expect(studioPageSource).toContain('announceDrawingShortcut("댓글 핀 배치 취소")');
+    // 의도된 변경(2026-08, B-06): Esc 취소 안내는 추출된 keydown 디스패처의 분기다.
+    expect(studioShortcutDispatcherSource).toContain('announceDrawingShortcut("댓글 핀 배치 취소")');
     expect(studioPageSource).toContain("studioCommentFocusRequestSequenceRef");
     expect(studioPageSource).toContain('setStudioCommentPlacementPhase("idle")');
     expect(studioPageSource).toContain(

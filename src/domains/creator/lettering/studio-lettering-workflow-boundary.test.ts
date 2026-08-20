@@ -8,13 +8,15 @@ const read = (fileName: string) =>
 describe("Studio lettering workflow boundary", () => {
   it("keeps the advertised T shortcut connected to the shipped lettering handler", () => {
     const settings = read("../studio-app-settings.ts");
-    const page = read("../StudioPage.tsx");
+    // 의도된 변경(2026-08, B-06): T 단축키 분기는 StudioPage 의 keydown 디스패처와 함께
+    // studio-page-shortcut-dispatcher.ts 로 추출되었다 — 핸들러 연결 검증은 그 파일을 읽는다.
+    const dispatcher = read("../studio-page-shortcut-dispatcher.ts");
     const help = read("../StudioShortcutsHelp.tsx");
 
     expect(settings).toContain('{ id: "tool-lettering", label: "레터링(텍스트·말풍선)", labelKey: "studio.settings.shortcut.toolLettering", defaultKeys: "T" }');
-    expect(page).toContain('matchStudioShortcut(sc["tool-lettering"], e)');
-    expect(page).toContain("void startEditText(selected.id)");
-    expect(page).toContain("addBubble(lastLettering.variant, undefined, true)");
+    expect(dispatcher).toContain('matchStudioShortcut(sc["tool-lettering"], e)');
+    expect(dispatcher).toContain("void startEditText(selected.id)");
+    expect(dispatcher).toContain("addBubble(lastLettering.variant, undefined, true)");
     const textShortcutStart = help.indexOf('keys: "T",');
     const textShortcutEnd = help.indexOf("},", textShortcutStart);
     const textShortcut = help.slice(textShortcutStart, textShortcutEnd);

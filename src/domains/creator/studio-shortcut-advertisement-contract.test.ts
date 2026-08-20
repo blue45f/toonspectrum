@@ -17,7 +17,12 @@ import { resolveStudioViewShortcut } from "./studio-view-controls";
  * 화음 전수 스윕으로 "두 리졸버가 같은 화음을 주장하지 않는다"를 계약으로 못 박는다.
  */
 
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+// 의도된 변경(2026-08, B-06): 마스터 keydown 디스패처 본문이 StudioPage.tsx 에서
+// studio-page-shortcut-dispatcher.ts 로 추출되어, ⌘S 바인딩 스캔은 그 파일을 읽는다.
+const shortcutDispatcherSource = readFileSync(
+  new URL("./studio-page-shortcut-dispatcher.ts", import.meta.url),
+  "utf8",
+);
 const menuGroupsSource = readFileSync(
   new URL("./studio-main-menu-items-document.ts", import.meta.url),
   "utf8",
@@ -95,14 +100,14 @@ describe("studio shortcut advertisement contract", () => {
     // 메뉴가 `⌘S`를 계속 광고한다(광고를 지우는 것도 유효한 해법이므로 함께 고정한다).
     expect(menuGroupsSource).toContain('shortcut: "⌘S"');
 
-    const handlerStart = studioPageSource.indexOf("shortcutRef.current = (e: KeyboardEvent) => {");
+    const handlerStart = shortcutDispatcherSource.indexOf("return (e: KeyboardEvent) => {");
     expect(handlerStart).toBeGreaterThanOrEqual(0);
-    const handlerEnd = studioPageSource.indexOf(
+    const handlerEnd = shortcutDispatcherSource.indexOf(
       "const editShortcut = resolveStudioEditShortcut(e);",
       handlerStart,
     );
     expect(handlerEnd).toBeGreaterThan(handlerStart);
-    const handler = studioPageSource.slice(handlerStart, handlerEnd);
+    const handler = shortcutDispatcherSource.slice(handlerStart, handlerEnd);
 
     const saveBindingStart = handler.indexOf('&& e.code === "KeyS"');
     expect(saveBindingStart).toBeGreaterThanOrEqual(0);

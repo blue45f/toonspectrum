@@ -189,7 +189,6 @@ import {
 } from "./studio-api-payload-safety";
 import {
   defaultStudioAppSettings,
-  matchStudioShortcut,
   type StudioAppSettings,
   type StudioAppSettingsTab,
   type StudioRailToolId,
@@ -302,7 +301,6 @@ import {
   type ColorRangeSample,
 } from "./studio-color-range";
 import { clampWheelCenter } from "./studio-color-wheel";
-import { projectStudioPointCommentToScreen } from "./studio-comment-screen-projection";
 import {
   createStudioCommentThreadSessionState,
   projectStudioCommentThreadSession,
@@ -316,7 +314,6 @@ import {
 import {
   addStudioCommentReply,
   addStudioCommentThread,
-  applyStudioTeamCommentReanchorReceipt,
   createEmptyStudioCommentsDocument,
   createStudioCommentMessageId,
   normalizeStudioCommentsDocument,
@@ -441,17 +438,12 @@ import {
 } from "./brush/studio-drawing-pointer-transport";
 import { createStudioDrawingShortcutNoticeStore } from "./brush/studio-drawing-shortcut-notice-store";
 import {
-  adjustStudioBrushOpacity,
   adjustStudioBrushWidth,
-  resolveStudioDrawingShortcut,
-  shouldPreserveStudioTabNavigation,
 } from "./brush/studio-drawing-shortcuts";
 import { disposeStudioDynamicCoverageCommittedCache } from "./studio-dynamic-brush-coverage-renderer";
 import {
   isStudioPasteScopeCurrent,
   resolveStudioEditAvailability,
-  resolveStudioEditShortcut,
-  isStudioUndoRedoChord,
   shouldHandleStudioEditEvent,
 } from "./studio-edit-controls";
 import {
@@ -543,7 +535,6 @@ import {
   planAtomicSelectionTranslation,
   planGroupClickSelection,
   planGroupEnter,
-  planGroupEscape,
   selectionShapeForIds,
   type GroupSelectionState,
 } from "./studio-group-selection";
@@ -904,10 +895,17 @@ import {
   type StudioSurfaceRect,
 } from "./studio-oncanvas-command-surfaces";
 import { comipoSeedsToEls } from "./studio-page-comipo-seeds";
+import {
+  buildStudioCommentThreadPopoverScreenProjection,
+  buildStudioCommentViewDocument,
+  buildStudioLegacyCommentThreadIdSet,
+  buildStudioPointCommentScreenProjection,
+  createStudioCommentPinReanchor,
+  createStudioTeamCommentLiveRefreshRuntime,
+} from "./studio-page-comments-runtime";
 import { useStudioPageDnd } from "./studio-page-dnd";
 import {
   BRUSH_DELETE_UNDO_MS,
-  STUDIO_FILTER_SHORTCUTS,
   STUDIO_SERVER_AUTOSAVE_IDLE_MS,
   defaultStampTuningForBrushId,
   filterSfxPresets,
@@ -1028,6 +1026,7 @@ import {
 import { useStudioAdvancedFill } from "./studio-page-advanced-fill";
 import { useStudioCompanionRuntime } from "./studio-page-companion-runtime";
 import { useStudioMenuAssetLoader } from "./studio-page-menu-asset-loaders";
+import { buildStudioShortcutHandler } from "./studio-page-shortcut-dispatcher";
 import { createStudioPageVectorOps } from "./studio-page-vector-ops";
 import {
   appendPageState,
@@ -1094,12 +1093,9 @@ import {
 } from "./studio-pixel-pencil";
 import {
   bindPixelSelectionHistory,
-  canRedoPixelSelectionHistory,
-  canUndoPixelSelectionHistory,
   commitPixelSelectionHistory,
   createPixelSelectionHistory,
   redoPixelSelectionHistory,
-  resolvePixelSelectionHistoryShortcut,
   undoPixelSelectionHistory,
   type PixelSelectionHistoryOperation,
 } from "./studio-pixel-selection-session-history";
@@ -1371,7 +1367,6 @@ import {
   type StudioStrokeSurfaceRoute,
 } from "./brush/studio-stroke-surface-route";
 import {
-  decideStudioTeamCommentLiveResponse,
   mergeStudioTeamCommentMutationReceipt,
   mergeStudioTeamCommentReadReceipt,
 } from "./studio-team-comment-frontier";
@@ -1425,7 +1420,6 @@ import {
   planStudioViewScrollToDocumentPoint,
   projectStudioViewPointToDocument,
   resolveStudioVisibleDocumentPlacement,
-  resolveStudioViewShortcut,
   rotateStudioViewLeft,
   rotateStudioViewRight,
   stepStudioViewZoom,
@@ -4497,28 +4491,26 @@ function StudioCuttoonEditor({
       : null;
   // Server-owned review comments never enter the persisted work document. The panel/overlay gets
   // a projection that keeps pre-server document comments as explicitly read-only archive rows.
-  const studioCommentViewDocument = useMemo(() => {
-    if (!studioTeamCommentsWorkId) return studioComments;
-    const remoteThreadIds = new Set(studioTeamComments.threads.map((thread) => thread.id));
-    return normalizeStudioCommentsDocument({
-      version: 1,
-      threads: [
-        ...studioTeamComments.threads,
-        ...studioComments.threads.filter((thread) => !remoteThreadIds.has(thread.id)),
-      ],
-    });
-  }, [studioComments, studioTeamComments, studioTeamCommentsWorkId]);
+  // 의도된 변경(2026-08, B-06): 투영 본문은 studio-page-comments-runtime.ts 로 추출 — memo 는
+  // 원본 deps 그대로 유지한 채 순수 빌더에 위임한다.
+  const studioCommentViewDocument = useMemo(
+    () => buildStudioCommentViewDocument({
+      studioComments,
+      studioTeamComments,
+      studioTeamCommentsWorkId,
+    }),
+    [studioComments, studioTeamComments, studioTeamCommentsWorkId]
+  );
   const studioCommentViewDocumentRef = useRef(studioCommentViewDocument);
   studioCommentViewDocumentRef.current = studioCommentViewDocument;
-  const studioLegacyCommentThreadIdSet = useMemo(() => {
-    if (!studioTeamCommentsWorkId) return new Set<string>();
-    const remoteThreadIds = new Set(studioTeamComments.threads.map((thread) => thread.id));
-    return new Set(
-      studioComments.threads
-        .filter((thread) => !remoteThreadIds.has(thread.id))
-        .map((thread) => thread.id)
-    );
-  }, [studioComments.threads, studioTeamComments.threads, studioTeamCommentsWorkId]);
+  const studioLegacyCommentThreadIdSet = useMemo(
+    () => buildStudioLegacyCommentThreadIdSet({
+      studioCommentThreads: studioComments.threads,
+      studioTeamCommentThreads: studioTeamComments.threads,
+      studioTeamCommentsWorkId,
+    }),
+    [studioComments.threads, studioTeamComments.threads, studioTeamCommentsWorkId]
+  );
   useEffect(() => {
     // Comment mutations and read receipts are scoped to one hydrated work generation. Abort and
     // forget every previous flight before changing the authoritative work/comment frontier.
@@ -4659,143 +4651,26 @@ function StudioCuttoonEditor({
       studioTeamCommentRefreshSessionRef.current?.request("panel-open");
     }
   }, [commentsOpen]);
-  function refreshStudioTeamComments(): void {
-    studioTeamCommentRefreshSessionRef.current?.request("manual");
-  }
-  function queueStudioTeamCommentLiveRefresh(change: StudioTeamCommentLiveEvent): void {
-    const workIdValue = studioTeamCommentsScopeRef.current;
-    const generation = studioTeamCommentsLoadGenerationRef.current;
-    if (
-      !workIdValue
-      || change.workId !== workIdValue
-      || !editorMountedRef.current
-    ) return;
-
-    const incomingSequence = BigInt(change.activitySequence);
-    const acceptedSequence = studioTeamCommentActivitySequenceRef.current.get(change.threadId);
-    if (acceptedSequence !== undefined && acceptedSequence >= incomingSequence) return;
-
-    const targets = studioTeamCommentLiveTargetSequenceRef.current;
-    const previousTarget = targets.get(change.threadId);
-    if (previousTarget === undefined || incomingSequence > previousTarget) {
-      targets.set(change.threadId, incomingSequence);
-    }
-    const flights = studioTeamCommentLiveRefreshFlightRef.current;
-    if (flights.has(change.threadId)) return;
-
-    const pending = (async () => {
-      let staleResponseRetries = 0;
-      while (
-        studioTeamCommentsScopeRef.current === workIdValue
-        && studioTeamCommentsLoadGenerationRef.current === generation
-        && editorMountedRef.current
-      ) {
-        const targetSequence = targets.get(change.threadId);
-        const currentSequence = studioTeamCommentActivitySequenceRef.current.get(change.threadId);
-        if (
-          targetSequence === undefined
-          || (currentSequence !== undefined && currentSequence >= targetSequence)
-        ) {
-          targets.delete(change.threadId);
-          return;
-        }
-
-        const registry = studioTeamCommentOperationScopeRegistryRef.current;
-        const ticket = registry.begin(workIdValue, generation);
-        let admitted = false;
-        try {
-          const commentClient = await loadStudioTeamCommentClient();
-          if (!registry.isCurrent(ticket, currentStudioTeamCommentOperationContext())) {
-            registry.invalidate(ticket);
-            return;
-          }
-          const remoteThread = await commentClient.getStudioTeamCommentThread(
-            workIdValue,
-            change.threadId,
-            { messageLimit: 51 },
-            ticket.signal
-          );
-          admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-          registry.finish(ticket);
-          if (!admitted) return;
-
-          const remoteSequence = BigInt(remoteThread.latestActivitySequence);
-          const latestTarget = targets.get(change.threadId) ?? targetSequence;
-          const currentReadSequence =
-            studioTeamCommentReadSequenceRef.current.get(change.threadId) ?? BigInt(-1);
-          const liveDecision = decideStudioTeamCommentLiveResponse({
-            remoteSequence,
-            targetSequence: latestTarget,
-            currentReadSequence,
-            remoteUnread: remoteThread.unread,
-            staleResponseRetries,
-          });
-          if (liveDecision.status === "retry") {
-            // A newer socket event may arrive while this GET is in flight. Retry once against
-            // the newer target instead of discarding it; keep the target for a later event if a
-            // lagging replica still cannot satisfy the frontier without starting a poll loop.
-            staleResponseRetries = liveDecision.staleResponseRetries;
-            continue;
-          }
-          if (liveDecision.status === "defer") {
-            setStudioCommentSyncError(
-              "팀 댓글 변경이 아직 동기화 중이에요. 다음 변경 알림에서 자동으로 다시 확인합니다."
-            );
-            return;
-          }
-          staleResponseRetries = liveDecision.staleResponseRetries;
-          const localThread = commentClient.studioTeamCommentThreadToLocalThread(remoteThread);
-          if (!localThread) {
-            throw new Error("변경된 팀 댓글의 전체 기록을 안전하게 반영하지 못했어요.");
-          }
-
-          const acceptedRemoteSequence = studioTeamCommentActivitySequenceRef.current.get(
-            change.threadId
-          );
-          if (
-            acceptedRemoteSequence === undefined
-            || remoteSequence >= acceptedRemoteSequence
-          ) {
-            studioTeamCommentActivitySequenceRef.current.set(change.threadId, remoteSequence);
-            if (!remoteThread.unread) {
-              if (remoteSequence > currentReadSequence) {
-                studioTeamCommentReadSequenceRef.current.set(change.threadId, remoteSequence);
-              }
-            }
-            setStudioTeamCommentsState((current) => normalizeStudioCommentsDocument({
-              version: 1,
-              threads: current.threads.some((thread) => thread.id === localThread.id)
-                ? current.threads.map((thread) =>
-                    thread.id === localThread.id ? localThread : thread
-                  )
-                : [localThread, ...current.threads],
-            }));
-            setStudioTeamUnreadCommentIds((current) => liveDecision.remainsUnread
-              ? current.includes(change.threadId)
-                ? current
-                : [...current, change.threadId].sort()
-              : current.filter((threadId) => threadId !== change.threadId));
-          }
-          setStudioCommentSyncError(null);
-        } catch (cause) {
-          const shouldReport = admitted
-            || registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-          registry.invalidate(ticket);
-          if (!shouldReport) return;
-          const message = cause instanceof Error
-            ? cause.message
-            : "변경된 팀 댓글을 불러오지 못했어요.";
-          setStudioCommentSyncError(message);
-          targets.delete(change.threadId);
-          return;
-        }
-      }
-    })();
-    flights.set(change.threadId, pending);
-    void pending.finally(() => {
-      if (flights.get(change.threadId) === pending) flights.delete(change.threadId);
-    });
-  }
+  // 의도된 변경(2026-08, B-06): 라이브 새로고침 큐 본문(refresh/queue)은
+  // studio-page-comments-runtime.ts 로 추출 — 시퀀스 프론티어·세대 가드 계약은 그대로다.
+  const {
+    refreshStudioTeamComments,
+    queueStudioTeamCommentLiveRefresh,
+  } = createStudioTeamCommentLiveRefreshRuntime({
+    currentStudioTeamCommentOperationContext,
+    editorMountedRef,
+    setStudioCommentSyncError,
+    setStudioTeamCommentsState,
+    setStudioTeamUnreadCommentIds,
+    studioTeamCommentActivitySequenceRef,
+    studioTeamCommentLiveRefreshFlightRef,
+    studioTeamCommentLiveTargetSequenceRef,
+    studioTeamCommentOperationScopeRegistryRef,
+    studioTeamCommentReadSequenceRef,
+    studioTeamCommentRefreshSessionRef,
+    studioTeamCommentsLoadGenerationRef,
+    studioTeamCommentsScopeRef,
+  });
   studioLiveCommentEventHandlerRef.current = queueStudioTeamCommentLiveRefresh;
   useEffect(() => {
     if (!collaborationDocumentLocked) return;
@@ -12889,20 +12764,16 @@ function StudioCuttoonEditor({
   } | null>(null);
   const pointCommentComposerRef = useRef(pointCommentComposer);
   pointCommentComposerRef.current = pointCommentComposer;
+  // 의도된 변경(2026-08, B-06): 투영 본문은 studio-page-comments-runtime.ts 로 추출 — 렌더마다
+  // 새 클로저를 만들어 넘기는 useStudioStableHandlers 계약은 그대로다.
   const studioPointCommentScreenProjectionHandlers = useStudioStableHandlers({
-    getScreenPoint: () => {
-      const current = pointCommentComposerRef.current;
-      const host = zoomHostRef.current;
-      if (!current || !host?.isConnected || canvasH <= 0) return null;
-      return projectStudioPointCommentToScreen({
-        anchor: current.anchor,
-        canvasWidth: CANVAS_W,
-        canvasHeight: canvasH,
-        canvasFlipH,
-        canvasRotation,
-        viewportRect: host.getBoundingClientRect(),
-      });
-    },
+    getScreenPoint: buildStudioPointCommentScreenProjection({
+      pointCommentComposerRef,
+      zoomHostRef,
+      canvasH,
+      canvasFlipH,
+      canvasRotation,
+    }),
   });
   /**
    * On-canvas command surfaces (V5 §15 포인터 거리) — see
@@ -17476,25 +17347,15 @@ function StudioCuttoonEditor({
     studioCommentThreadSessionThreads,
     studioTeamUnreadCommentIdSet
   );
+  // 의도된 변경(2026-08, B-06): 팝오버 투영 본문도 studio-page-comments-runtime.ts 로 추출.
   const studioCommentThreadPopoverScreenProjectionHandlers = useStudioStableHandlers({
-    getScreenPoint: () => {
-      const selectedThread = studioCommentThreadSessionView.selectedThread;
-      const host = zoomHostRef.current;
-      if (
-        !selectedThread
-        || selectedThread.anchor.type !== "point"
-        || !host?.isConnected
-        || canvasH <= 0
-      ) return null;
-      return projectStudioPointCommentToScreen({
-        anchor: selectedThread.anchor,
-        canvasWidth: CANVAS_W,
-        canvasHeight: canvasH,
-        canvasFlipH,
-        canvasRotation,
-        viewportRect: host.getBoundingClientRect(),
-      });
-    },
+    getScreenPoint: buildStudioCommentThreadPopoverScreenProjection({
+      studioCommentThreadSessionView,
+      zoomHostRef,
+      canvasH,
+      canvasFlipH,
+      canvasRotation,
+    }),
   });
   useEffect(() => {
     dispatchStudioCommentThreadSession({
@@ -17543,194 +17404,34 @@ function StudioCuttoonEditor({
     return selected ? { selected, cluster } : null;
   }
 
-  async function reanchorStudioCommentPin(
-    payload: StudioCommentPinReanchorPayload
-  ): Promise<boolean> {
-    const currentThread = studioCommentViewDocumentRef.current.threads.find(
-      (thread) => thread.id === payload.threadId
-    );
-    if (!currentThread || currentThread.anchor.type !== "point") {
-      setStudioCommentInteractionNotice("이동할 위치 댓글을 현재 문서에서 찾을 수 없어요.");
-      return false;
-    }
-    if (payload.anchor.pageId !== currentThread.anchor.pageId) {
-      setStudioCommentInteractionNotice("댓글 핀은 현재 페이지 안에서만 이동할 수 있어요.");
-      return false;
-    }
+  // 의도된 변경(2026-08, B-06): 핀 재앵커 본문은 화면 투영 핸들러들과 함께
+  // studio-page-comments-runtime.ts 로 추출 — 옵티미스틱 적용·서버 확정/롤백·연속 이동 큐
+  // 연쇄 계약은 그대로이고, StudioPage 는 렌더마다 같은 컨텍스트로 팩토리를 배선만 한다.
+  const reanchorStudioCommentPin = createStudioCommentPinReanchor({
+    announceDrawingShortcut,
+    collaborationDocumentLocked,
+    currentStudioTeamCommentOperationContext,
+    editorMountedRef,
+    refreshStudioTeamComments,
+    setStudioCommentInteractionNotice,
+    setStudioCommentSyncError,
+    setStudioComments,
+    setStudioTeamCommentsState,
+    setStudioTeamUnreadCommentIds,
+    studioAuthUserId,
+    studioCommentViewDocumentRef,
+    studioLegacyCommentThreadIdSet,
+    studioTeamCommentActivitySequenceRef,
+    studioTeamCommentCapabilities,
+    studioTeamCommentOperationScopeRegistryRef,
+    studioTeamCommentReadSequenceRef,
+    studioTeamCommentReanchorFlightRef,
+    studioTeamCommentReanchorQueueRef,
+    studioTeamCommentsLoadGenerationRef,
+    studioTeamCommentsScopeRef,
+    studioTeamCommentsWorkId,
+  });
 
-    if (!studioTeamCommentsWorkId) {
-      if (collaborationDocumentLocked) {
-        setStudioCommentInteractionNotice("읽기 전용 원고에서는 댓글 위치를 변경할 수 없어요.");
-        return false;
-      }
-      if (!setStudioComments((current) => applyStudioTeamCommentReanchorReceipt(current, {
-        threadId: payload.threadId,
-        anchor: payload.anchor,
-        updatedAt: new Date().toISOString(),
-      }))) return false;
-      setStudioCommentInteractionNotice(null);
-      announceDrawingShortcut("댓글 위치를 옮겼습니다");
-      return true;
-    }
-
-    if (studioLegacyCommentThreadIdSet.has(payload.threadId)) {
-      setStudioCommentInteractionNotice("이전 문서에 보관된 댓글 위치는 변경할 수 없어요.");
-      return false;
-    }
-    const ownsThread = Boolean(
-      studioAuthUserId && currentThread.author.id === studioAuthUserId
-    );
-    if (studioTeamCommentCapabilities?.reanchor !== true && !ownsThread) {
-      setStudioCommentInteractionNotice(
-        "자신이 작성한 댓글만 옮길 수 있어요. 소유자·관리자·편집자는 모든 핀을 옮길 수 있습니다."
-      );
-      return false;
-    }
-    const workIdValue = studioTeamCommentsWorkId;
-    const generation = studioTeamCommentsLoadGenerationRef.current;
-    const expectedSequence = studioTeamCommentActivitySequenceRef.current.get(payload.threadId);
-    if (!expectedSequence || expectedSequence <= BigInt(0)) {
-      setStudioCommentInteractionNotice("댓글 최신 상태를 확인한 뒤 위치를 다시 옮겨 주세요.");
-      refreshStudioTeamComments();
-      return false;
-    }
-    const flightKey = `${workIdValue}:reanchor:${payload.threadId}`;
-    const existingFlight = studioTeamCommentReanchorFlightRef.current.get(flightKey);
-    if (existingFlight) {
-      studioTeamCommentReanchorQueueRef.current.set(flightKey, payload);
-      setStudioTeamCommentsState((current) => applyStudioTeamCommentReanchorReceipt(current, {
-        threadId: payload.threadId,
-        anchor: payload.anchor,
-        updatedAt: new Date().toISOString(),
-      }));
-      setStudioCommentInteractionNotice("연속 위치 변경을 이어서 저장하고 있어요…");
-      return existingFlight;
-    }
-
-    const previousAnchor = currentThread.anchor;
-    const previousUpdatedAt = currentThread.updatedAt;
-    setStudioTeamCommentsState((current) => applyStudioTeamCommentReanchorReceipt(current, {
-      threadId: payload.threadId,
-      anchor: payload.anchor,
-      updatedAt: new Date().toISOString(),
-    }));
-    setStudioCommentInteractionNotice("댓글 위치를 저장하고 있어요…");
-
-    const pending = (async (): Promise<boolean> => {
-      const registry = studioTeamCommentOperationScopeRegistryRef.current;
-      const ticket = registry.begin(workIdValue, generation);
-      let admitted = false;
-      try {
-        const commentClient = await loadStudioTeamCommentClient();
-        if (!registry.isCurrent(ticket, currentStudioTeamCommentOperationContext())) {
-          registry.invalidate(ticket);
-          return false;
-        }
-        const response = await commentClient.reanchorStudioTeamCommentThread(
-          workIdValue,
-          payload.threadId,
-          {
-            mutationId: commentClient.createStudioTeamCommentMutationId(),
-            anchor: payload.anchor,
-            expectedActivitySequence: expectedSequence.toString(),
-          },
-          ticket.signal
-        );
-        admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-        registry.finish(ticket);
-        if (!admitted) return false;
-        const receipt = mergeStudioTeamCommentMutationReceipt(
-          studioTeamCommentActivitySequenceRef.current,
-          studioTeamCommentReadSequenceRef.current,
-          payload.threadId,
-          BigInt(response.latestActivitySequence)
-        );
-        if (!receipt.stale) {
-          setStudioTeamCommentsState((current) => {
-            const queued = studioTeamCommentReanchorQueueRef.current.get(flightKey);
-            const optimistic = current.threads.find((thread) => thread.id === payload.threadId);
-            // Do not let the first receipt visually rewind a newer keyboard/drag destination that
-            // is already queued behind it. The queued request will reconcile its own server time.
-            if (
-              queued
-              && optimistic
-              && studioCommentAnchorsEqual(optimistic.anchor, queued.anchor)
-            ) return current;
-            return applyStudioTeamCommentReanchorReceipt(current, {
-              threadId: response.threadId,
-              anchor: response.anchor,
-              updatedAt: response.updatedAt,
-            });
-          });
-          setStudioTeamUnreadCommentIds((current) => current.filter(
-            (threadId) => threadId !== payload.threadId
-          ));
-        }
-        setStudioCommentInteractionNotice(null);
-        setStudioCommentSyncError(null);
-        announceDrawingShortcut(
-          payload.source === "keyboard"
-            ? "댓글 위치를 미세 조정했습니다"
-            : "댓글 위치를 옮겼습니다"
-        );
-        return true;
-      } catch (cause) {
-        const shouldReport = admitted
-          || registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-        registry.invalidate(ticket);
-        if (!shouldReport) return false;
-        // Roll back only if no newer mutation or live event has replaced this optimistic anchor.
-        if (
-          studioTeamCommentActivitySequenceRef.current.get(payload.threadId) === expectedSequence
-        ) {
-          setStudioTeamCommentsState((current) => {
-            const queued = studioTeamCommentReanchorQueueRef.current.get(flightKey);
-            const optimistic = current.threads.find((thread) => thread.id === payload.threadId);
-            const ownsOptimisticAnchor = optimistic && (
-              studioCommentAnchorsEqual(optimistic.anchor, payload.anchor)
-              || Boolean(queued && studioCommentAnchorsEqual(optimistic.anchor, queued.anchor))
-            );
-            return ownsOptimisticAnchor
-              ? applyStudioTeamCommentReanchorReceipt(current, {
-                  threadId: payload.threadId,
-                  anchor: previousAnchor,
-                  updatedAt: previousUpdatedAt,
-                })
-              : current;
-          });
-        }
-        const message = cause instanceof Error
-          ? cause.message
-          : "댓글 위치를 저장하지 못했어요.";
-        setStudioCommentInteractionNotice(message);
-        setStudioCommentSyncError(message);
-        throw new Error(message, { cause });
-      }
-    })();
-    studioTeamCommentReanchorFlightRef.current.set(flightKey, pending);
-    let completedSuccessfully = false;
-    try {
-      completedSuccessfully = await pending;
-      return completedSuccessfully;
-    } finally {
-      if (studioTeamCommentReanchorFlightRef.current.get(flightKey) === pending) {
-        studioTeamCommentReanchorFlightRef.current.delete(flightKey);
-      }
-      const queued = studioTeamCommentReanchorQueueRef.current.get(flightKey);
-      studioTeamCommentReanchorQueueRef.current.delete(flightKey);
-      if (
-        completedSuccessfully
-        && queued
-        && studioTeamCommentsScopeRef.current === workIdValue
-        && studioTeamCommentsLoadGenerationRef.current === generation
-        && editorMountedRef.current
-      ) {
-        void reanchorStudioCommentPin(queued).catch(() => {
-          // The queued call reports its own interaction and sync error state.
-        });
-      }
-    }
-  }
 
   function openStudioCommentThreadPopover(payload: StudioCommentPinClickPayload): void {
     const selection = selectStudioCommentPinThread(payload);
@@ -24141,772 +23842,197 @@ const puppetWarpArmed =
   // 최신 클로저를 ref로 흘려 리스너 재등록 없이(빈 deps) 항상 현재 상태를 참조.
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
+    // 의도된 변경(2026-08, B-06): keydown 디스패처 본문(~770줄)을 studio-page-shortcut-dispatcher.ts
+    // 의 buildStudioShortcutHandler 로 추출했다. 컨텍스트는 렌더마다 한 번(그 렌더의 첫 keydown 때)
+    // 조립되고, 단축키 id·우선순위·동작은 추출 전과 동일하다. deps 없는 이 이펙트가 렌더마다 새
+    // 클로저를 대입하는 원본 shortcutRef 최신-클로저 계약도 그대로다.
+    let handler: ((e: KeyboardEvent) => void) | null = null;
     shortcutRef.current = (e: KeyboardEvent) => {
-      // 탭·메뉴·캔버스 내부 위젯이 이미 소비한 키는 전역 원고 편집 명령으로 다시 실행하지 않는다.
-      if (e.defaultPrevented) return;
-      if (e.isComposing || e.keyCode === 229) return;
-      const target = e.target as HTMLElement | null;
-      const typing = !!target && (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.tagName === "SELECT" ||
-        target.isContentEditable ||
-        target.getAttribute("role") === "textbox"
-      );
-      const insideShortcutBoundary = target !== null &&
-        target.closest("[data-studio-shortcut-boundary='true'], [aria-modal='true']") !== null;
-      // 포커스를 아직 모달 안으로 옮기지 못한 첫 프레임에도 Delete/Undo/B/E가 뒤 원고에 닿지 않게,
-      // 이벤트 target뿐 아니라 열린 modal 자체를 전역 파괴 명령의 경계로 취급한다.
-      const openModals = typeof document === "undefined"
-        ? []
-        : [...document.querySelectorAll<HTMLElement>("[aria-modal='true']")].filter(
-            (modal) => !modal.hidden && !modal.inert && modal.getClientRects().length > 0
-          );
-      if (openModals.length > 0) {
-        if (
-          e.key === "Escape"
-          && mobileSheet
-          && openModals.every((modal) => modal.dataset.studioMobileSheet === "true")
-        ) {
-          e.preventDefault();
-          dismissActiveMobileSheet();
-        }
-        return;
-      }
-      // 파일 메뉴(`임시저장`)와 Quick Access deck이 ⌘S를 광고하므로 실제 핸들러를 여기에 둔다.
-      // 광고만 되고 바인딩이 없으면 브라우저 "페이지 저장" 대화상자가 대신 뜬다.
-      // 제목·대사 입력 중에도 저장은 동작해야 하므로 편집 게이트보다 앞에 배치한다.
-      if (
-        (e.metaKey || e.ctrlKey)
-        && !e.altKey
-        && !e.shiftKey
-        && e.code === "KeyS"
-        && !e.repeat
-      ) {
-        e.preventDefault();
-        if (collaborationDocumentLocked) {
-          announceDrawingShortcut(collaborationLockMessage());
-        } else if (saving) {
-          announceDrawingShortcut("이미 저장 중이에요");
-        } else {
-          void handleSave("draft");
-        }
-        return;
-      }
-      if (!shouldHandleStudioEditEvent({
-        typing,
-        editing: Boolean(editing),
-        insideShortcutBoundary,
-        undoRedoIntent: isStudioUndoRedoChord(e),
+      handler ??= buildStudioShortcutHandler({
+        activateDrawToolWithProperties,
+        activatePixelSelectionToolFromInspector,
+        activatePrimaryCanvasTool,
+        activeCatalogBrush,
+        activeGroupIdRef,
+        activeSurfaceReviewLocked,
+        activeSurfaceReviewLockedRef,
+        addBubble,
+        addLayerGroup,
+        addText,
+        advancedFillActive,
+        advancedFillPreview,
+        announceDrawingShortcut,
+        appSettingsRef,
+        applyBrushSlot,
+        applyGroupSelectionState,
+        applyPixelSelectionAdjust,
+        applyPixelSelectionHistoryCommand,
+        brush,
+        brushDynamics,
+        brushOpacity,
+        brushSlotsState,
+        bubbleShapeArmed,
+        bubbleShapeDragRef,
+        bubbleShapeEditActive,
+        bubbleShapeSelectedPointIndex,
+        cancelAdvancedFillPreview,
+        cancelCanvasGroupDrag,
+        cancelCanvasSelectionResize,
+        cancelLiquifyPointerSession,
+        cancelStudioPointCommentComposer,
+        cancelStudioRasterPreparation,
+        canvasOnlyMode,
+        clearFilterMaskDragPreview,
+        clearHealCloneDragPreview,
+        clearHistoryBrushDragPreview,
+        clearLayerMaskDragPreview,
+        clearPaintRetouchStrokePreview,
+        clearPolyLassoDraft,
+        closeViewToolWithFocus,
+        collaborationDocumentLocked,
+        collaborationLockMessage,
+        color,
+        commentPinArmed,
+        commitPixelSelectionState,
+        commitProDrawPrefsMutation,
+        commitQuickMask,
+        commitStudioBrushSlotsMutation,
+        copySelectedElements,
+        cropRect,
+        cutSelectedElements,
+        deselectForEdit,
+        disarmAllPixelTools,
+        discardDrawingPointerSession,
+        dismissActiveMobileSheet,
+        dodgeBurnActive,
+        dodgeBurnDragRef,
+        drawingShortcutStateRef,
+        duplicateSelected,
+        editing,
+        elements,
+        enterCanvasOnlyMode,
+        enterCompleteSelectedGroup,
+        enterQuickMask,
+        exitQuickMask,
+        eyedropperActive,
+        filterMaskDragRef,
+        filterMaskPaintActive,
+        finishPolyLassoSession,
+        fitCanvasToWidth,
+        flipSelected,
+        groupResizeRef,
+        groupSelectedElements,
+        groups,
+        handleSave,
+        hasActiveDrawingPointerSession,
+        healCloneAbortRef,
+        healCloneDragRef,
+        healCloneTool,
+        historyBrushActive,
+        historyBrushDragRef,
+        invertSelectionForEdit,
+        lastLetteringInsertRef,
+        layerMaskDragRef,
+        layerMaskPaintActive,
+        liquifyActive,
+        marqueeIds,
+        marqueeIdsRef,
+        menu,
+        menuRef,
+        mobileSheet,
+        nodeEditTool,
+        nudgeSelected,
+        openPixelSelectionTransform,
+        openSelectedLayerCrop,
+        openStudioFilter,
+        panelSplitActive,
+        pasteStudioElementsFromClipboard,
+        patchEl,
+        pixelBusy,
+        pixelSel,
+        pixelSelectionDocumentHistoryOwnsLatestEditRef,
+        pixelSelectionHistoryRef,
+        pixelTool,
+        pointCommentComposer,
+        polyLassoSessionRef,
+        puppetWarpActive,
+        quickMaskActive,
+        redo,
+        releaseBubbleShapePointerCapture,
+        removeSelected,
+        reorder,
+        resetView,
+        restoreSavedStudioView,
+        saveCurrentStudioView,
+        saving,
+        secondaryColor,
+        selectAllForEdit,
+        selected,
+        selectedId,
+        selectedIdRef,
+        selectedImageMutationLocked,
+        setActualPixelView,
+        setBrushOpacity,
+        setBubbleShapeEditActive,
+        setBubbleShapeSelectedPointIndex,
+        setCanvasOnlyMode,
+        setColor,
+        setCropRect,
+        setDodgeBurnActive,
+        setEyedropperActive,
+        setFilterMaskPaintActive,
+        setHealCloneBusy,
+        setHealCloneTool,
+        setHistoryBrushActive,
+        setLayerMaskPaintActive,
+        setLiquifyActive,
+        setMarqueeIds,
+        setMenu,
+        setNodeEditTool,
+        setPanelSplitActive,
+        setPanelSplitHint,
+        setPixelTool,
+        setPuppetWarpActive,
+        setPuppetWarpPins,
+        setSecondaryColor,
+        setSelectedId,
+        setShortcutsOpen,
+        setSmudgeActive,
+        setStabilizer,
+        setStrokeWidth,
+        setStudioCommentPinsHidden,
+        setViewTool,
+        setWetMixActive,
+        setZoom,
+        shortcutsOpen,
+        smudgeActive,
+        smudgeDragRef,
+        startEditText,
+        stopStudioCommentPlacementSession,
+        strokeWidth,
         timelapseCapturing,
-      })) return;
-      const mod = e.metaKey || e.ctrlKey;
-      if (e.key === "Escape" && viewTool) {
-        e.preventDefault();
-        closeViewToolWithFocus();
-        return;
-      }
-      if (
-        e.code === "KeyC"
-        && e.shiftKey
-        && !e.metaKey
-        && !e.ctrlKey
-        && !e.altKey
-        && !e.repeat
-      ) {
-        e.preventDefault();
-        setStudioCommentPinsHidden((hidden) => {
-          const next = !hidden;
-          announceDrawingShortcut(next ? "열린 댓글 핀 숨김" : "열린 댓글 핀 표시");
-          return next;
-        });
-        return;
-      }
-
-      // 앱 설정 → Shortcuts: user-bound chords (tool switchers etc.).
-      const sc = appSettingsRef.current.shortcuts;
-      if (matchStudioShortcut(sc["tool-select"], e)) {
-        e.preventDefault();
-        activatePrimaryCanvasTool("select");
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-pen"], e)) {
-        e.preventDefault();
-        activateDrawToolWithProperties("pen");
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-eraser"], e)) {
-        e.preventDefault();
-        activateDrawToolWithProperties("eraser");
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-fill"], e)) {
-        e.preventDefault();
-        toggleAdvancedFill();
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-eyedropper"], e)) {
-        e.preventDefault();
-        const nextEyedropperActive = !eyedropperActive;
-        if (nextEyedropperActive) disarmAllPixelTools();
-        setEyedropperActive(nextEyedropperActive);
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-lasso"], e)) {
-        e.preventDefault();
-        activatePixelSelectionToolFromInspector("lasso");
-        return;
-      }
-      // 각 설정 가능 단축키는 레일 버튼과 동일한 상태 전이를 재사용한다.
-      if (matchStudioShortcut(sc["tool-pixel"], e)) {
-        e.preventDefault();
-        if (!activeSurfaceReviewLocked) {
-          activateDrawToolWithProperties("pixel");
-        }
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-marquee"], e)) {
-        e.preventDefault();
-        togglePixelMarquee("rect");
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-marquee-circle"], e)) {
-        e.preventDefault();
-        togglePixelMarquee("circle");
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-transform"], e)) {
-        e.preventDefault();
-        openPixelSelectionTransform();
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-crop"], e)) {
-        e.preventDefault();
-        openSelectedLayerCrop();
-        return;
-      }
-      if (!e.repeat && matchStudioShortcut(sc["tool-comment"], e)) {
-        e.preventDefault();
-        toggleStudioCommentPinPlacement();
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-blend"], e)) {
-        e.preventDefault();
-        toggleSmudgeTool();
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-wet-mix"], e)) {
-        e.preventDefault();
-        toggleWetMixTool();
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-dodge-burn"], e)) {
-        e.preventDefault();
-        toggleDodgeBurnTool();
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-liquify"], e)) {
-        e.preventDefault();
-        toggleLiquifyTool();
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-lettering"], e)) {
-        e.preventDefault();
-        if (
-          selected &&
-          (selected.type === "text" || selected.type === "bubble" || selected.type === "sticker")
-        ) {
-          if (activeSurfaceReviewLocked || isEffectivelyLocked(selected, groups)) {
-            announceDrawingShortcut("잠긴 레터링은 편집할 수 없어요");
-            return;
-          }
-          void startEditText(selected.id);
-          return;
-        }
-        if (activeSurfaceReviewLocked) {
-          announceDrawingShortcut("검토 잠금을 해제한 뒤 레터링을 추가할 수 있어요");
-          return;
-        }
-        const lastLettering = lastLetteringInsertRef.current;
-        if (lastLettering.kind === "text") addText(undefined, true);
-        else addBubble(lastLettering.variant, undefined, true);
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-zoom"], e)) {
-        e.preventDefault();
-        if (!viewTransformSuppressed) {
-          if (viewTool === "zoom") closeViewToolWithFocus();
-          else setViewTool("zoom");
-          announceDrawingShortcut("보기 확대·축소 도구");
-        }
-        return;
-      }
-      if (matchStudioShortcut(sc["tool-rotate-view"], e)) {
-        e.preventDefault();
-        if (!viewTransformSuppressed) {
-          if (viewTool === "rotate") closeViewToolWithFocus();
-          else setViewTool("rotate");
-          announceDrawingShortcut("보기 회전 도구");
-        }
-        return;
-      }
-      if (matchStudioShortcut(sc["flip-canvas"], e)) {
-        e.preventDefault();
-        if (!e.repeat) toggleHorizontalCanvasView();
-        return;
-      }
-      if (matchStudioShortcut(sc["reset-view"], e)) {
-        e.preventDefault();
-        resetView();
-        announceDrawingShortcut("화면 리셋");
-        return;
-      }
-      if (matchStudioShortcut(sc["zoom-to-selection"], e) && !e.repeat) {
-        e.preventDefault();
-        zoomToSelection();
-        return;
-      }
-      if (matchStudioShortcut(sc["flip-selection-h"], e) && !e.repeat) {
-        e.preventDefault();
-        flipSelected("horizontal");
-        return;
-      }
-      if (matchStudioShortcut(sc["flip-selection-v"], e) && !e.repeat) {
-        e.preventDefault();
-        flipSelected("vertical");
-        return;
-      }
-      if (matchStudioShortcut(sc["deselect-pixels"], e)) {
-        e.preventDefault();
-        deselectForEdit();
-        return;
-      }
-      // 빠른 액세스 팔레트 — Q(퀵 마스크)와 충돌하지 않는 Shift+Q.
-      // 사용자 지정 도구 단축키를 먼저 해석했으므로 같은 조합을 직접 지정한 경우 그 설정이 우선한다.
-      if (
-        e.code === "KeyQ"
-        && e.shiftKey
-        && !e.metaKey
-        && !e.ctrlKey
-        && !e.altKey
-        && !e.repeat
-      ) {
-        e.preventDefault();
-        toggleStudioQuickAccessPalette();
-        return;
-      }
-      // 퀵 마스크(Q) — PS 관례: 토글, 끌 때 마스크를 선택 영역으로 변환한다.
-      if (e.code === "KeyQ" && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && !e.repeat) {
-        if (quickMaskActive) {
-          e.preventDefault();
-          commitQuickMask();
-          return;
-        }
-        if (selected?.type === "image" && !selectedImageMutationLocked) {
-          e.preventDefault();
-          enterQuickMask();
-          return;
-        }
-      }
-      if (
-        matchStudioShortcut(sc["invert-pixels"], e)
-        && selected?.type === "image"
-        && isSelectionUsable(pixelSel)
-      ) {
-        e.preventDefault();
-        invertSelectionForEdit();
-        return;
-      }
-      if (matchStudioShortcut(sc["shortcuts-help"], e)) {
-        e.preventDefault();
-        setShortcutsOpen((v) => !v);
-        return;
-      }
-      // Magma식 보기 키는 Shift+S(기존 크기 잠금)와 Shift+G(고급 채우기)보다 먼저 해석한다.
-      // 입력 필드·모달·메뉴·레이어 트리는 위 shortcut boundary 가 이미 보호한다.
-      const viewShortcut = resolveStudioViewShortcut(e);
-      if (viewShortcut) {
-        e.preventDefault();
-        if (viewTransformSuppressed) return;
-        if (viewShortcut === "zoom-in") {
-          setZoom((current) => stepStudioViewZoom(current, 1));
-        } else if (viewShortcut === "zoom-out") {
-          setZoom((current) => stepStudioViewZoom(current, -1));
-        } else if (viewShortcut === "fit-width") {
-          fitCanvasToWidth();
-          announceDrawingShortcut("화면에 맞게 조정");
-        } else if (viewShortcut === "actual-pixels") {
-          setActualPixelView();
-          announceDrawingShortcut("실제 픽셀 100%");
-        } else if (viewShortcut === "fullscreen") {
-          toggleFullscreen();
-        } else if (viewShortcut === "toggle-grayscale") {
-          toggleGrayscaleView();
-        } else if (viewShortcut === "save-view") {
-          saveCurrentStudioView();
-        } else if (viewShortcut === "restore-view") {
-          restoreSavedStudioView();
-        } else if (viewShortcut === "toggle-perspective-guide") {
-          togglePerspectiveGuideView();
-        }
-        return;
-      }
-      const editShortcut = resolveStudioEditShortcut(e);
-      const drawingShortcut = resolveStudioDrawingShortcut(e, { shortcuts: appSettingsRef.current.shortcuts });
-      const filterShortcut = mod && e.shiftKey && !e.altKey
-        ? STUDIO_FILTER_SHORTCUTS[e.code]
-        : undefined;
-      const pixelSelectionHistoryShortcut = resolvePixelSelectionHistoryShortcut(e, {
-        history: pixelSelectionHistoryRef.current,
-        activeElementId: selected?.type === "image" ? selected.id : null,
-        pixelSelectionContextActive:
-          !pixelBusy
-          && selected?.type === "image"
-          && Boolean(
-            pixelTool
-            || pixelSel
-            || canUndoPixelSelectionHistory(
-              pixelSelectionHistoryRef.current,
-              selected.id
-            )
-            || canRedoPixelSelectionHistory(
-              pixelSelectionHistoryRef.current,
-              selected.id
-            )
-          ),
-        documentHistoryOwnsLatestEdit:
-          pixelSelectionDocumentHistoryOwnsLatestEditRef.current,
+        toggleAdvancedFill,
+        toggleCanvasRulers,
+        toggleDodgeBurnTool,
+        toggleFullscreen,
+        toggleGrayscaleView,
+        toggleHorizontalCanvasView,
+        toggleLiquifyTool,
+        togglePerspectiveGuideView,
+        togglePixelMarquee,
+        toggleSmudgeTool,
+        toggleStudioCommentPinPlacement,
+        toggleStudioQuickAccessPalette,
+        toggleWetMixTool,
+        undo,
+        ungroupSelectedElements,
+        viewTool,
+        viewTransformSuppressed,
+        wetMixActive,
+        wetMixDragRef,
+        zoomToSelection,
       });
-      if (pixelSelectionHistoryShortcut.command) {
-        if (pixelSelectionHistoryShortcut.preventDefault) e.preventDefault();
-        applyPixelSelectionHistoryCommand(
-          pixelSelectionHistoryShortcut.command === "selection-undo" ? "undo" : "redo"
-        );
-      } else if (filterShortcut) {
-        e.preventDefault();
-        openStudioFilter(filterShortcut);
-      } else if (mod && (e.key === "z" || e.key === "Z")) {
-        e.preventDefault();
-        if (e.shiftKey) {
-          redo();
-          pixelSelectionDocumentHistoryOwnsLatestEditRef.current = true;
-        } else {
-          undo();
-          pixelSelectionDocumentHistoryOwnsLatestEditRef.current = false;
-        }
-      } else if (mod && (e.key === "y" || e.key === "Y")) {
-        e.preventDefault();
-        redo();
-        pixelSelectionDocumentHistoryOwnsLatestEditRef.current = true;
-      } else if (editShortcut === "cut") {
-        if (cutSelectedElements()) e.preventDefault();
-      } else if (editShortcut === "copy") {
-        if (copySelectedElements()) e.preventDefault();
-      } else if (editShortcut === "paste-in-place") {
-        e.preventDefault();
-        void pasteStudioElementsFromClipboard("in-place");
-      } else if (editShortcut === "select-all") {
-        e.preventDefault();
-        selectAllForEdit();
-      } else if (editShortcut === "deselect") {
-        e.preventDefault();
-        deselectForEdit();
-      } else if (editShortcut === "invert-selection") {
-        e.preventDefault();
-        invertSelectionForEdit();
-      } else if (editShortcut === "duplicate") {
-        e.preventDefault();
-        if (!activeSurfaceReviewLocked) duplicateSelected();
-      } else if (editShortcut === "bring-front") {
-        e.preventDefault();
-        if (!activeSurfaceReviewLocked) reorder("front");
-      } else if (editShortcut === "bring-forward") {
-        e.preventDefault();
-        if (!activeSurfaceReviewLocked) reorder("forward");
-      } else if (editShortcut === "send-back") {
-        e.preventDefault();
-        if (!activeSurfaceReviewLocked) reorder("back");
-      } else if (editShortcut === "send-backward") {
-        e.preventDefault();
-        if (!activeSurfaceReviewLocked) reorder("backward");
-      } else if (mod && (e.key === "=" || e.key === "+")) {
-        e.preventDefault();
-        if (!viewTransformSuppressed) {
-          setZoom((current) => stepStudioViewZoom(current, 1));
-        }
-      } else if (mod && e.key === "-") {
-        e.preventDefault();
-        if (!viewTransformSuppressed) {
-          setZoom((current) => stepStudioViewZoom(current, -1));
-        }
-      } else if (mod && e.key === "0") {
-        e.preventDefault();
-        if (!viewTransformSuppressed) setZoom(1);
-      } else if (drawingShortcut) {
-        const targetEl = e.target instanceof HTMLElement ? e.target : null;
-        const inField = Boolean(
-          targetEl?.closest("input, textarea, select, [contenteditable='true']")
-        );
-        const preserveTabNavigation =
-          drawingShortcut.type === "toggle-chrome" &&
-          targetEl !== null &&
-          shouldPreserveStudioTabNavigation({
-            tagName: targetEl.tagName,
-            role: targetEl.getAttribute("role"),
-            tabIndex: targetEl.tabIndex,
-            isContentEditable: targetEl.isContentEditable,
-            canvasViewportFocused: targetEl.matches("[data-studio-canvas-viewport]"),
-          });
-        // Chrome toggle / number slots must not steal focus from form fields.
-        if (
-          preserveTabNavigation ||
-          (inField && drawingShortcut.type === "recall-brush-slot")
-        ) {
-          return;
-        }
-        e.preventDefault();
-        if (
-          activeSurfaceReviewLockedRef.current &&
-          drawingShortcut.type !== "toggle-chrome"
-        ) {
-          if (!e.repeat) {
-            announceDrawingShortcut(
-              collaborationDocumentLocked
-                ? collaborationLockMessage()
-                : "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 그릴 수 있어요."
-            );
-          }
-          return;
-        }
-        if (drawingShortcut.type === "select-pen") {
-          drawingShortcutStateRef.current.tool = "draw";
-          drawingShortcutStateRef.current.drawMode = "pen";
-          activatePrimaryCanvasTool("draw", "pen");
-          announceDrawingShortcut("펜");
-        } else if (drawingShortcut.type === "select-eraser") {
-          const currentDrawing = drawingShortcutStateRef.current;
-          currentDrawing.tool = "draw";
-          currentDrawing.drawMode = "eraser";
-          activatePrimaryCanvasTool("draw", "eraser");
-          announceDrawingShortcut("지우개");
-        } else if (drawingShortcut.type === "toggle-transparent-color") {
-          const currentDrawing = drawingShortcutStateRef.current;
-          const nextMode = currentDrawing.drawMode === "eraser" ? "pen" : "eraser";
-          currentDrawing.tool = "draw";
-          currentDrawing.drawMode = nextMode;
-          activatePrimaryCanvasTool("draw", nextMode);
-          announceDrawingShortcut(nextMode === "eraser" ? "투명색 (지우개 모드)" : "원래 색 (펜 모드)");
-        } else if (drawingShortcut.type === "swap-colors") {
-          setColor(secondaryColor);
-          setSecondaryColor(color);
-          announceDrawingShortcut("색 교체");
-        } else if (drawingShortcut.type === "default-colors") {
-          setColor("#1a1a1a");
-          setSecondaryColor("#f5f0e8");
-          announceDrawingShortcut("기본 색 (먹·종이)");
-        } else if (drawingShortcut.type === "cycle-stabilizer") {
-          setStabilizer((prev) => {
-            const next = cycleStudioStabilizerStrength(prev);
-            announceDrawingShortcut(`보정 ${next}`);
-            return next;
-          });
-        } else if (drawingShortcut.type === "toggle-canvas-flip-h") {
-          toggleHorizontalCanvasView();
-        } else if (drawingShortcut.type === "toggle-size-lock") {
-          const { prefs: next } = commitProDrawPrefsMutation(
-            (latest) => ({ ...latest, sizeLocked: !latest.sizeLocked })
-          );
-          announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
-        } else if (drawingShortcut.type === "toggle-opacity-lock") {
-          const { prefs: next } = commitProDrawPrefsMutation(
-            (latest) => ({ ...latest, opacityLocked: !latest.opacityLocked })
-          );
-          announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
-        } else if (drawingShortcut.type === "adjust-width") {
-          const currentDrawing = drawingShortcutStateRef.current;
-          const nextWidth = adjustStudioBrushWidth(currentDrawing.strokeWidth, drawingShortcut.delta);
-          if (nextWidth === currentDrawing.strokeWidth) return;
-          currentDrawing.strokeWidth = nextWidth;
-          setStrokeWidth(nextWidth);
-          if (!e.repeat) announceDrawingShortcut(`브러시 크기 ${nextWidth}px`);
-        } else if (drawingShortcut.type === "adjust-opacity") {
-          const currentDrawing = drawingShortcutStateRef.current;
-          const nextOpacity = adjustStudioBrushOpacity(currentDrawing.brushOpacity, drawingShortcut.delta);
-          if (nextOpacity === currentDrawing.brushOpacity) return;
-          currentDrawing.brushOpacity = nextOpacity;
-          setBrushOpacity(nextOpacity);
-          if (!e.repeat) announceDrawingShortcut(`브러시 불투명도 ${Math.round(nextOpacity * 100)}%`);
-        } else if (drawingShortcut.type === "recall-brush-slot") {
-          const slot = studioBrushSlotAt(brushSlotsState, drawingShortcut.index);
-          if (!slot) {
-            if (!e.repeat) announceDrawingShortcut(`슬롯 ${drawingShortcut.index + 1} 비어 있음 · Shift+${drawingShortcut.index + 1}로 저장`);
-            return;
-          }
-          applyBrushSlot(slot);
-          announceDrawingShortcut(`슬롯 ${drawingShortcut.index + 1}`);
-        } else if (drawingShortcut.type === "toggle-chrome") {
-          // Browser-safe canvas-first toggle; Tab remains native focus navigation.
-          if (canvasOnlyMode) {
-            setCanvasOnlyMode(false);
-            announceDrawingShortcut("도구 표시");
-          } else {
-            enterCanvasOnlyMode();
-            announceDrawingShortcut("캔버스만");
-          }
-        }
-      } else if (
-        !mod &&
-        e.shiftKey &&
-        !e.altKey &&
-        !e.repeat &&
-        /^[1-6]$/.test(e.key) &&
-        !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
-      ) {
-        e.preventDefault();
-        const index = Number(e.key) - 1;
-        commitStudioBrushSlotsMutation(
-          (prev) => assignStudioBrushSlot(prev, index, {
-            brushId: brush,
-            ...(activeCatalogBrush.sourcePresetId
-              ? {
-                  sourcePresetId: activeCatalogBrush.sourcePresetId,
-                  sourcePresetName: activeCatalogBrush.sourcePresetName ?? activeCatalogBrush.name,
-                }
-              : {}),
-            brushDynamics,
-            strokeWidth,
-            brushOpacity,
-          }),
-          {
-            successMessage: `슬롯 ${index + 1}에 저장`,
-            failureMessage: `슬롯 ${index + 1}을 SQLite에 저장하지 못했어요.`,
-          },
-        );
-      } else if (
-        !mod &&
-        !e.altKey &&
-        !e.shiftKey &&
-        !e.repeat &&
-        (e.key === "x" || e.key === "X") &&
-        !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
-      ) {
-        // Photoshop/CSP: swap foreground / background colors.
-        e.preventDefault();
-        setColor(secondaryColor);
-        setSecondaryColor(color);
-        announceDrawingShortcut("색 교체");
-      } else if ((e.key === "Delete" || e.key === "Backspace") && (selectedId || marqueeIds.length > 0)) {
-        e.preventDefault();
-        if (
-          bubbleShapeArmed &&
-          selected?.type === "bubble" &&
-          bubbleShapeSelectedPointIndex !== null
-        ) {
-          const removed = removeBubbleShapePoint(
-            selected.customShapePoints ?? [],
-            bubbleShapeSelectedPointIndex
-          );
-          if (removed.changed) {
-            patchEl(selected.id, { customShapePoints: removed.points } as Partial<El>);
-            const nextCount = removed.points.length / 2;
-            setBubbleShapeSelectedPointIndex(Math.min(bubbleShapeSelectedPointIndex, nextCount - 1));
-            announceDrawingShortcut(`말풍선 외곽선 점 삭제 · ${nextCount}개`);
-          } else if (removed.outcome === "minimum-points") {
-            announceDrawingShortcut("말풍선 외곽선에는 최소 3개의 점이 필요합니다");
-          }
-          return;
-        }
-        // 픽셀 선택이 살아 있으면 요소 삭제 대신 선택 영역 픽셀 삭제(포토샵과 동일한 기대).
-        if (selected?.type === "image" && isSelectionUsable(pixelSel)) {
-          if (!pixelBusy && !selectedImageMutationLocked) {
-            void applyPixelSelectionAdjust(planSelectionAdjust("delete"));
-          }
-          return;
-        }
-        removeSelected();
-      } else if (e.key === "?") {
-        e.preventDefault();
-        setShortcutsOpen((v) => !v);
-      } else if (e.key === "Escape") {
-        // Quick Start dismisses itself via capture-phase Esc on StudioQuickStartPanel.
-        if (cancelStudioRasterPreparation()) {
-          e.preventDefault();
-          announceDrawingShortcut("편집용 래스터 준비를 취소했습니다");
-        } else if (groupResizeRef.current) {
-          e.preventDefault();
-          cancelCanvasSelectionResize();
-          announceDrawingShortcut("그룹 크기 조절을 취소했습니다");
-        } else if (cancelCanvasGroupDrag()) {
-          e.preventDefault();
-          announceDrawingShortcut("그룹 이동을 취소했습니다");
-        } else if (hasActiveDrawingPointerSession()) {
-          e.preventDefault();
-          discardDrawingPointerSession();
-          announceDrawingShortcut("진행 중인 획을 취소했습니다");
-        } else if (mobileSheet) dismissActiveMobileSheet();
-        else if (shortcutsOpen) setShortcutsOpen(false);
-        else if (menu) {
-          // 위 레이어부터 닫기: 단축키 오버레이 → 열린 툴바 드롭다운 → 선택해제.
-          // 포커스가 드롭다운 안이면 언마운트로 잃어버리므로 트리거(래퍼 첫 버튼)로 복귀.
-          menuRef.current?.querySelector<HTMLButtonElement>(":scope > button")?.focus();
-          setMenu(null);
-        } else if (commentPinArmed) {
-          e.preventDefault();
-          stopStudioCommentPlacementSession();
-          announceDrawingShortcut("댓글 핀 배치 취소");
-        } else if (pointCommentComposer) {
-          e.preventDefault();
-          cancelStudioPointCommentComposer();
-        } else if (advancedFillPreview) {
-          cancelAdvancedFillPreview();
-        } else if (advancedFillActive) {
-          toggleAdvancedFill();
-        } else if (cropRect) {
-          // 크롭 모드를 먼저 종료(영역 폐기) — 다음 Esc 가 픽셀 선택/요소 선택을 해제한다.
-          setCropRect(null);
-        } else if (puppetWarpActive) {
-          // 퍼펫 워프도 crop과 동일하게 Esc 로 먼저 종료(핀 전부 폐기) — 다음 Esc 가 그 다음 레이어를 닫는다.
-          setPuppetWarpActive(false);
-          setPuppetWarpPins([]);
-        } else if (panelSplitActive) {
-          setPanelSplitActive(false);
-          setPanelSplitHint(null);
-        } else if (nodeEditTool) {
-          setNodeEditTool(null);
-        } else if (bubbleShapeEditActive) {
-          setBubbleShapeEditActive(false);
-          releaseBubbleShapePointerCapture();
-          bubbleShapeDragRef.current = null;
-        } else if (healCloneTool) {
-          healCloneAbortRef.current?.abort();
-          healCloneAbortRef.current = null;
-          setHealCloneBusy(false);
-          setHealCloneTool(null);
-          healCloneDragRef.current = null;
-          clearHealCloneDragPreview();
-        } else if (historyBrushActive) {
-          // 소스 지정(historyBrushSourceIndex/Src)은 crop rect 와 달리 Esc 로 폐기하지 않는다 — 다시
-          // 켰을 때 같은 소스로 이어서 칠할 수 있어야 사용자가 반복 작업하기 편하다(heal-clone 의
-          // Alt+클릭 오프셋도 disarm 으로는 안 지워지고 요소 전환/명시적 해제로만 지워지는 것과 동일 정책).
-          setHistoryBrushActive(false);
-          historyBrushDragRef.current = null;
-          clearHistoryBrushDragPreview();
-        } else if (smudgeActive) {
-          setSmudgeActive(false);
-          smudgeDragRef.current = null;
-          clearPaintRetouchStrokePreview();
-        } else if (dodgeBurnActive) {
-          setDodgeBurnActive(false);
-          dodgeBurnDragRef.current = null;
-          clearPaintRetouchStrokePreview();
-        } else if (wetMixActive) {
-          setWetMixActive(false);
-          wetMixDragRef.current = null;
-          clearPaintRetouchStrokePreview();
-        } else if (liquifyActive) {
-          setLiquifyActive(false);
-          cancelLiquifyPointerSession();
-        } else if (quickMaskActive) {
-          // Esc = 취소(선택 원상 유지) — 완료는 Q 또는 패널 버튼.
-          exitQuickMask();
-        } else if (layerMaskPaintActive) {
-          setLayerMaskPaintActive(false);
-          layerMaskDragRef.current = null;
-          clearLayerMaskDragPreview();
-        } else if (filterMaskPaintActive) {
-          setFilterMaskPaintActive(false);
-          filterMaskDragRef.current = null;
-          clearFilterMaskDragPreview();
-        } else if (polyLassoSessionRef.current) {
-          // 다각형 올가미 초안만 먼저 취소 — 다음 Esc 가 도구/완성 선택을 해제한다.
-          e.preventDefault();
-          clearPolyLassoDraft();
-        } else if (pixelTool || pixelSel) {
-          // 픽셀 선택 도구/영역을 먼저 해제 — 다음 Esc 가 요소 선택을 해제한다.
-          setPixelTool(null);
-          commitPixelSelectionState(null, "clear");
-          clearPolyLassoDraft();
-        } else if (activeGroupIdRef.current) {
-          // 그룹 진입 중이면 Esc 는 한 단계 위로: 진입을 해제하고 그룹 전체를 다시 선택한다(Figma 관례).
-          e.preventDefault();
-          const stepUp = planGroupEscape({
-            items: elements,
-            current: {
-              selectedId: selectedIdRef.current,
-              marqueeIds: marqueeIdsRef.current,
-              activeGroupId: activeGroupIdRef.current,
-            },
-          });
-          if (stepUp) {
-            applyGroupSelectionState(stepUp);
-            announceDrawingShortcut("그룹 내부 편집 종료 · 그룹 전체 선택");
-          }
-          else {
-            applyGroupSelectionState({
-              selectedId: null,
-              marqueeIds: [],
-              activeGroupId: null,
-            });
-          }
-        } else {
-          setSelectedId(null);
-          setMarqueeIds([]);
-        }
-      } else if (
-        !mod &&
-        !e.altKey &&
-        !e.shiftKey &&
-        !e.repeat &&
-        e.key === "Enter" &&
-        polyLassoSessionRef.current &&
-        !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
-      ) {
-        e.preventDefault();
-        finishPolyLassoSession();
-      } else if (
-        !mod &&
-        !e.altKey &&
-        !e.shiftKey &&
-        !e.repeat &&
-        e.key === "Enter" &&
-        !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
-      ) {
-        if (enterCompleteSelectedGroup()) e.preventDefault();
-      } else if (mod && e.altKey && (e.key === "g" || e.key === "G" || e.key === "ㅎ")) {
-        // Photoshop / ClipStudio / Figma: ⌥⌘G (Alt+Cmd+G / Alt+Ctrl+G) = 클리핑 마스크 토글
-        e.preventDefault();
-        if (selected) {
-          const nextClip = !(selected as El & { clipToBelow?: boolean }).clipToBelow;
-          patchEl(selected.id, { clipToBelow: nextClip } as Partial<El>);
-          announceDrawingShortcut(nextClip ? "아래 레이어에 클리핑 마스크 적용 (Alt+Cmd+G)" : "클리핑 마스크 해제");
-        }
-      } else if (mod && e.altKey && (e.key === "r" || e.key === "R" || e.key === "ㄱ")) {
-        // Photoshop / CSP / Figma: ⌥⌘R (Alt+Cmd+R) = 캔버스 눈금자(Rulers) 표시/숨기기 토글
-        e.preventDefault();
-        toggleCanvasRulers();
-      } else if (mod && !e.altKey && (e.key === "g" || e.key === "G")) {
-        // Figma/Illustrator/ClipStudio: ⌘G = 그룹 생성, ⇧⌘G = 그룹 해제
-        e.preventDefault();
-        if (e.shiftKey) {
-          ungroupSelectedElements();
-        } else {
-          if (marqueeIdsRef.current.length >= 2) {
-            groupSelectedElements();
-          } else if (selectedIdRef.current) {
-            if (addLayerGroup(selectedIdRef.current)) {
-              announceDrawingShortcut("그룹 생성 완료");
-            }
-          }
-        }
-      } else if ((selectedId || marqueeIds.length > 0) && e.key.startsWith("Arrow")) {
-        // 방향키 미세이동: 1px, Shift 동반 시 10px.
-        e.preventDefault();
-        const step = e.shiftKey ? 10 : 1;
-        if (e.key === "ArrowLeft") nudgeSelected(-step, 0);
-        else if (e.key === "ArrowRight") nudgeSelected(step, 0);
-        else if (e.key === "ArrowUp") nudgeSelected(0, -step);
-        else if (e.key === "ArrowDown") nudgeSelected(0, step);
-      }
+      handler(e);
     };
   });
   useEffect(() => {
