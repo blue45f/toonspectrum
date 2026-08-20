@@ -22,6 +22,12 @@ import {
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
 } from "../brush/studio-brush-render-budget";
+import {
+  rasterizeStudioBrushSoftFalloffMaskRgba,
+  STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
+  STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+  type StudioBrushSoftFalloffStampTone,
+} from "../brush/studio-brush-soft-falloff-stamp";
 import { studioDynamicBrushDabVariations } from "../brush/studio-brush-symmetry";
 import {
   encodeStudioBrushTipAlphaMapBase64,
@@ -3224,6 +3230,156 @@ describe("도형 직렬화", () => {
       STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
     );
     expect(result.skipped).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 해석적 soft-falloff 톤 패리티 — 핀 스트로크의 SVG 스커트는 Canvas 스탬프와 같은 램프다
+// ---------------------------------------------------------------------------
+
+describe("해석적 soft-falloff 톤 패리티", () => {
+  /**
+   * airbrush 프리셋(fresh-authoring 민트 사이트) 스냅샷을 그대로 쓰면 핀 스트로크,
+   * `softFalloffLinearProgram`만 제거하면 톤 없는 레거시(pre-wave 스냅샷) 스트로크다.
+   * 둘 다 같은 soft 팁·softness라 해석적 falloff exponent는 동일하다.
+   */
+  function softFalloffFixture(id: string, pinned: boolean): SvgDrawTestEl {
+    const settings = studioBrushDynamicsPresetSettings("airbrush");
+    if (!pinned) settings.softFalloffLinearProgram = undefined;
+    return rectEl({
+      id,
+      kind: "freehand",
+      brush: "airbrush",
+      points: [12, 18, 46, 30, 84, 22],
+      pressures: [0.5, 0.85, 0.6],
+      stroke: "#336699",
+      strokeWidth: 24,
+      brushDynamics: normalizeStudioBrushDynamicsSettings(settings),
+    });
+  }
+
+  function analyticFalloffMarks(fixture: SvgDrawTestEl) {
+    const marks = canvasCoverageMarksForSvgFixture(fixture)
+      .filter((mark) => mark.falloff?.kind === "analytic-radial");
+    if (marks.length === 0) throw new Error("fixture planned no analytic falloff marks");
+    const exponents = new Set(marks.map((mark) => mark.falloff!.exponent));
+    if (exponents.size !== 1) throw new Error("fixture exponent is not uniform");
+    return marks;
+  }
+
+  function analyticRadialUses(svg: string): string[] {
+    return Array.from(
+      svg.matchAll(/<use data-brush-coverage="analytic-radial"[^>]*\/>/gu),
+      (match) => match[0],
+    );
+  }
+
+  function analyticRadialSymbolId(use: string): string {
+    const symbolId = /\bhref="#(sbt\d+)"/u.exec(use)?.[1];
+    if (!symbolId) throw new Error("missing analytic-radial symbol reference");
+    return symbolId;
+  }
+
+  function embeddedSymbolPixelBytes(svg: string, symbolId: string): Buffer {
+    const dataUrl = new RegExp(
+      `<symbol data-brush-tip-asset="full-alpha-map-v1" id="${symbolId}"[^>]*>`
+        + `.*?<image [^>]*href="([^"]+)"`,
+      "u",
+    ).exec(svg)?.[1];
+    if (!dataUrl) throw new Error(`missing embedded asset for #${symbolId}`);
+    return Buffer.from(decodeEmbeddedRgbaPng(dataUrl).pixels);
+  }
+
+  function referenceStampBytes(
+    exponent: number,
+    tone?: StudioBrushSoftFalloffStampTone,
+  ): Buffer {
+    // Canvas 경로의 스탬프 원천과 동일한 호출 — `prepareStudioBrushSoftFalloffTintedStampSurface`
+    // 는 `acquireSoftFalloffMaskSurface`를 통해 정확히 이 래스터를 표면에 올린다.
+    const raster = rasterizeStudioBrushSoftFalloffMaskRgba(
+      exponent,
+      STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+      tone,
+    );
+    if (!raster) throw new Error("reference stamp raster unavailable");
+    return Buffer.from(
+      raster.pixels.buffer,
+      raster.pixels.byteOffset,
+      raster.pixels.byteLength,
+    );
+  }
+
+  it("핀 스트로크 — 내보낸 텍스처가 Canvas 스탬프 경로와 같은 linear-accumulation 마스크 바이트다", () => {
+    const fixture = softFalloffFixture("soft-falloff-pinned", true);
+    const falloffMarks = analyticFalloffMarks(fixture);
+    expect(falloffMarks.every((mark) => (
+      mark.falloff?.tone === STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE
+    ))).toBe(true);
+    const exponent = falloffMarks[0]!.falloff!.exponent;
+
+    const { svg, skipped } = exportPageToSvg(page([fixture]));
+    const uses = analyticRadialUses(svg);
+
+    expect(skipped).toEqual([]);
+    expect(exportPageToSvg(page([fixture])).svg).toBe(svg);
+    expect(uses).toHaveLength(falloffMarks.length);
+    // 마크 단위 왕복 — 모든 핀 마크가 자신의 톤을 문서에 직렬화한다.
+    for (const use of uses) {
+      expect(use).toContain(
+        ` data-brush-falloff-tone="${STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE}"`,
+      );
+    }
+    // 텍스처 패리티 — 내보낸 PNG 픽셀이 Canvas 스탬프 래스터와 바이트 단위로 같고,
+    // 레거시 sRGB 램프와는 실제로 달라야 한다(공허 통과 방지).
+    const exported = embeddedSymbolPixelBytes(svg, analyticRadialSymbolId(uses[0]!));
+    expect(exported.equals(referenceStampBytes(
+      exponent,
+      STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
+    ))).toBe(true);
+    expect(exported.equals(referenceStampBytes(exponent))).toBe(false);
+  });
+
+  it("톤 없는 레거시 마크 — 오늘의 sRGB 스커트 마크업·텍스처 바이트를 그대로 유지한다", () => {
+    const fixture = softFalloffFixture("soft-falloff-legacy", false);
+    const falloffMarks = analyticFalloffMarks(fixture);
+    expect(falloffMarks.every((mark) => mark.falloff?.tone === undefined)).toBe(true);
+    const exponent = falloffMarks[0]!.falloff!.exponent;
+
+    const { svg, skipped } = exportPageToSvg(page([fixture]));
+    const uses = analyticRadialUses(svg);
+
+    expect(skipped).toEqual([]);
+    expect(uses).toHaveLength(falloffMarks.length);
+    // 바이트 동일성 잠금 — 톤 속성이 전혀 붙지 않고 coverage 주석과 재질 주석이 오늘의
+    // 인접성을 그대로 유지해 레거시 마크업이 이 웨이브 이전과 문자 단위로 같다.
+    expect(svg).not.toContain("data-brush-falloff-tone");
+    for (const use of uses) {
+      expect(use).toMatch(
+        /^<use data-brush-coverage="analytic-radial" data-brush-material="airbrush" href="#sbt\d+" x="/u,
+      );
+    }
+    const exported = embeddedSymbolPixelBytes(svg, analyticRadialSymbolId(uses[0]!));
+    expect(exported.equals(referenceStampBytes(exponent))).toBe(true);
+  });
+
+  it("같은 exponent의 핀·레거시 스트로크가 한 문서에서 서로 다른 텍스처 자산을 쓴다", () => {
+    const pinnedEl = softFalloffFixture("soft-falloff-pinned-pair", true);
+    const legacyEl = softFalloffFixture("soft-falloff-legacy-pair", false);
+    const pinnedExponent = analyticFalloffMarks(pinnedEl)[0]!.falloff!.exponent;
+    expect(analyticFalloffMarks(legacyEl)[0]!.falloff!.exponent).toBe(pinnedExponent);
+
+    const { svg, skipped } = exportPageToSvg(page([pinnedEl, legacyEl]));
+    const uses = analyticRadialUses(svg);
+    const symbolIds = new Set(uses.map(analyticRadialSymbolId));
+
+    expect(skipped).toEqual([]);
+    // 톤이 캐시 키 네임스페이스를 가르지 않으면 두 스트로크가 자산 하나를 공유해 실패한다.
+    expect(symbolIds.size).toBe(2);
+    const [firstId, secondId] = [...symbolIds];
+    expect(
+      embeddedSymbolPixelBytes(svg, firstId!)
+        .equals(embeddedSymbolPixelBytes(svg, secondId!)),
+    ).toBe(false);
   });
 });
 

@@ -61,8 +61,10 @@ import {
 import { resolveStudioBrushSinglePointRoute } from "../brush/studio-brush-runtime-contract";
 import {
   rasterizeStudioBrushSoftFalloffMaskRgba,
+  STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+  type StudioBrushSoftFalloffStampTone,
 } from "../brush/studio-brush-soft-falloff-stamp";
 import {
   planStudioStampBrushDabs,
@@ -1015,9 +1017,23 @@ function svgAlphaMapTextureAsset(
 function svgSoftFalloffTextureAsset(
   ctx: ExportCtx,
   exponent: number,
+  tone?: StudioBrushSoftFalloffStampTone,
 ): Readonly<{ symbolId: string; size: number }> | null {
+  // An unknown tone must never reuse a cached legacy-ramp asset — fail closed instead of
+  // silently substituting a different skirt (the stamp rasterizer would reject it anyway).
+  if (
+    tone !== undefined
+    && tone !== STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE
+  ) {
+    return null;
+  }
   const cacheKey = JSON.stringify([
-    "analytic-radial-v1",
+    // The tone-less key stays byte-identical to the historical key; the pinned tone claims a
+    // disjoint versioned namespace (mirrors softFalloffMaskCacheKey in the stamp module), so a
+    // pinned stroke and a legacy stroke of the same exponent never share an exported asset.
+    tone === STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE
+      ? "analytic-radial-linear-accumulation-v1"
+      : "analytic-radial-v1",
     exponent.toString(),
     STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
     STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
@@ -1028,8 +1044,13 @@ function svgSoftFalloffTextureAsset(
     ctx,
     cacheKey,
     surfaceSize,
+    // The mark's versioned tone selects the mask ramp exactly like the Canvas stamp path
+    // (`prepareStudioBrushSoftFalloffTintedStampSurface`), so exported texture bytes match the
+    // canvas stamp byte-for-byte for both the pinned and the historical ramp.
     () => rasterizeStudioBrushSoftFalloffMaskRgba(
       exponent,
+      STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+      tone,
     )?.pixels ?? null,
   );
 }
@@ -1175,13 +1196,19 @@ function serializeStudioDynamicCoverageMark(
     const asset = svgSoftFalloffTextureAsset(
       ctx,
       mark.falloff.exponent,
+      mark.falloff.tone,
     );
     if (!asset) return null;
     const overscan = asset.size / STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION;
     const radiusX = mark.radiusX * overscan;
     const radiusY = mark.radiusY * overscan;
+    // 톤은 마크 단위로 왕복 직렬화한다 — 핀 스트로크의 문서는 어떤 램프로 스커트를 쌓았는지
+    // 자체 기술하고, 톤 없는 레거시 마크는 오늘의 마크업과 바이트 단위로 같아야 한다.
+    const toneAttribute = mark.falloff.tone === undefined
+      ? ""
+      : ` data-brush-falloff-tone="${escapeXml(mark.falloff.tone)}"`;
     return (
-      `<use data-brush-coverage="analytic-radial"${materialAttributes} href="#${asset.symbolId}"`
+      `<use data-brush-coverage="analytic-radial"${toneAttribute}${materialAttributes} href="#${asset.symbolId}"`
         + ` x="${fmtCoverageNumber(mark.x - radiusX)}"`
         + ` y="${fmtCoverageNumber(mark.y - radiusY)}"`
         + ` width="${fmtCoverageNumber(radiusX * 2)}"`
