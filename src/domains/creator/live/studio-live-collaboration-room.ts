@@ -365,7 +365,15 @@ export class StudioLiveRoom {
   >();
   private readonly inkListeners = new Set<(event: StudioLiveInkRoomEvent) => void>();
   private readonly outboundInkTracker = new StudioLiveInkStrokeTracker();
-  private readonly inboundInkTrackerBySession = new Map<string, StudioLiveInkStrokeTracker>();
+  /**
+   * Inbound stroke gates keyed by the frame's author identity (the canonical client-instance
+   * session id every ink wire frame stamps), never by transport connection identity. A raw
+   * socket transport keys presence by per-connection ids, so one author reconnecting across
+   * connections must still land on one tracker — see resolveInkAuthorParticipant.
+   */
+  private readonly inboundInkTrackerByAuthor = new Map<string, StudioLiveInkStrokeTracker>();
+  /** Author-side ids of strokes begun but not yet ended/cancelled; drives reconnect cancels. */
+  private readonly outboundActiveInkStrokeIds = new Set<string>();
   private readonly outboundInkQueue: OutboundStudioLiveInkEntry[] = [];
   private transport: StudioLiveTransport | null = null;
   private unsubscribeTransport: (() => void) | null = null;
@@ -375,6 +383,9 @@ export class StudioLiveRoom {
   private outboundInkFlushHandle: unknown = null;
   private lastInkPayloadSentAt = Number.NEGATIVE_INFINITY;
   private droppedInkPredictions = 0;
+  private droppedUnknownInkAuthorFrames = 0;
+  /** Set on a recoverable disconnect with live outbound strokes; consumed once on reconnect. */
+  private inkReconnectRecoveryPending = false;
   private heartbeatHandle: unknown = null;
   private phase: "idle" | "starting" | "ready" | "closed" = "idle";
   private startPromise: Promise<void> | null = null;
@@ -712,6 +723,15 @@ export class StudioLiveRoom {
 
   getInkBackpressure(): StudioLiveInkBackpressure {
     return this.computeInkBackpressure();
+  }
+
+  /**
+   * Structurally valid inbound ink frames dropped because the presence roster could not vouch
+   * for the claimed author identity (unknown author, ambiguous connection mapping, or a claim
+   * that names a roster key belonging to a different canonical identity). Fail-closed telemetry.
+   */
+  getInkUnknownAuthorDropCount(): number {
+    return this.droppedUnknownInkAuthorFrames;
   }
 
   /**
@@ -1223,7 +1243,9 @@ export class StudioLiveRoom {
     this.previewInboundWindowBySession.clear();
     this.outboundInkQueue.length = 0;
     this.outboundInkTracker.clear();
-    this.inboundInkTrackerBySession.clear();
+    this.outboundActiveInkStrokeIds.clear();
+    this.inkReconnectRecoveryPending = false;
+    this.inboundInkTrackerByAuthor.clear();
     this.listeners.clear();
     this.crdtListeners.clear();
     this.voiceListeners.clear();
@@ -1285,8 +1307,14 @@ export class StudioLiveRoom {
   private forgetGesturePreviewPeer(sessionId: string): void {
     this.previewParticipantBySession.delete(sessionId);
     this.previewInboundWindowBySession.delete(sessionId);
-    // A departed peer's ink lifecycle gate dies with its presence; a rejoin starts clean.
-    this.inboundInkTrackerBySession.delete(sessionId);
+    // A departed author's ink lifecycle gate dies with its presence; a rejoin starts clean.
+    // The tracker is keyed by canonical author identity, so map the roster key through the
+    // transport bridge. While the same identity still holds another live connection
+    // (connection replacement), the bridge returns the transport key unchanged and the
+    // author's gate deliberately survives the older connection's leave.
+    this.inboundInkTrackerByAuthor.delete(
+      this.transport?.canonicalSessionId?.(sessionId) ?? sessionId,
+    );
   }
 
   /** True only when the transport negotiated the ink-v2 binary lane. Fail closed otherwise. */
@@ -1319,6 +1347,11 @@ export class StudioLiveRoom {
       return false;
     }
     if (!this.outboundInkTracker.accept(message)) return false;
+    if (message.kind === "ink:begin") {
+      this.outboundActiveInkStrokeIds.add(message.strokeId);
+    } else if (message.kind === "ink:end" || message.kind === "ink:cancel") {
+      this.outboundActiveInkStrokeIds.delete(message.strokeId);
+    }
     this.outboundInkQueue.push({
       wire,
       payloadBytes:
@@ -1444,6 +1477,31 @@ export class StudioLiveRoom {
     this.outboundInkQueue.length = 0;
   }
 
+  /**
+   * V18 reconnect semantics: a recoverable disconnect cancels every open outbound stroke
+   * instead of resuming it. Replaying the buffered tail cannot be made safe — a receiver
+   * whose presence dropped lost its lifecycle gate (our mid-stroke chunks are noise), while a
+   * receiver that kept presence still holds the gate, so re-sending `ink:begin` under the same
+   * strokeId trips its active/settled reuse ban and permanently kills the stroke there. Wet
+   * ink is an ephemeral preview (the durable stroke rides the CRDT lane), so the always-correct
+   * move is: drop the buffered frames, publish `ink:cancel` — "transport-error" is the closest
+   * reason the protocol's cancel union offers for a connection loss — and let the author's next
+   * stroke begin under a fresh id. The pending flag survives an ink-less rejoin so a later
+   * ink-capable reconnect still settles the strokes exactly once.
+   */
+  private cancelOutboundInkAfterReconnect(): void {
+    if (!this.inkReconnectRecoveryPending) return;
+    if (!this.transportSupportsInk()) return;
+    this.inkReconnectRecoveryPending = false;
+    for (const entry of this.outboundInkQueue) {
+      if (entry.droppablePrediction) this.droppedInkPredictions += 1;
+    }
+    this.outboundInkQueue.length = 0;
+    for (const strokeId of Array.from(this.outboundActiveInkStrokeIds)) {
+      this.publishInkCancel({ strokeId, reason: "transport-error" });
+    }
+  }
+
   private onTransportInk(value: unknown): void {
     if (!this.ready || !this.transportSupportsInk()) return;
     const receivedAt = this.now();
@@ -1454,23 +1512,56 @@ export class StudioLiveRoom {
     });
     if (!wire) return;
     this.pruneExpired(receivedAt);
-    const sessionId = wire.senderSessionId;
-    const participant = this.previewParticipantBySession.get(sessionId);
-    // Fail closed: only presence-verified, edit-capable peers may stream ink into this room.
-    if (!this.peers.has(sessionId) || !participant || !canPublishStudioLiveInk(participant)) {
+    // The wire contract stamps the author's canonical client-instance session id, while a raw
+    // socket transport keys presence by per-connection ids. Resolve the claim through the
+    // roster (and the transport identity bridge, when one exists) so the same author over two
+    // connections stays one ink sender — and so per-sender stroke budgets follow the author.
+    const authorId = wire.senderSessionId;
+    const participant = this.resolveInkAuthorParticipant(authorId);
+    if (!participant) {
+      // Fail closed: an author the presence roster cannot vouch for never reaches a tracker.
+      this.droppedUnknownInkAuthorFrames += 1;
       return;
     }
-    let tracker = this.inboundInkTrackerBySession.get(sessionId);
+    // Only presence-verified, edit-capable peers may stream ink into this room.
+    if (!canPublishStudioLiveInk(participant)) return;
+    let tracker = this.inboundInkTrackerByAuthor.get(authorId);
     if (!tracker) {
       tracker = new StudioLiveInkStrokeTracker();
-      this.inboundInkTrackerBySession.set(sessionId, tracker);
+      this.inboundInkTrackerByAuthor.set(authorId, tracker);
     }
     if (!tracker.accept(wire.message)) return;
     this.emitInk({
       type: "ink",
-      participant: copyParticipant(participant),
+      // Attribute by the canonical author identity so presence-to-ink attribution cannot
+      // split one author into per-connection senders on raw socket transports.
+      participant: { ...copyParticipant(participant), sessionId: authorId },
       message: wire.message,
     });
+  }
+
+  /**
+   * Maps one ink frame's claimed author identity onto the presence roster. Transports without
+   * an identity bridge (local BroadcastChannel) key presence by the same canonical session id
+   * the wire carries, so a direct roster hit is required. A raw socket transport keys presence
+   * by per-connection ids and exposes the bridge instead: the claim resolves only while it maps
+   * to a live roster connection whose canonical identity is the claim itself. A frame stamping
+   * some peer's connection id instead of its author identity, or an identity that several live
+   * connections currently share, fails closed here.
+   */
+  private resolveInkAuthorParticipant(authorId: string): StudioLiveParticipant | null {
+    const transport = this.transport;
+    const bridge = transport?.transportSessionId;
+    if (!bridge) {
+      if (!this.peers.has(authorId)) return null;
+      return this.previewParticipantBySession.get(authorId) ?? null;
+    }
+    const rosterSessionId = bridge.call(transport, authorId);
+    if (!rosterSessionId || !this.peers.has(rosterSessionId)) return null;
+    const canonical =
+      transport?.canonicalSessionId?.(rosterSessionId) ?? rosterSessionId;
+    if (canonical !== authorId) return null;
+    return this.previewParticipantBySession.get(rosterSessionId) ?? null;
   }
 
   private emitInk(event: StudioLiveInkRoomEvent): void {
@@ -1980,10 +2071,12 @@ export class StudioLiveRoom {
         this.lastSequenceBySession.clear();
         this.previewParticipantBySession.clear();
         this.previewInboundWindowBySession.clear();
-        this.inboundInkTrackerBySession.clear();
+        this.inboundInkTrackerByAuthor.clear();
         // Access revocation is terminal for the lane: buffered ink must never reach the room again.
         this.outboundInkQueue.length = 0;
         this.outboundInkTracker.clear();
+        this.outboundActiveInkStrokeIds.clear();
+        this.inkReconnectRecoveryPending = false;
         if (this.outboundInkFlushHandle !== null) this.cancelTimeout(this.outboundInkFlushHandle);
         this.outboundInkFlushHandle = null;
         if (hadPeers) this.emitPresence();
@@ -2005,9 +2098,16 @@ export class StudioLiveRoom {
         this.lastSequenceBySession.clear();
         this.previewParticipantBySession.clear();
         this.previewInboundWindowBySession.clear();
-        // Remote lifecycle gates reset with presence; the outbound actual buffer survives the
-        // recoverable gap so no authored sample is ever dropped by a transient disconnect.
-        this.inboundInkTrackerBySession.clear();
+        // Remote lifecycle gates reset with presence. Outbound strokes cannot safely resume
+        // either: a peer that dropped our presence lost its per-stroke gate (buffered
+        // mid-stroke chunks become noise), while a peer that kept it still holds the old gate,
+        // so replaying `ink:begin` for the same strokeId would trip its active/settled reuse
+        // ban and permanently kill the stroke there. Mark the gap; the reconnect handler
+        // cancels every open stroke and restarts cleanly under fresh ids.
+        if (this.outboundActiveInkStrokeIds.size > 0 || this.outboundInkQueue.length > 0) {
+          this.inkReconnectRecoveryPending = true;
+        }
+        this.inboundInkTrackerByAuthor.clear();
         if (hadPeers) this.emitPresence();
         let changed = false;
         for (const [sessionId, member] of this.voiceMembers) {
@@ -2031,7 +2131,8 @@ export class StudioLiveRoom {
         this.sendPresence("presence:heartbeat");
         const voice = this.voiceMembers.get(this.participant.sessionId);
         if (voice) this.post("voice:join", { callId: voice.callId, muted: voice.muted });
-        // Buffered actual ink packets resume on their own scheduler after a reconnect.
+        // Strokes that straddled the gap are cancelled — never resumed; see the method's doc.
+        this.cancelOutboundInkAfterReconnect();
         this.pumpInkQueue();
       }
       this.emit({ type: "transport-status", status: event.status });

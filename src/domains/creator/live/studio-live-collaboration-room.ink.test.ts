@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { studioLocalLiveChannelName, type StudioLiveParticipant } from "./studio-live-collaboration-protocol";
+import {
+  createStudioLiveEnvelope,
+  studioLocalLiveChannelName,
+  type StudioLiveEnvelope,
+  type StudioLiveParticipant,
+} from "./studio-live-collaboration-protocol";
 import {
   STUDIO_LIVE_INK_BACKPRESSURE_HIGH_QUEUED_CHUNKS,
   STUDIO_LIVE_INK_BACKPRESSURE_MID_QUEUED_CHUNKS,
@@ -15,6 +20,9 @@ import {
 import {
   createStudioMemoryLiveTransportFactory,
   StudioMemoryBroadcastHub,
+  type StudioLiveTransport,
+  type StudioLiveTransportContext,
+  type StudioLiveTransportControlEvent,
 } from "./studio-live-collaboration-transport";
 import {
   decodeStudioLiveInkSamples,
@@ -23,11 +31,14 @@ import {
 } from "./studio-live-ink-codec";
 import {
   createStudioLiveInkWireMessage,
+  STUDIO_LIVE_INK_MAX_ACTIVE_STROKES,
   STUDIO_LIVE_INK_PROTOCOL_VERSION,
   STUDIO_LIVE_INK_SAMPLE_SCHEMA,
   type StudioLiveInkBegin,
   type StudioLiveInkChunk,
+  type StudioLiveInkMessage,
   type StudioLiveInkPrediction,
+  type StudioLiveInkWireMessage,
 } from "./studio-live-ink-protocol";
 
 const alice: StudioLiveParticipant = {
@@ -461,5 +472,493 @@ describe("StudioLiveRoom ink channel (V18)", () => {
     ).toEqual(["ink:begin", "ink:chunk"]);
     roomA.close();
     roomB.close();
+  });
+});
+
+/**
+ * Raw socket-style transport double: presence envelopes are keyed by per-connection ids while
+ * ink wire frames carry the author's canonical client-instance id. The identity bridge mirrors
+ * the Socket.IO transport's single-active-connection rule — a connection canonicalizes only
+ * while it is the sole live connection of its identity, and a tombstoned connection
+ * canonicalizes only after the identity's last live connection has left.
+ */
+class FakeRawSocketTransport implements StudioLiveTransport {
+  readonly mode = "server" as const;
+  inkLane = true;
+  readonly sentEnvelopes: StudioLiveEnvelope[] = [];
+  readonly sentInk: StudioLiveInkWireMessage[] = [];
+  private connected = false;
+  private closed = false;
+  private readonly listeners = new Set<(value: unknown) => void>();
+  private readonly controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
+  private readonly inkListeners = new Set<(value: unknown) => void>();
+  private readonly connections = new Map<
+    string,
+    { clientInstanceId: string; active: boolean }
+  >();
+
+  constructor(private readonly context: StudioLiveTransportContext) {}
+
+  get ready(): boolean {
+    return this.connected && !this.closed;
+  }
+
+  get binaryLaneCapabilities(): readonly string[] {
+    return this.ready && this.inkLane ? ["ink-v2"] : [];
+  }
+
+  joinPeer(connectionId: string, clientInstanceId: string): void {
+    this.connections.set(connectionId, { clientInstanceId, active: true });
+  }
+
+  leavePeer(connectionId: string): void {
+    const record = this.connections.get(connectionId);
+    if (record) record.active = false;
+  }
+
+  canonicalSessionId(transportSessionId: string): string {
+    if (transportSessionId === this.context.participant.sessionId) return transportSessionId;
+    const record = this.connections.get(transportSessionId);
+    if (!record) return transportSessionId;
+    const active = this.activeConnectionsOf(record.clientInstanceId);
+    if (record.active) {
+      return active.length === 1 && active[0] === transportSessionId
+        ? record.clientInstanceId
+        : transportSessionId;
+    }
+    return active.length === 0 ? record.clientInstanceId : transportSessionId;
+  }
+
+  transportSessionId(canonicalSessionId: string): string | null {
+    if (canonicalSessionId === this.context.participant.sessionId) return canonicalSessionId;
+    if (this.connections.has(canonicalSessionId)) return canonicalSessionId;
+    const active = this.activeConnectionsOf(canonicalSessionId);
+    return active.length === 1 ? active[0]! : null;
+  }
+
+  connect(): Promise<void> {
+    this.connected = true;
+    return Promise.resolve();
+  }
+
+  send(envelope: StudioLiveEnvelope): boolean {
+    if (!this.ready) return false;
+    this.sentEnvelopes.push(structuredClone(envelope));
+    return true;
+  }
+
+  sendInk(message: StudioLiveInkWireMessage): boolean {
+    if (!this.ready || !this.inkLane) return false;
+    this.sentInk.push(structuredClone(message));
+    return true;
+  }
+
+  subscribe(listener: (value: unknown) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  subscribeControl(listener: (event: StudioLiveTransportControlEvent) => void): () => void {
+    this.controlListeners.add(listener);
+    return () => this.controlListeners.delete(listener);
+  }
+
+  subscribeInk(listener: (value: unknown) => void): () => void {
+    this.inkListeners.add(listener);
+    return () => this.inkListeners.delete(listener);
+  }
+
+  receiveEnvelope(value: unknown): void {
+    if (!this.ready) return;
+    for (const listener of this.listeners) listener(structuredClone(value));
+  }
+
+  receiveControl(event: StudioLiveTransportControlEvent): void {
+    if (this.closed) return;
+    if (event.type === "status") {
+      if (event.status.state === "revoked" || event.status.state === "disconnected") {
+        this.connected = false;
+      } else if (event.status.state === "ready") {
+        this.connected = true;
+      }
+    }
+    for (const listener of this.controlListeners) listener(structuredClone(event));
+  }
+
+  receiveInk(value: unknown): void {
+    if (!this.ready || !this.inkLane) return;
+    for (const listener of this.inkListeners) listener(structuredClone(value));
+  }
+
+  close(): void {
+    this.closed = true;
+    this.listeners.clear();
+    this.controlListeners.clear();
+    this.inkListeners.clear();
+  }
+
+  private activeConnectionsOf(clientInstanceId: string): string[] {
+    const active: string[] = [];
+    for (const [connectionId, record] of this.connections) {
+      if (record.active && record.clientInstanceId === clientInstanceId) {
+        active.push(connectionId);
+      }
+    }
+    return active;
+  }
+}
+
+function rawSocketRoom(
+  test: ReturnType<typeof harness>,
+  participant: StudioLiveParticipant
+): { room: StudioLiveRoom; transport: () => FakeRawSocketTransport } {
+  let transport: FakeRawSocketTransport | null = null;
+  const room = test.room(participant, {
+    transportFactory: (context) => {
+      transport = new FakeRawSocketTransport(context);
+      return transport;
+    },
+  });
+  return {
+    room,
+    transport: () => {
+      if (!transport) throw new Error("transport not created — start the room first");
+      return transport;
+    },
+  };
+}
+
+function serverPresenceHello(
+  transport: FakeRawSocketTransport,
+  connectionId: string,
+  role: StudioLiveParticipant["role"],
+  sequence: number,
+  sentAt: number
+): void {
+  transport.receiveEnvelope(
+    createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: { sessionId: connectionId, displayName: "재접속 편집자", role },
+      sentAt,
+      sequence,
+      kind: "presence:hello",
+      payload: { visibility: "active", pageId: null },
+    })
+  );
+}
+
+function serverPresenceLeave(
+  transport: FakeRawSocketTransport,
+  connectionId: string,
+  role: StudioLiveParticipant["role"],
+  sequence: number,
+  sentAt: number
+): void {
+  transport.receiveEnvelope(
+    createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: { sessionId: connectionId, displayName: "재접속 편집자", role },
+      sentAt,
+      sequence,
+      kind: "presence:leave",
+      payload: {},
+    })
+  );
+}
+
+function inkWire(
+  authorId: string,
+  sentAt: number,
+  message: StudioLiveInkMessage
+): StudioLiveInkWireMessage {
+  return createStudioLiveInkWireMessage({
+    workId: "work-1",
+    senderSessionId: authorId,
+    sentAt,
+    message,
+  });
+}
+
+function drainInkTimers(test: ReturnType<typeof harness>): void {
+  for (let guard = 0; guard < 50 && test.pendingTimeouts.length > 0; guard += 1) {
+    test.advance(STUDIO_LIVE_INK_CHUNK_CADENCE_HIGH_MS);
+    test.runNextTimeout();
+  }
+}
+
+describe("StudioLiveRoom ink sender identity over raw socket transports", () => {
+  it("tracks one author across two connections as one ink sender", async () => {
+    const test = harness();
+    const { room, transport } = rawSocketRoom(test, bob);
+    await room.start();
+    const t = transport();
+    const inkEvents = collectInk(room);
+
+    t.joinPeer("conn-a", "client-hana");
+    serverPresenceHello(t, "conn-a", "editor", 1, test.now());
+    t.receiveInk(
+      inkWire("client-hana", test.now(), { ...beginInput("stroke-1", test.now()), kind: "ink:begin" })
+    );
+    t.receiveInk(inkWire("client-hana", test.now(), { ...chunkInput("stroke-1", 1, 0), kind: "ink:chunk" }));
+
+    // Server-side connection replacement: the new connection joins before the old one leaves.
+    t.joinPeer("conn-b", "client-hana");
+    serverPresenceHello(t, "conn-b", "editor", 1, test.now());
+    t.leavePeer("conn-a");
+    serverPresenceLeave(t, "conn-a", "editor", 2, test.now());
+
+    // The stroke continues over the new connection: same author, same lifecycle gate.
+    t.receiveInk(inkWire("client-hana", test.now(), { ...chunkInput("stroke-1", 2, 4), kind: "ink:chunk" }));
+    t.receiveInk(
+      inkWire("client-hana", test.now(), {
+        kind: "ink:end",
+        strokeId: "stroke-1",
+        lastChunkSequence: 2,
+        totalActualSamples: 8,
+        sampleHash: hashStudioLiveInkPayloads([payloadOf(4, 0), payloadOf(4, 4)]),
+        crdtStrokeId: "crdt-stroke-1",
+      })
+    );
+
+    expect(inkEvents.map((event) => event.message.kind)).toEqual([
+      "ink:begin",
+      "ink:chunk",
+      "ink:chunk",
+      "ink:end",
+    ]);
+    // Presence-to-ink attribution stays canonical: one author, never two per-connection senders.
+    expect(new Set(inkEvents.map((event) => event.participant.sessionId))).toEqual(
+      new Set(["client-hana"])
+    );
+    expect(room.getInkUnknownAuthorDropCount()).toBe(0);
+    room.close();
+  });
+
+  it("fails closed on unknown, connection-stamped and ambiguous author claims", async () => {
+    const test = harness();
+    const { room, transport } = rawSocketRoom(test, bob);
+    await room.start();
+    const t = transport();
+    const inkEvents = collectInk(room);
+
+    t.joinPeer("conn-a", "client-hana");
+    serverPresenceHello(t, "conn-a", "editor", 1, test.now());
+
+    // A structurally valid frame from an identity presence never verified.
+    t.receiveInk(
+      inkWire("client-ghost", test.now(), { ...beginInput("stroke-ghost", test.now()), kind: "ink:begin" })
+    );
+    expect(inkEvents).toEqual([]);
+    expect(room.getInkUnknownAuthorDropCount()).toBe(1);
+
+    // A frame stamping the peer's transport connection id instead of its author identity.
+    t.receiveInk(
+      inkWire("conn-a", test.now(), { ...beginInput("stroke-conn", test.now()), kind: "ink:begin" })
+    );
+    expect(inkEvents).toEqual([]);
+    expect(room.getInkUnknownAuthorDropCount()).toBe(2);
+
+    // Two live connections share the identity: the claim is ambiguous and must not attach.
+    t.joinPeer("conn-b", "client-hana");
+    serverPresenceHello(t, "conn-b", "editor", 1, test.now());
+    t.receiveInk(
+      inkWire("client-hana", test.now(), {
+        ...beginInput("stroke-ambiguous", test.now()),
+        kind: "ink:begin",
+      })
+    );
+    expect(inkEvents).toEqual([]);
+    expect(room.getInkUnknownAuthorDropCount()).toBe(3);
+
+    // Once the identity is unambiguous again, the same author resolves normally.
+    t.leavePeer("conn-a");
+    serverPresenceLeave(t, "conn-a", "editor", 2, test.now());
+    t.receiveInk(
+      inkWire("client-hana", test.now(), { ...beginInput("stroke-1", test.now()), kind: "ink:begin" })
+    );
+    expect(inkEvents.map((event) => event.message.kind)).toEqual(["ink:begin"]);
+    expect(room.getInkUnknownAuthorDropCount()).toBe(3);
+    room.close();
+  });
+
+  it("keeps the per-author active-stroke budget across a connection replacement", async () => {
+    const test = harness();
+    const { room, transport } = rawSocketRoom(test, bob);
+    await room.start();
+    const t = transport();
+    const inkEvents = collectInk(room);
+
+    t.joinPeer("conn-a", "client-hana");
+    serverPresenceHello(t, "conn-a", "editor", 1, test.now());
+    for (let index = 1; index <= STUDIO_LIVE_INK_MAX_ACTIVE_STROKES; index += 1) {
+      t.receiveInk(
+        inkWire("client-hana", test.now(), {
+          ...beginInput(`stroke-${index}`, test.now()),
+          kind: "ink:begin",
+        })
+      );
+    }
+    expect(inkEvents).toHaveLength(STUDIO_LIVE_INK_MAX_ACTIVE_STROKES);
+
+    t.joinPeer("conn-b", "client-hana");
+    serverPresenceHello(t, "conn-b", "editor", 1, test.now());
+    t.leavePeer("conn-a");
+    serverPresenceLeave(t, "conn-a", "editor", 2, test.now());
+
+    // The active-stroke budget belongs to the author, not to the connection: a new connection
+    // must not mint a fresh tracker with a fresh budget.
+    t.receiveInk(
+      inkWire("client-hana", test.now(), { ...beginInput("stroke-9", test.now()), kind: "ink:begin" })
+    );
+    expect(inkEvents).toHaveLength(STUDIO_LIVE_INK_MAX_ACTIVE_STROKES);
+
+    // Settling one stroke frees exactly one slot in that same tracker.
+    t.receiveInk(
+      inkWire("client-hana", test.now(), { kind: "ink:cancel", strokeId: "stroke-1", reason: "user" })
+    );
+    t.receiveInk(
+      inkWire("client-hana", test.now(), { ...beginInput("stroke-9", test.now()), kind: "ink:begin" })
+    );
+    expect(inkEvents.map((event) => event.message.kind).slice(-2)).toEqual([
+      "ink:cancel",
+      "ink:begin",
+    ]);
+    expect(inkEvents).toHaveLength(STUDIO_LIVE_INK_MAX_ACTIVE_STROKES + 2);
+    expect(room.getInkUnknownAuthorDropCount()).toBe(0);
+    room.close();
+  });
+});
+
+describe("StudioLiveRoom ink reconnect semantics", () => {
+  it("cancels active outbound strokes exactly once on reconnect instead of replaying", async () => {
+    const test = harness();
+    const { room, transport } = rawSocketRoom(test, alice);
+    await room.start();
+    const t = transport();
+
+    expect(room.publishInkBegin(beginInput("stroke-1", test.now()))).toBe(true);
+    expect(room.publishInkChunk(chunkInput("stroke-1", 1, 0))).toBe(true);
+    // A second actual buffers behind the cadence and straddles the disconnect.
+    expect(room.publishInkChunk(chunkInput("stroke-1", 2, 4))).toBe(true);
+    expect(t.sentInk.map((frame) => frame.message.kind)).toEqual(["ink:begin", "ink:chunk"]);
+
+    t.receiveControl({
+      type: "status",
+      status: { state: "disconnected", message: "network lost", recoverable: true },
+    });
+    expect(room.publishInkChunk(chunkInput("stroke-1", 3, 8))).toBe(false);
+
+    test.advance(1_000);
+    t.receiveControl({
+      type: "status",
+      status: { state: "ready", message: "reconnected", recoverable: true },
+    });
+    drainInkTimers(test);
+
+    // The buffered mid-stroke chunk is discarded, never replayed; the stroke is cancelled.
+    expect(t.sentInk.map((frame) => frame.message.kind)).toEqual([
+      "ink:begin",
+      "ink:chunk",
+      "ink:cancel",
+    ]);
+    const cancel = t.sentInk.at(-1)!.message;
+    if (cancel.kind !== "ink:cancel") throw new Error("cancel expected");
+    expect(cancel).toMatchObject({ strokeId: "stroke-1", reason: "transport-error" });
+
+    // A second ready tick must not cancel again.
+    t.receiveControl({
+      type: "status",
+      status: { state: "ready", message: "reconnected again", recoverable: true },
+    });
+    drainInkTimers(test);
+    expect(
+      t.sentInk.filter((frame) => frame.message.kind === "ink:cancel")
+    ).toHaveLength(1);
+
+    // The settled id is banned for reuse; the author restarts under a fresh id only.
+    expect(room.publishInkBegin(beginInput("stroke-1", test.now()))).toBe(false);
+    expect(room.publishInkChunk(chunkInput("stroke-1", 3, 8))).toBe(false);
+    expect(room.publishInkBegin(beginInput("stroke-2", test.now()))).toBe(true);
+    drainInkTimers(test);
+    expect(t.sentInk.at(-1)!.message).toMatchObject({ kind: "ink:begin", strokeId: "stroke-2" });
+    room.close();
+  });
+
+  it("cancels every straddling stroke and leaves none dangling", async () => {
+    const test = harness();
+    const { room, transport } = rawSocketRoom(test, alice);
+    await room.start();
+    const t = transport();
+
+    expect(room.publishInkBegin(beginInput("stroke-1", test.now()))).toBe(true);
+    expect(room.publishInkBegin(beginInput("stroke-2", test.now()))).toBe(true);
+    t.receiveControl({
+      type: "status",
+      status: { state: "disconnected", message: "network lost", recoverable: true },
+    });
+    test.advance(1_000);
+    t.receiveControl({
+      type: "status",
+      status: { state: "ready", message: "reconnected", recoverable: true },
+    });
+    drainInkTimers(test);
+
+    const cancelled = t.sentInk
+      .map((frame) => frame.message)
+      .filter((message): message is StudioLiveInkMessage & { kind: "ink:cancel" } =>
+        message.kind === "ink:cancel"
+      )
+      .map((message) => message.strokeId)
+      .sort();
+    expect(cancelled).toEqual(["stroke-1", "stroke-2"]);
+    room.close();
+  });
+
+  it("keeps a receiver that retained the author's presence consistent across a reconnect", async () => {
+    const test = harness();
+    const author = rawSocketRoom(test, alice);
+    await author.room.start();
+    const authorTransport = author.transport();
+
+    expect(author.room.publishInkBegin(beginInput("stroke-1", test.now()))).toBe(true);
+    expect(author.room.publishInkChunk(chunkInput("stroke-1", 1, 0))).toBe(true);
+    expect(author.room.publishInkChunk(chunkInput("stroke-1", 2, 4))).toBe(true);
+    authorTransport.receiveControl({
+      type: "status",
+      status: { state: "disconnected", message: "network lost", recoverable: true },
+    });
+    test.advance(1_000);
+    authorTransport.receiveControl({
+      type: "status",
+      status: { state: "ready", message: "reconnected", recoverable: true },
+    });
+    drainInkTimers(test);
+    expect(author.room.publishInkBegin(beginInput("stroke-2", test.now()))).toBe(true);
+    drainInkTimers(test);
+
+    // A receiver whose roster never dropped the author still holds the old lifecycle gate. The
+    // cancel-then-fresh-id contract must replay cleanly there: no frame is refused, and the
+    // author's old strokeId is never begun twice.
+    const receiver = rawSocketRoom(test, bob);
+    await receiver.room.start();
+    const receiverTransport = receiver.transport();
+    const received = collectInk(receiver.room);
+    receiverTransport.joinPeer("conn-a", alice.sessionId);
+    serverPresenceHello(receiverTransport, "conn-a", "editor", 1, test.now());
+    for (const frame of authorTransport.sentInk) receiverTransport.receiveInk(frame);
+
+    expect(received.map((event) => event.message.kind)).toEqual([
+      "ink:begin",
+      "ink:chunk",
+      "ink:cancel",
+      "ink:begin",
+    ]);
+    expect(received).toHaveLength(authorTransport.sentInk.length);
+    expect(receiver.room.getInkUnknownAuthorDropCount()).toBe(0);
+    expect(new Set(received.map((event) => event.participant.sessionId))).toEqual(
+      new Set([alice.sessionId])
+    );
+    author.room.close();
+    receiver.room.close();
   });
 });
