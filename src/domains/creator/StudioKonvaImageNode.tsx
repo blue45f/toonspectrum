@@ -16,6 +16,10 @@ import {
 } from "./filter/studio-filter-mask";
 import { scheduleStudioFilterRenderTournament } from "./filter/studio-filter-render-tournament";
 import {
+  captureStudioFilterExecutionRouteSnapshot,
+  recordStudioFilterExecutionShadow,
+} from "./render/studio-filter-plan-shadow";
+import {
   hasActiveImageFilters,
   imageFilterCacheKey,
   type ImageFilterFields,
@@ -1176,6 +1180,17 @@ export function StudioKonvaImageNode({
       && maskCoverage === null
       && typeof gpuFilterModule.presentGpuFilterChain === "function"
       && typeof gpuFilterModule.createStudioGpuFilterPresentationSurface === "function";
+    // V11 필터 planner 위임 — 섀도 관측 전용. 위 게이트가 실행 권한을 그대로 유지한 채, 같은
+    // 스냅샷에 대한 HybridExecutionPlanner 의 결정을 나란히 계산해 영수증(카운터)으로 비교한다.
+    // 계획 계산만 있고 GPU 작업은 없다. 불완전 입력은 miss 로만 기록되며 절대 던지지 않는다.
+    recordStudioFilterExecutionShadow(
+      captureStudioFilterExecutionRouteSnapshot({
+        islandHeadLane: filterIslandPlan.lanes[0] ?? "konva-native",
+        gpuFilterModule,
+        maskActive: maskCoverage !== null,
+      }),
+      useRetainedGpuPreview ? "gpu-chain" : "worker",
+    );
     if (!useRetainedGpuPreview) {
       gpuFilterPreviewFrameRef.current?.dispose();
       gpuFilterPreviewFrameRef.current = null;
