@@ -25,9 +25,16 @@ import type {
 } from "canvaskit-wasm";
 
 /**
- * CanvasKit (Skia) SceneIR renderer — CPU raster lane of the skia-canvaskit
- * provider. All CanvasKit objects are engine caches: they are created from the
- * IR per call and deleted before returning (WASM heap has no GC).
+ * CanvasKit (Skia) SceneIR renderer — the CPU raster lane of the
+ * `skia-canvaskit` provider (V13 §2.6 / V19 §3.2 role split): reference,
+ * golden, export and GPU-loss recovery scope, worker-friendly. MakeSurface +
+ * readPixels is the point of this lane, and is allowed exactly because it is
+ * never the interactive primary surface — interactive Skia completion is the
+ * `skia-canvaskit-gpu` ImageBitmap island (see gpu-island.ts), which must not
+ * readPixels on the hot path.
+ *
+ * All CanvasKit objects are engine caches: they are created from the IR per
+ * call and deleted before returning (WASM heap has no GC).
  */
 
 export interface RenderOptions {

@@ -2,6 +2,7 @@ export {
   canvasKitCpuReferenceProviderDescriptor,
   canvasKitGpuProviderDescriptor,
   canvasKitProviderDescriptor,
+  skiaExecutionContractByProviderId,
   skiaGraphiteWebgpuProviderDescriptor,
 } from "./descriptor";
 export {
