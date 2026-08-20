@@ -10,6 +10,7 @@ import {
   type StudioEngineVNextBrushProviderGpuExecutionBoundary,
 } from "./render/studio-engine-vnext-brush-provider-gpu-boundary";
 import {
+  computeStudioCanonicalVNextQualityShadowShardManifest,
   STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_BRIDGE_VERSION,
   type StudioCanonicalVNextQualityShadowBackend,
   type StudioCanonicalVNextQualityShadowCapability,
@@ -73,7 +74,10 @@ function capability(
     ))
     || !Array.isArray(catalogIds)
     || catalogIds.length < 1
-    || catalogIds.length > 64
+    // The manifest size cap is owned by the shadow module: any manifest its shard-manifest
+    // validator accepts is accepted here, and per-run workload bounds come from the shadow
+    // module's deterministic shard scheduling instead of a local whole-manifest cap.
+    || computeStudioCanonicalVNextQualityShadowShardManifest(catalogIds) === null
     || new Set(catalogIds).size !== catalogIds.length
     || !catalogIds.every(validIdentifier)
   ) return null;
