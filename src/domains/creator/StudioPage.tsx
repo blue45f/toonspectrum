@@ -43,7 +43,6 @@ import {
 import {
   createEmptyStudioAiProvenanceDocument,
   normalizeStudioAiProvenanceDocument,
-  projectStudioAiProvenanceForPublish,
   type StudioAiProvenanceDocument,
 } from "./ai/studio-ai-provenance";
 import {
@@ -475,6 +474,13 @@ import { elementLabel } from "./studio-element-label";
 import {
   type ExportFormat,
 } from "./export/studio-export";
+import {
+  buildStudioPublishPreflightInput,
+  collectStudioPublishPreflightProvenance,
+  downloadStudioPublishPackageManifest,
+  downloadStudioPublishPreflightReport,
+  executeStudioPublishPackageExport,
+} from "./export/studio-publish-package-export";
 import { pickColorFromImageData } from "./studio-eyedropper";
 import {
   planStudioSelectionFlip,
@@ -866,7 +872,6 @@ import {
   EMPTY_STUDIO_MENU_SESSION,
   reduceStudioAppMenuOpenUpdate,
   reduceStudioMenuSession,
-  resolveStudioCompanionTool,
   resolveStudioToolbarGroup,
   type StudioMenuSessionState,
   type StudioWorkspaceLayoutSource,
@@ -1007,7 +1012,6 @@ import {
   isStudioViewToolsHudEventTarget,
   publishPackageCreditsFromPack,
   publishPackageSettingsFromPack,
-  sha256Blob,
   QUICK_SAMPLE_CANVAS_H,
   STUDIO_GPU_PIN_REQUEST_TIMEOUT_MS,
   STUDIO_LINKED_3D_CLOUD_SAVE_RECOVERY_STATE_KEY,
@@ -1021,6 +1025,7 @@ import {
   withStudioLinked3dCloudSaveRecoveryState,
 } from "./studio-page-shell-runtime";
 import { useStudioAdvancedFill } from "./studio-page-advanced-fill";
+import { useStudioCompanionRuntime } from "./studio-page-companion-runtime";
 import { useStudioMenuAssetLoader } from "./studio-page-menu-asset-loaders";
 import { createStudioPageVectorOps } from "./studio-page-vector-ops";
 import {
@@ -1149,7 +1154,6 @@ import {
   planStudioPublishCanvasSlices,
   planStudioPublishPackage,
   sanitizeStudioPublishFileStem,
-  type StudioPublishPackageManifest,
   type StudioPublishPackagePlan,
   type StudioPublishPackageSettings,
 } from "./studio-publish-package";
@@ -1386,14 +1390,7 @@ import {
   rememberStudioToolOperationSnapshot,
   type StudioToolOperationMemory,
 } from "./studio-tool-operation-memory";
-import {
-  loadStudioCompanionReferenceCaptureRuntime,
-  openStudioToolsCompanionForMenu,
-  type StudioCompanionReferenceCaptureRuntime,
-  type StudioToolsCompanionPrimaryRuntime,
-  type StudioToolsCompanionReviewProjectionInput,
-  startStudioToolsCompanionPrimaryRuntime,
-} from "./studio-tools-companion-runtime";
+import { openStudioToolsCompanionForMenu } from "./studio-tools-companion-runtime";
 import {
   bootStudioTournamentPersistence,
   peekBootedStudioTournamentRuntime,
@@ -1656,7 +1653,6 @@ import type {
   StudioPageInsertState,
   StudioPageSelectedFrame,
 } from "./studio-comipo-shipped";
-import type { StudioCompanionReviewControl } from "./studio-companion-review-projection";
 import type {
   PendingStudioInterchangeImport,
   StudioInterchangeImportChoice,
@@ -1725,9 +1721,6 @@ import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client
 import type { StudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
 import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutation-plan";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
-import type {
-  StudioCompanionCommandName,
-} from "./studio-tools-companion";
 import type { StudioUiBooleanPreferenceKey } from "./studio-ui-preferences-sqlite";
 import type { StudioVelocityPressureState } from "./studio-velocity-pressure-response";
 import type {
@@ -9213,67 +9206,29 @@ function StudioCuttoonEditor({
     sourceHydrationPending,
   ]);
 
+  // 사전검사 조립은 export/studio-publish-package-export.ts 로 추출(B-04) — 여기는 페이지
+  // 상태를 스냅샷으로 캡처해 넘기는 얇은 지점만 유지한다.
   function collectPublishPreflightProvenance(
     sourcePages: readonly PageState[] = pages
   ): StudioPublishAiProvenance[] {
-    return sourcePages.flatMap((page) =>
-      page.elements.flatMap((element) => {
-        const provenance: StudioPublishAiProvenance[] = [];
-        if ("aiProvenance" in element && element.aiProvenance) {
-          provenance.push({ ...element.aiProvenance, assetId: `render:${page.id}` });
-        }
-        if (element.type === "frame" && element.storyBeat?.textAiProvenance) {
-          provenance.push({
-            action: "other",
-            assetId: `frame:${page.id}:${element.id}`,
-            ...element.storyBeat.textAiProvenance,
-          });
-        }
-        return provenance;
-      })
-    );
+    return collectStudioPublishPreflightProvenance(sourcePages);
   }
 
   function buildPublishPreflightInput(
     provenance: readonly StudioPublishAiProvenance[],
     sourcePages: readonly PageState[] = pages
   ): StudioPublishPreflightInput {
-    return {
-      title,
-      tags: tagsText
-        .split(/[,\s]+/)
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-      pages: sourcePages.map((page) => {
-        const review = normalizePageReviewState(page.review);
-        return {
-          id: page.id,
-          reviewStatus: review.status,
-          reviewLocked: review.locked,
-          images: [
-            {
-              id: `render:${page.id}`,
-              fileName: `${page.id}.png`,
-              mimeType: "image/png",
-              width: CANVAS_W,
-              height: page.canvasH,
-              aiGenerated: page.elements.some(
-                (element) => "aiProvenance" in element && element.aiProvenance?.action === "generated"
-              ),
-            },
-          ],
-        };
-      }),
-      aiContent: {
-        usage: publishAiUsage,
-        disclosure: publishAiDisclosure,
-        provenance,
+    return buildStudioPublishPreflightInput(
+      {
+        title,
+        tagsText,
+        publishAiUsage,
+        publishAiDisclosure,
+        commentThreads: studioCommentViewDocument.threads,
       },
-      editorial: {
-        openCommentThreads: studioCommentViewDocument.threads
-          .filter((thread) => !thread.resolved).length,
-      },
-    };
+      provenance,
+      sourcePages
+    );
   }
 
   const publishPreflightProvenance = publishPreflightOpen ? collectPublishPreflightProvenance() : [];
@@ -16260,39 +16215,63 @@ function StudioCuttoonEditor({
   }, []);
 
   // 멀티 디스플레이 도구 컴패니언 — 문서/undo 는 이 탭이 소유, 도구 의도만 BroadcastChannel.
-  const companionRuntimeRef = useRef<StudioToolsCompanionPrimaryRuntime | null>(null);
-  const companionRuntimePromiseRef = useRef<Promise<StudioToolsCompanionPrimaryRuntime | null> | null>(null);
-  const companionRuntimeGenerationRef = useRef(0);
-  const companionWindowRef = useRef<Window | null>(null);
-  const companionPendingTextTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-  const companionReferenceCaptureRuntimeRef =
-    useRef<StudioCompanionReferenceCaptureRuntime | null>(null);
-  const companionReferenceCaptureRuntimePromiseRef =
-    useRef<Promise<StudioCompanionReferenceCaptureRuntime | null> | null>(null);
-  const companionReferenceCaptureGenerationRef = useRef(0);
-  const companionReferenceDemandActiveRef = useRef(false);
-  const companionProjectionRevisionRef = useRef(0);
-  const companionReviewProjectionInputRef = useRef<
-    (() => StudioToolsCompanionReviewProjectionInput) | null
-  >(null);
-  const companionControlHandlerRef = useRef<(control: StudioCompanionReviewControl) => void>(
-    () => undefined
-  );
-  const companionHistoryHandlerRef = useRef<(action: "undo" | "redo") => void>(
-    () => undefined
-  );
-  const companionUiRef = useRef({
-    tool,
-    drawMode,
-    menu,
-    uiDensityMode,
-    canvasOnlyMode,
-    title,
+  // 채널 수명주기·레퍼런스 캡처 런타임은 useStudioCompanionRuntime 이 소유한다(B-04 추출).
+  // 페이지는 콜백 계약으로 편집기 소유 읽기를 공급하고, 투영 입력·핸들러는 아래에서 ref 대입만 한다.
+  const {
+    companionRuntimeRef,
+    companionWindowRef,
+    companionPendingTextTimerRef,
+    companionUiRef,
+    companionReviewProjectionInputRef,
+    companionControlHandlerRef,
+    companionHistoryHandlerRef,
+    companionCommandHandlerRef,
+    ensureStudioToolsCompanionRuntime,
+    publishCompanionUiMirror,
+  } = useStudioCompanionRuntime({
+    ui: { tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title },
+    isCaptureBlocked: () => Boolean(
+      drawingRef.current || drawingPointerTransportRef.current?.getSession()
+    ),
+    // 동반 창 내비게이터는 "문서 전체 축소판"이다 — 화면 거울이 아니다. 다른 캡처 경로와 같은
+    // 초크 포인트를 지나 문서 전체 스테이지에서 읽는다(보기 전용 회전·반전도 함께 정규화된다).
+    captureNavigatorCanvas: (maximumLongestEdge) => {
+      const stage = stageRef.current;
+      if (!stage) return null;
+      const geometry = stageDocumentGeometryRef.current;
+      return readStudioStageInDocumentView(stage, geometry, () => {
+        const longestEdge = Math.max(1, stage.width(), stage.height());
+        return stage.toCanvas({ pixelRatio: Math.min(1, maximumLongestEdge / longestEdge) });
+      });
+    },
+    // 캡처 런타임 로딩 전 부트스트랩 투영 — 커밋된 레퍼런스 스냅샷만 한 번 읽는다.
+    getReferenceProjection: (surfaceGeneration) => {
+      const snapshot = referenceBoardCommittedSnapshotRef.current;
+      return {
+        generation: surfaceGeneration,
+        revision: 1,
+        referenceRevision: snapshot.revision,
+        itemCount: snapshot.document.items.length,
+        resolvedItemCount: 0,
+        canPickColor: false,
+      };
+    },
+    reference: {
+      getSnapshot: () => {
+        const snapshot = referenceBoardCommittedSnapshotRef.current;
+        return {
+          document: snapshot.document,
+          revision: snapshot.revision,
+          itemCount: snapshot.document.items.length,
+        };
+      },
+    },
+    applySampledReferenceColor: (nextColor) => {
+      setColor(nextColor);
+      rememberColor(nextColor);
+    },
   });
-
-  useEffect(() => {
-    companionUiRef.current = { tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title };
-  }, [tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title]);
+  const companionProjectionRevisionRef = useRef(0);
 
   companionReviewProjectionInputRef.current = () => {
     companionProjectionRevisionRef.current = companionProjectionRevisionRef.current
@@ -16414,7 +16393,6 @@ function StudioCuttoonEditor({
   const activatePrimaryCanvasToolRef = useRef<
     (tool: "select" | "draw", drawMode?: DrawMode) => void
   >(() => undefined);
-  const companionCommandHandlerRef = useRef<(command: StudioCompanionCommandName) => void>(() => undefined);
   useEffect(() => {
     companionCommandHandlerRef.current = (command) => {
       const toolExecution = executeStudioCompanionToolCommand(command, {
@@ -16482,192 +16460,14 @@ function StudioCuttoonEditor({
     return () => {
       companionCommandHandlerRef.current = () => undefined;
     };
-  }, [setLeftPanelOpenWithOverride]);
+    // 훅 반환 ref 는 안정 객체 — deps 에 넣어도 재구독을 일으키지 않는다.
+  }, [companionCommandHandlerRef, companionPendingTextTimerRef, companionUiRef, setLeftPanelOpenWithOverride]);
 
-  const ensureStudioCompanionReferenceCaptureRuntime = useCallback(() => {
-    const existingRuntime = companionReferenceCaptureRuntimeRef.current;
-    if (existingRuntime) return Promise.resolve(existingRuntime);
-    const existingPromise = companionReferenceCaptureRuntimePromiseRef.current;
-    if (existingPromise) return existingPromise;
-    const generation = companionReferenceCaptureGenerationRef.current;
-    const promise = loadStudioCompanionReferenceCaptureRuntime().then((module) => {
-      if (generation !== companionReferenceCaptureGenerationRef.current) return null;
-      const runtime = module.createStudioCompanionReferenceCaptureRuntime({
-        getSnapshot: () => {
-          const snapshot = referenceBoardCommittedSnapshotRef.current;
-          return {
-            document: snapshot.document,
-            revision: snapshot.revision,
-            itemCount: snapshot.document.items.length,
-          };
-        },
-        isCaptureBlocked: () => Boolean(
-          drawingRef.current || drawingPointerTransportRef.current?.getSession()
-        ),
-        onProjectionChanged: () => companionRuntimeRef.current?.schedulePublish(),
-      });
-      if (generation !== companionReferenceCaptureGenerationRef.current) {
-        runtime.release();
-        return null;
-      }
-      companionReferenceCaptureRuntimeRef.current = runtime;
-      return runtime;
-    }).catch(() => null);
-    companionReferenceCaptureRuntimePromiseRef.current = promise;
-    void promise.then((runtime) => {
-      if (!runtime && companionReferenceCaptureRuntimePromiseRef.current === promise) {
-        companionReferenceCaptureRuntimePromiseRef.current = null;
-      }
-    });
-    return promise;
-  }, []);
-
-  const ensureStudioToolsCompanionRuntime = useCallback(() => {
-    const existing = companionRuntimePromiseRef.current;
-    if (existing) return existing;
-    const generation = companionRuntimeGenerationRef.current + 1;
-    companionRuntimeGenerationRef.current = generation;
-    const promise = startStudioToolsCompanionPrimaryRuntime({
-      search: typeof window !== "undefined" ? window.location.search : "",
-      getSnapshot: () => {
-        const s = companionUiRef.current;
-        return {
-          tool: resolveStudioCompanionTool(s),
-          density: s.uiDensityMode,
-          canvasOnly: s.canvasOnlyMode,
-          title: s.title,
-        };
-      },
-      getReviewProjectionInput: () => {
-        const create = companionReviewProjectionInputRef.current;
-        if (!create) throw new Error("Studio companion projection is unavailable");
-        return create();
-      },
-      isNavigatorCaptureBlocked: () => Boolean(
-        drawingRef.current || drawingPointerTransportRef.current?.getSession()
-      ),
-      // 동반 창 내비게이터는 "문서 전체 축소판"이다 — 화면 거울이 아니다. 다른 캡처 경로와 같은
-      // 초크 포인트를 지나 문서 전체 스테이지에서 읽는다(보기 전용 회전·반전도 함께 정규화된다).
-      captureNavigatorCanvas: (maximumLongestEdge) => {
-        const stage = stageRef.current;
-        if (!stage) return null;
-        const geometry = stageDocumentGeometryRef.current;
-        return readStudioStageInDocumentView(stage, geometry, () => {
-          const longestEdge = Math.max(1, stage.width(), stage.height());
-          return stage.toCanvas({ pixelRatio: Math.min(1, maximumLongestEdge / longestEdge) });
-        });
-      },
-      getReferenceProjection: (surfaceGeneration) => {
-        const ready = companionReferenceCaptureRuntimeRef.current?.getProjection(surfaceGeneration);
-        if (ready) return ready;
-        const snapshot = referenceBoardCommittedSnapshotRef.current;
-        return {
-          generation: surfaceGeneration,
-          revision: 1,
-          referenceRevision: snapshot.revision,
-          itemCount: snapshot.document.items.length,
-          resolvedItemCount: 0,
-          canPickColor: false,
-        };
-      },
-      captureReferenceFrame: async (request) => {
-        if (!companionReferenceDemandActiveRef.current) return null;
-        const runtime = await ensureStudioCompanionReferenceCaptureRuntime();
-        if (!runtime || request.signal.aborted || !companionReferenceDemandActiveRef.current) {
-          return null;
-        }
-        await runtime.setDemand(true);
-        if (request.signal.aborted || !companionReferenceDemandActiveRef.current) return null;
-        return runtime.captureFrame(request);
-      },
-      sampleReferenceColor: async ({ current, point, sequence, signal }) => {
-        if (
-          signal.aborted
-          || drawingRef.current
-          || drawingPointerTransportRef.current?.getSession()
-        ) return null;
-        const runtime = companionReferenceCaptureRuntimeRef.current;
-        if (!runtime || !companionReferenceDemandActiveRef.current) return null;
-        const sampled = await runtime.sampleColor({ current, point, sequence, signal });
-        if (
-          !sampled
-          || signal.aborted
-          || drawingRef.current
-          || drawingPointerTransportRef.current?.getSession()
-        ) return null;
-        const nextColor = sampled.toLowerCase();
-        setColor(nextColor);
-        rememberColor(nextColor);
-        return nextColor;
-      },
-      onReferenceDemandChange: (active) => {
-        companionReferenceDemandActiveRef.current = active;
-        if (!active) {
-          void companionReferenceCaptureRuntimeRef.current?.setDemand(false);
-          return;
-        }
-        void ensureStudioCompanionReferenceCaptureRuntime().then(async (runtime) => {
-          if (!runtime || !companionReferenceDemandActiveRef.current) return;
-          const ready = await runtime.setDemand(true);
-          if (ready && companionReferenceDemandActiveRef.current) {
-            companionRuntimeRef.current?.schedulePublish();
-          }
-        });
-      },
-      onCommand: (command) => companionCommandHandlerRef.current(command),
-      onControl: (control) => companionControlHandlerRef.current(control),
-    }).then((runtime) => {
-      if (generation !== companionRuntimeGenerationRef.current) {
-        runtime?.dispose();
-        return null;
-      }
-      companionRuntimeRef.current = runtime;
-      return runtime;
-    }).catch(() => null);
-    companionRuntimePromiseRef.current = promise;
-    void promise.then((runtime) => {
-      if (!runtime && companionRuntimePromiseRef.current === promise) {
-        companionRuntimePromiseRef.current = null;
-      }
-    });
-    return promise;
-  }, [ensureStudioCompanionReferenceCaptureRuntime]);
-
+  // 컴패니언에 현재 UI 상태 미러 (채널·미러 판정은 useStudioCompanionRuntime 이 소유).
   useEffect(() => {
-    try {
-      if (new URLSearchParams(window.location.search).has("session")) {
-        void ensureStudioToolsCompanionRuntime();
-      }
-    } catch {
-      // A malformed query simply waits for an explicit tools-window request.
-    }
-    return () => {
-      companionRuntimeGenerationRef.current += 1;
-      companionReferenceCaptureGenerationRef.current += 1;
-      companionReferenceDemandActiveRef.current = false;
-      const runtime = companionRuntimeRef.current;
-      companionRuntimeRef.current = null;
-      companionRuntimePromiseRef.current = null;
-      runtime?.dispose();
-      const referenceRuntime = companionReferenceCaptureRuntimeRef.current;
-      companionReferenceCaptureRuntimeRef.current = null;
-      companionReferenceCaptureRuntimePromiseRef.current = null;
-      referenceRuntime?.release();
-      if (companionPendingTextTimerRef.current !== null) {
-        globalThis.clearTimeout(companionPendingTextTimerRef.current);
-        companionPendingTextTimerRef.current = null;
-      }
-    };
-  }, [ensureStudioToolsCompanionRuntime]);
-
-  // 컴패니언에 현재 UI 상태 미러 (채널은 위 effect 가 소유).
-  useEffect(() => {
-    if (
-      resolveStudioCompanionTool({ tool, drawMode, menu })
-      !== resolveStudioCompanionTool(companionUiRef.current)
-    ) return;
-    companionRuntimeRef.current?.schedulePublish();
+    publishCompanionUiMirror({ tool, drawMode, menu });
   }, [
+    publishCompanionUiMirror,
     tool,
     drawMode,
     menu,
@@ -33506,7 +33306,7 @@ function clearSelectionForEdit() {
       canvasRotation,
       collaborationDocumentLocked,
       colorBlindPreview,
-      ensureStudioToolsCompanionRuntime,
+      companionRuntimeRef, companionWindowRef, ensureStudioToolsCompanionRuntime,
       isFullscreen,
       lastStudioFilterDraft,
       leftPanelOpen,
@@ -33709,210 +33509,34 @@ function clearSelectionForEdit() {
     handleCapturePagesForIndices,
   } = rasterExportOrchestration;
 
+  // 게시 패키지 조립·검증·ZIP 다운로드는 export/studio-publish-package-export.ts 로 추출(B-04).
+  // 가드(공동 문서·busy·캡처 완결성·목적지 재검증) 순서는 추출 모듈이 그대로 소유한다.
   async function executePublishPackageExport() {
-    if (!ensureSharedDocumentAvailableForExport()) return;
-    if (!publishPackagePlan?.canExport || publishPackageExportBusy) return;
-    const structuralResult = validateStudioPublishPreflight(
-      buildPublishPreflightInput(collectPublishPreflightProvenance()),
-      effectivePublishPackageSettings.destination
-    );
-    const complianceResult = validateStudioPublishCompliance(
+    await executeStudioPublishPackageExport({
+      title,
+      tagsText,
+      publishAiUsage,
+      publishAiDisclosure,
+      commentThreads: studioCommentViewDocument.threads,
+      pages,
+      currentPageId,
+      episodeTitle: writerRoom.stages["episode-outline"].title || title,
+      effectivePublishPackageSettings,
+      publishPackagePlan,
+      publishPackageExportBusy,
       publishCompliance,
-      effectivePublishPackageSettings.destination,
-      { aiUsage: effectivePublishPackageSettings.aiUsage }
-    );
-    if (!structuralResult.canPublish || !complianceResult.readyForDestinationReview) {
-      const blockedCount = structuralResult.errors.length + complianceResult.errors.length;
-      setPublishPackageExportStatus({
-        tone: "bad",
-        text: `게시 전 필수 점검 ${blockedCount}개를 해결해야 정식 패키지를 만들 수 있어요.`,
-      });
-      setError(`게시 전 필수 점검 ${blockedCount}개를 확인해 주세요.`);
-      setPublishPackageOpen(false);
-      setPublishPreflightOpen(true);
-      return;
-    }
-    const watermarkForExport = await ensureWatermarkLoaded();
-    setPublishPackageExportBusy(true);
-    setPublishPackageExportProgress(null);
-    setPublishPackageExportStatus({ tone: "info", text: "페이지 픽셀을 캡처하는 중…" });
-    let captured: HTMLCanvasElement[] = [];
-    try {
-      captured = await handleCapturePagesForPreset("all");
-      if (captured.length !== pages.length) {
-        throw new Error("일부 페이지를 캡처하지 못해 패키지 생성을 중단했어요.");
-      }
-      const [
-        { renderStudioPublishPackageImages },
-        {
-          finalizeStudioPublishPackageManifest,
-          serializeStudioPublishPackageManifest,
-        },
-      ] = await Promise.all([
-        import("./studio-publish-package-renderer"),
-        import("./studio-publish-package-manifest-runtime"),
-      ]);
-      const sources = captured.map((canvas, index) => ({ id: pages[index].id, canvas }));
-      const rendered = await renderStudioPublishPackageImages({
-        settings: effectivePublishPackageSettings,
-        seriesTitle: title,
-        sources,
-        thumbnailSourceId: currentPageId,
-        watermark: watermarkForExport,
-        onProgress: (done, total) => {
-          setPublishPackageExportProgress({ done, total });
-          setPublishPackageExportStatus({
-            tone: "info",
-            text: `규격 이미지와 썸네일 렌더링 중… ${done}/${total}`,
-          });
-        },
-      });
-      const creditsText = currentPublishPackageCreditsText();
-      const actualPlan = planStudioPublishPackage({
-        settings: effectivePublishPackageSettings,
-        seriesTitle: title,
-        episodeTitle: writerRoom.stages["episode-outline"].title || title,
-        canvases: sources.map((source) => ({
-          id: source.id,
-          width: source.canvas.width,
-          height: source.canvas.height,
-        })),
-        episodeImages: rendered.episodeImages.map(({ metadata }) => metadata),
-        thumbnails: rendered.thumbnails.map(({ metadata }) => metadata),
-        creditsText,
-        generatedAt: new Date(),
-      });
-      if (!actualPlan.canExport) {
-        throw new Error(
-          actualPlan.errors[0]?.message || "렌더한 파일이 목적지 규격을 통과하지 못했어요."
-        );
-      }
-
-      const archiveEntries: Array<{ path: string; data: Blob }> = [
-        ...rendered.episodeImages.map((file) => ({ path: file.fileName, data: file.blob })),
-        ...rendered.thumbnails.map((file) => ({ path: file.fileName, data: file.blob })),
-      ];
-      if (effectivePublishPackageSettings.includeReviewPdf) {
-        setPublishPackageExportStatus({ tone: "info", text: "검수용 PDF를 만드는 중…" });
-        const { renderStudioReviewPdf } = await import("./studio-review-pdf");
-        // 페이지 검토 메타데이터는 내부 review.pdf의 픽셀 주석에만 전달한다. public manifest와
-        // 게시용 이미지 렌더 경로에는 넘기지 않아 담당자·검토 메모가 외부 산출물에 섞이지 않는다.
-        const reviewPdf = await renderStudioReviewPdf({
-          pages: captured,
-          pageMetadata: pages,
-          profile: effectivePublishPackageSettings.reviewPdfProfile,
-          title: "review",
-          watermark: watermarkForExport,
-          onProgress: (done, total) => {
-            setPublishPackageExportProgress({ done, total });
-          },
-        });
-        archiveEntries.push({ path: "review.pdf", data: reviewPdf.blob });
-      }
-      if (effectivePublishPackageSettings.includeCredits && creditsText) {
-        archiveEntries.push({
-          path: "credits.txt",
-          data: new Blob([creditsText], { type: "text/plain;charset=utf-8" }),
-        });
-      }
-      if (effectivePublishPackageSettings.aiUsage !== "none") {
-        archiveEntries.push({
-          path: "ai-disclosure.json",
-          data: new Blob([JSON.stringify({
-            schema: "toonspectrum.ai-disclosure",
-            version: 1,
-            usage: effectivePublishPackageSettings.aiUsage,
-            disclosure: effectivePublishPackageSettings.aiDisclosure,
-            provenance: projectStudioAiProvenanceForPublish(aiProvenance),
-          }, null, 2)], { type: "application/json" }),
-        });
-      }
-      archiveEntries.push({
-        path: "validation-report.json",
-        data: new Blob([JSON.stringify({
-          schema: "toonspectrum.publish-package-validation",
-          version: 1,
-          generatedAt: actualPlan.manifest.generatedAt,
-          destination: actualPlan.settings.destination,
-          canExport: actualPlan.canExport,
-          errors: actualPlan.errors,
-          warnings: actualPlan.warnings,
-          preflight: {
-            structural: {
-              canPublish: structuralResult.canPublish,
-              errors: structuralResult.errors,
-              warnings: structuralResult.warnings,
-            },
-            compliance: {
-              readyForDestinationReview: complianceResult.readyForDestinationReview,
-              errors: complianceResult.errors,
-              warnings: complianceResult.warnings,
-            },
-          },
-        }, null, 2)], { type: "application/json" }),
-      });
-
-      const renderedHashes = new Map<string, string>([
-        ...rendered.episodeImages.map((file) => [file.fileName, file.metadata.sha256 ?? ""] as const),
-        ...rendered.thumbnails.map((file) => [file.fileName, file.metadata.sha256 ?? ""] as const),
-      ]);
-      const actualArtifacts = [];
-      for (let index = 0; index < archiveEntries.length; index += 1) {
-        const entry = archiveEntries[index];
-        if (!entry) continue;
-        setPublishPackageExportProgress({ done: index, total: archiveEntries.length });
-        setPublishPackageExportStatus({
-          tone: "info",
-          text: `파일 무결성과 manifest 일치 여부 확인 중… ${index + 1}/${archiveEntries.length}`,
-        });
-        actualArtifacts.push({
-          fileName: entry.path,
-          mimeType: entry.data.type,
-          byteSize: entry.data.size,
-          sha256: renderedHashes.get(entry.path) || await sha256Blob(entry.data),
-        });
-      }
-      const finalManifest: StudioPublishPackageManifest = finalizeStudioPublishPackageManifest(
-        actualPlan.manifest,
-        actualArtifacts
-      );
-      const manifestBlob = new Blob([serializeStudioPublishPackageManifest(finalManifest)], {
-        type: "application/json",
-      });
-      const finalEntries = [...archiveEntries, { path: "manifest.json", data: manifestBlob }];
-      const { buildStudioPackageArchiveBlob } = await import("./studio-package-archive");
-      const archiveBlob = await buildStudioPackageArchiveBlob(finalEntries, {
-        modifiedAt: finalManifest.generatedAt,
-        onProgress: ({ completedFiles, totalFiles }) => {
-          setPublishPackageExportProgress({ done: completedFiles, total: totalFiles });
-          setPublishPackageExportStatus({
-            tone: "info",
-            text: `모바일 호환 단일 ZIP 패키지 조립 중… ${completedFiles}/${totalFiles}`,
-          });
-        },
-      });
-      const { downloadBlob } = await import("./export/studio-export");
-      const archiveName = `${sanitizeStudioPublishFileStem(title, {
-        fallback: "toonspectrum",
-        maxCodeUnits: 90,
-      })}-${effectivePublishPackageSettings.destination}-publish.toonpkg.zip`;
-      downloadBlob(archiveBlob, archiveName);
-      setPublishPackageExportStatus({
-        tone: "good",
-        text: `검증된 ${finalEntries.length}개 파일을 ZIP 하나로 저장 요청했어요. 브라우저 다운로드 완료 여부를 확인한 뒤 플랫폼 업로드는 직접 진행해 주세요.`,
-      });
-    } catch (cause) {
-      setPublishPackageExportStatus({
-        tone: "bad",
-        text: cause instanceof Error ? cause.message : "게시 패키지를 만들지 못했어요.",
-      });
-    } finally {
-      for (const canvas of captured) {
-        canvas.width = 0;
-        canvas.height = 0;
-      }
-      setPublishPackageExportBusy(false);
-    }
+      aiProvenance,
+      ensureSharedDocumentAvailableForExport,
+      ensureWatermarkLoaded,
+      handleCapturePagesForPreset,
+      currentPublishPackageCreditsText,
+      setPublishPackageExportStatus,
+      setPublishPackageExportProgress,
+      setPublishPackageExportBusy,
+      setPublishPackageOpen,
+      setPublishPreflightOpen,
+      setError,
+    });
   }
 
   // 타임랩스 — pagesHi를 히스토리 인덱스로 스크러빙하며 각 단계를 캡처한다. 고정 sleep 대신
@@ -34045,64 +33669,30 @@ function clearSelectionForEdit() {
     }
   }
 
-  // 목적지별 Publish Pack 사전검사 결과를 사람이 검토·보관할 수 있는 JSON 보고서로 내보낸다.
+  // 사전검사 보고서·패키지 manifest 다운로드도 export/studio-publish-package-export.ts 소유(B-04).
   async function downloadPublishPreflightReport() {
-    if (!ensureSharedDocumentAvailableForExport()) return;
-    if (!publishPreflightResult) return;
-    const report = {
-      format: "toonspectrum-publish-preflight",
-      version: 2,
-      createdAt: new Date().toISOString(),
-      destination: publishProfile,
-      work: {
-        title: title.trim(),
-        pageCount: pages.length,
-        pageOrder: pages.map((page) => page.id),
-        pageReviews: pages.map((page) => ({
-          pageId: page.id,
-          ...normalizePageReviewState(page.review),
-        })),
-      },
-      aiContent: {
-        usage: publishAiUsage,
-        disclosure: publishAiDisclosure.trim(),
-        provenance: publishPreflightProvenance,
-      },
-      editorial: {
-        commentThreads: studioCommentViewDocument.threads.length,
-        openCommentThreads: studioCommentViewDocument.threads
-          .filter((thread) => !thread.resolved).length,
-        resolvedCommentThreads: studioCommentViewDocument.threads
-          .filter((thread) => thread.resolved).length,
-        plannedReleaseItems: releaseSchedule.items.length,
-        importedAnalyticsRecords: publicationAnalytics.records.length,
-      },
-      structuralResult: publishPreflightResult,
-      complianceResult: publishComplianceResult,
-    };
-    const { downloadBlob } = await import("./export/studio-export");
-    downloadBlob(
-      new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }),
-      `${(title.trim() || "toonspectrum").replace(/[\\/:*?"<>|]+/g, "-")}-publish-preflight.json`
-    );
+    await downloadStudioPublishPreflightReport({
+      title,
+      publishProfile,
+      pages,
+      publishAiUsage,
+      publishAiDisclosure,
+      publishPreflightProvenance,
+      commentThreads: studioCommentViewDocument.threads,
+      plannedReleaseItems: releaseSchedule.items.length,
+      importedAnalyticsRecords: publicationAnalytics.records.length,
+      publishPreflightResult,
+      publishComplianceResult,
+      ensureSharedDocumentAvailableForExport,
+    });
   }
 
   async function downloadPublishPackageManifest() {
-    if (!ensureSharedDocumentAvailableForExport()) return;
-    if (!publishPackagePlan) return;
-    const [
-      { downloadBlob },
-      { serializeStudioPublishPackageManifest },
-    ] = await Promise.all([
-      import("./export/studio-export"),
-      import("./studio-publish-package-manifest-runtime"),
-    ]);
-    downloadBlob(
-      new Blob([serializeStudioPublishPackageManifest(publishPackagePlan.manifest)], {
-        type: "application/json",
-      }),
-      `${(title.trim() || "toonspectrum").replace(/[\\/:*?"<>|]+/g, "-")}-publish-package-manifest.json`
-    );
+    await downloadStudioPublishPackageManifest({
+      title,
+      publishPackagePlan,
+      ensureSharedDocumentAvailableForExport,
+    });
   }
 
   async function downloadAiPublicSummary(summary: unknown) {

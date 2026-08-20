@@ -189,7 +189,11 @@ describe("StudioPage tool transition boundary", () => {
 
   it("routes top-menu drawing modes through the stroke-safe primary transition", () => {
     const start = studioPageSource.indexOf("selectDrawMode: (mode) => {");
-    const end = studioPageSource.indexOf("},\n        },", start);
+    // 의도된 변경(2026-08, B-04): 예전 끝 마커("},\n        },")는 실제로는 뒤따르던
+    // executePublishPackageExport 의 validation-report JSON 리터럴에 걸려 있었고, 그 코드가
+    // export/studio-publish-package-export.ts 로 추출되며 사라졌다. 그리기 메뉴 구간의 실제
+    // 다음 항목(activateTransformTool)으로 끝을 고정한다 — 검증 대상 전이 두 건은 동일하다.
+    const end = studioPageSource.indexOf("activateTransformTool:", start);
     const drawingMenu = studioPageSource.slice(start, end);
 
     expect(start).toBeGreaterThanOrEqual(0);
