@@ -32,6 +32,13 @@ export const STUDIO_DUAL_COLOR_WELL_HINTS = {
     "color-palette",
     "swap-colors"
   ),
+  transparent: studioToolHintFromLabel(
+    "투명색 그리기",
+    "현재 브러시의 모양·필압·질감을 그대로 유지한 채 지우개처럼 투명색으로 그립니다.",
+    "C",
+    "color-palette",
+    undefined
+  ),
 } as const;
 
 /** CSP / Photopea-style primary + secondary color well with a bounded recent strip. */
@@ -43,6 +50,8 @@ export function StudioDualColorWell({
   onSecondaryChange,
   onSwap,
   className,
+  isTransparent,
+  onTransparentToggle,
 }: {
   primary: string;
   secondary?: string;
@@ -51,6 +60,8 @@ export function StudioDualColorWell({
   onSecondaryChange?: (hex: string) => void;
   onSwap?: () => void;
   className?: string;
+  isTransparent?: boolean;
+  onTransparentToggle?: () => void;
 }) {
   const showSecondary = Boolean(onSecondaryChange && secondary !== undefined);
   return (
@@ -129,6 +140,35 @@ export function StudioDualColorWell({
           </label>
         </StudioToolHintTarget>
       </div>
+
+      {onTransparentToggle ? (
+        <StudioToolHintTarget preferredSide="top" hint={STUDIO_DUAL_COLOR_WELL_HINTS.transparent}>
+          <button
+            type="button"
+            onClick={onTransparentToggle}
+            aria-label="투명색 선택 (단축키 C)"
+            aria-pressed={isTransparent}
+            aria-keyshortcuts="C"
+            data-studio-transparent-color-well="true"
+            className={cn(
+              "grid size-6 shrink-0 place-items-center rounded-md border shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110 motion-reduce:transform-none",
+              STUDIO_FOCUS_RING,
+              isTransparent
+                ? "ring-2 ring-accent ring-offset-1 ring-offset-panel border-transparent"
+                : "border-line/70"
+            )}
+            style={{
+              backgroundImage: "repeating-conic-gradient(#e5e7eb 0% 25%, #ffffff 0% 50%)",
+              backgroundSize: "6px 6px",
+            }}
+          >
+            <svg viewBox="0 0 10 10" className="size-full opacity-30" aria-hidden>
+              <line x1="0" y1="10" x2="10" y2="0" stroke="currentColor" strokeWidth="1" />
+            </svg>
+          </button>
+        </StudioToolHintTarget>
+      ) : null}
+
       {onSwap && showSecondary ? (
         <StudioToolHintTarget preferredSide="top" hint={STUDIO_DUAL_COLOR_WELL_HINTS.swap}>
           <button

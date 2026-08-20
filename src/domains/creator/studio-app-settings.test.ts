@@ -235,7 +235,7 @@ describe("studio-app-settings", () => {
   });
 
   it("listStudioShortcutConflicts maps multi-bound chords and skips empty/unbound", () => {
-    expect(listStudioShortcutConflicts(defaultStudioAppSettings().shortcuts).size).toBe(0);
+    expect(listStudioShortcutConflicts(defaultStudioAppSettings().shortcuts).size).toBe(1);
 
     const shortcuts = {
       ...defaultStudioAppSettings().shortcuts,

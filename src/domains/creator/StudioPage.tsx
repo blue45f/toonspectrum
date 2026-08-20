@@ -26441,6 +26441,13 @@ const puppetWarpArmed =
           currentDrawing.drawMode = "eraser";
           activatePrimaryCanvasTool("draw", "eraser");
           announceDrawingShortcut("지우개");
+        } else if (drawingShortcut.type === "toggle-transparent-color") {
+          const currentDrawing = drawingShortcutStateRef.current;
+          const nextMode = currentDrawing.drawMode === "eraser" ? "pen" : "eraser";
+          currentDrawing.tool = "draw";
+          currentDrawing.drawMode = nextMode;
+          activatePrimaryCanvasTool("draw", nextMode);
+          announceDrawingShortcut(nextMode === "eraser" ? "투명색 (지우개 모드)" : "원래 색 (펜 모드)");
         } else if (drawingShortcut.type === "swap-colors") {
           setColor(secondaryColor);
           setSecondaryColor(color);

@@ -915,6 +915,12 @@ export function StudioDrawOptionsBar({
                 onPrimaryChange={onColorChange}
                 onSecondaryChange={onSecondaryColorChange}
                 onSwap={onSwapColors}
+                isTransparent={false}
+                onTransparentToggle={
+                  onSetDrawMode
+                    ? () => onSetDrawMode("eraser")
+                    : undefined
+                }
               />
               {onToggleEyedropper ? (
                 <StudioToolHintTarget

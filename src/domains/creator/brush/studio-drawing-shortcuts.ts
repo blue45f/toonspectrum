@@ -29,7 +29,8 @@ export type StudioDrawingShortcut =
   /** Procreate: toggle size lock when switching brushes. */
   | { type: "toggle-size-lock" }
   /** Procreate: toggle opacity lock when switching brushes. */
-  | { type: "toggle-opacity-lock" };
+  | { type: "toggle-opacity-lock" }
+  | { type: "toggle-transparent-color" };
 
 export interface StudioDrawingShortcutEvent {
   code?: string;
@@ -72,6 +73,7 @@ const REGISTRY_DRAWING_DEFAULTS: ReadonlyArray<{
   { id: "flip-canvas", defaultChord: "H" },
   { id: "brush-smaller", defaultChord: "[" },
   { id: "brush-larger", defaultChord: "]" },
+  { id: "toggle-transparent-color", defaultChord: "C" },
 ];
 
 /**
@@ -90,6 +92,7 @@ function physicalCode(event: StudioDrawingShortcutEvent): string {
     if (event.code === "b" || event.code === "B") return "KeyB";
     if (event.code === "e" || event.code === "E") return "KeyE";
     if (event.code === "x" || event.code === "X") return "KeyX";
+    if (event.code === "c" || event.code === "C") return "KeyC";
     if (event.code === "d" || event.code === "D") return "KeyD";
     if (event.code === "s" || event.code === "S") return "KeyS";
     if (event.code === "f" || event.code === "F") return "KeyF";
@@ -102,6 +105,7 @@ function physicalCode(event: StudioDrawingShortcutEvent): string {
   if (key === "b") return "KeyB";
   if (key === "e") return "KeyE";
   if (key === "x") return "KeyX";
+  if (key === "c") return "KeyC";
   if (key === "d") return "KeyD";
   if (key === "s") return "KeyS";
   if (key === "f") return "KeyF";
@@ -159,6 +163,9 @@ function resolveFromRegistry(
     }
     if (matchRegistryAction(shortcuts, "flip-canvas", event)) {
       return { type: "toggle-canvas-flip-h" };
+    }
+    if (matchRegistryAction(shortcuts, "toggle-transparent-color", event)) {
+      return { type: "toggle-transparent-color" };
     }
   }
 
@@ -227,12 +234,16 @@ export function resolveStudioDrawingShortcut(
   const allowFlip = hardcodeAllowed(shortcuts, "flip-canvas");
   const allowBrushSmaller = defaultBrushHardcodeAllowed(shortcuts, "brush-smaller", "[");
   const allowBrushLarger = defaultBrushHardcodeAllowed(shortcuts, "brush-larger", "]");
+  const allowTransparent = hardcodeAllowed(shortcuts, "toggle-transparent-color");
 
   if (allowPen && code === "KeyB" && !event.altKey && !event.repeat) {
     return { type: "select-pen" };
   }
   if (allowEraser && code === "KeyE" && !event.altKey && !event.repeat) {
     return { type: "select-eraser" };
+  }
+  if (allowTransparent && code === "KeyC" && !event.altKey && !event.shiftKey && !event.repeat) {
+    return { type: "toggle-transparent-color" };
   }
 
   // Digit1–6 → recent brush slots (no modifiers). Shift+Digit assigns is handled by caller.

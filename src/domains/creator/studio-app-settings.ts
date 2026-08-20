@@ -115,6 +115,13 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "flip-selection-h", label: "선택 좌우 반전", labelKey: "studio.settings.shortcut.flipSelectionH", defaultKeys: "Shift+H" },
   { id: "flip-selection-v", label: "선택 상하 반전", labelKey: "studio.settings.shortcut.flipSelectionV", defaultKeys: "Shift+V" },
   { id: "shortcuts-help", label: "단축키 도움말", labelKey: "studio.settings.shortcut.help", defaultKeys: "?" },
+  { id: "toggle-transparent-color", label: "투명색 그리기 토글", labelKey: "studio.settings.shortcut.toggleTransparentColor", defaultKeys: "C" },
+  { id: "new-layer", label: "새 래스터 레이어", labelKey: "studio.settings.shortcut.newLayer", defaultKeys: "Mod+Shift+N" },
+  { id: "merge-layer-down", label: "아래 레이어와 결합", labelKey: "studio.settings.shortcut.mergeLayerDown", defaultKeys: "Mod+E" },
+  { id: "duplicate-layer", label: "레이어 복제", labelKey: "studio.settings.shortcut.duplicateLayer", defaultKeys: "Mod+J" },
+  { id: "group-layers", label: "선택 레이어 그룹화", labelKey: "studio.settings.shortcut.groupLayers", defaultKeys: "Mod+G" },
+  { id: "fit-view", label: "화면 크기에 맞춤", labelKey: "studio.settings.shortcut.fitView", defaultKeys: "Mod+0" },
+  { id: "actual-size-view", label: "100% 원본 뷰", labelKey: "studio.settings.shortcut.actualSizeView", defaultKeys: "Mod+1" },
 ] as const;
 
 export type StudioShortcutActionId = (typeof STUDIO_SHORTCUT_ACTIONS)[number]["id"];
