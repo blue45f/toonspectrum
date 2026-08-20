@@ -116,6 +116,19 @@ export function isStudioDryMediaKernelDabProgramPin(
     && candidate.programDigest === STUDIO_DRY_MEDIA_KERNEL_PROGRAM_DIGEST
     && Object.keys(candidate).every((key) => key === "version" || key === "programDigest");
 }
+/**
+ * Fresh-authoring causal stamp-grid selection rule pin (v2).
+ *
+ * `studio-brush-render-budget.ts` owns the versioned width-adaptive lattice rule and reads this
+ * marker via `studioDynamicBrushCausalStampGridRuleOf`. The pin follows the `depositPipeline`
+ * string-pin idiom: only freshly authored causal alpha-tip snapshots mint it, normalization
+ * preserves the exact string byte-for-byte and drops anything else closed, and it is never
+ * injected — so every persisted record without the pin keeps the historical fixed three-sample
+ * causal lattice and replays exactly as before.
+ */
+const STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN =
+  "causal-stamp-grid-v2" as const;
+
 export const STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2 =
   "causal-deposit-v2" as const;
 /**
@@ -290,6 +303,12 @@ export interface StudioBrushDynamicsSettings {
    * dab path. The carrier engine is pinned; its grain constants are not.
    */
   dryMediaKernelProgram?: StudioDryMediaKernelProgramPin;
+  /**
+   * Versioned causal stamp-grid selection rule minted only by freshly authored causal alpha-tip
+   * snapshots. Absent snapshots — every persisted pre-rule stroke — keep the bounded legacy
+   * three-sample causal lattice (see `studio-brush-render-budget.ts`).
+   */
+  causalStampGridRule?: "causal-stamp-grid-v2";
   seed?: number;
   fallbackPressure?: number;
   /** CSS px/ms at which the normalized speed source reaches 1. */
@@ -599,6 +618,11 @@ export interface NormalizedStudioBrushDynamicsSettings {
    * explicit pins fail normalization closed.
    */
   dryMediaKernelProgram?: StudioDryMediaKernelProgramPin;
+  /**
+   * Omitted whenever the source snapshot omits it so persisted canonical serialization stays
+   * byte-stable; malformed values drop closed and a default is never injected.
+   */
+  causalStampGridRule?: "causal-stamp-grid-v2";
   seed: number;
   fallbackPressure: number;
   maxSpeed: number;
@@ -1094,6 +1118,9 @@ function cloneNormalizedSettings(
     ...(settings.dryMediaKernelProgram
       ? { dryMediaKernelProgram: { ...settings.dryMediaKernelProgram } }
       : {}),
+    ...(settings.causalStampGridRule
+      ? { causalStampGridRule: settings.causalStampGridRule }
+      : {}),
     seed: settings.seed,
     fallbackPressure: settings.fallbackPressure,
     maxSpeed: settings.maxSpeed,
@@ -1384,6 +1411,9 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
       : {}),
     ...(dryMediaUnionProgram ? { dryMediaUnionProgram } : {}),
     ...(dryMediaKernelProgram ? { dryMediaKernelProgram } : {}),
+    ...(source.causalStampGridRule === STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN
+      ? { causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN }
+      : {}),
     ...(isStudioBrushDynamicsPresetId(source.presetId)
       ? { presetId: source.presetId }
       : {}),
@@ -3164,6 +3194,10 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       // Fresh-authoring kernel opt-in (T1 de-polygon). Only these authored core snapshots mint
       // the marker; persisted documents never gain it, so their union replay stays byte-stable.
       dryMediaKernelProgram: studioDryMediaKernelDabProgramPin(),
+      // Fresh-authoring causal stamp-grid rule v2: large nibs of these causal alpha-tip media
+      // lattice 5/7 instead of the fixed causal grid 3, selected once at stroke start
+      // (`selectStudioDynamicBrushCausalStampGrid`). Persisted snapshots never gain the pin.
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
       seed: 307,
       tip: { shape: "hard", softness: 0.32 },
       width: {
@@ -3209,6 +3243,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
     presetId: "dry-media",
     overrides: {
       dryMediaKernelProgram: studioDryMediaKernelDabProgramPin(),
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
       seed: 311,
       tip: { shape: "sponge", softness: 0.48 },
       width: {
@@ -3252,6 +3287,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
     presetId: "dry-media",
     overrides: {
       dryMediaKernelProgram: studioDryMediaKernelDabProgramPin(),
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
       seed: 317,
       tip: { shape: "bristle", softness: 0.58 },
       width: {
@@ -3298,6 +3334,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
     presetId: "dry-media",
     overrides: {
       dryMediaKernelProgram: studioDryMediaKernelDabProgramPin(),
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
       seed: 331,
       taper: {
         enabled: true,
@@ -3372,6 +3409,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
     presetId: "dry-media",
     overrides: {
       dryMediaKernelProgram: studioDryMediaKernelDabProgramPin(),
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
       seed: 337,
       taper: {
         enabled: true,
@@ -3625,10 +3663,11 @@ export function studioBrushDynamicsSettingsForBrushId(
  * The id-derived resolver for REPLAY of an element that stored no dynamics snapshot of its own.
  *
  * Such elements predate element-level capture, so their dynamics are re-derived from today's
- * catalogue — and that catalogue mints `dryMediaKernelProgram` for freshly authored presets.
- * Inheriting it would move a finished stroke off the union carrier it was actually drawn with,
- * changing its grain and edge in a document the artist already closed. Only an element's own
- * stored snapshot may carry the pin.
+ * catalogue — and that catalogue mints `dryMediaKernelProgram` and `causalStampGridRule` for
+ * freshly authored presets. Inheriting the kernel pin would move a finished stroke off the union
+ * carrier it was actually drawn with, and inheriting the grid rule would re-lattice its accepted
+ * causal dabs — both change pixels in a document the artist already closed. Only an element's own
+ * stored snapshot may carry the pins.
  *
  * This exists as one shared function precisely because the rule has to hold on every surface at
  * once: canvas and SVG export each have their own fallback, and fixing only one made the same
@@ -3638,10 +3677,17 @@ export function studioReplaySafeBrushDynamicsSettingsForBrushId(
   brushId: unknown
 ): NormalizedStudioBrushDynamicsSettings | null {
   const settings = studioBrushDynamicsSettingsForBrushId(brushId);
-  if (!settings || settings.dryMediaKernelProgram === undefined) return settings;
+  if (
+    !settings
+    || (settings.dryMediaKernelProgram === undefined
+      && settings.causalStampGridRule === undefined)
+  ) {
+    return settings;
+  }
   return normalizeStudioBrushDynamicsSettings({
     ...settings,
     dryMediaKernelProgram: undefined,
+    causalStampGridRule: undefined,
   });
 }
 

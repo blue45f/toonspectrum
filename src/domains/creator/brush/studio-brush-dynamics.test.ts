@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { resolveStudioDynamicBrushCoverageBudgetContract } from "../studio-dynamic-brush-coverage-renderer";
+
 import {
   DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
   STUDIO_BRUSH_DYNAMICS_PRESETS,
@@ -19,16 +21,24 @@ import {
   studioBrushDynamicsSettingsEqual,
   studioDryMediaUnionComposableProgramPin,
   studioBrushTaperFactors,
+  studioReplaySafeBrushDynamicsSettingsForBrushId,
   type StudioBrushDynamicsRecipe,
   type StudioBrushDynamicsSettings,
   type StudioDynamicBrushPlan,
   type StudioDynamicBrushPlanInput,
 } from "./studio-brush-dynamics";
 import {
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2,
+  selectStudioDynamicBrushCausalStampGrid,
+  studioDynamicBrushCausalStampGridRuleOf,
+} from "./studio-brush-render-budget";
+import {
   buildStudioBrushTipAlphaMap,
   DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE,
   sampleStudioBrushTipProceduralAlpha,
 } from "./studio-brush-tip-stamp";
+import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
 
 function expectFiniteRecipe(recipe: StudioBrushDynamicsRecipe): void {
   for (const value of Object.values(recipe)) expect(Number.isFinite(value)).toBe(true);
@@ -1163,6 +1173,127 @@ describe("studio dynamic brush arc-length dab planner", () => {
     expect(() => normalizeStudioBrushDynamicsSettings({
       dryMediaUnionProgram: { ...pin, extra: true },
     })).toThrow(/Unsupported dry-media union program pin/u);
+  });
+
+  it("preserves the causal stamp-grid rule pin byte-for-byte and drops malformed values closed", () => {
+    const v2 = STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2;
+    const legacy = normalizeStudioBrushDynamicsSettings({ seed: 17 });
+    expect(legacy.causalStampGridRule).toBeUndefined();
+    expect(serializeStudioBrushDynamicsSettingsCanonical(legacy))
+      .not.toContain("causalStampGridRule");
+
+    const pinned = normalizeStudioBrushDynamicsSettings({
+      seed: 17,
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      causalStampGridRule: v2,
+    });
+    expect(pinned.causalStampGridRule).toBe(v2);
+    expect(studioDynamicBrushCausalStampGridRuleOf(pinned)).toBe(v2);
+    // Round-trip: the normalized output re-normalizes byte-identically with the pin retained.
+    expect(normalizeStudioBrushDynamicsSettings(JSON.parse(JSON.stringify(pinned))))
+      .toEqual(pinned);
+    expect(serializeStudioBrushDynamicsSettingsCanonical(pinned)).toBe(JSON.stringify(pinned));
+    // Fail closed: anything but the exact rule string drops without ever injecting a default.
+    const canonical = serializeStudioBrushDynamicsSettingsCanonical({ seed: 17 });
+    for (const malformed of [
+      "causal-stamp-grid-v3",
+      "CAUSAL-STAMP-GRID-V2",
+      2,
+      true,
+      {},
+      [v2],
+      null,
+    ]) {
+      const dropped = normalizeStudioBrushDynamicsSettings({
+        seed: 17,
+        causalStampGridRule: malformed,
+      });
+      expect(dropped.causalStampGridRule).toBeUndefined();
+      expect(serializeStudioBrushDynamicsSettingsCanonical({
+        seed: 17,
+        causalStampGridRule: malformed,
+      })).toBe(canonical);
+    }
+  });
+
+  it("carries the pin through canonical serialization so save/reopen replays the same grid", () => {
+    const v2 = STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2;
+    const canonical = serializeStudioBrushDynamicsSettingsCanonical({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      causalStampGridRule: v2,
+      tip: { shape: "bristle" as const, softness: 0.58 },
+      width: { base: 72 },
+    });
+    expect(JSON.parse(canonical)).toMatchObject({ causalStampGridRule: v2 });
+    const reopened = normalizeStudioBrushDynamicsSettings(JSON.parse(canonical));
+    expect(studioDynamicBrushCausalStampGridRuleOf(reopened)).toBe(v2);
+    expect(serializeStudioBrushDynamicsSettingsCanonical(reopened)).toBe(canonical);
+    expect(selectStudioDynamicBrushCausalStampGrid({
+      rule: studioDynamicBrushCausalStampGridRuleOf(reopened),
+      baseWidth: reopened.width.base,
+    })).toBe(7);
+  });
+
+  it("mints the rule pin for fresh dry-media authoring and strips it from replay re-derivation", () => {
+    const v2 = STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2;
+    for (const brushId of ["crayon", "chalk", "charcoal", "pastel", "oil-pastel"] as const) {
+      const fresh = studioBrushDynamicsSettingsForBrushId(brushId);
+      expect(fresh?.causalStampGridRule).toBe(v2);
+      expect(fresh?.dryMediaKernelProgram).toBeDefined();
+      expect(studioDynamicBrushCausalStampGridRuleOf(fresh!)).toBe(v2);
+      // Snapshot-less persisted strokes re-derive from today's catalogue and must never inherit
+      // the pin — inheriting it would re-lattice already accepted causal dabs.
+      expect(
+        studioReplaySafeBrushDynamicsSettingsForBrushId(brushId)?.causalStampGridRule,
+      ).toBeUndefined();
+    }
+    // Canonical presets stay unpinned, so persisted preset-only serialization is unchanged.
+    expect(studioBrushDynamicsPresetSettings("dry-media").causalStampGridRule).toBeUndefined();
+
+    // Fresh large charcoal/crayon strokes now lattice 5/7; the authored small nibs keep grid 3.
+    const charcoal = studioBrushDynamicsSettingsForBrushId("charcoal")!;
+    const gridFor = (baseWidth: number) => selectStudioDynamicBrushCausalStampGrid({
+      rule: studioDynamicBrushCausalStampGridRuleOf(normalizeStudioBrushDynamicsSettings({
+        ...charcoal,
+        width: { ...charcoal.width, base: baseWidth },
+      })),
+      baseWidth,
+    });
+    expect(gridFor(charcoal.width.base)).toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+    expect(gridFor(48)).toBe(5);
+    expect(gridFor(96)).toBe(7);
+  });
+
+  it("keeps the pin through the coverage-budget contract, including the ribbon copy branch", () => {
+    const v2 = STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2;
+    const pinned = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      causalStampGridRule: v2,
+      tip: { shape: "bristle" as const, softness: 0.4 },
+      tipLayers: [{ tip: { shape: "grain" as const }, opacity: 0.8 }],
+      width: { base: 96 },
+    });
+    expect(pinned.tipLayers.length).toBeGreaterThan(0);
+
+    // Ordinary identities pass the settings through by reference with the pin intact.
+    const plain = resolveStudioDynamicBrushCoverageBudgetContract(
+      resolveStudioDynamicBrushMaterialIdentity("charcoal") ?? undefined,
+      pinned,
+    );
+    expect(plain.settings).toBe(pinned);
+    expect(studioDynamicBrushCausalStampGridRuleOf(plain.settings)).toBe(v2);
+
+    // The professional-shelf ribbon branch copies fields while stripping decorative tip layers;
+    // that spread must still carry the pin so live/retained/SVG select the identical grid.
+    const ribbon = resolveStudioDynamicBrushCoverageBudgetContract(
+      resolveStudioDynamicBrushMaterialIdentity("dry-media", "bristle-fan-dry") ?? undefined,
+      pinned,
+    );
+    expect(ribbon.specialistCarrier).toBe("professional-shelf-ribbon");
+    expect(ribbon.settings).not.toBe(pinned);
+    expect(ribbon.settings.tipLayers).toEqual([]);
+    expect(ribbon.settings.causalStampGridRule).toBe(v2);
+    expect(studioDynamicBrushCausalStampGridRuleOf(ribbon.settings)).toBe(v2);
   });
 
   it("round-trips enabled dual brush fields through normalization, JSON and the planner", () => {

@@ -3,7 +3,14 @@ import * as Y from "yjs";
 
 import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  normalizeStudioBrushDynamicsSettings,
 } from "../brush/studio-brush-dynamics";
+import {
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2,
+  selectStudioDynamicBrushCausalStampGrid,
+  studioDynamicBrushCausalStampGridRuleOf,
+} from "../brush/studio-brush-render-budget";
 import {
   STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
   STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
@@ -550,6 +557,53 @@ describe("StudioCrdtDocument", () => {
         payload: { ...versioned, version: legacyVersion },
       })).toThrow("분할 연속 브러시 파이프라인과 페이로드 버전이 호환되지 않습니다");
     }
+    document.destroy();
+  });
+
+  it("replays a collaborator's pinned rule-v2 causal stroke to the same width-adaptive grid", () => {
+    const document = new StudioCrdtDocument();
+    const created = document.addStroke({
+      ...stroke("causal-stamp-grid-rule-v2", "page-a"),
+      payload: payload([10, 20, 200, 20], {
+        version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+        brush: "charcoal",
+        strokeWidth: 96,
+        brushDynamics: {
+          depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+          causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2,
+          tip: { shape: "bristle", softness: 0.58 },
+          width: { base: 96 },
+        },
+      }),
+    });
+
+    const collaborator = new StudioCrdtDocument(document.encodeStateAsUpdate());
+    const replayed = collaborator.getStroke(created.id);
+    expect(replayed?.payload.brushDynamics).toMatchObject({
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2,
+    });
+
+    // The collaborator's normalization keeps the pin, so its planner resolves the identical
+    // width-adaptive lattice the author pinned at stroke start.
+    const dynamics = normalizeStudioBrushDynamicsSettings(replayed?.payload.brushDynamics);
+    expect(studioDynamicBrushCausalStampGridRuleOf(dynamics))
+      .toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2);
+    expect(selectStudioDynamicBrushCausalStampGrid({
+      rule: studioDynamicBrushCausalStampGridRuleOf(dynamics),
+      baseWidth: dynamics.width.base,
+    })).toBe(7);
+
+    // A replayed legacy causal stroke without the pin keeps the bounded three-sample lattice.
+    const legacy = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      width: { base: 96 },
+    });
+    expect(studioDynamicBrushCausalStampGridRuleOf(legacy)).toBeUndefined();
+    expect(selectStudioDynamicBrushCausalStampGrid({
+      rule: studioDynamicBrushCausalStampGridRuleOf(legacy),
+      baseWidth: legacy.width.base,
+    })).toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+    collaborator.destroy();
     document.destroy();
   });
 
