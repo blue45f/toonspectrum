@@ -19,6 +19,7 @@ import {
 // program must not typecheck or bundle, while these descriptor modules are
 // pure data.
 import {
+  googleInkMeshProviderDescriptor,
   hokusaiProviderDescriptor,
   perfectFreehandProviderDescriptor,
 } from "../../../packages/studio-brush-platform/src/providers";
@@ -72,6 +73,7 @@ export const STUDIO_KNOWN_ENGINE_DESCRIPTORS: readonly ProviderDescriptor[] = [
   velloGpuBrowserProviderDescriptor,
   velloSvgNativeProviderDescriptor,
   perfectFreehandProviderDescriptor,
+  googleInkMeshProviderDescriptor,
   hokusaiProviderDescriptor,
   canvasKitImageFilterDescriptor,
   openCvImageWorkerDescriptor,
@@ -274,8 +276,12 @@ export type DeriveAssetMetadataInput =
 /**
  * Engine requirements of an imported brush program, grounded in the shipped
  * provider vocabulary (no invented tokens):
- * - vector-path output executes on the stroke-geometry lane
+ * - vector-path output executes on the stroke-geometry outline lane
  *   → "stroke.geometry.pressure-outline"
+ * - vector-mesh output executes on the Google Ink mesh lane
+ *   → "stroke.geometry.ink-mesh" (declared only by the google-ink-mesh
+ *   provider — the requirement fails closed on hosts without the ink WASM
+ *   lane instead of resolving to outline geometry)
  * - a hokusai provider preference means faithful rendering needs the
  *   natural-media lane → "brush.natural-media.dynamics"
  * - `.myb` payloads additionally need the myb interpreter
@@ -288,6 +294,9 @@ function deriveBrushEngineRequirements(
   const requirements = new Set<string>();
   if (program.output.target === "vector-path") {
     requirements.add("stroke.geometry.pressure-outline");
+  }
+  if (program.output.target === "vector-mesh") {
+    requirements.add("stroke.geometry.ink-mesh");
   }
   if (
     sourceFormat === "myb" ||
@@ -566,6 +575,9 @@ export function deriveAssetMetadata(
       const outlineCapabilities = engineRequirements.filter((capability) =>
         descriptorById("perfect-freehand").capabilities.includes(capability),
       );
+      const meshCapabilities = engineRequirements.filter((capability) =>
+        descriptorById("google-ink-mesh").capabilities.includes(capability),
+      );
       candidate = {
         ...base,
         kind: "brush-program",
@@ -577,6 +589,20 @@ export function deriveAssetMetadata(
         originalBlobRef: originalBlobRef(input.bytes, "image/png"),
         normalizedIrRef: normalizedReference,
         rendererVariants: [
+          ...(meshCapabilities.length === 0
+            ? []
+            : [
+                rendererVariant(
+                  "stable-google-ink-mesh",
+                  "stable",
+                  "google-ink-mesh",
+                  normalizedReference,
+                  meshCapabilities,
+                  [
+                    "Mesh output consumes pre-modeled input; flow/opacity dynamics and stamp tips do not reach the mesh.",
+                  ],
+                ),
+              ]),
           ...(hokusaiCapabilities.length === 0
             ? []
             : [
@@ -607,24 +633,45 @@ export function deriveAssetMetadata(
         visualEquivalenceReport: null,
         dependencies: [],
         previewVariants: importedPreviewVariants(
-          hokusaiCapabilities.length > 0 ? "stable-hokusai" : null,
+          hokusaiCapabilities.length > 0
+            ? "stable-hokusai"
+            : meshCapabilities.length > 0
+              ? "stable-google-ink-mesh"
+              : null,
           null,
         ),
-        fallback: {
-          strategy: "renderer-variant",
-          rendererVariantId:
-            outlineCapabilities.length > 0
-              ? "stable-perfect-freehand-fallback"
-              : "stable-hokusai",
-          providerId:
-            outlineCapabilities.length > 0
-              ? "perfect-freehand"
-              : "hokusai-natural-media",
-          preservesNormalizedIr: true,
-          reason:
-            "Retain normalized BrushProgramIR and surface all KPP approximation limits when the preferred dynamics provider is unavailable.",
-          limitations: ["Fallback does not claim Krita or CSP stroke equivalence."],
-        },
+        fallback:
+          outlineCapabilities.length > 0 || hokusaiCapabilities.length > 0
+            ? {
+                strategy: "renderer-variant",
+                rendererVariantId:
+                  outlineCapabilities.length > 0
+                    ? "stable-perfect-freehand-fallback"
+                    : "stable-hokusai",
+                providerId:
+                  outlineCapabilities.length > 0
+                    ? "perfect-freehand"
+                    : "hokusai-natural-media",
+                preservesNormalizedIr: true,
+                reason:
+                  "Retain normalized BrushProgramIR and surface all KPP approximation limits when the preferred dynamics provider is unavailable.",
+                limitations: ["Fallback does not claim Krita or CSP stroke equivalence."],
+              }
+            : {
+                // Vector-mesh lane: fail closed. No geometry-equivalence
+                // certification exists for an outline rendition of ink mesh
+                // strokes, so an incapable host retains BrushProgramIR and
+                // hides the brush instead of substituting geometry.
+                strategy: "renderer-variant",
+                rendererVariantId: "stable-google-ink-mesh",
+                providerId: "google-ink-mesh",
+                preservesNormalizedIr: true,
+                reason:
+                  "The vector-mesh lane fails closed when the google-ink-mesh provider is unavailable; BrushProgramIR is retained and the brush is hidden rather than re-rendered with different geometry.",
+                limitations: [
+                  "No independent provider fallback is currently available for the vector-mesh lane.",
+                ],
+              },
         replacementCondition: {
           summary:
             "Replace this brush path only with real-device, pressure-fidelity and visual evidence over the same KPP corpus.",

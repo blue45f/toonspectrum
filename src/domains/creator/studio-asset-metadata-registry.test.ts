@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { EngineCapabilityRegistry } from "@toonspectrum/studio-engine-registry";
 import {
   UnknownAssetCapabilityError,
+  brushProgramIRSchema,
   collectSceneFeatures,
   computeAssetContentDigest,
   computeAssetStructuredDigest,
@@ -30,6 +31,7 @@ import type {
   StudioLocalDatabase,
   StudioSqliteApiHandle,
 } from "./studio-local-database";
+import type { KppImportResult } from "../../../packages/studio-format-gateway/src/kpp";
 import type { AssetMetadataIR } from "@toonspectrum/studio-project-model";
 
 // ---------------------------------------------------------------------------
@@ -82,6 +84,36 @@ function deriveKppCard(): AssetMetadataIR {
       id: "asset-kpp-ink-basic",
       license: CORPUS_LICENSE,
       sourceFileName: "paintbrush-ink-basic.kpp",
+      now: () => FIXED_NOW,
+    },
+  );
+}
+
+/**
+ * Synthetic vector-mesh brush program (Google Ink lane, V19 §2.3). No shipped
+ * importer emits `google-ink-mesh` geometry today, so the fixture exercises
+ * the derivation seam directly with a schema-parsed program.
+ */
+function deriveMeshCard(): AssetMetadataIR {
+  const bytes = new TextEncoder().encode("synthetic-kpp-mesh-fixture");
+  const program = brushProgramIRSchema.parse({
+    id: "kpp:mesh-ink",
+    name: "메시 잉크",
+    geometry: { kind: "google-ink-mesh" },
+    output: { target: "vector-mesh", bake: "editable-proxy" },
+  });
+  const result: KppImportResult = {
+    program,
+    unmapped: [],
+    warnings: [],
+    presetName: "메시 잉크",
+  };
+  return deriveAssetMetadata(
+    { format: "kpp", bytes, result },
+    {
+      id: "asset-kpp-mesh-ink",
+      license: CORPUS_LICENSE,
+      sourceFileName: "mesh-ink.kpp",
       now: () => FIXED_NOW,
     },
   );
@@ -244,6 +276,52 @@ describe("deriveAssetMetadata", () => {
     expect(card.provenance.unmapped).toEqual(result.unmapped);
   });
 
+  it("derives a vector-mesh brush card requiring the google-ink-mesh lane, fail-closed", () => {
+    const card = deriveMeshCard();
+    expect(card.kind).toBe("brush-program");
+    expect(card.name).toBe("메시 잉크");
+    // The mesh token is the only requirement — never the outline lane's
+    // pressure-outline token, so no host can satisfy it with perfect-freehand.
+    expect(card.engineRequirements).toEqual(["stroke.geometry.ink-mesh"]);
+    expect(card.providerRequirements).toEqual([
+      {
+        capability: "stroke.geometry.ink-mesh",
+        providerIds: ["google-ink-mesh"],
+        versionRange: null,
+        optional: false,
+        reason: "Normalized IR requires stroke.geometry.ink-mesh.",
+      },
+    ]);
+    expect(
+      card.rendererVariants.map(({ id, tier, providerId, qualityStatus }) => ({
+        id,
+        tier,
+        providerId,
+        qualityStatus,
+      })),
+    ).toEqual([
+      {
+        id: "stable-google-ink-mesh",
+        tier: "stable",
+        providerId: "google-ink-mesh",
+        qualityStatus: "unmeasured",
+      },
+    ]);
+    expect(card.previewVariants.stable).toMatchObject({
+      status: "not-generated",
+      rendererVariantId: "stable-google-ink-mesh",
+    });
+    // Fail-closed: the fallback stays on the mesh lane itself — no outline or
+    // natural-media substitution without a visual-equivalence certification.
+    expect(card.fallback).toMatchObject({
+      strategy: "renderer-variant",
+      rendererVariantId: "stable-google-ink-mesh",
+      providerId: "google-ink-mesh",
+      preservesNormalizedIr: true,
+    });
+    expect(card.visualEquivalenceReport).toBeNull();
+  });
+
   it("derives an SVG decoration card whose requirements are exactly the scene features", () => {
     const result = parseSvgToScene(SVG_FIXTURE);
     const card = deriveSvgCard();
@@ -305,7 +383,12 @@ describe("deriveAssetMetadata", () => {
   });
 
   it("only names providers that actually declare each derived capability", () => {
-    for (const card of [deriveMybCard(), deriveKppCard(), deriveSvgCard()]) {
+    for (const card of [
+      deriveMybCard(),
+      deriveKppCard(),
+      deriveMeshCard(),
+      deriveSvgCard(),
+    ]) {
       expect(card.providerRequirements.map((requirement) => requirement.capability)).toEqual(
         card.engineRequirements,
       );
@@ -407,6 +490,8 @@ describe("StudioAssetMetadataRegistry", () => {
       "format.svg.strict-audit",
       "brush.natural-media.myb",
       "stroke.geometry.pressure-outline",
+      "stroke.geometry.ink-mesh",
+      "stroke.geometry.incremental-mesh-delta",
       "filter.op.gaussian-blur",
       "render.blend.multiply",
     ]) {
@@ -484,6 +569,27 @@ describe("renderability judgment", () => {
       engineSet(BASELINE_NO_WEBGPU),
     );
     expect(mybFull.renderable).toBe(true);
+  });
+
+  it("judges a vector-mesh card unrenderable without the google-ink-mesh lane (no silent outline substitution)", () => {
+    const withoutMesh = judgeAssetRenderability(
+      deriveMeshCard(),
+      engineSet(BASELINE_NO_WEBGPU),
+    );
+    expect(withoutMesh.renderable).toBe(false);
+    expect(withoutMesh.missingCapabilities).toEqual(["stroke.geometry.ink-mesh"]);
+    // perfect-freehand is registered but must NOT satisfy the mesh token.
+    expect(withoutMesh.capabilityProviders["stroke.geometry.ink-mesh"]).toEqual([]);
+
+    const withMesh = judgeAssetRenderability(
+      deriveMeshCard(),
+      engineSet([...BASELINE_NO_WEBGPU, "google-ink-mesh"]),
+    );
+    expect(withMesh.renderable).toBe(true);
+    expect(withMesh.missingCapabilities).toEqual([]);
+    expect(withMesh.capabilityProviders["stroke.geometry.ink-mesh"]).toEqual([
+      "google-ink-mesh",
+    ]);
   });
 
   it("refuses to judge an unregistered asset id", () => {
