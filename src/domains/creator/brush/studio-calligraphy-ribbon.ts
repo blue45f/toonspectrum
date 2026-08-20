@@ -42,11 +42,6 @@ export interface StudioCalligraphyRibbonPlan {
   readonly acceptedSegmentCount: number;
 }
 
-interface RibbonPoint {
-  x: number;
-  y: number;
-}
-
 const COORDINATE_LIMIT = 1_000_000;
 const WIDTH_LIMIT = 4_096;
 const POINT_EPSILON = 1e-6;
@@ -64,17 +59,16 @@ function finiteWidth(value: unknown): number | null {
   return Math.min(WIDTH_LIMIT, Math.max(0.05, value));
 }
 
-function normalizedDirection(
+function hasValidDirection(
   fromX: number,
   fromY: number,
   toX: number,
   toY: number
-): RibbonPoint | null {
+): boolean {
   const dx = toX - fromX;
   const dy = toY - fromY;
   const length = Math.hypot(dx, dy);
-  if (!Number.isFinite(length) || length <= POINT_EPSILON) return null;
-  return { x: dx / length, y: dy / length };
+  return Number.isFinite(length) && length > POINT_EPSILON;
 }
 
 function samePoint(leftX: number, leftY: number, rightX: number, rightY: number): boolean {
@@ -93,7 +87,7 @@ function normalizedSegment(segment: CalligraphySegment): CalligraphySegment | nu
     || x1 === null
     || y1 === null
     || width === null
-    || normalizedDirection(x0, y0, x1, y1) === null
+    || !hasValidDirection(x0, y0, x1, y1)
   ) {
     return null;
   }
@@ -119,48 +113,6 @@ function quantize(value: number): number {
   return Object.is(quantized, -0) ? 0 : quantized;
 }
 
-function cross(origin: RibbonPoint, left: RibbonPoint, right: RibbonPoint): number {
-  return (left.x - origin.x) * (right.y - origin.y)
-    - (left.y - origin.y) * (right.x - origin.x);
-}
-
-function convexHull(points: readonly RibbonPoint[]): readonly RibbonPoint[] {
-  const sorted = [...points].sort((left, right) => (
-    left.x === right.x ? left.y - right.y : left.x - right.x
-  ));
-  const unique = sorted.filter((point, index) => (
-    index === 0
-    || point.x !== sorted[index - 1]!.x
-    || point.y !== sorted[index - 1]!.y
-  ));
-  if (unique.length <= 2) return unique;
-
-  const lower: RibbonPoint[] = [];
-  for (const point of unique) {
-    while (
-      lower.length >= 2
-      && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, point) <= 0
-    ) {
-      lower.pop();
-    }
-    lower.push(point);
-  }
-  const upper: RibbonPoint[] = [];
-  for (let index = unique.length - 1; index >= 0; index -= 1) {
-    const point = unique[index]!;
-    while (
-      upper.length >= 2
-      && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, point) <= 0
-    ) {
-      upper.pop();
-    }
-    upper.push(point);
-  }
-  lower.pop();
-  upper.pop();
-  return [...lower, ...upper];
-}
-
 function signedArea(points: readonly number[]): number {
   let area = 0;
   for (let index = 0; index + 1 < points.length; index += 2) {
@@ -171,8 +123,7 @@ function signedArea(points: readonly number[]): number {
   return area / 2;
 }
 
-function sameWinding(points: readonly RibbonPoint[]): readonly number[] {
-  const flattened = points.flatMap((point) => [quantize(point.x), quantize(point.y)]);
+function sameWinding(flattened: readonly number[]): readonly number[] {
   if (signedArea(flattened) >= 0) return flattened;
   const reversed: number[] = [];
   for (let index = flattened.length - 2; index >= 0; index -= 2) {
@@ -185,7 +136,7 @@ function nibFootprint(
   centerX: number,
   centerY: number,
   segment: CalligraphySegment,
-): readonly RibbonPoint[] {
+): readonly number[] {
   const travelAngle = Math.atan2(segment.y1 - segment.y0, segment.x1 - segment.x0);
   const relativeTravelAngle = travelAngle - segment.tipAngleRad;
   const sine = Math.sin(relativeTravelAngle);
@@ -193,8 +144,6 @@ function nibFootprint(
   const projection = Math.sqrt(
     sine * sine + segment.roundness * segment.roundness * cosine * cosine,
   );
-  // buildCalligraphySegments stores the ellipse diameter projected onto the travel normal.
-  // Recover the physical nib axes so terminal geometry follows tilt/twist rather than a circle.
   const majorRadius = Math.min(
     WIDTH_LIMIT / 2,
     segment.width / 2 / Math.max(segment.roundness, projection, POINT_EPSILON),
@@ -202,22 +151,90 @@ function nibFootprint(
   const minorRadius = majorRadius * segment.roundness;
   const tipCosine = Math.cos(segment.tipAngleRad);
   const tipSine = Math.sin(segment.tipAngleRad);
-  return Array.from({ length: NIB_FOOTPRINT_STEPS }, (_, step): RibbonPoint => {
+  
+  const footprint = new Float64Array(NIB_FOOTPRINT_STEPS * 2);
+  for (let step = 0; step < NIB_FOOTPRINT_STEPS; step += 1) {
     const angle = Math.PI * 2 * step / NIB_FOOTPRINT_STEPS;
     const localX = Math.cos(angle) * majorRadius;
     const localY = Math.sin(angle) * minorRadius;
-    return {
-      x: quantize(centerX + localX * tipCosine - localY * tipSine),
-      y: quantize(centerY + localX * tipSine + localY * tipCosine),
-    };
-  });
+    footprint[step * 2] = quantize(centerX + localX * tipCosine - localY * tipSine);
+    footprint[step * 2 + 1] = quantize(centerY + localX * tipSine + localY * tipCosine);
+  }
+  return Array.from(footprint);
 }
 
+const SHARED_FOOTPRINT_X = new Float64Array(NIB_FOOTPRINT_STEPS);
+const SHARED_FOOTPRINT_Y = new Float64Array(NIB_FOOTPRINT_STEPS);
+
 function sweptSegmentOutline(segment: CalligraphySegment): readonly number[] {
-  return sameWinding(convexHull([
-    ...nibFootprint(segment.x0, segment.y0, segment),
-    ...nibFootprint(segment.x1, segment.y1, segment),
-  ]));
+  const travelAngle = Math.atan2(segment.y1 - segment.y0, segment.x1 - segment.x0);
+  const relativeTravelAngle = travelAngle - segment.tipAngleRad;
+  const sine = Math.sin(relativeTravelAngle);
+  const cosine = Math.cos(relativeTravelAngle);
+  const projection = Math.sqrt(
+    sine * sine + segment.roundness * segment.roundness * cosine * cosine,
+  );
+  const majorRadius = Math.min(
+    WIDTH_LIMIT / 2,
+    segment.width / 2 / Math.max(segment.roundness, projection, POINT_EPSILON),
+  );
+  const minorRadius = majorRadius * segment.roundness;
+  const tipCosine = Math.cos(segment.tipAngleRad);
+  const tipSine = Math.sin(segment.tipAngleRad);
+
+  const dx = segment.x1 - segment.x0;
+  const dy = segment.y1 - segment.y0;
+  const nx = -dy;
+  const ny = dx;
+
+  let maxDot = -Infinity;
+  let minDot = Infinity;
+  let maxIdx = 0;
+  let minIdx = 0;
+
+  for (let step = 0; step < NIB_FOOTPRINT_STEPS; step += 1) {
+    const angle = Math.PI * 2 * step / NIB_FOOTPRINT_STEPS;
+    const localX = Math.cos(angle) * majorRadius;
+    const localY = Math.sin(angle) * minorRadius;
+    const oxVal = localX * tipCosine - localY * tipSine;
+    const oyVal = localX * tipSine + localY * tipCosine;
+    
+    SHARED_FOOTPRINT_X[step] = oxVal;
+    SHARED_FOOTPRINT_Y[step] = oyVal;
+
+    const dot = oxVal * nx + oyVal * ny;
+    if (dot > maxDot) { maxDot = dot; maxIdx = step; }
+    if (dot < minDot) { minDot = dot; minIdx = step; }
+  }
+
+  const hull: number[] = [];
+  
+  let i = minIdx;
+  while (true) {
+    hull.push(
+      quantize(segment.x1 + SHARED_FOOTPRINT_X[i]!),
+      quantize(segment.y1 + SHARED_FOOTPRINT_Y[i]!)
+    );
+    if (i === maxIdx) break;
+    i = (i + 1) % NIB_FOOTPRINT_STEPS;
+  }
+  
+  i = maxIdx;
+  while (true) {
+    hull.push(
+      quantize(segment.x0 + SHARED_FOOTPRINT_X[i]!),
+      quantize(segment.y0 + SHARED_FOOTPRINT_Y[i]!)
+    );
+    if (i === minIdx) break;
+    i = (i + 1) % NIB_FOOTPRINT_STEPS;
+  }
+
+  if (signedArea(hull) >= 0) return hull;
+  const reversed: number[] = [];
+  for (let index = hull.length - 2; index >= 0; index -= 2) {
+    reversed.push(hull[index]!, hull[index + 1]!);
+  }
+  return reversed;
 }
 
 /**

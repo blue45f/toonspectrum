@@ -1205,3 +1205,176 @@ export function applyStudioPaletteNormalization(
 ): StudioAdvancedColorResult {
   return applyStudioAdvancedColorFilter({ ...request, kernel: "palette-normalization" }, budget);
 }
+
+export interface StudioParsedCubeLut {
+  size: number;
+  data: Float32Array;
+  title?: string;
+  domainMin: [number, number, number];
+  domainMax: [number, number, number];
+}
+
+export function parseStudioCubeLut(text: string): StudioParsedCubeLut | null {
+  let size = 0;
+  let title: string | undefined;
+  let domainMin: [number, number, number] = [0, 0, 0];
+  let domainMax: [number, number, number] = [1, 1, 1];
+  
+  const lines = text.split(/\r?\n/);
+  const data: number[] = [];
+
+  for (let line of lines) {
+    line = line.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    if (line.startsWith('TITLE')) {
+      const match = line.match(/^TITLE\s+"?([^"]*)"?$/);
+      if (match) title = match[1];
+      continue;
+    }
+
+    if (line.startsWith('LUT_3D_SIZE')) {
+      const match = line.match(/^LUT_3D_SIZE\s+(\d+)$/);
+      if (match) size = parseInt(match[1], 10);
+      continue;
+    }
+
+    if (line.startsWith('LUT_1D_SIZE')) {
+      const match = line.match(/^LUT_1D_SIZE\s+(\d+)$/);
+      if (match && size === 0) size = parseInt(match[1], 10);
+      continue;
+    }
+
+    if (line.startsWith('DOMAIN_MIN')) {
+      const match = line.match(/^DOMAIN_MIN\s+([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s+([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s+([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)$/);
+      if (match) {
+        domainMin = [parseFloat(match[1]!), parseFloat(match[2]!), parseFloat(match[3]!)];
+      }
+      continue;
+    }
+
+    if (line.startsWith('DOMAIN_MAX')) {
+      const match = line.match(/^DOMAIN_MAX\s+([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s+([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s+([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)$/);
+      if (match) {
+        domainMax = [parseFloat(match[1]!), parseFloat(match[2]!), parseFloat(match[3]!)];
+      }
+      continue;
+    }
+
+    const parts = line.split(/\s+/);
+    if (parts.length >= 3) {
+      const r = parseFloat(parts[0]!);
+      const g = parseFloat(parts[1]!);
+      const b = parseFloat(parts[2]!);
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+        data.push(r, g, b);
+      }
+    }
+  }
+
+  if (size === 0 || data.length === 0) return null;
+  
+  return {
+    size,
+    title,
+    domainMin,
+    domainMax,
+    data: new Float32Array(data)
+  };
+}
+
+export function applyStudio3dCubeLut(
+  source: { readonly width: number; readonly height: number; readonly data: Uint8ClampedArray },
+  lut: StudioParsedCubeLut,
+  blendAmount: number = 1
+): void {
+  if (blendAmount <= 0) return;
+  const { data, size, domainMin, domainMax } = lut;
+  const pixels = source.data;
+  
+  const [minR, minG, minB] = domainMin;
+  const [maxR, maxG, maxB] = domainMax;
+  
+  const scaleR = maxR! > minR! ? 1 / (maxR! - minR!) : 1;
+  const scaleG = maxG! > minG! ? 1 / (maxG! - minG!) : 1;
+  const scaleB = maxB! > minB! ? 1 / (maxB! - minB!) : 1;
+  
+  const gridMax = size - 1;
+  
+  for (let i = 0; i < pixels.length; i += 4) {
+    const sR = pixels[i]!;
+    const sG = pixels[i + 1]!;
+    const sB = pixels[i + 2]!;
+    
+    let rNorm = sR / 255;
+    let gNorm = sG / 255;
+    let bNorm = sB / 255;
+    
+    rNorm = Math.max(0, Math.min(1, (rNorm - minR!) * scaleR));
+    gNorm = Math.max(0, Math.min(1, (gNorm - minG!) * scaleG));
+    bNorm = Math.max(0, Math.min(1, (bNorm - minB!) * scaleB));
+    
+    const rPos = rNorm * gridMax;
+    const gPos = gNorm * gridMax;
+    const bPos = bNorm * gridMax;
+    
+    const r0 = Math.floor(rPos);
+    const g0 = Math.floor(gPos);
+    const b0 = Math.floor(bPos);
+    
+    const r1 = Math.min(gridMax, r0 + 1);
+    const g1 = Math.min(gridMax, g0 + 1);
+    const b1 = Math.min(gridMax, b0 + 1);
+    
+    const rFrac = rPos - r0;
+    const gFrac = gPos - g0;
+    const bFrac = bPos - b0;
+
+    const offset000 = ((b0 * size + g0) * size + r0) * 3;
+    const offset100 = ((b0 * size + g0) * size + r1) * 3;
+    const offset010 = ((b0 * size + g1) * size + r0) * 3;
+    const offset110 = ((b0 * size + g1) * size + r1) * 3;
+    const offset001 = ((b1 * size + g0) * size + r0) * 3;
+    const offset101 = ((b1 * size + g0) * size + r1) * 3;
+    const offset011 = ((b1 * size + g1) * size + r0) * 3;
+    const offset111 = ((b1 * size + g1) * size + r1) * 3;
+
+    const cx00R = data[offset000]! + rFrac * (data[offset100]! - data[offset000]!);
+    const cx00G = data[offset000 + 1]! + rFrac * (data[offset100 + 1]! - data[offset000 + 1]!);
+    const cx00B = data[offset000 + 2]! + rFrac * (data[offset100 + 2]! - data[offset000 + 2]!);
+
+    const cx10R = data[offset010]! + rFrac * (data[offset110]! - data[offset010]!);
+    const cx10G = data[offset010 + 1]! + rFrac * (data[offset110 + 1]! - data[offset010 + 1]!);
+    const cx10B = data[offset010 + 2]! + rFrac * (data[offset110 + 2]! - data[offset010 + 2]!);
+
+    const cx01R = data[offset001]! + rFrac * (data[offset101]! - data[offset001]!);
+    const cx01G = data[offset001 + 1]! + rFrac * (data[offset101 + 1]! - data[offset001 + 1]!);
+    const cx01B = data[offset001 + 2]! + rFrac * (data[offset101 + 2]! - data[offset001 + 2]!);
+
+    const cx11R = data[offset011]! + rFrac * (data[offset111]! - data[offset011]!);
+    const cx11G = data[offset011 + 1]! + rFrac * (data[offset111 + 1]! - data[offset011 + 1]!);
+    const cx11B = data[offset011 + 2]! + rFrac * (data[offset111 + 2]! - data[offset011 + 2]!);
+
+    const cxx0R = cx00R + gFrac * (cx10R - cx00R);
+    const cxx0G = cx00G + gFrac * (cx10G - cx00G);
+    const cxx0B = cx00B + gFrac * (cx10B - cx00B);
+
+    const cxx1R = cx01R + gFrac * (cx11R - cx01R);
+    const cxx1G = cx01G + gFrac * (cx11G - cx01G);
+    const cxx1B = cx01B + gFrac * (cx11B - cx01B);
+
+    let outR = cxx0R + bFrac * (cxx1R - cxx0R);
+    let outG = cxx0G + bFrac * (cxx1G - cxx0G);
+    let outB = cxx0B + bFrac * (cxx1B - cxx0B);
+
+    if (blendAmount < 1) {
+      outR = (sR / 255) + (outR - (sR / 255)) * blendAmount;
+      outG = (sG / 255) + (outG - (sG / 255)) * blendAmount;
+      outB = (sB / 255) + (outB - (sB / 255)) * blendAmount;
+    }
+
+    pixels[i] = Math.max(0, Math.min(255, Math.round(outR * 255)));
+    pixels[i + 1] = Math.max(0, Math.min(255, Math.round(outG * 255)));
+    pixels[i + 2] = Math.max(0, Math.min(255, Math.round(outB * 255)));
+  }
+}

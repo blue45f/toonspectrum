@@ -440,6 +440,29 @@ describe("halftoneKonvaFilter", () => {
     // strength 누락→기본 0 → no-op.
     expect(Array.from(img.data)).toEqual(before);
   });
+
+  it("line, diamond, cross 패턴을 지원하며 결정적 결과를 생성", () => {
+    const mk = () => makeSolid(24, 24, [100, 100, 100, 255]);
+    const imgCircle = mk();
+    const imgLine = mk();
+    const imgDiamond = mk();
+    const imgCross = mk();
+
+    applyHalftone(imgCircle, normalizeHalftone({ dotSize: 6, angle: 15, mode: "mono", strength: 100, pattern: "circle" }));
+    applyHalftone(imgLine, normalizeHalftone({ dotSize: 6, angle: 15, mode: "mono", strength: 100, pattern: "line" }));
+    applyHalftone(imgDiamond, normalizeHalftone({ dotSize: 6, angle: 15, mode: "mono", strength: 100, pattern: "diamond" }));
+    applyHalftone(imgCross, normalizeHalftone({ dotSize: 6, angle: 15, mode: "mono", strength: 100, pattern: "cross" }));
+
+    // 각 패턴마다 다른 텍스처 데이터가 생성되어야 함
+    expect(Array.from(imgLine.data)).not.toEqual(Array.from(imgCircle.data));
+    expect(Array.from(imgDiamond.data)).not.toEqual(Array.from(imgCircle.data));
+    expect(Array.from(imgCross.data)).not.toEqual(Array.from(imgCircle.data));
+
+    // 결정성 검증: 동일한 line 패턴 적용 시 동일한 결과
+    const imgLine2 = mk();
+    applyHalftone(imgLine2, normalizeHalftone({ dotSize: 6, angle: 15, mode: "mono", strength: 100, pattern: "line" }));
+    expect(Array.from(imgLine2.data)).toEqual(Array.from(imgLine.data));
+  });
 });
 
 // 미사용 import 방지용 타입 참조.

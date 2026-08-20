@@ -12,6 +12,7 @@ import {
   type StudioAdvancedColorWorkBudget,
   type StudioColorLookupCube,
 } from "./studio-advanced-color-filter-kernels";
+import { parseStudioCubeLut, applyStudio3dCubeLut } from "./studio-advanced-color-filter-kernels";
 
 function image(
   width: number,
@@ -330,5 +331,124 @@ describe("determinism, receipts, alpha, and material distinction", () => {
       expect(alphaBytes(result.image)).toEqual(alphaBytes(source));
       expect(result.alphaSemantics).toBe("preserve-source-alpha");
     }
+  });
+});
+
+describe("Adobe .CUBE 3D LUT parser", () => {
+  it("parses valid 3D LUT files with comments and metadata", () => {
+    const lutText = `
+# Comment line
+TITLE "Test LUT"
+DOMAIN_MIN 0.0 0.0 0.0
+DOMAIN_MAX 1.0 1.0 1.0
+LUT_3D_SIZE 2
+0 0 0
+1 0 0
+0 1 0
+1 1 0
+0 0 1
+1 0 1
+0 1 1
+1 1 1
+    `;
+    const parsed = parseStudioCubeLut(lutText);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.size).toBe(2);
+    expect(parsed?.title).toBe("Test LUT");
+    expect(parsed?.domainMin).toEqual([0, 0, 0]);
+    expect(parsed?.domainMax).toEqual([1, 1, 1]);
+    expect(parsed?.data.length).toBe(24);
+    expect(parsed?.data[0]).toBe(0);
+    expect(parsed?.data[21]).toBe(1);
+  });
+
+  it("handles 1D LUT size when 3D is not present", () => {
+    const lutText = `
+LUT_1D_SIZE 2
+0 0 0
+1 1 1
+    `;
+    const parsed = parseStudioCubeLut(lutText);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.size).toBe(2);
+    expect(parsed?.data.length).toBe(6);
+  });
+
+  it("gracefully handles out-of-range floats and negatives", () => {
+    const lutText = `
+LUT_3D_SIZE 2
+DOMAIN_MIN -0.5 -0.5 -0.5
+DOMAIN_MAX 1.5 1.5 1.5
+-0.1 0 0
+1.1 0 0
+0 1.1 0
+1 1 0
+0 0 1.1
+1 0 1
+0 1 1
+1 1 1
+    `;
+    const parsed = parseStudioCubeLut(lutText);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.domainMin).toEqual([-0.5, -0.5, -0.5]);
+    expect(parsed?.domainMax).toEqual([1.5, 1.5, 1.5]);
+    expect(parsed?.data[0]).toBeCloseTo(-0.1, 5);
+  });
+
+  it("returns null for corrupt or empty files", () => {
+    expect(parseStudioCubeLut("JUST SOME JUNK")).toBeNull();
+    expect(parseStudioCubeLut("LUT_3D_SIZE 0")).toBeNull();
+  });
+});
+
+describe("applyStudio3dCubeLut", () => {
+  it("applies trilinear interpolation correctly", () => {
+    const lutText = `
+LUT_3D_SIZE 2
+0 0 0
+1 0 0
+0 1 0
+1 1 0
+0 0 1
+1 0 1
+0 1 1
+1 1 1
+    `;
+    const parsed = parseStudioCubeLut(lutText)!;
+    // Identity LUT, so output should match input exactly
+    
+    // image function from the test file
+    const src = new Uint8ClampedArray([128, 64, 192, 255]);
+    const source = { width: 1, height: 1, data: src };
+    applyStudio3dCubeLut(source, parsed);
+    
+    expect(source.data[0]).toBe(128);
+    expect(source.data[1]).toBe(64);
+    expect(source.data[2]).toBe(192);
+    expect(source.data[3]).toBe(255); // preserve alpha
+  });
+  
+  it("supports blendAmount and clamps bounds", () => {
+    const lutText = `
+LUT_3D_SIZE 2
+0 0 0
+0 0 0
+0 0 0
+0 0 0
+0 0 0
+0 0 0
+0 0 0
+0 0 0
+    `; // all black
+    const parsed = parseStudioCubeLut(lutText)!;
+    
+    const src = new Uint8ClampedArray([100, 100, 100, 255]);
+    const source = { width: 1, height: 1, data: src };
+    
+    // With blend 0.5, it should be 50, 50, 50
+    applyStudio3dCubeLut(source, parsed, 0.5);
+    expect(source.data[0]).toBe(50);
+    expect(source.data[1]).toBe(50);
+    expect(source.data[2]).toBe(50);
   });
 });

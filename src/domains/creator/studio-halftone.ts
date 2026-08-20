@@ -14,24 +14,39 @@ import type { StudioImageDataLike } from "./studio-filters";
 // 파라미터 타입·기본값·범위
 // ---------------------------------------------------------------------------
 
+export type HalftonePattern = "circle" | "line" | "diamond" | "cross";
+
 /**
  * 컬러 하프톤 설정.
  *   dotSize  2..16  px 셀(망점 격자) 크기 — 클수록 굵은 점.
  *   angle    0..90  기준 회전각(도) — 채널별 기본각에 더해지는 오프셋.
  *   mode     cmyk(컬러 4채널 망점)·mono(휘도 단일 흑색 망점).
  *   strength 0..100 원본과의 블렌드 비율(0=항등, 100=완전 망점화).
+ *   pattern  망점 형태 — circle(원형)·line(선형)·diamond(마름모)·cross(십자격자).
  */
-export type Halftone = { dotSize: number; angle: number; mode: "cmyk" | "mono"; strength: number };
+export type Halftone = {
+  dotSize: number;
+  angle: number;
+  mode: "cmyk" | "mono";
+  strength: number;
+  pattern?: HalftonePattern;
+};
 
 /** 항등(망점화 없음) — strength 0이라 픽셀을 건드리지 않는다. */
-export const DEFAULT_HALFTONE: Halftone = { dotSize: 4, angle: 15, mode: "cmyk", strength: 0 };
+export const DEFAULT_HALFTONE: Halftone = {
+  dotSize: 4,
+  angle: 15,
+  mode: "cmyk",
+  strength: 0,
+};
 
 export const HALFTONE_DOT_RANGE = { min: 2, max: 16, step: 1 } as const;
 export const HALFTONE_ANGLE_RANGE = { min: 0, max: 90, step: 1 } as const;
 export const HALFTONE_STRENGTH_RANGE = { min: 0, max: 100, step: 1 } as const;
 
-// 유효 모드 집합(외부 입력 검증용).
+// 유효 모드 및 패턴 집합(외부 입력 검증용).
 const HALFTONE_MODES: readonly Halftone["mode"][] = ["cmyk", "mono"];
+const HALFTONE_PATTERNS: readonly HalftonePattern[] = ["circle", "line", "diamond", "cross"];
 
 // CMYK 채널별 스크린 기본 회전각(도). 전통 인쇄 각도(C15 M75 Y0 K45)에 angle 오프셋을 더한다.
 const CHANNEL_BASE_ANGLES = { c: 15, m: 75, y: 0, k: 45 } as const;
@@ -62,6 +77,10 @@ export function normalizeHalftone(h?: Partial<Halftone> | null): Halftone {
   const mode = HALFTONE_MODES.includes(src.mode as Halftone["mode"])
     ? (src.mode as Halftone["mode"])
     : DEFAULT_HALFTONE.mode;
+  const pattern =
+    src.pattern && HALFTONE_PATTERNS.includes(src.pattern as HalftonePattern)
+      ? (src.pattern as HalftonePattern)
+      : undefined;
   return {
     dotSize: clampTo(src.dotSize, HALFTONE_DOT_RANGE.min, HALFTONE_DOT_RANGE.max, DEFAULT_HALFTONE.dotSize),
     angle: clampTo(src.angle, HALFTONE_ANGLE_RANGE.min, HALFTONE_ANGLE_RANGE.max, DEFAULT_HALFTONE.angle),
@@ -72,6 +91,7 @@ export function normalizeHalftone(h?: Partial<Halftone> | null): Halftone {
       HALFTONE_STRENGTH_RANGE.max,
       DEFAULT_HALFTONE.strength
     ),
+    ...(pattern !== undefined ? { pattern } : {}),
   };
 }
 
@@ -102,7 +122,8 @@ function screenChannel(
   width: number,
   height: number,
   dotSize: number,
-  angleDeg: number
+  angleDeg: number,
+  pattern: HalftonePattern = "circle"
 ): Float32Array {
   const ink = new Float32Array(width * height);
   const cell = Math.max(2, Math.round(dotSize));
@@ -173,23 +194,42 @@ function screenChannel(
           if (n <= 0) continue;
           const c = sum[ci]! / n; // 셀 평균 커버리지 0..1
           if (c <= 0) continue;
-          const r = Math.sqrt(c) * rMax; // 면적 비례 반지름
+
           // 셀 중심 회전계 좌표.
           const cu = (baseIu + du + 0.5) * cell;
           const cv = (baseIv + dv + 0.5) * cell;
           const ddu = u - cu;
           const ddv = v - cv;
-          // 1px 선형 AA 램프 — 원 경계(dist=r) 기준 대칭이라 점 면적(톤)을 보존한다.
-          const dist = Math.sqrt(ddu * ddu + ddv * ddv);
-          const cov = r - dist + 0.5;
-          if (cov >= 1) {
+
+          let covVal: number;
+          if (pattern === "line") {
+            const halfThick = (c * cell) * 0.5;
+            const dist = Math.abs(ddv);
+            covVal = halfThick - dist + 0.5;
+          } else if (pattern === "diamond") {
+            const rDia = Math.sqrt(c) * cell * 0.7071;
+            const dist = (Math.abs(ddu) + Math.abs(ddv)) * 0.7071;
+            covVal = rDia - dist + 0.5;
+          } else if (pattern === "cross") {
+            const halfArm = (c * cell) * 0.35;
+            const distU = Math.abs(ddu);
+            const distV = Math.abs(ddv);
+            covVal = Math.max(halfArm - distU + 0.5, halfArm - distV + 0.5);
+          } else {
+            // "circle" (기본)
+            const r = Math.sqrt(c) * rMax; // 면적 비례 반지름
+            const dist = Math.sqrt(ddu * ddu + ddv * ddv);
+            covVal = r - dist + 0.5;
+          }
+
+          if (covVal >= 1) {
             coverage = 1;
             break;
           }
-          if (cov > coverage) coverage = cov;
+          if (covVal > coverage) coverage = covVal;
         }
       }
-      ink[y * width + x] = coverage;
+      ink[y * width + x] = Math.max(0, Math.min(1, coverage));
     }
   }
 
@@ -217,6 +257,7 @@ export function applyHalftone(img: StudioImageDataLike, h: Halftone): void {
 
   const blend = Math.min(1, Math.max(0, h.strength / 100));
   const n = width * height;
+  const pattern = h.pattern ?? "circle";
 
   if (h.mode === "mono") {
     // 잉크 커버리지 = 어두울수록 1(검정), 밝을수록 0(흰).
@@ -226,7 +267,7 @@ export function applyHalftone(img: StudioImageDataLike, h: Halftone): void {
       const luma = LUMA_R * data[j]! + LUMA_G * data[j + 1]! + LUMA_B * data[j + 2]!;
       cov[i] = 1 - luma / 255;
     }
-    const ink = screenChannel(cov, width, height, h.dotSize, MONO_BASE_ANGLE + h.angle);
+    const ink = screenChannel(cov, width, height, h.dotSize, MONO_BASE_ANGLE + h.angle, pattern);
     for (let i = 0; i < n; i++) {
       const j = i * 4;
       const v = 255 * (1 - ink[i]!); // 점=검정, 바탕=흰, 가장자리는 AA 중간톤
@@ -263,10 +304,10 @@ export function applyHalftone(img: StudioImageDataLike, h: Halftone): void {
     }
   }
 
-  const inkC = screenChannel(cC, width, height, h.dotSize, CHANNEL_BASE_ANGLES.c + h.angle);
-  const inkM = screenChannel(cM, width, height, h.dotSize, CHANNEL_BASE_ANGLES.m + h.angle);
-  const inkY = screenChannel(cY, width, height, h.dotSize, CHANNEL_BASE_ANGLES.y + h.angle);
-  const inkK = screenChannel(cK, width, height, h.dotSize, CHANNEL_BASE_ANGLES.k + h.angle);
+  const inkC = screenChannel(cC, width, height, h.dotSize, CHANNEL_BASE_ANGLES.c + h.angle, pattern);
+  const inkM = screenChannel(cM, width, height, h.dotSize, CHANNEL_BASE_ANGLES.m + h.angle, pattern);
+  const inkY = screenChannel(cY, width, height, h.dotSize, CHANNEL_BASE_ANGLES.y + h.angle, pattern);
+  const inkK = screenChannel(cK, width, height, h.dotSize, CHANNEL_BASE_ANGLES.k + h.angle, pattern);
 
   // 흰 바탕에서 점이 찍힌 잉크를 승법으로 빼서 재구성(AA 커버리지 그대로 승법 — 부드러운 점 경계).
   for (let i = 0; i < n; i++) {
