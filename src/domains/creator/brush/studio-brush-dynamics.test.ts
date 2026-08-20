@@ -22,6 +22,7 @@ import {
   type StudioBrushDynamicsRecipe,
   type StudioBrushDynamicsSettings,
   type StudioDynamicBrushPlan,
+  type StudioDynamicBrushPlanInput,
 } from "./studio-brush-dynamics";
 import {
   buildStudioBrushTipAlphaMap,
@@ -66,6 +67,16 @@ function expectFinitePlan(plan: StudioDynamicBrushPlan): void {
     expect(dab.roundness).toBeGreaterThanOrEqual(0.08);
     expect(dab.roundness).toBeLessThanOrEqual(1);
   }
+}
+
+/** Stable FNV-1a digest so large planner outputs can be pinned byte-for-byte without megabyte literals. */
+function fnv1aHex(text: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 describe("studio brush dynamics input normalization", () => {
@@ -1234,5 +1245,118 @@ describe("studio dynamic brush arc-length dab planner", () => {
       expect(plan.dabs.length).toBeGreaterThan(1);
       expect(plan.settings.tip.shape).toBe(preset.tip.shape);
     }
+  });
+
+  it("pins byte-identical planner output for a representative ratio/jitter/mapping brush", () => {
+    const input = {
+      points: [0, 0, 14, 6, 30, 10, 46, 10],
+      pressures: [0.35, 0.6, 0.9, 0.5],
+      speeds: [0.1, 0.5, 0.9, 0.2],
+      tiltXs: [8, 20, 42, 6],
+      tiltYs: [-6, 12, 24, 0],
+      twists: [10, 80, 200, 340],
+      baseWidth: 14,
+      baseOpacity: 0.85,
+      seed: 0xbead_cafe,
+      maxDabs: 64,
+      settings: {
+        seed: 7,
+        spacingRatio: 0.75,
+        scatterRatio: 0.4,
+        width: {
+          base: 14,
+          mappings: [{ source: "pressure", from: 0.5, to: 1.6 }],
+          jitter: { mode: "multiply", amount: 0.2 },
+        },
+        opacity: { base: 0.85, mappings: [{ source: "speed", from: 1, to: 0.6 }] },
+        angle: {
+          base: 0,
+          mappings: [{ source: "tilt-azimuth", mode: "add", from: -40, to: 40 }],
+          jitter: { mode: "add", amount: 6 },
+        },
+      },
+    } satisfies Partial<StudioDynamicBrushPlanInput>;
+
+    const plan = planStudioDynamicBrush(input);
+    const replay = planStudioDynamicBrush(structuredClone(input));
+
+    expect(JSON.stringify(replay.dabs)).toBe(JSON.stringify(plan.dabs));
+    expect(plan.dabs.map((dab) => JSON.stringify(dab))).toMatchInlineSnapshot(`
+      [
+        "{"index":0,"progress":0,"sourceX":0,"sourceY":0,"direction":23.19859051364824,"distanceFromPrevious":0,"distanceFromStrokeStart":0,"contactLoadFromStrokeStart":0,"contactFactor":11.96336485991475,"x":-2.2050014418566226,"y":0.5793137207782181,"size":14.43543271181267,"opacity":0.82875,"flow":1,"spacing":10.826574533859503,"scatter":5.774173084725068,"angle":28.825643557756734,"roundness":1}",
+        "{"index":1,"progress":0.22685821874320491,"sourceX":9.951192174917034,"sourceY":4.264796646393014,"direction":23.19859051364824,"distanceFromPrevious":10.826574533859503,"distanceFromStrokeStart":10.826574533859503,"contactLoadFromStrokeStart":137.08414974506198,"contactFactor":13.360277316350514,"segmentStartFrame":{"index":0,"sourceX":0,"sourceY":0,"direction":23.19859051364824,"size":14.43543271181267,"roundness":1,"distanceFromStrokeStart":0,"contactLoadFromStrokeStart":0,"contactFactor":11.96336485991475},"x":11.873935069588327,"y":7.06062329235702,"size":17.388676366758606,"opacity":0.7683320475094322,"flow":1,"spacing":13.041507275068955,"scatter":6.955470546703443,"angle":-36.54382596997311,"roundness":1}",
+        "{"index":2,"progress":0.5001277649783433,"sourceX":22.378670236862387,"sourceY":8.094667559215598,"direction":14.03624346792651,"distanceFromPrevious":13.041507275068955,"distanceFromStrokeStart":23.86808180892846,"contactLoadFromStrokeStart":308.09958400179573,"contactFactor":12.866052301800085,"segmentStartFrame":{"index":1,"sourceX":9.951192174917034,"sourceY":4.264796646393014,"direction":23.19859051364824,"size":17.388676366758606,"roundness":1,"distanceFromStrokeStart":10.826574533859503,"contactLoadFromStrokeStart":137.08414974506198,"contactFactor":13.360277316350514},"x":27.76579543378267,"y":4.944738895200652,"size":18.400096272546858,"opacity":0.6992383143666685,"flow":1,"spacing":13.800072204410142,"scatter":7.360038509018743,"angle":-34.239076674552734,"roundness":1}",
+        "{"index":3,"progress":0.7892921529414184,"sourceX":35.94418529914014,"sourceY":10,"direction":0,"distanceFromPrevious":13.800072204410142,"distanceFromStrokeStart":37.6681540133386,"contactLoadFromStrokeStart":475.47725166977875,"contactFactor":11.391453773348353,"segmentStartFrame":{"index":2,"sourceX":22.378670236862387,"sourceY":8.094667559215598,"direction":14.03624346792651,"size":18.400096272546858,"roundness":1,"distanceFromStrokeStart":23.86808180892846,"contactLoadFromStrokeStart":308.09958400179573,"contactFactor":12.866052301800085},"x":36.021811727860545,"y":9.904733732360922,"size":15.954141143351254,"opacity":0.7140123477029435,"flow":1,"spacing":11.965605857513442,"scatter":6.381656457340502,"angle":-33.143428475072255,"roundness":1}",
+        "{"index":4,"progress":1,"sourceX":46,"sourceY":10,"direction":0,"distanceFromPrevious":10.055814700859862,"distanceFromStrokeStart":47.72396871419846,"contactLoadFromStrokeStart":588.0633759419451,"contactFactor":11.000789445401335,"segmentStartFrame":{"index":3,"sourceX":35.94418529914014,"sourceY":10,"direction":0,"size":15.954141143351254,"roundness":1,"distanceFromStrokeStart":37.6681540133386,"contactLoadFromStrokeStart":475.47725166977875,"contactFactor":11.391453773348353},"x":43.87073216758048,"y":5.673295918088508,"size":13.623268663035708,"opacity":0.8075,"flow":1,"spacing":10.21745149727678,"scatter":5.449307465214283,"angle":-41.8289495781064,"roundness":1}",
+      ]
+    `);
+  });
+
+  it("pins byte-identical capped redistribution output for the commercial presets", () => {
+    const digests = {} as Record<string, string>;
+    for (const presetId of ["ink-particle", "airbrush", "dry-media"] as const) {
+      const settings = studioBrushDynamicsPresetSettings(presetId);
+      const plan = planStudioDynamicBrush({
+        points: [0, 0, 10_000, 40],
+        pressures: [0.3, 0.8],
+        speeds: [0.1, 0.7],
+        baseWidth: settings.width.base,
+        baseOpacity: settings.opacity.base,
+        settings,
+        seed: 0x51ce_d001,
+        maxDabs: 96,
+      });
+      const json = JSON.stringify(plan.dabs);
+
+      expect(plan.capped).toBe(true);
+      expect(plan.dabs).toHaveLength(96);
+      expect(plan.dabs[0]).toMatchObject({ sourceX: 0, sourceY: 0, progress: 0 });
+      expect(plan.dabs.at(-1)).toMatchObject({ sourceX: 10_000, sourceY: 40, progress: 1 });
+      digests[presetId] = `${json.length}:${fnv1aHex(json)}`;
+    }
+    expect(digests).toMatchInlineSnapshot(`
+      {
+        "airbrush": "75575:72f60e1d",
+        "dry-media": "80736:5a6c0115",
+        "ink-particle": "77377:5bcb0fdf",
+      }
+    `);
+  });
+
+  it("keeps capped-prefix stations identical to the natural pass where spacing beats the budget floor", () => {
+    const input = {
+      points: [0, 0, 1000, 0],
+      speeds: [1, 0],
+      baseWidth: 10,
+      baseOpacity: 1,
+      settings: {
+        maxSpeed: 1,
+        spacing: { base: 1, mappings: [{ source: "speed", mode: "add", from: 0, to: 400 }] },
+        scatter: { base: 0 },
+      },
+    } satisfies Partial<StudioDynamicBrushPlanInput>;
+    const capped = planStudioDynamicBrush({ ...input, maxDabs: 10 });
+    const natural = planStudioDynamicBrush({ ...input, maxDabs: 4096 });
+
+    expect(capped.capped).toBe(true);
+    expect(natural.capped).toBe(false);
+    // The early high-speed region asks for ~401px natural spacing, well above the ~111px budget
+    // floor, so the bounded second pass must reproduce the natural pass byte-for-byte there.
+    expect(capped.dabs[1]).toEqual(natural.dabs[1]);
+    expect(capped.dabs.at(-1)!.sourceX).toBe(1000);
+  });
+
+  it("freezes per-dab segment receipts under dev invariants", () => {
+    const plan = planStudioDynamicBrush({
+      points: [0, 0, 10, 0],
+      baseWidth: 6,
+      baseOpacity: 1,
+      settings: { spacing: { base: 3, mappings: [] }, scatter: { base: 0 } },
+    });
+    const frame = plan.dabs.at(-1)?.segmentStartFrame;
+    expect(frame).toBeDefined();
+    // Vitest runs with import.meta.env.DEV=true; prod skips the freeze guard but keeps the exact
+    // same receipt shape and values.
+    expect(Object.isFrozen(frame)).toBe(true);
   });
 });

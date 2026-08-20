@@ -3749,6 +3749,35 @@ function resolveProperty(
   return clamp(value, property.min, property.max);
 }
 
+/**
+ * Reusable scratch property backing the per-dab spacing/scatter ratio rebase below.
+ *
+ * `resolveProperty` reads the property synchronously and only returns a plain number, so it never
+ * retains the object; the planner hot loop can therefore rebase ratio-driven properties without
+ * allocating a spread copy for every emitted dab. All five fields are rewritten before each use
+ * and the object never escapes `resolveNormalizedStudioBrushDynamics`.
+ */
+const RATIO_SCRATCH_PROPERTY: {
+  base: number;
+  min: number;
+  max: number;
+  mappings: NormalizedStudioBrushDynamicsProperty["mappings"];
+  jitter: NormalizedStudioBrushDynamicsProperty["jitter"];
+} = { base: 0, min: 0, max: 0, mappings: [], jitter: null };
+
+function ratioRebasedProperty(
+  property: NormalizedStudioBrushDynamicsProperty,
+  tipWidth: number,
+  ratio: number
+): NormalizedStudioBrushDynamicsProperty {
+  RATIO_SCRATCH_PROPERTY.base = clamp(tipWidth * ratio, property.min, property.max);
+  RATIO_SCRATCH_PROPERTY.min = property.min;
+  RATIO_SCRATCH_PROPERTY.max = property.max;
+  RATIO_SCRATCH_PROPERTY.mappings = property.mappings;
+  RATIO_SCRATCH_PROPERTY.jitter = property.jitter;
+  return RATIO_SCRATCH_PROPERTY;
+}
+
 function resolveNormalizedStudioBrushDynamics(
   sample: NormalizedStudioBrushDynamicsSample,
   settings: NormalizedStudioBrushDynamicsSettings
@@ -3760,15 +3789,9 @@ function resolveNormalizedStudioBrushDynamics(
     // nominal toolbar width. Property mappings then remain available for extra speed/pressure
     // modulation on top of that physical ratio.
     if (propertyName === "spacing" && settings.spacingRatio !== null) {
-      property = {
-        ...property,
-        base: clamp(values.width * settings.spacingRatio, property.min, property.max),
-      };
+      property = ratioRebasedProperty(property, values.width, settings.spacingRatio);
     } else if (propertyName === "scatter" && settings.scatterRatio !== null) {
-      property = {
-        ...property,
-        base: clamp(values.width * settings.scatterRatio, property.min, property.max),
-      };
+      property = ratioRebasedProperty(property, values.width, settings.scatterRatio);
     }
     values[propertyName] = resolveProperty(property, propertyName, sample, settings.seed);
   }
@@ -4082,6 +4105,15 @@ function settingsForPlan(
 }
 
 /**
+ * Per-dab segment receipts are frozen only outside production builds. The freeze is a dev/test
+ * invariant guard (carriers must treat the shared receipt as immutable), and its per-dab cost is
+ * measurable in the planner hot loop; prod emits the exact same object shape and values without
+ * paying for it. Optional chaining keeps plain-Node tooling (tsx scripts) working where
+ * `import.meta.env` is absent, and the module-level constant keeps the env lookup off the loop.
+ */
+const FREEZE_SEGMENT_FRAMES = import.meta.env?.DEV === true;
+
+/**
  * Converts a stroke to deterministic, arc-length-spaced particle dabs.
  *
  * When maxDabs >= 2, both unscattered source endpoints are retained even if the plan is capped.
@@ -4110,7 +4142,10 @@ function planStudioDynamicBrushFromInput(
     readonly station: StrokeStation;
     readonly recipe: StudioBrushDynamicsRecipe;
   }
-  const buildStations = (fitWholePathToBudget: boolean): PlannedDynamicBrushStation[] => {
+  const buildStations = (
+    fitWholePathToBudget: boolean,
+    reusableStations?: readonly PlannedDynamicBrushStation[]
+  ): PlannedDynamicBrushStation[] => {
     const stationAtDistance = createStationAtDistanceSampler(
       points,
       cumulative,
@@ -4120,6 +4155,14 @@ function planStudioDynamicBrushFromInput(
       distance: number,
       index: number
     ): PlannedDynamicBrushStation => {
+      // A planned station is a pure function of its exact (distance, stampIndex) pair for this
+      // fixed input/settings closure, so the bounded second pass reuses first-pass stations
+      // byte-identically wherever natural spacing still wins over the budget floor, instead of
+      // re-resolving the shared prefix's samples and recipes. Skipping the arc-length sampler for
+      // reused stations is safe: its cursor only ever starts at or below the queried segment, and
+      // per-pass distances stay strictly increasing.
+      const reusableStation = reusableStations?.[index];
+      if (reusableStation && reusableStation.distance === distance) return reusableStation;
       const station = stationAtDistance(distance);
       const sample = normalizeStudioBrushDynamicsSample(
         sampleForStation(station, index, input, settings),
@@ -4169,7 +4212,7 @@ function planStudioDynamicBrushFromInput(
   // cap pays for the bounded redistribution pass. A one-dab budget cannot retain both endpoints and
   // intentionally keeps the start, matching the public maxDabs=1 contract.
   const plannedStations = capped && maxDabs >= 2
-    ? buildStations(true)
+    ? buildStations(true, naturalStations)
     : naturalStations;
 
   // Point taps and zero-length runs have no travel axis, so shared start/end taper would
@@ -4234,7 +4277,7 @@ function planStudioDynamicBrushFromInput(
       angle: recipe.angle,
       roundness: recipe.roundness,
     };
-    previousSegmentFrame = Object.freeze({
+    const segmentFrame: StudioDynamicBrushSegmentStartFrame = {
       index,
       sourceX: station.x,
       sourceY: station.y,
@@ -4244,7 +4287,8 @@ function planStudioDynamicBrushFromInput(
       distanceFromStrokeStart: distance,
       contactLoadFromStrokeStart,
       contactFactor,
-    });
+    };
+    previousSegmentFrame = FREEZE_SEGMENT_FRAMES ? Object.freeze(segmentFrame) : segmentFrame;
     return dab;
   });
 
