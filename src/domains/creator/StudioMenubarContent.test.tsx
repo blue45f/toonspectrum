@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER } from "./studio-main-menu-presentation";
@@ -115,6 +115,15 @@ afterEach(() => {
   vi.useRealTimers();
   mainMenuTriggerClicks.length = 0;
 });
+
+/** 동일 접근명이 커맨드 바 슬롯과 원래 메뉴바 버튼에 공존할 수 있어, 비-슬롯 쪽을 고른다. */
+function getMenubarButton(name: string): HTMLButtonElement {
+  const match = screen
+    .getAllByRole<HTMLButtonElement>("button", { name })
+    .find((button) => !button.hasAttribute("data-studio-command-bar-command"));
+  if (!match) throw new Error(`menubar button not found: ${name}`);
+  return match;
+}
 
 describe("resolveStudioMenubarLaneOverflow", () => {
   const lane = { left: 0, right: 600, scrollLeft: 0, scrollWidth: 1_200, clientWidth: 600 };
@@ -232,7 +241,7 @@ describe("StudioMenubarContent", () => {
       />
     );
 
-    const trigger = screen.getByRole("button", { name: "내보내기 옵션" });
+    const trigger = getMenubarButton("내보내기 옵션");
     fireEvent.mouseEnter(trigger);
     fireEvent.focus(trigger);
     fireEvent.click(trigger);
@@ -498,7 +507,7 @@ describe("StudioMenubarContent", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "전체 화면 드로잉" }));
-    fireEvent.click(screen.getByRole("button", { name: "임시저장" }));
+    fireEvent.click(getMenubarButton("임시저장"));
     fireEvent.click(screen.getByRole("button", { name: "게시하기" }));
 
     expect(stableHandlers.changeMobileImmersiveMode).toHaveBeenCalledWith(true);
@@ -510,7 +519,7 @@ describe("StudioMenubarContent", () => {
     render(<StudioMenubarContent {...createProps({ isMobile: true })} />);
 
     for (const name of ["전체 화면 드로잉", "임시저장", "게시하기"] as const) {
-      const action = screen.getByRole("button", { name });
+      const action = getMenubarButton(name);
       expect(action.className).toContain("max-[359px]:size-11");
       const label = [...action.querySelectorAll("span")].find((span) =>
         span.textContent?.includes(name === "전체 화면 드로잉" ? "전체화면" : name),
@@ -556,7 +565,7 @@ describe("StudioMenubarContent", () => {
     expect(context.className).toContain("sr-only");
     expect(context.className).not.toContain("flex-1");
     const exit = screen.getByRole("button", { name: "전체 화면 드로잉 종료" });
-    const draft = screen.getByRole("button", { name: "임시저장" });
+    const draft = getMenubarButton("임시저장");
     const publish = screen.getByRole("button", { name: "게시하기" });
     expect(exit).toBeTruthy();
     expect(draft).toBeTruthy();
@@ -773,8 +782,8 @@ describe("StudioMenubarContent", () => {
     // history authority stays a fixed control inside it.
     const group = screen.getByRole("group", { name: "빠른 명령 바" });
     expect(group.getAttribute("data-studio-menubar-command-bar")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "빠른 명령: 실행취소" }));
-    fireEvent.click(screen.getByRole("button", { name: "빠른 명령: 다시실행" }));
+    fireEvent.click(screen.getByRole("button", { name: "실행취소" }));
+    fireEvent.click(screen.getByRole("button", { name: "다시실행" }));
     fireEvent.click(screen.getByRole("button", { name: "작업 내역" }));
 
     expect(stableHandlers.undo).toHaveBeenCalledOnce();
@@ -803,12 +812,12 @@ describe("StudioMenubarContent", () => {
       "zoom-fit",
     ]);
 
-    fireEvent.click(screen.getByRole("button", { name: "빠른 명령: 임시저장" }));
+    fireEvent.click(within(bar).getByRole("button", { name: "임시저장" }));
     expect(stableHandlers.handleSave).toHaveBeenCalledWith("draft");
 
     // zoom-fit stays honestly disabled until the host provides the handler.
     expect(
-      screen.getByRole<HTMLButtonElement>("button", { name: "빠른 명령: 화면 폭 맞춤" }).disabled
+      screen.getByRole<HTMLButtonElement>("button", { name: "화면 폭 맞춤" }).disabled
     ).toBe(true);
   });
 
@@ -817,7 +826,7 @@ describe("StudioMenubarContent", () => {
     render(<StudioMenubarContent {...createProps({ stableHandlers })} />);
 
     const zoomFit = screen.getByRole<HTMLButtonElement>("button", {
-      name: "빠른 명령: 화면 폭 맞춤",
+      name: "화면 폭 맞춤",
     });
     expect(zoomFit.disabled).toBe(false);
     fireEvent.click(zoomFit);
@@ -899,10 +908,10 @@ describe("StudioMenubarContent", () => {
     );
 
     for (const name of [
-      "빠른 명령: 실행취소",
-      "빠른 명령: 다시실행",
-      "빠른 명령: 임시저장",
-      "빠른 명령: 내보내기 옵션",
+      "실행취소",
+      "다시실행",
+      "임시저장",
+      "내보내기 옵션",
       "작업 내역",
       "명령 바 설정",
       "템플릿·에셋",
@@ -913,9 +922,10 @@ describe("StudioMenubarContent", () => {
       "임시저장",
       "게시하기",
     ]) {
-      const control = screen.getByRole("button", { name });
-      expect(control.closest('[data-studio-tool-hint-target="true"]')).not.toBeNull();
-      expect(control.getAttribute("title")).toBeNull();
+      for (const control of screen.getAllByRole("button", { name })) {
+        expect(control.closest('[data-studio-tool-hint-target="true"]')).not.toBeNull();
+        expect(control.getAttribute("title")).toBeNull();
+      }
     }
   });
 });

@@ -335,7 +335,9 @@ function StudioMenubarCommandBar({
                   type="button"
                   onClick={binding.run}
                   disabled={binding.disabled}
-                  aria-label={`빠른 명령: ${binding.label}`}
+                  // 접근명은 명령 라벨 그대로 — 검증기·스크린리더 모두 "실행취소" 같은
+                  // 정식 명령명을 찾는다("빠른 명령:" 접두어는 접근명 회귀였음).
+                  aria-label={binding.label}
                   data-studio-command-bar-slot={index}
                   data-studio-command-bar-command={slot}
                   className={buttonClass({
