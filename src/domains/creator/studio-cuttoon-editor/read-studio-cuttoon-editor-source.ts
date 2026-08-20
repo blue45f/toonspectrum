@@ -11,6 +11,9 @@ const baseDir = import.meta.dirname ?? dirname(fileURLToPath(import.meta.url));
  */
 export function readStudioCuttoonEditorSource(): string {
   return [
+    // Extracted pure helpers come first so source slices that start at an
+    // extracted symbol still reach their StudioPage.tsx end boundary.
+    resolve(baseDir, "../canvas/studio-hokusai-gpu-plan-matchers.ts"),
     resolve(baseDir, "../StudioPage.tsx"),
     resolve(baseDir, "../studio-page-editor-ui-contracts.ts"),
     resolve(baseDir, "../studio-page-shell-runtime.ts"),
@@ -18,6 +21,8 @@ export function readStudioCuttoonEditorSource(): string {
     resolve(baseDir, "../studio-legacy-editor-runtime-helpers.ts"),
     resolve(baseDir, "./studio-cuttoon-stage-pointers.ts"),
     resolve(baseDir, "./StudioCuttoonEditorView.tsx"),
+    resolve(baseDir, "../studio-page-editor-types.ts"),
+    resolve(baseDir, "../studio-page-comipo-seeds.ts"),
   ]
     .map((filePath) => readFileSync(filePath, "utf8"))
     .join("\n");

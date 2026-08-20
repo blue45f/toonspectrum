@@ -564,25 +564,20 @@ import {
   seekStudioHistoryJournalToPagesDepth,
   stepStudioHistoryJournal,
   studioHistoryJournalSidecarLabel,
-  type StudioHistoryJournal,
-  type StudioHistoryJournalSidecarEntry,
 } from "./studio-history-journal";
 import {
   createStudioHistoryRetentionUiState,
   observeStudioHistoryRetentionAppend,
 } from "./studio-history-retention-ui";
 import {
+  initialGpuLiveSourceJournalMatchesPlan,
+  studioHokusaiVectorTailShadow,
+} from "./canvas/studio-hokusai-gpu-plan-matchers";
+import {
   StudioHokusaiLiveOverlayRenderer,
 } from "./render/studio-hokusai-live-brush-overlay";
 import {
-  type StudioHokusaiLiveSampleLike,
-} from "./render/studio-hokusai-live-brush-protocol";
-import {
-  type StudioHokusaiLiveRouteResult,
-} from "./render/studio-hokusai-live-brush-router";
-import {
   StudioHokusaiLiveBrushProvider,
-  type StudioHokusaiLiveStrokeSession,
 } from "./render/studio-hokusai-live-brush-runtime";
 import {
   studioHokusaiSourceRevision,
@@ -788,9 +783,7 @@ import {
 import { StudioLiveStampOverlayRenderer } from "./live/studio-live-stamp-overlay";
 import {
   StudioLiveStrokeRenderBackendCoordinator,
-  type StudioLiveStrokeCanonicalCanvasToken,
   type StudioLiveStrokeGpuFailureReason,
-  type StudioLiveStrokeGpuRequestToken,
 } from "./live/studio-live-stroke-render-backend";
 import {
   StudioLiveWetInkOverlayRenderer,
@@ -911,6 +904,7 @@ import {
   projectStudioDocumentRectToClient,
   type StudioSurfaceRect,
 } from "./studio-oncanvas-command-surfaces";
+import { comipoSeedsToEls } from "./studio-page-comipo-seeds";
 import { useStudioPageDnd } from "./studio-page-dnd";
 import {
   BRUSH_DELETE_UNDO_MS,
@@ -933,6 +927,23 @@ import {
   type ProductBrushLibraryRepository,
   type StudioBrushQuickSlotsSnapshot,
 } from "./studio-page-editor-runtime-loaders";
+import {
+  EMPTY_STUDIO_GPU_STROKES,
+  STUDIO_GPU_LIVE_OPERATION_ORDER_PREFIX,
+  STUDIO_GPU_LIVE_SOURCE_JOURNAL_STYLE_KEY,
+  STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS,
+  type StudioHokusaiLiveOverlaySurfaceState,
+  type StudioHokusaiPinnedLiveStroke,
+  type StudioHybridDccPersistenceUiState,
+  type StudioHybridDccWorkspacePersistence,
+  type StudioLiveStrokeBackendAuditSession,
+  type StudioLivingInkCanonicalHandoff,
+  type StudioLivingInkOverlaySurfaceState,
+  type StudioLivingInkPinnedStroke,
+  type StudioPageHistoryJournal,
+  type StudioPageHistorySidecarEntry,
+  type StudioQuickAccessIntegrationModule,
+} from "./studio-page-editor-types";
 import {
   EMPTY_EFFECT_EMOJIS,
   EMPTY_FX_LINE_PRESETS,
@@ -1462,7 +1473,6 @@ import {
   advanceStudioGpuLiveSourceJournal,
   createStudioGpuLiveSourceJournal,
   sameStudioGpuLiveSourceJournalIdentity,
-  type StudioGpuLiveSourceJournalAdvance,
   type StudioGpuLiveSourceJournalIdentity,
   type StudioGpuLiveSourceJournalState,
 } from "./render/studio-webgpu-live-source-journal";
@@ -1664,7 +1674,6 @@ import type {
 import type { StudioClip } from "./studio-clips";
 import type {
   ComipoAssemblyInput,
-  ComipoAssemblySeed,
 } from "./studio-comipo-assembly";
 import type {
   StudioElementLike,
@@ -1794,109 +1803,6 @@ import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
 
-/** 이 편집기의 통합 실행취소 저널 — 캔버스 스냅샷 단계와 사이드카 편집을 한 시간 순서로 담는다. */
-type StudioPageHistoryJournal = StudioHistoryJournal<StudioCharacterBible, StudioWriterRoomDocument>;
-type StudioPageHistorySidecarEntry = StudioHistoryJournalSidecarEntry<
-  StudioCharacterBible,
-  StudioWriterRoomDocument
->;
-
-type StudioHybridDccWorkspacePersistence = ReturnType<
-  typeof import("./hybrid-dcc/studio-hybrid-dcc-workspace-persistence")
-    .createStudioHybridDccWorkspacePersistenceFromFileSystem
->;
-
-type StudioHybridDccPersistenceStatus =
-  import("./hybrid-dcc/StudioHybridDccPanel").StudioHybridDccPersistenceStatus;
-
-interface StudioHybridDccPersistenceUiState {
-  readonly scope: string;
-  readonly status: StudioHybridDccPersistenceStatus;
-}
-
-const STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS = 12_000;
-
-type StudioQuickAccessIntegrationModule =
-  typeof import("./studio-quick-access-integration");
-
-type StudioLiveStrokeBackendAuditSession = {
-  readonly coordinator: StudioLiveStrokeRenderBackendCoordinator;
-  readonly epoch: number;
-  readonly strokeId: string;
-  readonly seenGpuRequestIds: Set<string>;
-  gpuRequest: StudioLiveStrokeGpuRequestToken | null;
-  canonicalCanvasRequest: StudioLiveStrokeCanonicalCanvasToken | null;
-};
-
-type StudioHokusaiReadyRoute = Extract<
-  StudioHokusaiLiveRouteResult,
-  { status: "ready" }
->;
-
-type StudioHokusaiPinnedLiveStroke = {
-  readonly abortController: AbortController;
-  readonly pageId: string;
-  readonly route: StudioHokusaiReadyRoute;
-  readonly strokeId: string;
-  readonly surfaceKey: string;
-  beginPromise: Promise<StudioHokusaiLiveStrokeSession> | null;
-  session: StudioHokusaiLiveStrokeSession | null;
-  queuedSamples: StudioHokusaiLiveSampleLike[];
-  forwardedSampleCount: number;
-  lastAppendedSequence: number;
-  lastMaterialFrameSequence: number;
-  materialCompositeBounds: Readonly<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }> | null;
-  overlayPresented: boolean;
-  failed: boolean;
-  finishing: boolean;
-  finalDrawing: DrawEl | null;
-  canonicalImageId: string | null;
-  canonicalPngHash: `sha256:${string}` | null;
-  transactionCommitted: boolean;
-};
-
-type StudioHokusaiLiveOverlaySurfaceState = {
-  readonly binding: StudioHokusaiLiveOverlaySurfaceBinding;
-  readonly renderer: StudioHokusaiLiveOverlayRenderer;
-};
-
-type StudioLivingInkRoute = Extract<StudioStrokeSurfaceRoute, { kind: "living-ink" }>;
-
-type StudioLivingInkPinnedStroke = {
-  readonly mode: StudioLivingInkStrokeMode;
-  readonly pageId: string;
-  readonly strokeId: string;
-  readonly route: StudioLivingInkRoute;
-  readonly surfaceKey: string;
-  forwardedSampleCount: number;
-  overlayPresented: boolean;
-  failed: boolean;
-  finishing: boolean;
-  finalDrawing: DrawEl | null;
-  canonicalImageId: string | null;
-  canonicalPngHash: `sha256:${string}` | null;
-  transactionCommitted: boolean;
-};
-
-type StudioLivingInkOverlaySurfaceState = {
-  readonly binding: StudioLivingInkOverlaySurfaceBinding;
-  readonly renderer: StudioLivingInkOverlayRenderer;
-};
-
-type StudioLivingInkCanonicalHandoff = Readonly<{
-  token: string;
-  kind: "action" | "stroke";
-  pageId: string;
-  imageId: string;
-  pngHash: `sha256:${string}`;
-  strokeId: string | null;
-}>;
-
 export { StudioCuttoonEditor };
 
 /**
@@ -1919,11 +1825,6 @@ export { StudioCuttoonEditor };
 // 의 `STUDIO_PRESET_FONT_SPECS` 표로 옮겼다. 마운트 시 무조건 8종을 붙이던 것을 "문서가 쓰는
 // 글꼴은 즉시 · 나머지는 프리셋 목록을 처음 열 때" 두 갈래로 나누기 위해서다.
 
-const EMPTY_STUDIO_GPU_STROKES: readonly StudioGpuStroke[] = Object.freeze([]);
-const STUDIO_GPU_LIVE_SOURCE_JOURNAL_STYLE_KEY = "round-ink-source-journal-v1";
-const STUDIO_GPU_LIVE_OPERATION_ORDER_PREFIX = "\uffffstudio-live:";
-// Live operations must sort after the already-settled prefix even when their random UUID happens
-// to compare before it. A fixed-width sequence preserves append-only tile composition.
 function StudioCuttoonEditor({
   remixId,
   studioRoute,
@@ -11578,51 +11479,6 @@ function StudioCuttoonEditor({
     liveDraftLayerRef.current?.drawScene();
   }
 
-  function studioHokusaiVectorTailShadow(
-    element: DrawEl,
-    state: StudioHokusaiPinnedLiveStroke,
-  ): DrawEl | null {
-    const sampleCount = Math.floor(element.points.length / 2);
-    const bounds = state.materialCompositeBounds;
-    if (!bounds) return null;
-    const margin = Math.max(1, state.route.config.radiusPixels * 1.5);
-    let presentedSampleCount = 0;
-    for (let index = 0; index < sampleCount; index += 1) {
-      const x = element.points[index * 2] ?? Number.NaN;
-      const y = element.points[index * 2 + 1] ?? Number.NaN;
-      const covered = Number.isFinite(x)
-        && Number.isFinite(y)
-        && x >= bounds.x - margin
-        && x <= bounds.x + bounds.width + margin
-        && y >= bounds.y - margin
-        && y <= bounds.y + bounds.height + margin;
-      if (!covered && presentedSampleCount > 0) break;
-      if (covered) presentedSampleCount = index + 1;
-    }
-    if (presentedSampleCount <= 0 || presentedSampleCount >= sampleCount) return null;
-    // Retain one overlap sample so the transient suffix joins the material prefix without a gap.
-    // A 0.6 alpha bridge approximates the current natural-media energy while the Worker catches
-    // up; unlike a full-vector shadow it cannot darken the already receipted material prefix.
-    const start = Math.max(0, Math.min(sampleCount - 1, presentedSampleCount - 1));
-    const slice = (values: number[] | undefined): number[] | undefined => values?.slice(start);
-    return {
-      ...element,
-      points: element.points.slice(start * 2),
-      pressures: slice(element.pressures),
-      tiltXs: slice(element.tiltXs),
-      tiltYs: slice(element.tiltYs),
-      twists: slice(element.twists),
-      speeds: slice(element.speeds),
-      tangentialPressures: slice(element.tangentialPressures),
-      altitudeAngles: slice(element.altitudeAngles),
-      azimuthAngles: slice(element.azimuthAngles),
-      contactWidths: slice(element.contactWidths),
-      contactHeights: slice(element.contactHeights),
-      sampleTimeOffsets: slice(element.sampleTimeOffsets),
-      opacity: Math.max(0.01, Math.min(1, (element.opacity ?? 1) * 0.6)),
-    };
-  }
-
   function refreshStudioHokusaiVectorTailShadow(
     state: StudioHokusaiPinnedLiveStroke,
     element: DrawEl,
@@ -14166,34 +14022,6 @@ function StudioCuttoonEditor({
       sampleSpacing: el.sampleSpacing ?? 0,
       variations,
     };
-  }
-  function initialGpuLiveSourceJournalMatchesPlan(
-    advanced: StudioGpuLiveSourceJournalAdvance,
-    plan: StudioGpuLiveStrokePlan
-  ): boolean {
-    if (
-      advanced.status !== "advanced"
-      || advanced.state.renderedPointCount !== plan.renderedPointCount
-      || advanced.suffixes.length !== plan.strokes.length
-    ) return false;
-    return advanced.suffixes.every((suffix, variationIndex) => {
-      const stroke = plan.strokes[variationIndex];
-      if (
-        !stroke
-        || suffix.id !== stroke.id
-        || suffix.previousRenderedPointCount !== 0
-        || suffix.nextRenderedPointCount !== plan.renderedPointCount
-        || suffix.points.length !== stroke.points.length
-        || suffix.pressures.length !== stroke.pressures?.length
-      ) return false;
-      for (let index = 0; index < suffix.points.length; index += 1) {
-        if (!Object.is(suffix.points[index], stroke.points[index])) return false;
-      }
-      for (let index = 0; index < suffix.pressures.length; index += 1) {
-        if (!Object.is(suffix.pressures[index], stroke.pressures?.[index])) return false;
-      }
-      return true;
-    });
   }
   function activeGpuLiveSourceJournalMatchesPlan(
     el: DrawEl,
@@ -24680,90 +24508,6 @@ const puppetWarpArmed =
     globalThis.requestAnimationFrame(() => {
       propsSheetRef.current?.scrollTo({ top: 0, behavior: "smooth" });
       titleInputRef.current?.focus({ preventScroll: true });
-    });
-  }
-  function comipoSeedsToEls(seeds: ComipoAssemblySeed[]): El[] {
-    return seeds.map((seed) => {
-      const id = uid();
-      if (seed.type === "frame") {
-        return {
-          id,
-          type: "frame" as const,
-          x: seed.x,
-          y: seed.y,
-          width: seed.width,
-          height: seed.height,
-          stroke: "stroke" in seed ? seed.stroke : undefined,
-          strokeWidth: "strokeWidth" in seed ? seed.strokeWidth : undefined,
-          bgColor: "bgColor" in seed ? seed.bgColor : undefined,
-        };
-      }
-      if (seed.type === "bubble") {
-        return {
-          id,
-          type: "bubble" as const,
-          variant: seed.variant,
-          text: seed.text,
-          x: seed.x,
-          y: seed.y,
-          width: seed.width,
-          height: seed.height,
-          fill: seed.fill,
-          textFill: seed.textFill,
-          rotation: seed.rotation,
-          tail: "tail" in seed ? seed.tail : undefined,
-          tailDirection: "tailDirection" in seed ? seed.tailDirection : undefined,
-          align: "align" in seed ? seed.align : undefined,
-        };
-      }
-      if (seed.type === "text") {
-        return {
-          id,
-          type: "text" as const,
-          text: seed.text,
-          x: seed.x,
-          y: seed.y,
-          width: seed.width,
-          fontSize: seed.fontSize,
-          fill: seed.fill,
-          rotation: seed.rotation,
-          font: seed.font,
-          stroke: seed.stroke,
-          strokeWidth: seed.strokeWidth,
-          align: seed.align,
-          fontStyle: seed.fontStyle,
-        };
-      }
-      if (seed.type === "focusLines") {
-        return {
-          id,
-          type: "focusLines" as const,
-          x: seed.x,
-          y: seed.y,
-          width: seed.width,
-          height: seed.height,
-          lineCount: seed.lineCount,
-          innerRadius: seed.innerRadius,
-          outerRadius: seed.outerRadius,
-          stroke: seed.stroke,
-          strokeWidth: seed.strokeWidth,
-          noise: seed.noise,
-          rotation: seed.rotation,
-        };
-      }
-      return {
-        id,
-        type: "speedLines" as const,
-        x: seed.x,
-        y: seed.y,
-        width: seed.width,
-        height: seed.height,
-        lineCount: seed.lineCount,
-        direction: seed.direction,
-        stroke: seed.stroke,
-        strokeWidth: seed.strokeWidth,
-        rotation: seed.rotation,
-      };
     });
   }
   function captureDeferredComipoAction() {
