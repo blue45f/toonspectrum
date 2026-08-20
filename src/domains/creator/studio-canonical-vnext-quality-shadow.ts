@@ -6,6 +6,16 @@
  * pair already approved by the material quality policy. The same detached canonical plan object is
  * then submitted once as the final live frame and once as the commit frame. The result owns no
  * pixels: existing Studio Canvas/Konva remains authoritative even after two matching receipts.
+ *
+ * The shadow's posture is DERIVED from the provider authority lifecycle: this module is pinned to
+ * the "quality-shadow" stage, whose lifecycle-guaranteed invariant (no presentation payload, no
+ * authoritative handoff, no UI renderer change) supplies the literal receipt fields below. If the
+ * lifecycle table ever stopped guaranteeing that invariant for the stage, this module would throw
+ * at load instead of silently gaining authority.
+ *
+ * Opted-in catalogue manifests are sharded deterministically: each installed run audits exactly
+ * one shard (bounded to the size the historical 64-id cap allowed per run), and consecutive
+ * session epochs sweep every shard, so a full sweep covers all manifest ids across N runs.
  */
 
 import {
@@ -21,13 +31,37 @@ import {
   hashStudioCanonicalBrushPlan,
   type StudioCanonicalBrushPlan,
 } from "./studio-canonical-brush-plan";
+import {
+  requireQualityShadowStagePosture,
+  type AuthorityStage,
+} from "./studio-provider-authority-lifecycle";
 
 import type { StudioLinearColorSpace } from "./studio-color-quality-engine";
 import type { DrawEl } from "./studio-element-model";
 
 export const STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_BRIDGE_VERSION = 1 as const;
 
-const MAX_OPTED_IN_CATALOG_IDS = 64;
+/** Authority lifecycle stage this module is pinned to; its posture is derived, not asserted. */
+export const STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_AUTHORITY_STAGE =
+  "quality-shadow" satisfies AuthorityStage;
+
+/**
+ * Lifecycle-derived shadow posture. `requireQualityShadowStagePosture` throws when the lifecycle
+ * no longer guarantees the shadow invariant, so a mis-edit of the lifecycle table fails this
+ * module closed at load time instead of letting shadow receipts acquire authority.
+ */
+const SHADOW_STAGE_POSTURE = requireQualityShadowStagePosture(
+  STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_AUTHORITY_STAGE,
+);
+
+/**
+ * Per-run shard size for the opted-in catalogue manifest. Historically this value was a hard cap
+ * on the whole manifest; it now bounds how many catalogue ids one installed run audits, while the
+ * manifest itself may name every id and is swept shard-by-shard across session epochs.
+ */
+export const STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_SHARD_SIZE = 64;
+
+const MAX_MANIFEST_CATALOG_IDS = STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_SHARD_SIZE * 64;
 const MAX_IDENTIFIER_CHARACTERS = 160;
 const SAFE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]*$/u;
 const VNEXT_QUALITY_SHADOW_FAMILIES = new Set<StudioBrushBackendQualityFamily>([
@@ -63,7 +97,10 @@ export interface StudioCanonicalVNextQualityShadowCapability {
   readonly supportedBackends: readonly StudioCanonicalVNextQualityShadowBackend[];
   /**
    * Exact catalogue identities only. A family wildcard is intentionally unsupported so installing
-   * a runtime cannot silently migrate the complete product brush shelf.
+   * a runtime cannot silently migrate the complete product brush shelf. The list is a manifest:
+   * each installed run audits only its deterministically assigned shard (at most
+   * {@link STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_SHARD_SIZE} ids), and consecutive session epochs
+   * sweep every shard so a full sweep covers all manifest ids across N runs.
    */
   readonly optedInCatalogIds: readonly string[];
 }
@@ -169,6 +206,7 @@ export type StudioCanonicalVNextQualityShadowSubmissionResult =
       reason:
         | "no-runtime"
         | "brush-not-opted-in"
+        | "catalog-id-out-of-shard"
         | "family-ineligible"
         | "route-not-vnext"
         | "canonical-specialist-not-required";
@@ -191,7 +229,24 @@ export interface StudioCanonicalVNextQualityShadowRuntimeLease {
   dispose(): void;
 }
 
-let installedRuntime: StudioCanonicalVNextQualityShadowRuntime | null = null;
+export interface StudioCanonicalVNextQualityShadowShardManifest {
+  readonly kind: "studio-canonical-vnext-quality-shadow-shard-manifest";
+  readonly shardSize: number;
+  readonly shardCount: number;
+  readonly catalogIdCount: number;
+  /** Sorted, disjoint shards whose union is exactly the input id set. */
+  readonly shards: readonly (readonly string[])[];
+}
+
+interface InstalledStudioCanonicalVNextQualityShadowState {
+  readonly runtime: StudioCanonicalVNextQualityShadowRuntime;
+  readonly manifest: StudioCanonicalVNextQualityShadowShardManifest;
+  readonly activeShardIndex: number;
+  readonly manifestCatalogIds: ReadonlySet<string>;
+  readonly activeShardCatalogIds: ReadonlySet<string>;
+}
+
+let installedState: InstalledStudioCanonicalVNextQualityShadowState | null = null;
 let nextStrokeEpoch = 1;
 
 function positiveSafeInteger(value: unknown): value is number {
@@ -209,7 +264,7 @@ function denseUniqueIdentifiers(value: unknown): readonly string[] | null {
   if (
     !Array.isArray(value)
     || value.length < 1
-    || value.length > MAX_OPTED_IN_CATALOG_IDS
+    || value.length > MAX_MANIFEST_CATALOG_IDS
   ) return null;
   const result: string[] = [];
   const seen = new Set<string>();
@@ -259,6 +314,52 @@ function snapshotCapability(
   });
 }
 
+/**
+ * Deterministic manifest sharding. Ids are sorted (so assignment is independent of declaration
+ * order), then split into `ceil(n / shardSize)` contiguous near-equal shards: every id lands in
+ * exactly one shard, no shard exceeds `shardSize`, and a sweep of all shards covers the complete
+ * manifest. Fails closed (null) on malformed ids or a non-positive shard size.
+ */
+export function computeStudioCanonicalVNextQualityShadowShardManifest(
+  catalogIds: readonly string[],
+  shardSize: number = STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_SHARD_SIZE,
+): StudioCanonicalVNextQualityShadowShardManifest | null {
+  if (!positiveSafeInteger(shardSize)) return null;
+  const ids = denseUniqueIdentifiers(catalogIds);
+  if (!ids) return null;
+  const sorted = [...ids].sort();
+  const shardCount = Math.ceil(sorted.length / shardSize);
+  const baseSize = Math.floor(sorted.length / shardCount);
+  const remainder = sorted.length % shardCount;
+  const shards: (readonly string[])[] = [];
+  let cursor = 0;
+  for (let index = 0; index < shardCount; index += 1) {
+    const size = baseSize + (index < remainder ? 1 : 0);
+    shards.push(Object.freeze(sorted.slice(cursor, cursor + size)));
+    cursor += size;
+  }
+  return Object.freeze({
+    kind: "studio-canonical-vnext-quality-shadow-shard-manifest",
+    shardSize,
+    shardCount,
+    catalogIdCount: sorted.length,
+    shards: Object.freeze(shards),
+  });
+}
+
+/**
+ * Deterministic per-run shard selection: consecutive session epochs rotate through every shard,
+ * so `shardCount` consecutive runs audit the complete manifest. Fails closed (null) on malformed
+ * input.
+ */
+export function selectStudioCanonicalVNextQualityShadowShardIndex(
+  sessionEpoch: number,
+  shardCount: number,
+): number | null {
+  if (!positiveSafeInteger(sessionEpoch) || !positiveSafeInteger(shardCount)) return null;
+  return (sessionEpoch - 1) % shardCount;
+}
+
 export function installStudioCanonicalVNextQualityShadowRuntime(
   runtime: StudioCanonicalVNextQualityShadowRuntime,
 ): StudioCanonicalVNextQualityShadowRuntimeLease | Readonly<{
@@ -269,27 +370,60 @@ export function installStudioCanonicalVNextQualityShadowRuntime(
   if (!capability || typeof runtime?.execute !== "function") {
     return Object.freeze({ status: "rejected", reason: "invalid-runtime" });
   }
-  if (installedRuntime !== null) {
+  if (installedState !== null) {
     return Object.freeze({ status: "rejected", reason: "runtime-already-installed" });
   }
-  const installed = Object.freeze({
-    capability,
-    execute: runtime.execute.bind(runtime),
-  }) satisfies StudioCanonicalVNextQualityShadowRuntime;
-  installedRuntime = installed;
+  const manifest = computeStudioCanonicalVNextQualityShadowShardManifest(
+    capability.optedInCatalogIds,
+  );
+  const activeShardIndex = manifest === null
+    ? null
+    : selectStudioCanonicalVNextQualityShadowShardIndex(
+      capability.sessionEpoch,
+      manifest.shardCount,
+    );
+  if (manifest === null || activeShardIndex === null) {
+    return Object.freeze({ status: "rejected", reason: "invalid-runtime" });
+  }
+  const installed: InstalledStudioCanonicalVNextQualityShadowState = Object.freeze({
+    runtime: Object.freeze({
+      capability,
+      execute: runtime.execute.bind(runtime),
+    }) satisfies StudioCanonicalVNextQualityShadowRuntime,
+    manifest,
+    activeShardIndex,
+    manifestCatalogIds: new Set(capability.optedInCatalogIds),
+    activeShardCatalogIds: new Set(manifest.shards[activeShardIndex]),
+  });
+  installedState = installed;
   let active = true;
   return Object.freeze({
     status: "installed" as const,
     dispose(): void {
       if (!active) return;
       active = false;
-      if (installedRuntime === installed) installedRuntime = null;
+      if (installedState === installed) installedState = null;
     },
   });
 }
 
 export function hasStudioCanonicalVNextQualityShadowRuntime(): boolean {
-  return installedRuntime !== null;
+  return installedState !== null;
+}
+
+/** Introspection for tests/telemetry: which manifest shard this run audits. */
+export function getStudioCanonicalVNextQualityShadowActiveShard(): Readonly<{
+  shardIndex: number;
+  shardCount: number;
+  catalogIds: readonly string[];
+}> | null {
+  const state = installedState;
+  if (!state) return null;
+  return Object.freeze({
+    shardIndex: state.activeShardIndex,
+    shardCount: state.manifest.shardCount,
+    catalogIds: state.manifest.shards[state.activeShardIndex]!,
+  });
 }
 
 function nextEpoch(): number {
@@ -327,8 +461,10 @@ function receiptMatches(
     && receipt.canonicalPlanHash === request.canonicalPlanHash
     && receipt.seed === request.seed
     && identifier(receipt.providerReceiptIdentity)
-    && receipt.presentationPayload === null
-    && receipt.authoritativeHandoff === false
+    // The lifecycle-derived quality-shadow posture: provider receipts may never carry pixels
+    // or claim authority, or the whole submission fails closed.
+    && receipt.presentationPayload === SHADOW_STAGE_POSTURE.presentationPayload
+    && receipt.authoritativeHandoff === SHADOW_STAGE_POSTURE.authoritativeHandoff
     && receipt.complete === true;
 }
 
@@ -383,8 +519,9 @@ function reject(
 export async function submitStudioCanonicalVNextQualityShadowFinalParity(
   input: StudioCanonicalVNextQualityShadowSubmission,
 ): Promise<StudioCanonicalVNextQualityShadowSubmissionResult> {
-  const runtime = installedRuntime;
-  if (!runtime) return Object.freeze({ status: "skipped", reason: "no-runtime" });
+  const state = installedState;
+  if (!state) return Object.freeze({ status: "skipped", reason: "no-runtime" });
+  const runtime = state.runtime;
   if (
     typeof input !== "object"
     || input === null
@@ -418,8 +555,12 @@ export async function submitStudioCanonicalVNextQualityShadowFinalParity(
   if (!runtime.capability.supportedFamilies.includes(route.identity.family)) {
     return Object.freeze({ status: "skipped", reason: "family-ineligible" });
   }
-  if (!runtime.capability.optedInCatalogIds.includes(route.identity.catalogId)) {
+  if (!state.manifestCatalogIds.has(route.identity.catalogId)) {
     return Object.freeze({ status: "skipped", reason: "brush-not-opted-in" });
+  }
+  if (!state.activeShardCatalogIds.has(route.identity.catalogId)) {
+    // Opted in, but assigned to another run's shard: the deterministic sweep audits it there.
+    return Object.freeze({ status: "skipped", reason: "catalog-id-out-of-shard" });
   }
   if (
     !VNEXT_QUALITY_SHADOW_BACKENDS.has(route.liveBackend)
@@ -540,10 +681,10 @@ export async function submitStudioCanonicalVNextQualityShadowFinalParity(
       sameCanonicalPlan: true,
       samePersistedSeed: true,
       sameProvider: true,
-      authority: "quality-shadow-only",
-      presentationPayload: null,
-      authoritativeHandoff: false,
-      uiRendererChanged: false,
+      authority: `${STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_AUTHORITY_STAGE}-only` as const,
+      presentationPayload: SHADOW_STAGE_POSTURE.presentationPayload,
+      authoritativeHandoff: SHADOW_STAGE_POSTURE.authoritativeHandoff,
+      uiRendererChanged: SHADOW_STAGE_POSTURE.uiRendererChanged,
       live: liveOutput,
       commit: commitOutput,
       complete: true,

@@ -5,7 +5,12 @@ import {
   createStudioCanonicalVNextGpuQualityShadowRuntime,
 } from "./studio-canonical-vnext-gpu-quality-shadow-runtime";
 import {
+  computeStudioCanonicalVNextQualityShadowShardManifest,
+  getStudioCanonicalVNextQualityShadowActiveShard,
   installStudioCanonicalVNextQualityShadowRuntime,
+  selectStudioCanonicalVNextQualityShadowShardIndex,
+  STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_AUTHORITY_STAGE,
+  STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_SHARD_SIZE,
   submitStudioCanonicalVNextQualityShadowFinalParity,
   type StudioCanonicalVNextQualityShadowCapability,
   type StudioCanonicalVNextQualityShadowProviderRequest,
@@ -13,6 +18,11 @@ import {
   type StudioCanonicalVNextQualityShadowRuntimeLease,
 } from "./studio-canonical-vnext-quality-shadow";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+import {
+  authorityStagePosture,
+  nextStagesOf,
+  requireQualityShadowStagePosture,
+} from "./studio-provider-authority-lifecycle";
 
 import type {
   StudioEngineVNextBrushProviderGpuExecutionBoundary,
@@ -376,5 +386,155 @@ describe("Studio canonical vNext quality shadow", () => {
     expect(boundaryRequests[0]!.canonicalPlanHash)
       .toBe(boundaryRequests[1]!.canonicalPlanHash);
     expect(boundaryRequests[0]!.requirements).toEqual(["texture-tip", "grain"]);
+  });
+});
+
+describe("Studio canonical vNext quality shadow authority lifecycle derivation", () => {
+  it("pins the shadow to the lifecycle quality-shadow stage and its invariant", () => {
+    expect(STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_AUTHORITY_STAGE).toBe("quality-shadow");
+    expect(requireQualityShadowStagePosture(
+      STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_AUTHORITY_STAGE,
+    )).toEqual({
+      stage: "quality-shadow",
+      presentationPayload: null,
+      authoritativeHandoff: false,
+      uiRendererChanged: false,
+    });
+    // The stage can never promote straight into a presentation-granting stage.
+    for (const next of nextStagesOf(STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_AUTHORITY_STAGE)) {
+      const posture = authorityStagePosture(next);
+      expect(posture?.presentationPayloadAllowed).toBe(false);
+      expect(posture?.authoritativeHandoffAllowed).toBe(false);
+    }
+  });
+
+  it("keeps every completed parity receipt inside the shadow-stage invariant", async () => {
+    install({
+      capability: capability(),
+      execute(request) {
+        return providerReceipt(request);
+      },
+    });
+
+    const result = await submitStudioCanonicalVNextQualityShadowFinalParity({
+      element: dryTextureElement(),
+    });
+
+    expect(result.status).toBe("completed");
+    if (result.status !== "completed") return;
+    const invariant = requireQualityShadowStagePosture(
+      STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_AUTHORITY_STAGE,
+    );
+    expect(result.receipt.presentationPayload).toBe(invariant.presentationPayload);
+    expect(result.receipt.authoritativeHandoff).toBe(invariant.authoritativeHandoff);
+    expect(result.receipt.uiRendererChanged).toBe(invariant.uiRendererChanged);
+    expect(result.receipt.authority).toBe("quality-shadow-only");
+    expect(result.receipt.live.presentationPayload).toBe(invariant.presentationPayload);
+    expect(result.receipt.commit.authoritativeHandoff).toBe(invariant.authoritativeHandoff);
+  });
+});
+
+describe("Studio canonical vNext quality shadow manifest sharding", () => {
+  function sweepCatalogIds(count: number): string[] {
+    const ids = Array.from({ length: count - 1 }, (_, index) => (
+      `sweep-brush-${String(index).padStart(3, "0")}`
+    ));
+    return [...ids, "dry-media"];
+  }
+
+  it("covers every catalogue id exactly once across deterministic order-independent shards", () => {
+    const ids = sweepCatalogIds(130);
+    const manifest = computeStudioCanonicalVNextQualityShadowShardManifest(ids);
+    expect(manifest).not.toBeNull();
+    if (!manifest) return;
+    expect(manifest.shardSize).toBe(STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_SHARD_SIZE);
+    expect(manifest.shardCount).toBe(3);
+    expect(manifest.catalogIdCount).toBe(130);
+    const seen = new Set<string>();
+    for (const shard of manifest.shards) {
+      expect(shard.length).toBeLessThanOrEqual(STUDIO_CANONICAL_VNEXT_QUALITY_SHADOW_SHARD_SIZE);
+      for (const id of shard) {
+        expect(seen.has(id)).toBe(false);
+        seen.add(id);
+      }
+    }
+    expect(seen.size).toBe(130);
+    expect([...seen].sort()).toEqual([...ids].sort());
+
+    const permuted = computeStudioCanonicalVNextQualityShadowShardManifest(
+      [...ids].reverse(),
+    );
+    expect(permuted).toEqual(manifest);
+  });
+
+  it("sweeps every shard across consecutive session epochs", () => {
+    const shardCount = 3;
+    const visited = new Set<number>();
+    for (let epoch = 1; epoch <= shardCount; epoch += 1) {
+      const index = selectStudioCanonicalVNextQualityShadowShardIndex(epoch, shardCount);
+      expect(index).not.toBeNull();
+      if (index !== null) visited.add(index);
+    }
+    expect([...visited].sort()).toEqual([0, 1, 2]);
+    // Deterministic wrap-around: epoch N+shardCount audits the same shard as epoch N.
+    expect(selectStudioCanonicalVNextQualityShadowShardIndex(4, shardCount))
+      .toBe(selectStudioCanonicalVNextQualityShadowShardIndex(1, shardCount));
+    expect(selectStudioCanonicalVNextQualityShadowShardIndex(0, shardCount)).toBeNull();
+    expect(selectStudioCanonicalVNextQualityShadowShardIndex(1, 0)).toBeNull();
+    expect(computeStudioCanonicalVNextQualityShadowShardManifest([])).toBeNull();
+    expect(computeStudioCanonicalVNextQualityShadowShardManifest(["ok"], 0)).toBeNull();
+  });
+
+  it("accepts manifests beyond the legacy cap and audits only the active shard per run", async () => {
+    const ids = sweepCatalogIds(150);
+    const manifest = computeStudioCanonicalVNextQualityShadowShardManifest(ids);
+    expect(manifest).not.toBeNull();
+    if (!manifest) return;
+    const dryShardIndex = manifest.shards.findIndex((shard) => shard.includes("dry-media"));
+    expect(dryShardIndex).toBeGreaterThanOrEqual(0);
+    const inShardEpoch = dryShardIndex + 1;
+    const outShardEpoch = ((dryShardIndex + 1) % manifest.shardCount) + 1;
+    expect(outShardEpoch).not.toBe(inShardEpoch);
+
+    expect(getStudioCanonicalVNextQualityShadowActiveShard()).toBeNull();
+    install({
+      capability: capability({
+        optedInCatalogIds: ids,
+        sessionEpoch: outShardEpoch,
+      }),
+      execute(request) {
+        return providerReceipt(request);
+      },
+    });
+    expect(getStudioCanonicalVNextQualityShadowActiveShard()).toMatchObject({
+      shardIndex: outShardEpoch - 1,
+      shardCount: manifest.shardCount,
+    });
+    await expect(submitStudioCanonicalVNextQualityShadowFinalParity({
+      element: dryTextureElement(),
+    })).resolves.toEqual({
+      status: "skipped",
+      reason: "catalog-id-out-of-shard",
+    });
+    lease?.dispose();
+    lease = null;
+
+    install({
+      capability: capability({
+        optedInCatalogIds: ids,
+        sessionEpoch: inShardEpoch,
+      }),
+      execute(request) {
+        return providerReceipt(request);
+      },
+    });
+    expect(getStudioCanonicalVNextQualityShadowActiveShard()).toMatchObject({
+      shardIndex: dryShardIndex,
+      shardCount: manifest.shardCount,
+    });
+    const result = await submitStudioCanonicalVNextQualityShadowFinalParity({
+      element: dryTextureElement(),
+    });
+    expect(result.status).toBe("completed");
   });
 });
