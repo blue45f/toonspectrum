@@ -239,7 +239,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     ],
     declarationRef:
       "studio-main-menu-item-routing.ts (STUDIO_MENU_ITEM_BUILDERS) + studio-main-menu-items-*.ts",
-    measuredCount: 185,
+    measuredCount: 186,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -264,7 +264,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     label: "커스터마이즈 키맵",
     file: "src/domains/creator/studio-app-settings.ts",
     declarationRef: "studio-app-settings.ts:82-117 (STUDIO_SHORTCUT_ACTIONS)",
-    measuredCount: 34,
+    measuredCount: 41,
   },
   help: {
     label: "단축키 도움말",
@@ -435,6 +435,7 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "filter/photocopy",
   "filter/normal-map",
   "filter/god-rays",
+  "filter/polar-coordinates",
   // vector (2) — lifted out of insert, plus the eraser's vector mode
   "vector/elements",
   "vector/erase-to-intersection",
@@ -837,6 +838,34 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
 
     /* --------------------------------------------------------------- layer */
     defineCommand({
+      id: "layer.new-raster",
+      labels: [ko("새 래스터 레이어"), en("New raster layer")],
+      aliases: [csp("신규 래스터 레이어"), ps("New Layer"), krita("New Paint Layer")],
+      shortcut: "⌘⇧N",
+      origins: [keymap("new-layer", { shortcut: "Mod+Shift+N" })],
+    }),
+    defineCommand({
+      id: "layer.merge-down",
+      labels: [ko("아래 레이어와 결합"), en("Merge layer down")],
+      aliases: [csp("아래 레이어와 결합"), ps("Merge Down"), krita("Merge with Layer Below")],
+      shortcut: "⌘E",
+      origins: [keymap("merge-layer-down", { shortcut: "Mod+E" })],
+    }),
+    defineCommand({
+      id: "layer.duplicate",
+      labels: [ko("레이어 복제"), en("Duplicate layer")],
+      aliases: [csp("레이어 복제"), ps("Duplicate Layer"), krita("Duplicate Layer or Mask")],
+      shortcut: "⌘J",
+      origins: [keymap("duplicate-layer", { shortcut: "Mod+J" })],
+    }),
+    defineCommand({
+      id: "layer.group",
+      labels: [ko("선택 레이어 그룹화"), en("Group selected layers")],
+      aliases: [csp("새 레이어 폴더"), ps("Group Layers"), krita("Group Layers")],
+      shortcut: "⌘G",
+      origins: [keymap("group-layers", { shortcut: "Mod+G" })],
+    }),
+    defineCommand({
       id: "layer.bring-front",
       labels: [ko("레이어 · 맨 위로"), en("Bring to front")],
       aliases: [csp("맨 앞으로"), ps("Bring to Front"), krita("Move Layer to Top")],
@@ -987,6 +1016,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
         menu("view/fit", { shortcut: "Home" }),
         quickAccess("fit-canvas", { shortcut: "Home" }),
         radial("fit-width"),
+        keymap("fit-view", { shortcut: "Mod+0" }),
         help("view.zoomFit", {
           shortcut: "⌘ 0",
           note: "도움말만 ⌘0 으로 문서화 — 메뉴·팔레트는 Home.",
@@ -998,7 +1028,10 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("실제 픽셀 (100%)"), en("Actual pixels (100%)")],
       aliases: [csp("100%"), ps("100%"), krita("Reset Zoom")],
       shortcut: "End",
-      origins: [menu("view/actual-pixels", { shortcut: "End" })],
+      origins: [
+        menu("view/actual-pixels", { shortcut: "End" }),
+        keymap("actual-size-view", { shortcut: "Mod+1" }),
+      ],
     }),
     defineCommand({
       id: "view.canvas-rulers",
@@ -1572,6 +1605,13 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
         help("drawing.swapColors", { shortcut: "X" }),
       ],
     }),
+    defineCommand({
+      id: "color.toggle-transparent",
+      labels: [ko("투명색 그리기 토글"), en("Toggle transparent color")],
+      aliases: [csp("투명색"), cspEn("Transparent color"), ours("투명 브러시")],
+      shortcut: "C",
+      origins: [keymap("toggle-transparent-color", { shortcut: "C" })],
+    }),
 
     /* ----------------------------------------------------------- transform */
     defineCommand({
@@ -1991,6 +2031,12 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [ps("Radial Blur · zoom light"), ours("갓 레이")],
       origins: [menu("filter/god-rays")],
     }),
+    defineCommand({
+      id: "filter.polar-coordinates",
+      labels: [ko("극좌표 변환"), en("Polar coordinates")],
+      aliases: [csp("극좌표"), ps("Polar Coordinates"), krita("Polar Coordinates")],
+      origins: [menu("filter/polar-coordinates")],
+    }),
 
     /* ------------------------------------------------------------------ ai */
     defineCommand({
@@ -2307,6 +2353,35 @@ export const COMMAND_CONFLICTS: readonly StudioCommandConflict[] = Object.freeze
     ],
     resolution:
       "팔레트 흡수(3단계)에서 팔레트 표기를 `⌘J` 로 정정한다. 카탈로그의 정본은 edit.duplicate=⌘J, select.deselect=⌘D.",
+  },
+  {
+    id: "cmd-j-duplicate-layer-vs-edit",
+    kind: "shortcut-collision",
+    key: "⌘J",
+    commandIds: ["edit.duplicate", "layer.duplicate"],
+    detail:
+      "Photoshop/CSP 관례에 따라 `⌘J` 는 선택/레이어 복제에 공통으로 바인딩되어 있으며, 선택 요소가 있으면 요소 복제, 없으면 활성 레이어 복제로 동작한다.",
+    evidence: [
+      "studio-edit-controls.ts:71 (edit.duplicate, ⌘J)",
+      "studio-app-settings.ts:118 (duplicate-layer, Mod+J)",
+    ],
+    resolution:
+      "컨텍스트 인식 디스패처가 선택 유무에 따라 요소 복제와 레이어 복제로 분기한다.",
+  },
+  {
+    id: "c-crop-vs-transparent",
+    kind: "shortcut-collision",
+    key: "C",
+    commandIds: ["tool.crop", "color.toggle-transparent"],
+    detail:
+      "`C` 단축키는 포토샵 자르기(Crop) 툴과 클립스튜디오 투명색(Transparent) 그리기 모드에 동시 정의되어 있다. 드로잉 캔버스 포커스 시 투명색 모드로 전환된다.",
+    evidence: [
+      "studio-app-settings.ts:95 (tool-crop, C)",
+      "studio-app-settings.ts:115 (toggle-transparent-color, C)",
+      "studio-drawing-shortcuts.ts:76 (toggle-transparent-color, C)",
+    ],
+    resolution:
+      "드로잉/브러시 활성 시에는 투명색 그리기가 우선되며, 선택 모드에서는 자르기 툴이 동작하도록 컨텍스트 기반으로 분기한다.",
   },
   {
     id: "delete-clear-vs-remove",

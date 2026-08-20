@@ -198,7 +198,9 @@ describe("studio command catalog — shortcut conflicts", () => {
     expect(COMMAND_CONFLICTS.map((conflict) => conflict.id).sort()).toEqual(
       [
         "balloon-id-divergence",
+        "c-crop-vs-transparent",
         "cmd-d-duplicate-vs-deselect",
+        "cmd-j-duplicate-layer-vs-edit",
         "cmd-s-unbound",
         "dead-keymap-entries",
         "delete-clear-vs-remove",

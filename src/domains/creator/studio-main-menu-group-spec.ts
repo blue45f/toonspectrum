@@ -349,6 +349,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
         "filter/twirl",
         "filter/pinch-bloat",
         "filter/lens-distortion",
+        "filter/polar-coordinates",
       ),
       has(
         "Line/Tone/Webtoon",
