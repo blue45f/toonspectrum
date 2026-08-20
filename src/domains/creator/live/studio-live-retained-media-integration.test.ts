@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), "utf8");
 }
@@ -29,9 +31,12 @@ describe("Studio live retained-media overlay integration", () => {
     );
     expect(queue).toContain("liveRetainedMediaOverlayRendererRef.current.settledStrokeCount");
 
-    const release = page.slice(
-      page.indexOf("function releaseCommittedInkSurfaceCounts("),
-      page.indexOf("function scheduleCommittedInkSurfaceHandoffRetry"),
+    // Intentional change: releaseCommittedInkSurfaceCounts moved into
+    // studio-cuttoon-editor/studio-deferred-stroke-commit.ts — scan the composed editor surface.
+    const editor = readStudioCuttoonEditorSource();
+    const release = editor.slice(
+      editor.indexOf("function releaseCommittedInkSurfaceCounts("),
+      editor.indexOf("function scheduleCommittedInkSurfaceHandoffRetry"),
     );
     expect(release).toContain("retainedMediaOverlayRenderer.releaseSettledPrefix(retainedOverlayBudget)");
     expect(release).toContain("dynamicBrushOverlayRenderer.releaseSettledPrefix(dynamicOverlayBudget)");

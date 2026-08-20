@@ -14,7 +14,14 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+// Intentional change: the deferred-stroke commit engine (commit/commitCoalesced/
+// expandDeferredStrokeCommitHistory/commitPages) moved into
+// studio-cuttoon-editor/studio-deferred-stroke-commit.ts. Slices that start at an extracted
+// symbol scan the composed editor surface; the contract itself is unchanged.
+const studioEditorSource = readStudioCuttoonEditorSource();
 const catalogSource = readFileSync(
   new URL("./studio-destructive-command-catalog.ts", import.meta.url),
   "utf8",
@@ -30,6 +37,14 @@ function sourceBetween(start: string, end: string): string {
   expect(startIndex).toBeGreaterThanOrEqual(0);
   expect(endIndex).toBeGreaterThan(startIndex);
   return studioPageSource.slice(startIndex, endIndex);
+}
+
+function editorSourceBetween(start: string, end: string): string {
+  const startIndex = studioEditorSource.indexOf(start);
+  const endIndex = studioEditorSource.indexOf(end, startIndex + start.length);
+  expect(startIndex).toBeGreaterThanOrEqual(0);
+  expect(endIndex).toBeGreaterThan(startIndex);
+  return studioEditorSource.slice(startIndex, endIndex);
 }
 
 describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목으로 들어간다", () => {
@@ -48,7 +63,7 @@ describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목�
   });
 
   it("펼치기는 뒤쪽 획만 걷어낸 접두 스냅샷을 되돌려 끼운다", () => {
-    const expand = sourceBetween(
+    const expand = editorSourceBetween(
       "function expandDeferredStrokeCommitHistory(batch: PendingStrokeCommitBatch)",
       "// 커밋 지연 파이프라인의 동기화/폐기",
     );
@@ -198,14 +213,16 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
     expect(record).toContain("recordStudioHistoryJournalPagesSteps(historyJournalRef.current, { addedSteps, nextUndoDepth })");
 
     // 새 단계를 만드는 모든 경로가 실제 결과 인덱스를 그대로 넘긴다(기대값을 다시 계산하지 않는다).
+    // 커밋 엔진 경로(commit/commitCoalesced/펼치기)는 studio-deferred-stroke-commit.ts 로
+    // 추출됐으므로 합성 에디터 소스에서 확인한다.
     for (const site of [
       "recordStudioHistoryJournalPages(1, appended.historyIndex);",
       "recordStudioHistoryJournalPages(batch.strokes.length - 1, accIndex);",
     ]) {
-      expect(studioPageSource).toContain(site);
+      expect(studioEditorSource).toContain(site);
     }
     // 합치기 분기는 새 단계가 없다 — 저널도 늘리지 않는다.
-    expect(studioPageSource).toContain(
+    expect(studioEditorSource).toContain(
       "if (!replacesCurrentSnapshot) recordStudioHistoryJournalPages(1, nextHistoryIndex);",
     );
   });

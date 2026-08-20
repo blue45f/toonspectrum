@@ -23,6 +23,7 @@ export function readStudioCuttoonEditorSource(): string {
     resolve(baseDir, "../studio-page-companion-runtime.ts"),
     resolve(baseDir, "../export/studio-publish-package-export.ts"),
     resolve(baseDir, "../live/studio-collaboration-wiring.ts"),
+    resolve(baseDir, "./studio-deferred-stroke-commit.ts"),
     resolve(baseDir, "../studio-page-shortcut-dispatcher.ts"),
     resolve(baseDir, "../studio-page-comments-runtime.ts"),
     resolve(baseDir, "../StudioPage.tsx"),
