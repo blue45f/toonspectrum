@@ -54,6 +54,8 @@ export interface StudioMainMenuSurfaceActions {
   activatePixelSelectionTool: (tool: StudioPixelSelectionToolId) => unknown;
   /** Window ▸ 명령 바 — flips the persisted command bar visibility. */
   toggleCommandBar?: () => unknown;
+  /** 레이어 ▸ 경계 효과… — ensures the right dock is visible so the panel can open. */
+  openLayerPanel?: () => unknown;
   /** §15.3 Select ▸ Quick Mask — enter/commit, the `Q` chord's two halves. */
   enterQuickMask: () => unknown;
   commitQuickMask: () => unknown;

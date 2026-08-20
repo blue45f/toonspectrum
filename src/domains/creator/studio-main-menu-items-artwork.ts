@@ -204,6 +204,8 @@ export function buildStudioLayerMenuItems({
         tip: "레이어 탭 아래쪽 '경계 효과' 패널에서 바깥/안쪽/중앙을 고를 수 있어요.",
       },
       onSelect: () => {
+        // 우패널이 접혀 있으면 aside 가 CSS 로 숨겨져 이벤트가 무의미해진다 — 먼저 편다.
+        ui.openLayerPanel?.();
         requestStudioLayerBorderEffectPanelOpen();
       },
     },

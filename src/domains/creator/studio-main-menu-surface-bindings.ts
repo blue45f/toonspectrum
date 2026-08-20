@@ -29,6 +29,7 @@ export interface StudioMainMenuSurfaceHandlerBundle {
     tool: StudioPixelSelectionToolId,
   ) => unknown;
   readonly toggleStudioCommandBar: () => unknown;
+  readonly openLayerPanelForBorderEffect: () => unknown;
   readonly enterQuickMask: () => unknown;
   readonly commitQuickMask: () => unknown;
   readonly toggleAnimationTimeline: () => unknown;
@@ -64,6 +65,7 @@ export function bindStudioMainMenuSurfaceActions(
   return {
     activatePixelSelectionTool: actions.activatePixelSelectionToolFromInspector,
     toggleCommandBar: actions.toggleStudioCommandBar,
+    openLayerPanel: actions.openLayerPanelForBorderEffect,
     enterQuickMask: actions.enterQuickMask,
     commitQuickMask: actions.commitQuickMask,
     toggleAnimationTimeline: actions.toggleAnimationTimeline,

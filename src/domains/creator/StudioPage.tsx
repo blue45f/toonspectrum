@@ -32948,6 +32948,7 @@ function clearSelectionForEdit() {
   const studioMainMenuSurfaceActions =
     useStudioStableHandlers<StudioMainMenuSurfaceHandlerBundle>({
       activatePixelSelectionToolFromInspector,
+      openLayerPanelForBorderEffect: () => setRightPanelOpenWithOverride(true),
       toggleStudioCommandBar: () => {
         const state = workspacePersistenceRef.current.state;
         const layout = state.liveLayout;
