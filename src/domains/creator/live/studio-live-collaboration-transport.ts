@@ -12,6 +12,11 @@ import {
   type StudioCrdtUpdateAck,
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
+import {
+  isStudioLiveInkWireCandidate,
+  STUDIO_LIVE_INK_CAPABILITY,
+  type StudioLiveInkWireMessage,
+} from "./studio-live-ink-protocol";
 
 import type {
   StudioLiveEnvelope,
@@ -97,6 +102,17 @@ export interface StudioLiveTransport {
   respondCrdtSync?(response: StudioCrdtSyncResponse, targetSessionId: string): boolean;
   publishCrdtUpdate?(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck>;
   subscribeCrdt?(listener: (message: StudioCrdtTransportMessage) => void): () => void;
+  /**
+   * Binary lane capabilities negotiated for the current connection (e.g. "ink-v2"). Publishers
+   * must check the capability before offering binary traffic: a transport that does not advertise
+   * a lane never carries or delivers its messages. This is the fail-closed V18 contract — a peer
+   * without ink-v2 stays cursor-only, and there is no JSON re-encoding fallback.
+   */
+  readonly binaryLaneCapabilities?: readonly string[];
+  /** Sends one pre-validated ink-v2 frame on the binary lane. Requires the "ink-v2" capability. */
+  sendInk?(message: StudioLiveInkWireMessage): boolean;
+  /** Delivers raw binary-lane candidates; subscribers must run the strict ink wire parser. */
+  subscribeInk?(listener: (value: unknown) => void): () => void;
   close(): void;
 }
 
@@ -117,6 +133,11 @@ export interface StudioBroadcastCrdtDependencies {
   setTimeout?: (handler: () => void, delay: number) => unknown;
   clearTimeout?: (handle: unknown) => void;
   syncTimeoutMs?: number;
+  /**
+   * Compatibility/test seam: `false` removes the negotiated binary ink lane so the transport
+   * behaves like a pre-V18 peer (cursor-only; ink frames are neither sent nor delivered).
+   */
+  inkLane?: boolean;
 }
 
 interface StudioBroadcastCrdtContext {
@@ -131,6 +152,9 @@ interface PendingLocalSync {
 
 const DEFAULT_LOCAL_CRDT_SYNC_TIMEOUT_MS = 750;
 const MAX_SEEN_LOCAL_UPDATE_IDS = 2_048;
+const STUDIO_LOCAL_BINARY_LANES: readonly string[] = Object.freeze([
+  STUDIO_LIVE_INK_CAPABILITY,
+]);
 
 function defaultBroadcastChannelFactory(name: string): StudioBroadcastChannelLike {
   return new BroadcastChannel(name);
@@ -146,17 +170,26 @@ export class StudioBroadcastChannelTransport implements StudioLiveTransport {
   private readonly channel: StudioBroadcastChannelLike;
   private readonly listeners = new Set<(value: unknown) => void>();
   private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
+  private readonly inkListeners = new Set<(value: unknown) => void>();
   private readonly crdtContext: StudioBroadcastCrdtContext | null;
   private readonly pendingSync = new Map<string, PendingLocalSync>();
   private readonly seenUpdateIds = new Set<string>();
   private readonly scheduleTimeout: (handler: () => void, delay: number) => unknown;
   private readonly cancelTimeout: (handle: unknown) => void;
   private readonly syncTimeoutMs: number;
+  private readonly inkLaneEnabled: boolean;
   private closed = false;
   private connected = false;
   private readonly onMessage = (event: MessageEvent<unknown>) => {
     if (isStudioCrdtLocalWireCandidate(event.data)) {
       this.onCrdtMessage(event.data);
+      return;
+    }
+    if (isStudioLiveInkWireCandidate(event.data)) {
+      // Fail closed: without the negotiated lane an ink frame is dropped, never re-routed to the
+      // JSON envelope listeners. A pre-V18 peer therefore stays cursor-only by construction.
+      if (!this.inkLaneEnabled || !this.ready) return;
+      for (const listener of this.inkListeners) listener(event.data);
       return;
     }
     for (const listener of this.listeners) listener(event.data);
@@ -178,11 +211,17 @@ export class StudioBroadcastChannelTransport implements StudioLiveTransport {
       5_000,
       Math.max(100, Math.trunc(dependencies.syncTimeoutMs ?? DEFAULT_LOCAL_CRDT_SYNC_TIMEOUT_MS))
     );
+    this.inkLaneEnabled = dependencies.inkLane !== false;
     this.channel.addEventListener("message", this.onMessage);
   }
 
   get ready(): boolean {
     return this.connected && !this.closed;
+  }
+
+  /** Same-origin tabs run the same build, so the local lane set is negotiated statically. */
+  get binaryLaneCapabilities(): readonly string[] {
+    return this.inkLaneEnabled ? STUDIO_LOCAL_BINARY_LANES : [];
   }
 
   connect(): Promise<void> {
@@ -207,6 +246,23 @@ export class StudioBroadcastChannelTransport implements StudioLiveTransport {
     if (this.closed) return () => undefined;
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** Binary ink lane. Fails closed when the "ink-v2" capability was not negotiated. */
+  sendInk(message: StudioLiveInkWireMessage): boolean {
+    if (!this.ready || !this.inkLaneEnabled) return false;
+    try {
+      this.channel.postMessage(message);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  subscribeInk(listener: (value: unknown) => void): () => void {
+    if (this.closed || !this.inkLaneEnabled) return () => undefined;
+    this.inkListeners.add(listener);
+    return () => this.inkListeners.delete(listener);
   }
 
   requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
@@ -312,6 +368,7 @@ export class StudioBroadcastChannelTransport implements StudioLiveTransport {
     this.closed = true;
     this.listeners.clear();
     this.crdtListeners.clear();
+    this.inkListeners.clear();
     for (const pending of this.pendingSync.values()) {
       this.cancelTimeout(pending.timeout);
       pending.resolve(null);

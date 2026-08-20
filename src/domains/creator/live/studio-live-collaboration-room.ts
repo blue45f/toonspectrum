@@ -48,6 +48,19 @@ import {
   copyStudioLiveGesturePreviewPayload,
   type StudioLiveGesturePreviewPayload,
 } from "./studio-live-gesture-preview";
+import {
+  createStudioLiveInkWireMessage,
+  parseStudioLiveInkWireMessage,
+  STUDIO_LIVE_INK_CAPABILITY,
+  StudioLiveInkStrokeTracker,
+  type StudioLiveInkBegin,
+  type StudioLiveInkCancel,
+  type StudioLiveInkChunk,
+  type StudioLiveInkEnd,
+  type StudioLiveInkMessage,
+  type StudioLiveInkPrediction,
+  type StudioLiveInkWireMessage,
+} from "./studio-live-ink-protocol";
 import { isStudioLiveP2pMeshShareId } from "./studio-live-p2p-overlay-transport";
 
 import type {
@@ -74,6 +87,22 @@ export const STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_WINDOW_MS = 3_000;
 export const STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS = 90;
 export const STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_BYTES = 2 * 1024 * 1024;
 export const STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_SENDERS = 64;
+
+/**
+ * V18 ink chunk cadence. The scheduler is deliberately independent from cursor throttling
+ * (`cursorIntervalMs` stays untouched): a healthy queue streams one sample packet every 8–16ms,
+ * and rising backpressure stretches the interval to 24ms then 33ms instead of dropping actuals.
+ */
+export const STUDIO_LIVE_INK_CHUNK_CADENCE_LOW_FAST_MS = 8;
+export const STUDIO_LIVE_INK_CHUNK_CADENCE_LOW_MS = 16;
+export const STUDIO_LIVE_INK_CHUNK_CADENCE_MID_MS = 24;
+export const STUDIO_LIVE_INK_CHUNK_CADENCE_HIGH_MS = 33;
+export const STUDIO_LIVE_INK_BACKPRESSURE_MID_QUEUED_CHUNKS = 4;
+export const STUDIO_LIVE_INK_BACKPRESSURE_HIGH_QUEUED_CHUNKS = 12;
+export const STUDIO_LIVE_INK_BACKPRESSURE_MID_QUEUED_BYTES = 96 * 1024;
+export const STUDIO_LIVE_INK_BACKPRESSURE_HIGH_QUEUED_BYTES = 256 * 1024;
+/** Absolute fail-closed bound; an author must cancel the stroke when the queue is saturated. */
+export const STUDIO_LIVE_INK_MAX_QUEUED_MESSAGES = 512;
 
 type StudioLiveSignalKind =
   | "screen:announce"
@@ -184,6 +213,32 @@ export type StudioLiveCrdtRoomEvent =
   | StudioCrdtTransportMessage
   | { type: "error"; operation: "sync" | "publish"; message: string };
 
+/** One validated remote ink message, delivered on its own channel apart from cursor events. */
+export interface StudioLiveInkRoomEvent {
+  type: "ink";
+  participant: StudioLiveParticipant;
+  message: StudioLiveInkMessage;
+}
+
+export type StudioLiveInkBackpressureLevel = "low" | "mid" | "high";
+
+export interface StudioLiveInkBackpressure {
+  level: StudioLiveInkBackpressureLevel;
+  queuedMessages: number;
+  /** Payload-bearing packets (chunks and still-queued predictions) awaiting send. */
+  queuedChunks: number;
+  queuedBytes: number;
+  chunkCadenceMs: number;
+  droppedPredictions: number;
+}
+
+interface OutboundStudioLiveInkEntry {
+  wire: StudioLiveInkWireMessage;
+  payloadBytes: number;
+  droppablePrediction: boolean;
+  expiresAt: number | null;
+}
+
 export interface StudioLiveRoomDependencies {
   transportFactory?: StudioLiveTransportFactory;
   now?: () => number;
@@ -257,6 +312,9 @@ function canEditStudioLiveGesturePreview(participant: StudioLiveParticipant): bo
     || participant.role === "editor";
 }
 
+/** V18 ink shares the gesture-preview authoring gate: only edit-capable roles may stream. */
+const canPublishStudioLiveInk = canEditStudioLiveGesturePreview;
+
 function copyCursor(cursor: StudioLiveCursorPayload): StudioLiveCursorPayload {
   return {
     ...cursor,
@@ -305,10 +363,18 @@ export class StudioLiveRoom {
     string,
     StudioLiveGesturePreviewInboundWindow
   >();
+  private readonly inkListeners = new Set<(event: StudioLiveInkRoomEvent) => void>();
+  private readonly outboundInkTracker = new StudioLiveInkStrokeTracker();
+  private readonly inboundInkTrackerBySession = new Map<string, StudioLiveInkStrokeTracker>();
+  private readonly outboundInkQueue: OutboundStudioLiveInkEntry[] = [];
   private transport: StudioLiveTransport | null = null;
   private unsubscribeTransport: (() => void) | null = null;
   private unsubscribeTransportControl: (() => void) | null = null;
   private unsubscribeTransportCrdt: (() => void) | null = null;
+  private unsubscribeTransportInk: (() => void) | null = null;
+  private outboundInkFlushHandle: unknown = null;
+  private lastInkPayloadSentAt = Number.NEGATIVE_INFINITY;
+  private droppedInkPredictions = 0;
   private heartbeatHandle: unknown = null;
   private phase: "idle" | "starting" | "ready" | "closed" = "idle";
   private startPromise: Promise<void> | null = null;
@@ -398,6 +464,12 @@ export class StudioLiveRoom {
     return () => this.voiceListeners.delete(listener);
   }
 
+  /** Validated remote ink stream. Deliberately separate from cursor and gesture-preview events. */
+  subscribeInk(listener: (event: StudioLiveInkRoomEvent) => void): () => void {
+    this.inkListeners.add(listener);
+    return () => this.inkListeners.delete(listener);
+  }
+
   async start(): Promise<void> {
     if (this.phase === "ready") return;
     if (this.phase === "closed") throw new Error("이미 닫힌 공동작업 세션입니다.");
@@ -417,6 +489,8 @@ export class StudioLiveRoom {
         transport.subscribeControl?.((event) => this.onTransportControl(event)) ?? null;
       this.unsubscribeTransportCrdt =
         transport.subscribeCrdt?.((message) => this.emitCrdt(message)) ?? null;
+      this.unsubscribeTransportInk =
+        transport.subscribeInk?.((value) => this.onTransportInk(value)) ?? null;
       try {
         await transport.connect();
         if (this.phase === "closed" || generation !== this.connectionGeneration) {
@@ -436,6 +510,8 @@ export class StudioLiveRoom {
           this.unsubscribeTransportControl = null;
           this.unsubscribeTransportCrdt?.();
           this.unsubscribeTransportCrdt = null;
+          this.unsubscribeTransportInk?.();
+          this.unsubscribeTransportInk = null;
         }
         transport.close();
         throw error;
@@ -606,6 +682,36 @@ export class StudioLiveRoom {
   publishGesturePreview(payload: StudioLiveGesturePreviewPayload): boolean {
     if (!this.ready || !canEditStudioLiveGesturePreview(this.participant)) return false;
     return this.post("preview:gesture", payload);
+  }
+
+  /**
+   * Live Ink Protocol V2 publishers. Ink runs on the transport's negotiated binary lane with its
+   * own backpressure scheduler; cursor throttling and cadence stay completely untouched. Every
+   * publisher fails closed: no negotiated `ink-v2` capability, a viewer role, an out-of-order
+   * lifecycle call, or a saturated queue all return false without any JSON fallback path.
+   */
+  publishInkBegin(message: Omit<StudioLiveInkBegin, "kind">): boolean {
+    return this.publishInk({ ...message, kind: "ink:begin" });
+  }
+
+  publishInkChunk(message: Omit<StudioLiveInkChunk, "kind">): boolean {
+    return this.publishInk({ ...message, kind: "ink:chunk" });
+  }
+
+  publishInkPrediction(message: Omit<StudioLiveInkPrediction, "kind">): boolean {
+    return this.publishInk({ ...message, kind: "ink:prediction" });
+  }
+
+  publishInkEnd(message: Omit<StudioLiveInkEnd, "kind">): boolean {
+    return this.publishInk({ ...message, kind: "ink:end" });
+  }
+
+  publishInkCancel(message: Omit<StudioLiveInkCancel, "kind">): boolean {
+    return this.publishInk({ ...message, kind: "ink:cancel" });
+  }
+
+  getInkBackpressure(): StudioLiveInkBackpressure {
+    return this.computeInkBackpressure();
   }
 
   /**
@@ -1079,6 +1185,7 @@ export class StudioLiveRoom {
         if (lock.owner.sessionId !== this.participant.sessionId) continue;
         this.post("lock:release", { resource: lock.resource, claimId: lock.claimId });
       }
+      this.drainInkQueueOnClose();
       this.post("presence:leave", {});
     }
     this.revokePendingLockClaims(
@@ -1092,12 +1199,16 @@ export class StudioLiveRoom {
     this.phase = "closed";
     if (this.heartbeatHandle !== null) this.cancelInterval(this.heartbeatHandle);
     this.heartbeatHandle = null;
+    if (this.outboundInkFlushHandle !== null) this.cancelTimeout(this.outboundInkFlushHandle);
+    this.outboundInkFlushHandle = null;
     this.unsubscribeTransport?.();
     this.unsubscribeTransport = null;
     this.unsubscribeTransportControl?.();
     this.unsubscribeTransportControl = null;
     this.unsubscribeTransportCrdt?.();
     this.unsubscribeTransportCrdt = null;
+    this.unsubscribeTransportInk?.();
+    this.unsubscribeTransportInk = null;
     this.transport?.close();
     this.transport = null;
     this.emitVoice({ type: "terminal", reason: "closed" });
@@ -1110,9 +1221,13 @@ export class StudioLiveRoom {
     this.lastSequenceBySession.clear();
     this.previewParticipantBySession.clear();
     this.previewInboundWindowBySession.clear();
+    this.outboundInkQueue.length = 0;
+    this.outboundInkTracker.clear();
+    this.inboundInkTrackerBySession.clear();
     this.listeners.clear();
     this.crdtListeners.clear();
     this.voiceListeners.clear();
+    this.inkListeners.clear();
   }
 
   private appendChatMessage(message: StudioLiveChatMessage): void {
@@ -1170,6 +1285,202 @@ export class StudioLiveRoom {
   private forgetGesturePreviewPeer(sessionId: string): void {
     this.previewParticipantBySession.delete(sessionId);
     this.previewInboundWindowBySession.delete(sessionId);
+    // A departed peer's ink lifecycle gate dies with its presence; a rejoin starts clean.
+    this.inboundInkTrackerBySession.delete(sessionId);
+  }
+
+  /** True only when the transport negotiated the ink-v2 binary lane. Fail closed otherwise. */
+  private transportSupportsInk(): boolean {
+    const transport = this.transport;
+    return (
+      transport !== null &&
+      typeof transport.sendInk === "function" &&
+      (transport.binaryLaneCapabilities?.includes(STUDIO_LIVE_INK_CAPABILITY) ?? false)
+    );
+  }
+
+  private publishInk(message: StudioLiveInkMessage): boolean {
+    if (!this.ready || !canPublishStudioLiveInk(this.participant)) return false;
+    if (!this.transportSupportsInk()) return false;
+    // Structural validation runs before any stroke state mutates; authoring bugs throw loud.
+    const wire = createStudioLiveInkWireMessage({
+      workId: this.workId,
+      senderSessionId: this.participant.sessionId,
+      sentAt: this.now(),
+      message,
+    });
+    const prediction = message.kind === "ink:prediction";
+    if (prediction && this.computeInkBackpressure().level === "high") {
+      // Backpressure sheds speculative packets first; actual samples are never dropped.
+      this.droppedInkPredictions += 1;
+      return false;
+    }
+    if (!prediction && this.outboundInkQueue.length >= STUDIO_LIVE_INK_MAX_QUEUED_MESSAGES) {
+      return false;
+    }
+    if (!this.outboundInkTracker.accept(message)) return false;
+    this.outboundInkQueue.push({
+      wire,
+      payloadBytes:
+        message.kind === "ink:chunk" || message.kind === "ink:prediction"
+          ? message.payload.byteLength
+          : 0,
+      droppablePrediction: prediction,
+      expiresAt: prediction ? (message as StudioLiveInkPrediction).expiresAt : null,
+    });
+    if (this.computeInkBackpressure().level === "high") this.dropQueuedInkPredictions();
+    this.pumpInkQueue();
+    return true;
+  }
+
+  private computeInkBackpressure(): StudioLiveInkBackpressure {
+    let queuedChunks = 0;
+    let queuedBytes = 0;
+    for (const entry of this.outboundInkQueue) {
+      if (entry.payloadBytes > 0) queuedChunks += 1;
+      queuedBytes += entry.payloadBytes;
+    }
+    const level: StudioLiveInkBackpressureLevel =
+      queuedChunks >= STUDIO_LIVE_INK_BACKPRESSURE_HIGH_QUEUED_CHUNKS ||
+      queuedBytes >= STUDIO_LIVE_INK_BACKPRESSURE_HIGH_QUEUED_BYTES
+        ? "high"
+        : queuedChunks >= STUDIO_LIVE_INK_BACKPRESSURE_MID_QUEUED_CHUNKS ||
+            queuedBytes >= STUDIO_LIVE_INK_BACKPRESSURE_MID_QUEUED_BYTES
+          ? "mid"
+          : "low";
+    const chunkCadenceMs =
+      level === "high"
+        ? STUDIO_LIVE_INK_CHUNK_CADENCE_HIGH_MS
+        : level === "mid"
+          ? STUDIO_LIVE_INK_CHUNK_CADENCE_MID_MS
+          : queuedChunks <= 1
+            ? STUDIO_LIVE_INK_CHUNK_CADENCE_LOW_FAST_MS
+            : STUDIO_LIVE_INK_CHUNK_CADENCE_LOW_MS;
+    return {
+      level,
+      queuedMessages: this.outboundInkQueue.length,
+      queuedChunks,
+      queuedBytes,
+      chunkCadenceMs,
+      droppedPredictions: this.droppedInkPredictions,
+    };
+  }
+
+  private dropQueuedInkPredictions(): void {
+    let index = this.outboundInkQueue.length;
+    while (index > 0) {
+      index -= 1;
+      if (!this.outboundInkQueue[index]!.droppablePrediction) continue;
+      this.outboundInkQueue.splice(index, 1);
+      this.droppedInkPredictions += 1;
+    }
+  }
+
+  private pumpInkQueue(): void {
+    if (this.outboundInkFlushHandle !== null || this.outboundInkQueue.length === 0) return;
+    if (!this.ready || !this.transportSupportsInk()) return;
+    const now = this.now();
+    const cadence = this.computeInkBackpressure().chunkCadenceMs;
+    const dueIn = this.lastInkPayloadSentAt + cadence - now;
+    if (dueIn > 0) {
+      this.scheduleInkFlush(dueIn);
+      return;
+    }
+    if (!this.flushInkQueueOnce(now)) {
+      // The transport refused the head frame; retry one cadence later instead of spinning.
+      this.scheduleInkFlush(cadence);
+      return;
+    }
+    if (this.outboundInkQueue.length > 0) {
+      this.scheduleInkFlush(this.computeInkBackpressure().chunkCadenceMs);
+    }
+  }
+
+  private scheduleInkFlush(delayMs: number): void {
+    if (this.outboundInkFlushHandle !== null) return;
+    this.outboundInkFlushHandle = this.scheduleTimeout(() => {
+      this.outboundInkFlushHandle = null;
+      this.pumpInkQueue();
+    }, delayMs);
+  }
+
+  /** Sends queued control frames plus at most one payload packet, honoring the chunk cadence. */
+  private flushInkQueueOnce(now: number): boolean {
+    let index = this.outboundInkQueue.length;
+    while (index > 0) {
+      index -= 1;
+      const entry = this.outboundInkQueue[index]!;
+      if (!entry.droppablePrediction || entry.expiresAt === null || entry.expiresAt > now) continue;
+      this.outboundInkQueue.splice(index, 1);
+      this.droppedInkPredictions += 1;
+    }
+    let sentAny = false;
+    while (this.outboundInkQueue.length > 0) {
+      const entry = this.outboundInkQueue[0]!;
+      if (this.transport?.sendInk?.(entry.wire) !== true) {
+        if (!sentAny) {
+          this.emit({ type: "transport-error", message: "실시간 잉크 메시지를 보내지 못했습니다." });
+        }
+        return sentAny;
+      }
+      this.outboundInkQueue.shift();
+      sentAny = true;
+      if (entry.payloadBytes > 0) {
+        this.lastInkPayloadSentAt = now;
+        break;
+      }
+    }
+    return sentAny;
+  }
+
+  /** Best-effort ordered drain of buffered actual packets before the room says goodbye. */
+  private drainInkQueueOnClose(): void {
+    if (this.transportSupportsInk()) {
+      for (const entry of this.outboundInkQueue) {
+        if (entry.droppablePrediction) continue;
+        if (this.transport?.sendInk?.(entry.wire) !== true) break;
+      }
+    }
+    this.outboundInkQueue.length = 0;
+  }
+
+  private onTransportInk(value: unknown): void {
+    if (!this.ready || !this.transportSupportsInk()) return;
+    const receivedAt = this.now();
+    const wire = parseStudioLiveInkWireMessage(value, {
+      expectedWorkId: this.workId,
+      selfSessionId: this.participant.sessionId,
+      now: receivedAt,
+    });
+    if (!wire) return;
+    this.pruneExpired(receivedAt);
+    const sessionId = wire.senderSessionId;
+    const participant = this.previewParticipantBySession.get(sessionId);
+    // Fail closed: only presence-verified, edit-capable peers may stream ink into this room.
+    if (!this.peers.has(sessionId) || !participant || !canPublishStudioLiveInk(participant)) {
+      return;
+    }
+    let tracker = this.inboundInkTrackerBySession.get(sessionId);
+    if (!tracker) {
+      tracker = new StudioLiveInkStrokeTracker();
+      this.inboundInkTrackerBySession.set(sessionId, tracker);
+    }
+    if (!tracker.accept(wire.message)) return;
+    this.emitInk({
+      type: "ink",
+      participant: copyParticipant(participant),
+      message: wire.message,
+    });
+  }
+
+  private emitInk(event: StudioLiveInkRoomEvent): void {
+    for (const listener of this.inkListeners) {
+      try {
+        listener(event);
+      } catch {
+        // One ink renderer cannot interrupt room cleanup or other subscribers.
+      }
+    }
   }
 
   private claimLocalLock(resource: string, requestId?: string, requestedAt = this.now()): boolean {
@@ -1669,6 +1980,12 @@ export class StudioLiveRoom {
         this.lastSequenceBySession.clear();
         this.previewParticipantBySession.clear();
         this.previewInboundWindowBySession.clear();
+        this.inboundInkTrackerBySession.clear();
+        // Access revocation is terminal for the lane: buffered ink must never reach the room again.
+        this.outboundInkQueue.length = 0;
+        this.outboundInkTracker.clear();
+        if (this.outboundInkFlushHandle !== null) this.cancelTimeout(this.outboundInkFlushHandle);
+        this.outboundInkFlushHandle = null;
         if (hadPeers) this.emitPresence();
         if (hadLocks) this.emitLocks();
         this.voiceMembers.clear();
@@ -1688,6 +2005,9 @@ export class StudioLiveRoom {
         this.lastSequenceBySession.clear();
         this.previewParticipantBySession.clear();
         this.previewInboundWindowBySession.clear();
+        // Remote lifecycle gates reset with presence; the outbound actual buffer survives the
+        // recoverable gap so no authored sample is ever dropped by a transient disconnect.
+        this.inboundInkTrackerBySession.clear();
         if (hadPeers) this.emitPresence();
         let changed = false;
         for (const [sessionId, member] of this.voiceMembers) {
@@ -1711,6 +2031,8 @@ export class StudioLiveRoom {
         this.sendPresence("presence:heartbeat");
         const voice = this.voiceMembers.get(this.participant.sessionId);
         if (voice) this.post("voice:join", { callId: voice.callId, muted: voice.muted });
+        // Buffered actual ink packets resume on their own scheduler after a reconnect.
+        this.pumpInkQueue();
       }
       this.emit({ type: "transport-status", status: event.status });
       return;

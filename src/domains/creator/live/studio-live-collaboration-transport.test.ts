@@ -13,6 +13,14 @@ import {
   type StudioBroadcastChannelLike,
   type StudioLiveTransportControlEvent,
 } from "./studio-live-collaboration-transport";
+import { encodeStudioLiveInkSamples } from "./studio-live-ink-codec";
+import {
+  createStudioLiveInkWireMessage,
+  STUDIO_LIVE_INK_CAPABILITY,
+  STUDIO_LIVE_INK_PROTOCOL_VERSION,
+  STUDIO_LIVE_INK_SAMPLE_SCHEMA,
+  type StudioLiveInkWireMessage,
+} from "./studio-live-ink-protocol";
 
 class FakeBroadcastChannel implements StudioBroadcastChannelLike {
   private readonly listeners = new Set<(event: MessageEvent<unknown>) => void>();
@@ -205,6 +213,100 @@ describe("StudioBroadcastChannelTransport", () => {
     expect(received).toHaveLength(1);
     alice.close();
     bob.close();
+  });
+
+  it("routes negotiated binary ink frames to the ink lane only", async () => {
+    const hub = new FakeBroadcastHub();
+    const alice = makeTransport(hub, "alice");
+    const bob = makeTransport(hub, "bob");
+    await alice.connect();
+    await bob.connect();
+    const ephemeral: unknown[] = [];
+    const durable: StudioCrdtTransportMessage[] = [];
+    const ink: unknown[] = [];
+    bob.subscribe((value) => ephemeral.push(value));
+    bob.subscribeCrdt((message) => durable.push(message));
+    bob.subscribeInk((value) => ink.push(value));
+
+    expect(alice.binaryLaneCapabilities).toContain(STUDIO_LIVE_INK_CAPABILITY);
+    const wire = createStudioLiveInkWireMessage({
+      workId: "work-1",
+      senderSessionId: "alice",
+      sentAt: Date.now(),
+      message: {
+        kind: "ink:chunk",
+        strokeId: "stroke-1",
+        chunkSequence: 1,
+        firstSampleIndex: 0,
+        sampleCount: 2,
+        payload: encodeStudioLiveInkSamples([
+          { x: 1, y: 2, pressure: 0.5 },
+          { x: 3, y: 4, pressure: 0.75 },
+        ]),
+      },
+    });
+    expect(alice.sendInk(wire)).toBe(true);
+
+    expect(ephemeral).toEqual([]);
+    expect(durable).toEqual([]);
+    expect(ink).toHaveLength(1);
+    expect(ink[0]).toMatchObject({ wire: "studio-live-ink", senderSessionId: "alice" });
+    alice.close();
+    bob.close();
+  });
+
+  it("fails closed on both sides when the ink-v2 lane was not negotiated", async () => {
+    const hub = new FakeBroadcastHub();
+    const capable = makeTransport(hub, "alice");
+    const legacy = new StudioBroadcastChannelTransport(
+      "channel-1",
+      hub.create,
+      {
+        workId: "work-1",
+        participant: { sessionId: "bob", displayName: "bob", role: "editor" },
+      },
+      { syncTimeoutMs: 100, inkLane: false }
+    );
+    await capable.connect();
+    await legacy.connect();
+    const legacyInk: unknown[] = [];
+    const legacyEphemeral: unknown[] = [];
+    legacy.subscribeInk((value) => legacyInk.push(value));
+    legacy.subscribe((value) => legacyEphemeral.push(value));
+
+    const wire: StudioLiveInkWireMessage = createStudioLiveInkWireMessage({
+      workId: "work-1",
+      senderSessionId: "alice",
+      sentAt: Date.now(),
+      message: {
+        kind: "ink:begin",
+        protocolVersion: STUDIO_LIVE_INK_PROTOCOL_VERSION,
+        strokeId: "stroke-1",
+        pageId: "page-1",
+        layerId: "layer-1",
+        coordinateSpaceId: "space-1",
+        coordinateSpaceRevision: 0,
+        provider: { providerId: "p", providerVersion: "1", buildHash: "h" },
+        brushPresetId: "brush",
+        brushContractHash: "hash",
+        seed: 1,
+        mode: "pen",
+        blendMode: "normal",
+        color: "#000000",
+        width: 4,
+        opacity: 1,
+        sampleSchema: STUDIO_LIVE_INK_SAMPLE_SCHEMA,
+        startedAt: Date.now(),
+      },
+    });
+    expect(legacy.binaryLaneCapabilities).toEqual([]);
+    expect(legacy.sendInk(wire)).toBe(false);
+    // A capable sender's frame is dropped by the lane-less peer, never re-routed to JSON.
+    expect(capable.sendInk(wire)).toBe(true);
+    expect(legacyInk).toEqual([]);
+    expect(legacyEphemeral).toEqual([]);
+    capable.close();
+    legacy.close();
   });
 
   it("drops cross-work durable frames before they reach a subscriber", async () => {
