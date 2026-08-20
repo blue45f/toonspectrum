@@ -433,11 +433,18 @@ describe("studio brush dynamics settings safety", () => {
   });
 
   it("keeps canonical presets compatible and returns detached alias settings", () => {
-    for (const id of ["ink-particle", "airbrush", "dry-media"] as const) {
-      expect(studioBrushDynamicsSettingsForBrushId(id)).toEqual(
-        studioBrushDynamicsPresetSettings(id)
-      );
+    // The causal alpha-tip toolbar ids additionally mint the second-wave stamp-grid rule pin at
+    // brush-id resolution; everything else stays byte-identical to the raw canonical preset.
+    for (const id of ["ink-particle", "dry-media"] as const) {
+      expect(studioBrushDynamicsSettingsForBrushId(id)).toEqual({
+        ...studioBrushDynamicsPresetSettings(id),
+        causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2,
+      });
     }
+    // The analytic-falloff airbrush stays unminted and resolves the pristine preset.
+    expect(studioBrushDynamicsSettingsForBrushId("airbrush")).toEqual(
+      studioBrushDynamicsPresetSettings("airbrush")
+    );
     expect(studioBrushDynamicsSettingsForBrushId("pencil")).toBeNull();
     expect(studioBrushDynamicsSettingsForBrushId(null)).toBeNull();
 
@@ -1247,8 +1254,12 @@ describe("studio dynamic brush arc-length dab planner", () => {
         studioReplaySafeBrushDynamicsSettingsForBrushId(brushId)?.causalStampGridRule,
       ).toBeUndefined();
     }
-    // Canonical presets stay unpinned, so persisted preset-only serialization is unchanged.
+    // Raw canonical preset settings stay unpinned — they are the merge base for every derived
+    // alias, and persisted preset-only serialization must not change. The canonical toolbar ids
+    // mint the pin at brush-id resolution instead (second-wave test below).
     expect(studioBrushDynamicsPresetSettings("dry-media").causalStampGridRule).toBeUndefined();
+    expect(studioBrushDynamicsPresetSettings("ink-particle").causalStampGridRule).toBeUndefined();
+    expect(studioBrushDynamicsPresetSettings("airbrush").causalStampGridRule).toBeUndefined();
 
     // Fresh large charcoal/crayon strokes now lattice 5/7; the authored small nibs keep grid 3.
     const charcoal = studioBrushDynamicsSettingsForBrushId("charcoal")!;
@@ -1262,6 +1273,53 @@ describe("studio dynamic brush arc-length dab planner", () => {
     expect(gridFor(charcoal.width.base)).toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
     expect(gridFor(48)).toBe(5);
     expect(gridFor(96)).toBe(7);
+  });
+
+  it("mints the second-wave rule pin for the remaining causal alpha-tip toolbar ids", () => {
+    const v2 = STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2;
+    const secondWaveBrushIds = [
+      // Canonical causal presets used directly as toolbar ids (their sampled hard/grain tips
+      // lattice on the stamp grid; the analytic-falloff airbrush is checked separately below).
+      "ink-particle",
+      "dry-media",
+      // Engine-lane dry-media variants.
+      "charcoal--vine-soft",
+      "charcoal--compressed-edge",
+      "crayon--wax-scrape",
+      "chalk--klecks-powder",
+      "pastel--cake-soft",
+      "oil-pastel--waxy-film",
+      "oil-pastel--wgm-mix",
+      "brush--dry-rake",
+    ] as const;
+    for (const brushId of secondWaveBrushIds) {
+      const fresh = studioBrushDynamicsSettingsForBrushId(brushId);
+      expect(fresh?.causalStampGridRule, brushId).toBe(v2);
+      expect(fresh?.depositPipeline, brushId)
+        .toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3);
+      // Fresh dynamics select the width-appropriate lattice once the authored width grows.
+      const gridFor = (baseWidth: number) => selectStudioDynamicBrushCausalStampGrid({
+        rule: studioDynamicBrushCausalStampGridRuleOf(normalizeStudioBrushDynamicsSettings({
+          ...fresh!,
+          width: { ...fresh!.width, base: baseWidth },
+        })),
+        baseWidth,
+      });
+      expect(gridFor(8), brushId).toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+      expect(gridFor(48), brushId).toBe(5);
+      expect(gridFor(96), brushId).toBe(7);
+      // Snapshot-less persisted strokes re-derive replay-safe and stay on legacy grid 3.
+      const replay = studioReplaySafeBrushDynamicsSettingsForBrushId(brushId);
+      expect(replay?.causalStampGridRule, brushId).toBeUndefined();
+      expect(selectStudioDynamicBrushCausalStampGrid({
+        rule: studioDynamicBrushCausalStampGridRuleOf(replay!),
+        baseWidth: 96,
+      }), brushId).toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+    }
+    // The canonical airbrush is deliberately NOT minted: its analytic soft-falloff tip renders as
+    // one analytic-radial command, so the sampled stamp lattice the rule selects never applies.
+    expect(studioBrushDynamicsSettingsForBrushId("airbrush")?.causalStampGridRule)
+      .toBeUndefined();
   });
 
   it("keeps the pin through the coverage-budget contract, including the ribbon copy branch", () => {

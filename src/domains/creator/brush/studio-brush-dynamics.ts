@@ -3261,6 +3261,26 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       },
     },
   },
+  // Second-wave causal stamp-grid rule v2 (fresh authoring only): the canonical causal presets
+  // are themselves toolbar brushes, so their exact ids mint the width-adaptive lattice pin here
+  // at the brush-id resolution seam — exactly like the dry-media variants below — instead of
+  // inside `STUDIO_BRUSH_DYNAMICS_PRESETS`, whose settings are the merge base for every derived
+  // alias (hard-airbrush, spray, web-* …) and would silently pin families the rollout has not
+  // audited. `airbrush` is deliberately NOT minted: its analytic soft-falloff tip renders as one
+  // analytic-radial command (`tipUsesAnalyticSoftFalloff`), so the sampled stamp lattice — the
+  // only thing the rule selects — never applies to it.
+  "ink-particle": {
+    presetId: "ink-particle",
+    overrides: {
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
+    },
+  },
+  "dry-media": {
+    presetId: "dry-media",
+    overrides: {
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
+    },
+  },
   crayon: {
     presetId: "dry-media",
     overrides: {
@@ -3617,6 +3637,11 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   "charcoal--vine-soft": {
     presetId: "dry-media",
     overrides: {
+      // Second-wave causal stamp-grid rule v2 mint for the engine-lane dry-media variants: their
+      // sampled alpha tips lattice 5/7 on large fresh nibs (see the crayon mint above). Fresh
+      // authoring only — replay re-derivation strips the pin, so persisted lane strokes keep the
+      // fixed causal grid 3.
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
       seed: 9071, tip: { shape: "sponge", softness: 0.7 }, spacingRatio: 0.16, scatterRatio: 0.12,
       grain: { space: "canvas-fixed", amount: 0.45, scale: 9, contrast: 0.55, seed: 9071 },
     },
@@ -3624,6 +3649,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   "charcoal--compressed-edge": {
     presetId: "dry-media",
     overrides: {
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
       seed: 9079, tip: { shape: "hard", softness: 0.15 }, spacingRatio: 0.11, scatterRatio: 0.06,
       grain: { space: "canvas-fixed", amount: 0.35, scale: 6, contrast: 0.7, seed: 9079 },
     },
@@ -3631,6 +3657,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   "crayon--wax-scrape": {
     presetId: "dry-media",
     overrides: {
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
       seed: 9083, tip: { shape: "hard", softness: 0.12 }, spacingRatio: 0.13, scatterRatio: 0.05,
       grain: { space: "canvas-fixed", amount: 0.5, scale: 7, contrast: 0.65, seed: 9083 },
     },
@@ -3638,17 +3665,24 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   "chalk--klecks-powder": {
     presetId: "dry-media",
     overrides: {
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
       seed: 9091, tip: { shape: "sponge", softness: 0.55 }, spacingRatio: 0.15, scatterRatio: 0.18,
       grain: { space: "canvas-fixed", amount: 0.6, scale: 4.5, contrast: 0.75, seed: 9091 },
     },
   },
   "pastel--cake-soft": {
     presetId: "dry-media",
-    overrides: { seed: 9103, tip: { shape: "sponge", softness: 0.68 }, spacingRatio: 0.12, scatterRatio: 0.08 },
+    overrides: {
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
+      seed: 9103, tip: { shape: "sponge", softness: 0.68 }, spacingRatio: 0.12, scatterRatio: 0.08,
+    },
   },
   "oil-pastel--waxy-film": {
     presetId: "dry-media",
-    overrides: { seed: 9109, tip: { shape: "bristle", softness: 0.35 }, spacingRatio: 0.1, scatterRatio: 0.04 },
+    overrides: {
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
+      seed: 9109, tip: { shape: "bristle", softness: 0.35 }, spacingRatio: 0.1, scatterRatio: 0.04,
+    },
   },
   // F3(2026-08-13): waxy-film과 같은 dry-media 물성 위에서 색 파이프라인만 다르다 — 카탈로그의
   // spectral-wgm-v1 핀 + 종이톤 배경 + dab별 지터가 이 레인의 유일한 SSOT(값 중복 금지). 핀이
@@ -3656,6 +3690,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   "oil-pastel--wgm-mix": {
     presetId: "dry-media",
     overrides: {
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
       seed: 9137,
       tip: { shape: "bristle", softness: 0.35 },
       spacingRatio: 0.1,
@@ -3666,7 +3701,10 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   },
   "brush--dry-rake": {
     presetId: "dry-media",
-    overrides: { seed: 9113, tip: { shape: "bristle", softness: 0.25 }, spacingRatio: 0.14, scatterRatio: 0.2 },
+    overrides: {
+      causalStampGridRule: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID_RULE_V2_PIN,
+      seed: 9113, tip: { shape: "bristle", softness: 0.25 }, spacingRatio: 0.14, scatterRatio: 0.2,
+    },
   },
   "ink-particle--scatter-cloud": {
     presetId: "ink-particle",
