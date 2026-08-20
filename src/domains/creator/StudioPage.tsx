@@ -37122,6 +37122,7 @@ function clearSelectionForEdit() {
   const studioInspectorAsideHandlers = useStudioStableHandlers<StudioInspectorAsideHandlers>({
     activateCanvasTool: activatePrimaryCanvasTool,
     activatePixelSelectionToolFromInspector,
+    applyBuiltInBrushPreset,
     addProceduralArtisticBrushRaster: (
       src,
       width,

@@ -39,6 +39,13 @@ import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./brush/studio-draw-hud";
 import { STUDIO_BRUSH_OPACITY_RANGE, STUDIO_BRUSH_SIZE_RANGE } from "./brush/studio-draw-ux";
 import { toggleStudioDrawingPalette, type StudioDrawingPaletteLayout } from "./brush/studio-drawing-palettes";
 import { normalizeShapeParams, normalizeStrokeStyle } from "./brush/studio-stroke-shapes";
+import {
+  STUDIO_SUB_TOOL_PALETTE_DEFAULT_CATEGORY_ID,
+  studioSubToolPaletteCategoryById,
+  studioSubToolPaletteCategoryIdForBrushId,
+  studioSubToolPalettePresetById,
+} from "./brush/studio-sub-tool-palette-data";
+import { StudioSubToolPalette } from "./brush/StudioSubToolPalette";
 import { type FilterMaskPaintMode } from "./filter/studio-filter-mask";
 import { type LayerMaskPaintMode } from "./layer/studio-layer-mask";
 import {
@@ -66,7 +73,7 @@ import { CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
 import { preloadStudioBackground3D } from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
 import { BRAND_KIT_FONTS, DEFAULT_BRAND_KIT_FONT } from "./studio-brand-kit";
-import { BRUSH_PRESETS } from "./studio-brush";
+import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
 import { type ColorRangeSample } from "./studio-color-range";
 import {
   applyCropAspect,
@@ -297,6 +304,12 @@ export interface StudioInspectorAsideHandlers {
     transaction: StudioBrushDefaultRestoreTransaction,
     direction: StudioBrushDefaultRestoreDirection,
   ) => void;
+  /**
+   * CSP식 서브 도구 팔레트가 코어 카탈로그 프리셋을 원자적으로 적용할 때 쓴다.
+   * StudioPage의 `applyBuiltInBrushPreset`(카탈로그 선택 → 도구 전환까지 한 트랜잭션)을
+   * 그대로 배선한다 — 미배선 시 팔레트는 렌더되지 않는다(반쪽 동작 금지).
+   */
+  applyBuiltInBrushPreset?: (preset: BrushPreset) => void;
   applyContentAwareFill: () => Promise<void>;
   extractPixelSelectionToLayer: (mode: "copy" | "cut") => Promise<void>;
   applyCropToSelectedImage: () => Promise<void>;
@@ -1135,6 +1148,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     applyBgPreset,
     onBrushEngineProgramsChange,
     applyBrushDefaultRestoreTransaction,
+    applyBuiltInBrushPreset,
     applyContentAwareFill,
     extractPixelSelectionToLayer,
     applyCropToSelectedImage,
@@ -1241,6 +1255,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   const [activatedImageInspectorTabs, setActivatedImageInspectorTabs] = useState<
     ReadonlySet<StudioImageInspectorSection>
   >(() => new Set());
+  // 서브 도구 팔레트의 "탐색 중" 탭. 적용된 브러시의 분류와 별개로, 아티스트가 다른 탭을
+  // 둘러보는 상태만 기억한다(적용 자체는 activateCanvasTool + applyBuiltInBrushPreset 경유).
+  const [subToolPaletteBrowsedCategory, setSubToolPaletteBrowsedCategory] = useState<
+    string | null
+  >(null);
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;
@@ -1539,6 +1558,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     currentBrushSnapshot.sourcePresetName
     ?? BRUSH_PRESETS.find((preset) => preset.id === brush)?.name
     ?? brush;
+  // 표시 중인 서브 도구 탭 — 탐색 중이면 그 탭, 아니면 적용된 브러시의 소속 분류,
+  // 팔레트 밖 브러시면 지우개 모드에 한해 지우개 탭, 그 외엔 기본 탭.
+  const subToolPaletteCategory =
+    subToolPaletteBrowsedCategory
+    ?? studioSubToolPaletteCategoryIdForBrushId(activeInspectorBrushId)
+    ?? (drawMode === "eraser" ? "eraser" : STUDIO_SUB_TOOL_PALETTE_DEFAULT_CATEGORY_ID);
   const canvasControlsDisabled = inspectorInteractionPolicy.page.disabled;
   const drawingAssistControlsDisabled = inspectorInteractionPolicy.page.disabled;
   const drawingAssistDisabledReason = inspectorInteractionPolicy.page.reason;
@@ -3518,8 +3543,32 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 onSymmetryChange={setSymmetryType}
               />
 
-              {/* 기본 프리셋 탐색은 하단 도크 한 곳에만 둔다. 인스펙터는 현재 상태와
-                  사용자 저장 브러시·고급 동역학에 집중해 긴 중복 메뉴를 만들지 않는다. */}
+              {/* CSP식 서브 도구 팔레트 — 코어 카탈로그의 선별 매핑(분류 탭 + 서브 도구
+                  리스트)만 노출한다. 분류 탭 활성화는 DrawModeControls와 동일한 도구 전환
+                  경로(activateCanvasTool)를 타고, 서브 도구 적용은 StudioPage의
+                  applyBuiltInBrushPreset 트랜잭션 하나로 끝난다(핸들러 미배선 시 미노출). */}
+              {applyBuiltInBrushPreset && (drawMode === "pen" || drawMode === "eraser") ? (
+                <StudioSubToolPalette
+                  activeCategory={subToolPaletteCategory}
+                  activeSubToolId={activeInspectorBrushId}
+                  onCategoryChange={(category) => {
+                    setSubToolPaletteBrowsedCategory(category);
+                    const nextDrawMode =
+                      studioSubToolPaletteCategoryById(category)?.drawMode;
+                    if (nextDrawMode) activateCanvasTool("draw", nextDrawMode);
+                  }}
+                  onSelectSubTool={(subToolId) => {
+                    const preset = studioSubToolPalettePresetById(subToolId);
+                    if (!preset) return;
+                    applyBuiltInBrushPreset(preset);
+                    setSubToolPaletteBrowsedCategory(null);
+                  }}
+                />
+              ) : null}
+
+              {/* 기본 프리셋 "전체" 탐색은 하단 도크 한 곳에만 둔다. 인스펙터의 서브 도구
+                  팔레트는 선별 매핑만 다루고, 그 외에는 현재 상태와 사용자 저장 브러시·고급
+                  동역학에 집중해 긴 중복 메뉴를 만들지 않는다. */}
               {drawMode === "pen" && inspectorLayout.primary === "properties" ? (
                 <StudioInspectorCurrentBrushSummary
                   brushId={activeInspectorBrushId}
