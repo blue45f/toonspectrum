@@ -22,6 +22,11 @@ const viewHudLoaderSource = readFileSync(
   new URL("./studio-view-tools-hud-loader.ts", import.meta.url),
   "utf8",
 );
+// 줌 정착(앵커 보존) 투영은 휠·핀치 제스처 엔진과 함께 추출됐다 — 헬퍼 사용 계약은 그 파일에서 본다.
+const zoomEngineSource = readFileSync(
+  new URL("./canvas/studio-zoom-gesture-engine.ts", import.meta.url),
+  "utf8",
+);
 
 describe("StudioPage view integration contract", () => {
   it("wires the quarter-turn Stage and transformed collaboration overlay together", () => {
@@ -42,7 +47,8 @@ describe("StudioPage view integration contract", () => {
     expect(source).toContain("planStudioViewRotationTransition({");
     expect(source).toContain("planStudioViewScrollToDocumentPoint({");
     expect(source).toContain("projectStudioViewPointToDocument({");
-    expect(source).toContain("projectStudioDocumentPointToView({");
+    expect(zoomEngineSource).toContain("projectStudioViewPointToDocument({");
+    expect(zoomEngineSource).toContain("projectStudioDocumentPointToView({");
     expect(minimapViewportBoxSource).toContain("projectStudioViewRectToDocumentRect({");
     // and the inspector must not have grown a second, hand-rolled projection.
     expect(inspectorSource).not.toMatch(/scrollPos\.(?:left|top)\s*\/\s*effScale/u);

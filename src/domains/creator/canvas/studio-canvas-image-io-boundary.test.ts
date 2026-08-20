@@ -122,9 +122,14 @@ describe("Studio canvas image I/O module boundary", () => {
     // retouch loader (4 → 5) and reuses createStudioPixelEditCanvas for live bakes
     // (30 → 32: frame downscale path + ROI full-res path) so drop-frame previews stay on
     // the shared pixel-edit factory.
-    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(20);
+    // 의도적 변경(2026-08-20): 확장 블렌드 병합이 layer/studio-layer-operations 로 추출되며
+    // 그 안의 load 1회 / canvas 2회가 함께 이동 — load 20 → 19, canvas 30 → 28.
+    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(19);
     expect(callCount(page.sourceFile, "loadStudioRetouchSourceImage")).toBe(5);
-    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(30);
+    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(28);
+    const layerOperations = moduleShape("../layer/studio-layer-operations.ts");
+    expect(callCount(layerOperations.sourceFile, "loadStudioPixelEditImage")).toBe(1);
+    expect(layerOperations.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(3);
     expect(page.source).not.toContain('from "../studio-gif-element"');
     expect(page.source).not.toContain('from "../studio-upload-image-safety"');
   });

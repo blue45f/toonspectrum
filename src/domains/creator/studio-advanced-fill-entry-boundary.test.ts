@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 
 const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
 const source = readFileSync(pageUrl, "utf8");
+const advancedFillEffectsSource = readFileSync(
+  new URL("./studio-page-advanced-fill.ts", import.meta.url),
+  "utf8",
+);
 const file = ts.createSourceFile(
   pageUrl.pathname,
   source,
@@ -66,10 +70,14 @@ describe("Studio advanced fill entry boundary", () => {
     expect(toggle).toContain("setMarqueeIds([])");
     expect(toggle).toContain("setSelectedId(target.id)");
     expect(toggle).toContain("advancedFillAutoArmTargetRef.current = { targetId: target.id, status: readyStatus }");
-    expect(editor).toContain("const pendingAutoArm = advancedFillAutoArmTargetRef.current");
-    expect(editor).toContain("if (pendingAutoArm?.targetId === selectedId)");
-    expect(editor).toContain("setAdvancedFillVirtualTarget(pendingAutoArm.virtualTarget)");
-    expect(editor).toContain("setAdvancedFillStatus(pendingAutoArm.status)");
+    // 자동 무장 토큰의 1회 소비·재생은 studio-page-advanced-fill 훅의 리셋 effect 로 추출됐다.
+    expect(advancedFillEffectsSource).toContain(
+      "const pendingAutoArm = takeStudioAdvancedFillAutoArmTarget(advancedFillAutoArmTargetRef)",
+    );
+    expect(advancedFillEffectsSource).toContain("const pendingAutoArm = ref.current");
+    expect(advancedFillEffectsSource).toContain("if (pendingAutoArm?.targetId === selectedId)");
+    expect(advancedFillEffectsSource).toContain("setAdvancedFillVirtualTarget(pendingAutoArm.virtualTarget)");
+    expect(advancedFillEffectsSource).toContain("setAdvancedFillStatus(pendingAutoArm.status)");
     expect(toggle).toContain("virtualTarget: entry.target");
     expect(toggle).toContain('selectInspectorRoute({ primary: "properties", image: "fill" }');
     expect(toggle).not.toContain(

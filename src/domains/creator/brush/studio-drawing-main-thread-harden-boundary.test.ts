@@ -65,16 +65,17 @@ describe("studio drawing main-thread harden boundary", () => {
   });
 
   it("extended blend merge uses async PNG encode", () => {
-    // applyExtendedBlendMergeDown ends before crop? Check actual order.
-    // Fall back: just search the function body by unique tokens.
-    expect(pageSource).toContain("applyExtendedBlendMergeDown");
-    const start = pageSource.indexOf("async function applyExtendedBlendMergeDown()");
-    const end = pageSource.indexOf("async function applyCropToSelectedImage()", start);
-    // If crop is far, still ok — use liquify or next known token.
-    const body = pageSource.slice(
-      start,
-      end > start ? end : start + 4000,
+    // 확장 블렌드 병합은 layer/studio-layer-operations 로 추출됐다 — 추출 파일에서 본문을 스캔한다.
+    const layerOperationsSource = readFileSync(
+      resolve(process.cwd(), "src/domains/creator/layer/studio-layer-operations.ts"),
+      "utf8",
     );
+    expect(pageSource).toContain("applyExtendedBlendMergeDown");
+    const start = layerOperationsSource.indexOf("async function applyExtendedBlendMergeDown()");
+    const end = layerOperationsSource.indexOf("function handleLayerNavigatorAction(", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const body = layerOperationsSource.slice(start, end);
     expect(body).toContain("encodeStudioPixelEditResultPng");
     expect(body).not.toContain('.toDataURL("image/png")');
   });

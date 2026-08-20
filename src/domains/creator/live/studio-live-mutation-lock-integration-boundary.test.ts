@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
+// 병합 명령은 layer/studio-layer-operations 로 추출됐다 — 통합 소스로 페이지+추출 본문을 함께 스캔한다.
+const pageSource = readStudioCuttoonEditorSource();
 
 function sourceBetween(startToken: string, endToken: string): string {
   const start = pageSource.indexOf(startToken);
