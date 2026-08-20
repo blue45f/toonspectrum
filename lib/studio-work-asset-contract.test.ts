@@ -14,6 +14,7 @@ import {
 import {
   parseStudioWorkAssetDescriptor,
   parseStudioWorkAssetSourceUri,
+  parseStudioWorkAssetStructuredEditValue,
   isStudioWorkAssetAdmissionOptedIn,
   isStudioWorkAssetImageAdmissionOptedIn,
   STUDIO_WORK_ASSET_ADMISSION_OPT_IN_TOKEN,
@@ -203,6 +204,7 @@ describe("studio work asset wire contract", () => {
       "differenceOfGaussians",
       "dustScratches",
       "colorToAlpha",
+      "borderEffect",
       "curve",
       "curveCh",
       "edgeAwareDenoise",
@@ -543,6 +545,98 @@ describe("studio work asset wire contract", () => {
         edgeAwareDenoise: { ...edgeAwareDenoise, rangeThreshold: 193 },
       },
     }, { assetId: "asset-1", elementType: "image" })).toThrow();
+  });
+
+  it("round-trips the normalized per-layer border effect on image references exactly", () => {
+    const borderEffect = {
+      enabled: true,
+      thickness: 3,
+      color: "#ff8800",
+      type: "outer" as const,
+      antiAliased: true,
+    };
+    const parsed = parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: { ...descriptor().element, borderEffect },
+    }, { assetId: "asset-1", elementType: "image" });
+
+    expect(STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS).toContain("borderEffect");
+    expect(STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS).toContain("borderEffect");
+    expect(parsed.element.borderEffect).toEqual(borderEffect);
+    expect(parsed.element.borderEffect).not.toBe(borderEffect);
+    expect(parseStudioWorkAssetStructuredEditValue("borderEffect", borderEffect))
+      .toEqual(borderEffect);
+
+    // Normalized identity/off forms still sync the collaborator-visible toggle state.
+    for (const identityRecipe of [
+      { enabled: false, thickness: 3, color: "#000000", type: "outer" as const, antiAliased: true },
+      { enabled: true, thickness: 0, color: "#000000", type: "inner" as const },
+      {
+        enabled: true,
+        thickness: 32,
+        color: "rgba(255, 128, 0, 0.5)",
+        type: "center" as const,
+        antiAliased: false,
+      },
+    ]) {
+      expect(parseStudioWorkAssetDescriptor({
+        ...descriptor(),
+        element: { ...descriptor().element, borderEffect: identityRecipe },
+      }, { assetId: "asset-1", elementType: "image" }).element.borderEffect)
+        .toEqual(identityRecipe);
+    }
+  });
+
+  it("fails closed on malformed border effect recipes instead of passing them through", () => {
+    const validBorderEffect = {
+      enabled: true,
+      thickness: 3,
+      color: "#ff8800",
+      type: "outer" as const,
+      antiAliased: true,
+    };
+    for (const malformed of [
+      { ...validBorderEffect, thickness: 33 },
+      { ...validBorderEffect, thickness: -1 },
+      { ...validBorderEffect, thickness: 0.5 },
+      { ...validBorderEffect, thickness: Number.POSITIVE_INFINITY },
+      { ...validBorderEffect, color: "" },
+      { ...validBorderEffect, color: "not-a-color" },
+      { ...validBorderEffect, color: "#ff880" },
+      { ...validBorderEffect, color: "rgb(999, 0, 0)" },
+      { ...validBorderEffect, color: "url(javascript:alert(1))" },
+      { ...validBorderEffect, type: "glow" },
+      { ...validBorderEffect, implementationHint: "gpu-only" },
+      { thickness: 3, color: "#ff8800", type: "outer" },
+      "outer",
+      null,
+    ]) {
+      expect(() => parseStudioWorkAssetStructuredEditValue(
+        "borderEffect",
+        malformed
+      )).toThrow();
+      expect(() => parseStudioWorkAssetDescriptor({
+        ...descriptor(),
+        element: { ...descriptor().element, borderEffect: malformed },
+      }, { assetId: "asset-1", elementType: "image" })).toThrow();
+    }
+    expect(() => parseStudioWorkAssetDescriptor({
+      ...descriptor("asset-1", "vrm"),
+      element: { ...descriptor("asset-1", "vrm").element, borderEffect: validBorderEffect },
+    }, { assetId: "asset-1", elementType: "vrm" })).toThrow(/이미지/u);
+  });
+
+  it("keeps envelope output byte-identical for elements without a border effect", () => {
+    const parsed = parseStudioWorkAssetDescriptor(descriptor(), {
+      assetId: "asset-1",
+      elementType: "image",
+    });
+
+    expect("borderEffect" in parsed.element).toBe(false);
+    expect(serializeStudioWorkAssetDescriptorCanonical(parsed)).toBe(
+      '{"element":{"height":400,"id":"asset-1","rotation":0,"type":"image",' +
+      '"width":300,"x":10,"y":20},"version":1}'
+    );
   });
 
   it("rejects MIME/type mismatches and over-limit manifests", () => {

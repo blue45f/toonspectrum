@@ -113,6 +113,7 @@ export const STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS = [
   "differenceOfGaussians",
   "dustScratches",
   "colorToAlpha",
+  "borderEffect",
   "curve",
   "curveCh",
   "edgeAwareDenoise",
@@ -306,6 +307,61 @@ export const StudioWorkAssetColorToAlphaSchema = z
   })
   .strict();
 
+export const STUDIO_WORK_ASSET_BORDER_EFFECT_TYPES = ["outer", "inner", "center"] as const;
+export const STUDIO_WORK_ASSET_BORDER_EFFECT_MAX_THICKNESS = 32;
+
+const STUDIO_WORK_ASSET_BORDER_EFFECT_HEX_COLOR_PATTERN =
+  /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/u;
+const STUDIO_WORK_ASSET_BORDER_EFFECT_RGBA_COLOR_PATTERN =
+  /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(?:0|1|0?\.\d{1,6}|1\.0{1,6}))?\s*\)$/u;
+
+function isStudioWorkAssetBorderEffectColor(value: string): boolean {
+  if (STUDIO_WORK_ASSET_BORDER_EFFECT_HEX_COLOR_PATTERN.test(value)) return true;
+  const match = STUDIO_WORK_ASSET_BORDER_EFFECT_RGBA_COLOR_PATTERN.exec(value);
+  if (!match) return false;
+  return [match[1], match[2], match[3]].every(
+    (channel) => Number.parseInt(channel ?? "", 10) <= 255
+  );
+}
+
+/**
+ * Mirrors the normalized per-layer border-effect recipe
+ * (src/domains/creator/layer/studio-layer-border-effect.ts) without importing frontend code into
+ * this shared kernel. Thickness admits exactly the normalized forms — identity 0 or the clamped
+ * 1..32 px band — and the color must be one of the exact hex/rgb(a) shapes the renderer's parser
+ * understands, so a malformed recipe fails closed at the boundary instead of drifting into a
+ * different border on a collaborator's screen.
+ */
+export const StudioWorkAssetBorderEffectSchema = z
+  .object({
+    enabled: z.boolean(),
+    thickness: z
+      .number()
+      .finite()
+      .min(0)
+      .max(STUDIO_WORK_ASSET_BORDER_EFFECT_MAX_THICKNESS),
+    color: z.string().min(1).max(48),
+    type: z.enum(STUDIO_WORK_ASSET_BORDER_EFFECT_TYPES),
+    antiAliased: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.thickness !== 0 && value.thickness < 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["thickness"],
+        message: "경계 효과 굵기는 정규화된 0 또는 1~32px 범위여야 합니다.",
+      });
+    }
+    if (!isStudioWorkAssetBorderEffectColor(value.color)) {
+      context.addIssue({
+        code: "custom",
+        path: ["color"],
+        message: "경계 효과 색상 형식이 올바르지 않습니다.",
+      });
+    }
+  });
+
 /**
  * A master or RGB-channel curve is intentionally capped at 16 points. Four full curves remain
  * comfortably inside the immutable descriptor's 2 KiB budget while still covering detailed
@@ -403,6 +459,7 @@ export type StudioWorkAssetStructuredEditValue =
   | z.infer<typeof StudioWorkAssetDifferenceOfGaussiansSchema>
   | z.infer<typeof StudioWorkAssetDustScratchesSchema>
   | z.infer<typeof StudioWorkAssetColorToAlphaSchema>
+  | z.infer<typeof StudioWorkAssetBorderEffectSchema>
   | z.infer<typeof StudioWorkAssetCurveSchema>
   | z.infer<typeof StudioWorkAssetCurveChannelsSchema>
   | z.infer<typeof StudioWorkAssetEdgeAwareDenoiseSchema>
@@ -435,6 +492,8 @@ export function parseStudioWorkAssetStructuredEditValue(
       return StudioWorkAssetDustScratchesSchema.parse(value);
     case "colorToAlpha":
       return StudioWorkAssetColorToAlphaSchema.parse(value);
+    case "borderEffect":
+      return StudioWorkAssetBorderEffectSchema.parse(value);
     case "curve":
       return StudioWorkAssetCurveSchema.parse(value);
     case "curveCh":
@@ -498,6 +557,7 @@ export const StudioWorkAssetElementSchema = z
     differenceOfGaussians: StudioWorkAssetDifferenceOfGaussiansSchema.optional(),
     dustScratches: StudioWorkAssetDustScratchesSchema.optional(),
     colorToAlpha: StudioWorkAssetColorToAlphaSchema.optional(),
+    borderEffect: StudioWorkAssetBorderEffectSchema.optional(),
     curve: StudioWorkAssetCurveSchema.optional(),
     curveCh: StudioWorkAssetCurveChannelsSchema.optional(),
     edgeAwareDenoise: StudioWorkAssetEdgeAwareDenoiseSchema.optional(),
