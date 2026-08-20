@@ -5,6 +5,7 @@ import {
   createEmptyInkStrokeMeshReplica,
   loadInkMeshGenerator,
   type InkMeshGenerator,
+  type InkMeshInputPoint,
   type InkStrokeMesh,
   type InkStrokeMeshDelta,
   type InkStrokeMeshReplica,
@@ -16,6 +17,8 @@ import {
   StudioInkMeshLivePreviewRuntime,
   StudioInkMeshPreviewError,
   createStudioInkMeshReplacementDelta,
+  deriveStudioInkMeshBrushParams,
+  deriveStudioInkMeshInputPoints,
   expandStudioInkMeshPredictedSuffix,
   type StudioInkMeshGpuApplyReceipt,
   type StudioInkMeshPreparedResources,
@@ -543,5 +546,186 @@ describe("Studio Google Ink GPU retained buffers", () => {
       "utf8",
     );
     expect(source).not.toMatch(/\.mapAsync\(|getMappedRange|copyBufferToBuffer/u);
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Shared-derivation parity. The runtime delegates its input/param derivation
+ * to @toonspectrum/studio-brush-platform (ink-mesh-derivation — the pure
+ * module compileMeshBrush also uses). The reference functions below are a
+ * verbatim copy of the pre-rebase local derivation; the fixtures lock the
+ * rebase to byte-identical mesh output across every pose branch.
+ * -------------------------------------------------------------------------- */
+
+const REFERENCE_HALF_PI = Math.PI / 2;
+const REFERENCE_TWO_PI = Math.PI * 2;
+
+function referenceFiniteChannel(
+  values: readonly number[] | undefined,
+  index: number,
+  fallback: number,
+): number {
+  const value = values?.[index];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function referenceNormalizedOrientation(value: number): number {
+  const wrapped = value % REFERENCE_TWO_PI;
+  return wrapped < 0 ? wrapped + REFERENCE_TWO_PI : wrapped;
+}
+
+function referenceInputPoints(
+  stroke: StudioInkMeshStrokeLike,
+  pressures?: readonly number[],
+): InkMeshInputPoint[] {
+  const count = stroke.points.length / 2;
+  const result: InkMeshInputPoint[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const x = stroke.points[index * 2]!;
+    const y = stroke.points[index * 2 + 1]!;
+    const pressure = referenceFiniteChannel(pressures ?? stroke.pressures, index, 0.5);
+    const altitude = referenceFiniteChannel(stroke.altitudeAngles, index, Number.NaN);
+    const tiltX = referenceFiniteChannel(stroke.tiltXs, index, 0);
+    const tiltY = referenceFiniteChannel(stroke.tiltYs, index, 0);
+    const twist = referenceFiniteChannel(stroke.twists, index, 0) * Math.PI / 180;
+    const tiltRad = Number.isFinite(altitude)
+      ? Math.min(REFERENCE_HALF_PI, Math.max(0, REFERENCE_HALF_PI - altitude))
+      : Math.min(REFERENCE_HALF_PI, Math.hypot(tiltX, tiltY) * Math.PI / 180);
+    const azimuth = referenceFiniteChannel(stroke.azimuthAngles, index, Number.NaN);
+    const orientationRad = Number.isFinite(azimuth)
+      ? referenceNormalizedOrientation(azimuth)
+      : referenceNormalizedOrientation(Math.atan2(tiltY, tiltX) + twist);
+    const tMs = Math.max(0, referenceFiniteChannel(stroke.sampleTimeOffsets, index, index * 4));
+    result.push({ x, y, tMs, pressure, tiltRad, orientationRad });
+  }
+  return result;
+}
+
+function referenceBrushParams(stroke: StudioInkMeshStrokeLike) {
+  const roundness = Number(stroke.brushTip?.roundness);
+  const angle = Number(stroke.brushTip?.angleDeg);
+  const tiltEnabled = stroke.brushTip?.tiltEnabled === true;
+  return {
+    size: Number(stroke.strokeWidth),
+    pressureToSize: { minMultiplier: 0.3, maxMultiplier: 1.7 },
+    rotationRad: Number.isFinite(angle) ? angle * Math.PI / 180 : 0,
+    scale: {
+      x: Number.isFinite(roundness) ? Math.max(0.08, Math.min(1, roundness)) : 1,
+      y: 1,
+    },
+    tiltToRotation: tiltEnabled
+      ? { minOffsetRad: 0, maxOffsetRad: REFERENCE_HALF_PI }
+      : null,
+  };
+}
+
+/** Exercises every pose branch: NaN altitude, NaN/negative/>2π azimuth, tip clamps. */
+function poseBranchStroke(): StudioInkMeshStrokeLike {
+  const count = 48;
+  const points: number[] = [];
+  const pressures: number[] = [];
+  const altitudeAngles: number[] = [];
+  const azimuthAngles: number[] = [];
+  const sampleTimeOffsets: number[] = [];
+  const tiltXs: number[] = [];
+  const tiltYs: number[] = [];
+  const twists: number[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const t = index / (count - 1);
+    points.push(32 + index * 3, 120 + Math.cos(t * Math.PI * 2.5) * 30);
+    pressures.push(0.1 + t * 0.85);
+    // Odd samples lose altitude so the tiltX/tiltY magnitude fallback engages.
+    altitudeAngles.push(index % 2 === 0 ? Math.PI / 2 - t * 1.2 : Number.NaN);
+    // Every third sample loses azimuth (atan2+twist fallback); the rest wrap
+    // through negative and >2π orientations.
+    azimuthAngles.push(index % 3 === 0 ? Number.NaN : -3.2 + t * 12.9);
+    sampleTimeOffsets.push(index * 7);
+    tiltXs.push(-30 + t * 65);
+    tiltYs.push(25 - t * 50);
+    twists.push(t * 350);
+  }
+  return {
+    id: "stroke-ink-mesh-pose-branches",
+    kind: "freehand",
+    mode: "pen",
+    points,
+    pressures,
+    altitudeAngles,
+    azimuthAngles,
+    sampleTimeOffsets,
+    tiltXs,
+    tiltYs,
+    twists,
+    stroke: "#12351f",
+    strokeWidth: 9,
+    opacity: 1,
+    symmetry: { type: "none", centerX: 0, centerY: 0 },
+    // Below the 0.08 roundness floor, negative tip angle, tilt rotation off.
+    brushTip: { tiltEnabled: false, angleDeg: -40, roundness: 0.03 },
+  };
+}
+
+/** Every optional channel and the brushTip absent: pure-default derivation. */
+function sparseChannelStroke(): StudioInkMeshStrokeLike {
+  const points: number[] = [];
+  for (let index = 0; index < 24; index += 1) {
+    points.push(50 + index * 4, 200 + Math.sin(index / 3) * 18);
+  }
+  return {
+    id: "stroke-ink-mesh-sparse-channels",
+    kind: "freehand",
+    mode: "pen",
+    points,
+    stroke: "#000000",
+    strokeWidth: 14,
+  };
+}
+
+describe("Studio Google Ink shared-derivation parity", () => {
+  it("derives input points and brush params exactly as the pre-rebase local code", () => {
+    for (const source of [poseBranchStroke(), sparseChannelStroke()]) {
+      // toEqual on plain number fields is exact (===), so even a one-ulp
+      // arithmetic reordering in the shared module fails this fixture.
+      expect(deriveStudioInkMeshInputPoints(source, source.pressures))
+        .toEqual(referenceInputPoints(source, source.pressures));
+      expect(deriveStudioInkMeshBrushParams(source)).toEqual(referenceBrushParams(source));
+    }
+  });
+
+  it("keeps runtime meshes byte-identical to the pre-rebase derivation fixtures", async () => {
+    for (const source of [poseBranchStroke(), sparseChannelStroke()]) {
+      const harness = runtimeHarness();
+      await harness.prepared;
+      const count = source.points.length / 2;
+      expect(harness.runtime.begin(prefix(source, 1), source.pressures?.slice(0, 1)).status)
+        .toBe("started");
+      const middle = prefix(source, Math.floor(count / 2));
+      expect(harness.runtime.synchronizeAuthoritative(middle, middle.pressures).status)
+        .toBe("synchronized");
+      const finish = harness.runtime.finish(source, source.pressures);
+      expect(finish.status).toBe("finished");
+      if (finish.status !== "finished") throw new Error("expected finish receipt");
+      expect(finish.finalMesh.triangleCount).toBeGreaterThan(0);
+      expectExactMesh(
+        finish.finalMesh,
+        generator.generateInkStrokeMesh(
+          referenceInputPoints(source, source.pressures),
+          referenceBrushParams(source),
+        ),
+      );
+    }
+  });
+
+  it("keeps the live preview free of a second local derivation", () => {
+    const source = readFileSync(
+      new URL("./studio-ink-mesh-live-preview.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("inkMeshTiltRadFromStudioLivePose");
+    expect(source).toContain("inkMeshOrientationRadFromStudioLivePose");
+    expect(source).toContain("inkMeshBrushParamsFromStudioBrushTip");
+    // The pressureToSize response, tilt clamp, and azimuth wrap now live only
+    // in @toonspectrum/studio-brush-platform's ink-mesh-derivation module.
+    expect(source).not.toMatch(/minMultiplier|maxMultiplier|Math\.hypot|Math\.atan2|TWO_PI/u);
   });
 });

@@ -1,6 +1,7 @@
 import { evaluateDynamicMapping } from "@toonspectrum/studio-project-model";
 
 import { strokeOutlinePath } from "./geometry";
+import { inkMeshInputPointFromModeledSample as meshInputPoint } from "./ink-mesh-derivation";
 import { inkStrokeMeshToPathIR } from "./ink-mesh-path";
 import { applyStabilizer } from "./stabilizer";
 
@@ -104,9 +105,6 @@ export function compileVectorBrush(program: BrushProgramIR): CompiledVectorBrush
  * -------------------------------------------------------------------------- */
 
 const GOOGLE_INK_MESH_PROVIDER_ID = "google-ink-mesh";
-const DEG_TO_RAD = Math.PI / 180;
-const HALF_PI = Math.PI / 2;
-const TWO_PI = Math.PI * 2;
 
 /** One live mesh stroke bound to a compiled program (ModeledSampleIR in). */
 export interface CompiledMeshBrushSession {
@@ -162,22 +160,6 @@ function requireInkMeshGenerator(
     );
   }
   return generator;
-}
-
-function meshInputPoint(sample: ModeledSampleIR): InkMeshInputPoint {
-  const tiltRad = Math.min(
-    HALF_PI,
-    Math.max(0, (90 - sample.altitudeDeg) * DEG_TO_RAD),
-  );
-  const wrapped = (sample.azimuthDeg * DEG_TO_RAD) % TWO_PI;
-  return {
-    x: sample.x,
-    y: sample.y,
-    tMs: sample.tMs,
-    pressure: sample.pressure,
-    tiltRad,
-    orientationRad: wrapped < 0 ? wrapped + TWO_PI : wrapped,
-  };
 }
 
 /**

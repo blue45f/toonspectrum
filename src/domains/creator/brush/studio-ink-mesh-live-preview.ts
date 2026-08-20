@@ -13,6 +13,9 @@ import {
   InkMeshError,
   applyInkStrokeMeshDelta,
   createEmptyInkStrokeMeshReplica,
+  inkMeshBrushParamsFromStudioBrushTip,
+  inkMeshOrientationRadFromStudioLivePose,
+  inkMeshTiltRadFromStudioLivePose,
   loadInkMeshGenerator,
   type InkMeshBrushParams,
   type InkMeshGenerator,
@@ -47,8 +50,6 @@ const BUFFER_USAGE_VERTEX = 0x0020;
 const BUFFER_USAGE_UNIFORM = 0x0040;
 const FLOAT_BYTES = Float32Array.BYTES_PER_ELEMENT;
 const INDEX_BYTES = Uint32Array.BYTES_PER_ELEMENT;
-const HALF_PI = Math.PI / 2;
-const TWO_PI = Math.PI * 2;
 
 export type StudioInkMeshFallbackCode =
   | "authoritative-prefix-rewritten"
@@ -906,11 +907,13 @@ function finiteChannel(
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function normalizedOrientation(value: number): number {
-  const wrapped = value % TWO_PI;
-  return wrapped < 0 ? wrapped + TWO_PI : wrapped;
-}
-
+/**
+ * DrawEl channels → ink input points. The tilt/orientation mapping is the
+ * canonical live-lane derivation exported by @toonspectrum/studio-brush-platform
+ * (ink-mesh-derivation) — the same pure module `compileMeshBrush` delegates to —
+ * so the preview cannot drift from the compiled mesh programs. This module only
+ * keeps the admission validation.
+ */
 function strokeInputPoints(
   stroke: StudioInkMeshStrokeLike,
   pressures: readonly number[] | undefined,
@@ -935,17 +938,13 @@ function strokeInputPoints(
     const x = stroke.points[index * 2];
     const y = stroke.points[index * 2 + 1];
     const pressure = finiteChannel(pressures ?? stroke.pressures, index, 0.5);
-    const altitude = finiteChannel(stroke.altitudeAngles, index, Number.NaN);
-    const tiltX = finiteChannel(stroke.tiltXs, index, 0);
-    const tiltY = finiteChannel(stroke.tiltYs, index, 0);
-    const twist = finiteChannel(stroke.twists, index, 0) * Math.PI / 180;
-    const tiltRad = Number.isFinite(altitude)
-      ? Math.min(HALF_PI, Math.max(0, HALF_PI - altitude))
-      : Math.min(HALF_PI, Math.hypot(tiltX, tiltY) * Math.PI / 180);
-    const azimuth = finiteChannel(stroke.azimuthAngles, index, Number.NaN);
-    const orientationRad = Number.isFinite(azimuth)
-      ? normalizedOrientation(azimuth)
-      : normalizedOrientation(Math.atan2(tiltY, tiltX) + twist);
+    const pose = {
+      altitudeRad: finiteChannel(stroke.altitudeAngles, index, Number.NaN),
+      azimuthRad: finiteChannel(stroke.azimuthAngles, index, Number.NaN),
+      tiltXDeg: finiteChannel(stroke.tiltXs, index, 0),
+      tiltYDeg: finiteChannel(stroke.tiltYs, index, 0),
+      twistDeg: finiteChannel(stroke.twists, index, 0),
+    };
     const tMs = Math.max(0, finiteChannel(stroke.sampleTimeOffsets, index, index * 4));
     if (
       x === undefined
@@ -961,11 +960,23 @@ function strokeInputPoints(
         `Studio live stroke sample ${index} has invalid position or pressure.`,
       );
     }
-    result.push({ x, y, tMs, pressure, tiltRad, orientationRad });
+    result.push({
+      x,
+      y,
+      tMs,
+      pressure,
+      tiltRad: inkMeshTiltRadFromStudioLivePose(pose),
+      orientationRad: inkMeshOrientationRadFromStudioLivePose(pose),
+    });
   }
   return result;
 }
 
+/**
+ * DrawEl brushTip snapshot → ink brush params via the canonical live-lane
+ * derivation in @toonspectrum/studio-brush-platform; only the fail-closed
+ * width validation lives here.
+ */
 function brushParams(stroke: StudioInkMeshStrokeLike): InkMeshBrushParams {
   const size = Number(stroke.strokeWidth);
   if (!Number.isFinite(size) || size <= 0) {
@@ -974,21 +985,31 @@ function brushParams(stroke: StudioInkMeshStrokeLike): InkMeshBrushParams {
       "Studio live stroke width is not a positive finite number.",
     );
   }
-  const roundness = Number(stroke.brushTip?.roundness);
-  const angle = Number(stroke.brushTip?.angleDeg);
-  const tiltEnabled = stroke.brushTip?.tiltEnabled === true;
-  return {
-    size,
-    pressureToSize: { minMultiplier: 0.3, maxMultiplier: 1.7 },
-    rotationRad: Number.isFinite(angle) ? angle * Math.PI / 180 : 0,
-    scale: {
-      x: Number.isFinite(roundness) ? Math.max(0.08, Math.min(1, roundness)) : 1,
-      y: 1,
-    },
-    tiltToRotation: tiltEnabled
-      ? { minOffsetRad: 0, maxOffsetRad: HALF_PI }
-      : null,
-  };
+  return inkMeshBrushParamsFromStudioBrushTip({
+    sizePx: size,
+    roundness: Number(stroke.brushTip?.roundness),
+    angleDeg: Number(stroke.brushTip?.angleDeg),
+    tiltEnabled: stroke.brushTip?.tiltEnabled === true,
+  });
+}
+
+/**
+ * Complete live-lane input derivation, exported for the shared-derivation
+ * parity contract: exactly what `begin`/`synchronizeAuthoritative` feed the
+ * ink session for a full stroke.
+ */
+export function deriveStudioInkMeshInputPoints(
+  stroke: StudioInkMeshStrokeLike,
+  pressures?: readonly number[],
+): InkMeshInputPoint[] {
+  return strokeInputPoints(stroke, pressures, 0, pointCount(stroke));
+}
+
+/** Live-lane brush-param derivation, exported for the same parity contract. */
+export function deriveStudioInkMeshBrushParams(
+  stroke: StudioInkMeshStrokeLike,
+): InkMeshBrushParams {
+  return brushParams(stroke);
 }
 
 function inputPointEqual(left: InkMeshInputPoint, right: InkMeshInputPoint): boolean {

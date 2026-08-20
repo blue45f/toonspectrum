@@ -3,6 +3,7 @@ export * from "./input";
 export * from "./stabilizer";
 export * from "./geometry";
 export * from "./ink-mesh";
+export * from "./ink-mesh-derivation";
 export * from "./ink-mesh-path";
 export * from "./compile";
 export * from "./raster-compile";
