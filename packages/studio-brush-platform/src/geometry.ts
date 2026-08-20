@@ -41,10 +41,27 @@ export function effectiveSizeAt(
 
 export function strokeOutlinePath(program: BrushProgramIR, stroke: StrokeIR): PathIR {
   const geometry = program.geometry;
-  const points = stroke.samples.map((sample) => [sample.x, sample.y, sample.pressure]);
+  // D-03: pre-map each sample's dynamics-resolved effective size into the
+  // per-point pressure channel so the outline lane gains velocity/tilt width
+  // response, not just raw pressure. perfect-freehand's per-point radius is
+  // size * (0.5 - thinning * (0.5 - pressure)), so pinning thinning to 1
+  // makes the pressure channel address radius linearly (radius = size * p)
+  // and lets it reproduce the desired per-sample radius exactly: the radius
+  // the geometry's own thinning would produce if `size` were the sample's
+  // effective size. Programs without sizeDynamics keep the legacy path
+  // byte-identical (buildVectorOutline in brush-composition depends on it).
+  const hasSizeDynamics = program.sizeDynamics.length > 0 && stroke.baseSizePx > 0;
+  const points = hasSizeDynamics
+    ? stroke.samples.map((sample) => {
+        const effectiveSize = effectiveSizeAt(program, stroke.baseSizePx, sample);
+        const radius =
+          effectiveSize * (0.5 - geometry.thinning * (0.5 - sample.pressure));
+        return [sample.x, sample.y, Math.min(1, Math.max(0, radius / stroke.baseSizePx))];
+      })
+    : stroke.samples.map((sample) => [sample.x, sample.y, sample.pressure]);
   const outline = getStroke(points, {
     size: stroke.baseSizePx,
-    thinning: geometry.thinning,
+    thinning: hasSizeDynamics ? 1 : geometry.thinning,
     smoothing: geometry.smoothing,
     streamline: geometry.streamline,
     simulatePressure: false,
