@@ -781,10 +781,13 @@ function surfaceDynamicInputValue(
     case "constant":
       return 1;
     case "twist":
-      throw new CompositionExecutionError(
-        `surface.dynamics.sample[${sampleIndex}]`,
-        "BrushProgramIR requests twist, but ModeledSampleIR does not carry twist; refusing silent substitution",
-      );
+      if (sample.twistDeg === undefined) {
+        throw new CompositionExecutionError(
+          `surface.dynamics.sample[${sampleIndex}]`,
+          "BrushProgramIR requests twist, but this ModeledSampleIR does not carry twistDeg; refusing silent substitution",
+        );
+      }
+      return sample.twistDeg / 360;
   }
 }
 
@@ -1578,9 +1581,17 @@ function normalizedArcLengths(
 /**
  * Carry the source samples' dynamics (pressure, time, velocity, tilt) onto a
  * re-flattened centerline by matching normalized arc-length position. Linear
- * interpolation only — no invented dynamics.
+ * interpolation only — no invented dynamics. Optional sensor passthrough
+ * channels (twist, tangential pressure, contact patch, buttons, provenance)
+ * cannot be interpolated without inventing data, so each rebuilt sample copies
+ * them from the nearest source neighbour (t < 0.5 → lower, else upper; the
+ * documented nearest-sample choice for twist — no angle-lerp helper exists).
+ * A channel absent on that neighbour stays absent — no default injection.
+ *
+ * Exported: this is the canonical resampler-side passthrough contract that
+ * input.ts documents, so planner/GPU lanes reuse it instead of re-deriving it.
  */
-function carryDynamicsOntoCenterline(
+export function carryDynamicsOntoCenterline(
   points: ReadonlyArray<readonly [number, number]>,
   source: readonly ModeledSampleIR[],
 ): ModeledSampleIR[] {
@@ -1600,6 +1611,7 @@ function carryDynamicsOntoCenterline(
     const t = span > 0 ? Math.min(1, Math.max(0, (u - lowerU) / span)) : 0;
     const from = lower as ModeledSampleIR;
     const to = upper as ModeledSampleIR;
+    const nearest = t < 0.5 ? from : to;
     return {
       x: point[0],
       y: point[1],
@@ -1608,6 +1620,22 @@ function carryDynamicsOntoCenterline(
       velocity: Math.max(0, lerp(from.velocity, to.velocity, t)),
       altitudeDeg: lerp(from.altitudeDeg, to.altitudeDeg, t),
       azimuthDeg: lerp(from.azimuthDeg, to.azimuthDeg, t),
+      // Conditional spreads keep absent channels absent (no default injection).
+      ...(nearest.twistDeg !== undefined ? { twistDeg: nearest.twistDeg } : {}),
+      ...(nearest.tangentialPressure !== undefined
+        ? { tangentialPressure: nearest.tangentialPressure }
+        : {}),
+      ...(nearest.contactWidth !== undefined
+        ? { contactWidth: nearest.contactWidth }
+        : {}),
+      ...(nearest.contactHeight !== undefined
+        ? { contactHeight: nearest.contactHeight }
+        : {}),
+      ...(nearest.buttons !== undefined ? { buttons: nearest.buttons } : {}),
+      ...(nearest.source !== undefined ? { source: nearest.source } : {}),
+      ...(nearest.sourceSampleIndex !== undefined
+        ? { sourceSampleIndex: nearest.sourceSampleIndex }
+        : {}),
     };
   });
 }
