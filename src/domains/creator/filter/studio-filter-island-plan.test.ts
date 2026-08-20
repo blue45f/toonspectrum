@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { PlanUnsatisfiableError } from "@toonspectrum/studio-engine-registry";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 
 import {
@@ -11,12 +11,15 @@ import {
 } from "../studio-renderer-tournament-runtime";
 
 import {
+  deriveStudioFilterIslandCostFingerprint,
   installStudioFilterTournamentBootstrap,
   planStudioFilterIslandLanes,
+  readStudioFilterIslandCostShadowReceipt,
+  resetStudioFilterIslandCostShadowReceipt,
   studioFilterIslandBucket,
   studioFilterLaneProviderId,
 } from "./studio-filter-island-plan";
-import { STUDIO_FILTER_LANE_COST_SEED } from "./studio-filter-lane-cost-model";
+import { STUDIO_FILTER_LANE_COST_SEED, megapixelsOf } from "./studio-filter-lane-cost-model";
 
 /**
  * First real-path V11 delegation gate (ADR 0001 2차 개정 step c): the image
@@ -530,5 +533,116 @@ describe("filter island planning never touches persistence (wasm budget)", () =>
     // if the call itself were deferred.
     expect(source).not.toMatch(/^import .*studio-tournament-sqlite-persistence/mu);
     expect(source).toMatch(/import\("\.\.\/studio-tournament-sqlite-persistence"\)/u);
+  });
+});
+
+/**
+ * V13 §2.5 cost shadow: the island's authority plan runs through
+ * planWithCostShadow with a workload fingerprint assembled from the caller's
+ * own size/chain fields. Receipts must be total (every plan recorded) and
+ * deterministic, degenerate workloads must fail closed to an absent
+ * fingerprint, and the lane ladder must stay byte-identical (the lane suites
+ * above already run through the same wired path).
+ */
+describe("V13 §2.5 cost shadow receipts (filter island)", () => {
+  beforeEach(() => {
+    resetStudioFilterIslandCostShadowReceipt();
+  });
+
+  it("a sized workload populates the fingerprint from the island's own fields", () => {
+    planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+      workload: { width: 2048, height: 2048, chainSteps: 3 },
+    });
+    const receipt = readStudioFilterIslandCostShadowReceipt();
+    expect(receipt.total).toBe(1);
+    expect(receipt.absentFingerprint).toBe(0);
+    expect(receipt.shadowFailures).toBe(0);
+    expect(receipt.agreed + receipt.disagreed).toBe(1);
+    const island = receipt.lastReceipt?.islands[0];
+    expect(island?.legacyWinner).toBe("filter-lane-gpu-chain");
+    const fingerprint = island?.fingerprint;
+    if (fingerprint === undefined || fingerprint === "absent") {
+      throw new Error("expected a populated fingerprint on the receipt");
+    }
+    expect(fingerprint).toMatchObject({
+      pathCount: 0,
+      segmentCount: 0,
+      imageCount: 1,
+      isolatedLayerCount: 1,
+      maskDepth: 0,
+      filterNodeCount: 3,
+      visibleAreaRatio: 1,
+    });
+    // Area factor (visibleAreaRatio × dpr²) equals the island's megapixels.
+    expect(fingerprint.dpr).toBeCloseTo(Math.sqrt(megapixelsOf(2048 * 2048)), 12);
+    expect(island?.costs.length).toBeGreaterThan(0);
+    for (const cost of island?.costs ?? []) {
+      expect(Number.isFinite(cost.total)).toBe(true);
+    }
+  });
+
+  it("workload-less calls record an absent fingerprint and keep the size-blind ladder", () => {
+    const { lanes } = planStudioFilterIslandLanes({ gpuChainEligible: false });
+    expect(lanes).toEqual(["worker", "konva-native"]);
+    const receipt = readStudioFilterIslandCostShadowReceipt();
+    expect(receipt.total).toBe(1);
+    expect(receipt.absentFingerprint).toBe(1);
+    expect(receipt.agreed).toBe(0);
+    expect(receipt.disagreed).toBe(0);
+    const island = receipt.lastReceipt?.islands[0];
+    expect(island?.fingerprint).toBe("absent");
+    expect(island?.costs).toEqual([]);
+    expect(island?.agreed).toBe(true);
+  });
+
+  it("degenerate workloads fail closed to an absent fingerprint (ladder untouched)", () => {
+    expect(deriveStudioFilterIslandCostFingerprint(null)).toBeUndefined();
+    expect(deriveStudioFilterIslandCostFingerprint(undefined)).toBeUndefined();
+    expect(
+      deriveStudioFilterIslandCostFingerprint({ pixelCount: 0, chainSteps: 2 }),
+    ).toBeUndefined();
+    expect(
+      deriveStudioFilterIslandCostFingerprint({ pixelCount: Number.NaN, chainSteps: 2 }),
+    ).toBeUndefined();
+    expect(
+      deriveStudioFilterIslandCostFingerprint({ width: -128, height: 128, chainSteps: 2 }),
+    ).toBeUndefined();
+    const degenerate = planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+      workload: { pixelCount: 0, chainSteps: 2 },
+    });
+    const blind = planStudioFilterIslandLanes({ gpuChainEligible: true });
+    expect(degenerate.lanes).toEqual(blind.lanes);
+    const receipt = readStudioFilterIslandCostShadowReceipt();
+    expect(receipt.total).toBe(2);
+    expect(receipt.absentFingerprint).toBe(2);
+  });
+
+  it("sub-1 chain steps clamp to one filter node (same clamp as the cost tier)", () => {
+    const fingerprint = deriveStudioFilterIslandCostFingerprint({
+      pixelCount: 1_000_000,
+      chainSteps: 0,
+    });
+    expect(fingerprint?.filterNodeCount).toBe(1);
+    // ≤1 MP islands floor the area factor at the logical surface (dpr 1).
+    expect(fingerprint?.dpr).toBe(1);
+  });
+
+  it("receipts are total and deterministic across identical plans", () => {
+    const input = {
+      gpuChainEligible: true,
+      workload: { width: 512, height: 512, chainSteps: 2 },
+    } as const;
+    planStudioFilterIslandLanes(input);
+    const first = readStudioFilterIslandCostShadowReceipt().lastReceipt;
+    planStudioFilterIslandLanes(input);
+    const second = readStudioFilterIslandCostShadowReceipt().lastReceipt;
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+    const receipt = readStudioFilterIslandCostShadowReceipt();
+    expect(receipt.total).toBe(2);
+    expect(receipt.absentFingerprint).toBe(0);
+    expect(receipt.agreed + receipt.disagreed).toBe(2);
+    expect(receipt.shadowFailures).toBe(0);
   });
 });

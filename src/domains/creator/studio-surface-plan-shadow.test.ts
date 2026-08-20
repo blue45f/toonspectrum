@@ -3,7 +3,7 @@ import {
   WinnerCache,
   evaluateLicenseGate,
 } from "@toonspectrum/studio-engine-registry";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 
 import {
@@ -27,7 +27,10 @@ import {
 } from "./render/studio-engine-provider-bridge";
 import {
   admittedLanes,
+  deriveStudioStrokeSurfaceCostFingerprint,
   planStudioStrokeSurfaceShadow,
+  readStudioSurfaceCostShadowReceipt,
+  resetStudioSurfaceCostShadowReceipt,
   type StudioStrokeSurfaceShadowTournamentProbe,
 } from "./studio-surface-plan-shadow";
 
@@ -369,5 +372,137 @@ describe("V12 §5 tournament probe on the shadow planner (observation only)", ()
     expect(result.tournament?.lanes).toEqual(["gpu", "dynamic", "konva"]);
     expect(result.tournament?.killIgnoredReason).toContain("keeping the original order");
     expect(result.tournament?.killIgnoredReason).toContain("panic");
+  });
+});
+
+/**
+ * V13 §2.5 cost shadow: the shadow plan runs through planWithCostShadow with
+ * a workload fingerprint derived from the probe's stroke traits — the only
+ * scene signal this seam sees. Receipts must be total (every plan recorded)
+ * and deterministic, absent inputs must fail closed, and nothing about the
+ * legacy/planned verdict may change (the 8192-state parity above already runs
+ * through the same wired path).
+ */
+describe("V13 §2.5 cost shadow receipts (observation only)", () => {
+  const COST_TRAITS: StudioStrokeRouteWorkloadTraits = {
+    pointCount: 640,
+    brushFamily: "wet-ink",
+    canvasScale: 2,
+  };
+
+  function costProbe(
+    traits: StudioStrokeRouteWorkloadTraits,
+  ): StudioStrokeSurfaceShadowTournamentProbe {
+    return {
+      traits,
+      state: {
+        deviceHash: "device-a",
+        winnerCache: new WinnerCache(),
+        killSwitch: new RemoteKillSwitch(),
+      },
+    };
+  }
+
+  beforeEach(() => {
+    resetStudioSurfaceCostShadowReceipt();
+  });
+
+  it("probe traits populate the workload fingerprint on the receipt", () => {
+    planStudioStrokeSurfaceShadow(snapshot({ gpuAdmitted: true }), costProbe(COST_TRAITS));
+    const receipt = readStudioSurfaceCostShadowReceipt();
+    expect(receipt.total).toBe(1);
+    expect(receipt.absentFingerprint).toBe(0);
+    expect(receipt.shadowFailures).toBe(0);
+    expect(receipt.agreed + receipt.disagreed).toBe(1);
+    const island = receipt.lastReceipt?.islands[0];
+    expect(island?.legacyWinner).toBe("stroke-route-gpu");
+    expect(island?.fingerprint).toEqual({
+      pathCount: 1,
+      segmentCount: 640,
+      changedPathRatio: 1,
+      imageCount: 0,
+      glyphCount: 0,
+      gradientCount: 0,
+      isolatedLayerCount: 0,
+      maskDepth: 0,
+      filterNodeCount: 0,
+      visibleAreaRatio: 1,
+      dpr: 2,
+    });
+    expect(island?.costs.length).toBeGreaterThan(0);
+    for (const cost of island?.costs ?? []) {
+      expect(Number.isFinite(cost.total)).toBe(true);
+    }
+  });
+
+  it("probe-less calls record an absent fingerprint and rank nothing", () => {
+    planStudioStrokeSurfaceShadow(snapshot({ stampAdmitted: true }));
+    const receipt = readStudioSurfaceCostShadowReceipt();
+    expect(receipt.total).toBe(1);
+    expect(receipt.absentFingerprint).toBe(1);
+    expect(receipt.agreed).toBe(0);
+    expect(receipt.disagreed).toBe(0);
+    const island = receipt.lastReceipt?.islands[0];
+    expect(island?.fingerprint).toBe("absent");
+    expect(island?.costs).toEqual([]);
+    expect(island?.agreed).toBe(true);
+  });
+
+  it("malformed traits fail closed to an absent fingerprint; the verdict is untouched", () => {
+    expect(deriveStudioStrokeSurfaceCostFingerprint(null)).toBeUndefined();
+    expect(deriveStudioStrokeSurfaceCostFingerprint(undefined)).toBeUndefined();
+    expect(
+      deriveStudioStrokeSurfaceCostFingerprint({ ...COST_TRAITS, pointCount: Number.NaN }),
+    ).toBeUndefined();
+    expect(
+      deriveStudioStrokeSurfaceCostFingerprint({ ...COST_TRAITS, pointCount: -1 }),
+    ).toBeUndefined();
+    expect(
+      deriveStudioStrokeSurfaceCostFingerprint({ ...COST_TRAITS, canvasScale: 0 }),
+    ).toBeUndefined();
+    expect(
+      deriveStudioStrokeSurfaceCostFingerprint({ ...COST_TRAITS, canvasScale: Number.NaN }),
+    ).toBeUndefined();
+    const input = snapshot({ gpuAdmitted: true });
+    const bare = planStudioStrokeSurfaceShadow(input);
+    const malformed = planStudioStrokeSurfaceShadow(
+      input,
+      costProbe({ ...COST_TRAITS, pointCount: Number.NaN }),
+    );
+    expect(malformed.legacyKind).toBe(bare.legacyKind);
+    expect(malformed.plannedKind).toBe(bare.plannedKind);
+    expect(malformed.agrees).toBe(bare.agrees);
+    const receipt = readStudioSurfaceCostShadowReceipt();
+    expect(receipt.total).toBe(2);
+    expect(receipt.absentFingerprint).toBe(2);
+  });
+
+  it("receipts are total and deterministic across a mixed run", () => {
+    const input = snapshot({ gpuAdmitted: true, dynamicAdmitted: true });
+    planStudioStrokeSurfaceShadow(input, costProbe(COST_TRAITS));
+    const first = readStudioSurfaceCostShadowReceipt().lastReceipt;
+    planStudioStrokeSurfaceShadow(input, costProbe(COST_TRAITS));
+    const second = readStudioSurfaceCostShadowReceipt().lastReceipt;
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+    planStudioStrokeSurfaceShadow(input);
+    planStudioStrokeSurfaceShadow(input);
+    planStudioStrokeSurfaceShadow(input);
+    const receipt = readStudioSurfaceCostShadowReceipt();
+    expect(receipt.total).toBe(5);
+    expect(receipt.absentFingerprint).toBe(3);
+    expect(receipt.agreed + receipt.disagreed).toBe(2);
+    expect(receipt.shadowFailures).toBe(0);
+  });
+
+  it("the cost shadow never changes the shadow plan product", () => {
+    const input = snapshot({ gpuAdmitted: true, dynamicAdmitted: true });
+    const bare = planStudioStrokeSurfaceShadow(input);
+    const fingerprinted = planStudioStrokeSurfaceShadow(input, costProbe(COST_TRAITS));
+    expect(fingerprinted.legacyKind).toBe(bare.legacyKind);
+    expect(fingerprinted.plannedKind).toBe(bare.plannedKind);
+    expect(fingerprinted.plan.islands[0]?.providerId).toBe(bare.plan.islands[0]?.providerId);
+    expect(fingerprinted.plan.islands[0]?.fallbackChain).toEqual(
+      bare.plan.islands[0]?.fallbackChain,
+    );
   });
 });

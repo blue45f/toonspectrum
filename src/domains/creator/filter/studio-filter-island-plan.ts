@@ -2,8 +2,12 @@ import {
   declareTrustedBootstrapProvider,
   EngineCapabilityRegistry,
   HybridExecutionPlanner,
+  planWithCostShadow,
   providerDescriptorSchema,
   quantizePow2Bucket,
+  type CostShadowFingerprint,
+  type CostShadowPlanRequest,
+  type SurfaceCostShadowReceipt,
   type SurfacePlan,
 } from "@toonspectrum/studio-engine-registry";
 
@@ -53,6 +57,17 @@ import {
  * pass no workload keep the exact pre-existing size-blind ladder, and a
  * GPU-ineligible ladder is never reordered at all (the CPU lanes measured
  * identical, so there is nothing to decide and nothing to destabilise).
+ *
+ * V13 §2.5 (GPU planning, cost shadow): the authority plan is produced through
+ * planWithCostShadow so a real workload fingerprint — assembled from the
+ * island's own size/chain fields — feeds the observation-only cost ranking.
+ * Disagreement receipts accumulate module-level
+ * (readStudioFilterIslandCostShadowReceipt) as promotion evidence. Fail
+ * closed: a missing or degenerate workload records an absent fingerprint and
+ * ranks nothing; a cost-shadow failure falls back to the legacy planner; the
+ * legacy winner keeps sole routing authority either way. Assembly is O(1)
+ * arithmetic on fields already in hand — no scene walk, no GPU work, no
+ * readbacks.
  */
 
 export type { StudioFilterLane } from "./studio-filter-lane-cost-model";
@@ -260,6 +275,144 @@ function resolvePixelCount(workload: StudioFilterIslandWorkload): number {
   return workload.width * workload.height;
 }
 
+/* ------------------------------------------------------------------ */
+/* V13 §2.5 cost shadow — fingerprint assembly + receipt counters      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Derives the cost-shadow workload fingerprint from the island fields the
+ * caller already supplies. O(1) arithmetic on data in hand.
+ *
+ * Mapping (mirrors fingerprintRenderScene's filter-group accounting):
+ * - filterNodeCount = chainSteps (one graph node per filter pass, clamped to
+ *   ≥1 the same way the cost tier clamps it);
+ * - isolatedLayerCount 1 — the island always runs as one forced offscreen
+ *   isolation; imageCount 1 — the filtered element's bitmap;
+ * - changedPathRatio 1 — a filter run recomputes fully (inert here anyway:
+ *   the island carries no path geometry);
+ * - dpr = √max(1, megapixels), visibleAreaRatio 1: the model's area factor
+ *   (visibleAreaRatio × dpr²) then equals the island's megapixels, making
+ *   per-area raster/transfer terms linear in island size — the same scaling
+ *   studio-filter-lane-cost-model uses.
+ *
+ * Fail closed: a nullish workload or non-finite/non-positive pixel count
+ * yields undefined, which planWithCostShadow records as `fingerprint:
+ * "absent"` — no ranking, no disagreement evidence, legacy plan untouched.
+ */
+export function deriveStudioFilterIslandCostFingerprint(
+  workload: StudioFilterIslandWorkload | null | undefined,
+): CostShadowFingerprint | undefined {
+  if (!workload) return undefined;
+  const pixelCount = resolvePixelCount(workload);
+  if (!Number.isFinite(pixelCount) || pixelCount <= 0) return undefined;
+  const chainSteps = Math.max(
+    1,
+    Number.isFinite(workload.chainSteps) ? workload.chainSteps : 1,
+  );
+  return {
+    pathCount: 0,
+    segmentCount: 0,
+    changedPathRatio: 1,
+    imageCount: 1,
+    glyphCount: 0,
+    gradientCount: 0,
+    isolatedLayerCount: 1,
+    maskDepth: 0,
+    filterNodeCount: chainSteps,
+    visibleAreaRatio: 1,
+    dpr: Math.sqrt(Math.max(1, megapixelsOf(pixelCount))),
+  };
+}
+
+/**
+ * Module-level cost-shadow receipt — same counter idiom as
+ * studio-filter-plan-shadow.ts. `agreed + disagreed + absentFingerprint ===
+ * total`; `shadowFailures` counts plans the cost shadow could not observe
+ * (the legacy planner served them) and is deliberately outside `total`.
+ */
+export interface StudioFilterIslandCostShadowReceipt {
+  /** Island plans that produced a cost receipt. */
+  readonly total: number;
+  /** Fingerprinted receipts where the cost winner matched the legacy winner. */
+  readonly agreed: number;
+  /** Fingerprinted receipts with strictly cheaper evidence for another lane. */
+  readonly disagreed: number;
+  /** Receipts recorded without a usable fingerprint (fail closed, no ranking). */
+  readonly absentFingerprint: number;
+  /** Cost-shadow failures; the legacy planner produced the plan unchanged. */
+  readonly shadowFailures: number;
+  readonly lastReceipt: SurfaceCostShadowReceipt | null;
+  readonly lastDisagreement: SurfaceCostShadowReceipt | null;
+}
+
+interface MutableCostShadowCounters {
+  total: number;
+  agreed: number;
+  disagreed: number;
+  absentFingerprint: number;
+  shadowFailures: number;
+  lastReceipt: SurfaceCostShadowReceipt | null;
+  lastDisagreement: SurfaceCostShadowReceipt | null;
+}
+
+function emptyCostShadowCounters(): MutableCostShadowCounters {
+  return {
+    total: 0,
+    agreed: 0,
+    disagreed: 0,
+    absentFingerprint: 0,
+    shadowFailures: 0,
+    lastReceipt: null,
+    lastDisagreement: null,
+  };
+}
+
+let costShadowCounters = emptyCostShadowCounters();
+
+export function readStudioFilterIslandCostShadowReceipt(): StudioFilterIslandCostShadowReceipt {
+  return Object.freeze({ ...costShadowCounters });
+}
+
+/** Test seam — each suite starts from a clean slate. */
+export function resetStudioFilterIslandCostShadowReceipt(): void {
+  costShadowCounters = emptyCostShadowCounters();
+}
+
+function recordFilterIslandCostShadowReceipt(receipt: SurfaceCostShadowReceipt): void {
+  costShadowCounters.total += 1;
+  costShadowCounters.lastReceipt = receipt;
+  const fingerprinted = receipt.islands.some((island) => island.fingerprint !== "absent");
+  if (!fingerprinted) costShadowCounters.absentFingerprint += 1;
+  else if (receipt.agreed) costShadowCounters.agreed += 1;
+  else {
+    costShadowCounters.disagreed += 1;
+    costShadowCounters.lastDisagreement = receipt;
+  }
+}
+
+/**
+ * Authority plan through the cost shadow. The returned plan is byte-identical
+ * to `filterPlanner.plan(request)` — planWithCostShadow runs the legacy
+ * selection first and only observes alongside it. If the call throws, the
+ * legacy planner is re-run alone to disambiguate: an unsatisfiable request
+ * rethrows here exactly as before the cost shadow existed, while a legacy
+ * success means only the shadow side broke — counted, plan served (fail
+ * closed).
+ */
+function planFilterIslandWithCostReceipt(request: CostShadowPlanRequest): SurfacePlan {
+  let receipt: SurfaceCostShadowReceipt;
+  let plan: SurfacePlan;
+  try {
+    ({ plan, receipt } = planWithCostShadow(filterRegistry, request));
+  } catch {
+    const legacyPlan = filterPlanner.plan(request);
+    costShadowCounters.shadowFailures += 1;
+    return legacyPlan;
+  }
+  recordFilterIslandCostShadowReceipt(receipt);
+  return plan;
+}
+
 /**
  * Deterministic workload class for the bucket key. Quantized with the same
  * power-of-two quantizer the tournament's scene fingerprint uses, so nearby
@@ -297,7 +450,10 @@ export function planStudioFilterIslandLanes(
   input: StudioFilterIslandPlanInput,
 ): StudioFilterIslandPlan {
   const headLane: StudioFilterLane = input.gpuChainEligible ? "gpu-chain" : "worker";
-  const plan = filterPlanner.plan({
+  // V13 §2.5: the caller's workload fields are the real fingerprint data; no
+  // workload (or a degenerate one) ⇒ undefined ⇒ receipt records "absent".
+  const fingerprint = deriveStudioFilterIslandCostFingerprint(input.workload);
+  const plan = planFilterIslandWithCostReceipt({
     surfaceId: "studio-image-filter-island",
     // Terminal single readback is part of this island's contract, so it must
     // plan as final-export; "interactive" would (correctly) refuse the plan.
@@ -309,6 +465,7 @@ export function planStudioFilterIslandLanes(
         kind: "filter",
         requiredCapabilities: [`filter.lane.${headLane}`],
         availableTransports: ["cpu-readback"],
+        ...(fingerprint === undefined ? {} : { fingerprint }),
       },
     ],
   });
