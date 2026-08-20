@@ -4,6 +4,7 @@ export * from "./workload-fingerprint";
 export * from "./island-compiler";
 export * from "./registry";
 export * from "./planner";
+export * from "./planner-cost-shadow";
 export * from "./manifest";
 export * from "./filter-providers";
 export * from "./effect-compiler";
