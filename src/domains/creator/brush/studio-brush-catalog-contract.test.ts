@@ -157,6 +157,55 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     }
   });
 
+  it("keeps quarantined favorites/MRU off the quick shelf without touching listed rows", () => {
+    // The quick shelf is a LISTING lane: its fresh default must come from the listed inventory,
+    // or a quarantined id persisted in favorites/MRU re-surfaces as a picker affordance the
+    // library and search already refuse to show.
+    for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
+      const quick = listStudioQuickBrushCatalogItems({
+        favoriteIds: [quarantinedId, "heart-stamp"],
+        recentIds: [quarantinedId, "pen"],
+      });
+      expect(
+        quick.some((item) => item.id === quarantinedId),
+        `${quarantinedId}: quarantined favorite/MRU re-surfaced on the quick shelf`
+      ).toBe(false);
+      // Exposure removal only — saved-document metadata RESOLUTION stays on the unfiltered SSOT.
+      expect(
+        studioBrushCatalogItemById(quarantinedId),
+        `${quarantinedId}: saved-document metadata resolution lost`
+      ).not.toBeNull();
+    }
+
+    // A quarantined favorite/MRU entry is skipped, never a hole: listed neighbours keep their slots.
+    const quarantinedId = STUDIO_BRUSH_QUARANTINED_PRESET_IDS[0]!;
+    expect(listStudioQuickBrushCatalogItems({
+      favoriteIds: [quarantinedId, "heart-stamp"],
+      recentIds: [quarantinedId, "hair-fiber", "pen"],
+      limit: 3,
+    }).map(({ id, quickSource }) => [id, quickSource])).toEqual([
+      ["heart-stamp", "favorite"],
+      ["hair-fiber", "recent"],
+      ["pen", "recent"],
+    ]);
+
+    // Non-quarantined listings are byte-identical to the unfiltered default: the listed inventory
+    // preserves SSOT order, so removing quarantined rows must not reorder or reshape anything.
+    for (const options of [
+      {},
+      { favoriteIds: ["heart-stamp"], recentIds: ["hair-fiber", "pen"] },
+      { favoriteIds: ["heart-stamp"], recentIds: ["hair-fiber", "pen"], limit: 3 },
+      { limit: STUDIO_ALL_BRUSH_CATALOG_ITEMS.length },
+    ]) {
+      expect(JSON.stringify(listStudioQuickBrushCatalogItems(options))).toBe(
+        JSON.stringify(listStudioQuickBrushCatalogItems({
+          ...options,
+          catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+        }))
+      );
+    }
+  });
+
   it("keeps paint and eraser catalogues disjoint on the operation axis", () => {
     expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS.every(
       (item) => item.operation === "paint" || item.operation === "erase"

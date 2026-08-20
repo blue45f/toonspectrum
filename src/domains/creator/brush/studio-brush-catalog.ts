@@ -131,7 +131,11 @@ export function listStudioQuickBrushCatalogItems(options: {
 } = {}): StudioQuickBrushTrayItem[] {
   return listStudioQuickBrushTrayItems({
     ...options,
-    // Missing injection must never silently collapse the shelf to core-only tools.
-    catalogItems: options.catalogItems ?? STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+    // Missing injection must never silently collapse the shelf to core-only tools, but the quick
+    // shelf is a LISTING lane, so its fresh default is the listed (non-quarantined) inventory —
+    // otherwise a quarantined id persisted in favorites/MRU re-surfaces as a picker affordance.
+    // Metadata RESOLUTION for saved documents stays on the unfiltered SSOT via
+    // `studioBrushCatalogItemById`; callers who inject `catalogItems` own their lane's filtering.
+    catalogItems: options.catalogItems ?? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
   });
 }
