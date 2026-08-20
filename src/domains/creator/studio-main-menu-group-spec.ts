@@ -580,7 +580,11 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
         "window/canvas-only",
       ),
       has("Quick Deck", "window/quick-access-palette"),
-      gap("Action Bar", "하단 액션바는 상시 노출이라 전환 명령이 없다."),
+      part(
+        "Action Bar",
+        "메뉴바의 상시 명령 바 — 표시 전환과 8슬롯 사용자화(기본: 실행취소·다시실행·임시저장·내보내기 옵션·화면 맞춤). 드래그 재배치와 구분자 편집은 없다.",
+        "window/command-bar",
+      ),
       part("Asset Vault", "템플릿·에셋 패널.", "window/template"),
       part("Reference Desk", "참고 이미지 삽입과 참고 창 토글.", "window/ref", "window/reference-window"),
       gap("Capability Center"),

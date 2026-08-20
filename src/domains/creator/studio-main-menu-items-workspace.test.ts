@@ -71,6 +71,7 @@ type StudioMainMenuActionsOverrides = {
   collapseSidePanels?: ReturnType<typeof vi.fn>;
   expandSidePanels?: ReturnType<typeof vi.fn>;
   toggleCanvasWideMode?: ReturnType<typeof vi.fn>;
+  toggleCommandBar?: ReturnType<typeof vi.fn>;
 };
 
 const noopActions: StudioMainMenuEditorActions = new Proxy({} as StudioMainMenuEditorActions, {
@@ -171,5 +172,46 @@ describe("window 패널 확장/축소 메뉴", () => {
     expect(ui.collapseSidePanels).toHaveBeenCalledTimes(0);
     expect(ui.expandSidePanels).toHaveBeenCalledTimes(0);
     expect(ui.toggleCanvasWideMode).toHaveBeenCalledTimes(0);
+  });
+});
+
+describe("window 명령 바 메뉴 (§15.3 Action Bar)", () => {
+  function getCommandBarItem(items: readonly StudioMainMenuItem[]): StudioMainMenuItem {
+    const item = items.find((candidate) => candidate.id === "command-bar");
+    if (!item) throw new Error("missing window command-bar menu item");
+    return item;
+  }
+
+  it("표시 상태를 라벨·체크로 반영하고 배선된 토글을 실행한다", () => {
+    const toggleCommandBar = vi.fn();
+    const { items } = buildWindowItems({ commandBarVisible: true }, { toggleCommandBar });
+    const item = getCommandBarItem(items);
+
+    expect(item.commandId).toBe("window.command-bar");
+    expect(item.label).toBe("명령 바 숨기기");
+    expect(item.checked).toBe(true);
+    expect(item.disabled).not.toBe(true);
+
+    item.onSelect();
+    expect(toggleCommandBar).toHaveBeenCalledTimes(1);
+  });
+
+  it("숨김 상태에서는 표시 라벨로 뒤집힌다", () => {
+    const toggleCommandBar = vi.fn();
+    const { items } = buildWindowItems({ commandBarVisible: false }, { toggleCommandBar });
+    const item = getCommandBarItem(items);
+
+    expect(item.label).toBe("명령 바 표시");
+    expect(item.checked).toBe(false);
+  });
+
+  it("호스트가 토글을 배선하지 않은 동안은 이유와 함께 비활성화된다", () => {
+    const { items } = buildWindowItems();
+    const item = getCommandBarItem(items);
+
+    expect(item.disabled).toBe(true);
+    expect(item.unavailableReason?.trim()).toBeTruthy();
+    // onSelect 는 배선 없이 불러도 아무 일도 하지 않는다(옵셔널 체이닝).
+    expect(() => item.onSelect()).not.toThrow();
   });
 });

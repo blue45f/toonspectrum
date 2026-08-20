@@ -15,6 +15,7 @@ import {
   Layers,
   Maximize2,
   Minimize2,
+  PanelTop,
   PictureInPicture2,
   Settings2,
   SlidersHorizontal,
@@ -136,6 +137,27 @@ export function buildStudioWindowMenuItems({
       disabled: state.quickAccessPaletteLoading,
       separatorAfter: true,
       onSelect: ui.toggleQuickAccessPalette,
+    },
+    {
+      // §15.3 Window ▸ Action Bar — the persistent slotted command strip under the menubar
+      // (CSP 커맨드 바). The strip itself lives in StudioMenubarContent and persists through
+      // the workspace live layout; this row is the visibility toggle.
+      id: "command-bar",
+      commandId: "window.command-bar",
+      label: state.commandBarVisible === false ? "명령 바 표시" : "명령 바 숨기기",
+      icon: PanelTop,
+      checked: state.commandBarVisible !== false,
+      separatorAfter: true,
+      ...(typeof ui.toggleCommandBar === "function"
+        ? {}
+        : {
+            disabled: true,
+            unavailableReason:
+              "이 화면에는 명령 바 표시 전환이 아직 연결되지 않았습니다. 메뉴바의 명령 바 설정에서 표시를 바꿀 수 있어요.",
+          }),
+      onSelect: () => {
+        ui.toggleCommandBar?.();
+      },
     },
     {
       id: "template",

@@ -48,7 +48,8 @@ export const STUDIO_CHROME_REGIONS: readonly StudioChromeRegionSpec[] = [
     id: "menubar",
     role: "document-and-app-menus",
     labelKo: "상단 메뉴",
-    description: "파일·편집·삽입·보기 등 문서/앱 명령 (CSP/PowerPoint 상단 메뉴)",
+    description:
+      "파일·편집·삽입·보기 등 문서/앱 명령과 사용자 구성 명령 바 (CSP/PowerPoint 상단 메뉴 + CSP 커맨드 바; §15.3 Window ▸ Action Bar 는 `window/command-bar` 가 토글)",
   },
   {
     id: "left-tool-rail",

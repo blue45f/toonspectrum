@@ -20,13 +20,17 @@ import {
   Package,
   PlaySquare,
   Save,
+  Scan,
   Send,
+  Settings2,
   ShieldCheck,
+  SlidersHorizontal,
   Redo2,
   Undo2,
   Upload,
   WandSparkles,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Suspense,
@@ -54,6 +58,14 @@ import {
   preloadStudioAssetMenuPanel,
   preloadStudioExportMenuPanel,
 } from "./studio-page-lazy-ui";
+import {
+  DEFAULT_STUDIO_COMMAND_BAR,
+  STUDIO_COMMAND_BAR_COMMAND_IDS,
+  normalizeStudioCommandBarPreferences,
+  setStudioCommandBarVisible,
+  updateStudioCommandBarSlot,
+  updateStudioWorkspaceLiveLayout,
+} from "./studio-workspaces";
 import { studioWriterRoomHasContent } from "./studio-writer-room";
 import { StudioProjectReviewActions } from "./StudioProjectReviewActions";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -77,6 +89,8 @@ import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { WatermarkSettings } from "./studio-watermark";
 import type {
+  StudioCommandBarCommandId,
+  StudioCommandBarPreferences,
   StudioWorkspaceDeviceKind,
   StudioWorkspaceId,
   StudioWorkspaceLayout,
@@ -183,6 +197,288 @@ const MENUBAR_OVERFLOW_HINT = {
     "메뉴바 폭이 모자라 잘린 상위 메뉴 목록입니다. 고르면 그 메뉴가 보이는 위치로 이동하며 바로 열립니다.",
   tip: "폭이 넉넉해지면 이 버튼은 스스로 사라져요.",
 } satisfies StudioToolHintSpec;
+
+/** Hints for command-bar-only surfaces. Ids are globally unique across every hint spec. */
+const COMMAND_BAR_HINTS = {
+  zoomFit: {
+    id: "menubar-zoom-fit",
+    title: "화면 폭 맞춤",
+    description: "캔버스 줌을 현재 작업 창에 맞춰 페이지 전체 폭이 한눈에 보이게 조정합니다.",
+  },
+  customize: {
+    id: "menubar-command-bar-customize",
+    title: "명령 바 설정",
+    description: "메뉴바 아래 명령 바의 슬롯 구성과 표시 여부를 바꿉니다.",
+    tip: "자주 쓰는 명령을 앞쪽 슬롯에 두면 손이 가장 빨리 닿아요.",
+  },
+} satisfies Readonly<Record<string, StudioToolHintSpec>>;
+
+/** User-facing names of the assignable command-bar commands (slot editor + aria labels). */
+const COMMAND_BAR_COMMAND_LABELS: Readonly<Record<StudioCommandBarCommandId, string>> = {
+  undo: "실행취소",
+  redo: "다시실행",
+  save: "임시저장",
+  publish: "게시하기",
+  download: "현재 페이지 다운로드",
+  "export-open": "내보내기 옵션",
+  "zoom-fit": "화면 폭 맞춤",
+  assets: "템플릿·에셋",
+  bubbles: "말풍선",
+  project: "프로젝트 작업",
+};
+
+/** One slot command bound to the executor seam the menubar already owns for it. */
+interface StudioMenubarCommandBinding {
+  label: string;
+  icon: LucideIcon;
+  hint: StudioToolHintSpec;
+  run: () => void;
+  disabled?: boolean;
+  unavailableReason?: string;
+}
+
+/**
+ * §15.3 Window ▸ Action Bar — the fixed undo/redo/history cluster, extended into a
+ * user-configurable slotted command strip (CSP 커맨드 바 parity).
+ *
+ * Slots execute through the same handler backpack the fixed menubar buttons already use — no
+ * second dispatch path. History and the slot editor stay fixed at the strip's end so the desktop
+ * history authority and the way back from "slots hidden" can never be customized away.
+ */
+function StudioMenubarCommandBar({
+  preferences,
+  bindings,
+  historyPanelOpen,
+  onToggleHistoryPanel,
+  onPreferencesChange,
+  hidden,
+}: {
+  preferences: StudioCommandBarPreferences;
+  bindings: Readonly<Record<StudioCommandBarCommandId, StudioMenubarCommandBinding>>;
+  historyPanelOpen: boolean;
+  onToggleHistoryPanel: () => void;
+  onPreferencesChange: (next: StudioCommandBarPreferences) => void;
+  hidden: boolean;
+}): ReactElement {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const settingsPanelRef = useRef<HTMLDivElement | null>(null);
+  const settingsPanelId = useId();
+  const [settingsCoords, setSettingsCoords] = useState({ top: 44, right: 12 });
+
+  const closeSettings = useCallback((restoreFocus: boolean) => {
+    setSettingsOpen(false);
+    if (restoreFocus) settingsButtonRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  const openSettings = useCallback(() => {
+    const rect = settingsButtonRef.current?.getBoundingClientRect();
+    if (rect && typeof window !== "undefined") {
+      setSettingsCoords({
+        top: rect.bottom + 6,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    }
+    setSettingsOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (
+        settingsButtonRef.current?.contains(target)
+        || settingsPanelRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setSettingsOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      closeSettings(true);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [closeSettings, settingsOpen]);
+
+  return (
+    <div
+      role="group"
+      aria-label="빠른 명령 바"
+      data-studio-menubar-command-bar="true"
+      className={cn(
+        "hidden shrink-0 items-center gap-0.5 md:flex",
+        hidden && "!hidden"
+      )}
+    >
+      {preferences.visible
+        ? preferences.slots.map((slot, index) => {
+            if (slot === null) return null;
+            const binding = bindings[slot];
+            return (
+              <StudioToolHintTarget
+                // Duplicate commands across slots are allowed, so key by position + command.
+                key={`${index}:${slot}`}
+                hint={binding.hint}
+                disabled={binding.disabled}
+                unavailableReason={binding.disabled ? binding.unavailableReason : undefined}
+                preferredSide="bottom"
+              >
+                <button
+                  type="button"
+                  onClick={binding.run}
+                  disabled={binding.disabled}
+                  aria-label={`빠른 명령: ${binding.label}`}
+                  data-studio-command-bar-slot={index}
+                  data-studio-command-bar-command={slot}
+                  className={buttonClass({
+                    size: "sm",
+                    variant: "quiet",
+                    className: "min-h-9 min-w-9 px-0 disabled:opacity-35",
+                  })}
+                >
+                  <binding.icon size={14} aria-hidden />
+                </button>
+              </StudioToolHintTarget>
+            );
+          })
+        : null}
+      {/* The desktop history authority stays fixed: pointer commits, keyboard users, screen
+          readers, and automation share this one control even when the slots hide it-alikes. */}
+      <StudioToolHintTarget hint={MENUBAR_HINTS.history} preferredSide="bottom">
+        <button
+          type="button"
+          onClick={onToggleHistoryPanel}
+          aria-label="작업 내역"
+          aria-pressed={historyPanelOpen}
+          className={buttonClass({
+            size: "sm",
+            variant: historyPanelOpen ? "solid" : "quiet",
+            className: "min-h-9 min-w-9 px-0",
+          })}
+        >
+          <HistoryIcon size={14} aria-hidden />
+        </button>
+      </StudioToolHintTarget>
+      {/* Fixed as well — hiding the slots must never hide the way to bring them back. */}
+      <StudioToolHintTarget hint={COMMAND_BAR_HINTS.customize} preferredSide="bottom">
+        <button
+          ref={settingsButtonRef}
+          type="button"
+          onClick={() => (settingsOpen ? closeSettings(true) : openSettings())}
+          aria-label="명령 바 설정"
+          aria-haspopup="dialog"
+          aria-expanded={settingsOpen}
+          aria-controls={settingsOpen ? settingsPanelId : undefined}
+          data-studio-command-bar-settings-trigger="true"
+          className={buttonClass({
+            size: "sm",
+            variant: settingsOpen ? "solid" : "quiet",
+            className: "min-h-9 min-w-9 px-0",
+          })}
+        >
+          <Settings2 size={14} aria-hidden />
+        </button>
+      </StudioToolHintTarget>
+      {settingsOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={settingsPanelRef}
+              id={settingsPanelId}
+              role="dialog"
+              aria-label="명령 바 설정"
+              data-studio-command-bar-settings-panel="true"
+              data-studio-shortcut-boundary="true"
+              style={{ top: settingsCoords.top, right: settingsCoords.right }}
+              className="fixed z-[100] max-h-[min(70dvh,28rem)] w-72 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel p-3 shadow-2xl"
+            >
+              <div className="flex items-center justify-between gap-2 border-b border-line/60 pb-2">
+                <span>
+                  <span className="block text-xs font-bold text-fg">명령 바 설정</span>
+                  <span className="mt-0.5 block text-[0.65rem] text-fg-3">
+                    슬롯 구성은 이 브라우저의 작업공간 설정에 저장돼요.
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => closeSettings(true)}
+                  aria-label="명령 바 설정 닫기"
+                  className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg"
+                >
+                  <X size={15} aria-hidden />
+                </button>
+              </div>
+              <label className="flex min-h-10 cursor-pointer items-center gap-2 border-b border-line/60 py-1 text-[0.75rem] font-medium text-fg-2">
+                <input
+                  type="checkbox"
+                  checked={preferences.visible}
+                  onChange={(event) =>
+                    onPreferencesChange(
+                      setStudioCommandBarVisible(preferences, event.target.checked)
+                    )
+                  }
+                  className="size-4 accent-accent"
+                />
+                명령 슬롯 표시
+              </label>
+              <div className="flex flex-col gap-1 py-2">
+                {preferences.slots.map((slot, index) => (
+                  <label
+                    // Slot rows are positional; the index is the slot's identity.
+                    key={index}
+                    className="flex min-h-9 items-center justify-between gap-2 text-[0.72rem] text-fg-3"
+                  >
+                    <span className="shrink-0 tabular-nums">슬롯 {index + 1}</span>
+                    <select
+                      value={slot ?? ""}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        onPreferencesChange(
+                          updateStudioCommandBarSlot(
+                            preferences,
+                            index,
+                            value === "" ? null : (value as StudioCommandBarCommandId)
+                          )
+                        );
+                      }}
+                      aria-label={`명령 슬롯 ${index + 1}`}
+                      className="min-h-9 w-44 rounded-lg border border-line bg-canvas px-2 text-[0.75rem] text-fg"
+                    >
+                      <option value="">빈 슬롯</option>
+                      {STUDIO_COMMAND_BAR_COMMAND_IDS.map((commandId) => (
+                        <option key={commandId} value={commandId}>
+                          {COMMAND_BAR_COMMAND_LABELS[commandId]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => onPreferencesChange(DEFAULT_STUDIO_COMMAND_BAR)}
+                className={buttonClass({
+                  size: "sm",
+                  variant: "quiet",
+                  className: "min-h-9 w-full justify-center border border-line/70",
+                })}
+              >
+                기본 구성으로 되돌리기
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
+    </div>
+  );
+}
 
 /** 메뉴바 가로 레인의 실측 상태 — 폭 브레이크포인트가 아니라 기하로만 판정한다. */
 export interface StudioMenubarLaneOverflow {
@@ -460,6 +756,11 @@ export interface StudioMenubarContentHandlers extends StudioProjectReviewActionH
   setWatermark: (next: WatermarkSettings) => void;
   toggleHistoryPanel: () => void;
   undo: () => void;
+  /**
+   * Optional until StudioPage wires it: fits the canvas zoom to the working width. The command
+   * bar's zoom-fit slot disables itself with a reason while the host has not provided it.
+   */
+  zoomToFit?: () => void;
 }
 
 export interface StudioMenubarContentProps {
@@ -642,6 +943,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     setWatermark,
     toggleHistoryPanel,
     undo,
+    zoomToFit,
     exportCurrentPageToPsd,
     exportCurrentPageToRasterInterchange,
     exportCurrentPageToInkMl,
@@ -761,6 +1063,118 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     }
   }, []);
 
+  // 명령 바 환경설정은 작업공간 liveLayout(저자형)에 실려 저장된다. liveWorkspaceLayout 프롭이
+  // 이미 captureStudioWorkspaceDeviceLayout 을 거친 저자형이라, 그 위에 commandBar 만 바꿔 얹어도
+  // 기기 해석 기하가 저자 desktop 으로 접혀 들어갈 일이 없다(작업공간 저자형 불변식).
+  const commandBarPreferences = normalizeStudioCommandBarPreferences(
+    liveWorkspaceLayout.commandBar
+  );
+  const changeCommandBarPreferences = (next: StudioCommandBarPreferences) => {
+    persistStudioWorkspaceState(
+      updateStudioWorkspaceLiveLayout(workspaceState, {
+        ...liveWorkspaceLayout,
+        commandBar: next,
+      })
+    );
+  };
+
+  const sharedNonOwner = Boolean(sharedDocument && sharedDocument.role !== "owner");
+  /** Every slot routes through a handler the fixed menubar controls already own. */
+  const commandBarBindings: Readonly<
+    Record<StudioCommandBarCommandId, StudioMenubarCommandBinding>
+  > = {
+    undo: {
+      label: COMMAND_BAR_COMMAND_LABELS.undo,
+      icon: Undo2,
+      hint: MENUBAR_HINTS.undo,
+      run: undo,
+      disabled: undoDisabled,
+      unavailableReason: "되돌릴 편집 작업이 아직 없습니다.",
+    },
+    redo: {
+      label: COMMAND_BAR_COMMAND_LABELS.redo,
+      icon: Redo2,
+      hint: MENUBAR_HINTS.redo,
+      run: redo,
+      disabled: redoDisabled,
+      unavailableReason: "다시 적용할 편집 작업이 아직 없습니다.",
+    },
+    save: {
+      label: sharedNonOwner ? "공동 저장" : COMMAND_BAR_COMMAND_LABELS.save,
+      icon: Save,
+      hint: MENUBAR_HINTS.draft,
+      run: () => void handleSave("draft"),
+      disabled: saving || collaborationDocumentLocked,
+      unavailableReason: collaborationDocumentLocked
+        ? collaborationLockMessage()
+        : "현재 저장 작업이 끝난 뒤 다시 시도하세요.",
+    },
+    publish: {
+      label: workId ? "수정 게시" : COMMAND_BAR_COMMAND_LABELS.publish,
+      icon: Send,
+      hint: MENUBAR_HINTS.publish,
+      run: () => void handleSave("published"),
+      disabled: saving || collaborationDocumentLocked || sharedNonOwner,
+      unavailableReason: sharedNonOwner
+        ? "공유 문서의 게시는 소유자만 할 수 있습니다."
+        : collaborationDocumentLocked
+          ? collaborationLockMessage()
+          : "현재 저장 작업이 끝난 뒤 다시 시도하세요.",
+    },
+    download: {
+      label: COMMAND_BAR_COMMAND_LABELS.download,
+      icon: Download,
+      hint: MENUBAR_HINTS.download,
+      run: () => void handleDownload(),
+    },
+    "export-open": {
+      label: COMMAND_BAR_COMMAND_LABELS["export-open"],
+      icon: SlidersHorizontal,
+      hint: MENUBAR_HINTS.exportOptions,
+      // Open-only on purpose: outside-pointerdown closing already owns dismissal, and a toggle
+      // here would race it (close-on-pointerdown then reopen-on-click).
+      run: () => {
+        preloadStudioExportMenuPanel();
+        void ensureWatermarkLoaded().then(() => {
+          setProjectActionsOpen(false);
+          setExportMenuOpen(true);
+        });
+      },
+    },
+    "zoom-fit": {
+      label: COMMAND_BAR_COMMAND_LABELS["zoom-fit"],
+      icon: Scan,
+      hint: COMMAND_BAR_HINTS.zoomFit,
+      run: () => zoomToFit?.(),
+      disabled: typeof zoomToFit !== "function",
+      unavailableReason: "이 화면에는 화면 맞춤 명령이 아직 연결되지 않았습니다.",
+    },
+    assets: {
+      label: COMMAND_BAR_COMMAND_LABELS.assets,
+      icon: Folder,
+      hint: MENUBAR_HINTS.assets,
+      run: () => {
+        preloadStudioAssetMenuPanel();
+        setMenu("template");
+      },
+    },
+    bubbles: {
+      label: COMMAND_BAR_COMMAND_LABELS.bubbles,
+      icon: MessageCircle,
+      hint: MENUBAR_HINTS.bubbles,
+      run: () => setMenu(menu === "bubble" ? null : "bubble"),
+    },
+    project: {
+      label: COMMAND_BAR_COMMAND_LABELS.project,
+      icon: Folder,
+      hint: MENUBAR_HINTS.project,
+      run: () => {
+        setExportMenuOpen(false);
+        setProjectActionsOpen(true);
+      },
+    },
+  };
+
   return (
     <>
         {/* 가져오기 파일 입력은 StudioPage 루트(data-studio-document-import-inputs)에 상시 마운트한다.
@@ -825,73 +1239,17 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           ) : null}
           </div>
           <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
-          {/* The legacy tool belt is mobile-only. Keep the desktop history authority visible here
-              so pointer commits, keyboard users, screen readers, and automation share one control. */}
-          <div
-            role="group"
-            aria-label="작업 내역 빠른 작업"
-            data-studio-menubar-history-actions="true"
-            className={cn(
-              "hidden shrink-0 items-center gap-0.5 md:flex",
-              mobileImmersive && "!hidden"
-            )}
-          >
-            <StudioToolHintTarget
-              hint={MENUBAR_HINTS.undo}
-              disabled={undoDisabled}
-              unavailableReason={undoDisabled ? "되돌릴 편집 작업이 아직 없습니다." : undefined}
-              preferredSide="bottom"
-            >
-              <button
-                type="button"
-                onClick={undo}
-                disabled={undoDisabled}
-                aria-label="실행취소"
-                className={buttonClass({
-                  size: "sm",
-                  variant: "quiet",
-                  className: "min-h-9 min-w-9 px-0 disabled:opacity-35",
-                })}
-              >
-                <Undo2 size={14} aria-hidden />
-              </button>
-            </StudioToolHintTarget>
-            <StudioToolHintTarget
-              hint={MENUBAR_HINTS.redo}
-              disabled={redoDisabled}
-              unavailableReason={redoDisabled ? "다시 적용할 편집 작업이 아직 없습니다." : undefined}
-              preferredSide="bottom"
-            >
-              <button
-                type="button"
-                onClick={redo}
-                disabled={redoDisabled}
-                aria-label="다시실행"
-                className={buttonClass({
-                  size: "sm",
-                  variant: "quiet",
-                  className: "min-h-9 min-w-9 px-0 disabled:opacity-35",
-                })}
-              >
-                <Redo2 size={14} aria-hidden />
-              </button>
-            </StudioToolHintTarget>
-            <StudioToolHintTarget hint={MENUBAR_HINTS.history} preferredSide="bottom">
-              <button
-                type="button"
-                onClick={toggleHistoryPanel}
-                aria-label="작업 내역"
-                aria-pressed={historyPanelOpen}
-                className={buttonClass({
-                  size: "sm",
-                  variant: historyPanelOpen ? "solid" : "quiet",
-                  className: "min-h-9 min-w-9 px-0",
-                })}
-              >
-                <HistoryIcon size={14} aria-hidden />
-              </button>
-            </StudioToolHintTarget>
-          </div>
+          {/* The legacy tool belt is mobile-only. The old fixed undo/redo/history cluster grew
+              into this user-configurable command strip (§15.3 Window ▸ Action Bar); history and
+              the slot editor stay fixed so the desktop history authority survives customization. */}
+          <StudioMenubarCommandBar
+            preferences={commandBarPreferences}
+            bindings={commandBarBindings}
+            historyPanelOpen={historyPanelOpen}
+            onToggleHistoryPanel={toggleHistoryPanel}
+            onPreferencesChange={changeCommandBarPreferences}
+            hidden={mobileImmersive}
+          />
           <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
           {/* Desktop application commands live in the compressible center lane. */}
           <Suspense fallback={null}>

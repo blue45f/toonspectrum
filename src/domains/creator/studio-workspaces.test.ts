@@ -14,8 +14,11 @@ import {
   STUDIO_QUICK_ACTIONS_STORAGE_KEY,
 } from "./studio-quick-actions";
 import {
+  DEFAULT_STUDIO_COMMAND_BAR,
   DEFAULT_STUDIO_WORKSPACE_STATE,
   STUDIO_CLASSIC_WORKSPACE_IDS,
+  STUDIO_COMMAND_BAR_COMMAND_IDS,
+  STUDIO_COMMAND_BAR_SLOT_COUNT,
   STUDIO_DEFAULT_WORKSPACE_IDS,
   STUDIO_DEFAULT_WORKSPACES,
   STUDIO_EXPANDED_WORKSPACE_IDS,
@@ -43,8 +46,11 @@ import {
   loadStudioWorkspaceState,
   migrateLegacyStudioWorkspaceState,
   moveStudioWorkspace,
+  normalizeStudioCommandBarPreferences,
   normalizeStudioWorkspaceLayout,
   normalizeStudioWorkspaceState,
+  setStudioCommandBarVisible,
+  updateStudioCommandBarSlot,
   overwriteStudioWorkspace,
   reloadStudioWorkspace,
   renameStudioWorkspace,
@@ -1674,5 +1680,134 @@ describe("Studio workspace payload budget with the device axis", () => {
     const raw = storage.values.get(studioWorkspaceStorageKey(null)) ?? "";
     expect(new TextEncoder().encode(raw).byteLength)
       .toBeLessThan(STUDIO_WORKSPACE_RAW_MAX_BYTES);
+  });
+});
+
+describe("Studio command bar preferences (§15.3 Window ▸ Action Bar)", () => {
+  it("ships the documented default: five filled slots, three empty, visible", () => {
+    expect(DEFAULT_STUDIO_COMMAND_BAR.visible).toBe(true);
+    expect(DEFAULT_STUDIO_COMMAND_BAR.slots).toEqual([
+      "undo",
+      "redo",
+      "save",
+      "export-open",
+      "zoom-fit",
+      null,
+      null,
+      null,
+    ]);
+    expect(DEFAULT_STUDIO_COMMAND_BAR.slots).toHaveLength(STUDIO_COMMAND_BAR_SLOT_COUNT);
+    expect(Object.isFrozen(DEFAULT_STUDIO_COMMAND_BAR)).toBe(true);
+    expect(Object.isFrozen(DEFAULT_STUDIO_COMMAND_BAR.slots)).toBe(true);
+    // Every default slot names a command from the closed vocabulary.
+    const known = new Set<string>(STUDIO_COMMAND_BAR_COMMAND_IDS);
+    for (const slot of DEFAULT_STUDIO_COMMAND_BAR.slots) {
+      if (slot !== null) expect(known.has(slot)).toBe(true);
+    }
+  });
+
+  it("recovers slots field by field and always rebuilds the exact slot count", () => {
+    const normalized = normalizeStudioCommandBarPreferences({
+      version: 1,
+      visible: false,
+      slots: ["download", "no-such-command", null, 7, "project"],
+    });
+    expect(normalized.visible).toBe(false);
+    expect(normalized.slots).toEqual([
+      "download",
+      // Corrupt entries fall back per slot; the rest of the customization survives.
+      "redo",
+      null,
+      "export-open",
+      "project",
+      null,
+      null,
+      null,
+    ]);
+
+    // A wrong version or malformed root resets wholesale.
+    expect(normalizeStudioCommandBarPreferences({ version: 2, slots: [] }))
+      .toEqual(DEFAULT_STUDIO_COMMAND_BAR);
+    expect(normalizeStudioCommandBarPreferences("{broken")).toEqual(DEFAULT_STUDIO_COMMAND_BAR);
+  });
+
+  it("updates one slot and the visibility immutably with range/vocabulary guards", () => {
+    const updated = updateStudioCommandBarSlot(DEFAULT_STUDIO_COMMAND_BAR, 5, "download");
+    expect(updated.slots[5]).toBe("download");
+    expect(DEFAULT_STUDIO_COMMAND_BAR.slots[5]).toBeNull();
+
+    const cleared = updateStudioCommandBarSlot(updated, 0, null);
+    expect(cleared.slots[0]).toBeNull();
+
+    expect(() => updateStudioCommandBarSlot(DEFAULT_STUDIO_COMMAND_BAR, 8, "undo"))
+      .toThrow(RangeError);
+    expect(() =>
+      updateStudioCommandBarSlot(DEFAULT_STUDIO_COMMAND_BAR, 0, "nope" as never)
+    ).toThrow(TypeError);
+
+    const hidden = setStudioCommandBarVisible(DEFAULT_STUDIO_COMMAND_BAR, false);
+    expect(hidden.visible).toBe(false);
+    expect(hidden.slots).toEqual(DEFAULT_STUDIO_COMMAND_BAR.slots);
+    expect(DEFAULT_STUDIO_COMMAND_BAR.visible).toBe(true);
+  });
+
+  it("round-trips a customized command bar through owner-scoped persistence", () => {
+    const storage = memoryStorage();
+    const owner = "command-bar-owner";
+    const customized = updateStudioWorkspaceLiveLayout(
+      DEFAULT_STUDIO_WORKSPACE_STATE,
+      normalizeStudioWorkspaceLayout({
+        ...DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout,
+        commandBar: setStudioCommandBarVisible(
+          updateStudioCommandBarSlot(DEFAULT_STUDIO_COMMAND_BAR, 5, "project"),
+          false,
+        ),
+      }),
+    );
+
+    const saved = saveStudioWorkspaceState(storage, owner, customized);
+    expect(saved).toMatchObject({ status: "persisted", failure: null });
+
+    const loaded = loadStudioWorkspacePersistence(storage, owner);
+    expect(loaded.source).toBe("current");
+    expect(loaded.state.liveLayout.commandBar?.visible).toBe(false);
+    expect(loaded.state.liveLayout.commandBar?.slots[5]).toBe("project");
+  });
+
+  it("keeps the authored-form invariant: the bar never enters deviceOverrides and stays put on switch", () => {
+    const customized = updateStudioWorkspaceLiveLayout(
+      DEFAULT_STUDIO_WORKSPACE_STATE,
+      normalizeStudioWorkspaceLayout({
+        ...DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout,
+        commandBar: updateStudioCommandBarSlot(DEFAULT_STUDIO_COMMAND_BAR, 6, "bubbles"),
+      }),
+    );
+
+    // Device resolution swaps dock geometry only; the command bar is device-independent.
+    for (const device of STUDIO_WORKSPACE_DEVICE_KINDS) {
+      const presented = resolveStudioWorkspaceDeviceLayout(customized.liveLayout, device);
+      expect(presented.commandBar).toEqual(customized.liveLayout.commandBar);
+      expect(
+        Object.values(presented.deviceOverrides).some(
+          (override) => override && "commandBar" in override,
+        ),
+      ).toBe(false);
+    }
+
+    // App chrome follows the artist across workspaces instead of resetting per profile…
+    const switched = switchStudioWorkspace(customized, "lineart");
+    expect(switched.liveLayout.commandBar?.slots[6]).toBe("bubbles");
+    // …and a customized bar alone never reads as workspace drift.
+    expect(isStudioWorkspaceDirty(switched)).toBe(false);
+  });
+
+  it("treats pre-command-bar payloads as default instead of rejecting them", () => {
+    const legacyState = JSON.parse(
+      JSON.stringify(DEFAULT_STUDIO_WORKSPACE_STATE),
+    ) as Record<string, unknown>;
+    delete (legacyState.liveLayout as Record<string, unknown>).commandBar;
+
+    const normalized = normalizeStudioWorkspaceState(legacyState);
+    expect(normalized.liveLayout.commandBar).toEqual(DEFAULT_STUDIO_COMMAND_BAR);
   });
 });

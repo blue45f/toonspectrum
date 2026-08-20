@@ -173,6 +173,124 @@ export function studioWorkspaceLaunchSurface(
     : null;
 }
 
+/* ------------------------------------------------------------- command bar */
+
+/**
+ * Menubar command bar (§15.3 Window ▸ Action Bar — CSP 커맨드 바 parity).
+ *
+ * Same shape of pure preference model as `studio-quick-actions.ts`: a fixed slot list, a closed
+ * command vocabulary, per-slot recovery from untrusted storage. Every command id here maps onto an
+ * executor seam the menubar already owns — the bar never grows its own dispatch path.
+ */
+export const STUDIO_COMMAND_BAR_SLOT_COUNT = 8;
+
+export const STUDIO_COMMAND_BAR_COMMAND_IDS = [
+  "undo",
+  "redo",
+  "save",
+  "publish",
+  "download",
+  "export-open",
+  "zoom-fit",
+  "assets",
+  "bubbles",
+  "project",
+] as const;
+
+export type StudioCommandBarCommandId = (typeof STUDIO_COMMAND_BAR_COMMAND_IDS)[number];
+/** `null` is an intentionally empty slot, preserved so custom arrangements keep their spacing. */
+export type StudioCommandBarSlot = StudioCommandBarCommandId | null;
+
+export interface StudioCommandBarPreferences {
+  readonly version: 1;
+  /** Whether the slot strip renders. The fixed history/customize controls stay regardless. */
+  readonly visible: boolean;
+  /** Always exactly `STUDIO_COMMAND_BAR_SLOT_COUNT` entries after normalization. */
+  readonly slots: readonly StudioCommandBarSlot[];
+}
+
+const COMMAND_BAR_COMMAND_ID_SET = new Set<string>(STUDIO_COMMAND_BAR_COMMAND_IDS);
+
+function freezeCommandBar(
+  preferences: StudioCommandBarPreferences
+): StudioCommandBarPreferences {
+  return Object.freeze({
+    version: 1,
+    visible: preferences.visible,
+    slots: Object.freeze([...preferences.slots]),
+  });
+}
+
+export const DEFAULT_STUDIO_COMMAND_BAR: StudioCommandBarPreferences = freezeCommandBar({
+  version: 1,
+  visible: true,
+  slots: ["undo", "redo", "save", "export-open", "zoom-fit", null, null, null],
+});
+
+/**
+ * Normalizes untrusted command bar preferences. Slots recover field by field — one corrupt slot
+ * never discards the rest of a customization — and the list is always rebuilt to exactly
+ * `STUDIO_COMMAND_BAR_SLOT_COUNT` entries. Duplicate commands across slots are preserved.
+ */
+export function normalizeStudioCommandBarPreferences(
+  raw: unknown,
+  fallback: StudioCommandBarPreferences = DEFAULT_STUDIO_COMMAND_BAR
+): StudioCommandBarPreferences {
+  if (!isRecord(raw) || raw.version !== 1) return freezeCommandBar(fallback);
+  const rawSlots = Array.isArray(raw.slots) ? raw.slots : null;
+  const slots: StudioCommandBarSlot[] = [];
+  for (let index = 0; index < STUDIO_COMMAND_BAR_SLOT_COUNT; index += 1) {
+    const candidate = rawSlots?.[index];
+    if (candidate === null) {
+      slots.push(null);
+    } else if (
+      typeof candidate === "string"
+      && COMMAND_BAR_COMMAND_ID_SET.has(candidate)
+    ) {
+      slots.push(candidate as StudioCommandBarCommandId);
+    } else {
+      slots.push(fallback.slots[index] ?? null);
+    }
+  }
+  return freezeCommandBar({
+    version: 1,
+    visible: typeof raw.visible === "boolean" ? raw.visible : fallback.visible,
+    slots,
+  });
+}
+
+/** Returns new preferences with one slot replaced. The input and its slots stay untouched. */
+export function updateStudioCommandBarSlot(
+  preferences: StudioCommandBarPreferences,
+  slotIndex: number,
+  command: StudioCommandBarSlot
+): StudioCommandBarPreferences {
+  if (
+    !Number.isInteger(slotIndex)
+    || slotIndex < 0
+    || slotIndex >= STUDIO_COMMAND_BAR_SLOT_COUNT
+  ) {
+    throw new RangeError(`Studio command bar slot index is out of range: ${slotIndex}`);
+  }
+  if (command !== null && !COMMAND_BAR_COMMAND_ID_SET.has(command)) {
+    throw new TypeError(`Unknown Studio command bar command: ${String(command)}`);
+  }
+  const normalized = normalizeStudioCommandBarPreferences(preferences);
+  const slots = [...normalized.slots];
+  slots[slotIndex] = command;
+  return freezeCommandBar({ version: 1, visible: normalized.visible, slots });
+}
+
+/** Returns new preferences with visibility set; identical visibility returns the normalized input. */
+export function setStudioCommandBarVisible(
+  preferences: StudioCommandBarPreferences,
+  visible: boolean
+): StudioCommandBarPreferences {
+  const normalized = normalizeStudioCommandBarPreferences(preferences);
+  if (normalized.visible === visible) return normalized;
+  return freezeCommandBar({ version: 1, visible, slots: [...normalized.slots] });
+}
+
 export interface StudioWorkspaceDesktopLayout {
   readonly leftPanelOpen: boolean;
   readonly rightPanelOpen: boolean;
@@ -203,6 +321,13 @@ export interface StudioWorkspaceLayout {
   readonly desktop: StudioWorkspaceDesktopLayout;
   readonly drawingPalettes: StudioDrawingPaletteLayout;
   readonly quickActions: StudioQuickActionsPreferences;
+  /**
+   * Menubar command bar — app chrome that rides in the live layout. Device-independent like
+   * `quickActions`, so it never folds into `deviceOverrides` and the authored-form invariant
+   * holds untouched. Optional only because pre-command-bar payloads and layout literals omit it;
+   * every normalized layout carries it (see `normalizeWorkspaceLayout`).
+   */
+  readonly commandBar?: StudioCommandBarPreferences;
   /** Absent devices fall through to `desktop`; an empty map is the documented default. */
   readonly deviceOverrides: StudioWorkspaceDeviceOverrides;
 }
@@ -420,6 +545,7 @@ function freezeLayout(layout: StudioWorkspaceLayout): StudioWorkspaceLayout {
       layout.drawingPalettes,
     ),
     quickActions: freezeQuickActions(layout.quickActions),
+    commandBar: freezeCommandBar(layout.commandBar ?? DEFAULT_STUDIO_COMMAND_BAR),
     deviceOverrides: freezeDeviceOverrides(layout.deviceOverrides, desktop),
   });
 }
@@ -904,6 +1030,15 @@ function normalizeWorkspaceLayout(
   const quickActions = isExactQuickActions(value.quickActions)
     ? normalizeStudioQuickActionsPreferences(value.quickActions)
     : fallback.quickActions;
+  // Payloads older than the command bar carry no `commandBar` key at all; they inherit the
+  // fallback (the previous live layout, or a built-in's default) instead of resetting, exactly
+  // like the device axis below. A present key recovers slot by slot.
+  const commandBar = "commandBar" in value
+    ? normalizeStudioCommandBarPreferences(
+        value.commandBar,
+        fallback.commandBar ?? DEFAULT_STUDIO_COMMAND_BAR,
+      )
+    : fallback.commandBar ?? DEFAULT_STUDIO_COMMAND_BAR;
   // A v1-v3 payload has no device overrides at all. Inheriting the fallback's keeps a built-in
   // profile's curated adaptations after migration instead of silently flattening them.
   const deviceOverrides = "deviceOverrides" in value
@@ -915,6 +1050,7 @@ function normalizeWorkspaceLayout(
     desktop,
     drawingPalettes,
     quickActions,
+    commandBar,
     deviceOverrides,
   });
 }
@@ -1746,6 +1882,10 @@ function applyWorkspaceLayout(
     quickActions: applyQuickActions
       ? workspaceLayout.quickActions
       : liveLayout.quickActions,
+    // The command bar is app chrome, not task layout: an artist arranges it once and expects it
+    // wherever they work, so switching (and reloading) a workspace never rewrites it from the
+    // target profile's snapshot.
+    commandBar: liveLayout.commandBar ?? workspaceLayout.commandBar,
     // Device adaptations belong to the workspace being switched to, never to the live layout the
     // artist is leaving: keeping the old ones would silently apply one profile's pen-display
     // geometry to another profile's docks.
@@ -2024,6 +2164,13 @@ export function resolveStudioWorkspaceDeviceKind(
   return null;
 }
 
+/**
+ * Layout equality for workspace dirtiness and autosave guards.
+ *
+ * `commandBar` is deliberately not compared: switching a workspace never rewrites it (see
+ * `applyWorkspaceLayout`), so a customized bar must not make every workspace read as modified —
+ * that badge sits in front of a button that overwrites the authored profile.
+ */
 export function areStudioWorkspaceLayoutsEqual(
   first: StudioWorkspaceLayout,
   second: StudioWorkspaceLayout,

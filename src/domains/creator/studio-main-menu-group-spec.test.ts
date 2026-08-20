@@ -171,14 +171,17 @@ describe("§15.3 menu group spec", () => {
     // Filter ▸ Depth/Normal Effects from absent to partial: normal-map bakes a
     // normal map and god-rays casts volumetric light, but there is still no depth
     // input and no relighting, so it is not "present".
+    // The command bar wave moved Window ▸ Action Bar from absent to partial: the
+    // menubar strip is user-configurable (8 slots) with a visibility toggle, but
+    // drag reordering and separators are still missing, so it is not "present".
     expect(studioMenuSpecCoverageSummary()).toEqual({
       specGroups: 17,
       groupsWithItems: 17,
       emptyGroupIds: [],
       specRows: 135,
       rowsPresent: 37,
-      rowsPartial: 35,
-      rowsAbsent: 63,
+      rowsPartial: 36,
+      rowsAbsent: 62,
       // 툴벨트에서 승격한 검수·미리보기 3종은 §15.3 행이 없어 extras로 센다.
       extras: 37,
     });

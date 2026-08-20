@@ -239,7 +239,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     ],
     declarationRef:
       "studio-main-menu-item-routing.ts (STUDIO_MENU_ITEM_BUILDERS) + studio-main-menu-items-*.ts",
-    measuredCount: 186,
+    measuredCount: 187,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -468,7 +468,9 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "collaboration/team",
   "collaboration/comments",
   "collaboration/page-review",
-  // window (12) — lifted out of view and insert
+  // window (13) — lifted out of view and insert; the command bar toggle (§15.3
+  // Action Bar, CSP 커맨드 바) joined when the menubar history cluster became a
+  // user-configurable slotted strip (186 → 187).
   "window/density-focus",
   "window/density-full",
   "window/left-panel",
@@ -476,6 +478,7 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "window/wide",
   "window/canvas-only",
   "window/quick-access-palette",
+  "window/command-bar",
   "window/template",
   "window/ref",
   "window/reference-window",
@@ -1185,6 +1188,19 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("퀵 액세스"), ps("Command Search"), krita("Search Actions")],
       shortcut: "⇧Q",
       origins: [menu("window/quick-access-palette", { shortcut: "⇧Q" })],
+    }),
+    defineCommand({
+      id: "window.command-bar",
+      labels: [
+        ko("명령 바", "메뉴바 아래 상시 명령 바를 표시하거나 숨깁니다. 슬롯은 명령 바 설정에서 바꿉니다."),
+        en("Command bar"),
+      ],
+      aliases: [csp("커맨드 바"), cspEn("Command Bar"), krita("Toolbars")],
+      origins: [
+        menu("window/command-bar", {
+          note: "호스트가 toggleCommandBar 를 배선하기 전에는 메뉴 행이 스스로 비활성화된다(메뉴바 명령 바 설정이 대체 경로).",
+        }),
+      ],
     }),
     defineCommand({
       id: "window.left-panel",

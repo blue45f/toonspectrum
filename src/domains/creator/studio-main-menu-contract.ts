@@ -63,6 +63,7 @@ export interface StudioMainMenuBuilderState extends StudioMainMenuSurfaceState {
   hasLocallyHiddenLayers: boolean;
   quickAccessPaletteOpen: boolean;
   quickAccessPaletteLoading: boolean;
+  commandBarVisible?: boolean;
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
   visibleLeftPanelOpen?: boolean;
@@ -157,6 +158,7 @@ export interface StudioMainMenuUiActions extends StudioMainMenuSurfaceActions {
   expandSidePanels: () => unknown;
   openToolsCompanion: () => unknown;
   toggleQuickAccessPalette: () => unknown;
+  toggleCommandBar?: () => unknown;
   toggleLeftPanel: () => unknown;
   toggleRightPanel: () => unknown;
   /** 왼쪽/오른쪽 도크를 함께 접고 펼쳐 캔버스 활용 폭을 극대화. */

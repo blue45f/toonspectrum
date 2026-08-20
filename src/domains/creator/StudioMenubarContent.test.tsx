@@ -769,10 +769,12 @@ describe("StudioMenubarContent", () => {
       />
     );
 
-    const group = screen.getByRole("group", { name: "작업 내역 빠른 작업" });
-    expect(group.getAttribute("data-studio-menubar-history-actions")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "실행취소" }));
-    fireEvent.click(screen.getByRole("button", { name: "다시실행" }));
+    // §15.3 Window ▸ Action Bar: the fixed cluster became a slotted command strip, but the
+    // history authority stays a fixed control inside it.
+    const group = screen.getByRole("group", { name: "빠른 명령 바" });
+    expect(group.getAttribute("data-studio-menubar-command-bar")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "빠른 명령: 실행취소" }));
+    fireEvent.click(screen.getByRole("button", { name: "빠른 명령: 다시실행" }));
     fireEvent.click(screen.getByRole("button", { name: "작업 내역" }));
 
     expect(stableHandlers.undo).toHaveBeenCalledOnce();
@@ -781,6 +783,109 @@ describe("StudioMenubarContent", () => {
     expect(
       screen.getByRole("button", { name: "작업 내역" }).getAttribute("aria-pressed")
     ).toBe("true");
+  });
+
+  it("renders the default command bar slots and routes them through the existing handlers", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMenubarContent
+        {...createProps({ redoDisabled: false, stableHandlers, undoDisabled: false })}
+      />
+    );
+
+    const bar = screen.getByRole("group", { name: "빠른 명령 바" });
+    const slots = [...bar.querySelectorAll<HTMLButtonElement>("[data-studio-command-bar-slot]")];
+    expect(slots.map((slot) => slot.getAttribute("data-studio-command-bar-command"))).toEqual([
+      "undo",
+      "redo",
+      "save",
+      "export-open",
+      "zoom-fit",
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "빠른 명령: 임시저장" }));
+    expect(stableHandlers.handleSave).toHaveBeenCalledWith("draft");
+
+    // zoom-fit stays honestly disabled until the host provides the handler.
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", { name: "빠른 명령: 화면 폭 맞춤" }).disabled
+    ).toBe(true);
+  });
+
+  it("delegates the zoom-fit slot once the host wires the optional handler", () => {
+    const stableHandlers = { ...createHandlers(), zoomToFit: vi.fn() };
+    render(<StudioMenubarContent {...createProps({ stableHandlers })} />);
+
+    const zoomFit = screen.getByRole<HTMLButtonElement>("button", {
+      name: "빠른 명령: 화면 폭 맞춤",
+    });
+    expect(zoomFit.disabled).toBe(false);
+    fireEvent.click(zoomFit);
+    expect(stableHandlers.zoomToFit).toHaveBeenCalledOnce();
+  });
+
+  it("persists slot customization through the workspace live layout without touching docks", () => {
+    const stableHandlers = createHandlers();
+    const liveWorkspaceLayout = {
+      desktop: {
+        leftPanelOpen: false,
+        rightPanelOpen: true,
+        leftPanelWidth: 200,
+        rightPanelWidth: 320,
+      },
+    } as unknown as StudioMenubarContentProps["liveWorkspaceLayout"];
+    render(
+      <StudioMenubarContent
+        {...createProps({ liveWorkspaceLayout, stableHandlers })}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "명령 바 설정" }));
+    const panel = document.body.querySelector('[data-studio-command-bar-settings-panel="true"]');
+    expect(panel).not.toBeNull();
+
+    fireEvent.change(screen.getByLabelText("명령 슬롯 6"), {
+      target: { value: "download" },
+    });
+
+    expect(stableHandlers.persistStudioWorkspaceState).toHaveBeenCalledOnce();
+    const persisted = vi.mocked(stableHandlers.persistStudioWorkspaceState).mock
+      .calls[0]?.[0] as StudioMenubarContentProps["workspaceState"];
+    expect(persisted.liveLayout.commandBar?.slots).toEqual([
+      "undo",
+      "redo",
+      "save",
+      "export-open",
+      "zoom-fit",
+      "download",
+      null,
+      null,
+    ]);
+    // Authored-form invariant: the strip only rides on the live layout — the authored dock
+    // geometry it was handed goes back out unchanged.
+    expect(persisted.liveLayout.desktop).toEqual({
+      leftPanelOpen: false,
+      rightPanelOpen: true,
+      leftPanelWidth: 200,
+      rightPanelWidth: 320,
+    });
+  });
+
+  it("keeps history and the slot editor reachable while the slot strip is hidden", () => {
+    const liveWorkspaceLayout = {
+      commandBar: {
+        version: 1,
+        visible: false,
+        slots: ["undo", "redo", "save", "export-open", "zoom-fit", null, null, null],
+      },
+    } as unknown as StudioMenubarContentProps["liveWorkspaceLayout"];
+    render(<StudioMenubarContent {...createProps({ liveWorkspaceLayout })} />);
+
+    const bar = screen.getByRole("group", { name: "빠른 명령 바" });
+    expect(bar.querySelectorAll("[data-studio-command-bar-slot]")).toHaveLength(0);
+    // The way back can never be customized away.
+    expect(screen.getByRole("button", { name: "작업 내역" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "명령 바 설정" })).toBeTruthy();
   });
 
   it("routes meaningful top actions through the exclusive rich-tooltip channel", () => {
@@ -794,9 +899,12 @@ describe("StudioMenubarContent", () => {
     );
 
     for (const name of [
-      "실행취소",
-      "다시실행",
+      "빠른 명령: 실행취소",
+      "빠른 명령: 다시실행",
+      "빠른 명령: 임시저장",
+      "빠른 명령: 내보내기 옵션",
       "작업 내역",
+      "명령 바 설정",
       "템플릿·에셋",
       "말풍선",
       "현재 페이지 다운로드",
