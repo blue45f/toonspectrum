@@ -3,6 +3,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
+// Intentional change: the live-room rotation callbacks moved from StudioPage.tsx into the
+// extracted collaboration wiring hook — the rotation-ordering pins now scan that file.
+const collaborationWiringSource = readFileSync(
+  new URL("./studio-collaboration-wiring.ts", import.meta.url),
+  "utf8",
+);
 const viewportSource = readFileSync(
   new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
@@ -29,21 +35,30 @@ describe("Studio live gesture preview viewport wiring", () => {
       "useSyncExternalStore(\n    studioLiveGesturePreviewAdapter.subscribe",
     );
 
-    const roomRotation = pageSource.slice(
-      pageSource.indexOf("const handleStudioLiveRoomChange"),
-      pageSource.indexOf("const handleStudioCrdtAuthoritativeSaveBarrierChange"),
+    // Intentional change: the rotation body now lives in the module-level
+    // rotateStudioLiveCollaborationRoom helper (react-compiler rejects mutating injected
+    // hook-argument refs inside the compiled hook), so the ordering pins scan that function.
+    const roomRotation = collaborationWiringSource.slice(
+      collaborationWiringSource.indexOf("function rotateStudioLiveCollaborationRoom("),
+      collaborationWiringSource.indexOf("interface StudioCollaborationAccessGeneration"),
     );
     expect(roomRotation.indexOf("cancelStudioLiveGesturePreviewRef.current()"))
       .toBeLessThan(roomRotation.indexOf("studioLiveGesturePreviewAdapter.setRoom(room)"));
     expect(roomRotation.indexOf("studioLiveGesturePreviewAdapter.setRoom(room)"))
       .toBeLessThan(roomRotation.indexOf("studioLiveRoomRef.current = room"));
-    expect(roomRotation).toContain(
+    const lifecycleDisposal = collaborationWiringSource.slice(
+      collaborationWiringSource.indexOf("const handleStudioLiveRoomChange"),
+      collaborationWiringSource.indexOf("const handleStudioCrdtAuthoritativeSaveBarrierChange"),
+    );
+    expect(lifecycleDisposal).toContain(
       "const lifecycle = studioLiveGesturePreviewLifecycleGenerationRef.current",
     );
-    expect(roomRotation).toContain("++lifecycle.generation");
-    expect(roomRotation).toContain("globalThis.queueMicrotask(() => {");
-    expect(roomRotation).toContain("lifecycle.generation !== lifecycleGeneration");
-    expect(roomRotation).toContain("studioLiveGesturePreviewAdapter.dispose()");
+    // Intentional change: the shared-object generation bump moved into a module-level helper
+    // (react-compiler rejects mutating an alias derived from an injected hook argument).
+    expect(lifecycleDisposal).toContain("advanceStudioLiveGesturePreviewLifecycle(lifecycle)");
+    expect(lifecycleDisposal).toContain("globalThis.queueMicrotask(() => {");
+    expect(lifecycleDisposal).toContain("lifecycle.generation !== lifecycleGeneration");
+    expect(lifecycleDisposal).toContain("studioLiveGesturePreviewAdapter.dispose()");
   });
 
   it("fails closed across every document capture and hydration boundary", () => {

@@ -81,15 +81,23 @@ describe("studio menu session model boundary", () => {
 
   it("owns the Page mappings and one mutually-exclusive app-menu session", () => {
     const page = readFileSync(PAGE_PATH, "utf8");
+    // 컴패니언 도구 매핑은 추출된 컴패니언 런타임 훅이 소유한다 (2026-08-20 B-04 추출).
+    const companionRuntime = readFileSync(
+      resolve(HERE, "studio-page-companion-runtime.ts"),
+      "utf8",
+    );
 
     expect(page).toContain('from "./studio-menu-session-model"');
     expect(page).toContain("useState<StudioMenuSessionState>(");
     expect(page).toContain('const exportMenuOpen = menuSession.appMenu === "export"');
     expect(page).toContain('const projectActionsOpen = menuSession.appMenu === "project"');
-    expect(page).toContain("resolveStudioCompanionTool(s)");
-    expect(page).toContain("resolveStudioCompanionTool({ tool, drawMode, menu })");
+    expect(companionRuntime).toContain("resolveStudioCompanionTool(s)");
+    expect(companionRuntime).toContain(
+      "resolveStudioCompanionTool(companionUiRef.current)",
+    );
     expect(page).toContain("resolveStudioToolbarGroup(menu)");
     expect(page).not.toContain("STUDIO_TOOLBAR_GROUP_OF");
+    expect(companionRuntime).not.toContain("STUDIO_TOOLBAR_GROUP_OF");
     expect(page).not.toContain("const [exportMenuOpen");
     expect(page).not.toContain("const [projectActionsOpen");
     expect(page).not.toMatch(/const mapTool\s*=/u);

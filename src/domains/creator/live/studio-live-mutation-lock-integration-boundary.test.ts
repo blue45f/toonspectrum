@@ -58,9 +58,12 @@ describe("StudioPage authoritative mutation-lock integration boundary", () => {
     );
     const text = sourceBetween("async function startEditText(", "function commitEditText(");
     const end = sourceBetween("function endLiveResourceEdit()", "function commitTextTransformEnd(");
+    // Intentional change: the room-rotation body moved into live/studio-collaboration-wiring's
+    // module-level rotateStudioLiveCollaborationRoom helper (react-compiler rejects mutating
+    // injected hook-argument refs inside the compiled hook).
     const roomChange = sourceBetween(
-      "const handleStudioLiveRoomChange = useCallback(",
-      "const handleStudioCrdtAuthoritativeSaveBarrierChange",
+      "function rotateStudioLiveCollaborationRoom(",
+      "interface StudioCollaborationAccessGeneration",
     );
 
     expect(merge).toContain("await beginLiveResourceEditAsync(result.plan.removeIds)");

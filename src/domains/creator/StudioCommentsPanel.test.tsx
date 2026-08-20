@@ -19,6 +19,12 @@ import type {
 
 const source = readFileSync(resolve("src/domains/creator/StudioCommentsPanel.tsx"), "utf8");
 const studioPageSource = readFileSync(resolve("src/domains/creator/StudioPage.tsx"), "utf8");
+// Intentional change: the live-room comment subscription moved into the extracted
+// collaboration wiring hook, so the comment-changed gate is pinned against that file.
+const studioCollaborationWiringSource = readFileSync(
+  resolve("src/domains/creator/live/studio-collaboration-wiring.ts"),
+  "utf8"
+);
 const studioEditorViewSource = readFileSync(
   resolve("src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorView.tsx"),
   "utf8",
@@ -232,7 +238,7 @@ describe("StudioCommentsPanel review rail contract", () => {
 
     expect(refreshStart).toBeGreaterThanOrEqual(0);
     expect(refreshEnd).toBeGreaterThan(refreshStart);
-    expect(studioPageSource).toContain('event.type !== "comment-changed"');
+    expect(studioCollaborationWiringSource).toContain('event.type !== "comment-changed"');
     expect(refreshSource).toContain("studioTeamCommentLiveTargetSequenceRef");
     expect(refreshSource).toContain("studioTeamCommentLiveRefreshFlightRef");
     expect(refreshSource).toContain("getStudioTeamCommentThread(");

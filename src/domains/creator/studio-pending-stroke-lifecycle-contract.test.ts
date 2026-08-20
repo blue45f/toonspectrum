@@ -85,7 +85,10 @@ describe("pending stroke lifecycle source contract", () => {
       "// useCallback: 렌더 중 호출되는 메시지 헬퍼"
     );
 
-    expect(admission).toContain("pagesHistoryRef.current = admitted.history");
+    // Intentional change: the admission block moved into live/studio-collaboration-wiring, where the
+    // authority-ref write happens through a module helper (react-compiler forbids mutating injected
+    // hook-argument refs inside effect scope). The ref-before-state contract is unchanged.
+    expect(admission).toContain("commitStudioWorkAssetAdmittedHistory(pagesHistoryRef, admitted.history)");
     expect(admission).toContain("rebaseStudioHistoryJournal(");
     expect(remoteFrontier).toContain("const currentHistory = pagesHistoryRef.current");
     expect(remoteFrontier).toContain("pagesHistoryRef.current = reconciled.history");

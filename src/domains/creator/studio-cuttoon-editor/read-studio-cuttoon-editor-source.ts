@@ -22,6 +22,7 @@ export function readStudioCuttoonEditorSource(): string {
     resolve(baseDir, "../studio-page-menu-asset-loaders.ts"),
     resolve(baseDir, "../studio-page-companion-runtime.ts"),
     resolve(baseDir, "../export/studio-publish-package-export.ts"),
+    resolve(baseDir, "../live/studio-collaboration-wiring.ts"),
     resolve(baseDir, "../StudioPage.tsx"),
     resolve(baseDir, "../studio-page-vector-ops.ts"),
     resolve(baseDir, "../ai/studio-scenario-image-generation.ts"),

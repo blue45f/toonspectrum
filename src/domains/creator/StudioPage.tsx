@@ -354,6 +354,7 @@ import {
   type StudioContinuityIssue,
   type StudioStoryBeat,
 } from "./studio-continuity";
+import { useStudioCollaborationWiring } from "./live/studio-collaboration-wiring";
 import { StudioCrdtLiveStrokePublisher } from "./live/studio-crdt-live-stroke-publisher";
 import { STUDIO_CRDT_ORIGIN_LOCAL } from "./live/studio-crdt-protocol";
 import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
@@ -1464,10 +1465,7 @@ import {
   WET_MIX_WETNESS_DEFAULT,
 } from "./brush/studio-wet-mix";
 import { exportStudioPageToWillV1 } from "./export/studio-will-v1-export-bridge";
-import {
-  StudioWorkAssetAdmissionCoordinator,
-  replaceStudioWorkAssetSourceAcrossHistory,
-} from "./studio-work-asset-admission";
+import { StudioWorkAssetAdmissionCoordinator } from "./studio-work-asset-admission";
 import {
   studioWorkAssetDestructiveEditReason,
   studioWorkAssetDocumentSourceTransitionReason,
@@ -1565,7 +1563,6 @@ import {
   type StudioSfxPacks,
   type StudioToolBeltContentHandlers,
 } from "./StudioToolBeltContent";
-import { useStudioAutosaveDocumentRuntime } from "./useStudioAutosaveDocumentRuntime";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 import { useStudioProDrawPrefs } from "./useStudioProDrawPrefs";
 import { useStudioProjectArchiveOrchestration } from "./useStudioProjectArchiveOrchestration";
@@ -2301,85 +2298,13 @@ function StudioCuttoonEditor({
       );
     }
   }
-  const handleStudioLiveRoomChange = useCallback((room: StudioLiveRoom | null) => {
-    const previous = studioLiveRoomRef.current;
-    if (previous === room) return;
-    // The cancel must traverse the room that owned begin. A packet from the replacement room
-    // cannot safely close the old sender/gesture identity, so cancel before rotating the command.
-    cancelStudioLiveGesturePreviewRef.current();
-    studioLiveCommentRoomUnsubscribeRef.current?.();
-    studioLiveCommentRoomUnsubscribeRef.current = null;
-    ++studioLiveMutationGenerationRef.current;
-    studioLiveHeldResourcesRef.current = [
-      ...releaseStudioLiveMutationLocks(previous, studioLiveHeldResourcesRef.current),
-    ];
-    studioLivePendingMutationRef.current = null;
-    studioLiveGesturePreviewAdapter.setRoom(room);
-    studioLiveRoomRef.current = room;
-    if (room) {
-      const subscribedRoom = room;
-      studioLiveCommentRoomUnsubscribeRef.current = room.subscribe((event) => {
-        if (
-          studioLiveRoomRef.current !== subscribedRoom
-          || event.type !== "comment-changed"
-        ) return;
-        studioLiveCommentEventHandlerRef.current(event.change);
-      });
-    }
-  }, [studioLiveGesturePreviewAdapter]);
-  useLayoutEffect(() => {
-    const lifecycle = studioLiveGesturePreviewLifecycleGenerationRef.current;
-    const lifecycleGeneration = ++lifecycle.generation;
-    return () => {
-      studioLiveCommentRoomUnsubscribeRef.current?.();
-      studioLiveCommentRoomUnsubscribeRef.current = null;
-      studioLiveCommentEventHandlerRef.current = () => undefined;
-      // React StrictMode replays setup→cleanup→setup on the same state object. Defer terminal
-      // disposal by one microtask so that replay can reacquire this adapter. Compare setup generation
-      // to ensure that only the final unmount performs hard disposal.
-      globalThis.queueMicrotask(() => {
-        if (lifecycle.generation !== lifecycleGeneration) return;
-        studioLiveGesturePreviewAdapter.dispose();
-      });
-    };
-  }, [studioLiveGesturePreviewAdapter]);
-  const handleStudioCrdtAuthoritativeSaveBarrierChange = useCallback((
-    barrier: StudioCrdtAuthoritativeSaveBarrier | null
-  ) => {
-    studioCrdtAuthoritativeSaveBarrierRef.current = barrier;
-    // The command is ref-backed to avoid subscription churn, while this rare generation change
-    // restarts fail-closed raster authority after reconnect, revocation or room replacement.
-    setStudioCrdtAuthoritativeBarrierGeneration((generation) => generation + 1);
-  }, []);
-  const handleStudioCrdtDocumentChange = useCallback((
-    document: StudioCrdtDocument | null,
-    runtime: StudioCrdtSceneGraphRuntime | null
-  ) => {
-    // document와 동적 scene runtime은 반드시 같은 room 세대의 한 쌍으로만 공개한다. 둘 중
-    // 하나라도 없으면 즉시 fail-closed 상태로 되돌려 지연 로딩/room 교체 틈의 로컬 편집을 막는다.
-    const readyDocument = document && runtime ? document : null;
-    studioCrdtDocumentRef.current = readyDocument;
-    studioCrdtSceneRuntimeRef.current = readyDocument ? runtime : null;
-    // 새 pair가 도착해도 initial frontier를 React history에 합치기 전에는 편집을 열지 않는다.
-    setStudioCrdtReconciledDocument(null);
-    setStudioCrdtDocument(readyDocument);
-  }, []);
+  // Live-room 회전/CRDT 문서 페어링 콜백, 오토세이브 문서 런타임, work-asset admission 배선은
+  // live/studio-collaboration-wiring 의 useStudioCollaborationWiring 으로 추출됐다. pages 히스토리와
+  // 협업 잠금 계산이 끝난 지점(아래 호출부)에서 주입 컨텍스트로 연결된다.
   const [studioLiveEditsDurablyProtected, setStudioLiveEditsDurablyProtected] = useState(false);
-  const handleStudioLiveEditSafetyChange = useCallback((editsDurablyProtected: boolean) => {
-    setStudioLiveEditsDurablyProtected(editsDurablyProtected);
-  }, []);
   const workAuthScopeKey = workId ? studioAuthUserId : null;
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
-  const {
-    autosaveDocumentLeadership,
-    autosaveDocumentLeaseRef,
-    autosaveLeadershipGuardRef,
-    autosaveOpfsSessionRef,
-    autosaveSqliteStoreRef,
-  } = useStudioAutosaveDocumentRuntime({
-    autosaveKey,
-  });
   const [scenarioImageReferenceDocument, setScenarioImageReferenceDocument] =
     useState<StudioAiImageReferenceDocument>(
       createEmptyStudioAiImageReferenceDocument,
@@ -3312,6 +3237,53 @@ function StudioCuttoonEditor({
     paperVectorRefinementClientRef.current?.dispose();
     paperVectorRefinementClientRef.current = null;
   }, []);
+  const {
+    autosaveDocumentLeadership,
+    autosaveDocumentLeaseRef,
+    autosaveLeadershipGuardRef,
+    autosaveOpfsSessionRef,
+    autosaveSqliteStoreRef,
+    handleStudioCrdtAuthoritativeSaveBarrierChange,
+    handleStudioCrdtDocumentChange,
+    handleStudioLiveEditSafetyChange,
+    handleStudioLiveRoomChange,
+  } = useStudioCollaborationWiring({
+    authorizedWorkAssetScopeId,
+    autosaveKey,
+    cancelStudioLiveGesturePreviewRef,
+    collaborationAccessRef,
+    collaborationDocumentLocked,
+    editorMountedRef,
+    markStudioDocumentChanged,
+    pages,
+    pagesHiRef,
+    pagesHistoryRef,
+    publishStudioCrdtSceneTransitionRef,
+    rebaseStudioHistoryJournal,
+    // setError 는 이 지점보다 뒤에 선언되는 상태 setter 다. 값으로 넘기면 TDZ 라 지연 클로저로 넘긴다.
+    setError: (message) => setError(message),
+    setPagesHistoryState,
+    setStudioCrdtAuthoritativeBarrierGeneration,
+    setStudioCrdtDocument,
+    setStudioCrdtReconciledDocument,
+    setStudioLiveEditsDurablyProtected,
+    sharedDocument,
+    studioAuthUserId,
+    studioCrdtAuthoritativeSaveBarrierRef,
+    studioCrdtDocument,
+    studioCrdtDocumentRef,
+    studioCrdtOperationSyncReady,
+    studioCrdtSceneRuntimeRef,
+    studioLiveCommentEventHandlerRef,
+    studioLiveCommentRoomUnsubscribeRef,
+    studioLiveGesturePreviewAdapter,
+    studioLiveGesturePreviewLifecycleGenerationRef,
+    studioLiveHeldResourcesRef,
+    studioLiveMutationGenerationRef,
+    studioLivePendingMutationRef,
+    studioLiveRoomRef,
+    studioWorkAssetAdmissionCoordinator,
+  });
   // 신규 캔버스(작업ID/리믹스 없음)에서는 페이지 리뷰 잠금이 편집 차단에 개입하지 않도록 스코프를 분리한다.
   const reviewBoundPage = workId !== null || remixId !== null;
   const pageEditLocked = reviewBoundPage && isPageReviewLocked(activePage.review);
@@ -3324,91 +3296,6 @@ function StudioCuttoonEditor({
     !persistLeadershipAllowsDraw;
   const activeSurfaceReviewLocked =
     collaborationDocumentLocked || (pageEditLocked && !masterEditMode);
-
-  const studioWorkAssetAdmissionEnabled = Boolean(
-    authorizedWorkAssetScopeId &&
-    studioAuthUserId &&
-    sharedDocument?.access === "edit" &&
-    sharedDocument.capabilities.edit &&
-    studioCrdtOperationSyncReady &&
-    !collaborationDocumentLocked
-  );
-  useLayoutEffect(() => {
-    studioWorkAssetAdmissionCoordinator.sync({
-      workId: authorizedWorkAssetScopeId,
-      authUserId: studioAuthUserId,
-      editable: studioWorkAssetAdmissionEnabled,
-      pages,
-      onAdmitted: (receipt) => {
-        const access = collaborationAccessRef.current;
-        if (
-          !editorMountedRef.current ||
-          access.authScopeKey !== studioAuthUserId ||
-          access.workId !== authorizedWorkAssetScopeId ||
-          access.locked ||
-          studioCrdtDocumentRef.current !== studioCrdtDocument
-        ) {
-          return false;
-        }
-        const history = pagesHistoryRef.current;
-        const currentIndex = Math.max(0, Math.min(pagesHiRef.current, history.length - 1));
-        const currentSnapshot = history[currentIndex] ?? [];
-        const stillOwnsSource = currentSnapshot.some((page) =>
-          page.elements.some((element) =>
-            element.id === receipt.assetId &&
-            element.type === "image" &&
-            element.src === receipt.source
-          )
-        );
-        // A source edit wins over a late upload. Do not rewrite older undo snapshots with a receipt
-        // that no longer belongs to the visible current element.
-        if (!stillOwnsSource) return false;
-        const admitted = replaceStudioWorkAssetSourceAcrossHistory({
-          history,
-          currentIndex,
-          assetId: receipt.assetId,
-          expectedSource: receipt.source,
-          canonicalSource: receipt.canonicalSource,
-        });
-        if (!admitted.changed) return false;
-        if (!markStudioDocumentChanged()) {
-          throw new Error("저장 중이라 승인된 이미지 참조 전환을 잠시 미뤘습니다.");
-        }
-        if (!publishStudioCrdtSceneTransitionRef.current(
-          admitted.previousCurrentPages,
-          admitted.nextCurrentPages
-        )) {
-          throw new Error("승인된 이미지 참조를 실시간 팀 문서에 반영하지 못했습니다.");
-        }
-        // Every undo snapshot switches source identity in one React update. Placement/filter edits
-        // remain snapshot-specific; only the exact local source is replaced by the opaque URI.
-        pagesHistoryRef.current = admitted.history;
-        rebaseStudioHistoryJournal(
-          admitted.nextCurrentPages,
-          currentIndex,
-          "work asset canonicalization"
-        );
-        setPagesHistoryState(admitted.history);
-        return true;
-      },
-      onError: (message) => {
-        const access = collaborationAccessRef.current;
-        if (
-          !editorMountedRef.current ||
-          access.authScopeKey !== studioAuthUserId ||
-          access.workId !== authorizedWorkAssetScopeId
-        ) return;
-        setError(`공동 작업 이미지 업로드: ${message} 로컬 이미지는 캔버스에 그대로 유지됩니다.`);
-      },
-    });
-  }, [
-    authorizedWorkAssetScopeId,
-    pages,
-    studioAuthUserId,
-    studioCrdtDocument,
-    studioWorkAssetAdmissionCoordinator,
-    studioWorkAssetAdmissionEnabled,
-  ]);
 
   useLayoutEffect(() => {
     const observeSceneElements = (
