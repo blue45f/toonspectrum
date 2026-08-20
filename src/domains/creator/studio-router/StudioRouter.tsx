@@ -1,5 +1,5 @@
-import { Suspense, useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Suspense, useRef } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import {
   advanceStudioDraftIdentityScope,
@@ -114,29 +114,22 @@ export function StudioRouter() {
     pathname: location.pathname,
     search: location.search,
   });
-  const canonicalHref = resolution.kind === "invalid"
-    ? null
-    : resolution.canonicalHref;
-
-  useEffect(() => {
-    if (canonicalHref === null) return;
-    const currentHref = `${location.pathname}${location.search}`;
-    if (currentHref === canonicalHref) return;
-    navigate(canonicalHref, { replace: true, state: location.state });
-  }, [
-    canonicalHref,
-    location.pathname,
-    location.search,
-    location.state,
-    navigate,
-  ]);
-
   if (resolution.kind === "invalid") {
     return (
       <StudioRouteFailure
         errorCode={resolution.errorCode}
         onOpenStudio={() => navigate("/studio", { replace: true })}
       />
+    );
+  }
+
+  const currentHref = `${location.pathname}${location.search}`;
+  if (currentHref !== resolution.canonicalHref) {
+    // Canonicalize at render time so no stale frame mounts under a legacy alias
+    // URL. location.state must ride along: the studioWorkspaceReturn v1 receipt
+    // and the linked-3D cloud-save recovery notice both travel through it.
+    return (
+      <Navigate replace state={location.state} to={resolution.canonicalHref} />
     );
   }
   if (resolution.kind === "editor") {
