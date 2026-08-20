@@ -51,32 +51,37 @@ function moduleEdges(relativePath: string): ModuleEdges {
 }
 
 function pathBooleanHandler(): string {
-  const page = moduleEdges("../StudioPage.tsx").source;
-  const start = page.indexOf(
+  // The async command bodies moved verbatim into the StudioPage vector-ops factory module.
+  const vectorOps = moduleEdges("../studio-page-vector-ops.ts").source;
+  const start = vectorOps.indexOf(
     "async function applyPathBooleanCombine(op: StudioPathBooleanOp)",
   );
-  const end = page.indexOf(
-    "function handleLayerNavigatorAction(",
+  const end = vectorOps.indexOf(
+    "return { applyPaperVectorRefinement, applyPathBooleanCombine };",
     start,
   );
   expect(start).toBeGreaterThan(0);
   expect(end).toBeGreaterThan(start);
-  return page.slice(start, end);
+  return vectorOps.slice(start, end);
 }
 
 describe("CanvasKit PathOps product entry boundary", () => {
   it("keeps the heavy Worker client graph behind one analyzable dynamic import", () => {
     const page = moduleEdges("../StudioPage.tsx");
+    const vectorOps = moduleEdges("../studio-page-vector-ops.ts");
     const workerClient = "./studio-quality-worker-client";
 
-    expect(page.valueImports).toContain(
+    expect(vectorOps.valueImports).toContain(
       "./render/studio-canvaskit-path-boolean-document-adapter",
     );
-    expect(page.valueImports).not.toContain(workerClient);
-    expect(page.typeOnlyImports).toContain(workerClient);
+    expect(vectorOps.valueImports).not.toContain(workerClient);
+    expect(vectorOps.typeOnlyImports).toContain(workerClient);
     expect(
-      page.dynamicImports.filter((specifier) => specifier === workerClient),
+      vectorOps.dynamicImports.filter((specifier) => specifier === workerClient),
     ).toEqual([workerClient]);
+    expect(page.valueImports).toContain("./studio-page-vector-ops");
+    expect(page.valueImports).not.toContain(workerClient);
+    expect(page.dynamicImports).not.toContain(workerClient);
   });
 
   it("flushes settled ink, calls CanvasKit, revalidates authority, and commits once", () => {

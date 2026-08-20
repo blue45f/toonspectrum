@@ -4,6 +4,8 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const fileUrl = new URL("../StudioPage.tsx", import.meta.url);
+// The scenario image executors moved verbatim into the ctx-parameterized factory module.
+const scenarioModuleUrl = new URL("./studio-scenario-image-generation.ts", import.meta.url);
 const viewportUrl = new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url);
 const source = readFileSync(fileUrl, "utf8");
 const viewportSource = readFileSync(viewportUrl, "utf8");
@@ -14,9 +16,17 @@ const file = ts.createSourceFile(
   true,
   ts.ScriptKind.TSX
 );
+const scenarioModuleFile = ts.createSourceFile(
+  scenarioModuleUrl.pathname,
+  readFileSync(scenarioModuleUrl, "utf8"),
+  ts.ScriptTarget.Latest,
+  true,
+  ts.ScriptKind.TS
+);
 
 function functionSource(name: string): string {
   let match: ts.FunctionDeclaration | null = null;
+  let matchFile: ts.SourceFile = file;
   function visit(node: ts.Node): void {
     if (ts.isFunctionDeclaration(node) && node.name?.text === name) {
       match = node;
@@ -25,8 +35,12 @@ function functionSource(name: string): string {
     ts.forEachChild(node, visit);
   }
   visit(file);
+  if (!match) {
+    matchFile = scenarioModuleFile;
+    visit(scenarioModuleFile);
+  }
   if (!match) throw new Error(`Missing function ${name}`);
-  return (match as ts.FunctionDeclaration).getText(file);
+  return (match as ts.FunctionDeclaration).getText(matchFile);
 }
 
 function expectInOrder(value: string, fragments: readonly string[]): void {

@@ -14,7 +14,11 @@ export function readStudioCuttoonEditorSource(): string {
     // Extracted pure helpers come first so source slices that start at an
     // extracted symbol still reach their StudioPage.tsx end boundary.
     resolve(baseDir, "../canvas/studio-hokusai-gpu-plan-matchers.ts"),
+    resolve(baseDir, "../export/studio-interchange-import.ts"),
     resolve(baseDir, "../StudioPage.tsx"),
+    resolve(baseDir, "../studio-page-vector-ops.ts"),
+    resolve(baseDir, "../ai/studio-scenario-image-generation.ts"),
+    resolve(baseDir, "../bg3d/studio-bg3d-lt-apply.ts"),
     resolve(baseDir, "../studio-page-editor-ui-contracts.ts"),
     resolve(baseDir, "../studio-page-shell-runtime.ts"),
     resolve(baseDir, "../studio-page-editor-runtime-loaders.ts"),

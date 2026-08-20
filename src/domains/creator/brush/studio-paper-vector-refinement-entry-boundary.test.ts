@@ -48,21 +48,26 @@ function moduleEdges(relativePath: string): ModuleEdges {
 }
 
 describe("Paper vector refinement production entry boundary", () => {
-  it("keeps the Paper Worker graph behind one analyzable StudioPage dynamic import", () => {
+  it("keeps the Paper Worker graph behind one analyzable dynamic import", () => {
+    // The async refinement body moved verbatim into the StudioPage vector-ops factory module.
     const page = moduleEdges("../StudioPage.tsx");
+    const vectorOps = moduleEdges("../studio-page-vector-ops.ts");
     const workerClient = "./brush/studio-paper-vector-refinement-worker-client";
 
-    expect(page.valueImports).toContain(
+    expect(vectorOps.valueImports).toContain(
       "./brush/studio-paper-vector-document-adapter",
     );
-    expect(page.valueImports).not.toContain(workerClient);
+    expect(vectorOps.valueImports).not.toContain(workerClient);
     expect(
-      page.dynamicImports.filter((specifier) => specifier === workerClient),
+      vectorOps.dynamicImports.filter((specifier) => specifier === workerClient),
     ).toEqual([workerClient]);
+    expect(page.valueImports).toContain("./studio-page-vector-ops");
+    expect(page.valueImports).not.toContain(workerClient);
+    expect(page.dynamicImports).not.toContain(workerClient);
   });
 
   it("captures authority before await and revalidates source identity before one canonical commit", () => {
-    const page = moduleEdges("../StudioPage.tsx").source;
+    const page = moduleEdges("../studio-page-vector-ops.ts").source;
     const start = page.indexOf("async function applyPaperVectorRefinement(");
     const end = page.indexOf(
       "// 벡터 패스 불리언 결합",

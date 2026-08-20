@@ -39,6 +39,8 @@ export interface StudioMainMenuSurfaceState {
   readonly documentCommentsOpen: boolean;
   readonly canvasGridVisible: boolean;
   readonly vectorEraseToIntersection: boolean;
+  /** Menubar command bar visibility, persisted on the authored workspace layout. */
+  readonly commandBarVisible?: boolean;
   /** Master-page editing suspends the document timeline and page review. */
   readonly masterEditMode: boolean;
 }
@@ -50,6 +52,8 @@ export interface StudioMainMenuSurfaceState {
 export interface StudioMainMenuSurfaceActions {
   /** §15.3 Select ▸ Rectangle/Ellipse/Lasso/Polygon + Magic Wand/Color Range. */
   activatePixelSelectionTool: (tool: StudioPixelSelectionToolId) => unknown;
+  /** Window ▸ 명령 바 — flips the persisted command bar visibility. */
+  toggleCommandBar?: () => unknown;
   /** §15.3 Select ▸ Quick Mask — enter/commit, the `Q` chord's two halves. */
   enterQuickMask: () => unknown;
   commitQuickMask: () => unknown;

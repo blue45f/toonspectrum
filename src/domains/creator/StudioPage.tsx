@@ -15,21 +15,17 @@ import {
   DEFAULT_STUDIO_AI_IMAGE_SIZE,
   generateBackgroundImage,
   generateConsistentCharacterImage,
-  generateImageWithRoleReferences,
   generateScenarioScenes,
   generateStudioWriterRoomDraft,
   isStudioAiConfigured,
   isStudioTextAiConfigured,
   loadStudioAiSessionSettings,
   saveStudioAiSettings,
-  STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS,
   studioTextAiTransportForOperation,
   suggestColorPalette,
   suggestDialogueLines,
   translateDialogueBatch,
   type StudioAiImageSize,
-  type StudioAiResolvedImageReference,
-  type StudioAiResult,
   type StudioAiSettings,
   type StudioTextAiProvenance,
   type StudioTextAiTransport,
@@ -62,8 +58,17 @@ import {
   type StudioAiPendingOperationInput,
 } from "./ai/studio-ai-provenance-recorder";
 import {
-  planStudioBg3dEditableCompositeDetach,
-} from "./bg3d/studio-bg3d-editable-composite-detach-plan";
+  createStudioScenarioImageGenerationExecutors,
+} from "./ai/studio-scenario-image-generation";
+import {
+  planStudioBg3dLtDetachComposite,
+  planStudioBg3dLtDrawingAssist,
+  planStudioBg3dSharedCharacterVisibility,
+  planStudioBg3dSharedStageMutation,
+  resolveStudioBg3dCapturedCharacterPlacements,
+  resolveStudioBg3dLinkedRenderState,
+  resolveStudioBg3dLtLinkedScene,
+} from "./bg3d/studio-bg3d-lt-apply";
 import {
   planStudioBg3dLtLayers,
   preserveStudioBg3dLtSceneAnchorAfterRemoval,
@@ -263,7 +268,6 @@ import {
   recordStudioHotPathRender,
 } from "./canvas/studio-canvas-shared-runtime";
 import { clampStudioCanvasHeight } from "./canvas/studio-canvas-size";
-import { combineStudioShapesWithCanvasKit } from "./render/studio-canvaskit-path-boolean-document-adapter";
 import {
   selectStudioCausalInkSamples,
 } from "./studio-causal-ink";
@@ -411,9 +415,11 @@ import {
 import { attachStudioDismissableSurface } from "./studio-dismissable-surface";
 import {
   loadStudioPsdExportModule,
-  loadStudioPsdImportModule,
   loadStudioSvgExportWorkerClientModule,
 } from "./export/studio-document-export-loaders";
+import {
+  createStudioInterchangeImportOrchestration,
+} from "./export/studio-interchange-import";
 import {
   DODGE_BURN_EXPOSURE_DEFAULT,
   DODGE_BURN_HARDNESS_DEFAULT,
@@ -712,7 +718,6 @@ import {
 } from "./studio-linked-3d-raster-edit-policy";
 import {
   detachStudioLinked3dCorrections,
-  ensureStudioLinked3dRenderShot,
   materializeStudioLinked3dLinePassLocator,
   parseStudioLinked3dRenderDocument,
   reconcileStudioLinked3dRenderDocumentAfterElementMutation,
@@ -914,7 +919,6 @@ import {
   filterSfxPresets,
   hasStudioBg3dServerPersistedTarget,
   isStudioBg3dRecoveryScopeLocallyCurrent,
-  scenarioAspectToImageSize,
   studioBg3dRecoveryMemoryIdentity,
   studioPatchValuesEqual,
 } from "./studio-page-editor-runtime-contracts";
@@ -1028,13 +1032,13 @@ import {
   STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
   withStudioLinked3dCloudSaveRecoveryState,
 } from "./studio-page-shell-runtime";
+import { createStudioPageVectorOps } from "./studio-page-vector-ops";
 import {
   appendPageState,
   applyBackgroundToAllPages,
   applyGradeToAllPages,
   clearPage,
   computeNextActiveIdAfterBulkDelete,
-  createBlankPage,
   deletePagesBulk as deletePagesBulkPure,
   duplicateMirroredPage,
   duplicatePageState,
@@ -1065,18 +1069,8 @@ import {
   planStudioPaperSurfaceApply,
 } from "./brush/studio-paper-surface-catalog";
 import {
-  refineStudioDrawElementWithPaper,
   studioPaperVectorDocumentIneligibilityReason,
 } from "./brush/studio-paper-vector-document-adapter";
-import {
-  combineStudioShapes,
-  drawElToStudioPathBooleanSpec,
-  studioPathBooleanOpLabel,
-  studioPathBooleanPieceToDrawElSeed,
-  studioPathBooleanUnavailableReason,
-  type StudioPathBooleanCombineResult,
-  type StudioPathBooleanOp,
-} from "./studio-path-boolean";
 import {
   appendStudioPagesHistorySnapshot,
   createStudioLifecycleEmergencyAutosave,
@@ -1319,19 +1313,12 @@ import {
 } from "./studio-server-ai-client";
 import { createSfxTextConfig, SFX_LIBRARY } from "./studio-sfx-presets";
 import {
-  planStudioShared3dCapturedSourceLayerVisibility,
-} from "./studio-shared-3d-scene-bridge";
-import {
-  migrateStudioShared3dStageCollectionDocument,
   planStudioShared3dStageCollectionRemoval,
-  planStudioShared3dStageCollectionUpsert,
   reconcileStudioShared3dStageVisibilityReceiptsAfterElementMutation,
   studioShared3dStageCollectionEntries,
   studioShared3dStageEntryAsDocument,
-  studioShared3dStageReusableHiddenCharacterElementIds,
 } from "./studio-shared-3d-stage-collection";
 import {
-  createStudioShared3dStageDocument,
   resolveStudioShared3dStageBundleIdForElement,
   type StudioShared3dStageDccSource,
 } from "./studio-shared-3d-stage-document";
@@ -1423,9 +1410,6 @@ import {
   installStudioUnloadGuard,
   studioPendingStrokeFingerprint,
 } from "./studio-unsaved-work-guard";
-import {
-  studioVectorAsyncCommandStaleReason,
-} from "./studio-vector-async-command-guard";
 import {
   planStudioVectorEraseToIntersectionApply,
   STUDIO_ERASE_TO_INTERSECTION_LABEL,
@@ -23016,419 +23000,52 @@ const puppetWarpArmed =
    * 잠금이 시작 시점과 정확히 같을 때에만 같은 ID의 DrawEl로 치환해 canonical commit 1회를
    * 수행한다. 취소·페이지 전환·원격 변경 뒤 도착한 결과는 문서 권위를 얻지 못한다.
    */
-  async function applyPaperVectorRefinement(
-    operation: "simplify" | "smooth"
-  ) {
-    if (paperVectorRefinementUnavailableReason) {
-      setError(paperVectorRefinementUnavailableReason);
-      return;
-    }
-    if (
-      selected?.type !== "draw"
-      || elementById.get(selected.id) !== selected
-      || paperVectorRefinementActiveRef.current
-    ) {
-      return;
-    }
-
-    const source = selected;
-    const runId = paperVectorRefinementRunIdRef.current + 1;
-    paperVectorRefinementRunIdRef.current = runId;
-    paperVectorRefinementActiveRef.current = true;
-    const controller = new AbortController();
-    paperVectorRefinementAbortRef.current = controller;
-    const mutationTicket = captureStudioMutationTicket();
-    const targetPageId = currentPageIdRef.current || activePage.id;
-    const targetMasterEditMode = masterEditModeRef.current;
-    const requestSequence =
-      paperVectorRefinementRequestSequenceRef.current + 1;
-    paperVectorRefinementRequestSequenceRef.current = requestSequence;
-    const engineEpoch = paperVectorRefinementEngineEpochRef.current;
-    const snapshot = {
-      runId,
-      pageId: targetPageId,
-      masterEditMode: targetMasterEditMode,
-      selectedIds: [source.id],
-      sourceElements: [source],
-    } as const;
-    setPaperVectorRefinementBusy(true);
-
-    try {
-      const {
-        getStudioPaperVectorRefinementWorkerClient,
-      } = await import("./brush/studio-paper-vector-refinement-worker-client");
-      if (
-        controller.signal.aborted
-        || !paperVectorRefinementActiveRef.current
-        || paperVectorRefinementRunIdRef.current !== runId
-      ) {
-        return;
-      }
-      const client = getStudioPaperVectorRefinementWorkerClient({
-        engineEpoch,
-      });
-      paperVectorRefinementClientRef.current = client;
-      const provider = {
-        refine: (request: unknown) =>
-          client.refine(request, { signal: controller.signal }),
-      };
-      const result = await refineStudioDrawElementWithPaper({
-        element: source,
-        provider,
-        requestSequence,
-        engineEpoch,
-        refinement: operation === "simplify"
-          ? {
-              kind: "simplify",
-              tolerance: 0.25 + Math.min(1, Math.max(0, nodeSmoothStrength)) * 2.75,
-            }
-          : {
-              kind: "smooth",
-              smoothing: {
-                type: "catmull-rom",
-                factor: Math.min(1, Math.max(0, nodeSmoothStrength)),
-              },
-            },
-        signal: controller.signal,
-      });
-      if (
-        controller.signal.aborted
-        || !paperVectorRefinementActiveRef.current
-        || paperVectorRefinementRunIdRef.current !== runId
-      ) {
-        return;
-      }
-      if (!result.ok) {
-        if (
-          result.providerReason === "aborted"
-          || result.providerReason === "disposed"
-          || result.providerReason === "epoch-mismatch"
-        ) {
-          return;
-        }
-        console.warn(
-          `Paper vector refinement was rejected: ${JSON.stringify({
-            reason: result.reason,
-            providerReason: result.providerReason ?? null,
-            detail: result.detail,
-          })}`,
-        );
-        setError(
-          result.reason === "budget-exceeded"
-            ? "선택한 획이 너무 복잡해 안전한 경로 예산 안에서 정리하지 못했어요."
-            : result.reason === "ineligible-element"
-              ? "이 브러시는 질감과 획 의미를 보존하기 위해 경로 정리를 제한해요."
-              : "경로 정리 결과를 안전하게 검증하지 못했어요. 다시 시도해 주세요."
-        );
-        return;
-      }
-
-      const latestElements = activeElementsRef.current;
-      const staleReason = studioVectorAsyncCommandStaleReason(snapshot, {
-        runId: paperVectorRefinementRunIdRef.current,
-        pageId: currentPageIdRef.current || activePage.id,
-        masterEditMode: masterEditModeRef.current,
-        selectedIds: currentCanvasSelectionIds(),
-        elements: latestElements,
-        mutationAllowed: canApplyStudioMutation(mutationTicket),
-        reviewLocked: activeSurfaceReviewLockedRef.current,
-        isElementLocked: (element) =>
-          isEffectivelyLocked(element, activeGroupsRef.current),
-      });
-      if (staleReason) {
-        if (
-          staleReason !== "superseded"
-          && staleReason !== "document-changed"
-        ) {
-          setError(
-            staleReason === "locked"
-              ? "계산 중 획이나 작업면이 잠겨 경로 정리 결과를 적용하지 않았어요."
-              : "계산 중 페이지·선택 또는 획이 바뀌어 오래된 경로 정리 결과를 적용하지 않았어요."
-          );
-        }
-        return;
-      }
-
-      const nextElements = latestElements.map((element) =>
-        element === source ? result.replacement : element
-      );
-      const committed = commit(nextElements, undefined, targetPageId);
-      if (!committed) return;
-      selectedIdRef.current = source.id;
-      marqueeIdsRef.current = [];
-      setSelectedId(source.id);
-      setMarqueeIds([]);
-      setError(null);
-      announceDrawingShortcut(
-        operation === "simplify"
-          ? "경로의 불필요한 점을 정리했어요."
-          : "경로를 자연스러운 곡선으로 다듬었어요."
-      );
-    } catch (cause) {
-      if (!controller.signal.aborted) {
-        console.error("Failed to refine vector path with Paper worker:", cause);
-        setError("벡터 경로 엔진을 시작하지 못했어요. 다시 시도해 주세요.");
-      }
-    } finally {
-      if (paperVectorRefinementRunIdRef.current === runId) {
-        paperVectorRefinementActiveRef.current = false;
-        paperVectorRefinementAbortRef.current = null;
-        setPaperVectorRefinementBusy(false);
-      }
-    }
-  }
-
-  // 벡터 패스 불리언 결합 — 마퀴로 고른 도형 2개를 합치기/빼기/교차/제외로 치환한다.
-  // CanvasKit PathOps는 전용 module Worker에서 곡선을 계산하고 portable contour만 반환한다.
-  // Worker 자체를 시작할 수 없는 환경만 기존 polygon-clipping으로 fail-soft 처리한다.
-  // 계산은 lazy geometry 청크를 기다리므로 시작 시점의 render closure를 그대로 커밋하면 안 된다.
-  // 페이지/Undo/선택/원본/잠금이 하나라도 바뀐 결과는 authority 없는 suggestion으로 폐기하고,
-  // 최신 ref-backed surface가 정확히 같은 때에만 단일 undo commit으로 소비한다.
-  async function applyPathBooleanCombine(op: StudioPathBooleanOp) {
-    if (
-      drawingRef.current
-      || requireStudioDrawingPointerTransport(
-        drawingPointerTransportRef,
-      ).getSession()
-    ) {
-      setError("현재 획을 마친 뒤 도형을 결합할 수 있어요.");
-      return;
-    }
-    if (
-      pendingStrokeCommitsRef.current
-      && !flushPendingStrokeCommitsRef.current()
-    ) {
-      setError(
-        "마지막 획을 원고에 확정하지 못해 도형 결합을 시작하지 않았어요. 잠금·동기화 상태를 확인해 주세요.",
-      );
-      return;
-    }
-    if (pathBooleanActiveRef.current) return;
-
-    const selectedIdsAtStart = currentCanvasSelectionIds();
-    const elementsAtStart = activeElementsRef.current;
-    const groupsAtStart = activeGroupsRef.current;
-    const selectionEls = selectedIdsAtStart
-      .map((id) => elementsAtStart.find((el) => el.id === id))
-      .filter((el): el is El => Boolean(el));
-    const gate = studioPathBooleanUnavailableReason(selectionEls);
-    if (gate) {
-      setError(gate);
-      return;
-    }
-    if (
-      selectionEls.some((el) => isEffectivelyLocked(el, groupsAtStart))
-    ) {
-      setError("잠긴 도형은 결합할 수 없어요.");
-      return;
-    }
-    const groupIds = new Set(
-      selectionEls.map((element) => element.groupId ?? null),
-    );
-    if (groupIds.size > 1) {
-      setError(
-        "서로 다른 그룹의 도형은 바로 결합할 수 없어요. 같은 그룹 안에서 선택하거나 먼저 그룹을 해제해 주세요.",
-      );
-      return;
-    }
-    if (pageEditLocked && !masterEditMode) {
-      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 편집해 주세요.");
-      return;
-    }
-
-    const runId = pathBooleanRunIdRef.current + 1;
-    pathBooleanRunIdRef.current = runId;
-    pathBooleanActiveRef.current = true;
-    const controller = new AbortController();
-    pathBooleanAbortRef.current = controller;
-    const mutationTicket = captureStudioMutationTicket();
-    const targetPageId = currentPageIdRef.current || activePage.id;
-    const targetMasterEditMode = masterEditModeRef.current;
-    const selectedIds = selectionEls.map((element) => element.id);
-    const snapshot = {
-      runId,
-      pageId: targetPageId,
-      masterEditMode: targetMasterEditMode,
-      selectedIds,
-      sourceElements: selectionEls,
-    } as const;
-    setPathBooleanBusy(true);
-    try {
-      const indexed = selectionEls
-        .map((el) => ({
-          el: el as DrawEl & El,
-          index: elementsAtStart.findIndex((element) => element.id === el.id),
-        }))
-        .sort((x, y) => x.index - y.index);
-      const base = indexed[0]!.el; // 아래(BACK 쪽)
-      const top = indexed[1]!.el; // 위
-      const baseSpec = drawElToStudioPathBooleanSpec(base)!;
-      const topSpec = drawElToStudioPathBooleanSpec(top)!;
-      let result: StudioPathBooleanCombineResult;
-      let provider: "canvaskit" | "polygon-clipping" = "canvaskit";
-      try {
-        const qualityModule = await import("./studio-quality-worker-client");
-        if (
-          controller.signal.aborted
-          || !pathBooleanActiveRef.current
-          || pathBooleanRunIdRef.current !== runId
-        ) {
-          return;
-        }
-        const client = pathBooleanClientRef.current
-          ?? new qualityModule.StudioQualityWorkerClient();
-        pathBooleanClientRef.current = client;
-        result = await combineStudioShapesWithCanvasKit(
-          client,
-          baseSpec,
-          topSpec,
-          op,
-          { signal: controller.signal },
-        );
-      } catch (cause) {
-        if (controller.signal.aborted) return;
-        const code = (
-          typeof cause === "object"
-          && cause !== null
-          && "code" in cause
-          && typeof cause.code === "string"
-        ) ? cause.code : null;
-        const fallbackAllowed = code === null || [
-          "post-failed",
-          "provider-capability-missing",
-          "provider-init-failed",
-          "protocol",
-          "unsupported-protocol",
-          "worker-failed",
-          "worker-unavailable",
-        ].includes(code);
-        if (!fallbackAllowed) throw cause;
-        pathBooleanClientRef.current?.dispose();
-        pathBooleanClientRef.current = null;
-        provider = "polygon-clipping";
-        result = await combineStudioShapes(baseSpec, topSpec, op);
-      }
-      if (
-        controller.signal.aborted
-        || !pathBooleanActiveRef.current
-        || pathBooleanRunIdRef.current !== runId
-      ) {
-        return;
-      }
-      if (!result.ok) {
-        setError(result.reason);
-        return;
-      }
-
-      const latestElements = activeElementsRef.current;
-      const mutationAllowed = canApplyStudioMutation(mutationTicket);
-      const staleReason = studioVectorAsyncCommandStaleReason(snapshot, {
-        runId: pathBooleanRunIdRef.current,
-        pageId: currentPageIdRef.current || activePage.id,
-        masterEditMode: masterEditModeRef.current,
-        selectedIds: marqueeIdsRef.current,
-        elements: latestElements,
-        mutationAllowed,
-        reviewLocked: activeSurfaceReviewLockedRef.current,
-        isElementLocked: (element) =>
-          isEffectivelyLocked(element, activeGroupsRef.current),
-      });
-      if (staleReason) {
-        if (
-          staleReason !== "superseded"
-          && staleReason !== "document-changed"
-        ) {
-          setError(
-            staleReason === "locked"
-              ? "계산 중 페이지나 도형이 잠겨 결합 결과를 적용하지 않았어요."
-              : "계산 중 페이지·선택 또는 도형이 바뀌어 오래된 결합 결과를 적용하지 않았어요."
-          );
-        }
-        return;
-      }
-
-      const latestSelectionEls = selectedIds
-        .map((id) => latestElements.find((element) => element.id === id))
-        .filter((element): element is El => Boolean(element));
-      const latestGate = studioPathBooleanUnavailableReason(
-        latestSelectionEls
-      );
-      if (latestGate) {
-        setError(latestGate);
-        return;
-      }
-      const pieceEls = result.output.pieces.map((piece) => ({
-        ...studioPathBooleanPieceToDrawElSeed(piece, base),
-        id: uid(),
-        name: `도형 결합 ${studioPathBooleanOpLabel(op)}`,
-        ...(base.groupId ? { groupId: base.groupId } : {}),
-        ...(base.blendMode ? { blendMode: base.blendMode } : {}),
-        ...(base.noClip !== undefined ? { noClip: base.noClip } : {}),
-        ...(base.clipBelow !== undefined ? { clipBelow: base.clipBelow } : {}),
-        ...(base.alphaLocked !== undefined
-          ? { alphaLocked: base.alphaLocked }
-          : {}),
-        ...(base.maskSrc ? { maskSrc: base.maskSrc } : {}),
-        ...(base.maskEnabled !== undefined
-          ? { maskEnabled: base.maskEnabled }
-          : {}),
-        ...(base.layerRole ? { layerRole: base.layerRole } : {}),
-        ...(base.layerColor ? { layerColor: base.layerColor } : {}),
-      }) as El);
-      const latestBaseIndex = latestElements.findIndex(
-        (element) => element.id === base.id
-      );
-      const kept = latestElements.filter(
-        (element) => element.id !== base.id && element.id !== top.id
-      );
-      const insertAt = latestElements
-        .slice(0, latestBaseIndex)
-        .filter((element) => element.id !== top.id).length;
-      const trackedSourceIds = selectedIds.filter((id) =>
-        hasTrack(animTimeline, id)
-      );
-      const nextTimeline = trackedSourceIds.reduce(
-        (document, id) => removeTrack(document, id),
-        animTimeline,
-      );
-      const committed = commit(
-        [...kept.slice(0, insertAt), ...pieceEls, ...kept.slice(insertAt)],
-        trackedSourceIds.length > 0
-          ? { animTimeline: nextTimeline }
-          : undefined,
-        targetPageId
-      );
-      if (!committed) return;
-      applyGroupSelectionState({
-        ...selectionShapeForIds(pieceEls.map((element) => element.id)),
-        activeGroupId:
-          base.groupId && activeGroupIdRef.current === base.groupId
-            ? base.groupId
-            : null,
-      });
-      setError(null);
-      announceDrawingShortcut(
-        `${studioPathBooleanOpLabel(op)} 완료 · 2개 → ${pieceEls.length}개${
-          provider === "canvaskit" ? " · Skia 고품질 경로" : " · 호환 경로"
-        }`,
-      );
-    } catch (err) {
-      if (!controller.signal.aborted) {
-        console.error("Failed to apply path boolean combine:", err);
-        setError(
-          err instanceof Error && err.name === "TimeoutError"
-            ? "고품질 도형 결합 시간이 초과됐어요. 도형을 단순화한 뒤 다시 시도해 주세요."
-            : "도형 결합에 실패했습니다.",
-        );
-      }
-    } finally {
-      if (pathBooleanRunIdRef.current === runId) {
-        pathBooleanActiveRef.current = false;
-        pathBooleanAbortRef.current = null;
-        setPathBooleanBusy(false);
-      }
-    }
-  }
+  const {
+    applyPaperVectorRefinement,
+    applyPathBooleanCombine,
+  } = createStudioPageVectorOps({
+    paperVectorRefinementUnavailableReason,
+    selected,
+    elementById,
+    nodeSmoothStrength,
+    pageEditLocked,
+    masterEditMode,
+    activePage,
+    animTimeline,
+    drawingRef,
+    drawingPointerTransportRef,
+    pendingStrokeCommitsRef,
+    flushPendingStrokeCommitsRef,
+    pathBooleanRunIdRef,
+    pathBooleanActiveRef,
+    pathBooleanAbortRef,
+    pathBooleanClientRef,
+    paperVectorRefinementRunIdRef,
+    paperVectorRefinementActiveRef,
+    paperVectorRefinementAbortRef,
+    paperVectorRefinementRequestSequenceRef,
+    paperVectorRefinementEngineEpochRef,
+    paperVectorRefinementClientRef,
+    currentPageIdRef,
+    masterEditModeRef,
+    activeElementsRef,
+    activeGroupsRef,
+    activeSurfaceReviewLockedRef,
+    selectedIdRef,
+    marqueeIdsRef,
+    activeGroupIdRef,
+    captureStudioMutationTicket,
+    canApplyStudioMutation,
+    currentCanvasSelectionIds,
+    commit,
+    applyGroupSelectionState,
+    setError,
+    setPaperVectorRefinementBusy,
+    setPathBooleanBusy,
+    setSelectedId,
+    setMarqueeIds,
+    announceDrawingShortcut,
+  });
 
   function handleLayerNavigatorAction(action: StudioLayerNavigatorAction) {
     if (pageEditLocked && !masterEditMode) {
@@ -23853,34 +23470,17 @@ const puppetWarpArmed =
       return true;
     }
 
-    const targetBundleId = resolveStudioShared3dStageBundleIdForElement(
-      activePage.elements,
+    const linkedSceneResolution = resolveStudioBg3dLtLinkedScene({
+      activePage,
+      result,
       targetElementId,
-    );
-    const existingDccSource = studioShared3dStageEntryAsDocument(
-      activePage.shared3dStage,
-      targetBundleId,
-    )?.dccSource;
-    const dccLinked = bg3dDccSourceRef.current !== null || existingDccSource !== undefined;
-    const removingLinkedRender = result.sharedStageMutation?.kind === "unlink";
-    const linkedScene = removingLinkedRender
-      ? result.bg3dScene
-      : ensureStudioLinked3dRenderShot(result.bg3dScene, {
-          // A DCC handoff has an explicit sourceShotId↔sceneShotId mapping. Inventing a Canvas Shot
-          // when no mapped Scene shot is active would silently break that provenance chain.
-          allowCreate: !dccLinked,
-        });
-    if (!linkedScene || (!removingLinkedRender && !linkedScene.activeShotId)) {
-      setError(
-        dccLinked
-          ? "DCC에서 전달한 Shot을 먼저 선택하거나 새 Shot을 캡처한 뒤 Canvas에 추가해 주세요."
-          : "현재 3D 뷰를 저장 가능한 Shot으로 확정하지 못해 Canvas를 바꾸지 않았어요.",
-      );
+      dccSource: bg3dDccSourceRef.current,
+    });
+    if (!linkedSceneResolution.ok) {
+      setError(linkedSceneResolution.message);
       return false;
     }
-    const renderResult = linkedScene === result.bg3dScene
-      ? result
-      : { ...result, bg3dScene: linkedScene };
+    const { linkedScene, renderResult } = linkedSceneResolution;
 
     if (targetElementId && renderResult.magicFilterMask) {
       setError(
@@ -23919,36 +23519,17 @@ const puppetWarpArmed =
       setError(plan.message);
       return false;
     }
-    const detachEditableComposite =
-      renderResult.materialization?.kind === "detached-editable-composite";
-    if (
-      detachEditableComposite
-      && (
-        !targetElementId
-        || renderResult.sharedStageMutation?.kind !== "unlink"
-        || renderResult.linkedCharacterCapture !== undefined
-        || renderResult.magicFilterMask !== undefined
-      )
-    ) {
-      setError("3D 원본을 유지한 한 장 정리는 기존 배경의 캐릭터 연결을 안전하게 해제할 때만 사용할 수 있어요.");
+    const detachResolution = planStudioBg3dLtDetachComposite({
+      renderResult,
+      plan,
+      targetElementId,
+      pageLocked: pageEditLocked,
+    });
+    if (!detachResolution.ok) {
+      setError(detachResolution.message);
       return false;
     }
-    const detachPlan = detachEditableComposite
-      ? planStudioBg3dEditableCompositeDetach<El, StudioBg3dSceneDocument>({
-          plan,
-          compositePngDataUrl: renderResult.compositePngDataUrl,
-          pageLocked: pageEditLocked,
-          expected: {
-            bundleId: plan.bundleId,
-            groupId: plan.groupId,
-            anchorElementId: plan.anchorElementId,
-          },
-        })
-      : null;
-    if (detachPlan && !detachPlan.ok) {
-      setError(detachPlan.message);
-      return false;
-    }
+    const { detachEditableComposite, detachPlan } = detachResolution;
     const magicAttachment = detachPlan?.ok
       ? {
           ok: true as const,
@@ -23965,151 +23546,59 @@ const puppetWarpArmed =
       return false;
     }
     const materializedGroups = detachPlan?.ok ? detachPlan.nextGroups : plan.nextGroups;
-    const capturedCharacterElementIds =
-      renderResult.linkedCharacterCapture?.kind === "full-fidelity-linked-vrm-capture"
-        ? renderResult.linkedCharacterCapture.elementIds
-        : [];
-    const capturedCharacterPlacements =
-      renderResult.linkedCharacterCapture?.kind === "full-fidelity-linked-vrm-capture"
-        ? renderResult.linkedCharacterCapture.stagePlacements
-        : [];
-    if (
-      capturedCharacterPlacements.length !== capturedCharacterElementIds.length
-      || new Set(capturedCharacterPlacements.map(({ elementId }) => elementId)).size
-        !== capturedCharacterPlacements.length
-      || capturedCharacterElementIds.some((elementId) =>
-        !capturedCharacterPlacements.some((placement) => placement.elementId === elementId))
-    ) {
-      setError("이 배경의 캐릭터 배치 확인 정보가 일치하지 않아 원본과 다른 배경은 바꾸지 않았어요.");
+    const capturedPlacements = resolveStudioBg3dCapturedCharacterPlacements({ renderResult });
+    if (!capturedPlacements.ok) {
+      setError(capturedPlacements.message);
       return false;
     }
-    const currentStageCollection = activePage.shared3dStage === undefined
-      ? undefined
-      : migrateStudioShared3dStageCollectionDocument(activePage.shared3dStage);
-    if (activePage.shared3dStage !== undefined && !currentStageCollection) {
-      setError("공유 3D 장면 연결 정보가 손상되어 기존 연결을 덮어쓰지 않았어요. 연결 상태를 확인해 주세요.");
-      return false;
-    }
-    const reusableHiddenCharacterIds = studioShared3dStageReusableHiddenCharacterElementIds(
-      currentStageCollection,
-      magicAttachment.nextElements,
-    );
-    const sharedCharacterVisibility = planStudioShared3dCapturedSourceLayerVisibility({
+    const { capturedCharacterElementIds, capturedCharacterPlacements } = capturedPlacements;
+    const visibilityResolution = planStudioBg3dSharedCharacterVisibility({
+      shared3dStage: activePage.shared3dStage,
       elements: magicAttachment.nextElements,
-      capturedElementIds: capturedCharacterElementIds,
-      isLocked: (element) => isEffectivelyLocked(element, groups),
-      reusableHiddenElementIds: reusableHiddenCharacterIds,
+      capturedCharacterElementIds,
+      groups,
     });
-    if (!sharedCharacterVisibility.ok) {
-      setError(sharedCharacterVisibility.message);
+    if (!visibilityResolution.ok) {
+      setError(visibilityResolution.message);
       return false;
     }
+    const { currentStageCollection, sharedCharacterVisibility } = visibilityResolution;
     let nextElements = [...sharedCharacterVisibility.nextElements];
     const anchor = nextElements.find((element) => element.id === plan.anchorElementId);
     const mappedGuides = anchor?.type === "image"
       ? mapStudioBg3dPerspectiveGuidesToAnchor(renderResult.perspectiveGuides, anchor)
       : [];
-    const drawingAssistState = mappedGuides.length > 0
-      ? currentStudioDrawingAssistDocument()
-      : null;
-    const nextDrawingAssist = drawingAssistState?.page.id === activePage.id
-      ? normalizeStudioDrawingAssistDocument({
-          ...drawingAssistState.document,
-          perspective: {
-            ...drawingAssistState.document.perspective,
-            active: true,
-            points: mappedGuides.map((point) => ({ id: uid(), x: point.x, y: point.y })),
-          },
-          isometric: { ...drawingAssistState.document.isometric, active: false },
-          advanced: {
-            ...drawingAssistState.document.advanced,
-            activeSnapRulerId: null,
-          },
-        }, {
-          canvasWidth: CANVAS_W,
-          canvasHeight: drawingAssistState.page.canvasH,
-        })
-      : undefined;
-    const priorTargetStage = studioShared3dStageEntryAsDocument(
+    const nextDrawingAssist = planStudioBg3dLtDrawingAssist({
+      mappedGuides,
+      activePageId: activePage.id,
+      currentStudioDrawingAssistDocument,
+    });
+    const stageMutationResolution = planStudioBg3dSharedStageMutation({
       currentStageCollection,
-      plan.bundleId,
-    );
-    const sharedStageMutationKind = renderResult.sharedStageMutation?.kind
-      ?? (priorTargetStage ? "refresh" : "connect");
-    const stageMutation = sharedStageMutationKind === "unlink"
-      ? priorTargetStage
-        ? planStudioShared3dStageCollectionRemoval({
-            value: currentStageCollection,
-            bundleIds: [plan.bundleId],
-            elements: nextElements,
-          })
-        : null
-      : (() => {
-          const provisionalStage = createStudioShared3dStageDocument({
-            backgroundBundleId: plan.bundleId,
-            elements: nextElements,
-            characterElementIds: capturedCharacterElementIds,
-            hiddenByStageElementIds: [],
-            dccSource: priorTargetStage?.dccSource ?? bg3dDccSourceRef.current ?? undefined,
-            capturePolicy: sharedStageMutationKind === "background-only"
-              || capturedCharacterElementIds.length === 0
-              ? "background-only"
-              : "require-all-linked",
-          });
-          if (!provisionalStage) return null;
-          const priorReceiptsById = new Map(
-            currentStageCollection?.visibilityReceipts.map((receipt) =>
-              [receipt.elementId, receipt.modelRuntimeKey] as const) ?? [],
-          );
-          const currentRuntimeKeysById = new Map(
-            provisionalStage.characters.map((character) =>
-              [character.elementId, character.modelRuntimeKey] as const),
-          );
-          const transferredVisibilityReceiptIds = capturedCharacterElementIds.filter(
-            (elementId) =>
-              sharedCharacterVisibility.hiddenElementIds.includes(elementId)
-              || (
-                sharedStageMutationKind === "relink"
-                && priorReceiptsById.get(elementId)
-                  === currentRuntimeKeysById.get(elementId)
-                && nextElements.some((element) =>
-                  element.id === elementId && element.hidden === true)
-              ),
-          );
-          const stage = transferredVisibilityReceiptIds.length === 0
-            ? provisionalStage
-            : createStudioShared3dStageDocument({
-                backgroundBundleId: plan.bundleId,
-                elements: nextElements,
-                characterElementIds: capturedCharacterElementIds,
-                hiddenByStageElementIds: transferredVisibilityReceiptIds,
-                dccSource: provisionalStage.dccSource,
-                capturePolicy: provisionalStage.capturePolicy,
-              });
-          return stage
-            ? planStudioShared3dStageCollectionUpsert({
-                value: currentStageCollection,
-                stage,
-                elements: nextElements,
-                placementCaptures: capturedCharacterPlacements,
-              })
-            : null;
-        })();
-    if (!stageMutation || (sharedStageMutationKind !== "unlink" && !stageMutation.nextState)) {
-      setError("이 배경과 캐릭터 원본의 공유 연결을 안전하게 검증하지 못해 적용하지 않았어요.");
+      bundleId: plan.bundleId,
+      requestedMutationKind: renderResult.sharedStageMutation?.kind,
+      nextElements,
+      capturedCharacterElementIds,
+      capturedCharacterPlacements,
+      hiddenElementIds: sharedCharacterVisibility.hiddenElementIds,
+      dccSource: bg3dDccSourceRef.current,
+    });
+    if (!stageMutationResolution.ok) {
+      setError(stageMutationResolution.message);
       return false;
     }
+    const { sharedStageMutationKind, stageMutation } = stageMutationResolution;
     nextElements = [...stageMutation.nextElements];
-    const currentLinkedRender = activePage.linked3dRender === undefined
-      ? undefined
-      : parseStudioLinked3dRenderDocument(activePage.linked3dRender);
-    if (activePage.linked3dRender !== undefined && !currentLinkedRender) {
-      setError("연결된 3D Shot 인덱스가 손상되어 기존 링크를 덮어쓰지 않았어요.");
+    const linkedRenderResolution = resolveStudioBg3dLinkedRenderState({
+      linked3dRender: activePage.linked3dRender,
+      activeShotId: linkedScene.activeShotId,
+      dccShotMappings: bg3dDccShotMappingsRef.current,
+    });
+    if (!linkedRenderResolution.ok) {
+      setError(linkedRenderResolution.message);
       return false;
     }
-    const sourceShotId = bg3dDccShotMappingsRef.current.find(
-      (mapping) => mapping.sceneShotId === linkedScene.activeShotId,
-    )?.sourceShotId;
+    const { currentLinkedRender, sourceShotId } = linkedRenderResolution;
     if (sharedStageMutationKind === "unlink") {
       const detachedElements = detachStudioLinked3dCorrections(nextElements, [plan.bundleId]);
       if (!detachedElements) {
@@ -27438,325 +26927,36 @@ const puppetWarpArmed =
     });
   }
 
-  function scenarioRoleReferencesForRequest(
-    previewCharacterDataUrl: string | null
-  ): readonly StudioAiResolvedImageReference[] {
-    if (scenarioImageReferenceResolution.references.length === 0) return [];
-    if (
-      scenarioImageReferenceResolution.hasCharacterReference
-      || !previewCharacterDataUrl
-    ) {
-      return scenarioImageReferenceResolution.references;
-    }
-    return [
-      {
-        referenceId: "scenario-preview-character-reference",
-        role: "character",
-        dataUrl: previewCharacterDataUrl,
-        label: "앞 장면 캐릭터 연속성",
-        guidance: "앞 장면의 인물 정체성만 유지합니다.",
-      },
-      ...scenarioImageReferenceResolution.references,
-    ];
-  }
-
-  async function executeGenerateScenarioImages() {
-    if (collaborationAccessRef.current.locked) return;
-    if (scenarioAbortControllerRef.current) return;
-    const mutationTicket = captureStudioMutationTicket();
-    const snapshot = scenarioResult;
-    if (!snapshot || scenarioBusy || scenarioRegeneratingIndex !== null || !isStudioAiConfigured(aiSettings)) return;
-    if (
-      scenarioImageReferenceDocument.references.length > 0
-      && (!assetsLoaded || assetsLoading)
-    ) {
-      setScenarioError("AI 참조 에셋을 불러오는 중이에요. 잠시 뒤 다시 시도해 주세요.");
-      return;
-    }
-    if (
-      scenarioImageReferenceDocument.references.length
-      > STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages
-    ) {
-      setScenarioError(
-        `AI 이미지 참조는 최대 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages}개까지 사용할 수 있어요. 참조 팩에서 일부를 제거해 주세요.`
-      );
-      return;
-    }
-    if (scenarioImageReferenceResolution.missing.length > 0) {
-      setScenarioError(
-        `연결된 AI 참조 에셋 ${scenarioImageReferenceResolution.missing.length}개를 찾을 수 없어요. 참조 팩에서 제거하거나 에셋을 다시 추가해 주세요.`
-      );
-      return;
-    }
-    const targetIndexes = snapshot.items.flatMap((item, index) => (item.imageDataUrl ? [] : [index]));
-    if (targetIndexes.length === 0) return;
-
-    scenarioCancelRef.current = false;
-    const controller = beginScenarioRequest();
-    setScenarioBusy(true);
-    setScenarioError(null);
-    setScenarioStageLabel("검토한 장면 이미지 생성 중…");
-    setScenarioProgress({ done: 0, total: targetIndexes.length });
-    let referenceImageDataUrl = snapshot.items.find((item) => item.imageDataUrl)?.imageDataUrl ?? null;
-    const characterContext = buildStudioCharacterBiblePromptContext(characterBible, 4_000);
-
-    try {
-      for (let taskIndex = 0; taskIndex < targetIndexes.length; taskIndex++) {
-        if (scenarioCancelRef.current || controller.signal.aborted) break;
-        const index = targetIndexes[taskIndex];
-        const panel = snapshot.items[index];
-        let imageResult: StudioAiResult<{ dataUrl: string }>;
-        const reviewedImagePrompt = [
-          characterContext ? `[캐릭터 바이블 — [고정] 설정 유지]\n${characterContext}` : "",
-          panel.imagePrompt,
-        ]
-          .filter((value) => value.trim().length > 0)
-          .join("\n\n");
-        const provider = studioImageAiProviderContext(aiSettings);
-        const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
-        const roleReferences = scenarioRoleReferencesForRequest(referenceImageDataUrl);
-        const usesRoleReferences = roleReferences.length > 0;
-        const usesPreviewReference = Boolean(referenceImageDataUrl);
-        const hasCharacterAnchor =
-          scenarioImageReferenceResolution.hasCharacterReference || usesPreviewReference;
-        const usesReference = usesRoleReferences || usesPreviewReference;
-        const requestPrompt = hasCharacterAnchor
-          ? reviewedImagePrompt
-          : [snapshot.characterDescription, reviewedImagePrompt]
-              .filter((value) => value.trim().length > 0)
-              .join(", ");
-        const trackedReferenceAssetIds = [
-          ...scenarioImageReferenceResolution.trackingAssetIds,
-          ...(!scenarioImageReferenceResolution.hasCharacterReference && usesPreviewReference
-            ? ["scenario-preview-character-reference"]
-            : []),
-        ];
-        const operationId = beginTrackedStudioAiOperation("scenario-image", {
-          kind: "image",
-          task: usesReference
-            ? hasCharacterAnchor
-              ? "character-image"
-              : "image-edit"
-            : "background-image",
-          provider: provider.provider,
-          model: provider.model,
-          transport: provider.transport,
-          promptVersion: 1,
-          prompt: requestPrompt,
-          target: { pageId: activePage.id },
-          ...(usesReference
-            ? {
-                references: trackedReferenceAssetIds.map((assetId) => ({ assetId })),
-              }
-            : {
-                requestedSize: parseStudioAiRequestedSize(scenarioAspectToImageSize(panel.aspect)),
-                references: [],
-              }),
-        });
-        if (usesRoleReferences) {
-          imageResult = await generateImageWithRoleReferences(
-            aiSettings,
-            roleReferences,
-            requestPrompt,
-            { signal: controller.signal }
-          );
-        } else if (referenceImageDataUrl) {
-          imageResult = await generateConsistentCharacterImage(
-            aiSettings,
-            referenceImageDataUrl,
-            reviewedImagePrompt,
-            { signal: controller.signal }
-          );
-        } else {
-          imageResult = await generateBackgroundImage(
-            aiSettings,
-            requestPrompt,
-            { size: scenarioAspectToImageSize(panel.aspect), signal: controller.signal }
-          );
-        }
-        if (!canApplyStudioMutation(mutationTicket)) break;
-        settleTrackedStudioAiOperation(operationId, imageResult, {
-          aborted: !imageResult.ok && controller.signal.aborted,
-          target: { pageId: activePage.id },
-        });
-        if (controller.signal.aborted) break;
-
-        if (imageResult.ok) {
-          const dataUrl = imageResult.data.dataUrl;
-          referenceImageDataUrl ??= dataUrl;
-          setScenarioResult((previous) =>
-            previous
-              ? {
-                  ...previous,
-                  items: previous.items.map((item, itemIndex) =>
-                    itemIndex === index
-                      ? { ...item, imageDataUrl: dataUrl, imageError: undefined, imageProvenance: requestProvenance }
-                      : item
-                  ),
-                }
-              : previous
-          );
-        } else {
-          setScenarioResult((previous) =>
-            previous
-              ? {
-                  ...previous,
-                  items: previous.items.map((item, itemIndex) =>
-                    itemIndex === index
-                      ? { ...item, imageDataUrl: undefined, imageError: imageResult.error, imageProvenance: undefined }
-                      : item
-                  ),
-                }
-              : previous
-          );
-        }
-        setScenarioProgress({ done: taskIndex + 1, total: targetIndexes.length });
-      }
-    } finally {
-      setScenarioBusy(false);
-      setScenarioStageLabel(null);
-      finishScenarioRequest(controller);
-    }
-  }
-
-  async function executeRegenerateScenarioImage(index: number) {
-    if (collaborationAccessRef.current.locked) return;
-    if (scenarioAbortControllerRef.current) return;
-    const mutationTicket = captureStudioMutationTicket();
-    const snapshot = scenarioResult;
-    const panel = snapshot?.items[index];
-    if (!snapshot || !panel || scenarioBusy || scenarioRegeneratingIndex !== null || !isStudioAiConfigured(aiSettings)) {
-      return;
-    }
-    if (
-      scenarioImageReferenceDocument.references.length > 0
-      && (!assetsLoaded || assetsLoading)
-    ) {
-      setScenarioError("AI 참조 에셋을 불러오는 중이에요. 잠시 뒤 다시 시도해 주세요.");
-      return;
-    }
-    if (
-      scenarioImageReferenceDocument.references.length
-      > STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages
-    ) {
-      setScenarioError(
-        `AI 이미지 참조는 최대 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages}개까지 사용할 수 있어요. 참조 팩에서 일부를 제거해 주세요.`
-      );
-      return;
-    }
-    if (scenarioImageReferenceResolution.missing.length > 0) {
-      setScenarioError(
-        `연결된 AI 참조 에셋 ${scenarioImageReferenceResolution.missing.length}개를 찾을 수 없어요. 참조 팩에서 제거하거나 에셋을 다시 추가해 주세요.`
-      );
-      return;
-    }
-    const controller = beginScenarioRequest();
-    setScenarioRegeneratingIndex(index);
-    setScenarioError(null);
-    setScenarioResult((previous) =>
-      previous
-        ? {
-            ...previous,
-            items: previous.items.map((item, itemIndex) =>
-              itemIndex === index ? { ...item, imageError: undefined } : item
-            ),
-          }
-        : previous
-    );
-    const referenceImageDataUrl =
-      snapshot.items.find((item, itemIndex) => itemIndex !== index && item.imageDataUrl)?.imageDataUrl ?? null;
-    const characterContext = buildStudioCharacterBiblePromptContext(characterBible, 4_000);
-    const reviewedImagePrompt = [
-      characterContext ? `[캐릭터 바이블 — [고정] 설정 유지]\n${characterContext}` : "",
-      panel.imagePrompt,
-    ]
-      .filter((value) => value.trim().length > 0)
-      .join("\n\n");
-    const provider = studioImageAiProviderContext(aiSettings);
-    const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
-    const roleReferences = scenarioRoleReferencesForRequest(referenceImageDataUrl);
-    const usesRoleReferences = roleReferences.length > 0;
-    const usesPreviewReference = Boolean(referenceImageDataUrl);
-    const hasCharacterAnchor =
-      scenarioImageReferenceResolution.hasCharacterReference || usesPreviewReference;
-    const usesReference = usesRoleReferences || usesPreviewReference;
-    const requestPrompt = hasCharacterAnchor
-      ? reviewedImagePrompt
-      : [snapshot.characterDescription, reviewedImagePrompt]
-          .filter((value) => value.trim().length > 0)
-          .join(", ");
-    const trackedReferenceAssetIds = [
-      ...scenarioImageReferenceResolution.trackingAssetIds,
-      ...(!scenarioImageReferenceResolution.hasCharacterReference && usesPreviewReference
-        ? ["scenario-preview-character-reference"]
-        : []),
-    ];
-    const operationId = beginTrackedStudioAiOperation("scenario-image", {
-      kind: "image",
-      task: usesReference
-        ? hasCharacterAnchor
-          ? "character-image"
-          : "image-edit"
-        : "background-image",
-      provider: provider.provider,
-      model: provider.model,
-      transport: provider.transport,
-      promptVersion: 1,
-      prompt: requestPrompt,
-      target: { pageId: activePage.id },
-      ...(usesReference
-        ? {
-            references: trackedReferenceAssetIds.map((assetId) => ({ assetId })),
-          }
-        : {
-            requestedSize: parseStudioAiRequestedSize(scenarioAspectToImageSize(panel.aspect)),
-            references: [],
-          }),
-    });
-    try {
-      const imageResult = usesRoleReferences
-        ? await generateImageWithRoleReferences(aiSettings, roleReferences, requestPrompt, {
-            signal: controller.signal,
-          })
-        : referenceImageDataUrl
-          ? await generateConsistentCharacterImage(aiSettings, referenceImageDataUrl, reviewedImagePrompt, {
-              signal: controller.signal,
-            })
-          : await generateBackgroundImage(
-              aiSettings,
-              requestPrompt,
-              { size: scenarioAspectToImageSize(panel.aspect), signal: controller.signal }
-            );
-      if (!canApplyStudioMutation(mutationTicket)) return;
-      settleTrackedStudioAiOperation(operationId, imageResult, {
-        aborted: !imageResult.ok && controller.signal.aborted,
-        target: { pageId: activePage.id },
-      });
-      if (controller.signal.aborted) return;
-      setScenarioResult((previous) =>
-        previous
-          ? {
-              ...previous,
-              items: previous.items.map((item, itemIndex) =>
-                itemIndex === index
-                  ? imageResult.ok
-                    ? {
-                        ...item,
-                        imageDataUrl: imageResult.data.dataUrl,
-                        imageError: undefined,
-                        imageProvenance: requestProvenance,
-                      }
-                    : { ...item, imageDataUrl: undefined, imageError: imageResult.error, imageProvenance: undefined }
-                  : item
-              ),
-            }
-          : previous
-      );
-    } finally {
-      setScenarioRegeneratingIndex(null);
-      finishScenarioRequest(controller);
-    }
-  }
+  const {
+    executeGenerateScenarioImages,
+    executeRegenerateScenarioImage,
+  } = createStudioScenarioImageGenerationExecutors({
+    collaborationAccessRef,
+    scenarioAbortControllerRef,
+    scenarioCancelRef,
+    scenarioResult,
+    scenarioBusy,
+    scenarioRegeneratingIndex,
+    aiSettings,
+    scenarioImageReferenceDocument,
+    scenarioImageReferenceResolution,
+    assetsLoaded,
+    assetsLoading,
+    characterBible,
+    activePage,
+    captureStudioMutationTicket,
+    canApplyStudioMutation,
+    beginScenarioRequest,
+    finishScenarioRequest,
+    beginTrackedStudioAiOperation,
+    settleTrackedStudioAiOperation,
+    setScenarioBusy,
+    setScenarioError,
+    setScenarioStageLabel,
+    setScenarioProgress,
+    setScenarioResult,
+    setScenarioRegeneratingIndex,
+  });
 
   // 텍스트 장면 구성은 생성형 이미지 고지 대상이 아니며 서버 Z.ai/DeepSeek transport도 사용할 수 있다.
   function onGenerateScenario() {
@@ -34697,17 +33897,6 @@ function clearSelectionForEdit() {
     toggleHorizontalCanvasView,
     togglePerspectiveGuideView,
     toggleSelectedClippingMask,
-    toggleStudioCommandBar: () => {
-      const state = workspacePersistenceRef.current.state;
-      const layout = state.liveLayout;
-      const prefs = normalizeStudioCommandBarPreferences(layout.commandBar);
-      persistStudioWorkspaceState(
-        updateStudioWorkspaceLiveLayout(state, {
-          ...layout,
-          commandBar: setStudioCommandBarVisible(prefs, !prefs.visible),
-        }),
-      );
-    },
     toggleStudioQuickAccessPalette,
     undo,
   });
@@ -34883,6 +34072,17 @@ function clearSelectionForEdit() {
   const studioMainMenuSurfaceActions =
     useStudioStableHandlers<StudioMainMenuSurfaceHandlerBundle>({
       activatePixelSelectionToolFromInspector,
+      toggleStudioCommandBar: () => {
+        const state = workspacePersistenceRef.current.state;
+        const layout = state.liveLayout;
+        const prefs = normalizeStudioCommandBarPreferences(layout.commandBar);
+        persistStudioWorkspaceState(
+          updateStudioWorkspaceLiveLayout(state, {
+            ...layout,
+            commandBar: setStudioCommandBarVisible(prefs, !prefs.visible),
+          }),
+        );
+      },
       enterQuickMask,
       commitQuickMask,
       toggleAnimationTimeline: () => setTimelineOpen((open) => !open),
@@ -34931,6 +34131,8 @@ function clearSelectionForEdit() {
         ? "circle"
         : "ellipse"
       : pixelTool;
+  const menuCommandBarVisible =
+    workspacePersistence.state.liveLayout.commandBar?.visible !== false;
   const studioMainMenuSurfaceState = useMemo<StudioMainMenuSurfaceState>(
     () => ({
       pixelSelectionTool: menuPixelSelectionTool,
@@ -34940,12 +34142,14 @@ function clearSelectionForEdit() {
       documentCommentsOpen: commentsOpen,
       canvasGridVisible: showGrid,
       vectorEraseToIntersection: eraseToIntersection,
+      commandBarVisible: menuCommandBarVisible,
       masterEditMode,
     }),
     [
       commentsOpen,
       eraseToIntersection,
       masterEditMode,
+      menuCommandBarVisible,
       menuPixelSelectionTool,
       onionSkin.enabled,
       quickMaskActive,
@@ -34953,8 +34157,6 @@ function clearSelectionForEdit() {
       timelineOpen,
     ],
   );
-  const menuCommandBarVisible =
-    workspacePersistence.state.liveLayout.commandBar?.visible !== false;
   const studioMainMenuGroups = useMemo(
     () => {
       return buildStudioMainMenuGroups({
@@ -35007,7 +34209,6 @@ function clearSelectionForEdit() {
           clippingMaskDisabled: menuClippingMaskDisabled,
           imageLayerSelected: menuImageLayerSelected,
           activeToolCommandId: menuActiveToolCommandId,
-          commandBarVisible: menuCommandBarVisible,
         },
         // Name-for-name delegation; it carries no browser state, so it lives in
         // the pure layer (`studio-main-menu-editor-bindings.ts`).
@@ -35091,7 +34292,6 @@ function clearSelectionForEdit() {
           toggleQuickAccessPalette: studioMainMenuActions.toggleStudioQuickAccessPalette,
           toggleLeftPanel: () => setLeftPanelOpenWithOverride((current) => !current),
           toggleRightPanel: () => setRightPanelOpenWithOverride((current) => !current),
-          toggleCommandBar: studioMainMenuActions.toggleStudioCommandBar,
           openShortcuts: () => setShortcutsOpen(true),
           selectDrawMode: (mode) => {
             studioMainMenuActions.activatePrimaryCanvasTool("draw", mode);
@@ -35125,7 +34325,6 @@ function clearSelectionForEdit() {
       menuActiveToolCommandId,
       menuClippingMaskActive,
       menuClippingMaskDisabled,
-      menuCommandBarVisible,
       menuImageLayerSelected,
       menuEditClearDisabled,
       menuEditCopyDisabled,
@@ -36368,378 +35567,41 @@ function clearSelectionForEdit() {
     setError,
   });
 
-  function cancelInterchangeImport() {
-    documentImportEpochRef.current += 1;
-    const activeOperation = documentImportOperationRef.current;
-    if (activeOperation?.kind === "archive-inspect" || activeOperation?.kind === "archive-apply") {
-      documentImportOperationRef.current = null;
-    }
-    interchangeImportAbortRef.current?.abort();
-    interchangeImportAbortRef.current = null;
-    setInterchangeImportBusy(false);
-    setInterchangeImportStatus({ tone: "warn", text: "문서 안전 검사를 취소했어요." });
-  }
-
-  async function handleImportInterchangeArchive(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (
-      !file ||
-      interchangeImportBusy ||
-      psdImportBusy ||
-      documentImportOperationRef.current !== null
-    ) return;
-    const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
-    if (extension !== ".ora" && extension !== ".cbz" && extension !== ".will") {
-      setInterchangeImportStatus({
-        tone: "bad",
-        text: "이 경로에서는 OpenRaster(.ora), Comic Book ZIP(.cbz), bounded WILL v1(.will)만 가져올 수 있어요.",
-      });
-      return;
-    }
-
-    if (extension === ".cbz" && pages.length >= STUDIO_PROJECT_MAX_PAGES) {
-      setInterchangeImportStatus({
-        tone: "bad",
-        text: `프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지에 도달했어요. 기존 페이지를 정리한 뒤 CBZ를 가져와 주세요.`,
-      });
-      return;
-    }
-
-    interchangeImportAbortRef.current?.abort();
-    const importEpoch = documentImportEpochRef.current + 1;
-    documentImportEpochRef.current = importEpoch;
-    documentImportOperationRef.current = { epoch: importEpoch, kind: "archive-inspect" };
-    const controller = new AbortController();
-    interchangeImportAbortRef.current = controller;
-    setInterchangeImportBusy(true);
-    setInterchangeImportStatus({
-      tone: "warn",
-      text: extension === ".ora"
-        ? "OpenRaster 구조·PNG·메모리 예산을 검사하는 중…"
-        : extension === ".cbz"
-          ? "CBZ 페이지 순서·이미지 header·메모리 예산을 검사하는 중…"
-          : "전용 Worker에서 bounded WILL v1 구조·경로·메모리 예산을 검사하는 중…",
-    });
-    try {
-      if (extension === ".will") {
-        const { inspectStudioWillV1Import } = await import("./studio-will-v1-import-bridge"
-        );
-        const inspected = await inspectStudioWillV1Import(file, file.name, {
-          canvasWidth: CANVAS_W,
-          currentPageElementCount: activePage.elements.length,
-          canAddPage: pages.length < STUDIO_PROJECT_MAX_PAGES,
-          signal: controller.signal,
-        });
-        if (
-          controller.signal.aborted ||
-          interchangeImportAbortRef.current !== controller ||
-          documentImportEpochRef.current !== importEpoch
-        ) return;
-        setPendingInterchangeImport(inspected);
-        setWillImportChoice(null);
-        setInterchangeImportStatus({
-          tone: inspected.preview.constraints?.some(({ gate }) => gate === "blocking")
-            ? "bad"
-            : inspected.adaptations.length > 0 || inspected.skipped.length > 0
-              ? "warn"
-              : "good",
-          text: `WILL v1 경로 ${inspected.result.paths.length.toLocaleString("ko-KR")}개를 검증했어요. 적용 위치와 변환 손실을 직접 확인해 주세요.`,
-        });
-        setProjectActionsOpen(false);
-        return;
-      }
-      const [
-        { studioDocumentImportDeviceProfile },
-        { inspectStudioDocumentInterchangeArchive },
-      ] = await Promise.all([
-        import("./studio-document-import-device-profile"),
-        import("./studio-document-interchange-commit"),
-      ]);
-      const deviceProfile = studioDocumentImportDeviceProfile(isMobile, pages.length);
-      const inspected = await inspectStudioDocumentInterchangeArchive(file, {
-        extension,
-        signal: controller.signal,
-        canvasWidth: CANVAS_W,
-        maxEmbeddedBytes: deviceProfile.maxEmbeddedBytes,
-        currentPageCount: pages.length,
-        canAddPage: pages.length < STUDIO_PROJECT_MAX_PAGES,
-        openRasterLimits: deviceProfile.openRasterLimits,
-        cbzLimits: deviceProfile.cbzLimits,
-      });
-      if (
-        controller.signal.aborted ||
-        interchangeImportAbortRef.current !== controller ||
-        documentImportEpochRef.current !== importEpoch
-      ) return;
-      setPendingInterchangeImport(inspected.pending);
-      setInterchangeImportChoice(inspected.choice);
-      setInterchangeImportStatus(inspected.status);
-      setProjectActionsOpen(false);
-    } catch (cause) {
-      if (controller.signal.aborted || documentImportEpochRef.current !== importEpoch) return;
-      const message = cause instanceof Error ? cause.message : "문서 파일을 안전하게 검사하지 못했어요.";
-      setInterchangeImportStatus({ tone: "bad", text: message });
-      setError(message);
-    } finally {
-      if (
-        interchangeImportAbortRef.current === controller &&
-        documentImportOperationRef.current?.kind === "archive-inspect" &&
-        documentImportOperationRef.current.epoch === importEpoch
-      ) {
-        documentImportOperationRef.current = null;
-        interchangeImportAbortRef.current = null;
-        setInterchangeImportBusy(false);
-      }
-    }
-  }
-
-  // PSD 레이어 가져오기 — ag-psd로 파싱한 뒤 공통 손실 미리보기에서 해상도·편집성·프로젝트
-  // 포함 예산과 새 페이지/현재 페이지 배치를 명시적으로 확인하고 적용한다.
-  async function handleImportPsd(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (
-      !file ||
-      psdImportBusy ||
-      interchangeImportBusy ||
-      documentImportOperationRef.current !== null
-    ) return;
-    interchangeImportAbortRef.current?.abort();
-    interchangeImportAbortRef.current = null;
-    const importEpoch = documentImportEpochRef.current + 1;
-    documentImportEpochRef.current = importEpoch;
-    documentImportOperationRef.current = { epoch: importEpoch, kind: "psd-inspect" };
-    const mutationTicket = captureStudioMutationTicket();
-    setPsdImportBusy(true);
-    setPsdImportStatus(null);
-    try {
-      const [
-        { importPsdFile, psdImportResultMessage },
-        { createStudioPsdImportLossPreview },
-        { studioDocumentImportDeviceProfile },
-      ] = await Promise.all([
-        loadStudioPsdImportModule(),
-        import("./studio-document-interchange-preview"),
-        import("./studio-document-import-device-profile"),
-      ]);
-      const deviceProfile = studioDocumentImportDeviceProfile(isMobile, pages.length);
-      const result = await importPsdFile(file, CANVAS_W);
-      if (documentImportEpochRef.current !== importEpoch) return;
-      if (!canApplyStudioMutation(mutationTicket)) return;
-      if (result.elements.length === 0) {
-        setPsdImportStatus({ tone: "warn", text: psdImportResultMessage(result) });
-        return;
-      }
-      const preview = createStudioPsdImportLossPreview(file.name, result, {
-        canvasWidth: CANVAS_W,
-        maxEmbeddedBytes: deviceProfile.maxEmbeddedBytes,
-        currentPageCount: pages.length,
-      });
-      setPendingInterchangeImport({ kind: "psd", fileName: file.name, result, preview });
-      setInterchangeImportChoice(
-        pages.length >= STUDIO_PROJECT_MAX_PAGES ? "current-page" : "new-page",
-      );
-      setProjectActionsOpen(false);
-      setPsdImportStatus({
-        tone: "warn",
-        text: `${psdImportResultMessage(result)} · 적용 전 편집성 손실과 배치 방식을 확인해 주세요.`,
-      });
-    } catch (err) {
-      if (documentImportEpochRef.current !== importEpoch) return;
-      setPsdImportStatus({
-        tone: "warn",
-        text: err instanceof Error ? err.message : "PSD 파일을 읽지 못했어요.",
-      });
-    } finally {
-      if (
-        documentImportOperationRef.current?.kind === "psd-inspect" &&
-        documentImportOperationRef.current.epoch === importEpoch
-      ) {
-        documentImportOperationRef.current = null;
-        setPsdImportBusy(false);
-      }
-    }
-  }
-
-  function dismissPendingInterchangeImport() {
-    if (interchangeImportBusy) {
-      cancelInterchangeImport();
-      return;
-    }
-    setPendingInterchangeImport(null);
-    setWillImportChoice(null);
-  }
-
-  async function applyPendingInterchangeImport(selectedChoiceId?: string | null) {
-    const pending = pendingInterchangeImport;
-    if (
-      !pending ||
-      interchangeImportBusy ||
-      collaborationDocumentLocked ||
-      documentImportOperationRef.current !== null
-    ) return;
-    const requestedChoice: StudioInterchangeImportChoice | null =
-      selectedChoiceId === "current-page"
-        ? "current-page"
-        : selectedChoiceId === "new-page"
-          ? "new-page"
-          : pending.kind === "will-v1"
-            ? willImportChoice
-            : interchangeImportChoice;
-    if (pending.kind === "will-v1" && requestedChoice === null) {
-      setInterchangeImportStatus({
-        tone: "bad",
-        text: "WILL v1을 새 페이지 또는 현재 페이지 중 어디에 추가할지 먼저 선택해 주세요.",
-      });
-      return;
-    }
-    const applyChoice: StudioInterchangeImportChoice =
-      requestedChoice ?? interchangeImportChoice;
-    const anchorPageId = activePage.id;
-    if (
-      pending.kind !== "cbz" &&
-      applyChoice === "new-page" &&
-      pages.length >= STUDIO_PROJECT_MAX_PAGES
-    ) {
-      setInterchangeImportStatus({
-        tone: "bad",
-        text: `프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지에 도달했어요. 현재 페이지 위에 배치하거나 기존 페이지를 정리해 주세요.`,
-      });
-      return;
-    }
-    if (
-      pending.kind === "cbz" &&
-      pages.length > STUDIO_PROJECT_MAX_PAGES - pending.result.pages.length
-    ) {
-      setInterchangeImportStatus({
-        tone: "bad",
-        text: `CBZ를 추가하면 프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지를 넘습니다. 파일을 나누거나 기존 페이지를 정리해 주세요.`,
-      });
-      return;
-    }
-    if (applyChoice === "current-page" && activePageMutationLocked) {
-      setInterchangeImportStatus({
-        tone: "bad",
-        text: "현재 페이지가 검토 잠금 상태라 레이어를 추가할 수 없어요. 새 페이지로 가져와 주세요.",
-      });
-      return;
-    }
-
-    interchangeImportAbortRef.current?.abort();
-    const applyEpoch = documentImportEpochRef.current + 1;
-    documentImportEpochRef.current = applyEpoch;
-    documentImportOperationRef.current = { epoch: applyEpoch, kind: "archive-apply" };
-    const controller = new AbortController();
-    interchangeImportAbortRef.current = controller;
-    const mutationTicket = captureStudioMutationTicket();
-    setInterchangeImportBusy(true);
-    setInterchangeImportStatus({ tone: "warn", text: "검증된 이미지와 레이어를 문서에 적용하는 중…" });
-    const commitImportedPages = (nextPages: PageState[]): boolean => {
-      if (commitPages(nextPages)) return true;
-      setInterchangeImportStatus({
-        tone: "bad",
-        text: "적용 직전에 문서 상태가 바뀌어 가져오기를 멈췄어요. 손실 확인 창에서 다시 시도해 주세요.",
-      });
-      return false;
-    };
-    const canCommitImport = (): boolean => {
-      if (canApplyStudioMutation(mutationTicket)) return true;
-      setInterchangeImportStatus({
-        tone: "bad",
-        text: "검사하는 동안 다른 편집이 반영되어 가져오기를 멈췄어요. 최신 문서에서 다시 시도해 주세요.",
-      });
-      return false;
-    };
-    try {
-      if (pending.kind === "will-v1") {
-        const { prepareStudioWillV1ImportCommit } = await import("./studio-will-v1-import-bridge"
-        );
-        const draft = prepareStudioWillV1ImportCommit(pending, {
-          destination: applyChoice,
-          currentPageElementCount: activePage.elements.length,
-          existingElementIds: new Set([
-            ...pages.flatMap((page) => page.elements.map(({ id }) => id)),
-            ...master.elements.map(({ id }) => id),
-          ]),
-        });
-        if (!canCommitImport()) return;
-        let nextPages: PageState[];
-        let selectedPageId: string | null = null;
-        if (applyChoice === "current-page") {
-          nextPages = pages.map((page) => page.id === anchorPageId
-            ? {
-                ...page,
-                canvasH: Math.max(page.canvasH, draft.pageHeight),
-                elements: [...page.elements, ...draft.elements],
-              }
-            : page);
-        } else {
-          const page = {
-            ...createBlankPage(uid, draft.pageHeight),
-            name: draft.title,
-            elements: [...draft.elements],
-          } as PageState;
-          const anchorIndex = pages.findIndex(({ id }) => id === anchorPageId);
-          if (anchorIndex < 0) {
-            throw new Error("WILL v1을 추가할 기준 페이지를 찾지 못했어요.");
-          }
-          nextPages = [...pages];
-          nextPages.splice(anchorIndex + 1, 0, page);
-          selectedPageId = page.id;
-        }
-        if (!commitImportedPages(nextPages)) return;
-        if (selectedPageId) setCurrentPageId(selectedPageId);
-        setInterchangeImportStatus(draft.status);
-        setPendingInterchangeImport(null);
-        setWillImportChoice(null);
-        setError(null);
-        return;
-      }
-      const [
-        { prepareStudioDocumentInterchangeCommit },
-        { studioDocumentImportDeviceProfile },
-      ] = await Promise.all([
-        import("./studio-document-interchange-commit"),
-        import("./studio-document-import-device-profile"),
-      ]);
-      const deviceProfile = studioDocumentImportDeviceProfile(isMobile, pages.length);
-      const draft = await prepareStudioDocumentInterchangeCommit(pending, {
-        pages,
-        anchorPageId,
-        choice: applyChoice,
-        canvasWidth: CANVAS_W,
-        createId: uid,
-        createBlankPage: (createId, canvasHeight) => (
-          createBlankPage(createId, canvasHeight) as PageState
-        ),
-        maxEmbeddedBytes: deviceProfile.maxEmbeddedBytes,
-        signal: controller.signal,
-      });
-      if (!canCommitImport()) return;
-      if (!commitImportedPages(draft.pages)) return;
-      if (draft.selectedPageId) setCurrentPageId(draft.selectedPageId);
-      setInterchangeImportStatus(draft.status);
-      if (draft.psdStatus) setPsdImportStatus(draft.psdStatus);
-      setPendingInterchangeImport(null);
-      setError(null);
-    } catch (cause) {
-      if (controller.signal.aborted) return;
-      const message = cause instanceof Error ? cause.message : "문서 가져오기를 적용하지 못했어요.";
-      setInterchangeImportStatus({ tone: "bad", text: message });
-      setError(message);
-    } finally {
-      if (
-        interchangeImportAbortRef.current === controller &&
-        documentImportOperationRef.current?.kind === "archive-apply" &&
-        documentImportOperationRef.current.epoch === applyEpoch
-      ) {
-        documentImportOperationRef.current = null;
-        interchangeImportAbortRef.current = null;
-        setInterchangeImportBusy(false);
-      }
-    }
-  }
+  const {
+    cancelInterchangeImport,
+    handleImportInterchangeArchive,
+    handleImportPsd,
+    dismissPendingInterchangeImport,
+    applyPendingInterchangeImport,
+  } = createStudioInterchangeImportOrchestration({
+    interchangeImportBusy,
+    psdImportBusy,
+    pages,
+    activePage,
+    master,
+    isMobile,
+    collaborationDocumentLocked,
+    activePageMutationLocked,
+    pendingInterchangeImport,
+    interchangeImportChoice,
+    willImportChoice,
+    documentImportEpochRef,
+    documentImportOperationRef,
+    interchangeImportAbortRef,
+    captureStudioMutationTicket,
+    canApplyStudioMutation,
+    commitPages,
+    setCurrentPageId,
+    setError,
+    setInterchangeImportBusy,
+    setInterchangeImportStatus,
+    setPsdImportBusy,
+    setPsdImportStatus,
+    setPendingInterchangeImport,
+    setInterchangeImportChoice,
+    setWillImportChoice,
+    setProjectActionsOpen,
+  });
 
   const pendingBrushDelete = pendingBrushDeletes.length > 0
     ? pendingBrushDeletes[pendingBrushDeletes.length - 1]

@@ -125,8 +125,9 @@ describe("Studio menubar ownership boundary", () => {
     expect(menubar).toContain('data-studio-export-menu-panel="true"');
     expect(menubar).toContain('data-studio-project-actions-menu="true"');
     expect(menubar).toContain('data-studio-menubar-overflow-panel="true"');
-    // Export, project actions, and the measured overflow menu each escape clipping through one portal.
-    expect(menubar.match(/createPortal\(/g)).toHaveLength(3);
+    // Export, project actions, the measured overflow menu, and the command bar
+    // settings dialog each escape clipping through one portal (2026-08-20).
+    expect(menubar.match(/createPortal\(/g)).toHaveLength(4);
     expect(menubar).toContain("document.body");
     expect(menubar).toContain("globalThis.setTimeout(() => setProjectActionsOpen(false), 0)");
     expect(page).toContain("exportMenuRef={exportMenuRef}");

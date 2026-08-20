@@ -102,9 +102,9 @@ describe("Studio document interchange UI boundary", () => {
     expect(cancelFlow).toContain("interchangeImportAbortRef.current?.abort()");
     expect(cancelFlow).toContain("setInterchangeImportBusy(false)");
     expect(importFlow).toContain("const controller = new AbortController()");
-    expect(importFlow).toContain('import("./studio-document-interchange-commit")');
-    expect(importFlow).toContain('import("./studio-document-import-device-profile")');
-    expect(importFlow).toContain('"./studio-will-v1-import-bridge"');
+    expect(importFlow).toContain('import("../studio-document-interchange-commit")');
+    expect(importFlow).toContain('import("../studio-document-import-device-profile")');
+    expect(importFlow).toContain('"../studio-will-v1-import-bridge"');
     expect(importFlow).toContain("inspectStudioWillV1Import(file, file.name, {");
     expect(importFlow).toContain("inspectStudioDocumentInterchangeArchive(file, {");
     expect(interchangeCommit).toContain('import("./studio-openraster-interchange")');
@@ -130,7 +130,7 @@ describe("Studio document interchange UI boundary", () => {
       "function dismissPendingInterchangeImport",
     );
 
-    expect(psdFlow).toContain('import("./studio-document-interchange-preview")');
+    expect(psdFlow).toContain('import("../studio-document-interchange-preview")');
     expect(psdFlow).toContain("createStudioPsdImportLossPreview(file.name, result");
     expect(psdFlow).toContain('setPendingInterchangeImport({ kind: "psd"');
     expect(psdFlow).not.toMatch(/\b(?:globalThis\.)?confirm\s*\(/u);
@@ -153,7 +153,7 @@ describe("Studio document interchange UI boundary", () => {
       "return {\n    pages,",
     );
 
-    expect(applyFlow).toContain('import("./studio-document-interchange-commit")');
+    expect(applyFlow).toContain('import("../studio-document-interchange-commit")');
     expect(applyFlow).toContain("prepareStudioDocumentInterchangeCommit(pending");
     expect(applyFlow).toContain("commitImportedPages(draft.pages)");
     expect(interchangeCommit).toContain('import("./studio-archive-import-apply")');

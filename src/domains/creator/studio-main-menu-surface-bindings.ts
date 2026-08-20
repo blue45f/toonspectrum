@@ -28,6 +28,7 @@ export interface StudioMainMenuSurfaceHandlerBundle {
   readonly activatePixelSelectionToolFromInspector: (
     tool: StudioPixelSelectionToolId,
   ) => unknown;
+  readonly toggleStudioCommandBar: () => unknown;
   readonly enterQuickMask: () => unknown;
   readonly commitQuickMask: () => unknown;
   readonly toggleAnimationTimeline: () => unknown;
@@ -62,6 +63,7 @@ export function bindStudioMainMenuSurfaceActions(
 ): StudioMainMenuSurfaceActions {
   return {
     activatePixelSelectionTool: actions.activatePixelSelectionToolFromInspector,
+    toggleCommandBar: actions.toggleStudioCommandBar,
     enterQuickMask: actions.enterQuickMask,
     commitQuickMask: actions.commitQuickMask,
     toggleAnimationTimeline: actions.toggleAnimationTimeline,
