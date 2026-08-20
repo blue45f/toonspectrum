@@ -14,6 +14,9 @@
  *  - 라이브 계약: 다이렉트 핫패스 초안 파이프라인(임페러티브 sceneFunc/WebGPU — pen/marker
  *    전용)은 건드리지 않는다. "perfect" 패밀리는 direct-live 대상이 아니므로 리테인드 초안과
  *    커밋 렌더 모두 StudioDrawNode의 같은 어댑터 경로를 지난다(pointer-up 커밋 스왑 계약 유지).
+ *  - 크기 다이내믹스(D-08): 프로필이 sizeDynamics 를 선언하면 패키지 레인
+ *    (studio-brush-platform geometry.ts, D-03)과 동일한 프리매핑으로 velocity/tilt 폭 반응을
+ *    얻는다. 미선언 프로필은 종전 경로가 바이트 동일하게 유지된다.
  */
 import { getStroke, type StrokeOptions } from "perfect-freehand";
 
@@ -30,6 +33,103 @@ export type StudioPerfectFreehandStroker = (
 // ---------------------------------------------------------------------------
 
 export type StudioPerfectFreehandProfileId = "perfect-ink" | "perfect-marker" | "gpen";
+
+// ---------------------------------------------------------------------------
+// D-08 — 아웃라인 크기 다이내믹스 프리매핑 (패키지 레인 D-03 포팅)
+// ---------------------------------------------------------------------------
+
+/**
+ * 패키지 레인(studio-brush-platform geometry.ts) DynamicInputIR 의 결정적 부분집합.
+ * "random"/"twist" 는 시드 다이내믹스 소관이라 여기서 받지 않는다(아웃라인 레인은 무시드).
+ */
+export type StudioPerfectFreehandSizeDynamicInput =
+  | "pressure"
+  | "velocity"
+  | "tiltAltitude"
+  | "tiltAzimuth"
+  | "constant";
+
+/** 패키지 DynamicMappingIR 미러 — [0,1] 균일 LUT(탭 ≥ 2), 탭 사이 선형 보간. */
+export interface StudioPerfectFreehandSizeDynamicMapping {
+  readonly input: StudioPerfectFreehandSizeDynamicInput;
+  readonly curve: readonly number[];
+  readonly min: number;
+  readonly max: number;
+}
+
+/**
+ * 포인트별 스타일러스 다이내믹스 입력. 결측 필드의 기본값은 패키지 modeledSampleIRSchema 의
+ * 기본값과 같다(velocity 0, altitudeDeg 90, azimuthDeg 0) — 두 레인의 폭 패리티 전제.
+ */
+export interface StudioPerfectFreehandDynamicsSample {
+  /** 장면 좌표 px/ms — 패키지 ModeledSampleIR.velocity 와 같은 단위. min(1, v/4)로 정규화. */
+  readonly velocity?: number;
+  /** 0(완전 눕힘)–90(수직). */
+  readonly altitudeDeg?: number;
+  /** 0–360. */
+  readonly azimuthDeg?: number;
+}
+
+/**
+ * 패키지 studio-project-model `evaluateDynamicMapping` 미러 — 식 순서까지 동일하다.
+ * 값 배럴(zod) import 는 핫 청크(StudioDrawNode)로 zod 를 끌어들이므로 로컬 미러를 쓰고,
+ * 크로스 레인 패리티 테스트(studio-perfect-freehand.test.ts)가 두 구현을 상호 고정한다.
+ */
+function evaluateStudioPerfectFreehandSizeDynamicMapping(
+  mapping: StudioPerfectFreehandSizeDynamicMapping,
+  inputValue: number
+): number {
+  const clamped = Math.min(1, Math.max(0, inputValue));
+  const scaled = clamped * (mapping.curve.length - 1);
+  const lower = Math.floor(scaled);
+  const upper = Math.min(mapping.curve.length - 1, lower + 1);
+  const t = scaled - lower;
+  const lowerValue = mapping.curve[lower] ?? 0;
+  const upperValue = mapping.curve[upper] ?? lowerValue;
+  const curveValue = lowerValue + (upperValue - lowerValue) * t;
+  return mapping.min + (mapping.max - mapping.min) * curveValue;
+}
+
+/** 패키지 geometry `effectiveSizeAt` 미러 — 다이내믹스 곱 누적과 0.1px 바닥까지 동일. */
+export function studioPerfectFreehandEffectiveSizeAt(
+  sizeDynamics: readonly StudioPerfectFreehandSizeDynamicMapping[],
+  baseSizePx: number,
+  pressure: number,
+  sample?: StudioPerfectFreehandDynamicsSample
+): number {
+  let size = baseSizePx;
+  for (const mapping of sizeDynamics) {
+    const input =
+      mapping.input === "pressure"
+        ? pressure
+        : mapping.input === "velocity"
+          ? Math.min(1, (sample?.velocity ?? 0) / 4)
+          : mapping.input === "tiltAltitude"
+            ? (sample?.altitudeDeg ?? 90) / 90
+            : mapping.input === "tiltAzimuth"
+              ? (sample?.azimuthDeg ?? 0) / 360
+              : 1; // "constant"
+    size *= evaluateStudioPerfectFreehandSizeDynamicMapping(mapping, input);
+  }
+  return Math.max(0.1, size);
+}
+
+/**
+ * D-08 프리매핑: 다이내믹스가 해석한 샘플별 목표 반지름을 perfect-freehand 필압 채널로
+ * 인코딩한다. perfect-freehand 의 포인트 반지름은 size * (0.5 - thinning * (0.5 - pressure))
+ * 이므로 thinning 을 1로 고정하면 반지름 = size × p — 인코딩된 필압이 반지름을 선형으로
+ * 지정해, 지오메트리 자체 thinning 이 "샘플의 유효 크기"에서 만들었을 반지름을 그대로
+ * 재현한다. 패키지 레인 strokeOutlinePath(D-03)와 같은 식·같은 clamp 다.
+ */
+export function studioPerfectFreehandEncodeDynamicsPressure(
+  effectiveSize: number,
+  thinning: number,
+  pressure: number,
+  baseSizePx: number
+): number {
+  const radius = effectiveSize * (0.5 - thinning * (0.5 - pressure));
+  return Math.min(1, Math.max(0, radius / baseSizePx));
+}
 
 /**
  * Selectable brushes backed by the outline stroker.
@@ -64,6 +164,15 @@ export interface StudioPerfectFreehandProfile {
   /** 테이퍼가 0일 때 끝을 둥근 캡으로 마감할지. */
   readonly capStart: boolean;
   readonly capEnd: boolean;
+  /**
+   * D-08: 프로필이 선언하는 크기 다이내믹스(패키지 BrushProgramIR.sizeDynamics 와 동일 의미론).
+   * 선언한 프로필만 프리매핑 분기를 타고, 미선언 프로필은 기존 렌더 경로가 바이트 동일하게
+   * 유지된다. 2026-08-20 현재 카탈로그 프로필은 아직 아무것도 선언하지 않는다 — 영속
+   * outlineStroke 계약 스냅샷(StudioOutlineStrokeProfileSnapshotV1)이 이 필드를 운반하지 않아,
+   * 지금 선언하면 라이브 프리뷰와 커밋/SVG 리플레이가 어긋난다. 계약 v-next 가 스냅샷에
+   * sizeDynamics 를 실은 뒤에만 카탈로그 선언을 켠다.
+   */
+  readonly sizeDynamics?: readonly StudioPerfectFreehandSizeDynamicMapping[];
 }
 
 /**
@@ -247,6 +356,12 @@ export interface StudioPerfectFreehandStrokeInput {
   readonly pressures?: readonly number[] | null;
   readonly strokeWidth: number;
   readonly profile: StudioPerfectFreehandProfile;
+  /**
+   * D-08: 소스 포인트 인덱스와 정렬된 포인트별 다이내믹스 샘플(velocity/tilt).
+   * 프로필이 sizeDynamics 를 선언한 경우에만 소비된다 — 미선언 프로필은 이 값과 무관하게
+   * 기존 경로 그대로다(결측 인덱스는 패키지 스키마 기본값으로 해석).
+   */
+  readonly dynamics?: readonly StudioPerfectFreehandDynamicsSample[] | null;
 }
 
 /**
@@ -266,6 +381,13 @@ export function buildStudioPerfectFreehandOutline(
     ? resampleStrokePressures(input.pressures, pointCount, 0.5)
     : null;
 
+  // D-08: 프로필이 sizeDynamics 를 선언하면 샘플별 유효 크기를 필압 채널로 프리매핑한다.
+  // baseSizePx 는 getStroke 로 전달되는 클램프된 size 와 반드시 같아야 반지름 인코딩
+  // (radius / size)이 어긋나지 않는다(studioPerfectFreehandStrokeOptions 와 같은 클램프).
+  const sizeDynamics = input.profile.sizeDynamics;
+  const hasSizeDynamics = sizeDynamics !== undefined && sizeDynamics.length > 0;
+  const baseSizePx = clampTo(input.strokeWidth, 0.5, 400, 6);
+
   const strokePoints: number[][] = [];
   for (let index = 0; index < pointCount; index++) {
     const x = input.points[index * 2];
@@ -276,7 +398,27 @@ export function buildStudioPerfectFreehandOutline(
     ) {
       continue;
     }
-    strokePoints.push([x, y, sampledPressures?.[index] ?? 0.5]);
+    const pressure = sampledPressures?.[index] ?? 0.5;
+    if (hasSizeDynamics) {
+      const effectiveSize = studioPerfectFreehandEffectiveSizeAt(
+        sizeDynamics,
+        baseSizePx,
+        pressure,
+        input.dynamics?.[index]
+      );
+      strokePoints.push([
+        x,
+        y,
+        studioPerfectFreehandEncodeDynamicsPressure(
+          effectiveSize,
+          input.profile.thinning,
+          pressure,
+          baseSizePx
+        ),
+      ]);
+    } else {
+      strokePoints.push([x, y, pressure]);
+    }
   }
   if (strokePoints.length < 2) return [];
   let pathLength = 0;
@@ -286,9 +428,17 @@ export function buildStudioPerfectFreehandOutline(
     pathLength += Math.hypot(current[0]! - previous[0]!, current[1]! - previous[1]!);
   }
 
+  const options = studioPerfectFreehandStrokeOptions(
+    input.profile,
+    input.strokeWidth,
+    hasPressures,
+    pathLength
+  );
+  // D-08: 다이내믹스 분기는 필압 채널이 반지름을 직접 지정하므로 thinning 1 고정 +
+  // 속도 시뮬레이션 해제(패키지 레인과 동일). 미선언 프로필은 options 를 손대지 않는다.
   return stroker(
     strokePoints,
-    studioPerfectFreehandStrokeOptions(input.profile, input.strokeWidth, hasPressures, pathLength)
+    hasSizeDynamics ? { ...options, thinning: 1, simulatePressure: false } : options
   );
 }
 

@@ -1,3 +1,5 @@
+import { strokeOutlinePath } from "@toonspectrum/studio-brush-platform";
+import { brushProgramIRSchema, type StrokeIR } from "@toonspectrum/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -7,8 +9,12 @@ import {
   peekStudioPerfectFreehandStroker,
   resolveStudioPerfectFreehandProfile,
   STUDIO_PERFECT_FREEHAND_PROFILES,
+  studioPerfectFreehandEffectiveSizeAt,
+  studioPerfectFreehandEncodeDynamicsPressure,
   studioPerfectFreehandOutlineToPathData,
   studioPerfectFreehandStrokeOptions,
+  type StudioPerfectFreehandProfile,
+  type StudioPerfectFreehandSizeDynamicMapping,
   type StudioPerfectFreehandStroker,
 } from "./studio-perfect-freehand";
 
@@ -376,6 +382,292 @@ describe("buildStudioPerfectFreehandOutline / PathData (실제 getStroke 주입)
  * 브러시는 테이퍼 없는 뭉툭한 시작·끝으로 출하돼 있었다. 브러시 id 를 여기 하드코딩하는 대신
  * 카탈로그를 원본으로 삼아, 앞으로 추가되는 레인도 같은 방식으로 빠지지 않게 한다.
  */
+/**
+ * D-08 — 패키지 레인(D-03)의 크기 다이내믹스 프리매핑을 라이브 레인에 포팅했다.
+ *
+ * 라이브 어댑터는 핫 청크(StudioDrawNode)라 studio-project-model 값 배럴(zod)을 끌어올 수
+ * 없어 프리매핑 수식을 로컬 미러로 갖는다. 대신 이 크로스 레인 패리티 스위트가 같은 입력에
+ * 대해 두 레인이 정점 단위로 같은 폭 아웃라인을 만든다는 것을 상호 고정한다 — 어느 쪽이든
+ * 수식이 표류하면 여기서 깨진다.
+ */
+describe("D-08 크기 다이내믹스 프리매핑 — 패키지 레인 패리티", () => {
+  /** gpen 지오메트리 수치 — 테이퍼만 0(패키지 레인은 테이퍼 옵션이 없다). */
+  const PARITY_GEOMETRY = {
+    thinning: 0.775,
+    smoothing: 0.68,
+    streamline: 0.06,
+    capStart: true,
+    capEnd: true,
+  } as const;
+  const PARITY_SIZE = 12;
+
+  interface ParitySample {
+    readonly x: number;
+    readonly y: number;
+    readonly pressure: number;
+    readonly velocity: number;
+    readonly altitudeDeg: number;
+    readonly azimuthDeg: number;
+  }
+
+  // 전반부 정지 → 후반부 고속, 짝수 인덱스만 수직 틸트 — 세 입력 채널을 모두 자극한다.
+  const paritySamples: readonly ParitySample[] = Array.from(
+    { length: 21 },
+    (_, index) => ({
+      x: index * 10,
+      y: 50,
+      pressure: 0.35 + 0.03 * (index % 5),
+      velocity: index <= 10 ? 0 : 4,
+      altitudeDeg: index % 2 === 0 ? 90 : 45,
+      azimuthDeg: (index * 30) % 360,
+    })
+  );
+
+  const parityDynamics: readonly StudioPerfectFreehandSizeDynamicMapping[] = [
+    { input: "velocity", curve: [0, 1], min: 1, max: 1.6 },
+    { input: "tiltAltitude", curve: [1, 0.55], min: 0.4, max: 1 },
+    { input: "pressure", curve: [0, 1], min: 0.9, max: 1.1 },
+  ];
+
+  function liveProfile(
+    sizeDynamics?: readonly StudioPerfectFreehandSizeDynamicMapping[]
+  ): StudioPerfectFreehandProfile {
+    return {
+      id: "gpen",
+      ...PARITY_GEOMETRY,
+      taperStartFactor: 0,
+      taperEndFactor: 0,
+      ...(sizeDynamics ? { sizeDynamics } : {}),
+    };
+  }
+
+  function packageOutlineVertices(
+    sizeDynamics: readonly StudioPerfectFreehandSizeDynamicMapping[]
+  ): number[][] {
+    const program = brushProgramIRSchema.parse({
+      id: "parity-pen",
+      name: "Parity Pen",
+      stabilizer: { kind: "none", strength: 0, predictionMs: 0 },
+      sizeDynamics,
+      geometry: { kind: "perfect-freehand", ...PARITY_GEOMETRY },
+    });
+    const stroke: StrokeIR = {
+      id: "parity-stroke",
+      brushPresetId: "parity-pen",
+      seed: 0,
+      color: { r: 0, g: 0, b: 0, a: 1 },
+      baseSizePx: PARITY_SIZE,
+      samples: paritySamples.map((sample, index) => ({
+        x: sample.x,
+        y: sample.y,
+        tMs: index * 8,
+        pressure: sample.pressure,
+        velocity: sample.velocity,
+        altitudeDeg: sample.altitudeDeg,
+        azimuthDeg: sample.azimuthDeg,
+      })),
+    };
+    const vertices: number[][] = [];
+    for (const verb of strokeOutlinePath(program, stroke).verbs) {
+      if (verb.v !== "Z") vertices.push([verb.x, verb.y]);
+    }
+    return vertices;
+  }
+
+  let stroker: StudioPerfectFreehandStroker;
+
+  beforeAll(async () => {
+    stroker = await loadStudioPerfectFreehandStroker();
+  });
+
+  function liveOutlineVertices(
+    sizeDynamics?: readonly StudioPerfectFreehandSizeDynamicMapping[]
+  ): number[][] {
+    return buildStudioPerfectFreehandOutline(stroker, {
+      points: paritySamples.flatMap((sample) => [sample.x, sample.y]),
+      pressures: paritySamples.map((sample) => sample.pressure),
+      strokeWidth: PARITY_SIZE,
+      profile: liveProfile(sizeDynamics),
+      dynamics: paritySamples.map((sample) => ({
+        velocity: sample.velocity,
+        altitudeDeg: sample.altitudeDeg,
+        azimuthDeg: sample.azimuthDeg,
+      })),
+    });
+  }
+
+  function expectSameVertices(actual: number[][], expected: number[][]): void {
+    expect(actual.length).toBeGreaterThan(12);
+    expect(actual.length).toBe(expected.length);
+    actual.forEach((point, index) => {
+      expect(point[0]).toBeCloseTo(expected[index]![0]!, 10);
+      expect(point[1]).toBeCloseTo(expected[index]![1]!, 10);
+    });
+  }
+
+  it("다이내믹스가 없어도 두 레인 픽스처는 정점 단위로 일치한다(하니스 자체 검증)", () => {
+    expectSameVertices(liveOutlineVertices(undefined), packageOutlineVertices([]));
+  });
+
+  it("velocity·tilt·pressure 다이내믹스에서 패키지 레인과 정점 단위로 같은 폭을 만든다", () => {
+    expectSameVertices(
+      liveOutlineVertices(parityDynamics),
+      packageOutlineVertices(parityDynamics)
+    );
+  });
+
+  it("sizeDynamics 미선언 프로필은 dynamics 입력이 있어도 stroker 입력이 바이트 동일하다", () => {
+    const calls: {
+      points: number[][];
+      options: Parameters<StudioPerfectFreehandStroker>[1];
+    }[] = [];
+    const spy: StudioPerfectFreehandStroker = (points, options) => {
+      calls.push({ points: points as number[][], options });
+      return [[0, 0], [2, 0], [1, 2]];
+    };
+    const base = {
+      points: [0, 0, 10, 0, 20, 0],
+      pressures: [0.2, 0.5, 0.9],
+      strokeWidth: 12,
+      profile: STUDIO_PERFECT_FREEHAND_PROFILES.gpen,
+    };
+    buildStudioPerfectFreehandOutline(spy, base);
+    buildStudioPerfectFreehandOutline(spy, {
+      ...base,
+      dynamics: [{ velocity: 4 }, { velocity: 4 }, { velocity: 4 }],
+    });
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.points).toEqual(calls[0]!.points);
+    expect(calls[1]!.options).toEqual(calls[0]!.options);
+    expect(calls[0]!.options?.thinning).toBe(STUDIO_PERFECT_FREEHAND_PROFILES.gpen.thinning);
+    expect(calls[0]!.points.map((point) => point[2])).toEqual([0.2, 0.5, 0.9]);
+  });
+
+  it("다이내믹스 분기는 thinning 1 고정·시뮬레이션 해제·반지름 인코딩을 수행한다", () => {
+    const calls: {
+      points: number[][];
+      options: Parameters<StudioPerfectFreehandStroker>[1];
+    }[] = [];
+    const spy: StudioPerfectFreehandStroker = (points, options) => {
+      calls.push({ points: points as number[][], options });
+      return [[0, 0], [2, 0], [1, 2]];
+    };
+    buildStudioPerfectFreehandOutline(spy, {
+      points: [0, 0, 10, 0, 20, 0],
+      pressures: [0.7, 0.7, 0.7],
+      strokeWidth: 12,
+      profile: liveProfile([{ input: "velocity", curve: [0, 1], min: 1, max: 1.6 }]),
+      dynamics: [{ velocity: 0 }, { velocity: 4 }, { velocity: 4 }],
+    });
+    const call = calls[0]!;
+    expect(call.options?.thinning).toBe(1);
+    expect(call.options?.simulatePressure).toBe(false);
+    const encode = (effectiveSize: number) =>
+      studioPerfectFreehandEncodeDynamicsPressure(effectiveSize, 0.775, 0.7, 12);
+    // 정지 샘플: 유효 크기 12 → 지오메트리 thinning 이 만들었을 반지름 비율 그대로.
+    expect(call.points[0]![2]).toBeCloseTo(encode(12), 12);
+    // 고속 샘플: 유효 크기 19.2 → 목표 반지름이 base 를 넘어 1로 클램프(패키지와 동일).
+    expect(call.points[1]![2]).toBeCloseTo(encode(12 * 1.6), 12);
+    expect(call.points[1]![2]).toBe(1);
+  });
+
+  it("정지 구간은 다이내믹스 off 와 같은 폭, 고속 구간은 눈에 띄게 넓다", () => {
+    const linePoints = Array.from({ length: 21 }, (_, index) => [index * 10, 50]).flat();
+    const pressures = Array(21).fill(0.7) as number[];
+    const dynamics = Array.from({ length: 21 }, (_, index) => ({
+      velocity: index <= 10 ? 0 : 4,
+    }));
+    const mapping: readonly StudioPerfectFreehandSizeDynamicMapping[] = [
+      { input: "velocity", curve: [0, 1], min: 1, max: 1.6 },
+    ];
+    const off = buildStudioPerfectFreehandOutline(stroker, {
+      points: linePoints,
+      pressures,
+      strokeWidth: 12,
+      profile: liveProfile(),
+    });
+    const on = buildStudioPerfectFreehandOutline(stroker, {
+      points: linePoints,
+      pressures,
+      strokeWidth: 12,
+      profile: liveProfile(mapping),
+      dynamics,
+    });
+    const halfWidthNear = (outline: number[][], minX: number, maxX: number): number => {
+      let widest = 0;
+      for (const [x, y] of outline) {
+        if (x! >= minX && x! <= maxX) widest = Math.max(widest, Math.abs(y! - 50));
+      }
+      return widest;
+    };
+    // 정지 구간(×1): 인코딩이 지오메트리 thinning 의 반지름을 그대로 재현해 off 와 같다.
+    expect(halfWidthNear(on, 40, 60)).toBeCloseTo(halfWidthNear(off, 40, 60), 6);
+    // 고속 구간(×1.6): 같은 필압에서 폭이 커진다 — 사용자가 보는 개선 그 자체.
+    expect(halfWidthNear(on, 140, 160)).toBeGreaterThan(halfWidthNear(off, 140, 160) + 1.5);
+  });
+
+  it("다이내믹스 경로도 같은 입력이면 같은 패스 문자열을 만든다(결정성·무시드)", () => {
+    const input = {
+      points: paritySamples.flatMap((sample) => [sample.x, sample.y]),
+      pressures: paritySamples.map((sample) => sample.pressure),
+      strokeWidth: PARITY_SIZE,
+      profile: liveProfile(parityDynamics),
+      dynamics: paritySamples.map((sample) => ({ velocity: sample.velocity })),
+    };
+    const first = buildStudioPerfectFreehandPathData(stroker, input);
+    expect(first.length).toBeGreaterThan(0);
+    expect(buildStudioPerfectFreehandPathData(stroker, input)).toBe(first);
+  });
+
+  it("유효 크기는 0.1px 바닥·곡선 보간·스키마 기본값까지 패키지 의미론을 따른다", () => {
+    const zeroMap: StudioPerfectFreehandSizeDynamicMapping = {
+      input: "constant",
+      curve: [0, 1],
+      min: 0,
+      max: 0,
+    };
+    expect(studioPerfectFreehandEffectiveSizeAt([zeroMap], 12, 0.5)).toBe(0.1);
+    const velocityMap: StudioPerfectFreehandSizeDynamicMapping = {
+      input: "velocity",
+      curve: [0, 1],
+      min: 1,
+      max: 2,
+    };
+    // velocity 2 → min(1, 2/4) = 0.5 → 곡선 0.5 → ×1.5
+    expect(
+      studioPerfectFreehandEffectiveSizeAt([velocityMap], 10, 0.5, { velocity: 2 })
+    ).toBeCloseTo(15, 12);
+    // 결측 샘플은 패키지 스키마 기본값: velocity 0 → ×1
+    expect(studioPerfectFreehandEffectiveSizeAt([velocityMap], 10, 0.5)).toBeCloseTo(10, 12);
+    const tiltMap: StudioPerfectFreehandSizeDynamicMapping = {
+      input: "tiltAltitude",
+      curve: [1, 0.5],
+      min: 0,
+      max: 1,
+    };
+    // 결측 altitude → 90(수직) → 곡선 탭 1 → ×0.5
+    expect(studioPerfectFreehandEffectiveSizeAt([tiltMap], 10, 0.5)).toBeCloseTo(5, 12);
+  });
+
+  it("인코딩 필압은 radius/baseSize 를 [0,1] 로 클램프한다", () => {
+    expect(studioPerfectFreehandEncodeDynamicsPressure(12, 0.775, 0.7, 12)).toBeCloseTo(
+      0.655,
+      12
+    );
+    expect(studioPerfectFreehandEncodeDynamicsPressure(40, 0.775, 1, 12)).toBe(1);
+    expect(studioPerfectFreehandEncodeDynamicsPressure(0.1, 1, 0, 12)).toBe(0);
+  });
+
+  it("카탈로그 프로필은 아직 sizeDynamics 를 선언하지 않는다(계약 스냅샷 v-next 게이트)", () => {
+    // StudioOutlineStrokeProfileSnapshotV1 이 sizeDynamics 를 운반하기 전에는 카탈로그
+    // 선언이 라이브 프리뷰와 커밋/SVG 리플레이를 어긋나게 한다 — 그때까지 이 게이트가
+    // 실수 선언을 막는다. 스냅샷 v-next 가 들어오면 이 테스트를 함께 갱신한다.
+    for (const profile of Object.values(STUDIO_PERFECT_FREEHAND_PROFILES)) {
+      expect(profile.sizeDynamics).toBeUndefined();
+    }
+  });
+});
+
 describe("perfect-outline 레인 계약", () => {
   it("perfect-outline 로 선언된 모든 레인이 canonical 프로필을 실제로 해석한다", async () => {
     const { STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS } = await import("./brush/studio-brush-engine-lane-catalog"
