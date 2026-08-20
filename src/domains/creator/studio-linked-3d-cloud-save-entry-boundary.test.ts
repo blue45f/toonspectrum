@@ -12,8 +12,20 @@ const file = ts.createSourceFile(
   true,
   ts.ScriptKind.TSX,
 );
+// Intentional change (2026-08, B-09): the handleSave orchestration body moved to
+// studio-page-save-pipeline.ts (runStudioPageSavePipeline); the cloud-save entry
+// contracts parse that function while StudioPage keeps the deps-forwarding wrapper.
+const pipelineUrl = new URL("./studio-page-save-pipeline.ts", import.meta.url);
+const pipelineSource = readFileSync(pipelineUrl, "utf8");
+const pipelineFile = ts.createSourceFile(
+  pipelineUrl.pathname,
+  pipelineSource,
+  ts.ScriptTarget.Latest,
+  true,
+  ts.ScriptKind.TS,
+);
 
-function nestedFunction(name: string): string {
+function declaredFunction(sourceFile: ts.SourceFile, name: string): string {
   let match: ts.FunctionDeclaration | null = null;
   function visit(node: ts.Node): void {
     if (ts.isFunctionDeclaration(node) && node.name?.text === name) {
@@ -22,9 +34,15 @@ function nestedFunction(name: string): string {
     }
     ts.forEachChild(node, visit);
   }
-  visit(file);
-  if (!match) throw new Error(`Missing nested function ${name}`);
-  return (match as ts.FunctionDeclaration).getText(file);
+  visit(sourceFile);
+  if (!match) throw new Error(`Missing function ${name}`);
+  return (match as ts.FunctionDeclaration).getText(sourceFile);
+}
+
+function nestedFunction(name: string): string {
+  return name === "handleSave"
+    ? declaredFunction(pipelineFile, "runStudioPageSavePipeline")
+    : declaredFunction(file, name);
 }
 
 describe("Studio linked-3D cloud-save entry boundary", () => {

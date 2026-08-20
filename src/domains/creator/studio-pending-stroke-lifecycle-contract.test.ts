@@ -9,6 +9,12 @@ const studioCanvasViewportSource = readFileSync(
   new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
+// 의도된 변경(2026-08, B-09): handleSave 오케스트레이션이 studio-page-save-pipeline.ts 의
+// runStudioPageSavePipeline 으로 추출되어, 저장 flush/잠금 순서 계약은 그 파일을 직접 읽는다.
+const savePipelineSource = readFileSync(
+  new URL("./studio-page-save-pipeline.ts", import.meta.url),
+  "utf8",
+);
 
 function sourceBetween(start: string, end: string): string {
   const startIndex = studioPageSource.indexOf(start);
@@ -20,9 +26,8 @@ function sourceBetween(start: string, end: string): string {
 
 describe("pending stroke lifecycle source contract", () => {
   it("서버 저장 잠금 전에 대기 획을 flush하고 같은 savePages로 이미지와 서버 doc 투영을 만든다", () => {
-    const handleSave = sourceBetween(
-      "async function handleSave(status:",
-      "// 터치 기기(작은 폰)에서는"
+    const handleSave = savePipelineSource.slice(
+      savePipelineSource.indexOf("export async function runStudioPageSavePipeline(")
     );
     const flushIndex = handleSave.indexOf("flushPendingStrokeCommitsRef.current()");
     const lockIndex = handleSave.indexOf("documentSaveInFlightRef.current = true");

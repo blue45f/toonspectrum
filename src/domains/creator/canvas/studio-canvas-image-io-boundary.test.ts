@@ -105,7 +105,11 @@ describe("Studio canvas image I/O module boundary", () => {
     const page = moduleShape("../StudioPage.tsx");
 
     expect(callCount(page.sourceFile, "loadStudioCanvasImageFile")).toBe(4);
-    expect(callCount(page.sourceFile, "downscaleStudioCanvasDataUrl")).toBe(1);
+    // 의도적 변경(2026-08, B-09): 저장 커버 축소(downscaleStudioCanvasDataUrl)는 handleSave
+    // 오케스트레이션과 함께 studio-page-save-pipeline.ts 로 이동했다 — 호출 수는 1로 보존.
+    const savePipeline = moduleShape("../studio-page-save-pipeline.ts");
+    expect(callCount(page.sourceFile, "downscaleStudioCanvasDataUrl")).toBe(0);
+    expect(callCount(savePipeline.sourceFile, "downscaleStudioCanvasDataUrl")).toBe(1);
     // 의도적 변경(2026-07-24): 필터 마스크 페인팅 툴 배선 — bake/add/invert 3개 액션이 레이어
     // 마스크와 대칭으로 이미지 로드·픽셀 캔버스를 재사용(loadStudioPixelEditImage 17 → 22,
     // createStudioPixelEditCanvas 20 → 23).

@@ -15,6 +15,12 @@ const storageRecoveryRuntime = readFileSync(
   new URL("./studio-storage-recovery-runtime.ts", import.meta.url),
   "utf8",
 );
+// Intentional change (2026-08, B-09): the handleSave orchestration moved to
+// studio-page-save-pipeline.ts, so the durable-tombstone ordering reads it there.
+const savePipeline = readFileSync(
+  new URL("./studio-page-save-pipeline.ts", import.meta.url),
+  "utf8",
+);
 
 function sourceBetween(
   source: string,
@@ -169,10 +175,8 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
       "function clearAutosaveDurableAuthority()",
       "function downloadAutosaveBackup()",
     );
-    const saveHandler = sourceBetween(
-      studioPage,
-      "async function handleSave(",
-      "const activeToolbarGroup:",
+    const saveHandler = savePipeline.slice(
+      savePipeline.indexOf("export async function runStudioPageSavePipeline("),
     );
 
     expect(clear).toContain("if (session) attempted.push(session.clear(savedAt))");

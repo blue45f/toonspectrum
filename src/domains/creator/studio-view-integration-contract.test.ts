@@ -123,15 +123,23 @@ describe("StudioPage view integration contract", () => {
     expect(source).toContain("wrap.scrollLeft = restored.scrollLeft");
     expect(source).toContain("wrap.scrollTop = restored.scrollTop");
 
-    const captureStarts = [
-      ...source.matchAll(/set(?:IsExporting|Saving|TimelapseCapturing)\(true\)/gu),
-    ];
-    expect(captureStarts.length).toBeGreaterThan(0);
-    for (const captureStart of captureStarts) {
-      const index = captureStart.index ?? 0;
-      expect(source.slice(Math.max(0, index - 180), index)).toContain(
-        "preserveStudioViewBeforeCapture()"
-      );
+    // 의도된 변경(2026-08, B-09): handleSave 의 캡처 시작점(setSaving/setIsExporting)이
+    // studio-page-save-pipeline.ts 로 추출돼, view 보존 계약은 두 파일을 함께 스캔한다.
+    const savePipelineSource = readFileSync(
+      new URL("./studio-page-save-pipeline.ts", import.meta.url),
+      "utf8",
+    );
+    for (const captureSource of [source, savePipelineSource]) {
+      const captureStarts = [
+        ...captureSource.matchAll(/set(?:IsExporting|Saving|TimelapseCapturing)\(true\)/gu),
+      ];
+      expect(captureStarts.length).toBeGreaterThan(0);
+      for (const captureStart of captureStarts) {
+        const index = captureStart.index ?? 0;
+        expect(captureSource.slice(Math.max(0, index - 180), index)).toContain(
+          "preserveStudioViewBeforeCapture()"
+        );
+      }
     }
   });
 });

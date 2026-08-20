@@ -101,6 +101,10 @@ describe("StudioPage optional UI registry", () => {
 
   it("defers capture readiness and save projection until user intent", () => {
     const page = moduleEdges("./StudioPage.tsx");
+    // Intentional change (2026-08, B-09): the save orchestration that consumes the
+    // save-payload runtime moved to studio-page-save-pipeline.ts — the lazy-chunk
+    // contract now covers both the page and the extracted pipeline.
+    const savePipeline = moduleEdges("./studio-page-save-pipeline.ts");
     const registry = moduleEdges("./studio-page-lazy-ui.ts");
 
     for (const specifier of USER_TRIGGERED_STUDIO_RUNTIMES) {
@@ -110,6 +114,14 @@ describe("StudioPage optional UI registry", () => {
       expect(page.dynamicImports, `${specifier} must keep one registry-owned loader`).not.toContain(
         specifier
       );
+      expect(
+        savePipeline.valueImports,
+        `${specifier} must leave the save-pipeline static graph`
+      ).not.toContain(specifier);
+      expect(
+        savePipeline.dynamicImports,
+        `${specifier} must keep one registry-owned loader`
+      ).not.toContain(specifier);
       expect(
         registry.dynamicImports.filter((candidate) => candidate === specifier),
         `${specifier} must retain one literal Vite boundary`
@@ -122,9 +134,10 @@ describe("StudioPage optional UI registry", () => {
       /function preloadStudioExportMenuPanel\(\): void \{[\s\S]*?preloadStudioCaptureReadinessRuntime\(\);[\s\S]*?\}/u
     );
     expect(page.source).toContain("await loadStudioCaptureReadinessRuntime()");
-    expect(page.source).toContain("await loadStudioSavePayloadRuntime()");
+    expect(savePipeline.source).toContain("await loadStudioSavePayloadRuntime()");
     expect(page.source).toContain("preloadStudioCaptureReadinessRuntime();");
     expect(page.source).toContain("preloadStudioSavePayloadRuntime();");
+    expect(savePipeline.source).toContain("preloadStudioSavePayloadRuntime();");
   });
 
   it("keeps shared preload promises in the registry instead of recreating them per render", () => {

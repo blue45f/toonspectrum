@@ -13,6 +13,10 @@ export function readStudioCuttoonEditorSource(): string {
   return [
     // Extracted pure helpers come first so source slices that start at an
     // extracted symbol still reach their StudioPage.tsx end boundary.
+    // The save pipeline is intentionally FIRST: save-contract tests slice it
+    // directly, and leading the concat keeps its tokens out of every
+    // cross-file slice that starts in a later extracted file.
+    resolve(baseDir, "../studio-page-save-pipeline.ts"),
     resolve(baseDir, "../canvas/studio-hokusai-gpu-plan-matchers.ts"),
     resolve(baseDir, "../export/studio-interchange-import.ts"),
     resolve(baseDir, "../layer/studio-layer-operations.ts"),

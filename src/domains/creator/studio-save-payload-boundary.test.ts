@@ -33,14 +33,20 @@ describe("studio save payload ownership boundary", () => {
     expect(payload.split("\n").length).toBeLessThanOrEqual(200);
   });
 
-  it("keeps capture, freshness, transport, CRDT, and cleanup ordering in StudioPage", () => {
+  it("keeps capture, freshness, transport, CRDT, and cleanup ordering in the save pipeline", () => {
     const page = source("./StudioPage.tsx");
+    // Intentional change (2026-08, B-09): the handleSave orchestration moved to
+    // studio-page-save-pipeline.ts; StudioPage keeps only the deps-forwarding
+    // wrapper, so the ordering contract reads the extracted pipeline function.
+    const pipeline = source("./studio-page-save-pipeline.ts");
     const lazyRegistry = source("./studio-page-lazy-ui.ts");
-    const saveStart = page.indexOf('async function handleSave(status: "published" | "draft")');
-    const saveEnd = page.indexOf("// 터치 기기(작은 폰)", saveStart);
-    const save = page.slice(saveStart, saveEnd);
+    const saveStart = pipeline.indexOf("export async function runStudioPageSavePipeline(");
+    expect(saveStart).toBeGreaterThanOrEqual(0);
+    const save = pipeline.slice(saveStart);
 
     expect(page).not.toContain('from "./studio-save-payload"');
+    expect(pipeline).not.toContain('from "./studio-save-payload"');
+    expect(page).toContain('await runStudioPageSavePipeline(status, {');
     expect(lazyRegistry.match(/import\("\.\/studio-save-payload"\)/gu)).toHaveLength(1);
     expect(save).toContain("await loadStudioSavePayloadRuntime()");
     expect(save).toContain("validateStudioPublishPreflight(");

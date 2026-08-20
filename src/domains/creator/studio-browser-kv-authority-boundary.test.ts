@@ -389,9 +389,14 @@ const HISTORY_LEGACY_IDB_PROOF =
 
 const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   // Deletion-only cleanup of browser compatibility remnants.
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "studioAutosaveKey({userId:studioAuthUserId,workId,remixId})", 3, CLEANUP_ONLY, CLEANUP_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 3, CLEANUP_ONLY, CLEANUP_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 3, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "studioAutosaveKey({userId:studioAuthUserId,workId,remixId})", 2, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 2, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 2, CLEANUP_ONLY, CLEANUP_PROOF),
+  // Intentional change (2026-08, B-09): the post-save tombstone cleanup moved with
+  // the extracted handleSave orchestration into studio-page-save-pipeline.ts.
+  allow("src/domains/creator/studio-page-save-pipeline.ts", "local-storage-cleanup", "autosaveKey", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/studio-page-save-pipeline.ts", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/studio-page-save-pipeline.ts", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "STUDIO_AI_RECENT_PROMPTS_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/vrm/StudioVrmPoser.tsx", "local-storage-cleanup", '"studio_pose_clipboard"', 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/vrm/StudioVrmPoser.tsx", "local-storage-cleanup", '"studio_vrm_full_clip"', 1, CLEANUP_ONLY, CLEANUP_PROOF),

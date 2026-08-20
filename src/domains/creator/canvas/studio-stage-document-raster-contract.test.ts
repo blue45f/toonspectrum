@@ -619,7 +619,19 @@ describe("every stage raster read goes through a choke point", () => {
   const editorSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 
   it("routes each StudioPage stage read through a document-view restore or a capture render", () => {
-    const lines = editorSource.split("\n");
+    // 의도적 변경(2026-08, B-09): handleSave 의 페이지 캡처 읽기(stage.toDataURL)는
+    // studio-page-save-pipeline.ts 로 추출됐다 — 같은 초크 포인트 규칙을 두 파일에
+    // 적용한다(기존 7 = StudioPage 6 + save pipeline 1).
+    const savePipelineSource = readFileSync(
+      new URL("../studio-page-save-pipeline.ts", import.meta.url),
+      "utf8"
+    );
+    const scannedSources = [
+      { source: editorSource, expectedReads: 6 },
+      { source: savePipelineSource, expectedReads: 1 },
+    ];
+    for (const { source: scannedSource, expectedReads } of scannedSources) {
+    const lines = scannedSource.split("\n");
     const reads: { line: number; text: string }[] = [];
     for (const [index, text] of lines.entries()) {
       if (/\bstage\.(toCanvas|toDataURL|toBlob|toImage)\(/u.test(text) && !text.trimStart().startsWith("//")) {
@@ -628,7 +640,7 @@ describe("every stage raster read goes through a choke point", () => {
     }
     // Fewer reads than expected means a path was removed and this guard needs re-deriving; more
     // means a new one appeared and has to be classified before it can ship.
-    expect(reads).toHaveLength(7);
+    expect(reads).toHaveLength(expectedReads);
 
     /*
      * Each read must sit inside one of the two choke points. `readStageInDocumentView` /
@@ -643,6 +655,7 @@ describe("every stage raster read goes through a choke point", () => {
         chokePoint.test(window),
         `${read.line}: ${read.text} — stage raster read outside a document-view choke point`
       ).toBe(true);
+    }
     }
   });
 
