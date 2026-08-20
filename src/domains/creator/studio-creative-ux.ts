@@ -14,6 +14,7 @@
  * Pure data + presentation helpers; no document state.
  */
 
+import { isStudioBrushQuarantinedPresetId } from "./brush/studio-brush-quarantine";
 import { resolveStudioBrushRuntimeContract } from "./brush/studio-brush-runtime-contract";
 import {
   BRUSH_PRESETS,
@@ -512,7 +513,17 @@ export function listStudioQuickBrushTrayItems({
   recentIds = [],
   limit = STUDIO_QUICK_BRUSH_LIMIT,
 }: StudioQuickBrushTrayOptions = {}): StudioQuickBrushTrayItem[] {
-  const availableItems = catalogItems ?? listStudioBrushTrayItems("all");
+  // Quarantine filtering happens exactly once per lane, at the point that resolves the lane's
+  // inventory. This fallback IS such a point (a bare listing lane), so it filters the SSOT on the
+  // quarantine ledger (leaf import, no cycle). Injected `catalogItems` are used verbatim — the
+  // injecting caller owns its lane's filtering (see `listStudioCoreQuickBrushCatalogItems` and
+  // `listStudioQuickBrushCatalogItems`, which inject already-listed inventories) — so a listed
+  // injection is never double-filtered and lanes cannot drift apart.
+  const availableItems =
+    catalogItems
+    ?? listStudioBrushTrayItems("all").filter(
+      (item) => !isStudioBrushQuarantinedPresetId(item.id)
+    );
   const catalog = new Map(availableItems.map((item) => [item.id, item]));
   const safeLimit = Number.isFinite(limit)
     ? Math.min(catalog.size, Math.max(0, Math.floor(limit)))

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./brush/studio-brush-catalog";
+import {
+  STUDIO_BRUSH_QUARANTINED_PRESET_IDS,
+  isStudioBrushQuarantinedPresetId,
+} from "./brush/studio-brush-quarantine";
 import { BRUSH_PRESETS } from "./studio-brush";
 import {
   listStudioBrushTrayItems,
@@ -122,6 +126,50 @@ describe("studio creative ux", () => {
     ]);
     expect(quick[0]?.name).toBe("하트 도장");
     expect(quick[1]?.name).toBe("머리카락 결");
+  });
+
+  it("keeps quarantined favorites/MRU off the default quick shelf without holes", () => {
+    expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS.length).toBeGreaterThan(0);
+    const quarantinedId = STUDIO_BRUSH_QUARANTINED_PRESET_IDS[0]!;
+
+    const quick = listStudioQuickBrushTrayItems({
+      favoriteIds: [quarantinedId, "pen"],
+      recentIds: [quarantinedId, "marker"],
+      limit: 4,
+    });
+    expect(quick.some((item) => item.id === quarantinedId)).toBe(false);
+    // Skipped, never a hole: listed neighbours keep their slots and the shelf stays full.
+    expect(quick.map(({ id, quickSource }) => [id, quickSource])).toEqual([
+      ["pen", "favorite"],
+      ["marker", "recent"],
+      ["gpen", "starter"],
+      ["watercolor", "starter"],
+    ]);
+  });
+
+  it("filters the default lane exactly once and never re-filters injected catalogues", () => {
+    const quarantinedId = STUDIO_BRUSH_QUARANTINED_PRESET_IDS[0]!;
+
+    // The bare default is the quarantine-filtered SSOT — byte-identical to filtering it by hand,
+    // so the lanes cannot drift apart on what "listed" means.
+    expect(listStudioQuickBrushTrayItems({ favoriteIds: [quarantinedId, "glow"] })).toEqual(
+      listStudioQuickBrushTrayItems({
+        catalogItems: listStudioBrushTrayItems("all").filter(
+          (item) => !isStudioBrushQuarantinedPresetId(item.id)
+        ),
+        favoriteIds: [quarantinedId, "glow"],
+      })
+    );
+
+    // Injected catalogItems are used verbatim: the injecting caller owns its lane's filtering,
+    // proving no second quarantine filter is layered inside.
+    const unfiltered = listStudioQuickBrushTrayItems({
+      catalogItems: listStudioBrushTrayItems("all"),
+      favoriteIds: [quarantinedId],
+      limit: 2,
+    });
+    expect(unfiltered[0]?.id).toBe(quarantinedId);
+    expect(unfiltered[0]?.quickSource).toBe("favorite");
   });
 
   it("exposes drawing-first starter cards without publish marketing", () => {

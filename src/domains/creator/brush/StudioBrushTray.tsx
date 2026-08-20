@@ -17,7 +17,7 @@ import {
   STUDIO_BRUSH_CATALOG_COUNTS,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog-core";
-import { loadStudioFullBrushCatalogItems } from "./studio-brush-catalog-loader";
+import { loadStudioListedBrushCatalogItems } from "./studio-brush-catalog-loader";
 import {
   resolveStudioBrushEngineLaneLabelKo,
   studioBrushEngineLaneRowById,
@@ -204,7 +204,10 @@ export function StudioBrushTray({
   useEffect(() => {
     if (!needsProMetadata) return;
     let live = true;
-    void loadStudioFullBrushCatalogItems()
+    // The tray is a LISTING lane: the listed (quarantine-filtered) inventory keeps a quarantined
+    // favorite/MRU id from re-surfacing as a chip. Current-brush metadata resolution stays on the
+    // unfiltered lane (`loadStudioBrushCatalogItemById` in StudioActiveBrushSummary).
+    void loadStudioListedBrushCatalogItems()
       .then((items) => {
         if (live) setDeferredCatalogItems(items);
       })

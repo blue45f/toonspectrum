@@ -7,6 +7,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_BRUSH_QUARANTINED_PRESET_IDS } from "./studio-brush-quarantine";
 import { StudioBrushTray } from "./StudioBrushTray";
 
 const traySource = readFileSync(
@@ -88,6 +89,46 @@ describe("StudioBrushTray", () => {
       name: "머리카락 결",
       quickSource: "recent",
     });
+  });
+
+  it("keeps quarantined favorites off both the core and deferred listing lanes", async () => {
+    expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS.length).toBeGreaterThan(0);
+    const quarantinedId = STUDIO_BRUSH_QUARANTINED_PRESET_IDS[0]!;
+
+    // Core-only path (no pack ids, no deferred load): the quarantined favorite is skipped,
+    // never a hole — listed neighbours keep their slots.
+    const html = renderToStaticMarkup(
+      <StudioBrushTray
+        activeBrushId="pen"
+        favoriteBrushIds={[quarantinedId, "pen"]}
+        recentBrushIds={[quarantinedId, "marker"]}
+        onSelect={vi.fn()}
+        onOpenLibrary={vi.fn()}
+      />
+    );
+    expect(html).not.toContain(`data-studio-brush-chip="${quarantinedId}"`);
+    expect(html).toContain('data-studio-brush-chip="pen"');
+    expect(html).toContain('data-studio-brush-chip="marker"');
+
+    // Deferred pro path: the tray injects the LISTED (quarantine-filtered) catalogue, so the
+    // quarantined id stays off the shelf after the full catalogue arrives too.
+    render(
+      <StudioBrushTray
+        activeBrushId="pen"
+        favoriteBrushIds={[quarantinedId, "heart-stamp"]}
+        onSelect={vi.fn()}
+        onOpenLibrary={vi.fn()}
+      />
+    );
+    const heart = await screen.findByRole("option", {
+      name: /즐겨찾기 브러시 하트 도장/,
+    });
+    expect(heart.getAttribute("data-studio-brush-chip")).toBe("heart-stamp");
+    expect(
+      document.querySelector(`[data-studio-brush-chip="${quarantinedId}"]`)
+    ).toBeNull();
+    expect(traySource).toContain("loadStudioListedBrushCatalogItems");
+    expect(traySource).not.toContain("loadStudioFullBrushCatalogItems");
   });
 
   it("uses the selected preset's real outer opacity in the quick preview", () => {

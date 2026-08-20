@@ -15,6 +15,7 @@ import {
 } from "../studio-creative-ux";
 
 import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
+import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
 
 import type { StudioToolOperation } from "../studio-brush";
 
@@ -36,6 +37,17 @@ export function listStudioCoreBrushCatalogItems(
     ? STUDIO_CORE_BRUSH_CATALOG_ITEMS
     : STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === operation);
 }
+
+/**
+ * V17.1 quarantine, core LISTING lane: same lifecycle split as the lazy catalogue
+ * (`studio-brush-catalog.ts`). The SSOT array above keeps quarantined ids so
+ * `studioCoreBrushCatalogItemById` and the counts stay resolution-complete; only picker-facing
+ * listings consume this filtered view. Order is SSOT order — filtering never reorders.
+ */
+export const STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter((item) => !isStudioBrushQuarantinedPresetId(item.id)),
+  );
 
 const STUDIO_CORE_ERASE_BRUSH_COUNT = STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter(
   (item) => item.operation === "erase",
@@ -98,6 +110,11 @@ export function listStudioCoreQuickBrushCatalogItems(options: {
 } = {}): StudioQuickBrushTrayItem[] {
   return listStudioQuickBrushTrayItems({
     ...options,
-    catalogItems: options.catalogItems ?? STUDIO_CORE_BRUSH_CATALOG_ITEMS,
+    // The quick shelf is a LISTING lane, so the fresh default is the listed (non-quarantined)
+    // core inventory — a quarantined id persisted in favorites/MRU must not re-surface as a
+    // picker affordance. Because this injection is already filtered, `listStudioQuickBrushTrayItems`
+    // never re-filters it (callers who inject `catalogItems` own their lane's filtering).
+    // Metadata RESOLUTION stays on the unfiltered SSOT via `studioCoreBrushCatalogItemById`.
+    catalogItems: options.catalogItems ?? STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS,
   });
 }
