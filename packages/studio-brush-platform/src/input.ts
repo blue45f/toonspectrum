@@ -10,6 +10,16 @@ import type {
  * Input modeling stage (V11 §10.1): raw/coalesced samples become calibrated
  * ModeledSampleIR. Predicted samples are preview-only by contract — they are
  * dropped here so a committed stroke never contains speculative points.
+ *
+ * Sensor passthrough: modeling is strictly 1:1 (no resampling happens in this
+ * stage), so every modeled sample copies its raw sample's optional sensor
+ * channels (twist, tangential pressure, contact patch, buttons) verbatim and
+ * records provenance (`source`, `sourceSampleIndex` — the index in the
+ * original raw array, so predicted gaps stay visible). Channels absent on the
+ * raw sample stay absent on the modeled sample — no neutral-value injection.
+ * Downstream resamplers that synthesize interpolated samples must carry these
+ * channels from the nearest source sample (angle channels with wraparound
+ * interpolation where an angle-lerp helper exists).
  */
 
 export interface InputModelOptions {
@@ -27,7 +37,7 @@ export function modelRawInput(
   let previous: RawInputSampleIR | null = null;
   let smoothedVelocity = 0;
 
-  for (const sample of samples) {
+  for (const [sourceSampleIndex, sample] of samples.entries()) {
     if (sample.source === "predicted") continue;
     let velocity = 0;
     if (previous !== null) {
@@ -71,6 +81,20 @@ export function modelRawInput(
       velocity: smoothedVelocity,
       altitudeDeg: altitude,
       azimuthDeg: azimuth,
+      source: sample.source,
+      sourceSampleIndex,
+      // Conditional spreads keep absent channels absent (no default injection).
+      ...(sample.twistDeg !== undefined ? { twistDeg: sample.twistDeg } : {}),
+      ...(sample.tangentialPressure !== undefined
+        ? { tangentialPressure: sample.tangentialPressure }
+        : {}),
+      ...(sample.contactWidth !== undefined
+        ? { contactWidth: sample.contactWidth }
+        : {}),
+      ...(sample.contactHeight !== undefined
+        ? { contactHeight: sample.contactHeight }
+        : {}),
+      ...(sample.buttons !== undefined ? { buttons: sample.buttons } : {}),
     });
     previous = sample;
   }

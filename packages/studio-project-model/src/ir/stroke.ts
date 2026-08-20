@@ -16,6 +16,17 @@ export const rawInputSampleIRSchema = z.object({
   tiltXDeg: z.number().min(-90).max(90).default(0),
   tiltYDeg: z.number().min(-90).max(90).default(0),
   twistDeg: z.number().min(0).max(359).default(0),
+  /**
+   * Barrel/finger-wheel pressure (PointerEvent.tangentialPressure), -1..1.
+   * Optional with no default: absent means the driver never reported it, and
+   * downstream stages must not invent a neutral value.
+   */
+  tangentialPressure: z.number().min(-1).max(1).optional(),
+  /** Contact patch size in px (PointerEvent.width/height). Optional, no default. */
+  contactWidth: z.number().nonnegative().optional(),
+  contactHeight: z.number().nonnegative().optional(),
+  /** PointerEvent.buttons bitmask at sample time (barrel = 2, eraser = 32). */
+  buttons: z.number().int().nonnegative().optional(),
   pointerType: z.enum(["pen", "touch", "mouse"]),
   phase: z.enum(["down", "move", "up"]),
   source: z.enum(["raw", "coalesced", "predicted"]),
@@ -46,6 +57,25 @@ export const modeledSampleIRSchema = z.object({
   velocity: z.number().nonnegative(),
   altitudeDeg: z.number().min(0).max(90).default(90),
   azimuthDeg: z.number().min(0).max(360).default(0),
+  /**
+   * Sensor passthrough channels. All optional with NO defaults: a channel is
+   * present iff the source raw sample carried it — modeling must never inject
+   * neutral values for hardware that did not report the channel.
+   */
+  twistDeg: z.number().min(0).max(359).optional(),
+  tangentialPressure: z.number().min(-1).max(1).optional(),
+  contactWidth: z.number().nonnegative().optional(),
+  contactHeight: z.number().nonnegative().optional(),
+  buttons: z.number().int().nonnegative().optional(),
+  /**
+   * Provenance of the source raw sample. Deliberately narrower than
+   * RawInputSampleIR["source"]: predicted samples are preview-only by contract
+   * and never enter the modeled stream, so a "predicted" tag here is rejected
+   * at parse time instead of being silently accepted.
+   */
+  source: z.enum(["raw", "coalesced"]).optional(),
+  /** Index into the raw sample array this modeled sample was derived from. */
+  sourceSampleIndex: z.number().int().nonnegative().optional(),
 });
 export type ModeledSampleIR = z.infer<typeof modeledSampleIRSchema>;
 
