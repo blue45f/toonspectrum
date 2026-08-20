@@ -1,11 +1,15 @@
 import {
   declareTrustedBootstrapProvider,
   EngineCapabilityRegistry,
+  estimateProviderCost,
   HybridExecutionPlanner,
   planWithCostShadow,
   providerDescriptorSchema,
+  quantizePow2Bucket,
   type CostShadowFingerprint,
   type CostShadowPlanRequest,
+  type IslandCostShadowReceipt,
+  type ProviderRuntime,
   type SurfaceCostShadowReceipt,
   type SurfacePlan,
 } from "@toonspectrum/studio-engine-registry";
@@ -50,7 +54,40 @@ import {
  * Fail closed: a missing or malformed probe records an absent fingerprint and
  * ranks nothing; a cost-shadow failure falls back to the legacy planner; the
  * legacy winner keeps sole routing authority either way.
+ *
+ * P-02c (full-ladder observation): the authority query is capability-narrowed
+ * to the single lane the admission ladder already chose, so its cost receipt
+ * ranks a singleton and disagreement evidence is structurally zero. A SECOND,
+ * observation-only query therefore re-ranks the cost model over the FULL
+ * admitted ladder ("stroke.route.any", filtered to the admitted lanes) and
+ * feeds only the receipt — never the returned plan. It runs at most once per
+ * coarse fingerprint bucket (admitted-lane signature × quantized workload
+ * class) so the 8192-state parity loop and the pointerdown hot path stay
+ * fast, and absent fingerprints skip it entirely.
  */
+
+/**
+ * Truthful runtime substrate per lane, mirrored from each lane's backing
+ * implementation in BACKEND_DERIVATIONS (render/studio-engine-provider-bridge)
+ * — the same policy render/studio-filter-plan-shadow.ts applies to its shadow
+ * descriptors. Every authority query in this module is a capability-narrowed
+ * singleton, so the runtime can never change the planner product (the
+ * 8192-state parity suite proves it); it exists so the cost shadow's lane
+ * classes are real. With the previous all-"js" placeholders every candidate
+ * cost identically and full-ladder disagreement was structurally impossible.
+ */
+const STROKE_LANE_RUNTIME: Readonly<
+  Record<StudioStrokeSurfaceRouteKind, ProviderRuntime>
+> = Object.freeze({
+  "living-ink": "webgpu", // webgpu-live-causal-ink
+  hokusai: "wasm-worker", // hokusai-myb-worker
+  stamp: "js", // canvas2d-stamp-pattern
+  gpu: "webgpu", // canonical-webgpu-* stroke surface
+  "live-ink": "js", // canvas2d-causal-ink live overlay
+  "wet-fallback": "js", // canvas2d-wet-field / wet-ribbon
+  dynamic: "js", // canvas2d-dynamic-coverage
+  konva: "js", // Konva canvas2d surface
+});
 
 /** Route lanes as V11 providers, ladder order = registration order. */
 function buildShadowRegistry(): EngineCapabilityRegistry {
@@ -65,7 +102,7 @@ function buildShadowRegistry(): EngineCapabilityRegistry {
       license: "internal",
       attribution: "",
       maturity: "production-baseline",
-      runtime: "js",
+      runtime: STROKE_LANE_RUNTIME[kind],
       capabilities: [`stroke.route.${kind}`, "stroke.route.any"],
       limitations: [],
       previewQuality: "production",
@@ -216,6 +253,20 @@ export interface StudioSurfaceCostShadowReceipt {
   readonly shadowFailures: number;
   readonly lastReceipt: SurfaceCostShadowReceipt | null;
   readonly lastDisagreement: SurfaceCostShadowReceipt | null;
+  /**
+   * P-02c full-ladder observation (second query, receipt-only): the cost
+   * model re-ranked over every admitted lane — the multi-candidate ladder the
+   * narrowed authority query collapses to a singleton. Ran at most once per
+   * coarse fingerprint bucket; `fullLadderQueries === fullLadderAgreed +
+   * fullLadderDisagreed`. Never feeds the returned plan.
+   */
+  readonly fullLadderQueries: number;
+  /** Full-ladder rankings whose cheapest lane matched the authority winner. */
+  readonly fullLadderAgreed: number;
+  /** Full-ladder rankings with strictly cheaper evidence for another lane. */
+  readonly fullLadderDisagreed: number;
+  readonly lastFullLadderReceipt: IslandCostShadowReceipt | null;
+  readonly lastFullLadderDisagreement: IslandCostShadowReceipt | null;
 }
 
 interface MutableCostShadowCounters {
@@ -226,6 +277,11 @@ interface MutableCostShadowCounters {
   shadowFailures: number;
   lastReceipt: SurfaceCostShadowReceipt | null;
   lastDisagreement: SurfaceCostShadowReceipt | null;
+  fullLadderQueries: number;
+  fullLadderAgreed: number;
+  fullLadderDisagreed: number;
+  lastFullLadderReceipt: IslandCostShadowReceipt | null;
+  lastFullLadderDisagreement: IslandCostShadowReceipt | null;
 }
 
 function emptyCostShadowCounters(): MutableCostShadowCounters {
@@ -237,10 +293,23 @@ function emptyCostShadowCounters(): MutableCostShadowCounters {
     shadowFailures: 0,
     lastReceipt: null,
     lastDisagreement: null,
+    fullLadderQueries: 0,
+    fullLadderAgreed: 0,
+    fullLadderDisagreed: 0,
+    lastFullLadderReceipt: null,
+    lastFullLadderDisagreement: null,
   };
 }
 
 let costShadowCounters = emptyCostShadowCounters();
+
+/**
+ * Coarse-bucket memo for the full-ladder observation: one entry per
+ * admitted-lane signature × power-of-two workload class. Bounded by the 128
+ * possible admitted-lane sets times a handful of size classes, so it can
+ * never grow with plan volume.
+ */
+const fullLadderSeenBuckets = new Set<string>();
 
 export function readStudioSurfaceCostShadowReceipt(): StudioSurfaceCostShadowReceipt {
   return Object.freeze({ ...costShadowCounters });
@@ -249,6 +318,7 @@ export function readStudioSurfaceCostShadowReceipt(): StudioSurfaceCostShadowRec
 /** Test seam — each suite starts from a clean slate. */
 export function resetStudioSurfaceCostShadowReceipt(): void {
   costShadowCounters = emptyCostShadowCounters();
+  fullLadderSeenBuckets.clear();
 }
 
 function recordSurfaceCostShadowReceipt(receipt: SurfaceCostShadowReceipt): void {
@@ -260,6 +330,77 @@ function recordSurfaceCostShadowReceipt(receipt: SurfaceCostShadowReceipt): void
   else {
     costShadowCounters.disagreed += 1;
     costShadowCounters.lastDisagreement = receipt;
+  }
+}
+
+/**
+ * P-02c: coarse memo key for the full-ladder observation. The admitted-lane
+ * signature pins the ladder (and thereby the authority winner); the quantized
+ * segment/dpr classes pool nearby workloads exactly like the tournament's
+ * scene-fingerprint buckets, so a stroke in progress re-ranks once, not per
+ * pointer sample.
+ */
+function strokeFullLadderBucket(
+  lanes: readonly StudioStrokeSurfaceRouteKind[],
+  fingerprint: CostShadowFingerprint,
+): string {
+  return `${lanes.join(">")}|seg${quantizePow2Bucket(fingerprint.segmentCount)}|dpr${quantizePow2Bucket(fingerprint.dpr)}`;
+}
+
+/**
+ * P-02c second query — observation only. Re-ranks the cost model over the
+ * FULL admitted ladder (the "stroke.route.any" candidates restricted to the
+ * lanes the admission snapshot admitted) against the authority winner, and
+ * records the outcome into the receipt counters. Nothing here can reach the
+ * returned plan: the function has no return value and no caller reads its
+ * effects on the planning path. Ranking only admitted lanes keeps the
+ * evidence honest — a cheaper but inadmissible lane must never look like a
+ * disagreement (fail closed, quality never traded for cost).
+ */
+function observeStrokeFullLadderCosts(
+  lanes: readonly StudioStrokeSurfaceRouteKind[],
+  legacyWinner: string,
+  fingerprint: CostShadowFingerprint | undefined,
+): void {
+  if (fingerprint === undefined) return;
+  const bucket = strokeFullLadderBucket(lanes, fingerprint);
+  if (fullLadderSeenBuckets.has(bucket)) return;
+  fullLadderSeenBuckets.add(bucket);
+  const admittedIds = new Set(lanes.map((kind) => `stroke-route-${kind}`));
+  const candidates = shadowRegistry
+    .query("raster-brush", ["stroke.route.any"])
+    .filter((candidate) => admittedIds.has(candidate.descriptor.id));
+  // A singleton ladder cannot disagree by construction — recording it would
+  // pad the agreement count with structural zeros, which is exactly the
+  // evidence defect this second query exists to fix.
+  if (candidates.length < 2) return;
+  const costs = candidates
+    .map((candidate) => estimateProviderCost(candidate.descriptor, fingerprint))
+    .sort((a, b) =>
+      a.total !== b.total ? a.total - b.total : a.providerId < b.providerId ? -1 : 1,
+    );
+  const cheapest = costs[0];
+  if (cheapest === undefined) return;
+  // Exact-total ties defer to the authority winner: disagreement requires
+  // strictly cheaper evidence — same rule as planWithCostShadow.
+  const legacyTiesCheapest = costs.some(
+    (cost) => cost.total === cheapest.total && cost.providerId === legacyWinner,
+  );
+  const costWinner = legacyTiesCheapest ? legacyWinner : cheapest.providerId;
+  const observation: IslandCostShadowReceipt = {
+    islandId: "live-stroke",
+    legacyWinner,
+    costWinner,
+    agreed: costWinner === legacyWinner,
+    fingerprint,
+    costs,
+  };
+  costShadowCounters.fullLadderQueries += 1;
+  costShadowCounters.lastFullLadderReceipt = observation;
+  if (observation.agreed) costShadowCounters.fullLadderAgreed += 1;
+  else {
+    costShadowCounters.fullLadderDisagreed += 1;
+    costShadowCounters.lastFullLadderDisagreement = observation;
   }
 }
 
@@ -317,6 +458,9 @@ export function planStudioStrokeSurfaceShadow(
     ],
   });
   const plannedProviderId = plan.islands[0]?.providerId ?? "stroke-route-konva";
+  // P-02c: second, observation-only query over the full admitted ladder.
+  // Feeds only the receipt counters; the plan above is already final.
+  observeStrokeFullLadderCosts(lanes, plannedProviderId, fingerprint);
   const plannedKind = plannedProviderId.replace(
     "stroke-route-",
     "",

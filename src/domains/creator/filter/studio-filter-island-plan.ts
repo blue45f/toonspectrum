@@ -1,12 +1,14 @@
 import {
   declareTrustedBootstrapProvider,
   EngineCapabilityRegistry,
+  estimateProviderCost,
   HybridExecutionPlanner,
   planWithCostShadow,
   providerDescriptorSchema,
   quantizePow2Bucket,
   type CostShadowFingerprint,
   type CostShadowPlanRequest,
+  type IslandCostShadowReceipt,
   type SurfaceCostShadowReceipt,
   type SurfacePlan,
 } from "@toonspectrum/studio-engine-registry";
@@ -68,6 +70,16 @@ import {
  * legacy winner keeps sole routing authority either way. Assembly is O(1)
  * arithmetic on fields already in hand — no scene walk, no GPU work, no
  * readbacks.
+ *
+ * P-02c (full-ladder observation): the authority query is capability-narrowed
+ * to the head lane, so its cost receipt ranks a singleton and disagreement
+ * evidence is structurally zero. A SECOND, observation-only query therefore
+ * re-ranks the cost model over the FULL admitted ladder (the
+ * "filter.phase.final" candidates restricted to the planner's fallback
+ * chain) and feeds only the receipt — never the returned plan or lanes. It
+ * runs at most once per island bucket (studioFilterIslandBucket) so the
+ * dialog-open hot path pays one Set lookup after the first plan, and absent
+ * workloads skip it entirely.
  */
 
 export type { StudioFilterLane } from "./studio-filter-lane-cost-model";
@@ -343,6 +355,20 @@ export interface StudioFilterIslandCostShadowReceipt {
   readonly shadowFailures: number;
   readonly lastReceipt: SurfaceCostShadowReceipt | null;
   readonly lastDisagreement: SurfaceCostShadowReceipt | null;
+  /**
+   * P-02c full-ladder observation (second query, receipt-only): the cost
+   * model re-ranked over every admitted lane — the multi-candidate ladder the
+   * narrowed authority query collapses to a singleton. Ran at most once per
+   * island bucket; `fullLadderQueries === fullLadderAgreed +
+   * fullLadderDisagreed`. Never feeds the returned plan or lanes.
+   */
+  readonly fullLadderQueries: number;
+  /** Full-ladder rankings whose cheapest lane matched the authority winner. */
+  readonly fullLadderAgreed: number;
+  /** Full-ladder rankings with strictly cheaper evidence for another lane. */
+  readonly fullLadderDisagreed: number;
+  readonly lastFullLadderReceipt: IslandCostShadowReceipt | null;
+  readonly lastFullLadderDisagreement: IslandCostShadowReceipt | null;
 }
 
 interface MutableCostShadowCounters {
@@ -353,6 +379,11 @@ interface MutableCostShadowCounters {
   shadowFailures: number;
   lastReceipt: SurfaceCostShadowReceipt | null;
   lastDisagreement: SurfaceCostShadowReceipt | null;
+  fullLadderQueries: number;
+  fullLadderAgreed: number;
+  fullLadderDisagreed: number;
+  lastFullLadderReceipt: IslandCostShadowReceipt | null;
+  lastFullLadderDisagreement: IslandCostShadowReceipt | null;
 }
 
 function emptyCostShadowCounters(): MutableCostShadowCounters {
@@ -364,10 +395,22 @@ function emptyCostShadowCounters(): MutableCostShadowCounters {
     shadowFailures: 0,
     lastReceipt: null,
     lastDisagreement: null,
+    fullLadderQueries: 0,
+    fullLadderAgreed: 0,
+    fullLadderDisagreed: 0,
+    lastFullLadderReceipt: null,
+    lastFullLadderDisagreement: null,
   };
 }
 
 let costShadowCounters = emptyCostShadowCounters();
+
+/**
+ * Coarse-bucket memo for the full-ladder observation, keyed by
+ * studioFilterIslandBucket — eligibility class × quantized size/chain class,
+ * so its cardinality is a handful of pow-2 classes, never plan volume.
+ */
+const fullLadderSeenBuckets = new Set<string>();
 
 export function readStudioFilterIslandCostShadowReceipt(): StudioFilterIslandCostShadowReceipt {
   return Object.freeze({ ...costShadowCounters });
@@ -376,6 +419,7 @@ export function readStudioFilterIslandCostShadowReceipt(): StudioFilterIslandCos
 /** Test seam — each suite starts from a clean slate. */
 export function resetStudioFilterIslandCostShadowReceipt(): void {
   costShadowCounters = emptyCostShadowCounters();
+  fullLadderSeenBuckets.clear();
 }
 
 function recordFilterIslandCostShadowReceipt(receipt: SurfaceCostShadowReceipt): void {
@@ -387,6 +431,66 @@ function recordFilterIslandCostShadowReceipt(receipt: SurfaceCostShadowReceipt):
   else {
     costShadowCounters.disagreed += 1;
     costShadowCounters.lastDisagreement = receipt;
+  }
+}
+
+/**
+ * P-02c second query — observation only. Re-ranks the cost model over the
+ * FULL admitted ladder (the "filter.phase.final" candidates restricted to
+ * the authority plan's fallback chain) against the authority winner, and
+ * records the outcome into the receipt counters. Nothing here can reach the
+ * returned plan or lane ladder: the function has no return value and no
+ * caller reads its effects on the planning path. Ranking only admitted lanes
+ * keeps the evidence honest — the GPU chain outside its eligibility gate
+ * must never look like a cheaper alternative (fail closed, quality never
+ * traded for cost).
+ */
+function observeFilterFullLadderCosts(
+  bucket: string,
+  admittedLanes: readonly StudioFilterLane[],
+  legacyWinner: string,
+  fingerprint: CostShadowFingerprint | undefined,
+): void {
+  if (fingerprint === undefined) return;
+  if (fullLadderSeenBuckets.has(bucket)) return;
+  fullLadderSeenBuckets.add(bucket);
+  const admittedIds = new Set(
+    admittedLanes.map((lane) => `${LANE_PROVIDER_PREFIX}${lane}`),
+  );
+  const candidates = filterRegistry
+    .query("filter", ["filter.phase.final"])
+    .filter((candidate) => admittedIds.has(candidate.descriptor.id));
+  // A singleton ladder cannot disagree by construction — recording it would
+  // pad the agreement count with structural zeros, which is exactly the
+  // evidence defect this second query exists to fix.
+  if (candidates.length < 2) return;
+  const costs = candidates
+    .map((candidate) => estimateProviderCost(candidate.descriptor, fingerprint))
+    .sort((a, b) =>
+      a.total !== b.total ? a.total - b.total : a.providerId < b.providerId ? -1 : 1,
+    );
+  const cheapest = costs[0];
+  if (cheapest === undefined) return;
+  // Exact-total ties defer to the authority winner: disagreement requires
+  // strictly cheaper evidence — same rule as planWithCostShadow.
+  const legacyTiesCheapest = costs.some(
+    (cost) => cost.total === cheapest.total && cost.providerId === legacyWinner,
+  );
+  const costWinner = legacyTiesCheapest ? legacyWinner : cheapest.providerId;
+  const observation: IslandCostShadowReceipt = {
+    islandId: "image-filter-chain",
+    legacyWinner,
+    costWinner,
+    agreed: costWinner === legacyWinner,
+    fingerprint,
+    costs,
+  };
+  costShadowCounters.fullLadderQueries += 1;
+  costShadowCounters.lastFullLadderReceipt = observation;
+  if (observation.agreed) costShadowCounters.fullLadderAgreed += 1;
+  else {
+    costShadowCounters.fullLadderDisagreed += 1;
+    costShadowCounters.lastFullLadderDisagreement = observation;
   }
 }
 
@@ -482,6 +586,16 @@ export function planStudioFilterIslandLanes(
   // the idle bootstrap scheduled at the end of this function.
   const runtime = peekStudioTournamentRuntime();
   const bucket = studioFilterIslandBucket(input);
+
+  // P-02c: second, observation-only query over the full admitted ladder.
+  // Feeds only the receipt counters; the plan and lanes below are computed
+  // exactly as if this call did not exist.
+  observeFilterFullLadderCosts(
+    bucket,
+    plannedLanes,
+    plan.islands[0]?.providerId ?? `${LANE_PROVIDER_PREFIX}konva-native`,
+    fingerprint,
+  );
 
   // Cost tier (seed, upgraded per lane by this device's measured samples).
   // Only runs when there is a GPU lane in the ladder and a known workload:

@@ -646,3 +646,111 @@ describe("V13 §2.5 cost shadow receipts (filter island)", () => {
     expect(receipt.shadowFailures).toBe(0);
   });
 });
+
+/**
+ * P-02c: the authority query narrows to the head lane, so its cost receipt
+ * ranks a singleton and can never disagree. The second, observation-only
+ * query re-ranks the full admitted ladder (never the ineligible GPU chain)
+ * and feeds only the receipt — these cases pin the multi-candidate ranking,
+ * the strictly-cheaper tie rule, the coarse-bucket memo, and that the plan
+ * and lane ladder stay byte-identical.
+ */
+describe("P-02c full-ladder cost observation (filter island)", () => {
+  beforeEach(() => {
+    resetStudioFilterIslandCostShadowReceipt();
+  });
+
+  afterEach(() => {
+    installStudioTournamentRuntime(null);
+  });
+
+  it("ranks the full three-lane ladder the singleton authority query collapses", () => {
+    planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+      workload: { width: 2048, height: 2048, chainSteps: 3 },
+    });
+    const receipt = readStudioFilterIslandCostShadowReceipt();
+    // The narrowed authority receipt ranked a singleton…
+    expect(receipt.total).toBe(1);
+    expect(receipt.lastReceipt?.islands[0]?.costs.length).toBe(1);
+    // …while the observation ranked the real multi-candidate ladder.
+    expect(receipt.fullLadderQueries).toBe(1);
+    expect(receipt.fullLadderAgreed + receipt.fullLadderDisagreed).toBe(1);
+    const observation = receipt.lastFullLadderReceipt;
+    expect(observation?.islandId).toBe("image-filter-chain");
+    expect(observation?.legacyWinner).toBe("filter-lane-gpu-chain");
+    expect(observation?.costs).toHaveLength(3);
+    expect(observation?.costWinner).not.toBeNull();
+    // At 2048²×3 the shared cost model also puts the GPU chain first, so the
+    // full-ladder verdict is a genuine (not structural) agreement.
+    expect(observation?.costs[0]?.providerId).toBe("filter-lane-gpu-chain");
+    expect(observation?.costs[0]?.lane).toBe("webgpu");
+    expect(observation?.agreed).toBe(true);
+  });
+
+  it("never ranks the ineligible GPU chain, and exact ties defer to the authority winner", () => {
+    planStudioFilterIslandLanes({
+      gpuChainEligible: false,
+      workload: { width: 512, height: 512, chainSteps: 2 },
+    });
+    const observation = readStudioFilterIslandCostShadowReceipt().lastFullLadderReceipt;
+    // Two CPU lanes only — a cheaper-looking but inadmissible GPU chain must
+    // never appear as evidence (fail closed).
+    expect(observation?.costs).toHaveLength(2);
+    expect(
+      observation?.costs.every((cost) => cost.providerId !== "filter-lane-gpu-chain"),
+    ).toBe(true);
+    // The two CPU lanes cost identically; the id-sorted cheapest is
+    // konva-native, but a tie is not strictly cheaper evidence, so the
+    // authority winner stands and the observation agrees.
+    expect(observation?.costs[0]?.providerId).toBe("filter-lane-konva-native");
+    expect(observation?.legacyWinner).toBe("filter-lane-worker");
+    expect(observation?.costWinner).toBe("filter-lane-worker");
+    expect(observation?.agreed).toBe(true);
+  });
+
+  it("memoizes by island bucket and skips absent workloads entirely", () => {
+    const input = {
+      gpuChainEligible: true,
+      workload: { width: 512, height: 512, chainSteps: 2 },
+    } as const;
+    for (let i = 0; i < 5; i += 1) {
+      planStudioFilterIslandLanes(input);
+    }
+    expect(readStudioFilterIslandCostShadowReceipt().fullLadderQueries).toBe(1);
+    // A different power-of-two size class is a different bucket.
+    planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+      workload: { width: 4096, height: 4096, chainSteps: 2 },
+    });
+    expect(readStudioFilterIslandCostShadowReceipt().fullLadderQueries).toBe(2);
+    // Workload-less and degenerate calls never reach the second query.
+    planStudioFilterIslandLanes({ gpuChainEligible: true });
+    planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+      workload: { pixelCount: 0, chainSteps: 2 },
+    });
+    const receipt = readStudioFilterIslandCostShadowReceipt();
+    expect(receipt.fullLadderQueries).toBe(2);
+    expect(receipt.fullLadderAgreed + receipt.fullLadderDisagreed).toBe(2);
+  });
+
+  it("plan and lane ladder are byte-identical with and without the second query", () => {
+    installStudioTournamentRuntime(
+      createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-test" }),
+    );
+    const input = {
+      gpuChainEligible: true,
+      workload: { width: 4096, height: 4096, chainSteps: 6 },
+    } as const;
+    // First call: the full-ladder query runs. Second call: the memo skips it.
+    const first = planStudioFilterIslandLanes(input);
+    const second = planStudioFilterIslandLanes(input);
+    expect(readStudioFilterIslandCostShadowReceipt().fullLadderQueries).toBe(1);
+    expect(JSON.stringify(second.plan)).toBe(JSON.stringify(first.plan));
+    expect(second.lanes).toEqual(first.lanes);
+    // …and the ladder is exactly the pre-P-02c product for this workload.
+    expect(first.lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
+    expect(first.killIgnoredReason).toBeNull();
+  });
+});
