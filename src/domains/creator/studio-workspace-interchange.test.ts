@@ -12,6 +12,7 @@ import {
   type StudioWorkspaceInterchangeTargetState,
   type StudioWorkspaceInterchangeWorkspace,
 } from "./studio-workspace-interchange";
+import { DEFAULT_STUDIO_COMMAND_BAR } from "./studio-workspaces";
 
 function presentation(
   variant: "current" | "imported" = "current",
@@ -78,7 +79,21 @@ function presentation(
       displayMode: imported ? "list" : "tiles",
       density: imported ? "compact" : "comfortable",
     },
+    commandBar: {
+      version: 1,
+      visible: !imported,
+      slots: imported
+        ? ["export-open", "download", "bubbles", "publish", null, "redo", "undo", "save"]
+        : ["undo", "redo", "save", "publish", "zoom-fit", null, "bubbles", null],
+    },
   };
+}
+
+function legacyPresentation(
+  variant: "current" | "imported" = "imported",
+): StudioWorkspaceInterchangePresentation {
+  const { commandBar: _commandBar, ...rest } = presentation(variant);
+  return rest;
 }
 
 function workspace(
@@ -152,6 +167,7 @@ describe("Studio workspace interchange codec", () => {
         includeDrawingPalettes: false,
         includeQuickActions: false,
         includeQuickAccess: false,
+        includeCommandBar: false,
       },
     );
 
@@ -163,6 +179,7 @@ describe("Studio workspace interchange codec", () => {
     expect(exported.text).not.toContain("drawingPalettes");
     expect(exported.text).not.toContain("quickActions");
     expect(exported.text).not.toContain("quickAccess");
+    expect(exported.text).not.toContain("commandBar");
   });
 
   it("rejects duplicate IDs, duplicate normalized names, and more than 24 user workspaces", () => {
@@ -362,6 +379,7 @@ describe("Studio workspace import scopes and conflicts", () => {
       current.livePresentation.quickActions,
     );
     expect(restored.quickAccess).toEqual(current.livePresentation.quickAccess);
+    expect(restored.commandBar).toEqual(current.livePresentation.commandBar);
   });
 
   it("groups radial quick actions and Quick Access under the quickAccess restore scope", () => {
@@ -386,6 +404,7 @@ describe("Studio workspace import scopes and conflicts", () => {
     );
     expect(restored.quickActions).toEqual(imported.presentation.quickActions);
     expect(restored.quickAccess).toEqual(imported.presentation.quickAccess);
+    expect(restored.commandBar).toEqual(imported.presentation.commandBar);
   });
 
   it("preserves the replacement snapshot, not the live layout, for unselected scopes", () => {
@@ -427,6 +446,9 @@ describe("Studio workspace import scopes and conflicts", () => {
     );
     expect(snapshot?.quickAccess).toEqual(
       replacement.presentation.quickAccess,
+    );
+    expect(snapshot?.commandBar).toEqual(
+      replacement.presentation.commandBar,
     );
     expect(result.plan.nextState.livePresentation).toEqual(
       presentation("current"),
@@ -709,5 +731,200 @@ describe("Studio workspace interchange hostile input boundary", () => {
       expect(exported.ok, unknownKey).toBe(false);
     }
     expect(({} as { polluted?: boolean }).polluted).toBeUndefined();
+  });
+});
+
+describe("Studio workspace interchange command bar", () => {
+  function documentTextWithCommandBar(commandBar: unknown): string {
+    return JSON.stringify({
+      kind: STUDIO_WORKSPACE_INTERCHANGE_KIND,
+      version: STUDIO_WORKSPACE_INTERCHANGE_VERSION,
+      workspaces: [{
+        id: "portable-bar",
+        name: "커맨드 바",
+        presentation: { ...legacyPresentation(), commandBar },
+      }],
+    });
+  }
+
+  it("round-trips command-bar slots and visibility through export, decode, and apply", () => {
+    const text = encoded([workspace("portable-bar", "커맨드 바 이동")]);
+    expect(text).toContain('"commandBar"');
+
+    const decoded = decodeStudioWorkspaceInterchange(text);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.document.workspaces[0]?.presentation.commandBar).toEqual(
+      presentation("imported").commandBar,
+    );
+
+    const result = planStudioWorkspaceInterchangeImport(
+      currentState(),
+      text,
+      { action: "add-and-apply", createConflictId: () => "unused-id" },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.nextState.livePresentation.commandBar).toEqual(
+      presentation("imported").commandBar,
+    );
+    expectDeepFrozen(result.plan.nextState.livePresentation.commandBar);
+  });
+
+  it("imports legacy files without the commandBar key exactly as today", () => {
+    const text = encoded([
+      workspace("legacy-portable", "레거시 파일", legacyPresentation()),
+    ]);
+    expect(text).not.toContain("commandBar");
+
+    const decoded = decodeStudioWorkspaceInterchange(text);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(
+      "commandBar" in (decoded.document.workspaces[0]?.presentation ?? {}),
+    ).toBe(false);
+
+    // A current state with a customized bar keeps it: legacy files never overwrite it.
+    const applied = planStudioWorkspaceInterchangeImport(
+      currentState(),
+      text,
+      { action: "add-and-apply", createConflictId: () => "unused-id" },
+    );
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    expect(applied.plan.nextState.livePresentation.commandBar).toEqual(
+      presentation("current").commandBar,
+    );
+
+    // A fully legacy pipeline stays legacy: no commandBar key materializes anywhere.
+    const legacyState: StudioWorkspaceInterchangeTargetState = {
+      activeWorkspaceId: "storyboard",
+      livePresentation: legacyPresentation("current"),
+      workspaces: [],
+    };
+    const legacyResult = planStudioWorkspaceInterchangeImport(
+      legacyState,
+      text,
+      { action: "add-and-apply", createConflictId: () => "unused-id" },
+    );
+    expect(legacyResult.ok).toBe(true);
+    if (!legacyResult.ok) return;
+    expect(
+      "commandBar" in legacyResult.plan.nextState.livePresentation,
+    ).toBe(false);
+    expect(
+      "commandBar" in (legacyResult.plan.nextState.workspaces[0]?.presentation ?? {}),
+    ).toBe(false);
+  });
+
+  it("drops every malformed commandBar to the default bar without failing the file", () => {
+    const malformedVariants: readonly unknown[] = [
+      "visible",
+      42,
+      [],
+      {},
+      { version: 2, visible: false, slots: presentation("imported").commandBar?.slots },
+      { version: 1, visible: false, slots: "all" },
+      { version: 1, visible: false, slots: Array.from({ length: 9 }, () => null) },
+      { ...presentation("imported").commandBar, unknownField: true },
+    ];
+    for (const commandBar of malformedVariants) {
+      const decoded = decodeStudioWorkspaceInterchange(
+        documentTextWithCommandBar(commandBar),
+      );
+      expect(decoded.ok, JSON.stringify(commandBar)).toBe(true);
+      if (!decoded.ok) continue;
+      expect(decoded.document.workspaces[0]?.presentation.commandBar).toEqual(
+        DEFAULT_STUDIO_COMMAND_BAR,
+      );
+    }
+  });
+
+  it("recovers slot by slot so one corrupt slot never discards the customization", () => {
+    const decoded = decodeStudioWorkspaceInterchange(
+      documentTextWithCommandBar({
+        version: 1,
+        visible: false,
+        slots: ["publish", "not-a-command"],
+      }),
+    );
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.document.workspaces[0]?.presentation.commandBar).toEqual({
+      version: 1,
+      visible: false,
+      slots: ["publish", "redo", "save", "export-open", "zoom-fit", null, null, null],
+    });
+  });
+
+  it("never invokes commandBar accessors and normalizes hostile shapes on export", () => {
+    const getter = vi.fn(() => presentation("imported").commandBar?.slots);
+    const hostileBar: Record<string, unknown> = { version: 1, visible: true };
+    Object.defineProperty(hostileBar, "slots", {
+      enumerable: true,
+      get: getter,
+    });
+    const decoded = decodeStudioWorkspaceInterchange({
+      kind: STUDIO_WORKSPACE_INTERCHANGE_KIND,
+      version: STUDIO_WORKSPACE_INTERCHANGE_VERSION,
+      workspaces: [{
+        id: "portable-bar",
+        name: "커맨드 바",
+        presentation: { ...legacyPresentation(), commandBar: hostileBar },
+      }],
+    });
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.document.workspaces[0]?.presentation.commandBar).toEqual(
+      DEFAULT_STUDIO_COMMAND_BAR,
+    );
+    expect(getter).not.toHaveBeenCalled();
+
+    const exported = encodeStudioWorkspaceInterchange([
+      workspace("normalized-bar", "정규화된 바", {
+        ...legacyPresentation(),
+        commandBar: {
+          version: 99,
+        } as unknown as StudioWorkspaceInterchangePresentation["commandBar"],
+      }),
+    ]);
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    expect(exported.document.workspaces[0]?.presentation.commandBar).toEqual(
+      DEFAULT_STUDIO_COMMAND_BAR,
+    );
+  });
+
+  it("hard-fails on sensitive keys inside commandBar and never serializes the secret", () => {
+    const secret = "sk-command-bar-never-crosses";
+    const decoded = decodeStudioWorkspaceInterchange(
+      documentTextWithCommandBar({ apiKey: { value: secret } }),
+    );
+    expect(decoded).toEqual({ ok: false, reason: "sensitive-field" });
+    expect(JSON.stringify(decoded)).not.toContain(secret);
+
+    const exported = encodeStudioWorkspaceInterchange([
+      workspace("leak-bar", "커맨드 바 누출 방지", {
+        ...legacyPresentation(),
+        commandBar: {
+          accessToken: secret,
+        } as unknown as StudioWorkspaceInterchangePresentation["commandBar"],
+      }),
+    ]);
+    expect(exported).toEqual({ ok: false, reason: "sensitive-field" });
+    expect(JSON.stringify(exported)).not.toContain(secret);
+  });
+
+  it("omits the command bar from exports when includeCommandBar is false", () => {
+    const exported = encodeStudioWorkspaceInterchange(
+      [workspace("bar-opt-out", "바 제외 내보내기")],
+      { includeCommandBar: false },
+    );
+    expect(exported.ok).toBe(true);
+    if (!exported.ok) return;
+    expect(exported.text).not.toContain("commandBar");
+    expect(exported.document.workspaces[0]?.presentation.quickAccess).toEqual(
+      presentation("imported").quickAccess,
+    );
   });
 });

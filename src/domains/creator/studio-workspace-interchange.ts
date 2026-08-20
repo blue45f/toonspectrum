@@ -1,6 +1,9 @@
 import {
+  STUDIO_COMMAND_BAR_SLOT_COUNT,
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
+  normalizeStudioCommandBarPreferences,
+  type StudioCommandBarPreferences,
   type StudioDrawingPaletteLayout,
   type StudioWorkspaceDesktopLayout,
   type StudioWorkspaceLayout,
@@ -50,6 +53,12 @@ export interface StudioWorkspaceInterchangePresentation {
   readonly quickActions?: StudioWorkspaceLayout["quickActions"];
   /** Exact durable Quick Access v1 presentation state; catalog metadata stays process-local. */
   readonly quickAccess?: StudioQuickAccessState;
+  /**
+   * Canonical command-bar customization (slots + visibility). Always normalized to the closed
+   * command vocabulary on both export and import; malformed values collapse to the default bar
+   * instead of failing the file, and files without the key behave exactly like legacy files.
+   */
+  readonly commandBar?: StudioCommandBarPreferences;
 }
 
 export interface StudioWorkspaceInterchangeWorkspace {
@@ -74,6 +83,7 @@ export interface StudioWorkspaceInterchangeExportOptions {
   readonly includeDrawingPalettes?: boolean;
   readonly includeQuickActions?: boolean;
   readonly includeQuickAccess?: boolean;
+  readonly includeCommandBar?: boolean;
 }
 
 export interface StudioWorkspaceInterchangePlanOptions {
@@ -694,13 +704,42 @@ function parseQuickAccess(value: unknown): StudioQuickAccessState {
   });
 }
 
+/**
+ * Command-bar preferences are tolerated, not trusted: structural hazards and unknown fields
+ * collapse to the canonical default bar instead of failing the whole file, while sensitive keys
+ * still hard-fail the boundary. Extraction never invokes hostile accessors, and the returned
+ * value is rebuilt from the closed command vocabulary by the canonical normalizer, so nothing
+ * beyond `version`/`visible`/`slots` can ever cross this file.
+ */
+function parseCommandBar(value: unknown): StudioCommandBarPreferences {
+  try {
+    const fields = ownDataFields(value, [], ["version", "visible", "slots"]);
+    const slots = Object.hasOwn(fields, "slots")
+      ? [...ownArrayValues(fields.slots, STUDIO_COMMAND_BAR_SLOT_COUNT)]
+      : undefined;
+    return normalizeStudioCommandBarPreferences({
+      version: fields.version,
+      visible: fields.visible,
+      slots,
+    });
+  } catch (error) {
+    if (
+      error instanceof InterchangeBoundaryError &&
+      error.reason === "sensitive-field"
+    ) {
+      throw error;
+    }
+    return normalizeStudioCommandBarPreferences(undefined);
+  }
+}
+
 function parsePresentation(
   value: unknown,
 ): StudioWorkspaceInterchangePresentation {
   const presentation = ownDataFields(
     value,
     ["panels"],
-    ["drawingPalettes", "quickActions", "quickAccess"],
+    ["drawingPalettes", "quickActions", "quickAccess", "commandBar"],
   );
   return Object.freeze({
     panels: parsePanels(presentation.panels),
@@ -715,6 +754,11 @@ function parsePresentation(
     ...(Object.hasOwn(presentation, "quickAccess")
       ? {
           quickAccess: parseQuickAccess(presentation.quickAccess),
+        }
+      : {}),
+    ...(Object.hasOwn(presentation, "commandBar")
+      ? {
+          commandBar: parseCommandBar(presentation.commandBar),
         }
       : {}),
   });
@@ -799,12 +843,18 @@ function parseExportOptions(
       includeDrawingPalettes: true,
       includeQuickActions: true,
       includeQuickAccess: true,
+      includeCommandBar: true,
     });
   }
   const options = ownDataFields(
     value,
     [],
-    ["includeDrawingPalettes", "includeQuickActions", "includeQuickAccess"],
+    [
+      "includeDrawingPalettes",
+      "includeQuickActions",
+      "includeQuickAccess",
+      "includeCommandBar",
+    ],
   );
   for (const option of Object.values(options)) {
     if (typeof option !== "boolean") boundaryFailure("invalid-shape");
@@ -821,6 +871,10 @@ function parseExportOptions(
     includeQuickAccess:
       typeof options.includeQuickAccess === "boolean"
         ? options.includeQuickAccess
+        : true,
+    includeCommandBar:
+      typeof options.includeCommandBar === "boolean"
+        ? options.includeCommandBar
         : true,
   });
 }
@@ -839,6 +893,9 @@ function filterPresentationForExport(
       : {}),
     ...(options.includeQuickAccess && presentation.quickAccess !== undefined
       ? { quickAccess: presentation.quickAccess }
+      : {}),
+    ...(options.includeCommandBar && presentation.commandBar !== undefined
+      ? { commandBar: presentation.commandBar }
       : {}),
   });
 }
@@ -970,11 +1027,19 @@ function mergePresentationScopes(
     Object.hasOwn(imported, "quickAccess")
       ? imported.quickAccess
       : current.quickAccess;
+  // Command-surface customizations travel together: the command bar restores under the same
+  // `quickAccess` scope as the radial quick actions, keeping the scope vocabulary stable.
+  const commandBar =
+    selected.has("quickAccess") &&
+    Object.hasOwn(imported, "commandBar")
+      ? imported.commandBar
+      : current.commandBar;
   return Object.freeze({
     panels: selected.has("panels") ? imported.panels : current.panels,
     ...(drawingPalettes ? { drawingPalettes } : {}),
     ...(quickActions !== undefined ? { quickActions } : {}),
     ...(quickAccess !== undefined ? { quickAccess } : {}),
+    ...(commandBar !== undefined ? { commandBar } : {}),
   });
 }
 
@@ -1110,7 +1175,8 @@ function appliedOperation(
  *
  * Omitting `action` always adds snapshots without changing the active/live workspace. Applying or
  * replacing requires an explicit action string. Scope omissions are filled from the current live
- * presentation, so importing only panels cannot overwrite palette or Quick Access preferences.
+ * presentation, so importing only panels cannot overwrite palette, command-bar, or Quick Access
+ * preferences.
  */
 export function planStudioWorkspaceInterchangeImport(
   currentState: unknown,
