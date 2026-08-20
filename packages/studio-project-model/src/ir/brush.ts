@@ -65,7 +65,14 @@ export const mixingGraphIRSchema = z.object({
 export type MixingGraphIR = z.infer<typeof mixingGraphIRSchema>;
 
 export const brushOutputPolicyIRSchema = z.object({
-  target: z.enum(["vector-path", "raster-tiles"]).default("vector-path"),
+  /**
+   * Output lane union:
+   * - `vector-path` — outline PathIR baked from stroke geometry (compileVectorBrush)
+   * - `vector-mesh` — Google Ink triangle-mesh output with incremental deltas
+   *   (compileMeshBrush; requires `geometry.kind === "google-ink-mesh"`)
+   * - `raster-tiles` — natural-media pixel output (compileRasterBrush)
+   */
+  target: z.enum(["vector-path", "vector-mesh", "raster-tiles"]).default("vector-path"),
   bake: z.enum(["editable-proxy", "flatten"]).default("editable-proxy"),
 });
 export type BrushOutputPolicyIR = z.infer<typeof brushOutputPolicyIRSchema>;
