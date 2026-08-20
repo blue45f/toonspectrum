@@ -377,6 +377,165 @@ describe("studio CRDT page bridge", () => {
     });
   });
 
+  it("clears allowlisted reference edits absent from the envelope on hydration", () => {
+    const canonicalSource = "work-asset://image/effect-clear-1";
+    const staleEffects = {
+      // Structured object key, scalar filter key, boolean key — one per allowlist category.
+      borderEffect: {
+        enabled: true, thickness: 3, color: "#ff0000", type: "outer" as const, antiAliased: false,
+      },
+      blur: 12,
+      grayscale: true,
+    };
+    const staleLocal = {
+      id: "effect-clear-1",
+      type: "image",
+      src: canonicalSource,
+      x: 24,
+      y: 48,
+      width: 400,
+      height: 300,
+      rotation: 0,
+      contrast: 30,
+      decodedWidth: 800,
+      ...structuredClone(staleEffects),
+    } as StudioCrdtCompatibleElement & Record<string, unknown>;
+    // The remote author removed all three effects: an unset key is entirely absent from the
+    // envelope, while the surviving contrast edit still rides along.
+    const encoded = studioElementToCrdtSceneElement("page-a", {
+      id: "effect-clear-1",
+      type: "image",
+      src: canonicalSource,
+      x: 140,
+      y: 60,
+      width: 400,
+      height: 300,
+      rotation: 0,
+      contrast: -40,
+    } as StudioCrdtCompatibleElement & Record<string, unknown>);
+    for (const key of Object.keys(staleEffects)) {
+      expect(encoded.payload.props).not.toHaveProperty(key);
+    }
+    const record = { ...encoded, orderIndex: 0, deleted: false };
+
+    const hydrated = studioCrdtElementToSceneElement(
+      record,
+      staleLocal
+    ) as Record<string, unknown>;
+    // The envelope is authoritative for the whole allowlist — absent keys clear stale values.
+    for (const key of Object.keys(staleEffects)) {
+      expect(hydrated).not.toHaveProperty(key);
+    }
+    // Present envelope values and non-allowlist local metadata both survive untouched.
+    expect(hydrated).toMatchObject({
+      id: "effect-clear-1",
+      type: "image",
+      src: canonicalSource,
+      x: 140,
+      y: 60,
+      contrast: -40,
+      decodedWidth: 800,
+    });
+
+    // Topology references (not-yet-admitted local source) never carry allowlist props in their
+    // envelope; the deletion rule must not touch their byte-preserved local body.
+    const topologyLocal = {
+      id: "local-1",
+      type: "image",
+      src: "blob:local-body",
+      x: 1,
+      y: 2,
+      width: 10,
+      height: 10,
+      rotation: 0,
+      borderEffect: structuredClone(staleEffects.borderEffect),
+    } as StudioCrdtCompatibleElement & Record<string, unknown>;
+    const topologyEncoded = studioElementToCrdtSceneElement("page-a", topologyLocal);
+    expect(Object.keys(topologyEncoded.payload.props)).toEqual(["elementType"]);
+    const topologyHydrated = studioCrdtElementToSceneElement(
+      { ...topologyEncoded, orderIndex: 0, deleted: false },
+      topologyLocal
+    ) as Record<string, unknown>;
+    expect(topologyHydrated.borderEffect).toEqual(staleEffects.borderEffect);
+    expect(topologyHydrated.src).toBe("blob:local-body");
+  });
+
+  it("clears envelope-absent reference edits through scene-graph reconciliation over the descriptor fallback", () => {
+    const canonicalSource = "work-asset://image/effect-clear-2";
+    const staleEffects = {
+      borderEffect: {
+        enabled: true, thickness: 3, color: "#ff0000", type: "outer" as const, antiAliased: false,
+      },
+      blur: 12,
+      grayscale: true,
+    };
+    type EffectElement = StudioCrdtCompatibleElement & Record<string, unknown>;
+    const staleLocal: EffectElement = {
+      id: "effect-clear-2",
+      type: "image",
+      src: canonicalSource,
+      x: 24,
+      y: 48,
+      width: 400,
+      height: 300,
+      rotation: 0,
+      decodedWidth: 800,
+      ...structuredClone(staleEffects),
+    };
+    // The immutable upload-time descriptor may also still carry the removed effects; the realtime
+    // envelope must win over both merge inputs ({...descriptor, ...local} feeds the hydrator).
+    const descriptorFallback: EffectElement = {
+      id: "effect-clear-2",
+      type: "image",
+      src: canonicalSource,
+      x: 1,
+      y: 2,
+      width: 400,
+      height: 300,
+      rotation: 0,
+      ...structuredClone(staleEffects),
+    };
+    const encoded = studioElementToCrdtSceneElement("page-a", {
+      id: "effect-clear-2",
+      type: "image",
+      src: canonicalSource,
+      x: 140,
+      y: 60,
+      width: 400,
+      height: 300,
+      rotation: 0,
+    } as EffectElement);
+    const record = { ...encoded, orderIndex: 0, deleted: false };
+
+    const reconciled = reconcileStudioCrdtSceneGraphPages(
+      [{
+        id: "page-a",
+        bg: "#fff",
+        bgGrad: null,
+        canvasH: 1_600,
+        elements: [structuredClone(staleLocal)],
+      }],
+      [],
+      [record],
+      [],
+      [],
+      undefined,
+      new Map([["effect-clear-2", descriptorFallback]])
+    );
+    const element = reconciled.pages[0]?.elements[0] as Record<string, unknown> | undefined;
+    expect(element).toBeDefined();
+    for (const key of Object.keys(staleEffects)) {
+      expect(element).not.toHaveProperty(key);
+    }
+    expect(element).toMatchObject({
+      id: "effect-clear-2",
+      src: canonicalSource,
+      x: 140,
+      y: 60,
+      decodedWidth: 800,
+    });
+  });
+
   it("round-trips the complete drawing metadata and aligns legacy pointer arrays", () => {
     const element: StudioCrdtCompatibleDrawElement = {
       id: "stroke-a",

@@ -440,6 +440,20 @@ export function studioCrdtElementToSceneElement<
         }),
       } : {}),
     } as TElement & { groupId?: string };
+    if (!topologyReference) {
+      // The realtime envelope is authoritative for the entire reference edit allowlist: a remote
+      // removal propagates as an *absent* key (publisher unset, concurrent LWW, history undo), so
+      // any allowlisted key the envelope no longer carries must be deleted from the merge or the
+      // stale local/descriptor value silently survives on collaborators. The allowlist is exactly
+      // the key set the current envelope schema version admits; rich local-only metadata outside
+      // it (vrmScene, decodedWidth, …) stays, and topology references — whose envelope never
+      // carries allowlist props — keep their local body untouched above.
+      for (const key of STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS) {
+        if (!Object.hasOwn(referenceProps, key)) {
+          delete (element as Record<string, unknown>)[key];
+        }
+      }
+    }
     if (record.layerId === "page-root") delete element.groupId;
     else element.groupId = record.layerId;
     return element;
@@ -908,7 +922,9 @@ export function reconcileStudioCrdtSceneGraphPages<
             // Keep rich local-only editing metadata where it exists, but let the admitted server
             // descriptor provide the durable fallback. The exact local stable element may add rich
             // editing metadata, and studioCrdtElementToSceneElement applies realtime reference props
-            // last so immutable upload geometry can never reset a collaborator's later move.
+            // last so immutable upload geometry can never reset a collaborator's later move — and
+            // deletes allowlisted keys absent from the envelope, so a stale descriptor or local
+            // effect merged here cannot outlive a remote removal.
             element: {
               ...exactHydratedSource,
               ...(canonicalLocalSource?.element ?? {}),

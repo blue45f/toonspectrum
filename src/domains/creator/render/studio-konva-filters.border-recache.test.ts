@@ -197,23 +197,23 @@ describe("원격 borderEffect 변경 — reference envelope 왕복 recache", () 
   });
 
   /**
-   * 알려진 갭(문서화용 실패 예정 테스트) — envelope에서 borderEffect *키 자체가 사라진* 경우
-   * (동시 편집 LWW로 이전 payload가 이기거나, 히스토리 undo가 키 없던 payload를 복원할 때),
-   * `studioCrdtElementToSceneElement`(src/domains/creator/live/studio-crdt-page-bridge.ts,
-   * reference 분기 `{...referenceSource, ...referenceProps}` 병합)는 referenceSource의
-   * stale borderEffect를 지우지 못한다. imageFilterCacheKey가 그대로라 recache도 없고,
-   * 새로 합류한 피어(원본에 borderEffect 없음)와 기존 피어의 화면이 갈라진다.
-   * 수정 위치: 위 병합 직후, 비-토폴로지 work-asset 참조에 대해 envelope props에 없는
-   * 허용 목록 편집 키(STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS 중 구조화/스칼라 필터 키)를
-   * 병합 결과에서 삭제해야 한다. 이 슬라이스는 검증 전용이라 프로덕션 코드는 건드리지
-   * 않는다 — 메인 루프가 수정을 스케줄하면 이 it.fails를 일반 단언으로 뒤집을 것.
+   * envelope에서 borderEffect *키 자체가 사라진* 경우(원격 제거가 publisher unset으로
+   * 전파되거나, 동시 편집 LWW로 이전 payload가 이기거나, 히스토리 undo가 키 없던 payload를
+   * 복원할 때) — `studioCrdtElementToSceneElement`의 reference 분기가 비-토폴로지
+   * work-asset 참조에 대해 envelope props에 없는 허용 목록 편집 키
+   * (STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS)를 병합 결과에서 삭제한다. stale 로컬 값이
+   * 지워지고 imageFilterCacheKey가 바뀌어 recache가 돌며, 새로 합류한 피어(원본에
+   * borderEffect 없음)와 기존 피어의 화면이 수렴한다.
    */
-  it.fails("원격 payload에서 키가 제거된 borderEffect는 stale 값을 지워야 한다(현재 미지원)", () => {
+  it("원격 payload에서 키가 제거된 borderEffect는 stale 값을 지운다", () => {
     const staleWithBorder = imageElement(ACTIVE_BORDER);
     const hydrated = roundTripFromRemote(imageElement(), staleWithBorder);
-    // 원하는 동작: envelope에 없는 borderEffect는 제거되고 키가 바뀌어 recache가 돈다.
+    // envelope에 없는 borderEffect는 제거되고 키가 바뀌어 recache가 돈다.
     expect(hydrated.borderEffect).toBeUndefined();
     expect(imageFilterCacheKey(hydrated))
       .not.toBe(imageFilterCacheKey(staleWithBorder as unknown as ImageFilterFields));
+    // 제거 뒤에는 양쪽 활성 판정도 함께 꺼진다 — 유지된 노드의 캐시가 해제된다.
+    expect(hasLightweightActiveImageFilters(hydrated)).toBe(false);
+    expect(hasActiveImageFilters(hydrated)).toBe(false);
   });
 });
