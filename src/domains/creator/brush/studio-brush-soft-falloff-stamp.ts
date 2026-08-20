@@ -19,6 +19,20 @@
  */
 export const STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION = 257;
 export const STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS = 1;
+/**
+ * Versioned linear-accumulation tone for analytic soft-falloff masks.
+ *
+ * Canvas `source-over` multiplies gamma-encoded transmittance per dab, so the historical
+ * `(1 - r) ^ exponent` coverage ramp reads as a dark fringe where soft skirts overlap. Marks
+ * carrying this tone rasterize their mask through
+ * `linearizeStudioBrushSoftFalloffCoverageAlpha`, whose encoded transmittances multiply the way
+ * linear light does. An absent tone keeps the historical ramp byte-identically; anything else
+ * fails closed — a mask is never silently substituted.
+ */
+export const STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE =
+  "linear-accumulation-v1" as const;
+export type StudioBrushSoftFalloffStampTone =
+  typeof STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE;
 export const STUDIO_BRUSH_SOFT_FALLOFF_STAMP_CACHE_BYTE_BUDGET =
   40 * 1024 * 1024;
 export const STUDIO_BRUSH_SOFT_FALLOFF_STAMP_CACHE_ENTRY_LIMIT = 64;
@@ -154,6 +168,37 @@ function validFalloffExponent(exponent: number): boolean {
   return Number.isFinite(exponent) && exponent > 0 && exponent <= 32;
 }
 
+function validFalloffTone(tone: unknown): tone is StudioBrushSoftFalloffStampTone | undefined {
+  return tone === undefined
+    || tone === STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE;
+}
+
+/** Exact sRGB electro-optical encode of one linear-light unit value. */
+function srgbEncodeUnitValue(linear: number): number {
+  if (linear <= 0) return 0;
+  if (linear >= 1) return 1;
+  return linear <= 0.0031308
+    ? linear * 12.92
+    : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055;
+}
+
+/**
+ * `linear-accumulation-v1` coverage transfer: `alpha' = 1 - srgbEncode(1 - alpha)`.
+ *
+ * `source-over` scales the destination by the encoded transmittance `1 - alpha'` per dab, so the
+ * display transmittance of N stacked dabs is `∏ srgbEncode(tᵢ)` — and because the sRGB curve is a
+ * near-pure power law, that product tracks `srgbEncode(∏ tᵢ)`, the exact linear-light composite.
+ * Mid alphas encode lower than the historical ramp, which is precisely the dark fringe the sRGB
+ * path added; the fully covered centre and the transparent skirt edge are fixed points.
+ */
+export function linearizeStudioBrushSoftFalloffCoverageAlpha(
+  alpha: number,
+): number {
+  if (!Number.isFinite(alpha) || alpha <= 0) return 0;
+  if (alpha >= 1) return 1;
+  return 1 - srgbEncodeUnitValue(1 - alpha);
+}
+
 function validStampResolution(resolution: number): boolean {
   return Number.isSafeInteger(resolution)
     && resolution >= 32
@@ -167,9 +212,14 @@ function surfaceSizeForResolution(resolution: number): number {
 function softFalloffMaskCacheKey(
   exponent: number,
   resolution: number,
+  tone?: StudioBrushSoftFalloffStampTone,
 ): string {
   return JSON.stringify([
-    "analytic-radial-mask-v1",
+    // The absent-tone key stays byte-identical to the historical key so already-warm legacy
+    // caches keep hitting; the pinned tone claims a disjoint versioned namespace.
+    tone === STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE
+      ? "analytic-radial-mask-linear-accumulation-v1"
+      : "analytic-radial-mask-v1",
     exponent.toString(),
     resolution,
     STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
@@ -191,11 +241,18 @@ function softFalloffTintedCacheKey(
 export function rasterizeStudioBrushSoftFalloffMaskRgba(
   exponent: number,
   resolution = STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+  tone?: StudioBrushSoftFalloffStampTone,
 ): StudioBrushSoftFalloffStampRaster | null {
-  if (!validFalloffExponent(exponent) || !validStampResolution(resolution)) {
+  if (
+    !validFalloffExponent(exponent)
+    || !validStampResolution(resolution)
+    || !validFalloffTone(tone)
+  ) {
     return null;
   }
 
+  const linearAccumulation =
+    tone === STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE;
   const gutterPixels = STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS;
   const surfaceSize = surfaceSizeForResolution(resolution);
   const centre = surfaceSize / 2;
@@ -214,7 +271,11 @@ export function rasterizeStudioBrushSoftFalloffMaskRgba(
       pixels[offset] = 255;
       pixels[offset + 1] = 255;
       pixels[offset + 2] = 255;
-      pixels[offset + 3] = clampByte(coverage * 255);
+      pixels[offset + 3] = clampByte(
+        (linearAccumulation
+          ? linearizeStudioBrushSoftFalloffCoverageAlpha(coverage)
+          : coverage) * 255,
+      );
     }
   }
 
@@ -234,8 +295,13 @@ export function rasterizeStudioBrushSoftFalloffStampRgba(
   exponent: number,
   color: string,
   resolution = STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+  tone?: StudioBrushSoftFalloffStampTone,
 ): StudioBrushSoftFalloffStampRaster | null {
-  const mask = rasterizeStudioBrushSoftFalloffMaskRgba(exponent, resolution);
+  const mask = rasterizeStudioBrushSoftFalloffMaskRgba(
+    exponent,
+    resolution,
+    tone,
+  );
   const channels = canonicalHexColorChannels(color);
   if (!mask || !channels) return null;
   const [red, green, blue, sourceAlpha] = channels;
@@ -454,11 +520,16 @@ function acquireSoftFalloffMaskSurface(
   exponent: number,
   factory: StudioBrushSoftFalloffStampSurfaceFactory,
   resolution: number,
+  tone?: StudioBrushSoftFalloffStampTone,
 ): StudioBrushSoftFalloffStampSurface | null {
-  if (!validFalloffExponent(exponent) || !validStampResolution(resolution)) {
+  if (
+    !validFalloffExponent(exponent)
+    || !validStampResolution(resolution)
+    || !validFalloffTone(tone)
+  ) {
     return null;
   }
-  const cacheKey = softFalloffMaskCacheKey(exponent, resolution);
+  const cacheKey = softFalloffMaskCacheKey(exponent, resolution, tone);
   const cached = softFalloffMaskCacheByFactory.get(factory)?.get(cacheKey);
   if (cached) {
     cached.lastUsed = ++softFalloffStampCacheClock;
@@ -467,7 +538,11 @@ function acquireSoftFalloffMaskSurface(
   }
 
   softFalloffStampCacheMisses += 1;
-  const raster = rasterizeStudioBrushSoftFalloffMaskRgba(exponent, resolution);
+  const raster = rasterizeStudioBrushSoftFalloffMaskRgba(
+    exponent,
+    resolution,
+    tone,
+  );
   if (!raster) return null;
   const bytes = raster.pixels.byteLength;
   if (bytes > STUDIO_BRUSH_SOFT_FALLOFF_STAMP_CACHE_BYTE_BUDGET) return null;
@@ -611,16 +686,20 @@ export function prepareStudioBrushSoftFalloffTintedStampSurface(
   color: string,
   factory: StudioBrushSoftFalloffStampSurfaceFactory,
   resolution = STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+  tone?: StudioBrushSoftFalloffStampTone,
 ): StudioBrushSoftFalloffStampSurface | null {
   const resolvedColor = canonicalHexColor(color);
   if (
     !resolvedColor
     || !validFalloffExponent(exponent)
     || !validStampResolution(resolution)
+    || !validFalloffTone(tone)
   ) {
     return null;
   }
-  const profileKey = softFalloffMaskCacheKey(exponent, resolution);
+  // The tone participates in the profile key, so tinted promotions and their per-profile colour
+  // budget version together with the mask — a pinned stroke can never reuse a legacy-ramp stamp.
+  const profileKey = softFalloffMaskCacheKey(exponent, resolution, tone);
   const tintedCacheKey = softFalloffTintedCacheKey(
     profileKey,
     resolvedColor,
@@ -637,6 +716,7 @@ export function prepareStudioBrushSoftFalloffTintedStampSurface(
     exponent,
     factory,
     resolution,
+    tone,
   );
   if (!mask) return null;
   const profileEntries = softFalloffTintedProfilesByFactory

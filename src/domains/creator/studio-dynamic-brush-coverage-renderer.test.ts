@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizeStudioBrushDynamicsSettings,
+  studioBrushDynamicsSettingsForBrushId,
+  studioSoftFalloffLinearAccumulationProgramPin,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
 } from "./brush/studio-brush-dynamics";
 import {
@@ -18,7 +20,12 @@ import {
 } from "./brush/studio-brush-r8-grain-runtime";
 import {
   clearStudioBrushSoftFalloffStampCache,
+  linearizeStudioBrushSoftFalloffCoverageAlpha,
   studioBrushSoftFalloffStampCacheStats,
+  STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
+  STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
+  STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+  type StudioBrushSoftFalloffStampTone,
 } from "./brush/studio-brush-soft-falloff-stamp";
 import {
   clearStudioBrushTextureStampCache,
@@ -1816,5 +1823,249 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     expect(new Set(rich.marks.map(({ color }) => color))).not.toEqual(new Set(["#2468ac"]));
     expect(rich.marks.some(({ x }) => x < 50)).toBe(true);
     expect(rich.marks.some(({ x }) => x > 50)).toBe(true);
+  });
+});
+
+describe("studio dynamic brush soft-falloff linear-accumulation tone", () => {
+  const legacyMaskOracleByte = (x: number, y: number, exponent: number): number => {
+    const surfaceSize = STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION
+      + STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS * 2;
+    const centre = surfaceSize / 2;
+    const unitRadius = STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION / 2;
+    const radius = Math.hypot(
+      (x + 0.5 - centre) / unitRadius,
+      (y + 0.5 - centre) / unitRadius,
+    );
+    const coverage = radius < 1 ? Math.pow(1 - radius, exponent) : 0;
+    return Math.min(255, Math.max(0, Math.round(coverage * 255)));
+  };
+  const linearMaskOracleByte = (x: number, y: number, exponent: number): number => {
+    const surfaceSize = STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION
+      + STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS * 2;
+    const centre = surfaceSize / 2;
+    const unitRadius = STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION / 2;
+    const radius = Math.hypot(
+      (x + 0.5 - centre) / unitRadius,
+      (y + 0.5 - centre) / unitRadius,
+    );
+    const coverage = radius < 1 ? Math.pow(1 - radius, exponent) : 0;
+    return Math.min(255, Math.max(0, Math.round(
+      linearizeStudioBrushSoftFalloffCoverageAlpha(coverage) * 255,
+    )));
+  };
+
+  it("mints the versioned tone only from the exact fresh-authoring pin", () => {
+    const pinned = studioBrushDynamicsSettingsForBrushId("airbrush");
+    if (!pinned) throw new Error("missing airbrush dynamics");
+    expect(pinned.softFalloffLinearProgram).toEqual(
+      studioSoftFalloffLinearAccumulationProgramPin(),
+    );
+    const plan = (dynamics: typeof pinned) => planStudioDynamicBrushCoverageMarks({
+      dabVariations: [[
+        dab({ size: 48 }),
+        dab({ index: 1, x: 26, y: 24, sourceX: 26, sourceY: 24, size: 44 }),
+      ]],
+      dynamics,
+      dynamicSeed: 42,
+      stroke: "#336699",
+      stampGrid: 7,
+      markBudget: 8,
+    });
+
+    const pinnedPlan = plan(pinned);
+    expect(pinnedPlan.ok).toBe(true);
+    if (!pinnedPlan.ok) throw new Error("expected pinned analytic marks");
+    expect(pinnedPlan.marks.length).toBeGreaterThan(0);
+    for (const plannedMark of pinnedPlan.marks) {
+      expect(plannedMark.falloff).toMatchObject({
+        kind: "analytic-radial",
+        tone: STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
+      });
+    }
+
+    // A persisted pre-wave snapshot is the same settings without the pin: it must plan the exact
+    // historical marks — the pin changes ONLY the versioned tone tag, never geometry or alpha.
+    const legacyPlan = plan(normalizeStudioBrushDynamicsSettings({
+      ...pinned,
+      softFalloffLinearProgram: undefined,
+    }));
+    expect(legacyPlan.ok).toBe(true);
+    if (!legacyPlan.ok) throw new Error("expected legacy analytic marks");
+    expect(legacyPlan.marks.every(
+      (candidate) => candidate.falloff?.tone === undefined,
+    )).toBe(true);
+    expect(pinnedPlan.marks.map((candidate) => ({
+      ...candidate,
+      falloff: {
+        kind: candidate.falloff!.kind,
+        exponent: candidate.falloff!.exponent,
+      },
+    }))).toEqual(legacyPlan.marks);
+  });
+
+  it("mints the tone on both halves of the decomposed legacy screen dual", () => {
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      softFalloffLinearProgram: studioSoftFalloffLinearAccumulationProgramPin(),
+      tip: { shape: "soft", softness: 0.82 },
+      grain: { amount: 0 },
+      taper: { enabled: false },
+      dualBrush: {
+        enabled: true,
+        tip: { shape: "soft", softness: 0.6 },
+        blendMode: "screen",
+        sizeRatio: 0.8,
+      },
+    });
+    const plan = planStudioDynamicBrushCoverageMarks({
+      dabVariations: [[dab({ size: 48 })]],
+      dynamics,
+      dynamicSeed: 42,
+      stroke: "#336699",
+      stampGrid: 7,
+      markBudget: 8,
+    });
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) throw new Error("expected decomposed dual marks");
+    expect(plan.marks).toHaveLength(2);
+    expect(plan.marks.every((candidate) => (
+      candidate.falloff?.kind === "analytic-radial"
+      && candidate.falloff.tone === STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE
+    ))).toBe(true);
+  });
+
+  it("keeps tone-less marks on the byte-identical legacy mask and gives the tone its own", () => {
+    clearStudioBrushSoftFalloffStampCache();
+    const exponent = 3.2;
+    const surfaces: RecordingSurface[] = [];
+    const factory = surfaceFactory(surfaces);
+    const destination = new RecordingDestination();
+
+    renderStudioDynamicBrushCoverageMark(
+      destination,
+      mark({ falloff: { kind: "analytic-radial", exponent } }),
+      1,
+      factory,
+    );
+    const legacyMask = surfaces.find(
+      ({ context }) => context.imagePixels.length > 0,
+    );
+    if (!legacyMask) throw new Error("expected a legacy mask surface");
+    const centreRow = Math.floor(legacyMask.width / 2);
+    const alphaAt = (surface: RecordingSurface, x: number): number =>
+      surface.context.imagePixels[(centreRow * surface.width + x) * 4 + 3]!;
+    for (let x = 0; x < legacyMask.width; x += 1) {
+      expect(alphaAt(legacyMask, x)).toBe(
+        legacyMaskOracleByte(x, centreRow, exponent),
+      );
+    }
+    expect(studioBrushSoftFalloffStampCacheStats()).toMatchObject({ entries: 1 });
+
+    renderStudioDynamicBrushCoverageMark(
+      destination,
+      mark({
+        falloff: {
+          kind: "analytic-radial",
+          exponent,
+          tone: STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
+        },
+      }),
+      1,
+      factory,
+    );
+    const linearMask = surfaces.find(
+      (surface) => surface !== legacyMask && surface.context.imagePixels.length > 0,
+    );
+    if (!linearMask) throw new Error("expected a separate linear mask surface");
+    expect(studioBrushSoftFalloffStampCacheStats()).toMatchObject({ entries: 2 });
+    let midTexels = 0;
+    for (let x = 0; x < linearMask.width; x += 1) {
+      const linearByte = linearMaskOracleByte(x, centreRow, exponent);
+      expect(alphaAt(linearMask, x)).toBe(linearByte);
+      const legacyByte = legacyMaskOracleByte(x, centreRow, exponent);
+      if (legacyByte > 13 && legacyByte < 242) {
+        midTexels += 1;
+        expect(linearByte).toBeLessThan(legacyByte);
+      }
+    }
+    expect(midTexels).toBeGreaterThan(16);
+  });
+
+  it("fails closed instead of substituting a mask for an unknown tone", () => {
+    const destination = new RecordingDestination();
+    expect(() => renderStudioDynamicBrushCoverageMark(
+      destination,
+      mark({
+        falloff: {
+          kind: "analytic-radial",
+          exponent: 3.2,
+          tone: "linear-accumulation-v2" as unknown as StudioBrushSoftFalloffStampTone,
+        },
+      }),
+      1,
+      surfaceFactory([]),
+    )).toThrow("studio-brush-soft-falloff-stamp-unavailable");
+    expect(destination.draws).toHaveLength(0);
+  });
+
+  it("invalidates a committed coverage entry whose marks change only in tone", () => {
+    clearStudioDynamicCoverageCommittedCache();
+    clearStudioBrushSoftFalloffStampCache();
+    const surfaces: RecordingSurface[] = [];
+    const factory = surfaceFactory(surfaces);
+    const committedCacheKey = "document-a:soft-linear-upgrade";
+    const legacyMarks = [mark({
+      x: 64,
+      y: 64,
+      radiusX: 8,
+      radiusY: 8,
+      angleRadians: 0,
+      falloff: { kind: "analytic-radial", exponent: 3.2 },
+    })];
+
+    expect(renderStudioDynamicBrushCoverage(
+      new RecordingDestination(),
+      legacyMarks,
+      { activeDraft: false, opacity: 1, surfaceFactory: factory, committedCacheKey },
+    ).status).toBe("rendered");
+    const firstRenderSurfaces = surfaces.length;
+    const legacyTiles = surfaces.filter(
+      ({ context }) => context.imageDraws.length > 0 && context.rectFills === 0,
+    );
+    expect(legacyTiles.length).toBeGreaterThan(0);
+
+    // Identical marks replay from the retained entry without allocating.
+    expect(renderStudioDynamicBrushCoverage(
+      new RecordingDestination(),
+      legacyMarks.map((candidate) => ({
+        ...candidate,
+        falloff: { ...candidate.falloff! },
+      })),
+      { activeDraft: false, opacity: 1, surfaceFactory: factory, committedCacheKey },
+    ).status).toBe("rendered");
+    expect(surfaces).toHaveLength(firstRenderSurfaces);
+
+    // The same stroke re-planned under the pin differs only in tone: the retained sRGB tiles
+    // must be discarded and re-rendered from the linear mask, never served stale.
+    expect(renderStudioDynamicBrushCoverage(
+      new RecordingDestination(),
+      legacyMarks.map((candidate) => ({
+        ...candidate,
+        falloff: {
+          ...candidate.falloff!,
+          tone: STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
+        },
+      })),
+      { activeDraft: false, opacity: 1, surfaceFactory: factory, committedCacheKey },
+    ).status).toBe("rendered");
+    expect(surfaces.length).toBeGreaterThan(firstRenderSurfaces);
+    expect(studioDynamicCoverageCommittedCacheStats()).toMatchObject({ entries: 1 });
+    expect(legacyTiles.every(
+      (surface) => surface.width === 1 && surface.height === 1,
+    )).toBe(true);
+    expect(studioBrushSoftFalloffStampCacheStats()).toMatchObject({ entries: 2 });
+
+    clearStudioDynamicCoverageCommittedCache();
+    clearStudioBrushSoftFalloffStampCache();
   });
 });

@@ -2,14 +2,17 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   clearStudioBrushSoftFalloffStampCache,
+  linearizeStudioBrushSoftFalloffCoverageAlpha,
   prepareStudioBrushSoftFalloffTintedStampSurface,
   rasterizeStudioBrushSoftFalloffMaskRgba,
   studioBrushSoftFalloffStampCacheStats,
+  STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_CACHE_ENTRY_LIMIT,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
   type StudioBrushSoftFalloffStampSurface,
   type StudioBrushSoftFalloffStampSurfaceContext,
+  type StudioBrushSoftFalloffStampTone,
 } from "./studio-brush-soft-falloff-stamp";
 
 function parseHexRgba(
@@ -417,5 +420,221 @@ describe("studio analytic soft-falloff stamp", () => {
       surface.width === STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION + 2
       && surface.height === STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION + 2
     )).toBe(true);
+  });
+});
+
+describe("studio analytic soft-falloff linear-accumulation tone", () => {
+  beforeEach(() => {
+    clearStudioBrushSoftFalloffStampCache();
+  });
+
+  const srgbEncode = (linear: number): number => {
+    if (linear <= 0) return 0;
+    if (linear >= 1) return 1;
+    return linear <= 0.0031308
+      ? linear * 12.92
+      : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055;
+  };
+  const clampByte = (value: number): number => {
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    if (value >= 255) return 255;
+    return Math.round(value);
+  };
+  const coverageAt = (
+    raster: NonNullable<ReturnType<typeof rasterizeStudioBrushSoftFalloffMaskRgba>>,
+    x: number,
+    y: number,
+    exponent: number,
+  ): number => {
+    const centre = raster.surfaceSize / 2;
+    const unitRadius = raster.resolution / 2;
+    const radius = Math.hypot(
+      (x + 0.5 - centre) / unitRadius,
+      (y + 0.5 - centre) / unitRadius,
+    );
+    return radius < 1 ? Math.pow(1 - radius, exponent) : 0;
+  };
+
+  it("keeps the tone-less legacy mask byte-identical to the historical ramp", () => {
+    const exponent = 3.2;
+    const raster = rasterizeStudioBrushSoftFalloffMaskRgba(exponent);
+    const explicitUndefined = rasterizeStudioBrushSoftFalloffMaskRgba(
+      exponent,
+      STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+      undefined,
+    );
+    if (!raster || !explicitUndefined) throw new Error("expected legacy masks");
+
+    expect(explicitUndefined.pixels).toEqual(raster.pixels);
+    let oracleMismatches = 0;
+    for (let y = 0; y < raster.surfaceSize; y += 1) {
+      for (let x = 0; x < raster.surfaceSize; x += 1) {
+        const expected = clampByte(coverageAt(raster, x, y, exponent) * 255);
+        if (raster.pixels[(y * raster.surfaceSize + x) * 4 + 3] !== expected) {
+          oracleMismatches += 1;
+        }
+      }
+    }
+    expect(oracleMismatches).toBe(0);
+  });
+
+  it("re-encodes the pinned mask through the exact linear-accumulation transfer", () => {
+    const exponent = 3.2;
+    const legacy = rasterizeStudioBrushSoftFalloffMaskRgba(exponent);
+    const linear = rasterizeStudioBrushSoftFalloffMaskRgba(
+      exponent,
+      STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+      STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
+    );
+    if (!legacy || !linear) throw new Error("expected both mask tones");
+
+    // Fixed points: the covered centre and the transparent skirt edge are unchanged.
+    const centreRow = Math.floor(linear.surfaceSize / 2);
+    const alphaAt = (
+      raster: typeof linear,
+      x: number,
+    ): number => raster.pixels[(centreRow * raster.surfaceSize + x) * 4 + 3]!;
+    expect(alphaAt(linear, centreRow)).toBe(255);
+    expect(alphaAt(linear, 0)).toBe(0);
+    expect([...linear.pixels.slice(0, 3)]).toEqual([255, 255, 255]);
+
+    let midTexels = 0;
+    for (let x = centreRow; x < linear.surfaceSize; x += 1) {
+      const coverage = coverageAt(linear, x, centreRow, exponent);
+      expect(alphaAt(linear, x)).toBe(clampByte(
+        linearizeStudioBrushSoftFalloffCoverageAlpha(coverage) * 255,
+      ));
+      if (coverage > 0.05 && coverage < 0.95) {
+        midTexels += 1;
+        // Mid alphas encode strictly lower: that reduction is exactly the sRGB dark fringe.
+        expect(alphaAt(linear, x)).toBeLessThan(alphaAt(legacy, x));
+      }
+    }
+    expect(midTexels).toBeGreaterThan(16);
+  });
+
+  it("keeps overlapping skirts near the linear-light reference instead of the sRGB dark fringe", () => {
+    const exponent = 3.2;
+    const legacy = rasterizeStudioBrushSoftFalloffMaskRgba(exponent);
+    const linear = rasterizeStudioBrushSoftFalloffMaskRgba(
+      exponent,
+      STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+      STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
+    );
+    if (!legacy || !linear) throw new Error("expected both mask tones");
+
+    // Channel math for two identical black dabs source-over white: each dab scales the display
+    // channel by its encoded transmittance, so the composite is 255 · (1 − a/255)². The exact
+    // linear-light reference re-encodes the linear composite: 255 · srgbEncode((1 − coverage)²).
+    const centreRow = Math.floor(linear.surfaceSize / 2);
+    let maxLegacyDarkening = 0;
+    let maxLinearDeviation = 0;
+    let midOverlapChecked = false;
+    for (let x = centreRow; x < linear.surfaceSize; x += 1) {
+      const coverage = coverageAt(linear, x, centreRow, exponent);
+      if (coverage <= 0 || coverage >= 1) continue;
+      const offset = (centreRow * linear.surfaceSize + x) * 4 + 3;
+      const legacyResult = 255 * (1 - legacy.pixels[offset]! / 255) ** 2;
+      const linearResult = 255 * (1 - linear.pixels[offset]! / 255) ** 2;
+      const reference = 255 * srgbEncode((1 - coverage) ** 2);
+      maxLegacyDarkening = Math.max(maxLegacyDarkening, reference - legacyResult);
+      maxLinearDeviation = Math.max(
+        maxLinearDeviation,
+        Math.abs(reference - linearResult),
+      );
+      if (coverage > 0.45 && coverage < 0.55) {
+        midOverlapChecked = true;
+        // Mid-alpha overlap must come out brighter than the sRGB path, with no dark fringe.
+        expect(linearResult).toBeGreaterThan(legacyResult + 60);
+        expect(Math.abs(linearResult - reference)).toBeLessThanOrEqual(3);
+      }
+    }
+    expect(midOverlapChecked).toBe(true);
+    // The historical ramp darkens the overlap by up to ~74/255; the pinned ramp stays within the
+    // sRGB-affine bound of the multiplicative approximation.
+    expect(maxLegacyDarkening).toBeGreaterThan(60);
+    expect(maxLinearDeviation).toBeLessThanOrEqual(8.5);
+  });
+
+  it("keys masks and tinted stamps by tone so pinned strokes never reuse a legacy stamp", () => {
+    const surfaces: PixelSurface[] = [];
+    const factory = pixelSurfaceFactory(surfaces);
+
+    const legacyStamp = prepareStudioBrushSoftFalloffTintedStampSurface(
+      3.2,
+      "#336699",
+      factory,
+    );
+    const linearStamp = prepareStudioBrushSoftFalloffTintedStampSurface(
+      3.2,
+      "#336699",
+      factory,
+      STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+      STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
+    );
+    expect(legacyStamp).not.toBeNull();
+    expect(linearStamp).not.toBeNull();
+    expect(linearStamp).not.toBe(legacyStamp);
+    // Two immutable masks plus two exact-colour promotions — one per tone profile.
+    expect(studioBrushSoftFalloffStampCacheStats()).toMatchObject({
+      entries: 2,
+      tintedEntries: 2,
+      scratchSurfaces: 0,
+      surfaceAllocations: 4,
+      misses: 2,
+    });
+    const midTexelAlpha = (surface: PixelSurface): number => {
+      const centreRow = Math.floor(surface.width / 2);
+      const offset = (centreRow * surface.width + centreRow + 64) * 4 + 3;
+      return surface.context.sourcePixels![offset]!;
+    };
+    expect(midTexelAlpha(linearStamp as unknown as PixelSurface))
+      .toBeLessThan(midTexelAlpha(legacyStamp as unknown as PixelSurface));
+
+    const replay = prepareStudioBrushSoftFalloffTintedStampSurface(
+      3.2,
+      "#336699",
+      factory,
+      STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+      STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
+    );
+    expect(replay).toBe(linearStamp);
+    expect(studioBrushSoftFalloffStampCacheStats()).toMatchObject({
+      surfaceAllocations: 4,
+      tintedHits: 1,
+    });
+  });
+
+  it("fails closed on a malformed tone without retaining cache entries", () => {
+    const surfaces: PixelSurface[] = [];
+    const factory = pixelSurfaceFactory(surfaces);
+    for (const malformedTone of [
+      "linear-accumulation-v2",
+      "LINEAR-ACCUMULATION-V1",
+      "srgb",
+      1,
+      null,
+      {},
+    ]) {
+      expect(rasterizeStudioBrushSoftFalloffMaskRgba(
+        3.2,
+        STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+        malformedTone as unknown as StudioBrushSoftFalloffStampTone,
+      )).toBeNull();
+      expect(prepareStudioBrushSoftFalloffTintedStampSurface(
+        3.2,
+        "#336699",
+        factory,
+        STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+        malformedTone as unknown as StudioBrushSoftFalloffStampTone,
+      )).toBeNull();
+    }
+    expect(surfaces).toHaveLength(0);
+    expect(studioBrushSoftFalloffStampCacheStats()).toMatchObject({
+      entries: 0,
+      tintedEntries: 0,
+      scratchSurfaces: 0,
+      surfaceAllocations: 0,
+    });
   });
 });

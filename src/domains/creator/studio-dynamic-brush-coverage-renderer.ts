@@ -9,6 +9,7 @@
 
 import {
   isStudioDynamicBrushCausalDepositPipeline,
+  isStudioSoftFalloffLinearAccumulationProgramPin,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
 } from "./brush/studio-brush-dynamics";
@@ -30,8 +31,10 @@ import {
 import {
   clearStudioBrushSoftFalloffStampCache,
   prepareStudioBrushSoftFalloffTintedStampSurface,
+  STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
   STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+  type StudioBrushSoftFalloffStampTone,
 } from "./brush/studio-brush-soft-falloff-stamp";
 import {
   acquireStudioBrushTextureStampSurface,
@@ -198,6 +201,13 @@ export interface StudioDynamicBrushCoverageMark {
     readonly kind: "analytic-radial";
     /** Alpha at normalized radius r is `(1 - r) ^ exponent`. */
     readonly exponent: number;
+    /**
+     * Versioned mask tone. Present only on marks planned from dynamics carrying the explicit
+     * `softFalloffLinearProgram` pin: the ramp above is re-encoded through
+     * `linearizeStudioBrushSoftFalloffCoverageAlpha` so overlapping skirts accumulate like linear
+     * light. Absence keeps the historical sRGB ramp byte-identically.
+     */
+    readonly tone?: StudioBrushSoftFalloffStampTone;
   }>;
 }
 
@@ -709,6 +719,11 @@ function markIsValid(mark: StudioDynamicBrushCoverageMark): boolean {
         && finitePositive(mark.falloff.exponent)
         && mark.falloff.exponent >= ANALYTIC_FALLOFF_EXPONENT_MIN
         && mark.falloff.exponent <= ANALYTIC_FALLOFF_EXPONENT_MAX
+        && (
+          mark.falloff.tone === undefined
+          || mark.falloff.tone
+            === STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE
+        )
       )
     );
 }
@@ -910,6 +925,10 @@ export function renderStudioDynamicBrushCoverageMark(
     mark.falloff.exponent,
     mark.color,
     textureSurfaceFactory,
+    STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+    // The mark's versioned tone selects the mask ramp; the stamp cache keys on it, so a pinned
+    // stroke and a legacy stroke of the same exponent never share a surface.
+    mark.falloff.tone,
   );
   if (!surface) {
     throw new Error("studio-brush-soft-falloff-stamp-unavailable");
@@ -1145,6 +1164,19 @@ export function planStudioDynamicBrushCoverageMarks(
         fullTextureAuthority,
       )
   ));
+  /*
+   * Linear-accumulation opt-in (dryMediaKernelProgram idiom): only dynamics carrying the exact
+   * fresh-authoring `softFalloffLinearProgram` pin mint the versioned tone onto their analytic
+   * falloff marks. Every unpinned snapshot — every persisted pre-wave stroke — plans tone-less
+   * marks and replays its historical sRGB skirt byte-identically. The guard re-validates the pin
+   * here so a hand-built settings object can never reach the linear ramp with a malformed pin.
+   */
+  const softFalloffTone: StudioBrushSoftFalloffStampTone | undefined =
+    isStudioSoftFalloffLinearAccumulationProgramPin(
+      dynamics.softFalloffLinearProgram,
+    )
+      ? STUDIO_BRUSH_SOFT_FALLOFF_LINEAR_ACCUMULATION_TONE
+      : undefined;
   const tipUsesEllipse = tipDefinitions.map((tip, tipIndex) => (
     !grainActive && (tipIndex === 0
       ? studioBrushDualTipUsesSolidEllipse(tip, dualBrush)
@@ -1440,6 +1472,7 @@ export function planStudioDynamicBrushCoverageMarks(
                 falloff: {
                   kind: "analytic-radial" as const,
                   exponent: proceduralSoftTipFalloffExponent(tip),
+                  ...(softFalloffTone ? { tone: softFalloffTone } : {}),
                 },
               }
             : {}),
@@ -1483,6 +1516,7 @@ export function planStudioDynamicBrushCoverageMarks(
                   falloff: {
                     kind: "analytic-radial" as const,
                     exponent: proceduralSoftTipFalloffExponent(secondaryTip),
+                    ...(softFalloffTone ? { tone: softFalloffTone } : {}),
                   },
                 }
               : {}),
@@ -2211,6 +2245,7 @@ function committedCoverageMarksEqual(
       || leftMark.color !== rightMark.color
       || leftMark.falloff?.kind !== rightMark.falloff?.kind
       || leftMark.falloff?.exponent !== rightMark.falloff?.exponent
+      || leftMark.falloff?.tone !== rightMark.falloff?.tone
       || leftMark.texture?.kind !== rightMark.texture?.kind
       || !textureEqual
       || !ribbonEqual
