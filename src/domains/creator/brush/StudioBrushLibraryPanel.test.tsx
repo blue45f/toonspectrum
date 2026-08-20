@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildAuthoredSutFixture } from "../../../../tests/corpus/formats/csp-sut-fixtures";
 import { buildKritaBundleFixture } from "../../../../tests/corpus/formats/krita-bundle-fixtures";
 
+import { brushLifecycleStageOf } from "./studio-brush-catalog-lifecycle";
 import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
 import {
   BRUSH_LIBRARY_KEY,
@@ -54,6 +55,60 @@ const saved: StudioSavedBrush = {
   lastUsedAt: 3,
   ...snapshot,
 };
+
+// 노출 단계 픽스처 — 각 단계 판정은 테스트 본문에서 수명주기 결정자로 재검증한다.
+const watercolorBase: StudioSavedBrush = {
+  ...saved,
+  id: "saved-watercolor-core",
+  name: "수채 기본",
+  brushId: "watercolor",
+  pinned: false,
+};
+
+const watercolorExtended: StudioSavedBrush = {
+  ...saved,
+  id: "saved-watercolor-extended",
+  name: "번짐 수채",
+  brushId: "watercolor",
+  sourcePresetId: "watercolor-wet-bleed",
+  pinned: false,
+};
+
+const watercolorExperimental: StudioSavedBrush = {
+  ...saved,
+  id: "saved-watercolor-experimental",
+  name: "실험 수채",
+  brushId: "watercolor",
+  sourcePresetId: "watercolor--edge-bloom",
+  pinned: false,
+};
+
+const quarantinedGpen: StudioSavedBrush = {
+  ...saved,
+  id: "saved-gpen-quarantined",
+  name: "격리 지펜",
+  brushId: "gpen",
+  sourcePresetId: "gpen--causal-round",
+  pinned: false,
+};
+
+function seededRepositoryFactory(brushes: readonly StudioSavedBrush[]) {
+  const values = new Map<string, string>([
+    [
+      BRUSH_LIBRARY_KEY,
+      JSON.stringify({ version: BRUSH_LIBRARY_STORAGE_VERSION, brushes }),
+    ],
+  ]);
+  const repository = createStorageBrushLibraryRepository({
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  });
+  return async () => ({
+    authority: "sqlite" as const,
+    repository,
+    migration: null,
+  });
+}
 
 afterEach(() => {
   cleanup();
@@ -543,5 +598,164 @@ describe("StudioBrushLibraryPanel", () => {
     expect(screen.getByRole("alert").textContent).toContain("SQLite 카탈로그에는 저장하지 않았어요");
     expect(screen.queryByRole("status")).toBeNull();
     expect(putMany).not.toHaveBeenCalled();
+  });
+
+  it("노출 필터는 전체가 기본이고 격리 프리셋 브러시는 정적 렌더에서도 목록에서 제외한다", () => {
+    expect(brushLifecycleStageOf("gpen--causal-round")).toBe("quarantined");
+    const html = renderToStaticMarkup(
+      <StudioBrushLibraryPanel
+        currentSnapshot={snapshot}
+        brushes={[saved, quarantinedGpen]}
+        onBrushesChange={() => undefined}
+        onApplyBrush={() => undefined}
+        onBrushDeleted={() => undefined}
+      />
+    );
+    expect(html).toContain('aria-label="브러시 노출 단계 필터"');
+    expect(html).toContain('data-studio-brush-exposure-tier="all"');
+    expect(html).toContain('aria-pressed="true" data-studio-brush-exposure-tier-option="all"');
+    expect(html).toContain('aria-pressed="false" data-studio-brush-exposure-tier-option="core"');
+    expect(html).toContain(
+      'aria-pressed="false" data-studio-brush-exposure-tier-option="experimental"',
+    );
+    expect(html).toContain("주력 펜");
+    expect(html).not.toContain("격리 지펜");
+  });
+
+  it("전체 보기는 격리 프리셋만 제외하고 핵심·확장·실험 저장 브러시를 모두 나열한다", async () => {
+    expect(brushLifecycleStageOf("pen")).toBe("core");
+    expect(brushLifecycleStageOf("watercolor")).toBe("core");
+    expect(brushLifecycleStageOf("watercolor-wet-bleed")).toBe("extended");
+    expect(brushLifecycleStageOf("watercolor--edge-bloom")).toBe("experimental");
+    const repositoryFactory = seededRepositoryFactory([
+      saved,
+      watercolorBase,
+      watercolorExtended,
+      watercolorExperimental,
+      quarantinedGpen,
+    ]);
+
+    function Harness() {
+      const [items, setItems] = useState<StudioSavedBrush[]>([]);
+      return (
+        <StudioBrushLibraryPanel
+          currentSnapshot={snapshot}
+          brushes={items}
+          onBrushesChange={setItems}
+          onApplyBrush={vi.fn()}
+          onBrushDeleted={vi.fn()}
+          repositoryFactory={repositoryFactory}
+        />
+      );
+    }
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByText("번짐 수채")).toBeTruthy());
+    expect(screen.getByText("주력 펜")).toBeTruthy();
+    expect(screen.getByText("수채 기본")).toBeTruthy();
+    expect(screen.getByText("실험 수채")).toBeTruthy();
+    // 격리 프리셋 브러시는 저장소에는 남지만(5개 로드) 새 목록에는 나타나지 않는다.
+    expect(screen.getByText(/5개 · 무제한 · 로컬 SQL/u)).toBeTruthy();
+    expect(screen.queryByText("격리 지펜")).toBeNull();
+  });
+
+  it("핵심·실험 보기는 해당 단계만 남기고 격리는 모든 보기에서 계속 제외한다", async () => {
+    const repositoryFactory = seededRepositoryFactory([
+      saved,
+      watercolorBase,
+      watercolorExtended,
+      watercolorExperimental,
+      quarantinedGpen,
+    ]);
+
+    function Harness() {
+      const [items, setItems] = useState<StudioSavedBrush[]>([]);
+      return (
+        <StudioBrushLibraryPanel
+          currentSnapshot={snapshot}
+          brushes={items}
+          onBrushesChange={setItems}
+          onApplyBrush={vi.fn()}
+          onBrushDeleted={vi.fn()}
+          repositoryFactory={repositoryFactory}
+        />
+      );
+    }
+
+    const { container } = render(<Harness />);
+    await waitFor(() => expect(screen.getByText("번짐 수채")).toBeTruthy());
+    const tierAttribute = () => container
+      .querySelector("[data-studio-brush-exposure-tier]")
+      ?.getAttribute("data-studio-brush-exposure-tier");
+
+    fireEvent.click(screen.getByRole("button", { name: "핵심" }));
+    expect(tierAttribute()).toBe("core");
+    await waitFor(() => {
+      expect(screen.getByText("주력 펜")).toBeTruthy();
+      expect(screen.getByText("수채 기본")).toBeTruthy();
+      expect(screen.queryByText("번짐 수채")).toBeNull();
+      expect(screen.queryByText("실험 수채")).toBeNull();
+      expect(screen.queryByText("격리 지펜")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "실험" }));
+    expect(tierAttribute()).toBe("experimental");
+    await waitFor(() => {
+      expect(screen.getByText("실험 수채")).toBeTruthy();
+      expect(screen.queryByText("주력 펜")).toBeNull();
+      expect(screen.queryByText("수채 기본")).toBeNull();
+      expect(screen.queryByText("번짐 수채")).toBeNull();
+      expect(screen.queryByText("격리 지펜")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "전체" }));
+    expect(tierAttribute()).toBe("all");
+    await waitFor(() => {
+      expect(screen.getByText("주력 펜")).toBeTruthy();
+      expect(screen.getByText("번짐 수채")).toBeTruthy();
+      expect(screen.queryByText("격리 지펜")).toBeNull();
+    });
+  });
+
+  it("변형군 배지에서 형제 프리셋을 고르면 그 저장 브러시가 적용되고 격리 형제는 나열되지 않는다", async () => {
+    const onApplyBrush = vi.fn();
+    const repositoryFactory = seededRepositoryFactory([
+      watercolorBase,
+      watercolorExtended,
+      quarantinedGpen,
+    ]);
+
+    function Harness() {
+      const [items, setItems] = useState<StudioSavedBrush[]>([]);
+      return (
+        <StudioBrushLibraryPanel
+          currentSnapshot={snapshot}
+          brushes={items}
+          onBrushesChange={setItems}
+          onApplyBrush={onApplyBrush}
+          onBrushDeleted={vi.fn()}
+          repositoryFactory={repositoryFactory}
+        />
+      );
+    }
+
+    render(<Harness />);
+    const applyBase = await screen.findByRole("button", { name: /수채 기본 브러시 적용/u });
+    const item = applyBase.closest("li");
+    expect(item).toBeTruthy();
+    if (!item) return;
+
+    // 거버넌스 모듈이 지연 로드된 뒤에야 변형군 배지가 나타난다.
+    await waitFor(() => expect(within(item).getByText(/변형군 · 형제/u)).toBeTruthy());
+    expect(within(item).getByRole("list", { name: "수채 기본 변형군 형제 프리셋" })).toBeTruthy();
+
+    // 격리된 형제(G펜 · 연속 원형)는 어느 항목의 변형군에서도 새로 나열되지 않는다.
+    expect(screen.queryByText("G펜 · 연속 원형")).toBeNull();
+
+    fireEvent.click(within(item).getByRole("button", { name: /저장 브러시 번짐 수채/u }));
+    await waitFor(() => expect(onApplyBrush).toHaveBeenCalledOnce());
+    expect(onApplyBrush).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "saved-watercolor-extended" }),
+    );
   });
 });

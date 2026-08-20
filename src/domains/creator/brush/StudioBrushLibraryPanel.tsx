@@ -36,6 +36,10 @@ import { useStudioInspectorFocusScroll } from "../studio-inspector-focus-effect"
 
 import { studioCoreBrushCatalogItemById } from "./studio-brush-catalog-core";
 import {
+  type BrushLifecycleStage,
+  type BrushVariantGroup,
+} from "./studio-brush-catalog-lifecycle";
+import {
   brushFileName,
   createBrush,
   importBrushFromJson,
@@ -61,6 +65,7 @@ import {
   studioBrushPackFormatOf,
 } from "./studio-brush-pack-format";
 import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
+import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
 import {
   studioBrushPreviewDashArray,
   studioBrushPreviewDotCenters,
@@ -232,6 +237,40 @@ function brushMutationMessage(
     : `${session} 브라우저를 닫으면 사라져요.`;
 }
 
+type BrushExposureTier = "core" | "all" | "experimental";
+
+/**
+ * 노출 단계·변형군 거버넌스 API. `studio-brush-catalog-lifecycle` 는 전체 카탈로그를 정적으로
+ * 끌고 오는 모듈이라 패널 청크에 싣지 않고 마운트 뒤 지연 로드한 결과만 여기 담는다.
+ * 로드 전/실패 시 핵심·실험 보기는 fail closed 로 잠기고(무필터 노출 금지), 격리 제외는
+ * zero-import 격리 원장으로 항상 동기 적용된다.
+ */
+interface BrushExposureGovernance {
+  stageOf: (presetId: unknown) => BrushLifecycleStage | null;
+  variantGroupOf: (presetId: unknown) => BrushVariantGroup | null;
+}
+
+const EXPOSURE_TIER_OPTIONS: readonly {
+  id: BrushExposureTier;
+  label: string;
+  title: string;
+}[] = [
+  { id: "core", label: "핵심", title: "기본 셸프에 노출되는 핵심 프리셋으로 저장한 브러시만 보기" },
+  { id: "all", label: "전체", title: "격리 프리셋을 제외한 모든 저장 브러시 보기" },
+  { id: "experimental", label: "실험", title: "실험 단계 프리셋으로 저장한 브러시만 보기" },
+];
+
+/** 저장 브러시의 노출 판정 기준 프리셋 id — 원본 프리셋이 있으면 그쪽, 없으면 런타임 브러시. */
+function savedBrushExposurePresetId(brush: StudioSavedBrush): string {
+  return brush.sourcePresetId ?? brush.brushId;
+}
+
+function brushCatalogPresetLabel(presetId: string): string {
+  return studioBrushPackDescriptorById(presetId)?.catalogName
+    ?? studioCoreBrushCatalogItemById(presetId)?.name
+    ?? brushPresetLabel(presetId);
+}
+
 export interface StudioBrushLibraryPanelProps {
   currentSnapshot: StudioBrushSnapshot;
   brushes: StudioSavedBrush[];
@@ -262,6 +301,11 @@ export function StudioBrushLibraryPanel({
   const [viewMode, setViewMode] = useState<"stroke" | "text">("stroke");
   const [searchQuery, setSearchQuery] = useState("");
   const [pinnedOnly, setPinnedOnly] = useState(false);
+  // 노출 단계 필터는 이 컴포넌트 상태로만 유지한다(이번 슬라이스는 비영속, 기본은 전체).
+  const [exposureTier, setExposureTier] = useState<BrushExposureTier>("all");
+  const [exposureGovernance, setExposureGovernance] =
+    useState<BrushExposureGovernance | null>(null);
+  const [exposureGovernanceFailed, setExposureGovernanceFailed] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery.trim());
   const [repositoryAuthority, setRepositoryAuthority] = useState<
     ProductBrushLibraryAuthority | "loading" | "error"
@@ -280,6 +324,33 @@ export function StudioBrushLibraryPanel({
   const brushesRef = useRef(brushes);
   brushesRef.current = brushes;
   const orderedBrushes = sortBrushesForLibrary(brushes);
+  // 격리 프리셋은 어떤 보기의 새 목록에도 나타나지 않는다 — 노출 제거일 뿐, 저장 데이터와
+  // 문서 재생·메타데이터 해석은 그대로다(studio-brush-quarantine.ts 의 USED_PRESET_DATA_PRESERVED).
+  const freshBrushes = orderedBrushes.filter(
+    (brush) => !isStudioBrushQuarantinedPresetId(savedBrushExposurePresetId(brush)),
+  );
+  const visibleBrushes = exposureTier === "all"
+    ? freshBrushes
+    : exposureGovernance === null
+      ? []
+      : freshBrushes.filter(
+          (brush) =>
+            exposureGovernance.stageOf(savedBrushExposurePresetId(brush)) === exposureTier,
+        );
+  const savedSiblingByPresetId = new Map<string, StudioSavedBrush>();
+  for (const brush of freshBrushes) {
+    const presetId = savedBrushExposurePresetId(brush);
+    if (!savedSiblingByPresetId.has(presetId)) savedSiblingByPresetId.set(presetId, brush);
+  }
+  const exposureEmptyMessage = exposureTier !== "all" && exposureGovernanceFailed
+    ? "브러시 노출 단계 정보를 불러오지 못해 이 보기를 열 수 없어요. 전체 보기를 이용해 주세요."
+    : exposureTier !== "all" && exposureGovernance === null
+      ? "브러시 노출 단계 정보를 불러오는 중이에요…"
+      : exposureTier === "core"
+        ? "핵심 단계 프리셋으로 저장한 브러시가 없어요."
+        : exposureTier === "experimental"
+          ? "실험 단계 프리셋으로 저장한 브러시가 없어요."
+          : "격리된 프리셋으로 저장한 브러시는 새 목록에 표시하지 않아요.";
   const displayedTotal = totalCount === null
     ? `${brushes.length}${hasMorePages ? "+" : ""}`
     : String(totalCount);
@@ -349,8 +420,48 @@ export function StudioBrushLibraryPanel({
     };
   });
 
+  // 수명주기 거버넌스는 마운트 뒤 한 번 지연 로드한다. 실패는 조용히 삼키지 않고
+  // exposureGovernanceFailed 로 남겨 핵심·실험 보기를 명시적 안내와 함께 잠근다(fail closed).
+  useEffect(() => {
+    let active = true;
+    void import("./studio-brush-catalog-lifecycle")
+      .then((lifecycle) => {
+        if (!active) return;
+        setExposureGovernance({
+          stageOf: lifecycle.brushLifecycleStageOf,
+          variantGroupOf: lifecycle.brushVariantGroupOf,
+        });
+      })
+      .catch(() => {
+        if (active) setExposureGovernanceFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   function productRepository(): Promise<ProductBrushLibraryRepository> {
     return repositoryFactory();
+  }
+
+  function variantSiblingEntries(
+    brush: StudioSavedBrush,
+    group: BrushVariantGroup,
+  ): readonly { presetId: string; label: string; savedSibling: StudioSavedBrush | null }[] {
+    const selfPresetId = savedBrushExposurePresetId(brush);
+    return group.memberPresetIds
+      .filter((presetId) =>
+        presetId !== selfPresetId && !isStudioBrushQuarantinedPresetId(presetId))
+      .map((presetId) => {
+        const savedSibling = savedSiblingByPresetId.get(presetId) ?? null;
+        return {
+          presetId,
+          label: brushCatalogPresetLabel(presetId),
+          savedSibling: savedSibling !== null && savedSibling.id === brush.id
+            ? null
+            : savedSibling,
+        };
+      });
   }
 
   function setRepositoryError(caught: unknown): void {
@@ -792,6 +903,7 @@ export function StudioBrushLibraryPanel({
       data-studio-brush-surface-role="user-library-management"
       data-studio-brush-library-authority={repositoryAuthority}
       data-studio-brush-library-loaded-count={brushes.length}
+      data-studio-brush-exposure-tier={exposureTier}
       aria-busy={repositoryBusy || pageLoading || repositoryAuthority === "loading"}
     >
       <div className="flex items-center justify-between gap-2">
@@ -889,6 +1001,36 @@ export function StudioBrushLibraryPanel({
 
       {orderedBrushes.length > 0 ? (
         <div className="flex min-w-0 items-center justify-between gap-2">
+          <span className="shrink-0 text-[0.62rem] font-semibold text-fg-3">노출</span>
+          <div
+            role="group"
+            aria-label="브러시 노출 단계 필터"
+            className="grid min-w-0 flex-1 grid-cols-3 rounded-xl border border-line bg-card p-0.5"
+          >
+            {EXPOSURE_TIER_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                title={option.title}
+                aria-pressed={exposureTier === option.id}
+                data-studio-brush-exposure-tier-option={option.id}
+                onClick={() => setExposureTier(option.id)}
+                className={cx(
+                  "flex min-h-11 min-w-0 items-center justify-center rounded-lg px-2 text-[0.62rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8",
+                  exposureTier === option.id
+                    ? "bg-raised text-fg"
+                    : "text-fg-3 hover:bg-raised/70 hover:text-fg"
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {orderedBrushes.length > 0 ? (
+        <div className="flex min-w-0 items-center justify-between gap-2">
           <span className="shrink-0 text-[0.62rem] font-semibold text-fg-3">표시</span>
           <div
             role="group"
@@ -943,6 +1085,14 @@ export function StudioBrushLibraryPanel({
         </p>
       ) : (
         <>
+          {visibleBrushes.length === 0 ? (
+            <p
+              data-studio-brush-exposure-empty={exposureTier}
+              className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[0.64rem] leading-relaxed text-fg-3"
+            >
+              {exposureEmptyMessage}
+            </p>
+          ) : (
           <ul
             data-studio-saved-brush-view={viewMode}
             className={cx(
@@ -950,7 +1100,12 @@ export function StudioBrushLibraryPanel({
               viewMode === "stroke" ? "space-y-1.5" : "space-y-1"
             )}
           >
-            {orderedBrushes.map((brush) => (
+            {visibleBrushes.map((brush) => {
+            const variantGroup =
+              exposureGovernance?.variantGroupOf(savedBrushExposurePresetId(brush)) ?? null;
+            const variantSiblings =
+              variantGroup === null ? [] : variantSiblingEntries(brush, variantGroup);
+            return (
             <li
               key={brush.id}
               className={cx(
@@ -1037,6 +1192,63 @@ export function StudioBrushLibraryPanel({
                 </span>
               </button>
 
+              {variantGroup !== null && variantSiblings.length > 0 ? (
+                <details
+                  className="group mt-1.5 border-t border-line/50 pt-1.5"
+                  data-studio-brush-variant-group={variantGroup.id}
+                >
+                  <summary
+                    title={`${variantGroup.intent} · 형제 프리셋: ${variantSiblings
+                      .map((entry) => entry.label)
+                      .join(", ")}`}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Escape") return;
+                      event.preventDefault();
+                      const details = event.currentTarget.parentElement;
+                      if (details instanceof HTMLDetailsElement) details.open = false;
+                      event.currentTarget.focus({ preventScroll: true });
+                    }}
+                    className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-2 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8 [&::-webkit-details-marker]:hidden"
+                  >
+                    <span>변형군 · 형제 {variantSiblings.length}종</span>
+                    <ChevronDown
+                      size={13}
+                      className="transition-transform group-open:rotate-180"
+                      aria-hidden
+                    />
+                  </summary>
+                  <ul
+                    aria-label={`${brush.name} 변형군 형제 프리셋`}
+                    className="flex flex-wrap gap-1 pt-1"
+                  >
+                    {variantSiblings.map((entry) => {
+                      const sibling = entry.savedSibling;
+                      return (
+                        <li key={entry.presetId}>
+                          {sibling ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleApplySavedBrush(sibling)}
+                              aria-label={`${entry.label} 변형 브러시 적용 · 저장 브러시 ${sibling.name}`}
+                              className="flex min-h-11 items-center rounded-lg border border-line px-2 text-[0.6rem] font-medium text-fg-2 transition-colors hover:border-accent hover:bg-accent-soft/30 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8"
+                            >
+                              {entry.label}
+                            </button>
+                          ) : (
+                            <span
+                              title="이 변형 프리셋으로 저장한 브러시가 없어요 — 브러시 카탈로그에서 선택할 수 있어요"
+                              className="flex min-h-11 items-center rounded-lg border border-dashed border-line/60 px-2 text-[0.6rem] text-fg-3 lg:min-h-8"
+                            >
+                              {entry.label}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </details>
+              ) : null}
+
               <details className="group mt-1.5 border-t border-line/50 pt-1.5">
                 <summary
                   onKeyDown={(event) => {
@@ -1077,8 +1289,10 @@ export function StudioBrushLibraryPanel({
                 </div>
               </details>
             </li>
-            ))}
+            );
+            })}
           </ul>
+          )}
           {hasMorePages ? (
             <button
               type="button"
