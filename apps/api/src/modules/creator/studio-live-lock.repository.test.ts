@@ -296,10 +296,15 @@ describe("studio live distributed lock persistence contract", () => {
     );
   });
 
-  it("parses canonical page/element scopes and leaves legacy resources opaque", () => {
+  it("parses canonical page/layer/element scopes and leaves legacy resources opaque", () => {
     expect(parseStudioLiveLockResourceScope("page:page-1")).toEqual({
       kind: "page",
       pageId: "page-1",
+    });
+    expect(parseStudioLiveLockResourceScope("layer:page-1:cell:shade")).toEqual({
+      kind: "layer",
+      pageId: "page-1",
+      layerId: "cell:shade",
     });
     expect(parseStudioLiveLockResourceScope("element:page-1:panel:ink")).toEqual({
       kind: "element",
@@ -307,6 +312,8 @@ describe("studio live distributed lock persistence contract", () => {
       elementId: "panel:ink",
     });
     expect(parseStudioLiveLockResourceScope("element:legacy-panel")).toBeNull();
+    expect(parseStudioLiveLockResourceScope("layer:page-1:")).toBeNull();
+    expect(parseStudioLiveLockResourceScope("layer:legacy-cell")).toBeNull();
     expect(parseStudioLiveLockResourceScope("page:")).toBeNull();
   });
 
@@ -319,6 +326,100 @@ describe("studio live distributed lock persistence contract", () => {
     expect(studioLiveLockResourcesConflict("page:page-1", "element:page-2:panel-1")).toBe(false);
     expect(studioLiveLockResourcesConflict("legacy:panel-1", "legacy:panel-1")).toBe(true);
     expect(studioLiveLockResourcesConflict("legacy:panel-1", "legacy:panel-2")).toBe(false);
+  });
+
+  it("enforces the client layer conflict table: page covers layers, siblings stay free", () => {
+    // Page ↔ layer, both directions.
+    expect(studioLiveLockResourcesConflict("page:page-1", "layer:page-1:cell-1")).toBe(true);
+    expect(studioLiveLockResourcesConflict("layer:page-1:cell-1", "page:page-1")).toBe(true);
+    expect(studioLiveLockResourcesConflict("layer:page-1:cell-1", "page:page-2")).toBe(false);
+    // Layer ↔ layer: exact match only.
+    expect(studioLiveLockResourcesConflict("layer:page-1:cell-1", "layer:page-1:cell-1")).toBe(
+      true
+    );
+    expect(studioLiveLockResourcesConflict("layer:page-1:cell-1", "layer:page-1:cell-2")).toBe(
+      false
+    );
+    expect(studioLiveLockResourcesConflict("layer:page-1:cell-1", "layer:page-2:cell-1")).toBe(
+      false
+    );
+    // Layer ↔ element: never at the grammar level (element ids do not encode their layer);
+    // clients that need the exclusion claim the containing layer resource alongside elements.
+    expect(
+      studioLiveLockResourcesConflict("layer:page-1:cell-1", "element:page-1:panel-1")
+    ).toBe(false);
+    expect(
+      studioLiveLockResourcesConflict("element:page-1:panel-1", "layer:page-1:cell-1")
+    ).toBe(false);
+    // Malformed/legacy layer shapes keep exact-match semantics.
+    expect(studioLiveLockResourcesConflict("layer:page-1:", "layer:page-1:")).toBe(true);
+    expect(studioLiveLockResourcesConflict("page:page-1", "layer:page-1:")).toBe(false);
+  });
+
+  it("denies a cross-connection layer acquire under a page lease but admits siblings", async () => {
+    const { transaction } = createLockPersistenceHarness();
+    vi.spyOn(db, "transaction").mockImplementation(
+      ((callback: (value: object) => Promise<unknown>) => callback(transaction)) as never
+    );
+    const repository = new DrizzleStudioLiveLockRepository();
+    const base = {
+      workId: "work-layer",
+      ownerName: "서윤",
+      leaseMs: 15_000,
+      rotateLease: true,
+    };
+
+    await expect(repository.acquire({
+      ...base,
+      resourceId: "page:page-1",
+      ownerConnectionId: "socket-page",
+      requestedLeaseId: "lease-page",
+      acquisitionId: "request-page.nonce-page",
+    })).resolves.toMatchObject({ status: "acquired", created: true });
+    // The authoritative server now applies the same page-over-layer coverage as the client guard.
+    await expect(repository.acquire({
+      ...base,
+      resourceId: "layer:page-1:cell-1",
+      ownerConnectionId: "socket-layer",
+      requestedLeaseId: "lease-layer",
+      acquisitionId: "request-layer.nonce-layer",
+    })).resolves.toMatchObject({
+      status: "conflict",
+      lock: { resourceId: "page:page-1", ownerConnectionId: "socket-page" },
+    });
+    await expect(repository.release({
+      workId: base.workId,
+      resourceId: "page:page-1",
+      ownerConnectionId: "socket-page",
+      leaseId: "lease-page",
+    })).resolves.toMatchObject({ resourceId: "page:page-1" });
+
+    // Sibling layers on the same page stay independently claimable across connections.
+    await expect(repository.acquire({
+      ...base,
+      resourceId: "layer:page-1:cell-1",
+      ownerConnectionId: "socket-layer",
+      requestedLeaseId: "lease-layer",
+      acquisitionId: "request-layer.nonce-layer",
+    })).resolves.toMatchObject({ status: "acquired", created: true });
+    await expect(repository.acquire({
+      ...base,
+      resourceId: "layer:page-1:cell-2",
+      ownerConnectionId: "socket-sibling",
+      requestedLeaseId: "lease-sibling",
+      acquisitionId: "request-sibling.nonce-sibling",
+    })).resolves.toMatchObject({ status: "acquired", created: true });
+    // A layer seat also fences a later whole-page acquire by another connection.
+    await expect(repository.acquire({
+      ...base,
+      resourceId: "page:page-1",
+      ownerConnectionId: "socket-page",
+      requestedLeaseId: "lease-page-again",
+      acquisitionId: "request-page-again.nonce-page-again",
+    })).resolves.toMatchObject({
+      status: "conflict",
+      lock: { resourceId: "layer:page-1:cell-2" },
+    });
   });
 
   it("defines one bounded lease row per work/resource with cascade cleanup", () => {

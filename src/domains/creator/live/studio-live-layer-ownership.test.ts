@@ -13,6 +13,7 @@ import {
 } from "./studio-live-layer-ownership";
 import {
   studioLiveElementResource,
+  studioLiveLayerResource,
   studioLivePageResource,
   type StudioLiveLockLike,
 } from "./studio-live-mutation-guard";
@@ -112,6 +113,74 @@ describe("studio live layer ownership", () => {
     ).toBe("free");
   });
 
+  it("marks peer layer seat leases as blocking with the layer status label", () => {
+    const ownership = resolveStudioLiveLayerOwnership({
+      pageId,
+      elementId: layerA,
+      locks: [lock(studioLiveLayerResource(pageId, layerA), "peer", "민수")],
+      selfSessionId: "me",
+      now,
+    });
+    expect(ownership.kind).toBe("peer");
+    expect(ownership.blocksLocalEdit).toBe(true);
+    expect(ownership.resource).toBe(studioLiveLayerResource(pageId, layerA));
+    expect(ownership.statusLabel).toBe("민수 · 레이어 편집 중");
+    expect(ownership.ownerColor).toMatch(/^#/);
+  });
+
+  it("marks self-held layer seat leases without blocking", () => {
+    const ownership = resolveStudioLiveLayerOwnership({
+      pageId,
+      elementId: layerA,
+      locks: [lock(studioLiveLayerResource(pageId, layerA), "me", "나")],
+      selfSessionId: "me",
+      now,
+    });
+    expect(ownership.kind).toBe("self");
+    expect(ownership.blocksLocalEdit).toBe(false);
+    expect(ownership.resource).toBe(studioLiveLayerResource(pageId, layerA));
+    expect(ownership.statusLabel).toBe("내가 편집 중");
+  });
+
+  it("layer seat leases stay row-scoped; page peers still shadow the seat", () => {
+    // A sibling row is untouched by the seat lease.
+    expect(
+      resolveStudioLiveLayerOwnership({
+        pageId,
+        elementId: layerB,
+        locks: [lock(studioLiveLayerResource(pageId, layerA), "peer", "민수")],
+        selfSessionId: "me",
+        now,
+      }).kind,
+    ).toBe("free");
+    // The seat lease outranks an element lease on the same row (it covers the whole layer)…
+    const seated = resolveStudioLiveLayerOwnership({
+      pageId,
+      elementId: layerA,
+      locks: [
+        lock(studioLiveElementResource(pageId, layerA), "peer2", "지영"),
+        lock(studioLiveLayerResource(pageId, layerA), "peer", "민수"),
+      ],
+      selfSessionId: "me",
+      now,
+    });
+    expect(seated.resource).toBe(studioLiveLayerResource(pageId, layerA));
+    expect(seated.ownerDisplayName).toBe("민수");
+    // …while a page-level peer lock still shadows every seat on the page.
+    const shadowed = resolveStudioLiveLayerOwnership({
+      pageId,
+      elementId: layerA,
+      locks: [
+        lock(studioLiveLayerResource(pageId, layerA), "me", "나"),
+        lock(studioLivePageResource(pageId), "peer", "지민"),
+      ],
+      selfSessionId: "me",
+      now,
+    });
+    expect(shadowed.kind).toBe("page-peer");
+    expect(shadowed.blocksLocalEdit).toBe(true);
+  });
+
   it("builds a dense map only for non-free entries", () => {
     const map = buildStudioLiveLayerOwnershipByItemId({
       pageId,
@@ -127,18 +196,22 @@ describe("studio live layer ownership", () => {
     expect(map.get(layerB)).toBeUndefined();
   });
 
-  it("lists active locks that belong to a page", () => {
+  it("lists active locks that belong to a page, layer seats included", () => {
     const locks = listStudioLiveLayerOwnershipLocksOnPage(
       [
         lock(studioLiveElementResource(pageId, layerA), "peer", "민수"),
+        lock(studioLiveLayerResource(pageId, layerB), "peer2", "지영"),
+        lock(studioLiveLayerResource("other", layerA), "peer2", "다른페이지시트"),
         lock(studioLivePageResource("other"), "peer", "다른페이지"),
         lock(studioLiveElementResource(pageId, layerB), "me", "나", now - 10),
       ],
       pageId,
       now,
     );
-    expect(locks).toHaveLength(1);
-    expect(locks[0]!.resource).toBe(studioLiveElementResource(pageId, layerA));
+    expect(locks.map((entry) => entry.resource)).toEqual([
+      studioLiveElementResource(pageId, layerA),
+      studioLiveLayerResource(pageId, layerB),
+    ]);
   });
 
   it("summarizes selection ownership for banners with blocked vs free contrast", () => {

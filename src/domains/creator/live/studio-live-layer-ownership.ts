@@ -1,14 +1,15 @@
 /**
  * Pure projection of live collaboration locks onto layer-navigator ownership UI.
  *
- * Locks use `page:{pageId}` / `element:{pageId}:{elementId}` (see
- * `studio-live-mutation-guard`). This module never claims or releases leases —
+ * Locks use `page:{pageId}` / `layer:{pageId}:{layerId}` / `element:{pageId}:{elementId}`
+ * (see `studio-live-mutation-guard`). This module never claims or releases leases —
  * it only describes who currently holds a conflicting lock for display.
  */
 
 import { studioLiveParticipantColor } from "./studio-live-canvas-overlay-model";
 import {
   studioLiveElementResource,
+  studioLiveLayerResource,
   studioLivePageResource,
   type StudioLiveLockLike,
 } from "./studio-live-mutation-guard";
@@ -61,7 +62,9 @@ function displayName(lock: StudioLiveLockLike): string {
 
 /**
  * Resolve ownership for one layer/element on a page.
- * Page-level peer locks shadow every element on that page.
+ * Page-level peer locks shadow every item on that page. A layer seat lease
+ * (`layer:<pageId>:<itemId>`) claims the navigator row directly and outranks an
+ * element lease on the same row — the seat covers the whole layer, not one element.
  */
 export function resolveStudioLiveLayerOwnership(input: {
   readonly pageId: string;
@@ -79,10 +82,13 @@ export function resolveStudioLiveLayerOwnership(input: {
 
   const now = input.now ?? Date.now();
   const pageResource = studioLivePageResource(pageId);
+  const layerResource = studioLiveLayerResource(pageId, elementId);
   const elementResource = studioLiveElementResource(pageId, elementId);
 
   let pagePeer: StudioLiveLockLike | null = null;
   let pageSelf: StudioLiveLockLike | null = null;
+  let layerPeer: StudioLiveLockLike | null = null;
+  let layerSelf: StudioLiveLockLike | null = null;
   let elementPeer: StudioLiveLockLike | null = null;
   let elementSelf: StudioLiveLockLike | null = null;
 
@@ -91,6 +97,11 @@ export function resolveStudioLiveLayerOwnership(input: {
     if (lock.resource === pageResource) {
       if (lock.owner.sessionId === self) pageSelf = lock;
       else pagePeer = lock;
+      continue;
+    }
+    if (lock.resource === layerResource) {
+      if (lock.owner.sessionId === self) layerSelf = lock;
+      else layerPeer = lock;
       continue;
     }
     if (lock.resource === elementResource) {
@@ -112,6 +123,19 @@ export function resolveStudioLiveLayerOwnership(input: {
     });
   }
 
+  if (layerPeer) {
+    const name = displayName(layerPeer);
+    return Object.freeze({
+      kind: "peer",
+      resource: layerPeer.resource,
+      ownerSessionId: layerPeer.owner.sessionId,
+      ownerDisplayName: name,
+      ownerColor: studioLiveParticipantColor(layerPeer.owner.sessionId),
+      statusLabel: `${name} · 레이어 편집 중`,
+      blocksLocalEdit: true,
+    });
+  }
+
   if (elementPeer) {
     const name = displayName(elementPeer);
     return Object.freeze({
@@ -125,8 +149,8 @@ export function resolveStudioLiveLayerOwnership(input: {
     });
   }
 
-  if (pageSelf || elementSelf) {
-    const lock = elementSelf ?? pageSelf!;
+  if (pageSelf || layerSelf || elementSelf) {
+    const lock = layerSelf ?? elementSelf ?? pageSelf!;
     return Object.freeze({
       kind: "self",
       resource: lock.resource,
