@@ -28,6 +28,7 @@ const OBSTACLE_SELECTOR = [
   "[data-studio-tool-popover]",
   "[data-studio-point-comment-composer]",
   "[data-studio-color-wheel]",
+  "[data-studio-presence-dock]",
   '[role="dialog"]',
 ].join(",");
 

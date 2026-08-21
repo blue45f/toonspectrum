@@ -185,10 +185,24 @@ export const StudioSelectionContextBar = memo(function StudioSelectionContextBar
         hide();
         return;
       }
+      // 라이브 협업 프레즌스 독(저장 상태 필, z-[56])이 캔버스 우상단에 떠 있다.
+      // 장애물로 알려줘야 명령 바가 그 아래에 깔려 버튼이 가려지는 일이 없다.
+      const dockRect = globalThis.document
+        .querySelector('[data-studio-presence-dock="true"]')
+        ?.getBoundingClientRect();
+      const obstacles = dockRect && dockRect.width > 0 && dockRect.height > 0
+        ? [{
+          left: dockRect.left,
+          top: dockRect.top,
+          width: dockRect.width,
+          height: dockRect.height,
+        }]
+        : [];
       const placement = planStudioSelectionContextBarPlacement({
         selection,
         bar: { width: node.offsetWidth, height: node.offsetHeight },
         safeArea: studioOnCanvasSafeArea(canvasRect, viewportRect()),
+        obstacles,
       });
       node.style.visibility = "visible";
       node.style.pointerEvents = "auto";
