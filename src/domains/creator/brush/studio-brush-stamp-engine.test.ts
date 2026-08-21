@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   beginStampWalker,
   drawStampStroke,
+  drawStudioStampBrushDabs,
   planStudioStampBrushDabs,
   resolveStudioStampBrushKind,
   resolveStudioStampBrushStyle,
@@ -476,6 +477,171 @@ describe("studio dry-media stamp lane (verified OSS kernels)", () => {
         dabs.some((dab) => dab.alpha > 0),
         `${lane.brushId}: fully blank stroke`
       ).toBe(true);
+    }
+  });
+});
+
+/**
+ * 캐시된 촉 래스터 blit 의 발자국 계약.
+ *
+ * 촉은 캐시 적중률을 위해 `Math.max(1, Math.round(radius))` 정수 반지름으로 굽는다. 굽는 건
+ * 그대로 두되, blit 은 계획된 연속 반지름으로 되돌려야 한다 — 자연 크기로 찍으면 화면 반지름이
+ * 정수로 양자화되어 1.4 는 1.0, 1.6 은 2.0, 테이퍼 하한 0.35 는 1.0(약 2.86배)이 되고, 같은
+ * dab 을 정확한 radius 로 쓰는 폴백 arc 경로 및 SVG 내보내기(`r = dab.radius`)와 아트보드가
+ * 어긋난다. 이 스위트는 실제 캔버스 경로(window + document 스텁)를 태워 그 계약을 고정한다.
+ */
+interface RecordedBlit {
+  source: object;
+  dx: number;
+  dy: number;
+  dw: number | undefined;
+  dh: number | undefined;
+}
+
+/** getCachedDabTipCanvas 가 실제로 촉을 구울 수 있는 최소 document/window 스텁. */
+function stubRealCanvasEnvironment(): { createdTips: { width: number; height: number }[] } {
+  const createdTips: { width: number; height: number }[] = [];
+  vi.stubGlobal("window", {} as Window & typeof globalThis);
+  vi.stubGlobal("document", {
+    createElement: (tag: string) => {
+      if (tag !== "canvas") throw new Error(`unexpected element: ${tag}`);
+      const tip = {
+        width: 0,
+        height: 0,
+        getContext: (kind: string) =>
+          kind === "2d"
+            ? {
+                fillStyle: "",
+                strokeStyle: "",
+                lineWidth: 0,
+                beginPath: () => undefined,
+                arc: () => undefined,
+                fill: () => undefined,
+                stroke: () => undefined,
+                createRadialGradient: () => ({ addColorStop: () => undefined }),
+              }
+            : null,
+      };
+      createdTips.push(tip);
+      return tip;
+    },
+  });
+  return { createdTips };
+}
+
+/** 실제 캔버스로 판정되는(= 캐시 blit 경로를 타는) 기록용 컨텍스트. */
+function blitRecordingContext() {
+  const blits: RecordedBlit[] = [];
+  const arcs: { x: number; y: number; r: number }[] = [];
+  let pathArc: { x: number; y: number; r: number } | null = null;
+  const context = {
+    canvas: {} as HTMLCanvasElement,
+    globalAlpha: 1,
+    fillStyle: "",
+    strokeStyle: "",
+    lineWidth: 0,
+    createRadialGradient: () => ({ addColorStop: () => undefined }),
+    beginPath: () => {
+      pathArc = null;
+    },
+    arc: (x: number, y: number, r: number) => {
+      pathArc = { x, y, r };
+    },
+    fill: () => {
+      if (pathArc) arcs.push(pathArc);
+    },
+    stroke: () => undefined,
+    drawImage: (
+      source: object,
+      dx: number,
+      dy: number,
+      dw?: number,
+      dh?: number
+    ) => {
+      blits.push({ source, dx, dy, dw, dh });
+    },
+  } as unknown as CanvasRenderingContext2D;
+  return { context, blits, arcs };
+}
+
+/**
+ * blit 이 실제로 칠하는 반지름. 촉 래스터는 `bake*2 + 4` 픽셀 정사각형 안에 반지름 `bake` 의
+ * 원을 그리므로, 목적 사각형 폭에서 같은 비율을 되돌리면 화면 반지름이 나온다.
+ */
+function blittedRadius(blit: RecordedBlit, bakedRadius: number): number {
+  const tipSize = bakedRadius * 2 + 4;
+  expect(Number.isFinite(blit.dw ?? Number.NaN)).toBe(true);
+  expect(blit.dw).toBe(blit.dh);
+  return ((blit.dw as number) / tipSize) * bakedRadius;
+}
+
+describe("studio stamp brush engine — cached tip blit footprint", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("blits the planned continuous radius, not the integer bake radius", () => {
+    stubRealCanvasEnvironment();
+    // 0.35 = pressureRadius 의 테이퍼 하한(굽는 반지름 1 로 올림 — 자연 크기면 약 2.86배).
+    // 1.4 는 아래로, 1.6 은 위로 양자화되던 경계값.
+    for (const [index, radius] of [0.35, 1.4, 1.6].entries()) {
+      const { context, blits, arcs } = blitRecordingContext();
+      const brushStyle = style("ink", { color: `#01020${index}` });
+      drawStudioStampBrushDabs(context, brushStyle, [
+        { x: 40, y: 24, radius, alpha: 0.8, index },
+      ]);
+      expect(blits, `radius ${radius}: cached tip lane not taken`).toHaveLength(1);
+      expect(arcs, `radius ${radius}: fell through to the arc fallback`).toHaveLength(0);
+      const blit = blits[0]!;
+      const bakedRadius = Math.max(1, Math.round(radius));
+      expect(blittedRadius(blit, bakedRadius)).toBeCloseTo(radius, 10);
+      // 발자국은 계획 좌표 중심에 그대로 놓인다.
+      expect(blit.dx + (blit.dw as number) / 2).toBeCloseTo(40, 10);
+      expect(blit.dy + (blit.dh as number) / 2).toBeCloseTo(24, 10);
+    }
+  });
+
+  it("agrees with the non-cached arc fallback for the same planned dab", () => {
+    const dab = { x: 12, y: 9, radius: 1.4, alpha: 0.6, index: 3 };
+    const brushStyle = style("ink", { color: "#0a0b0c" });
+
+    // 폴백(=의도된 동작): 정확한 radius 로 arc 를 그린다.
+    const fallback = recordingContext();
+    drawStudioStampBrushDabs(fallback.context, brushStyle, [dab]);
+    expect(fallback.dabs).toHaveLength(1);
+    const fallbackRadius = fallback.dabs[0]!.r;
+    expect(fallbackRadius).toBeCloseTo(dab.radius, 10);
+
+    stubRealCanvasEnvironment();
+    const cached = blitRecordingContext();
+    drawStudioStampBrushDabs(cached.context, brushStyle, [dab]);
+    expect(cached.blits).toHaveLength(1);
+    expect(blittedRadius(cached.blits[0]!, 1)).toBeCloseTo(fallbackRadius, 10);
+  });
+
+  it("keeps one baked raster serving several fractional radii", () => {
+    const { createdTips } = stubRealCanvasEnvironment();
+    const { context, blits } = blitRecordingContext();
+    const brushStyle = style("ink", { color: "#0d0e0f" });
+    // 넷 다 Math.max(1, Math.round(r)) === 1 → 같은 캐시 키.
+    const radii = [0.35, 0.6, 1.2, 1.4];
+    drawStudioStampBrushDabs(
+      context,
+      brushStyle,
+      radii.map((radius, index) => ({ x: 30, y: 30, radius, alpha: 0.5, index }))
+    );
+
+    // 캐시 적중: 촉은 한 번만 구웠다.
+    expect(createdTips).toHaveLength(1);
+    expect(createdTips[0]).toMatchObject({ width: 6, height: 6 });
+    expect(blits).toHaveLength(radii.length);
+    expect(new Set(blits.map((blit) => blit.source)).size).toBe(1);
+
+    // 그래도 화면 발자국은 네 반지름 모두 서로 다르고 정확하다.
+    const widths = blits.map((blit) => blit.dw as number);
+    expect(new Set(widths).size).toBe(radii.length);
+    for (const [index, radius] of radii.entries()) {
+      expect(blittedRadius(blits[index]!, 1)).toBeCloseTo(radius, 10);
     }
   });
 });

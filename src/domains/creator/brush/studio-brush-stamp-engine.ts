@@ -979,14 +979,24 @@ function drawRoundDab(
       else if (kind === "charcoal") dabAlpha = alpha * 0.9;
       else if (kind === "pastel") dabAlpha = alpha * 0.9;
       context.globalAlpha = dabAlpha;
+      // 촉 래스터는 캐시 적중률을 위해 정수 반지름으로 굽지만, blit 은 계획된 연속 반지름으로
+      // 되돌린다. 자연 크기로 찍으면 화면 반지름이 Math.round(radius) 로 양자화돼 1.4 는 1.0,
+      // 1.6 은 2.0, 테이퍼 하한 0.35 는 1.0(약 3배)이 되고, 같은 dab 을 정확한 radius 로 쓰는
+      // 폴백 경로(아래 arc 분기)·SVG 내보내기와 아트보드가 어긋난다. 목적 사각형을
+      // radius/roundedRadius 로 곱하면 2px 여백까지 같은 비율로 늘어나 알파 프로파일은 그대로인
+      // 채 발자국만 정확해진다.
+      const bakedRadius = Math.max(1, Math.round(radius));
+      const tipScale = Number.isFinite(radius) && radius > 0 ? radius / bakedRadius : 1;
+      const tipWidth = cachedTip.width * tipScale;
+      const tipHeight = cachedTip.height * tipScale;
       if (tipRotationRadians && typeof context.translate === "function") {
         context.save();
         context.translate(x, y);
         context.rotate(tipRotationRadians);
-        context.drawImage(cachedTip, -cachedTip.width / 2, -cachedTip.height / 2);
+        context.drawImage(cachedTip, -tipWidth / 2, -tipHeight / 2, tipWidth, tipHeight);
         context.restore();
       } else {
-        context.drawImage(cachedTip, x - cachedTip.width / 2, y - cachedTip.height / 2);
+        context.drawImage(cachedTip, x - tipWidth / 2, y - tipHeight / 2, tipWidth, tipHeight);
       }
       // Spray grit is baked into the OSS tip raster (Klecks multi-octave coverage).
       // Extra micro-arcs would break plan/render dab-count parity contracts.
