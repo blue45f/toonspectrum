@@ -39,12 +39,4 @@ interface ImportMetaEnv {
   readonly VITE_DESK_PLATFORM_URL?: string;
   // `1` re-enables automatic visits/ping. Default off — desk-platform currently 502s without CORS.
   readonly VITE_DESK_PLATFORM_VISITS?: "1";
-  // 통합 로그인(Firebase Auth, deskcloud-fleet-auth) — 리터럴 금지, env 로만 주입(lib/firebaseAuth/config.ts).
-  // apiKey/appId 미설정 시 런타임 인증 비활성(isFirebaseAuthConfigured=false), 빌드/타입은 정상.
-  readonly VITE_FIREBASE_API_KEY?: string;
-  readonly VITE_FIREBASE_AUTH_DOMAIN?: string;
-  readonly VITE_FIREBASE_PROJECT_ID?: string;
-  readonly VITE_FIREBASE_STORAGE_BUCKET?: string;
-  readonly VITE_FIREBASE_SENDER_ID?: string;
-  readonly VITE_FIREBASE_APP_ID?: string;
 }
