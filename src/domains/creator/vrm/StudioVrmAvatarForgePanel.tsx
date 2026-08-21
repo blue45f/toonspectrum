@@ -27,6 +27,10 @@ import {
 } from "./studio-vrm-avatar-forge";
 import { resolveStudioVrmAvatarForgeVisualProportionMetrics } from "./studio-vrm-avatar-forge-face-controller";
 import {
+  applyStudioVrmCharacterVariant,
+  listStudioVrmCharacterVariantSummaries,
+} from "./studio-vrm-character-variants";
+import {
   generateStudioVrmCharacter,
   type StudioVrmGenerateResult,
 } from "./studio-vrm-generate-mcp";
@@ -231,6 +235,31 @@ export function StudioVrmAvatarForgePanel({
                   </button>
                 );
               })}
+            </div>
+            <div className="mt-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-[0.68rem] font-bold text-fg-2">캐릭터 베리언트</p>
+                <span className="text-[0.62rem] text-fg-3">얼굴 비율을 유지한 채 헤어·체형 교체</span>
+              </div>
+              <div className="-mx-3.5 flex snap-x snap-mandatory gap-2 overflow-x-auto px-3.5 pb-2 [scrollbar-width:thin]">
+                {listStudioVrmCharacterVariantSummaries().map((variant) => (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    disabled={disabled}
+                    aria-label={`${variant.label} 베리언트: ${variant.description}`}
+                    title={variant.tags.join(" · ")}
+                    onClick={() => onChange(applyStudioVrmCharacterVariant(state, variant.id))}
+                    className="min-h-[5.2rem] w-[8.4rem] shrink-0 snap-start rounded-xl border border-line bg-card p-2.5 text-left text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
+                  >
+                    <span className="text-lg" aria-hidden>{variant.emoji}</span>
+                    <span className="mt-1 block text-[0.68rem] font-extrabold">{variant.label}</span>
+                    <span className="mt-0.5 line-clamp-2 block text-[0.6rem] leading-snug text-fg-3">
+                      {variant.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="mt-2.5 rounded-xl border border-line/70 bg-panel/55 p-2.5">
               <p className="flex items-center gap-1.5 text-[0.66rem] font-bold text-fg-2">
