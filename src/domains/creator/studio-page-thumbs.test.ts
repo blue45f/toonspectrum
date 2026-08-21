@@ -436,6 +436,39 @@ describe("studio-page-thumbs — buildThumbNodes(요소 프록시)", () => {
     expect(speed.d.split("M").length - 1).toBe(14); // 속도선 상한 14
   });
 
+  it("focusLines: noise 를 캔버스와 동일하게 반영한다(예전 썸네일은 통째로 무시했다)", () => {
+    // 회귀 방지 — 썸네일이 noise 를 안 읽어서 캔버스와 다른 그림을 보여주던 버그.
+    const focus = (noise: number) => {
+      const { nodes } = buildThumbNodes(
+        pageWith([
+          {
+            id: "fx-noise",
+            type: "focusLines",
+            x: 0,
+            y: 0,
+            width: 400,
+            height: 400,
+            lineCount: 12,
+            innerRadius: 100,
+            outerRadius: 200,
+            noise,
+            stroke: "#000000",
+            strokeWidth: 2,
+            rotation: 0,
+          },
+        ])
+      );
+      const node = nodes[0];
+      if (node.kind !== "path") throw new Error("path 노드가 아님");
+      return node.d;
+    };
+    const clean = focus(0);
+    const noisy = focus(24);
+    expect(noisy).not.toBe(clean);
+    // 같은 시드(id)면 결정적이어야 재렌더에도 썸네일이 흔들리지 않는다.
+    expect(focus(24)).toBe(noisy);
+  });
+
   it("숨김 요소·숨김 그룹 소속 요소는 제외한다", () => {
     const page = pageWith(
       [

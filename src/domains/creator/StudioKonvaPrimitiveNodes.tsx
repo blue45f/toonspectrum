@@ -8,6 +8,12 @@ import {
   Text as KText,
 } from "react-konva/lib/ReactKonvaCore";
 
+import {
+  planStudioFocusLineSegments,
+  planStudioSpeedLineSegments,
+  STUDIO_FOCUS_LINE_DEFAULTS,
+  STUDIO_SPEED_LINE_DEFAULTS,
+} from "./render/studio-radial-line-geometry";
 import { resizableNodeProps } from "./studio-node-props";
 
 import type { FocusLinesEl, FrameEl, SpeedLinesEl } from "./studio-element-model";
@@ -263,17 +269,6 @@ export function StudioFramePanel({
   );
 }
 
-function seededRandom(seedStr: string) {
-  let hash = 0;
-  for (let i = 0; i < seedStr.length; i++) {
-    hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return () => {
-    const x = Math.sin(hash++) * 10000;
-    return x - Math.floor(x);
-  };
-}
-
 export function StudioFocusLinesNode({
   el,
   draggable,
@@ -293,34 +288,15 @@ export function StudioFocusLinesNode({
   onInteractionBegin?: () => boolean;
   onInteractionEnd?: () => void;
 }) {
-  const count = el.lineCount ?? 80;
-  const innerR = el.innerRadius ?? 120;
-  const outerR = el.outerRadius ?? 600;
-  const noise = el.noise ?? 24;
-
   return (
     <Shape
       studioElementId={el.id}
       ref={innerRef}
       sceneFunc={(context, shape) => {
         context.beginPath();
-        const cx = el.width * (el.centerXRatio ?? 0.5);
-        const cy = el.height * (el.centerYRatio ?? 0.5);
-        const rand = seededRandom(el.id);
-        for (let i = 0; i < count; i++) {
-          const angle = (i * 2 * Math.PI) / count;
-          const nStart = (rand() - 0.5) * noise;
-          const nEnd = (rand() - 0.5) * noise;
-          const rStart = Math.max(1, innerR + nStart);
-          const rEnd = Math.max(rStart + 10, outerR + nEnd);
-
-          const x1 = cx + rStart * Math.cos(angle);
-          const y1 = cy + rStart * Math.sin(angle);
-          const x2 = cx + rEnd * Math.cos(angle);
-          const y2 = cy + rEnd * Math.sin(angle);
-
-          context.moveTo(x1, y1);
-          context.lineTo(x2, y2);
+        for (const segment of planStudioFocusLineSegments(el)) {
+          context.moveTo(segment.x1, segment.y1);
+          context.lineTo(segment.x2, segment.y2);
         }
         context.fillStrokeShape(shape);
       }}
@@ -335,8 +311,8 @@ export function StudioFocusLinesNode({
       y={el.y}
       width={el.width}
       height={el.height}
-      stroke={el.stroke ?? "#000000"}
-      strokeWidth={el.strokeWidth ?? 2.5}
+      stroke={el.stroke ?? STUDIO_FOCUS_LINE_DEFAULTS.stroke}
+      strokeWidth={el.strokeWidth ?? STUDIO_FOCUS_LINE_DEFAULTS.strokeWidth}
       rotation={el.rotation ?? 0}
       opacity={el.opacity ?? 1}
       {...resizableNodeProps<Partial<FocusLinesEl>>({
@@ -370,34 +346,15 @@ export function StudioSpeedLinesNode({
   onInteractionBegin?: () => boolean;
   onInteractionEnd?: () => void;
 }) {
-  const count = el.lineCount ?? 60;
-  const dir = el.direction ?? "horizontal";
-
   return (
     <Shape
       studioElementId={el.id}
       ref={innerRef}
       sceneFunc={(context, shape) => {
         context.beginPath();
-        const rand = seededRandom(el.id);
-        const w = el.width;
-        const h = el.height;
-        if (dir === "horizontal") {
-          for (let i = 0; i < count; i++) {
-            const y = rand() * h;
-            const len = w * (0.2 + rand() * 0.8);
-            const xStart = rand() > 0.5 ? 0 : w - len;
-            context.moveTo(xStart, y);
-            context.lineTo(xStart + len, y);
-          }
-        } else {
-          for (let i = 0; i < count; i++) {
-            const x = rand() * w;
-            const len = h * (0.2 + rand() * 0.8);
-            const yStart = rand() > 0.5 ? 0 : h - len;
-            context.moveTo(x, yStart);
-            context.lineTo(x, yStart + len);
-          }
+        for (const segment of planStudioSpeedLineSegments(el)) {
+          context.moveTo(segment.x1, segment.y1);
+          context.lineTo(segment.x2, segment.y2);
         }
         context.fillStrokeShape(shape);
       }}
@@ -412,8 +369,8 @@ export function StudioSpeedLinesNode({
       y={el.y}
       width={el.width}
       height={el.height}
-      stroke={el.stroke ?? "#000000"}
-      strokeWidth={el.strokeWidth ?? 2.5}
+      stroke={el.stroke ?? STUDIO_SPEED_LINE_DEFAULTS.stroke}
+      strokeWidth={el.strokeWidth ?? STUDIO_SPEED_LINE_DEFAULTS.strokeWidth}
       rotation={el.rotation ?? 0}
       opacity={el.opacity ?? 1}
       {...resizableNodeProps<Partial<SpeedLinesEl>>({

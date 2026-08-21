@@ -7,6 +7,15 @@ import {
   type SceneNodeIR,
 } from "@toonspectrum/studio-project-model";
 
+import {
+  placeStudioLineSegment,
+  planStudioFocusLineSegments,
+  planStudioSpeedLineSegments,
+  STUDIO_FOCUS_LINE_DEFAULTS,
+  STUDIO_SPEED_LINE_DEFAULTS,
+  type StudioLineSegment,
+} from "./studio-radial-line-geometry";
+
 import type { El } from "../studio-element-model";
 
 /**
@@ -157,6 +166,41 @@ export function studioDocumentAllowsKonvaHide(
   return true;
 }
 
+/**
+ * Element-local line segments → placed stroke nodes.
+ *
+ * Placement uses the Konva node transform (`translate(x, y) · rotate`), so the
+ * pivot is the node ORIGIN. The previous lowering rotated focus rays about the
+ * pattern centre and ignored speed-line rotation entirely.
+ */
+function lineSegmentNodes(
+  element: {
+    readonly id: string;
+    readonly x: number;
+    readonly y: number;
+    readonly rotation: number;
+    readonly stroke?: string;
+    readonly strokeWidth?: number;
+  },
+  segments: readonly StudioLineSegment[],
+  fallbackStrokeWidth: number,
+  opacity: number,
+): RenderNodeIR[] {
+  const color = parseCssColorToIR(element.stroke, { r: 0, g: 0, b: 0, a: 1 });
+  const placement = { x: element.x, y: element.y, rotationDeg: element.rotation };
+  const width = element.strokeWidth ?? fallbackStrokeWidth;
+  return segments.map((segment, index) => {
+    const placed = placeStudioLineSegment(segment, placement);
+    return strokeNode(
+      `${element.id}:${index}`,
+      polylineToPath([[placed.x1, placed.y1], [placed.x2, placed.y2]]),
+      color,
+      width,
+      opacity,
+    );
+  });
+}
+
 function lowerElement(element: El): RenderNodeIR[] {
   if (element.hidden) return [];
   const opacity = clamp01(element.opacity ?? 1);
@@ -180,56 +224,24 @@ function lowerElement(element: El): RenderNodeIR[] {
       // Brush/media strokes and even geometric draw-nodes keep Konva appearance
       // (pressure, wash, stamp, sketch, gradient, pattern). Do not polyline them.
       return [];
-    case "focusLines": {
-      const cx = element.x + element.width * (element.centerXRatio ?? 0.5);
-      const cy = element.y + element.height * (element.centerYRatio ?? 0.5);
-      const color = parseCssColorToIR(element.stroke, { r: 0, g: 0, b: 0, a: 1 });
-      const nodes: RenderNodeIR[] = [];
-      for (let index = 0; index < element.lineCount; index += 1) {
-        const angle = (Math.PI * 2 * index) / element.lineCount + (element.rotation * Math.PI) / 180;
-        const inner = element.innerRadius;
-        const outer = element.outerRadius;
-        const jitter = (element.noise ?? 0) * ((index % 5) - 2) * 0.4;
-        nodes.push(strokeNode(
-          `${element.id}:${index}`,
-          polylineToPath([
-            [cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner],
-            [cx + Math.cos(angle) * (outer + jitter), cy + Math.sin(angle) * (outer + jitter)],
-          ]),
-          color,
-          element.strokeWidth,
-          opacity,
-        ));
-      }
-      return nodes;
-    }
-    case "speedLines": {
-      const color = parseCssColorToIR(element.stroke, { r: 0, g: 0, b: 0, a: 1 });
-      const nodes: RenderNodeIR[] = [];
-      for (let index = 0; index < element.lineCount; index += 1) {
-        const t = element.lineCount <= 1 ? 0.5 : index / (element.lineCount - 1);
-        if (element.direction === "horizontal") {
-          const y = element.y + t * element.height;
-          nodes.push(strokeNode(
-            `${element.id}:${index}`,
-            polylineToPath([[element.x, y], [element.x + element.width, y]]),
-            color,
-            element.strokeWidth,
-            opacity,
-          ));
-        } else {
-          const x = element.x + t * element.width;
-          nodes.push(strokeNode(
-            `${element.id}:${index}`,
-            polylineToPath([[x, element.y], [x, element.y + element.height]]),
-            color,
-            element.strokeWidth,
-            opacity,
-          ));
-        }
-      }
-      return nodes;
-    }
+    // Focus/speed lines share ONE planner with the Konva nodes, the SVG
+    // exporter, and page thumbnails. Do not reimplement the geometry here — a
+    // GPU-vs-CPU pixel gate cannot see a geometry divergence, because both
+    // Vello lanes would render the same wrong artwork in perfect agreement.
+    case "focusLines":
+      return lineSegmentNodes(
+        element,
+        planStudioFocusLineSegments(element),
+        STUDIO_FOCUS_LINE_DEFAULTS.strokeWidth,
+        opacity,
+      );
+    case "speedLines":
+      return lineSegmentNodes(
+        element,
+        planStudioSpeedLineSegments(element),
+        STUDIO_SPEED_LINE_DEFAULTS.strokeWidth,
+        opacity,
+      );
     case "text":
     case "sticker":
       return [{

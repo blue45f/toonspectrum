@@ -94,10 +94,17 @@ const MOVED_FUNCTIONS = [
   "StudioWorkAssetPlaceholderNode",
   "coverFitRect",
   "StudioFramePanel",
-  "seededRandom",
   "StudioFocusLinesNode",
   "StudioSpeedLinesNode",
 ] as const;
+
+/**
+ * Focus/speed-line geometry (`seededRandom` included) no longer lives here: it
+ * moved to the renderer-neutral planner so Konva, the Vello/WebGPU lowering,
+ * the SVG exporter, and page thumbnails all draw from one source. It must not
+ * come back — a second copy is how the four lanes diverged in the first place.
+ */
+const GEOMETRY_OWNED_BY_PLANNER = ["seededRandom"] as const;
 
 const EXPORTED_COMPONENTS = [
   "StudioWorkAssetPlaceholderNode",
@@ -133,7 +140,10 @@ describe("Studio Konva primitive node boundary", () => {
       expect(primitives.exportedDeclarations.has(name)).toBe(true);
     }
     expect(primitives.exportedDeclarations.has("coverFitRect")).toBe(false);
-    expect(primitives.exportedDeclarations.has("seededRandom")).toBe(false);
+    for (const name of GEOMETRY_OWNED_BY_PLANNER) {
+      expect(primitives.topLevelDeclarations.has(name)).toBe(false);
+      expect(page.topLevelDeclarations.has(name)).toBe(false);
+    }
     for (const name of LEGACY_COMPONENT_NAMES) {
       expect(page.topLevelDeclarations.has(name)).toBe(false);
       expect(viewport.source).not.toMatch(new RegExp(`<${name}\\b`, "u"));
@@ -149,6 +159,7 @@ describe("Studio Konva primitive node boundary", () => {
     expect(primitives.imports).toEqual([
       "react",
       "react-konva/lib/ReactKonvaCore",
+      "./render/studio-radial-line-geometry",
       "./studio-node-props",
       "./studio-element-model",
       "./studio-work-asset-render-projection",

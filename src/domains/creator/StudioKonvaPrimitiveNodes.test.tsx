@@ -3,6 +3,8 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { lowerStudioElementsToRenderScene } from "./render/studio-document-scene-lower";
+import { STUDIO_FOCUS_LINE_DEFAULTS } from "./render/studio-radial-line-geometry";
 import {
   StudioFocusLinesNode,
   StudioFramePanel,
@@ -10,7 +12,7 @@ import {
   StudioWorkAssetPlaceholderNode,
 } from "./StudioKonvaPrimitiveNodes";
 
-import type { FocusLinesEl, FrameEl, SpeedLinesEl } from "./studio-element-model";
+import type { El, FocusLinesEl, FrameEl, SpeedLinesEl } from "./studio-element-model";
 import type { StudioWorkAssetRenderPlaceholder } from "./studio-work-asset-render-projection";
 import type { ReactNode } from "react";
 
@@ -361,5 +363,142 @@ describe("StudioWorkAssetPlaceholderNode", () => {
     });
     expect(konvaCapture.texts.map((props) => props.text)).toEqual(["공유 에셋", "동기화 완료"]);
     expect(konvaCapture.groups[0]).toMatchObject({ listening: false, rotation: 5, x: 10, y: 20 });
+  });
+});
+
+/**
+ * Konva ↔ Vello/WebGPU parity — the repo's first assertion that the two
+ * renderers agree about WHAT to draw, not merely that two Vello lanes agree
+ * with each other.
+ *
+ * The product's shadow gate (`compareToReference` + a δ48 3×3 fuzzy diff at
+ * 0.6%) compares Vello-GPU to Vello-CPU. It is structurally blind to a geometry
+ * divergence: both lanes render the same wrong picture in perfect agreement.
+ * It also forgives a 47/255 channel delta and a one-pixel shift, so it could
+ * pass a subtly wrong algorithm. This assertion is therefore EXACT, and it is
+ * anchored on the Konva `sceneFunc` recording — the artwork the artist sees.
+ *
+ * `rotation: 37` is load-bearing. The lowering used to rotate focus rays about
+ * the pattern centre and ignore speed-line rotation entirely; both bugs are
+ * invisible at `rotation: 0`, which is the common case. Without a rotated
+ * fixture this test would be theatre.
+ */
+describe("Konva ↔ Vello lowering geometry parity", () => {
+  function recordSceneSegments(shape: CapturedShapeProps): number[][] {
+    const context = sceneContext();
+    shape.sceneFunc(context, {});
+    expect(context.moves).toHaveLength(context.lines.length);
+    return context.moves.map((move, index) => [
+      move[0],
+      move[1],
+      context.lines[index][0],
+      context.lines[index][1],
+    ]);
+  }
+
+  function loweredStrokeSegments(element: El): number[][] {
+    const scene = lowerStudioElementsToRenderScene([element], { width: 1200, height: 900 });
+    return scene.nodes.map((node) => {
+      if (node.kind !== "stroke-path") throw new Error(`expected stroke-path, got ${node.kind}`);
+      const [start, end, ...rest] = node.path.verbs;
+      if (start?.v !== "M" || end?.v !== "L" || rest.length > 0) {
+        throw new Error("expected a two-point polyline per line segment");
+      }
+      return [start.x, start.y, end.x, end.y];
+    });
+  }
+
+  /**
+   * Konva's absolute transform for a node with only x/y/rotation set, written
+   * out longhand ON PURPOSE. Routing this side through `placeStudioLineSegment`
+   * would make the comparison tautological — both sides would share the very
+   * function whose pivot choice is the thing under test.
+   */
+  function konvaAbsolute(
+    point: readonly [number, number],
+    node: { x: number; y: number; rotation: number },
+  ): [number, number] {
+    const radians = (node.rotation * Math.PI) / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    return [
+      node.x + point[0] * cos - point[1] * sin,
+      node.y + point[0] * sin + point[1] * cos,
+    ];
+  }
+
+  function expectLaneParity(
+    shape: CapturedShapeProps,
+    element: El & { x: number; y: number; rotation: number },
+  ): void {
+    const konva = recordSceneSegments(shape);
+    const placed = konva.map((segment) => [
+      ...konvaAbsolute([segment[0], segment[1]], element),
+      ...konvaAbsolute([segment[2], segment[3]], element),
+    ]);
+    const lowered = loweredStrokeSegments(element);
+    expect(lowered).toHaveLength(placed.length);
+    expect(placed.length).toBeGreaterThan(0);
+    expect(lowered).toEqual(placed);
+  }
+
+  it.each([0, 37])("focus lines agree coordinate-for-coordinate at rotation %i", (rotation) => {
+    const el = focusLines({ noise: 24, rotation, x: 41, y: 23 });
+    render(<StudioFocusLinesNode {...commonNodeProps()} el={el} />);
+    expectLaneParity(latest(konvaCapture.shapes, "focus shape") as unknown as CapturedShapeProps, el);
+  });
+
+  it("focus lines agree with noise disabled", () => {
+    const el = focusLines({ noise: 0, rotation: 37, x: 41, y: 23 });
+    render(<StudioFocusLinesNode {...commonNodeProps()} el={el} />);
+    expectLaneParity(latest(konvaCapture.shapes, "focus shape") as unknown as CapturedShapeProps, el);
+  });
+
+  it.each([0, 37])("horizontal speed lines agree at rotation %i", (rotation) => {
+    const el = speedLines({ direction: "horizontal", rotation, x: 41, y: 23 });
+    render(<StudioSpeedLinesNode {...commonNodeProps()} el={el} />);
+    expectLaneParity(latest(konvaCapture.shapes, "speed shape") as unknown as CapturedShapeProps, el);
+  });
+
+  it("vertical speed lines agree at rotation 37", () => {
+    const el = speedLines({ direction: "vertical", rotation: 37, x: 41, y: 23 });
+    render(<StudioSpeedLinesNode {...commonNodeProps()} el={el} />);
+    expectLaneParity(latest(konvaCapture.shapes, "speed shape") as unknown as CapturedShapeProps, el);
+  });
+
+  it("agrees on an element that omits every optional field a saved document may predate", () => {
+    // Konva's `??` fallbacks are the contract. The old lowering read the raw
+    // fields and produced NaN geometry when one was missing.
+    const el = {
+      height: 320,
+      id: "legacy-burst",
+      rotation: 37,
+      type: "focusLines",
+      width: 320,
+      x: 12,
+      y: 34,
+    } as unknown as FocusLinesEl;
+    render(<StudioFocusLinesNode {...commonNodeProps()} el={el} />);
+    const shape = latest(konvaCapture.shapes, "focus shape") as unknown as CapturedShapeProps;
+    const konva = recordSceneSegments(shape);
+    expect(konva).toHaveLength(STUDIO_FOCUS_LINE_DEFAULTS.lineCount);
+    expect(konva.flat().every(Number.isFinite)).toBe(true);
+    expectLaneParity(shape, el as El & { x: number; y: number; rotation: number });
+  });
+
+  it("keeps a full-box hit area on a node the GPU surface may be painting", () => {
+    // The strangler flips ownership by hiding Konva's PIXELS, not its picking:
+    // `Node#shouldDrawHit` gates on visible + listening, never on opacity, and
+    // `drawHit` runs `hitFunc` with no globalAlpha. An opacity-0 node still
+    // answers a hit query over its whole box.
+    const el = focusLines({ opacity: 0 });
+    render(<StudioFocusLinesNode {...commonNodeProps()} el={el} />);
+    const shape = latest(konvaCapture.shapes, "focus shape");
+    expect(shape.opacity).toBe(0);
+    // Never `listening={false}` — hiding pixels must not disarm picking.
+    expect(shape.listening).toBeUndefined();
+    const hit = sceneContext();
+    (shape as unknown as CapturedShapeProps).hitFunc(hit, {});
+    expect(hit.rect).toHaveBeenCalledWith(0, 0, el.width, el.height);
   });
 });

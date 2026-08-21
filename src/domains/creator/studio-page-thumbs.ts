@@ -22,6 +22,14 @@ import {
   type BubbleTailDirection,
   type BubbleTailSpec,
 } from "./lettering/studio-bubble-path";
+import {
+  planStudioFocusLineSegments,
+  planStudioSpeedLineSegments,
+  studioSeededRandom,
+  STUDIO_FOCUS_LINE_DEFAULTS,
+  STUDIO_SPEED_LINE_DEFAULTS,
+  type StudioLineSegment,
+} from "./render/studio-radial-line-geometry";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 
 // ── 입력 — 느슨한 구조 타입(StudioPage 의 El/PageState 가 그대로 대입 가능) ────────────
@@ -78,6 +86,8 @@ export interface ThumbElement {
   lineCount?: number;
   innerRadius?: number;
   outerRadius?: number;
+  /** 집중선 반지름 흔들림. 예전 썸네일은 이 필드를 아예 읽지 않아 캔버스와 그림이 달랐다. */
+  noise?: number;
   direction?: string;
   centerXRatio?: number;
   centerYRatio?: number;
@@ -315,17 +325,12 @@ export function joinTransforms(...parts: Array<string | null>): string | null {
   return list.length > 0 ? list.join(" ") : null;
 }
 
-/** StudioPage 캔버스와 동일한 시퀀스의 결정적 의사난수(속도선 위치 재현용). */
-export function seededRandom(seedStr: string): () => number {
-  let hash = 0;
-  for (let i = 0; i < seedStr.length; i++) {
-    hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return () => {
-    const x = Math.sin(hash++) * 10000;
-    return x - Math.floor(x);
-  };
-}
+/**
+ * StudioPage 캔버스와 동일한 시퀀스의 결정적 의사난수(속도선 위치 재현용).
+ * 구현 본체는 렌더러 중립 플래너(`render/studio-radial-line-geometry`)로 옮겼다 —
+ * 여기는 기존 임포트를 유지하기 위한 재수출.
+ */
+export const seededRandom = studioSeededRandom;
 
 // ── 요소 → ThumbNode 변환 ────────────────────────────────────────────────────────────
 
@@ -756,31 +761,28 @@ function drawNodes(el: ThumbElement, ctx: ThumbBuildContext): ThumbNode[] {
   ];
 }
 
+/** 세그먼트 목록 → 썸네일 path d 문자열(소수 2자리 반올림). */
+function lineSegmentsToThumbPath(segments: readonly StudioLineSegment[]): string {
+  return segments
+    .map((s) => `M ${round2(s.x1)} ${round2(s.y1)} L ${round2(s.x2)} ${round2(s.y2)}`)
+    .join(" ");
+}
+
 function focusLinesNodes(el: ThumbElement, ctx: ThumbBuildContext): ThumbNode[] {
-  const w = el.width ?? 0;
-  const h = el.height ?? 0;
-  const count = Math.max(1, Math.min(el.lineCount ?? 80, 20)); // 방사선 개수 상한(썸네일 비용)
-  const inner = el.innerRadius ?? 120;
-  const outer = el.outerRadius ?? 600;
-  const cx = w * (el.centerXRatio ?? 0.5);
-  const cy = h * (el.centerYRatio ?? 0.5);
-  const parts: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const angle = (i * 2 * Math.PI) / count;
-    parts.push(
-      `M ${round2(cx + inner * Math.cos(angle))} ${round2(cy + inner * Math.sin(angle))} L ${round2(
-        cx + outer * Math.cos(angle)
-      )} ${round2(cy + outer * Math.sin(angle))}`
-    );
-  }
+  // 캔버스와 같은 플래너 — 예전에는 noise 를 통째로 빠뜨려서 썸네일과 캔버스의
+  // 집중선이 서로 다른 그림이었다. 상한(20)은 lineCount 자체를 낮추므로 방사선은
+  // 원 전체에 고르게 남는다(앞쪽 20개만 잘라내면 한쪽 부채꼴만 남아 더 나쁘다).
+  const parts = lineSegmentsToThumbPath(
+    planStudioFocusLineSegments(el, { maxSegments: 20 }), // 방사선 개수 상한(썸네일 비용)
+  );
   return [
     {
       kind: "path",
       key: el.id,
-      d: parts.join(" "),
+      d: parts,
       fill: null,
-      stroke: el.stroke ?? "#000000",
-      strokeWidth: clampThumbStroke(el.strokeWidth ?? 2.5, ctx.minStroke),
+      stroke: el.stroke ?? STUDIO_FOCUS_LINE_DEFAULTS.stroke,
+      strokeWidth: clampThumbStroke(el.strokeWidth ?? STUDIO_FOCUS_LINE_DEFAULTS.strokeWidth, ctx.minStroke),
       dashed: false,
       transform: svgLocalTransform(el.x ?? 0, el.y ?? 0, el.rotation ?? 0),
       opacity: el.opacity ?? 1,
@@ -789,33 +791,18 @@ function focusLinesNodes(el: ThumbElement, ctx: ThumbBuildContext): ThumbNode[] 
 }
 
 function speedLinesNodes(el: ThumbElement, ctx: ThumbBuildContext): ThumbNode[] {
-  const w = el.width ?? 0;
-  const h = el.height ?? 0;
-  const count = Math.max(1, Math.min(el.lineCount ?? 60, 14)); // 상한 — 캔버스와 같은 시드라 앞쪽 선 위치는 동일
-  const rand = seededRandom(el.id);
-  const horizontal = (el.direction ?? "horizontal") === "horizontal";
-  const parts: string[] = [];
-  for (let i = 0; i < count; i++) {
-    if (horizontal) {
-      const y = rand() * h;
-      const len = w * (0.2 + rand() * 0.8);
-      const xStart = rand() > 0.5 ? 0 : w - len;
-      parts.push(`M ${round2(xStart)} ${round2(y)} L ${round2(xStart + len)} ${round2(y)}`);
-    } else {
-      const x = rand() * w;
-      const len = h * (0.2 + rand() * 0.8);
-      const yStart = rand() > 0.5 ? 0 : h - len;
-      parts.push(`M ${round2(x)} ${round2(yStart)} L ${round2(x)} ${round2(yStart + len)}`);
-    }
-  }
+  // 상한 — 캔버스와 같은 시드/플래너라 앞쪽 14개 선 위치는 캔버스와 완전히 동일.
+  const parts = lineSegmentsToThumbPath(
+    planStudioSpeedLineSegments(el, { maxSegments: 14 }),
+  );
   return [
     {
       kind: "path",
       key: el.id,
-      d: parts.join(" "),
+      d: parts,
       fill: null,
-      stroke: el.stroke ?? "#000000",
-      strokeWidth: clampThumbStroke(el.strokeWidth ?? 2.5, ctx.minStroke),
+      stroke: el.stroke ?? STUDIO_SPEED_LINE_DEFAULTS.stroke,
+      strokeWidth: clampThumbStroke(el.strokeWidth ?? STUDIO_SPEED_LINE_DEFAULTS.strokeWidth, ctx.minStroke),
       dashed: false,
       transform: svgLocalTransform(el.x ?? 0, el.y ?? 0, el.rotation ?? 0),
       opacity: el.opacity ?? 1,
