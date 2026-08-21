@@ -76,13 +76,17 @@ describe("VRM durable creative product authority", () => {
 
   it("routes precision-sensitive tracking calibration to its own SQLite namespace", () => {
     const poser = source("./StudioVrmPoser.tsx");
+    // 2026-08-21 의도적 변경: 캘리브레이션 저장(save)은 웹캠 트래킹 루프와 함께
+    // use-studio-vrm-webcam-session.ts로 분리됐다. load/clear 는 포저에 그대로 남는다.
+    const webcamSession = source("./use-studio-vrm-webcam-session.ts");
     const repository = source("./studio-vrm-tracking-calibration-sqlite-repository.ts");
 
     expect(poser).toContain("createStudioVrmTrackingCalibrationSqliteRepository");
     expect(poser).toContain("trackingCalibrationRepository.load()");
-    expect(poser).toContain("trackingCalibrationRepository.save(cal)");
+    expect(webcamSession).toContain("trackingCalibrationRepository.save(cal)");
     expect(poser).toContain("trackingCalibrationRepository.clear()");
     expect(poser).not.toContain("CALIBRATION_STORAGE_KEY");
+    expect(webcamSession).not.toContain("CALIBRATION_STORAGE_KEY");
     expect(repository).toContain('"studio-vrm-tracking-calibration-v12"');
     expect(repository).toContain("acquireStudioLocalDatabase");
     expect(repository).not.toContain("localStorage");

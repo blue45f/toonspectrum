@@ -43,7 +43,17 @@ describe("studio live socket wire ownership boundary", () => {
   it("keeps connection lifecycle in transport and wire parsers out of that module", () => {
     const transport = moduleImports("./studio-live-socket-transport.ts");
 
-    expect(transport.specifiers).toContain("socket.io-client");
+    // 2026-08-21 intentional change: the Socket.IO connection factory (endpoint resolution,
+    // `io(...)` construction, realtime purpose routing, default injectables) moved to
+    // `studio-live-socket-connection-factory.ts`. The boundary still holds — one module owns the
+    // socket.io-client dependency and the transport reaches it only through that module.
+    const connectionFactory = moduleImports(
+      "./studio-live-socket-connection-factory.ts",
+    );
+
+    expect(connectionFactory.specifiers).toContain("socket.io-client");
+    expect(transport.specifiers).toContain("./studio-live-socket-connection-factory");
+    expect(transport.specifiers).not.toContain("socket.io-client");
     expect(transport.specifiers).toContain("./studio-live-socket-wire");
     for (const parser of [
       "parseParticipant",

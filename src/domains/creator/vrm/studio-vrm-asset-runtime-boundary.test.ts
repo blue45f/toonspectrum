@@ -103,6 +103,12 @@ describe("Studio VRM asset runtime ownership boundary", () => {
   it("keeps React, persistence, request arbitration, object URLs, and install orchestration in the parent", () => {
     const poser = moduleEdges("./StudioVrmPoser.tsx");
     const runtime = moduleEdges("./studio-vrm-asset-runtime.ts");
+    // 2026-08-21 의도적 변경: 요청 중재·objectURL·라이브러리 영속은 포저가 소유하는 훅
+    // use-studio-vrm-model-loading.ts 로 분리됐다. 이 경계가 지키는 것은 "리프(asset-runtime)가
+    // React/영속/설치를 소유하지 않는다"이므로, 소유자 쪽 검사는 포저 + 그 훅을 합친
+    // 에디터 계층 소스로 대조한다(리프 쪽 not.toContain 은 그대로).
+    const modelLoading = moduleEdges("./use-studio-vrm-model-loading.ts");
+    const editorLayerSource = `${poser.source}\n${modelLoading.source}`;
 
     for (const ownerToken of [
       "loadRequestRef",
@@ -113,7 +119,7 @@ describe("Studio VRM asset runtime ownership boundary", () => {
       "resetFullStateHistory",
       "setVrm(",
     ]) {
-      expect(poser.source).toContain(ownerToken);
+      expect(editorLayerSource).toContain(ownerToken);
       expect(runtime.source).not.toContain(ownerToken);
     }
     expect(runtime.allImports.some((specifier) => specifier.startsWith("react"))).toBe(false);
@@ -124,7 +130,7 @@ describe("Studio VRM asset runtime ownership boundary", () => {
   });
 
   it("leaves stale-request disposal and object-URL revocation ordering in the parent", () => {
-    const source = moduleEdges("./StudioVrmPoser.tsx").source;
+    const source = moduleEdges("./use-studio-vrm-model-loading.ts").source;
     const libraryStart = source.indexOf("function loadModelFromLibraryEntry");
     const libraryEnd = source.indexOf("async function handleFileChange", libraryStart);
     expect(libraryStart).toBeGreaterThanOrEqual(0);

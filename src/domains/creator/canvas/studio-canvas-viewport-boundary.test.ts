@@ -191,6 +191,10 @@ describe("Studio canvas viewport module boundary", () => {
   it("keeps transient shortcut notices below the memoized Stage boundary", () => {
     const page = moduleShape("../StudioPage.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
+    // 2026-08-21 intentional: the notice layer moved verbatim out of StudioCanvasViewport.tsx into
+    // its own leaf module. The boundary being guarded is unchanged — the store still lives in
+    // StudioPage, the subscribing layer still renders below the memoized Stage.
+    const noticeLayer = moduleShape("./StudioDrawingShortcutNoticeLayer.tsx");
 
     expect(page.source).toContain(
       "const [drawingShortcutNoticeStore] = useState(createStudioDrawingShortcutNoticeStore);",
@@ -204,14 +208,15 @@ describe("Studio canvas viewport module boundary", () => {
       "drawingShortcutNoticeStore={drawingShortcutNoticeStore}",
     );
     expect(page.source).not.toContain("drawingShortcutNotice={");
-    expect(viewport.source).toContain("function StudioDrawingShortcutNoticeLayer({");
-    expect(viewport.source).toContain("const snapshot = useSyncExternalStore(");
+    expect(viewport.source).toContain("<StudioDrawingShortcutNoticeLayer");
+    expect(noticeLayer.source).toContain("export function StudioDrawingShortcutNoticeLayer({");
+    expect(noticeLayer.source).toContain("const snapshot = useSyncExternalStore(");
     expect(viewport.source).toContain(
       "drawingShortcutNoticeStore: StudioDrawingShortcutNoticeStore;",
     );
-    expect(viewport.source).toContain('aria-live="polite"');
-    expect(viewport.source).toContain("key={notice.id}");
-    expect(viewport.source).toContain("const notice = hasAutosave ? null : snapshot;");
+    expect(noticeLayer.source).toContain('aria-live="polite"');
+    expect(noticeLayer.source).toContain("key={notice.id}");
+    expect(noticeLayer.source).toContain("const notice = hasAutosave ? null : snapshot;");
   });
 
   it("keeps the viewport and right inspector in one desktop row without collapsing canvas height", () => {
@@ -240,10 +245,16 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("keeps desktop status controls above the measured drawing options dock", () => {
+    // 2026-08-21 intentional: the desktop status bar moved verbatim out of
+    // StudioCanvasViewport.tsx into the stage-HUD leaf; the measured dock offset travelled with it.
+    const stageHud = moduleShape("./StudioCanvasStageHud.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
-    expect(viewport.source).toContain(
+    expect(stageHud.source).toContain(
       '"calc(var(--studio-draw-options-height, 3.75rem) + max(0.75rem, env(safe-area-inset-bottom)) + 0.75rem)"',
+    );
+    expect(stageHud.source).not.toContain(
+      'tool === "draw" && !isMobile && "bottom-[4.75rem]"',
     );
     expect(viewport.source).not.toContain(
       'tool === "draw" && !isMobile && "bottom-[4.75rem]"',

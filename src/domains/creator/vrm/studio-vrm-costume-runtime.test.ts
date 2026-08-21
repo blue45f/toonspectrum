@@ -75,7 +75,9 @@ describe("Studio VRM baked costume runtime", () => {
     expect(runtimeSource).not.toContain("StudioVrmPoser");
 
     const installStart = poserSource.indexOf("function installVrm(");
-    const installEnd = poserSource.indexOf("function beginModelLoad(", installStart);
+    // 2026-08-21 의도적 변경: beginModelLoad 가 use-studio-vrm-model-loading.ts 로 옮겨가,
+    // installVrm 다음 선언인 handlePoseSelect 를 종료 마커로 쓴다(잘라내는 구간은 동일).
+    const installEnd = poserSource.indexOf("function handlePoseSelect(", installStart);
     const installSource = poserSource.slice(installStart, installEnd);
     expect(installStart).toBeGreaterThanOrEqual(0);
     expect(installEnd).toBeGreaterThan(installStart);

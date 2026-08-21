@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 const source = [
   "./StudioBackground3D.tsx",
+  // 2026-08-21 intentional change: BgViewportController.readView moved into StudioBg3dSceneNodes.tsx.
+  "./StudioBg3dSceneNodes.tsx",
   "./StudioBg3dShapesPanel.tsx",
   "./StudioBg3dViewPanel.tsx",
   "./StudioBg3dLtPanel.tsx",
@@ -12,6 +14,19 @@ const cameraApplicationSource = readFileSync(
   new URL("./studio-bg3d-camera-application.ts", import.meta.url),
   "utf8",
 );
+// 2026-08-21 intentional change: the shot batch orchestration moved out of StudioBackground3D.tsx
+// into studio-bg3d-shot-batch-export-run.ts during the editor split. The `exportSavedShotsAsZip`
+// marker still resolves — it now lives in that module, so the slice reads it there instead.
+const shotBatchExportSource = readFileSync(
+  new URL("./studio-bg3d-shot-batch-export-run.ts", import.meta.url),
+  "utf8",
+);
+
+function exportedFunctionSlice(moduleSource: string, name: string): string {
+  const start = moduleSource.indexOf(`function ${name}(`);
+  expect(start).toBeGreaterThanOrEqual(0);
+  return moduleSource.slice(start);
+}
 
 function functionSlice(name: string, nextName: string): string {
   const start = source.indexOf(`function ${name}(`);
@@ -82,7 +97,7 @@ describe("Studio BG3D shot UI integration boundary", () => {
   });
 
   it("batch-renders selected shots and passes without recording temporary scene states in history", () => {
-    const handler = functionSlice("exportSavedShotsAsZip", "updateBackgroundTransparency");
+    const handler = exportedFunctionSlice(shotBatchExportSource, "exportSavedShotsAsZip");
 
     expect(handler.indexOf("if (shotBatchBlockedReason)")).toBeLessThan(
       handler.indexOf("readCurrentCanonicalSceneForShot()"),

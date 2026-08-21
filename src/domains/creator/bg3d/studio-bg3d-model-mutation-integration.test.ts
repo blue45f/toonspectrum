@@ -7,6 +7,15 @@ const admissionSource = readFileSync(
   new URL("./studio-bg3d-model-runtime-admission.ts", import.meta.url),
   "utf8",
 );
+// 2026-08-21 intentional change: handleUploadModelFiles and handleDeleteModelFromLibrary moved
+// out of StudioBackground3D.tsx into studio-bg3d-editor-model-import-actions.ts (editor split).
+// Their markers resolve in that module now; the module tail replaces the old end marker.
+const modelImportActionsSource = readFileSync(
+  new URL("./studio-bg3d-editor-model-import-actions.ts", import.meta.url),
+  "utf8",
+);
+const MODEL_IMPORT_ACTIONS_TAIL =
+  "return { handleDeleteModelFromLibrary, handleUploadModelFiles };";
 
 function sourceBetweenIn(haystack: string, startNeedle: string, endNeedle: string): string {
   const start = haystack.indexOf(startNeedle);
@@ -56,9 +65,10 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "async function ensureModelRootCached(",
       "function publishPlacementSession(",
     );
-    const remove = sourceBetween(
+    const remove = sourceBetweenIn(
+      modelImportActionsSource,
       "async function handleDeleteModelFromLibrary(",
-      "const handlePanelTabChange",
+      MODEL_IMPORT_ACTIONS_TAIL,
     );
 
     expectInOrder(admission, [
@@ -122,13 +132,14 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "function commitCustomModelPlacement(",
       "async function addCustomModelToScene(",
     );
-    const upload = sourceBetween(
+    const upload = sourceBetweenIn(
+      modelImportActionsSource,
       "async function handleUploadModelFiles(",
       "async function handleDeleteModelFromLibrary(",
     );
     const template = sourceBetween(
       "async function applyUserTemplate(",
-      "async function handleUploadModelFiles(",
+      "function reportLtUserPresetMutationFailure(",
     );
     expectInOrder(ensure, [
       "const live = physicsRuntimeSourceRef.current",
@@ -168,9 +179,10 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
   });
 
   it("preflights detachment before IndexedDB delete and advances one snapshot before React state", () => {
-    const handler = sourceBetween(
+    const handler = sourceBetweenIn(
+      modelImportActionsSource,
       "async function handleDeleteModelFromLibrary(",
-      "const handlePanelTabChange",
+      MODEL_IMPORT_ACTIONS_TAIL,
     );
     const commit = sourceBetween(
       "const commitSceneEntityRemoval = (",

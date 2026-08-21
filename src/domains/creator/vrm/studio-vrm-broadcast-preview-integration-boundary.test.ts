@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const POSER_PATH = fileURLToPath(new URL("./StudioVrmPoser.tsx", import.meta.url));
+const MODEL_LOADING_PATH = fileURLToPath(
+  new URL("./use-studio-vrm-model-loading.ts", import.meta.url),
+);
 const PREVIEW_PATH = fileURLToPath(
   new URL("./StudioVrmBroadcastPreview.tsx", import.meta.url),
 );
@@ -64,7 +67,9 @@ describe("Studio VRM broadcast preview product boundary", () => {
     );
     expect(poser).toContain("if (broadcastPreviewActive || isCapturing");
     expect(poser).toContain("if (broadcastPreviewActive || vrmCreativeReadOnly) return;");
-    expect(poser).toContain("if (broadcastPreviewActive) {\n      event.currentTarget.value");
+    // 2026-08-21 의도적 변경: handleFileChange 가 use-studio-vrm-model-loading.ts 로 분리됐다.
+    const modelLoading = await readFile(MODEL_LOADING_PATH, "utf8");
+    expect(modelLoading).toContain("if (broadcastPreviewActive) {\n      event.currentTarget.value");
     expect(poser).toContain("|| status !== \"ready\"\n      || broadcastPreviewActive");
   });
 

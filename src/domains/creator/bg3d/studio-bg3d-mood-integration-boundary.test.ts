@@ -2,8 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+// 2026-08-21 intentional change: the render-settings/sky controllers and mesh nodes moved out of
+// StudioBackground3D.tsx into StudioBg3dSceneNodes.tsx during the editor split.
 const background3dSource = [
   "./StudioBackground3D.tsx",
+  "./StudioBg3dSceneNodes.tsx",
   "./StudioBg3dDirectionalShadowLight.tsx",
   "./StudioBg3dShapesPanel.tsx",
   "./StudioBg3dViewPanel.tsx",

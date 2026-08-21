@@ -3,6 +3,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+// 2026-08-21 의도적 변경: 순수 헬퍼(studioVrmTexturePaintSceneIdentity 포함)가
+// StudioVrmPoser.tsx에서 studio-vrm-poser-helpers.ts로 분리됐다. 마커만 옮기고
+// 검증 대상(장면 아이덴티티는 surfacePaint 만 본다)은 그대로 유지한다.
+const poserHelpersSource = readFileSync(
+  new URL("./studio-vrm-poser-helpers.ts", import.meta.url),
+  "utf8",
+);
 const projectArchiveSource = readFileSync(
   new URL("../studio-project-archive-orchestration-runtime.ts", import.meta.url),
   "utf8",
@@ -259,9 +266,9 @@ describe("Studio VRM texture-paint wiring boundary", () => {
 
   it("recreates paint runtime only when canonical initial surface-paint identity changes", () => {
     const identityHelper = sourceBetween(
-      poserSource,
+      poserHelpersSource,
       "function studioVrmTexturePaintSceneIdentity(",
-      "type CustomPose =",
+      "export const EXPORT_HEIGHT",
     );
     expect(identityHelper).toContain("JSON.stringify(scene.surfacePaint)");
     expect(identityHelper).not.toContain("scene.model");

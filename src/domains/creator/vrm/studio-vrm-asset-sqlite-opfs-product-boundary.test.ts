@@ -15,24 +15,34 @@ function source(fileName: string): string {
 describe("VRM asset SQLite/OPFS product boundary", () => {
   it("routes the poser catalog, model load, upload, thumbnail, and delete through vrm-library defaults", () => {
     const poser = source("StudioVrmPoser.tsx");
+    // 2026-08-21 의도적 변경: 모델 로딩·업로드·삭제가 StudioVrmPoser.tsx에서
+    // use-studio-vrm-model-loading.ts(포저가 소유하는 훅)로 분리됐다. 카탈로그/썸네일은
+    // 포저에 남아 있어 그대로 대조하고, 이동한 경로만 새 모듈로 마커를 옮긴다.
+    const modelLoading = source("use-studio-vrm-model-loading.ts");
     expect(poser).toContain("queryUploadedVrmLibraryEntriesPage({");
     expect(poser).toContain("hydrateVrmLibraryThumbnailWindow(windowEntries");
     expect(poser).not.toContain("listVrmLibraryEntries()");
-    expect(poser).toContain("await getStoredVrmModel(entry.id)");
-    expect(poser).toContain("await saveUploadedVrm(file)");
+    expect(modelLoading).toContain("await getStoredVrmModel(entry.id)");
+    expect(modelLoading).toContain("await saveUploadedVrm(file)");
     expect(poser).toContain("saveVrmThumbnail(activeLibraryEntry.id, thumbnail)");
-    expect(poser).toContain("await deleteStoredVrmModel(entry.id)");
+    expect(modelLoading).toContain("await deleteStoredVrmModel(entry.id)");
     expect(poser).not.toContain("legacyIndexedDb");
     expect(poser).not.toContain("globalThis.indexedDB");
+    expect(modelLoading).not.toContain("legacyIndexedDb");
+    expect(modelLoading).not.toContain("globalThis.indexedDB");
   });
 
   it("preserves the catalog and cursor when a post-mutation first-page refresh fails", () => {
     const poser = source("StudioVrmPoser.tsx");
-    const uploadStart = poser.indexOf("async function handleFileChange(");
-    const deleteStart = poser.indexOf("async function handleDeleteEntry(", uploadStart);
-    const upload = poser.slice(uploadStart, deleteStart);
-    const deleteEnd = poser.indexOf("function handlePoseSelect(", deleteStart);
-    const deletion = poser.slice(deleteStart, deleteEnd);
+    // 2026-08-21 의도적 변경: 모델 로딩·업로드·삭제가 StudioVrmPoser.tsx에서
+    // use-studio-vrm-model-loading.ts(포저가 소유하는 훅)로 분리됐다. 카탈로그/썸네일은
+    // 포저에 남아 있어 그대로 대조하고, 이동한 경로만 새 모듈로 마커를 옮긴다.
+    const modelLoading = source("use-studio-vrm-model-loading.ts");
+    const uploadStart = modelLoading.indexOf("async function handleFileChange(");
+    const deleteStart = modelLoading.indexOf("async function handleDeleteEntry(", uploadStart);
+    const upload = modelLoading.slice(uploadStart, deleteStart);
+    const deleteEnd = modelLoading.indexOf("return {", deleteStart);
+    const deletion = modelLoading.slice(deleteStart, deleteEnd);
     expect(uploadStart).toBeGreaterThan(-1);
     expect(deleteStart).toBeGreaterThan(uploadStart);
     expect(deleteEnd).toBeGreaterThan(deleteStart);

@@ -91,8 +91,12 @@ describe("Studio BG3D control-field ownership boundary", () => {
 
     expect(loaderImports.valueImports).not.toContain("./bg3d/StudioBackground3D");
     expect(loaderImports.dynamicImports).toEqual(["./bg3d/StudioBackground3D"]);
+    // 2026-08-21 intentional change: the R3F mesh nodes moved from StudioBackground3D.tsx into
+    // StudioBg3dSceneNodes.tsx (editor split); both still sit behind the one lazy editor chunk.
+    const sceneNodesSource = moduleSource("./StudioBg3dSceneNodes.tsx");
+
     expect(editorSource).toContain("function CaptureBridge(");
-    expect(editorSource).toContain("function BgCustomModelMesh(");
-    expect(editorSource).toContain("function BgCustomModelInstanceBatch(");
+    expect(sceneNodesSource).toContain("function BgCustomModelMesh(");
+    expect(sceneNodesSource).toContain("function BgCustomModelInstanceBatch(");
   });
 });

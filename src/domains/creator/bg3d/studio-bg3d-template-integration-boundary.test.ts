@@ -10,6 +10,15 @@ const admissionSource = readFileSync(
   new URL("./studio-bg3d-model-runtime-admission.ts", import.meta.url),
   "utf8",
 );
+// 2026-08-21 intentional change: handleUploadModelFiles and handleDeleteModelFromLibrary moved
+// out of StudioBackground3D.tsx into studio-bg3d-editor-model-import-actions.ts (editor split).
+// Their markers resolve in that module now; the module tail replaces the old end marker.
+const modelImportActionsSource = readFileSync(
+  new URL("./studio-bg3d-editor-model-import-actions.ts", import.meta.url),
+  "utf8",
+);
+const MODEL_IMPORT_ACTIONS_TAIL =
+  "return { handleDeleteModelFromLibrary, handleUploadModelFiles };";
 
 function sourceBetweenIn(source: string, startMarker: string, endMarker: string): string {
   const start = source.indexOf(startMarker);
@@ -45,7 +54,7 @@ describe("Studio BG3D user-template integration boundary", () => {
   it("resolves every attachment by hash and commits hydrated placements only after all checks", () => {
     const apply = sourceBetween(
       "async function applyUserTemplate(",
-      "async function handleUploadModelFiles(",
+      "function reportLtUserPresetMutationFailure(",
     );
     const mutationStart = apply.indexOf("runSceneMutation(");
     const instantiate = apply.indexOf("instantiateBg3dTemplateDocument(");
@@ -78,7 +87,7 @@ describe("Studio BG3D user-template integration boundary", () => {
     );
     const apply = sourceBetween(
       "async function applyUserTemplate(",
-      "async function handleUploadModelFiles(",
+      "function reportLtUserPresetMutationFailure(",
     );
 
     expect(cacheAdmission).toContain("readonly onCacheEntryCreated?:");
@@ -95,7 +104,8 @@ describe("Studio BG3D user-template integration boundary", () => {
   });
 
   it("does not let a slow upload cleanup dispose cache committed by an earlier scene mutation", () => {
-    const upload = sourceBetween(
+    const upload = sourceBetweenIn(
+      modelImportActionsSource,
       "async function handleUploadModelFiles(",
       "async function handleDeleteModelFromLibrary(",
     );
@@ -111,9 +121,10 @@ describe("Studio BG3D user-template integration boundary", () => {
   });
 
   it("fences every user-dismiss path while persistent model deletion is active", () => {
-    const deletion = sourceBetween(
+    const deletion = sourceBetweenIn(
+      modelImportActionsSource,
       "async function handleDeleteModelFromLibrary(",
-      "const handlePanelTabChange",
+      MODEL_IMPORT_ACTIONS_TAIL,
     );
     const dismiss = sourceBetween(
       "function requestUserClose()",

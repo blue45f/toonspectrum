@@ -11,6 +11,15 @@ const admissionSource = readFileSync(
   new URL("./studio-bg3d-model-runtime-admission.ts", import.meta.url),
   "utf8",
 );
+// 2026-08-21 intentional change: handleUploadModelFiles and handleDeleteModelFromLibrary moved
+// out of StudioBackground3D.tsx into studio-bg3d-editor-model-import-actions.ts (editor split).
+// Their markers resolve in that module now; the module tail replaces the old end marker.
+const modelImportActionsSource = readFileSync(
+  new URL("./studio-bg3d-editor-model-import-actions.ts", import.meta.url),
+  "utf8",
+);
+const MODEL_IMPORT_ACTIONS_TAIL =
+  "return { handleDeleteModelFromLibrary, handleUploadModelFiles };";
 
 function sourceBetweenIn(haystack: string, startNeedle: string, endNeedle: string): string {
   const start = haystack.indexOf(startNeedle);
@@ -45,7 +54,8 @@ describe("Studio BG3D generic model mode integration boundary", () => {
   });
 
   it("records the original GLB, glTF, or OBJ/MTL boundary only after canonical admission", () => {
-    const upload = sourceBetween(
+    const upload = sourceBetweenIn(
+      modelImportActionsSource,
       "async function handleUploadModelFiles(",
       "async function handleDeleteModelFromLibrary(",
     );
@@ -137,9 +147,10 @@ describe("Studio BG3D generic model mode integration boundary", () => {
   });
 
   it("removes session-only source and classification metadata with persistent deletion", () => {
-    const remove = sourceBetween(
+    const remove = sourceBetweenIn(
+      modelImportActionsSource,
       "async function handleDeleteModelFromLibrary(",
-      "const handlePanelTabChange",
+      MODEL_IMPORT_ACTIONS_TAIL,
     );
     expectInOrder(remove, [
       "preflightAndDeleteStudioBg3dPersistedModel({",

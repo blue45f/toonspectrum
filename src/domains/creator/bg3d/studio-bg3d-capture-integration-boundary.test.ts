@@ -16,7 +16,9 @@ const studioLazyPanelStackSource = readFileSync(
 describe("Studio 3D asynchronous capture integration boundary", () => {
   it("keeps adapter registration stable when capture UI state rerenders", () => {
     const start = background3dSource.indexOf("function CaptureBridge(");
-    const end = background3dSource.indexOf("function SkyClearColorController", start);
+    // 2026-08-21 intentional change: SkyClearColorController moved into StudioBg3dSceneNodes.tsx,
+    // so CaptureBridge now ends at the next declaration left in the editor module.
+    const end = background3dSource.indexOf("type StudioBg3dImmersiveStageSuccess", start);
     const bridge = background3dSource.slice(start, end);
 
     expect(start).toBeGreaterThanOrEqual(0);

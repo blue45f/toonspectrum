@@ -48,9 +48,11 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
       "async function handleInsert()",
       "// 선택된 것이 도형(primitives)인지",
     );
+    // 2026-08-21 intentional change: ltOutputFingerprint moved into
+    // studio-bg3d-editor-derivations.ts (editor split); the cap now ends at the next declaration.
     const fallback = sourceBetween(
       "const STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS",
-      "function ltOutputFingerprint(",
+      "const BG_PANEL_TABS",
     );
 
     expect(fallback).toContain("1_048_576");

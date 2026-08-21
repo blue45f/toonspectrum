@@ -204,10 +204,12 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
 
   it("measures wardrobe and prop fit inside the committed proportion-rig rest lifecycle", () => {
     const proportionTransaction = proportionFitSource;
+    // 2026-08-21 의도적 변경: loadModelFromLibraryEntry 가 use-studio-vrm-model-loading.ts 로
+    // 옮겨가, installVrm 다음 선언인 handlePoseSelect 를 종료 마커로 쓴다(구간은 동일).
     const installVrm = sourceBetween(
       poserSource,
       "function installVrm(",
-      "function loadModelFromLibraryEntry(",
+      "function handlePoseSelect(",
     );
     const wardrobeMeasurement = requiredIndex(
       proportionTransaction,

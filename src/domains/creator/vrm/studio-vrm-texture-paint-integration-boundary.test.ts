@@ -3,6 +3,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+// 2026-08-21 의도적 변경: CHARACTER_PANEL_SECTIONS 등 정적 카탈로그가
+// StudioVrmPoser.tsx에서 studio-vrm-poser-catalogs.ts로 분리됐다. 마커만 옮기고
+// 검증 대상(표면 섹션이 캐릭터 탭에 등록되어 있다)은 그대로 유지한다.
+const catalogsSource = readFileSync(
+  new URL("./studio-vrm-poser-catalogs.ts", import.meta.url),
+  "utf8",
+);
 const panelSource = readFileSync(
   new URL("./StudioVrmTexturePaintPanel.tsx", import.meta.url),
   "utf8",
@@ -36,7 +43,7 @@ describe("Studio VRM texture-paint production integration boundary", () => {
   it("mounts one compact surface workflow and owns one runtime per loaded VRM", () => {
     expect(poserSource).toContain('from "./studio-vrm-texture-paint-runtime"');
     expect(poserSource).toContain('from "./StudioVrmTexturePaintPanel"');
-    expect(poserSource).toContain('{ id: "surface", label: "표면", icon: Paintbrush }');
+    expect(catalogsSource).toContain('{ id: "surface", label: "표면", icon: Paintbrush }');
     expect(poserSource).toContain('<StudioVrmTexturePaintPanel');
     expect(poserSource).toContain('hidden={hideOnCharacterSection("surface")}');
     expect(poserSource).toContain("planStudioVrmTexturePaintDeviceTier(");

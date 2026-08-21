@@ -109,10 +109,17 @@ describe("Studio canvas selection interaction guards", () => {
     expect(viewportSource).toContain(
       'const hasCoarsePointer = useMediaQuery("(pointer: coarse)")',
     );
-    const resizeProxy = sourceBetween(
-      "<StudioGroupUniformResizeProxy",
-      "/>\n              ) : null}",
+    // 2026-08-21 intentional: the proxy call site moved verbatim into the selection-decorations
+    // leaf, so the slice reads that file (and its shallower indentation) instead.
+    const decorations = readFileSync(
+      new URL("./StudioCanvasSelectionDecorations.tsx", import.meta.url),
+      "utf8",
     );
+    const proxyStart = decorations.indexOf("<StudioGroupUniformResizeProxy");
+    const proxyEnd = decorations.indexOf("/>\n      ) : null}", proxyStart);
+    expect(proxyStart).toBeGreaterThanOrEqual(0);
+    expect(proxyEnd).toBeGreaterThan(proxyStart);
+    const resizeProxy = decorations.slice(proxyStart, proxyEnd);
     expect(resizeProxy).toContain("mobile={isMobile}");
     expect(resizeProxy).toContain("coarse={hasCoarsePointer}");
   });

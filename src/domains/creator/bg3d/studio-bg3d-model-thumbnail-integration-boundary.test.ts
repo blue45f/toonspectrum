@@ -3,8 +3,11 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+// 2026-08-21 intentional change: the model import/delete handlers moved into
+// studio-bg3d-editor-model-import-actions.ts (editor split); their markers resolve there.
 const sourceFiles = [
   "./StudioBackground3D.tsx",
+  "./studio-bg3d-editor-model-import-actions.ts",
   "./StudioBg3dShapesPanel.tsx",
   "./StudioBg3dViewPanel.tsx",
   "./StudioBg3dLtPanel.tsx",

@@ -1,7 +1,6 @@
-import { BookOpen, CircleHelp, Clapperboard, Eraser, FlipHorizontal2, Grid3X3, ImagePlus, Keyboard, Lock, Maximize2, MessageSquare, Minimize2, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Shapes, Sparkles, Square, Unlock, Wind } from "lucide-react";
+import { BookOpen, CircleHelp, Keyboard, Minus, Plus } from "lucide-react";
 import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
-import { createPortal } from "react-dom";
-import { Stage, Layer, Rect, Group, Circle as KCircle, Line, Transformer, Shape, Text, Image as KImage } from "react-konva/lib/ReactKonvaCore";
+import { Stage, Layer, Rect, Group, Circle as KCircle, Line, Shape, Image as KImage } from "react-konva/lib/ReactKonvaCore";
 // Paper grain still uses fillPatternImage on Rect; KImage is for live liquify warp preview.
 
 import { BlendIsolationGroup } from "../BlendIsolationGroup";
@@ -9,7 +8,6 @@ import {
   isStudioBrushEraserAliasId,
   studioBrushAliasEffectiveDiameter,
 } from "../brush/studio-brush-alias-profile";
-import { studioDrawHudToolLabel, studioPressureCurveHudLabel, studioShapeFillHudLabel, studioShapeKindLabel, studioStabilizerHudLabel, studioSymmetryHudLabel } from "../brush/studio-draw-hud";
 import { drawLiveFreehandDraftToContext, getSymmetricPoints } from "../brush/studio-draw-rendering";
 import { type StudioInkMeshLivePreviewRuntime } from "../brush/studio-ink-mesh-live-preview-loader";
 import {
@@ -57,7 +55,6 @@ import {
   resolveStudioBrushPresetOperation,
   type BrushPreset,
 } from "../studio-brush";
-import { StudioHudPill, StudioStatusBar } from "../studio-chrome-ui";
 import { type CropRect } from "../studio-crop";
 import { containingPanel, elBounds } from "../studio-element-geometry";
 import { elementLabel } from "../studio-element-label";
@@ -73,9 +70,8 @@ import { type StudioLivingInkOverlayProjection } from "../studio-living-ink-over
 import { MASTER_EDIT_GHOST_OPACITY, createEmptyDocumentMaster, togglePageHideMaster, type DocumentMaster } from "../studio-master-page";
 import { type NodeEditHandle, type NodeEditTool } from "../studio-node-edit";
 import { vignetteCss, type PageGrade } from "../studio-page-grade";
-import { StudioAnimTimelinePanel, StudioAppSettingsPanel, StudioBubbleShapeOverlay, StudioCanonicalVNextDryMediaCanvas, StudioCropOverlay, StudioDialogueBatchPanel, StudioDialogueTranslatePanel, StudioFeatureTutorialHub, StudioFrameAnimationPanel, StudioHealCloneOverlay, StudioHistoryBrushOverlay, StudioHistoryPanel, StudioLayerMaskOverlay, StudioQuickMaskOverlay, StudioLiveDynamicBrushOverlayHost, StudioLiveInkOverlayHost, StudioLiveInkPredictionHost, StudioLivePresenceDockConnected, StudioLivePressureHudPill, StudioLiveRetainedMediaOverlayHost, StudioLiveStampOverlayHost, StudioLiveWetInkOverlayHost, StudioMasterPagePanel, StudioDrawSelectionOverlay, StudioNodeEditOverlay, StudioOnionSkinImage, StudioPanelSplitOverlay, StudioPuppetWarpOverlay, StudioRasterCrdtSurface, StudioRemoteCursorOverlay, StudioSelectionAntsOverlay, StudioShortcutsHelp, StudioTextEditFallbackModal, StudioTextEditOverlay, QuickStartPanel, StudioWebGpuCanvas, preloadStudioCommentThreadPopover } from "../studio-page-lazy-ui";
+import { StudioAnimTimelinePanel, StudioAppSettingsPanel, StudioBubbleShapeOverlay, StudioCanonicalVNextDryMediaCanvas, StudioCropOverlay, StudioDialogueBatchPanel, StudioDialogueTranslatePanel, StudioFeatureTutorialHub, StudioFrameAnimationPanel, StudioHealCloneOverlay, StudioHistoryBrushOverlay, StudioHistoryPanel, StudioLayerMaskOverlay, StudioQuickMaskOverlay, StudioLiveDynamicBrushOverlayHost, StudioLiveInkOverlayHost, StudioLiveInkPredictionHost, StudioLiveRetainedMediaOverlayHost, StudioLiveStampOverlayHost, StudioLiveWetInkOverlayHost, StudioMasterPagePanel, StudioNodeEditOverlay, StudioOnionSkinImage, StudioPanelSplitOverlay, StudioPuppetWarpOverlay, StudioRasterCrdtSurface, StudioRemoteCursorOverlay, StudioSelectionAntsOverlay, StudioShortcutsHelp, StudioTextEditFallbackModal, StudioTextEditOverlay, QuickStartPanel, StudioWebGpuCanvas, preloadStudioCommentThreadPopover } from "../studio-page-lazy-ui";
 import { pageDisplayName } from "../studio-page-meta";
-import { adoptMissingPage } from "../studio-pages";
 import { isEligibleForPanelAutoFit } from "../studio-panel-autofit";
 import { type PanelSplitPreview } from "../studio-panel-split";
 import { type VanishingPoint } from "../studio-perspective-guide";
@@ -90,15 +86,13 @@ import {
   type StudioSingleObjectDragLayerSession,
 } from "../studio-single-object-drag-layer";
 import { type SmartGuideOverlay } from "../studio-smart-guides";
-import { studioUiDensityDescription, studioUiDensityLabel, type StudioUiDensityMode } from "../studio-ui-density";
+import { type StudioUiDensityMode } from "../studio-ui-density";
 import { materializeStudioAdvancedFillVectorTarget } from "../studio-vector-fill-reference";
 import { STUDIO_VIEW_ACTION_HINTS } from "../studio-view-action-hints";
 import { planStudioCanvasStageLayout, stepStudioViewZoom, toggleStudioCanvasWheelMode, type StudioViewRotation } from "../studio-view-controls";
-import { StudioViewToolsHud } from "../studio-view-tools-hud-loader";
 import { type StudioWorkAssetRenderPlaceholder } from "../studio-work-asset-render-projection";
 import { colorBlindFilterStyle, StudioColorBlindFilterDefs, type CvdMode } from "../StudioColorBlindPreview";
 import { StudioDraftPreviewLayers } from "../StudioDraftPreviewLayers";
-import { StudioGroupUniformResizeProxy } from "../StudioGroupUniformResizeProxy";
 import { StudioInkMeshLivePreviewHost } from "../StudioInkMeshLivePreviewHost";
 import { StudioKonvaBubbleNode } from "../StudioKonvaBubbleNode";
 import { StudioKonvaImageNode } from "../StudioKonvaImageNode";
@@ -115,13 +109,26 @@ import {
   studioElementIdOf,
 } from "./studio-canvas-shared-runtime";
 import {
+  liveNodeDisplayBounds,
+  localizeText,
+  readStageDevicePixelRatio,
+  STUDIO_STAGE_CLIPPED_STYLE,
+  STUDIO_STAGE_DOCUMENT_STYLE,
+} from "./studio-canvas-viewport-primitives";
+import {
   applyStudioStageViewportClip,
   resolveStudioStageViewportClipArmed,
   studioStageBackingPixels,
   type StudioStageViewportClipRuntime,
 } from "./studio-stage-viewport-clip";
+import { AiAssetNotice } from "./StudioCanvasAiAssetNotice";
 import { StudioCanvasGuideOverlayLayers, StudioCanvasGuideUnderlay } from "./StudioCanvasGuideLayers";
+import { renderStudioCanvasSelectionDecorations } from "./StudioCanvasSelectionDecorations";
+import { renderStudioCanvasStageHud } from "./StudioCanvasStageHud";
 import { StudioCanvasStatusRail } from "./StudioCanvasStatusRail";
+import { renderStudioCanvasStickyBanners } from "./StudioCanvasStickyBanners";
+import { StudioViewInputModeControls } from "./StudioCanvasViewInputModeControls";
+import { StudioDrawingShortcutNoticeLayer } from "./StudioDrawingShortcutNoticeLayer";
 
 import type { StudioDrawingShortcutNoticeStore } from "../brush/studio-drawing-shortcut-notice-store";
 import type { StudioFilterPreview } from "../filter/studio-filter-menu";
@@ -153,281 +160,6 @@ import type Konva from "konva";
 import { useMediaQuery } from "@/components/use-media-query";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-
-function localizeText(
-  t: (key: string) => string,
-  fallback: string,
-  key: string,
-): string {
-  const translated = t(key);
-  return translated === key ? fallback : translated;
-}
-
-function StudioDrawingShortcutNoticeLayer({
-  canvasOnlyMode,
-  drawMode,
-  hasAutosave,
-  noticeStore,
-  quickShapeActive,
-  tool,
-}: {
-  readonly canvasOnlyMode: boolean;
-  readonly drawMode: DrawMode;
-  readonly hasAutosave: boolean;
-  readonly noticeStore: StudioDrawingShortcutNoticeStore;
-  readonly quickShapeActive: boolean;
-  readonly tool: Tool;
-}) {
-  const t = useT();
-  const snapshot = useSyncExternalStore(
-    noticeStore.subscribe,
-    noticeStore.getSnapshot,
-    noticeStore.getSnapshot,
-  );
-  const notice = hasAutosave ? null : snapshot;
-
-  return (
-    <div
-      className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2"
-      style={
-        tool === "draw" && !canvasOnlyMode
-          ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 0.75rem)" }
-          : undefined
-      }
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-    >
-      {notice ? (
-        <span
-          key={notice.id}
-          className="mx-3 block max-w-[min(28rem,calc(100vw-1.5rem))] whitespace-normal rounded-lg border border-line bg-panel/95 px-3 py-1.5 text-center text-xs font-semibold leading-relaxed text-fg shadow-lg backdrop-blur motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1"
-        >
-          {notice.message}
-        </span>
-      ) : null}
-      {quickShapeActive && tool === "draw" && drawMode === "pen" && !notice ? (
-        <span className="mx-3 inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-panel/95 px-3 py-1 text-center text-[0.68rem] font-semibold text-accent shadow-lg backdrop-blur">
-          <Shapes size={12} aria-hidden />
-          {localizeText(t, "스마트 도형 · 선·원·네모 등을 그리고 손을 떼면 다듬어요 (잠시 멈추면 미리보기)", "studio.quickShape.notice")}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-function readStageDevicePixelRatio(): number {
-  const ratio = globalThis.devicePixelRatio;
-  return typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
-}
-
-/*
- * Two frozen style objects rather than an inline literal, so React only ever writes the Stage
- * container's style when the clip actually turns on or off. The clip *offset* is written straight
- * to `style.transform` by the scroll follower, and `transform` appears in neither object — React
- * therefore never clears it out from under the follower.
- *
- * Drawing owns the contact stream; browser panning would otherwise cancel a fast finger stroke. The
- * wrap's explicit two-finger pinch handler still receives bubbled touch events.
- */
-const STUDIO_STAGE_DOCUMENT_STYLE = { touchAction: "none" } as const;
-const STUDIO_STAGE_CLIPPED_STYLE = {
-  touchAction: "none",
-  position: "absolute",
-  left: 0,
-  top: 0,
-} as const;
-
-function liveNodeDisplayBounds(
-  node: Konva.Node | null | undefined,
-  layer: Konva.Layer | null,
-  fallback: { x: number; y: number; w: number; h: number }
-): { x: number; y: number; w: number; h: number } {
-  if (!node || !layer) return fallback;
-  try {
-    const rect = node.getClientRect({ relativeTo: layer });
-    if (
-      Number.isFinite(rect.x) &&
-      Number.isFinite(rect.y) &&
-      Number.isFinite(rect.width) &&
-      Number.isFinite(rect.height)
-    ) {
-      return { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
-    }
-  } catch {
-    // A node can detach between React render and Konva reconciliation. Document bounds stay safe.
-  }
-  return fallback;
-}
-
-/** Generative-image disclosure rendered above every isolated Studio surface. */
-/**
- * 생성형 AI(이미지 생성) 최초 사용 고지 다이얼로그.
- * 사용자가 처음 "생성"을 누를 때 1회 노출하고, 확인하면 곧바로 생성을 이어서 실행한다.
- * a11y: role=dialog + aria-modal, Esc 닫기, 진입 시 기본(확인) 버튼 포커스, 스크림 클릭으로 닫기.
- */
-function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAcknowledge: () => void }) {
-  const t = useT();
-  const confirmRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onCancel();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    const raf = requestAnimationFrame(() => confirmRef.current?.focus());
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      cancelAnimationFrame(raf);
-    };
-  }, [onCancel]);
-
-  const notice = (
-    <div
-      role="presentation"
-      onClick={(e) => {
-        // 스크림(다이얼로그 바깥) 클릭일 때만 닫는다 — 내부 클릭은 currentTarget 이 아니라 무시.
-        if (e.target === e.currentTarget) onCancel();
-      }}
-      // z-[90] — 전체화면 모달(StoryboardGrid/ScrollPreview/Timelapse/Background3D 등, z-[80])이
-      // 전부 route-stage(레이아웃 래퍼)의 isolation:isolate 안에 있어, 시나리오 자동 생성처럼 그
-      // z-80 모달이 열린 채로 안에서 이미지 생성을 시작하면 이 고지가 그 위에 떠야 한다(기존 z-70은
-      // z-80 모달 뒤로 가려 확인 버튼을 누를 수 없었다). 법적으로 필수인 고지라 항상 최상단이어야
-      // 하므로, 이 앱의 어떤 z-index보다도 높게 고정한다 — document.body에 포탈로 렌더(아래 참고)
-      // 하므로 route-stage의 격리 자체도 벗어난다(z-index 숫자만으로는 그 격리를 못 벗어난다).
-      className="fixed inset-0 z-[90] grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm"
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ai-notice-title"
-        className="w-full max-w-sm rounded-2xl border border-line bg-panel p-5 shadow-xl"
-      >
-        <div className="mb-2 flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-full bg-accent-soft text-accent">
-          <Sparkles size={16} aria-hidden />
-          </span>
-          <h2 id="ai-notice-title" className="text-base font-bold text-fg">
-            {localizeText(t, "생성형 AI 이미지 안내", "studio.aiNotice.title")}
-          </h2>
-        </div>
-        <p className="text-sm leading-relaxed text-fg-2">
-          {localizeText(
-            t,
-            "이 기능은 생성형 AI(OpenAI)로 이미지를 만들어요. 만들어진 결과물에는 AI 배지가 표시돼요.",
-            "studio.aiNotice.description"
-          )}
-        </p>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-fg-3">
-          <li>{localizeText(t, "타인의 저작물·캐릭터, 실존 인물의 얼굴은 생성하지 않아요.", "studio.aiNotice.ruleCopyright")}</li>
-          <li>{localizeText(t, "AI 결과물은 부정확하거나 의도와 다를 수 있어요.", "studio.aiNotice.ruleAccuracy")}</li>
-          <li>{localizeText(t, "만든 이미지의 사용 책임은 본인에게 있어요.", "studio.aiNotice.ruleResponsibility")}</li>
-        </ul>
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border border-line bg-card px-3 py-2 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
-          >
-            {localizeText(t, "취소", "studio.aiNotice.cancel")}
-          </button>
-          <button
-            ref={confirmRef}
-            type="button"
-            onClick={onAcknowledge}
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
-          >
-            {localizeText(t, "이해했어요, 생성하기", "studio.aiNotice.confirm")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-  // auth-modal.tsx와 동일한 이유로 document.body에 포탈 렌더 — 이 앱의 라우트 콘텐츠 래퍼
-  // (route-stage)가 isolation:isolate를 걸어놔서, 그 안에서 아무리 z-index를 높여도 사이트 전역
-  // 고정 헤더(z-50, route-stage 밖의 형제) 뒤로 가려진다(z-index는 같은 스태킹 컨텍스트 안에서만
-  // 비교된다). 이 고지는 페이지 어디서 트리거되든 항상 최상단이어야 해서 격리 자체를 벗어난다.
-  if (typeof document === "undefined") return null;
-  return createPortal(notice, document.body);
-}
-
-function StudioViewInputModeControls({
-  compact = false,
-  wheelMode,
-  zoomLocked,
-  onToggleWheelMode,
-  onToggleZoomLock,
-}: {
-  compact?: boolean;
-  wheelMode: StudioAppSettings["mouse"]["wheel"];
-  zoomLocked: boolean;
-  onToggleWheelMode: () => void;
-  onToggleZoomLock: () => void;
-}) {
-  const t = useT();
-  const wheelScrollMode = wheelMode === "pan";
-  const wheelLabel = wheelScrollMode
-    ? localizeText(t, "휠: 캔버스 스크롤", "studio.canvas.wheelMode.pan")
-    : wheelMode === "brush-size"
-      ? localizeText(t, "휠: 브러시 크기", "studio.canvas.wheelMode.brushSize")
-      : localizeText(t, "휠: 캔버스 확대·축소", "studio.canvas.wheelMode.zoom");
-  const lockLabel = zoomLocked
-    ? localizeText(t, "캔버스 배율 잠금 해제", "studio.canvas.zoomLock.unlock")
-    : localizeText(t, "캔버스 배율 잠금", "studio.canvas.zoomLock.lock");
-
-  return (
-    <div
-      role="group"
-      aria-label={localizeText(t, "캔버스 보기 조작", "studio.canvas.viewInputControls")}
-      className={cn(
-        "inline-flex items-center gap-0.5",
-        compact ? "" : "rounded-full border border-line/60 bg-card/45 p-0.5",
-      )}
-    >
-      <button
-        type="button"
-        aria-pressed={wheelScrollMode}
-        aria-label={wheelLabel}
-        title={`${wheelLabel} · ${localizeText(t, "클릭해서 줌/스크롤 전환", "studio.canvas.wheelMode.toggleHint")}`}
-        onClick={onToggleWheelMode}
-        className={cn(
-          "inline-flex min-h-7 items-center justify-center gap-1 rounded-full px-2 text-[0.65rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-          wheelScrollMode
-            ? "bg-accent-soft text-accent"
-            : "text-fg-2 hover:bg-raised hover:text-fg",
-          compact && "size-7 px-0",
-        )}
-      >
-        <Mouse className="size-3.5" aria-hidden />
-        {!compact ? (
-          <span>{wheelScrollMode
-            ? localizeText(t, "스크롤", "studio.canvas.wheelMode.panShort")
-            : localizeText(t, "줌", "studio.canvas.wheelMode.zoomShort")}</span>
-        ) : null}
-      </button>
-      <button
-        type="button"
-        aria-pressed={zoomLocked}
-        aria-label={lockLabel}
-        title={lockLabel}
-        onClick={onToggleZoomLock}
-        className={cn(
-          "grid size-7 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-          zoomLocked
-            ? "bg-warning-soft text-warning"
-            : "text-fg-2 hover:bg-raised hover:text-fg",
-        )}
-      >
-        {zoomLocked
-          ? <Lock className="size-3.5" aria-hidden />
-          : <Unlock className="size-3.5" aria-hidden />}
-      </button>
-    </div>
-  );
-}
 
 export interface StudioCanvasViewportHandlers {
   activateCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
@@ -2393,239 +2125,49 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
           />
           {/* 색맹 시뮬레이션용 숨김 SVG filter defs — filter id 는 문서 전역 참조라 위치 무관, 정적이라 무조건 마운트 */}
           <StudioColorBlindFilterDefs />
-          {/* Sketchbook/Krita/Concepts status — zoom HUD + tool metrics over canvas */}
-          {!canvasOnlyMode && !isMobile ? (
-            <StudioStatusBar
-              className={cn(
-                mobileImmersive && "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
-              )}
-              style={
-                tool === "draw"
-                  ? {
-                      bottom:
-                        "calc(var(--studio-draw-options-height, 3.75rem) + max(0.75rem, env(safe-area-inset-bottom)) + 0.75rem)",
-                    }
-                  : undefined
-              }
-            >
-              <StudioViewInputModeControls
-                wheelMode={appSettings.mouse.wheel}
-                zoomLocked={zoomLocked}
-                onToggleWheelMode={toggleWheelCanvasMode}
-                onToggleZoomLock={() => setZoomLocked((current) => !current)}
-              />
-              <StudioHudPill>
-                <StudioToolHintTarget
-                  hint={STUDIO_VIEW_ACTION_HINTS.zoomOut}
-                  unavailableReason={zoomOutUnavailableReason}
-                  preferredSide="top"
-                >
-                  <button
-                    type="button"
-                    className={cn(
-                      "grid size-7 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg",
-                      (viewTransformSuppressed || zoomLocked || zoomOutAtLimit) && "cursor-not-allowed opacity-40"
-                    )}
-                    aria-label="축소"
-                    aria-disabled={viewTransformSuppressed || zoomLocked || zoomOutAtLimit ? true : undefined}
-                    onClick={() => {
-                      if (!viewTransformSuppressed && !zoomLocked && !zoomOutAtLimit) {
-                        setZoom((current) => stepStudioViewZoom(current, -1));
-                      }
-                    }}
-                  >
-                    −
-                  </button>
-                </StudioToolHintTarget>
-                <span className="min-w-[2.4rem] text-center tabular-nums text-fg">
-                  {Math.round(zoom * scale * 100)}%
-                </span>
-                <StudioToolHintTarget
-                  hint={STUDIO_VIEW_ACTION_HINTS.zoomIn}
-                  unavailableReason={zoomInUnavailableReason}
-                  preferredSide="top"
-                >
-                  <button
-                    type="button"
-                    className={cn(
-                      "grid size-7 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg",
-                      (viewTransformSuppressed || zoomLocked || zoomInAtLimit) && "cursor-not-allowed opacity-40"
-                    )}
-                    aria-label="확대"
-                    aria-disabled={viewTransformSuppressed || zoomLocked || zoomInAtLimit ? true : undefined}
-                    onClick={() => {
-                      if (!viewTransformSuppressed && !zoomLocked && !zoomInAtLimit) {
-                        setZoom((current) => stepStudioViewZoom(current, 1));
-                      }
-                    }}
-                  >
-                    +
-                  </button>
-                </StudioToolHintTarget>
-              </StudioHudPill>
-              <StudioHudPill title={pageDisplayName(activePage, activePageIndex)} className="max-w-[7rem] truncate">
-                <button
-                  type="button"
-                  aria-expanded={pageSequenceOpen}
-                  aria-label={`페이지 시퀀스 ${pageSequenceOpen ? "닫기" : "열기"} · ${pageDisplayName(activePage, activePageIndex)}`}
-                  onClick={() => setPageSequenceOpen((current) => !current)}
-                  className="inline-flex min-w-0 items-center gap-1 rounded-full px-0.5 text-fg transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  <Clapperboard size={11} aria-hidden />
-                  <span className="truncate">{pageDisplayName(activePage, activePageIndex)}</span>
-                </button>
-              </StudioHudPill>
-              <StudioHudPill
-                title={studioDrawHudToolLabel(
-                  tool === "draw"
-                    ? drawMode === "eraser"
-                      ? {
-                          mode: "eraser",
-                          widthPx: strokeWidth,
-                          ...(eraserPresetActive
-                            ? {
-                                brushName: activeCatalogBrushName,
-                                opacity01: brushOpacity,
-                              }
-                            : {}),
-                        }
-                      : drawMode === "shape"
-                        ? { mode: "shape", shapeLabel: studioShapeKindLabel(drawShape) }
-                        : drawMode === "pixel"
-                          ? { mode: "pixel" }
-                        : {
-                            mode: "pen",
-                            brushName: activeCatalogBrushName,
-                            widthPx: strokeWidth,
-                            opacity01: brushOpacity,
-                          }
-                    : tool === "select"
-                      ? {
-                          mode: "select",
-                          selectionLabel: selected ? elementLabel(selected) : null,
-                        }
-                      : { mode: "other", label: String(tool) }
-                )}
-                accent={tool === "draw"}
-              >
-                {tool === "draw" && drawMode === "eraser" ? (
-                  <Eraser size={12} strokeWidth={1.75} aria-hidden />
-                ) : tool === "draw" && drawMode === "shape" ? (
-                  <Shapes size={12} strokeWidth={1.75} aria-hidden />
-                ) : tool === "draw" && drawMode === "pixel" ? (
-                  <Grid3X3 size={12} strokeWidth={1.75} aria-hidden />
-                ) : tool === "draw" ? (
-                  <Pencil size={12} strokeWidth={1.75} aria-hidden />
-                ) : tool === "select" ? (
-                  <MousePointer2 size={12} strokeWidth={1.75} aria-hidden />
-                ) : (
-                  <span className="tabular-nums">{String(tool)}</span>
-                )}
-                {tool === "draw" ? (
-                  <span className="tabular-nums">
-                    {drawMode === "shape"
-                      ? studioShapeKindLabel(drawShape)
-                      : drawMode === "pixel"
-                        ? "1px"
-                        : eraserPresetActive
-                          ? `${activeCatalogBrushName} · ${strokeWidth}px · ${Math.round(brushOpacity * 100)}%`
-                          : `${strokeWidth}px`}
-                  </span>
-                ) : null}
-              </StudioHudPill>
-              {tool === "draw" && drawMode === "pen" ? (
-                <StudioHudPill title={studioStabilizerHudLabel(stabilizer, stabilizerMode)}>
-                  <Wind size={12} strokeWidth={1.75} aria-hidden />
-                  <span className="tabular-nums">{stabilizer}</span>
-                </StudioHudPill>
-              ) : null}
-              {tool === "draw" && drawMode === "pen" ? (
-                <StudioHudPill title={studioPressureCurveHudLabel(pressureCurve)}>
-                  <PenTool size={12} strokeWidth={1.75} aria-hidden />
-                </StudioHudPill>
-              ) : null}
-              {tool === "draw" && drawMode === "pen" ? (
-                <Suspense fallback={null}>
-                  <StudioLivePressureHudPill store={liveDrawPressureStore} />
-                </Suspense>
-              ) : null}
-              {tool === "draw" && drawMode === "shape" && studioShapeFillHudLabel(shapeFill, drawShape) ? (
-                <StudioHudPill accent title={localizeText(t, "도형 채우기", "studio.canvas.shapeFill")}>
-                  <PaintBucket size={12} strokeWidth={1.75} aria-hidden />
-                </StudioHudPill>
-              ) : null}
-              {tool === "draw" && drawMode !== "pixel" && symmetryType !== "none" ? (
-                <StudioHudPill accent title={studioSymmetryHudLabel(symmetryType) ?? "대칭"}>
-                  <FlipHorizontal2 size={12} strokeWidth={1.75} aria-hidden />
-                </StudioHudPill>
-              ) : null}
-              {tool === "draw" && quickShapeActive ? (
-                <StudioHudPill accent title={t("studio.quickShape.title")}>
-                  <Sparkles size={12} strokeWidth={1.75} aria-hidden />
-                </StudioHudPill>
-              ) : null}
-              <div
-                className="flex items-center gap-px"
-                role="group"
-                aria-label={localizeText(t, "레이아웃 모드", "studio.canvas.layoutMode")}
-              >
-                {(
-                  [
-                    { mode: "focus" as const, Icon: Minimize2 },
-                    { mode: "simple" as const, Icon: Square },
-                    { mode: "full" as const, Icon: Maximize2 },
-                  ] as const
-                ).map(({ mode, Icon }) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    aria-pressed={uiDensityMode === mode}
-                    title={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
-                    aria-label={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
-                    onClick={() => setStudioUiDensity(mode)}
-                    className={cn(
-                      "grid size-6 place-items-center rounded-full transition-colors",
-                      uiDensityMode === mode
-                        ? "bg-accent text-on-accent"
-                        : "text-fg-3 hover:bg-raised hover:text-fg-2"
-                    )}
-                  >
-                    <Icon size={11} strokeWidth={1.75} aria-hidden />
-                  </button>
-                ))}
-              </div>
-              <StudioToolHintTarget
-                hint={STUDIO_VIEW_ACTION_HINTS.fitWidth}
-                unavailableReason={viewBusyReason}
-                preferredSide="top"
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!viewTransformSuppressed) fitCanvasToWidth();
-                  }}
-                  aria-disabled={viewTransformSuppressed ? true : undefined}
-                  className={cn(
-                    "min-h-7 rounded-full px-2 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg",
-                    viewTransformSuppressed && "cursor-not-allowed opacity-40"
-                  )}
-                >
-                  {localizeText(t, "맞춤", "studio.canvas.fit")}
-                </button>
-              </StudioToolHintTarget>
-              <button
-                type="button"
-                onClick={() => {
-                  if (canvasOnlyMode) setCanvasOnlyMode(false);
-                  else enterCanvasOnlyMode();
-                }}
-                className="rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
-                title={localizeText(t, "` — 캔버스만 / 도구 토글", "studio.canvas.canvasOnlyModeTitle")}
-              >
-                {canvasOnlyMode ? localizeText(t, "도구", "studio.canvas.canvasOnlyModeTool") : "`"}
-              </button>
-            </StudioStatusBar>
-          ) : null}
+          {renderStudioCanvasStageHud({
+            activeCatalogBrushName,
+            activePage,
+            activePageIndex,
+            appSettings,
+            brushOpacity,
+            canvasOnlyMode,
+            drawMode,
+            drawShape,
+            enterCanvasOnlyMode,
+            eraserPresetActive,
+            fitCanvasToWidth,
+            isMobile,
+            liveDrawPressureStore,
+            mobileImmersive,
+            pageSequenceOpen,
+            pressureCurve,
+            quickShapeActive,
+            scale,
+            selected,
+            setCanvasOnlyMode,
+            setPageSequenceOpen,
+            setStudioUiDensity,
+            setZoom,
+            setZoomLocked,
+            shapeFill,
+            stabilizer,
+            stabilizerMode,
+            strokeWidth,
+            symmetryType,
+            t,
+            toggleWheelCanvasMode,
+            tool,
+            uiDensityMode,
+            viewBusyReason,
+            viewTransformSuppressed,
+            zoom,
+            zoomInAtLimit,
+            zoomInUnavailableReason,
+            zoomLocked,
+            zoomOutAtLimit,
+            zoomOutUnavailableReason,
+          })}
           {/* 고정높이 스크롤 뷰포트: 줌·긴 캔버스 시 내부 스크롤, 컨트롤은 바깥에 고정 */}
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 마우스 핸들러는 클릭이 아니라 스페이스+드래그 패닝/에셋 드롭 전용이며 실제 상호작용은 내부 Konva Stage + document keydown(Space) 이 담당한다 */}
           <div
@@ -2662,172 +2204,41 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               (isSpacePressed || tool === "hand") && "select-none"
             )}
           >
-          <div
-            data-studio-asset-drop-indicator
-            aria-hidden
-            className="pointer-events-none absolute z-[46] size-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-accent bg-accent/15 opacity-0 shadow-[0_0_0_8px_oklch(0.72_0.18_45/0.12)] transition-opacity group-data-[studio-asset-drop-active=true]/asset-drop:opacity-100"
-            style={{
-              left: "var(--studio-asset-drop-x, -9999px)",
-              top: "var(--studio-asset-drop-y, -9999px)",
-            }}
-          >
-            <span className="absolute inset-1 rounded-full border border-dashed border-accent/80" />
-          </div>
-          <div
-            aria-hidden
-            className="pointer-events-none sticky top-3 z-[47] flex h-0 justify-center px-3 opacity-0 transition-opacity group-data-[studio-asset-drop-active=true]/asset-drop:opacity-100"
-          >
-            <div className="inline-flex min-h-9 items-center gap-2 rounded-full border border-accent/60 bg-panel/95 px-3 text-[0.68rem] font-bold text-fg shadow-xl backdrop-blur-md">
-              <ImagePlus size={14} className="text-accent" aria-hidden />
-              {localizeText(t, "놓는 위치에 정확히 배치", "studio.canvas.dropPlaceHint")}
-              <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.58rem] text-accent">
-                {localizeText(t, "복사", "studio.canvas.copyBadge")}
-              </span>
-            </div>
-          </div>
-          <div className="pointer-events-none sticky top-2 z-[56] flex h-0 items-start justify-end pr-2">
-            <Suspense fallback={null}>
-              <StudioLivePresenceDockConnected
-                operationSyncReady={studioCrdtOperationSyncReady}
-                followingSessionId={followingStudioSessionId}
-                onOpenTeam={() => {
-                  dismissQuickStart();
-                  setTeamPanelOpen(true);
-                }}
-                onToggleFollow={(sessionId) =>
-                  setFollowingStudioSessionId((current) =>
-                    current === sessionId ? null : sessionId
-                  )
-                }
-                onFollowPage={(pageId) => {
-                  if (pageId === activePage.id) return;
-                  if (!pages.some((page) => page.id === pageId)) {
-                    const nextPages = adoptMissingPage(pages, pageId, activePage.canvasH || 1080);
-                    if (nextPages === pages || !commitPages(nextPages)) return;
-                  }
-                  if (!setCurrentPageId(pageId)) return;
-                  setSelectedId(null);
-                  setTool("select");
-                }}
-              />
-            </Suspense>
-          </div>
-          {viewTool ? (
-            <div className="pointer-events-none sticky top-2 z-[44] flex h-0 items-start justify-center px-2">
-              <Suspense fallback={null}>
-                <StudioViewToolsHud
-                  className="!relative !left-auto !top-auto !max-w-full !translate-x-0"
-                  mode={viewTool}
-                  magnification={effScale}
-                  canZoomIn={stepStudioViewZoom(zoom, 1) !== zoom}
-                  canZoomOut={stepStudioViewZoom(zoom, -1) !== zoom}
-                  rotation={canvasRotation}
-                  flipped={canvasFlipH}
-                  onZoomIn={() => setZoom((current) => stepStudioViewZoom(current, 1))}
-                  onZoomOut={() => setZoom((current) => stepStudioViewZoom(current, -1))}
-                  onFit={fitCanvasToWidth}
-                  onActual={setActualPixelView}
-                  onRotateLeft={() => rotateCanvasView("left")}
-                  onRotateRight={() => rotateCanvasView("right")}
-                  onToggleFlip={toggleHorizontalCanvasView}
-                  onReset={resetView}
-                  onClose={closeViewToolWithFocus}
-                />
-              </Suspense>
-            </div>
-          ) : null}
-          {commentPinArmed ? (
-            <div className="pointer-events-none sticky top-3 z-[45] flex h-0 items-start justify-center px-3">
-              <div
-                role="status"
-                aria-live="polite"
-                className="pointer-events-auto flex max-w-[min(32rem,calc(100vw-1.5rem))] items-center gap-2 rounded-lg border border-accent/45 bg-panel px-3 py-2 text-xs text-fg shadow-[0_10px_30px_oklch(0.08_0.01_70/0.48)]"
-              >
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
-                  <MessageSquare size={15} aria-hidden />
-                </span>
-                <span className="min-w-0 flex-1 leading-relaxed">
-                  캔버스에서 댓글을 연결할 위치를 선택하세요.
-                  <span className="ml-1 text-fg-3">Esc로 취소</span>
-                </span>
-                <button
-                  type="button"
-                  aria-label="댓글 핀 배치 취소"
-                  onClick={() => {
-                    stopStudioCommentPlacementSession();
-                  }}
-                  className="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-line bg-card px-3 text-xs font-bold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                >
-                  취소
-                </button>
-              </div>
-            </div>
-          ) : null}
-          {sourceHydrationPending || collaborationDocumentUnavailable ? (
-            <div className="sticky left-0 top-0 z-20 grid min-h-[15rem] w-full place-items-center px-6 py-10 text-center lg:min-h-[20rem]">
-              <span className="max-w-sm">
-                <Lock size={22} className="mx-auto text-warn" aria-hidden />
-                <strong className="mt-3 block text-sm font-semibold text-fg">
-                  {sourceHydrationPending
-                    ? workHydrationFailed
-                      ? workHydrationUnsupportedFormat
-                        ? "업로드형 작품은 별도 편집기가 필요해요"
-                        : remixId
-                        ? "리믹스 원본을 열지 못했어요"
-                        : "원고를 열지 못했어요"
-                      : remixId
-                        ? "리믹스 원본을 안전하게 불러오는 중"
-                        : "원고를 안전하게 불러오는 중"
-                    : "공동 문서를 열지 못했어요"}
-                </strong>
-                <span className="mt-1 block text-xs leading-relaxed text-fg-2">
-                  {sourceHydrationPending
-                    ? workHydrationFailed
-                      ? workHydrationUnsupportedFormat
-                        ? "원본을 보호하기 위해 컷툰 편집을 잠갔습니다. 업로드 편집 화면으로 이동해 주세요."
-                        : "빈 캔버스로 덮어쓰지 않도록 잠금을 유지합니다. 다시 불러와 주세요."
-                      : "불러오기가 끝날 때까지 편집·저장·가져오기·내보내기를 잠급니다."
-                    : "이전 계정이나 다른 작품의 캔버스는 표시·내보내지 않습니다."}
-                </span>
-                {sourceHydrationPending && workHydrationFailed ? (
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (workHydrationUnsupportedFormat && workId) {
-                          navigate(`/studio?mode=upload&id=${encodeURIComponent(workId)}`);
-                          return;
-                        }
-                        if (workHydrationUnsupportedFormat && remixId) {
-                          navigate(`/create/${encodeURIComponent(remixId)}`);
-                          return;
-                        }
-                        globalThis.location.reload();
-                      }}
-                      className="min-h-11 rounded-lg border border-line bg-card px-4 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                    >
-                      {workHydrationUnsupportedFormat
-                        ? workId
-                          ? "업로드 편집기로 이동"
-                          : "원본 작품으로 이동"
-                        : "다시 불러오기"}
-                    </button>
-                    {!workHydrationUnsupportedFormat && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          globalThis.location.href = "/studio";
-                        }}
-                        className="min-h-11 rounded-lg border border-accent/40 bg-accent-soft px-4 text-xs font-semibold text-accent transition-colors hover:bg-accent/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                      >
-                        새 작업 공간으로 이동
-                      </button>
-                    )}
-                  </div>
-                ) : null}
-              </span>
-            </div>
-          ) : null}
+          {renderStudioCanvasStickyBanners({
+            activePage,
+            canvasFlipH,
+            canvasRotation,
+            closeViewToolWithFocus,
+            collaborationDocumentUnavailable,
+            commentPinArmed,
+            commitPages,
+            dismissQuickStart,
+            effScale,
+            fitCanvasToWidth,
+            followingStudioSessionId,
+            navigate,
+            pages,
+            remixId,
+            resetView,
+            rotateCanvasView,
+            setActualPixelView,
+            setCurrentPageId,
+            setFollowingStudioSessionId,
+            setSelectedId,
+            setTeamPanelOpen,
+            setTool,
+            setZoom,
+            sourceHydrationPending,
+            stopStudioCommentPlacementSession,
+            studioCrdtOperationSyncReady,
+            t,
+            toggleHorizontalCanvasView,
+            viewTool,
+            workHydrationFailed,
+            workHydrationUnsupportedFormat,
+            workId,
+            zoom,
+          })}
           {/* 페이지 색보정 미리보기: Stage에 CSS filter, 그 위에 비네트 오버레이(내보내기 때 픽셀로 합성) */}
           {/* 색맹 시뮬레이션은 이미 색보정된 결과 위에 적용되도록 pageGradeCss 뒤에 이어 붙인다(filter 리스트는 좌→우로 순차 적용). */}
           {/* Raster handoff colocation contract — the data-studio-post-processing-scope div below
@@ -3728,257 +3139,30 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   </>
                 );
               })()}
-              {/* 그룹 및 다중 선택은 구성 타입(draw + image/text 등)이 섞여도 하나의 union bounds를
-                  항상 보여준다. 아직 전용 affine proxy가 없는 혼합 선택에서도 PPT/Figma처럼 무엇이
-                  한 이동 단위인지 명확해야 한다. 잠금/혼합 상태는 amber 점선으로 즉시 구분하며
-                  listening=false라 선택·드래그 hit를 절대 가로채지 않는다. */}
-              {!isExporting &&
-                tool === "select" &&
-                !activeSurfaceReviewLocked &&
-                (marqueeIds.length > 1 || singleDrawFreeScale) &&
-                multiSelectionBounds &&
-                multiSelectionBounds.w >= 0 &&
-                multiSelectionBounds.h >= 0 && (() => {
-                  const pad = 7 / Math.max(effScale, 0.001);
-                  const constrained = selectionLockState !== "unlocked";
-                  const label =
-                    completeSelectionGroup?.name?.trim() ||
-                    (completeSelectionGroup
-                      ? "그룹"
-                      : singleDrawFreeScale
-                        ? "선화 레이어"
-                        : "다중 선택");
-                  const lockStateLabel =
-                    selectionLockState === "locked"
-                      ? "잠금"
-                      : selectionLockState === "mixed"
-                        ? "일부 잠금"
-                        : null;
-                  const badgeText = `${label} · ${canvasSelectionEls.length}개${
-                    lockStateLabel ? ` · ${lockStateLabel}` : ""
-                  }`;
-                  const badgeWidth = Math.min(
-                    180 / effScale,
-                    Math.max(62 / effScale, (badgeText.length * 7 + 18) / effScale)
-                  );
-                  const badgeHeight = 20 / effScale;
-                  const badgeInset = 2 / effScale;
-                  const preferredBadgeY =
-                    multiSelectionBounds.y - pad - badgeHeight - 4 / effScale;
-                  const badgeX = Math.min(
-                    Math.max(multiSelectionBounds.x - pad, badgeInset),
-                    Math.max(badgeInset, CANVAS_W - badgeWidth - badgeInset)
-                  );
-                  const badgeY =
-                    preferredBadgeY >= badgeInset
-                      ? preferredBadgeY
-                      : Math.min(
-                          canvasH - badgeHeight - badgeInset,
-                          multiSelectionBounds.y + pad + 4 / effScale
-                        );
-                  return (
-                    <Group
-                      name="studio-group-selection-overlay"
-                      listening={false}
-                      studioSelectionRole="group-bounds"
-                      studioGroupId={completeSelectionGroup?.id ?? ""}
-                      studioGroupLocked={completeSelectionGroup?.locked === true}
-                    >
-                      {/* 조절 가능한 선택은 전용 Transformer가 정확한 한 줄 경계와 핸들을 그린다.
-                          같은 위치에 padded overlay까지 겹치면 이중 점선으로 보여 상용 도구보다
-                          산만해진다. 잠금·일시 차단 상태에서만 이 fallback 경계를 사용한다. */}
-                      {!groupResizeEnabled ? (
-                        <Rect
-                          name="studio-group-selection-boundary"
-                          x={multiSelectionBounds.x - pad}
-                          y={multiSelectionBounds.y - pad}
-                          width={Math.max(
-                            pad * 2,
-                            multiSelectionBounds.w + pad * 2
-                          )}
-                          height={Math.max(
-                            pad * 2,
-                            multiSelectionBounds.h + pad * 2
-                          )}
-                          stroke={constrained ? "#b45309" : "#c2410c"}
-                          strokeWidth={(constrained ? 1.75 : 1.35) / effScale}
-                          dash={
-                            constrained
-                              ? [7 / effScale, 4 / effScale]
-                              : [2 / effScale, 3 / effScale]
-                          }
-                          cornerRadius={5 / effScale}
-                          shadowColor={constrained ? "#b45309" : "#c2410c"}
-                          shadowBlur={4 / effScale}
-                          shadowOpacity={0.22}
-                        />
-                      ) : null}
-                      <Group
-                        name="studio-group-selection-badge"
-                        x={badgeX}
-                        y={badgeY}
-                      >
-                        <Rect
-                          width={badgeWidth}
-                          height={badgeHeight}
-                          fill={constrained ? "#b45309" : "#c2410c"}
-                          cornerRadius={5 / effScale}
-                          shadowColor="#111827"
-                          shadowBlur={3 / effScale}
-                          shadowOpacity={0.24}
-                        />
-                        <Text
-                          text={badgeText}
-                          width={badgeWidth}
-                          height={badgeHeight}
-                          padding={5 / effScale}
-                          fontSize={10 / effScale}
-                          fontStyle="600"
-                          fill="#fffaf5"
-                          ellipsis
-                          wrap="none"
-                        />
-                      </Group>
-                      {constrained ? (
-                        <Rect
-                          name="studio-group-selection-lock-marker"
-                          x={multiSelectionBounds.x - pad}
-                          y={multiSelectionBounds.y - pad}
-                          width={10 / effScale}
-                          height={10 / effScale}
-                          offsetX={5 / effScale}
-                          offsetY={5 / effScale}
-                          rotation={45}
-                          fill="#b45309"
-                          stroke="#fff7ed"
-                          strokeWidth={1 / effScale}
-                          cornerRadius={1.5 / effScale}
-                        />
-                      ) : null}
-                    </Group>
-                  );
-                })()}
-              {(marqueeIds.length > 1 || singleDrawFreeScale) && multiSelectionBounds ? (
-                <StudioGroupUniformResizeProxy
-                  bounds={{
-                    x: multiSelectionBounds.x,
-                    y: multiSelectionBounds.y,
-                    width: multiSelectionBounds.w,
-                    height: multiSelectionBounds.h,
-                  }}
-                  effScale={effScale}
-                  mobile={isMobile}
-                  coarse={hasCoarsePointer}
-                  enabled={groupResizeEnabled}
-                  // One stroke can absorb rotation and independent width/height exactly, so it
-                  // gets the full handle set. A multi-selection stays on uniform corners.
-                  freeTransform={singleDrawFreeScale}
-                  // Group drags already shift the proxy through translateGroupPreview; a lone
-                  // stroke has no such path, so the proxy follows the wrapper's transform itself.
-                  mirrorDragElementId={
-                    singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
-                  }
-                  onBegin={beginCanvasSelectionResize}
-                  onCommit={commitCanvasSelectionResize}
-                  onCancel={cancelCanvasSelectionResize}
-                />
-              ) : null}
-              <Transformer
-                ref={trRef}
-                rotateEnabled
-                rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
-                rotationSnapTolerance={6}
-                keepRatio={selected?.type === "text" || selected?.type === "sticker" || !!selected?.lockAspect}
-                enabledAnchors={
-                  selected?.type === "text" || selected?.type === "sticker" || selected?.lockAspect
-                    ? ["top-left", "top-right", "bottom-left", "bottom-right"]
-                    : ["top-left", "top-right", "bottom-left", "bottom-right", "middle-left", "middle-right", "top-center", "bottom-center"]
-                }
-                // Konva 기본 파란 사각 핸들 대신 디자인 시스템(persimmon 악센트)의 라운드 핸들.
-                // 그림자를 살짝 깔아 어떤 원고 색 위에서도 핸들이 읽힌다.
-                anchorSize={11}
-                anchorCornerRadius={5.5}
-                anchorStroke="oklch(0.72 0.185 42)"
-                anchorStrokeWidth={1.5}
-                anchorFill="oklch(0.998 0.004 85)"
-                borderStroke="oklch(0.72 0.185 42 / 0.9)"
-                borderStrokeWidth={1.25}
-                rotateAnchorOffset={26}
-                anchorStyleFunc={(anchor) => {
-                  anchor.shadowColor("oklch(0.08 0.01 70)");
-                  anchor.shadowBlur(4);
-                  anchor.shadowOpacity(0.35);
-                  anchor.shadowOffsetY(1);
-                }}
-                boundBoxFunc={(oldBox, newBox) => (newBox.width < 24 || newBox.height < 24 ? oldBox : newBox)}
-              />
-              {/* 잠긴 선택 요소는 트랜스포머가 안 붙으므로 점선 박스로 '선택됨'을 표시(삭제·잠금해제 안내). */}
-              {selected && isEffectivelyLocked(selected, groups) && marqueeIds.length === 0 && tool === "select" && !isExporting && (() => {
-                const sb = elBounds(selected);
-                return (
-                  <Rect
-                    x={sb.x}
-                    y={sb.y}
-                    width={sb.w}
-                    height={sb.h}
-                    rotation={(selected as { rotation?: number }).rotation ?? 0}
-                    stroke="oklch(0.72 0.185 42 / 0.9)"
-                    strokeWidth={1.5 / effScale}
-                    dash={[7 / effScale, 4 / effScale]}
-                    listening={false}
-                  />
-                );
-              })()}
-              {/* draw(선화)는 points 기반이라 노드 ref 미등록 → 트랜스포머가 붙지 않는다.
-                  단일 선택·마퀴 다중선택의 선화 멤버 모두 점선 박스로 '선택됨'을 표시한다. */}
-              {!isExporting && tool === "select" && !activeSurfaceReviewLocked && (() => {
-                const drawSelectionEls =
-                  marqueeIds.length > 0
-                    ? completeSelectionGroup
-                      ? []
-                      : elements.filter(
-                          (el): el is DrawEl & El =>
-                            el.type === "draw" &&
-                            marqueeIds.includes(el.id) &&
-                            !isEffectivelyLocked(el, groups) &&
-                            !isEffectivelyHidden(el, groups)
-                        )
-                    : selected?.type === "draw" &&
-                        !isEffectivelyLocked(selected, groups) &&
-                        !isEffectivelyHidden(selected, groups)
-                      ? [selected]
-                      : [];
-                if (drawSelectionEls.length === 0) return null;
-                return (
-                  <Suspense fallback={null}>
-                    <StudioDrawSelectionOverlay els={drawSelectionEls} scale={effScale} />
-                  </Suspense>
-                );
-              })()}
-              {/* 그룹 진입(더블클릭) 표시 — 편집 중인 그룹의 경계를 옅은 점선으로 그려 "지금 이 그룹
-                  안에서 개별 편집 중"임을 알린다(PPT/Figma 관례). listening=false 라 클릭을 가로채지 않는다. */}
-              {!isExporting && tool === "select" && !activeSurfaceReviewLocked && activeGroupId && (() => {
-                const memberBounds = elements
-                  .filter((el) => el.groupId === activeGroupId && !isEffectivelyHidden(el, groups))
-                  .map((el) => elBounds(el));
-                if (memberBounds.length === 0) return null;
-                const box = unionBounds(memberBounds);
-                if (box.w <= 0 || box.h <= 0) return null;
-                const pad = 6 / effScale;
-                return (
-                  <Rect
-                    x={box.x - pad}
-                    y={box.y - pad}
-                    width={box.w + pad * 2}
-                    height={box.h + pad * 2}
-                    stroke="oklch(0.62 0.02 250 / 0.7)"
-                    strokeWidth={1 / effScale}
-                    dash={[4 / effScale, 4 / effScale]}
-                    cornerRadius={4 / effScale}
-                    listening={false}
-                  />
-                );
-              })()}
+              {renderStudioCanvasSelectionDecorations({
+                activeGroupId,
+                activeSurfaceReviewLocked,
+                beginCanvasSelectionResize,
+                cancelCanvasSelectionResize,
+                canvasH,
+                canvasSelectionEls,
+                commitCanvasSelectionResize,
+                completeSelectionGroup,
+                effScale,
+                elements,
+                groupResizeEnabled,
+                groups,
+                hasCoarsePointer,
+                isExporting,
+                isMobile,
+                marqueeIds,
+                multiSelectionBounds,
+                selected,
+                selectionLockState,
+                singleDrawFreeScale,
+                tool,
+                trRef,
+              })}
               {/* 지우개 다이렉트 라이브 초안: destination-out 으로 메인 레이어 콘텐츠를 직접 실시간 소거 */}
               {tool === "draw" && (
                 <Shape

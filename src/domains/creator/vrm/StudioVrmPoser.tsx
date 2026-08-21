@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { AlertTriangle, Camera, ChevronDown, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, Camera, ChevronDown, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Sparkles, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type MouseEvent } from "react";
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
@@ -22,14 +22,11 @@ import {
   type StudioPoseScope,
 } from "../studio-humanoid-bones";
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "../studio-pose-presets";
-import { createTwoBoneDefaultPoleTarget } from "../studio-rig-two-bone-ik";
 import { StudioToolHintTarget } from "../StudioToolHint";
 
 import {
   STUDIO_VRM_BASE_ROTATION_Y_KEY as BASE_ROTATION_Y_KEY,
-  STUDIO_VRM_HTML_FALLBACK_ERROR as HTML_FALLBACK_VRM_ERROR,
   disposeStudioVrmAsset as disposeVrm,
-  loadStudioVrmAsset as loadVrmAsset,
   readStudioVrmAssetLicenseAuthority,
 } from "./studio-vrm-asset-runtime";
 import {
@@ -92,7 +89,6 @@ import {
   inspectStudioVrmGarmentFit,
   type StudioVrmGarmentEvaluationReceipt,
 } from "./studio-vrm-garment-fit";
-import { avatarSideForHand, solveHandToFingerBones } from "./studio-vrm-hand-solver";
 import {
   canCommitStudioVrmIkResult,
   cloneStudioVrmIkConstraints,
@@ -150,6 +146,43 @@ import {
   normalizeStudioVrmPoseTranslations,
 } from "./studio-vrm-pose-translations";
 import {
+  BONE_CATEGORIES,
+  BONE_LABELS,
+  CAMERA_PRESETS,
+  CHARACTER_PANEL_SECTIONS,
+  COSTUME_PRESETS,
+  ENV_VARIANTS,
+  HAND_SHAPE_PRESETS,
+  PANEL_TABS,
+  PROP_CATEGORY_LABELS,
+  STUDIO_VRM_IK_AXIS_LOCKS,
+  STUDIO_VRM_IK_DRAG_MODES,
+  STUDIO_VRM_IK_NOT_CONVERGED_STATUS,
+  type CameraPreset,
+  type CharacterPanelSection,
+  type ExpressionAction,
+  type PanelTab,
+} from "./studio-vrm-poser-catalogs";
+import {
+  applyStudioVrmRotationPose,
+  categoryForStudioVrmJointHandle,
+  createCharacterThumbnail,
+  createStudioVrmIkPole,
+  cx,
+  extractStudioVrmFingerRotations,
+  findCameraPreset,
+  findPose,
+  findPoseById,
+  getAvailableExpressionActions,
+  getErrorMessage,
+  getExpressionCategory,
+  mergeStudioVrmFingerRotationsIntoBones,
+  resolveStudioVrmJointHandleBone,
+  roundExportSize,
+  roundThumbnailCaptureSize,
+  studioVrmTexturePaintSceneIdentity,
+} from "./studio-vrm-poser-helpers";
+import {
   createStudioVrmPoserPreferencesRuntime,
   hasStudioVrmWebcamSessionConsent,
   rememberStudioVrmWebcamSessionConsent,
@@ -178,8 +211,6 @@ import {
   normalizeFullVrmModelId,
   DEFAULT_VRM_MATERIAL_FX,
   type PoseBoneMap,
-  type PosePreset,
-  type Vec3,
   type FingerRotationMap,
   type BodyScale,
   type LightingParams,
@@ -294,7 +325,6 @@ import {
   type StudioVrmTexturePaintRuntimeSnapshot,
 } from "./studio-vrm-texture-paint-runtime";
 import {
-  applyCalibration,
   CalibrationSampler,
   type TrackingCalibration,
 } from "./studio-vrm-tracking-calibration";
@@ -329,19 +359,8 @@ import {
   type WardrobeState,
 } from "./studio-vrm-wardrobe";
 import {
-  initFaceLandmarker,
-  disposeFaceLandmarker,
-  initPoseLandmarker,
-  disposePoseLandmarker,
-  initHandLandmarker,
-  disposeHandLandmarker,
-  processTrackingResult,
-  processPoseResult,
-  convertChannelsToVrmData,
   createChannelSmoother,
-  warmupLandmarkers,
   DEFAULT_TRACKING_OPTIONS,
-  NEUTRAL_CHANNELS,
   type TrackingOptions,
   type TrackingChannels,
   type VrmTrackingData,
@@ -359,7 +378,6 @@ import {
 } from "./StudioVrmBroadcastPreview";
 import { StudioVrmCharacterLibraryPanel } from "./StudioVrmCharacterLibraryPanel";
 import {
-  STUDIO_VRM_JOINT_HANDLE_DEFINITIONS,
   StudioVrmJointHandles,
   type StudioVrmIkAxisLock,
   type StudioVrmIkDragMode,
@@ -386,25 +404,19 @@ import {
   type StudioVrmWardrobeCaptureSync,
   type StudioVrmWardrobeSurfaceReceipt,
 } from "./StudioVrmWardrobePropsProjection";
+import { useStudioVrmModelLoading } from "./use-studio-vrm-model-loading";
+import { useStudioVrmWebcamSession } from "./use-studio-vrm-webcam-session";
 import {
   studioVrmAvatarReferenceCatalogueDiagnosticMessage,
   useStudioVrmAvatarReferenceCatalogue,
 } from "./useStudioVrmAvatarReferenceCatalogue";
 import {
   canonicalizeVrmContentHash,
-  createUploadedVrmRecord,
-  deleteStoredVrmModel,
-  durableVrmLibraryEntry,
-  ensureStoredVrmContentIdentity,
-  getStoredVrmModel,
   hydrateVrmLibraryThumbnailWindow,
   memoryVrmLibraryEntry,
   queryUploadedVrmLibraryEntriesPage,
   SAMPLE_VRM_ID,
   SAMPLE_VRM_ENTRIES,
-  isBundledVrmRightsBlocked,
-  selectableSampleVrmUrl,
-  saveUploadedVrm,
   saveVrmThumbnail,
   type VrmLibraryEntry,
   type VrmStoredModelWithContentIdentity,
@@ -462,252 +474,8 @@ type CaptureState = {
   camera: THREE.Camera | null;
 };
 
-function studioVrmTexturePaintSceneIdentity(
-  scene: StudioVrmSceneDocument | undefined,
-): string {
-  if (!scene) return "new-scene";
-  return JSON.stringify(scene.surfacePaint);
-}
-
 type CustomPose = StudioVrmCustomPose;
 
-type ExpressionAction = {
-  id: string;
-  label: string;
-  name: string | null;
-  tone: string;
-};
-
-type CameraPreset = {
-  id: string;
-  label: string;
-  position: Vec3;
-  target: Vec3;
-  fov: number;
-};
-
-type CostumePreset = {
-  id: string;
-  name: string;
-  emoji: string;
-  colors: Record<string, string>;
-};
-
-const COSTUME_PRESETS: CostumePreset[] = [
-  {
-    id: "school",
-    name: "스쿨룩 (교복)",
-    emoji: "🏫",
-    colors: { tops: "#f8f9fa", bottoms: "#1e293b", hair: "#475569", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "knight",
-    name: "성기사 (갑옷)",
-    emoji: "🛡️",
-    colors: { tops: "#cbd5e1", bottoms: "#1e3a8a", hair: "#fbbf24", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "royal",
-    name: "로판 황실예복",
-    emoji: "👑",
-    colors: { tops: "#991b1b", bottoms: "#d97706", hair: "#e2e8f0", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "cyber",
-    name: "사이버펑크",
-    emoji: "⚡",
-    colors: { tops: "#0f172a", bottoms: "#ec4899", hair: "#a855f7", body: "#06b6d4", face: "#06b6d4" },
-  },
-  {
-    id: "gothic",
-    name: "고스 롤리타",
-    emoji: "🖤",
-    colors: { tops: "#111827", bottoms: "#581c87", hair: "#f3f4f6", body: "#f9fafb", face: "#f9fafb" },
-  },
-  {
-    id: "autumn",
-    name: "클래식 코트",
-    emoji: "🍂",
-    colors: { tops: "#d97706", bottoms: "#451a03", hair: "#b45309", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "marine",
-    name: "마린 세일러",
-    emoji: "⚓",
-    colors: { tops: "#f8f9fa", bottoms: "#0f172a", hair: "#0284c7", body: "#ffe4e6", face: "#ffe4e6" },
-  },
-  {
-    id: "druid",
-    name: "숲의 엘프",
-    emoji: "🍃",
-    colors: { tops: "#065f46", bottoms: "#78350f", hair: "#10b981", body: "#fef3c7", face: "#fef3c7" },
-  },
-  {
-    id: "ninja",
-    name: "그림자 암살자",
-    emoji: "🥷",
-    colors: { tops: "#111827", bottoms: "#1f2937", hair: "#9ca3af", body: "#e5e7eb", face: "#e5e7eb" },
-  },
-  {
-    id: "magical",
-    name: "마법소녀/소년",
-    emoji: "💖",
-    colors: { tops: "#f472b6", bottoms: "#f472b6", hair: "#fb7185", body: "#ffe4e6", face: "#ffe4e6" },
-  },
-  {
-    id: "wizard",
-    name: "판타지 마법사",
-    emoji: "🔮",
-    colors: { tops: "#3b0764", bottoms: "#1e1b4b", hair: "#a5b4fc", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "murim",
-    name: "무협 소협",
-    emoji: "⚔️",
-    colors: { tops: "#0284c7", bottoms: "#f8f9fa", hair: "#1e293b", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "ceo",
-    name: "현대 재벌/정장",
-    emoji: "💼",
-    colors: { tops: "#0f172a", bottoms: "#0f172a", hair: "#1e293b", body: "#ffe4e6", face: "#ffe4e6" },
-  },
-  {
-    id: "sporty",
-    name: "스포티 트랙슈트",
-    emoji: "🏃",
-    colors: { tops: "#10b981", bottoms: "#10b981", hair: "#6b7280", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "explorer",
-    name: "설원 탐험가",
-    emoji: "❄️",
-    colors: { tops: "#f1f5f9", bottoms: "#64748b", hair: "#38bdf8", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "steampunk",
-    name: "스팀펑크",
-    emoji: "⚙️",
-    colors: { tops: "#78350f", bottoms: "#451a03", hair: "#d97706", body: "#fef3c7", face: "#fef3c7" },
-  },
-  {
-    id: "angel",
-    name: "성직자/천사",
-    emoji: "👼",
-    colors: { tops: "#ffffff", bottoms: "#ffffff", hair: "#fef08a", body: "#fffbeb", face: "#fffbeb" },
-  },
-  {
-    id: "devil",
-    name: "심연의 악마",
-    emoji: "😈",
-    colors: { tops: "#450a0a", bottoms: "#1a0505", hair: "#ef4444", body: "#1c1917", face: "#1c1917" },
-  },
-  {
-    id: "zombie",
-    name: "강시/강령술사",
-    emoji: "🧟",
-    colors: { tops: "#1e1b4b", bottoms: "#0f172a", hair: "#312e81", body: "#86efac", face: "#86efac" },
-  },
-  {
-    id: "astronaut",
-    name: "우주 대원",
-    emoji: "👨‍🚀",
-    colors: { tops: "#f97316", bottoms: "#e2e8f0", hair: "#475569", body: "#f1f5f9", face: "#f1f5f9" },
-  },
-  {
-    id: "office",
-    name: "오피스 정장",
-    emoji: "💼",
-    colors: { tops: "#f8fafc", bottoms: "#111827", hair: "#2b211f", body: "#c98b68", face: "#c98b68" },
-  },
-  {
-    id: "doctor",
-    name: "의사 가운",
-    emoji: "🥼",
-    colors: { tops: "#f8fafc", bottoms: "#155e75", hair: "#3b2b27", body: "#dca982", face: "#dca982" },
-  },
-  {
-    id: "surgeon",
-    name: "외과 수술복",
-    emoji: "🩺",
-    colors: { tops: "#0f766e", bottoms: "#115e59", hair: "#242124", body: "#9f684e", face: "#9f684e" },
-  },
-  {
-    id: "nurse",
-    name: "간호 스크럽",
-    emoji: "🏥",
-    colors: { tops: "#60a5fa", bottoms: "#2563eb", hair: "#49352f", body: "#efd1bb", face: "#efd1bb" },
-  },
-  {
-    id: "paramedic",
-    name: "응급구조사",
-    emoji: "🚑",
-    colors: { tops: "#f97316", bottoms: "#1e293b", hair: "#252027", body: "#b87855", face: "#b87855" },
-  },
-  // 추가 10종 (장르 다양성: 웹툰·판타지·현대·전통·코스프레)
-  {
-    id: "idol",
-    name: "아이돌 스테이지",
-    emoji: "🎤",
-    colors: { tops: "#f472b6", bottoms: "#1e293b", hair: "#e0f2fe", body: "#ffe4e6", face: "#ffedd5" },
-  },
-  {
-    id: "samurai",
-    name: "사무라이",
-    emoji: "🗡️",
-    colors: { tops: "#334155", bottoms: "#1e293b", hair: "#0f172a", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "witch",
-    name: "마녀",
-    emoji: "🧙‍♀️",
-    colors: { tops: "#312e81", bottoms: "#1e1b4b", hair: "#64748b", body: "#c084fc", face: "#c084fc" },
-  },
-  {
-    id: "pirate",
-    name: "해적",
-    emoji: "🏴‍☠️",
-    colors: { tops: "#334155", bottoms: "#1e293b", hair: "#854d0e", body: "#fed7aa", face: "#ffedd5" },
-  },
-  {
-    id: "hanbok",
-    name: "한복",
-    emoji: "👘",
-    colors: { tops: "#b91c1c", bottoms: "#166534", hair: "#1e293b", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "maid",
-    name: "메이드",
-    emoji: "🧹",
-    colors: { tops: "#1e293b", bottoms: "#1e293b", hair: "#f3e8ff", body: "#fff1f2", face: "#ffedd5" },
-  },
-  {
-    id: "butler",
-    name: "집사/신사",
-    emoji: "🎩",
-    colors: { tops: "#0f172a", bottoms: "#0f172a", hair: "#1e293b", body: "#f1f5f9", face: "#ffedd5" },
-  },
-  {
-    id: "superhero",
-    name: "히어로",
-    emoji: "🦸",
-    colors: { tops: "#1e40af", bottoms: "#1e3a8a", hair: "#f8fafc", body: "#e0f2fe", face: "#ffedd5" },
-  },
-  {
-    id: "qipao",
-    name: "치파오",
-    emoji: "🪭",
-    colors: { tops: "#9f1239", bottoms: "#9f1239", hair: "#1e293b", body: "#ffedd5", face: "#ffedd5" },
-  },
-  {
-    id: "street",
-    name: "스트릿 패션",
-    emoji: "🧢",
-    colors: { tops: "#334155", bottoms: "#1e293b", hair: "#f59e0b", body: "#fef3c7", face: "#ffedd5" },
-  },
-];
-
-const EXPORT_HEIGHT = 520;
 const STUDIO_VRM_CAPTURE_PNG_TIMEOUT_MS = 20_000;
 const STUDIO_VRM_SHARE_TIMEOUT_MS = 30_000;
 const DEFAULT_VRM_CUSTOM_COLORS: Record<string, string> = {};
@@ -732,14 +500,6 @@ const ZERO_EULER = [0, 0, 0] as const;
 const LIMB_FADE_HALF_LIFE = 0.5;
 // vrm.lookAt 직접 구동 시 이중 적용을 막을 시선 표정 이름(lookAt 부재 모델 폴백용).
 const LOOK_EXPRESSION_NAMES = new Set(["lookUp", "lookDown", "lookLeft", "lookRight"]);
-// 얼굴 로스트: 이 프레임 수까지는 마지막 채널을 홀드(~0.3s, 순간 드랍 마스킹),
-// 이후 중립 채널로 감쇠 복귀한다(One-Euro 필터가 전환을 스무딩 — 제로 스냅 없음).
-const FACE_HOLD_FRAMES = 10;
-// 얼굴 미검출이 이 프레임 수(~5초@30fps)를 넘으면 프리뷰에 힌트 배지를 띄운다.
-const FACE_LOST_HINT_FRAMES = 150;
-const FALLBACK_EXPORT_WIDTH = 360;
-const THUMBNAIL_WIDTH = 72;
-const THUMBNAIL_HEIGHT = 96;
 const CONTROL_BUTTON =
   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
 const ICON_BUTTON =
@@ -851,29 +611,6 @@ function VrmColorControl({
   );
 }
 
-// 우측 컨트롤 패널 탭 — 16개 섹션을 작업 흐름별로 묶어 탐색 부담을 줄인다.
-type PanelTab = "character" | "pose" | "face" | "scene" | "props";
-const PANEL_TABS: Array<{ id: PanelTab; label: string; icon: typeof UserRound; hint: string }> = [
-  { id: "character", label: "캐릭터", icon: UserRound, hint: "모델 · 의상 · 색상" },
-  { id: "pose", label: "포즈", icon: PersonStanding, hint: "프리셋 · 관절 · 대기" },
-  { id: "face", label: "표정", icon: Smile, hint: "표정 · 블렌드 · 웹캠" },
-  { id: "scene", label: "연출", icon: Clapperboard, hint: "카메라 · 조명 · 물리" },
-  { id: "props", label: "소품", icon: Swords, hint: "부착 · 배치" },
-];
-
-type CharacterPanelSection = "library" | "forge" | "appearance" | "wardrobe" | "surface";
-const CHARACTER_PANEL_SECTIONS: Array<{
-  id: CharacterPanelSection;
-  label: string;
-  icon: typeof UserRound;
-}> = [
-  { id: "library", label: "모델", icon: Upload },
-  { id: "forge", label: "조형", icon: Sparkles },
-  { id: "appearance", label: "체형·색", icon: Sliders },
-  { id: "wardrobe", label: "의상", icon: Shirt },
-  { id: "surface", label: "표면", icon: Paintbrush },
-];
-
 const STUDIO_VRM_SURFACE_BRUSH_UNAVAILABLE_REASON =
   "검증·승인된 3D 표면 브러시 엔진이 아직 연결되지 않아 브러시 그리기를 사용할 수 없습니다. 자체 라운드 촉으로 대체하지 않으며, 현재는 ColorDrop과 스포이드를 사용할 수 있습니다.";
 
@@ -931,148 +668,6 @@ function readStudioVrmTexturePaintEnvironmentSignals(): StudioVrmTexturePaintEnv
   };
 }
 
-const ENV_VARIANTS: Array<{ id: EnvVariant; label: string }> = [
-  { id: "none", label: "없음" },
-  { id: "floor", label: "바닥" },
-  { id: "wall", label: "벽" },
-  { id: "room", label: "방" },
-  { id: "outdoor", label: "야외" },
-];
-const HAND_SHAPE_PRESETS = [
-  { id: "fist", label: "주먹" },
-  { id: "open", label: "보" },
-  { id: "point", label: "가리키기" },
-  { id: "peace", label: "브이" },
-  { id: "thumbsUp", label: "따봉" },
-  { id: "relaxed", label: "기본" },
-] as const;
-
-const NEUTRAL_EXPRESSION_ACTION: ExpressionAction = { id: "neutral", label: "초기화", name: null, tone: "리셋" };
-const EXPRESSION_LABELS: Record<string, string> = {
-  happy: "행복",
-  angry: "화남",
-  sad: "슬픔",
-  relaxed: "편안",
-  surprised: "놀람",
-  blink: "눈감음",
-  blinkLeft: "왼쪽 눈",
-  blinkRight: "오른쪽 눈",
-  aa: "입모양 A",
-  ih: "입모양 I",
-  ou: "입모양 U",
-  ee: "입모양 E",
-  oh: "입모양 O",
-  lookUp: "시선 위",
-  lookDown: "시선 아래",
-  lookLeft: "시선 왼쪽",
-  lookRight: "시선 오른쪽",
-};
-const EXPRESSION_ORDER = [
-  "happy",
-  "angry",
-  "sad",
-  "relaxed",
-  "surprised",
-  "blink",
-  "blinkLeft",
-  "blinkRight",
-  "aa",
-  "ih",
-  "ou",
-  "ee",
-  "oh",
-  "lookUp",
-  "lookDown",
-  "lookLeft",
-  "lookRight",
-];
-
-const CAMERA_PRESETS: CameraPreset[] = [
-  { id: "front", label: "정면", position: [0, 1.42, 3.15], target: [0, 1.22, 0], fov: 30 },
-  { id: "threeQuarter", label: "사선", position: [1.55, 1.48, 2.75], target: [0, 1.2, 0], fov: 31 },
-  { id: "low", label: "로우", position: [0.52, 0.92, 3.02], target: [0, 1.18, 0], fov: 32 },
-  { id: "bust", label: "상반신", position: [0, 1.68, 2.1], target: [0, 1.45, 0], fov: 27 },
-  { id: "high", label: "하이 앵글", position: [0, 2.2, 2.8], target: [0, 1.2, 0], fov: 28 },
-  { id: "extremeLow", label: "웅장한 앵글", position: [0.1, 0.4, 2.5], target: [0, 1.3, 0], fov: 36 },
-  { id: "closeup", label: "얼굴 줌", position: [0, 1.55, 1.25], target: [0, 1.5, 0], fov: 25 },
-  { id: "profile", label: "측면", position: [2.8, 1.4, 0.35], target: [0, 1.25, 0], fov: 30 },
-  { id: "overShoulder", label: "어깨 너머", position: [-1.35, 1.55, 1.85], target: [0.2, 1.35, 0], fov: 32 },
-  { id: "fullBody", label: "전신", position: [0, 1.05, 4.4], target: [0, 0.95, 0], fov: 34 },
-  { id: "dutch", label: "더치 앵글", position: [1.2, 1.35, 2.6], target: [0, 1.25, 0], fov: 33 },
-  { id: "topDown", label: "탑 다운", position: [0.2, 3.4, 1.2], target: [0, 1.1, 0], fov: 36 },
-];
-
-const BONE_LABELS: Record<string, string> = {
-  hips: "골반 (Hips)",
-  head: "머리 (Head)",
-  neck: "목 (Neck)",
-  spine: "척추 (Spine)",
-  chest: "가슴 (Chest)",
-  upperChest: "윗가슴 (Upper Chest)",
-  leftEye: "왼쪽 눈 (L Eye)",
-  rightEye: "오른쪽 눈 (R Eye)",
-  jaw: "턱 (Jaw)",
-  leftShoulder: "왼쪽 쇄골/어깨 (L Shoulder)",
-  rightShoulder: "오른쪽 쇄골/어깨 (R Shoulder)",
-  leftUpperArm: "왼쪽 어깨 (L Upper Arm)",
-  rightUpperArm: "오른쪽 어깨 (R Upper Arm)",
-  leftLowerArm: "왼쪽 팔꿈치 (L Lower Arm)",
-  rightLowerArm: "오른쪽 팔꿈치 (R Lower Arm)",
-  leftHand: "왼쪽 손목 (L Hand)",
-  rightHand: "오른쪽 손목 (R Hand)",
-  leftUpperLeg: "왼쪽 고관절 (L Upper Leg)",
-  rightUpperLeg: "오른쪽 고관절 (R Upper Leg)",
-  leftLowerLeg: "왼쪽 무릎 (L Lower Leg)",
-  rightLowerLeg: "오른쪽 무릎 (R Lower Leg)",
-  leftFoot: "왼쪽 발목 (L Foot)",
-  rightFoot: "오른쪽 발목 (R Foot)",
-  leftToes: "왼쪽 발끝 (L Toes)",
-  rightToes: "오른쪽 발끝 (R Toes)",
-  // finger labels (detailed per-finger editing)
-  leftThumbMetacarpal: "왼 엄지 중수 (L Thumb MC)",
-  leftThumbProximal: "왼 엄지 근위 (L Thumb Prox)",
-  leftThumbDistal: "왼 엄지 말단 (L Thumb Dist)",
-  leftIndexProximal: "왼 검지 근위",
-  leftIndexIntermediate: "왼 검지 중간",
-  leftIndexDistal: "왼 검지 말단",
-  leftMiddleProximal: "왼 중지 근위",
-  leftMiddleIntermediate: "왼 중지 중간",
-  leftMiddleDistal: "왼 중지 말단",
-  leftRingProximal: "왼 약지 근위",
-  leftRingIntermediate: "왼 약지 중간",
-  leftRingDistal: "왼 약지 말단",
-  leftLittleProximal: "왼 소지 근위",
-  leftLittleIntermediate: "왼 소지 중간",
-  leftLittleDistal: "왼 소지 말단",
-  rightThumbMetacarpal: "오른 엄지 중수",
-  rightThumbProximal: "오른 엄지 근위",
-  rightThumbDistal: "오른 엄지 말단",
-  rightIndexProximal: "오른 검지 근위",
-  rightIndexIntermediate: "오른 검지 중간",
-  rightIndexDistal: "오른 검지 말단",
-  rightMiddleProximal: "오른 중지 근위",
-  rightMiddleIntermediate: "오른 중지 중간",
-  rightMiddleDistal: "오른 중지 말단",
-  rightRingProximal: "오른 약지 근위",
-  rightRingIntermediate: "오른 약지 중간",
-  rightRingDistal: "오른 약지 말단",
-  rightLittleProximal: "오른 소지 근위",
-  rightLittleIntermediate: "오른 소지 중간",
-  rightLittleDistal: "오른 소지 말단",
-};
-
-const BONE_CATEGORIES: Array<{ id: string; label: string; bones: VRMHumanBoneName[] }> = [
-  { id: "head", label: "머리/목", bones: ["head", "neck"] },
-  { id: "gaze", label: "시선/턱", bones: ["leftEye", "rightEye", "jaw"] },
-  { id: "torso", label: "골반/몸통", bones: ["hips", "spine", "chest", "upperChest"] },
-  { id: "rightArm", label: "오른팔", bones: ["rightShoulder", "rightUpperArm", "rightLowerArm", "rightHand"] },
-  { id: "leftArm", label: "왼팔", bones: ["leftShoulder", "leftUpperArm", "leftLowerArm", "leftHand"] },
-  { id: "rightLeg", label: "오른다리", bones: ["rightUpperLeg", "rightLowerLeg", "rightFoot", "rightToes"] },
-  { id: "leftLeg", label: "왼다리", bones: ["leftUpperLeg", "leftLowerLeg", "leftFoot", "leftToes"] },
-  { id: "leftFingers", label: "왼손가락", bones: POSER_FINGER_BONES.filter((b) => b.startsWith("left")) as VRMHumanBoneName[] },
-  { id: "rightFingers", label: "오른손가락", bones: POSER_FINGER_BONES.filter((b) => b.startsWith("right")) as VRMHumanBoneName[] },
-];
-
 const VIEWPORT_POSE_BONES: readonly VRMHumanBoneName[] = Object.freeze([
   "hips", "spine", "chest", "neck", "head",
   "leftUpperArm", "leftLowerArm", "leftHand",
@@ -1099,266 +694,12 @@ type StudioVrmIkTransaction = {
   latest: StudioVrmUserIkResult | StudioVrmFullBodyIkResult | null;
 };
 
-const STUDIO_VRM_IK_NOT_CONVERGED_STATUS =
-  "전신 IK가 안정적으로 수렴하지 않아 미리보기를 취소하고 시작 자세로 되돌렸습니다. 목표를 몸 가까이 옮기거나 고정점을 줄인 뒤 다시 시도해 주세요.";
-
-const STUDIO_VRM_IK_DRAG_MODES: readonly {
-  id: StudioVrmIkDragMode;
-  label: string;
-  description: string;
-}[] = Object.freeze([
-  { id: "screen", label: "화면", description: "화면과 나란한 평면에서 이동" },
-  { id: "depth", label: "깊이", description: "위로 끌면 멀리, 아래로 끌면 가까이 이동" },
-]);
-
-const STUDIO_VRM_IK_AXIS_LOCKS: readonly {
-  id: StudioVrmIkAxisLock;
-  label: string;
-  description: string;
-}[] = Object.freeze([
-  { id: "free", label: "자유", description: "축 제한 없이 이동" },
-  { id: "x", label: "X", description: "장면 X축으로만 이동" },
-  { id: "y", label: "Y", description: "장면 Y축으로만 이동" },
-  { id: "z", label: "Z", description: "장면 Z축으로만 이동" },
-]);
-
 type PendingStudioVrmPersistentIkCommand = {
   before: FullVrmState;
   candidateAfter: FullVrmState;
   inputSignature: string;
   historyGeneration: number;
 };
-
-function extractStudioVrmFingerRotations(bones: PoseBoneMap): FingerRotationMap {
-  const fingers: FingerRotationMap = {};
-  for (const boneName of POSER_FINGER_BONES) {
-    const rotation = bones[boneName]?.rotation;
-    if (!rotation) continue;
-    fingers[boneName] = [rotation[0], rotation[1], rotation[2]];
-  }
-  return fingers;
-}
-
-function mergeStudioVrmFingerRotationsIntoBones(
-  bones: PoseBoneMap,
-  fingerEdits: FingerRotationMap,
-): PoseBoneMap {
-  const merged: PoseBoneMap = { ...bones };
-  for (const boneName of POSER_FINGER_BONES) {
-    const rotation = fingerEdits[boneName];
-    if (!rotation) continue;
-    merged[boneName] = { rotation: [rotation[0], rotation[1], rotation[2]] };
-  }
-  return merged;
-}
-
-function applyStudioVrmRotationPose(
-  targetVrm: VRM,
-  pose: {
-    bones: PoseBoneMap;
-    yOffset: number;
-    translations?: StudioVrmPoseTranslations;
-  },
-  bodyScale: BodyScale,
-) {
-  applyPoserVisualState(targetVrm, {
-    bones: stripFingerBones(pose.bones),
-    yOffset: pose.yOffset,
-    poseTranslations: pose.translations ?? EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
-    fingerEdits: extractStudioVrmFingerRotations(pose.bones),
-    bodyScale,
-  });
-}
-
-function createStudioVrmIkPole(
-  targetVrm: VRM,
-  effector: StudioVrmIkEffectorBone,
-): THREE.Vector3 | undefined {
-  try {
-    const chain = STUDIO_VRM_USER_IK_CHAINS[effector];
-    const upper = targetVrm.humanoid.getNormalizedBoneNode(chain.upper);
-    const lower = targetVrm.humanoid.getNormalizedBoneNode(chain.lower);
-    const end = targetVrm.humanoid.getNormalizedBoneNode(chain.end);
-    if (!upper || !lower || !end) return undefined;
-    targetVrm.scene.updateMatrixWorld(true);
-    const startWorld = upper.getWorldPosition(new THREE.Vector3());
-    const middleWorld = lower.getWorldPosition(new THREE.Vector3());
-    const endWorld = end.getWorldPosition(new THREE.Vector3());
-    const values = [startWorld, middleWorld, endWorld].flatMap((point) => [point.x, point.y, point.z]);
-    if (!values.every(Number.isFinite)) return undefined;
-    const pole = createTwoBoneDefaultPoleTarget(
-      [startWorld.x, startWorld.y, startWorld.z],
-      [middleWorld.x, middleWorld.y, middleWorld.z],
-      [endWorld.x, endWorld.y, endWorld.z],
-    );
-    return new THREE.Vector3(pole[0], pole[1], pole[2]);
-  } catch {
-    return undefined;
-  }
-}
-
-function categoryForStudioVrmJointHandle(bone: StudioVrmJointHandleBone): string | null {
-  return BONE_CATEGORIES.find((category) => category.bones.includes(bone))?.id ?? null;
-}
-
-function resolveStudioVrmJointHandleBone(bone: VRMHumanBoneName): StudioVrmJointHandleBone | null {
-  return STUDIO_VRM_JOINT_HANDLE_DEFINITIONS.find((definition) => definition.bone === bone)?.bone ?? null;
-}
-
-const PROP_CATEGORY_LABELS: Record<string, string> = { animal: "동물", item: "아이템", effect: "이펙트" };
-
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
-
-function findPoseById(id: string): PosePreset | null {
-  // 기본 프리셋 → 확장 팩 → 자연 아이들(스폰 기본) 순으로 탐색. 셋 다 같은 본 규약을 쓴다.
-  return (
-    POSE_PRESETS.find((pose) => pose.id === id) ??
-    EXTRA_POSE_PRESETS.find((pose) => pose.id === id) ??
-    NATURAL_IDLE_POSES.find((pose) => pose.id === id) ??
-    null
-  );
-}
-
-function findPose(id: string): PosePreset {
-  return findPoseById(id) ?? POSE_PRESETS[0];
-}
-
-function findCameraPreset(id: string) {
-  return CAMERA_PRESETS.find((preset) => preset.id === id) ?? CAMERA_PRESETS[0];
-}
-
-function getExpressionTone(name: string, vrm: VRM) {
-  const expressionManager = vrm.expressionManager;
-  if (!expressionManager) return "표정";
-  if (expressionManager.mouthExpressionNames.includes(name)) return "입모양";
-  if (expressionManager.blinkExpressionNames.includes(name)) return "눈";
-  if (name.startsWith("look")) return "시선";
-  return EXPRESSION_LABELS[name] ? "기본" : "커스텀";
-}
-
-function formatExpressionLabel(name: string) {
-  return EXPRESSION_LABELS[name] ?? name.replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function getAvailableExpressionActions(vrm: VRM | null) {
-  const expressionManager = vrm?.expressionManager;
-  if (!expressionManager) return [];
-
-  const expressionNames = expressionManager.expressions
-    .map((expression) => expression.expressionName)
-    .filter((name) => name !== "neutral")
-    .sort((a, b) => {
-      const aIndex = EXPRESSION_ORDER.indexOf(a);
-      const bIndex = EXPRESSION_ORDER.indexOf(b);
-      if (aIndex !== -1 || bIndex !== -1) {
-        return (aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex) - (bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex);
-      }
-      return a.localeCompare(b);
-    });
-
-  return [
-    NEUTRAL_EXPRESSION_ACTION,
-    ...expressionNames.map<ExpressionAction>((name) => ({
-      id: name,
-      label: formatExpressionLabel(name),
-      name,
-      tone: getExpressionTone(name, vrm),
-    })),
-  ];
-}
-
-// three-vrm의 VRMExpressionManager.customExpressionMap은 VRM1 expressions.custom과,
-function getExpressionCategory(action: ExpressionAction): "emotion" | "eye" | "mouth" | "custom" {
-  const name = action.name;
-  if (!name) return "emotion";
-  const tone = action.tone;
-  if (tone === "눈" || tone === "시선" || name.startsWith("blink") || name.startsWith("look")) {
-    return "eye";
-  }
-  if (tone === "입모양" || ["aa", "ih", "ou", "ee", "oh"].includes(name)) {
-    return "mouth";
-  }
-  if (["happy", "sad", "relaxed", "angry", "surprised"].includes(name) || tone === "기본") {
-    return "emotion";
-  }
-  return "custom";
-}
-
-function roundExportSize(canvas: HTMLCanvasElement) {
-  if (canvas.width <= 0 || canvas.height <= 0) {
-    return { width: FALLBACK_EXPORT_WIDTH, height: EXPORT_HEIGHT };
-  }
-
-  const aspect = canvas.width / canvas.height;
-  return { width: Math.round(EXPORT_HEIGHT * aspect), height: EXPORT_HEIGHT };
-}
-
-function roundThumbnailCaptureSize(canvas: HTMLCanvasElement) {
-  if (canvas.width <= 0 || canvas.height <= 0) {
-    return { width: Math.round(THUMBNAIL_HEIGHT * FALLBACK_EXPORT_WIDTH / EXPORT_HEIGHT), height: THUMBNAIL_HEIGHT };
-  }
-  const scale = Math.min(THUMBNAIL_WIDTH / canvas.width, THUMBNAIL_HEIGHT / canvas.height);
-  return {
-    width: Math.max(1, Math.round(canvas.width * scale)),
-    height: Math.max(1, Math.round(canvas.height * scale)),
-  };
-}
-
-function createCharacterThumbnail(
-  rgba: Uint8ClampedArray,
-  sourceWidth: number,
-  sourceHeight: number,
-) {
-  const sourceCanvas = document.createElement("canvas");
-  sourceCanvas.width = sourceWidth;
-  sourceCanvas.height = sourceHeight;
-  const thumbnailCanvas = document.createElement("canvas");
-  thumbnailCanvas.width = THUMBNAIL_WIDTH;
-  thumbnailCanvas.height = THUMBNAIL_HEIGHT;
-
-  const sourceContext = sourceCanvas.getContext("2d");
-  const context = thumbnailCanvas.getContext("2d");
-  if (
-    !sourceContext || !context ||
-    sourceWidth <= 0 || sourceHeight <= 0 ||
-    rgba.byteLength !== sourceWidth * sourceHeight * 4
-  ) {
-    sourceCanvas.width = 1;
-    sourceCanvas.height = 1;
-    thumbnailCanvas.width = 1;
-    thumbnailCanvas.height = 1;
-    return null;
-  }
-
-  const imageData = sourceContext.createImageData(sourceWidth, sourceHeight);
-  imageData.data.set(rgba);
-  sourceContext.putImageData(imageData, 0, 0);
-  const scale = Math.min(THUMBNAIL_WIDTH / sourceWidth, THUMBNAIL_HEIGHT / sourceHeight);
-  const drawWidth = Math.round(sourceWidth * scale);
-  const drawHeight = Math.round(sourceHeight * scale);
-  const drawX = Math.round((THUMBNAIL_WIDTH - drawWidth) / 2);
-  const drawY = Math.round((THUMBNAIL_HEIGHT - drawHeight) / 2);
-
-  context.clearRect(0, 0, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
-  context.drawImage(sourceCanvas, drawX, drawY, drawWidth, drawHeight);
-  const dataUrl = thumbnailCanvas.toDataURL("image/png");
-  sourceCanvas.width = 1;
-  sourceCanvas.height = 1;
-  thumbnailCanvas.width = 1;
-  thumbnailCanvas.height = 1;
-  return dataUrl;
-}
-
-function getErrorMessage(caughtError: unknown, fallback: string) {
-  return caughtError instanceof Error ? caughtError.message : fallback;
-}
-
-function getVrmLoadErrorMessage(caughtError: unknown) {
-  const message = getErrorMessage(caughtError, "VRM을 불러오지 못했습니다.");
-  return /Unexpected token '<'|<!doctype/i.test(message) ? HTML_FALLBACK_VRM_ERROR : message;
-}
 
 function applyCameraPreset(camera: THREE.Camera, preset: CameraPreset, invalidate: () => void) {
   camera.position.set(preset.position[0], preset.position[1], preset.position[2]);
@@ -2898,60 +2239,6 @@ function VrmLighting({
       </group>
     </>
   );
-}
-
-function parseCameraError(error: unknown): string {
-  let errMsg = "카메라 권한 접근에 실패했습니다.";
-  if (error instanceof Error) {
-    const name = error.name;
-    const msg = error.message;
-
-    // Compute recommended access URL dynamically
-    const getRecommendedUrl = () => {
-      if (typeof window === "undefined") return "https://www.toonstudio.cloud/studio";
-      const { protocol, hostname, origin, pathname } = window.location;
-      const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
-      if (protocol === "https:" || isLocal) {
-        // Use current URL (preserve path like /studio)
-        return `${origin}${pathname}`;
-      }
-      // Suggest production HTTPS URL
-      return "https://www.toonstudio.cloud/studio";
-    };
-    const recommended = getRecommendedUrl();
-    const isSecure = typeof window !== "undefined" && (window.isSecureContext || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-
-    if (!isSecure) {
-      return "보안 접속(HTTPS 또는 localhost) 환경이 아니기 때문에 브라우저가 카메라 권한 팝업을 띄우지 않고 요청을 원천 차단했습니다.\n\n" +
-        "[해결 방법]\n" +
-        `1. 현재 비보안 주소로 접속 중입니다. 브라우저 보안 규정상 웹캠은 HTTPS 또는 localhost에서만 허용됩니다.\n` +
-        `2. 로컬 개발 시: 주소창에 'http://localhost:5173' (또는 현재 Vite 포트)을 직접 입력해 접속하세요.\n` +
-        `3. 운영/배포 환경에서는 반드시 HTTPS 주소(${recommended})로 접속하세요. (Vercel 등은 자동으로 HTTPS를 강제합니다.)\n` +
-        `4. 외부 IP(예: http://192.168.x.x:xxxx)로 직접 접속 중이라면, 도메인 또는 localhost를 사용하거나 ngrok/cloudflare tunnel 같은 HTTPS 터널을 이용하세요.`;
-    }
-
-    if (name === "NotAllowedError" || msg.includes("Permission denied") || msg.includes("denied")) {
-      errMsg = "카메라 사용 권한이 거부되었거나 즉시 차단되었습니다. (브라우저가 동의 팝업을 띄우지 않는 상태)\n\n" +
-        "[원인 및 해결 방법]\n" +
-        "1. 브라우저 주소창 왼쪽 '자물쇠' 아이콘 클릭 → '카메라'가 '허용'인지 확인 (이 사이트 origin에서 별도로 설정해야 함: localhost vs https://www.toonstudio.cloud 별개).\n" +
-        "2. macOS: 시스템 설정 → 개인정보 보호 및 보안 → 카메라 에서 사용 중인 브라우저 스위치를 **켜기**. (브라우저 권한과 별도의 시스템 권한임)\n" +
-        "3. 위 설정 변경 후: 브라우저 **완전 종료 → 재실행 → F5** 후 다시 '트래킹 시작' 클릭.\n" +
-        `4. 여전히 안 되면 '${recommended}' 로 직접 접속했는지, 다른 앱이 카메라 점유 중인지 확인.`;
-    } else if (name === "TypeError" && (msg.includes("undefined") || msg.includes("Insecure Context") || msg.includes("getUserMedia"))) {
-      errMsg = "보안 접속 환경(HTTPS 또는 localhost)이 아니어서 브라우저가 카메라 접근 요청을 원천 차단했습니다.\n\n" +
-        "[해결 방법]\n" +
-        `현재 주소가 비보안(HTTP IP 등)입니다. 로컬 개발은 'http://localhost:5173' (또는 dev server), 운영 환경은 HTTPS 주소(${recommended})로 직접 접속해 주세요.`;
-    } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-      errMsg = "연결된 카메라(웹캠) 장치를 찾을 수 없습니다. 카메라가 컴퓨터에 올바르게 연결되어 있고 전원이 켜져 있는지 확인해 주세요.";
-    } else if (name === "NotReadableError" || name === "TrackStartError") {
-      errMsg = "카메라 장치를 사용할 수 없습니다. 이미 다른 앱(Zoom, Discord, FaceTime, Skype, 또는 다른 브라우저 탭)에서 카메라를 사용 중일 가능성이 높습니다. 카메라를 점유 중인 다른 프로그램을 완전히 종료하고 다시 시도해 주세요.";
-    } else if (name === "SecurityError") {
-      errMsg = `보안 정책(Feature Policy 또는 Sandbox) 제한이나 비보안 컨텍스트 문제로 인해 카메라에 접근할 수 없습니다. '${recommended}' 주소로 직접 접속했는지 확인해 주세요.`;
-    } else {
-      errMsg = `카메라 접근 오류 (${name}): ${msg}\n\n브라우저 주소창의 자물쇠 설정과 macOS 시스템 보안 설정에서 카메라 권한이 켜져 있는지 다시 한번 확인해 주세요.`;
-    }
-  }
-  return errMsg;
 }
 
 function normalizeCatalogNextOffset(currentOffset: number, page: SharedAssetCatalogPage): number | null {
@@ -5843,357 +5130,6 @@ export function StudioVrmPoser({
     };
   }, [webcamActive]);
 
-  // Synchronize options to a ref for the frame loop
-  const trackingOptionsRef = useRef(trackingOptions);
-  useEffect(() => {
-    trackingOptionsRef.current = trackingOptions;
-  }, [trackingOptions]);
-
-  // 탭 숨김 → 카메라 완전 해제(LED 소등 = 프라이버시) + 루프 정지, 복귀 시 재시작.
-  // 기존 웹캠 effect 가 webcamActive=false 에서 track.stop 을 이미 수행하므로 토글을 재사용한다
-  // (권한은 granted 상태라 재시작 시 프롬프트 없음, 모델은 싱글턴 캐시라 재-init 비용 없음).
-  useEffect(() => {
-    const wasActive = { current: false };
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        wasActive.current = webcamActiveRef.current;
-        if (wasActive.current) setWebcamActive(false);
-      } else if (wasActive.current) {
-        wasActive.current = false;
-        setWebcamActive(true);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, []);
-
-  // 캘리브레이션 카운트다운(3·2·1) → 종료 시 샘플러 가동(완료 감지는 트래킹 루프에서).
-  useEffect(() => {
-    if (!calibrating) return;
-    if (calibrationCountdown > 0) {
-      const timer = setTimeout(() => setCalibrationCountdown((c) => c - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-    setCalibrationProgress(0);
-    calibrationSamplerRef.current = new CalibrationSampler();
-  }, [calibrating, calibrationCountdown]);
-
-  // Webcam live tracking loop
-  useEffect(() => {
-    if (!webcamActive) {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
-      // 트래킹 세션 상태 초기화 — 재시작 시 stale 필터/홀드 값 방지.
-      channelSmootherRef.current.reset();
-      blinkStabilizerRef.current.reset();
-      qualityRef.current = null;
-      calibrationSamplerRef.current = null;
-      faceLostFramesRef.current = 0;
-      faceLostLongRef.current = false;
-      lastChannelsRef.current = null;
-      lastPoseBonesRef.current = {};
-      lastFingersRef.current = null;
-      frameIndexRef.current = 0;
-      trackingDataRef.current = null;
-      setFaceDetected(false);
-      setFaceLostLong(false);
-      setCalibrating(false);
-      return;
-    }
-
-    let active = true;
-    let lastVideoTime = -1;
-    let requestId: number;
-    let videoFrameCallbackId: number | null = null;
-    // rVFC 를 등록한 비디오 엘리먼트 — cleanup 에서 ref 재조회 대신 이 변수를 사용.
-    let schedulingVideo: HTMLVideoElement | null = null;
-
-    const startCamera = async () => {
-      setWebcamLoading(true);
-      setWebcamError(null);
-      setWebcamErrorStage(null);
-      let failureStage: "camera" | "engine" = "engine";
-      try {
-        // MediaPipe must settle before asking for a privacy-sensitive camera grant. If engine
-        // initialization fails, the browser never lights the camera or leaves a stream to clean up.
-        let landmarker;
-        let poseLandmarker;
-        try {
-          [landmarker, poseLandmarker] = await Promise.all([
-            initFaceLandmarker(),
-            initPoseLandmarker(),
-          ]);
-        } catch (modelErr) {
-          console.error("Tracking AI models initialization failed:", modelErr);
-          throw new Error(
-            "얼굴 및 전신 동작 인식 엔진을 준비하지 못했습니다. 네트워크를 확인한 뒤 다시 시도하고, 계속되면 페이지를 새로고침해 주세요.",
-            { cause: modelErr },
-          );
-        }
-        if (!active) return;
-
-        failureStage = "camera";
-        let stream: MediaStream;
-        try {
-          if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new TypeError("navigator.mediaDevices is undefined (Insecure Context or unsupported browser)");
-          }
-
-          // Always attempt getUserMedia on explicit user click (best chance for prompt).
-          // The separate permission state effect + banner handles showing "already denied" warning.
-          // This makes it more robust when Permissions API state lags behind actual grants (common on macOS).
-          // Optional: enumerate first to help diagnose (labels empty = no permission yet or system block)
-          try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(d => d.kind === 'videoinput');
-            if (videoDevices.length === 0) {
-              console.warn('No videoinput devices found via enumerateDevices()');
-            } else if (videoDevices.some(d => !d.label)) {
-              console.warn('Video devices found but labels empty (permission not yet fully granted or system level block)');
-            }
-          } catch { /* ignore */ }
-
-          // 모델 내부 입력이 192~256px 라 640 초과는 낭비, 320×240 은 iris 정밀도 손실
-          // — 640×480 이 스윗스팟. exact 는 OverconstrainedError 위험이 있어 ideal 만 사용.
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              width: { ideal: 640 },
-              height: { ideal: 480 },
-              frameRate: { ideal: 30, max: 30 },
-              facingMode: "user",
-            },
-            audio: false,
-          });
-        } catch (cameraErr) {
-          console.error("Webcam access failed:", cameraErr);
-          // Force update permission state on NotAllowed so banner shows even if Permissions API was "prompt"
-          if (cameraErr instanceof Error && (cameraErr.name === "NotAllowedError" || /denied|Permission denied/i.test(cameraErr.message))) {
-            setBrowserPermissionState("denied");
-          }
-          throw new Error(parseCameraError(cameraErr), { cause: cameraErr });
-        }
-
-        if (!active) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        streamRef.current = stream;
-
-        const video = videoRef.current;
-        if (video) {
-          video.srcObject = stream;
-          try {
-            await video.play();
-          } catch (e) {
-            console.error("Video play failed:", e);
-          }
-        }
-
-        if (!active) return;
-        landmarkerRef.current = landmarker;
-        poseLandmarkerRef.current = poseLandmarker;
-
-        // 손가락 추적(옵션) — 별도 lazy 초기화. 실패해도 전신 추적은 유지.
-        if (trackingOptionsRef.current.fingerTracking) {
-          initHandLandmarker()
-            .then((hand) => {
-              if (active) handLandmarkerRef.current = hand;
-            })
-            .catch((handErr) => console.warn("HandLandmarker init failed (손가락 추적 비활성):", handErr));
-        }
-
-        // 적응형 품질 초기 티어 — 저사양 하드웨어 판정은 여기(호출부)서 주입해
-        // 컨트롤러 모듈은 navigator 무의존 순수 모듈로 유지한다.
-        const lowEnd =
-          (navigator.hardwareConcurrency ?? 8) <= 4 ||
-          ((navigator as { deviceMemory?: number }).deviceMemory ?? 8) <= 4;
-        qualityRef.current = new AdaptiveQualityController(lowEnd ? "reduced" : "full");
-
-        // 첫 실제 프레임의 셰이더 컴파일/그래프 빌드 스톨을 트래킹 시작 전에 흡수.
-        if (videoRef.current && videoRef.current.readyState >= 2) {
-          warmupLandmarkers(videoRef.current, performance.now());
-        }
-
-        setWebcamLoading(false);
-
-        const loop = () => {
-          if (!active) return;
-          const currentVideo = videoRef.current;
-          const currentLandmarker = landmarkerRef.current;
-          const currentPoseLandmarker = poseLandmarkerRef.current;
-          if (currentVideo && currentLandmarker && currentPoseLandmarker && currentVideo.readyState >= 2) {
-            // detectForVideo 타임스탬프는 단조 증가 필수 — 추론 시간 측정 시작점 겸용.
-            const timestamp = performance.now();
-            // rVFC 경로는 프레임당 1회 호출이지만 rAF 폴백을 위해 currentTime 가드 유지(무해).
-            if (currentVideo.currentTime !== lastVideoTime) {
-              lastVideoTime = currentVideo.currentTime;
-              const frameIndex = frameIndexRef.current++;
-              const quality = qualityRef.current;
-              const options = trackingOptionsRef.current;
-
-              const result = currentLandmarker.detectForVideo(currentVideo, timestamp);
-              const rawChannels = processTrackingResult(result);
-
-              // 적응형 품질: pose 는 티어에 따라 격프레임 스킵(스킵 프레임은 직전 결과 재사용
-              // — 본 스무더가 보간을 겸한다).
-              if (!quality || quality.shouldRunPose(frameIndex)) {
-                const poseResult = currentPoseLandmarker.detectForVideo(currentVideo, timestamp);
-                lastPoseBonesRef.current = processPoseResult(poseResult, options.mirrorMode);
-              }
-              const poseBones = lastPoseBonesRef.current;
-
-              setFaceDetected(!!rawChannels);
-
-              // 얼굴 로스트: 짧은 드랍은 마지막 채널 홀드, 길어지면 중립으로 감쇠 복귀.
-              if (rawChannels) {
-                faceLostFramesRef.current = 0;
-                lastChannelsRef.current = rawChannels;
-                if (faceLostLongRef.current) {
-                  faceLostLongRef.current = false;
-                  setFaceLostLong(false);
-                }
-              } else {
-                faceLostFramesRef.current += 1;
-                if (!faceLostLongRef.current && faceLostFramesRef.current > FACE_LOST_HINT_FRAMES) {
-                  faceLostLongRef.current = true;
-                  setFaceLostLong(true);
-                }
-              }
-              const held =
-                (faceLostFramesRef.current <= FACE_HOLD_FRAMES ? lastChannelsRef.current : null) ??
-                NEUTRAL_CHANNELS;
-
-              // 캘리브레이션 샘플링 — 반드시 보정 "이전" raw 값으로, 얼굴 검출 프레임만 수집.
-              const sampler = calibrationSamplerRef.current;
-              if (sampler && rawChannels) {
-                sampler.add(rawChannels);
-                setCalibrationProgress(sampler.progress);
-                if (sampler.done) {
-                  calibrationSamplerRef.current = null;
-                  const cal = sampler.build();
-                  if (cal) {
-                    calibrationRef.current = cal;
-                    const generation = ++calibrationPersistenceGenerationRef.current;
-                    setCalibrationPersistenceStatus("saving");
-                    setCalibrationPersistenceMessage("");
-                    void trackingCalibrationRepository.save(cal).then(() => {
-                      if (
-                        !calibrationPersistenceMountedRef.current
-                        || calibrationPersistenceGenerationRef.current !== generation
-                      ) return;
-                      setCalibrationPersistenceStatus("sqlite");
-                    }).catch((caughtError: unknown) => {
-                      if (
-                        !calibrationPersistenceMountedRef.current
-                        || calibrationPersistenceGenerationRef.current !== generation
-                      ) return;
-                      setCalibrationPersistenceStatus("memory");
-                      setCalibrationPersistenceMessage(
-                        `캘리브레이션은 현재 탭에만 적용됩니다. SQLite/OPFS 저장 실패: ${
-                          caughtError instanceof Error ? caughtError.message : String(caughtError)
-                        }`,
-                      );
-                    });
-                    channelSmootherRef.current.reset();
-                  }
-                  setCalibrated(!!cal);
-                  setCalibrating(false);
-                }
-              }
-
-              // 적용 순서: raw → 캘리브레이션 → One-Euro → 블링크 안정화 → VRM 변환.
-              const calibratedChannels = applyCalibration(held, calibrationRef.current);
-              const smoothed = channelSmootherRef.current.smooth(
-                calibratedChannels,
-                timestamp / 1000, // 초 단위 실제 시간 — 프레임 인덱스 금지(가변 fps 왜곡).
-                options.smoothing
-              );
-              // blink 좌우는 카메라 좌표계 그대로 — 미러 스왑은 convertChannelsToVrmData
-              // 한 곳에서만 수행한다(이중 반전 금지).
-              const blink = blinkStabilizerRef.current.process(
-                smoothed.blinkLeft,
-                smoothed.blinkRight,
-                smoothed.headYaw
-              );
-              const vrmData = convertChannelsToVrmData(
-                { ...smoothed, blinkLeft: blink.left, blinkRight: blink.right },
-                options
-              );
-              vrmData.bones = { ...vrmData.bones, ...poseBones };
-
-              // 손가락 추적: 티어에 따라 격프레임/비활성(스킵 프레임은 직전 결과 재사용).
-              const handLm = handLandmarkerRef.current;
-              if (handLm) {
-                if (!quality || quality.shouldRunHands(frameIndex, options.fingerTracking)) {
-                  const handResult = handLm.detectForVideo(currentVideo, timestamp);
-                  const fingers: Record<string, readonly [number, number, number]> = {};
-                  const hands = handResult?.landmarks ?? [];
-                  const handed = handResult?.handednesses ?? [];
-                  for (let i = 0; i < hands.length; i++) {
-                    const label = handed[i]?.[0]?.categoryName ?? "Right";
-                    const side = avatarSideForHand(label, options.mirrorMode);
-                    Object.assign(fingers, solveHandToFingerBones(hands[i], side));
-                  }
-                  lastFingersRef.current = fingers;
-                }
-                if (lastFingersRef.current) vrmData.fingers = lastFingersRef.current;
-              }
-
-              trackingDataRef.current = vrmData;
-              qualityRef.current?.recordFrame(performance.now() - timestamp, performance.now());
-            }
-          }
-          scheduleNext();
-        };
-        // 30fps 웹캠에서 rAF(60Hz) 대비 호출 절반 — 새 비디오 프레임에만 깨어난다.
-        const scheduleNext = () => {
-          const video = videoRef.current;
-          if (video && "requestVideoFrameCallback" in video) {
-            schedulingVideo = video;
-            videoFrameCallbackId = video.requestVideoFrameCallback(() => loop());
-          } else {
-            requestId = requestAnimationFrame(loop);
-          }
-        };
-        scheduleNext();
-      } catch (err) {
-        console.error("Webcam start failed:", err);
-        const errMsg = err instanceof Error ? err.message : "카메라 권한 접근에 실패했거나 트래킹 로드 오류가 발생했습니다.";
-        setWebcamErrorStage(failureStage);
-        setWebcamError(errMsg);
-        setWebcamActive(false);
-        setWebcamLoading(false);
-      }
-    };
-
-    startCamera();
-
-    return () => {
-      active = false;
-      setWebcamLoading(false);
-      if (requestId) cancelAnimationFrame(requestId);
-      if (videoFrameCallbackId !== null && schedulingVideo && "cancelVideoFrameCallback" in schedulingVideo) {
-        schedulingVideo.cancelVideoFrameCallback(videoFrameCallbackId);
-      }
-      // 핸드 랜드마커 참조 해제 — 재시작 시 옵션에 따라 다시 설정.
-      handLandmarkerRef.current = null;
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
-    };
-  }, [trackingCalibrationRepository, webcamActive]);
-
-  useEffect(() => {
-    return () => {
-      disposeFaceLandmarker();
-      disposePoseLandmarker();
-      disposeHandLandmarker();
-    };
-  }, []);
-
   // 정면 캘리브레이션 시작 — 3초 카운트다운 후 샘플러 가동(완료는 트래킹 루프가 감지).
   const handleStartCalibration = () => {
     calibrationSamplerRef.current = null;
@@ -6252,6 +5188,49 @@ export function StudioVrmPoser({
 
     setWebcamActive(false);
   };
+
+  // 웹캠 트래킹 세션(getUserMedia + MediaPipe rVFC 루프 + 캘리브레이션) —
+  // use-studio-vrm-webcam-session 이 소유한다. 동작은 동일하고 상태는 여기 남는다.
+  useStudioVrmWebcamSession({
+    blinkStabilizerRef,
+    calibrating,
+    calibrationCountdown,
+    calibrationPersistenceGenerationRef,
+    calibrationPersistenceMountedRef,
+    calibrationRef,
+    calibrationSamplerRef,
+    channelSmootherRef,
+    faceLostFramesRef,
+    faceLostLongRef,
+    frameIndexRef,
+    handLandmarkerRef,
+    landmarkerRef,
+    lastChannelsRef,
+    lastFingersRef,
+    lastPoseBonesRef,
+    poseLandmarkerRef,
+    qualityRef,
+    setBrowserPermissionState,
+    setCalibrated,
+    setCalibrating,
+    setCalibrationCountdown,
+    setCalibrationPersistenceMessage,
+    setCalibrationPersistenceStatus,
+    setCalibrationProgress,
+    setFaceDetected,
+    setFaceLostLong,
+    setWebcamActive,
+    setWebcamError,
+    setWebcamErrorStage,
+    setWebcamLoading,
+    streamRef,
+    trackingCalibrationRepository,
+    trackingDataRef,
+    trackingOptions,
+    videoRef,
+    webcamActive,
+    webcamActiveRef,
+  });
 
   const vrmCreativeReadOnly = vrmCreativePersistenceStatus === "hydrating"
     || vrmCreativePersistenceStatus === "read-error";
@@ -7244,6 +6223,38 @@ export function StudioVrmPoser({
     cancelPendingInsertCapture,
   ]);
 
+  // 모델 로딩·라이브러리 파일 처리는 use-studio-vrm-model-loading 이 소유한다.
+  // 설치(installVrm)와 요청 카운터·상태는 여기 남고 컨텍스트로만 주입된다.
+  const {
+    handleDeleteEntry,
+    handleFileChange,
+    handleGeneratedVrmFile,
+    handleSampleLoad,
+    loadModelFromLibraryEntry,
+  } = useStudioVrmModelLoading({
+    activeModelId,
+    activeModelIdRef,
+    broadcastPreviewActive,
+    clearCurrentVrm,
+    installVrm,
+    libraryEntries,
+    loadRequestRef,
+    memoryVrmModelsRef,
+    modelLoadTargetIdRef,
+    rememberCharacterSelection,
+    resetFullStateHistory,
+    setActiveModelId,
+    setDeletingModelId,
+    setError,
+    setIsUploading,
+    setLibraryEntries,
+    setLibraryError,
+    setLibraryNextCursor,
+    setLibraryStatus,
+    setStatus,
+    thumbnailRequestRef,
+  });
+
   const loadModelRef = useRef(loadModelFromLibraryEntry);
   loadModelRef.current = loadModelFromLibraryEntry;
 
@@ -7938,286 +6949,6 @@ export function StudioVrmPoser({
       clearCurrentVrm();
       if (!wasPublished) disposeVrm(nextVrm);
       throw installError;
-    }
-  }
-
-  function beginModelLoad(nextModelId: string) {
-    resetFullStateHistory();
-    const requestId = loadRequestRef.current + 1;
-    loadRequestRef.current = requestId;
-    thumbnailRequestRef.current += 1;
-    setActiveModelId(nextModelId);
-    setStatus("loading");
-    setError("");
-    clearCurrentVrm();
-    modelLoadTargetIdRef.current = nextModelId;
-    return requestId;
-  }
-
-  function handleLoadFailure(requestId: number, caughtError: unknown) {
-    if (requestId !== loadRequestRef.current) return;
-    modelLoadTargetIdRef.current = null;
-    setError(getVrmLoadErrorMessage(caughtError));
-    setStatus("error");
-  }
-
-  function loadModelFromUrl(url: string, nextModelName: string, revokeUrl: boolean, nextModelId = SAMPLE_VRM_ID) {
-    const requestId = beginModelLoad(nextModelId);
-
-    loadVrmAsset(url)
-      .then((loadedVrm) => {
-        if (requestId !== loadRequestRef.current) {
-          disposeVrm(loadedVrm);
-          return;
-        }
-        try {
-          installVrm(loadedVrm, nextModelName, nextModelId);
-        } catch (installError: unknown) {
-          handleLoadFailure(requestId, installError);
-        }
-      })
-      .catch((caughtError: unknown) => {
-        handleLoadFailure(requestId, caughtError);
-      })
-      .finally(() => {
-        if (revokeUrl) {
-          URL.revokeObjectURL(url);
-        }
-      });
-  }
-
-  function loadModelFromLibraryEntry(entry: VrmLibraryEntry) {
-    if (entry.source === "sample") {
-      const sampleUrl = selectableSampleVrmUrl(entry.id);
-      if (!sampleUrl) {
-        const requestId = beginModelLoad(entry.id);
-        handleLoadFailure(
-          requestId,
-          new Error(
-            isBundledVrmRightsBlocked(entry.id)
-              ? "이 번들 VRM은 재배포·상업 이용 권리가 확인되지 않아 불러올 수 없습니다."
-              : "등록되지 않은 번들 VRM은 불러올 수 없습니다.",
-          ),
-        );
-        return;
-      }
-      rememberCharacterSelection(entry.id);
-      loadModelFromUrl(sampleUrl, entry.name, false, entry.id);
-      return;
-    }
-
-    rememberCharacterSelection(entry.id);
-    const requestId = beginModelLoad(entry.id);
-
-    void (async () => {
-      try {
-        const storedModel = entry.source === "memory"
-          ? memoryVrmModelsRef.current.get(entry.id) ?? null
-          : await getStoredVrmModel(entry.id);
-        if (requestId !== loadRequestRef.current) return;
-        if (!storedModel) {
-          throw new Error("저장된 VRM 파일을 찾지 못했습니다.");
-        }
-
-        const objectUrl = URL.createObjectURL(storedModel.blob);
-        try {
-          const loadedVrm = await loadVrmAsset(objectUrl);
-          if (requestId !== loadRequestRef.current) {
-            disposeVrm(loadedVrm);
-            return;
-          }
-          installVrm(loadedVrm, storedModel.name, storedModel.id);
-        } finally {
-          URL.revokeObjectURL(objectUrl);
-        }
-      } catch (caughtError: unknown) {
-        handleLoadFailure(requestId, caughtError);
-      }
-    })();
-  }
-
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    if (broadcastPreviewActive) {
-      event.currentTarget.value = "";
-      return;
-    }
-    const files = Array.from(event.currentTarget.files ?? []).filter((file) => /\.vrm$/i.test(file.name));
-    event.currentTarget.value = "";
-    if (files.length === 0) return;
-
-    setIsUploading(true);
-    setLibraryError("");
-
-    try {
-      const savedModels: VrmStoredModelWithContentIdentity[] = [];
-      let memoryOnly = false;
-      for (const file of files) {
-        const validated = await ensureStoredVrmContentIdentity(createUploadedVrmRecord(file));
-        try {
-          const saved = await saveUploadedVrm(file);
-          savedModels.push(saved as VrmStoredModelWithContentIdentity);
-        } catch {
-          memoryOnly = true;
-          memoryVrmModelsRef.current.set(validated.id, validated);
-          savedModels.push(validated);
-        }
-      }
-      let firstPage: Awaited<ReturnType<typeof queryUploadedVrmLibraryEntriesPage>> = null;
-      let refreshSucceeded = false;
-      let refreshFailure: unknown;
-      try {
-        firstPage = await queryUploadedVrmLibraryEntriesPage();
-        refreshSucceeded = true;
-      } catch (caughtError: unknown) {
-        refreshFailure = caughtError;
-      }
-      const durableEntries = refreshSucceeded
-        ? [...SAMPLE_VRM_ENTRIES, ...(firstPage?.items ?? [])]
-        : [...libraryEntries];
-      const memoryEntries = [...memoryVrmModelsRef.current.values()]
-        .sort((left, right) => right.updatedAt - left.updatedAt)
-        .map(memoryVrmLibraryEntry);
-      const savedEntries = savedModels.map((record) => (
-        memoryVrmModelsRef.current.has(record.id)
-          ? memoryVrmLibraryEntry(record)
-          : durableVrmLibraryEntry(record)
-      ));
-      const nextEntries = [...durableEntries];
-      const retainedActive = libraryEntries.find(
-        (entry) => entry.id === activeModelIdRef.current,
-      );
-      for (const entry of [
-        ...(retainedActive ? [retainedActive] : []),
-        ...savedEntries,
-        ...memoryEntries,
-      ]) {
-        if (nextEntries.some((candidate) => (
-          candidate.id === entry.id ||
-          (candidate.contentHash && candidate.contentHash === entry.contentHash)
-        ))) continue;
-        nextEntries.push(entry);
-      }
-      setLibraryEntries(nextEntries);
-      if (refreshSucceeded) {
-        setLibraryNextCursor(firstPage?.nextCursor ?? null);
-      }
-      setLibraryStatus(memoryOnly || !refreshSucceeded ? "error" : "ready");
-      if (memoryOnly) {
-        setLibraryError(
-          refreshSucceeded
-            ? "SQLite/OPFS 저장에 실패해 선택한 VRM을 현재 탭 메모리에만 유지합니다. 새로고침하면 사라지며 프로젝트 삽입은 durable 저장 전까지 차단됩니다."
-            : "일부 VRM은 현재 탭 메모리에만 유지되며, 저장된 라이브러리 새로고침에도 실패했습니다. 현재 목록과 페이지 위치를 보존했습니다. 다시 불러오기를 시도해 주세요.",
-        );
-      } else if (!refreshSucceeded) {
-        setLibraryError(getErrorMessage(
-          refreshFailure,
-          "VRM 저장은 완료했지만 라이브러리 새로고침에 실패했습니다. 현재 목록과 페이지 위치를 보존했습니다.",
-        ));
-      }
-
-      const firstUploadedEntry = nextEntries.find((entry) => entry.id === savedModels[0]?.id);
-      if (firstUploadedEntry) {
-        loadModelFromLibraryEntry(firstUploadedEntry);
-      }
-    } catch (caughtError: unknown) {
-      setLibraryStatus("error");
-      setLibraryError(getErrorMessage(caughtError, "VRM 파일을 라이브러리에 저장하지 못했습니다."));
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
-  function handleSampleLoad() {
-    if (broadcastPreviewActive) return;
-    loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
-  }
-
-  async function handleGeneratedVrmFile(file: File) {
-    setIsUploading(true);
-    setLibraryError("");
-    try {
-      const validated = await ensureStoredVrmContentIdentity(createUploadedVrmRecord(file));
-      let saved: VrmStoredModelWithContentIdentity;
-      try {
-        saved = await saveUploadedVrm(file) as VrmStoredModelWithContentIdentity;
-      } catch {
-        memoryVrmModelsRef.current.set(validated.id, validated);
-        saved = validated;
-      }
-      const entry = memoryVrmModelsRef.current.has(saved.id)
-        ? memoryVrmLibraryEntry(saved)
-        : durableVrmLibraryEntry(saved);
-      setLibraryEntries((current) => [
-        entry,
-        ...current.filter((candidate) => candidate.id !== entry.id),
-      ]);
-      loadModelFromLibraryEntry(entry);
-    } catch (caughtError: unknown) {
-      setLibraryStatus("error");
-      setLibraryError(getErrorMessage(caughtError, "생성한 VRM을 라이브러리에 넣지 못했습니다."));
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
-  async function handleDeleteEntry(entry: VrmLibraryEntry) {
-    if (broadcastPreviewActive) return;
-    if (entry.source === "sample") return;
-
-    setDeletingModelId(entry.id);
-    setLibraryError("");
-
-    try {
-      if (entry.source === "memory") memoryVrmModelsRef.current.delete(entry.id);
-      else await deleteStoredVrmModel(entry.id);
-      let firstPage: Awaited<ReturnType<typeof queryUploadedVrmLibraryEntriesPage>> = null;
-      let refreshSucceeded = false;
-      let refreshFailure: unknown;
-      try {
-        firstPage = await queryUploadedVrmLibraryEntriesPage();
-        refreshSucceeded = true;
-      } catch (caughtError: unknown) {
-        refreshFailure = caughtError;
-      }
-      const durableEntries = refreshSucceeded
-        ? [...SAMPLE_VRM_ENTRIES, ...(firstPage?.items ?? [])]
-        : libraryEntries.filter((candidate) => candidate.id !== entry.id);
-      const nextEntries = [...durableEntries];
-      const retainedActive = libraryEntries.find((candidate) => (
-        candidate.id === activeModelIdRef.current && candidate.id !== entry.id
-      ));
-      const memoryEntries = [...memoryVrmModelsRef.current.values()].map(
-        memoryVrmLibraryEntry,
-      );
-      for (const candidate of [
-        ...(retainedActive ? [retainedActive] : []),
-        ...memoryEntries,
-      ]) {
-        if (nextEntries.some((current) => (
-          current.id === candidate.id ||
-          (current.contentHash && current.contentHash === candidate.contentHash)
-        ))) continue;
-        nextEntries.push(candidate);
-      }
-      setLibraryEntries(nextEntries);
-      if (refreshSucceeded) {
-        setLibraryNextCursor(firstPage?.nextCursor ?? null);
-        setLibraryStatus("ready");
-      } else {
-        setLibraryStatus("error");
-        setLibraryError(getErrorMessage(
-          refreshFailure,
-          "VRM 삭제는 완료했지만 라이브러리 새로고침에 실패했습니다. 삭제 항목만 제거하고 현재 목록과 페이지 위치를 보존했습니다.",
-        ));
-      }
-      if (activeModelId === entry.id) {
-        loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
-      }
-    } catch (caughtError: unknown) {
-      setLibraryStatus("error");
-      setLibraryError(getErrorMessage(caughtError, "VRM을 삭제하지 못했습니다."));
-    } finally {
-      setDeletingModelId(null);
     }
   }
 

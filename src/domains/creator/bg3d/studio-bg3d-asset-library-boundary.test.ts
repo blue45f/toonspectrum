@@ -61,6 +61,12 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     const editorSource = moduleSource("./StudioBackground3D.tsx");
     const editorImports = moduleImports("./StudioBackground3D.tsx");
     const panelSource = moduleSource("./StudioBg3dAssetLibraryPanel.tsx");
+    // 2026-08-21 intentional change: the editor's model import/delete actions moved into
+    // studio-bg3d-editor-model-import-actions.ts (editor split). Ownership still sits with the
+    // editor side of the boundary, so the owner tokens are checked across both editor modules.
+    const editorOwnedSource = `${editorSource}\n${
+      moduleSource("./studio-bg3d-editor-model-import-actions.ts")
+    }`;
 
     expect(editorImports.valueImports).not.toContain("./StudioBg3dAssetLibraryPanel");
     expect(editorImports.dynamicImports).toContain("./StudioBg3dAssetLibraryPanel");
@@ -78,7 +84,7 @@ describe("Studio BG3D asset-library ownership boundary", () => {
       "historyRef",
       "setSelectedIds",
     ]) {
-      expect(editorSource).toContain(ownerToken);
+      expect(editorOwnedSource).toContain(ownerToken);
       expect(panelSource).not.toContain(ownerToken);
     }
     expect(editorSource).not.toContain('aria-label="3D 모델 및 연결 파일 선택"');

@@ -3,6 +3,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+// 2026-08-21 의도적 변경: BONE_CATEGORIES 등 정적 카탈로그가 StudioVrmPoser.tsx에서
+// studio-vrm-poser-catalogs.ts로 분리됐다. 마커만 옮기고 검증 대상(시선/턱 카테고리가
+// leftEye/rightEye/jaw를 덮는다)은 그대로 유지한다.
+const catalogsSource = readFileSync(
+  new URL("./studio-vrm-poser-catalogs.ts", import.meta.url),
+  "utf8",
+);
 const panelSource = readFileSync(
   new URL("./StudioVrmPoseMaterialPanel.tsx", import.meta.url),
   "utf8",
@@ -54,7 +61,7 @@ describe("Studio VRM portable pose-material production boundary", () => {
     expect(runtimeSource).toContain("PRE_DIRECTION_ROTATION_BONE_ORDER.forEach");
     expect(runtimeSource).toContain("POST_DIRECTION_ROTATION_BONE_ORDER.forEach");
     expect(bakeSource).toContain("STUDIO_HUMANOID_BONE_NAMES;");
-    expect(poserSource).toContain('{ id: "gaze", label: "시선/턱", bones: ["leftEye", "rightEye", "jaw"] }');
+    expect(catalogsSource).toContain('{ id: "gaze", label: "시선/턱", bones: ["leftEye", "rightEye", "jaw"] }');
   });
 
   it("keeps future/corrupt rows read-only, uses SQLite merge, and separates legacy Euler poses", () => {

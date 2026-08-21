@@ -3,6 +3,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const poser = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+// 2026-08-21 의도적 변경: 모델 로딩·라이브러리 파일 처리(beginModelLoad/loadModelFrom*/
+// handleFileChange/handleDeleteEntry 등)가 StudioVrmPoser.tsx에서
+// use-studio-vrm-model-loading.ts(포저가 소유하는 훅)로 분리됐다. 마커만 새 모듈로
+// 옮기고 검증 대상은 그대로 유지한다.
+const modelLoading = readFileSync(
+  new URL("./use-studio-vrm-model-loading.ts", import.meta.url),
+  "utf8",
+);
 const forge = readFileSync(new URL("./StudioVrmAvatarForge.tsx", import.meta.url), "utf8");
 const projection = readFileSync(
   new URL("./StudioVrmWardrobePropsProjection.tsx", import.meta.url),
@@ -32,7 +40,7 @@ describe("Avatar Forge v4 product integration boundary", () => {
   });
 
   it("creates the rig authority before pose restore and measures fit before reapplying pose", () => {
-    const install = section(poser, "function installVrm(", "function loadModelFromLibraryEntry(");
+    const install = section(poser, "function installVrm(", "function handlePoseSelect(");
     expect(install.indexOf("initializeProportionRigRuntime(nextVrm);")).toBeLessThan(
       install.indexOf("const pending = pendingPoseDataRef.current;"),
     );
@@ -181,7 +189,7 @@ describe("Avatar Forge v4 product integration boundary", () => {
   });
 
   it("starts a newly selected model from identity scene scale instead of inheriting legacy scale", () => {
-    const install = section(poser, "function installVrm(", "function loadModelFromLibraryEntry(");
+    const install = section(poser, "function installVrm(", "function handlePoseSelect(");
     const restore = section(poser, "function commitFullStateRestore(", "const loadHandlers =");
     expect(install).toContain("const freshBodyScale: BodyScale = { height: 1, width: 1 };");
     expect(install).toContain("setBodyScale(freshBodyScale);");
@@ -205,8 +213,8 @@ describe("Avatar Forge v4 product integration boundary", () => {
   });
 
   it("publishes a model atomically and preserves pending scene data until final success", () => {
-    const install = section(poser, "function installVrm(", "function beginModelLoad(");
-    const urlLoad = section(poser, "function loadModelFromUrl(", "function loadModelFromLibraryEntry(");
+    const install = section(poser, "function installVrm(", "function handlePoseSelect(");
+    const urlLoad = section(modelLoading, "function loadModelFromUrl(", "function loadModelFromLibraryEntry(");
     const finalRepair = install.lastIndexOf("repairVrmTexturedNearBlackLitFactors(nextVrm);");
     const pendingCommit = install.indexOf("pendingPoseDataRef.current = null;");
 

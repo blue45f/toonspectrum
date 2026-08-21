@@ -1,5 +1,3 @@
-import { io } from "socket.io-client";
-
 import {
   resolveStudioCloudflareRealtimeOrigin,
 } from "../studio-realtime-provider-cloudflare-adapter";
@@ -71,24 +69,43 @@ import {
   type StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
 import {
-  parseStudioLiveGesturePreviewPayload,
-  type StudioLiveGesturePreviewPayload,
-} from "./studio-live-gesture-preview";
-import {
   isStudioLiveInkWireCandidate,
   STUDIO_LIVE_INK_CAPABILITY,
   type StudioLiveInkWireMessage,
 } from "./studio-live-ink-protocol";
-import { applyStudioLiveP2pOverlay } from "./studio-live-p2p-overlay-transport";
 import {
-  createStudioCloudflarePurposeRoutedLiveTransportFactory,
-} from "./studio-live-purpose-routed-transport";
+  acceptStudioLiveLockRevision,
+  applyStudioLiveLockRevisionFloor,
+  clearStudioLiveLockRevisionState,
+  createStudioLiveLockRevisionLedger,
+  studioLiveLockAcquiredFingerprint,
+  studioLiveLockDeltasRequireResync,
+} from "./studio-live-lock-revision-ledger";
+import { applyStudioLiveP2pOverlay } from "./studio-live-p2p-overlay-transport";
 import { createStudioLiveSignalingServerTransportFactory } from "./studio-live-signaling-server-transport";
-import { resolveStudioLiveSocketEndpoint } from "./studio-live-socket-endpoint";
+import {
+  connectErrorCode,
+  eventMessage,
+  isNonRecoverable,
+  isTerminalConnectErrorCode,
+  parseScreenAnnouncement,
+  parseScreenStop,
+} from "./studio-live-socket-connect-error";
+import {
+  CONNECT_TIMEOUT_MS,
+  applyStudioRealtimePurposeRouting,
+  createSocketAtEndpoint,
+  defaultClearTimeout,
+  defaultCreateSocket,
+  defaultRandomId,
+  defaultSetTimeout,
+  parseStudioLiveGesturePreviewSocketRelay,
+  runtimeSocketEndpoint,
+  type StudioLiveSocketLike,
+} from "./studio-live-socket-connection-factory";
 import {
   isRecord,
   nullableString,
-  parseActiveScreenShare,
   parseFailure,
   parseJoinAck,
   parseLock,
@@ -110,7 +127,15 @@ import {
 
 import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
 
-const SOCKET_PATH = "/socket.io";
+export {
+  STUDIO_LIVE_SOCKET_RETRY_POLICY,
+  applyStudioRealtimePurposeRouting,
+  resolveStudioLiveSocketRuntimeEndpoint,
+  type StudioLiveSocketLike,
+  type StudioLiveSocketRuntimeEnvironment,
+  type StudioRealtimePurposeRoutingEnvironment,
+} from "./studio-live-socket-connection-factory";
+
 export const STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT =
   "studio:gesture:preview" as const;
 export const STUDIO_LIVE_INK_SOCKET_EVENT = "studio:ink" as const;
@@ -120,7 +145,6 @@ export const STUDIO_LIVE_INK_SOCKET_INBOUND_WINDOW_MS = 3_000;
 export const STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_PACKETS = 480;
 export const STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_BYTES = 4 * 1024 * 1024;
 export const STUDIO_LIVE_INK_SOCKET_INBOUND_MAX_SENDERS = 64;
-const CONNECT_TIMEOUT_MS = 15_000;
 const CRDT_ACK_TIMEOUT_MS = 10_000;
 const CRDT_WIRE_SELECT_ACK_TIMEOUT_MS = 8_000;
 const LOCK_ACK_TIMEOUT_MS = 10_000;
@@ -133,29 +157,11 @@ const MAX_PENDING_VOICE_CONNECTIONS = 256;
 const MAX_PENDING_LOCK_DELTAS = 512;
 const MAX_PENDING_VOICE_SIGNALS = 256;
 const MAX_ABANDONED_LOCK_ACQUISITIONS = 512;
-const MAX_LOCK_REVISION_WATERMARKS = 1_024;
 const MAX_CANONICAL_SESSION_TOMBSTONES = 2_048;
 const ABANDONED_LOCK_ACQUISITION_TTL_MS = 90_000;
 const JOIN_RESYNC_RETRY_BASE_MS = 500;
 const JOIN_RESYNC_RETRY_MAX_MS = 10_000;
 const JOIN_RATE_LIMIT_RETRY_MS = 60_000;
-const DEFAULT_STUDIO_REALTIME_PROVIDER_ID = "cloudflare-realtime-v1";
-const STUDIO_REALTIME_PROVIDER_ID =
-  /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,159}$/u;
-
-/**
- * Bounded retries still cover a free container's cold start. Production never constructs this
- * socket without an explicit long-running origin, so the larger window cannot revive the old
- * Vercel-serverless reconnect loop.
- */
-export const STUDIO_LIVE_SOCKET_RETRY_POLICY = Object.freeze({
-  reconnection: true,
-  reconnectionAttempts: 8,
-  reconnectionDelay: 1_000,
-  reconnectionDelayMax: 8_000,
-  randomizationFactor: 0.25,
-  timeout: CONNECT_TIMEOUT_MS,
-});
 
 type PendingPresenceDelta =
   | { kind: "update"; participant: ServerParticipant }
@@ -202,17 +208,6 @@ function inkWirePayloadByteLength(value: Record<string, unknown>): number {
   if (!isRecord(message)) return 0;
   const payload = message.payload;
   return payload instanceof ArrayBuffer ? payload.byteLength : 0;
-}
-
-type LockRevisionFamily = "acquired" | "destructive";
-
-interface LockRevisionWatermark {
-  revision: StudioLiveLockRevision;
-  family: LockRevisionFamily;
-  acquiredFingerprint?: string;
-  /** Latest acquire proof retained even after this exact resource is later released. */
-  conflictAcquiredRevision?: StudioLiveLockRevision;
-  conflictOwnerConnectionId?: string;
 }
 
 interface PendingVoiceSignal {
@@ -264,16 +259,6 @@ interface PendingLockRelease {
   timeout: unknown;
 }
 
-export interface StudioLiveSocketLike {
-  connected: boolean;
-  auth: Record<string, unknown>;
-  connect(): StudioLiveSocketLike;
-  disconnect(): StudioLiveSocketLike;
-  emit(event: string, ...args: unknown[]): StudioLiveSocketLike;
-  on(event: string, listener: (...args: unknown[]) => void): StudioLiveSocketLike;
-  off(event: string, listener: (...args: unknown[]) => void): StudioLiveSocketLike;
-}
-
 export interface StudioLiveSocketTransportDependencies {
   createSocket?: (auth: { sessionToken: string }) => StudioLiveSocketLike;
   /**
@@ -294,218 +279,6 @@ export interface StudioLiveSocketTransportDependencies {
   clearTimeout?: (handle: unknown) => void;
   voiceJoinAckTimeoutMs?: number;
   lockAckTimeoutMs?: number;
-}
-
-export interface StudioLiveSocketRuntimeEnvironment {
-  readonly explicitOrigin?: string | null;
-  readonly locationOrigin?: string | null;
-  readonly development?: boolean;
-  /**
-   * Vite's same-origin Socket.IO proxy is intentionally opt-in. A development build alone is not
-   * proof that the proxy exists (production-preview harnesses also execute Vite output locally).
-   */
-  readonly devProxyEnabled?: boolean;
-}
-
-interface StudioLiveGesturePreviewSocketRelay {
-  readonly connectionId: string;
-  readonly preview: StudioLiveGesturePreviewPayload;
-}
-
-function parseStudioLiveGesturePreviewSocketRelay(
-  value: unknown,
-): StudioLiveGesturePreviewSocketRelay | null {
-  if (
-    !isRecord(value) ||
-    Object.keys(value).length !== 2 ||
-    !Object.hasOwn(value, "connectionId") ||
-    !Object.hasOwn(value, "preview") ||
-    !safeIdentifier(value.connectionId, 128)
-  ) {
-    return null;
-  }
-  const preview = parseStudioLiveGesturePreviewPayload(value.preview);
-  return preview ? { connectionId: value.connectionId, preview } : null;
-}
-
-function nonBlank(value: string | null | undefined): string | null {
-  return value?.trim() || null;
-}
-
-/**
- * Runtime admission policy for Socket.IO. Missing configuration is a deliberate local-only mode,
- * never an instruction to probe the current static/Vercel origin and start a reconnect loop.
- */
-export function resolveStudioLiveSocketRuntimeEndpoint(
-  environment: StudioLiveSocketRuntimeEnvironment,
-): string | null {
-  const explicitOrigin = nonBlank(environment.explicitOrigin);
-  if (explicitOrigin) {
-    try {
-      const url = new URL(explicitOrigin);
-      if (url.pathname !== "/" || url.search || url.hash) return null;
-    } catch {
-      // Relative Vite/API paths are not proof of a long-running realtime origin.
-      return null;
-    }
-    return resolveStudioLiveSocketEndpoint({
-      explicitOrigin,
-      locationOrigin: environment.locationOrigin,
-      allowInsecureLoopback: environment.development === true,
-      localDevelopment: environment.development === true,
-    });
-  }
-
-  if (environment.development === true && environment.devProxyEnabled === true) {
-    return "/studio-live";
-  }
-  return null;
-}
-
-function runtimeSocketEndpoint(): string | null {
-  // Socket.IO is only for a long-running Nest CRDT/lock host (`VITE_STUDIO_LIVE_ORIGIN`).
-  // `VITE_STUDIO_REALTIME_ORIGIN` is the Cloudflare Durable Object data plane for presence,
-  // comment invalidation, and screen-share signaling — it speaks a custom WS protocol, not
-  // Engine.IO. Falling back to it here produced endless
-  // `wss://…workers.dev/socket.io/?EIO=4&transport=websocket` failures in production.
-  return resolveStudioLiveSocketRuntimeEndpoint({
-    explicitOrigin: import.meta.env.VITE_STUDIO_LIVE_ORIGIN,
-    locationOrigin: globalThis.location?.origin,
-    development: import.meta.env.DEV,
-    devProxyEnabled:
-      import.meta.env.VITE_STUDIO_LIVE_DEV_PROXY_ENABLED === "true",
-  });
-}
-
-export interface StudioRealtimePurposeRoutingEnvironment {
-  readonly realtimeOrigin?: string;
-  readonly providerId?: string;
-}
-
-function resolveStudioRealtimeProviderId(
-  value: string | null | undefined,
-): string | null {
-  const providerId = value?.trim() || DEFAULT_STUDIO_REALTIME_PROVIDER_ID;
-  return STUDIO_REALTIME_PROVIDER_ID.test(providerId) ? providerId : null;
-}
-
-/**
- * Activates the purpose-specific Cloudflare data plane only for an exact HTTPS origin. Missing or
- * malformed browser configuration leaves the proven primary transport untouched. The ticket
- * endpoint intentionally remains the same trusted API base so its HttpOnly cookie and CSRF
- * boundary cannot be redirected to a runtime-configured third-party origin.
- */
-export function applyStudioRealtimePurposeRouting(
-  primaryFactory: StudioLiveTransportFactory,
-  environment: StudioRealtimePurposeRoutingEnvironment,
-): StudioLiveTransportFactory {
-  const realtimeOrigin = resolveStudioCloudflareRealtimeOrigin(
-    environment.realtimeOrigin,
-  );
-  const providerId = resolveStudioRealtimeProviderId(environment.providerId);
-  if (!realtimeOrigin || !providerId) return primaryFactory;
-  return (context) => {
-    const primary = primaryFactory(context);
-    // A browser-local BroadcastChannel cannot provide remote CRDT/locks/chat authority. Wrapping
-    // it with remote presence would advertise collaborators the document path can never reach.
-    if (primary.mode !== "server") return primary;
-    return createStudioCloudflarePurposeRoutedLiveTransportFactory({
-      primaryFactory: () => primary,
-      realtimeOrigin,
-      providerId,
-    })(context);
-  };
-}
-
-function createSocketAtEndpoint(
-  endpoint: string,
-  auth: { sessionToken: string },
-): StudioLiveSocketLike {
-  return io(
-    endpoint,
-    {
-      path: SOCKET_PATH,
-      transports: ["websocket"],
-      autoConnect: false,
-      ...STUDIO_LIVE_SOCKET_RETRY_POLICY,
-      auth,
-    }
-  ) as unknown as StudioLiveSocketLike;
-}
-
-function defaultCreateSocket(auth: { sessionToken: string }): StudioLiveSocketLike {
-  const endpoint = runtimeSocketEndpoint();
-  if (!endpoint) {
-    throw new Error(
-      "실시간 서버가 구성되지 않아 네트워크 연결 대신 로컬 공동작업을 사용해야 합니다.",
-    );
-  }
-  return createSocketAtEndpoint(endpoint, auth);
-}
-
-function defaultSetTimeout(handler: () => void, delay: number): unknown {
-  return globalThis.setTimeout(handler, delay);
-}
-
-function defaultClearTimeout(handle: unknown): void {
-  globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>);
-}
-
-function defaultRandomId(): string {
-  if (typeof globalThis.crypto?.randomUUID !== "function") {
-    throw new Error("보안 잠금 요청 식별자를 생성할 수 없습니다.");
-  }
-  return globalThis.crypto.randomUUID();
-}
-
-function eventMessage(error: unknown, fallback: string): string {
-  let rawMsg = "";
-  if (error instanceof Error && error.message.trim()) rawMsg = error.message;
-  else if (isRecord(error) && typeof error.message === "string" && error.message.trim()) {
-    rawMsg = error.message;
-  }
-  if (rawMsg.includes("503") || rawMsg.toLowerCase().includes("service unavailable")) {
-    return "실시간 서버를 준비 중이거나 점검 상태입니다. 캔버스 편집은 지속되며 잠시 후 자동 연결됩니다.";
-  }
-  if (rawMsg.toLowerCase().includes("xhr poll error") || rawMsg.toLowerCase().includes("websocket error")) {
-    return "팀 네트워크 연결이 원활하지 않습니다. 작업 내용은 지속적으로 보존되며 자동 재연결을 시도합니다.";
-  }
-  return rawMsg ? rawMsg.slice(0, 500) : fallback;
-}
-
-function connectErrorCode(error: unknown): string | null {
-  if (!isRecord(error) || !isRecord(error.data) || !safeString(error.data.code, 80)) return null;
-  return error.data.code;
-}
-
-function isTerminalConnectErrorCode(code: string | null): boolean {
-  return code === "unauthenticated" || code === "forbidden" || code === "access_revoked";
-}
-
-function isNonRecoverable(code: string): boolean {
-  return code === "unauthenticated" || code === "forbidden";
-}
-
-function parseScreenAnnouncement(value: unknown): ServerActiveScreenShare | null {
-  if (!isRecord(value)) return null;
-  return parseActiveScreenShare({
-    connectionId: value.fromConnectionId,
-    shareId: value.shareId,
-    label: value.label,
-  });
-}
-
-function parseScreenStop(
-  value: unknown
-): { connectionId: string; shareId: string } | null {
-  if (
-    !isRecord(value) ||
-    !safeIdentifier(value.fromConnectionId, 128) ||
-    !safeIdentifier(value.shareId, 160)
-  ) {
-    return null;
-  }
-  return { connectionId: value.fromConnectionId, shareId: value.shareId };
 }
 
 /**
@@ -563,7 +336,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly shareIdByConnection = new Map<string, string>();
   private readonly voiceMemberByConnection = new Map<string, ServerVoiceMember>();
   private readonly locksByResource = new Map<string, ServerLock>();
-  private readonly lockRevisionByResource = new Map<string, LockRevisionWatermark>();
+  private readonly lockRevisions = createStudioLiveLockRevisionLedger();
   private readonly pendingPresenceByConnection = new Map<string, PendingPresenceDelta>();
   private readonly pendingScreenByConnection = new Map<string, PendingScreenDelta>();
   private readonly pendingVoiceByConnection = new Map<string, PendingVoiceDelta>();
@@ -577,9 +350,6 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private accessRevoked = false;
   private everJoined = false;
   private lockProtocolVersion = 1;
-  private lockRevisionVersion: 0 | typeof STUDIO_LIVE_LOCK_REVISION_VERSION = 0;
-  private lockSnapshotFloor: StudioLiveLockRevision | null = null;
-  private maxCommittedLockRevision: StudioLiveLockRevision | null = null;
   private joinGeneration = 0;
   private voiceIntentGeneration = 0;
   private desiredVoiceCallId: string | null = null;
@@ -1570,7 +1340,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.shareIdByConnection.clear();
     this.voiceMemberByConnection.clear();
     this.locksByResource.clear();
-    this.clearLockRevisionState();
+    clearStudioLiveLockRevisionState(this.lockRevisions);
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
     this.pendingScreenByConnection.clear();
@@ -1665,7 +1435,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.pendingVoiceByConnection.clear();
     this.pendingLockDeltas.length = 0;
     this.pendingLockDeltaOverflowed = false;
-    this.clearLockRevisionState();
+    clearStudioLiveLockRevisionState(this.lockRevisions);
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
     this.clearConnectDeferred();
@@ -1749,7 +1519,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.pendingVoiceByConnection.clear();
     this.pendingLockDeltas.length = 0;
     this.pendingLockDeltaOverflowed = false;
-    this.clearLockRevisionState();
+    clearStudioLiveLockRevisionState(this.lockRevisions);
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
     this.clearConnectDeferred();
@@ -2010,7 +1780,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly onLockUpdate = (value: unknown) => {
     if (!isRecord(value)) return;
     const revisionAware =
-      this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION;
+      this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION;
     let delta: PendingLockDelta | null = null;
     if (value.action === "acquired") {
       const lock = parseLock(value.lock, { requireRevision: revisionAware });
@@ -2069,101 +1839,6 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (!this.applyLockDelta(delta)) this.restartJoinAfterUnsafeSnapshot();
   };
 
-  private lockAcquiredFingerprint(lock: ServerLock): string {
-    return JSON.stringify([
-      lock.leaseId,
-      lock.ownerConnectionId,
-      lock.expiresAt,
-      lock.revision?.toString() ?? null,
-    ]);
-  }
-
-  private acceptLockRevision(
-    resourceId: string,
-    revision: StudioLiveLockRevision | undefined,
-    family: LockRevisionFamily,
-    acquiredFingerprint?: string,
-    acquiredOwnerConnectionId?: string
-  ): "apply" | "ignore" | "unsafe" {
-    if (this.lockRevisionVersion !== STUDIO_LIVE_LOCK_REVISION_VERSION) return "apply";
-    if (revision === undefined || this.lockSnapshotFloor === null) return "unsafe";
-    if (revision <= this.lockSnapshotFloor) return "ignore";
-
-    const current = this.lockRevisionByResource.get(resourceId);
-    if (current) {
-      if (revision < current.revision) return "ignore";
-      if (revision === current.revision) {
-        if (family === "destructive" && current.family === "destructive") return "apply";
-        if (
-          family === "acquired" &&
-          current.family === "acquired" &&
-          current.acquiredFingerprint === acquiredFingerprint
-        ) {
-          return "ignore";
-        }
-        return "unsafe";
-      }
-    }
-
-    if (family === "acquired") {
-      if (!acquiredOwnerConnectionId || !acquiredFingerprint) return "unsafe";
-      for (const [otherResourceId, watermark] of this.lockRevisionByResource) {
-        if (
-          otherResourceId === resourceId ||
-          !studioLiveLockResourcesConflict(resourceId, otherResourceId)
-        ) {
-          continue;
-        }
-        if (
-          watermark.conflictAcquiredRevision !== undefined &&
-          watermark.conflictOwnerConnectionId &&
-          watermark.conflictOwnerConnectionId !== acquiredOwnerConnectionId
-        ) {
-          if (watermark.conflictAcquiredRevision > revision) return "ignore";
-          if (watermark.conflictAcquiredRevision === revision) return "unsafe";
-        }
-        // A newer acquire by a different owner proves this older hierarchy member was absent. A
-        // standalone destructive event does not: it may be an unseen lifecycle release or one of
-        // the synthetic rotation-fence revocations. Rejoin instead of guessing whether the older
-        // page/element acquire was still valid at that point.
-        if (watermark.family === "destructive" && watermark.revision >= revision) {
-          return "unsafe";
-        }
-      }
-    }
-
-    if (!current && this.lockRevisionByResource.size >= MAX_LOCK_REVISION_WATERMARKS) {
-      // A fresh snapshot compresses every accumulated tombstone into one global floor. Arbitrary
-      // eviction would allow an older acquired event for the forgotten resource to resurrect.
-      return "unsafe";
-    }
-
-    this.lockRevisionByResource.set(resourceId, {
-      revision,
-      family,
-      ...(current?.conflictAcquiredRevision !== undefined &&
-      current.conflictOwnerConnectionId
-        ? {
-            conflictAcquiredRevision: current.conflictAcquiredRevision,
-            conflictOwnerConnectionId: current.conflictOwnerConnectionId,
-          }
-        : {}),
-      ...(family === "acquired" && acquiredFingerprint
-        ? { acquiredFingerprint }
-        : {}),
-      ...(family === "acquired" && acquiredOwnerConnectionId
-        ? {
-            conflictAcquiredRevision: revision,
-            conflictOwnerConnectionId: acquiredOwnerConnectionId,
-          }
-        : {}),
-    });
-    if (this.maxCommittedLockRevision === null || revision > this.maxCommittedLockRevision) {
-      this.maxCommittedLockRevision = revision;
-    }
-    return "apply";
-  }
-
   private applyLockDelta(delta: PendingLockDelta): boolean {
     if (delta.kind === "acquired") {
       const pending = delta.requestId
@@ -2189,24 +1864,24 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         });
       } else {
         if (!this.participants.has(delta.lock.ownerConnectionId)) return false;
-        const ordering = this.acceptLockRevision(
-          delta.lock.resourceId,
-          delta.revision,
-          "acquired",
-          this.lockAcquiredFingerprint(delta.lock),
-          delta.lock.ownerConnectionId
-        );
+        const ordering = acceptStudioLiveLockRevision(this.lockRevisions, {
+          resourceId: delta.lock.resourceId,
+          revision: delta.revision,
+          family: "acquired",
+          acquiredFingerprint: studioLiveLockAcquiredFingerprint(delta.lock),
+          acquiredOwnerConnectionId: delta.lock.ownerConnectionId,
+        });
         if (ordering === "unsafe") return false;
         if (ordering === "ignore") return true;
         this.applyAuthoritativeLock(delta.lock, delta.requestId);
       }
       return true;
     }
-    const ordering = this.acceptLockRevision(
-      delta.resourceId,
-      delta.revision,
-      "destructive"
-    );
+    const ordering = acceptStudioLiveLockRevision(this.lockRevisions, {
+      resourceId: delta.resourceId,
+      revision: delta.revision,
+      family: "destructive",
+    });
     if (ordering === "unsafe") return false;
     if (ordering === "ignore") return true;
     this.applyAuthoritativeRelease(delta.resourceId, delta.leaseId);
@@ -2897,10 +2572,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     const reconciledSnapshot = this.reconcilePendingPresence(snapshot);
     const wasJoined = this.everJoined;
     if (
-      this.maxCommittedLockRevision !== null &&
+      this.lockRevisions.maxCommittedLockRevision !== null &&
       (reconciledSnapshot.lockRevisionVersion !== STUDIO_LIVE_LOCK_REVISION_VERSION ||
         reconciledSnapshot.lockSnapshotRevision === null ||
-        reconciledSnapshot.lockSnapshotRevision < this.maxCommittedLockRevision)
+        reconciledSnapshot.lockSnapshotRevision < this.lockRevisions.maxCommittedLockRevision)
     ) {
       this.joined = true;
       this.everJoined = true;
@@ -2910,16 +2585,16 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (
       reconciledSnapshot.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION &&
       reconciledSnapshot.lockSnapshotRevision !== null &&
-      (this.maxCommittedLockRevision === null ||
-        reconciledSnapshot.lockSnapshotRevision > this.maxCommittedLockRevision)
+      (this.lockRevisions.maxCommittedLockRevision === null ||
+        reconciledSnapshot.lockSnapshotRevision > this.lockRevisions.maxCommittedLockRevision)
     ) {
       // Persist capability observation at JOIN acceptance, not at the later first-heartbeat flush.
       // A disconnect in that staging window must never let the same client downgrade to a legacy
       // gateway that cannot preserve the already-observed monotonic revision contract.
-      this.maxCommittedLockRevision = reconciledSnapshot.lockSnapshotRevision;
+      this.lockRevisions.maxCommittedLockRevision = reconciledSnapshot.lockSnapshotRevision;
     }
     this.lockProtocolVersion = reconciledSnapshot.lockProtocolVersion;
-    this.lockRevisionVersion = reconciledSnapshot.lockRevisionVersion;
+    this.lockRevisions.lockRevisionVersion = reconciledSnapshot.lockRevisionVersion;
     this.selfConnectionId = reconciledSnapshot.self.connectionId;
     this.rememberCanonicalSession(
       reconciledSnapshot.self.connectionId,
@@ -3095,7 +2770,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (!recoverable || (code && isNonRecoverable(code))) {
       this.accessRevoked = true;
       this.clearCrdtReconnectTimeout();
-      this.clearLockRevisionState();
+      clearStudioLiveLockRevisionState(this.lockRevisions);
       this.scrubCredentials();
       this.socket.disconnect();
     }
@@ -3136,7 +2811,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       this.pendingVoiceByConnection.clear();
       this.pendingLockDeltas.length = 0;
       this.pendingLockDeltaOverflowed = false;
-      this.clearLockRevisionState();
+      clearStudioLiveLockRevisionState(this.lockRevisions);
       this.scrubCredentials();
       this.socket.disconnect();
     }
@@ -3168,7 +2843,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       reconciled.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION;
     if (
       (revisioned && pendingLockDeltas.some((delta) => delta.revision === undefined)) ||
-      (!revisioned && this.lockDeltasRequireResync(reconciled.locks, pendingLockDeltas))
+      (!revisioned &&
+        studioLiveLockDeltasRequireResync(reconciled.locks, pendingLockDeltas))
     ) {
       this.restartJoinAfterUnsafeSnapshot();
       return false;
@@ -3209,31 +2885,6 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       recoverable: true,
     });
     this.scheduleJoinRetry();
-  }
-
-  private lockDeltasRequireResync(
-    snapshotLocks: ServerLock[],
-    deltas: PendingLockDelta[]
-  ): boolean {
-    const locks = new Map(snapshotLocks.map((lock) => [lock.resourceId, lock]));
-    for (const delta of deltas) {
-      if (delta.kind === "acquired") {
-        const current = locks.get(delta.lock.resourceId);
-        // Without a server monotonic event revision, a novel acquire can be either side of the
-        // snapshot barrier on a multi-node adapter. Never guess which fence is authoritative.
-        if (
-          !current ||
-          current.leaseId !== delta.lock.leaseId ||
-          current.ownerConnectionId !== delta.lock.ownerConnectionId
-        ) {
-          return true;
-        }
-        continue;
-      }
-      const current = locks.get(delta.resourceId);
-      if (current?.leaseId === delta.leaseId) locks.delete(delta.resourceId);
-    }
-    return false;
   }
 
   private scheduleJoinRetry(minimumDelayMs = 0): void {
@@ -3341,21 +2992,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     locks: ServerLock[],
     snapshotRevision: StudioLiveLockRevision | null
   ): void {
-    if (this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION) {
-      if (snapshotRevision === null) return;
-      this.lockSnapshotFloor = snapshotRevision;
-      this.lockRevisionByResource.clear();
-      if (
-        this.maxCommittedLockRevision === null ||
-        snapshotRevision > this.maxCommittedLockRevision
-      ) {
-        this.maxCommittedLockRevision = snapshotRevision;
-      }
-    } else {
-      this.lockSnapshotFloor = null;
-      this.lockRevisionByResource.clear();
-      this.maxCommittedLockRevision = null;
-    }
+    if (!applyStudioLiveLockRevisionFloor(this.lockRevisions, snapshotRevision)) return;
     const nextKeys = new Set(locks.map((lock) => JSON.stringify([lock.resourceId, lock.leaseId])));
     for (const current of this.locksByResource.values()) {
       if (!nextKeys.has(JSON.stringify([current.resourceId, current.leaseId]))) {
@@ -3365,13 +3002,6 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     // The join snapshot is an authenticated, server-authoritative baseline. In particular, it may
     // restore a self-owned fence after reconnect without carrying per-request broadcast metadata.
     for (const lock of locks) this.applyAuthoritativeLock(lock, undefined, true);
-  }
-
-  private clearLockRevisionState(): void {
-    this.lockRevisionVersion = 0;
-    this.lockSnapshotFloor = null;
-    this.lockRevisionByResource.clear();
-    this.maxCommittedLockRevision = null;
   }
 
   private applyAuthoritativeLock(
@@ -3848,13 +3478,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       if (lateLock) {
         const abandoned = this.abandonedLockAcquisitions.get(pending.request.requestId);
         if (abandoned?.resource === pending.request.resource) {
-          const ordering = this.acceptLockRevision(
-            lateLock.resourceId,
-            lateLock.revision ?? undefined,
-            "acquired",
-            this.lockAcquiredFingerprint(lateLock),
-            lateLock.ownerConnectionId
-          );
+          const ordering = acceptStudioLiveLockRevision(this.lockRevisions, {
+            resourceId: lateLock.resourceId,
+            revision: lateLock.revision ?? undefined,
+            family: "acquired",
+            acquiredFingerprint: studioLiveLockAcquiredFingerprint(lateLock),
+            acquiredOwnerConnectionId: lateLock.ownerConnectionId,
+          });
           if (ordering === "unsafe") {
             this.rollbackAbandonedLock(abandoned, lateLock);
             this.restartJoinAfterUnsafeSnapshot();
@@ -3870,7 +3500,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           this.applyAuthoritativeLock(lateLock, pending.request.requestId);
         }
       } else if (
-        this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION &&
+        this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION &&
         isRecord(value) &&
         value.ok === true
       ) {
@@ -3905,20 +3535,20 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       const abandoned = this.rememberAbandonedLockAcquisition(pending);
       const uncorrelatedLock = this.parseLockAcquisitionSuccess(pending, value, true);
       if (uncorrelatedLock) {
-        const ordering = this.acceptLockRevision(
-          uncorrelatedLock.resourceId,
-          uncorrelatedLock.revision ?? undefined,
-          "acquired",
-          this.lockAcquiredFingerprint(uncorrelatedLock),
-          uncorrelatedLock.ownerConnectionId
-        );
+        const ordering = acceptStudioLiveLockRevision(this.lockRevisions, {
+          resourceId: uncorrelatedLock.resourceId,
+          revision: uncorrelatedLock.revision ?? undefined,
+          family: "acquired",
+          acquiredFingerprint: studioLiveLockAcquiredFingerprint(uncorrelatedLock),
+          acquiredOwnerConnectionId: uncorrelatedLock.ownerConnectionId,
+        });
         this.rollbackAbandonedLock(abandoned, uncorrelatedLock);
         if (ordering === "unsafe") this.restartJoinAfterUnsafeSnapshot();
       } else {
         const deferred = this.deferredSelfLocks.get(pending.request.resource);
         if (deferred) this.rollbackDeferredSelfLock(deferred, abandoned);
         if (
-          this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION &&
+          this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION &&
           isRecord(value) &&
           value.ok === true
         ) {
@@ -3944,7 +3574,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       const conflictLock = isRecord(value)
         ? parseLock(value.lock, {
             requireRevision:
-              this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION,
+              this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION,
           })
         : null;
       const conflictOwner = conflictLock
@@ -3952,18 +3582,18 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         : null;
       let conflictOrdering: "apply" | "ignore" | "unsafe" = "ignore";
       if (conflictLock && conflictOwner) {
-        conflictOrdering = this.acceptLockRevision(
-          conflictLock.resourceId,
-          conflictLock.revision ?? undefined,
-          "acquired",
-          this.lockAcquiredFingerprint(conflictLock),
-          conflictLock.ownerConnectionId
-        );
+        conflictOrdering = acceptStudioLiveLockRevision(this.lockRevisions, {
+          resourceId: conflictLock.resourceId,
+          revision: conflictLock.revision ?? undefined,
+          family: "acquired",
+          acquiredFingerprint: studioLiveLockAcquiredFingerprint(conflictLock),
+          acquiredOwnerConnectionId: conflictLock.ownerConnectionId,
+        });
         if (conflictOrdering === "apply") {
           this.applyAuthoritativeLock(conflictLock);
         }
       } else if (
-        this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION &&
+        this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION &&
         hasConflictLock
       ) {
         conflictOrdering = "unsafe";
@@ -4006,7 +3636,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (!lock) {
       const abandoned = this.rememberAbandonedLockAcquisition(pending);
       const revisionlessLock =
-        this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION
+        this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION
           ? this.parseLockAcquisitionSuccess(pending, value, false, false)
           : null;
       if (revisionlessLock) {
@@ -4024,18 +3654,18 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         message,
       });
       this.emitStatus({ state: "error", message, recoverable: true });
-      if (this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION) {
+      if (this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION) {
         this.restartJoinAfterUnsafeSnapshot();
       }
       return;
     }
-    const ordering = this.acceptLockRevision(
-      lock.resourceId,
-      lock.revision ?? undefined,
-      "acquired",
-      this.lockAcquiredFingerprint(lock),
-      lock.ownerConnectionId
-    );
+    const ordering = acceptStudioLiveLockRevision(this.lockRevisions, {
+      resourceId: lock.resourceId,
+      revision: lock.revision ?? undefined,
+      family: "acquired",
+      acquiredFingerprint: studioLiveLockAcquiredFingerprint(lock),
+      acquiredOwnerConnectionId: lock.ownerConnectionId,
+    });
     if (ordering === "unsafe") {
       const abandoned = this.rememberAbandonedLockAcquisition(pending);
       this.rollbackAbandonedLock(abandoned, lock);
@@ -4093,7 +3723,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     value: unknown,
     ignoreRequestId = false,
     requireRevision =
-      this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION
+      this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION
   ): ServerLock | null {
     if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) return null;
     if (value.data.decision !== undefined && value.data.decision !== "acquired") return null;
@@ -4253,7 +3883,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         message,
       });
       this.emitStatus({ state: "error", message, recoverable: true });
-      if (this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION) {
+      if (this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION) {
         this.restartJoinAfterUnsafeSnapshot();
       }
       return;
@@ -4298,7 +3928,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         message,
       });
       this.emitStatus({ state: "error", message, recoverable: true });
-      if (this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION) {
+      if (this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION) {
         this.restartJoinAfterUnsafeSnapshot();
       }
       return;
@@ -4313,7 +3943,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       : parseLockRevision(data.revision);
     const revisionResponseValid =
       (data.revision === undefined || releaseRevision !== null) &&
-      (this.lockRevisionVersion !== STUDIO_LIVE_LOCK_REVISION_VERSION ||
+      (this.lockRevisions.lockRevisionVersion !== STUDIO_LIVE_LOCK_REVISION_VERSION ||
         data.released !== true ||
         releaseRevision !== null);
     if (
@@ -4332,20 +3962,20 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         message,
       });
       this.emitStatus({ state: "error", message, recoverable: true });
-      if (this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION) {
+      if (this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION) {
         this.restartJoinAfterUnsafeSnapshot();
       }
       return;
     }
     if (
       data.released &&
-      this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION
+      this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION
     ) {
-      const ordering = this.acceptLockRevision(
-        pending.request.resource,
-        releaseRevision ?? undefined,
-        "destructive"
-      );
+      const ordering = acceptStudioLiveLockRevision(this.lockRevisions, {
+        resourceId: pending.request.resource,
+        revision: releaseRevision ?? undefined,
+        family: "destructive",
+      });
       if (ordering === "unsafe") {
         settleLocalFence();
         const message = "편집 잠금 해제 순서를 확인할 수 없어 최신 팀 상태를 다시 불러옵니다.";
@@ -4434,7 +4064,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     lock: ServerLock
   ): void {
     const canChaseAcrossRevisionResync =
-      this.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION &&
+      this.lockRevisions.lockRevisionVersion === STUDIO_LIVE_LOCK_REVISION_VERSION &&
       this.socket.connected &&
       abandoned.selfConnectionId === this.selfConnectionId;
     if (

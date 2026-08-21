@@ -104,7 +104,14 @@ describe("Studio canvas image I/O module boundary", () => {
   it("preserves every StudioPage consumer call after extraction", () => {
     const page = moduleShape("../StudioPage.tsx");
 
-    expect(callCount(page.sourceFile, "loadStudioCanvasImageFile")).toBe(4);
+    // 의도적 변경(2026-08-21, B-15): 에셋 업로드 핸들러(onUploadAsset)가
+    // studio-cuttoon-editor/studio-asset-library-mutations.ts 로 추출되며 그 안의 load 1회가
+    // 함께 이동 — StudioPage 4 → 3, 추출 모듈 1.
+    expect(callCount(page.sourceFile, "loadStudioCanvasImageFile")).toBe(3);
+    const assetLibraryMutations = moduleShape(
+      "../studio-cuttoon-editor/studio-asset-library-mutations.ts"
+    );
+    expect(callCount(assetLibraryMutations.sourceFile, "loadStudioCanvasImageFile")).toBe(1);
     // 의도적 변경(2026-08, B-09): 저장 커버 축소(downscaleStudioCanvasDataUrl)는 handleSave
     // 오케스트레이션과 함께 studio-page-save-pipeline.ts 로 이동했다 — 호출 수는 1로 보존.
     const savePipeline = moduleShape("../studio-page-save-pipeline.ts");
