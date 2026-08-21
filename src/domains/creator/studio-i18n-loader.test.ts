@@ -32,7 +32,7 @@ describe("Studio lazy i18n assets", () => {
     for (const locale of STUDIO_I18N_ASSET_LOCALES) {
       const dictionary = parseStudioI18nDictionary(readAsset(locale));
       expect(dictionary).not.toBeNull();
-      expect(Object.keys(dictionary ?? {})).toHaveLength(1_297);
+      expect(Object.keys(dictionary ?? {})).toHaveLength(1_323);
     }
     // The mobile dock used to hardcode Korean labels; every pack must now carry the keys that
     // replaced them, so an `en` viewport cannot fall back to Korean chrome.
@@ -79,6 +79,71 @@ describe("Studio lazy i18n assets", () => {
       "Wheel: zoom canvas",
     );
     expect(resolveI18nValue("ko", "studio.settings.state.hide")).toBe("숨김");
+    // The menubar command bar strip, its slot editor, and the two menu rows that
+    // reach the strip and the layer border effect shipped Korean literals. Every
+    // pack now carries them translated — these keys must never regress to the
+    // "English everywhere" pending-translation shape the filter rows use, because
+    // the strip is chrome a reader sees on every screen.
+    for (
+      const key of [
+        "studio.mainMenu.item.window.command-bar",
+        "studio.mainMenu.item.window.command-bar.open",
+        "studio.mainMenu.item.window.command-bar.unavailable",
+        "studio.mainMenu.item.layer.border-effect",
+        "studio.mainMenu.item.layer.border-effect.unavailable",
+        "studio.commandBar.aria",
+        "studio.commandBar.settings",
+        "studio.commandBar.settingsDescription",
+        "studio.commandBar.settingsTip",
+        "studio.commandBar.settingsClose",
+        "studio.commandBar.settingsStorageNote",
+        "studio.commandBar.showSlots",
+        "studio.commandBar.slot",
+        "studio.commandBar.slotAria",
+        "studio.commandBar.slotEmpty",
+        "studio.commandBar.resetDefaults",
+        "studio.commandBar.command.undo",
+        "studio.commandBar.command.redo",
+        "studio.commandBar.command.save",
+        "studio.commandBar.command.publish",
+        "studio.commandBar.command.download",
+        "studio.commandBar.command.export-open",
+        "studio.commandBar.command.zoom-fit",
+        "studio.commandBar.command.assets",
+        "studio.commandBar.command.bubbles",
+        "studio.commandBar.command.project",
+      ]
+    ) {
+      const values = STUDIO_I18N_ASSET_LOCALES.map(
+        (locale) => parseStudioI18nDictionary(readAsset(locale))?.[key],
+      );
+      for (const value of values) expect(value).toBeTruthy();
+      // A key left untranslated shows up as ~75 copies of the English value. The
+      // ceiling is loose rather than 1 because loanwords legitimately collide —
+      // "Slot {index}" is the same string in Dutch, German, Czech, Malay and more.
+      const english = parseStudioI18nDictionary(readAsset("en"))?.[key];
+      expect(values.filter((value) => value === english).length).toBeLessThan(20);
+    }
+    // Korean stays the authored source of truth for the literals these replaced.
+    expect(resolveI18nValue("ko", "studio.commandBar.aria")).toBe("빠른 명령 바");
+    expect(resolveI18nValue("ko", "studio.commandBar.settings")).toBe("명령 바 설정");
+    expect(resolveI18nValue("ko", "studio.commandBar.slotEmpty")).toBe("빈 슬롯");
+    expect(resolveI18nValue("ko", "studio.mainMenu.item.layer.border-effect")).toBe(
+      "경계 효과…",
+    );
+    expect(resolveI18nValue("en", "studio.commandBar.aria")).toBe("Quick command bar");
+    expect(resolveI18nValue("en", "studio.mainMenu.item.window.command-bar")).toBe(
+      "Show command bar",
+    );
+    expect(resolveI18nValue("en", "studio.mainMenu.item.window.command-bar.open")).toBe(
+      "Hide command bar",
+    );
+    // Both slot rows interpolate the same placeholder the rest of the packs use.
+    for (const key of ["studio.commandBar.slot", "studio.commandBar.slotAria"]) {
+      for (const locale of STUDIO_I18N_ASSET_LOCALES) {
+        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toContain("{index}");
+      }
+    }
   });
 
   it("loads both assets in parallel before either Studio route commits", async () => {

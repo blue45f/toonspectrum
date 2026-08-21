@@ -206,4 +206,89 @@ describe("localizeStudioMainMenuGroups", () => {
       "필터를 사용할 수 없습니다.",
     );
   });
+
+  it("keys the command bar row off visibility so show and hide never share a sentence", () => {
+    const windowGroup = (): StudioMainMenuGroup => ({
+      id: "window",
+      label: "창",
+      items: [
+        {
+          id: "command-bar",
+          label: "명령 바 숨기기",
+          unavailableReason: "명령 바 표시 전환이 연결되지 않았습니다.",
+          onSelect: vi.fn(),
+        },
+      ],
+    });
+    const dictionary = translator({
+      "studio.mainMenu.item.window.command-bar": "Show command bar",
+      "studio.mainMenu.item.window.command-bar.open": "Hide command bar",
+      "studio.mainMenu.item.window.command-bar.unavailable": "No toggle on this screen.",
+    });
+
+    expect(
+      item(
+        localizeStudioMainMenuGroups(
+          [windowGroup()],
+          { ...BASE_STATE, commandBarVisible: false },
+          dictionary,
+        ),
+        "window",
+        "command-bar",
+      ),
+    ).toMatchObject({
+      label: "Show command bar",
+      unavailableReason: "No toggle on this screen.",
+    });
+    expect(
+      item(
+        localizeStudioMainMenuGroups(
+          [windowGroup()],
+          { ...BASE_STATE, commandBarVisible: true },
+          dictionary,
+        ),
+        "window",
+        "command-bar",
+      ).label,
+    ).toBe("Hide command bar");
+    // An authored layout that has never toggled the strip carries no flag at all;
+    // the builder reads that as visible, so the label must too.
+    expect(
+      item(
+        localizeStudioMainMenuGroups([windowGroup()], BASE_STATE, dictionary),
+        "window",
+        "command-bar",
+      ).label,
+    ).toBe("Hide command bar");
+  });
+
+  it("localizes the layer border effect row through the plain group/item key", () => {
+    const projected = localizeStudioMainMenuGroups(
+      [
+        {
+          id: "layer",
+          label: "레이어",
+          items: [
+            {
+              id: "border-effect",
+              label: "경계 효과…",
+              unavailableReason: "경계 효과를 적용할 이미지 레이어를 먼저 선택하세요.",
+              onSelect: vi.fn(),
+            },
+          ],
+        },
+      ],
+      BASE_STATE,
+      translator({
+        "studio.mainMenu.item.layer.border-effect": "Border effect…",
+        "studio.mainMenu.item.layer.border-effect.unavailable":
+          "Select an image layer to apply a border effect to.",
+      }),
+    );
+
+    expect(item(projected, "layer", "border-effect")).toMatchObject({
+      label: "Border effect…",
+      unavailableReason: "Select an image layer to apply a border effect to.",
+    });
+  });
 });

@@ -18,6 +18,13 @@ export interface StudioMainMenuLocalizationState {
   readonly quickAccessPaletteLoading: boolean;
   readonly leftPanelOpen: boolean;
   readonly rightPanelOpen: boolean;
+  /**
+   * Menubar command bar visibility. Optional because it is absent on the
+   * authored workspace layout until the strip has been toggled once, and the
+   * item builder reads that absence as "visible" (`!== false`) — this module
+   * must agree or the label would flip on a fresh workspace.
+   */
+  readonly commandBarVisible?: boolean;
   readonly lastFilterDraft: unknown | null;
 }
 
@@ -59,6 +66,12 @@ function itemLabelKey(
   }
   if (path === "view/left-panel" && state.leftPanelOpen) return `${baseKey}.open`;
   if (path === "view/right-panel" && state.rightPanelOpen) return `${baseKey}.open`;
+  // Same two-key shape the panel rows use: the base key is the "show" wording and
+  // `.open` the "hide" one. Without the branch a single key would localize both
+  // states to one sentence, which reads as the wrong action half the time.
+  if (path === "window/command-bar" && state.commandBarVisible !== false) {
+    return `${baseKey}.open`;
+  }
   if (path === "filter/last-filter") {
     return `${baseKey}.${state.lastFilterDraft ? "ready" : "empty"}`;
   }
@@ -106,7 +119,7 @@ function localizeUnavailableReason(
     // 영어가 되고 사유만 한국어로 남았다(실측: en 로케일에서 "Required conditions: 마스터
     // 편집에서는 필터를 적용할 이미지 레이어를 선택하세요."). 계산된 사유를 버리지 않으면서
     // 로케일만 맞추려면 여기서 문장 표로 옮기는 수밖에 없다 — 팩에 키를 넣는 길은 75개 팩
-    // 1,297키 동수 계약 때문에 막혀 있다(모듈 헤더 참고).
+    // 동수 계약(현재 팩당 1,323키) 때문에 막혀 있다(모듈 헤더 참고).
     if (state.filterUnavailableReason) {
       return localizeStudioFilterUnavailableReason(state.filterUnavailableReason, t);
     }
