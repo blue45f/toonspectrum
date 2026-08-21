@@ -17,7 +17,28 @@ export type StudioBrushPreviewStyle =
   | "texture"
   | "tone";
 
-export type StudioBrushMediaGroupVisual = "line" | "marker" | "paint" | "fx" | "texture";
+/**
+ * 재질(머티리얼) 그룹 — 브러시 서랍의 유일한 분류 축.
+ *
+ * 이전의 5개 미디어 그룹(line/marker/paint/fx/texture)은 "티어"(프로/엔진)와 섞여 있어서
+ * 같은 재질의 브러시가 서로 다른 탭에 흩어졌다. 이제는 렌더 계약이 선언한 재질 하나만 쓴다.
+ * 이 파일은 리프 모듈이라 카탈로그·트레이·팩 인덱스가 순환 없이 같은 어휘를 공유한다.
+ */
+export type StudioBrushMaterialGroup =
+  | "ink"
+  | "pencil"
+  | "marker"
+  | "watercolor"
+  | "oil"
+  | "airbrush"
+  | "pastel"
+  | "texture"
+  | "tone"
+  | "fx"
+  | "eraser";
+
+/** 칩 표면은 재질 그룹과 1:1 이므로 별도 축을 두지 않는다. */
+export type StudioBrushMediaGroupVisual = StudioBrushMaterialGroup;
 
 export interface StudioBrushChipSurface {
   /** Tile rest background */
@@ -28,14 +49,23 @@ export interface StudioBrushChipSurface {
   paper: string;
 }
 
-/** Warm-ink chip surfaces per media family (DESIGN.md hue ~64–70). */
+/**
+ * 재질 그룹별 칩 표면 (DESIGN.md 웜잉크 베이스). 재질이 곧 색상 단서라서 탭을 바꾸지 않고도
+ * "이 브러시가 무슨 재료인지"가 타일에서 먼저 읽힌다.
+ */
 export function studioBrushChipSurface(media: StudioBrushMediaGroupVisual): StudioBrushChipSurface {
   switch (media) {
-    case "line":
+    case "ink":
       return {
         tile: "oklch(0.2 0.01 66 / 0.75)",
         ink: "oklch(0.78 0.02 70)",
         paper: "oklch(0.28 0.012 64 / 0.35)",
+      };
+    case "pencil":
+      return {
+        tile: "oklch(0.21 0.012 250 / 0.5)",
+        ink: "oklch(0.74 0.03 250)",
+        paper: "oklch(0.3 0.014 250 / 0.28)",
       };
     case "marker":
       return {
@@ -43,11 +73,41 @@ export function studioBrushChipSurface(media: StudioBrushMediaGroupVisual): Stud
         ink: "oklch(0.72 0.14 42)",
         paper: "oklch(0.3 0.04 42 / 0.25)",
       };
-    case "paint":
+    case "watercolor":
+      return {
+        tile: "oklch(0.21 0.035 232 / 0.32)",
+        ink: "oklch(0.74 0.11 232)",
+        paper: "oklch(0.29 0.035 232 / 0.24)",
+      };
+    case "oil":
       return {
         tile: "oklch(0.21 0.03 150 / 0.28)",
         ink: "oklch(0.72 0.1 150)",
         paper: "oklch(0.28 0.03 150 / 0.22)",
+      };
+    case "airbrush":
+      return {
+        tile: "oklch(0.21 0.028 196 / 0.3)",
+        ink: "oklch(0.76 0.08 196)",
+        paper: "oklch(0.29 0.028 196 / 0.22)",
+      };
+    case "pastel":
+      return {
+        tile: "oklch(0.22 0.032 16 / 0.32)",
+        ink: "oklch(0.76 0.09 16)",
+        paper: "oklch(0.3 0.032 16 / 0.24)",
+      };
+    case "texture":
+      return {
+        tile: "oklch(0.21 0.02 80 / 0.4)",
+        ink: "oklch(0.7 0.06 80)",
+        paper: "oklch(0.32 0.02 70 / 0.3)",
+      };
+    case "tone":
+      return {
+        tile: "oklch(0.2 0.016 300 / 0.42)",
+        ink: "oklch(0.72 0.05 300)",
+        paper: "oklch(0.3 0.016 300 / 0.3)",
       };
     case "fx":
       return {
@@ -55,11 +115,11 @@ export function studioBrushChipSurface(media: StudioBrushMediaGroupVisual): Stud
         ink: "oklch(0.78 0.16 330)",
         paper: "oklch(0.28 0.04 300 / 0.28)",
       };
-    case "texture":
+    case "eraser":
       return {
-        tile: "oklch(0.21 0.02 80 / 0.4)",
-        ink: "oklch(0.7 0.06 80)",
-        paper: "oklch(0.32 0.02 70 / 0.3)",
+        tile: "oklch(0.19 0.004 66 / 0.6)",
+        ink: "oklch(0.68 0.008 70)",
+        paper: "oklch(0.26 0.006 64 / 0.32)",
       };
     default:
       return {

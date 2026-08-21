@@ -66,21 +66,15 @@ export const STUDIO_BRUSH_CORE_SHELF_PRESET_IDS: readonly string[] = Object.free
   "brush",
   "highlighter",
   "fountain-pen",
-  "gel-pen",
   "ballpoint",
   "felt-tip",
-  "school-pen",
   "standard-eraser",
   "kneaded-eraser",
   // 서브 툴 팔레트 — 펜
   "maru-pen",
-  "kaburapen",
-  "mapping-pen",
   "calligraphy",
   // 서브 툴 팔레트 — 연필
-  "pencil-2b",
   "pencil-6b",
-  "soft-pencil",
   "colored-pencil",
   // 서브 툴 팔레트 — 붓
   "ink-wash",

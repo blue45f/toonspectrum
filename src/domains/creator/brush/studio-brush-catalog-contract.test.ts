@@ -19,6 +19,7 @@ import {
   STUDIO_BRUSH_CATALOG_COUNTS,
   STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
   STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
+  STUDIO_PRO_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog";
@@ -26,6 +27,7 @@ import {
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
 } from "./studio-brush-dynamics";
+import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
 import {
   isStudioBrushQuarantinedPresetId,
   STUDIO_BRUSH_QUARANTINED_PRESET_IDS,
@@ -97,7 +99,7 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       expect(studioBrushCatalogItemById(item.id), `${item.id}: lookup drift`).toBe(item);
       expect(studioBrushCatalogKindLabel(item), `${item.id}: missing kind label`).toMatch(
-        /^(선화|마커|채색|효과|질감|지우개)$/u
+        /^(잉크|연필|마커|수채|유화|에어브러시|파스텔|질감|톤|효과|지우개)$/u
       );
       // V17.1 quarantined ids stay resolvable above but leave every picker listing/search —
       // their exposure contract is asserted in the dedicated quarantine block below.
@@ -135,18 +137,39 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
       expect(studioBrushCatalogItemById(quarantinedId), `${quarantinedId}: lookup lost`)
         .not.toBeNull();
-      expect(
-        BRUSH_PRESETS.some((preset) => preset.id === quarantinedId),
-        `${quarantinedId}: left the preset SSOT`
-      ).toBe(true);
-      expect(
-        resolveStudioBrushRuntimeContract(quarantinedId)?.id,
-        `${quarantinedId}: renderer contract lost`
-      ).toBe(quarantinedId);
+      // Registration is partition-specific: a core/lane id lives in BRUSH_PRESETS and owns a
+      // renderer contract under its own name, while a pro-pack id lives in the pack descriptor
+      // array and materializes onto one of the three durable pack runtimes. Both must still be
+      // registered — checked on the registry that actually holds them, so the assertion keeps
+      // testing the real replay path rather than a lookup that was never going to hit.
+      const packDescriptor = studioBrushPackDescriptorById(quarantinedId);
+      if (packDescriptor) {
+        expect(
+          STUDIO_PRO_BRUSH_CATALOG_ITEMS.some((item) => item.id === quarantinedId),
+          `${quarantinedId}: left the pro pack SSOT`
+        ).toBe(true);
+        expect(
+          resolveStudioBrushRuntimeContract(packDescriptor.runtimeBrushId)?.id,
+          `${quarantinedId}: pack runtime contract lost`
+        ).toBe(packDescriptor.runtimeBrushId);
+      } else {
+        expect(
+          BRUSH_PRESETS.some((preset) => preset.id === quarantinedId),
+          `${quarantinedId}: left the preset SSOT`
+        ).toBe(true);
+        expect(
+          resolveStudioBrushRuntimeContract(quarantinedId)?.id,
+          `${quarantinedId}: renderer contract lost`
+        ).toBe(quarantinedId);
+      }
       for (const listing of [
         filterStudioBrushCatalogItems({}),
         filterStudioBrushCatalogItems({ operation: "paint" }),
-        filterStudioBrushCatalogItems({ category: "engines" }),
+        // 티어 탭이 사라진 뒤에도 "자기 재질 탭"에서 새어나오지 않아야 한다. 카테고리를
+        // 고정하지 않고 해당 id 의 실제 재질 그룹으로 조회해 탭이 늘어나도 커버리지가 유지된다.
+        filterStudioBrushCatalogItems({
+          category: studioBrushCatalogItemById(quarantinedId)!.mediaGroup,
+        }),
         filterStudioBrushCatalogItems({ query: quarantinedId }),
       ]) {
         expect(

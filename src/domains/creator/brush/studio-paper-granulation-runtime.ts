@@ -19,15 +19,31 @@
  *    종이 골 쪽으로 재배치된다. 획의 형태·굵기·필압 응답을 만드는 기하는 건드리지 않는다.
  */
 
+import { resolveStudioPaperDepositScaleForHeightV1 } from "./studio-paper-media-profile-v1";
+import {
+  STUDIO_PAPER_SUBSTRATE_DETILE_COS_V2,
+  STUDIO_PAPER_SUBSTRATE_DETILE_OFFSET_V2,
+  STUDIO_PAPER_SUBSTRATE_DETILE_PRIMARY_COS_V2,
+  STUDIO_PAPER_SUBSTRATE_DETILE_PRIMARY_SIN_V2,
+  STUDIO_PAPER_SUBSTRATE_DETILE_RATIO_V2,
+  STUDIO_PAPER_SUBSTRATE_DETILE_SIN_V2,
+  STUDIO_PAPER_SUBSTRATE_DETILE_WEIGHT_V2,
+  STUDIO_PAPER_SUBSTRATE_MODEL_CONTACT_TOOTH_V2,
+  studioPaperUsesContactTooth,
+  type StudioPaperSubstrateModel,
+} from "./studio-paper-substrate-model";
 import {
   DEFAULT_PAPER_GRAIN_KIND,
   PAPER_REFERENCE_TILE,
+  STUDIO_PAPER_HEIGHT_CONTRAST_SHAPED_V2,
   createPaperGranulationGain,
   createPaperHeightField,
   normalizePaperGrainKind,
   type PaperGrainKind,
   type PaperHeightField,
 } from "./studio-paper-texture";
+
+import type { StudioPaperMediumV1 } from "./studio-paper-media-profile-v1";
 
 /** 문서 px ↔ 종이 텍셀 배율의 허용 범위. 1이면 종이 1텍셀 = 문서 1px. */
 export const STUDIO_PAPER_GRANULATION_LIMITS = {
@@ -175,6 +191,11 @@ export interface StudioPaperGranulationTile {
   readonly gain: Float32Array;
   readonly settings: StudioPaperGranulationSettings;
   readonly surface: StudioPaperSurfaceSettings;
+  /**
+   * 이 타일의 높이장이 어떤 세대로 구워졌는가. 생략은 역사적(평균-only) 필드다.
+   * v2 타일만 `contrast: "shaped-v2"`로 구워지므로 두 세대가 한 캐시에 공존해도 섞이지 않는다.
+   */
+  readonly model?: StudioPaperSubstrateModel;
 }
 
 /**
@@ -193,14 +214,20 @@ function quantize(value: number): number {
 
 function tileCacheKey(
   surface: StudioPaperSurfaceSettings,
-  settings: StudioPaperGranulationSettings
+  settings: StudioPaperGranulationSettings,
+  model?: StudioPaperSubstrateModel
 ): string {
-  return [
+  const base = [
     surface.kind,
     surface.seed,
     quantize(settings.granulation),
     quantize(settings.staining),
   ].join(":");
+  // 키 없는 획은 예전과 **문자 단위로 같은 키**를 받아야 같은 타일을 본다. 모델 접미사는
+  // v2 획에만 붙으므로 두 세대가 캐시를 공유하지 않으면서 서로를 무효화하지도 않는다.
+  return studioPaperUsesContactTooth(model)
+    ? `${base}:${STUDIO_PAPER_SUBSTRATE_MODEL_CONTACT_TOOTH_V2}`
+    : base;
 }
 
 /**
@@ -211,10 +238,12 @@ function tileCacheKey(
  */
 export function acquireStudioPaperGranulationTile(
   surface: StudioPaperSurfaceSettings,
-  settings: StudioPaperGranulationSettings
+  settings: StudioPaperGranulationSettings,
+  model?: StudioPaperSubstrateModel
 ): StudioPaperGranulationTile | null {
   if (!studioPaperGranulationIsActive(settings)) return null;
-  const key = tileCacheKey(surface, settings);
+  const contactTooth = studioPaperUsesContactTooth(model);
+  const key = tileCacheKey(surface, settings, model);
   const cached = tileCache.get(key);
   if (cached) {
     // 삽입 순서가 FIFO 큐다. 조회는 순서를 바꾸지 않는다(잉크워시 타일 캐시와 동일 규약).
@@ -225,6 +254,7 @@ export function acquireStudioPaperGranulationTile(
     width: PAPER_REFERENCE_TILE,
     height: PAPER_REFERENCE_TILE,
     seed: surface.seed,
+    ...(contactTooth ? { contrast: STUDIO_PAPER_HEIGHT_CONTRAST_SHAPED_V2 } : {}),
   });
   const gain = createPaperGranulationGain(field, {
     strength: quantize(settings.granulation),
@@ -237,6 +267,7 @@ export function acquireStudioPaperGranulationTile(
     gain,
     settings,
     surface,
+    ...(contactTooth ? { model: STUDIO_PAPER_SUBSTRATE_MODEL_CONTACT_TOOTH_V2 } : {}),
   };
   if (tileCache.size >= TILE_CACHE_LIMIT) {
     const oldest = tileCache.keys().next();
@@ -346,6 +377,117 @@ export function resolveStudioPaperGranulationAlphaMultiplierAt(
   if (!tile) return 1;
   const gain = sampleStudioPaperGranulationGainAt(tile, x, y, scale);
   const multiplier = 1 + gain;
+  if (!(multiplier > 0)) return 0;
+  return multiplier > STUDIO_PAPER_GRANULATION_MAX_MULTIPLIER
+    ? STUDIO_PAPER_GRANULATION_MAX_MULTIPLIER
+    : multiplier;
+}
+
+// ---------------------------------------------------------------------------
+// contact-tooth-v2 — 결이 있는 종이 위의 접촉면
+// ---------------------------------------------------------------------------
+
+/**
+ * De-tiled 종이 높이(0..1, 평균 0.5).
+ *
+ * 같은 구운 타일을 **통약불가능한 두 배율**로 두 번 읽어 더한다. 두 번째 조회는 φ⁻¹ 배율로
+ * 축소되고 회전·평행이동되어 있으므로 `128·s`와 `128·s·φ`는 공배수가 없고, 합에는 정확한
+ * 주기가 아예 존재하지 않는다. 그래도 모든 샘플은 여전히 구운 타일의 바이리니어 조회라,
+ * 나중에 WebGPU substrate 레인이 r8unorm 타일로 같은 값을 비트 단위로 재현할 수 있다.
+ *
+ * `sqrt(1 + w²)`로 나눠 두 독립 조회의 합이 원래 RMS를 보존한다 — 이게 없으면 de-tiling이
+ * 방금 정규화한 amplitude 대비를 다시 무너뜨린다.
+ */
+export function sampleStudioPaperDetiledHeightAt(
+  tile: StudioPaperGranulationTile,
+  x: number,
+  y: number,
+  scale: number
+): number {
+  const safeScale = clamp(
+    finiteNumber(scale, 1),
+    STUDIO_PAPER_GRANULATION_LIMITS.scale.min,
+    STUDIO_PAPER_GRANULATION_LIMITS.scale.max
+  );
+  const px = finiteNumber(x, 0);
+  const py = finiteNumber(y, 0);
+  const primaryX = px * STUDIO_PAPER_SUBSTRATE_DETILE_PRIMARY_COS_V2
+    - py * STUDIO_PAPER_SUBSTRATE_DETILE_PRIMARY_SIN_V2;
+  const primaryY = px * STUDIO_PAPER_SUBSTRATE_DETILE_PRIMARY_SIN_V2
+    + py * STUDIO_PAPER_SUBSTRATE_DETILE_PRIMARY_COS_V2;
+  const primary = bilinearWrapped(
+    tile.field.values,
+    tile.size,
+    primaryX / safeScale,
+    primaryY / safeScale
+  );
+  const fineScale = safeScale * STUDIO_PAPER_SUBSTRATE_DETILE_RATIO_V2;
+  const rotatedX = px * STUDIO_PAPER_SUBSTRATE_DETILE_COS_V2
+    - py * STUDIO_PAPER_SUBSTRATE_DETILE_SIN_V2;
+  const rotatedY = px * STUDIO_PAPER_SUBSTRATE_DETILE_SIN_V2
+    + py * STUDIO_PAPER_SUBSTRATE_DETILE_COS_V2;
+  const secondary = bilinearWrapped(
+    tile.field.values,
+    tile.size,
+    rotatedX / fineScale + STUDIO_PAPER_SUBSTRATE_DETILE_OFFSET_V2,
+    rotatedY / fineScale + STUDIO_PAPER_SUBSTRATE_DETILE_OFFSET_V2
+  );
+  const combined = (primary - 0.5)
+    + STUDIO_PAPER_SUBSTRATE_DETILE_WEIGHT_V2 * (secondary - 0.5);
+  const normalizer = Math.sqrt(
+    1 + STUDIO_PAPER_SUBSTRATE_DETILE_WEIGHT_V2 * STUDIO_PAPER_SUBSTRATE_DETILE_WEIGHT_V2
+  );
+  return clamp(0.5 + combined / normalizer, 0, 1);
+}
+
+/**
+ * 종이별 span을 걷어낸 표준화 높이.
+ *
+ * `contrast: "shaped-v2"` 필드는 선언된 amplitude를 **그대로 span으로** 쓰므로, 매끈한 종이
+ * (marker-pad, amplitude 0.08)의 높이는 0.46..0.54에 갇힌다. `STUDIO_PAPER_MEDIA_INTERACTION_V1`의
+ * 접촉 문턱(연필 0.84↔0.18)은 0..1 전폭에 맞춰 보정된 값이라, span을 걷어내지 않으면
+ * 매끈한 종이에서는 어떤 필압에서도 문턱을 못 넘어 침착이 항상 0이 된다.
+ *
+ * 종이가 얼마나 거친가는 여기서가 아니라 **강도 축**(`granulation × toothGain`)으로 도달한다 —
+ * 표준화는 "접촉면이 이 종이 이빨 분포의 몇 분위에 앉는가"라는 물리적으로 옳은 진술이다.
+ */
+function standardizeSubstrateHeight(height: number, amplitude: number): number {
+  if (!(amplitude > 1e-6)) return 0.5;
+  return clamp(0.5 + (height - 0.5) / amplitude, 0, 1);
+}
+
+/**
+ * contact-tooth-v2 알파 배수 — 매체별 극성 + 필압 결합.
+ *
+ * 침착 수학 자체는 여기 없다. `resolveStudioPaperDepositScaleForHeightV1`에 위임하므로
+ * 건식=peak-catch / 수채=valley-settle / 유화=weave-reveal 사본이 트리에 두 벌 생기지 않고,
+ * 이 런타임과 스탬프 엔진 W7 레인이 **같은 침착 권위**를 공유한다.
+ *
+ * `medium`이 null(기술펜·톤·픽셀)이면 정확한 항등 1이다.
+ */
+export function resolveStudioPaperContactToothAlphaMultiplierAt(
+  tile: StudioPaperGranulationTile | null,
+  x: number,
+  y: number,
+  scale: number,
+  medium: StudioPaperMediumV1 | null,
+  pressure: number
+): number {
+  if (!tile || !medium) return 1;
+  const height = standardizeSubstrateHeight(
+    sampleStudioPaperDetiledHeightAt(tile, x, y, scale),
+    tile.field.params.amplitude
+  );
+  const deposit = resolveStudioPaperDepositScaleForHeightV1(
+    medium,
+    clamp(finiteNumber(pressure, 1), 0, 1),
+    // 강도는 아래 mix 한 곳에서만 적용한다. affinity까지 강도를 곱하면 이중 계상이 된다.
+    1,
+    height
+  );
+  // staining 만큼은 지형과 무관하게 섬유에 물든다 — 그 몫이 항등 1로 남는 이유다.
+  const strength = studioPaperGranulationEffectiveStrength(tile.settings);
+  const multiplier = 1 + strength * (deposit - 1);
   if (!(multiplier > 0)) return 0;
   return multiplier > STUDIO_PAPER_GRANULATION_MAX_MULTIPLIER
     ? STUDIO_PAPER_GRANULATION_MAX_MULTIPLIER

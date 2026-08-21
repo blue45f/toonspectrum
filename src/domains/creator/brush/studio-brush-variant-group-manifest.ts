@@ -90,6 +90,13 @@ export type BrushLifecycleStage =
  * 2026-08-13 brush quality wave: 11 new engine lanes (dry-stamp x4, wet-texture x4, oil x3).
  * 2026-08-13 wave 3: 17 new engine lanes (CC0 MyPaint verbatim import x12, croquis capsule x2,
  * living-ink settled bake x2, bristle-physics oil x1).
+ *
+ * 2026-08-21 roster reduction wave: 12 pins were RESOLVED rather than renewed. The lab period
+ * exists to decide whether a lane earns a permanent shelf slot; for those 12 the answer came back
+ * "no — it shares an execution signature with a lane that already ships", so the pin was removed
+ * here and the id moved to the quarantine ledger with its measured reason. Resolving the pin first
+ * is exactly what the audit below demands (`resolve the pin first`), so the guard stays strict:
+ * this list and the quarantine ledger must remain disjoint.
  */
 export const STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS: readonly string[] = Object.freeze([
   "crayon--klecks-stamp",
@@ -97,34 +104,22 @@ export const STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS: readonly string[] = Obje
   "charcoal--mypaint-stamp",
   "pastel--soft-stamp",
   "watercolor--edge-bloom",
-  "watercolor--granulating",
   "ink-wash--fiber-feather",
   "ink-wash--chroma-halo",
   "brush--impasto-relief",
   "brush--bristle-depletion",
   "oil-pastel--wgm-mix",
-  // 2026-08-13 wave 3
-  "mypaint-cc0--charcoal",
-  "mypaint-cc0--charcoal-tanda",
+  // 2026-08-13 wave 3 (2026-08-21 웨이브에서 중복 12종의 핀을 해제하고 격리 원장으로 옮김)
   "mypaint-cc0--2b-pencil",
   "mypaint-cc0--dry-brush",
   "mypaint-cc0--splatter",
   "mypaint-cc0--ink-blot",
   "mypaint-cc0--kabura",
-  "mypaint-cc0--calligraphy",
   "mypaint-cc0--marker-fat",
-  "mypaint-cc0--marker-small",
-  "mypaint-cc0--slow-ink",
-  "mypaint-cc0--knife",
   "mypaint-cc0--watercolor-fringe",
-  "mypaint-cc0--watercolor-expressive",
-  "mypaint-cc0--oil-paint",
-  "mypaint-cc0--pastel",
-  "mypaint-cc0--spray",
   "gpen--croquis-capsule",
   "pen--croquis-stabilized",
   "ink-wash--living-bake",
-  "watercolor--fluid-feather",
   "brush--bristle-physics",
 ]);
 
@@ -157,7 +152,11 @@ export function resolveStudioBrushLifecycleStage(
  * - SSOT catalogue row present — persisted documents keep resolving metadata by id,
  * - runtime contract present — `resolveStudioBrushRuntime` keeps resolving `exact`, never the pen
  *   safe-fallback and never a silent texture substitute (지침 3),
- * - never a pro pack (owner-sold content) and never a pinned experimental lane (lab period),
+ * - a pro pack preset may be delisted, but only while another preset in ITS OWN pack category stays
+ *   exposed (2026-08-21 owner decision: the pack is allowed to shrink — 비슷한 질감이 너무 많다 —
+ *   but no purchased category may go dark, and the descriptor itself never leaves the pack, so the
+ *   ordinal-seeded dynamics of every OTHER pack id stay byte-identical),
+ * - never a pinned experimental lane (lab period) — resolve the pin first,
  * - a non-quarantined canonical sibling exists — the owner's removal precondition (그룹 내 대안)
  *   stays mechanically true, which also shields self-canonical core family representatives.
  */
@@ -171,17 +170,40 @@ function auditStudioBrushQuarantineRegistration(): string[] {
     if (!paintIds.has(quarantinedId)) {
       issues.push(`${quarantinedId}: not a shipped paint preset — quarantine would orphan persisted strokes`);
     }
-    if (studioBrushPackDescriptorById(quarantinedId)) {
-      issues.push(`${quarantinedId}: pro-pack preset (owner-sold content) must never be quarantined`);
+    const packDescriptor = studioBrushPackDescriptorById(quarantinedId);
+    if (packDescriptor) {
+      // Owner-sold content may be delisted, never orphaned: the pack category the buyer paid for
+      // must still hand them a working brush. The descriptor stays in the pack either way, so
+      // replay and every other id's array-ordinal dynamics are untouched.
+      const exposedCategorySibling = STUDIO_PAINT_BRUSH_CATALOG_ITEMS.some((item) => (
+        item.id !== quarantinedId
+        && !isStudioBrushQuarantinedPresetId(item.id)
+        && studioBrushPackDescriptorById(item.id)?.category === packDescriptor.category
+      ));
+      if (!exposedCategorySibling) {
+        issues.push(
+          `${quarantinedId}: pro-pack preset leaves no exposed ${packDescriptor.category} sibling`,
+        );
+      }
     }
     if (EXPERIMENTAL_LANE_PRESET_ID_SET.has(quarantinedId)) {
       issues.push(`${quarantinedId}: pinned experimental lane keeps its lab period — resolve the pin first`);
     }
-    const contract = resolveStudioBrushRuntimeContract(quarantinedId);
+    // Pro-pack ids never own a contract under their own name — they materialize onto one of the
+    // three durable pack runtimes, exactly as `resolveVariantGroupMemberFacts` resolves them. Look
+    // the contract up the same way so the "would converge to the pen safe-fallback" check keeps
+    // testing the real replay path instead of failing on a lookup that was never going to hit.
+    const contractId = packDescriptor ? packDescriptor.runtimeBrushId : quarantinedId;
+    const contract = resolveStudioBrushRuntimeContract(contractId);
     if (!contract) {
       issues.push(`${quarantinedId}: runtime contract missing — the id would converge to the pen safe-fallback`);
       continue;
     }
+    // A pro id shares its runtime brush with ~50 pack siblings, so its `canonicalId` is that shared
+    // runtime and says nothing about whether an alternative stays exposed. The pack-category check
+    // above is that preset's version of this invariant; running the family check here as well would
+    // only re-assert a fact about the runtime trio.
+    if (packDescriptor) continue;
     // The invariant is that an alternative stays drawable, not that the id happens to be a
     // variant of something. A self-canonical preset therefore qualifies when its render family
     // still exposes another preset (사용자 기준: "대체 브러시군이 있다면"), which is exactly the

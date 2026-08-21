@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
+import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
   adjustStudioBrushOpacity,
   adjustStudioBrushSize,
@@ -45,12 +46,24 @@ describe("studio-draw-ux", () => {
   });
 
   it("filters the complete injected catalog without losing Pro favorites, recents, or search", () => {
-    const pro = filterStudioBrushLibraryItems({
-      category: "pro",
+    // 티어("프로") 탭이 사라져도 팩 브러시는 재질 탭으로 전부 도달 가능해야 한다.
+    const all = filterStudioBrushLibraryItems({
+      category: "all",
       catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
     });
+    const pro = all.filter((item) => isStudioBrushPackCatalogId(item.id));
     expect(pro).toHaveLength(160);
     expect(new Set(pro.map((item) => item.id))).toHaveProperty("size", 160);
+    for (const item of pro) {
+      const tabItems = filterStudioBrushLibraryItems({
+        category: item.mediaGroup,
+        catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+      });
+      expect(
+        tabItems.some((candidate) => candidate.id === item.id),
+        `${item.id}: unreachable from its ${item.mediaGroup} tab`,
+      ).toBe(true);
+    }
 
     const favorites = filterStudioBrushLibraryItems({
       category: "favorites",

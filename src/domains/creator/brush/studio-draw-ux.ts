@@ -10,11 +10,6 @@ import {
   type StudioBrushTrayItem,
 } from "../studio-creative-ux";
 
-import { isStudioBrushEngineLaneId } from "./studio-brush-engine-lane-catalog";
-import {
-  isStudioBrushPackCatalogId,
-  STUDIO_BRUSH_PACK_CATALOG_IDS,
-} from "./studio-brush-pack-id";
 
 export const STUDIO_BRUSH_SIZE_RANGE = { min: 1, max: 80 } as const;
 export const STUDIO_BRUSH_OPACITY_RANGE = { min: 0.05, max: 1 } as const;
@@ -69,10 +64,6 @@ export function filterStudioBrushLibraryItems(options: {
     items = favoriteIds.map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
   } else if (category === "recent") {
     items = recentIds.map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
-  } else if (category === "pro") {
-    items = allItems.filter((item) => isStudioBrushPackCatalogId(item.id));
-  } else if (category === "engines") {
-    items = allItems.filter((item) => isStudioBrushEngineLaneId(item.id));
   } else if (category === "all" || category === "expressive") {
     items = category === "all"
       ? allItems
@@ -102,7 +93,14 @@ export function studioBrushPresetById(id: unknown): BrushPreset | null {
   return BRUSH_PRESETS.find((preset) => preset.id === id) ?? null;
 }
 
-/** Group chips for the brush library sheet. */
+/**
+ * 브러시 라이브러리 탭 — 재질 축 하나로 정리했다.
+ *
+ * "프로"와 "엔진" 탭은 삭제했다. 둘 다 브러시가 어떤 재료를 남기는지 말해주지 않는 구현 티어라,
+ * 유화 리본과 수채 과립이 "엔진" 한 칸에 뒤섞여 있었고 프로 160종은 재질과 무관하게 한 덩어리였다.
+ * 지금은 잉크·연필·마커·수채·유화·에어·파스텔·질감·톤·효과 열 갈래이며, 각 항목의 소속은
+ * 렌더 계약에서 파생되므로 새 브러시가 추가돼도 손으로 표를 고칠 일이 없다.
+ */
 export const STUDIO_BRUSH_LIBRARY_TABS: readonly {
   id: StudioBrushTrayCategory | "favorites" | "recent";
   label: string;
@@ -111,20 +109,15 @@ export const STUDIO_BRUSH_LIBRARY_TABS: readonly {
   { id: "favorites", label: "즐겨찾기", title: "즐겨찾기 브러시" },
   { id: "recent", label: "최근", title: "최근 사용한 브러시" },
   { id: "beginner", label: "기본", title: "초보 키트" },
-  {
-    id: "pro",
-    label: `프로 ${STUDIO_BRUSH_PACK_CATALOG_IDS.length}`,
-    title: `프로시저럴 확장 브러시 ${STUDIO_BRUSH_PACK_CATALOG_IDS.length}종`,
-  },
-  {
-    id: "engines",
-    label: "엔진",
-    title: "엔진 레인 브러시 — 같은 재료·다른 엔진",
-  },
-  { id: "line", label: "선", title: "펜·연필·G펜" },
-  { id: "marker", label: "마커", title: "마커·형광·네온" },
-  { id: "paint", label: "페인트", title: "붓·수채·유화" },
-  { id: "fx", label: "효과", title: "글로우·글리터" },
-  { id: "texture", label: "질감", title: "크레용·파스텔·톤" },
+  { id: "ink", label: "잉크", title: "펜·G펜·붓펜 — 균일한 잉크 선" },
+  { id: "pencil", label: "연필", title: "연필·흑연 — 종이결 그레인" },
+  { id: "marker", label: "마커", title: "마커·형광펜 — 반투명 균일 도포" },
+  { id: "watercolor", label: "수채", title: "수채·수묵·과슈 — 웻엣지 번짐" },
+  { id: "oil", label: "유화", title: "유화·아크릴·임파스토 — 강모결과 두께" },
+  { id: "airbrush", label: "에어브러시", title: "에어·스프레이·스플래터 — 소프트 입자" },
+  { id: "pastel", label: "파스텔", title: "파스텔·목탄·크레용·초크 — 마른 가루" },
+  { id: "texture", label: "질감", title: "천·암석·나뭇잎·털 — 재질 스탬프" },
+  { id: "tone", label: "톤", title: "스크린톤·망점·해칭" },
+  { id: "fx", label: "효과", title: "네온·글로우·글리터·비·눈·불꽃" },
   { id: "all", label: "전체", title: "모든 브러시" },
 ];

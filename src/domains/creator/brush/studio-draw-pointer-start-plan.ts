@@ -43,6 +43,8 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
+import { resolveStudioPaperBrushMedium } from "./studio-paper-brush-response";
+import { STUDIO_PAPER_SUBSTRATE_MODEL_CONTACT_TOOTH_V2 } from "./studio-paper-substrate-model";
 import {
   STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
   STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
@@ -192,6 +194,15 @@ export function planStudioDrawPointerStart(
     drawMode === "pen"
     && hasBrushDynamics
     && isStudioBoundedFlowSymmetryCompatible(symmetry);
+  /**
+   * 이 획이 교정된 substrate로 태어나는가.
+   *
+   * 지우개·픽셀은 안료를 얹지 않으므로 제외하고, 종이 반응이 항등인 도구도 제외한다 —
+   * 키가 붙어도 렌더가 같으므로 문서에 의미 없는 바이트만 남는다.
+   */
+  const contactToothSubstrateEligible =
+    drawMode === "pen"
+    && resolveStudioPaperBrushMedium(brush) !== null;
   const hybridPressure = (drawMode === "pen" || lowDensityEraser) && brush !== "pen"
     ? resolveStudioHybridPressureSample(brush, {
         pointerType: pointer.pointerType,
@@ -291,6 +302,11 @@ export function planStudioDrawPointerStart(
         fill: drawMode === "lasso-fill" ? color : undefined,
         pressures: [drawMode === "pixel" ? 1 : pressure],
         pressureModel,
+        // 종이를 실제로 읽는 패밀리에만 찍는다. 항등 도구(기술펜·톤·픽셀)는 키를 달아도
+        // 렌더가 달라지지 않으므로 문서에 의미 없는 바이트를 남기지 않는다.
+        paperModel: contactToothSubstrateEligible
+          ? STUDIO_PAPER_SUBSTRATE_MODEL_CONTACT_TOOTH_V2
+          : undefined,
         paintModel: boundedDynamicFlowPaintEligible
           ? STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2
           : layeredFlowPaintEligible

@@ -96,8 +96,10 @@ import {
   sliceStudioDynamicDabsForLiveFrame,
 } from "../studio-web-drawing-stroke-bridge";
 
+import type { StudioPaperMediumV1 } from "../brush/studio-paper-media-profile-v1";
 import type { DrawEl } from "../studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
+import type { StudioPaperSubstrateModel } from "../brush/studio-paper-substrate-model";
 
 const POINT_EPSILON = 1e-6;
 const MAX_LEGACY_LIVE_DABS = STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.max;
@@ -192,6 +194,10 @@ interface DetachedDynamicStrokeStyle {
   readonly paper?: Readonly<{
     readonly response: StudioPaperGranulationSettings;
     readonly surface: StudioPaperSurfaceSettings;
+    /** 획이 태어날 때 얼린 substrate 세대. 라이브 프리픽스와 커밋이 갈라지지 않게 함께 옮긴다. */
+    readonly model?: StudioPaperSubstrateModel;
+    /** 극성 taxonomy상의 상호작용 매체. `model`이 있을 때만 채워진다. */
+    readonly medium?: StudioPaperMediumV1;
   }>;
 }
 

@@ -80,7 +80,12 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // (320 → 325). 조합은 브러시 id 로부터 재유도할 수 없으므로 — 그게 커스텀 브러시가
     // 성립하지 않던 이유다 — capture 시점에 획에 실려야 한다. 순수 capture 정책이며
     // 렌더러·브라우저 소유권은 여전히 이 플래너 밖에 있다.
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(325);
+    // 의도적 변경(2026-08-21): 종이 substrate 세대를 시작 스냅샷에 얼린다(325 → 340).
+    // ToonSpectrum 획은 커밋 시점에 래스터화되지 않고 저장된 점·필압에서 매 렌더마다 다시
+    // 계획된다. 그래서 substrate 물리를 고치면서 획에 세대 키를 남기지 않으면 이미 완성된
+    // 페이지가 다음에 열릴 때 조용히 다시 칠해진다. `pressureModel`·`paintModel`과 정확히
+    // 같은 이유·같은 모양의 capture 정책이며, 렌더러·브라우저 소유권은 여전히 밖에 있다.
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(340);
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {

@@ -6,6 +6,8 @@
  * regenerating megapixel textures every frame.
  */
 
+import { computeStudioImpastoReliefShading } from "../studio-impasto-relief-shading-v1";
+
 import {
   DEFAULT_STUDIO_PAPER_SURFACE,
   normalizeStudioPaperSurfaceSettings,
@@ -151,6 +153,87 @@ export function getStudioPaperSurfacePreviewTile(
     if (!oldest) break;
     cache.delete(oldest);
   }
+  return canvas;
+}
+
+/**
+ * Paint a signed substrate relief field ([-1,1], row-major) into a pattern canvas.
+ *
+ * This is the high-fidelity sibling of `getStudioPaperSurfacePreviewTile`. The legacy path
+ * samples `createPaperHeightField` (unsigned, mean-only) and then hard-expands contrast by ×5,
+ * which clips. The substrate path receives a field that is already tanh-shaped and span
+ * standardized by the procedural surface provider, so the only work left here is turning the
+ * signed relief into a multiply-blend luminance tile.
+ *
+ * The caller owns the field; nothing here mutates it. Returns null without a DOM.
+ */
+export interface StudioPaperSubstrateTilePaintOptions
+  extends StudioPaperSurfacePreviewOptions {
+  /**
+   * Halo width baked around the core tile. Relief shading clamps at buffer edges, which would
+   * print a seam grid on a repeating pattern; sampling a halo and cropping it away keeps the
+   * shaded tile exactly as seamless as the field it came from.
+   */
+  readonly halo?: number;
+  /**
+   * `"lit"` runs the production impasto relief BRDF over the sheet so the tooth catches a raking
+   * light — this is what makes paper read as paper rather than as grey noise. `"flat"` keeps the
+   * plain signed-relief multiply.
+   */
+  readonly relief?: "flat" | "lit";
+}
+
+export function paintStudioPaperSubstrateTileCanvas(
+  heightField: Float32Array,
+  size: number,
+  options: StudioPaperSubstrateTilePaintOptions = {},
+): HTMLCanvasElement | null {
+  if (typeof document === "undefined") return null;
+  const halo = Math.max(0, Math.min(8, Math.round(options.halo ?? 0)));
+  const fieldWidth = size + halo * 2;
+  if (
+    !Number.isInteger(size)
+    || size < 8
+    || heightField.length !== fieldWidth * fieldWidth
+  ) return null;
+  const grainStrength = clamp01(options.grainStrength ?? 0.52, 0.52);
+  const grainOpacity = clamp01(options.grainOpacity ?? 1, 1);
+  const { r, g, b } = parseHexRgb(options.tintHex ?? "#ffffff");
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  // The BRDF returns a multiplier around 1; a flat sheet maps to exactly 1 everywhere.
+  const shading = options.relief === "lit"
+    ? computeStudioImpastoReliefShading(heightField, {
+        width: fieldWidth,
+        height: fieldWidth,
+        normalScale: 2.4,
+        roughness: 0.42,
+        specularScale: 0.28,
+        diffuseScale: 0.35,
+        maxShadingMultiplier: 1.9,
+      })
+    : null;
+  const image = ctx.createImageData(size, size);
+  const data = image.data;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const source = (y + halo) * fieldWidth + (x + halo);
+      const relief = Math.min(1, Math.max(-1, heightField[source]!));
+      const base = shading
+        ? (shading[source]! - 1) * 1.35 + relief * 0.45
+        : relief;
+      const lit = 1 + Math.min(1, Math.max(-1, base)) * grainStrength * grainOpacity;
+      const o = (y * size + x) * 4;
+      data[o] = Math.round(Math.min(255, Math.max(0, r * lit)));
+      data[o + 1] = Math.round(Math.min(255, Math.max(0, g * lit)));
+      data[o + 2] = Math.round(Math.min(255, Math.max(0, b * lit)));
+      data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
   return canvas;
 }
 

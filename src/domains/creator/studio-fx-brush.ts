@@ -1718,9 +1718,20 @@ function smoothGate(value: number, edge: number, margin: number): number {
   return t * t * (3 - 2 * t);
 }
 
-export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
-  const points = sanitizePoints(input.points, input.pressures);
-  if (points.length === 0) return [];
+/**
+ * The scalar inputs a dab's value depends on, resolved once so the full planner and the
+ * incremental planner cannot drift into resolving them differently.
+ */
+interface OilDabSettings {
+  readonly baseWidth: number;
+  readonly seed: number;
+  readonly maxDabs: number;
+  readonly paintBody: FxOilPaintBody;
+  readonly tipProfile: FxOilTipProfile;
+  readonly spacing: number;
+}
+
+function resolveOilDabSettings(input: FxOilPlanInput): OilDabSettings {
   const baseWidth = clamp(finiteNumber(input.baseWidth, 22), 0.5, 2048);
   const seed = Math.floor(
     clamp(finiteNumber(input.seed, DEFAULT_FX_BRUSH_SEED), FX_BRUSH_SEED_RANGE.min, FX_BRUSH_SEED_RANGE.max)
@@ -1739,11 +1750,30 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
     ? Math.min(0.2, Math.max(0.004, input.stationSpacingRatio!))
     : OIL_STATION_SPACING_RATIO;
   const spacing = Math.max(0.5, baseWidth * spacingRatio);
-  const stations = sampleStations(points, spacing, maxDabs);
-  const bristleOffsets = bristleBedOffsets(baseWidth, seed);
-  const dabs: FxOilDab[] = [];
+  return { baseWidth, seed, maxDabs, paintBody, tipProfile, spacing };
+}
 
-  for (let si = 0; si < stations.length; si++) {
+/**
+ * Appends dabs for `stations[from..]` onto `dabs`.
+ *
+ * Split out of `planOilBrushDabs` verbatim so `FxOilDabPlanner` can re-enter the SAME loop at a
+ * verified-unchanged prefix. Dabs are pushed 1:1 with `si` and never skipped, so on entry with a
+ * prefix of length `from` the invariant `dabs.length === si` holds exactly as it did from zero and
+ * the `dabs.length >= maxDabs` break fires on the same station.
+ *
+ * A dab is a pure function of `si`, `stations[si-1 … si+1]`, `stations.length === 1`, and the
+ * settings — no accumulator crosses iterations. That is what makes prefix reuse bit-identical
+ * rather than merely close.
+ */
+function appendOilBrushDabs(
+  dabs: FxOilDab[],
+  stations: readonly StrokePoint[],
+  from: number,
+  settings: OilDabSettings,
+  bristleOffsets: readonly number[],
+): void {
+  const { baseWidth, seed, maxDabs, paintBody, tipProfile } = settings;
+  for (let si = from; si < stations.length; si++) {
     if (dabs.length >= maxDabs) break;
     const st = stations[si]!;
     const n1 = hash2(si, 5, seed);
@@ -1863,7 +1893,129 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
       bristles,
     });
   }
+}
+
+export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
+  const points = sanitizePoints(input.points, input.pressures);
+  if (points.length === 0) return [];
+  const settings = resolveOilDabSettings(input);
+  const stations = sampleStations(points, settings.spacing, settings.maxDabs);
+  const bristleOffsets = bristleBedOffsets(settings.baseWidth, settings.seed);
+  const dabs: FxOilDab[] = [];
+  appendOilBrushDabs(dabs, stations, 0, settings, bristleOffsets);
   return dabs;
+}
+
+/**
+ * Growing-stroke planner for the oil/acrylic lanes: same output as `planOilBrushDabs`, without
+ * rebuilding the whole bed on every pointer move.
+ *
+ * A live oil stroke replans from scratch every frame, and each station carries 7–44 freshly
+ * allocated bristle records, so the per-move cost climbs with the stroke — 0.6 ms at 100 dabs,
+ * 12.7 ms at the 4096-dab cap, i.e. quadratic over one drag.
+ *
+ * The cure is prefix reuse, but it is deliberately NOT built on an ASSUMPTION that the station
+ * lattice is prefix-stable. It is not always: `sampleStations` refits across the entire arc once
+ * `naturalStationCount` exceeds the budget, which moves every station, and `sanitizePoints`
+ * resamples pressure at `i / (pairCount - 1)`, so a growing pressure array can perturb earlier
+ * samples too. Instead this planner RE-DERIVES the stations every call (that walk is cheap — a few
+ * flops per source point) and then verifies, by exact `Object.is` comparison of x/y/pressure, how
+ * long a prefix is genuinely byte-for-byte unchanged. Only that verified prefix is reused.
+ *
+ * Reuse stops one dab short of the verified prefix because dab `k` reads `stations[k+1]`: with a
+ * verified prefix of `m` stations, dabs `0 … m-2` had every input they read inside it. The `tap`
+ * flag (`stations.length === 1`) is a whole-array input, so a change in single-station-ness voids
+ * the cache outright.
+ *
+ * Consequence: at the cap crossing, where the refit moves every station, the verifier finds a
+ * zero-length prefix and the planner degenerates to a full replan plus one cheap comparison pass.
+ * Correct in every regime, by construction, with no special case to get wrong.
+ */
+export class FxOilDabPlanner {
+  private settingsKey: string | null = null;
+  private stations: readonly StrokePoint[] = [];
+  private dabs: readonly FxOilDab[] = [];
+  private lastReusedDabs = 0;
+
+  /** Dabs reused from the previous call. Diagnostics and identity tests only. */
+  get reusedDabs(): number {
+    return this.lastReusedDabs;
+  }
+
+  plan(input: FxOilPlanInput): FxOilDab[] {
+    const points = sanitizePoints(input.points, input.pressures);
+    if (points.length === 0) {
+      this.reset();
+      return [];
+    }
+    const settings = resolveOilDabSettings(input);
+    const key = `${settings.baseWidth}|${settings.seed}|${settings.maxDabs}`
+      + `|${settings.paintBody}|${settings.tipProfile}|${settings.spacing}`;
+    if (key !== this.settingsKey) {
+      this.settingsKey = key;
+      this.stations = [];
+      this.dabs = [];
+    }
+    const stations = sampleStations(points, settings.spacing, settings.maxDabs);
+    if (stations.length >= settings.maxDabs) {
+      // The station budget is saturated, so `sampleStations` is refitting the lattice across the
+      // whole arc and every station moves on every append: no prefix can survive. Drop the retained
+      // bed rather than keep 4096 stations x 7-44 bristles alive next to the one being built —
+      // holding both generations measured +4.5 ms per move in GC alone. Bailing out here can only
+      // ever cause a full replan, never a wrong reuse.
+      this.stations = [];
+      this.dabs = [];
+      this.lastReusedDabs = 0;
+      const full: FxOilDab[] = [];
+      appendOilBrushDabs(
+        full,
+        stations,
+        0,
+        settings,
+        bristleBedOffsets(settings.baseWidth, settings.seed),
+      );
+      return full;
+    }
+    const cached = this.stations;
+    // `tap` is read from the whole array, so single-station-ness must match before any reuse.
+    let verified = (stations.length === 1) === (cached.length === 1)
+      ? Math.min(stations.length, cached.length)
+      : 0;
+    for (let index = 0; index < verified; index += 1) {
+      const next = stations[index]!;
+      const previous = cached[index]!;
+      if (
+        !Object.is(next.x, previous.x)
+        || !Object.is(next.y, previous.y)
+        || !Object.is(next.pressure, previous.pressure)
+      ) {
+        verified = index;
+        break;
+      }
+    }
+    const reuse = Math.max(0, Math.min(verified - 1, this.dabs.length));
+    const dabs: FxOilDab[] = this.dabs.slice(0, reuse);
+    appendOilBrushDabs(
+      dabs,
+      stations,
+      reuse,
+      settings,
+      bristleBedOffsets(settings.baseWidth, settings.seed),
+    );
+    this.stations = stations;
+    // Snapshot, not the returned array: a caller that mutates its own result must not be able to
+    // corrupt the prefix this planner will later reuse.
+    this.dabs = dabs.slice();
+    this.lastReusedDabs = reuse;
+    return dabs;
+  }
+
+  reset(): void {
+    this.settingsKey = null;
+    this.stations = [];
+    this.dabs = [];
+    this.lastReusedDabs = 0;
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -304,10 +304,14 @@ describe("brush library view persistence", () => {
    * turn every future rename into a storage migration.
    */
   it("preserves an unknown tab id rather than treating a renamed category as malformed", () => {
-    const restored = normalizeStudioProDrawPrefs({
-      brushLibraryView: { paint: { tab: "engines", query: "", viewMode: "stroke" } },
-    });
-    expect(restored.brushLibraryView.paint.tab).toBe("engines");
+    // "engines"/"pro" 는 재질 축 개편(2026-08) 에서 삭제된 실제 탭 id 다. 저장돼 있던 값이 그대로
+    // 복원되고, 시트가 조용히 기본 탭으로 떨어지는 것이 의도된 동작이다(검증을 추가하지 말 것).
+    for (const removedTab of ["engines", "pro"]) {
+      const restored = normalizeStudioProDrawPrefs({
+        brushLibraryView: { paint: { tab: removedTab, query: "", viewMode: "stroke" } },
+      });
+      expect(restored.brushLibraryView.paint.tab).toBe(removedTab);
+    }
   });
 
   it("bounds and cleans restored text so storage cannot seed the search box with junk", () => {

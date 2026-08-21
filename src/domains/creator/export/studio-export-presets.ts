@@ -14,7 +14,16 @@
 
 import { shouldDrawWatermark, watermarkPlacement, type WatermarkSettings } from "../studio-watermark";
 
+import {
+  planStudioEpisodeByteBudget,
+  planStudioEpisodeFileByteCap,
+  studioEpisodeByteBudgetMessage,
+} from "./studio-episode-byte-budget";
 import { MAX_CANVAS_DIM, canvasToBlob, downloadBlob, exportMimeType, exportQuality } from "./studio-export";
+import {
+  negotiateStudioExportQuality,
+  studioQualityNegotiationMessage,
+} from "./studio-export-quality-negotiation";
 import {
   downscaleForExport,
   loadVipsForExport,
@@ -23,6 +32,14 @@ import {
   type StudioVipsExportRuntime,
   type StudioVipsRaster,
 } from "./studio-vips-export";
+
+export {
+  planStudioEpisodeByteBudget,
+  planStudioEpisodeFileByteCap,
+  studioEpisodeByteBudgetMessage,
+  negotiateStudioExportQuality,
+  studioQualityNegotiationMessage,
+};
 
 export type ExportFormat = "png" | "jpg" | "webp";
 
@@ -38,6 +55,15 @@ export interface ExportPreset {
   maxImageHeight?: number;
   /** 이미지 1장 최대 용량(byte). */
   maxFileBytes?: number;
+  /**
+   * 회차 전체 합계 최대 용량(byte).
+   *
+   * 도전만화의 실제 반려 사유 1위가 이 값인데, 지금까지는 `note` 문장 안에만 있어서
+   * 어떤 코드도 쓰지 않았다 — 4.9MB 12장을 저장하면 장별 경고 없이 58MB 회차가 만들어졌다.
+   * 이 값이 있으면 저장 단계에서 장별 실효 상한을 역산해(studio-episode-byte-budget)
+   * 품질 협상 목표로 쓰고, 저장 후 합계도 정산한다.
+   */
+  maxEpisodeBytes?: number;
   note: string;
 }
 
@@ -57,6 +83,7 @@ export const EXPORT_PRESETS: ExportPreset[] = [
     recommendedFormat: "jpg",
     maxImageHeight: 1280,
     maxFileBytes: 5 * MB,
+    maxEpisodeBytes: 50 * MB,
     note: "폭 690px · JPG만 지원(PNG 불가) · 이미지당 5MB · 회차 합계 약 50MB.",
   },
   {

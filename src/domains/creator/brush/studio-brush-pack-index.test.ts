@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
+import { isStudioBrushMaterialGroup } from "./studio-brush-material-group";
 import {
   STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS,
   STUDIO_BRUSH_PACK_MATERIAL_WAVE_IDS,
@@ -9,6 +10,7 @@ import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
 import {
   STUDIO_BRUSH_PACK_DESCRIPTORS,
   studioBrushPackDescriptorById,
+  studioBrushPackMaterialGroup,
 } from "./studio-brush-pack-index";
 import { filterStudioBrushLibraryItems } from "./studio-draw-ux";
 
@@ -48,7 +50,11 @@ describe("procedural brush pack catalogue", () => {
       expect(descriptor.shortName).toMatch(/[가-힣]/);
       expect(descriptor.hint.length).toBeGreaterThan(12);
       expect(["ink-particle", "airbrush", "dry-media"]).toContain(descriptor.runtimeBrushId);
-      expect(["line", "marker", "paint", "fx", "texture"]).toContain(descriptor.mediaGroup);
+      expect(isStudioBrushMaterialGroup(descriptor.mediaGroup)).toBe(true);
+      // 재질은 (카테고리, 런타임)에서 파생된다 — 행에 손으로 적히지 않는다.
+      expect(descriptor.mediaGroup).toBe(
+        studioBrushPackMaterialGroup(descriptor.category, descriptor.runtimeBrushId),
+      );
       expect(descriptor.defaultWidth).toBeGreaterThanOrEqual(1);
       expect(descriptor.defaultWidth).toBeLessThanOrEqual(80);
       expect(descriptor.defaultOpacity).toBeGreaterThanOrEqual(0.05);
@@ -80,11 +86,15 @@ describe("procedural brush pack catalogue", () => {
       "foliage",
     ]));
     expect(new Set(extension.map((item) => item.mediaGroup))).toEqual(new Set([
-      "line",
+      "ink",
+      "pencil",
       "marker",
-      "paint",
-      "fx",
+      "oil",
+      "airbrush",
+      "pastel",
       "texture",
+      "tone",
+      "fx",
     ]));
   });
 
@@ -115,7 +125,7 @@ describe("procedural brush pack catalogue", () => {
     for (const [id, query] of searchTerms) {
       const results = filterStudioBrushLibraryItems({
         catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
-        category: "pro",
+        category: "all",
         query,
       });
       expect(
@@ -149,11 +159,15 @@ describe("procedural brush pack catalogue", () => {
       "pattern",
     ]));
     expect(new Set(expansion.map((item) => item.mediaGroup))).toEqual(new Set([
-      "line",
+      "ink",
+      "pencil",
       "marker",
-      "paint",
-      "fx",
+      "oil",
+      "airbrush",
+      "pastel",
       "texture",
+      "tone",
+      "fx",
     ]));
   });
 
@@ -197,7 +211,7 @@ describe("procedural brush pack catalogue", () => {
     for (const [id, query] of searchTerms) {
       const results = filterStudioBrushLibraryItems({
         catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
-        category: "pro",
+        category: "all",
         query,
       });
       expect(
@@ -259,7 +273,7 @@ describe("procedural brush pack catalogue", () => {
     for (const [id, query] of searchTerms) {
       const results = filterStudioBrushLibraryItems({
         catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
-        category: "pro",
+        category: "all",
         query,
       });
       expect(

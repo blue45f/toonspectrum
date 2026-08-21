@@ -10,7 +10,7 @@ import { STUDIO_FOCUS_RING, STUDIO_EASE } from "../studio-panel-ui";
 
 import {
   listStudioCoreQuickBrushCatalogItems,
-  STUDIO_BRUSH_CATALOG_COUNTS,
+  STUDIO_BRUSH_LISTED_CATALOG_COUNTS,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog-core";
 import { loadStudioListedBrushCatalogItems } from "./studio-brush-catalog-loader";
@@ -384,7 +384,7 @@ export function StudioBrushTray({
         aria-expanded={libraryOpen}
         aria-haspopup="dialog"
         aria-label="브러시 전체 라이브러리와 관리 열기"
-        title={`전체 ${STUDIO_BRUSH_CATALOG_COUNTS.paint}종 검색·분류·즐겨찾기·기본값 다시 적용`}
+        title={`전체 ${STUDIO_BRUSH_LISTED_CATALOG_COUNTS.paint}종 검색·분류·즐겨찾기·기본값 다시 적용`}
         data-studio-open-brush-library="true"
         className={cn(
           "flex h-11 shrink-0 items-center gap-1 rounded-xl border border-line/70 bg-card/80 px-2 text-[0.62rem] font-bold text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg",

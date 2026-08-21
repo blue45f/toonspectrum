@@ -32,7 +32,10 @@ import {
   resolveStudioDynamicBrushMaterialIdentity,
   type StudioDynamicBrushMaterialIdentity,
 } from "./brush/studio-dry-media-dynamic-bridge";
-import { resolveStudioPaperBrushResponse } from "./brush/studio-paper-brush-response";
+import {
+  resolveStudioPaperBrushMedium,
+  resolveStudioPaperBrushResponse,
+} from "./brush/studio-paper-brush-response";
 import {
   normalizeStudioPaperSurfaceSettings,
   resolveStudioDocumentPaperSurface,
@@ -40,6 +43,11 @@ import {
   type StudioPaperGranulationSettings,
   type StudioPaperSurfaceSettings,
 } from "./brush/studio-paper-granulation-runtime";
+import {
+  normalizeStudioPaperSubstrateModel,
+  studioPaperUsesContactTooth,
+  type StudioPaperSubstrateModel,
+} from "./brush/studio-paper-substrate-model";
 import {
   planStudioCausalDynamicBrushDepositSegmentsV3,
   planStudioCausalDynamicBrushDepositsV2,
@@ -60,6 +68,7 @@ import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
 } from "./brush/studio-brush-dynamics";
+import type { StudioPaperMediumV1 } from "./brush/studio-paper-media-profile-v1";
 import type { DrawEl } from "./studio-element-model";
 
 const dynamicsBySnapshot = new WeakMap<object, NormalizedStudioBrushDynamicsSettings>();
@@ -80,6 +89,10 @@ export interface StudioDynamicBrushRenderPlan {
   readonly paper?: Readonly<{
     readonly response: StudioPaperGranulationSettings;
     readonly surface: StudioPaperSurfaceSettings;
+    /** 획이 태어날 때 얼린 substrate 세대. 생략 = 레거시 valley-multiply. */
+    readonly model?: StudioPaperSubstrateModel;
+    /** 극성 taxonomy상의 상호작용 매체. `model`이 있을 때만 채워진다. */
+    readonly medium?: StudioPaperMediumV1;
   }>;
   readonly dabVariations: readonly StudioDynamicBrushSegmentedDabVariation[]
     | readonly (readonly StudioDynamicBrushDab[])[];
@@ -327,8 +340,22 @@ export function planStudioDynamicBrushRender(
     }
   }
 
+  const paperBrushId = typeof element.brush === "string" && element.brush
+    ? element.brush
+    : dynamicBrushId;
+  /**
+   * 이 획이 태어날 때 얼린 substrate 세대. 획이 스스로 들고 있는 키만 읽는다 —
+   * 페이지나 카탈로그가 새 모델을 알게 되었다고 해서 기존 획을 재해석하지 않는다.
+   */
+  const paperModel = normalizeStudioPaperSubstrateModel(element.paperModel);
+  const paperMedium = studioPaperUsesContactTooth(paperModel)
+    ? resolveStudioPaperBrushMedium(paperBrushId)
+    : null;
   const paperResponse = resolveStudioPaperBrushResponse(
-    typeof element.brush === "string" && element.brush ? element.brush : dynamicBrushId,
+    paperBrushId,
+    undefined,
+    // 키 없는 획은 3번째 인자가 undefined라 반환값이 예전과 비트 단위로 같다.
+    paperModel === undefined ? undefined : { model: paperModel, medium: paperMedium },
   );
   const paper = studioPaperGranulationIsActive(paperResponse)
     ? Object.freeze({
@@ -336,6 +363,8 @@ export function planStudioDynamicBrushRender(
         surface: paperSurface === undefined
           ? resolveStudioDocumentPaperSurface()
           : normalizeStudioPaperSurfaceSettings(paperSurface),
+        ...(paperModel ? { model: paperModel } : {}),
+        ...(paperMedium ? { medium: paperMedium } : {}),
       })
     : undefined;
 

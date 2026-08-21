@@ -4,6 +4,15 @@ import {
   type StudioBrushMediaPixelPoint,
 } from "./studio-brush-media-pixel-quality";
 
+import type { StudioBrushMaterialGroup } from "../src/domains/creator/brush/studio-brush-visual";
+
+/** 예전 "paint" 미디어 그룹의 재질 축 대응 집합 (수채·유화·에어브러시). */
+const SOFT_WET_MATERIAL_GROUPS: ReadonlySet<StudioBrushMaterialGroup> = new Set([
+  "watercolor",
+  "oil",
+  "airbrush",
+]);
+
 export type StudioLongBrushQualityPolicyKind =
   | "strict-continuous"
   | "soft-wet-continuous"
@@ -15,7 +24,7 @@ export interface StudioLongBrushQualityPolicyInput {
   readonly id: string;
   readonly source: "core" | "pro";
   readonly runtimeBrushId: string;
-  readonly mediaGroup: "line" | "marker" | "paint" | "fx" | "texture";
+  readonly mediaGroup: StudioBrushMaterialGroup;
   readonly previewStyle: string;
   readonly intentionalDiscrete: boolean;
 }
@@ -797,8 +806,10 @@ export function classifyStudioLongBrushQualityPolicy(
   if (
     input.runtimeBrushId === "airbrush"
     || (input.source === "core" && CORE_SOFT_WET_BRUSH_IDS.has(input.id))
+    // 예전의 단일 "paint" 미디어 그룹은 재질 축에서 수채·유화·에어 셋으로 갈라졌다.
+    // 정책 대상 집합은 그대로 유지해야 품질 게이트의 의미가 바뀌지 않는다.
     || (
-      input.mediaGroup === "paint"
+      SOFT_WET_MATERIAL_GROUPS.has(input.mediaGroup)
       && (input.previewStyle === "soft" || input.previewStyle === "oil")
     )
   ) {

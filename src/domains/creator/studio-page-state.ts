@@ -21,8 +21,11 @@ export interface PageState {
    */
   paperSurface?: StudioPaperSurfaceSettings;
   /**
-   * When true, stage paints a seamless paper-grain fill over the page background.
-   * Missing on legacy pages → true (paper choice should be visible).
+   * When set, decides whether the stage paints a seamless paper-grain fill over the page
+   * background. Missing → resolved by `brush/studio-paper-grain-visibility-v1`: the sheet shows
+   * exactly when `paperSurface` above is authored, so choosing a paper is immediately visible
+   * while a legacy page that never chose one is never retroactively repainted. That module is the
+   * single authority; do not re-derive this flag at a call site.
    */
   paperGrainVisible?: boolean;
   grade?: PageGrade; // 페이지 전체 색보정(밝기/대비/채도/색조/세피아/흑백/비네트). 미설정=보정 없음.

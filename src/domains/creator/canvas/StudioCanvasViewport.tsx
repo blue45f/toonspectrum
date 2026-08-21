@@ -9,11 +9,17 @@ import {
   studioBrushAliasEffectiveDiameter,
 } from "../brush/studio-brush-alias-profile";
 import { drawLiveFreehandDraftToContext, getSymmetricPoints } from "../brush/studio-draw-rendering";
+import { resolveStudioPaperGrainVisibleV1 } from "../brush/studio-paper-grain-visibility-v1";
 import {
   normalizeStudioPaperSurfaceSettings,
 } from "../brush/studio-paper-granulation-runtime";
 import {
+  requestStudioPaperSubstrateTileHeightsV1,
+  STUDIO_PAPER_SUBSTRATE_TILE_SIZE_V1,
+} from "../brush/studio-paper-substrate-tile-host-v1";
+import {
   getStudioPaperSurfacePreviewTile,
+  paintStudioPaperSubstrateTileCanvas,
   studioPaperSurfacePreviewOpacity,
 } from "../brush/studio-paper-surface-preview";
 import { normalizeShapeParams } from "../brush/studio-stroke-shapes";
@@ -1196,21 +1202,66 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     studioLiveGesturePreviewVisible,
   ]);
 
-  // Document paper grain preview: one seamless tile from the same height field as brush granulation.
-  // This is an opt-in editor aid. An unset legacy/new page stays visually clean while its selected
-  // paper can still influence paper-aware brushes.
+  // Document paper grain: the sheet the artist chose, painted under the artwork.
+  //
+  // Visibility is resolved by one authority (`resolveStudioPaperGrainVisibleV1`) so the stage and
+  // this viewport can never disagree: an explicit toggle wins, otherwise the sheet shows exactly
+  // when the page carries an authored `paperSurface`. Export is deliberately NOT excluded any more
+  // — the paper is a property of the page, so what the artist sees is what ships.
   const paperSurfaceForPreview = useMemo(
     () => normalizeStudioPaperSurfaceSettings(activePage.paperSurface),
     [activePage.paperSurface],
   );
-  const paperGrainVisible = activePage.paperGrainVisible === true;
-  const paperGrainPatternImage = useMemo(() => {
-    if (!paperGrainVisible || isExporting) return null;
+  const paperGrainVisible = resolveStudioPaperGrainVisibleV1(activePage);
+  // High-fidelity substrate tile, baked off the main thread by the procedural surface worker.
+  // Until it lands (or if workers are unavailable) the legacy 128² tile keeps the paper visible —
+  // the degradation path never turns the sheet off.
+  const [substrateTile, setSubstrateTile] = useState<HTMLCanvasElement | null>(null);
+  const paperSurfaceKind = paperSurfaceForPreview.kind;
+  const paperSurfaceSeed = paperSurfaceForPreview.seed;
+  useEffect(() => {
+    if (!paperGrainVisible) {
+      setSubstrateTile(null);
+      return;
+    }
+    let cancelled = false;
+    const abort = new AbortController();
+    void requestStudioPaperSubstrateTileHeightsV1(
+      {
+        kind: paperSurfaceKind,
+        seed: paperSurfaceSeed,
+        size: STUDIO_PAPER_SUBSTRATE_TILE_SIZE_V1,
+        // One-texel halo so the relief BRDF never clamps inside the repeating core.
+        halo: 1,
+      },
+      abort.signal,
+    ).then((baked) => {
+      if (cancelled || !baked) return;
+      setSubstrateTile(
+        paintStudioPaperSubstrateTileCanvas(baked.heightField, baked.size, {
+          halo: baked.halo,
+          relief: "lit",
+          grainStrength: 0.58,
+        }),
+      );
+    });
+    return () => {
+      cancelled = true;
+      abort.abort();
+    };
+  }, [paperGrainVisible, paperSurfaceKind, paperSurfaceSeed]);
+  const paperGrainFallbackImage = useMemo(() => {
+    if (!paperGrainVisible) return null;
     return getStudioPaperSurfacePreviewTile(paperSurfaceForPreview, {
       size: 128,
       grainStrength: 0.58,
     });
-  }, [paperGrainVisible, isExporting, paperSurfaceForPreview]);
+  }, [paperGrainVisible, paperSurfaceForPreview]);
+  // Both tiles cover exactly `tile.width` document pixels, so the pattern scale stays 1 and the
+  // physical wavelength of the grain is identical whichever tile is live.
+  const paperGrainPatternImage = paperGrainVisible
+    ? substrateTile ?? paperGrainFallbackImage
+    : null;
   const paperGrainOpacity = paperGrainVisible
     ? studioPaperSurfacePreviewOpacity(paperSurfaceForPreview.kind)
     : 0;

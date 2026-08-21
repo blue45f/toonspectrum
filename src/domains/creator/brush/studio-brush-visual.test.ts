@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_BRUSH_MATERIAL_GROUPS } from "./studio-brush-material-group";
 import {
   studioBrushChipSurface,
   studioBrushPreviewDashArray,
@@ -20,13 +21,17 @@ describe("studio brush commercial visuals", () => {
     expect(studioBrushPreviewOpacity(Number.NaN)).toBe(1);
   });
 
-  it("returns warm-ink chip surfaces per media family", () => {
-    for (const media of ["line", "marker", "paint", "texture"] as const) {
+  it("returns a distinct warm-ink chip surface for every material group", () => {
+    const inks = new Set<string>();
+    for (const media of STUDIO_BRUSH_MATERIAL_GROUPS) {
       const surface = studioBrushChipSurface(media);
-      expect(surface.tile).toMatch(/^oklch\(/);
-      expect(surface.ink).toMatch(/^oklch\(/);
-      expect(surface.paper).toMatch(/^oklch\(/);
+      expect(surface.tile, media).toMatch(/^oklch\(/);
+      expect(surface.ink, media).toMatch(/^oklch\(/);
+      expect(surface.paper, media).toMatch(/^oklch\(/);
+      inks.add(surface.ink);
     }
+    // 재질이 곧 색 단서다. 두 재질이 같은 잉크 색을 쓰면 타일만 보고 구분할 수 없다.
+    expect(inks.size).toBe(STUDIO_BRUSH_MATERIAL_GROUPS.length);
     // Marker family leans toward accent hue (persimmon-ish)
     expect(studioBrushChipSurface("marker").ink).toContain("42");
   });

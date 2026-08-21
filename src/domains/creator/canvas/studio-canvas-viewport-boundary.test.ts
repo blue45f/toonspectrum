@@ -289,18 +289,46 @@ describe("Studio canvas viewport module boundary", () => {
     expect(shared.runtimeImports).not.toContain("react-konva/lib/ReactKonvaCore");
   });
 
-  it("keeps paper grain an opt-in editor preview on unset pages", () => {
+  it("routes paper-grain visibility through one authority, never an inline predicate", () => {
+    // Both call sites used to read `=== true` independently, so a page that had chosen a paper
+    // still rendered nothing. The rule now lives in `studio-paper-grain-visibility-v1` alone:
+    // an explicit toggle wins, otherwise the sheet shows iff the page carries an authored
+    // `paperSurface` — which never repaints a page that never opted in.
     const page = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(viewport.source).toContain(
-      "const paperGrainVisible = activePage.paperGrainVisible === true;",
+      "const paperGrainVisible = resolveStudioPaperGrainVisibleV1(activePage);",
     );
     expect(page.source).toContain(
-      "paperGrainVisible={activePage.paperGrainVisible === true}",
+      "paperGrainVisible={resolveStudioPaperGrainVisibleV1(activePage)}",
     );
-    expect(viewport.source).not.toContain(
-      "activePage.paperGrainVisible !== false",
-    );
+    for (const shape of [page, viewport]) {
+      expect(shape.source).not.toContain("activePage.paperGrainVisible === true");
+      expect(shape.source).not.toContain("activePage.paperGrainVisible !== false");
+      expect(shape.runtimeImports).toContain(
+        shape === page
+          ? "../brush/studio-paper-grain-visibility-v1"
+          : "../brush/studio-paper-grain-visibility-v1",
+      );
+    }
+  });
+
+  it("paints the sheet into exports — what the artist sees is what ships", () => {
+    // `isExporting` used to null the pattern out, so PNG/PSD/timelapse output disagreed with the
+    // canvas. The paper is a property of the page, so the export gate is gone.
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+    expect(viewport.source).not.toContain("if (!paperGrainVisible || isExporting) return null;");
+  });
+
+  it("bakes the high-fidelity substrate off the main thread and degrades to the fast tile", () => {
+    // A 256² procedural surface costs ~1s on this repo's CPU. It must never run inline, and its
+    // failure path must keep the paper visible rather than turning it off.
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+    expect(viewport.runtimeImports).toContain("../brush/studio-paper-substrate-tile-host-v1");
+    expect(viewport.source).toContain("requestStudioPaperSubstrateTileHeightsV1");
+    expect(viewport.source).toContain("substrateTile ?? paperGrainFallbackImage");
+    // The synchronous baker must not be pulled into the viewport bundle path.
+    expect(viewport.source).not.toContain("bakeStudioPaperSubstrateTileV1");
   });
 });

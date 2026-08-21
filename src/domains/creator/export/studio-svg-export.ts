@@ -115,11 +115,19 @@ import {
   STUDIO_OIL_IMPASTO_RELIEF_OVERLAY_VERSION,
   studioOilRibbonPathData,
 } from "../brush/studio-oil-ribbon-carrier";
-import { resolveStudioPaperBrushResponse } from "../brush/studio-paper-brush-response";
+import {
+  resolveStudioPaperBrushMedium,
+  resolveStudioPaperBrushResponse,
+} from "../brush/studio-paper-brush-response";
 import {
   resolveStudioDocumentPaperSurface,
   studioPaperGranulationIsActive,
 } from "../brush/studio-paper-granulation-runtime";
+import {
+  normalizeStudioPaperSubstrateModel,
+  studioPaperUsesContactTooth,
+  type StudioPaperSubstrateModel,
+} from "../brush/studio-paper-substrate-model";
 import {
   planStudioStampInkRibbon,
   studioStampInkRibbonOptions,
@@ -173,6 +181,13 @@ import {
 } from "../lettering/studio-dialogue-ruby-layout";
 import { buildTextPathData, isFlatTextPath, normalizeTextPath, type TextPathConfig } from "../lettering/studio-text-path";
 import { hasActiveImageFilters, type ImageFilterFields } from "../render/studio-konva-filter-fields";
+import {
+  planStudioFocusLineSegments,
+  planStudioSpeedLineSegments,
+  STUDIO_FOCUS_LINE_DEFAULTS,
+  STUDIO_SPEED_LINE_DEFAULTS,
+  type StudioLineSegment,
+} from "../render/studio-radial-line-geometry";
 import {
   buildCalligraphySegments,
   processFreehandPoints,
@@ -446,6 +461,8 @@ export interface SvgDrawElLike extends SvgElMeta {
   outlineStroke?: unknown;
   pressures?: number[];
   pressureModel?: StudioInkPressureModel;
+  /** 획이 태어날 때 얼린 종이 substrate 세대. 생략 = 레거시(내보내기 픽셀 불변). */
+  paperModel?: StudioPaperSubstrateModel;
   materialPressureModel?: StudioMaterialPressureModel;
   materialMinimumDiameterRatio?: StudioMaterialMinimumDiameterRatio;
   paintModel?: StudioStrokePaintModel;
@@ -678,18 +695,6 @@ function pointsAttr(points: readonly number[]): string {
   const pairs: string[] = [];
   for (let i = 0; i + 1 < points.length; i += 2) pairs.push(`${fmt(points[i])},${fmt(points[i + 1])}`);
   return pairs.join(" ");
-}
-
-/** StudioPage seededRandom 포트 — 같은 id 면 같은 난수열(집중선/속도선 재현의 핵심). */
-function seededRandom(seedStr: string): () => number {
-  let hash = 0;
-  for (let i = 0; i < seedStr.length; i++) {
-    hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return () => {
-    const x = Math.sin(hash++) * 10000;
-    return x - Math.floor(x);
-  };
 }
 
 /** StudioPage drawBounds 포트 — 도형 드래그 박스(첫 두 점 기준). */
@@ -1929,8 +1934,18 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           usesCausalDepositPlan
           || materialIdentity.dryMediaPresetId !== null
         ) {
+          // Canvas(`studio-dynamic-brush-render-plan`)와 **같은 순서로 같은 값**을 해석한다.
+          // 획이 들고 있는 키만 읽으므로, 키 없는 획의 SVG는 예전과 비트 단위로 같다.
+          const paperModel = normalizeStudioPaperSubstrateModel(el.paperModel);
+          const paperMedium = studioPaperUsesContactTooth(paperModel)
+            ? resolveStudioPaperBrushMedium(el.brush)
+            : null;
           const paperResponse = resolveStudioPaperBrushResponse(
             el.brush,
+            undefined,
+            paperModel === undefined
+              ? undefined
+              : { model: paperModel, medium: paperMedium },
           );
           const sharedCoverageInput = {
             dynamics,
@@ -1945,6 +1960,8 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
                   paper: {
                     response: paperResponse,
                     surface: resolveStudioDocumentPaperSurface(),
+                    ...(paperModel ? { model: paperModel } : {}),
+                    ...(paperMedium ? { medium: paperMedium } : {}),
                   },
                 }
               : {}),
@@ -3850,53 +3867,37 @@ function serializeImage(ctx: ExportCtx, el: SvgImageElLike): string {
   return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}${attrs.join("")}>${image}</g>`;
 }
 
-function serializeFocusLines(el: SvgFocusLinesElLike): string {
-  const count = el.lineCount ?? 80;
-  const innerR = el.innerRadius ?? 120;
-  const outerR = el.outerRadius ?? 600;
-  const noise = el.noise ?? 24;
-  const cx = el.width * (el.centerXRatio ?? 0.5);
-  const cy = el.height * (el.centerYRatio ?? 0.5);
-  const rand = seededRandom(el.id);
-  const segs: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const angle = (i * 2 * Math.PI) / count;
-    const nStart = (rand() - 0.5) * noise;
-    const nEnd = (rand() - 0.5) * noise;
-    const rStart = Math.max(1, innerR + nStart);
-    const rEnd = Math.max(rStart + 10, outerR + nEnd);
-    segs.push(
-      `M ${fmt(cx + rStart * Math.cos(angle))} ${fmt(cy + rStart * Math.sin(angle))} L ${fmt(cx + rEnd * Math.cos(angle))} ${fmt(cy + rEnd * Math.sin(angle))}`
-    );
-  }
+/** 요소-로컬 세그먼트 + 노드 변환 → 집중선/속도선 `<g><path/></g>` 직렬화(두 종류 공통). */
+function serializeLineSegments(
+  el: SvgFocusLinesElLike | SvgSpeedLinesElLike,
+  segments: readonly StudioLineSegment[],
+  fallbackStroke: string,
+  fallbackStrokeWidth: number,
+): string {
+  const segs = segments.map(
+    (s) => `M ${fmt(s.x1)} ${fmt(s.y1)} L ${fmt(s.x2)} ${fmt(s.y2)}`,
+  );
   const transform = nodeTransform(el.x, el.y, el.rotation ?? 0);
   const opacity = el.opacity ?? 1;
-  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}><path d="${segs.join(" ")}" fill="none" stroke="${escapeXml(el.stroke ?? "#000000")}" stroke-width="${fmt(el.strokeWidth ?? 2.5)}"/></g>`;
+  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}><path d="${segs.join(" ")}" fill="none" stroke="${escapeXml(el.stroke ?? fallbackStroke)}" stroke-width="${fmt(el.strokeWidth ?? fallbackStrokeWidth)}"/></g>`;
+}
+
+function serializeFocusLines(el: SvgFocusLinesElLike): string {
+  return serializeLineSegments(
+    el,
+    planStudioFocusLineSegments(el),
+    STUDIO_FOCUS_LINE_DEFAULTS.stroke,
+    STUDIO_FOCUS_LINE_DEFAULTS.strokeWidth,
+  );
 }
 
 function serializeSpeedLines(el: SvgSpeedLinesElLike): string {
-  const count = el.lineCount ?? 60;
-  const dir = el.direction ?? "horizontal";
-  const rand = seededRandom(el.id);
-  const segs: string[] = [];
-  if (dir === "horizontal") {
-    for (let i = 0; i < count; i++) {
-      const y = rand() * el.height;
-      const len = el.width * (0.2 + rand() * 0.8);
-      const xStart = rand() > 0.5 ? 0 : el.width - len;
-      segs.push(`M ${fmt(xStart)} ${fmt(y)} L ${fmt(xStart + len)} ${fmt(y)}`);
-    }
-  } else {
-    for (let i = 0; i < count; i++) {
-      const x = rand() * el.width;
-      const len = el.height * (0.2 + rand() * 0.8);
-      const yStart = rand() > 0.5 ? 0 : el.height - len;
-      segs.push(`M ${fmt(x)} ${fmt(yStart)} L ${fmt(x)} ${fmt(yStart + len)}`);
-    }
-  }
-  const transform = nodeTransform(el.x, el.y, el.rotation ?? 0);
-  const opacity = el.opacity ?? 1;
-  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}><path d="${segs.join(" ")}" fill="none" stroke="${escapeXml(el.stroke ?? "#000000")}" stroke-width="${fmt(el.strokeWidth ?? 2.5)}"/></g>`;
+  return serializeLineSegments(
+    el,
+    planStudioSpeedLineSegments(el),
+    STUDIO_SPEED_LINE_DEFAULTS.stroke,
+    STUDIO_SPEED_LINE_DEFAULTS.strokeWidth,
+  );
 }
 
 // ---------------------------------------------------------------------------

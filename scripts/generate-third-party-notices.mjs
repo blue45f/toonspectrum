@@ -373,6 +373,16 @@ export const EMBEDDED_FIRST_PARTY_PORT_NOTICES = Object.freeze([
   }),
   Object.freeze({
     label:
+      "dli/paint (Fluid Paint) brush.js PBD chain + splat.frag + painting.frag WGSL port — src/domains/creator/render/studio-gpu-bristle-wgsl.ts — MIT",
+    licensePath: join(REPOSITORY_ROOT, "third_party", "dli-paint", "LICENSE"),
+    upstream: "https://github.com/dli/paint/blob/master/LICENSE",
+    requiredMarkers: Object.freeze([
+      "Copyright (c) 2017 David Li",
+      "Permission is hereby granted",
+    ]),
+  }),
+  Object.freeze({
+    label:
       "croquis.js (@disjukr/croquis-js 0.0.3) capsule pen + pulled-string port — src/domains/creator/studio-croquis-capsule-pen-v1.ts — MIT option of (MIT OR Apache-2.0)",
     licensePath: join(
       REPOSITORY_ROOT,
@@ -1794,6 +1804,7 @@ function validateRepositoryPolicy() {
     "third_party/croquis-js/LICENSE-MIT",
     "third_party/klecks/LICENSE",
     "studio-impasto-relief-shading-v1.ts",
+    "studio-gpu-bristle-wgsl.ts",
     "studio-croquis-capsule-pen-v1.ts",
     "studio-oss-brush-kernels.ts",
     "dist/legal/THIRD_PARTY_NOTICES.generated.md",

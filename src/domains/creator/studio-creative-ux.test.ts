@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./brush/studio-brush-catalog";
+import { isStudioBrushMaterialGroup } from "./brush/studio-brush-material-group";
 import {
   STUDIO_BRUSH_QUARANTINED_PRESET_IDS,
   isStudioBrushQuarantinedPresetId,
@@ -29,20 +30,47 @@ describe("studio creative ux", () => {
   });
 
   it("keeps the Pro pack out of the eager core tray so its full dynamics stay lazy", () => {
-    expect(listStudioBrushTrayItems("pro")).toEqual([]);
-    expect(listStudioBrushTrayItems("all")).toHaveLength(BRUSH_PRESETS.length);
+    // 팩 브러시는 게으른 카탈로그에서만 들어온다. 코어 트레이는 BRUSH_PRESETS 와 1:1.
+    const all = listStudioBrushTrayItems("all");
+    expect(all).toHaveLength(BRUSH_PRESETS.length);
+    expect(all.some((item) => item.id === "heart-stamp")).toBe(false);
     expect(BRUSH_PRESETS.length).toBeGreaterThan(99);
   });
 
-  it("filters Picsart-style media groups", () => {
+  it("assigns every core preset a material group derived from its render contract", () => {
+    const all = listStudioBrushTrayItems("all");
+    const groups = new Map<string, number>();
+    for (const item of all) {
+      expect(isStudioBrushMaterialGroup(item.mediaGroup), item.id).toBe(true);
+      groups.set(item.mediaGroup, (groups.get(item.mediaGroup) ?? 0) + 1);
+    }
+    // 재질이 한 갈래로 쏠려 있으면 분류가 정보를 주지 못한다. 예전 표는 88개를 "선"으로 흘렸다.
+    expect(groups.size).toBeGreaterThanOrEqual(9);
+    for (const [group, count] of groups) {
+      expect(count, `${group}: 코어 전체의 절반을 넘는 쏠림`).toBeLessThan(all.length / 2);
+    }
+
     const markers = listStudioBrushTrayItems("marker");
     expect(markers.length).toBeGreaterThan(0);
     expect(markers.every((item) => item.mediaGroup === "marker")).toBe(true);
-    expect(markers.some((item) => item.id === "neon")).toBe(true);
+    expect(markers.some((item) => item.id === "alcohol-marker")).toBe(true);
     const fx = listStudioBrushTrayItems("fx");
     expect(fx.some((item) => item.id === "glow")).toBe(true);
     expect(fx.some((item) => item.id === "glitter")).toBe(true);
+    expect(fx.some((item) => item.id === "neon")).toBe(true);
     expect(fx.every((item) => item.mediaGroup === "fx")).toBe(true);
+
+    // 이전에 손표에서 누락돼 "선"으로 떨어지던 코어 프리셋들.
+    const groupOf = (id: string) => all.find((item) => item.id === id)?.mediaGroup;
+    expect(groupOf("technical-pen")).toBe("ink");
+    expect(groupOf("pencil-6b")).toBe("pencil");
+    expect(groupOf("gouache")).toBe("watercolor");
+    expect(groupOf("acrylic")).toBe("oil");
+    expect(groupOf("splatter")).toBe("airbrush");
+    expect(groupOf("oil-pastel")).toBe("pastel");
+    expect(groupOf("crosshatch")).toBe("tone");
+    // 지우개는 재료가 아니라 도구 경계라 자기 그룹을 가진다.
+    expect(groupOf("standard-eraser")).toBe("eraser");
   });
 
   it("builds short labels and preview weights for tray chips", () => {

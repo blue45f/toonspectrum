@@ -20,6 +20,15 @@ import {
   type StudioPaperGranulationSettings,
 } from "./studio-paper-granulation-runtime";
 import {
+  STUDIO_PAPER_MEDIA_INTERACTION_V1,
+  resolveStudioPaperMediumForBrushFamilyV1,
+  type StudioPaperMediumV1,
+} from "./studio-paper-media-profile-v1";
+import {
+  studioPaperUsesContactTooth,
+  type StudioPaperSubstrateModel,
+} from "./studio-paper-substrate-model";
+import {
   getStudioPaperPhysicsProfile,
   normalizePaperGrainKind,
   type PaperGrainKind,
@@ -70,6 +79,59 @@ const STUDIO_AUTHORED_WET_DYNAMIC_PAPER_RESPONSE_IDS = new Set([
 /** Mean-preserving ceiling shared with granulation runtime tests. */
 const GRANULATION_CEILING = 0.7;
 
+/**
+ * contact-tooth-v2 전용 상한.
+ *
+ * 0.7은 **평균 보존** 제약에서 나온 값이다 — 레거시 이득은 타일 평균 0으로 정규화되어 있어
+ * 강도가 그 위로 가면 알파 배수가 상한에 닿아 균일 획의 총 안료량이 깨진다. peak-catch에는
+ * 그 불변식이 없다(가벼운 연필 한 번은 실제로 안료를 덜 남기는 게 옳다). 상한을 0.95로 올려야
+ * 접촉면 아래 텍셀이 **정말 비어 보이고**, 그게 종이 이빨이 눈에 보이는 유일한 이유다.
+ * 1이 아니라 0.95인 건 완전 0 알파 구멍이 스트로크 경계에서 계단으로 보이기 때문이다.
+ */
+const CONTACT_TOOTH_GRANULATION_CEILING_V2 = 0.95;
+
+/**
+ * 필압 → 이빨 가시성.
+ *
+ * 필압이 오르면 접촉면이 골까지 내려가 이빨이 메워진다(burnishing). 샘플러의 문턱 이동과
+ * 같은 방향으로 작용하되, 이쪽은 **결이 보이는 정도** 자체를 줄인다. 무거운 필압에서도
+ * 0으로 떨어뜨리지 않는 이유는 실물에서도 완전히 메워진 종이가 여전히 미세한 결을 남기기 때문.
+ */
+const CONTACT_TOOTH_HEAVY_VISIBILITY_V2 = 0.55;
+
+function contactToothVisibilityV2(pressure: number): number {
+  const safe = clamp(Number.isFinite(pressure) ? pressure : 1, 0, 1);
+  return 1 - (1 - CONTACT_TOOTH_HEAVY_VISIBILITY_V2) * safe * safe;
+}
+
+/**
+ * peak-catch 매체의 강도 승수.
+ *
+ * 레거시 베이스(연필 0.55, 건식 0.7)는 **평균 보존** 이득에 맞춰 튜닝된 값이라, 그대로 두면
+ * 알파 배수의 하한이 `1 - 0.64 = 0.36`에 머물러 골이 절대 비지 않는다. 실측에서 가벼운 필압
+ * bare 비율이 0.0%로 나온 원인이 이것이었다. 마른 안료는 접촉면 아래 구멍에 **실제로 닿지
+ * 않으므로**, peak-catch에서는 강도가 상한 가까이 가야 종이 이빨이 눈에 보인다.
+ * valley-settle(수채)·weave-reveal(유화)에는 걸지 않는다 — 그쪽은 평균 보존이 여전히 옳다.
+ */
+const CONTACT_TOOTH_PEAK_CATCH_STRENGTH_V2 = 1.55;
+
+function isPeakCatchMediumV2(medium: StudioPaperMediumV1 | null | undefined): boolean {
+  return medium != null
+    && STUDIO_PAPER_MEDIA_INTERACTION_V1[medium].mode === "peak-catch";
+}
+
+/**
+ * 종이 반응을 물을 때 함께 넘기는 맥락. 둘 다 생략하면 반환값은 예전과 **정확히 같다**.
+ */
+export interface StudioPaperBrushResponseContext {
+  /** 0..1 캐노니컬 필압. 생략하면 필압 결합이 아예 걸리지 않는다(역사적 계약). */
+  readonly pressure?: number;
+  /** 획이 들고 있는 substrate 세대. 생략 = 레거시 valley-multiply. */
+  readonly model?: StudioPaperSubstrateModel;
+  /** 상호작용 매체. `resolveStudioPaperBrushResponse`가 브러시에서 스스로 채운다. */
+  readonly medium?: StudioPaperMediumV1 | null;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -81,6 +143,7 @@ function clamp(value: number, min: number, max: number): number {
 export function applyStudioPaperPhysicsToBrushResponse(
   base: StudioPaperGranulationSettings,
   paperKind: PaperGrainKind | unknown,
+  context?: StudioPaperBrushResponseContext,
 ): StudioPaperGranulationSettings {
   if (
     base === STUDIO_PAPER_GRANULATION_IDENTITY
@@ -93,10 +156,19 @@ export function applyStudioPaperPhysicsToBrushResponse(
   const dryBoost = 0.72 + physics.contactFriction * 0.45;
   const wetBoost = 0.85 + physics.absorbency * 0.22;
   const mediumBlend = dryBoost * 0.55 + wetBoost * 0.45;
+  const contactTooth = studioPaperUsesContactTooth(context?.model);
+  // 필압은 v2 획에서만, 그리고 실제로 값이 넘어왔을 때만 결합한다. 둘 중 하나라도 없으면
+  // 아래 식은 예전과 항이 완전히 동일해 기존 호출부의 반환값이 비트 단위로 보존된다.
+  const toothVisibility = contactTooth && context?.pressure !== undefined
+    ? contactToothVisibilityV2(context.pressure)
+    : 1;
+  const peakCatchLift = contactTooth && isPeakCatchMediumV2(context?.medium)
+    ? CONTACT_TOOTH_PEAK_CATCH_STRENGTH_V2
+    : 1;
   const granulation = clamp(
-    base.granulation * physics.toothGain * mediumBlend,
+    base.granulation * physics.toothGain * mediumBlend * toothVisibility * peakCatchLift,
     0,
-    GRANULATION_CEILING,
+    contactTooth ? CONTACT_TOOTH_GRANULATION_CEILING_V2 : GRANULATION_CEILING,
   );
   const staining = clamp(base.staining * physics.sizingGain, 0, 1);
   const scale = clamp(
@@ -118,6 +190,7 @@ export function applyStudioPaperPhysicsToBrushResponse(
 export function resolveStudioPaperBrushResponse(
   brushId: unknown,
   paperKind?: PaperGrainKind | unknown,
+  context?: StudioPaperBrushResponseContext | number,
 ): StudioPaperGranulationSettings {
   if (
     typeof brushId === "string"
@@ -133,7 +206,44 @@ export function resolveStudioPaperBrushResponse(
   const kind = paperKind !== undefined && paperKind !== null
     ? normalizePaperGrainKind(paperKind)
     : resolveStudioDocumentPaperSurface().kind;
-  return applyStudioPaperPhysicsToBrushResponse(base, kind);
+  const normalized = normalizeStudioPaperBrushResponseContext(context);
+  return applyStudioPaperPhysicsToBrushResponse(
+    base,
+    kind,
+    normalized === undefined
+      ? undefined
+      : {
+        ...normalized,
+        // 매체는 브러시가 결정한다. 호출부가 굳이 덮어쓸 이유가 없으므로 여기서 채운다.
+        medium: normalized.medium ?? resolveStudioPaperMediumForBrushFamilyV1(family),
+      },
+  );
+}
+
+/** 세 번째 인자는 필압 숫자 하나로도, 맥락 오브젝트로도 받는다. 생략은 역사적 계약이다. */
+function normalizeStudioPaperBrushResponseContext(
+  context?: StudioPaperBrushResponseContext | number,
+): StudioPaperBrushResponseContext | undefined {
+  if (context === undefined) return undefined;
+  return typeof context === "number" ? { pressure: context } : context;
+}
+
+/**
+ * 이 브러시가 종이와 상호작용하는 **매체**. null이면 종이를 아예 타지 않는 도구다.
+ * 극성 분류(건식/수채/유화)의 단일 권위는 `studio-paper-media-profile-v1`이다.
+ */
+export function resolveStudioPaperBrushMedium(brushId: unknown): StudioPaperMediumV1 | null {
+  if (
+    typeof brushId === "string"
+    && STUDIO_AUTHORED_WET_DYNAMIC_PAPER_RESPONSE_IDS.has(brushId.trim().toLowerCase())
+  ) {
+    return null;
+  }
+  const family = resolveStudioBrushRenderFamily(brushId);
+  if (STUDIO_PAPER_BRUSH_RESPONSE[family] === STUDIO_PAPER_GRANULATION_IDENTITY) {
+    return null;
+  }
+  return resolveStudioPaperMediumForBrushFamilyV1(family);
 }
 
 /**

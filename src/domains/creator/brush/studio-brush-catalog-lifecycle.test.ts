@@ -76,7 +76,10 @@ describe("studio brush catalog lifecycle", () => {
   it("resolves representative stages and fails closed on unknown input", () => {
     expect(brushLifecycleStageOf("gpen")).toBe("core");
     expect(brushLifecycleStageOf("standard-eraser")).toBe("core");
-    expect(brushLifecycleStageOf("glass-pen")).toBe("extended");
+    // 2026-08-21 로스터 축소 웨이브에서 glass-pen 은 pen 과 실행 서명이 같아 delist 됐습니다.
+    // "extended" 대표는 같은 성격의 코어 확장 프리셋인 perfect-ink 로 옮깁니다.
+    expect(brushLifecycleStageOf("perfect-ink")).toBe("extended");
+    expect(brushLifecycleStageOf("glass-pen")).toBe("quarantined");
     expect(brushLifecycleStageOf("watercolor-salt-bloom")).toBe("extended");
     expect(brushLifecycleStageOf("gpen--croquis-capsule")).toBe("experimental");
     expect(brushLifecycleStageOf("gpen--causal-round")).toBe("quarantined");

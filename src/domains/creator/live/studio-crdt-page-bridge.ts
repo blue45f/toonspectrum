@@ -4,6 +4,7 @@ import {
 } from "../brush/studio-brush-dynamics";
 import { serializeStudioBrushR8TextureGrainSourceCanonical } from "../brush/studio-brush-r8-grain-asset-contract";
 import { isStudioInkPressureModel } from "../brush/studio-ink-pressure-model";
+import { isStudioPaperSubstrateModel } from "../brush/studio-paper-substrate-model";
 import { isStudioStrokePaintModelCompatible } from "../brush/studio-stroke-paint-model";
 import {
   isStudioMaterialMinimumDiameterRatio,
@@ -233,6 +234,8 @@ export function studioCrdtStrokeToDrawElement(
   }
   const pressureModel = extensions.pressureModel;
   if (isStudioInkPressureModel(pressureModel)) result.pressureModel = pressureModel;
+  const paperModel = extensions.paperModel;
+  if (isStudioPaperSubstrateModel(paperModel)) result.paperModel = paperModel;
   if (extensions.outlineStroke !== undefined) {
     if (payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION) {
       throw new Error("외곽선 획 계약과 페이로드 버전이 호환되지 않습니다.");

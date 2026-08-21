@@ -676,27 +676,109 @@ function clipFootprintLayerAtCoverage(
   });
 }
 
+/**
+ * Threshold of one rung of the fixed coverage ladder.
+ *
+ * Nearest-bucket coverage changes at half-bucket thresholds. The first non-zero bucket deliberately
+ * starts immediately above zero so tiny but authored pigment is not erased.
+ */
+function coverageThresholdForBucket(coverageBucket: number): number {
+  return coverageBucket === 1
+    ? 0
+    : (coverageBucket - 0.5) / OPACITY_BUCKET_COUNT;
+}
+
+/**
+ * Highest ladder rung whose `clipFootprintLayerAtCoverage` inclusion test still accepts `opacity`.
+ *
+ * `includes` is `opacity > 0` on rung 1 and `opacity >= (bucket - 0.5) / COUNT` above it, and the
+ * rung thresholds are strictly increasing, so the test is a monotone step in `coverageBucket`. The
+ * closed-form guess is only a seed: both adjustment walks re-evaluate the *same* comparison the
+ * per-bucket scan used, so a float landing exactly on a rung boundary resolves identically to the
+ * scan it replaces. Returns 0 when no rung includes the value.
+ */
+function highestIncludingCoverageBucket(
+  opacity: number,
+  maximumCoverageBucket: number,
+): number {
+  if (maximumCoverageBucket < 1 || !(opacity > 0)) return 0;
+  let coverageBucket = Math.min(
+    maximumCoverageBucket,
+    Math.max(1, Math.floor(opacity * OPACITY_BUCKET_COUNT + 0.5)),
+  );
+  while (
+    coverageBucket > 1
+    && !(opacity >= coverageThresholdForBucket(coverageBucket))
+  ) {
+    coverageBucket -= 1;
+  }
+  while (
+    coverageBucket < maximumCoverageBucket
+    && opacity >= coverageThresholdForBucket(coverageBucket + 1)
+  ) {
+    coverageBucket += 1;
+  }
+  return coverageBucket;
+}
+
+/**
+ * Groups every deposit onto the coverage ladder in one pass instead of rescanning all deposits once
+ * per rung.
+ *
+ * The previous shape was `layers x rungs x deposits` clip attempts — with a 4096-footprint cap and
+ * a 128-rung ladder that is millions of inclusion tests per pointer move, the overwhelming majority
+ * of which returned `null` or the deposit's own unclipped polygon. Because the inclusion test is
+ * monotone in the rung index, each deposit's rung span is two integers: rungs `1..fullBucket` take
+ * the unclipped polygon (the identical frozen reference the scan returned), rungs
+ * `fullBucket+1..anyBucket` take the real threshold clip at the identical threshold, and rungs
+ * above `anyBucket` were exactly the ones the scan discarded.
+ *
+ * Output order is unchanged, which is load-bearing: these polygons composite translucently, so
+ * reordering them within a batch would change pixels. Deposits are appended to each rung's list in
+ * deposit order and the rungs are emitted in ascending order per layer — the same traversal order
+ * the nested scan produced.
+ */
 function buildBatches(
   footprints: readonly StudioWetRibbonFootprint[],
 ): readonly StudioWetRibbonCarrierBatch[] {
   const batches: StudioWetRibbonCarrierBatch[] = [];
   for (const layer of LAYER_ORDER) {
-    const deposits = footprints.flatMap((footprint) => {
+    // One pass instead of flatMap plus reduce: the same first-match-per-footprint selection, the
+    // same filter, the same left-to-right `Math.max` fold, without a throwaway array per footprint.
+    const deposits: StudioWetRibbonFootprintLayer[] = [];
+    let maximumCoverageBucket = 0;
+    for (const footprint of footprints) {
       const planned = footprint.layers.find(
         (candidate) => candidate.layer === layer,
       );
-      return planned
-        && Math.max(planned.startOpacity, planned.endOpacity) > 0
-        ? [planned]
-        : [];
-    });
-    const maximumCoverageBucket = deposits.reduce(
-      (maximum, deposit) => Math.max(
-        maximum,
-        opacityBucket(Math.max(deposit.startOpacity, deposit.endOpacity)),
-      ),
-      0,
-    );
+      if (!planned) continue;
+      const depositCeiling = Math.max(planned.startOpacity, planned.endOpacity);
+      if (!(depositCeiling > 0)) continue;
+      deposits.push(planned);
+      maximumCoverageBucket = Math.max(
+        maximumCoverageBucket,
+        opacityBucket(depositCeiling),
+      );
+    }
+    if (maximumCoverageBucket < 1) continue;
+
+    /*
+     * If A is the coverage after the previous pass and T is the next target, source-over needs
+     * source alpha `(T - A) / (1 - A)` to land exactly on T. Every polygon at or above T is
+     * traced into one compound path, so overlap inside this same threshold is a geometric union
+     * rather than another alpha deposit. The complete fixed threshold ladder is important:
+     * a later input suffix cannot insert a new intermediate pass and subtly re-antialias pixels
+     * that were already visible. Repeating it therefore evaluates to max(local authored
+     * opacity), not the sum of crossing station opacities, while remaining causal-prefix stable.
+     *
+     * The ladder is walked first, in the same ascending order, so each rung's increment is the
+     * identical float the sequential accumulator produced. A rung whose increment is not positive
+     * is left without a polygon list, which is what suppressed both its clips and its batch before.
+     */
+    const rungOpacities = new Array<number>(maximumCoverageBucket + 1).fill(0);
+    const rungPolygons = new Array<StudioWetRibbonPolygon[] | null>(
+      maximumCoverageBucket + 1,
+    ).fill(null);
     let previousCeiling = 0;
     for (
       let coverageBucket = 1;
@@ -704,15 +786,6 @@ function buildBatches(
       coverageBucket += 1
     ) {
       const coverageCeiling = coverageBucket / OPACITY_BUCKET_COUNT;
-      /*
-       * If A is the coverage after the previous pass and T is the next target, source-over needs
-       * source alpha `(T - A) / (1 - A)` to land exactly on T. Every polygon at or above T is
-       * traced into one compound path, so overlap inside this same threshold is a geometric union
-       * rather than another alpha deposit. The complete fixed 1/32 threshold ladder is important:
-       * a later input suffix cannot insert a new intermediate pass and subtly re-antialias pixels
-       * that were already visible. Repeating it therefore evaluates to max(local authored
-       * opacity), not the sum of crossing station opacities, while remaining causal-prefix stable.
-       */
       const opacity = previousCeiling >= 1
         ? 0
         : clamp(
@@ -720,28 +793,58 @@ function buildBatches(
             0,
             1,
           );
-      if (opacity > 0) {
-        // Nearest-bucket coverage changes at half-bucket thresholds. The first non-zero bucket
-        // deliberately starts immediately above zero so tiny but authored pigment is not erased.
-        const coverageThreshold = coverageBucket === 1
-          ? 0
-          : (coverageBucket - 0.5) / OPACITY_BUCKET_COUNT;
-        const polygons: StudioWetRibbonPolygon[] = [];
-        for (const deposit of deposits) {
-          const clipped = clipFootprintLayerAtCoverage(
-            deposit,
-            coverageThreshold,
-          );
-          if (clipped) polygons.push(clipped);
-        }
-        batches.push(Object.freeze({
-          layer,
-          coverageCeiling,
-          opacity,
-          polygons: Object.freeze(polygons),
-        }));
-      }
+      rungOpacities[coverageBucket] = opacity;
+      if (opacity > 0) rungPolygons[coverageBucket] = [];
       previousCeiling = coverageCeiling;
+    }
+
+    for (const deposit of deposits) {
+      // `includesStart && includesEnd` is `includes(min)` and `includesStart || includesEnd` is
+      // `includes(max)`, because the inclusion test is a threshold comparison on each endpoint.
+      const fullBucket = highestIncludingCoverageBucket(
+        Math.min(deposit.startOpacity, deposit.endOpacity),
+        maximumCoverageBucket,
+      );
+      const anyBucket = highestIncludingCoverageBucket(
+        Math.max(deposit.startOpacity, deposit.endOpacity),
+        maximumCoverageBucket,
+      );
+      for (
+        let coverageBucket = 1;
+        coverageBucket <= fullBucket;
+        coverageBucket += 1
+      ) {
+        rungPolygons[coverageBucket]?.push(deposit.polygon);
+      }
+      for (
+        let coverageBucket = fullBucket + 1;
+        coverageBucket <= anyBucket;
+        coverageBucket += 1
+      ) {
+        const polygons = rungPolygons[coverageBucket];
+        if (!polygons) continue;
+        // Mixed-inclusion rungs still take the real clip, including its fail-closed rejections.
+        const clipped = clipFootprintLayerAtCoverage(
+          deposit,
+          coverageThresholdForBucket(coverageBucket),
+        );
+        if (clipped) polygons.push(clipped);
+      }
+    }
+
+    for (
+      let coverageBucket = 1;
+      coverageBucket <= maximumCoverageBucket;
+      coverageBucket += 1
+    ) {
+      const polygons = rungPolygons[coverageBucket];
+      if (!polygons) continue;
+      batches.push(Object.freeze({
+        layer,
+        coverageCeiling: coverageBucket / OPACITY_BUCKET_COUNT,
+        opacity: rungOpacities[coverageBucket]!,
+        polygons: Object.freeze(polygons),
+      }));
     }
   }
   return Object.freeze(batches);

@@ -10,6 +10,7 @@ import {
   studioBrushCatalogItemById,
 } from "./brush/studio-brush-catalog";
 import { studioBrushIconId } from "./brush/studio-brush-icons";
+import { isStudioBrushQuarantinedPresetId } from "./brush/studio-brush-quarantine";
 import {
   resolveStudioBrushRuntimeContract,
 } from "./brush/studio-brush-runtime-contract";
@@ -123,17 +124,17 @@ describe("commercial basic brush expansion", () => {
       });
     }
 
-    const discoveryQueries = [
-      ["school-pen", "학생 펜"],
-      ["school-pen", "school nib"],
+    // Search coverage is a LISTING promise, so it is asserted per partition. school-pen and
+    // gel-pen were delisted in the 2026-08-21 roster reduction (both share pen/gpen's execution
+    // signature), and a delisted id must be unreachable from every picker path including alias
+    // search — its aliases keep resolving metadata for saved documents, nothing more.
+    const listedDiscoveryQueries = [
       ["fountain-pen", "잉크 만년필"],
       ["fountain-pen", "fountain nib"],
-      ["gel-pen", "중성펜"],
-      ["gel-pen", "gel ink pen"],
       ["kneaded-eraser", "말랑 지우개"],
       ["kneaded-eraser", "putty eraser"],
     ] as const;
-    for (const [id, query] of discoveryQueries) {
+    for (const [id, query] of listedDiscoveryQueries) {
       expect(
         filterStudioBrushCatalogItems({
           // A query must escape the currently selected category.
@@ -142,6 +143,22 @@ describe("commercial basic brush expansion", () => {
         }).some((candidate) => candidate.id === id),
         `${id}: alias ${query} is not globally searchable`,
       ).toBe(true);
+    }
+    const delistedDiscoveryQueries = [
+      ["school-pen", "학생 펜"],
+      ["school-pen", "school nib"],
+      ["gel-pen", "중성펜"],
+      ["gel-pen", "gel ink pen"],
+    ] as const;
+    for (const [id, query] of delistedDiscoveryQueries) {
+      expect(isStudioBrushQuarantinedPresetId(id), `${id}: expected delisted`).toBe(true);
+      expect(
+        filterStudioBrushCatalogItems({ query }).some((candidate) => candidate.id === id),
+        `${id}: alias ${query} still exposes a delisted preset`,
+      ).toBe(false);
+      // Exposure removal only — the preset and its aliases stay registered for saved documents.
+      expect(studioBrushCatalogItemById(id)?.searchAliases, id)
+        .toEqual([...EXPECTED_PRESETS[id].aliases]);
     }
   });
 

@@ -145,9 +145,14 @@ describe("Studio pixel-edit brush runtime boundary", () => {
     expect(healMoveStart).toBeGreaterThan(moveStart);
     expect(healMoveEnd).toBeLessThan(moveEnd);
     const healMoveSource = source.slice(healMoveStart, healMoveEnd);
-    expect(healMoveSource).toContain("session.points.push(appended)");
+    // The guarantee is that the drag appends into the live session IN PLACE and never rebuilds the
+    // array — `[...points, next]` per pointer move is what made these drags O(n²). The direct
+    // `session.points.push(appended)` was replaced by the shared `appendBrushPointInPlace` helper,
+    // which also carries the min-distance dedup; the in-place contract is unchanged.
+    expect(healMoveSource).toContain("appendBrushPointInPlace(session.points");
     expect(healMoveSource).toContain("scheduleHealCloneDragPreview(session)");
     expect(healMoveSource).not.toContain("setHealCloneDragPreview");
     expect(healMoveSource).not.toContain("session.points =");
+    expect(healMoveSource).not.toContain("...session.points");
   });
 });

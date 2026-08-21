@@ -99,11 +99,29 @@ describe("studio brush engine-lane catalog", () => {
     }
   });
 
-  it("filters the engines library tab to engine-lane shelf only", () => {
-    const engines = filterStudioBrushLibraryItems({ category: "engines" });
-    expect(engines.length).toBe(STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.length);
-    expect(engines.every((item) => isStudioBrushEngineLaneId(item.id))).toBe(true);
-    expect(engines.some((item) => item.id === "pen")).toBe(false);
+  it("files every engine lane under its own material tab instead of a tier tab", () => {
+    // 회귀 방지: 예전에는 id→미디어 그룹 표에 `--` 레인 키가 하나도 없어서 71개 레인이 전부
+    // "선" 탭으로 떨어졌다. 유화 리본이 선화 탭에, 수채 과립이 선화 탭에 있던 원인이다.
+    const laneIds = new Set(listStudioBrushEngineLaneIds());
+    const all = filterStudioBrushLibraryItems({ category: "all" });
+    const lanes = all.filter((item) => laneIds.has(item.id));
+    expect(lanes.length).toBe(STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.length);
+    expect(lanes.every((item) => isStudioBrushEngineLaneId(item.id))).toBe(true);
+
+    for (const lane of lanes) {
+      const tabItems = filterStudioBrushLibraryItems({ category: lane.mediaGroup });
+      expect(
+        tabItems.some((item) => item.id === lane.id),
+        `${lane.id}: missing from its own ${lane.mediaGroup} tab`,
+      ).toBe(true);
+    }
+
+    const groupOf = (id: string) => lanes.find((item) => item.id === id)?.mediaGroup;
+    expect(groupOf("oil--filbert-ribbon")).toBe("oil");
+    expect(groupOf("watercolor--granular")).toBe("watercolor");
+    expect(groupOf("mypaint-cc0--pastel")).toBe("pastel");
+    expect(groupOf("ink-wash--sumi-core")).toBe("watercolor");
+    expect(lanes.some((item) => item.id === "pen")).toBe(false);
   });
 
   it("pairs same-medium lanes onto different runtime engines", () => {

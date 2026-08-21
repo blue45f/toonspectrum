@@ -14,6 +14,10 @@
  * Pure data + presentation helpers; no document state.
  */
 
+import {
+  isStudioBrushMaterialGroup,
+  studioBrushCoreMaterialGroup,
+} from "./brush/studio-brush-material-group";
 import { isStudioBrushQuarantinedPresetId } from "./brush/studio-brush-quarantine";
 import { resolveStudioBrushRuntimeContract } from "./brush/studio-brush-runtime-contract";
 import {
@@ -22,7 +26,10 @@ import {
   type StudioToolOperation,
 } from "./studio-brush";
 
-import type { StudioBrushPreviewStyle } from "./brush/studio-brush-visual";
+import type {
+  StudioBrushMaterialGroup,
+  StudioBrushPreviewStyle,
+} from "./brush/studio-brush-visual";
 
 /** Canva/Express style “simple draw” kit — first tools a beginner sees. */
 export const STUDIO_BEGINNER_BRUSH_IDS = [
@@ -37,10 +44,11 @@ export const STUDIO_BEGINNER_BRUSH_IDS = [
   "brush",
   "highlighter",
   "fountain-pen",
-  "gel-pen",
+  // 2026-08-21 로스터 축소: gel-pen·school-pen 을 스타터 키트에서 뺐습니다. 둘 다 pen/gpen 과
+  // 실행 서명이 같아(굵기만 다름) 초보 키트 한 줄에 같은 선이 다섯 번 보이던 자리였습니다.
+  // 두 id 는 격리 원장으로 옮겼고, 저장된 문서는 계속 원래 브러시로 재생됩니다.
   "ballpoint",
   "felt-tip",
-  "school-pen",
   "standard-eraser",
   "kneaded-eraser",
 ] as const;
@@ -117,22 +125,19 @@ export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
   "screentone",
 ] as const;
 
-/** Picsart-style category filter for the brush strip. */
+/**
+ * 브러시 서랍 필터. 티어 축("프로"/"엔진")은 재료를 말해주지 않아 제거했고, 남은 축은
+ * 숙련도(기본/전체+)와 재질뿐이다.
+ */
 export type StudioBrushTrayCategory =
   | "beginner"
   | "expressive"
-  | "pro"
-  | "engines"
-  | "line"
-  | "marker"
-  | "paint"
-  | "fx"
-  | "texture"
+  | StudioBrushMediaGroup
   | "all";
 
 export type StudioBrushTrayItemCategory = "beginner" | "expressive";
 
-export type StudioBrushMediaGroup = "line" | "marker" | "paint" | "fx" | "texture";
+export type StudioBrushMediaGroup = StudioBrushMaterialGroup;
 
 export interface StudioBrushTrayItem {
   id: string;
@@ -176,94 +181,6 @@ export const STUDIO_QUICK_BRUSH_LIMIT = 8;
 
 const BEGINNER_SET = new Set<string>(STUDIO_BEGINNER_BRUSH_IDS);
 
-const MEDIA_GROUP: Record<string, StudioBrushMediaGroup> = {
-  pen: "line",
-  fineliner: "line",
-  ballpoint: "line",
-  "gel-pen": "line",
-  "glass-pen": "line",
-  "ruling-pen": "line",
-  gpen: "line",
-  "school-pen": "line",
-  "maru-pen": "line",
-  liner: "line",
-  calligraphy: "line",
-  "fountain-pen": "line",
-  "parallel-pen": "line",
-  "standard-eraser": "texture",
-  "kneaded-eraser": "texture",
-  pencil: "line",
-  "soft-pencil": "line",
-  "erodible-pencil": "line",
-  "ink-brush": "line",
-  "perfect-ink": "line",
-  "perfect-marker": "marker",
-  "pencil-grain": "line",
-  "airbrush-fine": "paint",
-  "wash-brush": "paint",
-  marker: "marker",
-  "felt-tip": "marker",
-  "marker-bold": "marker",
-  highlighter: "marker",
-  neon: "marker",
-  glow: "fx",
-  "soft-glow": "fx",
-  glitter: "fx",
-  "star-dust": "fx",
-  brush: "paint",
-  watercolor: "paint",
-  "ink-wash": "paint",
-  "inkwash-pen": "paint",
-  "inkwash-water-brush": "paint",
-  "inkwash-bleed-wash": "paint",
-  "inkwash-white-ink": "paint",
-  oil: "paint",
-  "fluid-paint": "paint",
-  "fluid-paint-fine": "paint",
-  "fluid-paint-load": "paint",
-  "fluid-paint-rake": "paint",
-  "paint-tube": "paint",
-  airbrush: "paint",
-  "hard-airbrush": "paint",
-  "soft-brush": "paint",
-  spray: "paint",
-  "dry-media": "texture",
-  crayon: "texture",
-  chalk: "texture",
-  charcoal: "texture",
-  pastel: "texture",
-  "ink-particle": "texture",
-  "tangent-normal-brush": "texture",
-  "sketchpad-tile": "texture",
-  "sketchpad-mirror": "fx",
-  "sketchpad-soft-marker": "marker",
-  "web-multi-agent": "fx",
-  "web-rough-ink": "line",
-  "web-gravity-drip": "paint",
-  "web-soft-cloud": "fx",
-  "web-calligraphy-ribbon": "line",
-  "web-dash-stitch": "line",
-  "web-scatter-stamp": "texture",
-  "web-rainbow-flow": "fx",
-  "web-lazy-ink": "line",
-  "web-hatch-color": "line",
-  "web-cel-flat": "marker",
-  "web-blend-softener": "paint",
-  "web-dot-tone": "texture",
-  "web-kaleido-ink": "fx",
-  "web-fur-strand": "texture",
-  "web-contour-double": "line",
-  "web-radial-burst": "fx",
-  "web-mirror-ink": "fx",
-  "web-grid-ink": "line",
-  "web-spiro-orbit": "fx",
-  "web-zigzag-edge": "line",
-  "web-neon-tube": "fx",
-  "web-pressure-flat": "line",
-  "web-smudge-trail": "paint",
-  "web-cross-hatch-pen": "line",
-  screentone: "texture",
-};
 
 const SHORT_NAMES: Record<string, string> = {
   pen: "펜",
@@ -459,7 +376,9 @@ export function studioBrushTrayItem(preset: BrushPreset): StudioBrushTrayItem {
     defaultColor: preset.defaultColor,
     operation: preset.operation,
     category: BEGINNER_SET.has(preset.id) ? "beginner" : "expressive",
-    mediaGroup: MEDIA_GROUP[preset.id] ?? "line",
+    // 재질은 렌더 계약에서 파생한다. 손으로 적던 id 표는 엔진 레인 71종과 코어 17종을
+    // 전부 "선"으로 흘려보냈다(88/330 오분류). 계약은 감사받는 SSOT라 누락이 불가능하다.
+    mediaGroup: studioBrushCoreMaterialGroup(preset.id),
     previewWeight: previewWeightFor(preset),
     // Preview style is part of the same audited contract as Canvas/SVG routing. Keeping it there
     // prevents a catalogue card from advertising a texture that the selected preset cannot draw.
@@ -487,16 +406,9 @@ export function listStudioBrushTrayItems(
   const all = [...beginner, ...expressiveUnique, ...extras];
 
   if (category === "beginner") return beginner;
-  if (category === "pro") return [];
   // Expressive kit still surfaces wash/air for discovery even when they are beginner-primary.
   if (category === "expressive") return [...expressive, ...extras];
-  if (
-    category === "line"
-    || category === "marker"
-    || category === "paint"
-    || category === "fx"
-    || category === "texture"
-  ) {
+  if (isStudioBrushMaterialGroup(category)) {
     return all.filter((item) => item.mediaGroup === category);
   }
   return all;
@@ -557,11 +469,16 @@ export const STUDIO_BRUSH_TRAY_CATEGORY_CHIPS: readonly {
   title: string;
 }[] = [
   { id: "beginner", label: "기본", title: "Canva·Express 초보 키트" },
-  { id: "line", label: "선", title: "펜·연필·G펜 선화" },
-  { id: "marker", label: "마커", title: "마커·형광·네온" },
-  { id: "paint", label: "페인트", title: "붓·수채·유화·에어" },
-  { id: "fx", label: "효과", title: "글로우·글리터 (PicsArt-class)" },
-  { id: "texture", label: "질감", title: "크레용·초크·파스텔·톤" },
+  { id: "ink", label: "잉크", title: "펜·G펜·붓 — 균일한 잉크선" },
+  { id: "pencil", label: "연필", title: "연필·흑연 — 종이결 그레인" },
+  { id: "marker", label: "마커", title: "마커·형광펜 — 반투명 균일 도포" },
+  { id: "watercolor", label: "수채", title: "수채·수묵·과슈 — 웻엣지 번짐" },
+  { id: "oil", label: "유화", title: "유화·아크릴·임파스토 — 강모결과 두께" },
+  { id: "airbrush", label: "에어", title: "에어·스프레이·스플래터 — 소프트 입자" },
+  { id: "pastel", label: "파스텔", title: "파스텔·목탄·크레용·초크 — 마른 가루" },
+  { id: "texture", label: "질감", title: "천·암석·나뭇잎·털 — 재질 스탬프" },
+  { id: "tone", label: "톤", title: "스크린톤·망점·해칭" },
+  { id: "fx", label: "효과", title: "네온·글로우·글리터" },
   { id: "expressive", label: "전체+", title: "확장 브러시 전체" },
 ];
 

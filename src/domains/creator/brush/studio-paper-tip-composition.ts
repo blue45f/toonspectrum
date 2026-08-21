@@ -18,8 +18,12 @@
  * 농도는 그대로고 그 뒤 구간의 종이 질감만 사라진다(밀도 단차보다 질감 페이드가 낫다).
  */
 
+import { resolveStudioPaperContactToothAlphaMultiplierAt } from "./studio-paper-granulation-runtime";
+import { STUDIO_PAPER_SUBSTRATE_FALLBACK_PRESSURE } from "./studio-paper-substrate-model";
+
 import type { StudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
 import type { StudioPaperGranulationTile } from "./studio-paper-granulation-runtime";
+import type { StudioPaperMediumV1 } from "./studio-paper-media-profile-v1";
 
 
 /**
@@ -45,6 +49,13 @@ export interface StudioPaperTipCompositionInput {
   readonly radiusX: number;
   readonly radiusY: number;
   readonly angleRadians: number;
+  /**
+   * contact-tooth-v2 획의 상호작용 매체. 생략(= 레거시 획)이면 아래 이득 walk가 **한 줄도
+   * 바뀌지 않은 채** 돌아 픽셀이 비트 단위로 보존된다.
+   */
+  readonly medium?: StudioPaperMediumV1 | null;
+  /** v2 전용 — 이 dab의 필압. 접촉면 깊이를 정한다. */
+  readonly pressure?: number;
 }
 
 /**
@@ -55,7 +66,7 @@ export interface StudioPaperTipCompositionInput {
  * 해시를 돌릴 필요 없이 그대로 이어 붙인다 — dab마다 sha256을 계산하지 않는 것이 요점이다.
  */
 function compositionRevision(input: StudioPaperTipCompositionInput): string {
-  return [
+  const base = [
     "paper-tip-v1",
     typeof input.tip.revision === "undefined" ? "anon" : String(input.tip.revision),
     input.tile.key,
@@ -66,6 +77,11 @@ function compositionRevision(input: StudioPaperTipCompositionInput): string {
     input.radiusY,
     input.angleRadians,
   ].join("|");
+  // 레거시 dab은 접미사가 붙지 않아 리비전 문자열이 예전과 **문자 단위로 같다** —
+  // 텍스처 스탬프 캐시가 기존 표면을 계속 재사용한다.
+  return input.medium
+    ? `${base}|contact-tooth-v2|${input.medium}|${input.pressure ?? ""}`
+    : base;
 }
 
 /**
@@ -116,8 +132,60 @@ export function composeStudioPaperTipAlphaMap(
   // (0.5, 0.5) 텍셀 중심을 [-1,1]로 보낸 뒤 dab 변환을 태운 좌상단 시작점.
   const originLocalX = (0.5 / size) * 2 * input.radiusX - input.radiusX;
   const originLocalY = (0.5 / size) * 2 * input.radiusY - input.radiusY;
-  let rowU = (input.centerX + originLocalX * cosine - originLocalY * sine) / scale;
-  let rowV = (input.centerY + originLocalX * sine + originLocalY * cosine) / scale;
+  const originDocumentX = input.centerX + originLocalX * cosine - originLocalY * sine;
+  const originDocumentY = input.centerY + originLocalX * sine + originLocalY * cosine;
+  if (input.medium) {
+    /*
+     * contact-tooth-v2 — 텍셀당 **문서 좌표**를 그대로 걸어가며 단일 침착 권위를 호출한다.
+     *
+     * v2 높이는 서로 통약불가능한 두 타일 조회의 합이라 위의 "이득 타일 한 장을 상수 증분으로
+     * 걷는" walk로는 표현할 수 없다. 대신 문서 좌표 자체가 텍셀에 대해 아핀이므로 그 좌표를
+     * 상수 증분으로 걷고(삼각함수 0회), 극성·필압 수학은
+     * `resolveStudioPaperContactToothAlphaMultiplierAt` 한 곳에만 둔다 — 레거시 walk를 v2로
+     * 베껴 쓰면 침착 수학이 트리에 또 한 벌 생긴다.
+     */
+    const documentStepXx = texelToLocalX * cosine;
+    const documentStepXy = texelToLocalX * sine;
+    const documentStepYx = -texelToLocalY * sine;
+    const documentStepYy = texelToLocalY * cosine;
+    const pressure = input.pressure ?? STUDIO_PAPER_SUBSTRATE_FALLBACK_PRESSURE;
+    let rowX = originDocumentX;
+    let rowY = originDocumentY;
+    for (let y = 0; y < size; y += 1) {
+      let px = rowX;
+      let py = rowY;
+      const row = y * size;
+      for (let x = 0; x < size; x += 1) {
+        const tipAlpha = source[row + x]!;
+        if (tipAlpha > 0) {
+          const multiplier = resolveStudioPaperContactToothAlphaMultiplierAt(
+            input.tile,
+            px,
+            py,
+            scale,
+            input.medium,
+            pressure,
+          );
+          const value = tipAlpha * multiplier;
+          alphas[row + x] = value >= 1 ? 1 : value;
+        }
+        px += documentStepXx;
+        py += documentStepXy;
+      }
+      rowX += documentStepYx;
+      rowY += documentStepYy;
+    }
+    return {
+      size,
+      alphas,
+      shape: input.tip.shape,
+      softness: input.tip.softness,
+      custom: true,
+      revision: compositionRevision(input),
+    };
+  }
+  let rowU = originDocumentX / scale;
+  let rowV = originDocumentY / scale;
   for (let y = 0; y < size; y += 1) {
     let u = rowU;
     let v = rowV;

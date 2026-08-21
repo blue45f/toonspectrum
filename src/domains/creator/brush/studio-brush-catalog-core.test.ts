@@ -13,8 +13,14 @@ describe("studio brush catalog core quarantine lanes", () => {
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS.length).toBeGreaterThan(0);
     const quarantined = new Set(STUDIO_BRUSH_QUARANTINED_PRESET_IDS);
 
-    for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
-      // Every ledger entry today is a core lane variant, so the core SSOT must keep it…
+    // The ledger spans both partitions since the 2026-08-21 roster reduction, and this module owns
+    // only the core one — so assert core ids against the core SSOT and require that the ids this
+    // module does NOT own are genuinely absent from it rather than silently skipped.
+    const coreIds = new Set(STUDIO_CORE_BRUSH_CATALOG_ITEMS.map((item) => item.id));
+    const quarantinedCoreIds = STUDIO_BRUSH_QUARANTINED_PRESET_IDS.filter((id) => coreIds.has(id));
+    expect(quarantinedCoreIds.length).toBeGreaterThan(0);
+    for (const quarantinedId of quarantinedCoreIds) {
+      // A quarantined core lane variant must stay in the core SSOT…
       expect(
         STUDIO_CORE_BRUSH_CATALOG_ITEMS.some((item) => item.id === quarantinedId),
         `${quarantinedId}: left the core SSOT`
@@ -24,6 +30,15 @@ describe("studio brush catalog core quarantine lanes", () => {
         studioCoreBrushCatalogItemById(quarantinedId)?.id,
         `${quarantinedId}: saved-document resolution lost`
       ).toBe(quarantinedId);
+    }
+    for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
+      if (coreIds.has(quarantinedId)) continue;
+      // Pro-pack ledger entries: this module must not resolve them at all (the lazy pack index
+      // owns that), so a null here proves the launch-safe core chunk still excludes the pack.
+      expect(
+        studioCoreBrushCatalogItemById(quarantinedId),
+        `${quarantinedId}: leaked into the launch-safe core chunk`
+      ).toBeNull();
     }
     expect(
       STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS.some((item) => quarantined.has(item.id))

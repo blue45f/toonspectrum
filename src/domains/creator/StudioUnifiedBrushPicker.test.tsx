@@ -60,7 +60,7 @@ describe("StudioUnifiedBrushPicker", () => {
     expect(html).toContain("펜(매끈)");
     expect(html).toContain("12px");
     expect(html).toContain("농도 75%");
-    expect(html).toContain("선화 · 원형 촉");
+    expect(html).toContain("잉크 · 원형 촉");
     expect(html).toContain("속도 적응 6");
     expect(html).toContain('data-studio-active-brush-summary="true"');
     expect(html).toContain('data-studio-brush-tray="true"');

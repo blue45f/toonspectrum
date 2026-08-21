@@ -457,3 +457,181 @@ describe("studio wet ribbon carrier long-stroke budget", () => {
     expect(plan.polygonCount).toBe(508);
   });
 });
+
+/**
+ * The coverage ladder is built by grouping each deposit onto its rung span once, rather than by
+ * rescanning every deposit at every rung. These assertions pin the properties that made the two
+ * equivalent, so a future re-tuning cannot quietly reintroduce per-rung geometry drift.
+ *
+ * Composite order is the load-bearing one: batch polygons are translucent, so reordering them
+ * inside a batch changes pixels even when the set is unchanged.
+ */
+function coverageThresholdOf(
+  batch: ReturnType<typeof planStudioWetRibbonCarrier>["batches"][number],
+): number {
+  const bucket = Math.round(batch.coverageCeiling * BUCKETS);
+  return bucket === 1 ? 0 : (bucket - 0.5) / BUCKETS;
+}
+
+function includedAtThreshold(opacity: number, threshold: number): boolean {
+  return threshold <= 0 ? opacity > 0 : opacity >= threshold;
+}
+
+function layerDepositsOf(
+  plan: ReturnType<typeof planStudioWetRibbonCarrier>,
+  layer: StudioWetRibbonFootprint["layers"][number]["layer"],
+) {
+  return plan.footprints.flatMap((footprint) => {
+    const planned = footprint.layers.find(
+      (candidate) => candidate.layer === layer,
+    );
+    return planned
+      && Math.max(planned.startOpacity, planned.endOpacity) > 0
+      ? [planned]
+      : [];
+  });
+}
+
+function assertLadderMatchesDepositScan(
+  plan: ReturnType<typeof planStudioWetRibbonCarrier>,
+): void {
+  const depositCache = new Map<
+    string,
+    ReturnType<typeof layerDepositsOf>
+  >();
+  for (const batch of plan.batches) {
+    let deposits = depositCache.get(batch.layer);
+    if (!deposits) {
+      deposits = layerDepositsOf(plan, batch.layer);
+      depositCache.set(batch.layer, deposits);
+    }
+    const threshold = coverageThresholdOf(batch);
+    const fullyIncluded = deposits.filter((deposit) => includedAtThreshold(
+      Math.min(deposit.startOpacity, deposit.endOpacity),
+      threshold,
+    ));
+    const partiallyIncluded = deposits.filter((deposit) => includedAtThreshold(
+      Math.max(deposit.startOpacity, deposit.endOpacity),
+      threshold,
+    ));
+    const unclipped = new Set(fullyIncluded.map(({ polygon }) => polygon));
+    const actualUnclipped = batch.polygons.filter(
+      (candidate) => unclipped.has(candidate),
+    );
+
+    // Deposits whose whole span clears the rung must be the planner's own frozen polygon, shared by
+    // reference — that is what proves no re-quantization happened on the grouped path.
+    expect(actualUnclipped.length).toBe(fullyIncluded.length);
+    for (let index = 0; index < fullyIncluded.length; index += 1) {
+      expect(actualUnclipped[index]).toBe(fullyIncluded[index]!.polygon);
+    }
+    // Mixed-span deposits contribute a real clip (or fail closed), never an extra polygon.
+    expect(batch.polygons.length).toBeGreaterThanOrEqual(fullyIncluded.length);
+    expect(batch.polygons.length).toBeLessThanOrEqual(partiallyIncluded.length);
+  }
+}
+
+describe("studio wet ribbon carrier coverage-ladder grouping", () => {
+  it.each([
+    ["short", 12],
+    ["medium", 120],
+    ["long", 900],
+  ] as const)(
+    "matches a per-rung deposit scan on a %s stroke",
+    (_label, pointCount) => {
+      const points: number[] = [];
+      const pressures: number[] = [];
+      for (let index = 0; index < pointCount; index += 1) {
+        points.push(20 + index * 3.1, 60 + Math.sin(index * 0.09) * 24);
+        pressures.push(0.2 + 0.75 * Math.abs(Math.sin(index * 0.013)));
+      }
+      const plan = planStudioWetRibbonCarrier(
+        planCausalWatercolorBrushDabs({ ...SETTINGS, points, pressures }, true),
+        { seed: SETTINGS.seed },
+      );
+
+      expect(plan.batches.length).toBeGreaterThan(0);
+      assertLadderMatchesDepositScan(plan);
+    },
+  );
+
+  it("emits every layer's rungs contiguously in ascending coverage order", () => {
+    const points: number[] = [];
+    const pressures: number[] = [];
+    for (let index = 0; index < 200; index += 1) {
+      points.push(15 + index * 2.7, 50 + Math.cos(index * 0.07) * 18);
+      pressures.push(0.15 + 0.8 * Math.abs(Math.sin(index * 0.021)));
+    }
+    const plan = planStudioWetRibbonCarrier(
+      planCausalWatercolorBrushDabs({ ...SETTINGS, points, pressures }, true),
+      { seed: SETTINGS.seed },
+    );
+
+    const seenLayers: string[] = [];
+    let previousLayer: string | null = null;
+    let previousBucket = 0;
+    for (const batch of plan.batches) {
+      const bucket = Math.round(batch.coverageCeiling * BUCKETS);
+      if (batch.layer !== previousLayer) {
+        expect(seenLayers).not.toContain(batch.layer);
+        seenLayers.push(batch.layer);
+        previousLayer = batch.layer;
+        previousBucket = 0;
+      }
+      // A contiguous ladder is what keeps a later input suffix from inserting an intermediate pass.
+      expect(bucket).toBe(previousBucket + 1);
+      expect(batch.opacity).toBeGreaterThan(0);
+      previousBucket = bucket;
+    }
+    expect(seenLayers.length).toBeGreaterThan(1);
+  });
+
+  it.each([
+    ["cap - 1", -1],
+    ["cap", 0],
+    ["cap + 1", 1],
+  ] as const)(
+    "groups identically across the footprint cap boundary at %s",
+    (_label, offset) => {
+      const cap = 96;
+      const stationCount = cap + offset;
+      const dabs: StudioWetRibbonSourceDab[] = Array.from(
+        { length: stationCount },
+        (_, index) => ({
+          x: 12 + index * 1.7,
+          y: 40 + Math.sin(index * 0.13) * 20,
+          radius: 3 + (index % 5) * 0.4,
+          opacity: 0.1 + ((index * 29) % 67) / 100,
+          role: "core" as const,
+        }),
+      );
+      const plan = planStudioWetRibbonCarrier(dabs, {
+        seed: 41,
+        maxFootprints: cap,
+      });
+
+      expect(plan.capped).toBe(offset > 0);
+      expect(plan.sourceStationCount).toBe(Math.min(cap, stationCount));
+      assertLadderMatchesDepositScan(plan);
+    },
+  );
+
+  it("keeps a fully saturated stroke on the complete ladder", () => {
+    const plan = planStudioWetRibbonCarrier(
+      Array.from({ length: 24 }, (_, index) => ({
+        x: 10 + index * 4,
+        y: 30,
+        radius: 6,
+        opacity: 1,
+        role: "core" as const,
+      })),
+      { seed: 7 },
+    );
+
+    const coreBuckets = plan.batches
+      .filter(({ layer }) => layer === "core")
+      .map(({ coverageCeiling }) => Math.round(coverageCeiling * BUCKETS));
+    expect(coreBuckets.at(-1)).toBe(BUCKETS);
+    assertLadderMatchesDepositScan(plan);
+  });
+});

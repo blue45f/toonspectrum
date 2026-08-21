@@ -33,7 +33,8 @@ import {
 
 import {
   filterStudioBrushCatalogItems,
-  STUDIO_BRUSH_CATALOG_COUNTS,
+  STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog";
@@ -41,6 +42,7 @@ import {
   resolveStudioBrushEngineLaneLabelKo,
   studioBrushEngineLaneRowById,
 } from "./studio-brush-engine-lane-catalog";
+import { isStudioBrushMaterialGroup } from "./studio-brush-material-group";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
   materializeStudioBrushCatalogSelection,
@@ -812,16 +814,18 @@ export function StudioBrushLibrarySheet({
   const catalogTabs = operation === "erase"
     ? STUDIO_ERASER_LIBRARY_TABS
     : STUDIO_BRUSH_LIBRARY_TABS;
-  // SSOT totals — never hardcode (legacy copy said "229 paint" from core 71 era).
+  // SSOT totals — never hardcode (legacy copy said "229 paint" from core 71 era). The number must
+  // come from the LISTED inventory, not the registered one: registered counts include quarantined
+  // ids that this sheet can never show, so `STUDIO_BRUSH_CATALOG_COUNTS.paint` would advertise
+  // 328 brushes behind a drawer that offers 240 (2026-08-21 로스터 축소 이후).
   const operationCatalogCount = operation === "erase"
-    ? STUDIO_BRUSH_CATALOG_COUNTS.erase
-    : STUDIO_BRUSH_CATALOG_COUNTS.paint;
-  const operationCoreCount = operation === "erase"
-    ? STUDIO_BRUSH_CATALOG_COUNTS.erase
-    : STUDIO_BRUSH_CATALOG_COUNTS.core - STUDIO_BRUSH_CATALOG_COUNTS.erase;
-  const operationProCount = operation === "erase"
-    ? 0
-    : STUDIO_BRUSH_CATALOG_COUNTS.pro;
+    ? STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS.length
+    : STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length;
+  // 코어/프로시저럴은 구현 티어라 서랍에서 말하지 않는다. 대신 지금 고를 수 있는 재질 갈래 수를
+  // 보여준다 — 탭이 곧 재질이므로 이 숫자는 탭 목록에서 파생된다.
+  const materialTabCount = catalogTabs.filter(
+    (chip) => isStudioBrushMaterialGroup(chip.id),
+  ).length;
   const operationLabel = operation === "erase" ? "지우개" : "브러시";
 
   useEffect(() => {
@@ -1147,7 +1151,7 @@ export function StudioBrushLibrarySheet({
           >
             {operation === "erase"
               ? `지우개 ${operationCatalogCount}종 · ${visibleItems.length}/${items.length}개 표시`
-              : `브러시 ${operationCatalogCount}종 · 코어 ${operationCoreCount} + 프로시저럴 ${operationProCount} · ${visibleItems.length}/${items.length}개 표시`}
+              : `브러시 ${operationCatalogCount}종 · 재질 ${materialTabCount}갈래 · ${visibleItems.length}/${items.length}개 표시`}
           </p>
         </div>
         <button
@@ -1211,7 +1215,7 @@ export function StudioBrushLibrarySheet({
             ? `분류와 관계없이 전체 ${operationCatalogCount}종에서 검색 중`
             : operation === "erase"
               ? "지우는 강도와 결과를 비교해 선택하세요."
-              : "분류를 고르거나 이름·용도·종류로 전체 검색"}
+              : "재질을 고르거나 이름·용도·종류로 전체 검색"}
         </p>
         {operation === "paint" ? <div
           className={cn(
@@ -1283,7 +1287,7 @@ export function StudioBrushLibrarySheet({
           "[@media(max-height:32rem)]:px-1 [@media(max-height:32rem)]:py-0"
         )}
         role="tablist"
-        aria-label={`${operationLabel} 분류`}
+        aria-label={`${operationLabel} 재질 분류`}
       >
         {catalogTabs.map((chip, chipIndex) => {
           const active = tab === chip.id;

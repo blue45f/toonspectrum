@@ -9,6 +9,10 @@ import {
   type StudioInkPressureModel,
 } from "../brush/studio-ink-pressure-model";
 import {
+  isStudioPaperSubstrateModel,
+  type StudioPaperSubstrateModel,
+} from "../brush/studio-paper-substrate-model";
+import {
   isStudioStrokePaintModel,
   isStudioStrokePaintModelCompatible,
   type StudioStrokePaintModel,
@@ -67,6 +71,7 @@ export interface StudioCrdtCompatibleDrawElement {
   pressures?: number[];
   inkInput?: StudioInkInputContract;
   pressureModel?: StudioInkPressureModel;
+  paperModel?: StudioPaperSubstrateModel;
   outlineStroke?: StudioOutlineStrokeContractV1;
   materialPressureModel?: StudioMaterialPressureModel;
   materialMinimumDiameterRatio?: StudioMaterialMinimumDiameterRatio;
@@ -289,6 +294,11 @@ function extensionsOf(element: StudioCrdtCompatibleDrawElement): StudioCrdtJsonO
   // never be persisted as if this client knew how to render its pressure semantics.
   if (isStudioInkPressureModel(element.pressureModel)) {
     extensions.pressureModel = element.pressureModel;
+  }
+  // 같은 이유로 종이 substrate 세대도 화이트리스트 밖에서 직접 검증한다. 협업 상대가 이 키를
+  // 떨어뜨리면 그 획만 조용히 레거시 valley-multiply로 강등되어 두 클라이언트가 다른 그림을 본다.
+  if (isStudioPaperSubstrateModel(element.paperModel)) {
+    extensions.paperModel = element.paperModel;
   }
   if (element.outlineStroke !== undefined) {
     const outlineStroke = normalizeStudioOutlineStrokeContract(element.outlineStroke);

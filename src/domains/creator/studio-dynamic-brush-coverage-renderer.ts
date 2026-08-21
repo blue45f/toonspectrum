@@ -75,12 +75,18 @@ import {
 import {
   acquireStudioPaperGranulationTile,
   resolveStudioDocumentPaperSurface,
+  resolveStudioPaperContactToothAlphaMultiplierAt,
   resolveStudioPaperGranulationAlphaMultiplierAt,
   studioPaperGranulationIsActive,
   type StudioPaperGranulationSettings,
   type StudioPaperGranulationTile,
   type StudioPaperSurfaceSettings,
 } from "./brush/studio-paper-granulation-runtime";
+import {
+  STUDIO_PAPER_SUBSTRATE_FALLBACK_PRESSURE,
+  studioPaperUsesContactTooth,
+  type StudioPaperSubstrateModel,
+} from "./brush/studio-paper-substrate-model";
 import {
   composeStudioPaperTipAlphaMap,
   STUDIO_PAPER_TIP_COMPOSITION_BYTE_BUDGET,
@@ -110,6 +116,8 @@ import {
   planStudioSplatterOriginAnchorDab,
   studioSplatterOriginAnchorMarkCount,
 } from "./studio-splatter-origin-anchor";
+
+import type { StudioPaperMediumV1 } from "./brush/studio-paper-media-profile-v1";
 
 export const STUDIO_DYNAMIC_COVERAGE_TILE_PIXEL_SIZE = 256;
 export const STUDIO_DYNAMIC_COVERAGE_TILE_BLEED_PIXELS = 2;
@@ -347,6 +355,10 @@ export interface StudioDynamicBrushCoverageMarkPlanInput {
   readonly paper?: Readonly<{
     readonly response: StudioPaperGranulationSettings;
     readonly surface?: StudioPaperSurfaceSettings;
+    /** 획이 태어날 때 얼린 substrate 세대. 생략 = 레거시 valley-multiply(픽셀 불변). */
+    readonly model?: StudioPaperSubstrateModel;
+    /** 극성 taxonomy상의 상호작용 매체. `model`이 있을 때만 채워진다. */
+    readonly medium?: StudioPaperMediumV1;
   }>;
 }
 
@@ -1228,14 +1240,40 @@ export function planStudioDynamicBrushCoverageMarks(
    * 마크 알파는 배선 전과 비트 단위로 같다.
    */
   const paperResponse = input.paper?.response;
+  const paperModel = input.paper?.model;
   const paperTile: StudioPaperGranulationTile | null =
     paperResponse && studioPaperGranulationIsActive(paperResponse)
       ? acquireStudioPaperGranulationTile(
           input.paper?.surface ?? resolveStudioDocumentPaperSurface(),
           paperResponse,
+          paperModel,
         )
       : null;
   const paperScale = paperResponse?.scale ?? 1;
+  /**
+   * 이 획이 교정된 substrate를 타는가. 키가 없으면 아래 조회는 **예전 함수 그대로**라
+   * 기존 문서의 픽셀이 한 비트도 바뀌지 않는다.
+   */
+  const paperContactTooth = studioPaperUsesContactTooth(paperModel) && paperTile !== null;
+  const paperMedium = paperContactTooth ? input.paper?.medium ?? null : null;
+  /**
+   * 지금 찍는 dab의 필압. `opacity × flow`는 이 파일이 이미 "RAW pressure-resolved alpha"라고
+   * 부르는 값이다(아래 kernel tip 밴드 폭이 같은 값을 쓴다). dab 루프가 grainAt 클로저보다
+   * 안쪽이라 인자로 넘길 수 없어, `paperCompositionDabIndex`와 같은 방식으로 가변 변수를 쓴다.
+   */
+  let paperContactPressure = STUDIO_PAPER_SUBSTRATE_FALLBACK_PRESSURE;
+  const paperMultiplierAt = (x: number, y: number): number => (
+    paperContactTooth
+      ? resolveStudioPaperContactToothAlphaMultiplierAt(
+          paperTile,
+          x,
+          y,
+          paperScale,
+          paperMedium,
+          paperContactPressure,
+        )
+      : resolveStudioPaperGranulationAlphaMultiplierAt(paperTile, x, y, paperScale)
+  );
   /**
    * 종이 결이 dab **안쪽**까지 들어가는 마지막 dab 인덱스(배타).
    *
@@ -1269,11 +1307,9 @@ export function planStudioDynamicBrushCoverageMarks(
     for (const [unitX, unitY, weight] of STUDIO_PAPER_FOOTPRINT_QUADRATURE) {
       const localX = unitX * radiusX;
       const localY = unitY * radiusY;
-      weighted += resolveStudioPaperGranulationAlphaMultiplierAt(
-        paperTile,
+      weighted += paperMultiplierAt(
         x + localX * cosine - localY * sine,
         y + localX * sine + localY * cosine,
-        paperScale,
       ) * weight;
       totalWeight += weight;
     }
@@ -1312,7 +1348,7 @@ export function planStudioDynamicBrushCoverageMarks(
                 dynamics.grain
               )
             : 1)
-          * resolveStudioPaperGranulationAlphaMultiplierAt(paperTile, x, y, paperScale)
+          * paperMultiplierAt(x, y)
         );
     const grainAcrossFootprint = (
       x: number,
@@ -1354,6 +1390,8 @@ export function planStudioDynamicBrushCoverageMarks(
        * density instead of reading as a lighter half-tone of it.
        */
       const kernelTipMaterial = tipIndex === 0 ? dryMediaKernelTipMaterial : null;
+      // 접촉면 깊이는 이 dab의 필압에서 온다. grainAt/paperAcrossFootprint가 읽는다.
+      paperContactPressure = clampAlpha(composedDab.opacity * composedDab.flow);
       const depositionAlpha = kernelTipMaterial
         ? clampAlpha(linearizeStudioDryMediaKernelDepositionAlpha(
             kernelTipMaterial,
@@ -1560,6 +1598,8 @@ export function planStudioDynamicBrushCoverageMarks(
           radiusX,
           radiusY,
           angleRadians,
+          medium: paperMedium,
+          pressure: paperContactPressure,
         });
         if (composed) texturedAlphaMap = composed;
       }
@@ -1631,6 +1671,9 @@ export function planStudioDynamicBrushCoverageMarks(
 
     for (const dab of studioDynamicBrushDabsInVariation(dabs)) {
       paperCompositionDabIndex = dab.index;
+      // appendTipDab 안쪽은 합성 dab으로 다시 덮어쓴다. 여기 값은 그 경로를 타지 않는
+      // 직결 union/폴백 dab이 읽는 필압이다.
+      paperContactPressure = clampAlpha(dab.opacity * dab.flow);
       const dabColor = resolveNormalizedStudioBrushDabColor(
         stroke,
         dab.index,

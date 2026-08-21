@@ -644,6 +644,44 @@ function paperDepositScaleForModeV1(
 }
 
 /**
+ * 호출 측이 **직접 샘플한 높이**에 대한 depositScale.
+ *
+ * `resolveStudioPaperDepositScaleV1`은 높이 샘플링과 모드 수학을 함께 소유한다. substrate-v2
+ * 런타임은 같은 모드 수학을 **자기가 샘플한 높이**에 걸어야 한다 — v2 필드는 서로 통약불가능한
+ * 두 타일 조회로 de-tiling 되어 있어 `samplePaperHeightV1`이 표현할 수 없다. 커널을 여기서
+ * 노출해 두면 peak-catch / valley-settle / weave-reveal 사본이 트리에 두 벌 생기지 않는다 —
+ * 침착 수학의 단일 권위는 이 파일 하나다.
+ *
+ * 검증되지 않은 입력은 `resolveStudioPaperDepositScaleV1`과 동일하게 항등(1)으로 fail-closed.
+ */
+export function resolveStudioPaperDepositScaleForHeightV1(
+  medium: unknown,
+  pressure: number,
+  affinity: number,
+  height: number,
+  thinness?: number,
+): number {
+  if (
+    !isStudioPaperMediumV1(medium)
+    || !Number.isFinite(pressure)
+    || !Number.isFinite(height)
+  ) {
+    return STUDIO_PAPER_MEDIA_MODULATION_IDENTITY_V1.depositScale;
+  }
+  const profile = STUDIO_PAPER_MEDIA_INTERACTION_V1[medium];
+  const clampedPressure = clamp01(pressure);
+  const flood = Math.pow(clampedPressure, profile.pressureCurve);
+  return paperDepositScaleForModeV1(
+    profile,
+    clampedPressure,
+    clamp01(finiteNumber(affinity, 0)),
+    clamp01(height),
+    flood,
+    thinness,
+  );
+}
+
+/**
  * dab/텍셀 핫패스용 스칼라 fast path — `resolveStudioPaperMediaModulationV1(...).depositScale`
  * 과 항상 정확히 같은 값을 돌려주지만 입력/결과 객체를 만들지 않는다(할당 0, freeze 0).
  * 스탬프 플래너는 dab 당 depositScale 하나만 소비하므로 이 경로를 쓴다. 검증되지 않은

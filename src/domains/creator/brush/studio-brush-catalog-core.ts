@@ -14,8 +14,12 @@ import {
   type StudioQuickBrushTrayItem,
 } from "../studio-creative-ux";
 
+import { STUDIO_BRUSH_MATERIAL_GROUP_LABELS } from "./studio-brush-material-group";
 import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
-import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
+import {
+  isStudioBrushQuarantinedPresetId,
+  STUDIO_BRUSH_QUARANTINED_PRESET_IDS,
+} from "./studio-brush-quarantine";
 
 import type { StudioToolOperation } from "../studio-brush";
 
@@ -75,14 +79,43 @@ export const STUDIO_BRUSH_CATALOG_COUNTS = Object.freeze({
     + STUDIO_BRUSH_PACK_CATALOG_IDS.length,
 });
 
+/**
+ * Product-facing totals for the LISTED inventory — what a picker can actually offer today.
+ *
+ * `STUDIO_BRUSH_CATALOG_COUNTS` above counts REGISTERED presets, including quarantined ids that no
+ * listing may show; using it in UI copy advertises brushes the drawer cannot open (2026-08-21
+ * 로스터 축소 이후 등록 328 vs 노출 240). Derived, never hardcoded, and still launch-safe: the
+ * quarantine ledger is a zero-import leaf, so the pro slice is counted as "ledger entries this
+ * module does not own" rather than by importing the 160 pack descriptors.
+ */
+const STUDIO_QUARANTINED_PRO_BRUSH_COUNT = STUDIO_BRUSH_QUARANTINED_PRESET_IDS.filter(
+  (quarantinedId) => !STUDIO_CORE_BRUSH_CATALOG_ITEMS.some((item) => item.id === quarantinedId),
+).length;
+
+const STUDIO_LISTED_CORE_ERASE_BRUSH_COUNT = STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS.filter(
+  (item) => item.operation === "erase",
+).length;
+
+export const STUDIO_BRUSH_LISTED_CATALOG_COUNTS = Object.freeze({
+  core: STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS.length,
+  pro: STUDIO_BRUSH_PACK_CATALOG_IDS.length - STUDIO_QUARANTINED_PRO_BRUSH_COUNT,
+  total:
+    STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS.length
+    + STUDIO_BRUSH_PACK_CATALOG_IDS.length
+    - STUDIO_QUARANTINED_PRO_BRUSH_COUNT,
+  erase: STUDIO_LISTED_CORE_ERASE_BRUSH_COUNT,
+  paint:
+    STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS.length
+    - STUDIO_LISTED_CORE_ERASE_BRUSH_COUNT
+    + STUDIO_BRUSH_PACK_CATALOG_IDS.length
+    - STUDIO_QUARANTINED_PRO_BRUSH_COUNT,
+});
+
+/**
+ * 재질 라벨은 파생 모듈이 소유한다. 여기서 다시 적으면 탭·칩·배지가 서로 다른 이름을 쓰게 된다.
+ */
 export const STUDIO_BRUSH_MEDIA_LABELS: Readonly<Record<StudioBrushMediaGroup, string>> =
-  Object.freeze({
-    line: "선화",
-    marker: "마커",
-    paint: "채색",
-    fx: "효과",
-    texture: "질감",
-  });
+  STUDIO_BRUSH_MATERIAL_GROUP_LABELS;
 
 const STUDIO_CORE_BRUSH_CATALOG_BY_ID: ReadonlyMap<string, StudioBrushCatalogItem> =
   new Map(STUDIO_CORE_BRUSH_CATALOG_ITEMS.map((item) => [item.id, item]));

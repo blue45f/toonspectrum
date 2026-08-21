@@ -283,6 +283,24 @@ export function circleSelectionPolygon(
 }
 
 /**
+ * 궤적 연장 판정 — 마지막 점과 minDist 미만이면 false. appendLassoPoint(불변)와
+ * appendLassoPointInPlace(제자리)가 **같은 이 함수 하나**를 공유하므로 두 경로의 채택 판정은
+ * 정의상 동일하다(부동소수 비교식이 하나뿐이라 갈라질 수 없다).
+ */
+function extendsSelectionTrail(
+  last: SelPoint | undefined,
+  next: SelPoint,
+  minDist: number
+): boolean {
+  if (!last) return true;
+  const dx = next.x - last.x;
+  const dy = next.y - last.y;
+  // 원래의 `< minDist²` 판정을 부호까지 그대로 보존한다. `>=` 로 뒤집으면 NaN 입력에서
+  // (NaN 비교는 항상 false) 채택/거부가 뒤바뀐다 — 위생 처리되지 않은 궤적에 대한 동작 변화.
+  return !(dx * dx + dy * dy < minDist * minDist);
+}
+
+/**
  * 올가미 궤적에 점 추가 — 마지막 점과 minDist 미만이면 기존 배열을 그대로 반환(추가 없음).
  * 불변: 추가 시 새 배열을 만든다(React 상태로 바로 쓸 수 있음).
  */
@@ -292,13 +310,24 @@ export function appendLassoPoint(
   minDist = LASSO_MIN_POINT_DIST
 ): SelPoint[] {
   const next = sanitizePoint(p, SEL_POINT_MIN, SEL_POINT_MAX);
-  const last = points[points.length - 1];
-  if (last) {
-    const dx = next.x - last.x;
-    const dy = next.y - last.y;
-    if (dx * dx + dy * dy < minDist * minDist) return points as SelPoint[];
-  }
+  if (!extendsSelectionTrail(points[points.length - 1], next, minDist)) return points as SelPoint[];
   return [...points, next];
+}
+
+/**
+ * appendLassoPoint 의 제자리(mutable) 쌍 — 같은 sanitize/간격 규약으로 판정하고, 채택된
+ * 점만 배열 끝에 push 한다. 반환값은 "추가되었는가". 세션이 소유한 배열에만 쓸 것.
+ * 매 포인터 이동마다 배열 전체를 spread 복제하던 O(n²) 누적을 O(1) 추가로 바꾼다.
+ */
+export function appendLassoPointInPlace(
+  points: SelPoint[],
+  p: SelPoint,
+  minDist = LASSO_MIN_POINT_DIST
+): boolean {
+  const next = sanitizePoint(p, SEL_POINT_MIN, SEL_POINT_MAX);
+  if (!extendsSelectionTrail(points[points.length - 1], next, minDist)) return false;
+  points.push(next);
+  return true;
 }
 
 /** 브러시 이웃 점 최소 간격(정규화) — 반경의 20%. 굵을수록 성기게 저장해도 라운드 조인이 획을 메운다. */
@@ -309,6 +338,15 @@ export function brushPointMinDist(radiusNorm: number): number {
 /** 브러시 궤적에 점 추가 — appendLassoPoint 와 동일한 불변 규약(안 늘면 같은 배열), 간격만 반경 비례. */
 export function appendBrushPoint(points: readonly SelPoint[], p: SelPoint, radiusNorm: number): SelPoint[] {
   return appendLassoPoint(points, p, brushPointMinDist(radiusNorm));
+}
+
+/** appendBrushPoint 의 제자리 쌍 — 같은 간격 규약, 배열 복제 없이 push. 반환값은 "추가되었는가". */
+export function appendBrushPointInPlace(
+  points: SelPoint[],
+  p: SelPoint,
+  radiusNorm: number
+): boolean {
+  return appendLassoPointInPlace(points, p, brushPointMinDist(radiusNorm));
 }
 
 /**

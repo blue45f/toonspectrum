@@ -5,6 +5,8 @@ import {
   STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
 } from "./studio-brush-catalog";
+import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
+import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
 import {
   resolveStudioBrushRuntime,
   resolveStudioBrushRuntimeContract,
@@ -102,39 +104,32 @@ describe("studio brush variant group manifest", () => {
     // The wave's new engine lanes are pinned experimental by the catalogue integrator here
     // (2026-08-13 brush quality wave: dry-stamp x4, wet-texture x4, oil x3;
     // 2026-08-13 wave 3: CC0 MyPaint x17, croquis capsule x2, living-ink bake x2, physics oil x1).
+    // 2026-08-21 roster reduction: 12 pins RESOLVED — watercolor--granulating,
+    // watercolor--fluid-feather and 10 mypaint-cc0 lanes each shared an execution signature with a
+    // lane that already ships, so the lab answered "no" and they moved to the quarantine ledger.
+    // The audit demands the pin be resolved before quarantine, so this list and the ledger must
+    // stay disjoint; that disjointness is asserted in studio-brush-catalog-lifecycle.test.ts.
     expect(STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS).toEqual([
       "crayon--klecks-stamp",
       "chalk--klecks-stamp",
       "charcoal--mypaint-stamp",
       "pastel--soft-stamp",
       "watercolor--edge-bloom",
-      "watercolor--granulating",
       "ink-wash--fiber-feather",
       "ink-wash--chroma-halo",
       "brush--impasto-relief",
       "brush--bristle-depletion",
       "oil-pastel--wgm-mix",
-      "mypaint-cc0--charcoal",
-      "mypaint-cc0--charcoal-tanda",
       "mypaint-cc0--2b-pencil",
       "mypaint-cc0--dry-brush",
       "mypaint-cc0--splatter",
       "mypaint-cc0--ink-blot",
       "mypaint-cc0--kabura",
-      "mypaint-cc0--calligraphy",
       "mypaint-cc0--marker-fat",
-      "mypaint-cc0--marker-small",
-      "mypaint-cc0--slow-ink",
-      "mypaint-cc0--knife",
       "mypaint-cc0--watercolor-fringe",
-      "mypaint-cc0--watercolor-expressive",
-      "mypaint-cc0--oil-paint",
-      "mypaint-cc0--pastel",
-      "mypaint-cc0--spray",
       "gpen--croquis-capsule",
       "pen--croquis-stabilized",
       "ink-wash--living-bake",
-      "watercolor--fluid-feather",
       "brush--bristle-physics",
     ]);
     for (const experimentalId of STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS) {
@@ -172,6 +167,20 @@ describe("studio brush variant group manifest", () => {
     // predate this audit (inkwash-water-brush, watercolor--granulating, gouache--matte-body,
     // mypaint-cc0--knife, all edge-periodicity). Land the shrink together with a fresh receipt
     // once those four are fixed; a red evidence gate hides the next regression.
+    //
+    // 2026-08-21 ROSTER REDUCTION WAVE (사용자 지시: "비슷한 질감의 브러시가 너무 많다") — 83 ids
+    // added below, 325 -> 242 listed. Two mechanical facts decide membership, never taste:
+    //   - core/lane: a shared `studioBrushRuntimeExecutionSignature` means one execution path, so
+    //     the only thing separating the pair is a value the width/opacity sliders reproduce;
+    //   - pro pack: a shared tip footprint (runtime + tip motif/alpha map + tip layers) means one
+    //     texture, because every other pack parameter is a brush-editor slider.
+    // Distinct alpha-map motifs (68 pro), distinct signatures, the four real nib geometries
+    // (calligraphy/fountain-pen/parallel-pen/brush-pen) and the sparse ids pinned by
+    // studio-brush-continuity-audit are all deliberately untouched. Each entry's reason cites the
+    // shared signature/footprint and names the alternatives that stay exposed.
+    // Note this wave delists three of the four ids the paragraph above blames for the stale
+    // receipt (inkwash-water-brush, watercolor--granulating, mypaint-cc0--knife); gouache--matte-
+    // body is the remaining continuous-policy failure and is NOT a duplicate, so it stays listed.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -179,6 +188,89 @@ describe("studio brush variant group manifest", () => {
         "marker--chisel-ribbon",
         "screentone--sparse-grid",
         "gpen--causal-round",
+        "gel-pen",
+        "glass-pen",
+        "ruling-pen",
+        "technical-pen",
+        "alcohol-marker",
+        "school-pen",
+        "liner",
+        "mapping-pen",
+        "kaburapen",
+        "soft-pencil",
+        "pencil-2b",
+        "inkwash-pen",
+        "inkwash-water-brush",
+        "inkwash-bleed-wash",
+        "watercolor--granulating",
+        "watercolor--fluid-feather",
+        "watercolor--dense-core",
+        "gouache--flat-stamp",
+        "mypaint-cc0--calligraphy",
+        "mypaint-cc0--marker-small",
+        "mypaint-cc0--slow-ink",
+        "mypaint-cc0--knife",
+        "mypaint-cc0--spray",
+        "mypaint-cc0--watercolor-expressive",
+        "mypaint-cc0--charcoal",
+        "mypaint-cc0--charcoal-tanda",
+        "mypaint-cc0--oil-paint",
+        "mypaint-cc0--pastel",
+        "brush--oil-lanes",
+        "acrylic--stiff-ribbon",
+        "oil--tube-extrude",
+        "acrylic--polymer-flat",
+        "marker--soft-dynamic",
+        "airbrush--hard-envelope",
+        "airbrush--klecks-grit",
+        "spray--equal-area",
+        "splatter--burst-cloud",
+        "pen--perfect-taper",
+        "calligraphy--perfect-chisel",
+        "pencil--erodible-wear",
+        "pencil--stamp-grain",
+        "sparkle-star",
+        "chalk--klecks-powder",
+        "pastel--cake-soft",
+        "crayon--wax-scrape",
+        "oil-pastel--waxy-film",
+        "watercolor--edge-stamp",
+        "powder-sketch",
+        "chalk-powder",
+        "rough-grain",
+        "sand-texture",
+        "pencil-colored-soft",
+        "pencil-tilt-shading",
+        "watercolor-dry-granule",
+        "oval-shading",
+        "clean-flat",
+        "rhythm-flat",
+        "clean-flat-marker",
+        "alcohol-chisel-marker",
+        "acrylic-stiff-flat",
+        "chalk-rough",
+        "strong-rough-grain",
+        "heavy-rough-grain",
+        "plaster-texture",
+        "pencil-charcoal-stick",
+        "classic-marker",
+        "round-paint",
+        "watercolor-detail-round",
+        "crisp-ink",
+        "milli-pen-uniform",
+        "cloud-soft",
+        "airbrush-grand-soft",
+        "watercolor-wet-wash",
+        "fiber-marker",
+        "fiber-sketch",
+        "scattered-flat",
+        "chalk-compressed",
+        "paint-ink",
+        "watercolor-edge-stain",
+        "broken-nib-ink",
+        "angular-square",
+        "watercolor-flat-wash",
+        "foliage-broad-canopy",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);
@@ -199,9 +291,33 @@ describe("studio brush variant group manifest", () => {
 
   it("keeps every quarantined id on its own runtime contract — never the pen safe-fallback", () => {
     // Pen-convergence regression (지침 3): quarantine removes exposure, not registration. A
-    // quarantined id must resolve `exact` with its own contract so persisted strokes keep their
-    // texture; only genuinely unknown ids may converge to the documented pen fallback.
+    // quarantined id must keep replaying its OWN texture; only genuinely unknown ids may converge
+    // to the documented pen fallback.
+    //
+    // The two catalogue partitions replay through different resolvers and always have:
+    //  - core/engine-lane ids own a row in the runtime contract, so `resolveStudioBrushRuntime`
+    //    answers `exact` for them;
+    //  - pro-pack ids never appear in that table at all (quarantined or not) — they materialize
+    //    onto one of the three durable pack runtimes through `materializeStudioBrushPackSelection`,
+    //    keyed by the descriptor's array ordinal. Asserting `exact` from the core resolver for a
+    //    pack id would assert a fact that was never true, so each partition is checked on the
+    //    resolver that actually replays it.
     for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
+      const packDescriptor = studioBrushPackDescriptorById(quarantinedId);
+      if (packDescriptor) {
+        // Pack replay path: the descriptor is still in the pack and still materializes its own
+        // dynamics snapshot — the ordinal it is keyed by never moved, so the stroke is unchanged.
+        const selection = materializeStudioBrushPackSelection(quarantinedId);
+        expect(selection, quarantinedId).not.toBeNull();
+        expect(selection?.catalogId, quarantinedId).toBe(quarantinedId);
+        expect(selection?.brushDynamics?.presetId, quarantinedId)
+          .toBe(packDescriptor.runtimeBrushId);
+        // …and its runtime brush is a real contract, never the pen fallback.
+        const packRuntime = resolveStudioBrushRuntime(packDescriptor.runtimeBrushId);
+        expect(packRuntime.status, quarantinedId).toBe("exact");
+        expect(packRuntime.resolvedId, quarantinedId).not.toBe(STUDIO_BRUSH_SAFE_FALLBACK_ID);
+        continue;
+      }
       const resolution = resolveStudioBrushRuntime(quarantinedId);
       expect(resolution.status, quarantinedId).toBe("exact");
       expect(resolution.reason, quarantinedId).toBe("supported");

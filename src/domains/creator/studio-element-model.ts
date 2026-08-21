@@ -9,6 +9,7 @@ import type { StudioBrushEngineProgramSet } from "./brush/studio-brush-engine-pr
 import type { StudioStampBrushTuning } from "./brush/studio-brush-stamp-engine";
 import type { StudioInkPressureModel } from "./brush/studio-ink-pressure-model";
 import type { InkWash } from "./brush/studio-ink-wash";
+import type { StudioPaperSubstrateModel } from "./brush/studio-paper-substrate-model";
 import type { StudioStrokePaintModel } from "./brush/studio-stroke-paint-model";
 import type { ShapeParams, StrokeStyle } from "./brush/studio-stroke-shapes";
 import type { StudioLayerBorderEffectSettings } from "./layer/studio-layer-border-effect";
@@ -463,6 +464,16 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElemen
   inkInput?: StudioInkInputContract;
   /** Versioned pressure→diameter semantics. Omitted persisted strokes retain the legacy curve. */
   pressureModel?: StudioInkPressureModel;
+  /**
+   * Versioned paper-substrate semantics. Omitted persisted strokes retain the legacy
+   * valley-multiply substrate — every coupled family depositing into the valleys, with no pressure
+   * input and an exact 128-texel tile repeat.
+   *
+   * This key is load-bearing for finished artwork: ToonSpectrum strokes are re-planned from their
+   * stored points and pressures on every render rather than rasterized at commit time, so a
+   * substrate correction without a key would silently repaint every existing page.
+   */
+  paperModel?: StudioPaperSubstrateModel;
   /**
    * Immutable outline-renderer snapshot captured at pointer start. New perfect-freehand/G-pen
    * strokes replay this contract instead of re-resolving mutable brush catalog semantics.

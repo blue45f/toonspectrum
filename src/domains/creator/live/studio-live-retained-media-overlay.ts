@@ -30,6 +30,7 @@ import {
 } from "../studio-brush";
 import {
   FX_OIL_DAB_CAP,
+  FxOilDabPlanner,
   fxBrushSeedFromKey,
   isStudioFxPressureBrushId,
   planOilBrushDabs,
@@ -141,6 +142,12 @@ interface ActiveRetainedStroke {
   paintedDabs: number;
   paintedPencilMarks: number;
   paintedSourceSegments: number;
+  /**
+   * Per-stroke oil dab cache. Present only for the live in-progress stroke: settled replays build
+   * a throwaway `ActiveRetainedStroke` and pass `null`, which routes them through the plain
+   * `planOilBrushDabs` exactly as before.
+   */
+  oilPlanner: FxOilDabPlanner | null;
 }
 
 export class StudioLiveRetainedMediaOverlayRenderer {
@@ -227,6 +234,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedDabs: 0,
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
+      oilPlanner: kind === "oil" ? new FxOilDabPlanner() : null,
     };
     this.activePaintedOntoSettled = false;
     const painted = this.paintSuffix(this.active, element, this.activeContext);
@@ -267,6 +275,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedDabs: 0,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
+        oilPlanner: null,
       };
       if (!this.paintSuffix(fullActive, element, this.activeContext)) {
         return { status: "fallback" };
@@ -348,7 +357,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       const pairs = pairsFromElement(element);
       if (pairs.length === 0) return true;
       const brush = element.brush ?? "oil";
-      const dabs = planOilBrushDabs({
+      const planInput = {
         points: flatPairs(pairs),
         pressures: element.pressures,
         baseWidth: Math.max(1, element.strokeWidth),
@@ -357,7 +366,13 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintBody: studioOilPaintBodyForBrush(brush),
         tipProfile: studioOilTipProfileForBrush(brush),
         stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
-      });
+      };
+      // Same values either way: the planner re-derives the station lattice and reuses only the
+      // prefix it has verified byte-equal, so a growing stroke stops rebuilding 4096 stations x
+      // 7-44 bristles per pointer move.
+      const dabs = active.oilPlanner
+        ? active.oilPlanner.plan(planInput)
+        : planOilBrushDabs(planInput);
       if (dabs.length === 0) return true;
       if (active.paintedDabs === dabs.length && target === this.activeContext) {
         return true;
@@ -828,6 +843,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedDabs: 0,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
+        oilPlanner: null,
       }, stroke, this.settledContext);
     }
   }
@@ -846,6 +862,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedDabs: 0,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
+        oilPlanner: null,
       }, stroke, this.settledContext);
     }
     if (!this.active) return;
@@ -855,6 +872,9 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
     };
+    // A replay repaints from zero onto a cleared surface; it keeps the live planner so the next
+    // append still reuses a verified prefix rather than paying a full replan for the resize.
+
     this.paintSuffix(replayActive, this.active.element, this.activeContext);
     this.active.paintedDabs = replayActive.paintedDabs;
     this.active.paintedPencilMarks = replayActive.paintedPencilMarks;

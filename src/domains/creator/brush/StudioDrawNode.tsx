@@ -12,6 +12,10 @@ import {
 } from "react-konva/lib/ReactKonvaCore";
 
 import {
+  requestStudioGpuBristleOverlay,
+  studioGpuBristleOilRequest,
+} from "../render/studio-gpu-bristle-host";
+import {
   buildCalligraphySegments,
   processFreehandPoints,
   processPencilPoints,
@@ -332,6 +336,15 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   // is bumped when a requested bake lands in the deterministic cache; it flows into the request
   // call below so compiled (React Compiler) render bodies re-execute it and pick up the cache.
   const [livingInkBakeGeneration, notifyLivingInkBakeReady] = useReducer(
+    (generation: number) => (generation + 1) | 0,
+    0,
+  );
+  // Opt-in GPU bristle overlay (dli position-based-dynamics chain + per-pixel impasto). The lane
+  // advances in a Worker off the render path and this counter is bumped when a result lands, so
+  // the compiled (React Compiler) render body re-executes the request and picks up the bitmap.
+  // Until then — and on every device without WebGPU — the request returns null and the existing
+  // oil carrier paints, byte-identically to today.
+  const [gpuBristleGeneration, notifyGpuBristleReady] = useReducer(
     (generation: number) => (generation + 1) | 0,
     0,
   );
@@ -2261,6 +2274,26 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               <Shape
                 key={index}
                 sceneFunc={(context) => {
+                  // brush--gpu-bristle 레인만 GPU 강모 오버레이를 시도한다. 아직 카탈로그에 없는
+                  // id 라 기존 유화 브러시는 전부 바이트 동일 경로를 그대로 탄다(증분 2에서 등록).
+                  const gpuBristle = studioGpuBristleOilRequest(el.id, brush, dabs, opacity, stroke);
+                  if (gpuBristle) {
+                    const overlay = requestStudioGpuBristleOverlay(
+                      gpuBristle,
+                      notifyGpuBristleReady,
+                      gpuBristleGeneration,
+                    );
+                    if (overlay) {
+                      context.drawImage(
+                        overlay.bitmap,
+                        overlay.dx,
+                        overlay.dy,
+                        overlay.dw,
+                        overlay.dh,
+                      );
+                      return;
+                    }
+                  }
                   const paintInput = {
                     carrier,
                     stroke,

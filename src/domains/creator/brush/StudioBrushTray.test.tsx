@@ -43,7 +43,7 @@ describe("StudioBrushTray", () => {
     expect(html).toContain('data-studio-open-brush-library="true"');
     expect(html).toContain('aria-label="브러시 전체 라이브러리와 관리 열기"');
     expect(html).toContain("라이브러리");
-    expect(html).toContain('data-studio-brush-kind="선화"');
+    expect(html).toContain('data-studio-brush-kind="잉크"');
     expect(html).not.toContain("브러시 키트 펼치기");
     expect(html).not.toContain("브러시 키트 접기");
     // Commercial stroke-preview glyphs (not text-only chips)
@@ -71,10 +71,10 @@ describe("StudioBrushTray", () => {
     expect(tray?.getAttribute("aria-busy")).toBe("true");
     expect(tray?.getAttribute("data-studio-pro-catalog-state")).toBe("loading");
     const heart = await screen.findByRole("option", {
-      name: /즐겨찾기 브러시 하트 도장 · 효과/,
+      name: /즐겨찾기 브러시 하트 도장 · 질감/,
     });
     const hair = await screen.findByRole("option", {
-      name: /최근 사용 브러시 머리카락 결 · 선화/,
+      name: /최근 사용 브러시 머리카락 결 · 질감/,
     });
     expect(heart.getAttribute("aria-selected")).toBe("true");
     expect(heart.getAttribute("data-studio-brush-chip")).toBe("heart-stamp");

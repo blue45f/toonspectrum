@@ -10,6 +10,7 @@ import {
   studioBrushCatalogItemById,
 } from "./brush/studio-brush-catalog";
 import { studioBrushIconId } from "./brush/studio-brush-icons";
+import { isStudioBrushQuarantinedPresetId } from "./brush/studio-brush-quarantine";
 import {
   resolveStudioBrushRuntimeContract,
 } from "./brush/studio-brush-runtime-contract";
@@ -128,22 +129,36 @@ describe("commercial basic line-tool expansion", () => {
       });
     }
 
-    const discoveryQueries = [
+    // ruling-pen and glass-pen were delisted in the 2026-08-21 roster reduction — both share
+    // pen's causal-ink execution signature, so nothing but width separated them from it. Alias
+    // search is a picker path, so it must stop returning them while metadata stays resolvable.
+    const listedDiscoveryQueries = [
       ["maru-pen", "둥근 펜촉"],
       ["maru-pen", "round manga nib"],
       ["parallel-pen", "평행 촉"],
       ["parallel-pen", "parallel calligraphy nib"],
-      ["ruling-pen", "선긋기 펜"],
-      ["ruling-pen", "technical ruling pen"],
-      ["glass-pen", "유리 딥펜"],
-      ["glass-pen", "glass dip pen"],
     ] as const;
-    for (const [id, query] of discoveryQueries) {
+    for (const [id, query] of listedDiscoveryQueries) {
       expect(
         filterStudioBrushCatalogItems({ category: "fx", query })
           .some((item) => item.id === id),
         `${id}: alias ${query} is not globally searchable`,
       ).toBe(true);
+    }
+    const delistedDiscoveryQueries = [
+      ["ruling-pen", "선긋기 펜"],
+      ["ruling-pen", "technical ruling pen"],
+      ["glass-pen", "유리 딥펜"],
+      ["glass-pen", "glass dip pen"],
+    ] as const;
+    for (const [id, query] of delistedDiscoveryQueries) {
+      expect(isStudioBrushQuarantinedPresetId(id), `${id}: expected delisted`).toBe(true);
+      expect(
+        filterStudioBrushCatalogItems({ query }).some((item) => item.id === id),
+        `${id}: alias ${query} still exposes a delisted preset`,
+      ).toBe(false);
+      expect(studioBrushCatalogItemById(id)?.searchAliases, id)
+        .toEqual([...EXPECTED_PRESETS[id].aliases]);
     }
   });
 

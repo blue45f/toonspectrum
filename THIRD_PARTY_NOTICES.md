@@ -39,6 +39,7 @@ obscure, or claim ownership of these libraries.
 | `abseil-cpp` linked into Google Ink WASM | 20260526.0 and 20250512.0 | Apache-2.0 | <https://github.com/abseil/abseil-cpp> |
 | `libmypaint` WASM | 1.6.1 / `2768251dacce3939136c839aeca413f4aa4241d0` | ISC | <https://github.com/mypaint/libmypaint> |
 | dli/paint (Fluid Paint) `painting.frag` CPU port | first-party embedded port, no npm artifact | MIT | <https://github.com/dli/paint> |
+| dli/paint (Fluid Paint) `brush.js` PBD chain + `splat.frag` + `painting.frag` WGSL port | first-party embedded port, no npm artifact | MIT | <https://github.com/dli/paint> |
 | croquis.js capsule pen + pulled-string port | `@disjukr/croquis-js` 0.0.3, first-party embedded port | (MIT OR Apache-2.0), MIT elected | <https://github.com/disjukr/croquis.js> |
 | Klecks brush tip kernel re-implementations | first-party embedded kernels, no npm artifact | MIT | <https://github.com/bitbof/klecks> |
 
@@ -62,10 +63,15 @@ local deterministic finite-difference fill-compositor patch: it replaces an
 undefined fragment-quad derivative at translucent fill edges while retaining
 the upstream spectral pigment blend, public API, attribution, and license.
 
-Three natural-media modules embed third-party code ported by hand rather than
+Four natural-media modules embed third-party code ported by hand rather than
 resolved from npm: `src/domains/creator/studio-impasto-relief-shading-v1.ts`
 (CPU port of dli/paint `shaders/painting.frag` and its `paint.js` defaults,
-MIT), `src/domains/creator/studio-croquis-capsule-pen-v1.ts` (re-typed port of
+MIT), `src/domains/creator/render/studio-gpu-bristle-wgsl.ts` (WGSL port of
+dli/paint `brush.js` and its six constraint fragment shaders
+`project.frag`, `distanceconstraint.frag`, `bendingconstraint.frag`,
+`planeconstraint.frag`, `setbristles.frag` and `updatevelocity.frag`, plus
+`shaders/splat.frag` and `shaders/painting.frag`, MIT),
+`src/domains/creator/studio-croquis-capsule-pen-v1.ts` (re-typed port of
 croquis.js `brush/simple.ts` and `stabilizer/pulled-string.ts`, dual
 `(MIT OR Apache-2.0)` with the MIT option elected), and
 `src/domains/creator/studio-oss-brush-kernels.ts` (clean re-implementations of
@@ -89,6 +95,30 @@ includes both MIT and Apache-2.0 license choices, the Hokusai attribution, and
 the Unicode-3.0 notice required by `unicode-ident` data tables. The license
 audit records the complete locked Rust dependency graph and the exact crates.io
 checksums, rather than treating the WASM file as an opaque binary.
+
+### inkwash — permission on record, nothing ported yet
+
+The project owner has stated that Johno Whitaker
+(<https://github.com/johnowhitaker/inkwash>) granted express permission to use
+that project's source and shaders. The repository publishes no licence file, so
+this record exists to make the grant auditable **before** any line is ported.
+
+- Upstream: <https://github.com/johnowhitaker/inkwash>
+- Author: Johno Whitaker
+- Basis: express permission granted to the project owner (no public licence)
+- Permission reference: **TODO — project owner to record the email, issue or DM
+  that carries the grant.** Do not cite a reference that has not been supplied.
+
+**As of this entry no inkwash code is present in this repository.** The
+watercolour/ink lane's parameter reuse is a clean-room reimplementation and says
+so in code at `src/domains/creator/brush/studio-wet-edge-bloom-v1.ts`, and
+`scripts/verify-studio-living-ink-inkwash-oracle.mjs` drives a locally pinned
+original without bundling or copying it. Both of those statements are true
+today and both become false on the first ported line: a port must update them
+in the same change, add the ported modules to
+`EMBEDDED_FIRST_PARTY_PORT_NOTICES` in
+`scripts/generate-third-party-notices.mjs`, and keep the ported code in clearly
+identifiable modules so provenance stays auditable.
 
 `pnpm run verify:studio-hokusai-wasm` validates the source/output integrity
 manifest without requiring Rust. `pnpm run

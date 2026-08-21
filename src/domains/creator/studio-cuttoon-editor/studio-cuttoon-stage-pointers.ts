@@ -159,7 +159,7 @@ import { replaceStudioRawPenInkPreview, syncStudioRawPenInkPreviewAuthority } fr
 import { appendStudioPendingRasterRetouchGesturePoint } from "../studio-retouch-raster-gesture";
 import { normalizeMarqueeRect, selectIdsByMarquee } from "../studio-selection";
 import {
-  appendBrushPoint,
+  appendBrushPointInPlace,
   appendPolyLassoVertex,
   beginPolyLassoSession,
   beginSelectionDrag,
@@ -2852,10 +2852,11 @@ export function bindStudioCuttoonStagePointers(h: StudioCuttoonStagePointersHost
         const session = quickMaskDragRef.current;
         const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
         const radiusNorm = quickMaskRadius / Math.max(1, session.frame.width);
-        const nextPoints = appendBrushPoint(session.points, p, radiusNorm);
-        if (nextPoints !== session.points) {
-          session.points = nextPoints;
-          scheduleQuickMaskDragPreview({ points: nextPoints });
+        // heal-clone과 동일: 세션이 소유한 배열에 제자리 push 한다(같은 sanitize/간격 규약).
+        // 프리뷰에는 매번 새 래퍼 객체를 넘겨 오버레이의 컴파일러 메모(의존성 = drag 객체)와
+        // React 상태 비교가 그대로 무효화되게 한다 — 배열만 재사용하고 게시 규약은 불변.
+        if (appendBrushPointInPlace(session.points, p, radiusNorm)) {
+          scheduleQuickMaskDragPreview({ points: session.points });
         }
       }
       return;
@@ -2868,10 +2869,8 @@ export function bindStudioCuttoonStagePointers(h: StudioCuttoonStagePointersHost
         const session = layerMaskDragRef.current;
         const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
         const radiusNorm = layerMaskRadius / Math.max(1, session.frame.width);
-        const nextPoints = appendBrushPoint(session.points, p, radiusNorm);
-        if (nextPoints !== session.points) {
-          session.points = nextPoints;
-          scheduleLayerMaskDragPreview({ points: nextPoints });
+        if (appendBrushPointInPlace(session.points, p, radiusNorm)) {
+          scheduleLayerMaskDragPreview({ points: session.points });
         }
       }
       return;
@@ -2883,10 +2882,8 @@ export function bindStudioCuttoonStagePointers(h: StudioCuttoonStagePointersHost
         const session = filterMaskDragRef.current;
         const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
         const radiusNorm = filterMaskRadius / Math.max(1, session.frame.width);
-        const nextPoints = appendBrushPoint(session.points, p, radiusNorm);
-        if (nextPoints !== session.points) {
-          session.points = nextPoints;
-          scheduleFilterMaskDragPreview({ points: nextPoints });
+        if (appendBrushPointInPlace(session.points, p, radiusNorm)) {
+          scheduleFilterMaskDragPreview({ points: session.points });
         }
       }
       return;
@@ -2898,13 +2895,9 @@ export function bindStudioCuttoonStagePointers(h: StudioCuttoonStagePointersHost
         const session = healCloneDragRef.current;
         const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
         updateHealCloneCursorNodes(p, session.frame);
-        // appendBrushPoint에 마지막 점 하나만 넘겨 동일한 sanitize/간격 규약을 O(1)로 재사용한다.
-        // 허용된 점만 mutable session에 push하므로 growing-array spread의 누적 O(n²)를 피한다.
-        const last = session.points[session.points.length - 1];
-        const tail = appendBrushPoint(last ? [last] : [], p, session.radiusNorm);
-        const appended = tail[last ? 1 : 0];
-        if (appended) {
-          session.points.push(appended);
+        // appendBrushPoint 와 같은 sanitize/간격 규약을 배열 복제 없이 O(1)로 적용한다
+        // (이전의 "마지막 점 하나만 넘기는" 우회 대신 공용 제자리 API 사용 — 판정식은 동일).
+        if (appendBrushPointInPlace(session.points, p, session.radiusNorm)) {
           scheduleHealCloneDragPreview(session);
         }
       }
@@ -2918,10 +2911,8 @@ export function bindStudioCuttoonStagePointers(h: StudioCuttoonStagePointersHost
         const session = historyBrushDragRef.current;
         const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
         updateHistoryBrushCursorNode(p, session.frame);
-        const nextPoints = appendBrushPoint(session.points, p, session.radiusNorm);
-        if (nextPoints !== session.points) {
-          session.points = nextPoints;
-          scheduleHistoryBrushDragPreview({ points: nextPoints });
+        if (appendBrushPointInPlace(session.points, p, session.radiusNorm)) {
+          scheduleHistoryBrushDragPreview({ points: session.points });
         }
       }
       return;
@@ -3639,12 +3630,16 @@ export function bindStudioCuttoonStagePointers(h: StudioCuttoonStagePointersHost
         sourceTimeMilliseconds: pointerSample.timeStamp,
       },
     );
+    // 정렬 복사와 꼬리 추가를 한 번의 순회로 합친다. Array.from + spread 는 같은 값을 두 번
+    // 훑어 포인트당 ~2n 이었다. 값·순서·길이는 정의상 동일하고(index 0..previousPointCount-1 을
+    // 같은 `values?.[index] ?? 0` 로 채운 뒤 value 하나를 붙임) 새 배열을 만드는 불변 규약도 그대로다.
     const appendStylusValue = (values: number[] | undefined, value: number): number[] => {
-      const aligned = Array.from(
-        { length: previousPointCount },
-        (_, index) => values?.[index] ?? 0
-      );
-      return [...aligned, value];
+      const aligned: number[] = [];
+      for (let index = 0; index < previousPointCount; index += 1) {
+        aligned.push(values?.[index] ?? 0);
+      }
+      aligned.push(value);
+      return aligned;
     };
     const appendMutableStylusValue = (
       values: number[] | undefined,
@@ -3891,37 +3886,37 @@ export function bindStudioCuttoonStagePointers(h: StudioCuttoonStagePointersHost
     });
     if (immediateBatchMutation && drawingRef.current) {
       const current = drawingRef.current;
-      // Clone once per browser delivery, then append every coalesced sample into that private
-      // draft. Non-overlay eraser/watercolor and legacy outline/material brushes therefore stay
-      // O(events × points), not O(hardwareSamples × points), while the previously published draft
-      // remains immutable.
-      drawingRef.current = {
-        ...current,
-        points: [...current.points],
-        pressures: current.pressures ? [...current.pressures] : undefined,
-        tiltXs: current.tiltXs ? [...current.tiltXs] : undefined,
-        tiltYs: current.tiltYs ? [...current.tiltYs] : undefined,
-        twists: current.twists ? [...current.twists] : undefined,
-        speeds: current.speeds ? [...current.speeds] : undefined,
-        tangentialPressures: current.tangentialPressures
-          ? [...current.tangentialPressures]
-          : undefined,
-        altitudeAngles: current.altitudeAngles
-          ? [...current.altitudeAngles]
-          : undefined,
-        azimuthAngles: current.azimuthAngles
-          ? [...current.azimuthAngles]
-          : undefined,
-        contactWidths: current.contactWidths
-          ? [...current.contactWidths]
-          : undefined,
-        contactHeights: current.contactHeights
-          ? [...current.contactHeights]
-          : undefined,
-        sampleTimeOffsets: current.sampleTimeOffsets
-          ? [...current.sampleTimeOffsets]
-          : undefined,
+      // Clone once per stroke — not once per browser delivery. The first delivery still takes the
+      // private copy that keeps every previously published draft immutable; afterwards the arrays
+      // carry the same ownership token appendFixedRateStrokeSamples already uses, so the batch
+      // simply keeps appending into the draft it made. That removes twelve O(points) prefix copies
+      // from every later delivery (the old comment's admitted O(events × points)) and, because
+      // `pressures` keeps its identity, the alias-mapped prefix cache in StudioPage stays hot
+      // instead of remapping the whole stroke each frame.
+      // Any path that replaces `points` with a fresh array (QuickShape regularization, the Shift
+      // replace-in-place gesture, a new stroke) breaks the token and pays exactly one clone again.
+      const ownsBatchArrays = current.points === drawingFixedRateOwnedPointsRef.current;
+      const reuseOrCloneBatch = <T,>(values: T[] | undefined): T[] | undefined => {
+        if (!values) return values;
+        return ownsBatchArrays ? values : [...values];
       };
+      const batchDraft: DrawEl = {
+        ...current,
+        points: ownsBatchArrays ? current.points : [...current.points],
+        pressures: reuseOrCloneBatch(current.pressures),
+        tiltXs: reuseOrCloneBatch(current.tiltXs),
+        tiltYs: reuseOrCloneBatch(current.tiltYs),
+        twists: reuseOrCloneBatch(current.twists),
+        speeds: reuseOrCloneBatch(current.speeds),
+        tangentialPressures: reuseOrCloneBatch(current.tangentialPressures),
+        altitudeAngles: reuseOrCloneBatch(current.altitudeAngles),
+        azimuthAngles: reuseOrCloneBatch(current.azimuthAngles),
+        contactWidths: reuseOrCloneBatch(current.contactWidths),
+        contactHeights: reuseOrCloneBatch(current.contactHeights),
+        sampleTimeOffsets: reuseOrCloneBatch(current.sampleTimeOffsets),
+      };
+      drawingRef.current = batchDraft;
+      drawingFixedRateOwnedPointsRef.current = batchDraft.points;
       drawingImmediateBatchMutationRef.current = true;
     }
     try {

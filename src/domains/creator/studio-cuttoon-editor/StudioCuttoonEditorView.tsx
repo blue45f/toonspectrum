@@ -4,6 +4,7 @@
 import { Maximize2, Lock, MessageCircle, UsersRound, SlidersHorizontal, Undo2 } from "lucide-react";
 import { Suspense } from "react";
 
+import { resolveStudioPaperGrainVisibleV1 } from "../brush/studio-paper-grain-visibility-v1";
 import { STUDIO_BRUSH_PACK_ACCEPT } from "../brush/studio-brush-pack-format";
 import { StudioBrushHud } from "../brush/StudioBrushHud";
 import { isStudioBrushCursorMode } from "../canvas/studio-canvas-cursor";
@@ -4106,7 +4107,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
           canvasRotation={canvasRotation}
           collaborationDocumentLocked={collaborationDocumentLocked}
           paperGrainKind={paperGrainKind}
-          paperGrainVisible={activePage.paperGrainVisible === true}
+          paperGrainVisible={resolveStudioPaperGrainVisibleV1(activePage)}
           color={color}
           colorRangeFuzziness={colorRangeFuzziness}
           colorRangePickActive={colorRangePickActive}

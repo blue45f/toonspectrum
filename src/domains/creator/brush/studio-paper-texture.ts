@@ -397,7 +397,35 @@ export interface PaperHeightFieldOptions {
   readonly seed?: number;
   /** 프리셋 파라미터 부분 덮어쓰기(실험·튜닝용). */
   readonly params?: Partial<PaperTextureParams>;
+  /**
+   * 대비 정규화 방식. 생략하면 **역사적 계약**(평균만 빼는 경로)이 바이트 단위로 그대로 돌고,
+   * 아래 주석이 설명하는 "RMS가 옥타브 구성에서 창발한다"는 성질도 그대로 유지된다.
+   *
+   * `"shaped-v2"`는 표준편차까지 정규화한 뒤 `tanh`로 성형해 **선언된 amplitude가 실제 span이
+   * 되도록** 만든다. 기존 경로는 평균만 빼기 때문에 rough가 amplitude 0.78을 선언하고도 실측
+   * RMS 0.067(선언값의 8.6%)에 그쳤고, RMS/amplitude 비가 프리셋마다 0.086~0.154로 1.8배
+   * 흔들려 "이 종이가 얼마나 거친가"라는 선언이 렌더에 도달하지 못했다.
+   */
+  readonly contrast?: StudioPaperHeightContrast;
 }
+
+/**
+ * `"shaped-v2"` — 표준편차 정규화 + tanh 성형. 생략(= `undefined`)은 역사적 평균-only 경로다.
+ */
+export const STUDIO_PAPER_HEIGHT_CONTRAST_SHAPED_V2 = "shaped-v2" as const;
+
+export type StudioPaperHeightContrast = typeof STUDIO_PAPER_HEIGHT_CONTRAST_SHAPED_V2;
+
+/**
+ * tanh 성형 계수.
+ *
+ * 정규화된 z를 그대로 amplitude에 곱하면 fbm 꼬리가 0/1에 하드 클립되어 종이 골이 평평한
+ * 판으로 뭉개진다. `tanh`는 꼬리만 부드럽게 눌러 클립을 0%로 유지하면서 중심부 대비는
+ * 살려 둔다 — `studio-procedural-media-surface-provider`가 이미 쓰고 있는 기법과 같다.
+ * 1.1은 단위분산 z에 대해 RMS(tanh(1.1z)) ≈ 0.63을 주는 값이라, span 대비 RMS 비가
+ * 모든 프리셋에서 상수 ≈0.315가 된다.
+ */
+export const STUDIO_PAPER_HEIGHT_SHAPED_V2_CONTRAST = 1.1;
 
 const PAPER_TILE_MIN = 4;
 const PAPER_TILE_MAX = 4096;
@@ -903,6 +931,26 @@ export function createPaperHeightField(options?: PaperHeightFieldOptions): Paper
   }
 
   const shapedMean = shapedSum / count;
+  if (options?.contrast === STUDIO_PAPER_HEIGHT_CONTRAST_SHAPED_V2) {
+    // 표준편차까지 정규화해야 amplitude가 실제 span이 된다. 평균만 빼는 아래 경로는
+    // 옥타브 구성이 결정한 임의의 sd를 그대로 남겨 선언값을 무의미하게 만든다.
+    let varianceSum = 0;
+    for (let index = 0; index < count; index++) {
+      const delta = values[index]! - shapedMean;
+      varianceSum += delta * delta;
+    }
+    const deviation = Math.sqrt(varianceSum / count);
+    // sd 0 = 완전 균일한 판(병리적 입력). 나눗셈 대신 평평한 0.5로 fail-closed.
+    const inverseDeviation = deviation > 1e-9 ? 1 / deviation : 0;
+    const halfSpan = params.amplitude * 0.5;
+    for (let index = 0; index < count; index++) {
+      const z = (values[index]! - shapedMean) * inverseDeviation;
+      values[index] = clampUnit(
+        0.5 + halfSpan * Math.tanh(z * STUDIO_PAPER_HEIGHT_SHAPED_V2_CONTRAST),
+      );
+    }
+    return { kind, params, width, height, seed, values };
+  }
   for (let index = 0; index < count; index++) {
     values[index] = clampUnit(0.5 + params.amplitude * (values[index]! - shapedMean));
   }
