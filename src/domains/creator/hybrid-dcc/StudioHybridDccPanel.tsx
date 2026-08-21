@@ -456,6 +456,38 @@ export function StudioHybridDccPanel({
                 angleLimitRad: modifier.angleLimitRad,
                 weightInfluence: modifier.weightInfluence,
               };
+            case "subdivision":
+              return {
+                id: modifier.id,
+                kind: modifier.kind,
+                enabled: modifier.enabled,
+                levels: modifier.levels,
+                smooth: modifier.smooth,
+              };
+            case "weld":
+              return {
+                id: modifier.id,
+                kind: modifier.kind,
+                enabled: modifier.enabled,
+                quantum: modifier.quantum,
+              };
+            case "decimate":
+              return {
+                id: modifier.id,
+                kind: modifier.kind,
+                enabled: modifier.enabled,
+                ratio: modifier.ratio,
+              };
+            case "simple-deform":
+              return {
+                id: modifier.id,
+                kind: modifier.kind,
+                enabled: modifier.enabled,
+                mode: modifier.mode,
+                axis: modifier.axis,
+                angleRad: modifier.angleRad,
+                factor: modifier.factor,
+              };
           }
         })
       : [],

@@ -55,6 +55,10 @@ export const STUDIO_HYBRID_DCC_MODIFIER_LABELS: Readonly<Record<
   boolean: "합치기·빼기",
   solidify: "두께",
   bevel: "모서리 둥글리기",
+  subdivision: "세분화",
+  weld: "버텍스 병합",
+  decimate: "면수 축소",
+  "simple-deform": "변형(비틀기·테이퍼)",
 });
 
 function activeRecord(workspace: StudioHybridDccWorkspace): StudioGeometryAuthorityRecord {
@@ -283,6 +287,38 @@ function defaultModifier(
         },
       };
     }
+    case "subdivision":
+      return {
+        kind,
+        id,
+        enabled: true,
+        levels: 1,
+        smooth: true,
+      };
+    case "weld":
+      return {
+        kind,
+        id,
+        enabled: true,
+        quantum: 0.0001,
+      };
+    case "decimate":
+      return {
+        kind,
+        id,
+        enabled: true,
+        ratio: 0.5,
+      };
+    case "simple-deform":
+      return {
+        kind,
+        id,
+        enabled: true,
+        mode: "twist",
+        axis: "y",
+        angleRad: Math.PI / 4,
+        factor: 1,
+      };
   }
 }
 
@@ -390,6 +426,43 @@ function patchModifier(
           0,
           1,
         ),
+      };
+    case "subdivision":
+      return {
+        ...modifier,
+        enabled,
+        levels: Math.trunc(finiteNumber(patch.levels, modifier.levels, 1, 3)),
+        smooth: booleanValue(patch.smooth, modifier.smooth),
+      };
+    case "weld":
+      return {
+        ...modifier,
+        enabled,
+        quantum: finiteNumber(patch.quantum, modifier.quantum, 1e-6, 1_000_000),
+      };
+    case "decimate":
+      return {
+        ...modifier,
+        enabled,
+        ratio: finiteNumber(patch.ratio, modifier.ratio, 0.05, 0.95),
+      };
+    case "simple-deform":
+      return {
+        ...modifier,
+        enabled,
+        mode: patch.mode === "twist" || patch.mode === "taper" || patch.mode === "stretch"
+          ? patch.mode
+          : modifier.mode,
+        axis: patch.axis === "x" || patch.axis === "y" || patch.axis === "z"
+          ? patch.axis
+          : modifier.axis,
+        angleRad: finiteNumber(
+          patch.angleRad,
+          modifier.angleRad,
+          -Math.PI * 8,
+          Math.PI * 8,
+        ),
+        factor: finiteNumber(patch.factor, modifier.factor, 0.001, 100),
       };
   }
 }

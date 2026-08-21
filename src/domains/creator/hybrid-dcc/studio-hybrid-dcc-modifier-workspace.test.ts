@@ -230,4 +230,50 @@ describe("Hybrid DCC non-destructive modifier workspace", () => {
       workspace.session.state.commandCount + 1,
     );
   });
+
+  it("adds and patches the modeling wave modifiers with a live render cache", async () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("modifier-modeling-wave"),
+      "hero",
+    );
+
+    workspace = await workspaceAddActiveModifier(workspace, "subdivision");
+    const subdivided = workspace.session.state.geometry.records.hero!;
+    expect(subdivided.modifierStack.modifiers[0]).toMatchObject({
+      kind: "subdivision",
+      levels: 1,
+      smooth: true,
+    });
+    expect(subdivided.renderCache).not.toBeNull();
+
+    workspace = await workspacePatchActiveModifier(workspace, "modifier-subdivision", {
+      levels: 2,
+      smooth: false,
+    });
+    expect(workspace.session.state.geometry.records.hero!
+      .modifierStack.modifiers[0]).toMatchObject({ levels: 2, smooth: false });
+
+    workspace = await workspacePatchActiveModifier(workspace, "modifier-subdivision", {
+      levels: 9,
+    });
+    expect(workspace.session.state.geometry.records.hero!
+      .modifierStack.modifiers[0]).toMatchObject({ levels: 3 });
+
+    workspace = await workspaceAddActiveModifier(workspace, "simple-deform");
+    expect(workspace.session.state.geometry.records.hero!
+      .modifierStack.modifiers[1]).toMatchObject({ kind: "simple-deform", mode: "twist" });
+
+    workspace = await workspacePatchActiveModifier(workspace, "modifier-simple-deform", {
+      mode: "taper",
+      factor: 0.4,
+    });
+    expect(workspace.session.state.geometry.records.hero!
+      .modifierStack.modifiers[1]).toMatchObject({ mode: "taper", factor: 0.4 });
+
+    // Applying the stack must stay atomic and clear it in the same undo step.
+    const applied = await workspaceApplyActiveModifierStack(workspace);
+    const appliedRecord = applied.session.state.geometry.records.hero!;
+    expect(appliedRecord.modifierStack.modifiers).toHaveLength(0);
+    expect(appliedRecord.mesh.faces.length).toBeGreaterThan(12);
+  });
 });

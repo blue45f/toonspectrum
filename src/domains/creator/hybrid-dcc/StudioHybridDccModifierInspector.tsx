@@ -19,6 +19,10 @@ const STUDIO_HYBRID_DCC_MODIFIER_KINDS = [
   "boolean",
   "solidify",
   "bevel",
+  "subdivision",
+  "weld",
+  "decimate",
+  "simple-deform",
 ] as const;
 
 export type StudioHybridDccModifierKind =
@@ -93,12 +97,46 @@ export interface StudioHybridDccBevelModifierView
   readonly weightInfluence: number;
 }
 
+export interface StudioHybridDccSubdivisionModifierView
+  extends StudioHybridDccModifierBase {
+  readonly kind: "subdivision";
+  readonly levels: number;
+  readonly smooth: boolean;
+}
+
+export interface StudioHybridDccWeldModifierView
+  extends StudioHybridDccModifierBase {
+  readonly kind: "weld";
+  readonly quantum: number;
+}
+
+export interface StudioHybridDccDecimateModifierView
+  extends StudioHybridDccModifierBase {
+  readonly kind: "decimate";
+  readonly ratio: number;
+}
+
+export type StudioHybridDccSimpleDeformMode = "twist" | "taper" | "stretch";
+
+export interface StudioHybridDccSimpleDeformModifierView
+  extends StudioHybridDccModifierBase {
+  readonly kind: "simple-deform";
+  readonly mode: StudioHybridDccSimpleDeformMode;
+  readonly axis: StudioHybridDccModifierAxis;
+  readonly angleRad: number;
+  readonly factor: number;
+}
+
 export type StudioHybridDccModifierView =
   | StudioHybridDccMirrorModifierView
   | StudioHybridDccArrayModifierView
   | StudioHybridDccBooleanModifierView
   | StudioHybridDccSolidifyModifierView
-  | StudioHybridDccBevelModifierView;
+  | StudioHybridDccBevelModifierView
+  | StudioHybridDccSubdivisionModifierView
+  | StudioHybridDccWeldModifierView
+  | StudioHybridDccDecimateModifierView
+  | StudioHybridDccSimpleDeformModifierView;
 
 export interface StudioHybridDccModifierStackView {
   readonly modifiers: readonly StudioHybridDccModifierView[];
@@ -156,6 +194,26 @@ const MODIFIER_COPY: Readonly<Record<
     label: "모서리 다듬기",
     technical: "Bevel",
     description: "날카로운 모서리를 정확한 한 단계 절삭으로 다듬습니다.",
+  },
+  subdivision: {
+    label: "세분화",
+    technical: "Subdivision",
+    description: "면을 잘게 나누고 부드럽게 만들어 둥근 형태로 다듬습니다.",
+  },
+  weld: {
+    label: "버텍스 병합",
+    technical: "Weld",
+    description: "가까운 꼭짓점을 하나로 합쳐 구멍과 틈을 정리합니다.",
+  },
+  decimate: {
+    label: "면수 축소",
+    technical: "Decimate",
+    description: "삼각형 수를 줄여 장면을 가볍게 만듭니다.",
+  },
+  "simple-deform": {
+    label: "변형(비틀기·테이퍼)",
+    technical: "Simple Deform",
+    description: "오브젝트 축을 따라 비틀거나, 한쪽을 좁히거나, 늘입니다.",
   },
 };
 
@@ -495,6 +553,129 @@ function ModifierParameters({
           description="앞면과 뒷면 사이에 옆면을 만들어 빈 틈을 닫습니다."
           onChange={(rim) => onPatch({ rim })}
         />
+      </div>
+    );
+  }
+
+  if (modifier.kind === "subdivision") {
+    return (
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+        <ModifierNumberField
+          label={`${instanceName} 세분화 단계`}
+          visibleLabel="세분화 단계"
+          description="단계가 높을수록 촘촘하지만 계산량이 늘어납니다."
+          value={modifier.levels}
+          min={1}
+          max={3}
+          step={1}
+          unit="단계"
+          disabled={busy}
+          onChange={(levels) => onPatch({ levels })}
+        />
+        <ModifierToggleField
+          checked={modifier.smooth}
+          disabled={busy}
+          label={`${instanceName} 부드럽게 만들기`}
+          description="끄면 면 분할만 하고, 켜면 전체적으로 둥글게 말립니다."
+          onChange={(smooth) => onPatch({ smooth })}
+        />
+      </div>
+    );
+  }
+
+  if (modifier.kind === "weld") {
+    return (
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+        <ModifierNumberField
+          label={`${instanceName} 병합 거리`}
+          visibleLabel="병합 거리"
+          description="이 거리보다 가까운 꼭짓점을 하나로 합칩니다."
+          value={modifier.quantum}
+          min={0.000001}
+          step={0.0001}
+          unit="m"
+          disabled={busy}
+          onChange={(quantum) => onPatch({ quantum })}
+        />
+      </div>
+    );
+  }
+
+  if (modifier.kind === "decimate") {
+    return (
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+        <ModifierNumberField
+          label={`${instanceName} 유지 비율`}
+          visibleLabel="유지 비율"
+          description="원본 삼각형 중 남길 비율입니다. 0.05~0.95."
+          value={modifier.ratio}
+          min={0.05}
+          max={0.95}
+          step={0.05}
+          disabled={busy}
+          onChange={(ratio) => onPatch({ ratio })}
+        />
+      </div>
+    );
+  }
+
+  if (modifier.kind === "simple-deform") {
+    const angleDeg = modifier.angleRad * 180 / Math.PI;
+    return (
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+        <ModifierSelectField
+          label={`${instanceName} 변형 종류`}
+          visibleLabel="변형 종류"
+          value={modifier.mode}
+          disabled={busy}
+          options={[
+            { value: "twist", label: "비틀기" },
+            { value: "taper", label: "테이퍼(한쪽 좁히기)" },
+            { value: "stretch", label: "늘리기" },
+          ]}
+          onChange={(mode) => onPatch({ mode })}
+        />
+        <ModifierSelectField
+          label={`${instanceName} 기준 축`}
+          visibleLabel="기준 축"
+          value={modifier.axis}
+          disabled={busy}
+          options={[
+            { value: "x", label: "X축" },
+            { value: "y", label: "Y축" },
+            { value: "z", label: "Z축" },
+          ]}
+          onChange={(axis) => onPatch({ axis })}
+        />
+        {modifier.mode === "twist" ? (
+          <ModifierNumberField
+            label={`${instanceName} 비틀 각도`}
+            visibleLabel="비틀 각도"
+            description="끝까지 갔을 때의 회전 각도입니다."
+            value={angleDeg}
+            min={-1440}
+            max={1440}
+            step={5}
+            unit="°"
+            disabled={busy}
+            onChange={(value) => onPatch({ angleRad: value * Math.PI / 180 })}
+          />
+        ) : (
+          <ModifierNumberField
+            label={`${instanceName} 변형 세기`}
+            visibleLabel={modifier.mode === "taper" ? "끝 지점 크기 배율" : "축 방향 늘림 배율"}
+            description={modifier.mode === "taper"
+              ? "1이 원본이며, 작게 주면 한쪽이 좁아집니다."
+              : "1이 원본이며, 크게 주면 길어집니다."}
+            value={modifier.factor}
+            min={0.001}
+            max={100}
+            step={0.05}
+            unit="×"
+            disabled={busy}
+            onChange={(factor) => onPatch({ factor })}
+          />
+        )}
       </div>
     );
   }

@@ -99,7 +99,7 @@ describe("StudioHybridDccModifierInspector", () => {
     expect(inspector?.className).toContain("overflow-hidden");
     expect(screen.getByText("아직 쌓인 변형이 없습니다")).toBeTruthy();
     expect(screen.getByText(/적용하기 전에는 원본 메시를 바꾸지 않습니다/u)).toBeTruthy();
-    expect(screen.getAllByRole("option")).toHaveLength(5);
+    expect(screen.getAllByRole("option")).toHaveLength(9);
     expect((apply as HTMLButtonElement).disabled).toBe(true);
     expect(apply.getAttribute("aria-describedby")).toBeTruthy();
 
