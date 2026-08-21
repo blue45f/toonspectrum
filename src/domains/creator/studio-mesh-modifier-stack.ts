@@ -105,12 +105,52 @@ export interface StudioMeshBevelModifier {
   readonly weightInfluence: number;
 }
 
+export interface StudioMeshSubdivisionModifier {
+  readonly kind: "subdivision";
+  readonly id: string;
+  readonly enabled: boolean;
+  readonly levels: number;
+  readonly smooth: boolean;
+}
+
+export interface StudioMeshWeldModifier {
+  readonly kind: "weld";
+  readonly id: string;
+  readonly enabled: boolean;
+  readonly quantum: number;
+}
+
+export interface StudioMeshDecimateModifier {
+  readonly kind: "decimate";
+  readonly id: string;
+  readonly enabled: boolean;
+  readonly ratio: number;
+}
+
+export type StudioMeshSimpleDeformMode = "twist" | "taper" | "stretch";
+
+export interface StudioMeshSimpleDeformModifier {
+  readonly kind: "simple-deform";
+  readonly id: string;
+  readonly enabled: boolean;
+  readonly mode: StudioMeshSimpleDeformMode;
+  readonly axis: "x" | "y" | "z";
+  /** twist rotation at the far end, radians. */
+  readonly angleRad: number;
+  /** taper scale at the far end (1 = untouched); stretch factor along the axis. */
+  readonly factor: number;
+}
+
 export type StudioMeshModifier =
   | StudioMeshMirrorModifier
   | StudioMeshArrayModifier
   | StudioMeshBooleanModifier
   | StudioMeshSolidifyModifier
-  | StudioMeshBevelModifier;
+  | StudioMeshBevelModifier
+  | StudioMeshSubdivisionModifier
+  | StudioMeshWeldModifier
+  | StudioMeshDecimateModifier
+  | StudioMeshSimpleDeformModifier;
 
 /** Exact JSON-safe DTO. Boolean typed arrays are deliberately encoded as dense number arrays. */
 export type StudioMeshModifierDto =
@@ -161,6 +201,34 @@ export type StudioMeshModifierDto =
       readonly segments: number;
       readonly angleLimitRad: number;
       readonly weightInfluence: number;
+    }
+  | {
+      readonly kind: "subdivision";
+      readonly id: string;
+      readonly enabled: boolean;
+      readonly levels: number;
+      readonly smooth: boolean;
+    }
+  | {
+      readonly kind: "weld";
+      readonly id: string;
+      readonly enabled: boolean;
+      readonly quantum: number;
+    }
+  | {
+      readonly kind: "decimate";
+      readonly id: string;
+      readonly enabled: boolean;
+      readonly ratio: number;
+    }
+  | {
+      readonly kind: "simple-deform";
+      readonly id: string;
+      readonly enabled: boolean;
+      readonly mode: StudioMeshSimpleDeformMode;
+      readonly axis: "x" | "y" | "z";
+      readonly angleRad: number;
+      readonly factor: number;
     };
 
 export interface StudioMeshModifierStackDto {
@@ -474,6 +542,84 @@ function decodeModifier(
     });
   }
 
+  if (value.kind === "subdivision") {
+    if (!hasExactKeys(value, ["kind", "id", "enabled", "levels", "smooth"])) {
+      return fail("invalid-stack", `${path} subdivision DTO keys are invalid`);
+    }
+    if (!Number.isSafeInteger(value.levels) || (value.levels as number) < 1
+      || (value.levels as number) > 3) {
+      return fail("invalid-parameter", `${path}.levels must be an integer in 1..3`);
+    }
+    if (typeof value.smooth !== "boolean") {
+      return fail("invalid-stack", `${path}.smooth must be boolean`);
+    }
+    return ok({
+      kind: "subdivision",
+      id: value.id,
+      enabled: value.enabled,
+      levels: value.levels as number,
+      smooth: value.smooth,
+    });
+  }
+
+  if (value.kind === "weld") {
+    if (!hasExactKeys(value, ["kind", "id", "enabled", "quantum"])) {
+      return fail("invalid-stack", `${path} weld DTO keys are invalid`);
+    }
+    if (!finiteInRange(
+      value.quantum,
+      1e-6,
+      STUDIO_MESH_MODIFIER_STACK_LIMITS.maxParameterMagnitude,
+    )) return fail("invalid-parameter", `${path}.quantum is invalid`);
+    return ok({
+      kind: "weld",
+      id: value.id,
+      enabled: value.enabled,
+      quantum: value.quantum,
+    });
+  }
+
+  if (value.kind === "decimate") {
+    if (!hasExactKeys(value, ["kind", "id", "enabled", "ratio"])) {
+      return fail("invalid-stack", `${path} decimate DTO keys are invalid`);
+    }
+    if (!finiteInRange(value.ratio, 0.05, 0.95)) {
+      return fail("invalid-parameter", `${path}.ratio must be within 0.05..0.95`);
+    }
+    return ok({
+      kind: "decimate",
+      id: value.id,
+      enabled: value.enabled,
+      ratio: value.ratio,
+    });
+  }
+
+  if (value.kind === "simple-deform") {
+    if (!hasExactKeys(value, [
+      "kind", "id", "enabled", "mode", "axis", "angleRad", "factor",
+    ])) return fail("invalid-stack", `${path} simple-deform DTO keys are invalid`);
+    if (value.mode !== "twist" && value.mode !== "taper" && value.mode !== "stretch") {
+      return fail("invalid-parameter", `${path}.mode is invalid`);
+    }
+    if (value.axis !== "x" && value.axis !== "y" && value.axis !== "z") {
+      return fail("invalid-parameter", `${path}.axis is invalid`);
+    }
+    const limit = STUDIO_MESH_MODIFIER_STACK_LIMITS.maxParameterMagnitude;
+    if (!finiteInRange(value.angleRad, -limit, limit)
+      || !finiteInRange(value.factor, 0.001, limit)) {
+      return fail("invalid-parameter", `${path} simple-deform limits are invalid`);
+    }
+    return ok({
+      kind: "simple-deform",
+      id: value.id,
+      enabled: value.enabled,
+      mode: value.mode,
+      axis: value.axis,
+      angleRad: value.angleRad,
+      factor: value.factor,
+    });
+  }
+
   return fail("invalid-stack", `${path}.kind is unsupported`);
 }
 
@@ -590,6 +736,41 @@ function validateRuntimeModifier(
       || !finiteInRange(modifier.angleLimitRad, 0, Math.PI)
       || !finiteInRange(modifier.weightInfluence, 0, 1)) {
       return fail("invalid-parameter", `${path} bevel parameters are invalid`);
+    }
+    return ok(0);
+  }
+
+  if (modifier.kind === "subdivision") {
+    if (!Number.isSafeInteger(modifier.levels) || modifier.levels < 1 || modifier.levels > 3
+      || typeof modifier.smooth !== "boolean") {
+      return fail("invalid-parameter", `${path} subdivision parameters are invalid`);
+    }
+    return ok(0);
+  }
+
+  if (modifier.kind === "weld") {
+    if (!finiteInRange(
+      modifier.quantum,
+      1e-6,
+      STUDIO_MESH_MODIFIER_STACK_LIMITS.maxParameterMagnitude,
+    )) return fail("invalid-parameter", `${path} weld parameters are invalid`);
+    return ok(0);
+  }
+
+  if (modifier.kind === "decimate") {
+    if (!finiteInRange(modifier.ratio, 0.05, 0.95)) {
+      return fail("invalid-parameter", `${path} decimate parameters are invalid`);
+    }
+    return ok(0);
+  }
+
+  if (modifier.kind === "simple-deform") {
+    const limit = STUDIO_MESH_MODIFIER_STACK_LIMITS.maxParameterMagnitude;
+    if ((modifier.mode !== "twist" && modifier.mode !== "taper" && modifier.mode !== "stretch")
+      || (modifier.axis !== "x" && modifier.axis !== "y" && modifier.axis !== "z")
+      || !finiteInRange(modifier.angleRad, -limit, limit)
+      || !finiteInRange(modifier.factor, 0.001, limit)) {
+      return fail("invalid-parameter", `${path} simple-deform parameters are invalid`);
     }
     return ok(0);
   }
@@ -715,7 +896,7 @@ function serializeModifier(modifier: StudioMeshModifier, index: number): StudioM
       evenThickness: modifier.evenThickness,
       rim: modifier.rim,
     };
-  } else {
+  } else if (modifier.kind === "bevel") {
     dto = {
       kind: "bevel",
       id: modifier.id,
@@ -724,6 +905,38 @@ function serializeModifier(modifier: StudioMeshModifier, index: number): StudioM
       segments: modifier.segments,
       angleLimitRad: modifier.angleLimitRad,
       weightInfluence: modifier.weightInfluence,
+    };
+  } else if (modifier.kind === "subdivision") {
+    dto = {
+      kind: "subdivision",
+      id: modifier.id,
+      enabled: modifier.enabled,
+      levels: modifier.levels,
+      smooth: modifier.smooth,
+    };
+  } else if (modifier.kind === "weld") {
+    dto = {
+      kind: "weld",
+      id: modifier.id,
+      enabled: modifier.enabled,
+      quantum: modifier.quantum,
+    };
+  } else if (modifier.kind === "decimate") {
+    dto = {
+      kind: "decimate",
+      id: modifier.id,
+      enabled: modifier.enabled,
+      ratio: modifier.ratio,
+    };
+  } else {
+    dto = {
+      kind: "simple-deform",
+      id: modifier.id,
+      enabled: modifier.enabled,
+      mode: modifier.mode,
+      axis: modifier.axis,
+      angleRad: modifier.angleRad,
+      factor: modifier.factor,
     };
   }
   return dto;
@@ -2015,6 +2228,242 @@ function applyBevel(
 }
 
 /**
+ * MOD-017: Catmull-lite subdivision (mid-edge split + optional neighbor smoothing),
+ * evaluated non-destructively under the same budget discipline as the other modifiers.
+ */
+function applySubdivision(
+  mesh: StudioEditableMesh,
+  metrics: StudioMeshEvaluationMetrics,
+  mod: StudioMeshSubdivisionModifier,
+  budget: StudioMeshEvaluationBudget,
+): StudioMeshModifierResult<StudioEditableMesh> {
+  let current = mesh;
+  let currentMetrics = metrics;
+  for (let level = 0; level < mod.levels; level += 1) {
+    const context = `subdivision ${mod.id} level ${level + 1}`;
+    const soupResult = materializeTriangleSoup(current, currentMetrics, budget, context);
+    if (!soupResult.ok) return soupResult;
+    const soup = soupResult.value;
+    const vertexCount = soup.positions.length / 3;
+    const triangleCount = soup.indices.length / 3;
+    const worstVertices = checkedSum(vertexCount, checkedProduct(triangleCount, 2) ?? Number.NaN);
+    const worstIndices = checkedProduct(soup.indices.length, 4);
+    if (worstVertices === null || worstIndices === null) {
+      return fail("budget-exceeded", `${context}: topology arithmetic overflow`);
+    }
+    const reserved = reserveGeneratedMesh(
+      budget,
+      worstVertices,
+      worstIndices,
+      checkedSum(
+        checkedProduct(worstVertices, 96) ?? Number.NaN,
+        checkedProduct(worstIndices, 24) ?? Number.NaN,
+      ) ?? Number.NaN,
+      checkedSum(worstVertices, worstIndices) ?? Number.NaN,
+      context,
+    );
+    if (!reserved.ok) return reserved;
+    const edgeMid = new Map<string, number>();
+    const positions: number[] = [...soup.positions];
+    const midOf = (a: number, b: number) => {
+      const lo = Math.min(a, b);
+      const hi = Math.max(a, b);
+      const key = `${lo}|${hi}`;
+      let idx = edgeMid.get(key);
+      if (idx !== undefined) return idx;
+      idx = positions.length / 3;
+      positions.push(
+        (soup.positions[a * 3]! + soup.positions[b * 3]!) / 2,
+        (soup.positions[a * 3 + 1]! + soup.positions[b * 3 + 1]!) / 2,
+        (soup.positions[a * 3 + 2]! + soup.positions[b * 3 + 2]!) / 2,
+      );
+      edgeMid.set(key, idx);
+      return idx;
+    };
+    const indices: number[] = [];
+    for (let t = 0; t < soup.indices.length; t += 3) {
+      const a = soup.indices[t]!;
+      const b = soup.indices[t + 1]!;
+      const c = soup.indices[t + 2]!;
+      const ab = midOf(a, b);
+      const bc = midOf(b, c);
+      const ca = midOf(c, a);
+      indices.push(a, ab, ca, ab, b, bc, ca, bc, c, ab, bc, ca);
+    }
+    if (mod.smooth) {
+      const accum = new Float64Array(vertexCount * 3);
+      const degree = new Uint32Array(vertexCount);
+      for (let t = 0; t < soup.indices.length; t += 3) {
+        for (let k = 0; k < 3; k += 1) {
+          const i = soup.indices[t + k]!;
+          const j = soup.indices[t + ((k + 1) % 3)]!;
+          accum[i * 3]! += soup.positions[j * 3]!;
+          accum[i * 3 + 1]! += soup.positions[j * 3 + 1]!;
+          accum[i * 3 + 2]! += soup.positions[j * 3 + 2]!;
+          degree[i]! += 1;
+        }
+      }
+      for (let i = 0; i < vertexCount; i += 1) {
+        if (degree[i] === 0) continue;
+        positions[i * 3] = soup.positions[i * 3]! * 0.5
+          + (accum[i * 3]! / degree[i]!) * 0.5;
+        positions[i * 3 + 1] = soup.positions[i * 3 + 1]! * 0.5
+          + (accum[i * 3 + 1]! / degree[i]!) * 0.5;
+        positions[i * 3 + 2] = soup.positions[i * 3 + 2]! * 0.5
+          + (accum[i * 3 + 2]! / degree[i]!) * 0.5;
+      }
+    }
+    current = soupToMesh(new Float32Array(positions), new Uint32Array(indices));
+    const inspected = inspectEvaluationMesh(current, budget, `${context} result`, false);
+    if (!inspected.ok) return inspected;
+    currentMetrics = inspected.value;
+  }
+  return ok(current);
+}
+
+/** MOD-019 subset: weld duplicated vertices by positional quantum and drop degenerate faces. */
+function applyWeld(
+  mesh: StudioEditableMesh,
+  metrics: StudioMeshEvaluationMetrics,
+  mod: StudioMeshWeldModifier,
+  budget: StudioMeshEvaluationBudget,
+): StudioMeshModifierResult<StudioEditableMesh> {
+  const context = `weld ${mod.id}`;
+  const soupResult = materializeTriangleSoup(mesh, metrics, budget, context);
+  if (!soupResult.ok) return soupResult;
+  const soup = soupResult.value;
+  const reserved = reserveGeneratedMesh(
+    budget,
+    soup.positions.length / 3,
+    soup.indices.length,
+    checkedSum(soup.positions.byteLength, soup.indices.byteLength) ?? Number.NaN,
+    checkedSum(soup.positions.length, soup.indices.length) ?? Number.NaN,
+    context,
+  );
+  if (!reserved.ok) return reserved;
+  const q = 1 / mod.quantum;
+  const keyOf = (i: number) =>
+    `${Math.round(soup.positions[i * 3]! * q)}|${Math.round(soup.positions[i * 3 + 1]! * q)}|${Math.round(soup.positions[i * 3 + 2]! * q)}`;
+  const remap = new Map<string, number>();
+  const positions: number[] = [];
+  const vertexIndexOf = (i: number) => {
+    const key = keyOf(i);
+    let target = remap.get(key);
+    if (target === undefined) {
+      target = positions.length / 3;
+      remap.set(key, target);
+      positions.push(soup.positions[i * 3]!, soup.positions[i * 3 + 1]!, soup.positions[i * 3 + 2]!);
+    }
+    return target;
+  };
+  const indices: number[] = [];
+  for (let t = 0; t < soup.indices.length; t += 3) {
+    const a = vertexIndexOf(soup.indices[t]!);
+    const b = vertexIndexOf(soup.indices[t + 1]!);
+    const c = vertexIndexOf(soup.indices[t + 2]!);
+    if (a === b || b === c || a === c) continue;
+    indices.push(a, b, c);
+  }
+  if (indices.length < 3) {
+    return fail("invalid-parameter", `${context}: weld collapsed every face`);
+  }
+  return ok(soupToMesh(new Float32Array(positions), new Uint32Array(indices)));
+}
+
+/** MOD-018: deterministic stride decimation toward a target triangle ratio. */
+function applyDecimate(
+  mesh: StudioEditableMesh,
+  metrics: StudioMeshEvaluationMetrics,
+  mod: StudioMeshDecimateModifier,
+  budget: StudioMeshEvaluationBudget,
+): StudioMeshModifierResult<StudioEditableMesh> {
+  const context = `decimate ${mod.id}`;
+  const soupResult = materializeTriangleSoup(mesh, metrics, budget, context);
+  if (!soupResult.ok) return soupResult;
+  const soup = soupResult.value;
+  const triangleCount = soup.indices.length / 3;
+  const target = Math.max(4, Math.floor(triangleCount * mod.ratio));
+  if (target >= triangleCount) return ok(mesh);
+  const step = Math.max(1, Math.ceil(triangleCount / target));
+  const keptPositions = new Float32Array(soup.positions);
+  const indices: number[] = [];
+  for (let t = 0; t < triangleCount; t += 1) {
+    if (t % step !== 0 && indices.length / 3 < target) continue;
+    if (t % step !== 0) continue;
+    indices.push(
+      soup.indices[t * 3]!,
+      soup.indices[t * 3 + 1]!,
+      soup.indices[t * 3 + 2]!,
+    );
+  }
+  if (indices.length < 3) {
+    return fail("invalid-parameter", `${context}: decimate removed every face`);
+  }
+  const reserved = reserveGeneratedMesh(
+    budget,
+    soup.positions.length / 3,
+    indices.length,
+    checkedSum(keptPositions.byteLength, indices.length * 4) ?? Number.NaN,
+    checkedSum(triangleCount, indices.length) ?? Number.NaN,
+    context,
+  );
+  if (!reserved.ok) return reserved;
+  return ok(soupToMesh(keptPositions, new Uint32Array(indices)));
+}
+
+/** MOD-020 subset: twist/taper/stretch along a world axis. */
+function applySimpleDeform(
+  mesh: StudioEditableMesh,
+  metrics: StudioMeshEvaluationMetrics,
+  mod: StudioMeshSimpleDeformModifier,
+  budget: StudioMeshEvaluationBudget,
+): StudioMeshModifierResult<StudioEditableMesh> {
+  const context = `simple-deform ${mod.id}`;
+  const soupResult = materializeTriangleSoup(mesh, metrics, budget, context);
+  if (!soupResult.ok) return soupResult;
+  const soup = soupResult.value;
+  const reserved = reserveGeneratedMesh(
+    budget,
+    soup.positions.length / 3,
+    soup.indices.length,
+    checkedSum(soup.positions.byteLength, soup.indices.byteLength) ?? Number.NaN,
+    checkedSum(soup.positions.length, soup.indices.length) ?? Number.NaN,
+    context,
+  );
+  if (!reserved.ok) return reserved;
+  const axisIndex = mod.axis === "x" ? 0 : mod.axis === "y" ? 1 : 2;
+  const uIndex = (axisIndex + 1) % 3;
+  const vIndex = (axisIndex + 2) % 3;
+  const positions = new Float32Array(soup.positions);
+  let minAxis = Infinity;
+  let maxAxis = -Infinity;
+  for (let i = axisIndex; i < positions.length; i += 3) {
+    minAxis = Math.min(minAxis, positions[i]!);
+    maxAxis = Math.max(maxAxis, positions[i]!);
+  }
+  const span = Math.max(1e-6, maxAxis - minAxis);
+  for (let i = 0; i < positions.length / 3; i += 1) {
+    const t = (positions[i * 3 + axisIndex]! - minAxis) / span;
+    if (mod.mode === "twist") {
+      const angle = mod.angleRad * t;
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      const u = positions[i * 3 + uIndex]!;
+      const w = positions[i * 3 + vIndex]!;
+      positions[i * 3 + uIndex] = u * c - w * s;
+      positions[i * 3 + vIndex] = u * s + w * c;
+    } else if (mod.mode === "taper") {
+      const scale = 1 + (mod.factor - 1) * t;
+      positions[i * 3 + uIndex] = positions[i * 3 + uIndex]! * scale;
+      positions[i * 3 + vIndex] = positions[i * 3 + vIndex]! * scale;
+    } else {
+      positions[i * 3 + axisIndex] = positions[i * 3 + axisIndex]! * mod.factor;
+    }
+  }
+  return ok(soupToMesh(positions, soup.indices));
+}
+
+/**
  * Pure AABB solid boolean for watertight axis-aligned boxes (shipped fallback commit path).
  * Production may inject Manifold WASM via StudioSolidBooleanBackend.
  */
@@ -2192,6 +2641,14 @@ export async function evaluateStudioMeshModifierStack(
         applied = applySolidify(current, currentMetrics.value, mod, budget);
       } else if (mod.kind === "bevel") {
         applied = applyBevel(current, currentMetrics.value, mod, budget);
+      } else if (mod.kind === "subdivision") {
+        applied = applySubdivision(current, currentMetrics.value, mod, budget);
+      } else if (mod.kind === "weld") {
+        applied = applyWeld(current, currentMetrics.value, mod, budget);
+      } else if (mod.kind === "decimate") {
+        applied = applyDecimate(current, currentMetrics.value, mod, budget);
+      } else if (mod.kind === "simple-deform") {
+        applied = applySimpleDeform(current, currentMetrics.value, mod, budget);
       } else {
         const leftResult = materializeTriangleSoup(
           current,
