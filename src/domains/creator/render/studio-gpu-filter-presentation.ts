@@ -6,12 +6,17 @@
  * There is deliberately no staging buffer, MAP_READ, readPixels, getImageData, ImageBitmap, or
  * intermediate CPU canvas in this module. Canonical pixels are obtained separately by the explicit
  * settle/export readback on the frame handle returned from studio-gpu-filter-apply.
+ *
+ * Alpha convention: the packed buffer is straight alpha, the swapchain is premultiplied, and the
+ * fullscreen fragment pass is the only place the two are reconciled. That conversion is presentation
+ * only — it never touches the packed buffer the canonical readback maps.
  */
 
 const GPU_BUFFER_COPY_DST = 0x0008;
 const GPU_BUFFER_UNIFORM = 0x0040;
 
-const STUDIO_GPU_FILTER_PRESENTATION_WGSL = /* wgsl */ `
+/** The shipped presentation shader. Exported so the alpha contract is assertable without a GPU. */
+export const STUDIO_GPU_FILTER_PRESENTATION_WGSL = /* wgsl */ `
 struct PresentationParams {
   width : u32,
   height : u32,
@@ -42,20 +47,35 @@ fn channel(value : u32, shift : u32) -> f32 {
   return f32((value >> shift) & 255u) / 255.0;
 }
 
+// The packed storage buffer carries straight (non-premultiplied) alpha end to end: the captured 2D
+// source is straight, and the spatial kernels explicitly un-premultiply on resolve. GPUCanvasAlphaMode
+// admits only "opaque" | "premultiplied", so the swapchain convention is not negotiable and the buffer
+// side converts here. Emitting the channels verbatim presented semi-transparent frames too bright.
 @fragment
 fn fragment_main(@builtin(position) position : vec4<f32>) -> @location(0) vec4<f32> {
   let x = min(u32(position.x), params.width - 1u);
   let y = min(u32(position.y), params.height - 1u);
   let index = min(y * params.width + x, params.pixel_count - 1u);
   let packed = packed_pixels[index];
+  let alpha = channel(packed, 24u);
   return vec4<f32>(
-    channel(packed, 0u),
-    channel(packed, 8u),
-    channel(packed, 16u),
-    channel(packed, 24u),
+    channel(packed, 0u) * alpha,
+    channel(packed, 8u) * alpha,
+    channel(packed, 16u) * alpha,
+    alpha,
   );
 }
 `;
+
+/**
+ * The alpha convention the packed filter buffer carries into {@link fragment_main}.
+ * Straight alpha in, premultiplied out — matched to the `alphaMode: "premultiplied"` swapchain
+ * configured below. Exported so the presentation contract is assertable without a GPU.
+ */
+export const STUDIO_GPU_FILTER_PRESENTATION_ALPHA = {
+  buffer: "straight",
+  swapchain: "premultiplied",
+} as const;
 
 export type StudioGpuFilterPresentationCanvas = HTMLCanvasElement & {
   getContext(contextId: "webgpu"): GPUCanvasContext | null;
@@ -184,7 +204,7 @@ class StudioGpuFilterPresentationSurfaceImpl implements StudioGpuFilterPresentat
         context.configure({
           device: input.device,
           format,
-          alphaMode: "premultiplied",
+          alphaMode: STUDIO_GPU_FILTER_PRESENTATION_ALPHA.swapchain,
         });
         this.device = input.device;
         this.format = format;
