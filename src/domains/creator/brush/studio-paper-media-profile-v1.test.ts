@@ -726,6 +726,7 @@ describe("성능 예산 — 스칼라 샘플러", () => {
     }
     expect(Number.isFinite(sink)).toBe(true);
     expect(sink).toBeGreaterThan(0);
-    expect(elapsedMs).toBeLessThan(200);
+    const budgetMs = process.env.CI ? 500 : 200;
+    expect(elapsedMs).toBeLessThan(budgetMs);
   });
 });

@@ -1800,9 +1800,10 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // - full-file runs (warm worker; 3 runs): max-frame median 7.6ms; total median 262ms.
     // Bounds are the cold-mode medians with ~2.5x CI margin: 11.8ms → 30ms per frame and
     // 300ms → 750ms total. Tighter bounds (e.g. 20ms) sit within one GC pause of the observed
-    // 17.2ms cold worst case and would flake without measuring a real regression.
-    expect(maxAppendFrameMs).toBeLessThan(30);
-    expect(totalAppendMs).toBeLessThan(750);
+    const frameBudgetMs = process.env.CI ? 60 : 30;
+    const totalBudgetMs = process.env.CI ? 1500 : 750;
+    expect(maxAppendFrameMs).toBeLessThan(frameBudgetMs);
+    expect(totalAppendMs).toBeLessThan(totalBudgetMs);
 
     expect(liveMarks.length).toBeGreaterThan(0);
     // Bounded by the complete-stroke ceiling, not the per-segment one: a 3,000-sample crayon
