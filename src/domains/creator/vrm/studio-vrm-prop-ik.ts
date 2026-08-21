@@ -37,6 +37,8 @@ interface VrmTwoBoneGripStateInternal {
   binding: GripBoneBinding | null;
   baseRotations: GripLocalRotations | null;
   appliedRotations: GripLocalRotations | null;
+  /** restore 시 normalized→raw 동기화에 쓰는 휴머노이드. 첫 apply에서 스탬프된다. */
+  humanoid: NonNullable<VRM["humanoid"]> | null;
 }
 
 declare const VRM_TWO_BONE_GRIP_STATE_BRAND: unique symbol;
@@ -55,6 +57,7 @@ export function createVrmTwoBoneGripState(): VrmTwoBoneGripState {
     binding: null,
     baseRotations: null,
     appliedRotations: null,
+    humanoid: null,
   });
   return state;
 }
@@ -159,6 +162,9 @@ export function releaseVrmTwoBoneGripState(state: VrmTwoBoneGripState): boolean 
         internal.binding.hand,
         internal.baseRotations
       );
+      // 복원은 normalized 본에만 쓰이므로 raw 스키튼에 즉시 동기화한다. 그렇지 않으면
+      // 소품 해제 직후 손이 그립 포즈로 한 프레임(또는 커밋이 없는 경로에선 영구히) 남는다.
+      if (typeof internal.humanoid?.update === "function") internal.humanoid.update();
       internal.binding.upperArm.updateWorldMatrix(true, true);
       restored = true;
     }
@@ -168,6 +174,14 @@ export function releaseVrmTwoBoneGripState(state: VrmTwoBoneGripState): boolean 
   internal.baseRotations = null;
   internal.appliedRotations = null;
   return restored;
+}
+
+function stampGripHumanoid(
+  state: VrmTwoBoneGripState,
+  humanoid: NonNullable<VRM["humanoid"]> | null
+) {
+  const internal = gripStateInternals.get(state);
+  if (internal) internal.humanoid = humanoid;
 }
 
 function resolveGripBaseRotations(
@@ -234,6 +248,7 @@ export function applyVrmTwoBoneGrip(
   if (!upperArm || !lowerArm || !hand) return false;
 
   const binding = { upperArm, lowerArm, hand };
+  if (options.state) stampGripHumanoid(options.state, vrm.humanoid);
   const original = captureLocalRotations(binding);
   const base = options.state
     ? resolveGripBaseRotations(options.state, binding, original) ?? original
