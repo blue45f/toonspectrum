@@ -141,6 +141,7 @@ import { parseStudioHybridDccRoomPartMetadata } from "./studio-hybrid-dcc-room-a
 import {
   applyStudioSculptStroke,
   voxelRemeshStudioMesh,
+  type StudioSculptBrushKind,
 } from "./studio-hybrid-sculpt-kernel";
 
 /** OCCT result shape (lazy-loaded; browser fetch or Node loader). */
@@ -1057,19 +1058,31 @@ export function workspaceCadProp(
   return { ...ws, session, activeAssetId: assetId };
 }
 
+export interface StudioHybridDccSculptStrokeOptions {
+  readonly kind?: StudioSculptBrushKind;
+  readonly center?: { readonly x: number; readonly y: number; readonly z: number };
+  readonly radius?: number;
+  readonly strength?: number;
+  readonly direction?: { readonly x: number; readonly y: number; readonly z: number };
+}
+
 export function workspaceSculptActive(
   ws: StudioHybridDccWorkspace,
-  strength = 0.15,
+  strengthOrOptions: number | StudioHybridDccSculptStrokeOptions = 0.15,
 ): StudioHybridDccWorkspace {
+  const options: StudioHybridDccSculptStrokeOptions = typeof strengthOrOptions === "number"
+    ? { strength: strengthOrOptions }
+    : strengthOrOptions;
   const id = ws.activeAssetId;
   if (!id) throw new Error("no active asset");
   const record = ws.session.state.geometry.records[id];
   if (!record) throw new Error(`missing ${id}`);
   const sculpted = applyStudioSculptStroke(record.mesh, {
-    kind: "inflate",
-    center: { x: 0.5, y: 0.5, z: 0.5 },
-    radius: 0.75,
-    strength,
+    kind: options.kind ?? "inflate",
+    center: options.center ?? { x: 0.5, y: 0.5, z: 0.5 },
+    radius: options.radius ?? 0.75,
+    strength: options.strength ?? 0.15,
+    ...(options.direction ? { direction: options.direction } : {}),
   });
   if (!sculpted.ok) throw new Error(sculpted.detail);
   const session = hybridDccCommitGeometry(ws.session, id, sculpted.mesh);

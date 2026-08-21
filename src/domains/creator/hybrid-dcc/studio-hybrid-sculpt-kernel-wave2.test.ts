@@ -32,7 +32,7 @@ describe("hybrid sculpt kernel — flatten / scrape / snakeHook", () => {
     }
   });
 
-  it("snake hook without movement leaves geometry untouched", () => {
+  it("snake hook without explicit direction drags along the fallback surface axis", () => {
     const mesh = createStudioUnitCubeMesh();
     // 커널은 항상 triangle soup 으로 재구성하므로(쿼드→트라이) 무이동 기준선과 비교한다.
     const baseline = applyStudioSculptStroke(mesh, {
@@ -49,8 +49,10 @@ describe("hybrid sculpt kernel — flatten / scrape / snakeHook", () => {
     });
     expect(baseline.ok && result.ok).toBe(true);
     if (!baseline.ok || !result.ok) return;
-    // 방향 벡터가 없으면 평균 법선(≈0 벡터)로 정규화되어 이동이 없다.
-    expect(hashStudioEditableMesh(result.mesh)).toBe(hashStudioEditableMesh(baseline.mesh));
+    // 닫힌 메시의 평균 법선 퇴화 시 +y 폴백 축으로 끌린다.
+    const baseMaxY = Math.max(...Array.from(baseline.mesh.vertices, (v) => v.position.y));
+    const nextMaxY = Math.max(...Array.from(result.mesh.vertices, (v) => v.position.y));
+    expect(nextMaxY).toBeGreaterThan(baseMaxY);
   });
 
   it("scrape respects the vertex mask so masked-out vertices stay frozen", () => {

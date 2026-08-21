@@ -155,7 +155,11 @@ describe("StudioHybridDccPanel industrial wiring", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "조형 작업 모드" }));
     expect(screen.getByText("조형 실험실 · voxel-lite")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /표면 조형 \(실험\)/u })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /브러시 조형 · 부풀리기/u })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "부풀리기" }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("radio", { name: "스네이크 훅" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /복셀 리메시/u })).toBeTruthy();
   });
 

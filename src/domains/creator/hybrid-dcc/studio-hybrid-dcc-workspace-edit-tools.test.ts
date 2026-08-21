@@ -8,6 +8,7 @@ import {
   workspaceDuplicateActive,
   workspaceInsetActive,
   workspaceLoopCutActive,
+  workspaceSculptActive,
   workspaceSetAssetVisibility,
   workspaceShadeActive,
   workspaceUndo,
@@ -105,5 +106,33 @@ describe("Hybrid DCC product mesh-edit tools", () => {
     const restoredFlat = workspaceUndo(smooth);
     expect(restoredFlat.session.state.geometry.records.cube?.mesh.faces.every((face) => !face.smooth))
       .toBe(true);
+  });
+
+  it("sculpts with an explicit brush kind, radius and dig direction", () => {
+    const ws = cubeWorkspace("sculpt-options");
+    const before = ws.session.state.geometry.records.cube!.meshHash;
+
+    const inflated = workspaceSculptActive(ws, {
+      kind: "inflate",
+      center: { x: 0, y: 0.5, z: 0 },
+      radius: 1,
+      strength: 0.25,
+    });
+    expect(inflated.session.state.geometry.records.cube!.meshHash).not.toBe(before);
+
+    const dug = workspaceSculptActive(ws, {
+      kind: "clay",
+      center: { x: 0, y: 0.5, z: 0 },
+      radius: 1,
+      strength: -0.3,
+    });
+    const dugHash = dug.session.state.geometry.records.cube!.meshHash;
+    expect(dugHash).not.toBe(inflated.session.state.geometry.records.cube!.meshHash);
+
+    // 숫자 시그니처 호환 유지: 기존 호출도 같은 결과 경로를 쓴다.
+    const legacy = workspaceSculptActive(dug, 0);
+    expect(legacy.session.state.geometry.records.cube!.meshHash).toBe(
+      dug.session.state.geometry.records.cube!.meshHash,
+    );
   });
 });

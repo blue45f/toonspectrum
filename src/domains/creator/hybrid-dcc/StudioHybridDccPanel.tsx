@@ -96,6 +96,7 @@ import {
   workspaceWeldActive,
   type StudioHybridDccWorkspace,
 } from "./studio-hybrid-dcc-workspace";
+import { type StudioSculptBrushKind } from "./studio-hybrid-sculpt-kernel";
 import {
   StudioHybridDccModifierInspector,
   type StudioHybridDccModifierStackView,
@@ -121,6 +122,17 @@ function friendlyHybridDccAssetName(assetId: string, index: number): string {
   if (roomPart) return `방 구성품 ${Number(roomPart[1])}`;
   return `오브젝트 ${index + 1}`;
 }
+
+const SCULPT_BRUSH_LABELS: Readonly<Record<StudioSculptBrushKind, string>> = Object.freeze({
+  grab: "잡아당기기",
+  smooth: "매끈하게",
+  inflate: "부풀리기",
+  clay: "점토",
+  crease: "접힘",
+  flatten: "평평하게",
+  scrape: "긁어내기",
+  snakeHook: "스네이크 훅",
+});
 
 const STUDIO_HYBRID_DCC_MODE_GUIDE: Record<
   StudioDccWorkbenchMode,
@@ -283,6 +295,8 @@ export function StudioHybridDccPanel({
     onWorkbenchModeChange?.(mode);
   };
   const [modifierError, setModifierError] = useState<string | null>(null);
+  const [sculptBrushKind, setSculptBrushKind] = useState<StudioSculptBrushKind>("inflate");
+  const [sculptDig, setSculptDig] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
   const runGenerationRef = useRef(0);
@@ -832,11 +846,17 @@ export function StudioHybridDccPanel({
     },
   ] : workbenchMode === "sculpt" ? [
     {
-      label: "표면 조형 (실험)",
-      technical: "Voxel-lite Sculpt · experimental",
-      description: "전문 Sculpt 엔진이 아닌 제한된 voxel-lite 커널로 큰 형태만 시험합니다.",
+      label: `브러시 조형 · ${SCULPT_BRUSH_LABELS[sculptBrushKind]}${sculptDig ? " (깎기)" : ""}`,
+      technical: `${sculptBrushKind} · experimental`,
+      description: "선택한 브러시 종류로 오브젝트 중심을 조형합니다. 깎기 토글로 방향을 반전합니다.",
       requiresAsset: true,
-      onClick: () => { void run("표면 조형", () => workspaceSculptActive(ws)); },
+      primary: true,
+      onClick: () => {
+        void run("브러시 조형", () => workspaceSculptActive(ws, {
+          kind: sculptBrushKind,
+          strength: sculptDig ? -0.25 : 0.25,
+        }));
+      },
     },
     {
       label: "필요한 곳만 세분화",
@@ -1103,6 +1123,42 @@ export function StudioHybridDccPanel({
             {quickTools.length}개 추천 도구
           </span>
         </div>
+        {workbenchMode === "sculpt" ? (
+          <div
+            role="radiogroup"
+            aria-label="조형 브러시 종류"
+            className="mt-3 flex flex-wrap gap-1.5 rounded-xl border border-line/70 bg-canvas/35 p-2"
+          >
+            {(Object.keys(SCULPT_BRUSH_LABELS) as readonly StudioSculptBrushKind[]).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                role="radio"
+                aria-checked={sculptBrushKind === kind}
+                onClick={() => setSculptBrushKind(kind)}
+                className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                  sculptBrushKind === kind
+                    ? "border-accent bg-accent-soft text-accent"
+                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                }`}
+              >
+                {SCULPT_BRUSH_LABELS[kind]}
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-pressed={sculptDig}
+              onClick={() => setSculptDig((current) => !current)}
+              className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                sculptDig
+                  ? "border-warn bg-warn/10 text-warn"
+                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+              }`}
+            >
+              {sculptDig ? "깎기 모드 ON" : "깎기 모드 OFF"}
+            </button>
+          </div>
+        ) : null}
         <div
           className="mt-3 grid gap-2 max-sm:-mx-1 max-sm:flex max-sm:snap-x max-sm:overflow-x-auto max-sm:px-1 max-sm:pb-1 sm:grid-cols-2 xl:grid-cols-4"
           aria-label="추천 3D 도구"

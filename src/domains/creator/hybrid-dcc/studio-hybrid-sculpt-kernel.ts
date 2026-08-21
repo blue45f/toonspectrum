@@ -92,10 +92,17 @@ export function applyStudioSculptStroke(
     ny += bz * cxn - bx * czn;
     nz += bx * cyn - by * cxn;
   }
-  const nl = Math.hypot(nx, ny, nz) || 1;
-  nx /= nl;
-  ny /= nl;
-  nz /= nl;
+  const nl = Math.hypot(nx, ny, nz);
+  // 닫힌 메시는 면적 가중 평균 법선이 0 으로 퇴화한다 — 그때는 브러시 direction 이 평면 축을 대신한다.
+  if (nl > 1e-6) {
+    nx /= nl;
+    ny /= nl;
+    nz /= nl;
+  } else {
+    nx = 0;
+    ny = 1;
+    nz = 0;
+  }
 
   const dir = stroke.direction ?? { x: nx, y: ny, z: nz };
   const dl = Math.hypot(dir.x, dir.y, dir.z) || 1;
