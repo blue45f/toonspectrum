@@ -2,16 +2,25 @@ import { preserveStudioBg3dLtSceneAnchorAfterRemoval } from "../bg3d/studio-bg3d
 import { hasTrack, removeTrack, type AnimationTimelineDoc } from "../studio-anim-tracks";
 import { elBounds } from "../studio-element-geometry";
 import { planBindSelectionToFrameFolder } from "../studio-frame-folder";
-import { selectionShapeForIds, type GroupSelectionState } from "../studio-group-selection";
+import {
+  planGroupEnter,
+  selectionShapeForIds,
+  type GroupSelectionState,
+} from "../studio-group-selection";
 import { uid } from "../studio-id";
 import {
   createLayerGroup,
   emptyGroupIds,
   groupItems,
+  isEffectivelyLocked,
   moveLayerGroup,
   removeItemsFromGroups,
   removeLayerItems,
+  reorderLayerSelection,
+  setItemGroup,
+  ungroupItems,
   type LayerGroup,
+  type LayerItemReorderDirection,
 } from "../studio-layers";
 import {
   createStudioPixelEditCanvas,
@@ -19,6 +28,7 @@ import {
   loadStudioPixelEditImage,
   yieldStudioPixelEditMainThread,
 } from "../studio-legacy-editor-runtime-helpers";
+import { studioLinked3dPassDestructiveEditReason } from "../studio-linked-3d-raster-edit-policy";
 import {
   planStudioShared3dStageCollectionRemoval,
   studioShared3dStageCollectionEntries,
@@ -60,7 +70,8 @@ export interface StudioLayerOperationsContext {
   readonly extendedBlendOpacity: number;
   readonly coalesceKeyRef: { current: string | null };
   readonly activeGroupIdRef: { current: string | null };
-  readonly shared3dStageMergeConflictReason: (removeIds: readonly string[]) => string | null;
+  readonly marqueeIdsRef: { current: string[] };
+  readonly currentCanvasSelectionIds: () => string[];
   readonly beginLiveResourceEditAsync: (
     elementIds?: readonly string[] | null
   ) => Promise<boolean>;
@@ -76,9 +87,6 @@ export interface StudioLayerOperationsContext {
     resolvePatch: (element: El) => Partial<El>,
     options?: { readonly coalesceKey?: string }
   ) => void;
-  readonly groupSelectedElements: () => boolean;
-  readonly ungroupSelectedElements: () => boolean;
-  readonly deleteLayerGroup: (groupId: string) => void;
   readonly moveLayer: (id: string, dir: "up" | "down") => void;
   readonly applyGroupSelectionState: (next: GroupSelectionState) => void;
   readonly setError: (message: string | null) => void;
@@ -96,10 +104,21 @@ export interface StudioLayerOperations {
   readonly applyExtendedBlendMergeDown: () => Promise<void>;
   readonly handleLayerNavigatorAction: (action: StudioLayerNavigatorAction) => void;
   readonly deleteLayerElements: (ids: readonly string[]) => boolean;
+  readonly addLayerGroup: (seedElId?: string) => boolean;
+  readonly groupSelectedElements: () => boolean;
+  readonly completeSelectedGroupId: () => string | null;
+  readonly ungroupSelectedElements: () => boolean;
+  readonly enterCompleteSelectedGroup: () => boolean;
+  readonly toggleSelectedElementsLocked: () => void;
+  readonly reorderSelectedElements: (direction: LayerItemReorderDirection) => void;
+  readonly deleteLayerGroup: (groupId: string) => void;
+  readonly assignElementToGroup: (elId: string, groupId: string | undefined) => void;
 }
 
 /**
- * Layer merge / navigator-action / explicit-delete commands extracted from StudioPage.
+ * Layer merge / navigator-action / explicit-delete commands plus the layer-group (folder)
+ * commands — create/group/ungroup, enter-group, lock toggle, group-safe reorder, group
+ * delete and element↔group assignment — extracted from StudioPage.
  * Behavior-identical move: the bodies below are verbatim, with dependencies received
  * through {@link ctx} instead of component closure. The review-lock, master-edit and
  * live-resource gates stay inside the extracted code so every entry point keeps the
@@ -124,15 +143,13 @@ export function createStudioLayerOperations(
     extendedBlendOpacity,
     coalesceKeyRef,
     activeGroupIdRef,
-    shared3dStageMergeConflictReason,
+    marqueeIdsRef,
+    currentCanvasSelectionIds,
     beginLiveResourceEditAsync,
     endLiveResourceEdit,
     commit,
     updateActivePage,
     patchLayerItems,
-    groupSelectedElements,
-    ungroupSelectedElements,
-    deleteLayerGroup,
     moveLayer,
     applyGroupSelectionState,
     setError,
@@ -142,6 +159,212 @@ export function createStudioLayerOperations(
     setActiveGroupId,
     announceDrawingShortcut,
   } = ctx;
+
+  // ── 레이어 그룹(폴더) ─────────────────────────────────────────────────────
+  // 그룹 목록·요소 groupId를 한 번에 커밋(원자적). seedElId가 있으면 새 그룹에 그 요소를 넣는다.
+  function addLayerGroup(seedElId?: string): boolean {
+    const seed = seedElId ? elementById.get(seedElId) : undefined;
+    if (seed?.groupId) {
+      const message =
+        "기존 그룹의 자식은 다시 그룹화하지 않아요. 먼저 그룹을 해제하거나 다른 요소를 함께 선택하세요.";
+      setError(message);
+      announceDrawingShortcut(message);
+      return false;
+    }
+    const g = createLayerGroup(uid(), `그룹 ${groups.length + 1}`);
+    const nextElements = seedElId ? (groupItems(elements, [seedElId], g.id) as El[]) : elements;
+    updateActivePage({ groups: [...groups, g], elements: nextElements });
+    if (seedElId) {
+      applyGroupSelectionState({
+        ...selectionShapeForIds([seedElId]),
+        activeGroupId: null,
+      });
+    }
+    return true;
+  }
+  function groupSelectedElements(): boolean {
+    const memberIds = [...marqueeIdsRef.current];
+    if (memberIds.length < 2) return false;
+    const alreadyGrouped = memberIds
+      .map((id) => elementById.get(id))
+      .some((element) => element?.groupId);
+    if (alreadyGrouped) {
+      // 현재 레이어 그룹은 중첩 구조가 아니라 평면 메타데이터다. 기존 그룹 멤버를 다시
+      // Cmd/Ctrl+G 하면 이전 그룹을 비워 둔 채 새 groupId로 덮어쓸 수 있으므로, PPT의
+      // "이미 그룹인 선택은 다시 묶지 않음"처럼 명시적으로 fail-close한다.
+      setError("기존 그룹이 포함된 선택이에요. 먼저 그룹을 해제한 뒤 다시 그룹화해 주세요.");
+      announceDrawingShortcut("기존 그룹을 먼저 해제한 뒤 다시 그룹화해 주세요");
+      return false;
+    }
+    const groupId = uid();
+    const g = createLayerGroup(groupId, `그룹 ${groups.length + 1}`);
+    const nextElements = groupItems(elements, memberIds, groupId) as El[];
+    updateActivePage({ groups: [...groups, g], elements: nextElements });
+    // PPT/Figma처럼 그룹 생성 직후 새 그룹을 그대로 선택한다. 이어서 이동·복제·잠금을
+    // 실행하려는 사용자가 캔버스에서 다시 그룹을 찾아 클릭할 필요가 없어야 한다.
+    applyGroupSelectionState({
+      selectedId: null,
+      marqueeIds: memberIds,
+      activeGroupId: null,
+    });
+    announceDrawingShortcut(`요소 ${memberIds.length}개 그룹화`);
+    return true;
+  }
+  function completeSelectedGroupId(): string | null {
+    const currentSelectionIds = currentCanvasSelectionIds();
+    if (currentSelectionIds.length === 0) return null;
+    const selectedIds = new Set(currentSelectionIds);
+    const selectedElements = elements.filter((element) => selectedIds.has(element.id));
+    const groupIds = new Set(
+      selectedElements
+        .map((element) => element.groupId)
+        .filter((groupId): groupId is string => groupId !== undefined)
+    );
+    if (groupIds.size !== 1) return null;
+    const groupId = [...groupIds][0]!;
+    if (!groups.some((group) => group.id === groupId)) return null;
+    // 그룹 내부 편집 중에는 모든 자식이 선택되어도 최상위 그룹 하나로 되돌리지 않는다.
+    // 그래야 정렬·잠금·해제 같은 자식 대상 명령이 PPT/Figma의 그룹 진입 상태를 유지한다.
+    if (activeGroupIdRef.current === groupId) return null;
+    const memberIds = elements
+      .filter((element) => element.groupId === groupId)
+      .map((element) => element.id);
+    return (
+      selectedElements.length === selectedIds.size &&
+      memberIds.length === selectedElements.length &&
+      memberIds.every((id) => selectedIds.has(id))
+    )
+      ? groupId
+      : null;
+  }
+  function ungroupSelectedElements(): boolean {
+    const groupId = completeSelectedGroupId();
+    if (!groupId) {
+      const message =
+        "그룹 전체가 선택된 경우에만 해제할 수 있어요. 그룹을 한 번 클릭해 전체를 선택하세요.";
+      setError(message);
+      announceDrawingShortcut(message);
+      return false;
+    }
+    const selectedIds = currentCanvasSelectionIds();
+    updateActivePage({
+      elements: ungroupItems(elements, groupId) as El[],
+      groups: groups.filter((group) => group.id !== groupId),
+    });
+    // 요소 선택은 유지한다. PPT/Figma처럼 그룹 해제 직후에도 이동·정렬·재그룹화가
+    // 이어져야 하며, 캔버스를 다시 드래그해 대상을 찾게 만들지 않는다.
+    applyGroupSelectionState({
+      ...selectionShapeForIds(selectedIds.filter((id) => elementById.has(id))),
+      activeGroupId: null,
+    });
+    announceDrawingShortcut("그룹 해제 완료");
+    return true;
+  }
+  function enterCompleteSelectedGroup(): boolean {
+    const groupId = completeSelectedGroupId();
+    if (!groupId) return false;
+    const firstMember = elements.find((element) => element.groupId === groupId);
+    if (!firstMember) return false;
+    applyGroupSelectionState(
+      planGroupEnter({
+        items: elements,
+        groups,
+        clickedId: firstMember.id,
+      })
+    );
+    announceDrawingShortcut("그룹 내부 편집 · Esc로 그룹 전체 선택");
+    return true;
+  }
+  function toggleSelectedElementsLocked() {
+    const currentSelectionIds = currentCanvasSelectionIds();
+    const selectedIds = new Set(currentSelectionIds);
+    if (selectedIds.size === 0) return;
+    const selectedElements = elements.filter((element) => selectedIds.has(element.id));
+    if (selectedElements.length === 0) return;
+    const nextLocked = !selectedElements.every((element) =>
+      isEffectivelyLocked(element, groups)
+    );
+    const groupId = completeSelectedGroupId();
+    if (groupId) {
+      updateActivePage({
+        groups: groups.map((group) =>
+          group.id === groupId ? { ...group, locked: nextLocked } : group
+        ),
+        // 잠금 해제는 그룹 잠금과 멤버 개별 잠금을 함께 정리해야 UI의 “잠금 해제”
+        // 약속대로 즉시 다시 편집할 수 있다. 잠글 때는 기존 멤버 메타를 보존한다.
+        elements: nextLocked
+          ? elements
+          : elements.map((element) =>
+              selectedIds.has(element.id) && element.locked
+                ? ({ ...element, locked: false } as El)
+                : element
+            ),
+      });
+      return;
+    }
+    patchLayerItems(currentSelectionIds, () => ({ locked: nextLocked }));
+  }
+  function reorderSelectedElements(direction: LayerItemReorderDirection) {
+    const currentSelectionIds = currentCanvasSelectionIds();
+    if (currentSelectionIds.length === 0) return;
+    const next = reorderLayerSelection(elements, currentSelectionIds, direction) as El[];
+    if (next === elements) return;
+    commit(next);
+  }
+  // 그룹 해제: 멤버 groupId 제거 + 그룹 자체 삭제(요소는 보존).
+  function deleteLayerGroup(groupId: string) {
+    updateActivePage({
+      elements: ungroupItems(elements, groupId) as El[],
+      groups: groups.filter((g) => g.id !== groupId),
+    });
+    if (activeGroupIdRef.current === groupId) {
+      activeGroupIdRef.current = null;
+      setActiveGroupId(null);
+    }
+  }
+  // 요소를 그룹에 넣기/빼기(연속성 유지). groupId=undefined면 그룹에서 제거.
+  function assignElementToGroup(elId: string, groupId: string | undefined) {
+    updateActivePage({ elements: setItemGroup(elements, elId, groupId) as El[] });
+  }
+
+  function shared3dStageMergeConflictReason(removeIds: readonly string[]): string | null {
+    if (removeIds.length === 0) return null;
+    const removedIds = new Set(removeIds);
+    const removesReservedLinkedPassState = elements.some((element) =>
+      removedIds.has(element.id)
+      && element.type === "image"
+      && (
+        studioLinked3dPassDestructiveEditReason(element) !== null
+        || element.bg3dLtBundleId !== undefined
+      ),
+    );
+    if (removesReservedLinkedPassState) {
+      return "연결된 3D 장면과 선화는 일반 레이어 병합으로 제거하지 않아요. 3D 원본을 유지하는 정적 복사본을 만든 뒤 그 복사본을 병합해 주세요.";
+    }
+    if (activePage.shared3dStage === undefined) return null;
+    const sharedStages = studioShared3dStageCollectionEntries(activePage.shared3dStage);
+    if (!sharedStages) {
+      return "공유 3D 장면 연결 정보가 손상되어 안전하게 병합하지 않았어요. 먼저 3D 배경 연결을 확인해 주세요.";
+    }
+    const linkedCharacterIds = new Set(sharedStages.flatMap((stage) =>
+      stage.characters.map((character) => character.elementId)));
+    const linkedBundleIds = new Set(sharedStages.map((stage) =>
+      stage.background.bundleId));
+    const removesStageAuthority = elements.some((element) =>
+      removedIds.has(element.id)
+      && (
+        (
+          element.type === "image"
+          && element.bg3dLtBundleId !== undefined
+          && linkedBundleIds.has(element.bg3dLtBundleId)
+        )
+        || linkedCharacterIds.has(element.id)
+      ),
+    );
+    return removesStageAuthority
+      ? "공유 3D 장면은 일반 병합으로 일부만 지우지 않아요. 3D 배경에서 ‘3D 원본 유지 · 한 장으로 정리’를 사용하거나, 배경을 삭제해 원본 캐릭터를 복원해 주세요."
+      : null;
+  }
 
   async function commitLayerMergePlan(
     result: ReturnType<typeof planStudioLayerMergeDown>
@@ -622,5 +845,14 @@ export function createStudioLayerOperations(
     applyExtendedBlendMergeDown,
     handleLayerNavigatorAction,
     deleteLayerElements,
+    addLayerGroup,
+    groupSelectedElements,
+    completeSelectedGroupId,
+    ungroupSelectedElements,
+    enterCompleteSelectedGroup,
+    toggleSelectedElementsLocked,
+    reorderSelectedElements,
+    deleteLayerGroup,
+    assignElementToGroup,
   };
 }

@@ -180,14 +180,21 @@ describe("pending stroke lifecycle source contract", () => {
   });
 
   it("복구와 프로젝트 교체는 활성·대기 획을 문서 경계 너머로 운반하지 않는다", () => {
-    const restore = sourceBetween("async function restoreAutosave()", "function clearAutosave()");
+    // Intentional change (2026-08, B-17): restoreAutosave's body moved to
+    // studio-page-autosave-runtime.ts; the composed editor surface still carries it verbatim.
+    const restore = sourceBetween(
+      "export async function restoreStudioAutosaveRecovery(",
+      "export interface StudioAutosaveDurableAuthorityContext"
+    );
+    // ctx 구조 분해는 알파벳 순이라 실행 순서가 아니다 — 본문부터 센다.
+    const restoreBody = restore.slice(restore.indexOf("} = ctx;"));
     const replacement = sourceBetween(
       "function applyStudioProjectSnapshotWithPreparedDocuments",
       "async function applyStudioProjectSnapshot("
     );
 
-    expect(restore.indexOf("prepareStudioDocumentReplacement")).toBeLessThan(
-      restore.indexOf("captureStudioMutationTicket")
+    expect(restoreBody.indexOf("prepareStudioDocumentReplacement")).toBeLessThan(
+      restoreBody.indexOf("captureStudioMutationTicket")
     );
     expect(restore).toContain("requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()");
     expect(restore).toContain("pendingStrokeCommitsRef.current");

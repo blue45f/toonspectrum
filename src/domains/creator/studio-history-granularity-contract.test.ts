@@ -22,6 +22,13 @@ const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.ur
 // studio-cuttoon-editor/studio-deferred-stroke-commit.ts. Slices that start at an extracted
 // symbol scan the composed editor surface; the contract itself is unchanged.
 const studioEditorSource = readStudioCuttoonEditorSource();
+// Intentional change (2026-08, B-17): restoreAutosave/clearAutosave bodies moved to
+// studio-page-autosave-runtime.ts (StudioPage keeps thin same-named wrappers). The guard,
+// approval-seam and journal-reset contracts below are unchanged — only the file they live in.
+const autosaveRuntimeSource = readFileSync(
+  new URL("./studio-page-autosave-runtime.ts", import.meta.url),
+  "utf8",
+);
 const catalogSource = readFileSync(
   new URL("./studio-destructive-command-catalog.ts", import.meta.url),
   "utf8",
@@ -31,12 +38,20 @@ const statusRailSource = readFileSync(
   "utf8",
 );
 
-function sourceBetween(start: string, end: string): string {
-  const startIndex = studioPageSource.indexOf(start);
-  const endIndex = studioPageSource.indexOf(end, startIndex + start.length);
+function sliceBetween(source: string, start: string, end: string): string {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex + start.length);
   expect(startIndex).toBeGreaterThanOrEqual(0);
   expect(endIndex).toBeGreaterThan(startIndex);
-  return studioPageSource.slice(startIndex, endIndex);
+  return source.slice(startIndex, endIndex);
+}
+
+function sourceBetween(start: string, end: string): string {
+  return sliceBetween(studioPageSource, start, end);
+}
+
+function autosaveRuntimeBetween(start: string, end: string): string {
+  return sliceBetween(autosaveRuntimeSource, start, end);
 }
 
 function editorSourceBetween(start: string, end: string): string {
@@ -95,7 +110,10 @@ describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목�
 
 describe("B — 복구 배너의 비우기는 파괴 승인 seam을 지난다", () => {
   it("clearAutosave 는 되돌릴 수 없음 등급의 승인 트랜잭션으로 감싼다", () => {
-    const clear = sourceBetween("async function clearAutosave()", "function downloadAutosaveBackup(");
+    const clear = autosaveRuntimeBetween(
+      "export async function requestStudioAutosaveClear(",
+      "export interface StudioAutosaveBackupContext",
+    );
 
     expect(clear).toContain("studioClearAutosaveRequest({");
     expect(clear).toContain("runStudioDestructiveAction({");
@@ -105,7 +123,10 @@ describe("B — 복구 배너의 비우기는 파괴 승인 seam을 지난다", 
   });
 
   it("사라지는 페이지 수·요소 수를 실제 임시저장본에서 센다", () => {
-    const clear = sourceBetween("async function clearAutosave()", "function downloadAutosaveBackup(");
+    const clear = autosaveRuntimeBetween(
+      "export async function requestStudioAutosaveClear(",
+      "export interface StudioAutosaveBackupContext",
+    );
 
     expect(clear).toContain("saved?.payload.pagesList ?? []");
     expect(clear).toContain("pageCount: savedPages.length");
@@ -228,7 +249,10 @@ describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌�
   });
 
   it("문서 전체 수화는 저널을 비우고 사이드카 항목을 남기지 않는다", () => {
-    const restore = sourceBetween("async function restoreAutosave()", "function clearAutosaveDurableAuthority(");
+    const restore = autosaveRuntimeBetween(
+      "export async function restoreStudioAutosaveRecovery(",
+      "export interface StudioAutosaveDurableAuthorityContext",
+    );
     expect(restore).toContain("resetStudioHistoryJournal();");
     expect(restore).toContain("hydrateStudioSidecarDocuments({");
 

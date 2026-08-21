@@ -21,6 +21,13 @@ const savePipeline = readFileSync(
   new URL("./studio-page-save-pipeline.ts", import.meta.url),
   "utf8",
 );
+// Intentional change (2026-08, B-17): the restore/durable-tombstone/clear/backup bodies moved to
+// studio-page-autosave-runtime.ts, so those source slices read them there. StudioPage keeps thin
+// same-named wrappers, and every guard/ordering contract below is unchanged.
+const autosaveRuntimeActions = readFileSync(
+  new URL("./studio-page-autosave-runtime.ts", import.meta.url),
+  "utf8",
+);
 
 function sourceBetween(
   source: string,
@@ -127,15 +134,15 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
 
   it("retains the reconciled durable candidate for restore and backup without rereading its browser mirror", () => {
     const restore = sourceBetween(
-      studioPage,
-      "async function restoreAutosave()",
-      "function clearAutosaveDurableAuthority()",
+      autosaveRuntimeActions,
+      "export async function restoreStudioAutosaveRecovery(",
+      "export interface StudioAutosaveDurableAuthorityContext",
     );
-    const backup = sourceBetween(
-      studioPage,
-      "function downloadAutosaveBackup()",
-      "// 화면 드래그 스크롤 핸들러",
+    const backupIndex = autosaveRuntimeActions.indexOf(
+      "export function downloadStudioAutosaveBackup(",
     );
+    expect(backupIndex).toBeGreaterThanOrEqual(0);
+    const backup = autosaveRuntimeActions.slice(backupIndex);
 
     expect(restore).toContain("const saved = autosaveRecoveryCandidateRef.current");
     expect(restore).toContain('saved.authority === "browser-storage-compatibility"');
@@ -171,9 +178,9 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
 
   it("records a durable tombstone for explicit clear and successful server save", () => {
     const clear = sourceBetween(
-      studioPage,
-      "function clearAutosaveDurableAuthority()",
-      "function downloadAutosaveBackup()",
+      autosaveRuntimeActions,
+      "export function clearStudioAutosaveDurableAuthority(",
+      "export interface StudioAutosaveBackupContext",
     );
     const saveHandler = savePipeline.slice(
       savePipeline.indexOf("export async function runStudioPageSavePipeline("),
@@ -181,7 +188,7 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
 
     expect(clear).toContain("if (session) attempted.push(session.clear(savedAt))");
     expect(clear).toContain("if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt))");
-    expect(clear).toContain("function clearAutosave()");
+    expect(clear).toContain("export async function requestStudioAutosaveClear(");
     expect(clear.indexOf("clearAutosaveDurableAuthority()")).toBeLessThan(
       clear.indexOf("localStorage.removeItem(autosaveKey)"),
     );

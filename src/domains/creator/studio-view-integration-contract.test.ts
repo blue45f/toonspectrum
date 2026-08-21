@@ -10,6 +10,13 @@ const shortcutDispatcherSource = readFileSync(
   "utf8",
 );
 const viewportSource = readFileSync(new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url), "utf8");
+// 의도된 변경(2026-08-21): 캔버스 스크롤 뷰포트 위에 떠 있던 sticky 배너들(에셋 드롭 힌트·프레즌스
+// 독·보기 도구 HUD 호스트·댓글 핀 배너·하이드레이션 플레이스홀더)이 StudioCanvasViewport.tsx 에서
+// 그대로 잘려 나와 자체 리프 모듈이 됐다. 보기 HUD 계약은 그 파일을 읽는다.
+const stickyBannersSource = readFileSync(
+  new URL("./canvas/StudioCanvasStickyBanners.tsx", import.meta.url),
+  "utf8",
+);
 const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
 // The minimap scroll-window box moved out of the inspector into its own leaf so a
 // pan frame re-renders one element instead of the whole aside. The invariant this
@@ -68,7 +75,7 @@ describe("StudioPage view integration contract", () => {
   });
 
   it("shows effective magnification and exposes an accessible rail-to-toolbar relationship", () => {
-    expect(viewportSource).toContain("magnification={effScale}");
+    expect(stickyBannersSource).toContain("magnification={effScale}");
     expect(leftToolRailSource).toContain('aria-controls="studio-view-tools-hud-zoom"');
     expect(leftToolRailSource).toContain('data-studio-view-tool-trigger="rotate"');
   });
@@ -87,14 +94,17 @@ describe("StudioPage view integration contract", () => {
   });
 
   it("loads the optional view HUD only after a zoom or rotate intent", () => {
-    expect(viewportSource).toContain(
+    expect(stickyBannersSource).toContain(
       'import { StudioViewToolsHud } from "../studio-view-tools-hud-loader";',
+    );
+    expect(stickyBannersSource).not.toContain(
+      'import { StudioViewToolsHud } from "../StudioViewToolsHud";',
     );
     expect(viewportSource).not.toContain(
       'import { StudioViewToolsHud } from "../StudioViewToolsHud";',
     );
     expect(viewHudLoaderSource).toContain('import("./StudioViewToolsHud")');
-    expect(viewportSource).toMatch(
+    expect(stickyBannersSource).toMatch(
       /\{viewTool \? \([\s\S]*?<Suspense fallback=\{null\}>[\s\S]*?<StudioViewToolsHud/u,
     );
   });
@@ -107,7 +117,7 @@ describe("StudioPage view integration contract", () => {
     expect(source).toContain("closeViewToolWithFocusRef.current({ preferCanvas: true })");
     expect(shortcutDispatcherSource).toContain('if (viewTool === "zoom") closeViewToolWithFocus();');
     expect(shortcutDispatcherSource).toContain('if (viewTool === "rotate") closeViewToolWithFocus();');
-    expect(viewportSource).toContain("onClose={closeViewToolWithFocus}");
+    expect(stickyBannersSource).toContain("onClose={closeViewToolWithFocus}");
   });
 
   it("keeps configurable flip dispatch before the hard-coded view resolver", () => {

@@ -139,6 +139,7 @@ import {
   isStudioCanvasInteractionBlocked,
 } from "./canvas/studio-canvas-cursor";
 import { buildStudioLiveShareHref, studioCreationLinkParams } from "./creator-studio-links";
+import { createStudioAssetLibraryMutations } from "./studio-cuttoon-editor/studio-asset-library-mutations";
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
 import { createStudioDeferredStrokeCommitEngine } from "./studio-cuttoon-editor/studio-deferred-stroke-commit";
 import { useStudioPixelToolSessions } from "./studio-cuttoon-editor/studio-pixel-tool-sessions";
@@ -215,7 +216,6 @@ import {
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
   readStudioAutosave,
-  serializeStudioAutosave,
   studioAutosaveKey,
   studioLifecycleAutosaveSidecarKey,
   studioSharedAutosaveCompatibility,
@@ -367,16 +367,12 @@ import {
   STUDIO_DEFERRED_STROKE_POSTPROCESS_TIMEOUT_MS,
   replaceStudioPendingStrokePostprocess,
 } from "./studio-deferred-stroke-postprocess";
-import {
-  confirmStudioDestructiveAction,
-  runStudioDestructiveAction,
-} from "./studio-destructive-action-preview";
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
 import {
   settleStudioDestructiveCommit,
   studioApplyCollageRequest,
   studioApplyPanelLayoutRequest,
   studioApplyTemplateRequest,
-  studioClearAutosaveRequest,
   studioClearLivingInkRequest,
   studioDeleteCheckpointRequest,
   studioQuickComicReplaceRequest,
@@ -612,11 +608,7 @@ import {
   type ImageFilterFields,
 } from "./render/studio-konva-filter-fields";
 import { studioKonvaRuntime as KonvaRuntime } from "./render/studio-konva-runtime";
-import { inspectStudioLayerLiftAvailability } from "./layer/studio-layer-lift-availability";
 import { StudioLayerLiftComposeWorkerClient } from "./layer/studio-layer-lift-compose-worker-client";
-import {
-  applyStudioLayerLiftCorrectionWorkflow,
-} from "./layer/studio-layer-lift-correction-workflow";
 import {
   createStudioLayerLiftLocalForegroundProvider,
 } from "./layer/studio-layer-lift-local-provider";
@@ -625,16 +617,14 @@ import {
 } from "./layer/studio-layer-lift-mediapipe-inference";
 import {
   StudioLayerLiftOperationRegistry,
-  type StudioLayerLiftOperationCurrentState,
 } from "./layer/studio-layer-lift-operation-context";
 import {
-  createStudioLayerLiftReviewPreviewResource,
   type StudioLayerLiftReviewPreviewResource,
 } from "./layer/studio-layer-lift-review-preview";
 import {
-  analyzeStudioLayerLiftWorkflow,
-  finalizeStudioLayerLiftWorkflow,
-} from "./layer/studio-layer-lift-workflow";
+  createStudioLayerLiftSession,
+  resolveStudioLayerLiftDisabledReason,
+} from "./layer/studio-layer-lift-session";
 import {
   bakeLayerMaskStroke,
   canLayerMask,
@@ -657,15 +647,10 @@ import {
 } from "./layer/studio-layer-solo";
 import {
   createLayerGroup,
-  groupItems,
   isEffectivelyHidden,
   isEffectivelyLocked,
   missingLayerGroupIds,
   reorderLayerItem,
-  reorderLayerSelection,
-  setItemGroup,
-  ungroupItems,
-  type LayerItemReorderDirection,
 } from "./studio-layers";
 import {
   acquireProductStudioUiPreferencesRepository,
@@ -755,10 +740,6 @@ import {
   replaceStudioLiveMutationLocks,
 } from "./live/studio-live-mutation-lock-coordinator";
 import { StudioLiveStampOverlayRenderer } from "./live/studio-live-stamp-overlay";
-import {
-  StudioLiveStrokeRenderBackendCoordinator,
-  type StudioLiveStrokeGpuFailureReason,
-} from "./live/studio-live-stroke-render-backend";
 import {
   StudioLiveWetInkOverlayRenderer,
   studioLiveWetInkOverlaySupportsElement,
@@ -875,6 +856,14 @@ import {
   projectStudioDocumentRectToClient,
   type StudioSurfaceRect,
 } from "./studio-oncanvas-command-surfaces";
+import {
+  clearStudioAutosaveDurableAuthority,
+  clearStudioAutosaveRecord,
+  downloadStudioAutosaveBackup,
+  guardStudioDocumentReplacement,
+  requestStudioAutosaveClear,
+  restoreStudioAutosaveRecovery,
+} from "./studio-page-autosave-runtime";
 import { comipoSeedsToEls } from "./studio-page-comipo-seeds";
 import {
   buildStudioCommentThreadPopoverScreenProjection,
@@ -972,7 +961,6 @@ import {
 } from "./studio-page-meta";
 import {
   isPageReviewLocked,
-  normalizePageReviewState,
   patchPageReviewState,
   type PageReviewState,
 } from "./studio-page-review";
@@ -988,7 +976,6 @@ import {
   publishPackageCreditsFromPack,
   publishPackageSettingsFromPack,
   QUICK_SAMPLE_CANVAS_H,
-  STUDIO_GPU_PIN_REQUEST_TIMEOUT_MS,
   STUDIO_LINKED_3D_CLOUD_SAVE_RECOVERY_STATE_KEY,
   studioBrushQuickSlotsDeviceProfile,
   studioLinked3dCloudSaveRecoveryNotice,
@@ -1283,10 +1270,7 @@ import {
   type StudioServerAiStatus,
 } from "./studio-server-ai-client";
 import { createSfxTextConfig, SFX_LIBRARY } from "./studio-sfx-presets";
-import {
-  studioShared3dStageCollectionEntries,
-  studioShared3dStageEntryAsDocument,
-} from "./studio-shared-3d-stage-collection";
+import { studioShared3dStageEntryAsDocument } from "./studio-shared-3d-stage-collection";
 import {
   resolveStudioShared3dStageBundleIdForElement,
   type StudioShared3dStageDccSource,
@@ -1427,6 +1411,7 @@ import {
   reconcileStudioGpuPendingAuthorityToCanvas,
   type StudioGpuPendingDrawAuthority,
 } from "./render/studio-webgpu-pending-authority";
+import { createStudioLiveStrokeGpuAudit } from "./render/studio-live-stroke-gpu-audit";
 import { StudioGpuPinReceiptWatchdog } from "./render/studio-webgpu-pin-receipt-watchdog";
 import { planStudioWebGpuViewportSurface } from "./render/studio-webgpu-viewport";
 import {
@@ -1550,9 +1535,6 @@ import type {
   StudioFilterPreview,
 } from "./filter/studio-filter-menu";
 import type {
-  StudioLayerLiftCorrectionStroke,
-} from "./layer/studio-layer-lift-correction";
-import type {
   StudioLayerNavigatorItem,
 } from "./layer/studio-layer-navigator";
 import type {
@@ -1593,7 +1575,6 @@ import type { AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import type {
   StudioAsset,
-  StudioAssetWithContentHash,
 } from "./studio-asset-library";
 import type {
   StudioAutoActionExecutionProgress,
@@ -1704,10 +1685,7 @@ import type {
 } from "./StudioMobileEditingDock";
 import type { StudioPageListPaneHandlers } from "./StudioPageListPane";
 import type { PublishContext } from "./StudioPublishContextBanner";
-import type {
-  StudioWebGpuCanvasHandle,
-  StudioWebGpuSurfaceFrameRequest,
-} from "./StudioWebGpuCanvas";
+import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type { CreatorAssetReportReason } from "@/lib/creator-asset-contract";
 import type {
   GeneratedAssetQuality,
@@ -9295,208 +9273,91 @@ function StudioCuttoonEditor({
     workId,
   ]);
 
+  // 아래 여섯 동작의 본문은 studio-page-autosave-runtime.ts 로 옮겼다(2026-08, B-17).
+  // 페이지에는 얇은 래퍼 함수 선언만 남긴다 — effect 안에서 참조되는 심볼의 참조 안정성을
+  // react-hooks/exhaustive-deps 가 컴포넌트 스코프 함수 선언에 대해서만 전이 증명하기 때문이다.
   function prepareStudioDocumentReplacement(
     label: string,
     options: { flushPending: boolean } = { flushPending: false }
   ): boolean {
-    if (drawingRef.current || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) {
-      setError(`현재 획을 마친 뒤 ${label}할 수 있어요.`);
-      return false;
-    }
-    if (pendingStrokeCommitsRef.current) {
-      if (!options.flushPending) {
-        setError(`${label}하는 동안 새 획이 생겨 적용하지 않았어요. 획을 마친 뒤 다시 시도해 주세요.`);
-        return false;
-      }
-      if (!flushPendingStrokeCommitsRef.current()) {
-        setError(
-          `마지막 획을 확정하지 못해 ${label}하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요.`
-        );
-        return false;
-      }
-    }
-    return true;
+    return guardStudioDocumentReplacement(
+      {
+        drawingRef,
+        drawingPointerTransportRef,
+        pendingStrokeCommitsRef,
+        flushPendingStrokeCommitsRef,
+        setError: (message) => setError(message),
+      },
+      label,
+      options
+    );
   }
 
   async function restoreAutosave() {
-    if (collaborationDocumentLocked) {
-      setError(collaborationLockMessage());
-      return;
-    }
-    if (!prepareStudioDocumentReplacement("임시저장본을 복구", { flushPending: true })) return;
-    const mutationTicket = captureStudioMutationTicket();
-    try {
-      const saved = autosaveRecoveryCandidateRef.current;
-      if (!saved) {
-        setError("복구할 내구 임시저장 데이터를 찾지 못했어요.");
-        return;
-      }
-      if (saved.authority === "browser-storage-compatibility") {
-        setAutosaveRestoreBlockedReason("legacy-unversioned");
-        setError(
-          "내구 저장소에서 확인되지 않은 호환 백업은 자동 복구하지 않아요. JSON 백업으로 내려받아 보관해 주세요."
-        );
-        return;
-      }
-      {
-        if (workId && sharedDocument) {
-          const compatibility = studioSharedAutosaveCompatibility(saved.payload, {
-            workId,
-            revision: sharedDocument.revision,
-          });
-          if (!compatibility.compatible) {
-            setAutosaveRestoreBlockedReason(compatibility.reason);
-            setError(
-              compatibility.reason === "revision-mismatch"
-                ? "임시저장본의 서버 revision이 현재 공동 문서와 달라 자동 복구를 차단했어요. JSON 백업으로 내려받아 수동 병합해 주세요."
-                : "출처 revision을 확인할 수 없는 공동 임시저장본이라 자동 복구를 차단했어요. JSON 백업으로 내려받아 보관해 주세요."
-            );
-            return;
-          }
-        }
-        const parsed = saved.payload;
-        const [
-          { normalizeStudioReleaseSchedule },
-          normalizedPublicationAnalytics,
-        ] = await Promise.all([
-          loadStudioReleaseScheduleRuntime(),
-          normalizeStudioPublicationAnalyticsDeferred(parsed.publicationAnalytics),
-        ]);
-        if (
-          drawingRef.current
-          || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
-          || pendingStrokeCommitsRef.current
-        ) {
-          setError("임시저장본을 준비하는 동안 새 획이 시작되어 복구하지 않았어요. 획을 마친 뒤 다시 시도해 주세요.");
-          return;
-        }
-        if (!canApplyStudioMutation(mutationTicket)) {
-          setError("임시저장본을 준비하는 동안 원고가 변경되어 복구하지 않았어요. 다시 확인해 주세요.");
-          return;
-        }
-        if (parsed.pagesList.length > 0) {
-          const restoredPages = parsed.pagesList.map((page) => ({
-            ...page,
-            ...((page as Record<string, unknown>)?.review !== undefined
-              ? { review: normalizePageReviewState((page as Record<string, unknown>).review) }
-              : {}),
-          })) as PageState[];
-          const currentHistory = pagesHistoryRef.current;
-          const currentHistoryIndex = Math.max(
-            0,
-            Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
-          );
-          const currentPages = currentHistory[currentHistoryIndex] ?? pages;
-          const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(
-            currentPages,
-            restoredPages
-          );
-          if (workAssetReason) {
-            setError(workAssetReason);
-            return;
-          }
-          resetAdvancedFillForDocumentReplacement();
-          pagesHistoryCommandJournalRef.current?.rebase({
-            pages: restoredPages,
-            historyIndex: 0,
-          });
-          pagesHistoryRef.current = [restoredPages];
-          pagesHiRef.current = 0;
-          // 히스토리를 통째로 갈아치웠으니 통합 저널도 처음부터 — 남은 항목은 사라진 스냅샷을 가리킨다.
-          resetStudioHistoryRetention();
-          resetStudioHistoryJournal();
-          setPagesHistory([restoredPages]);
-          setPagesHi(0);
-          const restoredCurrentId = restoredPages.some((page) => page.id === parsed.currentPageId)
-            ? parsed.currentPageId!
-            : restoredPages[0].id;
-          setCurrentPageId(restoredCurrentId);
-        }
-        if (typeof parsed.title === "string") setTitle(parsed.title);
-        if (typeof parsed.description === "string") setDescription(parsed.description);
-        if (typeof parsed.tagsText === "string") setTagsText(parsed.tagsText);
-        if (parsed.webtoonTheme === "classic" || parsed.webtoonTheme === "soft" || parsed.webtoonTheme === "vivid") {
-          setWebtoonTheme(parsed.webtoonTheme);
-        }
-        if (typeof parsed.panelGutter === "number" && Number.isFinite(parsed.panelGutter)) {
-          setPanelGutter(parsed.panelGutter);
-        }
-        const publishPack = normalizeStudioPublishPackSettings(parsed.publishPack);
-        setPublishProfile(publishPack.profile);
-        setPublishAiUsage(publishPack.aiUsage);
-        setPublishAiDisclosure(publishPack.disclosure);
-        setPublishCompliance(publishPack.compliance);
-        setPublishPackageSettings(publishPackageSettingsFromPack(parsed.publishPack));
-        setPublishPackageCredits(publishPackageCreditsFromPack(parsed.publishPack));
-        hydrateStudioSidecarDocuments({
-          characterBible: normalizeStudioCharacterBible(parsed.characterBible),
-          writerRoom: normalizeStudioWriterRoomDocument(parsed.writerRoom),
-        });
-        setAiProvenance(
-          recoverInterruptedStudioAiOperations(
-            normalizeStudioAiProvenanceDocument(parsed.aiProvenance)
-          )
-        );
-        setStudioComments(normalizeStudioCommentsDocument(parsed.comments));
-        setReleaseSchedule(normalizeStudioReleaseSchedule(parsed.releaseSchedule));
-        setPublicationAnalytics(normalizedPublicationAnalytics);
-        setReferenceBoard(normalizeStudioReferenceBoardDocument(parsed.referenceBoard));
-        // 문서 마스터 복구 — 백업에 없으면 빈 마스터(하위호환).
-        setMaster(normalizeDocumentMaster(parsed.master) as DocumentMaster<El>);
-        autosaveRecoveryCandidateRef.current = null;
-        setAutosaveRestoreBlockedReason(null);
-        setHasAutosave(false);
-      }
-    } catch {
-      setError("임시저장 복구에 실패했어요.");
-    }
+    await restoreStudioAutosaveRecovery({
+      autosaveRecoveryCandidateRef,
+      canApplyStudioMutation: (ticket) => canApplyStudioMutation(ticket),
+      captureStudioMutationTicket: () => captureStudioMutationTicket(),
+      collaborationDocumentLocked,
+      collaborationLockMessage,
+      drawingPointerTransportRef,
+      drawingRef,
+      hydrateStudioSidecarDocuments: (input) => hydrateStudioSidecarDocuments(input),
+      pages,
+      pagesHiRef,
+      pagesHistoryCommandJournalRef,
+      pagesHistoryRef,
+      pendingStrokeCommitsRef,
+      prepareStudioDocumentReplacement,
+      resetAdvancedFillForDocumentReplacement: () => resetAdvancedFillForDocumentReplacement(),
+      resetStudioHistoryJournal: () => resetStudioHistoryJournal(),
+      resetStudioHistoryRetention: () => resetStudioHistoryRetention(),
+      setAiProvenance,
+      setAutosaveRestoreBlockedReason,
+      setCurrentPageId: (next) => setCurrentPageId(next),
+      setDescription,
+      setError: (message) => setError(message),
+      setHasAutosave,
+      setMaster,
+      setPagesHi,
+      setPagesHistory,
+      setPanelGutter,
+      setPublicationAnalytics,
+      setPublishAiDisclosure,
+      setPublishAiUsage,
+      setPublishCompliance,
+      setPublishPackageCredits,
+      setPublishPackageSettings,
+      setPublishProfile,
+      setReferenceBoard,
+      setReleaseSchedule,
+      setStudioComments,
+      setTagsText,
+      setTitle,
+      setWebtoonTheme,
+      sharedDocument,
+      workId,
+    });
   }
 
   function clearAutosaveDurableAuthority() {
-    const sessionPromise = autosaveOpfsSessionRef.current;
-    const sqlitePromise = autosaveSqliteStoreRef.current;
-    if (!sessionPromise && !sqlitePromise) return;
-    const savedAt = new Date().toISOString();
-    void Promise.all([
-      sessionPromise ?? Promise.resolve(null),
-      sqlitePromise ?? Promise.resolve(null),
-    ])
-      .then(async ([session, sqlite]) => {
-        const attempted: Promise<unknown>[] = [];
-        if (session) attempted.push(session.clear(savedAt));
-        if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt));
-        const results = await Promise.allSettled(attempted);
-        if (
-          results.length > 0
-          && results.every((result) => result.status === "rejected")
-        ) {
-          throw new AggregateError(
-            results.map((result) =>
-              result.status === "rejected" ? result.reason : null
-            ),
-            "Studio durable autosave tombstones failed",
-          );
-        }
-      })
-      .catch((cause: unknown) => {
-        if (import.meta.env.DEV) {
-          console.warn("Studio durable autosave tombstone could not be written.", cause);
-        }
-      });
+    clearStudioAutosaveDurableAuthority({
+      autosaveKey,
+      autosaveOpfsSessionRef,
+      autosaveSqliteStoreRef,
+    });
   }
 
   function clearAutosaveRecord() {
-    clearAutosaveDurableAuthority();
-    try {
-      localStorage.removeItem(autosaveKey);
-      localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
-      if (!workId && !remixId) localStorage.removeItem(LEGACY_STUDIO_AUTOSAVE_KEY);
-    } catch {
-      // 무시
-    }
-    autosaveRecoveryCandidateRef.current = null;
-    setHasAutosave(false);
-    setAutosaveRestoreBlockedReason(null);
+    clearStudioAutosaveRecord({
+      autosaveKey,
+      autosaveRecoveryCandidateRef,
+      clearAutosaveDurableAuthority,
+      remixId,
+      setAutosaveRestoreBlockedReason,
+      setHasAutosave,
+      workId,
+    });
   }
 
   /**
@@ -9508,53 +9369,18 @@ function StudioCuttoonEditor({
    * 파괴 승인 seam(되돌릴 수 없음 등급)에 태우고 무엇이 몇 개 사라지는지 먼저 보여준다.
    */
   async function clearAutosave() {
-    const saved = autosaveRecoveryCandidateRef.current;
-    const savedPages = saved?.payload.pagesList ?? [];
-    const savedAt = saved ? new Date(saved.savedAt) : null;
-    const savedAtLabel =
-      savedAt && Number.isFinite(savedAt.getTime())
-        ? savedAt.toLocaleString("ko-KR")
-        : undefined;
-    const request = studioClearAutosaveRequest({
-      pageCount: savedPages.length,
-      elementCount: savedPages.reduce(
-        (total, page) => total + (page.elements?.length ?? 0),
-        0,
-      ),
-      ...(savedAtLabel ? { savedAtLabel } : {}),
-    });
-    // runStudioDestructiveAction 이 승인·실행·결과 고지를 한 흐름으로 묶는다 — 거절도
-    // 실패도 원장에 남으므로 "눌렀는데 아무 일도 없다"가 생기지 않는다.
-    await runStudioDestructiveAction({
-      request,
-      execute: () => {
-        clearAutosaveRecord();
-      },
+    await requestStudioAutosaveClear({
+      autosaveRecoveryCandidateRef,
+      clearAutosaveRecord,
     });
   }
 
   function downloadAutosaveBackup() {
-    try {
-      const saved = autosaveRecoveryCandidateRef.current;
-      if (!saved) {
-        setError("내려받을 임시저장 데이터를 찾지 못했어요.");
-        return;
-      }
-      const blob = new Blob([serializeStudioAutosave(saved.payload)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${(title.trim() || "toonspectrum-autosave").replace(/[\\/:*?"<>|]+/g, "-")}-autosave.json`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setError(null);
-    } catch {
-      setError("임시저장 JSON 백업을 만들지 못했어요.");
-    }
+    downloadStudioAutosaveBackup({
+      autosaveRecoveryCandidateRef,
+      setError: (message) => setError(message),
+      title,
+    });
   }
 
   // 화면 드래그 스크롤 핸들러 (Space + Drag · 핸드 툴)
@@ -11132,426 +10958,6 @@ function StudioCuttoonEditor({
     }>>(null as never);
   liveStrokeBackendAuditEarlyGpuReceiptsRef.current ??= new Map();
 
-  function applyLiveStrokeBackendPresentationEffects(): void {
-    const activeId = liveStrokeBackendAuditActiveIdRef.current;
-    const activeSession = activeId
-      ? liveStrokeBackendAuditSessionsRef.current.get(activeId)
-      : null;
-    const activeSnapshot = activeSession?.coordinator.getSnapshot();
-    const activeAcceptedRequest = activeSnapshot && activeSnapshot.phase !== "idle"
-      ? activeSnapshot.acceptedGpuRequest
-      : null;
-    const activeGpuReceiptExact = activeAcceptedRequest !== null
-      && gpuPinReceiptWatchdogRef.current?.hasExactReceipt(
-        activeAcceptedRequest.requestId
-      ) === true;
-    const activeGpuAuthorized = Boolean(
-      activeSnapshot
-      && activeSnapshot.phase !== "idle"
-      && activeSnapshot.gpuOverlayVisible
-      && activeGpuReceiptExact
-    );
-
-    // If coordinator acceptance raced ahead of the imperative receipt watchdog, fail visible.
-    // The exact retained vector stays in liveDraftVisualRef and is merely redrawn/hidden; it is
-    // never deleted at the backend transition.
-    const canvasShadowVisible = Boolean(
-      activeSnapshot
-      && activeSnapshot.phase !== "idle"
-      && (
-        activeSnapshot.canvasShadowVisible
-        || (activeSnapshot.gpuOverlayVisible && !activeGpuAuthorized)
-      )
-    );
-
-    const receiptedSessionVisible = [
-      ...liveStrokeBackendAuditSessionsRef.current.values(),
-    ].some((session) => {
-      const snapshot = session.coordinator.getSnapshot();
-      if (snapshot.phase === "idle" || !snapshot.gpuOverlayVisible) return false;
-      if (session.strokeId !== activeId) return true;
-      return activeGpuAuthorized;
-    });
-    // Pending geometry alone is never a visibility capability. Every surface rewrite invalidates
-    // the prior pixels, so only a coordinator session holding an exact GPU receipt may reopen it.
-    const gpuOverlayVisible = receiptedSessionVisible;
-    gpuCanvasShadowVisibleRef.current = canvasShadowVisible;
-    if (canvasShadowVisible) {
-      // Restore the retained pixels synchronously before hiding the DOM GPU canvas. A deferred
-      // batchDraw here would expose one blank compositor frame on timeout/device loss.
-      liveDraftLayerRef.current?.drawScene();
-      webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(gpuOverlayVisible);
-    } else {
-      // Conversely, publish the exact receipted GPU frame before removing the duplicate shadow.
-      webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(gpuOverlayVisible);
-      liveDraftLayerRef.current?.drawScene();
-    }
-  }
-
-  function prepareLiveStrokeGpuSubmission(strokeId: string): boolean {
-    const session = liveStrokeBackendAuditSessionsRef.current.get(strokeId);
-    const snapshot = session?.coordinator.getSnapshot();
-    if (
-      !session
-      || snapshot?.phase !== "drawing"
-      || snapshot.pinnedBackend !== "webgpu"
-      || snapshot.canvasFallbackReason !== null
-    ) return false;
-    // Submission mutates the shared surface before its request id can be returned. Restore the
-    // exact vector synchronously first, then perform a compositor-only hide that preserves the
-    // journal. Registration below binds the returned id to the coordinator token.
-    gpuCanvasShadowVisibleRef.current = true;
-    liveDraftLayerRef.current?.drawScene();
-    webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false);
-    return true;
-  }
-
-  function retireLiveStrokeBackendAudit(strokeId: string): void {
-    const session = liveStrokeBackendAuditSessionsRef.current.get(strokeId);
-    if (!session) return;
-    if (session.gpuRequest) {
-      liveStrokeBackendAuditGpuOwnersRef.current.delete(session.gpuRequest.requestId);
-      liveStrokeBackendAuditEarlyGpuReceiptsRef.current.delete(
-        session.gpuRequest.requestId
-      );
-    }
-    liveStrokeBackendAuditSessionsRef.current.delete(strokeId);
-    if (liveStrokeBackendAuditActiveIdRef.current === strokeId) {
-      liveStrokeBackendAuditActiveIdRef.current = null;
-    }
-    applyLiveStrokeBackendPresentationEffects();
-  }
-
-  function beginLiveStrokeBackendAudit(
-    strokeId: string,
-    backend: StudioGpuBackend
-  ): boolean {
-    retireLiveStrokeBackendAudit(strokeId);
-    const coordinator = new StudioLiveStrokeRenderBackendCoordinator();
-    const transition = coordinator.pointerDown({ strokeId, backend });
-    if (transition.status !== "accepted" || transition.next.phase === "idle") {
-      return false;
-    }
-    const session: StudioLiveStrokeBackendAuditSession = {
-      coordinator,
-      epoch: transition.next.epoch,
-      strokeId,
-      seenGpuRequestIds: new Set(),
-      gpuRequest: null,
-      canonicalCanvasRequest: null,
-    };
-    liveStrokeBackendAuditSessionsRef.current.set(strokeId, session);
-    liveStrokeBackendAuditActiveIdRef.current = strokeId;
-    applyLiveStrokeBackendPresentationEffects();
-    return true;
-  }
-
-  function registerLiveStrokeGpuRequest(strokeId: string, requestId: string): boolean {
-    const session = liveStrokeBackendAuditSessionsRef.current.get(strokeId);
-    if (!session) return false;
-    // A resize can synchronously announce the exact request before the imperative journal call
-    // returns the same outcome to its caller. That is one request crossing two API boundaries,
-    // not a replay: accept only the currently owned identity as an idempotent registration.
-    if (
-      session.gpuRequest?.requestId === requestId
-      && liveStrokeBackendAuditGpuOwnersRef.current.get(requestId) === session
-    ) {
-      return true;
-    }
-    if (session.seenGpuRequestIds.has(requestId)) return false;
-    const pin = session.coordinator.checkBackendPin({
-      epoch: session.epoch,
-      strokeId,
-      backend: "webgpu",
-    });
-    if (pin.status !== "accepted") return false;
-    const transition = session.coordinator.requestGpuFrame({
-      epoch: session.epoch,
-      strokeId,
-      requestId,
-    });
-    if (transition.status !== "accepted" || !transition.gpuRequest) return false;
-    session.seenGpuRequestIds.add(requestId);
-    if (session.gpuRequest) {
-      liveStrokeBackendAuditGpuOwnersRef.current.delete(session.gpuRequest.requestId);
-    }
-    session.gpuRequest = transition.gpuRequest;
-    liveStrokeBackendAuditGpuOwnersRef.current.set(requestId, session);
-
-    const earlyReceipt = liveStrokeBackendAuditEarlyGpuReceiptsRef.current.get(requestId);
-    if (!earlyReceipt) {
-      applyLiveStrokeBackendPresentationEffects();
-      return true;
-    }
-    liveStrokeBackendAuditEarlyGpuReceiptsRef.current.delete(requestId);
-    if (earlyReceipt.strokeId !== strokeId) return false;
-    const receipted = session.coordinator.receiveGpuFrameReceipt({
-      token: transition.gpuRequest,
-      backend: earlyReceipt.receipt.backend,
-      complete: earlyReceipt.receipt.complete,
-    });
-    if (receipted.status !== "accepted") return false;
-    liveStrokeBackendAuditGpuOwnersRef.current.delete(requestId);
-    session.gpuRequest = null;
-    if (liveStrokeBackendAuditActiveIdRef.current === strokeId) {
-      gpuPinReceiptWatchdog().receipt(requestId);
-    }
-    applyLiveStrokeBackendPresentationEffects();
-    return true;
-  }
-
-  function receiveLiveStrokeGpuAuditReceipt(
-    receipt: StudioGpuFrameReceipt
-  ):
-    | {
-        readonly status: "accepted";
-        readonly strokeId: string;
-      readonly active: boolean;
-      }
-    | {
-        readonly status: "rejected";
-        readonly strokeId: string;
-        readonly active: boolean;
-      }
-    | { readonly status: "pending-registration" | "untracked" } {
-    const session = liveStrokeBackendAuditGpuOwnersRef.current.get(receipt.requestId);
-    if (session?.gpuRequest) {
-      const transition = session.coordinator.receiveGpuFrameReceipt({
-        token: session.gpuRequest,
-        backend: receipt.backend,
-        complete: receipt.complete,
-      });
-      if (transition.status !== "accepted") {
-        return {
-          status: "rejected",
-          strokeId: session.strokeId,
-          active: liveStrokeBackendAuditActiveIdRef.current === session.strokeId,
-        };
-      }
-      liveStrokeBackendAuditGpuOwnersRef.current.delete(receipt.requestId);
-      session.gpuRequest = null;
-      applyLiveStrokeBackendPresentationEffects();
-      return {
-        status: "accepted",
-        strokeId: session.strokeId,
-        active: liveStrokeBackendAuditActiveIdRef.current === session.strokeId,
-      };
-    }
-
-    const activeId = liveStrokeBackendAuditActiveIdRef.current;
-    const active = activeId
-      ? liveStrokeBackendAuditSessionsRef.current.get(activeId)
-      : null;
-    const snapshot = active?.coordinator.getSnapshot();
-    if (
-      active
-      && snapshot?.phase === "drawing"
-      && snapshot.pinnedBackend === "webgpu"
-    ) {
-      const early = liveStrokeBackendAuditEarlyGpuReceiptsRef.current;
-      early.set(receipt.requestId, { strokeId: active.strokeId, receipt });
-      while (early.size > 8) {
-        const oldest = early.keys().next().value;
-        if (typeof oldest !== "string") break;
-        early.delete(oldest);
-      }
-      return { status: "pending-registration" };
-    }
-    return { status: "untracked" };
-  }
-
-  function reportLiveStrokeGpuAuditFailure(
-    reason: StudioLiveStrokeGpuFailureReason,
-    requestId?: string,
-    strokeId?: string
-  ): boolean {
-    const requestOwner = requestId
-      ? liveStrokeBackendAuditGpuOwnersRef.current.get(requestId)
-      : null;
-    const activeId = liveStrokeBackendAuditActiveIdRef.current;
-    const session = requestOwner
-      ?? (strokeId
-        ? liveStrokeBackendAuditSessionsRef.current.get(strokeId)
-        : null)
-      ?? (activeId
-        ? liveStrokeBackendAuditSessionsRef.current.get(activeId)
-        : null);
-    if (!session) return false;
-    const token = requestId
-      ? session.gpuRequest?.requestId === requestId
-        ? session.gpuRequest
-        : null
-      : session.gpuRequest;
-    const transition = session.coordinator.reportGpuFailure({
-      epoch: session.epoch,
-      strokeId: session.strokeId,
-      reason,
-      ...(
-        reason === "device-lost" || reason === "surface-lost"
-          ? {}
-          : { token }
-      ),
-    });
-    if (transition.status !== "accepted") return false;
-    if (session.gpuRequest) {
-      liveStrokeBackendAuditGpuOwnersRef.current.delete(session.gpuRequest.requestId);
-      session.gpuRequest = null;
-    }
-    applyLiveStrokeBackendPresentationEffects();
-    return true;
-  }
-
-  function reportAllLiveStrokeGpuAuditFailures(
-    reason: "device-lost" | "surface-lost"
-  ): void {
-    for (const session of liveStrokeBackendAuditSessionsRef.current.values()) {
-      const snapshot = session.coordinator.getSnapshot();
-      if (snapshot.phase === "idle" || snapshot.pinnedBackend !== "webgpu") continue;
-      const transition = session.coordinator.reportGpuFailure({
-        epoch: session.epoch,
-        strokeId: session.strokeId,
-        reason,
-      });
-      if (transition.status !== "accepted") continue;
-      if (session.gpuRequest) {
-        liveStrokeBackendAuditGpuOwnersRef.current.delete(session.gpuRequest.requestId);
-        session.gpuRequest = null;
-      }
-    }
-    applyLiveStrokeBackendPresentationEffects();
-  }
-
-  function failActiveLiveStrokeBackendAuditForCanvasFallback(): void {
-    const activeId = liveStrokeBackendAuditActiveIdRef.current;
-    const session = activeId
-      ? liveStrokeBackendAuditSessionsRef.current.get(activeId)
-      : null;
-    if (!session) return;
-    if (session.gpuRequest) {
-      reportLiveStrokeGpuAuditFailure("cancelled", session.gpuRequest.requestId);
-      return;
-    }
-    // No request is pending, but an already-receipted GPU frame may still be visible. Treat the
-    // deliberate authority-surface relinquish as epoch-scoped surface loss.
-    reportLiveStrokeGpuAuditFailure("surface-lost");
-  }
-
-  function sealLiveStrokeBackendAudit(strokeId: string): boolean {
-    const session = liveStrokeBackendAuditSessionsRef.current.get(strokeId);
-    if (!session) return false;
-    const snapshot = session.coordinator.getSnapshot();
-    if (snapshot.phase === "awaiting-canonical-canvas") return true;
-    const transition = session.coordinator.pointerUp({
-      epoch: session.epoch,
-      strokeId,
-      canonicalCanvasRequestId: `canvas:${strokeId}:pending`,
-    });
-    if (transition.status !== "accepted" || !transition.canonicalCanvasRequest) {
-      return false;
-    }
-    session.canonicalCanvasRequest = transition.canonicalCanvasRequest;
-    if (liveStrokeBackendAuditActiveIdRef.current === strokeId) {
-      liveStrokeBackendAuditActiveIdRef.current = null;
-    }
-    return true;
-  }
-
-  function armLiveStrokeCanonicalCanvasAudit(
-    strokeIds: readonly string[],
-    requestId: string
-  ): void {
-    for (const strokeId of strokeIds) {
-      const session = liveStrokeBackendAuditSessionsRef.current.get(strokeId);
-      if (!session) continue;
-      if (!sealLiveStrokeBackendAudit(strokeId)) {
-        retireLiveStrokeBackendAudit(strokeId);
-        continue;
-      }
-      const transition = session.coordinator.requestCanonicalCanvasCommit({
-        epoch: session.epoch,
-        strokeId,
-        requestId: `${requestId}:${strokeId}`,
-      });
-      if (transition.status !== "accepted" || !transition.canonicalCanvasRequest) {
-        continue;
-      }
-      session.canonicalCanvasRequest = transition.canonicalCanvasRequest;
-    }
-  }
-
-  function receiveLiveStrokeCanonicalCanvasAudit(
-    strokeIds: readonly string[],
-    outcome: "drawn" | "failed" | "cancelled"
-  ): void {
-    for (const strokeId of strokeIds) {
-      const session = liveStrokeBackendAuditSessionsRef.current.get(strokeId);
-      const token = session?.canonicalCanvasRequest;
-      if (!session || !token) {
-        if (outcome !== "failed") retireLiveStrokeBackendAudit(strokeId);
-        continue;
-      }
-      const transition = session.coordinator.receiveCanonicalCanvasReceipt({
-        token,
-        outcome,
-      });
-      if (transition.status !== "accepted") continue;
-      session.canonicalCanvasRequest = null;
-      if (outcome !== "drawn") {
-        // The active live ref has already been sealed/cleared by this phase. Restore the durable
-        // whole-DrawEl authority into the settled Konva FIFO before hiding its GPU surface.
-        const targetStillOwnsGpuAuthority =
-          pendingGpuDrawAuthoritiesRef.current.some(
-            (authority) => authority.element.id === strokeId
-          );
-        if (targetStillOwnsGpuAuthority) promotePendingGpuAuthoritiesToKonva();
-        applyLiveStrokeBackendPresentationEffects();
-      }
-      if (outcome !== "failed") retireLiveStrokeBackendAudit(strokeId);
-    }
-  }
-
-  function cancelLiveStrokeBackendAudit(strokeId: string): void {
-    const session = liveStrokeBackendAuditSessionsRef.current.get(strokeId);
-    if (!session) return;
-    const snapshot = session.coordinator.getSnapshot();
-    if (
-      snapshot.phase !== "idle"
-      && snapshot.pinnedBackend === "webgpu"
-      && session.gpuRequest
-      && snapshot.canvasFallbackReason === null
-    ) {
-      session.coordinator.reportGpuFailure({
-        epoch: session.epoch,
-        strokeId,
-        reason: "cancelled",
-        token: session.gpuRequest,
-      });
-    }
-    if (session.coordinator.getSnapshot().phase === "drawing") {
-      sealLiveStrokeBackendAudit(strokeId);
-    }
-    receiveLiveStrokeCanonicalCanvasAudit([strokeId], "cancelled");
-    retireLiveStrokeBackendAudit(strokeId);
-  }
-
-  function finalizeLiveStrokeBackendAudit(
-    strokeId: string | null,
-    awaitCanonicalCanvas: boolean
-  ): void {
-    if (!strokeId) return;
-    if (awaitCanonicalCanvas && sealLiveStrokeBackendAudit(strokeId)) return;
-    cancelLiveStrokeBackendAudit(strokeId);
-  }
-
-  function cancelAllLiveStrokeBackendAudits(): void {
-    for (const strokeId of [...liveStrokeBackendAuditSessionsRef.current.keys()]) {
-      cancelLiveStrokeBackendAudit(strokeId);
-    }
-    liveStrokeBackendAuditGpuOwnersRef.current.clear();
-    liveStrokeBackendAuditEarlyGpuReceiptsRef.current.clear();
-    liveStrokeBackendAuditActiveIdRef.current = null;
-  }
-
   function gpuAuthoritySurfaceIsPending(): boolean {
     return gpuLiveInkPinnedRef.current
       || pendingGpuDrawAuthoritiesRef.current.length > 0
@@ -11676,53 +11082,6 @@ function StudioCuttoonEditor({
       viewport: webGpuViewportSurface,
     }));
   }
-  function onWebGpuFrameInvalid() {
-    setWebGpuAuthority(null);
-    // The Canvas boundary intentionally has no request id on invalidation. Do not let an older
-    // invalidation re-arm a timer after the current receipt; every admitted journal request arms
-    // its own exact-request watchdog below, while Canvas filters ready receipts by request id.
-  }
-  function onWebGpuFrameRequest(request: StudioWebGpuSurfaceFrameRequest) {
-    setWebGpuAuthority(null);
-    const activeStrokeId = liveStrokeBackendAuditActiveIdRef.current;
-    const activeSession = activeStrokeId
-      ? liveStrokeBackendAuditSessionsRef.current.get(activeStrokeId)
-      : null;
-    const snapshot = activeSession?.coordinator.getSnapshot();
-    if (
-      activeStrokeId
-      && snapshot?.phase === "drawing"
-      && snapshot.pinnedBackend === "webgpu"
-      && gpuLiveInkPinnedRef.current
-    ) {
-      if (
-        !prepareLiveStrokeGpuSubmission(activeStrokeId)
-        || !registerLiveStrokeGpuRequest(activeStrokeId, request.requestId)
-      ) {
-        relinquishGpuLiveInkToKonva(true);
-        return;
-      }
-      gpuLiveAcceptedRequestIdRef.current = request.requestId;
-      armGpuPinnedRequestWatchdog(request.requestId);
-      applyLiveStrokeBackendPresentationEffects();
-      return;
-    }
-
-    // A pointer-up surface cannot mint a new stroke receipt by coordinator contract. The child has
-    // already hidden the backing surface synchronously; migrate the retained DrawEls after this
-    // resize callback unwinds so no imperative handle request re-enters the resize transaction.
-    if (
-      pendingGpuStrokesRef.current.length > 0
-      || pendingGpuDrawAuthoritiesRef.current.length > 0
-    ) {
-      globalThis.queueMicrotask(() => {
-        if (liveStrokeBackendAuditActiveIdRef.current !== null) return;
-        if (!promotePendingGpuAuthoritiesToKonva()) {
-          webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false);
-        }
-      });
-    }
-  }
   // 파인 가시성은 StudioWebGpuCanvas 임페러티브 핸들(setPinnedVisible)로만 흐른다 — 스트로크
   // 시작/종료가 30k 라인 부모를 다시 렌더하지 않는다. 펜 리프트 핸드오프(마지막 GPU 프레임을
   // 커밋 페인트까지 유지)도 아래 더블 rAF + 핸들 호출로 처리한다.
@@ -11735,27 +11094,6 @@ function StudioCuttoonEditor({
   const gpuFinalReceiptRequestIdRef = useRef<string | null>(null);
   const gpuFinalFallbackOrderIdsRef = useRef<readonly string[] | null>(null);
   const gpuPinReceiptWatchdogRef = useRef<StudioGpuPinReceiptWatchdog | null>(null);
-  function gpuPinReceiptWatchdog(): StudioGpuPinReceiptWatchdog {
-    gpuPinReceiptWatchdogRef.current ??= new StudioGpuPinReceiptWatchdog({
-      timeoutMs: STUDIO_GPU_PIN_REQUEST_TIMEOUT_MS,
-      onTimeout: (_reason, requestId) => {
-        reportLiveStrokeGpuAuditFailure("timeout", requestId);
-        if (gpuLiveInkPinnedRef.current) relinquishGpuLiveInkToKonva(true);
-      },
-    });
-    return gpuPinReceiptWatchdogRef.current;
-  }
-  function cancelGpuPinnedRequestWatchdog(): void {
-    gpuPinReceiptWatchdogRef.current?.cancel();
-  }
-  function armGpuPinnedRequestWatchdog(requestId: string): void {
-    if (!gpuLiveInkPinnedRef.current) return;
-    gpuPinReceiptWatchdog().request(requestId);
-  }
-  function beginGpuPinnedReceiptEpoch(requestId: string): void {
-    if (!gpuLiveInkPinnedRef.current) return;
-    gpuPinReceiptWatchdog().begin(requestId);
-  }
   // 다이렉트 라이브 초안: 프리핸드 펜 계열은 스트로크 수명주기 전체(시작·프레임·종료)에서
   // React 를 거치지 않는다 — 초안 노드는 상시 마운트된 임페러티브 sceneFunc 이고, 시작은 ref
   // 무장, 커밋은 아래 지연 파이프라인이 유휴 시 한 번만 동기화한다. 30k 라인 컴포넌트 본문
@@ -12127,6 +11465,48 @@ function StudioCuttoonEditor({
   // delayed/missing final receipt can promote the whole FIFO to Konva without partial mirrors,
   // hidden earlier strokes, or a later baseline that double-composites already-promoted ink.
   const pendingGpuDrawAuthoritiesRef = useRef<StudioGpuPendingDrawAuthority[]>([]);
+  // 라이브 스트로크 백엔드 감사(coordinator receipt authority)와 WebGPU 표면 프레임 콜백은
+  // render/studio-live-stroke-gpu-audit 로 들어냈다. 팩토리는 훅이 아니라 react-compiler 경계
+  // 밖이고 반환 클로저의 ref 변이는 추출 전 본문 그대로다. 배선 지점이 여기인 이유는
+  // liveDraftLayerRef·pendingGpuStrokesRef·pendingGpuDrawAuthoritiesRef 가 이 줄에서야 선언되기
+  // 때문이다 — 감사 멤버는 전부 포인터/콜백 런타임에서만 호출된다.
+  const {
+    applyLiveStrokeBackendPresentationEffects,
+    armGpuPinnedRequestWatchdog,
+    armLiveStrokeCanonicalCanvasAudit,
+    beginGpuPinnedReceiptEpoch,
+    beginLiveStrokeBackendAudit,
+    cancelAllLiveStrokeBackendAudits,
+    cancelGpuPinnedRequestWatchdog,
+    cancelLiveStrokeBackendAudit,
+    failActiveLiveStrokeBackendAuditForCanvasFallback,
+    finalizeLiveStrokeBackendAudit,
+    gpuPinReceiptWatchdog,
+    onWebGpuFrameInvalid,
+    onWebGpuFrameRequest,
+    prepareLiveStrokeGpuSubmission,
+    receiveLiveStrokeCanonicalCanvasAudit,
+    receiveLiveStrokeGpuAuditReceipt,
+    registerLiveStrokeGpuRequest,
+    reportAllLiveStrokeGpuAuditFailures,
+    reportLiveStrokeGpuAuditFailure,
+  } = createStudioLiveStrokeGpuAudit({
+    gpuCanvasShadowVisibleRef,
+    gpuLiveAcceptedRequestIdRef,
+    gpuLiveInkPinnedRef,
+    gpuPinReceiptWatchdogRef,
+    liveDraftLayerRef,
+    liveStrokeBackendAuditActiveIdRef,
+    liveStrokeBackendAuditEarlyGpuReceiptsRef,
+    liveStrokeBackendAuditGpuOwnersRef,
+    liveStrokeBackendAuditSessionsRef,
+    pendingGpuDrawAuthoritiesRef,
+    pendingGpuStrokesRef,
+    promotePendingGpuAuthoritiesToKonva,
+    relinquishGpuLiveInkToKonva,
+    setWebGpuAuthority,
+    webGpuCanvasHandleRef,
+  });
   const [studioRasterHandoffCandidate, setStudioRasterHandoffCandidate] =
     useState<StudioRasterHandoffCandidate | null>(null);
   const [studioRasterServerAuthority, setStudioRasterServerAuthority] =
@@ -15481,428 +14861,56 @@ function StudioCuttoonEditor({
       (reference) => studioWorkAssetHydrator.get(reference)
     )
     : null;
-  const studioLayerLiftAvailability = inspectStudioLayerLiftAvailability({
+  const studioLayerLiftDisabledReason = resolveStudioLayerLiftDisabledReason({
     elements,
     groups,
     selectedIds: selected?.type === "image" ? [selected.id] : [],
+    workId,
+    collaborationDocumentLocked,
+    collaborationLockMessage,
+    activeSurfaceReviewLocked,
+    pageEditLocked,
+    masterEditMode,
+    timelinePlaying,
+    timelapseCapturing,
+    saving,
   });
-  const studioLayerLiftDisabledReason = workId
-    ? "저장된 팀 원고용 에셋 트랜잭션을 연결하는 중입니다. 현재 베타는 새 로컬 원고에서 사용할 수 있어요."
-    : collaborationDocumentLocked
-      ? collaborationLockMessage()
-      : activeSurfaceReviewLocked || (pageEditLocked && !masterEditMode)
-        ? "작업면 검토 잠금을 해제한 뒤 레이어를 복원하세요."
-        : masterEditMode
-          ? "현재 베타는 페이지 이미지 레이어에서만 사용할 수 있어요. 마스터 편집을 종료해 주세요."
-          : timelinePlaying
-            ? "타임라인 재생을 멈춘 뒤 레이어를 복원하세요."
-            : timelapseCapturing
-              ? "타임랩스 캡처가 끝난 뒤 레이어를 복원하세요."
-              : saving
-                ? "저장이 끝난 뒤 레이어를 복원하세요."
-                : studioLayerLiftAvailability.available
-                  ? null
-                  : studioLayerLiftAvailability.message;
-  function currentStudioLayerLiftAvailabilityInput() {
-    return {
-      elements: activeElementsRef.current,
-      groups: activeGroupsRef.current,
-      selectedIds: currentCanvasSelectionIds(),
-    };
-  }
-  function readCurrentStudioLayerLiftOperation():
-    StudioLayerLiftOperationCurrentState {
-    const collaboration = collaborationAccessRef.current;
-    return {
-      mutationState: {
-        ...collaboration,
-        mounted: editorMountedRef.current,
-        aborted: false,
-      },
-      pageId: currentPageIdRef.current,
-      masterEditMode: masterEditModeRef.current,
-      selectedIds: currentCanvasSelectionIds(),
-      elements: activeElementsRef.current,
-      groups: activeGroupsRef.current,
-    };
-  }
-  function replaceStudioLayerLiftPreviewResource(
-    next: StudioLayerLiftReviewPreviewResource | null,
-  ) {
-    const previous = studioLayerLiftPreviewResourceRef.current;
-    if (previous === next) return;
-    studioLayerLiftPreviewResourceRef.current = next;
-    previous?.revoke();
-  }
-  function closeStudioLayerLift() {
-    studioLayerLiftRunIdRef.current += 1;
-    studioLayerLiftAbortRef.current?.abort();
-    studioLayerLiftAbortRef.current = null;
-    studioLayerLiftRegistryRef.current?.invalidate();
-    replaceStudioLayerLiftPreviewResource(null);
-    setStudioLayerLiftUi(closedStudioLayerLiftUiState());
-  }
-  async function runStudioLayerLiftAnalysis(
-    sourceId: string,
-    options: StudioLayerLiftReviewOptions,
-  ) {
-    const source = activeElementsRef.current.find(
-      (element) => element.id === sourceId,
-    );
-    if (!source || source.type !== "image") {
-      setStudioLayerLiftUi((current) => ({
-        ...current,
-        phase: "error",
-        progressLabel: null,
-        error: "분리할 이미지가 현재 페이지에 없습니다.",
-        session: null,
-        preview: null,
-      }));
-      return;
-    }
-    const registry = studioLayerLiftRegistryRef.current;
-    const provider = studioLayerLiftProviderRef.current;
-    const compositor = studioLayerLiftCompositorRef.current;
-    if (!registry || !provider || !compositor) {
-      setStudioLayerLiftUi((current) => ({
-        ...current,
-        phase: "error",
-        progressLabel: null,
-        error: "로컬 레이어 분석 엔진을 준비하지 못했습니다.",
-      }));
-      return;
-    }
-
-    studioLayerLiftRunIdRef.current += 1;
-    const runId = studioLayerLiftRunIdRef.current;
-    studioLayerLiftAbortRef.current?.abort();
-    registry.invalidate();
-    replaceStudioLayerLiftPreviewResource(null);
-    const controller = new AbortController();
-    studioLayerLiftAbortRef.current = controller;
-    const requestId = `layer-lift-${uid()}`;
-    const sourceName = source.name?.trim() || "선택 이미지";
-    const readableSource =
-      resolveStudioWorkAssetReadableImageSource(
-        source,
-        (reference) => studioWorkAssetHydrator.get(reference),
-      ) ?? source.src;
-    setStudioLayerLiftUi({
-      open: true,
-      activeKey: requestId,
-      sourceId,
-      sourceName,
-      sourceSrc: readableSource,
-      phase: "analyzing",
-      progressLabel: "원본 외형을 고정하고 로컬 인물 모델을 준비하고 있어요.",
-      error: null,
-      session: null,
-      preview: null,
-    });
-
-    const result = await analyzeStudioLayerLiftWorkflow({
-      registry,
-      mutationTicket: captureStudioMutationTicket(),
-      pageId: currentPageIdRef.current,
-      masterEditMode: masterEditModeRef.current,
-      availability: currentStudioLayerLiftAvailabilityInput(),
-      readAvailability: currentStudioLayerLiftAvailabilityInput,
-      readCurrent: readCurrentStudioLayerLiftOperation,
-      requestId,
-      backgroundOutputId: uid(),
-      foregroundOutputId: uid(),
-      provider,
-      compositor,
-      providerOptions: options,
-      compositorTimeoutMs: 45_000,
-      signal: controller.signal,
-    });
-    if (
-      controller.signal.aborted
-      || runId !== studioLayerLiftRunIdRef.current
-      || !editorMountedRef.current
-    ) {
-      return;
-    }
-    if (!result.ok) {
-      studioLayerLiftAbortRef.current = null;
-      setStudioLayerLiftUi((current) => ({
-        ...current,
-        phase: "error",
-        progressLabel: null,
-        error: result.message,
-        session: null,
-        preview: null,
-      }));
-      return;
-    }
-    setStudioLayerLiftUi((current) => ({
-      ...current,
-      phase: "analyzing",
-      progressLabel: "검증된 픽셀로 비교 미리보기를 만들고 있어요.",
-      error: null,
-      session: result.session,
-      preview: null,
-    }));
-    let previewResource: StudioLayerLiftReviewPreviewResource;
-    try {
-      previewResource = await createStudioLayerLiftReviewPreviewResource(
-        result.session,
-        { signal: controller.signal },
-      );
-    } catch (previewError) {
-      if (
-        controller.signal.aborted
-        || runId !== studioLayerLiftRunIdRef.current
-        || !editorMountedRef.current
-      ) {
-        return;
-      }
-      studioLayerLiftAbortRef.current = null;
-      registry.invalidate(result.session.ticket);
-      setStudioLayerLiftUi((current) => ({
-        ...current,
-        phase: "error",
-        progressLabel: null,
-        error: previewError instanceof Error
-          ? previewError.message
-          : "레이어 분리 비교 미리보기를 만들지 못했습니다.",
-        session: null,
-        preview: null,
-      }));
-      return;
-    }
-    if (
-      controller.signal.aborted
-      || runId !== studioLayerLiftRunIdRef.current
-      || !editorMountedRef.current
-    ) {
-      previewResource.revoke();
-      return;
-    }
-    studioLayerLiftAbortRef.current = null;
-    replaceStudioLayerLiftPreviewResource(previewResource);
-    setStudioLayerLiftUi((current) => ({
-      ...current,
-      phase: "review",
-      progressLabel: "경계와 복원 배경을 확인한 뒤 적용하세요.",
-      error: null,
-      session: result.session,
-      preview: previewResource.preview,
-    }));
-  }
-  function openStudioLayerLift() {
-    if (studioLayerLiftDisabledReason) {
-      setError(studioLayerLiftDisabledReason);
-      return;
-    }
-    const source = activeElementsRef.current.find(
-      (element) => element.id === selectedIdRef.current,
-    );
-    if (!source || source.type !== "image") {
-      setError("분리할 이미지 레이어 하나를 선택해 주세요.");
-      return;
-    }
-    void runStudioLayerLiftAnalysis(source.id, studioLayerLiftOptions);
-  }
-  async function correctStudioLayerLift(
-    stroke: StudioLayerLiftCorrectionStroke,
-  ) {
-    const current = studioLayerLiftUiRef.current;
-    const registry = studioLayerLiftRegistryRef.current;
-    const compositor = studioLayerLiftCompositorRef.current;
-    if (!current.session || !registry || !compositor) {
-      setStudioLayerLiftUi((state) => ({
-        ...state,
-        phase: "error",
-        progressLabel: null,
-        error: "보정할 레이어 경계가 없습니다. 다시 분석해 주세요.",
-      }));
-      return;
-    }
-    const operationState = readCurrentStudioLayerLiftOperation();
-    if (!registry.checkCurrent(current.session.ticket, operationState).ok) {
-      setStudioLayerLiftUi((state) => ({
-        ...state,
-        phase: "error",
-        progressLabel: null,
-        error: "원고나 선택이 바뀌어 이전 경계를 보정하지 않았습니다. 다시 분석해 주세요.",
-      }));
-      return;
-    }
-
-    studioLayerLiftRunIdRef.current += 1;
-    const runId = studioLayerLiftRunIdRef.current;
-    studioLayerLiftAbortRef.current?.abort();
-    const controller = new AbortController();
-    studioLayerLiftAbortRef.current = controller;
-    setStudioLayerLiftUi((state) => ({
-      ...state,
-      phase: "analyzing",
-      progressLabel: "작가가 고친 경계로 배경·전경을 다시 합성하고 있어요.",
-      error: null,
-    }));
-
-    const corrected = await applyStudioLayerLiftCorrectionWorkflow({
-      session: current.session,
-      stroke,
-      compositor,
-      signal: controller.signal,
-      timeoutMs: 45_000,
-    });
-    if (
-      controller.signal.aborted
-      || runId !== studioLayerLiftRunIdRef.current
-      || !editorMountedRef.current
-    ) {
-      return;
-    }
-    if (!corrected.ok) {
-      studioLayerLiftAbortRef.current = null;
-      setStudioLayerLiftUi((state) => ({
-        ...state,
-        phase: "error",
-        progressLabel: null,
-        error: corrected.message,
-      }));
-      return;
-    }
-    if (!registry.checkCurrent(corrected.session.ticket, readCurrentStudioLayerLiftOperation()).ok) {
-      studioLayerLiftAbortRef.current = null;
-      setStudioLayerLiftUi((state) => ({
-        ...state,
-        phase: "error",
-        progressLabel: null,
-        error: "재합성 중 원고나 선택이 바뀌어 보정 결과를 버렸습니다.",
-      }));
-      return;
-    }
-    if (!corrected.recomposed) {
-      studioLayerLiftAbortRef.current = null;
-      setStudioLayerLiftUi((state) => ({
-        ...state,
-        phase: "review",
-        progressLabel: "경계가 바뀌지 않아 현재 미리보기를 유지했어요.",
-        error: null,
-      }));
-      return;
-    }
-
-    let previewResource: StudioLayerLiftReviewPreviewResource;
-    try {
-      previewResource = await createStudioLayerLiftReviewPreviewResource(
-        corrected.session,
-        { signal: controller.signal },
-      );
-    } catch (previewError) {
-      if (
-        controller.signal.aborted
-        || runId !== studioLayerLiftRunIdRef.current
-        || !editorMountedRef.current
-      ) {
-        return;
-      }
-      studioLayerLiftAbortRef.current = null;
-      setStudioLayerLiftUi((state) => ({
-        ...state,
-        phase: "error",
-        progressLabel: null,
-        error: previewError instanceof Error
-          ? previewError.message
-          : "보정된 레이어 미리보기를 만들지 못했습니다.",
-      }));
-      return;
-    }
-    if (
-      controller.signal.aborted
-      || runId !== studioLayerLiftRunIdRef.current
-      || !editorMountedRef.current
-      || !registry.checkCurrent(
-        corrected.session.ticket,
-        readCurrentStudioLayerLiftOperation(),
-      ).ok
-    ) {
-      previewResource.revoke();
-      return;
-    }
-    studioLayerLiftAbortRef.current = null;
-    replaceStudioLayerLiftPreviewResource(previewResource);
-    setStudioLayerLiftUi((state) => ({
-      ...state,
-      phase: "review",
-      progressLabel: `${corrected.changedPixelCount.toLocaleString("ko-KR")}픽셀의 경계를 다시 합성했어요.`,
-      error: null,
-      session: corrected.session,
-      preview: previewResource.preview,
-    }));
-  }
-  async function applyStudioLayerLift() {
-    const current = studioLayerLiftUiRef.current;
-    const registry = studioLayerLiftRegistryRef.current;
-    if (!current.session || !registry) {
-      setStudioLayerLiftUi((state) => ({
-        ...state,
-        phase: "error",
-        progressLabel: null,
-        error: "적용할 레이어 복원 미리보기가 없습니다. 다시 분석해 주세요.",
-      }));
-      return;
-    }
-    studioLayerLiftRunIdRef.current += 1;
-    const runId = studioLayerLiftRunIdRef.current;
-    setStudioLayerLiftUi((state) => ({
-      ...state,
-      phase: "applying",
-      progressLabel: "검증된 배경·전경을 한 번의 실행 취소 단계로 묶고 있어요.",
-      error: null,
-    }));
-
-    const finalized = await finalizeStudioLayerLiftWorkflow({
-      registry,
-      session: current.session,
-      readCurrent: readCurrentStudioLayerLiftOperation,
-      groupId: uid(),
-    });
-    if (
-      runId !== studioLayerLiftRunIdRef.current
-      || !editorMountedRef.current
-    ) {
-      return;
-    }
-    if (!finalized.ok) {
-      setStudioLayerLiftUi((state) => ({
-        ...state,
-        phase: "error",
-        progressLabel: null,
-        error: finalized.message,
-      }));
-      return;
-    }
-    const committed = commit(
-      finalized.plan.nextElements,
-      { groups: finalized.plan.nextGroups },
-      currentPageIdRef.current,
-    );
-    if (!committed) {
-      setStudioLayerLiftUi((state) => ({
-        ...state,
-        phase: "error",
-        progressLabel: null,
-        error: "원고 상태가 바뀌어 레이어 그룹을 적용하지 못했습니다. 다시 분석해 주세요.",
-        session: null,
-      }));
-      return;
-    }
-    applyGroupSelectionState({
-      selectedId: finalized.plan.selectedId,
-      marqueeIds: [],
-      activeGroupId: null,
-    });
-    closeStudioLayerLift();
-    announceDrawingShortcut(
-      "컷 레이어 복원 완료 · 원본 백업, 분리 배경, 분리 전경 · 실행 취소 1회"
-    );
-  }
+  // 레이어 분리 세션(분석·보정·적용)은 layer/studio-layer-lift-session.ts 로 추출됐다. 팩토리는
+  // 훅이 아니라 react-compiler 컴파일 경계 밖이며, 이 렌더의 값·ref·헬퍼를 그대로 주입해
+  // 추출 전과 동일한 클로저를 만든다. `commit` 은 아래에서 늦게 선언되므로 thunk 로 넘긴다.
+  const {
+    applyStudioLayerLift,
+    closeStudioLayerLift,
+    correctStudioLayerLift,
+    openStudioLayerLift,
+    runStudioLayerLiftAnalysis,
+  } = createStudioLayerLiftSession({
+    activeElementsRef,
+    activeGroupsRef,
+    announceDrawingShortcut,
+    applyGroupSelectionState,
+    captureStudioMutationTicket,
+    collaborationAccessRef,
+    commit: (nextElements, extraPatch, targetPageId) =>
+      commit(nextElements, extraPatch, targetPageId),
+    currentCanvasSelectionIds,
+    currentPageIdRef,
+    editorMountedRef,
+    masterEditModeRef,
+    selectedIdRef,
+    setError: (message) => setError(message),
+    setStudioLayerLiftUi,
+    studioLayerLiftAbortRef,
+    studioLayerLiftCompositorRef,
+    studioLayerLiftDisabledReason,
+    studioLayerLiftOptions,
+    studioLayerLiftPreviewResourceRef,
+    studioLayerLiftProviderRef,
+    studioLayerLiftRegistryRef,
+    studioLayerLiftRunIdRef,
+    studioLayerLiftUiRef,
+    studioWorkAssetHydrator,
+  });
   // 요소 객체가 커밋을 넘어 reference-stable(불변 업데이트)인 점을 이용해 아이템 객체도
   // 요소별로 재사용한다 — 레이어 내비게이터 행 memo가 "새 획 1개 추가" 커밋에서 기존 행을
   // 전부 다시 그리지 않게 하는 열쇠(입력이 같으면 같은 참조를 돌려준다).
@@ -17638,192 +16646,32 @@ const puppetWarpArmed =
     }
   }, [studioDocumentPresetFontsHref]);
 
-  // 커스텀 에셋 라이브러리 목록 불러오기 및 관리
-  const loadAssetsList = async () => {
-    const generation = ++assetHydrationGenerationRef.current;
-    if (assetMemoryModeRef.current) {
-      setAssetsLoaded(true);
-      setAssetsLoading(false);
-      setAssetStorageState("memory");
-      return;
-    }
-    setAssetsLoading(true);
-    setAssetStorageState("loading");
-    try {
-      const { listAssets } = await import("./studio-asset-library");
-      const list = await listAssets();
-      if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
-      replaceStudioAssets(list);
-      setAssetStorageState("sqlite-opfs");
-    } catch (err) {
-      console.error("Failed to load custom assets:", err);
-      if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
-      const repositoryModule = await import("./studio-asset-library-sqlite-opfs-repository"
-      ).catch(() => null);
-      if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
-      const failClosed = repositoryModule
-        && err instanceof repositoryModule.StudioAssetLibraryRepositoryError
-        && err.code === "corrupt";
-      if (failClosed) {
-        setAssetStorageState("unavailable");
-        setError(`${err.message} 손상된 manifest나 누락된 blob을 일부만 불러오지 않았습니다.`);
-      } else {
-        assetMemoryModeRef.current = true;
-        setAssetStorageState("memory");
-        setError(`SQLite/OPFS 에셋 보관함을 열지 못해 현재 탭 메모리만 사용합니다. 새로고침하면 변경이 사라집니다: ${
-          err instanceof Error ? err.message : String(err)
-        }`);
-      }
-    } finally {
-      if (editorMountedRef.current && generation === assetHydrationGenerationRef.current) {
-        setAssetsLoaded(true);
-        setAssetsLoading(false);
-      }
-    }
-  };
-
-  async function createValidatedMemoryAsset(
-    input: import("./studio-asset-library").StudioAssetSaveInput,
-  ): Promise<StudioAssetWithContentHash> {
-    const assetLibrary = await import("./studio-asset-library");
-    const actualHash = await assetLibrary.hashStudioAssetDataUrl(input.dataUrl);
-    const expectedHash = assetLibrary.canonicalizeStudioAssetContentHash(input.contentHash);
-    if (input.contentHash !== undefined && expectedHash !== actualHash) {
-      throw new Error("제공된 contentHash가 실제 에셋 바이트 SHA-256과 일치하지 않습니다.");
-    }
-    return {
-      ...assetLibrary.createAssetRecord({ ...input, contentHash: actualHash }),
-      contentHash: actualHash,
-    };
-  }
-
-  async function canKeepAssetMutationInMemory(cause: unknown): Promise<boolean> {
-    const repositoryModule = await import("./studio-asset-library-sqlite-opfs-repository"
-    ).catch(() => null);
-    return repositoryModule === null
-      || repositoryModule.isStudioAssetLibraryMemoryFallbackError(cause);
-  }
-
-  function enqueueAssetMutation<T>(work: () => Promise<T>): Promise<T> {
-    const result = assetMutationTailRef.current.then(work, work);
-    assetMutationTailRef.current = result.then(() => undefined, () => undefined);
-    return result;
-  }
-
-  function saveStudioAssetMutation(
-    input: import("./studio-asset-library").StudioAssetSaveInput,
-  ): Promise<StudioAssetWithContentHash> {
-    return enqueueAssetMutation(async () => {
-      const generation = ++assetMutationGenerationRef.current;
-      assetHydrationGenerationRef.current += 1;
-      if (assetMemoryModeRef.current) {
-        const saved = await createValidatedMemoryAsset(input);
-        if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
-          replaceStudioAssets([
-            saved,
-            ...assetsRef.current.filter(({ id }) => id !== saved.id),
-          ]);
-          setAssetsLoaded(true);
-          setAssetsLoading(false);
-          setAssetStorageState("memory");
-        }
-        return saved;
-      }
-      try {
-        const { saveAsset } = await import("./studio-asset-library");
-        const saved = await saveAsset(input);
-        if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
-          assetHydrationGenerationRef.current += 1;
-          replaceStudioAssets([
-            saved,
-            ...assetsRef.current.filter(({ id }) => id !== saved.id),
-          ]);
-          setAssetsLoaded(true);
-          setAssetsLoading(false);
-          setAssetStorageState("sqlite-opfs");
-        }
-        return saved;
-      } catch (cause) {
-        if (!await canKeepAssetMutationInMemory(cause)) throw cause;
-        const saved = await createValidatedMemoryAsset(input);
-        assetMemoryModeRef.current = true;
-        if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
-          assetHydrationGenerationRef.current += 1;
-          replaceStudioAssets([
-            saved,
-            ...assetsRef.current.filter(({ id }) => id !== saved.id),
-          ]);
-          setAssetsLoaded(true);
-          setAssetsLoading(false);
-          setAssetStorageState("memory");
-          setError(`SQLite/OPFS 저장에 실패해 에셋을 현재 탭 메모리에만 유지합니다. 새로고침하면 사라집니다: ${
-            cause instanceof Error ? cause.message : String(cause)
-          }`);
-        }
-        return saved;
-      }
-    });
-  }
-
-  function deleteStudioAssetMutation(id: string): Promise<void> {
-    return enqueueAssetMutation(async () => {
-      const generation = ++assetMutationGenerationRef.current;
-      assetHydrationGenerationRef.current += 1;
-      if (!assetMemoryModeRef.current) {
-        try {
-          const { deleteAsset } = await import("./studio-asset-library");
-          await deleteAsset(id);
-          if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
-            setAssetStorageState("sqlite-opfs");
-          }
-        } catch (cause) {
-          if (!await canKeepAssetMutationInMemory(cause)) throw cause;
-          if (!editorMountedRef.current || generation !== assetMutationGenerationRef.current) return;
-          assetMemoryModeRef.current = true;
-          setAssetStorageState("memory");
-          setError(`SQLite/OPFS 삭제에 실패해 현재 탭 목록에서만 에셋을 숨깁니다. 새로고침하면 다시 나타날 수 있습니다: ${
-            cause instanceof Error ? cause.message : String(cause)
-          }`);
-        }
-      }
-      if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
-        replaceStudioAssets(assetsRef.current.filter((asset) => asset.id !== id));
-        setAssetsLoaded(true);
-        setAssetsLoading(false);
-      }
-    });
-  }
-
-  function renameStudioAssetMutation(id: string, name: string): Promise<void> {
-    return enqueueAssetMutation(async () => {
-      const generation = ++assetMutationGenerationRef.current;
-      assetHydrationGenerationRef.current += 1;
-      const assetLibrary = await import("./studio-asset-library");
-      const normalizedName = assetLibrary.normalizeAssetName(name);
-      if (!assetMemoryModeRef.current) {
-        try {
-          await assetLibrary.renameAsset(id, normalizedName);
-          if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
-            setAssetStorageState("sqlite-opfs");
-          }
-        } catch (cause) {
-          if (!await canKeepAssetMutationInMemory(cause)) throw cause;
-          if (!editorMountedRef.current || generation !== assetMutationGenerationRef.current) return;
-          assetMemoryModeRef.current = true;
-          setAssetStorageState("memory");
-          setError(`SQLite/OPFS 이름 변경에 실패해 현재 탭 메모리에서만 반영합니다. 새로고침하면 사라집니다: ${
-            cause instanceof Error ? cause.message : String(cause)
-          }`);
-        }
-      }
-      if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
-        replaceStudioAssets(assetsRef.current.map((asset) =>
-          asset.id === id ? { ...asset, name: normalizedName } : asset));
-        setAssetsLoaded(true);
-        setAssetsLoading(false);
-      }
-    });
-  }
+  // 커스텀 에셋 라이브러리 CRUD — 목록 하이드레이션(세대 펜싱), 큐잉된 저장/삭제/이름 변경,
+  // 업로드·삭제 핸들러는 studio-cuttoon-editor/studio-asset-library-mutations.ts 로 추출됐다.
+  // 팩토리는 훅이 아니라 react-compiler 컴파일 경계 밖이며, 이 렌더의 ref·setter 를 그대로 주입해
+  // 추출 전과 동일한 클로저를 만든다. 네 개의 세대·꼬리 ref 는 값이 아니라 ref 로 넘어가 하이드레이션
+  // 펜싱(assetHydrationGenerationRef)과 변이 직렬화(assetMutationTailRef) 계약이 그대로 유지된다.
+  const {
+    loadAssetsList,
+    saveStudioAssetMutation,
+    deleteStudioAssetMutation,
+    renameStudioAssetMutation,
+    onUploadAsset,
+    onDeleteAsset,
+  } = createStudioAssetLibraryMutations({
+    assetHydrationGenerationRef,
+    assetMemoryModeRef,
+    assetMutationGenerationRef,
+    assetMutationTailRef,
+    assetsRef,
+    editorMountedRef,
+    removeAssetFavorite,
+    replaceStudioAssets,
+    setAssetStorageState,
+    setAssetsLoaded,
+    setAssetsLoading,
+    setError,
+  });
 
   const loadAssetsListFromEffect = useEffectEvent(loadAssetsList);
 
@@ -17832,28 +16680,6 @@ const puppetWarpArmed =
       void loadAssetsListFromEffect();
     }
   }, [menu]);
-
-  async function onUploadAsset(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const { src, width, height } = await loadStudioCanvasImageFile(file);
-      await saveStudioAssetMutation({ name: file.name, dataUrl: src, width, height });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "에셋 업로드 실패");
-    } finally {
-      e.target.value = "";
-    }
-  }
-
-  async function onDeleteAsset(id: string) {
-    try {
-      await deleteStudioAssetMutation(id);
-      removeAssetFavorite(createStudioAssetFavoriteId("local", id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "에셋 삭제 실패");
-    }
-  }
 
   // 에셋 라이브러리 고도화 상태 및 함수
   const [assetSearchQuery, setAssetSearchQuery] = useState("");
@@ -20027,172 +18853,8 @@ const puppetWarpArmed =
     setTool("select");
     return true;
   }
-  // ── 레이어 그룹(폴더) ─────────────────────────────────────────────────────
-  // 그룹 목록·요소 groupId를 한 번에 커밋(원자적). seedElId가 있으면 새 그룹에 그 요소를 넣는다.
-  function addLayerGroup(seedElId?: string): boolean {
-    const seed = seedElId ? elementById.get(seedElId) : undefined;
-    if (seed?.groupId) {
-      const message =
-        "기존 그룹의 자식은 다시 그룹화하지 않아요. 먼저 그룹을 해제하거나 다른 요소를 함께 선택하세요.";
-      setError(message);
-      announceDrawingShortcut(message);
-      return false;
-    }
-    const g = createLayerGroup(uid(), `그룹 ${groups.length + 1}`);
-    const nextElements = seedElId ? (groupItems(elements, [seedElId], g.id) as El[]) : elements;
-    updateActivePage({ groups: [...groups, g], elements: nextElements });
-    if (seedElId) {
-      applyGroupSelectionState({
-        ...selectionShapeForIds([seedElId]),
-        activeGroupId: null,
-      });
-    }
-    return true;
-  }
-  function groupSelectedElements(): boolean {
-    const memberIds = [...marqueeIdsRef.current];
-    if (memberIds.length < 2) return false;
-    const alreadyGrouped = memberIds
-      .map((id) => elementById.get(id))
-      .some((element) => element?.groupId);
-    if (alreadyGrouped) {
-      // 현재 레이어 그룹은 중첩 구조가 아니라 평면 메타데이터다. 기존 그룹 멤버를 다시
-      // Cmd/Ctrl+G 하면 이전 그룹을 비워 둔 채 새 groupId로 덮어쓸 수 있으므로, PPT의
-      // "이미 그룹인 선택은 다시 묶지 않음"처럼 명시적으로 fail-close한다.
-      setError("기존 그룹이 포함된 선택이에요. 먼저 그룹을 해제한 뒤 다시 그룹화해 주세요.");
-      announceDrawingShortcut("기존 그룹을 먼저 해제한 뒤 다시 그룹화해 주세요");
-      return false;
-    }
-    const groupId = uid();
-    const g = createLayerGroup(groupId, `그룹 ${groups.length + 1}`);
-    const nextElements = groupItems(elements, memberIds, groupId) as El[];
-    updateActivePage({ groups: [...groups, g], elements: nextElements });
-    // PPT/Figma처럼 그룹 생성 직후 새 그룹을 그대로 선택한다. 이어서 이동·복제·잠금을
-    // 실행하려는 사용자가 캔버스에서 다시 그룹을 찾아 클릭할 필요가 없어야 한다.
-    applyGroupSelectionState({
-      selectedId: null,
-      marqueeIds: memberIds,
-      activeGroupId: null,
-    });
-    announceDrawingShortcut(`요소 ${memberIds.length}개 그룹화`);
-    return true;
-  }
-  function completeSelectedGroupId(): string | null {
-    const currentSelectionIds = currentCanvasSelectionIds();
-    if (currentSelectionIds.length === 0) return null;
-    const selectedIds = new Set(currentSelectionIds);
-    const selectedElements = elements.filter((element) => selectedIds.has(element.id));
-    const groupIds = new Set(
-      selectedElements
-        .map((element) => element.groupId)
-        .filter((groupId): groupId is string => groupId !== undefined)
-    );
-    if (groupIds.size !== 1) return null;
-    const groupId = [...groupIds][0]!;
-    if (!groups.some((group) => group.id === groupId)) return null;
-    // 그룹 내부 편집 중에는 모든 자식이 선택되어도 최상위 그룹 하나로 되돌리지 않는다.
-    // 그래야 정렬·잠금·해제 같은 자식 대상 명령이 PPT/Figma의 그룹 진입 상태를 유지한다.
-    if (activeGroupIdRef.current === groupId) return null;
-    const memberIds = elements
-      .filter((element) => element.groupId === groupId)
-      .map((element) => element.id);
-    return (
-      selectedElements.length === selectedIds.size &&
-      memberIds.length === selectedElements.length &&
-      memberIds.every((id) => selectedIds.has(id))
-    )
-      ? groupId
-      : null;
-  }
-  function ungroupSelectedElements(): boolean {
-    const groupId = completeSelectedGroupId();
-    if (!groupId) {
-      const message =
-        "그룹 전체가 선택된 경우에만 해제할 수 있어요. 그룹을 한 번 클릭해 전체를 선택하세요.";
-      setError(message);
-      announceDrawingShortcut(message);
-      return false;
-    }
-    const selectedIds = currentCanvasSelectionIds();
-    updateActivePage({
-      elements: ungroupItems(elements, groupId) as El[],
-      groups: groups.filter((group) => group.id !== groupId),
-    });
-    // 요소 선택은 유지한다. PPT/Figma처럼 그룹 해제 직후에도 이동·정렬·재그룹화가
-    // 이어져야 하며, 캔버스를 다시 드래그해 대상을 찾게 만들지 않는다.
-    applyGroupSelectionState({
-      ...selectionShapeForIds(selectedIds.filter((id) => elementById.has(id))),
-      activeGroupId: null,
-    });
-    announceDrawingShortcut("그룹 해제 완료");
-    return true;
-  }
-  function enterCompleteSelectedGroup(): boolean {
-    const groupId = completeSelectedGroupId();
-    if (!groupId) return false;
-    const firstMember = elements.find((element) => element.groupId === groupId);
-    if (!firstMember) return false;
-    applyGroupSelectionState(
-      planGroupEnter({
-        items: elements,
-        groups,
-        clickedId: firstMember.id,
-      })
-    );
-    announceDrawingShortcut("그룹 내부 편집 · Esc로 그룹 전체 선택");
-    return true;
-  }
-  function toggleSelectedElementsLocked() {
-    const currentSelectionIds = currentCanvasSelectionIds();
-    const selectedIds = new Set(currentSelectionIds);
-    if (selectedIds.size === 0) return;
-    const selectedElements = elements.filter((element) => selectedIds.has(element.id));
-    if (selectedElements.length === 0) return;
-    const nextLocked = !selectedElements.every((element) =>
-      isEffectivelyLocked(element, groups)
-    );
-    const groupId = completeSelectedGroupId();
-    if (groupId) {
-      updateActivePage({
-        groups: groups.map((group) =>
-          group.id === groupId ? { ...group, locked: nextLocked } : group
-        ),
-        // 잠금 해제는 그룹 잠금과 멤버 개별 잠금을 함께 정리해야 UI의 “잠금 해제”
-        // 약속대로 즉시 다시 편집할 수 있다. 잠글 때는 기존 멤버 메타를 보존한다.
-        elements: nextLocked
-          ? elements
-          : elements.map((element) =>
-              selectedIds.has(element.id) && element.locked
-                ? ({ ...element, locked: false } as El)
-                : element
-            ),
-      });
-      return;
-    }
-    patchLayerItems(currentSelectionIds, () => ({ locked: nextLocked }));
-  }
-  function reorderSelectedElements(direction: LayerItemReorderDirection) {
-    const currentSelectionIds = currentCanvasSelectionIds();
-    if (currentSelectionIds.length === 0) return;
-    const next = reorderLayerSelection(elements, currentSelectionIds, direction) as El[];
-    if (next === elements) return;
-    commit(next);
-  }
-  // 그룹 해제: 멤버 groupId 제거 + 그룹 자체 삭제(요소는 보존).
-  function deleteLayerGroup(groupId: string) {
-    updateActivePage({
-      elements: ungroupItems(elements, groupId) as El[],
-      groups: groups.filter((g) => g.id !== groupId),
-    });
-    if (activeGroupIdRef.current === groupId) {
-      activeGroupIdRef.current = null;
-      setActiveGroupId(null);
-    }
-  }
-  // 요소를 그룹에 넣기/빼기(연속성 유지). groupId=undefined면 그룹에서 제거.
-  function assignElementToGroup(elId: string, groupId: string | undefined) {
-    updateActivePage({ elements: setItemGroup(elements, elId, groupId) as El[] });
-  }
+  // ── 레이어 그룹(폴더) ── 그룹 생성/해제·잠금·정렬·그룹 삭제·요소 그룹 재배치와
+  // 공유 3D 장면 병합 충돌 판정은 layer/studio-layer-operations 팩토리로 옮겼다.
 
   function selectLayersFromNavigator(ids: readonly string[]) {
     const validIds = [...new Set(ids)].filter((id) => elementById.has(id)).slice(0, 500);
@@ -20203,45 +18865,6 @@ const puppetWarpArmed =
       ...selectionShapeForIds(validIds),
       activeGroupId: null,
     });
-  }
-
-  function shared3dStageMergeConflictReason(removeIds: readonly string[]): string | null {
-    if (removeIds.length === 0) return null;
-    const removedIds = new Set(removeIds);
-    const removesReservedLinkedPassState = elements.some((element) =>
-      removedIds.has(element.id)
-      && element.type === "image"
-      && (
-        studioLinked3dPassDestructiveEditReason(element) !== null
-        || element.bg3dLtBundleId !== undefined
-      ),
-    );
-    if (removesReservedLinkedPassState) {
-      return "연결된 3D 장면과 선화는 일반 레이어 병합으로 제거하지 않아요. 3D 원본을 유지하는 정적 복사본을 만든 뒤 그 복사본을 병합해 주세요.";
-    }
-    if (activePage.shared3dStage === undefined) return null;
-    const sharedStages = studioShared3dStageCollectionEntries(activePage.shared3dStage);
-    if (!sharedStages) {
-      return "공유 3D 장면 연결 정보가 손상되어 안전하게 병합하지 않았어요. 먼저 3D 배경 연결을 확인해 주세요.";
-    }
-    const linkedCharacterIds = new Set(sharedStages.flatMap((stage) =>
-      stage.characters.map((character) => character.elementId)));
-    const linkedBundleIds = new Set(sharedStages.map((stage) =>
-      stage.background.bundleId));
-    const removesStageAuthority = elements.some((element) =>
-      removedIds.has(element.id)
-      && (
-        (
-          element.type === "image"
-          && element.bg3dLtBundleId !== undefined
-          && linkedBundleIds.has(element.bg3dLtBundleId)
-        )
-        || linkedCharacterIds.has(element.id)
-      ),
-    );
-    return removesStageAuthority
-      ? "공유 3D 장면은 일반 병합으로 일부만 지우지 않아요. 3D 배경에서 ‘3D 원본 유지 · 한 장으로 정리’를 사용하거나, 배경을 삭제해 원본 캐릭터를 복원해 주세요."
-      : null;
   }
 
   function patchLayerItems(
@@ -20339,14 +18962,24 @@ const puppetWarpArmed =
   });
 
   /**
-   * 레이어 병합·내비게이터 액션·명시적 삭제 명령 — layer/studio-layer-operations 팩토리로 추출.
+   * 레이어 병합·내비게이터 액션·명시적 삭제 명령과 레이어 그룹(폴더) 명령 —
+   * layer/studio-layer-operations 팩토리로 추출.
    * 검토 잠금·마스터 편집·live 자원 잠금 게이트와 단일 undo 계약은 추출된 본문 안에 그대로 있다.
-   * (commitLayerMergePlan 은 내비게이터 병합 액션 내부에서만 쓰여 페이지로 되돌려받지 않는다.)
+   * (commitLayerMergePlan·shared3dStageMergeConflictReason 은 팩토리 내부에서만 쓰여 페이지로
+   * 되돌려받지 않는다.)
    */
   const {
     applyExtendedBlendMergeDown,
     handleLayerNavigatorAction,
     deleteLayerElements,
+    addLayerGroup,
+    groupSelectedElements,
+    completeSelectedGroupId,
+    ungroupSelectedElements,
+    enterCompleteSelectedGroup,
+    toggleSelectedElementsLocked,
+    reorderSelectedElements,
+    assignElementToGroup,
   } = createStudioLayerOperations({
     elements,
     groups,
@@ -20363,15 +18996,13 @@ const puppetWarpArmed =
     extendedBlendOpacity,
     coalesceKeyRef,
     activeGroupIdRef,
-    shared3dStageMergeConflictReason,
+    marqueeIdsRef,
+    currentCanvasSelectionIds,
     beginLiveResourceEditAsync,
     endLiveResourceEdit,
     commit,
     updateActivePage,
     patchLayerItems,
-    groupSelectedElements,
-    ungroupSelectedElements,
-    deleteLayerGroup,
     moveLayer,
     applyGroupSelectionState,
     setError,

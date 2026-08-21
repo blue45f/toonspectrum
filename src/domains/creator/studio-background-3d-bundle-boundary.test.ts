@@ -144,27 +144,36 @@ describe("Studio background 3D bundle boundary", () => {
 
   it("loads durable shot production only after the user starts a batch", () => {
     const imports = moduleImports("./bg3d/StudioBackground3D.tsx");
+    // 2026-08-21 intentional change: the batch orchestration moved from StudioBackground3D.tsx into
+    // studio-bg3d-shot-batch-export-run.ts (editor split), so the runtime-loader boundary now lives
+    // in that module. Both files still have to stay off the durable production chunks.
+    const runImports = moduleImports("./bg3d/studio-bg3d-shot-batch-export-run.ts");
     const loaderImports = moduleImports("./bg3d/studio-bg3d-shot-batch-runtime-loader.ts");
     const runtimeSource = readFileSync(
       new URL("./bg3d/studio-bg3d-shot-batch-runtime.ts", import.meta.url),
       "utf8",
     );
 
-    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-runtime");
-    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-artifact-pipeline");
-    expect(imports.dynamicImports).not.toContain("./studio-bg3d-shot-batch-runtime");
-    expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-runtime-loader");
+    for (const editorImports of [imports, runImports]) {
+      expect(editorImports.valueImports).not.toContain("./studio-bg3d-shot-batch-runtime");
+      expect(editorImports.valueImports).not.toContain("./studio-bg3d-shot-artifact-pipeline");
+      expect(editorImports.dynamicImports).not.toContain("./studio-bg3d-shot-batch-runtime");
+      expect(editorImports.valueImports).not.toContain("./studio-bg3d-shot-batch-recovery-store");
+      expect(editorImports.valueImports).not.toContain("./studio-bg3d-shot-batch-worker-client");
+      expect(editorImports.valueImports).not.toContain(
+        "./studio-bg3d-shot-contact-sheet-worker-client",
+      );
+      expect(editorImports.valueImports).not.toContain("./studio-bg3d-shot-psd-worker-client");
+      expect(editorImports.valueImports).not.toContain("./studio-bg3d-shot-batch");
+      expect(editorImports.valueImports).not.toContain("./studio-bg3d-shot-batch-plan");
+    }
+    expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-export-run");
+    expect(runImports.valueImports).toContain("./studio-bg3d-shot-batch-runtime-loader");
     expect(loaderImports.dynamicImports).toEqual([
       "./studio-bg3d-shot-batch-runtime",
       "./studio-bg3d-shot-batch-recovery-store",
     ]);
-    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-recovery-store");
-    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-worker-client");
-    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-contact-sheet-worker-client");
-    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-psd-worker-client");
-    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch");
-    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-plan");
-    expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-limits");
+    expect(runImports.valueImports).toContain("./studio-bg3d-shot-batch-limits");
     expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-pass-catalog");
     expect(runtimeSource).toContain('from "./studio-bg3d-shot-artifact-pipeline"');
     expect(runtimeSource).not.toContain('from "./studio-bg3d-shot-batch-recovery-store"');

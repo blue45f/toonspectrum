@@ -13,6 +13,13 @@ const proxySource = readFileSync(
   new URL("./StudioGroupUniformResizeProxy.tsx", import.meta.url),
   "utf8",
 );
+// 2026-08-21 intentional: the proxy call site and the single-object Transformer moved verbatim out
+// of StudioCanvasViewport.tsx into the canvas selection-decorations leaf. The viewport still owns
+// the resize handlers and the bounds they consume, which is what the rest of this test asserts.
+const selectionDecorationsSource = readFileSync(
+  new URL("./canvas/StudioCanvasSelectionDecorations.tsx", import.meta.url),
+  "utf8",
+);
 
 function functionBody(name: string): string {
   const start = pageSource.indexOf(`function ${name}`);
@@ -61,7 +68,7 @@ describe("Studio group uniform-resize runtime boundary", () => {
       "dedicated group resize Transformer",
     );
     expectSourceToken(
-      viewportSource,
+      selectionDecorationsSource,
       "<StudioGroupUniformResizeProxy",
       "StudioCanvasViewport group resize integration",
     );
@@ -69,12 +76,13 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expectSourceToken(viewportSource, "commitCanvasSelectionResize", "Viewport handlers");
     expectSourceToken(viewportSource, "cancelCanvasSelectionResize", "Viewport handlers");
     expect(viewportSource).not.toContain("previewCanvasSelectionResize");
+    expect(selectionDecorationsSource).not.toContain("previewCanvasSelectionResize");
     expect(proxySource).not.toContain("previewCanvasSelectionResize");
 
-    expect(occurrences(viewportSource, "<Transformer")).toBeGreaterThanOrEqual(1);
+    expect(occurrences(selectionDecorationsSource, "<Transformer")).toBeGreaterThanOrEqual(1);
     expect(occurrences(proxySource, "<Transformer")).toBe(1);
     expectSourceToken(proxySource, "transformer.nodes([proxy])", "group Transformer");
-    expectSourceToken(viewportSource, "ref={trRef}", "single-object Transformer");
+    expectSourceToken(selectionDecorationsSource, "ref={trRef}", "single-object Transformer");
     expectSourceToken(
       viewportSource,
       "unionBounds(multiSelectionVisibleBounds)",

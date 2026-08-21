@@ -9,6 +9,14 @@ const viewportSource = readFileSync(
   new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
+// 2026-08-21 intentional: the Konva selection decorations (union-bounds ghost, label badge, resize
+// proxy, Transformer, dashed boxes) moved verbatim out of StudioCanvasViewport.tsx into their own
+// leaf module. The viewport still owns every input they read, so the split assertions below only
+// follow the markup to its new file.
+const selectionDecorationsSource = readFileSync(
+  new URL("./canvas/StudioCanvasSelectionDecorations.tsx", import.meta.url),
+  "utf8",
+);
 
 function functionBody(name: string, nextName: string): string {
   const start = pageSource.indexOf(`function ${name}`);
@@ -339,20 +347,20 @@ describe("Studio PPT-style group convenience boundary", () => {
   it("renders one labelled union boundary for mixed groups and ordinary multi-selection", () => {
     expect(viewportSource).toContain("multiSelectionBounds");
     expect(viewportSource).toContain("marqueeIds.length > 1");
-    expect(viewportSource).toContain('studioSelectionRole="group-bounds"');
-    expect(viewportSource).toContain(
+    expect(selectionDecorationsSource).toContain('studioSelectionRole="group-bounds"');
+    expect(selectionDecorationsSource).toContain(
       "studioGroupLocked={completeSelectionGroup?.locked === true}",
     );
-    expect(viewportSource).toContain('name="studio-group-selection-lock-marker"');
-    expect(viewportSource).toContain('name="studio-group-selection-overlay"');
-    expect(viewportSource).toContain('name="studio-group-selection-badge"');
-    expect(viewportSource).toContain('? "잠금"');
-    expect(viewportSource).toContain('? "일부 잠금"');
-    expect(viewportSource).toContain(
+    expect(selectionDecorationsSource).toContain('name="studio-group-selection-lock-marker"');
+    expect(selectionDecorationsSource).toContain('name="studio-group-selection-overlay"');
+    expect(selectionDecorationsSource).toContain('name="studio-group-selection-badge"');
+    expect(selectionDecorationsSource).toContain('? "잠금"');
+    expect(selectionDecorationsSource).toContain('? "일부 잠금"');
+    expect(selectionDecorationsSource).toContain(
       'stroke={constrained ? "#b45309" : "#c2410c"}',
     );
-    expect(viewportSource).toContain("const badgeX = Math.min(");
-    expect(viewportSource).toContain("preferredBadgeY >= badgeInset");
+    expect(selectionDecorationsSource).toContain("const badgeX = Math.min(");
+    expect(selectionDecorationsSource).toContain("preferredBadgeY >= badgeInset");
     expect(viewportSource).toContain(
       'element.type === "draw"',
     );

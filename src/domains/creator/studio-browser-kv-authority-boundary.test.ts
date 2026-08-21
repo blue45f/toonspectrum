@@ -389,9 +389,15 @@ const HISTORY_LEGACY_IDB_PROOF =
 
 const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   // Deletion-only cleanup of browser compatibility remnants.
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "studioAutosaveKey({userId:studioAuthUserId,workId,remixId})", 2, CLEANUP_ONLY, CLEANUP_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 2, CLEANUP_ONLY, CLEANUP_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 2, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "studioAutosaveKey({userId:studioAuthUserId,workId,remixId})", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  // Intentional change (2026-08, B-17): the recovery-banner "clear" browser-mirror cleanup moved
+  // with clearAutosaveRecord into studio-page-autosave-runtime.ts. Same three deletions, same
+  // durable-tombstone-first ordering — only the file changed.
+  allow("src/domains/creator/studio-page-autosave-runtime.ts", "local-storage-cleanup", "autosaveKey", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/studio-page-autosave-runtime.ts", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/studio-page-autosave-runtime.ts", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   // Intentional change (2026-08, B-09): the post-save tombstone cleanup moved with
   // the extracted handleSave orchestration into studio-page-save-pipeline.ts.
   allow("src/domains/creator/studio-page-save-pipeline.ts", "local-storage-cleanup", "autosaveKey", 1, CLEANUP_ONLY, CLEANUP_PROOF),

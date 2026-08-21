@@ -15,6 +15,12 @@ const studioCanvasViewportSource = readFileSync(
   new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
+// 2026-08-21 intentional: the desktop stage HUD (the status bar this test's desktop-lane guard
+// reads) moved verbatim out of StudioCanvasViewport.tsx into its own leaf module.
+const studioCanvasStageHudSource = readFileSync(
+  new URL("./canvas/StudioCanvasStageHud.tsx", import.meta.url),
+  "utf8",
+);
 const studioMobileEditingDockSource = readFileSync(
   new URL("./StudioMobileEditingDock.tsx", import.meta.url),
   "utf8",
@@ -68,7 +74,7 @@ describe("Studio mobile immersive preference", () => {
     expect(studioPageSource).toContain('mobileImmersive && "max-lg:hidden"');
     expect(studioPageSource).toContain('"lg:hidden"');
     expect(studioPageSource).not.toContain("lg:h-0 lg:w-0 lg:overflow-visible");
-    expect(studioCanvasViewportSource).toContain("!canvasOnlyMode && !isMobile");
+    expect(studioCanvasStageHudSource).toContain("!canvasOnlyMode && !isMobile");
     expect(studioPageSource).toContain("<StudioMobileEditingDock");
     expect(studioMobileEditingDockSource).toContain('data-studio-mobile-editing-dock="true"');
     expect(studioMobileEditingDockSource).toContain('data-studio-canvas-transient="coach"');
