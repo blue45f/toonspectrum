@@ -53,6 +53,16 @@ yarn-error.log*
 # AI agent local caches and session state (로컬 전용, 절대 커밋 금지)
 /.impeccable/
 /.claude/
+# opencode loop/goal 플러그인 상태 및 로컬 의존성 (커맨드·에이전트 정의 및 설정은 추적)
+/.opencode/goals/
+/.opencode/opencode-loop/
+/.opencode/package*.json
+/.opencode/bun.lock
+/.opencode/.gitignore
+
+# scratch diagnostic / benchmark scripts (로컬 임시 디버깅 전용)
+**/__diag*
+**/__tmp*
 
 # scratch tsconfigs written by scoped typecheck runs (root tsconfig.json stays tracked)
 /tsconfig.scratch*.json
@@ -90,3 +100,6 @@ test-accounts.local.*
 
 # cargo build artifacts
 crates/*/target/
+
+# Local AI assistant sessions & configs
+/.continue/
