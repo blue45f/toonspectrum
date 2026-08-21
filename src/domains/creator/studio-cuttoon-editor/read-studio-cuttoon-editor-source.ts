@@ -35,6 +35,7 @@ export function readStudioCuttoonEditorSource(): string {
     resolve(baseDir, "../studio-router/studio-dcc-workbench-navigation.ts"),
     resolve(baseDir, "../studio-router/StudioDccWorkbenchRoute.tsx"),
     resolve(baseDir, "../studio-page-workspace-persistence.ts"),
+    resolve(baseDir, "../render/studio-hokusai-natural-media-replacement.ts"),
     resolve(baseDir, "../StudioPage.tsx"),
     resolve(baseDir, "../studio-page-vector-ops.ts"),
     resolve(baseDir, "../ai/studio-scenario-image-generation.ts"),

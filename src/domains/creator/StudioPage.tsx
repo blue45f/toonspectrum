@@ -575,8 +575,8 @@ import {
   StudioHokusaiLiveBrushProvider,
 } from "./render/studio-hokusai-live-brush-runtime";
 import {
-  studioHokusaiSourceRevision,
-} from "./render/studio-hokusai-natural-media-contract";
+  planStudioHokusaiNaturalMediaReplacement,
+} from "./render/studio-hokusai-natural-media-replacement";
 import { useStudioHybridDccPersistence } from "./hybrid-dcc/studio-hybrid-dcc-persistence";
 import { uid } from "./studio-id";
 import {
@@ -31508,60 +31508,15 @@ function clearSelectionForEdit() {
       ) {
         return false;
       }
-      const sourceIndex = elements.findIndex(
-        ({ id }) => id === result.sourceElementId,
+      const plan = planStudioHokusaiNaturalMediaReplacement(
+        elements,
+        groups,
+        result,
       );
-      const source = sourceIndex >= 0 ? elements[sourceIndex] : null;
-      if (
-        !source
-        || source.type !== "draw"
-        || isEffectivelyLocked(source, groups)
-        || studioHokusaiSourceRevision(source) !== result.sourceRevision
-        || !result.src.startsWith("data:image/png;base64,")
-        || !Number.isFinite(result.logicalBounds.x)
-        || !Number.isFinite(result.logicalBounds.y)
-        || !Number.isFinite(result.logicalBounds.width)
-        || !Number.isFinite(result.logicalBounds.height)
-        || result.logicalBounds.width <= 0
-        || result.logicalBounds.height <= 0
-      ) {
-        return false;
-      }
-      const rasterId = uid();
-      const hiddenSource: El = {
-        ...source,
-        hidden: true,
-        name: `${source.name ?? source.brush ?? "선화"} · Hokusai 원본 벡터`,
-      };
-      const raster: El = {
-        id: rasterId,
-        type: "image",
-        src: result.src,
-        x: result.logicalBounds.x,
-        y: result.logicalBounds.y,
-        width: result.logicalBounds.width,
-        height: result.logicalBounds.height,
-        rotation: 0,
-        name: result.name,
-        lockAspect: true,
-        ...(source.groupId ? { groupId: source.groupId } : {}),
-        ...(source.noClip !== undefined ? { noClip: source.noClip } : {}),
-        ...(source.blendMode ? { blendMode: source.blendMode } : {}),
-        ...(source.clipBelow !== undefined
-          ? { clipBelow: source.clipBelow }
-          : {}),
-        ...(source.alphaLocked !== undefined
-          ? { alphaLocked: source.alphaLocked }
-          : {}),
-        ...(source.layerRole ? { layerRole: source.layerRole } : {}),
-        ...(source.layerColor ? { layerColor: source.layerColor } : {}),
-      };
-      const nextElements = elements.map((element, index) =>
-        index === sourceIndex ? hiddenSource : element);
-      nextElements.splice(sourceIndex + 1, 0, raster);
-      const committed = commit(nextElements);
+      if (!plan) return false;
+      const committed = commit(plan.nextElements);
       if (!committed) return false;
-      setSelectedId(rasterId);
+      setSelectedId(plan.rasterId);
       announceDrawingShortcut(
         "Hokusai 자연매체 변환 완료 · 원본 벡터는 숨김 보존",
       );
