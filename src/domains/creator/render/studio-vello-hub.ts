@@ -573,6 +573,14 @@ export interface StudioVelloHubPresentationTarget {
   present(frame: StudioVelloBackendFrame): Promise<void>;
   /** Must not clear or hide the current primary frame. */
   holdLastGood(reason: string): void;
+  /**
+   * Drops every GPU resource still bound to a device that the browser lost, so
+   * the CPU recovery frame cannot be presented against the destroyed device.
+   * Like `holdLastGood` it must not clear or hide the current primary frame.
+   * Only targets that adopt a `GPUDevice` need to implement it; a target that
+   * never holds one has nothing to release.
+   */
+  releaseLostDevice?(reason: string): void;
 }
 
 export type StudioVelloHubDecision =
@@ -1135,6 +1143,11 @@ export class StudioVelloHub {
   async handleDeviceLoss(reason: string): Promise<StudioVelloHubRenderReceipt | null> {
     if (this.disposed) return null;
     this.killGpuBackends(reason);
+    // The adopted device is gone: the target must forget it before the CPU
+    // recovery frame is presented, or the frame is uploaded into a destroyed
+    // swapchain instead of taking the CPU path. Only device loss releases it —
+    // a killed backend on a live device still recovers through that device.
+    this.target.releaseLostDevice?.(reason);
     this.target.holdLastGood(reason);
     if (!this.latestScene) return null;
     return this.renderInternal(this.latestScene, {

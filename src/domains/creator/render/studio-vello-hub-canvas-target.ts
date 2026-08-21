@@ -14,6 +14,8 @@ export interface StudioVelloHubCanvasTarget
   /** @deprecated V13 uses a single canvas; alias of `canvas`. */
   readonly cpuCanvas: HTMLCanvasElement;
   readonly activeBackendId: StudioVelloHubBackendId | null;
+  /** Forgets the lost `GPUDevice` without clearing the visible primary frame. */
+  releaseLostDevice(reason: string): void;
   setIsland(island: StudioVelloSceneIsland): void;
   /** Stop the retain-present loop and release the swapchain when nothing is shown. */
   park(): void;
@@ -44,8 +46,11 @@ function styleHubCanvas(canvas: HTMLCanvasElement): void {
 }
 
 /**
- * One visible canvas. GPU frames copy on-device; CPU recovery uploads pixels
- * into the same WebGPU swapchain so a second DOM canvas is never created.
+ * One visible canvas at a time. GPU frames copy on-device; CPU recovery uploads
+ * pixels into the same WebGPU swapchain, so no second canvas exists while a
+ * device is alive. Device loss is the one exception: a canvas that has bound a
+ * WebGPU context can never hand back a 2D context, so the CPU recovery frame
+ * paints a freshly minted canvas and replaces the poisoned one in the same tick.
  * Empty mixed pages call `park()` so the retain-present rAF loop does not
  * copy a viewport-sized swapchain every frame.
  */
@@ -53,7 +58,7 @@ export function createStudioVelloHubCanvasTarget(
   ownerDocument: Document,
   mountParent: HTMLElement,
 ): StudioVelloHubCanvasTarget {
-  const canvas = ownerDocument.createElement("canvas");
+  let canvas = ownerDocument.createElement("canvas");
   styleHubCanvas(canvas);
   const content = mountParent.querySelector(".konvajs-content");
   if (content?.firstElementChild) {
@@ -65,6 +70,7 @@ export function createStudioVelloHubCanvasTarget(
   let island: StudioVelloSceneIsland | null = null;
   let activeBackendId: StudioVelloHubBackendId | null = null;
   let destroyed = false;
+  let webgpuContextBound = false;
   let configuredDevice: GPUDevice | null = null;
   let configuredWidth = 0;
   let configuredHeight = 0;
@@ -179,6 +185,39 @@ export function createStudioVelloHubCanvasTarget(
     return retainedTexture;
   };
 
+  /**
+   * A canvas that already bound a WebGPU context returns `null` for `"2d"`
+   * forever, so the CPU recovery frame needs a canvas that never touched the
+   * lost device. The replacement is painted before it is swapped in, keeping
+   * the last-good frame on screen until the recovery frame exists.
+   */
+  const adoptRecoveryCanvas = (fresh: HTMLCanvasElement) => {
+    const previous = canvas;
+    const holdReason = previous.dataset.studioVelloHubHoldReason;
+    if (holdReason) fresh.dataset.studioVelloHubHoldReason = holdReason;
+    const lostReason = previous.dataset.studioVelloHubDeviceLost;
+    if (lostReason) fresh.dataset.studioVelloHubDeviceLost = lostReason;
+    if (previous.parentNode) {
+      previous.replaceWith(fresh);
+    } else {
+      mountParent.append(fresh);
+    }
+    canvas = fresh;
+    webgpuContextBound = false;
+  };
+
+  const releaseLostDevice = (reason: string) => {
+    if (destroyed) return;
+    stopPresentLoop();
+    destroyRetainedTexture();
+    loopDevice = null;
+    loopContext = null;
+    configuredDevice = null;
+    configuredWidth = 0;
+    configuredHeight = 0;
+    canvas.dataset.studioVelloHubDeviceLost = reason;
+  };
+
   const presentPixelsOnGpu = (
     frame: Extract<StudioVelloBackendFrame, { kind: "pixels" }>,
     device: GPUDevice,
@@ -196,12 +235,19 @@ export function createStudioVelloHubCanvasTarget(
   };
 
   const target: StudioVelloHubCanvasTarget = {
-    canvas,
-    gpuCanvas: canvas,
-    cpuCanvas: canvas,
+    get canvas() {
+      return canvas;
+    },
+    get gpuCanvas() {
+      return canvas;
+    },
+    get cpuCanvas() {
+      return canvas;
+    },
     get activeBackendId() {
       return activeBackendId;
     },
+    releaseLostDevice,
     setIsland(nextIsland) {
       island = nextIsland;
     },
@@ -227,6 +273,7 @@ export function createStudioVelloHubCanvasTarget(
           frame.release();
           throw new Error("VelloHub WebGPU canvas context unavailable");
         }
+        webgpuContextBound = true;
         try {
           if (
             configuredDevice !== frame.device
@@ -275,18 +322,26 @@ export function createStudioVelloHubCanvasTarget(
         return;
       }
 
-      const context2d = canvas.getContext("2d");
+      const surface = webgpuContextBound
+        ? ownerDocument.createElement("canvas")
+        : canvas;
+      const context2d = surface.getContext("2d");
       if (!context2d) throw new Error("VelloHub canvas 2D context unavailable");
       const ImageDataConstructor = ownerDocument.defaultView?.ImageData
         ?? globalThis.ImageData;
       if (!ImageDataConstructor) {
         throw new Error("VelloHub CPU ImageData constructor unavailable");
       }
+      if (surface !== canvas) {
+        styleHubCanvas(surface);
+        applyCanvasPlacement(surface, island.placement, frame.width, frame.height);
+      }
       context2d.putImageData(
         new ImageDataConstructor(new Uint8ClampedArray(frame.pixels), frame.width, frame.height),
         0,
         0,
       );
+      if (surface !== canvas) adoptRecoveryCanvas(surface);
       markPrimary(frame.backendId);
     },
     holdLastGood(reason) {
