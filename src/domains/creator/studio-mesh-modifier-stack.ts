@@ -46,7 +46,11 @@ export type StudioMeshModifierKind =
   | "array"
   | "boolean"
   | "solidify"
-  | "bevel";
+  | "bevel"
+  | "subdivision"
+  | "weld"
+  | "decimate"
+  | "simple-deform";
 
 export type StudioMeshBooleanOp = "union" | "difference" | "intersection";
 
