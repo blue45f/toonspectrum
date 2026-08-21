@@ -292,6 +292,47 @@ function resolvePixelCount(workload: StudioFilterIslandWorkload): number {
 /* ------------------------------------------------------------------ */
 
 /**
+ * AREA ENCODING CONTRACT (shared with
+ * `@toonspectrum/studio-engine-registry`'s `presentedMegapixels`, which is the
+ * only consumer of these two fields):
+ *
+ *     presentedMegapixels = clamp01(visibleAreaRatio) × max(1, dpr)²
+ *                           × COST_MODEL_REFERENCE.referenceSurfaceMegapixels  (= 1 MP)
+ *
+ * Two clamps constrain how an island's true area can be expressed:
+ * `visibleAreaRatio` is clamped into [0, 1], and `dpr` is FLOORED AT 1 (a
+ * sub-1 dpr must never shrink work below the logical surface). So the area
+ * factor must be split across the two fields by regime:
+ *
+ * - `megapixels >= 1` ⇒ `visibleAreaRatio = 1`, `dpr = √megapixels`
+ *   (dpr carries the whole factor; the ratio is saturated).
+ * - `megapixels < 1`  ⇒ `dpr = 1`, `visibleAreaRatio = megapixels`
+ *   (dpr is pinned at its floor; the ratio carries the whole factor).
+ *
+ * Both branches satisfy `visibleAreaRatio × max(1, dpr)² === megapixels`
+ * exactly, and they agree at the seam (megapixels === 1 ⇒ 1 × 1² = 1).
+ *
+ * This split is load-bearing evidence, not cosmetics. The previous encoding
+ * was `dpr = √max(1, megapixels), visibleAreaRatio = 1`, whose `max(1, …)`
+ * floored EVERY sub-megapixel island to a full 1 MP. The registry's newly
+ * calibrated `fixedMs + perMegapixelMs × megapixels` model has a real lane
+ * crossover — the gpu lane's measured ~2.4 ms submit floor only amortizes
+ * once the area is large enough — so flattening every small island to 1 MP
+ * made the crossover structurally unobservable: small islands rendered as
+ * 1 MP always land on the gpu side of it.
+ *
+ * A followup may lift this helper into the registry package so both sides
+ * import one encoder instead of restating the contract.
+ */
+function encodeIslandAreaFactor(megapixels: number): {
+  visibleAreaRatio: number;
+  dpr: number;
+} {
+  if (megapixels >= 1) return { visibleAreaRatio: 1, dpr: Math.sqrt(megapixels) };
+  return { visibleAreaRatio: megapixels, dpr: 1 };
+}
+
+/**
  * Derives the cost-shadow workload fingerprint from the island fields the
  * caller already supplies. O(1) arithmetic on data in hand.
  *
@@ -302,14 +343,18 @@ function resolvePixelCount(workload: StudioFilterIslandWorkload): number {
  *   isolation; imageCount 1 — the filtered element's bitmap;
  * - changedPathRatio 1 — a filter run recomputes fully (inert here anyway:
  *   the island carries no path geometry);
- * - dpr = √max(1, megapixels), visibleAreaRatio 1: the model's area factor
- *   (visibleAreaRatio × dpr²) then equals the island's megapixels, making
- *   per-area raster/transfer terms linear in island size — the same scaling
+ * - visibleAreaRatio + dpr per {@link encodeIslandAreaFactor}: the model's
+ *   area factor (visibleAreaRatio × max(1, dpr)²) equals the island's TRUE
+ *   megapixels — sub-megapixel islands included — making per-area
+ *   raster/layering/transfer terms linear in island size, the same scaling
  *   studio-filter-lane-cost-model uses.
  *
- * Fail closed: a nullish workload or non-finite/non-positive pixel count
- * yields undefined, which planWithCostShadow records as `fingerprint:
- * "absent"` — no ranking, no disagreement evidence, legacy plan untouched.
+ * Fail closed: a nullish workload, a non-finite/non-positive pixel count, or
+ * an area that does not survive the conversion as a strictly positive finite
+ * number (e.g. a denormal pixel count underflowing to 0 megapixels) yields
+ * undefined, which planWithCostShadow records as `fingerprint: "absent"` — no
+ * ranking, no disagreement evidence, legacy plan untouched. A fabricated
+ * stand-in area would be worse than no evidence at all.
  */
 export function deriveStudioFilterIslandCostFingerprint(
   workload: StudioFilterIslandWorkload | null | undefined,
@@ -317,10 +362,15 @@ export function deriveStudioFilterIslandCostFingerprint(
   if (!workload) return undefined;
   const pixelCount = resolvePixelCount(workload);
   if (!Number.isFinite(pixelCount) || pixelCount <= 0) return undefined;
+  const megapixels = megapixelsOf(pixelCount);
+  // Guard the conversion itself, not just its input: `pixelCount / 1e6` can
+  // underflow a denormal to exactly 0, and a zero area is not evidence.
+  if (!Number.isFinite(megapixels) || megapixels <= 0) return undefined;
   const chainSteps = Math.max(
     1,
     Number.isFinite(workload.chainSteps) ? workload.chainSteps : 1,
   );
+  const { visibleAreaRatio, dpr } = encodeIslandAreaFactor(megapixels);
   return {
     pathCount: 0,
     segmentCount: 0,
@@ -331,8 +381,8 @@ export function deriveStudioFilterIslandCostFingerprint(
     isolatedLayerCount: 1,
     maskDepth: 0,
     filterNodeCount: chainSteps,
-    visibleAreaRatio: 1,
-    dpr: Math.sqrt(Math.max(1, megapixelsOf(pixelCount))),
+    visibleAreaRatio,
+    dpr,
   };
 }
 

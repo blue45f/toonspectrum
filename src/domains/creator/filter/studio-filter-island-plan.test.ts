@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 
-import { PlanUnsatisfiableError } from "@toonspectrum/studio-engine-registry";
+import {
+  laneCrossoverMegapixels,
+  PlanUnsatisfiableError,
+  presentedMegapixels,
+} from "@toonspectrum/studio-engine-registry";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 
@@ -625,8 +629,10 @@ describe("V13 §2.5 cost shadow receipts (filter island)", () => {
       chainSteps: 0,
     });
     expect(fingerprint?.filterNodeCount).toBe(1);
-    // ≤1 MP islands floor the area factor at the logical surface (dpr 1).
+    // Exactly 1 MP is the seam of the area encoding: both regimes agree there
+    // (1 × 1² = 1), so dpr sits at its floor and the ratio is saturated.
     expect(fingerprint?.dpr).toBe(1);
+    expect(fingerprint?.visibleAreaRatio).toBe(1);
   });
 
   it("receipts are total and deterministic across identical plans", () => {
@@ -752,5 +758,198 @@ describe("P-02c full-ladder cost observation (filter island)", () => {
     // …and the ladder is exactly the pre-P-02c product for this workload.
     expect(first.lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
     expect(first.killIgnoredReason).toBeNull();
+  });
+});
+
+/**
+ * R-03b: the fingerprint's area encoding must carry TRUE sub-megapixel area.
+ *
+ * The previous encoding was `dpr = √max(1, MP), visibleAreaRatio = 1`, and
+ * that `max(1, …)` floored every sub-megapixel island to a full 1 MP. The
+ * registry's calibrated `fixedMs + perMegapixelMs × MP` model has a real lane
+ * crossover well below 1 MP, so the floor made the whole cpu-favouring regime
+ * structurally unreachable: every small island was ranked as if it were 1 MP,
+ * i.e. always on the gpu side of the crossover. These cases pin the encoding,
+ * the crossover in both directions (read off the receipt, through the real
+ * calibrated model), and that routing is untouched either way.
+ */
+describe("R-03b filter island area encoding (sub-megapixel crossover evidence)", () => {
+  beforeEach(() => {
+    resetStudioFilterIslandCostShadowReceipt();
+  });
+
+  afterEach(() => {
+    installStudioTournamentRuntime(null);
+  });
+
+  function fingerprintFor(width: number, height: number, chainSteps: number) {
+    const fingerprint = deriveStudioFilterIslandCostFingerprint({
+      width,
+      height,
+      chainSteps,
+    });
+    if (fingerprint === undefined) {
+      throw new Error(`expected a fingerprint for ${width}x${height}`);
+    }
+    return fingerprint;
+  }
+
+  it("gives every sub-megapixel island its own true area (no 1 MP floor)", () => {
+    const tiny = fingerprintFor(128, 128, 1);
+    const small = fingerprintFor(256, 256, 1);
+    const mid = fingerprintFor(512, 512, 1);
+
+    // Area factor round-trips to the island's real megapixels.
+    expect(presentedMegapixels(tiny)).toBeCloseTo(megapixelsOf(128 * 128), 12);
+    expect(presentedMegapixels(small)).toBeCloseTo(megapixelsOf(256 * 256), 12);
+    expect(presentedMegapixels(mid)).toBeCloseTo(megapixelsOf(512 * 512), 12);
+
+    // Distinct — the defect this slice fixes collapsed all three onto 1 MP.
+    const areas = [tiny, small, mid].map(presentedMegapixels);
+    expect(new Set(areas).size).toBe(3);
+    for (const area of areas) {
+      expect(area).toBeLessThan(1);
+      expect(area).toBeGreaterThan(0);
+      expect(Number.isFinite(area)).toBe(true);
+    }
+
+    // Sub-megapixel regime: dpr pinned at its registry floor, ratio carries
+    // the area (strictly positive, inside the model's [0, 1] clamp).
+    for (const fingerprint of [tiny, small, mid]) {
+      expect(fingerprint.dpr).toBe(1);
+      expect(fingerprint.visibleAreaRatio).toBeGreaterThan(0);
+      expect(fingerprint.visibleAreaRatio).toBeLessThan(1);
+    }
+  });
+
+  it("keeps the ≥1 MP encoding exactly as before (dpr = √MP, ratio 1)", () => {
+    for (const size of [1024, 2048, 4096]) {
+      const fingerprint = fingerprintFor(size, size, 3);
+      const megapixels = megapixelsOf(size * size);
+      expect(fingerprint.visibleAreaRatio).toBe(1);
+      expect(fingerprint.dpr).toBeCloseTo(Math.sqrt(megapixels), 12);
+      expect(presentedMegapixels(fingerprint)).toBeCloseTo(megapixels, 10);
+    }
+  });
+
+  it("ranks a cpu lane cheaper on a small island and the gpu lane on a large one", () => {
+    const chainSteps = 1;
+
+    planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+      workload: { width: 512, height: 512, chainSteps },
+    });
+    const small = readStudioFilterIslandCostShadowReceipt().lastFullLadderReceipt;
+    expect(small?.costs).toHaveLength(3);
+    const smallCheapest = small?.costs[0];
+    const smallGpu = small?.costs.find((cost) => cost.lane === "webgpu");
+    if (smallCheapest === undefined || smallGpu === undefined) {
+      throw new Error("expected a ranked small-island ladder");
+    }
+    // Below the crossover the gpu submit floor cannot amortize.
+    expect(smallCheapest.lane).toBe("cpu");
+    expect(smallGpu.total).toBeGreaterThan(smallCheapest.total);
+    expect(smallGpu.providerId).toBe("filter-lane-gpu-chain");
+    // Strictly cheaper evidence against the authority winner is exactly the
+    // disagreement this shadow exists to collect.
+    expect(small?.legacyWinner).toBe("filter-lane-gpu-chain");
+    expect(small?.costWinner).not.toBe("filter-lane-gpu-chain");
+    expect(small?.agreed).toBe(false);
+    expect(readStudioFilterIslandCostShadowReceipt().fullLadderDisagreed).toBe(1);
+
+    resetStudioFilterIslandCostShadowReceipt();
+    planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+      workload: { width: 2048, height: 2048, chainSteps },
+    });
+    const large = readStudioFilterIslandCostShadowReceipt().lastFullLadderReceipt;
+    const largeCheapest = large?.costs[0];
+    const largeCpu = large?.costs.find((cost) => cost.lane === "cpu");
+    if (largeCheapest === undefined || largeCpu === undefined) {
+      throw new Error("expected a ranked large-island ladder");
+    }
+    // …and above it the same model flips.
+    expect(largeCheapest.lane).toBe("webgpu");
+    expect(largeCpu.total).toBeGreaterThan(largeCheapest.total);
+    expect(large?.agreed).toBe(true);
+
+    // The flip is the calibrated model's own analytic crossover, not a
+    // coincidence of two sampled sizes: it sits strictly between the two
+    // areas — and, decisively, BELOW 1 MP, which is why the old
+    // `max(1, megapixels)` floor could never let it be observed.
+    const crossover = laneCrossoverMegapixels(largeCpu, largeCheapest);
+    if (crossover === null) throw new Error("expected a finite lane crossover");
+    expect(crossover).toBeLessThan(1);
+    expect(smallGpu.areaMegapixels).toBeLessThan(crossover);
+    expect(largeCheapest.areaMegapixels).toBeGreaterThan(crossover);
+  });
+
+  it("fails closed on degenerate areas instead of fabricating one", () => {
+    // Underflows to exactly 0 MP — positive pixels, but no usable area.
+    expect(
+      deriveStudioFilterIslandCostFingerprint({
+        pixelCount: Number.MIN_VALUE,
+        chainSteps: 1,
+      }),
+    ).toBeUndefined();
+    expect(
+      deriveStudioFilterIslandCostFingerprint({
+        pixelCount: Number.POSITIVE_INFINITY,
+        chainSteps: 1,
+      }),
+    ).toBeUndefined();
+    // width × height overflowing to Infinity is degenerate the same way.
+    expect(
+      deriveStudioFilterIslandCostFingerprint({
+        width: 1e200,
+        height: 1e200,
+        chainSteps: 1,
+      }),
+    ).toBeUndefined();
+    expect(
+      deriveStudioFilterIslandCostFingerprint({
+        width: Number.NaN,
+        height: 512,
+        chainSteps: 1,
+      }),
+    ).toBeUndefined();
+
+    const degenerate = planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+      workload: { pixelCount: Number.MIN_VALUE, chainSteps: 1 },
+    });
+    const receipt = readStudioFilterIslandCostShadowReceipt();
+    expect(receipt.absentFingerprint).toBe(1);
+    expect(receipt.lastReceipt?.islands[0]?.fingerprint).toBe("absent");
+    expect(receipt.lastReceipt?.islands[0]?.costs).toEqual([]);
+    expect(receipt.fullLadderQueries).toBe(0);
+    // Routing authority is untouched — the fallback chain is still the full
+    // planner ladder (the product cost tier may still reorder `lanes`, which
+    // is a separate, pre-existing mechanism this slice does not feed).
+    expect(degenerate.plan.islands[0]?.fallbackChain).toEqual([
+      "filter-lane-gpu-chain",
+      "filter-lane-worker",
+      "filter-lane-konva-native",
+    ]);
+  });
+
+  it("never lets the area encoding reach the authority plan (routing unchanged)", () => {
+    const blind = planStudioFilterIslandLanes({ gpuChainEligible: true });
+    const sub = planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+      workload: { width: 256, height: 256, chainSteps: 1 },
+    });
+    const large = planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+      workload: { width: 4096, height: 4096, chainSteps: 6 },
+    });
+    // Byte-identical authority plans: the fingerprint is observation-only.
+    expect(JSON.stringify(sub.plan)).toBe(JSON.stringify(blind.plan));
+    expect(JSON.stringify(large.plan)).toBe(JSON.stringify(blind.plan));
+    expect(sub.plan.islands[0]?.fallbackChain).toEqual([
+      "filter-lane-gpu-chain",
+      "filter-lane-worker",
+      "filter-lane-konva-native",
+    ]);
   });
 });
