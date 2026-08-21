@@ -25,6 +25,7 @@ import {
   chromium,
   type Browser,
   type BrowserContext,
+  type Locator,
   type Page,
 } from "playwright";
 
@@ -33,6 +34,9 @@ import {
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/brush/studio-brush-catalog";
 
+import {
+  enabledStudioHistoryControl,
+} from "./lib/studio-verify-history-controls.mjs";
 import {
   cleanScratchDir,
   findFreePort,
@@ -354,13 +358,8 @@ async function drawCurve(
 async function waitForHistoryButton(
   page: Page,
   ariaLabel: "실행취소" | "다시실행",
-): Promise<void> {
-  await page.waitForFunction((label) => [...document.querySelectorAll<HTMLButtonElement>(
-    `button[aria-label="${label}"]`,
-  )].some((button) => (
-    !button.disabled
-    && button.getClientRects().length > 0
-  )), ariaLabel);
+): Promise<Locator> {
+  return enabledStudioHistoryControl(page, ariaLabel === "실행취소" ? "undo" : "redo");
 }
 
 async function analyzeFrame(

@@ -40,6 +40,9 @@ import { STUDIO_CANVAS_WIDTH } from "../src/domains/creator/canvas/studio-canvas
 import { DEFAULT_CANVAS_H } from "../src/domains/creator/studio-pages";
 
 import {
+  enabledStudioHistoryControl,
+} from "./lib/studio-verify-history-controls.mjs";
+import {
   cleanScratchDir,
   findFreePort,
   spawnVitePreview,
@@ -272,16 +275,7 @@ async function enabledHistoryButton(
   page: Page,
   ariaLabel: "실행취소" | "다시실행",
 ): Promise<Locator> {
-  await page.waitForFunction((label) => [...document.querySelectorAll<HTMLButtonElement>(
-    `button[aria-label="${label}"]`,
-  )].some((button) => !button.disabled && button.getClientRects().length > 0), ariaLabel);
-  const candidates = page.locator(`button[aria-label="${ariaLabel}"]:visible`);
-  const count = await candidates.count();
-  for (let index = 0; index < count; index += 1) {
-    const candidate = candidates.nth(index);
-    if (await candidate.isEnabled()) return candidate;
-  }
-  throw new Error(`${ariaLabel} button did not become enabled`);
+  return enabledStudioHistoryControl(page, ariaLabel === "실행취소" ? "undo" : "redo");
 }
 
 async function comparePngPixels(
