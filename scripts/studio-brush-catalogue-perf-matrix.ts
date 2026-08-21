@@ -461,7 +461,7 @@ export function evaluateStudioBrushCataloguePaintDeterminismProbe(
  * had zero soak coverage. The two banded wax sticks join as dry-media sentinels: they exercise
  * the kernel tip cache and the deepest (36-key) working sets on the causal-coverage path. The
  * pinned legacy-union replay path keeps its own chunked perf gate in
- * src/domains/creator/studio-dry-media-long-stroke-regression.test.ts.
+ * src/domains/creator/brush/studio-dry-media-long-stroke-regression.test.ts.
  */
 export const STUDIO_BRUSH_CATALOGUE_SOAK_IDS = [
   "pixel-square",

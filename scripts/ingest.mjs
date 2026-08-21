@@ -56,7 +56,7 @@ function isTitleLike(item) {
 }
 
 async function loadPayload() {
-  const from = argValue("--from ");
+  const from = argValue("--from");
   if (from) {
     const raw = readFileSync(path.resolve(ROOT, from), "utf8");
     return JSON.parse(raw);

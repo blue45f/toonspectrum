@@ -490,11 +490,11 @@ async function generateEnvelope(): Promise<Readonly<{
     hashFile(executablePath),
     hashFile(resolve(
       STUDIO_VRM_AVATAR_REFERENCE_ROOT,
-      "src/domains/creator/StudioVrmAvatarForge.tsx",
+      "src/domains/creator/vrm/StudioVrmAvatarForge.tsx",
     )),
     hashFile(resolve(
       STUDIO_VRM_AVATAR_REFERENCE_ROOT,
-      "src/domains/creator/studio-vrm-avatar-forge.ts",
+      "src/domains/creator/vrm/studio-vrm-avatar-forge.ts",
     )),
     Promise.all([
       readPackageVersion("three"),
