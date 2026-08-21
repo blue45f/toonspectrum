@@ -24,6 +24,7 @@ import { join } from "node:path";
 
 import { chromium, type Browser, type Locator, type Page } from "playwright";
 
+import { DIST_DIR } from "./lib/repo-paths.mjs";
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const ARTIFACT_DIR = process.env.TOONSPECTRUM_BG3D_PHYSICS_VERIFY_DIR ??
@@ -653,7 +654,7 @@ async function main(): Promise<void> {
   }
   writeFileSync(LOG_PATH, "");
   assertCondition(
-    existsSync(join(process.cwd(), "dist", "index.html")),
+    existsSync(join(DIST_DIR, "index.html")),
     'missing dist/index.html; run "pnpm run build" before the browser verifier',
   );
 

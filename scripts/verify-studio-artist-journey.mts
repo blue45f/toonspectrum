@@ -30,6 +30,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { DIST_DIR, REPO_ROOT } from "./lib/repo-paths.mjs";
 import { STUDIO_LONG_BRUSH_QUALITY_REPORT_SCHEMA_VERSION } from "./studio-brush-long-matrix-quality";
 import {
   studioLifecycleVisualViolations,
@@ -620,8 +621,8 @@ function readJsonReport(path: string): unknown {
 }
 
 async function main(): Promise<void> {
-  const root = process.cwd();
-  if (!existsSync(join(root, "dist", "index.html"))) {
+  const root = REPO_ROOT;
+  if (!existsSync(join(DIST_DIR, "index.html"))) {
     throw new Error(
       "dist/index.html is missing; run `pnpm run build` before the artist journey verifier"
     );

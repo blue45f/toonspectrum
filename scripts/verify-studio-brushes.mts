@@ -84,6 +84,7 @@ import {
   studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
 } from "../src/domains/creator/studio-cc0-mypaint-preset-import-v1";
 
+import { DIST_DIR } from "./lib/repo-paths.mjs";
 import {
   enabledStudioHistoryControl,
 } from "./lib/studio-verify-history-controls.mjs";
@@ -2124,7 +2125,7 @@ let builtAutosaveSqliteModulePath: string | null = null;
 
 function resolveBuiltAutosaveSqliteModulePath(): string {
   if (builtAutosaveSqliteModulePath) return builtAutosaveSqliteModulePath;
-  const manifestPath = resolve(process.cwd(), "dist/.vite/manifest.json");
+  const manifestPath = resolve(DIST_DIR, ".vite/manifest.json");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<
     string,
     { file?: unknown }

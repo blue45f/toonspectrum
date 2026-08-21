@@ -39,6 +39,7 @@ import {
 import { STUDIO_CANVAS_WIDTH } from "../src/domains/creator/canvas/studio-canvas-constants";
 import { DEFAULT_CANVAS_H } from "../src/domains/creator/studio-pages";
 
+import { DIST_DIR } from "./lib/repo-paths.mjs";
 import {
   enabledStudioHistoryControl,
 } from "./lib/studio-verify-history-controls.mjs";
@@ -691,7 +692,7 @@ async function main(): Promise<void> {
   const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   if (!externalOrigin) {
     invariant(
-      existsSync(join(process.cwd(), "dist", "index.html")),
+      existsSync(join(DIST_DIR, "index.html")),
       "dist/index.html is missing; run `pnpm build` before the lifecycle verifier",
     );
   }

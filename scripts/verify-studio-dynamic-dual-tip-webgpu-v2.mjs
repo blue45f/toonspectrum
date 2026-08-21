@@ -11,6 +11,8 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 
+import { WEB_ROOT } from "./lib/repo-paths.mjs";
+
 const SCRATCH =
   process.env.TOONSPECTRUM_DYNAMIC_DUAL_TIP_V2_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
@@ -155,7 +157,7 @@ mkdirSync(SCRATCH, { recursive: true });
 const port = await findFreePort();
 const origin = `http://127.0.0.1:${port}/`;
 const viteServer = await createViteServer({
-  root: process.cwd(),
+  root: WEB_ROOT,
   logLevel: "error",
   server: { host: "127.0.0.1", port, strictPort: true },
   plugins: [{

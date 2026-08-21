@@ -35,6 +35,7 @@ import {
   type Page,
 } from "playwright";
 
+import { DIST_DIR } from "./lib/repo-paths.mjs";
 import {
   findFreePort,
   stopChildProcess,
@@ -2199,7 +2200,7 @@ async function main(): Promise<void> {
   const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   if (!externalOrigin) {
     invariant(
-      existsSync(join(process.cwd(), "dist", "index.html")),
+      existsSync(join(DIST_DIR, "index.html")),
       "dist/index.html is missing; build once before running the Living Ink production verifier",
     );
   }

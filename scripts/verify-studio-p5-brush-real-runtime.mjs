@@ -20,6 +20,8 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 
+import { WEB_ROOT } from "./lib/repo-paths.mjs";
+
 const SCRATCH =
   process.env.TOONSPECTRUM_P5_BRUSH_REAL_RUNTIME_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
@@ -209,7 +211,7 @@ async function main() {
   const port = await findFreePort();
   const origin = `http://127.0.0.1:${port}`;
   const viteServer = await createViteServer({
-    root: process.cwd(),
+    root: WEB_ROOT,
     // This harness imports only the isolated production Worker graph. Loading
     // the application-wide React/compiler/catalog configuration needlessly
     // expands the verifier's memory footprint and can perturb software-WebGL

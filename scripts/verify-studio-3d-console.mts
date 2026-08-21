@@ -36,6 +36,7 @@ import {
   serializeStudioBg3dSceneDocument,
 } from "../src/domains/creator/bg3d/studio-bg3d-scene-document";
 
+import { DIST_DIR } from "./lib/repo-paths.mjs";
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -639,7 +640,7 @@ function createMagicLayerAlignmentProofScenarios():
 }
 
 function findProductionAssetFile(pattern: RegExp, label: string): string {
-  const assetsDirectory = join(process.cwd(), "dist", "assets");
+  const assetsDirectory = join(DIST_DIR, "assets");
   const entries = readdirSync(assetsDirectory).filter((name) => pattern.test(name));
   assertCondition(entries.length === 1, `expected one ${label}, found ${entries.length}`);
   return entries[0]!;
@@ -3077,7 +3078,7 @@ async function runStudio3dWebGpuConformanceBrowserAttempt(
 async function main(): Promise<void> {
   verifyPatchedThreeRuntime();
   assertCondition(
-    existsSync(join(process.cwd(), "dist", "index.html")),
+    existsSync(join(DIST_DIR, "index.html")),
     'missing dist/index.html; run "pnpm run build" before the browser verifier',
   );
 

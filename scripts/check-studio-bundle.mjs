@@ -3,7 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
 
-const outputDirectory = path.resolve(process.env.STUDIO_BUNDLE_DIR ?? "dist");
+import { DIST_DIR } from "./lib/repo-paths.mjs";
+
+const outputDirectory = path.resolve(process.env.STUDIO_BUNDLE_DIR ?? DIST_DIR);
 const manifestPath = path.join(outputDirectory, ".vite", "manifest.json");
 const studioEntry =
   "src/domains/creator/studio-legacy-editor-adapter.tsx";

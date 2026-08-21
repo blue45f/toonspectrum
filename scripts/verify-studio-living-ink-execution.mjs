@@ -14,6 +14,8 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 
+import { WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
+
 const EVIDENCE_ROOT = process.env.TOONSPECTRUM_LIVING_INK_VERIFY_DIR
   ?? join(tmpdir(), `toonspectrum-living-ink-${Date.now()}`);
 const PROBE_RESULTS_PATH = new URL("../tests/benchmarks/results/living-ink-probe.json",
@@ -451,7 +453,7 @@ async function main() {
   const port = await freePort();
   const vite = await createViteServer({
     appType: "custom",
-    configFile: join(process.cwd(), "vite.config.ts"),
+    configFile: WEB_VITE_CONFIG,
     logLevel: "error",
     server: { host: "127.0.0.1", port, strictPort: true },
     plugins: [{
