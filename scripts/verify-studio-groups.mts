@@ -27,6 +27,14 @@ import {
   type Page,
 } from "playwright";
 
+import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
+
+import {
+  readDurableStudioAutosaveDocument,
+  readDurableStudioAutosaveError,
+  resolveDurableStudioAutosaveModuleUrl,
+  seedDurableStudioAutosaveDocument,
+} from "./lib/studio-verify-durable-autosave.mjs";
 import {
   cleanScratchDir,
   findFreePort,
@@ -43,11 +51,25 @@ const RESULT_PATH = join(SCRATCH, "studio-group-evidence.json");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+/** The guest `/studio` draft this verifier authors — the document key Studio persists under. */
+const AUTOSAVE_KEY = studioAutosaveKey({});
 const CLEAN_SESSION_KEY = "toonspectrum-group-verifier-cleaned";
+/**
+ * Every locator below names a Korean control ("텍스트 추가", "복구하기", "3개 선택", …).
+ * Studio localizes its chrome from the browser locale (`lib/i18n.ts` seeds the store with
+ * `detectBrowserLocale()`), and Playwright's default context is `en-US`, so the audited
+ * pages must be opened the way the Korean UI these assertions describe is actually served.
+ */
+const STUDIO_UI_LOCALE = "ko-KR";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  // Studio asks for the signed-in session on mount. Like the two below, it is an API route the
+  // local static preview does not serve — `verify:studio-brushes` excuses the same path.
+  "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
 ] as const;
+/** `Konva.dblClickWindow` — the shipped renderer's own double-click coalescing window. */
+const KONVA_DOUBLE_CLICK_WINDOW_MS = 400;
 const POSITION_TOLERANCE = 0.15;
 const RESIZE_TOLERANCE = 0.35;
 
@@ -163,6 +185,14 @@ interface MobileEvidence {
 interface DesktopAuditResult {
   evidence: DesktopEvidence;
   storageState: Awaited<ReturnType<BrowserContext["storageState"]>>;
+  /**
+   * The grouped document as the durable authority holds it, plus the shipped session chunk
+   * that produced it. `storageState` carries only cookies and localStorage, and Studio now
+   * persists to BrowserContext-scoped OPFS, so the mobile context is handed the document
+   * itself and re-persists it through the same shipped writer.
+   */
+  durableAutosaveRaw: string;
+  durableAutosaveModuleUrl: string | null;
 }
 
 function log(message: string): void {
@@ -334,12 +364,13 @@ async function prepareSeededMobilePage(page: Page, studioUrl: string): Promise<v
   });
   const restore = page.getByRole("button", { name: "복구하기", exact: true });
   // Static preview can spend a few seconds waiting for unavailable API proxies before
-  // the autosave banner settles. Do not start the mobile canvas audit against the
-  // temporary blank document just because the Konva shell became visible first.
-  if (await restore.isVisible({ timeout: 9_000 }).catch(() => false)) {
-    await restore.click();
-    await restore.waitFor({ state: "hidden" });
-  }
+  // the autosave banner settles, and the durable-recovery probe itself runs in an idle
+  // callback. Do not start the mobile canvas audit against the temporary blank document
+  // just because the Konva shell became visible first — `isVisible()` never waits, so poll
+  // for the control the seeded document guarantees and take it.
+  await restore.waitFor({ state: "visible", timeout: 15_000 });
+  await restore.click();
+  await restore.waitFor({ state: "hidden" });
   await page.locator(".konvajs-content").first().waitFor({ state: "visible" });
   await page.waitForTimeout(180);
 }
@@ -371,111 +402,83 @@ async function drawMousePath(page: Page, points: readonly ScreenPoint[]): Promis
   await page.mouse.up();
 }
 
+/**
+ * The persisted document comes from Studio's durable authority — the browser-owned OPFS
+ * recovery journal — read through the shipped autosave session module. The old
+ * `toonspectrum-studio-autosave*` localStorage JSON slot is not a fallback: the product
+ * tombstones it on every durable save (`verify:studio-lifecycle` asserts zero surviving
+ * browser compatibility records), so enumerating localStorage only ever finds nothing.
+ */
 async function readLatestSnapshot(page: Page): Promise<PersistedSnapshot | null> {
-  return page.evaluate((prefix) => {
-    interface StoredDocument {
-      savedAt?: unknown;
-      currentPageId?: unknown;
-      pagesList?: Array<{
-        id?: unknown;
-        elements?: unknown[];
-        groups?: unknown[];
-      }>;
-    }
+  const durable = await readDurableStudioAutosaveDocument(page, AUTOSAVE_KEY);
+  if (!durable) return null;
 
-    let newest: { key: string; raw: string; value: StoredDocument } | null = null;
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as StoredDocument;
-        if (!Array.isArray(value.pagesList)) continue;
-        if (
-          !newest
-          || String(value.savedAt ?? "") >= String(newest.value.savedAt ?? "")
-        ) {
-          newest = { key, raw, value };
-        }
-      } catch {
-        // Ignore corrupt or unrelated entries; the scenario wait remains strict.
-      }
-    }
-    if (!newest) return null;
+  const pageRecord =
+    durable.pagesList.find((candidate) => candidate.id === durable.currentPageId)
+    ?? durable.pagesList[0];
+  if (!pageRecord) return null;
 
-    const currentPageId =
-      typeof newest.value.currentPageId === "string"
-        ? newest.value.currentPageId
-        : null;
-    const pageRecord =
-      newest.value.pagesList?.find((candidate) => candidate.id === currentPageId)
-      ?? newest.value.pagesList?.[0];
-    if (!pageRecord) return null;
+  const elements = (pageRecord.elements ?? []).flatMap((element) => {
+    if (!element || typeof element !== "object" || Array.isArray(element)) return [];
+    const record = element as Record<string, unknown>;
+    if (typeof record.id !== "string" || typeof record.type !== "string") return [];
+    return [{
+      id: record.id,
+      type: record.type,
+      groupId: typeof record.groupId === "string" ? record.groupId : null,
+      locked: record.locked === true,
+      x:
+        typeof record.x === "number" && Number.isFinite(record.x)
+          ? record.x
+          : null,
+      y:
+        typeof record.y === "number" && Number.isFinite(record.y)
+          ? record.y
+          : null,
+      width:
+        typeof record.width === "number" && Number.isFinite(record.width)
+          ? record.width
+          : null,
+      height:
+        typeof record.height === "number" && Number.isFinite(record.height)
+          ? record.height
+          : null,
+      fontSize:
+        typeof record.fontSize === "number" && Number.isFinite(record.fontSize)
+          ? record.fontSize
+          : null,
+      strokeWidth:
+        typeof record.strokeWidth === "number" && Number.isFinite(record.strokeWidth)
+          ? record.strokeWidth
+          : null,
+      points: Array.isArray(record.points)
+        ? record.points.filter(
+            (value): value is number =>
+              typeof value === "number" && Number.isFinite(value),
+          )
+        : [],
+    }];
+  });
+  const groups = (pageRecord.groups ?? []).flatMap((group) => {
+    if (!group || typeof group !== "object" || Array.isArray(group)) return [];
+    const record = group as Record<string, unknown>;
+    if (typeof record.id !== "string") return [];
+    return [{
+      id: record.id,
+      name: typeof record.name === "string" ? record.name : null,
+      locked: record.locked === true,
+    }];
+  });
 
-    const elements = (pageRecord.elements ?? []).flatMap((element) => {
-      if (!element || typeof element !== "object" || Array.isArray(element)) return [];
-      const record = element as Record<string, unknown>;
-      if (typeof record.id !== "string" || typeof record.type !== "string") return [];
-      return [{
-        id: record.id,
-        type: record.type,
-        groupId: typeof record.groupId === "string" ? record.groupId : null,
-        locked: record.locked === true,
-        x:
-          typeof record.x === "number" && Number.isFinite(record.x)
-            ? record.x
-            : null,
-        y:
-          typeof record.y === "number" && Number.isFinite(record.y)
-            ? record.y
-            : null,
-        width:
-          typeof record.width === "number" && Number.isFinite(record.width)
-            ? record.width
-            : null,
-        height:
-          typeof record.height === "number" && Number.isFinite(record.height)
-            ? record.height
-            : null,
-        fontSize:
-          typeof record.fontSize === "number" && Number.isFinite(record.fontSize)
-            ? record.fontSize
-            : null,
-        strokeWidth:
-          typeof record.strokeWidth === "number" && Number.isFinite(record.strokeWidth)
-            ? record.strokeWidth
-            : null,
-        points: Array.isArray(record.points)
-          ? record.points.filter(
-              (value): value is number =>
-                typeof value === "number" && Number.isFinite(value),
-            )
-          : [],
-      }];
-    });
-    const groups = (pageRecord.groups ?? []).flatMap((group) => {
-      if (!group || typeof group !== "object" || Array.isArray(group)) return [];
-      const record = group as Record<string, unknown>;
-      if (typeof record.id !== "string") return [];
-      return [{
-        id: record.id,
-        name: typeof record.name === "string" ? record.name : null,
-        locked: record.locked === true,
-      }];
-    });
-
-    return {
-      key: newest.key,
-      raw: newest.raw,
-      savedAt:
-        typeof newest.value.savedAt === "string" ? newest.value.savedAt : "",
-      currentPageId,
-      pageId: typeof pageRecord.id === "string" ? pageRecord.id : null,
-      elements,
-      groups,
-    };
-  }, AUTOSAVE_PREFIX);
+  return {
+    key: durable.key,
+    raw: durable.raw,
+    savedAt: durable.savedAt,
+    currentPageId: durable.currentPageId,
+    pageId: typeof pageRecord.id === "string" ? pageRecord.id : null,
+    elements,
+    groups,
+  };
 }
 
 async function waitForSnapshot(
@@ -499,7 +502,11 @@ async function waitForSnapshot(
         groups: latest.groups,
       }
     : null;
-  throw new Error(`${description}; latest autosave=${JSON.stringify(summary)}`);
+  const readError = await readDurableStudioAutosaveError(page);
+  throw new Error(
+    `${description}; latest autosave=${JSON.stringify(summary)}`
+    + (readError ? `; last durable read error=${readError}` : ""),
+  );
 }
 
 function byId(snapshot: PersistedSnapshot, id: string): PersistedElement {
@@ -751,22 +758,39 @@ function assertAtomicTranslation(
   return { x: dx, y: dy };
 }
 
+/**
+ * The user-visible whole-group selection readout.
+ *
+ * The desktop canvas status rail reserves a selection command lane that spells the count out
+ * as "N개 선택". The mobile layout deliberately does not mount that lane at all
+ * (`StudioCanvasStatusRail`: `selectionCommandLaneMounted = !useIsMobile()` — those 51px go
+ * back to the drawing area), and shows the same selection through the on-canvas selection
+ * command bar, which publishes the count as `data-studio-selection-count`. Matching either
+ * keeps both audits asserting the same fact a person reads off the screen.
+ */
+function wholeGroupSelectionReadout(page: Page, expectedCount: number): Locator {
+  const statusRailReadout = page
+    .locator("[data-studio-canvas-status-rail]")
+    .getByText(`${expectedCount}개 선택`, { exact: true });
+  const onCanvasReadout = page.locator(
+    '[data-studio-selection-context-bar="true"]'
+    + `[data-studio-selection-count="${expectedCount}"]`,
+  );
+  return statusRailReadout.or(onCanvasReadout).first();
+}
+
 async function waitForWholeGroupSelection(
   page: Page,
   expectedCount: number,
 ): Promise<void> {
-  await page.locator('[data-studio-canvas-status-rail]')
-    .getByText(`${expectedCount}개 선택`, { exact: true })
-    .waitFor({ state: "visible" });
+  await wholeGroupSelectionReadout(page, expectedCount).waitFor({ state: "visible" });
 }
 
 async function waitForNoWholeGroupSelection(
   page: Page,
   expectedCount: number,
 ): Promise<void> {
-  await page.locator('[data-studio-canvas-status-rail]')
-    .getByText(`${expectedCount}개 선택`, { exact: true })
-    .waitFor({ state: "hidden" });
+  await wholeGroupSelectionReadout(page, expectedCount).waitFor({ state: "hidden" });
 }
 
 async function groupLayerState(page: Page): Promise<"all" | "partial" | "none"> {
@@ -1326,8 +1350,15 @@ async function createMixedFixture(
   );
 
   const png = await createFixturePng(page);
-  const imageInput = page.locator('input[aria-label="이미지 추가"]').first();
-  await imageInput.setInputFiles({
+  // The rail's "이미지 추가" name lives on the visible button; the file input beside it is
+  // an unlabelled `sr-only` element the button clicks. Go through the shipped control and
+  // answer the chooser it opens, which is the same path a person takes.
+  const imageTool = await visible(page.locator('[data-studio-rail-tool-id="image"]'));
+  const [imageChooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    imageTool.click(),
+  ]);
+  await imageChooser.setFiles({
     name: "group-fixture.png",
     mimeType: "image/png",
     buffer: png,
@@ -1348,7 +1379,10 @@ async function runDesktopGroupAudit(
   browser: Browser,
   studioUrl: string,
 ): Promise<DesktopAuditResult> {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1100 },
+    locale: STUDIO_UI_LOCALE,
+  });
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, "desktop-groups", studioUrl);
   const screenshots: string[] = [];
@@ -1448,9 +1482,12 @@ async function runDesktopGroupAudit(
     await waitForGroupLayerState(page, "none");
     const shiftClickRemovedWholeGroup = true;
     // The selection overlay and per-node drag contract are reconciled by the Konva renderer after
-    // the DOM status rail commits. Wait one frame so the second Shift click exercises the new
-    // unselected node contract rather than an element being replaced mid-contact.
-    await page.waitForTimeout(40);
+    // the DOM status rail commits, so the second Shift click must exercise the new unselected
+    // node contract rather than an element being replaced mid-contact. It must also read as a
+    // second *click*: both clicks land on the same pixel, and Konva coalesces same-target
+    // presses inside `Konva.dblClickWindow` (400ms) into a double click, which enters the group
+    // instead of re-selecting it. Stay clear of that window.
+    await page.waitForTimeout(KONVA_DOUBLE_CLICK_WINDOW_MS + 80);
     const unselectedDrawScreenPoints =
       await konvaDocumentPointsToScreen(page, drawDocumentPoints);
     invariant(
@@ -1800,6 +1837,7 @@ async function runDesktopGroupAudit(
     const errorCount = errors.messages.length + errors.failedResponses.length;
     invariant(errorCount === 0, `desktop group audit recorded ${errorCount} browser errors`);
     const storageState = await context.storageState();
+    const durableAutosaveModuleUrl = await resolveDurableStudioAutosaveModuleUrl(page);
     return {
       evidence: {
         fixtureIds,
@@ -1832,24 +1870,56 @@ async function runDesktopGroupAudit(
         errorCount,
       },
       storageState,
+      durableAutosaveRaw: finalSnapshot.raw,
+      durableAutosaveModuleUrl,
     };
   } finally {
     await context.close();
   }
 }
 
+/**
+ * Transplant the desktop fixture into the mobile BrowserContext's durable authority.
+ *
+ * `storageState` restores the localStorage flags only; the grouped document lives in OPFS,
+ * which every BrowserContext partitions separately. The transplant runs on a throwaway
+ * same-origin page that never mounts Studio — the editor holds the document's writer lease
+ * for as long as it is open — and is released before the audited page navigates.
+ */
+async function seedMobileDurableAutosave(
+  context: BrowserContext,
+  origin: string,
+  desktop: DesktopAuditResult,
+): Promise<void> {
+  const seedPage = await context.newPage();
+  try {
+    await seedPage.goto(origin, { waitUntil: "domcontentloaded", timeout: 20_000 });
+    await seedDurableStudioAutosaveDocument(
+      seedPage,
+      AUTOSAVE_KEY,
+      desktop.durableAutosaveRaw,
+      desktop.durableAutosaveModuleUrl,
+    );
+  } finally {
+    await seedPage.close();
+  }
+}
+
 async function runMobileGroupAudit(
   browser: Browser,
+  origin: string,
   studioUrl: string,
-  storageState: Awaited<ReturnType<BrowserContext["storageState"]>>,
+  desktop: DesktopAuditResult,
 ): Promise<MobileEvidence> {
   const viewport = { width: 390, height: 844 };
   const context = await browser.newContext({
-    storageState,
+    storageState: desktop.storageState,
     viewport,
     hasTouch: true,
     isMobile: true,
+    locale: STUDIO_UI_LOCALE,
   });
+  await seedMobileDurableAutosave(context, origin, desktop);
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, "mobile-groups", studioUrl);
   const screenshot = join(SCRATCH, "studio-group-mobile-double-tap.png");
@@ -1880,9 +1950,7 @@ async function runMobileGroupAudit(
     await page.waitForTimeout(80);
     await page.touchscreen.tap(imageBounds.center.x, imageBounds.center.y);
 
-    await page.locator('[data-studio-canvas-status-rail]')
-      .getByText("3개 선택", { exact: true })
-      .waitFor({ state: "hidden" });
+    await waitForNoWholeGroupSelection(page, 3);
     const doubleTapEnteredGroup = true;
     await page.keyboard.press("Escape");
     await waitForWholeGroupSelection(page, 3);
@@ -1944,7 +2012,7 @@ async function main(): Promise<void> {
     await waitForServer(origin);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     const desktop = await runDesktopGroupAudit(browser, studioUrl);
-    const mobile = await runMobileGroupAudit(browser, studioUrl, desktop.storageState);
+    const mobile = await runMobileGroupAudit(browser, origin, studioUrl, desktop);
     const result = {
       scratch: SCRATCH,
       desktop: desktop.evidence,
