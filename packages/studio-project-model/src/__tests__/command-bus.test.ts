@@ -87,6 +87,47 @@ describe("CommandBus", () => {
     expect(slots).toEqual(["A", "B"]);
   });
 
+  it("resumes the A/B cursor past the recovered snapshot slot", async () => {
+    const store = new MemoryJournalStore();
+    const { bus } = await CommandBus.open(store, { snapshotEvery: 2 });
+    await bus.dispatch({ type: "scene/init", scene: createEmptyScene(64, 64) });
+    await bus.dispatch({ type: "scene/add-node", node: strokeNode("anchored") }); // snapshot A @2
+    const anchor = (await store.readSnapshots()).find((snapshot) => snapshot.slot === "A");
+    expect(anchor?.seq).toBe(2);
+
+    // Reopen: recovery validates slot A, so the next write must target B — the
+    // freshly recovered anchor is the one snapshot we must not overwrite first.
+    const { bus: reopened, recovery } = await CommandBus.open(store);
+    expect(recovery.snapshotSlotUsed).toBe("A");
+    await reopened.dispatch({ type: "scene/add-node", node: strokeNode("after-reopen") });
+    await reopened.writeSnapshot();
+
+    const snapshots = await store.readSnapshots();
+    expect(snapshots.find((snapshot) => snapshot.slot === "B")?.seq).toBe(reopened.getSeq());
+    expect(snapshots.find((snapshot) => snapshot.slot === "A")).toEqual(anchor);
+  });
+
+  it("resumes from slot A when recovery anchored on slot B", async () => {
+    const { bus, store } = await scriptedBus(); // 6 commands @ snapshotEvery 3 → A @3, B @6
+    const anchor = (await store.readSnapshots()).find((snapshot) => snapshot.slot === "B");
+    expect(anchor?.seq).toBe(bus.getSeq());
+
+    const { bus: reopened, recovery } = await CommandBus.open(store);
+    expect(recovery.snapshotSlotUsed).toBe("B");
+    await reopened.dispatch({ type: "scene/add-node", node: strokeNode("post-b") });
+    await reopened.writeSnapshot();
+
+    const snapshots = await store.readSnapshots();
+    expect(snapshots.find((snapshot) => snapshot.slot === "A")?.seq).toBe(reopened.getSeq());
+    expect(snapshots.find((snapshot) => snapshot.slot === "B")).toEqual(anchor);
+
+    // Alternation is otherwise unchanged: the write after that swings back to B.
+    await reopened.dispatch({ type: "scene/add-node", node: strokeNode("post-a") });
+    await reopened.writeSnapshot();
+    const afterSecond = await store.readSnapshots();
+    expect(afterSecond.find((snapshot) => snapshot.slot === "B")?.seq).toBe(reopened.getSeq());
+  });
+
   it("update-node patches nested group children", async () => {
     const store = new MemoryJournalStore();
     const { bus } = await CommandBus.open(store);

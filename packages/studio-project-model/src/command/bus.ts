@@ -43,13 +43,19 @@ export class CommandBus {
     state: ProjectStateIR | null,
     seq: number,
     options: CommandBusOptions,
+    recoveredSlot: SnapshotSlot | null,
   ) {
     this.state = state;
     this.seq = seq;
     this.startedAtSeq = seq;
     this.snapshotEvery = options.snapshotEvery ?? 64;
     this.now = options.now ?? (() => Date.now());
-    this.nextSlot = "A";
+    // Resume the A/B cursor past the slot recovery just anchored on. Starting
+    // at "A" unconditionally makes the first write overwrite the newest good
+    // snapshot, so a crash mid-write leaves only the older sibling — and a
+    // snapshot-then-compact caller would have already dropped the journal
+    // entries that sibling needs. Recovering from nothing still starts at "A".
+    this.nextSlot = recoveredSlot === "A" ? "B" : "A";
   }
 
   /** Opens a project over a journal store, running crash recovery first. */
@@ -58,7 +64,13 @@ export class CommandBus {
     options: CommandBusOptions = {},
   ): Promise<{ bus: CommandBus; recovery: RecoveryReport }> {
     const recovered = await recoverProject(store);
-    const bus = new CommandBus(store, recovered.project, recovered.seq, options);
+    const bus = new CommandBus(
+      store,
+      recovered.project,
+      recovered.seq,
+      options,
+      recovered.report.snapshotSlotUsed,
+    );
     return { bus, recovery: recovered.report };
   }
 
