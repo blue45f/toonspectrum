@@ -45,6 +45,39 @@ describe("StudioQuickStartPanel", () => {
     expect(handlers.onDismiss).toHaveBeenCalledOnce();
   });
 
+  it("yields instead of stealing focus when another modal is already open", () => {
+    // 자동 코치가 이미 열린 다이얼로그 위로 뒤늦게 마운트되는 실측 경로(2026-08-21).
+    const foreign = document.createElement("section");
+    foreign.setAttribute("role", "dialog");
+    foreign.setAttribute("aria-modal", "true");
+    const foreignControl = document.createElement("button");
+    foreignControl.type = "button";
+    foreign.append(foreignControl);
+    document.body.append(foreign);
+    foreignControl.focus();
+
+    const handlers = createHandlers();
+    try {
+      render(<StudioQuickStartPanel {...handlers} />);
+
+      expect(handlers.onDismiss).toHaveBeenCalledOnce();
+      expect(document.activeElement).toBe(foreignControl);
+    } finally {
+      foreign.remove();
+    }
+  });
+
+  it("keeps its modal contract armed when it is the only modal on screen", () => {
+    // jsdom 은 레이아웃이 없어 실제 초기 포커스 착지를 재현하지 못한다. 대신 계약이
+    // 살아 있다는 관측 가능한 신호(자동 양보 없음 + Esc 처리)를 확인한다.
+    const handlers = createHandlers();
+    render(<StudioQuickStartPanel {...handlers} />);
+
+    expect(handlers.onDismiss).not.toHaveBeenCalled();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(handlers.onDismiss).toHaveBeenCalledOnce();
+  });
+
   it("presents the familiar four-step workflow in order and opens immediate actions", () => {
     const handlers = createHandlers();
     render(<StudioQuickStartPanel {...handlers} />);

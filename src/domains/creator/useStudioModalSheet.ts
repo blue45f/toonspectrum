@@ -42,6 +42,15 @@ interface UseStudioModalSheetOptions {
   resolveInitialFocus?: (dialog: HTMLElement) => HTMLElement | null;
   resolveReturnFocus?: () => HTMLElement | null;
   rootRef: RefObject<HTMLElement | null>;
+  /**
+   * 사용자가 부른 게 아니라 스스로 뜨는 시트(코치·안내)는 이걸 켠다. 활성화 시점에 남의
+   * 모달이 이미 포커스를 쥐고 있으면 계약을 아예 걸지 않는다 — 걸었다가 푸는 것으로는
+   * 부족하다. 해제 경로가 포커스를 자기 복귀 지점(메뉴바 첫 트리거)으로 돌려보내서,
+   * 사용자가 방금 연 다이얼로그에서 포커스를 빼앗는 것이 실측된 회귀였다
+   * (2026-08-21 verify-studio-launch: `focus holder: button[File]`).
+   * 사용자가 다이얼로그 안 컨트롤로 연 중첩 확인창은 이 옵션을 켜지 않으므로 영향이 없다.
+   */
+  yieldToOpenModal?: boolean;
 }
 
 function canReceiveFocus(element: Element | null): element is HTMLElement {
@@ -233,6 +242,7 @@ export function useStudioModalSheet({
   resolveInitialFocus,
   resolveReturnFocus,
   rootRef,
+  yieldToOpenModal = false,
 }: UseStudioModalSheetOptions): void {
   const dismissFromEffect = useEffectEvent(onDismiss);
   const resolveInitialFocusFromEffect = useEffectEvent(
@@ -246,6 +256,9 @@ export function useStudioModalSheet({
     if (!activeKey) return;
     const root = rootRef.current;
     if (!root) return;
+    if (yieldToOpenModal && holdsForeignModalFocus(root.ownerDocument, dialogRef.current)) {
+      return;
+    }
     const requestedReturnFocus = resolveReturnFocusFromEffect();
     const ownerDocument = root.ownerDocument;
     const returnFocus = canRestoreFocusLater(requestedReturnFocus)
@@ -286,5 +299,20 @@ export function useStudioModalSheet({
       observer?.disconnect();
       deactivate?.();
     };
-  }, [activeKey, dialogRef, fallbackReturnFocusRef, rootRef]);
+  }, [activeKey, dialogRef, fallbackReturnFocusRef, rootRef, yieldToOpenModal]);
+}
+
+/** True when focus already sits inside a modal dialog that is not this sheet's own. */
+export function holdsForeignModalFocus(
+  ownerDocument: Document,
+  ownDialog: HTMLElement | null,
+): boolean {
+  const active = ownerDocument.activeElement;
+  if (!active) return false;
+  const modal = active.closest('[aria-modal="true"]');
+  if (!modal) return false;
+  if (!ownDialog) return true;
+  return modal !== ownDialog
+    && !ownDialog.contains(modal)
+    && !modal.contains(ownDialog);
 }

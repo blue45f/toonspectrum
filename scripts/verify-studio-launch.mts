@@ -348,6 +348,26 @@ async function verifyWorkspaceMenuGate(
         { timeout: 3000 },
       ).then(() => true).catch(() => false)
     : false;
+  // A bare `focusInside=false` costs an investigation every time; name the element that
+  // actually holds focus so the failure line points at the thief.
+  if (!focusMovedInside) {
+    const holder = await page.evaluate(() => {
+      const active = document.activeElement;
+      if (!active) return "none";
+      const label = active.getAttribute("aria-label")
+        ?? active.getAttribute("data-testid")
+        ?? (active.textContent ?? "").trim().slice(0, 24);
+      const owner = active.closest('[aria-modal="true"], [role="dialog"], [data-testid]');
+      const ownerName = owner
+        ? owner.getAttribute("data-testid")
+          ?? owner.getAttribute("aria-label")
+          ?? owner.getAttribute("aria-labelledby")
+          ?? owner.tagName.toLowerCase()
+        : "no-dialog-ancestor";
+      return `${active.tagName.toLowerCase()}${label ? `[${label}]` : ""} in ${ownerName}`;
+    }).catch(() => "unreadable");
+    log(`run${run} workspace-gate focus holder: ${holder}`);
+  }
   const activatedGateCount = await gate.count();
   const activatedHeavyMenuCount = await heavyMenu.count();
   const activatedDialogCount = await dialog.count();

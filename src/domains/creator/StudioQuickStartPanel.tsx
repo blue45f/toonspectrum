@@ -16,7 +16,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef } from "react";
 
 import {
   formatStudioShortcutChord,
@@ -26,7 +26,7 @@ import {
   resolveStudioDialogOpener,
   studioDialogFocusAnchor,
 } from "./studio-dialog-focus-return";
-import { useStudioModalSheet } from "./useStudioModalSheet";
+import { holdsForeignModalFocus, useStudioModalSheet } from "./useStudioModalSheet";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { useI18n, useT } from "@/lib/i18n";
@@ -162,6 +162,19 @@ export function StudioQuickStartPanel({
   // 없고, 실측에서 Esc 뒤 포커스가 `document.body` 로 떨어져 키보드 사용자가 문서 맨 앞부터
   // 다시 Tab 해야 했다. 실제 트리거(우하단 빠른 실행 버튼)로 열렸으면 그쪽을, 자동으로 떴으면
   // 메뉴바 첫 트리거를 착지점으로 준다 — Esc 한 번이면 메뉴바에 도달한다.
+  //
+  // 다만 사용자가 이미 열어 둔 다이얼로그 위로 뒤늦게 마운트되면 모달 계약이
+  // 그 다이얼로그에서 포커스를 빼앗으므로(실측 2026-08-21 verify-studio-launch), 계약을 아예
+  // 걸지 않고(`yieldToOpenModal`) 자리를 비운다. 화면도 가리지 않게 즉시 dismiss 한다.
+  const dismissForForeignModal = useEffectEvent(() => onDismiss());
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    const ownerDocument = dialog?.ownerDocument ?? rootRef.current?.ownerDocument;
+    if (!ownerDocument) return;
+    if (!holdsForeignModalFocus(ownerDocument, dialog)) return;
+    dismissForForeignModal();
+  }, []);
+
   useStudioModalSheet({
     activeKey: "studio-quick-start",
     dialogRef,
@@ -177,6 +190,7 @@ export function StudioQuickStartPanel({
       );
     },
     rootRef,
+    yieldToOpenModal: true,
   });
 
   // 코치는 바깥에서 벌어지는 첫 실제 조작에 자리를 내준다.
