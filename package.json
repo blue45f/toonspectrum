@@ -132,13 +132,11 @@
     "@babylonjs/core": "9.19.0",
     "@babylonjs/loaders": "9.19.0",
     "@dimforge/rapier3d-deterministic-compat": "0.19.3",
-    "@flatten-js/core": "^1.6.12",
     "@gltf-transform/core": "4.4.2",
     "@gltf-transform/extensions": "4.4.2",
     "@gltf-transform/functions": "4.4.2",
     "@heejun/deskcloud": "^0.1.0",
     "@hookform/resolvers": "^5.4.0",
-    "@libsql/client": "^0.17.3",
     "@mediapipe/tasks-vision": "^0.10.35",
     "@pixiv/three-vrm": "^3.5.3",
     "@radix-ui/react-dialog": "^1.1.16",
@@ -185,7 +183,6 @@
     "paper": "0.12.18",
     "perfect-freehand": "1.2.3",
     "pg": "^8.21.0",
-    "pica": "^10.0.2",
     "pixi.js": "^8.19.0",
     "polygon-clipping": "^0.15.7",
     "rbush": "4.0.1",
@@ -256,9 +253,5 @@
     "*.{ts,tsx}": [
       "eslint --max-warnings=0 --no-warn-ignored --fix --cache --cache-strategy content --cache-location node_modules/.cache/eslint/staged/"
     ]
-  },
-  "overrides": {
-    "tar": "^7.5.18",
-    "minimatch": "^10.0.3"
   }
 }

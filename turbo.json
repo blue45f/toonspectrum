@@ -8,8 +8,6 @@
       "outputs": [
         "dist/**",
         "build/**",
-        ".next/**",
-        "!.next/cache/**",
         "out/**",
         "storybook-static/**",
         "public/**",
@@ -35,18 +33,6 @@
       "outputs": [
         "coverage/**"
       ]
-    },
-    "format:check": {
-      "outputs": []
-    },
-    "format": {
-      "outputs": []
-    },
-    "check:bundle": {
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": []
     },
     "dev": {
       "cache": false,

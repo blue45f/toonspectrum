@@ -53,6 +53,13 @@ overrides:
   'js-yaml@>=4.0.0 <4.3.1': 4.3.1
   'postcss@<=8.5.17': 8.5.18
   'sharp@<0.35.0': 0.35.2
+  # 이전에 루트 package.json 의 npm 전용 "overrides" 에 있던 핀. pnpm 워크스페이스는 그 블록을
+  # 읽지 않아 실제로는 아무것도 고정하지 못했다(@vercel/fun 이 tar 7.5.7 로 해석되고 있었다).
+  # 같은 트리에 이미 존재하는 tar 7.5.22 로 수렴시킨다.
+  # (동일 블록의 minimatch 핀은 옮기지 않는다 — 아래 patchedDependencies 의 minimatch@3.1.5
+  #  패치와 'minimatch@3.1.5>brace-expansion' 핀, scripts/minimatch-security-compat.test.mjs
+  #  회귀 테스트가 3.1.5 의 존재를 전제하므로 전역 ^10 핀은 그것들을 깨뜨린다.)
+  tar: '^7.5.18'
   path-to-regexp: '>=6.3.0'
   serialize-javascript: '>=7.0.3'
   piscina: '>=4.9.3'
