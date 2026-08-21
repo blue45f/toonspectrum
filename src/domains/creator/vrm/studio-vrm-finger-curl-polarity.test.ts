@@ -12,6 +12,7 @@ import {
   applyFingerRotations,
   applyPoseToVrm,
   estimateVrmPalmNormal,
+  invalidateVrmFingerCurlPolarityCache,
   stripFingerBones,
   type FingerRotationMap,
   type PoseBoneMap,
@@ -97,4 +98,71 @@ describe("VRM finger curl polarity", () => {
     }
     expect(failures, failures.join(" | ")).toEqual([]);
   }, 180_000);
+
+  it("keeps the untouched hand's finger pose when only one side is overridden", async () => {
+    for (const character of CORE) {
+      if (!fs.existsSync(path.resolve(character.file))) continue;
+      const vrm = await load(character.file);
+      const pose = pickNaturalIdlePose(character.id);
+      const bones = stripFingerBones(pose.bones as PoseBoneMap);
+      const fingers = extractFingers(pose.bones as PoseBoneMap);
+      applyPoseToVrm(vrm, bones, pose.yOffset ?? 0);
+      applyFingerRotations(vrm, fingers);
+      vrm.humanoid?.update();
+      vrm.scene.updateMatrixWorld(true);
+
+      const leftBefore = readFingerEuler(vrm, "leftIndexProximal");
+      const rightFist: FingerRotationMap = { rightIndexProximal: [0, 0, 1.4] };
+      applyFingerRotations(vrm, rightFist);
+      vrm.humanoid?.update();
+      vrm.scene.updateMatrixWorld(true);
+
+      const leftAfter = readFingerEuler(vrm, "leftIndexProximal");
+      expect(
+        eulerDistance(leftAfter, leftBefore),
+        `${character.name} 왼손가락이 반대손 오버라이드에 초기화됨`,
+      ).toBeLessThan(1e-4);
+      invalidateVrmFingerCurlPolarityCache(vrm);
+    }
+  }, 180_000);
+
+  it("caches polarity so repeated applies do not flip between curl and hyperextension", async () => {
+    for (const character of CORE) {
+      if (!fs.existsSync(path.resolve(character.file))) continue;
+      const vrm = await load(character.file);
+      const pose = pickNaturalIdlePose(character.id);
+      const bones = stripFingerBones(pose.bones as PoseBoneMap);
+      const fingers = extractFingers(pose.bones as PoseBoneMap);
+      applyPoseToVrm(vrm, bones, pose.yOffset ?? 0);
+
+      applyFingerRotations(vrm, fingers);
+      vrm.humanoid?.update();
+      vrm.scene.updateMatrixWorld(true);
+      const first = readFingerEuler(vrm, "rightIndexProximal");
+      for (let i = 0; i < 3; i += 1) {
+        applyPoseToVrm(vrm, bones, pose.yOffset ?? 0);
+        applyFingerRotations(vrm, fingers);
+        vrm.humanoid?.update();
+        vrm.scene.updateMatrixWorld(true);
+        const again = readFingerEuler(vrm, "rightIndexProximal");
+        expect(
+          eulerDistance(again, first),
+          `${character.name} 반복 적용 시 손가락 극성이 뒤집힘`,
+        ).toBeLessThan(1e-6);
+      }
+      invalidateVrmFingerCurlPolarityCache(vrm);
+    }
+  }, 180_000);
 });
+
+function readFingerEuler(
+  vrm: import("@pixiv/three-vrm").VRM,
+  boneName: Parameters<NonNullable<import("@pixiv/three-vrm").VRM["humanoid"]>["getNormalizedBoneNode"]>[0],
+): [number, number, number] {
+  const node = vrm.humanoid!.getNormalizedBoneNode(boneName)!;
+  return [node.rotation.x, node.rotation.y, node.rotation.z];
+}
+
+function eulerDistance(a: [number, number, number], b: [number, number, number]): number {
+  return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+}

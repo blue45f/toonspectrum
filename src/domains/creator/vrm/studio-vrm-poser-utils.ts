@@ -1929,7 +1929,26 @@ function applyFingerSide(
  * Some bundled VRM rest axes (notably sample.vrm / 루미) mirror finger local Z relative to
  * typical VRoid samples. After the body/palm pose is live, pick the curl polarity that moves
  * the middle fingertip toward the palm (−palm normal), not into hyperextension.
+ *
+ * 극성은 모델의 정규화 본 축이 고정한 정적 성질이다. 프로브는 살아있는 포즈로 측정하므로
+ * 임계값 근처에서 적용마다 결과가 뒤집히면 손가락이 접힘↔과신전 사이를 튀는 불안정이
+ * 그대로 화면에 나타난다. 첫 명확한 측정만 휴머노이드 인스턴스에 캐시해 이후 적용은
+ * 재측정 없이 재사용한다(휴머노이드 재구축 시 새 인스턴스라 자동 무효화).
  */
+const fingerCurlPolarityCache = new WeakMap<
+  NonNullable<VRM["humanoid"]>,
+  Partial<Record<"left" | "right", 1 | -1>>
+>();
+
+/** 이 값보다 작은 판별 신호는 모호한 것으로 보고 캐시하지 않는다. */
+export const STUDIO_VRM_FINGER_CURL_POLARITY_MARGIN = 0.04;
+
+/** proportion 리그 재구축 등 모델 축 가정이 깨졌을 때 명시적으로 캐시를 버린다. */
+export function invalidateVrmFingerCurlPolarityCache(vrm: VRM): void {
+  const humanoid = vrm.humanoid;
+  if (humanoid) fingerCurlPolarityCache.delete(humanoid);
+}
+
 export function resolveFingerCurlPolarity(
   vrm: VRM,
   fingers: FingerRotationMap,
@@ -1941,6 +1960,9 @@ export function resolveFingerCurlPolarity(
     (boneName) => String(boneName).startsWith(side) && fingers[boneName],
   );
   if (!hasSide) return 1;
+
+  const cached = fingerCurlPolarityCache.get(humanoid)?.[side];
+  if (cached) return cached;
 
   zeroFingerSide(humanoid, side);
   humanoid.update();
@@ -1956,24 +1978,52 @@ export function resolveFingerCurlPolarity(
 
   // Prefer the polarity that decreases tip·palm (curl into the palm surface).
   // If +1 makes the tip more palm-normal-aligned, the axes are inverted → use -1.
-  return positive - baseline > 0.04 ? -1 : 1;
+  const delta = positive - baseline;
+  const polarity: 1 | -1 = delta > 0 ? -1 : 1;
+  if (Math.abs(delta) > STUDIO_VRM_FINGER_CURL_POLARITY_MARGIN) {
+    let cache = fingerCurlPolarityCache.get(humanoid);
+    if (!cache) {
+      cache = {};
+      fingerCurlPolarityCache.set(humanoid, cache);
+    }
+    cache[side] = polarity;
+  }
+  return polarity;
+}
+
+function fingerMapSides(fingers: FingerRotationMap): Array<"left" | "right"> {
+  const sides: Array<"left" | "right"> = [];
+  for (const side of ["left", "right"] as const) {
+    if (
+      FINGER_ROTATION_BONE_ORDER.some(
+        (boneName) => String(boneName).startsWith(side) && fingers[boneName],
+      )
+    ) {
+      sides.push(side);
+    }
+  }
+  return sides;
 }
 
 export function applyFingerRotations(vrm: VRM, fingers: FingerRotationMap) {
   const humanoid = vrm.humanoid;
   if (!humanoid) return;
-  if (Object.keys(fingers).length === 0) return;
+  // 맵에 없는 반대손은 건드리지 않는다. 한 손만 오버라이드할 때(자동그립·게임 제스처)
+  // 다른 손의 이미 적용된 손가락 포즈가 0으로 초기화되어 펴지는 버그의 원인이었다.
+  const sides = fingerMapSides(fingers);
+  if (sides.length === 0) return;
 
   // Body/palm pose must already be on the skeleton (applyPoseToVrm first).
   vrm.scene.updateMatrixWorld(true);
-  const leftPolarity = resolveFingerCurlPolarity(vrm, fingers, "left");
-  const rightPolarity = resolveFingerCurlPolarity(vrm, fingers, "right");
+  const polarities = sides.map(
+    (side) => resolveFingerCurlPolarity(vrm, fingers, side),
+  );
 
-  // resolve* leaves each side at its trial pose; re-apply both with chosen polarities.
-  zeroFingerSide(humanoid, "left");
-  zeroFingerSide(humanoid, "right");
-  applyFingerSide(humanoid, fingers, "left", leftPolarity);
-  applyFingerSide(humanoid, fingers, "right", rightPolarity);
+  // resolve* leaves each probed side at its trial pose; re-apply with chosen polarities.
+  for (const side of sides) zeroFingerSide(humanoid, side);
+  sides.forEach((side, index) => {
+    applyFingerSide(humanoid, fingers, side, polarities[index]);
+  });
   humanoid.update();
   vrm.scene.updateMatrixWorld(true);
 }
