@@ -1,9 +1,18 @@
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
 
 import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
-import { defineConfig, type Plugin } from "vite";
+import { build as viteBuild, defineConfig, type Plugin } from "vite";
 
+import {
+  planStudioServiceWorkerPrecache,
+  studioServiceWorkerBuildId,
+  type StudioServiceWorkerManifest,
+  type StudioViteManifest,
+} from "./src/app/service-worker/studio-service-worker-precache-plan";
 import {
   STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS,
   STUDIO_CROSS_ORIGIN_ISOLATION_WORKER_HEADERS,
@@ -189,6 +198,15 @@ function studioCrossOriginIsolationPlugin(): Plugin {
     },
     response: { setHeader(name: string, value: string): void },
   ) => {
+    // The Service Worker script itself. `credentialless` matches the Studio
+    // document's embedder policy: a worker may only control a client whose COEP
+    // it is compatible with, and a non-isolated public page accepts it too.
+    // `no-cache` keeps the field-recovery window short if a bad worker ships.
+    if ((request.url ?? "").split("?")[0] === "/sw.js") {
+      response.setHeader("Cache-Control", "no-cache");
+      response.setHeader("Service-Worker-Allowed", "/");
+      response.setHeader("Cross-Origin-Embedder-Policy", "credentialless");
+    }
     if (isStudioCrossOriginIsolationWorkerRequest({
       url: request.url,
       method: request.method,
@@ -233,10 +251,118 @@ function studioCrossOriginIsolationPlugin(): Plugin {
   };
 }
 
+/**
+ * Same-origin URLs the Studio route *blocks* on but that are not part of any JS
+ * module graph: `AppRouter` `Promise.all`s these two dictionaries with the route
+ * chunk, so the route cannot commit until they resolve.
+ */
+const STUDIO_SERVICE_WORKER_WARM_URLS = [
+  "/i18n/studio/ko.json",
+  "/i18n/studio/en.json",
+];
+
+/**
+ * Compiles `src/app/service-worker/studio-service-worker-entry.ts` into
+ * `dist/sw.js`, injecting a precache manifest derived from the app build.
+ *
+ * A nested `vite.build()` (rather than an extra Rollup entry) is what keeps the
+ * worker out of `dist/.vite/manifest.json`. `scripts/check-studio-bundle.mjs`
+ * reads that manifest to police the eager module graph, so emitting the worker
+ * as an app chunk would put a precache list on the studio bundle ratchet.
+ */
+function studioServiceWorkerPlugin(): Plugin {
+  let root = process.cwd();
+  let outDir = path.resolve(root, "dist");
+
+  return {
+    name: "toonspectrum-service-worker",
+    apply: "build",
+    configResolved(config) {
+      root = config.root;
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    async closeBundle() {
+      const manifestPath = path.join(outDir, ".vite", "manifest.json");
+      // Only the app build emits a manifest; any nested/library build skips.
+      if (!existsSync(manifestPath)) return;
+
+      const manifest = JSON.parse(
+        readFileSync(manifestPath, "utf8"),
+      ) as StudioViteManifest;
+      const sizeOf = (url: string): number | null => {
+        try {
+          return statSync(path.join(outDir, url.replace(/^\/+/u, ""))).size;
+        } catch {
+          return null;
+        }
+      };
+
+      const plan = planStudioServiceWorkerPrecache({
+        manifest,
+        appEntryKey: "index.html",
+        warmUrls: STUDIO_SERVICE_WORKER_WARM_URLS,
+        sizeOf,
+      });
+      for (const warning of plan.warnings) this.warn(warning);
+      if (plan.violations.length > 0) {
+        // Failing the build is the point: a precache that quietly grew into the
+        // lazy graph would ship megabytes to every first-time visitor.
+        throw new Error(
+          `service worker precache plan rejected:\n  ${plan.violations.join("\n  ")}`,
+        );
+      }
+
+      const swManifest: StudioServiceWorkerManifest = {
+        buildId: studioServiceWorkerBuildId(plan, (value) =>
+          createHash("sha256").update(value).digest("hex"),
+        ),
+        shellUrls: plan.shellUrls,
+        criticalUrls: plan.criticalUrls,
+        warmUrls: plan.warmUrls,
+      };
+
+      await viteBuild({
+        configFile: false,
+        root,
+        logLevel: "warn",
+        define: {
+          __STUDIO_SERVICE_WORKER_MANIFEST__: JSON.stringify(swManifest),
+        },
+        build: {
+          outDir,
+          emptyOutDir: false,
+          copyPublicDir: false,
+          manifest: false,
+          sourcemap: false,
+          reportCompressedSize: false,
+          // `iife`, not `module`: classic worker registration is the only shape
+          // every supported browser accepts today.
+          lib: {
+            entry: path.resolve(
+              root,
+              "src/app/service-worker/studio-service-worker-entry.ts",
+            ),
+            formats: ["iife"],
+            name: "toonspectrumServiceWorker",
+            fileName: () => "sw.js",
+          },
+        },
+      });
+
+      this.warn(
+        `service worker ${swManifest.buildId}: `
+        + `${plan.criticalUrls.length} critical precache URLs (${plan.criticalBytes} B), `
+        + `${plan.warmUrls.length} warm URLs (${plan.warmBytes} B)`,
+      );
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
   plugins: [
     preferImplementationOverTestModulePlugin(),
     studioCrossOriginIsolationPlugin(),
+    studioServiceWorkerPlugin(),
     react(),
     babel({ presets: [reactCompilerPreset()] }),
   ],
