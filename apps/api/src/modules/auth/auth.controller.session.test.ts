@@ -1,7 +1,7 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { signSession } from "../../../../../lib/server/session";
+import { signSession } from "../../server/session";
 import { AUTH_SESSION_COOKIE_NAME } from "../../session-cookie";
 
 import { resolveAuthSessionUser } from "./auth-session-profile";
@@ -13,8 +13,8 @@ import type { Request, Response } from "express";
 const revokeUserSessions = vi.hoisted(() => vi.fn());
 const revokeRealtimeSession = vi.fn();
 
-vi.mock("../../../../../lib/server/user-lifecycle", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../../lib/server/user-lifecycle")>()),
+vi.mock("../../server/user-lifecycle", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../server/user-lifecycle")>()),
   revokeUserSessions,
 }));
 

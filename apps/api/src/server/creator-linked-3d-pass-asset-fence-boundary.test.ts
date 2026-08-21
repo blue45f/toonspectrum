@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const creatorFileUrl = new URL("./creator.ts", import.meta.url);
 const creatorSource = readFileSync(creatorFileUrl, "utf8");
 const workAssetRepositorySource = readFileSync(
-  new URL("../../apps/api/src/modules/creator/studio-work-asset.repository.ts",
+  new URL("../modules/creator/studio-work-asset.repository.ts",
     import.meta.url,
   ),
   "utf8",

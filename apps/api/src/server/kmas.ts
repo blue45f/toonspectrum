@@ -1,6 +1,6 @@
-import { activeTags, TITLES } from "./catalog-store";
+import { activeTags, TITLES } from "../../../../packages/core/src/server/catalog-store";
 
-import type { PlatformId, Title } from "../types";
+import type { PlatformId, Title } from "../../../../lib/types";
 
 export interface KmasBookAndWebtoonItem {
   mastrId?: string | number | null;

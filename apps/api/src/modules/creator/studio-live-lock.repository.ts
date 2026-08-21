@@ -1,11 +1,11 @@
 import { and, asc, eq, gt, lte, sql } from "drizzle-orm";
 
+import { studioLiveLockResourcesConflict } from "../../../../../lib/studio-live-lock-resource";
 import {
   creatorWorkLiveLockClocks,
   creatorWorkLiveLocks,
   db,
-} from "../../../../../lib/db";
-import { studioLiveLockResourcesConflict } from "../../../../../lib/studio-live-lock-resource";
+} from "../../db";
 
 export const STUDIO_LIVE_LOCK_REPOSITORY = Symbol("STUDIO_LIVE_LOCK_REPOSITORY");
 export const STUDIO_LIVE_LOCK_LIMIT_PER_WORK = 200;

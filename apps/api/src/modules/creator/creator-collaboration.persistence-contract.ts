@@ -2,8 +2,8 @@ import type {
   CreatorCollaborationRole,
   CreatorCollaborationStatus,
 } from "./creator-collaboration.policy";
-import type { CreatorWorkRevisionSnapshot } from "../../../../../lib/server/creator-work-revisions";
 import type { StudioLinked3dPassAssetRow } from "../../../../../lib/studio-linked-3d-pass-asset-fence";
+import type { CreatorWorkRevisionSnapshot } from "../../server/creator-work-revisions";
 
 export type CreatorCollaborationInvitationAction = "accept" | "decline";
 

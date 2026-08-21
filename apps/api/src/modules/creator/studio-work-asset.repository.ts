@@ -4,16 +4,6 @@ import { and, asc, count, eq, inArray, ne, or, sql } from "drizzle-orm";
 import * as Y from "yjs";
 
 import {
-  creatorAssetStorageObjects,
-  creatorWorkAssetStorageReferences,
-  creatorWorkAssets,
-  creatorWorkAssetTombstones,
-  creatorWorkCollaborators,
-  creatorWorkRevisions,
-  creatorWorks,
-  db,
-} from "../../../../../lib/db";
-import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
 } from "../../../../../lib/studio-brush-r8-grain-asset-contract";
@@ -29,6 +19,16 @@ import {
   STUDIO_WORK_ASSET_MAX_TOTAL_BYTES_PER_WORK,
   serializeStudioWorkAssetDescriptorCanonical,
 } from "../../../../../lib/studio-work-asset-contract";
+import {
+  creatorAssetStorageObjects,
+  creatorWorkAssetStorageReferences,
+  creatorWorkAssets,
+  creatorWorkAssetTombstones,
+  creatorWorkCollaborators,
+  creatorWorkRevisions,
+  creatorWorks,
+  db,
+} from "../../db";
 import {
   SupabaseObjectReferenceSchema,
   type SupabaseObjectPurpose,

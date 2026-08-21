@@ -10,26 +10,9 @@ import {
 import { desc, eq, inArray, sql } from "drizzle-orm";
 
 import { fromDb } from "../../../../../lib/api-helpers";
-import { db, reviewLikes, reviews, users } from "../../../../../lib/db";
 import { rateLimit } from "../../../../../lib/rate-limit";
 import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../../lib/recommend";
 import { searchTitles, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../../lib/search";
-import { isAdminUser } from "../../../../../lib/server/app-config";
-import { getCatalogIngestStatus, isCatalogForceDb, loadLatestCatalogSnapshotFromDb, loadLatestCatalogSnapshotFromFile, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, verifyCatalogIngestToken, type CatalogIngestRunResult } from "../../../../../lib/server/catalog-ingest";
-import {
-  enrichTitleWithKmas,
-  enrichTitlesWithKmas,
-  getKmasBookAndWebtoonProxyResponse,
-  getKmasSearchData,
-  mergeKmasForSiteAccessOnce,
-  shouldMergeKmasOnAccess,
-  withKmasImageUrlsForResponse,
-  type KmasSiteAccessMergeResult,
-} from "../../../../../lib/server/kmas";
-import { getTitleDetail as getTitleDetailFromLib } from "../../../../../lib/server/title";
-// 브라우저-세이프 카탈로그 read-model 7종은 @toonspectrum/core 패키지(packages/core/src/server)로 이전됨
-// (웹 앱·API가 공유). API 는 lib/* 와 동일한 deep-climb(rootDir=레포루트) 로 참조한다 — tsc 가 dist 로 함께
-// 컴파일해 상대 require 로 런타임 해석되도록(bare 패키지 지정자는 plain-node 가 .ts exports 를 못 풀어 부적합).
 import {
   activeTags,
   getAuthorData,
@@ -43,6 +26,24 @@ import {
   getTitle,
   TITLES,
 } from "../../../../../packages/core/src/server";
+import { db, reviewLikes, reviews, users } from "../../db";
+import { isAdminUser } from "../../server/app-config";
+import { getCatalogIngestStatus, isCatalogForceDb, loadLatestCatalogSnapshotFromDb, loadLatestCatalogSnapshotFromFile, normalizeCatalogIngestConfig, refreshCatalogIfChanged, runCatalogIngest, verifyCatalogIngestToken, type CatalogIngestRunResult } from "../../server/catalog-ingest";
+import {
+  enrichTitleWithKmas,
+  enrichTitlesWithKmas,
+  getKmasBookAndWebtoonProxyResponse,
+  getKmasSearchData,
+  mergeKmasForSiteAccessOnce,
+  shouldMergeKmasOnAccess,
+  withKmasImageUrlsForResponse,
+  type KmasSiteAccessMergeResult,
+} from "../../server/kmas";
+import { getReviewGlobalStats } from "../../server/reviews";
+import { getTitleDetail as getTitleDetailFromLib } from "../../server/title";
+// 브라우저-세이프 카탈로그 read-model 7종은 @toonspectrum/core 패키지(packages/core/src/server)로 이전됨
+// (웹 앱·API가 공유). API 는 lib/* 와 동일한 deep-climb(rootDir=레포루트) 로 참조한다 — tsc 가 dist 로 함께
+// 컴파일해 상대 require 로 런타임 해석되도록(bare 패키지 지정자는 plain-node 가 .ts exports 를 못 풀어 부적합).
 
 import type { AgeRating, PlatformId, ReadState, SerialStatus, Title, WorkType } from "../../../../../lib/types";
 import type { OnModuleInit } from "@nestjs/common";
@@ -236,7 +237,8 @@ export class CatalogService implements OnModuleInit {
 
   async getHomeData() {
     await this.mergeKmasOnSiteAccess();
-    return this.withKmasImages(getHomeData());
+    // 리뷰 총계는 DB read-model 이라 API(앱 레이어)가 core 홈 read-model 에 주입한다.
+    return this.withKmasImages(getHomeData({ loadReviewStats: getReviewGlobalStats }));
   }
 
   async getCalendarData() {

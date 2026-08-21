@@ -6,8 +6,8 @@ import {
   normalizeCollectionEmoji,
   normalizeCollectionName,
 } from "../../../../../lib/collection-contract";
-import { db, ratings, reviews, reviewLikes, reads, subscriptions } from "../../../../../lib/db";
-import { deleteMyAccount, loadMe, updateProfile, type UpdateProfileInput } from "../../../../../lib/server/me";
+import { db, ratings, reviews, reviewLikes, reads, subscriptions } from "../../db";
+import { deleteMyAccount, loadMe, updateProfile, type UpdateProfileInput } from "../../server/me";
 
 import { type MeCollectionRepository } from "./me-collection.repository";
 import { type CollectionMutation } from "./me.dto";

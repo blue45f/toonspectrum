@@ -15,8 +15,8 @@ import {
   Query,
 } from "@nestjs/common";
 
-import { isAdminUser } from "../../../../../lib/server/app-config";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { isAdminUser } from "../../server/app-config";
 
 import {
   CreateCreatorWorkDto,

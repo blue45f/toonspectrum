@@ -933,7 +933,7 @@ describe("creator draft collaboration SQL boundary", () => {
   it("ships an indexed FK-safe marker migration with lease, size and promotion constraints", () => {
     const migration = readFileSync(
       new URL(
-        "../../../../../lib/db/migrations/0020_creator_draft_collaboration_room.sql",
+        "../../db/migrations/0020_creator_draft_collaboration_room.sql",
         import.meta.url
       ),
       "utf8"
@@ -951,7 +951,7 @@ describe("creator draft collaboration SQL boundary", () => {
   it("widens the provision intent check through a validated forward migration", () => {
     const migration = readFileSync(
       new URL(
-        "../../../../../lib/db/migrations/0026_creator_draft_cloud_save_intent.sql",
+        "../../db/migrations/0026_creator_draft_cloud_save_intent.sql",
         import.meta.url
       ),
       "utf8"

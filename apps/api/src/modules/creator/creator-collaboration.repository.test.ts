@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { db } from "../../../../../lib/db";
-import { CreatorDraftCollaborationStatusLockedError } from "../../../../../lib/server/creator-provisional-work-status";
 import {
   StudioLinked3dPassAssetFenceError,
   type StudioLinked3dPassAssetRow,
 } from "../../../../../lib/studio-linked-3d-pass-asset-fence";
+import { db } from "../../db";
+import { CreatorDraftCollaborationStatusLockedError } from "../../server/creator-provisional-work-status";
 
 import {
   buildCreatorCollaborationWorkQuery,

@@ -1,18 +1,18 @@
 import { and, count, eq, inArray, sql } from "drizzle-orm";
 import * as Y from "yjs";
 
-import {
-  creatorWorkCollaborators,
-  creatorWorks,
-  db,
-} from "../../../../../lib/db";
-import { creatorWorkRasterAssets } from "../../../../../lib/db/studio-raster-asset.schema";
 import { readStudioCrdtRasterDocument } from "../../../../../lib/studio-crdt-raster-document-contract";
 import {
   STUDIO_RASTER_ASSET_CONTRACT_VERSION,
   STUDIO_RASTER_ASSET_MAX_ASSETS_PER_WORK,
   STUDIO_RASTER_ASSET_MAX_TOTAL_BYTES_PER_WORK,
 } from "../../../../../lib/studio-raster-asset-contract";
+import {
+  creatorWorkCollaborators,
+  creatorWorks,
+  db,
+} from "../../db";
+import { creatorWorkRasterAssets } from "../../db/studio-raster-asset.schema";
 
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
 import {

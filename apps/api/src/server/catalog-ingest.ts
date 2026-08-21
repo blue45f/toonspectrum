@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 
 import { and, desc, eq, lt, notInArray } from "drizzle-orm";
 
+import { getCatalogState, loadCatalogSnapshot, replaceCatalogData, resetCatalogToEmpty } from "../../../../packages/core/src/server/catalog-store";
 import { catalogIngestRuns, catalogSnapshots, db, dbClient } from "../db";
 
 import {
@@ -15,9 +16,8 @@ import {
   writeCatalogTitlesToFile,
 } from "./catalog-file";
 import { buildCatalogSourcePlan, parseCatalogSourceIds } from "./catalog-sources";
-import { getCatalogState, loadCatalogSnapshot, replaceCatalogData, resetCatalogToEmpty } from "./catalog-store";
 
-import type { Title } from "../types";
+import type { Title } from "../../../../lib/types";
 
 
 const execFileAsync = promisify(execFile);

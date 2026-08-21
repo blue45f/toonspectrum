@@ -60,7 +60,7 @@ services:
       db:
         condition: service_healthy
     # .env 의 모든 키를 컨테이너에 주입 — 서버가 읽는 OAuth 키 이름(GOOGLE_OAUTH_CLIENT_ID·
-    # AUTH_STATE_SECRET·OAUTH_REDIRECT_BASE_URL·WEB_APP_BASE_URL 등, lib/server/oauth.ts)에 견고.
+    # AUTH_STATE_SECRET·OAUTH_REDIRECT_BASE_URL·WEB_APP_BASE_URL 등, apps/api/src/server/oauth.ts)에 견고.
     env_file:
       - .env
     # DATABASE_URL 은 내부 db 서비스로 계산해 덮어쓴다(environment 가 env_file 보다 우선).

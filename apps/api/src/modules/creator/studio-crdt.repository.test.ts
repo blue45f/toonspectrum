@@ -5,7 +5,7 @@ import {
   creatorWorkCrdtSnapshots,
   creatorWorkCrdtUpdateReceipts,
   creatorWorkCrdtUpdates,
-} from "../../../../../lib/db/schema";
+} from "../../db/schema";
 
 import {
   DrizzleStudioCrdtRepository,

@@ -1,5 +1,5 @@
-import { dbPool } from "../../../../../lib/db";
 import { matchesPostgresCheckDefinition } from "../../common/postgres-check-definition";
+import { dbPool } from "../../db";
 
 import type { Pool } from "pg";
 

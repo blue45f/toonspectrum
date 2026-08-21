@@ -4,7 +4,7 @@ import { z } from "zod";
  * 백엔드 env 검증(NON-FATAL).
  *
  * boot 시 process.env 를 Zod 스키마로 safeParse 한다. 실패해도 절대 throw/exit 하지 않고
- * 경고만 남긴다 — 라이브 부팅을 깨지 않기 위함이다. 기존 process.env 읽기(lib/db, session 등)는
+ * 경고만 남긴다 — 라이브 부팅을 깨지 않기 위함이다. 기존 process.env 읽기(apps/api/src/db, session 등)는
  * 각자 폴백을 가지므로 그대로 두고, 여기서는 검증과 경고만 ADD 한다.
  *
  * production 에서 알려진 안전하지 않은 기본값(개발용 폴백 시크릿)을 발견하면 큰 경고를 출력한다.
@@ -130,7 +130,7 @@ const envSchema = z.object({
     .optional(),
   OAUTH_REDIRECT_BASE_URL: z.url().optional(),
   WEB_APP_BASE_URL: z.url().optional(),
-  // PostgreSQL(Neon) 연결 문자열. 미설정 시 로컬 docker 폴백(lib/db).
+  // PostgreSQL(Neon) 연결 문자열. 미설정 시 로컬 docker 폴백(apps/api/src/db).
   DATABASE_URL: z.string().min(1).optional(),
   WEBDEX_PG_POOL_MAX: boundedPositiveInteger(
     "WEBDEX_PG_POOL_MAX",

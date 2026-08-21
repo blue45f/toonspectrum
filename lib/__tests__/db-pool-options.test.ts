@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePgPoolOptions } from "../db";
+import { resolvePgPoolOptions } from "../../apps/api/src/db";
 
 // pg 풀 슬림화(Neon 비용 가드) 옵션 파서 — 유휴 연결을 빨리 닫아 Neon autosuspend 를 유도하는 설정.
 // (모듈 import 는 Pool 객체만 만들고 실제 연결은 하지 않는다 — 쿼리 전까지 lazy.)

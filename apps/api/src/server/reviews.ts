@@ -1,9 +1,9 @@
 import { and, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
 
-import { fromDb } from "../api-helpers";
+import { fromDb } from "../../../../lib/api-helpers";
+import { getTitle } from "../../../../packages/core/src/server/catalog-store";
 import { db, reviewLikes, reviews, users } from "../db";
 
-import { getTitle } from "./catalog-store";
 
 export type ReviewSort = "recent" | "likes" | "high" | "low";
 

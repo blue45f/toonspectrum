@@ -1,5 +1,5 @@
 // 창작 게시판(사용자 제작 웹툰/컷툰) 서버 로직 — feedback.ts 패턴을 따른다.
-// 스키마는 lib/db/schema.ts에 이미 존재(creatorWorks/creatorWorkLikes/creatorWorkComments) — 재정의하지 않는다.
+// 스키마는 apps/api/src/db/schema.ts에 이미 존재(creatorWorks/creatorWorkLikes/creatorWorkComments) — 재정의하지 않는다.
 // 연재 시리즈·챌린지·팔로우(creatorSeries/creatorChallenges/creatorFollows)도 이 파일에서 함께 다룬다.
 import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 
@@ -14,7 +14,12 @@ import {
   isCreatorAssetReportReason,
   normalizeCreatorAssetTags,
   parseCreatorAssetCatalogSort,
-} from "../creator-asset-contract";
+} from "../../../../lib/creator-asset-contract";
+import {
+  assertStudioLinked3dPassAssetRows,
+  extractStudioLinked3dPassAssetRequirements,
+  type CreatorWorkLinked3dJsonEnvelope,
+} from "../../../../lib/studio-linked-3d-pass-asset-fence";
 import {
   creatorAssetReports,
   creatorAssets,
@@ -32,11 +37,6 @@ import {
   dbPool,
   users,
 } from "../db";
-import {
-  assertStudioLinked3dPassAssetRows,
-  extractStudioLinked3dPassAssetRequirements,
-  type CreatorWorkLinked3dJsonEnvelope,
-} from "../studio-linked-3d-pass-asset-fence";
 
 import {
   assertCreatorAssetPersistedIntegrity,
@@ -67,7 +67,7 @@ import type {
   CreatorAssetLicenseId,
   CreatorAssetModerationStatus,
   CreatorAssetReportReason,
-} from "../creator-asset-contract";
+} from "../../../../lib/creator-asset-contract";
 import type { SQL, SQLWrapper } from "drizzle-orm";
 
 type CreatorCommunityTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];

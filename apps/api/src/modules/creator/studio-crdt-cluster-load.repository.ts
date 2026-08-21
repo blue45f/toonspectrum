@@ -1,6 +1,6 @@
 import { gt, lt, sql } from "drizzle-orm";
 
-import { creatorWorkCrdtNodeLoad, db } from "../../../../../lib/db";
+import { creatorWorkCrdtNodeLoad, db } from "../../db";
 
 export const STUDIO_CRDT_CLUSTER_LOAD_REPOSITORY = Symbol("STUDIO_CRDT_CLUSTER_LOAD_REPOSITORY");
 

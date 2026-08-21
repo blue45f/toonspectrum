@@ -8,7 +8,7 @@ import {
   isOAuthProvider,
   providerMode,
   listAuthProviders,
-} from "../server/oauth";
+} from "../../apps/api/src/server/oauth";
 
 afterEach(() => {
   vi.unstubAllEnvs();

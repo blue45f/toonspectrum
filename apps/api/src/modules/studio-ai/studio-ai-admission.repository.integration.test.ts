@@ -94,7 +94,7 @@ describeWithDirectPostgres("Studio AI admission PostgreSQL fencing", () => {
     const migration = forwardMigrationBody(
       await readFile(
         new URL(
-          "../../../../../lib/db/migrations/0018_studio_ai_request_gate.sql",
+          "../../db/migrations/0018_studio_ai_request_gate.sql",
           import.meta.url
         ),
         "utf8"

@@ -1,4 +1,4 @@
-import type { PlatformId, WorkType } from "../types";
+import type { PlatformId, WorkType } from "../../../../lib/types";
 
 export type CatalogSourceImplementation = "crawler" | "partner-required" | "manual";
 export type CatalogSourceRisk = "low" | "medium" | "high";

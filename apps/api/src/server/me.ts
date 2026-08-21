@@ -1,6 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
 
-import { fromDb } from "../api-helpers";
+import { fromDb } from "../../../../lib/api-helpers";
 import {
   db,
   users,

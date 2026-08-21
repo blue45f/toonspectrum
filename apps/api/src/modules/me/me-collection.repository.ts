@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { and, eq, sql } from "drizzle-orm";
 
-import { collectionItems, collections, db } from "../../../../../lib/db";
+import { collectionItems, collections, db } from "../../db";
 
 export const ME_COLLECTION_REPOSITORY = Symbol("ME_COLLECTION_REPOSITORY");
 

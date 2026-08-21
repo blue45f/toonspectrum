@@ -11,7 +11,7 @@ import {
   parseFeedbackStatusFilter,
   validateFeedbackPost,
   validateFeedbackReply,
-} from "../../../../../lib/server/feedback";
+} from "../../server/feedback";
 
 interface ListQuery {
   category?: string | null;

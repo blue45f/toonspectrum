@@ -57,7 +57,7 @@ KMAS item(정확한 JSON 키는 실응답 확인) → `Title`(packages/core/src/
 
 ## 4. 소스 레지스트리 등록
 
-`lib/server/catalog-sources.ts` `CATALOG_SOURCE_REGISTRY`에 KMAS 추가:
+`apps/api/src/server/catalog-sources.ts` `CATALOG_SOURCE_REGISTRY`에 KMAS 추가:
 - `implementation: "manual"`(오프라인 수동 fetch), `risk: "low"`(공식 공공데이터),
   `requiredReview: []`(허용된 오픈 API), `capabilities: ["catalog", "search"]`,
   `notes: "한국만화영상진흥원 공식 오픈API — 메타·시놉시스·썸네일 URL 공신력 출처"`.

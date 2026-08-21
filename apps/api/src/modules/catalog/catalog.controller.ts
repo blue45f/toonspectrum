@@ -15,8 +15,8 @@ import {
 } from "@nestjs/common";
 
 import { buildAffiliateUrl } from "../../../../../lib/affiliate";
-import { getAppConfig } from "../../../../../lib/server/app-config";
-import { coverImagePolicy } from "../../../../../lib/server/cover-policy";
+import { coverImagePolicy } from "../../../../../packages/core/src/server";
+import { getAppConfig } from "../../server/app-config";
 
 import { CatalogService } from "./catalog.service";
 

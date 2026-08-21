@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import { creatorWorkCrdtRasterCheckpointJobs } from "../../../../../lib/db/studio-crdt-raster-checkpoint.schema";
+import { creatorWorkCrdtRasterCheckpointJobs } from "../../db/studio-crdt-raster-checkpoint.schema";
 
 import {
   DrizzleStudioCrdtRasterCheckpointRepository,
@@ -78,7 +78,7 @@ describe("Studio raster checkpoint durable repository contract", () => {
 
   it("ships an additive restart-safe migration without mutating earlier migrations", () => {
     const migration = readFileSync(
-      new URL("../../../../../lib/db/migrations/0015_creator_work_crdt_raster_checkpoint_job.sql", import.meta.url),
+      new URL("../../db/migrations/0015_creator_work_crdt_raster_checkpoint_job.sql", import.meta.url),
       "utf8"
     );
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS "creator_work_crdt_raster_checkpoint_job"');

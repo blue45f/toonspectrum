@@ -1,16 +1,16 @@
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
 
 import {
-  signStudioLiveAdmissionTicket,
-  type VerifiedSessionToken,
-} from "../../../../../lib/server/session";
-import {
   STUDIO_LIVE_AUTH_TICKET_VERSION,
   StudioLiveAuthTicketRequestSchema,
   StudioLiveAuthTicketResponseSchema,
   type StudioLiveAuthTicketRequest,
   type StudioLiveAuthTicketResponse,
 } from "../../../../../lib/studio-live-auth-ticket";
+import {
+  signStudioLiveAdmissionTicket,
+  type VerifiedSessionToken,
+} from "../../server/session";
 
 const TICKET_UNAVAILABLE_MESSAGE = "실시간 팀 연결 정보를 발급할 수 없습니다.";
 

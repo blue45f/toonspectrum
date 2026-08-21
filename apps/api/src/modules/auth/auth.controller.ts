@@ -25,9 +25,15 @@ import {
   resolveSignupAvatar,
   resolveSignupAvatarImage,
 } from "../../../../../lib/avatar";
-import { db, users } from "../../../../../lib/db";
-import { resolveEffectiveAdminRole } from "../../../../../lib/server/admin-emails";
-import { getAppConfig } from "../../../../../lib/server/app-config";
+import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { db, users } from "../../db";
+import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
+import {
+  UPSTASH_COORDINATION_PORT,
+  type UpstashCoordinationPort,
+} from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import { resolveEffectiveAdminRole } from "../../server/admin-emails";
+import { getAppConfig } from "../../server/app-config";
 import {
   buildAuthorizeUrl,
   consumeHandoff,
@@ -44,23 +50,17 @@ import {
   providerMode,
   verifyState,
   webAppBaseUrl,
-} from "../../../../../lib/server/oauth";
+} from "../../server/oauth";
 import {
   signSession,
   verifySessionToken,
-} from "../../../../../lib/server/session";
+} from "../../server/session";
 import {
   ensureUserLifecycleSchema,
   getUserAuthBlock,
   normalizeSessionVersion,
   revokeUserSessions,
-} from "../../../../../lib/server/user-lifecycle";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
-import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
-import {
-  UPSTASH_COORDINATION_PORT,
-  type UpstashCoordinationPort,
-} from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+} from "../../server/user-lifecycle";
 import {
   AUTH_SESSION_COOKIE_NAME,
   resolveSessionCookieValue,

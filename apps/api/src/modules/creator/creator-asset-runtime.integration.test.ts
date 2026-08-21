@@ -3,10 +3,10 @@ import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { CREATOR_ASSET_FALLBACK_PREVIEW_DATA_URL } from "../../../../../lib/server/creator-asset-image";
+import { CREATOR_ASSET_FALLBACK_PREVIEW_DATA_URL } from "../../server/creator-asset-image";
 
-import type * as DatabaseRuntime from "../../../../../lib/db";
-import type * as CreatorRuntime from "../../../../../lib/server/creator";
+import type * as DatabaseRuntime from "../../db";
+import type * as CreatorRuntime from "../../server/creator";
 
 const INTEGRATION_URL = process.env.STUDIO_LIVE_POSTGRES_INTEGRATION_URL?.trim();
 if (process.env.CI && !INTEGRATION_URL) {
@@ -79,8 +79,8 @@ describeWithDirectPostgres("Creator Asset PostgreSQL runtime", () => {
       advisoryClient = await observerPool.connect();
       await acquireSchemaAdvisoryLock(advisoryClient);
       advisoryLockAcquired = true;
-      databaseRuntime = await import("../../../../../lib/db");
-      creatorRuntime = await import("../../../../../lib/server/creator");
+      databaseRuntime = await import("../../db");
+      creatorRuntime = await import("../../server/creator");
     } catch (setupError) {
       const teardownErrors = await teardownRuntime();
       throw new AggregateError(

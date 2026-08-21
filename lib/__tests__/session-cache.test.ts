@@ -11,7 +11,7 @@ import {
   signSession,
   verifySession,
   verifySessionToken,
-} from "../server/session";
+} from "../../apps/api/src/server/session";
 
 // 세션 마이크로캐시 — 요청마다 나가던 users SELECT(예: isAdminUser)를 TTL 30초로 흡수하는 계층.
 // loader 주입형이라 DB 없이 호출 횟수로 캐시 동작을 검증한다.

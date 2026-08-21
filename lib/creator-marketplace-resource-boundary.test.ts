@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  new URL("./db/migrations/0021_creator_marketplace_resource.sql", import.meta.url),
+  new URL("../apps/api/src/db/migrations/0021_creator_marketplace_resource.sql", import.meta.url),
   "utf8"
 );
 const appModule = readFileSync(
@@ -63,7 +63,7 @@ describe("creator marketplace metadata-first persistence boundary", () => {
     );
     expect(appModule).toContain("CreatorMarketplaceModule,");
     expect(drizzleConfig).toContain(
-      '"./lib/db/creator-marketplace-resource.schema.ts"'
+      '"./apps/api/src/db/creator-marketplace-resource.schema.ts"'
     );
   });
 });

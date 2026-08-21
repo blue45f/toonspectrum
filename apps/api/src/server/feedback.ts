@@ -10,7 +10,7 @@ import type {
   FeedbackPostList,
   FeedbackReply,
   FeedbackStatus,
-} from "../types";
+} from "../../../../lib/types";
 import type { SQL } from "drizzle-orm";
 
 const CATEGORIES = new Set<FeedbackCategory>(["question", "idea", "bug"]);

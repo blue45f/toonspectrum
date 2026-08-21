@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 
-import { assertCreatorDraftCollaborationStatusMutationAllowed } from "../../../../../lib/server/creator-provisional-work-status";
-import {
-  CREATOR_WORK_REVISION_MAX,
-  createCreatorWorkRevisionSnapshot,
-  creatorWorkRevisionRetentionCutoff,
-} from "../../../../../lib/server/creator-work-revisions";
 import {
   assertStudioLinked3dPassAssetRows,
   extractStudioLinked3dPassAssetRequirements,
 } from "../../../../../lib/studio-linked-3d-pass-asset-fence";
+import { assertCreatorDraftCollaborationStatusMutationAllowed } from "../../server/creator-provisional-work-status";
+import {
+  CREATOR_WORK_REVISION_MAX,
+  createCreatorWorkRevisionSnapshot,
+  creatorWorkRevisionRetentionCutoff,
+} from "../../server/creator-work-revisions";
 
 import { createDefaultCreatorCollaborationPersistence } from "./creator-collaboration.drizzle-persistence";
 import {
@@ -45,7 +45,7 @@ import type {
   CreatorCollaborationStatus,
   CreatorCollaborationViewerRole,
 } from "./creator-collaboration.policy";
-import type { CreatorWorkRevisionSnapshot } from "../../../../../lib/server/creator-work-revisions";
+import type { CreatorWorkRevisionSnapshot } from "../../server/creator-work-revisions";
 
 export {
   buildCreatorCollaborationWorkQuery,

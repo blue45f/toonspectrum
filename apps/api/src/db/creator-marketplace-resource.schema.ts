@@ -14,13 +14,13 @@ import {
 
 import {
   CREATOR_MARKETPLACE_RESOURCE_MAX_MANIFEST_BYTES,
-} from "../creator-marketplace-resource-contract";
+} from "../../../../lib/creator-marketplace-resource-contract";
 
 import { users } from "./schema";
 
 import type {
   CreatorMarketplaceResourceManifest,
-} from "../creator-marketplace-resource-contract";
+} from "../../../../lib/creator-marketplace-resource-contract";
 
 // Drizzle parameterizes primitive `${value}` interpolations as `$1`. PostgreSQL does not accept
 // parameters inside a CHECK constraint created by `drizzle-kit push`, so render this trusted,

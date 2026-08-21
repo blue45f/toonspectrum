@@ -1,4 +1,4 @@
-import { dbPool } from "../../../../../lib/db";
+import { dbPool } from "../../db";
 
 import type { Pool } from "pg";
 

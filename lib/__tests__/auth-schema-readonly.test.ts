@@ -24,13 +24,13 @@ afterEach(() => {
 describe("authentication runtime schema assertions", () => {
   it("checks the user lifecycle schema read-only, caches success, and retries after failure", async () => {
     vi.resetModules();
-    const { dbClient } = await import("../db");
+    const { dbClient } = await import("../../apps/api/src/db");
     const failure = new Error("user schema unavailable");
     const execute = vi
       .spyOn(dbClient, "execute")
       .mockRejectedValueOnce(failure)
       .mockResolvedValue(EMPTY_EXECUTE_RESULT);
-    const { ensureUserLifecycleSchema } = await import("../server/user-lifecycle"
+    const { ensureUserLifecycleSchema } = await import("../../apps/api/src/server/user-lifecycle"
     );
 
     await expect(ensureUserLifecycleSchema()).rejects.toBe(failure);
@@ -55,14 +55,14 @@ describe("authentication runtime schema assertions", () => {
 
   it("checks OAuth tables read-only, caches success, and retries only the failed assertion", async () => {
     vi.resetModules();
-    const { dbClient } = await import("../db");
+    const { dbClient } = await import("../../apps/api/src/db");
     const failure = new Error("account schema unavailable");
     const execute = vi
       .spyOn(dbClient, "execute")
       .mockResolvedValueOnce(EMPTY_EXECUTE_RESULT)
       .mockRejectedValueOnce(failure)
       .mockResolvedValue(EMPTY_EXECUTE_RESULT);
-    const { ensureOAuthTables } = await import("../server/oauth");
+    const { ensureOAuthTables } = await import("../../apps/api/src/server/oauth");
 
     await expect(ensureOAuthTables()).rejects.toBe(failure);
     await Promise.all([ensureOAuthTables(), ensureOAuthTables()]);
@@ -86,7 +86,7 @@ describe("authentication runtime schema assertions", () => {
 
   it("keeps concurrent first-login inserts idempotent and reselects authoritative rows", () => {
     const source = readFileSync(
-      new URL("../server/oauth.ts", import.meta.url),
+      new URL("../../apps/api/src/server/oauth.ts", import.meta.url),
       "utf8",
     );
     const start = source.indexOf("async function upsertOAuthUser(");

@@ -28,7 +28,7 @@ const { isAdminUser } = vi.hoisted(() => ({
   isAdminUser: vi.fn(),
 }));
 
-vi.mock("../../../../../lib/server/app-config", () => ({
+vi.mock("../../server/app-config", () => ({
   isAdminUser,
 }));
 

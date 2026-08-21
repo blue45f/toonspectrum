@@ -3,18 +3,18 @@ import { randomUUID } from "node:crypto";
 import { and, count, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
 
 import {
+  assertStudioLinked3dPassAssetRows,
+  extractStudioLinked3dPassAssetRequirements,
+  type StudioLinked3dPassAssetRow,
+} from "../../../../../lib/studio-linked-3d-pass-asset-fence";
+import {
   creatorDraftCollaborationRooms,
   creatorWorkAssets,
   creatorWorkRevisions,
   creatorWorks,
   db,
-} from "../../../../../lib/db";
-import { createCreatorWorkRevisionSnapshot } from "../../../../../lib/server/creator-work-revisions";
-import {
-  assertStudioLinked3dPassAssetRows,
-  extractStudioLinked3dPassAssetRequirements,
-  type StudioLinked3dPassAssetRow,
-} from "../../../../../lib/studio-linked-3d-pass-asset-fence";
+} from "../../db";
+import { createCreatorWorkRevisionSnapshot } from "../../server/creator-work-revisions";
 
 import {
   isCreatorDraftCollaborationFinalStatus,

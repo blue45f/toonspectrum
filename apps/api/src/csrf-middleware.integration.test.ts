@@ -16,10 +16,11 @@ import {
   TOONSPECTRUM_CSRF_HEADER,
   TOONSPECTRUM_CSRF_HEADER_VALUE,
 } from "../../../lib/csrf";
-import { signSession } from "../../../lib/server/session";
+
 
 import { configureCors } from "./config/cors";
 import { createCsrfProtectionMiddleware } from "./csrf-middleware";
+import { signSession } from "./server/session";
 import { AUTH_SESSION_COOKIE_NAME } from "./session-cookie";
 import { sessionAuth } from "./session-middleware";
 

@@ -1,13 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  getCommunityScopeTargetLink,
-  parseCommunityScope,
-  parseCommunitySort,
-  parseCommunityScopeWithAll,
-} from "../community-ui";
-import { db, dbClient, fanPostReplies, fanPosts, users } from "../db";
+import { db, dbClient, fanPostReplies, fanPosts, users } from "../../apps/api/src/db";
 import {
   createFanPost,
   createFanPostReply,
@@ -18,7 +12,13 @@ import {
   validateCafeInput,
   validatePostInput,
   validateReplyText,
-} from "../server/community";
+} from "../../apps/api/src/server/community";
+import {
+  getCommunityScopeTargetLink,
+  parseCommunityScope,
+  parseCommunitySort,
+  parseCommunityScopeWithAll,
+} from "../community-ui";
 import { GENRES } from "../taxonomy";
 
 import { retryOnDeadlock } from "./db-test-utils";

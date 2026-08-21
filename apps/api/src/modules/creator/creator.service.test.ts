@@ -9,13 +9,13 @@ import {
 } from "@nestjs/common";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CreatorDraftCollaborationStatusLockedError } from "../../../../../lib/server/creator-provisional-work-status";
+import { StudioLinked3dPassAssetFenceError } from
+  "../../../../../lib/studio-linked-3d-pass-asset-fence";
+import { CreatorDraftCollaborationStatusLockedError } from "../../server/creator-provisional-work-status";
 import {
   CreatorWorkRevisionConflictError,
   CreatorWorkRevisionNotFoundError,
-} from "../../../../../lib/server/creator-work-revisions";
-import { StudioLinked3dPassAssetFenceError } from
-  "../../../../../lib/studio-linked-3d-pass-asset-fence";
+} from "../../server/creator-work-revisions";
 
 import {
   CreatorCollaborationCrdtSequenceConflictError,
@@ -73,7 +73,7 @@ const {
   listSharedAssets: vi.fn(),
 }));
 
-vi.mock("../../../../../lib/server/creator", () => ({
+vi.mock("../../server/creator", () => ({
   addComment: vi.fn(),
   bumpAssetDownloads,
   bumpViews,

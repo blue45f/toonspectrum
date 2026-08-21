@@ -5,18 +5,18 @@ import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
 import {
-  creatorAssetStorageObjects,
-  creatorWorkAssetStorageReferences,
-} from "../../../../../lib/db/creator-asset-object-storage.schema";
-import {
-  creatorWorkAssets,
-  creatorWorkAssetTombstones,
-} from "../../../../../lib/db/schema";
-import {
   STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
   STUDIO_WORK_ASSET_MAX_TOMBSTONES_PER_WORK,
   STUDIO_WORK_ASSET_MAX_TOTAL_BYTES_PER_WORK,
 } from "../../../../../lib/studio-work-asset-contract";
+import {
+  creatorAssetStorageObjects,
+  creatorWorkAssetStorageReferences,
+} from "../../db/creator-asset-object-storage.schema";
+import {
+  creatorWorkAssets,
+  creatorWorkAssetTombstones,
+} from "../../db/schema";
 
 import {
   assertStudioWorkAssetIdNotReserved,

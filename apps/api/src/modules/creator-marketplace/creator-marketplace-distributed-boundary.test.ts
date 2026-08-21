@@ -3,12 +3,12 @@ import { readFileSync } from "node:fs";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import { creatorMarketplaceResources } from "../../../../../lib/db/creator-marketplace-resource.schema";
-import { creatorMarketplacePublishGates } from "../../../../../lib/db/schema";
+import { creatorMarketplaceResources } from "../../db/creator-marketplace-resource.schema";
+import { creatorMarketplacePublishGates } from "../../db/schema";
 
 const migration = readFileSync(
   new URL(
-    "../../../../../lib/db/migrations/0022_creator_marketplace_distributed_gate_search.sql",
+    "../../db/migrations/0022_creator_marketplace_distributed_gate_search.sql",
     import.meta.url
   ),
   "utf8"

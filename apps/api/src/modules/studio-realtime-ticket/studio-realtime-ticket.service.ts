@@ -31,7 +31,7 @@ import type {
 import type {
   StudioRealtimeTicketSignerPort,
 } from "./studio-realtime-ticket.provider";
-import type { VerifiedSessionToken } from "../../../../../lib/server/session";
+import type { VerifiedSessionToken } from "../../server/session";
 
 const TICKET_FORBIDDEN_MESSAGE =
   "이 작업실의 실시간 기능을 사용할 권한이 없습니다.";

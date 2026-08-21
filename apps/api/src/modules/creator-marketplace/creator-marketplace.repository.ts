@@ -1,7 +1,7 @@
 import { and, desc, eq, isNotNull, lt, or, sql } from "drizzle-orm";
 
-import { db, users } from "../../../../../lib/db";
-import { creatorMarketplaceResources } from "../../../../../lib/db/creator-marketplace-resource.schema";
+import { db, users } from "../../db";
+import { creatorMarketplaceResources } from "../../db/creator-marketplace-resource.schema";
 
 import {
   CREATOR_MARKETPLACE_RESOURCE_REPOSITORY,

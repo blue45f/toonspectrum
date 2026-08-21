@@ -10,7 +10,7 @@ import {
   type QueryConfig,
 } from "pg";
 
-import { normalizePgConnectionStringForTls } from "../../../../lib/db/pg-connection";
+import { normalizePgConnectionStringForTls } from "../db/pg-connection";
 
 import {
   createLifecycleSafeStudioLivePostgresTransport,

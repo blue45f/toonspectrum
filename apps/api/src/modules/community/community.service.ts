@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 
 import { parseCommunitySort } from "../../../../../lib/community-ui";
+import { GENRES } from "../../../../../lib/taxonomy";
 import {
   createCafe,
   createFanPost,
@@ -25,9 +26,8 @@ import {
   validateReplyPayload,
   createReviewReply,
   listReviewReplies,
-} from "../../../../../lib/server/community";
-import { getReviewsData } from "../../../../../lib/server/reviews";
-import { GENRES } from "../../../../../lib/taxonomy";
+} from "../../server/community";
+import { getReviewsData } from "../../server/reviews";
 
 import type { CommunityCafe, FanCafePost, FanCafeReply, ReviewReply } from "../../../../../lib/types";
 

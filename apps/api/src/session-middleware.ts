@@ -1,9 +1,8 @@
 import {
   verifySessionToken,
   type VerifiedSessionToken,
-} from "../../../lib/server/session";
-import { isSessionAllowed } from "../../../lib/server/user-lifecycle";
-
+} from "./server/session";
+import { isSessionAllowed } from "./server/user-lifecycle";
 import { resolveSessionCookieValue } from "./session-cookie";
 
 import type { Request, Response, NextFunction } from "express";

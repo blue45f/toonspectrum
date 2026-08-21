@@ -7,8 +7,8 @@ import type {
   DrizzleStudioWorkAssetRepository,
   StudioWorkAssetWrite,
 } from "./studio-work-asset.repository";
-import type * as DatabaseRuntime from "../../../../../lib/db";
-import type { deleteWork as DeleteCreatorWork } from "../../../../../lib/server/creator";
+import type * as DatabaseRuntime from "../../db";
+import type { deleteWork as DeleteCreatorWork } from "../../server/creator";
 
 const INTEGRATION_URL =
   process.env.STUDIO_LIVE_POSTGRES_INTEGRATION_URL?.trim();
@@ -121,9 +121,9 @@ describeWithDirectPostgres(
         connectionString: INTEGRATION_URL,
         max: 2,
       });
-      databaseRuntime = await import("../../../../../lib/db");
+      databaseRuntime = await import("../../db");
       ({ deleteWork: deleteCreatorWork } = await import(
-        "../../../../../lib/server/creator"
+        "../../server/creator"
       ));
       const repositoryRuntime = await import("./studio-work-asset.repository");
       repository = new repositoryRuntime.DrizzleStudioWorkAssetRepository();

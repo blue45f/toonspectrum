@@ -3,16 +3,16 @@ import { readFileSync } from "node:fs";
 import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { db } from "../../../../../lib/db";
-import {
-  creatorWorkLiveLockClocks,
-  creatorWorkLiveLocks,
-  toonspectrumSchemaMigrations,
-} from "../../../../../lib/db/schema";
 import {
   parseStudioLiveLockResourceScope,
   studioLiveLockResourcesConflict,
 } from "../../../../../lib/studio-live-lock-resource";
+import { db } from "../../db";
+import {
+  creatorWorkLiveLockClocks,
+  creatorWorkLiveLocks,
+  toonspectrumSchemaMigrations,
+} from "../../db/schema";
 
 import {
   createStudioLiveLockAcquisitionId,
@@ -252,7 +252,7 @@ describe("studio live distributed lock persistence contract", () => {
   it("ships a ledger-fenced, fail-closed revision cutover migration", () => {
     const migration = readFileSync(
       new URL(
-        "../../../../../lib/db/migrations/0017_creator_work_live_lock_revision.sql",
+        "../../db/migrations/0017_creator_work_live_lock_revision.sql",
         import.meta.url
       ),
       "utf8"

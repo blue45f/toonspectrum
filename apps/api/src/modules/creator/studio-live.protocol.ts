@@ -1,11 +1,6 @@
 import { z } from "zod";
 
 import {
-  verifyStudioLiveAdmissionTicket,
-  type VerifiedSessionToken,
-} from "../../../../../lib/server/session";
-import { isSessionAllowed } from "../../../../../lib/server/user-lifecycle";
-import {
   STUDIO_CRDT_BINARY_HEADER_BYTES,
   STUDIO_CRDT_BINARY_SYNC_MAX_BYTES,
   STUDIO_CRDT_BINARY_SYNC_MAX_FRAGMENTS,
@@ -14,6 +9,11 @@ import {
   reassembleStudioCrdtBinarySyncEnvelope,
   type StudioCrdtBinaryEnvelopeKind,
 } from "../../../../../lib/studio-crdt-binary-envelope";
+import {
+  verifyStudioLiveAdmissionTicket,
+  type VerifiedSessionToken,
+} from "../../server/session";
+import { isSessionAllowed } from "../../server/user-lifecycle";
 
 import { STUDIO_CRDT_UPDATE_MAX_BYTES } from "./studio-crdt.repository";
 import { STUDIO_CRDT_STATE_VECTOR_MAX_BYTES } from "./studio-crdt.service";

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { isAdminUser } from "../server/app-config";
+import { isAdminUser } from "../../apps/api/src/server/app-config";
 import {
   STALE_RUN_GRACE_MS,
   evaluateRegression,
@@ -15,13 +15,13 @@ import {
   safeTokenEqual,
   staleCatalogRunCutoff,
   verifyCatalogIngestToken,
-} from "../server/catalog-ingest";
-import { buildCatalogSourcePlan } from "../server/catalog-sources";
+} from "../../apps/api/src/server/catalog-ingest";
+import { buildCatalogSourcePlan } from "../../apps/api/src/server/catalog-sources";
 
 // Nest CatalogService(수동 ingest 경로) 검증용 부분 mock — 순수 함수(verify/normalize/…)는 실제 구현 유지,
 // DB/크롤 프로세스·파일 로드를 만지는 함수만 스텁한다. 서비스가 같은 모듈을 다른 상대경로로 import해도 동일 모듈로 적용된다.
-vi.mock("../server/catalog-ingest", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../server/catalog-ingest")>();
+vi.mock("../../apps/api/src/server/catalog-ingest", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../apps/api/src/server/catalog-ingest")>();
   return {
     ...original,
     runCatalogIngest: vi.fn(),
@@ -33,8 +33,8 @@ vi.mock("../server/catalog-ingest", async (importOriginal) => {
   };
 });
 
-vi.mock("../server/app-config", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../server/app-config")>();
+vi.mock("../../apps/api/src/server/app-config", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../apps/api/src/server/app-config")>();
   return { ...original, isAdminUser: vi.fn(async () => false) };
 });
 

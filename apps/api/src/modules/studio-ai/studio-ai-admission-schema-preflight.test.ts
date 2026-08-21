@@ -135,7 +135,7 @@ describe("Studio AI admission schema preflight", () => {
   it("ships a transactional canonical replacement for every owned CHECK", () => {
     const migration = readFileSync(
       new URL(
-        "../../../../../lib/db/migrations/0018_studio_ai_request_gate.sql",
+        "../../db/migrations/0018_studio_ai_request_gate.sql",
         import.meta.url
       ),
       "utf8"

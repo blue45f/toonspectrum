@@ -16,7 +16,7 @@ vi.mock("google-auth-library", () => ({
 
 async function freshModule() {
   vi.resetModules();
-  return import("../server/oauth");
+  return import("../../apps/api/src/server/oauth");
 }
 
 describe("Google GIS ID 토큰 검증(verifyGoogleIdToken)", () => {

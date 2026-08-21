@@ -51,7 +51,7 @@ test("auth lifecycle migration owns schema repair and a durable readiness marker
   expect(sql).not.toMatch(/GRANT\s+CREATE|ALTER\s+ROLE/u);
 
   const drizzleSchema = readFileSync(
-    new URL("../lib/db/schema.ts", import.meta.url),
+    new URL("../apps/api/src/db/schema.ts", import.meta.url),
     "utf8",
   );
   expect(drizzleSchema).toContain(

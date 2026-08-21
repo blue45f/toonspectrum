@@ -1,7 +1,7 @@
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 
-import { GOOGLE_ID_TOKEN_MAX_LENGTH } from "../../../../../lib/server/oauth";
+import { GOOGLE_ID_TOKEN_MAX_LENGTH } from "../../server/oauth";
 
 export const AuthSessionUserSchema = z
   .object({

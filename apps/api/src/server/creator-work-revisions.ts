@@ -1,4 +1,4 @@
-import { projectRevisionComparisonValue } from "../revision-comparison-projection";
+import { projectRevisionComparisonValue } from "../../../../lib/revision-comparison-projection";
 
 export const CREATOR_WORK_REVISION_RETENTION = 20;
 export const CREATOR_WORK_REVISION_MAX = 2_147_483_647;

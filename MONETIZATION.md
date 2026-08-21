@@ -6,10 +6,10 @@
 
 | 인프라 | 위치 | 상태 |
 | --- | --- | --- |
-| 전역 수익화 토글 `monetizationEnabled` | `lib/server/app-config.ts` (기본 false, 관리자만 ON) | 완성 |
+| 전역 수익화 토글 `monetizationEnabled` | `apps/api/src/server/app-config.ts` (기본 false, 관리자만 ON) | 완성 |
 | 광고/스폰서 지면 `<AdSlot>` | `components/ad-slot.tsx` (OFF면 `return null`, ON이면 "AD·스폰서" 배지 자리표시자) | 자리표시자 (네트워크 미연동) |
 | "어디서 봐" 라우터 외부링크 | `components/availability.tsx` `AvailabilityRouter` (`<a target="_blank" rel="noopener noreferrer">`) | 어필리에이트 주입 지점 (URL 가공만 하면 됨) |
-| 구독 플랜 테이블 `monetization_plan` | `lib/db/schema.ts:256` (code·priceCents·perks[]·intervalDays) | 스키마 완성, 결제 미연동 |
+| 구독 플랜 테이블 `monetization_plan` | `apps/api/src/db/schema.ts:256` (code·priceCents·perks[]·intervalDays) | 스키마 완성, 결제 미연동 |
 | 크리에이터 캠페인 `creator_campaign` | `schema.ts:272` (펀딩·목표/모금액) | 스키마 완성 |
 | 수익 원장 `revenue_ledger` | `schema.ts:292` (kind·status pending/approved/paid·정산 settledAt·reviewNote) | 스키마 + 정산 워크플로 완성 |
 | 관리자 콘솔 (플랜/캠페인/수익/정산) | `apps/api/.../admin.controller.ts`, `src/components/admin/AdminDashboard.tsx` | 완성 |

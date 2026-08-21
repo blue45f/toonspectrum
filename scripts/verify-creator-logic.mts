@@ -10,11 +10,11 @@
 import { challengeDday } from "../src/infrastructure/creator-client.js";
 
 async function main() {
-  // Ensure env so that lib/server/creator loads without the top-level throw
+  // Ensure env so that apps/api/src/server/creator loads without the top-level throw
   process.env.DATABASE_URL = process.env.DATABASE_URL || "postgresql://dummy:pass@127.0.0.1:1/dummy";
 
   const { validateSeriesInput, nextEpisodeNumber, challengeStateOf, parseCreatorSort, SEED_CHALLENGES } =
-    await import("../lib/server/creator.js");
+    await import("../apps/api/src/server/creator.js");
 
   console.log("=== DIRECT PURE CALLS (real exports) ===");
 

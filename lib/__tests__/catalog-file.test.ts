@@ -12,13 +12,13 @@ import {
   resolveCatalogFileForWrite,
   statCatalogFile,
   writeCatalogTitlesToFile,
-} from "../server/catalog-file";
+} from "../../apps/api/src/server/catalog-file";
 import {
   isCatalogForceDb,
   loadLatestCatalogSnapshotFromFile,
   persistCatalogSnapshotToFile,
   refreshCatalogIfChanged,
-} from "../server/catalog-ingest";
+} from "../../apps/api/src/server/catalog-ingest";
 import { allTitles, getCatalogState, replaceCatalogData } from "../server/catalog-store";
 
 import { makeTitle } from "./fixtures";

@@ -5,8 +5,8 @@ import {
 } from "@nestjs/common";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { issueState } from "../../../../../lib/server/oauth";
-import { verifySessionToken } from "../../../../../lib/server/session";
+import { issueState } from "../../server/oauth";
+import { verifySessionToken } from "../../server/session";
 import { AUTH_SESSION_COOKIE_NAME } from "../../session-cookie";
 
 import { AuthController } from "./auth.controller";
@@ -16,8 +16,8 @@ import type { Request, Response } from "express";
 const handleGoogleIdToken = vi.hoisted(() => vi.fn());
 const handleOAuthCallback = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../../lib/server/oauth", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../../lib/server/oauth")>()),
+vi.mock("../../server/oauth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../server/oauth")>()),
   handleGoogleIdToken,
   handleOAuthCallback,
 }));

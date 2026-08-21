@@ -2,14 +2,14 @@ import { createHash, timingSafeEqual } from "node:crypto";
 
 import { and, eq, inArray } from "drizzle-orm";
 
+import { canonicalStudioRasterJson } from "../../../../../lib/studio-crdt-raster-ops";
 import {
   creatorWorkCrdtUpdateReceipts,
   creatorWorkCrdtUpdates,
   db,
-} from "../../../../../lib/db";
-import { creatorWorkCrdtRasterCheckpointJobs } from "../../../../../lib/db/studio-crdt-raster-checkpoint.schema";
-import { creatorWorkRasterAssets } from "../../../../../lib/db/studio-raster-asset.schema";
-import { canonicalStudioRasterJson } from "../../../../../lib/studio-crdt-raster-ops";
+} from "../../db";
+import { creatorWorkCrdtRasterCheckpointJobs } from "../../db/studio-crdt-raster-checkpoint.schema";
+import { creatorWorkRasterAssets } from "../../db/studio-raster-asset.schema";
 
 import {
   STUDIO_CRDT_UPDATE_MAX_BYTES,

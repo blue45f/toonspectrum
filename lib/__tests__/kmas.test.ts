@@ -6,7 +6,7 @@ import {
   kmasItems,
   mergeKmasItemIntoTitle,
   type KmasBookAndWebtoonResponse,
-} from "../server/kmas";
+} from "../../apps/api/src/server/kmas";
 
 import type { Title } from "../types";
 

@@ -1473,7 +1473,7 @@ export const creatorSeries = pgTable("creator_series", {
   updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
 });
 
-// ── 창작 챌린지(주간 주제 이벤트) — 기본 시드는 lib/server/creator.ts가 idempotent 보장 ──
+// ── 창작 챌린지(주간 주제 이벤트) — 기본 시드는 apps/api/src/server/creator.ts가 idempotent 보장 ──
 export const creatorChallenges = pgTable("creator_challenge", {
   id: text("id")
     .primaryKey()

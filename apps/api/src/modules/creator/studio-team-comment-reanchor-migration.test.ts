@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   creatorWorkTeamCommentActivities,
   creatorWorkTeamCommentMutations,
-} from "../../../../../lib/db/schema";
+} from "../../db/schema";
 
 describe("Studio team comment re-anchor persistence contract", () => {
   it("allows message-free re-anchor activity and retry receipts in the Drizzle schema", () => {
@@ -24,7 +24,7 @@ describe("Studio team comment re-anchor persistence contract", () => {
 
   it("ships a forward-only migration for existing databases", async () => {
     const migration = await readFile(new URL(
-      "../../../../../lib/db/migrations/0016_creator_work_team_comment_reanchor.sql",
+      "../../db/migrations/0016_creator_work_team_comment_reanchor.sql",
       import.meta.url
     ), "utf8");
 

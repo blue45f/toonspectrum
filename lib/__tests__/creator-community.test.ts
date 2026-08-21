@@ -12,8 +12,7 @@ import {
   db,
   dbClient,
   users,
-} from "../db";
-import { REVISION_COMPARISON_AI_PROMPT_DIGEST_SENTINEL } from "../revision-comparison-projection";
+} from "../../apps/api/src/db";
 import {
   SEED_CHALLENGES,
   challengeStateOf,
@@ -39,12 +38,13 @@ import {
   updateWork,
   validateFollowPair,
   validateSeriesInput,
-} from "../server/creator";
+} from "../../apps/api/src/server/creator";
 import {
   CREATOR_WORK_REVISION_RETENTION,
   CreatorWorkRevisionConflictError,
   CreatorWorkRevisionNotFoundError,
-} from "../server/creator-work-revisions";
+} from "../../apps/api/src/server/creator-work-revisions";
+import { REVISION_COMPARISON_AI_PROMPT_DIGEST_SENTINEL } from "../revision-comparison-projection";
 import { StudioLinked3dPassAssetFenceError } from "../studio-linked-3d-pass-asset-fence";
 
 import { retryOnDeadlock } from "./db-test-utils";

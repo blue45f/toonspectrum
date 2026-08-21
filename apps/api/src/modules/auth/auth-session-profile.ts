@@ -1,15 +1,15 @@
 import { eq } from "drizzle-orm";
 
-import { db, users } from "../../../../../lib/db";
+import { db, users } from "../../db";
 import {
   isWhitelistedAdminEmail,
   resolveEffectiveAdminRole,
-} from "../../../../../lib/server/admin-emails";
-import { invalidateSessionUser } from "../../../../../lib/server/session";
+} from "../../server/admin-emails";
+import { invalidateSessionUser } from "../../server/session";
 import {
   ensureUserLifecycleSchema,
   getUserAuthBlock,
-} from "../../../../../lib/server/user-lifecycle";
+} from "../../server/user-lifecycle";
 
 export type AuthSessionRole = "admin" | "creator" | "operator" | "user";
 

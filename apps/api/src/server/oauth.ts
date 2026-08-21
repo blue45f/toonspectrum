@@ -15,7 +15,7 @@ import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } 
 //   하위 호환: 기존 인가-코드 콜백 경로(handleOAuthCallback)도 키 설정 시 그대로 동작한다.
 // Kakao·Naver: 실 앱키(REST API key / client secret) 가 없어 의도적으로 데모 고정(DEMO_ONLY_PROVIDERS).
 //   실연동 재개 시 외부 앱키 발급 후 이 집합에서 제거하면 인가-코드 흐름으로 동작한다.
-// 세션은 서명 JWT(lib/server/session.ts)로 발급되어 HttpOnly 쿠키에 저장된다.
+// 세션은 서명 JWT(./session.ts)로 발급되어 HttpOnly 쿠키에 저장된다.
 // 마이그레이션 중인 탭 전용 클라이언트는 같은 JWT를 x-user-id 헤더로도 보낼 수 있다.
 
 export type OAuthProviderId = "google" | "kakao" | "naver";

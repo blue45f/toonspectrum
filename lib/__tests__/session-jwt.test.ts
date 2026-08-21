@@ -11,7 +11,7 @@ import {
   verifySession,
   verifySessionToken,
   verifyStudioLiveAdmissionTicket,
-} from "../server/session";
+} from "../../apps/api/src/server/session";
 import { STUDIO_LIVE_AUTH_TICKET_TTL_MS } from "../studio-live-auth-ticket";
 
 afterEach(() => {

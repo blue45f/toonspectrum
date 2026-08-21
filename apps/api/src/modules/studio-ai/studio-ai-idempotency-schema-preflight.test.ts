@@ -7,7 +7,7 @@ import {
   STUDIO_AI_IDEMPOTENCY_SCHEMA_PREFLIGHT,
 } from "./studio-ai-idempotency-schema-preflight";
 
-vi.mock("../../../../../lib/db", () => ({ dbPool: {} }));
+vi.mock("../../db", () => ({ dbPool: {} }));
 
 function healthyRow() {
   return {

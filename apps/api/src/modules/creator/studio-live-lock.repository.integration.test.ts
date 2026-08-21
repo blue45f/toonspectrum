@@ -6,8 +6,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import * as schema from "../../../../../lib/db/schema";
-import { creatorWorks, users } from "../../../../../lib/db/schema";
+import * as schema from "../../db/schema";
+import { creatorWorks, users } from "../../db/schema";
 
 import {
   DrizzleStudioLiveLockRepository,
@@ -141,7 +141,7 @@ describeWithDirectPostgres("Studio live lock repository PostgreSQL fencing", () 
   it("cuts over a legacy schema once and preserves revision-aware leases on retry", async () => {
     const migration = await readFile(
       new URL(
-        "../../../../../lib/db/migrations/0017_creator_work_live_lock_revision.sql",
+        "../../db/migrations/0017_creator_work_live_lock_revision.sql",
         import.meta.url
       ),
       "utf8"

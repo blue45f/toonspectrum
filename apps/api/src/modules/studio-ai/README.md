@@ -89,7 +89,7 @@ Override them with `STUDIO_AI_DAILY_REQUEST_LIMIT`,
 `STUDIO_AI_DAILY_TOKEN_LIMIT`, `STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT`, and
 `STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT`.
 
-Apply `lib/db/migrations/0001_studio_ai_usage_ledger.sql` and
-`lib/db/migrations/0014_studio_ai_global_daily_quota.sql` (or the equivalent
+Apply `apps/api/src/db/migrations/0001_studio_ai_usage_ledger.sql` and
+`apps/api/src/db/migrations/0014_studio_ai_global_daily_quota.sql` (or the equivalent
 `drizzle-kit push`) before deploying the quota-enforcing API build. If any
 quota table is missing, Studio AI safely returns `503` before provider use.

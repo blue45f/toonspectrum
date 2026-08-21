@@ -11,12 +11,12 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 
-import { studioLivePrincipalFingerprint } from "../../../../../lib/server/session";
 import {
   encodeStudioCrdtBinaryEnvelope,
   fragmentStudioCrdtBinarySyncEnvelope,
 } from "../../../../../lib/studio-crdt-binary-envelope";
 import { allowedCorsOrigins } from "../../config/cors";
+import { studioLivePrincipalFingerprint } from "../../server/session";
 
 import { CreatorService } from "./creator.service";
 import { StudioCrdtService } from "./studio-crdt.service";

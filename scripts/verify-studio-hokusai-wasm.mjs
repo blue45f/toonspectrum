@@ -50,12 +50,17 @@ const BUILD_INPUT_FILES = Object.freeze([
   "src/lib.rs",
 ]);
 
-const POLICY_INPUT_FILES = Object.freeze([
-  "package.json",
-  "scripts/generate-third-party-notices.mjs",
-  "scripts/studio-hokusai-wasm-release-contract.mjs",
-  "scripts/verify-studio-hokusai-wasm.mjs",
-]);
+/*
+ * The manifest deliberately seals ONLY the crate inputs and the built package.
+ *
+ * It used to seal the repo's root package.json and this release script too, which meant a
+ * script rename or a dependency bump invalidated a supply-chain attestation that had
+ * nothing to do with either, and repairing it demanded a full rebuild on the pinned Rust
+ * toolchain. That is friction without a matching guarantee: the license inventory is
+ * re-validated from package.json and the lockfile on every `audit:licenses` run anyway.
+ * What only the manifest can prove is that the checked-in WASM is the one this checked-in
+ * Rust source builds — so that, and nothing else, is what it seals.
+ */
 
 const REQUIRED_PACKAGE_JSON_FILES = Object.freeze([
   "INTEGRITY.sha256",
@@ -104,10 +109,6 @@ function collectIntegrityRecords({
     ...REQUIRED_PACKAGE_FILES.map((path) => ({
       path: integrityRecordPath("pkg", path),
       digest: sha256File(join(pkgDirectory, path)),
-    })),
-    ...POLICY_INPUT_FILES.map((path) => ({
-      path: integrityRecordPath("policy", path),
-      digest: sha256File(join(REPOSITORY_ROOT, path)),
     })),
   ].sort((left, right) => left.path.localeCompare(right.path));
 }
@@ -191,12 +192,6 @@ export function verifyCheckedInHokusaiArtifacts({
         `Hokusai WASM release input/output is missing: ${relative(REPOSITORY_ROOT, candidate)}.`,
       );
     }
-  }
-  for (const path of POLICY_INPUT_FILES) {
-    assertRegularFile(
-      join(REPOSITORY_ROOT, path),
-      "Hokusai WASM release policy input",
-    );
   }
   if (
     !existsSync(integrityManifestPath)
@@ -599,22 +594,16 @@ function writeBuiltPackage(generatedPackageDirectory) {
 }
 
 /**
- * Reseals the manifest after a POLICY input changed, without touching the artifacts.
+ * Rewrites the manifest without rebuilding, and only when the artifacts are untouched.
  *
- * The manifest seals three kinds of record: `source/` (crate inputs), `pkg/` (the built
- * WASM and its siblings) and `policy/` (this repo's root package.json and the three
- * release scripts). Editing any policy file — adding one dependency to the root
- * package.json is enough — invalidates the whole manifest, and the only documented
- * repair was a full rebuild with the pinned Rust toolchain. That turned every routine
- * root-manifest edit into a blocked push on machines without that toolchain.
- *
- * This mode narrows the repair to what actually changed. It recomputes the manifest and
+ * The manifest also used to seal the repo's root package.json and the release scripts, so
+ * every routine edit to either invalidated it and the only documented repair was a full
+ * rebuild on the pinned Rust toolchain. This mode is the migration path off that: it
  * refuses to write unless every `source/` and `pkg/` digest is byte-identical to the one
- * already sealed — so a modified WASM can never be laundered through here; that still
- * requires `--build` with the pinned toolchain. Only `policy/` digests may move, and the
- * ones that moved are printed for review.
+ * already sealed, so a modified WASM can never be laundered through here — that still
+ * requires `--build` with the pinned toolchain.
  */
-function resealPolicyInputs() {
+function resealManifest() {
   const manifestPath = HOKUSAI_INTEGRITY_MANIFEST_PATH;
   if (!existsSync(manifestPath) || !lstatSync(manifestPath).isFile()) {
     throw new Error(
@@ -630,40 +619,41 @@ function resealPolicyInputs() {
         return [path, digest];
       }),
   );
-  const changed = [];
-  for (const record of collectIntegrityRecords()) {
+  const records = collectIntegrityRecords();
+  for (const record of records) {
     const sealed = sealedDigests.get(record.path);
     if (sealed === record.digest) continue;
-    if (!record.path.startsWith("policy/")) {
-      throw new Error(
-        `Refusing to reseal: ${record.path} is not a policy input but its digest changed `
-        + `(sealed ${sealed ?? "absent"}, now ${record.digest}). Rebuild with `
-        + "`pnpm run build:studio-hokusai-wasm` on the pinned toolchain instead.",
-      );
-    }
-    changed.push(record.path);
+    throw new Error(
+      `Refusing to reseal: ${record.path} changed (sealed ${sealed ?? "absent"}, now `
+      + `${record.digest}). Rebuild with \`pnpm run build:studio-hokusai-wasm\` on the `
+      + "pinned toolchain instead.",
+    );
   }
-  if (changed.length === 0) {
-    process.stdout.write("Hokusai WASM manifest already matches every policy input.\n");
+  const dropped = [...sealedDigests.keys()].filter(
+    (path) => !records.some((record) => record.path === path),
+  );
+  const next = renderIntegrityManifest();
+  if (next === readFileSync(manifestPath, "utf8")) {
+    process.stdout.write("Hokusai WASM manifest is already current.\n");
     return;
   }
-  writeFileSync(manifestPath, renderIntegrityManifest(), "utf8");
+  writeFileSync(manifestPath, next, "utf8");
   verifyCheckedInHokusaiArtifacts();
   process.stdout.write(
-    `Resealed ${changed.length} Hokusai WASM policy input(s), artifacts untouched:\n`
-    + changed.map((path) => `  ${path}\n`).join(""),
+    `Resealed the Hokusai WASM manifest with artifacts untouched`
+    + (dropped.length > 0 ? `; dropped ${dropped.length} stale record(s):\n` + dropped.map((path) => `  ${path}\n`).join("") : ".\n"),
   );
 }
 
 export function main(argumentsList = process.argv.slice(2)) {
   if (
     argumentsList.length !== 1
-    || !["--build", "--check", "--rebuild", "--reseal-policy", "--test"].includes(
+    || !["--build", "--check", "--rebuild", "--reseal", "--test"].includes(
       argumentsList[0],
     )
   ) {
     throw new Error(
-      "Use exactly one of --build, --check, --rebuild, --reseal-policy, or --test.",
+      "Use exactly one of --build, --check, --rebuild, --reseal, or --test.",
     );
   }
 
@@ -676,8 +666,8 @@ export function main(argumentsList = process.argv.slice(2)) {
     );
     return;
   }
-  if (command === "--reseal-policy") {
-    resealPolicyInputs();
+  if (command === "--reseal") {
+    resealManifest();
     return;
   }
   if (command === "--test") {

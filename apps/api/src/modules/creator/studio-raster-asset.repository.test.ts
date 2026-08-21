@@ -2,7 +2,6 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { creatorWorkRasterAssets } from "../../../../../lib/db/studio-raster-asset.schema";
 import {
   STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT,
   STUDIO_CRDT_RASTER_OPERATIONS_ROOT,
@@ -19,6 +18,7 @@ import {
   STUDIO_RASTER_ASSET_MAX_ASSETS_PER_WORK,
   STUDIO_RASTER_ASSET_MAX_TOTAL_BYTES_PER_WORK,
 } from "../../../../../lib/studio-raster-asset-contract";
+import { creatorWorkRasterAssets } from "../../db/studio-raster-asset.schema";
 
 import {
   DrizzleStudioRasterAssetRepository,

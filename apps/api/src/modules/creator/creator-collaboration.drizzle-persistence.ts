@@ -12,8 +12,8 @@ import {
   creatorWorks,
   db,
   users,
-} from "../../../../../lib/db";
-import { CREATOR_WORK_REVISION_MAX } from "../../../../../lib/server/creator-work-revisions";
+} from "../../db";
+import { CREATOR_WORK_REVISION_MAX } from "../../server/creator-work-revisions";
 
 import { studioCrdtWorkAdvisoryLockQuery } from "./studio-crdt.repository";
 
@@ -38,7 +38,7 @@ import type {
   CreatorSharedWorksCursorKey,
   UpdateCreatorCollaborationMembershipInput,
 } from "./creator-collaboration.persistence-contract";
-import type { CreatorWorkRevisionSnapshot } from "../../../../../lib/server/creator-work-revisions";
+import type { CreatorWorkRevisionSnapshot } from "../../server/creator-work-revisions";
 
 type DrizzleCreatorCollaborationTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DrizzleCreatorCollaborationExecutor = typeof db | DrizzleCreatorCollaborationTransaction;

@@ -40,11 +40,11 @@ const REQUIRED_PENDING_MIGRATION_IDS = Object.freeze([
 ]);
 const DRIZZLE_SCHEMA_PATHS = Object.freeze([
   "drizzle.config.ts",
-  "lib/db/schema.ts",
-  "lib/db/creator-marketplace-resource.schema.ts",
-  "lib/db/creator-asset-object-storage.schema.ts",
-  "lib/db/studio-crdt-raster-checkpoint.schema.ts",
-  "lib/db/studio-raster-asset.schema.ts",
+  "apps/api/src/db/schema.ts",
+  "apps/api/src/db/creator-marketplace-resource.schema.ts",
+  "apps/api/src/db/creator-asset-object-storage.schema.ts",
+  "apps/api/src/db/studio-crdt-raster-checkpoint.schema.ts",
+  "apps/api/src/db/studio-raster-asset.schema.ts",
 ]);
 const BOOTSTRAP_CONTRACT_PATHS = Object.freeze([
   "package.json",

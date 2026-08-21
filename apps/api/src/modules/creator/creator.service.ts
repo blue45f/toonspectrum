@@ -15,6 +15,8 @@ import {
   CREATOR_ASSET_LEGACY_FULL_MAX_PAGE_SIZE,
 } from "../../../../../lib/creator-asset-contract";
 import { rateLimit } from "../../../../../lib/rate-limit";
+import { StudioLinked3dPassAssetFenceError } from "../../../../../lib/studio-linked-3d-pass-asset-fence";
+import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
 import {
   addComment,
   bumpAssetDownloads,
@@ -50,17 +52,15 @@ import {
   toggleLike,
   updateSeries,
   updateWork,
-} from "../../../../../lib/server/creator";
+} from "../../server/creator";
 import {
   CREATOR_DRAFT_COLLABORATION_STATUS_LOCKED_CODE,
   CreatorDraftCollaborationStatusLockedError,
-} from "../../../../../lib/server/creator-provisional-work-status";
+} from "../../server/creator-provisional-work-status";
 import {
   CreatorWorkRevisionConflictError,
   CreatorWorkRevisionNotFoundError,
-} from "../../../../../lib/server/creator-work-revisions";
-import { StudioLinked3dPassAssetFenceError } from "../../../../../lib/studio-linked-3d-pass-asset-fence";
-import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
+} from "../../server/creator-work-revisions";
 
 import {
   CreatorCollaborationCrdtSequenceConflictError,

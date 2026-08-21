@@ -16,7 +16,7 @@ The default production UI uses the static catalog engine (`src/catalog-static.ts
 - Service boundary: `apps/api/src/modules/catalog/catalog.service.ts`
 - Cache policy: `Cache-Control: no-store, max-age=0`
 - Active ranking mode: snapshot formula (`disableLive=true`)
-- Preserved live source adapter: `lib/server/live.ts`
+- Preserved live source adapter: `apps/api/src/server/live.ts`
 - Formula source: `lib/ranking.ts`
 
 The Vite client normally reads ranking data from static files or computes filtered rankings in the static catalog engine after loading `public/data/catalog.json`. The Nest service owns the same query normalization, catalog filtering, and reliability metadata for API fallback mode so browser components do not duplicate ranking rules.
@@ -80,7 +80,7 @@ The Vite client normally reads ranking data from static files or computes filter
 
 국내 전체 웹툰/웹소설을 다루기 위해 플랫폼 목록과 실제 crawler 구현을 분리했습니다.
 
-- 레지스트리 파일: `lib/server/catalog-sources.ts`
+- 레지스트리 파일: `apps/api/src/server/catalog-sources.ts`
 - 플랫폼 모델: `lib/types.ts`, `lib/platforms.ts`
 - 현재 crawler 구현 소스:
   - `naver-webtoon`, `naver-series`, `kakao-webtoon`, `kakao-page`, `lezhin`, `ridi`
@@ -156,7 +156,7 @@ The Vite client normally reads ranking data from static files or computes filter
 
 ## 실시간 어댑터 상태 (Preserved, Not Active)
 
-`lib/server/live.ts`에는 네이버웹툰/카카오웹툰 공개 순위 신호를 가져와 `popular`/`trending` 축에 보정하는 어댑터가 남아 있습니다. 현재 활성 사용자 경로는 정적 CDN 스냅샷과 API 폴백 모두 `disableLive=true`로 호출하므로, 이 어댑터는 기본 랭킹 순위에 반영되지 않습니다.
+`apps/api/src/server/live.ts`에는 네이버웹툰/카카오웹툰 공개 순위 신호를 가져와 `popular`/`trending` 축에 보정하는 어댑터가 남아 있습니다. 현재 활성 사용자 경로는 정적 CDN 스냅샷과 API 폴백 모두 `disableLive=true`로 호출하므로, 이 어댑터는 기본 랭킹 순위에 반영되지 않습니다.
 
 라이브 모드를 다시 운영하려면 아래 조건을 먼저 만족해야 합니다.
 
@@ -275,8 +275,8 @@ Confidence is not another ranking factor. It is a UI disclosure layer that tells
 - `apps/api/data/catalog.json.gz` and generated `public/data/*.json` are the default production catalog surfaces.
 - `catalog_snapshot` is a legacy DB catalog source used only under `WEBDEX_CATALOG_FORCE_DB=1`; the DB otherwise stores dynamic data (reviews, community, accounts, creator) plus small ingest run history.
 - `src/catalog-static.ts` is the default browser-side catalog query boundary.
-- `lib/server/catalog-store.ts` is the shared in-memory runtime catalog store populated from the gz catalog file (legacy: DB snapshots).
-- `lib/server/*` is the server service boundary.
+- `apps/api/src/server/catalog-store.ts` is the shared in-memory runtime catalog store populated from the gz catalog file (legacy: DB snapshots).
+- `apps/api/src/server/*` is the server service boundary.
 - `apps/api/src/modules/catalog/*` is the external and client-facing data boundary.
 - `components/*` must not import runtime catalog globals such as `TITLES`; they must use static/API responses.
 
@@ -292,7 +292,7 @@ Operational review should cite the current text of these sources before enabling
 
 ## Runtime configuration
 
-Live variables below are preserved for `lib/server/live.ts`, but current ranking routes use `disableLive=true` unless live mode is explicitly reconnected.
+Live variables below are preserved for `apps/api/src/server/live.ts`, but current ranking routes use `disableLive=true` unless live mode is explicitly reconnected.
 
 - `WEBTOON_LIVE_TTL_SECONDS`
 - `WEBTOON_LIVE_REFRESH_MODE`

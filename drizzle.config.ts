@@ -1,6 +1,6 @@
 import { defineConfig } from "drizzle-kit";
 
-import { normalizePgConnectionStringForTls } from "./lib/db/pg-connection";
+import { normalizePgConnectionStringForTls } from "./apps/api/src/db/pg-connection";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -11,13 +11,13 @@ const normalizedDatabaseUrl = normalizePgConnectionStringForTls(databaseUrl);
 // PostgreSQL(Neon). 로컬 검증은 docker postgres(:55432), 원격은 Neon(DATABASE_URL, sslmode=verify-full).
 export default defineConfig({
   schema: [
-    "./lib/db/schema.ts",
-    "./lib/db/creator-marketplace-resource.schema.ts",
-    "./lib/db/creator-asset-object-storage.schema.ts",
-    "./lib/db/studio-crdt-raster-checkpoint.schema.ts",
-    "./lib/db/studio-raster-asset.schema.ts",
+    "./apps/api/src/db/schema.ts",
+    "./apps/api/src/db/creator-marketplace-resource.schema.ts",
+    "./apps/api/src/db/creator-asset-object-storage.schema.ts",
+    "./apps/api/src/db/studio-crdt-raster-checkpoint.schema.ts",
+    "./apps/api/src/db/studio-raster-asset.schema.ts",
   ],
-  out: "./lib/db/migrations",
+  out: "./apps/api/src/db/migrations",
   dialect: "postgresql",
   dbCredentials: {
     url: normalizedDatabaseUrl,

@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { verifySessionToken } from "../../../lib/server/session";
-import { isSessionAllowed } from "../../../lib/server/user-lifecycle";
-
+import { verifySessionToken } from "./server/session";
+import { isSessionAllowed } from "./server/user-lifecycle";
 import { AUTH_SESSION_COOKIE_NAME, resolveSessionCookieValue } from "./session-cookie";
 import {
   getSessionAuthenticationPrincipal,
@@ -11,11 +10,11 @@ import {
 } from "./session-middleware";
 
 
-vi.mock("../../../lib/server/session", () => ({
+vi.mock("./server/session", () => ({
   verifySessionToken: vi.fn(),
 }));
 
-vi.mock("../../../lib/server/user-lifecycle", () => ({
+vi.mock("./server/user-lifecycle", () => ({
   isSessionAllowed: vi.fn(),
 }));
 

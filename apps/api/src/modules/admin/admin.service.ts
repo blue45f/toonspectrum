@@ -17,20 +17,20 @@ import {
   reviews,
   revenueLedger,
   users,
-} from "../../../../../lib/db";
+} from "../../db";
 import {
   getAdminEmailWhitelist,
   normalizeAdminEmail,
-} from "../../../../../lib/server/admin-emails";
-import { getAppConfig, setAppConfig } from "../../../../../lib/server/app-config";
-import { deleteFanPost, ensureCommunityTables } from "../../../../../lib/server/community";
-import { invalidateSessionUser } from "../../../../../lib/server/session";
+} from "../../server/admin-emails";
+import { getAppConfig, setAppConfig } from "../../server/app-config";
+import { deleteFanPost, ensureCommunityTables } from "../../server/community";
+import { invalidateSessionUser } from "../../server/session";
 import {
   ensureUserLifecycleSchema,
   normalizeUserAccountStatus,
   setUserLifecycleStatus,
   type UserAccountStatus,
-} from "../../../../../lib/server/user-lifecycle";
+} from "../../server/user-lifecycle";
 
 type AdminRole = "admin" | "creator" | "operator" | "user";
 type MemberStatus = UserAccountStatus;
@@ -2047,7 +2047,7 @@ function isInsufficientPrivilegeError(error: unknown): boolean {
 }
 
 function getAdminMigrationSql() {
-  // PostgreSQL DDL — lib/db/schema.ts(pgTable)와 컬럼 타입을 일치시킨다.
+  // PostgreSQL DDL — apps/api/src/db/schema.ts(pgTable)와 컬럼 타입을 일치시킨다.
   //  camelCase 식별자는 PG에서 소문자 폴딩되므로 큰따옴표로 보존, "user"는 예약어라 항상 인용.
   //  타입: ms 타임스탬프→timestamp, boolean INTEGER→boolean, *Cents→bigint, json TEXT→jsonb.
   return [

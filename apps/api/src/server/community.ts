@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
+import { validateAttachmentImages } from "../../../../lib/image-attach";
 import {
   communityCafeMembers,
   communityCafes,
@@ -10,7 +11,6 @@ import {
   reviewReplies,
   users,
 } from "../db";
-import { validateAttachmentImages } from "../image-attach";
 
 import type {
   CommunityCafe,
@@ -22,7 +22,7 @@ import type {
   FanCafePostList,
   FanCafeBoard,
   ReviewReply,
-} from "../types";
+} from "../../../../lib/types";
 import type { SQL } from "drizzle-orm";
 
 export interface ValidatedFanPostInput {

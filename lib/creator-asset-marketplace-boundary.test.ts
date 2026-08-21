@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migrationSource = readFileSync(
-  new URL("./db/migrations/0013_creator_asset_marketplace.sql", import.meta.url),
+  new URL("../apps/api/src/db/migrations/0013_creator_asset_marketplace.sql", import.meta.url),
   "utf8"
 );
-const serverSource = readFileSync(new URL("./server/creator.ts", import.meta.url), "utf8");
+const serverSource = readFileSync(new URL("../apps/api/src/server/creator.ts", import.meta.url), "utf8");
 const preflightSource = readFileSync(
   new URL("../apps/api/src/modules/creator/creator-asset-schema-preflight.ts",
     import.meta.url
@@ -78,7 +78,7 @@ describe("creator asset marketplace persistence boundary", () => {
     expect(preflightSource).toContain("to_regclass('public.creator_asset')");
     expect(preflightSource).toContain("to_regclass('public.creator_asset_report')");
     expect(productionMigrationManifestSource).toContain(
-      "lib/db/migrations/0013_creator_asset_marketplace.sql"
+      "apps/api/src/db/migrations/0013_creator_asset_marketplace.sql"
     );
     expect(ciSource).toContain("scripts/production-database-migrations.manifest");
     expect(ciSource).toContain("run-production-database-migrations.mjs");

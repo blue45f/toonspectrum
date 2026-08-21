@@ -11,9 +11,6 @@
     "emitDecoratorMetadata": true,
     "verbatimModuleSyntax": false,
     "baseUrl": ".",
-    "paths": {
-      "@/*": ["../*"]
-    },
     "outDir": "dist",
     "rootDir": "../..",
     "types": ["node"],

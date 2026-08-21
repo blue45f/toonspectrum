@@ -1,4 +1,4 @@
-import { SESSION_TOKEN_TTL_MS } from "../../../lib/server/session";
+import { SESSION_TOKEN_TTL_MS } from "./server/session";
 
 import type { CookieOptions } from "express";
 

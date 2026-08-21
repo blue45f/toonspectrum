@@ -141,7 +141,7 @@ jobs:
         run: |
           set -euo pipefail
           while IFS= read -r migration_path; do
-            if [[ "$migration_path" == lib/db/migrations/0020_* ]]; then
+            if [[ "$migration_path" == apps/api/src/db/migrations/0020_* ]]; then
               break
             fi
             psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \

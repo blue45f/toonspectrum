@@ -101,7 +101,7 @@ async function main() {
     { DrizzleCreatorMarketplaceResourceRepository },
     { PostgresCreatorMarketplacePublishGate },
   ] = await Promise.all([
-    import("../lib/db/index"),
+    import("../apps/api/src/db/index"),
     import("../apps/api/src/modules/creator-marketplace/creator-marketplace.repository"),
     import("../apps/api/src/modules/creator-marketplace/creator-marketplace-publish-gate.repository"),
   ]);
@@ -124,7 +124,7 @@ async function main() {
         "0021_creator_marketplace_resource.sql",
         "0022_creator_marketplace_distributed_gate_search.sql",
       ].map((name) =>
-        readFile(new URL(`../lib/db/migrations/${name}`, import.meta.url), "utf8")
+        readFile(new URL(`../apps/api/src/db/migrations/${name}`, import.meta.url), "utf8")
       )
     );
     for (const migration of migrations) await dbPool.query(migration);

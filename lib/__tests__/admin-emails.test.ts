@@ -6,7 +6,7 @@ import {
   isWhitelistedAdminEmail,
   normalizeAdminEmail,
   resolveEffectiveAdminRole,
-} from "../server/admin-emails";
+} from "../../apps/api/src/server/admin-emails";
 
 describe("admin email whitelist", () => {
   const original = process.env.ADMIN_EMAILS;

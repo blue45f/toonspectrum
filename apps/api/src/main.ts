@@ -1,4 +1,4 @@
-import "./load-env"; // 반드시 첫 import — lib/db가 DATABASE_URL을 읽기 전에 .env.local 주입
+import "./load-env"; // 반드시 첫 import — apps/api/src/db가 DATABASE_URL을 읽기 전에 .env.local 주입
 import "reflect-metadata";
 import { RequestMethod } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";

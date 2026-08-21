@@ -28,15 +28,15 @@ starting the API:
 ```bash
 pnpm exec drizzle-kit push --force
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
-  -f lib/db/migrations/0013_creator_asset_marketplace.sql
+  -f apps/api/src/db/migrations/0013_creator_asset_marketplace.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
-  -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
+  -f apps/api/src/db/migrations/0009_socket_io_postgres_adapter.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
-  -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
+  -f apps/api/src/db/migrations/0017_creator_work_live_lock_revision.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
-  -f lib/db/migrations/0018_studio_ai_request_gate.sql
+  -f apps/api/src/db/migrations/0018_studio_ai_request_gate.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
-  -f lib/db/migrations/0019_studio_ai_request_receipt.sql
+  -f apps/api/src/db/migrations/0019_studio_ai_request_receipt.sql
 ```
 
 On a fresh Drizzle schema there are no legacy leases to evict. The `0017` command establishes the
@@ -50,13 +50,13 @@ With all Studio API writers stopped:
 
 ```bash
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
-  -f lib/db/migrations/0013_creator_asset_marketplace.sql
+  -f apps/api/src/db/migrations/0013_creator_asset_marketplace.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
-  -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
+  -f apps/api/src/db/migrations/0017_creator_work_live_lock_revision.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
-  -f lib/db/migrations/0018_studio_ai_request_gate.sql
+  -f apps/api/src/db/migrations/0018_studio_ai_request_gate.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
-  -f lib/db/migrations/0019_studio_ai_request_receipt.sql
+  -f apps/api/src/db/migrations/0019_studio_ai_request_receipt.sql
 ```
 
 Do not run `drizzle-kit push --force` as a substitute. It can create the final column shape but

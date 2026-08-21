@@ -16,7 +16,7 @@
   위조하지 않는다**(핫링크 보호 우회 금지). 원본 CDN 이 핫링크를 거부하면 그 거부를 존중하고
   타이포그래픽 커버로 폴백한다.
 - **킬스위치**: `COVER_IMAGE_POLICY=off` 로 두면 제3자 표지를 일절 표시하지 않는다. 정적 빌드·런타임
-  API(`replaceCatalogData` → `lib/server/cover-policy.ts`)와 프록시가 모두 표지를 끈다(이미 캐시된
+  API(`replaceCatalogData` → `apps/api/src/server/cover-policy.ts`)와 프록시가 모두 표지를 끈다(이미 캐시된
   정적 JSON 의 표지 URL 도 프록시가 404 로 무력화).
 - 캐시는 `immutable` 을 쓰지 않는다 → 권리침해 신고·정책 변경이 빠르게 전파된다.
 - ⚠️ 잔존: `proxy` 모드의 표지 표시 자체는 비영리·인용 항변이 가능한 영역이나 다툼의 여지가 있다.
@@ -32,7 +32,7 @@
 > 정당성** — ①공식 제휴/라이선스 ②자체/UGC ③허용된 공식 API.
 
 - **런타임 크롤 없음.** 배포된 서비스는 요청 시점에 외부 플랫폼을 호출하지 않는다. (2026-07-03:
-  런타임에 네이버/카카오를 페치해 랭킹을 보정하던 `lib/server/live.ts`와 자동 ingest 스케줄러를
+  런타임에 네이버/카카오를 페치해 랭킹을 보정하던 `apps/api/src/server/live.ts`와 자동 ingest 스케줄러를
   **폐기**했다. 랭킹은 커밋된 스냅샷에 대한 산식 전용.) 카탈로그는 커밋 스냅샷(`apps/api/data/
   catalog.json.gz`)을 정적 서빙하며, 수집(`CATALOG_INGEST_MODE`)은 **기본 off**·오프라인 수동
   작업(`pnpm catalog:update`)이다.
@@ -42,7 +42,7 @@
   저장/노출한다. 단, KMAS 이미지 바이너리는 저장하지 않고 서버 이미지 프록시로도 중계하지 않는다.
   KMAS 일 1,000회 한도와 응답 지연을 고려해 제목 조회 결과는 서버 메모리 TTL 캐시로 재사용한다.
   관련정보(`docs/related-info.md`)는 이미 네이버 검색 API·YouTube Data API 전환 경로(env 키)를 갖춰 뒀다.
-- 소스 레지스트리(`lib/server/catalog-sources.ts`)는 플랫폼별 `implementation`·`risk`·`requiredReview`
+- 소스 레지스트리(`apps/api/src/server/catalog-sources.ts`)는 플랫폼별 `implementation`·`risk`·`requiredReview`
   를 둔다. `partner-required`/`high` 소스는 **제휴·공식 피드 확인 전까지 운영 활성화 금지**.
 - ⚠️ **잔존 갭 — 시놉시스 원문:** detail 샤드(`s` 필드)에 플랫폼 시놉시스가 원문 그대로 저장된다.
   시놉시스는 사실이 아니라 **창작 표현**이라 저작권 직접 대상이다. 완화안: 짧은 스니펫만 노출하거나

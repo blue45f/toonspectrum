@@ -63,8 +63,8 @@ flowchart TD
 | 단계 | 무엇 | 핵심 파일 | 비고 |
 |---|---|---|---|
 | ① 수집 | 공개 카탈로그 fetch → `Title[]` 정규화, 표지 URL → `/api/cover?u=` | `scripts/crawl.mjs`, `scripts/crawlers/*.mjs`, `scripts/crawlers/_shared.mjs`, `scripts/crawl-helpers.mjs` | `WEBDEX_SOURCE_IDS`로 소스 제한(`all` 가능). 제목 정규화(`norm`)로 교차연결/신규 분리. 선택된 crawler를 병렬/제한 호출로 실행. |
-| ② 스냅샷 | 크롤 JSON → 품질 게이트 → `catalog.json.gz` **원자적 저장**(tmp→rename, 동일 runHash 스킵) | `lib/server/catalog-ingest.ts`, `lib/server/catalog-file.ts`, `scripts/ingest.mjs`, `scripts/build-static-catalog.ts` | `evaluateRegression`이 총건수 급감/주요 소스 붕괴 시 승격 거부(낡은·부분 데이터로 덮어쓰지 않음). 실행 이력만 DB `catalog_ingest_run`(수 KB). DB 스냅샷 적재는 `WEBDEX_CATALOG_FORCE_DB=1`/`ingest --db` 레거시. 정적 운영은 `catalog:gen`으로 `public/data/*.json`을 생성. |
-| ③ 로드 | gz 파일 → 메모리 카탈로그 (부팅 1회 + 파일 스탯 폴링 핫 리로드) | `src/catalog-static.ts`, `lib/server/catalog-store.ts`, `lib/server/catalog-file.ts` | 기본 프론트는 CDN 정적 파일을 사용. API는 부팅 시 gz 로드 + 인덱스 구성, `CATALOG_REFRESH_POLL_SECONDS`마다 mtime/size 비교(무비용). 파일 없으면 **빈 카탈로그**로 시작(가짜 데이터 미노출). |
+| ② 스냅샷 | 크롤 JSON → 품질 게이트 → `catalog.json.gz` **원자적 저장**(tmp→rename, 동일 runHash 스킵) | `apps/api/src/server/catalog-ingest.ts`, `apps/api/src/server/catalog-file.ts`, `scripts/ingest.mjs`, `scripts/build-static-catalog.ts` | `evaluateRegression`이 총건수 급감/주요 소스 붕괴 시 승격 거부(낡은·부분 데이터로 덮어쓰지 않음). 실행 이력만 DB `catalog_ingest_run`(수 KB). DB 스냅샷 적재는 `WEBDEX_CATALOG_FORCE_DB=1`/`ingest --db` 레거시. 정적 운영은 `catalog:gen`으로 `public/data/*.json`을 생성. |
+| ③ 로드 | gz 파일 → 메모리 카탈로그 (부팅 1회 + 파일 스탯 폴링 핫 리로드) | `src/catalog-static.ts`, `apps/api/src/server/catalog-store.ts`, `apps/api/src/server/catalog-file.ts` | 기본 프론트는 CDN 정적 파일을 사용. API는 부팅 시 gz 로드 + 인덱스 구성, `CATALOG_REFRESH_POLL_SECONDS`마다 mtime/size 비교(무비용). 파일 없으면 **빈 카탈로그**로 시작(가짜 데이터 미노출). |
 | ④ STATIC/API | 카탈로그 질의 + 표지 프록시 + 동적 API | `src/catalog-static.ts`, `apps/api/src/modules/catalog/catalog.controller.ts`, `catalog.service.ts` | 검색·탐색·랭킹 기본은 정적/클라이언트 계산. `/api/cover`는 호스트 allowlist 통과분만 referer 붙여 업스트림서 받아 바이트 검증 후 스트리밍. |
 | ⑤ 화면 | 정적/API fetch → 표지/카드 렌더 | `src/pages/*`, `components/title-poster.tsx`, `components/cover-image.tsx`, `vite.config.ts` | `coverImage`(=`/api/cover`)를 `<img>`로 렌더, 실패 시 타이포그래픽 폴백. |
 
@@ -91,14 +91,14 @@ flowchart TD
 
 - **실크롤(crawler) — 19개 슬롯**: 네이버웹툰, 네이버시리즈, 카카오웹툰, 카카오페이지, 레진, 리디, 문피아, 조아라, 노벨피아, 봄툰, 탑툰, 포스타입, 미스터블루, 코미코, 투믹스, 북큐브, 원스토리, 교보문고, 예스24.
 - **조건부 소스**: 코미코는 한국 외 IP 지오펜스가 있어 KR egress에서만 수집되고, 그 외 환경에서는 빈 결과로 빠르게 종료한다.
-- 레지스트리·구현 상태: `lib/server/catalog-sources.ts` (`implementation: "crawler" | "partner-required"`)
+- 레지스트리·구현 상태: `apps/api/src/server/catalog-sources.ts` (`implementation: "crawler" | "partner-required"`)
 
 ## 설계 원칙
 
 - **역할 분리(비용)**: 카탈로그는 **파일 전용**(`catalog.json.gz`), DB는 **동적 데이터 전용**(리뷰·
   커뮤니티·계정·창작 + ingest 실행 이력 수 KB). 24k편 ~22MB 스냅샷을 DB로 읽고 쓰다 Neon 전송
   쿼터를 소진한 사고의 재발 방지(`docs/ARCH-DECISION-catalog-storage.md` v2).
-- **단일 연결**: `lib/db`는 `DATABASE_URL`(Neon 원격 또는 로컬 docker `:55432`)로 연결 →
+- **단일 연결**: `apps/api/src/db`는 `DATABASE_URL`(Neon 원격 또는 로컬 docker `:55432`)로 연결 →
   ingest 이력/동적 API/drizzle-kit이 동일 DB를 사용. 풀은 슬림(`max 3`·유휴 10s 종료·
   `allowExitOnIdle`)하게 잡아 Neon 컴퓨트가 유휴 시 잠들 수 있게 한다.
 - **정직성**: seed 없음. 스냅샷이 없으면 빈 카탈로그로 시작하고, 품질 게이트가 급감·붕괴 시 승격을 거부.
