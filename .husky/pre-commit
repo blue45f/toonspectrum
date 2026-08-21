@@ -1,4 +1,9 @@
 #!/usr/bin/env sh
 set -e
+# 커밋 훅은 "지금 스테이징한 것"만 본다.
+#
+# 전에는 여기서 저장소 전체 typecheck 를 돌렸다. 같은 보증을 pre-push 와 GitHub CI 가 각각
+# 다시 증명하므로 한 번의 보증에 세 번을 지불하는 구조였고, 무엇보다 커밋과 무관한 파일의
+# 타입 오류가 커밋을 막았다 — 실제로 봉인 갱신 커밋이 손대지도 않은 두 파일 때문에 막혔다.
+# 타입 검사는 pre-push 로 옮겼다(거기서는 푸시 범위 전체가 대상이라 의미가 있다).
 NODE_OPTIONS='--max-old-space-size=8192' pnpm exec lint-staged
-pnpm run typecheck

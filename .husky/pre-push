@@ -26,4 +26,27 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 127
 fi
 
-pnpm run verify:push
+# 푸시 훅은 "이 푸시가 가져오는 변경"만 본다.
+#
+# 전에는 여기서 `verify:push`(=`ci` 전체 + 감사 2회 중복)를 돌렸다. 20~45분이 걸렸고,
+# 몇 분 뒤 GitHub CI 가 같은 체인을 Postgres 서비스와 Playwright 브라우저까지 갖춘
+# 러너에서 다시 돌렸다 — 노트북이 못 하는 검증까지 포함해서. 게다가 `pnpm audit` 이
+# 네트워크를 요구해 오프라인에서는 푸시 자체가 불가능했다.
+# 무거운 체인은 CI 한 곳에서만 지불하고, 여기서는 빠른 되먹임만 남긴다.
+BASE="${PRE_PUSH_BASE:-origin/main}"
+git rev-parse --verify --quiet "$BASE" >/dev/null || BASE=""
+
+pnpm run validate:architecture
+NODE_OPTIONS='--max-old-space-size=8192' pnpm run typecheck
+
+if [ -n "$BASE" ]; then
+  node scripts/lint-changed.mjs "--base=$BASE"
+  # 의존성·릴리스 산출물이 이 푸시에 포함될 때만 공급망 검사를 지불한다.
+  if git diff --name-only "$BASE...HEAD" -- package.json pnpm-lock.yaml packages/studio-hokusai-wasm \
+    | grep -q .; then
+    pnpm run audit:security
+    pnpm run audit:licenses
+  fi
+else
+  node scripts/lint-changed.mjs
+fi
