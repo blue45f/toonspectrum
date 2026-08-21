@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PANEL_LAYOUTS } from "../studio-panel-layouts";
+import { NATURAL_IDLE_POSES } from "../studio-pose-presets";
 import { SCENE_TEMPLATES } from "../studio-scene-templates";
 
 import {
@@ -8,7 +9,10 @@ import {
   createQuickComicDraft,
   createQuickComicInput,
   createQuickComicPreview,
+  createQuickComicSceneRecipe,
+  diagnoseQuickComicSceneRecipe,
   QUICK_COMIC_STEPS,
+  quickComicRecipeReferenceCatalog,
 } from "./studio-quick-comic-plan";
 
 describe("studio quick comic plan", () => {
@@ -74,5 +78,42 @@ describe("studio quick comic plan", () => {
     expect(clampQuickComicStep(-3)).toBe(0);
     expect(clampQuickComicStep(2.8)).toBe(2);
     expect(clampQuickComicStep(99)).toBe(3);
+  });
+
+  it("레이아웃 프레임 1개를 Scene Recipe 컷 1개로 사상한다", () => {
+    const layout = PANEL_LAYOUTS.find((candidate) => candidate.frames.length >= 3)!;
+    const recipe = createQuickComicSceneRecipe({
+      ...createQuickComicDraft(),
+      layoutId: layout.id,
+      sceneTemplateId: SCENE_TEMPLATES[0]!.id,
+      cast: [{ id: "hero", expressionRef: "xf_joy", poseRef: NATURAL_IDLE_POSES[0]!.id }],
+    });
+    expect(recipe).not.toBeNull();
+    expect(recipe!.shots.length).toBe(layout.frames.length);
+    expect(recipe!.shots[0]!.id).toBe(`${layout.id}-frame-1`);
+    expect(recipe!.setRef).toBe(SCENE_TEMPLATES[0]!.id);
+    expect(recipe!.cast[0]!.expressionRef).toBe("xf_joy");
+  });
+
+  it("유효하지 않은 레이아웃이면 레시피를 만들지 않는다", () => {
+    expect(createQuickComicSceneRecipe({
+      ...createQuickComicDraft(),
+      layoutId: "no-such-layout",
+    })).toBeNull();
+  });
+
+  it("실제 프리셋 카탈로그로 dangling 레퍼런스를 진단한다", () => {
+    const catalog = quickComicRecipeReferenceCatalog();
+    expect(catalog.expressions?.has("xf_joy")).toBe(true);
+    const diagnostics = diagnoseQuickComicSceneRecipe({
+      ...createQuickComicDraft(),
+      cast: [
+        { id: "hero", expressionRef: "xf_joy" },
+        { id: "rival", poseRef: "pose-no-such" },
+      ],
+    });
+    const codes = diagnostics.map((d) => d.code);
+    expect(codes).toContain("dangling-pose-ref");
+    expect(codes).not.toContain("dangling-expression-ref");
   });
 });
