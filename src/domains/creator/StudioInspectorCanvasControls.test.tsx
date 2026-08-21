@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BG_PRESETS } from "./studio-assets";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
+import { resetStudioInspectorSectionStateCache } from "./studio-inspector-section-state";
 import {
   StudioInspectorCanvasControls,
   type StudioInspectorCanvasControlsProps,
@@ -47,7 +48,25 @@ afterEach(cleanup);
 
 beforeEach(() => {
   useI18n.getState().setLang("ko");
+  // 접기 상태는 이제 저장된다 — 테스트 간 누수를 막는다.
+  globalThis.localStorage.clear();
+  resetStudioInspectorSectionStateCache();
 });
+
+/**
+ * 접힌 섹션을 헤더 클릭으로 연다 — 아티스트가 실제로 밟는 경로와 같다.
+ * 이 헬퍼가 필요하다는 사실 자체가 계약이다: advanced 컨트롤은 디스클로저
+ * 하나 뒤에 있고, 그 하나는 이름 있는 버튼이라 키보드로도 닿는다.
+ */
+function openSection(label: string): HTMLElement {
+  const header = screen.getByRole("button", {
+    name: new RegExp(`^${label}`, "u"),
+  });
+  expect(header.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(header);
+  expect(header.getAttribute("aria-expanded")).toBe("true");
+  return header;
+}
 
 function canvasProps(
   overrides: Partial<StudioInspectorCanvasControlsProps> = {}
@@ -105,6 +124,7 @@ describe("StudioInspectorCanvasControls", () => {
     const props = canvasProps();
     render(<StudioInspectorCanvasControls {...props} />);
 
+    openSection("배경·종이 질감");
     fireEvent.click(screen.getByRole("button", { name: "한지" }));
     expect(props.onPaperGrainKindChange).toHaveBeenCalledWith("washi");
     fireEvent.click(screen.getByRole("button", { name: "목탄지" }));
@@ -115,6 +135,7 @@ describe("StudioInspectorCanvasControls", () => {
     const props = canvasProps();
     const view = render(<StudioInspectorCanvasControls {...props} />);
 
+    openSection("배경·종이 질감");
     expect(screen.getByText("균형 · 자연스러운 과립")).toBeTruthy();
     expect(screen.getByRole("img", { name: "수채 중목 실제 결 확대 미리보기" })).toBeTruthy();
     expect(screen.getAllByRole("meter")).toHaveLength(4);
@@ -135,6 +156,7 @@ describe("StudioInspectorCanvasControls", () => {
     const props = canvasProps();
     render(<StudioInspectorCanvasControls {...props} />);
 
+    openSection("배경·종이 질감");
     const preview = screen.getByRole("checkbox", {
       name: /편집 화면에서 종이 결 미리보기/u,
     });
@@ -151,11 +173,18 @@ describe("StudioInspectorCanvasControls", () => {
     const props = canvasProps();
     render(<StudioInspectorCanvasControls {...props} />);
 
+    // 배경색과 높이는 기본 티어 — 디스클로저 없이 바로 닿는다.
     fireEvent.change(screen.getByLabelText("배경색"), {
       target: { value: "#123456" },
     });
     expect(props.onBackgroundChange).toHaveBeenCalledWith("#123456");
 
+    fireEvent.click(screen.getByRole("button", { name: "높이 240px 줄이기" }));
+    fireEvent.click(screen.getByRole("button", { name: "높이 240px 늘리기" }));
+    expect(props.onCanvasHeightDelta).toHaveBeenNthCalledWith(1, -240);
+    expect(props.onCanvasHeightDelta).toHaveBeenNthCalledWith(2, 240);
+
+    openSection("배경·종이 질감");
     fireEvent.click(
       screen.getByRole("button", { name: `배경 ${BG_PRESETS[0]?.label}` })
     );
@@ -170,38 +199,24 @@ describe("StudioInspectorCanvasControls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "배경 편집기 · 리사이저 열기" }));
     expect(props.onOpenBackgroundEditor).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByRole("button", { name: "높이 240px 줄이기" }));
-    fireEvent.click(screen.getByRole("button", { name: "높이 240px 늘리기" }));
-    expect(props.onCanvasHeightDelta).toHaveBeenNthCalledWith(1, -240);
-    expect(props.onCanvasHeightDelta).toHaveBeenNthCalledWith(2, 240);
   });
 
   it("스냅·그리드·규격과 사용자 가이드 조작을 controlled callback으로 전달한다", () => {
     const props = canvasProps();
     render(<StudioInspectorCanvasControls {...props} />);
 
-    fireEvent.change(screen.getByRole("slider", { name: /패널 여백/u }), {
-      target: { value: "32" },
-    });
-    expect(props.onPanelGutterChange).toHaveBeenCalledWith(32);
-
+    // 기본 티어 — 스냅·그리드·웹툰 규격은 접기 뒤가 아니다.
     const snapGuideCheckbox = screen.getByRole("checkbox", {
       name: /오브젝트·격자 스냅/u,
     });
-    const alignmentGuideCheckbox = screen.getByRole("checkbox", {
-      name: /정렬선 표시/u,
-    });
-
     fireEvent.click(snapGuideCheckbox);
     expect(props.onSnapEnabledChange).toHaveBeenCalledWith(false);
 
-    fireEvent.click(alignmentGuideCheckbox);
-    expect(props.onShowAlignmentGuidesChange).toHaveBeenCalledWith(false);
-
     fireEvent.click(screen.getByLabelText("그리드 격자 표시"));
     expect(props.onShowGridChange).toHaveBeenCalledWith(false);
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "60" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "그리드 간격" }), {
+      target: { value: "60" },
+    });
     expect(props.onGridSizeChange).toHaveBeenCalledWith(60);
 
     const webtoonGuideToggle = screen.getByLabelText("웹툰 규격 가이드");
@@ -209,6 +224,19 @@ describe("StudioInspectorCanvasControls", () => {
     fireEvent.click(webtoonGuideToggle);
     expect(props.onWarmWebtoonGuides).toHaveBeenCalledTimes(1);
     expect(props.onShowWebtoonGuidesChange).toHaveBeenCalledWith(true);
+
+    openSection("크기·여백");
+    fireEvent.change(screen.getByRole("slider", { name: /패널 여백/u }), {
+      target: { value: "32" },
+    });
+    expect(props.onPanelGutterChange).toHaveBeenCalledWith(32);
+
+    openSection("가이드선");
+    const alignmentGuideCheckbox = screen.getByRole("checkbox", {
+      name: /정렬선 표시/u,
+    });
+    fireEvent.click(alignmentGuideCheckbox);
+    expect(props.onShowAlignmentGuidesChange).toHaveBeenCalledWith(false);
 
     fireEvent.click(screen.getByRole("button", { name: "+ 세로 가이드" }));
     fireEvent.click(screen.getByRole("button", { name: "+ 가로 가이드" }));
@@ -230,6 +258,7 @@ describe("StudioInspectorCanvasControls", () => {
     const props = canvasProps();
     render(<StudioInspectorCanvasControls {...props} />);
 
+    openSection("가이드선");
     fireEvent.click(screen.getByRole("button", { name: "세로 가이드 25% 추가" }));
     expect(props.onAddUserGuide).toHaveBeenLastCalledWith("v", 180);
 
@@ -248,6 +277,7 @@ describe("StudioInspectorCanvasControls", () => {
     const props = canvasProps();
     render(<StudioInspectorCanvasControls {...props} />);
 
+    openSection("가이드선");
     const directInput = screen.getByRole("textbox", { name: "직접 입력" });
     const addButton = screen.getByRole("button", { name: "추가" });
     const initialCalls = vi.mocked(props.onAddUserGuide).mock.calls.length;
@@ -268,6 +298,9 @@ describe("StudioInspectorCanvasControls", () => {
     const props = canvasProps();
     const { rerender } = render(<StudioInspectorCanvasControls {...props} />);
 
+    openSection("크기·여백");
+    openSection("가이드선");
+    openSection("만화/웹툰 연출 스타일");
     expect(screen.getByRole("region", { name: "매직 리사이즈 720×12000" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "테스트 규격 적용" }));
     fireEvent.click(screen.getByRole("button", { name: "맞춤 축소 전략" }));
@@ -296,5 +329,157 @@ describe("StudioInspectorCanvasControls", () => {
 
     rerender(<StudioInspectorCanvasControls {...props} masterEditMode />);
     expect(screen.queryByRole("region", { name: /매직 리사이즈/u })).toBeNull();
+  });
+});
+
+/**
+ * Wave D 는 이 패널을 손대지 않아서 23개 컨트롤이 전부 펼쳐진 채였다 — 인스펙터에서
+ * 가장 긴 스크롤이었다. 아래는 그걸 접고 나서 지켜야 하는 것들이다.
+ */
+describe("StudioInspectorCanvasControls — CSP식 접기", () => {
+  const ADVANCED_SECTIONS = [
+    "배경·종이 질감",
+    "크기·여백",
+    "가이드선",
+    "만화/웹툰 연출 스타일",
+  ] as const;
+
+  it("기본 티어 다섯 가지는 접기 없이 바로 보인다", () => {
+    render(<StudioInspectorCanvasControls {...canvasProps()} />);
+
+    expect(screen.getByLabelText("배경색")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "높이 240px 늘리기" })).toBeTruthy();
+    expect(screen.getByLabelText("그리드 격자 표시")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /오브젝트·격자 스냅/u })).toBeTruthy();
+    expect(screen.getByLabelText("웹툰 규격 가이드")).toBeTruthy();
+  });
+
+  it("접힌 섹션은 열기 전까지 자기 컨트롤을 아예 렌더하지 않는다", () => {
+    render(<StudioInspectorCanvasControls {...canvasProps()} />);
+
+    // 열기 전: 안쪽 컨트롤이 DOM 에 없다(숨김이 아니라 미마운트).
+    expect(screen.queryByRole("button", { name: "배경 편집기 · 리사이저 열기" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: /패널 여백/u })).toBeNull();
+    expect(screen.queryByRole("button", { name: "+ 세로 가이드" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "소프트" })).toBeNull();
+
+    for (const label of ADVANCED_SECTIONS) openSection(label);
+
+    expect(screen.getByRole("button", { name: "배경 편집기 · 리사이저 열기" })).toBeTruthy();
+    expect(screen.getByRole("slider", { name: /패널 여백/u })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "+ 세로 가이드" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "소프트" })).toBeTruthy();
+  });
+
+  it("모든 섹션 헤더가 aria-expanded 와 aria-controls 를 가진 진짜 버튼이다", () => {
+    render(<StudioInspectorCanvasControls {...canvasProps()} />);
+
+    for (const label of ADVANCED_SECTIONS) {
+      const header = screen.getByRole("button", {
+        name: new RegExp(`^${label}`, "u"),
+      });
+      expect(header.tagName).toBe("BUTTON");
+      expect(header.getAttribute("type")).toBe("button");
+      expect(header.getAttribute("aria-expanded")).toBe("false");
+      const controls = header.getAttribute("aria-controls");
+      expect(controls).toBeTruthy();
+      expect(document.getElementById(controls!)).toBeTruthy();
+    }
+  });
+
+  it("키보드 Enter 로도 열린다 — 마우스 전용 경로가 아니다", () => {
+    render(<StudioInspectorCanvasControls {...canvasProps()} />);
+
+    const header = screen.getByRole("button", { name: /^가이드선/u });
+    header.focus();
+    expect(document.activeElement).toBe(header);
+    // 네이티브 <button> 이므로 Enter 는 click 으로 승격된다.
+    fireEvent.click(header);
+    expect(header.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("값이 설정된 섹션은 닫힌 헤더에 배지로 그 사실을 밝힌다", () => {
+    render(
+      <StudioInspectorCanvasControls
+        {...canvasProps({ showAlignmentGuides: true, webtoonTheme: "vivid" })}
+      />,
+    );
+
+    // 가이드선: 정렬선 표시 + 사용자 가이드 있음 → 2. 숫자 배지는 시각 전용이고
+    // 접근 가능한 이름에는 문장이 들어간다("가이드선2" 로 붙여 읽히지 않게).
+    expect(
+      screen.getByRole("button", { name: "가이드선, 설정 2개 켜짐" }),
+    ).toBeTruthy();
+    // 연출 스타일: 기본값(출판만화)이 아니므로 1
+    expect(
+      screen.getByRole("button", { name: "만화/웹툰 연출 스타일, 설정 1개 켜짐" }),
+    ).toBeTruthy();
+  });
+
+  it("기본값 그대로인 섹션에는 배지를 붙이지 않는다", () => {
+    render(
+      <StudioInspectorCanvasControls
+        {...canvasProps({
+          showAlignmentGuides: false,
+          userGuides: [],
+          webtoonTheme: "classic",
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "가이드선" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "만화/웹툰 연출 스타일" })).toBeTruthy();
+  });
+
+  it("펼쳐 둔 섹션은 패널이 통째로 언마운트됐다 돌아와도 펼쳐진 채다", () => {
+    const view = render(<StudioInspectorCanvasControls {...canvasProps()} />);
+    openSection("크기·여백");
+
+    // 인스펙터가 페이지 탭을 떠났다 돌아오는 상황.
+    view.unmount();
+    render(<StudioInspectorCanvasControls {...canvasProps()} />);
+
+    const header = screen.getByRole("button", { name: /^크기·여백/u });
+    expect(header.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("slider", { name: /패널 여백/u })).toBeTruthy();
+  });
+
+  it("접어 둔 것도 똑같이 기억한다 — 기억은 한쪽 방향이 아니다", () => {
+    const view = render(<StudioInspectorCanvasControls {...canvasProps()} />);
+    const opened = openSection("가이드선");
+    fireEvent.click(opened);
+    expect(opened.getAttribute("aria-expanded")).toBe("false");
+
+    view.unmount();
+    render(<StudioInspectorCanvasControls {...canvasProps()} />);
+    expect(
+      screen.getByRole("button", { name: /^가이드선/u }).getAttribute("aria-expanded"),
+    ).toBe("false");
+  });
+
+  it("모든 컨트롤은 접기 뒤로 갔을 뿐 사라지지 않았다", () => {
+    const props = canvasProps();
+    render(<StudioInspectorCanvasControls {...props} />);
+    for (const label of ADVANCED_SECTIONS) openSection(label);
+
+    // density 표가 23개 leaf 를 선언한다. 대표 컨트롤이 전부 살아 있는지 훑는다.
+    for (const name of [
+      "배경 편집기 · 리사이저 열기",
+      "+ 세로 가이드",
+      "+ 가로 가이드",
+      "모든 가이드 삭제",
+      "세로 가이드 25% 추가",
+      "출판만화",
+      "소프트",
+      "비비드",
+      "배경도 중목 색으로 맞추기",
+    ]) {
+      expect(screen.getByRole("button", { name }), name).toBeTruthy();
+    }
+    expect(screen.getByRole("slider", { name: /패널 여백/u })).toBeTruthy();
+    expect(screen.getByRole("slider", { name: "세로 가이드 #1 위치" })).toBeTruthy();
+    expect(
+      screen.getByRole("checkbox", { name: /편집 화면에서 종이 결 미리보기/u }),
+    ).toBeTruthy();
   });
 });

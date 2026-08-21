@@ -17,6 +17,10 @@
  *   table, so an unlisted section would be invisible to them.
  * - `activeCount` surfaces "이 안에 값이 설정돼 있다" on the closed header, so
  *   collapsing never hides the fact that something is switched on.
+ * - The open/closed choice **survives the tabpanel unmount**
+ *   (`studio-inspector-section-state.ts`). The inspector tears whole tabpanels
+ *   down as the artist moves between 속성/레이어/페이지/게시, so before this the
+ *   disclosure re-charged a click on every round trip; CSP's palettes remember.
  */
 
 import { ChevronDown } from "lucide-react";
@@ -28,6 +32,10 @@ import {
   scrollStudioInspectorTargetIntoView,
   useStudioInspectorFocusRequest,
 } from "./studio-inspector-focus-effect";
+import {
+  readStudioInspectorSectionOpen,
+  writeStudioInspectorSectionOpen,
+} from "./studio-inspector-section-state";
 
 import type { StudioInspectorFocusTarget } from "./studio-inspector-focus";
 import type { ReactNode } from "react";
@@ -59,13 +67,26 @@ export function StudioInspectorSection({
   loadingLabel = "설정을 여는 중...",
   children,
 }: StudioInspectorSectionProps) {
-  const [open, setOpen] = useState(defaultOpen || forceOpen);
+  const [open, setOpen] = useState(
+    () =>
+      forceOpen || readStudioInspectorSectionOpen(sectionId, defaultOpen),
+  );
   const panelId = useId();
   const rootRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (forceOpen) setOpen(true);
   }, [forceOpen]);
+
+  /**
+   * 헤더를 실제로 누른 것만 기록한다. 검색/딥링크가 강제로 연 것까지 선호로
+   * 저장하면 "내가 접어 둔 섹션"이 남의 이동 때문에 조용히 바뀐다.
+   */
+  const toggleOpen = () => {
+    const next = !open;
+    setOpen(next);
+    writeStudioInspectorSectionOpen(sectionId, next);
+  };
 
   // A menu row pointing at this section must land the artist *on the control*,
   // not on a collapsed header they still have to find and click.
@@ -81,25 +102,34 @@ export function StudioInspectorSection({
   return (
     <section
       ref={rootRef}
-      className="mt-3 border-t border-line/50 pt-3"
+      className="mt-2 border-t border-line/50 pt-2"
       data-inspector-section={sectionId}
+      data-inspector-section-open={open ? "true" : "false"}
     >
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((previous) => !previous)}
-        className="flex min-h-6 w-full items-center justify-between gap-3 rounded-lg px-1.5 py-1 text-left text-xs font-semibold text-fg transition-colors hover:bg-raised/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        onClick={toggleOpen}
+        // 터치에서는 44px, 데스크톱 마우스에서는 32px. 이전 min-h-6(24px)은
+        // 손가락 대상으로 쓰기에 너무 작았다.
+        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-1.5 py-1 text-left text-xs font-semibold text-fg transition-colors hover:bg-raised/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-8 pointer-coarse:min-h-11"
       >
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate">{heading}</span>
           {activeCount > 0 && !open ? (
-            <span
-              className="shrink-0 rounded-full bg-accent/15 px-1.5 py-px text-[0.6rem] font-bold tabular-nums text-accent"
-              title={`${activeCount}개 설정이 켜져 있습니다.`}
-            >
-              {activeCount}
-            </span>
+            <>
+              {/* 스크린리더가 "가이드선2" 로 붙여 읽지 않도록 숫자는 시각 전용으로
+                  두고, 이름에는 문장을 넣는다. */}
+              <span
+                aria-hidden
+                className="shrink-0 rounded-full bg-accent/15 px-1.5 py-px text-[0.6rem] font-bold tabular-nums text-accent"
+                title={`${activeCount}개 설정이 켜져 있습니다.`}
+              >
+                {activeCount}
+              </span>
+              <span className="sr-only">{`, 설정 ${activeCount}개 켜짐`}</span>
+            </>
           ) : null}
         </span>
         <ChevronDown

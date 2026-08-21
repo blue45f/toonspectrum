@@ -1711,25 +1711,25 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               : { width: rightResize.width, minWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum }
           }
         >
-          <div className="hidden items-center justify-between gap-1 lg:flex">
-            <span className="text-[0.65rem] font-bold uppercase tracking-[0.08em] text-fg-3">인스펙터</span>
-            <button
-              type="button"
-              onClick={() => setRightPanelOpen(false)}
-              className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-              title="속성 패널 접기"
-            >
-              접기 <ChevronRight size={12} />
-            </button>
-          </div>
-          {/*
-            통합 Command Search 진입점. 감사 §2.8 이 센 네 개의 부분 검색창을
-            대신하고, 인스펙터가 접은 Advanced 컨트롤의 대체 도달 경로이기도
-            하다(F1).
-          */}
-          {/* 명령 검색 결과를 실제 도움말 목적지에 연결해 클릭·Enter no-op을 막는다. */}
+          {/* 통합 Command Search 진입점(F1) — 감사 §2.8 의 네 부분 검색창을 대신하고
+              접힌 Advanced 컨트롤의 대체 도달 경로다. 접기 버튼은 이 줄 위에 있던
+              "인스펙터" 캡션 전용 행에서 여기로 합쳤다(캡션은 아래 탭 스트립과 중복).
+              명령 검색 결과는 실제 도움말 목적지로 연결해 클릭·Enter no-op을 막는다. */}
           <StudioCommandSearchHost
             hideTrigger={isMobile}
+            trailing={
+              isMobile ? null : (
+                <button
+                  type="button"
+                  onClick={() => setRightPanelOpen(false)}
+                  aria-label="속성 패널 접기"
+                  className="mr-1 hidden min-h-9 shrink-0 items-center gap-0.5 rounded px-1.5 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:inline-flex"
+                  title="속성 패널 접기"
+                >
+                  접기 <ChevronRight size={12} aria-hidden />
+                </button>
+              )
+            }
             onNavigateInspector={(route) => {
               changeInspectorLayout(
                 normalizeStudioInspectorLayout({ ...inspectorLayout, ...route }),

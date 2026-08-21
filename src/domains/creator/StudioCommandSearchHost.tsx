@@ -17,6 +17,7 @@ import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./s
 import { subscribeStudioCommandSearchRequests } from "./studio-help-center-channel";
 
 import type { StudioCommandSearchDialogProps } from "./StudioCommandSearchDialog";
+import type { ReactNode } from "react";
 
 const StudioCommandSearchDialog = lazy(() =>
   import("./StudioCommandSearchDialog").then((module) => ({
@@ -30,6 +31,14 @@ export type StudioCommandSearchHostProps = Omit<
 > & {
   /** 트리거 버튼을 숨기고 F1 만 남긴다(모바일 등). */
   hideTrigger?: boolean;
+  /**
+   * 트리거와 같은 줄 오른쪽에 붙는 크롬 버튼(예: 인스펙터 접기).
+   *
+   * 인스펙터는 이 줄 위에 "인스펙터 / 접기" 전용 캡션 행을 따로 갖고 있었다. 캡션은
+   * 바로 아래 탭 스트립이 이미 말해 주는 정보라 세로 공간만 먹었으므로, 접기 버튼을
+   * 검색 트리거 옆으로 옮기고 행 하나를 캔버스에 돌려준다.
+   */
+  trailing?: ReactNode;
 };
 
 /**
@@ -45,6 +54,7 @@ function isEditingTarget(target: EventTarget | null): boolean {
 
 export function StudioCommandSearchHost({
   hideTrigger = false,
+  trailing,
   ...dialogProps
 }: StudioCommandSearchHostProps) {
   const [open, setOpen] = useState(false);
@@ -71,27 +81,35 @@ export function StudioCommandSearchHost({
 
   return (
     <>
-      {hideTrigger ? null : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          data-testid="studio-command-search-trigger"
-          title="명령·속성 통합 검색 (F1)"
-          className="flex min-h-11 w-full items-center gap-2 border-b border-line px-3 text-left text-xs text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      {hideTrigger && !trailing ? null : (
+        <div
+          data-studio-command-search-row="true"
+          className="flex min-w-0 items-center gap-1 border-b border-line"
         >
-          <Search
-            size={STUDIO_ICON_SIZE.contextMenu}
-            strokeWidth={STUDIO_ICON_STROKE}
-            aria-hidden
-            className={studioChromeIconClass({ tone: "default" })}
-          />
-          <span className="min-w-0 flex-1 truncate">
-            기능 검색 · CSP·Photoshop 용어
-          </span>
-          <kbd className="shrink-0 rounded border border-line bg-card px-1.5 py-px text-[0.62rem]">
-            F1
-          </kbd>
-        </button>
+          {hideTrigger ? null : (
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              data-testid="studio-command-search-trigger"
+              title="명령·속성 통합 검색 (F1)"
+              className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-xs text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-9"
+            >
+              <Search
+                size={STUDIO_ICON_SIZE.contextMenu}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioChromeIconClass({ tone: "default" })}
+              />
+              <span className="min-w-0 flex-1 truncate">
+                기능 검색 · CSP·Photoshop 용어
+              </span>
+              <kbd className="shrink-0 rounded border border-line bg-card px-1.5 py-px text-[0.62rem]">
+                F1
+              </kbd>
+            </button>
+          )}
+          {trailing}
+        </div>
       )}
       {open ? (
         <Suspense fallback={null}>

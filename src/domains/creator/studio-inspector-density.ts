@@ -46,7 +46,15 @@
 
 /* ------------------------------------------------------------------ types */
 
-export type StudioInspectorPanelId = "element-properties" | "tool-properties";
+export type StudioInspectorPanelId =
+  | "element-properties"
+  | "tool-properties"
+  /**
+   * 페이지 ▸ 캔버스. Wave D 는 두 속성 패널만 접었고 이 패널은 손대지 않아서,
+   * 23개 컨트롤이 디스클로저 하나 없이 전부 펼쳐진 채 남아 있었다 — 인스펙터에서
+   * 가장 긴 스크롤이자 "항상 펼쳐져 있지만 자주 쓰지 않는" 표면의 대표였다.
+   */
+  | "document-canvas";
 
 export type StudioInspectorTier = "default" | "advanced";
 
@@ -82,7 +90,16 @@ export type StudioInspectorCanonicalKey =
   | "brush-studio"
   | "brush-engines"
   | "symmetry"
-  | "rulers";
+  | "rulers"
+  | "canvas-background"
+  | "canvas-height"
+  | "canvas-grid"
+  | "canvas-snap"
+  | "canvas-webtoon-guides"
+  | "canvas-surface"
+  | "canvas-resize"
+  | "canvas-guide-lines"
+  | "canvas-style";
 
 export interface StudioInspectorControlGroup {
   id: string;
@@ -143,6 +160,15 @@ export const STUDIO_INSPECTOR_CANONICAL_LABELS: Readonly<
   "brush-engines": "브러시 엔진",
   symmetry: "대칭 자",
   rulers: "자·가이드",
+  "canvas-background": "배경색",
+  "canvas-height": "높이",
+  "canvas-grid": "그리드 격자 표시",
+  "canvas-snap": "정렬 가이드 (스냅)",
+  "canvas-webtoon-guides": "웹툰 규격 가이드",
+  "canvas-surface": "배경·종이 질감",
+  "canvas-resize": "크기·여백",
+  "canvas-guide-lines": "가이드선",
+  "canvas-style": "만화/웹툰 연출 스타일",
 });
 
 /** V5 §15 budget for the default tier, counted in leaves. */
@@ -452,6 +478,108 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
   },
 ];
 
+/**
+ * 페이지 ▸ 캔버스 (`StudioInspectorCanvasControls.tsx`).
+ *
+ * 기본 티어는 "이 문서가 어떻게 보이는지"를 매 컷 확인하는 다섯 가지다 — 배경색,
+ * 높이, 그리드, 스냅, 웹툰 규격 가이드. 나머지는 문서를 처음 세울 때 한 번 만지고
+ * 그 뒤로는 거의 건드리지 않는 설정이라 CSP 팔레트처럼 접었다.
+ */
+const DOCUMENT_CANVAS: readonly StudioInspectorControlGroup[] = [
+  /* -------------------------------------------------------------- default */
+  {
+    id: "canvas.background",
+    canonical: "canvas-background",
+    label: label("canvas-background"),
+    tier: "default",
+    leaves: 1,
+    source: "StudioInspectorCanvasControls.tsx:134-146",
+    rationale:
+      "프록시 3 — CSP 신규 캔버스 대화상자·PS 캔버스 설정 모두 배경색을 첫 줄에 둔다.",
+  },
+  {
+    id: "canvas.height",
+    canonical: "canvas-height",
+    label: label("canvas-height"),
+    tier: "default",
+    leaves: 1,
+    source: "StudioInspectorCanvasControls.tsx:148-176",
+    rationale:
+      "프록시 3 — 세로 스크롤 웹툰에서 페이지 길이는 작업 내내 조정하는 값이다.",
+  },
+  {
+    id: "canvas.grid",
+    canonical: "canvas-grid",
+    label: label("canvas-grid"),
+    tier: "default",
+    leaves: 2,
+    source: "StudioInspectorCanvasControls.tsx:178-208",
+    rationale:
+      "프록시 3 — 격자 표시 토글은 CSP 표시 메뉴·PS 보기 메뉴의 상시 항목이다. 간격 select 가 같은 행에 묶여 있다.",
+  },
+  {
+    id: "canvas.snap",
+    canonical: "canvas-snap",
+    label: label("canvas-snap"),
+    tier: "default",
+    leaves: 1,
+    source: "StudioInspectorCanvasControls.tsx:210-226",
+    rationale:
+      "프록시 3 — 스냅 on/off 는 배치 작업 중 계속 껐다 켜는 토글이라 어느 제품도 접지 않는다.",
+  },
+  {
+    id: "canvas.webtoon-guides",
+    canonical: "canvas-webtoon-guides",
+    label: label("canvas-webtoon-guides"),
+    tier: "default",
+    leaves: 1,
+    source: "StudioInspectorCanvasControls.tsx:228-262",
+    rationale:
+      "프록시 1 — 이 제품 고유의 규격 확인 수단이고, 켜져 있는지 아닌지가 매 컷 판단에 들어간다.",
+  },
+
+  /* ------------------------------------------------------------- advanced */
+  {
+    id: "canvas.surface",
+    canonical: "canvas-surface",
+    label: label("canvas-surface"),
+    tier: "advanced",
+    leaves: 6,
+    source: "StudioInspectorCanvasControls.tsx:264-318",
+    rationale:
+      "종이 질감 3 + 배경 프리셋 + 그라디언트 프리셋 + 배경 편집기. 문서를 세울 때 한 번 정하는 값들이다.",
+  },
+  {
+    id: "canvas.resize",
+    canonical: "canvas-resize",
+    label: label("canvas-resize"),
+    tier: "advanced",
+    leaves: 3,
+    source: "StudioInspectorCanvasControls.tsx:320-352",
+    rationale:
+      "매직 리사이즈 2 + 패널 여백. 리사이즈는 플랫폼 납품 직전 한 번, 여백은 템플릿이 있을 때만 활성이다.",
+  },
+  {
+    id: "canvas.guide-lines",
+    canonical: "canvas-guide-lines",
+    label: label("canvas-guide-lines"),
+    tier: "advanced",
+    leaves: 7,
+    source: "StudioInspectorCanvasControls.tsx:354-430",
+    rationale:
+      "정렬 가이드 표시 + 세로/가로 추가 2 + 퍼센트 가이드 + 가이드 목록 3(위치·삭제·전체 삭제). 가이드를 깔고 나면 목록은 잘 안 본다.",
+  },
+  {
+    id: "canvas.style",
+    canonical: "canvas-style",
+    label: label("canvas-style"),
+    tier: "advanced",
+    leaves: 1,
+    source: "StudioInspectorCanvasControls.tsx:432-452",
+    rationale: "출판만화/소프트/비비드 연출 프리셋. 작품 단위로 한 번 고른다.",
+  },
+];
+
 export const STUDIO_INSPECTOR_DENSITY: Readonly<
   Record<StudioInspectorPanelId, StudioInspectorPanelDensity>
 > = Object.freeze({
@@ -464,6 +592,11 @@ export const STUDIO_INSPECTOR_DENSITY: Readonly<
     id: "tool-properties",
     label: "도구 속성",
     groups: Object.freeze(TOOL_PROPERTIES),
+  },
+  "document-canvas": {
+    id: "document-canvas",
+    label: "캔버스 설정",
+    groups: Object.freeze(DOCUMENT_CANVAS),
   },
 });
 

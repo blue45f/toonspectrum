@@ -33,12 +33,30 @@ import type { StudioInspectorPanelId } from "./studio-inspector-density";
 const PANELS: readonly StudioInspectorPanelId[] = [
   "element-properties",
   "tool-properties",
+  "document-canvas",
 ];
 
-/** Counts the audit reported for each panel before Wave D. */
+/**
+ * Counts measured before each panel was collapsed. The two property panels are
+ * the audit's own numbers; `document-canvas` was counted the same way when the
+ * canvas panel was brought under this contract — it had been left flat by Wave
+ * D and was, at 23 leaves, the longest undisclosed scroll in the inspector.
+ */
 const AUDITED_LEAVES: Readonly<Record<StudioInspectorPanelId, number>> = {
   "element-properties": 33,
   "tool-properties": 35,
+  "document-canvas": 23,
+};
+
+/**
+ * Which component file renders each panel. The density table's `source` fields
+ * must point into one of these, and the disclosure wiring is asserted against
+ * the matching file rather than always `StudioInspectorAside.tsx`.
+ */
+const PANEL_SOURCE_FILES: Readonly<Record<StudioInspectorPanelId, string>> = {
+  "element-properties": "StudioInspectorAside.tsx",
+  "tool-properties": "StudioInspectorAside.tsx",
+  "document-canvas": "StudioInspectorCanvasControls.tsx",
 };
 
 describe("inspector density — 기본 노출 예산 5~9", () => {
@@ -61,7 +79,10 @@ describe("inspector density — 기본 노출 예산 5~9", () => {
       for (const group of inspectorGroups(panel)) {
         expect(["default", "advanced"]).toContain(group.tier);
         expect(group.leaves).toBeGreaterThan(0);
-        expect(group.source).toMatch(/StudioInspectorAside\.tsx:\d/u);
+        // 출처는 그 패널을 실제로 그리는 파일을 가리켜야 한다.
+        expect(group.source, group.id).toMatch(
+          new RegExp(`^${PANEL_SOURCE_FILES[panel].replace(".", "\\.")}:\\d`, "u"),
+        );
       }
     }
   });
@@ -163,10 +184,11 @@ describe("inspector density — 모드가 달라도 동일 명칭", () => {
 });
 
 describe("inspector density — 컴포넌트가 실제로 접기를 렌더한다", () => {
-  const source = readFileSync(
-    path.join(__dirname, "StudioInspectorAside.tsx"),
-    "utf-8",
-  );
+  const sourceOf = (file: string) =>
+    readFileSync(path.join(__dirname, file), "utf-8");
+
+  const source = sourceOf("StudioInspectorAside.tsx");
+  const canvasSource = sourceOf("StudioInspectorCanvasControls.tsx");
 
   const sectionSource = readFileSync(
     path.join(__dirname, "StudioInspectorSection.tsx"),
@@ -183,18 +205,31 @@ describe("inspector density — 컴포넌트가 실제로 접기를 렌더한다
     expect(source).toMatch(
       /import \{ StudioInspectorSection \} from "\.\/StudioInspectorSection"/u,
     );
+    expect(canvasSource).toMatch(
+      /import \{ StudioInspectorSection \} from "\.\/StudioInspectorSection"/u,
+    );
   });
 
   it("선언된 Advanced 섹션 id 가 전부 컴포넌트에 배선돼 있다", () => {
     for (const panel of PANELS) {
+      const panelSource = sourceOf(PANEL_SOURCE_FILES[panel]);
       for (const id of inspectorAdvancedSectionIds(panel)) {
-        expect(source.includes(`"${id}"`), id).toBe(true);
+        expect(panelSource.includes(`"${id}"`), id).toBe(true);
       }
     }
   });
 
-  it("두 패널 정의가 모두 등록돼 있다", () => {
+  it("접기 상태는 탭패널 언마운트를 넘어 기억된다", () => {
+    // 인스펙터는 속성/레이어/페이지/게시를 오갈 때 탭패널을 통째로 버린다.
+    // 기억이 없으면 접기가 왕복마다 클릭을 다시 청구한다(CSP 팔레트는 기억한다).
+    expect(sectionSource).toContain("readStudioInspectorSectionOpen(sectionId, defaultOpen)");
+    expect(sectionSource).toContain("writeStudioInspectorSectionOpen(sectionId, next)");
+    expect(sectionSource).toMatch(/data-inspector-section-open=/u);
+  });
+
+  it("세 패널 정의가 모두 등록돼 있다", () => {
     expect(Object.keys(STUDIO_INSPECTOR_DENSITY).sort()).toEqual([
+      "document-canvas",
       "element-properties",
       "tool-properties",
     ]);
