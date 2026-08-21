@@ -5,14 +5,50 @@ import {
   requestStudioLiveAuthTicket,
   type StudioLiveAuthTicketClientOptions,
 } from "./studio-live-auth-ticket-client";
-import { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
 
 import type { StudioLiveTransportFactory } from "./studio-live-collaboration-transport";
+import type { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
 import type { StudioLiveAuthTicketResponse } from "../../../../lib/studio-live-auth-ticket";
 
 const INITIAL_RETRY_DELAY_MS = 500;
 const MAX_RETRY_DELAY_MS = 8_000;
 const MAX_AUTOMATIC_RETRY_ATTEMPTS = 5;
+
+type StudioServerLiveTransportFactoryBuilder = typeof createStudioServerLiveTransportFactory;
+
+let serverTransportBuilderRequest: Promise<StudioServerLiveTransportFactoryBuilder> | null = null;
+
+/**
+ * The Socket.IO transport is ~4.5k lines and pulls the live wire protocol, the ink codec and the
+ * lock ledger with it. None of that is needed to paint the editor, so it is fetched only once an
+ * admission credential exists — the point at which a collaboration channel is actually wanted.
+ */
+function loadStudioServerLiveTransportFactoryBuilder(): Promise<StudioServerLiveTransportFactoryBuilder> {
+  serverTransportBuilderRequest ??= import("./studio-live-socket-transport")
+    .then((module) => module.createStudioServerLiveTransportFactory)
+    .catch((error: unknown) => {
+      serverTransportBuilderRequest = null;
+      throw error;
+    });
+  return serverTransportBuilderRequest;
+}
+
+function buildGuestTransportFactory(
+  build: StudioServerLiveTransportFactoryBuilder,
+  createGuestCredential: () => string,
+): { readonly credential: string; readonly factory: StudioLiveTransportFactory } | null {
+  try {
+    const credential = createGuestCredential();
+    return {
+      credential,
+      factory: build(credential, {
+        refreshSocketCredential: async () => credential,
+      }),
+    };
+  } catch {
+    return null;
+  }
+}
 
 function defaultScheduleTimeout(handler: () => void, delayMs: number): unknown {
   return globalThis.setTimeout(handler, delayMs);
@@ -57,8 +93,7 @@ export function useStudioLiveTransportAuth(
   const requestTicket = dependencies.requestTicket ?? requestStudioLiveAuthTicket;
   const createGuestCredential =
     dependencies.createGuestCredential ?? persistStudioLiveGuestCredential;
-  const createServerFactory =
-    dependencies.createServerFactory ?? createStudioServerLiveTransportFactory;
+  const injectedServerFactory = dependencies.createServerFactory ?? null;
   const scheduleTimeout = dependencies.setTimeout ?? defaultScheduleTimeout;
   const cancelTimeout = dependencies.clearTimeout ?? defaultCancelTimeout;
   const guestFactoryRef = useRef<{
@@ -67,6 +102,9 @@ export function useStudioLiveTransportAuth(
   } | null>(null);
   const [authenticatedFactory, setAuthenticatedFactory] =
     useState<AuthenticatedTransportFactoryState | null>(null);
+  // Only bumped when a guest factory is minted from the lazily fetched transport module, so the
+  // render below re-reads the ref that the effect just filled.
+  const [, setGuestFactoryGeneration] = useState(0);
 
   useEffect(() => {
     if (!input.authReady || !input.userId) {
@@ -111,7 +149,10 @@ export function useStudioLiveTransportAuth(
       try {
         const response = await requestTicket({ signal: controller.signal });
         if (cancelled || controller.signal.aborted) return;
-        const factory = createServerFactory(response.ticket, {
+        const build =
+          injectedServerFactory ?? (await loadStudioServerLiveTransportFactoryBuilder());
+        if (cancelled || controller.signal.aborted) return;
+        const factory = build(response.ticket, {
           refreshSocketCredential: async () => {
             const refreshed = await requestTicket();
             return refreshed.ticket;
@@ -152,12 +193,33 @@ export function useStudioLiveTransportAuth(
     };
   }, [
     cancelTimeout,
-    createServerFactory,
+    injectedServerFactory,
     input.authReady,
     input.userId,
     requestTicket,
     scheduleTimeout,
   ]);
+
+  // A signed-out visitor still gets one stable guest identity, but minting it now waits for the
+  // transport chunk. Nothing on the canvas depends on it: the room only consumes the factory once
+  // a server-backed session is requested, and that path is already asynchronous.
+  useEffect(() => {
+    if (!input.authReady || input.userId) return;
+    if (injectedServerFactory || guestFactoryRef.current) return;
+    let cancelled = false;
+    void loadStudioServerLiveTransportFactoryBuilder()
+      .then((build) => {
+        if (cancelled || guestFactoryRef.current) return;
+        const minted = buildGuestTransportFactory(build, createGuestCredential);
+        if (!minted) return;
+        guestFactoryRef.current = minted;
+        setGuestFactoryGeneration((generation) => generation + 1);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [createGuestCredential, injectedServerFactory, input.authReady, input.userId]);
 
   if (!input.authReady) return undefined;
   if (input.userId) {
@@ -165,18 +227,13 @@ export function useStudioLiveTransportAuth(
       ? authenticatedFactory.factory
       : undefined;
   }
-  if (!guestFactoryRef.current) {
-    try {
-      const credential = createGuestCredential();
-      guestFactoryRef.current = {
-        credential,
-        factory: createServerFactory(credential, {
-          refreshSocketCredential: async () => credential,
-        }),
-      };
-    } catch {
-      guestFactoryRef.current = null;
-    }
+  // An injected builder keeps the synchronous contract the collaboration tests and callers with
+  // their own transport rely on; the default path is filled in by the effect above.
+  if (!guestFactoryRef.current && injectedServerFactory) {
+    guestFactoryRef.current = buildGuestTransportFactory(
+      injectedServerFactory,
+      createGuestCredential,
+    );
   }
   return guestFactoryRef.current?.factory;
 }

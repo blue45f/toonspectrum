@@ -1,17 +1,18 @@
 import {
-  type WetMixPixelPoint,
-  type WetMixSettings,
-} from "./brush/studio-wet-mix";
-import {
   rememberStudioRasterEditSurface,
   takeStudioRasterEditSurface,
 } from "./render/studio-raster-edit-surface-cache";
-import {
-  type DodgeBurnPixelPoint,
-  type DodgeBurnSettings,
-} from "./studio-dodge-burn";
 import { loadFloodFillSourceImage } from "./studio-flood-fill";
 import { runStudioRetouchWorker } from "./studio-retouch-worker-client";
+
+import type {
+  WetMixPixelPoint,
+  WetMixSettings,
+} from "./brush/studio-wet-mix";
+import type {
+  DodgeBurnPixelPoint,
+  DodgeBurnSettings,
+} from "./studio-dodge-burn";
 
 export interface StudioRetouchBrowserOptions {
   readonly signal?: AbortSignal;

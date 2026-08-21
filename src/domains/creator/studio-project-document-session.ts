@@ -1,8 +1,7 @@
-import {
-  type CanonicalStudioDocumentEnvelope,
-  type StudioDocumentJsonObject,
+import type {
+  CanonicalStudioDocumentEnvelope,
+  StudioDocumentJsonObject,
 } from "./studio-document-envelope";
-
 import type { StudioProjectDocumentMetadata } from "./studio-project-document";
 
 export interface StudioProjectDocumentSessionProvenance {

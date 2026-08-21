@@ -2,15 +2,13 @@ import { resolveStudioPointerPredictionPreference, studioPointerPredictionEnviro
 import { computeBubbleAnchorTail, resolveAnchorTargetPoint, type AnchorTargetBounds } from "./lettering/studio-bubble-anchor";
 import { hasCustomBubbleShape } from "./lettering/studio-bubble-custom-shape";
 import { resolveStudioLiveInkRollout, studioLiveInkRolloutInputFromGlobals } from "./live/studio-live-ink-rollout";
-import { type StudioAsset } from "./studio-asset-library";
 import { CANVAS_W } from "./studio-assets";
 import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
 import { elBounds } from "./studio-element-geometry";
-import { type FrameEl, type El } from "./studio-element-model";
 import { uid } from "./studio-id";
 import { createStudioPagesHistoryCommandJournalClient } from "./studio-pages-history-command-journal-client";
 import { normalizeStudioPublishPackageSettings } from "./studio-publish-package";
-import { type StudioPublishPackageSettings } from "./studio-publish-package";
+
 
 import type { StudioLayerLiftWorkflowSession } from "./layer/studio-layer-lift-workflow";
 import type {
@@ -18,6 +16,9 @@ import type {
   StudioLayerLiftReviewOptions,
   StudioLayerLiftReviewPreview,
 } from "./layer/StudioLayerLiftDialog";
+import type { StudioAsset } from "./studio-asset-library";
+import type { FrameEl, El } from "./studio-element-model";
+import type { StudioPublishPackageSettings } from "./studio-publish-package";
 
 
 // 포인터 이벤트 기반 툴링의 모듈 레벨 상태 계산값을 컴포넌트 본문에서 분리한다.

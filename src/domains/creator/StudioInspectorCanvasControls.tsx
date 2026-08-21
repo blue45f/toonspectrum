@@ -2,12 +2,12 @@ import { Droplets } from "lucide-react";
 
 import { BG_PRESETS, CANVAS_W, type BgPreset } from "./studio-assets";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
-import { type MagicResizePreset, type MagicResizeStrategy } from "./studio-magic-resize";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioPaperSurfacePicker } from "./StudioPaperSurfacePicker";
 import { StudioPercentGuideControls } from "./StudioPercentGuideControls";
 
 import type { PaperGrainKind } from "./brush/studio-paper-texture";
+import type { MagicResizePreset, MagicResizeStrategy } from "./studio-magic-resize";
 
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";

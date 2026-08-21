@@ -4,15 +4,6 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  type StudioXAtlasUvArtifact,
-  type StudioXAtlasUvRequest,
-  type StudioXAtlasUvResult,
-  type StudioXAtlasUvRuntime,
-  type StudioXAtlasUvRuntimeAtlas,
-  type StudioXAtlasUvRuntimeGeometry,
-  type StudioXAtlasUvRuntimeMeshInput,
-} from "./studio-xatlas-uv-provider";
-import {
   isStudioXAtlasUvResult,
   isStudioXAtlasUvWorkerInboundMessage,
   isStudioXAtlasUvWorkerOutboundMessage,
@@ -32,6 +23,16 @@ import {
   installStudioXAtlasUvWorkerHost,
   type StudioXAtlasUvWorkerHostScope,
 } from "./studio-xatlas-uv-provider-worker-host";
+
+import type {
+  StudioXAtlasUvArtifact,
+  StudioXAtlasUvRequest,
+  StudioXAtlasUvResult,
+  StudioXAtlasUvRuntime,
+  StudioXAtlasUvRuntimeAtlas,
+  StudioXAtlasUvRuntimeGeometry,
+  StudioXAtlasUvRuntimeMeshInput,
+} from "./studio-xatlas-uv-provider";
 
 interface MessageEventLike {
   readonly data: unknown;

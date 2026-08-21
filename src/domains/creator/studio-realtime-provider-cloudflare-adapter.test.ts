@@ -13,14 +13,15 @@ import {
   studioCloudflareRealtimeRoomUrl,
   type StudioCloudflareRealtimeWebSocketLike,
 } from "./studio-realtime-provider-cloudflare-adapter";
-import {
-  type StudioRealtimeCapability,
-  type StudioRealtimeConnectionRequest,
-  type StudioRealtimeInboundEvent,
-  type StudioRealtimeOutboundEvent,
-  type StudioRealtimeWorkload,
-} from "./studio-realtime-provider-protocol";
 import { StudioRealtimeProviderSession } from "./studio-realtime-provider-runtime";
+
+import type {
+  StudioRealtimeCapability,
+  StudioRealtimeConnectionRequest,
+  StudioRealtimeInboundEvent,
+  StudioRealtimeOutboundEvent,
+  StudioRealtimeWorkload,
+} from "./studio-realtime-provider-protocol";
 
 class FakeWebSocket implements StudioCloudflareRealtimeWebSocketLike {
   readyState = 0;

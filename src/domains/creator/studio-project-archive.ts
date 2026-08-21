@@ -1,10 +1,6 @@
 import { z } from "zod";
 
 import { deriveStudioBg3dGlbBudgetProfiles } from "./bg3d/studio-bg3d-device-quality";
-import {
-  type StudioBg3dGlbBudgetProfiles,
-  type StudioBg3dGlbValidationSuccess,
-} from "./bg3d/studio-bg3d-glb-validation";
 import { validateStudioBg3dGlbOffMainThread } from "./bg3d/studio-bg3d-glb-validation-worker-client";
 import { STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS } from "./bg3d/studio-bg3d-meshopt";
 import {
@@ -49,6 +45,11 @@ import {
   verifyStudioVrmTexturePaintArtifact,
 } from "./vrm/studio-vrm-texture-paint-artifact";
 import { SAMPLE_VRMS } from "./vrm/vrm-library";
+
+import type {
+  StudioBg3dGlbBudgetProfiles,
+  StudioBg3dGlbValidationSuccess,
+} from "./bg3d/studio-bg3d-glb-validation";
 
 /**
  * Self-contained ToonSpectrum project archive.

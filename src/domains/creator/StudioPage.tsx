@@ -87,11 +87,11 @@ import {
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsPresetId,
 } from "./brush/studio-brush-dynamics";
-import {
-  type DeletedBrushRecord,
-  type StudioBrushStampTuning,
-  type StudioBrushSnapshot,
-  type StudioSavedBrush,
+import type {
+  DeletedBrushRecord,
+  StudioBrushStampTuning,
+  StudioBrushSnapshot,
+  StudioSavedBrush,
 } from "./brush/studio-brush-library";
 import {
   planStudioDrawModeChange,
@@ -164,8 +164,8 @@ import {
   DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS,
   type StudioAdvancedFillSettings,
 } from "./studio-advanced-fill-settings";
-import {
-  type StudioAdvancedFillTapGesture,
+import type {
+  StudioAdvancedFillTapGesture,
 } from "./studio-advanced-fill-tap";
 import {
   createStudioAdvancedRulerOfType,
@@ -174,8 +174,8 @@ import {
   type StudioAdvancedRuler,
   type StudioAdvancedRulerDocument,
 } from "./studio-advanced-ruler-document";
-import {
-  type StudioAdvancedRulerSnapState,
+import type {
+  StudioAdvancedRulerSnapState,
 } from "./studio-advanced-ruler-snap";
 import { shouldClipToExistingAlpha } from "./studio-alpha-lock";
 import {
@@ -334,8 +334,8 @@ import {
   type StudioCommittedInkSurfaceHandoff,
   type StudioCommittedInkVisibleDrawReceipt,
 } from "./studio-committed-ink-handoff-coordinator";
-import {
-  type StudioCommittedInkRetainedRetryState,
+import type {
+  StudioCommittedInkRetainedRetryState,
 } from "./studio-committed-ink-release-retry";
 import {
   createStudioCommunityAssetCredit,
@@ -455,8 +455,8 @@ import {
 } from "./studio-effect-favorites";
 import { containingPanel, elBounds } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
-import {
-  type ExportFormat,
+import type {
+  ExportFormat,
 } from "./export/studio-export";
 import {
   buildStudioPublishPreflightInput,
@@ -495,8 +495,8 @@ import {
   type StudioInlineFilterMaskMutationPatch,
 } from "./filter/studio-filter-mask-surface-projection";
 import { hexToRgb } from "./studio-filters";
-import {
-  type FixedRateStrokeFilterState,
+import type {
+  FixedRateStrokeFilterState,
 } from "./studio-fixed-rate-stroke-filter";
 import {
   createFixedRateStrokeFrameClock,
@@ -604,8 +604,8 @@ import {
   defaultIsometricOrigin,
   type IsometricAxisRay,
 } from "./studio-isometric-grid";
-import {
-  type ImageFilterFields,
+import type {
+  ImageFilterFields,
 } from "./render/studio-konva-filter-fields";
 import { studioKonvaRuntime as KonvaRuntime } from "./render/studio-konva-runtime";
 import { StudioLayerLiftComposeWorkerClient } from "./layer/studio-layer-lift-compose-worker-client";
@@ -618,8 +618,8 @@ import {
 import {
   StudioLayerLiftOperationRegistry,
 } from "./layer/studio-layer-lift-operation-context";
-import {
-  type StudioLayerLiftReviewPreviewResource,
+import type {
+  StudioLayerLiftReviewPreviewResource,
 } from "./layer/studio-layer-lift-review-preview";
 import {
   createStudioLayerLiftSession,
@@ -684,7 +684,7 @@ import {
   removeStudioLinked3dRenderLinks,
   upsertStudioLinked3dRenderLink,
 } from "./studio-linked-3d-render-document";
-import { type StudioLiquifyMode } from "./studio-liquify-contract";
+import type { StudioLiquifyMode } from "./studio-liquify-contract";
 import {
   mapLiquifyRoiToDocumentFrame,
   planStudioLiquifyLivePreview,
@@ -1017,9 +1017,9 @@ import {
 } from "./studio-pages-history-command-journal-client";
 import { createPalette } from "./studio-palette-library";
 import { withShotTag } from "./studio-panel-shot-tags";
-import {
-  type PanelSplitLine,
-  type PanelSplitPreview,
+import type {
+  PanelSplitLine,
+  PanelSplitPreview,
 } from "./studio-panel-split";
 import {
   DEFAULT_STUDIO_PAPER_SURFACE,
@@ -1124,9 +1124,9 @@ import {
   isPuppetWarpNoop,
   type PuppetPin,
 } from "./studio-puppet-warp";
-import {
-  type StudioQuickActionId,
-  type StudioQuickActionsPreferences,
+import type {
+  StudioQuickActionId,
+  StudioQuickActionsPreferences,
 } from "./studio-quick-actions";
 import {
   buildQuickMaskTintPixels,
@@ -1306,8 +1306,8 @@ import {
   reportStudioAutosaveFailure,
   reportStudioSaveAuthorityDegraded,
 } from "./studio-storage-recovery-runtime";
-import {
-  type StudioStrokeObjectSnapCache,
+import type {
+  StudioStrokeObjectSnapCache,
 } from "./brush/studio-stroke-object-snap-cache";
 import { StudioStrokePostprocessWorkerClient } from "./brush/studio-stroke-postprocess-worker-client";
 import {
@@ -1317,11 +1317,11 @@ import {
 import {
   DEFAULT_SHAPE_PARAMS,
 } from "./brush/studio-stroke-shapes";
-import {
-  type StudioPointerVelocityState,
-  type StudioStabilizerMode,
-  type StudioStrokeStabilizerBridge,
-  type StudioStrokeStabilizerState,
+import type {
+  StudioPointerVelocityState,
+  StudioStabilizerMode,
+  StudioStrokeStabilizerBridge,
+  StudioStrokeStabilizerState,
 } from "./brush/studio-stroke-stabilizer";
 import {
   claimStudioStrokeSurfaceLifecycle,
@@ -1354,7 +1354,7 @@ import {
   bootStudioTournamentPersistence,
   peekBootedStudioTournamentRuntime,
 } from "./studio-tournament-persistence-bootstrap";
-import { type StudioUiDensityMode } from "./studio-ui-density";
+import type { StudioUiDensityMode } from "./studio-ui-density";
 import {
   hasStudioUnloadPromptWork,
   installStudioUnloadGuard,
@@ -1476,38 +1476,38 @@ import {
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
-import {
-  type StudioCanvasViewportHandlers,
-  type StudioHokusaiLiveOverlaySurfaceBinding,
-  type StudioLivingInkOverlaySurfaceBinding,
+import type {
+  StudioCanvasViewportHandlers,
+  StudioHokusaiLiveOverlaySurfaceBinding,
+  StudioLivingInkOverlaySurfaceBinding,
 } from "./canvas/StudioCanvasViewport";
-import {
-  type CvdMode,
+import type {
+  CvdMode,
 } from "./StudioColorBlindPreview";
-import {
-  type StudioLazyPanelStackHandlers,
-  type StudioLazyPanelStackProps,
+import type {
+  StudioLazyPanelStackHandlers,
+  StudioLazyPanelStackProps,
 } from "./StudioLazyPanelStack";
-import {
-  type StudioCrdtAuthoritativeSaveBarrier,
-  type StudioCrdtSceneGraphRuntime,
+import type {
+  StudioCrdtAuthoritativeSaveBarrier,
+  StudioCrdtSceneGraphRuntime,
 } from "./live/StudioLiveCollaborationProvider";
-import {
-  type StudioOptionsBarsDrawModel,
-  type StudioOptionsBarsHandlers,
-  type StudioOptionsBarsSelectionModel,
+import type {
+  StudioOptionsBarsDrawModel,
+  StudioOptionsBarsHandlers,
+  StudioOptionsBarsSelectionModel,
 } from "./StudioOptionsBars";
-import {
-  type StudioSelectionAlignMode,
+import type {
+  StudioSelectionAlignMode,
 } from "./StudioSelectionContextBar";
-import {
-  type FxPickerSection,
-  type StudioBgScene,
-  type StudioEmeresTemplate,
-  type StudioOptionalAssetPacks,
-  type StudioSceneTemplatePacks,
-  type StudioSfxPacks,
-  type StudioToolBeltContentHandlers,
+import type {
+  FxPickerSection,
+  StudioBgScene,
+  StudioEmeresTemplate,
+  StudioOptionalAssetPacks,
+  StudioSceneTemplatePacks,
+  StudioSfxPacks,
+  StudioToolBeltContentHandlers,
 } from "./StudioToolBeltContent";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 import { useStudioProDrawPrefs } from "./useStudioProDrawPrefs";

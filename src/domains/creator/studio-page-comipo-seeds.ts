@@ -1,6 +1,10 @@
-import { type ComipoAssemblySeed } from "./studio-comipo-assembly";
-import { type El } from "./studio-element-model";
 import { uid } from "./studio-id";
+
+// Under `verbatimModuleSyntax` an inline-type specifier list still emits a side-effect import,
+// which re-anchors the whole comipo assembly/template graph into the eager Studio chunk. A
+// type-only import statement is erased instead, so these two must stay in the `import type` form.
+import type { ComipoAssemblySeed } from "./studio-comipo-assembly";
+import type { El } from "./studio-element-model";
 
 export function comipoSeedsToEls(seeds: ComipoAssemblySeed[]): El[] {
   return seeds.map((seed) => {

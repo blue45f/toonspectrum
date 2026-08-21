@@ -6,10 +6,6 @@ import {
   type StudioSavedBrush,
 } from "./brush/studio-brush-library";
 import {
-  type StudioCreatorInstalledFilterPreset,
-  type StudioCreatorPackStorage,
-} from "./studio-creator-pack-runtime";
-import {
   STUDIO_MARKETPLACE_PACKAGE_SCHEMA,
   type StudioMarketplaceLicense,
   type StudioMarketplaceOrigin,
@@ -19,7 +15,6 @@ import {
   findStudioOriginalFreeAsset,
   type StudioOriginalFreeAsset,
 } from "./studio-original-free-asset-packs";
-import { type StudioNamedPalette } from "./studio-palette-library";
 import {
   SCENE_TEMPLATES,
 } from "./studio-scene-templates";
@@ -29,6 +24,11 @@ import type {
   StudioCreatorPackEntry,
   StudioCreatorPackKind,
 } from "./studio-creator-pack-catalog";
+import type {
+  StudioCreatorInstalledFilterPreset,
+  StudioCreatorPackStorage,
+} from "./studio-creator-pack-runtime";
+import type { StudioNamedPalette } from "./studio-palette-library";
 import type {
   CreatorMarketplaceJsonValue,
   CreatorMarketplaceResourceLicense,

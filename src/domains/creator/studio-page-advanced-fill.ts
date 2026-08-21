@@ -1,10 +1,10 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 
-import { type SelectionFrame } from "./studio-selection-tools";
 
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import type { StudioAdvancedFillTapGesture } from "./studio-advanced-fill-tap";
 import type { Tool } from "./studio-editor-tool-model";
+import type { SelectionFrame } from "./studio-selection-tools";
 import type { StudioAdvancedFillVirtualTarget } from "./studio-vector-fill-reference";
 
 /** 진행 중 계산·탭 제스처를 소유하는 페이지 refs — 무효화 헬퍼들이 공유한다. */

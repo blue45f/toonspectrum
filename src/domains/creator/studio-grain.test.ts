@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_GRAIN,
   GRAIN_AMOUNT_RANGE,
@@ -16,6 +15,8 @@ import {
   type Grain,
   type GrainType,
 } from "./studio-grain";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

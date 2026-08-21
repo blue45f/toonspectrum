@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_VIBRANCE,
   VIBRANCE_PRESETS,
@@ -11,6 +10,8 @@ import {
   vibranceKonvaFilter,
   type Vibrance,
 } from "./studio-vibrance";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

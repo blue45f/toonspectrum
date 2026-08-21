@@ -15,14 +15,15 @@ import {
 } from "./studio-crdt-document";
 import { StudioCrdtRoomBinding } from "./studio-crdt-room-binding";
 import { STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION } from "./studio-crdt-scene-schema";
-import {
-  type StudioLiveParticipant,
-} from "./studio-live-collaboration-protocol";
 import { StudioLiveRoom } from "./studio-live-collaboration-room";
 import {
   StudioMemoryBroadcastHub,
   createStudioMemoryLiveTransportFactory,
 } from "./studio-live-collaboration-transport";
+
+import type {
+  StudioLiveParticipant,
+} from "./studio-live-collaboration-protocol";
 
 const ALICE: StudioLiveParticipant = {
   sessionId: "session-alice",

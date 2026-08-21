@@ -1,12 +1,12 @@
 /** Canvas-factory orchestration for the pure Heal/Clone engine. */
 import { planStudioRasterRetouchRegion } from "./render/studio-raster-retouch-region";
-import { type HealCloneBrushSettings, type HealCloneDab, type HealCloneMode } from "./studio-heal-clone";
 import {
   runStudioHealCloneWorker,
   type StudioHealCloneWorkerClientOptions,
 } from "./studio-heal-clone-worker-client";
 
 import type { StudioImageDataLike } from "./studio-filters";
+import type { HealCloneBrushSettings, HealCloneDab, HealCloneMode } from "./studio-heal-clone";
 import type { MaskCanvasLike, MaskCtx2DLike, MaskImageSource } from "./studio-selection-tools";
 
 /**

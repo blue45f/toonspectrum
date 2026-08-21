@@ -44,7 +44,6 @@ import {
   type StudioAppSettingsTab,
   type StudioRailToolId,
 } from "./studio-app-settings";
-import { type BubbleVariant } from "./studio-assets";
 import {
   STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER,
   studioChromeRailGroupLabel,
@@ -57,8 +56,6 @@ import {
   StudioVerticalToolRail,
   studioChromeIconClass,
 } from "./studio-chrome-ui";
-import { type DrawMode, type DrawShapeKind, type StudioMenu, type Tool } from "./studio-editor-tool-model";
-import { type El } from "./studio-element-model";
 import {
   resolveStudioRailMorePosition,
   type StudioRailMorePosition,
@@ -81,6 +78,10 @@ import {
 import { studioUiDensityAllows } from "./studio-ui-density";
 import { StudioLeftToolRailViewToolsCluster } from "./StudioLeftToolRailViewToolsCluster";
 import { StudioToolHintTarget } from "./StudioToolHint";
+
+import type { BubbleVariant } from "./studio-assets";
+import type { DrawMode, DrawShapeKind, StudioMenu, Tool } from "./studio-editor-tool-model";
+import type { El } from "./studio-element-model";
 
 import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";

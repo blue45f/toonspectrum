@@ -36,10 +36,6 @@ import { useStudioInspectorFocusScroll } from "../studio-inspector-focus-effect"
 
 import { studioCoreBrushCatalogItemById } from "./studio-brush-catalog-core";
 import {
-  type BrushLifecycleStage,
-  type BrushVariantGroup,
-} from "./studio-brush-catalog-lifecycle";
-import {
   brushFileName,
   createBrush,
   importBrushFromJson,
@@ -75,6 +71,11 @@ import {
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 import { STUDIO_STABILIZER_MODES } from "./studio-stroke-stabilizer";
+
+import type {
+  BrushLifecycleStage,
+  BrushVariantGroup,
+} from "./studio-brush-catalog-lifecycle";
 
 import { cx } from "@/lib/cx";
 

@@ -1,7 +1,7 @@
-import { type StudioGpuLiveSourceJournalAdvance } from "../render/studio-webgpu-live-source-journal";
-import { type StudioGpuLiveStrokePlan } from "../render/studio-webgpu-live-stroke-plan";
-import { type DrawEl } from "../studio-element-model";
-import { type StudioHokusaiPinnedLiveStroke } from "../studio-page-editor-types";
+import type { StudioGpuLiveSourceJournalAdvance } from "../render/studio-webgpu-live-source-journal";
+import type { StudioGpuLiveStrokePlan } from "../render/studio-webgpu-live-stroke-plan";
+import type { DrawEl } from "../studio-element-model";
+import type { StudioHokusaiPinnedLiveStroke } from "../studio-page-editor-types";
 
 export function studioHokusaiVectorTailShadow(
   element: DrawEl,

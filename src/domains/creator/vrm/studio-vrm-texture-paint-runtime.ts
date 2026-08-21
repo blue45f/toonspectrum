@@ -31,11 +31,6 @@ import {
   type StudioVrmTexturePaintOp,
 } from "./studio-vrm-texture-paint-ops";
 import {
-  type StudioVrmTextureStrokePlanOptions,
-  type StudioVrmTextureStrokeSample,
-  type StudioVrmTextureStrokeStyle,
-} from "./studio-vrm-texture-stroke";
-import {
   createStudioVrmTextureStrokeWalker,
   type StudioVrmTextureStrokeWalker,
 } from "./studio-vrm-texture-stroke-walker";
@@ -63,6 +58,11 @@ import type {
   StudioVrmTextureFillResult,
   StudioVrmTextureFillScope,
 } from "./studio-vrm-texture-fill";
+import type {
+  StudioVrmTextureStrokePlanOptions,
+  StudioVrmTextureStrokeSample,
+  StudioVrmTextureStrokeStyle,
+} from "./studio-vrm-texture-stroke";
 
 const RGBA_CHANNELS = 4;
 const DEFAULT_TARGET_RGBA_BYTES = STUDIO_VRM_TEXTURE_MAX_TEXELS * RGBA_CHANNELS;

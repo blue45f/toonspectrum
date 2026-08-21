@@ -1,10 +1,6 @@
 import { Circle, Group, Line } from "react-konva/lib/ReactKonvaCore";
 
 import {
-  type StudioAdvancedRuler,
-  type StudioAdvancedRulerDocument,
-} from "./studio-advanced-ruler-document";
-import {
   createStudioConcentricGuideRadii,
   createStudioParallelGuideSegments,
   createStudioRadialGuideSegments,
@@ -15,6 +11,10 @@ import {
   sampleStudioFisheyeGuideCurve,
 } from "./studio-fisheye-ruler";
 
+import type {
+  StudioAdvancedRuler,
+  StudioAdvancedRulerDocument,
+} from "./studio-advanced-ruler-document";
 import type { ReactElement } from "react";
 
 /** Screen-space distance from the parallel origin to its rotation handle. */

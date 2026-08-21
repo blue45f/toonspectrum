@@ -1,9 +1,3 @@
-import {
-  type ImportStudioProjectArchiveResult,
-  type StudioProjectArchiveAttachmentInput,
-  type StudioProjectArchiveDocumentReference,
-  type StudioProjectArchiveImportedAttachment,
-} from "../studio-project-archive";
 import { parseStudioProjectFile, type StudioProjectFile } from "../studio-project-file";
 
 import {
@@ -35,6 +29,13 @@ import {
   type VrmStoredModelRecord,
   type VrmStoredModelWithContentIdentity,
 } from "./vrm-library";
+
+import type {
+  ImportStudioProjectArchiveResult,
+  StudioProjectArchiveAttachmentInput,
+  StudioProjectArchiveDocumentReference,
+  StudioProjectArchiveImportedAttachment,
+} from "../studio-project-archive";
 
 /**
  * Portable VRM archive bridge.

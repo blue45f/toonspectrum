@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_SELECTIVE_HSL,
   HSL_BANDS,
@@ -18,6 +17,8 @@ import {
   type BandAdjust,
   type SelectiveHsl,
 } from "./studio-selective-hsl";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

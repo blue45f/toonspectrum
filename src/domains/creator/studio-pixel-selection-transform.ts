@@ -5,10 +5,10 @@
  * 픽셀 내용을 변형하는 것이 아닌, 선택 영역 궤적(Subpath)의 좌표를 직접 트랜스폼합니다.
  */
 
-import {
-  type PixelSelection,
-  type SelPoint,
-  type SelectionSubpath,
+import type {
+  PixelSelection,
+  SelPoint,
+  SelectionSubpath,
 } from "./studio-selection-tools";
 
 export interface SelectionTransformState {

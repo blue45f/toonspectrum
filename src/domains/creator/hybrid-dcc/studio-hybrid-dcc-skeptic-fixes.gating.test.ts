@@ -41,9 +41,7 @@ import {
   evaluateStudioMeshModifierStack,
   withStudioMeshModifier,
 } from "../studio-mesh-modifier-stack";
-import {
-  type StudioOpfsRecoveryJournalAdapter,
-} from "../studio-opfs-recovery-journal";
+
 
 import {
   repairStudioHybridOrphanRights,
@@ -65,6 +63,9 @@ import {
 } from "./studio-hybrid-dcc-document";
 
 import type { BgPrimitive } from "../studio-background-3d-metadata";
+import type {
+  StudioOpfsRecoveryJournalAdapter,
+} from "../studio-opfs-recovery-journal";
 
 // ── Fake OPFS adapter (same contract as studio-opfs-recovery-journal tests) ──
 

@@ -1,27 +1,13 @@
-import { type MutableRefObject, type SetStateAction } from "react";
 
 import { requireStudioDrawingPointerTransport } from "../brush/studio-drawing-pointer-transport";
-import { type StudioCollaborationWiringContext } from "../live/studio-collaboration-wiring";
-import { type StudioLiveDynamicBrushOverlayRenderer } from "../live/studio-live-dynamic-brush-overlay";
-import { type StudioLiveInkOverlayRenderer } from "../live/studio-live-ink-overlay";
-import { type StudioLiveRetainedMediaOverlayRenderer } from "../live/studio-live-retained-media-overlay";
-import { type StudioGpuLiveSourceJournalState } from "../render/studio-webgpu-live-source-journal";
-import { type StudioGpuLiveStrokePlan } from "../render/studio-webgpu-live-stroke-plan";
 import {
   releaseStudioGpuPendingAuthorityPrefix,
   type StudioGpuPendingDrawAuthority,
 } from "../render/studio-webgpu-pending-authority";
-import { type StudioGpuStroke } from "../render/studio-webgpu-stroke";
-import {
-  type StudioCommittedInkSurfaceCounts,
-  type StudioCommittedInkSurfaceHandoff,
-} from "../studio-committed-ink-handoff-coordinator";
 import {
   planStudioCommittedInkRetainedRetry,
   type StudioCommittedInkRetainedRetryState,
 } from "../studio-committed-ink-release-retry";
-import { type StudioDraftPreviewStore } from "../studio-draft-preview-store";
-import { type DrawEl, type El } from "../studio-element-model";
 import {
   detachStudioLinked3dCorrections,
   parseStudioLinked3dRenderDocument,
@@ -32,10 +18,6 @@ import {
 import { withMasterElements, type DocumentMaster } from "../studio-master-page";
 import { findChangedLockedPageId } from "../studio-page-review";
 import { applyBubbleAnchors } from "../studio-page-shell-runtime";
-import { type PageState } from "../studio-page-state";
-import {
-  type StudioHistoryJournalTransitionInput,
-} from "../studio-pages-history-command-journal-client";
 import {
   appendStudioPagesHistorySnapshot,
   projectStudioPendingStrokes,
@@ -48,12 +30,31 @@ import {
 import {
   reconcileStudioShared3dStageVisibilityReceiptsAfterElementMutation,
 } from "../studio-shared-3d-stage-collection";
-import { type StudioShared3dStageDccSource } from "../studio-shared-3d-stage-document";
 import {
   studioWorkAssetDocumentSourceTransitionReason,
   studioWorkAssetSourceTransitionReason,
 } from "../studio-work-asset-edit-guard";
-import { type StudioWebGpuCanvasHandle } from "../StudioWebGpuCanvas";
+
+import type { StudioCollaborationWiringContext } from "../live/studio-collaboration-wiring";
+import type { StudioLiveDynamicBrushOverlayRenderer } from "../live/studio-live-dynamic-brush-overlay";
+import type { StudioLiveInkOverlayRenderer } from "../live/studio-live-ink-overlay";
+import type { StudioLiveRetainedMediaOverlayRenderer } from "../live/studio-live-retained-media-overlay";
+import type { StudioGpuLiveSourceJournalState } from "../render/studio-webgpu-live-source-journal";
+import type { StudioGpuLiveStrokePlan } from "../render/studio-webgpu-live-stroke-plan";
+import type { StudioGpuStroke } from "../render/studio-webgpu-stroke";
+import type {
+  StudioCommittedInkSurfaceCounts,
+  StudioCommittedInkSurfaceHandoff,
+} from "../studio-committed-ink-handoff-coordinator";
+import type { StudioDraftPreviewStore } from "../studio-draft-preview-store";
+import type { DrawEl, El } from "../studio-element-model";
+import type { PageState } from "../studio-page-state";
+import type {
+  StudioHistoryJournalTransitionInput,
+} from "../studio-pages-history-command-journal-client";
+import type { StudioShared3dStageDccSource } from "../studio-shared-3d-stage-document";
+import type { StudioWebGpuCanvasHandle } from "../StudioWebGpuCanvas";
+import type { MutableRefObject, SetStateAction } from "react";
 
 /**
  * 대기(지연) 획 커밋 배치 — StudioPage 의 pendingStrokeCommitsRef 가 들고 있는 배치에서

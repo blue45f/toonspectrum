@@ -43,10 +43,6 @@ import {
   type StudioCanvasCommentPin,
 } from "./studio-live-canvas-overlay-model";
 import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
-import {
-  type StudioLiveCursorPayload,
-  type StudioLiveParticipant,
-} from "./studio-live-collaboration-protocol";
 import { openStudioLiveCompanionTab } from "./studio-live-jam-session";
 import { summarizeStudioLiveActiveOwners } from "./studio-live-layer-ownership";
 import { useStudioRemoteCursors } from "./studio-live-remote-cursor-store";
@@ -58,6 +54,10 @@ import {
   type StudioLiveSyncSnapshot,
 } from "./studio-live-sync-safety";
 
+import type {
+  StudioLiveCursorPayload,
+  StudioLiveParticipant,
+} from "./studio-live-collaboration-protocol";
 import type { StudioCommentAnchor } from "../studio-comments";
 import type { StudioLivePeer } from "./studio-live-collaboration-room";
 

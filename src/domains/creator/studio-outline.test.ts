@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_OUTLINE,
   DEFAULT_OUTLINE_SECOND_COLOR,
@@ -16,6 +15,8 @@ import {
   outlineTotalWidth,
   type Outline,
 } from "./studio-outline";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

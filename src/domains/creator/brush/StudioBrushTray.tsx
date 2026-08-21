@@ -5,10 +5,6 @@
 import { History, LayoutGrid, Star } from "lucide-react";
 import { useEffect, useState, type KeyboardEvent, type ReactElement } from "react";
 
-import {
-  type StudioBrushTrayItem,
-  type StudioQuickBrushSource,
-} from "../studio-creative-ux";
 import { planNeonBrushPasses } from "../studio-fx-brush";
 import { STUDIO_FOCUS_RING, STUDIO_EASE } from "../studio-panel-ui";
 
@@ -33,6 +29,11 @@ import {
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
+
+import type {
+  StudioBrushTrayItem,
+  StudioQuickBrushSource,
+} from "../studio-creative-ux";
 
 import { cn } from "@/lib/utils";
 

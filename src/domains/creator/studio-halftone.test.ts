@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_HALFTONE,
   HALFTONE_ANGLE_RANGE,
@@ -13,6 +12,8 @@ import {
   normalizeHalftone,
   type Halftone,
 } from "./studio-halftone";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

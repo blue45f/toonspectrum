@@ -1,10 +1,10 @@
-import {
-  type WetMixPixelPoint,
-  type WetMixSettings,
+import type {
+  WetMixPixelPoint,
+  WetMixSettings,
 } from "./brush/studio-wet-mix";
-import {
-  type DodgeBurnPixelPoint,
-  type DodgeBurnSettings,
+import type {
+  DodgeBurnPixelPoint,
+  DodgeBurnSettings,
 } from "./studio-dodge-burn";
 
 export const STUDIO_RETOUCH_WORKER_PROTOCOL_VERSION = 1 as const;

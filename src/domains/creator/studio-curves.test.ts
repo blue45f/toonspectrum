@@ -23,7 +23,8 @@ import {
   type CurvePoint,
   type CurveRgbChannels,
 } from "./studio-curves";
-import { type StudioImageDataLike } from "./studio-filters";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

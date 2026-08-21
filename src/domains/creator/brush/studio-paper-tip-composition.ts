@@ -18,9 +18,9 @@
  * 농도는 그대로고 그 뒤 구간의 종이 질감만 사라진다(밀도 단차보다 질감 페이드가 낫다).
  */
 
-import { type StudioPaperGranulationTile } from "./studio-paper-granulation-runtime";
-
 import type { StudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
+import type { StudioPaperGranulationTile } from "./studio-paper-granulation-runtime";
+
 
 /**
  * 종이 합성 알파맵에 쓸 수 있는 바이트 — **dab 인덱스 천장으로 환산해서** 쓴다.

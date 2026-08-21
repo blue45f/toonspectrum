@@ -1,19 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  type StudioRealtimeConnectionRequest,
-  type StudioRealtimeOutboundEvent,
-  type StudioRealtimeTicketRequest,
-  type StudioRealtimeWorkload,
-} from "./studio-realtime-provider-protocol";
-import {
-  type StudioRealtimeProviderAdapter,
-  type StudioRealtimeProviderAdapterFactory,
-} from "./studio-realtime-provider-runtime";
-import {
   StudioRealtimeWorkloadCoordinator,
   type StudioRealtimeWorkloadRoute,
 } from "./studio-realtime-workload-coordinator";
+
+import type {
+  StudioRealtimeConnectionRequest,
+  StudioRealtimeOutboundEvent,
+  StudioRealtimeTicketRequest,
+  StudioRealtimeWorkload,
+} from "./studio-realtime-provider-protocol";
+import type {
+  StudioRealtimeProviderAdapter,
+  StudioRealtimeProviderAdapterFactory,
+} from "./studio-realtime-provider-runtime";
 
 const scope = { workId: "work-1", roomId: "room-1" } as const;
 const clientId = "00000000-0000-4000-8000-000000000001";

@@ -10,17 +10,18 @@
 import * as THREE from "three";
 
 import {
-  type StudioBg3dCaptureAdapter,
-  type StudioBg3dCapturedRaster,
-  type StudioBg3dCaptureRequest,
-} from "./studio-bg3d-capture-adapter";
-import {
   STUDIO_BG3D_MODEL_THUMBNAIL_HEIGHT,
   STUDIO_BG3D_MODEL_THUMBNAIL_MAX_DIMENSION,
   STUDIO_BG3D_MODEL_THUMBNAIL_MAX_PIXELS,
   STUDIO_BG3D_MODEL_THUMBNAIL_WIDTH,
 } from "./studio-bg3d-model-thumbnail-data";
 import { createStudioBg3dThreeWebglCaptureAdapter } from "./studio-bg3d-three-webgl-capture";
+
+import type {
+  StudioBg3dCaptureAdapter,
+  StudioBg3dCapturedRaster,
+  StudioBg3dCaptureRequest,
+} from "./studio-bg3d-capture-adapter";
 
 export const STUDIO_BG3D_MODEL_THUMBNAIL_CAMERA_FOV_DEGREES = 32;
 export const STUDIO_BG3D_MODEL_THUMBNAIL_CAMERA_PADDING = 1.16;

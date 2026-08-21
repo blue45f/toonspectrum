@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { type StudioFilterLane } from "../filter/studio-filter-lane-cost-model";
-
 import {
   STUDIO_FILTER_EXECUTION_ROUTE_PRIORITY,
   admittedStudioFilterExecutionLanes,
@@ -13,6 +11,9 @@ import {
   resolveStudioFilterExecutionRoute,
   type StudioFilterExecutionRouteSnapshotInput,
 } from "./studio-filter-plan-shadow";
+
+import type { StudioFilterLane } from "../filter/studio-filter-lane-cost-model";
+
 
 /**
  * V11 strangler gate (필터 planner 위임, shadow step): the shadow

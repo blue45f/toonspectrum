@@ -34,9 +34,10 @@ import {
   type StudioGoogleFontCategory,
 } from "./studio-google-fonts";
 import { downscaleImageFile } from "./studio-image-utils";
-import { type StudioNamedPalette } from "./studio-palette-library";
 import { getProductStudioPaletteSqliteRepository } from "./studio-palette-sqlite-repository";
 import { ensureStudioPresetFontsLoaded } from "./studio-preset-font-loading";
+
+import type { StudioNamedPalette } from "./studio-palette-library";
 
 import { cx } from "@/lib/cx";
 

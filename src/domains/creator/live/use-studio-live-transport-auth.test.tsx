@@ -13,6 +13,26 @@ import type { StudioLiveTransportFactory } from "./studio-live-collaboration-tra
 import type { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
 import type { StudioLiveAuthTicketResponse } from "../../../../lib/studio-live-auth-ticket";
 
+// The Socket.IO transport is deliberately not part of the eager Studio graph. This mock stands in
+// for the chunk the hook fetches on demand; it is only reached by the tests that leave
+// `createServerFactory` out of the injected dependencies.
+const deferredTransport = vi.hoisted(() => ({
+  importCount: 0,
+  credentials: [] as string[],
+}));
+
+vi.mock("./studio-live-socket-transport", () => {
+  deferredTransport.importCount += 1;
+  return {
+    createStudioServerLiveTransportFactory: (credential: string) => {
+      deferredTransport.credentials.push(credential);
+      return (() => {
+        throw new Error("The deferred transport must not open a real socket in tests.");
+      }) as unknown as StudioLiveTransportFactory;
+    },
+  };
+});
+
 function ticket(sequence: number): StudioLiveAuthTicketResponse {
   const issuedAt = new Date(1_800_000_000_000 + sequence * 60_000);
   return {
@@ -213,5 +233,53 @@ describe("useStudioLiveTransportAuth", () => {
     await expect(live.refreshers[0]?.()).resolves.toBe("guest:v1:seed-credential");
     expect(live.createGuestCredential).toHaveBeenCalledOnce();
     expect(hook.result.current).toBe(live.factories[0]);
+  });
+
+  it("fetches the socket transport on demand and still mints one stable guest factory", async () => {
+    const live = harness();
+    deferredTransport.credentials.length = 0;
+    const hook = renderHook(
+      (input: StudioLiveTransportAuthInput) =>
+        useStudioLiveTransportAuth(input, {
+          requestTicket: live.requestTicket,
+          createGuestCredential: live.createGuestCredential,
+        }),
+      { initialProps: { authReady: true, userId: null } },
+    );
+
+    // Nothing exists on the first render: the transport chunk has not landed yet, and the canvas
+    // never waits on it.
+    expect(hook.result.current).toBeUndefined();
+
+    await flushPromises();
+
+    expect(deferredTransport.importCount).toBeGreaterThan(0);
+    expect(deferredTransport.credentials).toEqual([
+      "guest:v1:7a75f75a-4abc-4def-8abc-04c9e58a52f1",
+    ]);
+    const factory = hook.result.current;
+    expect(factory).toBeDefined();
+
+    hook.rerender({ authReady: true, userId: null });
+    expect(hook.result.current).toBe(factory);
+    expect(live.createGuestCredential).toHaveBeenCalledOnce();
+  });
+
+  it("fetches the socket transport on demand for an authenticated admission ticket", async () => {
+    const live = harness();
+    deferredTransport.credentials.length = 0;
+    live.requestTicket.mockResolvedValue(ticket(9));
+    const hook = renderHook(
+      (input: StudioLiveTransportAuthInput) =>
+        useStudioLiveTransportAuth(input, { requestTicket: live.requestTicket }),
+      { initialProps: { authReady: true, userId: "artist-9" } },
+    );
+
+    expect(hook.result.current).toBeUndefined();
+
+    await flushPromises();
+
+    expect(deferredTransport.credentials).toEqual([ticket(9).ticket]);
+    expect(hook.result.current).toBeDefined();
   });
 });

@@ -1,27 +1,27 @@
-import { type StudioStrokeSurfaceRoute } from "./brush/studio-stroke-surface-route";
-import {
-  type StudioHokusaiLiveOverlaySurfaceBinding,
-  type StudioLivingInkOverlaySurfaceBinding,
+import type { StudioStrokeSurfaceRoute } from "./brush/studio-stroke-surface-route";
+import type {
+  StudioHokusaiLiveOverlaySurfaceBinding,
+  StudioLivingInkOverlaySurfaceBinding,
 } from "./canvas/StudioCanvasViewport";
-import {
-  type StudioLiveStrokeCanonicalCanvasToken,
-  type StudioLiveStrokeGpuRequestToken,
-  type StudioLiveStrokeRenderBackendCoordinator,
+import type {
+  StudioLiveStrokeCanonicalCanvasToken,
+  StudioLiveStrokeGpuRequestToken,
+  StudioLiveStrokeRenderBackendCoordinator,
 } from "./live/studio-live-stroke-render-backend";
-import { type StudioHokusaiLiveOverlayRenderer } from "./render/studio-hokusai-live-brush-overlay";
-import { type StudioHokusaiLiveSampleLike } from "./render/studio-hokusai-live-brush-protocol";
-import { type StudioHokusaiLiveRouteResult } from "./render/studio-hokusai-live-brush-router";
-import { type StudioHokusaiLiveStrokeSession } from "./render/studio-hokusai-live-brush-runtime";
-import { type StudioGpuStroke } from "./render/studio-webgpu-stroke";
-import { type StudioCharacterBible } from "./studio-character-bible";
-import { type DrawEl } from "./studio-element-model";
-import {
-  type StudioHistoryJournal,
-  type StudioHistoryJournalSidecarEntry,
+import type { StudioHokusaiLiveOverlayRenderer } from "./render/studio-hokusai-live-brush-overlay";
+import type { StudioHokusaiLiveSampleLike } from "./render/studio-hokusai-live-brush-protocol";
+import type { StudioHokusaiLiveRouteResult } from "./render/studio-hokusai-live-brush-router";
+import type { StudioHokusaiLiveStrokeSession } from "./render/studio-hokusai-live-brush-runtime";
+import type { StudioGpuStroke } from "./render/studio-webgpu-stroke";
+import type { StudioCharacterBible } from "./studio-character-bible";
+import type { DrawEl } from "./studio-element-model";
+import type {
+  StudioHistoryJournal,
+  StudioHistoryJournalSidecarEntry,
 } from "./studio-history-journal";
-import { type StudioLivingInkOverlayRenderer } from "./studio-living-ink-overlay";
-import { type StudioLivingInkStrokeMode } from "./studio-living-ink-studio-coordinator";
-import { type StudioWriterRoomDocument } from "./studio-writer-room";
+import type { StudioLivingInkOverlayRenderer } from "./studio-living-ink-overlay";
+import type { StudioLivingInkStrokeMode } from "./studio-living-ink-studio-coordinator";
+import type { StudioWriterRoomDocument } from "./studio-writer-room";
 
 /** 이 편집기의 통합 실행취소 저널 — 캔버스 스냅샷 단계와 사이드카 편집을 한 시간 순서로 담는다. */
 export type StudioPageHistoryJournal = StudioHistoryJournal<StudioCharacterBible, StudioWriterRoomDocument>;

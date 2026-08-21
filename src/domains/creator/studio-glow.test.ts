@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_GLOW,
   GLOW_PRESETS,
@@ -12,6 +11,8 @@ import {
   isIdentityGlow,
   normalizeGlow,
 } from "./studio-glow";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

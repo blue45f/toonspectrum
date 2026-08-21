@@ -4,12 +4,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { defaultStudioAppSettings } from "./studio-app-settings";
-import { type El } from "./studio-element-model";
 import {
   StudioLeftToolRail,
   type StudioLeftToolRailHandlers,
 } from "./StudioLeftToolRail";
 
+import type { El } from "./studio-element-model";
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 

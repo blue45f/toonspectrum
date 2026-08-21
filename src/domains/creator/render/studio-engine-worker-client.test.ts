@@ -13,9 +13,10 @@ import {
   type StudioEngineCapabilitySnapshot,
   type StudioEngineHelloAckMessage,
 } from "./studio-engine-worker-protocol";
-import {
-  type StudioEngineOffscreenSurface,
-  type StudioEngineTransientContext2d,
+
+import type {
+  StudioEngineOffscreenSurface,
+  StudioEngineTransientContext2d,
 } from "./studio-engine-worker-runtime";
 
 interface MessageEventLike {

@@ -24,8 +24,7 @@ import {
 
 import { StudioToggleChip } from "../studio-panel-ui";
 
-import { type BubbleQuickTransformAction } from "./studio-bubble-quick-transform";
-
+import type { BubbleQuickTransformAction } from "./studio-bubble-quick-transform";
 import type { ReactElement } from "react";
 
 export type StudioBubbleShapePanelProps = {

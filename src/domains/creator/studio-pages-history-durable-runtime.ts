@@ -2,9 +2,6 @@ import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
 import {
   calculateStudioCrc32,
 } from "./studio-crc32";
-import {
-  type StudioLocalDatabase,
-} from "./studio-local-database";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import {
   selectStudioOpfsFileSystem,
@@ -38,6 +35,10 @@ import {
   type StudioHistoryJournalTransitionInput,
 } from "./studio-pages-history-command-journal";
 import { createStudioPagesHistorySqliteRecovery } from "./studio-pages-history-sqlite-recovery";
+
+import type {
+  StudioLocalDatabase,
+} from "./studio-local-database";
 
 const RECOVERY_DATABASE_NAME = "toonspectrum-studio-crdt-recovery-vault";
 const RECOVERY_DATABASE_VERSION = 1;

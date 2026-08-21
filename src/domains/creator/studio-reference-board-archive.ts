@@ -8,11 +8,6 @@ import {
   type StudioAsset,
   type StudioAssetWithContentHash,
 } from "./studio-asset-library";
-import {
-  type ImportStudioProjectArchiveResult,
-  type StudioProjectArchiveAttachmentInput,
-  type StudioProjectArchiveDocumentReference,
-} from "./studio-project-archive";
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
 import {
   createDefaultStudioReferenceBoardDocument,
@@ -21,6 +16,12 @@ import {
   type StudioReferenceBoardDocument,
   type StudioReferenceBoardSha256,
 } from "./studio-reference-board";
+
+import type {
+  ImportStudioProjectArchiveResult,
+  StudioProjectArchiveAttachmentInput,
+  StudioProjectArchiveDocumentReference,
+} from "./studio-project-archive";
 
 /**
  * Reference-board archive bridge.

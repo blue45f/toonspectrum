@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_SHADOW_HIGHLIGHT,
   SHADOW_HIGHLIGHT_AMOUNT_RANGE,
@@ -14,6 +13,8 @@ import {
   shadowHighlightKonvaFilter,
   type ShadowHighlight,
 } from "./studio-shadow-highlight";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

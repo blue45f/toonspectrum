@@ -17,6 +17,7 @@ import {
   STUDIO_LIVE_INK_CAPABILITY,
   type StudioLiveInkWireMessage,
 } from "./studio-live-ink-protocol";
+import { isStudioLocalLiveTransportSupported } from "./studio-live-local-transport-support";
 
 import type {
   StudioLiveEnvelope,
@@ -160,9 +161,10 @@ function defaultBroadcastChannelFactory(name: string): StudioBroadcastChannelLik
   return new BroadcastChannel(name);
 }
 
-export function isStudioLocalLiveTransportSupported(): boolean {
-  return typeof BroadcastChannel === "function";
-}
+// Re-exported for the existing call sites that already import it from here. Callers that only
+// need the capability answer — notably StudioLiveCollaborationProvider's gating effect — must
+// import it from the leaf module directly so they do not anchor this file eagerly.
+export { isStudioLocalLiveTransportSupported };
 
 /** Memory-only, same-origin tab transport. It never writes signaling data to localStorage. */
 export class StudioBroadcastChannelTransport implements StudioLiveTransport {

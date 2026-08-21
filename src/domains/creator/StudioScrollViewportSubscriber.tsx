@@ -7,11 +7,11 @@
  * minimap viewport box — rather than the whole editor.
  */
 
-import { type ReactNode } from "react";
 
 import { useStudioScrollViewport } from "./use-studio-scroll-viewport";
 
 import type { StudioScrollViewport, StudioScrollViewportStore } from "./studio-scroll-viewport-store";
+import type { ReactNode } from "react";
 
 export interface StudioScrollViewportSubscriberProps {
   readonly store: StudioScrollViewportStore;

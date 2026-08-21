@@ -1,6 +1,7 @@
 import { BUBBLE_VARIANTS, type BubbleVariant } from "./studio-assets";
-import {
-  type StudioInsertDragPayload,
+
+import type {
+  StudioInsertDragPayload,
 } from "./studio-insert-drag-core";
 
 export * from "./studio-insert-drag-core";

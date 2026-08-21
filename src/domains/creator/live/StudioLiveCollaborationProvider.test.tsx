@@ -438,7 +438,9 @@ interface RenderProviderOptions {
   onAuthoritativeSaveBarrierChange?: (barrier: (() => Promise<unknown>) | null) => void;
 }
 
-function renderProvider(options: RenderProviderOptions = {}): StudioLiveCollaborationContextValue {
+function renderProviderOnce(
+  options: RenderProviderOptions = {}
+): StudioLiveCollaborationContextValue {
   const output = hooks.render(() => StudioLiveCollaborationProvider({
     children: options.children ?? null,
     workId: options.workId === undefined ? "work-a" : options.workId,
@@ -457,6 +459,20 @@ function renderProvider(options: RenderProviderOptions = {}): StudioLiveCollabor
     onAuthoritativeSaveBarrierChange: options.onAuthoritativeSaveBarrierChange,
   }));
   return (output as { props: { value: StudioLiveCollaborationContextValue } }).props.value;
+}
+
+/**
+ * The provider fetches studio-live-collaboration-room on demand, so a single render pass no
+ * longer produces a room. Draining the microtask queue and rendering again is what React does
+ * once the lazy chunk lands, so every assertion below observes the post-resolution state — which
+ * is also what makes this suite a proof that the dynamic boundary resolves.
+ */
+async function renderProvider(
+  options: RenderProviderOptions = {}
+): Promise<StudioLiveCollaborationContextValue> {
+  renderProviderOnce(options);
+  for (let tick = 0; tick < 16; tick += 1) await Promise.resolve();
+  return renderProviderOnce(options);
 }
 
 describe("StudioLiveCollaborationProvider lifecycle", () => {
@@ -479,22 +495,22 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     vi.unstubAllGlobals();
   });
 
-  it("closes the previous room when the work or authorized participant changes", () => {
+  it("closes the previous room when the work or authorized participant changes", async () => {
     const onRoomChange = vi.fn();
-    renderProvider({ onRoomChange });
+    await renderProvider({ onRoomChange });
     const first = rooms.instances[0];
 
-    renderProvider({ workId: "work-b", onRoomChange });
+    await renderProvider({ workId: "work-b", onRoomChange });
     const second = rooms.instances[1];
     expect(first.closeCount).toBe(1);
     expect(first.unsubscribeCount).toBe(1);
     expect(second.options.workId).toBe("work-b");
 
-    renderProvider({ workId: "work-b", participant: null, onRoomChange });
+    await renderProvider({ workId: "work-b", participant: null, onRoomChange });
     expect(second.closeCount).toBe(1);
     expect(rooms.instances).toHaveLength(2);
 
-    renderProvider({
+    await renderProvider({
       workId: "work-b",
       participant: { displayName: "서윤", role: "commenter" },
       onRoomChange,
@@ -505,7 +521,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       role: "commenter",
     });
 
-    renderProvider({
+    await renderProvider({
       workId: "work-b",
       participant: { displayName: "민호", role: "owner" },
       onRoomChange,
@@ -518,14 +534,14 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     });
   });
 
-  it("updates page and tool presence without recreating the room", () => {
+  it("updates page and tool presence without recreating the room", async () => {
     const onRoomChange = vi.fn();
-    renderProvider({ onRoomChange });
+    await renderProvider({ onRoomChange });
     const room = rooms.instances[0];
 
     expect(room.presenceUpdates).toEqual([{ pageId: "page-a", tool: "pen" }]);
 
-    renderProvider({ currentPageId: "page-b", currentTool: "eraser", onRoomChange });
+    await renderProvider({ currentPageId: "page-b", currentTool: "eraser", onRoomChange });
 
     expect(rooms.instances).toHaveLength(1);
     expect(room.closeCount).toBe(0);
@@ -536,8 +552,55 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     expect(room.clearCursorCount).toBe(1);
   });
 
-  it("starts a same-origin jam on the local transport even when a server factory exists", () => {
-    const live = renderProvider({ serverRequired: false });
+  it("builds no room until the deferred room module resolves, then runs the session normally", async () => {
+    lifecycle.roomStart = "resolve";
+    const onRoomChange = vi.fn();
+
+    // One synchronous render pass is exactly what first paint of the canvas does. Nothing from
+    // studio-live-collaboration-room may be reachable at that point — the module, its transports
+    // and the live wire protocol only load once the gated effect asks for a session.
+    const connecting = renderProviderOnce({ onRoomChange });
+    expect(rooms.instances).toHaveLength(0);
+    expect(onRoomChange).not.toHaveBeenCalled();
+    expect(connecting.availability).toBe("connecting");
+
+    const live = await renderProvider({ onRoomChange });
+
+    expect(rooms.instances).toHaveLength(1);
+    expect(rooms.instances[0]?.startCount).toBe(1);
+    expect(onRoomChange).toHaveBeenCalledWith(expect.anything());
+    expect(live.room).not.toBeNull();
+    expect(live.availability).not.toBe("error");
+
+    // The session still behaves the same after the chunk lands: presence, locks and chat all
+    // flow through the subscription the deferred room installed.
+    rooms.instances[0]?.emit({ type: "locks", locks: [] });
+    const settled = await renderProvider({ onRoomChange });
+    expect(settled.locks).toEqual([]);
+
+    hooks.unmount();
+    expect(rooms.instances[0]?.unsubscribeCount).toBe(1);
+    await vi.waitFor(() => expect(rooms.instances[0]?.closeCount).toBe(1));
+  });
+
+  it("tears the effect down cleanly when it unmounts while the room module is still loading", async () => {
+    const onRoomChange = vi.fn();
+
+    renderProviderOnce({ onRoomChange });
+    expect(rooms.instances).toHaveLength(0);
+    hooks.unmount();
+    for (let tick = 0; tick < 16; tick += 1) await Promise.resolve();
+
+    // An in-flight import must not resurrect a room for an editor that is already gone, and no
+    // room object may escape to the parent after the teardown.
+    expect(rooms.instances).toHaveLength(0);
+    expect(
+      onRoomChange.mock.calls.filter(([exposedRoom]) => exposedRoom !== null)
+    ).toHaveLength(0);
+  });
+
+  it("starts a same-origin jam on the local transport even when a server factory exists", async () => {
+    const live = await renderProvider({ serverRequired: false });
 
     expect(rooms.instances).toHaveLength(1);
     expect(rooms.instances[0]?.options.dependencies?.transportFactory).toBeUndefined();
@@ -545,8 +608,8 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     expect(live.availability).not.toBe("error");
   });
 
-  it("fails closed when an authenticated work loses its server transport", () => {
-    const live = renderProvider({ transportFactory: null, serverRequired: true });
+  it("fails closed when an authenticated work loses its server transport", async () => {
+    const live = await renderProvider({ transportFactory: null, serverRequired: true });
 
     expect(rooms.instances).toHaveLength(0);
     expect(live.availability).toBe("error");
@@ -555,9 +618,9 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     expect(live.error).toContain("자동 전환하지 않았습니다");
   });
 
-  it("latches a terminal authorization failure across retries and transport rotation", () => {
+  it("latches a terminal authorization failure across retries and transport rotation", async () => {
     const options = { serverRequired: true };
-    renderProvider(options);
+    await renderProvider(options);
     const room = rooms.instances[0];
     room.emit({
       type: "transport-status",
@@ -568,7 +631,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       },
     });
 
-    const revoked = renderProvider(options);
+    const revoked = await renderProvider(options);
     expect(revoked.localFallbackAllowed).toBe(false);
     expect(revoked.sync).toMatchObject({
       phase: "revoked",
@@ -577,7 +640,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     });
     revoked.retryServer();
     revoked.useLocalFallback();
-    const afterAttempt = renderProvider(options);
+    const afterAttempt = await renderProvider(options);
 
     expect(rooms.instances).toHaveLength(1);
     expect(afterAttempt.usingLocalFallback).toBe(false);
@@ -586,7 +649,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     const rotatedTransportFactory: StudioLiveTransportFactory = () => {
       throw new Error("A revoked work must not open a replacement transport.");
     };
-    const afterTokenRotation = renderProvider({
+    const afterTokenRotation = await renderProvider({
       ...options,
       transportFactory: rotatedTransportFactory,
     });
@@ -600,7 +663,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     });
     expect(afterTokenRotation.localFallbackAllowed).toBe(false);
 
-    renderProvider({
+    await renderProvider({
       ...options,
       workId: "work-b",
       transportFactory: rotatedTransportFactory,
@@ -612,10 +675,10 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
   it("unsubscribes, closes, and clears the exposed room on unmount", async () => {
     lifecycle.roomStart = "resolve";
     const onRoomChange = vi.fn();
-    let live = renderProvider({ onRoomChange });
+    let live = await renderProvider({ onRoomChange });
     const room = rooms.instances[0];
-    await vi.waitFor(() => {
-      live = renderProvider({ onRoomChange });
+    await vi.waitFor(async () => {
+      live = await renderProvider({ onRoomChange });
       expect(live.availability).toBe("ready");
     });
 
@@ -630,9 +693,9 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     lifecycle.roomStart = "resolve";
     const onRoomChange = vi.fn();
     const onCrdtDocumentChange = vi.fn();
-    renderProvider({ onRoomChange, onCrdtDocumentChange });
+    await renderProvider({ onRoomChange, onCrdtDocumentChange });
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(lifecycle.bindings).toHaveLength(1);
       expect(onCrdtDocumentChange).toHaveBeenCalledWith(
         expect.anything(),
@@ -648,7 +711,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     const document = lifecycle.documents[0];
 
     hooks.unmount();
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(binding?.closeGracefullyCount).toBe(1);
       expect(document?.destroyCount).toBe(1);
       expect(room?.closeCount).toBe(1);
@@ -665,12 +728,12 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     const onCrdtDocumentChange = vi.fn();
     const options = { onRoomChange, onCrdtDocumentChange };
 
-    const connecting = renderProvider(options);
+    const connecting = await renderProvider(options);
 
     expect(onRoomChange).toHaveBeenCalledWith(expect.anything());
     expect(onCrdtDocumentChange).toHaveBeenLastCalledWith(null, null);
     expect(connecting.availability).toBe("connecting");
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(lifecycle.bindings).toHaveLength(1);
       expect(lifecycle.bindingStartResolvers).toHaveLength(1);
     });
@@ -680,7 +743,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
 
     lifecycle.bindingStartResolvers[0]?.();
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(onCrdtDocumentChange).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
@@ -701,9 +764,9 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     };
     const onCrdtDocumentChange = vi.fn();
     const options = { onCrdtDocumentChange };
-    renderProvider(options);
+    await renderProvider(options);
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(onCrdtDocumentChange).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
@@ -713,7 +776,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
         })
       );
     });
-    const live = renderProvider(options);
+    const live = await renderProvider(options);
 
     expect(live.availability).toBe("error");
     expect(live.error).toContain("IndexedDB 복구 저장소가 저하");
@@ -735,15 +798,15 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       lastAckServerSequence: "27",
     };
     const options = { onCrdtDocumentChange: vi.fn() };
-    renderProvider(options);
+    await renderProvider(options);
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(options.onCrdtDocumentChange).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything()
       );
     });
-    const live = renderProvider(options);
+    const live = await renderProvider(options);
     expect(live.sync).toMatchObject({
       phase: "synced",
       pendingCount: 0,
@@ -772,15 +835,15 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     vi.stubGlobal("location", { reload: reloadSpy } as unknown as Location);
     const onCrdtDocumentChange = vi.fn();
     const options = { onCrdtDocumentChange };
-    renderProvider(options);
+    await renderProvider(options);
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(lifecycle.bindings).toHaveLength(1);
       expect(onCrdtDocumentChange).toHaveBeenCalledWith(expect.anything(), expect.anything());
     });
 
-    const live = renderProvider(options);
-    await vi.waitFor(() => {
+    const live = await renderProvider(options);
+    await vi.waitFor(async () => {
       expect(live.sync.phase).toBe("synced");
     });
 
@@ -795,9 +858,9 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       onCrdtDocumentChange: vi.fn(),
       onAuthoritativeSaveBarrierChange,
     };
-    renderProvider(options);
+    await renderProvider(options);
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(onAuthoritativeSaveBarrierChange).toHaveBeenCalledWith(expect.any(Function));
     });
     const barrier = onAuthoritativeSaveBarrierChange.mock.calls
@@ -828,10 +891,10 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       onCrdtDocumentChange: vi.fn(),
       onEditSafetyChange,
     };
-    renderProvider(options);
+    await renderProvider(options);
 
-    await vi.waitFor(() => {
-      renderProvider(options);
+    await vi.waitFor(async () => {
+      await renderProvider(options);
       expect(onEditSafetyChange).toHaveBeenLastCalledWith(true);
     });
 
@@ -843,7 +906,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       persistenceDurability: "unavailable",
       transportReady: false,
     });
-    renderProvider(options);
+    await renderProvider(options);
 
     expect(onEditSafetyChange).toHaveBeenLastCalledWith(false);
   });
@@ -856,9 +919,9 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     };
     const onCrdtDocumentChange = vi.fn();
     const options = { onCrdtDocumentChange, serverRequired: true };
-    renderProvider(options);
+    await renderProvider(options);
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(lifecycle.bindings).toHaveLength(1);
       expect(onCrdtDocumentChange).toHaveBeenCalledWith(expect.anything(), expect.anything());
     });
@@ -874,7 +937,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       recoveryExportAvailable: true,
     });
 
-    const live = renderProvider(options);
+    const live = await renderProvider(options);
     expect(live.sync).toMatchObject({
       phase: "recovery-required",
       operationSyncReady: false,
@@ -892,7 +955,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
 
     live.retryServer();
     live.useLocalFallback();
-    const afterBypassAttempts = renderProvider(options);
+    const afterBypassAttempts = await renderProvider(options);
     expect(rooms.instances).toHaveLength(1);
     expect(afterBypassAttempts.mode).toBe("server");
     expect(afterBypassAttempts.usingLocalFallback).toBe(false);
@@ -902,9 +965,9 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     lifecycle.roomStart = "resolve";
     const onCrdtDocumentChange = vi.fn();
     const options = { onCrdtDocumentChange, outboxScope: "user-a" };
-    renderProvider(options);
+    await renderProvider(options);
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(lifecycle.bindings).toHaveLength(1);
       expect(onCrdtDocumentChange).toHaveBeenCalledWith(expect.anything(), expect.anything());
     });
@@ -920,19 +983,19 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       recoveryExportAvailable: true,
     });
 
-    const recoveryRequired = renderProvider(options);
+    const recoveryRequired = await renderProvider(options);
     recoveryVault.entries.push(recoveryVaultEntry({
       rejectedUpdateId: "private-update-id",
     }));
     await recoveryRequired.exportRecovery();
-    const exported = renderProvider(options);
+    const exported = await renderProvider(options);
     expect(exported.recovery?.exported).toBe(true);
     expect(recoveryDownloads.count).toBe(1);
 
     const rotatedTransportFactory: StudioLiveTransportFactory = () => {
       throw new Error("The latched recovery boundary must not open a replacement transport.");
     };
-    const afterTokenRotation = renderProvider({
+    const afterTokenRotation = await renderProvider({
       ...options,
       transportFactory: rotatedTransportFactory,
     });
@@ -951,9 +1014,9 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     lifecycle.roomStart = "resolve";
     const onCrdtDocumentChange = vi.fn();
     const options = { onCrdtDocumentChange, outboxScope: "user-late" };
-    renderProvider(options);
+    await renderProvider(options);
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(lifecycle.bindings).toHaveLength(1);
       expect(onCrdtDocumentChange).toHaveBeenCalledWith(expect.anything(), expect.anything());
     });
@@ -968,7 +1031,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       recoveryExportAvailable: false,
     });
 
-    const preserving = renderProvider(options);
+    const preserving = await renderProvider(options);
     expect(preserving.recovery).toMatchObject({
       vaultId: null,
       exportAvailable: false,
@@ -997,19 +1060,19 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       ...options,
       transportFactory: rotatedTransportFactory,
     };
-    const immediatelyAfterRotation = renderProvider(rotatedOptions);
+    const immediatelyAfterRotation = await renderProvider(rotatedOptions);
     expect(immediatelyAfterRotation.recovery?.exportAvailable).toBe(false);
 
-    await vi.waitFor(() => {
-      expect(renderProvider(rotatedOptions).recovery).toMatchObject({
+    await vi.waitFor(async () => {
+      expect((await renderProvider(rotatedOptions)).recovery).toMatchObject({
         vaultId: "late-vault",
         exportAvailable: true,
         exported: false,
       });
     });
-    const hydrated = renderProvider(rotatedOptions);
+    const hydrated = await renderProvider(rotatedOptions);
     await hydrated.exportRecovery();
-    const exported = renderProvider(rotatedOptions);
+    const exported = await renderProvider(rotatedOptions);
 
     expect(rooms.instances).toHaveLength(1);
     expect(recoveryVault.listCount).toBeGreaterThanOrEqual(3);
@@ -1027,7 +1090,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       onCrdtDocumentChange: vi.fn(),
       outboxScope: "user-slow-vault",
     };
-    renderProvider(options);
+    await renderProvider(options);
     await vi.waitFor(() => expect(lifecycle.bindings).toHaveLength(1));
     lifecycle.bindings[0]?.onStatus?.({
       state: "recovery-required",
@@ -1039,7 +1102,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       retryable: false,
       recoveryExportAvailable: false,
     });
-    renderProvider(options);
+    await renderProvider(options);
 
     recoveryVault.entries.push(recoveryVaultEntry({
       scope: "user-slow-vault",
@@ -1058,12 +1121,12 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
 
     vi.useFakeTimers();
     try {
-      renderProvider(rotatedOptions);
+      await renderProvider(rotatedOptions);
       for (let attempt = 0; attempt < 13; attempt += 1) {
         await vi.advanceTimersByTimeAsync(5_000);
-        renderProvider(rotatedOptions);
+        await renderProvider(rotatedOptions);
       }
-      expect(renderProvider(rotatedOptions).recovery).toMatchObject({
+      expect((await renderProvider(rotatedOptions)).recovery).toMatchObject({
         vaultId: "slow-vault",
         updateCount: 4_097,
         exportAvailable: true,
@@ -1091,13 +1154,13 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     };
     const onCrdtDocumentChange = vi.fn();
     const options = { onCrdtDocumentChange };
-    renderProvider(options);
+    await renderProvider(options);
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(lifecycle.bindings).toHaveLength(1);
       expect(onCrdtDocumentChange).toHaveBeenCalled();
     });
-    const live = renderProvider(options);
+    const live = await renderProvider(options);
 
     expect(
       onCrdtDocumentChange.mock.calls.filter(([document]) => document !== null)
@@ -1112,15 +1175,15 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     const onRoomChange = vi.fn();
     const onCrdtDocumentChange = vi.fn();
     const options = { onRoomChange, onCrdtDocumentChange };
-    renderProvider(options);
+    await renderProvider(options);
 
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(lifecycle.bindings).toHaveLength(1);
       expect(lifecycle.bindings[0]?.closeCount).toBe(1);
       expect(lifecycle.documents[0]?.destroyCount).toBe(1);
       expect(rooms.instances[0]?.closeCount).toBe(1);
     });
-    const failed = renderProvider(options);
+    const failed = await renderProvider(options);
 
     expect(failed.availability).toBe("error");
     expect(failed.error).toContain("binding start failed");

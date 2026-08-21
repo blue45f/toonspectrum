@@ -14,16 +14,17 @@ import {
   reconcileStudioAutosaveWithOpfsPrimary,
   type StudioAutosaveOpfsJournalPort,
 } from "./studio-autosave-opfs-session";
-import {
-  type StudioOpfsRecoveryEntry,
-  type StudioOpfsRecoveryScan,
-  type StudioOpfsRecoveryWriterLease,
-} from "./studio-opfs-recovery-journal";
 
 import type {
   StudioAutosaveSqlitePort,
   StudioAutosaveSqliteReadResult,
 } from "./studio-autosave-sqlite-store";
+import type {
+  StudioOpfsRecoveryEntry,
+  StudioOpfsRecoveryScan,
+  StudioOpfsRecoveryWriterLease,
+} from "./studio-opfs-recovery-journal";
+
 
 const DOCUMENT_ID = "autosave-test-document";
 const ENGINE_VERSION = "studio-autosave-v2";

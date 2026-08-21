@@ -1,9 +1,9 @@
 import * as THREE from "three";
 
-import {
-  type GarmentPart,
-  type GarmentShape,
-  type WardrobeBone,
+import type {
+  GarmentPart,
+  GarmentShape,
+  WardrobeBone,
 } from "./studio-vrm-wardrobe";
 
 export const STUDIO_VRM_SKINNED_GARMENT_VERSION = 1 as const;

@@ -14,7 +14,8 @@ import {
   type BlurFx,
   type BlurFxType,
 } from "./studio-blur";
-import { type StudioImageDataLike } from "./studio-filters";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

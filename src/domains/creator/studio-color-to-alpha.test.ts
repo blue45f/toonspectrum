@@ -10,7 +10,8 @@ import {
   normalizeColorToAlpha,
   type ColorToAlpha,
 } from "./studio-color-to-alpha";
-import { type StudioImageDataLike } from "./studio-filters";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

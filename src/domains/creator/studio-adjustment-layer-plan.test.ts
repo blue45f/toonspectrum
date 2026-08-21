@@ -15,9 +15,10 @@ import {
   type StudioAdjustmentLayerGroup,
   type StudioAdjustmentLayerRenderKind,
 } from "./studio-adjustment-layer-plan";
-import {
-  type StudioAdjustmentEngineId,
-  type StudioAdjustmentStack,
+
+import type {
+  StudioAdjustmentEngineId,
+  StudioAdjustmentStack,
 } from "./studio-adjustment-stack";
 
 function stack(

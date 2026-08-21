@@ -25,16 +25,6 @@ import {
 import { Suspense, memo, useEffect, useMemo, useState } from "react";
 
 import { isStudioAiConfigured, type StudioAiSettings } from "./ai/studio-ai-client";
-import { type StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
-import {
-  type NormalizedStudioBrushDynamicsSettings,
-  type StudioBrushDynamicsPresetId,
-} from "./brush/studio-brush-dynamics";
-import {
-  type DeletedBrushRecord,
-  type StudioBrushSnapshot,
-  type StudioSavedBrush,
-} from "./brush/studio-brush-library";
 import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./brush/studio-draw-hud";
 import { adjustStudioBrushSize, STUDIO_BRUSH_OPACITY_RANGE, STUDIO_BRUSH_SIZE_RANGE } from "./brush/studio-draw-ux";
 import { toggleStudioDrawingPalette, type StudioDrawingPaletteLayout } from "./brush/studio-drawing-palettes";
@@ -46,19 +36,11 @@ import {
   studioSubToolPalettePresetById,
 } from "./brush/studio-sub-tool-palette-data";
 import { StudioSubToolPalette } from "./brush/StudioSubToolPalette";
-import { type FilterMaskPaintMode } from "./filter/studio-filter-mask";
 import { STUDIO_LAYER_BORDER_EFFECT_OPEN_EVENT } from "./layer/studio-layer-border-effect";
-import { type LayerMaskPaintMode } from "./layer/studio-layer-mask";
-import {
-  type StudioLayerColor,
-  type StudioLayerNavigatorItem,
-  type StudioLayerRole,
-} from "./layer/studio-layer-navigator";
 import { StudioLayerBorderEffectPanel } from "./layer/StudioLayerBorderEffectPanel";
 import { hasCustomBubbleShape } from "./lettering/studio-bubble-custom-shape";
 import { normalizeExtraTails } from "./lettering/studio-bubble-path";
 import { normalizeTextPath, type TextPathConfig } from "./lettering/studio-text-path";
-import { type ImageFilterFields } from "./render/studio-konva-filter-fields";
 import { summarizeStudioRasterPreparationSources } from "./render/studio-raster-edit-preparation";
 import {
   resolveStudioRasterToolAvailability,
@@ -69,14 +51,12 @@ import {
   localizeStudioInspectorRasterPolicy,
   localizeStudioRasterToolAvailability,
 } from "./render/studio-raster-tool-reason-localization";
-import { type StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import { DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS, type StudioAdvancedFillSettings } from "./studio-advanced-fill-settings";
 import { CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
 import { preloadStudioBackground3D } from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
 import { BRAND_KIT_FONTS, DEFAULT_BRAND_KIT_FONT } from "./studio-brand-kit";
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
-import { type ColorRangeSample } from "./studio-color-range";
 import {
   applyCropAspect,
   cropAspectRatio,
@@ -85,33 +65,14 @@ import {
   type CropAspectId,
   type CropRect,
 } from "./studio-crop";
-import {
-  type DodgeBurnMode,
-  type DodgeBurnRange,
-  type DodgeBurnSpongeMode,
-} from "./studio-dodge-burn";
-import { type DrawMode, type DrawShapeKind, type StudioMenu, type Tool } from "./studio-editor-tool-model";
-import { type StudioEffectFavoriteState, type StudioEffectId } from "./studio-effect-favorites";
 import { containingPanel, elBounds } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
-import {
-  type BubbleEl,
-  type DrawEl,
-  type El,
-  type FocusLinesEl,
-  type ImageEl,
-  type SpeedLinesEl,
-  type StickerEl,
-  type TextEl,
-} from "./studio-element-model";
-import { type StudioExtendedBlendModeId } from "./studio-extended-blend";
 import {
   resolveStudioFigmaSelectionLayoutMetrics,
   selectStudioFigmaDesignTargets,
   type StudioFigmaSelectionLayoutPatch,
 } from "./studio-figma-selection-ux";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
-import { type HealCloneMode } from "./studio-heal-clone";
 import { openStudioHelpCenter } from "./studio-help-center-channel";
 import { uid } from "./studio-id";
 import {
@@ -127,7 +88,6 @@ import {
   studioInspectorTransientOwners,
   type StudioInspectorTransientState,
 } from "./studio-inspector-tool-transition";
-import { type StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
 import {
   groupOfItem,
   isEffectivelyHidden,
@@ -135,13 +95,10 @@ import {
   type LayerGroup,
 } from "./studio-layers";
 import { LIQUIFY_RADIUS_RANGE, LIQUIFY_STRENGTH_RANGE, type StudioLiquifyMode } from "./studio-liquify-contract";
-import { type MagicResizePreset, type MagicResizeStrategy } from "./studio-magic-resize";
 import {
   studioMobileSheetSizeStyle,
   type StudioMobileSheetSnap,
 } from "./studio-mobile-sheet-snap";
-import { type NodeEditHandle, type NodeEditTool } from "./studio-node-edit";
-import { type PageGrade } from "./studio-page-grade";
 import {
   StudioAdvancedRulerPanel,
   StudioAiColorizePanel,
@@ -181,10 +138,6 @@ import {
   StudioTextEffectPanel,
   StudioTextPathPanel,
 } from "./studio-page-lazy-ui";
-import { type PageState } from "./studio-page-state";
-import { type StudioPathBooleanOp } from "./studio-path-boolean";
-import { type VanishingPoint } from "./studio-perspective-guide";
-import { type PixelSelectionHistoryOperation } from "./studio-pixel-selection-history";
 import { StudioPresetFontPreload } from "./studio-preset-font-loading";
 import {
   isPuppetWarpNoop,
@@ -192,7 +145,6 @@ import {
   resetPuppetPinPositions,
   type PuppetPin,
 } from "./studio-puppet-warp";
-import { type QuickMaskBrushMode } from "./studio-quick-mask";
 import { QUICKSHAPE_KIND_LABELS } from "./studio-quickshape-labels";
 import {
   DEFAULT_STUDIO_SKETCH_STYLE,
@@ -219,7 +171,6 @@ import {
   type SelectionToolKind,
 } from "./studio-selection-tools";
 import { normalizeSkewPatch } from "./studio-skew";
-import { type StudioViewRotation } from "./studio-view-controls";
 import { STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH } from "./studio-workspaces";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioCommandSearchHost } from "./StudioCommandSearchHost";
@@ -262,18 +213,67 @@ import {
 import { StudioSkewPanel } from "./StudioSkewPanel";
 import { useStudioRasterSourcePresentation } from "./use-studio-raster-source-presentation";
 
+import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
 import type {
   StudioBrushDefaultRestoreDirection,
   StudioBrushDefaultRestoreTransaction,
 } from "./brush/studio-brush-default-restore";
+import type {
+  NormalizedStudioBrushDynamicsSettings,
+  StudioBrushDynamicsPresetId,
+} from "./brush/studio-brush-dynamics";
 import type { StudioBrushEngineProgramSet } from "./brush/studio-brush-engine-program-set";
+import type {
+  DeletedBrushRecord,
+  StudioBrushSnapshot,
+  StudioSavedBrush,
+} from "./brush/studio-brush-library";
+import type { FilterMaskPaintMode } from "./filter/studio-filter-mask";
 import type { StudioFilterKind } from "./filter/studio-filter-menu"; // keep type-only: inline `import { type X }` still emits a live import and drags the filter pack into launch
+import type { LayerMaskPaintMode } from "./layer/studio-layer-mask";
+import type {
+  StudioLayerColor,
+  StudioLayerNavigatorItem,
+  StudioLayerRole,
+} from "./layer/studio-layer-navigator";
 import type { StudioLayerNavigatorAction } from "./layer/StudioLayerNavigator";
+import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
+import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import type {
   StudioAdvancedRuler,
   StudioAdvancedRulerDocument,
 } from "./studio-advanced-ruler-document";
+import type { ColorRangeSample } from "./studio-color-range";
+import type {
+  DodgeBurnMode,
+  DodgeBurnRange,
+  DodgeBurnSpongeMode,
+} from "./studio-dodge-burn";
+import type { DrawMode, DrawShapeKind, StudioMenu, Tool } from "./studio-editor-tool-model";
+import type { StudioEffectFavoriteState, StudioEffectId } from "./studio-effect-favorites";
+import type {
+  BubbleEl,
+  DrawEl,
+  El,
+  FocusLinesEl,
+  ImageEl,
+  SpeedLinesEl,
+  StickerEl,
+  TextEl,
+} from "./studio-element-model";
+import type { StudioExtendedBlendModeId } from "./studio-extended-blend";
+import type { HealCloneMode } from "./studio-heal-clone";
+import type { StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
+import type { MagicResizePreset, MagicResizeStrategy } from "./studio-magic-resize";
+import type { NodeEditHandle, NodeEditTool } from "./studio-node-edit";
+import type { PageGrade } from "./studio-page-grade";
+import type { PageState } from "./studio-page-state";
+import type { StudioPathBooleanOp } from "./studio-path-boolean";
+import type { VanishingPoint } from "./studio-perspective-guide";
+import type { PixelSelectionHistoryOperation } from "./studio-pixel-selection-history";
+import type { QuickMaskBrushMode } from "./studio-quick-mask";
 import type { StudioScrollViewportStore } from "./studio-scroll-viewport-store";
+import type { StudioViewRotation } from "./studio-view-controls";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 
 import { buttonClass } from "@/components/ui/button-utils";

@@ -13,17 +13,7 @@ import {
   type StudioLiveRecoveryState,
 } from "./studio-live-collaboration-context";
 import { studioLiveDisplayName, type StudioLiveParticipant } from "./studio-live-collaboration-protocol";
-import {
-  StudioLiveRoom,
-  type StudioLiveChatMessage,
-  type StudioLiveLock,
-  type StudioLivePeer,
-} from "./studio-live-collaboration-room";
-import {
-  isStudioLocalLiveTransportSupported,
-  type StudioLiveTransportFactory,
-  type StudioLiveTransportMode,
-} from "./studio-live-collaboration-transport";
+import { isStudioLocalLiveTransportSupported } from "./studio-live-local-transport-support";
 import {
   projectStudioLiveSyncSnapshot,
   type StudioCrdtSyncTelemetry,
@@ -37,6 +27,16 @@ import type {
   StudioCrdtBindingStatus,
   StudioCrdtRoomBinding,
 } from "./studio-crdt-room-binding";
+import type {
+  StudioLiveRoom,
+  StudioLiveChatMessage,
+  StudioLiveLock,
+  StudioLivePeer,
+} from "./studio-live-collaboration-room";
+import type {
+  StudioLiveTransportFactory,
+  StudioLiveTransportMode,
+} from "./studio-live-collaboration-transport";
 
 export type StudioCrdtAuthoritativeSaveBarrier = (
   timeoutMs?: number
@@ -385,321 +385,346 @@ export function StudioLiveCollaborationProvider({
 
     setAvailability("connecting");
     setMode(transportPreference);
-    let nextRoom: StudioLiveRoom;
-    try {
-      nextRoom = new StudioLiveRoom({
-        workId,
-        participant: {
-          sessionId: localSessionId(workId),
-          displayName: studioLiveDisplayName(participantName, {
-            suffix: "· 이 탭",
-            fallback: "내 작업",
-          }),
-          role: participantRole,
-        },
-        ...(transportPreference === "server" && transportFactory
-          ? { dependencies: { transportFactory } }
-          : {}),
-      });
-    } catch (cause) {
-      setAvailability("error");
-      setError(messageFrom(cause, "공동작업 세션을 만들지 못했습니다."));
-      onRoomChange?.(null);
-      return;
-    }
-
-    setRoom(nextRoom);
-    onRoomChange?.(nextRoom);
-    let roomClosed = false;
-    let roomExposed = true;
-    const closeRoom = () => {
-      if (roomClosed) return;
-      roomClosed = true;
-      nextRoom.close();
-    };
-    const clearExposedRoom = () => {
-      if (!roomExposed) return;
-      roomExposed = false;
-      onRoomChange?.(null);
-    };
-    let crdtDocument: StudioCrdtDocument | null = null;
-    let crdtBinding: StudioCrdtRoomBinding | null = null;
-    let crdtDurabilityWarning: string | null = null;
-    const exposeReadyRoom = (nextError?: string | null) => {
-      if (crdtDurabilityWarning) {
-        setAvailability("error");
-        setError(crdtDurabilityWarning);
-        return;
-      }
-      setAvailability("ready");
-      if (nextError !== undefined) setError(nextError);
-    };
-    const unsubscribe = nextRoom.subscribe((event) => {
-      if (cancelled) return;
-      if (event.type === "presence") {
-        setPeers(event.peers);
-        if (nextRoom.ready) exposeReadyRoom();
-        return;
-      }
-      if (event.type === "locks") {
-        setLocks(event.locks);
-        return;
-      }
-      if (event.type === "chat") {
-        // The room already bounds its own history; mirror it so late panel mounts see context.
-        setChatMessages(nextRoom.getChatMessages());
-        return;
-      }
-      if (event.type === "transport-error") {
-        setError(event.message);
-        return;
-      }
-      if (event.type !== "transport-status") return;
-
-      setMode(nextRoom.mode);
-      if (event.status.state === "ready") {
-        setSyncTelemetry((previous) => previous
-          ? { ...previous, transportReady: true }
-          : {
-              state: "syncing",
-              message: "팀 원고의 권위 상태를 확인하는 중입니다.",
-              pendingCount: 0,
-              persistenceDurability:
-                participantCanEdit && outboxScope ? "checking" : participantCanEdit ? "unavailable" : "not-applicable",
-              transportReady: true,
-              lastAckAt: null,
-              lastAckServerSequence: null,
-            });
-        exposeReadyRoom(null);
-      } else if (event.status.state === "connecting" || event.status.state === "disconnected") {
-        setSyncTelemetry((previous) => previous
-          ? { ...previous, state: "retrying", transportReady: false, message: event.status.message }
-          : previous);
-        setAvailability("connecting");
-        setError(event.status.message);
-      } else if (event.status.state === "error" && nextRoom.ready) {
-        // Operation-level denial (for example a lease conflict) does not destroy the live room.
-        exposeReadyRoom(event.status.message);
-      } else {
-        setAvailability("error");
-        setError(event.status.message);
-      }
-
-      if (!event.status.recoverable) {
-        if (recoveryBoundaryScopeKey) {
-          revocationBoundaryRef.current = {
-            scopeKey: recoveryBoundaryScopeKey,
-            mode: nextRoom.mode ?? transportPreference,
-            message: event.status.message,
-          };
-        }
-        setTerminalTransportState("revoked");
-        setOperationSyncReady(false);
-        onAuthoritativeSaveBarrierChange?.(null);
-        onCrdtDocumentChange?.(null, null);
-        setPeers([]);
-        setLocks([]);
-        setChatMessages([]);
-        setLocalFallbackAllowed(false);
-      }
-    });
-    let roomSubscriptionActive = true;
-    const stopRoomSubscription = () => {
-      if (!roomSubscriptionActive) return;
-      roomSubscriptionActive = false;
-      unsubscribe();
-    };
-
-    const onVisibilityChange = () => {
-      try {
-        if (document.hidden) nextRoom.clearCursor();
-        nextRoom.updatePresence({ visibility: document.hidden ? "idle" : "active" });
-      } catch (cause) {
-        if (!cancelled) setError(messageFrom(cause, "작업 상태를 팀에 알리지 못했습니다."));
-      }
-    };
-    let visibilityListenerActive = false;
-    if (typeof document !== "undefined") {
-      nextRoom.updatePresence({ visibility: document.hidden ? "idle" : "active" });
-      document.addEventListener("visibilitychange", onVisibilityChange);
-      visibilityListenerActive = true;
-    }
-    const stopVisibilityListener = () => {
-      if (!visibilityListenerActive || typeof document === "undefined") return;
-      visibilityListenerActive = false;
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-
+    // The room, its transports and the live wire protocol are only reachable once a
+    // collaboration session actually starts. Connecting is already asynchronous, so resolving
+    // the module here adds no round trip to first paint and none to the local stroke path,
+    // which commits through studio-deferred-stroke-commit without touching the protocol.
+    let disposeSession: (() => void) | null = null;
     void (async () => {
+      let roomModule: typeof import("./studio-live-collaboration-room");
       try {
-        await nextRoom.start();
+        roomModule = await import("./studio-live-collaboration-room");
+      } catch (cause) {
         if (cancelled) return;
-        const [
-          documentModule,
-          bindingModule,
-          scenePublisherModule,
-          sceneHistoryModule,
-          scenePageBridgeModule,
-          rasterUiBridgeModule,
-        ] = await Promise.all([
-          import( "./studio-crdt-document"),
-          import( "./studio-crdt-room-binding"),
-          import("./studio-crdt-scene-publisher"),
-          import( "./studio-crdt-history"),
-          import("./studio-crdt-page-bridge"),
-          import( "./studio-crdt-raster-ui-bridge"),
-        ]);
-        if (cancelled) return;
-        crdtDocument = new documentModule.StudioCrdtDocument();
-        crdtBinding = new bindingModule.StudioCrdtRoomBinding({
-          document: crdtDocument,
-          room: nextRoom,
-          canEdit: participantRole === "owner" || participantRole === "admin" || participantRole === "editor",
-          outboxScope,
-          onStatus: (status) => {
-            if (cancelled) return;
-            setSyncTelemetry((previous) => mergeBindingTelemetry({
-              previous,
-              status,
-              transportReady: nextRoom.ready,
-              outboxConfigured: participantCanEdit && Boolean(outboxScope),
-            }));
-            if ((status as { state: string }).state === "recovery-required") {
-              const previousBoundary =
-                recoveryBoundaryRef.current?.scopeKey === recoveryBoundaryScopeKey
-                  ? recoveryBoundaryRef.current
-                  : null;
-              const previousRecovery = previousBoundary?.recovery ?? null;
-              const nextRecovery: StudioLiveRecoveryState = {
-                vaultId:
-                  "recoveryVaultId" in status &&
-                  typeof status.recoveryVaultId === "string"
-                    ? status.recoveryVaultId
-                    : previousRecovery?.vaultId ?? null,
-                updateCount:
-                  "recoveryUpdateCount" in status
-                    ? status.recoveryUpdateCount
-                    : previousRecovery?.updateCount ?? 0,
-                exportAvailable:
-                  "recoveryExportAvailable" in status
-                    ? status.recoveryExportAvailable
-                    : previousRecovery?.exportAvailable ?? false,
-                exported: previousRecovery?.exported ?? false,
-                message: status.message,
-              };
-              if (recoveryBoundaryScopeKey) {
-                recoveryBoundaryRef.current = {
-                  scopeKey: recoveryBoundaryScopeKey,
-                  rejectedUpdateId:
-                    "updateId" in status && typeof status.updateId === "string"
-                      ? status.updateId
-                      : previousBoundary?.rejectedUpdateId ?? null,
-                  recovery: nextRecovery,
-                };
-              }
-              setTerminalTransportState("recovery-required");
-              setRecovery(nextRecovery);
-              setOperationSyncReady(false);
-              onAuthoritativeSaveBarrierChange?.(null);
-              onCrdtDocumentChange?.(null, null);
-              setAvailability("error");
-              setError(status.message);
-              setLocalFallbackAllowed(false);
-              return;
-            }
-            if (status.state === "error") {
-              if (status.durabilityAtRisk) crdtDurabilityWarning = status.message;
-              setError(status.message);
-              if (status.durabilityAtRisk) setAvailability("error");
-            }
-            if (status.state === "ready" && nextRoom.ready) {
-              crdtDurabilityWarning = null;
-              exposeReadyRoom(null);
-            }
+        setAvailability("error");
+        setError(messageFrom(cause, "공동작업 세션을 만들지 못했습니다."));
+        onRoomChange?.(null);
+        return;
+      }
+      if (cancelled) return;
+
+      let nextRoom: StudioLiveRoom;
+      try {
+        nextRoom = new roomModule.StudioLiveRoom({
+          workId,
+          participant: {
+            sessionId: localSessionId(workId),
+            displayName: studioLiveDisplayName(participantName, {
+              suffix: "· 이 탭",
+              fallback: "내 작업",
+            }),
+            role: participantRole,
           },
+          ...(transportPreference === "server" && transportFactory
+            ? { dependencies: { transportFactory } }
+            : {}),
         });
-        await crdtBinding.start();
-        if (cancelled) return;
-        if (crdtBinding.recoveryRequired) {
-          // A restored optimistic update can be permanently rejected during the initial drain.
-          // Never re-expose that divergent Y.Doc after the terminal status callback locked Studio.
-          onCrdtDocumentChange?.(null, null);
-          setOperationSyncReady(false);
+      } catch (cause) {
+        setAvailability("error");
+        setError(messageFrom(cause, "공동작업 세션을 만들지 못했습니다."));
+        onRoomChange?.(null);
+        return;
+      }
+
+      setRoom(nextRoom);
+      onRoomChange?.(nextRoom);
+      let roomClosed = false;
+      let roomExposed = true;
+      const closeRoom = () => {
+        if (roomClosed) return;
+        roomClosed = true;
+        nextRoom.close();
+      };
+      const clearExposedRoom = () => {
+        if (!roomExposed) return;
+        roomExposed = false;
+        onRoomChange?.(null);
+      };
+      let crdtDocument: StudioCrdtDocument | null = null;
+      let crdtBinding: StudioCrdtRoomBinding | null = null;
+      let crdtDurabilityWarning: string | null = null;
+      const exposeReadyRoom = (nextError?: string | null) => {
+        if (crdtDurabilityWarning) {
+          setAvailability("error");
+          setError(crdtDurabilityWarning);
           return;
         }
-        const readyBinding = crdtBinding;
-        onAuthoritativeSaveBarrierChange?.((timeoutMs) =>
-          readyBinding.flushAndWaitForAuthoritativeAck(timeoutMs)
-        );
-        onCrdtDocumentChange?.(
-          crdtDocument,
-          {
-            publish: scenePublisherModule.publishStudioCrdtSceneGraphDiff,
-            reconcileHistory: sceneHistoryModule.reconcileStudioCrdtSceneGraphHistory,
-            reconcilePages: scenePageBridgeModule.reconcileStudioCrdtSceneGraphPages,
-            nextRasterLogicalClock: rasterUiBridgeModule.nextStudioRasterLogicalClock,
-            planRasterDrawPromotion: rasterUiBridgeModule.planStudioRasterDrawPromotion,
-            rasterDrawPromotionSourceMatches:
-              rasterUiBridgeModule.studioRasterDrawPromotionSourceMatches,
-            publishRasterHistoryTransition:
-              rasterUiBridgeModule.publishStudioRasterHistoryTransition,
-            sha256RasterSemanticParameters:
-              rasterUiBridgeModule.sha256StudioRasterSemanticParameters,
-          }
-        );
-        setOperationSyncReady(true);
-        setMode(nextRoom.mode);
-        setPeers(nextRoom.getPeers());
-        setLocks(nextRoom.getLocks());
-        exposeReadyRoom(null);
-      } catch (cause: unknown) {
+        setAvailability("ready");
+        if (nextError !== undefined) setError(nextError);
+      };
+      const unsubscribe = nextRoom.subscribe((event) => {
         if (cancelled) return;
-        const failedBinding = crdtBinding;
-        const failedDocument = crdtDocument;
-        crdtBinding = null;
-        crdtDocument = null;
-        setOperationSyncReady(false);
-        onAuthoritativeSaveBarrierChange?.(null);
-        failedBinding?.close();
-        failedDocument?.destroy();
+        if (event.type === "presence") {
+          setPeers(event.peers);
+          if (nextRoom.ready) exposeReadyRoom();
+          return;
+        }
+        if (event.type === "locks") {
+          setLocks(event.locks);
+          return;
+        }
+        if (event.type === "chat") {
+          // The room already bounds its own history; mirror it so late panel mounts see context.
+          setChatMessages(nextRoom.getChatMessages());
+          return;
+        }
+        if (event.type === "transport-error") {
+          setError(event.message);
+          return;
+        }
+        if (event.type !== "transport-status") return;
+
+        setMode(nextRoom.mode);
+        if (event.status.state === "ready") {
+          setSyncTelemetry((previous) => previous
+            ? { ...previous, transportReady: true }
+            : {
+                state: "syncing",
+                message: "팀 원고의 권위 상태를 확인하는 중입니다.",
+                pendingCount: 0,
+                persistenceDurability:
+                  participantCanEdit && outboxScope ? "checking" : participantCanEdit ? "unavailable" : "not-applicable",
+                transportReady: true,
+                lastAckAt: null,
+                lastAckServerSequence: null,
+              });
+          exposeReadyRoom(null);
+        } else if (event.status.state === "connecting" || event.status.state === "disconnected") {
+          setSyncTelemetry((previous) => previous
+            ? { ...previous, state: "retrying", transportReady: false, message: event.status.message }
+            : previous);
+          setAvailability("connecting");
+          setError(event.status.message);
+        } else if (event.status.state === "error" && nextRoom.ready) {
+          // Operation-level denial (for example a lease conflict) does not destroy the live room.
+          exposeReadyRoom(event.status.message);
+        } else {
+          setAvailability("error");
+          setError(event.status.message);
+        }
+
+        if (!event.status.recoverable) {
+          if (recoveryBoundaryScopeKey) {
+            revocationBoundaryRef.current = {
+              scopeKey: recoveryBoundaryScopeKey,
+              mode: nextRoom.mode ?? transportPreference,
+              message: event.status.message,
+            };
+          }
+          setTerminalTransportState("revoked");
+          setOperationSyncReady(false);
+          onAuthoritativeSaveBarrierChange?.(null);
+          onCrdtDocumentChange?.(null, null);
+          setPeers([]);
+          setLocks([]);
+          setChatMessages([]);
+          setLocalFallbackAllowed(false);
+        }
+      });
+      let roomSubscriptionActive = true;
+      const stopRoomSubscription = () => {
+        if (!roomSubscriptionActive) return;
+        roomSubscriptionActive = false;
+        unsubscribe();
+      };
+
+      const onVisibilityChange = () => {
+        try {
+          if (document.hidden) nextRoom.clearCursor();
+          nextRoom.updatePresence({ visibility: document.hidden ? "idle" : "active" });
+        } catch (cause) {
+          if (!cancelled) setError(messageFrom(cause, "작업 상태를 팀에 알리지 못했습니다."));
+        }
+      };
+      let visibilityListenerActive = false;
+      if (typeof document !== "undefined") {
+        nextRoom.updatePresence({ visibility: document.hidden ? "idle" : "active" });
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        visibilityListenerActive = true;
+      }
+      const stopVisibilityListener = () => {
+        if (!visibilityListenerActive || typeof document === "undefined") return;
+        visibilityListenerActive = false;
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      };
+
+      void (async () => {
+        try {
+          await nextRoom.start();
+          if (cancelled) return;
+          const [
+            documentModule,
+            bindingModule,
+            scenePublisherModule,
+            sceneHistoryModule,
+            scenePageBridgeModule,
+            rasterUiBridgeModule,
+          ] = await Promise.all([
+            import( "./studio-crdt-document"),
+            import( "./studio-crdt-room-binding"),
+            import("./studio-crdt-scene-publisher"),
+            import( "./studio-crdt-history"),
+            import("./studio-crdt-page-bridge"),
+            import( "./studio-crdt-raster-ui-bridge"),
+          ]);
+          if (cancelled) return;
+          crdtDocument = new documentModule.StudioCrdtDocument();
+          crdtBinding = new bindingModule.StudioCrdtRoomBinding({
+            document: crdtDocument,
+            room: nextRoom,
+            canEdit: participantRole === "owner" || participantRole === "admin" || participantRole === "editor",
+            outboxScope,
+            onStatus: (status) => {
+              if (cancelled) return;
+              setSyncTelemetry((previous) => mergeBindingTelemetry({
+                previous,
+                status,
+                transportReady: nextRoom.ready,
+                outboxConfigured: participantCanEdit && Boolean(outboxScope),
+              }));
+              if ((status as { state: string }).state === "recovery-required") {
+                const previousBoundary =
+                  recoveryBoundaryRef.current?.scopeKey === recoveryBoundaryScopeKey
+                    ? recoveryBoundaryRef.current
+                    : null;
+                const previousRecovery = previousBoundary?.recovery ?? null;
+                const nextRecovery: StudioLiveRecoveryState = {
+                  vaultId:
+                    "recoveryVaultId" in status &&
+                    typeof status.recoveryVaultId === "string"
+                      ? status.recoveryVaultId
+                      : previousRecovery?.vaultId ?? null,
+                  updateCount:
+                    "recoveryUpdateCount" in status
+                      ? status.recoveryUpdateCount
+                      : previousRecovery?.updateCount ?? 0,
+                  exportAvailable:
+                    "recoveryExportAvailable" in status
+                      ? status.recoveryExportAvailable
+                      : previousRecovery?.exportAvailable ?? false,
+                  exported: previousRecovery?.exported ?? false,
+                  message: status.message,
+                };
+                if (recoveryBoundaryScopeKey) {
+                  recoveryBoundaryRef.current = {
+                    scopeKey: recoveryBoundaryScopeKey,
+                    rejectedUpdateId:
+                      "updateId" in status && typeof status.updateId === "string"
+                        ? status.updateId
+                        : previousBoundary?.rejectedUpdateId ?? null,
+                    recovery: nextRecovery,
+                  };
+                }
+                setTerminalTransportState("recovery-required");
+                setRecovery(nextRecovery);
+                setOperationSyncReady(false);
+                onAuthoritativeSaveBarrierChange?.(null);
+                onCrdtDocumentChange?.(null, null);
+                setAvailability("error");
+                setError(status.message);
+                setLocalFallbackAllowed(false);
+                return;
+              }
+              if (status.state === "error") {
+                if (status.durabilityAtRisk) crdtDurabilityWarning = status.message;
+                setError(status.message);
+                if (status.durabilityAtRisk) setAvailability("error");
+              }
+              if (status.state === "ready" && nextRoom.ready) {
+                crdtDurabilityWarning = null;
+                exposeReadyRoom(null);
+              }
+            },
+          });
+          await crdtBinding.start();
+          if (cancelled) return;
+          if (crdtBinding.recoveryRequired) {
+            // A restored optimistic update can be permanently rejected during the initial drain.
+            // Never re-expose that divergent Y.Doc after the terminal status callback locked Studio.
+            onCrdtDocumentChange?.(null, null);
+            setOperationSyncReady(false);
+            return;
+          }
+          const readyBinding = crdtBinding;
+          onAuthoritativeSaveBarrierChange?.((timeoutMs) =>
+            readyBinding.flushAndWaitForAuthoritativeAck(timeoutMs)
+          );
+          onCrdtDocumentChange?.(
+            crdtDocument,
+            {
+              publish: scenePublisherModule.publishStudioCrdtSceneGraphDiff,
+              reconcileHistory: sceneHistoryModule.reconcileStudioCrdtSceneGraphHistory,
+              reconcilePages: scenePageBridgeModule.reconcileStudioCrdtSceneGraphPages,
+              nextRasterLogicalClock: rasterUiBridgeModule.nextStudioRasterLogicalClock,
+              planRasterDrawPromotion: rasterUiBridgeModule.planStudioRasterDrawPromotion,
+              rasterDrawPromotionSourceMatches:
+                rasterUiBridgeModule.studioRasterDrawPromotionSourceMatches,
+              publishRasterHistoryTransition:
+                rasterUiBridgeModule.publishStudioRasterHistoryTransition,
+              sha256RasterSemanticParameters:
+                rasterUiBridgeModule.sha256StudioRasterSemanticParameters,
+            }
+          );
+          setOperationSyncReady(true);
+          setMode(nextRoom.mode);
+          setPeers(nextRoom.getPeers());
+          setLocks(nextRoom.getLocks());
+          exposeReadyRoom(null);
+        } catch (cause: unknown) {
+          if (cancelled) return;
+          const failedBinding = crdtBinding;
+          const failedDocument = crdtDocument;
+          crdtBinding = null;
+          crdtDocument = null;
+          setOperationSyncReady(false);
+          onAuthoritativeSaveBarrierChange?.(null);
+          failedBinding?.close();
+          failedDocument?.destroy();
+          stopVisibilityListener();
+          stopRoomSubscription();
+          closeRoom();
+          clearExposedRoom();
+          onCrdtDocumentChange?.(null, null);
+          setRoom(null);
+          setPeers([]);
+          setLocks([]);
+          setChatMessages([]);
+          setAvailability("error");
+          setError(messageFrom(cause, "공동작업 채널에 연결하지 못했습니다."));
+        }
+      })();
+
+      disposeSession = () => {
         stopVisibilityListener();
         stopRoomSubscription();
-        closeRoom();
+        const closingBinding = crdtBinding;
+        const closingDocument = crdtDocument;
+        crdtBinding = null;
+        crdtDocument = null;
+        if (closingBinding && closingDocument) {
+          void closingBinding.closeGracefully()
+            .finally(() => {
+              closingDocument.destroy();
+              closeRoom();
+            })
+            .catch(() => undefined);
+        } else {
+          closingBinding?.close();
+          closingDocument?.destroy();
+          closeRoom();
+        }
         clearExposedRoom();
-        onCrdtDocumentChange?.(null, null);
-        setRoom(null);
-        setPeers([]);
-        setLocks([]);
-        setChatMessages([]);
-        setAvailability("error");
-        setError(messageFrom(cause, "공동작업 채널에 연결하지 못했습니다."));
-      }
+      };
     })();
 
     return () => {
       cancelled = true;
-      stopVisibilityListener();
-      stopRoomSubscription();
       onCrdtDocumentChange?.(null, null);
       setOperationSyncReady(false);
       onAuthoritativeSaveBarrierChange?.(null);
-      const closingBinding = crdtBinding;
-      const closingDocument = crdtDocument;
-      crdtBinding = null;
-      crdtDocument = null;
-      if (closingBinding && closingDocument) {
-        void closingBinding.closeGracefully()
-          .finally(() => {
-            closingDocument.destroy();
-            closeRoom();
-          })
-          .catch(() => undefined);
-      } else {
-        closingBinding?.close();
-        closingDocument?.destroy();
-        closeRoom();
-      }
-      clearExposedRoom();
+      const dispose = disposeSession;
+      disposeSession = null;
+      dispose?.();
     };
   }, [
     participantName,

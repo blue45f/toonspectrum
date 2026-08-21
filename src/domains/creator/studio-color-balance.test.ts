@@ -11,7 +11,8 @@ import {
   type ColorBalance,
   type RgbShift,
 } from "./studio-color-balance";
-import { type StudioImageDataLike } from "./studio-filters";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

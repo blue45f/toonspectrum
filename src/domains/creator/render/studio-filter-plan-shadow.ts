@@ -6,7 +6,7 @@ import {
   type SurfacePlan,
 } from "@toonspectrum/studio-engine-registry";
 
-import { type StudioFilterLane } from "../filter/studio-filter-lane-cost-model";
+import type { StudioFilterLane } from "../filter/studio-filter-lane-cost-model";
 
 /**
  * V11 strangler bridge — 필터 planner 위임, shadow step (ADR 0001 pattern).

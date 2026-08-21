@@ -20,10 +20,10 @@ import { createPortal } from "react-dom";
 
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
-import {
-  type StudioCanonicalDrawingPaletteLayout,
-  type StudioDrawingPaletteId,
-  type StudioDrawingPaletteLockKind,
+import type {
+  StudioCanonicalDrawingPaletteLayout,
+  StudioDrawingPaletteId,
+  StudioDrawingPaletteLockKind,
 } from "./studio-drawing-palettes";
 
 import { cn } from "@/lib/utils";

@@ -1,9 +1,9 @@
-import {
-  type StudioVelloBackendFrame,
-  type StudioVelloHubBackendId,
-  type StudioVelloHubPresentationTarget,
-  type StudioVelloIslandPlacement,
-  type StudioVelloSceneIsland,
+import type {
+  StudioVelloBackendFrame,
+  StudioVelloHubBackendId,
+  StudioVelloHubPresentationTarget,
+  StudioVelloIslandPlacement,
+  StudioVelloSceneIsland,
 } from "./studio-vello-hub";
 
 export interface StudioVelloHubCanvasTarget

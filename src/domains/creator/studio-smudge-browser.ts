@@ -9,10 +9,10 @@ import {
   loadStudioRetouchSourceImage,
   studioRetouchSourceDimensions,
 } from "./studio-retouch-browser";
-import { type SmudgePixelPoint } from "./studio-smudge";
 import { runStudioSmudgeWorker } from "./studio-smudge-worker-client";
 
 import type { SelPoint } from "./studio-selection-tools";
+import type { SmudgePixelPoint } from "./studio-smudge";
 
 /**
  * 문지르기 브러시 — src 이미지에 정규화 스트로크(요소 로컬 0..1, canvasPointToNormalized 로 만든

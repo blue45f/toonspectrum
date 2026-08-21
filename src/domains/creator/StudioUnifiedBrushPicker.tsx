@@ -6,7 +6,7 @@
  * sheet from opening competing dialogs or maintaining divergent favorites.
  */
 import { Bookmark } from "lucide-react";
-import { type ReactElement } from "react";
+
 
 import { StudioBrushTray } from "./brush/StudioBrushTray";
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
@@ -16,6 +16,7 @@ import type { StudioBrushStampTuning } from "./brush/studio-brush-library";
 import type { StudioStabilizerMode } from "./brush/studio-stroke-stabilizer";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
+import type { ReactElement } from "react";
 
 import { cn } from "@/lib/utils";
 

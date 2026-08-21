@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { type StudioAutosavePayload } from "./studio-autosave";
 import {
   STUDIO_AUTOSAVE_SQLITE_NAMESPACE,
   createStudioAutosaveSqliteStore,
@@ -9,6 +8,8 @@ import {
   openStudioLocalDatabase,
   type StudioLocalDatabase,
 } from "./studio-local-database";
+
+import type { StudioAutosavePayload } from "./studio-autosave";
 
 function payload(savedAt: string, id = "stroke-1"): StudioAutosavePayload {
   return {

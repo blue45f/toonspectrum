@@ -6,10 +6,10 @@ import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { STUDIO_Z_CLASS } from "../studio-z-index";
 import { useStudioModalSheet } from "../useStudioModalSheet";
 
-import {
-  type StudioVrmAttestedContentClassification,
-  type StudioVrmProjectArchiveAttestationPlan,
-  type StudioVrmProjectArchiveUseContextInput,
+import type {
+  StudioVrmAttestedContentClassification,
+  StudioVrmProjectArchiveAttestationPlan,
+  StudioVrmProjectArchiveUseContextInput,
 } from "./studio-vrm-license-product-gate";
 
 import { cn } from "@/lib/utils";

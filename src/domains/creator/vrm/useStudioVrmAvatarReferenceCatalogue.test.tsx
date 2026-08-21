@@ -4,9 +4,6 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  type StudioVrmAvatarReferenceCatalogueLoadResult,
-} from "./studio-vrm-avatar-reference-catalogue-runtime";
-import {
   STUDIO_VRM_AVATAR_REFERENCE_CATALOGUE_URL,
   type StudioVrmAvatarReferenceCatalogueEnvelope,
 } from "./studio-vrm-avatar-reference-product";
@@ -18,6 +15,10 @@ import {
   studioVrmAvatarReferenceCatalogueDiagnosticMessage,
   useStudioVrmAvatarReferenceCatalogue,
 } from "./useStudioVrmAvatarReferenceCatalogue";
+
+import type {
+  StudioVrmAvatarReferenceCatalogueLoadResult,
+} from "./studio-vrm-avatar-reference-catalogue-runtime";
 
 afterEach(cleanup);
 

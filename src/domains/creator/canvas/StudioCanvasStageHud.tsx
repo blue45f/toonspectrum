@@ -2,7 +2,6 @@ import { Clapperboard, Eraser, FlipHorizontal2, Grid3X3, Maximize2, Minimize2, M
 import { Fragment, Suspense, type Dispatch, type ReactNode, type SetStateAction } from "react";
 
 import { studioDrawHudToolLabel, studioPressureCurveHudLabel, studioShapeFillHudLabel, studioShapeKindLabel, studioStabilizerHudLabel, studioSymmetryHudLabel } from "../brush/studio-draw-hud";
-import { type StudioAppSettings } from "../studio-app-settings";
 import { StudioHudPill, StudioStatusBar } from "../studio-chrome-ui";
 import { elementLabel } from "../studio-element-label";
 import { StudioLivePressureHudPill } from "../studio-page-lazy-ui";
@@ -16,6 +15,7 @@ import { localizeText } from "./studio-canvas-viewport-primitives";
 import { StudioViewInputModeControls } from "./StudioCanvasViewInputModeControls";
 
 import type { StudioLivePressureStore } from "../live/StudioLiveInkHosts";
+import type { StudioAppSettings } from "../studio-app-settings";
 import type { DrawMode, DrawShapeKind, Tool } from "../studio-editor-tool-model";
 import type { El } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";

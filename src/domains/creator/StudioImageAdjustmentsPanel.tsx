@@ -1,7 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
-import { type LayerStylePatch } from "./layer/studio-layer-styles";
 import { isIdentityCurveChannels, normalizeCurve, type CurvePoint, type CurveRgbChannels } from "./studio-curves";
 import { createStudioEffectId, type StudioEffectFavoriteState, type StudioEffectId } from "./studio-effect-favorites";
 import {
@@ -14,6 +13,7 @@ import { extractFilterFields, looksResetPatch, type StudioLook } from "./studio-
 import { applyPhotoWebtoonPreset, resetPhotoWebtoonPreset } from "./studio-photo-webtoon-preset";
 import { useStudioHistogramSource } from "./useStudioHistogramSource";
 
+import type { LayerStylePatch } from "./layer/studio-layer-styles";
 import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
 import type { El, ImageEl } from "./studio-element-model";
 

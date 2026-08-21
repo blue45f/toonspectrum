@@ -1,7 +1,7 @@
 import { resolveStudioCanvasWideDensityMode } from "./canvas/studio-canvas-wide-density";
 import { studioUiDensityAllows } from "./studio-ui-density";
-import { type StudioUiDensityMode } from "./studio-ui-density";
 
+import type { StudioUiDensityMode } from "./studio-ui-density";
 import type { StudioWorkspaceId } from "./studio-workspaces";
 
 export interface StudioWorkspacePresentationLayout {

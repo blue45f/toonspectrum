@@ -1,11 +1,5 @@
 /** Browser orchestration for the pure Advanced Fill engine. */
 import {
-  type AdvancedFillDiagnostics,
-  type AdvancedFillImageDataLike,
-  type AdvancedFillMaskLike,
-  type AdvancedFillRgba,
-} from "./studio-advanced-fill";
-import {
   currentStudioAdvancedFillBrowserMaxPixels,
   formatStudioAdvancedFillRasterSizeError,
   validateStudioAdvancedFillRasterDimensions,
@@ -14,6 +8,12 @@ import { runStudioAdvancedFillWorker } from "./studio-advanced-fill-worker-clien
 import { hexToRgb } from "./studio-filters";
 import { loadFloodFillSourceImage } from "./studio-flood-fill";
 
+import type {
+  AdvancedFillDiagnostics,
+  AdvancedFillImageDataLike,
+  AdvancedFillMaskLike,
+  AdvancedFillRgba,
+} from "./studio-advanced-fill";
 import type { StudioAdvancedFillSettings } from "./studio-advanced-fill-settings";
 
 export { softenStudioAdvancedFillEdges } from "./studio-advanced-fill";

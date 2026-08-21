@@ -1,6 +1,6 @@
-import {
-  type StudioRasterToolAvailability,
-  type StudioRasterToolGate,
+import type {
+  StudioRasterToolAvailability,
+  StudioRasterToolGate,
 } from "./render/studio-raster-tool-availability";
 
 export type StudioInspectorRasterToolState =

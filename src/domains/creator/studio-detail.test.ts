@@ -13,7 +13,8 @@ import {
   type Detail,
   type DetailType,
 } from "./studio-detail";
-import { type StudioImageDataLike } from "./studio-filters";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 // ---- 테스트용 가짜 ImageData 빌더 ----
 

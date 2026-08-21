@@ -77,7 +77,7 @@ import {
   selectionShapeForIds,
 } from "../studio-group-selection";
 import { computeHealCloneSourceOffset, healCloneSourcePoint } from "../studio-heal-clone";
-import { type StudioHokusaiLiveCanonicalResult } from "../render/studio-hokusai-live-brush-runtime";
+import type { StudioHokusaiLiveCanonicalResult } from "../render/studio-hokusai-live-brush-runtime";
 import {
   createStudioHokusaiLiveCanonicalTransaction,
 } from "../render/studio-hokusai-live-brush-transaction";
@@ -113,7 +113,7 @@ import {
 } from "../studio-living-ink-document";
 import { studioLivingInkCoverageIntersectsStroke } from "../studio-living-ink-overlay";
 import { studioLivingInkFailureDisposition } from "../studio-living-ink-product-admission";
-import { type StudioLivingInkFinishedWork } from "../studio-living-ink-studio-coordinator";
+import type { StudioLivingInkFinishedWork } from "../studio-living-ink-studio-coordinator";
 import {
   beginNodeDrag,
   hitTestNodeHandle,
@@ -219,7 +219,7 @@ import {
   shouldFilterStudioThinLineInkInput,
 } from "../studio-thin-line-ink-input-v1";
 import { studioWorkAssetDestructiveEditReason } from "../studio-work-asset-edit-guard";
-import { type StudioCrdtSceneGraphRuntime } from "../live/StudioLiveCollaborationProvider";
+import type { StudioCrdtSceneGraphRuntime } from "../live/StudioLiveCollaborationProvider";
 
 import type { StudioCrdtDocument } from "../live/studio-crdt-document";
 import type { StudioBackground3DMagicFilterMask } from "../scene-3d/studio-3d-insert-contract";
