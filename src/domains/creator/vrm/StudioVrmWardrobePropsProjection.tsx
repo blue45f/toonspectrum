@@ -84,7 +84,16 @@ function schedulePropDisposal(object: THREE.Object3D) {
 
 const VRM_FRAME_PROP_PRIORITY = -2;
 const VRM_FRAME_COMMIT_PRIORITY = -1;
-const STUDIO_VRM_SECONDARY_HAND_TARGET_DAMPING = 0.35;
+/**
+ * 보조 손 목표 수렴 속도(초 단위 지수 감쇠). 이전 고정 lerp 0.35/프레임(@60fps)과 동등한
+ * 지연 시간을 프레임률과 무관하게 유지한다 — 고정 계수는 고주사 모니터에서 아이템이
+ * 빨리 끌려오고 저주사에서 늦게 따라와 접촉점이 들썩였다.
+ */
+const STUDIO_VRM_SECONDARY_HAND_SMOOTH_RATE = 25.8;
+/** 초당 최대 이동 거리 클램프(순간 이동·리바인드 급증만 잘라낸다). 이전 0.12/프레임(@60fps). */
+const STUDIO_VRM_SECONDARY_HAND_MAX_STEP_PER_SECOND = 7.2;
+/** 프레임 스파이크·탭 복귀 시 스무딩이 폭주하지 않도록 자르는 단일 프레임 상한. */
+const STUDIO_VRM_PROP_MAX_FRAME_DELTA = 0.1;
 const STUDIO_VRM_PROP_GEOMETRY_QUALITY = Object.freeze({
   roundedBox: (width: number, height: number, depth: number, radius: number) => (
     new RoundedBoxGeometry(width, height, depth, 3, radius)
@@ -130,12 +139,14 @@ export function StudioVrmPropAttachment({
   const localPositionRef = useRef(new THREE.Vector3());
   const boneWorldQuaternionRef = useRef(new THREE.Quaternion());
   const localQuaternionRef = useRef(new THREE.Quaternion());
+  const localEulerRef = useRef(new THREE.Euler());
   const anchorWorldOffsetRef = useRef(new THREE.Vector3());
   const secondaryWorldTargetRef = useRef(new THREE.Vector3());
   const secondaryTargetQuaternionRef = useRef(new THREE.Quaternion());
   const secondaryTargetSmoothedRef = useRef(new THREE.Vector3());
   const secondaryTargetQuaternionSmoothedRef = useRef(new THREE.Quaternion());
   const secondaryTargetInitializedRef = useRef(false);
+  const smoothingScratchRef = useRef(new THREE.Vector3());
   const groupWorldPositionRef = useRef(new THREE.Vector3());
   const groupWorldQuaternionRef = useRef(new THREE.Quaternion());
   const groupWorldScaleRef = useRef(new THREE.Vector3());
@@ -274,12 +285,14 @@ export function StudioVrmPropAttachment({
     return () => schedulePropDisposal(proceduralObject);
   }, [proceduralObject]);
 
-  useFrame(() => {
+  useFrame((_, rawDelta) => {
     const group = smartGroupRef.current;
     if (!group || !boneNode || !resolved?.usesSmartRig) {
       if (instance.rig) reportAttachmentStatus("unavailable");
       return;
     }
+    // 프레임 스파이크에서 스무딩·클램프가 폭주하지 않도록 델타를 먼저 정규화한다.
+    const frameDelta = THREE.MathUtils.clamp(rawDelta, 1e-4, STUDIO_VRM_PROP_MAX_FRAME_DELTA);
 
     boneNode.updateWorldMatrix(true, false);
     // socket만 bone matrix로 world 변환하고, geometry anchor 보정은 scale이 제거된 rigid world
@@ -288,7 +301,7 @@ export function StudioVrmPropAttachment({
     const socketWorldPosition = localPositionRef.current.set(...resolved.socketPosition);
     boneNode.localToWorld(socketWorldPosition);
     const boneWorldQuaternion = boneNode.getWorldQuaternion(boneWorldQuaternionRef.current);
-    const localQuaternion = localQuaternionRef.current.setFromEuler(new THREE.Euler(
+    const localQuaternion = localQuaternionRef.current.setFromEuler(localEulerRef.current.set(
       THREE.MathUtils.degToRad(resolved.rotationDeg[0]),
       THREE.MathUtils.degToRad(resolved.rotationDeg[1]),
       THREE.MathUtils.degToRad(resolved.rotationDeg[2]),
@@ -350,18 +363,19 @@ export function StudioVrmPropAttachment({
         secondaryTargetQuaternionSmoothedRef.current.copy(rawTargetQuaternion);
         secondaryTargetInitializedRef.current = true;
       } else {
-        const maxStep = 0.12;
-        const next = secondaryTargetSmoothedRef.current.clone()
-          .lerp(rawTarget, STUDIO_VRM_SECONDARY_HAND_TARGET_DAMPING);
+        // 프레임률 무관 지수 감쇠 + 초당 최대 이동 클램프. 매 프레임 clone 대신 스크래치 벡터를
+        // 재사용해 GC 러시로 인한 미세 프레임 드랍도 제거한다.
+        const blend = 1 - Math.exp(-STUDIO_VRM_SECONDARY_HAND_SMOOTH_RATE * frameDelta);
+        const maxStep = STUDIO_VRM_SECONDARY_HAND_MAX_STEP_PER_SECOND * frameDelta;
+        const next = smoothingScratchRef.current
+          .copy(secondaryTargetSmoothedRef.current)
+          .lerp(rawTarget, blend);
         const jump = next.distanceTo(secondaryTargetSmoothedRef.current);
         if (jump > maxStep) {
           next.sub(secondaryTargetSmoothedRef.current).setLength(maxStep).add(secondaryTargetSmoothedRef.current);
         }
         secondaryTargetSmoothedRef.current.copy(next);
-        secondaryTargetQuaternionSmoothedRef.current.slerp(
-          rawTargetQuaternion,
-          STUDIO_VRM_SECONDARY_HAND_TARGET_DAMPING,
-        );
+        secondaryTargetQuaternionSmoothedRef.current.slerp(rawTargetQuaternion, blend);
       }
       const target = secondaryTargetSmoothedRef.current;
       const targetQuaternion = secondaryTargetQuaternionSmoothedRef.current;
