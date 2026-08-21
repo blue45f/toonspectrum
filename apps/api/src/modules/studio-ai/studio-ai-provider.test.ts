@@ -18,36 +18,38 @@ describe("Studio AI provider resolution", () => {
     ZAI_MODEL: "glm-5.1",
     DEEPSEEK_API_KEY: "deepseek-test-key",
     DEEPSEEK_MODEL: "deepseek-test-model",
+    OPENROUTER_API_KEY: "openrouter-test-key",
+    OPENROUTER_MODEL: "stealth/ox-alpha",
   };
 
   it("auto는 중복을 제거한 설정 순서로 구성된 제공자만 반환한다", () => {
-    expect(resolveStudioAiProviderOrder({ ...env, STUDIO_AI_PROVIDER_ORDER: "deepseek,zai,deepseek" }))
-      .toEqual(["deepseek", "zai"]);
-    expect(resolveStudioAiProviders("auto", { ...env, STUDIO_AI_PROVIDER_ORDER: "deepseek,zai" }))
+    expect(resolveStudioAiProviderOrder({ ...env, STUDIO_AI_PROVIDER_ORDER: "deepseek,zai,openrouter,deepseek" }))
+      .toEqual(["deepseek", "zai", "openrouter"]);
+    expect(resolveStudioAiProviders("auto", { ...env, STUDIO_AI_PROVIDER_ORDER: "openrouter,deepseek,zai" }))
       .toMatchObject([
+        { id: "openrouter", model: "stealth/ox-alpha" },
         { id: "deepseek", model: "deepseek-test-model" },
         { id: "zai", model: "glm-5.1" },
       ]);
     expect(resolveStudioAiProviderOrder({ ...env, STUDIO_AI_PROVIDER_ORDER: "deepseek" }))
-      .toEqual(["deepseek", "zai"]);
-    expect(resolveStudioAiProviders("auto", { ...env, STUDIO_AI_PROVIDER_ORDER: "deepseek" })
-      .map(({ id }) => id)).toEqual(["deepseek", "zai"]);
+      .toEqual(["deepseek", "zai", "openrouter"]);
   });
 
   it("명시적 선택은 다른 제공자로 자동 전환하지 않는다", () => {
     expect(resolveStudioAiProviders("zai", env).map(({ id }) => id)).toEqual(["zai"]);
+    expect(resolveStudioAiProviders("openrouter", env).map(({ id }) => id)).toEqual(["openrouter"]);
     expect(resolveStudioAiProviders("zai", { DEEPSEEK_API_KEY: "only-deepseek" })).toEqual([]);
   });
 
   it("명시적 선택 후보는 선택 제공자를 우선하고 결제 거절용 보조 제공자를 뒤에 둔다", () => {
     expect(resolveStudioAiProviderCandidates("zai", {
       ...env,
-      STUDIO_AI_PROVIDER_ORDER: "deepseek,zai",
-    }).map(({ id }) => id)).toEqual(["zai", "deepseek"]);
-    expect(resolveStudioAiProviderCandidates("deepseek", {
+      STUDIO_AI_PROVIDER_ORDER: "deepseek,zai,openrouter",
+    }).map(({ id }) => id)).toEqual(["zai", "deepseek", "openrouter"]);
+    expect(resolveStudioAiProviderCandidates("openrouter", {
       ...env,
-      STUDIO_AI_PROVIDER_ORDER: "zai,deepseek",
-    }).map(({ id }) => id)).toEqual(["deepseek", "zai"]);
+      STUDIO_AI_PROVIDER_ORDER: "zai,deepseek,openrouter",
+    }).map(({ id }) => id)).toEqual(["openrouter", "zai", "deepseek"]);
     expect(resolveStudioAiProviderCandidates("zai", {
       DEEPSEEK_API_KEY: "only-deepseek",
     })).toEqual([]);
@@ -58,6 +60,7 @@ describe("Studio AI provider resolution", () => {
     expect(status).toMatchObject([
       { id: "zai", configured: true, model: "glm-5.1" },
       { id: "deepseek", configured: true, model: "deepseek-test-model" },
+      { id: "openrouter", configured: true, model: "stealth/ox-alpha" },
     ]);
     expect(JSON.stringify(status)).not.toContain("test-key");
   });

@@ -396,13 +396,16 @@ const envSchema = z.object({
   DEEPSEEK_MODEL: z.string().min(1).max(200).optional(),
   DEEPSEEK_TIMEOUT_MS: z.string().regex(/^\d+$/, "DEEPSEEK_TIMEOUT_MS must be numeric").optional(),
   DEEPSEEK_USER_ID_SALT: z.string().min(32).optional(),
+  OPENROUTER_API_KEY: z.string().min(1).optional(),
+  OPENROUTER_MODEL: z.string().min(1).max(200).optional(),
+  OPENROUTER_TIMEOUT_MS: z.string().regex(/^\d+$/, "OPENROUTER_TIMEOUT_MS must be numeric").optional(),
   ZAI_API_KEY: z.string().min(1).optional(),
   ZAI_MODEL: z.string().min(1).max(200).optional(),
   ZAI_TIMEOUT_MS: z.string().regex(/^\d+$/, "ZAI_TIMEOUT_MS must be numeric").optional(),
   STUDIO_AI_TIMEOUT_MS: z.string().regex(/^\d+$/, "STUDIO_AI_TIMEOUT_MS must be numeric").optional(),
   STUDIO_AI_PROVIDER_ORDER: z
     .string()
-    .regex(/^(zai|deepseek)(,(zai|deepseek))*$/, "STUDIO_AI_PROVIDER_ORDER must be a provider CSV")
+    .regex(/^(zai|deepseek|openrouter)(,(zai|deepseek|openrouter))*$/, "STUDIO_AI_PROVIDER_ORDER must be a provider CSV")
     .optional(),
   STUDIO_AI_DAILY_REQUEST_LIMIT: z
     .string()
@@ -493,6 +496,7 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "BACKEND_UPSTASH_QSTASH_PUBLISH_TOKEN",
   "STUDIO_VOICE_TURN_SHARED_SECRET",
   "OPENAI_API_KEY",
+  "OPENROUTER_API_KEY",
   "GEMINI_API_KEY",
   "DEEPSEEK_API_KEY",
   "DEEPSEEK_USER_ID_SALT",

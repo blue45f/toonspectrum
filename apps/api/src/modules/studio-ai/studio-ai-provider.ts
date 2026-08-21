@@ -1,6 +1,6 @@
 import type { StudioAiProviderPreference } from "./studio-ai.dto";
 
-export const STUDIO_AI_PROVIDER_IDS = ["zai", "deepseek"] as const;
+export const STUDIO_AI_PROVIDER_IDS = ["zai", "deepseek", "openrouter"] as const;
 
 export type StudioAiProviderId = (typeof STUDIO_AI_PROVIDER_IDS)[number];
 
@@ -35,7 +35,7 @@ export interface StudioAiProviderFailureClassification {
 
 type EnvLike = Partial<Record<string, string | undefined>>;
 
-const DEFAULT_PROVIDER_ORDER: readonly StudioAiProviderId[] = ["zai", "deepseek"];
+const DEFAULT_PROVIDER_ORDER: readonly StudioAiProviderId[] = ["zai", "deepseek", "openrouter"];
 const DEFAULT_TIMEOUT_MS = 45_000;
 
 function boundedText(value: unknown, fallback: string, maxLength: number): string {
@@ -54,6 +54,17 @@ function providerConfig(id: StudioAiProviderId, env: EnvLike): StudioAiProviderC
       endpoint: "https://api.z.ai/api/paas/v4/chat/completions",
       apiKey,
       model: boundedText(env.ZAI_MODEL, "glm-5.1", 200),
+    };
+  }
+  if (id === "openrouter") {
+    const apiKey = env.OPENROUTER_API_KEY?.trim() ?? "";
+    return {
+      id,
+      label: "OpenRouter",
+      configured: apiKey.length > 0,
+      endpoint: "https://openrouter.ai/api/v1/chat/completions",
+      apiKey,
+      model: boundedText(env.OPENROUTER_MODEL, "stealth/ox-alpha", 200),
     };
   }
   const apiKey = env.DEEPSEEK_API_KEY?.trim() ?? "";
@@ -129,7 +140,11 @@ export function resolveStudioAiTimeoutMs(
   env: EnvLike = process.env
 ): number {
   const raw = env.STUDIO_AI_TIMEOUT_MS ??
-    (firstProvider === "zai" ? env.ZAI_TIMEOUT_MS : env.DEEPSEEK_TIMEOUT_MS);
+    (firstProvider === "zai"
+      ? env.ZAI_TIMEOUT_MS
+      : firstProvider === "openrouter"
+        ? env.OPENROUTER_TIMEOUT_MS
+        : env.DEEPSEEK_TIMEOUT_MS);
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 5_000 && parsed <= 120_000
     ? Math.round(parsed)
@@ -173,7 +188,7 @@ export function studioAiProviderBusinessCode(payload: unknown): string | undefin
 }
 
 /**
- * Classifies only documented, machine-verifiable provider signals. DeepSeek
+ * Classifies only documented, machine-verifiable provider signals. DeepSeek & OpenRouter
  * HTTP 402 is insufficient balance; its HTTP 429 is a concurrency/rate limit.
  * Z.ai overloads HTTP 429, so only documented account/package business codes
  * are eligible for billing failover. Authentication, generic 429, 5xx and
@@ -186,7 +201,7 @@ export function classifyStudioAiProviderFailure(
 ): StudioAiProviderFailureClassification {
   const businessCode = studioAiProviderBusinessCode(payload);
   const billingFailoverEligible =
-    (provider === "deepseek" && responseStatus === 402) ||
+    ((provider === "deepseek" || provider === "openrouter") && responseStatus === 402) ||
     (provider === "zai" &&
       responseStatus === 429 &&
       businessCode !== undefined &&
