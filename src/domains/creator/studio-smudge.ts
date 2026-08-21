@@ -79,8 +79,11 @@ export function resampleSmudgePath(points: readonly SmudgePixelPoint[], step: nu
 export function smudgeBrushWeight(dx: number, dy: number, radiusPx: number): number {
   const r = Number.isFinite(radiusPx) && radiusPx > 0 ? radiusPx : 0;
   if (r <= 0) return 0;
-  const dist = Math.hypot(dx, dy);
-  if (dist >= r) return 0;
+  // Math.hypot 는 정확하지만 dab 내 픽셀마다 호출되는 이 루프에서는 측정 가능한 병목이다.
+  // 제곱거리로 먼저 잘라내고(Math.hypot 대비 수 배 빠름) 안쪽 원에만 sqrt 를 쓴다.
+  const dist2 = dx * dx + dy * dy;
+  if (dist2 >= r * r) return 0;
+  const dist = Math.sqrt(dist2);
   const t = 1 - dist / r; // 0..1, 1=중심
   return t * t;
 }
@@ -116,7 +119,9 @@ export function smudgeStroke(
   if (w <= 0 || h <= 0) return data;
 
   const step = safeRadius * SMUDGE_STEP_RATIO;
-  const resampled = resampleSmudgePath(points, step).slice(0, SMUDGE_MAX_RESAMPLED_POINTS);
+  // resampleSmudgePath 자체가 SMUDGE_MAX_RESAMPLED_POINTS 에서 먼저 잘라 반환하므로
+  // 여기서 다시 slice 하면 스트로크마다 최대 2000점 짜리 배열을 한 번 더 복사하는 셈이다.
+  const resampled = resampleSmudgePath(points, step);
   if (resampled.length < 2) return data; // 리샘플 후 점이 하나뿐(정지 탭 등)이면 문지를 방향이 없다.
 
   const rCeil = Math.ceil(safeRadius);

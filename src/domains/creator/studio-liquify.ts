@@ -338,8 +338,10 @@ export function liquifyBrushWeight(
 ): number {
   const r = Number.isFinite(radiusPx) && radiusPx > 0 ? radiusPx : 0;
   if (r <= 0) return 0;
-  const dist = Math.hypot(dx, dy);
-  if (dist >= r) return 0;
+  // dab 루프의 픽셀마다 호출되는 경로 — Math.hypot 대신 제곱거리 컷 + sqrt 한 번.
+  const dist2 = dx * dx + dy * dy;
+  if (dist2 >= r * r) return 0;
+  const dist = Math.sqrt(dist2);
   const t = dist / r;
   if (hardness === undefined) return 0.5 * (1 + Math.cos(Math.PI * t));
   const hardCore = clampFloat(hardness, 0, 1) * 0.8;

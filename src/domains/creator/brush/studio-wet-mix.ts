@@ -134,7 +134,11 @@ export function sampleWetMixDabAverage(
   let sumW = 0;
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
-      const falloff = dodgeBurnBrushFalloff(Math.hypot(x - center.x, y - center.y), R, hardness);
+      // dab 루프의 픽셀마다 Math.hypot 를 호출하지 않도록 제곱거리로 먼저 잘라낸다.
+      const dx = x - center.x;
+      const dy = y - center.y;
+      if (dx * dx + dy * dy > R * R) continue;
+      const falloff = dodgeBurnBrushFalloff(Math.sqrt(dx * dx + dy * dy), R, hardness);
       if (falloff <= 0) continue;
       const idx = (y * w + x) * 4;
       const a = data[idx + 3]!;
@@ -185,7 +189,11 @@ export function applyWetMixDab(
 
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
-      const falloff = dodgeBurnBrushFalloff(Math.hypot(x - center.x, y - center.y), R, hardness);
+      // dab 루프의 픽셀마다 Math.hypot 를 호출하지 않도록 제곱거리로 먼저 잘라낸다.
+      const dx = x - center.x;
+      const dy = y - center.y;
+      if (dx * dx + dy * dy > R * R) continue;
+      const falloff = dodgeBurnBrushFalloff(Math.sqrt(dx * dx + dy * dy), R, hardness);
       if (falloff <= 0) continue;
       const srcA = S * falloff;
       if (srcA <= 0) continue;
