@@ -1,5 +1,5 @@
 import { Command } from "lucide-react";
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode, type SetStateAction } from "react";
 import { flushSync } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -1215,6 +1215,8 @@ import {
   type StudioRasterRetouchNormalizedPoint,
 } from "./studio-retouch-raster-gesture";
 import { useStudioDocumentLayout } from "./studio-router/studio-document-layout-context";
+import { useStudioDccWorkbenchNavigation } from "./studio-router/studio-dcc-workbench-navigation";
+import { StudioDccWorkbenchRoute } from "./studio-router/StudioDccWorkbenchRoute";
 import { announceStudioGpuDeviceLoss } from "./studio-safe-mode-runtime";
 import { layoutScenarioPanels, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
@@ -1455,14 +1457,7 @@ import {
 import { resolveStudioWorkspaceCanvasDockInsets } from "./studio-workspace-canvas-dock";
 import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
 import { resolveStudioWorkspacePanelLayoutVisibility } from "./studio-workspace-presentation-layout";
-import {
-  createStudioDccNavigationState,
-  studioCanvasHref,
-  studioDccHref,
-  studioWorkspaceReturnHref,
-  type StudioDccWorkbenchMode,
-  type StudioWorkspaceRoute,
-} from "./studio-workspace-route";
+import type { StudioWorkspaceRoute } from "./studio-workspace-route";
 import { resolveStudioWorkspaceWidePanelToggle } from "./studio-workspace-wide-mode";
 import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
@@ -3942,42 +3937,6 @@ function StudioCuttoonEditor({
     studioAuthUserId,
     workId,
   });
-  const closeHybridDccWorkspace = () => {
-    flushHybridDccWorkspacePersistence();
-    const returnHref = studioWorkspaceReturnHref(location.state, studioRoute);
-    if (returnHref) {
-      navigate(-1);
-      return;
-    }
-    navigate(studioCanvasHref({
-      remixSourceWorkId: studioRoute.remixSourceWorkId,
-      search: location.search,
-      workId: studioRoute.workId,
-    }), { replace: true });
-  };
-  const closeHybridDccFromEffect = useEffectEvent(() => {
-    if (hybridDccRouteRequested) closeHybridDccWorkspace();
-  });
-  const flushHybridDccFromEffect = useEffectEvent(flushHybridDccWorkspacePersistence);
-  const previousHybridDccRouteRequestedRef = useRef(hybridDccRouteRequested);
-  useEffect(() => {
-    const previouslyRequested = previousHybridDccRouteRequestedRef.current;
-    previousHybridDccRouteRequestedRef.current = hybridDccRouteRequested;
-    if (previouslyRequested && !hybridDccRouteRequested) {
-      flushHybridDccFromEffect();
-    }
-  }, [hybridDccRouteRequested]);
-  useEffect(() => {
-    if (!hybridDccRouteRequested) return;
-    const flushBeforeDocumentExit = () => flushHybridDccFromEffect();
-    globalThis.addEventListener("pagehide", flushBeforeDocumentExit);
-    return () => globalThis.removeEventListener("pagehide", flushBeforeDocumentExit);
-  }, [hybridDccRouteRequested]);
-  useEffect(() => {
-    if (!hybridDccRouteRequested || hybridDccRouteAccess !== "denied") return;
-    closeHybridDccFromEffect();
-  }, [hybridDccRouteAccess, hybridDccRouteRequested]);
-
   const captureHybridDccReturnFocus = () => {
     if (typeof document === "undefined") return;
     const active = document.activeElement instanceof HTMLElement
@@ -3990,53 +3949,21 @@ function StudioCuttoonEditor({
       ? creativeModesTriggerRef.current ?? document.getElementById("main-content")
       : active ?? document.getElementById("main-content");
   };
-  const openHybridDccWorkspace = (mode: StudioDccWorkbenchMode) => {
-    if (hybridDccRouteRequested) return;
-    if (hybridDccRouteAccess !== "allowed") {
-      announceDrawingShortcut(
-        hybridDccRouteAccess === "pending"
-          ? "3D 작업 권한과 원고를 확인하는 중입니다. 잠시 뒤 다시 시도해 주세요."
-          : "이 작품에서는 3D 원본을 편집할 권한이 없습니다.",
-      );
-      return;
-    }
-    captureHybridDccReturnFocus();
-    navigate(studioDccHref({
-      mode,
-      remixSourceWorkId: studioRoute.remixSourceWorkId,
-      search: location.search,
-      workId: studioRoute.workId,
-    }), {
-      state: createStudioDccNavigationState(studioRoute, {
-        key: location.key,
-        pathname: location.pathname,
-        search: location.search,
-      }),
-    });
-  };
-  const setHybridDccOpen: Dispatch<SetStateAction<boolean>> = (nextValue) => {
-    const shouldOpen = typeof nextValue === "function"
-      ? nextValue(hybridDccRouteRequested)
-      : nextValue;
-    if (shouldOpen === hybridDccRouteRequested) return;
-    if (!shouldOpen) {
-      closeHybridDccWorkspace();
-      return;
-    }
-    openHybridDccWorkspace("model");
-  };
-  const setHybridDccWorkbenchMode = (mode: StudioDccWorkbenchMode) => {
-    if (!hybridDccRouteRequested || mode === studioRoute.dccMode) return;
-    navigate(studioDccHref({
-      mode,
-      remixSourceWorkId: studioRoute.remixSourceWorkId,
-      search: location.search,
-      workId: studioRoute.workId,
-    }), {
-      replace: true,
-      state: location.state,
-    });
-  };
+  // 라우트/내비게이션 절반은 StudioDccWorkbenchRoute가 소유한다(문서 레이아웃 아래). 이 페이지는
+  // 접근 판정과 편집기 UI 후크(announcer·포커스 복귀)만 주입하고 콜백을 그대로 아래로 넘긴다.
+  const {
+    closeHybridDccWorkspace,
+    openHybridDccWorkspace,
+    setHybridDccOpen,
+    setHybridDccWorkbenchMode,
+  } = useStudioDccWorkbenchNavigation({
+    dccRouteAccess: hybridDccRouteAccess,
+    dccRouteRequested: hybridDccRouteRequested,
+    onAnnounce: announceDrawingShortcut,
+    onCaptureReturnFocus: captureHybridDccReturnFocus,
+    onFlushWorkspacePersistence: flushHybridDccWorkspacePersistence,
+    studioRoute,
+  });
   const [assetRightsAuditOpen, setAssetRightsAuditOpen] = useState(false);
   const [autoActionsOpen, setAutoActionsOpen] = useState(false);
   const [autoActionSet, setAutoActionSet] = useState<StudioAutoActionSet | null>(null);
@@ -32867,7 +32794,9 @@ function clearSelectionForEdit() {
       )
     : [];
 
-  return (
+  // 편집기 표면은 DCC 라우트 래퍼 안에서 렌더된다. 래퍼는 표면 전환을 가로질러 마운트를
+  // 유지하므로 캔버스↔DCC 왕복이 이 트리를 재마운트하지 않는다.
+  const editorSurface = (
     <StudioCuttoonEditorView
       activatePrimaryCanvasTool={activatePrimaryCanvasTool}
       activeCatalogBrush={activeCatalogBrush}
@@ -33969,5 +33898,16 @@ function clearSelectionForEdit() {
       visibleLeftPanelOpen={visibleLeftPanelOpen}
       visibleRightPanelOpen={visibleRightPanelOpen}
     />
+  );
+
+  return (
+    <StudioDccWorkbenchRoute
+      dccRouteAccess={hybridDccRouteAccess}
+      dccRouteRequested={hybridDccRouteRequested}
+      onCloseWorkbench={closeHybridDccWorkspace}
+      onFlushWorkspacePersistence={flushHybridDccWorkspacePersistence}
+    >
+      {editorSurface}
+    </StudioDccWorkbenchRoute>
   );
 }

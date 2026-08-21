@@ -31,6 +31,9 @@ export function readStudioCuttoonEditorSource(): string {
     resolve(baseDir, "../studio-page-shortcut-dispatcher.ts"),
     resolve(baseDir, "../studio-page-comments-runtime.ts"),
     resolve(baseDir, "../hybrid-dcc/studio-hybrid-dcc-persistence.ts"),
+    // DCC 라우트/내비게이션 절반. 지속성 절반 바로 뒤에 둬서 세 조각이 인접하게 읽힌다.
+    resolve(baseDir, "../studio-router/studio-dcc-workbench-navigation.ts"),
+    resolve(baseDir, "../studio-router/StudioDccWorkbenchRoute.tsx"),
     resolve(baseDir, "../studio-page-workspace-persistence.ts"),
     resolve(baseDir, "../StudioPage.tsx"),
     resolve(baseDir, "../studio-page-vector-ops.ts"),
