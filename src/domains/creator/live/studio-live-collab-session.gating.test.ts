@@ -362,7 +362,14 @@ describe("Studio Magma/Figma live collaboration session", () => {
     expect(editorViewSource).toContain("StudioLiveCollaborationProvider");
     expect(editorViewSource).toContain("workId={effectiveWorkId}");
     expect(editorViewSource).toContain("participant={studioLiveParticipant}");
-    expect(pageSource).toContain("shouldPublishStudioLiveJamRoom");
+    // `?room=` publication is owned by the document layout above the editor, not by the page.
+    const documentLayoutSource = readFileSync(
+      new URL("../studio-router/StudioDocumentLayout.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(documentLayoutSource).toContain("shouldPublishStudioLiveJamRoom");
+    expect(documentLayoutSource).toContain("withStudioLiveJamRoom(current, instantWorkId)");
+    expect(pageSource).not.toContain("shouldPublishStudioLiveJamRoom");
     expect(editorViewSource).toContain("serverRequired={Boolean(studioLiveParticipant && requiresStudioLiveServer)}");
     expect(pageSource).toMatch(/buildStudioLiveShareHref\(provisionalWorkId/u);
     expect(pageSource).toContain("buildStudioLiveShareHref");

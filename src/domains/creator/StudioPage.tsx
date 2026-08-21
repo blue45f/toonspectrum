@@ -739,15 +739,11 @@ import {
   type StudioLiveInkStrokeStyle,
 } from "./live/studio-live-ink-overlay";
 import {
-  createStudioLiveInstantWorkId,
-  readStudioLiveRoomQuery,
   resolveStudioLiveSessionWorkId,
   shouldExpectStudioSharedDocument,
-  shouldPublishStudioLiveJamRoom,
   shouldRequireStudioLiveServer,
   shouldSeedStudioLiveSharedBootstrapPage,
   studioLiveSharedBootstrapPageId,
-  withStudioLiveJamRoom,
 } from "./live/studio-live-jam-session";
 import {
   planStudioLiveHeldResourceReplace,
@@ -1218,6 +1214,7 @@ import {
   type StudioRasterRetouchGestureTool,
   type StudioRasterRetouchNormalizedPoint,
 } from "./studio-retouch-raster-gesture";
+import { useStudioDocumentLayout } from "./studio-router/studio-document-layout-context";
 import { announceStudioGpuDeviceLoss } from "./studio-safe-mode-runtime";
 import { layoutScenarioPanels, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
@@ -1768,7 +1765,13 @@ function StudioCuttoonEditor({
   const navigate = useNavigate();
   const location = useLocation();
   const t = useT();
-  const [params, setSearchParams] = useSearchParams();
+  const [params] = useSearchParams();
+  // Live-session identity (`?room=`, per-tab instant id) is owned by StudioDocumentLayout, one level
+  // above this editor and inside the document runtime boundary. This page never parses that query.
+  const {
+    instantWorkId,
+    liveRoomParam: liveRoomQueryParam,
+  } = useStudioDocumentLayout();
   const { data: session, ready: studioAuthReady } = useSession();
   const workId = studioRoute.workId;
   const linked3dCloudSaveRecoveryNotice = studioLinked3dCloudSaveRecoveryNotice(
@@ -2277,7 +2280,6 @@ function StudioCuttoonEditor({
       createEmptyStudioAiImageReferenceDocument,
     );
   const loggedIn = Boolean(studioAuthUserId);
-  const liveRoomQueryParam = readStudioLiveRoomQuery(params);
   const [draftCollaboration, setDraftCollaboration] =
     useState<StudioDraftCollaborationReadiness | null>(null);
   const draftCollaborationProvisionGateRef =
@@ -2427,31 +2429,17 @@ function StudioCuttoonEditor({
       : null;
   const sharedDocumentRef = useRef(sharedDocument);
   sharedDocumentRef.current = sharedDocument;
-  const instantWorkIdRef = useRef<string | null>(null);
-  if (!instantWorkIdRef.current) {
-    instantWorkIdRef.current = createStudioLiveInstantWorkId();
-  }
   const draftCollaborationWorkId = draftCollaboration?.status === "ready"
     ? draftCollaboration.room.provisionalWorkId
     : draftCollaboration?.identity.draftDocumentId;
+  // `?room=` publication for a brand-new jam lives in StudioDocumentLayout; only the local draft
+  // identity — which the layout deliberately does not know about — is resolved here.
   const effectiveWorkId = resolveStudioLiveSessionWorkId({
     workId,
     roomId: liveRoomQueryParam,
     draftWorkId: draftCollaborationWorkId,
-    instantWorkId: instantWorkIdRef.current,
+    instantWorkId,
   });
-  useEffect(() => {
-    if (!shouldPublishStudioLiveJamRoom({
-      workId,
-      remixId,
-      roomId: liveRoomQueryParam,
-    })) return;
-    const roomId = effectiveWorkId;
-    setSearchParams((current) => {
-      if (readStudioLiveRoomQuery(current) === roomId) return current;
-      return withStudioLiveJamRoom(current, roomId);
-    }, { replace: true });
-  }, [effectiveWorkId, liveRoomQueryParam, remixId, setSearchParams, workId]);
   const studioLiveParticipant = useMemo(() => {
     if (sharedDocument && sharedDocument.status === "active" && sharedDocument.capabilities.view) {
       return {

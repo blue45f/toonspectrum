@@ -16,7 +16,14 @@ describe("unsaved Studio collaboration identity wiring", () => {
     expect(page).toContain("resolveStudioLiveSessionWorkId({");
     expect(page).toContain("roomId: liveRoomQueryParam");
     expect(page).toContain("draftWorkId: draftCollaborationWorkId");
-    expect(page).toContain("instantWorkId: instantWorkIdRef.current");
+    // The per-tab instant id moved up to StudioDocumentLayout so it survives surface switches;
+    // the page consumes it from that layout instead of owning a render-phase ref.
+    expect(page).toContain("useStudioDocumentLayout()");
+    expect(page).toContain("instantWorkId,");
+    expect(page).not.toContain("instantWorkIdRef");
+    expect(source("./studio-router/StudioDocumentLayout.tsx")).toContain(
+      "useState(createStudioLiveInstantWorkId)"
+    );
     expect(page).toContain("draftCollaboration={draftCollaboration}");
     expect(page).toContain("provisionCreatorDraftCollaborationRoom(request");
     expect(page).toContain('intent: "share-link"');

@@ -15,6 +15,7 @@ import {
   type StudioEditorRouteResolution,
   type StudioPublishRouteResolution,
 } from "./studio-route-manifest";
+import { StudioDocumentLayout } from "./StudioDocumentLayout";
 import { StudioDocumentRuntimeBoundary } from "./StudioDocumentRuntimeBoundary";
 import { StudioRouteFailure, StudioRoutePlaceholder } from "./StudioRouteFallbacks";
 
@@ -72,12 +73,22 @@ function StudioEditorRoute({ resolution }: {
 
   return (
     <StudioDocumentRuntimeBoundary documentKey={editorKey}>
-      <Suspense fallback={<StudioRouteLoading label="Studio 편집기를 여는 중..." />}>
-        <LegacyStudioEditorAdapter
-          remixId={route.remixSourceWorkId}
-          studioRoute={route}
-        />
-      </Suspense>
+      {/*
+        The layout owns the document-identity-scoped runtime (live-session identity, `?room=`
+        sync) and lives OUTSIDE this Suspense so that runtime survives the editor chunk load and
+        every later surface switch, and tears down only with the boundary key above it.
+      */}
+      <StudioDocumentLayout
+        draftSessionEpoch={draftScope.epoch}
+        studioRoute={route}
+      >
+        <Suspense fallback={<StudioRouteLoading label="Studio 편집기를 여는 중..." />}>
+          <LegacyStudioEditorAdapter
+            remixId={route.remixSourceWorkId}
+            studioRoute={route}
+          />
+        </Suspense>
+      </StudioDocumentLayout>
     </StudioDocumentRuntimeBoundary>
   );
 }

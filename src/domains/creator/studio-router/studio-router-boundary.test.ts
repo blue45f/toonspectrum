@@ -19,6 +19,10 @@ const legacyEditorAdapterSource = readFileSync(
   resolve(process.cwd(), "src/domains/creator/studio-legacy-editor-adapter.tsx"),
   "utf8",
 );
+const documentLayoutSource = readFileSync(
+  resolve(process.cwd(), "src/domains/creator/studio-router/StudioDocumentLayout.tsx"),
+  "utf8",
+);
 
 describe("Studio router bundle boundaries", () => {
   it("loads the publish screen without a static dependency on the legacy editor", () => {
@@ -46,5 +50,31 @@ describe("Studio router bundle boundaries", () => {
     expect(adapterSource).not.toContain("useLocation");
     expect(adapterSource).not.toContain("useSearchParams");
     expect(adapterSource).not.toContain("studioEditorInstanceKey");
+  });
+
+  it("nests the document layout inside the runtime boundary without collapsing the key layers", () => {
+    // Two-layer keying: the boundary keys by auth+epoch (studioEditorInstanceKey), the layout does
+    // not key at all — it inherits the boundary's lifetime so surface switches preserve it.
+    const boundaryOpenIndex = routerSource.indexOf(
+      "<StudioDocumentRuntimeBoundary documentKey={editorKey}>",
+    );
+    const layoutOpenIndex = routerSource.indexOf("<StudioDocumentLayout");
+    const adapterIndex = routerSource.indexOf("<LegacyStudioEditorAdapter");
+    expect(boundaryOpenIndex).toBeGreaterThanOrEqual(0);
+    expect(layoutOpenIndex).toBeGreaterThan(boundaryOpenIndex);
+    expect(adapterIndex).toBeGreaterThan(layoutOpenIndex);
+    expect(routerSource).toContain("draftSessionEpoch={draftScope.epoch}");
+    expect(documentLayoutSource).not.toMatch(/import[^;]*studio-editor-scope/u);
+    expect(documentLayoutSource).not.toMatch(/\skey=\{/u);
+  });
+
+  it("moves live-session identity ownership out of the legacy page and into the layout", () => {
+    expect(documentLayoutSource).toContain("useSearchParams");
+    expect(documentLayoutSource).toContain("readStudioLiveRoomQuery");
+    expect(documentLayoutSource).toContain("useStudioDocumentRuntime()");
+    expect(documentLayoutSource).not.toContain("useLocation");
+    expect(legacyEditorSource).not.toContain("readStudioLiveRoomQuery");
+    expect(legacyEditorSource).not.toContain("setSearchParams");
+    expect(legacyEditorSource).toContain("useStudioDocumentLayout()");
   });
 });
