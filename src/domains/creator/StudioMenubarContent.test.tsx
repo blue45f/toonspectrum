@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER } from "./studio-main-menu-presentation";
 import {
@@ -11,6 +11,8 @@ import {
 } from "./StudioMenubarContent";
 import { createHandlers, createProps } from "./StudioMenubarContent.test-fixture";
 import { StudioToolHintPreferencesProvider } from "./StudioToolHint";
+
+import { useI18n } from "@/lib/i18n";
 
 const {
   preloadStudioAssetMenuPanel,
@@ -109,21 +111,18 @@ vi.mock("./StudioWorkspaceMenuGate", () => ({
 }));
 
 
+// 저자 언어를 못박는다(형제 스튜디오 스위트와 같은 관용구). jsdom 의 navigator.language 는
+// en-US 라 고정하지 않으면 이 파일의 한글 접근명이 전부 영어 팩으로 해석된다.
+beforeEach(() => {
+  useI18n.setState({ lang: "ko" });
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.useRealTimers();
   mainMenuTriggerClicks.length = 0;
 });
-
-/** 동일 접근명이 커맨드 바 슬롯과 원래 메뉴바 버튼에 공존할 수 있어, 비-슬롯 쪽을 고른다. */
-function getMenubarButton(name: string): HTMLButtonElement {
-  const match = screen
-    .getAllByRole<HTMLButtonElement>("button", { name })
-    .find((button) => !button.hasAttribute("data-studio-command-bar-command"));
-  if (!match) throw new Error(`menubar button not found: ${name}`);
-  return match;
-}
 
 describe("resolveStudioMenubarLaneOverflow", () => {
   const lane = { left: 0, right: 600, scrollLeft: 0, scrollWidth: 1_200, clientWidth: 600 };
@@ -241,7 +240,7 @@ describe("StudioMenubarContent", () => {
       />
     );
 
-    const trigger = getMenubarButton("내보내기 옵션");
+    const trigger = screen.getByRole("button", { name: "내보내기 옵션" });
     fireEvent.mouseEnter(trigger);
     fireEvent.focus(trigger);
     fireEvent.click(trigger);
@@ -507,7 +506,7 @@ describe("StudioMenubarContent", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "전체 화면 드로잉" }));
-    fireEvent.click(getMenubarButton("임시저장"));
+    fireEvent.click(screen.getByRole("button", { name: "임시저장" }));
     fireEvent.click(screen.getByRole("button", { name: "게시하기" }));
 
     expect(stableHandlers.changeMobileImmersiveMode).toHaveBeenCalledWith(true);
@@ -519,7 +518,7 @@ describe("StudioMenubarContent", () => {
     render(<StudioMenubarContent {...createProps({ isMobile: true })} />);
 
     for (const name of ["전체 화면 드로잉", "임시저장", "게시하기"] as const) {
-      const action = getMenubarButton(name);
+      const action = screen.getByRole("button", { name });
       expect(action.className).toContain("max-[359px]:size-11");
       const label = [...action.querySelectorAll("span")].find((span) =>
         span.textContent?.includes(name === "전체 화면 드로잉" ? "전체화면" : name),
@@ -565,7 +564,7 @@ describe("StudioMenubarContent", () => {
     expect(context.className).toContain("sr-only");
     expect(context.className).not.toContain("flex-1");
     const exit = screen.getByRole("button", { name: "전체 화면 드로잉 종료" });
-    const draft = getMenubarButton("임시저장");
+    const draft = screen.getByRole("button", { name: "임시저장" });
     const publish = screen.getByRole("button", { name: "게시하기" });
     expect(exit).toBeTruthy();
     expect(draft).toBeTruthy();
@@ -786,6 +785,7 @@ describe("StudioMenubarContent", () => {
     fireEvent.click(screen.getByRole("button", { name: "다시실행" }));
     fireEvent.click(screen.getByRole("button", { name: "작업 내역" }));
 
+
     expect(stableHandlers.undo).toHaveBeenCalledOnce();
     expect(stableHandlers.redo).toHaveBeenCalledOnce();
     expect(stableHandlers.toggleHistoryPanel).toHaveBeenCalledOnce();
@@ -812,13 +812,121 @@ describe("StudioMenubarContent", () => {
       "zoom-fit",
     ]);
 
-    fireEvent.click(within(bar).getByRole("button", { name: "임시저장" }));
+    // 슬롯 3의 저장 명령은 액션 레인의 "임시저장"과 이름이 겹치므로 슬롯 번호로 갈린다.
+    fireEvent.click(within(bar).getByRole("button", { name: "슬롯 3: 임시저장" }));
     expect(stableHandlers.handleSave).toHaveBeenCalledWith("draft");
 
     // zoom-fit stays honestly disabled until the host provides the handler.
     expect(
       screen.getByRole<HTMLButtonElement>("button", { name: "화면 폭 맞춤" }).disabled
     ).toBe(true);
+  });
+
+  /**
+   * X-01 회귀 계약 — 커맨드 바가 메뉴 레인 안에 있으면 8 슬롯이 가로폭을 먹어 1600px 에서도
+   * 상위 메뉴 3개가 오버플로로 밀린다(`verify:studio-icons` 2xl chevron 계약 실패).
+   * 이 스트립은 오버플로 실측기가 재는 레인 밖, 자기 줄에 있어야 한다.
+   */
+  it("keeps the command strip on its own row, outside the measured menu lane", () => {
+    const { container } = render(
+      <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
+    );
+
+    const bar = screen.getByRole("group", { name: "빠른 명령 바" });
+    const lane = container.querySelector<HTMLElement>('[data-studio-menubar-primary="true"]');
+    expect(lane).not.toBeNull();
+    expect(lane?.contains(bar)).toBe(false);
+    expect(bar.closest('[data-studio-menubar-primary="true"]')).toBeNull();
+    // 실측기는 레인 안의 트리거만 본다 — 스트립 버튼이 그 안에 섞이면 안 된다.
+    expect(lane?.querySelectorAll("[data-studio-command-bar-slot]")).toHaveLength(0);
+    // 폭을 다투지 않으므로 `shrink-0`/`flex-1` 같은 가로 예산 토큰이 없어야 한다.
+    expect(bar.className).not.toMatch(/(?:^|\s)(?:shrink-0|flex-1)(?:\s|$)/u);
+    // 자기 줄임을 드러내는 구분선 — 메뉴 행과 시각적으로 갈라진다.
+    expect(bar.className).toContain("border-t");
+    // 두 행은 하나의 세로 스택이다.
+    const rows = container.querySelector<HTMLElement>('[data-studio-menubar-rows="true"]');
+    expect(rows?.className).toContain("flex-col");
+    expect(rows?.contains(bar)).toBe(true);
+    expect(rows?.contains(lane!)).toBe(true);
+  });
+
+  /**
+   * 한 화면에 같은 접근명이 둘이면 스크린리더도 자동화도 갈라내지 못한다
+   * (`verify:studio-menus` 의 strict mode 위반이 정확히 이것이었다).
+   */
+  it("never lets a slot share an accessible name with a fixed menubar control", () => {
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          liveWorkspaceLayout: {
+            commandBar: {
+              version: 1,
+              visible: true,
+              // 중복 명령(undo 두 번)까지 포함해 유일성을 확인한다.
+              slots: [
+                "undo",
+                "undo",
+                "save",
+                "export-open",
+                "download",
+                "assets",
+                "bubbles",
+                "project",
+              ],
+            },
+          } as unknown as StudioMenubarContentProps["liveWorkspaceLayout"],
+        })}
+      />
+    );
+
+    const names = screen
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label") ?? button.textContent?.trim() ?? "")
+      .filter((name) => name.length > 0);
+    expect(new Set(names).size).toBe(names.length);
+
+    // 스트립이 유일한 주인인 명령은 첫 슬롯에서 정식 이름을 지킨다
+    // (`verify-studio-lifecycle` 은 button[aria-label="실행취소"] 로 되돌리기를 찾는다).
+    expect(
+      screen.getByRole("button", { name: "실행취소" })
+        .getAttribute("data-studio-command-bar-slot")
+    ).toBe("0");
+    expect(screen.getByRole("button", { name: "슬롯 2: 실행취소" })).toBeTruthy();
+    // 고정 컨트롤과 겹치는 명령은 전부 슬롯 번호로 한정된다.
+    for (const name of [
+      "슬롯 3: 임시저장",
+      "슬롯 4: 내보내기 옵션",
+      "슬롯 5: 현재 페이지 다운로드",
+      "슬롯 6: 템플릿·에셋",
+      "슬롯 7: 말풍선",
+      "슬롯 8: 프로젝트 작업",
+    ]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+    // 고정 컨트롤 쪽은 정식 이름을 그대로 유지한다.
+    expect(
+      screen.getByRole("button", { name: "내보내기 옵션" })
+        .hasAttribute("data-studio-command-bar-command")
+    ).toBe(false);
+  });
+
+  it("takes slot names, the settings dialog, and its hint from the locale pack", async () => {
+    useI18n.setState({ lang: "en" });
+    render(<StudioMenubarContent {...createProps()} />);
+
+    expect(screen.getByRole("group", { name: "Quick command bar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Undo" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Slot 4: Export options" })).toBeTruthy();
+
+    const settings = screen.getByRole("button", { name: "Command bar settings" });
+    fireEvent.click(settings);
+    expect(
+      screen.getByRole("dialog", { name: "Command bar settings" })
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Command slot 6")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Close command bar settings" })).toBeTruthy();
+    expect(screen.getByText("Show command slots")).toBeTruthy();
+    expect(screen.getByText("Reset to the default layout")).toBeTruthy();
   });
 
   it("delegates the zoom-fit slot once the host wires the optional handler", () => {
@@ -910,8 +1018,9 @@ describe("StudioMenubarContent", () => {
     for (const name of [
       "실행취소",
       "다시실행",
-      "임시저장",
-      "내보내기 옵션",
+      "슬롯 3: 임시저장",
+      "슬롯 4: 내보내기 옵션",
+      "화면 폭 맞춤",
       "작업 내역",
       "명령 바 설정",
       "템플릿·에셋",

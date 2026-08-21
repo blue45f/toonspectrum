@@ -254,7 +254,10 @@ export function StudioAppMenubar({
       data-studio-app-menubar="true"
       className={cn(
         // Sumo-class top bar — denser commercial app chrome, still canvas-max height.
-        "relative z-[50] h-11 min-h-11 shrink-0 border-b border-line",
+        // Height grows with content (CSP 명령 바 second row) instead of a hard 44px:
+        // a fixed height clipped the strip, and the immersive pill already relies on
+        // the same auto/min-height shape in globals.css.
+        "relative z-[50] min-h-11 shrink-0 border-b border-line",
         // Critical: do NOT put overflow-x-auto here — it clips File/Edit dropdowns.
         "overflow-visible",
         className
@@ -263,7 +266,7 @@ export function StudioAppMenubar({
       <div
         data-studio-app-menubar-scroll="true"
         className={cn(
-          "flex h-full min-h-11 w-full flex-nowrap items-center gap-2 px-2.5 sm:gap-2.5 sm:px-3",
+          "flex min-h-11 w-full flex-nowrap items-center gap-2 px-2.5 sm:gap-2.5 sm:px-3",
           "overflow-hidden"
         )}
       >

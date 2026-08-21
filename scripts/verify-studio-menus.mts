@@ -226,6 +226,21 @@ async function hasVisibleText(page: Page, text: string): Promise<boolean> {
   return false;
 }
 
+/**
+ * 고정 내보내기 옵션 컨트롤 — 액션 레인의 그것 하나.
+ *
+ * 이름만으로는 못 집는다: §15.3 커맨드 바가 사용자 설정이라 같은 명령이 슬롯에도 놓일 수
+ * 있고, Playwright 의 `name` 은 기본이 **부분 일치**라 슬롯의 한정 이름("슬롯 4: 내보내기
+ * 옵션")까지 함께 걸려 strict mode 위반이 된다. 제품은 두 컨트롤을 서로 다른 접근명으로
+ * 갈라 놓았으므로(`StudioMenubarContent` 의 `resolveStudioCommandBarSlotNames`), 검증기도
+ * "액션 레인의 정확한 이름" 이라는 원래 뜻 그대로 좁혀서 묻는다.
+ */
+function exportOptionsTrigger(page: Page) {
+  return page
+    .locator('[data-studio-menubar-actions="true"]')
+    .getByRole("button", { name: "내보내기 옵션", exact: true });
+}
+
 async function assertChrome(page: Page): Promise<string[]> {
   const failures: string[] = [];
   const checks: { name: string; ok: () => Promise<boolean> }[] = [
@@ -253,7 +268,7 @@ async function assertChrome(page: Page): Promise<string[]> {
     },
     {
       name: "내보내기 옵션",
-      ok: async () => page.getByRole("button", { name: "내보내기 옵션" }).isVisible(),
+      ok: async () => exportOptionsTrigger(page).isVisible(),
     },
   ];
   for (const c of checks) {
@@ -450,7 +465,7 @@ async function assertDrawOptionsBar(page: Page): Promise<string[]> {
 async function assertExportOptions(page: Page): Promise<string[]> {
   const failures: string[] = [];
   try {
-    await page.getByRole("button", { name: "내보내기 옵션" }).click({ timeout: 4000 });
+    await exportOptionsTrigger(page).click({ timeout: 4000 });
     await page.waitForTimeout(350);
     const ok =
       (await page.getByText(/배율|포맷|PNG|JPG|WebP|투명/).first().isVisible().catch(() => false)) ||

@@ -91,6 +91,7 @@ import type { WatermarkSettings } from "./studio-watermark";
 import type {
   StudioCommandBarCommandId,
   StudioCommandBarPreferences,
+  StudioCommandBarSlot,
   StudioWorkspaceDeviceKind,
   StudioWorkspaceId,
   StudioWorkspaceLayout,
@@ -102,7 +103,32 @@ import type { StudioWriterRoomDocument } from "./studio-writer-room";
 import type { WorkDetail } from "@/src/infrastructure/creator-client";
 
 import { buttonClass } from "@/components/ui/button-utils";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+/**
+ * 로케일 팩이 아직 그 키를 싣지 않았으면 저자 한글 문구를 그대로 쓴다.
+ * (`resolveTranslation` 은 미등록 키에 대해 키 자체를 돌려준다 — 그게 유일한 "없음" 신호다.)
+ * 형제 스튜디오 컴포넌트(`StudioMainMenu`)와 같은 관용구다.
+ */
+function localizeText(
+  t: (key: string) => string,
+  fallback: string,
+  key: string,
+): string {
+  const translated = t(key);
+  return translated === key ? fallback : translated;
+}
+
+/** `슬롯 {index}` 처럼 자리표시자를 가진 팩 문구용. 한글 폴백에는 자리표시자가 없어 무해하다. */
+function localizeIndexedText(
+  t: (key: string) => string,
+  fallback: string,
+  key: string,
+  index: number,
+): string {
+  return localizeText(t, fallback, key).replaceAll("{index}", String(index));
+}
 
 const MENUBAR_HINTS = {
   undo: {
@@ -227,9 +253,51 @@ const COMMAND_BAR_COMMAND_LABELS: Readonly<Record<StudioCommandBarCommandId, str
   project: "프로젝트 작업",
 };
 
+/**
+ * 이 스트립이 화면에서 **유일한** 컨트롤인 명령들.
+ *
+ * 나머지 명령은 고정 메뉴바 컨트롤과 이름이 그대로 겹친다 — 임시저장·게시하기는 액션 레인
+ * (`data-studio-menubar-actions`), 현재 페이지 다운로드·내보내기 옵션은 내보내기 클러스터,
+ * 템플릿·에셋·말풍선은 xl 삽입 바로가기, 프로젝트 작업은 프로젝트 시트 트리거. 한 화면에
+ * 같은 접근명이 둘이면 스크린리더는 물론 자동화(`getByRole("button", { name })`)도 갈라내지
+ * 못하므로 그쪽 슬롯은 슬롯 번호로 한정한 접근명을 쓴다.
+ *
+ * 여기 셋은 겹치는 짝이 없어 정식 명령명을 그대로 유지한다. 접두어를 붙이면
+ * `scripts/verify-studio-lifecycle.mts` 의 `button[aria-label="실행취소"]` 조회가 0건이 되고,
+ * 되돌리기/다시실행은 이제 이 스트립 말고는 어디에도 없다.
+ */
+const COMMAND_BAR_SOLE_AUTHORITY_COMMANDS: ReadonlySet<StudioCommandBarCommandId> = new Set([
+  "undo",
+  "redo",
+  "zoom-fit",
+]);
+
+/**
+ * 슬롯별 접근명. 같은 명령을 여러 슬롯에 담는 것이 허용되므로(`normalizeStudioCommandBar…`)
+ * 유일성의 근거는 **슬롯 번호**다 — 정식 명령명은 "이 스트립이 유일한 주인이고, 그 명령의
+ * 첫 슬롯"일 때만 쓰고 나머지는 전부 번호로 갈린다.
+ */
+function resolveStudioCommandBarSlotNames(
+  slots: readonly StudioCommandBarSlot[],
+  labelOf: (commandId: StudioCommandBarCommandId) => string,
+  slotLabelOf: (slotNumber: number) => string,
+): readonly (string | null)[] {
+  const claimed = new Set<StudioCommandBarCommandId>();
+  return slots.map((slot, index) => {
+    if (slot === null) return null;
+    const label = labelOf(slot);
+    const keepsPlainName =
+      COMMAND_BAR_SOLE_AUTHORITY_COMMANDS.has(slot) && !claimed.has(slot);
+    claimed.add(slot);
+    return keepsPlainName ? label : `${slotLabelOf(index + 1)}: ${label}`;
+  });
+}
+
 /** One slot command bound to the executor seam the menubar already owns for it. */
 interface StudioMenubarCommandBinding {
   label: string;
+  /** Locale key for `label`; the Korean literal above stays the fallback. */
+  labelKey: string;
   icon: LucideIcon;
   hint: StudioToolHintSpec;
   run: () => void;
@@ -240,6 +308,12 @@ interface StudioMenubarCommandBinding {
 /**
  * §15.3 Window ▸ Action Bar — the fixed undo/redo/history cluster, extended into a
  * user-configurable slotted command strip (CSP 커맨드 바 parity).
+ *
+ * **메뉴 레인과 다른 행이다.** CSP 의 명령 바가 메뉴 바 아래 자기 줄을 갖는 것과 같고,
+ * 그래야 하는 실증적 이유도 있다: 같은 줄에 두면 8개 슬롯이 가로폭을 먹어 1600px 에서도
+ * 상위 메뉴 3개가 오버플로로 밀려났다(`verify:studio-icons` 의 2xl chevron 계약 실패).
+ * 그래서 이 스트립은 오버플로 실측기가 재는 레인(`data-studio-menubar-primary`) **밖**,
+ * 두 번째 행에 산다 — 레인 폭 계산에 아예 참여하지 않는다.
  *
  * Slots execute through the same handler backpack the fixed menubar buttons already use — no
  * second dispatch path. History and the slot editor stay fixed at the strip's end so the desktop
@@ -260,6 +334,7 @@ function StudioMenubarCommandBar({
   onPreferencesChange: (next: StudioCommandBarPreferences) => void;
   hidden: boolean;
 }): ReactElement {
+  const t = useT();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsButtonRef = useRef<HTMLButtonElement | null>(null);
   const settingsPanelRef = useRef<HTMLDivElement | null>(null);
@@ -308,13 +383,44 @@ function StudioMenubarCommandBar({
     };
   }, [closeSettings, settingsOpen]);
 
+  const labelOf = (commandId: StudioCommandBarCommandId) =>
+    localizeText(t, bindings[commandId].label, bindings[commandId].labelKey);
+  const slotLabelOf = (slotNumber: number) =>
+    localizeIndexedText(t, `슬롯 ${slotNumber}`, "studio.commandBar.slot", slotNumber);
+  const slotNames = resolveStudioCommandBarSlotNames(
+    preferences.slots,
+    labelOf,
+    slotLabelOf
+  );
+  const settingsLabel = localizeText(t, "명령 바 설정", "studio.commandBar.settings");
+  // 힌트 사본도 팩을 따른다 — 툴팁만 한글로 남으면 같은 컨트롤이 두 언어로 말한다.
+  const customizeHint: StudioToolHintSpec = {
+    ...COMMAND_BAR_HINTS.customize,
+    title: settingsLabel,
+    description: localizeText(
+      t,
+      COMMAND_BAR_HINTS.customize.description,
+      "studio.commandBar.settingsDescription"
+    ),
+    tip: localizeText(
+      t,
+      COMMAND_BAR_HINTS.customize.tip ?? "",
+      "studio.commandBar.settingsTip"
+    ),
+  };
+
   return (
     <div
       role="group"
-      aria-label="빠른 명령 바"
+      aria-label={localizeText(t, "빠른 명령 바", "studio.commandBar.aria")}
       data-studio-menubar-command-bar="true"
       className={cn(
-        "hidden shrink-0 items-center gap-0.5 md:flex",
+        // 자기 줄이라 `shrink-0` 도 `flex-1` 도 필요 없다 — 메뉴 레인과 폭을 다투지 않고,
+        // 세로 스택의 stretch 로 행 전체를 채운다. 음수 마진이 호스트 셸의 좌우 패딩까지
+        // 덮어 구분선이 메뉴바 전폭을 가로지르고, 같은 크기의 패딩을 되돌려 슬롯은 위 행의
+        // 컨트롤과 같은 세로선에서 시작한다.
+        "hidden min-h-9 items-center gap-0.5 border-t border-line/60 md:flex",
+        "-mx-2.5 px-2.5 sm:-mx-3 sm:px-3",
         hidden && "!hidden"
       )}
     >
@@ -322,6 +428,7 @@ function StudioMenubarCommandBar({
         ? preferences.slots.map((slot, index) => {
             if (slot === null) return null;
             const binding = bindings[slot];
+            const accessibleName = slotNames[index] ?? binding.label;
             return (
               <StudioToolHintTarget
                 // Duplicate commands across slots are allowed, so key by position + command.
@@ -335,9 +442,10 @@ function StudioMenubarCommandBar({
                   type="button"
                   onClick={binding.run}
                   disabled={binding.disabled}
-                  // 접근명은 명령 라벨 그대로 — 검증기·스크린리더 모두 "실행취소" 같은
-                  // 정식 명령명을 찾는다("빠른 명령:" 접두어는 접근명 회귀였음).
-                  aria-label={binding.label}
+                  // 접근명 규칙은 `resolveStudioCommandBarSlotNames` 참조 — 고정 메뉴바
+                  // 컨트롤과 이름이 겹치는 명령만 슬롯 번호로 한정한다. 자동화는 이름 대신
+                  // 아래 `data-studio-command-bar-command` 로 명령을 집는 편이 안전하다.
+                  aria-label={accessibleName}
                   data-studio-command-bar-slot={index}
                   data-studio-command-bar-command={slot}
                   className={buttonClass({
@@ -370,12 +478,12 @@ function StudioMenubarCommandBar({
         </button>
       </StudioToolHintTarget>
       {/* Fixed as well — hiding the slots must never hide the way to bring them back. */}
-      <StudioToolHintTarget hint={COMMAND_BAR_HINTS.customize} preferredSide="bottom">
+      <StudioToolHintTarget hint={customizeHint} preferredSide="bottom">
         <button
           ref={settingsButtonRef}
           type="button"
           onClick={() => (settingsOpen ? closeSettings(true) : openSettings())}
-          aria-label="명령 바 설정"
+          aria-label={settingsLabel}
           aria-haspopup="dialog"
           aria-expanded={settingsOpen}
           aria-controls={settingsOpen ? settingsPanelId : undefined}
@@ -395,7 +503,7 @@ function StudioMenubarCommandBar({
               ref={settingsPanelRef}
               id={settingsPanelId}
               role="dialog"
-              aria-label="명령 바 설정"
+              aria-label={settingsLabel}
               data-studio-command-bar-settings-panel="true"
               data-studio-shortcut-boundary="true"
               style={{ top: settingsCoords.top, right: settingsCoords.right }}
@@ -403,15 +511,23 @@ function StudioMenubarCommandBar({
             >
               <div className="flex items-center justify-between gap-2 border-b border-line/60 pb-2">
                 <span>
-                  <span className="block text-xs font-bold text-fg">명령 바 설정</span>
+                  <span className="block text-xs font-bold text-fg">{settingsLabel}</span>
                   <span className="mt-0.5 block text-[0.65rem] text-fg-3">
-                    슬롯 구성은 이 브라우저의 작업공간 설정에 저장돼요.
+                    {localizeText(
+                      t,
+                      "슬롯 구성은 이 브라우저의 작업공간 설정에 저장돼요.",
+                      "studio.commandBar.settingsStorageNote"
+                    )}
                   </span>
                 </span>
                 <button
                   type="button"
                   onClick={() => closeSettings(true)}
-                  aria-label="명령 바 설정 닫기"
+                  aria-label={localizeText(
+                    t,
+                    "명령 바 설정 닫기",
+                    "studio.commandBar.settingsClose"
+                  )}
                   className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg"
                 >
                   <X size={15} aria-hidden />
@@ -428,7 +544,7 @@ function StudioMenubarCommandBar({
                   }
                   className="size-4 accent-accent"
                 />
-                명령 슬롯 표시
+                {localizeText(t, "명령 슬롯 표시", "studio.commandBar.showSlots")}
               </label>
               <div className="flex flex-col gap-1 py-2">
                 {preferences.slots.map((slot, index) => (
@@ -437,7 +553,7 @@ function StudioMenubarCommandBar({
                     key={index}
                     className="flex min-h-9 items-center justify-between gap-2 text-[0.72rem] text-fg-3"
                   >
-                    <span className="shrink-0 tabular-nums">슬롯 {index + 1}</span>
+                    <span className="shrink-0 tabular-nums">{slotLabelOf(index + 1)}</span>
                     <select
                       value={slot ?? ""}
                       onChange={(event) => {
@@ -450,13 +566,20 @@ function StudioMenubarCommandBar({
                           )
                         );
                       }}
-                      aria-label={`명령 슬롯 ${index + 1}`}
+                      aria-label={localizeIndexedText(
+                        t,
+                        `명령 슬롯 ${index + 1}`,
+                        "studio.commandBar.slotAria",
+                        index + 1
+                      )}
                       className="min-h-9 w-44 rounded-lg border border-line bg-canvas px-2 text-[0.75rem] text-fg"
                     >
-                      <option value="">빈 슬롯</option>
+                      <option value="">
+                        {localizeText(t, "빈 슬롯", "studio.commandBar.slotEmpty")}
+                      </option>
                       {STUDIO_COMMAND_BAR_COMMAND_IDS.map((commandId) => (
                         <option key={commandId} value={commandId}>
-                          {COMMAND_BAR_COMMAND_LABELS[commandId]}
+                          {labelOf(commandId)}
                         </option>
                       ))}
                     </select>
@@ -472,7 +595,11 @@ function StudioMenubarCommandBar({
                   className: "min-h-9 w-full justify-center border border-line/70",
                 })}
               >
-                기본 구성으로 되돌리기
+                {localizeText(
+                  t,
+                  "기본 구성으로 되돌리기",
+                  "studio.commandBar.resetDefaults"
+                )}
               </button>
             </div>,
             document.body
@@ -1087,6 +1214,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   > = {
     undo: {
       label: COMMAND_BAR_COMMAND_LABELS.undo,
+      labelKey: "studio.commandBar.command.undo",
       icon: Undo2,
       hint: MENUBAR_HINTS.undo,
       run: undo,
@@ -1095,6 +1223,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     },
     redo: {
       label: COMMAND_BAR_COMMAND_LABELS.redo,
+      labelKey: "studio.commandBar.command.redo",
       icon: Redo2,
       hint: MENUBAR_HINTS.redo,
       run: redo,
@@ -1103,6 +1232,11 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     },
     save: {
       label: sharedNonOwner ? "공동 저장" : COMMAND_BAR_COMMAND_LABELS.save,
+      // 공유 문서의 "공동 저장"은 파일 메뉴가 이미 쓰는 키를 그대로 재사용한다 — 같은 명령이
+      // 메뉴에서와 스트립에서 다른 문구로 번역되면 안 된다.
+      labelKey: sharedNonOwner
+        ? "studio.mainMenu.item.file.save-draft.shared"
+        : "studio.commandBar.command.save",
       icon: Save,
       hint: MENUBAR_HINTS.draft,
       run: () => void handleSave("draft"),
@@ -1113,6 +1247,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     },
     publish: {
       label: workId ? "수정 게시" : COMMAND_BAR_COMMAND_LABELS.publish,
+      labelKey: workId
+        ? "studio.mainMenu.item.file.publish.has-work"
+        : "studio.commandBar.command.publish",
       icon: Send,
       hint: MENUBAR_HINTS.publish,
       run: () => void handleSave("published"),
@@ -1125,12 +1262,14 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     },
     download: {
       label: COMMAND_BAR_COMMAND_LABELS.download,
+      labelKey: "studio.commandBar.command.download",
       icon: Download,
       hint: MENUBAR_HINTS.download,
       run: () => void handleDownload(),
     },
     "export-open": {
       label: COMMAND_BAR_COMMAND_LABELS["export-open"],
+      labelKey: "studio.commandBar.command.export-open",
       icon: SlidersHorizontal,
       hint: MENUBAR_HINTS.exportOptions,
       // Open-only on purpose: outside-pointerdown closing already owns dismissal, and a toggle
@@ -1145,6 +1284,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     },
     "zoom-fit": {
       label: COMMAND_BAR_COMMAND_LABELS["zoom-fit"],
+      labelKey: "studio.commandBar.command.zoom-fit",
       icon: Scan,
       hint: COMMAND_BAR_HINTS.zoomFit,
       run: () => zoomToFit?.(),
@@ -1153,6 +1293,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     },
     assets: {
       label: COMMAND_BAR_COMMAND_LABELS.assets,
+      labelKey: "studio.commandBar.command.assets",
       icon: Folder,
       hint: MENUBAR_HINTS.assets,
       run: () => {
@@ -1162,12 +1303,14 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     },
     bubbles: {
       label: COMMAND_BAR_COMMAND_LABELS.bubbles,
+      labelKey: "studio.commandBar.command.bubbles",
       icon: MessageCircle,
       hint: MENUBAR_HINTS.bubbles,
       run: () => setMenu(menu === "bubble" ? null : "bubble"),
     },
     project: {
       label: COMMAND_BAR_COMMAND_LABELS.project,
+      labelKey: "studio.commandBar.command.project",
       icon: Folder,
       hint: MENUBAR_HINTS.project,
       run: () => {
@@ -1178,7 +1321,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   };
 
   return (
-    <>
+    <div
+      data-studio-menubar-rows="true"
+      className="flex min-w-0 flex-1 flex-col"
+    >
+      {/* 1행 — 문서 맥락 · 상위 메뉴 · 파일 액션. 여기 폭이 곧 §15.3 메뉴 18개의 가시성이다. */}
+      <div className="flex min-w-0 flex-nowrap items-center gap-2">
         {/* 가져오기 파일 입력은 StudioPage 루트(data-studio-document-import-inputs)에 상시 마운트한다.
             메뉴바 lazy 청크/패널 게이트와 무관하게 파일 메뉴·프로젝트 도구 버튼이 같은 ref 를 클릭한다.
             (2026-07-24: 패널 안 조건부 마운트 → 무반응 버그 수정 후, lazy menubar 레이스까지 제거) */}
@@ -1240,18 +1388,6 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             </span>
           ) : null}
           </div>
-          <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
-          {/* The legacy tool belt is mobile-only. The old fixed undo/redo/history cluster grew
-              into this user-configurable command strip (§15.3 Window ▸ Action Bar); history and
-              the slot editor stay fixed so the desktop history authority survives customization. */}
-          <StudioMenubarCommandBar
-            preferences={commandBarPreferences}
-            bindings={commandBarBindings}
-            historyPanelOpen={historyPanelOpen}
-            onToggleHistoryPanel={toggleHistoryPanel}
-            onPreferencesChange={changeCommandBarPreferences}
-            hidden={mobileImmersive}
-          />
           <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
           {/* Desktop application commands live in the compressible center lane. */}
           <Suspense fallback={null}>
@@ -2018,6 +2154,18 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             </StudioToolHintTarget>
           ) : null}
         </div>
-    </>
+      </div>
+      {/* 2행 — §15.3 Window ▸ Action Bar. CSP 처럼 메뉴 바 **아래** 자기 줄에 놓아, 8 슬롯이
+          늘어나도 상위 메뉴 18개의 가로 예산을 한 픽셀도 가져가지 않는다. 오버플로 실측기가
+          재는 것은 1행의 `data-studio-menubar-primary` 뿐이라 이 줄은 계산에 아예 안 들어온다. */}
+      <StudioMenubarCommandBar
+        preferences={commandBarPreferences}
+        bindings={commandBarBindings}
+        historyPanelOpen={historyPanelOpen}
+        onToggleHistoryPanel={toggleHistoryPanel}
+        onPreferencesChange={changeCommandBarPreferences}
+        hidden={mobileImmersive}
+      />
+    </div>
   );
 });
