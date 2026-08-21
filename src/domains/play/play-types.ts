@@ -77,7 +77,7 @@ export function normalizePlayTitle(raw: unknown): PlayTitle | null {
   };
 }
 
-// 저작권: 표지는 사이트 전반(랭킹·검색·상세)과 동일하게 표지 정책(lib/server/cover-policy)
+// 저작권: 표지는 사이트 전반(랭킹·검색·상세)과 동일하게 표지 정책(packages/core/src/server/cover-policy)
 // 하에 노출한다 — 프록시 경유 + 성인필터 + 킬스위치(COVER_IMAGE_POLICY=off 면 프록시가 막혀
 // 게임 표지까지 즉시 그라디언트 폴백). 게임 카드의 CardArt 는 coverImage 가 없으면 OKLCH
 // 그라디언트로 폴백하므로, off 정책/이미지 실패 시 자동으로 자체 커버만 남는다.

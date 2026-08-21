@@ -598,15 +598,72 @@ function writeBuiltPackage(generatedPackageDirectory) {
   );
 }
 
+/**
+ * Reseals the manifest after a POLICY input changed, without touching the artifacts.
+ *
+ * The manifest seals three kinds of record: `source/` (crate inputs), `pkg/` (the built
+ * WASM and its siblings) and `policy/` (this repo's root package.json and the three
+ * release scripts). Editing any policy file — adding one dependency to the root
+ * package.json is enough — invalidates the whole manifest, and the only documented
+ * repair was a full rebuild with the pinned Rust toolchain. That turned every routine
+ * root-manifest edit into a blocked push on machines without that toolchain.
+ *
+ * This mode narrows the repair to what actually changed. It recomputes the manifest and
+ * refuses to write unless every `source/` and `pkg/` digest is byte-identical to the one
+ * already sealed — so a modified WASM can never be laundered through here; that still
+ * requires `--build` with the pinned toolchain. Only `policy/` digests may move, and the
+ * ones that moved are printed for review.
+ */
+function resealPolicyInputs() {
+  const manifestPath = HOKUSAI_INTEGRITY_MANIFEST_PATH;
+  if (!existsSync(manifestPath) || !lstatSync(manifestPath).isFile()) {
+    throw new Error(
+      `Hokusai WASM integrity manifest is missing: ${relative(REPOSITORY_ROOT, manifestPath)}.`,
+    );
+  }
+  const sealedDigests = new Map(
+    readFileSync(manifestPath, "utf8")
+      .split("\n")
+      .filter((line) => line && !line.startsWith("#"))
+      .map((line) => {
+        const [digest, path] = line.split(/\s+/u);
+        return [path, digest];
+      }),
+  );
+  const changed = [];
+  for (const record of collectIntegrityRecords()) {
+    const sealed = sealedDigests.get(record.path);
+    if (sealed === record.digest) continue;
+    if (!record.path.startsWith("policy/")) {
+      throw new Error(
+        `Refusing to reseal: ${record.path} is not a policy input but its digest changed `
+        + `(sealed ${sealed ?? "absent"}, now ${record.digest}). Rebuild with `
+        + "`pnpm run build:studio-hokusai-wasm` on the pinned toolchain instead.",
+      );
+    }
+    changed.push(record.path);
+  }
+  if (changed.length === 0) {
+    process.stdout.write("Hokusai WASM manifest already matches every policy input.\n");
+    return;
+  }
+  writeFileSync(manifestPath, renderIntegrityManifest(), "utf8");
+  verifyCheckedInHokusaiArtifacts();
+  process.stdout.write(
+    `Resealed ${changed.length} Hokusai WASM policy input(s), artifacts untouched:\n`
+    + changed.map((path) => `  ${path}\n`).join(""),
+  );
+}
+
 export function main(argumentsList = process.argv.slice(2)) {
   if (
     argumentsList.length !== 1
-    || !["--build", "--check", "--rebuild", "--test"].includes(
+    || !["--build", "--check", "--rebuild", "--reseal-policy", "--test"].includes(
       argumentsList[0],
     )
   ) {
     throw new Error(
-      "Use exactly one of --build, --check, --rebuild, or --test.",
+      "Use exactly one of --build, --check, --rebuild, --reseal-policy, or --test.",
     );
   }
 
@@ -617,6 +674,10 @@ export function main(argumentsList = process.argv.slice(2)) {
     process.stdout.write(
       `Hokusai WASM release gate passed (${records.length} integrity records, ${wasmBytes} WASM bytes).\n`,
     );
+    return;
+  }
+  if (command === "--reseal-policy") {
+    resealPolicyInputs();
     return;
   }
   if (command === "--test") {

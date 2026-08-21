@@ -5,9 +5,13 @@
 // ② 운영자가 권리자 요청·정책 변화에 따라 실제 표지 표시를 즉시 끌 수 있어야 한다.
 //
 // 이 모듈은 순수(process.env 만 읽음)하며, 모든 적재 경로가 통과하는 replaceCatalogData
-// (lib/server/catalog-store) 한 곳에서 적용된다 → 정적 빌드·런타임 API·라이브 어댑터 공통.
+// (./catalog-store) 한 곳에서 적용된다 → 정적 빌드·런타임 API·라이브 어댑터 공통.
 // 추가로 표지 프록시(apps/api .../catalog.controller)가 정책 off 를 서빙 단에서 한 번 더
 // 강제한다(이미 배포·캐시된 정적 JSON 의 표지 URL 도 무력화 — 방어 심층).
+//
+// 위치: 소비자가 카탈로그 스토어(이 패키지)와 apps/api 표지 프록시뿐이고, DB/노드 API 없이
+// process.env 만 읽는 순수 모듈이라 공유 커널에 둔다. 앱 트리(lib/)로 climb 하면
+// packages → 앱 방향의 역참조가 생기므로 여기가 정본이다.
 import type { Title } from "../types";
 
 export type CoverImagePolicy = "proxy" | "off";

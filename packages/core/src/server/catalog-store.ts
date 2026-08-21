@@ -1,6 +1,6 @@
-// cover-policy 는 process.env(COVER_IMAGE_POLICY) 를 읽는 서버 전용 표지 정책이라 core 로 옮기지 않고
-// 웹 레포의 lib/server/ 에 남겨둔다 — core/server 에서 상대 경로로 climb 해 참조한다(웹 번들은 기존처럼 정적 치환).
-import { applyCoverPolicy } from "../../../../lib/server/cover-policy";
+// cover-policy 는 process.env(COVER_IMAGE_POLICY) 만 읽는 순수 표지 정책이고 소비자가 이 스토어와
+// apps/api 표지 프록시뿐이라 같은 패키지 안에 있다(앱 트리로 climb 하지 않는다).
+import { applyCoverPolicy } from "./cover-policy";
 
 import type { Title, WorkType } from "../types";
 
