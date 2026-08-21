@@ -894,6 +894,9 @@ export function correctVrmHangingHandPalmTwist(vrm: VRM): number {
     if (orientRelaxedHandPalm(humanoid, side)) corrected += 1;
   }
   if (corrected > 0) {
+    // 트위스트는 normalized 손 본 quaternion을 직접 쓰므로 raw 스키튼에 즉시 동기화한다.
+    // 이후 vrm.update()가 없는 경로(테스트·bg3d·저장 직전 스냅샷)에서도 결과가 보이게 한다.
+    humanoid.update();
     vrm.scene.updateMatrixWorld(true);
   }
   return corrected;
