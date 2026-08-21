@@ -214,6 +214,7 @@ describe("머리 소품의 face/bone socket 의미 계약", () => {
     "goggles",
     "blender_cyber_visor",
     "blender_cyber_glasses",
+    "blender_fox_mask",
   ] as const;
   const BONE_WEAR_IDS = [
     "cap",
@@ -232,6 +233,7 @@ describe("머리 소품의 face/bone socket 의미 계약", () => {
     "earmuffs",
     "hairpin",
     "blender_tactical_helmet",
+    "blender_wizard_hat",
   ] as const;
 
   it("classifies every current head-category definition exhaustively", () => {

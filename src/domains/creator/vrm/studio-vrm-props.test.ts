@@ -106,12 +106,33 @@ describe("VRM 소품 카탈로그", () => {
       blender_tactical_helmet: "/assets/3d/tactical_helmet.glb",
       blender_school_desk: "/assets/3d/school_desk.glb",
       blender_adaptive_power_wheelchair: "/assets/3d/adaptive_power_wheelchair.glb",
+      blender_ramen_bowl: "/assets/3d/ramen_bowl.glb",
+      blender_ice_cream_cone: "/assets/3d/ice_cream_cone.glb",
+      blender_bubble_tea: "/assets/3d/bubble_tea.glb",
+      blender_paper_lantern: "/assets/3d/paper_lantern.glb",
+      blender_potted_monstera: "/assets/3d/potted_monstera.glb",
+      blender_bonsai_tree: "/assets/3d/bonsai_tree.glb",
+      blender_street_food_cart: "/assets/3d/street_food_cart.glb",
+      blender_traffic_light: "/assets/3d/traffic_light.glb",
+      blender_mailbox: "/assets/3d/mailbox.glb",
+      blender_grandfather_clock: "/assets/3d/grandfather_clock.glb",
+      blender_fireplace: "/assets/3d/fireplace.glb",
+      blender_bathtub: "/assets/3d/bathtub.glb",
+      blender_kitchen_stove: "/assets/3d/kitchen_stove.glb",
+      blender_campfire: "/assets/3d/campfire.glb",
+      blender_wishing_well: "/assets/3d/wishing_well.glb",
+      blender_robot_pet: "/assets/3d/robot_pet.glb",
+      blender_mech_turret: "/assets/3d/mech_turret.glb",
+      blender_fox_mask: "/assets/3d/fox_mask.glb",
+      blender_wizard_hat: "/assets/3d/wizard_hat.glb",
+      blender_tea_set: "/assets/3d/tea_set.glb",
+      blender_hanging_sign: "/assets/3d/hanging_sign.glb",
     } as const;
 
     expect(BLENDER_PROP_GLTF_URLS).toEqual(expected);
     const blenderDefs = VRM_PROPS.filter((definition) => definition.id.startsWith("blender_"));
-    expect(blenderDefs).toHaveLength(27);
-    expect(Object.keys(BLENDER_PROP_GLTF_URLS)).toHaveLength(34);
+    expect(blenderDefs).toHaveLength(48);
+    expect(Object.keys(BLENDER_PROP_GLTF_URLS)).toHaveLength(55);
 
     for (const [id, url] of Object.entries(expected)) {
       expect(propDefById(id)?.geometrySource, id).toEqual({ kind: "gltf", url });
@@ -130,7 +151,7 @@ describe("VRM 소품 카탈로그", () => {
     }
   });
 
-  it("매핑된 first-party GLB 34개가 실제 mesh scene으로 파싱된다", async () => {
+  it("매핑된 first-party GLB 55개가 실제 mesh scene으로 파싱된다", async () => {
     const loader = new GLTFLoader();
     for (const url of Object.values(BLENDER_PROP_GLTF_URLS)) {
       const bytes = readFileSync(new URL(`../../../../public${url}`, import.meta.url));

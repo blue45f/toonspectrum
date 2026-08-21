@@ -174,6 +174,27 @@ export const BLENDER_PROP_GLTF_URLS = Object.freeze({
   blender_tactical_helmet: "/assets/3d/tactical_helmet.glb",
   blender_school_desk: "/assets/3d/school_desk.glb",
   blender_adaptive_power_wheelchair: "/assets/3d/adaptive_power_wheelchair.glb",
+  blender_ramen_bowl: "/assets/3d/ramen_bowl.glb",
+  blender_ice_cream_cone: "/assets/3d/ice_cream_cone.glb",
+  blender_bubble_tea: "/assets/3d/bubble_tea.glb",
+  blender_paper_lantern: "/assets/3d/paper_lantern.glb",
+  blender_potted_monstera: "/assets/3d/potted_monstera.glb",
+  blender_bonsai_tree: "/assets/3d/bonsai_tree.glb",
+  blender_street_food_cart: "/assets/3d/street_food_cart.glb",
+  blender_traffic_light: "/assets/3d/traffic_light.glb",
+  blender_mailbox: "/assets/3d/mailbox.glb",
+  blender_grandfather_clock: "/assets/3d/grandfather_clock.glb",
+  blender_fireplace: "/assets/3d/fireplace.glb",
+  blender_bathtub: "/assets/3d/bathtub.glb",
+  blender_kitchen_stove: "/assets/3d/kitchen_stove.glb",
+  blender_campfire: "/assets/3d/campfire.glb",
+  blender_wishing_well: "/assets/3d/wishing_well.glb",
+  blender_robot_pet: "/assets/3d/robot_pet.glb",
+  blender_mech_turret: "/assets/3d/mech_turret.glb",
+  blender_fox_mask: "/assets/3d/fox_mask.glb",
+  blender_wizard_hat: "/assets/3d/wizard_hat.glb",
+  blender_tea_set: "/assets/3d/tea_set.glb",
+  blender_hanging_sign: "/assets/3d/hanging_sign.glb",
 } as const satisfies Readonly<Record<string, PropGltfAssetUrl>>);
 
 const PROCEDURAL_PROP_GEOMETRY_SOURCE = Object.freeze({ kind: "procedural" } as const);
@@ -281,6 +302,28 @@ const VRM_PROP_BASES = [
   { id: "blender_tactical_helmet", label: "블렌더 택티컬 헬멧", category: "head", defaultBone: "head", defaultPosition: [0, 0.05, 0.01], defaultRotationDeg: [0, 0, 0], defaultScale: 0.45, defaultColor: null, hint: "Blender 5.2 생성 SF 택티컬 헬멧." },
   { id: "blender_school_desk", label: "블렌더 학교 책상", category: "body", defaultBone: "hips", defaultPosition: [0, -0.7, 0.3], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 학교/오피스 책상." },
   { id: "blender_adaptive_power_wheelchair", label: "블렌더 어댑티브 전동휠체어", category: "body", defaultBone: "hips", defaultPosition: [0, -0.39, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 어댑티브 전동휠체어. 좌석 앵커로 캐릭터 골반을 자연스럽게 맞춥니다." },
+  // Blender 5.2 diverse props pack v6 (음식·자연·거리·인테리어·판타지·SF)
+  { id: "blender_ramen_bowl", label: "블렌더 라면 그릇", category: "hand", defaultBone: "leftHand", defaultPosition: [0, 0.02, 0.02], defaultRotationDeg: [10, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 계란·노리 라면 그릇." },
+  { id: "blender_ice_cream_cone", label: "블렌더 아이스크림 콘", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0.01, 0.01], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 3단 스쿱 아이스크림." },
+  { id: "blender_bubble_tea", label: "블렌더 버블티", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0.02, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 펄 버블티 컵." },
+  { id: "blender_paper_lantern", label: "블렌더 종이 등롱", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0.05, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 발광 종이 등롱." },
+  { id: "blender_fox_mask", label: "블렌더 여우 가면", category: "head", defaultBone: "head", defaultPosition: [0, -0.02, 0.075], defaultRotationDeg: [0, 0, 0], defaultScale: 0.8, defaultColor: null, hint: "Blender 5.2 생성 여우 탈. 얼굴에 착용." },
+  { id: "blender_wizard_hat", label: "블렌더 마법사 모자", category: "head", defaultBone: "head", defaultPosition: [0, 0.09, 0], defaultRotationDeg: [-6, 0, 4], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 별 반짝이 마법사 모자." },
+  { id: "blender_potted_monstera", label: "블렌더 몬스테라 화분", category: "body", defaultBone: "hips", defaultPosition: [0.7, -0.85, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 인테리어 몬스테라 화분." },
+  { id: "blender_bonsai_tree", label: "블렌더 분재 나무", category: "body", defaultBone: "hips", defaultPosition: [-0.7, -0.85, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 선반용 분재." },
+  { id: "blender_street_food_cart", label: "블렌더 노점 포장마차", category: "body", defaultBone: "hips", defaultPosition: [0, -0.9, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 랜턴 노점 카트." },
+  { id: "blender_traffic_light", label: "블렌더 신호등", category: "body", defaultBone: "hips", defaultPosition: [1.0, -0.9, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 도시 신호등." },
+  { id: "blender_mailbox", label: "블렌더 우편함", category: "body", defaultBone: "hips", defaultPosition: [-1.0, -0.9, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 빨간 미국식 우편함." },
+  { id: "blender_grandfather_clock", label: "블렌더 괘종시계", category: "body", defaultBone: "hips", defaultPosition: [0.9, -0.85, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 진자 괘종시계." },
+  { id: "blender_fireplace", label: "블렌더 벽난로", category: "body", defaultBone: "hips", defaultPosition: [0, -0.95, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 불타는 벽난로." },
+  { id: "blender_bathtub", label: "블렌더 욕조", category: "body", defaultBone: "hips", defaultPosition: [0, -0.8, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 물이 찬 욕조." },
+  { id: "blender_kitchen_stove", label: "블렌더 가스레인지", category: "body", defaultBone: "hips", defaultPosition: [0.85, -0.85, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 4구 레인지 오븐." },
+  { id: "blender_campfire", label: "블렌더 모닥불", category: "body", defaultBone: "hips", defaultPosition: [0, -0.75, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 캠핑 모닥불." },
+  { id: "blender_wishing_well", label: "블렌더 소원 우물", category: "body", defaultBone: "hips", defaultPosition: [-0.95, -0.9, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 판타지 우물." },
+  { id: "blender_robot_pet", label: "블렌더 로봇 반려견", category: "body", defaultBone: "hips", defaultPosition: [0.45, -0.75, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 SF 로봇 강아지." },
+  { id: "blender_mech_turret", label: "블렌더 메카 터렛", category: "body", defaultBone: "hips", defaultPosition: [-0.45, -0.85, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 에너지 터렛." },
+  { id: "blender_tea_set", label: "블렌더 티 세트", category: "body", defaultBone: "hips", defaultPosition: [0, -0.72, 0.35], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 찻주전자 티세트." },
+  { id: "blender_hanging_sign", label: "블렌더 매달린 간판", category: "body", defaultBone: "chest", defaultPosition: [0.55, 0.3, -0.4], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 가게 현판." },
 ] as const satisfies readonly LegacyPropDef[];
 
 export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
@@ -647,6 +690,95 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   blender_adaptive_power_wheelchair: {
     anchors: [anchor("seat", "surface", [0, 0.61, 0.02])],
     fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_ramen_bowl: {
+    anchors: [handAnchor("primary", "primary", [0, -0.02, 0], 0.025)],
+    grip: grip("flat", 0.025, 20, 20),
+    fit: fit("hand", 0.075, 0.7, 1.4),
+  },
+  blender_ice_cream_cone: {
+    anchors: [handAnchor("primary", "primary", [0, -0.04, 0], 0.014)],
+    grip: grip("cylinder", 0.014, 42, 30),
+    fit: fit("hand", 0.075, 0.72, 1.4),
+  },
+  blender_bubble_tea: {
+    anchors: [handAnchor("primary", "primary", [0, -0.03, 0], 0.02)],
+    grip: grip("cylinder", 0.02, 40, 28),
+    fit: fit("hand", 0.075, 0.72, 1.4),
+  },
+  blender_paper_lantern: {
+    anchors: [handAnchor("primary", "primary", [0, 0.12, 0], 0.008)],
+    grip: grip("pinch", 0.008, 30, 36),
+    fit: fit("hand", 0.075, 0.7, 1.45),
+  },
+  blender_fox_mask: {
+    anchors: [anchor("surface", "surface", [0, 0, 0.02])],
+    fit: fit("head", 0.16, 0.75, 1.35),
+    wearSocket: "face",
+  },
+  blender_wizard_hat: {
+    anchors: [anchor("center", "surface", [0, -0.02, 0])],
+    fit: fit("head", 0.18, 0.75, 1.45),
+  },
+  blender_potted_monstera: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.7, 1.5),
+  },
+  blender_bonsai_tree: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.7, 1.5),
+  },
+  blender_street_food_cart: {
+    anchors: [anchor("center", "surface", [0, 0.8, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_traffic_light: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.6),
+  },
+  blender_mailbox: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.7, 1.5),
+  },
+  blender_grandfather_clock: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_fireplace: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_bathtub: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_kitchen_stove: {
+    anchors: [anchor("top", "surface", [0, 0.85, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_campfire: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.7, 1.5),
+  },
+  blender_wishing_well: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_robot_pet: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.7, 1.5),
+  },
+  blender_mech_turret: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_tea_set: {
+    anchors: [anchor("tray", "surface", [0, 0, 0])],
+    fit: fit("hand", 0.075, 0.7, 1.45),
+  },
+  blender_hanging_sign: {
+    anchors: [anchor("top", "surface", [0, 0.2, 0])],
+    fit: fit("avatarHeight", 1.65, 0.75, 1.5),
   },
 };
 
