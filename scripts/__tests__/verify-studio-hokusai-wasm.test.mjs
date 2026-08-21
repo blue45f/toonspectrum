@@ -77,10 +77,11 @@ describe("Studio Hokusai WASM checked-in artifact gate", () => {
     expect(manifest).toContain("source/LICENSE-UNICODE");
     expect(manifest).toContain("pkg/LICENSE-UNICODE");
     expect(manifest).toContain("pkg/studio_hokusai_wasm_bg.wasm");
-    expect(manifest).toContain("policy/package.json");
-    expect(manifest).toContain(
-      "policy/scripts/verify-studio-hokusai-wasm.mjs",
-    );
+    // 매니페스트는 크레이트 소스와 그 산출물만 봉인한다. 예전에는 루트 package.json 과
+    // 릴리스 스크립트까지 policy/ 레코드로 묶어서, 스크립트 이름 하나만 바꿔도 아무 상관 없는
+    // 공급망 증명이 무효가 되고 수리하려면 핀 고정 툴체인 전체 재빌드가 필요했다.
+    // 의존성 목록은 audit:licenses 가 매 실행마다 package.json + 락파일에서 다시 도출한다.
+    expect(manifest).not.toContain("policy/");
   });
 
   it("rejects a modified checked-in package artifact", () => {
