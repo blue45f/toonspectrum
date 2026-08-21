@@ -494,14 +494,61 @@ describe("StudioCanvasStatusRail", () => {
     expect(props.onApplyAdvancedFillPreview).toHaveBeenCalledOnce();
   });
 
-  it("marks the mobile rail as its own bounded scroll region", () => {
+  it("marks the mobile rail as its own bounded overlay scroll region when it holds a notice", () => {
+    viewportState.mobile = true;
+    const { container } = render(
+      <StudioCanvasStatusRail {...createProps({ mobileImmersive: true, hasAutosave: true })} />
+    );
+
+    const rail = container.querySelector("[data-studio-canvas-status-rail]");
+    expect(rail?.getAttribute("data-studio-canvas-status-rail-filled")).toBe("true");
+    expect(rail?.className).toContain("overflow-y-auto");
+    expect(rail?.className).not.toContain("contents");
+    // 담을 게 생겨도 캔버스를 밀지 않는다 — 흐름 밖에서 덮는다. 흐름 안이었다면 배너가
+    // 붙는 순간 스테이지 원점이 내려가 진행 중인 드래그·획이 그만큼 튄다.
+    expect(rail?.className).toContain("absolute");
+    expect((rail as HTMLElement | null)?.style.paddingTop).toBe("3.75rem");
+  });
+
+  it("gives the empty mobile notice strip zero drawing area", () => {
+    // 360×640 에서 이 띠는 담긴 것이 하나도 없어도 떠 있는 상단 바를 피하는 3.75rem
+    // (60px) 여백만으로 그리기 면적의 9.4% 를 먹었다.
+    viewportState.mobile = true;
     const { container } = render(
       <StudioCanvasStatusRail {...createProps({ mobileImmersive: true })} />
     );
 
     const rail = container.querySelector("[data-studio-canvas-status-rail]");
-    expect(rail?.className).toContain("overflow-y-auto");
-    expect(rail?.className).not.toContain("contents");
-    expect((rail as HTMLElement | null)?.style.paddingTop).toBe("3.75rem");
+    expect(rail?.getAttribute("data-studio-canvas-status-rail-filled")).toBe("false");
+    expect(rail?.className).toContain("hidden");
+    expect((rail as HTMLElement | null)?.style.paddingTop).toBe("");
+  });
+
+  it("floats the reliability rail over the canvas instead of displacing it", () => {
+    // 저장 실패·GPU 로스는 획을 긋는 도중에도 들어온다. 흐름 안의 띠였다면 그 순간
+    // 스테이지 원점이 통째로 내려갔다.
+    const { container } = render(<StudioCanvasStatusRail {...createProps()} />);
+
+    const reliability = container.querySelector("[data-studio-reliability-status-rail]");
+    expect(reliability).toBeTruthy();
+    expect(reliability?.className).toContain("absolute");
+    expect(container.querySelector("[data-studio-reliability-idle]")).toBeNull();
+
+    const anchor = container.querySelector("[data-studio-reliability-overlay-anchor]");
+    // 데스크톱은 왼쪽 아래 보기/줌 HUD 와 같은 줄, 모바일은 떠 있는 편집 독 위로 띄운다.
+    expect((anchor as HTMLElement | null)?.style.getPropertyValue(
+      "--studio-reliability-rail-bottom"
+    )).toBe("");
+
+    cleanup();
+    viewportState.mobile = true;
+    const mobile = render(
+      <StudioCanvasStatusRail {...createProps({ mobileImmersive: true })} />
+    );
+    expect(
+      (mobile.container.querySelector(
+        "[data-studio-reliability-overlay-anchor]"
+      ) as HTMLElement | null)?.style.getPropertyValue("--studio-reliability-rail-bottom")
+    ).toBe("calc(5.5rem + env(safe-area-inset-bottom))");
   });
 });

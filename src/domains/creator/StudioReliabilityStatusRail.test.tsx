@@ -29,10 +29,85 @@ afterEach(() => {
 });
 
 describe("StudioReliabilityStatusRail", () => {
-  it("stays quiet but present when nothing has failed", () => {
+  it("costs the canvas nothing while nothing has failed", () => {
+    // 예전에는 "저장·GPU 이상 없음" 한 줄이 흐름 안에서 26px(글 18px + mb 8px)을 상시
+    // 예약했다. 그 줄은 아무것도 알려주지 않으면서 그리기 면적만 먹었다.
     render(<StudioReliabilityStatusRail />);
-    expect(screen.getByText("저장·GPU 이상 없음")).toBeTruthy();
+
+    expect(screen.queryByText("저장·GPU 이상 없음")).toBeNull();
+    expect(document.querySelector("[data-studio-reliability-idle]")).toBeNull();
     expect(document.querySelector("[data-studio-safe-mode-banner]")).toBeNull();
+    // 조용할 때는 고지(live region) 자체가 없다 — 읽어 줄 새 소식이 없기 때문.
+    expect(screen.queryAllByRole("status")).toEqual([]);
+
+    const rail = document.querySelector("[data-studio-reliability-status-rail]");
+    expect(rail).not.toBeNull();
+    expect(rail?.getAttribute("data-studio-reliability-tone")).toBe("quiet");
+    // 흐름 밖 계약: 무엇이 켜지든 캔버스 스테이지 기하는 바뀌지 않는다.
+    expect(rail?.className).toContain("absolute");
+    expect(rail?.className).toContain("pointer-events-none");
+  });
+
+  it("still exposes save·GPU·storage on demand through a focusable chip", () => {
+    render(<StudioReliabilityStatusRail />);
+
+    const chip = screen.getByRole("button", { name: "저장·GPU·저장소 상태 · 이상 없음" });
+    // 마우스 호버 전용이 아니다 — 버튼이므로 탭 포커스와 Enter/Space 로 열린다.
+    expect(chip.getAttribute("aria-expanded")).toBe("false");
+    expect(chip.getAttribute("aria-controls")).toBe("studio-reliability-detail");
+    expect(document.getElementById("studio-reliability-detail")).toBeNull();
+
+    act(() => {
+      fireEvent.click(chip);
+    });
+
+    expect(chip.getAttribute("aria-expanded")).toBe("true");
+    const detail = document.getElementById("studio-reliability-detail");
+    expect(detail).not.toBeNull();
+    expect(
+      detail?.querySelector('[data-studio-reliability-detail-channel="save"]')?.textContent,
+    ).toBe("이상 없음");
+    expect(
+      detail?.querySelector('[data-studio-reliability-detail-channel="gpu"]')?.textContent,
+    ).toBe("이상 없음");
+    expect(
+      detail?.querySelector('[data-studio-reliability-detail-channel="storage"]')?.textContent,
+    ).toBe("이상 없음");
+    expect(
+      detail?.querySelector('[data-studio-reliability-detail-channel="safe-mode"]')?.textContent,
+    ).toBe("꺼짐");
+
+    act(() => {
+      fireEvent.keyDown(chip, { key: "Escape" });
+    });
+    expect(document.getElementById("studio-reliability-detail")).toBeNull();
+  });
+
+  it("reads the current failure back out of the on-demand panel", () => {
+    render(<StudioReliabilityStatusRail />);
+
+    act(() => {
+      reportStudioReliabilitySignal({
+        channel: "save",
+        level: "failed",
+        title: "임시저장에 실패했습니다",
+        at: 1,
+      });
+    });
+
+    const chip = screen.getByRole("button", {
+      name: "저장·GPU·저장소 상태 · 처리하지 못한 실패 있음",
+    });
+    act(() => {
+      fireEvent.click(chip);
+    });
+
+    expect(
+      document.querySelector('[data-studio-reliability-detail-channel="save"]')?.textContent,
+    ).toBe("임시저장에 실패했습니다");
+    expect(
+      document.querySelector('[data-studio-reliability-detail-channel="gpu"]')?.textContent,
+    ).toBe("이상 없음");
   });
 
   it("brings a GPU demotion that used to be console-only onto the screen", () => {
@@ -51,9 +126,16 @@ describe("StudioReliabilityStatusRail", () => {
     const row = document.querySelector('[data-studio-reliability-signal="gpu"]');
     expect(row).not.toBeNull();
     expect(row?.getAttribute("data-studio-reliability-level")).toBe("degraded");
+    // 실제 문제는 예전 그대로 스스로 튀어나오고, 스크린 리더에도 그대로 읽힌다.
+    expect(row?.getAttribute("role")).toBe("status");
+    expect(row?.getAttribute("aria-live")).toBe("polite");
     expect(screen.getByText("GPU 연결이 끊겨 CPU 렌더링으로 전환했습니다")).toBeTruthy();
     expect(screen.getByText("그림은 그대로예요.")).toBeTruthy();
-    expect(screen.queryByText("저장·GPU 이상 없음")).toBeNull();
+    expect(
+      document
+        .querySelector("[data-studio-reliability-status-rail]")
+        ?.getAttribute("data-studio-reliability-tone"),
+    ).toBe("degraded");
   });
 
   it("shows each failing channel independently", () => {

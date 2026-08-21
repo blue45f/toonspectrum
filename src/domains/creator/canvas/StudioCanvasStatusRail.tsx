@@ -25,7 +25,7 @@ import type {
   StudioAutosaveDocumentLeadershipBasis,
   StudioAutosaveDocumentRole,
 } from "../studio-autosave-document-leader";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { useIsMobile } from "@/components/use-media-query";
 import { cn } from "@/lib/utils";
@@ -364,19 +364,60 @@ export function StudioCanvasStatusRail({
     });
   };
 
-  return (
-    <div
-      data-studio-canvas-status-rail
-      style={mobileImmersive ? { paddingTop: "3.75rem" } : undefined}
-      className={cn(
-        mobileImmersive
-          ? "max-h-[min(30dvh,12rem)] shrink-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
-          : "contents"
-      )}
-    >
-      {/* 저장·GPU·저장소 상태와 Safe Mode 고지 — prop 없이 스토어를 직접 구독한다. */}
-      <StudioReliabilityStatusRail />
+  /**
+   * 모바일 몰입 모드의 고지 띠에 **지금 담긴 것이 있는지**.
+   *
+   * 예전에는 이 띠가 늘 흐름 안에 있었고, 담긴 것이 하나도 없어도 떠 있는 상단 바를
+   * 피하려는 3.75rem(60px) 여백만으로 세로 60px 을 먹었다. 360×640 에서 60px 은 그리기
+   * 면적의 9.4% 다. 아래 분기는 그 예약을 "담을 게 있을 때만"으로 좁힌다.
+   */
+  const mobileNoticeStripFilled =
+    followerNotice !== null
+    || hasAutosave
+    || normalizedActiveGroupName !== null
+    || selectionCommandLaneMounted
+    || advancedFillBusy
+    || hasAdvancedFillPreview;
 
+  return (
+    <>
+      {/*
+       * 저장·GPU·저장소 상태와 Safe Mode 고지 — prop 없이 스토어를 직접 구독한다.
+       * 레일 자신이 absolute 오버레이(캔버스 오른쪽 아래 HUD 줄)라 흐름 높이는 0 이다.
+       * 여기서는 바닥 오프셋만 정해 준다: 모바일에는 떠 있는 편집 독이 있어 그만큼 띄운다.
+       */}
+      <div
+        data-studio-reliability-overlay-anchor
+        className="contents"
+        style={
+          selectionCommandLaneMounted
+            ? undefined
+            : ({
+                "--studio-reliability-rail-bottom":
+                  "calc(5.5rem + env(safe-area-inset-bottom))",
+              } as CSSProperties)
+        }
+      >
+        <StudioReliabilityStatusRail />
+      </div>
+
+      <div
+        data-studio-canvas-status-rail
+        data-studio-canvas-status-rail-filled={mobileImmersive ? String(mobileNoticeStripFilled) : undefined}
+        style={mobileImmersive && mobileNoticeStripFilled ? { paddingTop: "3.75rem" } : undefined}
+        className={cn(
+          mobileImmersive
+            ? mobileNoticeStripFilled
+              /*
+               * 담을 게 생기면 **캔버스를 밀지 않고 덮는다.** 흐름 안에 있었다면 배너가
+               * 붙는 순간 스테이지 원점이 통째로 내려가고, 이미 시작된 Konva 드래그·획이
+               * 그만큼 튄다(선택 명령 레인이 상시 예약으로 막아 둔 것과 같은 결함).
+               */
+              ? "absolute inset-x-0 top-0 z-20 max-h-[min(30dvh,12rem)] overflow-y-auto overscroll-contain px-2 [scrollbar-gutter:stable]"
+              : "hidden"
+            : "contents"
+        )}
+      >
       {followerNotice ? (
         <div
           data-studio-autosave-document-follower
@@ -818,6 +859,7 @@ export function StudioCanvasStatusRail({
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
