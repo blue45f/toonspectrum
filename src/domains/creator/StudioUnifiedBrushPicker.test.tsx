@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+import { DEFAULT_STUDIO_PRO_DRAW_PREFS } from "./studio-pro-draw-prefs";
 import {
   StudioInspectorBrushCatalogButton,
   StudioInspectorDrawColorControls,
@@ -28,6 +29,7 @@ function renderPicker(): string {
       catalogOpen
       color="#7c5cfc"
       proDrawPrefs={{
+        ...DEFAULT_STUDIO_PRO_DRAW_PREFS,
         sizeLocked: false,
         opacityLocked: false,
         favoriteBrushIds: ["pen", "neon"],
@@ -105,6 +107,7 @@ describe("StudioUnifiedBrushPicker", () => {
         catalogOpen
         color="#7c5cfc"
         proDrawPrefs={{
+          ...DEFAULT_STUDIO_PRO_DRAW_PREFS,
           sizeLocked: false,
           opacityLocked: false,
           favoriteBrushIds: ["heart-stamp"],

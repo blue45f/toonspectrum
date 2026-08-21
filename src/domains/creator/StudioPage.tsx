@@ -1086,6 +1086,7 @@ import {
   applyBrushPresetWithLocks,
   cycleStudioStabilizerStrength,
   rememberRecentBrushId,
+  rememberStudioBrushLibraryView,
 } from "./studio-pro-draw-prefs";
 import { computeStudioProductionInsights } from "./studio-production-insights";
 import { buildStudioProductionInsightsInput } from "./studio-production-projection";
@@ -6907,6 +6908,19 @@ function StudioCuttoonEditor({
 
   function toggleBuiltInBrushFavorite(brushId: string) {
     toggleProDrawFavorite(brushId, announceDrawingShortcut);
+  }
+
+  /**
+   * The catalogue reports its tab/search/density once, as it closes. Persisting is best-effort:
+   * failing to remember where the artist was browsing must never surface as an error, so unlike
+   * favorites this deliberately does not announce its durability outcome.
+   */
+  function rememberBuiltInBrushCatalogView(
+    view: import( "./brush/StudioBrushLibrarySheet").StudioBrushCatalogRestoredView,
+  ) {
+    const lane = drawMode === "eraser" ? "erase" : "paint";
+    commitProDrawPrefsMutation((latest) =>
+      rememberStudioBrushLibraryView(latest, lane, view));
   }
 
   function toggleBuiltInBrushCatalog(
@@ -30631,6 +30645,7 @@ function clearSelectionForEdit() {
     },
     toggle: toggleBuiltInBrushCatalog,
     toggleFavorite: toggleBuiltInBrushFavorite,
+    rememberView: rememberBuiltInBrushCatalogView,
   });
 
   /**

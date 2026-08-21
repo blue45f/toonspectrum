@@ -3196,6 +3196,10 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
             operation={drawMode === "eraser" ? "erase" : "paint"}
             favoriteIds={proDrawPrefs.favoriteBrushIds}
             recentIds={proDrawPrefs.recentBrushIds}
+            restoredView={
+              proDrawPrefs.brushLibraryView[drawMode === "eraser" ? "erase" : "paint"]
+            }
+            onViewStateChange={studioBrushCatalogHandlers.rememberView}
             mobileKeyboardInset={mobileKeyboardInset}
             onClose={studioBrushCatalogHandlers.close}
             onSelect={applyStudioBrushCatalogSelection}

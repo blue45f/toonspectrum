@@ -98,6 +98,7 @@ import type {
 import type {
   StudioBrushCatalogCloseReason,
   StudioBrushCatalogPlacement,
+  StudioBrushCatalogRestoredView,
 } from "./brush/StudioBrushLibrarySheet";
 import type { StudioBrushDefaultRestoreViewState } from "./brush/useStudioBrushBaselineController";
 import type { StudioFilterKind } from "./filter/studio-filter-menu";
@@ -332,6 +333,8 @@ export interface StudioBrushCatalogHandlers {
     trigger: HTMLButtonElement
   ) => void;
   toggleFavorite: (brushId: string) => void;
+  /** Records where the artist left the catalogue so the next visit reopens there. */
+  rememberView?: (view: StudioBrushCatalogRestoredView) => void;
 }
 
 export interface StudioMobileEditingDockHandlers {

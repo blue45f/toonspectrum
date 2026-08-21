@@ -32,6 +32,35 @@ export interface StudioProDrawPrefsStorage {
   setItem(key: string, value: string): void;
 }
 
+export const STUDIO_BRUSH_LIBRARY_TAB_ID_LIMIT = 64;
+export const STUDIO_BRUSH_LIBRARY_QUERY_LIMIT = 120;
+
+export type StudioBrushLibraryLane = "paint" | "erase";
+
+/**
+ * Where the artist left the brush catalogue last time.
+ *
+ * `tab` is stored as an opaque bounded string and is deliberately NOT validated against the
+ * live tab manifest here. The catalogue's category set is product surface that gets reorganised;
+ * validating it in the persistence layer would turn every future rename into a migration, and a
+ * stale id already self-heals — the sheet falls back to its operation default whenever the
+ * restored id is absent from the current tab set. An empty string means "no preference yet".
+ */
+export interface StudioBrushLibraryViewPrefs {
+  tab: string;
+  query: string;
+  viewMode: "stroke" | "tile" | "text";
+}
+
+/**
+ * Paint and erase are separate tab manifests, so one shared slot would restore an eraser tab
+ * into the paint catalogue. Each lane keeps its own place.
+ */
+export type StudioBrushLibraryViewPrefsByLane = Record<
+  StudioBrushLibraryLane,
+  StudioBrushLibraryViewPrefs
+>;
+
 export interface StudioProDrawPrefs {
   sizeLocked: boolean;
   opacityLocked: boolean;
@@ -39,13 +68,25 @@ export interface StudioProDrawPrefs {
   recentBrushIds: string[];
   /** Core or procedural catalogue ids, artist-defined pin order. */
   favoriteBrushIds: string[];
+  /** Last brush-catalogue tab, search text, and tile density, per tool lane. */
+  brushLibraryView: StudioBrushLibraryViewPrefsByLane;
 }
+
+const DEFAULT_STUDIO_BRUSH_LIBRARY_VIEW: StudioBrushLibraryViewPrefs = {
+  tab: "",
+  query: "",
+  viewMode: "stroke",
+};
 
 export const DEFAULT_STUDIO_PRO_DRAW_PREFS: StudioProDrawPrefs = {
   sizeLocked: false,
   opacityLocked: false,
   recentBrushIds: [],
   favoriteBrushIds: [],
+  brushLibraryView: {
+    paint: { ...DEFAULT_STUDIO_BRUSH_LIBRARY_VIEW },
+    erase: { ...DEFAULT_STUDIO_BRUSH_LIBRARY_VIEW },
+  },
 };
 
 const KNOWN_BRUSH_IDS = new Set(BRUSH_PRESETS.map((preset) => preset.id));
@@ -71,14 +112,84 @@ function sanitizeBrushIdList(value: unknown, limit: number): string[] {
   return out;
 }
 
+/**
+ * Trims restored text to a bound without ever splitting a surrogate pair, and drops control
+ * characters — those survive a JSON round trip intact and would otherwise land straight in the
+ * search input. Written as a code-point walk rather than a regex so no control-character class
+ * has to appear in the source.
+ */
+function sanitizeBoundedText(value: unknown, limit: number): string {
+  if (typeof value !== "string") return "";
+  let cleaned = "";
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    if (code < 0x20 || code === 0x7f) continue;
+    if (cleaned.length + char.length > limit) break;
+    cleaned += char;
+  }
+  return cleaned;
+}
+
+function sanitizeBrushLibraryView(value: unknown): StudioBrushLibraryViewPrefs {
+  if (!value || typeof value !== "object") return { ...DEFAULT_STUDIO_BRUSH_LIBRARY_VIEW };
+  const record = value as Record<string, unknown>;
+  const viewMode = record.viewMode;
+  return {
+    tab: sanitizeBoundedText(record.tab, STUDIO_BRUSH_LIBRARY_TAB_ID_LIMIT),
+    query: sanitizeBoundedText(record.query, STUDIO_BRUSH_LIBRARY_QUERY_LIMIT),
+    viewMode:
+      viewMode === "tile" || viewMode === "text" || viewMode === "stroke"
+        ? viewMode
+        : DEFAULT_STUDIO_BRUSH_LIBRARY_VIEW.viewMode,
+  };
+}
+
+function sanitizeBrushLibraryViewByLane(value: unknown): StudioBrushLibraryViewPrefsByLane {
+  const record = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    paint: sanitizeBrushLibraryView(record.paint),
+    erase: sanitizeBrushLibraryView(record.erase),
+  };
+}
+
 export function normalizeStudioProDrawPrefs(value: unknown): StudioProDrawPrefs {
-  if (!value || typeof value !== "object") return { ...DEFAULT_STUDIO_PRO_DRAW_PREFS };
+  if (!value || typeof value !== "object") {
+    return {
+      ...DEFAULT_STUDIO_PRO_DRAW_PREFS,
+      brushLibraryView: sanitizeBrushLibraryViewByLane(undefined),
+    };
+  }
   const record = value as Record<string, unknown>;
   return {
     sizeLocked: asBool(record.sizeLocked, false),
     opacityLocked: asBool(record.opacityLocked, false),
     recentBrushIds: sanitizeBrushIdList(record.recentBrushIds, STUDIO_RECENT_BRUSH_LIMIT),
     favoriteBrushIds: sanitizeBrushIdList(record.favoriteBrushIds, STUDIO_FAVORITE_BRUSH_LIMIT),
+    brushLibraryView: sanitizeBrushLibraryViewByLane(record.brushLibraryView),
+  };
+}
+
+/**
+ * Records where the artist left the catalogue. Callers pass the whole view at once (on close),
+ * not per keystroke — every mutation here becomes one durable SQLite intent.
+ */
+export function rememberStudioBrushLibraryView(
+  prefs: StudioProDrawPrefs,
+  lane: StudioBrushLibraryLane,
+  view: Partial<StudioBrushLibraryViewPrefs>,
+): StudioProDrawPrefs {
+  const current = prefs.brushLibraryView[lane] ?? DEFAULT_STUDIO_BRUSH_LIBRARY_VIEW;
+  const next = sanitizeBrushLibraryView({ ...current, ...view });
+  if (
+    next.tab === current.tab
+    && next.query === current.query
+    && next.viewMode === current.viewMode
+  ) {
+    return prefs;
+  }
+  return {
+    ...prefs,
+    brushLibraryView: { ...prefs.brushLibraryView, [lane]: next },
   };
 }
 

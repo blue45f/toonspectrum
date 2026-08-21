@@ -75,9 +75,16 @@ function immutablePrefs(value: unknown): StudioProDrawPrefs {
     ...normalized,
     recentBrushIds: [...normalized.recentBrushIds],
     favoriteBrushIds: [...normalized.favoriteBrushIds],
+    brushLibraryView: {
+      paint: { ...normalized.brushLibraryView.paint },
+      erase: { ...normalized.brushLibraryView.erase },
+    },
   };
   Object.freeze(prefs.recentBrushIds);
   Object.freeze(prefs.favoriteBrushIds);
+  Object.freeze(prefs.brushLibraryView.paint);
+  Object.freeze(prefs.brushLibraryView.erase);
+  Object.freeze(prefs.brushLibraryView);
   return Object.freeze(prefs);
 }
 

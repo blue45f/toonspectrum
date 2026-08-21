@@ -79,11 +79,26 @@ export interface StudioBrushLibrarySheetProps {
   triggerElement?: HTMLElement | null;
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
+  /** Where the artist left this catalogue last time; omitted means "start at the default tab". */
+  restoredView?: StudioBrushCatalogRestoredView | null;
+  /** Called once per visit, when the catalogue closes, with the place to return to. */
+  onViewStateChange?: (view: StudioBrushCatalogRestoredView) => void;
   onClose: (reason: StudioBrushCatalogCloseReason) => void;
   onSelect: (selection: StudioBrushCatalogSelection) => void;
   onToggleFavorite?: (brushId: string) => void;
   className?: string;
   style?: CSSProperties;
+}
+
+/**
+ * The catalogue's restorable place. `tab` is an opaque id: a value that no longer exists in the
+ * current tab manifest is not an error, it simply falls back to the operation default, which is
+ * what keeps reorganising the categories from invalidating everyone's saved preference.
+ */
+export interface StudioBrushCatalogRestoredView {
+  tab: string;
+  query: string;
+  viewMode: StudioBrushCatalogViewMode;
 }
 
 export type StudioBrushCatalogPlacement = "desktop-dock" | "mobile-sheet";
@@ -102,6 +117,8 @@ export interface StudioBrushCatalogPortalProps {
   operation?: StudioToolOperation;
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
+  restoredView?: StudioBrushCatalogRestoredView | null;
+  onViewStateChange?: (view: StudioBrushCatalogRestoredView) => void;
   mobileKeyboardInset?: number;
   onClose: (reason: StudioBrushCatalogCloseReason) => void;
   onSelect: (selection: StudioBrushCatalogSelection) => void;
@@ -750,6 +767,8 @@ export function StudioBrushLibrarySheet({
   triggerElement = null,
   favoriteIds = [],
   recentIds = [],
+  restoredView = null,
+  onViewStateChange,
   onClose,
   onSelect,
   onToggleFavorite,
@@ -769,11 +788,20 @@ export function StudioBrushLibrarySheet({
   const progressiveObserverEpochRef = useRef(0);
   const mountedRef = useRef(true);
   const selectionRequestEpochRef = useRef(0);
-  const [query, setQuery] = useState("");
+  const viewStateRef = useRef<StudioBrushCatalogRestoredView>({
+    tab: restoredView?.tab ?? "",
+    query: restoredView?.query ?? "",
+    viewMode: restoredView?.viewMode ?? "stroke",
+  });
+  const reportViewStateRef = useRef(onViewStateChange);
+  const [query, setQuery] = useState(restoredView?.query ?? "");
   const [tab, setTab] = useState<(typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"]>(
-    operation === "erase" ? "all" : "beginner",
+    (restoredView?.tab as (typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"] | undefined)
+      || (operation === "erase" ? "all" : "beginner"),
   );
-  const [viewMode, setViewMode] = useState<StudioBrushCatalogViewMode>("stroke");
+  const [viewMode, setViewMode] = useState<StudioBrushCatalogViewMode>(
+    restoredView?.viewMode ?? "stroke",
+  );
   const [visibleLimit, setVisibleLimit] = useState(
     STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT
   );
@@ -803,6 +831,24 @@ export function StudioBrushLibrarySheet({
       selectionRequestEpochRef.current += 1;
     };
   }, []);
+
+  // The place to return to is reported ONCE, on teardown, rather than per keystroke: each report
+  // becomes a durable SQLite intent, and the catalogue closes on every exit path (escape, outside
+  // pointer, explicit, selection), so one write per visit captures the same information.
+  useEffect(() => {
+    viewStateRef.current = { tab, query: query.trim(), viewMode };
+  }, [tab, query, viewMode]);
+
+  useEffect(() => {
+    reportViewStateRef.current = onViewStateChange;
+  }, [onViewStateChange]);
+
+  useEffect(
+    () => () => {
+      reportViewStateRef.current?.(viewStateRef.current);
+    },
+    [],
+  );
 
   useLayoutEffect(() => {
     if (!open) selectionRequestEpochRef.current += 1;
@@ -1606,6 +1652,8 @@ export function StudioBrushCatalogPortal({
   operation = "paint",
   favoriteIds = [],
   recentIds = [],
+  restoredView = null,
+  onViewStateChange,
   mobileKeyboardInset = 0,
   onClose,
   onSelect,
@@ -1684,6 +1732,8 @@ export function StudioBrushCatalogPortal({
       triggerElement={triggerElement}
       favoriteIds={favoriteIds}
       recentIds={recentIds}
+      restoredView={restoredView}
+      onViewStateChange={onViewStateChange}
       onClose={onClose}
       onSelect={onSelect}
       onToggleFavorite={onToggleFavorite}

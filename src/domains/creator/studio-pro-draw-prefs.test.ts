@@ -5,11 +5,15 @@ import { BRUSH_PRESETS } from "./studio-brush";
 import {
   applyBrushPresetWithLocks,
   cycleStudioStabilizerStrength,
+  DEFAULT_STUDIO_PRO_DRAW_PREFS,
   loadStudioProDrawPrefs,
   mutateStudioProDrawPrefs,
   normalizeStudioProDrawPrefs,
   rememberRecentBrushId,
+  rememberStudioBrushLibraryView,
   saveStudioProDrawPrefs,
+  STUDIO_BRUSH_LIBRARY_QUERY_LIMIT,
+  STUDIO_BRUSH_LIBRARY_TAB_ID_LIMIT,
   STUDIO_FAVORITE_BRUSH_LIMIT,
   toggleFavoriteBrushId,
 } from "./studio-pro-draw-prefs";
@@ -120,6 +124,7 @@ describe("studio pro draw prefs", () => {
     };
     expect(
       saveStudioProDrawPrefs(storage, {
+        ...DEFAULT_STUDIO_PRO_DRAW_PREFS,
         sizeLocked: true,
         opacityLocked: false,
         recentBrushIds: ["pen", "gpen"],
@@ -180,6 +185,7 @@ describe("studio pro draw prefs", () => {
       },
     };
     saveStudioProDrawPrefs(storage, {
+      ...DEFAULT_STUDIO_PRO_DRAW_PREFS,
       sizeLocked: true,
       opacityLocked: false,
       recentBrushIds: ["marker"],
@@ -200,6 +206,7 @@ describe("studio pro draw prefs", () => {
 
     expect(result.persisted).toBe(true);
     expect(result.prefs).toEqual({
+      ...DEFAULT_STUDIO_PRO_DRAW_PREFS,
       sizeLocked: true,
       opacityLocked: false,
       recentBrushIds: ["marker"],
@@ -255,5 +262,93 @@ describe("studio pro draw prefs", () => {
     expect(recovered.persisted).toBe(true);
     expect(recovered.prefs.favoriteBrushIds).toEqual(["watercolor", "gpen"]);
     expect(loadStudioProDrawPrefs(storage)).toEqual(recovered.prefs);
+  });
+});
+
+describe("brush library view persistence", () => {
+  it("starts with no preference so each lane opens at its own default tab", () => {
+    const fresh = normalizeStudioProDrawPrefs(null);
+    expect(fresh.brushLibraryView.paint).toEqual({ tab: "", query: "", viewMode: "stroke" });
+    expect(fresh.brushLibraryView.erase).toEqual({ tab: "", query: "", viewMode: "stroke" });
+  });
+
+  it("keeps paint and erase places apart", () => {
+    const afterPaint = rememberStudioBrushLibraryView(
+      normalizeStudioProDrawPrefs(null),
+      "paint",
+      { tab: "texture", query: "\uc218\ucc44" },
+    );
+    const afterBoth = rememberStudioBrushLibraryView(afterPaint, "erase", { tab: "all" });
+    expect(afterBoth.brushLibraryView.paint).toEqual({
+      tab: "texture",
+      query: "\uc218\ucc44",
+      viewMode: "stroke",
+    });
+    expect(afterBoth.brushLibraryView.erase.tab).toBe("all");
+    expect(afterBoth.brushLibraryView.erase.query).toBe("");
+  });
+
+  it("returns the same object when nothing moved, so no durable write is queued", () => {
+    const parked = rememberStudioBrushLibraryView(
+      normalizeStudioProDrawPrefs(null),
+      "paint",
+      { tab: "line", query: "g", viewMode: "tile" },
+    );
+    expect(rememberStudioBrushLibraryView(parked, "paint", { tab: "line", query: "g", viewMode: "tile" }))
+      .toBe(parked);
+  });
+
+  /**
+   * A tab id that no longer exists is not corruption — the catalogue reorganises its categories,
+   * and the sheet falls back to its operation default. Rejecting unknown ids here would instead
+   * turn every future rename into a storage migration.
+   */
+  it("preserves an unknown tab id rather than treating a renamed category as malformed", () => {
+    const restored = normalizeStudioProDrawPrefs({
+      brushLibraryView: { paint: { tab: "engines", query: "", viewMode: "stroke" } },
+    });
+    expect(restored.brushLibraryView.paint.tab).toBe("engines");
+  });
+
+  it("bounds and cleans restored text so storage cannot seed the search box with junk", () => {
+    const restored = normalizeStudioProDrawPrefs({
+      brushLibraryView: {
+        paint: {
+          tab: "x".repeat(STUDIO_BRUSH_LIBRARY_TAB_ID_LIMIT + 40),
+          query: `${"y".repeat(STUDIO_BRUSH_LIBRARY_QUERY_LIMIT + 40)}\u0000\u001b`,
+          viewMode: "hologram",
+        },
+      },
+    });
+    expect(restored.brushLibraryView.paint.tab).toHaveLength(STUDIO_BRUSH_LIBRARY_TAB_ID_LIMIT);
+    expect(restored.brushLibraryView.paint.query).toHaveLength(STUDIO_BRUSH_LIBRARY_QUERY_LIMIT);
+    expect(
+      [...restored.brushLibraryView.paint.query].every((char) => {
+        const code = char.codePointAt(0) ?? 0;
+        return code >= 0x20 && code !== 0x7f;
+      }),
+    ).toBe(true);
+    expect(restored.brushLibraryView.paint.viewMode).toBe("stroke");
+  });
+
+  it("survives a storage round trip", () => {
+    const map = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        map.set(key, value);
+      },
+    };
+    const parked = rememberStudioBrushLibraryView(
+      normalizeStudioProDrawPrefs(null),
+      "paint",
+      { tab: "marker", query: "neon", viewMode: "text" },
+    );
+    expect(saveStudioProDrawPrefs(storage, parked)).toBe(true);
+    expect(loadStudioProDrawPrefs(storage).brushLibraryView.paint).toEqual({
+      tab: "marker",
+      query: "neon",
+      viewMode: "text",
+    });
   });
 });

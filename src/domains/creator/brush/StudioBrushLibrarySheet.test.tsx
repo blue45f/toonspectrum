@@ -979,3 +979,63 @@ describe("StudioBrushLibrarySheet", () => {
     expect(active).not.toContain("#39ff14");
   });
 });
+
+describe("StudioBrushLibrarySheet restored view", () => {
+  afterEach(cleanup);
+
+  it("reopens on the tab, search text, and density the artist left behind", () => {
+    render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        restoredView={{ tab: "texture", query: "\ud06c\ub808\uc6d0", viewMode: "text" }}
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+    const search = screen.getByRole("searchbox") as HTMLInputElement;
+    expect(search.value).toBe("\ud06c\ub808\uc6d0");
+  });
+
+  /**
+   * The category set is product surface that gets reorganised. A tab id that has since been
+   * removed must not strand the artist on an empty panel — the sheet falls back to its
+   * operation default, which is what lets the persistence layer store the id opaquely.
+   */
+  it("falls back to the default tab when the remembered category no longer exists", () => {
+    render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        restoredView={{ tab: "a-category-that-was-deleted", query: "", viewMode: "stroke" }}
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+    const selected = screen
+      .getAllByRole("tab")
+      .find((tab) => tab.getAttribute("aria-selected") === "true");
+    expect(selected).toBeTruthy();
+  });
+
+  it("reports the place to return to once, on teardown rather than per keystroke", () => {
+    const onViewStateChange = vi.fn();
+    const view = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onViewStateChange={onViewStateChange}
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+    const search = screen.getByRole("searchbox");
+    fireEvent.change(search, { target: { value: "\uc218\ucc44" } });
+    fireEvent.change(search, { target: { value: "\uc218\ucc44\ud654" } });
+    expect(onViewStateChange).not.toHaveBeenCalled();
+
+    view.unmount();
+    expect(onViewStateChange).toHaveBeenCalledTimes(1);
+    expect(onViewStateChange.mock.calls[0]?.[0]).toMatchObject({ query: "\uc218\ucc44\ud654" });
+  });
+});
