@@ -13,6 +13,8 @@ docs/third-party/*
 artifacts/
 .github/
 .grok/
+.claude/
+.impeccable/
 tmp/
 scratch/
 .playwright-mcp/

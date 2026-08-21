@@ -29,6 +29,13 @@ These are implementation evidence, not product mockups.
 | `layer-navigator-desktop.png` | Professional layer tree with multi-selection, production roles, color labels, grouping, search, and bounded panel height |
 | `layer-navigator-mobile.png` | 375px layer workspace with 44px controls, internal scrolling, grouped rows, and zero document overflow |
 | `layer-navigator-actions-mobile.png` | One bounded batch dialog for grouping, production role, color label, current-result deletion, and selection clearing |
+| `workspace-menu-desktop.png` | Workspace popover reporting an unsaved-drift badge with save-as-copy, restore-saved-layout, primary-tool switch toggle, and mobile dock handedness |
+| `workspace-menu-mobile.png` | Same workspace sheet at 375px in the layout-matched state, with the six locked built-in presets collapsed, an empty custom list, and left/right dock choice |
+| `workspace-quick-switch-desktop.png` | Expanded built-in preset list (storyboard, line art, color, dialogue/lettering, review) with per-preset purpose text and the manager entry point pinned below |
+| `workspace-quick-switch-mobile.png` | 375px quick switch showing the recent-workspace shortcut, searchable saved list with the active row checked, and manager row above the device-scope notice |
+| `workspace-manager-desktop.png` | Workspace manager tab: save current layout as a new workspace, 2/24 slot budget, and per-workspace switch, rename, duplicate, reorder, and delete actions |
+| `workspace-manager-mobile.png` | The same manager at 375px with one row's action block expanded and the up/down reorder buttons disabled at the list boundary |
+| `workspace-mobile-handed-dock.png` | Mobile primary-tool dock rendered on the configured hand, with the horizontally scrolling tool strip above the quick-menu/page/add/panel bar and zoom control |
 
 For each screen the interactive controls were checked at the mobile viewport, horizontal document
 overflow was zero, and critical touch controls were at least 44 CSS pixels tall. The archive and publish
