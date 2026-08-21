@@ -1409,6 +1409,10 @@ export function planStudioDynamicBrushCoverageMarks(
             // Band width follows the RAW pressure-resolved alpha (the union carrier's
             // coverageHalfWidth input), not the linearized deposition alpha.
             clampAlpha(composedDab.opacity * composedDab.flow),
+            // Aspect-compensated grain: the bake pre-compresses its noise along map X by this
+            // stamp's stretch ratio band, so the ellipse stamp lands isotropic pigment grain
+            // instead of travel-aligned streaks. Banded wax ignores it by contract.
+            composedDab.roundness,
           )
         : tipAlphaMaps[tipIndex] ?? null;
       if (r8GrainSampler) {

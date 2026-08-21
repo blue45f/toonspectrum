@@ -123,14 +123,21 @@ export function studioOssValueNoise2d(
  *   * circular soft falloff
  *   * centre darkening
  * Returns coverage in [0, 1].
+ *
+ * `grainStretch` (default 1) pre-compensates anisotropic stamping: the dry-media kernel path
+ * stretches this tip onto a fibre ellipse λ:1 (long axis = map X). Baking with the noise
+ * coordinates compressed λ× along X means the stretched stamp lands isotropic pigment grain in
+ * document space instead of λ:1 streaks. Only the NOISE inputs warp — `centerDist` and every
+ * envelope term stay computed on the unwarped coordinates, so the tip silhouette is unchanged.
  */
 export function studioOssKlecksChalkCoverage(
   normalizedX: number,
   normalizedY: number,
   seed: number,
+  grainStretch: number = 1,
 ): number {
   // Coordinates in a unit disk tip (−1..1). Scale matches 128-px tip sampling.
-  const px = normalizedX * 64;
+  const px = normalizedX * 64 * grainStretch;
   const py = normalizedY * 64;
   const scaleFac = 128 / 500;
   const sFac2 =
@@ -358,11 +365,18 @@ export function studioOssDirectionalWaxSample(
   y: number,
   directionRadians: number,
   seed: number,
+  grainStretch: number = 1,
 ): Readonly<{ wax: number; scrape: number; grit: number }> {
   const tangentX = Math.cos(directionRadians);
   const tangentY = Math.sin(directionRadians);
-  const across = x * -tangentY + y * tangentX;
-  const along = x * tangentX + y * tangentY;
+  // grainStretch > 1 compresses the map-X noise frequency so an anisotropically stretched stamp
+  // (fibre ellipse, long axis = map X) lands isotropic grain — see
+  // studioOssKlecksChalkCoverage. Warping the raw input before the across/along rotation keeps
+  // the compensation aligned with the stamp's actual stretch axis.
+  const warpedX = x * grainStretch;
+  const warpedY = y;
+  const across = warpedX * -tangentY + warpedY * tangentX;
+  const along = warpedX * tangentX + warpedY * tangentY;
   const fibre = studioOssValueNoise2d(
     along * 0.09 + across * 0.42,
     along * 0.02 - across * 0.08,

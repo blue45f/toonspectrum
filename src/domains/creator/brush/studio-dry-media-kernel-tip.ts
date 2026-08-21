@@ -48,7 +48,7 @@ import type {
 import type { StudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
 
 export const STUDIO_DRY_MEDIA_KERNEL_TIP_VERSION =
-  "dry-media-kernel-tip-v1" as const;
+  "dry-media-kernel-tip-v2" as const;
 
 export const STUDIO_DRY_MEDIA_CORE_IDS = [
   "crayon",
@@ -84,7 +84,54 @@ export const STUDIO_DRY_MEDIA_CORE_TIP_SHAPES = Object.freeze({
  */
 export const STUDIO_DRY_MEDIA_KERNEL_TIP_VARIANT_COUNT = 4;
 export const STUDIO_DRY_MEDIA_KERNEL_TIP_MAP_SIZE = 128;
-const KERNEL_TIP_CACHE_LIMIT = 64;
+const KERNEL_TIP_CACHE_LIMIT = 128;
+
+/**
+ * Aspect-compensated grain baking (streak-defect fix).
+ *
+ * The bridge deposits every fibre as an ellipse with radiusX ≫ radiusY (roundness
+ * 0.08–1, realistically 0.11–0.53 for these materials). A round-grain tip map stamped onto that
+ * ellipse stretches its speckle into λ:1 streaks aligned with travel — the "combed" interior the
+ * contact sheet reported on powder media. Baking the tip with its noise coordinates compressed
+ * λ× along map X makes the stretched stamp land isotropic grain instead.
+ *
+ * λ varies continuously per station (halfThickness/halfLength are both random), so it is
+ * quantized into three bands with fixed representatives. Residual anisotropy within a band is
+ * ≤ ~1.3× — below the threshold where a stretched speckle reads as a streak. Only the powder
+ * media (chalk/charcoal/pastel) take the aspect dimension: their identity is isotropic pigment
+ * granularity. The banded wax sticks (crayon/oil-pastel) keep aspect step 0 AND a byte-identical
+ * cache-key layout (no suffix), so their baked content and revisions are unchanged.
+ */
+export const STUDIO_DRY_MEDIA_KERNEL_TIP_ASPECT_BAND_REPRESENTATIVES = Object.freeze([
+  2.15,
+  3.4,
+  5.2,
+] as const);
+
+/** Upper bounds of aspect bands 0 and 1; band 2 is everything above. */
+const ASPECT_BAND_UPPER_BOUNDS: readonly [number, number] = [2.75, 4.25];
+
+/**
+ * Maps a stamp's roundness (radiusY/radiusX ∈ (0, 1]) to its aspect-band index.
+ * Missing/non-finite roundness resolves to the middle band — the statistical centre of the
+ * powder materials' real λ range — so legacy callers still get a stable, representative bake.
+ */
+export function studioDryMediaKernelTipAspectBand(
+  materialId: StudioDryMediaCoreId,
+  roundness: number | undefined,
+): number {
+  if (KERNEL_TIP_SHAPING[materialId].band) return 0;
+  if (
+    typeof roundness !== "number"
+    || !Number.isFinite(roundness)
+    || roundness <= 0
+  ) {
+    return 0;
+  }
+  const stretch = 1 / Math.min(1, roundness);
+  if (stretch < ASPECT_BAND_UPPER_BOUNDS[0]) return 0;
+  return stretch < ASPECT_BAND_UPPER_BOUNDS[1] ? 1 : 2;
+}
 
 /**
  * Exact material-eligibility contract shared by the union carrier and the kernel dab path.
@@ -169,6 +216,10 @@ const KERNEL_TIP_DIRECTION_RADIANS = -Math.PI / 5;
  * Pure per-texel coverage for one core dry medium. The four stamp materials delegate verbatim to
  * the W1-verified `studioStampOssTipCoverage` kernels; oil-pastel composes the same verified wax
  * primitives into a smoother, more occlusive film (wide pressed plateau, subtle scrape grooves).
+ *
+ * `grainStretch` pre-compensates anisotropic stamping (see the aspect-band note above): noise
+ * inputs compress along map X by the ratio while every envelope term stays on the unwarped
+ * coordinates. Default 1 reproduces the historical round-stamp bake exactly.
  */
 export function studioDryMediaKernelTipCoverage(
   materialId: StudioDryMediaCoreId,
@@ -176,6 +227,7 @@ export function studioDryMediaKernelTipCoverage(
   normalizedY: number,
   seed: number,
   hardness: number,
+  grainStretch: number = 1,
 ): number {
   if (materialId !== "oil-pastel") {
     return studioStampOssTipCoverage(
@@ -184,12 +236,13 @@ export function studioDryMediaKernelTipCoverage(
       normalizedY,
       seed,
       hardness,
+      grainStretch,
     );
   }
   const hard = clamp01(hardness);
   const radial = Math.hypot(normalizedX, normalizedY);
   const wax = studioOssDirectionalWaxSample(
-    normalizedX * STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
+    normalizedX * STUDIO_OSS_TIP_WAX_LATTICE_SCALE * grainStretch,
     normalizedY * STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
     KERNEL_TIP_DIRECTION_RADIANS,
     seed ^ 0x6f,
@@ -498,6 +551,7 @@ function bakeKernelTipAlphaMap(
   hardnessStep: number,
   widthStep: number,
   cacheKey: string,
+  grainStretch: number = 1,
 ): StudioBrushTipAlphaMap {
   const size = STUDIO_DRY_MEDIA_KERNEL_TIP_MAP_SIZE;
   const alphas = new Float32Array(size * size);
@@ -518,6 +572,7 @@ function bakeKernelTipAlphaMap(
           ny,
           seed,
           hardness,
+          grainStretch,
         ),
         nx,
         ny,
@@ -540,12 +595,17 @@ function bakeKernelTipAlphaMap(
  * Resolves the immutable kernel tip map for one dab. `dabIndex` is the stable causal dab index
  * (the bridge's expanded station-lane index), so an arbitrary live suffix and a full pointer-up
  * replay pick the same variant for the same physical fibre.
+ *
+ * `roundness` (radiusY/radiusX of the stamp this map will be stretched onto) selects the
+ * aspect-compensated grain bake for powder media; omitting it resolves to the middle band so
+ * legacy callers stay deterministic. Banded wax ignores it by contract.
  */
 export function resolveStudioDryMediaKernelTipAlphaMap(
   materialId: StudioDryMediaCoreId,
   tip: NormalizedStudioBrushTipSettings,
   dabIndex: number,
   depositionAlpha = 1,
+  roundness?: number,
 ): StudioBrushTipAlphaMap {
   const boundedIndex = Number.isSafeInteger(dabIndex) ? dabIndex : 0;
   // Wax sticks drag a persistent crystal surface: three consecutive stations share one variant so
@@ -563,7 +623,14 @@ export function resolveStudioDryMediaKernelTipAlphaMap(
   // keeping the softness slider connected to the material response.
   const hardnessStep = Math.round(clamp01(1 - tip.softness) * 20);
   const widthStep = studioDryMediaKernelTipWidthStep(materialId, depositionAlpha);
-  return resolveKernelTipMapForSteps(materialId, variant, hardnessStep, widthStep);
+  const aspectBand = studioDryMediaKernelTipAspectBand(materialId, roundness);
+  return resolveKernelTipMapForSteps(
+    materialId,
+    variant,
+    hardnessStep,
+    widthStep,
+    aspectBand,
+  );
 }
 
 /**
@@ -573,6 +640,10 @@ export function resolveStudioDryMediaKernelTipAlphaMap(
  * 9 width steps — so keys intern behind a numeric composite. Byte layout of
  * the produced string (and therefore every baked map's content-stable
  * `revision`) is unchanged.
+ *
+ * The 2026-08-22 aspect dimension appends `:a{band}` for powder media bands 1-2. Band 0 omits
+ * the suffix (the historical byte layout), and banded wax is forced to band 0 — so banded wax
+ * keys/revisions keep their exact historical bytes and the three powder bands can never collide.
  */
 const kernelTipKeyIntern = new Map<StudioDryMediaCoreId, Map<number, string>>();
 
@@ -581,8 +652,10 @@ function kernelTipMapCacheKey(
   variant: number,
   hardnessStep: number,
   widthStep: number,
+  aspectBand: number = 0,
 ): string {
-  const composite = (variant * 32 + hardnessStep) * 16 + widthStep;
+  const composite = ((variant * 32 + hardnessStep) * 16 + widthStep) * 4
+    + aspectBand;
   let byMaterial = kernelTipKeyIntern.get(materialId);
   if (!byMaterial) {
     byMaterial = new Map();
@@ -590,7 +663,8 @@ function kernelTipMapCacheKey(
   }
   let key = byMaterial.get(composite);
   if (key === undefined) {
-    key = `${STUDIO_DRY_MEDIA_KERNEL_TIP_VERSION}:${materialId}:${variant}:${hardnessStep}:${widthStep}`;
+    key = `${STUDIO_DRY_MEDIA_KERNEL_TIP_VERSION}:${materialId}:${variant}:${hardnessStep}:${widthStep}`
+      + (aspectBand > 0 ? `:a${aspectBand}` : "");
     byMaterial.set(composite, key);
   }
   return key;
@@ -601,8 +675,15 @@ function resolveKernelTipMapForSteps(
   variant: number,
   hardnessStep: number,
   widthStep: number,
+  aspectBand: number = 0,
 ): StudioBrushTipAlphaMap {
-  const cacheKey = kernelTipMapCacheKey(materialId, variant, hardnessStep, widthStep);
+  const cacheKey = kernelTipMapCacheKey(
+    materialId,
+    variant,
+    hardnessStep,
+    widthStep,
+    aspectBand,
+  );
   const cached = kernelTipMapCache.get(cacheKey);
   if (cached) {
     // Map insertion order is the LRU queue (same idiom as the shared tip alpha-map cache).
@@ -616,6 +697,7 @@ function resolveKernelTipMapForSteps(
     hardnessStep,
     widthStep,
     cacheKey,
+    STUDIO_DRY_MEDIA_KERNEL_TIP_ASPECT_BAND_REPRESENTATIVES[aspectBand] ?? 1,
   );
   if (kernelTipMapCache.size >= KERNEL_TIP_CACHE_LIMIT) {
     const oldestKey = kernelTipMapCache.keys().next().value;
@@ -640,9 +722,10 @@ function resolveKernelTipMapForSteps(
 // ---------------------------------------------------------------------------
 
 /**
- * Deterministic (variant × width-step) working set for one material at one
- * softness: banded wax sticks bake 4 variants × 9 width steps (≤36 keys, the
- * whole pressure ramp), powder media 4 variants × the single non-banded step.
+ * Deterministic (variant × width-step × aspect-band) working set for one material at one
+ * softness: banded wax sticks bake 4 variants × 9 width steps at the single forced aspect band
+ * (≤36 keys, the whole pressure ramp, unchanged), powder media 4 variants × the single
+ * non-banded width step × 3 aspect bands (12 keys).
  */
 export function studioDryMediaKernelTipWorkingSet(
   materialId: StudioDryMediaCoreId,
@@ -651,6 +734,7 @@ export function studioDryMediaKernelTipWorkingSet(
   readonly variant: number;
   readonly hardnessStep: number;
   readonly widthStep: number;
+  readonly aspectBand: number;
 }> {
   const hardnessStep = Math.round(clamp01(1 - clamp01(softness)) * 20);
   const widthSteps = KERNEL_TIP_SHAPING[materialId].band
@@ -659,14 +743,25 @@ export function studioDryMediaKernelTipWorkingSet(
         (_, step) => step,
       )
     : [STUDIO_DRY_MEDIA_KERNEL_TIP_WIDTH_STEPS];
-  const keys: Array<{ variant: number; hardnessStep: number; widthStep: number }> = [];
+  // Powder media prewarm all three aspect bands; banded wax is forced to band 0.
+  const aspectBands = KERNEL_TIP_SHAPING[materialId].band
+    ? [0]
+    : STUDIO_DRY_MEDIA_KERNEL_TIP_ASPECT_BAND_REPRESENTATIVES.map((_, band) => band);
+  const keys: Array<{
+    variant: number;
+    hardnessStep: number;
+    widthStep: number;
+    aspectBand: number;
+  }> = [];
   for (
     let variant = 0;
     variant < STUDIO_DRY_MEDIA_KERNEL_TIP_VARIANT_COUNT;
     variant += 1
   ) {
     for (const widthStep of widthSteps) {
-      keys.push({ variant, hardnessStep, widthStep });
+      for (const aspectBand of aspectBands) {
+        keys.push({ variant, hardnessStep, widthStep, aspectBand });
+      }
     }
   }
   return keys;
@@ -689,6 +784,7 @@ export function prewarmStudioDryMediaKernelTipMaps(
       key.variant,
       key.hardnessStep,
       key.widthStep,
+      key.aspectBand,
     );
     if (kernelTipMapCache.has(cacheKey)) continue;
     resolveKernelTipMapForSteps(
@@ -696,6 +792,7 @@ export function prewarmStudioDryMediaKernelTipMaps(
       key.variant,
       key.hardnessStep,
       key.widthStep,
+      key.aspectBand,
     );
     baked += 1;
   }
@@ -707,6 +804,7 @@ type KernelTipPrewarmUnit = Readonly<{
   variant: number;
   hardnessStep: number;
   widthStep: number;
+  aspectBand: number;
 }>;
 
 let kernelTipIdlePrewarmScheduled = false;
@@ -750,6 +848,7 @@ export function ensureStudioDryMediaKernelTipIdlePrewarm(
         unit.variant,
         unit.hardnessStep,
         unit.widthStep,
+        unit.aspectBand,
       );
       if (kernelTipMapCache.has(cacheKey)) continue;
       resolveKernelTipMapForSteps(
@@ -757,6 +856,7 @@ export function ensureStudioDryMediaKernelTipIdlePrewarm(
         unit.variant,
         unit.hardnessStep,
         unit.widthStep,
+        unit.aspectBand,
       );
       break; // exactly one bake per idle slice
     }

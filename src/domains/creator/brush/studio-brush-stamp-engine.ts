@@ -424,6 +424,7 @@ export function studioStampOssTipCoverage(
   normalizedY: number,
   seed: number,
   hardness: number,
+  grainStretch: number = 1,
 ): number {
   const hard = clamp01(hardness);
   const radial = Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
@@ -434,7 +435,12 @@ export function studioStampOssTipCoverage(
     return studioOssWatercolorTipCoverage(normalizedX, normalizedY, seed, hard);
   }
   if (kind === "chalk") {
-    const klecks = studioOssKlecksChalkCoverage(normalizedX, normalizedY, seed);
+    const klecks = studioOssKlecksChalkCoverage(
+      normalizedX,
+      normalizedY,
+      seed,
+      grainStretch,
+    );
     const shoulder = clamp01(1 - radial);
     const body = shoulder ** (0.4 + (1 - hard) * 0.9);
     return clamp01(klecks * (0.5 + 0.5 * body));
@@ -445,6 +451,7 @@ export function studioStampOssTipCoverage(
       normalizedY * STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
       OSS_TIP_DIRECTION_RADIANS,
       seed,
+      grainStretch,
     );
     const rimWobble = (wax.wax - 0.5) * 0.24;
     const plateau = 0.42 + hard * 0.3;
@@ -458,14 +465,25 @@ export function studioStampOssTipCoverage(
       normalizedY * STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
       OSS_TIP_DIRECTION_RADIANS,
       seed ^ 0xc4,
+      grainStretch,
     );
-    const chalkPowder = studioOssKlecksChalkCoverage(normalizedX, normalizedY, seed ^ 0xa1);
+    const chalkPowder = studioOssKlecksChalkCoverage(
+      normalizedX,
+      normalizedY,
+      seed ^ 0xa1,
+      grainStretch,
+    );
     const body = clamp01(1 - radial) ** (0.55 + (1 - hard) * 0.95);
     const packed = 0.28 * chalkPowder + 0.5 * wax.wax + 0.42 * wax.grit;
     return clamp01(body * packed * (1 - wax.scrape * 0.38));
   }
   // pastel
-  const chalkPowder = studioOssKlecksChalkCoverage(normalizedX, normalizedY, seed ^ 0xb7);
+  const chalkPowder = studioOssKlecksChalkCoverage(
+    normalizedX,
+    normalizedY,
+    seed ^ 0xb7,
+    grainStretch,
+  );
   const shoulder = clamp01(1 - radial * (0.8 + hard * 0.25));
   const velvet = shoulder * shoulder * (3 - 2 * shoulder);
   return clamp01(velvet * (0.45 + 0.55 * chalkPowder) * (0.72 + 0.28 * hard));
