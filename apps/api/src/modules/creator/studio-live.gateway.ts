@@ -212,6 +212,32 @@ export const STUDIO_LIVE_VOICE_MAX_PARTICIPANTS = 6;
 // frequency (once per session) so this trades a small race window (two nodes briefly both
 // admitting near the boundary) for avoiding a DB round-trip on every room join.
 export const STUDIO_LIVE_ROOM_MAX_PARTICIPANTS = 30;
+/**
+ * Concurrent live sockets a single authenticated account may hold on this node.
+ *
+ * Sized for a working artist, not for a budget: the canvas tab, a reference/preview tab, and a
+ * second device (desktop plus tablet) are all normal at once, and a flaky network can leave a
+ * stale socket overlapping a reconnect for a few seconds. Eight covers that with headroom while
+ * bounding what one account can pin in per-connection server state. It is deliberately far below
+ * STUDIO_LIVE_ROOM_MAX_PARTICIPANTS so one account can never crowd out a real team, and below the
+ * 12-per-minute "join" budget that every one of those connections now shares, so a whole-account
+ * reconnect storm still fits inside one window instead of rate-limiting the artist's own tabs.
+ */
+export const STUDIO_LIVE_MAX_CONNECTIONS_PER_USER = 8;
+/**
+ * Rejection reuses the `rate_limited` code rather than minting a new one: the client transport
+ * backs off on exactly that code and retries any other join failure immediately, so a fresh code
+ * would spin a capped tab. Closing another tab frees a slot, which makes the retry correct.
+ */
+const STUDIO_LIVE_CONNECTION_LIMIT_MESSAGE =
+  `한 계정이 동시에 열 수 있는 실시간 작업실 연결은 최대 ${STUDIO_LIVE_MAX_CONNECTIONS_PER_USER}개입니다. 다른 탭이나 기기의 작업실을 닫아 주세요.`;
+/**
+ * Distinct identities that may hold a live rate-limit bucket map on this node. Fails closed at the
+ * ceiling rather than evicting a live identity: eviction is exactly how a caller would buy itself a
+ * fresh budget, by churning enough identities to push its own entry out.
+ */
+const STUDIO_LIVE_RATE_LIMIT_IDENTITY_CAPACITY = 4_096;
+const STUDIO_LIVE_RATE_LIMIT_PRUNE_INTERVAL_MS = 30_000;
 
 interface StudioLiveParticipantInternal extends StudioLiveParticipant {
   userId: string;
@@ -478,7 +504,15 @@ export class StudioLiveGateway
   private readonly socketIdsByWork = new Map<string, Set<string>>();
   private readonly lockCleanupByConnectionWork = new Map<string, Promise<void>>();
   private readonly lockOperationTailByResource = new Map<string, Promise<void>>();
+  /**
+   * Keyed by the server-verified principal, never by a Socket.IO connection id and never by the
+   * client-supplied clientInstanceId. One account therefore spends one budget per action across
+   * tabs, parallel sockets, and reconnects — matching StudioLiveCrdtQuotaLimiter.
+   */
   private readonly rateLimits = new Map<string, Map<string, RateLimitBucket>>();
+  private lastRateLimitPruneAt: number | null = null;
+  private readonly connectionIdsByUser = new Map<string, Set<string>>();
+  private readonly userIdByConnection = new Map<string, string>();
   private readonly crdtQuotaLimiter = new StudioLiveCrdtQuotaLimiter();
   private readonly crdtBinarySelectionBySocket = new Map<
     string,
@@ -563,6 +597,9 @@ export class StudioLiveGateway
     this.lockCleanupByConnectionWork.clear();
     this.lockOperationTailByResource.clear();
     this.rateLimits.clear();
+    this.lastRateLimitPruneAt = null;
+    this.connectionIdsByUser.clear();
+    this.userIdByConnection.clear();
     this.crdtQuotaLimiter.clear();
     this.crdtBinarySelectionBySocket.clear();
     this.joinTransitions.clearAll();
@@ -602,7 +639,9 @@ export class StudioLiveGateway
     this.deleteCandidateRelayAuthorizationsForSocket(client.id);
     this.removeParticipant(client.id, "disconnect");
     this.clearSocketIdentityClaims(client);
-    this.rateLimits.delete(client.id);
+    // Only the connection slot is released. The identity's rate-limit buckets deliberately survive
+    // the socket so reconnecting cannot buy a fresh budget.
+    this.releaseUserConnection(client.id);
   }
 
   @SubscribeMessage("studio:join")
@@ -617,7 +656,7 @@ export class StudioLiveGateway
     }
     // Charge the valid request before session/ACL I/O so a connected client cannot bypass the
     // admission limit while still forcing repeated database-backed session validation.
-    if (!this.consumeRateLimit(client.id, "join", 12, 60_000)) {
+    if (!this.consumeRateLimit(client, "join", 12, 60_000)) {
       return reply(ack, failure("rate_limited", "작업실 참가 요청이 너무 많습니다."));
     }
     return this.joinTransitions.runLatest(client.id, (transitionSequence) =>
@@ -657,6 +696,12 @@ export class StudioLiveGateway
     const userId = principal?.userId ?? null;
     if (!userId || !principal || !this.isSocketPrincipalCurrent(client, principal, userId)) {
       return rejectInvalidSession();
+    }
+    // Refuse an over-cap account before any ACL/session I/O, so extra sockets cost this node a
+    // parse and a map lookup rather than a database round-trip each. Re-checked authoritatively at
+    // the commit boundary below, where nothing async can widen the window.
+    if (!this.hasUserConnectionCapacity(userId, client.id)) {
+      return reply(ack, failure("rate_limited", STUDIO_LIVE_CONNECTION_LIMIT_MESSAGE));
     }
     try {
       const team = await this.creatorService.getWorkTeam(userId, input.workId);
@@ -885,11 +930,22 @@ export class StudioLiveGateway
           failure("forbidden", "임시 협업 작업실이 만료되었습니다. 새 작업실을 만들어 주세요.")
         );
       }
+      // Authoritative connection cap. The pre-I/O check above can be raced by this account's own
+      // parallel joins while each awaits ACL and adapter I/O; this one sits inside the synchronous
+      // commit and is the boundary that actually holds.
+      if (!this.hasUserConnectionCapacity(userId, client.id)) {
+        await this.rollbackPendingIdentityClaim(client, identityAdmission.claim);
+        if (joinedNewRoom) {
+          this.roomTransitions.leaveJoinedRoomBestEffort(client, nextRoom);
+        }
+        return reply(ack, failure("rate_limited", STUDIO_LIVE_CONNECTION_LIMIT_MESSAGE));
+      }
       if (existing?.workId === input.workId && existing.capabilities.edit && !participant.capabilities.edit) {
         void this.releaseSocketLocks(existing, "revoked");
       }
       this.participantAuthorizationRechecks.delete(client.id);
       this.deleteCandidateRelayAuthorizationsForSocket(client.id);
+      this.registerUserConnection(userId, client.id);
       this.participantsBySocket.set(client.id, participant);
       if (participant.role === "viewer") this.removeVoiceMembership(client.id, "revoked");
       const roomSockets = this.socketIdsByWork.get(input.workId) ?? new Set<string>();
@@ -970,7 +1026,7 @@ export class StudioLiveGateway
   ) {
     const parsed = StudioLivePresenceSchema.safeParse(body);
     if (!parsed.success) return reply(ack, failure("invalid_payload", "작업 상태 정보가 올바르지 않습니다."));
-    if (!this.consumeRateLimit(client.id, "presence", 30, 10_000)) {
+    if (!this.consumeRateLimit(client, "presence", 30, 10_000)) {
       return reply(ack, failure("rate_limited", "작업 상태 갱신이 너무 빠릅니다."));
     }
     const authorized = await this.runWithAuthorizedParticipant(
@@ -1000,7 +1056,7 @@ export class StudioLiveGateway
   ) {
     const parsed = StudioLiveCursorSchema.safeParse(body);
     if (!parsed.success) return reply(ack, failure("invalid_payload", "커서 위치가 올바르지 않습니다."));
-    if (!this.consumeRateLimit(client.id, "cursor", 90, 3_000)) {
+    if (!this.consumeRateLimit(client, "cursor", 90, 3_000)) {
       return reply(ack, failure("rate_limited", "커서 위치 전송이 너무 빠릅니다."));
     }
     const authorized = await this.runWithAuthorizedParticipant(
@@ -1038,7 +1094,7 @@ export class StudioLiveGateway
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "제스처 미리보기 정보가 올바르지 않습니다."));
     }
-    if (!this.consumeRateLimit(client.id, "gesture-preview", 90, 3_000)) {
+    if (!this.consumeRateLimit(client, "gesture-preview", 90, 3_000)) {
       return reply(ack, failure("rate_limited", "제스처 미리보기 전송이 너무 빠릅니다."));
     }
     const authorized = await this.runWithAuthorizedParticipant(
@@ -1571,7 +1627,7 @@ export class StudioLiveGateway
         )
       );
     }
-    if (!this.consumeRateLimit(client.id, "lock", 60, 60_000)) {
+    if (!this.consumeRateLimit(client, "lock", 60, 60_000)) {
       return reply(
         ack,
         lockRequestFailure(
@@ -1799,7 +1855,7 @@ export class StudioLiveGateway
     // A socket can legitimately own the complete per-work lock set. Keep releases in a separate
     // abuse bucket, but never strand valid leases merely because the user closes a large batch.
     if (!this.consumeRateLimit(
-      client.id,
+      client,
       "lock-release",
       STUDIO_LIVE_LOCK_LIMIT_PER_WORK,
       60_000
@@ -1882,7 +1938,7 @@ export class StudioLiveGateway
   ) {
     const parsed = StudioLiveScreenStateSchema.safeParse(body);
     if (!parsed.success) return reply(ack, failure("invalid_payload", "화면 공유 상태가 올바르지 않습니다."));
-    if (!this.consumeRateLimit(client.id, "screen-set", 30, 60_000)) {
+    if (!this.consumeRateLimit(client, "screen-set", 30, 60_000)) {
       return reply(ack, failure("rate_limited", "화면 공유 상태 갱신이 너무 많습니다."));
     }
     const authorized = await this.runWithAuthorizedParticipant(
@@ -1928,7 +1984,7 @@ export class StudioLiveGateway
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "화면 공유 안내 정보가 올바르지 않습니다."));
     }
-    if (!this.consumeRateLimit(client.id, "screen-announce", 30, 60_000)) {
+    if (!this.consumeRateLimit(client, "screen-announce", 30, 60_000)) {
       return reply(ack, failure("rate_limited", "화면 공유 안내 전송이 너무 많습니다."));
     }
     const authorized = await this.runWithAuthorizedParticipant(
@@ -1987,7 +2043,7 @@ export class StudioLiveGateway
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "화면 공유 접근 요청이 올바르지 않습니다."));
     }
-    if (!this.consumeRateLimit(client.id, "screen-request", 60, 60_000)) {
+    if (!this.consumeRateLimit(client, "screen-request", 60, 60_000)) {
       return reply(ack, failure("rate_limited", "화면 공유 접근 요청이 너무 많습니다."));
     }
     const relay: StudioLiveInterServerRelayEvent = {
@@ -2046,7 +2102,7 @@ export class StudioLiveGateway
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "화면 공유 접근 결정이 올바르지 않습니다."));
     }
-    if (!this.consumeRateLimit(client.id, "screen-access", 60, 60_000)) {
+    if (!this.consumeRateLimit(client, "screen-access", 60, 60_000)) {
       return reply(ack, failure("rate_limited", "화면 공유 접근 결정 전송이 너무 많습니다."));
     }
 
@@ -2125,7 +2181,7 @@ export class StudioLiveGateway
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "화면 공유 종료 정보가 올바르지 않습니다."));
     }
-    if (!this.consumeRateLimit(client.id, "screen-stop", 30, 60_000)) {
+    if (!this.consumeRateLimit(client, "screen-stop", 30, 60_000)) {
       return reply(ack, failure("rate_limited", "화면 공유 종료 전송이 너무 많습니다."));
     }
     const authorized = await this.runWithAuthorizedParticipant(
@@ -2182,7 +2238,7 @@ export class StudioLiveGateway
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "음성 대화 참가 정보가 올바르지 않습니다."));
     }
-    if (!this.consumeRateLimit(client.id, "voice-join", 20, 60_000)) {
+    if (!this.consumeRateLimit(client, "voice-join", 20, 60_000)) {
       return reply(ack, failure("rate_limited", "음성 대화 참가 요청이 너무 많습니다."));
     }
     const authorized = await this.runWithAuthorizedParticipant(
@@ -2293,7 +2349,7 @@ export class StudioLiveGateway
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "음성 대화 상태가 올바르지 않습니다."));
     }
-    if (!this.consumeRateLimit(client.id, "voice-state", 90, 60_000)) {
+    if (!this.consumeRateLimit(client, "voice-state", 90, 60_000)) {
       return reply(ack, failure("rate_limited", "음성 대화 상태 변경이 너무 빠릅니다."));
     }
     const authorized = await this.runWithAuthorizedParticipant(
@@ -2376,7 +2432,7 @@ export class StudioLiveGateway
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "채팅 메시지가 올바르지 않습니다."));
     }
-    if (!this.consumeRateLimit(client.id, "chat", 20, 10_000)) {
+    if (!this.consumeRateLimit(client, "chat", 20, 10_000)) {
       return reply(ack, failure("rate_limited", "채팅 메시지를 너무 빨리 보내고 있습니다."));
     }
     const authorized = await this.runWithAuthorizedParticipant(
@@ -2423,7 +2479,7 @@ export class StudioLiveGateway
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "음성 WebRTC 연결 정보가 올바르지 않습니다."));
     }
-    if (!this.consumeRateLimit(client.id, "voice-signal", 240, 60_000)) {
+    if (!this.consumeRateLimit(client, "voice-signal", 240, 60_000)) {
       return reply(ack, failure("rate_limited", "음성 WebRTC 연결 요청이 너무 많습니다."));
     }
     const signalId = crypto.randomUUID();
@@ -2488,7 +2544,7 @@ export class StudioLiveGateway
     @MessageBody() body: StudioLiveSignalInput,
     @Ack() ack?: StudioLiveAckCallback<{ delivered: true; signalId: string }>
   ) {
-    if (!this.consumeRateLimit(client.id, "signal", 240, 60_000)) {
+    if (!this.consumeRateLimit(client, "signal", 240, 60_000)) {
       return reply(ack, failure("rate_limited", "WebRTC 연결 요청이 너무 많습니다."));
     }
     const parsed = StudioLiveSignalSchema.safeParse(body);
@@ -3509,7 +3565,7 @@ export class StudioLiveGateway
     }
     this.participantAuthorizationRechecks.delete(client.id);
     this.deleteCandidateRelayAuthorizationsForSocket(client.id);
-    this.rateLimits.delete(client.id);
+    this.releaseUserConnection(client.id);
     this.clearCrdtBinarySelectionBestEffort(client.id, client);
     this.socketAuthentication.clear(client);
     client.disconnect(true);
@@ -3724,23 +3780,98 @@ export class StudioLiveGateway
     }
   }
 
+  /**
+   * Resolves the budget key from socket-private authentication state. This is a cached, synchronous
+   * read — no session or ACL I/O — so callers that deliberately charge before revalidating (join)
+   * keep that ordering.
+   *
+   * An expired principal still names a server-verified account, so it is charged rather than
+   * rejected here. Rejecting it would short-circuit the caller before its own authorization
+   * boundary runs, and that boundary is what disconnects the socket, emits studio:access:revoked,
+   * and clears the principal — turning a fail-closed teardown into a socket that merely gets a
+   * rate-limit reply and stays connected.
+   */
+  private rateLimitIdentity(client: StudioLiveSocket): string | null {
+    return this.socketAuthentication.principal(client)?.userId ?? null;
+  }
+
   private consumeRateLimit(
-    socketId: string,
+    client: StudioLiveSocket,
     action: string,
     maximum: number,
     windowMs: number
   ): boolean {
+    const identity = this.rateLimitIdentity(client);
+    // A socket with no server-verified principal has no budget to charge, and must never fall back
+    // to its connection id — that per-socket key is the multiplier this replaced. It is also not
+    // rejected here: every caller's authorization boundary already refuses an unauthenticated
+    // socket synchronously, without session or ACL I/O (revalidate() and authorizedParticipant()
+    // both short-circuit on a missing principal), so there is no work left for a budget to protect
+    // and letting the caller answer keeps its authoritative typed error instead of masking it.
+    if (identity === null) return true;
     const now = Date.now();
-    const socketBuckets = this.rateLimits.get(socketId) ?? new Map<string, RateLimitBucket>();
-    const bucket = socketBuckets.get(action);
+    this.pruneRateLimits(now);
+    const existing = this.rateLimits.get(identity);
+    if (!existing && this.rateLimits.size >= STUDIO_LIVE_RATE_LIMIT_IDENTITY_CAPACITY) {
+      return false;
+    }
+    const identityBuckets = existing ?? new Map<string, RateLimitBucket>();
+    const bucket = identityBuckets.get(action);
     if (!bucket || bucket.resetsAt <= now) {
-      socketBuckets.set(action, { count: 1, resetsAt: now + windowMs });
-      this.rateLimits.set(socketId, socketBuckets);
+      identityBuckets.set(action, { count: 1, resetsAt: now + windowMs });
+      this.rateLimits.set(identity, identityBuckets);
       return true;
     }
     if (bucket.count >= maximum) return false;
     bucket.count += 1;
     return true;
+  }
+
+  /**
+   * Amortized sweep of elapsed windows. Buckets deliberately outlive the socket that opened them —
+   * dropping them on disconnect would let a client reset every budget by reconnecting.
+   */
+  private pruneRateLimits(now: number): void {
+    if (
+      this.lastRateLimitPruneAt !== null &&
+      now >= this.lastRateLimitPruneAt &&
+      now - this.lastRateLimitPruneAt < STUDIO_LIVE_RATE_LIMIT_PRUNE_INTERVAL_MS
+    ) {
+      return;
+    }
+    this.lastRateLimitPruneAt = now;
+    for (const [identity, buckets] of this.rateLimits) {
+      for (const [action, bucket] of buckets) {
+        if (bucket.resetsAt <= now) buckets.delete(action);
+      }
+      if (buckets.size === 0) this.rateLimits.delete(identity);
+    }
+  }
+
+  private hasUserConnectionCapacity(userId: string, socketId: string): boolean {
+    const connections = this.connectionIdsByUser.get(userId);
+    if (!connections || connections.has(socketId)) return true;
+    return connections.size < STUDIO_LIVE_MAX_CONNECTIONS_PER_USER;
+  }
+
+  private registerUserConnection(userId: string, socketId: string): void {
+    const previousUserId = this.userIdByConnection.get(socketId);
+    if (previousUserId !== undefined && previousUserId !== userId) {
+      this.releaseUserConnection(socketId);
+    }
+    const connections = this.connectionIdsByUser.get(userId) ?? new Set<string>();
+    connections.add(socketId);
+    this.connectionIdsByUser.set(userId, connections);
+    this.userIdByConnection.set(socketId, userId);
+  }
+
+  private releaseUserConnection(socketId: string): void {
+    const userId = this.userIdByConnection.get(socketId);
+    if (userId === undefined) return;
+    this.userIdByConnection.delete(socketId);
+    const connections = this.connectionIdsByUser.get(userId);
+    connections?.delete(socketId);
+    if (connections?.size === 0) this.connectionIdsByUser.delete(userId);
   }
 
   private isParticipantAuthorizationCurrent(
@@ -4025,7 +4156,7 @@ export class StudioLiveGateway
       room: studioLiveRoom(expectedParticipant.workId),
       finalizeLocalState: () => {
         this.removeParticipant(socketId, "revoked");
-        this.rateLimits.delete(socketId);
+        this.releaseUserConnection(socketId);
         this.socketAuthentication.clearBySocketId(socketId, socket);
       },
     });
@@ -4045,7 +4176,7 @@ export class StudioLiveGateway
       room: studioLiveRoom(participant.workId),
       finalizeLocalState: () => {
         this.removeParticipant(socketId, "revoked");
-        this.rateLimits.delete(socketId);
+        this.releaseUserConnection(socketId);
         this.joinTransitions.invalidate(socketId);
         this.socketAuthentication.clearBySocketId(socketId, socket);
       },

@@ -61,11 +61,14 @@ describe("studio live adapter cleanup boundary", () => {
     const invalidSession = source.slice(invalidStart, revokeStart);
     const revoke = source.slice(revokeStart, removeStart);
 
+    // Teardown releases the socket's connection slot, not the identity's rate-limit buckets: those
+    // are keyed on the authenticated user and must outlive the socket so a reconnect cannot buy a
+    // fresh budget.
     expect(invalidSession).toContain('this.removeParticipant(socketId, "revoked")');
-    expect(invalidSession).toContain("this.rateLimits.delete(socketId)");
+    expect(invalidSession).toContain("this.releaseUserConnection(socketId)");
     expect(invalidSession).toContain("this.socketAuthentication.clearBySocketId(socketId, socket)");
     expect(revoke).toContain('this.removeParticipant(socketId, "revoked")');
-    expect(revoke).toContain("this.rateLimits.delete(socketId)");
+    expect(revoke).toContain("this.releaseUserConnection(socketId)");
     expect(revoke).toContain("this.joinTransitions.invalidate(socketId)");
     expect(revoke).toContain("this.socketAuthentication.clearBySocketId(socketId, socket)");
   });

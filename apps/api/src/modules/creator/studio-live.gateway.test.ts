@@ -22,6 +22,7 @@ import { StudioLiveRoomTransitionCoordinator } from "./studio-live-room-transiti
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
   STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS,
+  STUDIO_LIVE_MAX_CONNECTIONS_PER_USER,
   STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS,
   StudioLiveCrdtSyncSchema,
   StudioLiveCrdtUpdateSchema,
@@ -2146,6 +2147,135 @@ describe("StudioLiveGateway", () => {
     ).resolves.toMatchObject({ ok: true });
   });
 
+  it("shares one per-action budget across every socket of a single authenticated user", async () => {
+    const harness = createHarness();
+    const firstTab = harness.socket("budget-tab-a", "valid:shared-budget-user");
+    const secondTab = harness.socket("budget-tab-b", "valid:shared-budget-user");
+    await connectAndJoin(harness, firstTab);
+    await connectAndJoin(harness, secondTab);
+
+    // The chat budget is 20 per 10s. Keyed on the socket it would be 20 per tab, so alternating
+    // two tabs would land all 40. Keyed on the authenticated identity the pair shares one budget.
+    const responses = [];
+    for (let index = 0; index < 40; index += 1) {
+      responses.push(
+        await harness.gateway.sendChatMessage(
+          (index % 2 === 0 ? firstTab : secondTab) as never,
+          { workId: "work-1", messageId: `shared-budget-${index}`, text: `메시지 ${index}` },
+          undefined
+        )
+      );
+    }
+
+    expect(responses.filter((response) => response.ok)).toHaveLength(20);
+    expect(
+      responses.filter((response) => !response.ok && response.code === "rate_limited")
+    ).toHaveLength(20);
+    expect(
+      harness.emissions.filter((emission) => emission.event === "studio:chat:message")
+    ).toHaveLength(20);
+  });
+
+  it("keeps per-action budgets independent between two authenticated users", async () => {
+    const harness = createHarness();
+    const exhausted = harness.socket("budget-user-a", "valid:budget-user-a");
+    const untouched = harness.socket("budget-user-b", "valid:budget-user-b");
+    await connectAndJoin(harness, exhausted);
+    await connectAndJoin(harness, untouched);
+
+    for (let index = 0; index < 20; index += 1) {
+      await expect(
+        harness.gateway.sendChatMessage(
+          exhausted as never,
+          { workId: "work-1", messageId: `user-a-${index}`, text: `메시지 ${index}` },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: true });
+    }
+    await expect(
+      harness.gateway.sendChatMessage(
+        exhausted as never,
+        { workId: "work-1", messageId: "user-a-overflow", text: "초과" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "rate_limited" });
+
+    // A second account must not inherit the first account's exhausted budget.
+    await expect(
+      harness.gateway.sendChatMessage(
+        untouched as never,
+        { workId: "work-1", messageId: "user-b-1", text: "안녕하세요" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+  });
+
+  it("does not reset a shared budget when one of the user's sockets reconnects", async () => {
+    const harness = createHarness();
+    const original = harness.socket("budget-before-reconnect", "valid:reconnect-budget-user");
+    await connectAndJoin(harness, original);
+
+    for (let index = 0; index < 20; index += 1) {
+      await expect(
+        harness.gateway.sendChatMessage(
+          original as never,
+          { workId: "work-1", messageId: `before-${index}`, text: `메시지 ${index}` },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: true });
+    }
+
+    harness.gateway.handleDisconnect(original as never);
+    const reconnected = harness.socket("budget-after-reconnect", "valid:reconnect-budget-user");
+    await connectAndJoin(harness, reconnected);
+
+    await expect(
+      harness.gateway.sendChatMessage(
+        reconnected as never,
+        { workId: "work-1", messageId: "after-reconnect", text: "다시" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "rate_limited" });
+  });
+
+  it("refuses the connection past the per-user cap and frees the slot when a tab closes", async () => {
+    const harness = createHarness();
+    const tabs = Array.from(
+      { length: STUDIO_LIVE_MAX_CONNECTIONS_PER_USER + 1 },
+      (_, index) => harness.socket(`tab-cap-${index}`, "valid:tab-cap-user")
+    );
+
+    for (const tab of tabs.slice(0, STUDIO_LIVE_MAX_CONNECTIONS_PER_USER)) {
+      await expect(connectAndJoin(harness, tab)).resolves.toMatchObject({ ok: true });
+    }
+
+    const refused = tabs[STUDIO_LIVE_MAX_CONNECTIONS_PER_USER]!;
+    const response = await connectAndJoin(harness, refused);
+    expect(response).toMatchObject({ ok: false, code: "rate_limited" });
+    // A normal protocol rejection, not a hard disconnect: the tab keeps its socket and can retry.
+    expect(refused.disconnected).toBe(false);
+    expect(refused.data.studioParticipant).toBeUndefined();
+    expect(
+      harness.service.getWorkTeam.mock.calls.filter(([, workId]) => workId === "work-1")
+    ).toHaveLength(STUDIO_LIVE_MAX_CONNECTIONS_PER_USER);
+
+    // Closing one tab must free the slot — the cap bounds concurrency, it is not a lockout.
+    harness.gateway.handleDisconnect(tabs[0] as never);
+    await expect(connectAndJoin(harness, refused)).resolves.toMatchObject({ ok: true });
+  });
+
+  it("counts the per-user connection cap per account, not across the room", async () => {
+    const harness = createHarness();
+    const sockets = Array.from(
+      { length: STUDIO_LIVE_MAX_CONNECTIONS_PER_USER + 1 },
+      (_, index) => harness.socket(`cap-user-${index}`, `valid:cap-user-${index}`)
+    );
+
+    for (const socket of sockets) {
+      await expect(connectAndJoin(harness, socket)).resolves.toMatchObject({ ok: true });
+    }
+  });
+
   it("relays normalized cursor positions only to the joined work room", async () => {
     const harness = createHarness();
     const socket = harness.socket("editor");
@@ -4020,7 +4150,7 @@ describe("StudioLiveGateway", () => {
     await connectAndJoin(harness, socket);
     const internals = harness.gateway as unknown as {
       participantsBySocket: Map<string, unknown>;
-      rateLimits: Map<string, unknown>;
+      userIdByConnection: Map<string, string>;
       disconnectInvalidSession(socketId: string, expectedParticipant: unknown): void;
     };
     const participant = internals.participantsBySocket.get(socket.id);
@@ -4047,7 +4177,7 @@ describe("StudioLiveGateway", () => {
     expect(socket.data.studioParticipant).toBeUndefined();
     expect(socket.data.studioWorkId).toBeUndefined();
     expect(internals.participantsBySocket.has(socket.id)).toBe(false);
-    expect(internals.rateLimits.has(socket.id)).toBe(false);
+    expect(internals.userIdByConnection.has(socket.id)).toBe(false);
     expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
   });
 
@@ -4057,7 +4187,7 @@ describe("StudioLiveGateway", () => {
     await connectAndJoin(harness, socket);
     const internals = harness.gateway as unknown as {
       participantsBySocket: Map<string, unknown>;
-      rateLimits: Map<string, unknown>;
+      userIdByConnection: Map<string, string>;
       revokeParticipant(socketId: string): void;
     };
     const originalTo = harness.namespace.to.bind(harness.namespace);
@@ -4079,7 +4209,7 @@ describe("StudioLiveGateway", () => {
     expect(socket.disconnected).toBe(true);
     expect(socket.left).toContain("studio-live:work-1");
     expect(internals.participantsBySocket.has(socket.id)).toBe(false);
-    expect(internals.rateLimits.has(socket.id)).toBe(false);
+    expect(internals.userIdByConnection.has(socket.id)).toBe(false);
     expect(invalidate).toHaveBeenCalledWith(socket.id);
     expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
   });
