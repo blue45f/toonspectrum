@@ -12,7 +12,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
-import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -36,6 +35,8 @@ import {
   normalizeStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
 } from "../src/domains/creator/bg3d/studio-bg3d-scene-document";
+
+import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
@@ -686,40 +687,6 @@ export function collectStudioVrmMannequinChromaFailures(
     );
   }
   return failures;
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      if (!address || typeof address === "string") {
-        probe.close();
-        reject(new Error("could not allocate a preview port"));
-        return;
-      }
-      probe.close((error) => error ? reject(error) : resolve(address.port));
-    });
-  });
-}
-
-async function waitForServer(url: string, timeoutMs = 20_000): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(url, { method: "HEAD" });
-      if (response.ok || response.status < 500) return;
-    } catch {
-      // Preview is still starting.
-    }
-    await delay(250);
-  }
-  throw new Error(`preview server did not become ready: ${url}`);
 }
 
 function isExpectedStaticPreviewApiMessage(message: string): boolean {
@@ -3130,7 +3097,9 @@ async function main(): Promise<void> {
 
   let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
   try {
-    await waitForServer(rootUrl);
+    await waitForServer(rootUrl, {
+      notReadyMessage: `preview server did not become ready: ${rootUrl}`,
+    });
     // Use Playwright's pinned Chromium rather than a machine-global Chrome channel. Pin Dawn's
     // WebGPU adapter as well as ANGLE's WebGL adapter: --use-angle alone does not select the
     // WebGPU device, so a GPU-less runner can otherwise lose its default Dawn device mid-proof.

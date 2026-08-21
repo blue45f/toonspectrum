@@ -22,7 +22,6 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -33,6 +32,12 @@ import {
   type Locator,
   type Page,
 } from "playwright";
+
+import {
+  findFreePort,
+  stopChildProcess,
+  waitForServer,
+} from "./lib/studio-verify-preview-harness.mjs";
 
 export const STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION = 1 as const;
 
@@ -1529,53 +1534,6 @@ async function runVerticalSlice(
   };
 }
 
-async function findFreePort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("could not allocate a production-preview port"));
-        return;
-      }
-      server.close((error) => error ? reject(error) : resolvePort(address.port));
-    });
-  });
-}
-
-async function waitForServer(origin: string, timeoutMilliseconds = 20_000): Promise<void> {
-  const deadline = Date.now() + timeoutMilliseconds;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(origin, { method: "HEAD" });
-      if (response.ok || response.status < 500) return;
-    } catch {
-      // Production preview is still starting.
-    }
-    await new Promise((resolveWait) => setTimeout(resolveWait, 250));
-  }
-  throw new Error(`production preview did not become ready: ${origin}`);
-}
-
-async function stopChildProcess(child: ChildProcess): Promise<void> {
-  const waitForExit = (timeoutMilliseconds: number) => Promise.race([
-    new Promise<void>((resolveExit) => child.once("exit", () => resolveExit())),
-    new Promise<void>((resolveTimeout) => setTimeout(resolveTimeout, timeoutMilliseconds)),
-  ]);
-  if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGTERM");
-    await waitForExit(1_500);
-  }
-  if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGKILL");
-    await waitForExit(1_500);
-  }
-  child.stdout?.destroy();
-  child.stderr?.destroy();
-}
-
 function prepareScratch(): void {
   mkdirSync(SCRATCH, { recursive: true });
   for (const name of readdirSync(SCRATCH)) {
@@ -1621,7 +1579,9 @@ function resultFrom(
 async function main(): Promise<void> {
   prepareScratch();
   const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
-  const port = externalOrigin ? null : await findFreePort();
+  const port = externalOrigin
+    ? null
+    : await findFreePort({ unavailableMessage: "could not allocate a production-preview port" });
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/u, "")}/`
     : `http://127.0.0.1:${port}/`;
@@ -1654,7 +1614,9 @@ async function main(): Promise<void> {
   let browser: Browser | null = null;
   let result: StudioHybridDccIntegrationResult;
   try {
-    await waitForServer(origin);
+    await waitForServer(origin, {
+      notReadyMessage: `production preview did not become ready: ${origin}`,
+    });
     log(`production preview ready @ ${studioUrl}`);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     const context = await browser.newContext({ viewport: { width: 1_600, height: 1_100 } });

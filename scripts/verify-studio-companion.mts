@@ -10,7 +10,6 @@
  *   pnpm run verify:studio-companion
  */
 import { mkdirSync } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -21,6 +20,8 @@ import {
   type Page,
 } from "playwright";
 import { preview, type PreviewServer } from "vite";
+
+import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
@@ -164,36 +165,6 @@ function observePage(
     log(`${label} window closed`);
   });
   return diagnostics;
-}
-
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      if (!address || typeof address === "string") {
-        probe.close();
-        reject(new Error("could not allocate preview port"));
-        return;
-      }
-      probe.close((error) => error ? reject(error) : resolve(address.port));
-    });
-  });
-}
-
-async function waitForServer(url: string, timeoutMs = 20_000): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(url, { method: "HEAD" });
-      if (response.ok || response.status < 500) return;
-    } catch {
-      // Preview is still starting.
-    }
-    await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
-  }
-  throw new Error(`preview did not become ready: ${url}`);
 }
 
 async function waitForCompanionConnection(
@@ -424,7 +395,7 @@ async function verify(baseUrl: string): Promise<VerificationResult> {
 }
 
 async function main(): Promise<void> {
-  const port = await findFreePort();
+  const port = await findFreePort({ unavailableMessage: "could not allocate preview port" });
   const baseUrl = `http://127.0.0.1:${port}`;
   let previewServer: PreviewServer | null = null;
 
@@ -436,7 +407,9 @@ async function main(): Promise<void> {
         strictPort: true,
       },
     });
-    await waitForServer(baseUrl);
+    await waitForServer(baseUrl, {
+      notReadyMessage: `preview did not become ready: ${baseUrl}`,
+    });
     log(`production preview ready @ ${baseUrl}`);
 
     const result = await verify(baseUrl);

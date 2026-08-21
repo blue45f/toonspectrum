@@ -25,7 +25,6 @@ import {
   mkdtempSync,
   writeFileSync,
 } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -39,6 +38,11 @@ import {
   type Page,
 } from "playwright";
 
+import {
+  findFreePort,
+  stopChildProcess,
+  waitForServer,
+} from "./lib/studio-verify-preview-harness.mjs";
 import {
   STUDIO_NATIVE_RASTER_REQUIRED_SCENARIOS,
   studioNativeRasterMatrixViolations,
@@ -2976,53 +2980,6 @@ async function runScenario(
   };
 }
 
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("could not allocate a production-preview port"));
-        return;
-      }
-      server.close((error) => error ? reject(error) : resolve(address.port));
-    });
-  });
-}
-
-async function waitForServer(url: string, timeoutMs = 25_000): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(url, { method: "HEAD" });
-      if (response.ok || response.status < 500) return;
-    } catch {
-      // Preview is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  throw new Error(`production preview did not become ready: ${url}`);
-}
-
-async function stopChildProcess(child: ChildProcess): Promise<void> {
-  const waitForExit = (timeoutMs: number) => Promise.race([
-    new Promise<void>((resolve) => child.once("exit", () => resolve())),
-    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
-  ]);
-  if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGTERM");
-    await waitForExit(1_500);
-  }
-  if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGKILL");
-    await waitForExit(1_500);
-  }
-  child.stdout?.destroy();
-  child.stderr?.destroy();
-}
-
 async function runWithConcurrency<T, R>(
   items: readonly T[],
   concurrency: number,
@@ -3067,7 +3024,9 @@ async function main(): Promise<void> {
   );
   const concurrency = Math.max(1, Math.min(4, Math.trunc(configuredConcurrency) || 1));
   const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
-  const port = externalOrigin ? null : await findFreePort();
+  const port = externalOrigin
+    ? null
+    : await findFreePort({ unavailableMessage: "could not allocate a production-preview port" });
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/u, "")}/`
     : `http://127.0.0.1:${port}/`;
@@ -3092,7 +3051,11 @@ async function main(): Promise<void> {
 
   let browser: Browser | null = null;
   try {
-    await waitForServer(origin);
+    await waitForServer(origin, {
+      timeoutMs: 25_000,
+      pollIntervalMs: 200,
+      notReadyMessage: `production preview did not become ready: ${origin}`,
+    });
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     if (cancellationRaceActions) {
       log(

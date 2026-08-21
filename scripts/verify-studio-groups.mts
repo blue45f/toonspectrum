@@ -15,14 +15,7 @@
  *   TOONSPECTRUM_GROUP_VERIFY_DIR=/tmp/studio-groups pnpm verify:studio-groups
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import {
-  appendFileSync,
-  mkdirSync,
-  readdirSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { createServer } from "node:net";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -33,6 +26,13 @@ import {
   type Locator,
   type Page,
 } from "playwright";
+
+import {
+  cleanScratchDir,
+  findFreePort,
+  stopChildProcess,
+  waitForServer,
+} from "./lib/studio-verify-preview-harness.mjs";
 
 const SCRATCH =
   process.env.TOONSPECTRUM_GROUP_VERIFY_DIR
@@ -1909,75 +1909,12 @@ async function runMobileGroupAudit(
   }
 }
 
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("could not allocate a preview port"));
-        return;
-      }
-      server.close((error) => error ? reject(error) : resolve(address.port));
-    });
-  });
-}
-
-async function waitForServer(url: string, timeoutMs = 20_000): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(url, { method: "HEAD" });
-      if (response.ok || response.status < 500) return;
-    } catch {
-      // Preview is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error("Vite preview did not become ready");
-}
-
-function cleanScratch(): void {
-  mkdirSync(SCRATCH, { recursive: true });
-  for (const file of readdirSync(SCRATCH)) {
-    if (!file.startsWith("studio-group-")) continue;
-    if (
-      !file.endsWith(".png")
-      && !file.endsWith(".log")
-      && !file.endsWith(".json")
-    ) {
-      continue;
-    }
-    try {
-      unlinkSync(join(SCRATCH, file));
-    } catch {
-      // A previous artifact may be open; the current run still overwrites stable names.
-    }
-  }
-}
-
-async function stopChildProcess(child: ChildProcess): Promise<void> {
-  const waitForExit = (timeoutMs: number) => Promise.race([
-    new Promise<void>((resolve) => child.once("exit", () => resolve())),
-    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
-  ]);
-
-  if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGTERM");
-    await waitForExit(1_500);
-  }
-  if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGKILL");
-    await waitForExit(1_500);
-  }
-  child.stdout?.destroy();
-  child.stderr?.destroy();
-}
-
 async function main(): Promise<void> {
-  cleanScratch();
+  cleanScratchDir({
+    directory: SCRATCH,
+    filePrefix: "studio-group-",
+    extensions: [".png", ".log", ".json"],
+  });
   const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   const port = externalOrigin ? null : await findFreePort();
   const origin = externalOrigin

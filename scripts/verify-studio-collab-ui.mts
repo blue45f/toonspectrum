@@ -8,31 +8,16 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { writeFileSync } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { chromium, type BrowserContext, type Page } from "playwright";
 
+import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
+
 const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-collab");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const EXISTING_ORIGIN = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.replace(/\/$/u, "") ?? "";
-
-function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        reject(new Error("port"));
-        return;
-      }
-      const port = address.port;
-      server.close(() => resolve(port));
-    });
-    server.on("error", reject);
-  });
-}
 
 async function waitForOrigin(origin: string): Promise<void> {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -212,7 +197,7 @@ async function liveStatus(page: Page): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const ownedOrigin = EXISTING_ORIGIN ? "" : `http://127.0.0.1:${await findFreePort()}`;
+  const ownedOrigin = EXISTING_ORIGIN ? "" : `http://127.0.0.1:${await findFreePort({ unavailableMessage: "port" })}`;
   const origin = EXISTING_ORIGIN || ownedOrigin;
   const server: ChildProcess | null = EXISTING_ORIGIN
     ? null

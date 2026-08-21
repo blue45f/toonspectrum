@@ -21,12 +21,13 @@
  *   TOONSPECTRUM_GPU_PARITY_VERIFY_DIR=/tmp/my-run pnpm verify:studio-gpu-committed-parity
  */
 import { mkdirSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { chromium, type Browser } from "playwright";
 import { createServer as createViteServer } from "vite";
+
+import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
 const SCRATCH =
   process.env.TOONSPECTRUM_GPU_PARITY_VERIFY_DIR
@@ -124,22 +125,6 @@ function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("could not allocate a dev-server port"));
-        return;
-      }
-      server.close((error) => (error ? reject(error) : resolve(address.port)));
-    });
-  });
-}
-
 function writeDataUrlPng(path: string, dataUrl: string): void {
   const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
   writeFileSync(path, Buffer.from(base64, "base64"));
@@ -148,7 +133,7 @@ function writeDataUrlPng(path: string, dataUrl: string): void {
 async function main(): Promise<void> {
   mkdirSync(SCRATCH, { recursive: true });
 
-  const port = await findFreePort();
+  const port = await findFreePort({ unavailableMessage: "could not allocate a dev-server port" });
   const origin = `http://127.0.0.1:${port}/`;
 
   const viteServer = await createViteServer({

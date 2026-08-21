@@ -6,40 +6,12 @@
  * Expects production build in dist/.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { createServer } from "node:net";
 
 import { chromium, type Page } from "playwright";
 
+import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
+
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      if (!address || typeof address === "string") {
-        probe.close();
-        reject(new Error("port"));
-        return;
-      }
-      probe.close((error) => (error ? reject(error) : resolve(address.port)));
-    });
-  });
-}
-
-async function waitForServer(url: string) {
-  for (let i = 0; i < 60; i++) {
-    try {
-      const res = await fetch(url, { method: "HEAD" });
-      if (res.ok || res.status < 500) return;
-    } catch {
-      /* retry */
-    }
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error("preview not ready");
-}
 
 function log(msg: string) {
   console.log(`[verify-icons] ${msg}`);
@@ -153,7 +125,7 @@ async function countVisibleSvgs(page: Page, selector: string): Promise<number> {
 }
 
 async function main() {
-  const port = await findFreePort();
+  const port = await findFreePort({ unavailableMessage: "port" });
   let child: ChildProcess | null = null;
   let exitCode: number;
 
@@ -167,7 +139,10 @@ async function main() {
       const s = String(d);
       if (!s.includes("ECONNREFUSED") && !s.includes("proxy error")) process.stderr.write(d);
     });
-    await waitForServer(`http://127.0.0.1:${port}/`);
+    await waitForServer(`http://127.0.0.1:${port}/`, {
+      maxAttempts: 60,
+      notReadyMessage: "preview not ready",
+    });
     log(`preview @ http://127.0.0.1:${port}/studio`);
 
     const browser = await chromium.launch({ headless: true });

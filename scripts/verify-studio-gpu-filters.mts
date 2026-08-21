@@ -27,11 +27,12 @@
  * Run:
  *   pnpm verify:studio-gpu-filters
  */
-import { createServer } from "node:net";
 import { join } from "node:path";
 
 import { chromium, type Browser } from "playwright";
 import { createServer as createViteServer } from "vite";
+
+import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
 const HARNESS_PATH = "/__studio_gpu_filters_parity__";
 const RESULT_TIMEOUT_MS = 45_000;
@@ -67,24 +68,8 @@ function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("could not allocate a dev-server port"));
-        return;
-      }
-      server.close((error) => (error ? reject(error) : resolve(address.port)));
-    });
-  });
-}
-
 async function main(): Promise<void> {
-  const port = await findFreePort();
+  const port = await findFreePort({ unavailableMessage: "could not allocate a dev-server port" });
   const origin = `http://127.0.0.1:${port}/`;
 
   const viteServer = await createViteServer({

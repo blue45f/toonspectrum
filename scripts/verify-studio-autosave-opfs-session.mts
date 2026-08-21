@@ -30,7 +30,6 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -46,6 +45,8 @@ import {
   preview,
   type PreviewServer,
 } from "vite";
+
+import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
 export const STUDIO_AUTOSAVE_OPFS_BROWSER_REPORT_SCHEMA_VERSION = 1 as const;
 
@@ -868,22 +869,6 @@ function writeJson(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function findFreePort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("could not allocate a Studio autosave OPFS verifier port"));
-        return;
-      }
-      server.close(error => error ? reject(error) : resolvePort(address.port));
-    });
-  });
-}
-
 async function waitForBrowserResult(page: Page): Promise<unknown> {
   await page.waitForFunction(
     resultGlobal => (
@@ -1008,7 +993,9 @@ async function executeProductionBrowser(
   });
   writeJson(plan.evidence.productionBuild, productionBuild);
 
-  const port = await findFreePort();
+  const port = await findFreePort({
+    unavailableMessage: "could not allocate a Studio autosave OPFS verifier port",
+  });
   const origin = `http://127.0.0.1:${port}`;
   let previewServer: PreviewServer | null = null;
   let browser: Browser | null = null;

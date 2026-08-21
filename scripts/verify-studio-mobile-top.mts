@@ -24,11 +24,12 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { appendFileSync, mkdirSync } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { chromium, type Browser, type Page } from "playwright";
+
+import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const SCRATCH = process.env.TOONSPECTRUM_MOBILE_TOP_VERIFY_DIR ??
   process.env.TOONSPECTRUM_VERIFY_DIR ??
@@ -162,34 +163,6 @@ function log(msg: string) {
   const line = `[verify-mobile-top] ${msg}`;
   console.log(line);
   try { appendFileSync(join(SCRATCH, "studio-mobile-top-verify.log"), line + "\n"); } catch {}
-}
-
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      if (!address || typeof address === "string") {
-        probe.close();
-        reject(new Error("could not allocate a preview port"));
-        return;
-      }
-      probe.close((error) => error ? reject(error) : resolve(address.port));
-    });
-  });
-}
-
-async function waitForServer(url: string, timeoutMs = 20000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await fetch(url, { method: "HEAD" });
-      if (res.ok || res.status < 500) return;
-    } catch {}
-    await new Promise(r => setTimeout(r, 250));
-  }
-  throw new Error("preview server did not become ready");
 }
 
 /**
@@ -990,7 +963,10 @@ async function main() {
 
   let browser: Browser | null = null;
   try {
-    await waitForServer(url, 20000);
+    await waitForServer(url, {
+      timeoutMs: 20000,
+      notReadyMessage: "preview server did not become ready",
+    });
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
 
     const results: ModeRunResult[] = [];

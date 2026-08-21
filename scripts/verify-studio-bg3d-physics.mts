@@ -20,10 +20,11 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { createServer } from "node:net";
 import { join } from "node:path";
 
 import { chromium, type Browser, type Locator, type Page } from "playwright";
+
+import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const ARTIFACT_DIR = process.env.TOONSPECTRUM_BG3D_PHYSICS_VERIFY_DIR ??
   process.env.TOONSPECTRUM_BG3D_VERIFY_DIR ??
@@ -154,36 +155,6 @@ async function poll<T>(
     latest = await sample();
   }
   return latest;
-}
-
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      if (!address || typeof address === "string") {
-        probe.close();
-        reject(new Error("could not allocate a preview port"));
-        return;
-      }
-      probe.close((error) => error ? reject(error) : resolve(address.port));
-    });
-  });
-}
-
-async function waitForServer(url: string, timeoutMs = 20_000): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(url, { method: "HEAD" });
-      if (response.ok || response.status < 500) return;
-    } catch {
-      // Preview is still starting.
-    }
-    await delay(250);
-  }
-  throw new Error(`preview server did not become ready: ${url}`);
 }
 
 function collectBrowserErrors(page: Page, studioUrl: string): BrowserErrorCollector {
@@ -703,7 +674,9 @@ async function main(): Promise<void> {
 
   let browser: Browser | null = null;
   try {
-    await waitForServer(rootUrl);
+    await waitForServer(rootUrl, {
+      notReadyMessage: `preview server did not become ready: ${rootUrl}`,
+    });
     log(`preview ready @ ${studioUrl}`);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     const activeBrowser = browser;

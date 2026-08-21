@@ -1,8 +1,8 @@
 /**
  * scripts/lib/studio-verify-preview-harness.mts
  *
- * Shared `vite preview` infrastructure for the Studio browser verifiers
- * (verify-studio-launch / verify-studio-lifecycle / verify-studio-brushes):
+ * Shared `vite preview` infrastructure for the `scripts/verify-studio-*`
+ * browser verifiers:
  * port allocation, readiness polling, preview spawning, scratch-dir hygiene,
  * and child-process shutdown. Pure tooling — the helpers are parameterized
  * where the consumers historically differed (timeouts, error text, spawn
@@ -19,8 +19,19 @@ import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
 
+export interface FindFreePortOptions {
+  /**
+   * Rejection text used when the OS hands back a non-TCP address — the
+   * verifiers historically worded this differently ("preview port",
+   * "dev-server port", "production-preview port", …).
+   */
+  readonly unavailableMessage?: string;
+}
+
 /** Allocate an OS-assigned free 127.0.0.1 port for a `vite preview` instance. */
-export async function findFreePort(): Promise<number> {
+export async function findFreePort({
+  unavailableMessage = "could not allocate a preview port",
+}: FindFreePortOptions = {}): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer();
     server.once("error", reject);
@@ -28,7 +39,7 @@ export async function findFreePort(): Promise<number> {
       const address = server.address();
       if (!address || typeof address === "string") {
         server.close();
-        reject(new Error("could not allocate a preview port"));
+        reject(new Error(unavailableMessage));
         return;
       }
       server.close((error) => error ? reject(error) : resolve(address.port));
@@ -40,25 +51,47 @@ export interface WaitForServerOptions {
   readonly timeoutMs?: number;
   /** Timeout error text — the verifiers historically used different wording. */
   readonly notReadyMessage?: string;
+  /**
+   * Poll a fixed number of attempts instead of a wall-clock deadline — the
+   * icons/brush verifiers historically counted attempts, not elapsed time.
+   * When set, `timeoutMs` is unused.
+   */
+  readonly maxAttempts?: number;
+  /** Delay between polls (250ms everywhere except the fast-poll verifiers). */
+  readonly pollIntervalMs?: number;
+  /**
+   * Probe request shape. Defaults to a HEAD; the brush verifiers historically
+   * probed with a redirect-manual GET.
+   */
+  readonly requestInit?: RequestInit;
 }
 
-/** Poll a preview URL with HEAD requests until it answers with any non-5xx response. */
+/** Poll a preview URL until it answers with any non-5xx response. */
 export async function waitForServer(
   url: string,
   {
     timeoutMs = 20_000,
     notReadyMessage = "Vite preview did not become ready",
+    maxAttempts,
+    pollIntervalMs = 250,
+    requestInit = { method: "HEAD" },
   }: WaitForServerOptions = {},
 ): Promise<void> {
   const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
+  let attempt = 0;
+  while (
+    maxAttempts === undefined
+      ? Date.now() - startedAt < timeoutMs
+      : attempt < maxAttempts
+  ) {
+    attempt += 1;
     try {
-      const response = await fetch(url, { method: "HEAD" });
+      const response = await fetch(url, requestInit);
       if (response.ok || response.status < 500) return;
     } catch {
       // Preview is still starting.
     }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
   throw new Error(notReadyMessage);
 }
@@ -146,8 +179,19 @@ export function cleanScratchDir({
   }
 }
 
+export interface StopChildProcessOptions {
+  /**
+   * Destroy the child's stdout/stderr pipes after it exits. The brush-latency
+   * verifier historically left them attached, so it opts out.
+   */
+  readonly releaseStdio?: boolean;
+}
+
 /** SIGTERM the preview child, escalate to SIGKILL, then release its stdio pipes. */
-export async function stopChildProcess(child: ChildProcess): Promise<void> {
+export async function stopChildProcess(
+  child: ChildProcess,
+  { releaseStdio = true }: StopChildProcessOptions = {},
+): Promise<void> {
   const waitForExit = (timeoutMs: number) => Promise.race([
     new Promise<void>((resolve) => child.once("exit", () => resolve())),
     new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
@@ -161,6 +205,7 @@ export async function stopChildProcess(child: ChildProcess): Promise<void> {
     child.kill("SIGKILL");
     await waitForExit(1_500);
   }
+  if (!releaseStdio) return;
   child.stdout?.destroy();
   child.stderr?.destroy();
 }

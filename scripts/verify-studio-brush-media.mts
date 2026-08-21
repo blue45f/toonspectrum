@@ -15,8 +15,7 @@
  *     pnpm run verify:studio-brush-media
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync, readdirSync, unlinkSync, writeFileSync, appendFileSync } from "node:fs";
-import { createServer } from "node:net";
+import { writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -34,6 +33,12 @@ import {
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/brush/studio-brush-catalog";
 
+import {
+  cleanScratchDir,
+  findFreePort,
+  stopChildProcess,
+  waitForServer,
+} from "./lib/studio-verify-preview-harness.mjs";
 import {
   analyzeStudioBrushMediaPixelQuality,
 } from "./studio-brush-media-pixel-quality";
@@ -145,19 +150,6 @@ function log(message: string): void {
 
 function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
-}
-
-function cleanScratch(): void {
-  mkdirSync(SCRATCH, { recursive: true });
-  for (const file of readdirSync(SCRATCH)) {
-    if (!file.startsWith("studio-brush-media-")) continue;
-    if (!file.endsWith(".png") && !file.endsWith(".json") && !file.endsWith(".log")) continue;
-    try {
-      unlinkSync(join(SCRATCH, file));
-    } catch {
-      // A previous artifact may be open; every new report still overwrites its deterministic name.
-    }
-  }
 }
 
 function expectedStaticPreviewFailure(message: string): boolean {
@@ -1050,54 +1042,12 @@ async function runBrushMedium(
   }
 }
 
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      invariant(address && typeof address === "object", "could not reserve preview port");
-      const port = address.port;
-      server.close((error) => {
-        if (error) reject(error);
-        else resolve(port);
-      });
-    });
-  });
-}
-
-async function waitForServer(origin: string): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    try {
-      const response = await fetch(origin, { redirect: "manual" });
-      if (response.status < 500) return;
-    } catch {
-      // Vite preview is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`Vite preview did not become ready at ${origin}`);
-}
-
-async function stopChildProcess(child: ChildProcess): Promise<void> {
-  const waitForExit = (timeoutMs: number) => Promise.race([
-    new Promise<void>((resolve) => child.once("exit", () => resolve())),
-    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
-  ]);
-  if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGTERM");
-    await waitForExit(1_500);
-  }
-  if (child.exitCode === null && child.signalCode === null) {
-    child.kill("SIGKILL");
-    await waitForExit(1_500);
-  }
-  child.stdout?.destroy();
-  child.stderr?.destroy();
-}
-
 async function main(): Promise<void> {
-  cleanScratch();
+  cleanScratchDir({
+    directory: SCRATCH,
+    filePrefix: "studio-brush-media-",
+    extensions: [".png", ".json", ".log"],
+  });
   const started = performance.now();
   const catalogById = new Map(
     STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((brush) => [brush.id, brush]),
@@ -1121,7 +1071,9 @@ async function main(): Promise<void> {
   );
 
   const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
-  const port = externalOrigin ? null : await findFreePort();
+  const port = externalOrigin
+    ? null
+    : await findFreePort({ unavailableMessage: "could not reserve preview port" });
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/u, "")}/`
     : `http://127.0.0.1:${port}/`;
@@ -1148,7 +1100,12 @@ async function main(): Promise<void> {
   const cases: BrushMediaBrowserResult[] = [];
   const executionFailures: Array<{ id: string; message: string }> = [];
   try {
-    await waitForServer(origin);
+    await waitForServer(origin, {
+      maxAttempts: 100,
+      pollIntervalMs: 100,
+      requestInit: { redirect: "manual" },
+      notReadyMessage: `Vite preview did not become ready at ${origin}`,
+    });
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     for (const { policy, brush } of representativeCases) {
       try {

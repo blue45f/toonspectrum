@@ -10,9 +10,10 @@
  * Expects production build in dist/ (vite preview).
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { createServer } from "node:net";
 
 import { chromium, type Page } from "playwright";
+
+import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 
@@ -185,36 +186,6 @@ const MENU_DRIVEN_POPOVERS: {
     expectDialogName: "프로젝트 작업",
   },
 ];
-
-async function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      if (!address || typeof address === "string") {
-        probe.close();
-        reject(new Error("could not allocate port"));
-        return;
-      }
-      probe.close((error) => (error ? reject(error) : resolve(address.port)));
-    });
-  });
-}
-
-async function waitForServer(url: string, timeoutMs = 20000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await fetch(url, { method: "HEAD" });
-      if (res.ok || res.status < 500) return;
-    } catch {
-      /* retry */
-    }
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error(`preview not ready: ${url}`);
-}
 
 function log(msg: string) {
   console.log(`[verify-menus] ${msg}`);
@@ -494,7 +465,7 @@ async function assertExportOptions(page: Page): Promise<string[]> {
 }
 
 async function main() {
-  const port = await findFreePort();
+  const port = await findFreePort({ unavailableMessage: "could not allocate port" });
   const url = `http://127.0.0.1:${port}/studio`;
   let child: ChildProcess | null = null;
   let exitCode: number;
@@ -509,7 +480,10 @@ async function main() {
       const s = String(d);
       if (!s.includes("ECONNREFUSED") && !s.includes("proxy error")) process.stderr.write(d);
     });
-    await waitForServer(`http://127.0.0.1:${port}/`);
+    await waitForServer(`http://127.0.0.1:${port}/`, {
+      timeoutMs: 20000,
+      notReadyMessage: `preview not ready: http://127.0.0.1:${port}/`,
+    });
     log(`preview ready @ ${url}`);
 
     const browser = await chromium.launch({ headless: true });
