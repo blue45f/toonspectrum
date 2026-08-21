@@ -21,7 +21,10 @@ export type StudioSculptBrushKind =
   | "smooth"
   | "inflate"
   | "clay"
-  | "crease";
+  | "crease"
+  | "flatten"
+  | "scrape"
+  | "snakeHook";
 
 export interface StudioSculptStroke {
   readonly kind: StudioSculptBrushKind;
@@ -106,7 +109,7 @@ export function applyStudioSculptStroke(
     const dist = Math.hypot(x - cx, y - cy, z - cz);
     const w = falloff(dist, stroke.radius) * stroke.strength * m;
     if (w === 0) continue;
-    if (stroke.kind === "grab") {
+    if (stroke.kind === "grab" || stroke.kind === "snakeHook") {
       positions[i * 3] = x + (dir.x / dl) * w;
       positions[i * 3 + 1] = y + (dir.y / dl) * w;
       positions[i * 3 + 2] = z + (dir.z / dl) * w;
@@ -119,6 +122,20 @@ export function applyStudioSculptStroke(
       positions[i * 3] = x - nx * w * 0.5;
       positions[i * 3 + 1] = y - ny * w * 0.5;
       positions[i * 3 + 2] = z - nz * w * 0.5;
+    } else if (stroke.kind === "flatten" || stroke.kind === "scrape") {
+      // 가중 평균 평면 투영. scrape 는 방향 쪽으로 튀어나온 정점만 닦아내린다.
+      // 평면 법선은 브러시 direction 을 따른다(닫힌 메시의 평균 법선은 0 으로 퇴화한다).
+      const px = dir.x / dl;
+      const py = dir.y / dl;
+      const pz = dir.z / dl;
+      const signed = (x - cx) * px + (y - cy) * py + (z - cz) * pz;
+      const above = signed > 0;
+      if (stroke.kind === "flatten" || above) {
+        const step = stroke.kind === "scrape" ? Math.max(0, signed) * w : signed * w;
+        positions[i * 3] = x - px * step;
+        positions[i * 3 + 1] = y - py * step;
+        positions[i * 3 + 2] = z - pz * step;
+      }
     } else if (stroke.kind === "smooth") {
       // Laplacian toward neighborhood average (1-ring approx via same face verts)
       let ax = 0;

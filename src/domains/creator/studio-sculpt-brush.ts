@@ -1,5 +1,6 @@
 /**
- * Studio Sculpt — 브러시 5종(draw / clay / smooth / grab / pinch). 전부 순수 함수다.
+ * Studio Sculpt — 브러시 10종(draw / clay / smooth / grab / pinch / inflate / crease /
+ * flatten / scrape / snakeHook). 전부 순수 함수다.
  *
  * ## 시그니처 규약
  * 브러시는 메시를 **직접 고치지 않는다**. `(ctx, params, out)` 을 받아 영향받는 정점 k 번째의
@@ -20,6 +21,11 @@
  *          (균일 가중 라플라시안. 코탄젠트 가중이 아니다 — 아래 한계 참고).
  *   grab   고정된 집합을 dab 이동 벡터 × weight 로 평행이동한다.
  *   pinch  브러시 중심 축으로 weight × strength × radius 만큼 끌어당긴다(direction −1 = 밀어냄).
+ *   inflate 법선 방향 균일 변위. weight(팔로프)를 무시해 영역 전체가 같은 비율로 부풀거나 줄어든다.
+ *   crease 중심축 당김(pinch 성분) + 법선 절삭(draw 반대 성분)을 합성한 V자 골/능선.
+ *   flatten 가중 무게중심·법선 평면으로의 순수 투영(clay 에서 offset 채우기를 뺀 형태).
+ *   scrape flatten 의 한쪽면 버전. 평면 기준 direction 쪽으로 튀어나온 정점만 닦아내린다.
+ *   snakeHook grab 과 같은 평행이동 산술이지만 pinning 이 없어 매 dab 영향 집합을 다시 잡는다.
  *
  * ## 결정성
  * 모든 루프가 `k` 오름차순이고, clay 의 누산도 같은 순서다. affected 배열의 순서는 스패셜 해시
@@ -36,7 +42,18 @@
 
 import type { SculptVertexAdjacency } from "./studio-sculpt-mesh";
 
-export const SCULPT_BRUSH_KINDS = ["draw", "clay", "smooth", "grab", "pinch"] as const;
+export const SCULPT_BRUSH_KINDS = [
+  "draw",
+  "clay",
+  "smooth",
+  "grab",
+  "pinch",
+  "inflate",
+  "crease",
+  "flatten",
+  "scrape",
+  "snakeHook",
+] as const;
 
 export type SculptBrushKind = (typeof SCULPT_BRUSH_KINDS)[number];
 
@@ -270,6 +287,156 @@ export function sculptPinchDisplacement(
   }
 }
 
+/** inflate — 법선 방향 균일 팽창. 팔로프 무시(풍선처럼 영역 전체가 같은 비율로 부풀음). */
+export function sculptInflateDisplacement(
+  ctx: SculptBrushContext,
+  params: SculptBrushParams,
+  out: Float32Array,
+): void {
+  const amount = params.radius * clamp01(params.strength) * params.direction;
+  for (let k = 0; k < ctx.affectedCount; k += 1) {
+    const base = ctx.affected[k] * 3;
+    out[k * 3] = ctx.normals[base] * amount;
+    out[k * 3 + 1] = ctx.normals[base + 1] * amount;
+    out[k * 3 + 2] = ctx.normals[base + 2] * amount;
+  }
+}
+
+/**
+ * crease — 날카로운 V자 골/능선. 중심축으로 당기는 성분과 법선 방향 절삭 성분을 합성한다.
+ * direction +1 이 골(파기), −1 이 능선(쌓기).
+ */
+export function sculptCreaseDisplacement(
+  ctx: SculptBrushContext,
+  params: SculptBrushParams,
+  out: Float32Array,
+): void {
+  const strength = clamp01(params.strength);
+  const depth = params.radius * strength * params.direction;
+  const pinch = params.radius * strength * 0.35;
+  for (let k = 0; k < ctx.affectedCount; k += 1) {
+    const base = ctx.affected[k] * 3;
+    const w = ctx.weights[k];
+    const dx = params.centerX - ctx.positions[base];
+    const dy = params.centerY - ctx.positions[base + 1];
+    const dz = params.centerZ - ctx.positions[base + 2];
+    const lengthSquared = dx * dx + dy * dy + dz * dz;
+    let pullX = 0;
+    let pullY = 0;
+    let pullZ = 0;
+    if (lengthSquared > 0) {
+      const scale = (pinch * w) / Math.sqrt(lengthSquared);
+      pullX = dx * scale;
+      pullY = dy * scale;
+      pullZ = dz * scale;
+    }
+    const cut = -depth * w;
+    out[k * 3] = pullX + ctx.normals[base] * cut;
+    out[k * 3 + 1] = pullY + ctx.normals[base + 1] * cut;
+    out[k * 3 + 2] = pullZ + ctx.normals[base + 2] * cut;
+  }
+}
+
+/** flatten — clay 에서 채우기(offset)를 뺀 순수 가중 평면 투영. */
+export function sculptFlattenDisplacement(
+  ctx: SculptBrushContext,
+  params: SculptBrushParams,
+  out: Float32Array,
+): void {
+  sculptPlaneProjectDisplacement(ctx, params, out, "both");
+}
+
+/** scrape — 한쪽 면만 깎는 flatten. 평면 기준 튀어나온 쪽만 담대로 눌러 닫는다. */
+export function sculptScrapeDisplacement(
+  ctx: SculptBrushContext,
+  params: SculptBrushParams,
+  out: Float32Array,
+): void {
+  sculptPlaneProjectDisplacement(ctx, params, out, params.direction === 1 ? "positive" : "negative");
+}
+
+type PlaneSideMode = "both" | "positive" | "negative";
+
+function sculptPlaneProjectDisplacement(
+  ctx: SculptBrushContext,
+  params: SculptBrushParams,
+  out: Float32Array,
+  mode: PlaneSideMode,
+): void {
+  let weightSum = 0;
+  let cx = 0;
+  let cy = 0;
+  let cz = 0;
+  let nx = 0;
+  let ny = 0;
+  let nz = 0;
+  for (let k = 0; k < ctx.affectedCount; k += 1) {
+    const base = ctx.affected[k] * 3;
+    const w = ctx.weights[k];
+    weightSum += w;
+    cx += ctx.positions[base] * w;
+    cy += ctx.positions[base + 1] * w;
+    cz += ctx.positions[base + 2] * w;
+    nx += ctx.normals[base] * w;
+    ny += ctx.normals[base + 1] * w;
+    nz += ctx.normals[base + 2] * w;
+  }
+  if (ctx.affectedCount === 0) return;
+  if (!(weightSum > 0)) {
+    out.fill(0, 0, ctx.affectedCount * 3);
+    return;
+  }
+  const inverse = 1 / weightSum;
+  cx *= inverse;
+  cy *= inverse;
+  cz *= inverse;
+  const normalLength = Math.sqrt(nx * nx + ny * ny + nz * nz);
+  if (normalLength > 0) {
+    nx /= normalLength;
+    ny /= normalLength;
+    nz /= normalLength;
+  } else {
+    nx = params.fallbackNormalX;
+    ny = params.fallbackNormalY;
+    nz = params.fallbackNormalZ;
+  }
+  const strength = clamp01(params.strength);
+  for (let k = 0; k < ctx.affectedCount; k += 1) {
+    const base = ctx.affected[k] * 3;
+    const distance =
+      (ctx.positions[base] - cx) * nx
+      + (ctx.positions[base + 1] - cy) * ny
+      + (ctx.positions[base + 2] - cz) * nz;
+    const above = distance > 0;
+    const active = mode === "both"
+      || (mode === "positive" ? above : !above);
+    if (!active) {
+      out[k * 3] = 0;
+      out[k * 3 + 1] = 0;
+      out[k * 3 + 2] = 0;
+      continue;
+    }
+    const scale = -distance * ctx.weights[k] * strength;
+    out[k * 3] = nx * scale;
+    out[k * 3 + 1] = ny * scale;
+    out[k * 3 + 2] = nz * scale;
+  }
+}
+
+/** snake hook — grab 산술이지만 매 dab 영향 집합을 다시 잡아 연속으로 끌고 간다(pinning 없음). */
+export function sculptSnakeHookDisplacement(
+  ctx: SculptBrushContext,
+  params: SculptBrushParams,
+  out: Float32Array,
+): void {
+  for (let k = 0; k < ctx.affectedCount; k += 1) {
+    const w = ctx.weights[k];
+    out[k * 3] = params.moveX * w;
+    out[k * 3 + 1] = params.moveY * w;
+    out[k * 3 + 2] = params.moveZ * w;
+  }
+}
+
 /** 디스패처 — 세션은 브러시 종류를 이 함수 하나로만 다룬다. */
 export function applySculptBrushDisplacement(
   brush: SculptBrushKind,
@@ -289,6 +456,21 @@ export function applySculptBrushDisplacement(
       return;
     case "pinch":
       sculptPinchDisplacement(ctx, params, out);
+      return;
+    case "inflate":
+      sculptInflateDisplacement(ctx, params, out);
+      return;
+    case "crease":
+      sculptCreaseDisplacement(ctx, params, out);
+      return;
+    case "flatten":
+      sculptFlattenDisplacement(ctx, params, out);
+      return;
+    case "scrape":
+      sculptScrapeDisplacement(ctx, params, out);
+      return;
+    case "snakeHook":
+      sculptSnakeHookDisplacement(ctx, params, out);
       return;
     case "draw":
     default:
