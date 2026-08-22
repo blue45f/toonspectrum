@@ -119,24 +119,35 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     // -----------------------------------------------------------------------
 
     // ── A. causal-ink:round:round:none:causal-pressure — 한 서명에 11종 ──────────
-    // pen·fineliner·ballpoint·felt-tip·marker·marker-bold 가 굵기 2.2→28 을 이미 덮습니다.
-    // 아래 다섯은 그 사이 값에 끼어 있을 뿐이라 실행 경로가 완전히 같습니다.
+    // pen·fineliner·marker·marker-bold 가 굵기 2.2→28 을 덮습니다. (2026-08-22 제2차 축소로
+    // 중간값 ballpoint·felt-tip 도 아래 A′ 항목으로 delist 됐습니다.)
+    // 원래 다섯은 그 사이 값에 끼어 있을 뿐이라 실행 경로가 완전히 같습니다.
     "gel-pen":
       "pen 과 실행 서명이 동일(causal-ink:round:round:none:causal-pressure) — 굵기 3.8/불투명도 1 로 "
-      + "fineliner(2.2)와 pen(6) 사이에 끼어 있을 뿐입니다. 대안: pen · fineliner · ballpoint(지침 6).",
+      + "fineliner(2.2)와 pen(6) 사이에 끼어 있을 뿐입니다. 대안: pen · fineliner(지침 6).",
     "glass-pen":
       "pen 과 실행 서명이 동일 — 선언된 \"잉크 흐름\"으로 분기하는 렌더러가 없어 굵기 3.1/농도 0.92 "
-      + "차이만 남습니다. 대안: ballpoint · fineliner · pen(지침 6).",
+      + "차이만 남습니다. 대안: fineliner · pen(지침 6).",
     "ruling-pen":
       "pen 과 실행 서명이 동일 — \"잉크 간격\" 변형이 페인트 시점에 실재하지 않아 굵기 4.6 의 pen "
-      + "입니다. 대안: pen · ballpoint · fineliner(지침 6).",
+      + "입니다. 대안: pen · fineliner(지침 6).",
     "technical-pen":
       "pen 과 실행 서명이 동일하고 굵기 2.5/불투명도 1 로 fineliner(2.2/1)와 사실상 같은 선. "
       + "대안: fineliner · pen(지침 6).",
     "alcohol-marker":
       "pen 과 실행 서명이 동일 — 알코올 마커의 블리드가 실재하지 않고 굵기 20/농도 0.65 로 "
-      + "marker(16/0.6)와 marker-bold(28/0.55) 사이에 끼어 있습니다. 대안: marker · marker-bold · "
-      + "felt-tip(지침 6).",
+      + "marker(16/0.6)와 marker-bold(28/0.55) 사이에 끼어 있습니다. 대안: marker · "
+      + "marker-bold(지침 6).",
+
+    // ── A′. causal-ink:round — 2026-08-22 제2차 로스터 축소(사용자 지시 재확인) ──
+    // 굵기·농도 축의 중간값만 더 정리합니다. 축 대표는 fineliner(2.2/1.0)·pen(6/1.0)·
+    // marker(16/0.6)·marker-bold(28/0.55) 가 그대로 유지됩니다.
+    "ballpoint":
+      "pen 과 실행 서명이 동일(causal-ink:round:round:none:causal-pressure) — 굵기 3.5/농도 0.95 는 "
+      + "fineliner(2.2/1.0)와 pen(6/1.0) 사이의 중간값입니다. 대안: pen · fineliner(지침 6).",
+    "felt-tip":
+      "pen 과 실행 서명이 동일 — 굵기 10/농도 0.85 로 pen(6/1.0)과 marker(16/0.6) 사이에 끼어 있는 "
+      + "중간값입니다. 대안: pen · marker · marker-bold(지침 6).",
 
     // ── B. perfect-outline:gpen-taper — 한 서명에 6종 ────────────────────────────
     // studio-perfect-freehand.ts 는 school-pen/liner/mapping-pen 을 아예 "gpen" 으로 별칭
@@ -165,16 +176,26 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
       + "대안: pencil · pencil-6b(지침 6).",
 
     // ── D. watercolor-dabs:diffuse:soft-diffuse:wet-edge — 한 서명에 7종 ──────────
-    // watercolor(수채) · ink-wash(수묵) · gouache(과슈) · inkwash-white-ink(화이트)만 남깁니다.
+    // watercolor(수채) · gouache(과슈) · inkwash-white-ink(화이트)만 남깁니다. (2026-08-22
+    // 제2차 축소로 코어 ink-wash 도 아래 D′ 항목으로 delist 됐습니다 — 수묵은 전용 레인이 대안.)
     "inkwash-pen":
       "이름은 딥펜이지만 watercolor 와 실행 서명이 동일한 확산 워시입니다(선언과 실재 불일치). "
-      + "실제 펜이 필요하면 pen·gpen, 워시가 필요하면 ink-wash 가 대안(지침 6).",
+      + "실제 펜이 필요하면 pen·gpen, 워시가 필요하면 watercolor 가 대안(지침 6).",
     "inkwash-water-brush":
       "watercolor 와 실행 서명이 동일하고 굵기 32/농도 0.6 으로 watercolor(28/0.55)와 같은 그림. "
-      + "대안: watercolor · ink-wash(지침 6).",
+      + "대안: watercolor(지침 6).",
     "inkwash-bleed-wash":
       "ink-wash 와 실행 서명이 동일하고 농도까지 0.5 로 같아 굵기 36/30 차이만 남습니다. "
-      + "대안: ink-wash · watercolor(지침 6).",
+      + "대안: watercolor(지침 6).",
+
+    // ── D′. watercolor-dabs:diffuse — 2026-08-22 제2차 로스터 축소 ────────────────
+    // 코어 ink-wash 는 watercolor 와 실행 서명·값이 사실상 같고, 수묵 표현은 노출 레인
+    // (ink-wash--sumi-core · ink-wash--bleed-halo · ink-wash--fiber-feather◆ ·
+    // ink-wash--chroma-halo◆ · ink-wash--living-bake◆)이 전담합니다.
+    "ink-wash":
+      "watercolor 와 실행 서명이 동일(watercolor-dabs:diffuse:soft-diffuse:wet-edge)하고 굵기 30/농도 "
+      + "0.5 는 watercolor(28/0.55)와 같은 결입니다. 수묵이 필요하면 ink-wash--sumi-core 등 수묵 레인이 "
+      + "대안(지침 6).",
 
     // ── E. 수채/수묵 엔진 레인 — (tip, texture) 짝이 겹치는 레인 ──────────────────
     "watercolor--granulating":
@@ -227,8 +248,8 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
 
     // ── H·I. 유화 리본 / 압출 레인 ────────────────────────────────────────────────
     "brush--oil-lanes":
-      "oil·acrylic 과 실행 서명이 동일(oil-ribbon:bristle-lanes) — 굵기 16 의 oil 입니다. "
-      + "대안: oil · acrylic · oil--filbert-ribbon(지침 6).",
+      "oil 과 실행 서명이 동일(oil-ribbon:bristle-lanes) — 굵기 16 의 oil 입니다. "
+      + "대안: oil · oil--filbert-ribbon(지침 6).",
     "acrylic--stiff-ribbon":
       "oil--flat-ribbon 과 tip(hard)·texture(procedural-bristle)가 같은 경질 평면 리본입니다. "
       + "대안: oil--flat-ribbon · acrylic · oil--impasto-ribbon(지침 6).",
@@ -238,6 +259,13 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     "acrylic--polymer-flat":
       "paint-tube 를 캐노니컬로 공유하는 hard 평면 레인이라 oil--knife-edge 와 같은 자국을 남깁니다. "
       + "대안: oil--knife-edge · paint-tube · oil--flat-ribbon(지침 6).",
+
+    // ── H′. oil-ribbon:bristle-lanes — 2026-08-22 제2차 로스터 축소 ───────────────
+    // 코어 acrylic 은 oil 과 서명·값이 사실상 같고, 유화 변주는 노출 레인(filbert·flat·
+    // impasto·impasto-relief◆·bristle-depletion◆·bristle-physics◆)이 전담합니다.
+    "acrylic":
+      "oil 과 실행 서명이 동일(oil-ribbon:bristle-lanes)하고 굵기 20/농도 0.95 는 oil(22/0.92)과 같은 "
+      + "결입니다. 대안: oil · oil--filbert-ribbon · oil--flat-ribbon(지침 6).",
 
     // ── J. 에어브러시·스프레이 ────────────────────────────────────────────────────
     "marker--soft-dynamic":

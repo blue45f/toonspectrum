@@ -66,8 +66,8 @@ export const STUDIO_BRUSH_CORE_SHELF_PRESET_IDS: readonly string[] = Object.free
   "brush",
   "highlighter",
   "fountain-pen",
-  "ballpoint",
-  "felt-tip",
+  // 2026-08-22 제2차 로스터 축소: ballpoint·felt-tip 은 causal-ink:round 서명의 굵기 중간값이라
+  // 격리 원장(A′)으로 delist 됐습니다 — 스타터 키트에서도 함께 뺐습니다.
   "standard-eraser",
   "kneaded-eraser",
   // 서브 툴 팔레트 — 펜
@@ -76,8 +76,7 @@ export const STUDIO_BRUSH_CORE_SHELF_PRESET_IDS: readonly string[] = Object.free
   // 서브 툴 팔레트 — 연필
   "pencil-6b",
   "colored-pencil",
-  // 서브 툴 팔레트 — 붓
-  "ink-wash",
+  // 서브 툴 팔레트 — 붓 (2026-08-22: ink-wash 는 watercolor 와 같은 서명이라 격리 D′로 delist)
   "ink-brush",
   "gouache",
   "oil",

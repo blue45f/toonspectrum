@@ -181,6 +181,11 @@ describe("studio brush variant group manifest", () => {
     // Note this wave delists three of the four ids the paragraph above blames for the stale
     // receipt (inkwash-water-brush, watercolor--granulating, mypaint-cc0--knife); gouache--matte-
     // body is the remaining continuous-policy failure and is NOT a duplicate, so it stays listed.
+    //
+    // 2026-08-22 SECOND REDUCTION WAVE (사용자 지시 재확인) — 4 more ids: ballpoint · felt-tip ·
+    // ink-wash · acrylic. Same mechanical rule as above: identical execution signature, separated
+    // only by slider-reproducible width/opacity, with an exposed in-group alternative kept
+    // (수묵은 ink-wash 레인, 유화 변주는 oil 레인이 유지합니다). 242 -> 238 listed.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -193,6 +198,8 @@ describe("studio brush variant group manifest", () => {
         "ruling-pen",
         "technical-pen",
         "alcohol-marker",
+        "ballpoint",
+        "felt-tip",
         "school-pen",
         "liner",
         "mapping-pen",
@@ -202,6 +209,7 @@ describe("studio brush variant group manifest", () => {
         "inkwash-pen",
         "inkwash-water-brush",
         "inkwash-bleed-wash",
+        "ink-wash",
         "watercolor--granulating",
         "watercolor--fluid-feather",
         "watercolor--dense-core",
@@ -220,6 +228,7 @@ describe("studio brush variant group manifest", () => {
         "acrylic--stiff-ribbon",
         "oil--tube-extrude",
         "acrylic--polymer-flat",
+        "acrylic",
         "marker--soft-dynamic",
         "airbrush--hard-envelope",
         "airbrush--klecks-grit",

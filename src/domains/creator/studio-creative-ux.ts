@@ -47,8 +47,7 @@ export const STUDIO_BEGINNER_BRUSH_IDS = [
   // 2026-08-21 로스터 축소: gel-pen·school-pen 을 스타터 키트에서 뺐습니다. 둘 다 pen/gpen 과
   // 실행 서명이 같아(굵기만 다름) 초보 키트 한 줄에 같은 선이 다섯 번 보이던 자리였습니다.
   // 두 id 는 격리 원장으로 옮겼고, 저장된 문서는 계속 원래 브러시로 재생됩니다.
-  "ballpoint",
-  "felt-tip",
+  // 2026-08-22 제2차 축소: ballpoint·felt-tip 도 같은 서명의 굵기 중간값이라 뺐습니다(격리 A′).
   "standard-eraser",
   "kneaded-eraser",
 ] as const;
@@ -72,7 +71,8 @@ export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
   "soft-pencil",
   "erodible-pencil",
   "watercolor",
-  "ink-wash",
+  // 2026-08-22 제2차 축소: ink-wash 는 watercolor 와 실행 서명·값이 같아 격리 원장으로
+  // 옮겼습니다(격리 D′). 수묵 표현은 ink-wash--sumi-core 등 전용 레인이 유지합니다.
   "inkwash-pen",
   "inkwash-water-brush",
   "inkwash-bleed-wash",
