@@ -405,12 +405,13 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   },
   book: {
     anchors: [
-      handAnchor("primary", "primary", [-0.07, -0.045, 0], 0.015),
-      handAnchor("secondary", "secondary", [0.07, -0.045, 0], 0.015),
+      // 뒷표지 중앙(두께 위쪽 면)이 손바닥에 얹히는 접점. 책은 XY 평면에 눕고 두께가 Z다.
+      handAnchor("primary", "primary", [0, 0.045, 0.008], 0.015),
+      handAnchor("secondary", "secondary", [0, -0.045, 0.008], 0.015),
     ],
     grip: grip("support", 0.015, 22, 24),
     fit: fit("hand", 0.075, 0.72, 1.45),
-    smartRotationDeg: [0, 0, 90],
+    smartRotationDeg: [0, 0, 0],
     secondaryGripInfluence: 0.65,
   },
   fan: {
