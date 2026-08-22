@@ -10,8 +10,12 @@ import {
   type StudioEditableMesh,
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
+import { fillHoleStudioEditableMesh } from "./studio-mesh-ops-modeling";
 
 export const STUDIO_MESH_OPS_ADVANCED_REVISION = 2 as const;
+
+const MAX_OPS_VERTICES = 200_000 as const;
+const MAX_OPS_INDICES = 1_200_000 as const;
 
 export type StudioMeshOpsResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -175,7 +179,13 @@ export function subdivideStudioMeshCatmullLite(
   return ok(current);
 }
 
-/** MOD-018: decimate by collapsing shortest edges until target triangle ratio. */
+/**
+ * MOD-018: deterministic shortest-edge-collapse decimation.
+ *
+ * Exact-position welding first, then union-find merges of the shortest edges until the logical
+ * vertex count approaches the requested ratio. Degenerate faces are dropped on rebuild, so the
+ * result keeps a connected shell instead of punching stride holes.
+ */
 export function decimateStudioMesh(
   mesh: StudioEditableMesh,
   ratio: number,
@@ -183,24 +193,181 @@ export function decimateStudioMesh(
   const r = Math.max(0.05, Math.min(1, ratio));
   if (r >= 0.999) return ok(mesh);
   const soup = studioEditableMeshToTriangleSoup(mesh);
-  const target = Math.max(1, Math.floor((soup.indices.length / 3) * r));
-  // Simple: randomly drop triangles deterministically by index stride
-  const step = Math.max(1, Math.floor(1 / r));
-  const indices: number[] = [];
-  let kept = 0;
-  for (let t = 0; t < soup.indices.length / 3; t += 1) {
-    if (t % step === 0 || kept < target) {
-      indices.push(
-        soup.indices[t * 3]!,
-        soup.indices[t * 3 + 1]!,
-        soup.indices[t * 3 + 2]!,
-      );
-      kept += 1;
-      if (kept >= target && t % step !== 0) break;
+  const soupVertexCount = soup.positions.length / 3;
+  if (soupVertexCount > MAX_OPS_VERTICES || soup.indices.length > MAX_OPS_INDICES) {
+    return fail("budget-exceeded", "mesh exceeds decimate budgets");
+  }
+  const q = 1e5;
+  const weldKeyOf = (i: number) =>
+    `${Math.round(soup.positions[i * 3]! * q)}|${Math.round(soup.positions[i * 3 + 1]! * q)}|${Math.round(soup.positions[i * 3 + 2]! * q)}`;
+  const weldIndex = new Map<string, number>();
+  const remap = new Int32Array(soupVertexCount);
+  let logicalCount = 0;
+  for (let i = 0; i < soupVertexCount; i += 1) {
+    const key = weldKeyOf(i);
+    let target = weldIndex.get(key);
+    if (target === undefined) {
+      target = logicalCount;
+      logicalCount += 1;
+      weldIndex.set(key, target);
+    }
+    remap[i] = target;
+  }
+  const positions = new Float64Array(logicalCount * 3);
+  for (let i = 0; i < soupVertexCount; i += 1) {
+    const t = remap[i]!;
+    positions[t * 3] = soup.positions[i * 3]!;
+    positions[t * 3 + 1] = soup.positions[i * 3 + 1]!;
+    positions[t * 3 + 2] = soup.positions[i * 3 + 2]!;
+  }
+  const tris: number[] = [];
+  for (let t = 0; t < soup.indices.length; t += 3) {
+    const a = remap[soup.indices[t]!]!;
+    const b = remap[soup.indices[t + 1]!]!;
+    const c = remap[soup.indices[t + 2]!]!;
+    if (a === b || b === c || a === c) continue;
+    tris.push(a, b, c);
+  }
+  if (tris.length < 3) return fail("empty", "mesh has no usable triangles");
+
+  interface CollapseEdge {
+    readonly a: number;
+    readonly b: number;
+    readonly lengthSquared: number;
+  }
+  const seenEdge = new Set<string>();
+  const edges: CollapseEdge[] = [];
+  for (let t = 0; t < tris.length; t += 3) {
+    for (let k = 0; k < 3; k += 1) {
+      const a = tris[t + k]!;
+      const b = tris[t + ((k + 1) % 3)]!;
+      const lo = Math.min(a, b);
+      const hi = Math.max(a, b);
+      const key = `${lo}|${hi}`;
+      if (seenEdge.has(key)) continue;
+      seenEdge.add(key);
+      const dx = positions[hi * 3]! - positions[lo * 3]!;
+      const dy = positions[hi * 3 + 1]! - positions[lo * 3 + 1]!;
+      const dz = positions[hi * 3 + 2]! - positions[lo * 3 + 2]!;
+      edges.push({
+        a: lo,
+        b: hi,
+        lengthSquared: dx * dx + dy * dy + dz * dz,
+      });
     }
   }
-  if (indices.length < 3) return fail("empty", "decimate removed all");
-  return ok(soupToMesh(soup.positions, new Uint32Array(indices)));
+  edges.sort((left, right) =>
+    left.lengthSquared - right.lengthSquared
+    || left.a - right.a
+    || left.b - right.b
+  );
+
+  const minRoots = 4;
+  const minSurvivors = Math.max(minRoots, Math.floor(tris.length / 3 * r));
+  const targetRoots = Math.max(minRoots, Math.ceil(logicalCount * r));
+  const parent = new Int32Array(logicalCount);
+  for (let i = 0; i < logicalCount; i += 1) parent[i] = i;
+  const findRoot = (start: number): number => {
+    let root = start;
+    while (parent[root] !== root) root = parent[root]!;
+    let cursor = start;
+    while (parent[cursor] !== cursor) {
+      const next = parent[cursor]!;
+      parent[cursor] = root;
+      cursor = next;
+    }
+    return root;
+  };
+  const triCountTotal = tris.length / 3;
+  const alive = new Uint8Array(triCountTotal).fill(1);
+  let aliveCount = triCountTotal;
+  const vertTris: number[][] = Array.from(
+    { length: logicalCount },
+    () => [] as number[],
+  );
+  for (let t = 0; t < triCountTotal; t += 1) {
+    for (let k = 0; k < 3; k += 1) vertTris[tris[t * 3 + k]!]!.push(t);
+  }
+  const cornerRootIs = (t: number, root: number): boolean =>
+    findRoot(tris[t * 3]!) === root
+    || findRoot(tris[t * 3 + 1]!) === root
+    || findRoot(tris[t * 3 + 2]!) === root;
+
+  let roots = logicalCount;
+  for (const edge of edges) {
+    if (roots <= targetRoots) break;
+    const ra = findRoot(edge.a);
+    const rb = findRoot(edge.b);
+    if (ra === rb) continue;
+    // Collapsing this edge kills the live triangles that span both endpoints.
+    let dying = 0;
+    let firstOpposite = -1;
+    let secondOpposite = -1;
+    for (const t of vertTris[rb]!) {
+      if (alive[t] !== 1 || !cornerRootIs(t, ra)) continue;
+      dying += 1;
+      // Opposite corner of rb inside this triangle.
+      const corners = [tris[t * 3]!, tris[t * 3 + 1]!, tris[t * 3 + 2]!];
+      const opposite = corners.find((corner) => {
+        const root = findRoot(corner);
+        return root !== ra && root !== rb;
+      });
+      if (opposite === undefined) {
+        dying = Number.MAX_SAFE_INTEGER;
+        break;
+      }
+      if (firstOpposite < 0) firstOpposite = findRoot(opposite);
+      else secondOpposite = findRoot(opposite);
+    }
+    // Link-condition shortcut: only interior edges with exactly two live incident
+    // triangles and two distinct opposite vertices collapse safely.
+    if (dying !== 2 || firstOpposite === secondOpposite) continue;
+    if (aliveCount - dying < minSurvivors) continue;
+    // Midpoint placement keeps the shell centered where detail is removed.
+    positions[ra * 3] = (positions[ra * 3]! + positions[rb * 3]!) / 2;
+    positions[ra * 3 + 1] = (positions[ra * 3 + 1]! + positions[rb * 3 + 1]!) / 2;
+    positions[ra * 3 + 2] = (positions[ra * 3 + 2]! + positions[rb * 3 + 2]!) / 2;
+    parent[rb] = ra;
+    for (const t of vertTris[rb]!) {
+      if (alive[t] === 1 && cornerRootIs(t, ra)) {
+        alive[t] = 0;
+        aliveCount -= 1;
+      }
+    }
+    vertTris[ra]!.push(...vertTris[rb]!);
+    vertTris[rb] = [];
+    roots -= 1;
+  }
+
+  const rootToOutput = new Map<number, number>();
+  const outPositions: number[] = [];
+  const outIndices: number[] = [];
+  for (let t = 0; t < triCountTotal; t += 1) {
+    if (alive[t] === 0) continue;
+    const mapped: number[] = [];
+    let degenerate = false;
+    for (let k = 0; k < 3; k += 1) {
+      const root = findRoot(tris[t * 3 + k]!);
+      let index = rootToOutput.get(root);
+      if (index === undefined) {
+        index = outPositions.length / 3;
+        rootToOutput.set(root, index);
+        outPositions.push(positions[root * 3]!, positions[root * 3 + 1]!, positions[root * 3 + 2]!);
+      }
+      if (mapped.includes(index)) {
+        degenerate = true;
+        break;
+      }
+      mapped.push(index);
+    }
+    if (!degenerate) outIndices.push(mapped[0]!, mapped[1]!, mapped[2]!);
+  }
+  if (outIndices.length < 3) return fail("empty", "decimate removed every face");
+  // Collapse shortcuts can pinch a corner open on irregular valence — cap any boundary loop
+  // so the decimated shell stays closed.
+  const rebuilt = soupToMesh(new Float32Array(outPositions), new Uint32Array(outIndices));
+  const capped = fillHoleStudioEditableMesh(rebuilt);
+  return capped.ok ? capped : ok(rebuilt);
 }
 
 /** MOD-020: simple bend deform along Y axis. */

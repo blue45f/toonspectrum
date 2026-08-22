@@ -15,6 +15,7 @@ import {
   type StudioEditableMesh,
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
+import { decimateStudioMesh } from "./studio-mesh-ops-advanced";
 import { sha256HexPortable } from "./studio-sha256";
 import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
 
@@ -2374,7 +2375,7 @@ function applyWeld(
   return ok(soupToMesh(new Float32Array(positions), new Uint32Array(indices)));
 }
 
-/** MOD-018: deterministic stride decimation toward a target triangle ratio. */
+/** MOD-018: deterministic shortest-edge-collapse decimation toward a triangle ratio. */
 function applyDecimate(
   mesh: StudioEditableMesh,
   metrics: StudioMeshEvaluationMetrics,
@@ -2388,31 +2389,24 @@ function applyDecimate(
   const triangleCount = soup.indices.length / 3;
   const target = Math.max(4, Math.floor(triangleCount * mod.ratio));
   if (target >= triangleCount) return ok(mesh);
-  const step = Math.max(1, Math.ceil(triangleCount / target));
-  const keptPositions = new Float32Array(soup.positions);
-  const indices: number[] = [];
-  for (let t = 0; t < triangleCount; t += 1) {
-    if (t % step !== 0 && indices.length / 3 < target) continue;
-    if (t % step !== 0) continue;
-    indices.push(
-      soup.indices[t * 3]!,
-      soup.indices[t * 3 + 1]!,
-      soup.indices[t * 3 + 2]!,
+  // Edge-collapse keeps the shell closed; the op owns determinism and degenerate cleanup.
+  const decimated = decimateStudioMesh(mesh, mod.ratio);
+  if (!decimated.ok) {
+    return fail(
+      decimated.code === "budget-exceeded" ? "budget-exceeded" : "invalid-parameter",
+      `${context}: ${decimated.detail}`,
     );
-  }
-  if (indices.length < 3) {
-    return fail("invalid-parameter", `${context}: decimate removed every face`);
   }
   const reserved = reserveGeneratedMesh(
     budget,
-    soup.positions.length / 3,
-    indices.length,
-    checkedSum(keptPositions.byteLength, indices.length * 4) ?? Number.NaN,
-    checkedSum(triangleCount, indices.length) ?? Number.NaN,
+    decimated.value.vertices.length,
+    studioEditableMeshToTriangleSoup(decimated.value).indices.length,
+    checkedProduct(decimated.value.vertices.length, 128) ?? Number.NaN,
+    checkedSum(triangleCount, decimated.value.vertices.length) ?? Number.NaN,
     context,
   );
   if (!reserved.ok) return reserved;
-  return ok(soupToMesh(keptPositions, new Uint32Array(indices)));
+  return ok(decimated.value);
 }
 
 /** MOD-020 subset: twist/taper/stretch along a world axis. */
