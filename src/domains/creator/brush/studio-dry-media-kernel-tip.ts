@@ -389,9 +389,17 @@ interface KernelStrokeTooth {
   readonly space: "stroke-world" | "arc-lane";
   /** Pore-threshold ratio on the lateral edge lanes (1 = full pore density, 0 = solid rails). */
   readonly railThresholdRatio?: number;
+  /**
+   * Low-frequency deposit patchiness (powder media only). Real sticks do not lay down ink
+   * uniformly: the surface catches and skips in broad patches as paper roughness varies under
+   * the stroke. One extra value-noise evaluation per DAB (never per texel), zero-mean so the
+   * stroke's mean density is preserved. Wax sticks are excluded — their identity is the
+   * continuous dragged bed.
+   */
+  readonly patch?: Readonly<{ scale: number; depth: number; saltX: number; saltY: number }>;
 }
 
-const KERNEL_STROKE_TOOTH = Object.freeze({
+const KERNEL_STROKE_TOOTH: Readonly<Record<StudioDryMediaCoreId, KernelStrokeTooth>> = Object.freeze({
   crayon: Object.freeze({
     depth: 1,
     threshold: 0.6,
@@ -406,6 +414,9 @@ const KERNEL_STROKE_TOOTH = Object.freeze({
     width: 0.08,
     scale: 2.8,
     space: "stroke-world",
+    // No broad patch field: measured A/B showed the Klecks powder body already carries
+    // multi-scale granularity, and the added low-frequency modulation split its bed into
+    // readable bands at high zoom instead of catching/skipping organically.
   }),
   charcoal: Object.freeze({
     depth: 0.95,
@@ -413,6 +424,7 @@ const KERNEL_STROKE_TOOTH = Object.freeze({
     width: 0.08,
     scale: 2,
     space: "stroke-world",
+    patch: Object.freeze({ scale: 14, depth: 0.32, saltX: 23.9, saltY: -41.1 }),
   }),
   pastel: Object.freeze({
     depth: 0.95,
@@ -420,6 +432,7 @@ const KERNEL_STROKE_TOOTH = Object.freeze({
     width: 0.08,
     scale: 2.6,
     space: "stroke-world",
+    patch: Object.freeze({ scale: 18, depth: 0.26, saltX: 47.3, saltY: -11.7 }),
   }),
   "oil-pastel": Object.freeze({
     depth: 0.95,
@@ -429,7 +442,7 @@ const KERNEL_STROKE_TOOTH = Object.freeze({
     space: "arc-lane",
     railThresholdRatio: 0.6,
   }),
-} as const satisfies Readonly<Record<StudioDryMediaCoreId, KernelStrokeTooth>>);
+});
 
 /** Native kernel lane count per material (the bridge's expanded-index modulus). */
 const KERNEL_NATIVE_LANE_COUNT = Object.freeze({
@@ -494,7 +507,18 @@ export function studioDryMediaKernelStrokeToothMultiplier(
     seed,
   );
   const pore = clamp01((tooth.threshold - noise) / tooth.width + 0.5);
-  return 1 - tooth.depth * pore;
+  const patch = tooth.patch;
+  if (!patch) return 1 - tooth.depth * pore;
+  // Zero-mean broad deposit modulation: pigment thins where the smooth paper "skips" and
+  // thickens where the rough patches "catch". Same value-noise budget class as the pore term
+  // (one lattice evaluation per dab), fully deterministic in (material, x, y, seed).
+  const patchNoise = studioOssValueNoise2d(
+    (dab.x - strokeOriginX) / patch.scale + patch.saltX,
+    (dab.y - strokeOriginY) / patch.scale + patch.saltY,
+    seed ^ 0x51c4_e9d5,
+  );
+  const patchMultiplier = clamp01(1 + (patchNoise - 0.5) * 2 * patch.depth);
+  return (1 - tooth.depth * pore) * patchMultiplier;
 }
 
 export const STUDIO_DRY_MEDIA_KERNEL_TIP_WIDTH_STEPS = 8;

@@ -29,6 +29,11 @@ for existing.
 3. **Oil-pastel unified bed** — band envelope floor 0.3 keeps pigment between lanes;
    the clean white "cables" between fibres are gone. Crayon keeps hard-zero ridges
    (its material identity).
+4. **Broad catch/skip patches (charcoal depth 0.32 @ 14 px, pastel 0.26 @ 18 px)** —
+   one extra value-noise evaluation per dab, zero-mean, so real sticks thin where smooth
+   paper skips and densify where rough patches catch. Measured A/B rejected the same field
+   for chalk: its Klecks powder body already carries multi-scale granularity and the added
+   modulation split its bed into readable bands at high zoom.
 
 ## Measured results
 
