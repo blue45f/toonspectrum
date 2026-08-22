@@ -59,15 +59,49 @@ receipt 부재 시 커밋이 더 긴 prefix(더 많은 댑)를 칠 수도 있으
 성김)이므로, 커밋이 **tipLayers/scatter 단계에서 다른 조건**으로 이어지는 지점까지
 함께 대조할 것. 2위 A(활성 시드 계보), 3위 B(페이지 스위치 경합).
 
-## 남은 유력 가설 상세
+## 2차 세션 진전 (같은 날)
 
-A. **활성 스트로크 시드 계보** — pointer-down 부착 시드와 릴리스 재계산 시드 비교 로그가 1차 실험.
+### 플래너 계약은 무죄 — 렌더 합성 계약이 유력
 
-B. **용지 표면 소스 불일치** — 페이지 스위치 직후 첫 획의 전역/prop 경합만 잔여 가능성.
-   같은 페이지에서 두 값 덤프·diff가 2차 실험.
+`studio-brush-carrier-quality.test.ts`(469행)가 이미 dry-media 레인의
+라이브 segmented vs retained 마크 완전 일치를 단언하고 통과한다. 즉 **동일 입력에 대한
+계획 출력은 동일**이고, 차이는 런타임 입력 불일치 또는 렌더 표면 합성에 있다.
 
-C. **activeDraft 분기 누수** — exactPlan의 acceptedPrefixReceipt와 커밋 경로의
-   접수 유무 대조. receipt 부재 시 prefix 선택이 달라지는 지점 추적.
+### 새 측정: 커밋 알파가 체계적으로 0.78×
+
+| 집단 | n | live 세기 | released 세기 |
+| --- | ---: | --- | --- |
+| 공통 픽셀(양쪽 모두 잉크) | 885 | 평균 31.7 | 평균 24.8 (**0.78×**) |
+| 사라진 픽셀(live만) | 405 | p50 23 | — |
+| 남은 픽셀(live 기준) | 885 | p50 33 | — |
+
+사라진 픽셀은 정확히 **약한 입자**(p50 23 vs 남은 것 33)다. 커밋이 전체 알파를
+~0.78×로 스케일 다운하면 약한 입자가 >8 가시 임계 아래로 떨어져 사라진다 — 관측된
+"균등 밀도 손실"과 정확히 같은 부호.
+
+### 가설 D(신규 최상위): 합성 경로 차이
+
+- 오버레이: `drawMarksToActive`가 마크마다 `renderStudioDynamicBrushCoverageMark`
+  (mark.alpha 그대로, source-over 누적)로 active 캔버스에 직접 적립, 프레젠테이션에서
+  opacity 1회.
+- 커밋(Konva): `renderStudioDynamicBrushCoverage` — 타일 오프스크린에 마크를 모아
+  블리트 시 `globalAlpha = inherited × opacity` 1회(바운디드 플로우 v2 "최종 커버리지
+  합성" 주석). 캐리어 이름 `…union-causal-group-alpha-max-v3`가 뜻하는 그룹 알파-max/
+  단일 합성이 오버레이 증분 경로와 어긋나면, 겹침 스택이 살아있는 라이브가 더 짙고
+  커밋이 성겨진다 — 관측과 같은 방향·규모.
+- 배제 업데이트: 예산·격자·시드 공식·용지 동기화·팁 캐시는 1차 세션과 동일하게 기각
+  유지. DPR은 양쪽 devicePixelRatio 사용으로 무해 판정.
+
+### 다음 실험 (3차 세션 첫 작업)
+
+1. 결정 실험: 동일 마크 배열을 (a) 마크별 직접 적립, (b)
+   `renderStudioDynamicBrushCoverage` 타일 경로로 각각 렌더해 픽셀 회수·세기 분포 비교.
+   브라우저 캔버스 필요 — `verify-studio-brushes.mts` 하네스에 프로브 페이지로 얹거나
+   `scripts/studio-gpu-committed-parity-browser.ts` 패턴 재사용.
+2. 1에서 재현되면 수정은 오버레이 active 합성을 커밋 타일 합성과 동일 계약으로 통일
+   (`renderStudioDynamicBrushCoverage(activeDraft:true)` 경로로 옮기는 것 포함 검토).
+3. 이후 `TOONSPECTRUM_BRUSH_VERIFY_IDS=dry-media pnpm verify:studio-brushes` 재실행으로
+   centroid-drift 소멸 확인.
 
 ## 재현
 
