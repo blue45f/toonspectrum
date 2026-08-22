@@ -35,5 +35,10 @@
     "**/*.mts",
     "scripts/studio-gpu-committed-parity-browser.ts"
   ],
-  "exclude": ["node_modules", "apps/**", "dist/**"]
+  "exclude": [
+    "node_modules",
+    "apps/**",
+    "dist/**",
+    "**/__diag*"
+  ]
 }
