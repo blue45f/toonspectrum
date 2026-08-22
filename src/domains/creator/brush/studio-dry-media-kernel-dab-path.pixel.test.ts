@@ -33,7 +33,10 @@ import {
 import { STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID } from "./studio-brush-render-budget";
 import { sampleStudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
 import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
-import { STUDIO_DRY_MEDIA_CORE_IDS } from "./studio-dry-media-kernel-tip";
+import {
+  STUDIO_DRY_MEDIA_CORE_IDS,
+  STUDIO_DRY_MEDIA_KERNEL_TIP_VERSION,
+} from "./studio-dry-media-kernel-tip";
 
 
 type ResvgWasmModule = typeof import("@resvg/resvg-wasm");
@@ -431,7 +434,7 @@ describe("dry-media kernel dab path (de-polygon)", () => {
       expect(
         marks.every((mark) =>
           String(mark.texture?.alphaMap.revision ?? "")
-            .startsWith("dry-media-kernel-tip-v1")),
+            .startsWith(STUDIO_DRY_MEDIA_KERNEL_TIP_VERSION)),
         brushId,
       ).toBe(true);
       // Fresh authored dynamics never carry the legacy union program pin.

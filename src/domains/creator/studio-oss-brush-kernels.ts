@@ -395,7 +395,12 @@ export function studioOssDirectionalWaxSample(
   const wax = broad * 0.18 + fine * 0.22 + fibre * 0.6;
   return {
     wax,
-    scrape: Math.max(0, fibre - 0.42),
+    // Scrape grooves get a fine-threshold modulation: a raw `fibre` cut makes paper-reveal
+    // grooves with optically smooth (C1) edges, which reads as etched plastic rather than a waxy
+    // stick skipping over tooth. Dithering the threshold with the high-frequency `fine` octave
+    // raggeds the groove boundary at pigment-grain scale while leaving groove placement,
+    // depth statistics and determinism untouched.
+    scrape: Math.max(0, fibre - 0.42 + (fine - 0.5) * 0.12),
     grit: Math.max(0, fine - 0.55),
   };
 }

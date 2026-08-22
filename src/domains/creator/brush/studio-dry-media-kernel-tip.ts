@@ -286,7 +286,7 @@ interface KernelTipShaping {
    * plateau disk merges the lanes into one flat slab. `zeroAt` is the |ny| where coverage ends,
    * `shoulder` its transition width.
    */
-  readonly band?: Readonly<{ zeroAt: number; shoulder: number }>;
+  readonly band?: Readonly<{ zeroAt: number; shoulder: number; floor?: number }>;
   /**
    * Deposition linearization exponent (libmypaint `opaque_linearize` DNA, ISC): the stroke-level
    * pigment target is reached through overlapping fibre dabs, so the per-dab source-over alpha is
@@ -350,7 +350,7 @@ const KERNEL_TIP_SHAPING: Readonly<Record<StudioDryMediaCoreId, KernelTipShaping
     gamma: 0.8,
     gain: 2.2,
     rimShoulder: 0.08,
-    band: Object.freeze({ zeroAt: 0.72, shoulder: 0.14 }),
+    band: Object.freeze({ zeroAt: 0.72, shoulder: 0.14, floor: 0.3 }),
     depositionLinearize: 4,
   }),
 });
@@ -536,7 +536,14 @@ export function shapeStudioDryMediaKernelTipCoverage(
       (shaping.band.zeroAt * widthRatio - Math.abs(normalizedY))
         / shaping.band.shoulder,
     );
-    bandEnvelope = band * band * (3 - 2 * band);
+    const envelope = band * band * (3 - 2 * band);
+    // `floor` keeps pigment between fibre lanes instead of paper. Oil pastel's bed is one
+    // occlusive wax film with subtle ridges; a hard-zero band turned the inter-lane gaps into
+    // clean white cables, which no real oil stick produces. Crayon keeps floor 0 — its
+    // separated wax ridges are the material's identity.
+    bandEnvelope = shaping.band.floor
+      ? shaping.band.floor + (1 - shaping.band.floor) * envelope
+      : envelope;
   }
   return clamp01(rawCoverage ** shaping.gamma * shaping.gain)
     * rimEnvelope
