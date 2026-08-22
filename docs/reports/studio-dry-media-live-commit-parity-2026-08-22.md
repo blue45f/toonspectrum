@@ -39,26 +39,35 @@ settled == released이므로 오토세이브 재생은 커밋과 패리티다(�
 4. **포인트 집합 차이** — `dynamicSourceFromElement`/`dynamicSourceMatchesElement`가
    element.points == 원본 샘플 계약을 강제한다. settled이 커밋과 일치하는 것과 함께,
    el.points 손상 가능성은 낮다. (단, 라우트가 짧아 여유 있는 검증은 아니다.)
+5. **용지 표면 소스 불일치(가설 B 약화)** — StudioPage가 useEffect로
+   `setStudioDocumentPaperSurface(normalize(activePage.paperSurface))` 동기화하므로
+   정상 상태에서 라이브 전역 조회와 커밋 prop은 수렴한다. 페이지 스위치 직후 첫 획
+   같은 경합 엣지만 남는다.
+6. **팁 캐시 버전 불일치** — 커널 팁 캐시 키에 `STUDIO_DRY_MEDIA_KERNEL_TIP_VERSION`
+   이 포함되어 v1→v2 전환이 두 경로에 동시 적용된다. 기각.
+7. **오버레이 자체 릴리스 재계획** — 오버레이는 릴리스 시 exactPlan을 active 캔버스에
+   다시 그려 settled을 만들고, 검증 비교 대상은 Konva retained 렌더다. settled==released
+   는 오버레이 내부 일관성 확인일 뿐 커밋 패리티와 무관 — 비교 축이 맞음을 확인.
 
-## 남은 유력 가설 (다음 세션 첫 작업)
+## 남은 유력 가설의 우선순위 갱신
 
-A. **활성 스트로크 시드 계보** — 포인터다운에서 태어나는 detached 스타일의 seed가
-   릴리스 후 `${element.id}:${dynamics.seed}` 재계산값과 다르면, 라이브 동안 본
-   흩뿌림 패턴과 커밋 패턴이 달라져 "균등한 밀도 차"로 관측될 수 있다.
-   → pointer-down 부착 지점에서 seed를 로그로 남겨 릴리스 값과 비교하는 것이 1차 실험.
+1위는 C(activeDraft 분기와 prefix receipt 접수 유무) — 예산 방향이 반대라 기각했던
+것과 달리, **접수(receipt) 유무**는 예산 크기와 별개로 prefix 선택을 바꾼다.
+exactPlan은 `acceptedPrefixReceipt.acceptedDabsPerVariation`로 잘라 붙이고,
+커밋 경로(`planStudioDynamicBrushRender`)의 receipt 발급 여부는 아직 확인 전이다.
+receipt 부재 시 커밋이 더 긴 prefix(더 많은 댑)를 칠 수도 있으나 관측은 반대(커밋이
+성김)이므로, 커밋이 **tipLayers/scatter 단계에서 다른 조건**으로 이어지는 지점까지
+함께 대조할 것. 2위 A(활성 시드 계보), 3위 B(페이지 스위치 경합).
 
-B. **용지 표면 소스 불일치** — 라이브는 `resolveStudioDocumentPaperSurface()`,
-   커밋은 `normalizeStudioPaperSurfaceSettings(activePage.paperSurface)`(viewport prop).
-   dry-media v2 팁의 catch/skip 변조는 용지 응답에 의해 밀도를 직접 바꾼다
-   (docs/brush-texture-competitive-analysis-2026-08-22.md §4). 두 소스가 한 점이라도
-   어긋나면 전 구간 균등 밀도 차가 나온다.
-   → 두 값을 같은 페이지에서 덤프해 diff 하는 것이 2차 실험.
+## 남은 유력 가설 상세
 
-C. **activeDraft 분기 누수** — `STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET`은
-   `planStudioDynamicBrushRender(el, id, activeDraft=true)` 경로에만 적용된다.
-   릴리스 직후 같은 요소가 activeDraft=false로 재계획되며 prefix receipt 없이
-   다른 prefix가 남을 가능성. exactPlan의 acceptedPrefixReceipt와 커밋 쪽 접수
-   유무를 대조할 것.
+A. **활성 스트로크 시드 계보** — pointer-down 부착 시드와 릴리스 재계산 시드 비교 로그가 1차 실험.
+
+B. **용지 표면 소스 불일치** — 페이지 스위치 직후 첫 획의 전역/prop 경합만 잔여 가능성.
+   같은 페이지에서 두 값 덤프·diff가 2차 실험.
+
+C. **activeDraft 분기 누수** — exactPlan의 acceptedPrefixReceipt와 커밋 경로의
+   접수 유무 대조. receipt 부재 시 prefix 선택이 달라지는 지점 추적.
 
 ## 재현
 
