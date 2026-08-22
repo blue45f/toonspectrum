@@ -107,6 +107,14 @@ export interface StudioHybridDccViewportProps {
   readonly onComponentSelectionError?: (message: string) => void;
   /** Keeps camera inspection available while preventing stale edits during async engine work. */
   readonly editingDisabled?: boolean;
+  /**
+   * 활성 조형 브러시. 주어지면 선택 오브젝트 위에서의 포인터 드래그가 로컬 좌표 스트로크로 전달된다.
+   */
+  readonly onSculptStroke?: (assetId: string, localPoint: {
+    x: number;
+    y: number;
+    z: number;
+  }) => void;
   readonly defaultTransformMode?: StudioHybridDccTransformMode;
   readonly defaultTransformSpace?: StudioHybridDccTransformSpace;
   /** Test/embedding override. `undefined` performs a browser WebGL capability probe after mount. */
@@ -910,6 +918,7 @@ function StudioHybridDccAssetMesh({
   editingDisabled,
   transformMode,
   transformSpace,
+  sculptStroke,
 }: {
   readonly asset: StudioHybridDccViewportAssetSnapshot;
   readonly onCommitTransform?: (
@@ -931,6 +940,8 @@ function StudioHybridDccAssetMesh({
   readonly editingDisabled: boolean;
   readonly transformMode: StudioHybridDccTransformMode;
   readonly transformSpace: StudioHybridDccTransformSpace;
+  /** 활성화되면 포인터 드래그가 오브젝트 로컬 좌표로 조형 스트로크를 보낸다. */
+  readonly sculptStroke?: (localPoint: { x: number; y: number; z: number }) => void;
 }) {
   const [resource, setResource] = useState<StudioHybridDccGeometryResource | null>(null);
   const objectRef = useRef<THREE.Group>(null);
@@ -959,6 +970,20 @@ function StudioHybridDccAssetMesh({
         geometry={resource.geometry}
         castShadow
         receiveShadow
+        onPointerDown={(event: ThreeEvent<PointerEvent>) => {
+          const group = objectRef.current;
+          if (!sculptStroke || !group) return;
+          event.stopPropagation();
+          (event.target as Element | null)?.setPointerCapture?.(event.pointerId);
+          sculptStroke(group.worldToLocal(event.point.clone()));
+        }}
+        onPointerMove={(event: ThreeEvent<PointerEvent>) => {
+          const group = objectRef.current;
+          if (!sculptStroke || !group) return;
+          if ((event.nativeEvent.buttons & 1) !== 1) return;
+          event.stopPropagation();
+          sculptStroke(group.worldToLocal(event.point.clone()));
+        }}
         onClick={(event: ThreeEvent<MouseEvent>) => {
           event.stopPropagation();
           if (editingDisabled) return;
@@ -1407,6 +1432,7 @@ export function StudioHybridDccViewport({
   onDuplicateSelected,
   onSelectComponent,
   editingDisabled = false,
+  onSculptStroke,
   defaultTransformMode = "translate",
   defaultTransformSpace = "world",
   webglAvailable,
@@ -1730,6 +1756,9 @@ export function StudioHybridDccViewport({
                 onCommitTransform={onCommitAssetTransform}
                 transformMode={transformMode}
                 transformSpace={transformSpace}
+                sculptStroke={onSculptStroke && asset.assetId === selectedAssetId
+                  ? (localPoint) => onSculptStroke(asset.assetId, localPoint)
+                  : undefined}
               />
             ))}
             <ContactShadows

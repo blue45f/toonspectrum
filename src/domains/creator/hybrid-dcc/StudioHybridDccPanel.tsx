@@ -1276,6 +1276,19 @@ export function StudioHybridDccPanel({
             }}
             onSelectAsset={selectWorkspaceAsset}
             onSelectComponent={selectMeshComponent}
+            onSculptStroke={workbenchMode === "sculpt" && !busy
+              ? (assetId, localPoint) => {
+                  void run("브러시 조형", () => workspaceSculptActive(ws, {
+                    kind: sculptBrushKind,
+                    center: localPoint,
+                    radius: 0.45,
+                    strength: sculptDig ? -0.2 : 0.2,
+                    ...(sculptBrushKind === "grab" || sculptBrushKind === "snakeHook"
+                      ? { direction: { x: 0, y: 0.15, z: 0 } }
+                      : {}),
+                  }));
+                }
+              : undefined}
           />
         </div>
 
