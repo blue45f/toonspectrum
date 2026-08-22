@@ -2142,6 +2142,7 @@ export interface VrmGripContactTarget {
 
 const GRIP_WRAP_FINGERS = ["Index", "Middle", "Ring"] as const;
 
+/** 세 손가락 중 가장 멀리 있는 관절 원점 거리 — 전지가 접점에 닿아야 목표를 통과한다. */
 function gripWrapDistance(
   vrm: VRM,
   side: "left" | "right",
@@ -2149,17 +2150,16 @@ function gripWrapDistance(
 ): number | null {
   const humanoid = vrm.humanoid;
   if (!humanoid) return null;
-  let sum = 0;
-  let count = 0;
+  let farthest: number | null = null;
   for (const fingerName of GRIP_WRAP_FINGERS) {
     const node =
       humanoid.getNormalizedBoneNode(`${side}${fingerName}Distal` as never)
       ?? humanoid.getNormalizedBoneNode(`${side}${fingerName}Intermediate` as never);
     if (!node) continue;
-    sum += node.getWorldPosition(new THREE.Vector3()).distanceTo(target);
-    count += 1;
+    const distance = node.getWorldPosition(new THREE.Vector3()).distanceTo(target);
+    farthest = farthest === null ? distance : Math.max(farthest, distance);
   }
-  return count === 0 ? null : sum / count;
+  return farthest;
 }
 
 /**
@@ -2181,7 +2181,7 @@ export function refineVrmGripFingerWrap(
     if (!Number.isFinite(gripRadius) || gripRadius <= 0) continue;
         // 측정점은 distal 관절 원점이다 — 완전히 감아도 손바닥 중심에서 ~3.8cm 떨어진다.
     // (미감지 상태 ~6.2cm와 구분되는 지점에서 멈춰 과감아·관절 포화를 방지한다.)
-    const reachGoal = gripRadius * 2.2 + 0.034;
+    const reachGoal = gripRadius * 2.2 + 0.030;
 
     for (let pass = 0; pass < maxPasses; pass += 1) {
       vrm.scene.updateMatrixWorld(true);

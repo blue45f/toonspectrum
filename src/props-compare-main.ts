@@ -14,6 +14,7 @@ import {
   applyFingerRotations,
   applyPoseToVrm,
   correctVrmHangingHandPalmTwist,
+  refineVrmGripFingerWrap,
   stripFingerBones,
   type FingerRotationMap,
   type PoseBoneMap,
@@ -268,6 +269,21 @@ async function selectCharacter(id: string, url: string, name: string) {
     applyFingerRotations(vrm, effective);
     correctVrmHangingHandPalmTwist(vrm);
     vrm.humanoid?.update();
+
+    // Grip contact refinement: amplify finger curls until fingertips reach the palm socket.
+    const gripTargets: Array<{ side: "left" | "right"; socketWorldPoint: THREE.Vector3; gripRadius: number }> = [];
+    for (const [side, propId] of [["right", "mug"], ["left", "book"]] as const) {
+      const node = vrm.humanoid?.getNormalizedBoneNode(`${side}Hand`);
+      const def2 = propDefById(propId);
+      if (!node || !def2?.grip) continue;
+      const socketWorld = new THREE.Vector3(...metrics.handSockets[`${side}Hand` as const].position);
+      node.localToWorld(socketWorld);
+      gripTargets.push({ side, socketWorldPoint: socketWorld, gripRadius: def2.grip.radius });
+    }
+    if (gripTargets.length > 0) {
+      refineVrmGripFingerWrap(vrm, gripTargets);
+      vrm.humanoid!.update();
+    }
 
     const scene = new THREE.Scene();
     scene.add(vrm.scene);

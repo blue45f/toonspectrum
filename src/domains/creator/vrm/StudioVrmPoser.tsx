@@ -403,6 +403,7 @@ import {
   StudioVrmWardrobeAttachment,
   type StudioVrmWardrobeCaptureSync,
   type StudioVrmWardrobeSurfaceReceipt,
+  StudioVrmGripContactRefine,
 } from "./StudioVrmWardrobePropsProjection";
 import { useStudioVrmModelLoading } from "./use-studio-vrm-model-loading";
 import { useStudioVrmWebcamSession } from "./use-studio-vrm-webcam-session";
@@ -8619,6 +8620,14 @@ export function StudioVrmPoser({
                         />
                       ))
                     : null}
+                  {vrm && vrmPropItems.length > 0 ? (
+                    <StudioVrmGripContactRefine
+                      vrm={vrm}
+                      items={vrmPropItems}
+                      metrics={effectivePropRigMetrics}
+                      rigRevision={proportionRigRevision}
+                    />
+                  ) : null}
                   {vrm ? (
                     <StudioVrmRuntimeCommit
                       vrm={vrm}

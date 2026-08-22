@@ -13,6 +13,7 @@ import {
   applyPoseToVrm,
   applyVrmCustomColors,
   applyVrmMaterialFx,
+  refineVrmGripFingerWrap,
   type FingerRotationMap,
   type PoseBoneMap,
   type VrmMaterialFx,
@@ -34,7 +35,7 @@ import {
   createStudioVrmProportionVrmAdapter,
   measureStudioVrmProportionHeadLength,
 } from "../vrm/studio-vrm-proportion-vrm-adapter";
-import { propDefById } from "../vrm/studio-vrm-props";
+import { propDefById, type PropHandBone } from "../vrm/studio-vrm-props";
 import { STUDIO_VRM_FINGER_BONES } from "../vrm/studio-vrm-scene-document";
 import {
   getStoredVrmModelByHash,
@@ -419,6 +420,28 @@ export function applyStudioBg3dLinkedCharacterState(
     return false;
   }
   applyFingerRotations(vrm, effectiveFingers);
+  // 자동그립 손가락이 접점까지 실제로 닿도록 컬을 정련한다(모델 손 크기 적응).
+  const gripContactTargets = projectedProps
+    .filter((item) => item.rig?.autoFingerPose === true)
+    .map((item) => {
+      const def = propDefById(item.propId);
+      const side: "left" | "right" | null = item.bone === "leftHand"
+        ? "left"
+        : item.bone === "rightHand" ? "right" : null;
+      if (!def?.grip || !side || !options.propRigMetrics) return null;
+      const handNode = vrm.humanoid?.getNormalizedBoneNode(`${side}Hand`);
+      if (!handNode) return null;
+      const socket: PropHandBone = side === "left" ? "leftHand" : "rightHand";
+      const socketWorldPoint = new THREE.Vector3(
+        ...options.propRigMetrics.handSockets[socket].position,
+      );
+      handNode.localToWorld(socketWorldPoint);
+      return { side, socketWorldPoint, gripRadius: def.grip.radius };
+    })
+    .filter((target): target is NonNullable<typeof target> => target !== null);
+  if (gripContactTargets.length > 0) {
+    refineVrmGripFingerWrap(vrm, gripContactTargets);
+  }
   applyBodyScale(vrm, scene.appearance.bodyScale);
   applyExpressionWeightsToVrm(vrm, { ...scene.expressions });
   applyVrmCustomColors(vrm, { ...scene.appearance.customColors });

@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 import { PHYSICS_PREVIEW_MAX_DELTA } from "./studio-vrm-physics";
+import { refineVrmGripFingerWrap } from "./studio-vrm-poser-utils";
 import {
   acquireStudioVrmPropAsset,
   type StudioVrmPropAssetLease,
@@ -18,6 +19,7 @@ import {
   resolvePropAttachment,
   resolveSecondaryHandConstraint,
   resolveSecondaryPropTarget,
+  type ResolvedPropAttachment,
   type VrmPropRigMetrics,
 } from "./studio-vrm-prop-rig";
 import {
@@ -84,6 +86,70 @@ function schedulePropDisposal(object: THREE.Object3D) {
 
 const VRM_FRAME_PROP_PRIORITY = -2;
 const VRM_FRAME_COMMIT_PRIORITY = -1;
+
+/**
+ * 자동그립 손가락이 접점까지 실제로 닿도록 컬을 증폭한다(items/metrics 변경 시 1회).
+ * 프레임마다 돌리면 트래킹·IK와 경합하므로 상태 변경 시점에만 정렬한다.
+ */
+export function StudioVrmGripContactRefine({
+  vrm,
+  items,
+  metrics,
+  rigRevision,
+}: {
+  vrm: VRM;
+  items: PropInstance[];
+  metrics: VrmPropRigMetrics;
+  /** Re-resolves normalized bone identities after a humanoid rebuild. */
+  rigRevision?: number;
+}) {
+  const targets = useMemo(() => {
+    void rigRevision;
+    return items
+      .filter((item) => item.rig?.autoFingerPose === true)
+      .map((item) => {
+        const def = propDefById(item.propId);
+        const side: "left" | "right" | null = item.bone === "leftHand"
+          ? "left"
+          : item.bone === "rightHand" ? "right" : null;
+        if (!def?.grip || !side || !vrm.humanoid) return null;
+        let resolved: ResolvedPropAttachment;
+        try {
+          resolved = resolvePropAttachment(def, item, metrics);
+        } catch {
+          return null;
+        }
+        if (!resolved.usesSmartRig) return null;
+        return {
+          bone: item.bone,
+          side,
+          socketLocal: [...resolved.socketPosition] as [number, number, number],
+          gripRadius: def.grip.radius,
+        };
+      })
+      .filter((target): target is NonNullable<typeof target> => target !== null);
+  }, [items, metrics, rigRevision, vrm]);
+
+  useEffect(() => {
+    if (targets.length === 0) return;
+    const refined: Array<{
+      side: "left" | "right";
+      socketWorldPoint: THREE.Vector3;
+      gripRadius: number;
+    }> = [];
+    for (const target of targets) {
+      const node = vrm.humanoid?.getNormalizedBoneNode(target.bone);
+      if (!node) continue;
+      node.updateWorldMatrix(true, false);
+      const socketWorldPoint = new THREE.Vector3(...target.socketLocal);
+      node.localToWorld(socketWorldPoint);
+      refined.push({ side: target.side, socketWorldPoint, gripRadius: target.gripRadius });
+    }
+    if (refined.length > 0) refineVrmGripFingerWrap(vrm, refined);
+  }, [targets, vrm]);
+
+  return null;
+}
 /**
  * 보조 손 목표 수렴 속도(초 단위 지수 감쇠). 이전 고정 lerp 0.35/프레임(@60fps)과 동등한
  * 지연 시간을 프레임률과 무관하게 유지한다 — 고정 계수는 고주사 모니터에서 아이템이
