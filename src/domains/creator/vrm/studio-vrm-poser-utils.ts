@@ -2179,7 +2179,9 @@ export function refineVrmGripFingerWrap(
   for (const target of targets) {
     const { side, socketWorldPoint, gripRadius } = target;
     if (!Number.isFinite(gripRadius) || gripRadius <= 0) continue;
-    const reachGoal = gripRadius * 1.9 + 0.006;
+        // 측정점은 distal 관절 원점이다 — 완전히 감아도 손바닥 중심에서 ~3.8cm 떨어진다.
+    // (미감지 상태 ~6.2cm와 구분되는 지점에서 멈춰 과감아·관절 포화를 방지한다.)
+    const reachGoal = gripRadius * 2.2 + 0.034;
 
     for (let pass = 0; pass < maxPasses; pass += 1) {
       vrm.scene.updateMatrixWorld(true);
