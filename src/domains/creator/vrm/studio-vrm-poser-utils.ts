@@ -2131,6 +2131,87 @@ export function applyFingerRotations(vrm: VRM, fingers: FingerRotationMap) {
   vrm.scene.updateMatrixWorld(true);
 }
 
+/** 접점 정련 대상 그립 하나. socketWorldPoint는 실측 palm socket의 world 좌표다. */
+export interface VrmGripContactTarget {
+  side: "left" | "right";
+  /** 소품 anchor가 도달하는 접점(= palm socket world). */
+  socketWorldPoint: THREE.Vector3;
+  /** 그립 반경(m). 손끝이 이 배수 안으로 닿도록 컬을 증폭한다. */
+  gripRadius: number;
+}
+
+const GRIP_WRAP_FINGERS = ["Index", "Middle", "Ring"] as const;
+
+function gripWrapDistance(
+  vrm: VRM,
+  side: "left" | "right",
+  target: THREE.Vector3,
+): number | null {
+  const humanoid = vrm.humanoid;
+  if (!humanoid) return null;
+  let sum = 0;
+  let count = 0;
+  for (const fingerName of GRIP_WRAP_FINGERS) {
+    const node =
+      humanoid.getNormalizedBoneNode(`${side}${fingerName}Distal` as never)
+      ?? humanoid.getNormalizedBoneNode(`${side}${fingerName}Intermediate` as never);
+    if (!node) continue;
+    sum += node.getWorldPosition(new THREE.Vector3()).distanceTo(target);
+    count += 1;
+  }
+  return count === 0 ? null : sum / count;
+}
+
+/**
+ * 자동그립 컬이 모델 손 크기에 비해 얕으면 손끝이 소품에 닿지 않는다(실측: 44° 컬로
+ * 손끝-접점 6.2cm). 적용된 손가락 Z컬을 접점까지 실제로 감싸도 증폭한다 — 부호 규약과
+ * 무관하게 "현재 적용값"을 키우므로 모델별 축 반전에도 안전하다. 상태 변경 시 1회 호출.
+ */
+export function refineVrmGripFingerWrap(
+  vrm: VRM,
+  targets: readonly VrmGripContactTarget[],
+  options: { readonly maxPasses?: number } = {},
+): void {
+  const humanoid = vrm.humanoid;
+  if (!humanoid || targets.length === 0) return;
+
+  const maxPasses = Math.max(1, Math.min(6, options.maxPasses ?? 4));
+  for (const target of targets) {
+    const { side, socketWorldPoint, gripRadius } = target;
+    if (!Number.isFinite(gripRadius) || gripRadius <= 0) continue;
+    const reachGoal = gripRadius * 1.9 + 0.006;
+
+    for (let pass = 0; pass < maxPasses; pass += 1) {
+      vrm.scene.updateMatrixWorld(true);
+      const distance = gripWrapDistance(vrm, side, socketWorldPoint);
+      if (distance === null || distance <= reachGoal) break;
+
+      // 접점에 가까워지는 동안에만 증폭한다. 개선이 멈추면(관절 한계 도달) 중단.
+      const before = distance;
+      let touched = false;
+      for (const fingerName of GRIP_WRAP_FINGERS) {
+        for (const segment of ["Proximal", "Intermediate", "Distal"] as const) {
+          const node = humanoid.getNormalizedBoneNode(`${side}${fingerName}${segment}` as never);
+          if (!node) continue;
+          const z = node.rotation.z;
+          if (!Number.isFinite(z) || Math.abs(z) < 1e-4) continue;
+          node.rotation.z = THREE.MathUtils.clamp(
+            z * 1.42,
+            -Math.PI / 2 + 0.02,
+            Math.PI / 2 - 0.02,
+          );
+          touched = true;
+        }
+      }
+      if (!touched) break;
+      humanoid.update();
+      vrm.scene.updateMatrixWorld(true);
+      const after = gripWrapDistance(vrm, side, socketWorldPoint);
+      if (after === null || after > before - 0.0006) break;
+    }
+  }
+}
+
 export type BodyScale = {
   height: number; // 0.7 ~ 1.4
   width: number; // 0.7 ~ 1.3
