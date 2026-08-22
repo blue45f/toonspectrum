@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>VRM Props Compare</title>
+    <style>
+      html, body { margin: 0; background: #1a1814; color: #f5efe6; font: 14px/1.4 system-ui, sans-serif; }
+      #bar { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px; align-items: center; border-bottom: 1px solid #3a342c; }
+      button { background: #3a2f22; color: #f5efe6; border: 1px solid #6a5640; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+      button.active { background: #c45c26; border-color: #e07a40; }
+      #status { opacity: 0.8; margin-left: auto; }
+      #grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; height: calc(100vh - 56px); box-sizing: border-box; }
+      .panel { position: relative; background: #0e0c0a; border: 1px solid #3a342c; border-radius: 12px; overflow: hidden; min-height: 280px; }
+      .panel canvas { width: 100% !important; height: 100% !important; display: block; }
+      .label { position: absolute; left: 10px; top: 8px; background: rgba(0,0,0,.55); padding: 4px 8px; border-radius: 6px; z-index: 2; font-size: 12px; }
+      .note { position: absolute; left: 10px; bottom: 8px; right: 10px; background: rgba(0,0,0,.55); padding: 6px 8px; border-radius: 6px; z-index: 2; font-size: 11px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <strong>소품 장착 비교</strong>
+      <button data-id="sample-vrm" data-url="/vrm/sample.vrm" data-name="루미">루미</button>
+      <button data-id="avatar-a" data-url="/vrm/AvatarSample_A.vrm" data-name="하arin">하arin</button>
+      <button data-id="avatar-b" data-url="/vrm/AvatarSample_B.vrm" data-name="세라">세라</button>
+      <button data-id="avatar-c" data-url="/vrm/AvatarSample_C.vrm" data-name="유나">유나</button>
+      <button data-id="mio" data-url="/vrm/fem_vroid.vrm" data-name="미오">미오</button>
+      <button data-id="noa" data-url="/vrm/masc_vroid.vrm" data-name="노아">노아</button>
+      <span id="status">대기</span>
+    </div>
+    <div id="grid">
+      <div class="panel" id="full">
+        <div class="label">전신 · 자연 아이들 + 소품</div>
+        <div class="note" id="full-note">캐릭터 선택…</div>
+      </div>
+      <div class="panel" id="right-item">
+        <div class="label">오른손 + 머그컵(handle)</div>
+        <div class="note" id="right-note">…</div>
+      </div>
+      <div class="panel" id="left-item">
+        <div class="label">왼손 + 책(flat)</div>
+        <div class="note" id="left-note">…</div>
+      </div>
+      <div class="panel" id="close">
+        <div class="label">접점 클로즈업</div>
+        <div class="note" id="close-note">…</div>
+      </div>
+    </div>
+    <script type="module" src="/src/props-compare-main.ts"></script>
+  </body>
+</html>
