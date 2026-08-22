@@ -70,7 +70,7 @@ describe("VRM 소품 카탈로그", () => {
     expect(propsByCategory("body").length).toBeGreaterThan(0);
   });
 
-  it("34개 안정 ID를 번들된 first-party GLB 경로에 정확히 연결한다", () => {
+  it("55개 안정 ID를 번들된 first-party GLB 경로에 정확히 연결한다", () => {
     const expected = {
       smartphone: "/assets/3d/modern_smartphone_prop.glb",
       mug: "/assets/3d/everyday_mug.glb",
