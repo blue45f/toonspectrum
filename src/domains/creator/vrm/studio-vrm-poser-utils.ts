@@ -1939,14 +1939,15 @@ function applyFingerSide(
  * 그대로 화면에 나타난다. 첫 명확한 측정만 휴머노이드 인스턴스에 캐시해 이후 적용은
  * 재측정 없이 재사용한다(휴머노이드 재구축 시 새 인스턴스라 자동 무효화).
  */
-interface FingerAxisPolarity {
-  curl: 1 | -1;
-  adduct: 1 | -1;
-}
+/**
+ * 축별 해석 결과만 담는다(미해석 축은 undefined). 기본값으로 채우면 다른 프로브가
+ * 만든 엔트리의 미해석 필드를 "해석됨"으로 잘못 보고 스킵하게 된다.
+ */
+type FingerAxisPolarityEntry = Partial<Record<"curl" | "adduct", 1 | -1>>;
 
 const fingerAxisPolarityCache = new WeakMap<
   NonNullable<VRM["humanoid"]>,
-  Partial<Record<"left" | "right", FingerAxisPolarity>>
+  Partial<Record<"left" | "right", FingerAxisPolarityEntry>>
 >();
 
 /** 이 값보다 작은 판별 신호는 모호한 것으로 보고 캐시하지 않는다. */
@@ -1957,22 +1958,21 @@ export const STUDIO_VRM_FINGER_ADDUCT_POLARITY_MARGIN = 0.0015;
 function cachedFingerAxisPolarity(
   humanoid: NonNullable<VRM["humanoid"]>,
   side: "left" | "right",
-): FingerAxisPolarity | undefined {
+): FingerAxisPolarityEntry | undefined {
   return fingerAxisPolarityCache.get(humanoid)?.[side];
 }
 
 function storeFingerAxisPolarity(
   humanoid: NonNullable<VRM["humanoid"]>,
   side: "left" | "right",
-  patch: Partial<FingerAxisPolarity>,
+  patch: FingerAxisPolarityEntry,
 ): void {
   let cache = fingerAxisPolarityCache.get(humanoid);
   if (!cache) {
     cache = {};
     fingerAxisPolarityCache.set(humanoid, cache);
   }
-  const entry = cache[side] ?? { curl: 1, adduct: 1 };
-  cache[side] = { ...entry, ...patch };
+  cache[side] = { ...cache[side], ...patch };
 }
 
 /** proportion 리그 재구축 등 모델 축 가정이 깨졌을 때 명시적으로 캐시를 버린다. */
@@ -1994,7 +1994,7 @@ export function resolveFingerCurlPolarity(
   if (!hasSide) return 1;
 
   const cached = cachedFingerAxisPolarity(humanoid, side)?.curl;
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   zeroFingerSide(humanoid, side);
   humanoid.update();
@@ -2037,7 +2037,7 @@ export function resolveFingerAdductPolarity(
   if (!hasSide) return 1;
 
   const cached = cachedFingerAxisPolarity(humanoid, side)?.adduct;
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   const spanOf = (): number | null => {
     humanoid.update();
