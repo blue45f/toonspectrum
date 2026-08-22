@@ -20,8 +20,6 @@ import {
   studioOilRibbonProgramsForBrush,
   type StudioOilRibbonPaintContext,
 } from "../brush/studio-oil-ribbon-carrier";
-import { applyStudioOilWetIntoWetStroke } from "../brush/studio-oil-wet-into-wet";
-import { parseStudioGpuColor } from "../render/studio-webgpu-color";
 import {
   buildCalligraphySegments,
   resolveStudioBrushRenderFamily,
@@ -125,14 +123,74 @@ function flatPairs(pairs: readonly { x: number; y: number }[]): number[] {
   return points;
 }
 
-function strokePaintColor(stroke: string): { r: number; g: number; b: number } {
-  const parsed = parseStudioGpuColor(stroke);
-  if (!parsed) return { r: 0, g: 0, b: 0 };
-  return {
-    r: Math.round(parsed[0] * 255),
-    g: Math.round(parsed[1] * 255),
-    b: Math.round(parsed[2] * 255),
-  };
+/**
+ * `pairsFromElement` + `flatPairs` without the intermediate object array: the oil hot path ran
+ * both on every pointer frame, allocating O(N) `{x,y}` objects per frame over one drag. Same
+ * finite-validation semantics — stop at the first non-finite coordinate.
+ */
+function flatFinitePoints(element: DrawEl): number[] {
+  const points: number[] = [];
+  const count = Math.floor(element.points.length / 2);
+  for (let index = 0; index < count; index += 1) {
+    const x = element.points[index * 2];
+    const y = element.points[index * 2 + 1];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) break;
+    points.push(x, y);
+  }
+  return points;
+}
+
+/**
+ * Extends the running dab-radius mean to cover `dabs` and returns it. Addition stays strictly
+ * left-to-right across frames, so the value is bit-identical to reducing the whole array every
+ * call while costing O(new dabs) instead of O(all dabs) per pointer frame.
+ */
+function extendOilRadiusMean(
+  active: ActiveRetainedStroke,
+  dabs: readonly { radiusY: number }[],
+): number {
+  if (
+    active.oilRadiusSum === undefined
+    || active.oilRadiusSumDabCount === undefined
+    || active.oilRadiusSumDabCount > dabs.length
+  ) {
+    let sum = 0;
+    for (let index = 0; index < active.paintedDabs; index += 1) {
+      sum += dabs[index]!.radiusY;
+    }
+    active.oilRadiusSum = sum;
+    active.oilRadiusSumDabCount = active.paintedDabs;
+  }
+  for (
+    let index = active.oilRadiusSumDabCount;
+    index < dabs.length;
+    index += 1
+  ) {
+    active.oilRadiusSum += dabs[index]!.radiusY;
+  }
+  active.oilRadiusSumDabCount = dabs.length;
+  return Math.max(1, active.oilRadiusSum / Math.max(1, dabs.length));
+}
+
+/** Reuses the per-frame dab point objects across carrier paints instead of re-mapping. */
+function oilDabPoints(
+  active: ActiveRetainedStroke,
+  dabs: readonly { x: number; y: number }[],
+): readonly { x: number; y: number }[] {
+  const cached = active.oilDabPoints;
+  if (
+    cached
+    && cached.length === dabs.length
+    && active.oilDabPointsElementPointsLength === active.element.points.length
+    && active.oilDabPointsPressuresLength === (active.element.pressures?.length ?? -1)
+  ) {
+    return cached;
+  }
+  const mapped = dabs.map((dab) => ({ x: dab.x, y: dab.y }));
+  active.oilDabPoints = mapped;
+  active.oilDabPointsElementPointsLength = active.element.points.length;
+  active.oilDabPointsPressuresLength = active.element.pressures?.length ?? -1;
+  return mapped;
 }
 
 interface ActiveRetainedStroke {
@@ -148,6 +206,18 @@ interface ActiveRetainedStroke {
    * `planOilBrushDabs` exactly as before.
    */
   oilPlanner: FxOilDabPlanner | null;
+  /**
+   * Running left-to-right `radiusY` sum over the accepted dab prefix plus the dab count it was
+   * accumulated for. Rebuilding the mean from the whole dab array every pointer frame made oil
+   * live cost O(N²) over one drag; extending the running sum keeps the float addition order —
+   * and therefore the produced `radiusPx` — bit-identical to the full reduce it replaces.
+   */
+  oilRadiusSum?: number;
+  oilRadiusSumDabCount?: number;
+  /** Cached carrier input points plus the element lengths they were mapped from. */
+  oilDabPoints?: readonly { x: number; y: number }[];
+  oilDabPointsElementPointsLength?: number;
+  oilDabPointsPressuresLength?: number;
 }
 
 export class StudioLiveRetainedMediaOverlayRenderer {
@@ -354,11 +424,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     const context = this.prepared(target);
     if (!context) return false;
     try {
-      const pairs = pairsFromElement(element);
-      if (pairs.length === 0) return true;
+      const flatPoints = flatFinitePoints(element);
+      if (flatPoints.length === 0) return true;
       const brush = element.brush ?? "oil";
       const planInput = {
-        points: flatPairs(pairs),
+        points: flatPoints,
         pressures: element.pressures,
         baseWidth: Math.max(1, element.strokeWidth),
         seed: fxBrushSeedFromKey(element.id),
@@ -377,20 +447,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       if (active.paintedDabs === dabs.length && target === this.activeContext) {
         return true;
       }
-      const newDabs = dabs.slice(active.paintedDabs);
-      const radiusPx = Math.max(
-        1,
-        dabs.reduce((sum, dab) => sum + dab.radiusY, 0) / Math.max(1, dabs.length),
-      );
-      if (newDabs.length > 0 && target === this.activeContext) {
-        this.wetMixPoints(
-          context,
-          newDabs.map((dab) => ({ x: dab.x, y: dab.y })),
-          radiusPx,
-          element.stroke,
-        );
-      }
+      const radiusPx = extendOilRadiusMean(active, dabs);
       if (target === this.activeContext) {
+        // The wet-mix readback that used to run here sampled and rewrote active-canvas pixels
+        // immediately before this clear discarded them — pure per-frame getImageData stall with
+        // zero surviving pixels. Wet-into-wet feel stays owned by the committed renderer.
         this.clearCanvas(this.activeContext, this.activeCanvas);
       }
       const carrier = planStudioOilRibbonCarrier(
@@ -407,7 +468,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
           carrier,
           stroke: element.stroke,
           opacity: element.opacity ?? 1,
-          points: dabs.map((dab) => ({ x: dab.x, y: dab.y })),
+          points: oilDabPoints(active, dabs),
           radiusPx,
           skipDestinationReadback: true,
         },
@@ -735,78 +796,6 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     }
     context.closePath();
     context.fill();
-  }
-
-  private wetMixPoints(
-    context: CanvasRenderingContext2D,
-    points: readonly { x: number; y: number }[],
-    radiusPx: number,
-    stroke: string,
-  ): boolean {
-    if (points.length === 0) return false;
-    const native = context;
-    const canvas = native.canvas;
-    if (!canvas || canvas.width <= 0 || canvas.height <= 0) return false;
-    const transform = native.getTransform();
-    const pad = Math.ceil(radiusPx + 2);
-    let minX = points[0]!.x;
-    let minY = points[0]!.y;
-    let maxX = minX;
-    let maxY = minY;
-    for (const point of points) {
-      minX = Math.min(minX, point.x);
-      minY = Math.min(minY, point.y);
-      maxX = Math.max(maxX, point.x);
-      maxY = Math.max(maxY, point.y);
-    }
-    const map = (x: number, y: number) => ({
-      x: transform.a * x + transform.c * y + transform.e,
-      y: transform.b * x + transform.d * y + transform.f,
-    });
-    const corners = [
-      map(minX - pad, minY - pad),
-      map(maxX + pad, minY - pad),
-      map(minX - pad, maxY + pad),
-      map(maxX + pad, maxY + pad),
-    ];
-    const devMinX = Math.max(0, Math.floor(Math.min(...corners.map((corner) => corner.x))));
-    const devMinY = Math.max(0, Math.floor(Math.min(...corners.map((corner) => corner.y))));
-    const devMaxX = Math.min(
-      canvas.width,
-      Math.ceil(Math.max(...corners.map((corner) => corner.x))),
-    );
-    const devMaxY = Math.min(
-      canvas.height,
-      Math.ceil(Math.max(...corners.map((corner) => corner.y))),
-    );
-    const width = devMaxX - devMinX;
-    const height = devMaxY - devMinY;
-    if (width <= 0 || height <= 0) return false;
-    try {
-      const image = native.getImageData(devMinX, devMinY, width, height);
-      applyStudioOilWetIntoWetStroke(
-        image.data,
-        width,
-        height,
-        points.map((point) => {
-          const mapped = map(point.x, point.y);
-          return { x: mapped.x - devMinX, y: mapped.y - devMinY };
-        }),
-        {
-          radiusPx,
-          hardness: 0.68,
-          strength: 0.82,
-          wetness: 0.62,
-          pickup: 0.48,
-          loadDepletion: 0,
-          paintColor: strokePaintColor(stroke),
-        },
-      );
-      native.putImageData(image, devMinX, devMinY);
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   private flattenActiveToSettled(): boolean {

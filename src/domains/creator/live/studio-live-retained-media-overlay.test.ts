@@ -219,7 +219,13 @@ describe("StudioLiveRetainedMediaOverlayRenderer", () => {
     }).status).toBe("settled");
   });
 
-  it("mixes only the growing oil suffix instead of rereading the whole stroke bbox", () => {
+  it("keeps the live oil path free of destination readbacks entirely", () => {
+    // 2026-08-22: paintOilSuffix used to run a per-frame wet-mix getImageData/putImageData over
+    // the new-dab bbox and then clearCanvas discarded those exact pixels — the carrier repaint
+    // below rebuilt everything from scratch. The readback was pure per-pointer-frame stall, so
+    // the live contract is now ZERO destination reads; wet-into-wet stays owned by the committed
+    // renderer (paintStudioOilRibbonCarrier's explicit-destination branch), which is where the
+    // document underlay it samples actually exists.
     const { renderer, active } = attachedRenderer();
     const first = drawElement("oil-live", "oil", [16, 40]);
     expect(renderer.begin(first)).toEqual({ status: "started", kind: "oil" });
@@ -229,8 +235,7 @@ describe("StudioLiveRetainedMediaOverlayRenderer", () => {
     ]);
     expect(renderer.appendFrom(grown).status).toBe("appended");
     const afterAppend = active.stats();
-    expect(afterAppend.getCalls).toBeGreaterThan(afterBegin.getCalls);
-    const lastArea = afterAppend.getArea - afterBegin.getArea;
-    expect(lastArea).toBeLessThan(256 * 128);
+    expect(afterAppend.getCalls).toBe(afterBegin.getCalls);
+    expect(afterAppend.getCalls).toBe(0);
   });
 });
