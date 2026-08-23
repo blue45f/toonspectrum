@@ -167,3 +167,48 @@ TOONSPECTRUM_BRUSH_VERIFY_IDS=dry-media pnpm verify:studio-brushes
 
 측정 스크립트(프레임 PNG 4장 대조)는 이 문서의 표를 만든 PIL/numpy 코드 그대로
 `00-baseline` 차분 >8 임계 사용.
+
+## 4차 세션 (2026-08-23): 계획·합성 무죄의 순수 tsx 증명과 신규 최상위 가설 G
+
+### HEAD 재현 확인
+
+같은 절차 재실행(drift 15.19px): live 1,367px / released 955px / settled 955px,
+settled==released 픽셀 일치, 공통 픽셀 세기비 0.804, live-only 416px가 x=36..503
+전 구간에 균등 분포(13개 x-밴드 lost/total이 거의 비례 — 이음매 클러스터 아님).
+
+### append 스트림 == exactPlan (tsx 순수 증명)
+
+`scripts/__diag-drymedia-append-paint-counts.mts`(신규, 로컬)가 오버레이의 causal
+append 분기를 프레임별로 충실히 재현(초기 탭·acceptedDabLimit·remainingMarks·
+stampGrid 선택 포함)하고 각 프레임 plan.marks를 연결해 단일 exactPlan과 대비:
+
+| 집단 | 수 |
+| --- | ---: |
+| 스트림 마크 | 960 |
+| exactPlan 마크 | 960 |
+| 중복 페인트 | 0 |
+| 종류 불일치 | 탭 교체 5개뿐(replaceInitialTap 처리 차이) |
+
+→ dry-media(causal 브리지 경로)의 **마크 계획은 완전 패리티**. 결합하면:
+계획 무죄(이 실험) + 합성 무죄(hypothesis D 프로브, 실제 텍스처 스탬프 배열 사용)
++ 입력 무죕(settled==autosave-reload). 남는 차이는 **커밋 retained 경로의
+픽셀 출력 자체**다.
+
+### 가설 G(신규 최상위): retained 밴드/그룹 알파 클램프
+
+StudioDrawNode의 angled-nib 밴드 합성 주석이 계약을 직접 기술한다 —
+"Konva가 한 번만 적용하는 것은 겹침이 두 밴드를 합산해 넘지 못하게 **가장 깊은
+밴드로 클램프**" 한다. dry-media retained 렌더도 같은 성격의 그룹 클램프
+(bounded-flow v2 최종 커버리지 합성)를 거친다면, 라이브의 소스-over 누적
+(겹침 스탬프 2a)와 커밋의 클램프(max a)가 겹침 픽셀에서 체계적으로 어긋나고,
+스태거드 레인 스탬프가 전 구간에서 균일하게 겹치는 dry-media에서 **관측된
+균일 ~0.8× 감쇠와 정확히 같은 부호**가 나온다. hypothesis D 프로브가 패리티를
+낸 것은 프로브 A/B가 모두 per-mark source-over였기 때문(경로 B 타일 내부도
+renderStudioDynamicBrushCoverageMark 루프)으로, 클램프는 프로브가 거치지 않은
+retained 전용 합성 단계에 있을 수 있다.
+
+결정 실험: 실제 앱에서 커밋 드로우 노드가 dry-media 요소를 그릴 때 거치는
+합성 함수를 확인하고, 겹치는 스탬프 2개(동일 알파 a)를 라이브 체인과 retained
+체인 각각으로 렌더해 픽셀 비 — retained가 max(a,…)를 반환하면 가설 G 확정.
+수정 방향: 라이브 프레젠테이션이 같은 클램프 계약을 쓰도록 통일(손맛 우선
+ADR 0010 — 커밋 쪽을 누적으로 바꾸는 것이 아니라 라이브를 커밋 계약에 맞춘다).
