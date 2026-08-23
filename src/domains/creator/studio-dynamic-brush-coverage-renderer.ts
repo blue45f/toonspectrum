@@ -122,10 +122,9 @@ import type { StudioPaperMediumV1 } from "./brush/studio-paper-media-profile-v1"
 export const STUDIO_DYNAMIC_COVERAGE_TILE_PIXEL_SIZE = 256;
 
 /**
- * 커널 팁 초단획 가시성 상수 — 위 하한의 적용 조건과 크기. 4 dab 이하 획만 대상이고 크기
- * 하한은 커널 텍스처가 서브픽셀에서도 알파를 남기는 최소 스탬프 반경(≈1.1px)에서 온다.
+ * 커널 팁 가시성 상수 — 커널 텍스처가 서브픽셀 반경에서도 알파를 남기는 최소 스탬프 크기.
+ * dab 크기만의 순수 함수로 적용된다(위 주석).
  */
-const STUDIO_KERNEL_TIP_SHORT_STROKE_DAB_LIMIT = 4;
 const STUDIO_KERNEL_TIP_MIN_VISIBLE_SIZE = 2.2;
 
 export const STUDIO_DYNAMIC_COVERAGE_TILE_BLEED_PIXELS = 2;
@@ -1681,15 +1680,12 @@ export function planStudioDynamicBrushCoverageMarks(
       return appendMark(texturedMark) ? "ok" : "mark-budget";
     };
 
-    // 초단획 가시성 하한: 커널 팁은 텍스처 알파맵이라 dab이 서브픽셀이면 커버리지가 0으로
+    // 커널 팁 가시성 하한: 커널 팁은 텍스처 알파맵이라 dab이 서브픽셀이면 커버리지가 0으로
     // 무너진다(빠른 짧은 터치가 완전 투명 획이 되는 실패 모드 — 패밀리 형제인 솔리드 캐리어는
-    // 같은 크기에서도 보인다). 커널 권한 dab에만 크기 하한을 적용하고, dab 수가 적은 획으로
-    // 한정한다. 장획의 dab은 하나도 수정되지 않으므로 커밋된 픽셀 패리티가 보존된다.
-    const plannedDabCount = "kind" in dabs
-      ? dabs.segments.reduce((sum: number, segment) => sum + segment.length, 0)
-      : dabs.length;
+    // 같은 크기에서도 보인다). 크기만의 순수 함수로 적용한다 — dab 수 조건을 붙이면 라이브
+    // prefix(적은 dab)와 커밋 플랜(전체 dab)이 다른 플로어를 적용해 live→released 무게중심이
+    // 흔들린다. dab당 결정적이므로 어떤 prefix 길이에서도 같은 마크가 나온다.
     const kernelTipVisibilityFloor = dryMediaKernelTipMaterial !== null
-      && plannedDabCount <= STUDIO_KERNEL_TIP_SHORT_STROKE_DAB_LIMIT
       ? STUDIO_KERNEL_TIP_MIN_VISIBLE_SIZE
       : null;
 
