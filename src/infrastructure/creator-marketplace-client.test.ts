@@ -7,10 +7,12 @@ import {
   createCreatorMarketplaceBuiltinDelivery,
   createCreatorMarketplacePortableDelivery,
   deleteCreatorMarketplaceResource,
+  getCreatorMarketplaceResource,
   listCreatorMarketplaceResources,
   listMyCreatorMarketplaceResources,
   publishCreatorMarketplaceResource,
 } from "./creator-marketplace-client";
+import { NotFoundError } from "./use-api-resource";
 
 import type {
   CreatorMarketplaceResourceManifest,
@@ -257,5 +259,37 @@ describe("creator marketplace client", () => {
     apiDelete.mockRejectedValue(new Error("private upstream"));
     await expect(deleteCreatorMarketplaceResource("id/with/slash"))
       .rejects.toThrow("공유 리소스를 삭제하지 못했습니다.");
+  });
+
+  it("단건 조회는 record를 검증해 돌려주고 404는 NotFoundError로 흐름 제어한다", async () => {
+    const input = await manifest();
+    const response = record(input);
+    const id = response.id;
+    apiGet.mockResolvedValueOnce(response).mockRejectedValueOnce({
+      response: { status: 404 },
+    });
+
+    await expect(getCreatorMarketplaceResource(id)).resolves.toMatchObject({
+      id,
+      packageId: "original/filter/webtoon-finish",
+    });
+    expect(apiGet).toHaveBeenNthCalledWith(
+      1,
+      `/creator/marketplace/resources/${id}`,
+      { signal: undefined }
+    );
+
+    await expect(getCreatorMarketplaceResource(id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("단건 조회의 5xx는 일반 에러 메시지로 변환한다", async () => {
+    toApiError.mockImplementationOnce(
+      async (_error: unknown, fallback: string) => new Error(fallback)
+    );
+    apiGet.mockRejectedValueOnce({ response: { status: 503 } });
+
+    await expect(getCreatorMarketplaceResource(randomUUID())).rejects.toThrow(
+      "공유 리소스를 불러오지 못했습니다."
+    );
   });
 });
