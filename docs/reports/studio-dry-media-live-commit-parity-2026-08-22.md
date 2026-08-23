@@ -122,6 +122,41 @@ commonRatio 1.004, 공통 픽셀 세기비 1.001 — **합성 계약은 패리�
 프로브 실행: `pnpm exec tsx scripts/verify-studio-dry-media-parity-probe.mts`
 (결과 JSON: $(tmpdir)/toonspectrum-dry-media-parity/parity-probe-result.json)
 
+### 3차 세션: 관찰 재해석과 접두사 안정성 실험
+
+핵심 재해석 — settled == released가 픽셀 일치이므로 오버레이 자체의 최종
+exactPlan 재획화와 Konva retained은 동일하다. 다른 것은 **증분 append로 쌓인
+라이브 프레젠테이션**뿐이다. 따라서 결함 국소는 오버레이 내부의
+"append 누적 ≠ 단일 exactPlan"이다.
+
+실험(`scripts/__diag-prefix-stability.mts`, tsx 순수 실행):
+causal V3 플래너에 20·40·61 샘플 부분 계획을 돌려 전체 계획과 대조 —
+
+| 샘플 | dabCount | 전체 계획 접두사와 일치 |
+| --- | ---: | --- |
+| 20 | 191 | 첫 불일치 없음 |
+| 40 | 476 | 첫 불일치 없음 |
+| 61(전체) | 690 | — |
+
+→ **플래너는 완전 접두사 안정**(가설 F 기각). append 시점 계획과 릴리스 시점
+계획의 댑 스트림 자체는 동일하다.
+
+### 최종 국소: append 중복 적립(세그먼트 이음매) 검증이 다음 문
+
+남은 설명은 렌더 입력이 같아도 **append 과정에서 같은 마크가 여러 번 칠해지는
+것**이다. stroke audit §2-6이 pencil/calligraphy에서 확인한 "suffix 칠이
+paintedSourceSegments − 1 세그먼트까지 겹쳐 칠함" 패턴의 dry-media판일 가능성이
+가장 크다 — V3 분할 획은 전체가 16세그먼트로 나뉘어 이음마다 겹침이 생기면
+전 구간에 균등한 추가 밀도가 쌓인다(관측과 일치).
+
+검증 방법(오버레이 파일이 다른 세션 WIP여서 커밋 후 진행):
+1. `drawMarksToActive` 호출마다 (mark 식별자, 횟수) 카운터를 붙여 한 획의
+   append 스트림에서 마크별 페인트 횟수를 집계한다.
+2. exactPlan 1회 칠과 비교해 다중 칠해진 마크 비율·위치 분포를 뽑는다.
+3. 수정 방향은 둘 중 하나 — (a) append 시 이미 칠한 접두사 셀을 건너뛰는
+   페인트 저널, (b) §2-4 캐리어처럼 dry-media도 프레임당 전체 프리픽스 재계획·
+   전면 교체(비용 O(N)/프레임, 정확도 우선).
+
 ## 재현
 
 ```bash
