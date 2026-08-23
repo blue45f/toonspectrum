@@ -56,6 +56,40 @@ const FILTER_CASES = [
 
 const SLIDER_NUDGE_STEPS = 15;
 
+/** Survey mode: TOONSPECTRUM_FILTER_DIALOG_SURVEY=1 drives every menu kind, not just the five representatives. */
+const SURVEY_MODE = process.env.TOONSPECTRUM_FILTER_DIALOG_SURVEY === "1";
+
+/**
+ * Menu rows that open a different surface than the pixel-filter dialog:
+ * the last-filter re-open (needs a prior draft) and the two adjustment-layer
+ * rows that open inspector panels instead of StudioFilterDialog.
+ */
+const NON_DIALOG_MENU_LABELS = new Set([
+  "마지막 필터…",
+  "마지막 필터 다시 열기",
+  "레이어 보정 · 레벨",
+  "레이어 보정 · 톤 커브",
+]);
+
+async function collectFilterMenuLabels(page: Page): Promise<string[]> {
+  await openMainMenuGroup(page, "필터");
+  const menu = page.locator('[role="menu"][aria-label="필터"]');
+  const items = menu.getByRole("menuitem");
+  const count = await items.count();
+  const labels: string[] = [];
+  for (let index = 0; index < count; index += 1) {
+    // textContent concatenates the ⌘⇧n chord with no separating space
+    // ("가우시안 블러⌘⇧1"); the accessible name keeps one, so strip from ⌘.
+    const rawLabel = (await items.nth(index).textContent())?.trim() ?? "";
+    const label = rawLabel.replace(/⌘[\s\S]*$/u, "").trim();
+    if (label && !NON_DIALOG_MENU_LABELS.has(label)) labels.push(label);
+  }
+  await page.keyboard.press("Escape").catch(() => undefined);
+  await page.waitForTimeout(200);
+  invariant(labels.length > 0, "필터 메뉴에서 항목을 하나도 수집하지 못했습니다");
+  return labels;
+}
+
 interface PixelDiff {
   changedPixels: number;
   totalPixels: number;
@@ -75,6 +109,7 @@ interface FilterCaseResult {
 
 interface FilterDialogReport {
   ok: boolean;
+  mode: "representative" | "survey";
   startedAt: string;
   finishedAt: string;
   cases: FilterCaseResult[];
@@ -341,7 +376,16 @@ async function main(): Promise<void> {
     const baseline = await screenshotClipped(page, clip);
     log(`baseline evidence captured (${clip.width}x${clip.height})`);
 
-    for (const filterCase of FILTER_CASES) {
+    const cases = SURVEY_MODE
+      ? (await collectFilterMenuLabels(page)).map((label) => ({ label, group: "survey" }))
+      : [...FILTER_CASES];
+    log(
+      SURVEY_MODE
+        ? `survey mode: ${cases.length} menu kinds collected`
+        : `representative mode: ${cases.length} cases`,
+    );
+
+    for (const filterCase of cases) {
       const result: FilterCaseResult = {
         label: filterCase.label,
         group: filterCase.group,
@@ -422,6 +466,7 @@ async function main(): Promise<void> {
 
   const report: FilterDialogReport = {
     ok: results.length > 0 && results.every((result) => result.ok),
+    mode: SURVEY_MODE ? "survey" : "representative",
     startedAt,
     finishedAt: new Date().toISOString(),
     cases: results,
