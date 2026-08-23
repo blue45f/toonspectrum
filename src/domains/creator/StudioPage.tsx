@@ -17505,6 +17505,17 @@ const puppetWarpArmed =
     return () => controller.abort();
   }, [menu, assetTab, assetSearchQuery, assetSortOrder]);
 
+  // 마켓 상세의 "스튜디오에서 불러오기" 딥링크(?assetMarket=community) — 자산 메뉴의 커뮤니티 탭을 바로 연다.
+  // 공유 에셋 목록 로딩은 위 effect가 menu·assetTab 변경에 반응해 수행한다.
+  const openAssetMarketDeepLink = useEffectEvent(() => {
+    if (params.get("assetMarket") !== "community") return;
+    setMenu((current) => current ?? "asset");
+    setAssetTab("community");
+  });
+  useEffect(() => {
+    openAssetMarketDeepLink();
+  }, []);
+
   // 내 로컬 에셋을 커뮤니티에 공유(로그인 필요)
   async function onShareAsset(asset: StudioAsset, options: StudioAssetShareOptions) {
     if (!studioAuthUserId) {

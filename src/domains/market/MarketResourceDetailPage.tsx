@@ -217,7 +217,10 @@ export function MarketResourceDetailPage() {
 
                 <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
                   <div className="flex flex-col gap-2 rounded-xl border border-line bg-card p-4">
-                    <Link href="/studio" className={buttonClass({ variant: "solid", size: "md", className: "w-full" })}>
+                    <Link
+                      href="/studio?assetMarket=community"
+                      className={buttonClass({ variant: "solid", size: "md", className: "w-full" })}
+                    >
                       <Download className="h-4 w-4" aria-hidden="true" />
                       스튜디오에서 불러오기
                     </Link>

@@ -2,6 +2,7 @@ import { Search, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { marketBrowseJsonLd } from "./market-jsonld";
 import { MARKET_KINDS, MARKET_LICENSES, marketKindMeta } from "./market-kind";
 import { MarketResourceCard } from "./MarketResourceCard";
 import { useMarketResources } from "./use-market-resources";
@@ -16,6 +17,7 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
+import { useJsonLd } from "@/src/hooks/use-document-title";
 
 
 const PAGE_SIZE = 12;
@@ -56,6 +58,8 @@ export function MarketBrowsePage() {
     tag: readParam(searchParams, "tag"),
   };
   const page = useMarketResources(query);
+
+  useJsonLd(marketBrowseJsonLd(page.items, query.kind));
 
   const patchParams = useCallback(
     (patch: Record<string, string | null>) => {

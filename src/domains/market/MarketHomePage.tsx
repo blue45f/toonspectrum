@@ -1,5 +1,6 @@
 import { Store, Upload } from "lucide-react";
 
+import { marketHomeJsonLd } from "./market-jsonld";
 import { MARKET_KINDS, MARKET_LICENSES } from "./market-kind";
 import { MarketResourceCard } from "./MarketResourceCard";
 import { useMarketResources } from "./use-market-resources";
@@ -8,10 +9,13 @@ import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
+import { useJsonLd } from "@/src/hooks/use-document-title";
 
 
 export function MarketHomePage() {
   const latest = useMarketResources({ limit: 8 });
+
+  useJsonLd(marketHomeJsonLd(latest.items));
 
   return (
     <div>
