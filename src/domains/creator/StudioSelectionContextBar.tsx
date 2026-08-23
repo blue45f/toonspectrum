@@ -176,6 +176,12 @@ export const StudioSelectionContextBar = memo(function StudioSelectionContextBar
       node.style.pointerEvents = "none";
     };
 
+    // 프레임마다 독 rect를 재측정하지 않는다 — 브러시 HUD의 장애물 갱신과 같은 250ms TTL.
+    // 독은 뷰포트 상단 고정이라 rect 변동이 드물고, paint는 pointermove마다 rAF로 돈다.
+    const DOCK_OBSTACLE_REFRESH_MS = 250;
+    let dockObstacle: StudioSurfaceRect | null = null;
+    let dockObstacleAt = -Infinity;
+
     const paint = () => {
       frame = 0;
       if (disposed) return;
@@ -187,17 +193,17 @@ export const StudioSelectionContextBar = memo(function StudioSelectionContextBar
       }
       // 라이브 협업 프레즌스 독(저장 상태 필, z-[56])이 캔버스 우상단에 떠 있다.
       // 장애물로 알려줘야 명령 바가 그 아래에 깔려 버튼이 가려지는 일이 없다.
-      const dockRect = globalThis.document
-        .querySelector('[data-studio-presence-dock="true"]')
-        ?.getBoundingClientRect();
-      const obstacles = dockRect && dockRect.width > 0 && dockRect.height > 0
-        ? [{
-          left: dockRect.left,
-          top: dockRect.top,
-          width: dockRect.width,
-          height: dockRect.height,
-        }]
-        : [];
+      const now = performance.now();
+      if (now - dockObstacleAt >= DOCK_OBSTACLE_REFRESH_MS) {
+        dockObstacleAt = now;
+        const rect = globalThis.document
+          .querySelector('[data-studio-presence-dock="true"]')
+          ?.getBoundingClientRect();
+        dockObstacle = rect && rect.width > 0 && rect.height > 0
+          ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+          : null;
+      }
+      const obstacles = dockObstacle ? [dockObstacle] : [];
       const placement = planStudioSelectionContextBarPlacement({
         selection,
         bar: { width: node.offsetWidth, height: node.offsetHeight },
