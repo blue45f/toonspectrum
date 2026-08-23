@@ -239,7 +239,12 @@ export function MarketResourceDetailPage() {
                           loading="lazy"
                         />
                       ) : null}
-                      {record.publisher.name}
+                      <Link
+                        href={`/market/browse?q=${encodeURIComponent(record.publisher.name)}`}
+                        className="underline-offset-2 transition-colors duration-150 hover:text-accent hover:underline"
+                      >
+                        {record.publisher.name}
+                      </Link>
                     </MetaRow>
                     <MetaRow label="버전">
                       <span className="numeral tnum">v{record.resourceVersion}</span>

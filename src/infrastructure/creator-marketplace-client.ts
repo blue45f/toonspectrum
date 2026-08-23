@@ -32,6 +32,7 @@ export interface CreatorMarketplaceListParams {
   tag?: string;
   kind?: CreatorMarketplaceResourceKind;
   license?: CreatorMarketplaceResourceLicense;
+  publisher?: string;
 }
 
 function loadCreatorMarketplaceNetworkClient() {

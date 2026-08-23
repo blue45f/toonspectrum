@@ -34,6 +34,8 @@ export const CreatorMarketplaceResourceListQuerySchema = z
     tag: z.string().trim().max(24).optional(),
     kind: z.enum(CREATOR_MARKETPLACE_RESOURCE_KINDS).optional(),
     license: z.enum(CREATOR_MARKETPLACE_RESOURCE_LICENSES).optional(),
+    // 공개 카탈로그의 배급자 필터. viewer-agnostic URL 상태라 엣지 캐시와 충돌하지 않는다.
+    publisher: z.string().uuid().optional(),
   })
   .strict();
 

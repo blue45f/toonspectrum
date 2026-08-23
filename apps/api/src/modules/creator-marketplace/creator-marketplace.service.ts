@@ -163,7 +163,7 @@ export class CreatorMarketplaceService {
     const cursor = parseCursor(query.cursor);
     try {
       const rows = await this.repository.list({
-        publisherId: options.publisherId,
+        publisherId: options.publisherId ?? query.publisher,
         viewerId: options.viewerId,
         limit: query.limit,
         cursor,

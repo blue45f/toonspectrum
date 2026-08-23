@@ -30,6 +30,7 @@ export async function listCreatorMarketplaceResources(
         tag: params.tag,
         kind: params.kind,
         license: params.license,
+        publisher: params.publisher,
       },
       signal,
     });

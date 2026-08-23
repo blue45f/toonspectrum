@@ -56,6 +56,7 @@ export function MarketBrowsePage() {
     kind: readKind(searchParams),
     license: readLicense(searchParams),
     tag: readParam(searchParams, "tag"),
+    publisher: readParam(searchParams, "publisher"),
   };
   const page = useMarketResources(query);
 
@@ -168,13 +169,16 @@ export function MarketBrowsePage() {
           </label>
         </div>
 
-        {(query.search || query.tag) ? (
+        {(query.search || query.tag || query.publisher) ? (
           <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-fg-2">
             {query.search ? <span>“{query.search}” 검색 결과</span> : null}
             {query.tag ? <span>#{query.tag}</span> : null}
+            {query.publisher ? (
+              <span className="rounded bg-raised px-1.5 py-0.5 text-xs text-fg-2">선택한 배급자의 리소스</span>
+            ) : null}
             <button
               type="button"
-              onClick={() => patchParams({ q: null, tag: null })}
+              onClick={() => patchParams({ q: null, tag: null, publisher: null })}
               className="inline-flex items-center gap-1 rounded bg-raised px-1.5 py-0.5 text-xs text-fg-2 hover:text-fg"
             >
               <X className="h-3 w-3" aria-hidden="true" />
