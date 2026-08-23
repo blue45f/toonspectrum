@@ -2,6 +2,7 @@ import { ArrowLeft, Cpu, Download, ShieldCheck, Sparkles, Upload } from "lucide-
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { marketResourceJsonLd } from "./market-jsonld";
 import {
   formatMarketByteSize,
   formatMarketDate,
@@ -16,6 +17,7 @@ import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import Link from "@/src/compat/router-link";
+import { useJsonLd } from "@/src/hooks/use-document-title";
 import { getCreatorMarketplaceResource } from "@/src/infrastructure/creator-marketplace-client";
 import { NotFoundError } from "@/src/infrastructure/use-api-resource";
 
@@ -75,6 +77,8 @@ export function MarketResourceDetailPage() {
 
     return () => controller.abort();
   }, [id, reloadToken]);
+
+  useJsonLd(record ? marketResourceJsonLd(record) : null);
 
   const related = useMarketResources(
     record ? { kind: record.kind, limit: 4 } : null

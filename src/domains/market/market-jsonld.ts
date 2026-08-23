@@ -53,3 +53,33 @@ export function marketBrowseJsonLd(
     itemListElement: itemListElements(items),
   };
 }
+
+/** 마켓 상세 — 공유 리소스 하나의 CreativeWork. 라이선스·배급자·수정일을 검색엔진에 노출한다. */
+export function marketResourceJsonLd(record: CreatorMarketplaceResourceRecord) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "CreativeWork",
+    name: record.name,
+    description: record.description || undefined,
+    url: `${MARKET_SITE_URL}/market/resource/${record.id}`,
+    author: { "@type": "Person", name: record.publisher.name },
+    dateModified: record.updatedAt,
+    datePublished: record.createdAt,
+    license: marketLicenseUrl(record.license),
+    isAccessibleForFree: true,
+    keywords: record.tags.length > 0 ? record.tags.join(", ") : undefined,
+  };
+}
+
+function marketLicenseUrl(license: string): string | undefined {
+  switch (license) {
+    case "cc0-1.0":
+      return "https://creativecommons.org/publicdomain/zero/1.0/";
+    case "cc-by-4.0":
+      return "https://creativecommons.org/licenses/by/4.0/";
+    case "cc-by-nc-4.0":
+      return "https://creativecommons.org/licenses/by-nc/4.0/";
+    default:
+      return `${MARKET_SITE_URL}/terms`;
+  }
+}
