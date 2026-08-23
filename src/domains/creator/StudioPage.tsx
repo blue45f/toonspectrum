@@ -936,6 +936,7 @@ import {
   preloadStudioCommentsPanelSession,
   preloadStudioCommentThreadPopover,
   preloadStudioCaptureReadinessRuntime,
+  preloadStudioFilterDialog,
   preloadStudioPointCommentComposer,
   preloadStudioReferencePanel,
   preloadStudioSavePayloadRuntime,
@@ -16645,6 +16646,22 @@ const puppetWarpArmed =
       if (timeoutHandle !== null) clearTimeout(timeoutHandle);
       removeLoadingDoneListener?.();
     };
+  }, []);
+
+  // 필터 다이얼로그 청크는 첫 "필터 메뉴 → 종류 선택" 순간에야 내려오는데, 그 순간은
+  // 래스터 합성 준비(동기 픽셀 작업)와 겹쳐 다이얼로그가 유독 늦게 뜬다. 마운트 뒤 유휴
+  // 시점에 미리 받아두면 첫 필터 열림이 이후 열림과 같은 비용이 된다.
+  useEffect(() => {
+    const ric = (globalThis as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+    if (typeof ric === "function") {
+      const handle = ric(() => preloadStudioFilterDialog());
+      return () => {
+        const cic = (globalThis as { cancelIdleCallback?: (handle: number) => void }).cancelIdleCallback;
+        if (typeof cic === "function") cic(handle);
+      };
+    }
+    const timeout = setTimeout(preloadStudioFilterDialog, 300);
+    return () => clearTimeout(timeout);
   }, []);
 
   // 위 효과는 마운트 때 한 번뿐이라, 나중에 도착하는 문서(작품 하이드레이션·페이지 이동·스냅샷

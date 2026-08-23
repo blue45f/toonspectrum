@@ -1,0 +1,454 @@
+/**
+ * scripts/verify-studio-filter-dialog.mts
+ * Real-browser E2E for the PRODUCT smart-filter path:
+ *
+ *   펜 스트로크 → 필터 메뉴 → StudioFilterDialog(미리보기) → 슬라이더 조정 → 적용
+ *   → 문서 픽셀 실제 변화 확인 → 실행취소로 복원 확인
+ *
+ * The runtime-level gates (verify:studio-gpu-filters,
+ * verify:studio-engine-webgpu-filter-parity) prove the GPU/CPU filter runtimes in
+ * isolation against a dev-server harness. Nothing drove the shipped dialog through
+ * vite preview — this verifier closes that gap: the lane ladder (gpu-chain → worker →
+ * konva-native) is exercised exactly as an artist triggers it, on the production build.
+ *
+ * Run: pnpm run build && pnpm exec tsx scripts/verify-studio-filter-dialog.mts
+ * Expects production build in dist/ (vite preview) — see studio-verify skill §2.
+ *
+ * Exit codes: 0 = every filter case applied, visibly changed pixels and undid cleanly
+ *             1 = dialog, preview, apply, pixel-diff or browser-diagnostic failure
+ */
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+
+import { chromium, type Page } from "playwright";
+
+import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
+import {
+  cleanScratchDir,
+  findFreePort,
+  spawnVitePreview,
+  stopChildProcess,
+  waitForServer,
+} from "./lib/studio-verify-preview-harness.mjs";
+
+import type { ChildProcess } from "node:child_process";
+
+const SCRATCH =
+  process.env.TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR
+  ?? process.env.TOONSPECTRUM_VERIFY_DIR
+  ?? join(tmpdir(), "toonspectrum-studio-filter-dialog");
+const LOG_PATH = join(SCRATCH, "studio-filter-dialog-preview.log");
+const REPORT_PATH = join(SCRATCH, "studio-filter-dialog-report.json");
+
+const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
+const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+
+/** One representative kind per catalog group; labels are the top-menu entries. */
+const FILTER_CASES = [
+  { label: "가우시안 블러", group: "blur" },
+  { label: "명도 / 대비", group: "tone" },
+  { label: "모자이크 / 픽셀화", group: "detail" },
+  { label: "노이즈 추가", group: "texture" },
+  { label: "비네트", group: "texture" },
+] as const;
+
+const SLIDER_NUDGE_STEPS = 15;
+
+interface PixelDiff {
+  changedPixels: number;
+  totalPixels: number;
+  maxChannelDelta: number;
+}
+
+interface FilterCaseResult {
+  label: string;
+  group: string;
+  ok: boolean;
+  openMs: number | null;
+  applyMs: number | null;
+  diff: PixelDiff | null;
+  undoDiff: PixelDiff | null;
+  failure?: string;
+}
+
+interface FilterDialogReport {
+  ok: boolean;
+  startedAt: string;
+  finishedAt: string;
+  cases: FilterCaseResult[];
+  consoleErrorCount: number;
+  failedResponses: string[];
+}
+
+function log(message: string): void {
+  const line = `[verify-filter-dialog] ${message}`;
+  console.log(line);
+  appendFileSync(LOG_PATH, `${line}\n`);
+}
+
+function invariant(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(message);
+}
+
+/** Static-preview noise that is not a product failure (copied idiom from verify-studio-menus). */
+function isExpectedPreviewNoise(message: string): boolean {
+  return (
+    message.includes("ECONNREFUSED")
+    || message.includes("proxy error")
+    || message.includes("Unexpected response code: 400")
+  );
+}
+
+function collectBrowserErrors(
+  page: Page,
+  collector: { messages: string[]; failedResponses: string[] },
+): void {
+  page.on("console", (entry) => {
+    if (entry.type() !== "error") return;
+    const message = entry.text();
+    if (!isExpectedPreviewNoise(message)) collector.messages.push(message);
+  });
+  page.on("pageerror", (error) => collector.messages.push(String(error)));
+  page.on("response", (response) => {
+    if (response.status() < 500) return;
+    const message = `${response.status()} ${response.url()}`;
+    if (!isExpectedPreviewNoise(message)) collector.failedResponses.push(message);
+  });
+}
+
+async function dismissTransientChrome(page: Page): Promise<void> {
+  for (const text of ["나중에", "닫기", "예시로 시작", "빈 캔버스", "확인"]) {
+    try {
+      const el = page.getByRole("button", { name: text }).first();
+      if (await el.isVisible({ timeout: 250 })) {
+        await el.click({ timeout: 600 });
+        await page.waitForTimeout(150);
+      }
+    } catch {
+      /* optional chrome */
+    }
+  }
+}
+
+async function activatePenAndDraw(page: Page): Promise<void> {
+  await page.keyboard.press("b");
+  const toolbar = page.locator('[data-studio-draw-options="true"]');
+  await toolbar.waitFor({ state: "visible", timeout: 10_000 });
+  const pen = toolbar.getByRole("button", { name: "펜", exact: true });
+  if ((await pen.getAttribute("aria-pressed")) !== "true") await pen.click();
+  await page.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
+
+  const viewport = page.locator("[data-studio-canvas-viewport]");
+  await viewport.waitFor({ state: "visible", timeout: 10_000 });
+  const box = await viewport.boundingBox();
+  invariant(box, "canvas viewport had no bounding box");
+
+  const centerX = box.x + box.width * 0.42;
+  const centerY = box.y + box.height * 0.42;
+  await page.mouse.move(centerX, centerY);
+  await page.mouse.down();
+  await page.mouse.move(centerX + 230, centerY + 130, { steps: 18 });
+  await page.mouse.up();
+  await page.mouse.move(centerX + 110, centerY - 20);
+  await page.mouse.down();
+  await page.mouse.move(centerX - 190, centerY + 170, { steps: 18 });
+  await page.mouse.up();
+  // Let the stroke commit and history entry land before measuring anything.
+  await page.waitForTimeout(600);
+}
+
+/** Central canvas region away from fixed chrome — the neighbourhood the filters visibly act on. */
+async function canvasEvidenceClip(page: Page): Promise<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}> {
+  const box = await page.locator("[data-studio-canvas-viewport]").boundingBox();
+  invariant(box, "canvas viewport had no bounding box for evidence clip");
+  const insetX = Math.round(box.width * 0.28);
+  const insetY = Math.round(box.height * 0.26);
+  return {
+    x: Math.round(box.x) + insetX,
+    y: Math.round(box.y) + insetY,
+    width: Math.max(64, Math.round(box.width) - insetX * 2),
+    height: Math.max(64, Math.round(box.height) - insetY * 2),
+  };
+}
+
+async function screenshotClipped(
+  page: Page,
+  clip: { x: number; y: number; width: number; height: number },
+): Promise<Buffer> {
+  return page.screenshot({ clip, animations: "disabled" });
+}
+
+async function compareScreenshotPixels(
+  page: Page,
+  first: Buffer,
+  second: Buffer,
+  channelTolerance = 2,
+): Promise<PixelDiff> {
+  return page.evaluate(async ({ firstBase64, secondBase64, tolerance }) => {
+    const [firstResponse, secondResponse] = await Promise.all([
+      fetch(`data:image/png;base64,${firstBase64}`),
+      fetch(`data:image/png;base64,${secondBase64}`),
+    ]);
+    const [firstBitmap, secondBitmap] = await Promise.all([
+      createImageBitmap(await firstResponse.blob()),
+      createImageBitmap(await secondResponse.blob()),
+    ]);
+    const firstCanvas = new OffscreenCanvas(firstBitmap.width, firstBitmap.height);
+    const secondCanvas = new OffscreenCanvas(secondBitmap.width, secondBitmap.height);
+    const firstContext = firstCanvas.getContext("2d", { willReadFrequently: true });
+    const secondContext = secondCanvas.getContext("2d", { willReadFrequently: true });
+    if (!firstContext || !secondContext) throw new Error("could not decode screenshot pixels");
+    firstContext.drawImage(firstBitmap, 0, 0);
+    secondContext.drawImage(secondBitmap, 0, 0);
+    const a = firstContext.getImageData(0, 0, firstCanvas.width, firstCanvas.height).data;
+    const b = secondContext.getImageData(0, 0, secondCanvas.width, secondCanvas.height).data;
+    const totalPixels = firstCanvas.width * firstCanvas.height;
+    firstBitmap.close();
+    secondBitmap.close();
+    if (a.length !== b.length || firstCanvas.width !== secondCanvas.width) {
+      return { changedPixels: totalPixels, totalPixels, maxChannelDelta: 255 };
+    }
+    let changedPixels = 0;
+    let maxChannelDelta = 0;
+    for (let offset = 0; offset < a.length; offset += 4) {
+      let pixelDelta = 0;
+      for (let channel = 0; channel < 4; channel += 1) {
+        pixelDelta = Math.max(pixelDelta, Math.abs(a[offset + channel]! - b[offset + channel]!));
+      }
+      if (pixelDelta > tolerance) changedPixels += 1;
+      maxChannelDelta = Math.max(maxChannelDelta, pixelDelta);
+    }
+    return { changedPixels, totalPixels, maxChannelDelta };
+  }, {
+    firstBase64: first.toString("base64"),
+    secondBase64: second.toString("base64"),
+    tolerance: channelTolerance,
+  });
+}
+
+async function openMainMenuGroup(page: Page, label: string): Promise<void> {
+  const nav = page.locator('[data-studio-main-menu="true"]');
+  await nav.waitFor({ state: "visible", timeout: 15_000 });
+  await page.keyboard.press("Escape").catch(() => undefined);
+  await page.waitForTimeout(80);
+  await nav.getByRole("menuitem", { name: label, exact: true }).click({ timeout: 5_000 });
+  await page
+    .locator(`[role="menu"][aria-label="${label}"]`)
+    .waitFor({ state: "visible", timeout: 5_000 });
+}
+
+function filterDialog(page: Page): ReturnType<Page["locator"]> {
+  return page.locator('[aria-labelledby="studio-filter-dialog-title"]');
+}
+
+async function nudgeFirstParameterSlider(dialog: ReturnType<Page["locator"]>): Promise<boolean> {
+  const slider = dialog.locator('input[type="range"]').locator("visible=true").first();
+  if ((await slider.count()) === 0) return false;
+  await slider.focus();
+  for (let step = 0; step < SLIDER_NUDGE_STEPS; step += 1) {
+    await slider.press("ArrowUp");
+  }
+  return true;
+}
+
+/**
+ * Core menu rows embed their ⌘⇧n chord in the accessible name ("가우시안 블러 ⌘⇧1"), so an
+ * exact name match misses them; a bare substring match would also catch "선택적 가우시안
+ * 블러". Anchor at the string start instead.
+ */
+function menuItemByLabel(page: Page, label: string): ReturnType<Page["getByRole"]> {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return page.getByRole("menuitem", { name: new RegExp(`^${escaped}`) });
+}
+
+async function main(): Promise<void> {
+  mkdirSync(SCRATCH, { recursive: true });
+  cleanScratchDir({
+    directory: SCRATCH,
+    filePrefix: "studio-filter-dialog",
+    extensions: [".log", ".json"],
+  });
+
+  const startedAt = new Date().toISOString();
+  const port = await findFreePort({ unavailableMessage: "could not allocate preview port" });
+  const url = `http://127.0.0.1:${port}/studio`;
+  let child: ChildProcess | null = null;
+
+  const results: FilterCaseResult[] = [];
+  const browserErrors: { messages: string[]; failedResponses: string[] } = {
+    messages: [],
+    failedResponses: [],
+  };
+
+  try {
+    child = spawnVitePreview({
+      port,
+      runner: "pnpm-exec",
+      logPath: LOG_PATH,
+    });
+    await waitForServer(`http://127.0.0.1:${port}/`, {
+      timeoutMs: 20_000,
+      notReadyMessage: `preview not ready: http://127.0.0.1:${port}/`,
+    });
+    log(`preview ready @ ${url}`);
+
+    const browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 1100 },
+      locale: "ko-KR",
+    });
+    const page = await context.newPage();
+    collectBrowserErrors(page, browserErrors);
+    await page.addInitScript(
+      ({ quickstartKey, autosavePrefix }) => {
+        try {
+          window.localStorage.setItem(quickstartKey, "1");
+          window.localStorage.setItem(
+            "toonspectrum-lang",
+            JSON.stringify({ state: { lang: "ko" }, version: 0 }),
+          );
+          window.localStorage.setItem(
+            "toonspectrum-studio-ui-density:v1",
+            JSON.stringify({ mode: "full" }),
+          );
+          for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+            const key = window.localStorage.key(index);
+            if (key?.startsWith(autosavePrefix)) window.localStorage.removeItem(key);
+          }
+        } catch {
+          /* storage unavailable — visible assertions stay strict */
+        }
+      },
+      { quickstartKey: QUICKSTART_KEY, autosavePrefix: AUTOSAVE_PREFIX },
+    );
+
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await page.locator("[data-studio-canvas-viewport]").waitFor({
+      state: "visible",
+      timeout: 30_000,
+    });
+    await dismissTransientChrome(page);
+
+    await activatePenAndDraw(page);
+    const clip = await canvasEvidenceClip(page);
+    const baseline = await screenshotClipped(page, clip);
+    log(`baseline evidence captured (${clip.width}x${clip.height})`);
+
+    for (const filterCase of FILTER_CASES) {
+      const result: FilterCaseResult = {
+        label: filterCase.label,
+        group: filterCase.group,
+        ok: false,
+        openMs: null,
+        applyMs: null,
+        diff: null,
+        undoDiff: null,
+      };
+      results.push(result);
+      try {
+        const openStartedAt = Date.now();
+        await openMainMenuGroup(page, "필터");
+        await menuItemByLabel(page, filterCase.label).click({ timeout: 5_000 });
+
+        const dialog = filterDialog(page);
+        await dialog.waitFor({ state: "visible", timeout: 45_000 });
+        result.openMs = Date.now() - openStartedAt;
+
+        const nudged = await nudgeFirstParameterSlider(dialog);
+        log(`${filterCase.label}: dialog open in ${result.openMs}ms (slider nudged=${nudged})`);
+        await page.waitForTimeout(500);
+
+        const beforeApply = await screenshotClipped(page, clip).catch(() => null);
+        const applyButton = dialog.getByRole("button", { name: "적용", exact: true });
+        const applyStartedAt = Date.now();
+        await applyButton.click({ timeout: 5_000 });
+        await dialog.waitFor({ state: "hidden", timeout: 90_000 });
+        result.applyMs = Date.now() - applyStartedAt;
+        await page.waitForTimeout(700);
+
+        const after = await screenshotClipped(page, clip);
+        result.diff = await compareScreenshotPixels(page, baseline, after);
+        invariant(
+          result.diff.changedPixels > result.diff.totalPixels * 0.005,
+          `${filterCase.label}: 적용 후 픽셀이 유의미하게 변하지 않았습니다 `
+            + `(${result.diff.changedPixels}/${result.diff.totalPixels})`,
+        );
+
+        if (beforeApply) {
+          const previewDiff = await compareScreenshotPixels(page, baseline, beforeApply);
+          log(
+            `${filterCase.label}: preview already differed from baseline: `
+              + `${previewDiff.changedPixels}/${previewDiff.totalPixels}`,
+          );
+        }
+
+        const undo = await enabledStudioHistoryControl(page, "undo", 10_000);
+        await undo.click();
+        await page.waitForTimeout(900);
+        const restored = await screenshotClipped(page, clip);
+        result.undoDiff = await compareScreenshotPixels(page, baseline, restored);
+        invariant(
+          result.undoDiff.changedPixels <= result.undoDiff.totalPixels * 0.002,
+          `${filterCase.label}: 실행취소 후 기본 상태로 복원되지 않았습니다 `
+            + `(${result.undoDiff.changedPixels}/${result.undoDiff.totalPixels})`,
+        );
+
+        result.ok = true;
+        log(
+          `${filterCase.label}: OK — apply ${result.applyMs}ms, `
+            + `changed ${result.diff.changedPixels}/${result.diff.totalPixels}px, `
+            + `undo restored (${result.undoDiff.changedPixels} residual)`,
+        );
+      } catch (error) {
+        result.failure = String(error instanceof Error ? error.message : error);
+        log(`${filterCase.label}: FAILED — ${result.failure}`);
+        // Recover to a known state so later cases still run from the baseline document.
+        await page.keyboard.press("Escape").catch(() => undefined);
+        await page.waitForTimeout(300);
+      }
+    }
+
+    await browser.close();
+  } finally {
+    if (child) await stopChildProcess(child);
+  }
+
+  const report: FilterDialogReport = {
+    ok: results.length > 0 && results.every((result) => result.ok),
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    cases: results,
+    consoleErrorCount: browserErrors.messages.length,
+    failedResponses: browserErrors.failedResponses,
+  };
+  writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
+  log(`report written → ${REPORT_PATH}`);
+
+  if (browserErrors.messages.length > 0) {
+    log(`browser errors observed (${browserErrors.messages.length}):`);
+    for (const message of browserErrors.messages.slice(0, 8)) log(`  ${message}`);
+  }
+  if (report.ok && browserErrors.messages.length === 0 && browserErrors.failedResponses.length === 0) {
+    log("PASS — 모든 필터 케이스가 실제 브라우저에서 적용·복원되었습니다");
+    return;
+  }
+  throw new Error(
+    `filter dialog verification failed — ok=${report.ok} `
+      + `consoleErrors=${browserErrors.messages.length} `
+      + `failedResponses=${browserErrors.failedResponses.length}`,
+  );
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error: unknown) => {
+    log(`FAIL ${String(error instanceof Error ? error.message : error)}`);
+    process.exitCode = 1;
+  });

@@ -108,10 +108,16 @@ const StudioImageAdjustmentsPanel = lazyRetry(
   () => import("./StudioImageAdjustmentsPanel").then((mod) => ({ default: mod.StudioImageAdjustmentsPanel })),
   "StudioImageAdjustmentsPanel"
 );
+const studioFilterDialogLoader = createStudioIntentLazyLoader(() =>
+  import( "./filter/StudioFilterDialog").then((mod) => ({ default: mod.StudioFilterDialog }))
+);
 const StudioFilterDialog = lazyRetry(
-  () => import( "./filter/StudioFilterDialog").then((mod) => ({ default: mod.StudioFilterDialog })),
+  studioFilterDialogLoader.load,
   "StudioFilterDialog"
 );
+function preloadStudioFilterDialog(): void {
+  studioFilterDialogLoader.preload();
+}
 const StudioLayerLiftDialog = lazyRetry(
   () => import( "./layer/StudioLayerLiftDialog").then((mod) => ({ default: mod.StudioLayerLiftDialog })),
   "StudioLayerLiftDialog"
@@ -973,6 +979,7 @@ export {
   preloadStudioPaletteLibraryPanel,
   preloadStudioCommentThreadPopover,
   preloadStudioCaptureReadinessRuntime,
+  preloadStudioFilterDialog,
   preloadStudioPointCommentComposer,
   preloadStudioReferencePanel,
   preloadStudioSavePayloadRuntime,

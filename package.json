@@ -130,7 +130,8 @@
     "studio:upload-assets:dry-run": "tsx scripts/upload-toonstudio-3d-assets.mts --dry-run",
     "studio:toolchain:check": "tsx scripts/studio-toolchain-check.ts",
     "studio:toolchain:setup": "tsx scripts/studio-toolchain-setup.ts",
-    "studio:asset:release": "tsx scripts/studio-asset-release.ts"
+    "studio:asset:release": "tsx scripts/studio-asset-release.ts",
+    "verify:studio-filter-dialog": "tsx scripts/verify-studio-filter-dialog.mts"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
