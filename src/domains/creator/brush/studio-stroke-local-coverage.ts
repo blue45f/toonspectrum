@@ -93,7 +93,7 @@ export interface StudioAngledNibPressureInput {
   readonly minimumDiameterRatio?: unknown;
   readonly profileId: Extract<
     StudioRetainedMediaPressureProfileId,
-    "brush" | "flat-brush"
+    "brush" | "flat-brush" | "marker-chisel"
   >;
   /**
    * The element's paint opacity, folded into every shell's absolute alpha so the darkest band
