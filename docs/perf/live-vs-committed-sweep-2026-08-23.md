@@ -1,0 +1,250 @@
+# 라이브 vs 커밋 전수 스윕 — 2026-08-23
+- 대상: listed 238종 중 238종 실행
+- 성공 8 / 실패 227 / 무출력 의심 0
+- 산출물: /tmp/studio-brush-sweep-results.json
+## 최악 20종 (장획 p95 프레임시간)
+| # | id | p50 | p95 | max | longtasks | changedPx | 최대채널差 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | highlighter | 8.4 | 68.3 | 1132.8 | 539 | 18485 | 242 |
+| 2 | airbrush | 8.3 | 31.9 | 276.6 | 211 | 18416 | 242 |
+| 3 | brush | 8.3 | 25.0 | 510.1 | 121 | 18166 | 242 |
+| 4 | watercolor | 8.3 | 24.9 | 191.6 | 150 | 18379 | 242 |
+| 5 | pen | 8.3 | 18.7 | 259.4 | 147 | 20134 | 242 |
+| 6 | marker | 8.3 | 10.3 | 217.2 | 53 | 18470 | 242 |
+| 7 | gpen | 8.3 | 10.3 | 274.6 | 54 | 19025 | 242 |
+| 8 | fountain-pen | 8.3 | 10.2 | 327.0 | 35 | 18191 | 242 |
+## 실패 목록
+
+- standard-eraser: locator.waitFor: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('button', { name: '일반 지우개 선택', exact: true }) to be visible[22m
+
+- kneaded-eraser: locator.waitFor: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('button', { name: '떡지우개(저농도) 선택', exact: true }) to be visible[22m
+
+- calligraphy: mouse.move: Target crashed 
+- parallel-pen: keyboard.press: Target crashed 
+- perfect-ink: keyboard.press: Target crashed 
+- perfect-marker: keyboard.press: Target crashed 
+- marker-bold: keyboard.press: Target crashed 
+- neon: keyboard.press: Target crashed 
+- soft-glow: keyboard.press: Target crashed 
+- glow: keyboard.press: Target crashed 
+- glitter: keyboard.press: Target crashed 
+- star-dust: keyboard.press: Target crashed 
+- erodible-pencil: keyboard.press: Target crashed 
+- inkwash-white-ink: keyboard.press: Target crashed 
+- oil: keyboard.press: Target crashed 
+- paint-tube: keyboard.press: Target crashed 
+- pastel: keyboard.press: Target crashed 
+- crayon: keyboard.press: Target crashed 
+- chalk: keyboard.press: Target crashed 
+- charcoal: keyboard.press: Target crashed 
+- dry-media: keyboard.press: Target crashed 
+- hard-airbrush: keyboard.press: Target crashed 
+- soft-brush: keyboard.press: Target crashed 
+- spray: keyboard.press: Target crashed 
+- ink-particle: keyboard.press: Target crashed 
+- tangent-normal-brush: keyboard.press: Target crashed 
+- sketchpad-tile: keyboard.press: Target crashed 
+- sketchpad-mirror: keyboard.press: Target crashed 
+- sketchpad-soft-marker: keyboard.press: Target crashed 
+- web-multi-agent: keyboard.press: Target crashed 
+- web-rough-ink: keyboard.press: Target crashed 
+- web-gravity-drip: keyboard.press: Target crashed 
+- web-soft-cloud: keyboard.press: Target crashed 
+- web-calligraphy-ribbon: keyboard.press: Target crashed 
+- web-dash-stitch: keyboard.press: Target crashed 
+- web-scatter-stamp: keyboard.press: Target crashed 
+- web-rainbow-flow: keyboard.press: Target crashed 
+- web-lazy-ink: keyboard.press: Target crashed 
+- web-hatch-color: keyboard.press: Target crashed 
+- web-cel-flat: keyboard.press: Target crashed 
+- web-blend-softener: keyboard.press: Target crashed 
+- web-dot-tone: keyboard.press: Target crashed 
+- web-kaleido-ink: keyboard.press: Target crashed 
+- web-fur-strand: keyboard.press: Target crashed 
+- web-contour-double: keyboard.press: Target crashed 
+- web-radial-burst: keyboard.press: Target crashed 
+- web-mirror-ink: keyboard.press: Target crashed 
+- web-grid-ink: keyboard.press: Target crashed 
+- web-spiro-orbit: keyboard.press: Target crashed 
+- web-zigzag-edge: keyboard.press: Target crashed 
+- web-neon-tube: keyboard.press: Target crashed 
+- web-pressure-flat: keyboard.press: Target crashed 
+- web-smudge-trail: keyboard.press: Target crashed 
+- web-cross-hatch-pen: keyboard.press: Target crashed 
+- screentone: keyboard.press: Target crashed 
+- ink-brush: keyboard.press: Target crashed 
+- brush-pen: keyboard.press: Target crashed 
+- chisel-highlighter: keyboard.press: Target crashed 
+- pastel-highlighter: keyboard.press: Target crashed 
+- flat-brush: keyboard.press: Target crashed 
+- gouache: keyboard.press: Target crashed 
+- airbrush-fine: keyboard.press: Target crashed 
+- wash-brush: keyboard.press: Target crashed 
+- splatter: keyboard.press: Target crashed 
+- pencil-6b: keyboard.press: Target crashed 
+- pencil-grain: keyboard.press: Target crashed 
+- colored-pencil: keyboard.press: Target crashed 
+- oil-pastel: keyboard.press: Target crashed 
+- crosshatch: keyboard.press: Target crashed 
+- oil--filbert-ribbon: keyboard.press: Target crashed 
+- oil--flat-ribbon: keyboard.press: Target crashed 
+- oil--impasto-ribbon: keyboard.press: Target crashed 
+- oil--knife-edge: keyboard.press: Target crashed 
+- watercolor--granular: keyboard.press: Target crashed 
+- ink-wash--sumi-core: keyboard.press: Target crashed 
+- ink-wash--bleed-halo: keyboard.press: Target crashed 
+- watercolor--edge-bloom: keyboard.press: Target crashed 
+- ink-wash--fiber-feather: keyboard.press: Target crashed 
+- ink-wash--chroma-halo: keyboard.press: Target crashed 
+- gouache--matte-body: keyboard.press: Target crashed 
+- charcoal--vine-soft: keyboard.press: Target crashed 
+- charcoal--compressed-edge: keyboard.press: Target crashed 
+- oil-pastel--wgm-mix: keyboard.press: Target crashed 
+- crayon--klecks-stamp: keyboard.press: Target crashed 
+- chalk--klecks-stamp: keyboard.press: Target crashed 
+- charcoal--mypaint-stamp: keyboard.press: Target crashed 
+- pastel--soft-stamp: keyboard.press: Target crashed 
+- pencil--side-shade: keyboard.press: Target crashed 
+- brush--dry-rake: keyboard.press: Target crashed 
+- brush--impasto-relief: keyboard.press: Target crashed 
+- brush--bristle-depletion: keyboard.press: Target crashed 
+- ink-particle--scatter-cloud: keyboard.press: Target crashed 
+- mypaint-cc0--2b-pencil: keyboard.press: Target crashed 
+- mypaint-cc0--dry-brush: keyboard.press: Target crashed 
+- mypaint-cc0--splatter: keyboard.press: Target crashed 
+- mypaint-cc0--ink-blot: keyboard.press: Target crashed 
+- mypaint-cc0--kabura: keyboard.press: Target crashed 
+- mypaint-cc0--watercolor-fringe: keyboard.press: Target crashed 
+- mypaint-cc0--marker-fat: keyboard.press: Target crashed 
+- gpen--croquis-capsule: keyboard.press: Target crashed 
+- pen--croquis-stabilized: keyboard.press: Target crashed 
+- ink-wash--living-bake: keyboard.press: Target crashed 
+- brush--bristle-physics: keyboard.press: Target crashed 
+- core-round: keyboard.press: Target crashed 
+- flex-ink: keyboard.press: Target crashed 
+- mist-soft: keyboard.press: Target crashed 
+- round-sketch: keyboard.press: Target crashed 
+- precision-pencil: keyboard.press: Target crashed 
+- comfort-pencil: keyboard.press: Target crashed 
+- needle-graphite: keyboard.press: Target crashed 
+- round-shading: keyboard.press: Target crashed 
+- vine-stroke: keyboard.press: Target crashed 
+- willow-fiber: keyboard.press: Target crashed 
+- velvet-charcoal: keyboard.press: Target crashed 
+- line-block: keyboard.press: Target crashed 
+- horizontal-blade: keyboard.press: Target crashed 
+- vertical-blade: keyboard.press: Target crashed 
+- directional-flat: keyboard.press: Target crashed 
+- transparent-flat: keyboard.press: Target crashed 
+- hard-oval: keyboard.press: Target crashed 
+- fabric-texture: keyboard.press: Target crashed 
+- bleeding-stain: keyboard.press: Target crashed 
+- rock-texture: keyboard.press: Target crashed 
+- cotton-fiber: keyboard.press: Target crashed 
+- bumpy-grain: keyboard.press: Target crashed 
+- paint-roller: keyboard.press: Target crashed 
+- particle-scatter: keyboard.press: Target crashed 
+- rough-ink: keyboard.press: Target crashed 
+- fine-rake: keyboard.press: Target crashed 
+- wide-rake: keyboard.press: Target crashed 
+- dry-rake: keyboard.press: Target crashed 
+- foliage-texture: keyboard.press: Target crashed 
+- loose-grass: keyboard.press: Target crashed 
+- dense-grass: keyboard.press: Target crashed 
+- fresh-leaf: keyboard.press: Target crashed 
+- long-leaf: keyboard.press: Target crashed 
+- round-leaf: keyboard.press: Target crashed 
+- leaf-cluster: keyboard.press: Target crashed 
+- free-stamp: keyboard.press: Target crashed 
+- scattered-oval: keyboard.press: Target crashed 
+- smooth-oval: keyboard.press: Target crashed 
+- layered-oval: keyboard.press: Target crashed 
+- checker-grid: keyboard.press: Target crashed 
+- hair-fiber: keyboard.press: Target crashed 
+- even-stripe: keyboard.press: Target crashed 
+- rough-stripe: keyboard.press: Target crashed 
+- footstep-stamp: keyboard.press: Target crashed 
+- heart-stamp: keyboard.press: Target crashed 
+- technical-needle-ink: keyboard.press: Target crashed 
+- side-graphite-shade: keyboard.press: Target crashed 
+- compressed-charcoal-edge: keyboard.press: Target crashed 
+- opaque-gouache: keyboard.press: Target crashed 
+- oil-filbert: keyboard.press: Target crashed 
+- taper-brush-marker: keyboard.press: Target crashed 
+- pixel-square: keyboard.press: Target crashed 
+- pixel-dither: keyboard.press: Target crashed 
+- cross-hatch: keyboard.press: Target crashed 
+- speed-hatch: keyboard.press: Target crashed 
+- dense-halftone: keyboard.press: Target crashed 
+- bokeh-scatter: keyboard.press: Target crashed 
+- canvas-weave: keyboard.press: Target crashed 
+- fine-hair-strands: keyboard.press: Target crashed 
+- cloth-fold-rake: keyboard.press: Target crashed 
+- pine-needle-cluster: keyboard.press: Target crashed 
+- pencil-4b-rough: keyboard.press: Target crashed 
+- pencil-hb-mechanical: keyboard.press: Target crashed 
+- g-pen-flex: keyboard.press: Target crashed 
+- maru-pen-fine: keyboard.press: Target crashed 
+- spoon-pen-round: keyboard.press: Target crashed 
+- brush-pen-ink: keyboard.press: Target crashed 
+- calligraphy-tilt-nib: keyboard.press: Target crashed 
+- watercolor-wet-bleed: keyboard.press: Target crashed 
+- oil-impasto-heavy: keyboard.press: Target crashed 
+- oil-dry-scumble: keyboard.press: Target crashed 
+- pastel-paper-soft: keyboard.press: Target crashed 
+- crayon-wax-bold: keyboard.press: Target crashed 
+- sponge-stipple-dab: keyboard.press: Target crashed 
+- marker-colorless-blender: keyboard.press: Target crashed 
+- marker-wide-chisel: keyboard.press: Target crashed 
+- spray-noise-fine: keyboard.press: Target crashed 
+- stardust-star-scatter: keyboard.press: Target crashed 
+- leaf-fall-flurry: keyboard.press: Target crashed 
+- cloud-billow-soft: keyboard.press: Target crashed 
+- rope-twist-stamp: keyboard.press: Target crashed 
+- halftone-sparse-dot: keyboard.press: Target crashed 
+- rain-streak-diagonal: keyboard.press: Target crashed 
+- sparkle-glint-cross: keyboard.press: Target crashed 
+- snow-flurry-flake: keyboard.press: Target crashed 
+- ink-splatter-burst: keyboard.press: Target crashed 
+- fur-soft-clumps: keyboard.press: Target crashed 
+- wood-grain-flow: keyboard.press: Target crashed 
+- bristle-round-loaded: keyboard.press: Target crashed 
+- bristle-fan-dry: keyboard.press: Target crashed 
+- bristle-flat-streak: keyboard.press: Target crashed 
+- palette-knife-edge: keyboard.press: Target crashed 
+- watercolor-salt-bloom: keyboard.press: Target crashed 
+- watercolor-backrun-ring: keyboard.press: Target crashed 
+- gouache-grain-flat: keyboard.press: Target crashed 
+- oil-linen-filbert: keyboard.press: Target crashed 
+- sumi-wash-fray: keyboard.press: Target crashed 
+- ribbon-satin-fold: keyboard.press: Target crashed 
+- rope-double-cord: keyboard.press: Target crashed 
+- chain-link-alternate: keyboard.press: Target crashed 
+- lace-scallop-trim: keyboard.press: Target crashed 
+- stitch-running-thread: keyboard.press: Target crashed 
+- stitch-cross-seam: keyboard.press: Target crashed 
+- fabric-knit-loop: keyboard.press: Target crashed 
+- metal-scratch-brush: keyboard.press: Target crashed 
+- smoke-wisp-layered: keyboard.press: Target crashed 
+- flame-tongue-spark: keyboard.press: Target crashed 
+- rain-mist-combo: keyboard.press: Target crashed 
+- snow-powder-drift: keyboard.press: Target crashed 
+- dust-mote-depth: keyboard.press: Target crashed 
+- stage-safe-splatter: keyboard.press: Target crashed 
+- bokeh-ring-glow: keyboard.press: Target crashed 
+- cloud-cirrus-stream: keyboard.press: Target crashed 
+- tree-bark-crack: keyboard.press: Target crashed 
+- flower-petal-scatter: keyboard.press: Target crashed 
+- rock-shard-texture: keyboard.press: Target crashed 
+- brick-mortar-pattern: keyboard.press: Target crashed 
+- wood-knot-rake: keyboard.press: Target crashed 
+- fur-undercoat-soft: keyboard.press: Target crashed 
+- hair-curl-ribbon: keyboard.press: Target crashed 
+- food-sesame-sprinkle: keyboard.press: Target crashed 
+- halftone-gradient-dot: keyboard.press: Target crashed 
+- hatching-contour-rake: keyboard.press: Target crashed 
+- focus-ray-streak: keyboard.press: Target crashed 
