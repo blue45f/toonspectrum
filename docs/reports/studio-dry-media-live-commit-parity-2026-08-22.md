@@ -92,16 +92,35 @@ receipt 부재 시 커밋이 더 긴 prefix(더 많은 댑)를 칠 수도 있으
 - 배제 업데이트: 예산·격자·시드 공식·용지 동기화·팁 캐시는 1차 세션과 동일하게 기각
   유지. DPR은 양쪽 devicePixelRatio 사용으로 무해 판정.
 
-### 다음 실험 (3차 세션 첫 작업)
+### 가설 D 결정 실험 결과: **기각** (합성 경로는 무죄)
 
-1. 결정 실험: 동일 마크 배열을 (a) 마크별 직접 적립, (b)
-   `renderStudioDynamicBrushCoverage` 타일 경로로 각각 렌더해 픽셀 회수·세기 분포 비교.
-   브라우저 캔버스 필요 — `verify-studio-brushes.mts` 하네스에 프로브 페이지로 얹거나
-   `scripts/studio-gpu-committed-parity-browser.ts` 패턴 재사용.
-2. 1에서 재현되면 수정은 오버레이 active 합성을 커밋 타일 합성과 동일 계약으로 통일
-   (`renderStudioDynamicBrushCoverage(activeDraft:true)` 경로로 옮기는 것 포함 검토).
-3. 이후 `TOONSPECTRUM_BRUSH_VERIFY_IDS=dry-media pnpm verify:studio-brushes` 재실행으로
-   centroid-drift 소멸 확인.
+`scripts/verify-studio-dry-media-parity-probe.mts`(신규)로 동일 마크 배열 690개를
+두 경로로 렌더 대조:
+
+| 경로 | 가시 픽셀 | 평균 세기 | p50 |
+| --- | ---: | --- | --- |
+| A. 오버레이식 마크별 직접 적립 | 692 | 46.46 | 44 |
+| B. 커밋식 renderStudioDynamicBrushCoverage 타일 합성 | 695 | 46.37 | 44 |
+
+commonRatio 1.004, 공통 픽셀 세기비 1.001 — **합성 계약은 패리티다.**
+
+### 남은 결론과 다음 실험
+
+계획(기존 테스트)과 합성(이번 프로브)이 모두 무죄이므로, 차이는 **커밋 시점에
+저장된 요소 입력이 라이브 소스 샘플과 다르다는 런타임 불일치**로 수렴한다:
+
+1. **안정기(stabilizer) 스무딩** — 포인터 파이프라인이 el.points를 저장하기 전에
+   평활화하면 라이브가 그린 원본 샘플과 커밋 지오메트리가 어긋나 균등 밀도 차가 난다.
+   → 실험: 릴리스 직전 live source.points와 커밋된 el.points를 같은 획에서 덤프해 diff.
+   (`dynamicSourceMatchesElement`는 오버레이 자체 재동기화용이지 StudioPage 저장 경로의
+   보장이 아니다.)
+2. **pressure/speed 채널 재수정** — 릴리스 후 압력 곡선 적용(velocity-pressure 등)으로
+   채널이 바뀌면 dab 알파 분포가 달라진다. → 같은 덤프에 pressures/speeds 포함.
+3. 덤프 스텝은 `verify-studio-dry-media-parity-probe.mts` 하네스에 StudioPage 마운트 +
+   검증기 제스처 재사용으로 확장하는 것이 가장 빠르다(마운트 비용만 추가).
+
+프로브 실행: `pnpm exec tsx scripts/verify-studio-dry-media-parity-probe.mts`
+(결과 JSON: $(tmpdir)/toonspectrum-dry-media-parity/parity-probe-result.json)
 
 ## 재현
 
