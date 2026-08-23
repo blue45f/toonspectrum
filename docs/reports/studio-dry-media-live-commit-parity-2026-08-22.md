@@ -354,3 +354,16 @@ verify-studio-brushes.mts 실제 코드 확인(:2706-2790):
   마크 수 281 동일, 평균 알파 0.2331→0.2315(±0.7%), 키 불일치 278/281은 값 단위
   미세 변조뿐 — 균일 밀도 손실 요인이 아니며, 라이브·커밋이 같은 문서 종이 전역을
   읽으므로 양변 동일 적용이다.
+
+### paperModel 수정 시도의 A/B 결과 (같은 세션)
+
+styleFromElement에 element.paperModel(contact-tooth-v2)+medium을 전달하도록 수정하면
+라이브 응답 granulation이 0.683→0.95로 커밋과 일치한다(실측). 그러나 그 상태에서
+`TOONSPECTRUM_BRUSH_VERIFY_IDS=dry-media`의 **짧은 획 매트릭스가 새로 실패**한다
+("fast short stroke produced no visible pixels", changedPixels 1/4392). 동일 빌드에서
+해당 수정만 되돌리면 단획은 통과하고 장획 드리프트 15.48px로 회귀한다.
+
+→ paperModel 정합화 자체는 방향이 맞지만, 556c1619가 전역으로 만든 커널 팁 가시성
+하한(모든 dab에 min size 2.2)과 granulation 0.95의 catch/skip이 짧은 획에서 상호작용해
+커밋 잉크를 잃는다. 두 변경은 **함께** 재설계되어야 한다: (a) substrate 응답 정합화 +
+(b) 가시성 하한의 granulation 상호작용 점검(하한이 스킵된 dab 보상 여부). 개별 착수 금지.
