@@ -52,6 +52,15 @@ function log(message) {
   process.stdout.write(`[sweep ${new Date().toISOString().slice(11, 19)}] ${message}\n`);
 }
 
+/** 크래시된 대상이 CDP 호출을 영원히 붙잡지 않도록 브러시당 상한을 둔다. */
+function withTimeout(promise, ms, label) {
+  let timer;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`watchdog:${label} ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+}
+
 /** 첫 실행 마법사·호환 배너 등 오버레이를 닫는다 (audit-studio-brushes-filters.mjs 패턴). */
 async function dismissChrome(page) {
   for (let i = 0; i < 4; i++) {
@@ -68,18 +77,23 @@ async function paperBox(page) {
 }
 
 /** verify-studio-brushes.mts:963-967 데스크톱 선택 패턴의 포트. */
-async function selectBrush(page, name) {
-  // 드로잉 옵션 바는 펜 도구가 활성된 뒤에 마운트된다 — 툴레일의 "펜 (B)"를 먼저 누른다.
+async function selectBrush(page, name, operation) {
+  // 드로잉 옵션 바는 그리기 도구가 활성된 뒤에 마운트된다 — 툴레일의 펜을 먼저 누르고,
+  // 지우개 종목은 그 위에서 'e' 로 전환한다(verify-studio-brushes.mts activateDesktopEraser 순서).
   await page
     .locator('[aria-label^="펜"]')
     .first()
     .click()
     .catch(() => {});
-  await page.keyboard.press("b");
-  await page.waitForFunction(() =>
-    document.querySelector('[data-studio-draw-options="true"]')
-      ?.getAttribute("data-studio-active-draw-mode") === "pen"
-  , undefined, { timeout: 15_000 });
+  const drawMode = operation === "erase" ? "eraser" : "pen";
+  if (operation === "erase") await page.keyboard.press("e");
+  await page.waitForFunction(
+    (mode) => document
+      .querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === mode,
+    drawMode,
+    { timeout: 15_000 },
+  );
   const toolbar = page.locator('[data-studio-draw-options="true"]');
   let pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
   if (await pill.count() === 0) {
@@ -243,12 +257,32 @@ async function main() {
     headless: HEADLESS,
     args: ["--enable-unsafe-webgpu"],
   });
-  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+  let page = await context.newPage();
   const globalErrors = [];
   page.on("pageerror", (error) => globalErrors.push(`pageerror:${error.message.slice(0, 200)}`));
   page.on("console", (msg) => {
     if (msg.type() === "error") globalErrors.push(`console:${msg.text().slice(0, 200)}`);
   });
+
+  /** 탭 크래시 후 같은 컨텍스트에서 새 페이지로 복원한다. */
+  async function recoverPageIfCrashed(error) {
+    const message = String(error instanceof Error ? error.message : error);
+    if (!/Target crashed|Target page, context or browser has been closed|Session closed/.test(message)) {
+      return false;
+    }
+    log("page crashed — recreating");
+    try { await page.close(); } catch { /* 이미 닫혀 있음 */ }
+    page = await context.newPage();
+    page.on("pageerror", (error2) => globalErrors.push(`pageerror:${error2.message.slice(0, 200)}`));
+    page.on("console", (msg) => {
+      if (msg.type() === "error") globalErrors.push(`console:${msg.text().slice(0, 200)}`);
+    });
+    await page.goto(STUDIO_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await dismissChrome(page);
+    globalErrors.length = 0;
+    return true;
+  }
 
   await page.goto(STUDIO_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await dismissChrome(page);
@@ -284,7 +318,7 @@ async function main() {
       errorsDuringRun: [],
     };
     try {
-      await selectBrush(page, preset.name);
+      await withTimeout(selectBrush(page, preset.name, preset.operation), 60_000, "select");
       const box = await paperBox(page);
       const errorBefore = globalErrors.length;
 
@@ -323,13 +357,24 @@ async function main() {
       await page.waitForTimeout(400);
       record.longStroke = await collectPerfSampling(page);
       record.errorsDuringRun = globalErrors.slice(errorBefore);
-      record.ok = record.liveVsCommitted.changedPixels > 0
+      // 지우개는 빈 캔버스에서 지울 것이 없어 changedPixels 0 이 정상이다.
+      const expectsInk = preset.operation !== "erase";
+      record.ok = (record.liveVsCommitted.changedPixels > 0 || !expectsInk)
         && record.errorsDuringRun.length === 0;
       await clearCanvas(page);
     } catch (error) {
       record.error = String(error instanceof Error ? error.message : error).slice(0, 300);
     }
     results.push(record);
+    // 크래시는 브러시 결함이 아니라 하네스 복원 사안 — 기록 후 다음 종목은 새 페이지에서.
+    if (record.error && /Target crashed|has been closed|Session closed/.test(record.error)) {
+      record.crashed = true;
+      try {
+        await recoverPageIfCrashed(record.error);
+      } catch (recoverError) {
+        log(`recovery failed: ${String(recoverError).slice(0, 120)}`);
+      }
+    }
     if (index % 10 === 9 || index === targets.length - 1) {
       const elapsedMin = ((Date.now() - startedAt) / 60_000).toFixed(1);
       log(`${index + 1}/${targets.length} done (${elapsedMin} min)`);
