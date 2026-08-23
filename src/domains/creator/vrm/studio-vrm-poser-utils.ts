@@ -2138,6 +2138,11 @@ export interface VrmGripContactTarget {
   socketWorldPoint: THREE.Vector3;
   /** 그립 반경(m). 손끝이 이 배수 안으로 닿도록 컬을 증폭한다. */
   gripRadius: number;
+  /**
+   * 그립 종류별 목표 보정(m). cylinder/handle은 0, flat/support처럼 얹히는 소품은
+   * 손가락을 감지 않고 받치므로 목표를 느슨하게 하려면 양수를 준다.
+   */
+  goalBias?: number;
 }
 
 const GRIP_WRAP_FINGERS = ["Index", "Middle", "Ring"] as const;
@@ -2181,7 +2186,7 @@ export function refineVrmGripFingerWrap(
     if (!Number.isFinite(gripRadius) || gripRadius <= 0) continue;
         // 측정점은 distal 관절 원점이다 — 완전히 감아도 손바닥 중심에서 ~3.8cm 떨어진다.
     // (미감지 상태 ~6.2cm와 구분되는 지점에서 멈춰 과감아·관절 포화를 방지한다.)
-    const reachGoal = gripRadius * 2.2 + 0.030;
+    const reachGoal = gripRadius * 2.2 + 0.030 + Math.max(0, target.goalBias ?? 0);
 
     for (let pass = 0; pass < maxPasses; pass += 1) {
       vrm.scene.updateMatrixWorld(true);

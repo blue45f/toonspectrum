@@ -436,7 +436,12 @@ export function applyStudioBg3dLinkedCharacterState(
         ...options.propRigMetrics.handSockets[socket].position,
       );
       handNode.localToWorld(socketWorldPoint);
-      return { side, socketWorldPoint, gripRadius: def.grip.radius };
+      return {
+        side,
+        socketWorldPoint,
+        gripRadius: def.grip.radius,
+        goalBias: def.grip.kind === "flat" || def.grip.kind === "support" ? 0.012 : 0,
+      };
     })
     .filter((target): target is NonNullable<typeof target> => target !== null);
   if (gripContactTargets.length > 0) {

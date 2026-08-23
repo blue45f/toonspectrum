@@ -125,6 +125,8 @@ export function StudioVrmGripContactRefine({
           side,
           socketLocal: [...resolved.socketPosition] as [number, number, number],
           gripRadius: def.grip.radius,
+          // flat/support는 감싸지 않고 받치는 소품이라 목표를 느슨하게 한다.
+          goalBias: def.grip.kind === "flat" || def.grip.kind === "support" ? 0.012 : 0,
         };
       })
       .filter((target): target is NonNullable<typeof target> => target !== null);
@@ -136,6 +138,7 @@ export function StudioVrmGripContactRefine({
       side: "left" | "right";
       socketWorldPoint: THREE.Vector3;
       gripRadius: number;
+      goalBias?: number;
     }> = [];
     for (const target of targets) {
       const node = vrm.humanoid?.getNormalizedBoneNode(target.bone);
@@ -143,7 +146,12 @@ export function StudioVrmGripContactRefine({
       node.updateWorldMatrix(true, false);
       const socketWorldPoint = new THREE.Vector3(...target.socketLocal);
       node.localToWorld(socketWorldPoint);
-      refined.push({ side: target.side, socketWorldPoint, gripRadius: target.gripRadius });
+      refined.push({
+      side: target.side,
+      socketWorldPoint,
+      gripRadius: target.gripRadius,
+      goalBias: target.goalBias,
+    });
     }
     if (refined.length > 0) refineVrmGripFingerWrap(vrm, refined);
   }, [targets, vrm]);
