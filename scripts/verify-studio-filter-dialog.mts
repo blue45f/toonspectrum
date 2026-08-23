@@ -20,6 +20,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { deflateSync } from "node:zlib";
 
 
 import { chromium, type Page } from "playwright";
@@ -102,6 +103,8 @@ interface FilterCaseResult {
   ok: boolean;
   openMs: number | null;
   applyMs: number | null;
+  /** Dialog-declared apply target: "image" (non-destructive layer) or "page-composite" (flatten). */
+  target: string | null;
   diff: PixelDiff | null;
   undoDiff: PixelDiff | null;
   failure?: string;
@@ -303,6 +306,98 @@ function menuItemByLabel(page: Page, label: string): ReturnType<Page["getByRole"
   return page.getByRole("menuitem", { name: new RegExp(`^${escaped}`) });
 }
 
+/**
+ * Menu rows disable transiently while a just-triggered autosave is in flight
+ * ("저장이 끝난 뒤 필터를 적용하세요"). Wait for the row to become enabled
+ * before clicking instead of racing a fixed timeout.
+ */
+async function clickEnabledMenuItem(page: Page, label: string): Promise<void> {
+  const item = menuItemByLabel(page, label);
+  // Rows disable transiently for two reasons observed in-product: a just-triggered autosave
+  // and the inspector's editable-raster preparation for a freshly selected image (the latter
+  // takes seconds on a full-page composite). Retry-clicking rides out both windows.
+  const deadline = Date.now() + 45_000;
+  let lastError: unknown = null;
+  while (Date.now() < deadline) {
+    try {
+      await item.click({ timeout: 1_500 });
+      return;
+    } catch (error) {
+      lastError = error;
+      await page.waitForTimeout(400);
+    }
+  }
+  const itemText = await item.textContent().catch(() => "");
+  throw new Error(
+    `메뉴 항목 클릭 실패(45초 대기 후): ${label} text=${itemText?.trim() ?? "?"} :: ${String(lastError)}`,
+  );
+}
+
+/** Minimal dependency-free PNG encoder — a blue field with a hard red square (blur-sensitive edges). */
+function buildTestPng(width: number, height: number): Buffer {
+  const raw = Buffer.alloc(height * (1 + width * 4));
+  for (let y = 0; y < height; y += 1) {
+    const rowStart = y * (1 + width * 4);
+    raw[rowStart] = 0; // filter: none
+    for (let x = 0; x < width; x += 1) {
+      const px = rowStart + 1 + x * 4;
+      const inSquare = x > width * 0.25 && x < width * 0.75 && y > height * 0.25 && y < height * 0.75;
+      raw[px] = inSquare ? 220 : 40;
+      raw[px + 1] = 30;
+      raw[px + 2] = inSquare ? 40 : 160;
+      raw[px + 3] = 255;
+    }
+  }
+  const crcTable = [...Array(256).keys()].map((n) => {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc32 = (data: Buffer): number => {
+    let c = 0xffffffff;
+    for (const byte of data) c = crcTable[(c ^ byte) & 0xff]! ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type: string, data: Buffer): Buffer => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // RGBA
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr),
+    chunk("IDAT", deflateSync(raw)),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+/**
+ * Places a fresh raster image via 레이어 ▸ 이미지… and waits for it to become the
+ * selected element. A freshly placed image carries no filter fields, which is the
+ * precondition for the direct-image filter lane (an image that already carries
+ * corrections is deliberately guarded with a merge-first notice).
+ */
+async function placeTestImage(page: Page): Promise<void> {
+  const chooserPromise = page.waitForEvent("filechooser", { timeout: 15_000 });
+  await openMainMenuGroup(page, "레이어");
+  await clickEnabledMenuItem(page, "이미지…");
+  const chooser = await chooserPromise;
+  await chooser.setFiles({
+    name: "filter-e2e-image.png",
+    mimeType: "image/png",
+    buffer: buildTestPng(800, 500),
+  });
+  await page.waitForTimeout(1_200);
+}
+
 async function main(): Promise<void> {
   mkdirSync(SCRATCH, { recursive: true });
   cleanScratchDir({
@@ -392,6 +487,7 @@ async function main(): Promise<void> {
         ok: false,
         openMs: null,
         applyMs: null,
+        target: null,
         diff: null,
         undoDiff: null,
       };
@@ -404,9 +500,16 @@ async function main(): Promise<void> {
         const dialog = filterDialog(page);
         await dialog.waitFor({ state: "visible", timeout: 45_000 });
         result.openMs = Date.now() - openStartedAt;
+        result.target = (await dialog
+          .getByText(/비파괴 필터로 적용합니다|합성 레이어로 만들고/)
+          .first()
+          .textContent()
+          .catch(() => null))
+          ?.includes("비파괴") ? "image" : "page-composite";
 
         const nudged = await nudgeFirstParameterSlider(dialog);
-        log(`${filterCase.label}: dialog open in ${result.openMs}ms (slider nudged=${nudged})`);
+        log(`${filterCase.label}: dialog open in ${result.openMs}ms `
+          + `(target=${result.target}, slider nudged=${nudged})`);
         await page.waitForTimeout(500);
 
         const beforeApply = await screenshotClipped(page, clip).catch(() => null);
@@ -454,6 +557,88 @@ async function main(): Promise<void> {
         result.failure = String(error instanceof Error ? error.message : error);
         log(`${filterCase.label}: FAILED — ${result.failure}`);
         // Recover to a known state so later cases still run from the baseline document.
+        await page.keyboard.press("Escape").catch(() => undefined);
+        await page.waitForTimeout(300);
+      }
+    }
+
+    // --- Direct-image target scenario ---
+    // Every loop case runs against the page-composite lane (no image element exists while the
+    // pen strokes are the only content). The most common artist flow — a SELECTED image layer
+    // receiving a non-destructive patch — is a different branch in openStudioFilter, so place
+    // a fresh raster image and require the dialog to declare the image target. A fresh image
+    // is required on purpose: an image that already carries corrections is guarded with a
+    // merge-first notice (probe-filter-image-target.mts documents that behaviour).
+    {
+      const result: FilterCaseResult = {
+        label: "선택 이미지 직접 적용",
+        group: "image-target",
+        ok: false,
+        openMs: null,
+        applyMs: null,
+        target: null,
+        diff: null,
+        undoDiff: null,
+      };
+      results.push(result);
+      try {
+        // 1) Place a fresh image via the file chooser; it becomes the selected element.
+        await placeTestImage(page);
+        const preScenario = await screenshotClipped(page, clip);
+
+        // 2) The dialog must declare the direct-image (non-destructive) target.
+        const openStartedAt = Date.now();
+        await openMainMenuGroup(page, "필터");
+        await clickEnabledMenuItem(page, "가우시안 블러");
+        const dialog = filterDialog(page);
+        await dialog.waitFor({ state: "visible", timeout: 45_000 });
+        result.openMs = Date.now() - openStartedAt;
+        result.target = (await dialog
+          .getByText(/비파괴 필터로 적용합니다|합성 레이어로 만들고/)
+          .first()
+          .textContent()
+          .catch(() => null))
+          ?.includes("비파괴") ? "image" : "page-composite";
+        invariant(
+          result.target === "image",
+          `선택한 이미지에 필터를 열었는데 대상이 image가 아닙니다: ${result.target}`,
+        );
+
+        // 3) Apply on the image target and require visible change + undo restore.
+        await nudgeFirstParameterSlider(dialog);
+        const applyStartedAt = Date.now();
+        await dialog.getByRole("button", { name: "적용", exact: true }).click();
+        await dialog.waitFor({ state: "hidden", timeout: 90_000 });
+        result.applyMs = Date.now() - applyStartedAt;
+        await page.waitForTimeout(700);
+
+        const after = await screenshotClipped(page, clip);
+        result.diff = await compareScreenshotPixels(page, preScenario, after);
+        invariant(
+          result.diff.changedPixels > result.diff.totalPixels * 0.005,
+          `이미지 대상 적용 후 픽셀이 유의미하게 변하지 않았습니다 `
+            + `(${result.diff.changedPixels}/${result.diff.totalPixels})`,
+        );
+
+        const undo = await enabledStudioHistoryControl(page, "undo", 10_000);
+        await undo.click();
+        await page.waitForTimeout(900);
+        const restored = await screenshotClipped(page, clip);
+        result.undoDiff = await compareScreenshotPixels(page, preScenario, restored);
+        invariant(
+          result.undoDiff.changedPixels <= result.undoDiff.totalPixels * 0.002,
+          `이미지 대상 시나리오 실행취소 후 복원되지 않았습니다 `
+            + `(${result.undoDiff.changedPixels}/${result.undoDiff.totalPixels})`,
+        );
+
+        result.ok = true;
+        log(
+          `선택 이미지 직접 적용: OK — apply ${result.applyMs}ms, `
+            + `changed ${result.diff!.changedPixels}px, undo restored`,
+        );
+      } catch (error) {
+        result.failure = String(error instanceof Error ? error.message : error);
+        log(`선택 이미지 직접 적용: FAILED — ${result.failure}`);
         await page.keyboard.press("Escape").catch(() => undefined);
         await page.waitForTimeout(300);
       }
