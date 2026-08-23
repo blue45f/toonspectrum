@@ -270,6 +270,25 @@ overlayCandidate 불가 — 함께 기각.
    발현되는 스케일 불일치 가능성. 검증기 하니스에 deviceScaleFactor 명시 주입으로
    재현 여부 확인.
 
+### 6차 세션 (2026-08-24): 가설 1의 필드 수준 확정 — live가 paperModel을 드랍
+
+코드 대조에서 가설 1의 구체적 비대칭을 확인했다:
+
+- 커밋(render-plan 343-360행): `paperBrushId`를 요소 브러시에서 정하고
+  `normalizeStudioPaperSubstrateModel(element.paperModel)`로 모델을 읽어
+  `resolveStudioPaperBrushResponse(paperBrushId, …, { model, medium })`로 전달한다.
+  `element.paperModel`이 있으면 substrate 세대가 얼린 응답이 나온다.
+- 라이브(styleFromElement): `resolveStudioPaperBrushResponse(element.brush)` —
+  **paperModel·medium 인자 없이** 호출한다. 요소가 paperModel을 지닌 최신 스트로크면
+  라이브와 커밋의 paper 응답 자체가 달라지고, granulation catch/skip이 밀도를
+  직접 변조하므로(dry-media v2 팁 계약) 전 구간 균등 밀도 차로 발현된다.
+
+수정은 styleFromElement의 paper 응답 호출에 element.paperModel(및 파생 medium)을
+같이 넘기는 한 줄 계열 — 단, 해당 파일이 타 세션 WIP여서 착수 대기 중이다.
+착수 시 회귀 검증: ① 본 프로브(합성 패리티) 재실행 ② 브라우저 체인 고립 실험
+재실행 ③ `TOONSPECTRUM_BRUSH_VERIFY_IDS=dry-media pnpm verify:studio-brushes`
+centroid-drift 소멸.
+
 ### 문서 스케일 실험 (같은 세션)
 
 고립 프로브의 setSurface.documentScale을 0.62/1.42로 바꾸고 커밋 렌더 컨텍스트에
