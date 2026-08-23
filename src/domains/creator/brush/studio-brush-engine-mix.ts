@@ -183,6 +183,21 @@ export function describeStudioBrushEngineStack(
       entries.push({ id: `oil-${key}`, label: oilLabels[key], active: oil[key] });
     }
   }
+  const watercolor = enginePrograms?.watercolor;
+  if (watercolor?.wetEdgeBloomProgramId) {
+    entries.push({
+      id: "watercolor-wet-edge-bloom",
+      label: `수채 블룸 · ${watercolor.wetEdgeBloomProgramId}`,
+      active: true,
+    });
+  }
+  if (watercolor?.livingInkBakeProgramId) {
+    entries.push({
+      id: "watercolor-living-ink-bake",
+      label: `정착 베이크 · ${watercolor.livingInkBakeProgramId}`,
+      active: true,
+    });
+  }
   return entries;
 }
 

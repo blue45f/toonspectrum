@@ -1602,6 +1602,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 plannedDabs,
                 watercolorSeed,
                 activeDraft ? "live" : "settled",
+                el.brushEnginePrograms,
               );
             }
             const wetRibbonPlan = causalWatercolor

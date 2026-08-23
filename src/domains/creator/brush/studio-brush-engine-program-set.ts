@@ -39,9 +39,21 @@ export interface StudioBrushOilProgramSet {
   readonly impastoRelief: boolean;
 }
 
+/**
+ * 수채 웻 텍스처 프로그램 — 레인 정적 테이블이 id 로 고정하던 wet-edge-bloom / living-ink settled
+ * bake 핀을 커스텀 조합이 덮어쓸 수 있게 하는 키. 값은 출하된 프로그램 레지스트리의 id 이고,
+ * 소비 시점(`applyStudioBrushAliasWatercolorMaterial`)의 리졸버가 모르는 id 는 null 로 실패
+ * 닫힘한다 — 여기서는 형식만 검증하고 존재 여부는 소비자가 단일 권위로 판정한다.
+ */
+export interface StudioBrushWatercolorProgramSet {
+  readonly wetEdgeBloomProgramId?: string;
+  readonly livingInkBakeProgramId?: string;
+}
+
 export interface StudioBrushEngineProgramSet {
   readonly version: typeof STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION;
   readonly oil?: StudioBrushOilProgramSet;
+  readonly watercolor?: StudioBrushWatercolorProgramSet;
 }
 
 export const STUDIO_BRUSH_OIL_PROGRAM_KEYS = Object.freeze([
@@ -143,6 +155,13 @@ function readBoolean(source: Record<string, unknown>, key: string): boolean {
   return source[key] === true;
 }
 
+/** 프로그램 id 는 출하 레지스트리 키와 같은 소문자 케백 형식으로만 저장된다. */
+function readProgramId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return /^[a-z0-9][a-z0-9-]{0,63}$/u.test(trimmed) ? trimmed : undefined;
+}
+
 /**
  * Validate an untrusted program set — persisted documents, imported brush files, collaboration
  * payloads. Anything that is not a recognised, well-formed set resolves to `null`, which every
@@ -156,8 +175,24 @@ export function normalizeStudioBrushEngineProgramSet(
   const source = raw as Record<string, unknown>;
   if (source.version !== STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION) return null;
   const oilSource = source.oil;
+  let watercolor: StudioBrushWatercolorProgramSet | undefined;
+  const watercolorSource = source.watercolor;
+  if (typeof watercolorSource === "object" && watercolorSource !== null) {
+    const record = watercolorSource as Record<string, unknown>;
+    const wetEdgeBloomProgramId = readProgramId(record.wetEdgeBloomProgramId);
+    const livingInkBakeProgramId = readProgramId(record.livingInkBakeProgramId);
+    if (wetEdgeBloomProgramId || livingInkBakeProgramId) {
+      watercolor = Object.freeze({
+        ...(wetEdgeBloomProgramId ? { wetEdgeBloomProgramId } : {}),
+        ...(livingInkBakeProgramId ? { livingInkBakeProgramId } : {}),
+      });
+    }
+  }
   if (typeof oilSource !== "object" || oilSource === null) {
-    return Object.freeze({ version: STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION });
+    return Object.freeze({
+      version: STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION,
+      ...(watercolor ? { watercolor } : {}),
+    });
   }
   const oilRecord = oilSource as Record<string, unknown>;
   return Object.freeze({
@@ -167,6 +202,7 @@ export function normalizeStudioBrushEngineProgramSet(
       bristleLoadDynamics: readBoolean(oilRecord, "bristleLoadDynamics"),
       impastoRelief: readBoolean(oilRecord, "impastoRelief"),
     }),
+    ...(watercolor ? { watercolor } : {}),
   });
 }
 
@@ -175,6 +211,10 @@ export function studioBrushEngineProgramSetMatchesBrush(
   brush: string,
   set: StudioBrushEngineProgramSet | null | undefined,
 ): boolean {
+  // 수채 오버라이드는 레인 베이스라인과의 비교가 브러시 id → 레인 행 해석을 필요로 한다. 여기서
+  // 레인 카탈로그를 당겨 오는 대신, 수채 키가 실린 세트는 보수적으로 "커스텀 조합"으로 읽는다.
+  // 이 판정은 편집기 안내 문구 전용이고 실제 페인트 경로와 무관하다.
+  if (set?.watercolor) return false;
   if (!set?.oil) return true;
   const baseline = studioOilProgramSetForBrush(brush);
   return STUDIO_BRUSH_OIL_PROGRAM_KEYS.every((key) => set.oil![key] === baseline[key]);
@@ -186,5 +226,14 @@ export function studioBrushEngineProgramSetFromOil(
   return Object.freeze({
     version: STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION,
     oil: Object.freeze({ ...oil }),
+  });
+}
+
+export function studioBrushWatercolorProgramSetFrom(
+  watercolor: StudioBrushWatercolorProgramSet,
+): StudioBrushEngineProgramSet {
+  return Object.freeze({
+    version: STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION,
+    watercolor: Object.freeze({ ...watercolor }),
   });
 }

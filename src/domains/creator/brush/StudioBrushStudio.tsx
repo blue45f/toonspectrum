@@ -106,6 +106,7 @@ import {
   StudioBrushEngineStackPanel,
   StudioBrushSaveAsCustomControls,
   StudioBrushTraitImportControls,
+  StudioBrushWatercolorProgramControls,
 } from "./StudioBrushEngineMixer";
 import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
 import { StudioBrushInputControls } from "./StudioBrushInputControls";
@@ -1375,6 +1376,11 @@ export function StudioBrushStudio({
         brushId={brushId}
         programSet={currentSnapshot.enginePrograms ?? null}
         onChange={onEngineProgramsChange ?? (() => undefined)}
+      />
+      <StudioBrushWatercolorProgramControls
+        brushId={brushId}
+        programSet={currentSnapshot.enginePrograms ?? null}
+        onChange={onEngineProgramsChange}
       />
       <StudioBrushTraitImportControls settings={settings} onSettingsChange={onSettingsChange} />
       <StudioBrushSaveAsCustomControls

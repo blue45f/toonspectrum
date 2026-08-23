@@ -24,6 +24,8 @@ import {
   resolveStudioWetEdgeBloomProgram,
 } from "./studio-wet-edge-bloom-v1";
 
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
+
 export const STUDIO_BRUSH_ALIAS_PROFILE_VERSION = "brush-alias-profile-v1" as const;
 
 export type StudioBrushAliasProfileVersion =
@@ -734,45 +736,56 @@ export function applyStudioBrushAliasWatercolorMaterial(
   dabs: readonly StudioBrushAliasWatercolorDab[],
   seed?: number,
   phase?: StudioLivingInkSettledBakePhase,
+  enginePrograms?: StudioBrushEngineProgramSet | null,
 ): readonly StudioBrushAliasWatercolorDab[] {
   const laneMaterial = typeof brushId === "string"
     ? resolveStudioBrushEngineLaneWatercolorMaterial(brushId)
     : null;
   const material = resolveStudioBrushAliasProfile(brushId)?.watercolor ?? laneMaterial;
-  if (!material) return dabs;
+  // 커스텀 조합 오버라이드가 레인 핀보다 우선하고, 오버라이드가 없으면 기존 레인 동작을 그대로
+  // 재현한다. 프로그램이 실리면 레인/프로필 재질 행이 없는 베이스(예: 일반 watercolor)에서도
+  // 웻 텍스처가 실제로 적용돼야 한다 — 그래서 재질 스케일과 프로그램 존재를 분리해 판정한다.
+  const overrideBloomProgramId = enginePrograms?.watercolor?.wetEdgeBloomProgramId;
+  const wetEdgeBloomProgramId =
+    overrideBloomProgramId ?? laneMaterial?.wetEdgeBloomProgramId ?? null;
+  const livingInkBakeProgramId = wetEdgeBloomProgramId
+    ? null
+    : enginePrograms?.watercolor?.livingInkBakeProgramId
+      ?? laneMaterial?.livingInkBakeProgramId
+      ?? null;
+  if (!material && !wetEdgeBloomProgramId && !livingInkBakeProgramId) return dabs;
   // Do not infer speed from planned station travel. Causal stations are regularly
   // spaced by design; treating that spacing as hand speed stamps a tonal bar on
   // every station. Real pointer speed belongs on the wet-ink / wet-mix paths.
-  const scaledDabs = dabs.map((dab) => {
-    const core = dab.role === "core";
-    return {
-      ...dab,
-      radius: Math.max(
-        0.05,
-        finiteOr(dab.radius, 0.05)
-          * (core ? material.coreRadiusScale : material.diffuseRadiusScale)
-      ),
-      opacity: clamp(
-        finiteOr(dab.opacity, 0)
-          * (core ? material.coreOpacityScale : material.diffuseOpacityScale),
-        0,
-        1
-      ),
-    };
-  });
+  const scaledDabs = material
+    ? dabs.map((dab) => {
+      const core = dab.role === "core";
+      return {
+        ...dab,
+        radius: Math.max(
+          0.05,
+          finiteOr(dab.radius, 0.05)
+            * (core ? material.coreRadiusScale : material.diffuseRadiusScale)
+        ),
+        opacity: clamp(
+          finiteOr(dab.opacity, 0)
+            * (core ? material.coreOpacityScale : material.diffuseOpacityScale),
+          0,
+          1
+        ),
+      };
+    })
+    : dabs;
   // Opt-in wet-texture physics (coffee ring / granulation / chromatography / fresh-ink wetness):
-  // only engine lanes whose material row carries a program id ever reach the augment pass.
-  const wetEdgeBloomProgram = resolveStudioWetEdgeBloomProgram(
-    laneMaterial?.wetEdgeBloomProgramId
-  );
+  // lanes whose material row carries a program id, plus custom program-set overrides, reach the
+  // augment pass.
+  const wetEdgeBloomProgram = resolveStudioWetEdgeBloomProgram(wetEdgeBloomProgramId);
   if (wetEdgeBloomProgram) {
     return augmentStudioWetEdgeBloomDabs(scaledDabs, { ...wetEdgeBloomProgram, seed });
   }
-  // Opt-in settled-only living-ink bake (2026-08-13 wave 3). One wet-texture authority per lane:
+  // Opt-in settled-only living-ink bake (2026-08-13 wave 3). One wet-texture authority per brush:
   // a bake program is consulted only when no wet-edge-bloom program is pinned.
-  const livingInkBakeProgram = resolveStudioLivingInkSettledBakeProgram(
-    laneMaterial?.livingInkBakeProgramId
-  );
+  const livingInkBakeProgram = resolveStudioLivingInkSettledBakeProgram(livingInkBakeProgramId);
   if (livingInkBakeProgram) {
     return augmentStudioLivingInkSettledBakeDabs(scaledDabs, {
       ...livingInkBakeProgram,

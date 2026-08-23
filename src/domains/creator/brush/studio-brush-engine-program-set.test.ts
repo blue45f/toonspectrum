@@ -16,6 +16,7 @@ import {
   STUDIO_BRUSH_OIL_PROGRAM_KEYS,
   studioBrushEngineProgramSetFromOil,
   studioBrushEngineProgramSetMatchesBrush,
+  studioBrushWatercolorProgramSetFrom,
   studioOilProgramSetForBrush,
   studioOilRibbonProgramsFromSet,
   type StudioBrushOilProgramSet,
@@ -166,6 +167,44 @@ describe("엔진 프로그램 세트", () => {
     });
   });
 
+  it("수채 웻 텍스처 프로그램 id 는 형식이 옳을 때만 보존된다", () => {
+    const good = normalizeStudioBrushEngineProgramSet({
+      version: STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION,
+      watercolor: {
+        wetEdgeBloomProgramId: "chroma-halo",
+        livingInkBakeProgramId: "sumi-flow-bake",
+      },
+    });
+    expect(good?.watercolor).toEqual({
+      wetEdgeBloomProgramId: "chroma-halo",
+      livingInkBakeProgramId: "sumi-flow-bake",
+    });
+    // 모르는 id 도 형식만 맞으면 통과한다 — 존재 판정은 소비 시점 리졸버의 단일 권위다.
+    const unknownId = normalizeStudioBrushEngineProgramSet({
+      version: STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION,
+      watercolor: { wetEdgeBloomProgramId: "not-a-program-yet" },
+    });
+    expect(unknownId?.watercolor?.wetEdgeBloomProgramId).toBe("not-a-program-yet");
+    // 형식이 틀린 id 는 떨어뜨리고, 둘 다 없으면 수채 키 자체를 만들지 않는다.
+    for (const bad of [42, "", "UPPER", "space id", `${"a".repeat(65)}`]) {
+      const dropped = normalizeStudioBrushEngineProgramSet({
+        version: STUDIO_BRUSH_ENGINE_PROGRAM_SET_VERSION,
+        watercolor: { wetEdgeBloomProgramId: bad },
+      });
+      expect(dropped?.watercolor, JSON.stringify(bad)).toBeUndefined();
+    }
+  });
+
+  it("수채 오버라이드가 실린 세트는 '프리셋과 같음'이 아니라 커스텀 조합이다", () => {
+    expect(
+      studioBrushEngineProgramSetMatchesBrush(
+        "watercolor--edge-bloom",
+        studioBrushWatercolorProgramSetFrom({ wetEdgeBloomProgramId: "edge-bloom" }),
+      ),
+    ).toBe(false);
+    expect(studioBrushEngineProgramSetMatchesBrush("watercolor", null)).toBe(true);
+  });
+
   it("프리셋과 같은 세트인지 판정해 편집기가 '기본값과 같음'을 말할 수 있다", () => {
     for (const brush of OIL_BRUSH_IDS) {
       const baseline = studioOilProgramSetForBrush(brush);
@@ -234,5 +273,41 @@ describe("엔진 프로그램 세트 · SVG 내보내기 패리티", () => {
     // 세트를 실으면 같은 브러시 id 로 릴리프가 나온다. 이 브러시에 대응하는 프리셋 id 는 없다.
     expect(impasto).toContain("data-paint-impasto-relief");
     expect(impasto).not.toBe(plain);
+  });
+
+  it("수채 블룸 오버라이드를 실은 획이 내보내기에서도 증강된 dab을 낸다", async () => {
+    const { exportPageToSvg } = await import("../export/studio-svg-export");
+    const base = {
+      id: "custom-watercolor",
+      type: "draw" as const,
+      kind: "freehand" as const,
+      mode: "pen" as const,
+      brush: "watercolor",
+      points: [8, 18, 120, 45, 240, 8, 380, 60, 520, 20],
+      pressures: [0.35, 0.72, 0.5, 0.9, 0.62],
+      stroke: "#3f6f8b",
+      strokeWidth: 26,
+      seed: 4100,
+    };
+    const page = (element: unknown) => ({
+      id: "p1",
+      width: 600,
+      height: 120,
+      background: "#ffffff",
+      elements: [element],
+    });
+
+    const plain = exportPageToSvg(page(base) as never).svg;
+    const bloomed = exportPageToSvg(page({
+      ...base,
+      brushEnginePrograms: studioBrushWatercolorProgramSetFrom({
+        wetEdgeBloomProgramId: "chroma-halo",
+      }),
+    }) as never).svg;
+
+    expect(bloomed).not.toBe(plain);
+    // 블룸 bead dab 이 추가되므로 원(circle) 수가 늘어난다.
+    const circles = (svg: string) => (svg.match(/<circle /gu) ?? []).length;
+    expect(circles(bloomed)).toBeGreaterThan(circles(plain));
   });
 });

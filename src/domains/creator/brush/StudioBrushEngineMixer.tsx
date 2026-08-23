@@ -8,6 +8,7 @@
 import { CheckCircle2, Download, LoaderCircle, Save, TriangleAlert } from "lucide-react";
 import { useMemo, useState, type ChangeEvent } from "react";
 
+import { resolveStudioBrushRenderFamily } from "../studio-brush";
 import { STUDIO_FOCUS_RING, StudioSectionHeader } from "../studio-panel-ui";
 
 import {
@@ -23,6 +24,10 @@ import {
   suggestStudioBrushMixName,
 } from "./studio-brush-engine-mix";
 import {
+  studioBrushWatercolorProgramSetFrom,
+  type StudioBrushEngineProgramSet,
+} from "./studio-brush-engine-program-set";
+import {
   createBrush,
   type StudioBrushSnapshot,
 } from "./studio-brush-library";
@@ -32,7 +37,6 @@ import {
 } from "./studio-brush-library-sqlite-repository";
 
 import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
-import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 
 import { cn } from "@/lib/utils";
 
@@ -301,5 +305,101 @@ export function StudioBrushComposerIntro() {
       title="엔진 믹서"
       description="캐리어는 유지한 채 다른 브러시의 펜촉·질감·반응을 가져와 조합하고, 하나의 커스텀 브러시로 저장합니다."
     />
+  );
+}
+
+const STUDIO_WET_EDGE_BLOOM_PROGRAM_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  "edge-bloom": "에지 블룸 — 건조 링",
+  "granulating-wash": "과립 워시 — 안료 침전",
+  "fiber-feather": "파이버 페더 — 신묵 번짐",
+  "chroma-halo": "크로마 헤일로 — 크로마토그래피",
+});
+
+const STUDIO_LIVING_INK_BAKE_PROGRAM_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  "sumi-flow-bake": "수묵 플로우 베이크",
+  "fluid-feather-lite": "유체 페더 (가벼운 수채)",
+});
+
+/**
+ * 수채 웻 텍스처 프로그램 조합 — 레인 정적 테이블을 커스텀 세트로 덮어쓴다.
+ * 수채 패밀리 브러시에서만 렌더링되고, 두 선택이 모두 비면 baseline 복원을 위해 null 을 보낸다
+ * (오일 토글과 같은 byte-identity 관례).
+ */
+export function StudioBrushWatercolorProgramControls({
+  brushId,
+  programSet,
+  onChange,
+}: {
+  brushId: string;
+  programSet: StudioBrushEngineProgramSet | null;
+  onChange?: ((next: StudioBrushEngineProgramSet | null) => void) | undefined;
+}) {
+  if (resolveStudioBrushRenderFamily(brushId) !== "watercolor") return null;
+  const current = programSet?.watercolor ?? null;
+  const bloomId = current?.wetEdgeBloomProgramId ?? "";
+  const bakeId = current?.livingInkBakeProgramId ?? "";
+
+  function emit(nextBloom: string, nextBake: string) {
+    if (!onChange) return;
+    if (!nextBloom && !nextBake) {
+      onChange(null);
+      return;
+    }
+    onChange(studioBrushWatercolorProgramSetFrom({
+      ...(nextBloom ? { wetEdgeBloomProgramId: nextBloom } : {}),
+      ...(nextBake ? { livingInkBakeProgramId: nextBake } : {}),
+    }));
+  }
+
+  const renderSelect = (
+    label: string,
+    value: string,
+    options: Readonly<Record<string, string>>,
+    onPick: (next: string) => void,
+    hint: string,
+  ) => (
+    <label className="block rounded-xl border border-line bg-card/55 px-3 py-2.5">
+      <span className="flex items-center justify-between gap-3 text-xs font-semibold text-fg-2">
+        <span>{label}</span>
+      </span>
+      <select
+        value={value}
+        onChange={(event: ChangeEvent<HTMLSelectElement>) => onPick(event.currentTarget.value)}
+        className={cn(
+          "mt-1.5 h-10 w-full rounded-lg border border-line bg-card px-2 text-xs font-medium text-fg",
+          STUDIO_FOCUS_RING,
+        )}
+      >
+        <option value="">레인 기본값</option>
+        {Object.entries(options).map(([id, text]) => (
+          <option key={id} value={id}>{text}</option>
+        ))}
+      </select>
+      <span className="mt-1 block text-[0.62rem] leading-relaxed text-fg-3">{hint}</span>
+    </label>
+  );
+
+  return (
+    <MixerCard
+      title="수채 엔진 프로그램"
+      description="젖은 가장자리 물성(커피 링 · 과립 · 크로마토그래피)과 정착 베이크를 이 브러시에 직접 조합합니다. 프로그램이 실린 순간 프리셋에 없는 커스텀 조합입니다."
+    >
+      <div className="grid gap-2 sm:grid-cols-2">
+        {renderSelect(
+          "웻엣지 블룸",
+          bloomId,
+          STUDIO_WET_EDGE_BLOOM_PROGRAM_LABELS,
+          (next) => emit(next, bakeId),
+          "블룸이 선택되면 베이크는 함께 적용되지 않습니다.",
+        )}
+        {renderSelect(
+          "정착 베이크 (드라이 후)",
+          bakeId,
+          STUDIO_LIVING_INK_BAKE_PROGRAM_LABELS,
+          (next) => emit(bloomId, next),
+          "마른 뒤 번짐·테·모세관 현상을 굽습니다.",
+        )}
+      </div>
+    </MixerCard>
   );
 }

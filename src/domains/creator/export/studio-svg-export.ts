@@ -2698,6 +2698,7 @@ function serializeFreehand(
         plannedDabs,
         watercolorSeed,
         "settled",
+        el.brushEnginePrograms,
       );
       const wetRibbonPlan = planStudioWetRibbonCarrier(dabs, {
         seed: watercolorSeed,
@@ -2724,6 +2725,7 @@ function serializeFreehand(
       plannedDabs,
       watercolorSeed,
       "settled",
+      el.brushEnginePrograms,
     );
     if (dabs.length === 0) return "";
     const diffuseId = nextId(ctx, "sw");
