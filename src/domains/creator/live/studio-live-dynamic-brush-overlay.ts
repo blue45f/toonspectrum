@@ -48,13 +48,17 @@ import {
 import {
   studioDryMediaUnionRibbonCarrierOwnsMaterial,
 } from "../brush/studio-dry-media-union-ribbon-carrier";
-import { resolveStudioPaperBrushResponse } from "../brush/studio-paper-brush-response";
+import { resolveStudioPaperBrushResponse, resolveStudioPaperBrushMedium } from "../brush/studio-paper-brush-response";
 import {
   resolveStudioDocumentPaperSurface,
   studioPaperGranulationIsActive,
   type StudioPaperGranulationSettings,
   type StudioPaperSurfaceSettings,
 } from "../brush/studio-paper-granulation-runtime";
+import {
+  normalizeStudioPaperSubstrateModel,
+  studioPaperUsesContactTooth,
+} from "../brush/studio-paper-substrate-model";
 import { isStudioBoundedFlowPaintModelCompatible } from "../brush/studio-stroke-paint-model";
 import {
   appendStudioCausalDynamicBrushDepositsV2,
@@ -838,8 +842,19 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
     const [x, y] = transformStudioBrushSymmetryPoint(firstX, firstY, transform);
     return Object.freeze({ x, y });
   });
+  const paperBrushId = typeof element.brush === "string" && element.brush
+    ? element.brush
+    : "dry-media";
+  const livePaperModel = normalizeStudioPaperSubstrateModel(element.paperModel);
+  const livePaperMedium = studioPaperUsesContactTooth(livePaperModel)
+    ? resolveStudioPaperBrushMedium(paperBrushId)
+    : null;
   const paperResponse = resolveStudioPaperBrushResponse(
-    element.brush,
+    paperBrushId,
+    undefined,
+    livePaperModel === undefined
+      ? undefined
+      : { model: livePaperModel, medium: livePaperMedium },
   );
   const paper = studioPaperGranulationIsActive(paperResponse)
     ? Object.freeze({ response: paperResponse, surface: resolveStudioDocumentPaperSurface() })
@@ -1633,6 +1648,21 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         active.style.dynamics,
       );
     if (requiresWholePrefixRibbonReplay) {
+      // Slow sub-spacing movement consumes samples without emitting dabs. The whole-prefix replay
+      // would replan the ENTIRE stroke from scratch and repaint identical pixels for that frame;
+      // the causal append above already proved no geometry changed, so skip the replan entirely.
+      // (Slow detailed knife/bristle work is exactly the many-moves-few-dabs regime.)
+      if (planned.dabs.length === 0 && !planned.replaceInitialTap) {
+        return {
+          status: "noop",
+          consumedSourcePoints: active.consumedSourcePoints,
+          appendedDabs: 0,
+          appendedMarks: 0,
+          ...(active.acceptedPrefixReceipt
+            ? { acceptedPrefixReceipt: active.acceptedPrefixReceipt }
+            : {}),
+        };
+      }
       const previousAcceptedDabCount = active.acceptedCausalDabCount;
       const exact = this.exactPlan(active.style, active.source);
       if (!exact || !exactPlanUsesWholePrefixRibbonUnion(exact)) {
