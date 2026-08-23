@@ -6,7 +6,7 @@
  * `notifyStudioBrushLibraryChanged()`로 열려 있는 라이브러리 패널에 갱신을 알린다.
  */
 import { CheckCircle2, Download, LoaderCircle, Save, TriangleAlert } from "lucide-react";
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 
 import { resolveStudioBrushRenderFamily } from "../studio-brush";
 import { STUDIO_FOCUS_RING, StudioSectionHeader } from "../studio-panel-ui";
@@ -35,6 +35,7 @@ import {
   notifyStudioBrushLibraryChanged,
   openProductBrushLibraryRepository,
 } from "./studio-brush-library-sqlite-repository";
+import { materializeStudioBrushCatalogSelection } from "./studio-brush-selection";
 
 import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 
@@ -109,26 +110,67 @@ interface TraitImportProps {
 export function StudioBrushTraitImportControls({ settings, onSettingsChange }: TraitImportProps) {
   const [sourceId, setSourceId] = useState("");
   const [status, setStatus] = useState<{ tone: "done" | "error"; message: string } | null>(null);
-
-  const groupedItems = useMemo(() => {
-    const groups = new Map<
-      typeof STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS[number]["mediaGroup"],
-      typeof STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS[number][]
-    >();
-    for (const item of STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS) {
-      if (item.operation !== "paint") continue;
-      const bucket = groups.get(item.mediaGroup) ?? [];
-      bucket.push(item);
-      groups.set(item.mediaGroup, bucket);
-    }
-    return Array.from(groups.entries());
+  // pro 절차적 브러시(160종)는 레이지 카탈로그 청크에 산다. 마운트 뒤 한 번 지연 로드하고,
+  // 실패해도 코어 목록으로 믹서가 계속 동작한다(fail open to core, 절대 빈 목록이 아님).
+  const [proItems, setProItems] = useState<
+    readonly {
+      id: string;
+      name: string;
+      mediaGroup: typeof STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS[number]["mediaGroup"];
+    }[]
+  >([]);
+  useEffect(() => {
+    let active = true;
+    void import("./studio-brush-catalog")
+      .then((catalog) => {
+        if (!active) return;
+        setProItems(
+          catalog.STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS
+            .filter((item) => item.source === "pro")
+            .map((item) => ({ id: item.id, name: item.name, mediaGroup: item.mediaGroup })),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, []);
 
-  function handleSectionImport(sectionId: string) {
+  const groupedItems = useMemo(() => {
+    type Item = typeof STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS[number];
+    const groups = new Map<Item["mediaGroup"], Item[]>();
+    const place = (item: Pick<Item, "id" | "name" | "mediaGroup">) => {
+      if (seenSourceIds.has(item.id)) return;
+      seenSourceIds.add(item.id);
+      const bucket = groups.get(item.mediaGroup) ?? [];
+      bucket.push(item as Item);
+      groups.set(item.mediaGroup, bucket);
+    };
+    const seenSourceIds = new Set<string>();
+    for (const item of STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS) {
+      if (item.operation === "paint") place(item);
+    }
+    for (const item of proItems) place(item);
+    return Array.from(groups.entries());
+  }, [proItems]);
+
+  async function handleSectionImport(sectionId: string) {
     if (!isStudioBrushMixTraitSectionId(sectionId) || !sourceId) return;
     const sourceName =
-      STUDIO_LISTED_CORE_BRUSH_CATALOG_ITEMS.find((item) => item.id === sourceId)?.name ?? sourceId;
-    const sourceDynamics = studioBrushDynamicsSettingsForBrushId(sourceId);
+      groupedItems
+        .flatMap(([, items]) => items)
+        .find((item) => item.id === sourceId)?.name ?? sourceId;
+    // 정준 테이블(코어·레인 변주 포함)이 1순위, 팩 런타임 물성화가 폴백 — 두 경로 모두
+    // 정규화된 설정을 돌려주므로 병합 결과가 같은 검증 경로를 지난다.
+    let sourceDynamics = studioBrushDynamicsSettingsForBrushId(sourceId);
+    if (!sourceDynamics) {
+      try {
+        const selection = await materializeStudioBrushCatalogSelection(sourceId);
+        sourceDynamics = selection?.brushDynamics ?? null;
+      } catch {
+        sourceDynamics = null;
+      }
+    }
     if (!sourceDynamics) {
       setStatus({ tone: "error", message: `"${sourceName}" 브러시에서 특성을 가져오지 못했어요.` });
       return;
