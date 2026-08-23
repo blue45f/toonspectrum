@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Layers,
   RotateCw,
+  Save,
   SlidersHorizontal,
   Sparkles,
   Stamp,
@@ -100,6 +101,12 @@ import {
   StudioBrushGrainControls,
   StudioBrushTaperAdvancedControls,
 } from "./StudioBrushDynamicsControls";
+import {
+  StudioBrushComposerIntro,
+  StudioBrushEngineStackPanel,
+  StudioBrushSaveAsCustomControls,
+  StudioBrushTraitImportControls,
+} from "./StudioBrushEngineMixer";
 import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
 import { StudioBrushInputControls } from "./StudioBrushInputControls";
 
@@ -1357,15 +1364,22 @@ export function StudioBrushStudio({
       </div>
     ) : <DynamicsRequiredNotice onRequestCompatibleBrush={onRequestCompatibleBrush} />
   ) : category === "engines" ? (
-    <div>
-      <StudioSectionHeader
-        title="엔진 조합"
-        description="한 획은 여러 패스가 순서대로 쌓여 만들어집니다. 필요한 패스만 켜면 프리셋에 없는 브러시가 됩니다."
+    <div className="space-y-3">
+      <StudioBrushComposerIntro />
+      <StudioBrushEngineStackPanel
+        brushId={brushId}
+        settings={settings}
+        enginePrograms={currentSnapshot.enginePrograms ?? null}
       />
       <StudioBrushEngineProgramControls
         brushId={brushId}
         programSet={currentSnapshot.enginePrograms ?? null}
         onChange={onEngineProgramsChange ?? (() => undefined)}
+      />
+      <StudioBrushTraitImportControls settings={settings} onSettingsChange={onSettingsChange} />
+      <StudioBrushSaveAsCustomControls
+        snapshot={currentSnapshot}
+        baseBrushName={brushLabel}
       />
     </div>
   ) : (
@@ -1547,6 +1561,18 @@ export function StudioBrushStudio({
               {brushLabel} · {dynamicsActive ? `${mappingCount}개 입력 연결` : "전역 입력과 입자 브러시 설정"}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setCategory("engines")}
+            aria-label="커스텀 브러시로 저장"
+            title="커스텀 브러시로 저장"
+            className={cn(
+              "grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+              category === "engines" && "border-accent/55 text-accent",
+            )}
+          >
+            <Save size={17} aria-hidden />
+          </button>
           <button
             ref={closeRef}
             type="button"
