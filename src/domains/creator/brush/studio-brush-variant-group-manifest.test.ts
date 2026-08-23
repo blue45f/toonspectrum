@@ -186,11 +186,15 @@ describe("studio brush variant group manifest", () => {
     // ink-wash · acrylic. Same mechanical rule as above: identical execution signature, separated
     // only by slider-reproducible width/opacity, with an exposed in-group alternative kept
     // (수묵은 ink-wash 레인, 유화 변주는 oil 레인이 유지합니다). 242 -> 238 listed.
+    //
+    // 2026-08-23 marker--chisel-ribbon delisted: it adopted the material pressure model via the
+    // dedicated "marker-chisel" profile consumed by both durable angled-nib renderers, so it now
+    // separates from canonical brush by measured material behaviour instead of the id checksum.
+    // 238 -> 237 listed.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
         "glitter--star-field",
-        "marker--chisel-ribbon",
         "screentone--sparse-grid",
         "gpen--causal-round",
         "gel-pen",

@@ -80,11 +80,13 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     // not the behaviour they advertise. pen--croquis-stabilized is a third, but its declared
     // variant (croquis-capsule-pulled-string) is a real INPUT-stage stabilizer that a fixed-
     // geometry render cannot show, so it is not a dead lane and is not listed.
-    "marker--chisel-ribbon":
-      "선언된 profileVariant(angled-ribbon/minus-30deg)로 분기하는 렌더러가 없습니다 — 지름 해시를 "
-      + "빼면 동일 기하에서 canonical(brush)과 바이트 동일한 SVG가 나오므로, 둘을 가르는 것은 "
-      + "각진 리본이 아니라 id 체크섬에서 나온 크기 차이뿐입니다. 남는 대안: brush · flat-brush "
-      + "· chisel-highlighter(지침 6).",
+    // 2026-08-23 delist: marker--chisel-ribbon adopted the material pressure model — a dedicated
+    // "marker-chisel" profile (firm wedge nib: near-invariant width, pressure-driven ink delivery)
+    // resolved via resolveStudioRetainedMediaPressureProfileId and consumed by both durable
+    // angled-nib renderers (StudioDrawNode / studio-svg-export). New strokes now differ from the
+    // canonical brush by measured material behaviour, not by the id checksum's size offset; saved
+    // pre-opt-in strokes replay byte-identically because their elements carry no
+    // materialPressureModel and keep the legacy fixed-width route.
     "screentone--sparse-grid":
       "선언된 engineVariant(성긴 격자)로 분기하는 렌더러가 없습니다 — 지름 해시를 빼면 동일 "
       + "기하에서 canonical(screentone)과 바이트 동일합니다. 남는 대안: screentone · crosshatch(지침 6).",

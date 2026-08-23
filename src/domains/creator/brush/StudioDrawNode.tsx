@@ -1424,7 +1424,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               -Math.PI / 6,
               el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
                 ? {
-                    profileId: brush === "flat-brush" ? "flat-brush" : "brush",
+                    profileId: brush === "flat-brush"
+                      ? "flat-brush"
+                      : brush === "marker--chisel-ribbon"
+                        ? "marker-chisel"
+                        : "brush",
                     pressures: el.pressures,
                     minimumDiameterRatio: el.materialMinimumDiameterRatio,
                     // The bands carry ABSOLUTE alpha, so the element opacity is folded in by the
@@ -1558,12 +1562,19 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // lanes without a bake program keep the exact single-call path and bytes.
             const laneWatercolorMaterial =
               resolveStudioBrushEngineLaneWatercolorMaterial(brush);
+            // 커스텀 프로그램 세트 오버라이드가 레인 핀보다 우선한다(단일 권위:
+            // applyStudioBrushAliasWatercolorMaterial과 같은 순서).
+            const watercolorOverride = el.brushEnginePrograms?.watercolor ?? null;
+            const resolvedWetEdgeBloomProgramId =
+              watercolorOverride?.wetEdgeBloomProgramId
+              ?? laneWatercolorMaterial?.wetEdgeBloomProgramId;
+            const livingInkBakeProgramId = !resolvedWetEdgeBloomProgramId
+              ? (watercolorOverride?.livingInkBakeProgramId
+                ?? laneWatercolorMaterial?.livingInkBakeProgramId)
+              : undefined;
             const livingInkBakeProgram =
-              !activeDraft && laneWatercolorMaterial
-              && !laneWatercolorMaterial.wetEdgeBloomProgramId
-                ? resolveStudioLivingInkSettledBakeProgram(
-                    laneWatercolorMaterial.livingInkBakeProgramId,
-                  )
+              !activeDraft && livingInkBakeProgramId
+                ? resolveStudioLivingInkSettledBakeProgram(livingInkBakeProgramId)
                 : null;
             let dabs: readonly StudioBrushAliasWatercolorDab[];
             if (livingInkBakeProgram) {
@@ -1572,6 +1583,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 plannedDabs,
                 watercolorSeed,
                 "live",
+                el.brushEnginePrograms,
               );
               dabs =
                 requestStudioLivingInkSettledBakeDabs(

@@ -21,7 +21,8 @@ export type StudioRetainedMediaPressureProfileId =
   | "soft-pencil"
   | "colored-pencil"
   | "brush"
-  | "flat-brush";
+  | "flat-brush"
+  | "marker-chisel";
 
 export interface StudioRetainedMediaPressureResponse {
   readonly pressure: number;
@@ -138,6 +139,14 @@ const PROFILE: Readonly<Record<StudioRetainedMediaPressureProfileId, ResponsePro
     opacity: { light: 0.62, heavy: 1.1, curve: 0.94 },
     flow: { light: 0.54, heavy: 1.24, curve: 0.9 },
   },
+  // Chisel felt marker (marker--chisel-ribbon): a firm wedge nib keeps its footprint almost
+  // constant across the pressure range — what pressure moves is ink delivery, not width.
+  "marker-chisel": {
+    nominalPressure: 0.6,
+    size: { light: 0.86, heavy: 1.12, curve: 0.95 },
+    opacity: { light: 0.72, heavy: 1.16, curve: 0.85 },
+    flow: { light: 0.64, heavy: 1.28, curve: 0.8 },
+  },
 };
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -180,6 +189,8 @@ export function resolveStudioRetainedMediaPressureProfileId(
     case "brush":
     case "flat-brush":
       return brushId;
+    case "marker--chisel-ribbon":
+      return "marker-chisel";
     default:
       return null;
   }

@@ -2810,7 +2810,11 @@ function serializeFreehand(
       -Math.PI / 6,
       el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
         ? {
-            profileId: brush === "flat-brush" ? "flat-brush" : "brush",
+            profileId: brush === "flat-brush"
+              ? "flat-brush"
+              : brush === "marker--chisel-ribbon"
+                ? "marker-chisel"
+                : "brush",
             pressures: el.pressures,
             minimumDiameterRatio: el.materialMinimumDiameterRatio,
             elementOpacity: strokeOpacity,
