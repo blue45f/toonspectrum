@@ -297,3 +297,26 @@ overlayCandidate 불가 — 함께 기각.
 (c) presentationCanvas를 함께 덤프해 세 표면의 관계를 앱 상태 그대로 비교한다.
 어느 표면이 어느 프레임에서 갈라지는지가 곧 답이다 — 특히 released 프레임이
 overlay settledCanvas인지 Konva 커밋 노드인지 라우팅을 로그로 고정하는 것이 첫 걸음.
+
+### 6차 세션 (2026-08-24): 측정 계약 정정 — 입력 불일치 가설 복귀
+
+verify-studio-brushes.mts 실제 코드 확인(:2706-2790):
+- 제스처는 mouse.down() 뒤 **단일 mouse.move**(start→end 일발)다. 포인터 파이프라인이
+  이 이벤트에서 몇 개의 소스 샘플을 el에 합성하는지가 스트로크 해상도를 결정한다.
+- 프레임 02-released는 mouse.up 직후, 03-settled는 autosave 지속 확인 **뒤 같은
+  페이지의 재촬영**이다. 페이지 reload가 아니다.
+
+→ 1차 세션의 "settled == released ⇒ 오토세이브 재생(=커밋) 패리티" 추론은
+성립하지 않는다. 두 프레임은 모두 커밋 표면의 동일 렌더라, 커밋 입력(el 배열)과
+라이브가 소비한 샘플의 일치를 증명하지 못한다. **릴리스 시점 el.points/pressures/speeds
+변형(지연 커밋 파이프라인·post-correction·리샘플링)이 최상위 가설로 복귀한다.**
+
+라이브 오버레이는 element 배열을 직접 소비하므로(sourceSampleAt), 커밋 전 어느
+시점에서든 배열이 통째로 교체되면 라이브는 옛 샘플, 커밋은 새 샘플로 그린다 —
+경계는 비슷하고 밀도만 균일하게 어긋나는 관측 서명과 정확히 일치한다.
+
+결정 실험(앱 계측 필요): 릴리스 직전 live가 소비한 points.length/마지막 샘플과
+커밋된 el.points.length/내용을 한 획에서 덤프해 diff. 개발용 디버그 훅이 아직
+없으므로, 동적 오버레이 렌더러에 DEV 전용 덤프 훅 추가가 다른 세션의 첫 작업이
+된다(단, 이 파일에는 소스 고정 경계 테스트가 있어 수정 시 해당 테스트 동시 점검
+필요 — studio-brush-catalog-lazy-boundary 등).
