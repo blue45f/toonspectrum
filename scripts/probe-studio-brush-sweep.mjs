@@ -165,29 +165,39 @@ async function diffShots(page, liveDataUrl, committedDataUrl) {
   }, { live: liveDataUrl, committed: committedDataUrl });
 }
 
-/** rAF 프레임 간격 + longtask 관측기를 심는다. 결과 수집은 collectPerfSampling 이 한다. */
+/** rAF 프레임 간격 + longtask 관측기를 심는다. headless 는 rAF 를 서스펜드할 때가 있어 확인 후 1회 재시도한다. */
 async function installPerfSampler(page) {
-  // headless 새 페이지는 가끔 rAF 를 서스펜드한다 — 워밍업 프레임 하나를 기다려 확인한다.
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-  await page.evaluate(() => {
-    window.__sweepFrames = [];
-    window.__sweepLongTasks = [];
-    const observer = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) window.__sweepLongTasks.push(entry.duration);
-    });
-    observer.observe({ entryTypes: ["longtask"] });
-    window.__sweepObserver = observer;
-    let last = performance.now();
-    let running = true;
-    function tick(now) {
-      if (!running) return;
-      window.__sweepFrames.push(now - last);
-      last = now;
+  await page.bringToFront().catch(() => {});
+  for (let attempt = 0; attempt < 2; attempt++) {
+    // headless 새 페이지는 가끔 rAF 를 서스펜드한다 — 워밍업 프레임 하나를 기다려 확인한다.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    // eslint-disable-next-line no-await-in-loop
+    await page.evaluate(() => {
+      window.__sweepFrames = [];
+      window.__sweepLongTasks = [];
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) window.__sweepLongTasks.push(entry.duration);
+      });
+      observer.observe({ entryTypes: ["longtask"] });
+      window.__sweepObserver = observer;
+      let last = performance.now();
+      let running = true;
+      function tick(now) {
+        if (!running) return;
+        window.__sweepFrames.push(now - last);
+        last = now;
+        requestAnimationFrame(tick);
+      }
       requestAnimationFrame(tick);
-    }
-    requestAnimationFrame(tick);
-    window.__sweepStopTick = () => { running = false; };
-  });
+      window.__sweepStopTick = () => { running = false; };
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await page.waitForTimeout(250);
+    // eslint-disable-next-line no-await-in-loop
+    const frames = await page.evaluate(() => (window.__sweepFrames ?? []).length);
+    if (frames > 0) return;
+    log(`rAF sampler suspended (attempt ${attempt + 1}) — retrying`);
+  }
 }
 
 /** 샘플러를 멈추고 프레임 통계를 회수한다. 함수는 페이지 경계를 넘을 수 없다. */
@@ -317,7 +327,9 @@ async function main() {
       longStroke: null,
       errorsDuringRun: [],
     };
-    try {
+    const phase = (label) => log(`#${index + 1} ${preset.id} — ${label}`);
+    const body = (async () => {
+      phase("select");
       await withTimeout(selectBrush(page, preset.name, preset.operation), 60_000, "select");
       const box = await paperBox(page);
       const errorBefore = globalErrors.length;
@@ -351,6 +363,7 @@ async function main() {
 
       // 2) 장획 성능 (3200 샘플)
       await clearCanvas(page);
+      phase("long-stroke");
       await installPerfSampler(page);
       await drawGesture(page, await paperBox(page), LONG_SAMPLES);
       await page.mouse.up({ button: "left" });
@@ -362,6 +375,9 @@ async function main() {
       record.ok = (record.liveVsCommitted.changedPixels > 0 || !expectsInk)
         && record.errorsDuringRun.length === 0;
       await clearCanvas(page);
+    })();
+    try {
+      await withTimeout(body, 240_000, `brush:${preset.id}`);
     } catch (error) {
       record.error = String(error instanceof Error ? error.message : error).slice(0, 300);
     }
