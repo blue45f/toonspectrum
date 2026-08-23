@@ -183,13 +183,48 @@ function strokeStyleSignature(stroke: StudioGpuStroke): string {
     : `${legacySignature}${semanticToken(`pressure-model:${stroke.pressureModel}`)}`;
 }
 
+/**
+ * Per-pass operation identity cache — the audit's hotspot #6.
+ *
+ * `planStudioGpuTileStates` runs every frame request, and each non-feed stroke rebuilt four
+ * O(points) token strings (fingerprint, signature, point samples, pressure samples) per pass even
+ * though settled strokes are documented immutable snapshots. The WeakMap keys the exact stroke
+ * object: untouched strokes hit in O(1), and only genuinely new snapshots (appends) pay one build.
+ * Length + feed-token guards detect a contract-breaking in-place mutation and force a rebuild.
+ */
+interface StudioGpuTileOperationCacheRecord {
+  readonly operation: StudioGpuTileOperation;
+  readonly pointCount: number;
+  readonly pressuresLength: number;
+  readonly feedToken: string | undefined;
+}
+
+const studioGpuTileOperationCache = new WeakMap<
+  StudioGpuStroke,
+  StudioGpuTileOperationCacheRecord
+>();
+
+function cachedStudioGpuTileOperation(
+  stroke: StudioGpuStroke,
+  feedToken: string | undefined,
+): StudioGpuTileOperation | null {
+  const record = studioGpuTileOperationCache.get(stroke);
+  if (!record) return null;
+  const pointCount = Math.floor(stroke.points.length / 2);
+  if (
+    record.pointCount !== pointCount
+    || record.pressuresLength !== (stroke.pressures?.length ?? -1)
+    || record.feedToken !== feedToken
+  ) return null;
+  return record.operation;
+}
+
 function operationForStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuTileOperation {
   const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
-  if (
-    isTrustedStudioGpuStrokeFeedStroke(stroke)
-    && isTrustedStudioGpuStrokeFeedRevision(feed)
-  ) {
-    return {
+  const trustedFeed = isTrustedStudioGpuStrokeFeedStroke(stroke)
+    && isTrustedStudioGpuStrokeFeedRevision(feed);
+  if (trustedFeed) {
+    const operation: StudioGpuTileOperation = {
       id: stroke.id,
       fingerprint: `feed:${feed.token}`,
       signature: `feed:${feed.token}`,
@@ -200,9 +235,19 @@ function operationForStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuTileOper
       feedLineage: feed.lineage,
       feedRevisionToken: feed.token,
     };
+    // 피드 스트로크는 토큰이 개정을 증명하므로 문자열 조립 없이 토큰만 캐시 가드로 쓴다.
+    studioGpuTileOperationCache.set(stroke, {
+      operation,
+      pointCount: Number.NaN,
+      pressuresLength: Number.NaN,
+      feedToken: feed.token,
+    });
+    return operation;
   }
+  const cached = cachedStudioGpuTileOperation(stroke, undefined);
+  if (cached) return cached;
   const pointCount = Math.floor(stroke.points.length / 2);
-  return {
+  const operation: StudioGpuTileOperation = {
     id: stroke.id,
     fingerprint: fingerprintStudioGpuStroke(stroke),
     signature: signatureStudioGpuStroke(stroke),
@@ -214,6 +259,13 @@ function operationForStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuTileOper
     )),
     pointCount,
   };
+  studioGpuTileOperationCache.set(stroke, {
+    operation,
+    pointCount,
+    pressuresLength: stroke.pressures?.length ?? -1,
+    feedToken: undefined,
+  });
+  return operation;
 }
 
 /** Exact immutable operation identity. Full strokes use unambiguous length-prefixed fields. */
