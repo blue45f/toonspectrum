@@ -43,6 +43,18 @@ describe("studio retained media pressure", () => {
     }
   });
 
+  it("keeps the chisel marker's footprint near-invariant while pressure drives ink delivery", () => {
+    expect(resolveStudioRetainedMediaPressureProfileId("marker--chisel-ribbon"))
+      .toBe("marker-chisel");
+    const light = resolveStudioRetainedMediaPressure("marker-chisel", 0);
+    const heavy = resolveStudioRetainedMediaPressure("marker-chisel", 1);
+    // A firm felt wedge barely changes width — that is what separates this lane from the
+    // pressure-broadened canonical brush it was quarantined against.
+    expect(heavy.sizeScale / light.sizeScale).toBeLessThan(1.35);
+    expect(heavy.flowScale / light.flowScale).toBeGreaterThan(1.8);
+    expect(heavy.opacityScale).toBeGreaterThan(light.opacityScale);
+  });
+
   it.each(["pencil", "brush"] as const)(
     "%s applies the selected minimum only to geometry",
     (profile) => {
