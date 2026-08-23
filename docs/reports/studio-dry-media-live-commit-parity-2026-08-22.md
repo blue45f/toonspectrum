@@ -238,3 +238,34 @@ ADR 0010 — 커밋 쪽을 누적으로 바꾸는 것이 아니라 라이브를 
    active 덤프는 커밋과 일치).
 덤프 방법: verify-studio-brushes 하네스에 페이지 평가 주입으로 activeCanvas
 픽셀을 수집하는 것이 재현 안정적이다.
+
+### 5차 세션 (2026-08-24): 실제 렌더러 체인 고립 실험 — 체인 전체 무죄
+
+`scripts/__diag-drymedia-live-chain.mts`(신규, 로컬)가 vite dev 서버 + playwright로
+**실제 StudioLiveDynamicBrushOverlayRenderer**를 구동한다. 실제 요소 계약
+(bounded-flow-v2 + brushDynamics 스냅샷 + 파생 시드)으로 begin→appendFrom×12→end를
+먹이고, 매 프레임 activeCanvas 알파를 "동일 접두사 완전 재계획 커밋 렌더
+(renderStudioDynamicBrushCoverage)"와 픽셀 비교했다:
+
+| 프레임(샘플) | live px | commit px | 공통 세기비 |
+| ---: | ---: | ---: | ---: |
+| 61(최종) | 2,047 | 2,081 | 0.978 |
+
+liveOnly/commitOnly는 가장자리 안티에일리어싱 수십 px뿐, 세기비 편차 ≤2.2%,
+activeCanvas==presentationCanvas(delta 0). paintImmediateContact은
+presentation 전용 시작 도트(균등 손실과 무관), WebGPU 핀은 paintModel 정의로
+overlayCandidate 불가 — 함께 기각.
+
+→ **렌더러 클래스·프레젠테이션 블릿·settle 체인 전체가 패리티다.** 관측된 30%
+손실은 앱 레벨에서 이 체인에 들어가는 입력 차이다. 남는 유력 가설:
+1. **용지(substrate) 소스 불일치 부활** — styleFromElement는 paper.response+
+   document surface를 획 시작에 동결하고, 커밋 render-plan은 문서 종이를 다시
+   읽는다. 검증기의 줌/문서 크기에서 두 종이 해상이 다른 seed/오프셋을 만들면
+   스탬프 배치가 균일하게 어긋난다. 실험: 라이브 style.paper와 커밋 planInput.paper를
+   같은 획에서 덤프해 diff.
+2. **커밋 마크 플랜의 dynamics 원천** — StudioDrawNode의 dynamicCoverageMarkPlan이
+   el.brushDynamics 어느 필드를 어떤 정규화로 쓰는지 styleFromElement 산물과
+   필드별 대조(시드·폭·tipLayers).
+3. 검증기 뷰포트 DPR(documentScale) 차이 — 고립 실험은 dpr=1이므로 여기서만
+   발현되는 스케일 불일치 가능성. 검증기 하니스에 deviceScaleFactor 명시 주입으로
+   재현 여부 확인.
