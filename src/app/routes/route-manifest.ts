@@ -13,6 +13,7 @@ export const appRoutes: AppRouteMeta[] = [
   { path: "/calendar", label: "route.calendar" },
   { path: "/reviews", label: "route.reviews" },
   { path: "/community", label: "route.community" },
+  { path: "/market", label: "route.market" },
   { path: "/library", label: "route.library" },
   { path: "/compare", label: "route.compare" },
   { path: "/insights", label: "route.insights" },

@@ -191,6 +191,23 @@ export class CreatorMarketplaceService {
     }
   }
 
+  async getById(
+    id: string,
+    options: { viewerId?: string } = {}
+  ): Promise<CreatorMarketplaceResourceRecord> {
+    try {
+      const row = await this.repository.findById(id);
+      if (!row) throw new NotFoundException();
+      return projectRecord(row, options.viewerId);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new ServiceUnavailableException({
+        code: "creator_marketplace_unavailable",
+        message: "공유 리소스를 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.",
+      });
+    }
+  }
+
   async publish(
     publisherId: string,
     body: PublishCreatorMarketplaceResourceDto

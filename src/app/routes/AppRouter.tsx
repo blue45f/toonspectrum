@@ -100,6 +100,24 @@ const StudioRouter = lazyRetry(
 );
 
 /* -------------------------------------------------------------------------- */
+/* Market Domain Routes                                                       */
+/* -------------------------------------------------------------------------- */
+const MarketHomePage = lazyRetry(
+  () => import("@/src/domains/market/MarketHomePage").then((m) => ({ default: m.MarketHomePage })),
+  "MarketHomePage"
+);
+const MarketBrowsePage = lazyRetry(
+  () => import("@/src/domains/market/MarketBrowsePage").then((m) => ({ default: m.MarketBrowsePage })),
+  "MarketBrowsePage"
+);
+const MarketResourceDetailPage = lazyRetry(
+  () => import("@/src/domains/market/MarketResourceDetailPage").then((m) => ({
+    default: m.MarketResourceDetailPage,
+  })),
+  "MarketResourceDetailPage"
+);
+
+/* -------------------------------------------------------------------------- */
 /* Account & Admin Domain Routes                                              */
 /* -------------------------------------------------------------------------- */
 const AccountPage = lazyRetry(() => import("@/src/domains/account/AccountPage").then((m) => ({ default: m.AccountPage })), "AccountPage");
@@ -215,6 +233,11 @@ export function AppRouter() {
             <Route path="/create/series/:id" element={<CreateSeriesPage />} />
             <Route path="/create/:id" element={<CreateWorkPage />} />
             <Route path="/studio/*" element={<StudioRouter />} />
+
+            {/* Market Routes */}
+            <Route path="/market" element={<MarketHomePage />} />
+            <Route path="/market/browse" element={<MarketBrowsePage />} />
+            <Route path="/market/resource/:id" element={<MarketResourceDetailPage />} />
 
             {/* Account & Admin Routes */}
             <Route path="/me" element={<AccountPage />} />

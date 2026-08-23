@@ -102,6 +102,7 @@ function storedRow(
 describe("CreatorMarketplaceService", () => {
   const repository = {
     list: vi.fn<CreatorMarketplaceResourceRepository["list"]>(),
+    findById: vi.fn<CreatorMarketplaceResourceRepository["findById"]>(),
     publish: vi.fn<CreatorMarketplaceResourceRepository["publish"]>(),
     deleteOwned: vi.fn<CreatorMarketplaceResourceRepository["deleteOwned"]>(),
   };
@@ -376,6 +377,30 @@ describe("CreatorMarketplaceService", () => {
 
     await expect(service.deleteOwned("publisher", id)).resolves.toEqual({ deleted: true });
     await expect(service.deleteOwned("publisher", id)).rejects.toBeInstanceOf(
+      NotFoundException
+    );
+  });
+
+  it("단건 조회는 공개 record를 돌려주고 뷰어가 배급자면 isOwner를 표시한다", async () => {
+    const row = storedRow();
+    repository.findById.mockResolvedValueOnce(row);
+
+    await expect(service.getById(row.id)).resolves.toMatchObject({
+      id: row.id,
+      packageId: "original/brush/ink-starter",
+      isOwner: false,
+      access: "free",
+    });
+    repository.findById.mockResolvedValueOnce(row);
+    await expect(service.getById(row.id, { viewerId: row.publisherId })).resolves.toMatchObject({
+      isOwner: true,
+    });
+  });
+
+  it("없거나 숨겨진 리소스 단건 조회는 404로 응답한다", async () => {
+    repository.findById.mockResolvedValueOnce(null);
+
+    await expect(service.getById(randomUUID())).rejects.toBeInstanceOf(
       NotFoundException
     );
   });

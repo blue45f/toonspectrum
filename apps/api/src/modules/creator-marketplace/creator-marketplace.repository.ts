@@ -96,6 +96,31 @@ export class DrizzleCreatorMarketplaceResourceRepository
     return rows.map(mapStoredRow);
   }
 
+  async findById(id: string): Promise<CreatorMarketplaceResourceStoredRow | null> {
+    const [row] = await db
+      .select({
+        id: creatorMarketplaceResources.id,
+        publisherId: creatorMarketplaceResources.publisherId,
+        publisherName: users.name,
+        publisherAvatar: users.avatar,
+        manifest: creatorMarketplaceResources.manifest,
+        manifestHash: creatorMarketplaceResources.manifestHash,
+        manifestByteSize: creatorMarketplaceResources.manifestByteSize,
+        createdAt: creatorMarketplaceResources.createdAt,
+        updatedAt: creatorMarketplaceResources.updatedAt,
+      })
+      .from(creatorMarketplaceResources)
+      .leftJoin(users, eq(creatorMarketplaceResources.publisherId, users.id))
+      .where(
+        and(
+          eq(creatorMarketplaceResources.id, id),
+          eq(creatorMarketplaceResources.hidden, false)
+        )
+      )
+      .limit(1);
+    return row ? mapStoredRow(row) : null;
+  }
+
   async publish(
     input: CreatorMarketplaceResourcePublishInput
   ): Promise<CreatorMarketplaceResourceStoredRow> {

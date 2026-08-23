@@ -1,7 +1,7 @@
 /* Extracted render tree from StudioCuttoonEditor.
  * Session props are an `any` bag matching the original editor closure. */
 // @ts-nocheck
-import { Maximize2, Lock, MessageCircle, UsersRound, SlidersHorizontal, Undo2 } from "lucide-react";
+import { Maximize2, Lock, MessageCircle, UsersRound, SlidersHorizontal, Undo2, X } from "lucide-react";
 import { Suspense } from "react";
 
 import { resolveStudioPaperGrainVisibleV1 } from "../brush/studio-paper-grain-visibility-v1";
@@ -3050,7 +3050,18 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
         )}
       >
         {densityShowsStatusRail && error ? (
-          <div role="status" className="my-1 rounded-lg border border-bad/40 bg-bad/10 px-2.5 py-1.5 text-xs text-bad">{error}</div>
+          <div role="alert" className="my-1 flex items-start justify-between gap-2 rounded-lg border border-bad/40 bg-bad/10 px-2.5 py-1.5 text-xs text-bad">
+            <span className="min-w-0 break-words">{error}</span>
+            <button
+              type="button"
+              data-studio-status-error-dismiss
+              aria-label="오류 메시지 닫기"
+              className="-mr-1 shrink-0 rounded p-0.5 transition hover:bg-bad/15"
+              onClick={() => setError(null)}
+            >
+              <X size={12} strokeWidth={2.5} aria-hidden="true" />
+            </button>
+          </div>
         ) : null}
         {densityShowsStatusRail && layerMergeBusy ? (
           <div role="status" className="my-1 rounded-lg border border-accent/35 bg-accent-soft/30 px-2.5 py-1.5 text-xs text-fg-2">

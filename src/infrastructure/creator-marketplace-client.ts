@@ -106,6 +106,14 @@ export async function listCreatorMarketplaceResources(
   return client.listCreatorMarketplaceResources(params, signal);
 }
 
+export async function getCreatorMarketplaceResource(
+  id: string,
+  signal?: AbortSignal
+): Promise<CreatorMarketplaceResourceRecord> {
+  const client = await loadCreatorMarketplaceNetworkClient();
+  return client.getCreatorMarketplaceResource(id, signal);
+}
+
 export async function listMyCreatorMarketplaceResources(
   params: CreatorMarketplaceListParams = {},
   signal?: AbortSignal

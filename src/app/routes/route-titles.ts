@@ -21,6 +21,8 @@ export const STATIC_TITLES: Record<string, string> = {
   "/reviews": "route.reviews",
   "/community": "route.community",
   "/community/cafes": "route.community_cafes",
+  "/market": "route.market",
+  "/market/browse": "route.marketBrowse",
   "/admin/community": "route.adminCommunity",
   "/admin/members": "route.adminMembers",
   "/library": "route.library",
@@ -60,6 +62,8 @@ export function useRouteTitle(pathname: string, search: string) {
       title = `${decodeURIComponent(pathname.slice(9))} ${t("route.pencafeSuffix")}`;
     } else if (pathname.startsWith("/community/")) {
       title = t("route.community");
+    } else if (pathname.startsWith("/market/resource/")) {
+      title = t("route.market");
     } else if (pathname.startsWith("/admin/")) {
       title = t("route.admin");
     } else if (pathname.startsWith("/me")) {

@@ -60,6 +60,17 @@ export class CreatorMarketplaceController {
     });
   }
 
+  @Get("/:id")
+  @Header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=300")
+  async getById(
+    @Param(new ZodValidationPipe(CreatorMarketplaceResourceParamsDto))
+    params: CreatorMarketplaceResourceParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    // Viewer-agnostic public cache like the list endpoint; x-user-id only enriches isOwner.
+    return this.marketplaceService.getById(params.id, { viewerId: userId });
+  }
+
   @Post()
   @Header("Cache-Control", "private, no-store, max-age=0")
   async publish(

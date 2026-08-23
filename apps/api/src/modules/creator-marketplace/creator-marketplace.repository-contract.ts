@@ -48,6 +48,7 @@ export interface CreatorMarketplaceResourceRepository {
   list(
     input: CreatorMarketplaceResourceListInput
   ): Promise<readonly CreatorMarketplaceResourceStoredRow[]>;
+  findById(id: string): Promise<CreatorMarketplaceResourceStoredRow | null>;
   publish(
     input: CreatorMarketplaceResourcePublishInput
   ): Promise<CreatorMarketplaceResourceStoredRow>;

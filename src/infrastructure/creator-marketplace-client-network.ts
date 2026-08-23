@@ -13,6 +13,7 @@ import {
   CreatorMarketplaceResourceRecordSchema,
 } from "@/lib/creator-marketplace-resource-contract";
 import { api, toApiError } from "@/src/infrastructure/api";
+import { NotFoundError } from "@/src/infrastructure/use-api-resource";
 
 const BASE = "/creator/marketplace/resources";
 
@@ -57,6 +58,30 @@ export async function listMyCreatorMarketplaceResources(
     return CreatorMarketplaceResourceListPageSchema.parse(response);
   } catch (error) {
     throw await toApiError(error, "내 공유 리소스를 불러오지 못했습니다.");
+  }
+}
+
+export async function getCreatorMarketplaceResource(
+  id: string,
+  signal?: AbortSignal
+): Promise<CreatorMarketplaceResourceRecord> {
+  try {
+    const response = await api.get<unknown>(
+      `${BASE}/${encodeURIComponent(id)}`,
+      { signal }
+    );
+    return CreatorMarketplaceResourceRecordSchema.parse(response);
+  } catch (error) {
+    // 404는 흐름 제어(notFound)로 다룬다 — useApiResource 계약과 동일.
+    // ky HTTPError는 response.status를 노출하므로 instanceof 대신 형태로 판별한다.
+    if (
+      error && typeof error === "object"
+      && "response" in error
+      && (error as { response?: { status?: number } }).response?.status === 404
+    ) {
+      throw new NotFoundError();
+    }
+    throw await toApiError(error, "공유 리소스를 불러오지 못했습니다.");
   }
 }
 
