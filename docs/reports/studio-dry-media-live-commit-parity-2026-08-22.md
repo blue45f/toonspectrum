@@ -339,3 +339,18 @@ verify-studio-brushes.mts 실제 코드 확인(:2706-2790):
 없으므로, 동적 오버레이 렌더러에 DEV 전용 덤프 훅 추가가 다른 세션의 첫 작업이
 된다(단, 이 파일에는 소스 고정 경계 테스트가 있어 수정 시 해당 테스트 동시 점검
 필요 — studio-brush-catalog-lazy-boundary 등).
+
+### 릴리스 변형 경로 정적 배제 (같은 세션)
+
+- **지연 워커 스무딩**: planStudioDeferredStrokePostprocess가
+  brushDynamics.depositPipeline이 causal인 획을 명시적으로 null 반환해 제외한다
+  (studio-deferred-stroke-postprocess.ts:60-65). dry-media 미적용.
+- **포인터업 직접 스무딩**: planStudioDrawPointerRelease는 postCorrection.strength>0일
+  때 points를 smoothStrokePoints로 교체하지만, 기본값이 0(studio-brush-library.ts:232)이라
+  검증기 기본 환경에서는 발화하지 않는다. 사용자가 후보정을 올리면 dry-media도
+  라이브/커밋 갈라짐이 생기는 별개의 잠재 결함으로 기록해 둔다.
+- **용지 채널 정량**: dry-media는 종이 반응 브러시(granulation 0.68)이고 문서 기본
+  종이(cold-press seed 41)가 항상 존재한다. 같은 획의 paper 유무 A/B 계획 비교:
+  마크 수 281 동일, 평균 알파 0.2331→0.2315(±0.7%), 키 불일치 278/281은 값 단위
+  미세 변조뿐 — 균일 밀도 손실 요인이 아니며, 라이브·커밋이 같은 문서 종이 전역을
+  읽으므로 양변 동일 적용이다.
