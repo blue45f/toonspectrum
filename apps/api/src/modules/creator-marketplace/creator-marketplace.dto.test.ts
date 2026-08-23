@@ -42,4 +42,15 @@ describe("creator marketplace DTO contracts", () => {
       false
     );
   });
+
+  it("공개 배급자 필터는 UUID만 허용한다", () => {
+    expect(
+      CreatorMarketplaceResourceListQuerySchema.parse({
+        publisher: "123e4567-e89b-42d3-a456-426614174000",
+      })
+    ).toMatchObject({ publisher: "123e4567-e89b-42d3-a456-426614174000" });
+    expect(
+      CreatorMarketplaceResourceListQuerySchema.safeParse({ publisher: "not-a-uuid" }).success
+    ).toBe(false);
+  });
 });
