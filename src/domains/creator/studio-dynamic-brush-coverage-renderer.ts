@@ -120,6 +120,14 @@ import {
 import type { StudioPaperMediumV1 } from "./brush/studio-paper-media-profile-v1";
 
 export const STUDIO_DYNAMIC_COVERAGE_TILE_PIXEL_SIZE = 256;
+
+/**
+ * 커널 팁 초단획 가시성 상수 — 위 하한의 적용 조건과 크기. 4 dab 이하 획만 대상이고 크기
+ * 하한은 커널 텍스처가 서브픽셀에서도 알파를 남기는 최소 스탬프 반경(≈1.1px)에서 온다.
+ */
+const STUDIO_KERNEL_TIP_SHORT_STROKE_DAB_LIMIT = 4;
+const STUDIO_KERNEL_TIP_MIN_VISIBLE_SIZE = 2.2;
+
 export const STUDIO_DYNAMIC_COVERAGE_TILE_BLEED_PIXELS = 2;
 /**
  * Live and committed passes intentionally share the same surface policy. A lower live resolution
@@ -1673,6 +1681,18 @@ export function planStudioDynamicBrushCoverageMarks(
       return appendMark(texturedMark) ? "ok" : "mark-budget";
     };
 
+    // 초단획 가시성 하한: 커널 팁은 텍스처 알파맵이라 dab이 서브픽셀이면 커버리지가 0으로
+    // 무너진다(빠른 짧은 터치가 완전 투명 획이 되는 실패 모드 — 패밀리 형제인 솔리드 캐리어는
+    // 같은 크기에서도 보인다). 커널 권한 dab에만 크기 하한을 적용하고, dab 수가 적은 획으로
+    // 한정한다. 장획의 dab은 하나도 수정되지 않으므로 커밋된 픽셀 패리티가 보존된다.
+    const plannedDabCount = "kind" in dabs
+      ? dabs.segments.reduce((sum: number, segment) => sum + segment.length, 0)
+      : dabs.length;
+    const kernelTipVisibilityFloor = dryMediaKernelTipMaterial !== null
+      && plannedDabCount <= STUDIO_KERNEL_TIP_SHORT_STROKE_DAB_LIMIT
+      ? STUDIO_KERNEL_TIP_MIN_VISIBLE_SIZE
+      : null;
+
     for (const dab of studioDynamicBrushDabsInVariation(dabs)) {
       paperCompositionDabIndex = dab.index;
       // appendTipDab 안쪽은 합성 dab으로 다시 덮어쓴다. 여기 값은 그 경로를 타지 않는
@@ -1731,7 +1751,14 @@ export function planStudioDynamicBrushCoverageMarks(
         continue;
       }
       const primaryMarkStart = marks.length;
-      const primaryResult = appendTipDab(dab, dynamics.tip, 0, dabColor);
+      const primaryResult = appendTipDab(
+        kernelTipVisibilityFloor !== null && dab.size < kernelTipVisibilityFloor
+          ? { ...dab, size: kernelTipVisibilityFloor }
+          : dab,
+        dynamics.tip,
+        0,
+        dabColor,
+      );
       if (primaryResult !== "ok") return { ok: false, reason: primaryResult };
       if (marks.length >= primaryMarkStart + 1) {
         visiblePrimaryDabs.push(dab);
