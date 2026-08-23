@@ -51,6 +51,7 @@ import {
   type StudioWriterRoomAiDraft,
 } from "../studio-writer-room-ai";
 
+import { normalizeStudioAiCompositionSuggestion } from "./studio-ai-composition-suggestion";
 import {
   STUDIO_AI_IMAGE_REFERENCE_LIMITS,
   compileStudioAiImageReferencePromptContexts,
@@ -1317,7 +1318,7 @@ export async function suggestSceneComposition(
   return {
     ok: true,
     data: {
-      suggestion: content,
+      suggestion: normalizeStudioAiCompositionSuggestion(content),
       textProvenance: extractTextAiProvenance(result.data, settings, transport),
     },
   };
