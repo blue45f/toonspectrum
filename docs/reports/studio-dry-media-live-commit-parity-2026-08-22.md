@@ -212,3 +212,29 @@ retained 전용 합성 단계에 있을 수 있다.
 체인 각각으로 렌더해 픽셀 비 — retained가 max(a,…)를 반환하면 가설 G 확정.
 수정 방향: 라이브 프레젠테이션이 같은 클램프 계약을 쓰도록 통일(손맛 우선
 ADR 0010 — 커밋 쪽을 누적으로 바꾸는 것이 아니라 라이브를 커밋 계약에 맞춘다).
+
+### 가설 G·H 기각 (같은 세션 후반)
+
+- **G(retained 밴드 클램프)**: StudioDrawNode의 dynamicBrush sceneFunc(:1117)은
+  `renderStudioDynamicBrushCoverage(context, marks, {activeDraft, opacity})`를
+  호출한다 — hypothesis D 프로브 경로 B와 동일 함수·동일 옵션. 프로브가
+  소스-over 패리티를 이미 보었으므로 retained 전용 클램프 단계는 없다. 기각.
+- **H(별칭 지름 불일치)**: 커밋은 studioLiveBrushEffectiveDiameter(별칭 해시
+  적용), 라이브 styleFromElement는 원본 strokeWidth — 그러나 실측
+  `studioBrushAliasEffectiveDiameter("dry-media", 16) === 16`(해시 1.0).
+  크기 채널은 양쪽 동일. 기각.
+
+### 남는 국소 (다음 세션의 첫 실험)
+
+계획·합성·입력·크기 채널이 모두 무죄이므로 차이는 라이브 체인의 나머지 두
+단계 중 하나다:
+1. **paintImmediateContact** — begin 시 exactPlan 밖 접촉 마크를 칠하는지,
+   release 재획화(clear+exactPlan)로 지워지는지 확인. 시작점 국소라면 관측된
+   균등 분포와 모순이므로 곧바로 기각 가능.
+2. **presentActiveRect 블릿 체인** — activeCanvas→presentationCanvas drawImage의
+   스케일/스무딩(DPR·imageSmoothingQuality)이 텍스처 스탬프 피크 알파를
+   체계적으로 올리는지. 라이브 프레임을 presentationCanvas가 아니라
+   activeCanvas에서 직접 덤프해 비교하면 즉시 분리된다(블릿이 원인이면
+   active 덤프는 커밋과 일치).
+덤프 방법: verify-studio-brushes 하네스에 페이지 평가 주입으로 activeCanvas
+픽셀을 수집하는 것이 재현 안정적이다.
