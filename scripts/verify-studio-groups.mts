@@ -1398,6 +1398,14 @@ async function runDesktopGroupAudit(
     await page.keyboard.press("Meta+A");
     await waitForWholeGroupSelection(page, 3);
     const groupButton = page.getByRole("button", { name: "선택 요소 그룹화", exact: true });
+    // TOONSPECTRUM_GROUPS_DEBUG=1 — 2026-08-24 그룹화 지속 플레이크 추적:
+    // 실패 재현 시 (a) 네이티브 click 은 버튼에 도달하고, (b) 핸들러는 올바른 memberIds 3개로
+    // groupSelectedElements → updateActivePage 까지 매번 실행되며, (c) 그 직후 클릭한 스냅샷의
+    // savedAt 가 8초+ 동결(자동저장 스케줄 미발화)한다. 즉 쓰기 유실이 아니라 그룹 변경에 대한
+    // 디바운스 저장 트리거 누락이다. 유력 용의: updateActivePage(commitPages) 직후
+    // applyGroupSelectionState 와 같은 태스크에서 배치 커밋될 때 더티 판정(generation/fingerprint
+    // 게이트)이 clean 으로 결론나는 경로. 다음 단계는 디바운스 자동저장 스케줄러의 더티 게이트를
+    // 이 배치 경로로 프로브하는 것이다.
     if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
       await page.evaluate(() => {
         (globalThis as { __studioGroupsDebug?: boolean }).__studioGroupsDebug = true;
@@ -1409,6 +1417,20 @@ async function runDesktopGroupAudit(
         console.log(`[groups-debug] console.${message.type()}: ${message.text()}`);
       });
     }
+    if (process.env.TOONSPECTRUM_GROUPS_DEBUG_NATIVE === "1") {
+      await groupButton.evaluate((element) => {
+        element.addEventListener(
+          "click",
+          () => console.log("[groups-probe] native-click reached button"),
+          { once: true, capture: true },
+        );
+        element.addEventListener(
+          "pointerdown",
+          () => console.log("[groups-probe] native-pointerdown reached button"),
+          { once: true, capture: true },
+        );
+      });
+    }
     await groupButton.click();
     if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
       for (let sample = 0; sample < 12; sample += 1) {
@@ -1417,7 +1439,7 @@ async function runDesktopGroupAudit(
         const groupIds = snap
           ? JSON.stringify(snap.elements.map((element) => element.groupId))
           : "read-error";
-        console.log(`[groups-debug] t=${(sample + 1) * 0.7}s groups=${JSON.stringify(snap?.groups?.length ?? null)} ids=${groupIds}`);
+        console.log(`[groups-debug] t=${(sample + 1) * 0.7}s savedAt=${snap?.savedAt ?? "?"} groups=${JSON.stringify(snap?.groups?.length ?? null)} ids=${groupIds}`);
       }
     }
 
