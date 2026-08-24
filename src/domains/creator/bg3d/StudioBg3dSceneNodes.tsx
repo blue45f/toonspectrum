@@ -49,6 +49,10 @@ import {
   type StudioBg3dSectionPlaneState,
 } from "./studio-bg3d-section-plane";
 import {
+  resolveStudioBg3dSurfaceMaterialProps,
+  spreadStudioBg3dSurfaceMaterialProps,
+} from "./studio-bg3d-surface-presets";
+import {
   createStudioBg3dThreeStaticInstanceBatch,
   type StudioBg3dThreeInstancingSuccess,
 } from "./studio-bg3d-three-instancing";
@@ -418,7 +422,14 @@ export function BgPrimitiveMesh({ prim, geometryPool, lineArt, showEdges, select
         {lineArt ? (
           <meshBasicMaterial color="#ffffff" polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
         ) : (
-          <meshStandardMaterial color={prim.color} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
+          <meshStandardMaterial
+            color={prim.color}
+            polygonOffset
+            polygonOffsetFactor={1}
+            polygonOffsetUnits={1}
+            {...spreadStudioBg3dSurfaceMaterialProps(resolveStudioBg3dSurfaceMaterialProps(prim.materialOverride))}
+            side={prim.materialOverride?.doubleSided ? THREE.DoubleSide : THREE.FrontSide}
+          />
         )}
       </mesh>
       {showEdges ? (

@@ -515,6 +515,10 @@ import {
   type StudioBg3dSunRigConfig,
 } from "./studio-bg3d-sun-rig";
 import {
+  buildStudioBg3dSurfacePresetOverride,
+  STUDIO_BG3D_SURFACE_PRESETS,
+} from "./studio-bg3d-surface-presets";
+import {
   collectStudioBg3dSurfaceSelectionSubtreeIds,
   collectStudioBg3dSurfaceTargetPathIds,
   planStudioBg3dMultiSurfaceSnap,
@@ -3159,6 +3163,20 @@ export function StudioBackground3D({
 
   const updateColor = (id: string, color: string) => {
     setPrimitives((prev) => prev.map((p) => (p.id === id ? { ...p, color } : p)));
+  };
+
+  const applySurfacePreset = (id: string, presetId: string | null) => {
+    setPrimitives((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              materialOverride:
+                presetId === null ? undefined : buildStudioBg3dSurfacePresetOverride(presetId) ?? undefined,
+            }
+          : p,
+      ),
+    );
   };
 
   function togglePrimitiveFlag(id: string, flag: "visible" | "locked") {
@@ -8464,6 +8482,8 @@ export function StudioBackground3D({
                   radToDeg,
                   degToRad,
                   updateColor,
+                  applySurfacePreset,
+                  surfacePresets: STUDIO_BG3D_SURFACE_PRESETS,
                   selectedCustomModel,
                   toggleCustomModelFlag,
                   canPlaceSelectedModelRecipe,

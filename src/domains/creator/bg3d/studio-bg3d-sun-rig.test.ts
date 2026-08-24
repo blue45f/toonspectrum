@@ -103,7 +103,7 @@ describe("resolveStudioBg3dSunLightState", () => {
     expect(night.keyIntensity).toBeLessThan(1);
   });
 
-  it("시간대 프리셋 5종(새벽/아침/정오/석양/밤)이 기대 모드로 갈라진다", () => {
+  it("시간대 프리셋 9종(새벽~자정)이 기대 모드로 갈라진다", () => {
     const modes = STUDIO_BG3D_SUN_TIME_PRESETS.map((preset) => ({
       id: preset.id,
       mode: resolveStudioBg3dSunLightState(preset.timeOfDayHours).mode,
@@ -111,9 +111,13 @@ describe("resolveStudioBg3dSunLightState", () => {
     expect(modes).toEqual([
       { id: "dawn", mode: "sun" },
       { id: "morning", mode: "sun" },
+      { id: "forenoon", mode: "sun" },
       { id: "noon", mode: "sun" },
+      { id: "afternoon", mode: "sun" },
       { id: "sunset", mode: "sun" },
+      { id: "dusk", mode: "moon" },
       { id: "night", mode: "moon" },
+      { id: "midnight", mode: "moon" },
     ]);
   });
 });

@@ -36,8 +36,8 @@ describe("초점거리 ↔ 세로 화각 매핑", () => {
     expect(studioBg3dFocalLengthToFovDegrees(STUDIO_BG3D_LENS_MAX_FOCAL_MM)).toBeGreaterThanOrEqual(10);
   });
 
-  it("프리셋 5종의 mm가 전부 슬라이더 한도 안이다", () => {
-    expect(STUDIO_BG3D_LENS_PRESETS).toHaveLength(5);
+  it("프리셋 7종의 mm가 전부 슬라이더 한도 안이다", () => {
+    expect(STUDIO_BG3D_LENS_PRESETS).toHaveLength(7);
     for (const preset of STUDIO_BG3D_LENS_PRESETS) {
       expect(preset.focalLengthMm).toBeGreaterThanOrEqual(STUDIO_BG3D_LENS_MIN_FOCAL_MM);
       expect(preset.focalLengthMm).toBeLessThanOrEqual(STUDIO_BG3D_LENS_MAX_FOCAL_MM);

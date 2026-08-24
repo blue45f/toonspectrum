@@ -398,12 +398,16 @@ function primitiveNodeFromRuntime(value: BgPrimitive): StudioBg3dSceneNode | nul
   ) {
     return null;
   }
+  const materialOverride = value.materialOverride === undefined
+    ? undefined
+    : normalizeStudioBg3dMaterialOverride(value.materialOverride);
   return {
     id: value.id,
     name: value.name || value.kind,
     kind: "primitive",
     primitiveKind: value.kind as BgPrimitiveKind,
     color: value.color,
+    ...(materialOverride ? { materialOverride } : {}),
     transform: {
       position: [...value.position],
       rotation: [...value.rotation],
@@ -786,6 +790,7 @@ export function hydrateStudioBg3dDocumentToRuntime(
         id: node.id,
         kind: node.primitiveKind,
         color: node.color,
+        materialOverride: node.materialOverride ? { ...node.materialOverride } : undefined,
         name: node.name !== node.primitiveKind ? node.name : undefined,
         position: [...node.transform.position],
         rotation: [...node.transform.rotation],

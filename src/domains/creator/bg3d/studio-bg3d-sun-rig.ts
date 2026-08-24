@@ -53,9 +53,13 @@ export interface StudioBg3dSunTimePreset {
 export const STUDIO_BG3D_SUN_TIME_PRESETS: readonly StudioBg3dSunTimePreset[] = Object.freeze([
   { id: "dawn", label: "새벽", timeOfDayHours: 6.3 },
   { id: "morning", label: "아침", timeOfDayHours: 9 },
+  { id: "forenoon", label: "오전", timeOfDayHours: 10.5 },
   { id: "noon", label: "정오", timeOfDayHours: 12 },
+  { id: "afternoon", label: "오후", timeOfDayHours: 15.5 },
   { id: "sunset", label: "석양", timeOfDayHours: 17.6 },
+  { id: "dusk", label: "황혼", timeOfDayHours: 19.5 },
   { id: "night", label: "밤", timeOfDayHours: 22 },
+  { id: "midnight", label: "자정", timeOfDayHours: 0 },
 ]);
 
 function wrapHours(hours: number): number {

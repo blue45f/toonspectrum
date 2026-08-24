@@ -99,6 +99,8 @@ interface StudioBg3dShapesPanelContext {
   readonly radToDeg: (rad: number) => number;
   readonly degToRad: (deg: number) => number;
   readonly updateColor: (id: string, color: string) => void;
+  readonly applySurfacePreset: (id: string, presetId: string | null) => void;
+  readonly surfacePresets: readonly import("./studio-bg3d-surface-presets").StudioBg3dSurfacePreset[];
   readonly selectedCustomModel: BgCustomModelInstance | null;
   readonly toggleCustomModelFlag: (id: string, flag: "visible" | "locked") => void;
   readonly canPlaceSelectedModelRecipe: boolean;
@@ -226,6 +228,8 @@ export function StudioBg3dShapesPanel({
     radToDeg,
     degToRad,
     updateColor,
+    applySurfacePreset,
+    surfacePresets,
     selectedCustomModel,
     toggleCustomModelFlag,
     canPlaceSelectedModelRecipe,
@@ -812,6 +816,31 @@ export function StudioBg3dShapesPanel({
                           className="h-11 w-11 cursor-pointer rounded border border-line bg-card sm:h-7 sm:w-10"
                         />
                       </label>
+
+                      <div>
+                        <p className="text-[0.65rem] font-semibold text-fg-3">표면 프리셋</p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label="표면 프리셋">
+                          {surfacePresets.map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              title={preset.description}
+                              className="min-h-8 rounded-full border border-line bg-card px-2 py-0.5 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+                              onClick={() => applySurfacePreset(selectedPrimitive.id, preset.id)}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            aria-label="표면 프리셋 해제"
+                            className="min-h-8 rounded-full border border-line bg-panel px-2 py-0.5 text-[0.62rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg"
+                            onClick={() => applySurfacePreset(selectedPrimitive.id, null)}
+                          >
+                            해제
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ) : selectedCustomModel ? (
                     <div className="space-y-3">

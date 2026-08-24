@@ -514,6 +514,8 @@ export interface StudioBg3dPrimitiveNode extends StudioBg3dSceneNodeBase {
   readonly kind: "primitive";
   readonly primitiveKind: StudioBg3dPrimitiveKind;
   readonly color: string;
+  /** Optional to preserve byte-for-byte compatibility with pre-preset documents. */
+  readonly materialOverride?: StudioBg3dMaterialOverride;
 }
 
 export interface StudioBg3dModelNode extends StudioBg3dSceneNodeBase {
@@ -1898,11 +1900,13 @@ function normalizeNode(
     if (typeof value.primitiveKind !== "string" || !PRIMITIVE_KIND_SET.has(value.primitiveKind)) {
       return null;
     }
+    const materialOverride = normalizeMaterialOverride(value.materialOverride);
     return {
       ...base,
       kind: "primitive",
       primitiveKind: value.primitiveKind as StudioBg3dPrimitiveKind,
       color: normalizedColor(value.color, "#b8b8c2"),
+      ...(materialOverride ? { materialOverride } : {}),
     };
   }
   if (value.kind === "model") {

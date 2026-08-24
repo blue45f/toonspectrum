@@ -46,11 +46,13 @@ export interface StudioBg3dLensPreset {
 }
 
 export const STUDIO_BG3D_LENS_PRESETS: readonly StudioBg3dLensPreset[] = Object.freeze([
+  { focalLengthMm: 12, label: "12mm 극광각" },
   { focalLengthMm: 16, label: "16mm 초광각" },
   { focalLengthMm: 24, label: "24mm 광각" },
   { focalLengthMm: 35, label: "35mm 준광각" },
   { focalLengthMm: 50, label: "50mm 표준" },
   { focalLengthMm: 85, label: "85mm 망원" },
+  { focalLengthMm: 135, label: "135mm 인물 망원" },
 ]);
 
 export interface StudioBg3dTwoPointPerspectiveResult {
