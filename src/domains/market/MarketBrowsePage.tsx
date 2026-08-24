@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { marketBrowseJsonLd } from "./market-jsonld";
 import { MARKET_KINDS, MARKET_LICENSES, marketKindMeta } from "./market-kind";
 import { MarketResourceCard } from "./MarketResourceCard";
+import { StaleNoticeBar } from "./StaleNoticeBar";
 import { useMarketResources } from "./use-market-resources";
 
 import type {
@@ -42,6 +43,16 @@ function readLicense(searchParams: URLSearchParams): CreatorMarketplaceResourceL
   return MARKET_LICENSES.some((meta) => meta.license === value)
     ? (value as CreatorMarketplaceResourceLicense)
     : undefined;
+}
+
+function filterChipClass(active: boolean): string {
+  return cn(
+    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-150",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+    active
+      ? "border-transparent text-fg"
+      : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
+  );
 }
 
 export function MarketBrowsePage() {
@@ -106,8 +117,21 @@ export function MarketBrowsePage() {
                 value={draftSearch}
                 onChange={(event) => setDraftSearch(event.target.value)}
                 placeholder="리소스·태그·배급자 검색"
-                className="h-10 w-full rounded-[0.7rem] border border-line bg-card pl-9 pr-3 text-sm text-fg placeholder:text-fg-3 outline-none transition-colors duration-150 focus:border-accent"
+                className="h-10 w-full rounded-[0.7rem] border border-line bg-card pl-9 pr-9 text-sm text-fg placeholder:text-fg-3 outline-none transition-colors duration-150 focus:border-accent"
               />
+              {draftSearch ? (
+                <button
+                  type="button"
+                  aria-label="검색어 지우기"
+                  onClick={() => {
+                    setDraftSearch("");
+                    patchParams({ q: null });
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-3 transition-colors duration-150 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              ) : null}
             </div>
             <button type="submit" className={buttonClass({ variant: "solid", size: "md" })}>
               검색
@@ -122,12 +146,7 @@ export function MarketBrowsePage() {
             type="button"
             onClick={() => patchParams({ kind: null })}
             aria-pressed={!activeKind}
-            className={cn(
-              "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-150",
-              !activeKind
-                ? "border-accent bg-accent-soft text-accent"
-                : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
-            )}
+            className={cn(filterChipClass(!activeKind), !activeKind && "border-accent bg-accent-soft text-accent")}
           >
             전체
           </button>
@@ -137,12 +156,7 @@ export function MarketBrowsePage() {
               type="button"
               onClick={() => patchParams({ kind: activeKind === kind.kind ? null : kind.kind })}
               aria-pressed={activeKind === kind.kind}
-              className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-150",
-                activeKind === kind.kind
-                  ? "border-transparent text-fg"
-                  : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
-              )}
+              className={filterChipClass(activeKind === kind.kind)}
               style={
                 activeKind === kind.kind
                   ? { backgroundColor: `oklch(0.72 0.11 ${kind.hue} / 0.16)`, color: `oklch(0.82 0.10 ${kind.hue})` }
@@ -152,39 +166,80 @@ export function MarketBrowsePage() {
               {kind.label}
             </button>
           ))}
-          <label className="ml-auto flex items-center gap-1.5 text-xs text-fg-3">
-            <span>라이선스</span>
-            <select
-              value={activeLicense ?? ""}
-              onChange={(event) => patchParams({ license: event.target.value || null })}
-              className="rounded-md border border-line bg-panel px-2 py-1.5 text-xs text-fg outline-none focus:border-accent"
-            >
-              <option value="">전체</option>
-              {MARKET_LICENSES.map((license) => (
-                <option key={license.license} value={license.license}>
-                  {license.label}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
 
-        {(query.search || query.tag || query.publisher) ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="라이선스 필터">
+          <button
+            type="button"
+            onClick={() => patchParams({ license: null })}
+            aria-pressed={!activeLicense}
+            className={cn(filterChipClass(!activeLicense), !activeLicense && "border-accent bg-accent-soft text-accent")}
+          >
+            전체 라이선스
+          </button>
+          {MARKET_LICENSES.map((license) => (
+            <button
+              key={license.license}
+              type="button"
+              onClick={() => patchParams({ license: activeLicense === license.license ? null : license.license })}
+              aria-pressed={activeLicense === license.license}
+              className={cn(filterChipClass(activeLicense === license.license), activeLicense === license.license && "border-accent bg-accent-soft text-accent")}
+            >
+              {license.label}
+            </button>
+          ))}
+        </div>
+
+        {!page.loading && !page.error ? (
+          <p className="mt-3 text-xs text-fg-3" aria-live="polite">
+            현재 조건 리소스 <span className="numeral tnum text-fg-2">{page.items.length}</span>개
+          </p>
+        ) : null}
+
+        {(query.search || query.tag || query.publisher || activeKind || activeLicense) ? (
           <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-fg-2">
             {query.search ? <span>“{query.search}” 검색 결과</span> : null}
             {query.tag ? <span>#{query.tag}</span> : null}
+            {activeKind ? (
+              <button
+                type="button"
+                onClick={() => patchParams({ kind: null })}
+                className="inline-flex items-center gap-1 rounded bg-raised px-1.5 py-0.5 text-xs text-fg-2 hover:text-fg"
+              >
+                {marketKindMeta(activeKind).label}
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            ) : null}
+            {activeLicense ? (
+              <button
+                type="button"
+                onClick={() => patchParams({ license: null })}
+                className="inline-flex items-center gap-1 rounded bg-raised px-1.5 py-0.5 text-xs text-fg-2 hover:text-fg"
+              >
+                {MARKET_LICENSES.find((meta) => meta.license === activeLicense)?.label}
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            ) : null}
             {query.publisher ? (
               <span className="rounded bg-raised px-1.5 py-0.5 text-xs text-fg-2">선택한 배급자의 리소스</span>
             ) : null}
             <button
               type="button"
-              onClick={() => patchParams({ q: null, tag: null, publisher: null })}
+              onClick={() => patchParams({ q: null, tag: null, publisher: null, kind: null, license: null })}
               className="inline-flex items-center gap-1 rounded bg-raised px-1.5 py-0.5 text-xs text-fg-2 hover:text-fg"
             >
               <X className="h-3 w-3" aria-hidden="true" />
               조건 지우기
             </button>
           </p>
+        ) : null}
+
+        {page.stale ? (
+          <StaleNoticeBar
+            savedAt={page.staleSavedAt ?? new Date().toISOString()}
+            onRetry={page.reload}
+            className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2 [&>button]:ml-auto"
+          />
         ) : null}
 
         {page.error ? (

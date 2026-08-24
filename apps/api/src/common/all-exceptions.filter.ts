@@ -47,7 +47,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
     };
 
+    // 라우트 @Header 캐시 정책(s-maxage)이 공유 캐시에 5xx 실패 본문을 저장하지 않도록 강제.
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      response.setHeader("Cache-Control", "no-store");
       // Error messages/stacks can repeat an OAuth callback URL, signed object URL or a driver
       // connection string. Keep the operational request/status signal without logging those
       // untrusted exception details at this outermost credential boundary.

@@ -3,6 +3,7 @@ import { Store, Upload } from "lucide-react";
 import { marketHomeJsonLd } from "./market-jsonld";
 import { MARKET_KINDS, MARKET_LICENSES } from "./market-kind";
 import { MarketResourceCard } from "./MarketResourceCard";
+import { StaleNoticeBar } from "./StaleNoticeBar";
 import { useMarketResources } from "./use-market-resources";
 
 import { Container } from "@/components/section";
@@ -16,6 +17,17 @@ export function MarketHomePage() {
   const latest = useMarketResources({ limit: 8 });
 
   useJsonLd(marketHomeJsonLd(latest.items));
+
+  const tagCounts = new Map<string, number>();
+  for (const record of latest.items) {
+    for (const tag of record.tags) {
+      tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+    }
+  }
+  const popularTags = [...tagCounts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 8)
+    .map(([tag]) => tag);
 
   return (
     <div>
@@ -70,6 +82,24 @@ export function MarketHomePage() {
         </ul>
       </Container>
 
+      {popularTags.length >= 3 ? (
+        <Container size="wide" className="pb-10 sm:pb-12">
+          <h2 className="eyebrow text-fg-3">Popular Tags</h2>
+          <ul className="mt-3 flex flex-wrap gap-1.5">
+            {popularTags.map((tag) => (
+              <li key={tag}>
+                <Link
+                  href={`/market/browse?tag=${encodeURIComponent(tag)}`}
+                  className="inline-block rounded bg-raised px-2 py-1 text-xs text-fg-2 transition-colors duration-150 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                >
+                  #{tag}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Container>
+      ) : null}
+
       <Container size="wide" className="pb-10 sm:pb-12">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="eyebrow text-fg-3">Latest</h2>
@@ -77,6 +107,13 @@ export function MarketHomePage() {
             전체 보기 →
           </Link>
         </div>
+        {latest.stale ? (
+          <StaleNoticeBar
+            savedAt={latest.staleSavedAt ?? new Date().toISOString()}
+            onRetry={latest.reload}
+            className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2 [&>button]:ml-auto"
+          />
+        ) : null}
         {latest.error ? (
           <ErrorState
             title="마켓 리소스를 불러오지 못했습니다"

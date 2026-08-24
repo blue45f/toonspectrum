@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { readCachedMarketPage, writeCachedMarketPage } from "./market-resource-cache";
+
 import type {
   CreatorMarketplaceResourceLicense,
   CreatorMarketplaceResourceKind,
@@ -23,15 +25,19 @@ export interface MarketResourcesPage {
   readonly loadingMore: boolean;
   readonly error: string | null;
   readonly hasMore: boolean;
+  /** 네트워크 실패로 저장된 목록을 보여주는 저하 상태. */
+  readonly stale: boolean;
+  readonly staleSavedAt: string | null;
   readonly loadMore: () => void;
   readonly reload: () => void;
 }
 
-const MARKET_LIST_ERROR = "마켓 리소스를 불러오지 못했습니다.";
+const MARKET_RETRY_HINT = "일시적인 장애일 수 있어요. 잠시 후 다시 시도해 주세요.";
 
 /**
  * creator-marketplace list API를 커서 페이지네이션과 함께 래핑한다.
  * query가 null이면 비활성화(요청 없음)하고, 바뀌면 상태를 초기화해 첫 페이지부터 다시 불러온다.
+ * 네트워크 실패 시 localStorage의 마지막 성공 페이지를 보여주는 저하 모드로 전환한다.
  */
 export function useMarketResources(query: MarketResourceQuery | null): MarketResourcesPage {
   const [items, setItems] = useState<readonly CreatorMarketplaceResourceRecord[]>([]);
@@ -39,6 +45,8 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  const [stale, setStale] = useState(false);
+  const [staleSavedAt, setStaleSavedAt] = useState<string | null>(null);
   const cursorRef = useRef<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const queryKey = query ? JSON.stringify(query) : null;
@@ -51,6 +59,8 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
       setLoadingMore(false);
       setError(null);
       setHasMore(false);
+      setStale(false);
+      setStaleSavedAt(null);
       return;
     }
     const parsedQuery = JSON.parse(queryKey) as MarketResourceQuery;
@@ -61,6 +71,8 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
     setLoadingMore(false);
     setError(null);
     setHasMore(false);
+    setStale(false);
+    setStaleSavedAt(null);
 
     listCreatorMarketplaceResources(
       {
@@ -78,10 +90,20 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
         cursorRef.current = page.nextCursor;
         setHasMore(page.hasMore);
         setLoading(false);
+        writeCachedMarketPage(queryKey, { items: page.items, hasMore: page.hasMore });
       })
-      .catch((cause: unknown) => {
+      .catch(() => {
         if (controller.signal.aborted) return;
-        setError(cause instanceof Error && cause.message ? cause.message : MARKET_LIST_ERROR);
+        const cached = readCachedMarketPage(queryKey);
+        if (cached) {
+          setItems(cached.items);
+          setHasMore(cached.hasMore);
+          setStale(true);
+          setStaleSavedAt(cached.savedAt);
+          setLoading(false);
+          return;
+        }
+        setError(MARKET_RETRY_HINT);
         setLoading(false);
       });
 
@@ -106,7 +128,9 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
       .then((page) => {
         setItems((previous) => {
           const seen = new Set(previous.map((record) => record.id));
-          return [...previous, ...page.items.filter((record) => !seen.has(record.id))];
+          const merged = [...previous, ...page.items.filter((record) => !seen.has(record.id))];
+          writeCachedMarketPage(queryKey, { items: merged, hasMore: page.hasMore });
+          return merged;
         });
         cursorRef.current = page.nextCursor;
         setHasMore(page.hasMore);
@@ -114,12 +138,11 @@ export function useMarketResources(query: MarketResourceQuery | null): MarketRes
       })
       .catch(() => {
         setLoadingMore(false);
-        setError(MARKET_LIST_ERROR);
       });
   }, [loading, loadingMore, queryKey]);
   const reload = useCallback(() => {
     setRefreshToken((token) => token + 1);
   }, []);
 
-  return { items, loading, loadingMore, error, hasMore, loadMore, reload };
+  return { items, loading, loadingMore, error, hasMore, stale, staleSavedAt, loadMore, reload };
 }

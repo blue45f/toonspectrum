@@ -12,8 +12,9 @@ import type { Request, Response } from "express";
 
 function boundary(requestUrl: string) {
   const json = vi.fn();
+  const setHeader = vi.fn();
   const status = vi.fn(() => ({ json }));
-  const response = { status } as unknown as Response;
+  const response = { setHeader, status } as unknown as Response;
   const request = {
     method: "GET",
     originalUrl: requestUrl,
@@ -25,7 +26,7 @@ function boundary(requestUrl: string) {
       getResponse: () => response,
     }),
   } as unknown as ArgumentsHost;
-  return { host, json, status };
+  return { host, json, setHeader, status };
 }
 
 afterEach(() => {
@@ -126,5 +127,28 @@ describe("AllExceptionsFilter credential boundary", () => {
     }));
     expect(JSON.stringify(json.mock.calls)).not.toContain("operator");
     expect(JSON.stringify(json.mock.calls)).not.toContain("signature");
+  });
+
+  it("overrides shared cache policies with no-store on 5xx so outages are never edge-cached", () => {
+    const logger = vi
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
+    const { host, setHeader } = boundary("/api/creator/marketplace/resources");
+
+    new AllExceptionsFilter().catch(new Error("neon quota exhausted"), host);
+
+    expect(setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
+    expect(logger).toHaveBeenCalled();
+  });
+
+  it("leaves 4xx responses untouched for route cache policies", () => {
+    const { host, setHeader } = boundary("/api/creator/marketplace/resources");
+
+    new AllExceptionsFilter().catch(
+      new BadRequestException({ error: "invalid-query" }),
+      host,
+    );
+
+    expect(setHeader).not.toHaveBeenCalled();
   });
 });

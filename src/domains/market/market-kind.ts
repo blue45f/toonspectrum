@@ -141,6 +141,18 @@ export function formatMarketDate(isoDate: string): string {
   return Number.isFinite(date.getTime()) ? dateFormatter.format(date) : isoDate;
 }
 
+const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export function formatMarketDateTime(isoDate: string): string {
+  const date = new Date(isoDate);
+  return Number.isFinite(date.getTime()) ? dateTimeFormatter.format(date) : isoDate;
+}
+
 export function formatMarketByteSize(bytes: number): string {
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${bytes} B`;

@@ -9,7 +9,9 @@ import {
   marketKindMeta,
   marketLicenseMeta,
 } from "./market-kind";
+import { readCachedMarketResource, writeCachedMarketResource } from "./market-resource-cache";
 import { MarketResourceCard } from "./MarketResourceCard";
+import { StaleNoticeBar } from "./StaleNoticeBar";
 import { useMarketResources } from "./use-market-resources";
 
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
@@ -49,6 +51,7 @@ export function MarketResourceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [staleSavedAt, setStaleSavedAt] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -58,20 +61,30 @@ export function MarketResourceDetailPage() {
     setLoading(true);
     setNotFound(false);
     setError(null);
+    setStaleSavedAt(null);
 
     getCreatorMarketplaceResource(id, controller.signal)
       .then((parsed) => {
         if (controller.signal.aborted) return;
         setRecord(parsed);
         setLoading(false);
+        writeCachedMarketResource(parsed);
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
         if (cause instanceof NotFoundError) {
           setNotFound(true);
-        } else {
-          setError(cause instanceof Error && cause.message ? cause.message : "공유 리소스를 불러오지 못했습니다.");
+          setLoading(false);
+          return;
         }
+        const cached = readCachedMarketResource(id);
+        if (cached) {
+          setRecord(cached.record);
+          setStaleSavedAt(cached.savedAt);
+          setLoading(false);
+          return;
+        }
+        setError(cause instanceof Error && cause.message ? cause.message : "공유 리소스를 불러오지 못했습니다.");
         setLoading(false);
       });
 
@@ -140,6 +153,13 @@ export function MarketResourceDetailPage() {
           const KindIcon = kind.icon;
           return (
             <article className="mt-6">
+              {staleSavedAt ? (
+                <StaleNoticeBar
+                  savedAt={staleSavedAt}
+                  onRetry={() => setReloadToken((token) => token + 1)}
+                  className="mb-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2 [&>button]:ml-auto"
+                />
+              ) : null}
               <header
                 className="relative overflow-hidden rounded-xl border border-line p-6 sm:p-8"
                 style={{
@@ -227,6 +247,12 @@ export function MarketResourceDetailPage() {
                     >
                       <Download className="h-4 w-4" aria-hidden="true" />
                       스튜디오에서 불러오기
+                    </Link>
+                    <Link
+                      href={`/market/browse?kind=${record.kind}`}
+                      className={buttonClass({ variant: "outline", size: "sm", className: "w-full" })}
+                    >
+                      이 리소스와 비슷한 것 더 보기
                     </Link>
                     <p className="text-center text-[0.68rem] leading-relaxed text-fg-3">
                       Studio 자산 메뉴의 커뮤니티 마켓에서 설치할 수 있어요.
