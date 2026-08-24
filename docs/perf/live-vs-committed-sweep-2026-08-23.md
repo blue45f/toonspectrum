@@ -1,250 +1,357 @@
 # 라이브 vs 커밋 전수 스윕 — 2026-08-23
-- 대상: listed 238종 중 238종 실행
-- 성공 8 / 실패 227 / 무출력 의심 0
+- 대상: listed 239종 중 239종 실행
+- 성공 54 / 실패 225 / 무출력 의심 0
 - 산출물: /tmp/studio-brush-sweep-results.json
 ## 최악 20종 (장획 p95 프레임시간)
 | # | id | p50 | p95 | max | longtasks | changedPx | 최대채널差 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | highlighter | 8.4 | 68.3 | 1132.8 | 539 | 18485 | 242 |
-| 2 | airbrush | 8.3 | 31.9 | 276.6 | 211 | 18416 | 242 |
-| 3 | brush | 8.3 | 25.0 | 510.1 | 121 | 18166 | 242 |
-| 4 | watercolor | 8.3 | 24.9 | 191.6 | 150 | 18379 | 242 |
-| 5 | pen | 8.3 | 18.7 | 259.4 | 147 | 20134 | 242 |
-| 6 | marker | 8.3 | 10.3 | 217.2 | 53 | 18470 | 242 |
-| 7 | gpen | 8.3 | 10.3 | 274.6 | 54 | 19025 | 242 |
-| 8 | fountain-pen | 8.3 | 10.2 | 327.0 | 35 | 18191 | 242 |
+| 1 | mypaint-cc0--ink-blot | 16.7 | 2683.3 | 10216.7 | 1018 | 79037 | 233 |
+| 2 | perfect-ink | 16.7 | 566.7 | 2737.6 | 2148 | 18998 | 242 |
+| 3 | oil--impasto-ribbon | 199.6 | 534.8 | 1714.7 | 2462 | 11206 | 228 |
+| 4 | watercolor--granular | 24.9 | 316.8 | 508.4 | 995 | 53517 | 239 |
+| 5 | watercolor | 15.8 | 250.2 | 666.6 | 411 | 18249 | 242 |
+| 6 | fine-rake | 8.9 | 250.2 | 8808.3 | 1245 | 17234 | 239 |
+| 7 | precision-pencil | 8.9 | 241.7 | 4442.0 | 1410 | 38581 | 225 |
+| 8 | web-smudge-trail | 15.8 | 240.9 | 1116.7 | 531 | 29240 | 242 |
+| 9 | brush--impasto-relief | 15.1 | 234.5 | 4866.7 | 1752 | 22888 | 237 |
+| 10 | rough-ink | 9.0 | 234.3 | 10800.0 | 1198 | 17149 | 238 |
+| 11 | charcoal--compressed-edge | 8.8 | 233.3 | 283.0 | 48 | 18186 | 242 |
+| 12 | chalk--klecks-stamp | 9.8 | 232.5 | 8908.6 | 972 | 19576 | 243 |
+| 13 | ink-brush | 8.9 | 226.4 | 6074.9 | 1095 | 207636 | 242 |
+| 14 | marker-bold | 9.9 | 225.3 | 1570895.2 | 1875 | 194656 | 242 |
+| 15 | fresh-leaf | 8.7 | 225.0 | 12983.3 | 1448 | 84067 | 238 |
+| 16 | round-sketch | 9.0 | 224.7 | 14933.3 | 1518 | 92510 | 235 |
+| 17 | mist-soft | 9.2 | 217.1 | 8041.6 | 1570 | 27697 | 237 |
+| 18 | pen | 9.2 | 216.7 | 1616.7 | 404 | 20102 | 242 |
+| 19 | crayon--klecks-stamp | 10.3 | 216.6 | 1673.3 | 444 | 34318 | 233 |
+| 20 | mypaint-cc0--splatter | 8.5 | 215.7 | 2841.7 | 1339 | 49784 | 237 |
 ## 실패 목록
 
-- standard-eraser: locator.waitFor: Timeout 15000ms exceeded.
+- fineliner: watchdog:brush:fineliner 240000ms
+- gpen: watchdog:brush:gpen 240000ms
+- fountain-pen: pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push')
+- airbrush: watchdog:brush:airbrush 240000ms
+- marker: watchdog:brush:marker 240000ms
+- brush: watchdog:brush:brush 240000ms
+- pencil: mouse.move: Target crashed 
+- standard-eraser: pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push')
+- kneaded-eraser: pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push')
+- maru-pen: watchdog:brush:maru-pen 240000ms
+- calligraphy: watchdog:brush:calligraphy 240000ms
+- parallel-pen: mouse.move: Target crashed 
+- perfect-marker: watchdog:brush:perfect-marker 240000ms
+- marker-bold: watchdog:brush:marker-bold 240000ms
+- neon: locator.click: Timeout 30000ms exceeded.
 Call log:
-[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('button', { name: '일반 지우개 선택', exact: true }) to be visible[22m
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('button', { name: '네온 마커 선택', exact: true })[22m
 
-- kneaded-eraser: locator.waitFor: Timeout 15000ms exceeded.
+- soft-glow: watchdog:brush:soft-glow 240000ms
+- glow: watchdog:select 60000ms
+- glitter: locator.click: Timeout 30000ms exceeded.
 Call log:
-[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('button', { name: '떡지우개(저농도) 선택', exact: true }) to be visible[22m
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('tab', { name: '전체', exact: true })[22m
+[2m    - locator resolved to <button role="tab" tabindex="0" type="button" title="모든 브러시" id="_r_av_-all" aria-selected="tr
+- star-dust: locator.scrollIntoViewIfNeeded: Element is not attached to the DOM
+Call log:
+[2m  - attempting scroll into view action[22m
+[2m    - waiting for element to be stable[22m
 
-- calligraphy: mouse.move: Target crashed 
-- parallel-pen: keyboard.press: Target crashed 
-- perfect-ink: keyboard.press: Target crashed 
-- perfect-marker: keyboard.press: Target crashed 
-- marker-bold: keyboard.press: Target crashed 
-- neon: keyboard.press: Target crashed 
-- soft-glow: keyboard.press: Target crashed 
-- glow: keyboard.press: Target crashed 
-- glitter: keyboard.press: Target crashed 
-- star-dust: keyboard.press: Target crashed 
-- erodible-pencil: keyboard.press: Target crashed 
-- inkwash-white-ink: keyboard.press: Target crashed 
-- oil: keyboard.press: Target crashed 
-- paint-tube: keyboard.press: Target crashed 
-- pastel: keyboard.press: Target crashed 
-- crayon: keyboard.press: Target crashed 
-- chalk: keyboard.press: Target crashed 
-- charcoal: keyboard.press: Target crashed 
-- dry-media: keyboard.press: Target crashed 
-- hard-airbrush: keyboard.press: Target crashed 
-- soft-brush: keyboard.press: Target crashed 
-- spray: keyboard.press: Target crashed 
-- ink-particle: keyboard.press: Target crashed 
-- tangent-normal-brush: keyboard.press: Target crashed 
-- sketchpad-tile: keyboard.press: Target crashed 
-- sketchpad-mirror: keyboard.press: Target crashed 
-- sketchpad-soft-marker: keyboard.press: Target crashed 
-- web-multi-agent: keyboard.press: Target crashed 
-- web-rough-ink: keyboard.press: Target crashed 
-- web-gravity-drip: keyboard.press: Target crashed 
-- web-soft-cloud: keyboard.press: Target crashed 
-- web-calligraphy-ribbon: keyboard.press: Target crashed 
-- web-dash-stitch: keyboard.press: Target crashed 
-- web-scatter-stamp: keyboard.press: Target crashed 
-- web-rainbow-flow: keyboard.press: Target crashed 
-- web-lazy-ink: keyboard.press: Target crashed 
-- web-hatch-color: keyboard.press: Target crashed 
-- web-cel-flat: keyboard.press: Target crashed 
-- web-blend-softener: keyboard.press: Target crashed 
-- web-dot-tone: keyboard.press: Target crashed 
-- web-kaleido-ink: keyboard.press: Target crashed 
-- web-fur-strand: keyboard.press: Target crashed 
-- web-contour-double: keyboard.press: Target crashed 
-- web-radial-burst: keyboard.press: Target crashed 
-- web-mirror-ink: keyboard.press: Target crashed 
-- web-grid-ink: keyboard.press: Target crashed 
-- web-spiro-orbit: keyboard.press: Target crashed 
-- web-zigzag-edge: keyboard.press: Target crashed 
-- web-neon-tube: keyboard.press: Target crashed 
-- web-pressure-flat: keyboard.press: Target crashed 
-- web-smudge-trail: keyboard.press: Target crashed 
-- web-cross-hatch-pen: keyboard.press: Target crashed 
-- screentone: keyboard.press: Target crashed 
-- ink-brush: keyboard.press: Target crashed 
-- brush-pen: keyboard.press: Target crashed 
-- chisel-highlighter: keyboard.press: Target crashed 
-- pastel-highlighter: keyboard.press: Target crashed 
-- flat-brush: keyboard.press: Target crashed 
-- gouache: keyboard.press: Target crashed 
-- airbrush-fine: keyboard.press: Target crashed 
-- wash-brush: keyboard.press: Target crashed 
-- splatter: keyboard.press: Target crashed 
-- pencil-6b: keyboard.press: Target crashed 
-- pencil-grain: keyboard.press: Target crashed 
-- colored-pencil: keyboard.press: Target crashed 
-- oil-pastel: keyboard.press: Target crashed 
-- crosshatch: keyboard.press: Target crashed 
-- oil--filbert-ribbon: keyboard.press: Target crashed 
-- oil--flat-ribbon: keyboard.press: Target crashed 
-- oil--impasto-ribbon: keyboard.press: Target crashed 
-- oil--knife-edge: keyboard.press: Target crashed 
-- watercolor--granular: keyboard.press: Target crashed 
-- ink-wash--sumi-core: keyboard.press: Target crashed 
-- ink-wash--bleed-halo: keyboard.press: Target crashed 
-- watercolor--edge-bloom: keyboard.press: Target crashed 
-- ink-wash--fiber-feather: keyboard.press: Target crashed 
-- ink-wash--chroma-halo: keyboard.press: Target crashed 
-- gouache--matte-body: keyboard.press: Target crashed 
-- charcoal--vine-soft: keyboard.press: Target crashed 
-- charcoal--compressed-edge: keyboard.press: Target crashed 
-- oil-pastel--wgm-mix: keyboard.press: Target crashed 
-- crayon--klecks-stamp: keyboard.press: Target crashed 
-- chalk--klecks-stamp: keyboard.press: Target crashed 
-- charcoal--mypaint-stamp: keyboard.press: Target crashed 
-- pastel--soft-stamp: keyboard.press: Target crashed 
-- pencil--side-shade: keyboard.press: Target crashed 
-- brush--dry-rake: keyboard.press: Target crashed 
-- brush--impasto-relief: keyboard.press: Target crashed 
-- brush--bristle-depletion: keyboard.press: Target crashed 
-- ink-particle--scatter-cloud: keyboard.press: Target crashed 
-- mypaint-cc0--2b-pencil: keyboard.press: Target crashed 
-- mypaint-cc0--dry-brush: keyboard.press: Target crashed 
-- mypaint-cc0--splatter: keyboard.press: Target crashed 
-- mypaint-cc0--ink-blot: keyboard.press: Target crashed 
-- mypaint-cc0--kabura: keyboard.press: Target crashed 
-- mypaint-cc0--watercolor-fringe: keyboard.press: Target crashed 
-- mypaint-cc0--marker-fat: keyboard.press: Target crashed 
-- gpen--croquis-capsule: keyboard.press: Target crashed 
-- pen--croquis-stabilized: keyboard.press: Target crashed 
-- ink-wash--living-bake: keyboard.press: Target crashed 
-- brush--bristle-physics: keyboard.press: Target crashed 
-- core-round: keyboard.press: Target crashed 
-- flex-ink: keyboard.press: Target crashed 
-- mist-soft: keyboard.press: Target crashed 
-- round-sketch: keyboard.press: Target crashed 
-- precision-pencil: keyboard.press: Target crashed 
-- comfort-pencil: keyboard.press: Target crashed 
-- needle-graphite: keyboard.press: Target crashed 
-- round-shading: keyboard.press: Target crashed 
-- vine-stroke: keyboard.press: Target crashed 
-- willow-fiber: keyboard.press: Target crashed 
-- velvet-charcoal: keyboard.press: Target crashed 
-- line-block: keyboard.press: Target crashed 
-- horizontal-blade: keyboard.press: Target crashed 
-- vertical-blade: keyboard.press: Target crashed 
-- directional-flat: keyboard.press: Target crashed 
-- transparent-flat: keyboard.press: Target crashed 
-- hard-oval: keyboard.press: Target crashed 
-- fabric-texture: keyboard.press: Target crashed 
-- bleeding-stain: keyboard.press: Target crashed 
-- rock-texture: keyboard.press: Target crashed 
-- cotton-fiber: keyboard.press: Target crashed 
-- bumpy-grain: keyboard.press: Target crashed 
-- paint-roller: keyboard.press: Target crashed 
-- particle-scatter: keyboard.press: Target crashed 
-- rough-ink: keyboard.press: Target crashed 
-- fine-rake: keyboard.press: Target crashed 
-- wide-rake: keyboard.press: Target crashed 
-- dry-rake: keyboard.press: Target crashed 
-- foliage-texture: keyboard.press: Target crashed 
-- loose-grass: keyboard.press: Target crashed 
-- dense-grass: keyboard.press: Target crashed 
-- fresh-leaf: keyboard.press: Target crashed 
-- long-leaf: keyboard.press: Target crashed 
-- round-leaf: keyboard.press: Target crashed 
-- leaf-cluster: keyboard.press: Target crashed 
-- free-stamp: keyboard.press: Target crashed 
-- scattered-oval: keyboard.press: Target crashed 
-- smooth-oval: keyboard.press: Target crashed 
-- layered-oval: keyboard.press: Target crashed 
-- checker-grid: keyboard.press: Target crashed 
-- hair-fiber: keyboard.press: Target crashed 
-- even-stripe: keyboard.press: Target crashed 
-- rough-stripe: keyboard.press: Target crashed 
-- footstep-stamp: keyboard.press: Target crashed 
-- heart-stamp: keyboard.press: Target crashed 
-- technical-needle-ink: keyboard.press: Target crashed 
-- side-graphite-shade: keyboard.press: Target crashed 
-- compressed-charcoal-edge: keyboard.press: Target crashed 
-- opaque-gouache: keyboard.press: Target crashed 
-- oil-filbert: keyboard.press: Target crashed 
-- taper-brush-marker: keyboard.press: Target crashed 
-- pixel-square: keyboard.press: Target crashed 
-- pixel-dither: keyboard.press: Target crashed 
-- cross-hatch: keyboard.press: Target crashed 
-- speed-hatch: keyboard.press: Target crashed 
-- dense-halftone: keyboard.press: Target crashed 
-- bokeh-scatter: keyboard.press: Target crashed 
-- canvas-weave: keyboard.press: Target crashed 
-- fine-hair-strands: keyboard.press: Target crashed 
-- cloth-fold-rake: keyboard.press: Target crashed 
-- pine-needle-cluster: keyboard.press: Target crashed 
-- pencil-4b-rough: keyboard.press: Target crashed 
-- pencil-hb-mechanical: keyboard.press: Target crashed 
-- g-pen-flex: keyboard.press: Target crashed 
-- maru-pen-fine: keyboard.press: Target crashed 
-- spoon-pen-round: keyboard.press: Target crashed 
-- brush-pen-ink: keyboard.press: Target crashed 
-- calligraphy-tilt-nib: keyboard.press: Target crashed 
-- watercolor-wet-bleed: keyboard.press: Target crashed 
-- oil-impasto-heavy: keyboard.press: Target crashed 
-- oil-dry-scumble: keyboard.press: Target crashed 
-- pastel-paper-soft: keyboard.press: Target crashed 
-- crayon-wax-bold: keyboard.press: Target crashed 
-- sponge-stipple-dab: keyboard.press: Target crashed 
-- marker-colorless-blender: keyboard.press: Target crashed 
-- marker-wide-chisel: keyboard.press: Target crashed 
-- spray-noise-fine: keyboard.press: Target crashed 
-- stardust-star-scatter: keyboard.press: Target crashed 
-- leaf-fall-flurry: keyboard.press: Target crashed 
-- cloud-billow-soft: keyboard.press: Target crashed 
-- rope-twist-stamp: keyboard.press: Target crashed 
-- halftone-sparse-dot: keyboard.press: Target crashed 
-- rain-streak-diagonal: keyboard.press: Target crashed 
-- sparkle-glint-cross: keyboard.press: Target crashed 
-- snow-flurry-flake: keyboard.press: Target crashed 
-- ink-splatter-burst: keyboard.press: Target crashed 
-- fur-soft-clumps: keyboard.press: Target crashed 
-- wood-grain-flow: keyboard.press: Target crashed 
-- bristle-round-loaded: keyboard.press: Target crashed 
-- bristle-fan-dry: keyboard.press: Target crashed 
-- bristle-flat-streak: keyboard.press: Target crashed 
-- palette-knife-edge: keyboard.press: Target crashed 
-- watercolor-salt-bloom: keyboard.press: Target crashed 
-- watercolor-backrun-ring: keyboard.press: Target crashed 
-- gouache-grain-flat: keyboard.press: Target crashed 
-- oil-linen-filbert: keyboard.press: Target crashed 
-- sumi-wash-fray: keyboard.press: Target crashed 
-- ribbon-satin-fold: keyboard.press: Target crashed 
-- rope-double-cord: keyboard.press: Target crashed 
-- chain-link-alternate: keyboard.press: Target crashed 
-- lace-scallop-trim: keyboard.press: Target crashed 
-- stitch-running-thread: keyboard.press: Target crashed 
-- stitch-cross-seam: keyboard.press: Target crashed 
-- fabric-knit-loop: keyboard.press: Target crashed 
-- metal-scratch-brush: keyboard.press: Target crashed 
-- smoke-wisp-layered: keyboard.press: Target crashed 
-- flame-tongue-spark: keyboard.press: Target crashed 
-- rain-mist-combo: keyboard.press: Target crashed 
-- snow-powder-drift: keyboard.press: Target crashed 
-- dust-mote-depth: keyboard.press: Target crashed 
-- stage-safe-splatter: keyboard.press: Target crashed 
-- bokeh-ring-glow: keyboard.press: Target crashed 
-- cloud-cirrus-stream: keyboard.press: Target crashed 
-- tree-bark-crack: keyboard.press: Target crashed 
-- flower-petal-scatter: keyboard.press: Target crashed 
-- rock-shard-texture: keyboard.press: Target crashed 
-- brick-mortar-pattern: keyboard.press: Target crashed 
-- wood-knot-rake: keyboard.press: Target crashed 
-- fur-undercoat-soft: keyboard.press: Target crashed 
-- hair-curl-ribbon: keyboard.press: Target crashed 
-- food-sesame-sprinkle: keyboard.press: Target crashed 
-- halftone-gradient-dot: keyboard.press: Target crashed 
-- hatching-contour-rake: keyboard.press: Target crashed 
-- focus-ray-streak: keyboard.press: Target crashed 
+- erodible-pencil: watchdog:brush:erodible-pencil 240000ms
+- inkwash-white-ink: locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('tab', { name: '전체', exact: true })[22m
+[2m    - locator resolved to <button role="tab" tabindex="0" type="button" title="모든 브러시" id="_r_b5_-all" aria-selected="tr
+- oil: page.waitForFunction: Timeout 15000ms exceeded.
+- paint-tube: page.waitForFunction: Timeout 15000ms exceeded.
+- pastel: page.waitForFunction: Timeout 15000ms exceeded.
+- crayon: page.waitForFunction: Timeout 15000ms exceeded.
+- chalk: page.waitForFunction: Timeout 15000ms exceeded.
+- charcoal: page.waitForFunction: Timeout 15000ms exceeded.
+- dry-media: page.waitForFunction: Timeout 15000ms exceeded.
+- hard-airbrush: page.waitForFunction: Timeout 15000ms exceeded.
+- soft-brush: page.waitForFunction: Timeout 15000ms exceeded.
+- spray: page.waitForFunction: Timeout 15000ms exceeded.
+- ink-particle: page.waitForFunction: Timeout 15000ms exceeded.
+- tangent-normal-brush: page.waitForFunction: Timeout 15000ms exceeded.
+- sketchpad-tile: page.waitForFunction: Timeout 15000ms exceeded.
+- sketchpad-mirror: page.waitForFunction: Timeout 15000ms exceeded.
+- sketchpad-soft-marker: page.waitForFunction: Timeout 15000ms exceeded.
+- web-multi-agent: page.waitForFunction: Timeout 15000ms exceeded.
+- web-rough-ink: page.waitForFunction: Timeout 15000ms exceeded.
+- web-gravity-drip: page.waitForFunction: Timeout 15000ms exceeded.
+- web-soft-cloud: page.waitForFunction: Timeout 15000ms exceeded.
+- web-calligraphy-ribbon: page.waitForFunction: Timeout 15000ms exceeded.
+- web-dash-stitch: page.waitForFunction: Timeout 15000ms exceeded.
+- web-scatter-stamp: page.waitForFunction: Timeout 15000ms exceeded.
+- web-rainbow-flow: page.waitForFunction: Timeout 15000ms exceeded.
+- web-lazy-ink: page.waitForFunction: Timeout 15000ms exceeded.
+- web-hatch-color: page.waitForFunction: Timeout 15000ms exceeded.
+- web-cel-flat: page.waitForFunction: Timeout 15000ms exceeded.
+- web-blend-softener: page.waitForFunction: Timeout 15000ms exceeded.
+- web-dot-tone: page.waitForFunction: Timeout 15000ms exceeded.
+- web-kaleido-ink: page.waitForFunction: Timeout 15000ms exceeded.
+- web-fur-strand: page.waitForFunction: Timeout 15000ms exceeded.
+- web-contour-double: page.waitForFunction: Timeout 15000ms exceeded.
+- web-radial-burst: page.waitForFunction: Timeout 15000ms exceeded.
+- web-mirror-ink: page.waitForFunction: Timeout 15000ms exceeded.
+- web-grid-ink: page.waitForFunction: Timeout 15000ms exceeded.
+- web-spiro-orbit: pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); console:opfs-sahpool: Error: Unknown write() failure.
+    at toss (http://localhost:5173/node_modules/.vite/deps/@sqlite__org_sqlite-wasm.js?v=9d12fda0:3502:12)
+    at xWrite (http://localhost:5173/node_modul; pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); console:opfs-sahpool: Error: Unknown write() failure.
+    at toss (http://localhost:5173/node_modules/.vite/deps/@sqlite__org_sqlite-wasm.js?v=9d12fda0:3502:12)
+    at xWrite (http://localhost:5173/node_modul; pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push')
+- web-zigzag-edge: pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); console:opfs-sahpool: Error: Unknown write() failure.
+    at toss (http://localhost:5173/node_modules/.vite/deps/@sqlite__org_sqlite-wasm.js?v=9d12fda0:3502:12)
+    at xWrite (http://localhost:5173/node_modul; pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); console:opfs-sahpool: Error: Unknown write() failure.
+    at toss (http://localhost:5173/node_modules/.vite/deps/@sqlite__org_sqlite-wasm.js?v=9d12fda0:3502:12)
+    at xWrite (http://localhost:5173/node_modul
+- web-neon-tube: pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); console:opfs-sahpool: Error: Unknown write() failure.
+    at toss (http://localhost:5173/node_modules/.vite/deps/@sqlite__org_sqlite-wasm.js?v=9d12fda0:3502:12)
+    at xWrite (http://localhost:5173/node_modul; pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); pageerror:Cannot read properties of undefined (reading 'push'); console:opfs-sahpool: Error: Unknown write() failure.
+    at toss (http://localhost:5173/node_modules/.vite/deps/@sqlite__org_sqlite-wasm.js?v=9d12fda0:3502:12)
+    at xWrite (http://localhost:5173/node_modul
+- web-pressure-flat: mouse.move: Target crashed 
+- web-cross-hatch-pen: watchdog:brush:web-cross-hatch-pen 240000ms
+- screentone: watchdog:brush:screentone 240000ms
+- ink-brush: watchdog:brush:ink-brush 240000ms
+- brush-pen: watchdog:select 60000ms
+- chisel-highlighter: watchdog:select 60000ms
+- pastel-highlighter: watchdog:select 60000ms
+- flat-brush: watchdog:select 60000ms
+- gouache: locator.waitFor: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]') to be visible[22m
+
+- airbrush-fine: watchdog:brush:airbrush-fine 240000ms
+- wash-brush: watchdog:brush:wash-brush 240000ms
+- splatter: mouse.move: Target crashed 
+- pencil-6b: watchdog:brush:pencil-6b 240000ms
+- pencil-grain: watchdog:brush:pencil-grain 240000ms
+- colored-pencil: watchdog:brush:colored-pencil 240000ms
+- oil-pastel: mouse.move: Target crashed 
+- oil--filbert-ribbon: watchdog:brush:oil--filbert-ribbon 240000ms
+- oil--flat-ribbon: watchdog:brush:oil--flat-ribbon 240000ms
+- oil--impasto-ribbon: watchdog:brush:oil--impasto-ribbon 240000ms
+- oil--knife-edge: locator.scrollIntoViewIfNeeded: Element is not attached to the DOM
+Call log:
+[2m  - attempting scroll into view action[22m
+[2m    - waiting for element to be stable[22m
+
+- watercolor--granular: watchdog:brush:watercolor--granular 240000ms
+- ink-wash--sumi-core: watchdog:brush:ink-wash--sumi-core 240000ms
+- ink-wash--bleed-halo: watchdog:brush:ink-wash--bleed-halo 240000ms
+- watercolor--edge-bloom: locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('button', { name: '수채 · 엣지 블룸 선택', exact: true })[22m
+[2m    - locator resolved to <button tabindex="0" type="button" title="수채 · 엣지 블룸" aria-pressed="false" aria-
+- ink-wash--fiber-feather: watchdog:brush:ink-wash--fiber-feather 240000ms
+- ink-wash--chroma-halo: watchdog:brush:ink-wash--chroma-halo 240000ms
+- gouache--matte-body: locator.waitFor: Timeout 15000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('button', { name: '과슈 · 매트 바디 선택', exact: true }) to be visible[22m
+
+- charcoal--vine-soft: mouse.move: Target crashed 
+- charcoal--compressed-edge: watchdog:brush:charcoal--compressed-edge 240000ms
+- oil-pastel--wgm-mix: watchdog:brush:oil-pastel--wgm-mix 240000ms
+- crayon--klecks-stamp: watchdog:brush:crayon--klecks-stamp 240000ms
+- chalk--klecks-stamp: watchdog:brush:chalk--klecks-stamp 240000ms
+- charcoal--mypaint-stamp: watchdog:brush:charcoal--mypaint-stamp 240000ms
+- pastel--soft-stamp: watchdog:brush:pastel--soft-stamp 240000ms
+- pencil--side-shade: locator.scrollIntoViewIfNeeded: Element is not attached to the DOM
+Call log:
+[2m  - attempting scroll into view action[22m
+[2m    - waiting for element to be stable[22m
+
+- marker--chisel-ribbon: mouse.move: Target crashed 
+- brush--impasto-relief: watchdog:brush:brush--impasto-relief 240000ms
+- brush--bristle-depletion: watchdog:brush:brush--bristle-depletion 240000ms
+- ink-particle--scatter-cloud: locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByRole('button', { name: '실행취소', exact: true }).first()[22m
+[2m    - locator resolved to <button type="button" aria-label="실행취소" data-studio-command-bar-slot="0" data-studio-command-bar-command="undo" class="inline-flex item
+- mypaint-cc0--2b-pencil: mouse.move: Target crashed 
+- mypaint-cc0--dry-brush: watchdog:brush:mypaint-cc0--dry-brush 240000ms
+- mypaint-cc0--splatter: watchdog:brush:mypaint-cc0--splatter 240000ms
+- mypaint-cc0--ink-blot: watchdog:brush:mypaint-cc0--ink-blot 240000ms
+- mypaint-cc0--kabura: watchdog:brush:mypaint-cc0--kabura 240000ms
+- mypaint-cc0--watercolor-fringe: watchdog:select 60000ms
+- mypaint-cc0--marker-fat: watchdog:select 60000ms
+- gpen--croquis-capsule: watchdog:brush:gpen--croquis-capsule 240000ms
+- pen--croquis-stabilized: watchdog:brush:pen--croquis-stabilized 240000ms
+- ink-wash--living-bake: locator.scrollIntoViewIfNeeded: Element is not attached to the DOM
+Call log:
+[2m  - attempting scroll into view action[22m
+[2m    - waiting for element to be stable[22m
+
+- brush--bristle-physics: watchdog:brush:brush--bristle-physics 240000ms
+- core-round: mouse.move: Target crashed 
+- mist-soft: watchdog:brush:mist-soft 240000ms
+- round-sketch: watchdog:brush:round-sketch 240000ms
+- precision-pencil: watchdog:brush:precision-pencil 240000ms
+- comfort-pencil: watchdog:brush:comfort-pencil 240000ms
+- needle-graphite: locator.scrollIntoViewIfNeeded: Element is not attached to the DOM
+Call log:
+[2m  - attempting scroll into view action[22m
+[2m    - waiting for element to be stable[22m
+
+- round-shading: watchdog:brush:round-shading 240000ms
+- vine-stroke: locator.scrollIntoViewIfNeeded: Element is not attached to the DOM
+Call log:
+[2m  - attempting scroll into view action[22m
+[2m    - waiting for element to be stable[22m
+
+- willow-fiber: mouse.move: Target crashed 
+- line-block: watchdog:brush:line-block 240000ms
+- horizontal-blade: watchdog:brush:horizontal-blade 240000ms
+- vertical-blade: locator.scrollIntoViewIfNeeded: Element is not attached to the DOM
+Call log:
+[2m  - attempting scroll into view action[22m
+[2m    - waiting for element to be stable[22m
+
+- directional-flat: watchdog:brush:directional-flat 240000ms
+- transparent-flat: watchdog:brush:transparent-flat 240000ms
+- hard-oval: locator.click: Target crashed 
+Call log:
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('tab', { name: '전체', exact: true })[22m
+[2m    - locator resolved to <button role="tab" tabindex="0" type="button" title="모든 브러시" id="_r_em_-all" aria-selected="true" aria-c
+- bleeding-stain: watchdog:brush:bleeding-stain 240000ms
+- rock-texture: watchdog:brush:rock-texture 240000ms
+- cotton-fiber: watchdog:brush:cotton-fiber 240000ms
+- bumpy-grain: mouse.move: Target crashed 
+- particle-scatter: watchdog:brush:particle-scatter 240000ms
+- rough-ink: watchdog:brush:rough-ink 240000ms
+- fine-rake: watchdog:brush:fine-rake 240000ms
+- wide-rake: watchdog:brush:wide-rake 240000ms
+- dry-rake: watchdog:brush:dry-rake 240000ms
+- foliage-texture: mouse.move: Target crashed 
+- dense-grass: watchdog:brush:dense-grass 240000ms
+- fresh-leaf: watchdog:brush:fresh-leaf 240000ms
+- long-leaf: watchdog:brush:long-leaf 240000ms
+- round-leaf: watchdog:brush:round-leaf 240000ms
+- leaf-cluster: locator.fill: Target crashed 
+Call log:
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('searchbox')[22m
+[2m    - locator resolved to <input value="둥근잎" type="search" aria-label="전체 브러시 검색" aria-controls="_r_6r_-panel" data-studio-brush-search-scope="all" placeh
+- scattered-oval: watchdog:brush:scattered-oval 240000ms
+- smooth-oval: watchdog:brush:smooth-oval 240000ms
+- layered-oval: locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('tab', { name: '전체', exact: true })[22m
+
+- checker-grid: watchdog:brush:checker-grid 240000ms
+- hair-fiber: mouse.move: Target crashed 
+- rough-stripe: watchdog:brush:rough-stripe 240000ms
+- footstep-stamp: watchdog:brush:footstep-stamp 240000ms
+- heart-stamp: watchdog:brush:heart-stamp 240000ms
+- technical-needle-ink: locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-brush-catalog-session="true"]').getByRole('button', { name: '초정밀 제도 잉크 선택', exact: true })[22m
+[2m    - locator resolved to <button tabindex="0" type="button" aria-pressed="false" aria-keyshortcuts="F" ari
+- side-graphite-shade: mouse.move: Target crashed 
+- compressed-charcoal-edge: watchdog:brush:compressed-charcoal-edge 240000ms
+- opaque-gouache: watchdog:brush:opaque-gouache 240000ms
+- oil-filbert: watchdog:brush:oil-filbert 240000ms
+- taper-brush-marker: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-draw-options="true"]').locator('[data-studio-brush-active-pill="true"]') to be visible[22m
+
+- pixel-square: page.waitForFunction: Timeout 15000ms exceeded.
+- pixel-dither: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-draw-options="true"]').locator('[data-studio-brush-active-pill="true"]') to be visible[22m
+
+- cross-hatch: watchdog:select 60000ms
+- speed-hatch: page.waitForFunction: Timeout 15000ms exceeded.
+- dense-halftone: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-draw-options="true"]').locator('[data-studio-brush-active-pill="true"]') to be visible[22m
+
+- bokeh-scatter: watchdog:select 60000ms
+- canvas-weave: page.waitForFunction: Timeout 15000ms exceeded.
+- fine-hair-strands: page.waitForFunction: Timeout 15000ms exceeded.
+- cloth-fold-rake: page.waitForFunction: Timeout 15000ms exceeded.
+- pine-needle-cluster: watchdog:select 60000ms
+- pencil-4b-rough: watchdog:select 60000ms
+- pencil-hb-mechanical: page.waitForFunction: Timeout 15000ms exceeded.
+- g-pen-flex: page.waitForFunction: Timeout 15000ms exceeded.
+- maru-pen-fine: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-draw-options="true"]').locator('[data-studio-brush-active-pill="true"]') to be visible[22m
+
+- spoon-pen-round: page.waitForFunction: Timeout 15000ms exceeded.
+- brush-pen-ink: watchdog:select 60000ms
+- calligraphy-tilt-nib: page.waitForFunction: Timeout 15000ms exceeded.
+- watercolor-wet-bleed: page.waitForFunction: Timeout 15000ms exceeded.
+- oil-impasto-heavy: page.waitForFunction: Timeout 15000ms exceeded.
+- oil-dry-scumble: page.waitForFunction: Timeout 15000ms exceeded.
+- pastel-paper-soft: page.waitForFunction: Timeout 15000ms exceeded.
+- crayon-wax-bold: watchdog:select 60000ms
+- sponge-stipple-dab: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-draw-options="true"]').locator('[data-studio-brush-active-pill="true"]') to be visible[22m
+
+- marker-colorless-blender: page.waitForFunction: Timeout 15000ms exceeded.
+- marker-wide-chisel: page.waitForFunction: Timeout 15000ms exceeded.
+- spray-noise-fine: page.waitForFunction: Timeout 15000ms exceeded.
+- stardust-star-scatter: watchdog:select 60000ms
+- leaf-fall-flurry: page.waitForFunction: Timeout 15000ms exceeded.
+- cloud-billow-soft: watchdog:select 60000ms
+- rope-twist-stamp: watchdog:select 60000ms
+- halftone-sparse-dot: watchdog:select 60000ms
+- rain-streak-diagonal: watchdog:select 60000ms
+- sparkle-glint-cross: watchdog:select 60000ms
+- snow-flurry-flake: watchdog:select 60000ms
+- ink-splatter-burst: page.waitForFunction: Timeout 15000ms exceeded.
+- fur-soft-clumps: watchdog:select 60000ms
+- wood-grain-flow: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-draw-options="true"]').locator('[data-studio-brush-active-pill="true"]') to be visible[22m
+
+- bristle-round-loaded: page.waitForFunction: Timeout 15000ms exceeded.
+- bristle-fan-dry: page.waitForFunction: Timeout 15000ms exceeded.
+- bristle-flat-streak: watchdog:select 60000ms
+- palette-knife-edge: watchdog:select 60000ms
+- watercolor-salt-bloom: page.waitForFunction: Timeout 15000ms exceeded.
+- watercolor-backrun-ring: page.waitForFunction: Timeout 15000ms exceeded.
+- gouache-grain-flat: watchdog:select 60000ms
+- oil-linen-filbert: page.waitForFunction: Timeout 15000ms exceeded.
+- sumi-wash-fray: page.waitForFunction: Timeout 15000ms exceeded.
+- ribbon-satin-fold: watchdog:select 60000ms
+- rope-double-cord: page.waitForFunction: Timeout 15000ms exceeded.
+- chain-link-alternate: page.waitForFunction: Timeout 15000ms exceeded.
+- lace-scallop-trim: page.waitForFunction: Timeout 15000ms exceeded.
+- stitch-running-thread: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-draw-options="true"]').locator('[data-studio-brush-active-pill="true"]') to be visible[22m
+
+- stitch-cross-seam: watchdog:select 60000ms
+- fabric-knit-loop: page.waitForFunction: Timeout 15000ms exceeded.
+- metal-scratch-brush: page.waitForFunction: Timeout 15000ms exceeded.
+- smoke-wisp-layered: page.waitForFunction: Timeout 15000ms exceeded.
+- flame-tongue-spark: page.waitForFunction: Timeout 15000ms exceeded.
+- rain-mist-combo: watchdog:select 60000ms
+- snow-powder-drift: page.waitForFunction: Timeout 15000ms exceeded.
+- dust-mote-depth: page.waitForFunction: Timeout 15000ms exceeded.
+- stage-safe-splatter: page.waitForFunction: Timeout 15000ms exceeded.
+- bokeh-ring-glow: page.waitForFunction: Timeout 15000ms exceeded.
+- cloud-cirrus-stream: page.waitForFunction: Timeout 15000ms exceeded.
+- tree-bark-crack: page.waitForFunction: Timeout 15000ms exceeded.
+- flower-petal-scatter: page.waitForFunction: Timeout 15000ms exceeded.
+- rock-shard-texture: page.waitForFunction: Timeout 15000ms exceeded.
+- brick-mortar-pattern: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-draw-options="true"]').locator('[data-studio-brush-active-pill="true"]') to be visible[22m
+
+- wood-knot-rake: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-draw-options="true"]').locator('[data-studio-brush-active-pill="true"]') to be visible[22m
+
+- fur-undercoat-soft: watchdog:select 60000ms
+- hair-curl-ribbon: page.waitForFunction: Timeout 15000ms exceeded.
+- food-sesame-sprinkle: locator.waitFor: Timeout 10000ms exceeded.
+Call log:
+[2m  - waiting for locator('[data-studio-draw-options="true"]').locator('[data-studio-brush-active-pill="true"]') to be visible[22m
+
+- halftone-gradient-dot: watchdog:select 60000ms
+- hatching-contour-rake: watchdog:select 60000ms
+- focus-ray-streak: page.waitForFunction: Timeout 15000ms exceeded.
