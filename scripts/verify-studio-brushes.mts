@@ -1844,6 +1844,27 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         writeFileSync(join(SCRATCH, `release-diag-${preset.id}-before.png`), before);
         writeFileSync(join(SCRATCH, `release-diag-${preset.id}-immediate.png`), immediate);
         log(`release diagnostic for ${preset.id}: ${JSON.stringify(immediateDiff)}`);
+        if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
+          const dump = await page.evaluate(() =>
+            Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
+              index,
+              w: canvas.width,
+              h: canvas.height,
+              cls: (canvas.className ?? "").toString().slice(0, 48),
+              url: canvas.toDataURL("image/png"),
+            })),
+          );
+          const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-short-invisible`);
+          mkdirSync(dumpDir, { recursive: true });
+          for (const entry of dump) {
+            const base64 = entry.url.split(",")[1] ?? "";
+            if (!base64) continue;
+            writeFileSync(
+              join(dumpDir, `${String(entry.index).padStart(2, "0")}-${entry.w}x${entry.h}.png`),
+              Buffer.from(base64, "base64"),
+            );
+          }
+        }
       }
       invariant(
         hasMeaningfulPixelChange(immediateDiff),
@@ -2713,6 +2734,32 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       // retained/committed representation. brushCursorStyle='none' was installed before Studio
       // initialized, so the complete live ROI is compared without an endpoint exclusion.
       await page.waitForTimeout(50);
+      if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
+        const dump = await page.evaluate(() =>
+          Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
+            index,
+            w: canvas.width,
+            h: canvas.height,
+            cls: (canvas.className ?? "").toString().slice(0, 48),
+            id: canvas.id,
+            parent: canvas.parentElement?.className?.toString().slice(0, 64) ?? "",
+            url: canvas.toDataURL("image/png"),
+          })),
+        );
+        const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-live`);
+        mkdirSync(dumpDir, { recursive: true });
+        writeFileSync(join(SCRATCH, `canvas-dump-${preset.id}-live-manifest.json`), JSON.stringify(
+          dump.map(({ url: _url, ...rest }) => rest), null, 1,
+        ));
+        for (const entry of dump) {
+          const base64 = entry.url.split(",")[1] ?? "";
+          if (!base64) continue;
+          writeFileSync(
+            join(dumpDir, `${String(entry.index).padStart(2, "0")}-${entry.w}x${entry.h}.png`),
+            Buffer.from(base64, "base64"),
+          );
+        }
+      }
       const live = await page.screenshot({ animations: "disabled", clip });
       if (operation === "erase") {
         invariant(
@@ -2725,6 +2772,29 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       }
       await page.mouse.up();
       const released = await page.screenshot({ animations: "disabled", clip });
+      if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
+        const dump = await page.evaluate(() =>
+          Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
+            index,
+            w: canvas.width,
+            h: canvas.height,
+            cls: (canvas.className ?? "").toString().slice(0, 48),
+            id: canvas.id,
+            parent: canvas.parentElement?.className?.toString().slice(0, 64) ?? "",
+            url: canvas.toDataURL("image/png"),
+          })),
+        );
+        const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-released`);
+        mkdirSync(dumpDir, { recursive: true });
+        for (const entry of dump) {
+          const base64 = entry.url.split(",")[1] ?? "";
+          if (!base64) continue;
+          writeFileSync(
+            join(dumpDir, `${String(entry.index).padStart(2, "0")}-${entry.w}x${entry.h}.png`),
+            Buffer.from(base64, "base64"),
+          );
+        }
+      }
       await page.mouse.move(4, 4);
       const immediateCoverage = await compareScreenshotCoverage(
         page,
