@@ -19047,6 +19047,7 @@ const puppetWarpArmed =
     patchLayerItems,
     moveLayer,
     applyGroupSelectionState,
+    markStudioDocumentChanged,
     setError,
     setLayerMergeBusy,
     setSelectedId,
@@ -22222,7 +22223,6 @@ const puppetWarpArmed =
   // 페이지의 무관한 대사까지 섞으면 오히려 톤을 흐린다)를 시스템 프롬프트 맥락으로 함께 실어 보낸다.
   async function executeSuggestDialogueLines() {
     if (collaborationAccessRef.current.locked) return;
-    const mutationTicket = captureStudioMutationTicket();
     const situation = aiDialogueSuggestSituation.trim();
     if (!situation || aiDialogueSuggestBusy) return;
     setAiDialogueSuggestBusy(true);
@@ -22253,10 +22253,10 @@ const puppetWarpArmed =
       { existingContext },
       studioTextAiTransportForOperation(textAiTransport, operationId)
     );
-    if (!canApplyStudioMutation(mutationTicket)) {
-      if (editorMountedRef.current) setAiDialogueSuggestBusy(false);
-      return;
-    }
+    // 제안 결과는 패널 로컬 상태일 뿐 문서를 즉시 바꾸지 않는다. 요청(수십 초) 사이에 임시저장이
+    // 겹쳐 mutation ticket이 어긋나도 결과를 조용히 버리면 유료 토큰만 사라진다(실측된 무피드백
+    // 손실 경로). 따라서 결과는 항상 패널에 표시하고, 실제 문서 반영(삽입·스크립트 추가)은 별도
+    // 사용자 동작에서 검증된다. provenance 정산도 이 경로에서 반드시 실행된다.
     settleTrackedTextAiOperation(
       operationId,
       result,
@@ -22289,7 +22289,6 @@ const puppetWarpArmed =
   // 대사/나레이션 제안과 동일한 이유로 runWithAiNotice 게이트를 타지 않는다.
   async function executeSuggestColorPalette() {
     if (collaborationAccessRef.current.locked) return;
-    const mutationTicket = captureStudioMutationTicket();
     const mood = aiPaletteSuggestMood.trim();
     if (!mood || aiPaletteSuggestBusy) return;
     setAiPaletteSuggestBusy(true);
@@ -22313,10 +22312,9 @@ const puppetWarpArmed =
       mood,
       studioTextAiTransportForOperation(textAiTransport, operationId)
     );
-    if (!canApplyStudioMutation(mutationTicket)) {
-      if (editorMountedRef.current) setAiPaletteSuggestBusy(false);
-      return;
-    }
+    // 대사 제안과 동일 — 패널 로컬 상태 결과라 ticket 어긋남으로 조용히 버리지 않는다(유료 결과
+    // 손실 방지, studio-ai-client 계약상 결과 표시는 문서 반영이 아니다). 저장도 팔레트
+    // 라이브러리(V12 SQLite)로 들가지 문서를 건드리지 않는다.
     settleTrackedTextAiOperation(
       operationId,
       result,

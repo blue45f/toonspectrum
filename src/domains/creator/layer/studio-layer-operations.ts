@@ -55,6 +55,12 @@ import type { SetStateAction } from "react";
  * the live value instead of their render-time closure.
  */
 export interface StudioLayerOperationsContext {
+  /**
+   * Marks the document dirty for the debounced autosave scheduler. Group metadata lives outside
+   * the pending-stroke fingerprint, so without this bump the scheduler's already-saved gate
+   * (`scheduledGeneration <= durableGeneration`) can silently drop a grouping commit.
+   */
+  readonly markStudioDocumentChanged: () => boolean;
   readonly elements: El[];
   readonly groups: LayerGroup[];
   readonly elementById: ReadonlyMap<string, El>;
@@ -152,6 +158,7 @@ export function createStudioLayerOperations(
     patchLayerItems,
     moveLayer,
     applyGroupSelectionState,
+    markStudioDocumentChanged,
     setError,
     setLayerMergeBusy,
     setSelectedId,
@@ -183,6 +190,9 @@ export function createStudioLayerOperations(
     return true;
   }
   function groupSelectedElements(): boolean {
+    // 그룹 메타데이터는 pending-stroke fingerprint 밖이므로 더티 마크가 없으면 디바운스
+    // 자동저장 스케줄러의 already-saved 게이트가 이 커밋을 조용히 생략할 수 있다.
+    if (!markStudioDocumentChanged()) return false;
     const memberIds = [...marqueeIdsRef.current];
     if (memberIds.length < 2) return false;
     const alreadyGrouped = memberIds
