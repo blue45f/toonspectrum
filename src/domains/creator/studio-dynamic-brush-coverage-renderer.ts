@@ -2002,7 +2002,10 @@ function candidateScales(
   _activeDraft: boolean
 ): readonly number[] {
   const maximumQualityScale = 4;
-  const minimum = 0.75;
+  // 텍스처 스탬프는 타일 래스터를 한 번만 리샘플해야 피크 알파가 살아남는다(ADR 0010).
+  // 1× 미만 타일은 조판 뒤 확대 블릿이라 겹침 코어가 무너진다 — 실측 0.8×에서 sumAlpha
+  // 216→81(2026-08-24 패리티 리포트 §8). 그래서 하한은 물리 배율이 아니라 1×이다.
+  const minimum = 1;
   const physicalScale = destinationPhysicalScale(context);
   // Below 0.75x we oversample and let the destination transform downsample. This spends extra
   // pixels but never lowers output quality or changes document-space geometry.

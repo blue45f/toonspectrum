@@ -1486,7 +1486,7 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     expect(destination.draws.every(({ alpha }) => alpha === 0.8 * 0.5)).toBe(true);
   });
 
-  it("oversamples a sub-0.75x view without changing destination-space geometry", () => {
+  it("rasterizes a sub-1x view at full resolution without changing destination-space geometry", () => {
     const destination = new RecordingDestination();
     destination._context.getTransform = () => ({
       a: 0.5,
@@ -1502,11 +1502,11 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       surfaceFactory: surfaceFactory([]),
     });
 
-    expect(result).toMatchObject({ status: "rendered", scale: 0.75 });
-    expect(destination.draws[0]?.args.slice(-2)).toEqual([
-      256 / 0.75,
-      256 / 0.75,
-    ]);
+    // 텍스처 스탬프 피크는 타일 래스터를 한 번만 리샘플해야 살아남는다(ADR 0010).
+    // 0.5× 줌이라도 타일은 1×로 조판하고 목적지 변환으로 축소한다 — 실측 0.8× 타일은
+    // 겹침 코어 sumAlpha가 216→81로 무너졌다(패리티 리포트 §8, 2026-08-24).
+    expect(result).toMatchObject({ status: "rendered", scale: 1 });
+    expect(destination.draws[0]?.args.slice(-2)).toEqual([256, 256]);
   });
 
   it("allocates only dab-intersecting sparse tiles instead of the marks' bounding rectangle", () => {
