@@ -22,24 +22,6 @@ import type Konva from "konva";
 /** Scoped so `off` can never strip listeners the product installed on the same node. */
 export const STUDIO_SELECTION_CHROME_MIRROR_NAMESPACE = "studioSelectionChromeMirror";
 
-/**
- * Name on each per-element draw selection indicator group.
- *
- * Lives here (not in the lazy StudioSelectionOverlays chunk) so imperative hot paths — the live
- * resize/rotate preview in particular — can resolve indicator nodes without statically importing
- * the overlay component and tearing the lazy-UI boundary.
- */
-export const STUDIO_DRAW_SELECTION_INDICATOR_NODE_NAME = "studio-draw-selection-indicator";
-
-/** Every draw-selection indicator group currently mounted in the scene, shallowest first. */
-export function findStudioDrawSelectionIndicatorGroups(
-  stage: Konva.Stage
-): Konva.Group[] {
-  return stage.find((node: Konva.Node) =>
-    node.name() === STUDIO_DRAW_SELECTION_INDICATOR_NODE_NAME
-  ) as Konva.Group[];
-}
-
 function konvaNodeDepth(node: Konva.Node): number {
   let depth = 0;
   let current: Konva.Node | null = node.getParent();

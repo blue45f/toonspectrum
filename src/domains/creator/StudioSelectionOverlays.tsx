@@ -24,10 +24,7 @@ import {
   type NodeEditHandle,
   type NodeEditTool,
 } from "./studio-node-edit";
-import {
-  STUDIO_DRAW_SELECTION_INDICATOR_NODE_NAME,
-  mirrorStudioDrawSelectionIndicators,
-} from "./studio-selection-chrome-mirror";
+import { mirrorStudioDrawSelectionIndicators } from "./studio-selection-chrome-mirror";
 import {
   brushStrokePreview,
   marchingAntsPasses,
@@ -420,7 +417,7 @@ export interface StudioDrawSelectionOverlayProps {
 }
 
 /** Name on each per-element indicator group, for scene-graph assertions and perf probes. */
-export const STUDIO_DRAW_SELECTION_INDICATOR_NAME = STUDIO_DRAW_SELECTION_INDICATOR_NODE_NAME;
+export const STUDIO_DRAW_SELECTION_INDICATOR_NAME = "studio-draw-selection-indicator";
 
 /**
  * Dashed "selected" boxes for draw(선화) elements.

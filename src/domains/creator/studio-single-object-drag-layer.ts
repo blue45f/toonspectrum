@@ -23,21 +23,7 @@ export interface BeginStudioSingleObjectDragLayerOptions {
   readonly mainLayer: Konva.Layer | null;
   readonly dragLayer: Konva.Layer | null;
   readonly transformer?: Konva.Transformer | null;
-  /**
-   * The selected element is a draw(선화). Draw strokes used to be excluded wholesale because their
-   * point-backed wrapper and selection chrome have a separate live contract, but that contract
-   * (chrome mirroring via `xChange`/`yChange`, points baked at drag end) is layer-independent, so a
-   * plain stroke now gets the same tiny invalidation surface as every other object. Only strokes
-   * whose ink is erased against the document backdrop stay behind — see
-   * {@link selectedDrawIsDestinationOut}.
-   */
   readonly selectedIsDraw: boolean;
-  /**
-   * A draw(선화) whose paint composites with `destination-out` (eraser strokes). Lifting one onto
-   * the drag layer would punch holes in the drag layer instead of the artwork below, so those
-   * gestures keep repainting the document Layer.
-   */
-  readonly selectedDrawIsDestinationOut?: boolean;
   readonly hasMaskOrClip: boolean;
   /** destination-out, clip-below and authored blend modes need the document layer as a backdrop. */
   readonly layerSensitiveComposite?: boolean;
@@ -88,8 +74,7 @@ function authoredCompositeOperationIsLayerSensitive(
  * Deliberate exclusions:
  * - multi/group selections (their peers and atomic preview still live in the document Layer),
  * - Transformer anchors (the target is not an authored element node),
- * - destination-out draw(선화) strokes (`selectedDrawIsDestinationOut` — erasing needs the document
- *   Layer as backdrop; plain source-over ink lifts like any other object),
+ * - draw elements (their point-backed wrapper and selection chrome have a separate live contract),
  * - clipped/cached/masked or non-source-over roots (a separate canvas cannot reproduce backdrop
  *   blending or a parent clip exactly).
  */
@@ -104,7 +89,6 @@ export function beginStudioSingleObjectDragLayer(
     dragLayer,
     transformer = null,
     selectedIsDraw,
-    selectedDrawIsDestinationOut = false,
     hasMaskOrClip,
     layerSensitiveComposite = false,
   } = options;
@@ -120,10 +104,7 @@ export function beginStudioSingleObjectDragLayer(
     || target.getLayer() !== mainLayer
     || target.getAttr("studioElementId") !== selectedElementId
     || target.draggable() !== true
-    // Only destination-out strokes need the document backdrop; plain source-over ink renders
-    // identically on either Layer, and the docstring exclusions below still catch clipped or
-    // blend-isolated roots before anything is moved.
-    || (selectedIsDraw && selectedDrawIsDestinationOut)
+    || selectedIsDraw
     || hasMaskOrClip
     || layerSensitiveComposite
   ) {

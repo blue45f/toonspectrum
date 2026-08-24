@@ -172,23 +172,8 @@ describe("single-object drag Layer", () => {
     }
   });
 
-  it("lifts plain source-over draw strokes but keeps destination-out strokes on the main Layer", () => {
+  it("leaves draw and parent-clipped nodes on the main Layer", () => {
     const draw = addSelectedNode(scene.mainLayer, "draw-1");
-    const lifted = beginStudioSingleObjectDragLayer({
-      target: draw,
-      selectedElementId: "draw-1",
-      selectionSize: 1,
-      mainLayer: scene.mainLayer,
-      dragLayer: scene.dragLayer,
-      selectedIsDraw: true,
-      selectedDrawIsDestinationOut: false,
-      hasMaskOrClip: false,
-    });
-    expect(lifted).not.toBeNull();
-    expect(draw.getLayer()).toBe(scene.dragLayer);
-    restoreStudioSingleObjectDragLayer(lifted);
-    // An eraser stroke punches holes in whatever is below it, so it must keep the document
-    // Layer as its backdrop for the whole gesture.
     expect(beginStudioSingleObjectDragLayer({
       target: draw,
       selectedElementId: "draw-1",
@@ -196,10 +181,8 @@ describe("single-object drag Layer", () => {
       mainLayer: scene.mainLayer,
       dragLayer: scene.dragLayer,
       selectedIsDraw: true,
-      selectedDrawIsDestinationOut: true,
       hasMaskOrClip: false,
     })).toBeNull();
-    expect(draw.getLayer()).toBe(scene.mainLayer);
 
     const wrapper = new studioKonvaRuntime.Group();
     const clipped = new studioKonvaRuntime.Group({ draggable: true });

@@ -8,8 +8,6 @@ import {
   isStudioBrushEraserAliasId,
   studioBrushAliasEffectiveDiameter,
 } from "../brush/studio-brush-alias-profile";
-import { resolveStudioBrushRuntimeContract } from "../brush/studio-brush-runtime-contract";
-import { studioDrawObjectTransformScale } from "../brush/studio-draw-object-transform";
 import { drawLiveFreehandDraftToContext, getSymmetricPoints } from "../brush/studio-draw-rendering";
 import { resolveStudioPaperGrainVisibleV1 } from "../brush/studio-paper-grain-visibility-v1";
 import {
@@ -72,10 +70,6 @@ import { pageDisplayName } from "../studio-page-meta";
 import { isEligibleForPanelAutoFit } from "../studio-panel-autofit";
 import { movePuppetPin, type PuppetPin } from "../studio-puppet-warp";
 import { unionBounds } from "../studio-selection";
-import {
-  findStudioDrawSelectionIndicatorGroups,
-  findStudioDrawWrapperNode,
-} from "../studio-selection-chrome-mirror";
 import {
   beginStudioSingleObjectDragLayer,
   restoreStudioSingleObjectDragLayer,
@@ -650,46 +644,6 @@ export interface StudioCanvasViewportProps {
   zoomHostRef: import("react").RefObject<HTMLDivElement | null>;
   stableHandlers: StudioCanvasViewportHandlers;
   setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-}
-
-/**
- * Returns a draw stroke's imperatively transformed wrapper to its document identity
- * (x/y 0, unit scale, no offset or rotation), plus any draw-selection indicator groups the live
- * transform preview may have affined. Module scope so selection-lifecycle effects can call it
- * without re-running on component-local closure churn.
- */
-function clearStudioDrawTransformWrapper(
-  elementId: string,
-  stage: Konva.Stage | null,
-): void {
-  const wrapper = stage ? findStudioDrawWrapperNode(stage, elementId) : null;
-  if (wrapper) {
-    wrapper.setAttrs({
-      x: 0,
-      y: 0,
-      offsetX: 0,
-      offsetY: 0,
-      scaleX: 1,
-      scaleY: 1,
-      rotation: 0,
-    });
-    wrapper.getLayer()?.batchDraw();
-  }
-  // The dashed "selected" box mirrors document points, which are still pre-bake during the
-  // gesture; drop whatever preview affine it carried so it re-syncs with the committed geometry.
-  if (!stage) return;
-  for (const indicator of findStudioDrawSelectionIndicatorGroups(stage)) {
-    indicator.setAttrs({
-      x: 0,
-      y: 0,
-      offsetX: 0,
-      offsetY: 0,
-      scaleX: 1,
-      scaleY: 1,
-      rotation: 0,
-    });
-    indicator.getLayer()?.batchDraw();
-  }
 }
 
 export const StudioCanvasViewport = memo(function StudioCanvasViewport({
@@ -1351,10 +1305,6 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
       dragLayer: singleObjectDragLayerRef.current,
       transformer: trRef.current,
       selectedIsDraw: selectedElement?.type === "draw",
-      selectedDrawIsDestinationOut:
-        selectedElement?.type === "draw" &&
-        (selectedElement.mode === "eraser" ||
-          resolveStudioBrushRuntimeContract(selectedElement.brush)?.operation === "erase"),
       hasMaskOrClip: Boolean(
         selectedElement?.clipBelow
         || (selectedElement?.type === "image" && shouldApplyLayerMask(selectedElement)),
@@ -1377,116 +1327,6 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     restoreSingleObjectDragLayer();
     onStagePointerCancel(event);
   }
-
-  // Live resize/rotate preview for the single-draw free-transform proxy. The proxy only reports
-  // boxes; the authoritative geometry is still baked into `points` at commit. Between those two
-  // moments this session drives the stroke's wrapper node imperatively with the exact affine
-  // `planStudioDrawObjectTransform` bakes — T(target)·R(θ)·S(scale)·T(-source) — so the ink tracks
-  // the handles in real time and the release-time bake lands on pixel-identical geometry with zero
-  // React commits per pointer frame.
-  const drawTransformPreviewRef = useRef<{
-    elementId: string;
-    sourceBounds: StudioGroupUniformResizeBounds;
-  } | null>(null);
-
-  function resetDrawTransformPreview(): void {
-    const session = drawTransformPreviewRef.current;
-    if (!session) return;
-    drawTransformPreviewRef.current = null;
-    clearStudioDrawTransformWrapper(
-      session.elementId,
-      mainLayerRef.current?.getStage() ?? null,
-    );
-  }
-
-  function beginCanvasSelectionResizeWithLivePreview(
-    sourceBounds: StudioGroupUniformResizeBounds
-  ): boolean {
-    const accepted = beginCanvasSelectionResize(sourceBounds);
-    if (!accepted) return false;
-    // Only the free-transform path (one unlocked draw stroke) can absorb a full affine; mixed
-    // multi-selections stay on the commit-only uniform planner.
-    const soleStroke =
-      marqueeIds.length === 0 &&
-      canvasSelectionEls.length === 1 &&
-      canvasSelectionEls[0]?.type === "draw"
-        ? canvasSelectionEls[0]
-        : null;
-    if (soleStroke) {
-      drawTransformPreviewRef.current = {
-        elementId: soleStroke.id,
-        sourceBounds: { ...sourceBounds },
-      };
-    }
-    return true;
-  }
-
-  function previewCanvasSelectionResize(
-    targetBounds: StudioGroupUniformResizeBounds,
-    rotationDeg: number
-  ): void {
-    const session = drawTransformPreviewRef.current;
-    if (!session || !Number.isFinite(rotationDeg)) return;
-    const scale = studioDrawObjectTransformScale(session.sourceBounds, targetBounds);
-    if (!scale) return;
-    const stage = mainLayerRef.current?.getStage();
-    const wrapper = stage ? findStudioDrawWrapperNode(stage, session.elementId) : null;
-    if (!wrapper) return;
-    wrapper.setAttrs({
-      x: targetBounds.x,
-      y: targetBounds.y,
-      offsetX: session.sourceBounds.x,
-      offsetY: session.sourceBounds.y,
-      scaleX: scale.scaleX,
-      scaleY: scale.scaleY,
-      rotation: rotationDeg,
-    });
-    wrapper.getLayer()?.batchDraw();
-    // The dashed selection indicator reads document points, so it would stand still while the ink
-    // transforms. It is a plain group of absolute-coordinate shapes, so the identical affine keeps
-    // it glued to the previewed geometry with zero React commits.
-    const indicators = stage ? findStudioDrawSelectionIndicatorGroups(stage) : [];
-    if (indicators.length === 1) {
-      indicators[0]!.setAttrs({
-        x: targetBounds.x,
-        y: targetBounds.y,
-        offsetX: session.sourceBounds.x,
-        offsetY: session.sourceBounds.y,
-        scaleX: scale.scaleX,
-        scaleY: scale.scaleY,
-        rotation: rotationDeg,
-      });
-      indicators[0]!.getLayer()?.batchDraw();
-    }
-  }
-
-  function commitCanvasSelectionResizeWithLivePreview(
-    targetBounds: StudioGroupUniformResizeBounds,
-    rotationDeg: number
-  ): void {
-    // Reset before the document bake lands: Konva rasterizes on the next rAF, by which time React
-    // has swapped in the baked points, so identity attrs + new points never double-apply the
-    // affine and old points never flash back.
-    resetDrawTransformPreview();
-    commitCanvasSelectionResize(targetBounds, rotationDeg);
-  }
-
-  function cancelCanvasSelectionResizeWithLivePreview(): void {
-    resetDrawTransformPreview();
-    cancelCanvasSelectionResize();
-  }
-
-  useLayoutEffect(() => {
-    const session = drawTransformPreviewRef.current;
-    if (!session) return;
-    drawTransformPreviewRef.current = null;
-    clearStudioDrawTransformWrapper(
-      session.elementId,
-      mainLayerRef.current?.getStage() ?? null,
-    );
-    // Same invalidation set as the drag-layer restore above: any of these changing mid-gesture
-    // means the selection or surface moved under the gesture, so drop the imperative preview.
-  }, [activePage.id, mainLayerRef, masterEditMode, marqueeIds.length, selectedId, tool]);
 
   useLayoutEffect(() => {
     restoreSingleObjectDragLayer();
@@ -3353,12 +3193,11 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               {renderStudioCanvasSelectionDecorations({
                 activeGroupId,
                 activeSurfaceReviewLocked,
-                beginCanvasSelectionResize: beginCanvasSelectionResizeWithLivePreview,
-                cancelCanvasSelectionResize: cancelCanvasSelectionResizeWithLivePreview,
+                beginCanvasSelectionResize,
+                cancelCanvasSelectionResize,
                 canvasH,
                 canvasSelectionEls,
-                commitCanvasSelectionResize: commitCanvasSelectionResizeWithLivePreview,
-                onPreview: previewCanvasSelectionResize,
+                commitCanvasSelectionResize,
                 completeSelectionGroup,
                 effScale,
                 elements,

@@ -75,36 +75,9 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expectSourceToken(viewportSource, "beginCanvasSelectionResize", "Viewport handlers");
     expectSourceToken(viewportSource, "commitCanvasSelectionResize", "Viewport handlers");
     expectSourceToken(viewportSource, "cancelCanvasSelectionResize", "Viewport handlers");
-    // 2026-08-23 intentional reversal of the commit-only contract: the single-draw free-transform
-    // proxy now reports every pointer frame through `onPreview`, and the viewport drives the
-    // stroke's wrapper node imperatively so scale/rotate track the handles in real time. The
-    // document model is still baked exactly once at commit; these gates pin the new shape.
-    expectSourceToken(proxySource, "onPreview", "live transform preview");
-    expectSourceToken(
-      proxySource,
-      "activeSessionRef.current",
-      "preview fires only inside an active gesture session",
-    );
-    expectSourceToken(
-      selectionDecorationsSource,
-      "onPreview={onPreview}",
-      "decorations pass the preview through to the proxy",
-    );
-    expectSourceToken(
-      viewportSource,
-      "resetDrawTransformPreview()",
-      "viewport resets the imperative preview before/without a bake",
-    );
-    expect(
-      viewportSource.indexOf("resetDrawTransformPreview()"),
-    ).toBeLessThan(
-      viewportSource.indexOf("commitCanvasSelectionResize(targetBounds, rotationDeg);"),
-    );
-    expectSourceToken(
-      viewportSource,
-      "canvasSelectionEls[0]?.type === \"draw\"",
-      "preview stays scoped to the single-draw free-transform path",
-    );
+    expect(viewportSource).not.toContain("previewCanvasSelectionResize");
+    expect(selectionDecorationsSource).not.toContain("previewCanvasSelectionResize");
+    expect(proxySource).not.toContain("previewCanvasSelectionResize");
 
     expect(occurrences(selectionDecorationsSource, "<Transformer")).toBeGreaterThanOrEqual(1);
     expect(occurrences(proxySource, "<Transformer")).toBe(1);

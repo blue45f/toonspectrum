@@ -67,19 +67,6 @@ export interface StudioGroupUniformResizeProxyProps {
   /** Return false when effective locks or collaboration leases reject the gesture. */
   readonly onBegin: (sourceBounds: StudioGroupUniformResizeBounds) => boolean;
   /**
-   * Live preview for every pointer frame of the gesture, carrying the same (box, rotation)
-   * decomposition {@link onCommit} receives at the end.
-   *
-   * Without it the ink only updates once on release — the handle frame moves but the artwork
-   * stands still, which reads as "scale/rotate is broken". The parent applies this imperatively
-   * to the selected node's Konva wrapper (no React commits) and resets it in its commit/cancel
-   * paths, where the authoritative bake replaces the preview.
-   */
-  readonly onPreview?: (
-    targetBounds: StudioGroupUniformResizeBounds,
-    rotationDeg: number
-  ) => void;
-  /**
    * Receives the post-gesture box. `rotationDeg` is the clockwise rotation about that box's
    * origin, and is always 0 unless `freeTransform` is on.
    */
@@ -110,7 +97,6 @@ export function StudioGroupUniformResizeProxy({
   freeTransform = false,
   mirrorDragElementId,
   onBegin,
-  onPreview,
   onCommit,
   onCancel,
 }: StudioGroupUniformResizeProxyProps) {
@@ -199,47 +185,6 @@ export function StudioGroupUniformResizeProxy({
     activeSessionRef.current = { sourceBounds };
   }
 
-  /** Reads the live (box, rotation) pair off the proxy in the exact shape commit consumes. */
-  function readLiveTransformBox(proxy: Konva.Rect): {
-    targetBounds: StudioGroupUniformResizeBounds;
-    rotationDeg: number;
-  } {
-    return {
-      targetBounds: {
-        x: proxy.x(),
-        y: proxy.y(),
-        width: proxy.width() * proxy.scaleX(),
-        height: proxy.height() * proxy.scaleY(),
-      },
-      rotationDeg: freeTransform ? proxy.rotation() : 0,
-    };
-  }
-
-  // Fires on every pointer frame of an active gesture. The preview must observe the same
-  // decomposition as the final bake, so the artwork tracks the handles one-to-one and the
-  // release-time commit lands on exactly what was last shown.
-  function handleTransform() {
-    const active = activeSessionRef.current;
-    if (!active || !onPreview) return;
-    const proxy = proxyRef.current;
-    if (!proxy) return;
-    const { targetBounds, rotationDeg } = readLiveTransformBox(proxy);
-    if (
-      !Number.isFinite(targetBounds.x) ||
-      !Number.isFinite(targetBounds.y) ||
-      !Number.isFinite(targetBounds.width) ||
-      !Number.isFinite(targetBounds.height) ||
-      !Number.isFinite(rotationDeg)
-    ) {
-      return;
-    }
-    try {
-      onPreview(targetBounds, rotationDeg);
-    } catch {
-      // A preview failure must never tear the gesture down; commit remains authoritative.
-    }
-  }
-
   function handleTransformEnd(event: Konva.KonvaEventObject<Event>) {
     const active = activeSessionRef.current;
     if (!active) {
@@ -249,7 +194,15 @@ export function StudioGroupUniformResizeProxy({
     activeSessionRef.current = null;
 
     const proxy = event.target as Konva.Rect;
-    const { targetBounds, rotationDeg } = readLiveTransformBox(proxy);
+    const targetBounds: StudioGroupUniformResizeBounds = {
+      x: proxy.x(),
+      y: proxy.y(),
+      width: proxy.width() * proxy.scaleX(),
+      height: proxy.height() * proxy.scaleY(),
+    };
+    // Konva reports the box unrotated and carries the angle separately, which is exactly the
+    // scale-then-rotate decomposition the draw planner consumes.
+    const rotationDeg = freeTransform ? proxy.rotation() : 0;
     restoreProxy(active.sourceBounds);
 
     if (!finitePositiveBounds(targetBounds) || !Number.isFinite(rotationDeg)) {
@@ -368,7 +321,6 @@ export function StudioGroupUniformResizeProxy({
         strokeEnabled={false}
         perfectDrawEnabled={false}
         onTransformStart={handleTransformStart}
-        onTransform={handleTransform}
         onTransformEnd={handleTransformEnd}
       />
       <Transformer

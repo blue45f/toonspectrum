@@ -35,11 +35,6 @@ export interface StudioCanvasSelectionDecorationsContext {
     targetBounds: StudioGroupUniformResizeBounds,
     rotationDeg: number
   ) => void;
-  /** Live per-frame preview for the single-draw free-transform proxy (see the proxy's contract). */
-  readonly onPreview?: (
-    targetBounds: StudioGroupUniformResizeBounds,
-    rotationDeg: number
-  ) => void;
   readonly completeSelectionGroup: LayerGroup | null;
   readonly effScale: number;
   readonly elements: readonly El[];
@@ -65,7 +60,6 @@ export function renderStudioCanvasSelectionDecorations({
   canvasH,
   canvasSelectionEls,
   commitCanvasSelectionResize,
-  onPreview,
   completeSelectionGroup,
   effScale,
   elements,
@@ -236,7 +230,6 @@ export function renderStudioCanvasSelectionDecorations({
           }
           onBegin={beginCanvasSelectionResize}
           onCommit={commitCanvasSelectionResize}
-          onPreview={onPreview}
           onCancel={cancelCanvasSelectionResize}
         />
       ) : null}
