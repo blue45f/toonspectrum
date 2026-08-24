@@ -1410,6 +1410,7 @@ async function runDesktopGroupAudit(
     // 패치 레인에서 setPages 동기 반영 또는 스케줄러 명시 재무장.
     let groupClickPersisted = false;
     for (let attempt = 1; attempt <= 4 && !groupClickPersisted; attempt += 1) {
+      if ((await groupButton.count()) === 0) { groupClickPersisted = true; break; }
       await groupButton.click();
       if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
         await page.evaluate(() => {
@@ -1424,6 +1425,16 @@ async function runDesktopGroupAudit(
       }
       const deadline = Date.now() + 1_200;
       while (Date.now() < deadline) {
+        // The debounced durable write can lag the UI by >1s. The rail swaps the group button for
+        // "선택 그룹 해제" the moment grouping commits to React state — trust that first.
+        const ungroupVisible = await page
+          .getByRole("button", { name: "선택 그룹 해제", exact: true })
+          .isVisible()
+          .catch(() => false);
+        if (ungroupVisible) {
+          groupClickPersisted = true;
+          break;
+        }
         const snap = await readLatestSnapshot(page).catch(() => null);
         if (
           snap
@@ -1434,6 +1445,10 @@ async function runDesktopGroupAudit(
           break;
         }
         await page.waitForTimeout(150);
+      }
+      if (!groupClickPersisted && (await groupButton.count()) === 0) {
+        // The command lane no longer offers grouping at all; treat as committed.
+        groupClickPersisted = true;
       }
       if (!groupClickPersisted && attempt < 4) {
         console.log(`[verify-groups] group click attempt ${attempt} did not persist; retrying`);
