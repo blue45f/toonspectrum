@@ -223,6 +223,7 @@ export function StudioAiToolPopoverBody({
                           : [
                               { id: "zai" as const, label: "Z.ai", configured: false, model: "" },
                               { id: "deepseek" as const, label: "DeepSeek", configured: false, model: "" },
+                              { id: "openrouter" as const, label: "OpenRouter", configured: false, model: "" },
                             ]
                         ).map((provider) => (
                           <option key={provider.id} value={provider.id} disabled={!provider.configured}>
