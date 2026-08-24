@@ -103,6 +103,29 @@ export const STUDIO_AI_BG_PROMPT_PRESETS: readonly StudioAiPromptPreset[] = Obje
   },
 ]);
 
+export const STUDIO_AI_CHARACTER_PRESETS: readonly StudioAiPromptPreset[] = Object.freeze([
+  {
+    id: "character-rain-alley",
+    label: "비 오는 골목",
+    prompt: "같은 캐릭터가 비 오는 골목에서 우산을 쓰고 서 있는 모습, 전신, 젖은 반사, 웹툰 컷",
+  },
+  {
+    id: "character-cafe-talk",
+    label: "카페 대화",
+    prompt: "같은 캐릭터가 카페 창가에서 커피잔을 들고 이야기하는 모습, 상반신, 따뜻한 조명, 웹툰 컷",
+  },
+  {
+    id: "character-chase",
+    label: "추격 신",
+    prompt: "같은 캐릭터가 뛰면서 뒤를 돌아보는 역동적인 모습, 스피드 라인, 웹툰 컷",
+  },
+  {
+    id: "character-closeup",
+    label: "표정 클로즈업",
+    prompt: "같은 캐릭터의 놀란 표정 클로즈업, 배경은 단순하게, 감정 전달이 잘 보이는 웹툰 컷",
+  },
+]);
+
 export const STUDIO_AI_COLORIZE_PRESETS: readonly StudioAiPromptPreset[] = Object.freeze([
   {
     id: "pastel-cel",
@@ -168,7 +191,7 @@ export function presetsForAssistTool(tool: StudioAiAssistToolId): readonly Studi
     case "background":
       return STUDIO_AI_BG_PROMPT_PRESETS;
     case "character":
-      return STUDIO_AI_BG_PROMPT_PRESETS.slice(0, 4);
+      return STUDIO_AI_CHARACTER_PRESETS;
     case "composition":
       return STUDIO_AI_COMPOSITION_PRESETS;
     case "dialogue":
