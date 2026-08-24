@@ -86,3 +86,26 @@ describe("CatalogController affiliate redirection", () => {
     );
   });
 });
+
+describe("CatalogService getHomeData & withKmasImages", () => {
+  it("getHomeData returns valid response structure", async () => {
+    const service = new CatalogService();
+    const data = await service.getHomeData();
+
+    expect(data).toBeDefined();
+    expect(Array.isArray(data.featured)).toBe(true);
+    expect(Array.isArray(data.topRated)).toBe(true);
+    expect(Array.isArray(data.waitFree)).toBe(true);
+    expect(Array.isArray(data.newest)).toBe(true);
+    expect(Array.isArray(data.families)).toBe(true);
+    expect(Array.isArray(data.tags)).toBe(true);
+    expect(typeof data.todayDay).toBe("string");
+    expect(Array.isArray(data.todayReleases)).toBe(true);
+    expect(typeof data.stats).toBe("object");
+    expect(typeof data.stats.titles).toBe("number");
+    expect(typeof data.stats.platforms).toBe("number");
+    expect(typeof data.stats.genres).toBe("number");
+    expect(typeof data.stats.reviews).toBe("number");
+  });
+});
+

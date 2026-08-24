@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { api } from "@/src/infrastructure/api";
+import { api, apiPath } from "@/src/infrastructure/api";
 
 // 404 를 흐름 제어(notFound)로 다루기 위한 센티넬 에러. 일반 에러와 구분한다.
 export class NotFoundError extends Error {
@@ -29,14 +29,30 @@ function initialState<T>(url: string | null): ResourceState<T> {
 }
 
 export async function fetchApiResource<T>(url: string, errorMessage: string, signal?: AbortSignal): Promise<T> {
-  // 전체 URL 그대로 호출(api.raw = prefix 없는 ky). 404 는 notFound, 그 외 에러는 errorMessage 로 처리.
-  const response = await api.raw(url, {
+  const requestUrl = apiPath(url);
+  const response = await api.raw(requestUrl, {
     cache: "no-store",
     signal,
     throwHttpErrors: false,
   });
   if (response.status === 404) throw new NotFoundError();
-  if (!response.ok) throw new Error(errorMessage);
+  if (!response.ok) {
+    let resolvedMessage = errorMessage;
+    try {
+      const parsed = await response.json();
+      if (
+        parsed
+        && typeof parsed === "object"
+        && "message" in parsed
+        && typeof (parsed as { message: unknown }).message === "string"
+      ) {
+        resolvedMessage = (parsed as { message: string }).message;
+      }
+    } catch {
+      // JSON 본문이 아니면 기존 errorMessage 폴백 유지
+    }
+    throw new Error(resolvedMessage);
+  }
   return (await response.json()) as T;
 }
 
@@ -100,11 +116,12 @@ export function useApiResource<T>(url: string | null, errorMessage: string) {
           });
           return;
         }
+        const errMessage = error instanceof Error && error.message ? error.message : errorMessage;
         setState((previous) => ({
           url: requestUrl,
           data: previous.url === requestUrl ? previous.data : null,
           loading: false,
-          error: errorMessage,
+          error: errMessage,
           notFound: false,
         }));
       });

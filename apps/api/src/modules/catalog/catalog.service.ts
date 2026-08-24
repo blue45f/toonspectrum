@@ -196,12 +196,13 @@ export class CatalogService implements OnModuleInit {
     });
   }
 
-  private async withKmasImages<T>(data: T): Promise<T> {
-    if (!shouldMergeKmasOnAccess()) return data;
+  private async withKmasImages<T>(data: T | Promise<T>): Promise<T> {
+    const resolved = await data;
+    if (!shouldMergeKmasOnAccess()) return resolved;
     const limit = clampLimit(process.env.KMAS_RESPONSE_IMAGE_LIMIT ?? 96);
-    return withKmasImageUrlsForResponse(data, process.env, limit, { cachedOnly: true }).catch((error) => {
+    return withKmasImageUrlsForResponse(resolved, process.env, limit, { cachedOnly: true }).catch((error) => {
       console.error("KMAS response image URL overlay failed; returning existing title data", error);
-      return data;
+      return resolved;
     });
   }
 
@@ -236,33 +237,33 @@ export class CatalogService implements OnModuleInit {
   }
 
   async getHomeData() {
-    await this.mergeKmasOnSiteAccess();
+    void this.mergeKmasOnSiteAccess().catch(() => {});
     // 리뷰 총계는 DB read-model 이라 API(앱 레이어)가 core 홈 read-model 에 주입한다.
-    return this.withKmasImages(getHomeData({ loadReviewStats: getReviewGlobalStats }));
+    return this.withKmasImages(await getHomeData({ loadReviewStats: getReviewGlobalStats }));
   }
 
   async getCalendarData() {
-    await this.mergeKmasOnSiteAccess();
-    return this.withKmasImages(getCalendarData());
+    void this.mergeKmasOnSiteAccess().catch(() => {});
+    return this.withKmasImages(await getCalendarData());
   }
 
   async getInsightsData() {
-    await this.mergeKmasOnSiteAccess();
-    return this.withKmasImages(getInsightsData());
+    void this.mergeKmasOnSiteAccess().catch(() => {});
+    return this.withKmasImages(await getInsightsData());
   }
 
   async getRankingData(query: QueryRecord) {
-    await this.mergeKmasOnSiteAccess();
-    return this.withKmasImages(getRankingData(createQueryReader(query)));
+    void this.mergeKmasOnSiteAccess().catch(() => {});
+    return this.withKmasImages(await getRankingData(createQueryReader(query)));
   }
 
   async getExploreData(query: QueryRecord) {
-    await this.mergeKmasOnSiteAccess();
-    return this.withKmasImages(getExploreData(query));
+    void this.mergeKmasOnSiteAccess().catch(() => {});
+    return this.withKmasImages(await getExploreData(query));
   }
 
   async getSearchData(query: SearchRouteQuery) {
-    await this.mergeKmasOnSiteAccess();
+    void this.mergeKmasOnSiteAccess().catch(() => {});
     const kmasLive = await getKmasSearchData({ q: query.q }).catch((error) => {
       console.error("KMAS live search failed; falling back to existing catalog search", error);
       return null;
@@ -306,7 +307,7 @@ export class CatalogService implements OnModuleInit {
   }
 
   async getRecommendData(payload: RecommendPayload) {
-    await this.mergeKmasOnSiteAccess();
+    void this.mergeKmasOnSiteAccess().catch(() => {});
     const body = (payload ?? {}) as Record<string, unknown>;
     const picked = stringList(body.picked);
     const seedId = typeof body.seedId === "string" ? body.seedId : null;

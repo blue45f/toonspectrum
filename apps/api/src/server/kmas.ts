@@ -317,14 +317,15 @@ export async function enrichTitleWithKmas(
 }
 
 export async function withKmasImageUrlsForResponse<T>(
-  data: T,
+  data: T | Promise<T>,
   env: EnvLike = process.env,
   limit = DEFAULT_LOOKUP_LIMIT,
   options: KmasResponseImageOptions = {}
 ): Promise<T> {
-  if (!hasKmasKey(env) || limit <= 0) return data;
-  const titles = collectResponseTitles(data).slice(0, limit);
-  if (titles.length === 0) return data;
+  const resolved = await data;
+  if (!hasKmasKey(env) || limit <= 0) return resolved;
+  const titles = collectResponseTitles(resolved).slice(0, limit);
+  if (titles.length === 0) return resolved;
   const imageById = new Map<string, string>();
   await Promise.all(
     titles.map(async (title) => {
@@ -336,8 +337,8 @@ export async function withKmasImageUrlsForResponse<T>(
       if (image) imageById.set(title.id, image);
     })
   );
-  if (imageById.size === 0) return data;
-  return applyResponseImages(data, imageById);
+  if (imageById.size === 0) return resolved;
+  return applyResponseImages(resolved, imageById);
 }
 
 export function mergeKmasItemIntoTitle(

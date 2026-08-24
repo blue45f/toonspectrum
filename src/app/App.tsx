@@ -96,13 +96,25 @@ function useKmasEntryMerge() {
   useEffect(() => {
     if (kmasEntryMergeStarted || import.meta.env.VITE_CATALOG_SOURCE === "static") return;
     kmasEntryMergeStarted = true;
-    fetch(apiPath("/api/kmas/merge-on-access"), withCsrfProtection({
-      method: "POST",
-      cache: "no-store",
-      keepalive: true,
-    })).catch(() => {
-      kmasEntryMergeStarted = false;
-    });
+    const run = () => {
+      fetch(apiPath("/api/kmas/merge-on-access"), withCsrfProtection({
+        method: "POST",
+        cache: "no-store",
+        keepalive: true,
+      })).catch(() => {
+        kmasEntryMergeStarted = false;
+      });
+    };
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      const handle = (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(run, { timeout: 3000 });
+      return () => {
+        if ("cancelIdleCallback" in window) {
+          (window as unknown as { cancelIdleCallback: (h: number) => void }).cancelIdleCallback(handle);
+        }
+      };
+    }
+    const timer = setTimeout(run, 1500);
+    return () => clearTimeout(timer);
   }, []);
 }
 

@@ -141,7 +141,9 @@ export function HomePage() {
           role="alert"
         >
           <p className="text-sm font-medium text-fg">{t("home.loadError")}</p>
-          <p className="mt-1 text-sm text-fg-2">{error ?? t("common.loading.empty")}</p>
+          {error && error !== t("home.loadError") && (
+            <p className="mt-1 text-sm text-fg-2">{error}</p>
+          )}
           <button type="button" onClick={reload} className={RETRY_BUTTON_CLASS}>
             {t("common.retry.short")}
           </button>
@@ -150,18 +152,16 @@ export function HomePage() {
     );
   }
 
-  const {
-    featured,
-    spotlight,
-    topRated,
-    waitFree,
-    newest,
-    families,
-    tags,
-    todayDay,
-    todayReleases,
-    stats,
-  } = data;
+  const featured = data.featured ?? [];
+  const spotlight = data.spotlight ?? null;
+  const topRated = data.topRated ?? [];
+  const waitFree = data.waitFree ?? [];
+  const newest = data.newest ?? [];
+  const families = data.families ?? [];
+  const tags = data.tags ?? [];
+  const todayDay = data.todayDay ?? "";
+  const todayReleases = data.todayReleases ?? [];
+  const stats = data.stats ?? { titles: 0, platforms: 0, genres: 0, reviews: 0 };
 
   // 추천 배너 캐러셀 항목 — 스포트라이트를 선두로 추천작을 회전 노출.
   const bannerItems = spotlight
