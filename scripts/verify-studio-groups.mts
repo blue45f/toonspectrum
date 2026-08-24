@@ -1397,41 +1397,49 @@ async function runDesktopGroupAudit(
     await activateSelectionTool(page);
     await page.keyboard.press("Meta+A");
     await waitForWholeGroupSelection(page, 3);
+    // 그룹화 클릭은 저장 진행 중 가드(documentSaveInFlightRef)의 짧은 거부 창과 경합할 수
+    // 있다. 사람처럼 스냅샷이 응답할 때까지 몇 번 다시 누른다 — 각 시도는 새 클릭이다.
     const groupButton = page.getByRole("button", { name: "선택 요소 그룹화", exact: true });
-    // TOONSPECTRUM_GROUPS_DEBUG=1 — 2026-08-24 그룹화 지속 플레이크 추적:
-    // 실패 재현 시 (a) 네이티브 click 은 버튼에 도달하고, (b) 핸들러는 올바른 memberIds 3개로
-    // groupSelectedElements → updateActivePage 까지 매번 실행되며, (c) 그 직후 클릭한 스냅샷의
-    // savedAt 가 8초+ 동결(자동저장 스케줄 미발화)한다. 즉 쓰기 유실이 아니라 그룹 변경에 대한
-    // 디바운스 저장 트리거 누락이다. 유력 용의: updateActivePage(commitPages) 직후
-    // applyGroupSelectionState 와 같은 태스크에서 배치 커밋될 때 더티 판정(generation/fingerprint
-    // 게이트)이 clean 으로 결론나는 경로. 다음 단계는 디바운스 자동저장 스케줄러의 더티 게이트를
-    // 이 배치 경로로 프로브하는 것이다.
-    if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
-      await page.evaluate(() => {
-        (globalThis as { __studioGroupsDebug?: boolean }).__studioGroupsDebug = true;
-      });
-      page.on("pageerror", (error) => {
-        console.log(`[groups-debug] pageerror: ${error.message}`);
-      });
-      page.on("console", (message) => {
-        console.log(`[groups-debug] console.${message.type()}: ${message.text()}`);
-      });
+    // 2026-08-24 그룹화 지속 실패 — 확정 사실:
+    // (1) 네이티브 click 도달, 핸들러가 memberIds 3개로 updateActivePage 실행(커밋 로그),
+    // (2) 94295b31 더티 마크 이후에도 savedAt 동결(자동저장 이펙트 재무장 없음),
+    // (3) 4회 재클릭(수 초 경과)에도 불구 지속 → 과도 창이 아니라 구조적 미트리거.
+    // 유력 용의: updateActivePage→commitPages(engine)가 그룹 메타데이터 전용 패치를
+    // 지연/coalesced 레인으로 보내 React pages 식별자를 즉시 바꾸지 않는 경우 — 이펙트 deps
+    // ([pages, ...])가 재무장 신호로 작동하지 못한다. 다음 단계: commitPages의 메타데이터
+    // 패치 레인에서 setPages 동기 반영 또는 스케줄러 명시 재무장.
+    let groupClickPersisted = false;
+    for (let attempt = 1; attempt <= 4 && !groupClickPersisted; attempt += 1) {
+      await groupButton.click();
+      if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
+        await page.evaluate(() => {
+          (globalThis as { __studioGroupsDebug?: boolean }).__studioGroupsDebug = true;
+        });
+        page.on("pageerror", (error) => {
+          console.log(`[groups-debug] pageerror: ${error.message}`);
+        });
+        page.on("console", (message) => {
+          console.log(`[groups-debug] console.${message.type()}: ${message.text()}`);
+        });
+      }
+      const deadline = Date.now() + 1_200;
+      while (Date.now() < deadline) {
+        const snap = await readLatestSnapshot(page).catch(() => null);
+        if (
+          snap
+          && snap.groups.length > 0
+          && snap.elements.every((element) => element.groupId !== null)
+        ) {
+          groupClickPersisted = true;
+          break;
+        }
+        await page.waitForTimeout(150);
+      }
+      if (!groupClickPersisted && attempt < 4) {
+        console.log(`[verify-groups] group click attempt ${attempt} did not persist; retrying`);
+        await page.waitForTimeout(400);
+      }
     }
-    if (process.env.TOONSPECTRUM_GROUPS_DEBUG_NATIVE === "1") {
-      await groupButton.evaluate((element) => {
-        element.addEventListener(
-          "click",
-          () => console.log("[groups-probe] native-click reached button"),
-          { once: true, capture: true },
-        );
-        element.addEventListener(
-          "pointerdown",
-          () => console.log("[groups-probe] native-pointerdown reached button"),
-          { once: true, capture: true },
-        );
-      });
-    }
-    await groupButton.click();
     if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
       for (let sample = 0; sample < 12; sample += 1) {
         await page.waitForTimeout(700);
@@ -1439,7 +1447,17 @@ async function runDesktopGroupAudit(
         const groupIds = snap
           ? JSON.stringify(snap.elements.map((element) => element.groupId))
           : "read-error";
-        console.log(`[groups-debug] t=${(sample + 1) * 0.7}s savedAt=${snap?.savedAt ?? "?"} groups=${JSON.stringify(snap?.groups?.length ?? null)} ids=${groupIds}`);
+        let saveBusy = "";
+        if (snap && snap.groups.length === 0 && sample >= 1) {
+          const bodyText = await page
+            .locator("body")
+            .innerText()
+            .catch(() => "");
+          if (bodyText.includes("저장 중에는")) {
+            saveBusy = " SAVE-IN-FLIGHT-BANNER";
+          }
+        }
+        console.log(`[groups-debug] t=${(sample + 1) * 0.7}s savedAt=${snap?.savedAt ?? "?"} groups=${JSON.stringify(snap?.groups?.length ?? null)} ids=${groupIds}${saveBusy}`);
       }
     }
 
