@@ -450,3 +450,18 @@ ADR 0010 품질 우선 계약에 따라 수정은 커널 텍스처 캐리어의 
 최우선 조사 대상이다. 다음 세션 첫 실험: 검증기 페이지에서 Konva stage
 pixelRatio와 layer scale을 덤프하고, RecordingDestination 목 mock에 실제
 Konva 컨텍스트 변환을 주입해 renderStudioDynamicBrushCoverage 곡선을 재현한다.
+
+### 단획 간헐 실패의 메커니즘 (같은 세션)
+
+"fast short stroke produced no visible pixels"(changedPixels 1–2/4392)이 실행마다
+발/복구된다. 원인 모델: 폭 7 · contact-tooth granulation 0.95에서 짧은 획의 소수
+dab이 산란 시드(획 id 파생)에 따라 종이 스킵 구간에 몰리면 mark.alpha가 전부
+가시 임계 아래로 떨어진다. STUDIO_KERNEL_TIP_MIN_VISIBLE_SIZE 크기 하한은
+알파 스킵을 막지 못한다.
+
+수정 제약: 이 계층은 "기존 문서 픽셀 불변" 계약(studio-dynamic-brush-coverage-renderer
+:1262 주석)이 있어 multiplier 클램프를 무버전으로 넣으면 저장 문서 재생이 바뀐다.
+따라서 커널 팁용 버전 정책(예: paper alpha floor 0.35를 포함한 contact-tooth v2 프로그램
+핀)으로 넣는 것이 올바른 경로다. 부수 관찰: 덤프 매니페스트에 rect/dpr 캡처를 추가했으나
+단획 조기 종료 시 long 매트릭스 덤프와 함께 볼 수 없으므로, 단획 경로에도 동일 덤프가
+필요하다(이번 실행부터 short-invisible 덤프는 이미 추가돼 있다).
