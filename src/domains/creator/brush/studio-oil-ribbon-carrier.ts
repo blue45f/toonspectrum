@@ -161,6 +161,16 @@ export interface StudioOilRibbonCarrierOptions {
    * is a 50–150ms main-thread stall and is reserved for export / explicit quality passes.
    */
   readonly bodyOnly?: boolean;
+  /**
+   * Load-band allocator for the bristle lanes. Default `observed-span-v1` keeps the shipped
+   * byte-identical plan. `fixed-anchor-v2` normalises run loads against fixed [0,1] anchors and
+   * derives every lane's deposit from its band anchor alone, so appending stations to a growing
+   * stroke can never retroactively change an already-planned lane — the precondition the live
+   * suffix assembly needs (see docs/perf/brush-advancement-roadmap-2026-08-22.md §3). The tone
+   * distribution differs from v1 by design (no observed-span contrast stretch, no cumulative
+   * shells); it is an opt-in pending the knot/quality gates, not a silent replacement.
+   */
+  readonly bristleBanding?: "observed-span-v1" | "fixed-anchor-v2";
 }
 
 /**
@@ -791,15 +801,99 @@ function quantizedRun(
   return frozen;
 }
 
+/**
+ * Fixed width bucket for the v2 fixed-anchor lanes, in document units.
+ *
+ * v1 groups hairs into equal-count quantiles and strokes each gauge at the observed mean — both
+ * values move when the stroke grows. The v2 lane's width must be a pure function of its members'
+ * shared key, so runs are binned by their own sample width on an absolute ruler. 4 units keeps
+ * the within-bucket stroke-width error under half a typical hair diameter; 8 buckets span the
+ * practical radiusY·2.425 range many times over.
+ */
+const BRISTLE_V2_WIDTH_BUCKET = 4;
+const BRISTLE_V2_WIDTH_BUCKETS = 8;
+
+/**
+ * Deposit of one v2 band's anchor load.
+ *
+ * Pure function of the band index: an append that adds runs to any band — or creates a band that
+ * did not exist — changes nothing about any other band's deposit, which is exactly the property
+ * v1's observed-span means cannot offer.
+ */
+function bandAnchorDeposit(band: number): number {
+  return accumulatedOpacity(
+    (band + 0.5) / BRISTLE_LOAD_BANDS,
+    BRISTLE_VIRTUAL_OVERLAPS,
+  );
+}
+
+/**
+ * Fixed-anchor bristle lanes (`bristleBanding: "fixed-anchor-v2"`).
+ *
+ * Every emitted value is either run-local geometry or a pure function of the lane's
+ * (band, width-bucket) key: the band comes from fixed [0,1] normalisation through the same
+ * per-hair Schmitt trigger and dry liftoff as v1, the width from an absolute ruler, the deposit
+ * from the band anchor alone. Planning a prefix of a growing stroke therefore emits byte-identical
+ * lanes for everything already planned — the append-stability contract the live suffix assembly
+ * needs. Deliberate divergences from v1, both tone-level and gate-arbitrated: no observed-span
+ * contrast stretch, and each band paints once at its own anchor instead of via cumulative shells
+ * (self-crossings of DIFFERENT bands fold again; within-band crossings stay fold-free).
+ */
+/**
+ * Fixed load ceiling the v2 banding normalises against.
+ *
+ * The station-opacity map clamps to [0.14, 0.62] (`pressureProxyFromStationOpacity` documents the
+ * same numbers from the other side). Raw per-run loads are therefore already on a known absolute
+ * ruler — stretching them to the observed span like v1 does is precisely what makes every band
+ * membership move on append.
+ */
+const BRISTLE_V2_FIXED_MAX_LOAD = 0.62;
+
+function planFixedAnchorBristleLanes(
+  planned: readonly PlannedBristleRun[],
+): readonly StudioOilRibbonBristleLane[] {
+  const bandByRun = bandRunsAlongEachHair(planned, 0, BRISTLE_V2_FIXED_MAX_LOAD);
+  const runsByKey = new Map<number, PlannedBristleRun[]>();
+  for (const run of planned) {
+    const band = bandByRun.get(run);
+    if (band === undefined) continue;
+    const bucket = Math.min(
+      BRISTLE_V2_WIDTH_BUCKETS - 1,
+      Math.floor(run.width / BRISTLE_V2_WIDTH_BUCKET),
+    );
+    const key = band * BRISTLE_V2_WIDTH_BUCKETS + bucket;
+    const group = runsByKey.get(key);
+    if (group) group.push(run);
+    else runsByKey.set(key, [run]);
+  }
+  const quantizedByRun = new Map<PlannedBristleRun, StudioOilRibbonPath>();
+  const lanes: StudioOilRibbonBristleLane[] = [];
+  for (const key of [...runsByKey.keys()].sort((left, right) => left - right)) {
+    const band = Math.floor(key / BRISTLE_V2_WIDTH_BUCKETS);
+    const bucket = key % BRISTLE_V2_WIDTH_BUCKETS;
+    lanes.push(Object.freeze({
+      runs: Object.freeze(
+        weldRuns(runsByKey.get(key)!).map((run) => quantizedRun(run, quantizedByRun)),
+      ),
+      lineWidth: quantize((bucket + 0.5) * BRISTLE_V2_WIDTH_BUCKET),
+      opacity: quantize(bandAnchorDeposit(band)),
+      loadBand: band,
+    }));
+  }
+  return Object.freeze(lanes);
+}
+
 function planBristleLanes(
   stations: readonly OilCarrierStation[],
   dynamics?: StudioOilBristleLoadDynamicsPlan,
   physics?: StudioBristlePhysicsOilPlan,
+  banding: "observed-span-v1" | "fixed-anchor-v2" = "observed-span-v1",
 ): readonly StudioOilRibbonBristleLane[] {
   if (stations.length < 2) return [];
   const bristleCount = Math.min(
     ...stations.map((station) => station.source.bristles.length),
   );
+  const fixedAnchor = banding === "fixed-anchor-v2";
   const planned: PlannedBristleRun[] = [];
   let minimumLoad = Number.POSITIVE_INFINITY;
   let maximumLoad = Number.NEGATIVE_INFINITY;
@@ -883,6 +977,10 @@ function planBristleLanes(
     }
   }
   if (planned.length === 0) return [];
+
+  if (fixedAnchor) {
+    return planFixedAnchorBristleLanes(planned);
+  }
 
   const span = maximumLoad - minimumLoad;
   const bandByRun = bandRunsAlongEachHair(planned, minimumLoad, span);
@@ -1700,7 +1798,9 @@ export function planStudioOilRibbonCarrier(
     // is exactly how the bed was reported. One overlap is the film itself, and it leaves the whole
     // band range visible against it.
     bodyOpacity: quantize(accumulatedOpacity(averageOpacity, 1)),
-    bristleLanes: bodyOnly ? Object.freeze([]) : planBristleLanes(stations, dynamics, physics),
+    bristleLanes: bodyOnly
+      ? Object.freeze([])
+      : planBristleLanes(stations, dynamics, physics, options?.bristleBanding),
     repeatedBodyStampCount: 0,
     ...(impastoReliefLanes ? { impastoReliefLanes } : {}),
   });
