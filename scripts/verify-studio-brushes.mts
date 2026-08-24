@@ -2743,6 +2743,9 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
             cls: (canvas.className ?? "").toString().slice(0, 48),
             id: canvas.id,
             parent: canvas.parentElement?.className?.toString().slice(0, 64) ?? "",
+            cssW: canvas.getBoundingClientRect().width,
+            cssH: canvas.getBoundingClientRect().height,
+            dpr: globalThis.devicePixelRatio ?? 1,
             url: canvas.toDataURL("image/png"),
           })),
         );
@@ -2781,6 +2784,9 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
             cls: (canvas.className ?? "").toString().slice(0, 48),
             id: canvas.id,
             parent: canvas.parentElement?.className?.toString().slice(0, 64) ?? "",
+            cssW: canvas.getBoundingClientRect().width,
+            cssH: canvas.getBoundingClientRect().height,
+            dpr: globalThis.devicePixelRatio ?? 1,
             url: canvas.toDataURL("image/png"),
           })),
         );
