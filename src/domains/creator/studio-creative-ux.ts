@@ -33,43 +33,53 @@ import type {
 
 /** Canva/Express style “simple draw” kit — first tools a beginner sees. */
 export const STUDIO_BEGINNER_BRUSH_IDS = [
+  // 선 — 굵기·필압 순 (pen 대표 → 세필 → 필압 → 펜촉)
   "pen",
+  "fineliner",
   "gpen",
-  // Wash/air early so the primary options strip shows them without horizontal scroll.
+  "fountain-pen",
+  // 워시/에어 — 번짐 축 (빈 히스토리 퀵 셸프 첫 8 안에 유지 계약)
   "watercolor",
   "airbrush",
-  "fineliner",
-  "pencil",
+  // 마커/붓 — 도포 축
   "marker",
   "brush",
+  // 드로잉
+  "pencil",
   "highlighter",
-  "fountain-pen",
   // 2026-08-21 로스터 축소: gel-pen·school-pen 을 스타터 키트에서 뺐습니다. 둘 다 pen/gpen 과
   // 실행 서명이 같아(굵기만 다름) 초보 키트 한 줄에 같은 선이 다섯 번 보이던 자리였습니다.
   // 두 id 는 격리 원장으로 옮겼고, 저장된 문서는 계속 원래 브러시로 재생됩니다.
   // 2026-08-22 제2차 축소: ballpoint·felt-tip 도 같은 서명의 굵기 중간값이라 뺐습니다(격리 A′).
+  // 지우개는 도구 경계라 마지막에 둡니다.
   "standard-eraser",
   "kneaded-eraser",
 ] as const;
 
 /** Picsart/Express expressive kit shown after expanding the tray. */
 export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
+  // ── 펜촉·캘리그래피 ──
   "maru-pen",
+  "calligraphy",
+  "fountain-pen",
   "parallel-pen",
+  "perfect-ink",
+  "perfect-marker",
+  // (2026-08-21 격리: ruling-pen · glass-pen · liner — pen/gpen 과 같은 서명, 원래 자리 유지)
   "ruling-pen",
   "glass-pen",
   "liner",
-  "calligraphy",
-  "perfect-ink",
-  "perfect-marker",
+  // ── 마커·형광 FX ──
   "marker-bold",
   "neon",
-  "glow",
   "soft-glow",
+  "glow",
   "glitter",
   "star-dust",
+  // ── 연필 ──
   "soft-pencil",
   "erodible-pencil",
+  // ── 수채·유화·페인트 ──
   "watercolor",
   // 2026-08-22 제2차 축소: ink-wash 는 watercolor 와 실행 서명·값이 같아 격리 원장으로
   // 옮겼습니다(격리 D′). 수묵 표현은 ink-wash--sumi-core 등 전용 레인이 유지합니다.
@@ -78,25 +88,30 @@ export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
   "inkwash-bleed-wash",
   "inkwash-white-ink",
   "oil",
+  "paint-tube",
   "fluid-paint",
   "fluid-paint-fine",
   "fluid-paint-load",
   "fluid-paint-rake",
-  "paint-tube",
+  // ── 파스텔·드라이 미디어 ──
   "pastel",
-  "airbrush",
-  "hard-airbrush",
-  "soft-brush",
-  "spray",
   "crayon",
   "chalk",
   "charcoal",
   "dry-media",
+  // ── 에어브러시 계열 ──
+  "airbrush",
+  "hard-airbrush",
+  "soft-brush",
+  "spray",
+  // ── 스페셜 잉크 ──
   "ink-particle",
   "tangent-normal-brush",
+  // ── 스케치패드 키트 ──
   "sketchpad-tile",
   "sketchpad-mirror",
   "sketchpad-soft-marker",
+  // ── 웹 드로잉 키트(도구군) ──
   "web-multi-agent",
   "web-rough-ink",
   "web-gravity-drip",
@@ -122,6 +137,7 @@ export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
   "web-pressure-flat",
   "web-smudge-trail",
   "web-cross-hatch-pen",
+  // ── 톤 ──
   "screentone",
 ] as const;
 

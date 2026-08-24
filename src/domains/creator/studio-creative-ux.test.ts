@@ -20,7 +20,7 @@ describe("studio creative ux", () => {
     const beginner = listStudioBrushTrayItems("beginner");
     expect(beginner.map((item) => item.id)).toEqual([...STUDIO_BEGINNER_BRUSH_IDS]);
     expect(beginner.every((item) => item.category === "beginner")).toBe(true);
-    expect(beginner.slice(0, 2).map((item) => item.id)).toEqual(["pen", "gpen"]);
+    expect(beginner.slice(0, 2).map((item) => item.id)).toEqual(["pen", "fineliner"]);
   });
 
   it("covers every BRUSH_PRESETS entry exactly once in the full tray", () => {
@@ -103,10 +103,10 @@ describe("studio creative ux", () => {
       "pen",
       "marker",
       "gpen",
+      "fineliner",
+      "fountain-pen",
       "watercolor",
       "airbrush",
-      "fineliner",
-      "pencil",
     ]);
     expect(quick.map((item) => item.quickSource)).toEqual([
       "favorite",
@@ -144,7 +144,7 @@ describe("studio creative ux", () => {
       "heart-stamp",
       "hair-fiber",
       "pen",
-      "gpen",
+      "fineliner",
     ]);
     expect(quick.map((item) => item.quickSource)).toEqual([
       "favorite",
@@ -170,8 +170,8 @@ describe("studio creative ux", () => {
     expect(quick.map(({ id, quickSource }) => [id, quickSource])).toEqual([
       ["pen", "favorite"],
       ["marker", "recent"],
+      ["fineliner", "starter"],
       ["gpen", "starter"],
-      ["watercolor", "starter"],
     ]);
   });
 
