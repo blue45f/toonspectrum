@@ -178,6 +178,9 @@ export function createStudioLayerOperations(
       announceDrawingShortcut(message);
       return false;
     }
+    // 그룹 메타데이터는 pending-stroke fingerprint 밖이므로 커밋 전 더티 마크가 없으면
+    // 디바운스 자동저장 스케줄러의 already-saved 게이트가 이 커밋을 조용히 생략할 수 있다.
+    if (!markStudioDocumentChanged()) return false;
     const g = createLayerGroup(uid(), `그룹 ${groups.length + 1}`);
     const nextElements = seedElId ? (groupItems(elements, [seedElId], g.id) as El[]) : elements;
     updateActivePage({ groups: [...groups, g], elements: nextElements });
@@ -190,9 +193,6 @@ export function createStudioLayerOperations(
     return true;
   }
   function groupSelectedElements(): boolean {
-    // 그룹 메타데이터는 pending-stroke fingerprint 밖이므로 더티 마크가 없으면 디바운스
-    // 자동저장 스케줄러의 already-saved 게이트가 이 커밋을 조용히 생략할 수 있다.
-    if (!markStudioDocumentChanged()) return false;
     const memberIds = [...marqueeIdsRef.current];
     if (memberIds.length < 2) return false;
     const alreadyGrouped = memberIds
@@ -206,6 +206,10 @@ export function createStudioLayerOperations(
       announceDrawingShortcut("기존 그룹을 먼저 해제한 뒤 다시 그룹화해 주세요");
       return false;
     }
+    // 그룹 메타데이터는 pending-stroke fingerprint 밖이므로 더티 마크가 없으면 디바운스
+    // 자동저장 스케줄러의 already-saved 게이트가 이 커밋을 조용히 생략할 수 있다.
+    // 검증 통과 후 실제 커밋 직전에만 범프해 실패 시도가 세대를 올리지 않게 한다.
+    if (!markStudioDocumentChanged()) return false;
     const groupId = uid();
     const g = createLayerGroup(groupId, `그룹 ${groups.length + 1}`);
     const nextElements = groupItems(elements, memberIds, groupId) as El[];
@@ -256,6 +260,9 @@ export function createStudioLayerOperations(
       announceDrawingShortcut(message);
       return false;
     }
+    // ungroup 커밋도 그룹 메타데이터라 fingerprint 밖이다. 게이트 생략으로 해제 결과가
+    // 저장에 반영되지 않는 사고를 막는다(groupSelectedElements와 동일 결함군).
+    if (!markStudioDocumentChanged()) return false;
     const selectedIds = currentCanvasSelectionIds();
     updateActivePage({
       elements: ungroupItems(elements, groupId) as El[],
@@ -296,6 +303,8 @@ export function createStudioLayerOperations(
     );
     const groupId = completeSelectedGroupId();
     if (groupId) {
+      // 그룹 잠금 토글도 groups 배열만 바꿀 수 있어 fingerprint 밖 커밋이다.
+      if (!markStudioDocumentChanged()) return;
       updateActivePage({
         groups: groups.map((group) =>
           group.id === groupId ? { ...group, locked: nextLocked } : group
@@ -312,6 +321,7 @@ export function createStudioLayerOperations(
       });
       return;
     }
+    if (!markStudioDocumentChanged()) return;
     patchLayerItems(currentSelectionIds, () => ({ locked: nextLocked }));
   }
   function reorderSelectedElements(direction: LayerItemReorderDirection) {
@@ -323,6 +333,7 @@ export function createStudioLayerOperations(
   }
   // 그룹 해제: 멤버 groupId 제거 + 그룹 자체 삭제(요소는 보존).
   function deleteLayerGroup(groupId: string) {
+    if (!markStudioDocumentChanged()) return;
     updateActivePage({
       elements: ungroupItems(elements, groupId) as El[],
       groups: groups.filter((g) => g.id !== groupId),
@@ -334,6 +345,8 @@ export function createStudioLayerOperations(
   }
   // 요소를 그룹에 넣기/빼기(연속성 유지). groupId=undefined면 그룹에서 제거.
   function assignElementToGroup(elId: string, groupId: string | undefined) {
+    // 요소 groupId 변경도 pending-stroke fingerprint 밖이라 범프 없으면 저장이 생략된다.
+    if (!markStudioDocumentChanged()) return;
     updateActivePage({ elements: setItemGroup(elements, elId, groupId) as El[] });
   }
 
@@ -426,6 +439,8 @@ export function createStudioLayerOperations(
         });
       const mode = planStudioMergeBakeMode(sources);
       if (mode.mode === "raster") {
+        // 병합 결과도 pending-stroke fingerprint 밖 커밋이라 범프 없으면 자동저장이 생략된다.
+        if (!markStudioDocumentChanged()) return;
         const baked = await bakeStudioMergeComposite({
           plan,
           sources,
@@ -449,6 +464,7 @@ export function createStudioLayerOperations(
         }
       }
       // Mixed vector/raster or bake unavailable — non-destructive group merge (single undo).
+      if (!markStudioDocumentChanged()) return;
       const group = createLayerGroup(uid(), plan.resultName);
       updateActivePage({
         groups: [...groups, group],
