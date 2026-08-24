@@ -499,3 +499,8 @@ context.getTransform() 실측(physicalScale 확인).
 18e46f16(조성 알파맵을 원본 팁 맵 방향으로 하한 비율 블렌드) 적용 후 연속 2회 focused
 run 단획 매트릭스 통과(이전 스칼라 전용 플로어는 4회 중 1회 실패). 드리프트 12.50–12.75px로
 안정. 채널 2(Konva 합성 소프트니)가 잔여 과제.
+### setTransform 기록 시도 중단 (같은 세션)
+addInitScript로 CanvasRenderingContext2D.setTransform을 감싸 스케일을 수집하려 했으나
+페이지 오류 불변(long-brush browser emitted console/page errors)이 발생해 되돌렸다.
+대안: Konva stage 인스턴스에 접근 가능한 디버그 엔트리(예: window.Konva 노출 또는
+app 측 debug hook)를 먼저 만들고 나서 변환을 읽는 것이 안전한다.
