@@ -2657,9 +2657,12 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
     w.__studioCtxScales = {};
     let canvasSeq = 0;
     const original = CanvasRenderingContext2D.prototype.setTransform;
-    CanvasRenderingContext2D.prototype.setTransform = function patched(...args: unknown[]) {
+    CanvasRenderingContext2D.prototype.setTransform = function patched(
+      this: CanvasRenderingContext2D,
+      ...args: unknown[]
+    ) {
       try {
-        const canvas = (this as unknown as { canvas?: HTMLCanvasElement }).canvas;
+        const canvas = this.canvas;
         if (canvas) {
           if (!canvas.dataset.__ctxId) {
             canvas.dataset.__ctxId = `c${canvasSeq++}`;
