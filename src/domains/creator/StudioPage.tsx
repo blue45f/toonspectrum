@@ -3000,8 +3000,10 @@ function StudioCuttoonEditor({
   };
   // pending/settled provenance bookkeeping is produced by the very async operation being guarded.
   // It is saved in the document, but must not invalidate its own source-generation ticket.
+  // 저장 진행 중이라고 조용히 버리면 안 된다 — 임시저장은 수 초 주기로 겹치므로 대부분의 AI 작업
+  // 기록이 유실됐다(실측: 성공한 dialogue 작업도 이력 패널에 0건). revision generation을 올리면
+  // 진행 중인 저장 이후에 후속 저장이 잡혀 기록이 반영된다(grouping 커밋의 dirty 마킹과 동일 패턴).
   const setAiProvenanceOperationState = (next: Parameters<typeof setAiProvenanceState>[0]) => {
-    if (documentSaveInFlightRef.current) return;
     studioRevisionProjectGenerationRef.current += 1;
     setAiProvenanceState(next);
   };
@@ -8972,11 +8974,25 @@ function StudioCuttoonEditor({
     if (!hasMeaningfulAutosaveContent && !hasExistingAutosaveAuthority) return;
     const scheduledGeneration = studioRevisionProjectGenerationRef.current;
     const scheduledPendingFingerprint = studioPendingStrokeFingerprint(pendingBatch);
+    if (
+      typeof globalThis !== "undefined"
+      && (globalThis as { __studioGroupsDebug?: boolean }).__studioGroupsDebug
+    ) {
+      console.log(
+        `[as-probe] arm gen=${scheduledGeneration} durable=${studioLifecycleDurableGenerationRef.current} fpSame=${scheduledPendingFingerprint === studioLifecycleDurablePendingFingerprintRef.current}`,
+      );
+    }
     const timer = setTimeout(() => {
       if (
         scheduledGeneration <= studioLifecycleDurableGenerationRef.current
         && scheduledPendingFingerprint === studioLifecycleDurablePendingFingerprintRef.current
       ) {
+        if (
+          typeof globalThis !== "undefined"
+          && (globalThis as { __studioGroupsDebug?: boolean }).__studioGroupsDebug
+        ) {
+          console.log(`[as-probe] skip gen=${scheduledGeneration} durable=${studioLifecycleDurableGenerationRef.current}`);
+        }
         return;
       }
       if (!hasMeaningfulAutosaveContent) {
@@ -9070,6 +9086,12 @@ function StudioCuttoonEditor({
             payload,
             onDurableAuthorityDegraded: reportStudioSaveAuthorityDegraded,
           });
+          if (
+            typeof globalThis !== "undefined"
+            && (globalThis as { __studioGroupsDebug?: boolean }).__studioGroupsDebug
+          ) {
+            console.log(`[as-probe] persisted authority=${receipt.authority} gen=${scheduledGeneration}`);
+          }
           if (
             sessionPromise !== null
             && autosaveOpfsSessionRef.current !== sessionPromise
@@ -16836,11 +16858,7 @@ const puppetWarpArmed =
     input: Omit<StudioAiPendingOperationInput, "id">
   ): string {
     const operationId = nextStudioAiOperationId(scope);
-    if (
-      collaborationAccessRef.current.locked ||
-      documentSaveInFlightRef.current ||
-      !editorMountedRef.current
-    ) return operationId;
+    if (collaborationAccessRef.current.locked || !editorMountedRef.current) return operationId;
     setAiProvenanceOperationState((current) =>
       recordPendingStudioAiOperation(current, { ...input, id: operationId })
     );
