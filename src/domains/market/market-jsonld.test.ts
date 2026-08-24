@@ -18,7 +18,6 @@ function record(overrides: Partial<CreatorMarketplaceResourceRecord> = {}): Crea
     license: "cc-by-4.0",
     attributionText: "",
     containsAi: false,
-    rightsConfirmed: true,
     provenance: { origin: "original", authoredByPublisher: true },
     compatibility: { engines: ["canvas2d"] },
     entries: [],
