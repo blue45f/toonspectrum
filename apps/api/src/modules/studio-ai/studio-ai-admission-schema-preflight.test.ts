@@ -2,12 +2,16 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { dbPool } from "../../db";
+
 import {
   preflightStudioAiAdmissionSchema,
   STUDIO_AI_ADMISSION_CANONICAL_CHECK_DEFINITIONS,
   STUDIO_AI_ADMISSION_SCHEMA_PREFLIGHT,
   studioAiAdmissionSchemaPreflightProvider,
 } from "./studio-ai-admission-schema-preflight";
+
+vi.mock("../../db", () => ({ dbPool: { query: vi.fn() } }));
 
 function completeSchema(overrides: Record<string, unknown> = {}) {
   return {
@@ -147,5 +151,21 @@ describe("Studio AI admission schema preflight", () => {
     expect(migration).toContain('ALTER COLUMN "requestTimes" SET NOT NULL');
     expect(migration).toContain('ALTER COLUMN "leaseExpiresAt" DROP NOT NULL');
     expect(migration).not.toMatch(/pg_get_constraintdef[\s\S]*?LIKE/iu);
+  });
+
+  it("keeps the API booting when the preflight cannot reach the database at all", async () => {
+    vi.mocked(dbPool.query).mockRejectedValue(
+      Object.assign(new Error("compute time quota exceeded"), { code: "53000" })
+    );
+
+    await expect(studioAiAdmissionSchemaPreflightProvider.useFactory()).resolves.toBe(true);
+  });
+
+  it("still refuses boot through the provider when the schema contract is violated", async () => {
+    vi.mocked(dbPool.query).mockResolvedValue({ rows: [] } as never);
+
+    await expect(studioAiAdmissionSchemaPreflightProvider.useFactory()).rejects.toThrow(
+      /0018_studio_ai_request_gate/u
+    );
   });
 });

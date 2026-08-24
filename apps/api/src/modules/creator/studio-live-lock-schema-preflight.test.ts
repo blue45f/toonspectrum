@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { dbPool } from "../../db";
+
 import {
   preflightStudioLiveLockSchema,
   STUDIO_LIVE_LOCK_SCHEMA_PREFLIGHT,
   studioLiveLockSchemaPreflightProvider,
 } from "./studio-live-lock-schema-preflight";
+
+vi.mock("../../db", () => ({ dbPool: { query: vi.fn() } }));
 
 function completeSchema(overrides: Record<string, unknown> = {}) {
   return {
@@ -64,5 +68,21 @@ describe("Studio live-lock revision schema preflight", () => {
       STUDIO_LIVE_LOCK_SCHEMA_PREFLIGHT
     );
     expect(studioLiveLockSchemaPreflightProvider.useFactory).toEqual(expect.any(Function));
+  });
+
+  it("keeps the API booting when the preflight cannot reach the database at all", async () => {
+    vi.mocked(dbPool.query).mockRejectedValue(
+      Object.assign(new Error("compute time quota exceeded"), { code: "53000" })
+    );
+
+    await expect(studioLiveLockSchemaPreflightProvider.useFactory()).resolves.toBe(true);
+  });
+
+  it("still refuses boot through the provider when the schema contract is violated", async () => {
+    vi.mocked(dbPool.query).mockResolvedValue({ rows: [] } as never);
+
+    await expect(studioLiveLockSchemaPreflightProvider.useFactory()).rejects.toThrow(
+      /apply migration 0017/u
+    );
   });
 });

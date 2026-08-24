@@ -1,3 +1,4 @@
+import { runSchemaPreflightToleratingDbUnavailability } from "../../common/database-availability";
 import { matchesPostgresCheckDefinition } from "../../common/postgres-check-definition";
 import { dbPool } from "../../db";
 
@@ -377,7 +378,10 @@ export async function preflightStudioAiAdmissionSchema(
 export const studioAiAdmissionSchemaPreflightProvider = {
   provide: STUDIO_AI_ADMISSION_SCHEMA_PREFLIGHT,
   useFactory: async (): Promise<true> => {
-    await preflightStudioAiAdmissionSchema();
+    await runSchemaPreflightToleratingDbUnavailability(
+      "Studio AI admission schema preflight",
+      () => preflightStudioAiAdmissionSchema()
+    );
     return true;
   },
 };

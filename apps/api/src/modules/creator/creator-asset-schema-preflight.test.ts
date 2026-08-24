@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { dbPool } from "../../db";
+
 import {
   CREATOR_ASSET_CANONICAL_CHECK_DEFINITIONS,
   CREATOR_ASSET_REPORT_CANONICAL_CHECK_DEFINITIONS,
@@ -7,6 +9,8 @@ import {
   creatorAssetSchemaPreflightProvider,
   preflightCreatorAssetSchema,
 } from "./creator-asset-schema-preflight";
+
+vi.mock("../../db", () => ({ dbPool: { query: vi.fn() } }));
 
 function completeSchema(overrides: Record<string, unknown> = {}) {
   return {
@@ -186,5 +190,19 @@ describe("Creator Asset schema preflight", () => {
   it("exports an eager Nest provider token for CreatorModule boot", () => {
     expect(creatorAssetSchemaPreflightProvider.provide).toBe(CREATOR_ASSET_SCHEMA_PREFLIGHT);
     expect(creatorAssetSchemaPreflightProvider.useFactory).toEqual(expect.any(Function));
+  });
+
+  it("keeps the API booting when the preflight cannot reach the database at all", async () => {
+    vi.mocked(dbPool.query).mockRejectedValue(
+      Object.assign(new Error("compute time quota exceeded"), { code: "53000" })
+    );
+
+    await expect(creatorAssetSchemaPreflightProvider.useFactory()).resolves.toBe(true);
+  });
+
+  it("still refuses boot through the provider when the schema contract is violated", async () => {
+    vi.mocked(dbPool.query).mockResolvedValue({ rows: [] } as never);
+
+    await expect(creatorAssetSchemaPreflightProvider.useFactory()).rejects.toThrow(/incomplete/u);
   });
 });

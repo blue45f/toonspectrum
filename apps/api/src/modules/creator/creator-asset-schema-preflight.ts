@@ -1,3 +1,4 @@
+import { runSchemaPreflightToleratingDbUnavailability } from "../../common/database-availability";
 import { matchesPostgresCheckDefinition } from "../../common/postgres-check-definition";
 import { dbPool } from "../../db";
 
@@ -767,7 +768,9 @@ export async function preflightCreatorAssetSchema(
 export const creatorAssetSchemaPreflightProvider = {
   provide: CREATOR_ASSET_SCHEMA_PREFLIGHT,
   useFactory: async (): Promise<true> => {
-    await preflightCreatorAssetSchema();
+    await runSchemaPreflightToleratingDbUnavailability("Creator asset schema preflight", () =>
+      preflightCreatorAssetSchema()
+    );
     return true;
   },
 };

@@ -1,3 +1,4 @@
+import { runSchemaPreflightToleratingDbUnavailability } from "../../common/database-availability";
 import { matchesPostgresCheckDefinition } from "../../common/postgres-check-definition";
 import { dbPool } from "../../db";
 
@@ -264,7 +265,10 @@ export async function preflightStudioAiIdempotencySchema(
 export const studioAiIdempotencySchemaPreflightProvider = {
   provide: STUDIO_AI_IDEMPOTENCY_SCHEMA_PREFLIGHT,
   useFactory: async (): Promise<true> => {
-    await preflightStudioAiIdempotencySchema();
+    await runSchemaPreflightToleratingDbUnavailability(
+      "Studio AI idempotency schema preflight",
+      () => preflightStudioAiIdempotencySchema()
+    );
     return true;
   },
 };

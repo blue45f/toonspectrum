@@ -1,3 +1,4 @@
+import { runSchemaPreflightToleratingDbUnavailability } from "../../common/database-availability";
 import { dbPool } from "../../db";
 
 import type { Pool } from "pg";
@@ -94,7 +95,10 @@ export async function preflightStudioLiveLockSchema(
 export const studioLiveLockSchemaPreflightProvider = {
   provide: STUDIO_LIVE_LOCK_SCHEMA_PREFLIGHT,
   useFactory: async (): Promise<true> => {
-    await preflightStudioLiveLockSchema();
+    await runSchemaPreflightToleratingDbUnavailability(
+      "Studio live-lock revision schema preflight",
+      () => preflightStudioLiveLockSchema()
+    );
     return true;
   },
 };

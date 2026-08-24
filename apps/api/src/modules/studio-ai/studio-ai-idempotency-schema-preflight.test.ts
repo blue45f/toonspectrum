@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { dbPool } from "../../db";
+
 import {
   preflightStudioAiIdempotencySchema,
   studioAiIdempotencySchemaPreflightProvider,
@@ -7,7 +9,7 @@ import {
   STUDIO_AI_IDEMPOTENCY_SCHEMA_PREFLIGHT,
 } from "./studio-ai-idempotency-schema-preflight";
 
-vi.mock("../../db", () => ({ dbPool: {} }));
+vi.mock("../../db", () => ({ dbPool: { query: vi.fn() } }));
 
 function healthyRow() {
   return {
@@ -55,5 +57,21 @@ describe("Studio AI idempotency schema preflight", () => {
       STUDIO_AI_IDEMPOTENCY_SCHEMA_PREFLIGHT
     );
     expect(studioAiIdempotencySchemaPreflightProvider.useFactory).toEqual(expect.any(Function));
+  });
+
+  it("keeps the API booting when the preflight cannot reach the database at all", async () => {
+    vi.mocked(dbPool.query).mockRejectedValue(
+      Object.assign(new Error("compute time quota exceeded"), { code: "53000" })
+    );
+
+    await expect(studioAiIdempotencySchemaPreflightProvider.useFactory()).resolves.toBe(true);
+  });
+
+  it("still refuses boot through the provider when the schema contract is violated", async () => {
+    vi.mocked(dbPool.query).mockResolvedValue({ rows: [] } as never);
+
+    await expect(studioAiIdempotencySchemaPreflightProvider.useFactory()).rejects.toThrow(
+      /0019_studio_ai_request_receipt/u
+    );
   });
 });
