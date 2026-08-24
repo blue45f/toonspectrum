@@ -295,6 +295,11 @@ function isAbortError(error: unknown): boolean {
 
 function networkErrorMessage(error: unknown): string {
   if (isAbortError(error)) return "요청이 취소되었습니다.";
+  // 브라우저 fetch 실패의 error.message는 "Failed to fetch" 같은 원문 영문이라 그대로 노출하지
+  // 않는다 — 사용자가 원인(CORS·오프라인·엔드포인트 오타)을 추측할 수 있는 한국어로 안내한다.
+  if (error instanceof TypeError) {
+    return "엔드포인트에 연결할 수 없어요. 주소·네트워크 상태와 CORS 허용 여부를 확인해 주세요.";
+  }
   return error instanceof Error ? error.message : "네트워크 요청에 실패했습니다.";
 }
 
