@@ -26,7 +26,7 @@
  *   TOONSPECTRUM_BRUSH_SWEEP_LIMIT 양의 정수 — 앞 N 종만 (0 = 전체)
  *   SWEEP_HEADLESS                "0" 이면 headed (기본 headless)
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
@@ -171,7 +171,7 @@ async function installPerfSampler(page) {
   for (let attempt = 0; attempt < 2; attempt++) {
     // headless 새 페이지는 가끔 rAF 를 서스펜드한다 — 워밍업 프레임 하나를 기다려 확인한다.
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-    // eslint-disable-next-line no-await-in-loop
+     
     await page.evaluate(() => {
       window.__sweepFrames = [];
       window.__sweepLongTasks = [];
@@ -191,9 +191,9 @@ async function installPerfSampler(page) {
       requestAnimationFrame(tick);
       window.__sweepStopTick = () => { running = false; };
     });
-    // eslint-disable-next-line no-await-in-loop
+     
     await page.waitForTimeout(250);
-    // eslint-disable-next-line no-await-in-loop
+     
     const frames = await page.evaluate(() => (window.__sweepFrames ?? []).length);
     if (frames > 0) return;
     log(`rAF sampler suspended (attempt ${attempt + 1}) — retrying`);
