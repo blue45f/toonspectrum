@@ -2650,6 +2650,34 @@ function writeLongBrushQualityReport(input: Readonly<{
 
 async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<LongBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  // 채널 2 진단: 모든 캔버스 2D 컨텍스트의 setTransform 스케일을 기록해 커밋 렌더가
+  // 실제 어떤 물리 배율에서 래스터되는지 덤프와 함께 확인한다.
+  await context.addInitScript(() => {
+    const w = globalThis as unknown as { __studioCtxScales?: Record<string, number[]> };
+    w.__studioCtxScales = {};
+    let canvasSeq = 0;
+    const original = CanvasRenderingContext2D.prototype.setTransform;
+    CanvasRenderingContext2D.prototype.setTransform = function patched(...args: unknown[]) {
+      try {
+        const canvas = (this as unknown as { canvas?: HTMLCanvasElement }).canvas;
+        if (canvas) {
+          if (!canvas.dataset.__ctxId) {
+            canvas.dataset.__ctxId = `c${canvasSeq++}`;
+          }
+          const id = canvas.dataset.__ctxId;
+          const a = Number(args[0]);
+          const d = Number(args[3]);
+          if (Number.isFinite(a) && Number.isFinite(d) && args.length >= 6) {
+            const scale = Math.hypot(a, d);
+            (w.__studioCtxScales![id] ??= []).push(+scale.toFixed(4));
+          }
+        }
+      } catch {
+        // diagnostics must never break rendering
+      }
+      return original.apply(this, args as never);
+    } as typeof CanvasRenderingContext2D.prototype.setTransform;
+  });
   const page = await context.newPage();
   if (DEBUG_BRUSH_VERIFIER) {
     page.on("console", (entry) => {
@@ -2772,9 +2800,13 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         );
         const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-live`);
         mkdirSync(dumpDir, { recursive: true });
-        writeFileSync(join(SCRATCH, `canvas-dump-${preset.id}-live-manifest.json`), JSON.stringify(
-          dump.map(({ url: _url, ...rest }) => rest), null, 1,
-        ));
+        const ctxScales = await page.evaluate(
+          () => (globalThis as unknown as { __studioCtxScales?: Record<string, number[]> }).__studioCtxScales ?? {},
+        );
+        writeFileSync(join(SCRATCH, `canvas-dump-${preset.id}-live-manifest.json`), JSON.stringify({
+          canvases: dump.map(({ url: _url, ...rest }) => rest),
+          ctxScales,
+        }, null, 1));
         for (const entry of dump) {
           const base64 = entry.url.split(",")[1] ?? "";
           if (!base64) continue;
