@@ -429,3 +429,24 @@ ADR 0010 품질 우선 계약에 따라 수정은 커널 텍스처 캐리어의 
   시작 시 고정, 커밋 renderBudget은 최종 dab 수로 재계산)과 Konva 합성 단계.
   다음 실험: 검증기 요소로 planStudioDynamicBrushRender의 renderBudget.stampGrid와
   라이브 initialStampGrid 값을 덤프해 대조한다.
+
+### 10차 세션 (2026-08-24): 정렬 프레임 프로파일 — 커밋은 강도 단조 압축
+
+그리드 가설 기각(liveGrid==commitGrid==3, maxDabs 632 여유). 덤프된 09(activeCanvas)와
+02(Konva 메인)를 잉크 무게중심으로 정렬해 같은 프레임에서 대비:
+
+| live 알파 밴드 | n | commit/live 비율 |
+| --- | ---: | ---: |
+| 8–20 | 97 | **1.529** |
+| 20–50 | 321 | 0.827 |
+| 50–120 | 659 | 0.646 |
+| 120–256 | 34 | **0.584** |
+
+전체 both 1,111 / onlyLive 434 / onlyCommit 47. 커밋 출력이 라이브 강도의
+단조 증가 함수로 압축된다(약한 픽셀은 오히려 상향 평활). 이는 (a) 커밋이 마크를
+더 작거나 흐리게 계획하거나 (b) Konva 합성/레이어 단계에서 소프트니가 걸린다는
+뜻이다. 모듈 수준에서는 동일 함수가 패리티이므로 (b)의 Konva 컨텍스트 래핑
+(context._context getTransform 경로) 또는 레이어 pixelRatio/스케일 상호작용이
+최우선 조사 대상이다. 다음 세션 첫 실험: 검증기 페이지에서 Konva stage
+pixelRatio와 layer scale을 덤프하고, RecordingDestination 목 mock에 실제
+Konva 컨텍스트 변환을 주입해 renderStudioDynamicBrushCoverage 곡선을 재현한다.
