@@ -9,6 +9,7 @@
 // StudioPaletteLibraryPanel이 관리하는 것과 완전히 같은 StudioNamedPalette 구조로 들어간다 — 이
 // 패널은 그 타입조차 몰라도 된다(onSaveToLibrary에 PaletteSuggestion만 그대로 넘긴다).
 import { Check, Loader2, Palette, Save, Sparkles } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 
@@ -35,6 +36,13 @@ export function StudioPaletteSuggestPanel({
   onSaveToLibrary: (suggestion: PaletteSuggestion) => void;
 }) {
   const canGenerate = configured && !busy && moodText.trim().length > 0;
+  // 팝오버 높이가 화면보다 작으면 결과·에러가 fold 아래에 생긴다. 도착 시 스크롤로
+  // 눈앞에 가져와야 "요청은 갔는데 아무 일도 없었다"로 오해하지 않는다.
+  const feedbackRef = useRef<HTMLDivElement | null>(null);
+  const hasFeedback = Boolean(suggestion || error);
+  useEffect(() => {
+    if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [hasFeedback]);
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel/50 p-3">
@@ -72,39 +80,41 @@ export function StudioPaletteSuggestPanel({
         {busy ? "배색을 구상하는 중…" : "팔레트 추천받기"}
       </button>
 
-      {error && <p className="text-xs text-bad">{error}</p>}
+      <div ref={feedbackRef}>
+        {error && <p className="text-xs text-bad">{error}</p>}
 
-      {suggestion && suggestion.colors.length > 0 && (
-        <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card/70 p-2">
-          <p className="text-[0.68rem] font-medium text-fg-2">{suggestion.name || "이름 없는 팔레트"}</p>
-          <div className="flex flex-wrap gap-2">
-            {suggestion.colors.map((c, i) => (
-              <div key={`${c.hex}-${i}`} className="flex flex-col items-center gap-0.5">
-                <div
-                  className="h-7 w-7 rounded border border-line"
-                  style={{ background: c.hex }}
-                  title={c.role ? `${c.hex} — ${c.role}` : c.hex}
-                />
-                <span className="max-w-14 truncate text-center text-[0.55rem] text-fg-3" title={c.role || c.hex}>
-                  {c.role || c.hex}
-                </span>
-              </div>
-            ))}
+        {suggestion && suggestion.colors.length > 0 && (
+          <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card/70 p-2">
+            <p className="text-[0.68rem] font-medium text-fg-2">{suggestion.name || "이름 없는 팔레트"}</p>
+            <div className="flex flex-wrap gap-2">
+              {suggestion.colors.map((c, i) => (
+                <div key={`${c.hex}-${i}`} className="flex flex-col items-center gap-0.5">
+                  <div
+                    className="h-7 w-7 rounded border border-line"
+                    style={{ background: c.hex }}
+                    title={c.role ? `${c.hex} — ${c.role}` : c.hex}
+                  />
+                  <span className="max-w-14 truncate text-center text-[0.55rem] text-fg-3" title={c.role || c.hex}>
+                    {c.role || c.hex}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => onSaveToLibrary(suggestion)}
+              className="inline-flex items-center justify-center gap-1 rounded-md border border-line bg-panel px-2 py-1.5 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+            >
+              <Save size={11} /> 내 팔레트에 저장
+            </button>
+            {savedMessage && (
+              <p className="flex items-center gap-1 text-[0.6rem] text-good" role="status">
+                <Check size={10} /> {savedMessage}
+              </p>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={() => onSaveToLibrary(suggestion)}
-            className="inline-flex items-center justify-center gap-1 rounded-md border border-line bg-panel px-2 py-1.5 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
-          >
-            <Save size={11} /> 내 팔레트에 저장
-          </button>
-          {savedMessage && (
-            <p className="flex items-center gap-1 text-[0.6rem] text-good" role="status">
-              <Check size={10} /> {savedMessage}
-            </p>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       <p className="text-[0.6rem] leading-relaxed text-fg-3">
         장르·무드를 설명하면 어울리는 색상 팔레트 후보를 제안받아요. 저장하면 &quot;스타일&quot; 탭의 내

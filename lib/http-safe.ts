@@ -19,6 +19,13 @@ const SERVER_ERROR_KEY_MAP: Record<string, string> = {
   "정산 처리에 실패했습니다.": "apiError.settlementFailed",
 };
 
+// 서버 5xx Sanitized Envelope의 고정 문구 — 호출 맥락이 없는 내부용 문자열이라 그대로 노출하지
+// 않고 호출자가 준 한국어 fallback(예: "서버 AI 요청에 실패했어요.")으로 대체한다.
+const GENERIC_SERVER_ENVELOPE_MESSAGES = new Set([
+  "Request could not be completed",
+  "Internal server error",
+]);
+
 export function resolveApiError(payload: unknown, fallback: string): string {
   let rawMsg = "";
 
@@ -39,7 +46,7 @@ export function resolveApiError(payload: unknown, fallback: string): string {
     }
   }
 
-  const msgToTranslate = rawMsg || fallback;
+  const msgToTranslate = rawMsg && !GENERIC_SERVER_ENVELOPE_MESSAGES.has(rawMsg) ? rawMsg : fallback;
   const key = SERVER_ERROR_KEY_MAP[msgToTranslate];
   if (key) {
     const translated = resolveI18nValue(getLang(), key);

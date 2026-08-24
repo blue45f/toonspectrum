@@ -209,6 +209,21 @@ describe("studio-server-ai-client", () => {
     expect(JSON.stringify(parsed)).not.toContain("private-upstream-body");
   });
 
+  it("openrouter 공급자 응답도 파싱한다 — 서버가 openrouter로 응답하면 클라이언트 파싱이 실패해 유료 결과가 사라졌었다", () => {
+    const parsed = parseStudioServerAiCompletion({
+      content: "팔레트 제안",
+      provider: "openrouter",
+      model: "stealth/ox-alpha",
+      usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+    });
+    expect(parsed).toEqual({
+      content: "팔레트 제안",
+      provider: "openrouter",
+      model: "stealth/ox-alpha",
+      usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+    });
+  });
+
   it("필수 실제 provider/model이 잘못된 응답은 비밀값을 반사하지 않는 parse_error로 거부한다", async () => {
     apiPost.mockResolvedValue({
       content: "결과",

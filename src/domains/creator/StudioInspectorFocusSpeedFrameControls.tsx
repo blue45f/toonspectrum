@@ -4,6 +4,7 @@ import {
   StudioContinuityMetadataEditor,
   StudioPanelSplitPanel,
 } from "./studio-page-lazy-ui";
+import { studioServerAiProviderLabel } from "./studio-server-ai-client";
 import {
   SCENARIO_BEAT_LABELS,
   SCENARIO_BEAT_TYPES,
@@ -357,7 +358,7 @@ export function StudioInspectorFocusSpeedFrameControls({
                     </span>
                     {selected.storyBeat.textAiProvenance.failover ? (
                       <span className="mt-1 block rounded-md border border-warn/35 bg-warn/10 px-2 py-1 text-warn">
-                        {selected.storyBeat.textAiProvenance.failover.attemptedProvider === "zai" ? "Z.ai" : "DeepSeek"} 잔액·패키지 한도 소진으로 {selected.storyBeat.textAiProvenance.failover.actualProvider === "zai" ? "Z.ai" : "DeepSeek"}에 자동 전환
+                        {studioServerAiProviderLabel(selected.storyBeat.textAiProvenance.failover.attemptedProvider)} 잔액·패키지 한도 소진으로 {studioServerAiProviderLabel(selected.storyBeat.textAiProvenance.failover.actualProvider)}에 자동 전환
                       </span>
                     ) : null}
                   </div>

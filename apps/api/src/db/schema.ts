@@ -1904,7 +1904,7 @@ export const studioAiUsageLedger = pgTable(
       "studio_ai_usage_task_check",
       sql`${t.task} in ('composition', 'scenario', 'translation', 'dialogue', 'palette')`
     ),
-    check("studio_ai_usage_provider_check", sql`${t.provider} in ('zai', 'deepseek')`),
+    check("studio_ai_usage_provider_check", sql`${t.provider} in ('zai', 'deepseek', 'openrouter')`),
     check("studio_ai_usage_model_check", sql`char_length(${t.model}) between 1 and 200`),
     check("studio_ai_usage_attempt_count_check", sql`${t.attemptCount} between 1 and 2`),
     check(

@@ -529,11 +529,14 @@ function extractTextAiProvenance(
         ? "zai"
         : transport.provider === "deepseek"
           ? "deepseek"
-          : "server-auto"
+          : transport.provider === "openrouter"
+            ? "openrouter"
+            : "server-auto"
       : textProviderFromSettings(settings)
   );
   const model = rawModel || settings.textModel.trim().slice(0, 200) || "unknown";
-  const failover = transport.mode === "server" && (provider === "zai" || provider === "deepseek")
+  const failover = transport.mode === "server"
+    && (provider === "zai" || provider === "deepseek" || provider === "openrouter")
     ? parseStudioServerAiFailoverMetadata(record.failover, { provider, model })
     : undefined;
   return {

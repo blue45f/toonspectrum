@@ -8,7 +8,7 @@
 // 없다(StudioLineCleanupPanel과 같은 "얇은 자체 완결 패널" 부류) — 이 판단의 근거는
 // docs/studio-ai-assist-integration.md §5에 있다.
 import { Clapperboard, Copy, Loader2, StickyNote } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   suggestSceneComposition,
@@ -55,6 +55,12 @@ export function StudioAiCompositionPanel({
   const [error, setError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // 팔레트·대사 패널과 동일 — 결과·에러가 팝오버 fold 아래에 생기지 않게 도착 시 nearest 스크롤.
+  const feedbackRef = useRef<HTMLDivElement | null>(null);
+  const hasFeedback = Boolean(suggestion || error);
+  useEffect(() => {
+    if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [hasFeedback]);
 
   const run = async () => {
     const prompt = sceneTextValue.trim();
@@ -128,31 +134,33 @@ export function StudioAiCompositionPanel({
         {busy ? "구상하는 중…" : "구도 제안 받기"}
       </button>
 
-      {error && <p className="text-xs text-bad">{error}</p>}
+      <div ref={feedbackRef}>
+        {error && <p className="text-xs text-bad">{error}</p>}
 
-      {suggestion && (
-        <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card/70 p-2">
-          <p className="whitespace-pre-wrap text-[0.68rem] leading-relaxed text-fg-2">{suggestion}</p>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => void copySuggestion()}
-              className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
-            >
-              <Copy size={11} /> {copied ? "복사됨" : "복사"}
-            </button>
-            {onInsertAsNote && (
+        {suggestion && (
+          <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card/70 p-2">
+            <p className="whitespace-pre-wrap text-[0.68rem] leading-relaxed text-fg-2">{suggestion}</p>
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => onInsertAsNote(suggestion)}
+                onClick={() => void copySuggestion()}
                 className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
               >
-                <StickyNote size={11} /> 캔버스에 메모로 추가
+                <Copy size={11} /> {copied ? "복사됨" : "복사"}
               </button>
-            )}
+              {onInsertAsNote && (
+                <button
+                  type="button"
+                  onClick={() => onInsertAsNote(suggestion)}
+                  className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                >
+                  <StickyNote size={11} /> 캔버스에 메모로 추가
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <p className="text-[0.6rem] leading-relaxed text-fg-3">
         그림을 자동으로 만들진 않아요 — 구도·카메라앵글·인물 배치 아이디어만 텍스트로 제안해요.

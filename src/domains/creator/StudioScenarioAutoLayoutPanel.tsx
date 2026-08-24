@@ -42,6 +42,7 @@ import {
   type StudioAiImageReferenceAssetOption,
 } from "./ai/StudioAiImageReferencePackEditor";
 import { SCENARIO_SCENE_COUNT_MAX, SCENARIO_SCENE_COUNT_MIN } from "./studio-scenario-scenes";
+import { studioServerAiProviderLabel } from "./studio-server-ai-client";
 import { SCENARIO_BEAT_LABELS, SCENARIO_BEAT_TYPES, type ScenarioBeatType } from "./studio-story-beats";
 import { StudioContinuityMetadataEditor } from "./StudioContinuityMetadataEditor";
 
@@ -365,7 +366,7 @@ export function StudioScenarioAutoLayoutPanel({
                       </p>
                       {textProvenance.failover ? (
                         <p className="mt-1 rounded-md border border-warn/35 bg-warn/10 px-2 py-1 text-warn" role="status">
-                          {textProvenance.failover.attemptedProvider === "zai" ? "Z.ai" : "DeepSeek"} 잔액·패키지 한도 소진으로 {textProvenance.failover.actualProvider === "zai" ? "Z.ai" : "DeepSeek"}에 자동 전환했어요.
+                          {studioServerAiProviderLabel(textProvenance.failover.attemptedProvider)} 잔액·패키지 한도 소진으로 {studioServerAiProviderLabel(textProvenance.failover.actualProvider)}에 자동 전환했어요.
                         </p>
                       ) : null}
                     </div>

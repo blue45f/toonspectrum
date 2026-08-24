@@ -11,6 +11,7 @@
 // 캔버스 요소)에 개입해야 해서, 상태를 이 컴포넌트 내부로 가져오면 오히려 부모와 자식 둘 다 같은
 // 값을 따로 들고 동기화해야 하는 이중 소유가 생긴다.
 import { Loader2, MessageSquareQuote, Plus, Sparkles } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import { formatDialogueSuggestionLine, type DialogueSuggestionCandidate } from "./lettering/studio-dialogue-suggest";
 
@@ -49,6 +50,12 @@ export function StudioDialogueSuggestPanel({
   onInsertToSelected: (candidate: DialogueSuggestionCandidate) => void;
 }) {
   const canGenerate = configured && !busy && situationText.trim().length > 0;
+  // 팔레트 패널과 동일 — 결과·에러가 fold 아래에 생기지 않게 도착 시 nearest 스크롤.
+  const feedbackRef = useRef<HTMLDivElement | null>(null);
+  const hasFeedback = Boolean(candidates || error);
+  useEffect(() => {
+    if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [hasFeedback]);
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel/50 p-3">
@@ -99,38 +106,40 @@ export function StudioDialogueSuggestPanel({
         {busy ? "구상하는 중…" : "대사 제안 받기"}
       </button>
 
-      {error && <p className="text-xs text-bad">{error}</p>}
+      <div ref={feedbackRef}>
+        {error && <p className="text-xs text-bad">{error}</p>}
 
-      {candidates && candidates.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          {candidates.map((candidate, i) => {
-            const line = formatDialogueSuggestionLine(candidate);
-            return (
-              <div key={`${i}-${line}`} className="flex flex-col gap-1 rounded-lg border border-line bg-card/70 p-2">
-                <p className="whitespace-pre-wrap text-[0.68rem] leading-relaxed text-fg-2">{line}</p>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => onAddToScript(candidate)}
-                    className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
-                  >
-                    <Plus size={11} /> 대사 스크립트에 추가
-                  </button>
-                  {canInsertToSelected && (
+        {candidates && candidates.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            {candidates.map((candidate, i) => {
+              const line = formatDialogueSuggestionLine(candidate);
+              return (
+                <div key={`${i}-${line}`} className="flex flex-col gap-1 rounded-lg border border-line bg-card/70 p-2">
+                  <p className="whitespace-pre-wrap text-[0.68rem] leading-relaxed text-fg-2">{line}</p>
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => onInsertToSelected(candidate)}
+                      onClick={() => onAddToScript(candidate)}
                       className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
                     >
-                      <MessageSquareQuote size={11} /> 선택한 말풍선에 삽입
+                      <Plus size={11} /> 대사 스크립트에 추가
                     </button>
-                  )}
+                    {canInsertToSelected && (
+                      <button
+                        type="button"
+                        onClick={() => onInsertToSelected(candidate)}
+                        className="inline-flex items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                      >
+                        <MessageSquareQuote size={11} /> 선택한 말풍선에 삽입
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <p className="text-[0.6rem] leading-relaxed text-fg-3">
         여러 개의 초안 후보예요 — 마음에 드는 걸 골라 다듬어 쓰세요. &quot;대사 스크립트에 추가&quot;는

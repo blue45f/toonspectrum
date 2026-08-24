@@ -1,7 +1,19 @@
 import { api, toApiError } from "@/src/infrastructure/api";
 
 export type StudioServerAiTask = "composition" | "scenario" | "translation" | "dialogue" | "palette";
-export type StudioServerAiProvider = "zai" | "deepseek";
+/** 서버가 구성할 수 있는 텍스트 AI 공급자. 서버 studio-ai-provider.ts의 allowlist와 일치해야 한다. */
+export type StudioServerAiProvider = "zai" | "deepseek" | "openrouter";
+
+const STUDIO_SERVER_AI_PROVIDER_LABELS: Record<StudioServerAiProvider, string> = {
+  zai: "Z.ai",
+  deepseek: "DeepSeek",
+  openrouter: "OpenRouter",
+};
+
+/** UI 표시용 공급자 이름 — failover 문구 등에서 이진 삼항식 대신 공통으로 쓴다. */
+export function studioServerAiProviderLabel(provider: StudioServerAiProvider): string {
+  return STUDIO_SERVER_AI_PROVIDER_LABELS[provider];
+}
 export type StudioServerAiProviderPreference = "auto" | StudioServerAiProvider;
 
 /**
@@ -88,7 +100,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function studioServerAiProvider(value: unknown): StudioServerAiProvider | undefined {
-  return value === "zai" || value === "deepseek" ? value : undefined;
+  return value === "zai" || value === "deepseek" || value === "openrouter" ? value : undefined;
 }
 
 function boundedText(value: unknown, maxCodeUnits: number): string | undefined {

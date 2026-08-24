@@ -218,18 +218,17 @@ export function StudioAiToolPopoverBody({
                         aria-label={lt("서버 텍스트 AI 제공자", "studio.aiToolPopover.serverTextAiProviderAria")}
                       >
                         <option value="auto">{lt("자동 전환", "studio.aiToolPopover.serverProviderAuto")}</option>
-                        <option
-                          value="zai"
-                          disabled={!configuredServerAiProviders.some((provider) => provider.id === "zai")}
-                        >
-                          Z.ai
-                        </option>
-                        <option
-                          value="deepseek"
-                          disabled={!configuredServerAiProviders.some((provider) => provider.id === "deepseek")}
-                        >
-                          DeepSeek
-                        </option>
+                        {(serverAiStatus?.providers.length
+                          ? serverAiStatus.providers
+                          : [
+                              { id: "zai" as const, label: "Z.ai", configured: false, model: "" },
+                              { id: "deepseek" as const, label: "DeepSeek", configured: false, model: "" },
+                            ]
+                        ).map((provider) => (
+                          <option key={provider.id} value={provider.id} disabled={!provider.configured}>
+                            {provider.label}
+                          </option>
+                        ))}
                       </select>
                     </label>
                     <p className="mt-1.5 text-[0.65rem] leading-relaxed text-fg-3">

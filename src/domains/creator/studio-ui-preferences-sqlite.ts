@@ -94,7 +94,7 @@ function parseJson(raw: string | null): unknown {
 }
 
 function normalizeServerAiProvider(value: unknown): StudioServerAiProviderPreference {
-  return value === "zai" || value === "deepseek" ? value : "auto";
+  return value === "zai" || value === "deepseek" || value === "openrouter" ? value : "auto";
 }
 
 function assetFavoritesKey(userId: string | null): string {

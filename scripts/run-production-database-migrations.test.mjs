@@ -21,10 +21,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(27);
+  expect(manifest).toHaveLength(28);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0027_creator_draft_atomic_publication");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(27);
+  expect(manifest.at(-1).id).toBe("0028_studio_ai_openrouter_provider");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(28);
 });
 
 test("auth lifecycle migration owns schema repair and a durable readiness marker", () => {
@@ -80,7 +80,9 @@ test("cloud-save intent migration widens and validates the existing room check",
 });
 
 test("atomic publication migration records an exact revision and final-status receipt", () => {
-  const migration = loadMigrationManifest().at(-1);
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0027_creator_draft_atomic_publication"
+  );
   expect(migration?.id).toBe("0027_creator_draft_atomic_publication");
   const sql = migration?.contents ?? "";
 

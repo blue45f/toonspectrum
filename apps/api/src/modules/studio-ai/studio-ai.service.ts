@@ -226,12 +226,17 @@ function isStudioAiProviderId(value: string | undefined): value is StudioAiProvi
 }
 
 const TASK_SPECS = {
-  composition: { temperature: 0.6, maxTokens: 600, responseFormat: "text" },
+  // composition/dialogue도 완료 토큰이 상한에 정확히 맞아 finish_reason=length로 잘리는 실패가
+  // 실측됐다(예: composition 992 = prompt 392 + 600). 잘림 없이 완성되도록 상한을 넉넉히 둔다 —
+  // quota 예약량이 maxTokens를 따라가므로 과다 회수 위험은 없다.
+  composition: { temperature: 0.6, maxTokens: 1_200, responseFormat: "text" },
   scenario: { temperature: 0.7, maxTokens: 2_400, responseFormat: "json" },
   // 기존 파서가 최상위 JSON 배열을 기대하므로 DeepSeek json_object 모드는 쓰지 않는다.
   translation: { temperature: 0.2, maxTokens: 4_000, responseFormat: "text" },
-  dialogue: { temperature: 0.8, maxTokens: 800, responseFormat: "text" },
-  palette: { temperature: 0.6, maxTokens: 800, responseFormat: "json" },
+  dialogue: { temperature: 0.8, maxTokens: 1_200, responseFormat: "text" },
+  // 팔레트 JSON(5~6색 + 용도 설명)이 800토큰에서 finish_reason=length로 잘려 provider_error가
+  // 되는 실패가 실측됐다(완료 토큰이 정확히 800). 잘림 없이 완성되도록 상향한다.
+  palette: { temperature: 0.6, maxTokens: 1_600, responseFormat: "json" },
 } as const;
 
 function providerUserId(userId: string): string | undefined {
