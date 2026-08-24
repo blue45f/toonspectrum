@@ -1397,7 +1397,29 @@ async function runDesktopGroupAudit(
     await activateSelectionTool(page);
     await page.keyboard.press("Meta+A");
     await waitForWholeGroupSelection(page, 3);
-    await page.getByRole("button", { name: "선택 요소 그룹화", exact: true }).click();
+    const groupButton = page.getByRole("button", { name: "선택 요소 그룹화", exact: true });
+    if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
+      await page.evaluate(() => {
+        (globalThis as { __studioGroupsDebug?: boolean }).__studioGroupsDebug = true;
+      });
+      page.on("pageerror", (error) => {
+        console.log(`[groups-debug] pageerror: ${error.message}`);
+      });
+      page.on("console", (message) => {
+        console.log(`[groups-debug] console.${message.type()}: ${message.text()}`);
+      });
+    }
+    await groupButton.click();
+    if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
+      for (let sample = 0; sample < 12; sample += 1) {
+        await page.waitForTimeout(700);
+        const snap = await readLatestSnapshot(page).catch(() => null);
+        const groupIds = snap
+          ? JSON.stringify(snap.elements.map((element) => element.groupId))
+          : "read-error";
+        console.log(`[groups-debug] t=${(sample + 1) * 0.7}s groups=${JSON.stringify(snap?.groups?.length ?? null)} ids=${groupIds}`);
+      }
+    }
 
     const grouped = await waitForSnapshot(
       page,
