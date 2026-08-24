@@ -91,12 +91,18 @@ const envSchema = z.object({
     300,
   ).optional(),
   CI: z.enum(["true", "false", "1", "0"]).optional(),
-  TZ: z
-    .string()
-    .min(1)
-    .max(128)
-    .regex(/^(?:UTC|[A-Za-z_+-]+\/[A-Za-z0-9_+:-]+)$/u)
-    .optional(),
+  TZ: z.preprocess(
+    (value) =>
+      // AWS Lambda(Vercel Functions) 런타임이 POSIX 형식의 `:UTC` 를 주입한다 — 선행 콜론을
+      // 벗긴 뒤 검증해 매 콜드스타트마다 거짓 경고가 찍히지 않게 한다.
+      typeof value === "string" ? value.replace(/^:/u, "") : value,
+    z
+      .string()
+      .min(1)
+      .max(128)
+      .regex(/^(?:UTC|[A-Za-z_+-]+\/[A-Za-z0-9_+:-]+)$/u)
+      .optional(),
+  ),
   // 포트 류: 숫자 문자열만 경고 대상(빈 값/미설정은 폴백 허용).
   PORT: z.string().regex(/^\d+$/, "PORT must be numeric").optional(),
   NEST_API_PORT: z.string().regex(/^\d+$/, "NEST_API_PORT must be numeric").optional(),

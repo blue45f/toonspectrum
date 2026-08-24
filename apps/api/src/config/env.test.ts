@@ -446,6 +446,21 @@ describe("Catalog, asset admission, and KMAS environment validation", () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
+  it("normalizes the Lambda-injected POSIX ':UTC' timezone instead of warning on every cold start", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(validateEnv({ NODE_ENV: "test", TZ: ":UTC" }, logger)).toMatchObject({
+      TZ: "UTC",
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+
+    expect(
+      validateEnv({ NODE_ENV: "test", TZ: "Asia/Seoul" }, logger)
+    ).toMatchObject({ TZ: "Asia/Seoul" });
+    expect(validateEnv({ NODE_ENV: "test", TZ: "KST" }, logger)).toBeNull();
+    expect(logger.warn).toHaveBeenCalled();
+  });
+
   it("rejects unsafe or out-of-budget operational values without reflecting secrets", () => {
     const logger = { warn: vi.fn(), error: vi.fn() };
     const kmasSecret = "private-kmas-value";
