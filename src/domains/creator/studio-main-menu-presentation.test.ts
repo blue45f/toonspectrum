@@ -32,16 +32,45 @@ describe("createStudioMainMenuPresentation", () => {
 
     expect(presentation.groups.map((group) => group.id)).toEqual([
       ...STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER,
+      "brush",
+      "text",
       "canvas",
       "transform",
-      "brush",
       "vector",
-      "text",
       "3d",
       "collaboration",
       "ai",
     ]);
-    expect(presentation.specialistBoundaryGroupId).toBe("canvas");
+    expect(presentation.specialistBoundaryGroupId).toBe("brush");
+  });
+
+  it("keeps unknown specialist groups after every known id, in source order", () => {
+    const groups = [
+      "file",
+      "canvas",
+      "future-a",
+      "brush",
+      "ai",
+      "future-b",
+    ].map((id) => ({ id, items: [{ id: `${id}-command` }] }));
+
+    const presentation = createStudioMainMenuPresentation(groups);
+
+    expect(presentation.groups.map((group) => group.id)).toEqual([
+      "file",
+      "brush",
+      "canvas",
+      "ai",
+      "future-a",
+      "future-b",
+    ]);
+    expect(presentation.specialistGroupIds).toEqual([
+      "brush",
+      "canvas",
+      "ai",
+      "future-a",
+      "future-b",
+    ]);
   });
 
   it("preserves every group, command array, and future specialist group by reference", () => {

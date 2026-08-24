@@ -56,11 +56,11 @@ const MENU_GROUP_IDS = [
 
 const PRESENTED_MENU_GROUP_IDS = [
   ...STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER,
+  "brush",
+  "text",
   "canvas",
   "transform",
-  "brush",
   "vector",
-  "text",
   "3d",
   "collaboration",
   "ai",
