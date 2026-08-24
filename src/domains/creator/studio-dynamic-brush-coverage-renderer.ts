@@ -1630,6 +1630,21 @@ export function planStudioDynamicBrushCoverageMarks(
           pressure: paperContactPressure,
         });
         if (composed) texturedAlphaMap = composed;
+        if (composed && kernelTipPaperGainFloor > 0) {
+          /*
+           * 조성 맵의 골 텍셀은 0까지 가라앉는다 — 스칼라 하한만으로는 짧은 획의 dab이
+           * 통째로 스킵 구간에 빠지는 것을 막지 못한다(실측 플레이크). 원본 팁 맵 방향으로
+           * 하한 비율만큼 블렌드해 최소 가시 기반을 보장하면서 상대적 종이 결은 유지한다.
+           */
+          const floor = kernelTipPaperGainFloor;
+          const lifted = {
+            ...composed,
+            alphas: composed.alphas.map((texel, texelIndex) => (
+              Math.max(texel, tipAlphaMap.alphas[texelIndex]! * floor)
+            )),
+          };
+          texturedAlphaMap = lifted;
+        }
       }
       /*
        * 커널 팁 가시 알파 하한(ADR 0010): 선형화된 침착 알파에 stroke-anchored tooth 승수를
