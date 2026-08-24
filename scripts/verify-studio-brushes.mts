@@ -1821,6 +1821,27 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           }
         }
       }
+      if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
+        const dump = await page.evaluate(() =>
+          Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
+            index,
+            w: canvas.width,
+            h: canvas.height,
+            cls: (canvas.className ?? "").toString().slice(0, 48),
+            url: canvas.toDataURL("image/png"),
+          })),
+        );
+        const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-short-live`);
+        mkdirSync(dumpDir, { recursive: true });
+        for (const entry of dump) {
+          const base64 = entry.url.split(",")[1] ?? "";
+          if (!base64) continue;
+          writeFileSync(
+            join(dumpDir, `${String(entry.index).padStart(2, "0")}-${entry.w}x${entry.h}.png`),
+            Buffer.from(base64, "base64"),
+          );
+        }
+      }
       await page.mouse.up();
       const immediate = await page.screenshot({ animations: "disabled", clip: usedClip });
       await page.mouse.move(4, 4);

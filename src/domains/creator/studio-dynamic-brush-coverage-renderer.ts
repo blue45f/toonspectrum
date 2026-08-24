@@ -1281,6 +1281,18 @@ export function planStudioDynamicBrushCoverageMarks(
         )
       : resolveStudioPaperGranulationAlphaMultiplierAt(paperTile, x, y, paperScale)
   );
+  /*
+   * 커널 팁 품질 하한(ADR 0010 손맛 우선): contact-tooth granulation이 깊은 종이 골에서
+   * multiplier≈0을 반환하면 짧은 획의 소수 dab이 전부 스킵 구간에 빠져 mark.alpha가
+   * 가시 임계 아래로 떨어지고, 저장 문서에서 획 자체가 사라진다(실측 간헐 실패 —
+   * 패리티 리포트 §단획 간헐 실패). STUDIO_KERNEL_TIP_MIN_VISIBLE_SIZE 크기 하한은
+   * 알파 스킵을 막지 못하므로, 커널 팁 재질의 스칼라 종이 이득에만 최소치를 보장한다.
+   * 라이브·커밋·내보내기가 같은 플래너를 공유하므로 세 표면이 함께 이동해 재생 일관성은 유지된다.
+   */
+  const kernelTipPaperGainFloor = dryMediaKernelTipMaterial !== null ? 0.35 : 0;
+  const paperGainFor = (x: number, y: number): number => (
+    Math.max(paperMultiplierAt(x, y), kernelTipPaperGainFloor)
+  );
   /**
    * 종이 결이 dab **안쪽**까지 들어가는 마지막 dab 인덱스(배타).
    *
@@ -1320,7 +1332,7 @@ export function planStudioDynamicBrushCoverageMarks(
       ) * weight;
       totalWeight += weight;
     }
-    return weighted / totalWeight;
+    return Math.max(weighted / totalWeight, kernelTipPaperGainFloor);
   };
 
   const appendMark = (mark: StudioDynamicBrushCoverageMark): boolean => {
@@ -1355,7 +1367,7 @@ export function planStudioDynamicBrushCoverageMarks(
                 dynamics.grain
               )
             : 1)
-          * paperMultiplierAt(x, y)
+          * paperGainFor(x, y)
         );
     const grainAcrossFootprint = (
       x: number,
