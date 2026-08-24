@@ -2594,19 +2594,25 @@ function StudioCuttoonEditor({
       accessGeneration: current.accessGeneration + 1,
     };
   }
-  function markStudioDocumentChanged(): boolean {
-    if (documentSaveInFlightRef.current) {
-      if (editorMountedRef.current) {
-        setError("저장 중에는 원고를 변경할 수 없어요. 저장이 끝난 뒤 다시 시도해 주세요.");
-      }
-      return false;
-    }
+  // 무음 더티 마크 — 슬라이더처럼 연속 입력되는 컨트롤용 변형. 저장 중이면 범프를
+  // 건너뛰고 false를 돌려주지만 오류 배너는 띄우지 않는다(입력 도중 차단 방지).
+  function tryMarkStudioDocumentChangedQuietly(): boolean {
+    if (documentSaveInFlightRef.current) return false;
     studioRevisionProjectGenerationRef.current += 1;
     const current = collaborationAccessRef.current;
     collaborationAccessRef.current = {
       ...current,
       documentGeneration: current.documentGeneration + 1,
     };
+    return true;
+  }
+  function markStudioDocumentChanged(): boolean {
+    if (!tryMarkStudioDocumentChangedQuietly()) {
+      if (editorMountedRef.current) {
+        setError("저장 중에는 원고를 변경할 수 없어요. 저장이 끝난 뒤 다시 시도해 주세요.");
+      }
+      return false;
+    }
     return true;
   }
   useLayoutEffect(() => {
@@ -3723,14 +3729,18 @@ function StudioCuttoonEditor({
       kind,
       seed: activePage.paperSurface?.seed ?? DEFAULT_STUDIO_PAPER_SURFACE.seed,
     });
+    // 종이 교체는 문서 속성 커밋이라 범프 없으면 오토세이브 게이트가 버린다.
+    if (!markStudioDocumentChanged()) return;
     setStudioDocumentPaperSurface(plan.surface);
     patchStudioLivingInkMaterial(plan.livingInk);
     updateActivePage({ paperSurface: plan.surface });
   };
   const setPaperGrainVisible = (visible: boolean) => {
+    if (!markStudioDocumentChanged()) return;
     updateActivePage({ paperGrainVisible: visible });
   };
   const applyPaperTintBackground = () => {
+    if (!markStudioDocumentChanged()) return;
     const entry = getStudioPaperSurfaceCatalogEntry(paperGrainKind);
     updateActivePage({ bg: entry.tintBg, bgGrad: null });
   };
@@ -3742,10 +3752,20 @@ function StudioCuttoonEditor({
     commitPages(nextPages);
   }
   // ── 페이지 색보정(그레이드) ──────────────────────────────────────────────
-  const patchPageGrade = (patch: Partial<PageGrade>) =>
+  // 그레이드 슬라이더는 연속 입력이라 저장 중 차단(fail-closed)을 쓰면 드래그가 끊긴다.
+  // 대신 저장 중이 아닐 때 조용히 범프해 오토세이브 게이트가 이 커밋을 버리지 않게 한다.
+  const patchPageGrade = (patch: Partial<PageGrade>) => {
+    tryMarkStudioDocumentChangedQuietly();
     updateActivePage({ grade: normalizePageGrade({ ...pageGrade, ...patch }) });
-  const applyPageGrade = (grade: PageGrade) => updateActivePage({ grade: normalizePageGrade(grade) });
-  const resetPageGrade = () => updateActivePage({ grade: undefined });
+  };
+  const applyPageGrade = (grade: PageGrade) => {
+    if (!markStudioDocumentChanged()) return;
+    updateActivePage({ grade: normalizePageGrade(grade) });
+  };
+  const resetPageGrade = () => {
+    if (!markStudioDocumentChanged()) return;
+    updateActivePage({ grade: undefined });
+  };
 
   // 줌/팬 드래그 상태
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -18874,6 +18894,7 @@ const puppetWarpArmed =
           } as El)
         : e
     );
+    if (!markStudioDocumentChanged()) return;
     commit(next);
     capturedElementIdsRef.current = new Set(next.map((e) => e.id));
   }
@@ -18905,6 +18926,7 @@ const puppetWarpArmed =
         pixelRatio: 2 / effScale,
       }),
     }));
+    if (!markStudioDocumentChanged()) return;
     updateActivePage({ animTimeline: setKeyframe(animTimeline, trackId, frameIndex, { id: uid(), src }) });
   }
   function addEl(el: El): boolean {
@@ -23272,6 +23294,8 @@ const puppetWarpArmed =
   }
 
   function applyBgPreset(p: BgPreset) {
+    if (!p.grad && !p.fill) return;
+    if (!markStudioDocumentChanged()) return;
     if (p.grad) setBgGrad(p.grad);
     else if (p.fill) {
       setBg(p.fill);
@@ -23295,6 +23319,8 @@ const puppetWarpArmed =
     presetId?: string;
   }) {
     setMenu(null);
+    // 모든 분기가 페이지 배경 필드나 fill 레이어를 커밋하므로 진입에서 한 번만 범프한다.
+    if (!markStudioDocumentChanged()) return;
     const {
       buildStudioBackgroundGradientSvg,
       isStudioBackgroundFillLayerName,
