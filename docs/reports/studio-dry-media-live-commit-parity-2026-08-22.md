@@ -495,3 +495,7 @@ paper-gain 플로어는 방향은 맞지만 이 결함의 축이 아니다(플�
 autosave에서 읽어 라이브 파생 dynamics와 필드별 diff — 특히 paper 응답 입력
 (granulation/scale/model/medium)과 seed. 우선순위 2: Konva sceneFunc에 주입되는
 context.getTransform() 실측(physicalScale 확인).
+### 조성 맵 골 리프트 검증 (같은 세션)
+18e46f16(조성 알파맵을 원본 팁 맵 방향으로 하한 비율 블렌드) 적용 후 연속 2회 focused
+run 단획 매트릭스 통과(이전 스칼라 전용 플로어는 4회 중 1회 실패). 드리프트 12.50–12.75px로
+안정. 채널 2(Konva 합성 소프트니)가 잔여 과제.
