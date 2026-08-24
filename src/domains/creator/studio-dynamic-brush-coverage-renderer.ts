@@ -126,6 +126,11 @@ export const STUDIO_DYNAMIC_COVERAGE_TILE_PIXEL_SIZE = 256;
  * dab 크기만의 순수 함수로 적용된다(위 주석).
  */
 const STUDIO_KERNEL_TIP_MIN_VISIBLE_SIZE = 2.2;
+/**
+ * 커널 팁 마크의 최소 가시 알파 — 선형화 침착 × stroke tooth 조합이 단일 dab(탭)에서
+ * 0.03 수준으로 내려가 저장 문서에서 획이 사라지는 것을 막는다(ADR 0010).
+ */
+const STUDIO_KERNEL_TIP_MIN_VISIBLE_ALPHA = 0.12;
 
 export const STUDIO_DYNAMIC_COVERAGE_TILE_BLEED_PIXELS = 2;
 /**
@@ -1626,6 +1631,56 @@ export function planStudioDynamicBrushCoverageMarks(
         });
         if (composed) texturedAlphaMap = composed;
       }
+      /*
+       * 커널 팁 가시 알파 하한(ADR 0010): 선형화된 침착 알파에 stroke-anchored tooth 승수를
+       * 곱하면 단일 dab(탭·빠른 짧은 터치)이 0.03 수준까지 내려가 저장 문서에서 획이
+       * 사라진다(실측 — 패리티 리포트 §단획 실피 재정성). 겹침 코어는 이미 하한 위라
+       * 무영향이고, 어떤 prefix 길이에서도 같은 값이라 라이브/커밋이 함께 이동한다.
+       */
+      const texturedMarkAlpha = clampAlpha(
+        Math.max(
+          depositionAlpha
+            * (paperFitsInsideDab
+              ? resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
+                  composedDab.x,
+                  composedDab.y,
+                  radiusX,
+                  radiusY,
+                  angleRadians,
+                  strokeOriginX,
+                  strokeOriginY,
+                  dynamicSeed,
+                  dynamics.grain,
+                )
+              : grainAcrossFootprint(
+                  composedDab.x,
+                  composedDab.y,
+                  radiusX,
+                  radiusY,
+                  angleRadians,
+                ))
+            * (kernelTipMaterial
+              ? studioDryMediaKernelStrokeToothMultiplier(
+                  kernelTipMaterial,
+                  {
+                    index: composedDab.index ?? 0,
+                    x: composedDab.x,
+                    y: composedDab.y,
+                    ...(composedDab.distanceFromStrokeStart !== undefined
+                      ? {
+                          distanceFromStrokeStart:
+                            composedDab.distanceFromStrokeStart,
+                        }
+                      : {}),
+                  },
+                  strokeOriginX,
+                  strokeOriginY,
+                  dynamicSeed,
+                )
+              : 1),
+          kernelTipMaterial ? STUDIO_KERNEL_TIP_MIN_VISIBLE_ALPHA : 0,
+        ),
+      );
       const texturedMark: StudioDynamicBrushCoverageMark = {
         x: composedDab.x,
         y: composedDab.y,
@@ -1639,50 +1694,8 @@ export function planStudioDynamicBrushCoverageMarks(
         // 두 번 곱하면 같은 물리를 제곱해 획이 근거 없이 어두워진다. 판정 기준은 "합성이
         // 성공했는가"가 아니라 "이 dab이 종이를 맵 안에 담을 수 있는가"다: 예산 소진으로
         // 합성을 건너뛰더라도 알파는 그대로 남아 질감만 옅어지고 획의 농도는 흔들리지 않는다.
-        alpha: clampAlpha(
-          depositionAlpha * (paperFitsInsideDab
-            ? resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
-                composedDab.x,
-                composedDab.y,
-                radiusX,
-                radiusY,
-                angleRadians,
-                strokeOriginX,
-                strokeOriginY,
-                dynamicSeed,
-                dynamics.grain,
-              )
-            : grainAcrossFootprint(
-                composedDab.x,
-                composedDab.y,
-                radiusX,
-                radiusY,
-                angleRadians,
-              ))
-          // Kernel lane only: stroke-anchored paper tooth. Tip-local grain cannot survive five
-          // overlapping fibres, so full-contrast pores live in the stroke's own coordinates where
-          // every overlapping dab dips at the same valley (the union carrier's pores did too).
-          * (kernelTipMaterial
-            ? studioDryMediaKernelStrokeToothMultiplier(
-                kernelTipMaterial,
-                {
-                  index: composedDab.index ?? 0,
-                  x: composedDab.x,
-                  y: composedDab.y,
-                  ...(composedDab.distanceFromStrokeStart !== undefined
-                    ? {
-                        distanceFromStrokeStart:
-                          composedDab.distanceFromStrokeStart,
-                      }
-                    : {}),
-                },
-                strokeOriginX,
-                strokeOriginY,
-                dynamicSeed,
-              )
-            : 1),
-        ),
-        color: dabColor,
+        alpha: texturedMarkAlpha,
+                color: dabColor,
         texture: {
           kind: "alpha-map",
           alphaMap: texturedAlphaMap,
