@@ -1,6 +1,7 @@
 import { ArrowUpRight, Layers } from "lucide-react";
 
 import { formatMarketDate, marketKindMeta, marketLicenseMeta } from "./market-kind";
+import { palettePreviewColors } from "./market-preview";
 
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
 
@@ -17,6 +18,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
   const kind = marketKindMeta(record.kind);
   const license = marketLicenseMeta(record.license);
   const KindIcon = kind.icon;
+  const paletteColors = palettePreviewColors(record);
 
   return (
     <Link
@@ -31,17 +33,43 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
       <div
         aria-hidden="true"
         className="relative flex aspect-[16/9] items-end justify-between p-3.5"
-        style={{
-          background: `linear-gradient(140deg, oklch(0.34 0.075 ${kind.hue}) 0%, oklch(0.24 0.045 ${kind.hue}) 55%, oklch(0.20 0.025 ${kind.hue}) 100%)`,
-        }}
+        style={
+          paletteColors
+            ? undefined
+            : {
+                background: `linear-gradient(140deg, oklch(0.34 0.075 ${kind.hue}) 0%, oklch(0.24 0.045 ${kind.hue}) 55%, oklch(0.20 0.025 ${kind.hue}) 100%)`,
+              }
+        }
       >
-        <span className="font-display text-[0.6rem] font-medium uppercase tracking-[0.14em] text-fg/85">
+        {paletteColors ? (
+          <span className="absolute inset-0 flex">
+            {paletteColors.slice(0, 10).map((color, index) => (
+              <span
+                key={`${color}-${index}`}
+                className="h-full flex-1 transition-[flex-grow] duration-200 ease-out-expo group-hover:grow-[1.35]"
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </span>
+        ) : null}
+        <span
+          className={cn(
+            "font-display text-[0.6rem] font-medium uppercase tracking-[0.14em]",
+            paletteColors
+              ? "rounded-md bg-canvas/55 px-1.5 py-0.5 text-fg backdrop-blur-sm"
+              : "text-fg/85"
+          )}
+        >
           {kind.english}
         </span>
-        <KindIcon strokeWidth={1.5} className="h-9 w-9 text-fg/35 transition-colors duration-200 group-hover:text-fg/60" />
-        <span className="absolute inset-x-0 bottom-0 h-[3px]" style={{
-          background: `linear-gradient(90deg, oklch(0.72 0.15 ${kind.hue}), oklch(0.62 0.12 ${(kind.hue + 40) % 360}), oklch(0.52 0.09 ${(kind.hue + 90) % 360}))`,
-        }} />
+        {!paletteColors ? (
+          <KindIcon strokeWidth={1.5} className="h-9 w-9 text-fg/35 transition-colors duration-200 group-hover:text-fg/60" />
+        ) : null}
+        {!paletteColors ? (
+          <span className="absolute inset-x-0 bottom-0 h-[3px]" style={{
+            background: `linear-gradient(90deg, oklch(0.72 0.15 ${kind.hue}), oklch(0.62 0.12 ${(kind.hue + 40) % 360}), oklch(0.52 0.09 ${(kind.hue + 90) % 360}))`,
+          }} />
+        ) : null}
         <span className="numeral tnum absolute right-3.5 top-3 inline-flex items-center gap-1 rounded-md bg-canvas/45 px-1.5 py-0.5 text-[0.65rem] text-fg/80 backdrop-blur-sm">
           <Layers className="h-3 w-3" aria-hidden="true" />
           {record.entries.length}

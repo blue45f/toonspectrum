@@ -3,26 +3,22 @@ import { RefreshCw } from "lucide-react";
 import { formatMarketDateTime } from "./market-kind";
 
 interface StaleNoticeBarProps {
-  readonly savedAt: string;
+  readonly savedAt?: string;
+  readonly message?: string;
   readonly onRetry: () => void;
   readonly className?: string;
 }
 
-/**
- * 네트워크 실패 시 저장된 목록을 보여주는 저하 상태 알림. role="status"로
- * 스크린리더에 조용히 공지하고, 재시도는 항상 접근 가능한 버튼으로 제공한다.
- */
-export function StaleNoticeBar({ savedAt, onRetry, className }: StaleNoticeBarProps) {
+const DEFAULT_CLASS
+  = "flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2";
+
+// 에러 블록이 아닌 status 안내 — role="alert"로 바꾸면 장애 시 방문자 경험이 퇴행한다.
+export function StaleNoticeBar({ savedAt, message, onRetry, className }: StaleNoticeBarProps) {
   return (
-    <div
-      role="status"
-      className={
-        className
-        ?? "flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2"
-      }
-    >
+    <div role="status" className={className ?? DEFAULT_CLASS}>
       <span>
-        연결이 불안정해 {formatMarketDateTime(savedAt)}에 저장된 목록을 보여드리고 있어요
+        {message
+          ?? `연결이 불안정해 ${formatMarketDateTime(savedAt ?? new Date().toISOString())}에 저장된 목록을 보여드리고 있어요`}
       </span>
       <button
         type="button"

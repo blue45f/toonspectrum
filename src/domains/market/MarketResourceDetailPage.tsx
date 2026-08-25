@@ -1,4 +1,4 @@
-import { ArrowLeft, Cpu, Download, ShieldCheck, Sparkles, Upload } from "lucide-react";
+import { ArrowLeft, Cpu, Download, Link2, ShieldCheck, Sparkles, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -9,6 +9,7 @@ import {
   marketKindMeta,
   marketLicenseMeta,
 } from "./market-kind";
+import { palettePreviewColors } from "./market-preview";
 import { readCachedMarketResource, writeCachedMarketResource } from "./market-resource-cache";
 import { MarketResourceCard } from "./MarketResourceCard";
 import { StaleNoticeBar } from "./StaleNoticeBar";
@@ -42,6 +43,42 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
       <dt className="shrink-0 text-xs text-fg-3">{label}</dt>
       <dd className="text-right text-xs font-medium text-fg">{children}</dd>
     </div>
+  );
+}
+
+function ShareLinkButton() {
+  const [copied, setCopied] = useState(false);
+
+  async function shareCurrentLink() {
+    const url = window.location.href;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ url, title: document.title });
+        return;
+      } catch {
+        // 사용자가 공유를 취소한 경우 — 클립보드 복사로 대체하지 않고 조용히 끝낸다.
+        return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // 클립보드 접근이 거부된 환경 — 피드백 없이 버튼만 유지한다.
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void shareCurrentLink()}
+      className={buttonClass({ variant: "ghost", size: "sm", className: "w-full" })}
+      aria-live="polite"
+    >
+      <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
+      {copied ? "링크를 복사했어요" : "링크 공유"}
+    </button>
   );
 }
 
@@ -132,12 +169,11 @@ export function MarketResourceDetailPage() {
           </Link>
         </div>
       ) : error || !record ? (
-        <div
-          role="alert"
-          className="mt-8 rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center"
-        >
-          <p className="text-sm font-medium text-fg">공유 리소스를 불러오지 못했습니다</p>
-          <p className="mt-1 text-sm text-fg-2">{error}</p>
+        <div role="status" className="mt-8 rounded-xl border border-warn/40 bg-warn/10 p-10 text-center">
+          <p className="text-sm font-medium text-fg">지금은 리소스를 불러올 수 없어요</p>
+          <p className="mx-auto mt-1.5 max-w-sm text-sm text-fg-2">
+            일시적인 장앙일 수 있어요. 잠시 후 다시 시도해 주세요.
+          </p>
           <button
             type="button"
             onClick={() => setReloadToken((token) => token + 1)}
@@ -151,6 +187,7 @@ export function MarketResourceDetailPage() {
           const kind = marketKindMeta(record.kind);
           const license = marketLicenseMeta(record.license);
           const KindIcon = kind.icon;
+          const paletteColors = palettePreviewColors(record);
           return (
             <article className="mt-6">
               {staleSavedAt ? (
@@ -182,6 +219,24 @@ export function MarketResourceDetailPage() {
 
               <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="min-w-0 space-y-6">
+                  {paletteColors ? (
+                    <section aria-labelledby="market-palette-heading">
+                      <h2 id="market-palette-heading" className="eyebrow text-fg-3">
+                        Colors · <span className="numeral tnum">{paletteColors.length}</span>
+                      </h2>
+                      <ul className="mt-3 grid grid-cols-4 gap-1.5 sm:grid-cols-6 lg:grid-cols-8">
+                        {paletteColors.map((color, index) => (
+                          <li key={`${color}-${index}`} className="overflow-hidden rounded-lg border border-line">
+                            <div className="aspect-square w-full" style={{ backgroundColor: color }} />
+                            <p className="numeral tnum bg-card px-1 py-1 text-center text-[0.6rem] text-fg-3">
+                              {color}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  ) : null}
+
                   <section aria-labelledby="market-entries-heading">
                     <h2 id="market-entries-heading" className="eyebrow text-fg-3">
                       Contents · <span className="numeral tnum">{record.entries.length}</span> items
@@ -254,6 +309,7 @@ export function MarketResourceDetailPage() {
                     >
                       이 리소스와 비슷한 것 더 보기
                     </Link>
+                    <ShareLinkButton />
                     <p className="text-center text-[0.68rem] leading-relaxed text-fg-3">
                       Studio 자산 메뉴의 커뮤니티 마켓에서 설치할 수 있어요.
                     </p>

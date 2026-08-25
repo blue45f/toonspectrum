@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { marketBrowseJsonLd } from "./market-jsonld";
@@ -17,7 +17,6 @@ import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
 import { useJsonLd } from "@/src/hooks/use-document-title";
 
 
@@ -92,6 +91,15 @@ export function MarketBrowsePage() {
 
   const activeKind = query.kind;
   const activeLicense = query.license;
+
+  const committedSearch = query.search ?? "";
+  useEffect(() => {
+    if (draftSearch === committedSearch) return;
+    const timer = setTimeout(() => {
+      patchParams({ q: draftSearch.trim() || null });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [draftSearch, committedSearch, patchParams]);
 
   return (
     <div>
@@ -243,13 +251,14 @@ export function MarketBrowsePage() {
         ) : null}
 
         {page.error ? (
-          <ErrorState
-            title="마켓 리소스를 불러오지 못했습니다"
-            message={page.error}
+          <StaleNoticeBar
+            message="지금은 새 목록을 불러올 수 없어요. 잠시 후 다시 시도해 주세요."
             onRetry={page.reload}
-            className="mt-6"
+            className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2 [&>button]:ml-auto"
           />
-        ) : (
+        ) : null}
+
+        {page.error ? null : (
           <>
             <ul className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
               {page.loading

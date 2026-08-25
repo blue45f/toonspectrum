@@ -9,7 +9,6 @@ import { useMarketResources } from "./use-market-resources";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import Link from "@/src/compat/router-link";
-import { ErrorState } from "@/src/components/error-state";
 import { useJsonLd } from "@/src/hooks/use-document-title";
 
 
@@ -107,6 +106,13 @@ export function MarketHomePage() {
             전체 보기 →
           </Link>
         </div>
+        {latest.error ? (
+          <StaleNoticeBar
+            message="지금은 새 목록을 불러올 수 없어요. 잠시 후 다시 시도해 주세요."
+            onRetry={latest.reload}
+            className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2 [&>button]:ml-auto"
+          />
+        ) : null}
         {latest.stale ? (
           <StaleNoticeBar
             savedAt={latest.staleSavedAt ?? new Date().toISOString()}
@@ -114,14 +120,7 @@ export function MarketHomePage() {
             className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2 [&>button]:ml-auto"
           />
         ) : null}
-        {latest.error ? (
-          <ErrorState
-            title="마켓 리소스를 불러오지 못했습니다"
-            message={latest.error}
-            onRetry={latest.reload}
-            className="mt-4"
-          />
-        ) : (
+        {latest.error || latest.stale ? null : (
           <>
             <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
               {latest.loading
