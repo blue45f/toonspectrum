@@ -122,6 +122,7 @@ export function MarketBrowsePage() {
               <input
                 id={searchInputId}
                 type="search"
+                aria-label="마켓 리소스 검색"
                 value={draftSearch}
                 onChange={(event) => setDraftSearch(event.target.value)}
                 placeholder="리소스·태그·배급자 검색"
@@ -260,6 +261,7 @@ export function MarketBrowsePage() {
 
         {page.error ? null : (
           <>
+            <h2 className="sr-only">탐색 결과</h2>
             <ul className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
               {page.loading
                 ? Array.from({ length: PAGE_SIZE }, (_, index) => (
