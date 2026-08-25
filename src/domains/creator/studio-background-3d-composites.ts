@@ -182,51 +182,6 @@ export const COMPOSITE_PRESETS: BgCompositePreset[] = [
     ],
   },
   {
-    id: "vehicle_bus",
-    category: "vehicle",
-    label: "버스",
-    description: "박스형 대형차량 (블록아웃 수준 — 바퀴 4개로 단순화)",
-    footprint: 2.0,
-    parts: [
-      { kind: "box", offset: [0, 1.25, 0], rotation: [0, 0, 0], scale: [2.4, 2.4, 6.5], color: "#3f6f8a" },
-      { kind: "box", offset: [0, 1.9, 3.26], rotation: [0, 0, 0], scale: [2.3, 0.9, 0.05], color: "#a8cbe0" },
-      // 바퀴 offset.y는 회전+스케일 후 바퀴 반지름(cylinder 기본 반지름 0.3 × scale.x 1.1 = 0.33)과
-      // 같아야 지면(y=0)에 닿는다 — 세단 바퀴(반지름 0.255, offset.y 0.26)와 동일 원칙. 리뷰에서
-      // 이 값이 0.55로 잘못돼 있어 바퀴가 지면 위 0.22m 떠 있는 버그를 발견해 0.33으로 수정함
-      // (node+three.js로 world-space bbox 직접 계산해 확인).
-      {
-        kind: "cylinder",
-        offset: [1.15, 0.33, 2.6],
-        rotation: [0, 0, Math.PI / 2],
-        scale: [1.1, 0.35, 1.1],
-        color: "#1c1c1c",
-      },
-      {
-        kind: "cylinder",
-        offset: [-1.15, 0.33, 2.6],
-        rotation: [0, 0, Math.PI / 2],
-        scale: [1.1, 0.35, 1.1],
-        color: "#1c1c1c",
-      },
-      {
-        kind: "cylinder",
-        offset: [1.15, 0.33, -2.6],
-        rotation: [0, 0, Math.PI / 2],
-        scale: [1.1, 0.35, 1.1],
-        color: "#1c1c1c",
-      },
-      {
-        kind: "cylinder",
-        offset: [-1.15, 0.33, -2.6],
-        rotation: [0, 0, Math.PI / 2],
-        scale: [1.1, 0.35, 1.1],
-        color: "#1c1c1c",
-      },
-    ],
-  },
-
-  // ── prop ──────────────────────────────────────────────────
-  {
     id: "prop_streetlamp",
     category: "prop",
     label: "가로등",
