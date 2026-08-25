@@ -400,7 +400,6 @@ import {
   DIALOGUE_LOCALE_PRESETS,
   SOURCE_LOCALE,
 } from "./lettering/studio-dialogue-translate";
-import { attachStudioDismissableSurface } from "./studio-dismissable-surface";
 import {
   loadStudioPsdExportModule,
   loadStudioSvgExportWorkerClientModule,
@@ -791,7 +790,6 @@ import {
   STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT,
   STUDIO_WATERMARK_PREFERENCES_OWNERSHIP_BUSY_HINT,
 } from "./studio-local-database-ownership";
-import { localizeStudioText } from "./studio-localize-text";
 import {
   createStudioMacroSession,
   recordStudioMacroCommand,
@@ -3918,26 +3916,7 @@ function StudioCuttoonEditor({
       setPoserVrmOpen(true);
     }
   }, [studioRoute.surface]);
-  const [creativeModesOpen, setCreativeModesOpen] = useState(false);
-  const creativeModesLabel = localizeStudioText(t, "크리에이티브 모드", "studio.creativeModes.title");
-  // 대화상자 자체가 "크리에이티브 모드"로 이름이 붙으므로 닫기 버튼은 앱 공용 키를 그대로 쓴다
-  // (75개 로케일 팩에 이미 번역이 있어 새 키를 만들 이유가 없다).
-  const creativeModesCloseLabel = localizeStudioText(t, "닫기", "common.close");
-  const creativeModesPanelRef = useRef<HTMLDivElement | null>(null);
-  const creativeModesTriggerRef = useRef<HTMLButtonElement | null>(null);
   const hybridDccReturnFocusRef = useRef<HTMLElement | null>(null);
-  // 크리에이티브 모드 시트는 캔버스와 모바일 도크를 계속 쓸 수 있어야 하므로 모달이 아니다.
-  // 대신 Escape·바깥 탭 두 경로를 직접 붙여, 화면보다 큰 뷰포트에서도 탈출로가 사라지지 않게 한다.
-  useEffect(() => {
-    if (!creativeModesOpen) return;
-    const surface = creativeModesPanelRef.current;
-    if (!surface) return;
-    return attachStudioDismissableSurface({
-      ignore: [creativeModesTriggerRef.current],
-      onDismiss: () => setCreativeModesOpen(false),
-      surface,
-    });
-  }, [creativeModesOpen]);
   const {
     flushHybridDccWorkspacePersistence,
     hybridDccPersistenceStatus,
@@ -3961,10 +3940,7 @@ function StudioCuttoonEditor({
       && document.activeElement !== document.documentElement
       ? document.activeElement
       : null;
-    hybridDccReturnFocusRef.current = active
-      && creativeModesPanelRef.current?.contains(active)
-      ? creativeModesTriggerRef.current ?? document.getElementById("main-content")
-      : active ?? document.getElementById("main-content");
+    hybridDccReturnFocusRef.current = active ?? document.getElementById("main-content");
   };
   // 라우트/내비게이션 절반은 StudioDccWorkbenchRoute가 소유한다(문서 레이아웃 아래). 이 페이지는
   // 접근 판정과 편집기 UI 후크(announcer·포커스 복귀)만 주입하고 콜백을 그대로 아래로 넘긴다.
@@ -7909,7 +7885,6 @@ function StudioCuttoonEditor({
     setBg3dOpen(false);
     setPoserVrmOpen(false);
     setMannequinPoserOpen(false);
-    setCreativeModesOpen(false);
     setQuickStartOpen(false);
     setQuickComicOpen(false);
   }, [hybridDccRouteRequested]);
@@ -31747,11 +31722,6 @@ function clearSelectionForEdit() {
       continuityOpen={continuityOpen}
       continuityScenes={continuityScenes}
       correctStudioLayerLift={correctStudioLayerLift}
-      creativeModesCloseLabel={creativeModesCloseLabel}
-      creativeModesLabel={creativeModesLabel}
-      creativeModesOpen={creativeModesOpen}
-      creativeModesPanelRef={creativeModesPanelRef}
-      creativeModesTriggerRef={creativeModesTriggerRef}
       cropArmed={cropArmed}
       cropAspect={cropAspect}
       cropBusy={cropBusy}
@@ -32233,7 +32203,6 @@ function clearSelectionForEdit() {
       setCommentsOpen={setCommentsOpen}
       setContextMenu={setContextMenu}
       setContinuityOpen={setContinuityOpen}
-      setCreativeModesOpen={setCreativeModesOpen}
       setCropAspect={setCropAspect}
       setCropRect={setCropRect}
       setCurrentPageId={setCurrentPageId}

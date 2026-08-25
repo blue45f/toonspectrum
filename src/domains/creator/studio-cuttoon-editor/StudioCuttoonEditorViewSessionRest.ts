@@ -124,7 +124,6 @@ export type StudioCuttoonEditorViewSessionRest = {
   setCommentsOpen: any;
   setContextMenu: any;
   setContinuityOpen: any;
-  setCreativeModesOpen: any;
   setCropAspect: any;
   setCropRect: any;
   setCurrentPageId: any;

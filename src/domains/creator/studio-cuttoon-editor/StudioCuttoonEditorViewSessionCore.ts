@@ -193,11 +193,6 @@ export type StudioCuttoonEditorViewSessionCore = {
   continuityOpen: any;
   continuityScenes: any;
   correctStudioLayerLift: any;
-  creativeModesCloseLabel: any;
-  creativeModesLabel: any;
-  creativeModesOpen: any;
-  creativeModesPanelRef: any;
-  creativeModesTriggerRef: any;
   cropArmed: any;
   cropAspect: any;
   cropBusy: any;
