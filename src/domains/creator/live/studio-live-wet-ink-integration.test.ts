@@ -9,6 +9,14 @@ const viewportSource = readFileSync(
   new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
+const viewportDomOverlaysSource = readFileSync(
+  new URL("../canvas/StudioCanvasViewportDomOverlays.tsx", import.meta.url),
+  "utf8",
+);
+const viewportTypesSource = readFileSync(
+  new URL("../canvas/StudioCanvasViewportTypes.ts", import.meta.url),
+  "utf8",
+);
 const hostSource = readFileSync(
   new URL("./StudioLiveInkHosts.tsx", import.meta.url),
   "utf8",
@@ -28,10 +36,11 @@ describe("live wet-ink product boundary", () => {
     expect(hostSource).toContain('data-studio-live-wet-ink-active="true"');
     expect(hostSource).toContain('data-studio-live-wet-ink-settled="true"');
     expect(lazyUiSource).toContain("mod.StudioLiveWetInkOverlayHost");
-    expect(viewportSource).toContain(
-      "liveWetInkOverlayRenderer: import(\"../live/studio-live-wet-ink-overlay\")",
+    expect(viewportTypesSource).toContain(
+      "liveWetInkOverlayRenderer: StudioLiveWetInkOverlayRenderer",
     );
-    expect(viewportSource).toContain(
+    expect(viewportSource).toContain("<StudioCanvasViewportStageHost");
+    expect(viewportDomOverlaysSource).toContain(
       "<StudioLiveWetInkOverlayHost",
     );
   });

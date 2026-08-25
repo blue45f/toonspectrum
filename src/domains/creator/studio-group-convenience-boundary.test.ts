@@ -2,13 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const pageSource = readStudioCuttoonEditorSource();
-const viewportSource = readFileSync(
-  new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
-  "utf8",
-);
+const viewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 // 2026-08-21 intentional: the Konva selection decorations (union-bounds ghost, label badge, resize
 // proxy, Transformer, dashed boxes) moved verbatim out of StudioCanvasViewport.tsx into their own
 // leaf module. The viewport still owns every input they read, so the split assertions below only
@@ -217,7 +215,8 @@ describe("Studio PPT-style group convenience boundary", () => {
 
   it("commits mixed draw and coordinate groups through one atomic translation plan", () => {
     const start = pageSource.indexOf("function onStageDragEnd");
-    const end = pageSource.indexOf("\n  return {\n    onStageDown", start);
+    const endRaw = pageSource.indexOf("\nfunction ", start + 1);
+    const end = endRaw === -1 ? pageSource.length : endRaw;
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     const source = pageSource.slice(start, end);

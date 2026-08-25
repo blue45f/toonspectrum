@@ -7,6 +7,7 @@ import {
   applyStudioVrmCostumeState,
   collectStudioVrmCostumeMeshes,
 } from "./studio-vrm-costume-runtime";
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
 
 import type { VRM } from "@pixiv/three-vrm";
 
@@ -54,10 +55,7 @@ describe("Studio VRM baked costume runtime", () => {
   });
 
   it("keeps the Poser on the shared non-React runtime without moving rest-pose measurement", () => {
-    const poserSource = readFileSync(
-      new URL("./StudioVrmPoser.tsx", import.meta.url),
-      "utf8",
-    );
+    const poserSource = readStudioVrmPoserImplementationSource();
     const runtimeSource = readFileSync(
       new URL("./studio-vrm-costume-runtime.ts", import.meta.url),
       "utf8",

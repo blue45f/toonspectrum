@@ -60,9 +60,9 @@ describe("Studio BG3D control-field ownership boundary", () => {
       moduleSource("./StudioBg3dLtPanel.tsx"),
     ].join("\n");
     const controlSource = moduleSource("./studio-bg3d-control-fields.tsx");
-    const editorImports = moduleImports("./StudioBackground3D.tsx");
+    const bindingsSource = moduleSource("./studio-bg3d-editor-runtime-bindings.ts");
 
-    expect(editorImports.valueImports).toContain("./studio-bg3d-control-fields");
+    expect(bindingsSource).toContain('from "./studio-bg3d-control-fields"');
     for (const controlName of CONTROL_NAMES) {
       expect(editorSource).not.toContain(`function ${controlName}(`);
       expect(controlSource).toContain(`export function ${controlName}(`);
@@ -86,7 +86,7 @@ describe("Studio BG3D control-field ownership boundary", () => {
   });
 
   it("preserves the single lazy editor boundary and renderer ownership", () => {
-    const editorSource = moduleSource("./StudioBackground3D.tsx");
+    const _editorSource = moduleSource("./StudioBackground3D.tsx");
     const loaderImports = moduleImports("../studio-background-3d-loader.ts");
 
     expect(loaderImports.valueImports).not.toContain("./bg3d/StudioBackground3D");
@@ -95,7 +95,7 @@ describe("Studio BG3D control-field ownership boundary", () => {
     // StudioBg3dSceneNodes.tsx (editor split); both still sit behind the one lazy editor chunk.
     const sceneNodesSource = moduleSource("./StudioBg3dSceneNodes.tsx");
 
-    expect(editorSource).toContain("function CaptureBridge(");
+    expect(moduleSource("./StudioBg3dCaptureBridge.tsx")).toContain("function CaptureBridge(");
     expect(sceneNodesSource).toContain("function BgCustomModelMesh(");
     expect(sceneNodesSource).toContain("function BgCustomModelInstanceBatch(");
   });

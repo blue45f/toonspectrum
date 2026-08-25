@@ -9,6 +9,14 @@ const studioCanvasViewportSource = readFileSync(
   new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
+const studioCanvasStickyBannersSource = readFileSync(
+  new URL("./canvas/StudioCanvasStickyBanners.tsx", import.meta.url),
+  "utf8",
+);
+const studioCanvasModalsOverlaySource = readFileSync(
+  new URL("./canvas/StudioCanvasModalsOverlay.tsx", import.meta.url),
+  "utf8",
+);
 // 의도된 변경(2026-08, B-09): handleSave 오케스트레이션이 studio-page-save-pipeline.ts 의
 // runStudioPageSavePipeline 으로 추출되어, 저장 flush/잠금 순서 계약은 그 파일을 직접 읽는다.
 const savePipelineSource = readFileSync(
@@ -167,7 +175,9 @@ describe("pending stroke lifecycle source contract", () => {
     expect(pageSelection).toContain("pendingBatch.pageId !== nextPageId");
     expect(pageSelection).toContain("!flushPendingStrokeCommitsRef.current()");
     expect(pageSelection).toContain("drawingRef.current || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()");
-    expect(studioCanvasViewportSource).toContain("if (!setCurrentPageId(pageId)) return;");
+    expect(studioCanvasViewportSource).toContain("<StudioCanvasViewportHudOverlays");
+    expect(studioCanvasStickyBannersSource).toContain("if (!setCurrentPageId(pageId)) return;");
+    expect(studioCanvasModalsOverlaySource).toContain("if (!setCurrentPageId(pageId)) return;");
     expect(drawingStart).toContain("pendingBatch.pageId !== activePage.id");
     expect(drawingStart).toContain("!flushPendingStrokeCommitsRef.current()");
     expect(flushPipeline).toContain("return false");

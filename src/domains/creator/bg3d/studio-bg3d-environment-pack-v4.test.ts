@@ -278,10 +278,8 @@ describe("Studio BG3D Blender 5.2 Wave 4 environment pack", () => {
       source: "upload",
     }).source).toBe("upload");
 
-    const editorSource = readFileSync(
-      fileURLToPath(new URL("./StudioBackground3D.tsx", import.meta.url)),
-      "utf8",
-    );
+    const { readStudioBg3dEditorSource } = await import("./read-studio-bg3d-editor-source");
+    const editorSource = readStudioBg3dEditorSource();
     const legacyRestoreStart = editorSource.indexOf(
       "const parsed = parseBg3dSceneWithModelsFromDataUrl(initialDataUrl);",
     );

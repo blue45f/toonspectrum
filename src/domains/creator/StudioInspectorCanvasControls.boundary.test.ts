@@ -8,7 +8,7 @@ function source(name: string): string {
 
 describe("StudioInspectorCanvasControls percent guide boundary", () => {
   it("persists the optional converted px position while preserving center defaults", () => {
-    const aside = source("./StudioInspectorAside.tsx");
+    const aside = source("./StudioInspectorAsideShell.tsx");
     const start = aside.indexOf("onAddUserGuide={withCanvasControlsGuard");
     expect(start).toBeGreaterThanOrEqual(0);
 

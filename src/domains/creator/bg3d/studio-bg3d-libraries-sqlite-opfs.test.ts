@@ -709,7 +709,7 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
   it("keeps product source imports on V12 aliases rather than ambient IndexedDB functions", async () => {
     const { readFile } = await import("node:fs/promises");
     const [studio, project, download, thumbnail, handoff, metadataStore] = await Promise.all([
-      "./StudioBackground3D.tsx",
+      "./studio-bg3d-editor-runtime-bindings.ts",
       "./studio-bg3d-project-library.ts",
       "./studio-bg3d-canonical-glb-download.ts",
       "./studio-bg3d-model-thumbnail-capture.ts",

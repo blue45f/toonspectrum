@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const PAGE_SOURCE = readStudioCuttoonEditorSource();
@@ -9,10 +10,7 @@ const HOKUSAI_HELPER_SOURCE = readFileSync(
   new URL("../studio-legacy-editor-runtime-helpers.ts", import.meta.url),
   "utf8",
 );
-const VIEWPORT_SOURCE = readFileSync(
-  new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
-  "utf8",
-);
+const VIEWPORT_SOURCE = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
 const IMAGE_NODE_SOURCE = readFileSync(
   new URL("../StudioKonvaImageNode.tsx", import.meta.url),
   "utf8",

@@ -86,6 +86,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   canvasGridVisible: false,
   vectorEraseToIntersection: false,
   masterEditMode: false,
+  pixelArtEnabled: false,
 };
 
 /** Rows that open a filter dialog — everything except 마지막 필터 and the two layer adjustments. */

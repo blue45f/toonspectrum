@@ -1,12 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
 import controlFieldsSource from "./studio-bg3d-control-fields.tsx?raw";
 // 2026-08-21 intentional change: describeStudioBg3dPhysicsStatus and its phase copy moved into
 // studio-bg3d-editor-derivations.ts during the editor split.
 import editorDerivationsSource from "./studio-bg3d-editor-derivations.ts?raw";
 import returnFocusSource from "./studio-bg3d-return-focus.ts?raw";
-import background3dEditorSource from "./StudioBackground3D.tsx?raw";
 import ltPanelSource from "./StudioBg3dLtPanel.tsx?raw";
 import {
   StudioBg3dPhysicsPanel,
@@ -17,7 +17,7 @@ import shapesPanelSource from "./StudioBg3dShapesPanel.tsx?raw";
 import viewPanelSource from "./StudioBg3dViewPanel.tsx?raw";
 
 const background3dSource = [
-  background3dEditorSource,
+  readStudioBg3dEditorSource(),
   editorDerivationsSource,
   shapesPanelSource,
   viewPanelSource,
@@ -163,12 +163,8 @@ describe("Studio BG3D modal focus contract", () => {
     expect(background3dSource).toContain('role={open ? "dialog" : undefined}');
     expect(background3dSource).toContain("tabIndex={-1}");
 
-    const keyboardHandler = sourceSlice(
-      background3dSource,
-      "// 키보드 단축키:",
-      "const onCaptureUpdate =",
-    );
-    expect(keyboardHandler).not.toContain('e.key === "Escape"');
+    // 키보드 핸들러는 공유 모달 오너로 이동했다 — 에디터 소스 어디에도 Escape 처리가 남으면 안 된다.
+    expect(background3dSource).not.toContain('e.key === "Escape"');
   });
 });
 

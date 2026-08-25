@@ -85,7 +85,7 @@ function moduleShape(relativePath: string): ModuleShape {
 describe("Studio options-bars module boundary", () => {
   it("keeps StudioPage as the one-way static orchestration owner", () => {
     const page = moduleShape("./StudioPage.tsx");
-    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx");
     const optionsBars = moduleShape("./StudioOptionsBars.tsx");
 
     expect(

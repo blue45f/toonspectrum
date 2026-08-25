@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
+
+const source = [
+  readFileSync(new URL("./StudioVrmPoserTypes.ts", import.meta.url), "utf8"),
+  readStudioVrmPoserImplementationSource(),
+].join("\n");
 
 describe("Studio VRM full-body editor integration boundary", () => {
   it("invalidates an active IK transaction before history restore and stale pointer release", () => {
@@ -50,7 +55,7 @@ describe("Studio VRM full-body editor integration boundary", () => {
   });
 
   it("retries after the Canvas scene mounts and preserves one body rotation field on shared restore", () => {
-    expect(source).toContain("setCaptureSceneGeneration((generation) => generation + 1)");
+    expect(source).toContain("setCaptureSceneGeneration((generation: number) => generation + 1)");
     expect(source).toContain("captureSceneGeneration,");
     expect(source).toContain("bodyRotation: initialScene.pose.bodyRotationY,");
     expect(source).not.toContain("pending.bodyRotationY");

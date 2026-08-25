@@ -2,10 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const editorSource = readFileSync(
-  new URL("./StudioBackground3D.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
+const editorSource = readStudioBg3dEditorSource();
 const encoderSource = readFileSync(
   new URL("./studio-bg3d-lt-layer-encoder.ts", import.meta.url),
   "utf8",
@@ -177,7 +176,7 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
 
   it("keeps PNG data-URL encoding as an explicit main-thread compatibility boundary", () => {
     expect(editorSource).toContain(
-      'import { encodeStudioBg3dLtLayers } from "./studio-bg3d-lt-layer-encoder";',
+      'encodeStudioBg3dLtLayers } from "./studio-bg3d-lt-layer-encoder"',
     );
     expect(editorSource).toContain(
       "const encoded = encodeStudioBg3dLtLayers(rendered.layers)",

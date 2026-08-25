@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const editorSource = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
+const editorSource = readStudioBg3dEditorSource();
 const viewPanelSource = readFileSync(
   new URL("./StudioBg3dViewPanel.tsx", import.meta.url),
   "utf8",
@@ -23,7 +25,7 @@ const ltPanelSource = readFileSync(
 
 describe("Studio BG3D accessibility boundary", () => {
   it("keeps the camera and physics sub-tabs keyboard navigable", () => {
-    expect(editorSource).toContain("const VIEW_EDITOR_SECTIONS");
+    expect(viewPanelSource).toContain("VIEW_EDITOR_SECTIONS");
     expect(viewPanelSource).toContain('event.key === "ArrowRight" || event.key === "ArrowDown"');
     expect(viewPanelSource).toContain('event.key === "ArrowLeft" || event.key === "ArrowUp"');
     expect(viewPanelSource).toContain('event.key === "Home"');

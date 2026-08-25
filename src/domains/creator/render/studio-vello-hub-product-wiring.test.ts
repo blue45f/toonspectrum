@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const viewportSource = readFileSync(
-  new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
+
+
+
+const viewportSource = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
 const canvasTargetSource = readFileSync(
   new URL("./studio-vello-hub-canvas-target.ts", import.meta.url),
   "utf8",
@@ -18,7 +19,7 @@ const verifierSource = readFileSync(
 describe("VelloHub /studio product wiring", () => {
   it("mounts the hub from the real StudioCanvasViewport call site", () => {
     expect(viewportSource).toContain(
-      'import {\n  StudioRenderSurface,',
+      'import { StudioRenderSurface } from "../render/StudioRenderSurface"',
     );
     expect(viewportSource).toContain("<StudioRenderSurface");
     expect(viewportSource).toContain("elements={elements}");

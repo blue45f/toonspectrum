@@ -61,7 +61,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 
 describe("Studio inspector focus, speed, and frame boundary", () => {
   it("keeps StudioInspectorAside as the static owner of one controlled leaf", () => {
-    const inspector = moduleEdges("./StudioInspectorAside.tsx");
+    const inspector = moduleEdges("./StudioInspectorSelectionSection.tsx");
     const leaf = moduleEdges("./StudioInspectorFocusSpeedFrameControls.tsx");
 
     expect(
@@ -77,7 +77,7 @@ describe("Studio inspector focus, speed, and frame boundary", () => {
   });
 
   it("leaves selection, document locks, panel state, history, CRDT, and saving outside the leaf", () => {
-    const inspector = moduleEdges("./StudioInspectorAside.tsx").source;
+    const inspector = moduleEdges("./StudioInspectorSelectionSection.tsx").source;
     const leaf = moduleEdges("./StudioInspectorFocusSpeedFrameControls.tsx");
     const forbiddenDependency =
       /(?:StudioPage|StudioInspectorAside|collaborat|(?:^|[-/])crdt(?:[-/]|$)|history|stores?\/|save)/iu;

@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 import {
@@ -38,10 +38,7 @@ describe("automatic raster publication feature gate", () => {
 
   it("guards both draw promotion and raster history publication in the editor wiring", () => {
     const pageSource = readStudioCuttoonEditorSource();
-    const viewportSource = readFileSync(
-      new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
-      "utf8",
-    );
+    const viewportSource = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
     const source = `${pageSource}\n${viewportSource}`;
     expect(source).toMatch(
       /STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*&&\s*studioAuthUserId/u

@@ -96,7 +96,7 @@ function moduleShape(relativePath: string): ModuleShape {
 describe("Studio page-list pane module boundary", () => {
   it("keeps StudioPage as the one-way orchestration owner", () => {
     const page = moduleShape("./StudioPage.tsx");
-    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");
     const modalLazyBoundary = moduleShape("./studio-page-modal-lazy-boundaries.ts");
 
@@ -157,7 +157,7 @@ describe("Studio page-list pane module boundary", () => {
 
   it("keeps resize handles accessible without creating a shared startup chunk", () => {
     const page = moduleShape("./StudioPage.tsx");
-    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");
     const resizeHandle = moduleShape("./StudioPanelResizeHandle.tsx");
 

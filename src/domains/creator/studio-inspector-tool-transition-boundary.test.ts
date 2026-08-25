@@ -2,10 +2,13 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const inspectorSource = readFileSync(
-  new URL("./StudioInspectorAside.tsx", import.meta.url),
-  "utf8",
-);
+const inspectorSource = [
+  "./StudioInspectorAsideBody.tsx",
+  "./StudioInspectorAsideShell.tsx",
+  "./StudioInspectorDrawingSection.tsx",
+  "./StudioInspectorImageToolsSection.tsx",
+  "./useStudioInspectorAsideModel.ts",
+].map((relativePath) => readFileSync(new URL(relativePath, import.meta.url), "utf8")).join("\n");
 
 describe("StudioInspectorAside transient tool boundary", () => {
   it("routes every Inspector navigation through the pointer ownership transition", () => {

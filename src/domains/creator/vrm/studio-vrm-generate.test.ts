@@ -18,6 +18,7 @@ import {
   createStudioVrmGenerateRecipe,
   exportStudioVrmFromGenerateRecipe,
 } from "./studio-vrm-generate-recipe";
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
 import { validateVrmGlbBytes } from "./vrm-library";
 
 const PRESET_A = "natural-short";
@@ -26,7 +27,7 @@ const PRESET_B = "romance-long";
 describe("studio VRM generate surface wiring", () => {
   it("exposes generate/export controls on the shipped Avatar Forge panel and Poser import path", () => {
     const panel = readFileSync(new URL("./StudioVrmAvatarForgePanel.tsx", import.meta.url), "utf8");
-    const poser = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+    const poser = readStudioVrmPoserImplementationSource();
     expect(panel).toContain("data-studio-vrm-generate");
     expect(panel).toContain("data-studio-vrm-generate-submit");
     expect(panel).toContain("data-studio-vrm-generate-export");

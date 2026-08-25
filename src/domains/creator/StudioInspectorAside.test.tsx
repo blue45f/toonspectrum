@@ -1,17 +1,12 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { STUDIO_BRUSH_SIZE_RANGE } from "./brush/studio-draw-ux";
+import { readStudioInspectorAsideSurface } from "./read-studio-inspector-aside-source";
 import { StudioBrushSizePresetGrid } from "./StudioInspectorAside";
 
-const asideSource = readFileSync(
-  path.join(__dirname, "StudioInspectorAside.tsx"),
-  "utf8"
-);
+const asideSource = readStudioInspectorAsideSurface();
 
 describe("StudioBrushSizePresetGrid", () => {
   afterEach(() => {

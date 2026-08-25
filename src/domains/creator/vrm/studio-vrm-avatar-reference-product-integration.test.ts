@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import catalogueRuntimeSource from "./studio-vrm-avatar-reference-catalogue-runtime.ts?raw";
 import productSource from "./studio-vrm-avatar-reference-product.ts?raw";
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
 import panelSource from "./StudioVrmAvatarReferenceRecommendationsPanel.tsx?raw";
-import poserSource from "./StudioVrmPoser.tsx?raw";
 import hookSource from "./useStudioVrmAvatarReferenceCatalogue.ts?raw";
+
+const poserSource = readStudioVrmPoserImplementationSource();
 
 function section(source: string, start: string, end: string): string {
   const startIndex = source.indexOf(start);

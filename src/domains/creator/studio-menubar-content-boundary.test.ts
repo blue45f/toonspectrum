@@ -61,7 +61,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 describe("Studio menubar ownership boundary", () => {
   it("keeps StudioPage as the single lazy parent and forbids a reverse dependency", () => {
     const page = moduleEdges("./StudioPage.tsx");
-    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx");
     const menubar = moduleEdges("./StudioMenubarContent.tsx");
     const modalLazyBoundary = moduleEdges("./studio-page-modal-lazy-boundaries.ts");
 
@@ -139,7 +139,7 @@ describe("Studio menubar ownership boundary", () => {
 
   it("keeps handler identity stable while render-time lock copy remains a normal prop", () => {
     const page = moduleEdges("./StudioPage.tsx").source;
-    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx").source;
+    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx").source;
     const menubar = moduleEdges("./StudioMenubarContent.tsx").source;
     const handlerContract = menubar.slice(
       menubar.indexOf("export interface StudioMenubarContentHandlers"),

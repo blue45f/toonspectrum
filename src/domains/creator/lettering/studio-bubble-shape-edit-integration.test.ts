@@ -2,11 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioInspectorAsideSurface } from "../read-studio-inspector-aside-source";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const pageSource = readStudioCuttoonEditorSource();
 const panelSource = readFileSync(new URL("./StudioBubbleShapePanel.tsx", import.meta.url), "utf8");
-const inspectorSource = readFileSync(new URL("../StudioInspectorAside.tsx", import.meta.url), "utf8");
+const inspectorSource = readStudioInspectorAsideSurface();
 
 describe("Studio bubble shape point editing integration", () => {
   it("connects point insertion, movement, and removal to the canvas gesture lifecycle", () => {

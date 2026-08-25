@@ -49,14 +49,23 @@ const AUDITED_LEAVES: Readonly<Record<StudioInspectorPanelId, number>> = {
 };
 
 /**
- * Which component file renders each panel. The density table's `source` fields
+ * Which component files render each panel. The density table's `source` fields
  * must point into one of these, and the disclosure wiring is asserted against
- * the matching file rather than always `StudioInspectorAside.tsx`.
+ * the matching files rather than always `StudioInspectorAside.tsx`.
  */
-const PANEL_SOURCE_FILES: Readonly<Record<StudioInspectorPanelId, string>> = {
-  "element-properties": "StudioInspectorAside.tsx",
-  "tool-properties": "StudioInspectorAside.tsx",
-  "document-canvas": "StudioInspectorCanvasControls.tsx",
+const PANEL_SOURCE_FILES: Readonly<Record<StudioInspectorPanelId, readonly string[]>> = {
+  "element-properties": [
+    "StudioInspectorSelectionSection.tsx",
+    "StudioInspectorImageToolsSection.tsx",
+    "StudioInspectorShapeSection.tsx",
+    "StudioInspectorTypographySection.tsx",
+    "StudioInspectorOrderAlignSection.tsx",
+  ],
+  "tool-properties": [
+    "StudioInspectorDrawingSection.tsx",
+    "StudioInspectorRulersSection.tsx",
+  ],
+  "document-canvas": ["StudioInspectorCanvasControls.tsx"],
 };
 
 describe("inspector density — 기본 노출 예산 5~9", () => {
@@ -81,7 +90,10 @@ describe("inspector density — 기본 노출 예산 5~9", () => {
         expect(group.leaves).toBeGreaterThan(0);
         // 출처는 그 패널을 실제로 그리는 파일을 가리켜야 한다.
         expect(group.source, group.id).toMatch(
-          new RegExp(`^${PANEL_SOURCE_FILES[panel].replace(".", "\\.")}:\\d`, "u"),
+          new RegExp(
+            `^(${PANEL_SOURCE_FILES[panel].map((file) => file.replace(".", "\\.")).join("|")}):\\d`,
+            "u",
+          ),
         );
       }
     }
@@ -175,10 +187,9 @@ describe("inspector density — 모드가 달라도 동일 명칭", () => {
   });
 
   it("도구 속성 팔레트에 '투명도' 라는 옛 라벨이 남아 있지 않다", () => {
-    const source = readFileSync(
-      path.join(__dirname, "StudioInspectorAside.tsx"),
-      "utf-8",
-    );
+    const source = PANEL_SOURCE_FILES["tool-properties"]
+      .map((file) => readFileSync(path.join(__dirname, file), "utf-8"))
+      .join("\n");
     expect(source).not.toMatch(/>\s*투명도\s*</u);
   });
 });
@@ -187,8 +198,15 @@ describe("inspector density — 컴포넌트가 실제로 접기를 렌더한다
   const sourceOf = (file: string) =>
     readFileSync(path.join(__dirname, file), "utf-8");
 
-  const source = sourceOf("StudioInspectorAside.tsx");
-  const canvasSource = sourceOf("StudioInspectorCanvasControls.tsx");
+  const source = PANEL_SOURCE_FILES["element-properties"]
+    .map(sourceOf)
+    .join("\n");
+  const toolSource = PANEL_SOURCE_FILES["tool-properties"]
+    .map(sourceOf)
+    .join("\n");
+  const canvasSource = PANEL_SOURCE_FILES["document-canvas"]
+    .map(sourceOf)
+    .join("\n");
 
   const sectionSource = readFileSync(
     path.join(__dirname, "StudioInspectorSection.tsx"),
@@ -205,6 +223,9 @@ describe("inspector density — 컴포넌트가 실제로 접기를 렌더한다
     expect(source).toMatch(
       /import \{ StudioInspectorSection \} from "\.\/StudioInspectorSection"/u,
     );
+    expect(toolSource).toMatch(
+      /import \{ StudioInspectorSection \} from "\.\/StudioInspectorSection"/u,
+    );
     expect(canvasSource).toMatch(
       /import \{ StudioInspectorSection \} from "\.\/StudioInspectorSection"/u,
     );
@@ -212,7 +233,7 @@ describe("inspector density — 컴포넌트가 실제로 접기를 렌더한다
 
   it("선언된 Advanced 섹션 id 가 전부 컴포넌트에 배선돼 있다", () => {
     for (const panel of PANELS) {
-      const panelSource = sourceOf(PANEL_SOURCE_FILES[panel]);
+      const panelSource = PANEL_SOURCE_FILES[panel].map(sourceOf).join("\n");
       for (const id of inspectorAdvancedSectionIds(panel)) {
         expect(panelSource.includes(`"${id}"`), id).toBe(true);
       }

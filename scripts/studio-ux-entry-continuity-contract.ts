@@ -74,7 +74,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_BASE_CONTRACTS: readonly StudioUxEntryContinuit
         id: "cta-changed-state",
         clauses: [
           {
-            file: "src/domains/creator/StudioInspectorAside.tsx",
+            file: "src/domains/creator/StudioInspectorDrawingSection.tsx",
             allOf: [
               "onRequestSelectStroke={() => {",
               'setTool("select")',
@@ -87,9 +87,14 @@ const STUDIO_UX_ENTRY_CONTINUITY_BASE_CONTRACTS: readonly StudioUxEntryContinuit
         id: "target-selectable-after-cta",
         clauses: [
           {
-            file: "src/domains/creator/StudioInspectorAside.tsx",
+            file: "src/domains/creator/StudioInspectorSelectionSection.tsx",
             allOf: [
               'selected.type === "draw"',
+            ],
+          },
+          {
+            file: "src/domains/creator/StudioInspectorShapeSection.tsx",
+            allOf: [
               '(selected.kind ?? "freehand") === "freehand"',
               "selected={selected}",
             ],
@@ -100,7 +105,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_BASE_CONTRACTS: readonly StudioUxEntryContinuit
         id: "entry-visible-after-target-selection",
         clauses: [
           {
-            file: "src/domains/creator/StudioInspectorAside.tsx",
+            file: "src/domains/creator/StudioInspectorDrawingSection.tsx",
             allOf: [
               '<StudioHokusaiNaturalMediaInspectorMount',
               'visible={drawMode !== "shape" && drawMode !== "pixel"}',
@@ -189,7 +194,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_BASE_CONTRACTS: readonly StudioUxEntryContinuit
             ],
           },
           {
-            file: "src/domains/creator/StudioInspectorAside.tsx",
+            file: "src/domains/creator/StudioInspectorImageToolsSection.tsx",
             allOf: [
               "<StudioInspectorFilterLauncher",
               "<StudioInspectorPixelSelectionLauncher",
@@ -227,7 +232,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "cta-changed-state",
         clauses: [{
-          file: "src/domains/creator/StudioInspectorAside.tsx",
+          file: "src/domains/creator/StudioInspectorShapeSection.tsx",
           allOf: [
             "onRequestSelectStroke={() => {",
             'setTool("select")',
@@ -239,9 +244,14 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
         id: "target-selectable-after-cta",
         clauses: [
           {
-            file: "src/domains/creator/StudioInspectorAside.tsx",
+            file: "src/domains/creator/StudioInspectorSelectionSection.tsx",
             allOf: [
               'selected.type === "draw"',
+            ],
+          },
+          {
+            file: "src/domains/creator/StudioInspectorShapeSection.tsx",
+            allOf: [
               '(selected.kind ?? "freehand") === "freehand"',
               "<StudioInspectorFreehandPathControls",
               "selected={selected}",
@@ -261,7 +271,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
       {
         id: "entry-visible-after-target-selection",
         clauses: [{
-          file: "src/domains/creator/StudioInspectorAside.tsx",
+          file: "src/domains/creator/StudioInspectorShapeSection.tsx",
           allOf: [
             "refinementUnavailableReason={",
             "onRefine={applyPaperVectorRefinement}",

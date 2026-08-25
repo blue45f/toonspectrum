@@ -73,7 +73,7 @@ function expectInOrder(source: string, tokens: readonly string[]): void {
 
 describe("Studio VRM asset runtime ownership boundary", () => {
   it("keeps a one-way asset runtime import without pulling the editor back into the leaf", () => {
-    const poser = moduleEdges("./StudioVrmPoser.tsx");
+    const poser = moduleEdges("./useStudioVrmPoserInstall.ts");
     const runtime = moduleEdges("./studio-vrm-asset-runtime.ts");
     const binding = moduleEdges("./studio-vrm-texture-paint-binding.ts");
 
@@ -101,14 +101,16 @@ describe("Studio VRM asset runtime ownership boundary", () => {
   });
 
   it("keeps React, persistence, request arbitration, object URLs, and install orchestration in the parent", () => {
-    const poser = moduleEdges("./StudioVrmPoser.tsx");
+    const poser = moduleEdges("./useStudioVrmPoserInstall.ts");
     const runtime = moduleEdges("./studio-vrm-asset-runtime.ts");
     // 2026-08-21 의도적 변경: 요청 중재·objectURL·라이브러리 영속은 포저가 소유하는 훅
     // use-studio-vrm-model-loading.ts 로 분리됐다. 이 경계가 지키는 것은 "리프(asset-runtime)가
     // React/영속/설치를 소유하지 않는다"이므로, 소유자 쪽 검사는 포저 + 그 훅을 합친
     // 에디터 계층 소스로 대조한다(리프 쪽 not.toContain 은 그대로).
     const modelLoading = moduleEdges("./use-studio-vrm-model-loading.ts");
-    const editorLayerSource = `${poser.source}\n${modelLoading.source}`;
+    const state = moduleEdges("./useStudioVrmPoserState.ts");
+    const history = moduleEdges("./useStudioVrmPoserRuntimeB.ts");
+    const editorLayerSource = `${poser.source}\n${modelLoading.source}\n${state.source}\n${history.source}`;
 
     for (const ownerToken of [
       "loadRequestRef",

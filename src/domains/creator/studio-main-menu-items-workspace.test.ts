@@ -65,6 +65,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   canvasGridVisible: false,
   vectorEraseToIntersection: false,
   masterEditMode: false,
+  pixelArtEnabled: false,
 };
 
 type StudioMainMenuActionsOverrides = {

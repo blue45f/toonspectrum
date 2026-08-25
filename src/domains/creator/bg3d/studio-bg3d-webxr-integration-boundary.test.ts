@@ -3,9 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const EDITOR_SOURCE_PATH = fileURLToPath(
-  new URL("./StudioBackground3D.tsx", import.meta.url),
-);
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
 const PANEL_STACK_SOURCE_PATH = fileURLToPath(
   new URL("../StudioThreeDPreviewPanelStack.tsx", import.meta.url),
 );
@@ -21,7 +20,7 @@ const RETAINED_STORE_SOURCE_PATH = fileURLToPath(
 
 describe("Studio BG3D WebXR product boundary", () => {
   it("plans from the lossless live scene and admitted production bounds before requesting XR", async () => {
-    const source = await readFile(EDITOR_SOURCE_PATH, "utf8");
+    const source = readStudioBg3dEditorSource();
 
     expect(source).toContain("readCurrentCanonicalSceneForShot()");
     expect(source).toContain("sceneBounds: shadowSceneBounds");
@@ -32,7 +31,7 @@ describe("Studio BG3D WebXR product boundary", () => {
   });
 
   it("reuses the one Canvas and bypasses the DOM scissor without remounting its portal scene", async () => {
-    const source = await readFile(EDITOR_SOURCE_PATH, "utf8");
+    const source = readStudioBg3dEditorSource();
 
     expect(source.match(/<Canvas\b/gu)).toHaveLength(1);
     expect(source).toContain("<StudioBg3dWebXrSessionBridge");
@@ -50,7 +49,7 @@ describe("Studio BG3D WebXR product boundary", () => {
   });
 
   it("keeps AR transparent and omits editor-only scene helpers during presentation", async () => {
-    const source = await readFile(EDITOR_SOURCE_PATH, "utf8");
+    const source = readStudioBg3dEditorSource();
 
     expect(source).toContain('immersiveStagePlan?.mode === "immersive-ar" ? 0 : 1');
     expect(source).toContain('immersiveStagePlan?.mode !== "immersive-ar"');
@@ -60,7 +59,7 @@ describe("Studio BG3D WebXR product boundary", () => {
   });
 
   it("blocks editing and persistence actions until the browser session is restored", async () => {
-    const source = await readFile(EDITOR_SOURCE_PATH, "utf8");
+    const source = readStudioBg3dEditorSource();
 
     expect(source).toContain("inert={immersiveSceneActive || undefined}");
     expect(source).toContain("|| immersiveSceneActive");
@@ -70,8 +69,8 @@ describe("Studio BG3D WebXR product boundary", () => {
   });
 
   it("closes logically at once while retaining the one Canvas through non-cancellable XR cleanup", async () => {
-    const [source, panelStack, retainedHost, retainedRoute, retainedStore] = await Promise.all([
-      readFile(EDITOR_SOURCE_PATH, "utf8"),
+    const source = readStudioBg3dEditorSource();
+    const [panelStack, retainedHost, retainedRoute, retainedStore] = await Promise.all([
       readFile(PANEL_STACK_SOURCE_PATH, "utf8"),
       readFile(RETAINED_HOST_SOURCE_PATH, "utf8"),
       readFile(RETAINED_ROUTE_SOURCE_PATH, "utf8"),

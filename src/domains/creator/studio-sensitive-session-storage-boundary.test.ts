@@ -48,7 +48,13 @@ describe("sensitive Studio browser state stays session-scoped", () => {
   });
 
   it("keeps fallback pose clipboards in sessionStorage and removes legacy copies", () => {
-    const poser = source("./vrm/StudioVrmPoser.tsx");
+    const poser = [
+      source("./vrm/useStudioVrmPoserState.ts"),
+      source("./vrm/useStudioVrmPoserPoseLibrary.ts"),
+      source("./vrm/useStudioVrmPoserPoseEdit.ts"),
+      source("./vrm/StudioVrmPoserDialog.tsx"),
+      source("./vrm/StudioVrmPoserPanelBodyD.tsx"),
+    ].join("\n");
     for (const key of ["studio_pose_clipboard", "studio_vrm_full_clip"]) {
       expect(poser).toContain(`sessionStorage.setItem("${key}"`);
       expect(poser).toContain(`localStorage.removeItem("${key}")`);
@@ -57,7 +63,13 @@ describe("sensitive Studio browser state stays session-scoped", () => {
   });
 
   it("keeps webcam UI consent in the current tab and never reads or writes its legacy key", () => {
-    const poser = source("./vrm/StudioVrmPoser.tsx");
+    const poser = [
+      source("./vrm/useStudioVrmPoserState.ts"),
+      source("./vrm/useStudioVrmPoserPoseLibrary.ts"),
+      source("./vrm/useStudioVrmPoserPoseEdit.ts"),
+      source("./vrm/StudioVrmPoserDialog.tsx"),
+      source("./vrm/StudioVrmPoserPanelBodyD.tsx"),
+    ].join("\n");
     const preferences = source("./vrm/studio-vrm-poser-preferences-sqlite.ts");
 
     expect(preferences).toContain(
@@ -74,7 +86,13 @@ describe("sensitive Studio browser state stays session-scoped", () => {
   });
 
   it("routes VRM recents to SQLite/OPFS with observable memory-only recovery", () => {
-    const poser = source("./vrm/StudioVrmPoser.tsx");
+    const poser = [
+      source("./vrm/useStudioVrmPoserState.ts"),
+      source("./vrm/useStudioVrmPoserPoseLibrary.ts"),
+      source("./vrm/useStudioVrmPoserPoseEdit.ts"),
+      source("./vrm/StudioVrmPoserDialog.tsx"),
+      source("./vrm/StudioVrmPoserPanelBodyD.tsx"),
+    ].join("\n");
     const preferences = source("./vrm/studio-vrm-poser-preferences-sqlite.ts");
 
     expect(poser).toContain("createStudioVrmPoserPreferencesRuntime");

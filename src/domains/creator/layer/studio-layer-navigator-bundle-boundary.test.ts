@@ -74,16 +74,17 @@ function moduleEdges(relativePath: string) {
 describe("Studio layer navigator bundle boundary", () => {
   it("keeps the optional layer navigator behind one registry-owned lazyRetry import", () => {
     const page = moduleEdges("../StudioPage.tsx");
-    const inspector = moduleEdges("../StudioInspectorAside.tsx");
+    const inspector = moduleEdges("../StudioInspectorAsideShell.tsx");
     const navigator = moduleEdges("./StudioLayerNavigator.tsx");
     const itemRow = moduleEdges("./StudioLayerNavigatorItemRow.tsx");
     const itemRowUi = moduleEdges("./studio-layer-navigator-row-ui.ts");
     const registry = moduleEdges("../studio-page-lazy-ui.ts");
 
+    const types = moduleEdges("../StudioInspectorAsideTypes.ts");
     expect(page.valueImports).not.toContain("./layer/StudioLayerNavigator");
     expect(inspector.valueImports).not.toContain("./layer/StudioLayerNavigator");
     expect(
-      inspector.wholeClauseTypeImports.filter((specifier) => specifier === "./layer/StudioLayerNavigator"),
+      types.wholeClauseTypeImports.filter((specifier) => specifier === "./layer/StudioLayerNavigator"),
     ).toEqual(["./layer/StudioLayerNavigator"]);
     expect(page.dynamicImports).not.toContain("./layer/StudioLayerNavigator");
     expect(inspector.dynamicImports).not.toContain("./layer/StudioLayerNavigator");
@@ -104,7 +105,7 @@ describe("Studio layer navigator bundle boundary", () => {
   });
 
   it("mounts the navigator only for the visible inspector layer tab with an accessible fallback", () => {
-    const source = moduleEdges("../StudioInspectorAside.tsx").source;
+    const source = moduleEdges("../StudioInspectorAsideShell.tsx").source;
 
     expect(source).toMatch(
       /aria-label="레이어"[\s\S]*?\{inspectorLayout\.primary === "layers" \? \([\s\S]*?<Suspense/,

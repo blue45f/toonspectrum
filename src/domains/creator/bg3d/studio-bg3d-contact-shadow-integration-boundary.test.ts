@@ -24,7 +24,7 @@ describe("Studio BG3D shared-character contact-shadow integration boundary", () 
     expect(sceneContent).toContain(
       '() => import("./StudioBg3dSharedCharacterContactShadow")',
     );
-    expect(source("./StudioBackground3D.tsx")).toContain(
+    expect(source("./StudioBg3dEditorSceneGraph.tsx")).toContain(
       "groundingResults={sharedCharacterGroundings}",
     );
   });

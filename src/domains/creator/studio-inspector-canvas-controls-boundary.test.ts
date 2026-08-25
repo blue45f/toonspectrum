@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioInspectorAsideSurface } from "./read-studio-inspector-aside-source";
+
 interface ModuleEdges {
   readonly imports: readonly string[];
   readonly source: string;
@@ -33,7 +35,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 
 describe("Studio inspector canvas-controls boundary", () => {
   it("keeps the inspector as the one-way static owner of the controlled canvas leaf", () => {
-    const inspector = moduleEdges("./StudioInspectorAside.tsx");
+    const inspector = moduleEdges("./StudioInspectorAsideShell.tsx");
     const leaf = moduleEdges("./StudioInspectorCanvasControls.tsx");
 
     expect(
@@ -47,7 +49,7 @@ describe("Studio inspector canvas-controls boundary", () => {
   });
 
   it("leaves document mutation, collaboration policy, ids, and shared notices in the parent", () => {
-    const inspector = moduleEdges("./StudioInspectorAside.tsx").source;
+    const inspector = readStudioInspectorAsideSurface();
     const leaf = moduleEdges("./StudioInspectorCanvasControls.tsx").source;
 
     for (const forbidden of [

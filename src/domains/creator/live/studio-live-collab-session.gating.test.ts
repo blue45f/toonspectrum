@@ -352,10 +352,16 @@ describe("Studio Magma/Figma live collaboration session", () => {
 
   it("wires the Studio work page to the shipped live-collaboration host and share URL", () => {
     const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
-    const editorViewSource = readFileSync(
-      new URL("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx", import.meta.url),
-      "utf8",
-    );
+    const editorViewSource = [
+      readFileSync(
+        new URL("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFileSync(
+        new URL("../studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx", import.meta.url),
+        "utf8",
+      ),
+    ].join("\n");
     const panelSource = readFileSync(
       new URL("./StudioLiveCollaborationPanel.tsx", import.meta.url),
       "utf8"

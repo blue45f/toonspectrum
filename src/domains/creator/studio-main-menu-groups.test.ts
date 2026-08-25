@@ -72,6 +72,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   canvasGridVisible: false,
   vectorEraseToIntersection: false,
   masterEditMode: false,
+  pixelArtEnabled: false,
 };
 
 function createEditorActions(): StudioMainMenuEditorActions {
@@ -180,6 +181,11 @@ function createUiActions(): StudioMainMenuUiActions {
     toggleVectorEraseToIntersection: vi.fn(),
     openDialogueBatch: vi.fn(),
     openDialogueTranslate: vi.fn(),
+    togglePixelArtMode: vi.fn(),
+    insertDefaultStickyNote: vi.fn(),
+    enableSilkSymmetry: vi.fn(),
+    openSculptWorkbench: vi.fn(),
+    startEphemeralWhiteboard: vi.fn(),
   };
 }
 

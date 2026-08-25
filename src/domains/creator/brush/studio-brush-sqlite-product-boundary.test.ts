@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioInspectorAsideSurface } from "../read-studio-inspector-aside-source";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const studioPageSource = readStudioCuttoonEditorSource();
@@ -9,10 +10,7 @@ const studioPageLoaderSource = readFileSync(
   new URL("../studio-page-editor-runtime-loaders.ts", import.meta.url),
   "utf8",
 );
-const inspectorSource = readFileSync(
-  new URL("../StudioInspectorAside.tsx", import.meta.url),
-  "utf8",
-);
+const inspectorSource = readStudioInspectorAsideSurface();
 const mobileDockSource = readFileSync(
   new URL("../StudioMobileEditingDock.tsx", import.meta.url),
   "utf8",

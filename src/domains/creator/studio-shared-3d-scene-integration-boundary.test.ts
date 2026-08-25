@@ -2,16 +2,14 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioBg3dEditorSource } from "./bg3d/read-studio-bg3d-editor-source";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const stackSource = readFileSync(
   new URL("./StudioThreeDPreviewPanelStack.tsx", import.meta.url),
   "utf8",
 );
-const backgroundSource = readFileSync(
-  new URL("./bg3d/StudioBackground3D.tsx", import.meta.url),
-  "utf8",
-);
+const backgroundSource = readStudioBg3dEditorSource();
 const characterSceneContentSource = readFileSync(
   new URL("./bg3d/StudioBg3dSharedCharacterSceneContent.tsx", import.meta.url),
   "utf8",

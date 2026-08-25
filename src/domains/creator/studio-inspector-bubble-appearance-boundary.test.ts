@@ -33,7 +33,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 
 describe("Studio inspector bubble-appearance boundary", () => {
   it("keeps the inspector as the one-way owner of a controlled appearance leaf", () => {
-    const inspector = moduleEdges("./StudioInspectorAside.tsx");
+    const inspector = moduleEdges("./StudioInspectorSelectionSection.tsx");
     const leaf = moduleEdges("./StudioInspectorBubbleAppearanceControls.tsx");
 
     expect(
@@ -50,7 +50,7 @@ describe("Studio inspector bubble-appearance boundary", () => {
   });
 
   it("keeps identity, document mutation, collaboration, and history policy in the parent", () => {
-    const inspector = moduleEdges("./StudioInspectorAside.tsx").source;
+    const inspector = moduleEdges("./StudioInspectorSelectionSection.tsx").source;
     const leaf = moduleEdges("./StudioInspectorBubbleAppearanceControls.tsx").source;
 
     for (const forbidden of [
@@ -69,7 +69,7 @@ describe("Studio inspector bubble-appearance boundary", () => {
   });
 
   it("leaves shape, tail, and anchor geometry outside the appearance leaf", () => {
-    const inspector = moduleEdges("./StudioInspectorAside.tsx").source;
+    const inspector = moduleEdges("./StudioInspectorSelectionSection.tsx").source;
     const leaf = moduleEdges("./StudioInspectorBubbleAppearanceControls.tsx");
     const shapeControls = moduleEdges("./StudioInspectorBubbleShapeControls.tsx");
 
@@ -90,7 +90,7 @@ describe("Studio inspector bubble-appearance boundary", () => {
   });
 
   it("loads optional panels through the neutral lazy surface and stays bounded", () => {
-    const inspector = moduleEdges("./StudioInspectorAside.tsx").source;
+    const inspector = moduleEdges("./StudioInspectorSelectionSection.tsx").source;
     const leaf = moduleEdges("./StudioInspectorBubbleAppearanceControls.tsx");
 
     expect(leaf.imports).toContain("./studio-page-lazy-ui");

@@ -7,6 +7,7 @@ const transportPath = fileURLToPath(
   new URL("./studio-live-inter-server-relay-transport.ts", import.meta.url)
 );
 const gatewayPath = fileURLToPath(new URL("./studio-live.gateway.ts", import.meta.url));
+const relayPath = fileURLToPath(new URL("./studio-live-gateway-relay.ts", import.meta.url));
 const creatorModulePath = fileURLToPath(new URL("./creator.module.ts", import.meta.url));
 
 describe("studio live inter-server relay transport boundary", () => {
@@ -31,12 +32,19 @@ describe("studio live inter-server relay transport boundary", () => {
 
   it("makes the gateway delegate transport mechanics while retaining relay policy", () => {
     const gateway = readFileSync(gatewayPath, "utf8");
+    const relaySource = readFileSync(relayPath, "utf8");
     const module = readFileSync(creatorModulePath, "utf8");
-    const sendStart = gateway.indexOf("private async sendInterServerRelay(");
-    const receiveStart = gateway.indexOf("private async receiveInterServerRelay(", sendStart);
-    const discoveryStart = gateway.indexOf("private async discoverVoiceRelayPeers(", receiveStart);
-    const send = gateway.slice(sendStart, receiveStart);
-    const receive = gateway.slice(receiveStart, discoveryStart);
+    const sendStart = relaySource.indexOf("export async function sendInterServerRelay(");
+    const receiveStart = relaySource.indexOf(
+      "export async function receiveInterServerRelay(",
+      sendStart
+    );
+    const discoveryStart = relaySource.indexOf(
+      "export async function discoverVoiceRelayPeers(",
+      receiveStart
+    );
+    const send = relaySource.slice(sendStart, receiveStart);
+    const receive = relaySource.slice(receiveStart, discoveryStart);
 
     expect(gateway).toContain(
       "private readonly interServerRelayTransport: StudioLiveInterServerRelayTransport"

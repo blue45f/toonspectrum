@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioInspectorAsideSurface } from "./read-studio-inspector-aside-source";
+
 interface ModuleEdges {
   readonly allImports: readonly string[];
   readonly dynamicImports: readonly string[];
@@ -116,7 +118,7 @@ describe("Studio optional UI bundle boundaries", () => {
   });
 
   it("mounts only active or actually visited image tabs instead of persisted hidden children", () => {
-    const source = moduleEdges("./StudioInspectorAside.tsx").source;
+    const source = readStudioInspectorAsideSurface();
 
     for (const tab of ["quick", "fill", "retouch", "mask", "transform"] as const) {
       expect(source).toContain(`shouldMountImageInspectorTab("${tab}") ? (`);
@@ -145,7 +147,7 @@ describe("Studio optional UI bundle boundaries", () => {
   });
 
   it("uses local passive Suspense boundaries for lazy Konva overlays", () => {
-    const source = moduleEdges("./canvas/StudioCanvasViewport.tsx").source;
+    const source = moduleEdges("./canvas/StudioCanvasInteractiveOverlays.tsx").source;
     const guideSource = moduleEdges("./canvas/StudioCanvasGuideLayers.tsx").source;
 
     for (const component of [

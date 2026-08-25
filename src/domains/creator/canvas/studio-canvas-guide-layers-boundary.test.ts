@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonStagePointersSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+
 interface ModuleShape {
   readonly allImports: readonly string[];
   readonly dynamicImports: readonly string[];
@@ -149,10 +151,13 @@ const OVERLAY_PROPS = [
 
 describe("Studio canvas guide layer ownership boundary", () => {
   it("keeps one-way guide rendering ownership outside StudioPage", () => {
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+    const stageHost = moduleShape("./StudioCanvasViewportStageHost.tsx");
+    const toolLayers = moduleShape("./StudioCanvasViewportToolLayers.tsx");
     const guides = moduleShape("./StudioCanvasGuideLayers.tsx");
 
-    expect(viewport.valueImports.filter((specifier) => specifier === "./StudioCanvasGuideLayers"))
+    expect(stageHost.valueImports.filter((specifier) => specifier === "./StudioCanvasGuideLayers"))
+      .toEqual(["./StudioCanvasGuideLayers"]);
+    expect(toolLayers.valueImports.filter((specifier) => specifier === "./StudioCanvasGuideLayers"))
       .toEqual(["./StudioCanvasGuideLayers"]);
     expect(guides.allImports).not.toContain("../StudioPage");
     expect(guides.dynamicImports).toEqual([]);
@@ -175,36 +180,44 @@ describe("Studio canvas guide layer ownership boundary", () => {
   });
 
   it("locks both exported contracts and their Page call sites", () => {
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+    const stageHost = moduleShape("./StudioCanvasViewportStageHost.tsx");
+    const toolLayers = moduleShape("./StudioCanvasViewportToolLayers.tsx");
     const guides = moduleShape("./StudioCanvasGuideLayers.tsx");
 
     expect(interfacePropNames(guides, "StudioCanvasGuideUnderlayProps")).toEqual(UNDERLAY_PROPS);
     expect(interfacePropNames(guides, "StudioCanvasGuideOverlayLayersProps")).toEqual(OVERLAY_PROPS);
-    expect(jsxPropNames(findJsx(viewport, "StudioCanvasGuideUnderlay"))).toEqual(UNDERLAY_PROPS);
-    expect(jsxPropNames(findJsx(viewport, "StudioCanvasGuideOverlayLayers"))).toEqual(OVERLAY_PROPS);
+    expect(jsxPropNames(findJsx(stageHost, "StudioCanvasGuideUnderlay"))).toEqual(UNDERLAY_PROPS);
+    expect(jsxPropNames(findJsx(toolLayers, "StudioCanvasGuideOverlayLayers"))).toEqual(OVERLAY_PROPS);
   });
 
   it("preserves the underlay/document/overlay Stage z-order", () => {
-    const source = moduleShape("./StudioCanvasViewport.tsx").source;
-    const mainLayer = source.indexOf("<Layer ref={mainLayerRef}>");
-    const underlay = source.indexOf("<StudioCanvasGuideUnderlay", mainLayer);
-    const authoredDocument = source.indexOf("const canvasRenderElements", underlay);
-    const lastToolOverlay = source.indexOf("<StudioLayerMaskOverlay", authoredDocument);
-    const overlay = source.indexOf("<StudioCanvasGuideOverlayLayers", lastToolOverlay);
-    const stageClose = source.indexOf("</Stage>", overlay);
+    const stageHost = moduleShape("./StudioCanvasViewportStageHost.tsx").source;
+    const documentLayer = moduleShape("./StudioCanvasViewportDocumentLayer.tsx").source;
+    const toolLayers = moduleShape("./StudioCanvasViewportToolLayers.tsx").source;
+    const interactive = moduleShape("./StudioCanvasInteractiveOverlays.tsx").source;
+    const mainLayer = stageHost.indexOf("<Layer ref={mainLayerRef}>");
+    const underlay = stageHost.indexOf("<StudioCanvasGuideUnderlay", mainLayer);
+    const documentCall = stageHost.indexOf("<StudioCanvasViewportDocumentLayer", underlay);
+    const toolCall = stageHost.indexOf("<StudioCanvasViewportToolLayers", documentCall);
+    const stageClose = stageHost.indexOf("</Stage>", toolCall);
+    const authoredDocument = documentLayer.indexOf("const canvasRenderElements");
+    const lastToolOverlay = interactive.indexOf("<StudioLayerMaskOverlay");
+    const overlay = toolLayers.indexOf("<StudioCanvasGuideOverlayLayers");
 
     expect(mainLayer).toBeGreaterThan(0);
     expect(underlay).toBeGreaterThan(mainLayer);
-    expect(authoredDocument).toBeGreaterThan(underlay);
-    expect(lastToolOverlay).toBeGreaterThan(authoredDocument);
-    expect(overlay).toBeGreaterThan(lastToolOverlay);
-    expect(stageClose).toBeGreaterThan(overlay);
-    expect(source.slice(overlay, stageClose).trim().endsWith("/>")).toBe(true);
+    expect(documentCall).toBeGreaterThan(underlay);
+    expect(toolCall).toBeGreaterThan(documentCall);
+    expect(stageClose).toBeGreaterThan(toolCall);
+    expect(authoredDocument).toBeGreaterThan(0);
+    expect(lastToolOverlay).toBeGreaterThan(0);
+    expect(overlay).toBeGreaterThan(0);
+    expect(toolLayers.slice(overlay).trim().startsWith("<StudioCanvasGuideOverlayLayers")).toBe(true);
   });
 
   it("moves every guide node implementation while retaining Stage pointer guards", () => {
     const page = moduleShape("../StudioPage.tsx").source;
-    const stagePointers = moduleShape("../studio-cuttoon-editor/studio-cuttoon-stage-pointers.ts").source;
+    const stagePointers = readStudioCuttoonStagePointersSource();
     const guides = moduleShape("./StudioCanvasGuideLayers.tsx").source;
 
     for (const marker of ["grid-v-", "sgseg-", "kaleido-wedge-"] as const) {

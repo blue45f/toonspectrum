@@ -404,8 +404,10 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("src/domains/creator/studio-page-save-pipeline.ts", "local-storage-cleanup", "studioLifecycleAutosaveSidecarKey(autosaveKey)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/studio-page-save-pipeline.ts", "local-storage-cleanup", "LEGACY_STUDIO_AUTOSAVE_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/StudioPage.tsx", "local-storage-cleanup", "STUDIO_AI_RECENT_PROMPTS_KEY", 1, CLEANUP_ONLY, CLEANUP_PROOF),
-  allow("src/domains/creator/vrm/StudioVrmPoser.tsx", "local-storage-cleanup", '"studio_pose_clipboard"', 1, CLEANUP_ONLY, CLEANUP_PROOF),
-  allow("src/domains/creator/vrm/StudioVrmPoser.tsx", "local-storage-cleanup", '"studio_vrm_full_clip"', 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  // Intentional change (2026-08): clipboard remnant cleanup moved with poser state
+  // into useStudioVrmPoserState.ts. Same two deletions — only the file changed.
+  allow("src/domains/creator/vrm/useStudioVrmPoserState.ts", "local-storage-cleanup", '"studio_pose_clipboard"', 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("src/domains/creator/vrm/useStudioVrmPoserState.ts", "local-storage-cleanup", '"studio_vrm_full_clip"', 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/studio-data-destruction.ts", "local-storage-cleanup", "key", 2, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/studio-server-revision-restore-controller.ts", "local-storage-cleanup", "autosaveKey", 1, CLEANUP_ONLY, CLEANUP_PROOF),
 

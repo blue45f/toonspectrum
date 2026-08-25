@@ -129,7 +129,7 @@ const RESIZABLE_PROPS = [
 describe("Studio Konva primitive node boundary", () => {
   it("owns every primitive implementation outside StudioPage", () => {
     const page = moduleShape("../StudioPage.tsx");
-    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const primitives = moduleShape("../StudioKonvaPrimitiveNodes.tsx");
 
     for (const name of MOVED_FUNCTIONS) {
@@ -171,7 +171,7 @@ describe("Studio Konva primitive node boundary", () => {
   });
 
   it("locks the exported component prop contracts and all four Page call sites", () => {
-    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const primitives = moduleShape("../StudioKonvaPrimitiveNodes.tsx");
 
     expect(componentPropNames(primitives, "StudioWorkAssetPlaceholderNode")).toEqual([
@@ -208,7 +208,7 @@ describe("Studio Konva primitive node boundary", () => {
   });
 
   it("preserves the frame, focus-line, speed-line, and placeholder branch order", () => {
-    const source = moduleShape("../canvas/StudioCanvasViewport.tsx").source;
+    const source = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx").source;
     const frame = source.indexOf("<StudioFramePanel");
     const focus = source.indexOf("<StudioFocusLinesNode");
     const speed = source.indexOf("<StudioSpeedLinesNode");

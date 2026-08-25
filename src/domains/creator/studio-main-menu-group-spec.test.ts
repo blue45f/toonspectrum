@@ -81,6 +81,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   canvasGridVisible: false,
   vectorEraseToIntersection: false,
   masterEditMode: false,
+  pixelArtEnabled: false,
 };
 
 function liveMenu() {
@@ -178,13 +179,13 @@ describe("§15.3 menu group spec", () => {
       specGroups: 17,
       groupsWithItems: 17,
       emptyGroupIds: [],
-      specRows: 135,
-      rowsPresent: 37,
+      specRows: 137,
+      rowsPresent: 39,
       rowsPartial: 36,
       rowsAbsent: 62,
       // 툴벨트에서 승격한 검수·미리보기 3종은 §15.3 행이 없어 extras로 센다.
       // 2026-08-20: CSP 경계 효과(layer/border-effect)도 §15.3 행이 없어 extras(37 → 38).
-      extras: 38,
+      extras: 40,
     });
   });
 

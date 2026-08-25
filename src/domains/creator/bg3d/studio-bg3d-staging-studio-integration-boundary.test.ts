@@ -2,10 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const background3dSource = readFileSync(
-  new URL("./StudioBackground3D.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
+const background3dSource = readStudioBg3dEditorSource();
 const viewPanelSource = readFileSync(
   new URL("./StudioBg3dViewPanel.tsx", import.meta.url),
   "utf8",

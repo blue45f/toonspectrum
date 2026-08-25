@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
+
 const attachmentSource = readFileSync(
   new URL("./StudioVrmXpbdSkirtAttachment.tsx", import.meta.url),
   "utf8",
@@ -10,7 +12,8 @@ const projectionSource = readFileSync(
   new URL("./StudioVrmWardrobePropsProjection.tsx", import.meta.url),
   "utf8",
 );
-const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+
+const poserSource = readStudioVrmPoserImplementationSource();
 
 function requiredIndex(source: string, token: string, from = 0): number {
   const index = source.indexOf(token, from);

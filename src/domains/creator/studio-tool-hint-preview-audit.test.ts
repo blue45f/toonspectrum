@@ -2,13 +2,15 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioBg3dEditorSource } from "./bg3d/read-studio-bg3d-editor-source";
+
 const SOURCES = {
-  background3d: readFileSync(new URL("./bg3d/StudioBackground3D.tsx", import.meta.url), "utf8"),
+  background3d: readStudioBg3dEditorSource(),
   frame: readFileSync(new URL("./StudioFrameAnimationPanel.tsx", import.meta.url), "utf8"),
   layer: readFileSync(new URL("./layer/StudioLayerNavigator.tsx", import.meta.url), "utf8"),
   mainMenu: readFileSync(new URL("./StudioMainMenu.tsx", import.meta.url), "utf8"),
   menubar: readFileSync(new URL("./StudioMenubarContent.tsx", import.meta.url), "utf8"),
-  vrm: readFileSync(new URL("./vrm/StudioVrmPoser.tsx", import.meta.url), "utf8"),
+  vrm: readFileSync(new URL("./vrm/StudioVrmPoserTypes.ts", import.meta.url), "utf8"),
 } as const;
 
 function authoredPreview(source: string, id: string): string | null {

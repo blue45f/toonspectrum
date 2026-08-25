@@ -2,22 +2,27 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const viewportSource = readFileSync(
-  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+const documentLayerSource = readFileSync(
+  new URL("./StudioCanvasViewportDocumentLayer.tsx", import.meta.url),
+  "utf8",
+);
+const interactionSource = readFileSync(
+  new URL("./studio-canvas-viewport-interaction.ts", import.meta.url),
   "utf8",
 );
 
-function sourceBetween(startToken: string, endToken: string): string {
-  const start = viewportSource.indexOf(startToken);
-  const end = viewportSource.indexOf(endToken, start + startToken.length);
+function sourceBetween(source: string, startToken: string, endToken: string): string {
+  const start = source.indexOf(startToken);
+  const end = source.indexOf(endToken, start + startToken.length);
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
-  return viewportSource.slice(start, end);
+  return source.slice(start, end);
 }
 
 describe("Studio canvas mask hit isolation boundary", () => {
   it("wraps every render-as-mask clone in a non-listening Konva ancestor", () => {
     const renderElement = sourceBetween(
+      documentLayerSource,
       "const renderEl = (el: El",
       "// 문서 마스터 밑그림",
     );
@@ -47,6 +52,7 @@ describe("Studio canvas mask hit isolation boundary", () => {
 
   it("does not create the select-only draw hit Shape for a mask clone", () => {
     const drawBranch = sourceBetween(
+      documentLayerSource,
       'if (el.type === "draw") {',
       'if (el.type === "text")',
     );
@@ -65,6 +71,7 @@ describe("Studio canvas mask hit isolation boundary", () => {
 
   it("marks every duplicate mask source non-interactive while leaving authored content interactive", () => {
     const composite = sourceBetween(
+      documentLayerSource,
       "const masterUnderlay =",
       "return (\n                  <>",
     );
@@ -103,10 +110,10 @@ describe("Studio canvas mask hit isolation boundary", () => {
 
 describe("Studio canvas selection interaction guards", () => {
   it("keeps 44px resize hit targets on wide coarse-pointer devices", () => {
-    expect(viewportSource).toContain(
+    expect(interactionSource).toContain(
       'import { useMediaQuery } from "@/components/use-media-query"',
     );
-    expect(viewportSource).toContain(
+    expect(interactionSource).toContain(
       'const hasCoarsePointer = useMediaQuery("(pointer: coarse)")',
     );
     // 2026-08-21 intentional: the proxy call site moved verbatim into the selection-decorations
@@ -126,6 +133,7 @@ describe("Studio canvas selection interaction guards", () => {
 
   it("disables alignment for both fully and partially locked selections", () => {
     const selectionGuards = sourceBetween(
+      interactionSource,
       "const selectionLockedCount =",
       "const multiSelectionVisibleBounds =",
     );

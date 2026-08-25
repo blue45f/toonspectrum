@@ -10,10 +10,9 @@
  * 2·3의 클로저는 export 되지 않으므로 이 파일의 모델과 **실제 소스 문자열**을 함께 대조한다
  * (레포의 boundary 소스 스캔 관례와 동일 — 모델이 배포 코드와 갈라지면 테스트가 깨진다).
  */
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
+import { readStudioCuttoonStagePointersSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   appendBrushPoint,
   appendBrushPointInPlace,
@@ -22,10 +21,7 @@ import {
   type SelPoint,
 } from "./studio-selection-tools";
 
-const POINTER_SOURCE = readFileSync(
-  new URL("./studio-cuttoon-editor/studio-cuttoon-stage-pointers.ts", import.meta.url),
-  "utf8",
-);
+const POINTER_SOURCE = readStudioCuttoonStagePointersSource();
 
 /** 실제 드래그처럼 대부분은 채택되고 일부는 최소간격에 걸려 버려지는 궤적. */
 function dragSamples(count: number): SelPoint[] {

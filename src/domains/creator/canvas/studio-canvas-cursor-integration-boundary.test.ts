@@ -9,6 +9,26 @@ const studioCanvasViewportSource = readFileSync(
   new URL("./StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
 );
+const studioCanvasViewportInteractionSource = readFileSync(
+  new URL("./studio-canvas-viewport-interaction.ts", import.meta.url),
+  "utf8",
+);
+const studioCanvasViewportStageHostSource = readFileSync(
+  new URL("./StudioCanvasViewportStageHost.tsx", import.meta.url),
+  "utf8",
+);
+const studioCanvasViewportToolLayersSource = readFileSync(
+  new URL("./StudioCanvasViewportToolLayers.tsx", import.meta.url),
+  "utf8",
+);
+const studioCanvasViewportDocumentLayerSource = readFileSync(
+  new URL("./StudioCanvasViewportDocumentLayer.tsx", import.meta.url),
+  "utf8",
+);
+const studioCanvasViewportDomOverlaysSource = readFileSync(
+  new URL("./StudioCanvasViewportDomOverlays.tsx", import.meta.url),
+  "utf8",
+);
 const globalsSource = readFileSync(new URL("../../../styles/globals.css", import.meta.url), "utf8");
 const perspectiveSource = readFileSync(new URL("../StudioPerspectiveOverlay.tsx", import.meta.url), "utf8");
 const isometricSource = readFileSync(new URL("../StudioIsometricGridOverlay.tsx", import.meta.url), "utf8");
@@ -24,17 +44,17 @@ function studioPageSourceBetween(startMarker: string, endMarker: string): string
 
 describe("Studio canvas cursor integration boundary", () => {
   it("projects pan cursors to the workspace and precision cursors only to the paper", () => {
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasViewportInteractionSource).toContain(
       "studioCanvasViewportCursorClassName(canvasCursorInput)",
     );
-    expect(studioCanvasViewportSource).toContain("studioCanvasCursorClassName(canvasCursorInput)");
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasViewportInteractionSource).toContain("studioCanvasCursorClassName(canvasCursorInput)");
+    expect(studioCanvasViewportStageHostSource).toContain(
       "data-studio-comment-placement-active={commentPinArmed",
     );
     expect(studioCanvasViewportSource).toContain(
       "data-studio-viewport-cursor={viewportCursorClassName",
     );
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasViewportStageHostSource).toContain(
       "data-studio-canvas-cursor={canvasCursorClassName",
     );
   });
@@ -66,21 +86,21 @@ describe("Studio canvas cursor integration boundary", () => {
       "updateBrushCursor(stage, pointerEvent, contactPoint, true);",
     );
 
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasViewportInteractionSource).toContain(
       "const brushCursorStyle = appSettings.general.brushCursorStyle"
     );
-    expect(studioCanvasViewportSource).toContain('brushCursorStyle !== "none"');
-    expect(studioCanvasViewportSource).toContain("<StudioBrushCursor");
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasViewportToolLayersSource).toContain('brushCursorStyle !== "none"');
+    expect(studioCanvasViewportToolLayersSource).toContain("<StudioBrushCursor");
+    expect(studioCanvasViewportToolLayersSource).toContain(
       "brushId={drawMode === \"eraser\" && !eraserPresetActive ? \"eraser\" : brush}",
     );
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasViewportToolLayersSource).toContain(
       'drawMode === "pen" || lowDensityEraserActive',
     );
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasViewportInteractionSource).toContain(
       'resolveStudioBrushPresetOperation(brush) === "erase"',
     );
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasViewportDocumentLayerSource).toContain(
       '!isStudioBrushEraserAliasId(liveEl.brush)',
     );
     expect(snapshot).toBeGreaterThanOrEqual(0);
@@ -105,7 +125,7 @@ describe("Studio canvas cursor integration boundary", () => {
     expect(rawUpdate).not.toContain("drawingRef.current =");
     expect(rawUpdate).not.toContain("appendDrawingCrdtSampleSuffix(");
     expect(rawUpdate).not.toContain("scheduleDraft(");
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasViewportDomOverlaysSource).toContain(
       "transientPenInkSurfaceEnabled && webGpuViewportSurface",
     );
     expect(studioPageSource).toContain(

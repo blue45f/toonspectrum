@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 
+
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import {
   defaultStudioAppSettings,
   type StudioAppSettings,
@@ -27,10 +30,7 @@ vi.mock("react-dom", () => ({
 }));
 
 const studioPageSource = readStudioCuttoonEditorSource();
-const studioCanvasViewportSource = readFileSync(
-  new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
-  "utf8",
-);
+const studioCanvasViewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 const appSettingsPanelSource = readFileSync(
   new URL("./StudioAppSettingsPanel.tsx", import.meta.url),
   "utf8"

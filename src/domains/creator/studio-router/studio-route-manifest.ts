@@ -42,7 +42,7 @@ export const STUDIO_ROUTE_MANIFEST = Object.freeze([
     id: "studio-editor",
     kind: "editor",
     ownsDocumentTitle: true,
-    pattern: "/studio/(work/:workId|remix/:sourceWorkId)?/:surface?",
+    pattern: "/studio/(work/:workId|remix/:sourceWorkId)?/:surface(canvas|comic|animation|brushes|bg3d|poser)?",
   },
   {
     id: "studio-publish",

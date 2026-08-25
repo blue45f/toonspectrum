@@ -352,7 +352,7 @@ describe("studio raster handoff authority", () => {
   });
 
   it("pins the raster surface inside the page grade + colour vision filter wrapper (M2b)", () => {
-    const source = readFileSync(new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url), "utf8");
+    const source = readFileSync(new URL("../canvas/StudioCanvasViewportStageHost.tsx", import.meta.url), "utf8");
 
     // Stable anchor: the single post-processing filter wrapper carries an inert data attribute.
     // Moving the attribute, the filter style or either presentation breaks this contract, which

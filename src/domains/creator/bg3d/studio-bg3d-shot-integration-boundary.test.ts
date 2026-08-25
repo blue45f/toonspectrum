@@ -2,14 +2,26 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
 const source = [
   "./StudioBackground3D.tsx",
+  "./read-studio-bg3d-editor-source.ts",
+  "./studio-bg3d-editor-shot-host.ts",
+  "./studio-bg3d-editor-capture-host.ts",
+  "./studio-bg3d-editor-insert-host.ts",
+  "./useStudioBg3dEditorEffects.ts",
+  "./useStudioBg3dEditorState.ts",
+  "./useStudioBg3dEditorRestoreEffects.ts",
+  "./StudioBg3dEditorViewport.tsx",
+  "./studio-bg3d-editor-layout-view-model.ts",
   // 2026-08-21 intentional change: BgViewportController.readView moved into StudioBg3dSceneNodes.tsx.
   "./StudioBg3dSceneNodes.tsx",
   "./StudioBg3dShapesPanel.tsx",
   "./StudioBg3dViewPanel.tsx",
   "./StudioBg3dLtPanel.tsx",
-].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n");
+].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n")
+  + "\n" + readStudioBg3dEditorSource();
 const cameraApplicationSource = readFileSync(
   new URL("./studio-bg3d-camera-application.ts", import.meta.url),
   "utf8",
@@ -93,7 +105,7 @@ describe("Studio BG3D shot UI integration boundary", () => {
     expect(handler).toContain("viewportApiRef.current?.applyView(appliedDocument.camera)");
     expect(handler).toContain("collectStudioBg3dEffectivelyVisibleEntityIds(appliedDocument.nodes)");
     expect(source).toContain("onClick={() => applySavedShot(shot.id)}");
-    expect(source).toContain("effectivelyVisibleLayerIds.has(firstSelectedId)");
+    expect(source).toContain(': selectedEntities.every((entity) => !effectivelyVisibleLayerIds.has(entity.id))');
   });
 
   it("batch-renders selected shots and passes without recording temporary scene states in history", () => {

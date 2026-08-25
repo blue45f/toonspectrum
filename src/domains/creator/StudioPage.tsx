@@ -1053,6 +1053,7 @@ import {
 import {
   admitStudioPixelArtStrokeColor,
   createStudioPixelArtMode,
+  enableStudioPixelArtMode,
   type StudioPixelArtModeState,
 } from "./studio-pixel-art-mode";
 import {
@@ -1303,6 +1304,7 @@ import {
   type StudioStagePointerFrameMapperCache,
 } from "./canvas/studio-stage-pointer-coordinate";
 import { createStudioStickyNoteElement } from "./studio-sticky-note";
+import { createStudioWhiteboardEphemeralSession } from "./studio-whiteboard-ephemeral";
 import {
   noteStudioSaveSucceeded,
   reportStudioAutosaveFailure,
@@ -1444,7 +1446,11 @@ import {
 import { resolveStudioWorkspaceCanvasDockInsets } from "./studio-workspace-canvas-dock";
 import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
 import { resolveStudioWorkspacePanelLayoutVisibility } from "./studio-workspace-presentation-layout";
-import type { StudioWorkspaceRoute } from "./studio-workspace-route";
+import {
+  studio2dHref,
+  type Studio2dWorkspaceSurface,
+  type StudioWorkspaceRoute,
+} from "./studio-workspace-route";
 import { resolveStudioWorkspaceWidePanelToggle } from "./studio-workspace-wide-mode";
 import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
@@ -3903,6 +3909,15 @@ function StudioCuttoonEditor({
     workId,
   });
   const hybridDccOpen = hybridDccRouteRequested && hybridDccRouteAccess === "allowed";
+  useEffect(() => {
+    if (studioRoute.surface === "brushes") {
+      void STUDIO_MOBILE_EDITING_DOCK_UI.loadStudioBrushStudio();
+    } else if (studioRoute.surface === "bg3d") {
+      setBg3dOpen(true);
+    } else if (studioRoute.surface === "poser") {
+      setPoserVrmOpen(true);
+    }
+  }, [studioRoute.surface]);
   const [creativeModesOpen, setCreativeModesOpen] = useState(false);
   const creativeModesLabel = localizeStudioText(t, "크리에이티브 모드", "studio.creativeModes.title");
   // 대화상자 자체가 "크리에이티브 모드"로 이름이 붙으므로 닫기 버튼은 앱 공용 키를 그대로 쓴다
@@ -7007,8 +7022,19 @@ function StudioCuttoonEditor({
     });
   }
 
+  function navigateStudio2dSurface(surface: Studio2dWorkspaceSurface) {
+    if (studioRoute.surface === surface) return;
+    navigate(studio2dHref({
+      remixSourceWorkId: studioRoute.remixSourceWorkId,
+      search: location.search,
+      surface,
+      workId: studioRoute.workId,
+    }));
+  }
+
   /** 그리기 ▸ 브러시 스튜디오 — §15.3 Brush ▸ Brush Studio/Brush DNA. */
   function openBrushStudioFromMenu() {
+    navigateStudio2dSurface("brushes");
     void STUDIO_MOBILE_EDITING_DOCK_UI.loadStudioBrushStudio();
     activatePrimaryCanvasTool("draw", "pen");
     openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
@@ -7426,6 +7452,14 @@ function StudioCuttoonEditor({
   /** Elements 3D rail → VRM poser one-shot prop seed (cleared after consume). */
   const [poserSeedPropId, setPoserSeedPropId] = useState<string | null>(null);
   const [bg3dOpen, setBg3dOpen] = useState(false);
+  function openVrmPoserFromMenu() {
+    setPoserVrmOpen(true);
+    navigateStudio2dSurface("poser");
+  }
+  function openBackground3dFromMenu() {
+    setBg3dOpen(true);
+    navigateStudio2dSurface("bg3d");
+  }
   /** Elements 3D rail → BG3D one-shot seeds (cleared after consume). */
   const [bg3dSeedTemplateId, setBg3dSeedTemplateId] = useState<string | null>(null);
   const [bg3dSeedPrimitiveKind, setBg3dSeedPrimitiveKind] = useState<string | null>(null);
@@ -17543,15 +17577,42 @@ const puppetWarpArmed =
     return () => controller.abort();
   }, [menu, assetTab, assetSearchQuery, assetSortOrder]);
 
-  // 마켓 상세의 "스튜디오에서 불러오기" 딥링크(?assetMarket=community) — 자산 메뉴의 커뮤니티 탭을 바로 연다.
-  // 공유 에셋 목록 로딩은 위 effect가 menu·assetTab 변경에 반응해 수행한다.
-  const openAssetMarketDeepLink = useEffectEvent(() => {
-    if (params.get("assetMarket") !== "community") return;
-    setMenu((current) => current ?? "asset");
-    setAssetTab("community");
+  // 마켓 상세의 "스튜디오에서 불러오기" 딥링크(?assetMarket=community 또는 ?installMarketResource=...)
+  // 자산 메뉴의 커뮤니티 탭을 열고, 전달된 리소스 ID가 있으면 백그라운드에서 SQLite 설치 및 캔버스 로드를 수행한다.
+  const openAssetMarketDeepLink = useEffectEvent(async () => {
+    const installResourceId = params.get("installMarketResource");
+    if (params.get("assetMarket") === "community" || installResourceId) {
+      setMenu((current) => current ?? "asset");
+      setAssetTab("community");
+    }
+    if (!installResourceId) return;
+    try {
+      const { getCreatorMarketplaceResource } = await import("@/src/infrastructure/creator-marketplace-client");
+      const { projectCreatorMarketplaceRecordToStudioPack, projectCreatorMarketplaceRecordToAssets } = await import("./studio-community-marketplace");
+      const { installStudioCreatorPackProduct } = await import("./studio-creator-pack-product-runtime");
+      const { browserStudioCreatorPackStorage } = await import("./studio-creator-pack-runtime");
+      const { createStudioOriginalFreeAssetRecord } = await import("./studio-original-free-asset-packs");
+
+      const record = await getCreatorMarketplaceResource(installResourceId);
+      if (!record) return;
+
+      const packProjection = projectCreatorMarketplaceRecordToStudioPack(record);
+      if (packProjection.status === "installable") {
+        const storage = browserStudioCreatorPackStorage();
+        await installStudioCreatorPackProduct(packProjection.pack, { storage });
+      } else if (record.kind === "asset") {
+        const assetProjection = projectCreatorMarketplaceRecordToAssets(record);
+        if (assetProjection.assets[0]) {
+          const asset = createStudioOriginalFreeAssetRecord(assetProjection.assets[0]);
+          addRenderedImage(asset.dataUrl, asset.width, asset.height);
+        }
+      }
+    } catch {
+      // Safe catch for network or parsing issues
+    }
   });
   useEffect(() => {
-    openAssetMarketDeepLink();
+    void openAssetMarketDeepLink();
   }, []);
 
   // 내 로컬 에셋을 커뮤니티에 공유(로그인 필요)
@@ -28775,6 +28836,29 @@ function clearSelectionForEdit() {
       toggleEraseToIntersection: toggleEraseToIntersectionMode,
       openDialogueBatch: () => setDialogueBatchOpen(true),
       openDialogueTranslate: () => setDialogueTranslateOpen(true),
+      togglePixelArtMode: () => {
+        setPixelArtMode((current) =>
+          current.enabled
+            ? { ...current, enabled: false }
+            : enableStudioPixelArtMode(current.palette?.id ?? "lospec-pico8"),
+        );
+      },
+      insertDefaultStickyNote: () => insertStudioStickyNote("lemon"),
+      enableSilkSymmetry: () => {
+        setSilkGenerativeSpec((current) => ({
+          ...DEFAULT_STUDIO_SILK_GENERATIVE_SPEC,
+          arms: current.arms,
+          mirror: true,
+        }));
+        changeStudioSymmetryType("silk");
+      },
+      openSculptWorkbench: () => openHybridDccWorkspace("sculpt"),
+      startEphemeralWhiteboard: () => {
+        const session = createStudioWhiteboardEphemeralSession({ title: "빠른 화이트보드" });
+        announceDrawingShortcut(`${session.title} · ${session.roomCode}`);
+      },
+      openVrmPoserFromMenu,
+      openBackground3dFromMenu,
     });
   // 무장된 픽셀 선택 도구를 메뉴가 읽는 단일 문자열로 환원한다. 원형 마퀴는
   // `ellipse` + forceCircle 조합이고 색 범위는 별도 플래그라, 라디오 체크 표시를
@@ -28799,6 +28883,7 @@ function clearSelectionForEdit() {
       vectorEraseToIntersection: eraseToIntersection,
       commandBarVisible: menuCommandBarVisible,
       masterEditMode,
+      pixelArtEnabled: pixelArtMode.enabled,
     }),
     [
       commentsOpen,
@@ -28807,6 +28892,7 @@ function clearSelectionForEdit() {
       menuCommandBarVisible,
       menuPixelSelectionTool,
       onionSkin.enabled,
+      pixelArtMode.enabled,
       quickMaskActive,
       showGrid,
       timelineOpen,
@@ -28913,8 +28999,6 @@ function clearSelectionForEdit() {
             editMenuImageInputRef.current?.click();
           },
           openMannequinPoser: () => setMannequinPoserOpen(true),
-          openVrmPoser: () => setPoserVrmOpen(true),
-          openBackground3d: () => setBg3dOpen(true),
           openReferencePanel: () => {
             preloadStudioReferencePanel();
             setReferencePanelOpen(true);
@@ -30887,7 +30971,7 @@ function clearSelectionForEdit() {
         finalExecutionReceipt: work.frame.receipt,
       });
       const baseElements = studioPageElementsFromHistory(activePage.id);
-      const existingImage = baseElements.find((element) =>
+      const existingImage = baseElements.find((element: El) =>
         element.type === "image" && element.livingInkReceipt?.pageId === activePage.id
       );
       const transaction = createStudioLivingInkCanonicalTransaction({
@@ -31440,6 +31524,10 @@ function clearSelectionForEdit() {
     startEditText: startCanvasEditText,
     snapBoundFunc,
     designateHistoryBrushSource,
+    setContextMenu,
+    setError,
+    setTool,
+    setStudioRasterHandoffCandidate,
   });
 
   const productionBibleAssetOptions = productionBibleOpen

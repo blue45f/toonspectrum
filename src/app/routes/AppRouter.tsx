@@ -103,15 +103,15 @@ const StudioRouter = lazyRetry(
 /* Market Domain Routes                                                       */
 /* -------------------------------------------------------------------------- */
 const MarketHomePage = lazyRetry(
-  () => import("@/src/domains/market/MarketHomePage").then((m) => ({ default: m.MarketHomePage })),
+  () => import("@/src/domains/market/pages/MarketHomePage").then((m) => ({ default: m.MarketHomePage })),
   "MarketHomePage"
 );
 const MarketBrowsePage = lazyRetry(
-  () => import("@/src/domains/market/MarketBrowsePage").then((m) => ({ default: m.MarketBrowsePage })),
+  () => import("@/src/domains/market/pages/MarketBrowsePage").then((m) => ({ default: m.MarketBrowsePage })),
   "MarketBrowsePage"
 );
 const MarketResourceDetailPage = lazyRetry(
-  () => import("@/src/domains/market/MarketResourceDetailPage").then((m) => ({
+  () => import("@/src/domains/market/pages/MarketResourceDetailPage").then((m) => ({
     default: m.MarketResourceDetailPage,
   })),
   "MarketResourceDetailPage"

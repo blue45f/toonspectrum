@@ -3,16 +3,21 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import { STUDIO_FILTER_MENU_KINDS } from "./filter/studio-filter-menu";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
-const viewportUrl = new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url);
 const editorViewUrl = new URL("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx", import.meta.url);
+const sessionDialogsUrl = new URL(
+  "./studio-cuttoon-editor/StudioCuttoonEditorSessionDialogs.tsx",
+  import.meta.url,
+);
 const pageSource = readStudioCuttoonEditorSource();
 const rawPageSource = readFileSync(pageUrl, "utf8");
-const viewportSource = readFileSync(viewportUrl, "utf8");
+const viewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 const editorViewSource = readFileSync(editorViewUrl, "utf8");
+const sessionDialogsSource = readFileSync(sessionDialogsUrl, "utf8");
 const pageFile = ts.createSourceFile(
   pageUrl.pathname,
   rawPageSource,
@@ -23,6 +28,13 @@ const pageFile = ts.createSourceFile(
 const editorViewFile = ts.createSourceFile(
   editorViewUrl.pathname,
   editorViewSource,
+  ts.ScriptTarget.Latest,
+  true,
+  ts.ScriptKind.TSX,
+);
+const sessionDialogsFile = ts.createSourceFile(
+  sessionDialogsUrl.pathname,
+  sessionDialogsSource,
   ts.ScriptTarget.Latest,
   true,
   ts.ScriptKind.TSX,
@@ -105,6 +117,7 @@ function jsxCallback(tagName: string, attributeName: string): { expression: ts.E
   }
   visit(pageFile, pageFile);
   if (!match) visit(editorViewFile, editorViewFile);
+  if (!match) visit(sessionDialogsFile, sessionDialogsFile);
   if (!match) throw new Error(`Missing ${tagName}.${attributeName} JSX callback`);
   return match;
 }

@@ -5,14 +5,18 @@ import { describe, expect, it } from "vitest";
 // 2026-08-21 intentional change: the R3F scene-node components (BgViewportController,
 // BgGroundHelper, BgPrimitiveMesh, BgCustomModelMesh, …) moved out of StudioBackground3D.tsx
 // into StudioBg3dSceneNodes.tsx during the editor split. Their markers resolve there now.
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
 const source = [
-  "./StudioBackground3D.tsx",
-  "./StudioBg3dSceneNodes.tsx",
-  "./StudioBg3dShapesPanel.tsx",
-  "./StudioBg3dViewPanel.tsx",
-  "./StudioBg3dLtPanel.tsx",
-  "./studio-bg3d-control-fields.tsx",
-].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n");
+  readStudioBg3dEditorSource(),
+  ...[
+    "./StudioBg3dSceneNodes.tsx",
+    "./StudioBg3dShapesPanel.tsx",
+    "./StudioBg3dViewPanel.tsx",
+    "./StudioBg3dLtPanel.tsx",
+    "./studio-bg3d-control-fields.tsx",
+  ].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")),
+].join("\n");
 
 function sourceBetween(startNeedle: string, endNeedle: string): string {
   const start = source.indexOf(startNeedle);
@@ -114,7 +118,7 @@ describe("Studio BG3D Camera vNext and surface snap integration", () => {
   it("keeps selection while resolving a real world hit and publishes one history step with optional normal-align rotation", () => {
     const handler = sourceBetween(
       "function handleSurfaceSnapPick(",
-      "let physicsSelectionUnavailableReason",
+      "h.handleSurfaceSnapPick = handleSurfaceSnapPick;",
     );
     expect(handler).toContain("collectStudioBg3dSurfaceSelectionSubtreeIds(");
     expect(handler).toContain("collectStudioBg3dSurfaceTargetPathIds(");

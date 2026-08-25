@@ -2,11 +2,13 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
 import { createStudioBg3dCameraUpForDutchRoll } from "./studio-bg3d-camera-orientation";
 import {
   deriveStudioBg3dVanishingPoints,
   mapStudioBg3dVanishingPointsToCanvas,
 } from "./studio-bg3d-perspective-bridge";
+
 
 const FRONT_CAMERA = {
   position: [0, 0, 5] as const,
@@ -17,7 +19,7 @@ const FRONT_CAMERA = {
   lensShift: [0, 0] as const,
 };
 
-const backgroundSource = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
+const backgroundSource = readStudioBg3dEditorSource();
 const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 
 describe("studio-bg3d-perspective-bridge", () => {

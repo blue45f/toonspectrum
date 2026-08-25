@@ -2,13 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioInspectorAsideSurface } from "../read-studio-inspector-aside-source";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const pageSource = readStudioCuttoonEditorSource();
-const inspectorSource = readFileSync(
-  new URL("../StudioInspectorAside.tsx", import.meta.url),
-  "utf8",
-);
+const inspectorSource = readStudioInspectorAsideSurface();
 const stackSource = readFileSync(
   new URL("./StudioDrawingPaletteStack.tsx", import.meta.url),
   "utf8",
@@ -253,12 +251,6 @@ describe("Studio drawing palette workspace integration boundary", () => {
       "stableHandlers={studioInspectorAsideHandlers}",
       "page inspector props",
     );
-    const inspectorLazyImport = sourceBetween(
-      inspectorSource,
-      "import {\n  StudioAdvancedRulerPanel",
-      '} from "./studio-page-lazy-ui";',
-      "inspector lazy registry import",
-    );
     const inspectorDrawingSurface = sourceBetween(
       inspectorSource,
       '{inspectorContentMode === "drawing" && (',
@@ -315,7 +307,9 @@ describe("Studio drawing palette workspace integration boundary", () => {
     expect(stackSource).toContain(
       "activeDragCleanupRef.current?.();",
     );
-    expect(inspectorLazyImport).toContain("StudioDrawingPaletteStack,");
+    expect(inspectorSource).toContain("StudioDrawingPaletteStack,");
+    expect(inspectorSource).toContain("StudioAdvancedRulerPanel");
+    expect(inspectorSource).toContain('from "./studio-page-lazy-ui"');
     expect(inspectorSource).not.toContain(
       'from "./StudioDrawingPaletteStack"',
     );

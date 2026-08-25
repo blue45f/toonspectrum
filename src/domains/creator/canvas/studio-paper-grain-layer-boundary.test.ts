@@ -106,7 +106,11 @@ describe("paper grain lives on its own DOM canvas", () => {
     // pixels. The paper-grain rect must therefore live in the background layer, above `bg` and
     // before `<Layer ref={mainLayerRef}>`, or a GPU handover would blank the sheet.
     const source = readFileSync(
-      resolve(process.cwd(), "src/domains/creator/canvas/StudioCanvasViewport.tsx"),
+      resolve(process.cwd(), "src/domains/creator/canvas/StudioCanvasViewportStageHost.tsx"),
+      "utf8",
+    );
+    const liveSurfaces = readFileSync(
+      resolve(process.cwd(), "src/domains/creator/canvas/studio-canvas-viewport-live-surfaces.ts"),
       "utf8",
     );
     const paperAt = source.indexOf('name="paper-grain"');
@@ -118,7 +122,7 @@ describe("paper grain lives on its own DOM canvas", () => {
     expect(paperAt).toBeGreaterThan(backgroundLayerAt);
     expect(paperAt).toBeLessThan(mainLayerAt);
     // The hide effect targets mainLayerRef and nothing else.
-    expect(source).toContain("const layer = mainLayerRef.current;");
+    expect(liveSurfaces).toContain("const layer = mainLayerRef.current;");
   });
 
   it("never renders through a WebGPU context — the 2d context is the only one it asks for", () => {

@@ -4,6 +4,34 @@ import { fileURLToPath } from "node:url";
 
 const baseDir = import.meta.dirname ?? dirname(fileURLToPath(import.meta.url));
 
+/** Pointer modules in original bindStudioCuttoonStagePointers function order. */
+export const STUDIO_CUTTOON_STAGE_POINTER_FILES = [
+  "./studio-cuttoon-stage-pointers-types.ts",
+  "./studio-cuttoon-stage-pointers.ts",
+  "./studio-cuttoon-stage-pointers-down.ts",
+  "./studio-cuttoon-stage-pointers-down-armed.ts",
+  "./studio-cuttoon-stage-pointers-down-pixel.ts",
+  "./studio-cuttoon-stage-pointers-down-draw.ts",
+  "./studio-cuttoon-stage-pointers-snap.ts",
+  "./studio-cuttoon-stage-pointers-move.ts",
+  "./studio-cuttoon-stage-pointers-fixed-rate.ts",
+  "./studio-cuttoon-stage-pointers-freehand.ts",
+  "./studio-cuttoon-stage-pointers-batch.ts",
+  "./studio-cuttoon-stage-pointers-publish.ts",
+  "./studio-cuttoon-stage-pointers-queue.ts",
+  "./studio-cuttoon-stage-pointers-release.ts",
+  "./studio-cuttoon-stage-pointers-finish.ts",
+  "./studio-cuttoon-stage-pointers-up.ts",
+  "./studio-cuttoon-stage-pointers-cursors.ts",
+  "./studio-cuttoon-stage-pointers-drag.ts",
+] as const;
+
+export function readStudioCuttoonStagePointersSource(): string {
+  return STUDIO_CUTTOON_STAGE_POINTER_FILES
+    .map((rel) => readFileSync(resolve(baseDir, rel), "utf8"))
+    .join("\n");
+}
+
 /**
  * Boundary tests used to source-scan StudioPage.tsx for editor-owned
  * handlers. Pointer/view extracts live beside the page, so tests should
@@ -48,8 +76,17 @@ export function readStudioCuttoonEditorSource(): string {
     resolve(baseDir, "../studio-page-shell-runtime.ts"),
     resolve(baseDir, "../studio-page-editor-runtime-loaders.ts"),
     resolve(baseDir, "../studio-legacy-editor-runtime-helpers.ts"),
-    resolve(baseDir, "./studio-cuttoon-stage-pointers.ts"),
+    ...STUDIO_CUTTOON_STAGE_POINTER_FILES.map((rel) => resolve(baseDir, rel)),
     resolve(baseDir, "./StudioCuttoonEditorView.tsx"),
+    resolve(baseDir, "./StudioCuttoonEditorHosts.tsx"),
+    resolve(baseDir, "./StudioCuttoonEditorDialogs.tsx"),
+    resolve(baseDir, "./StudioCuttoonEditorChrome.tsx"),
+    resolve(baseDir, "./StudioCuttoonEditorWorkspace.tsx"),
+    resolve(baseDir, "./StudioCuttoonEditorCanvasColumn.tsx"),
+    resolve(baseDir, "./StudioCuttoonEditorInspectorColumn.tsx"),
+    resolve(baseDir, "./StudioCuttoonEditorPanels.tsx"),
+    resolve(baseDir, "./StudioCuttoonEditorSessionDialogs.tsx"),
+    resolve(baseDir, "./StudioCuttoonEditorContextMenu.tsx"),
     resolve(baseDir, "../studio-page-editor-types.ts"),
     resolve(baseDir, "../studio-page-comipo-seeds.ts"),
   ]

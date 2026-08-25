@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioInspectorAsideSurface } from "../read-studio-inspector-aside-source";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 interface ModuleEdges {
@@ -106,7 +107,7 @@ describe("Paper vector refinement production entry boundary", () => {
 
   it("owns cancellation, epoch invalidation and the Inspector controls in Studio", () => {
     const page = readStudioCuttoonEditorSource();
-    const inspector = moduleEdges("../StudioInspectorAside.tsx").source;
+    const inspector = readStudioInspectorAsideSurface();
     const panel = moduleEdges("../StudioNodeEditPanel.tsx").source;
 
     expect(page).toContain("paperVectorRefinementAbortRef.current?.abort()");

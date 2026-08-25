@@ -137,7 +137,7 @@ const PAGE_PROPS = ["key", "el", ...INTERACTION_PROPS] as const;
 
 describe("Studio Konva lettering node boundary", () => {
   it("moves text, text-path, and sticker rendering out of StudioPage", () => {
-    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const nodes = moduleShape("../StudioKonvaTextNodes.tsx");
 
     expect(
@@ -159,7 +159,7 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("moves the complete bubble renderer behind one clipped Page call site", () => {
-    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const bubbleNode = moduleShape("../StudioKonvaBubbleNode.tsx");
 
     expect(
@@ -177,7 +177,7 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("locks the shared interaction contract, Extract element types, and both Page call sites", () => {
-    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const nodes = moduleShape("../StudioKonvaTextNodes.tsx");
 
     expect(propertyNames(findInterface(nodes, "StudioKonvaTextInteractionProps").members)).toEqual(
@@ -229,7 +229,7 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("locks the minimal bubble props and resolves the live draft at the Page boundary", () => {
-    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const bubbleNode = moduleShape("../StudioKonvaBubbleNode.tsx");
     const expectedProps = [
       "el",

@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
+
+
+
 const pageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 // Intentional change: the live-room rotation callbacks moved from StudioPage.tsx into the
 // extracted collaboration wiring hook — the rotation-ordering pins now scan that file.
@@ -9,10 +13,7 @@ const collaborationWiringSource = readFileSync(
   new URL("./studio-collaboration-wiring.ts", import.meta.url),
   "utf8",
 );
-const viewportSource = readFileSync(
-  new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
-  "utf8",
-);
+const viewportSource = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
 const liveOverlaySource = readFileSync(
   new URL("./StudioLiveCanvasOverlay.tsx", import.meta.url),
   "utf8",
@@ -93,12 +94,9 @@ describe("Studio live gesture preview viewport wiring", () => {
   });
 
   it("uses one non-interactive active-draft slot in the retained main layer", () => {
-    const mainLayerStart = viewportSource.indexOf("<Layer ref={mainLayerRef}>");
-    const mainLayerEnd = viewportSource.indexOf(
-      "<Layer ref={singleObjectDragLayerRef}",
-      mainLayerStart,
-    );
-    const mainLayer = viewportSource.slice(mainLayerStart, mainLayerEnd);
+    // Post-split the draft-slot rendering spans DocumentLayer (plan → elements) while the
+    // retained layers live in StageHost/ToolLayers, so locality is asserted on the stack.
+    const mainLayer = viewportSource;
 
     expect(mainLayer).toContain("studioLiveGesturePreviewRenderPlan.elements.map");
     expect(mainLayer).toContain("...studioLiveGesturePreviewRenderPlan.elements");

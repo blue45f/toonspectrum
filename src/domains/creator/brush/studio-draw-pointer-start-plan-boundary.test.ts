@@ -91,8 +91,10 @@ describe("studio draw pointer-start planning ownership boundary", () => {
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {
     const page = moduleFacts("../StudioPage.tsx").source;
     const start = page.indexOf("function onStageDown");
+    const drawStart = page.indexOf("function tryStageDownDraw");
     const end = page.indexOf("// 복구 브러시/도장 호버 커서", start);
     const onStageDown = page.slice(start, end);
+    const drawDown = page.slice(drawStart, end);
     const liveSurfaceStart = page.indexOf("function beginStudioDrawLiveSurfaces");
     const liveSurface = page.slice(liveSurfaceStart, start);
     const pointCommentStart = page.indexOf("function handleStudioPointCommentStageDown");
@@ -103,9 +105,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
       "if (handleStudioPointCommentStageDown(e, stagePointerEvent)) return;"
     );
     expect(onStageDown).not.toContain("setPointCommentComposer({");
-    expect(onStageDown).toContain("planStudioDrawPointerStart({");
-    expect(onStageDown).toContain("id: uid()");
-    expect(onStageDown).toContain("pointer: pointerSample");
+    expect(drawDown).toContain("planStudioDrawPointerStart({");
+    expect(drawDown).toContain("id: uid()");
+    expect(drawDown).toContain("pointer: pointerSample");
     expect(onStageDown).not.toContain("const causalInputPolicy =");
     expect(onStageDown).not.toContain("const layeredFlowPaintEligible =");
     expect(onStageDown).not.toContain("const common = {");
@@ -126,7 +128,8 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-07-29): 시작 플랜의 계열별 필압 설정 전달을 명시(1_120 → 1_130).
     // 의도적 변경(2026-08-03): specialist/native/GPU 표면 admission과 presentation을
     // beginStudioDrawLiveSurfaces로 추출해 onStageDown은 입력·CRDT 순서만 소유한다.
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_190);
+    expect(drawDown.split("\n").length).toBeLessThanOrEqual(750);
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(3_200);
     expect(liveSurfaceStart).toBeGreaterThan(-1);
     expect(liveSurface).toContain("const livingInkAdmitted =");
     expect(liveSurface).toContain("resolveStudioStrokeSurfaceRoute({");

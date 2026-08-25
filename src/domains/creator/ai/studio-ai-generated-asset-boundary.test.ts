@@ -3,12 +3,13 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
+
 const fileUrl = new URL("../StudioPage.tsx", import.meta.url);
 // The scenario image executors moved verbatim into the ctx-parameterized factory module.
 const scenarioModuleUrl = new URL("./studio-scenario-image-generation.ts", import.meta.url);
-const viewportUrl = new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url);
 const source = readFileSync(fileUrl, "utf8");
-const viewportSource = readFileSync(viewportUrl, "utf8");
+const viewportSource = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
 const file = ts.createSourceFile(
   fileUrl.pathname,
   source,

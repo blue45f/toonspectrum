@@ -42,6 +42,19 @@ describe("studio live socket wire ownership boundary", () => {
 
   it("keeps connection lifecycle in transport and wire parsers out of that module", () => {
     const transport = moduleImports("./studio-live-socket-transport.ts");
+    const outbound = moduleImports("./studio-live-socket-transport-outbound.ts");
+    const lifecycle = moduleImports("./studio-live-socket-transport-lifecycle.ts");
+    const family = [
+      transport,
+      moduleImports("./studio-live-socket-transport-host.ts"),
+      outbound,
+      lifecycle,
+      moduleImports("./studio-live-socket-transport-presence.ts"),
+      moduleImports("./studio-live-socket-transport-voice.ts"),
+      moduleImports("./studio-live-socket-transport-lock-apply.ts"),
+      moduleImports("./studio-live-socket-transport-lock-pending.ts"),
+      moduleImports("./studio-live-socket-transport-crdt.ts"),
+    ];
 
     // 2026-08-21 intentional change: the Socket.IO connection factory (endpoint resolution,
     // `io(...)` construction, realtime purpose routing, default injectables) moved to
@@ -53,8 +66,12 @@ describe("studio live socket wire ownership boundary", () => {
 
     expect(connectionFactory.specifiers).toContain("socket.io-client");
     expect(transport.specifiers).toContain("./studio-live-socket-connection-factory");
-    expect(transport.specifiers).not.toContain("socket.io-client");
-    expect(transport.specifiers).toContain("./studio-live-socket-wire");
+    for (const mod of family) {
+      expect(mod.specifiers).not.toContain("socket.io-client");
+    }
+    expect(family.some((mod) => mod.specifiers.includes("./studio-live-socket-wire"))).toBe(
+      true,
+    );
     for (const parser of [
       "parseParticipant",
       "parseLock",
@@ -63,13 +80,13 @@ describe("studio live socket wire ownership boundary", () => {
       "parseJoinAck",
       "publicParticipant",
     ]) {
-      expect(transport.source).not.toMatch(
-        new RegExp(`function\\s+${parser}\\b`)
-      );
-      expect(transport.source).toContain(parser);
+      for (const mod of family) {
+        expect(mod.source).not.toMatch(new RegExp(`function\\s+${parser}\\b`));
+      }
+      expect(family.some((mod) => mod.source.includes(parser))).toBe(true);
     }
-    expect(transport.source).toContain("private beginJoin()");
-    expect(transport.source).toContain("private reconcilePendingPresence(");
-    expect(transport.source).toContain("publishCrdtUpdate(");
+    expect(lifecycle.source).toContain("export function beginJoin(");
+    expect(lifecycle.source).toContain("export function reconcilePendingPresence(");
+    expect(outbound.source).toContain("export function publishCrdtUpdate(");
   });
 });

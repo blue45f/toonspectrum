@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 function source(relativePath: string): string {
@@ -43,7 +44,7 @@ describe("studio liquify performance boundaries", () => {
     const page = readStudioCuttoonEditorSource();
     const preview = source("./studio-liquify-live-preview.ts");
     const browser = source("./studio-liquify-browser.ts");
-    const viewport = source("./canvas/StudioCanvasViewport.tsx");
+    const viewport = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 
     expect(preview).toContain("planStudioLiquifyLivePreview");
     expect(preview).toContain("roi-full-res");

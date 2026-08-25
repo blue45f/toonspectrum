@@ -43,6 +43,8 @@ export interface StudioMainMenuSurfaceState {
   readonly commandBarVisible?: boolean;
   /** Master-page editing suspends the document timeline and page review. */
   readonly masterEditMode: boolean;
+  /** 픽셀 아트 제한 팔레트 모드 — 그리기 메뉴 체크 표시. */
+  readonly pixelArtEnabled: boolean;
 }
 
 /**
@@ -106,4 +108,18 @@ export interface StudioMainMenuSurfaceActions {
   openDialogueBatch: () => unknown;
   /** §15.3 Text ▸ Localization Layout — dialogue locales + translation memory. */
   openDialogueTranslate: () => unknown;
+  /** 그리기 ▸ 픽셀 아트 — 제한 팔레트 스냅. */
+  togglePixelArtMode: () => unknown;
+  /** 캔버스 ▸ 스티키 노트 — 기본 레몬 프리셋. */
+  insertDefaultStickyNote: () => unknown;
+  /** 그리기 ▸ 실크 대칭 — 미러 생성형 스트로크. */
+  enableSilkSymmetry: () => unknown;
+  /** 3D ▸ 스컬프트 — 하이브리드 DCC sculpt 표면. */
+  openSculptWorkbench: () => unknown;
+  /** 협업 ▸ 빠른 화이트보드 — 휘발 보드 세션. */
+  startEphemeralWhiteboard: () => unknown;
+  /** 3D ▸ 캐릭터 — VRM poser 표면. URL `surface=poser`. */
+  openVrmPoser: () => unknown;
+  /** 3D ▸ 배경 — 3D 배경 표면. URL `surface=bg3d`. */
+  openBackground3d: () => unknown;
 }

@@ -16,7 +16,7 @@
  * `studio-main-menu-group-spec.ts`.
  */
 
-import { ClipboardCheck, MessagesSquare, Users } from "lucide-react";
+import { ClipboardCheck, MessagesSquare, Presentation, Users } from "lucide-react";
 
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
@@ -58,6 +58,15 @@ export function buildStudioCollaborationMenuItems({
         : undefined,
       onSelect: () => {
         ui.openPageReview();
+      },
+    },
+    {
+      id: "ephemeral-board",
+      commandId: "collaboration.ephemeral-board",
+      label: "빠른 화이트보드…",
+      icon: Presentation,
+      onSelect: () => {
+        ui.startEphemeralWhiteboard();
       },
     },
   ];

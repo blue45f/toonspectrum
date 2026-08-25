@@ -92,7 +92,7 @@ function moduleShape(relativePath: string): ModuleShape {
 describe("Studio mobile editing dock module boundary", () => {
   it("keeps StudioPage as the one-way orchestration owner behind a mobile-only lazy boundary", () => {
     const page = moduleShape("./StudioPage.tsx");
-    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
     const loader = moduleShape("./studio-mobile-editing-dock-loader.ts");
 
@@ -131,7 +131,7 @@ describe("Studio mobile editing dock module boundary", () => {
 
   it("preserves the lazy registry and excludes canvas runtime dependencies", () => {
     const page = moduleShape("./StudioPage.tsx");
-    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
     const dockUi = moduleShape("./studio-mobile-dock-presets-config.ts");
     const dockPresets = moduleShape("./studio-mobile-dock-presets.tsx");
@@ -194,7 +194,7 @@ describe("Studio mobile editing dock module boundary", () => {
 
   it("routes mobile brush default restore through the page-owned baseline controller", () => {
     const page = moduleShape("./StudioPage.tsx");
-    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
 
     expect(editorView.source).toContain(

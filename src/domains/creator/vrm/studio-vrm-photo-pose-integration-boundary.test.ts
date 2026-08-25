@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
+
+const poserSource = readStudioVrmPoserImplementationSource();
 const scannerSource = readFileSync(
   new URL("./StudioVrmPhotoPoseScanner.tsx", import.meta.url),
   "utf8",

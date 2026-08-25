@@ -44,6 +44,27 @@ describe("Studio route manifest", () => {
       "/studio/work:work-1/editor",
     ],
     [
+      "/studio/work/work-1/brushes",
+      "",
+      "editor",
+      "/studio/work/work-1/brushes",
+      "/studio/work:work-1/editor",
+    ],
+    [
+      "/studio/work/work-1/bg3d",
+      "",
+      "editor",
+      "/studio/work/work-1/bg3d",
+      "/studio/work:work-1/editor",
+    ],
+    [
+      "/studio/work/work-1/poser",
+      "",
+      "editor",
+      "/studio/work/work-1/poser",
+      "/studio/work:work-1/editor",
+    ],
+    [
       "/studio/work/work-1/3d/dcc/shot",
       "",
       "editor",

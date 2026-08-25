@@ -179,7 +179,7 @@ const REPRESENTATIVE_OPTIONAL_SURFACES = [
 describe("Studio ToolBelt content module boundary", () => {
   it("keeps StudioPage as the one-way static owner", () => {
     const _page = moduleShape("./StudioPage.tsx");
-    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
 
     expect(
@@ -250,7 +250,7 @@ describe("Studio ToolBelt content module boundary", () => {
   });
 
   it("preserves all 203 props at the single Page call site", () => {
-    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
     const propNames = propertyNames(
       findInterface(toolBelt, "StudioToolBeltContentProps").members

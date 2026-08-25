@@ -37,10 +37,20 @@ const studioCollaborationWiringSource = readFileSync(
   resolve("src/domains/creator/live/studio-collaboration-wiring.ts"),
   "utf8"
 );
-const studioEditorViewSource = readFileSync(
-  resolve("src/domains/creator/studio-cuttoon-editor/StudioCuttoonEditorView.tsx"),
-  "utf8",
-);
+const studioEditorViewSource = [
+  "StudioCuttoonEditorView.tsx",
+  "StudioCuttoonEditorHosts.tsx",
+  "StudioCuttoonEditorDialogs.tsx",
+  "StudioCuttoonEditorChrome.tsx",
+  "StudioCuttoonEditorWorkspace.tsx",
+  "StudioCuttoonEditorCanvasColumn.tsx",
+  "StudioCuttoonEditorInspectorColumn.tsx",
+  "StudioCuttoonEditorPanels.tsx",
+  "StudioCuttoonEditorSessionDialogs.tsx",
+  "StudioCuttoonEditorContextMenu.tsx",
+].map((name) =>
+  readFileSync(resolve(`src/domains/creator/studio-cuttoon-editor/${name}`), "utf8"),
+).join("\n");
 const studioShellSource = `${studioPageSource}\n${studioEditorViewSource}`;
 const studioLazyPanelStackSource = readFileSync(
   resolve("src/domains/creator/StudioLazyPanelStack.tsx"),

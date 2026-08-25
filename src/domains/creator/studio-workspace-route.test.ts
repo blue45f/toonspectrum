@@ -21,6 +21,9 @@ describe("studio workspace routes", () => {
     ["/studio/work/work-1/canvas", "", "canvas", "work-1", null, "/studio/work/work-1/canvas"],
     ["/studio/comic", "", "comic", null, null, "/studio/comic"],
     ["/studio/work/work-1/animation", "", "animation", "work-1", null, "/studio/work/work-1/animation"],
+    ["/studio/work/work-1/brushes", "", "brushes", "work-1", null, "/studio/work/work-1/brushes"],
+    ["/studio/work/work-1/bg3d", "", "bg3d", "work-1", null, "/studio/work/work-1/bg3d"],
+    ["/studio/work/work-1/poser", "", "poser", "work-1", null, "/studio/work/work-1/poser"],
     ["/studio/remix/source-1/canvas", "", "canvas", null, null, "/studio/remix/source-1/canvas"],
     ["/studio?remix=source-1", "?remix=source-1", "canvas", null, null, "/studio/remix/source-1/canvas"],
     ["/studio/3d", "", "dcc", null, "model", "/studio/3d/dcc/model"],
@@ -83,6 +86,11 @@ describe("studio workspace routes", () => {
     })).toBe(
       "/studio/remix/source%2F%ED%95%9C%EA%B8%80/animation?room=room-2",
     );
+    expect(studio2dHref({
+      search: "",
+      surface: "brushes",
+      workId: "work-1",
+    })).toBe("/studio/work/work-1/brushes");
     expect(parseStudioWorkspaceRoute({
       pathname: "/studio/work/work%2F%ED%95%9C%EA%B8%80/3d/dcc/cad",
     })).toMatchObject({ valid: true, workId: "work/한글" });

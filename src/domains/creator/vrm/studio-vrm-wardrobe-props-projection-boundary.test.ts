@@ -3,11 +3,13 @@ import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
 import { measureStudioVrmWardrobeMetrics } from "./StudioVrmWardrobePropsProjection";
 
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
-const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+
+const poserSource = readStudioVrmPoserImplementationSource();
 const projectionSource = readFileSync(
   new URL("./StudioVrmWardrobePropsProjection.tsx", import.meta.url),
   "utf8",

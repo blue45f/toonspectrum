@@ -112,7 +112,7 @@ const OPTIONAL_VIEWPORT_SURFACES = [
 
 describe("Studio canvas viewport module boundary", () => {
   it("keeps the core canvas on one static, one-way ownership edge", () => {
-    const editor = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editor = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 
     expect(
@@ -127,10 +127,13 @@ describe("Studio canvas viewport module boundary", () => {
   it("moves the renderer and both public contracts out of the page monolith", () => {
     const page = moduleShape("../StudioPage.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
+    const viewportTypes = moduleShape("./StudioCanvasViewportTypes.ts");
 
-    expect(viewport.exportedDeclarations).toContain("StudioCanvasViewportHandlers");
-    expect(viewport.exportedDeclarations).toContain("StudioCanvasViewportProps");
+    expect(viewportTypes.exportedDeclarations).toContain("StudioCanvasViewportHandlers");
+    expect(viewportTypes.exportedDeclarations).toContain("StudioCanvasViewportProps");
     expect(viewport.exportedDeclarations).toContain("StudioCanvasViewport");
+    expect(viewport.source).toContain("type StudioCanvasViewportHandlers");
+    expect(viewport.source).toContain("type StudioCanvasViewportProps");
     expect(page.topLevelDeclarations).not.toContain("StudioCanvasViewportHandlers");
     expect(page.topLevelDeclarations).not.toContain("StudioCanvasViewportProps");
     expect(page.topLevelDeclarations).not.toContain("StudioCanvasViewport");
@@ -147,13 +150,14 @@ describe("Studio canvas viewport module boundary", () => {
     expect(viewport.source).toContain(
       "export const StudioCanvasViewport = memo(function StudioCanvasViewport({",
     );
-    expect(viewport.source).toContain('<Profiler id="studio:stage"');
+    const stageHost = moduleShape("./StudioCanvasViewportStageHost.tsx");
+    expect(stageHost.source).toContain('<Profiler id="studio:stage"');
   });
 
   it("stabilizes compiler-opted-out viewport projections and event bridges", () => {
     const page = moduleShape("../StudioPage.tsx");
-    const editor = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+    const editor = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx");
+    const viewportTypes = moduleShape("./StudioCanvasViewportTypes.ts");
 
     expect(page.source).toContain(
       "const studioWorkAssetRenderProjection = useMemo(",
@@ -174,7 +178,7 @@ describe("Studio canvas viewport module boundary", () => {
     expect(page.source).toContain(
       "activateCanvasTool: activatePrimaryCanvasTool,",
     );
-    expect(viewport.source).toContain(
+    expect(viewportTypes.source).toContain(
       'activateCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;',
     );
     expect(page.source).not.toContain(
@@ -183,7 +187,7 @@ describe("Studio canvas viewport module boundary", () => {
     expect(editor.source).toContain(
       "setRightPanelOpen={studioCanvasViewportHandlers.setRightPanelOpen}",
     );
-    expect(viewport.source).toContain(
+    expect(viewportTypes.source).toContain(
       "closeViewToolWithFocus: (options?: { preferCanvas?: boolean }) => void;",
     );
   });
@@ -208,10 +212,12 @@ describe("Studio canvas viewport module boundary", () => {
       "drawingShortcutNoticeStore={drawingShortcutNoticeStore}",
     );
     expect(page.source).not.toContain("drawingShortcutNotice={");
-    expect(viewport.source).toContain("<StudioDrawingShortcutNoticeLayer");
+    const hudOverlays = moduleShape("./StudioCanvasViewportHudOverlays.tsx");
+    const viewportTypes = moduleShape("./StudioCanvasViewportTypes.ts");
+    expect(hudOverlays.source).toContain("<StudioDrawingShortcutNoticeLayer");
     expect(noticeLayer.source).toContain("export function StudioDrawingShortcutNoticeLayer({");
     expect(noticeLayer.source).toContain("const snapshot = useSyncExternalStore(");
-    expect(viewport.source).toContain(
+    expect(viewportTypes.source).toContain(
       "drawingShortcutNoticeStore: StudioDrawingShortcutNoticeStore;",
     );
     expect(noticeLayer.source).toContain('aria-live="polite"');
@@ -220,24 +226,36 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("keeps the viewport and right inspector in one desktop row without collapsing canvas height", () => {
-    const page = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const workspace = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorWorkspace.tsx");
+    const canvas = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx");
+    const inspector = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const workspaceMarker = "중앙: 캔버스 + 우측 인스펙터";
-    const workspaceIndex = page.source.indexOf(workspaceMarker);
-    const viewportIndex = page.source.indexOf("<StudioCanvasViewport", workspaceIndex);
-    const pointCommentIndex = page.source.indexOf("{pointCommentComposer ?", viewportIndex);
-    const resizeHandleIndex = page.source.indexOf("캔버스 ↔ 속성 패널 너비 스플리터", viewportIndex);
-    const inspectorIndex = page.source.indexOf("<LazyStudioInspectorAside", resizeHandleIndex);
+    const workspaceIndex = workspace.source.indexOf(workspaceMarker);
+    const canvasColumnIndex = workspace.source.indexOf(
+      "<StudioCuttoonEditorCanvasColumn",
+      workspaceIndex,
+    );
+    const inspectorColumnIndex = workspace.source.indexOf(
+      "<StudioCuttoonEditorInspectorColumn",
+      canvasColumnIndex,
+    );
+    const viewportIndex = canvas.source.indexOf("<StudioCanvasViewport");
+    const pointCommentIndex = canvas.source.indexOf("{pointCommentComposer ?", viewportIndex);
+    const resizeHandleIndex = inspector.source.indexOf("캔버스 ↔ 속성 패널 너비 스플리터");
+    const inspectorIndex = inspector.source.indexOf("<LazyStudioInspectorAside", resizeHandleIndex);
 
     expect(workspaceIndex).toBeGreaterThan(-1);
     expect(
-      page.source.slice(workspaceIndex, viewportIndex),
+      workspace.source.slice(workspaceIndex, canvasColumnIndex),
     ).toContain(
       'className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row"',
     );
-    expect(viewportIndex).toBeGreaterThan(workspaceIndex);
+    expect(canvasColumnIndex).toBeGreaterThan(workspaceIndex);
+    expect(inspectorColumnIndex).toBeGreaterThan(canvasColumnIndex);
+    expect(viewportIndex).toBeGreaterThan(-1);
     expect(pointCommentIndex).toBeGreaterThan(viewportIndex);
-    expect(resizeHandleIndex).toBeGreaterThan(pointCommentIndex);
+    expect(resizeHandleIndex).toBeGreaterThan(-1);
     expect(inspectorIndex).toBeGreaterThan(resizeHandleIndex);
     expect(viewport.source).toContain(
       '"relative min-h-0 min-w-0 flex-1 lg:min-w-[16rem]"',
@@ -262,17 +280,26 @@ describe("Studio canvas viewport module boundary", () => {
   });
 
   it("preserves the neutral optional-UI registry instead of flattening lazy chunks", () => {
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+    const hosts = [
+      moduleShape("./StudioCanvasViewport.tsx"),
+      moduleShape("./StudioCanvasViewportStageHost.tsx"),
+      moduleShape("./StudioCanvasViewportDocumentLayer.tsx"),
+      moduleShape("./StudioCanvasViewportToolLayers.tsx"),
+      moduleShape("./StudioCanvasViewportDomOverlays.tsx"),
+      moduleShape("./StudioCanvasViewportHudOverlays.tsx"),
+    ];
 
     expect(
-      viewport.runtimeImports.filter((specifier) => specifier === "../studio-page-lazy-ui"),
-    ).toEqual(["../studio-page-lazy-ui"]);
-    expect(viewport.dynamicImports).toEqual([]);
-    for (const specifier of OPTIONAL_VIEWPORT_SURFACES) {
-      expect(
-        viewport.runtimeImports,
-        `${specifier} must stay behind studio-page-lazy-ui`,
-      ).not.toContain(specifier);
+      hosts.flatMap((host) => host.runtimeImports.filter((specifier) => specifier === "../studio-page-lazy-ui")),
+    ).not.toEqual([]);
+    for (const host of hosts) {
+      expect(host.dynamicImports).toEqual([]);
+      for (const specifier of OPTIONAL_VIEWPORT_SURFACES) {
+        expect(
+          host.runtimeImports,
+          `${specifier} must stay behind studio-page-lazy-ui in ${host.source.slice(0, 40)}`,
+        ).not.toContain(specifier);
+      }
     }
   });
 
@@ -281,8 +308,11 @@ describe("Studio canvas viewport module boundary", () => {
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const shared = moduleShape("./studio-canvas-shared-runtime.ts");
 
+    const stageHost = moduleShape("./StudioCanvasViewportStageHost.tsx");
+    const interaction = moduleShape("./studio-canvas-viewport-interaction.ts");
     expect(page.runtimeImports).toContain("./canvas/studio-canvas-shared-runtime");
-    expect(viewport.runtimeImports).toContain("./studio-canvas-shared-runtime");
+    expect(stageHost.runtimeImports).toContain("./studio-canvas-shared-runtime");
+    expect(interaction.runtimeImports).toContain("./studio-canvas-shared-runtime");
     expect(shared.runtimeImports).not.toContain("../StudioPage");
     expect(shared.runtimeImports).not.toContain("./StudioCanvasViewport");
     expect(shared.runtimeImports).not.toContain("react");
@@ -294,22 +324,20 @@ describe("Studio canvas viewport module boundary", () => {
     // still rendered nothing. The rule now lives in `studio-paper-grain-visibility-v1` alone:
     // an explicit toggle wins, otherwise the sheet shows iff the page carries an authored
     // `paperSurface` — which never repaints a page that never opted in.
-    const page = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+    const page = moduleShape("../studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
+    const liveSurfaces = moduleShape("./studio-canvas-viewport-live-surfaces.ts");
 
-    expect(viewport.source).toContain(
+    expect(liveSurfaces.source).toContain(
       "const paperGrainVisible = resolveStudioPaperGrainVisibleV1(activePage);",
     );
     expect(page.source).toContain(
       "paperGrainVisible={resolveStudioPaperGrainVisibleV1(activePage)}",
     );
-    for (const shape of [page, viewport]) {
+    for (const shape of [page, liveSurfaces]) {
       expect(shape.source).not.toContain("activePage.paperGrainVisible === true");
       expect(shape.source).not.toContain("activePage.paperGrainVisible !== false");
       expect(shape.runtimeImports).toContain(
-        shape === page
-          ? "../brush/studio-paper-grain-visibility-v1"
-          : "../brush/studio-paper-grain-visibility-v1",
+        "../brush/studio-paper-grain-visibility-v1",
       );
     }
   });
@@ -317,18 +345,18 @@ describe("Studio canvas viewport module boundary", () => {
   it("paints the sheet into exports — what the artist sees is what ships", () => {
     // `isExporting` used to null the pattern out, so PNG/PSD/timelapse output disagreed with the
     // canvas. The paper is a property of the page, so the export gate is gone.
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
-    expect(viewport.source).not.toContain("if (!paperGrainVisible || isExporting) return null;");
+    const liveSurfaces = moduleShape("./studio-canvas-viewport-live-surfaces.ts");
+    expect(liveSurfaces.source).not.toContain("if (!paperGrainVisible || isExporting) return null;");
   });
 
   it("bakes the high-fidelity substrate off the main thread and degrades to the fast tile", () => {
     // A 256² procedural surface costs ~1s on this repo's CPU. It must never run inline, and its
     // failure path must keep the paper visible rather than turning it off.
-    const viewport = moduleShape("./StudioCanvasViewport.tsx");
-    expect(viewport.runtimeImports).toContain("../brush/studio-paper-substrate-tile-host-v1");
-    expect(viewport.source).toContain("requestStudioPaperSubstrateTileHeightsV1");
-    expect(viewport.source).toContain("substrateTile ?? paperGrainFallbackImage");
+    const liveSurfaces = moduleShape("./studio-canvas-viewport-live-surfaces.ts");
+    expect(liveSurfaces.runtimeImports).toContain("../brush/studio-paper-substrate-tile-host-v1");
+    expect(liveSurfaces.source).toContain("requestStudioPaperSubstrateTileHeightsV1");
+    expect(liveSurfaces.source).toContain("substrateTile ?? paperGrainFallbackImage");
     // The synchronous baker must not be pulled into the viewport bundle path.
-    expect(viewport.source).not.toContain("bakeStudioPaperSubstrateTileV1");
+    expect(liveSurfaces.source).not.toContain("bakeStudioPaperSubstrateTileV1");
   });
 });

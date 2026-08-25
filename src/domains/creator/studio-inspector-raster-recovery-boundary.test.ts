@@ -2,12 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioInspectorAsideSurface } from "./read-studio-inspector-aside-source";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
-const asideSource = readFileSync(
-  new URL("./StudioInspectorAside.tsx", import.meta.url),
-  "utf8",
-);
+
+const asideSource = readStudioInspectorAsideSurface();
 const pageSource = readStudioCuttoonEditorSource();
 const railSource = readFileSync(
   new URL("./StudioLeftToolRail.tsx", import.meta.url),

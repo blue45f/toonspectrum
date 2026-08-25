@@ -141,8 +141,6 @@ export interface StudioMainMenuUiActions extends StudioMainMenuSurfaceActions {
   openAssetMenu: () => unknown;
   requestImageInsert: () => unknown;
   openMannequinPoser: () => unknown;
-  openVrmPoser: () => unknown;
-  openBackground3d: () => unknown;
   openReferencePanel: () => unknown;
   stepZoom: (direction: -1 | 1) => unknown;
   toggleReferencePanel: () => unknown;

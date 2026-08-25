@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
+
+const poserSource = readStudioVrmPoserImplementationSource();
 // 2026-08-21 의도적 변경: 순수 헬퍼(studioVrmTexturePaintSceneIdentity 포함)가
 // StudioVrmPoser.tsx에서 studio-vrm-poser-helpers.ts로 분리됐다. 마커만 옮기고
 // 검증 대상(장면 아이덴티티는 surfacePaint 만 본다)은 그대로 유지한다.
@@ -119,7 +121,7 @@ describe("Studio VRM texture-paint wiring boundary", () => {
     expect(thumbnailEffect).toContain("activeLibraryEntry.thumbnail");
     expect(thumbnailEffect).toContain("saveVrmThumbnail(");
 
-    expect(poserSource).toContain("setTexturePaintRestoreRetryToken((token) => token + 1)");
+    expect(poserSource).toContain("setTexturePaintRestoreRetryToken((token: number) => token + 1)");
     expect(poserSource).toContain("onRetryRestore={() => {");
   });
 

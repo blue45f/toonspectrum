@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
+
+
+
 function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), "utf8");
 }
@@ -42,7 +46,7 @@ describe("Studio native live-surface quality integration", () => {
 
   it("paints the live eraser draft on the main layer with destination-out for real pixel lifting", () => {
     const page = source("../StudioPage.tsx");
-    const viewport = source("../canvas/StudioCanvasViewport.tsx");
+    const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
     const flushStart = page.indexOf("const flushDirectLiveDraft =");
     const flushEnd = page.indexOf("const flushDirectLiveDraftNow =", flushStart);
     const flush = page.slice(flushStart, flushEnd);

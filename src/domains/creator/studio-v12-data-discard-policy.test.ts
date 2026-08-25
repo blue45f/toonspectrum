@@ -157,7 +157,7 @@ describe("V12 in-place cutover data-discard policy", () => {
     expect(sceneSnapshotPanel).not.toContain(
       "studioSceneSnapshotIndexedDbLibrary",
     );
-    const vrmPoser = source("./vrm/StudioVrmPoser.tsx");
+    const vrmPoser = source("./vrm/useStudioVrmPoserState.ts");
     expect(vrmPoser).toContain("createStudioVrmCreativeSqliteRepository");
     expect(vrmPoser).not.toContain('localStorage.getItem("studio_vrm_full_states")');
     const vrmPoseMaterials = source("./vrm/StudioVrmPoseMaterialPanel.tsx");
@@ -219,7 +219,10 @@ describe("V12 in-place cutover data-discard policy", () => {
     const mannequin = source("./scene-3d/StudioMannequinPoserPanel.tsx");
     expect(mannequin).toContain("getProductStudioMannequinStateSqliteRepository");
     expect(mannequin).not.toContain("localStorage.setItem(");
-    const background3d = source("./bg3d/StudioBackground3D.tsx");
+    const background3d = [
+      source("./bg3d/StudioBackground3D.tsx"),
+      source("./bg3d/useStudioBg3dEditorState.ts"),
+    ].join("\n");
     expect(background3d).toContain("getProductStudioBg3dLtPresetSqliteRepository");
     expect(background3d).not.toContain("studio-bg3d-lt-preset-storage");
     const originalMarketplace = source("./StudioOriginalAssetMarketplacePanel.tsx");

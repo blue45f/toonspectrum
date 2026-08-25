@@ -37,7 +37,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 
 describe("Studio canvas leaf boundaries", () => {
   it("statically imports each leaf exactly once from StudioPage", () => {
-    const page = moduleEdges("../studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const page = moduleEdges("../studio-cuttoon-editor/StudioCuttoonEditorContextMenu.tsx");
     const viewport = moduleEdges("./StudioCanvasViewport.tsx");
 
     expect(
@@ -65,7 +65,7 @@ describe("Studio canvas leaf boundaries", () => {
 
   it("keeps context-menu state, outside-click lifecycle, and 3D parsing in StudioPage", () => {
     const page = moduleEdges("../StudioPage.tsx");
-    const viewport = moduleEdges("./StudioCanvasViewport.tsx");
+    const viewport = moduleEdges("./StudioCanvasViewportStageHost.tsx");
     const menu = moduleEdges("./StudioCanvasContextMenu.tsx");
 
     expect(page.source).toContain("const [contextMenu, setContextMenu] = useState");

@@ -5,6 +5,9 @@ import { describe, expect, it } from "vitest";
 
 const ackPath = fileURLToPath(new URL("./studio-live-ack.ts", import.meta.url));
 const gatewayPath = fileURLToPath(new URL("./studio-live.gateway.ts", import.meta.url));
+const crdtPath = fileURLToPath(
+  new URL("./studio-live-gateway-handlers-crdt.ts", import.meta.url)
+);
 
 describe("studio live ACK ownership boundary", () => {
   it("keeps ACK policy in a bounded leaf without Nest, Socket.IO, repository, or gateway runtime", () => {
@@ -22,6 +25,7 @@ describe("studio live ACK ownership boundary", () => {
 
   it("makes the gateway consume the leaf mapping instead of owning duplicate ACK policy", () => {
     const gatewaySource = readFileSync(gatewayPath, "utf8");
+    const crdtSource = readFileSync(crdtPath, "utf8");
 
     expect(gatewaySource).toContain('from "./studio-live-ack"');
     expect(gatewaySource).toMatch(/replyStudioLiveAck\s+as\s+reply/u);
@@ -30,22 +34,20 @@ describe("studio live ACK ownership boundary", () => {
     expect(gatewaySource).not.toContain("private crdtFailure(");
     expect(gatewaySource).not.toContain("StudioCrdtBackpressureError");
     expect(gatewaySource).not.toContain("StudioCrdtStorageCorruptionError");
-    expect(gatewaySource).toContain(
+    expect(crdtSource).toContain(
       'mapStudioLiveCrdtFailure(error, parsed.data.workId, "sync")'
     );
-    expect(gatewaySource).toContain(
+    expect(crdtSource).toContain(
       'mapStudioLiveCrdtFailure(error, parsed.data.workId, "update")'
     );
   });
 
   it("preserves the CRDT update ACK-before-fan-out linearization contract in the gateway", () => {
-    const gatewaySource = readFileSync(gatewayPath, "utf8");
-    const updateStart = gatewaySource.indexOf("async applyCrdtUpdate(");
-    const updateEnd = gatewaySource.indexOf('@SubscribeMessage("studio:lock:request")', updateStart);
-    const updateHandler = gatewaySource.slice(updateStart, updateEnd);
+    const crdtSource = readFileSync(crdtPath, "utf8");
+    const updateStart = crdtSource.indexOf("export async function applyCrdtUpdate(");
+    const updateHandler = crdtSource.slice(updateStart);
 
     expect(updateStart).toBeGreaterThan(-1);
-    expect(updateEnd).toBeGreaterThan(updateStart);
     expect(updateHandler).toContain("await this.studioCrdtService.applyUpdate({");
     expect(updateHandler).toContain("reply(ack, response);");
     expect(updateHandler).toContain('.emit("studio:crdt:update", remote);');

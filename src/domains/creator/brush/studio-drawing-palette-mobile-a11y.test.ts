@@ -2,10 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const inspectorSource = readFileSync(
-  new URL("../StudioInspectorAside.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioInspectorAsideSurface } from "../read-studio-inspector-aside-source";
+
+const inspectorSource = readStudioInspectorAsideSurface();
 const utilitySource = readFileSync(
   new URL("../StudioInspectorUtilityPanels.tsx", import.meta.url),
   "utf8",

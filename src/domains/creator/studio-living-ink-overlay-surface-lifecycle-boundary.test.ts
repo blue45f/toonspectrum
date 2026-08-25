@@ -1,11 +1,11 @@
-import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const viewportSource = readFileSync(
-  new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
-  "utf8",
-);
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
+
+
+
+const viewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 
 describe("physical overlay surface lifecycle boundary", () => {
   it("does not transiently unmount Living Ink during dependency rerenders", () => {

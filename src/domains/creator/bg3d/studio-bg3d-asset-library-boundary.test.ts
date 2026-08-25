@@ -58,15 +58,18 @@ describe("Studio BG3D asset-library ownership boundary", () => {
   });
 
   it("keeps persistence, validation, resource disposal, scene, history, and selection in the parent", () => {
-    const editorSource = moduleSource("./StudioBackground3D.tsx");
+    const editorSource = [
+      moduleSource("./StudioBackground3D.tsx"),
+      moduleSource("./studio-bg3d-editor-lt-host.ts"),
+      moduleSource("./StudioBg3dEditorSidebarExtras.tsx"),
+    ].join("\n");
     const editorImports = moduleImports("./StudioBackground3D.tsx");
     const panelSource = moduleSource("./StudioBg3dAssetLibraryPanel.tsx");
-    // 2026-08-21 intentional change: the editor's model import/delete actions moved into
-    // studio-bg3d-editor-model-import-actions.ts (editor split). Ownership still sits with the
-    // editor side of the boundary, so the owner tokens are checked across both editor modules.
     const editorOwnedSource = `${editorSource}\n${
       moduleSource("./studio-bg3d-editor-model-import-actions.ts")
-    }`;
+    }\n${moduleSource("./useStudioBg3dEditor.ts")}\n${
+      moduleSource("./studio-bg3d-editor-scene-ops-host.ts")
+    }\n${moduleSource("./useStudioBg3dEditorState.ts")}`;
 
     expect(editorImports.valueImports).not.toContain("./StudioBg3dAssetLibraryPanel");
     expect(editorImports.dynamicImports).toContain("./StudioBg3dAssetLibraryPanel");
@@ -92,18 +95,23 @@ describe("Studio BG3D asset-library ownership boundary", () => {
   });
 
   it("delays SQLite/OPFS model, template, and LT preset authorities until their product surfaces activate", () => {
-    const editorSource = moduleSource("./StudioBackground3D.tsx");
-    const editorImports = moduleImports("./StudioBackground3D.tsx");
+    const editorSource = [
+      moduleSource("./StudioBackground3D.tsx"),
+      moduleSource("./useStudioBg3dEditorEffects.ts"),
+      moduleSource("./studio-bg3d-editor-lt-host.ts"),
+    ].join("\n");
+    const _editorImports = moduleImports("./studio-bg3d-editor-runtime-bindings.ts");
+    const bindingsSource = moduleSource("./studio-bg3d-editor-runtime-bindings.ts");
     const modelLoaderImports = moduleImports("./studio-bg3d-model-library-loader.ts");
     const templateLoaderImports = moduleImports("./studio-bg3d-template-library-loader.ts");
     const presetLoaderImports = moduleImports("./studio-bg3d-lt-preset-repository-loader.ts");
 
-    expect(editorImports.valueImports).toContain("./studio-bg3d-model-library-loader");
-    expect(editorImports.valueImports).toContain("./studio-bg3d-template-library-loader");
-    expect(editorImports.valueImports).toContain("./studio-bg3d-lt-preset-repository-loader");
-    expect(editorImports.valueImports).not.toContain("./bg3d-model-library");
-    expect(editorImports.valueImports).not.toContain("./bg3d-template-library");
-    expect(editorImports.valueImports).not.toContain(
+    expect(bindingsSource).toContain('from "./studio-bg3d-model-library-loader"');
+    expect(bindingsSource).toContain('from "./studio-bg3d-template-library-loader"');
+    expect(bindingsSource).toContain('from "./studio-bg3d-lt-preset-repository-loader"');
+    expect(bindingsSource).not.toContain('from "./bg3d-model-library"');
+    expect(bindingsSource).not.toContain('from "./bg3d-template-library"');
+    expect(bindingsSource).not.toContain(
       "../scene-3d/studio-mannequin-bg3d-preset-sqlite-repository",
     );
     expect(modelLoaderImports.dynamicImports).toEqual(["./bg3d-model-library"]);
@@ -118,8 +126,12 @@ describe("Studio BG3D asset-library ownership boundary", () => {
   });
 
   it("projects bundled environments before OPFS and degrades only the local library on failure", () => {
-    const editorSource = moduleSource("./StudioBackground3D.tsx");
-    const editorImports = moduleImports("./StudioBackground3D.tsx");
+    const editorSource = [
+      moduleSource("./StudioBackground3D.tsx"),
+      moduleSource("./useStudioBg3dEditorState.ts"),
+      moduleSource("./useStudioBg3dEditorEffects.ts"),
+    ].join("\n");
+    const _editorImports = moduleImports("./studio-bg3d-editor-runtime-bindings.ts");
     const effectStart = editorSource.indexOf(
       "// 모델 라이브러리 목록은 모달이 열릴 때 한 번 읽어온다",
     );
@@ -129,10 +141,12 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     );
     const modelLibraryEffect = editorSource.slice(effectStart, effectEnd);
 
-    expect(editorImports.valueImports).toContain(
-      "./studio-bg3d-bundled-environment-library",
+    expect(moduleSource("./studio-bg3d-editor-runtime-bindings.ts")).toContain(
+      'from "./studio-bg3d-bundled-environment-library"',
     );
-    expect(editorImports.valueImports).not.toContain("./bg3d-model-library");
+    expect(moduleSource("./studio-bg3d-editor-runtime-bindings.ts")).not.toContain(
+      'from "./bg3d-model-library"',
+    );
     expect(editorSource).toContain(
       "useState<Bg3dModelLibraryEntry[]>(\n    copyStudioBg3dBundledEnvironmentLibraryEntries,",
     );
@@ -146,7 +160,7 @@ describe("Studio BG3D asset-library ownership boundary", () => {
   });
 
   it("keeps the editor operation lifecycle active before the optional Models surface opens", () => {
-    const editorSource = moduleSource("./StudioBackground3D.tsx");
+    const editorSource = moduleSource("./useStudioBg3dEditorEffects.ts");
     const activeAssignment = editorSource.indexOf("componentActiveRef.current = true;");
     const lifecycleStart = editorSource.lastIndexOf("useEffect(() => {", activeAssignment);
     const lifecycleEnd = editorSource.indexOf("}, [", activeAssignment);

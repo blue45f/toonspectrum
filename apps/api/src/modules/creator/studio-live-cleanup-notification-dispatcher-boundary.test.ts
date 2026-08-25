@@ -7,10 +7,17 @@ const dispatcherPath = fileURLToPath(
   new URL("./studio-live-cleanup-notification-dispatcher.ts", import.meta.url)
 );
 const gatewayPath = fileURLToPath(new URL("./studio-live.gateway.ts", import.meta.url));
+const cleanupPath = fileURLToPath(new URL("./studio-live-gateway-cleanup.ts", import.meta.url));
 const creatorModulePath = fileURLToPath(new URL("./creator.module.ts", import.meta.url));
-const clientTransportPath = fileURLToPath(
+const clientPresencePath = fileURLToPath(
   new URL(
-    "../../../../../src/domains/creator/live/studio-live-socket-transport.ts",
+    "../../../../../src/domains/creator/live/studio-live-socket-transport-presence.ts",
+    import.meta.url
+  )
+);
+const clientVoicePath = fileURLToPath(
+  new URL(
+    "../../../../../src/domains/creator/live/studio-live-socket-transport-voice.ts",
     import.meta.url
   )
 );
@@ -36,17 +43,18 @@ describe("studio live cleanup notification dispatcher boundary", () => {
 
   it("wires bounded room tombstones while keeping terminal access delivery single-shot", () => {
     const gateway = readFileSync(gatewayPath, "utf8");
+    const cleanup = readFileSync(cleanupPath, "utf8");
     const creatorModule = readFileSync(creatorModulePath, "utf8");
-    const invalidStart = gateway.indexOf("private disconnectInvalidSession(");
-    const revokeStart = gateway.indexOf("private revokeParticipant(", invalidStart);
-    const removeStart = gateway.indexOf("private removeParticipant(", revokeStart);
-    const releaseStart = gateway.indexOf("private releaseSocketLocks(", removeStart);
-    const voiceStart = gateway.indexOf("private emitVoiceLeave(", releaseStart);
-    const detachStart = gateway.indexOf("private detachVoiceMembership(", voiceStart);
-    const invalid = gateway.slice(invalidStart, revokeStart);
-    const revoke = gateway.slice(revokeStart, removeStart);
-    const remove = gateway.slice(removeStart, releaseStart);
-    const voice = gateway.slice(voiceStart, detachStart);
+    const invalidStart = cleanup.indexOf("export function disconnectInvalidSession(");
+    const revokeStart = cleanup.indexOf("export function revokeParticipant(", invalidStart);
+    const removeStart = cleanup.indexOf("export function removeParticipant(", revokeStart);
+    const releaseStart = cleanup.indexOf("export function releaseSocketLocks(", removeStart);
+    const voiceStart = cleanup.indexOf("export function emitVoiceLeave(", releaseStart);
+    const detachStart = cleanup.indexOf("export function detachVoiceMembership(", voiceStart);
+    const invalid = cleanup.slice(invalidStart, revokeStart);
+    const revoke = cleanup.slice(revokeStart, removeStart);
+    const remove = cleanup.slice(removeStart, releaseStart);
+    const voice = cleanup.slice(voiceStart, detachStart);
 
     expect(gateway).toContain(
       "private readonly cleanupNotifications: StudioLiveCleanupNotificationDispatcher"
@@ -67,13 +75,14 @@ describe("studio live cleanup notification dispatcher boundary", () => {
   });
 
   it("only retries tombstones whose browser handlers tolerate duplicate delivery", () => {
-    const source = readFileSync(clientTransportPath, "utf8");
-    const presenceStart = source.indexOf("private applyPresenceLeave(");
-    const presenceEnd = source.indexOf("private applyPresenceUpdate(", presenceStart);
-    const voiceStart = source.indexOf("private readonly onVoiceLeave =");
-    const voiceEnd = source.indexOf("private readonly onVoiceSignal =", voiceStart);
-    const presence = source.slice(presenceStart, presenceEnd);
-    const voice = source.slice(voiceStart, voiceEnd);
+    const presenceSource = readFileSync(clientPresencePath, "utf8");
+    const voiceSource = readFileSync(clientVoicePath, "utf8");
+    const presenceStart = presenceSource.indexOf("export function applyPresenceLeave(");
+    const presenceEnd = presenceSource.indexOf("export function applyPresenceUpdate(", presenceStart);
+    const voiceStart = voiceSource.indexOf("export function onVoiceLeave(");
+    const voiceEnd = voiceSource.indexOf("export function onVoiceSignal(", voiceStart);
+    const presence = presenceSource.slice(presenceStart, presenceEnd);
+    const voice = voiceSource.slice(voiceStart, voiceEnd);
 
     expect(presence).toContain("this.participants.delete(connectionId)");
     expect(presence).toContain("if (!participant || participant.connectionId === this.selfConnectionId) return");

@@ -239,8 +239,8 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     ],
     declarationRef:
       "studio-main-menu-item-routing.ts (STUDIO_MENU_ITEM_BUILDERS) + studio-main-menu-items-*.ts",
-    // 2026-08-20: CSP 경계 효과 메뉴 진입점(layer/border-effect)으로 187 → 188.
-    measuredCount: 188,
+    // 2026-08-25: 크리에이티브 모드 해체 → 메뉴 재배치 5행 (188 → 193).
+    measuredCount: 193,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -345,6 +345,7 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   // canvas, Wave E (2) — studio-main-menu-items-authoring.ts
   "canvas/canvas-settings",
   "canvas/grid",
+  "canvas/sticky-note",
   // layer (9) — lifted out of edit, insert and view; Mask/Clipping is Wave D's own row
   "layer/image",
   "layer/bring-front",
@@ -371,8 +372,8 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "select/invert-selection",
   // transform (1) — §15.3 group that shipped nothing until Wave D
   "transform/pixel-transform",
-  // brush (11) — the former `draw` group, plus the five §15.3 Brush rows whose
-  // surfaces shipped inside the inspector with no menu door (spec §15.3 Brush).
+  // brush (13) — former `draw` group + §15.3 Brush doors + pixel/silk from the
+  // retired floating creative-modes pill.
   "brush/pen",
   "brush/eraser",
   "brush/fill",
@@ -384,6 +385,8 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "brush/import-pack",
   "brush/bg",
   "brush/style",
+  "brush/pixel-art",
+  "brush/silk-flow",
   // filter (51) — 마지막 필터 + 코어 5 + 레이어 보정 2 + 필터 팩 43.
   // 팩 구간은 studio-filter-pack-registry.ts 의 STUDIO_FILTER_PACK_KINDS 순서 그대로다:
   // 메뉴가 그 배열을 순회하므로 여기 순서를 임의로 바꾸면 드리프트 가드가 즉시 깨진다.
@@ -463,14 +466,16 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "animation/timeline",
   "animation/frame-anim",
   "animation/onion-skin",
-  // 3d (3) — lifted out of insert
+  // 3d (4) — insert tools + sculpt workbench (was creative-modes pill)
   "3d/mannequin3d",
   "3d/char",
   "3d/bg3d",
-  // collaboration (3) — the other group that left the never-rendered list
+  "3d/sculpt",
+  // collaboration (4) — Wave E doors + ephemeral whiteboard
   "collaboration/team",
   "collaboration/comments",
   "collaboration/page-review",
+  "collaboration/ephemeral-board",
   // window (13) — lifted out of view and insert; the command bar toggle (§15.3
   // Action Bar, CSP 커맨드 바) joined when the menubar history cluster became a
   // user-configurable slotted strip (186 → 187).
@@ -1623,6 +1628,18 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("소재 읽어들이기"), ps("Load Brushes"), krita("Import Brush Preset")],
       origins: [menu("brush/import-pack")],
     }),
+    defineCommand({
+      id: "brush.pixel-art",
+      labels: [ko("픽셀 아트"), en("Pixel art")],
+      aliases: [ours("제한 팔레트"), ps("Pixel Grid")],
+      origins: [menu("brush/pixel-art")],
+    }),
+    defineCommand({
+      id: "brush.silk-flow",
+      labels: [ko("실크 대칭"), en("Silk symmetry")],
+      aliases: [ours("실크 플로우"), procreate("Symmetry")],
+      origins: [menu("brush/silk-flow")],
+    }),
 
     /* --------------------------------------------------------------- color */
     defineCommand({
@@ -1720,6 +1737,12 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("3D 배경"), en("3D background")],
       aliases: [csp("3D 배경 소재")],
       origins: [menu("3d/bg3d")],
+    }),
+    defineCommand({
+      id: "insert.sculpt-3d",
+      labels: [ko("3D 스컬프트"), en("3D sculpt")],
+      aliases: [ours("스컬프트 작업대"), krita("Sculpt")],
+      origins: [menu("3d/sculpt")],
     }),
     defineCommand({
       id: "insert.reference-image",
@@ -2247,6 +2270,12 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       origins: [menu("canvas/grid")],
     }),
     defineCommand({
+      id: "canvas.sticky-note",
+      labels: [ko("스티키 노트"), en("Sticky note")],
+      aliases: [ours("스티키"), ps("Note")],
+      origins: [menu("canvas/sticky-note")],
+    }),
+    defineCommand({
       id: "vector.erase-to-intersection",
       labels: [ko("교차점까지 지우기"), en("Erase to intersection")],
       aliases: [csp("교점까지"), krita("Vector Eraser"), ours("교차점까지 지우기")],
@@ -2343,6 +2372,12 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("페이지 검토 · 승인"), en("Page review and approval")],
       aliases: [ps("Review"), ours("페이지 검토")],
       origins: [menu("collaboration/page-review")],
+    }),
+    defineCommand({
+      id: "collaboration.ephemeral-board",
+      labels: [ko("빠른 화이트보드"), en("Quick whiteboard")],
+      aliases: [ours("휘발 보드")],
+      origins: [menu("collaboration/ephemeral-board")],
     }),
   ]);
 

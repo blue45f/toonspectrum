@@ -22,6 +22,7 @@ import {
   BookMarked,
   Droplets,
   Eraser,
+  Grid2x2,
   LibraryBig,
   Mountain,
   PaintBucket,
@@ -30,6 +31,7 @@ import {
   Shapes,
   SlidersHorizontal,
   Upload,
+  Wind,
 } from "lucide-react";
 
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
@@ -42,6 +44,7 @@ import type { StudioMainMenuItem } from "./studio-main-menu-model";
  */
 export function buildStudioBrushMenuItems({
   editor,
+  state,
   ui,
 }: StudioMainMenuItemContext): StudioMainMenuItem[] {
   return [
@@ -151,8 +154,29 @@ export function buildStudioBrushMenuItems({
       legacyPath: "draw/style",
       label: "팔레트 · 브랜드",
       icon: Palette,
+      separatorAfter: true,
       onSelect: () => {
         ui.openStudioMenu("palette");
+      },
+    },
+    {
+      id: "pixel-art",
+      commandId: "brush.pixel-art",
+      label: state.pixelArtEnabled ? "픽셀 아트 끄기" : "픽셀 아트",
+      icon: Grid2x2,
+      checked: state.pixelArtEnabled,
+      selectionRole: "checkbox",
+      onSelect: () => {
+        ui.togglePixelArtMode();
+      },
+    },
+    {
+      id: "silk-flow",
+      commandId: "brush.silk-flow",
+      label: "실크 대칭",
+      icon: Wind,
+      onSelect: () => {
+        ui.enableSilkSymmetry();
       },
     },
   ];

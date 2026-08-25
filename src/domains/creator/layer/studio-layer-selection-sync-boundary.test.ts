@@ -4,7 +4,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const pageUrl = new URL("../StudioPage.tsx", import.meta.url);
-const inspectorUrl = new URL("../StudioInspectorAside.tsx", import.meta.url);
+const inspectorUrl = new URL("../StudioInspectorAsideShell.tsx", import.meta.url);
 const pageSource = readFileSync(pageUrl, "utf8");
 const inspectorSource = readFileSync(inspectorUrl, "utf8");
 const pageFile = ts.createSourceFile(

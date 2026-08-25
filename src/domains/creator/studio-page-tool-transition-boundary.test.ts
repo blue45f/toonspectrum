@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
+import { readStudioInspectorAsideSurface } from "./read-studio-inspector-aside-source";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const studioPageSource = readStudioCuttoonEditorSource();
@@ -17,14 +19,8 @@ const toolBeltSource = readFileSync(
   new URL("./StudioToolBeltContent.tsx", import.meta.url),
   "utf8",
 );
-const inspectorSource = readFileSync(
-  new URL("./StudioInspectorAside.tsx", import.meta.url),
-  "utf8",
-);
-const canvasViewportSource = readFileSync(
-  new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
-  "utf8",
-);
+const inspectorSource = readStudioInspectorAsideSurface();
+const canvasViewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 const companionToolExecutorSource = readFileSync(
   new URL("./studio-companion-tool-command-executor.ts", import.meta.url),
   "utf8",
@@ -387,9 +383,13 @@ describe("StudioPage tool transition boundary", () => {
       optionsStart,
     );
     const options = studioPageSource.slice(optionsStart, optionsEnd);
-    const contextStart = studioPageSource.indexOf("<StudioCanvasContextMenu");
-    const contextEnd = studioPageSource.indexOf("</Container>", contextStart);
-    const contextMenu = studioPageSource.slice(contextStart, contextEnd);
+    // 컨텍스트 메뉴는 StudioCuttoonEditorContextMenu.tsx로 추출되었다 — 파일 전체가 슬라이스 대상.
+    const contextMenu = readFileSync(
+      new URL("./studio-cuttoon-editor/StudioCuttoonEditorContextMenu.tsx", import.meta.url),
+      "utf8",
+    );
+    const contextStart = 0;
+    const contextEnd = contextMenu.length;
 
     expect(optionsStart).toBeGreaterThanOrEqual(0);
     expect(optionsEnd).toBeGreaterThan(optionsStart);

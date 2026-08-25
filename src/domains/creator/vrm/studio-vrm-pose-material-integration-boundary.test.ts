@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
+
+const poserSource = readStudioVrmPoserImplementationSource();
 // 2026-08-21 의도적 변경: BONE_CATEGORIES 등 정적 카탈로그가 StudioVrmPoser.tsx에서
 // studio-vrm-poser-catalogs.ts로 분리됐다. 마커만 옮기고 검증 대상(시선/턱 카테고리가
 // leftEye/rightEye/jaw를 덮는다)은 그대로 유지한다.

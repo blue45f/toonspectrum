@@ -84,6 +84,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   canvasGridVisible: false,
   vectorEraseToIntersection: false,
   masterEditMode: false,
+  pixelArtEnabled: false,
 };
 
 type StateOverrides = Partial<Omit<StudioMainMenuBuilderState, "edit">> & {

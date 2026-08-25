@@ -87,7 +87,7 @@ const STACK_OPTIONAL_MODULES = [
 describe("Studio lazy panel stack boundary", () => {
   it("keeps one-way static ownership from StudioPage", () => {
     const page = moduleEdges("./StudioPage.tsx");
-    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorPanels.tsx");
     const stack = moduleEdges("./StudioLazyPanelStack.tsx");
     const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx");
 
@@ -167,7 +167,7 @@ describe("Studio lazy panel stack boundary", () => {
 
   it("preserves semantic 3D transactions and initial-scene cleanup", () => {
     const page = moduleEdges("./StudioPage.tsx").source;
-    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx").source;
+    const editorView = moduleEdges("./studio-cuttoon-editor/StudioCuttoonEditorPanels.tsx").source;
     const stack = moduleEdges("./StudioLazyPanelStack.tsx").source;
     const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
     const stackUseStart = editorView.indexOf("<StudioLazyPanelStack");

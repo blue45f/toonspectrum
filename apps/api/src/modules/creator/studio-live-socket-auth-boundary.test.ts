@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const authPath = fileURLToPath(new URL("./studio-live-socket-auth.service.ts", import.meta.url));
 const gatewayPath = fileURLToPath(new URL("./studio-live.gateway.ts", import.meta.url));
+const joinPath = fileURLToPath(new URL("./studio-live-gateway-join.ts", import.meta.url));
 const creatorModulePath = fileURLToPath(new URL("./creator.module.ts", import.meta.url));
 
 describe("studio live socket authentication boundary", () => {
@@ -41,12 +42,16 @@ describe("studio live socket authentication boundary", () => {
 
   it("preserves authenticate-before-admission and revalidate-before-work-ACL order", () => {
     const gatewaySource = readFileSync(gatewayPath, "utf8");
+    const joinSource = readFileSync(joinPath, "utf8");
     const afterInitStart = gatewaySource.indexOf("afterInit(server: Namespace)");
     const connectionStart = gatewaySource.indexOf("async handleConnection(", afterInitStart);
     const middleware = gatewaySource.slice(afterInitStart, connectionStart);
-    const joinStart = gatewaySource.indexOf("private async performJoin(");
-    const presenceStart = gatewaySource.indexOf('@SubscribeMessage("studio:presence")', joinStart);
-    const join = gatewaySource.slice(joinStart, presenceStart);
+    const joinStart = joinSource.indexOf("export async function performJoin(");
+    const disconnectStart = joinSource.indexOf(
+      "export function disconnectInvalidJoinSession(",
+      joinStart
+    );
+    const join = joinSource.slice(joinStart, disconnectStart);
 
     expect(afterInitStart).toBeGreaterThan(-1);
     expect(connectionStart).toBeGreaterThan(afterInitStart);

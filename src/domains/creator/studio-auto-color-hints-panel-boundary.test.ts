@@ -37,7 +37,7 @@ describe("studio auto-color hints panel export boundary", () => {
 
   it("keeps StudioPage free of auto-color panel surgery and mounts via inspector + lazy-ui", () => {
     const page = readSource("./StudioPage.tsx");
-    const inspector = readSource("./StudioInspectorAside.tsx");
+    const inspector = readSource("./StudioInspectorImageToolsSection.tsx");
     const lazyUi = readSource("./studio-page-lazy-ui.ts");
     const panel = readSource("./StudioAutoColorHintsPanel.tsx");
 

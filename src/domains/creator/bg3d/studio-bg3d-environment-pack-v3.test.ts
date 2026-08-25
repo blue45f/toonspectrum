@@ -255,7 +255,7 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
-  it("publishes the environments as usable samples and preserves metres through insertion", () => {
+  it("publishes the environments as usable samples and preserves metres through insertion", async () => {
     expect(SAMPLE_BG3D_MODEL_ENTRIES).toEqual(expect.arrayContaining(
       STUDIO_BG3D_ENVIRONMENT_ASSETS_V3.map((asset) => expect.objectContaining({
         id: asset.id,
@@ -275,10 +275,8 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
     expect(resolveStudioBg3dModelNormalizationScale("uploaded-chair", [10, 2, 2]))
       .toBeCloseTo(0.2, 8);
 
-    const editorSource = readFileSync(
-      fileURLToPath(new URL("./StudioBackground3D.tsx", import.meta.url)),
-      "utf8",
-    );
+    const { readStudioBg3dEditorSource } = await import("./read-studio-bg3d-editor-source");
+    const editorSource = readStudioBg3dEditorSource();
     const panelSource = readFileSync(
       fileURLToPath(new URL("./StudioBg3dAssetLibraryPanel.tsx", import.meta.url)),
       "utf8",

@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const inspectorSource = readFileSync(
-  new URL("../StudioInspectorAside.tsx", import.meta.url),
+  new URL("../StudioInspectorDrawingSection.tsx", import.meta.url),
+  "utf8",
+);
+const shapeSectionSource = readFileSync(
+  new URL("../StudioInspectorShapeSection.tsx", import.meta.url),
   "utf8",
 );
 const mountSource = readFileSync(
@@ -17,19 +21,10 @@ const freehandControlsSource = readFileSync(
 
 describe("Hokusai inspector task routing", () => {
   it("keeps the conversion control visible after a freehand stroke is selected", () => {
-    const selectionStart = inspectorSource.indexOf('selected.type === "draw"');
-    const selectionEnd = inspectorSource.indexOf(
-      '(selected.type === "text" || selected.type === "bubble")',
-      selectionStart,
-    );
-    expect(selectionStart).toBeGreaterThan(-1);
-    expect(selectionEnd).toBeGreaterThan(selectionStart);
-    const selectedDrawPanel = inspectorSource.slice(selectionStart, selectionEnd);
-
-    expect(selectedDrawPanel).toContain('(selected.kind ?? "freehand") === "freehand"');
-    expect(selectedDrawPanel).toContain("<StudioInspectorFreehandPathControls");
-    expect(selectedDrawPanel).toContain("selected={selected}");
-    expect(selectedDrawPanel).toContain("onReplace={replaceDrawWithHokusaiNaturalMedia}");
+    expect(shapeSectionSource).toContain('(selected.kind ?? "freehand") === "freehand"');
+    expect(shapeSectionSource).toContain("<StudioInspectorFreehandPathControls");
+    expect(shapeSectionSource).toContain("selected={selected}");
+    expect(shapeSectionSource).toContain("onReplace={replaceDrawWithHokusaiNaturalMedia}");
     expect(freehandControlsSource).toContain("<StudioHokusaiNaturalMediaInspectorMount");
     expect(freehandControlsSource).toContain("selected={selected}");
     expect(freehandControlsSource).toContain("onReplace={onReplace}");

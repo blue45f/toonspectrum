@@ -8,6 +8,7 @@
  */
 
 import {
+  Box,
   Boxes,
   Clapperboard,
   Grid2x2,
@@ -144,8 +145,18 @@ export function buildStudio3dMenuItems({
       legacyPath: "insert/bg3d",
       label: "3D 배경",
       icon: Boxes,
+      separatorAfter: true,
       onSelect: () => {
         ui.openBackground3d();
+      },
+    },
+    {
+      id: "sculpt",
+      commandId: "insert.sculpt-3d",
+      label: "3D 스컬프트…",
+      icon: Box,
+      onSelect: () => {
+        ui.openSculptWorkbench();
       },
     },
   ];

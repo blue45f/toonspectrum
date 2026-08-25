@@ -181,7 +181,7 @@ const MOVED_DECLARATIONS = [
 describe("Studio Konva image node boundary", () => {
   it("moves the image renderer and its cache ownership out of StudioPage", () => {
     const page = moduleShape("../StudioPage.tsx");
-    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const imageNode = moduleShape("../StudioKonvaImageNode.tsx");
 
     expect(
@@ -199,7 +199,7 @@ describe("Studio Konva image node boundary", () => {
   });
 
   it("preserves the effective image call contract and its optional status observer", () => {
-    const viewport = moduleShape("../canvas/StudioCanvasViewport.tsx");
+    const viewport = moduleShape("../canvas/StudioCanvasViewportDocumentLayer.tsx");
     const imageNode = moduleShape("../StudioKonvaImageNode.tsx");
     const contract = propertyNames(
       findInterface(imageNode, "StudioKonvaImageNodeProps").members

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import bg3dSource from "../bg3d/StudioBackground3D.tsx?raw";
+import { readStudioBg3dEditorSource } from "../bg3d/read-studio-bg3d-editor-source";
 import ltPanelSource from "../bg3d/StudioBg3dLtPanel.tsx?raw";
 
 import repositorySource from "./studio-mannequin-bg3d-preset-sqlite-repository.ts?raw";
 import mannequinSource from "./StudioMannequinPoserPanel.tsx?raw";
+
+const bg3dSource = readStudioBg3dEditorSource();
 
 describe("mannequin and BG3D LT V12 product persistence boundary", () => {
   it("routes both default product paths to the shared SQLite runtime", () => {

@@ -144,8 +144,10 @@ describe("Studio pixel marquee vector-only raster preparation boundary", () => {
     expect(prepare).toContain("pixelDragRef.current =");
     expect(prepare).toContain("pixelMarqueeRasterPreparationActivationRef.current = preparationTool");
     expect(stageDown).toContain("pixelMarqueeRasterPreparationActivationRef.current");
+    // 분할 후 준비 저널은 onStageDown에, armed 게이트는 down-pixel 모듈이 담당한다.
+    expect(source).toContain("pixelToolGestureArmed");
     expect(stageDown.indexOf("pixelMarqueeRasterPreparationActivationRef.current"))
-      .toBeLessThan(stageDown.indexOf("pixelToolGestureArmed"));
+      .toBeLessThan(stageDown.indexOf("journalPendingPixelSelectionRasterGesture({"));
     expect(stageDown).toContain("forceCircle: pendingSelectionPreparation.forceCircle");
     expect(nodeInteractionBegin).toContain(
       "pixelMarqueeRasterPreparationActivationRef.current",

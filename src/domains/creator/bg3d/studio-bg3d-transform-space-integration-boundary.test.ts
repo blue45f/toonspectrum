@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
+const source = readStudioBg3dEditorSource();
 
 describe("Studio BG3D transform-space integration boundary", () => {
   it("preserves the established mode defaults until the user explicitly chooses an axis space", () => {

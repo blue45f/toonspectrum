@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 import {
   saveStudioMobileImmersivePreference,
@@ -11,10 +12,7 @@ import {
 
 
 const studioPageSource = readStudioCuttoonEditorSource();
-const studioCanvasViewportSource = readFileSync(
-  new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
-  "utf8",
-);
+const studioCanvasViewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 // 2026-08-21 intentional: the desktop stage HUD (the status bar this test's desktop-lane guard
 // reads) moved verbatim out of StudioCanvasViewport.tsx into its own leaf module.
 const studioCanvasStageHudSource = readFileSync(

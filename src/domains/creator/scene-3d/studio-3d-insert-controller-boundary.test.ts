@@ -111,9 +111,6 @@ describe("Studio 3D insert controller boundary", () => {
     expect(contract.source.split("\n").length).toBeLessThanOrEqual(70);
 
     expect(background.source).toContain(
-      'import type {\n  StudioBackground3DInsertResult,\n} from "../scene-3d/studio-3d-insert-contract";'
-    );
-    expect(background.source).toContain(
       'export type {\n  StudioBackground3DInsertResult,\n  StudioBackground3DLtLayer,\n} from "../scene-3d/studio-3d-insert-contract";'
     );
     expect(background.source).not.toContain("export interface StudioBackground3DLtLayer");

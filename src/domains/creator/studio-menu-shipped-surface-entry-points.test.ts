@@ -48,6 +48,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   interchangeImportBusy: false,
   psdImportBusy: false,
   edit: EDIT_AVAILABLE,
+  pixelArtEnabled: false,
   filterDisabled: false,
   filterUnavailableReason: null,
   viewTransformSuppressed: false,

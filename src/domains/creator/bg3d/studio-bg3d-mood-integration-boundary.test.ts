@@ -4,14 +4,18 @@ import { describe, expect, it } from "vitest";
 
 // 2026-08-21 intentional change: the render-settings/sky controllers and mesh nodes moved out of
 // StudioBackground3D.tsx into StudioBg3dSceneNodes.tsx during the editor split.
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
 const background3dSource = [
-  "./StudioBackground3D.tsx",
-  "./StudioBg3dSceneNodes.tsx",
-  "./StudioBg3dDirectionalShadowLight.tsx",
-  "./StudioBg3dShapesPanel.tsx",
-  "./StudioBg3dViewPanel.tsx",
-  "./StudioBg3dLtPanel.tsx",
-].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n");
+  readStudioBg3dEditorSource(),
+  ...[
+    "./StudioBg3dSceneNodes.tsx",
+    "./StudioBg3dDirectionalShadowLight.tsx",
+    "./StudioBg3dShapesPanel.tsx",
+    "./StudioBg3dViewPanel.tsx",
+    "./StudioBg3dLtPanel.tsx",
+  ].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")),
+].join("\n");
 
 describe("Studio BG3D mood/render integration boundary", () => {
   it("applies a mood only from the explicit preset command and records one immediate transition", () => {

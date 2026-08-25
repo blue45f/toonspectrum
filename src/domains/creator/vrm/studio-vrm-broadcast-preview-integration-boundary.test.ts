@@ -3,7 +3,11 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const POSER_PATH = fileURLToPath(new URL("./StudioVrmPoser.tsx", import.meta.url));
+import { STUDIO_VRM_POSER_IMPLEMENTATION_FILES } from "./studio-vrm-poser-implementation-source";
+
+const POSER_PATHS = STUDIO_VRM_POSER_IMPLEMENTATION_FILES.map((file) =>
+  fileURLToPath(new URL(file, import.meta.url)),
+);
 const MODEL_LOADING_PATH = fileURLToPath(
   new URL("./use-studio-vrm-model-loading.ts", import.meta.url),
 );
@@ -14,10 +18,18 @@ const PLANNER_PATH = fileURLToPath(
   new URL("./studio-vrm-broadcast-preview.ts", import.meta.url),
 );
 
+async function readPoser(): Promise<string> {
+  const parts = await Promise.all([
+    readFile(fileURLToPath(new URL("./StudioVrmPoserTypes.ts", import.meta.url)), "utf8"),
+    ...POSER_PATHS.map((path) => readFile(path, "utf8")),
+  ]);
+  return parts.join("\n");
+}
+
 describe("Studio VRM broadcast preview product boundary", () => {
   it("reuses the single poser Canvas and contains no recorder, stream, or renderer substitute", async () => {
     const [poser, preview] = await Promise.all([
-      readFile(POSER_PATH, "utf8"),
+      readPoser(),
       readFile(PREVIEW_PATH, "utf8"),
     ]);
 
@@ -33,7 +45,7 @@ describe("Studio VRM broadcast preview product boundary", () => {
 
   it("makes editor chrome inert and unreachable while preserving explicit button and Escape exits", async () => {
     const [poser, preview] = await Promise.all([
-      readFile(POSER_PATH, "utf8"),
+      readPoser(),
       readFile(PREVIEW_PATH, "utf8"),
     ]);
 
@@ -47,7 +59,7 @@ describe("Studio VRM broadcast preview product boundary", () => {
   });
 
   it("fails closed across upload, save, capture, paint, pose, and tracking transaction families", async () => {
-    const poser = await readFile(POSER_PATH, "utf8");
+    const poser = await readPoser();
     const blockerStart = poser.indexOf("function currentBroadcastPreviewBlockers()");
     const blockerEnd = poser.indexOf(
       "const broadcastPreviewAvailability",
@@ -74,7 +86,7 @@ describe("Studio VRM broadcast preview product boundary", () => {
   });
 
   it("rejects an active tracking session without stopping or restarting the user's camera", async () => {
-    const poser = await readFile(POSER_PATH, "utf8");
+    const poser = await readPoser();
     const startHandlerStart = poser.indexOf("function handleBroadcastPreviewStart()");
     const startHandlerEnd = poser.indexOf(
       "function handleBroadcastPreviewRuntimeError",
@@ -91,7 +103,7 @@ describe("Studio VRM broadcast preview product boundary", () => {
   });
 
   it("restores exact camera and mutation locks and keeps the preview out of canonical state", async () => {
-    const poser = await readFile(POSER_PATH, "utf8");
+    const poser = await readPoser();
 
     expect(poser).toContain("function restoreStudioVrmBroadcastImperativeState");
     expect(poser).toContain("cameraLease.restoreCamera(cameraLease.settings)");
@@ -114,7 +126,7 @@ describe("Studio VRM broadcast preview product boundary", () => {
 
   it("leases the chroma renderer pre-paint and restores the editor DPR policy on exit", async () => {
     const [poser, preview] = await Promise.all([
-      readFile(POSER_PATH, "utf8"),
+      readPoser(),
       readFile(PREVIEW_PATH, "utf8"),
     ]);
 

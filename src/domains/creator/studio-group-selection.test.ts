@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import {
   EMPTY_GROUP_SELECTION,
   currentSelectionIds,
@@ -762,10 +762,7 @@ describe("planAtomicSelectionAffineTransform — 혼합 그룹 전체 변형", (
  * (같은 도메인의 `studio-group-convenience-boundary.test.ts` 가 쓰는 것과 동일한 소스 계약 패턴.)
  */
 describe("캔버스 배선 계약 — 뗌 단계 좁히기", () => {
-  const viewportSource = readFileSync(
-    new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
-    "utf8",
-  );
+  const viewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 
   it("Stage 의 click/tap 이 planGroupClickSelectionRelease 로 간다", () => {
     expect(viewportSource).toContain("planGroupClickSelectionRelease");

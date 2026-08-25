@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const background3dSource = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
+const background3dSource = readStudioBg3dEditorSource();
 const actionFooterSource = readFileSync(
   new URL("./StudioBg3dActionFooter.tsx", import.meta.url),
   "utf8",
@@ -16,8 +18,6 @@ const studioLazyPanelStackSource = readFileSync(
 describe("Studio 3D asynchronous capture integration boundary", () => {
   it("keeps adapter registration stable when capture UI state rerenders", () => {
     const start = background3dSource.indexOf("function CaptureBridge(");
-    // 2026-08-21 intentional change: SkyClearColorController moved into StudioBg3dSceneNodes.tsx,
-    // so CaptureBridge now ends at the next declaration left in the editor module.
     const end = background3dSource.indexOf("type StudioBg3dImmersiveStageSuccess", start);
     const bridge = background3dSource.slice(start, end);
 

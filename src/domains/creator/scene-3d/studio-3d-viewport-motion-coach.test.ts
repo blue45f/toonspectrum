@@ -2,8 +2,17 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const backgroundSource = readFileSync(new URL("../bg3d/StudioBackground3D.tsx", import.meta.url), "utf8");
-const vrmSource = readFileSync(new URL("../vrm/StudioVrmPoser.tsx", import.meta.url), "utf8");
+import { readStudioBg3dEditorSource } from "../bg3d/read-studio-bg3d-editor-source";
+import { readStudioVrmPoserImplementationSource } from "../vrm/studio-vrm-poser-implementation-source";
+
+
+const backgroundSource = readStudioBg3dEditorSource();
+const vrmSource = [
+  readFileSync(new URL("../vrm/StudioVrmPoserTypes.ts", import.meta.url), "utf8"),
+  readStudioVrmPoserImplementationSource(
+    new URL("../vrm/studio-vrm-poser-implementation-source.ts", import.meta.url),
+  ),
+].join("\n");
 
 function sliceBetween(source: string, startToken: string, endToken: string): string {
   const start = source.indexOf(startToken);

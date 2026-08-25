@@ -3,15 +3,16 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const cleanupPath = fileURLToPath(
+const cleanupServicePath = fileURLToPath(
   new URL("./studio-live-adapter-cleanup.service.ts", import.meta.url)
 );
 const gatewayPath = fileURLToPath(new URL("./studio-live.gateway.ts", import.meta.url));
+const cleanupPath = fileURLToPath(new URL("./studio-live-gateway-cleanup.ts", import.meta.url));
 const creatorModulePath = fileURLToPath(new URL("./creator.module.ts", import.meta.url));
 
 describe("studio live adapter cleanup boundary", () => {
   it("keeps the service bounded to leave/finalize/disconnect ordering", () => {
-    const source = readFileSync(cleanupPath, "utf8");
+    const source = readFileSync(cleanupServicePath, "utf8");
     const leave = source.indexOf("this.startRoomLeaveBestEffort");
     const finalize = source.indexOf("input.finalizeLocalState()");
     const disconnect = source.indexOf("input.socket?.disconnect(true)");
@@ -32,12 +33,13 @@ describe("studio live adapter cleanup boundary", () => {
 
   it("wires the service and removes duplicated adapter cleanup from revocation methods", () => {
     const gatewaySource = readFileSync(gatewayPath, "utf8");
+    const cleanupSource = readFileSync(cleanupPath, "utf8");
     const moduleSource = readFileSync(creatorModulePath, "utf8");
-    const invalidStart = gatewaySource.indexOf("private disconnectInvalidSession(");
-    const revokeStart = gatewaySource.indexOf("private revokeParticipant(", invalidStart);
-    const removeStart = gatewaySource.indexOf("private removeParticipant(", revokeStart);
-    const invalidSession = gatewaySource.slice(invalidStart, revokeStart);
-    const revoke = gatewaySource.slice(revokeStart, removeStart);
+    const invalidStart = cleanupSource.indexOf("export function disconnectInvalidSession(");
+    const revokeStart = cleanupSource.indexOf("export function revokeParticipant(", invalidStart);
+    const removeStart = cleanupSource.indexOf("export function removeParticipant(", revokeStart);
+    const invalidSession = cleanupSource.slice(invalidStart, revokeStart);
+    const revoke = cleanupSource.slice(revokeStart, removeStart);
 
     expect(gatewaySource).toContain('from "./studio-live-adapter-cleanup.service"');
     expect(gatewaySource).toContain(
@@ -54,10 +56,10 @@ describe("studio live adapter cleanup boundary", () => {
   });
 
   it("keeps participant, rate, generation and authentication policy in gateway callbacks", () => {
-    const source = readFileSync(gatewayPath, "utf8");
-    const invalidStart = source.indexOf("private disconnectInvalidSession(");
-    const revokeStart = source.indexOf("private revokeParticipant(", invalidStart);
-    const removeStart = source.indexOf("private removeParticipant(", revokeStart);
+    const source = readFileSync(cleanupPath, "utf8");
+    const invalidStart = source.indexOf("export function disconnectInvalidSession(");
+    const revokeStart = source.indexOf("export function revokeParticipant(", invalidStart);
+    const removeStart = source.indexOf("export function removeParticipant(", revokeStart);
     const invalidSession = source.slice(invalidStart, revokeStart);
     const revoke = source.slice(revokeStart, removeStart);
 
@@ -74,16 +76,16 @@ describe("studio live adapter cleanup boundary", () => {
   });
 
   it("commits local participant state before best-effort cleanup notifications", () => {
-    const source = readFileSync(gatewayPath, "utf8");
-    const invalidStart = source.indexOf("private disconnectInvalidSession(");
-    const revokeStart = source.indexOf("private revokeParticipant(", invalidStart);
-    const removeStart = source.indexOf("private removeParticipant(", revokeStart);
-    const releaseStart = source.indexOf("private releaseSocketLocks(", removeStart);
+    const source = readFileSync(cleanupPath, "utf8");
+    const invalidStart = source.indexOf("export function disconnectInvalidSession(");
+    const revokeStart = source.indexOf("export function revokeParticipant(", invalidStart);
+    const removeStart = source.indexOf("export function removeParticipant(", revokeStart);
+    const releaseStart = source.indexOf("export function releaseSocketLocks(", removeStart);
     const notifyStart = source.indexOf(
-      "private emitCleanupNotificationBestEffort(",
+      "export function emitCleanupNotificationBestEffort(",
       releaseStart
     );
-    const notifyEnd = source.indexOf("private localVoiceMembers(", notifyStart);
+    const notifyEnd = source.indexOf("export function localVoiceMembers(", notifyStart);
     const invalidSession = source.slice(invalidStart, revokeStart);
     const revoke = source.slice(revokeStart, removeStart);
     const remove = source.slice(removeStart, releaseStart);

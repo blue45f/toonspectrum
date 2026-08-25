@@ -2,13 +2,19 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
+
 function source(relative: string): string {
   return readFileSync(new URL(relative, import.meta.url), "utf8");
 }
 
+function poserSource(): string {
+  return readStudioVrmPoserImplementationSource();
+}
+
 describe("VRM durable creative product authority", () => {
   it("routes custom poses and saved full states to separate shared V12 SQLite namespaces", () => {
-    const poser = source("./StudioVrmPoser.tsx");
+    const poser = poserSource();
     const repository = source("./studio-vrm-creative-sqlite-repository.ts");
 
     expect(poser).toContain("createStudioVrmCreativeSqliteRepository");
@@ -44,7 +50,7 @@ describe("VRM durable creative product authority", () => {
   });
 
   it("fences hydration, serializes mutations, and labels durable write failures as memory-only", () => {
-    const poser = source("./StudioVrmPoser.tsx");
+    const poser = poserSource();
     const panel = source("./StudioVrmPoseMaterialPanel.tsx");
 
     expect(poser).toContain("vrmCreativeMutationTailRef");
@@ -61,7 +67,7 @@ describe("VRM durable creative product authority", () => {
   });
 
   it("keeps clipboard, consent, and recents out of creative SQLite", () => {
-    const poser = source("./StudioVrmPoser.tsx");
+    const poser = poserSource();
     const repository = source("./studio-vrm-creative-sqlite-repository.ts");
 
     expect(poser).toContain('"studio_pose_clipboard"');
@@ -75,7 +81,7 @@ describe("VRM durable creative product authority", () => {
   });
 
   it("routes precision-sensitive tracking calibration to its own SQLite namespace", () => {
-    const poser = source("./StudioVrmPoser.tsx");
+    const poser = poserSource();
     // 2026-08-21 의도적 변경: 캘리브레이션 저장(save)은 웹캠 트래킹 루프와 함께
     // use-studio-vrm-webcam-session.ts로 분리됐다. load/clear 는 포저에 그대로 남는다.
     const webcamSession = source("./use-studio-vrm-webcam-session.ts");

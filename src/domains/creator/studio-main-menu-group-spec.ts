@@ -172,6 +172,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
         "canvas/canvas-rulers",
         "canvas/perspective-guide",
         "canvas/grid",
+        "canvas/sticky-note"
       ),
       gap("대칭·만다라", "6종 대칭(방사·만화경 포함)이 있으나 그리기 옵션 바와 인스펙터 전용이다."),
       gap("Seamless/Wrap-around"),
@@ -307,6 +308,8 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       ours("brush/eraser", "지우개."),
       ours("brush/fill", "채우기."),
       ours("brush/smart-shape", "스마트 도형 — 펜 + 도형 보정 모드."),
+      ours("brush/pixel-art", "픽셀 아트 모드."),
+      ours("brush/silk-flow", "실크 흐름 대칭 브러시."),
       ours(
         "brush/my-brushes",
         "내 브러시 — §15.3에 대응 행이 없다. 저장·가져오기·재적용을 한 곳에서 하는 사용자 라이브러리다.",
@@ -524,6 +527,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       has("VRM/Pose/Expression", "3d/mannequin3d", "3d/char"),
       gap("Camera/Light", "카메라·조명 스튜디오는 3D 배경 대화상자 ▸ 뷰 탭 ▸ 카메라 섹션 안에 있다."),
       part("Room Builder", "3D 배경 패널 안에서만 구성한다.", "3d/bg3d"),
+      has("Sculpt", "3d/sculpt"),
       gap("Modeling/Boolean", "Hybrid DCC 패널이 있으나 3D 그룹이 아니라 툴레일·프로젝트 시트가 연다."),
       gap("Physics/Cloth/Hair", "강체 물리만 있고 천·머리카락 저작 UI 는 없다."),
       gap("3D→2D Pass", "굽기(삽입·LT 출력)는 3D 배경 대화상자 하단에 있고 메뉴 항목이 없다."),
@@ -544,6 +548,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     },
     rows: [
       has("Share/Permission", "collaboration/team"),
+      has("Ephemeral Board", "collaboration/ephemeral-board"),
       gap(
         "Presence/Soft Lock",
         "참여자 표시와 소프트 잠금은 동작하지만 켜고 끄는 명령이 아니라 상태다. 세션 화면은 팀 패널이 연다.",

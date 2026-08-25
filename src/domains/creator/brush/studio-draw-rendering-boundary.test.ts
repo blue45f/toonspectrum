@@ -120,13 +120,17 @@ describe("studio draw rendering ownership boundary", () => {
   it("keeps the React-Konva node and draft preview runtime in one-way modules", () => {
     const page = moduleEdges("../StudioPage.tsx");
     const viewport = moduleEdges("../canvas/StudioCanvasViewport.tsx");
+    const documentLayer = moduleEdges("../canvas/StudioCanvasViewportDocumentLayer.tsx");
+    const toolLayers = moduleEdges("../canvas/StudioCanvasViewportToolLayers.tsx");
+    const stageHost = moduleEdges("../canvas/StudioCanvasViewportStageHost.tsx");
+    const viewportTypes = moduleEdges("../canvas/StudioCanvasViewportTypes.ts");
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
     const previewLayers = moduleEdges("../StudioDraftPreviewLayers.tsx");
     const previewStore = moduleEdges("../studio-draft-preview-store.ts");
     const rendering = moduleEdges("./studio-draw-rendering.ts");
 
     expect(
-      viewport.valueImports.filter((specifier) => specifier === "../brush/StudioDrawNode"),
+      documentLayer.valueImports.filter((specifier) => specifier === "../brush/StudioDrawNode"),
     ).toEqual(["../brush/StudioDrawNode"]);
     expect(page.source).not.toContain("const StudioDrawNode = memo(function StudioDrawNode(");
     expect(viewport.source).not.toContain("const StudioDrawNode = memo(function StudioDrawNode(");
@@ -143,14 +147,14 @@ describe("studio draw rendering ownership boundary", () => {
 
     expect(page.valueImports.filter((specifier) => specifier === "./studio-draft-preview-store"))
       .toEqual(["./studio-draft-preview-store"]);
-    expect(viewport.valueImports.filter((specifier) => specifier === "../StudioDraftPreviewLayers"))
+    expect(toolLayers.valueImports.filter((specifier) => specifier === "../StudioDraftPreviewLayers"))
       .toEqual(["../StudioDraftPreviewLayers"]);
     expect(page.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
     expect(page.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewLayers\b/);
     expect(viewport.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
     expect(viewport.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewLayers\b/);
-    expect(viewport.typeImports).toContain("../studio-draft-preview-store");
-    expect(viewport.valueImports).not.toContain("../studio-draft-preview-store");
+    expect(viewportTypes.typeImports).toContain("../studio-draft-preview-store");
+    expect(viewportTypes.valueImports).not.toContain("../studio-draft-preview-store");
 
     expect(previewStore.source).toContain("export class StudioDraftPreviewStore");
     expect(previewStore.typeImports).toContain("./studio-element-model");
@@ -169,7 +173,7 @@ describe("studio draw rendering ownership boundary", () => {
     expect(previewLayers.source).toContain('canvas.style.mixBlendMode = mode === "backdrop-multiply"');
     expect(previewLayers.source).toContain("getNativeCanvasElement()");
     expect(previewLayers.source).not.toContain("._canvas");
-    expect(viewport.source).toContain('isolation: "isolate"');
+    expect(stageHost.source).toContain('isolation: "isolate"');
 
     expect(rendering.source).not.toMatch(/\b(?:const|function|class)\s+StudioDrawNode\b/);
     expect(rendering.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
@@ -180,6 +184,7 @@ describe("studio draw rendering ownership boundary", () => {
   it("synchronizes retained DOM ink before admitting the next backdrop sample and bounds canvases", () => {
     const page = moduleEdges("../StudioPage.tsx");
     const viewport = moduleEdges("../canvas/StudioCanvasViewport.tsx");
+    const stageHost = moduleEdges("../canvas/StudioCanvasViewportStageHost.tsx");
     const previewLayers = moduleEdges("../StudioDraftPreviewLayers.tsx");
     const onStageDownStart = page.source.indexOf("function onStageDown(");
     const drawBranchStart = page.source.indexOf('if (tool === "draw")', onStageDownStart);
@@ -209,13 +214,13 @@ describe("studio draw rendering ownership boundary", () => {
 
     // Zoom host uses a callback ref (Pixi mount parent colocation); pin isolation on that host,
     // not on the Konva Stage (which only owns touch-action for the contact stream).
-    const zoomHostStart = viewport.source.indexOf("zoomHostRef.current = node");
-    const stageStart = viewport.source.indexOf("<Stage", zoomHostStart);
-    const stageEnd = viewport.source.indexOf(">", stageStart);
+    const zoomHostStart = viewport.source.indexOf("zoomHostNodeRef.current = node");
+    const stageStart = stageHost.source.indexOf("<Stage");
+    const stageEnd = stageHost.source.indexOf(">", stageStart);
     expect(zoomHostStart).toBeGreaterThanOrEqual(0);
-    expect(stageStart).toBeGreaterThan(zoomHostStart);
-    expect(viewport.source.slice(zoomHostStart, stageStart)).toContain('isolation: "isolate"');
-    expect(viewport.source.slice(stageStart, stageEnd)).not.toContain("isolation");
+    expect(stageStart).toBeGreaterThan(-1);
+    expect(stageHost.source).toContain('isolation: "isolate"');
+    expect(stageHost.source.slice(stageStart, stageEnd)).not.toContain("isolation");
   });
 
   it("keeps editor lifecycle, collaboration, routing, and GPU ownership out of StudioDrawNode", () => {

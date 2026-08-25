@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
 import {
   STUDIO_BG3D_PHYSICS_TIMELINE_PROTOCOL_VERSION,
   STUDIO_BG3D_PHYSICS_TIMELINE_STEP_SECONDS,
@@ -10,7 +11,8 @@ import {
   runStudioBg3dPhysicsTimeline,
   type StudioBg3dPhysicsTimelineWorkerLike,
 } from "./studio-bg3d-physics-worker-client";
-import background3dEditorSource from "./StudioBackground3D.tsx?raw";
+
+const background3dEditorSource = readStudioBg3dEditorSource();
 
 class FakeWorker implements StudioBg3dPhysicsTimelineWorkerLike {
   readonly messages: StudioBg3dPhysicsTimelineWorkerRunMessage[] = [];

@@ -24,6 +24,7 @@ import {
   MessageSquare,
   Ruler,
   Stamp,
+  StickyNote,
 } from "lucide-react";
 
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
@@ -79,6 +80,15 @@ export function buildStudioCanvasSurfaceMenuItems({
       selectionRole: "checkbox",
       onSelect: () => {
         ui.toggleCanvasGrid();
+      },
+    },
+    {
+      id: "sticky-note",
+      commandId: "canvas.sticky-note",
+      label: "스티키 노트",
+      icon: StickyNote,
+      onSelect: () => {
+        ui.insertDefaultStickyNote();
       },
     },
   ];

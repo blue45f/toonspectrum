@@ -121,7 +121,7 @@ describe("Studio rich-hint consumer mappings", () => {
   it("distinguishes mobile direct shapes, export settings, file workflows, insertion, and comments", () => {
     const mobile = readStudioSource("StudioMobileEditingDock.tsx");
     const menubar = readStudioSource("StudioMenubarContent.tsx");
-    const studioPage = readStudioSource("studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const studioPage = readStudioSource("studio-cuttoon-editor/StudioCuttoonEditorChrome.tsx");
     const toolBelt = readStudioSource("StudioToolBeltCreateModeUtilityButtons.tsx");
 
     expectNearby(mobile, "const shapeHintPreviewProps", 'hintPreview: "shape" as const');

@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
+import { readStudioInspectorAsideSurface } from "./read-studio-inspector-aside-source";
+
 const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 // 의도된 변경(2026-08, B-06): 전역 keydown 디스패처(보기 리졸버·flip 화음 분기 포함)가
 // studio-page-shortcut-dispatcher.ts 로 추출되어, 단축키 분기 검증은 그 파일을 읽는다.
@@ -9,7 +12,10 @@ const shortcutDispatcherSource = readFileSync(
   new URL("./studio-page-shortcut-dispatcher.ts", import.meta.url),
   "utf8",
 );
-const viewportSource = readFileSync(new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url), "utf8");
+const viewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
+const canvasControlsSource = ["StudioCanvasControls.tsx", "StudioCanvasStageHud.tsx"]
+  .map((name) => readFileSync(new URL(`./canvas/${name}`, import.meta.url), "utf8"))
+  .join("\n");
 // 의도된 변경(2026-08-21): 캔버스 스크롤 뷰포트 위에 떠 있던 sticky 배너들(에셋 드롭 힌트·프레즌스
 // 독·보기 도구 HUD 호스트·댓글 핀 배너·하이드레이션 플레이스홀더)이 StudioCanvasViewport.tsx 에서
 // 그대로 잘려 나와 자체 리프 모듈이 됐다. 보기 HUD 계약은 그 파일을 읽는다.
@@ -17,7 +23,7 @@ const stickyBannersSource = readFileSync(
   new URL("./canvas/StudioCanvasStickyBanners.tsx", import.meta.url),
   "utf8",
 );
-const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
+const inspectorSource = readStudioInspectorAsideSurface();
 // The minimap scroll-window box moved out of the inspector into its own leaf so a
 // pan frame re-renders one element instead of the whole aside. The invariant this
 // file pins is *which projection helper* the minimap uses, not which file holds it.
@@ -81,16 +87,16 @@ describe("StudioPage view integration contract", () => {
   });
 
   it("keeps the legacy canvas zoom cluster out of the full editor dock", () => {
-    expect(viewportSource).toContain(
+    expect(canvasControlsSource).toContain(
       '"absolute bottom-3 left-3 z-30 hidden items-center gap-0.5 rounded-full',
     );
-    expect(viewportSource).toContain('canvasOnlyMode && "lg:flex"');
+    expect(canvasControlsSource).toContain('canvasOnlyMode && "lg:flex"');
     expect(viewportSource).not.toContain('"absolute bottom-3 left-3 z-30 hidden lg:flex');
   });
 
   it("keeps localized actual-pixel and input-mode controls in the canvas-only cluster", () => {
-    expect(viewportSource).toContain("<StudioViewInputModeControls");
-    expect(viewportSource).toContain('"studio.canvas.actualPixelAria"');
+    expect(canvasControlsSource).toContain("<StudioViewInputModeControls");
+    expect(canvasControlsSource).toContain('"studio.canvas.actualPixelAria"');
   });
 
   it("loads the optional view HUD only after a zoom or rotate intent", () => {

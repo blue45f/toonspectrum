@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const poser = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
+
+const poser = readStudioVrmPoserImplementationSource();
 // 2026-08-21 의도적 변경: 모델 로딩·라이브러리 파일 처리(beginModelLoad/loadModelFrom*/
 // handleFileChange/handleDeleteEntry 등)가 StudioVrmPoser.tsx에서
 // use-studio-vrm-model-loading.ts(포저가 소유하는 훅)로 분리됐다. 마커만 새 모듈로
@@ -152,7 +154,7 @@ describe("Avatar Forge v4 product integration boundary", () => {
       "const restoreHistoryStep = (direction: -1 | 1) => {",
       "const doUndo = () => {",
     );
-    const restoreCall = restoreHistory.indexOf("const restored = commitFullStateRestore(");
+    const restoreCall = restoreHistory.indexOf("const restored = h.commitFullStateRestore(");
     const rejection = restoreHistory.indexOf("if (!restored) {");
     const cursorCommit = restoreHistory.lastIndexOf(
       "fullStateHistoryRef.current = transition.history;",

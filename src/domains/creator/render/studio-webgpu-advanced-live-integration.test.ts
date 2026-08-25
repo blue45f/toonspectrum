@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 function source(fileName: string): string {
@@ -66,7 +67,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
 
   it("keeps an exact Konva shadow until dual receipt authority swaps surfaces atomically", () => {
     const page = source("../StudioPage.tsx");
-    const viewport = source("../canvas/StudioCanvasViewport.tsx");
+    const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
     const applyStart = page.indexOf(
       "function applyLiveStrokeBackendPresentationEffects()"
     );
@@ -162,7 +163,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
 
   it("fails over synchronously when the engine rejects a compact command", () => {
     const page = source("../StudioPage.tsx");
-    const viewport = source("../canvas/StudioCanvasViewport.tsx");
+    const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
 
     expect(page).toContain('if (outcome.status === "rejected") {');
     expect(page).toContain("gpuLiveSourceJournalRef.current = advanced.state");

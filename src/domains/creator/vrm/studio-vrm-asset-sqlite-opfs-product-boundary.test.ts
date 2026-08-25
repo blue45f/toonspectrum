@@ -3,7 +3,12 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
+
 function source(fileName: string): string {
+  if (fileName === "StudioVrmPoser.tsx") {
+    return readStudioVrmPoserImplementationSource();
+  }
   const pathInVrm = join(process.cwd(), "src/domains/creator/vrm", fileName);
   try {
     return readFileSync(pathInVrm, "utf8");

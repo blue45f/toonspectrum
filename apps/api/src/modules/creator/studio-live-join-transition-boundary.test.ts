@@ -7,6 +7,8 @@ const sequencerPath = fileURLToPath(
   new URL("./studio-live-join-transition-sequencer.ts", import.meta.url)
 );
 const gatewayPath = fileURLToPath(new URL("./studio-live.gateway.ts", import.meta.url));
+const joinPath = fileURLToPath(new URL("./studio-live-gateway-join.ts", import.meta.url));
+const cleanupPath = fileURLToPath(new URL("./studio-live-gateway-cleanup.ts", import.meta.url));
 const creatorModulePath = fileURLToPath(new URL("./creator.module.ts", import.meta.url));
 
 describe("studio live join transition boundary", () => {
@@ -45,12 +47,13 @@ describe("studio live join transition boundary", () => {
 
   it("keeps latest-wins sequencing outside the adapter room transaction", () => {
     const gatewaySource = readFileSync(gatewayPath, "utf8");
+    const joinSource = readFileSync(joinPath, "utf8");
     const joinStart = gatewaySource.indexOf("async join(");
-    const performJoinStart = gatewaySource.indexOf("private async performJoin(", joinStart);
-    const joinHandler = gatewaySource.slice(joinStart, performJoinStart);
-    const currentStart = gatewaySource.indexOf("private isCurrentJoinTransition(");
-    const rollbackStart = gatewaySource.indexOf("private async rollbackJoinedRoom(", currentStart);
-    const currentCheck = gatewaySource.slice(currentStart, rollbackStart);
+    const presenceStart = gatewaySource.indexOf('@SubscribeMessage("studio:presence")', joinStart);
+    const joinHandler = gatewaySource.slice(joinStart, presenceStart);
+    const currentStart = joinSource.indexOf("export function isCurrentJoinTransition(");
+    const rollbackStart = joinSource.indexOf("export async function rollbackJoinedRoom(", currentStart);
+    const currentCheck = joinSource.slice(currentStart, rollbackStart);
 
     expect(joinHandler).toContain("this.joinTransitions.runLatest(client.id");
     expect(joinHandler).toContain("this.performJoin(client, parsed.data, transitionSequence, ack)");
@@ -65,12 +68,13 @@ describe("studio live join transition boundary", () => {
 
   it("preserves disconnect, revoke, and teardown invalidation ownership", () => {
     const gatewaySource = readFileSync(gatewayPath, "utf8");
+    const cleanupSource = readFileSync(cleanupPath, "utf8");
     const disconnectStart = gatewaySource.indexOf("handleDisconnect(client: StudioLiveSocket)");
     const joinStart = gatewaySource.indexOf('@SubscribeMessage("studio:join")', disconnectStart);
     const disconnect = gatewaySource.slice(disconnectStart, joinStart);
-    const revokeStart = gatewaySource.indexOf("private revokeParticipant(");
-    const removeStart = gatewaySource.indexOf("private removeParticipant(", revokeStart);
-    const revoke = gatewaySource.slice(revokeStart, removeStart);
+    const revokeStart = cleanupSource.indexOf("export function revokeParticipant(");
+    const removeStart = cleanupSource.indexOf("export function removeParticipant(", revokeStart);
+    const revoke = cleanupSource.slice(revokeStart, removeStart);
     const destroyStart = gatewaySource.indexOf("onModuleDestroy(): void");
     const connectionStart = gatewaySource.indexOf("async handleConnection(", destroyStart);
     const destroy = gatewaySource.slice(destroyStart, connectionStart);

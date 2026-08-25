@@ -2,11 +2,13 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_INSPECTOR_ASIDE_SURFACE_FILES } from "./read-studio-inspector-aside-source";
+
 const inspectorSources = [
-  {
-    file: "StudioInspectorAside.tsx",
-    source: readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8"),
-  },
+  ...STUDIO_INSPECTOR_ASIDE_SURFACE_FILES.map((file) => ({
+    file,
+    source: readFileSync(new URL(`./${file}`, import.meta.url), "utf8"),
+  })),
   {
     file: "StudioInspectorFocusSpeedFrameControls.tsx",
     source: readFileSync(

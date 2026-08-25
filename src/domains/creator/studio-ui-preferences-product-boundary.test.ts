@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
+
 const PRODUCT_PREFERENCE_CONSUMERS = [
   "StudioBackgroundPanel.tsx",
   "filter/StudioFilterDialog.tsx",
@@ -27,10 +29,7 @@ describe("Studio product UI preference authority", () => {
       resolve(process.cwd(), "src/domains/creator/StudioPage.tsx"),
       "utf8",
     );
-    const viewport = readFileSync(
-      resolve(process.cwd(), "src/domains/creator/canvas/StudioCanvasViewport.tsx"),
-      "utf8",
-    );
+    const viewport = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 
     expect(page).toContain("acquireProductStudioUiPreferencesRepository");
     expect(page).toContain("repository.loadAppSettings()");

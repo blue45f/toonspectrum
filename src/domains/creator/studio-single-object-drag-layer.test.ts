@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import studioCanvasViewportSource from "./canvas/StudioCanvasViewport.tsx?raw";
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import { studioKonvaRuntime } from "./render/studio-konva-runtime";
 import {
   beginStudioSingleObjectDragLayer,
@@ -10,6 +10,9 @@ import {
 } from "./studio-single-object-drag-layer";
 
 import type Konva from "konva";
+
+
+const studioCanvasViewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
 
 function installCanvasContextStub(): () => void {
   const prototype = globalThis.HTMLCanvasElement.prototype as unknown as {

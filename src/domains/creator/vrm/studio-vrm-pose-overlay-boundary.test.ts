@@ -8,7 +8,13 @@ import {
   studioVrmPoseShareUseContextConsentRequest,
 } from "../studio-destructive-command-catalog";
 
-const source = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
+import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
+
+const source = [
+  readFileSync(new URL("./StudioVrmPoserTypes.ts", import.meta.url), "utf8"),
+  readFileSync(new URL("./StudioVrmPoseBoneOverlay.tsx", import.meta.url), "utf8"),
+  readStudioVrmPoserImplementationSource(),
+].join("\n");
 const studioPageSource = readFileSync(new URL("../StudioPage.tsx", import.meta.url), "utf8");
 const studioLazyPanelStackSource = readFileSync(
   new URL("../StudioThreeDPreviewPanelStack.tsx", import.meta.url),

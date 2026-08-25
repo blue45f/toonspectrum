@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 
+
+
 import { describe, expect, it, vi } from "vitest";
 
 import { normalizeStudioBrushDynamicsSettings } from "./brush/studio-brush-dynamics";
+import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import {
   fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_DUAL_TIP_CAPABILITY,
@@ -535,10 +538,7 @@ function boundaries() {
 describe("canonical vNext dry-media presentation controller", () => {
   it("stays unmounted until a product host can atomically gate fallback visibility", () => {
     const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
-    const viewport = readFileSync(
-      new URL("./canvas/StudioCanvasViewport.tsx", import.meta.url),
-      "utf8",
-    );
+    const viewport = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
     expect(page).not.toContain("StudioCanonicalVNextDryMediaPresentationController");
     expect(viewport).not.toContain("StudioCanonicalVNextDryMediaPresentationController");
   });

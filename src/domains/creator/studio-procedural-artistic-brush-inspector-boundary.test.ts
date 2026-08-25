@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { readStudioInspectorAsideSurface } from "./read-studio-inspector-aside-source";
+
 interface ModuleEdges {
   readonly dynamicImports: readonly string[];
   readonly source: string;
@@ -47,7 +49,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 
 describe("procedural artistic brush inspector boundary", () => {
   it("keeps optional UI and heavy generation behind literal lazy boundaries", () => {
-    const inspector = moduleEdges("./StudioInspectorAside.tsx");
+    const inspector = moduleEdges("./StudioInspectorDrawingSection.tsx");
     const section = moduleEdges(
       "./StudioProceduralArtisticBrushInspectorSection.tsx",
     );
@@ -93,7 +95,7 @@ describe("procedural artistic brush inspector boundary", () => {
   });
 
   it("mounts beside Brush Studio only for pen/eraser-family modes", () => {
-    const source = moduleEdges("./StudioInspectorAside.tsx").source;
+    const source = moduleEdges("./StudioInspectorDrawingSection.tsx").source;
     const brushStudioAt = source.indexOf("<StudioBrushStudio");
     const proceduralAt = source.indexOf(
       "<StudioProceduralArtisticBrushInspectorSection",
@@ -114,7 +116,7 @@ describe("procedural artistic brush inspector boundary", () => {
   });
 
   it("enforces locks, bounded dimensions, monotonic requests and canonical insertion", () => {
-    const inspector = moduleEdges("./StudioInspectorAside.tsx").source;
+    const inspector = readStudioInspectorAsideSurface();
     const page = moduleEdges("./StudioPage.tsx").source;
     const source = moduleEdges(
       "./StudioProceduralArtisticBrushInspectorSection.tsx",

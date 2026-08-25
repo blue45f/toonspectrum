@@ -137,7 +137,9 @@ describe("studio Konva runtime ownership boundary", () => {
 
   it("registers every non-Core shape named by StudioPage and extracted canvas nodes", () => {
     const runtime = moduleEdges("./studio-konva-runtime.ts");
-    const viewport = moduleEdges("../canvas/StudioCanvasViewport.tsx");
+    const viewport = moduleEdges("../canvas/StudioCanvasViewportStageHost.tsx");
+    const documentLayer = moduleEdges("../canvas/StudioCanvasViewportDocumentLayer.tsx");
+    const toolLayers = moduleEdges("../canvas/StudioCanvasViewportToolLayers.tsx");
     const drawNode = moduleEdges("../brush/StudioDrawNode.tsx");
     const bubbleNode = moduleEdges("../StudioKonvaBubbleNode.tsx");
     const textNodes = moduleEdges("../StudioKonvaTextNodes.tsx");
@@ -158,6 +160,8 @@ describe("studio Konva runtime ownership boundary", () => {
       expect(runtime.valueImports).toContain(`konva/lib/shapes/${shapeName}`);
     }
     expect(viewport.valueImports).toContain("react-konva/lib/ReactKonvaCore");
+    expect(documentLayer.valueImports).toContain("react-konva/lib/ReactKonvaCore");
+    expect(toolLayers.valueImports).toContain("react-konva/lib/ReactKonvaCore");
     expect(drawNode.valueImports).toContain("react-konva/lib/ReactKonvaCore");
     expect(bubbleNode.valueImports).toContain("react-konva/lib/ReactKonvaCore");
     expect(textNodes.valueImports).toContain("react-konva/lib/ReactKonvaCore");

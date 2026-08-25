@@ -22,12 +22,15 @@
 
 import { readFileSync } from "node:fs";
 
+
+
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createStudioRasterExportOrchestration } from "../render/studio-raster-export-orchestration-runtime";
 import { DEFAULT_PAGE_GRADE } from "../studio-page-grade";
 import { planStudioCanvasStageLayout, type StudioViewStageLayout } from "../studio-view-controls";
 
+import { readStudioCanvasViewportStack } from "./read-studio-canvas-viewport-stack";
 import {
   planStudioStageDocumentViewBox,
   readStudioStageInDocumentView,
@@ -672,10 +675,7 @@ describe("every stage raster read goes through a choke point", () => {
   });
 
   it("keeps the live canvas on the shared stage-layout planner", () => {
-    const viewportSource = readFileSync(
-      new URL("./StudioCanvasViewport.tsx", import.meta.url),
-      "utf8"
-    );
+    const viewportSource = readStudioCanvasViewportStack(import.meta.url, "./");
     expect(viewportSource).toContain("captureDocumentView: suppressViewTransform");
     // Calling the lower-level planner here would let the live layout diverge from the capture path.
     expect(viewportSource).not.toMatch(/planStudioViewStageLayout\(/u);

@@ -143,7 +143,7 @@ describe("Studio background 3D bundle boundary", () => {
   });
 
   it("loads durable shot production only after the user starts a batch", () => {
-    const imports = moduleImports("./bg3d/StudioBackground3D.tsx");
+    const imports = moduleImports("./bg3d/studio-bg3d-editor-runtime-bindings.ts");
     // 2026-08-21 intentional change: the batch orchestration moved from StudioBackground3D.tsx into
     // studio-bg3d-shot-batch-export-run.ts (editor split), so the runtime-loader boundary now lives
     // in that module. Both files still have to stay off the durable production chunks.
@@ -167,14 +167,18 @@ describe("Studio background 3D bundle boundary", () => {
       expect(editorImports.valueImports).not.toContain("./studio-bg3d-shot-batch");
       expect(editorImports.valueImports).not.toContain("./studio-bg3d-shot-batch-plan");
     }
-    expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-export-run");
+    const bindingsSource = readFileSync(
+      new URL("./bg3d/studio-bg3d-editor-runtime-bindings.ts", import.meta.url),
+      "utf8",
+    );
+    expect(bindingsSource).toContain('from "./studio-bg3d-shot-batch-export-run"');
     expect(runImports.valueImports).toContain("./studio-bg3d-shot-batch-runtime-loader");
     expect(loaderImports.dynamicImports).toEqual([
       "./studio-bg3d-shot-batch-runtime",
       "./studio-bg3d-shot-batch-recovery-store",
     ]);
     expect(runImports.valueImports).toContain("./studio-bg3d-shot-batch-limits");
-    expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-pass-catalog");
+    expect(bindingsSource).toContain('from "./studio-bg3d-shot-batch-pass-catalog"');
     expect(runtimeSource).toContain('from "./studio-bg3d-shot-artifact-pipeline"');
     expect(runtimeSource).not.toContain('from "./studio-bg3d-shot-batch-recovery-store"');
   });
@@ -187,8 +191,20 @@ describe("Studio background 3D bundle boundary", () => {
   });
 
   it("loads Babylon exactly once from its named explicit diagnostic loader", () => {
-    const { file, source } = parseModule("./bg3d/StudioBackground3D.tsx");
-    const imports = moduleImports("./bg3d/StudioBackground3D.tsx");
+    const combined = [
+      readFileSync(new URL("./bg3d/StudioBackground3DTypes.ts", import.meta.url), "utf8"),
+      readFileSync(new URL("./bg3d/studio-bg3d-editor-misc-host.ts", import.meta.url), "utf8"),
+      readFileSync(new URL("./bg3d/studio-bg3d-editor-insert-host.ts", import.meta.url), "utf8"),
+    ].join("\n");
+    const file = ts.createSourceFile(
+      "studio-bg3d-editor-babylon-boundary.tsx",
+      combined,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    const source = combined;
+    const imports = moduleImports("./bg3d/studio-bg3d-editor-runtime-bindings.ts");
     const specialistImports = moduleImports(
       "./bg3d/studio-bg3d-babylon-specialist-entry.ts",
     );

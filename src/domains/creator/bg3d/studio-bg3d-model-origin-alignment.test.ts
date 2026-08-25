@@ -2,12 +2,16 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
 const editorSource = [
-  "./StudioBackground3D.tsx",
-  "./StudioBg3dShapesPanel.tsx",
-  "./StudioBg3dViewPanel.tsx",
-  "./StudioBg3dLtPanel.tsx",
-].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n");
+  readStudioBg3dEditorSource(),
+  ...[
+    "./StudioBg3dShapesPanel.tsx",
+    "./StudioBg3dViewPanel.tsx",
+    "./StudioBg3dLtPanel.tsx",
+  ].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")),
+].join("\n");
 const threeAlignmentSource = readFileSync(
   new URL("./studio-bg3d-three-model-alignment.ts", import.meta.url),
   "utf8"

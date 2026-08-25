@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 
 const studioPage = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 const studioCuttoonEditorView = readFileSync(
-  new URL("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx", import.meta.url),
+  new URL("./studio-cuttoon-editor/StudioCuttoonEditorHosts.tsx", import.meta.url),
   "utf8",
 );
 const statusRail = readFileSync(

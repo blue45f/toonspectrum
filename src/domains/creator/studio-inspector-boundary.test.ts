@@ -79,7 +79,7 @@ function moduleShape(relativePath: string): ModuleShape {
 describe("Studio inspector module boundary", () => {
   it("keeps StudioPage as the orchestration owner while deferring the heavy inspector surface", () => {
     const page = moduleShape("./StudioPage.tsx");
-    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const inspector = moduleShape("./StudioInspectorAside.tsx");
     const loader = moduleShape("./studio-inspector-aside-loader.ts");
     const registry = moduleShape("./studio-page-lazy-ui.ts");
@@ -102,7 +102,7 @@ describe("Studio inspector module boundary", () => {
 
   it("moves the handler contract and component while leaving page orchestration behind", () => {
     const page = moduleShape("./StudioPage.tsx");
-    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorView.tsx");
+    const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");
     const inspector = moduleShape("./StudioInspectorAside.tsx");
 
     expect(inspector.exportedDeclarations).toContain("StudioInspectorAsideHandlers");
@@ -122,10 +122,14 @@ describe("Studio inspector module boundary", () => {
 
   it("keeps the inspector presentation-only and delegates optional loading to the registry", () => {
     const inspector = moduleShape("./StudioInspectorAside.tsx");
+    const body = moduleShape("./StudioInspectorAsideBody.tsx");
 
-    expect(inspector.valueImports).toContain("./studio-page-lazy-ui");
+    expect(body.valueImports).toContain("./studio-page-lazy-ui");
     expect(inspector.allImports).not.toContain("konva");
     expect(inspector.allImports).not.toContain("react-konva/lib/ReactKonvaCore");
+    expect(body.allImports).not.toContain("konva");
+    expect(body.allImports).not.toContain("react-konva/lib/ReactKonvaCore");
     expect(inspector.source).not.toContain("lazyRetry(");
+    expect(body.source).not.toContain("lazyRetry(");
   });
 });

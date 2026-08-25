@@ -190,7 +190,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("color"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:1848-1858",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale:
       "프록시 3 — 색상 스와치는 CSP 컬러 서클·PS 전경색·Procreate 상단 원 모두 상시 노출한다.",
   },
@@ -200,7 +200,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("opacity"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:2388-2403",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale:
       "프록시 3 — CSP 레이어 팔레트·PS 레이어 패널의 기본 행에 항상 있다.",
     searchEntryId: "property.opacity",
@@ -211,7 +211,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("clipping"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:2417-2425",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale:
       "프록시 1 — 선택 타입과 무관하게 무조건 렌더되는 두 컨트롤 중 하나다.",
     searchEntryId: "property.clipping",
@@ -222,7 +222,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("group"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:2427-2444",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale: "프록시 1 — 무조건 렌더되는 나머지 하나다.",
   },
   {
@@ -231,7 +231,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("blend-mode"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:2446-2472",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale:
       "프록시 3 — 위와 같은 근거. 16개 옵션은 select 안에 이미 접혀 있다.",
     searchEntryId: "property.blend-mode",
@@ -242,7 +242,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("pixel-tools"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:2598-3189",
+    source: "StudioInspectorImageToolsSection.tsx:1",
     rationale:
       "프록시 1 — 5개 탭 스트립 자체는 컨트롤 1개다. 탭 내부는 이미 점진적 노출이라 예산에 1로 든다.",
   },
@@ -252,7 +252,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("edit-text"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:3192-3196",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale:
       "프록시 3 — 텍스트/말풍선 선택의 1차 동작이며 텍스트가 아닌 선택에서는 렌더되지 않는다.",
   },
@@ -262,7 +262,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("duplicate"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:3273-3275",
+    source: "StudioInspectorOrderAlignSection.tsx:1",
     rationale: "프록시 2 — ⌘J 코드를 가진 명령(`edit.duplicate`)이다.",
   },
   {
@@ -271,7 +271,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("delete"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:3276-3278",
+    source: "StudioInspectorOrderAlignSection.tsx:1",
     rationale:
       "프록시 2 — Delete 코드를 가진 명령(`edit.delete-selection`)이다.",
   },
@@ -283,7 +283,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("shape-style"),
     tier: "advanced",
     leaves: 4,
-    source: "StudioInspectorAside.tsx:1755-1846",
+    source: "StudioInspectorShapeSection.tsx:1",
     rationale: "그라데이션·패턴·선 스타일·도형 종류. 도형 선택에서만 의미가 있다.",
   },
   {
@@ -292,7 +292,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("text-fill"),
     tier: "advanced",
     leaves: 2,
-    source: "StudioInspectorAside.tsx:1860-1897",
+    source: "StudioInspectorShapeSection.tsx:1",
     rationale: "텍스트 그라데이션 채우기.",
   },
   {
@@ -301,7 +301,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("bubble"),
     tier: "advanced",
     leaves: 4,
-    source: "StudioInspectorAside.tsx:1898-1970",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale: "말풍선 외형·모양·앵커·꼬리.",
   },
   {
@@ -310,7 +310,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("typography"),
     tier: "advanced",
     leaves: 15,
-    source: "StudioInspectorAside.tsx:1971-2318",
+    source: "StudioInspectorTypographySection.tsx:1",
     rationale:
       "글꼴·크기·굵기·기울임 + 효과·곡선 텍스트·외곽선·자간/행간·그림자. 파일에서 연속된 한 덩어리라 한 섹션으로 접는다.",
   },
@@ -320,7 +320,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("constraints"),
     tier: "advanced",
     leaves: 3,
-    source: "StudioInspectorAside.tsx:2319-2339 + 2405-2415",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale:
       "패널 안에 가두기·꽉 채우기·비율 잠금. 비율 잠금이 같은 개념이라 한 섹션으로 모았다.",
   },
@@ -330,7 +330,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("text-align"),
     tier: "advanced",
     leaves: 3,
-    source: "StudioInspectorAside.tsx:2340-2387",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale: "정렬·세로 쓰기·높이를 텍스트에 맞춤.",
   },
   {
@@ -339,7 +339,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("blend-extended"),
     tier: "advanced",
     leaves: 3,
-    source: "StudioInspectorAside.tsx:2474-2489",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale: "이미지 선택 전용 확장 블렌드.",
   },
   {
@@ -348,7 +348,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("layout"),
     tier: "advanced",
     leaves: 7,
-    source: "StudioInspectorAside.tsx:2491-2569",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale:
       "프록시 4 — X·Y·너비·높이·회전·기울이기는 캔버스 핸들로 직접 조작 가능하다. 숫자 입력은 보조 경로다.",
     searchEntryId: "property.transform-numeric",
@@ -359,7 +359,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("effect-lines"),
     tier: "advanced",
     leaves: 2,
-    source: "StudioInspectorAside.tsx:2571-2596",
+    source: "StudioInspectorSelectionSection.tsx:1",
     rationale: "집중선·속도선·프레임 전용 컨트롤.",
   },
   {
@@ -368,7 +368,7 @@ const ELEMENT_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("order-align"),
     tier: "advanced",
     leaves: 12,
-    source: "StudioInspectorAside.tsx:3197-3272",
+    source: "StudioInspectorOrderAlignSection.tsx:1",
     rationale:
       "3D·배경 재편집 2 + 좌우/상하 반전 2 + 순서 2 + 정렬 6. 액션바 15개 중 12개가 여기로 접힌다.",
   },
@@ -382,7 +382,7 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("color"),
     tier: "default",
     leaves: 2,
-    source: "StudioInspectorAside.tsx:3484-3495",
+    source: "StudioInspectorDrawingSection.tsx:1",
     rationale:
       "프록시 3 — 색상과 스포이드는 Procreate 상시 레일과 CSP 도구 속성 최상단에 있다.",
   },
@@ -392,7 +392,7 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("size"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:3499-3514",
+    source: "StudioInspectorDrawingSection.tsx:1",
     rationale:
       "프록시 2+3 — `[`·`]` 코드(`brush.size-decrease/increase`)를 가졌고 모든 경쟁 제품이 상시 노출한다.",
   },
@@ -402,7 +402,7 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("opacity"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:3517-3531",
+    source: "StudioInspectorDrawingSection.tsx:1",
     rationale:
       "프록시 2+3 — `brush.opacity-step` 코드가 있다. 명칭을 요소 인스펙터와 '불투명도'로 통일했다(기존 '투명도').",
   },
@@ -412,7 +412,7 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("stamp-tuning"),
     tier: "default",
     leaves: 3,
-    source: "StudioInspectorAside.tsx:3533-3567",
+    source: "StudioInspectorDrawingSection.tsx:1",
     rationale:
       "프록시 3 — Flow·Hardness 는 Photoshop 옵션 막대의 기본 노출 항목이다. 최소 굵기가 같은 map 에 묶여 있다.",
   },
@@ -422,7 +422,7 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("quick-shape"),
     tier: "default",
     leaves: 1,
-    source: "StudioInspectorAside.tsx:3582-3607",
+    source: "StudioInspectorDrawingSection.tsx:1",
     rationale:
       "프록시 3 — Procreate QuickShape 대응 기능이고 펜 모드에서만 렌더된다.",
   },
@@ -434,7 +434,7 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("line-correction"),
     tier: "advanced",
     leaves: 5,
-    source: "StudioInspectorAside.tsx:3569-3580",
+    source: "StudioInspectorDrawingSection.tsx:1",
     rationale:
       "입력 보정·보정 방식·즉시 반응·그린 후 보정·모서리 유지. 자체 헤더를 가진 5개짜리 묶음이다.",
   },
@@ -444,7 +444,7 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("brush-studio"),
     tier: "advanced",
     leaves: 27,
-    source: "StudioInspectorAside.tsx:3609-3642",
+    source: "StudioInspectorDrawingSection.tsx:1",
     rationale:
       "감사 실측 21 Range + 6 Toggle. 모달+탭이라 그 안에서는 이미 기준 충족이었다.",
     searchEntryId: "panel.brush-studio",
@@ -455,7 +455,7 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("brush-engines"),
     tier: "advanced",
     leaves: 2,
-    source: "StudioInspectorAside.tsx:3643-3660",
+    source: "StudioInspectorDrawingSection.tsx:1",
     rationale: "호쿠사이 내추럴 미디어 + 절차적 아티스틱 브러시. 둘 다 자체 헤더를 가진 엔진 마운트다.",
   },
   {
@@ -464,7 +464,7 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("symmetry"),
     tier: "advanced",
     leaves: 5,
-    source: "StudioInspectorAside.tsx:3661-3743",
+    source: "StudioInspectorRulersSection.tsx:1",
     rationale: "대칭 유형·갈래 수·중앙 X/Y·중앙 정렬.",
   },
   {
@@ -473,7 +473,7 @@ const TOOL_PROPERTIES: readonly StudioInspectorControlGroup[] = [
     label: label("rulers"),
     tier: "advanced",
     leaves: 3,
-    source: "StudioInspectorAside.tsx:3744-3803",
+    source: "StudioInspectorRulersSection.tsx:1",
     rationale: "원근 자·아이소메트릭 그리드·고급 자. 세 패널 모두 자체 헤더를 갖는다.",
   },
 ];

@@ -56,13 +56,11 @@ describe("Studio BG3D panel source boundary", () => {
   });
 
   it("keeps the panels inside the single static BG3D editor closure", () => {
-    const editorImports = moduleImports("./StudioBackground3D.tsx");
-    expect(editorImports.staticImports).toEqual(expect.arrayContaining([
-      "./StudioBg3dImmersivePanel",
-      "./StudioBg3dShapesPanel",
-      "./StudioBg3dViewPanel",
-      "./StudioBg3dLtPanel",
-    ]));
+    const bindingsSource = moduleSource("./studio-bg3d-editor-runtime-bindings.ts");
+    expect(bindingsSource).toContain('from "./StudioBg3dImmersivePanel"');
+    expect(bindingsSource).toContain('from "./StudioBg3dShapesPanel"');
+    expect(bindingsSource).toContain('from "./StudioBg3dViewPanel"');
+    expect(bindingsSource).toContain('from "./StudioBg3dLtPanel"');
 
     const loaderImports = moduleImports("../studio-background-3d-loader.ts");
     expect(loaderImports.staticImports).not.toContain("./bg3d/StudioBackground3D");
@@ -83,7 +81,11 @@ describe("Studio BG3D panel source boundary", () => {
   });
 
   it("preserves always-mounted tab panels through the hidden attribute", () => {
-    const editorSource = moduleSource("./StudioBackground3D.tsx");
+    const editorSource = [
+      moduleSource("./StudioBackground3D.tsx"),
+      moduleSource("./StudioBg3dEditorSidebar.tsx"),
+      moduleSource("./StudioBg3dEditorSidebarExtras.tsx"),
+    ].join("\n");
     const expectations = [
       ["StudioBg3dShapesPanel", "shapes"],
       ["StudioBg3dViewPanel", "view"],

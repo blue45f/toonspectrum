@@ -2,12 +2,14 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
+import { readStudioInspectorAsideSurface } from "../read-studio-inspector-aside-source";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const source = readStudioCuttoonEditorSource();
-const viewportSource = readFileSync(new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url), "utf8");
+const viewportSource = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
 const guideSource = readFileSync(new URL("../canvas/StudioCanvasGuideLayers.tsx", import.meta.url), "utf8");
-const inspectorSource = readFileSync(new URL("../StudioInspectorAside.tsx", import.meta.url), "utf8");
+const inspectorSource = readStudioInspectorAsideSurface();
 const isometricPanelSource = readFileSync(
   new URL("../StudioIsometricGridPanel.tsx", import.meta.url),
   "utf8"

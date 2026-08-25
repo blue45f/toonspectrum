@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 function source(file: string): string {
@@ -11,7 +12,7 @@ function source(file: string): string {
 
 describe("Google Ink mesh actual /studio product wiring", () => {
   const page = source("../StudioPage.tsx");
-  const viewport = source("../canvas/StudioCanvasViewport.tsx");
+  const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
   const host = source("../StudioInkMeshLivePreviewHost.tsx");
   const runtime = source("./studio-ink-mesh-live-preview.ts");
 

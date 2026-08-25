@@ -5,26 +5,39 @@ import { describe, expect, it } from "vitest";
 
 // 2026-08-21 intentional change: the model import/delete handlers moved into
 // studio-bg3d-editor-model-import-actions.ts (editor split); their markers resolve there.
+import { readStudioBg3dEditorSource } from "./read-studio-bg3d-editor-source";
+
 const sourceFiles = [
-  "./StudioBackground3D.tsx",
-  "./studio-bg3d-editor-model-import-actions.ts",
-  "./StudioBg3dShapesPanel.tsx",
-  "./StudioBg3dViewPanel.tsx",
-  "./StudioBg3dLtPanel.tsx",
-].map((fileName) => {
-  const fileUrl = new URL(fileName, import.meta.url);
-  const text = readFileSync(fileUrl, "utf8");
-  return {
+  {
     file: ts.createSourceFile(
-      fileUrl.pathname,
-      text,
+      "studio-bg3d-editor-combined.tsx",
+      readStudioBg3dEditorSource(),
       ts.ScriptTarget.Latest,
       true,
       ts.ScriptKind.TSX,
     ),
-    text,
-  };
-});
+    text: readStudioBg3dEditorSource(),
+  },
+  ...[
+    "./studio-bg3d-editor-model-import-actions.ts",
+    "./StudioBg3dShapesPanel.tsx",
+    "./StudioBg3dViewPanel.tsx",
+    "./StudioBg3dLtPanel.tsx",
+  ].map((fileName) => {
+    const fileUrl = new URL(fileName, import.meta.url);
+    const text = readFileSync(fileUrl, "utf8");
+    return {
+      file: ts.createSourceFile(
+        fileUrl.pathname,
+        text,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      ),
+      text,
+    };
+  }),
+];
 const source = sourceFiles.map(({ text }) => text).join("\n");
 
 function functionSource(name: string): string {
@@ -57,12 +70,10 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
     const loader = functionSource("loadStudioBg3dModelThumbnailRuntime");
     const capture = functionSource("startModelThumbnailCaptureBatch");
 
-    expect(source).toContain(
-      'import type { StudioBg3dModelThumbnailCaptureController } from "./studio-bg3d-model-thumbnail-capture";',
-    );
-    expect(source).toContain(
-      'import type { StudioBg3dModelThumbnailThreeCaptureHandle } from "./studio-bg3d-model-thumbnail-three-capture";',
-    );
+    expect(source).toContain("StudioBg3dModelThumbnailCaptureController");
+    expect(source).toContain('"./studio-bg3d-model-thumbnail-capture"');
+    expect(source).toContain("StudioBg3dModelThumbnailThreeCaptureHandle");
+    expect(source).toContain('"./studio-bg3d-model-thumbnail-three-capture"');
     expect(loader).toContain('import("./studio-bg3d-model-thumbnail-capture")');
     expect(loader).toContain('import("./studio-bg3d-model-thumbnail-three-capture")');
     expect(loader).toContain("Promise.all([");
