@@ -106,11 +106,177 @@ function cylinderMesh(segments = STUDIO_HYBRID_DCC_ROOM_AUTHORITY_LIMITS.cylinde
   return createStudioEditableMeshFromPolygons(vertices, faces);
 }
 
+function coneMesh(segments = STUDIO_HYBRID_DCC_ROOM_AUTHORITY_LIMITS.cylinderSegments) {
+  const count = Math.max(8, Math.min(64, Math.trunc(segments)));
+  const vertices: StudioMeshVec3[] = [];
+  const bottom: number[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const angle = index / count * Math.PI * 2;
+    const x = Math.cos(angle) * 0.3;
+    const z = Math.sin(angle) * 0.3;
+    bottom.push(vertices.length);
+    vertices.push({ x, y: -0.5, z });
+  }
+  const apex = vertices.length;
+  vertices.push({ x: 0, y: 0.5, z: 0 });
+  const faces: number[][] = [];
+  faces.push([...bottom].reverse());
+  for (let index = 0; index < count; index += 1) {
+    const next = (index + 1) % count;
+    faces.push([bottom[index]!, bottom[next]!, apex]);
+  }
+  return createStudioEditableMeshFromPolygons(vertices, faces);
+}
+
+function sphereMesh(segments = STUDIO_HYBRID_DCC_ROOM_AUTHORITY_LIMITS.cylinderSegments) {
+  const count = Math.max(8, Math.min(64, Math.trunc(segments)));
+  const rings = Math.max(4, Math.trunc(count / 2));
+  const vertices: StudioMeshVec3[] = [];
+  const ringIndex: number[][] = [];
+  for (let ring = 1; ring < rings; ring += 1) {
+    const phi = ring / rings * Math.PI;
+    const y = Math.cos(phi) * 0.5;
+    const radius = Math.sin(phi) * 0.5;
+    const ringVertices: number[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const angle = index / count * Math.PI * 2;
+      ringVertices.push(vertices.length);
+      vertices.push({ x: Math.cos(angle) * radius, y, z: Math.sin(angle) * radius });
+    }
+    ringIndex.push(ringVertices);
+  }
+  const north = vertices.length;
+  vertices.push({ x: 0, y: 0.5, z: 0 });
+  const south = vertices.length;
+  vertices.push({ x: 0, y: -0.5, z: 0 });
+  const faces: number[][] = [];
+  const first = ringIndex[0]!;
+  for (let index = 0; index < count; index += 1) {
+    const next = (index + 1) % count;
+    faces.push([north, first[index]!, first[next]!]);
+  }
+  for (let r = 0; r < ringIndex.length - 1; r += 1) {
+    const upper = ringIndex[r]!;
+    const lower = ringIndex[r + 1]!;
+    for (let index = 0; index < count; index += 1) {
+      const next = (index + 1) % count;
+      faces.push([lower[index]!, lower[next]!, upper[next]!, upper[index]!]);
+    }
+  }
+  const last = ringIndex[ringIndex.length - 1]!;
+  for (let index = 0; index < count; index += 1) {
+    const next = (index + 1) % count;
+    faces.push([south, last[next]!, last[index]!]);
+  }
+  return createStudioEditableMeshFromPolygons(vertices, faces);
+}
+
+function hemisphereMesh(segments = STUDIO_HYBRID_DCC_ROOM_AUTHORITY_LIMITS.cylinderSegments) {
+  const count = Math.max(8, Math.min(64, Math.trunc(segments)));
+  const rings = Math.max(3, Math.trunc(count / 4));
+  const vertices: StudioMeshVec3[] = [];
+  const ringIndex: number[][] = [];
+  for (let ring = 1; ring <= rings; ring += 1) {
+    const phi = ring / rings * (Math.PI / 2);
+    const y = Math.cos(phi) * 0.5;
+    const radius = Math.sin(phi) * 0.5;
+    const ringVertices: number[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const angle = index / count * Math.PI * 2;
+      ringVertices.push(vertices.length);
+      vertices.push({ x: Math.cos(angle) * radius, y, z: Math.sin(angle) * radius });
+    }
+    ringIndex.push(ringVertices);
+  }
+  const north = vertices.length;
+  vertices.push({ x: 0, y: 0.5, z: 0 });
+  const faces: number[][] = [];
+  const first = ringIndex[0]!;
+  for (let index = 0; index < count; index += 1) {
+    const next = (index + 1) % count;
+    faces.push([north, first[index]!, first[next]!]);
+  }
+  for (let r = 0; r < ringIndex.length - 1; r += 1) {
+    const upper = ringIndex[r]!;
+    const lower = ringIndex[r + 1]!;
+    for (let index = 0; index < count; index += 1) {
+      const next = (index + 1) % count;
+      faces.push([lower[index]!, lower[next]!, upper[next]!, upper[index]!]);
+    }
+  }
+  const equator = ringIndex[ringIndex.length - 1]!;
+  faces.push([...equator].reverse());
+  return createStudioEditableMeshFromPolygons(vertices, faces);
+}
+
+function planeMesh() {
+  const vertices: StudioMeshVec3[] = [
+    { x: -0.5, y: 0, z: -0.5 },
+    { x: 0.5, y: 0, z: -0.5 },
+    { x: 0.5, y: 0, z: 0.5 },
+    { x: -0.5, y: 0, z: 0.5 },
+  ];
+  return createStudioEditableMeshFromPolygons(vertices, [[0, 1, 2, 3]]);
+}
+
+function pyramidMesh() {
+  const vertices: StudioMeshVec3[] = [
+    { x: -0.35, y: -0.5, z: -0.35 },
+    { x: 0.35, y: -0.5, z: -0.35 },
+    { x: 0.35, y: -0.5, z: 0.35 },
+    { x: -0.35, y: -0.5, z: 0.35 },
+    { x: 0, y: 0.5, z: 0 },
+  ];
+  const faces: number[][] = [
+    [0, 3, 2, 1],
+    [0, 1, 4],
+    [1, 2, 4],
+    [2, 3, 4],
+    [3, 0, 4],
+  ];
+  return createStudioEditableMeshFromPolygons(vertices, faces);
+}
+
+function triangularPrismMesh() {
+  const vertices: StudioMeshVec3[] = [];
+  const bottom: number[] = [];
+  const top: number[] = [];
+  for (let index = 0; index < 3; index += 1) {
+    const angle = index / 3 * Math.PI * 2 - Math.PI / 2;
+    const x = Math.cos(angle) * 0.4;
+    const z = Math.sin(angle) * 0.4;
+    bottom.push(vertices.length);
+    vertices.push({ x, y: -0.5, z });
+    top.push(vertices.length);
+    vertices.push({ x, y: 0.5, z });
+  }
+  const faces: number[][] = [
+    [...bottom].reverse(),
+    [...top],
+    [bottom[0]!, bottom[1]!, top[1]!, top[0]!],
+    [bottom[1]!, bottom[2]!, top[2]!, top[1]!],
+    [bottom[2]!, bottom[0]!, top[0]!, top[2]!],
+  ];
+  return createStudioEditableMeshFromPolygons(vertices, faces);
+}
+
 const CYLINDER_AUTHORITY_MESH = cylinderMesh();
+const CONE_AUTHORITY_MESH = coneMesh();
+const SPHERE_AUTHORITY_MESH = sphereMesh();
+const HEMISPHERE_AUTHORITY_MESH = hemisphereMesh();
+const PLANE_AUTHORITY_MESH = planeMesh();
+const PYRAMID_AUTHORITY_MESH = pyramidMesh();
+const TRIANGULAR_PRISM_AUTHORITY_MESH = triangularPrismMesh();
 
 function meshForPart(part: StudioBg3dRoomPart): StudioEditableMesh {
   if (part.kind === "box") return createStudioUnitCubeMesh();
   if (part.kind === "cylinder") return CYLINDER_AUTHORITY_MESH;
+  if (part.kind === "cone") return CONE_AUTHORITY_MESH;
+  if (part.kind === "sphere") return SPHERE_AUTHORITY_MESH;
+  if (part.kind === "hemisphere") return HEMISPHERE_AUTHORITY_MESH;
+  if (part.kind === "plane") return PLANE_AUTHORITY_MESH;
+  if (part.kind === "pyramid") return PYRAMID_AUTHORITY_MESH;
+  if (part.kind === "triangularPrism") return TRIANGULAR_PRISM_AUTHORITY_MESH;
   throw new Error(`Hybrid DCC에서 아직 편집할 수 없는 방 파츠입니다: ${part.kind}`);
 }
 
