@@ -124,7 +124,7 @@ describe("clampStudioBg3dRoomSpec", () => {
       ],
       furniture: [
         { kind: "table", x: 999, z: -999, yawDeg: 9_999 },
-        { kind: "sofa" as never, x: 0, z: 0, yawDeg: 0 },
+        { kind: "chandelier" as never, x: 0, z: 0, yawDeg: 0 },
       ],
     });
     expect(spec.width).toBe(STUDIO_BG3D_ROOM_LIMITS.maxWidth);

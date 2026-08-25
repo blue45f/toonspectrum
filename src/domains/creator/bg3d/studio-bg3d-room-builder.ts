@@ -48,6 +48,9 @@ export const STUDIO_BG3D_ROOM_FURNITURE_KINDS = [
   "bookshelf",
   "column",
   "stairs",
+  "sofa",
+  "plant",
+  "lamp",
 ] as const;
 export type StudioBg3dRoomFurnitureKind = (typeof STUDIO_BG3D_ROOM_FURNITURE_KINDS)[number];
 
@@ -58,6 +61,9 @@ export const STUDIO_BG3D_ROOM_FURNITURE_LABELS: Record<StudioBg3dRoomFurnitureKi
   bookshelf: "책장",
   column: "기둥",
   stairs: "계단",
+  sofa: "소파",
+  plant: "화분",
+  lamp: "스탠드 조명",
 };
 
 export interface StudioBg3dRoomFurnitureItem {
@@ -360,6 +366,27 @@ function furnitureParts(kind: StudioBg3dRoomFurnitureKind, wallHeight: number): 
       }
       return parts;
     }
+    case "sofa":
+      return [
+        { kind: "box", name: "소파 하부", offset: [0, 0.22, 0], scale: [1.7, 0.24, 0.85], color: "#5a6a7a" },
+        { kind: "box", name: "소파 좌석", offset: [-0.4, 0.42, 0], scale: [0.8, 0.16, 0.78], color: "#6b7b8b" },
+        { kind: "box", name: "소파 좌석", offset: [0.4, 0.42, 0], scale: [0.8, 0.16, 0.78], color: "#6b7b8b" },
+        { kind: "box", name: "소파 등받이", offset: [0, 0.62, -0.32], scale: [1.7, 0.56, 0.2], color: "#5a6a7a" },
+        { kind: "box", name: "소파 팔걸이", offset: [-0.79, 0.48, 0], scale: [0.12, 0.34, 0.85], color: "#4e5e6e" },
+        { kind: "box", name: "소파 팔걸이", offset: [0.79, 0.48, 0], scale: [0.12, 0.34, 0.85], color: "#4e5e6e" },
+      ];
+    case "plant":
+      return [
+        // cylinder 기본 반지름 0.3 → scale.x 0.9면 화분 반지름 ≈0.27m.
+        { kind: "cylinder", name: "화분 몸통", offset: [0, 0.19, 0], scale: [0.9, 0.38, 0.9], color: "#a4643f" },
+        { kind: "sphere", name: "화분 잎", offset: [0, 0.72, 0], scale: [1.4, 1.2, 1.4], color: "#4a7a3a" },
+      ];
+    case "lamp":
+      return [
+        { kind: "cylinder", name: "조명 베이스", offset: [0, 0.02, 0], scale: [1.2, 0.04, 1.2], color: "#3a3a42" },
+        { kind: "cylinder", name: "조명 폴", offset: [0, 0.75, 0], scale: [0.16, 1.44, 0.16], color: "#3a3a42" },
+        { kind: "cone", name: "조명 갓", offset: [0, 1.56, 0], scale: [1.2, 0.5, 1.2], color: "#e8dcc8" },
+      ];
   }
 }
 
@@ -541,6 +568,8 @@ export const STUDIO_BG3D_ROOM_PRESETS: readonly StudioBg3dRoomPreset[] = [
         { kind: "bookshelf", x: 1.9, z: -1.6, yawDeg: 0 },
         { kind: "table", x: 1.2, z: 1.1, yawDeg: 0 },
         { kind: "chair", x: 1.2, z: 1.8, yawDeg: 0 },
+        { kind: "sofa", x: -0.2, z: 1.35, yawDeg: 180 },
+        { kind: "lamp", x: 1.9, z: 1.6, yawDeg: 0 },
       ],
     }),
   },
@@ -585,6 +614,7 @@ export const STUDIO_BG3D_ROOM_PRESETS: readonly StudioBg3dRoomPreset[] = [
         { kind: "column", x: -3.4, z: -3, yawDeg: 0 },
         { kind: "table", x: -1.5, z: 2, yawDeg: 0 },
         { kind: "chair", x: -1.5, z: 2.8, yawDeg: 180 },
+        { kind: "plant", x: 3.4, z: 3.2, yawDeg: 0 },
       ],
     }),
   },
