@@ -94,6 +94,10 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
       "causal-ink \"round\" 프로파일 변형을 선언하지만 분기하는 렌더러가 없어 같은 레인의 "
       + "gpen--croquis-capsule 과 같은 그림 — 폭 정규화 픽셀 p95 0.00014. 그룹 내 대안 gpen · "
       + "gpen--croquis-capsule 이 노출 상태(지침 6).",
+    "marker--chisel-ribbon":
+      "angled-ribbon \"minus-30deg\" 치즐 프로파일 변형을 선언하지만 분기하는 렌더러가 없어 같은 "
+      + "폭·투명도(18/0.7)의 canonical brush 와 같은 그림 — exact-id 프로필 SVG 바이트 동일(계약 감사). "
+      + "그룹 내 대안 brush 가 노출 상태(지침 6).",
 
     // -----------------------------------------------------------------------
     // 2026-08-21 로스터 축소 웨이브 (사용자 지시: "브러시 종류를 축소해주면 좋겠다.

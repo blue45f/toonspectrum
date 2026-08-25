@@ -130,7 +130,7 @@ describe("studio brush catalog lifecycle", () => {
     // 격리는 노출 제거일 뿐 — 비교군 분할과 저장 문서 메타데이터 해석은 유지된다.
     const marker = brushVariantGroupOf("marker--chisel-ribbon");
     expect(marker?.id).toBe("marker");
-    expect(brushLifecycleStageOf("marker--chisel-ribbon")).toBe("extended");
+    expect(brushLifecycleStageOf("marker--chisel-ribbon")).toBe("quarantined");
     const airbrush = brushVariantGroupOf("airbrush--stamp-soft");
     expect(airbrush?.id).toBe("airbrush");
     expect(brushLifecycleStageOf("airbrush--stamp-soft")).toBe("quarantined");
