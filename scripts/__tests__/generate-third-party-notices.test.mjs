@@ -362,12 +362,13 @@ describe("generated third-party notice inventory", () => {
       ),
     ).toEqual([
       join("third_party", "dli-paint", "LICENSE"),
+      join("third_party", "dli-paint", "LICENSE"),
       join("third_party", "croquis-js", "LICENSE-MIT"),
       join("third_party", "klecks", "LICENSE"),
     ]);
 
     const documents = readEmbeddedFirstPartyPortDocuments();
-    expect(documents).toHaveLength(3);
+    expect(documents).toHaveLength(4);
     for (const document of documents) {
       expect(document.text).toContain("Permission is hereby granted");
       expect(document.text).toContain(
@@ -375,8 +376,9 @@ describe("generated third-party notice inventory", () => {
       );
     }
     expect(documents[0].text).toContain("Copyright (c) 2017 David Li");
-    expect(documents[1].text).toContain("JongChan Choi");
-    expect(documents[2].text).toContain("bitbof");
+    expect(documents[1].text).toContain("Copyright (c) 2017 David Li");
+    expect(documents[2].text).toContain("JongChan Choi");
+    expect(documents[3].text).toContain("bitbof");
 
     const directory = mkdtempSync(
       join(tmpdir(), "toonspectrum-embedded-port-license-test-"),

@@ -195,6 +195,8 @@ describe("Studio background 3D bundle boundary", () => {
       readFileSync(new URL("./bg3d/StudioBackground3DTypes.ts", import.meta.url), "utf8"),
       readFileSync(new URL("./bg3d/studio-bg3d-editor-misc-host.ts", import.meta.url), "utf8"),
       readFileSync(new URL("./bg3d/studio-bg3d-editor-insert-host.ts", import.meta.url), "utf8"),
+      readFileSync(new URL("./bg3d/StudioBg3dCaptureBridge.tsx", import.meta.url), "utf8"),
+      readFileSync(new URL("./bg3d/StudioBackground3D.tsx", import.meta.url), "utf8"),
     ].join("\n");
     const file = ts.createSourceFile(
       "studio-bg3d-editor-babylon-boundary.tsx",
