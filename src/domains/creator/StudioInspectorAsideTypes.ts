@@ -87,7 +87,7 @@ import type { StudioViewRotation } from "./studio-view-controls";
 import type { StudioHokusaiNaturalMediaReplaceHandler } from "./StudioHokusaiNaturalMediaInspectorMount";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 import type { StudioInspectorPixelSelectionToolId } from "./StudioRasterToolRecoveryPanel";
-import type { Resizable } from "@/components/use-resizable";
+import type { Resizable } from "@/src/hooks/use-resizable";
 
 export interface StudioInspectorAsideHandlers {
   activateCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;

@@ -1703,8 +1703,8 @@ import type {
 import type Konva from "konva";
 
 import { scheduleIdle } from "@/components/auth/schedule-idle";
-import { useIsMobile } from "@/components/use-media-query";
-import { useResizable } from "@/components/use-resizable";
+import { useIsMobile } from "@/src/hooks/use-media-query";
+import { useResizable } from "@/src/hooks/use-resizable";
 import { loadChunkWithReloadRecovery } from "@/lib/chunk-load-recovery";
 import { useT } from "@/lib/i18n";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-contract";

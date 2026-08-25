@@ -1,10 +1,10 @@
 import { Bell, BellRing } from "lucide-react";
 import { useState } from "react";
 
-import { useCelebrate } from "./use-celebrate";
 
 import { useApp, useHydrated } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { useCelebrate } from "@/src/hooks/use-celebrate";
 
 // 연재 알림 구독 토글 — 진행 중 작품 상세에서 사용
 export function SubscribeButton({

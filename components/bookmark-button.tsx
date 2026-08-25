@@ -1,12 +1,12 @@
 import { Bookmark } from "lucide-react";
 import { useState } from "react";
 
-import { useCelebrate } from "./use-celebrate";
 
 import { useT } from "@/lib/i18n";
 import { useApp, useHydrated } from "@/lib/store";
 import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
+import { useCelebrate } from "@/src/hooks/use-celebrate";
 
 export function BookmarkButton({
   titleId,

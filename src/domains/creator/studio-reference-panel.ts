@@ -1,6 +1,6 @@
 // 참고 이미지 서브뷰 패널 — 위치/크기 기하 계산 + 저장 포맷(순수 함수).
 // DOM 의존 없음: 드래그·리사이즈·뷰포트 클램프·직렬화 전부 여기서 테스트 가능하게 둔다.
-// 실제 포인터 이벤트 배선은 StudioReferencePanel.tsx가 담당(components/use-resizable.ts와 동일한 분리 원칙).
+// 실제 포인터 이벤트 배선은 StudioReferencePanel.tsx가 담당(src/hooks/use-resizable.ts와 동일한 분리 원칙).
 
 import type { StudioAsset } from "./studio-asset-library";
 

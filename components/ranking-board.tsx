@@ -12,8 +12,6 @@ import {
   LayoutList,
   RefreshCw,
   Rows3,
-  ShieldAlert,
-  ShieldCheck,
   SlidersHorizontal,
   Sprout,
   Star,
@@ -23,26 +21,26 @@ import {
 import { useEffect, useRef, useState, type ComponentType } from "react";
 
 import { PlatformTags } from "./availability";
-import { CountUp } from "./count-up";
 import {
   RankRow,
   MiniPoster,
   RANK_ENTRY_STAGGER_CAP,
-  RANK_ENTRY_STAGGER_STEP_MS,
   RANK_ENTRY_ANIMATION_CLASS,
 } from "./rank-row";
+import { SignalWorkbench } from "./ranking-board-signal";
+import { RankingSkeleton } from "./ranking-board-skeleton";
+import { metricFor, entryStaggerStyle, formatUpdatedAt } from "./ranking-board-utils";
 import { TitleCard } from "./title-card";
 import { TitleFilterPanel } from "./title-filter-panel";
 import { Segmented } from "./ui/segmented";
 import { Select } from "./ui/select";
 import { RatingInline } from "./ui/stars";
-import { PlatformMark } from "./visual-marks";
 
-import type { WorkType, Title, PlatformId, Pricing, SerialStatus } from "@/lib/types";
+import type { View, LoadState, RankingMeta, RankingInsights, RankingResponse } from "./ranking-board-types";
+import type { WorkType, PlatformId, Pricing, SerialStatus } from "@/lib/types";
 
 import { statsAreEstimated } from "@/lib/estimate";
-import { genreColor, genreTint, spectrumGradient } from "@/lib/genre-color";
-import { PLATFORM_LIST, PLATFORMS } from "@/lib/platforms";
+import { PLATFORM_LIST } from "@/lib/platforms";
 import {
   RANK_AXES,
   PERIODS,
@@ -56,84 +54,10 @@ import { useSavedTitleIds } from "@/lib/store";
 import { GENRES } from "@/lib/taxonomy";
 import { applyTitleFilters, countActiveTitleFilters } from "@/lib/title-filters";
 import { useRememberedFilters } from "@/lib/use-remembered-filters";
-import { cn, formatCount } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 import { useJsonLd } from "@/src/hooks/use-document-title";
 
-type View = "list" | "poster" | "compact";
-type LoadState = "loading" | "ready" | "refreshing" | "error";
-
-interface RankingMeta {
-  generatedAt: string;
-  refreshSeconds: number;
-  total: number;
-  source: "live-api" | "formula-api";
-  availablePlatforms?: PlatformId[];
-  live: {
-    enabled: boolean;
-    day: string | null;
-    fetchedAt: string | null;
-    nextRefreshAt: string | null;
-    ttlSeconds: number | null;
-    timeoutMs: number | null;
-    fetched: number;
-    matched: number;
-    sources: string[];
-    sourceStatuses: {
-      name: string;
-      ok: boolean;
-      fetched: number;
-      latencyMs: number;
-      message: string;
-    }[];
-  };
-  statusSignals: {
-    enabled: boolean;
-    fetchedAt: string | null;
-    ttlSeconds: number | null;
-    timeoutMs: number | null;
-    fetched: number;
-    matched: number;
-    overridden: number;
-    sources: string[];
-    sourceStatuses: {
-      name: string;
-      ok: boolean;
-      fetched: number;
-      latencyMs: number;
-      message: string;
-    }[];
-  };
-  reliability: {
-    confidence: number;
-    level: "high" | "medium" | "low";
-    label: string;
-    fallbackReason: string | null;
-    estimatedCount: number;
-    estimatedShare: number;
-    liveCoverage: number;
-    okSources: number;
-    sourceCount: number;
-    liveTtlSeconds: number | null;
-    timeoutMs: number | null;
-    basis: string[];
-  };
-}
-
-interface RankingInsights {
-  topGenres: { name: string; count: number; share: number }[];
-  platformMix: { id: PlatformId; label: string; color: string; count: number; share: number }[];
-  scoreSpread: number;
-  leader: { title: string; rank: number; score: number } | null;
-  rising: { title: string; delta: number; rank: number } | null;
-  liveCoverage: number;
-}
-
-interface RankingResponse {
-  items: RankedTitle[];
-  meta: RankingMeta;
-  insights: RankingInsights;
-}
 
 const axisIcons: Record<RankAxis, ComponentType<{ size?: number; className?: string }>> = {
   popular: Flame,
@@ -150,203 +74,6 @@ const PLATFORM_FILTER_ITEMS: { value: PlatformId | "all"; label: string }[] = [
   { value: "all", label: "전체 플랫폼" },
   ...PLATFORM_LIST.map((platform) => ({ value: platform.id, label: platform.short })),
 ];
-
-// countTo — 정수 스코어 지표(트렌드·몰입·완독률)만 진입 카운트업 대상으로 원시값을 함께 넘긴다.
-// 단위 포맷 문자열(1.2만 등)·연도·소수점 평점은 카운트업이 어색하거나 포맷을 깨므로 제외.
-function metricFor(
-  axis: RankAxis
-): (t: Title) => { label: string; value: string; countTo?: number; countSuffix?: string } {
-  switch (axis) {
-    case "trending":
-      return (t) => {
-        const n = Math.round(t.stats.trendingScore);
-        return { label: "트렌드", value: String(n), countTo: n };
-      };
-    case "rating":
-    case "hidden":
-      return (t) => ({ label: "평점", value: t.stats.ratingAvg.toFixed(1) });
-    case "favorites":
-      return (t) => ({ label: "관심", value: formatCount(t.stats.bookmarks) });
-    case "binge":
-      return (t) => {
-        const n = Math.round(t.stats.bingeIndex);
-        return { label: "몰입지수", value: String(n), countTo: n };
-      };
-    case "completed":
-      return (t) => {
-        const n = Math.round(t.stats.completionRate);
-        return { label: "완독률", value: `${n}%`, countTo: n, countSuffix: "%" };
-      };
-    case "rookie":
-      return (t) => ({ label: "데뷔", value: String(t.releaseYear) });
-    case "popular":
-    default:
-      return (t) => ({ label: "조회", value: formatCount(t.stats.views) });
-  }
-}
-
-// 목록 진입 스태거 — 첫 화면 분량(캡)까지만 지연을 주고, 캡 밖 행은 애니메이션 없이 즉시 표시.
-function entryStaggerStyle(index: number): React.CSSProperties | undefined {
-  return index < RANK_ENTRY_STAGGER_CAP
-    ? { animationDelay: `${index * RANK_ENTRY_STAGGER_STEP_MS}ms` }
-    : undefined;
-}
-
-function formatUpdatedAt(value?: string) {
-  if (!value) return "대기 중";
-  return `${new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(value))} ${new Intl.DateTimeFormat("ko-KR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(new Date(value))}`;
-}
-
-function confidenceTone(level?: RankingMeta["reliability"]["level"]) {
-  if (level === "high") return "text-good";
-  if (level === "medium") return "text-warn";
-  return "text-bad";
-}
-
-function RankingSkeleton() {
-  return (
-    <div className="rounded-2xl border border-line bg-panel/30 p-2 sm:p-3">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div
-          key={i}
-          className="grid grid-cols-[2.75rem_2.5rem_1fr_auto] items-center gap-3 rounded-lg border-b border-line/60 px-2 py-2.5 sm:gap-4 sm:px-3"
-        >
-          <span className="skeleton h-8 w-8" />
-          <span className="skeleton h-12 w-10" />
-          <span className="min-w-0 space-y-2">
-            <span className="skeleton block h-4 w-2/3" />
-            <span className="skeleton block h-3 w-4/5" />
-          </span>
-          <span className="skeleton h-8 w-14" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SignalWorkbench({
-  insights,
-  meta,
-}: {
-  insights: RankingInsights | null;
-  meta: RankingMeta | null;
-}) {
-  const genres = insights?.topGenres.map((g) => g.name) ?? [];
-  const gradient = spectrumGradient(genres);
-  const reliability = meta?.reliability;
-  const TrustIcon = reliability?.level === "low" ? ShieldAlert : ShieldCheck;
-  const trustTone = confidenceTone(reliability?.level);
-
-  return (
-    <section className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-card to-panel p-4 surface-hl">
-      <div className="absolute inset-x-0 top-0 h-1" style={{ background: gradient }} />
-      <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-line/70 bg-canvas/55 px-2.5 py-1 text-xs font-medium text-fg-2">
-        <FunctionSquare size={12} className="text-accent" />
-        <span>신호 관측대</span>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-4">
-        <div className="min-w-0 rounded-lg border border-line bg-canvas/35 p-3">
-          <p className="eyebrow text-[0.58rem] text-fg-3">CONFIDENCE</p>
-          <div className="mt-1 flex items-end gap-2">
-            <TrustIcon size={18} className={cn("mb-0.5 shrink-0", trustTone)} />
-            <p className={cn("font-display text-2xl font-bold leading-none tnum", trustTone)}>
-              {/* 신뢰도 카운트업 — 값이 바뀔 때만 재카운트(폴링 시 동일 값이면 정지 상태 유지). */}
-              <CountUp value={reliability?.confidence ?? 0} duration={0.9} />
-            </p>
-            <span className="pb-0.5 text-xs text-fg-3">/100</span>
-          </div>
-          <p className="mt-1 text-xs text-fg-3">{reliability?.label ?? "신호 대기"}</p>
-        </div>
-        <div className="min-w-0">
-          <p className="eyebrow text-[0.58rem] text-fg-3">SOURCE</p>
-          {/* 스냅샷 산식 전용 운영 — 외부 실시간 소스는 폐기됨. */}
-          <p className="mt-1 truncate text-sm font-semibold text-fg">스냅샷 산식</p>
-          <p className="mt-0.5 text-xs text-fg-3">{reliability?.fallbackReason ?? "산식 기반 폴백"}</p>
-        </div>
-        <div className="min-w-0">
-          <p className="eyebrow text-[0.58rem] text-fg-3">RISING</p>
-          <p className="mt-1 truncate text-sm font-semibold text-fg">{insights?.rising?.title ?? "대기 중"}</p>
-          <p className="mt-0.5 text-xs text-fg-3">
-            {insights?.rising ? `#${insights.rising.rank} · ${insights.rising.delta > 0 ? "+" : ""}${insights.rising.delta}` : "상승 신호 없음"}
-          </p>
-        </div>
-        <div className="min-w-0">
-          <p className="eyebrow text-[0.58rem] text-fg-3">SPREAD</p>
-          <p className="mt-1 font-display text-xl font-bold text-fg tnum">
-            <CountUp value={insights?.scoreSpread ?? 0} duration={0.9} />
-          </p>
-          <p className="mt-0.5 text-xs text-fg-3">1위와 하위권 점수 간격</p>
-        </div>
-      </div>
-
-      <div className="mt-4 border-t border-line pt-4">
-        <p className="eyebrow mb-2 text-[0.58rem] text-fg-3">EVIDENCE</p>
-        <div className="flex flex-wrap gap-1.5">
-          {(reliability?.basis ?? ["랭킹 신호 계산 대기"]).map((item) => (
-            <span
-              key={item}
-              className="rounded-md border border-line/80 bg-canvas/55 px-2 py-1 text-[0.7rem] text-fg-2"
-            >
-              {item}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
-        <div>
-          <div className="flex h-2 overflow-hidden rounded-full bg-raised">
-            {(insights?.topGenres.length ? insights.topGenres : [{ name: "판타지", share: 100, count: 0 }]).map(
-              (genre, index) => (
-              <span
-                key={`${genre.name}-${index}`}
-                className="h-full"
-                style={{
-                  width: `${Math.max(genre.share, 6)}%`,
-                  backgroundColor: genreColor(genre.name, 0.72),
-                }}
-              />
-              )
-            )}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {insights?.topGenres.slice(0, 5).map((genre, index) => (
-              <span
-                key={`${genre.name}-${index}`}
-                className="rounded-md border px-2 py-1 text-[0.7rem] text-fg-2"
-                style={{
-                  borderColor: genreColor(genre.name, 0.42),
-                  backgroundColor: genreTint(genre.name, 0.14),
-                }}
-              >
-                {genre.name} {genre.share}%
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="mt-1 flex flex-wrap items-start gap-1.5 lg:justify-end">
-          {insights?.platformMix.map((platform) => (
-            <span
-              key={platform.id}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-canvas/50 px-2 py-1 text-[0.7rem] text-fg-2"
-            >
-              <PlatformMark platform={PLATFORMS[platform.id]} size="sm" />
-              {platform.label} {platform.share}%
-            </span>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 export function RankingBoard({
   initialAxis = "popular",

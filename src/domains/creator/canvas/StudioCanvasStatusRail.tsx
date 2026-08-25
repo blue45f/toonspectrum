@@ -27,8 +27,8 @@ import type {
 } from "../studio-autosave-document-leader";
 import type { CSSProperties, ReactNode } from "react";
 
-import { useIsMobile } from "@/components/use-media-query";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/src/hooks/use-media-query";
 
 const SELECTION_LAYOUT_HINTS = {
   group: {

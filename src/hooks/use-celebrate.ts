@@ -1,6 +1,6 @@
 import { useFx, type SfxName } from "@toonspectrum/core/fx";
 
-import { reducedMotion } from "./use-in-view";
+import { reducedMotion } from "@/src/hooks/use-in-view";
 
 export type CelebrateHaptic = "tickWeak" | "confetti" | "success" | "error";
 

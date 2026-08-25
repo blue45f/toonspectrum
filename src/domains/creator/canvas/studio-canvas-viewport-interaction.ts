@@ -41,7 +41,7 @@ import type { El } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";
 import type Konva from "konva";
 
-import { useMediaQuery } from "@/components/use-media-query";
+import { useMediaQuery } from "@/src/hooks/use-media-query";
 import { useT } from "@/lib/i18n";
 
 export function useStudioCanvasViewportInteraction(props: StudioCanvasViewportProps) {

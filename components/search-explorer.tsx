@@ -4,8 +4,6 @@ import {
   X,
   LayoutGrid,
   List,
-  Gift,
-  Link2,
   AlertTriangle,
   RefreshCw,
   Database,
@@ -14,9 +12,16 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  SORTS,
+  WORK_TYPE_LABEL_KEY,
+  STATUS_LABEL_KEY,
+  AGE_LABEL_KEY,
+} from "./search-explorer-constants";
+import { SearchFacetPanel } from "./search-explorer-facets";
+import { compactNumber, relativeTime, platformName, platformColor } from "./search-explorer-utils";
 import { TitleCard, TitleRow } from "./title-card";
 import { buttonClass } from "./ui/button-utils";
-import { GenreChip, TagChip } from "./ui/chip";
 import { Segmented } from "./ui/segmented";
 import { Select } from "./ui/select";
 
@@ -27,110 +32,12 @@ import { useT } from "@/lib/i18n";
 import { PLATFORM_LIST } from "@/lib/platforms";
 import { normalizeQuery } from "@/lib/recent-searches";
 import { useApp, useSavedTitleIds } from "@/lib/store";
-import { GENRES } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/src/hooks/use-debounced-value";
 import { fetchSearchResponse, isSearchAbortError, type SearchCatalogMeta } from "@/src/infrastructure/search-client";
 
 
-const SORTS: { value: SortKey; labelKey: string }[] = [
-  { value: "relevance", labelKey: "search.explorer.sort.relevance" },
-  { value: "rating", labelKey: "search.explorer.sort.rating" },
-  { value: "popular", labelKey: "search.explorer.sort.popular" },
-  { value: "trending", labelKey: "search.explorer.sort.trending" },
-  { value: "bookmarks", labelKey: "search.explorer.sort.bookmarks" },
-  { value: "completion", labelKey: "search.explorer.sort.completion" },
-  { value: "newest", labelKey: "search.explorer.sort.newest" },
-  { value: "title", labelKey: "search.explorer.sort.title" },
-];
-
-const YEAR_RANGES: { key: string; labelKey: string; range: [number, number] | null }[] = [
-  { key: "all", labelKey: "search.explorer.year.all", range: null },
-  { key: "2022+", labelKey: "search.explorer.year.2022plus", range: [2022, 9999] },
-  { key: "2018-21", labelKey: "search.explorer.year.2018-21", range: [2018, 2021] },
-  { key: "2014-17", labelKey: "search.explorer.year.2014-17", range: [2014, 2017] },
-  { key: "upto2013", labelKey: "search.explorer.year.upto2013", range: [0, 2013] },
-];
-
-const RATING_OPTIONS = [0, 3, 4, 4.5] as const;
-const AGE_OPTIONS: AgeRating[] = ["all", "12", "15", "19"];
-const WORK_TYPES: { value: WorkType; labelKey: string }[] = [
-  { value: "webtoon", labelKey: "search.explorer.type.webtoon" },
-  { value: "webnovel", labelKey: "search.explorer.type.webnovel" },
-];
-const WORK_TYPE_LABEL_KEY: Record<WorkType, string> = {
-  webtoon: "search.explorer.type.webtoon",
-  webnovel: "search.explorer.type.webnovel",
-};
-const STATUS_OPTIONS = ["ongoing", "completed", "hiatus"] as const;
-const STATUS_LABEL_KEY: Record<SerialStatus, string> = {
-  ongoing: "search.explorer.status.ongoing",
-  completed: "search.explorer.status.completed",
-  hiatus: "search.explorer.status.hiatus",
-};
-const AGE_LABEL_KEY: Record<AgeRating, string> = {
-  all: "search.explorer.age.all",
-  "12": "search.explorer.age.12",
-  "15": "search.explorer.age.15",
-  "19": "search.explorer.age.19",
-};
-
-function toggle<T>(arr: T[], value: T): T[] {
-  return arr.includes(value) ? arr.filter((entry) => entry !== value) : [...arr, value];
-}
-
 type FilterToken = { key: string; label: string; category: string };
-function facetClass(active: boolean) {
-  return cn(
-    "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
-    active
-      ? "border-accent/60 bg-accent-soft text-accent"
-      : "border-line bg-card text-fg-2 hover:text-fg hover:border-line-strong"
-  );
-}
-
-function tinyPill(active: boolean) {
-  return cn(
-    // 좁은 화면에서도 읽히고 누르기 편하도록 최소 높이(32px)·12px 본문 + 한 줄 유지(줄바꿈 방지).
-    "inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors",
-    active
-      ? "border-accent/55 bg-accent-soft text-accent"
-      : "border-line bg-card text-fg-3 hover:text-fg hover:border-line-strong"
-  );
-}
-
-function FacetGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="border-b border-line py-3.5 last:border-0">
-      <p className="eyebrow mb-2.5 text-fg-3">{title}</p>
-      {children}
-    </section>
-  );
-}
-
-function compactNumber(value: number) {
-  return value.toLocaleString();
-}
-
-function relativeTime(value: string | undefined, t: (key: string) => string) {
-  if (!value) return t("search.explorer.time.noData");
-  const elapsed = Date.now() - new Date(value).getTime();
-  if (!Number.isFinite(elapsed)) return t("search.explorer.time.noData");
-  const minutes = Math.max(0, Math.floor(elapsed / 60_000));
-  if (minutes < 1) return t("search.explorer.time.justNow");
-  if (minutes < 60) return t("search.explorer.time.minutesAgo").replace("{count}", String(minutes));
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return t("search.explorer.time.hoursAgo").replace("{count}", String(hours));
-  return t("search.explorer.time.daysAgo").replace("{count}", String(Math.floor(hours / 24)));
-}
-
-function platformName(id: PlatformId) {
-  return PLATFORM_LIST.find((platform) => platform.id === id)?.short ?? id;
-}
-
-function platformColor(id: PlatformId) {
-  return PLATFORM_LIST.find((platform) => platform.id === id)?.color ?? "oklch(0.305 0.012 64)";
-}
 
 export function SearchExplorer({
   initialQuery = "",
@@ -401,177 +308,31 @@ export function SearchExplorer({
   const mobileCount = activeCount;
 
   const facets = (
-    <div className="flex flex-col">
-      <FacetGroup title={t("search.explorer.facet.type")}>
-        <div className="grid grid-cols-2 gap-1.5">
-          {WORK_TYPES.map((entry) => (
-            <button
-              key={entry.value}
-              type="button"
-              aria-pressed={types.includes(entry.value)}
-              onClick={() => setTypes((prev) => toggle(prev, entry.value))}
-              className={facetClass(types.includes(entry.value))}
-            >
-              {t(entry.labelKey)}
-            </button>
-          ))}
-        </div>
-      </FacetGroup>
-
-      <FacetGroup title={t("search.explorer.facet.genre")}>
-        <div className="flex flex-wrap gap-1.5">
-          {GENRES.map((genre) => (
-            <button
-              type="button"
-              key={genre}
-              onClick={() => setGenres((prev) => toggle(prev, genre))}
-              aria-pressed={genres.includes(genre)}
-            >
-              <GenreChip genre={genre} active={genres.includes(genre)} size="sm" />
-            </button>
-          ))}
-        </div>
-      </FacetGroup>
-
-      <FacetGroup title={t("search.explorer.facet.tag")}>
-        <div className="flex flex-wrap gap-1.5">
-          {topTags.map((tag) => (
-            <TagChip
-              key={tag}
-              label={tag}
-              active={tags.includes(tag)}
-              onClick={() => setTags((prev) => toggle(prev, tag))}
-              className="h-7"
-            />
-          ))}
-        </div>
-      </FacetGroup>
-
-      <FacetGroup title={t("search.explorer.facet.year")}>
-        <div className="grid grid-cols-3 gap-1.5">
-          {YEAR_RANGES.map((entry) => {
-            const active =
-              (entry.range === null && yearRange === null) ||
-              (entry.range !== null && yearRange !== null && entry.range[0] === yearRange[0] && entry.range[1] === yearRange[1]);
-
-            return (
-              <button
-                type="button"
-                key={entry.key}
-                onClick={() => setYearRange(entry.range)}
-                aria-pressed={active}
-                className={tinyPill(active)}
-              >
-                {entry.key === "all" ? t("search.explorer.year.all") : t(entry.labelKey)}
-              </button>
-            );
-          })}
-        </div>
-      </FacetGroup>
-
-      <FacetGroup title={t("search.explorer.facet.status")}>
-        <div className="grid grid-cols-3 gap-1.5">
-          {STATUS_OPTIONS.map((entry) => (
-            <button
-              type="button"
-              key={entry}
-              onClick={() => setStatus((prev) => toggle(prev, entry))}
-              aria-pressed={status.includes(entry)}
-              className={tinyPill(status.includes(entry))}
-            >
-              {t(STATUS_LABEL_KEY[entry])}
-            </button>
-          ))}
-        </div>
-      </FacetGroup>
-
-      <FacetGroup title={t("search.explorer.facet.platform")}>
-        <div className="grid gap-1.5 sm:grid-cols-2">
-          {platformOptions.map((entry) => (
-            <button
-              type="button"
-              key={entry.id}
-              onClick={() => setPlatforms((prev) => toggle(prev, entry.id))}
-              aria-pressed={platforms.includes(entry.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm transition-colors",
-                platforms.includes(entry.id)
-                  ? "border-accent/55 bg-accent-soft text-accent"
-                  : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
-              )}
-            >
-              <span className="size-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-              {entry.name}
-            </button>
-          ))}
-        </div>
-      </FacetGroup>
-
-      <FacetGroup title={t("search.explorer.facet.minRating")}>
-        <div className="grid grid-cols-4 gap-1.5">
-          {RATING_OPTIONS.map((rating) => (
-            <button
-              type="button"
-              key={rating}
-              onClick={() => setMinRating(rating)}
-              aria-pressed={minRating === rating}
-              className={tinyPill(minRating === rating)}
-            >
-              {rating === 0 ? t("search.explorer.ratingAll") : `${rating}★+`}
-            </button>
-          ))}
-        </div>
-      </FacetGroup>
-
-      <FacetGroup title={t("search.explorer.facet.age")}>
-        <div className="grid grid-cols-4 gap-1.5">
-          {AGE_OPTIONS.map((entry) => (
-            <button
-              type="button"
-              key={entry}
-              onClick={() => setAges((prev) => toggle(prev, entry))}
-              aria-pressed={ages.includes(entry)}
-              className={tinyPill(ages.includes(entry))}
-            >
-              {t(AGE_LABEL_KEY[entry])}
-            </button>
-          ))}
-        </div>
-      </FacetGroup>
-
-      <FacetGroup title={t("search.explorer.facet.option")}>
-        <div className="flex flex-col gap-1.5">
-          <button
-            type="button"
-            onClick={() => setFreeOnly((current) => !current)}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              freeOnly
-                ? "border-good/45 bg-[oklch(0.8_0.15_150/0.14)] text-good border border-good/35"
-                : "border-line bg-card text-fg-2 hover:text-fg"
-            )}
-            aria-pressed={freeOnly}
-          >
-            <Gift size={15} />
-            {t("search.explorer.option.freeOnly")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setAdaptedOnly((current) => !current)}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              adaptedOnly
-                ? "border-accent/55 bg-accent-soft text-accent border"
-                : "border-line bg-card text-fg-2 hover:text-fg"
-            )}
-            aria-pressed={adaptedOnly}
-          >
-            <Link2 size={15} />
-            {t("search.explorer.option.adapted")}
-          </button>
-        </div>
-      </FacetGroup>
-    </div>
+    <SearchFacetPanel
+      t={t}
+      types={types}
+      setTypes={setTypes}
+      genres={genres}
+      setGenres={setGenres}
+      topTags={topTags}
+      tags={tags}
+      setTags={setTags}
+      yearRange={yearRange}
+      setYearRange={setYearRange}
+      status={status}
+      setStatus={setStatus}
+      platformOptions={platformOptions}
+      platforms={platforms}
+      setPlatforms={setPlatforms}
+      minRating={minRating}
+      setMinRating={setMinRating}
+      ages={ages}
+      setAges={setAges}
+      freeOnly={freeOnly}
+      setFreeOnly={setFreeOnly}
+      adaptedOnly={adaptedOnly}
+      setAdaptedOnly={setAdaptedOnly}
+    />
   );
 
   return (

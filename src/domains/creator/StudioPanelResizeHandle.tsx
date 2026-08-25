@@ -1,7 +1,7 @@
 import { GripVertical } from "lucide-react";
 import { useId } from "react";
 
-import type { Resizable } from "@/components/use-resizable";
+import type { Resizable } from "@/src/hooks/use-resizable";
 
 import { cn } from "@/lib/utils";
 

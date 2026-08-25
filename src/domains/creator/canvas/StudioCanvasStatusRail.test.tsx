@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 
 const viewportState = vi.hoisted(() => ({ mobile: false }));
 
-vi.mock("@/components/use-media-query", () => ({
+vi.mock("@/src/hooks/use-media-query", () => ({
   useIsMobile: () => viewportState.mobile,
 }));
 

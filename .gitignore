@@ -103,3 +103,5 @@ crates/*/target/
 
 # Local AI assistant sessions & configs
 /.continue/
+/.omo/
+

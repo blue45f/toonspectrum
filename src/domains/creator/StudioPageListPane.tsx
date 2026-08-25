@@ -45,7 +45,7 @@ import type {
   StudioUiPreferencesRepository,
 } from "./studio-ui-preferences-sqlite";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
-import type { Resizable } from "@/components/use-resizable";
+import type { Resizable } from "@/src/hooks/use-resizable";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
 import { cn } from "@/lib/utils";

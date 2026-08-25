@@ -1,17 +1,28 @@
-import { Sparkles, Plus, Trash2, Pencil, Check, BookHeart, Star, Compass, FolderHeart, BellRing } from "lucide-react";
+import { Sparkles, BookHeart, Star, Compass, BellRing } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { CollectionsTab } from "./library-view-collections";
+import {
+  RATED_SORTS,
+  DAY_FROM_GETDAY,
+  READ_TABS,
+  EMPTY_PROFILE,
+} from "./library-view-constants";
+import { EmptyTeach } from "./library-view-empty";
 import { MiniPoster } from "./rank-row";
 import { TitleCard } from "./title-card";
 import { UnderlineTabs, Segmented } from "./ui/segmented";
 import { MeterBar } from "./ui/spectrum-bar";
 import { Stars, RatingInline } from "./ui/stars";
-import { CollectionIcon } from "./visual-marks";
-import { COLLECTION_ICON_OPTIONS } from "./visual-marks-utils";
 
+import type {
+  Tab,
+  RatedSort,
+  TasteProfile,
+  TasteRec,
+} from "./library-view-constants";
 import type { ReadState, Title } from "@/lib/types";
 
-import { MAX_COLLECTION_NAME_LENGTH } from "@/lib/collection-contract";
 import { withCsrfProtection } from "@/lib/csrf";
 import { statsAreEstimated } from "@/lib/estimate";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
@@ -19,74 +30,6 @@ import { useApp, useHydrated } from "@/lib/store";
 import { WEEK_DAYS } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
-
-type Tab = "shelf" | "rated" | "taste" | "collections" | "alerts";
-type RatedSort = "high" | "low" | "title";
-const RATED_SORTS: { value: RatedSort; label: string }[] = [
-  { value: "high", label: "별점 높은순" },
-  { value: "low", label: "별점 낮은순" },
-  { value: "title", label: "가나다순" },
-];
-const DAY_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5];
-const READ_TABS: { value: ReadState; label: string }[] = [
-  { value: "want", label: "관심" },
-  { value: "reading", label: "보는 중" },
-  { value: "done", label: "완독" },
-  { value: "dropped", label: "하차" },
-];
-
-type TasteProfile = {
-  affinityType: "webtoon" | "webnovel" | "balanced";
-  ratedCount: number;
-  avgRating: number;
-  topGenres: { name: string; weight: number }[];
-  topTags: { name: string; weight: number }[];
-};
-
-type TasteRec = {
-  title: Title;
-  reason: string;
-};
-
-const EMPTY_PROFILE: TasteProfile = {
-  affinityType: "balanced",
-  ratedCount: 0,
-  avgRating: 0,
-  topGenres: [],
-  topTags: [],
-};
-
-function EmptyTeach({
-  icon: Icon,
-  title,
-  desc,
-  cta,
-}: {
-  icon: typeof Star;
-  title: string;
-  desc: string;
-  cta?: { label: string; href: string };
-}) {
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line bg-card/40 px-6 py-16 text-center">
-      <div className="grid size-12 place-items-center rounded-2xl bg-raised text-fg-3">
-        <Icon size={22} />
-      </div>
-      <div>
-        <p className="font-semibold text-fg">{title}</p>
-        <p className="mt-1 max-w-xs text-sm leading-relaxed text-fg-2">{desc}</p>
-      </div>
-      {cta && (
-        <Link
-          href={cta.href}
-          className="mt-1 inline-flex min-h-11 items-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
-        >
-          {cta.label}
-        </Link>
-      )}
-    </div>
-  );
-}
 
 export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
   const hydrated = useHydrated();
@@ -523,153 +466,6 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-function CollectionsTab({
-  collections,
-  titlesById,
-  onCreate,
-  onRename,
-  onDelete,
-}: {
-  collections: ReturnType<typeof useApp.getState>["collections"];
-  titlesById: Record<string, Title>;
-  onCreate: (name: string, emoji: string) => string;
-  onRename: (id: string, name: string) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState(COLLECTION_ICON_OPTIONS[0].value);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const commitRename = () => {
-    if (editingId && editName.trim()) onRename(editingId, editName);
-    setEditingId(null);
-  };
-
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-card p-3">
-        <div className="flex gap-1">
-          {COLLECTION_ICON_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => setEmoji(option.value)}
-              title={option.label}
-              aria-label={`${option.label} 아이콘`}
-              className={cn(
-                "grid size-10 place-items-center rounded-xl transition-colors",
-                emoji === option.value ? "bg-accent-soft ring-1 ring-accent/45" : "hover:bg-raised"
-              )}
-            >
-              <CollectionIcon value={option.value} active={emoji === option.value} />
-            </button>
-          ))}
-        </div>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          aria-label="새 컬렉션 이름"
-          placeholder="새 컬렉션 이름"
-          maxLength={MAX_COLLECTION_NAME_LENGTH}
-          className="h-10 min-w-40 flex-1 rounded-lg border border-line bg-canvas px-3 text-sm outline-none focus:border-accent/50"
-        />
-        <button
-          onClick={() => {
-            if (name.trim()) {
-              onCreate(name.trim(), emoji);
-              setName("");
-            }
-          }}
-          className="flex h-10 items-center gap-1.5 rounded-lg bg-accent px-4 text-sm font-medium text-on-accent disabled:opacity-50"
-          disabled={!name.trim()}
-        >
-          <Plus size={16} /> 만들기
-        </button>
-      </div>
-
-      {collections.length === 0 ? (
-        <EmptyTeach
-          icon={FolderHeart}
-          title="컬렉션이 없어요"
-          desc="나만의 테마로 작품을 묶어보세요. 작품 상세에서 컬렉션에 담을 수 있어요."
-        />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {collections.map((c) => {
-            const titles = c.titleIds.map((id) => titlesById[id]).filter(Boolean).slice(0, 5);
-            return (
-              <div key={c.id} className="rounded-2xl border border-line bg-card p-5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <CollectionIcon value={c.emoji} size="lg" />
-                    <div className="min-w-0">
-                      {editingId === c.id ? (
-                        <input
-                          // 이름 변경(rename) 모드 진입이라는 명시적 사용자 액션으로만 마운트되는
-                          // 인라인 편집 입력이라 열릴 때 포커스 이동이 적절하다(페이지 로드 시 포커스 탈취 아님).
-                          // eslint-disable-next-line jsx-a11y/no-autofocus
-                          autoFocus
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          onBlur={commitRename}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commitRename();
-                            else if (e.key === "Escape") setEditingId(null);
-                          }}
-                          aria-label="컬렉션 이름 변경"
-                          maxLength={MAX_COLLECTION_NAME_LENGTH}
-                          className="h-7 w-full rounded-md border border-accent/50 bg-canvas px-2 text-sm font-semibold text-fg outline-none"
-                        />
-                      ) : (
-                        <p className="truncate font-semibold text-fg">{c.name}</p>
-                      )}
-                      <p className="text-xs text-fg-3">{c.titleIds.length}편</p>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {editingId === c.id ? (
-                      <button onClick={commitRename} aria-label="이름 저장" className="text-fg-3 transition-colors hover:text-good">
-                        <Check size={15} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setEditingId(c.id);
-                          setEditName(c.name);
-                        }}
-                        aria-label="이름 변경"
-                        title="이름 변경"
-                        className="text-fg-3 transition-colors hover:text-fg"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    )}
-                    <button onClick={() => onDelete(c.id)} aria-label="컬렉션 삭제" title="삭제" className="text-fg-3 transition-colors hover:text-bad">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </div>
-                {titles.length > 0 ? (
-                  <div className="mt-4 flex gap-2">
-                    {titles.map((t) => (
-                      <Link key={t!.id} href={`/title/${t!.slug}`} className="w-12">
-                        <MiniPoster title={t!} className="w-full" />
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-4 text-xs text-fg-3">
-                    아직 비어 있어요. 작품 상세에서 {`'`}컬렉션에 담기{`'`}를 눌러보세요.
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }

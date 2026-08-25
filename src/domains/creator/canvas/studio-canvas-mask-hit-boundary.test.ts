@@ -111,7 +111,7 @@ describe("Studio canvas mask hit isolation boundary", () => {
 describe("Studio canvas selection interaction guards", () => {
   it("keeps 44px resize hit targets on wide coarse-pointer devices", () => {
     expect(interactionSource).toContain(
-      'import { useMediaQuery } from "@/components/use-media-query"',
+      'import { useMediaQuery } from "@/src/hooks/use-media-query"',
     );
     expect(interactionSource).toContain(
       'const hasCoarsePointer = useMediaQuery("(pointer: coarse)")',

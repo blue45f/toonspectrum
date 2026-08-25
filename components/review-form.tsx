@@ -6,10 +6,11 @@ import { z } from "zod";
 
 import { RatingInput, ScaleSwitcher } from "./rating-input";
 import { Button } from "./ui/button";
-import { useCelebrate } from "./use-celebrate";
+
 
 import { useApp, useHydrated } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { useCelebrate } from "@/src/hooks/use-celebrate";
 
 
 const SUGGESTED = [
