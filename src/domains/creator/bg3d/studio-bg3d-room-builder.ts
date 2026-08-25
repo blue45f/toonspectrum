@@ -618,6 +618,30 @@ export const STUDIO_BG3D_ROOM_PRESETS: readonly StudioBg3dRoomPreset[] = [
       ],
     }),
   },
+  {
+    id: "study",
+    label: "서재",
+    description: "5×4.5m · 북쪽 큰 창 · 책장·책상·스탠드 조명",
+    spec: clampStudioBg3dRoomSpec({
+      width: 5,
+      depth: 4.5,
+      wallHeight: 2.7,
+      wallThickness: 0.12,
+      floorColor: "#8a7358",
+      wallColor: "#e8e0d0",
+      openings: [
+        { wall: "north", type: "window", centerOffset: 0, width: 3.2, height: 1.4, sillHeight: 0.8 },
+      ],
+      furniture: [
+        { kind: "bookshelf", x: -2.2, z: -2, yawDeg: 90 },
+        { kind: "bookshelf", x: -2.2, z: -0.9, yawDeg: 90 },
+        { kind: "table", x: 0.6, z: 0.4, yawDeg: 0 },
+        { kind: "chair", x: 0.6, z: 1.15, yawDeg: 180 },
+        { kind: "lamp", x: 1.9, z: -1.6, yawDeg: 0 },
+        { kind: "plant", x: 2.1, z: 1.8, yawDeg: 0 },
+      ],
+    }),
+  },
 ];
 
 export function getStudioBg3dRoomPreset(id: unknown): StudioBg3dRoomPreset | null {

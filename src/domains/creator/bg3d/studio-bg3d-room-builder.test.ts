@@ -229,15 +229,17 @@ describe("buildStudioBg3dRoomParts", () => {
 });
 
 describe("STUDIO_BG3D_ROOM_PRESETS", () => {
-  it("교실/카페/원룸/복도/옥상 5종이 있고 id 조회가 동작한다", () => {
+  it("교실/카페/원룸/복도/옥상/서재 6종이 있고 id 조회가 동작한다", () => {
     expect(STUDIO_BG3D_ROOM_PRESETS.map((preset) => preset.id)).toEqual([
       "classroom",
       "cafe",
       "studio-flat",
       "corridor",
       "rooftop",
+      "study",
     ]);
     expect(getStudioBg3dRoomPreset("cafe")?.label).toBe("카페");
+    expect(getStudioBg3dRoomPreset("study")?.label).toBe("서재");
     expect(getStudioBg3dRoomPreset("unknown")).toBeNull();
     expect(getStudioBg3dRoomPreset(42)).toBeNull();
   });
