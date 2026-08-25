@@ -68,8 +68,8 @@ describe("studio brush catalog core quarantine lanes", () => {
     expect(quick.map(({ id, quickSource }) => [id, quickSource])).toEqual([
       ["pen", "favorite"],
       ["marker", "recent"],
+      ["fineliner", "starter"],
       ["gpen", "starter"],
-      ["watercolor", "starter"],
     ]);
   });
 
