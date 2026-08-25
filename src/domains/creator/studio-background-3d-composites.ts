@@ -658,6 +658,47 @@ export const COMPOSITE_PRESETS: BgCompositePreset[] = [
       { kind: "box", offset: [-0.7, 0.35, 0], rotation: [0, 0, 0], scale: [0.4, 0.7, 0.4], color: "#5c4632" },
     ],
   },
+  {
+    id: "prop_streetlight",
+    category: "prop",
+    label: "가로등",
+    description: "기둥 + 팔 + 구형 등 head",
+    footprint: 0.4,
+    parts: [
+      { kind: "cylinder", offset: [0, 1.9, 0], rotation: [0, 0, 0], scale: [0.13, 3.8, 0.13], color: "#4a4f58" },
+      { kind: "box", offset: [0.38, 3.82, 0], rotation: [0, 0, 0], scale: [0.95, 0.07, 0.07], color: "#4a4f58" },
+      { kind: "sphere", offset: [0.78, 3.66, 0], rotation: [0, 0, 0], scale: [0.55, 0.55, 0.55], color: "#ffe9b8" },
+    ],
+  },
+  {
+    id: "nature_boulder",
+    category: "nature",
+    label: "바위",
+    description: "포개진 화강암 덩어리 3개",
+    footprint: 1.2,
+    parts: [
+      { kind: "sphere", offset: [0, 0.42, 0], rotation: [0, 0, 0], scale: [1.5, 0.95, 1.25], color: "#9a948a" },
+      { kind: "sphere", offset: [0.62, 0.22, 0.28], rotation: [0, 0, 0], scale: [0.85, 0.55, 0.75], color: "#8a847a" },
+      { kind: "sphere", offset: [-0.55, 0.18, -0.2], rotation: [0, 0, 0], scale: [0.7, 0.45, 0.65], color: "#a39d92" },
+    ],
+  },
+  {
+    id: "vehicle_bus",
+    category: "vehicle",
+    label: "시내버스",
+    description: "창문 띠와 앞유리, 네 바퀴",
+    footprint: 2.6,
+    parts: [
+      { kind: "box", offset: [0, 1.5, 0], rotation: [0, 0, 0], scale: [4.6, 1.8, 1.9], color: "#3f7f5f" },
+      { kind: "box", offset: [0, 2.02, 0.96], rotation: [0, 0, 0], scale: [4.2, 0.66, 0.05], color: "#9fc6d8" },
+      { kind: "box", offset: [0, 2.02, -0.96], rotation: [0, 0, 0], scale: [4.2, 0.66, 0.05], color: "#9fc6d8" },
+      { kind: "box", offset: [2.32, 1.98, 0], rotation: [0, 0, 0], scale: [0.05, 0.78, 1.6], color: "#9fc6d8" },
+      { kind: "cylinder", offset: [1.55, 0.36, 0.86], rotation: [0, 0, Math.PI / 2], scale: [0.76, 0.14, 0.76], color: "#22252a" },
+      { kind: "cylinder", offset: [-1.55, 0.36, 0.86], rotation: [0, 0, Math.PI / 2], scale: [0.76, 0.14, 0.76], color: "#22252a" },
+      { kind: "cylinder", offset: [1.55, 0.36, -0.86], rotation: [0, 0, Math.PI / 2], scale: [0.76, 0.14, 0.76], color: "#22252a" },
+      { kind: "cylinder", offset: [-1.55, 0.36, -0.86], rotation: [0, 0, Math.PI / 2], scale: [0.76, 0.14, 0.76], color: "#22252a" },
+    ],
+  },
 ];
 
 /**
