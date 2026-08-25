@@ -622,8 +622,8 @@ describe("부착 인스턴스 생성·직렬화", () => {
     });
 
     expect(parsed.items[0].rig?.secondary?.influence).toBe(0.65);
-    // 책은 XY 평면에 눕는 GLB라 표지 중앙 접점 + 무회전이 손바닥 위 얹힘이다.
-    expect(propDefById("book")?.smartRotationDeg).toEqual([0, 0, 0]);
+    // 책은 XY 평면에 눕는 GLB라 표지 중앙 접점 + 90° 회전이 손바닥 위 얹힘이다.
+    expect(propDefById("book")?.smartRotationDeg).toEqual([0, 0, 90]);
   });
 
   it("V2가 아닌 item rig와 secondary 미지원 소품의 보조점은 제거한다", () => {
