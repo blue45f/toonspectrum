@@ -980,6 +980,16 @@ export class StudioLiveDynamicBrushOverlayRenderer {
    * the active surface is cleared.
    */
   private settleFlattenUnionRect: PresentationPixelRect | null = null;
+  /**
+   * 시작 접촉 자리표시 원({@link paintImmediateContact})의 프레젠테이션 픽셀 rect.
+   *
+   * 자리표시 원은 브러시 계획과 무관한 단색 원이라, 실제 계획 마크가 그 원을 완전히 덮지
+   * 않는 레인(테이퍼 시작·치즐 엣지·그리드 스냅)에서는 획 내내 시작점에 라이브 전용 잉크로
+   * 남는다(장경로 실측: live-only-start-circle 79px / 1307px, centroid drift 7~11px). 첫
+   * 실제 프레젠테이션에서 이 rect 를 더티 영역에 합집합해 누적 캔버스 내용으로 재구성하면
+   * 탭 즉시 피드백 계약은 그대로 두고 자리표시 원만 계획된 잉크로 교체된다.
+   */
+  private contactPlaceholderRect: PresentationPixelRect | null = null;
 
   attach(canvases: StudioLiveDynamicBrushOverlayCanvases | null): void {
     this.activeCanvas = canvases?.activeCanvas ?? null;
@@ -2155,11 +2165,17 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     const destination = this.presentationCanvas;
     const surface = this.surface;
     if (!context || !source || !destination || !surface) return false;
-    const rect = presentationRectForMarks(marks, surface, this.dpr, destination);
+    const markRect = presentationRectForMarks(marks, surface, this.dpr, destination);
     // A valid suffix may be fully outside the clipped live viewport. Its coverage is still kept
     // in the source surface and will be presented after a viewport replay; there is simply no
     // visible destination crop to update in this frame.
-    if (!rect) return true;
+    if (!markRect) return true;
+    // 첫 실제 마크 프레젠테이션이 시작 접촉 자리표시 원을 함께 지우고 누적 캔버스 내용으로
+    // 재구성한다. 순수 탭(마크 없음)은 여기 오지 않으므로 즉시 피드백 원은 그대로 남는다.
+    const rect = this.contactPlaceholderRect
+      ? unionPresentationPixelRects(this.contactPlaceholderRect, markRect)
+      : markRect;
+    this.contactPlaceholderRect = null;
     try {
       context.save();
       context.setTransform(1, 0, 0, 1, 0, 0);
@@ -2414,10 +2430,59 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     context.globalCompositeOperation = "source-over";
     context.globalAlpha = Math.max(0.72, Math.min(1, style.opacity));
     context.fillStyle = style.color;
+    const radius = Math.max(2.8, style.width * 0.34);
     context.beginPath();
-    context.arc(first.x, first.y, Math.max(2.8, style.width * 0.34), 0, Math.PI * 2);
+    context.arc(first.x, first.y, radius, 0, Math.PI * 2);
     context.fill();
     context.restore();
+    this.recordContactPlaceholderRect(first.x, first.y, radius);
+  }
+
+  /**
+   * {@link presentationRectForMarks}와 같은 변환·같은 3px 프린지로 자리표시 원의 픽셀 rect 를
+   * 기록한다. begin 경로가 원을 두 번(요소 폭 → 스타일 폭) 그릴 수 있으므로 합집합으로 쌓는다.
+   */
+  private recordContactPlaceholderRect(
+    centerX: number,
+    centerY: number,
+    radius: number,
+  ): void {
+    const surface = this.surface;
+    const canvas = this.presentationCanvas;
+    if (!surface || !canvas) return;
+    const scale = this.dpr * surface.documentScale;
+    const translateX = surface.flipX
+      ? (surface.documentWidth * surface.documentScale - surface.left) * this.dpr
+      : -surface.left * this.dpr;
+    const translateY = -surface.top * this.dpr;
+    const firstPixelX = (surface.flipX ? -scale : scale) * (centerX - radius) + translateX;
+    const secondPixelX = (surface.flipX ? -scale : scale) * (centerX + radius) + translateX;
+    const firstPixelY = scale * (centerY - radius) + translateY;
+    const secondPixelY = scale * (centerY + radius) + translateY;
+    const fringe = 3;
+    const minimumPixelX = Math.max(
+      0,
+      Math.floor(Math.min(firstPixelX, secondPixelX)) - fringe,
+    );
+    const minimumPixelY = Math.max(
+      0,
+      Math.floor(Math.min(firstPixelY, secondPixelY)) - fringe,
+    );
+    const maximumPixelX = Math.min(
+      canvas.width,
+      Math.ceil(Math.max(firstPixelX, secondPixelX)) + fringe,
+    );
+    const maximumPixelY = Math.min(
+      canvas.height,
+      Math.ceil(Math.max(firstPixelY, secondPixelY)) + fringe,
+    );
+    const width = maximumPixelX - minimumPixelX;
+    const height = maximumPixelY - minimumPixelY;
+    if (width <= 0 || height <= 0) return;
+    this.contactPlaceholderRect = unionPresentationPixelRects(
+      this.contactPlaceholderRect,
+      { x: minimumPixelX, y: minimumPixelY, width, height },
+    );
   }
 
   private preparedActive(): CanvasRenderingContext2D | null {
@@ -2524,6 +2589,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     this.clearCanvas(this.activeContext, this.activeCanvas);
     this.clearCanvas(this.presentationContext, this.presentationCanvas);
     this.settleFlattenUnionRect = null;
+    this.contactPlaceholderRect = null;
   }
 
   private clearSettledRect(): void {
