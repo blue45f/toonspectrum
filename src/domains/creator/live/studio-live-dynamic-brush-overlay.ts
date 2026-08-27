@@ -1240,6 +1240,29 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     const appended = this.appendFrom(element);
     // 브라우저 감사 진단: 실패 프레임에서 "오버레이가 몇 개의 마크를 칠했다고 믿는지"가
     // 앱 내 계획/예산 문제와 렌더러 드로잉 드롭아웃을 가른다. 성공/실패 공통으로 남긴다.
+    // 무거운 캔버스 검열(census)은 감사 하니스가 플래그를 켠 세션에서만 수행한다 — 제품
+    // 경로에서는 스트로크마다 getImageData를 읽는 비용을 절대 지불하지 않는다.
+    const sealDiagnosticsEnabled = (globalThis as {
+      __studioDynamicSealDebugEnabled?: boolean;
+    }).__studioDynamicSealDebugEnabled === true;
+    const sealDebugCensus = (
+      canvas: HTMLCanvasElement | null,
+      context: CanvasRenderingContext2D | null,
+    ): number => {
+      if (!canvas || !context || canvas.width === 0 || canvas.height === 0) {
+        return -1;
+      }
+      try {
+        const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        let ink = 0;
+        for (let index = 3; index < data.length; index += 16) {
+          if ((data[index] ?? 0) > 16) ink += 1;
+        }
+        return ink;
+      } catch {
+        return -1;
+      }
+    };
     const recordSealDebug = (status: string): void => {
       (globalThis as {
         __studioDynamicSealDebug?: {
@@ -1253,6 +1276,27 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         markCountBefore: sealDebugMarkCount,
         markCountAfter: this.active?.markCount ?? -1,
         at: performance.now(),
+        ...(sealDiagnosticsEnabled
+          ? {
+              union: this.settleFlattenUnionRect,
+              surface: this.surface
+                ? {
+                    left: this.surface.left,
+                    top: this.surface.top,
+                    width: this.surface.width,
+                    height: this.surface.height,
+                    documentScale: this.surface.documentScale,
+                  }
+                : null,
+              dpr: this.dpr,
+              activeInk: sealDebugCensus(this.activeCanvas, this.activeContext),
+              presentationInk: sealDebugCensus(
+                this.presentationCanvas,
+                this.presentationContext,
+              ),
+              settledInk: sealDebugCensus(this.settledCanvas, this.settledContext),
+            }
+          : {}),
       };
     };
     if (appended.status === "fallback") {
@@ -1276,6 +1320,8 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       if (!this.flattenActiveToSettled(active.style.opacity)) {
         return this.failActive("surface-render");
       }
+      // 진단 모드에서만 유의미한 두 번째 기록: settled 검열이 flatten 결과를 반영한다.
+      recordSealDebug("seal-direct:flattened");
       this.settled.push({
         style: active.style,
         source: detachedSource(active.source),
@@ -1317,6 +1363,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     if (!this.flattenActiveToSettled(active.style.opacity)) {
       return this.failActive("surface-render");
     }
+    recordSealDebug("seal-exact-rebuild:flattened");
     this.settled.push({
       style: exactStyle,
       source: detachedSource(exactSource),

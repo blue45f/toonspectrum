@@ -635,7 +635,11 @@ async function installCleanStudioState(page: Page): Promise<void> {
   // 항등 함수로 채운다(문자열 스크립트라 트랜스파일 대상이 아니다). 앱 코드는 번들이
   // 자체 헬퍼를 인라인하므로 영향이 없다.
   await page.addInitScript({
-    content: "globalThis.__name ??= (fn) => fn;",
+    content:
+      "globalThis.__name ??= (fn) => fn;"
+      // 실링 진단 확장(union/표면/캔버스 검열)은 감사 세션에서만 계산되도록 오버레이가
+      // 이 플래그를 게이트로 삼는다 — 제품 사용자는 절대 비용을 내지 않는다.
+      + " globalThis.__studioDynamicSealDebugEnabled = true;",
   });
   await page.addInitScript(
     ({
@@ -2727,7 +2731,11 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
   // 아래 진단 스크립트는 이름 있는 함수 표현식을 담고 있어 tsx(keep-names) 직렬화가
   // esbuild `__name` 헬퍼 호출을 남긴다 — 페이지 수준 폴리필(installCleanStudioState)보다
   // 컨텍스트 init 스크립트가 먼저 돌므로 여기서도 먼저 채운다.
-  await context.addInitScript({ content: "globalThis.__name ??= (fn) => fn;" });
+  await context.addInitScript({
+    content:
+      "globalThis.__name ??= (fn) => fn;"
+      + " globalThis.__studioDynamicSealDebugEnabled = true;",
+  });
   // 채널 2 진단: 모든 캔버스 2D 컨텍스트의 setTransform 스케일을 기록해 커밋 렌더가
   // 실제 어떤 물리 배율에서 래스터되는지 덤프와 함께 확인한다.
   await context.addInitScript(() => {
