@@ -4159,7 +4159,15 @@ async function main(): Promise<void> {
   let browser: Browser | null = null;
   try {
     await waitForServer(origin);
-    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    // 샌드박스 이미지가 저장소의 Playwright 고정판과 다른 Chromium 리비전을 담고 있을 때
+    // playwright.config.ts 와 같은 규약으로 실행 파일 경로를 받아들인다.
+    browser = await chromium.launch({
+      headless: true,
+      args: ["--no-sandbox"],
+      ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
+        ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
+        : {}),
+    });
     const desktop = runDesktop ? await runDesktopBrushMatrix(browser, studioUrl) : null;
     if (desktop) {
       invariant(
