@@ -3888,6 +3888,20 @@ function StudioCuttoonEditor({
       setBg3dOpen(true);
     } else if (studioRoute.surface === "poser") {
       setPoserVrmOpen(true);
+    } else if (studioRoute.surface === "animation") {
+      // 매니페스트가 선언해 온 표면인데 소비자가 없어 죽은 세그먼트였다 — 딥링크/뒤·앞으로
+      // 가기가 타임라인 프로덕션 표면을 실제로 연다.
+      setTimelinePlaying(false);
+      setTimelineOpen(true);
+    } else if (studioRoute.surface === "comic") {
+      setStoryboardGridOpen(true);
+    } else if (studioRoute.surface === "canvas") {
+      // 라우트가 canvas 로 돌아오면(뒤로가기 포함) 라우트 소유 표면 패널도 함께 닫는다 —
+      // URL 이 보이는 표면의 단일 진실이 되는 대칭의 나머지 절반.
+      setTimelineOpen(false);
+      setStoryboardGridOpen(false);
+      setBg3dOpen(false);
+      setPoserVrmOpen(false);
     }
   }, [studioRoute.surface]);
   const hybridDccReturnFocusRef = useRef<HTMLElement | null>(null);
@@ -6973,14 +6987,22 @@ function StudioCuttoonEditor({
     });
   }
 
-  function navigateStudio2dSurface(surface: Studio2dWorkspaceSurface) {
+  function navigateStudio2dSurface(
+    surface: Studio2dWorkspaceSurface,
+    options?: { readonly replace?: boolean },
+  ) {
     if (studioRoute.surface === surface) return;
-    navigate(studio2dHref({
-      remixSourceWorkId: studioRoute.remixSourceWorkId,
-      search: location.search,
-      surface,
-      workId: studioRoute.workId,
-    }));
+    navigate(
+      studio2dHref({
+        remixSourceWorkId: studioRoute.remixSourceWorkId,
+        search: location.search,
+        surface,
+        workId: studioRoute.workId,
+      }),
+      // 패널을 닫아 표면이 canvas 로 내려오는 항목은 히스토리를 쌓지 않는다 — 뒤로가기가
+      // "방금 닫은 패널을 다시 여는" 계단이 되면 라우트 대칭의 의미가 없다.
+      options?.replace === true ? { replace: true } : undefined,
+    );
   }
 
   /** 그리기 ▸ 브러시 스튜디오 — §15.3 Brush ▸ Brush Studio/Brush DNA. */
@@ -7802,6 +7824,42 @@ function StudioCuttoonEditor({
   useEffect(() => {
     applyInitialStudioWorkspaceLaunch(initialWorkspaceLaunchId);
   }, [initialWorkspaceLaunchId]);
+  /**
+   * 라우트 소유 표면(타임라인·스토리보드·3D 배경·포저)의 열림/닫힘 전이를 URL 에 반영한다.
+   * 열림 전이는 canvas 라우트에서만 해당 표면으로 올라가고(다른 표면 위 패널 공존은 URL 을
+   * 다투지 않는다), 닫힘 전이는 URL 이 그 표면을 주장하고 있을 때만 canvas 로 내려온다 —
+   * 반대 방향(라우트→상태)은 위 studioRoute.surface 이펙트가 소유하므로 루프가 없다.
+   */
+  const upgradeRoutedSurface = useEffectEvent((surface: Studio2dWorkspaceSurface) => {
+    if (studioRoute.surface === "canvas") navigateStudio2dSurface(surface);
+  });
+  const downgradeRoutedSurface = useEffectEvent((surface: Studio2dWorkspaceSurface) => {
+    if (studioRoute.surface === surface) {
+      navigateStudio2dSurface("canvas", { replace: true });
+    }
+  });
+  const routedSurfacePanelSyncRef = useRef({
+    animation: false,
+    bg3d: false,
+    comic: false,
+    poser: false,
+  });
+  function useRoutedSurfacePanelSync(
+    surface: "animation" | "bg3d" | "comic" | "poser",
+    open: boolean,
+  ): void {
+    useEffect(() => {
+      const was = routedSurfacePanelSyncRef.current[surface];
+      routedSurfacePanelSyncRef.current[surface] = open;
+      if (open && !was) upgradeRoutedSurface(surface);
+      else if (!open && was) downgradeRoutedSurface(surface);
+      // 전이(edge)에만 반응한다 — 초기 마운트의 false 는 닫힘이 아니다.
+    }, [surface, open]);
+  }
+  useRoutedSurfacePanelSync("animation", timelineOpen);
+  useRoutedSurfacePanelSync("comic", storyboardGridOpen);
+  useRoutedSurfacePanelSync("bg3d", bg3dOpen);
+  useRoutedSurfacePanelSync("poser", poserVrmOpen);
   const [pageSequenceOpen, setPageSequenceOpen] = useState(false);
   const [timelinePlayhead, setTimelinePlayhead] = useState(0);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
