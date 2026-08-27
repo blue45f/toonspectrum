@@ -2231,7 +2231,9 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         surveyFailures.push(message);
         log(`SURVEY FAILURE ${index + 1}/${BRUSH_MATRIX_CATALOG_COUNT} ${message}`);
         await installCleanStudioState(page);
-        await page.reload({ waitUntil: "domcontentloaded" });
+        // 실패 진단(캔버스 덤프·검열) 직후의 페이지는 무겁다 — 기본 7초 내비게이션
+        // 타임아웃이 복구 리로드를 두 번이나 죽였다(실측). 복구에만 넉넉한 한도를 준다.
+        await page.reload({ timeout: 45_000, waitUntil: "domcontentloaded" });
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
       }
