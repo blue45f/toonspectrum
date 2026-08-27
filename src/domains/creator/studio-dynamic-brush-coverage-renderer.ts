@@ -131,6 +131,12 @@ const STUDIO_KERNEL_TIP_MIN_VISIBLE_SIZE = 2.2;
  * 0.03 수준으로 내려가 저장 문서에서 획이 사라지는 것을 막는다(ADR 0010).
  */
 const STUDIO_KERNEL_TIP_MIN_VISIBLE_ALPHA = 0.12;
+/**
+ * 하한 전액이 유지되는 획 시작 램프 길이(arc px). 탭과 빠른 짧은 터치는 이 안에서 끝나므로
+ * ADR 0010의 "저장 문서에서 획이 사라지지 않는다"가 그대로 성립하고, 이 너머의 완전 pore는
+ * 하한이 tooth 배율로 줄어 종이로 읽힌다(위 상수의 사용처 주석 참조).
+ */
+const STUDIO_KERNEL_TIP_TAP_FLOOR_REACH_PX = 8;
 
 export const STUDIO_DYNAMIC_COVERAGE_TILE_BLEED_PIXELS = 2;
 /**
@@ -1646,11 +1652,38 @@ export function planStudioDynamicBrushCoverageMarks(
           texturedAlphaMap = lifted;
         }
       }
+      const strokeToothMultiplier = kernelTipMaterial
+        ? studioDryMediaKernelStrokeToothMultiplier(
+            kernelTipMaterial,
+            {
+              index: composedDab.index ?? 0,
+              x: composedDab.x,
+              y: composedDab.y,
+              ...(composedDab.distanceFromStrokeStart !== undefined
+                ? {
+                    distanceFromStrokeStart:
+                      composedDab.distanceFromStrokeStart,
+                  }
+                : {}),
+            },
+            strokeOriginX,
+            strokeOriginY,
+            dynamicSeed,
+          )
+        : 1;
       /*
        * 커널 팁 가시 알파 하한(ADR 0010): 선형화된 침착 알파에 stroke-anchored tooth 승수를
        * 곱하면 단일 dab(탭·빠른 짧은 터치)이 0.03 수준까지 내려가 저장 문서에서 획이
        * 사라진다(실측 — 패리티 리포트 §단획 실피 재정성). 겹침 코어는 이미 하한 위라
        * 무영향이고, 어떤 prefix 길이에서도 같은 값이라 라이브/커밋이 함께 이동한다.
+       *
+       * 하한은 tooth 계약과 충돌하지 않게 획 진행에 따라 pore를 따라간다: tooth 필드의 완전
+       * pore는 "커버리지 플로어 아래로 내려가 종이로 읽힌다"가 명시 계약인데, 획 전체에
+       * 평평한 0.12 하한을 두면 겹치는 fibre 5–7개가 pore 구간을 0.35–0.5 중간톤으로 메워
+       * 측정 tooth 분산이 union 캐리어 아래로 떨어진다(픽셀 게이트 실측). 탭·짧은 터치의
+       * 가시성은 획 시작 램프가 그대로 보장하고(시작 8px 안에서는 하한 전액), 그 너머의
+       * 완전 pore만 하한이 tooth 배율로 줄어 종이가 실제로 드러난다. dab 정체성만의 순수
+       * 함수이므로 prefix 길이와 무관하게 같은 값이다(라이브/커밋 동시 이동).
        */
       const texturedMarkAlpha = clampAlpha(
         Math.max(
@@ -1674,26 +1707,14 @@ export function planStudioDynamicBrushCoverageMarks(
                   radiusY,
                   angleRadians,
                 ))
-            * (kernelTipMaterial
-              ? studioDryMediaKernelStrokeToothMultiplier(
-                  kernelTipMaterial,
-                  {
-                    index: composedDab.index ?? 0,
-                    x: composedDab.x,
-                    y: composedDab.y,
-                    ...(composedDab.distanceFromStrokeStart !== undefined
-                      ? {
-                          distanceFromStrokeStart:
-                            composedDab.distanceFromStrokeStart,
-                        }
-                      : {}),
-                  },
-                  strokeOriginX,
-                  strokeOriginY,
-                  dynamicSeed,
-                )
-              : 1),
-          kernelTipMaterial ? STUDIO_KERNEL_TIP_MIN_VISIBLE_ALPHA : 0,
+            * strokeToothMultiplier,
+          kernelTipMaterial
+            ? STUDIO_KERNEL_TIP_MIN_VISIBLE_ALPHA * Math.max(
+                strokeToothMultiplier,
+                1 - (composedDab.distanceFromStrokeStart ?? 0)
+                  / STUDIO_KERNEL_TIP_TAP_FLOOR_REACH_PX,
+              )
+            : 0,
         ),
       );
       const texturedMark: StudioDynamicBrushCoverageMark = {
