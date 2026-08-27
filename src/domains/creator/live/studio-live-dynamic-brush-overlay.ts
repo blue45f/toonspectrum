@@ -1390,8 +1390,27 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     const released = Math.min(requested, this.settled.length);
     if (released === 0) return 0;
     this.settled = this.settled.slice(released);
+    this.recordReleaseDebug("release-prefix", { released, remaining: this.settled.length });
     this.replay();
     return released;
+  }
+
+  /**
+   * 브라우저 감사 진단 브레드크럼: settled 표면을 비운 마지막 주체를 전역에 남긴다. 실패
+   * 프레임에서 "커밋 영수증 릴리스가 이른 것"과 "replay 실패의 조용한 전량 클리어"를 가른다.
+   */
+  private recordReleaseDebug(
+    reason: string,
+    detail?: Record<string, unknown>,
+  ): void {
+    (globalThis as {
+      __studioDynamicReleaseDebug?: Record<string, unknown>;
+    }).__studioDynamicReleaseDebug = {
+      reason,
+      ...(detail ?? {}),
+      settledCount: this.settled.length,
+      at: performance.now(),
+    };
   }
 
   clearSettled(): number {
@@ -2236,7 +2255,11 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   private replay(): void {
     this.clearActiveRect();
     this.clearSettledRect();
-    if (!this.surfaceReady()) return;
+    if (!this.surfaceReady()) {
+      this.recordReleaseDebug("replay-surface-not-ready");
+      return;
+    }
+    let replayIndex = 0;
     for (const stroke of this.settled) {
       const exact = this.exactPlan(stroke.style, stroke.source);
       if (
@@ -2245,11 +2268,18 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         || !this.flattenActiveToSettled(stroke.style.opacity)
       ) {
         this.fallbackReason = "surface-render";
+        // 이 경로는 failActive 를 거치지 않는 조용한 전량 클리어다 — 브레드크럼 없이는
+        // 커밋 영수증 릴리스와 구분되지 않았던 실측 교훈.
+        this.recordReleaseDebug("replay-settled-failed", {
+          failedAtIndex: replayIndex,
+          exactPlanned: Boolean(exact),
+        });
         this.clearActiveRect();
         this.clearSettledRect();
         return;
       }
       this.clearActiveRect();
+      replayIndex += 1;
     }
     const active = this.active;
     if (!active) return;
@@ -2440,6 +2470,19 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     }
     const width = Math.max(1, Math.round(surface.width * this.dpr));
     const height = Math.max(1, Math.round(surface.height * this.dpr));
+    if (
+      (activeCanvas.width !== width || activeCanvas.height !== height)
+      && (this.active !== null || this.settled.length > 0)
+    ) {
+      // 치수 변경은 세 백킹 비트맵을 조용히 지운다 — setSurface 의 replay 가 복구를 맡지만,
+      // 실패 프레임에서 지워진 시점을 확정할 수 있게 남긴다.
+      this.recordReleaseDebug("surface-resize-wipe", {
+        fromWidth: activeCanvas.width,
+        fromHeight: activeCanvas.height,
+        toWidth: width,
+        toHeight: height,
+      });
+    }
     if (activeCanvas.width !== width) activeCanvas.width = width;
     if (activeCanvas.height !== height) activeCanvas.height = height;
     if (presentationCanvas.width !== width) presentationCanvas.width = width;

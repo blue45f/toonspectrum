@@ -1913,6 +1913,12 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           }).__studioDynamicSealDebug ?? null,
         );
         log(`release diagnostic seal state for ${preset.id}: ${JSON.stringify(sealDebug)}`);
+        const releaseDebug = await page.evaluate(() =>
+          (globalThis as {
+            __studioDynamicReleaseDebug?: Record<string, unknown> | null;
+          }).__studioDynamicReleaseDebug ?? null,
+        );
+        log(`release diagnostic settled-clear state for ${preset.id}: ${JSON.stringify(releaseDebug)}`);
         // 어느 표면이 획을 들고 있(었)는지 확정하기 위해 캔버스별 메타데이터와 잉크 픽셀 수를
         // 함께 기록한다(index 만으로는 커서 캔버스와 오버레이가 구분되지 않았던 실측 교훈).
         const canvasInkCensus = await page.evaluate(() =>
@@ -1964,6 +1970,13 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
             );
           }
         }
+        // 릴리스-경합(늦게 나타남)과 불가시 커밋(끝내 안 나타남)을 가르는 최종 판별:
+        // 실패 프레임에서 600ms 더 기다린 뒤 같은 클립을 다시 비교한다.
+        await page.waitForTimeout(600);
+        const late = await page.screenshot({ animations: "disabled", clip: usedClip });
+        const lateDiff = await compareScreenshotPixels(page, before, late);
+        log(`release diagnostic late(+600ms) diff for ${preset.id}: ${JSON.stringify(lateDiff)}`);
+        writeFileSync(join(SCRATCH, `release-diag-${preset.id}-late.png`), late);
       }
       invariant(
         hasMeaningfulPixelChange(immediateDiff),
