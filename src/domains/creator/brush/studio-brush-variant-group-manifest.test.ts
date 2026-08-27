@@ -207,6 +207,18 @@ describe("studio brush variant group manifest", () => {
     // released stroke drops another 40% of ink with a 12.3px centroid drift — a strict-continuous
     // policy failure — while a fast short stroke measured changedPixels 1/4392 (invisible). All
     // five material children stay listed as in-group alternatives. 238 -> 237 listed.
+    //
+    // 2026-08-27 charcoal--vine-soft quarantined (second receipt-regeneration audit): the same
+    // defect class as the dry-media umbrella. The stored-replay authority resolver pins engine-
+    // lane ids to the kernel only by EXACT match, so this lane's identity resolved null and it
+    // stayed on the generic textured pipeline. Measured with the offline planner on the audit's
+    // own 9px fast-short-stroke: ink energy 1.1 vs charcoal's 37 (30x lighter), peak mark alpha
+    // 0.066–0.075 — straddling the visibility threshold (16/255 ≈ 0.063), which made the
+    // production-browser fast-short-stroke gate fail probabilistically (5 reproduced failures;
+    // the seal breadcrumb measured a 1px ink census on the full-alpha active surface at seal).
+    // A 66px stroke is uniformly 5.5x lighter (peak 0.277). Remapping onto the kernel would
+    // re-render persisted vine-soft strokes 30x denser, so exposure-only quarantine applies;
+    // charcoal · chalk · pastel stay listed as in-group alternatives. 237 -> 236 listed.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -302,6 +314,7 @@ describe("studio brush variant group manifest", () => {
         "watercolor-flat-wash",
         "foliage-broad-canopy",
         "dry-media",
+        "charcoal--vine-soft",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);

@@ -479,6 +479,24 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
       "커널 리워크가 재질 자식들만 커널 경로로 옮기고 우산 id 는 제네릭 파이프라인에 남아 실측 "
       + "잉크 에너지가 crayon 의 1/18 인 유령선을 그립니다(릴리스 centroid 12.3px 드리프트 포함) — "
       + "crayon · chalk · charcoal · pastel · oil-pastel 이 그룹 내 대안(지침 6).",
+
+    // ── 2026-08-27 영수증 재생성 감사 2: 엔진 레인 id 의 커널 미주행 ────────────────
+    // dry-media 우산과 같은 결함 클래스입니다. resolveStudioDryMediaAnisotropicPresetIdV1 은
+    // 저장-재생 권위 계약상 엔진 레인 id 를 EXACT 매칭으로만 커널에 물리므로,
+    // charcoal--vine-soft 는 정체성 null 로 제네릭 텍스처 파이프라인에 남았습니다. 실측
+    // (오프라인 플래너 프로브, 동일 입력): 9px 탭에서 잉크 에너지 1.1 vs charcoal 37(1/30),
+    // 피크 마크 알파 0.066–0.075 — 가시성 임계(16/255≈0.063) 바로 위·아래를 시드에 따라
+    // 오가는 값이라 프로덕션 브라우저 감사의 빠른 단획 게이트가 확률적으로 실패합니다
+    // (5회 재현, seal 브레드크럼 실측: 풀 알파 active 표면 검열 1px). 66px 장획도 에너지
+    // 1/5.5(피크 0.277)의 균일 결핍입니다. 커널 재질로 재매핑하면 저장된 vine-soft 획이
+    // 30배 진하게 재생되어 저장-재생 계약을 깨므로, 우산 id 와 동일하게 노출만 격리합니다.
+    // 복귀 경로: vine-soft 만의 실재 커널 재질(부드러운 vine 목탄 베이크)이 생겨 신규 획만
+    // 그 경로를 타게 될 때입니다. 저장된 문서는 계속 원래 파이프라인으로 바이트 동일 재생됩니다.
+    "charcoal--vine-soft":
+      "커널 리워크에서 엔진 레인 id 가 제네릭 파이프라인에 남아 9px 탭의 잉크 에너지가 "
+      + "charcoal 의 1/30, 피크 알파 0.066–0.075 로 가시성 임계(≈0.063)에 걸친 유령선을 "
+      + "그립니다(프로덕션 브라우저 감사 빠른 단획 게이트 확률적 실패 5회 실측) — "
+      + "charcoal · chalk · pastel 이 그룹 내 대안(지침 6).",
   });
 
 /** Frozen quarantine set consumed by the catalogue listing filter and the lifecycle resolver. */
