@@ -168,11 +168,7 @@ import type {
   StudioAdvancedFillTapGesture,
 } from "./studio-advanced-fill-tap";
 import {
-  createStudioAdvancedRulerOfType,
-  normalizeStudioAdvancedRulerDocument,
-  STUDIO_ADVANCED_RULER_NAME_PREFIXES,
   type StudioAdvancedRuler,
-  type StudioAdvancedRulerDocument,
 } from "./studio-advanced-ruler-document";
 import type {
   StudioAdvancedRulerSnapState,
@@ -416,6 +412,13 @@ import {
   type DodgeBurnSpongeMode,
 } from "./studio-dodge-burn";
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
+import { alignStudioSelection, type StudioAlignMode } from "./studio-cuttoon-editor/studio-align-selected";
+import { createStudioDrawingAssistHandlers } from "./studio-drawing-assist-handlers";
+import {
+  markAllStudioTeamCommentThreadsRead,
+  markStudioTeamCommentThreadRead,
+  type StudioTeamCommentReadMarkingDeps,
+} from "./studio-team-comment-read-marking";
 import {
   areStudioDrawingAssistDocumentsEqual,
   normalizeStudioDrawingAssistDocument,
@@ -598,9 +601,7 @@ import {
 } from "./studio-inspector-layout";
 import { resolveStudioInteractiveThreeDSurfaceAdmission } from "./studio-interactive-3d-surface";
 import {
-  clampIsometricAngleDeg,
   clampIsometricCellSize,
-  defaultIsometricOrigin,
   type IsometricAxisRay,
 } from "./studio-isometric-grid";
 import type {
@@ -1039,12 +1040,7 @@ import {
 } from "./studio-pending-stroke-durability";
 import {
   addVanishingPoint,
-  alignVanishingPointsToEyeLevel,
-  defaultPerspectiveEyeLevelY,
   defaultVanishingPointPosition,
-  movePerspectiveEyeLevel,
-  moveVanishingPointWithEyeLevel,
-  removeVanishingPoint,
   type PerspectiveRay,
   type VanishingPoint,
 } from "./studio-perspective-guide";
@@ -1218,8 +1214,6 @@ import {
 } from "./studio-scroll-viewport-store";
 import {
   clampCanvasPlacementCenter,
-  computeAlignDeltas,
-  computeDistributeDeltas,
   unionBounds,
   viewportSpawnCenter,
 } from "./studio-selection";
@@ -1333,7 +1327,6 @@ import {
 } from "./brush/studio-stroke-surface-route";
 import {
   mergeStudioTeamCommentMutationReceipt,
-  mergeStudioTeamCommentReadReceipt,
 } from "./studio-team-comment-frontier";
 import { StudioTeamCommentOperationScopeRegistry } from "./studio-team-comment-operation-scope";
 import {
@@ -1713,26 +1706,6 @@ import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
 
 export { StudioCuttoonEditor };
-
-/**
- * handleSave가 페이지마다 스테이지를 재캡처하는 무거운 경로라 손을 놓은 지 한참 지난 뒤에만
- * 조용히 돈다 — 로컬 임시저장(1.5초 디바운스)보다 훨씬 길게 잡아 타이핑·드로잉 중 서버 왕복이
- * 겹치지 않게 한다.
- */
-// 캔버스와 도구 패널 사이의 드래그 스플리터(데스크톱). 너비를 끌어서 조절, 더블클릭=기본값, ←/→=미세조절.
-
-
-// 스튜디오 전용 구글폰트 8종(글꼴 패널·말풍선 프리셋용) — 전 페이지 렌더 차단 경로(index.html)에는
-// 전역 폰트 Space Grotesk 만 남기고, 이 8종은 스튜디오 마운트 시에만 주입한다.
-// Nanum Myeongjo(브랜드킷 "명조")도 여기 속한다. index.html 에 있을 땐 전 라우트가 184블록
-// 25,604 B(gzip)를 렌더 차단 경로에서 받았는데, 정작 그 글꼴이 필요한 건 캔버스에서 명조를 고른
-// 스튜디오 사용자뿐이다. 나머지 BRAND_KIT_FONTS 와 같은 <link> 에 둬야 아래 idle 프리로드 타이밍과
-// document.fonts "loadingdone" 재도색 보정이 8종에 똑같이 걸린다(Konva 캔버스 텍스트는 DOM 과 달리
-// 폰트 스왑을 스스로 감지하지 못한다). 웹 크롬 쪽 소비자는 src/app/serif-webfont.ts 가 담당한다.
-//
-// 2026-08: 그 8종을 담은 단일 상수(`STUDIO_FONTS_CSS2_URL`)는 `studio-preset-font-loading.ts`
-// 의 `STUDIO_PRESET_FONT_SPECS` 표로 옮겼다. 마운트 시 무조건 8종을 붙이던 것을 "문서가 쓰는
-// 글꼴은 즉시 · 나머지는 프리셋 목록을 처음 열 때" 두 갈래로 나누기 위해서다.
 
 function StudioCuttoonEditor({
   remixId,
@@ -15202,126 +15175,25 @@ function StudioCuttoonEditor({
     return true;
   }
 
+  function studioTeamCommentReadMarkingDeps(): StudioTeamCommentReadMarkingDeps {
+    return {
+      scopeRef: studioTeamCommentsScopeRef,
+      generationRef: studioTeamCommentsLoadGenerationRef,
+      unreadThreadIdsRef: studioTeamUnreadCommentIdsRef,
+      readFlights: studioTeamCommentReadFlightRef.current,
+      operationRegistry: studioTeamCommentOperationScopeRegistryRef.current,
+      activitySequence: studioTeamCommentActivitySequenceRef.current,
+      readSequence: studioTeamCommentReadSequenceRef.current,
+      currentOperationContext: currentStudioTeamCommentOperationContext,
+      setUnreadThreadIds: setStudioTeamUnreadCommentIds,
+      setSyncError: setStudioCommentSyncError,
+    };
+  }
   async function markStudioCommentThreadRead(threadId: string): Promise<boolean> {
-    const workIdValue = studioTeamCommentsScopeRef.current;
-    if (!workIdValue || !studioTeamUnreadCommentIdsRef.current.includes(threadId)) return true;
-    const generation = studioTeamCommentsLoadGenerationRef.current;
-    const flightKey = `${workIdValue}:thread:${threadId}`;
-    const existingFlight = studioTeamCommentReadFlightRef.current.get(flightKey);
-    if (existingFlight) return existingFlight;
-
-    const pending = (async (): Promise<boolean> => {
-      const registry = studioTeamCommentOperationScopeRegistryRef.current;
-      const ticket = registry.begin(workIdValue, generation);
-      let admitted = false;
-      try {
-        const commentClient = await loadStudioTeamCommentClient();
-        if (!registry.isCurrent(ticket, currentStudioTeamCommentOperationContext())) {
-          registry.invalidate(ticket);
-          return false;
-        }
-        const response = await commentClient.markStudioTeamCommentRead(
-          workIdValue,
-          threadId,
-          ticket.signal
-        );
-        admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-        registry.finish(ticket);
-        if (!admitted) return false;
-        const receipt = mergeStudioTeamCommentReadReceipt(
-          studioTeamCommentActivitySequenceRef.current,
-          studioTeamCommentReadSequenceRef.current,
-          threadId,
-          BigInt(response.lastReadActivitySequence)
-        );
-        if (receipt.fullyRead) {
-          setStudioTeamUnreadCommentIds((current) => current.filter(
-            (candidate) => candidate !== threadId
-          ));
-        }
-        setStudioCommentSyncError(null);
-        return true;
-      } catch (cause) {
-        const shouldReport = admitted
-          || registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-        registry.invalidate(ticket);
-        if (!shouldReport) return false;
-        const message = cause instanceof Error ? cause.message : "댓글을 읽음 처리하지 못했어요.";
-        setStudioCommentSyncError(message);
-        throw new Error(message, { cause });
-      }
-    })();
-    studioTeamCommentReadFlightRef.current.set(flightKey, pending);
-    try {
-      return await pending;
-    } finally {
-      if (studioTeamCommentReadFlightRef.current.get(flightKey) === pending) {
-        studioTeamCommentReadFlightRef.current.delete(flightKey);
-      }
-    }
+    return markStudioTeamCommentThreadRead(studioTeamCommentReadMarkingDeps(), threadId);
   }
   async function markAllStudioCommentThreadsRead(): Promise<boolean> {
-    const workIdValue = studioTeamCommentsScopeRef.current;
-    if (!workIdValue || studioTeamUnreadCommentIdsRef.current.length === 0) return true;
-    const generation = studioTeamCommentsLoadGenerationRef.current;
-    const flightKey = `${workIdValue}:all`;
-    const existingFlight = studioTeamCommentReadFlightRef.current.get(flightKey);
-    if (existingFlight) return existingFlight;
-
-    const pending = (async (): Promise<boolean> => {
-      const registry = studioTeamCommentOperationScopeRegistryRef.current;
-      const ticket = registry.begin(workIdValue, generation);
-      let admitted = false;
-      try {
-        const commentClient = await loadStudioTeamCommentClient();
-        if (!registry.isCurrent(ticket, currentStudioTeamCommentOperationContext())) {
-          registry.invalidate(ticket);
-          return false;
-        }
-        // The bulk endpoint does not return per-thread clocks. Capture only the activity already
-        // visible at request time so concurrent new replies remain unread after this receipt.
-        const requestActivityFrontier = new Map(studioTeamCommentActivitySequenceRef.current);
-        await commentClient.markAllStudioTeamCommentsRead(workIdValue, ticket.signal);
-        admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-        registry.finish(ticket);
-        if (!admitted) return false;
-        for (const [threadId, sequence] of requestActivityFrontier) {
-          mergeStudioTeamCommentReadReceipt(
-            studioTeamCommentActivitySequenceRef.current,
-            studioTeamCommentReadSequenceRef.current,
-            threadId,
-            sequence
-          );
-        }
-        setStudioTeamUnreadCommentIds((current) => current.filter((threadId) => {
-          const requestedSequence = requestActivityFrontier.get(threadId);
-          const currentSequence = studioTeamCommentActivitySequenceRef.current.get(threadId);
-          return requestedSequence === undefined
-            || currentSequence === undefined
-            || currentSequence > requestedSequence;
-        }));
-        setStudioCommentSyncError(null);
-        return true;
-      } catch (cause) {
-        const shouldReport = admitted
-          || registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-        registry.invalidate(ticket);
-        if (!shouldReport) return false;
-        const message = cause instanceof Error
-          ? cause.message
-          : "모든 팀 댓글을 읽음 처리하지 못했어요.";
-        setStudioCommentSyncError(message);
-        throw new Error(message, { cause });
-      }
-    })();
-    studioTeamCommentReadFlightRef.current.set(flightKey, pending);
-    try {
-      return await pending;
-    } finally {
-      if (studioTeamCommentReadFlightRef.current.get(flightKey) === pending) {
-        studioTeamCommentReadFlightRef.current.delete(flightKey);
-      }
-    }
+    return markAllStudioTeamCommentThreadsRead(studioTeamCommentReadMarkingDeps());
   }
   const openStudioCommentCount = studioCommentViewDocument.threads
     .filter((thread) => !thread.resolved).length;
@@ -18473,304 +18345,37 @@ const puppetWarpArmed =
     return committed;
   }
 
-  function setPerspectiveRulerActive(
-    action: boolean | ((current: boolean) => boolean)
-  ): void {
-    commitStudioDrawingAssistDocument((current) => {
-      const active = typeof action === "function" ? action(current.perspective.active) : action;
-      let points = current.perspective.points;
-      if (active && points.length === 0) {
-        const position = defaultVanishingPointPosition(points, CANVAS_W, canvasH);
-        const y = current.perspective.lockHorizon
-          && (current.perspective.eyeLevelY ?? defaultPerspectiveEyeLevelY(canvasH)) !== null
-          ? (current.perspective.eyeLevelY ?? defaultPerspectiveEyeLevelY(canvasH))
-          : position.y;
-        points = addVanishingPoint(points, { id: uid(), x: position.x, y });
-      }
-      return {
-        ...current,
-        perspective: { ...current.perspective, active, points },
-        isometric: active ? { ...current.isometric, active: false } : current.isometric,
-        advanced: active
-          ? { ...current.advanced, activeSnapRulerId: null }
-          : current.advanced,
-      };
-    });
-  }
-
-  function setIsometricGridActive(
-    action: boolean | ((current: boolean) => boolean)
-  ): void {
-    commitStudioDrawingAssistDocument((current) => {
-      const active = typeof action === "function" ? action(current.isometric.active) : action;
-      return {
-        ...current,
-        perspective: active ? { ...current.perspective, active: false } : current.perspective,
-        isometric: { ...current.isometric, active },
-        advanced: active
-          ? { ...current.advanced, activeSnapRulerId: null }
-          : current.advanced,
-      };
-    });
-  }
-
-  // 원근자·아이소메트릭 설정은 페이지 문서에 포함되어 저장/undo/협업에서 같은 상태를 본다.
-  function addVanishingPointHandler() {
-    commitStudioDrawingAssistDocument((current) => {
-      const pos = defaultVanishingPointPosition(current.perspective.points, CANVAS_W, canvasH);
-      const eyeLevelY = current.perspective.eyeLevelY
-        ?? (current.perspective.lockHorizon ? defaultPerspectiveEyeLevelY(canvasH) : null);
-      const y = current.perspective.lockHorizon && eyeLevelY !== null ? eyeLevelY : pos.y;
-      return {
-        ...current,
-        perspective: {
-          ...current.perspective,
-          eyeLevelY: current.perspective.lockHorizon
-            ? (eyeLevelY ?? defaultPerspectiveEyeLevelY(canvasH))
-            : current.perspective.eyeLevelY,
-          points: addVanishingPoint(
-            current.perspective.points,
-            { id: uid(), x: pos.x, y }
-          ),
-        },
-      };
-    });
-  }
-  function removeVanishingPointHandler(id: string) {
-    commitStudioDrawingAssistDocument((current) => ({
-      ...current,
-      perspective: {
-        ...current.perspective,
-        points: removeVanishingPoint(current.perspective.points, id),
-      },
-    }));
-  }
-  function moveVanishingPointById(id: string, x: number, y: number) {
-    commitStudioDrawingAssistDocument((current) => ({
-      ...current,
-      perspective: {
-        ...current.perspective,
-        points: moveVanishingPointWithEyeLevel(
-          current.perspective.points,
-          id,
-          x,
-          y,
-          {
-            eyeLevelY: current.perspective.eyeLevelY,
-            lockHorizon: current.perspective.lockHorizon,
-          }
-        ),
-      },
-    }));
-  }
-  function previewVanishingPointById(id: string, x: number, y: number) {
-    previewStudioDrawingAssistDocument((current) => ({
-      ...current,
-      perspective: {
-        ...current.perspective,
-        points: moveVanishingPointWithEyeLevel(
-          current.perspective.points,
-          id,
-          x,
-          y,
-          {
-            eyeLevelY: current.perspective.eyeLevelY,
-            lockHorizon: current.perspective.lockHorizon,
-          }
-        ),
-      },
-    }));
-  }
-  function setPerspectiveEyeLevelY(nextY: number) {
-    commitStudioDrawingAssistDocument((current) => {
-      const previous = current.perspective.eyeLevelY;
-      return {
-        ...current,
-        perspective: {
-          ...current.perspective,
-          eyeLevelY: nextY,
-          points: movePerspectiveEyeLevel(current.perspective.points, previous, nextY),
-        },
-      };
-    });
-  }
-  function previewPerspectiveEyeLevelY(nextY: number) {
-    previewStudioDrawingAssistDocument((current) => {
-      const previous = current.perspective.eyeLevelY;
-      return {
-        ...current,
-        perspective: {
-          ...current.perspective,
-          eyeLevelY: nextY,
-          points: movePerspectiveEyeLevel(current.perspective.points, previous, nextY),
-        },
-      };
-    });
-  }
-  function setPerspectiveLockHorizon(next: boolean) {
-    commitStudioDrawingAssistDocument((current) => {
-      const eyeLevelY = current.perspective.eyeLevelY
-        ?? defaultPerspectiveEyeLevelY(canvasH);
-      return {
-        ...current,
-        perspective: {
-          ...current.perspective,
-          lockHorizon: next,
-          eyeLevelY: next ? eyeLevelY : current.perspective.eyeLevelY,
-          points: next
-            ? alignVanishingPointsToEyeLevel(current.perspective.points, eyeLevelY)
-            : current.perspective.points,
-        },
-      };
-    });
-  }
-  function alignPerspectiveToEyeLevel() {
-    commitStudioDrawingAssistDocument((current) => {
-      const eyeLevelY = current.perspective.eyeLevelY
-        ?? defaultPerspectiveEyeLevelY(canvasH);
-      return {
-        ...current,
-        perspective: {
-          ...current.perspective,
-          eyeLevelY,
-          points: alignVanishingPointsToEyeLevel(current.perspective.points, eyeLevelY),
-        },
-      };
-    });
-  }
-  // 원근자와 동시에 켜지면 펜/직선 스냅이 어느 쪽을 따를지 모호해지므로 상호 배타적으로 만든다
-  // (한쪽을 켜면 다른 쪽을 끈다).
-  function toggleIsometricGridActive() {
-    setIsometricGridActive((active) => !active);
-  }
-  function setIsometricAngleDegClamped(next: number) {
-    commitStudioDrawingAssistDocument((current) => ({
-      ...current,
-      isometric: { ...current.isometric, angleDeg: clampIsometricAngleDeg(next) },
-    }));
-  }
-  function previewIsometricAngleDegClamped(next: number) {
-    previewStudioDrawingAssistDocument((current) => ({
-      ...current,
-      isometric: { ...current.isometric, angleDeg: clampIsometricAngleDeg(next) },
-    }));
-  }
-  function setIsometricCellSizeClamped(next: number) {
-    commitStudioDrawingAssistDocument((current) => ({
-      ...current,
-      isometric: { ...current.isometric, cellSize: clampIsometricCellSize(next) },
-    }));
-  }
-  function previewIsometricCellSizeClamped(next: number) {
-    previewStudioDrawingAssistDocument((current) => ({
-      ...current,
-      isometric: { ...current.isometric, cellSize: clampIsometricCellSize(next) },
-    }));
-  }
-  function previewIsometricOrigin(x: number, y: number) {
-    previewStudioDrawingAssistDocument((current) => ({
-      ...current,
-      isometric: { ...current.isometric, originX: x, originY: y },
-    }));
-  }
-  function commitIsometricOrigin(x: number, y: number) {
-    commitStudioDrawingAssistDocument((current) => ({
-      ...current,
-      isometric: { ...current.isometric, originX: x, originY: y },
-    }));
-  }
-  function cancelStudioDrawingAssistPreview() {
-    setDrawingAssistPreview(null);
-  }
-  function resetIsometricOrigin() {
-    const origin = defaultIsometricOrigin(CANVAS_W, canvasH);
-    commitStudioDrawingAssistDocument((current) => ({
-      ...current,
-      isometric: { ...current.isometric, originX: origin.x, originY: origin.y },
-    }));
-  }
-
-  function updateStudioAdvancedRulers(
-    update: (current: StudioAdvancedRulerDocument) => StudioAdvancedRulerDocument,
-    preview = false
-  ): void {
-    const apply = (current: StudioDrawingAssistDocument): StudioDrawingAssistDocument => ({
-      ...current,
-      advanced: normalizeStudioAdvancedRulerDocument(update(current.advanced)),
-    });
-    if (preview) previewStudioDrawingAssistDocument(apply);
-    else commitStudioDrawingAssistDocument(apply);
-  }
-
-  function addAdvancedRuler(type: StudioAdvancedRuler["type"]): void {
-    const id = uid();
-    commitStudioDrawingAssistDocument((current) => {
-      const rulerNumber = current.advanced.rulers.filter((ruler) => ruler.type === type).length + 1;
-      const ruler: StudioAdvancedRuler = createStudioAdvancedRulerOfType(type, {
-        id,
-        name: `${STUDIO_ADVANCED_RULER_NAME_PREFIXES[type]} ${rulerNumber}`,
-        canvasWidth: CANVAS_W,
-        canvasHeight: canvasH,
-      });
-      return {
-        ...current,
-        perspective: { ...current.perspective, active: false },
-        isometric: { ...current.isometric, active: false },
-        advanced: normalizeStudioAdvancedRulerDocument({
-          ...current.advanced,
-          rulers: [...current.advanced.rulers, ruler],
-          selectedRulerId: id,
-          activeSnapRulerId: id,
-        }),
-      };
-    });
-  }
-
-  function patchAdvancedRuler(id: string, patch: Partial<StudioAdvancedRuler>): void {
-    updateStudioAdvancedRulers((current) => ({
-      ...current,
-      rulers: current.rulers.map((ruler) => ruler.id === id
-        ? ({ ...ruler, ...patch, id: ruler.id, type: ruler.type } as StudioAdvancedRuler)
-        : ruler),
-      activeSnapRulerId: patch.enabled === false && current.activeSnapRulerId === id
-        ? null
-        : current.activeSnapRulerId,
-    }));
-  }
-
-  function previewAdvancedRuler(id: string, patch: Partial<StudioAdvancedRuler>): void {
-    updateStudioAdvancedRulers((current) => ({
-      ...current,
-      rulers: current.rulers.map((ruler) => ruler.id === id
-        ? ({ ...ruler, ...patch, id: ruler.id, type: ruler.type } as StudioAdvancedRuler)
-        : ruler),
-    }), true);
-  }
-
-  function removeAdvancedRuler(id: string): void {
-    updateStudioAdvancedRulers((current) => ({
-      ...current,
-      rulers: current.rulers.filter((ruler) => ruler.id !== id),
-      activeSnapRulerId: current.activeSnapRulerId === id ? null : current.activeSnapRulerId,
-      selectedRulerId: current.selectedRulerId === id ? null : current.selectedRulerId,
-    }));
-  }
-
-  function selectAdvancedRuler(id: string | null): void {
-    updateStudioAdvancedRulers((current) => ({ ...current, selectedRulerId: id }));
-  }
-
-  function setActiveAdvancedRuler(id: string | null): void {
-    commitStudioDrawingAssistDocument((current) => ({
-      ...current,
-      perspective: id ? { ...current.perspective, active: false } : current.perspective,
-      isometric: id ? { ...current.isometric, active: false } : current.isometric,
-      advanced: normalizeStudioAdvancedRulerDocument({
-        ...current.advanced,
-        activeSnapRulerId: id,
-      }),
-    }));
-  }
+  const {
+    setPerspectiveRulerActive,
+    addVanishingPointHandler,
+    removeVanishingPointHandler,
+    moveVanishingPointById,
+    previewVanishingPointById,
+    setPerspectiveEyeLevelY,
+    previewPerspectiveEyeLevelY,
+    setPerspectiveLockHorizon,
+    alignPerspectiveToEyeLevel,
+    toggleIsometricGridActive,
+    setIsometricAngleDegClamped,
+    previewIsometricAngleDegClamped,
+    setIsometricCellSizeClamped,
+    previewIsometricCellSizeClamped,
+    previewIsometricOrigin,
+    commitIsometricOrigin,
+    cancelStudioDrawingAssistPreview,
+    resetIsometricOrigin,
+    addAdvancedRuler,
+    patchAdvancedRuler,
+    previewAdvancedRuler,
+    removeAdvancedRuler,
+    selectAdvancedRuler,
+    setActiveAdvancedRuler,
+  } = createStudioDrawingAssistHandlers({
+    canvasH,
+    commitStudioDrawingAssistDocument,
+    previewStudioDrawingAssistDocument,
+    clearDrawingAssistPreview: () => setDrawingAssistPreview(null),
+  });
 
   async function insertIsometricPrimitive(spec: StudioIsometricPrimitiveSpec): Promise<void> {
     const targetPageId = activePage.id;
@@ -20186,146 +19791,19 @@ const puppetWarpArmed =
   }
   // 들어간 패널 중앙(없으면 캔버스 중앙)으로 가로/세로 정렬.
   // 선택 요소를 들어있는 패널(없으면 캔버스) 기준으로 정렬. 좌·가로중앙·우 / 상·세로중앙·하 / 다중 분배.
-  function alignSelected(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") {
-    const completeGroupId = completeSelectedGroupId();
-    if (completeGroupId && marqueeIds.length > 1) {
-      const selectedIds = new Set(marqueeIds);
-      const selectedEls = elements.filter((element) => selectedIds.has(element.id));
-      if (
-        selectedEls.length !== selectedIds.size ||
-        selectedEls.some((element) => isEffectivelyLocked(element, groups))
-      ) {
-        setError("그룹 전체를 정렬하려면 모든 멤버의 잠금을 먼저 해제하세요.");
-        return;
-      }
-      if (mode === "distributeH" || mode === "distributeV") {
-        setError("그룹 내부 분배는 더블클릭으로 그룹에 들어간 뒤 자식들을 선택해 사용하세요.");
-        return;
-      }
-      const box = unionBounds(selectedEls.map((element) => elBounds(element)));
-      const centerX = box.x + box.w / 2;
-      const centerY = box.y + box.h / 2;
-      const frame = elements.find(
-        (element): element is FrameEl =>
-          element.type === "frame" &&
-          !selectedIds.has(element.id) &&
-          !element.hidden &&
-          centerX >= element.x &&
-          centerX <= element.x + element.width &&
-          centerY >= element.y &&
-          centerY <= element.y + element.height
-      );
-      const originX = frame?.x ?? 0;
-      const originY = frame?.y ?? 0;
-      const areaWidth = frame?.width ?? CANVAS_W;
-      const areaHeight = frame?.height ?? canvasH;
-      let deltaX = 0;
-      let deltaY = 0;
-      if (mode === "left") deltaX = originX - box.x;
-      else if (mode === "right") deltaX = originX + areaWidth - box.w - box.x;
-      else if (mode === "hcenter") deltaX = originX + (areaWidth - box.w) / 2 - box.x;
-      else if (mode === "top") deltaY = originY - box.y;
-      else if (mode === "bottom") deltaY = originY + areaHeight - box.h - box.y;
-      else if (mode === "vcenter") deltaY = originY + (areaHeight - box.h) / 2 - box.y;
-      if (deltaX === 0 && deltaY === 0) return;
-      const next = planAtomicSelectionTranslation({
-        items: elements,
-        selectedIds: marqueeIds,
-        deltaX,
-        deltaY,
-        isLocked: (element) => isEffectivelyLocked(element, groups),
-      });
-      if (next.some((element, index) => element !== elements[index])) commit(next);
-      return;
-    }
-    if (marqueeIds.length > 1) {
-      const selectedEls = elements.filter((el) => marqueeIds.includes(el.id));
-      if (selectedEls.length === 0) return;
-      if (selectedEls.some((element) => isEffectivelyLocked(element, groups))) {
-        setError("잠긴 멤버가 포함된 선택은 일부만 정렬하지 않아요. 잠금을 먼저 해제하세요.");
-        return;
-      }
-      const topLevelGroupIds = new Set(
-        selectedEls
-          .map((element) => element.groupId)
-          .filter(
-            (groupId): groupId is string =>
-              Boolean(groupId) && groupId !== activeGroupIdRef.current
-          )
-      );
-      if (topLevelGroupIds.size > 0) {
-        // 여러 최상위 그룹(또는 그룹+일반 객체)을 자식 배열로 정렬/분배하면 각 그룹
-        // 내부 간격이 파괴된다. aggregate group-unit planner가 도입되기 전까지는
-        // 일부만 움직이는 것보다 명확히 차단하는 편이 데이터 보존에 안전하다.
-        setError(
-          "여러 그룹이 포함된 선택은 그룹 내부 배치를 보호하기 위해 정렬·분배하지 않아요. 그룹별로 선택해 정렬해 주세요."
-        );
-        return;
-      }
-
-      const boundsList = selectedEls.map((el) => ({ el, b: elBounds(el) }));
-
-      if (mode === "distributeH" || mode === "distributeV") {
-        const bounds = boundsList.map(({ b }) => b);
-        const deltas = computeDistributeDeltas(bounds, mode);
-        if (!deltas) return;
-        const deltaById = new Map(selectedEls.map((el, index) => [el.id, deltas[index]!]));
-        const next = elements.map((el) => {
-          if (!marqueeIds.includes(el.id)) return el;
-          const delta = deltaById.get(el.id);
-          if (!delta || (delta.dx === 0 && delta.dy === 0)) return el;
-          return el.type === "draw"
-            ? ({
-                ...el,
-                points: el.points.map((v, i) => v + (i % 2 === 0 ? delta.dx : delta.dy)),
-              } as El)
-            : ({ ...el, x: (el as { x: number }).x + delta.dx, y: (el as { y: number }).y + delta.dy } as El);
-        });
-        commit(next);
-        return;
-      }
-
-      const bounds = boundsList.map(({ b }) => b);
-      const box = unionBounds(bounds);
-      const deltas = computeAlignDeltas(bounds, mode, box);
-      const deltaById = new Map(selectedEls.map((el, index) => [el.id, deltas[index]!]));
-      const next = elements.map((el) => {
-        if (!marqueeIds.includes(el.id)) return el;
-        const delta = deltaById.get(el.id);
-        if (!delta || (delta.dx === 0 && delta.dy === 0)) return el;
-        return el.type === "draw"
-          ? ({
-              ...el,
-              points: el.points.map((v, i) => v + (i % 2 === 0 ? delta.dx : delta.dy)),
-            } as El)
-          : ({ ...el, x: (el as { x: number }).x + delta.dx, y: (el as { y: number }).y + delta.dy } as El);
-      });
-      commit(next);
-      return;
-    }
-
-    if (!selected || isEffectivelyLocked(selected, groups)) return;
-    if (mode === "distributeH" || mode === "distributeV") return;
-    const b = elBounds(selected);
-    const frame = containingPanel(selected, elements);
-    const ox = frame ? frame.x : 0;
-    const ow = frame ? frame.width : CANVAS_W;
-    const oy = frame ? frame.y : 0;
-    const oh = frame ? frame.height : canvasH;
-    let dx = 0;
-    let dy = 0;
-    if (mode === "left") dx = ox - b.x;
-    else if (mode === "right") dx = ox + ow - b.w - b.x;
-    else if (mode === "hcenter") dx = ox + (ow - b.w) / 2 - b.x;
-    else if (mode === "top") dy = oy - b.y;
-    else if (mode === "bottom") dy = oy + oh - b.h - b.y;
-    else if (mode === "vcenter") dy = oy + (oh - b.h) / 2 - b.y;
-    if (dx === 0 && dy === 0) return;
-    if (selected.type === "draw") {
-      patchEl(selected.id, { points: selected.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as Partial<El>);
-    } else {
-      patchEl(selected.id, { x: b.x + dx, y: b.y + dy } as Partial<El>);
-    }
+  function alignSelected(mode: StudioAlignMode) {
+    alignStudioSelection(mode, {
+      elements,
+      marqueeIds,
+      selected,
+      groups,
+      activeGroupIdRef,
+      canvasH,
+      completeSelectedGroupId,
+      commit,
+      patchEl,
+      setError,
+    });
   }
 
   /**

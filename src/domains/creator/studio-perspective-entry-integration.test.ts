@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const page = readFileSync(new URL("./studio-drawing-assist-handlers.ts", import.meta.url), "utf8");
 
 describe("Studio perspective entry integration", () => {
   it("creates a usable default vanishing point when any UI enables an empty perspective ruler", () => {
