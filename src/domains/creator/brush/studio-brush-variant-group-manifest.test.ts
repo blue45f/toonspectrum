@@ -198,6 +198,15 @@ describe("studio brush variant group manifest", () => {
     // width/opacity), the same declaration-vs-reality collapse as gpen--causal-round. The
     // 3a79a43b ledger restructure had accidentally released it to extended, which unmasked the
     // collapse in the catalog contract.
+    //
+    // 2026-08-27 dry-media (the UMBRELLA id) quarantined during receipt regeneration: the T1
+    // de-polygon wave moved its five material children onto the kernel dab path but left the
+    // umbrella preset itself on the generic base pipeline with no kernel pin and no lane
+    // overrides. Measured on the production-browser long-route gate at the same 24px width:
+    // inkEnergy 170 vs crayon's 3044 (18x lighter), mean cross-section 3.1px vs 14.9px, and the
+    // released stroke drops another 40% of ink with a 12.3px centroid drift — a strict-continuous
+    // policy failure — while a fast short stroke measured changedPixels 1/4392 (invisible). All
+    // five material children stay listed as in-group alternatives. 238 -> 237 listed.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -292,6 +301,7 @@ describe("studio brush variant group manifest", () => {
         "angular-square",
         "watercolor-flat-wash",
         "foliage-broad-canopy",
+        "dry-media",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);

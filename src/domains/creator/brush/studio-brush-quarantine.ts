@@ -462,6 +462,23 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     "foliage-broad-canopy":
       "잎송이 알파맵과 팁 레이어를 leaf-cluster 와 공유하고 scatter 0.62/0.39 차이만 남습니다. "
       + "대안: leaf-cluster · long-leaf · leaf-fall-flurry(지침 6).",
+
+    // ── 2026-08-27 영수증 재생성 감사: 우산 id 의 커널 미주행 ─────────────────────
+    // T1 de-polygon 웨이브가 crayon·chalk·charcoal·pastel·oil-pastel 을 커널 dab 경로로 옮길 때
+    // 이 프리셋들이 파생돼 나온 우산 id "dry-media" 자체는 커널 프로그램 핀 없이(레인 변형
+    // 오버라이드도 없이) 제네릭 base 파이프라인에 남았습니다. 실측(같은 24px 장경로, 프로덕션
+    // 브라우저 게이트): inkEnergy 170 vs crayon 3044(18배), 평균 단면 폭 3.1px vs 14.9px —
+    // 사실상 유령선이고, 릴리스 시 잉크 에너지가 40% 더 빠지면서 centroid 가 12.3px 밀려
+    // strict-continuous 품질 게이트(centroid-drift)에 걸립니다. 빠른 단획은 실측 changedPixels
+    // 1/4392 로 아예 보이지 않는 프레임까지 나옵니다. 재질 자식 5종(crayon · chalk · charcoal ·
+    // pastel · oil-pastel)이 모두 노출 상태의 대안입니다(지침 6).
+    // 복귀 경로: 우산 id 를 커널 재질에 명시 핀으로 물리면 material-group 매핑(pastel)과
+    // 바이트 중복이 되므로, 실질적 복귀는 우산 id 만의 실재하는 재질 정체성이 생길 때입니다.
+    // 그때까지 저장된 문서는 계속 원래 파이프라인으로 바이트 동일 재생됩니다.
+    "dry-media":
+      "커널 리워크가 재질 자식들만 커널 경로로 옮기고 우산 id 는 제네릭 파이프라인에 남아 실측 "
+      + "잉크 에너지가 crayon 의 1/18 인 유령선을 그립니다(릴리스 centroid 12.3px 드리프트 포함) — "
+      + "crayon · chalk · charcoal · pastel · oil-pastel 이 그룹 내 대안(지침 6).",
   });
 
 /** Frozen quarantine set consumed by the catalogue listing filter and the lifecycle resolver. */
