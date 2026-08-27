@@ -856,8 +856,17 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
       ? undefined
       : { model: livePaperModel, medium: livePaperMedium },
   );
+  // model/medium 을 함께 옮겨야 커버리지 렌더러의 contact-tooth-v2 분기가 라이브에서도 켜진다.
+  // 빠뜨리면 라이브는 평균 보존 레거시 granulation, 커밋은 tooth 침착으로 그려져 같은 마크가
+  // 화면에서 갈라진다(장경로 실측: charcoal--compressed-edge 라이브/커밋 평균 알파 126/92,
+  // 문서 고정 tooth 필드의 공간 변조가 무게중심을 7~12px 흔드는 centroid-drift 로 나타남).
   const paper = studioPaperGranulationIsActive(paperResponse)
-    ? Object.freeze({ response: paperResponse, surface: resolveStudioDocumentPaperSurface() })
+    ? Object.freeze({
+        response: paperResponse,
+        surface: resolveStudioDocumentPaperSurface(),
+        ...(livePaperModel !== undefined ? { model: livePaperModel } : {}),
+        ...(livePaperMedium !== null ? { medium: livePaperMedium } : {}),
+      })
     : undefined;
   return {
     strokeId: element.id,
