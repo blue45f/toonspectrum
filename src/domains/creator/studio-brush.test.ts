@@ -7,6 +7,7 @@ import {
   STUDIO_BRUSH_OPACITY_CHIPS,
   STUDIO_BRUSH_SIZE_CHIPS,
   buildCalligraphySegments,
+  createStudioIncrementalCalligraphySegmentBuilder,
   gpenSegmentWidths,
   nearestStudioBrushOpacityChip,
   nearestStudioBrushSizeChip,
@@ -531,6 +532,99 @@ describe("buildCalligraphySegments", () => {
     }
     expect(buildCalligraphySegments([], [], [], 10, manualTip)).toEqual([]);
     expect(buildCalligraphySegments([1, 2], [], [], 10, manualTip)).toEqual([]);
+  });
+});
+
+describe("createStudioIncrementalCalligraphySegmentBuilder", () => {
+  const tip = { tiltEnabled: true, angleDeg: 45, roundness: 0.32 };
+  // pointCount - 1 = 16 (2의 거듭제곱)이면 배치 빌더의 (i-0.5)/(n-1)·(n-1) 진행률 왕복이
+  // 부동소수에서도 정확히 i-0.5로 떨어져, 나란한 배열에서 두 빌더가 바이트 동일해진다.
+  const pointCount = 17;
+  const flatPoints = Array.from({ length: pointCount }, (_, index) => [
+    index * 7 + Math.sin(index * 0.8) * 3,
+    40 + Math.cos(index * 0.6) * 11,
+  ]).flat();
+  const pressures = Array.from({ length: pointCount }, (_, index) => 0.2 + (index % 5) / 8);
+  const stylus = Array.from({ length: pointCount }, (_, index) => ({
+    pointerType: "pen" as const,
+    tiltX: 10 + (index % 7) * 4,
+    tiltY: -20 + (index % 5) * 6,
+    twist: (index * 37) % 360,
+  }));
+
+  function makeBuilder() {
+    return createStudioIncrementalCalligraphySegmentBuilder(14, tip);
+  }
+
+  function appendPrefix(
+    builder: ReturnType<typeof makeBuilder>,
+    count: number,
+  ): readonly ReturnType<typeof buildCalligraphySegments>[number][] {
+    return builder.append(
+      flatPoints.slice(0, count * 2),
+      (index) => pressures[index],
+      (index) => stylus[index],
+    );
+  }
+
+  it("matches the batch builder exactly for parallel per-point inputs", () => {
+    const batch = buildCalligraphySegments(flatPoints, pressures, stylus, 14, tip);
+    const whole = appendPrefix(makeBuilder(), pointCount);
+    expect(whole).toEqual(batch);
+
+    // 임의 크기 chunk로 나눠 넣어도 같은 목록이 자라난다 — 이동당 새 점만 소비하는 계약.
+    const chunked = makeBuilder();
+    let consumed = 2;
+    for (const chunk of [1, 3, 5, 2, 4]) {
+      appendPrefix(chunked, consumed);
+      consumed = Math.min(pointCount, consumed + chunk);
+    }
+    expect(appendPrefix(chunked, pointCount)).toEqual(batch);
+  });
+
+  it("rebuilds from scratch when the arrays shrink (seek/undo)", () => {
+    // 줄어든 길이도 (n-1)이 2의 거듭제곱인 9점이어야 배치 비교가 바이트 동일하다(위 주석).
+    const builder = makeBuilder();
+    appendPrefix(builder, pointCount);
+    const shrunk = appendPrefix(builder, 9);
+    expect(shrunk).toEqual(
+      buildCalligraphySegments(
+        flatPoints.slice(0, 18),
+        pressures.slice(0, 9),
+        stylus.slice(0, 9),
+        14,
+        tip,
+      ),
+    );
+    expect(appendPrefix(builder, pointCount)).toEqual(
+      buildCalligraphySegments(flatPoints, pressures, stylus, 14, tip),
+    );
+  });
+
+  it("truncates at the first non-finite coordinate like pairsFromElement", () => {
+    // 유효 점 5개(n-1=4, 2의 거듭제곱) 뒤에 비유한 좌표: 거기서 절단한다.
+    const builder = makeBuilder();
+    const corrupt = [...flatPoints.slice(0, 10), Number.NaN, 12, ...flatPoints.slice(12)];
+    const segments = builder.append(
+      corrupt,
+      (index) => pressures[index],
+      (index) => stylus[index],
+    );
+    expect(segments).toEqual(
+      buildCalligraphySegments(
+        flatPoints.slice(0, 10),
+        pressures.slice(0, 5),
+        stylus.slice(0, 5),
+        14,
+        tip,
+      ),
+    );
+    // 절단 뒤에도 같은 자리에서 다시 멈춘다(이동마다 O(1) 재검증).
+    expect(builder.append(
+      corrupt,
+      (index) => pressures[index],
+      (index) => stylus[index],
+    )).toHaveLength(4);
   });
 });
 

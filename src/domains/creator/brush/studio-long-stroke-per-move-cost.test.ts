@@ -83,8 +83,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
-  buildCalligraphySegments,
-  processFreehandPoints,
+  createStudioIncrementalCalligraphySegmentBuilder,
   resolveStudioBrushRenderFamily,
   resolveStudioFreehandRenderPath,
   screentoneDotsForStroke,
@@ -98,7 +97,10 @@ import {
   type StudioCausalDynamicBrushDepositStateV3,
   type StudioCausalDynamicBrushSampleV2,
 } from "../studio-causal-dynamic-brush-deposit-v2";
-import { planStudioCausalInk } from "../studio-causal-ink";
+import {
+  planStudioCausalInkDabs,
+  shouldAppendStudioCausalInkSample,
+} from "../studio-causal-ink";
 import { planStudioDynamicBrushCoverageMarks } from "../studio-dynamic-brush-coverage-renderer";
 import { planStudioDynamicBrushRender } from "../studio-dynamic-brush-render-plan";
 import {
@@ -125,9 +127,10 @@ import {
   loadStudioPerfectFreehandStroker,
   type StudioPerfectFreehandStroker,
 } from "../studio-perfect-freehand";
-import { planStudioRetainedMediaPressureCurve } from "../studio-retained-media-pressure";
+import { createStudioIncrementalRetainedMediaCurveBuilder } from "../studio-retained-media-pressure";
 import { planStudioRetainedMediaRibbon } from "../studio-retained-media-ribbon";
 
+import { mapStudioBrushAliasPressure } from "./studio-brush-alias-profile";
 import {
   resolveStudioCapturedBrushDynamicsPresetId,
   studioDynamicBrushDepositPipelineUsesContinuation,
@@ -142,6 +145,7 @@ import {
   resolveStudioStampBrushKind,
   resolveStudioStampBrushStyle,
 } from "./studio-brush-stamp-engine";
+import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import { studioFluidPaintStationSpacingRatio } from "./studio-fluid-paint-reference";
 import {
@@ -565,17 +569,72 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
   {
     id: "causal-ink",
     brushId: "gpen--causal-round",
-    path: "whole-prefix-replan",
-    entry: "planStudioCausalInk",
-    makeStroke: () =>
-      wholePrefixStepper((stroke) =>
-        planStudioCausalInk({
-          points: stroke.points,
-          pressures: stroke.pressures,
-          minDistance: 1,
-          size: 8,
-        }).dabs.length,
-      ),
+    path: "live-incremental",
+    entry: "StudioLiveInkOverlay.appendPoint -> planStudioCausalInkDabs(two-sample suffix)",
+    makeStroke: () => {
+      // `StudioLiveInkOverlay`'s exact per-move calls with the canvas removed: `appendPoint`
+      // passes each raw point through the same min-distance admission gate, and
+      // `drawLatestPiece` then plans only the TWO-sample suffix and paints `dabs.slice(1)` —
+      // the previous endpoint is already on the canvas. The whole-prefix `planStudioCausalInk`
+      // this probe used to time is the commit/SVG-export chain, a cost no pointer move pays
+      // (the header's own "both mistakes were made" note, caught late for this lane).
+      let keptX: number[] = [];
+      let keptY: number[] = [];
+      let keptP: number[] = [];
+      let consumed = 0;
+      let totalDabs = 0;
+      const appendThrough = (stroke: StrokePrefix, target: number): void => {
+        for (; consumed < target; consumed += 1) {
+          const x = stroke.points[consumed * 2]!;
+          const y = stroke.points[consumed * 2 + 1]!;
+          const pressure = stroke.pressures[consumed]!;
+          if (keptX.length === 0) {
+            keptX.push(x);
+            keptY.push(y);
+            keptP.push(pressure);
+            continue;
+          }
+          const n = keptX.length;
+          if (
+            !shouldAppendStudioCausalInkSample({
+              lastX: keptX[n - 1]!,
+              lastY: keptY[n - 1]!,
+              lastPressure: keptP[n - 1]!,
+              nextX: x,
+              nextY: y,
+              nextPressure: pressure,
+              minDistance: 1,
+            })
+          ) continue;
+          keptX.push(x);
+          keptY.push(y);
+          keptP.push(pressure);
+          totalDabs += planStudioCausalInkDabs({
+            samples: [
+              { x: keptX[n - 1]!, y: keptY[n - 1]!, pressure: keptP[n - 1]!, sourceIndex: n - 1 },
+              { x, y, pressure, sourceIndex: n },
+            ],
+            size: 8,
+          }).dabs.length - 1;
+        }
+      };
+      return {
+        seek(stroke) {
+          if (stroke.pointCount < consumed) {
+            keptX = [];
+            keptY = [];
+            keptP = [];
+            consumed = 0;
+            totalDabs = 0;
+          }
+          appendThrough(stroke, stroke.pointCount);
+        },
+        move(stroke) {
+          appendThrough(stroke, stroke.pointCount);
+          return totalDabs;
+        },
+      };
+    },
   },
 
   // ── outline engines ─────────────────────────────────────────────────────────────────────────
@@ -678,17 +737,38 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
   {
     id: "pencil-path",
     brushId: "pencil--side-shade",
-    path: "whole-prefix-replan",
-    entry: "planStudioRetainedMediaPressureCurve -> planStudioRetainedMediaRibbon",
-    makeStroke: () =>
-      wholePrefixStepper((stroke) => {
-        const curve = planStudioRetainedMediaPressureCurve(
-          freehandPath(stroke),
-          stroke.pressures,
-          "pencil",
+    path: "live-incremental",
+    entry: "createStudioIncrementalRetainedMediaCurveBuilder.append(suffix)"
+      + " -> planStudioRetainedMediaRibbon(suffix)",
+    makeStroke: () => {
+      // `paintPencilSuffix`'s exact per-move calls with the canvas removed: the incremental
+      // curve builder consumes only the unseen point suffix (the previous final segment is
+      // demoted in place), and the ribbon is planned for the painted-boundary suffix alone.
+      // The whole-prefix curve+ribbon this probe used to time is the commit/repaint chain.
+      // The builder rebuilds when the arrays shrink, which lets `seek` restore pre-move state.
+      const builder = createStudioIncrementalRetainedMediaCurveBuilder("pencil", null);
+      let paintedSourceSegments = 0;
+      let paintedCells = 0;
+      const paint = (stroke: StrokePrefix): number => {
+        if (Math.floor(stroke.points.length / 2) < paintedSourceSegments) paintedCells = 0;
+        const curve = builder.append(stroke.points, stroke.pressures);
+        const startSegment = paintedSourceSegments === 0
+          ? 0
+          : Math.max(0, paintedSourceSegments - 1);
+        const ribbon = planStudioRetainedMediaRibbon(
+          startSegment === 0
+            ? curve
+            : { ...curve, segments: curve.segments.slice(startSegment) },
+          10,
         );
-        return planStudioRetainedMediaRibbon(curve, 10).cellCount;
-      }),
+        paintedSourceSegments = curve.segments.length;
+        // Cumulative: the growth check needs an output that scales with the whole stroke, not
+        // with the constant-size suffix.
+        paintedCells += ribbon.cellCount;
+        return paintedCells;
+      };
+      return { seek: paint, move: paint };
+    },
   },
 
   // ── screentone ──────────────────────────────────────────────────────────────────────────────
@@ -727,14 +807,38 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
   {
     id: "family:calligraphy",
     brushId: "calligraphy",
-    path: "whole-prefix-replan",
-    entry: "processFreehandPoints -> buildCalligraphySegments -> planStudioCalligraphyRibbon",
-    makeStroke: () =>
-      wholePrefixStepper((stroke) => {
-        const smoothed = processFreehandPoints(stroke.points, 1.2);
-        const segments = buildCalligraphySegments(smoothed, stroke.pressures, null, 14, null);
-        return planStudioCalligraphyRibbon(segments).runs.length;
-      }),
+    path: "live-incremental",
+    entry: "createStudioIncrementalCalligraphySegmentBuilder.append(suffix)"
+      + " -> planStudioCalligraphyRibbon(suffix)",
+    makeStroke: () => {
+      // `paintCalligraphySuffix`'s exact per-move calls with the canvas removed: the incremental
+      // builder consumes only the unseen point suffix, with pressure/stylus arriving as parallel
+      // per-index accessors that are only called for new indices — exactly the overlay's own
+      // call shape. The builder rebuilds from scratch when the arrays shrink, which is what lets
+      // `seek` restore the pre-move state on the same stepper.
+      const tip = resolveStudioCalligraphyRenderTip("calligraphy", undefined);
+      const builder = createStudioIncrementalCalligraphySegmentBuilder(14, tip ?? null);
+      let paintedSourceSegments = 0;
+      const paint = (stroke: StrokePrefix): number => {
+        const segments = builder.append(
+          stroke.points,
+          (index) => mapStudioBrushAliasPressure("calligraphy", stroke.pressures[index], 0.5),
+          (index) => ({
+            pointerType: "pen" as const,
+            tiltX: stroke.tiltXs[index],
+            tiltY: stroke.tiltYs[index],
+            twist: stroke.twists[index],
+          }),
+        );
+        const start = paintedSourceSegments === 0
+          ? 0
+          : Math.max(0, paintedSourceSegments - 1);
+        const ribbon = planStudioCalligraphyRibbon(segments.slice(start));
+        paintedSourceSegments = segments.length;
+        return ribbon.runs.length;
+      };
+      return { seek: paint, move: paint };
+    },
   },
   fxPressurePathProbe("family:neon", "neon", "neon"),
   fxPressurePathProbe("family:glow", "glow", "glow"),

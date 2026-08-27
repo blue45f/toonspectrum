@@ -7,7 +7,7 @@
  */
 
 import {
-  mapStudioBrushAliasPressureSamples,
+  mapStudioBrushAliasPressure,
   studioBrushAliasEffectiveDiameter,
 } from "../brush/studio-brush-alias-profile";
 import { resolveStudioCalligraphyRenderTip } from "../brush/studio-calligraphy-nib-profile";
@@ -21,10 +21,11 @@ import {
   type StudioOilRibbonPaintContext,
 } from "../brush/studio-oil-ribbon-carrier";
 import {
-  buildCalligraphySegments,
+  createStudioIncrementalCalligraphySegmentBuilder,
   resolveStudioBrushRenderFamily,
   resolveStudioFreehandRenderPath,
   strokeRenderDistance,
+  type StudioIncrementalCalligraphySegmentBuilder,
 } from "../studio-brush";
 import {
   FX_OIL_DAB_CAP,
@@ -50,9 +51,10 @@ import {
 } from "../studio-low-latency-canvas";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
 import {
-  planStudioRetainedMediaPressureCurve,
+  createStudioIncrementalRetainedMediaCurveBuilder,
   planStudioRetainedMediaTapDab,
   resolveStudioRetainedMediaPressureProfileId,
+  type StudioIncrementalRetainedMediaCurveBuilder,
 } from "../studio-retained-media-pressure";
 import { planStudioRetainedMediaRibbon } from "../studio-retained-media-ribbon";
 
@@ -218,6 +220,14 @@ interface ActiveRetainedStroke {
   oilDabPoints?: readonly { x: number; y: number }[];
   oilDabPointsElementPointsLength?: number;
   oilDabPointsPressuresLength?: number;
+  /**
+   * Per-stroke incremental calligraphy segment state. Created lazily on the first multi-point
+   * paint; settled replays build a throwaway `ActiveRetainedStroke`, so each replay starts its
+   * own builder and pays one full O(n) build instead of per-move ones.
+   */
+  calligraphySegments?: StudioIncrementalCalligraphySegmentBuilder;
+  /** Per-stroke incremental pencil pressure-curve state — same lifecycle as `calligraphySegments`. */
+  pencilCurve?: StudioIncrementalRetainedMediaCurveBuilder;
 }
 
 export class StudioLiveRetainedMediaOverlayRenderer {
@@ -489,17 +499,24 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     const context = this.prepared(target);
     if (!context) return false;
     try {
-      const pairs = pairsFromElement(element);
-      if (pairs.length === 0) return true;
+      const rawPointCount = Math.floor(element.points.length / 2);
+      if (rawPointCount === 0) return true;
+      if (finiteCoordinate(element.points[0]) === null || finiteCoordinate(element.points[1]) === null) {
+        return true;
+      }
       const brush = element.brush ?? "pencil";
       const width = studioBrushAliasEffectiveDiameter(brush, Math.max(1, element.strokeWidth));
       const profile = resolveStudioRetainedMediaPressureProfileId(brush) ?? "pencil";
-      const tap = planStudioRetainedMediaTapDab(
-        flatPairs(pairs),
-        element.pressures,
-        profile,
-        { minimumDiameterRatio: element.materialMinimumDiameterRatio },
-      );
+      // 이동한 획은 다시 탭이 될 수 없으므로(점은 append 전용), 선분을 이미 칠했다면 탭
+      // 판정의 전점 스캔 O(n)을 건너뛴다 — 판정 결과는 그 경우 항상 null이다.
+      const tap = active.paintedSourceSegments === 0
+        ? planStudioRetainedMediaTapDab(
+            flatFinitePoints(element),
+            element.pressures,
+            profile,
+            { minimumDiameterRatio: element.materialMinimumDiameterRatio },
+          )
+        : null;
       if (tap && active.paintedSourceSegments === 0 && active.paintedPencilMarks === 0) {
         const scale = this.surface?.documentScale ?? 1;
         const radius = studioLiveVisibleTapDocumentRadius(
@@ -520,18 +537,29 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         return true;
       }
       if (tap) return true;
-      const curve = planStudioRetainedMediaPressureCurve(
-        flatPairs(pairs),
+      // 증분 곡선 빌더 + suffix 리본: 매 이동 전체 곡선·리본을 다시 세우던 O(n)/이동을 새 점
+      // 수에만 비례하게 만든다. 리본은 이미 칠한 선분 경계부터의 suffix만 계획한다 — 아래
+      // 셀 필터·start 캡 스킵과 같은 경계 규약이라 칠해지는 픽셀은 종전과 같다.
+      const pencilCurve = active.pencilCurve
+        ??= createStudioIncrementalRetainedMediaCurveBuilder(
+          profile,
+          { minimumDiameterRatio: element.materialMinimumDiameterRatio },
+        );
+      const curve = pencilCurve.append(
+        element.points,
         element.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
           ? element.pressures
           : undefined,
-        profile,
-        { minimumDiameterRatio: element.materialMinimumDiameterRatio },
       );
-      const ribbon = planStudioRetainedMediaRibbon(curve, Math.max(0.5, width));
       const startSegment = active.paintedSourceSegments === 0
         ? 0
         : Math.max(0, active.paintedSourceSegments - 1);
+      const ribbon = planStudioRetainedMediaRibbon(
+        startSegment === 0
+          ? curve
+          : { ...curve, segments: curve.segments.slice(startSegment) },
+        Math.max(0.5, width),
+      );
       const paintMark = (
         points: readonly number[],
         opacityScale: number,
@@ -571,11 +599,14 @@ export class StudioLiveRetainedMediaOverlayRenderer {
           paintMark(cap.points, cap.opacityScale, cap.flowScale, inherited);
         }
       }
-      if (pairs.length >= 2) {
+      // 원시 꼬리 폴리라인: 검증된 점 개수는 곡선 빌더가 이미 알고 있으므로(sourcePointCount)
+      // 점 배열을 다시 스캔하지 않고 suffix 인덱스만 직접 읽는다.
+      const validPointCount = curve.sourcePointCount;
+      if (validPointCount >= 2) {
         const from = active.paintedSourceSegments === 0
           ? 0
-          : Math.min(active.paintedSourceSegments, pairs.length - 1);
-        if (from < pairs.length - 1 || from === 0) {
+          : Math.min(active.paintedSourceSegments, validPointCount - 1);
+        if (from < validPointCount - 1 || from === 0) {
           const liveWidth = 2 * studioLiveVisibleTapDocumentRadius(
             Math.max(0.35, width / 2),
             this.surface?.documentScale ?? 1,
@@ -583,9 +614,9 @@ export class StudioLiveRetainedMediaOverlayRenderer {
           context.globalAlpha = inherited * Math.min(1, element.opacity ?? 1);
           context.lineWidth = liveWidth;
           context.beginPath();
-          context.moveTo(pairs[from]!.x, pairs[from]!.y);
-          for (let index = from + 1; index < pairs.length; index += 1) {
-            context.lineTo(pairs[index]!.x, pairs[index]!.y);
+          context.moveTo(element.points[from * 2]!, element.points[from * 2 + 1]!);
+          for (let index = from + 1; index < validPointCount; index += 1) {
+            context.lineTo(element.points[index * 2]!, element.points[index * 2 + 1]!);
           }
           context.stroke();
         }
@@ -606,11 +637,14 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     const context = this.prepared(target);
     if (!context) return false;
     try {
-      const pairs = pairsFromElement(element);
-      if (pairs.length === 0) return true;
+      const rawPointCount = Math.floor(element.points.length / 2);
+      if (rawPointCount === 0) return true;
+      const firstX = finiteCoordinate(element.points[0]);
+      const firstY = finiteCoordinate(element.points[1]);
+      if (firstX === null || firstY === null) return true;
       const brush = element.brush ?? "calligraphy";
       const width = studioBrushAliasEffectiveDiameter(brush, Math.max(1, element.strokeWidth));
-      if (pairs.length === 1) {
+      if (rawPointCount === 1) {
         if (active.paintedSourceSegments > 0 || active.paintedPencilMarks > 0) return true;
         const radius = studioLiveVisibleTapDocumentRadius(
           Math.max(0.5, width * 0.18),
@@ -619,29 +653,31 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         context.fillStyle = element.stroke;
         context.globalAlpha = Math.min(1, element.opacity ?? 1);
         context.beginPath();
-        context.arc(pairs[0]!.x, pairs[0]!.y, radius, 0, Math.PI * 2);
+        context.arc(firstX, firstY, radius, 0, Math.PI * 2);
         context.fill();
         active.paintedPencilMarks = 1;
         active.paintedSourceSegments = 1;
         return true;
       }
-      const stylus = pairs.map((_, index) => ({
-        pointerType: "pen" as const,
-        tiltX: element.tiltXs?.[index],
-        tiltY: element.tiltYs?.[index],
-        twist: element.twists?.[index],
-      }));
-      const segments = buildCalligraphySegments(
-        flatPairs(pairs),
-        mapStudioBrushAliasPressureSamples(
-          brush,
-          element.pressures,
-          pairs.length,
-          0.5,
-        ),
-        stylus,
-        width,
-        resolveStudioCalligraphyRenderTip(brush, element.brushTip),
+      // 증분 빌더: 이동마다 전체 스트로크의 선분을 다시 세우던 O(n)/이동을 새 점 수에만
+      // 비례하게 만든다. 필압·스타일러스는 나란한 인덱스별 접근자로 넘겨 배열 재구성
+      // O(n)도 제거한다(빌더는 새 인덱스에서만 호출한다). 아래 suffix 리본과 짝을 이뤄
+      // 이동당 비용이 스트로크 길이와 무관해진다.
+      const builder = active.calligraphySegments
+        ??= createStudioIncrementalCalligraphySegmentBuilder(
+          width,
+          resolveStudioCalligraphyRenderTip(brush, element.brushTip),
+        );
+      const { pressures, tiltXs, tiltYs, twists } = element;
+      const segments = builder.append(
+        element.points,
+        (index) => mapStudioBrushAliasPressure(brush, pressures?.[index], 0.5),
+        (index) => ({
+          pointerType: "pen" as const,
+          tiltX: tiltXs?.[index],
+          tiltY: tiltYs?.[index],
+          twist: twists?.[index],
+        }),
       );
       const start = active.paintedSourceSegments === 0
         ? 0
