@@ -535,16 +535,11 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
       + "재현의 기존 결함으로, 긴 획이 사실상 그려지지 않습니다 — soft-brush · airbrush · "
       + "soft-glow 가 그룹 내 대안(지침 6).",
 
-    // ── 2026-08-27 영수증 재생성 감사 5: 커밋이 리본 몸통을 잃는 웹 캘리그래피 ────────────
-    // 장경로 6구간 중 양끝 캡만 남고(190,0,0,0,0,197) 중간 4구간이 완전 소실됩니다.
-    // live/released 에너지 비 0.035·마스크 차이 97.4% — 라이브 리본은 온전한데 커밋이
-    // 몸통을 그리지 않습니다. origin/main 워크트리에서 바이트 동일 재현(이 PR 의
-    // 캘리그래피 분리와 무관한 기존 결함). 복귀 경로: 커밋 리본 캐리어가 몸통 구간을
-    // 실제로 그리게 될 때. 저장된 문서는 계속 원래 파이프라인으로 바이트 동일 재생됩니다.
-    "web-calligraphy-ribbon":
-      "장경로 획의 커밋이 양끝 캡만 남기고 리본 몸통(6구간 중 4구간)을 그리지 않습니다 — "
-      + "live/released 에너지 비 0.035, origin/main 동일 재현의 기존 결함 — calligraphy · "
-      + "parallel-pen · brush-pen 이 그룹 내 대안(지침 6).",
+    // ── 2026-08-27 web-calligraphy-ribbon: 같은 날 격리 후 같은 날 복귀(DELISTED) ─────────
+    // 격리 사유였던 "커밋이 리본 몸통을 잃음(양끝 캡만)"은 web-drawing 키트 브리지의 희소
+    // 경로 미보간이 원인으로 확정되어 densifySparseWebDrawingPathGaps 로 수리되었습니다
+    // (studio-web-drawing-stroke-bridge.ts — 커밋·SVG·라이브가 공유하는 단일 보간 권위).
+    // 수리 후 장경로 6/6 재검증을 거쳐 여기서 delist 합니다.
   });
 
 /** Frozen quarantine set consumed by the catalogue listing filter and the lifecycle resolver. */

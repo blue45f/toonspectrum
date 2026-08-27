@@ -241,13 +241,11 @@ describe("studio brush variant group manifest", () => {
     // deterministically breaking the gate's user contract that a long stroke stays on screen.
     // soft-brush - airbrush - soft-glow stay listed as in-group alternatives. 234 -> 233 listed.
     //
-    // 2026-08-27 web-calligraphy-ribbon quarantined (fifth receipt-regeneration audit): the
-    // committed long stroke keeps only the two endpoint caps (2/6; 190,0,0,0,0,197) while the
-    // live ribbon is complete (live/released energy ratio 0.035, mask difference 97.4%).
-    // Reproduced byte-identically on an origin/main worktree, so it is a pre-existing defect -
-    // notably NOT a regression from this PR's calligraphy segment-builder extraction.
-    // calligraphy - parallel-pen - brush-pen stay listed as in-group alternatives.
-    // 233 -> 232 listed.
+    // 2026-08-27 web-calligraphy-ribbon: quarantined for a bodyless committed long stroke
+    // (2/6; endpoint caps only, reproduced on origin/main), then DELISTED the same day once the
+    // root cause - the web-drawing kit bridge placing samples only ON sparse path points - was
+    // fixed by gap densification in studio-web-drawing-stroke-bridge.ts and the 6/6 long-route
+    // gate re-verified. 233 listed again after the round trip.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -347,7 +345,6 @@ describe("studio brush variant group manifest", () => {
         "oil-pastel--wgm-mix",
         "mypaint-cc0--watercolor-fringe",
         "web-soft-cloud",
-        "web-calligraphy-ribbon",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);

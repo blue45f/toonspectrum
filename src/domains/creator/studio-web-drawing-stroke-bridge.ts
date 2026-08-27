@@ -115,7 +115,12 @@ export function auditStudioWebDrawingBridgePlan(
   input: StudioWebDrawingBridgeInput,
 ): StudioWebDrawingBridgePlanAudit {
   const family = classifyStudioWebDrawingBrushFamily(input.brushId);
-  const path = pathFromFlat(input.points, input.pressures);
+  // The audit mirrors the planner's path exactly, sparse-gap densification included, so its
+  // sample/dab arithmetic never drifts from what planStudioWebDrawingDynamicDabs emits.
+  const path = densifySparseWebDrawingPathGaps(
+    pathFromFlat(input.points, input.pressures),
+    clamp(finite(input.baseWidth, 8), 0.5, 256),
+  );
   const maxDabs = Math.max(
     1,
     Math.min(65_536, Math.round(finite(input.maxDabs, 8_192))),
@@ -211,6 +216,52 @@ function pathFromFlat(
   return out;
 }
 
+/**
+ * Inserts linearly interpolated route points into sparse gaps, keeping every original point
+ * byte-identical. Kit family planners place samples ON path points, so this is the single
+ * interpolation authority the committed Konva plan, SVG export and live overlay all inherit
+ * through {@link planStudioWebDrawingDynamicDabs}. The step must stay well under the narrowest
+ * stamp footprint: chisel nibs (web-calligraphy-ribbon) are only `minRoundness × size ≈ 0.18 ×
+ * baseWidth` wide along the stroke, so a half-width step leaves separated stamps that the
+ * long-route quality gate flags as repeated-pattern / edge-periodicity (실측 0.649 / 0.721).
+ */
+function densifySparseWebDrawingPathGaps(
+  path: readonly { x: number; y: number; pressure: number }[],
+  baseWidth: number,
+): readonly { x: number; y: number; pressure: number }[] {
+  if (path.length < 2) return path;
+  const gapThreshold = clamp(baseWidth * 0.1, 1, 3);
+  let needsDensify = false;
+  for (let i = 1; i < path.length; i++) {
+    const prev = path[i - 1]!;
+    const next = path[i]!;
+    if (Math.hypot(next.x - prev.x, next.y - prev.y) > gapThreshold) {
+      needsDensify = true;
+      break;
+    }
+  }
+  if (!needsDensify) return path;
+  const out: { x: number; y: number; pressure: number }[] = [path[0]!];
+  for (let i = 1; i < path.length; i++) {
+    const prev = path[i - 1]!;
+    const next = path[i]!;
+    const gap = Math.hypot(next.x - prev.x, next.y - prev.y);
+    if (gap > gapThreshold) {
+      const steps = Math.min(512, Math.ceil(gap / gapThreshold));
+      for (let step = 1; step < steps; step++) {
+        const amount = step / steps;
+        out.push({
+          x: prev.x + (next.x - prev.x) * amount,
+          y: prev.y + (next.y - prev.y) * amount,
+          pressure: prev.pressure + (next.pressure - prev.pressure) * amount,
+        });
+      }
+    }
+    out.push(next);
+  }
+  return out;
+}
+
 function planSamples(
   brushId: string,
   path: readonly { x: number; y: number; pressure: number }[],
@@ -265,10 +316,17 @@ export function planStudioWebDrawingDynamicDabs(
   settings: NormalizedStudioBrushDynamicsSettings,
 ): StudioDynamicBrushDab[] | null {
   if (!isStudioWebDrawingBrushId(input.brushId)) return null;
-  const path = pathFromFlat(input.points, input.pressures);
-  if (path.length === 0) return [];
+  const sparsePath = pathFromFlat(input.points, input.pressures);
+  if (sparsePath.length === 0) return [];
 
   const baseWidth = clamp(finite(input.baseWidth, settings.width.base), 0.5, 256);
+  // 렌더러는 자기 경로를 스스로 보간해야 한다(장경로 감사 계약): 빠른 스와이프가 포인터
+  // 샘플을 391px 한 번의 점프로 전달하면, 키트 패밀리 플래너는 경로 점 위에만 샘플을 놓으므로
+  // 양끝 캡만 그려지고 몸통이 사라진다(실측: web-rainbow-flow · web-calligraphy-ribbon,
+  // origin/main 동일). 임계(브러시 폭 절반)를 넘는 갭에만 보간점을 삽입한다 — 사람 손의 정상
+  // 밀도 획은 경로가 바이트 그대로라 저장 문서의 재생이 변하지 않고, 오늘 끊겨 그려지던
+  // 희소 획만 몸통을 되찾는다.
+  const path = densifySparseWebDrawingPathGaps(sparsePath, baseWidth);
   const baseOpacity = clamp(finite(input.baseOpacity, settings.opacity.base), 0.02, 1);
   const maxDabs = Math.max(
     1,

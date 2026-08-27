@@ -3187,6 +3187,28 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         routeSegmentXRange,
       );
       if (coverage.visibleSegments !== 6) {
+        // 장경로 실패에서도 커밋 분기/렌더 결과 브레드크럼을 읽는다 — "양끝 캡만 남는" 패턴이
+        // 커밋 타일 합성의 부분 실패인지 플랜 자체의 공백인지 가른다.
+        const longCommitDebug = await page.evaluate(() => ({
+          route: (globalThis as { __studioCommitRouteDebug?: unknown }).__studioCommitRouteDebug ?? null,
+          render: (globalThis as { __studioCommitRenderDebug?: unknown }).__studioCommitRenderDebug ?? null,
+        }));
+        log(`${preset.id}: long commit breadcrumbs ${JSON.stringify(longCommitDebug)}`);
+        try {
+          await page.waitForTimeout(2_500);
+          const persisted = await persistedDrawElements(page);
+          const lastDraw = persisted.at(-1) as
+            | { points?: readonly number[]; pressures?: readonly number[] }
+            | undefined;
+          log(
+            `${preset.id}: long persisted element points=${(lastDraw?.points?.length ?? 0) / 2} `
+              + `pressures=${lastDraw?.pressures?.length ?? 0} `
+              + `head=${JSON.stringify((lastDraw?.points ?? []).slice(0, 8))} `
+              + `tail=${JSON.stringify((lastDraw?.points ?? []).slice(-4))}`,
+          );
+        } catch (cause) {
+          log(`${preset.id}: long persisted element read failed ${String(cause)}`);
+        }
         writeFileSync(join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-before.png`), before);
         writeFileSync(
           join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-immediate.png`),
