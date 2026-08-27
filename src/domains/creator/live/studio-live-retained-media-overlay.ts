@@ -20,6 +20,7 @@ import {
   studioOilRibbonProgramsForBrush,
   type StudioOilRibbonPaintContext,
 } from "../brush/studio-oil-ribbon-carrier";
+import { isStudioBoundedFlowPaintModelCompatible } from "../brush/studio-stroke-paint-model";
 import {
   createStudioIncrementalCalligraphySegmentBuilder,
   resolveStudioBrushRenderFamily,
@@ -85,6 +86,12 @@ export function studioLiveRetainedMediaOverlaySupportsElement(
   if (element.mode === "eraser") return true;
   if ((element.mode ?? "pen") !== "pen") return false;
   if (element.fill !== undefined && element.fill !== null) return false;
+  // bounded-flow-v2 다이내믹 획은 다이내믹 오버레이가 커밋과 동일한 dab 플랜으로 그린다.
+  // 이 오버레이가 패밀리만 보고 가로채면 라이브가 일반 캐리어(균일 실선)로 그려져 커밋과
+  // 갈라진다 — 장경로 실측: erodible-pencil energy 0.35 붕괴 + 79px 라이브 전용 시작원,
+  // oil--knife-edge 1307px 라이브 전용 시작원. 입장 체인에서 이 판정이 다이내믹보다 먼저
+  // 평가되므로 여기서 명시적으로 양보해야 한다.
+  if (isStudioBoundedFlowPaintModelCompatible(element)) return false;
   const family = resolveStudioBrushRenderFamily(element.brush ?? "pen");
   return family === "oil"
     || family === "pencil"
