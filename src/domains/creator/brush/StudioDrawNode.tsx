@@ -409,13 +409,17 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
   // 브라우저 감사 진단(플래그 게이트): 커밋 렌더가 분기하기 전의 요소 라우팅 사실을 남긴다 —
   // "라이브는 dynamic 커버리지, 커밋은 알 수 없는 분기"였던 실측 모순의 최종 판별점.
-  if (
-    !activeDraft
-    && kind === "freehand"
-    && el.mode !== "eraser"
-    && (globalThis as { __studioDynamicSealDebugEnabled?: boolean })
-      .__studioDynamicSealDebugEnabled === true
-  ) {
+  // 렌더 본문 부수효과는 react-compiler 계약 위반이라 커밋 후 이펙트에서 기록한다.
+  useEffect(() => {
+    if (
+      activeDraft
+      || kind !== "freehand"
+      || el.mode === "eraser"
+      || (globalThis as { __studioDynamicSealDebugEnabled?: boolean })
+        .__studioDynamicSealDebugEnabled !== true
+    ) {
+      return;
+    }
     (globalThis as {
       __studioCommitRouteDebug?: Record<string, unknown>;
     }).__studioCommitRouteDebug = {
@@ -433,9 +437,17 @@ export const StudioDrawNode = memo(function StudioDrawNode({
       pointCount: Math.floor(el.points.length / 2),
       stampBrushKind,
       perfectProfile: perfectProfile !== null,
-      at: performance.now(),
     };
-  }
+  }, [
+    activeDraft,
+    dynamicBrushId,
+    dynamicBrushPlanResult,
+    dynamicCoverageMarkPlan,
+    el,
+    kind,
+    perfectProfile,
+    stampBrushKind,
+  ]);
 
   return (
     <Group

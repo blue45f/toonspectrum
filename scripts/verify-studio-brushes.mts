@@ -1937,7 +1937,11 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           const persisted = await persistedDrawElements(page);
           const lastDraw = persisted.at(-1) as Record<string, unknown> | undefined;
           if (lastDraw) {
-            const { brushDynamics, brushEnginePrograms, ...channels } = lastDraw;
+            const {
+              brushDynamics,
+              brushEnginePrograms: _brushEnginePrograms,
+              ...channels
+            } = lastDraw;
             log(
               `release diagnostic persisted element for ${preset.id}: `
                 + `${JSON.stringify({ ...channels, hasDynamics: Boolean(brushDynamics) })}`,
