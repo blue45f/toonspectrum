@@ -1236,8 +1236,29 @@ export class StudioLiveDynamicBrushOverlayRenderer {
    * handoff. Same-length post-correction still rebuilds below.
    */
   end(element: DrawEl): StudioLiveDynamicBrushEndResult {
+    const sealDebugMarkCount = this.active?.markCount ?? -1;
     const appended = this.appendFrom(element);
-    if (appended.status === "fallback") return appended;
+    // 브라우저 감사 진단: 실패 프레임에서 "오버레이가 몇 개의 마크를 칠했다고 믿는지"가
+    // 앱 내 계획/예산 문제와 렌더러 드로잉 드롭아웃을 가른다. 성공/실패 공통으로 남긴다.
+    const recordSealDebug = (status: string): void => {
+      (globalThis as {
+        __studioDynamicSealDebug?: {
+          status: string;
+          markCountBefore: number;
+          markCountAfter: number;
+          at: number;
+        };
+      }).__studioDynamicSealDebug = {
+        status,
+        markCountBefore: sealDebugMarkCount,
+        markCountAfter: this.active?.markCount ?? -1,
+        at: performance.now(),
+      };
+    };
+    if (appended.status === "fallback") {
+      recordSealDebug(`append-fallback:${appended.reason}`);
+      return appended;
+    }
     const active = this.active;
     if (!active) return { status: "fallback", reason: "surface-unavailable" };
     if (!this.surfaceReady()) {
@@ -1251,6 +1272,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       active.style.dynamics.fallbackPressure,
     );
     if (sourceMatches && (active.causalState || active.markCount > 0)) {
+      recordSealDebug("seal-direct");
       if (!this.flattenActiveToSettled(active.style.opacity)) {
         return this.failActive("surface-render");
       }
@@ -1290,6 +1312,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     active.stampGrid = exact.stampGrid;
     if (!this.drawMarksToActive(exact.marks)) return this.failActive("surface-render");
     active.markCount = exact.marks.length;
+    recordSealDebug("seal-exact-rebuild");
     active.r8AlphaMapBytes = exact.r8AlphaMapBytes;
     if (!this.flattenActiveToSettled(active.style.opacity)) {
       return this.failActive("surface-render");

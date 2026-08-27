@@ -1903,6 +1903,12 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           }).__studioDynamicOverlayDebug ?? null,
         );
         log(`release diagnostic overlay state for ${preset.id}: ${JSON.stringify(overlayDebug)}`);
+        const sealDebug = await page.evaluate(() =>
+          (globalThis as {
+            __studioDynamicSealDebug?: Record<string, unknown> | null;
+          }).__studioDynamicSealDebug ?? null,
+        );
+        log(`release diagnostic seal state for ${preset.id}: ${JSON.stringify(sealDebug)}`);
         // 어느 표면이 획을 들고 있(었)는지 확정하기 위해 캔버스별 메타데이터와 잉크 픽셀 수를
         // 함께 기록한다(index 만으로는 커서 캔버스와 오버레이가 구분되지 않았던 실측 교훈).
         const canvasInkCensus = await page.evaluate(() =>
