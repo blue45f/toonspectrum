@@ -413,6 +413,7 @@ import {
 } from "./studio-dodge-burn";
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
 import { alignStudioSelection, type StudioAlignMode } from "./studio-cuttoon-editor/studio-align-selected";
+import { createStudioAutoActionsController } from "./studio-auto-actions-controller";
 import { createStudioDrawingAssistHandlers } from "./studio-drawing-assist-handlers";
 import { useStudioRafPreview } from "./studio-raf-preview";
 import {
@@ -1112,7 +1113,6 @@ import {
   normalizeStudioPublishPackageSettings,
   planStudioPublishCanvasSlices,
   planStudioPublishPackage,
-  sanitizeStudioPublishFileStem,
   type StudioPublishPackagePlan,
   type StudioPublishPackageSettings,
 } from "./studio-publish-package";
@@ -4311,7 +4311,8 @@ function StudioCuttoonEditor({
     setAutoActionProgress(null);
   }, [autoActionScope, autoActionSet, pages]);
   useEffect(() => {
-    return () => autoActionAbortRef.current?.abort();
+    const abortRef = autoActionAbortRef;
+    return () => abortRef.current?.abort();
   }, []);
   // 작업공간은 원고 내용과 분리된 계정/브라우저별 UI 상태다. 첫 페인트는 안전한 기본값으로
   // 시작하고, owner-scoped SQLite/OPFS snapshot을 비동기로 hydration한다. 그 사이의 UI 편집은
@@ -29296,149 +29297,38 @@ function clearSelectionForEdit() {
     });
   }
 
-  async function openAutoActions() {
-    setAutoActionsOpen(true);
-    setAutoActionError(null);
-    setAutoActionStatus(null);
-    if (autoActionSet) return;
-    try {
-      const { createDefaultStudioAutoActionSet } = await import("./studio-auto-actions");
-      setAutoActionSet(createDefaultStudioAutoActionSet());
-    } catch (cause) {
-      setAutoActionError(cause instanceof Error ? cause.message : "기본 Auto Action을 불러오지 못했어요.");
-    }
-  }
-
-  function changeAutoActionScope(scope: StudioAutoActionScope) {
-    setAutoActionError(null);
-    setAutoActionStatus(null);
-    setAutoActionScope(scope);
-  }
-
-  function changeAutoActionSelectedPages(pageIds: readonly string[]) {
-    const available = new Set(pages.map((page) => page.id));
-    const next = [...new Set(pageIds)].filter((id) => available.has(id));
-    if (next.length === 0) return;
-    setAutoActionSelectedPageIds(next);
-    if (autoActionScope.kind === "selected-pages") {
-      setAutoActionScope({ kind: "selected-pages", pageIds: next });
-    }
-    setAutoActionError(null);
-    setAutoActionStatus(null);
-  }
-
-  async function importAutoActionJson(json: string, fileName: string) {
-    setAutoActionError(null);
-    setAutoActionStatus(null);
-    try {
-      const { importStudioAutoActionSetJson } = await import("./studio-auto-actions");
-      const imported = importStudioAutoActionSetJson(json);
-      setAutoActionSet(imported);
-      setAutoActionStatus(`${fileName.replace(/[\\/:*?"<>|]+/g, "-").slice(0, 80) || "Action Set"} 검증 완료`);
-    } catch (cause) {
-      setAutoActionError(cause instanceof Error ? cause.message : "Action Set을 가져오지 못했어요.");
-    }
-  }
-
-  async function exportAutoActionJson() {
-    if (!autoActionSet) return;
-    setAutoActionError(null);
-    try {
-      const [{ exportStudioAutoActionSetJson }, { downloadBlob }] = await Promise.all([
-        import("./studio-auto-actions"),
-        import("./export/studio-export"),
-      ]);
-      const fileStem = sanitizeStudioPublishFileStem(autoActionSet.name, { fallback: "auto-action" }).slice(0, 80);
-      downloadBlob(
-        new Blob([exportStudioAutoActionSetJson(autoActionSet)], { type: "application/json" }),
-        `${fileStem}.toonaction.json`
-      );
-    } catch (cause) {
-      setAutoActionError(cause instanceof Error ? cause.message : "Action Set을 내보내지 못했어요.");
-    }
-  }
-
-  async function planAutoAction() {
-    if (!autoActionSet || autoActionBusy) return;
-    setAutoActionError(null);
-    setAutoActionStatus(null);
-    try {
-      const { planStudioAutoActionExecution } = await import("./studio-auto-actions");
-      setAutoActionPlan(
-        planStudioAutoActionExecution({
-          actionSet: autoActionSet,
-          pages,
-          scope: autoActionScope,
-          currentPageId,
-        })
-      );
-    } catch (cause) {
-      setAutoActionPlan(null);
-      setAutoActionError(cause instanceof Error ? cause.message : "Auto Action 영향을 계산하지 못했어요.");
-    }
-  }
-
-  async function executeAutoAction() {
-    if (
-      !autoActionSet ||
-      !autoActionPlan ||
-      autoActionPlan.failures.length > 0 ||
-      autoActionPlan.mutationCount === 0 ||
-      autoActionBusy
-    ) {
-      return;
-    }
-    const checkpointName = `Auto Actions 이전 · ${autoActionSet.name}`;
-    if (!saveNamedCheckpoint(checkpointName)) {
-      setAutoActionError("안전 복구 지점을 만들지 못해 실행을 중단했어요.");
-      return;
-    }
-    const mutationTicket = captureStudioMutationTicket();
-    const controller = new AbortController();
-    autoActionAbortRef.current = controller;
-    setAutoActionBusy(true);
-    setAutoActionError(null);
-    setAutoActionStatus(null);
-    setAutoActionProgress(null);
-    try {
-      const { executeStudioAutoAction } = await import("./studio-auto-actions");
-      if (!canApplyStudioMutation(mutationTicket)) return;
-      const result = await executeStudioAutoAction({
-        actionSet: autoActionSet,
-        pages,
-        scope: autoActionScope,
-        currentPageId,
-        signal: controller.signal,
-        onProgress: setAutoActionProgress,
-      });
-      if (!canApplyStudioMutation(mutationTicket)) return;
-      if (result.status === "cancelled") return;
-      if (!result.committed || result.failures.length > 0) {
-        setAutoActionError("일부 페이지를 안전하게 변환하지 못해 원문을 유지했어요.");
-        return;
-      }
-      if (!commitPages([...result.pages])) {
-        setAutoActionError("검토 잠긴 페이지가 포함되어 적용하지 않았어요.");
-        return;
-      }
-      setAutoActionPlan(null);
-      setAutoActionStatus(
-        `${result.plan.affectedPageIds.length}페이지 · ${result.plan.affectedElementCount}요소를 실행취소 한 단계로 적용했어요.`
-      );
-      setError(null);
-    } catch (cause) {
-      if (controller.signal.aborted) return;
-      setAutoActionError(cause instanceof Error ? cause.message : "Auto Action 실행에 실패했어요.");
-    } finally {
-      if (autoActionAbortRef.current === controller) autoActionAbortRef.current = null;
-      setAutoActionBusy(false);
-      setAutoActionProgress(null);
-    }
-  }
-
-  function cancelAutoAction() {
-    autoActionAbortRef.current?.abort();
-  }
+  const {
+    openAutoActions,
+    changeAutoActionScope,
+    changeAutoActionSelectedPages,
+    importAutoActionJson,
+    exportAutoActionJson,
+    planAutoAction,
+    executeAutoAction,
+    cancelAutoAction,
+  } = createStudioAutoActionsController({
+    autoActionSet,
+    autoActionScope,
+    autoActionPlan,
+    autoActionBusy,
+    pages,
+    currentPageId,
+    autoActionAbortRef,
+    setAutoActionsOpen,
+    setAutoActionError,
+    setAutoActionStatus,
+    setAutoActionSet,
+    setAutoActionScope,
+    setAutoActionSelectedPageIds,
+    setAutoActionPlan,
+    setAutoActionBusy,
+    setAutoActionProgress,
+    saveNamedCheckpoint,
+    captureStudioMutationTicket,
+    canApplyStudioMutation,
+    commitPages,
+    setError,
+  });
 
   // 스튜디오 프로젝트 내보내기 (.json). 새 파일은 버전·문서 식별자·revision을 명시한
   // canonical envelope이고, 불러오기는 과거 raw v1/v2 JSON도 계속 지원한다.
