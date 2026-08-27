@@ -1903,6 +1903,36 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           }).__studioDynamicOverlayDebug ?? null,
         );
         log(`release diagnostic overlay state for ${preset.id}: ${JSON.stringify(overlayDebug)}`);
+        // 어느 표면이 획을 들고 있(었)는지 확정하기 위해 캔버스별 메타데이터와 잉크 픽셀 수를
+        // 함께 기록한다(index 만으로는 커서 캔버스와 오버레이가 구분되지 않았던 실측 교훈).
+        const canvasInkCensus = await page.evaluate(() =>
+          Array.from(document.querySelectorAll("canvas"), (canvas, index) => {
+            let ink = -1;
+            try {
+              const context = canvas.getContext("2d");
+              if (context && canvas.width > 4 && canvas.height > 4) {
+                const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+                ink = 0;
+                for (let offset = 0; offset < data.length; offset += 16) {
+                  if (data[offset + 3]! > 16 && data[offset]! < 200) ink += 1;
+                }
+              }
+            } catch {
+              ink = -2;
+            }
+            return {
+              index,
+              w: canvas.width,
+              h: canvas.height,
+              attrs: Array.from(canvas.attributes)
+                .filter((attribute) => attribute.name.startsWith("data-"))
+                .map((attribute) => `${attribute.name}=${attribute.value.slice(0, 24)}`)
+                .join(" "),
+              ink,
+            };
+          }),
+        );
+        log(`release diagnostic canvas census for ${preset.id}: ${JSON.stringify(canvasInkCensus)}`);
         if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
           const dump = await page.evaluate(() =>
             Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
