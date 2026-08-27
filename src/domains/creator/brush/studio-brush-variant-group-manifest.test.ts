@@ -233,19 +233,14 @@ describe("studio brush variant group manifest", () => {
     // dry-media/vine-soft precedent; oil-pastel · pastel and watercolor · wash-brush stay
     // listed as in-group alternatives. 236 -> 234 listed.
     //
-    // 2026-08-27 web-soft-cloud quarantined (fourth receipt-regeneration audit): its 9px tap is
-    // visible, but the long-route matrix's 520px six-segment stroke leaves 8px@delta6 on screen
-    // in total - only the endpoint dwell segment registers (1/6). Reproduced byte-identically on
-    // an origin/main worktree, so it is a pre-existing defect, not this PR's regression: the
-    // ultra-low-alpha spray's speed-normalized deposition vanishes on any fast long stroke,
-    // deterministically breaking the gate's user contract that a long stroke stays on screen.
-    // soft-brush - airbrush - soft-glow stay listed as in-group alternatives. 234 -> 233 listed.
-    //
-    // 2026-08-27 web-calligraphy-ribbon: quarantined for a bodyless committed long stroke
-    // (2/6; endpoint caps only, reproduced on origin/main), then DELISTED the same day once the
-    // root cause - the web-drawing kit bridge placing samples only ON sparse path points - was
-    // fixed by gap densification in studio-web-drawing-stroke-bridge.ts and the 6/6 long-route
-    // gate re-verified. 233 listed again after the round trip.
+    // 2026-08-27 web-soft-cloud and web-calligraphy-ribbon: both quarantined during the fourth
+    // receipt-regeneration audit for near-invisible committed long strokes (soft-cloud 8px@delta6
+    // total, 1/6 segments; ribbon 2/6 with endpoint caps only - both reproduced on origin/main),
+    // then DELISTED the same day once the shared root cause - the web-drawing kit bridge placing
+    // samples only ON sparse path points, leaving soft-cloud with two particle stations and the
+    // ribbon with two chisel stamps for a 520px route - was fixed by gap densification in
+    // studio-web-drawing-stroke-bridge.ts and each lane re-verified 6/6 on the long-route gate.
+    // 234 listed again after the round trips.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -344,7 +339,6 @@ describe("studio brush variant group manifest", () => {
         "charcoal--vine-soft",
         "oil-pastel--wgm-mix",
         "mypaint-cc0--watercolor-fringe",
-        "web-soft-cloud",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);
