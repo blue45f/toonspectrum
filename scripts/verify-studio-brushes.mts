@@ -576,6 +576,24 @@ function expectedStaticPreviewError(message: string, studioUrl: string): boolean
   }
 }
 
+/**
+ * Third-party webfont/CDN stylesheet hosts whose fetch failures are environment noise, not app
+ * defects: an offline or proxied audit machine cannot reach them, the app's font stacks all carry
+ * real fallbacks, and no brush-geometry or layout gate in this file measures glyph rendering.
+ * Scoped to resource-load console errors on exactly these hosts so a same-origin asset failure —
+ * the thing this collector exists to catch — still fails the audit.
+ */
+const EXTERNAL_FONT_CDN_HOSTS: ReadonlySet<string> = new Set([
+  "fonts.googleapis.com",
+  "fonts.gstatic.com",
+  "cdn.jsdelivr.net",
+]);
+
+function expectedExternalFontCdnError(message: string): boolean {
+  return message.includes("Failed to load resource")
+    && messageUrls(message).some((url) => EXTERNAL_FONT_CDN_HOSTS.has(url.hostname));
+}
+
 function collectBrowserErrors(
   page: Page,
   label: string,
@@ -586,11 +604,16 @@ function collectBrowserErrors(
     if (entry.type() !== "error") return;
     const location = entry.location().url;
     const message = location ? `${entry.text()} @ ${location}` : entry.text();
-    if (!expectedStaticPreviewError(message, studioUrl)) {
+    if (
+      !expectedStaticPreviewError(message, studioUrl)
+      && !expectedExternalFontCdnError(message)
+    ) {
       collector.messages.push(`${label}: ${message}`);
     }
   });
-  page.on("pageerror", (error) => collector.messages.push(`${label}: ${String(error)}`));
+  page.on("pageerror", (error) => collector.messages.push(
+    `${label}: ${error instanceof Error ? error.stack ?? error.message : String(error)}`,
+  ));
   page.on("response", (response) => {
     if (response.status() < 500) return;
     const message = `${response.status()} ${response.url()}`;
@@ -607,6 +630,13 @@ function reportBrowserErrors(collector: BrowserErrorCollector): void {
 }
 
 async function installCleanStudioState(page: Page): Promise<void> {
+  // tsx가 keep-names로 트랜스파일한 함수를 page.evaluate 로 직렬화하면 esbuild 의 `__name`
+  // 헬퍼 호출이 함수 본문에 남는다. 브라우저 컨텍스트에는 그 헬퍼가 없으므로 여기서
+  // 항등 함수로 채운다(문자열 스크립트라 트랜스파일 대상이 아니다). 앱 코드는 번들이
+  // 자체 헬퍼를 인라인하므로 영향이 없다.
+  await page.addInitScript({
+    content: "globalThis.__name ??= (fn) => fn;",
+  });
   await page.addInitScript(
     ({
       autosavePrefix,
@@ -2650,6 +2680,10 @@ function writeLongBrushQualityReport(input: Readonly<{
 
 async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<LongBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  // 아래 진단 스크립트는 이름 있는 함수 표현식을 담고 있어 tsx(keep-names) 직렬화가
+  // esbuild `__name` 헬퍼 호출을 남긴다 — 페이지 수준 폴리필(installCleanStudioState)보다
+  // 컨텍스트 init 스크립트가 먼저 돌므로 여기서도 먼저 채운다.
+  await context.addInitScript({ content: "globalThis.__name ??= (fn) => fn;" });
   // 채널 2 진단: 모든 캔버스 2D 컨텍스트의 setTransform 스케일을 기록해 커밋 렌더가
   // 실제 어떤 물리 배율에서 래스터되는지 덤프와 함께 확인한다.
   await context.addInitScript(() => {
