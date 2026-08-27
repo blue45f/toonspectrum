@@ -232,6 +232,14 @@ describe("studio brush variant group manifest", () => {
     // preview down would still leave the tap invisible. Exposure-only quarantine per the
     // dry-media/vine-soft precedent; oil-pastel · pastel and watercolor · wash-brush stay
     // listed as in-group alternatives. 236 -> 234 listed.
+    //
+    // 2026-08-27 web-soft-cloud quarantined (fourth receipt-regeneration audit): its 9px tap is
+    // visible, but the long-route matrix's 520px six-segment stroke leaves 8px@delta6 on screen
+    // in total - only the endpoint dwell segment registers (1/6). Reproduced byte-identically on
+    // an origin/main worktree, so it is a pre-existing defect, not this PR's regression: the
+    // ultra-low-alpha spray's speed-normalized deposition vanishes on any fast long stroke,
+    // deterministically breaking the gate's user contract that a long stroke stays on screen.
+    // soft-brush - airbrush - soft-glow stay listed as in-group alternatives. 234 -> 233 listed.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -330,6 +338,7 @@ describe("studio brush variant group manifest", () => {
         "charcoal--vine-soft",
         "oil-pastel--wgm-mix",
         "mypaint-cc0--watercolor-fringe",
+        "web-soft-cloud",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);

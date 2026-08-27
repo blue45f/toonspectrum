@@ -522,6 +522,18 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
       "커밋이 수채 스탬프 워시로 렌더되어 9px 탭이 16px@delta3 의 결정적 불가시(신선 세션 "
       + "실측)이고 라이브 스탬프 미리보기는 같은 탭을 134px 로 그려 릴리스 때 증발합니다 — "
       + "watercolor · wash-brush 가 그룹 내 대안(지침 6).",
+
+    // ── 2026-08-27 영수증 재생성 감사 4: 장획이 화면에 남지 않는 소프트 스프레이 ─────────
+    // 탭(9px)은 가시 게이트를 통과하지만, 장경로 매트릭스의 520px 6구간 획이 화면에 총
+    // 8px@delta6 — 종점 dwell 구간 하나만 겨우 보이고 나머지 다섯 구간은 완전 불가시입니다.
+    // origin/main 워크트리에서 바이트 동일 재현(1/6; 0,0,0,0,0,8) — 이 PR 의 회귀가 아닌
+    // 기존 결함입니다. 빠른 장획에서 침착이 속도 정규화로 소멸하는 초저알파 스프레이 특성이
+    // 게이트가 지키는 사용자 계약("긴 획은 화면에 남는다")을 결정적으로 위반하므로 노출만
+    // 격리합니다. 복귀 경로: 속도 하한이 있는 최소 침착이 레인에 들어올 때.
+    "web-soft-cloud":
+      "장경로 520px 획이 화면에 총 8px@delta6(6구간 중 종점 1구간만) — origin/main 동일 "
+      + "재현의 기존 결함으로, 긴 획이 사실상 그려지지 않습니다 — soft-brush · airbrush · "
+      + "soft-glow 가 그룹 내 대안(지침 6).",
   });
 
 /** Frozen quarantine set consumed by the catalogue listing filter and the lifecycle resolver. */
