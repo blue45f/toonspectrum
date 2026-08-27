@@ -2317,6 +2317,7 @@ interface PersistedDrawElement {
   mode: "pen" | "eraser";
   polygonSides: number | null;
   points: number[];
+  pressures: number[];
 }
 
 interface PersistedStudioDocument {
@@ -2394,6 +2395,11 @@ function drawElementsFromPersistedDocument(
       polygonSides,
       points: Array.isArray(record.points)
         ? record.points.filter((value): value is number =>
+            typeof value === "number" && Number.isFinite(value)
+          )
+        : [],
+      pressures: Array.isArray(record.pressures)
+        ? record.pressures.filter((value): value is number =>
             typeof value === "number" && Number.isFinite(value)
           )
         : [],
@@ -3177,6 +3183,30 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           `${preset.id}: quality ${finding.level.toUpperCase()} `
             + `${finding.code} — ${finding.message}`,
         );
+      }
+      if (REQUESTED_BRUSH_VERIFY_IDS.length > 0) {
+        // 집중 진단 모드에서는 성공/실패와 무관하게 지속 요소의 압력 채널을 읽는다 — 라이브
+        // 합성 압력(속도 모델)과 커밋 재생 압력의 괴리(erodible energy-collapse 0.35 실측)를
+        // 요소 데이터에서 직접 가른다.
+        try {
+          const persisted = await persistedDrawElements(page);
+          const lastDraw = persisted.at(-1) as
+            | { points?: readonly number[]; pressures?: readonly number[] }
+            | undefined;
+          const pressures = lastDraw?.pressures ?? [];
+          log(
+            `${preset.id}: long persisted pressures n=${pressures.length} `
+              + `head=${JSON.stringify(pressures.slice(0, 6).map((value) => Number(value.toFixed(3))))} `
+              + `tail=${JSON.stringify(pressures.slice(-4).map((value) => Number(value.toFixed(3))))}`,
+          );
+        } catch (cause) {
+          log(`${preset.id}: long persisted pressures read failed ${String(cause)}`);
+        }
+        const liveOverlayDebug = await page.evaluate(() => ({
+          seal: (globalThis as { __studioDynamicSealDebug?: unknown }).__studioDynamicSealDebug ?? null,
+          release: (globalThis as { __studioDynamicReleaseDebug?: unknown }).__studioDynamicReleaseDebug ?? null,
+        }));
+        log(`${preset.id}: long live-overlay breadcrumbs ${JSON.stringify(liveOverlayDebug).slice(0, 900)}`);
       }
       const coverage = await compareScreenshotCoverage(
         page,
