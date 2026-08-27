@@ -239,18 +239,21 @@ const COMMAND_BAR_HINTS = {
   },
 } satisfies Readonly<Record<string, StudioToolHintSpec>>;
 
-/** User-facing names of the assignable command-bar commands (slot editor + aria labels). */
+/**
+ * User-facing names of the assignable command-bar commands (slot editor + aria labels).
+ * 힌트 제목이 단일 출처다 — 라벨 문자열을 다시 쓰면 툴팁과 aria-label이 서로 어긋난다.
+ */
 const COMMAND_BAR_COMMAND_LABELS: Readonly<Record<StudioCommandBarCommandId, string>> = {
-  undo: "실행취소",
-  redo: "다시실행",
-  save: "임시저장",
-  publish: "게시하기",
-  download: "현재 페이지 다운로드",
-  "export-open": "내보내기 옵션",
-  "zoom-fit": "화면 폭 맞춤",
-  assets: "템플릿·에셋",
-  bubbles: "말풍선",
-  project: "프로젝트 작업",
+  undo: MENUBAR_HINTS.undo.title,
+  redo: MENUBAR_HINTS.redo.title,
+  save: MENUBAR_HINTS.draft.title,
+  publish: MENUBAR_HINTS.publish.title,
+  download: MENUBAR_HINTS.download.title,
+  "export-open": MENUBAR_HINTS.exportOptions.title,
+  "zoom-fit": COMMAND_BAR_HINTS.zoomFit.title,
+  assets: MENUBAR_HINTS.assets.title,
+  bubbles: MENUBAR_HINTS.bubbles.title,
+  project: MENUBAR_HINTS.project.title,
 };
 
 /**

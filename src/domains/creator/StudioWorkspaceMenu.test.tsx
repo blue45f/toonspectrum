@@ -115,7 +115,7 @@ describe("StudioWorkspaceMenu selector and built-in workspaces", () => {
     expect(html).toContain('title="2. 다시 실행"');
     expect(html).toContain('title="3. 펜"');
     expect(html).toContain('title="4. 고급 채우기"');
-    expect(html).toContain('title="5. 말풍선"');
+    expect(html).toContain('title="5. 말풍선 추가"');
     expect(html).toContain('title="6. 폭 맞춤"');
   });
 
