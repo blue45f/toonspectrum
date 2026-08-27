@@ -17,7 +17,6 @@ import {
   Minimize2,
   PanelTop,
   PictureInPicture2,
-  Settings2,
   SlidersHorizontal,
   Square,
 } from "lucide-react";
@@ -169,21 +168,12 @@ export function buildStudioWindowMenuItems({
         ui.openAssetMenu();
       },
     },
-    {
-      id: "ref",
-      commandId: "insert.reference-image",
-      legacyPath: "insert/ref",
-      label: "참고 이미지",
-      icon: PictureInPicture2,
-      onSelect: () => {
-        ui.openReferencePanel();
-      },
-    },
+    // "참고 이미지"(열기 전용) 행은 제거했다 — 같은 창을 토글하는 아래 행 하나만 남긴다.
     {
       id: "reference-window",
       commandId: "window.reference-panel",
       legacyPath: "view/reference-window",
-      label: "참고 이미지 창 열기",
+      label: "참고 이미지 창",
       icon: PictureInPicture2,
       checked: state.referencePanelOpen,
       separatorAfter: true,
@@ -202,19 +192,8 @@ export function buildStudioWindowMenuItems({
         ui.openToolsCompanion();
       },
     },
-    {
-      // Second entry point to the same dialog as Edit ▸ Preferences. Kept because
-      // Wave C only relocates; the id is qualified so menu item ids stay globally
-      // unique (audit finding `menu-item-id-collision`).
-      id: "app-settings-window",
-      commandId: "window.app-settings",
-      legacyPath: "view/app-settings",
-      label: "애플리케이션 설정",
-      icon: Settings2,
-      onSelect: () => {
-        ui.openAppSettings();
-      },
-    },
+    // 애플리케이션 설정의 두 번째 진입점(Edit ▸ Preferences 와 같은 대화상자)은
+    // 제거했다 — 메뉴당 한 문 원칙. 단일 행은 편집 메뉴가 소유한다.
   ];
 }
 

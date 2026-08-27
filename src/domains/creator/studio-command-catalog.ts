@@ -22,8 +22,8 @@
  * `studio-main-menu-group-spec.ts`.
  *
  * 후속 메뉴 진입점 확장으로 카탈로그가 166개까지 늘어난 뒤, 툴벨트 전용이던
- * 검수·미리보기 3종(`view/anim-timeline`, `view/vertical-scroll-preview`,
- * `view/storyboard-grid`)이 보기 메뉴로 승격되며 166 → 169가 됐다.
+ * 검수·미리보기 3종은 View 중복이 제거되어 Animation/Comic 메뉴의 단일 행과
+ * "프로젝트 작업" 시트가 소유한다(메뉴당 한 문 원칙).
  *
  * Measured 2026-08-09 against:
  * - `studio-main-menu-items-*.ts`     17 rendered groups / 169 items
@@ -240,7 +240,8 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     declarationRef:
       "studio-main-menu-item-routing.ts (STUDIO_MENU_ITEM_BUILDERS) + studio-main-menu-items-*.ts",
     // 2026-08-25: 크리에이티브 모드 해체 → 메뉴 재배치 5행 (188 → 193).
-    measuredCount: 193,
+    // 2026-08-27: View 중복 검수·미리보기 3행 + 참고 이미지/앱 설정 중복 2행 제거 (193 → 188).
+    measuredCount: 188,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -333,9 +334,6 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "view/restore-view",
   "view/production-insights",
   // 검수·미리보기 3종 — 툴벨트에서 승격(studio-project-review-actions.ts 주석).
-  "view/anim-timeline",
-  "view/vertical-scroll-preview",
-  "view/storyboard-grid",
   // view, Wave E (2) — studio-main-menu-items-authoring.ts
   "view/navigator",
   "view/underlay",
@@ -488,10 +486,8 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "window/quick-access-palette",
   "window/command-bar",
   "window/template",
-  "window/ref",
   "window/reference-window",
   "window/tools-companion",
-  "window/app-settings-window",
   // ai (3)
   "ai/ai-assist",
   "ai/stock",
@@ -1161,33 +1157,6 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [ours("제작 인사이트")],
       origins: [menu("view/production-insights")],
     }),
-    defineCommand({
-      id: "view.anim-timeline",
-      labels: [
-        ko("다중 레이어 타임라인", "레이어별 키프레임과 재생 구간을 시간축에서 편집합니다."),
-        en("Layer timeline"),
-      ],
-      aliases: [ours("타임라인")],
-      origins: [menu("view/anim-timeline")],
-    }),
-    defineCommand({
-      id: "view.scroll-preview",
-      labels: [
-        ko("세로 스크롤 미리보기", "페이지를 모바일 독자 폭으로 이어 붙여 읽기 흐름을 확인합니다."),
-        en("Vertical scroll preview"),
-      ],
-      aliases: [ours("웹툰 미리보기")],
-      origins: [menu("view/vertical-scroll-preview")],
-    }),
-    defineCommand({
-      id: "view.storyboard-grid",
-      labels: [
-        ko("스토리보드 그리드 보기", "모든 페이지를 격자로 펼쳐 컷 흐름과 장면 전환을 비교합니다."),
-        en("Storyboard grid"),
-      ],
-      aliases: [ours("콘티 보기")],
-      origins: [menu("view/storyboard-grid")],
-    }),
 
     /* -------------------------------------------------------------- window */
     defineCommand({
@@ -1280,10 +1249,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("애플리케이션 설정"), en("Application settings")],
       aliases: [csp("환경 설정"), ps("Preferences"), krita("Configure Krita"), procreate("Settings")],
       origins: [
-        menu("window/app-settings-window"),
-        menu("edit/app-settings", {
-          note: "메뉴 항목 id `app-settings` 가 view·edit 두 그룹에 중복 등재 — conflict `menu-item-id-collision`.",
-        }),
+        menu("edit/app-settings"),
         editMenu("app-settings"),
       ],
     }),
@@ -1743,12 +1709,6 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("3D 스컬프트"), en("3D sculpt")],
       aliases: [ours("스컬프트 작업대"), krita("Sculpt")],
       origins: [menu("3d/sculpt")],
-    }),
-    defineCommand({
-      id: "insert.reference-image",
-      labels: [ko("참고 이미지"), en("Reference image")],
-      aliases: [krita("Reference Images Tool"), procreate("Reference")],
-      origins: [menu("window/ref")],
     }),
     defineCommand({
       id: "insert.page",

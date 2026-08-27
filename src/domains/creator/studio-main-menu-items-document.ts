@@ -20,7 +20,6 @@ import {
   GanttChartSquare,
   History as HistoryIcon,
   ImagePlus,
-  LayoutGrid,
   Maximize2,
   Minimize2,
   Minus,
@@ -35,7 +34,6 @@ import {
   Scissors,
   Settings2,
   SlidersHorizontal,
-  Smartphone,
   Trash2,
   Triangle,
   Undo2,
@@ -439,50 +437,16 @@ export function buildStudioViewMenuItems({
         editor.restoreSavedStudioView();
       },
     },
+    // 검수·미리보기 3종(타임라인·세로 스크롤·스토리보드)은 View에서 제거했다 —
+    // 같은 핸들러의 문이 Animation ▸ 타임라인, Comic ▸ 스토리보드/세로 스크롤,
+    // 그리고 "프로젝트 작업" 시트(터치 경로)에 이미 있어 메뉴당 한 문 원칙을 따른다.
     {
       id: "production-insights",
       commandId: "view.production-insights",
       label: "제작 인사이트…",
       icon: GanttChartSquare,
-      separatorAfter: true,
       onSelect: () => {
         ui.openProductionInsights();
-      },
-    },
-    // 검수·미리보기 3종. 이 셋은 "지금 만든 것을 어떻게 볼 것인가"라 View에 속한다
-    // (나머지 4종은 문서 상태를 다루므로 "프로젝트 작업" 시트가 소유한다).
-    // 원래는 툴벨트에만 트리거가 있었고 벨트 호스트가 전 뷰포트에서 display:none이라
-    // 어디서도 클릭할 수 없었다 — `studio-project-review-actions.ts` 주석 참조.
-    {
-      id: "anim-timeline",
-      commandId: "view.anim-timeline",
-      label: "다중 레이어 타임라인",
-      icon: GanttChartSquare,
-      checked: state.animationTimelineOpen,
-      disabled: state.masterEditMode,
-      unavailableReason: state.masterEditMode
-        ? "마스터 편집 중에는 타임라인을 열 수 없습니다."
-        : undefined,
-      onSelect: () => {
-        ui.toggleAnimationTimeline();
-      },
-    },
-    {
-      id: "vertical-scroll-preview",
-      commandId: "view.scroll-preview",
-      label: "세로 스크롤 미리보기",
-      icon: Smartphone,
-      onSelect: () => {
-        ui.openScrollPreview();
-      },
-    },
-    {
-      id: "storyboard-grid",
-      commandId: "view.storyboard-grid",
-      label: "스토리보드 그리드 보기",
-      icon: LayoutGrid,
-      onSelect: () => {
-        ui.openStoryboardGrid();
       },
     },
   ];
