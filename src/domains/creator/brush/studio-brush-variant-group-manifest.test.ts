@@ -191,12 +191,20 @@ describe("studio brush variant group manifest", () => {
     // dedicated "marker-chisel" profile consumed by both durable angled-nib renderers, so it now
     // separates from canonical brush by measured material behaviour instead of the id checksum.
     // 238 -> 237 listed.
+    //
+    // 2026-08-25 marker--chisel-ribbon RE-quarantined (6a32205): the declared minus-30deg chisel
+    // profile-variant turned out to have no renderer branch — at the contract audit's fixed points
+    // the brush is byte-identical to canonical brush (same engine/variant, same 18/0.7
+    // width/opacity), the same declaration-vs-reality collapse as gpen--causal-round. The
+    // 3a79a43b ledger restructure had accidentally released it to extended, which unmasked the
+    // collapse in the catalog contract.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
         "glitter--star-field",
         "screentone--sparse-grid",
         "gpen--causal-round",
+        "marker--chisel-ribbon",
         "gel-pen",
         "glass-pen",
         "ruling-pen",
