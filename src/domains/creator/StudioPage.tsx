@@ -414,6 +414,7 @@ import {
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
 import { alignStudioSelection, type StudioAlignMode } from "./studio-cuttoon-editor/studio-align-selected";
 import { createStudioDrawingAssistHandlers } from "./studio-drawing-assist-handlers";
+import { useStudioRafPreview } from "./studio-raf-preview";
 import {
   markAllStudioTeamCommentThreadsRead,
   markStudioTeamCommentThreadRead,
@@ -14023,31 +14024,14 @@ function StudioCuttoonEditor({
     radiusNorm: number;
     points: SelPoint[];
   } | null>(null);
-  const historyBrushRafRef = useRef<number | null>(null);
-  const pendingHistoryBrushDragRef = useRef<{ points: SelPoint[] } | null>(null);
-  const [historyBrushDragPreview, setHistoryBrushDragPreview] = useState<{ points: SelPoint[] } | null>(null);
+  const {
+    preview: historyBrushDragPreview,
+    schedule: scheduleHistoryBrushDragPreview,
+    clear: clearHistoryBrushDragPreview,
+  } = useStudioRafPreview<{ points: SelPoint[] }>();
   // 브러시 원 호버 커서 — healCloneCursorRef 와 동일 기법(ref 직접 갱신, React 리렌더 없음). 소스
   // 크로스헤어가 없어 healCloneSourceCursorRef 에 대응하는 두 번째 ref 는 없다.
   const historyBrushCursorRef = useRef<Konva.Circle>(null);
-  const scheduleHistoryBrushDragPreview = (next: { points: SelPoint[] } | null) => {
-    pendingHistoryBrushDragRef.current = next;
-    if (historyBrushRafRef.current !== null) return;
-    historyBrushRafRef.current = globalThis.requestAnimationFrame(() => {
-      historyBrushRafRef.current = null;
-      setHistoryBrushDragPreview(pendingHistoryBrushDragRef.current);
-    });
-  };
-  const clearHistoryBrushDragPreview = () => {
-    pendingHistoryBrushDragRef.current = null;
-    if (historyBrushRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(historyBrushRafRef.current);
-      historyBrushRafRef.current = null;
-    }
-    setHistoryBrushDragPreview(null);
-  };
-  useEffect(() => () => {
-    if (historyBrushRafRef.current !== null) globalThis.cancelAnimationFrame(historyBrushRafRef.current);
-  }, []);
   // 선택 요소가 바뀌면 소스·진행 중 드래그·busy 를 해제(모드는 유지 — heal-clone 과 동일 정책).
   useEffect(() => {
     void selectedId;
@@ -14056,7 +14040,7 @@ function StudioCuttoonEditor({
     setHistoryBrushSourceIndex(null);
     setHistoryBrushSourceSrc(null);
     setHistoryBrushBusy(false);
-  }, [selectedId]);
+  }, [selectedId, clearHistoryBrushDragPreview]);
   // pagesHistory 가 트렁케이트/갱신되어 지정해 둔 인덱스가 더는 그 스냅샷을 가리키지 않게 되면
   // 하이라이트만 조용히 해제한다(실제 굽기용 historyBrushSourceSrc 는 이미 해석 완료된 문자열이라
   // 영향받지 않지만, "하이라이트된 행"이 엉뚱한 스냅샷을 가리키는 건 혼란스러우므로 인덱스만 함께
@@ -14076,37 +14060,20 @@ function StudioCuttoonEditor({
   const [layerMaskBusy, setLayerMaskBusy] = useState(false);
   // 진행 중 드래그 — healCloneDragRef와 동일 패턴(frame은 드래그 시작 스냅샷).
   const layerMaskDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
-  const layerMaskRafRef = useRef<number | null>(null);
-  const pendingLayerMaskDragRef = useRef<{ points: SelPoint[] } | null>(null);
-  const [layerMaskDragPreview, setLayerMaskDragPreview] = useState<{ points: SelPoint[] } | null>(null);
+  const {
+    preview: layerMaskDragPreview,
+    schedule: scheduleLayerMaskDragPreview,
+    clear: clearLayerMaskDragPreview,
+  } = useStudioRafPreview<{ points: SelPoint[] }>();
   // 브러시 반경 호버 커서 — smudgeCursorRef와 동일 기법(ref 직접 갱신, React 리렌더 없음).
   const layerMaskCursorRef = useRef<Konva.Circle>(null);
-  const scheduleLayerMaskDragPreview = (next: { points: SelPoint[] } | null) => {
-    pendingLayerMaskDragRef.current = next;
-    if (layerMaskRafRef.current !== null) return;
-    layerMaskRafRef.current = globalThis.requestAnimationFrame(() => {
-      layerMaskRafRef.current = null;
-      setLayerMaskDragPreview(pendingLayerMaskDragRef.current);
-    });
-  };
-  const clearLayerMaskDragPreview = () => {
-    pendingLayerMaskDragRef.current = null;
-    if (layerMaskRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(layerMaskRafRef.current);
-      layerMaskRafRef.current = null;
-    }
-    setLayerMaskDragPreview(null);
-  };
-  useEffect(() => () => {
-    if (layerMaskRafRef.current !== null) globalThis.cancelAnimationFrame(layerMaskRafRef.current);
-  }, []);
   // 선택 요소가 바뀌면 진행 중 드래그·busy를 해제(모드/브러시 설정은 유지 — heal-clone과 동일 정책).
   useEffect(() => {
     void selectedId;
     layerMaskDragRef.current = null;
     clearLayerMaskDragPreview();
     setLayerMaskBusy(false);
-  }, [selectedId]);
+  }, [selectedId, clearLayerMaskDragPreview]);
   // ── 필터 마스크 브러시 — studio-filter-mask 통합 상태(레이어 마스크의 정확한 쌍둥이). ──
   // 마스크 인코딩이 동일해 굽기 파이프라인(bakeLayerMaskStroke/createLayerMaskCanvas/
   // invertLayerMaskAlpha)을 그대로 재사용한다. 레이어 마스크와 상호배제(disarmAllPixelTools).
@@ -14117,35 +14084,18 @@ function StudioCuttoonEditor({
   const [filterMaskStrength, setFilterMaskStrength] = useState(FILTER_MASK_BRUSH_STRENGTH_DEFAULT);
   const [filterMaskBusy, setFilterMaskBusy] = useState(false);
   const filterMaskDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
-  const filterMaskRafRef = useRef<number | null>(null);
-  const pendingFilterMaskDragRef = useRef<{ points: SelPoint[] } | null>(null);
-  const [filterMaskDragPreview, setFilterMaskDragPreview] = useState<{ points: SelPoint[] } | null>(null);
+  const {
+    preview: filterMaskDragPreview,
+    schedule: scheduleFilterMaskDragPreview,
+    clear: clearFilterMaskDragPreview,
+  } = useStudioRafPreview<{ points: SelPoint[] }>();
   const filterMaskCursorRef = useRef<Konva.Circle>(null);
-  const scheduleFilterMaskDragPreview = (next: { points: SelPoint[] } | null) => {
-    pendingFilterMaskDragRef.current = next;
-    if (filterMaskRafRef.current !== null) return;
-    filterMaskRafRef.current = globalThis.requestAnimationFrame(() => {
-      filterMaskRafRef.current = null;
-      setFilterMaskDragPreview(pendingFilterMaskDragRef.current);
-    });
-  };
-  const clearFilterMaskDragPreview = () => {
-    pendingFilterMaskDragRef.current = null;
-    if (filterMaskRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(filterMaskRafRef.current);
-      filterMaskRafRef.current = null;
-    }
-    setFilterMaskDragPreview(null);
-  };
-  useEffect(() => () => {
-    if (filterMaskRafRef.current !== null) globalThis.cancelAnimationFrame(filterMaskRafRef.current);
-  }, []);
   useEffect(() => {
     void selectedId;
     filterMaskDragRef.current = null;
     clearFilterMaskDragPreview();
     setFilterMaskBusy(false);
-  }, [selectedId]);
+  }, [selectedId, clearFilterMaskDragPreview]);
   // ── 퀵 마스크(Q) — 픽셀 선택을 편집 가능한 알파 래스터로 잠시 전환하는 모달 세션. ──
   const [quickMaskActive, setQuickMaskActive] = useState(false);
   const [quickMaskBrushMode, setQuickMaskBrushMode] = useState<QuickMaskBrushMode>("paint");
@@ -14159,29 +14109,12 @@ function StudioCuttoonEditor({
     elId: string; maskW: number; maskH: number; featherScale: number; mask: Uint8ClampedArray;
   } | null>(null);
   const quickMaskDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
-  const quickMaskRafRef = useRef<number | null>(null);
-  const pendingQuickMaskDragRef = useRef<{ points: SelPoint[] } | null>(null);
-  const [quickMaskDragPreview, setQuickMaskDragPreview] = useState<{ points: SelPoint[] } | null>(null);
+  const {
+    preview: quickMaskDragPreview,
+    schedule: scheduleQuickMaskDragPreview,
+    clear: clearQuickMaskDragPreview,
+  } = useStudioRafPreview<{ points: SelPoint[] }>();
   const [quickMaskTintCanvas, setQuickMaskTintCanvas] = useState<HTMLCanvasElement | null>(null);
-  const scheduleQuickMaskDragPreview = (next: { points: SelPoint[] } | null) => {
-    pendingQuickMaskDragRef.current = next;
-    if (quickMaskRafRef.current !== null) return;
-    quickMaskRafRef.current = globalThis.requestAnimationFrame(() => {
-      quickMaskRafRef.current = null;
-      setQuickMaskDragPreview(pendingQuickMaskDragRef.current);
-    });
-  };
-  const clearQuickMaskDragPreview = () => {
-    pendingQuickMaskDragRef.current = null;
-    if (quickMaskRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(quickMaskRafRef.current);
-      quickMaskRafRef.current = null;
-    }
-    setQuickMaskDragPreview(null);
-  };
-  useEffect(() => () => {
-    if (quickMaskRafRef.current !== null) globalThis.cancelAnimationFrame(quickMaskRafRef.current);
-  }, []);
   // 요소가 바뀌면 퀵 마스크 세션을 폐기한다 — 선택(pixelSel)과 동일한 "요소 1개 귀속" 규약.
   useEffect(() => {
     const session = quickMaskSessionRef.current;
@@ -14192,8 +14125,7 @@ function StudioCuttoonEditor({
       setQuickMaskTintCanvas(null);
       setQuickMaskActive(false);
     }
-     
-  }, [selectedId]);
+  }, [selectedId, clearQuickMaskDragPreview]);
   // 선택 요소가 바뀌면 크롭 모드·진행 중 드래그·busy 를 해제한다(크롭 rect 는 이미지 1개 귀속).
   useEffect(() => {
     const keepAutoTargetCrop = cropAutoTargetRef.current === selectedId;
@@ -17458,9 +17390,16 @@ const puppetWarpArmed =
       // Safe catch for network or parsing issues
     }
   });
+  // 마운트 직후가 아니라 퀵스타트 코치와 같은 "부팅 완료" 게이트 뒤에서 연다 — 작업/자동저장
+  // 하이드레이션과 인스턴트 룸 부트스트랩이 지나가며 메뉴 상태를 재설정해, 먼저 연 자산
+  // 메뉴가 닫히고 커뮤니티 딥링크가 유실되는 경합이 실브라우저에서 관측됐다(2026-08-27).
+  const assetMarketDeepLinkHandledRef = useRef(false);
   useEffect(() => {
+    if (!uiBooleanPreferencesReady || !workHydrated || !autosaveChecked) return;
+    if (assetMarketDeepLinkHandledRef.current) return;
+    assetMarketDeepLinkHandledRef.current = true;
     void openAssetMarketDeepLink();
-  }, []);
+  }, [uiBooleanPreferencesReady, workHydrated, autosaveChecked]);
 
   // 내 로컬 에셋을 커뮤니티에 공유(로그인 필요)
   async function onShareAsset(asset: StudioAsset, options: StudioAssetShareOptions) {

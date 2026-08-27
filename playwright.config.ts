@@ -22,8 +22,14 @@ export default defineConfig({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
-        // Prefer system Chrome when Playwright's bundled Chromium fails to spawn (errno -88).
-        channel: process.env.PLAYWRIGHT_CHANNEL ?? "chrome",
+        // Sandboxed CI/agent images ship one pinned Chromium build whose revision may not match
+        // this Playwright version — point PLAYWRIGHT_EXECUTABLE_PATH at it to skip channel lookup.
+        ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
+          ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } }
+          : {
+              // Prefer system Chrome when Playwright's bundled Chromium fails to spawn (errno -88).
+              channel: process.env.PLAYWRIGHT_CHANNEL ?? "chrome",
+            }),
       },
     },
   ],

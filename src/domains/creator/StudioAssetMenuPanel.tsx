@@ -18,7 +18,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import {
   createStudioAssetFavoriteId,
@@ -116,6 +116,30 @@ function preloadStudioAssetMarketplacePanels(): void {
   studioOriginalAssetMarketplaceLoader.preload();
   studioCreatorPackMarketplaceLoader.preload();
   studioCommunityMarketplaceLoader.preload();
+}
+
+/**
+ * 커뮤니티 탭 본문. 탭 버튼 hover/focus 인텐트가 없어도(마켓 딥링크 ?assetMarket=community 가
+ * 탭을 프로그램으로 여는 경우) 마운트 즉시 세 패널 청크를 병렬 프리로드한다 — React lazy 는
+ * 형제 lazy 를 순차(워터폴)로 깨우므로, 프리로드 없이는 첫 진입이 청크 3개 직렬 로드가 된다.
+ */
+function StudioAssetMarketplacePanels({
+  onUseLocalAsset,
+}: {
+  onUseLocalAsset: StudioAssetMenuPanelProps["onUseLocalAsset"];
+}) {
+  useEffect(() => {
+    preloadStudioAssetMarketplacePanels();
+  }, []);
+  return (
+    <Suspense fallback={<StudioAssetMarketplaceLoading />}>
+      <div data-studio-asset-marketplace-lazy-boundary="true">
+        <LazyStudioOriginalAssetMarketplacePanel onUseAsset={onUseLocalAsset} />
+        <LazyStudioCreatorPackMarketplacePanel />
+        <LazyStudioCommunityMarketplacePanel onUseAsset={onUseLocalAsset} />
+      </div>
+    </Suspense>
+  );
 }
 
 function StudioAssetMarketplaceLoading() {
@@ -573,13 +597,7 @@ export function StudioAssetMenuPanel({
       )}
 
       {assetTab === "community" ? (
-        <Suspense fallback={<StudioAssetMarketplaceLoading />}>
-          <div data-studio-asset-marketplace-lazy-boundary="true">
-            <LazyStudioOriginalAssetMarketplacePanel onUseAsset={onUseLocalAsset} />
-            <LazyStudioCreatorPackMarketplacePanel />
-            <LazyStudioCommunityMarketplacePanel onUseAsset={onUseLocalAsset} />
-          </div>
-        </Suspense>
+        <StudioAssetMarketplacePanels onUseLocalAsset={onUseLocalAsset} />
       ) : null}
 
       <div className="mb-2 grid grid-cols-2 gap-1.5">
