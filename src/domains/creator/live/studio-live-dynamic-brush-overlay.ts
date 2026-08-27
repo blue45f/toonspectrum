@@ -1289,6 +1289,11 @@ export class StudioLiveDynamicBrushOverlayRenderer {
                   }
                 : null,
               dpr: this.dpr,
+              // 렌더러가 들고 있는 캔버스가 아직 DOM에 붙어 있는가 — seal 시점 내부 잉크와
+              // DOM 검열 0 의 모순(실측)을 가르는 단 하나의 판별값.
+              activeConnected: this.activeCanvas?.isConnected ?? null,
+              presentationConnected: this.presentationCanvas?.isConnected ?? null,
+              settledConnected: this.settledCanvas?.isConnected ?? null,
               activeInk: sealDebugCensus(this.activeCanvas, this.activeContext),
               presentationInk: sealDebugCensus(
                 this.presentationCanvas,

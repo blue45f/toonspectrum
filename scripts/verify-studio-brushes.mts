@@ -1936,6 +1936,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
             } catch {
               ink = -2;
             }
+            const rect = canvas.getBoundingClientRect();
+            const computed = getComputedStyle(canvas);
             return {
               index,
               w: canvas.width,
@@ -1945,6 +1947,15 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
                 .map((attribute) => `${attribute.name}=${attribute.value.slice(0, 24)}`)
                 .join(" "),
               ink,
+              // 화면 합성 판별: 비트맵에 잉크가 있어도 rect 0×0·display:none·opacity 0 이면
+              // 스크린샷에는 절대 나타나지 않는다.
+              rect: {
+                x: Math.round(rect.x),
+                y: Math.round(rect.y),
+                w: Math.round(rect.width),
+                h: Math.round(rect.height),
+              },
+              css: `${computed.display}/${computed.visibility}/op${computed.opacity}`,
             };
           }),
         );
