@@ -497,6 +497,31 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
       + "charcoal 의 1/30, 피크 알파 0.066–0.075 로 가시성 임계(≈0.063)에 걸친 유령선을 "
       + "그립니다(프로덕션 브라우저 감사 빠른 단획 게이트 확률적 실패 5회 실측) — "
       + "charcoal · chalk · pastel 이 그룹 내 대안(지침 6).",
+
+    // ── 2026-08-27 영수증 재생성 감사 3: 커밋 탭이 가시성 임계에 걸친 레인 2종 ──────────
+    // 둘 다 전수 서베이·포커스 재현·오프라인 플래너 프로브로 커밋 강도를 실측했습니다.
+    //
+    // oil-pastel--wgm-mix: 요소마다 찍히는 contact-tooth-v2 종이 결합이 이 제네릭 텍스처
+    // 레인의 커밋 플랜을 피크 알파 0.147→0.014, 에너지 10.5배 붕괴시킵니다(커널 레인
+    // charcoal 은 같은 결합에서 34→33 으로 사실상 무영향). 9px 탭의 화면 픽셀 실측
+    // 22px@delta4 — 게이트(4px@delta4)에 정확히 걸쳐 런마다 통과/실패가 플립합니다.
+    // 라이브 오버레이는 tooth 없이 미리 그려 릴리스 순간 획이 눈에 띄게 증발합니다.
+    //
+    // mypaint-cc0--watercolor-fringe: 커밋이 stampPipeline causal-walker-v2 의 수채 스탬프
+    // 워시로 렌더되어 9px 탭이 16px@delta3 — 게이트 미달의 결정적 불가시입니다(신선 세션
+    // 재현). 라이브 스탬프 오버레이는 같은 탭을 풍부하게(검열 134px) 미리 그려 릴리스
+    // 순간 증발합니다. 커밋이 권위이므로 라이브를 맞추면 탭은 여전히 불가시 — 레인
+    // 자체가 빠른 단획을 그릴 수 없는 상태라 노출만 격리합니다.
+    // 복귀 경로: 각 레인의 커밋 탭 침착이 가시 임계를 결정적으로 넘도록 재질이 재작업될 때.
+    // 저장된 문서는 계속 원래 파이프라인으로 바이트 동일 재생됩니다.
+    "oil-pastel--wgm-mix":
+      "contact-tooth-v2 종이 결합이 커밋 탭의 피크 알파를 0.147→0.014 로 붕괴시켜 화면 "
+      + "실측 22px@delta4 — 가시성 게이트에 걸친 유령 탭을 그리고 라이브 미리보기는 tooth "
+      + "없이 진하게 그려 릴리스 때 증발합니다 — oil-pastel · pastel 이 그룹 내 대안(지침 6).",
+    "mypaint-cc0--watercolor-fringe":
+      "커밋이 수채 스탬프 워시로 렌더되어 9px 탭이 16px@delta3 의 결정적 불가시(신선 세션 "
+      + "실측)이고 라이브 스탬프 미리보기는 같은 탭을 134px 로 그려 릴리스 때 증발합니다 — "
+      + "watercolor · wash-brush 가 그룹 내 대안(지침 6).",
   });
 
 /** Frozen quarantine set consumed by the catalogue listing filter and the lifecycle resolver. */

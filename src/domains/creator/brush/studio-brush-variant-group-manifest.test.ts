@@ -119,14 +119,14 @@ describe("studio brush variant group manifest", () => {
       "ink-wash--chroma-halo",
       "brush--impasto-relief",
       "brush--bristle-depletion",
-      "oil-pastel--wgm-mix",
+      // 2026-08-27: oil-pastel--wgm-mix and mypaint-cc0--watercolor-fringe pins RESOLVED to the
+      // quarantine ledger — the browser lab's committed-tap measurements answered "no shelf slot".
       "mypaint-cc0--2b-pencil",
       "mypaint-cc0--dry-brush",
       "mypaint-cc0--splatter",
       "mypaint-cc0--ink-blot",
       "mypaint-cc0--kabura",
       "mypaint-cc0--marker-fat",
-      "mypaint-cc0--watercolor-fringe",
       "gpen--croquis-capsule",
       "pen--croquis-stabilized",
       "ink-wash--living-bake",
@@ -219,6 +219,19 @@ describe("studio brush variant group manifest", () => {
     // A 66px stroke is uniformly 5.5x lighter (peak 0.277). Remapping onto the kernel would
     // re-render persisted vine-soft strokes 30x denser, so exposure-only quarantine applies;
     // charcoal · chalk · pastel stay listed as in-group alternatives. 237 -> 236 listed.
+    //
+    // 2026-08-27 oil-pastel--wgm-mix + mypaint-cc0--watercolor-fringe quarantined (third
+    // receipt-regeneration audit, full-catalogue survey + fresh-session reproduction + offline
+    // planner probes). Both are committed-tap ghosts: wgm-mix's committed plan collapses under
+    // the per-stroke contact-tooth-v2 paper coupling (peak alpha 0.147 -> 0.014, energy 10.5x
+    // down; the kernel lanes are untouched by the same coupling) and measures 22px@delta4 on
+    // screen - exactly straddling the visibility gate, flipping run to run - while fringe
+    // commits through the causal-walker watercolor stamp wash at a deterministic 16px@delta3.
+    // Both live previews draw the same tap far denser (fringe: 134px census), so the stroke
+    // visibly evaporates on release; the commit is the stored authority, so matching the live
+    // preview down would still leave the tap invisible. Exposure-only quarantine per the
+    // dry-media/vine-soft precedent; oil-pastel · pastel and watercolor · wash-brush stay
+    // listed as in-group alternatives. 236 -> 234 listed.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
@@ -315,6 +328,8 @@ describe("studio brush variant group manifest", () => {
         "foliage-broad-canopy",
         "dry-media",
         "charcoal--vine-soft",
+        "oil-pastel--wgm-mix",
+        "mypaint-cc0--watercolor-fringe",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);
