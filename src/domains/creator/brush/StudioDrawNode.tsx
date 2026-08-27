@@ -407,6 +407,36 @@ export const StudioDrawNode = memo(function StudioDrawNode({
     : null;
   const dynamicCoverageMarkPlan = dynamicCoverageAndLegacyMarkPlan?.coveragePlan ?? null;
 
+  // 브라우저 감사 진단(플래그 게이트): 커밋 렌더가 분기하기 전의 요소 라우팅 사실을 남긴다 —
+  // "라이브는 dynamic 커버리지, 커밋은 알 수 없는 분기"였던 실측 모순의 최종 판별점.
+  if (
+    !activeDraft
+    && kind === "freehand"
+    && el.mode !== "eraser"
+    && (globalThis as { __studioDynamicSealDebugEnabled?: boolean })
+      .__studioDynamicSealDebugEnabled === true
+  ) {
+    (globalThis as {
+      __studioCommitRouteDebug?: Record<string, unknown>;
+    }).__studioCommitRouteDebug = {
+      elId: el.id,
+      brush: el.brush ?? null,
+      brushCatalogId: el.brushCatalogId ?? null,
+      dynamicBrushId,
+      planStatus: dynamicBrushPlanResult?.status ?? null,
+      coverageOk: dynamicCoverageMarkPlan?.ok ?? null,
+      paintModel: el.paintModel ?? null,
+      watercolorPipeline: el.watercolorPipeline ?? null,
+      stampPipeline: el.stampPipeline ?? null,
+      paperModel: el.paperModel ?? null,
+      hasDynamics: typeof el.brushDynamics === "object" && el.brushDynamics !== null,
+      pointCount: Math.floor(el.points.length / 2),
+      stampBrushKind,
+      perfectProfile: perfectProfile !== null,
+      at: performance.now(),
+    };
+  }
+
   return (
     <Group
       studioElementId={el.id}
@@ -1106,6 +1136,39 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               return null;
             }
             const legacyMarks = dynamicCoverageAndLegacyMarkPlan?.legacyMarks ?? [];
+            // 브라우저 감사 진단(플래그 게이트): 커밋 sceneFunc이 실제로 택한 분기와 커버리지
+            // 렌더 결과를 남긴다 — 계획은 풍부한데 커밋 픽셀이 희미한 실측 모순의 최종 판별점.
+            const commitRenderDebugEnabled = !activeDraft
+              && (globalThis as { __studioDynamicSealDebugEnabled?: boolean })
+                .__studioDynamicSealDebugEnabled === true;
+            const recordCommitRenderDebug = (
+              branch: string,
+              result: unknown,
+            ): void => {
+              if (!commitRenderDebugEnabled) return;
+              const planMarks = dynamicCoverageMarkPlan?.ok
+                ? dynamicCoverageMarkPlan.marks
+                : [];
+              (globalThis as {
+                __studioCommitRenderDebug?: Record<string, unknown>;
+              }).__studioCommitRenderDebug = {
+                elId: el.id,
+                branch,
+                result,
+                markCount: dynamicCoverageMarkPlan?.ok ? planMarks.length : -1,
+                // 인앱 커밋 플랜의 강도 요약 — 오프라인 프로브와의 마지막 비교점.
+                alphaPeak: planMarks.reduce((m, mark) => Math.max(m, mark.alpha), 0),
+                energy: planMarks.reduce(
+                  (sum, mark) => sum + mark.alpha * mark.radiusX * mark.radiusY,
+                  0,
+                ),
+                textured: planMarks.filter((mark) => mark.texture).length,
+                ribbons: planMarks.filter((mark) => mark.ribbon).length,
+                legacyMarkCount: legacyMarks.length,
+                opacity,
+                at: performance.now(),
+              };
+            };
             return (
               <Shape
                 key={index}
@@ -1114,7 +1177,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     dynamicCoverageMarkPlan?.ok
                     && isStudioBoundedFlowPaintModelCompatible(el)
                   ) {
-                    renderStudioDynamicBrushCoverage(
+                    const rendered = renderStudioDynamicBrushCoverage(
                       context,
                       dynamicCoverageMarkPlan.marks,
                       {
@@ -1125,6 +1188,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                           : {}),
                       },
                     );
+                    recordCommitRenderDebug("bounded-flow-coverage", rendered);
                     // bounded-flow-v2 owns stroke opacity as one final coverage composite. A
                     // surface/budget failure must remain empty (or retain a partial prefix) rather
                     // than replaying marks with opacity on every dab, which would irreversibly
@@ -1134,6 +1198,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   // Only omitted/legacy paint models retain historical per-dab opacity pixels.
                   // A malformed causal mark plan is rejected before this Shape is constructed.
                   renderStudioDynamicBrushLegacyMarks(context, legacyMarks, opacity);
+                  recordCommitRenderDebug("legacy-marks", null);
                 }}
                 globalCompositeOperation={composite}
                 listening={false}

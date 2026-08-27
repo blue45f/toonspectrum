@@ -1919,6 +1919,35 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           }).__studioDynamicReleaseDebug ?? null,
         );
         log(`release diagnostic settled-clear state for ${preset.id}: ${JSON.stringify(releaseDebug)}`);
+        const commitRenderDebug = await page.evaluate(() =>
+          (globalThis as {
+            __studioCommitRenderDebug?: Record<string, unknown> | null;
+          }).__studioCommitRenderDebug ?? null,
+        );
+        log(`release diagnostic commit render state for ${preset.id}: ${JSON.stringify(commitRenderDebug)}`);
+        const commitRouteDebug = await page.evaluate(() =>
+          (globalThis as {
+            __studioCommitRouteDebug?: Record<string, unknown> | null;
+          }).__studioCommitRouteDebug ?? null,
+        );
+        log(`release diagnostic commit route state for ${preset.id}: ${JSON.stringify(commitRouteDebug)}`);
+        // 실제 요소의 입력 채널(압력·속도·모델 키)이 오프라인 플랜 프로브와 다른지가
+        // "계획은 풍부, 커밋 픽셀은 희미" 모순의 남은 변수다.
+        try {
+          const persisted = await persistedDrawElements(page);
+          const lastDraw = persisted.at(-1) as Record<string, unknown> | undefined;
+          if (lastDraw) {
+            const { brushDynamics, brushEnginePrograms, ...channels } = lastDraw;
+            log(
+              `release diagnostic persisted element for ${preset.id}: `
+                + `${JSON.stringify({ ...channels, hasDynamics: Boolean(brushDynamics) })}`,
+            );
+          } else {
+            log(`release diagnostic persisted element for ${preset.id}: none`);
+          }
+        } catch (cause) {
+          log(`release diagnostic persisted element for ${preset.id}: read failed ${String(cause)}`);
+        }
         // 어느 표면이 획을 들고 있(었)는지 확정하기 위해 캔버스별 메타데이터와 잉크 픽셀 수를
         // 함께 기록한다(index 만으로는 커서 캔버스와 오버레이가 구분되지 않았던 실측 교훈).
         const canvasInkCensus = await page.evaluate(() =>
@@ -2001,6 +2030,31 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       const after = await page.screenshot({ animations: "disabled", clip: usedClip });
       const settledDiff = await compareScreenshotPixels(page, before, after);
       const visualChanged = hasMeaningfulPixelChange(settledDiff);
+      // 결정성 판별용: 성공 경로에서도 정착(커밋) 시점의 캔버스 비트맵을 남긴다 — 신선한
+      // 세션의 커밋 강도와 딥런 실패 프레임의 커밋 강도를 비트맵 수준에서 비교하기 위함.
+      if (process.env.TOONSPECTRUM_BRUSH_VERIFY_SETTLED_DUMP === "1") {
+        log(`settled diff for ${preset.id}: ${JSON.stringify(settledDiff)}`);
+        const dump = await page.evaluate(() =>
+          Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
+            index,
+            w: canvas.width,
+            h: canvas.height,
+            url: canvas.width > 4 ? canvas.toDataURL("image/png") : "",
+          })),
+        );
+        const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-settled`);
+        mkdirSync(dumpDir, { recursive: true });
+        writeFileSync(join(dumpDir, "settled-after.png"), after);
+        writeFileSync(join(dumpDir, "settled-before.png"), before);
+        for (const entry of dump) {
+          const base64 = entry.url.split(",")[1] ?? "";
+          if (!base64) continue;
+          writeFileSync(
+            join(dumpDir, `${String(entry.index).padStart(2, "0")}-${entry.w}x${entry.h}.png`),
+            Buffer.from(base64, "base64"),
+          );
+        }
+      }
       invariant(
         visualChanged,
         operation === "erase"
