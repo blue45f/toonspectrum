@@ -1895,6 +1895,14 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         writeFileSync(join(SCRATCH, `release-diag-${preset.id}-before.png`), before);
         writeFileSync(join(SCRATCH, `release-diag-${preset.id}-immediate.png`), immediate);
         log(`release diagnostic for ${preset.id}: ${JSON.stringify(immediateDiff)}`);
+        // 라이브 오버레이가 fail-closed 로 지워진 릴리스는 화면만으로 원인을 알 수 없다 —
+        // 오버레이가 남긴 마지막 폴백 사유 브레드크럼을 함께 기록한다.
+        const overlayDebug = await page.evaluate(() =>
+          (globalThis as {
+            __studioDynamicOverlayDebug?: { lastFailure: string; at: number } | null;
+          }).__studioDynamicOverlayDebug ?? null,
+        );
+        log(`release diagnostic overlay state for ${preset.id}: ${JSON.stringify(overlayDebug)}`);
         if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
           const dump = await page.evaluate(() =>
             Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({

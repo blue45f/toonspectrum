@@ -2207,6 +2207,14 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     readonly reason: StudioLiveDynamicBrushFallbackReason;
   } {
     this.fallbackReason = reason;
+    // 브라우저 감사 진단 브레드크럼: fail-closed 클리어는 화면에서 원인을 남기지 않으므로,
+    // 마지막 폴백 사유를 전역에 기록해 하니스가 실패 프레임에서 읽을 수 있게 한다.
+    (globalThis as {
+      __studioDynamicOverlayDebug?: {
+        lastFailure: StudioLiveDynamicBrushFallbackReason;
+        at: number;
+      };
+    }).__studioDynamicOverlayDebug = { lastFailure: reason, at: performance.now() };
     this.resetActiveState();
     this.clearActiveRect();
     return { status: "fallback", reason };
