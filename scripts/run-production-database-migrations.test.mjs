@@ -50,8 +50,9 @@ test("auth lifecycle migration owns schema repair and a durable readiness marker
   expect(sql).toContain('ON DELETE CASCADE');
   expect(sql).not.toMatch(/GRANT\s+CREATE|ALTER\s+ROLE/u);
 
+  // db/schema.ts 는 배럴이다 — user/account 테이블 선언은 schema/auth.schema.ts 가 소유한다.
   const drizzleSchema = readFileSync(
-    new URL("../apps/api/src/db/schema.ts", import.meta.url),
+    new URL("../apps/api/src/db/schema/auth.schema.ts", import.meta.url),
     "utf8",
   );
   expect(drizzleSchema).toContain(
