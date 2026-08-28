@@ -248,7 +248,12 @@ describe("studio draw rendering ownership boundary", () => {
     expect(stampShape.source).toContain("const sourceAligned = causalStamp || stampPoints === el.points");
     expect(stampShape.source).toContain("drawStudioStampStrokeWithSymmetry(");
     expect(drawNode.source).toContain('el.watercolorPipeline === "causal-walker-v2"');
-    expect(drawNode.source).toContain("planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)");
+    // 활성 초안은 요소·대칭변형 키의 증분 파이프라인, 커밋 렌더는 배치 봉인 리플레이 —
+    // 장획 게이트(wet-dabs) 이후의 워터컬러 라우팅 이음새.
+    expect(drawNode.source).toContain(
+      "planStudioWetWashLivePipeline(`${el.id}#${index}`, {",
+    );
+    expect(drawNode.source).toContain("planCausalWatercolorBrushDabs(watercolorInput, true)");
     expect(drawNode.source).toContain('globalCompositeOperation="multiply"');
     expect(drawNode.source).toContain(
       "globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}",
