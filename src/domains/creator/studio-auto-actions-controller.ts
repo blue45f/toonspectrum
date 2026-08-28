@@ -166,6 +166,11 @@ export function createStudioAutoActionsController<TMutationTicket>(
     setAutoActionStatus(null);
     setAutoActionProgress(null);
     try {
+      // 티켓은 반드시 첫 await 앞에서 캡처한다(P1 리뷰). 체크포인트 저장이 느린 동안
+      // 원고가 편집되면 documentGeneration 이 갈려 아래 두 canApplyStudioMutation 가드가
+      // 실행을 무효화한다 — 체크포인트 뒤에 캡처하면 그 편집 이후의 티켓이라 가드를 둘 다
+      // 통과하고, 클릭 시점 pages 로 계산한 결과가 편집을 commitPages 전체 교체로 덮어쓴다.
+      const mutationTicket = captureStudioMutationTicket();
       const checkpointName = `Auto Actions 이전 · ${autoActionSet.name}`;
       // saveNamedCheckpoint 는 async 다 — await 없이는 Promise 가 항상 truthy 라 이 안전
       // 가드가 죽은 분기였다(추출하며 수정, 2026-08-27).
@@ -173,7 +178,6 @@ export function createStudioAutoActionsController<TMutationTicket>(
         setAutoActionError("안전 복구 지점을 만들지 못해 실행을 중단했어요.");
         return;
       }
-      const mutationTicket = captureStudioMutationTicket();
       const { executeStudioAutoAction } = await import("./studio-auto-actions");
       if (!canApplyStudioMutation(mutationTicket)) return;
       const result = await executeStudioAutoAction({
