@@ -3881,7 +3881,10 @@ function StudioCuttoonEditor({
     workId,
   });
   const hybridDccOpen = hybridDccRouteRequested && hybridDccRouteAccess === "allowed";
+  const previousRoutedSurfaceRef = useRef(studioRoute.surface);
   useEffect(() => {
+    const previousSurface = previousRoutedSurfaceRef.current;
+    previousRoutedSurfaceRef.current = studioRoute.surface;
     if (studioRoute.surface === "brushes") {
       void STUDIO_MOBILE_EDITING_DOCK_UI.loadStudioBrushStudio();
     } else if (studioRoute.surface === "bg3d") {
@@ -3896,12 +3899,14 @@ function StudioCuttoonEditor({
     } else if (studioRoute.surface === "comic") {
       setStoryboardGridOpen(true);
     } else if (studioRoute.surface === "canvas") {
-      // 라우트가 canvas 로 돌아오면(뒤로가기 포함) 라우트 소유 표면 패널도 함께 닫는다 —
-      // URL 이 보이는 표면의 단일 진실이 되는 대칭의 나머지 절반.
-      setTimelineOpen(false);
-      setStoryboardGridOpen(false);
-      setBg3dOpen(false);
-      setPoserVrmOpen(false);
+      // 라우트가 canvas 로 돌아오면(뒤로가기·소유 표면 닫힘) 직전에 URL 을 소유했던 표면의
+      // 패널만 닫는다 — URL 이 보이는 표면의 단일 진실이 되는 대칭의 나머지 절반. 함께 열려
+      // 있던 다른 라우트 표면 패널은 URL 을 다투지 않았으므로 유지한다(P2 리뷰: 타임라인
+      // 닫기가 공존 중이던 BG3D 까지 닫던 과잉 정리).
+      if (previousSurface === "animation") setTimelineOpen(false);
+      else if (previousSurface === "comic") setStoryboardGridOpen(false);
+      else if (previousSurface === "bg3d") setBg3dOpen(false);
+      else if (previousSurface === "poser") setPoserVrmOpen(false);
     }
   }, [studioRoute.surface]);
   const hybridDccReturnFocusRef = useRef<HTMLElement | null>(null);

@@ -789,8 +789,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // 활성 초안은 요소 id 로 키된 증분 플래너가 크로키 캡슐 링·pathData 의 안정
             // prefix 를 유지한다(장획 게이트 capsule-outline; 다른 엔진은 내부에서 배치 위임).
             // 커밋 렌더는 배치 리플레이를 유지해 내부 점 재작성에도 항상 정본을 그린다.
+            // 대칭 변형은 같은 요소를 변형된 점 배열로 여러 번 그린다 — 변형 인덱스를 획
+            // 키에 포함해 변형끼리 유지 플래너(내부 보관 배열)를 공유하지 않게 한다(P2 리뷰).
             const outlinePlan = activeDraft
-              ? planStudioPerfectFreehandRenderIncremental(el.id, outlinePlanInput)
+              ? planStudioPerfectFreehandRenderIncremental(`${el.id}#${index}`, outlinePlanInput)
               : planStudioPerfectFreehandRender(outlinePlanInput);
             if (outlinePlan.kind === "outline") {
               return (
@@ -1540,7 +1542,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // 커밋 렌더는 배치 리플레이를 유지해 항상 정본을 그린다.
             const coveragePlan = activeDraft
               ? planStudioAngledNibStrokeLocalCoverageIncremental(
-                  el.id,
+                  // 변형 인덱스로 키 격리 — 변형 간 내부 보관 배열 공유 금지(P2 리뷰).
+                  `${el.id}#${index}`,
                   smoothed,
                   aliasStrokeWidth,
                   -Math.PI / 6,
@@ -1664,7 +1667,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // 오늘처럼 배치 리플레이를 유지해 후처리 워커의 전면 치환 같은 내부 점 재작성에도
             // 항상 정본을 그린다.
             const liveWetWashPlan = causalWatercolor && activeDraft
-              ? planStudioWetWashLivePipeline(el.id, {
+              // 변형 인덱스로 키 격리 — 변형 간 내부 보관 배열 공유 금지(P2 리뷰).
+              ? planStudioWetWashLivePipeline(`${el.id}#${index}`, {
                   brushId: brush,
                   enginePrograms: el.brushEnginePrograms,
                   input: watercolorInput,
@@ -1675,7 +1679,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               ? liveWetWashPlan.dabs
               : causalWatercolor
                 ? activeDraft
-                  ? planCausalWatercolorBrushDabsIncremental(el.id, watercolorInput, false)
+                  ? planCausalWatercolorBrushDabsIncremental(`${el.id}#${index}`, watercolorInput, false)
                   : planCausalWatercolorBrushDabs(watercolorInput, true)
                 : planWatercolorBrushDabs(watercolorInput);
             // The stroke seed feeds the opt-in wet-edge-bloom lanes; SVG export passes the same
@@ -1821,7 +1825,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             const pitch = Math.max(3, aliasStrokeWidth * 0.42);
             const radius = Math.max(2, aliasStrokeWidth / 2);
             const dots = activeDraft
-              ? screentoneDotsForStrokeIncremental(el.id, points, radius, pitch)
+              // 변형 인덱스로 키 격리 — 변형 간 내부 보관 배열 공유 금지(P2 리뷰).
+              ? screentoneDotsForStrokeIncremental(`${el.id}#${index}`, points, radius, pitch)
               : screentoneDotsForStroke(points, radius, pitch);
             const dotR = screentoneDotRadius(pitch);
             return (

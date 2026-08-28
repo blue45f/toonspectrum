@@ -155,14 +155,10 @@ export function createStudioAutoActionsController<TMutationTicket>(
     ) {
       return;
     }
-    const checkpointName = `Auto Actions 이전 · ${autoActionSet.name}`;
-    // saveNamedCheckpoint 는 async 다 — await 없이는 Promise 가 항상 truthy 라 이 안전
-    // 가드가 죽은 분기였다(추출하며 수정, 2026-08-27).
-    if (!(await saveNamedCheckpoint(checkpointName))) {
-      setAutoActionError("안전 복구 지점을 만들지 못해 실행을 중단했어요.");
-      return;
-    }
-    const mutationTicket = captureStudioMutationTicket();
+    // 렌더에 캡처된 busy 는 체크포인트 대기 중의 재클릭을 못 막는다(둘 다 false 를 본다) —
+    // abort ref 를 동기 in-flight 가드로 겸용해 첫 await 전에 선점한다(P2 리뷰: 더블클릭이
+    // 같은 플랜을 동시에 두 번 실행). 체크포인트 중 취소도 이 덕에 같이 동작한다.
+    if (autoActionAbortRef.current) return;
     const controller = new AbortController();
     autoActionAbortRef.current = controller;
     setAutoActionBusy(true);
@@ -170,6 +166,14 @@ export function createStudioAutoActionsController<TMutationTicket>(
     setAutoActionStatus(null);
     setAutoActionProgress(null);
     try {
+      const checkpointName = `Auto Actions 이전 · ${autoActionSet.name}`;
+      // saveNamedCheckpoint 는 async 다 — await 없이는 Promise 가 항상 truthy 라 이 안전
+      // 가드가 죽은 분기였다(추출하며 수정, 2026-08-27).
+      if (!(await saveNamedCheckpoint(checkpointName))) {
+        setAutoActionError("안전 복구 지점을 만들지 못해 실행을 중단했어요.");
+        return;
+      }
+      const mutationTicket = captureStudioMutationTicket();
       const { executeStudioAutoAction } = await import("./studio-auto-actions");
       if (!canApplyStudioMutation(mutationTicket)) return;
       const result = await executeStudioAutoAction({

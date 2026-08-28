@@ -125,6 +125,9 @@ class StampSceneContext {
   transform(a: number, b: number, c: number, d: number, e: number, f: number): void {
     this.transforms.push(`${a},${b},${c},${d},${e},${f}`);
   }
+  fillStrokeShape(): void {
+    this.fills.push({ alpha: this.globalAlpha, color: String(this.fillStyle) });
+  }
 }
 
 class AliasSceneContext {
@@ -2608,12 +2611,40 @@ describe("StudioDrawNode orchestration", () => {
       string,
       { brushId: unknown; input: Record<string, unknown> },
     ];
-    expect(strokeKey).toBe("draw-1");
+    // 획 키는 요소 id + 대칭 변형 인덱스 — 변형 간 유지 플래너 격리(P2 리뷰).
+    expect(strokeKey).toBe("draw-1#0");
     expect(params.brushId).toBe("watercolor");
     expect(params.input).toEqual(
       expect.objectContaining({ points: [0, 0, 8, 0], previewEndpoint: true }),
     );
     expect(watercolorCapture.causalPlan).not.toHaveBeenCalled();
+  });
+
+  it("keeps symmetric screentone draft variants on isolated incremental dot plans", () => {
+    render(
+      <StudioDrawNode
+        activeDraft
+        el={drawEl({
+          brush: "screentone",
+          mode: "pen",
+          points: [0, 0, 60, 10, 120, 0],
+          strokeWidth: 24,
+          symmetry: { type: "vertical", centerX: 200, centerY: 0 },
+        })}
+      />,
+    );
+    const shapes = captured("Shape");
+    expect(shapes).toHaveLength(2);
+    const arcSets = shapes.map((shape) => {
+      const context = new StampSceneContext();
+      (shape.props.sceneFunc as (c: unknown, s: unknown) => void)(context, {});
+      return context.arcs.join("|");
+    });
+    expect(arcSets[0]).not.toBe("");
+    expect(arcSets[1]).not.toBe("");
+    // 변형들이 같은 요소 키의 유지 빌더(내부 가변 배열)를 공유하면 두 sceneFunc 클로저가
+    // 마지막 변형의 도트만 그린다(P2 리뷰 회귀) — 변형 인덱스 키 격리로 서로 달라야 한다.
+    expect(arcSets[0]).not.toBe(arcSets[1]);
   });
 
   it("keeps the committed causal render on the batch replay with finalization=true", () => {
