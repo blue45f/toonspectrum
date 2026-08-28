@@ -75,23 +75,9 @@ const toolBtn = (active: boolean) => studioToolButtonClass(active, { dense: true
  *  (the dense px-3 padding alone leaves a 14–15px glyph at ~40px width). */
 const iconToolBtnTouch = "pointer-coarse:min-w-11 pointer-coarse:justify-center";
 
+// undo/redo/history 힌트는 실제 렌더 주체인 StudioToolBeltQuickActions 의
+// QUICK_ACTION_HINTS 가 단독 소유한다 — 여기 사본은 죽은 중복이라 제거했다.
 const TOOL_BELT_HINTS = {
-  undo: studioToolHintFromLabel(
-    "실행취소",
-    "가장 최근 편집 작업을 한 단계 되돌립니다.",
-    "⌘Z"
-  ),
-  redo: studioToolHintFromLabel(
-    "다시실행",
-    "실행취소로 되돌린 작업을 한 단계 다시 적용합니다.",
-    "⌘⇧Z"
-  ),
-  history: studioToolHintFromLabel(
-    "작업 내역",
-    "편집 기록을 열어 이전 작업 지점을 확인하고 원하는 상태로 이동합니다.",
-    undefined,
-    "history"
-  ),
   assets: studioToolHintFromLabel(
     "템플릿·에셋",
     "템플릿, 콜라주, 장면, 클립, 효과와 내 에셋을 한곳에서 찾아 캔버스에 추가합니다.",

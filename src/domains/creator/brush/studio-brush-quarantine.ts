@@ -462,6 +462,79 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     "foliage-broad-canopy":
       "잎송이 알파맵과 팁 레이어를 leaf-cluster 와 공유하고 scatter 0.62/0.39 차이만 남습니다. "
       + "대안: leaf-cluster · long-leaf · leaf-fall-flurry(지침 6).",
+
+    // ── 2026-08-27 영수증 재생성 감사: 우산 id 의 커널 미주행 ─────────────────────
+    // T1 de-polygon 웨이브가 crayon·chalk·charcoal·pastel·oil-pastel 을 커널 dab 경로로 옮길 때
+    // 이 프리셋들이 파생돼 나온 우산 id "dry-media" 자체는 커널 프로그램 핀 없이(레인 변형
+    // 오버라이드도 없이) 제네릭 base 파이프라인에 남았습니다. 실측(같은 24px 장경로, 프로덕션
+    // 브라우저 게이트): inkEnergy 170 vs crayon 3044(18배), 평균 단면 폭 3.1px vs 14.9px —
+    // 사실상 유령선이고, 릴리스 시 잉크 에너지가 40% 더 빠지면서 centroid 가 12.3px 밀려
+    // strict-continuous 품질 게이트(centroid-drift)에 걸립니다. 빠른 단획은 실측 changedPixels
+    // 1/4392 로 아예 보이지 않는 프레임까지 나옵니다. 재질 자식 5종(crayon · chalk · charcoal ·
+    // pastel · oil-pastel)이 모두 노출 상태의 대안입니다(지침 6).
+    // 복귀 경로: 우산 id 를 커널 재질에 명시 핀으로 물리면 material-group 매핑(pastel)과
+    // 바이트 중복이 되므로, 실질적 복귀는 우산 id 만의 실재하는 재질 정체성이 생길 때입니다.
+    // 그때까지 저장된 문서는 계속 원래 파이프라인으로 바이트 동일 재생됩니다.
+    "dry-media":
+      "커널 리워크가 재질 자식들만 커널 경로로 옮기고 우산 id 는 제네릭 파이프라인에 남아 실측 "
+      + "잉크 에너지가 crayon 의 1/18 인 유령선을 그립니다(릴리스 centroid 12.3px 드리프트 포함) — "
+      + "crayon · chalk · charcoal · pastel · oil-pastel 이 그룹 내 대안(지침 6).",
+
+    // ── 2026-08-27 영수증 재생성 감사 2: 엔진 레인 id 의 커널 미주행 ────────────────
+    // dry-media 우산과 같은 결함 클래스입니다. resolveStudioDryMediaAnisotropicPresetIdV1 은
+    // 저장-재생 권위 계약상 엔진 레인 id 를 EXACT 매칭으로만 커널에 물리므로,
+    // charcoal--vine-soft 는 정체성 null 로 제네릭 텍스처 파이프라인에 남았습니다. 실측
+    // (오프라인 플래너 프로브, 동일 입력): 9px 탭에서 잉크 에너지 1.1 vs charcoal 37(1/30),
+    // 피크 마크 알파 0.066–0.075 — 가시성 임계(16/255≈0.063) 바로 위·아래를 시드에 따라
+    // 오가는 값이라 프로덕션 브라우저 감사의 빠른 단획 게이트가 확률적으로 실패합니다
+    // (5회 재현, seal 브레드크럼 실측: 풀 알파 active 표면 검열 1px). 66px 장획도 에너지
+    // 1/5.5(피크 0.277)의 균일 결핍입니다. 커널 재질로 재매핑하면 저장된 vine-soft 획이
+    // 30배 진하게 재생되어 저장-재생 계약을 깨므로, 우산 id 와 동일하게 노출만 격리합니다.
+    // 복귀 경로: vine-soft 만의 실재 커널 재질(부드러운 vine 목탄 베이크)이 생겨 신규 획만
+    // 그 경로를 타게 될 때입니다. 저장된 문서는 계속 원래 파이프라인으로 바이트 동일 재생됩니다.
+    "charcoal--vine-soft":
+      "커널 리워크에서 엔진 레인 id 가 제네릭 파이프라인에 남아 9px 탭의 잉크 에너지가 "
+      + "charcoal 의 1/30, 피크 알파 0.066–0.075 로 가시성 임계(≈0.063)에 걸친 유령선을 "
+      + "그립니다(프로덕션 브라우저 감사 빠른 단획 게이트 확률적 실패 5회 실측) — "
+      + "charcoal · chalk · pastel 이 그룹 내 대안(지침 6).",
+
+    // ── 2026-08-27 영수증 재생성 감사 3: 커밋 탭이 가시성 임계에 걸친 레인 2종 ──────────
+    // 둘 다 전수 서베이·포커스 재현·오프라인 플래너 프로브로 커밋 강도를 실측했습니다.
+    //
+    // oil-pastel--wgm-mix: 요소마다 찍히는 contact-tooth-v2 종이 결합이 이 제네릭 텍스처
+    // 레인의 커밋 플랜을 피크 알파 0.147→0.014, 에너지 10.5배 붕괴시킵니다(커널 레인
+    // charcoal 은 같은 결합에서 34→33 으로 사실상 무영향). 9px 탭의 화면 픽셀 실측
+    // 22px@delta4 — 게이트(4px@delta4)에 정확히 걸쳐 런마다 통과/실패가 플립합니다.
+    // 라이브 오버레이는 tooth 없이 미리 그려 릴리스 순간 획이 눈에 띄게 증발합니다.
+    //
+    // mypaint-cc0--watercolor-fringe: 커밋이 stampPipeline causal-walker-v2 의 수채 스탬프
+    // 워시로 렌더되어 9px 탭이 16px@delta3 — 게이트 미달의 결정적 불가시입니다(신선 세션
+    // 재현). 라이브 스탬프 오버레이는 같은 탭을 풍부하게(검열 134px) 미리 그려 릴리스
+    // 순간 증발합니다. 커밋이 권위이므로 라이브를 맞추면 탭은 여전히 불가시 — 레인
+    // 자체가 빠른 단획을 그릴 수 없는 상태라 노출만 격리합니다.
+    // 복귀 경로: 각 레인의 커밋 탭 침착이 가시 임계를 결정적으로 넘도록 재질이 재작업될 때.
+    // 저장된 문서는 계속 원래 파이프라인으로 바이트 동일 재생됩니다.
+    "oil-pastel--wgm-mix":
+      "contact-tooth-v2 종이 결합이 커밋 탭의 피크 알파를 0.147→0.014 로 붕괴시켜 화면 "
+      + "실측 22px@delta4 — 가시성 게이트에 걸친 유령 탭을 그리고 라이브 미리보기는 tooth "
+      + "없이 진하게 그려 릴리스 때 증발합니다 — oil-pastel · pastel 이 그룹 내 대안(지침 6).",
+    "mypaint-cc0--watercolor-fringe":
+      "커밋이 수채 스탬프 워시로 렌더되어 9px 탭이 16px@delta3 의 결정적 불가시(신선 세션 "
+      + "실측)이고 라이브 스탬프 미리보기는 같은 탭을 134px 로 그려 릴리스 때 증발합니다 — "
+      + "watercolor · wash-brush 가 그룹 내 대안(지침 6).",
+
+    // ── 2026-08-27 web-soft-cloud: 같은 날 격리 후 같은 날 복귀(DELISTED) ────────────────
+    // 격리 사유였던 "장경로 520px 획이 화면에 총 8px@delta6"는 web-drawing 키트 브리지의
+    // 희소 경로 미보간이 원인이었습니다: 이 레인은 경로 스테이션마다 입자를 뿌리는데 희소
+    // 경로에서는 스테이션이 양끝 2개뿐이라 몸통이 비어 있었습니다. densifySparseWebDrawingPathGaps
+    // 수리 후 본 레인의 집중 브라우저 재검증(장경로 6/6 · 품질 정책 실패 0)을 거쳐 delist 합니다
+    // — 같은 원인의 web-rainbow-flow · web-calligraphy-ribbon 도 같은 날 같은 수리로 복귀.
+
+    // ── 2026-08-27 web-calligraphy-ribbon: 같은 날 격리 후 같은 날 복귀(DELISTED) ─────────
+    // 격리 사유였던 "커밋이 리본 몸통을 잃음(양끝 캡만)"은 web-drawing 키트 브리지의 희소
+    // 경로 미보간이 원인으로 확정되어 densifySparseWebDrawingPathGaps 로 수리되었습니다
+    // (studio-web-drawing-stroke-bridge.ts — 커밋·SVG·라이브가 공유하는 단일 보간 권위).
+    // 수리 후 장경로 6/6 재검증을 거쳐 여기서 delist 합니다.
   });
 
 /** Frozen quarantine set consumed by the catalogue listing filter and the lifecycle resolver. */

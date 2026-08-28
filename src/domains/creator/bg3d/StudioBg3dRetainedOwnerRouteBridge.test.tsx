@@ -40,6 +40,7 @@ class RouteUnmountSession extends EventTarget {
 
 interface Harness {
   readonly attachment: Promise<void>;
+  readonly attachmentPrivacyTimeoutMs: number;
   readonly controllerCount: () => number;
   readonly instanceCount: () => number;
   readonly nextInstanceId: () => number;
@@ -51,7 +52,9 @@ interface Harness {
   readonly unmountCount: () => number;
 }
 
-function createHarness(): Harness {
+function createHarness(
+  options: { readonly attachmentPrivacyTimeoutMs?: number } = {},
+): Harness {
   let resolveAttachment!: () => void;
   const attachment = new Promise<void>((resolve) => {
     resolveAttachment = resolve;
@@ -88,6 +91,7 @@ function createHarness(): Harness {
   };
   return {
     attachment,
+    attachmentPrivacyTimeoutMs: options.attachmentPrivacyTimeoutMs ?? 5,
     controllerCount: () => controllerCount,
     instanceCount: () => instanceCount,
     nextInstanceId: () => {
@@ -130,7 +134,7 @@ function RetainedWebXrCanvas({
           requestSession: async () => harness.session as unknown as XRSession,
         },
       },
-      attachmentPrivacyTimeoutMs: 5,
+      attachmentPrivacyTimeoutMs: harness.attachmentPrivacyTimeoutMs,
     });
     harness.recordController();
     controllerRef.current = controller;
@@ -349,7 +353,10 @@ describe("Studio BG3D route-independent WebXR owner", () => {
   });
 
   it("releases a Canvas poisoned by device end during attach before returning-route takeover", async () => {
-    const harness = createHarness();
+    // The privacy watchdog must not race the native end below: on a slow CI runner the waitFor
+    // gap after rerender can exceed a short deadline, which would fire requestSessionEnd() before
+    // finishNativeEnd() fences it and break the `session.end` never-called contract of this test.
+    const harness = createHarness({ attachmentPrivacyTimeoutMs: 60_000 });
     const view = render(
       <>
         <StudioBg3dRetainedOwnerHost />

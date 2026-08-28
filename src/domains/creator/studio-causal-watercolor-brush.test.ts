@@ -10,6 +10,7 @@ import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
   finishCausalWatercolorBrush,
   normalizeStudioCausalWatercolorSettings,
+  createStudioIncrementalCausalWatercolorPlanner,
   planCausalWatercolorBrush,
   planCausalWatercolorBrushDabs,
   previewCausalWatercolorBrushEndpoint,
@@ -339,5 +340,95 @@ describe("causal watercolor safety and cap behavior", () => {
       empty: true,
       finalized: false,
     });
+  });
+});
+
+describe("createStudioIncrementalCausalWatercolorPlanner", () => {
+  const strokePoints = (pointCount: number): { points: number[]; pressures: number[] } => {
+    const points: number[] = [];
+    const pressures: number[] = [];
+    let x = 210;
+    let y = 340;
+    for (let index = 0; index < pointCount; index += 1) {
+      // 결정적 지그재그 + 간헐적 근접 중복(EPSILON 분기)과 잘못된 표본(건너뛰기 분기).
+      const step = 1 + ((index * 7) % 11);
+      x += index % 13 === 5 ? 0 : step;
+      y += ((index * 5) % 9) - 4;
+      points.push(index % 29 === 17 ? Number.NaN : x, y);
+      pressures.push(0.2 + ((index * 3) % 7) / 10);
+    }
+    return { points, pressures };
+  };
+
+  it("matches the batch planner exactly across growth with a preview endpoint", () => {
+    const { points, pressures } = strokePoints(220);
+    const planner = createStudioIncrementalCausalWatercolorPlanner();
+    for (let pairCount = 1; pairCount <= 220; pairCount += 3) {
+      const input = {
+        points: points.slice(0, pairCount * 2),
+        pressures: pressures.slice(0, pairCount),
+        baseWidth: 30,
+        seed: 4242,
+        previewEndpoint: true,
+      };
+      const incremental = planner.plan(input, false);
+      const batch = planCausalWatercolorBrushDabs(input, false);
+      expect(incremental).toEqual(batch);
+    }
+  });
+
+  it("matches the batch planner exactly for the finalized replay", () => {
+    const { points, pressures } = strokePoints(150);
+    const planner = createStudioIncrementalCausalWatercolorPlanner();
+    const liveInput = {
+      points: points.slice(0, 149 * 2),
+      pressures: pressures.slice(0, 149),
+      baseWidth: 26,
+      seed: 777,
+      previewEndpoint: true,
+    };
+    planner.plan(liveInput, false);
+    const finalInput = { points, pressures, baseWidth: 26, seed: 777 };
+    const incremental = planner.plan(finalInput, true);
+    expect(incremental).toEqual(planCausalWatercolorBrushDabs(finalInput, true));
+    // 봉인 뒤 같은 스냅샷 재호출은 캐시된 최종 결과를 그대로 돌려준다.
+    expect(planner.plan(finalInput, true)).toEqual(
+      planCausalWatercolorBrushDabs(finalInput, true),
+    );
+  });
+
+  it("rebuilds when the consumed prefix is rewritten or the stroke shrinks", () => {
+    const { points, pressures } = strokePoints(90);
+    const planner = createStudioIncrementalCausalWatercolorPlanner();
+    const base = { pressures, baseWidth: 24, seed: 99, previewEndpoint: true };
+    planner.plan({ ...base, points }, false);
+    // O(1) 검증 앵커는 마지막 채택 표본이다(캘리그래피 증분 빌더와 같은 계약). 내부 점만
+    // 바뀌는 재작성은 초안 경로에 존재하지 않는다 — 초안 점 배열은 append 전용이고, 후처리
+    // 워커의 전면 치환은 커밋 렌더(배치 플래너) 쪽에서만 일어난다.
+    const rewritten = points.slice();
+    rewritten[rewritten.length - 2] = rewritten[rewritten.length - 2]! + 12;
+    expect(planner.plan({ ...base, points: rewritten }, false)).toEqual(
+      planCausalWatercolorBrushDabs({ ...base, points: rewritten }, false),
+    );
+    const shrunk = {
+      points: points.slice(0, 40 * 2),
+      pressures: pressures.slice(0, 40),
+      baseWidth: 24,
+      seed: 99,
+      previewEndpoint: true,
+    };
+    expect(planner.plan(shrunk, false)).toEqual(
+      planCausalWatercolorBrushDabs(shrunk, false),
+    );
+  });
+
+  it("rebuilds when the plan settings change", () => {
+    const { points, pressures } = strokePoints(60);
+    const planner = createStudioIncrementalCausalWatercolorPlanner();
+    planner.plan({ points, pressures, baseWidth: 24, seed: 5 }, false);
+    const widened = { points, pressures, baseWidth: 36, seed: 5 };
+    expect(planner.plan(widened, false)).toEqual(
+      planCausalWatercolorBrushDabs(widened, false),
+    );
   });
 });

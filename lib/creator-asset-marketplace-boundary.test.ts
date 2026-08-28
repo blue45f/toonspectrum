@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -6,7 +6,16 @@ const migrationSource = readFileSync(
   new URL("../apps/api/src/db/migrations/0013_creator_asset_marketplace.sql", import.meta.url),
   "utf8"
 );
-const serverSource = readFileSync(new URL("../apps/api/src/server/creator.ts", import.meta.url), "utf8");
+// creator 서버 로직은 server/creator/ 도메인 모듈로 분할됐다 — 배럴과 모듈 전체를 이어
+// 읽어야 이 경계 검증이 분할 전과 같은 표면을 본다.
+const creatorServerDir = new URL("../apps/api/src/server/creator/", import.meta.url);
+const serverSource = [
+  readFileSync(new URL("../apps/api/src/server/creator.ts", import.meta.url), "utf8"),
+  ...readdirSync(creatorServerDir)
+    .filter((name) => name.endsWith(".ts"))
+    .sort()
+    .map((name) => readFileSync(new URL(name, creatorServerDir), "utf8")),
+].join("\n");
 const preflightSource = readFileSync(
   new URL("../apps/api/src/modules/creator/creator-asset-schema-preflight.ts",
     import.meta.url

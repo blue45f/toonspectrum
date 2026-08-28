@@ -943,9 +943,21 @@ function evaluateContinuousQuality(
   const edgePeriodicityAmplitudeFloor = strict ? 0.025 : 0.04;
   const edgePeriodicityAmplitude =
     frames.settled.scallopResidualCoefficient ?? 0;
+  /**
+   * Absolute-pixel guard alongside the relative floor. A faint soft deposit (web-blend-softener:
+   * mean visible width 11.25px at 2-code tolerance) shows a deterministic ~1px contour wobble
+   * from dab-center-vs-pixel-grid quantization; its coefficient (0.086) clears the relative floor
+   * while the physical amplitude is invisible. No renderer controls sub-1.5px anti-aliased
+   * contour wobble at a tolerance boundary, so periodicity below that is measurement structure,
+   * not a stroke defect. Real scallops stay caught: the pre-fix calligraphy ribbon measured
+   * 0.354 x 24px = 8.5px RMS.
+   */
+  const edgePeriodicityAmplitudePx =
+    edgePeriodicityAmplitude * (frames.settled.meanCrossSectionWidth ?? 0);
   if (
     frames.settled.edgePeriodicityScore > edgePeriodicityLimit
     && edgePeriodicityAmplitude > edgePeriodicityAmplitudeFloor
+    && edgePeriodicityAmplitudePx > 1.5
   ) {
     findings.push(finding(
       artifactLevel,

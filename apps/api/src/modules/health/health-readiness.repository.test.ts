@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -174,8 +174,13 @@ describe("PostgresHealthReadinessRepository", () => {
   });
 
   it("tracks every relation declared across the current Drizzle schema", () => {
+    // db/schema.ts 는 db/schema/ 도메인 모듈들의 배럴이다 — pgTable 선언은 그 디렉터리에 있다.
+    const schemaDir = new URL("../../db/schema/", import.meta.url);
     const schemaFiles = [
-      "../../db/schema.ts",
+      ...readdirSync(schemaDir)
+        .filter((name) => name.endsWith(".ts"))
+        .sort()
+        .map((name) => `../../db/schema/${name}`),
       "../../db/creator-asset-object-storage.schema.ts",
       "../../db/creator-marketplace-resource.schema.ts",
       "../../db/studio-crdt-raster-checkpoint.schema.ts",

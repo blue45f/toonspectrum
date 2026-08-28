@@ -56,6 +56,42 @@ describe("studio web drawing stroke bridge", () => {
     }
   });
 
+  it("keeps interpolated spacing under the stamp threshold across huge sparse gaps", () => {
+    // P2 회귀: 이전 512 스텝 상한은 세로 수천 px 캔버스의 희소 2점 직선 획(간격 6000px)에서
+    // 보간 간격을 threshold(1–3px)의 몇 배로 벌려, 좁은 치즐 스탬프(web-calligraphy-ribbon,
+    // 몸통 폭 ≈ 0.18 × baseWidth)가 라이브·커밋·SVG 모두에서 끊긴 몸통을 남겼다.
+    const brushId = "web-calligraphy-ribbon";
+    const settings = studioBrushDynamicsSettingsForBrushId(brushId);
+    expect(settings).not.toBeNull();
+    const baseWidth = 30;
+    const dabs = planStudioWebDrawingDynamicDabs(
+      {
+        brushId,
+        points: [100, 100, 100, 6_100],
+        pressures: [0.6, 0.6],
+        baseWidth,
+        baseOpacity: 1,
+        seed: 7,
+        maxDabs: 8_192,
+        centerX: 100,
+        centerY: 3_100,
+      },
+      settings!,
+    );
+    expect(dabs).not.toBeNull();
+    expect(dabs!.length).toBeGreaterThan(2);
+    let maxConsecutiveGap = 0;
+    for (let i = 1; i < dabs!.length; i++) {
+      maxConsecutiveGap = Math.max(
+        maxConsecutiveGap,
+        Math.hypot(dabs![i]!.x - dabs![i - 1]!.x, dabs![i]!.y - dabs![i - 1]!.y),
+      );
+    }
+    // 치즐 몸통 폭(0.18 × 30 = 5.4px)보다 촘촘해야 몸통이 이어진다. 512 상한에서는 경로
+    // 간격이 6000/512 ≈ 11.7px 로 이 단언이 깨진다.
+    expect(maxConsecutiveGap).toBeLessThan(0.18 * baseWidth);
+  });
+
   it("falls through to ordinary dynamics for non-web brushes", () => {
     const settings = studioBrushDynamicsSettingsForBrushId("airbrush")!;
     const dabs = planStudioWebAwareDynamicBrushDabs(

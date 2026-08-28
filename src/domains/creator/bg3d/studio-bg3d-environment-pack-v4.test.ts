@@ -238,7 +238,10 @@ describe("Studio BG3D Blender 5.2 Wave 4 environment pack", () => {
       expect(loaded.bytes.byteLength).toBe(deployedBytes.byteLength);
       expect(createHash("sha256").update(loaded.bytes).digest("hex"))
         .toBe(asset.sha256.replace(/^sha256:/u, ""));
-      expect(loaded.bytes).not.toBe(deployedBytes);
+      // 참조 비교는 Object.is 로 직접 한다 — `.not.toBe` 는 참조가 다르면 "toEqual 을
+      // 쓰라"는 힌트 메시지를 위해 딥 비교를 수행하는데, 수 MB 바이트 배열에서는 그
+      // 비교만 자산당 10초+ 라 이 테스트가 CI 의 30초 타임아웃으로 죽는 원인이었다.
+      expect(Object.is(loaded.bytes, deployedBytes)).toBe(false);
     }
   });
 

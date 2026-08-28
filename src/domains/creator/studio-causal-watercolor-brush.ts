@@ -434,3 +434,182 @@ export function planCausalWatercolorBrushDabs(
 ): WatercolorBrushDab[] {
   return planCausalWatercolorBrush(input, finalized).dabs;
 }
+
+/** 정규화 설정의 값 동일성 — 증분 플래너의 구성 검증에 쓴다. */
+function causalWatercolorSettingsEqual(
+  left: StudioCausalWatercolorSettings,
+  right: StudioCausalWatercolorSettings,
+): boolean {
+  const leftKeys = Object.keys(left) as (keyof StudioCausalWatercolorSettings)[];
+  if (leftKeys.length !== Object.keys(right).length) return false;
+  for (const key of leftKeys) {
+    if (!Object.is(left[key], right[key])) return false;
+  }
+  return true;
+}
+
+export interface StudioIncrementalCausalWatercolorPlanner {
+  /**
+   * 자라나는 획의 현재 스냅샷을 소비하고 배치 `planCausalWatercolorBrushDabs`와 값이 정확히
+   * 같은 dab 배열을 돌려준다(같은 워커 함수를 같은 순서로 호출하므로 바이트 동일). 이미 소비한
+   * raw prefix는 다시 읽지 않으며(마지막 채택 표본 하나로 O(1) 검증), 되돌리기·재작성·설정
+   * 변경이 감지되면 전체를 다시 만든다. 반환 배열은 플래너 내부 보관 배열이므로 수정하면 안
+   * 된다. finish/previewEndpoint 꼬리 dab은 다음 호출에서 걷어내고 다시 단다.
+   */
+  plan(
+    input: Partial<StudioCausalWatercolorPlanInput> | null | undefined,
+    finalized: boolean,
+  ): WatercolorBrushDab[];
+  /**
+   * 마지막 `plan()`이 돌려준 배열에서 안정 prefix 길이. 그 뒤(미리보기/봉인 꼬리)는 다음
+   * 호출에서 걷어내고 다시 다는 휘발 영역이라, 하류 증분 소비자는 이 길이까지만 신뢰해야 한다.
+   */
+  stableDabCount(): number;
+  /** 전체 재구축마다 증가한다 — 하류 증분 소비자의 prefix 신뢰를 무효화하는 신호. */
+  generation(): number;
+}
+
+/**
+ * 라이브/리렌더용 증분 causal watercolor 플래너.
+ *
+ * `planCausalWatercolorBrush`는 출력이 prefix 안정이지만 매 호출 전체 스트로크를 다시 걷는다
+ * (이동당 O(n) — 장획 게이트가 잡는 형태). 워커(begin/append)는 원래 증분 설계이므로, 상태와
+ * 방출 dab 배열을 유지하고 새 raw 표본만 소비하면 이동당 비용이 새 표본 수에만 비례한다.
+ */
+export function createStudioIncrementalCausalWatercolorPlanner(): StudioIncrementalCausalWatercolorPlanner {
+  let settings: StudioCausalWatercolorSettings | null = null;
+  let started: StudioCausalWatercolorBeginResult | null = null;
+  const dabs: WatercolorBrushDab[] = [];
+  let tailCount = 0;
+  let consumedSourceIndex = 0;
+  let lastAcceptedIndex = -1;
+  let lastAcceptedX = 0;
+  let lastAcceptedY = 0;
+  let lastAcceptedPressureSlot: number | undefined;
+  let finalizedDone = false;
+  let rebuildGeneration = 0;
+
+  const reset = (): void => {
+    settings = null;
+    started = null;
+    dabs.length = 0;
+    tailCount = 0;
+    consumedSourceIndex = 0;
+    lastAcceptedIndex = -1;
+    lastAcceptedPressureSlot = undefined;
+    finalizedDone = false;
+    rebuildGeneration += 1;
+  };
+
+  return {
+    plan(input, finalized) {
+      const sourcePoints = Array.isArray(input?.points) ? input.points : [];
+      const sourcePointCount = Math.floor(sourcePoints.length / 2);
+      const nextSettings = normalizeStudioCausalWatercolorSettings(input ?? undefined);
+      if (
+        (settings !== null && !causalWatercolorSettingsEqual(settings, nextSettings))
+        || sourcePointCount < consumedSourceIndex
+      ) {
+        reset();
+      }
+      if (lastAcceptedIndex >= 0) {
+        const rawX = sourcePoints[lastAcceptedIndex * 2];
+        const rawY = sourcePoints[lastAcceptedIndex * 2 + 1];
+        if (
+          rawX !== lastAcceptedX
+          || rawY !== lastAcceptedY
+          || input?.pressures?.[lastAcceptedIndex] !== lastAcceptedPressureSlot
+        ) {
+          reset();
+        }
+      }
+      if (finalizedDone) {
+        if (finalized && sourcePointCount === consumedSourceIndex) return dabs;
+        // 봉인 뒤의 성장·재개는 편집이다 — 배치 리플레이 의미론대로 전체를 다시 만든다.
+        reset();
+      }
+      settings ??= nextSettings;
+      dabs.length -= tailCount;
+      tailCount = 0;
+      for (
+        let sourceIndex = consumedSourceIndex;
+        sourceIndex < sourcePointCount;
+        sourceIndex += 1
+      ) {
+        const x = safeCoordinate(sourcePoints[sourceIndex * 2]);
+        const y = safeCoordinate(sourcePoints[sourceIndex * 2 + 1]);
+        consumedSourceIndex = sourceIndex + 1;
+        // 배치와 같은 규약: 잘못된 표본은 건너뛰고 계속 걷는다.
+        if (x === null || y === null) continue;
+        const sample = {
+          x,
+          y,
+          pressure: input?.pressures?.[sourceIndex],
+        };
+        if (!started) {
+          started = beginCausalWatercolorBrush(sample, settings);
+          if (started) dabs.push(...started.dabs);
+        } else {
+          dabs.push(...appendCausalWatercolorBrush(started.state, sample));
+        }
+        lastAcceptedIndex = sourceIndex;
+        lastAcceptedX = sourcePoints[sourceIndex * 2] as number;
+        lastAcceptedY = sourcePoints[sourceIndex * 2 + 1] as number;
+        lastAcceptedPressureSlot = input?.pressures?.[sourceIndex];
+      }
+      if (started && finalized) {
+        const finishDabs = finishCausalWatercolorBrush(started.state);
+        dabs.push(...finishDabs);
+        tailCount = finishDabs.length;
+        finalizedDone = true;
+      } else if (started && input?.previewEndpoint === true) {
+        const previewDabs = previewCausalWatercolorBrushEndpoint(started.state);
+        dabs.push(...previewDabs);
+        tailCount = previewDabs.length;
+      }
+      return dabs;
+    },
+    stableDabCount() {
+      return dabs.length - tailCount;
+    },
+    generation() {
+      return rebuildGeneration;
+    },
+  };
+}
+
+const INCREMENTAL_CAUSAL_WATERCOLOR_PLANNER_CACHE = new Map<
+  string,
+  StudioIncrementalCausalWatercolorPlanner
+>();
+/** 활성 획은 하나지만 draft/commit 리렌더가 겹치는 짧은 창을 위해 소수의 최근 획을 유지한다. */
+const INCREMENTAL_CAUSAL_WATERCOLOR_PLANNER_LIMIT = 8;
+
+/**
+ * 요소 id로 키된 증분 causal watercolor 플랜. `StudioDrawNode`의 렌더 본문이 매 이동
+ * 호출하는 자리(기존 `planCausalWatercolorBrushDabs`)의 교체용으로, 반환 배열은 내부 보관
+ * 배열이므로 수정하면 안 된다. 검증·재구축 규약은 플래너 자체가 진다.
+ */
+export function planCausalWatercolorBrushDabsIncremental(
+  strokeKey: string,
+  input: Partial<StudioCausalWatercolorPlanInput> | null | undefined,
+  finalized = true,
+): WatercolorBrushDab[] {
+  let planner = INCREMENTAL_CAUSAL_WATERCOLOR_PLANNER_CACHE.get(strokeKey);
+  if (planner) {
+    // LRU 갱신: 재삽입으로 삽입 순서를 최근 사용 순서로 유지한다.
+    INCREMENTAL_CAUSAL_WATERCOLOR_PLANNER_CACHE.delete(strokeKey);
+  } else {
+    planner = createStudioIncrementalCausalWatercolorPlanner();
+  }
+  INCREMENTAL_CAUSAL_WATERCOLOR_PLANNER_CACHE.set(strokeKey, planner);
+  while (
+    INCREMENTAL_CAUSAL_WATERCOLOR_PLANNER_CACHE.size
+    > INCREMENTAL_CAUSAL_WATERCOLOR_PLANNER_LIMIT
+  ) {
+    const oldest = INCREMENTAL_CAUSAL_WATERCOLOR_PLANNER_CACHE.keys().next().value;
+    if (oldest === undefined) break;
+    INCREMENTAL_CAUSAL_WATERCOLOR_PLANNER_CACHE.delete(oldest);
+  }
+  return planner.plan(input, finalized);
+}

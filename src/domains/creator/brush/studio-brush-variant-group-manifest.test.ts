@@ -119,14 +119,14 @@ describe("studio brush variant group manifest", () => {
       "ink-wash--chroma-halo",
       "brush--impasto-relief",
       "brush--bristle-depletion",
-      "oil-pastel--wgm-mix",
+      // 2026-08-27: oil-pastel--wgm-mix and mypaint-cc0--watercolor-fringe pins RESOLVED to the
+      // quarantine ledger — the browser lab's committed-tap measurements answered "no shelf slot".
       "mypaint-cc0--2b-pencil",
       "mypaint-cc0--dry-brush",
       "mypaint-cc0--splatter",
       "mypaint-cc0--ink-blot",
       "mypaint-cc0--kabura",
       "mypaint-cc0--marker-fat",
-      "mypaint-cc0--watercolor-fringe",
       "gpen--croquis-capsule",
       "pen--croquis-stabilized",
       "ink-wash--living-bake",
@@ -191,12 +191,63 @@ describe("studio brush variant group manifest", () => {
     // dedicated "marker-chisel" profile consumed by both durable angled-nib renderers, so it now
     // separates from canonical brush by measured material behaviour instead of the id checksum.
     // 238 -> 237 listed.
+    //
+    // 2026-08-25 marker--chisel-ribbon RE-quarantined (6a32205): the declared minus-30deg chisel
+    // profile-variant turned out to have no renderer branch — at the contract audit's fixed points
+    // the brush is byte-identical to canonical brush (same engine/variant, same 18/0.7
+    // width/opacity), the same declaration-vs-reality collapse as gpen--causal-round. The
+    // 3a79a43b ledger restructure had accidentally released it to extended, which unmasked the
+    // collapse in the catalog contract.
+    //
+    // 2026-08-27 dry-media (the UMBRELLA id) quarantined during receipt regeneration: the T1
+    // de-polygon wave moved its five material children onto the kernel dab path but left the
+    // umbrella preset itself on the generic base pipeline with no kernel pin and no lane
+    // overrides. Measured on the production-browser long-route gate at the same 24px width:
+    // inkEnergy 170 vs crayon's 3044 (18x lighter), mean cross-section 3.1px vs 14.9px, and the
+    // released stroke drops another 40% of ink with a 12.3px centroid drift — a strict-continuous
+    // policy failure — while a fast short stroke measured changedPixels 1/4392 (invisible). All
+    // five material children stay listed as in-group alternatives. 238 -> 237 listed.
+    //
+    // 2026-08-27 charcoal--vine-soft quarantined (second receipt-regeneration audit): the same
+    // defect class as the dry-media umbrella. The stored-replay authority resolver pins engine-
+    // lane ids to the kernel only by EXACT match, so this lane's identity resolved null and it
+    // stayed on the generic textured pipeline. Measured with the offline planner on the audit's
+    // own 9px fast-short-stroke: ink energy 1.1 vs charcoal's 37 (30x lighter), peak mark alpha
+    // 0.066–0.075 — straddling the visibility threshold (16/255 ≈ 0.063), which made the
+    // production-browser fast-short-stroke gate fail probabilistically (5 reproduced failures;
+    // the seal breadcrumb measured a 1px ink census on the full-alpha active surface at seal).
+    // A 66px stroke is uniformly 5.5x lighter (peak 0.277). Remapping onto the kernel would
+    // re-render persisted vine-soft strokes 30x denser, so exposure-only quarantine applies;
+    // charcoal · chalk · pastel stay listed as in-group alternatives. 237 -> 236 listed.
+    //
+    // 2026-08-27 oil-pastel--wgm-mix + mypaint-cc0--watercolor-fringe quarantined (third
+    // receipt-regeneration audit, full-catalogue survey + fresh-session reproduction + offline
+    // planner probes). Both are committed-tap ghosts: wgm-mix's committed plan collapses under
+    // the per-stroke contact-tooth-v2 paper coupling (peak alpha 0.147 -> 0.014, energy 10.5x
+    // down; the kernel lanes are untouched by the same coupling) and measures 22px@delta4 on
+    // screen - exactly straddling the visibility gate, flipping run to run - while fringe
+    // commits through the causal-walker watercolor stamp wash at a deterministic 16px@delta3.
+    // Both live previews draw the same tap far denser (fringe: 134px census), so the stroke
+    // visibly evaporates on release; the commit is the stored authority, so matching the live
+    // preview down would still leave the tap invisible. Exposure-only quarantine per the
+    // dry-media/vine-soft precedent; oil-pastel · pastel and watercolor · wash-brush stay
+    // listed as in-group alternatives. 236 -> 234 listed.
+    //
+    // 2026-08-27 web-soft-cloud and web-calligraphy-ribbon: both quarantined during the fourth
+    // receipt-regeneration audit for near-invisible committed long strokes (soft-cloud 8px@delta6
+    // total, 1/6 segments; ribbon 2/6 with endpoint caps only - both reproduced on origin/main),
+    // then DELISTED the same day once the shared root cause - the web-drawing kit bridge placing
+    // samples only ON sparse path points, leaving soft-cloud with two particle stations and the
+    // ribbon with two chisel stamps for a 520px route - was fixed by gap densification in
+    // studio-web-drawing-stroke-bridge.ts and each lane re-verified 6/6 on the long-route gate.
+    // 234 listed again after the round trips.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
         "glitter--star-field",
         "screentone--sparse-grid",
         "gpen--causal-round",
+        "marker--chisel-ribbon",
         "gel-pen",
         "glass-pen",
         "ruling-pen",
@@ -284,6 +335,10 @@ describe("studio brush variant group manifest", () => {
         "angular-square",
         "watercolor-flat-wash",
         "foliage-broad-canopy",
+        "dry-media",
+        "charcoal--vine-soft",
+        "oil-pastel--wgm-mix",
+        "mypaint-cc0--watercolor-fringe",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);

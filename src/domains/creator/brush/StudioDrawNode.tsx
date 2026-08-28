@@ -1,4 +1,4 @@
-import { memo, useEffect, useReducer, useState } from "react";
+import { memo, useEffect, useReducer, useRef, useState } from "react";
 import {
   Arrow,
   Circle as KCircle,
@@ -24,11 +24,13 @@ import {
   resolveStudioFreehandRenderPath,
   screentoneDotRadius,
   screentoneDotsForStroke,
+  screentoneDotsForStrokeIncremental,
   strokeRenderDistance,
 } from "../studio-brush";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
   planCausalWatercolorBrushDabs,
+  planCausalWatercolorBrushDabsIncremental,
 } from "../studio-causal-watercolor-brush";
 import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
@@ -45,6 +47,7 @@ import {
   isStudioFxPressureBrushId,
   planGlitterBrushParticles,
   planGlowBrushPasses,
+  createStudioIncrementalFxPressurePathBuilder,
   planNeonBrushPasses,
   planOilBrushDabs,
   studioOilPaintBodyForBrush,
@@ -70,7 +73,10 @@ import {
   resolveStudioLivingInkSettledBakeProgram,
 } from "../studio-living-ink-settled-bake-v1";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
-import { planStudioPerfectFreehandRender } from "../studio-outline-stroke-contract";
+import {
+  planStudioPerfectFreehandRender,
+  planStudioPerfectFreehandRenderIncremental,
+} from "../studio-outline-stroke-contract";
 import {
   konvaPatternProps,
   loadPatternTileImage,
@@ -147,7 +153,10 @@ import {
 } from "./studio-oil-ribbon-carrier";
 import { paintStudioOilRibbonCarrierIncremental } from "./studio-oil-ribbon-incremental-paint";
 import { rasterizeStudioCoverageBands } from "./studio-stroke-coverage-raster";
-import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
+import {
+  planStudioAngledNibStrokeLocalCoverage,
+  planStudioAngledNibStrokeLocalCoverageIncremental,
+} from "./studio-stroke-local-coverage";
 import {
   isStudioBoundedFlowPaintModelCompatible,
 } from "./studio-stroke-paint-model";
@@ -171,10 +180,12 @@ import {
   planStudioWetRibbonCarrier,
   traceStudioWetRibbonCarrierBatch,
 } from "./studio-wet-ribbon-carrier";
+import { planStudioWetWashLivePipeline } from "./studio-wet-wash-live-pipeline";
 
 
 import type { CalligraphyStylusInput } from "../studio-brush";
 import type { DrawEl } from "../studio-element-model";
+import type { StudioIncrementalFxPressurePathBuilder } from "../studio-fx-brush";
 import type { StudioPaperSurfaceSettings } from "./studio-paper-granulation-runtime";
 import type { StudioPatternSpec } from "../studio-pattern-fill";
 import type { StudioPerfectFreehandStroker } from "../studio-perfect-freehand";
@@ -350,6 +361,30 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   );
   const isEraserOperation = el.mode === "eraser"
     || (el.brush ? resolveStudioBrushRuntimeContract(el.brush)?.operation === "erase" : false);
+  /**
+   * 압력 경로(fx 패밀리: neon/glow/highlighter)의 증분 빌더. 자라나는 요소가 이 컴포넌트를 매
+   * 이동 리렌더할 때 전체 압력 경로를 다시 계획하던 것(장획 게이트가 잡는 이동당 O(n))을,
+   * sceneFunc(그리기 시점)에서 append 로 소비해 이동당 상수 비용으로 만든다. 렌더 본문이 아닌
+   * 그리기 콜백에서만 접근하므로 react-compiler 순수성 규약과도 충돌하지 않는다.
+   *
+   * 라이브 드래프트에서만 쓴다(P2 리뷰): 빌더의 prefix 검증은 마지막 소비 슬롯만 보는 O(1)
+   * 앵커라, 길이·꼬리가 같은 내부 재작성(undo/복원)을 append-only 로 오인해 커밋 요소가 낡은
+   * 지오메트리를 유지할 수 있다 — 커밋/재수화 경로는 배치 플래너가 값 동일로 다시 계산한다.
+   * 대칭 변형은 인덱스별 빌더로 격리한다(꼬리점이 대칭축 위일 때 변형 간 앵커 충돌 방지).
+   */
+  const fxPressurePathBuildersRef =
+    useRef<Map<number, StudioIncrementalFxPressurePathBuilder> | null>(null);
+  const fxPressurePathBuilderForVariation = (
+    variationIndex: number,
+  ): StudioIncrementalFxPressurePathBuilder => {
+    const builders = fxPressurePathBuildersRef.current ??= new Map();
+    let builder = builders.get(variationIndex);
+    if (!builder) {
+      builder = createStudioIncrementalFxPressurePathBuilder();
+      builders.set(variationIndex, builder);
+    }
+    return builder;
+  };
   const composite = isEraserOperation ? "destination-out" : "source-over";
   const opacity = el.opacity ?? 1;
   const stroke = isEraserOperation ? "#16100c" : el.stroke;
@@ -406,6 +441,48 @@ export const StudioDrawNode = memo(function StudioDrawNode({
       })
     : null;
   const dynamicCoverageMarkPlan = dynamicCoverageAndLegacyMarkPlan?.coveragePlan ?? null;
+
+  // 브라우저 감사 진단(플래그 게이트): 커밋 렌더가 분기하기 전의 요소 라우팅 사실을 남긴다 —
+  // "라이브는 dynamic 커버리지, 커밋은 알 수 없는 분기"였던 실측 모순의 최종 판별점.
+  // 렌더 본문 부수효과는 react-compiler 계약 위반이라 커밋 후 이펙트에서 기록한다.
+  useEffect(() => {
+    if (
+      activeDraft
+      || kind !== "freehand"
+      || el.mode === "eraser"
+      || (globalThis as { __studioDynamicSealDebugEnabled?: boolean })
+        .__studioDynamicSealDebugEnabled !== true
+    ) {
+      return;
+    }
+    (globalThis as {
+      __studioCommitRouteDebug?: Record<string, unknown>;
+    }).__studioCommitRouteDebug = {
+      elId: el.id,
+      brush: el.brush ?? null,
+      brushCatalogId: el.brushCatalogId ?? null,
+      dynamicBrushId,
+      planStatus: dynamicBrushPlanResult?.status ?? null,
+      coverageOk: dynamicCoverageMarkPlan?.ok ?? null,
+      paintModel: el.paintModel ?? null,
+      watercolorPipeline: el.watercolorPipeline ?? null,
+      stampPipeline: el.stampPipeline ?? null,
+      paperModel: el.paperModel ?? null,
+      hasDynamics: typeof el.brushDynamics === "object" && el.brushDynamics !== null,
+      pointCount: Math.floor(el.points.length / 2),
+      stampBrushKind,
+      perfectProfile: perfectProfile !== null,
+    };
+  }, [
+    activeDraft,
+    dynamicBrushId,
+    dynamicBrushPlanResult,
+    dynamicCoverageMarkPlan,
+    el,
+    kind,
+    perfectProfile,
+    stampBrushKind,
+  ]);
 
   return (
     <Group
@@ -713,7 +790,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (outlineContractPresent) {
-            const outlinePlan = planStudioPerfectFreehandRender({
+            const outlinePlanInput = {
               contract: el.outlineStroke,
               stroker: perfectStroker,
               points,
@@ -724,7 +801,15 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               strokeWidth,
               sampleSpacing: el.sampleSpacing,
               legacyMinDistance: renderSampleDistance,
-            });
+            };
+            // 활성 초안은 요소 id 로 키된 증분 플래너가 크로키 캡슐 링·pathData 의 안정
+            // prefix 를 유지한다(장획 게이트 capsule-outline; 다른 엔진은 내부에서 배치 위임).
+            // 커밋 렌더는 배치 리플레이를 유지해 내부 점 재작성에도 항상 정본을 그린다.
+            // 대칭 변형은 같은 요소를 변형된 점 배열로 여러 번 그린다 — 변형 인덱스를 획
+            // 키에 포함해 변형끼리 유지 플래너(내부 보관 배열)를 공유하지 않게 한다(P2 리뷰).
+            const outlinePlan = activeDraft
+              ? planStudioPerfectFreehandRenderIncremental(`${el.id}#${index}`, outlinePlanInput)
+              : planStudioPerfectFreehandRender(outlinePlanInput);
             if (outlinePlan.kind === "outline") {
               return (
                 <Path
@@ -1106,6 +1191,39 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               return null;
             }
             const legacyMarks = dynamicCoverageAndLegacyMarkPlan?.legacyMarks ?? [];
+            // 브라우저 감사 진단(플래그 게이트): 커밋 sceneFunc이 실제로 택한 분기와 커버리지
+            // 렌더 결과를 남긴다 — 계획은 풍부한데 커밋 픽셀이 희미한 실측 모순의 최종 판별점.
+            const commitRenderDebugEnabled = !activeDraft
+              && (globalThis as { __studioDynamicSealDebugEnabled?: boolean })
+                .__studioDynamicSealDebugEnabled === true;
+            const recordCommitRenderDebug = (
+              branch: string,
+              result: unknown,
+            ): void => {
+              if (!commitRenderDebugEnabled) return;
+              const planMarks = dynamicCoverageMarkPlan?.ok
+                ? dynamicCoverageMarkPlan.marks
+                : [];
+              (globalThis as {
+                __studioCommitRenderDebug?: Record<string, unknown>;
+              }).__studioCommitRenderDebug = {
+                elId: el.id,
+                branch,
+                result,
+                markCount: dynamicCoverageMarkPlan?.ok ? planMarks.length : -1,
+                // 인앱 커밋 플랜의 강도 요약 — 오프라인 프로브와의 마지막 비교점.
+                alphaPeak: planMarks.reduce((m, mark) => Math.max(m, mark.alpha), 0),
+                energy: planMarks.reduce(
+                  (sum, mark) => sum + mark.alpha * mark.radiusX * mark.radiusY,
+                  0,
+                ),
+                textured: planMarks.filter((mark) => mark.texture).length,
+                ribbons: planMarks.filter((mark) => mark.ribbon).length,
+                legacyMarkCount: legacyMarks.length,
+                opacity,
+                at: performance.now(),
+              };
+            };
             return (
               <Shape
                 key={index}
@@ -1114,7 +1232,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     dynamicCoverageMarkPlan?.ok
                     && isStudioBoundedFlowPaintModelCompatible(el)
                   ) {
-                    renderStudioDynamicBrushCoverage(
+                    const rendered = renderStudioDynamicBrushCoverage(
                       context,
                       dynamicCoverageMarkPlan.marks,
                       {
@@ -1125,6 +1243,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                           : {}),
                       },
                     );
+                    recordCommitRenderDebug("bounded-flow-coverage", rendered);
                     // bounded-flow-v2 owns stroke opacity as one final coverage composite. A
                     // surface/budget failure must remain empty (or retain a partial prefix) rather
                     // than replaying marks with opacity on every dab, which would irreversibly
@@ -1134,6 +1253,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   // Only omitted/legacy paint models retain historical per-dab opacity pixels.
                   // A malformed causal mark plan is rejected before this Shape is constructed.
                   renderStudioDynamicBrushLegacyMarks(context, legacyMarks, opacity);
+                  recordCommitRenderDebug("legacy-marks", null);
                 }}
                 globalCompositeOperation={composite}
                 listening={false}
@@ -1418,25 +1538,39 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0,
             }).points;
-            const coveragePlan = planStudioAngledNibStrokeLocalCoverage(
-              smoothed,
-              aliasStrokeWidth,
-              -Math.PI / 6,
+            const coveragePressureInput =
               el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
                 ? {
                     profileId: brush === "flat-brush"
-                      ? "flat-brush"
+                      ? ("flat-brush" as const)
                       : brush === "marker--chisel-ribbon"
-                        ? "marker-chisel"
-                        : "brush",
+                        ? ("marker-chisel" as const)
+                        : ("brush" as const),
                     pressures: el.pressures,
                     minimumDiameterRatio: el.materialMinimumDiameterRatio,
                     // The bands carry ABSOLUTE alpha, so the element opacity is folded in by the
                     // planner and the Shape below must not apply it a second time.
                     elementOpacity: opacity,
                   }
-                : undefined,
-            );
+                : undefined;
+            // 활성 초안은 요소 id 로 키된 증분 빌더가 세그먼트 폴리곤/밀도의 안정 prefix 를
+            // 유지한다(장획 게이트 angled-ribbon; 톤 밴딩은 의도적 전역 설계라 매 호출 접는다).
+            // 커밋 렌더는 배치 리플레이를 유지해 항상 정본을 그린다.
+            const coveragePlan = activeDraft
+              ? planStudioAngledNibStrokeLocalCoverageIncremental(
+                  // 변형 인덱스로 키 격리 — 변형 간 내부 보관 배열 공유 금지(P2 리뷰).
+                  `${el.id}#${index}`,
+                  smoothed,
+                  aliasStrokeWidth,
+                  -Math.PI / 6,
+                  coveragePressureInput,
+                )
+              : planStudioAngledNibStrokeLocalCoverage(
+                  smoothed,
+                  aliasStrokeWidth,
+                  -Math.PI / 6,
+                  coveragePressureInput,
+                );
             // One band means the mark has no resolvable tonal range. That is the emission this
             // carrier has always had — one compound fill at the element's own opacity — and it
             // stays on the original code path, untouched, so saved documents replay to the byte.
@@ -1542,9 +1676,28 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               // stations stay prefix-stable, while pointer-up no longer grows the visible stroke.
               previewEndpoint: causalWatercolor && activeDraft,
             };
-            const plannedDabs = causalWatercolor
-              ? planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)
-              : planWatercolorBrushDabs(watercolorInput);
+            // 활성 초안은 점 배열이 append 전용이므로 요소 id 로 키된 증분 파이프라인이
+            // 플래너·재질 스케일·습식 리본 캐리어의 안정 prefix 를 함께 보관해 새 표본만 걷는다
+            // (이동당 O(1) — 장획 게이트 wet-dabs). 웻 텍스처 프로그램이 핀된 레인은 전획 물리
+            // 단계 때문에 파이프라인이 null 을 돌려주고 아래 배치 체인으로 내려간다. 커밋 렌더는
+            // 오늘처럼 배치 리플레이를 유지해 후처리 워커의 전면 치환 같은 내부 점 재작성에도
+            // 항상 정본을 그린다.
+            const liveWetWashPlan = causalWatercolor && activeDraft
+              // 변형 인덱스로 키 격리 — 변형 간 내부 보관 배열 공유 금지(P2 리뷰).
+              ? planStudioWetWashLivePipeline(`${el.id}#${index}`, {
+                  brushId: brush,
+                  enginePrograms: el.brushEnginePrograms,
+                  input: watercolorInput,
+                  carrierSeed: watercolorSeed,
+                })
+              : null;
+            const plannedDabs = liveWetWashPlan
+              ? liveWetWashPlan.dabs
+              : causalWatercolor
+                ? activeDraft
+                  ? planCausalWatercolorBrushDabsIncremental(`${el.id}#${index}`, watercolorInput, false)
+                  : planCausalWatercolorBrushDabs(watercolorInput, true)
+                : planWatercolorBrushDabs(watercolorInput);
             // The stroke seed feeds the opt-in wet-edge-bloom lanes; SVG export passes the same
             // seed at its two watercolor sites so Canvas and SVG stay pixel-agreeing.
             // The phase gates only the opt-in living-ink settled bake (2026-08-13 wave 3): the
@@ -1577,7 +1730,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 ? resolveStudioLivingInkSettledBakeProgram(livingInkBakeProgramId)
                 : null;
             let dabs: readonly StudioBrushAliasWatercolorDab[];
-            if (livingInkBakeProgram) {
+            if (liveWetWashPlan) {
+              // 파이프라인이 재질 스케일까지 끝냈다(프로그램 없는 레인만 진입하므로 배치의
+              // apply 결과와 값 동일).
+              dabs = liveWetWashPlan.dabs;
+            } else if (livingInkBakeProgram) {
               const baseDabs = applyStudioBrushAliasWatercolorMaterial(
                 brush,
                 plannedDabs,
@@ -1605,9 +1762,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 el.brushEnginePrograms,
               );
             }
-            const wetRibbonPlan = causalWatercolor
-              ? planStudioWetRibbonCarrier(dabs, { seed: watercolorSeed })
-              : null;
+            const wetRibbonPlan = liveWetWashPlan
+              ? liveWetWashPlan.carrierPlan
+              : causalWatercolor
+                ? planStudioWetRibbonCarrier(dabs, { seed: watercolorSeed })
+                : null;
             return (
               <Shape
                 key={index}
@@ -1677,9 +1836,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
           if (brushFamily === "screentone" && el.mode !== "eraser") {
             // 스크린톤: 전역 격자에 정렬된 망점 도트를 스트로크 경로에 찍는다(겹쳐도 패턴 유지).
+            // 활성 초안은 요소 id 로 키된 증분 빌더가 도장 워크의 안정 prefix 를 유지한다
+            // (이동당 새 표본 비례 — 장획 게이트 stamp-tone). 커밋 렌더는 배치를 유지한다.
             const pitch = Math.max(3, aliasStrokeWidth * 0.42);
             const radius = Math.max(2, aliasStrokeWidth / 2);
-            const dots = screentoneDotsForStroke(points, radius, pitch);
+            const dots = activeDraft
+              // 변형 인덱스로 키 격리 — 변형 간 내부 보관 배열 공유 금지(P2 리뷰).
+              ? screentoneDotsForStrokeIncremental(`${el.id}#${index}`, points, radius, pitch)
+              : screentoneDotsForStroke(points, radius, pitch);
             const dotR = screentoneDotRadius(pitch);
             return (
               <Shape
@@ -2009,14 +2173,6 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 </Group>
               );
             }
-            const pressurePath = planStudioFxBrushPressurePath({
-              brushId: "neon",
-              points: renderPath.points,
-              pressures: el.pressures,
-              pressureModel: el.materialPressureModel,
-              minimumDiameterRatio: el.materialMinimumDiameterRatio,
-              tension: renderPath.tension,
-            });
             const tapPressure = resolveStudioFxBrushTapPressureResponse(
               "neon",
               el.pressures?.[0],
@@ -2051,34 +2207,46 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                       listening={false}
                     />
-                  ) : (() => {
-                    const ribbonPlan = planStudioFxLuminousRibbonPass({
-                      brushId: "neon",
-                      pressurePath,
-                      baseWidth: strokeWidth,
-                      passWidthScale: pass.widthScale,
-                      passOpacity: pass.opacity,
-                      luminousCore,
-                    });
-                    return (
-                      <Shape
-                        key={passIndex}
-                        sceneFunc={(context) => {
-                          if (ribbonPlan.polygons.length === 0) return;
-                          context.save();
-                          context.globalAlpha *= ribbonPlan.opacity;
-                          context.fillStyle = passColor;
-                          context.beginPath();
-                          traceStudioFxLuminousRibbonPass(context, ribbonPlan);
-                          context.fill();
-                          context.restore();
-                        }}
-                        globalCompositeOperation={ribbonPlan.compositeOperation}
-                        listening={false}
-                        perfectDrawEnabled={false}
-                      />
-                    );
-                  })();
+                  ) : (
+                    <Shape
+                      key={passIndex}
+                      sceneFunc={(context) => {
+                        // 압력 경로는 라이브 드래프트에서만 증분 빌더로 소비한다 — 같은 스냅샷의
+                        // 두 번째 이후 패스는 휘발 꼬리만 다시 방출하므로 그리기당 추가 비용이
+                        // 상수다. 커밋 요소는 배치 플래너로 매번 값 동일 재계산(P2: O(1) 앵커가
+                        // 같은 길이·꼬리의 내부 재작성을 놓친다).
+                        const fxInput = {
+                          brushId: "neon",
+                          points: renderPath.points,
+                          pressures: el.pressures,
+                          pressureModel: el.materialPressureModel,
+                          minimumDiameterRatio: el.materialMinimumDiameterRatio,
+                          tension: renderPath.tension,
+                        } as const;
+                        const ribbonPlan = planStudioFxLuminousRibbonPass({
+                          brushId: "neon",
+                          pressurePath: activeDraft
+                            ? fxPressurePathBuilderForVariation(index).append(fxInput)
+                            : planStudioFxBrushPressurePath(fxInput),
+                          baseWidth: strokeWidth,
+                          passWidthScale: pass.widthScale,
+                          passOpacity: pass.opacity,
+                          luminousCore,
+                        });
+                        if (ribbonPlan.polygons.length === 0) return;
+                        context.save();
+                        context.globalAlpha *= ribbonPlan.opacity;
+                        context.fillStyle = passColor;
+                        context.beginPath();
+                        traceStudioFxLuminousRibbonPass(context, ribbonPlan);
+                        context.fill();
+                        context.restore();
+                      }}
+                      globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                  );
                 })}
               </Group>
             );
@@ -2136,14 +2304,6 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               );
             }
             const pressureBrush = soft ? "soft-glow" : "glow";
-            const pressurePath = planStudioFxBrushPressurePath({
-              brushId: pressureBrush,
-              points: renderPath.points,
-              pressures: el.pressures,
-              pressureModel: el.materialPressureModel,
-              minimumDiameterRatio: el.materialMinimumDiameterRatio,
-              tension: renderPath.tension,
-            });
             const tapPressure = resolveStudioFxBrushTapPressureResponse(
               pressureBrush,
               el.pressures?.[0],
@@ -2179,34 +2339,44 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                       listening={false}
                     />
-                  ) : (() => {
-                    const ribbonPlan = planStudioFxLuminousRibbonPass({
-                      brushId: pressureBrush,
-                      pressurePath,
-                      baseWidth: strokeWidth,
-                      passWidthScale: pass.widthScale,
-                      passOpacity: pass.opacity,
-                      luminousCore,
-                    });
-                    return (
-                      <Shape
-                        key={passIndex}
-                        sceneFunc={(context) => {
-                          if (ribbonPlan.polygons.length === 0) return;
-                          context.save();
-                          context.globalAlpha *= ribbonPlan.opacity;
-                          context.fillStyle = stroke;
-                          context.beginPath();
-                          traceStudioFxLuminousRibbonPass(context, ribbonPlan);
-                          context.fill();
-                          context.restore();
-                        }}
-                        globalCompositeOperation={ribbonPlan.compositeOperation}
-                        listening={false}
-                        perfectDrawEnabled={false}
-                      />
-                    );
-                  })();
+                  ) : (
+                    <Shape
+                      key={passIndex}
+                      sceneFunc={(context) => {
+                        // neon 분기와 같은 소비 규율 — 라이브 드래프트만 증분(이동당 상수),
+                        // 커밋 요소는 배치 플래너로 값 동일 재계산.
+                        const fxInput = {
+                          brushId: pressureBrush,
+                          points: renderPath.points,
+                          pressures: el.pressures,
+                          pressureModel: el.materialPressureModel,
+                          minimumDiameterRatio: el.materialMinimumDiameterRatio,
+                          tension: renderPath.tension,
+                        } as const;
+                        const ribbonPlan = planStudioFxLuminousRibbonPass({
+                          brushId: pressureBrush,
+                          pressurePath: activeDraft
+                            ? fxPressurePathBuilderForVariation(index).append(fxInput)
+                            : planStudioFxBrushPressurePath(fxInput),
+                          baseWidth: strokeWidth,
+                          passWidthScale: pass.widthScale,
+                          passOpacity: pass.opacity,
+                          luminousCore,
+                        });
+                        if (ribbonPlan.polygons.length === 0) return;
+                        context.save();
+                        context.globalAlpha *= ribbonPlan.opacity;
+                        context.fillStyle = stroke;
+                        context.beginPath();
+                        traceStudioFxLuminousRibbonPass(context, ribbonPlan);
+                        context.fill();
+                        context.restore();
+                      }}
+                      globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                  );
                 })}
               </Group>
             );

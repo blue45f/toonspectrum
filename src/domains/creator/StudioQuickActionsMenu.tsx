@@ -1,24 +1,7 @@
 import {
-  BringToFront,
-  CopyPlus,
-  Eraser,
-  Maximize2,
-  MessageCirclePlus,
-  MousePointer2,
   Move,
-  PenTool,
-  Contrast,
-  Droplets,
-  PaintBucket,
-  Pipette,
-  Scan,
-  Redo2,
   Settings2,
-  SlidersHorizontal,
-  Trash2,
-  Undo2,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -28,6 +11,7 @@ import {
   STUDIO_ICON_STROKE,
   studioChromeIconClass,
 } from "./studio-chrome-ui";
+import { STUDIO_QUICK_ACTION_PRESENTATION } from "./studio-quick-action-presentation";
 import {
   clampStudioQuickActionsCenter,
   QUICK_ACTION_IDS,
@@ -60,27 +44,7 @@ const SLOT_PRESENTATION: Record<
   northWest: { label: "왼쪽 위 슬롯", offset: { x: -90, y: -52 } },
 };
 
-const ACTION_PRESENTATION: Record<
-  StudioQuickActionId,
-  { label: string; Icon: LucideIcon }
-> = {
-  undo: { label: "되돌리기", Icon: Undo2 },
-  redo: { label: "다시 실행", Icon: Redo2 },
-  select: { label: "선택", Icon: MousePointer2 },
-  pen: { label: "펜", Icon: PenTool },
-  eraser: { label: "지우개", Icon: Eraser },
-  eyedropper: { label: "스포이트", Icon: Pipette },
-  properties: { label: "속성", Icon: SlidersHorizontal },
-  duplicate: { label: "복제", Icon: CopyPlus },
-  delete: { label: "삭제", Icon: Trash2 },
-  "bring-front": { label: "맨 앞으로", Icon: BringToFront },
-  "fit-width": { label: "폭 맞춤", Icon: Maximize2 },
-  "add-bubble": { label: "말풍선 추가", Icon: MessageCirclePlus },
-  "advanced-fill": { label: "고급 채우기", Icon: PaintBucket },
-  "quick-mask": { label: "퀵 마스크", Icon: Scan },
-  "wet-mix": { label: "혼색 브러시", Icon: Droplets },
-  "dodge-burn": { label: "닷지/번", Icon: Contrast },
-};
+const ACTION_PRESENTATION = STUDIO_QUICK_ACTION_PRESENTATION;
 
 export interface StudioQuickActionsMenuProps {
   open: boolean;

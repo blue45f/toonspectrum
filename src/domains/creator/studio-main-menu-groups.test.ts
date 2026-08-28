@@ -293,10 +293,12 @@ describe("buildStudioMainMenuGroups", () => {
     const ids = groups.flatMap((group) => group.items.map((item) => item.id));
 
     expect(new Set(ids).size).toBe(ids.length);
-    // The two Preferences entry points survive the regroup with distinct ids and
-    // their original handlers.
+    // Preferences 는 편집 메뉴 단일 행만 남는다 — 창 그룹의 두 번째 진입점은 제거됐다.
     expect(menuItem(groups, "edit", "app-settings").label).toBe("애플리케이션 설정…");
-    expect(menuItem(groups, "window", "app-settings-window").label).toBe("애플리케이션 설정");
+    const windowIds = groups.find((group) => group.id === "window")?.items.map(
+      (item) => item.id,
+    );
+    expect(windowIds).not.toContain("app-settings-window");
   });
 
   it("keeps relocated items on the locale keys the 75 shipped packs were authored against", () => {
@@ -305,7 +307,6 @@ describe("buildStudioMainMenuGroups", () => {
       "studio.mainMenu.item.view.canvas-rulers": "Canvas rulers",
       "studio.mainMenu.item.view.reset-local-visibility": "Show layers I hid",
       "studio.mainMenu.item.view.page-sequence.open": "Close page sequence",
-      "studio.mainMenu.item.view.app-settings": "Application settings",
       "studio.mainMenu.item.insert.bg3d": "3D background",
       "studio.mainMenu.item.insert.page": "New page",
       "studio.mainMenu.item.draw.pen": "Pen",
@@ -322,7 +323,6 @@ describe("buildStudioMainMenuGroups", () => {
     expect(menuItem(groups, "canvas", "canvas-rulers").label).toBe("Canvas rulers");
     expect(menuItem(groups, "layer", "reset-local-visibility").label).toBe("Show layers I hid");
     expect(menuItem(groups, "comic", "page-sequence").label).toBe("Close page sequence");
-    expect(menuItem(groups, "window", "app-settings-window").label).toBe("Application settings");
     expect(menuItem(groups, "3d", "bg3d").label).toBe("3D background");
     expect(menuItem(groups, "comic", "page").label).toBe("New page");
     expect(menuItem(groups, "brush", "pen").label).toBe("Pen");
@@ -545,35 +545,45 @@ describe("buildStudioMainMenuGroups", () => {
     );
   });
 
-  it("보기 메뉴의 검수·미리보기 3종을 주입된 ui 액션으로 보낸다", () => {
-    // 벨트에서 승격된 항목들이다. 여기서 어긋나면 메뉴에는 보이지만 아무것도 열지 않는,
-    // 도달성 테스트가 잡지 못하는 종류의 회귀가 된다(버튼은 가시하니까).
+  it("검수·미리보기 3종은 Animation/Comic 의 단일 행이 주입된 ui 액션으로 보낸다", () => {
+    // View 중복 행은 제거됐다 — 메뉴당 한 문 원칙. 여기서 어긋나면 메뉴에는 보이지만
+    // 아무것도 열지 않는, 도달성 테스트가 잡지 못하는 종류의 회귀가 된다(버튼은 가시하니까).
     const { groups, ui } = buildMenu();
 
-    menuItem(groups, "view", "anim-timeline").onSelect();
-    menuItem(groups, "view", "vertical-scroll-preview").onSelect();
-    menuItem(groups, "view", "storyboard-grid").onSelect();
+    menuItem(groups, "animation", "timeline").onSelect();
+    menuItem(groups, "comic", "scroll-preview").onSelect();
+    menuItem(groups, "comic", "storyboard").onSelect();
 
     expect(ui.toggleAnimationTimeline).toHaveBeenCalledOnce();
     expect(ui.openScrollPreview).toHaveBeenCalledOnce();
     expect(ui.openStoryboardGrid).toHaveBeenCalledOnce();
   });
 
+  it("보기 메뉴에는 검수·미리보기 중복 행이 다시 생기지 않는다", () => {
+    const { groups } = buildMenu();
+    const viewIds = (groups.find((group) => group.id === "view")?.items ?? []).map(
+      (item) => item.id,
+    );
+    expect(viewIds).not.toContain("anim-timeline");
+    expect(viewIds).not.toContain("vertical-scroll-preview");
+    expect(viewIds).not.toContain("storyboard-grid");
+  });
+
   it("마스터 편집 중에는 타임라인 항목이 벨트와 같은 이유로 잠긴다", () => {
     const { groups } = buildMenu({ masterEditMode: true });
-    const timeline = menuItem(groups, "view", "anim-timeline");
+    const timeline = menuItem(groups, "animation", "timeline");
 
     expect(timeline.disabled).toBe(true);
     expect(timeline.unavailableReason).toContain("마스터 편집");
     // 나머지 둘은 히스토리 스크러빙을 쓰지 않으므로 잠기지 않는다.
-    expect(menuItem(groups, "view", "vertical-scroll-preview").disabled).toBeFalsy();
-    expect(menuItem(groups, "view", "storyboard-grid").disabled).toBeFalsy();
+    expect(menuItem(groups, "comic", "scroll-preview").disabled).toBeFalsy();
+    expect(menuItem(groups, "comic", "storyboard").disabled).toBeFalsy();
   });
 
   it("타임라인 항목은 열림 상태를 체크 표시로 반영한다", () => {
-    expect(menuItem(buildMenu().groups, "view", "anim-timeline").checked).toBe(false);
+    expect(menuItem(buildMenu().groups, "animation", "timeline").checked).toBe(false);
     expect(
-      menuItem(buildMenu({ animationTimelineOpen: true }).groups, "view", "anim-timeline")
+      menuItem(buildMenu({ animationTimelineOpen: true }).groups, "animation", "timeline")
         .checked,
     ).toBe(true);
   });
@@ -635,7 +645,7 @@ describe("buildStudioMainMenuGroups", () => {
     menuItem(groups, "window", "quick-access-palette").onSelect();
     menuItem(groups, "help", "feature-tutorials").onSelect();
     menuItem(groups, "help", "shortcuts").onSelect();
-    menuItem(groups, "window", "app-settings-window").onSelect();
+    menuItem(groups, "edit", "app-settings").onSelect();
     menuItem(groups, "filter", "last-filter").onSelect();
     menuItem(groups, "filter", "gaussian-blur").onSelect();
 
@@ -657,7 +667,7 @@ describe("buildStudioMainMenuGroups", () => {
     expect(ui.toggleQuickAccessPalette).toHaveBeenCalledOnce();
     expect(editor.openFeatureTutorial).toHaveBeenCalledOnce();
     expect(ui.openShortcuts).toHaveBeenCalledOnce();
-    expect(ui.openAppSettings).toHaveBeenCalledWith();
+    expect(ui.openAppSettings).toHaveBeenCalledWith("general");
     expect(editor.openStudioFilter).toHaveBeenNthCalledWith(
       1,
       "motion-blur",

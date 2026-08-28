@@ -1,32 +1,24 @@
 import {
   ArrowDown,
   ArrowUp,
-  BringToFront,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
-  Contrast,
-  Droplets,
-  Eraser,
   Hand,
   Keyboard,
   LayoutPanelTop,
   LockKeyhole,
-  Maximize2,
   MessageCircle,
   MoreHorizontal,
   MousePointer2,
-  PaintBucket,
   Palette,
   PanelLeft,
   PanelRight,
   PanelsTopLeft,
   PencilLine,
   PenTool,
-  Pipette,
-  Redo2,
   RotateCcw,
   Save,
   Scan,
@@ -34,12 +26,10 @@ import {
   Search,
   Send,
   Settings2,
-  SlidersHorizontal,
   Smartphone,
   SunMedium,
   Tablet,
   Trash2,
-  Undo2,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -60,10 +50,9 @@ import {
   STUDIO_ICON_STROKE,
   studioChromeIconClass,
 } from "./studio-chrome-ui";
-import {
-  QUICK_ACTION_SLOTS,
-  type StudioQuickActionId,
-} from "./studio-quick-actions";
+import { STUDIO_QUICK_ACTION_PRESENTATION } from "./studio-quick-action-presentation";
+import { QUICK_ACTION_SLOTS } from "./studio-quick-actions";
+import { studioSearchTextMatches } from "./studio-search-text";
 import {
   resolveStudioWorkspaceRecommendation,
   studioWorkspaceSearchAliases,
@@ -200,27 +189,7 @@ const PRO_COMIC_PALETTE_LABELS: Record<
   "materials-quick-access": "소재·빠른 실행",
 };
 
-const QUICK_ACTION_PREVIEW: Record<
-  StudioQuickActionId,
-  { label: string; Icon: LucideIcon }
-> = {
-  undo: { label: "되돌리기", Icon: Undo2 },
-  redo: { label: "다시 실행", Icon: Redo2 },
-  select: { label: "선택", Icon: MousePointer2 },
-  pen: { label: "펜", Icon: PenTool },
-  eraser: { label: "지우개", Icon: Eraser },
-  eyedropper: { label: "스포이트", Icon: Pipette },
-  properties: { label: "속성", Icon: SlidersHorizontal },
-  duplicate: { label: "복제", Icon: Copy },
-  delete: { label: "삭제", Icon: Trash2 },
-  "bring-front": { label: "맨 앞으로", Icon: BringToFront },
-  "fit-width": { label: "폭 맞춤", Icon: Maximize2 },
-  "add-bubble": { label: "말풍선", Icon: MessageCircle },
-  "advanced-fill": { label: "고급 채우기", Icon: PaintBucket },
-  "quick-mask": { label: "퀵 마스크", Icon: Scan },
-  "wet-mix": { label: "혼색", Icon: Droplets },
-  "dodge-burn": { label: "닷지·번", Icon: Contrast },
-};
+const QUICK_ACTION_PREVIEW = STUDIO_QUICK_ACTION_PRESENTATION;
 
 const FOCUSABLE_SELECTOR = [
   "button:not([disabled])",
@@ -395,29 +364,20 @@ function StudioWorkspaceOverlayLayer({
 
 class StudioWorkspaceOwnerChangedError extends Error {}
 
-function normalizedSearchTokens(value: string): readonly string[] {
-  return value
-    .normalize("NFKC")
-    .toLocaleLowerCase("ko-KR")
-    .trim()
-    .split(/\s+/u)
-    .filter(Boolean);
-}
-
-/** Local AND search shared by the compact workspace picker and its edge-case tests. */
+/**
+ * Local AND search shared by the compact workspace picker and its edge-case tests.
+ * 폴딩 규칙은 studio-search-text 한 곳만 쓴다 — 스튜디오의 다른 검색창과 같은 질의에
+ * 같은 답을 주기 위한 통일이다(docs/rewrite/ux-audit-v5.md §2.8).
+ */
 function matchesStudioWorkspaceQuery(
   workspace: StudioWorkspaceSearchEntry,
   query: string
 ): boolean {
-  const tokens = normalizedSearchTokens(query);
-  if (tokens.length === 0) return true;
-  const aliases = workspace.id
-    ? studioWorkspaceSearchAliases(workspace.id).join(" ")
-    : "";
-  const haystack = `${workspace.name} ${workspace.description ?? ""} ${aliases}`
-    .normalize("NFKC")
-    .toLocaleLowerCase("ko-KR");
-  return tokens.every((token) => haystack.includes(token));
+  return studioSearchTextMatches(query, [
+    workspace.name,
+    workspace.description,
+    ...(workspace.id ? studioWorkspaceSearchAliases(workspace.id) : []),
+  ]);
 }
 
 /** Builds a valid copy name without splitting surrogate pairs at the 48-character boundary. */

@@ -33,7 +33,8 @@ describe("creator provisional-work status guard", () => {
   });
 
   it("runs the direct PATCH guard after the authoritative work lock and before UPDATE", () => {
-    const source = readFileSync(new URL("./creator.ts", import.meta.url), "utf8");
+    // updateWork 는 분할된 server/creator/works.ts 가 소유한다.
+    const source = readFileSync(new URL("./creator/works.ts", import.meta.url), "utf8");
     const method = source.indexOf("export async function updateWork(");
     const transaction = source.indexOf("const updated = await db.transaction", method);
     const workLock = source.indexOf('.for("update")', transaction);

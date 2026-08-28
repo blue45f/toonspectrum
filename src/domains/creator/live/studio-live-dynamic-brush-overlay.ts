@@ -856,8 +856,17 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
       ? undefined
       : { model: livePaperModel, medium: livePaperMedium },
   );
+  // model/medium 을 함께 옮겨야 커버리지 렌더러의 contact-tooth-v2 분기가 라이브에서도 켜진다.
+  // 빠뜨리면 라이브는 평균 보존 레거시 granulation, 커밋은 tooth 침착으로 그려져 같은 마크가
+  // 화면에서 갈라진다(장경로 실측: charcoal--compressed-edge 라이브/커밋 평균 알파 126/92,
+  // 문서 고정 tooth 필드의 공간 변조가 무게중심을 7~12px 흔드는 centroid-drift 로 나타남).
   const paper = studioPaperGranulationIsActive(paperResponse)
-    ? Object.freeze({ response: paperResponse, surface: resolveStudioDocumentPaperSurface() })
+    ? Object.freeze({
+        response: paperResponse,
+        surface: resolveStudioDocumentPaperSurface(),
+        ...(livePaperModel !== undefined ? { model: livePaperModel } : {}),
+        ...(livePaperMedium !== null ? { medium: livePaperMedium } : {}),
+      })
     : undefined;
   return {
     strokeId: element.id,
@@ -980,6 +989,16 @@ export class StudioLiveDynamicBrushOverlayRenderer {
    * the active surface is cleared.
    */
   private settleFlattenUnionRect: PresentationPixelRect | null = null;
+  /**
+   * 시작 접촉 자리표시 원({@link paintImmediateContact})의 프레젠테이션 픽셀 rect.
+   *
+   * 자리표시 원은 브러시 계획과 무관한 단색 원이라, 실제 계획 마크가 그 원을 완전히 덮지
+   * 않는 레인(테이퍼 시작·치즐 엣지·그리드 스냅)에서는 획 내내 시작점에 라이브 전용 잉크로
+   * 남는다(장경로 실측: live-only-start-circle 79px / 1307px, centroid drift 7~11px). 첫
+   * 실제 프레젠테이션에서 이 rect 를 더티 영역에 합집합해 누적 캔버스 내용으로 재구성하면
+   * 탭 즉시 피드백 계약은 그대로 두고 자리표시 원만 계획된 잉크로 교체된다.
+   */
+  private contactPlaceholderRect: PresentationPixelRect | null = null;
 
   attach(canvases: StudioLiveDynamicBrushOverlayCanvases | null): void {
     this.activeCanvas = canvases?.activeCanvas ?? null;
@@ -1236,8 +1255,78 @@ export class StudioLiveDynamicBrushOverlayRenderer {
    * handoff. Same-length post-correction still rebuilds below.
    */
   end(element: DrawEl): StudioLiveDynamicBrushEndResult {
+    const sealDebugMarkCount = this.active?.markCount ?? -1;
     const appended = this.appendFrom(element);
-    if (appended.status === "fallback") return appended;
+    // 브라우저 감사 진단: 실패 프레임에서 "오버레이가 몇 개의 마크를 칠했다고 믿는지"가
+    // 앱 내 계획/예산 문제와 렌더러 드로잉 드롭아웃을 가른다. 성공/실패 공통으로 남긴다.
+    // 무거운 캔버스 검열(census)은 감사 하니스가 플래그를 켠 세션에서만 수행한다 — 제품
+    // 경로에서는 스트로크마다 getImageData를 읽는 비용을 절대 지불하지 않는다.
+    const sealDiagnosticsEnabled = (globalThis as {
+      __studioDynamicSealDebugEnabled?: boolean;
+    }).__studioDynamicSealDebugEnabled === true;
+    const sealDebugCensus = (
+      canvas: HTMLCanvasElement | null,
+      context: CanvasRenderingContext2D | null,
+    ): number => {
+      if (!canvas || !context || canvas.width === 0 || canvas.height === 0) {
+        return -1;
+      }
+      try {
+        const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        let ink = 0;
+        for (let index = 3; index < data.length; index += 16) {
+          if ((data[index] ?? 0) > 16) ink += 1;
+        }
+        return ink;
+      } catch {
+        return -1;
+      }
+    };
+    const recordSealDebug = (status: string): void => {
+      (globalThis as {
+        __studioDynamicSealDebug?: {
+          status: string;
+          markCountBefore: number;
+          markCountAfter: number;
+          at: number;
+        };
+      }).__studioDynamicSealDebug = {
+        status,
+        markCountBefore: sealDebugMarkCount,
+        markCountAfter: this.active?.markCount ?? -1,
+        at: performance.now(),
+        ...(sealDiagnosticsEnabled
+          ? {
+              union: this.settleFlattenUnionRect,
+              surface: this.surface
+                ? {
+                    left: this.surface.left,
+                    top: this.surface.top,
+                    width: this.surface.width,
+                    height: this.surface.height,
+                    documentScale: this.surface.documentScale,
+                  }
+                : null,
+              dpr: this.dpr,
+              // 렌더러가 들고 있는 캔버스가 아직 DOM에 붙어 있는가 — seal 시점 내부 잉크와
+              // DOM 검열 0 의 모순(실측)을 가르는 단 하나의 판별값.
+              activeConnected: this.activeCanvas?.isConnected ?? null,
+              presentationConnected: this.presentationCanvas?.isConnected ?? null,
+              settledConnected: this.settledCanvas?.isConnected ?? null,
+              activeInk: sealDebugCensus(this.activeCanvas, this.activeContext),
+              presentationInk: sealDebugCensus(
+                this.presentationCanvas,
+                this.presentationContext,
+              ),
+              settledInk: sealDebugCensus(this.settledCanvas, this.settledContext),
+            }
+          : {}),
+      };
+    };
+    if (appended.status === "fallback") {
+      recordSealDebug(`append-fallback:${appended.reason}`);
+      return appended;
+    }
     const active = this.active;
     if (!active) return { status: "fallback", reason: "surface-unavailable" };
     if (!this.surfaceReady()) {
@@ -1251,9 +1340,12 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       active.style.dynamics.fallbackPressure,
     );
     if (sourceMatches && (active.causalState || active.markCount > 0)) {
+      recordSealDebug("seal-direct");
       if (!this.flattenActiveToSettled(active.style.opacity)) {
         return this.failActive("surface-render");
       }
+      // 진단 모드에서만 유의미한 두 번째 기록: settled 검열이 flatten 결과를 반영한다.
+      recordSealDebug("seal-direct:flattened");
       this.settled.push({
         style: active.style,
         source: detachedSource(active.source),
@@ -1290,10 +1382,12 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     active.stampGrid = exact.stampGrid;
     if (!this.drawMarksToActive(exact.marks)) return this.failActive("surface-render");
     active.markCount = exact.marks.length;
+    recordSealDebug("seal-exact-rebuild");
     active.r8AlphaMapBytes = exact.r8AlphaMapBytes;
     if (!this.flattenActiveToSettled(active.style.opacity)) {
       return this.failActive("surface-render");
     }
+    recordSealDebug("seal-exact-rebuild:flattened");
     this.settled.push({
       style: exactStyle,
       source: detachedSource(exactSource),
@@ -1320,8 +1414,27 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     const released = Math.min(requested, this.settled.length);
     if (released === 0) return 0;
     this.settled = this.settled.slice(released);
+    this.recordReleaseDebug("release-prefix", { released, remaining: this.settled.length });
     this.replay();
     return released;
+  }
+
+  /**
+   * 브라우저 감사 진단 브레드크럼: settled 표면을 비운 마지막 주체를 전역에 남긴다. 실패
+   * 프레임에서 "커밋 영수증 릴리스가 이른 것"과 "replay 실패의 조용한 전량 클리어"를 가른다.
+   */
+  private recordReleaseDebug(
+    reason: string,
+    detail?: Record<string, unknown>,
+  ): void {
+    (globalThis as {
+      __studioDynamicReleaseDebug?: Record<string, unknown>;
+    }).__studioDynamicReleaseDebug = {
+      reason,
+      ...(detail ?? {}),
+      settledCount: this.settled.length,
+      at: performance.now(),
+    };
   }
 
   clearSettled(): number {
@@ -2061,11 +2174,17 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     const destination = this.presentationCanvas;
     const surface = this.surface;
     if (!context || !source || !destination || !surface) return false;
-    const rect = presentationRectForMarks(marks, surface, this.dpr, destination);
+    const markRect = presentationRectForMarks(marks, surface, this.dpr, destination);
     // A valid suffix may be fully outside the clipped live viewport. Its coverage is still kept
     // in the source surface and will be presented after a viewport replay; there is simply no
     // visible destination crop to update in this frame.
-    if (!rect) return true;
+    if (!markRect) return true;
+    // 첫 실제 마크 프레젠테이션이 시작 접촉 자리표시 원을 함께 지우고 누적 캔버스 내용으로
+    // 재구성한다. 순수 탭(마크 없음)은 여기 오지 않으므로 즉시 피드백 원은 그대로 남는다.
+    const rect = this.contactPlaceholderRect
+      ? unionPresentationPixelRects(this.contactPlaceholderRect, markRect)
+      : markRect;
+    this.contactPlaceholderRect = null;
     try {
       context.save();
       context.setTransform(1, 0, 0, 1, 0, 0);
@@ -2166,7 +2285,11 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   private replay(): void {
     this.clearActiveRect();
     this.clearSettledRect();
-    if (!this.surfaceReady()) return;
+    if (!this.surfaceReady()) {
+      this.recordReleaseDebug("replay-surface-not-ready");
+      return;
+    }
+    let replayIndex = 0;
     for (const stroke of this.settled) {
       const exact = this.exactPlan(stroke.style, stroke.source);
       if (
@@ -2175,11 +2298,18 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         || !this.flattenActiveToSettled(stroke.style.opacity)
       ) {
         this.fallbackReason = "surface-render";
+        // 이 경로는 failActive 를 거치지 않는 조용한 전량 클리어다 — 브레드크럼 없이는
+        // 커밋 영수증 릴리스와 구분되지 않았던 실측 교훈.
+        this.recordReleaseDebug("replay-settled-failed", {
+          failedAtIndex: replayIndex,
+          exactPlanned: Boolean(exact),
+        });
         this.clearActiveRect();
         this.clearSettledRect();
         return;
       }
       this.clearActiveRect();
+      replayIndex += 1;
     }
     const active = this.active;
     if (!active) return;
@@ -2207,6 +2337,14 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     readonly reason: StudioLiveDynamicBrushFallbackReason;
   } {
     this.fallbackReason = reason;
+    // 브라우저 감사 진단 브레드크럼: fail-closed 클리어는 화면에서 원인을 남기지 않으므로,
+    // 마지막 폴백 사유를 전역에 기록해 하니스가 실패 프레임에서 읽을 수 있게 한다.
+    (globalThis as {
+      __studioDynamicOverlayDebug?: {
+        lastFailure: StudioLiveDynamicBrushFallbackReason;
+        at: number;
+      };
+    }).__studioDynamicOverlayDebug = { lastFailure: reason, at: performance.now() };
     this.resetActiveState();
     this.clearActiveRect();
     return { status: "fallback", reason };
@@ -2301,10 +2439,59 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     context.globalCompositeOperation = "source-over";
     context.globalAlpha = Math.max(0.72, Math.min(1, style.opacity));
     context.fillStyle = style.color;
+    const radius = Math.max(2.8, style.width * 0.34);
     context.beginPath();
-    context.arc(first.x, first.y, Math.max(2.8, style.width * 0.34), 0, Math.PI * 2);
+    context.arc(first.x, first.y, radius, 0, Math.PI * 2);
     context.fill();
     context.restore();
+    this.recordContactPlaceholderRect(first.x, first.y, radius);
+  }
+
+  /**
+   * {@link presentationRectForMarks}와 같은 변환·같은 3px 프린지로 자리표시 원의 픽셀 rect 를
+   * 기록한다. begin 경로가 원을 두 번(요소 폭 → 스타일 폭) 그릴 수 있으므로 합집합으로 쌓는다.
+   */
+  private recordContactPlaceholderRect(
+    centerX: number,
+    centerY: number,
+    radius: number,
+  ): void {
+    const surface = this.surface;
+    const canvas = this.presentationCanvas;
+    if (!surface || !canvas) return;
+    const scale = this.dpr * surface.documentScale;
+    const translateX = surface.flipX
+      ? (surface.documentWidth * surface.documentScale - surface.left) * this.dpr
+      : -surface.left * this.dpr;
+    const translateY = -surface.top * this.dpr;
+    const firstPixelX = (surface.flipX ? -scale : scale) * (centerX - radius) + translateX;
+    const secondPixelX = (surface.flipX ? -scale : scale) * (centerX + radius) + translateX;
+    const firstPixelY = scale * (centerY - radius) + translateY;
+    const secondPixelY = scale * (centerY + radius) + translateY;
+    const fringe = 3;
+    const minimumPixelX = Math.max(
+      0,
+      Math.floor(Math.min(firstPixelX, secondPixelX)) - fringe,
+    );
+    const minimumPixelY = Math.max(
+      0,
+      Math.floor(Math.min(firstPixelY, secondPixelY)) - fringe,
+    );
+    const maximumPixelX = Math.min(
+      canvas.width,
+      Math.ceil(Math.max(firstPixelX, secondPixelX)) + fringe,
+    );
+    const maximumPixelY = Math.min(
+      canvas.height,
+      Math.ceil(Math.max(firstPixelY, secondPixelY)) + fringe,
+    );
+    const width = maximumPixelX - minimumPixelX;
+    const height = maximumPixelY - minimumPixelY;
+    if (width <= 0 || height <= 0) return;
+    this.contactPlaceholderRect = unionPresentationPixelRects(
+      this.contactPlaceholderRect,
+      { x: minimumPixelX, y: minimumPixelY, width, height },
+    );
   }
 
   private preparedActive(): CanvasRenderingContext2D | null {
@@ -2362,6 +2549,19 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     }
     const width = Math.max(1, Math.round(surface.width * this.dpr));
     const height = Math.max(1, Math.round(surface.height * this.dpr));
+    if (
+      (activeCanvas.width !== width || activeCanvas.height !== height)
+      && (this.active !== null || this.settled.length > 0)
+    ) {
+      // 치수 변경은 세 백킹 비트맵을 조용히 지운다 — setSurface 의 replay 가 복구를 맡지만,
+      // 실패 프레임에서 지워진 시점을 확정할 수 있게 남긴다.
+      this.recordReleaseDebug("surface-resize-wipe", {
+        fromWidth: activeCanvas.width,
+        fromHeight: activeCanvas.height,
+        toWidth: width,
+        toHeight: height,
+      });
+    }
     if (activeCanvas.width !== width) activeCanvas.width = width;
     if (activeCanvas.height !== height) activeCanvas.height = height;
     if (presentationCanvas.width !== width) presentationCanvas.width = width;
@@ -2398,6 +2598,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     this.clearCanvas(this.activeContext, this.activeCanvas);
     this.clearCanvas(this.presentationContext, this.presentationCanvas);
     this.settleFlattenUnionRect = null;
+    this.contactPlaceholderRect = null;
   }
 
   private clearSettledRect(): void {

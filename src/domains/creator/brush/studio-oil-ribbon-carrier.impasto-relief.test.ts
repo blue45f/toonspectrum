@@ -193,7 +193,10 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
     expect(longDabs.length).toBeGreaterThanOrEqual(2000);
     const { plan, elapsed } = fastestPlan(longDabs);
     expect(plan.impastoReliefLanes!.length).toBeGreaterThan(0);
-    expect(elapsed).toBeLessThan(30);
+    // Same busy-runner allowance as the scribble budget below (its rationale comment applies):
+    // even the min-of-5 statistic measured 39.5ms on a starved shared runner that passed the
+    // identical commit's local run at a third of that.
+    expect(elapsed).toBeLessThan(process.env.CI ? 60 : 30);
   });
 
   it("stays within the plan budget on a dense self-crossing scribble too", () => {

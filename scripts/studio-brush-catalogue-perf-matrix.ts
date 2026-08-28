@@ -472,7 +472,7 @@ export const STUDIO_BRUSH_CATALOGUE_SOAK_IDS = [
   "crayon",
   "oil-pastel",
 ] as const;
-export const STUDIO_BRUSH_CATALOGUE_SOAK_RUNS = 3;
+export const STUDIO_BRUSH_CATALOGUE_SOAK_RUNS = 10;
 /** Consecutive-plan growth tolerated before monotonic slowdown counts as degradation. */
 export const STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH = 1.2;
 /**
@@ -491,7 +491,7 @@ export interface StudioBrushCataloguePaintSoakResult {
   readonly planOk: boolean;
   /** `null` when the path exposes no geometry stream to hash (unmeasured, not failed). */
   readonly digestsStable: boolean | null;
-  /** True when every consecutive plan slowed down and the last exceeded the first by >20%. */
+  /** True when the second half's cheapest run stays >20% (and >4ms) above the first half's. */
   readonly monotonicDegradation: boolean;
   readonly freezeCount: number;
   readonly ok: boolean;
@@ -500,8 +500,21 @@ export interface StudioBrushCataloguePaintSoakResult {
 /**
  * Soak mode: plans the same stroke `runs` times back to back, mirroring a long editing session
  * replaying one heavy brush. A healthy planner stays flat (JIT warm-up may only speed it up) and
- * replays byte-identical geometry; strictly increasing times ending >20% above the first run mean
- * per-plan state is accumulating somewhere and must fail the gate.
+ * replays byte-identical geometry; per-plan state accumulating somewhere slows EVERY subsequent
+ * plan, so the gate compares the cheapest run of the SECOND half against the cheapest run of the
+ * FIRST half and trips only on >20% (and >4ms) sustained growth.
+ *
+ * Both halves must be minima over several runs. The original "strictly increasing" form was
+ * satisfiable by sub-ms jitter plus ONE preempted final run (measured: oil-pastel
+ * [7.22, 7.26, 18.90]ms), and the next form — min of the later runs against the single first
+ * run — fell to the mirror image, one LUCKY first run before a starved stretch (measured:
+ * acrylic-stiff-flat [6.55, 15.54, 13.59]ms). Three-run windows survived two scheduler
+ * preemptions on either side but still fell to the same lucky-baseline shape at ~40ms plan
+ * scale on a contended CI runner (measured: needle-graphite
+ * [40.68, 38.13, 46.76, 46.16, 82.60, 63.89]ms — cheapest-later 46.16 vs lucky baseline 38.13
+ * = x1.21, while the first half's OWN spread already spanned 38.1–46.8). Five-run windows make
+ * each minimum an estimate over enough samples that one clean run per half suffices, while a
+ * genuine compounding leak still slows every second-half run and clears the threshold at once.
  */
 export function evaluateStudioBrushCataloguePaintSoak(
   catalogId: string,
@@ -525,17 +538,12 @@ export function evaluateStudioBrushCataloguePaintSoak(
     ? null
     : measuredDigests.length === digests.length
       && measuredDigests.every((digest) => digest === measuredDigests[0]);
-  let strictlyIncreasing = true;
-  for (let run = 1; run < elapsedMs.length; run += 1) {
-    if (elapsedMs[run]! <= elapsedMs[run - 1]!) {
-      strictlyIncreasing = false;
-      break;
-    }
-  }
-  const monotonicDegradation = strictlyIncreasing
-    && elapsedMs.at(-1)!
-      > elapsedMs[0]! * STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
-    && elapsedMs.at(-1)! - elapsedMs[0]!
+  const halfIndex = Math.floor(elapsedMs.length / 2);
+  const baselineRun = Math.min(...elapsedMs.slice(0, Math.max(1, halfIndex)));
+  const cheapestLaterRun = Math.min(...elapsedMs.slice(Math.max(1, halfIndex)));
+  const monotonicDegradation =
+    cheapestLaterRun > baselineRun * STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
+    && cheapestLaterRun - baselineRun
       > STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS;
   const freezeCount = rows.filter((row) => row.freeze).length;
   return {
@@ -586,13 +594,23 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
   const rows = paintIds.map((catalogId) =>
     evaluateStudioBrushCataloguePaintPerfRow(catalogId, { packById }),
   );
-  const crayonFamily = STUDIO_BRUSH_CRAYON_FAMILY_IDS.map((catalogId) =>
-    evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
-      sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
-      budgetMs: 200,
-      packById,
-    }),
-  );
+  // Freeze verdicts here come from the MINIMUM of a few identical evaluations, the long-stroke
+  // gate's own statistic: shared-runner interference is additive, so one preempted pass cannot
+  // manufacture a freeze (measured CI flake: crayon 205.3ms single-sample against the 200ms
+  // budget on a runner that passed the identical commit at a fraction of that). The plan is
+  // deterministic, so the digest is identical across passes and only the clock varies.
+  const crayonFamily = STUDIO_BRUSH_CRAYON_FAMILY_IDS.map((catalogId) => {
+    let best: StudioBrushCataloguePerfRow | null = null;
+    for (let pass = 0; pass < 3; pass += 1) {
+      const row = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
+        sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
+        budgetMs: 200,
+        packById,
+      });
+      if (!best || row.elapsedMs < best.elapsedMs) best = row;
+    }
+    return best!;
+  });
   const observed = new Set(rows.map((row) => row.catalogId));
   const missingCatalogIds = paintIds.filter((id) => !observed.has(id));
   const freezeCount = rows.filter((row) => row.freeze).length

@@ -697,6 +697,486 @@ export function planStudioHighlighterWashRibbon(input: {
   });
 }
 
+export interface StudioIncrementalHighlighterWashRibbonBuilder {
+  /**
+   * 배치 `planStudioHighlighterWashRibbon`과 값이 정확히 같은 플랜을 돌려주되, 압력 경로의
+   * 안정 prefix 구간에서 평탄화 섹션·본체/조인 커버리지·디테일 워시를 호출 사이에 유지한다.
+   *
+   * `stableSegmentCount`는 상류 증분 압력 경로 빌더가 보증하는 append 전용 세그먼트 prefix
+   * 길이이고, `sourceGeneration`은 그 보증이 깨질 때 증가하는 세대 카운터다. 캡(끝막) 두 개와
+   * 휘발 꼬리는 매 호출 다시 만들고, 최종 `runs`/`detailRuns` 배열 조립은 참조 밀어넣기라
+   * 기하 연산은 새 섹션 수에만 비례한다. 반환 배열은 다음 `plan()` 호출까지만 유효하다.
+   */
+  plan(
+    input: {
+      readonly brushId: StudioHighlighterWashBrushId;
+      readonly pressurePath: StudioFxPressurePathPlan;
+      readonly baseWidth: unknown;
+    },
+    stableSegmentCount: number,
+    sourceGeneration: number,
+  ): StudioHighlighterWashPlan;
+}
+
+/**
+ * 증분 하이라이터 워시 빌더.
+ *
+ * 배치 플래너의 단계는 모두 앞으로만 흐른다: 평탄화는 세그먼트별 순수 사상, 연속 런 분할은
+ * 직전 섹션과의 연속성만 보고, 커버리지의 본체/조인은 이웃 섹션 쌍의 국소 함수이며, 디테일
+ * 워시 게이트는 전역 스텝 인덱스의 결정적 함수다. 런 하나의 커버리지가 [본체들, 조인들,
+ * 캡 2개] 순서로 묶여 있어 활성 런은 블록별로 따로 유지하고 호출마다 순서대로 이어 붙인다 —
+ * 참조 복사일 뿐 기하 재계산이 아니므로 이동당 기하 비용은 새 섹션 수에 비례한다.
+ */
+export function createStudioIncrementalHighlighterWashRibbonBuilder(): StudioIncrementalHighlighterWashRibbonBuilder {
+  let generation: number | null = null;
+  let configBrushId: StudioHighlighterWashBrushId | null = null;
+  let configBaseWidth = 0;
+
+  /** 평탄화 섹션(안정 prefix + 이번 호출의 휘발 꼬리 — 꼬리는 다음 호출에서 걷어낸다). */
+  const sections: FlatSection[] = [];
+  let stableSectionCount = 0;
+  let consumedSegments = 0;
+  /** 배치 평탄화가 캡에서 함수 전체를 반환하는 지점 — 이후 세그먼트는 영원히 무시된다. */
+  let stableStopped = false;
+  let stableCapped = false;
+  let stableWeighted = 0;
+  let stableDistance = 0;
+
+  /** 닫힌 런들의 커버리지(순서대로) — 활성 런 앞부분. */
+  const closedCoverage: StudioHighlighterWashRun[] = [];
+  /** 활성 런의 안정 블록: 본체 / 조인. 캡은 매 호출 다시 만든다. */
+  const activeBodies: StudioHighlighterWashRun[] = [];
+  const activeJoins: StudioHighlighterWashRun[] = [];
+  let activeRunIndex = 0;
+  let activeSectionCount = 0;
+  let activeFirstSection: FlatSection | null = null;
+  let activeFirstDirection: Direction | null = null;
+  let activeLastSection: FlatSection | null = null;
+  let activeLastDirection: Direction | null = null;
+
+  /** 디테일 워시(안정 prefix + 휘발 꼬리) + 전역 스텝 인덱스. */
+  const detailRuns: StudioHighlighterWashDetailRun[] = [];
+  let stableDetailCount = 0;
+  let stableSteppedCount = 0;
+
+  const reset = (): void => {
+    sections.length = 0;
+    stableSectionCount = 0;
+    consumedSegments = 0;
+    stableStopped = false;
+    stableCapped = false;
+    stableWeighted = 0;
+    stableDistance = 0;
+    closedCoverage.length = 0;
+    activeBodies.length = 0;
+    activeJoins.length = 0;
+    activeRunIndex = 0;
+    activeSectionCount = 0;
+    activeFirstSection = null;
+    activeFirstDirection = null;
+    activeLastSection = null;
+    activeLastDirection = null;
+    detailRuns.length = 0;
+    stableDetailCount = 0;
+    stableSteppedCount = 0;
+  };
+
+  const bodyRun = (section: FlatSection): StudioHighlighterWashRun => Object.freeze({
+    outlinePoints: bodyOutline(section),
+    flattenedSegmentCount: 1,
+    role: "body" as const,
+  });
+
+  const joinRun = (
+    previous: FlatSection,
+    previousDirection: Direction,
+    next: FlatSection,
+    nextDirection: Direction,
+    runIndex: number,
+    sectionIndexInRun: number,
+  ): StudioHighlighterWashRun => Object.freeze({
+    outlinePoints: footprintOutline(
+      previous.to,
+      joinDirection(previousDirection, nextDirection),
+      Math.max(previous.halfWidth, next.halfWidth),
+      "round-superellipse",
+      runIndex * 4099 + sectionIndexInRun,
+      JOIN_STEPS,
+      1,
+    ),
+    flattenedSegmentCount: 0,
+    role: "join" as const,
+  });
+
+  const startCapRun = (
+    profile: StudioHighlighterCapProfile,
+    first: FlatSection,
+    firstDirection: Direction,
+    runIndex: number,
+  ): StudioHighlighterWashRun => Object.freeze({
+    outlinePoints: footprintOutline(
+      first.from,
+      firstDirection,
+      first.halfWidth,
+      profile,
+      runIndex * 2 + 401,
+      CAP_STEPS * 2,
+    ),
+    flattenedSegmentCount: 0,
+    role: "start-cap" as const,
+  });
+
+  const endCapRun = (
+    profile: StudioHighlighterCapProfile,
+    last: FlatSection,
+    lastDirection: Direction,
+    runIndex: number,
+  ): StudioHighlighterWashRun => Object.freeze({
+    outlinePoints: footprintOutline(
+      last.to,
+      lastDirection,
+      last.halfWidth,
+      profile,
+      runIndex * 2 + 307,
+      CAP_STEPS * 2,
+    ),
+    flattenedSegmentCount: 0,
+    role: "end-cap" as const,
+  });
+
+  /** `planDetailRuns` 한 평탄화 섹션 분 — 전역 스텝 인덱스를 이어가며 target 에 밀어넣는다. */
+  const emitDetailForSection = (
+    section: FlatSection,
+    brushId: StudioHighlighterWashBrushId,
+    steppedIndexStart: number,
+    target: StudioHighlighterWashDetailRun[],
+  ): number => {
+    const profile = HIGHLIGHTER_DETAIL_PROFILES[brushId];
+    const length = Math.hypot(
+      section.to.x - section.from.x,
+      section.to.y - section.from.y,
+    );
+    const step = Math.max(POINT_EPSILON, section.halfWidth * 1.6);
+    const count = Math.min(4_096, Math.max(1, Math.ceil(length / step)));
+    let sectionIndex = steppedIndexStart;
+    for (let index = 0; index < count; index += 1) {
+      const t0 = index / count;
+      const t1 = (index + 1) / count;
+      const stepped: FlatSection = Object.freeze({
+        from: Object.freeze({
+          x: section.from.x + (section.to.x - section.from.x) * t0,
+          y: section.from.y + (section.to.y - section.from.y) * t0,
+        }),
+        to: Object.freeze({
+          x: section.from.x + (section.to.x - section.from.x) * t1,
+          y: section.from.y + (section.to.y - section.from.y) * t1,
+        }),
+        halfWidth: section.halfWidth,
+        opacityScale: section.opacityScale,
+      });
+      for (const [sideIndex, side] of ([1, -1] as const).entries()) {
+        if (!fibreDeposits(sectionIndex, 11 + sideIndex, 0.72)) continue;
+        const swell = 0.55
+          + (fibreDeposits(sectionIndex, 23 + sideIndex, 0.5) ? 0.85 : 0.2);
+        const outline = bandOutline(
+          stepped,
+          side * (1 - profile.poolRatio * swell),
+          side * 1,
+        );
+        if (outline.length > 0) {
+          target.push(Object.freeze({ outlinePoints: outline, role: "edge-pool" as const }));
+        }
+      }
+      for (let fibreIndex = 0; fibreIndex < profile.fibreCount; fibreIndex += 1) {
+        if (!fibreDeposits(sectionIndex, fibreIndex, profile.fibreDuty)) continue;
+        const centre = -0.62 + (1.24 * (fibreIndex + 0.5)) / profile.fibreCount;
+        const halfBand = 0.62 / profile.fibreCount / 2;
+        const outline = bandOutline(stepped, centre - halfBand, centre + halfBand);
+        if (outline.length > 0) {
+          target.push(Object.freeze({ outlinePoints: outline, role: "fibre" as const }));
+        }
+      }
+      sectionIndex += 1;
+    }
+    return sectionIndex;
+  };
+
+  return {
+    plan(input, stableSegmentCount, sourceGeneration) {
+      const baseWidth = finiteWidth(input.baseWidth);
+      const profile = highlighterCapProfile(input.brushId);
+      if (baseWidth === null) {
+        // 배치의 무효 폭 분기 그대로 — 상태는 비워 다음 유효 입력부터 다시 쌓는다.
+        reset();
+        generation = null;
+        return {
+          version: STUDIO_HIGHLIGHTER_WASH_RIBBON_VERSION,
+          brushId: input.brushId,
+          capProfile: profile,
+          gesture: "stroke",
+          sourceSegmentCount: input.pressurePath.segments.length,
+          flattenedSegmentCount: 0,
+          capped: false,
+          opacityScale: 1,
+          runs: [],
+          detailRuns: [],
+          detailOpacityScale: 0,
+        };
+      }
+      const segments = input.pressurePath.segments;
+      const stableSegments = Math.max(0, Math.min(stableSegmentCount, segments.length));
+      if (
+        generation !== sourceGeneration
+        || configBrushId !== input.brushId
+        || configBaseWidth !== baseWidth
+        || stableSegments < consumedSegments
+      ) {
+        reset();
+        generation = sourceGeneration;
+        configBrushId = input.brushId;
+        configBaseWidth = baseWidth;
+      }
+
+      // 1. 휘발 꼬리 걷어내기.
+      sections.length = stableSectionCount;
+      detailRuns.length = stableDetailCount;
+
+      // 배치 평탄화 루프 본문 한 세그먼트 분. `true` = 평탄화 캡 도달(배치의 조기 반환).
+      const flattenSegmentInto = (
+        segment: StudioFxPressurePathSegment,
+      ): boolean => {
+        const widthScale = Number.isFinite(segment.widthScale)
+          ? clamp(segment.widthScale, 0.025, WIDTH_LIMIT / baseWidth)
+          : 1;
+        const opacityScale = Number.isFinite(segment.opacityScale)
+          ? clamp(segment.opacityScale, 0, 1)
+          : 1;
+        const subdivisions = flattenSubdivisionCount(segment, baseWidth);
+        let from = pointAt(segment, 0);
+        for (let index = 1; index <= subdivisions; index += 1) {
+          if (sections.length >= MAX_FLATTENED_SEGMENTS) return true;
+          const to = pointAt(segment, index / subdivisions);
+          if (normalizedDirection(from, to)) {
+            sections.push(Object.freeze({
+              from,
+              to,
+              halfWidth: clamp(baseWidth * widthScale / 2, 0.25, WIDTH_LIMIT / 2),
+              opacityScale,
+            }));
+          }
+          from = to;
+        }
+        return false;
+      };
+
+      // 2. 새 안정 세그먼트 소비: 섹션 → 활성 런 본체/조인 → 닫힌 런 커버리지 → 디테일.
+      if (!stableStopped) {
+        for (
+          let segmentIndex = consumedSegments;
+          segmentIndex < stableSegments;
+          segmentIndex += 1
+        ) {
+          const before = sections.length;
+          const capReached = flattenSegmentInto(segments[segmentIndex]!);
+          for (let sectionIndex = before; sectionIndex < sections.length; sectionIndex += 1) {
+            const section = sections[sectionIndex]!;
+            const direction = normalizedDirection(section.from, section.to)!;
+            const previous = sectionIndex > 0 ? sections[sectionIndex - 1]! : null;
+            if (previous && !samePoint(previous.to, section.from)) {
+              // 불연속: 활성 런을 닫는다 — 본체들, 조인들, 캡 두 개 순서로.
+              closedCoverage.push(...activeBodies, ...activeJoins);
+              closedCoverage.push(
+                startCapRun(profile, activeFirstSection!, activeFirstDirection!, activeRunIndex),
+                endCapRun(profile, activeLastSection!, activeLastDirection!, activeRunIndex),
+              );
+              activeBodies.length = 0;
+              activeJoins.length = 0;
+              activeRunIndex += 1;
+              activeSectionCount = 0;
+            }
+            if (activeSectionCount === 0) {
+              activeFirstSection = section;
+              activeFirstDirection = direction;
+            } else {
+              activeJoins.push(joinRun(
+                activeLastSection!,
+                activeLastDirection!,
+                section,
+                direction,
+                activeRunIndex,
+                activeSectionCount,
+              ));
+            }
+            activeBodies.push(bodyRun(section));
+            activeSectionCount += 1;
+            activeLastSection = section;
+            activeLastDirection = direction;
+            const length = Math.hypot(
+              section.to.x - section.from.x,
+              section.to.y - section.from.y,
+            );
+            stableWeighted += section.opacityScale * length;
+            stableDistance += length;
+            stableSteppedCount = emitDetailForSection(
+              section,
+              input.brushId,
+              stableSteppedCount,
+              detailRuns,
+            );
+          }
+          consumedSegments = segmentIndex + 1;
+          if (capReached) {
+            stableStopped = true;
+            stableCapped = true;
+            break;
+          }
+        }
+      }
+      consumedSegments = stableSegments;
+      stableSectionCount = sections.length;
+      stableDetailCount = detailRuns.length;
+
+      // 3. 휘발 꼬리 재구축: 남은 세그먼트를 임시 상태로 걷는다(유지 상태는 건드리지 않는다).
+      let volatileCapped = false;
+      // 배치 weightedOpacity 는 전 섹션을 순서대로 한 번에 접는다 — 부동소수 덧셈은 결합
+      // 법칙이 없으므로 안정 부분합에서 그대로 이어 더해야 비트 동일하다.
+      let runningWeighted = stableWeighted;
+      let runningDistance = stableDistance;
+      const volatileActiveBodies: StudioHighlighterWashRun[] = [];
+      const volatileActiveJoins: StudioHighlighterWashRun[] = [];
+      /** 활성 런이 휘발 구간에서 닫혔다면 그 캡, 그리고 이후 완전-휘발 런들의 커버리지. */
+      let activeClosedCaps: readonly [StudioHighlighterWashRun, StudioHighlighterWashRun] | null = null;
+      const volatileTailCoverage: StudioHighlighterWashRun[] = [];
+      let localRunIndex = activeRunIndex;
+      let localSectionCount = activeSectionCount;
+      let localFirstSection = activeFirstSection;
+      let localFirstDirection = activeFirstDirection;
+      let localLastSection = activeLastSection;
+      let localLastDirection = activeLastDirection;
+      let localSteppedCount = stableSteppedCount;
+      /** 아직 원래 활성 런을 잇는 중인가(참조 유지 블록으로 들어가는가)? */
+      let extendsActiveRun = true;
+      let volatileRunBodies: StudioHighlighterWashRun[] = [];
+      let volatileRunJoins: StudioHighlighterWashRun[] = [];
+
+      if (!stableStopped) {
+        for (
+          let segmentIndex = stableSegments;
+          segmentIndex < segments.length;
+          segmentIndex += 1
+        ) {
+          const before = sections.length;
+          const capReached = flattenSegmentInto(segments[segmentIndex]!);
+          for (let sectionIndex = before; sectionIndex < sections.length; sectionIndex += 1) {
+            const section = sections[sectionIndex]!;
+            const direction = normalizedDirection(section.from, section.to)!;
+            const previous = sectionIndex > 0 ? sections[sectionIndex - 1]! : null;
+            if (previous && localSectionCount > 0 && !samePoint(previous.to, section.from)) {
+              const caps: [StudioHighlighterWashRun, StudioHighlighterWashRun] = [
+                startCapRun(profile, localFirstSection!, localFirstDirection!, localRunIndex),
+                endCapRun(profile, localLastSection!, localLastDirection!, localRunIndex),
+              ];
+              if (extendsActiveRun) {
+                activeClosedCaps = caps;
+                extendsActiveRun = false;
+              } else {
+                volatileTailCoverage.push(...volatileRunBodies, ...volatileRunJoins, ...caps);
+                volatileRunBodies = [];
+                volatileRunJoins = [];
+              }
+              localRunIndex += 1;
+              localSectionCount = 0;
+            }
+            if (localSectionCount === 0) {
+              localFirstSection = section;
+              localFirstDirection = direction;
+            } else {
+              const join = joinRun(
+                localLastSection!,
+                localLastDirection!,
+                section,
+                direction,
+                localRunIndex,
+                localSectionCount,
+              );
+              if (extendsActiveRun) volatileActiveJoins.push(join);
+              else volatileRunJoins.push(join);
+            }
+            const body = bodyRun(section);
+            if (extendsActiveRun) volatileActiveBodies.push(body);
+            else volatileRunBodies.push(body);
+            localSectionCount += 1;
+            localLastSection = section;
+            localLastDirection = direction;
+            const length = Math.hypot(
+              section.to.x - section.from.x,
+              section.to.y - section.from.y,
+            );
+            runningWeighted += section.opacityScale * length;
+            runningDistance += length;
+            localSteppedCount = emitDetailForSection(
+              section,
+              input.brushId,
+              localSteppedCount,
+              detailRuns,
+            );
+          }
+          if (capReached) {
+            volatileCapped = true;
+            break;
+          }
+        }
+      }
+
+      // 4. 조립: 닫힌 런들 → 활성 런(안정 본체+휘발 본체, 안정 조인+휘발 조인, 캡) → 휘발 런들.
+      //    참조 밀어넣기만 있고 기하 재계산이 없다.
+      const runs: StudioHighlighterWashRun[] = [];
+      runs.push(...closedCoverage);
+      if (activeSectionCount > 0 || volatileActiveBodies.length > 0) {
+        runs.push(...activeBodies, ...volatileActiveBodies);
+        runs.push(...activeJoins, ...volatileActiveJoins);
+        if (activeClosedCaps) {
+          runs.push(...activeClosedCaps);
+        } else {
+          runs.push(
+            startCapRun(
+              profile,
+              (activeSectionCount > 0 ? activeFirstSection : localFirstSection)!,
+              (activeSectionCount > 0 ? activeFirstDirection : localFirstDirection)!,
+              activeRunIndex,
+            ),
+            endCapRun(profile, localLastSection!, localLastDirection!, activeRunIndex),
+          );
+        }
+      }
+      runs.push(...volatileTailCoverage);
+      if (!extendsActiveRun && localSectionCount > 0) {
+        runs.push(...volatileRunBodies, ...volatileRunJoins);
+        runs.push(
+          startCapRun(profile, localFirstSection!, localFirstDirection!, localRunIndex),
+          endCapRun(profile, localLastSection!, localLastDirection!, localRunIndex),
+        );
+      }
+
+      return {
+        version: STUDIO_HIGHLIGHTER_WASH_RIBBON_VERSION,
+        brushId: input.brushId,
+        capProfile: profile,
+        gesture: "stroke",
+        sourceSegmentCount: segments.length,
+        flattenedSegmentCount: sections.length,
+        capped: stableCapped || volatileCapped,
+        opacityScale: runningDistance <= POINT_EPSILON
+          ? 1
+          : clamp(runningWeighted / runningDistance, 0, 1),
+        runs,
+        detailRuns,
+        detailOpacityScale: HIGHLIGHTER_DETAIL_PROFILES[input.brushId].opacityScale,
+      };
+    },
+  };
+}
+
 function tapOutline(
   brushId: StudioHighlighterWashBrushId,
   center: Point,

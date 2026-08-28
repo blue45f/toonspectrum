@@ -125,6 +125,9 @@ class StampSceneContext {
   transform(a: number, b: number, c: number, d: number, e: number, f: number): void {
     this.transforms.push(`${a},${b},${c},${d},${e},${f}`);
   }
+  fillStrokeShape(): void {
+    this.fills.push({ alpha: this.globalAlpha, color: String(this.fillStyle) });
+  }
 }
 
 class AliasSceneContext {
@@ -308,6 +311,23 @@ vi.mock("../studio-causal-watercolor-brush", async (importOriginal) => {
   };
 });
 
+const wetWashCapture = vi.hoisted(() => ({
+  livePlan: vi.fn((..._args: unknown[]): void => {}),
+}));
+
+vi.mock("./studio-wet-wash-live-pipeline", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("./studio-wet-wash-live-pipeline")>();
+  return {
+    ...actual,
+    // 스파이 후 실제 파이프라인으로 통과시킨다 — 배선 계약만 검증하고 동작은 실물을 쓴다.
+    planStudioWetWashLivePipeline: ((strokeKey, params) => {
+      wetWashCapture.livePlan(strokeKey, params);
+      return actual.planStudioWetWashLivePipeline(strokeKey, params);
+    }) as typeof actual.planStudioWetWashLivePipeline,
+  };
+});
+
 function drawEl(overrides: Partial<DrawEl> = {}): DrawEl {
   return {
     id: "draw-1",
@@ -374,6 +394,7 @@ beforeEach(() => {
   konvaCapture.nodes.length = 0;
   patternLoader.loads.length = 0;
   watercolorCapture.causalPlan.mockClear();
+  wetWashCapture.livePlan.mockClear();
 });
 
 afterEach(() => {
@@ -2570,34 +2591,86 @@ describe("StudioDrawNode orchestration", () => {
     expect(context.fills).toHaveLength(context.arcs.length);
   });
 
-  it.each([
-    [true, false],
-    [false, true],
-  ])(
-    "passes activeDraft=%s as causal-watercolor finalization=%s",
-    (activeDraft, expectedFinalize) => {
-      render(
-        <StudioDrawNode
-          activeDraft={activeDraft}
-          el={drawEl({
-            brush: "watercolor",
-            mode: "pen",
-            points: [0, 0, 8, 0],
-            watercolorPipeline: "causal-walker-v2",
-          })}
-        />,
-      );
-
-      expect(watercolorCapture.causalPlan).toHaveBeenCalledTimes(1);
-      expect(watercolorCapture.causalPlan).toHaveBeenCalledWith(
-        expect.objectContaining({
+  it("routes the active causal draft through the incremental wet-wash pipeline", () => {
+    render(
+      <StudioDrawNode
+        activeDraft
+        el={drawEl({
+          brush: "watercolor",
+          mode: "pen",
           points: [0, 0, 8, 0],
-          previewEndpoint: activeDraft,
-        }),
-        expectedFinalize,
-      );
-    },
-  );
+          watercolorPipeline: "causal-walker-v2",
+        })}
+      />,
+    );
+
+    // 활성 초안(프로그램 없는 레인)은 요소 id 로 키된 증분 파이프라인이 이동당 비용을 진다
+    // (장획 게이트 wet-dabs). 배치 리플레이는 커밋 렌더 전용이다.
+    expect(wetWashCapture.livePlan).toHaveBeenCalledTimes(1);
+    const [strokeKey, params] = wetWashCapture.livePlan.mock.calls[0]! as [
+      string,
+      { brushId: unknown; input: Record<string, unknown> },
+    ];
+    // 획 키는 요소 id + 대칭 변형 인덱스 — 변형 간 유지 플래너 격리(P2 리뷰).
+    expect(strokeKey).toBe("draw-1#0");
+    expect(params.brushId).toBe("watercolor");
+    expect(params.input).toEqual(
+      expect.objectContaining({ points: [0, 0, 8, 0], previewEndpoint: true }),
+    );
+    expect(watercolorCapture.causalPlan).not.toHaveBeenCalled();
+  });
+
+  it("keeps symmetric screentone draft variants on isolated incremental dot plans", () => {
+    render(
+      <StudioDrawNode
+        activeDraft
+        el={drawEl({
+          brush: "screentone",
+          mode: "pen",
+          points: [0, 0, 60, 10, 120, 0],
+          strokeWidth: 24,
+          symmetry: { type: "vertical", centerX: 200, centerY: 0 },
+        })}
+      />,
+    );
+    const shapes = captured("Shape");
+    expect(shapes).toHaveLength(2);
+    const arcSets = shapes.map((shape) => {
+      const context = new StampSceneContext();
+      (shape.props.sceneFunc as (c: unknown, s: unknown) => void)(context, {});
+      return context.arcs.join("|");
+    });
+    expect(arcSets[0]).not.toBe("");
+    expect(arcSets[1]).not.toBe("");
+    // 변형들이 같은 요소 키의 유지 빌더(내부 가변 배열)를 공유하면 두 sceneFunc 클로저가
+    // 마지막 변형의 도트만 그린다(P2 리뷰 회귀) — 변형 인덱스 키 격리로 서로 달라야 한다.
+    expect(arcSets[0]).not.toBe(arcSets[1]);
+  });
+
+  it("keeps the committed causal render on the batch replay with finalization=true", () => {
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "watercolor",
+          mode: "pen",
+          points: [0, 0, 8, 0],
+          watercolorPipeline: "causal-walker-v2",
+        })}
+      />,
+    );
+
+    // 커밋 렌더는 배치 리플레이를 유지해 후처리 워커의 전면 치환 같은 내부 점 재작성에도
+    // 항상 정본을 그린다.
+    expect(wetWashCapture.livePlan).not.toHaveBeenCalled();
+    expect(watercolorCapture.causalPlan).toHaveBeenCalledTimes(1);
+    expect(watercolorCapture.causalPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        points: [0, 0, 8, 0],
+        previewEndpoint: false,
+      }),
+      true,
+    );
+  });
 });
 
 describe("StudioDrawNode perfect-freehand outline brush", () => {

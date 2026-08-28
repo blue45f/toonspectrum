@@ -80,6 +80,36 @@ export function planStudioTonalBands<T extends StudioTonalPolygon>(
   densities: readonly number[],
   elementOpacity: number,
 ): StudioTonalLayerPlan<T> {
+  let densityPeak = 0;
+  for (const density of densities) densityPeak = Math.max(densityPeak, density);
+  let densityMin = Number.POSITIVE_INFINITY;
+  for (const density of densities) densityMin = Math.min(densityMin, density);
+  return planStudioTonalBandsFromExtremes(
+    polygons,
+    densities,
+    elementOpacity,
+    densityPeak,
+    densityMin,
+  );
+}
+
+/**
+ * `planStudioTonalBands`, 밀도 극값을 호출자가 이미 알 때의 형태.
+ *
+ * 증분 커버리지 빌더는 밀도를 append 전용으로 유지하므로 최대/최소가 O(1) 러닝 값이다 — 매
+ * 이동 두 번의 전체 스캔이 (특히 평면 판정으로 즉시 접히는 무필압 획에서) 이동당 비용의
+ * 지배항이 되는 것을 막는다. `densityPeak`은 `Math.max` 폴드(초기 0), `densityMin`은
+ * `Math.min` 폴드(초기 +∞)와 정확히 같아야 한다. 원래의 원소별 `min(dᵢ/peak)` 폴드와
+ * `min(dᵢ)/peak` 은 IEEE 나눗셈의 단조성으로 비트 동일하므로(0 ≤ dᵢ ≤ peak 에서 몫 ≤ 1
+ * 포함) 배치 결과가 바이트 단위로 보존된다.
+ */
+export function planStudioTonalBandsFromExtremes<T extends StudioTonalPolygon>(
+  polygons: readonly T[],
+  densities: readonly number[],
+  elementOpacity: number,
+  densityPeak: number,
+  densityMin: number,
+): StudioTonalLayerPlan<T> {
   const flatLayers = Object.freeze([
     Object.freeze({ band: 0, opacity: elementOpacity, polygons }),
   ]);
@@ -90,12 +120,12 @@ export function planStudioTonalBands<T extends StudioTonalPolygon>(
     return Object.freeze({ shells: Object.freeze([]), bands: Object.freeze([]) });
   }
 
-  let peak = 0;
-  for (const density of densities) peak = Math.max(peak, density);
+  const peak = densityPeak;
   if (!(peak > 0)) return flat;
-  let floor = 1;
-  for (const density of densities) floor = Math.min(floor, density / peak);
-  floor = Math.min(1, Math.max(0, floor));
+  const floor = Math.min(
+    1,
+    Math.max(0, densities.length === 0 ? 1 : densityMin / peak),
+  );
   // Whole tonal range invisible at this opacity — banding it would only cost geometry.
   if ((1 - floor) * elementOpacity < MIN_VISIBLE_DEPOSIT) return flat;
 

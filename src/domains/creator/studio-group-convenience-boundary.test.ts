@@ -176,7 +176,7 @@ describe("Studio PPT-style group convenience boundary", () => {
   });
 
   it("aligns a complete group as one union instead of rearranging its children", () => {
-    const source = functionBody("alignSelected", "reorder");
+    const source = functionBody("alignStudioSelection", "reorder");
     expect(source).toContain("completeSelectedGroupId()");
     expect(source).toContain("planAtomicSelectionTranslation");
     expect(source).toContain("그룹 내부 분배");

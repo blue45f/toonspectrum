@@ -576,6 +576,24 @@ function expectedStaticPreviewError(message: string, studioUrl: string): boolean
   }
 }
 
+/**
+ * Third-party webfont/CDN stylesheet hosts whose fetch failures are environment noise, not app
+ * defects: an offline or proxied audit machine cannot reach them, the app's font stacks all carry
+ * real fallbacks, and no brush-geometry or layout gate in this file measures glyph rendering.
+ * Scoped to resource-load console errors on exactly these hosts so a same-origin asset failure —
+ * the thing this collector exists to catch — still fails the audit.
+ */
+const EXTERNAL_FONT_CDN_HOSTS: ReadonlySet<string> = new Set([
+  "fonts.googleapis.com",
+  "fonts.gstatic.com",
+  "cdn.jsdelivr.net",
+]);
+
+function expectedExternalFontCdnError(message: string): boolean {
+  return message.includes("Failed to load resource")
+    && messageUrls(message).some((url) => EXTERNAL_FONT_CDN_HOSTS.has(url.hostname));
+}
+
 function collectBrowserErrors(
   page: Page,
   label: string,
@@ -586,11 +604,16 @@ function collectBrowserErrors(
     if (entry.type() !== "error") return;
     const location = entry.location().url;
     const message = location ? `${entry.text()} @ ${location}` : entry.text();
-    if (!expectedStaticPreviewError(message, studioUrl)) {
+    if (
+      !expectedStaticPreviewError(message, studioUrl)
+      && !expectedExternalFontCdnError(message)
+    ) {
       collector.messages.push(`${label}: ${message}`);
     }
   });
-  page.on("pageerror", (error) => collector.messages.push(`${label}: ${String(error)}`));
+  page.on("pageerror", (error) => collector.messages.push(
+    `${label}: ${error instanceof Error ? error.stack ?? error.message : String(error)}`,
+  ));
   page.on("response", (response) => {
     if (response.status() < 500) return;
     const message = `${response.status()} ${response.url()}`;
@@ -607,6 +630,17 @@ function reportBrowserErrors(collector: BrowserErrorCollector): void {
 }
 
 async function installCleanStudioState(page: Page): Promise<void> {
+  // tsx가 keep-names로 트랜스파일한 함수를 page.evaluate 로 직렬화하면 esbuild 의 `__name`
+  // 헬퍼 호출이 함수 본문에 남는다. 브라우저 컨텍스트에는 그 헬퍼가 없으므로 여기서
+  // 항등 함수로 채운다(문자열 스크립트라 트랜스파일 대상이 아니다). 앱 코드는 번들이
+  // 자체 헬퍼를 인라인하므로 영향이 없다.
+  await page.addInitScript({
+    content:
+      "globalThis.__name ??= (fn) => fn;"
+      // 실링 진단 확장(union/표면/캔버스 검열)은 감사 세션에서만 계산되도록 오버레이가
+      // 이 플래그를 게이트로 삼는다 — 제품 사용자는 절대 비용을 내지 않는다.
+      + " globalThis.__studioDynamicSealDebugEnabled = true;",
+  });
   await page.addInitScript(
     ({
       autosavePrefix,
@@ -1865,6 +1899,100 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         writeFileSync(join(SCRATCH, `release-diag-${preset.id}-before.png`), before);
         writeFileSync(join(SCRATCH, `release-diag-${preset.id}-immediate.png`), immediate);
         log(`release diagnostic for ${preset.id}: ${JSON.stringify(immediateDiff)}`);
+        // 라이브 오버레이가 fail-closed 로 지워진 릴리스는 화면만으로 원인을 알 수 없다 —
+        // 오버레이가 남긴 마지막 폴백 사유 브레드크럼을 함께 기록한다.
+        const overlayDebug = await page.evaluate(() =>
+          (globalThis as {
+            __studioDynamicOverlayDebug?: { lastFailure: string; at: number } | null;
+          }).__studioDynamicOverlayDebug ?? null,
+        );
+        log(`release diagnostic overlay state for ${preset.id}: ${JSON.stringify(overlayDebug)}`);
+        const sealDebug = await page.evaluate(() =>
+          (globalThis as {
+            __studioDynamicSealDebug?: Record<string, unknown> | null;
+          }).__studioDynamicSealDebug ?? null,
+        );
+        log(`release diagnostic seal state for ${preset.id}: ${JSON.stringify(sealDebug)}`);
+        const releaseDebug = await page.evaluate(() =>
+          (globalThis as {
+            __studioDynamicReleaseDebug?: Record<string, unknown> | null;
+          }).__studioDynamicReleaseDebug ?? null,
+        );
+        log(`release diagnostic settled-clear state for ${preset.id}: ${JSON.stringify(releaseDebug)}`);
+        const commitRenderDebug = await page.evaluate(() =>
+          (globalThis as {
+            __studioCommitRenderDebug?: Record<string, unknown> | null;
+          }).__studioCommitRenderDebug ?? null,
+        );
+        log(`release diagnostic commit render state for ${preset.id}: ${JSON.stringify(commitRenderDebug)}`);
+        const commitRouteDebug = await page.evaluate(() =>
+          (globalThis as {
+            __studioCommitRouteDebug?: Record<string, unknown> | null;
+          }).__studioCommitRouteDebug ?? null,
+        );
+        log(`release diagnostic commit route state for ${preset.id}: ${JSON.stringify(commitRouteDebug)}`);
+        // 실제 요소의 입력 채널(압력·속도·모델 키)이 오프라인 플랜 프로브와 다른지가
+        // "계획은 풍부, 커밋 픽셀은 희미" 모순의 남은 변수다.
+        try {
+          const persisted = await persistedDrawElements(page);
+          const lastDraw = persisted.at(-1) as Record<string, unknown> | undefined;
+          if (lastDraw) {
+            const {
+              brushDynamics,
+              brushEnginePrograms: _brushEnginePrograms,
+              ...channels
+            } = lastDraw;
+            log(
+              `release diagnostic persisted element for ${preset.id}: `
+                + `${JSON.stringify({ ...channels, hasDynamics: Boolean(brushDynamics) })}`,
+            );
+          } else {
+            log(`release diagnostic persisted element for ${preset.id}: none`);
+          }
+        } catch (cause) {
+          log(`release diagnostic persisted element for ${preset.id}: read failed ${String(cause)}`);
+        }
+        // 어느 표면이 획을 들고 있(었)는지 확정하기 위해 캔버스별 메타데이터와 잉크 픽셀 수를
+        // 함께 기록한다(index 만으로는 커서 캔버스와 오버레이가 구분되지 않았던 실측 교훈).
+        const canvasInkCensus = await page.evaluate(() =>
+          Array.from(document.querySelectorAll("canvas"), (canvas, index) => {
+            let ink = -1;
+            try {
+              const context = canvas.getContext("2d");
+              if (context && canvas.width > 4 && canvas.height > 4) {
+                const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+                ink = 0;
+                for (let offset = 0; offset < data.length; offset += 16) {
+                  if (data[offset + 3]! > 16 && data[offset]! < 200) ink += 1;
+                }
+              }
+            } catch {
+              ink = -2;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const computed = getComputedStyle(canvas);
+            return {
+              index,
+              w: canvas.width,
+              h: canvas.height,
+              attrs: Array.from(canvas.attributes)
+                .filter((attribute) => attribute.name.startsWith("data-"))
+                .map((attribute) => `${attribute.name}=${attribute.value.slice(0, 24)}`)
+                .join(" "),
+              ink,
+              // 화면 합성 판별: 비트맵에 잉크가 있어도 rect 0×0·display:none·opacity 0 이면
+              // 스크린샷에는 절대 나타나지 않는다.
+              rect: {
+                x: Math.round(rect.x),
+                y: Math.round(rect.y),
+                w: Math.round(rect.width),
+                h: Math.round(rect.height),
+              },
+              css: `${computed.display}/${computed.visibility}/op${computed.opacity}`,
+            };
+          }),
+        );
+        log(`release diagnostic canvas census for ${preset.id}: ${JSON.stringify(canvasInkCensus)}`);
         if (process.env.TOONSPECTRUM_LONG_BRUSH_CANVAS_DUMP === "1") {
           const dump = await page.evaluate(() =>
             Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
@@ -1886,6 +2014,13 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
             );
           }
         }
+        // 릴리스-경합(늦게 나타남)과 불가시 커밋(끝내 안 나타남)을 가르는 최종 판별:
+        // 실패 프레임에서 600ms 더 기다린 뒤 같은 클립을 다시 비교한다.
+        await page.waitForTimeout(600);
+        const late = await page.screenshot({ animations: "disabled", clip: usedClip });
+        const lateDiff = await compareScreenshotPixels(page, before, late);
+        log(`release diagnostic late(+600ms) diff for ${preset.id}: ${JSON.stringify(lateDiff)}`);
+        writeFileSync(join(SCRATCH, `release-diag-${preset.id}-late.png`), late);
       }
       invariant(
         hasMeaningfulPixelChange(immediateDiff),
@@ -1899,6 +2034,31 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       const after = await page.screenshot({ animations: "disabled", clip: usedClip });
       const settledDiff = await compareScreenshotPixels(page, before, after);
       const visualChanged = hasMeaningfulPixelChange(settledDiff);
+      // 결정성 판별용: 성공 경로에서도 정착(커밋) 시점의 캔버스 비트맵을 남긴다 — 신선한
+      // 세션의 커밋 강도와 딥런 실패 프레임의 커밋 강도를 비트맵 수준에서 비교하기 위함.
+      if (process.env.TOONSPECTRUM_BRUSH_VERIFY_SETTLED_DUMP === "1") {
+        log(`settled diff for ${preset.id}: ${JSON.stringify(settledDiff)}`);
+        const dump = await page.evaluate(() =>
+          Array.from(document.querySelectorAll("canvas"), (canvas, index) => ({
+            index,
+            w: canvas.width,
+            h: canvas.height,
+            url: canvas.width > 4 ? canvas.toDataURL("image/png") : "",
+          })),
+        );
+        const dumpDir = join(SCRATCH, `canvas-dump-${preset.id}-settled`);
+        mkdirSync(dumpDir, { recursive: true });
+        writeFileSync(join(dumpDir, "settled-after.png"), after);
+        writeFileSync(join(dumpDir, "settled-before.png"), before);
+        for (const entry of dump) {
+          const base64 = entry.url.split(",")[1] ?? "";
+          if (!base64) continue;
+          writeFileSync(
+            join(dumpDir, `${String(entry.index).padStart(2, "0")}-${entry.w}x${entry.h}.png`),
+            Buffer.from(base64, "base64"),
+          );
+        }
+      }
       invariant(
         visualChanged,
         operation === "erase"
@@ -2071,7 +2231,9 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         surveyFailures.push(message);
         log(`SURVEY FAILURE ${index + 1}/${BRUSH_MATRIX_CATALOG_COUNT} ${message}`);
         await installCleanStudioState(page);
-        await page.reload({ waitUntil: "domcontentloaded" });
+        // 실패 진단(캔버스 덤프·검열) 직후의 페이지는 무겁다 — 기본 7초 내비게이션
+        // 타임아웃이 복구 리로드를 두 번이나 죽였다(실측). 복구에만 넉넉한 한도를 준다.
+        await page.reload({ timeout: 45_000, waitUntil: "domcontentloaded" });
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
       }
@@ -2155,6 +2317,7 @@ interface PersistedDrawElement {
   mode: "pen" | "eraser";
   polygonSides: number | null;
   points: number[];
+  pressures: number[];
 }
 
 interface PersistedStudioDocument {
@@ -2232,6 +2395,11 @@ function drawElementsFromPersistedDocument(
       polygonSides,
       points: Array.isArray(record.points)
         ? record.points.filter((value): value is number =>
+            typeof value === "number" && Number.isFinite(value)
+          )
+        : [],
+      pressures: Array.isArray(record.pressures)
+        ? record.pressures.filter((value): value is number =>
             typeof value === "number" && Number.isFinite(value)
           )
         : [],
@@ -2650,6 +2818,14 @@ function writeLongBrushQualityReport(input: Readonly<{
 
 async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<LongBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  // 아래 진단 스크립트는 이름 있는 함수 표현식을 담고 있어 tsx(keep-names) 직렬화가
+  // esbuild `__name` 헬퍼 호출을 남긴다 — 페이지 수준 폴리필(installCleanStudioState)보다
+  // 컨텍스트 init 스크립트가 먼저 돌므로 여기서도 먼저 채운다.
+  await context.addInitScript({
+    content:
+      "globalThis.__name ??= (fn) => fn;"
+      + " globalThis.__studioDynamicSealDebugEnabled = true;",
+  });
   // 채널 2 진단: 모든 캔버스 2D 컨텍스트의 setTransform 스케일을 기록해 커밋 렌더가
   // 실제 어떤 물리 배율에서 래스터되는지 덤프와 함께 확인한다.
   await context.addInitScript(() => {
@@ -3008,6 +3184,30 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
             + `${finding.code} — ${finding.message}`,
         );
       }
+      if (REQUESTED_BRUSH_VERIFY_IDS.length > 0) {
+        // 집중 진단 모드에서는 성공/실패와 무관하게 지속 요소의 압력 채널을 읽는다 — 라이브
+        // 합성 압력(속도 모델)과 커밋 재생 압력의 괴리(erodible energy-collapse 0.35 실측)를
+        // 요소 데이터에서 직접 가른다.
+        try {
+          const persisted = await persistedDrawElements(page);
+          const lastDraw = persisted.at(-1) as
+            | { points?: readonly number[]; pressures?: readonly number[] }
+            | undefined;
+          const pressures = lastDraw?.pressures ?? [];
+          log(
+            `${preset.id}: long persisted pressures n=${pressures.length} `
+              + `head=${JSON.stringify(pressures.slice(0, 6).map((value) => Number(value.toFixed(3))))} `
+              + `tail=${JSON.stringify(pressures.slice(-4).map((value) => Number(value.toFixed(3))))}`,
+          );
+        } catch (cause) {
+          log(`${preset.id}: long persisted pressures read failed ${String(cause)}`);
+        }
+        const liveOverlayDebug = await page.evaluate(() => ({
+          seal: (globalThis as { __studioDynamicSealDebug?: unknown }).__studioDynamicSealDebug ?? null,
+          release: (globalThis as { __studioDynamicReleaseDebug?: unknown }).__studioDynamicReleaseDebug ?? null,
+        }));
+        log(`${preset.id}: long live-overlay breadcrumbs ${JSON.stringify(liveOverlayDebug).slice(0, 900)}`);
+      }
       const coverage = await compareScreenshotCoverage(
         page,
         before,
@@ -3017,6 +3217,28 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         routeSegmentXRange,
       );
       if (coverage.visibleSegments !== 6) {
+        // 장경로 실패에서도 커밋 분기/렌더 결과 브레드크럼을 읽는다 — "양끝 캡만 남는" 패턴이
+        // 커밋 타일 합성의 부분 실패인지 플랜 자체의 공백인지 가른다.
+        const longCommitDebug = await page.evaluate(() => ({
+          route: (globalThis as { __studioCommitRouteDebug?: unknown }).__studioCommitRouteDebug ?? null,
+          render: (globalThis as { __studioCommitRenderDebug?: unknown }).__studioCommitRenderDebug ?? null,
+        }));
+        log(`${preset.id}: long commit breadcrumbs ${JSON.stringify(longCommitDebug)}`);
+        try {
+          await page.waitForTimeout(2_500);
+          const persisted = await persistedDrawElements(page);
+          const lastDraw = persisted.at(-1) as
+            | { points?: readonly number[]; pressures?: readonly number[] }
+            | undefined;
+          log(
+            `${preset.id}: long persisted element points=${(lastDraw?.points?.length ?? 0) / 2} `
+              + `pressures=${lastDraw?.pressures?.length ?? 0} `
+              + `head=${JSON.stringify((lastDraw?.points ?? []).slice(0, 8))} `
+              + `tail=${JSON.stringify((lastDraw?.points ?? []).slice(-4))}`,
+          );
+        } catch (cause) {
+          log(`${preset.id}: long persisted element read failed ${String(cause)}`);
+        }
         writeFileSync(join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-before.png`), before);
         writeFileSync(
           join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-immediate.png`),
@@ -4159,7 +4381,15 @@ async function main(): Promise<void> {
   let browser: Browser | null = null;
   try {
     await waitForServer(origin);
-    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    // 샌드박스 이미지가 저장소의 Playwright 고정판과 다른 Chromium 리비전을 담고 있을 때
+    // playwright.config.ts 와 같은 규약으로 실행 파일 경로를 받아들인다.
+    browser = await chromium.launch({
+      headless: true,
+      args: ["--no-sandbox"],
+      ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
+        ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
+        : {}),
+    });
     const desktop = runDesktop ? await runDesktopBrushMatrix(browser, studioUrl) : null;
     if (desktop) {
       invariant(

@@ -3,8 +3,14 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const creatorFileUrl = new URL("./creator.ts", import.meta.url);
-const creatorSource = readFileSync(creatorFileUrl, "utf8");
+// createWork/updateWork 는 server/creator/works.ts, restoreWorkRevision 은
+// server/creator/work-revision-service.ts 가 소유한다(배럴 분할). 두 모듈을 이어
+// 하나의 소스로 파싱해 분할 전과 같은 함수 표면을 검사한다.
+const creatorFileUrl = new URL("./creator/works.ts", import.meta.url);
+const creatorSource = [
+  readFileSync(creatorFileUrl, "utf8"),
+  readFileSync(new URL("./creator/work-revision-service.ts", import.meta.url), "utf8"),
+].join("\n");
 const workAssetRepositorySource = readFileSync(
   new URL("../modules/creator/studio-work-asset.repository.ts",
     import.meta.url,

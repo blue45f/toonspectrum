@@ -229,6 +229,26 @@ function pressureAtProgress(
   return lower + (upper - lower) * amount;
 }
 
+/**
+ * 시리즈의 `index` 번째 항목 하나 — 배치 시리즈와 같은 진행률 식이다. 증분 소비자는 소비
+ * 시점의 `count` 로 값을 잠근다: 필압 배열이 점과 나란하면 진행률 표본이 인덱스 조회로
+ * 환원되어 최종 배치와 최대 ulp 수준 차이만 남는다(fx 압력 경로 빌더와 같은 계약 —
+ * 커밋/재적재의 배치 리플랜이 정본을 다시 그린다).
+ */
+export function resolveStudioRetainedMediaPressureAt(
+  profileId: StudioRetainedMediaPressureProfileId,
+  pressures: readonly number[] | null | undefined,
+  index: number,
+  count: number,
+  minimumDiameterRatio?: unknown,
+): StudioRetainedMediaPressureResponse {
+  return resolveStudioRetainedMediaPressure(
+    profileId,
+    pressureAtProgress(pressures, count <= 1 ? 0 : index / (count - 1)),
+    minimumDiameterRatio,
+  );
+}
+
 /** Aligns an arbitrary persisted pressure journal to a renderer-owned point count. */
 export function resolveStudioRetainedMediaPressureSeries(
   profileId: StudioRetainedMediaPressureProfileId,
@@ -241,9 +261,11 @@ export function resolveStudioRetainedMediaPressureSeries(
     : 0;
   if (count === 0) return Object.freeze([]);
   return Object.freeze(Array.from({ length: count }, (_, index) => (
-    resolveStudioRetainedMediaPressure(
+    resolveStudioRetainedMediaPressureAt(
       profileId,
-      pressureAtProgress(pressures, count <= 1 ? 0 : index / (count - 1)),
+      pressures,
+      index,
+      count,
       minimumDiameterRatio,
     )
   )));
@@ -397,4 +419,140 @@ export function planStudioRetainedMediaPressureCurve(
     sourcePointCount,
     segments: Object.freeze(segments),
   });
+}
+
+export interface StudioIncrementalRetainedMediaCurveBuilder {
+  /**
+   * 자라나는 스트로크의 현재 스냅샷을 소비하고 지금까지의 곡선 계획을 돌려준다. 이미 소비한
+   * prefix의 선분은 다시 계산하지 않는다 — 이동 한 번의 비용이 새 점 수에만 비례한다. 마지막
+   * 선분만은 "교체 가능한 꼬리"다: 배치 빌더가 최종 선분의 끝을 원시 끝점에 두므로, 다음 점이
+   * 도착하면 그 선분의 끝이 중점으로 물러난다(선분 개수와 sourceSegmentIndex는 불변). 반환
+   * plan의 segments는 빌더 내부 보관 배열이므로 수정하면 안 된다.
+   */
+  append(
+    points: readonly number[],
+    pressures: readonly number[] | null | undefined,
+  ): StudioRetainedMediaCurvePlan;
+}
+
+/** 점 배열과 나란한 필압 배열에서 점 index의 정규화 필압(진행률 표본화의 나란한-배열 특수화). */
+function parallelPointPressure(
+  pressures: readonly number[] | null | undefined,
+  index: number,
+): number {
+  if (!pressures || pressures.length === 0) return DEFAULT_PRESSURE;
+  if (pressures.length === 1) return normalizedPressure(pressures[0]);
+  return normalizedPressure(pressures[Math.min(pressures.length - 1, index)]);
+}
+
+/**
+ * 라이브 오버레이용 증분 리테인드 미디어 필압 곡선 빌더.
+ *
+ * `planStudioRetainedMediaPressureCurve`는 진행률 비례 필압 표본화와 "최종 선분은 원시
+ * 끝점에서 끝난다" 규칙 때문에 매 이동 전체를 다시 세운다(이동당 O(n) — 장획 게이트가 잡는
+ * 형태). 필압 배열이 점 배열과 나란할 때(라이브 원소가 항상 이 경우다) 진행률 표본화는 이웃
+ * 두 샘플의 평균으로 환원되어 선분이 국소 함수가 되고, 최종-선분 규칙은 위 append 계약의
+ * 교체 가능한 꼬리로 흡수된다. 좌표 검증·클램프는 배치의 `finitePointPrefix`와 같은 "첫
+ * 비유한 좌표에서 절단" 규약을 새 suffix에만 적용한다. prefix가 다시 쓰였는지는 마지막 소비
+ * 점 하나로 O(1) 검증하고, 다르면 전체를 다시 만든다(비용은 그 한 번의 O(n)).
+ * 나란하지 않은 필압 배열은 진행률 표본화와 값이 어긋날 수 있다 — 커밋 렌더러가 배치
+ * 빌더로 정본을 다시 그리므로 라이브 프리뷰 한정 근사다.
+ */
+export function createStudioIncrementalRetainedMediaCurveBuilder(
+  profileId: StudioRetainedMediaPressureProfileId,
+  options?: StudioRetainedMediaCurveOptions | null,
+): StudioIncrementalRetainedMediaCurveBuilder {
+  const tension = typeof options?.tension === "number" && Number.isFinite(options.tension)
+    ? clamp(options.tension, 0, 1)
+    : 0.2;
+  const controlPull = tension * 0.5;
+  const minimumDiameterRatio = options?.minimumDiameterRatio;
+  const segments: StudioRetainedMediaCurveSegment[] = [];
+  let consumedPoints = 0;
+  // 마지막으로 소비한 두 원시 점(클램프 적용) — 꼬리 선분 재계산과 O(1) prefix 검증에 쓴다.
+  let prevX = 0;
+  let prevY = 0;
+  let prevPrevX = 0;
+  let prevPrevY = 0;
+
+  const reset = (): void => {
+    segments.length = 0;
+    consumedPoints = 0;
+  };
+
+  return {
+    append(points, pressures) {
+      const pointCount = Math.min(MAX_SOURCE_POINTS, Math.floor(points.length / 2));
+      if (pointCount < consumedPoints) reset();
+      if (consumedPoints > 0) {
+        const lastIndex = consumedPoints - 1;
+        if (
+          finiteCoordinate(points[lastIndex * 2]) !== prevX
+          || finiteCoordinate(points[lastIndex * 2 + 1]) !== prevY
+        ) {
+          reset();
+        }
+      }
+      if (consumedPoints === 0 && pointCount > 0) {
+        const firstX = finiteCoordinate(points[0]);
+        const firstY = finiteCoordinate(points[1]);
+        if (firstX !== null && firstY !== null) {
+          prevX = firstX;
+          prevY = firstY;
+          consumedPoints = 1;
+        }
+      }
+      for (
+        let pointIndex = consumedPoints;
+        pointIndex >= 1 && pointIndex < pointCount;
+        pointIndex += 1
+      ) {
+        const currentX = finiteCoordinate(points[pointIndex * 2]);
+        const currentY = finiteCoordinate(points[pointIndex * 2 + 1]);
+        // 첫 비유한 좌표에서 절단(배치 `finitePointPrefix` 규약): 이 점과 그 뒤는 소비하지 않는다.
+        if (currentX === null || currentY === null) break;
+        let moveX = prevX;
+        let moveY = prevY;
+        const tail = segments.length > 0 ? segments[segments.length - 1]! : null;
+        if (tail) {
+          // 직전 최종 선분의 끝을 원시 끝점에서 중점으로 물린다(배치의 비최종 규칙).
+          const demotedEndX = (prevPrevX + prevX) / 2;
+          const demotedEndY = (prevPrevY + prevY) / 2;
+          segments[segments.length - 1] = Object.freeze({
+            ...tail,
+            endX: demotedEndX,
+            endY: demotedEndY,
+          });
+          moveX = demotedEndX;
+          moveY = demotedEndY;
+        }
+        const pressure = (
+          parallelPointPressure(pressures, pointIndex - 1)
+          + parallelPointPressure(pressures, pointIndex)
+        ) / 2;
+        segments.push(Object.freeze({
+          moveX,
+          moveY,
+          controlX: prevX + (currentX - prevX) * controlPull,
+          controlY: prevY + (currentY - prevY) * controlPull,
+          endX: currentX,
+          endY: currentY,
+          sourceSegmentIndex: pointIndex - 1,
+          ...resolveStudioRetainedMediaPressure(profileId, pressure, minimumDiameterRatio),
+        }));
+        prevPrevX = prevX;
+        prevPrevY = prevY;
+        prevX = currentX;
+        prevY = currentY;
+        consumedPoints = pointIndex + 1;
+      }
+      return {
+        kind: "studio-retained-media-pressure-curve",
+        version: STUDIO_RETAINED_MEDIA_PRESSURE_VERSION,
+        profileId,
+        sourcePointCount: consumedPoints,
+        segments,
+      };
+    },
+  };
 }

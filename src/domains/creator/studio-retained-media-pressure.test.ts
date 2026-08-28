@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createStudioIncrementalRetainedMediaCurveBuilder,
   planStudioRetainedMediaPressureCurve,
   planStudioRetainedMediaTapDab,
   resolveStudioRetainedMediaPressure,
@@ -163,5 +164,73 @@ describe("studio retained media pressure", () => {
     expect(Object.values(malformed.segments[0]!).every((value) => (
       typeof value !== "number" || Number.isFinite(value)
     ))).toBe(true);
+  });
+});
+
+describe("createStudioIncrementalRetainedMediaCurveBuilder", () => {
+  // pointCount - 1 = 16 (2의 거듭제곱)이면 배치 빌더의 진행률 위치 i/(n-1)·(n-1)가
+  // 부동소수에서도 정확히 정수 i로 떨어져, 나란한 필압 배열에서 두 빌더가 바이트 동일해진다.
+  const pointCount = 17;
+  const points = Array.from({ length: pointCount }, (_, index) => [
+    index * 6 + Math.sin(index * 0.7) * 2,
+    30 + Math.cos(index * 0.5) * 9,
+  ]).flat();
+  const pressures = Array.from({ length: pointCount }, (_, index) => 0.15 + (index % 6) / 8);
+  const options = { minimumDiameterRatio: 0.2 };
+
+  it("matches the batch planner exactly for parallel per-point pressures", () => {
+    const batch = planStudioRetainedMediaPressureCurve(points, pressures, "pencil", options);
+    const builder = createStudioIncrementalRetainedMediaCurveBuilder("pencil", options);
+    const whole = builder.append(points, pressures);
+    expect(whole.sourcePointCount).toBe(batch.sourcePointCount);
+    expect(whole.segments).toEqual([...batch.segments]);
+
+    // chunk 단위로 나눠 넣어도 같은 곡선이 자라난다 — 직전 최종 선분의 끝이 중점으로 물러나는
+    // "교체 가능한 꼬리"까지 배치와 일치해야 한다.
+    const chunked = createStudioIncrementalRetainedMediaCurveBuilder("pencil", options);
+    for (const consumed of [2, 3, 6, 7, 11, pointCount]) {
+      const plan = chunked.append(points.slice(0, consumed * 2), pressures.slice(0, consumed));
+      // 부분 prefix도 그 길이의 배치 결과와 같아야 한다(9점: n-1=8도 2의 거듭제곱).
+      if (consumed === 3 || consumed === pointCount) {
+        expect(plan.segments).toEqual([
+          ...planStudioRetainedMediaPressureCurve(
+            points.slice(0, consumed * 2),
+            pressures.slice(0, consumed),
+            "pencil",
+            options,
+          ).segments,
+        ]);
+      }
+    }
+    expect(chunked.append(points, pressures).segments).toEqual([...batch.segments]);
+  });
+
+  it("matches the batch planner without pressures and rebuilds on shrink", () => {
+    const builder = createStudioIncrementalRetainedMediaCurveBuilder("brush", null);
+    builder.append(points, undefined);
+    const shrunk = builder.append(points.slice(0, 18), undefined);
+    expect(shrunk.segments).toEqual([
+      ...planStudioRetainedMediaPressureCurve(points.slice(0, 18), undefined, "brush").segments,
+    ]);
+    expect(builder.append(points, undefined).segments).toEqual([
+      ...planStudioRetainedMediaPressureCurve(points, undefined, "brush").segments,
+    ]);
+  });
+
+  it("truncates at the first malformed coordinate like the batch planner", () => {
+    // 유효 점 5개(n-1=4) 뒤에 NaN: 거기서 절단하고, 다음 append도 같은 자리에서 멈춘다.
+    const corrupt = [...points.slice(0, 10), Number.NaN, 3, ...points.slice(12)];
+    const builder = createStudioIncrementalRetainedMediaCurveBuilder("pencil", options);
+    const plan = builder.append(corrupt, pressures);
+    expect(plan.sourcePointCount).toBe(5);
+    expect(plan.segments).toEqual([
+      ...planStudioRetainedMediaPressureCurve(
+        points.slice(0, 10),
+        pressures.slice(0, 5),
+        "pencil",
+        options,
+      ).segments,
+    ]);
+    expect(builder.append(corrupt, pressures).segments).toHaveLength(4);
   });
 });
