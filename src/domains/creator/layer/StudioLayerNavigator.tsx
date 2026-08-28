@@ -1,12 +1,8 @@
 import {
   ArrowDown,
   ArrowUp,
-  Check,
-  ChevronDown,
-  ChevronRight,
   Eye,
   EyeOff,
-  Folder,
   FolderMinus,
   FolderPlus,
   Ghost,
@@ -16,8 +12,6 @@ import {
   ListChecks,
   Lock,
   LockOpen,
-  MoreHorizontal,
-  Minus,
   Palette,
   ScanLine,
   Search,
@@ -44,17 +38,14 @@ import {
   type StudioLiveLayerOwnership,
 } from "../live/studio-live-layer-ownership";
 import { useStudioStableHandlers } from "../studio-stable-handlers";
-import { StudioToolHintTarget } from "../StudioToolHint";
 
 import { studioLayerSourcesBakeToSingleLayer } from "./studio-layer-merge";
 import {
   DEFAULT_STUDIO_LAYER_NAVIGATOR_FILTERS,
   STUDIO_LAYER_COLORS,
   STUDIO_LAYER_COLOR_LABELS,
-  STUDIO_LAYER_FLAGS,
   STUDIO_LAYER_FLAG_LABELS,
   STUDIO_LAYER_KIND_LABELS,
-  STUDIO_LAYER_KINDS,
   STUDIO_LAYER_ROLES,
   STUDIO_LAYER_ROLE_LABELS,
   buildStudioLayerNavigatorNodes,
@@ -64,7 +55,6 @@ import {
   reduceStudioLayerSelection,
   summarizeStudioLayerNavigator,
   type StudioLayerColor,
-  type StudioLayerFlag,
   type StudioLayerNavigatorFilters,
   type StudioLayerNavigatorItem,
   type StudioLayerNavigatorResult,
@@ -74,13 +64,15 @@ import {
 import {
   STUDIO_LAYER_NAVIGATOR_COARSE_TARGET as coarseTarget,
   STUDIO_LAYER_NAVIGATOR_FOCUS_RING as focusRing,
-  STUDIO_LAYER_NAVIGATOR_KIND_ICONS as KIND_ICONS,
   studioLayerNavigatorItemStatusLabel as itemStatusLabel,
 } from "./studio-layer-navigator-row-ui";
+import { StudioLayerNavigatorBatchBar } from "./StudioLayerNavigatorBatchBar";
+import { StudioLayerNavigatorFilterPanel } from "./StudioLayerNavigatorFilterPanel";
 import {
   StudioLayerNavigatorItemRow as LayerNavigatorItemRow,
   type LayerNavigatorRowHandlers,
 } from "./StudioLayerNavigatorItemRow";
+import { StudioLayerNavigatorTree } from "./StudioLayerNavigatorTree";
 
 
 import type { LayerGroup } from "../studio-layers";
@@ -178,7 +170,7 @@ type RenameTarget = { kind: "item" | "group"; id: string; value: string };
 type ActionTarget =
   | { kind: "item" | "group"; id: string }
   | { kind: "batch"; id: "selection" };
-type FocusTarget =
+export type FocusTarget =
   | { key: string; kind: "item"; entry: StudioLayerNavigatorResult }
   | {
       key: string;
@@ -746,15 +738,6 @@ export function StudioLayerNavigator({
     setFilters({ ...DEFAULT_STUDIO_LAYER_NAVIGATOR_FILTERS, flags: [] });
   }
 
-  function toggleFilterFlag(flag: StudioLayerFlag) {
-    setFilters((current) => ({
-      ...current,
-      flags: current.flags.includes(flag)
-        ? current.flags.filter((candidate) => candidate !== flag)
-        : [...current.flags, flag],
-    }));
-  }
-
   function setSelectedRole(value: string, ids = selectedIds) {
     if (value === "__mixed__") return;
     onAction({
@@ -1062,613 +1045,71 @@ export function StudioLayerNavigator({
         ) : null}
       </div>
 
-      <div
+      <StudioLayerNavigatorFilterPanel
         id={filterPanelId}
-        ref={filterPanelRef}
-        role="dialog"
-        aria-label="레이어 필터"
-        aria-modal="false"
-        tabIndex={-1}
-        hidden={!filterOpen}
-        className={cn(
-          "absolute inset-x-2 z-30 max-h-[min(28rem,62vh)] overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-2xl",
-          filterActive ? "top-[9.5rem]" : "top-[7.75rem]"
-        )}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-xs font-bold text-fg">레이어 필터</p>
-            <p className="text-[0.6rem] text-fg-3">기능 필터는 모두 만족하는 레이어만 표시합니다.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setFilterOpen(false);
-              filterTriggerRef.current?.focus();
-            }}
-            className={cn("grid size-8 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
-            aria-label="레이어 필터 닫기"
-          >
-            <X size={14} />
-          </button>
-        </div>
-
-        <fieldset className="mt-3">
-          <legend className="mb-1 text-[0.62rem] font-bold text-fg-2">종류</legend>
-          <div className="grid grid-cols-3 gap-1">
-            {STUDIO_LAYER_KINDS.map((kind) => {
-              const Icon = kind === "all" ? Layers3 : KIND_ICONS[kind];
-              return (
-                <button
-                  key={kind}
-                  type="button"
-                  onClick={() => setFilters((current) => ({ ...current, kind }))}
-                  aria-pressed={filters.kind === kind}
-                  className={cn(compactControl, "justify-start", filters.kind === kind && "border-accent bg-accent-soft text-accent")}
-                >
-                  <Icon size={12} /> {STUDIO_LAYER_KIND_LABELS[kind]}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
-
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <label className="text-[0.62rem] font-bold text-fg-2">
-            표시 상태
-            <select
-              value={filters.visibility}
-              onChange={(event) => setFilters((current) => ({
-                ...current,
-                visibility: event.target.value as StudioLayerNavigatorFilters["visibility"],
-              }))}
-              className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
-            >
-              <option value="all">전체</option>
-              <option value="visible">표시만</option>
-              <option value="hidden">숨김만</option>
-            </select>
-          </label>
-          <label className="text-[0.62rem] font-bold text-fg-2">
-            잠금 상태
-            <select
-              value={filters.lock}
-              onChange={(event) => setFilters((current) => ({
-                ...current,
-                lock: event.target.value as StudioLayerNavigatorFilters["lock"],
-              }))}
-              className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
-            >
-              <option value="all">전체</option>
-              <option value="locked">잠김만</option>
-              <option value="unlocked">잠금 해제만</option>
-            </select>
-          </label>
-          <label className="text-[0.62rem] font-bold text-fg-2">
-            작업 역할
-            <select
-              value={filters.role}
-              onChange={(event) => setFilters((current) => ({
-                ...current,
-                role: event.target.value as StudioLayerNavigatorFilters["role"],
-              }))}
-              className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
-            >
-              <option value="all">전체 역할</option>
-              <option value="unassigned">역할 없음</option>
-              {STUDIO_LAYER_ROLES.map((role) => <option key={role} value={role}>{STUDIO_LAYER_ROLE_LABELS[role]}</option>)}
-            </select>
-          </label>
-          <label className="text-[0.62rem] font-bold text-fg-2">
-            색 라벨
-            <select
-              value={filters.color}
-              onChange={(event) => setFilters((current) => ({
-                ...current,
-                color: event.target.value as StudioLayerNavigatorFilters["color"],
-              }))}
-              className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
-            >
-              <option value="all">전체 색</option>
-              <option value="none">색 없음</option>
-              {STUDIO_LAYER_COLORS.map((color) => <option key={color} value={color}>{STUDIO_LAYER_COLOR_LABELS[color]}</option>)}
-            </select>
-          </label>
-        </div>
-
-        <fieldset className="mt-3">
-          <legend className="mb-1 text-[0.62rem] font-bold text-fg-2">전문 상태</legend>
-          <div className="grid grid-cols-2 gap-1">
-            {STUDIO_LAYER_FLAGS.map((flag) => (
-              <label key={flag} className={cn("flex min-h-9 items-center gap-2 rounded-md border border-line bg-card px-2 text-[0.65rem] text-fg-2 hover:bg-raised max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}>
-                <input
-                  type="checkbox"
-                  checked={filters.flags.includes(flag)}
-                  onChange={() => toggleFilterFlag(flag)}
-                  className="size-4 accent-accent"
-                />
-                {STUDIO_LAYER_FLAG_LABELS[flag]}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-2">
-          <span className="text-[0.6rem] text-fg-3">참조 {stats.referenced} · 마스크 {stats.masked} · AI {stats.ai}</span>
-          <button type="button" onClick={resetFilters} className={compactControl}>필터 초기화</button>
-        </div>
-      </div>
+        panelRef={filterPanelRef}
+        triggerRef={filterTriggerRef}
+        open={filterOpen}
+        onOpenChange={setFilterOpen}
+        filters={filters}
+        setFilters={setFilters}
+        onReset={resetFilters}
+        filterActive={filterActive}
+        stats={stats}
+      />
 
       {selectedIds.length > 0 ? (
-        <div
-          aria-label="선택 레이어 일괄 작업"
-          role="toolbar"
-          className="flex max-w-full items-center gap-1 overflow-x-auto overscroll-x-contain border-b border-line/70 bg-accent-soft/20 px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0"
-        >
-          <span
-            className={cn(
-              "min-w-0 truncate px-1 text-[0.68rem] font-bold",
-              outsideSelectionCount > 0 ? "text-warning" : "text-accent"
-            )}
-            title={
-              outsideSelectionCount > 0
-                ? `전체 선택 ${selectedIds.length}개 중 현재 결과 ${batchSelectedIds.length}개만 일괄 작업 대상입니다.`
-                : `선택 ${selectedIds.length}개`
-            }
-          >
-            선택 {batchSelectedIds.length}개
-            {outsideSelectionCount > 0 ? ` · 밖 ${outsideSelectionCount}` : ""}
-          </span>
-          <StudioToolHintTarget
-            disabled={mutationDisabled || batchShowIds.length === 0}
-            unavailableReason={
-              readOnly
-                ? "읽기 전용 작업공간에서는 레이어 표시 상태를 바꿀 수 없어요."
-                : batchShowIds.length === 0
-                  ? batchShowBlockedCount > 0
-                    ? `숨긴 상위 그룹 안의 ${batchShowBlockedCount}개는 그룹을 먼저 표시해야 해요.`
-                    : "현재 선택에는 다시 표시할 숨긴 레이어가 없어요."
-                  : undefined
-            }
-            preferredSide="top"
-            hint={{
-              id: "layer-batch-show",
-              title: "선택 레이어 표시",
-              description: "현재 검색 결과 안에서 선택한 숨김 레이어를 다시 보이게 합니다.",
-              preview: "layer-visibility",
-            }}
-          >
-            <button
-              type="button"
-              disabled={mutationDisabled || batchShowIds.length === 0}
-              onClick={() => onAction({ type: "set-items-hidden", ids: batchShowIds, hidden: false })}
-              className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
-              aria-label={`현재 결과의 선택 ${batchShowIds.length}개 표시${batchShowBlockedCount > 0 ? `, 숨긴 상위 그룹 ${batchShowBlockedCount}개 제외` : ""}`}
-            >
-              <Eye size={13} />
-            </button>
-          </StudioToolHintTarget>
-          <StudioToolHintTarget
-            disabled={mutationDisabled || batchSelectedIds.length === 0}
-            unavailableReason={
-              readOnly
-                ? "읽기 전용 작업공간에서는 레이어를 숨길 수 없어요."
-                : batchSelectedIds.length === 0
-                  ? "먼저 레이어를 하나 이상 선택하세요."
-                  : undefined
-            }
-            preferredSide="top"
-            hint={{
-              id: "layer-batch-hide",
-              title: "선택 레이어 숨김",
-              description: "선택한 레이어를 문서에서 지우지 않고 캔버스에서만 숨깁니다.",
-              preview: "layer-visibility",
-              tip: "나중에 눈 아이콘으로 다시 표시할 수 있어요.",
-            }}
-          >
-            <button
-              type="button"
-              disabled={mutationDisabled || batchSelectedIds.length === 0}
-              onClick={() => onAction({ type: "set-items-hidden", ids: batchSelectedIds, hidden: true })}
-              className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
-              aria-label={`현재 결과의 선택 ${batchSelectedIds.length}개 숨김`}
-            >
-              <EyeOff size={13} />
-            </button>
-          </StudioToolHintTarget>
-          <StudioToolHintTarget
-            disabled={mutationDisabled || batchSelectedIds.length === 0}
-            unavailableReason={
-              readOnly
-                ? "읽기 전용 작업공간에서는 레이어를 잠글 수 없어요."
-                : batchSelectedIds.length === 0
-                  ? "먼저 레이어를 하나 이상 선택하세요."
-                  : undefined
-            }
-            preferredSide="top"
-            hint={{
-              id: "layer-batch-lock",
-              title: "선택 레이어 잠금",
-              description: "선택한 레이어를 고정해 캔버스에서 실수로 이동하거나 편집하지 않도록 보호합니다.",
-              preview: "layer-lock",
-            }}
-          >
-            <button
-              type="button"
-              disabled={mutationDisabled || batchSelectedIds.length === 0}
-              onClick={() => onAction({ type: "set-items-locked", ids: batchSelectedIds, locked: true })}
-              className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
-              aria-label={`현재 결과의 선택 ${batchSelectedIds.length}개 잠금`}
-            >
-              <Lock size={13} />
-            </button>
-          </StudioToolHintTarget>
-          <StudioToolHintTarget
-            disabled={mutationDisabled || batchUnlockIds.length === 0}
-            unavailableReason={
-              readOnly
-                ? "읽기 전용 작업공간에서는 레이어 잠금을 해제할 수 없어요."
-                : batchUnlockIds.length === 0
-                  ? batchUnlockBlockedCount > 0
-                    ? `잠긴 상위 그룹 안의 ${batchUnlockBlockedCount}개는 그룹 잠금을 먼저 풀어야 해요.`
-                    : "현재 선택에는 잠금을 풀 수 있는 레이어가 없어요."
-                  : undefined
-            }
-            preferredSide="top"
-            hint={{
-              id: "layer-batch-unlock",
-              title: "선택 레이어 잠금 해제",
-              description: "선택한 레이어의 보호 상태를 풀어 다시 이동·변형·편집할 수 있게 합니다.",
-              preview: "layer-lock",
-            }}
-          >
-            <button
-              type="button"
-              disabled={mutationDisabled || batchUnlockIds.length === 0}
-              onClick={() => onAction({ type: "set-items-locked", ids: batchUnlockIds, locked: false })}
-              className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
-              aria-label={`현재 결과의 선택 ${batchUnlockIds.length}개 잠금 해제${batchUnlockBlockedCount > 0 ? `, 잠긴 상위 그룹 ${batchUnlockBlockedCount}개 제외` : ""}`}
-            >
-              <LockOpen size={13} />
-            </button>
-          </StudioToolHintTarget>
-          <StudioToolHintTarget
-            disabled={mutationDisabled || batchSelectedIds.length < 2}
-            unavailableReason={
-              readOnly
-                ? "읽기 전용 작업공간에서는 레이어를 병합할 수 없어요."
-                : batchSelectedIds.length < 2
-                  ? "병합할 레이어를 두 개 이상 선택하세요."
-                  : undefined
-            }
-            preferredSide="top"
-            hint={{
-              id: "layer-batch-merge-selected",
-              title: batchMergeFallbackNote ? "선택 레이어 묶기 (병합 보류)" : "선택 레이어 병합",
-              description:
-                batchMergeFallbackNote ??
-                "선택한 두 개 이상의 레이어를 표시 순서대로 하나의 결과로 합칩니다.",
-              preview: "layer-merge",
-              tip: "편집 가능한 원본을 유지하려면 병합 전에 프로젝트 체크포인트를 만들어 두세요.",
-            }}
-          >
-            <button
-              type="button"
-              disabled={mutationDisabled || batchSelectedIds.length < 2}
-              onClick={() => onAction({ type: "merge-selected", ids: batchSelectedIds })}
-              className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
-              aria-label="선택 레이어 병합"
-              aria-describedby={batchMergeFallbackNote ? mergeFallbackNoteId : undefined}
-              title={batchMergeFallbackNote ?? undefined}
-            >
-              <Layers3 size={13} />
-            </button>
-          </StudioToolHintTarget>
-          <StudioToolHintTarget
-            disabled={mutationDisabled}
-            unavailableReason={readOnly ? "읽기 전용 작업공간에서는 표시 레이어를 병합할 수 없어요." : undefined}
-            preferredSide="top"
-            hint={{
-              id: "layer-batch-flatten-visible",
-              title: flattenVisibleFallbackNote ? "표시 레이어 묶기 (병합 보류)" : "표시 레이어 병합",
-              description:
-                flattenVisibleFallbackNote ??
-                "현재 보이는 레이어 전체를 화면에 보이는 순서대로 하나의 결과로 합칩니다.",
-              preview: "layer-merge",
-              tip: "숨겨진 레이어는 결과에 포함되지 않아요.",
-            }}
-          >
-            <button
-              type="button"
-              disabled={mutationDisabled}
-              onClick={() => onAction({ type: "flatten-visible" })}
-              className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
-              aria-label="표시 레이어 병합"
-              aria-describedby={flattenVisibleFallbackNote ? flattenFallbackNoteId : undefined}
-              title={flattenVisibleFallbackNote ?? undefined}
-            >
-              <Grid2X2 size={13} />
-            </button>
-          </StudioToolHintTarget>
-          <StudioToolHintTarget
-            preferredSide="top"
-            hint={{
-              id: "layer-batch-more",
-              title: "일괄 작업 더보기",
-              description: "선택 레이어의 그룹·역할·색 라벨·삭제 작업을 한 메뉴에서 실행합니다.",
-              preview: "layer-actions",
-            }}
-          >
-            <button
-              type="button"
-              onClick={(event) => openActionMenu(event, { kind: "batch", id: "selection" })}
-              aria-haspopup="dialog"
-              aria-expanded={actionTarget?.kind === "batch"}
-              aria-controls={actionPopoverId}
-              className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
-              aria-label="선택 레이어 일괄 작업 더보기"
-            >
-              <MoreHorizontal size={15} />
-            </button>
-          </StudioToolHintTarget>
-        </div>
+        <StudioLayerNavigatorBatchBar
+          selectedIds={selectedIds}
+          outsideSelectionCount={outsideSelectionCount}
+          batchSelectedIds={batchSelectedIds}
+          batchShowIds={batchShowIds}
+          batchUnlockIds={batchUnlockIds}
+          batchShowBlockedCount={batchShowBlockedCount}
+          batchUnlockBlockedCount={batchUnlockBlockedCount}
+          mutationDisabled={mutationDisabled}
+          readOnly={readOnly}
+          batchMergeFallbackNote={batchMergeFallbackNote}
+          flattenVisibleFallbackNote={flattenVisibleFallbackNote}
+          mergeFallbackNoteId={mergeFallbackNoteId}
+          flattenFallbackNoteId={flattenFallbackNoteId}
+          actionPopoverId={actionPopoverId}
+          actionTargetKind={actionTarget?.kind ?? null}
+          onAction={onAction}
+          onOpenActionMenu={openActionMenu}
+        />
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-1.5 overscroll-contain [scrollbar-gutter:stable]">
-        {nodes.length > 0 ? (
-          <ul
-            role="tree"
-            aria-label="레이어 트리"
-            aria-multiselectable="true"
-            className="flex flex-col gap-0.5"
-            onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === "a" && event.target === event.currentTarget) {
-                event.preventDefault();
-                event.stopPropagation();
-                onSelectionChange(visibleItemIds.slice(0, 500));
-              }
-            }}
-          >
-            {nodes.map((node) => {
-              if (node.kind === "item") return renderItemRow(node.entry, node.key, 1);
-              const key = node.key;
-              const editing = renameTarget?.kind === "group" && renameTarget.id === node.group.id;
-              const target: FocusTarget = {
-                key,
-                kind: "group",
-                group: node.group,
-                itemIds: node.entries.map((entry) => entry.item.id),
-                expanded: node.expanded,
-              };
-              const selectedChildCount = target.itemIds.filter((id) => selectedIdSet.has(id)).length;
-              const allChildrenSelected = target.itemIds.length > 0 && selectedChildCount === target.itemIds.length;
-              const partiallySelected = selectedChildCount > 0 && !allChildrenSelected;
-              const groupStatus = [
-                node.group.hidden ? "숨김" : null,
-                node.group.locked ? "잠김" : null,
-                selectedChildCount > 0 ? `${selectedChildCount}개 선택` : null,
-              ].filter(Boolean).join(", ");
-              return (
-                <li
-                  key={key}
-                  role="none"
-                  className={cn(
-                    "rounded-lg border bg-card/25 transition-[border-color,background-color] duration-150 motion-reduce:transition-none",
-                    allChildrenSelected
-                      ? "border-accent/55 bg-accent-soft/20"
-                      : partiallySelected
-                        ? "border-cool/45 bg-cool/5"
-                        : "border-line/65"
-                  )}
-                  data-studio-layer-group-selection={
-                    allChildrenSelected ? "all" : partiallySelected ? "partial" : "none"
-                  }
-                >
-                  <div
-                    ref={(element) => {
-                      if (element) rowRefs.current.set(key, element);
-                      else rowRefs.current.delete(key);
-                    }}
-                    role="treeitem"
-                    aria-level={1}
-                    aria-selected={allChildrenSelected}
-                    aria-expanded={node.empty ? undefined : node.expanded}
-                    aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G"
-                    aria-label={`${node.group.name}, 그룹, ${node.entries.length}개 레이어${groupStatus ? `, ${groupStatus}` : ""}`}
-                    tabIndex={tabStopKey === key ? 0 : -1}
-                    onFocus={() => setFocusedKey(key)}
-                    onKeyDown={(event) => handleTreeItemKeyDown(event, target)}
-                    onClick={(event) => {
-                      if (isLayerRowControl(event.target) || node.empty) return;
-                      const itemIds = displayItems
-                        .filter((item) => item.groupId === node.group.id)
-                        .map((item) => item.id);
-                      const additive =
-                        event.shiftKey ||
-                        event.metaKey ||
-                        event.ctrlKey ||
-                        mobileMultiSelect;
-                      if (additive) selectGroupItems(itemIds);
-                      else replaceWithGroupItems(itemIds);
-                    }}
-                    onDoubleClick={(event) => {
-                      if (isLayerRowControl(event.target)) return;
-                      beginRename("group", node.group.id, node.group.name);
-                    }}
-                    className={cn(
-                      "flex min-h-9 items-center gap-1 rounded-lg px-1 py-0.5 [contain-intrinsic-size:44px] [content-visibility:auto] max-lg:min-h-11 pointer-coarse:min-h-11",
-                      allChildrenSelected
-                        ? "bg-accent-soft/25 hover:bg-accent-soft/40"
-                        : partiallySelected
-                          ? "bg-cool/5 hover:bg-cool/10"
-                          : "hover:bg-raised/60",
-                      focusRing
-                    )}
-                  >
-                    {node.empty ? (
-                      <span className="grid size-7 shrink-0 place-items-center text-fg-3" aria-hidden>
-                        <ChevronRight size={14} />
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        tabIndex={-1}
-                        data-layer-row-control
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setGroupCollapsed(node.group.id, node.expanded);
-                        }}
-                        className={cn(
-                          "grid size-8 shrink-0 place-items-center rounded text-fg-3 hover:bg-raised",
-                          coarseTarget,
-                          focusRing
-                        )}
-                        aria-label={
-                          node.expanded
-                            ? `${node.group.name} 그룹 접기`
-                            : `${node.group.name} 그룹 펼치기`
-                        }
-                      >
-                        {node.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      </button>
-                    )}
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "grid size-5 shrink-0 place-items-center rounded-md border",
-                        allChildrenSelected
-                          ? "border-accent bg-accent text-on-accent"
-                          : partiallySelected
-                            ? "border-cool/70 bg-cool/10 text-cool"
-                            : "border-line/70 bg-card text-transparent"
-                      )}
-                    >
-                      {allChildrenSelected ? <Check size={12} strokeWidth={2.5} /> : partiallySelected ? <Minus size={12} strokeWidth={2.5} /> : null}
-                    </span>
-                    <Folder size={14} className="shrink-0 text-accent" aria-hidden />
-                    {editing && renameTarget
-                      ? renderRenameInput(renameTarget, key)
-                      : (
-                          // The member count is its own chip, outside the truncating name. Inlined
-                          // and unitless it fused with the name — `병합 e6659cca` + `2` read as one
-                          // string, `병합 e6659cca2`.
-                          <>
-                            <span className={cn(
-                              "min-w-0 flex-1 truncate text-[0.7rem] font-bold",
-                              selectedChildCount > 0 ? "text-fg" : "text-fg-2",
-                              node.group.hidden && "line-through decoration-fg-3/80"
-                            )}>
-                              {node.group.name}
-                            </span>
-                            <span
-                              aria-hidden
-                              className="shrink-0 rounded bg-raised px-1 py-0.5 text-[0.62rem] font-normal tabular-nums text-fg-3 lg:text-[0.56rem]"
-                            >
-                              {node.empty ? "비어 있음" : `${node.entries.length}개`}
-                            </span>
-                          </>
-                        )}
-                    {selectedChildCount > 0 ? (
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "shrink-0 rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold tabular-nums",
-                          allChildrenSelected ? "bg-accent text-on-accent" : "bg-cool/15 text-cool"
-                        )}
-                      >
-                        {selectedChildCount}
-                      </span>
-                    ) : null}
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      data-layer-row-control
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onAction({
-                          type: "set-group-flag",
-                          groupId: node.group.id,
-                          flag: "locked",
-                          value: !node.group.locked,
-                        });
-                      }}
-                      disabled={mutationDisabled}
-                      className={cn(
-                        "grid size-8 shrink-0 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-35",
-                        coarseTarget,
-                        focusRing
-                      )}
-                      aria-label={
-                        node.group.locked
-                          ? `${node.group.name} 그룹 잠금 해제`
-                          : `${node.group.name} 그룹 잠금`
-                      }
-                      aria-pressed={node.group.locked === true}
-                    >
-                      {node.group.locked ? <Lock size={13} /> : <LockOpen size={13} />}
-                    </button>
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      data-layer-row-control
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onAction({
-                          type: "set-group-flag",
-                          groupId: node.group.id,
-                          flag: "hidden",
-                          value: !node.group.hidden,
-                        });
-                      }}
-                      disabled={mutationDisabled}
-                      className={cn("grid size-8 shrink-0 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-35", coarseTarget, focusRing)}
-                      aria-label={node.group.hidden ? `${node.group.name} 그룹 표시` : `${node.group.name} 그룹 숨김`}
-                    >
-                      {node.group.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
-                    </button>
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      data-layer-row-control
-                      onClick={(event) => openActionMenu(event, { kind: "group", id: node.group.id })}
-                      aria-haspopup="dialog"
-                      aria-expanded={actionTarget?.kind === "group" && actionTarget.id === node.group.id}
-                      aria-controls={actionPopoverId}
-                      className={cn("grid size-8 shrink-0 place-items-center rounded text-fg-3 hover:bg-raised", coarseTarget, focusRing)}
-                      aria-label={`${node.group.name} 그룹 작업`}
-                    >
-                      <MoreHorizontal size={15} />
-                    </button>
-                  </div>
-                  {node.expanded && node.entries.length > 0 ? (
-                    <ul role="group" aria-label={`${node.group.name} 그룹 레이어`} className="flex flex-col gap-0.5 border-t border-line/45 p-1 pl-3">
-                      {node.entries.map((entry) => renderItemRow(
-                        entry,
-                        `${node.key}:item:${entry.item.id}`,
-                        2
-                      ))}
-                    </ul>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <div className="grid min-h-40 place-items-center px-4 py-8 text-center" role="status">
-            <div>
-              {filterActive ? <Search size={22} className="mx-auto text-fg-3" aria-hidden /> : <Layers3 size={22} className="mx-auto text-fg-3" aria-hidden />}
-              <p className="mt-2 text-xs font-semibold text-fg-2">
-                {filterActive ? "조건에 맞는 레이어가 없습니다" : "아직 레이어가 없습니다"}
-              </p>
-              <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
-                {filterActive ? "검색어나 필터를 지우고 다시 확인해 보세요." : "이미지, 말풍선, 텍스트 또는 선화를 추가하면 이곳에서 관리할 수 있어요."}
-              </p>
-              {filterActive ? (
-                <button type="button" onClick={resetFilters} className={cn(compactControl, "mt-3")}>필터 지우기</button>
-              ) : null}
-            </div>
-          </div>
-        )}
+        <StudioLayerNavigatorTree
+          nodes={nodes}
+          filterActive={filterActive}
+          selectedIdSet={selectedIdSet}
+          tabStopKey={tabStopKey}
+          mutationDisabled={mutationDisabled}
+          mobileMultiSelect={mobileMultiSelect}
+          getGroupItemIds={(groupId) =>
+            displayItems.filter((item) => item.groupId === groupId).map((item) => item.id)
+          }
+          rowRefs={rowRefs}
+          renameTarget={renameTarget}
+          actionTargetKind={actionTarget?.kind ?? null}
+          actionTargetId={actionTarget?.id ?? null}
+          actionPopoverId={actionPopoverId}
+          onSelectionChange={onSelectionChange}
+          visibleItemIds={visibleItemIds}
+          setFocusedKey={setFocusedKey}
+          handleTreeItemKeyDown={handleTreeItemKeyDown}
+          selectGroupItems={selectGroupItems}
+          replaceWithGroupItems={replaceWithGroupItems}
+          beginRename={beginRename}
+          renderRenameInput={renderRenameInput}
+          setGroupCollapsed={setGroupCollapsed}
+          onAction={onAction}
+          openActionMenu={openActionMenu}
+          renderItemRow={renderItemRow}
+          resetFilters={resetFilters}
+        />
       </div>
 
       {actionTarget && (actionTarget.kind === "batch" || activeItem || activeGroup) ? (

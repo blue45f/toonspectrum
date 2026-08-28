@@ -7,7 +7,13 @@ import { readStudioBg3dEditorSource } from "./bg3d/read-studio-bg3d-editor-sourc
 const SOURCES = {
   background3d: readStudioBg3dEditorSource(),
   frame: readFileSync(new URL("./StudioFrameAnimationPanel.tsx", import.meta.url), "utf8"),
-  layer: readFileSync(new URL("./layer/StudioLayerNavigator.tsx", import.meta.url), "utf8"),
+  // The navigator's batch toolbar (and its hints) live in the extracted BatchBar module.
+  layer: [
+    "./layer/StudioLayerNavigator.tsx",
+    "./layer/StudioLayerNavigatorBatchBar.tsx",
+  ]
+    .map((path) => readFileSync(new URL(path, import.meta.url), "utf8"))
+    .join("\n"),
   mainMenu: readFileSync(new URL("./StudioMainMenu.tsx", import.meta.url), "utf8"),
   menubar: readFileSync(new URL("./StudioMenubarContent.tsx", import.meta.url), "utf8"),
   vrm: readFileSync(new URL("./vrm/StudioVrmPoserTypes.ts", import.meta.url), "utf8"),
