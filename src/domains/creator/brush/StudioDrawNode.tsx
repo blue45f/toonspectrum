@@ -365,10 +365,26 @@ export const StudioDrawNode = memo(function StudioDrawNode({
    * 압력 경로(fx 패밀리: neon/glow/highlighter)의 증분 빌더. 자라나는 요소가 이 컴포넌트를 매
    * 이동 리렌더할 때 전체 압력 경로를 다시 계획하던 것(장획 게이트가 잡는 이동당 O(n))을,
    * sceneFunc(그리기 시점)에서 append 로 소비해 이동당 상수 비용으로 만든다. 렌더 본문이 아닌
-   * 그리기 콜백에서만 접근하므로 react-compiler 순수성 규약과도 충돌하지 않는다. 한 요소는 fx
-   * 분기 하나만 타므로 빌더 하나로 충분하고, 입력 구성이 바뀌면 빌더가 스스로 재구축한다.
+   * 그리기 콜백에서만 접근하므로 react-compiler 순수성 규약과도 충돌하지 않는다.
+   *
+   * 라이브 드래프트에서만 쓴다(P2 리뷰): 빌더의 prefix 검증은 마지막 소비 슬롯만 보는 O(1)
+   * 앵커라, 길이·꼬리가 같은 내부 재작성(undo/복원)을 append-only 로 오인해 커밋 요소가 낡은
+   * 지오메트리를 유지할 수 있다 — 커밋/재수화 경로는 배치 플래너가 값 동일로 다시 계산한다.
+   * 대칭 변형은 인덱스별 빌더로 격리한다(꼬리점이 대칭축 위일 때 변형 간 앵커 충돌 방지).
    */
-  const fxPressurePathBuilderRef = useRef<StudioIncrementalFxPressurePathBuilder | null>(null);
+  const fxPressurePathBuildersRef =
+    useRef<Map<number, StudioIncrementalFxPressurePathBuilder> | null>(null);
+  const fxPressurePathBuilderForVariation = (
+    variationIndex: number,
+  ): StudioIncrementalFxPressurePathBuilder => {
+    const builders = fxPressurePathBuildersRef.current ??= new Map();
+    let builder = builders.get(variationIndex);
+    if (!builder) {
+      builder = createStudioIncrementalFxPressurePathBuilder();
+      builders.set(variationIndex, builder);
+    }
+    return builder;
+  };
   const composite = isEraserOperation ? "destination-out" : "source-over";
   const opacity = el.opacity ?? 1;
   const stroke = isEraserOperation ? "#16100c" : el.stroke;
@@ -2195,20 +2211,23 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     <Shape
                       key={passIndex}
                       sceneFunc={(context) => {
-                        // 압력 경로는 증분 빌더로 소비한다 — 같은 스냅샷의 두 번째 이후 패스는
-                        // 휘발 꼬리만 다시 방출하므로 그리기당 추가 비용이 상수다.
-                        const builder = fxPressurePathBuilderRef.current
-                          ??= createStudioIncrementalFxPressurePathBuilder();
+                        // 압력 경로는 라이브 드래프트에서만 증분 빌더로 소비한다 — 같은 스냅샷의
+                        // 두 번째 이후 패스는 휘발 꼬리만 다시 방출하므로 그리기당 추가 비용이
+                        // 상수다. 커밋 요소는 배치 플래너로 매번 값 동일 재계산(P2: O(1) 앵커가
+                        // 같은 길이·꼬리의 내부 재작성을 놓친다).
+                        const fxInput = {
+                          brushId: "neon",
+                          points: renderPath.points,
+                          pressures: el.pressures,
+                          pressureModel: el.materialPressureModel,
+                          minimumDiameterRatio: el.materialMinimumDiameterRatio,
+                          tension: renderPath.tension,
+                        } as const;
                         const ribbonPlan = planStudioFxLuminousRibbonPass({
                           brushId: "neon",
-                          pressurePath: builder.append({
-                            brushId: "neon",
-                            points: renderPath.points,
-                            pressures: el.pressures,
-                            pressureModel: el.materialPressureModel,
-                            minimumDiameterRatio: el.materialMinimumDiameterRatio,
-                            tension: renderPath.tension,
-                          }),
+                          pressurePath: activeDraft
+                            ? fxPressurePathBuilderForVariation(index).append(fxInput)
+                            : planStudioFxBrushPressurePath(fxInput),
                           baseWidth: strokeWidth,
                           passWidthScale: pass.widthScale,
                           passOpacity: pass.opacity,
@@ -2324,19 +2343,21 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     <Shape
                       key={passIndex}
                       sceneFunc={(context) => {
-                        // neon 분기와 같은 증분 압력 경로 소비 — 이동당 계획 비용을 상수로.
-                        const builder = fxPressurePathBuilderRef.current
-                          ??= createStudioIncrementalFxPressurePathBuilder();
+                        // neon 분기와 같은 소비 규율 — 라이브 드래프트만 증분(이동당 상수),
+                        // 커밋 요소는 배치 플래너로 값 동일 재계산.
+                        const fxInput = {
+                          brushId: pressureBrush,
+                          points: renderPath.points,
+                          pressures: el.pressures,
+                          pressureModel: el.materialPressureModel,
+                          minimumDiameterRatio: el.materialMinimumDiameterRatio,
+                          tension: renderPath.tension,
+                        } as const;
                         const ribbonPlan = planStudioFxLuminousRibbonPass({
                           brushId: pressureBrush,
-                          pressurePath: builder.append({
-                            brushId: pressureBrush,
-                            points: renderPath.points,
-                            pressures: el.pressures,
-                            pressureModel: el.materialPressureModel,
-                            minimumDiameterRatio: el.materialMinimumDiameterRatio,
-                            tension: renderPath.tension,
-                          }),
+                          pressurePath: activeDraft
+                            ? fxPressurePathBuilderForVariation(index).append(fxInput)
+                            : planStudioFxBrushPressurePath(fxInput),
                           baseWidth: strokeWidth,
                           passWidthScale: pass.widthScale,
                           passOpacity: pass.opacity,

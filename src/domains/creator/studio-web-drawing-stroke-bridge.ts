@@ -247,7 +247,12 @@ function densifySparseWebDrawingPathGaps(
     const next = path[i]!;
     const gap = Math.hypot(next.x - prev.x, next.y - prev.y);
     if (gap > gapThreshold) {
-      const steps = Math.min(512, Math.ceil(gap / gapThreshold));
+      // 상한은 병적 입력(손상 좌표 등)만 막는 안전판이다. 이전 512 상한은 threshold(1–3px)의
+      // 512배를 넘는 간격 — 세로로 수천 px 인 캔버스의 희소 2점 직선 획에서 실제로 가능 — 에서
+      // 보간 간격이 threshold 를 훌쩍 넘겨 좁은 치즐 스탬프 몸통이 다시 끊겼다(P2 리뷰).
+      // 65,536 이면 1px 하한 기준 65k px 간격까지 간격 보장이 정확히 유지된다 — 지원 캔버스
+      // 어느 크기보다도 크다.
+      const steps = Math.min(65_536, Math.ceil(gap / gapThreshold));
       for (let step = 1; step < steps; step++) {
         const amount = step / steps;
         out.push({

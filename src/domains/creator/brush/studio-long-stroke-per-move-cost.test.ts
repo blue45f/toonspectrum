@@ -577,12 +577,13 @@ function fxPressurePathProbe(id: string, brushId: string, fxBrushId: string): La
     path: "live-incremental",
     entry: "sceneFunc -> StudioIncrementalFxPressurePathBuilder.append",
     makeStroke: () => {
-      // `StudioDrawNode` holds one builder per element (`fxPressurePathBuilderRef`) and its pass
-      // sceneFuncs consume the growing snapshot with `append` — this is the exact per-move call
-      // shape, including the canonical pressure model and the accepted-input tension the render
-      // path reports for new-pipeline strokes. The whole-prefix
-      // `planStudioFxBrushPressurePath` this probe used to time remains the SVG-export and
-      // legacy-document chain, a cost no pointer move pays.
+      // `StudioDrawNode` holds one builder per (element, symmetry variation)
+      // (`fxPressurePathBuilderForVariation`) for ACTIVE DRAFTS and its pass sceneFuncs consume
+      // the growing snapshot with `append` — this is the exact per-move call shape, including
+      // the canonical pressure model and the accepted-input tension the render path reports for
+      // new-pipeline strokes. Committed elements replay the whole-prefix
+      // `planStudioFxBrushPressurePath` (also the SVG-export and legacy-document chain), a cost
+      // no pointer move pays.
       const builder = createStudioIncrementalFxPressurePathBuilder();
       return wholePrefixStepper((stroke) =>
         builder.append({
