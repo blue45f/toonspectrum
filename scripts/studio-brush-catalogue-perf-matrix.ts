@@ -472,7 +472,7 @@ export const STUDIO_BRUSH_CATALOGUE_SOAK_IDS = [
   "crayon",
   "oil-pastel",
 ] as const;
-export const STUDIO_BRUSH_CATALOGUE_SOAK_RUNS = 6;
+export const STUDIO_BRUSH_CATALOGUE_SOAK_RUNS = 10;
 /** Consecutive-plan growth tolerated before monotonic slowdown counts as degradation. */
 export const STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH = 1.2;
 /**
@@ -508,9 +508,13 @@ export interface StudioBrushCataloguePaintSoakResult {
  * satisfiable by sub-ms jitter plus ONE preempted final run (measured: oil-pastel
  * [7.22, 7.26, 18.90]ms), and the next form — min of the later runs against the single first
  * run — fell to the mirror image, one LUCKY first run before a starved stretch (measured:
- * acrylic-stiff-flat [6.55, 15.54, 13.59]ms). With three runs per window a verdict survives two
- * scheduler preemptions on either side, while a genuine compounding leak still slows every
- * second-half run and clears the threshold at once.
+ * acrylic-stiff-flat [6.55, 15.54, 13.59]ms). Three-run windows survived two scheduler
+ * preemptions on either side but still fell to the same lucky-baseline shape at ~40ms plan
+ * scale on a contended CI runner (measured: needle-graphite
+ * [40.68, 38.13, 46.76, 46.16, 82.60, 63.89]ms — cheapest-later 46.16 vs lucky baseline 38.13
+ * = x1.21, while the first half's OWN spread already spanned 38.1–46.8). Five-run windows make
+ * each minimum an estimate over enough samples that one clean run per half suffices, while a
+ * genuine compounding leak still slows every second-half run and clears the threshold at once.
  */
 export function evaluateStudioBrushCataloguePaintSoak(
   catalogId: string,

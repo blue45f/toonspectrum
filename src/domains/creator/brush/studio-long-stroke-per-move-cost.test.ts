@@ -407,7 +407,17 @@ function outlineProbe(id: string, brushId: string): LaneProbe {
  * the renderer's exact calls with the canvas removed — the overlay's own tests own byte identity;
  * this one owns the cost curve. The retained `StudioDrawNode` path for these same lanes replans the
  * whole element, but that is a commit/repaint cost, not what a pointer move pays.
+ *
+ * Pressure is held CONSTANT for these probes. Deposit spacing follows pressure, and the fixture's
+ * pressure drifts with a ~785-sample period, so the tail pressure differs between the two lengths
+ * (~0.95 at n=400 vs ~0.41 at n=3200). The same 4-sample timed move then deposits 2 dabs at the
+ * short length but 5 at the long one (measured on CI, charcoal--vine-soft), and the gate reads
+ * that OUTPUT growth as replan growth — x2.1 against the x2 allowance, a 7µs coin flip. Constant
+ * pressure makes the timed move the same physical segment at both lengths; the state-size effect
+ * this gate exists to catch is untouched (a whole-prefix replan still measures ~x8 here).
  */
+const DYNAMIC_PROBE_PRESSURE = 0.6;
+
 function dynamicDabProbe(id: string, brushId: string): LaneProbe {
   return {
     id,
@@ -428,7 +438,7 @@ function dynamicDabProbe(id: string, brushId: string): LaneProbe {
       const sampleAt = (stroke: StrokePrefix, index: number): StudioCausalDynamicBrushSampleV2 => ({
         x: stroke.points[index * 2]!,
         y: stroke.points[index * 2 + 1]!,
-        pressure: stroke.pressures[index]!,
+        pressure: DYNAMIC_PROBE_PRESSURE,
         tangentialPressure: stroke.tangentialPressures[index]!,
         speed: stroke.speeds[index]!,
         tiltX: stroke.tiltXs[index]!,
