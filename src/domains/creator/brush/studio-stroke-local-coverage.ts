@@ -15,7 +15,10 @@ import {
   type StudioRetainedMediaPressureResponse,
   type StudioRetainedMediaPressureProfileId,
 } from "../studio-retained-media-pressure";
-import { planStudioTonalBands } from "../studio-tonal-band-plan";
+import {
+  planStudioTonalBands,
+  planStudioTonalBandsFromExtremes,
+} from "../studio-tonal-band-plan";
 
 export const STUDIO_STROKE_LOCAL_COVERAGE_VERSION = 2 as const;
 
@@ -316,6 +319,9 @@ export function createStudioIncrementalAngledNibCoverageBuilder(): StudioIncreme
   let lastRawPressure: number | undefined;
   const polygons: StudioStrokeLocalCoveragePolygon[] = [];
   const densities: number[] = [];
+  /** 밀도 극값의 러닝 폴드 — 톤 밴딩의 평면 판정을 이동당 O(1)로 만든다(전체 스캔 제거). */
+  let densityPeak = 0;
+  let densityMin = Number.POSITIVE_INFINITY;
   let previousResponse: StudioRetainedMediaPressureResponse | undefined;
   let previousNibX = 0;
   let previousNibY = 0;
@@ -327,6 +333,8 @@ export function createStudioIncrementalAngledNibCoverageBuilder(): StudioIncreme
     lastRawPressure = undefined;
     polygons.length = 0;
     densities.length = 0;
+    densityPeak = 0;
+    densityMin = Number.POSITIVE_INFINITY;
     previousResponse = undefined;
     previousX = null;
     previousY = null;
@@ -420,10 +428,13 @@ export function createStudioIncrementalAngledNibCoverageBuilder(): StudioIncreme
           if (polygon) {
             polygons.push(polygon);
             // 세그먼트는 두 표본에 걸치므로 두 표본의 안료를 나른다(배치 주석 그대로).
-            densities.push((
+            const density = (
               sampleDensity(previousResponse)
               + sampleDensity(response)
-            ) / 2);
+            ) / 2;
+            densities.push(density);
+            densityPeak = Math.max(densityPeak, density);
+            densityMin = Math.min(densityMin, density);
           }
         }
         previousResponse = response;
@@ -438,11 +449,14 @@ export function createStudioIncrementalAngledNibCoverageBuilder(): StudioIncreme
       }
 
       // 톤 밴딩은 관측 피크/플로어 상대 설계(의도적 전역) — 유지 배열 위에서 매 호출 접는다.
-      // 무필압/평탄 밀도는 단일 평면 레이어로 즉시 접혀 이 호출이 O(1)이다.
-      const layers = planStudioTonalBands(
+      // 밀도 극값은 러닝 폴드로 넘겨 무필압/평탄 밀도 획의 평면 판정을 이동당 O(1)로 만든다
+      // (CI 러너에서 두 전체 스캔이 x2.0 경계를 넘겼다).
+      const layers = planStudioTonalBandsFromExtremes(
         polygons,
         densities,
         finiteUnitInterval(pressureInput?.elementOpacity) ?? 1,
+        densityPeak,
+        densityMin,
       );
       return {
         kind: "studio-angled-nib-stroke-local-coverage-plan",
