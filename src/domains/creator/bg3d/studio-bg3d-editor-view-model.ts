@@ -1,5 +1,9 @@
 /* Extracted from StudioBackground3D. Closures keep original identifiers via an `any` host bag. */
 // @ts-nocheck
+"use no memo";
+// React Compiler 옵트아웃: 가변 호스트 백(h) 을 렌더마다 재대입해 공유하는 추출 패턴이라,
+// 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
+// (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 
 export function bindStudioBg3dEditorViewModel(h) {
@@ -173,7 +177,7 @@ export function bindStudioBg3dEditorViewModel(h) {
     disposeCurrentWebXrControllerGeneration, disposeWebXrControllerForOpenChange, handleWebXrControllerReady, handleWebXrSessionStateChange,
     historyRef, historyIndexRef, transitionPhysicsPhase, commitImmediateHistoryTransition,
     doUndo, doRedo, canAdmitSceneNodes, addPrimitive,
-    addComposite, proceduralStarterDisabledReason, addProceduralStarterAsset, addSceneTemplate,
+    addComposite, addProceduralStarterAsset, addSceneTemplate,
     addPrimitiveRef, addSceneTemplateRef, objectInsertSeedKeyRef, addRoomBuild,
     applyRoomBuilderPreset, handleRoomBuilderSpecChange, commitSceneEntityRemoval, removeSceneEntities,
     deleteSelected, deleteSelectedCustomModel, deleteSelectedEntity, duplicateSelected,
@@ -242,6 +246,8 @@ export function bindStudioBg3dEditorViewModel(h) {
     renderedPanoramaRotation, renderedBackgroundSettings, sharedCharacterGroundSurfaceRevision, staticModelBatches,
     mainCameraFarClip, mainCameraMaxOrbitDistance, quadViewHint, snapToggleHint,
     lineArtPreviewHint, surfaceSnapHint,
+    // 파일 분할 때 목록에서 빠져 ReferenceError 를 던지던 식별자들(런타임 값 위치) — 복구.
+    sceneRecoveryError, transformSpaceOverride,
   } = { ...R, ...h };
   const isBatchRenderingShots = shotBatchProgress !== null;
   const savedShots = sceneBaseDocument.shots ?? [];
@@ -284,6 +290,18 @@ export function bindStudioBg3dEditorViewModel(h) {
       captureReadiness: sharedCharacterCaptureReadiness,
     });
   const physicsInteractionLocked = isStudioBg3dPhysicsTransientPhase(physicsPhase);
+  // 파일 분할 때 계산 자체가 누락됐던 파생값 — 분할 전 StudioBackground3D 원문 그대로 복원
+  // (소비처: scene-ops 호스트의 addProceduralStarterAsset 가드, ShapesPanel disabledReason).
+  const proceduralStarterDisabledReason = isRestoringScene
+    ? "3D 장면을 복원하는 중입니다. 복원이 끝난 뒤 추가할 수 있습니다."
+    : isUploadingModel || applyingTemplateId !== null || deletingModelId !== null ||
+        isSavingTemplate
+      ? "다른 3D 에셋 작업이 끝난 뒤 추가할 수 있습니다."
+      : isCapturing || isBatchRenderingShots
+        ? "3D 장면을 캡처하는 동안에는 에셋을 추가할 수 없습니다."
+        : physicsInteractionLocked || isTransforming
+          ? "물리 미리보기 또는 변형 작업을 마친 뒤 추가할 수 있습니다."
+          : null;
   const transformSpace =
     transformSpaceOverride ?? (transformMode === "rotate" ? "local" : "world");
   const insertBlocked = Boolean(sceneRecoveryError) || hasCloneFailure || hasPendingClone ||
@@ -337,6 +355,14 @@ export function bindStudioBg3dEditorViewModel(h) {
   // 선택된 것이 도형(primitives)인지 커스텀 모델(customModels)인지는 배타적이다 — 둘 다 같은
   // selectedId/primitiveObjectsRef를 공유하므로(§4) "primitives에 있으면 도형, 아니면 모델"로 분기한다.
   Object.assign(h, {
+    // 파일 분할 때 출력 목록에서 빠져 소비 모듈(레이아웃 VM·캡처/삽입 호스트·이펙트)이
+    // ReferenceError 를 던지던 useState 쌍 — 복구. deviceSignals 쌍은 이펙트의 matchMedia
+    // 리스너가 setDeviceSignals 를 undefined 로 호출하던 TypeError 의 원인이었다.
+    captureBackgroundSnapshot,
+    setCaptureBackgroundSnapshot,
+    deviceSignals,
+    setDeviceSignals,
+    proceduralStarterDisabledReason,
     isBatchRenderingShots,
     savedShots,
     shotBatchSelectedIds,

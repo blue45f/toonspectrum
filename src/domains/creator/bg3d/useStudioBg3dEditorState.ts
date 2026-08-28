@@ -1,5 +1,9 @@
 /* Extracted from StudioBackground3D. Closures keep original identifiers via an `any` host bag. */
 // @ts-nocheck
+"use no memo";
+// React Compiler 옵트아웃: 가변 호스트 백(h) 을 렌더마다 재대입해 공유하는 추출 패턴이라,
+// 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
+// (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 
 export function useStudioBg3dEditorState(props) {
@@ -282,6 +286,26 @@ export function useStudioBg3dEditorState(props) {
   const modelThumbnailGpuLeaseRef = useRef<ModelThumbnailGpuLease | null>(null);
   const modelAnimationTimeReadersRef = useRef(new Map<string, () => number>());
   const modelRigBakeReadersRef = useRef(new Map<string, StudioBg3dRigBakeReader>());
+  // 파일 분할 때 계산 자체가 누락됐던 리더 등록/애니메이션 종료 콜백 3종 — 분할 전
+  // StudioBackground3D 원문 그대로 복원(소비처: SceneGraph 의 registerAnimationTime /
+  // registerRigBake / onAnimationComplete props).
+  const registerModelAnimationTime = useCallback((id: string, reader: (() => number) | null) => {
+    if (reader) modelAnimationTimeReadersRef.current.set(id, reader);
+    else modelAnimationTimeReadersRef.current.delete(id);
+  }, []);
+  const registerModelRigBake = useCallback((id: string, reader: StudioBg3dRigBakeReader | null) => {
+    if (reader) modelRigBakeReadersRef.current.set(id, reader);
+    else modelRigBakeReadersRef.current.delete(id);
+  }, []);
+  const finishModelAnimation = useCallback((id: string, timeSeconds: number) => {
+    setCustomModels((current) => current.map((model) => {
+      if (model.id !== id || !model.animation?.playing) return model;
+      return {
+        ...model,
+        animation: { ...model.animation, playing: false, timeSeconds },
+      };
+    }));
+  }, []);
   const [poseJointSelection, setPoseJointSelection] =
     useState<StudioBg3dRigSelectionState | null>(null);
   const [ikEndJointSelection, setIkEndJointSelection] = useState<{
@@ -614,6 +638,9 @@ export function useStudioBg3dEditorState(props) {
     modelThumbnailGpuLeaseRef,
     modelAnimationTimeReadersRef,
     modelRigBakeReadersRef,
+    registerModelAnimationTime,
+    registerModelRigBake,
+    finishModelAnimation,
     poseJointSelection,
     setPoseJointSelection,
     ikEndJointSelection,
@@ -667,7 +694,9 @@ export function useStudioBg3dEditorState(props) {
     modalAssetSessionRef,
     captureInFlightRef,
     invalidateModelThumbnailCaptures,
-    thumbnailLease,
+    // `thumbnailLease` 는 위 invalidateModelThumbnailCaptures 콜백의 지역 변수다 — 추출 때
+    // 호스트 백 목록에 잘못 올라와 이 객체 리터럴 평가가 ReferenceError 를 던졌고, BG3D
+    // 편집기가 마운트 자체를 못 했다(@ts-nocheck 파일이라 tsc 가 잡지 못한다). 소비자는 없다.
     ltInsertAbortRef,
     aiMethodReferenceAbortRef,
     ltInsertSceneEpochRef,
