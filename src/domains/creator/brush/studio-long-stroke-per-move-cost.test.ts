@@ -101,6 +101,7 @@ import {
   planStudioCausalInkDabs,
   shouldAppendStudioCausalInkSample,
 } from "../studio-causal-ink";
+import { DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS } from "../studio-causal-watercolor-brush";
 import { planStudioDynamicBrushCoverageMarks } from "../studio-dynamic-brush-coverage-renderer";
 import { planStudioDynamicBrushRender } from "../studio-dynamic-brush-render-plan";
 import {
@@ -153,8 +154,7 @@ import {
   studioOilRibbonProgramsForBrush,
 } from "./studio-oil-ribbon-carrier";
 import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
-import { planWatercolorBrushDabs } from "./studio-watercolor-brush";
-import { planStudioWetRibbonCarrier } from "./studio-wet-ribbon-carrier";
+import { planStudioWetWashLivePipeline } from "./studio-wet-wash-live-pipeline";
 
 import type { DrawEl } from "../studio-element-model";
 
@@ -321,6 +321,8 @@ function wholePrefixStepper(plan: (stroke: StrokePrefix) => number): StrokeStepp
 const STROKE_COLOR = "#1d1b1a";
 const ELEMENT_ID = "long-stroke-gate";
 const SEED = fxBrushSeedFromKey(ELEMENT_ID);
+/** 획 키 분리 — 프로브 스트로크마다 파이프라인 항목이 새로 시작해야 seek 이 정직하다. */
+let wetDabsProbeSequence = 0;
 
 function drawElement(brushId: string, stroke: StrokePrefix, extra?: Partial<DrawEl>): DrawEl {
   return {
@@ -687,18 +689,33 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
   {
     id: "wet-dabs",
     brushId: "watercolor--granular",
-    path: "whole-prefix-replan",
-    entry: "planWatercolorBrushDabs -> planStudioWetRibbonCarrier",
-    makeStroke: () =>
-      wholePrefixStepper((stroke) => {
-        const dabs = planWatercolorBrushDabs({
-          points: freehandPath(stroke),
-          pressures: stroke.pressures,
-          baseWidth: 30,
-          seed: SEED,
+    path: "live-incremental",
+    entry: "StudioDrawNode draft -> planStudioWetWashLivePipeline (planner+material+carrier)",
+    makeStroke: () => {
+      // `StudioDrawNode`'s active-draft branch drives one element-id-keyed pipeline per move:
+      // the causal planner, the material per-dab scale and the wet ribbon carrier all retain
+      // their stable prefix, so a move pays only for new samples plus the preview tail. The
+      // batch chain (`planCausalWatercolorBrushDabs` -> `applyStudioBrushAliasWatercolorMaterial`
+      // -> `planStudioWetRibbonCarrier`) remains the commit/SVG-export path, a cost no pointer
+      // move pays. The input mirrors the draft branch: raw points (causal strokes skip
+      // `processFreehandPoints`), the shared causal dab cap and `previewEndpoint: true`.
+      const strokeKey = `${ELEMENT_ID}:wet-dabs:${wetDabsProbeSequence += 1}`;
+      return wholePrefixStepper((stroke) => {
+        const plan = planStudioWetWashLivePipeline(strokeKey, {
+          brushId: "watercolor--granular",
+          input: {
+            points: stroke.points,
+            pressures: stroke.pressures,
+            baseWidth: 30,
+            seed: SEED,
+            maxDabs: DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
+            previewEndpoint: true,
+          },
+          carrierSeed: SEED,
         });
-        return planStudioWetRibbonCarrier(dabs, { seed: SEED }).footprintCount;
-      }),
+        return plan ? plan.carrierPlan.footprintCount : 0;
+      });
+    },
   },
 
   // ── stamp engines ───────────────────────────────────────────────────────────────────────────

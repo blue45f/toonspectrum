@@ -29,6 +29,7 @@ import {
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
   planCausalWatercolorBrushDabs,
+  planCausalWatercolorBrushDabsIncremental,
 } from "../studio-causal-watercolor-brush";
 import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
@@ -172,6 +173,7 @@ import {
   planStudioWetRibbonCarrier,
   traceStudioWetRibbonCarrierBatch,
 } from "./studio-wet-ribbon-carrier";
+import { planStudioWetWashLivePipeline } from "./studio-wet-wash-live-pipeline";
 
 
 import type { CalligraphyStylusInput } from "../studio-brush";
@@ -1629,9 +1631,27 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               // stations stay prefix-stable, while pointer-up no longer grows the visible stroke.
               previewEndpoint: causalWatercolor && activeDraft,
             };
-            const plannedDabs = causalWatercolor
-              ? planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)
-              : planWatercolorBrushDabs(watercolorInput);
+            // 활성 초안은 점 배열이 append 전용이므로 요소 id 로 키된 증분 파이프라인이
+            // 플래너·재질 스케일·습식 리본 캐리어의 안정 prefix 를 함께 보관해 새 표본만 걷는다
+            // (이동당 O(1) — 장획 게이트 wet-dabs). 웻 텍스처 프로그램이 핀된 레인은 전획 물리
+            // 단계 때문에 파이프라인이 null 을 돌려주고 아래 배치 체인으로 내려간다. 커밋 렌더는
+            // 오늘처럼 배치 리플레이를 유지해 후처리 워커의 전면 치환 같은 내부 점 재작성에도
+            // 항상 정본을 그린다.
+            const liveWetWashPlan = causalWatercolor && activeDraft
+              ? planStudioWetWashLivePipeline(el.id, {
+                  brushId: brush,
+                  enginePrograms: el.brushEnginePrograms,
+                  input: watercolorInput,
+                  carrierSeed: watercolorSeed,
+                })
+              : null;
+            const plannedDabs = liveWetWashPlan
+              ? liveWetWashPlan.dabs
+              : causalWatercolor
+                ? activeDraft
+                  ? planCausalWatercolorBrushDabsIncremental(el.id, watercolorInput, false)
+                  : planCausalWatercolorBrushDabs(watercolorInput, true)
+                : planWatercolorBrushDabs(watercolorInput);
             // The stroke seed feeds the opt-in wet-edge-bloom lanes; SVG export passes the same
             // seed at its two watercolor sites so Canvas and SVG stay pixel-agreeing.
             // The phase gates only the opt-in living-ink settled bake (2026-08-13 wave 3): the
@@ -1664,7 +1684,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 ? resolveStudioLivingInkSettledBakeProgram(livingInkBakeProgramId)
                 : null;
             let dabs: readonly StudioBrushAliasWatercolorDab[];
-            if (livingInkBakeProgram) {
+            if (liveWetWashPlan) {
+              // 파이프라인이 재질 스케일까지 끝냈다(프로그램 없는 레인만 진입하므로 배치의
+              // apply 결과와 값 동일).
+              dabs = liveWetWashPlan.dabs;
+            } else if (livingInkBakeProgram) {
               const baseDabs = applyStudioBrushAliasWatercolorMaterial(
                 brush,
                 plannedDabs,
@@ -1692,9 +1716,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 el.brushEnginePrograms,
               );
             }
-            const wetRibbonPlan = causalWatercolor
-              ? planStudioWetRibbonCarrier(dabs, { seed: watercolorSeed })
-              : null;
+            const wetRibbonPlan = liveWetWashPlan
+              ? liveWetWashPlan.carrierPlan
+              : causalWatercolor
+                ? planStudioWetRibbonCarrier(dabs, { seed: watercolorSeed })
+                : null;
             return (
               <Shape
                 key={index}

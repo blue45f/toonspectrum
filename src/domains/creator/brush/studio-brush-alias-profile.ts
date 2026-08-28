@@ -719,6 +719,67 @@ export interface StudioBrushAliasWatercolorDab {
 }
 
 /**
+ * `applyStudioBrushAliasWatercolorMaterial`의 재질/프로그램 해석 머리 — 단일 권위.
+ *
+ * 증분 라이브 파이프라인(장획 게이트)이 같은 해석으로 "프로그램 없는 레인"을 판별해 배치와
+ * 바이트 동일한 per-dab 스케일 경로를 안전하게 탈 수 있도록 분리했다. 우선순위 규칙은 원래
+ * 본문 그대로다: 커스텀 조합 오버라이드가 레인 핀보다 우선하고, wet-edge-bloom 핀이 있으면
+ * living-ink bake 는 상담하지 않는다(웻 텍스처 권위는 브러시당 하나).
+ */
+export interface StudioBrushAliasWatercolorMaterialStage {
+  readonly material: StudioBrushAliasWatercolorMaterial | null;
+  readonly wetEdgeBloomProgramId: string | null;
+  readonly livingInkBakeProgramId: string | null;
+}
+
+export function resolveStudioBrushAliasWatercolorMaterialStage(
+  brushId: unknown,
+  enginePrograms?: StudioBrushEngineProgramSet | null,
+): StudioBrushAliasWatercolorMaterialStage {
+  const laneMaterial = typeof brushId === "string"
+    ? resolveStudioBrushEngineLaneWatercolorMaterial(brushId)
+    : null;
+  const material = resolveStudioBrushAliasProfile(brushId)?.watercolor ?? laneMaterial;
+  // 커스텀 조합 오버라이드가 레인 핀보다 우선하고, 오버라이드가 없으면 기존 레인 동작을 그대로
+  // 재현한다. 프로그램이 실리면 레인/프로필 재질 행이 없는 베이스(예: 일반 watercolor)에서도
+  // 웻 텍스처가 실제로 적용돼야 한다 — 그래서 재질 스케일과 프로그램 존재를 분리해 판정한다.
+  const overrideBloomProgramId = enginePrograms?.watercolor?.wetEdgeBloomProgramId;
+  const wetEdgeBloomProgramId =
+    overrideBloomProgramId ?? laneMaterial?.wetEdgeBloomProgramId ?? null;
+  const livingInkBakeProgramId = wetEdgeBloomProgramId
+    ? null
+    : enginePrograms?.watercolor?.livingInkBakeProgramId
+      ?? laneMaterial?.livingInkBakeProgramId
+      ?? null;
+  return { material: material ?? null, wetEdgeBloomProgramId, livingInkBakeProgramId };
+}
+
+/**
+ * 재질 스케일 한 dab 분 — 배치 map 본문과 같은 함수라서 배치/증분 결과가 바이트 동일하다.
+ * 중심 좌표는 절대 움직이지 않는다(재질은 반지름/안료만 다르게 한다).
+ */
+export function scaleStudioBrushAliasWatercolorMaterialDab(
+  material: StudioBrushAliasWatercolorMaterial,
+  dab: StudioBrushAliasWatercolorDab,
+): StudioBrushAliasWatercolorDab {
+  const core = dab.role === "core";
+  return {
+    ...dab,
+    radius: Math.max(
+      0.05,
+      finiteOr(dab.radius, 0.05)
+        * (core ? material.coreRadiusScale : material.diffuseRadiusScale)
+    ),
+    opacity: clamp(
+      finiteOr(dab.opacity, 0)
+        * (core ? material.coreOpacityScale : material.diffuseOpacityScale),
+      0,
+      1
+    ),
+  };
+}
+
+/**
  * Applies material-only radius/pigment differences without moving deterministic dab centres.
  *
  * `seed` is the stroke-stable watercolor seed (`watercolorBrushSeedFromKey(element.id)`); it is
@@ -738,43 +799,14 @@ export function applyStudioBrushAliasWatercolorMaterial(
   phase?: StudioLivingInkSettledBakePhase,
   enginePrograms?: StudioBrushEngineProgramSet | null,
 ): readonly StudioBrushAliasWatercolorDab[] {
-  const laneMaterial = typeof brushId === "string"
-    ? resolveStudioBrushEngineLaneWatercolorMaterial(brushId)
-    : null;
-  const material = resolveStudioBrushAliasProfile(brushId)?.watercolor ?? laneMaterial;
-  // 커스텀 조합 오버라이드가 레인 핀보다 우선하고, 오버라이드가 없으면 기존 레인 동작을 그대로
-  // 재현한다. 프로그램이 실리면 레인/프로필 재질 행이 없는 베이스(예: 일반 watercolor)에서도
-  // 웻 텍스처가 실제로 적용돼야 한다 — 그래서 재질 스케일과 프로그램 존재를 분리해 판정한다.
-  const overrideBloomProgramId = enginePrograms?.watercolor?.wetEdgeBloomProgramId;
-  const wetEdgeBloomProgramId =
-    overrideBloomProgramId ?? laneMaterial?.wetEdgeBloomProgramId ?? null;
-  const livingInkBakeProgramId = wetEdgeBloomProgramId
-    ? null
-    : enginePrograms?.watercolor?.livingInkBakeProgramId
-      ?? laneMaterial?.livingInkBakeProgramId
-      ?? null;
+  const { material, wetEdgeBloomProgramId, livingInkBakeProgramId } =
+    resolveStudioBrushAliasWatercolorMaterialStage(brushId, enginePrograms);
   if (!material && !wetEdgeBloomProgramId && !livingInkBakeProgramId) return dabs;
   // Do not infer speed from planned station travel. Causal stations are regularly
   // spaced by design; treating that spacing as hand speed stamps a tonal bar on
   // every station. Real pointer speed belongs on the wet-ink / wet-mix paths.
   const scaledDabs = material
-    ? dabs.map((dab) => {
-      const core = dab.role === "core";
-      return {
-        ...dab,
-        radius: Math.max(
-          0.05,
-          finiteOr(dab.radius, 0.05)
-            * (core ? material.coreRadiusScale : material.diffuseRadiusScale)
-        ),
-        opacity: clamp(
-          finiteOr(dab.opacity, 0)
-            * (core ? material.coreOpacityScale : material.diffuseOpacityScale),
-          0,
-          1
-        ),
-      };
-    })
+    ? dabs.map((dab) => scaleStudioBrushAliasWatercolorMaterialDab(material, dab))
     : dabs;
   // Opt-in wet-texture physics (coffee ring / granulation / chromatography / fresh-ink wetness):
   // lanes whose material row carries a program id, plus custom program-set overrides, reach the

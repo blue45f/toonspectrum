@@ -872,6 +872,375 @@ export function planStudioWetRibbonCarrier(
   });
 }
 
+export interface StudioIncrementalWetRibbonCarrier {
+  /**
+   * 배치 `planStudioWetRibbonCarrier`와 값이 정확히 같은 플랜을 돌려주되, 안정 prefix 구간의
+   * 스테이션·풋프린트·사다리 칸(rung) 폴리곤을 호출 사이에 유지해 이동당 비용을 새 표본 수에만 비례시킨다.
+   *
+   * `stableDabCount`는 상류 증분 플래너가 보증하는 append 전용 prefix 길이이고,
+   * `sourceGeneration`은 그 보증이 깨질 때(되돌리기·재작성·설정 변경) 증가하는 세대 카운터다 —
+   * 세대가 바뀌면 여기서도 전체를 다시 만든다. 반환 플랜의 `footprints`와 각 batch 의
+   * `polygons`는 내부 보관 배열을 그대로 노출하므로 수정하면 안 되고, 다음 `plan()` 호출까지만
+   * 유효하다(휘발 꼬리는 다음 호출에서 걷어내고 다시 단다).
+   */
+  plan(
+    dabs: readonly StudioWetRibbonSourceDab[],
+    stableDabCount: number,
+    sourceGeneration: number,
+    options?: StudioWetRibbonCarrierPlanOptions | null,
+  ): StudioWetRibbonCarrierPlan;
+}
+
+interface IncrementalCarrierLaneState {
+  /** 사다리 칸(rung)(커버리지 사다리 칸)별 폴리곤 목록 — 인덱스 1..OPACITY_BUCKET_COUNT 사용. */
+  readonly rungPolygons: StudioWetRibbonPolygon[][];
+  readonly rungStableCounts: number[];
+  stableMaxBucket: number;
+  volatileMaxBucket: number;
+}
+
+/**
+ * 증분 습식 리본 캐리어.
+ *
+ * 배치 플래너의 세 단계는 모두 앞으로만 흐르는 상태를 가진다: `collectStations`는 마지막
+ * 스테이션만 소급 변형하고(디퓨즈 dab), `buildFootprints`의 `previousEdges`는 직전 세그먼트의
+ * 끝단만 참조하며, `buildBatches`의 사다리 칸(rung) 소속은 예치물 자신의 불투명도와 레이어 최대 버킷의
+ * `min` 으로만 정해진다. 그래서 (1) 마지막 안정 스테이션 스냅샷 복원 → 새 안정 dab 순차 소비,
+ * (2) 안정 풋프린트는 끝 스테이션이 확정된 쌍까지만 유지, (3) 사다리 칸(rung) 배열은 상한 없이(캡 128)
+ * 소속을 미리 계산해 두고 방출 시 레이어 최대 버킷까지만 자르면, 각 호출의 결과가 같은 입력의
+ * 배치 플랜과 값으로 완전히 일치한다(같은 헬퍼를 같은 순서로 호출하므로 부동소수점까지 동일).
+ */
+export function createStudioIncrementalWetRibbonCarrier(): StudioIncrementalWetRibbonCarrier {
+  let generation: number | null = null;
+  let seed = 0;
+  let maxFootprints = 0;
+
+  const stations: WetRibbonStation[] = [];
+  let consumedDabs = 0;
+  let stableStationCount = 0;
+  let stableLastStationSnapshot: WetRibbonStation | null = null;
+  /** 캡 초과 코어 dab 을 만나 배치 루프가 `break` 한 상태 — 이후 dab 은 영원히 무시된다. */
+  let stableStopped = false;
+  let stableCapped = false;
+
+  const footprints: StudioWetRibbonFootprint[] = [];
+  let stableFootprintCount = 0;
+  let stablePolygonSum = 0;
+  /** 다음에 방출할 안정 세그먼트 쌍의 끝 스테이션 인덱스. */
+  let stableNextEnd = 1;
+  const stableEdges = new Map<StudioWetRibbonCarrierLayer, LayerEdge>();
+
+  const lanes: IncrementalCarrierLaneState[] = LAYER_ORDER.map(() => ({
+    rungPolygons: Array.from(
+      { length: OPACITY_BUCKET_COUNT + 1 },
+      () => [] as StudioWetRibbonPolygon[],
+    ),
+    rungStableCounts: new Array<number>(OPACITY_BUCKET_COUNT + 1).fill(0),
+    stableMaxBucket: 0,
+    volatileMaxBucket: 0,
+  }));
+
+  const reset = (): void => {
+    stations.length = 0;
+    consumedDabs = 0;
+    stableStationCount = 0;
+    stableLastStationSnapshot = null;
+    stableStopped = false;
+    stableCapped = false;
+    footprints.length = 0;
+    stableFootprintCount = 0;
+    stablePolygonSum = 0;
+    stableNextEnd = 1;
+    stableEdges.clear();
+    for (const lane of lanes) {
+      for (let bucket = 0; bucket <= OPACITY_BUCKET_COUNT; bucket += 1) {
+        lane.rungPolygons[bucket]!.length = 0;
+        lane.rungStableCounts[bucket] = 0;
+      }
+      lane.stableMaxBucket = 0;
+      lane.volatileMaxBucket = 0;
+    }
+  };
+
+  /** `collectStations` 루프 본문 한 dab 분. `true` = 캡 초과 코어 dab(배치의 `break`). */
+  const consumeDab = (dab: StudioWetRibbonSourceDab): boolean => {
+    if (dab.role === "diffuse") {
+      const station = stations.at(-1);
+      if (station) {
+        station.diffuseRadius = Math.max(
+          station.coreRadius * 1.08,
+          normalizeRadius(dab.radius),
+        );
+        station.diffuseOpacity = smoothCausalWetOpacity(
+          stations.at(-2)?.diffuseOpacity,
+          normalizeOpacity(dab.opacity),
+        );
+      }
+      return false;
+    }
+    if (
+      typeof dab.x !== "number"
+      || !Number.isFinite(dab.x)
+      || typeof dab.y !== "number"
+      || !Number.isFinite(dab.y)
+    ) {
+      return false;
+    }
+    if (stations.length >= maxFootprints) return true;
+    const coreRadius = normalizeRadius(dab.radius);
+    const coreOpacity = smoothCausalWetOpacity(
+      stations.at(-1)?.coreOpacity,
+      normalizeOpacity(dab.opacity),
+    );
+    stations.push({
+      x: quantize(dab.x),
+      y: quantize(dab.y),
+      coreRadius,
+      coreOpacity,
+      diffuseRadius: coreRadius * 1.42,
+      diffuseOpacity: coreOpacity * 0.24,
+    });
+    return false;
+  };
+
+  /**
+   * `buildBatches`의 예치 스캔 한 풋프린트 분. 사다리 칸(rung) 소속은 캡 128 로 계산해 보관한다 —
+   * `highestIncludingCoverageBucket`은 캡에 대해 `min(무캡 결과, 캡)` 이므로, 방출 시 레이어
+   * 최대 버킷 `M` 까지만 노출하면 사다리 칸(rung) `b <= M` 의 내용이 배치 계산과 정확히 같다.
+   */
+  const pushFootprintDeposits = (
+    footprint: StudioWetRibbonFootprint,
+    stable: boolean,
+  ): void => {
+    for (let layerIndex = 0; layerIndex < LAYER_ORDER.length; layerIndex += 1) {
+      const deposit = footprint.layers[layerIndex]!;
+      const depositCeiling = Math.max(deposit.startOpacity, deposit.endOpacity);
+      if (!(depositCeiling > 0)) continue;
+      const lane = lanes[layerIndex]!;
+      const fullBucket = highestIncludingCoverageBucket(
+        Math.min(deposit.startOpacity, deposit.endOpacity),
+        OPACITY_BUCKET_COUNT,
+      );
+      const anyBucket = highestIncludingCoverageBucket(
+        depositCeiling,
+        OPACITY_BUCKET_COUNT,
+      );
+      for (let bucket = 1; bucket <= fullBucket; bucket += 1) {
+        lane.rungPolygons[bucket]!.push(deposit.polygon);
+      }
+      for (let bucket = fullBucket + 1; bucket <= anyBucket; bucket += 1) {
+        const clipped = clipFootprintLayerAtCoverage(
+          deposit,
+          coverageThresholdForBucket(bucket),
+        );
+        if (clipped) lane.rungPolygons[bucket]!.push(clipped);
+      }
+      const ceilingBucket = opacityBucket(depositCeiling);
+      if (stable) {
+        lane.stableMaxBucket = Math.max(lane.stableMaxBucket, ceilingBucket);
+      } else {
+        lane.volatileMaxBucket = Math.max(lane.volatileMaxBucket, ceilingBucket);
+      }
+    }
+  };
+
+  /** `buildFootprints` 세그먼트 루프 본문 한 쌍 분(끝 스테이션 `endIndex`). */
+  const emitSegmentPair = (
+    endIndex: number,
+    edges: Map<StudioWetRibbonCarrierLayer, LayerEdge>,
+    stable: boolean,
+  ): number => {
+    const start = stations[endIndex - 1]!;
+    const end = stations[endIndex]!;
+    if (Math.hypot(end.x - start.x, end.y - start.y) <= POINT_EPSILON) return 0;
+    const layers = LAYER_ORDER.map((layer) => {
+      const planned = segmentPolygon({
+        start,
+        end,
+        layer,
+        previousEdge: edges.get(layer) ?? null,
+      });
+      edges.set(layer, planned.endEdge);
+      return footprintLayer(
+        layer,
+        layerOpacity(start, layer),
+        layerOpacity(end, layer),
+        planned.polygon,
+      );
+    });
+    const footprint = Object.freeze({
+      index: footprints.length,
+      kind: "segment" as const,
+      startX: start.x,
+      startY: start.y,
+      endX: end.x,
+      endY: end.y,
+      layers: Object.freeze(layers),
+    });
+    footprints.push(footprint);
+    pushFootprintDeposits(footprint, stable);
+    return layers.length;
+  };
+
+  return {
+    plan(dabs, stableDabCount, sourceGeneration, options) {
+      const normalized = normalizeOptions(options);
+      const sourceDabs = Array.isArray(dabs) ? dabs : [];
+      const stableCount = Math.max(0, Math.min(stableDabCount, sourceDabs.length));
+      if (
+        generation !== sourceGeneration
+        || seed !== normalized.seed
+        || maxFootprints !== normalized.maxFootprints
+        || stableCount < consumedDabs
+      ) {
+        reset();
+        generation = sourceGeneration;
+        seed = normalized.seed;
+        maxFootprints = normalized.maxFootprints;
+      }
+
+      // 1. 휘발 오버레이 복원: 지난 호출의 꼬리 스테이션/풋프린트/사다리 칸(rung) 항목을 걷어내고,
+      //    휘발 디퓨즈 dab 이 소급 변형했을 수 있는 마지막 안정 스테이션을 스냅샷으로 되돌린다.
+      stations.length = stableStationCount;
+      if (stableStationCount > 0 && stableLastStationSnapshot) {
+        stations[stableStationCount - 1] = { ...stableLastStationSnapshot };
+      }
+      footprints.length = stableFootprintCount;
+      let volatilePolygonSum = 0;
+      for (const lane of lanes) {
+        for (let bucket = 1; bucket <= OPACITY_BUCKET_COUNT; bucket += 1) {
+          lane.rungPolygons[bucket]!.length = lane.rungStableCounts[bucket]!;
+        }
+        lane.volatileMaxBucket = 0;
+      }
+
+      // 2. 새 안정 dab 순차 소비 — 배치 `collectStations` 와 같은 배열 상태 위에서 같은 순서로
+      //    걷기 때문에 결과 스테이션 값이 비트 동일하다.
+      if (!stableStopped) {
+        for (let index = consumedDabs; index < stableCount; index += 1) {
+          if (consumeDab(sourceDabs[index]!)) {
+            stableStopped = true;
+            stableCapped = true;
+            break;
+          }
+        }
+      }
+      consumedDabs = stableCount;
+      stableStationCount = stations.length;
+
+      // 3. 확정된 스테이션 쌍만 안정 풋프린트로 방출한다. 스테이션 i 는 다음 코어 dab(스테이션
+      //    i+1)이 안정 구간에 존재해야 디퓨즈 소급 변형에서 벗어나므로, 끝 인덱스는
+      //    stableStationCount - 2 까지다.
+      for (
+        let endIndex = stableNextEnd;
+        endIndex <= stableStationCount - 2;
+        endIndex += 1
+      ) {
+        stablePolygonSum += emitSegmentPair(endIndex, stableEdges, true);
+      }
+      stableNextEnd = Math.max(stableNextEnd, stableStationCount - 1);
+      stableFootprintCount = footprints.length;
+      for (const lane of lanes) {
+        for (let bucket = 1; bucket <= OPACITY_BUCKET_COUNT; bucket += 1) {
+          lane.rungStableCounts[bucket] = lane.rungPolygons[bucket]!.length;
+        }
+      }
+      const lastStable = stations.at(-1);
+      stableLastStationSnapshot = lastStable ? { ...lastStable } : null;
+
+      // 4. 휘발 꼬리 재구축: 꼬리 dab → 꼬리 스테이션 → 꼬리 풋프린트/예치. 다음 호출이 1 에서
+      //    걷어낸다.
+      let volatileCapped = false;
+      if (!stableStopped) {
+        for (let index = stableCount; index < sourceDabs.length; index += 1) {
+          if (consumeDab(sourceDabs[index]!)) {
+            volatileCapped = true;
+            break;
+          }
+        }
+      }
+      if (stations.length === 1) {
+        // 배치의 탭 특례: 스테이션이 하나뿐일 때만 방향성 잎을 만든다. 항상 휘발로 다뤄
+        // 두 번째 스테이션이 생기는 순간 자연히 사라진다(탭→세그먼트 전이 재구축 불필요).
+        const first = stations[0]!;
+        const tapAngle = hash2(0, 73, seed) * TAU;
+        const tap = Object.freeze({
+          index: 0,
+          kind: "tap" as const,
+          startX: first.x,
+          startY: first.y,
+          endX: first.x,
+          endY: first.y,
+          layers: Object.freeze(LAYER_ORDER.map((layer) => footprintLayer(
+            layer,
+            layerOpacity(first, layer),
+            layerOpacity(first, layer),
+            tapPolygon(first, layer, tapAngle),
+          ))),
+        });
+        footprints.push(tap);
+        pushFootprintDeposits(tap, false);
+        volatilePolygonSum += tap.layers.length;
+      } else if (stations.length > 1) {
+        const volatileEdges = new Map(stableEdges);
+        for (
+          let endIndex = Math.max(1, stableStationCount - 1);
+          endIndex <= stations.length - 1;
+          endIndex += 1
+        ) {
+          volatilePolygonSum += emitSegmentPair(endIndex, volatileEdges, false);
+        }
+      }
+
+      // 5. 래퍼 방출 — 레이어별 최대 버킷까지 고정 사다리 공식으로 batch 객체만 새로 만든다
+      //    (사다리 칸(rung) 수는 128 이하 상수라 이동당 비용이 스트로크 길이와 무관하다).
+      const batches: StudioWetRibbonCarrierBatch[] = [];
+      for (let layerIndex = 0; layerIndex < LAYER_ORDER.length; layerIndex += 1) {
+        const lane = lanes[layerIndex]!;
+        const maximumCoverageBucket = Math.max(
+          lane.stableMaxBucket,
+          lane.volatileMaxBucket,
+        );
+        if (maximumCoverageBucket < 1) continue;
+        let previousCeiling = 0;
+        for (
+          let coverageBucket = 1;
+          coverageBucket <= maximumCoverageBucket;
+          coverageBucket += 1
+        ) {
+          const coverageCeiling = coverageBucket / OPACITY_BUCKET_COUNT;
+          const opacity = previousCeiling >= 1
+            ? 0
+            : clamp(
+                (coverageCeiling - previousCeiling) / (1 - previousCeiling),
+                0,
+                1,
+              );
+          if (opacity > 0) {
+            batches.push({
+              layer: LAYER_ORDER[layerIndex]!,
+              coverageCeiling,
+              opacity,
+              polygons: lane.rungPolygons[coverageBucket]!,
+            });
+          }
+          previousCeiling = coverageCeiling;
+        }
+      }
+
+      return {
+        version: STUDIO_WET_RIBBON_CARRIER_VERSION,
+        sourceStationCount: stations.length,
+        footprintCount: footprints.length,
+        polygonCount: stablePolygonSum + volatilePolygonSum,
+        capped: stableCapped || volatileCapped,
+        footprints,
+        batches,
+      };
+    },
+  };
+}
+
 export interface StudioWetRibbonPathSink {
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;

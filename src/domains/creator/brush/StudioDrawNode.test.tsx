@@ -308,6 +308,23 @@ vi.mock("../studio-causal-watercolor-brush", async (importOriginal) => {
   };
 });
 
+const wetWashCapture = vi.hoisted(() => ({
+  livePlan: vi.fn((..._args: unknown[]): void => {}),
+}));
+
+vi.mock("./studio-wet-wash-live-pipeline", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("./studio-wet-wash-live-pipeline")>();
+  return {
+    ...actual,
+    // 스파이 후 실제 파이프라인으로 통과시킨다 — 배선 계약만 검증하고 동작은 실물을 쓴다.
+    planStudioWetWashLivePipeline: ((strokeKey, params) => {
+      wetWashCapture.livePlan(strokeKey, params);
+      return actual.planStudioWetWashLivePipeline(strokeKey, params);
+    }) as typeof actual.planStudioWetWashLivePipeline,
+  };
+});
+
 function drawEl(overrides: Partial<DrawEl> = {}): DrawEl {
   return {
     id: "draw-1",
@@ -374,6 +391,7 @@ beforeEach(() => {
   konvaCapture.nodes.length = 0;
   patternLoader.loads.length = 0;
   watercolorCapture.causalPlan.mockClear();
+  wetWashCapture.livePlan.mockClear();
 });
 
 afterEach(() => {
@@ -2570,34 +2588,58 @@ describe("StudioDrawNode orchestration", () => {
     expect(context.fills).toHaveLength(context.arcs.length);
   });
 
-  it.each([
-    [true, false],
-    [false, true],
-  ])(
-    "passes activeDraft=%s as causal-watercolor finalization=%s",
-    (activeDraft, expectedFinalize) => {
-      render(
-        <StudioDrawNode
-          activeDraft={activeDraft}
-          el={drawEl({
-            brush: "watercolor",
-            mode: "pen",
-            points: [0, 0, 8, 0],
-            watercolorPipeline: "causal-walker-v2",
-          })}
-        />,
-      );
-
-      expect(watercolorCapture.causalPlan).toHaveBeenCalledTimes(1);
-      expect(watercolorCapture.causalPlan).toHaveBeenCalledWith(
-        expect.objectContaining({
+  it("routes the active causal draft through the incremental wet-wash pipeline", () => {
+    render(
+      <StudioDrawNode
+        activeDraft
+        el={drawEl({
+          brush: "watercolor",
+          mode: "pen",
           points: [0, 0, 8, 0],
-          previewEndpoint: activeDraft,
-        }),
-        expectedFinalize,
-      );
-    },
-  );
+          watercolorPipeline: "causal-walker-v2",
+        })}
+      />,
+    );
+
+    // 활성 초안(프로그램 없는 레인)은 요소 id 로 키된 증분 파이프라인이 이동당 비용을 진다
+    // (장획 게이트 wet-dabs). 배치 리플레이는 커밋 렌더 전용이다.
+    expect(wetWashCapture.livePlan).toHaveBeenCalledTimes(1);
+    const [strokeKey, params] = wetWashCapture.livePlan.mock.calls[0]! as [
+      string,
+      { brushId: unknown; input: Record<string, unknown> },
+    ];
+    expect(strokeKey).toBe("draw-1");
+    expect(params.brushId).toBe("watercolor");
+    expect(params.input).toEqual(
+      expect.objectContaining({ points: [0, 0, 8, 0], previewEndpoint: true }),
+    );
+    expect(watercolorCapture.causalPlan).not.toHaveBeenCalled();
+  });
+
+  it("keeps the committed causal render on the batch replay with finalization=true", () => {
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "watercolor",
+          mode: "pen",
+          points: [0, 0, 8, 0],
+          watercolorPipeline: "causal-walker-v2",
+        })}
+      />,
+    );
+
+    // 커밋 렌더는 배치 리플레이를 유지해 후처리 워커의 전면 치환 같은 내부 점 재작성에도
+    // 항상 정본을 그린다.
+    expect(wetWashCapture.livePlan).not.toHaveBeenCalled();
+    expect(watercolorCapture.causalPlan).toHaveBeenCalledTimes(1);
+    expect(watercolorCapture.causalPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        points: [0, 0, 8, 0],
+        previewEndpoint: false,
+      }),
+      true,
+    );
+  });
 });
 
 describe("StudioDrawNode perfect-freehand outline brush", () => {
