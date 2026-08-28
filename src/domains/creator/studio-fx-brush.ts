@@ -748,6 +748,14 @@ export interface StudioIncrementalFxPressurePathBuilder {
     readonly minimumDiameterRatio?: unknown;
     readonly tension?: unknown;
   }): StudioFxPressurePathPlan;
+  /**
+   * 마지막 `append()`가 돌려준 `segments`에서 앞으로 어떤 append도 다시 쓰지 않는 안정 prefix
+   * 길이. 그 뒤(휘발 꼬리 ≤ 3 + 아주 짧은 획 특례)는 다음 호출이 다시 방출할 수 있으므로,
+   * 하류 증분 소비자는 이 길이까지만 세그먼트를 신뢰해야 한다.
+   */
+  stableSegmentCount(): number;
+  /** 전체 재구축(리셋)마다 증가한다 — 하류 증분 소비자의 prefix 신뢰를 무효화하는 신호. */
+  generation(): number;
 }
 
 /**
@@ -782,12 +790,16 @@ export function createStudioIncrementalFxPressurePathBuilder(): StudioIncrementa
   let configCanonical = false;
   let configMinimumDiameterRatio: unknown;
   let configParallelPressures = false;
+  let stableSegments = 0;
+  let rebuildGeneration = 0;
 
   const reset = (): void => {
     sanitized.length = 0;
     segments.length = 0;
     consumedRawPairs = 0;
     lastRawPressureSlot = undefined;
+    stableSegments = 0;
+    rebuildGeneration += 1;
   };
 
   return {
@@ -851,6 +863,7 @@ export function createStudioIncrementalFxPressurePathBuilder(): StudioIncrementa
       const sourcePointCount = sanitized.length;
       if (sourcePointCount < 2) {
         segments.length = 0;
+        stableSegments = 0;
         return {
           kind: "studio-fx-pressure-path",
           brushId: input.brushId,
@@ -895,12 +908,23 @@ export function createStudioIncrementalFxPressurePathBuilder(): StudioIncrementa
           resolvePressure,
         ));
       }
+      // 미래 append의 rebuildFrom 하한: 점이 5개 미만이면 통째로 다시 만들 수 있고, 그
+      // 이상이면 항상 `segments.length - 3` 이상에서 시작한다(EPS 병합 여파 포함 — 위 주석).
+      stableSegments = sourcePointCount < 5
+        ? 0
+        : Math.max(0, segments.length - FX_PRESSURE_PATH_VOLATILE_TAIL_SEGMENTS);
       return {
         kind: "studio-fx-pressure-path",
         brushId: input.brushId,
         sourcePointCount,
         segments,
       };
+    },
+    stableSegmentCount() {
+      return stableSegments;
+    },
+    generation() {
+      return rebuildGeneration;
     },
   };
 }

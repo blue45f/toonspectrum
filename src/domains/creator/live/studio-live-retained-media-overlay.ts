@@ -31,19 +31,21 @@ import {
 import {
   FX_OIL_DAB_CAP,
   FxOilDabPlanner,
+  createStudioIncrementalFxPressurePathBuilder,
   fxBrushSeedFromKey,
   isStudioFxPressureBrushId,
   planOilBrushDabs,
-  planStudioFxBrushPressurePath,
   studioOilPaintBodyForBrush,
   studioOilTipProfileForBrush,
+  type StudioIncrementalFxPressurePathBuilder,
 } from "../studio-fx-brush";
 import {
-  planStudioHighlighterWashRibbon,
+  createStudioIncrementalHighlighterWashRibbonBuilder,
   planStudioHighlighterWashTap,
   resolveStudioHighlighterWashBrushId,
   traceStudioHighlighterWashDetail,
   traceStudioHighlighterWashPlan,
+  type StudioIncrementalHighlighterWashRibbonBuilder,
 } from "../studio-highlighter-wash-ribbon";
 import {
   acquireStudioLowLatencyCanvas2dContext,
@@ -215,6 +217,14 @@ interface ActiveRetainedStroke {
    * `planOilBrushDabs` exactly as before.
    */
   oilPlanner: FxOilDabPlanner | null;
+  /**
+   * Per-stroke incremental highlighter planners (fx pressure path + wash ribbon), created lazily
+   * on first paint. A live append then pays only for new samples; settled replays build throwaway
+   * actives whose fresh builder pair reproduces the batch plan in one cold append, so replay
+   * output stays batch-identical.
+   */
+  fxPressurePathBuilder?: StudioIncrementalFxPressurePathBuilder;
+  highlighterWashBuilder?: StudioIncrementalHighlighterWashRibbonBuilder;
   /**
    * Running left-to-right `radiusY` sum over the accepted dab prefix plus the dab count it was
    * accumulated for. Rebuilding the mean from the whole dab array every pointer frame made oil
@@ -744,7 +754,14 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         legacyMinDistance: strokeRenderDistance(element.sampleSpacing),
         legacyTension: 0.35,
       });
-      const pressurePath = planStudioFxBrushPressurePath({
+      // 획별 증분 빌더 쌍: 압력 경로와 워시 리본이 안정 prefix 를 유지해 append 가 새 표본
+      // 수에만 비례한다(장획 게이트 family:highlighter). 콜드 1회 append 는 배치 플랜과 바이트
+      // 동일하므로 settled 리플레이의 일회용 active 도 같은 경로를 그대로 쓴다.
+      const fxBuilder = active.fxPressurePathBuilder
+        ??= createStudioIncrementalFxPressurePathBuilder();
+      const washBuilder = active.highlighterWashBuilder
+        ??= createStudioIncrementalHighlighterWashRibbonBuilder();
+      const pressurePath = fxBuilder.append({
         brushId: isStudioFxPressureBrushId(brush) ? brush : "highlighter",
         points: renderPath.points,
         pressures: element.pressures,
@@ -752,11 +769,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         minimumDiameterRatio: element.materialMinimumDiameterRatio,
         tension: renderPath.tension,
       });
-      const wash = planStudioHighlighterWashRibbon({
-        brushId,
-        pressurePath,
-        baseWidth: width,
-      });
+      const wash = washBuilder.plan(
+        { brushId, pressurePath, baseWidth: width },
+        fxBuilder.stableSegmentCount(),
+        fxBuilder.generation(),
+      );
       const washAlpha = Math.min(1, (element.opacity ?? 1) * wash.opacityScale);
       context.globalAlpha = washAlpha;
       context.beginPath();

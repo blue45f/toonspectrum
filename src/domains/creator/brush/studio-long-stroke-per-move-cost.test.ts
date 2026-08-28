@@ -115,7 +115,7 @@ import {
   studioOilTipProfileForBrush,
 } from "../studio-fx-brush";
 import {
-  planStudioHighlighterWashRibbon,
+  createStudioIncrementalHighlighterWashRibbonBuilder,
   resolveStudioHighlighterWashBrushId,
 } from "../studio-highlighter-wash-ribbon";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
@@ -813,22 +813,36 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
   {
     id: "family:highlighter",
     brushId: "highlighter",
-    path: "whole-prefix-replan",
-    entry: "planStudioFxBrushPressurePath -> planStudioHighlighterWashRibbon",
-    makeStroke: () =>
-      wholePrefixStepper((stroke) => {
-        const pressurePath = planStudioFxBrushPressurePath({
+    path: "live-incremental",
+    entry: "paintHighlighterSuffix -> fx builder.append -> wash builder.plan(suffix)",
+    makeStroke: () => {
+      // `paintHighlighterSuffix`'s exact per-move planning with the canvas removed: the retained
+      // overlay keeps one fx-pressure-path builder and one wash-ribbon builder per stroke, so a
+      // move pays geometry only for new samples plus the constant volatile tail. The batch chain
+      // (`planStudioFxBrushPressurePath` -> `planStudioHighlighterWashRibbon`) remains the
+      // commit/SVG-export path, a cost no pointer move pays. The one-fill REPAINT stays a clear
+      // and retrace by design (translucent one-wash semantics); this gate times planning.
+      const fxBuilder = createStudioIncrementalFxPressurePathBuilder();
+      const washBuilder = createStudioIncrementalHighlighterWashRibbonBuilder();
+      return wholePrefixStepper((stroke) => {
+        const pressurePath = fxBuilder.append({
           brushId: "highlighter",
           points: freehandPath(stroke),
           pressures: stroke.pressures,
-          tension: 0,
+          pressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+          tension: 0.35,
         });
-        return planStudioHighlighterWashRibbon({
-          brushId: resolveStudioHighlighterWashBrushId("highlighter"),
-          pressurePath,
-          baseWidth: 24,
-        }).detailRuns.length;
-      }),
+        return washBuilder.plan(
+          {
+            brushId: resolveStudioHighlighterWashBrushId("highlighter"),
+            pressurePath,
+            baseWidth: 24,
+          },
+          fxBuilder.stableSegmentCount(),
+          fxBuilder.generation(),
+        ).detailRuns.length;
+      });
+    },
   },
   {
     id: "family:calligraphy",
