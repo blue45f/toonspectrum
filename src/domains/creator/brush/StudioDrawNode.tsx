@@ -1,4 +1,4 @@
-import { memo, useEffect, useReducer, useState } from "react";
+import { memo, useEffect, useReducer, useRef, useState } from "react";
 import {
   Arrow,
   Circle as KCircle,
@@ -45,6 +45,7 @@ import {
   isStudioFxPressureBrushId,
   planGlitterBrushParticles,
   planGlowBrushPasses,
+  createStudioIncrementalFxPressurePathBuilder,
   planNeonBrushPasses,
   planOilBrushDabs,
   studioOilPaintBodyForBrush,
@@ -175,6 +176,7 @@ import {
 
 import type { CalligraphyStylusInput } from "../studio-brush";
 import type { DrawEl } from "../studio-element-model";
+import type { StudioIncrementalFxPressurePathBuilder } from "../studio-fx-brush";
 import type { StudioPaperSurfaceSettings } from "./studio-paper-granulation-runtime";
 import type { StudioPatternSpec } from "../studio-pattern-fill";
 import type { StudioPerfectFreehandStroker } from "../studio-perfect-freehand";
@@ -350,6 +352,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   );
   const isEraserOperation = el.mode === "eraser"
     || (el.brush ? resolveStudioBrushRuntimeContract(el.brush)?.operation === "erase" : false);
+  /**
+   * 압력 경로(fx 패밀리: neon/glow/highlighter)의 증분 빌더. 자라나는 요소가 이 컴포넌트를 매
+   * 이동 리렌더할 때 전체 압력 경로를 다시 계획하던 것(장획 게이트가 잡는 이동당 O(n))을,
+   * sceneFunc(그리기 시점)에서 append 로 소비해 이동당 상수 비용으로 만든다. 렌더 본문이 아닌
+   * 그리기 콜백에서만 접근하므로 react-compiler 순수성 규약과도 충돌하지 않는다. 한 요소는 fx
+   * 분기 하나만 타므로 빌더 하나로 충분하고, 입력 구성이 바뀌면 빌더가 스스로 재구축한다.
+   */
+  const fxPressurePathBuilderRef = useRef<StudioIncrementalFxPressurePathBuilder | null>(null);
   const composite = isEraserOperation ? "destination-out" : "source-over";
   const opacity = el.opacity ?? 1;
   const stroke = isEraserOperation ? "#16100c" : el.stroke;
@@ -2086,14 +2096,6 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 </Group>
               );
             }
-            const pressurePath = planStudioFxBrushPressurePath({
-              brushId: "neon",
-              points: renderPath.points,
-              pressures: el.pressures,
-              pressureModel: el.materialPressureModel,
-              minimumDiameterRatio: el.materialMinimumDiameterRatio,
-              tension: renderPath.tension,
-            });
             const tapPressure = resolveStudioFxBrushTapPressureResponse(
               "neon",
               el.pressures?.[0],
@@ -2128,34 +2130,43 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                       listening={false}
                     />
-                  ) : (() => {
-                    const ribbonPlan = planStudioFxLuminousRibbonPass({
-                      brushId: "neon",
-                      pressurePath,
-                      baseWidth: strokeWidth,
-                      passWidthScale: pass.widthScale,
-                      passOpacity: pass.opacity,
-                      luminousCore,
-                    });
-                    return (
-                      <Shape
-                        key={passIndex}
-                        sceneFunc={(context) => {
-                          if (ribbonPlan.polygons.length === 0) return;
-                          context.save();
-                          context.globalAlpha *= ribbonPlan.opacity;
-                          context.fillStyle = passColor;
-                          context.beginPath();
-                          traceStudioFxLuminousRibbonPass(context, ribbonPlan);
-                          context.fill();
-                          context.restore();
-                        }}
-                        globalCompositeOperation={ribbonPlan.compositeOperation}
-                        listening={false}
-                        perfectDrawEnabled={false}
-                      />
-                    );
-                  })();
+                  ) : (
+                    <Shape
+                      key={passIndex}
+                      sceneFunc={(context) => {
+                        // 압력 경로는 증분 빌더로 소비한다 — 같은 스냅샷의 두 번째 이후 패스는
+                        // 휘발 꼬리만 다시 방출하므로 그리기당 추가 비용이 상수다.
+                        const builder = fxPressurePathBuilderRef.current
+                          ??= createStudioIncrementalFxPressurePathBuilder();
+                        const ribbonPlan = planStudioFxLuminousRibbonPass({
+                          brushId: "neon",
+                          pressurePath: builder.append({
+                            brushId: "neon",
+                            points: renderPath.points,
+                            pressures: el.pressures,
+                            pressureModel: el.materialPressureModel,
+                            minimumDiameterRatio: el.materialMinimumDiameterRatio,
+                            tension: renderPath.tension,
+                          }),
+                          baseWidth: strokeWidth,
+                          passWidthScale: pass.widthScale,
+                          passOpacity: pass.opacity,
+                          luminousCore,
+                        });
+                        if (ribbonPlan.polygons.length === 0) return;
+                        context.save();
+                        context.globalAlpha *= ribbonPlan.opacity;
+                        context.fillStyle = passColor;
+                        context.beginPath();
+                        traceStudioFxLuminousRibbonPass(context, ribbonPlan);
+                        context.fill();
+                        context.restore();
+                      }}
+                      globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                  );
                 })}
               </Group>
             );
@@ -2213,14 +2224,6 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               );
             }
             const pressureBrush = soft ? "soft-glow" : "glow";
-            const pressurePath = planStudioFxBrushPressurePath({
-              brushId: pressureBrush,
-              points: renderPath.points,
-              pressures: el.pressures,
-              pressureModel: el.materialPressureModel,
-              minimumDiameterRatio: el.materialMinimumDiameterRatio,
-              tension: renderPath.tension,
-            });
             const tapPressure = resolveStudioFxBrushTapPressureResponse(
               pressureBrush,
               el.pressures?.[0],
@@ -2256,34 +2259,42 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                       listening={false}
                     />
-                  ) : (() => {
-                    const ribbonPlan = planStudioFxLuminousRibbonPass({
-                      brushId: pressureBrush,
-                      pressurePath,
-                      baseWidth: strokeWidth,
-                      passWidthScale: pass.widthScale,
-                      passOpacity: pass.opacity,
-                      luminousCore,
-                    });
-                    return (
-                      <Shape
-                        key={passIndex}
-                        sceneFunc={(context) => {
-                          if (ribbonPlan.polygons.length === 0) return;
-                          context.save();
-                          context.globalAlpha *= ribbonPlan.opacity;
-                          context.fillStyle = stroke;
-                          context.beginPath();
-                          traceStudioFxLuminousRibbonPass(context, ribbonPlan);
-                          context.fill();
-                          context.restore();
-                        }}
-                        globalCompositeOperation={ribbonPlan.compositeOperation}
-                        listening={false}
-                        perfectDrawEnabled={false}
-                      />
-                    );
-                  })();
+                  ) : (
+                    <Shape
+                      key={passIndex}
+                      sceneFunc={(context) => {
+                        // neon 분기와 같은 증분 압력 경로 소비 — 이동당 계획 비용을 상수로.
+                        const builder = fxPressurePathBuilderRef.current
+                          ??= createStudioIncrementalFxPressurePathBuilder();
+                        const ribbonPlan = planStudioFxLuminousRibbonPass({
+                          brushId: pressureBrush,
+                          pressurePath: builder.append({
+                            brushId: pressureBrush,
+                            points: renderPath.points,
+                            pressures: el.pressures,
+                            pressureModel: el.materialPressureModel,
+                            minimumDiameterRatio: el.materialMinimumDiameterRatio,
+                            tension: renderPath.tension,
+                          }),
+                          baseWidth: strokeWidth,
+                          passWidthScale: pass.widthScale,
+                          passOpacity: pass.opacity,
+                          luminousCore,
+                        });
+                        if (ribbonPlan.polygons.length === 0) return;
+                        context.save();
+                        context.globalAlpha *= ribbonPlan.opacity;
+                        context.fillStyle = stroke;
+                        context.beginPath();
+                        traceStudioFxLuminousRibbonPass(context, ribbonPlan);
+                        context.fill();
+                        context.restore();
+                      }}
+                      globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                  );
                 })}
               </Group>
             );

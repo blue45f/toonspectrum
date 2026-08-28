@@ -105,11 +105,10 @@ import { planStudioDynamicBrushCoverageMarks } from "../studio-dynamic-brush-cov
 import { planStudioDynamicBrushRender } from "../studio-dynamic-brush-render-plan";
 import {
   FX_OIL_DAB_CAP,
-  FX_PASTEL_DAB_CAP,
   FxOilDabPlanner,
+  createStudioIncrementalFxPressurePathBuilder,
   fxBrushSeedFromKey,
   planGlitterBrushParticles,
-  planPastelBrushDabs,
   planStudioFxBrushPressurePath,
   studioOilPaintBodyForBrush,
   studioOilTipProfileForBrush,
@@ -118,6 +117,7 @@ import {
   planStudioHighlighterWashRibbon,
   resolveStudioHighlighterWashBrushId,
 } from "../studio-highlighter-wash-ribbon";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
 import {
   captureStudioOutlineStrokeContractV1,
   planStudioPerfectFreehandRender,
@@ -550,17 +550,26 @@ function fxPressurePathProbe(id: string, brushId: string, fxBrushId: string): La
   return {
     id,
     brushId,
-    path: "whole-prefix-replan",
-    entry: "resolveStudioFreehandRenderPath -> planStudioFxBrushPressurePath",
-    makeStroke: () =>
-      wholePrefixStepper((stroke) =>
-        planStudioFxBrushPressurePath({
+    path: "live-incremental",
+    entry: "sceneFunc -> StudioIncrementalFxPressurePathBuilder.append",
+    makeStroke: () => {
+      // `StudioDrawNode` holds one builder per element (`fxPressurePathBuilderRef`) and its pass
+      // sceneFuncs consume the growing snapshot with `append` — this is the exact per-move call
+      // shape, including the canonical pressure model and the accepted-input tension the render
+      // path reports for new-pipeline strokes. The whole-prefix
+      // `planStudioFxBrushPressurePath` this probe used to time remains the SVG-export and
+      // legacy-document chain, a cost no pointer move pays.
+      const builder = createStudioIncrementalFxPressurePathBuilder();
+      return wholePrefixStepper((stroke) =>
+        builder.append({
           brushId: fxBrushId as Parameters<typeof planStudioFxBrushPressurePath>[0]["brushId"],
           points: freehandPath(stroke),
           pressures: stroke.pressures,
-          tension: 0,
+          pressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+          tension: 0.3,
         }).segments.length,
-      ),
+      );
+    },
   };
 }
 
@@ -842,22 +851,12 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
   },
   fxPressurePathProbe("family:neon", "neon", "neon"),
   fxPressurePathProbe("family:glow", "glow", "glow"),
-  {
-    id: "family:pastel",
-    brushId: "pastel",
-    path: "whole-prefix-replan",
-    entry: "resolveStudioFreehandRenderPath -> planPastelBrushDabs",
-    makeStroke: () =>
-      wholePrefixStepper((stroke) =>
-        planPastelBrushDabs({
-          points: freehandPath(stroke),
-          pressures: stroke.pressures,
-          baseWidth: 22,
-          seed: SEED,
-          maxDabs: FX_PASTEL_DAB_CAP,
-        }).length,
-      ),
-  },
+  // The pastel family draws live on the dynamic-dabs overlay (production canvas dump: the live
+  // stroke accumulates on the dynamic overlay's hidden coverage + presentation canvases, planned
+  // per move as an appendFrom suffix). The whole-prefix `planPastelBrushDabs` chain this probe
+  // used to time is the retained `StudioDrawNode` commit/repaint and SVG-export cost, which no
+  // pointer move pays.
+  dynamicDabProbe("family:pastel", "pastel"),
 ]);
 
 /**

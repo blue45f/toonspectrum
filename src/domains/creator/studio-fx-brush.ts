@@ -559,35 +559,113 @@ interface FxCardinalControl {
   readonly afterY: number;
 }
 
+/**
+ * One cardinal control, identical math to the historical `cardinalFxControls` loop body.
+ * Depends only on points index-1..index+1, which is what makes the pressure path suffix-stable
+ * for the incremental builder below.
+ */
+function cardinalFxControlAt(
+  points: readonly FxPressurePoint[],
+  index: number,
+  tension: number,
+): FxCardinalControl | null {
+  if (index < 1 || index >= points.length - 1) return null;
+  const previous = points[index - 1]!;
+  const current = points[index]!;
+  const next = points[index + 1]!;
+  const previousDistance = Math.hypot(
+    current.x - previous.x,
+    current.y - previous.y,
+  );
+  const nextDistance = Math.hypot(next.x - current.x, next.y - current.y);
+  const totalDistance = previousDistance + nextDistance;
+  if (totalDistance <= POINT_EPS) return null;
+  const beforeFactor = tension * previousDistance / totalDistance;
+  const afterFactor = tension * nextDistance / totalDistance;
+  return {
+    beforeX: current.x - beforeFactor * (next.x - previous.x),
+    beforeY: current.y - beforeFactor * (next.y - previous.y),
+    afterX: current.x + afterFactor * (next.x - previous.x),
+    afterY: current.y + afterFactor * (next.y - previous.y),
+  };
+}
+
 function cardinalFxControls(
   points: readonly FxPressurePoint[],
   tension: number,
 ): Array<FxCardinalControl | null> {
-  const controls: Array<FxCardinalControl | null> = Array.from(
+  return Array.from(
     { length: points.length },
-    () => null,
+    (_ignored, index) => cardinalFxControlAt(points, index, tension),
   );
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const previous = points[index - 1]!;
-    const current = points[index]!;
-    const next = points[index + 1]!;
-    const previousDistance = Math.hypot(
-      current.x - previous.x,
-      current.y - previous.y,
-    );
-    const nextDistance = Math.hypot(next.x - current.x, next.y - current.y);
-    const totalDistance = previousDistance + nextDistance;
-    if (totalDistance <= POINT_EPS) continue;
-    const beforeFactor = tension * previousDistance / totalDistance;
-    const afterFactor = tension * nextDistance / totalDistance;
-    controls[index] = {
-      beforeX: current.x - beforeFactor * (next.x - previous.x),
-      beforeY: current.y - beforeFactor * (next.y - previous.y),
-      afterX: current.x + afterFactor * (next.x - previous.x),
-      afterY: current.y + afterFactor * (next.y - previous.y),
-    };
+}
+
+/**
+ * One pressure-path segment, extracted from the historical planner loop body so the batch planner
+ * and the incremental builder emit byte-identical commands from the same inputs.
+ */
+function emitFxPressurePathSegment(
+  points: readonly FxPressurePoint[],
+  controlAt: (index: number) => FxCardinalControl | null,
+  sourceSegmentIndex: number,
+  sourcePointCount: number,
+  resolvePressure: (start: FxPressurePoint, end: FxPressurePoint) => StudioFxBrushPressureResponse,
+): StudioFxPressurePathSegment {
+  const start = points[sourceSegmentIndex]!;
+  const end = points[sourceSegmentIndex + 1]!;
+  const pressure = resolvePressure(start, end);
+  const startControl = controlAt(sourceSegmentIndex);
+  const endControl = controlAt(sourceSegmentIndex + 1);
+  if (sourceSegmentIndex === 0 && endControl) {
+    return Object.freeze({
+      command: "quadratic",
+      moveX: start.x,
+      moveY: start.y,
+      controlX: endControl.beforeX,
+      controlY: endControl.beforeY,
+      endX: end.x,
+      endY: end.y,
+      sourceSegmentIndex,
+      ...pressure,
+    });
   }
-  return controls;
+  if (sourceSegmentIndex === sourcePointCount - 2 && startControl) {
+    return Object.freeze({
+      command: "quadratic",
+      moveX: start.x,
+      moveY: start.y,
+      controlX: startControl.afterX,
+      controlY: startControl.afterY,
+      endX: end.x,
+      endY: end.y,
+      sourceSegmentIndex,
+      ...pressure,
+    });
+  }
+  if (startControl && endControl) {
+    return Object.freeze({
+      command: "cubic",
+      moveX: start.x,
+      moveY: start.y,
+      control1X: startControl.afterX,
+      control1Y: startControl.afterY,
+      control2X: endControl.beforeX,
+      control2Y: endControl.beforeY,
+      endX: end.x,
+      endY: end.y,
+      sourceSegmentIndex,
+      ...pressure,
+    });
+  }
+  return Object.freeze({
+    command: "line",
+    moveX: start.x,
+    moveY: start.y,
+    endX: end.x,
+    endY: end.y,
+    sourceSegmentIndex,
+    ...pressure,
+  });
 }
 
 /**
@@ -621,72 +699,31 @@ export function planStudioFxBrushPressurePath(input: {
   const controls = tension > 0 && sourcePointCount >= 3
     ? cardinalFxControls(points, tension)
     : [];
+  const resolvePressure = (
+    start: FxPressurePoint,
+    end: FxPressurePoint,
+  ): StudioFxBrushPressureResponse => (
+    canonicalPressure
+      ? resolveStudioFxBrushPressureResponse(
+          input.brushId,
+          (start.pressure + end.pressure) / 2,
+          input.minimumDiameterRatio,
+        )
+      : neutralStudioFxBrushPressureResponse()
+  );
   const segments: StudioFxPressurePathSegment[] = [];
   for (
     let sourceSegmentIndex = 0;
     sourceSegmentIndex < sourcePointCount - 1;
     sourceSegmentIndex += 1
   ) {
-    const start = points[sourceSegmentIndex]!;
-    const end = points[sourceSegmentIndex + 1]!;
-    const pressure = canonicalPressure
-      ? resolveStudioFxBrushPressureResponse(
-          input.brushId,
-          (start.pressure + end.pressure) / 2,
-          input.minimumDiameterRatio,
-        )
-      : neutralStudioFxBrushPressureResponse();
-    const startControl = controls[sourceSegmentIndex];
-    const endControl = controls[sourceSegmentIndex + 1];
-    if (sourceSegmentIndex === 0 && endControl) {
-      segments.push(Object.freeze({
-        command: "quadratic",
-        moveX: start.x,
-        moveY: start.y,
-        controlX: endControl.beforeX,
-        controlY: endControl.beforeY,
-        endX: end.x,
-        endY: end.y,
-        sourceSegmentIndex,
-        ...pressure,
-      }));
-    } else if (sourceSegmentIndex === sourcePointCount - 2 && startControl) {
-      segments.push(Object.freeze({
-        command: "quadratic",
-        moveX: start.x,
-        moveY: start.y,
-        controlX: startControl.afterX,
-        controlY: startControl.afterY,
-        endX: end.x,
-        endY: end.y,
-        sourceSegmentIndex,
-        ...pressure,
-      }));
-    } else if (startControl && endControl) {
-      segments.push(Object.freeze({
-        command: "cubic",
-        moveX: start.x,
-        moveY: start.y,
-        control1X: startControl.afterX,
-        control1Y: startControl.afterY,
-        control2X: endControl.beforeX,
-        control2Y: endControl.beforeY,
-        endX: end.x,
-        endY: end.y,
-        sourceSegmentIndex,
-        ...pressure,
-      }));
-    } else {
-      segments.push(Object.freeze({
-        command: "line",
-        moveX: start.x,
-        moveY: start.y,
-        endX: end.x,
-        endY: end.y,
-        sourceSegmentIndex,
-        ...pressure,
-      }));
-    }
+    segments.push(emitFxPressurePathSegment(
+      points,
+      (index) => controls[index] ?? null,
+      sourceSegmentIndex,
+      sourcePointCount,
+      resolvePressure,
+    ));
   }
   return Object.freeze({
     kind: "studio-fx-pressure-path",
@@ -694,6 +731,178 @@ export function planStudioFxBrushPressurePath(input: {
     sourcePointCount,
     segments: Object.freeze(segments),
   });
+}
+
+export interface StudioIncrementalFxPressurePathBuilder {
+  /**
+   * 자라나는 획의 현재 스냅샷을 소비하고 전체 압력 경로 플랜을 돌려준다. 이미 소비한 raw
+   * prefix는 다시 읽지 않으며(마지막 소비 점·필압 슬롯 하나로 O(1) 검증), 되돌리기/재작성이
+   * 감지되면 전체를 다시 만든다. 반환 플랜의 `segments`는 빌더 내부 보관 배열이므로 수정하면
+   * 안 된다.
+   */
+  append(input: {
+    readonly brushId: StudioFxPressureBrushId;
+    readonly points: readonly number[];
+    readonly pressures?: readonly number[] | null;
+    readonly pressureModel?: StudioMaterialPressureModel;
+    readonly minimumDiameterRatio?: unknown;
+    readonly tension?: unknown;
+  }): StudioFxPressurePathPlan;
+}
+
+/**
+ * 최근 append가 다시 방출해야 하는 기존 세그먼트 수. 마지막 sanitize 점은 EPS 병합으로
+ * 교체될 수 있고(cardinal control이 ±1 이웃을 읽으므로 그 여파가 세그먼트 두 개 앞까지
+ * 미친다), 직전의 "마지막 세그먼트" quadratic 분기도 중간 cubic으로 승격되므로, 여유 하나를
+ * 더해 세 개를 다시 만든다 — append당 상수 비용이다.
+ */
+const FX_PRESSURE_PATH_VOLATILE_TAIL_SEGMENTS = 3;
+
+/**
+ * 라이브/리렌더용 증분 압력 경로 빌더.
+ *
+ * `planStudioFxBrushPressurePath`는 매 이동 전체 스트로크를 다시 계획한다(이동당 O(n) →
+ * 스트로크당 O(n²) — 장획 게이트가 잡는 형태). 필압 배열이 점 배열과 나란하거나 아예 없을 때
+ * (라이브 획은 항상 이 경우다) 진행률 필압 표본은 인덱스별 조회로 대수적으로 환원되고, cardinal
+ * control은 ±1 이웃만 읽으므로 세그먼트는 국소 함수가 된다 — 즉 append 전용으로 만들 수 있다.
+ * 기하·필압 수치는 배치 플래너와 같은 `emitFxPressurePathSegment`에서 나온다(유지된 옛 점의
+ * 필압은 소비 시점의 진행률로 고정되어 신선한 배치 플랜과 최대 1 ulp 차이 — 문서 재적재 시
+ * 배치 리플랜이 정본을 다시 그린다). 검증은 캘리그래피 증분 빌더와 같은 규약을 따른다: 마지막
+ * 소비 raw 점(과 그 필압 슬롯) 하나로 O(1) 확인하고, 다르거나 배열이 줄면 전체 재구축.
+ */
+export function createStudioIncrementalFxPressurePathBuilder(): StudioIncrementalFxPressurePathBuilder {
+  const sanitized: FxPressurePoint[] = [];
+  const segments: StudioFxPressurePathSegment[] = [];
+  let consumedRawPairs = 0;
+  let lastRawX = 0;
+  let lastRawY = 0;
+  let lastRawPressureSlot: number | undefined;
+  let configBrushId: StudioFxPressureBrushId | null = null;
+  let configTension = 0;
+  let configCanonical = false;
+  let configMinimumDiameterRatio: unknown;
+  let configParallelPressures = false;
+
+  const reset = (): void => {
+    sanitized.length = 0;
+    segments.length = 0;
+    consumedRawPairs = 0;
+    lastRawPressureSlot = undefined;
+  };
+
+  return {
+    append(input) {
+      const pairCount = Math.min(1_000_000, Math.floor(input.points.length / 2));
+      const tension = clamp(finiteNumber(input.tension, 0), 0, 1);
+      const canonicalPressure =
+        input.pressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1;
+      const pressures = input.pressures;
+      const pressuresAbsent = !pressures || pressures.length === 0;
+      const pressuresParallel = !pressuresAbsent && pressures.length === pairCount;
+      // 진행률 표본이 인덱스별 조회로 환원되지 않는 입력(리샘플·레거시)은 유지가 불가능하다 —
+      // 배치 플래너로 위임하고 내부 상태는 비워 다음 나란한 입력부터 다시 쌓는다.
+      if (!pressuresAbsent && !pressuresParallel) {
+        reset();
+        configBrushId = null;
+        return planStudioFxBrushPressurePath(input);
+      }
+      const configMatches = configBrushId === input.brushId
+        && configTension === tension
+        && configCanonical === canonicalPressure
+        && Object.is(configMinimumDiameterRatio, input.minimumDiameterRatio)
+        && configParallelPressures === pressuresParallel;
+      let prefixVerified = configMatches && pairCount >= consumedRawPairs;
+      if (prefixVerified && consumedRawPairs > 0) {
+        const lastIndex = consumedRawPairs - 1;
+        prefixVerified = input.points[lastIndex * 2] === lastRawX
+          && input.points[lastIndex * 2 + 1] === lastRawY
+          && (!pressuresParallel || pressures![lastIndex] === lastRawPressureSlot);
+      }
+      if (!prefixVerified) reset();
+      configBrushId = input.brushId;
+      configTension = tension;
+      configCanonical = canonicalPressure;
+      configMinimumDiameterRatio = input.minimumDiameterRatio;
+      configParallelPressures = pressuresParallel;
+
+      const previousSegmentCount = segments.length;
+      let sanitizedChangedFrom = sanitized.length;
+      for (let pointIndex = consumedRawPairs; pointIndex < pairCount; pointIndex += 1) {
+        const x = safeCoord(input.points[pointIndex * 2]);
+        const y = safeCoord(input.points[pointIndex * 2 + 1]);
+        if (x === null || y === null) break;
+        const pressure = fixedPathPressureAt(
+          pressures,
+          pairCount <= 1 ? 0 : pointIndex / (pairCount - 1),
+        );
+        const previous = sanitized.at(-1);
+        if (previous && Math.hypot(x - previous.x, y - previous.y) <= POINT_EPS) {
+          sanitized[sanitized.length - 1] = { x, y, pressure };
+          sanitizedChangedFrom = Math.min(sanitizedChangedFrom, sanitized.length - 1);
+        } else {
+          sanitized.push({ x, y, pressure });
+        }
+        consumedRawPairs = pointIndex + 1;
+        lastRawX = input.points[pointIndex * 2]!;
+        lastRawY = input.points[pointIndex * 2 + 1]!;
+        lastRawPressureSlot = pressuresParallel ? pressures![pointIndex] : undefined;
+      }
+
+      const sourcePointCount = sanitized.length;
+      if (sourcePointCount < 2) {
+        segments.length = 0;
+        return {
+          kind: "studio-fx-pressure-path",
+          brushId: input.brushId,
+          sourcePointCount,
+          segments,
+        };
+      }
+      const useControls = tension > 0 && sourcePointCount >= 3;
+      const controlAt = (index: number): FxCardinalControl | null => (
+        useControls ? cardinalFxControlAt(sanitized, index, tension) : null
+      );
+      const resolvePressure = (
+        start: FxPressurePoint,
+        end: FxPressurePoint,
+      ): StudioFxBrushPressureResponse => (
+        canonicalPressure
+          ? resolveStudioFxBrushPressureResponse(
+              input.brushId,
+              (start.pressure + end.pressure) / 2,
+              input.minimumDiameterRatio,
+            )
+          : neutralStudioFxBrushPressureResponse()
+      );
+      // 아주 짧은 획은 첫 세그먼트의 quadratic 분기까지 흔들리므로 통째로 다시 만든다.
+      const rebuildFrom = sourcePointCount < 5
+        ? 0
+        : Math.min(
+            Math.max(0, previousSegmentCount - FX_PRESSURE_PATH_VOLATILE_TAIL_SEGMENTS),
+            Math.max(0, sanitizedChangedFrom - 2),
+          );
+      segments.length = rebuildFrom;
+      for (
+        let sourceSegmentIndex = rebuildFrom;
+        sourceSegmentIndex < sourcePointCount - 1;
+        sourceSegmentIndex += 1
+      ) {
+        segments.push(emitFxPressurePathSegment(
+          sanitized,
+          controlAt,
+          sourceSegmentIndex,
+          sourcePointCount,
+          resolvePressure,
+        ));
+      }
+      return {
+        kind: "studio-fx-pressure-path",
+        brushId: input.brushId,
+        sourcePointCount,
+        segments,
+      };
+    },
+  };
 }
 
 interface FxLuminousPoint {
