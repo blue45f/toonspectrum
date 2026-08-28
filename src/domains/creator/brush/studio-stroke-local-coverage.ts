@@ -10,7 +10,9 @@
  */
 
 import {
+  resolveStudioRetainedMediaPressureAt,
   resolveStudioRetainedMediaPressureSeries,
+  type StudioRetainedMediaPressureResponse,
   type StudioRetainedMediaPressureProfileId,
 } from "../studio-retained-media-pressure";
 import { planStudioTonalBands } from "../studio-tonal-band-plan";
@@ -280,4 +282,213 @@ export function planStudioAngledNibStrokeLocalCoverage(
     shells: layers.shells,
     bands: layers.bands,
   });
+}
+
+export interface StudioIncrementalAngledNibCoverageBuilder {
+  /**
+   * 배치 `planStudioAngledNibStrokeLocalCoverage`와 값이 같은 플랜을 돌려주되, 세그먼트
+   * 폴리곤·밀도의 안정 prefix 를 호출 사이에 유지한다 — 세그먼트는 양 끝점의 국소 함수라
+   * 소급점이 아예 없다. 필압 응답은 소비 시점 진행률로 잠근다(나란한 배열에서 인덱스 조회로
+   * 환원 — fx 압력 경로 빌더와 같은 계약, 커밋 배치 리플랜이 정본). 나란하지 않은 필압 배열은
+   * 배치로 위임한다(전방 보간이 배열 길이에 소급 의존하므로 유지 불가). 톤 밴딩은 마크 자체의
+   * 관측 피크/플로어에 상대적인 의도적 전역 설계라 매 호출 유지 배열 위에서 그대로 접는다 —
+   * 프로브가 재는 무필압 형상은 단일 평면 레이어로 접혀 조립이 O(1)이다. 반환 플랜의
+   * `polygons`는 내부 보관 배열이므로 수정하면 안 된다.
+   */
+  plan(
+    sourcePoints: readonly number[],
+    strokeWidthInput: unknown,
+    angleRadiansInput?: unknown,
+    pressureInput?: StudioAngledNibPressureInput | null,
+  ): StudioAngledNibStrokeLocalCoveragePlan;
+}
+
+export function createStudioIncrementalAngledNibCoverageBuilder(): StudioIncrementalAngledNibCoverageBuilder {
+  let configStrokeWidth = 0;
+  let configAngle = 0;
+  let configProfileId: string | null = null;
+  let configMinimumDiameterRatio: unknown;
+  let configHasPressures = false;
+
+  let consumedPairs = 0;
+  let lastRawX = 0;
+  let lastRawY = 0;
+  let lastRawPressure: number | undefined;
+  const polygons: StudioStrokeLocalCoveragePolygon[] = [];
+  const densities: number[] = [];
+  let previousResponse: StudioRetainedMediaPressureResponse | undefined;
+  let previousNibX = 0;
+  let previousNibY = 0;
+  let previousX: number | null = null;
+  let previousY: number | null = null;
+
+  const reset = (): void => {
+    consumedPairs = 0;
+    lastRawPressure = undefined;
+    polygons.length = 0;
+    densities.length = 0;
+    previousResponse = undefined;
+    previousX = null;
+    previousY = null;
+  };
+
+  return {
+    plan(sourcePoints, strokeWidthInput, angleRadiansInput = -Math.PI / 6, pressureInput) {
+      const sourcePointCount = Math.floor(sourcePoints.length / 2);
+      const sourceSegmentCount = Math.max(0, sourcePointCount - 1);
+      const strokeWidth = finiteStrokeWidth(strokeWidthInput);
+      const angleRadians = finiteAngle(angleRadiansInput);
+      if (strokeWidth === null || angleRadians === null || sourceSegmentCount === 0) {
+        reset();
+        configProfileId = null;
+        return {
+          kind: "studio-angled-nib-stroke-local-coverage-plan",
+          version: STUDIO_STROKE_LOCAL_COVERAGE_VERSION,
+          sourcePointCount,
+          sourceSegmentCount,
+          acceptedSegmentCount: 0,
+          polygons: [],
+          shells: [],
+          bands: [],
+        };
+      }
+      const pressures = pressureInput?.pressures ?? null;
+      if (pressureInput && pressures && pressures.length !== sourcePointCount) {
+        reset();
+        configProfileId = null;
+        return planStudioAngledNibStrokeLocalCoverage(
+          sourcePoints,
+          strokeWidthInput,
+          angleRadiansInput,
+          pressureInput,
+        );
+      }
+      const profileId = pressureInput ? pressureInput.profileId : null;
+      if (
+        strokeWidth !== configStrokeWidth
+        || angleRadians !== configAngle
+        || profileId !== configProfileId
+        || !Object.is(configMinimumDiameterRatio, pressureInput?.minimumDiameterRatio)
+        || configHasPressures !== (pressures !== null)
+        || sourcePointCount < consumedPairs
+      ) {
+        reset();
+        configStrokeWidth = strokeWidth;
+        configAngle = angleRadians;
+        configProfileId = profileId;
+        configMinimumDiameterRatio = pressureInput?.minimumDiameterRatio;
+        configHasPressures = pressures !== null;
+      }
+      if (consumedPairs > 0) {
+        const lastIndex = consumedPairs - 1;
+        if (
+          sourcePoints[lastIndex * 2] !== lastRawX
+          || sourcePoints[lastIndex * 2 + 1] !== lastRawY
+          || (pressures ? pressures[lastIndex] : undefined) !== lastRawPressure
+        ) {
+          reset();
+        }
+      }
+
+      for (let index = consumedPairs; index < sourcePointCount; index += 1) {
+        const response = pressureInput
+          ? resolveStudioRetainedMediaPressureAt(
+              pressureInput.profileId,
+              pressures,
+              index,
+              sourcePointCount,
+              pressureInput.minimumDiameterRatio,
+            )
+          : undefined;
+        const scale = response?.sizeScale ?? 1;
+        const radius = strokeWidth * scale / 2;
+        const nibX = radius * Math.cos(angleRadians);
+        const nibY = radius * Math.sin(angleRadians);
+        const x = finiteCoordinate(sourcePoints[index * 2]);
+        const y = finiteCoordinate(sourcePoints[index * 2 + 1]);
+        if (index >= 1 && previousX !== null && previousY !== null && x !== null && y !== null) {
+          const polygon = normalizeStudioStrokeLocalCoveragePolygon([
+            previousX - previousNibX,
+            previousY - previousNibY,
+            previousX + previousNibX,
+            previousY + previousNibY,
+            x + nibX,
+            y + nibY,
+            x - nibX,
+            y - nibY,
+          ]);
+          if (polygon) {
+            polygons.push(polygon);
+            // 세그먼트는 두 표본에 걸치므로 두 표본의 안료를 나른다(배치 주석 그대로).
+            densities.push((
+              sampleDensity(previousResponse)
+              + sampleDensity(response)
+            ) / 2);
+          }
+        }
+        previousResponse = response;
+        previousNibX = nibX;
+        previousNibY = nibY;
+        previousX = x;
+        previousY = y;
+        lastRawX = sourcePoints[index * 2] as number;
+        lastRawY = sourcePoints[index * 2 + 1] as number;
+        lastRawPressure = pressures ? pressures[index] : undefined;
+        consumedPairs = index + 1;
+      }
+
+      // 톤 밴딩은 관측 피크/플로어 상대 설계(의도적 전역) — 유지 배열 위에서 매 호출 접는다.
+      // 무필압/평탄 밀도는 단일 평면 레이어로 즉시 접혀 이 호출이 O(1)이다.
+      const layers = planStudioTonalBands(
+        polygons,
+        densities,
+        finiteUnitInterval(pressureInput?.elementOpacity) ?? 1,
+      );
+      return {
+        kind: "studio-angled-nib-stroke-local-coverage-plan",
+        version: STUDIO_STROKE_LOCAL_COVERAGE_VERSION,
+        sourcePointCount,
+        sourceSegmentCount,
+        acceptedSegmentCount: polygons.length,
+        polygons,
+        shells: layers.shells,
+        bands: layers.bands,
+      };
+    },
+  };
+}
+
+const INCREMENTAL_ANGLED_NIB_CACHE = new Map<
+  string,
+  StudioIncrementalAngledNibCoverageBuilder
+>();
+/** 활성 초안은 하나지만 draft/commit 리렌더가 겹치는 짧은 창을 위해 소수의 최근 획을 유지한다. */
+const INCREMENTAL_ANGLED_NIB_CACHE_LIMIT = 8;
+
+/**
+ * 획 키(요소 id)로 보관된 증분 앵글드 닙 커버리지 플랜 — `StudioDrawNode` 활성 초안의
+ * `planStudioAngledNibStrokeLocalCoverage` 자리 교체용. 반환 플랜의 `polygons`는 내부 보관
+ * 배열이므로 수정하면 안 된다.
+ */
+export function planStudioAngledNibStrokeLocalCoverageIncremental(
+  strokeKey: string,
+  sourcePoints: readonly number[],
+  strokeWidthInput: unknown,
+  angleRadiansInput?: unknown,
+  pressureInput?: StudioAngledNibPressureInput | null,
+): StudioAngledNibStrokeLocalCoveragePlan {
+  let builder = INCREMENTAL_ANGLED_NIB_CACHE.get(strokeKey);
+  if (builder) {
+    // LRU 갱신: 재삽입으로 삽입 순서를 최근 사용 순서로 유지한다.
+    INCREMENTAL_ANGLED_NIB_CACHE.delete(strokeKey);
+  } else {
+    builder = createStudioIncrementalAngledNibCoverageBuilder();
+  }
+  INCREMENTAL_ANGLED_NIB_CACHE.set(strokeKey, builder);
+  while (INCREMENTAL_ANGLED_NIB_CACHE.size > INCREMENTAL_ANGLED_NIB_CACHE_LIMIT) {
+    const oldest = INCREMENTAL_ANGLED_NIB_CACHE.keys().next().value;
+    if (oldest === undefined) break;
+    INCREMENTAL_ANGLED_NIB_CACHE.delete(oldest);
+  }
+  return builder.plan(sourcePoints, strokeWidthInput, angleRadiansInput, pressureInput);
 }

@@ -24,6 +24,7 @@ import {
   resolveStudioFreehandRenderPath,
   screentoneDotRadius,
   screentoneDotsForStroke,
+  screentoneDotsForStrokeIncremental,
   strokeRenderDistance,
 } from "../studio-brush";
 import {
@@ -152,7 +153,10 @@ import {
 } from "./studio-oil-ribbon-carrier";
 import { paintStudioOilRibbonCarrierIncremental } from "./studio-oil-ribbon-incremental-paint";
 import { rasterizeStudioCoverageBands } from "./studio-stroke-coverage-raster";
-import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
+import {
+  planStudioAngledNibStrokeLocalCoverage,
+  planStudioAngledNibStrokeLocalCoverageIncremental,
+} from "./studio-stroke-local-coverage";
 import {
   isStudioBoundedFlowPaintModelCompatible,
 } from "./studio-stroke-paint-model";
@@ -1516,25 +1520,38 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0,
             }).points;
-            const coveragePlan = planStudioAngledNibStrokeLocalCoverage(
-              smoothed,
-              aliasStrokeWidth,
-              -Math.PI / 6,
+            const coveragePressureInput =
               el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
                 ? {
                     profileId: brush === "flat-brush"
-                      ? "flat-brush"
+                      ? ("flat-brush" as const)
                       : brush === "marker--chisel-ribbon"
-                        ? "marker-chisel"
-                        : "brush",
+                        ? ("marker-chisel" as const)
+                        : ("brush" as const),
                     pressures: el.pressures,
                     minimumDiameterRatio: el.materialMinimumDiameterRatio,
                     // The bands carry ABSOLUTE alpha, so the element opacity is folded in by the
                     // planner and the Shape below must not apply it a second time.
                     elementOpacity: opacity,
                   }
-                : undefined,
-            );
+                : undefined;
+            // 활성 초안은 요소 id 로 키된 증분 빌더가 세그먼트 폴리곤/밀도의 안정 prefix 를
+            // 유지한다(장획 게이트 angled-ribbon; 톤 밴딩은 의도적 전역 설계라 매 호출 접는다).
+            // 커밋 렌더는 배치 리플레이를 유지해 항상 정본을 그린다.
+            const coveragePlan = activeDraft
+              ? planStudioAngledNibStrokeLocalCoverageIncremental(
+                  el.id,
+                  smoothed,
+                  aliasStrokeWidth,
+                  -Math.PI / 6,
+                  coveragePressureInput,
+                )
+              : planStudioAngledNibStrokeLocalCoverage(
+                  smoothed,
+                  aliasStrokeWidth,
+                  -Math.PI / 6,
+                  coveragePressureInput,
+                );
             // One band means the mark has no resolvable tonal range. That is the emission this
             // carrier has always had — one compound fill at the element's own opacity — and it
             // stays on the original code path, untouched, so saved documents replay to the byte.
@@ -1799,9 +1816,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
           if (brushFamily === "screentone" && el.mode !== "eraser") {
             // 스크린톤: 전역 격자에 정렬된 망점 도트를 스트로크 경로에 찍는다(겹쳐도 패턴 유지).
+            // 활성 초안은 요소 id 로 키된 증분 빌더가 도장 워크의 안정 prefix 를 유지한다
+            // (이동당 새 표본 비례 — 장획 게이트 stamp-tone). 커밋 렌더는 배치를 유지한다.
             const pitch = Math.max(3, aliasStrokeWidth * 0.42);
             const radius = Math.max(2, aliasStrokeWidth / 2);
-            const dots = screentoneDotsForStroke(points, radius, pitch);
+            const dots = activeDraft
+              ? screentoneDotsForStrokeIncremental(el.id, points, radius, pitch)
+              : screentoneDotsForStroke(points, radius, pitch);
             const dotR = screentoneDotRadius(pitch);
             return (
               <Shape

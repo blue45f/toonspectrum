@@ -1732,6 +1732,168 @@ export function screentoneDotsForStroke(points: number[], brushRadius: number, p
   return dots;
 }
 
+export interface StudioIncrementalScreentoneDotsBuilder {
+  /**
+   * 자라나는 획의 현재 스냅샷을 소비하고 배치 `screentoneDotsForStroke`와 값·순서가 정확히
+   * 같은 도트 배열을 돌려준다(같은 도장/중복제거 워크를 같은 순서로 잇는다). 이미 소비한 raw
+   * prefix 는 다시 읽지 않으며(마지막 소비 쌍 하나로 O(1) 검증), 되돌리기·재작성·반지름/피치
+   * 변경이 감지되면 전체를 다시 만든다. 유일한 소급점은 배치가 매 호출 끝에 찍는 끝점 도장
+   * 하나다 — 그 도장의 도트와 격자 키를 기록해 두고 다음 호출에서 걷어낸 뒤 이어 걷는다.
+   * 반환 배열은 내부 보관 배열이므로 수정하면 안 된다.
+   */
+  plan(points: readonly number[], brushRadius: number, pitch: number): number[];
+}
+
+export function createStudioIncrementalScreentoneDotsBuilder(): StudioIncrementalScreentoneDotsBuilder {
+  let configR = 0;
+  let configP = 0;
+  const seen = new Set<number>();
+  const dots: number[] = [];
+  let consumedPairs = 0;
+  let lastRawX = 0;
+  let lastRawY = 0;
+  let prevX = 0;
+  let prevY = 0;
+  let carried = 0;
+  /** 지난 호출의 끝점 도장이 추가한 도트 수와 격자 키 — 다음 호출에서 되돌린다. */
+  let endStampDotStart = 0;
+  const endStampKeys: number[] = [];
+
+  const GRID_KEY_BIAS = 1 << 20;
+  const GRID_KEY_STRIDE = GRID_KEY_BIAS * 2;
+
+  const reset = (): void => {
+    seen.clear();
+    dots.length = 0;
+    consumedPairs = 0;
+    carried = 0;
+    endStampDotStart = 0;
+    endStampKeys.length = 0;
+  };
+
+  /** 배치 `stampAt` 그대로 — recordKeys 가 있으면 새로 추가한 격자 키를 기록한다. */
+  const stampAt = (cx: number, cy: number, recordKeys: number[] | null): void => {
+    const r = configR;
+    const p = configP;
+    const minIx = Math.floor((cx - r) / p);
+    const maxIx = Math.ceil((cx + r) / p);
+    const minIy = Math.floor((cy - r) / p);
+    const maxIy = Math.ceil((cy + r) / p);
+    for (let iy = minIy; iy <= maxIy; iy++) {
+      const rowOffset = (iy % 2 === 0 ? 0 : 0.5) * p;
+      for (let ix = minIx; ix <= maxIx; ix++) {
+        const dx = ix * p + rowOffset;
+        const dy = iy * p;
+        if ((dx - cx) * (dx - cx) + (dy - cy) * (dy - cy) > r * r) continue;
+        const key = (iy + GRID_KEY_BIAS) * GRID_KEY_STRIDE + (ix + GRID_KEY_BIAS);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (recordKeys) recordKeys.push(key);
+        dots.push(dx, dy);
+      }
+    }
+  };
+
+  return {
+    plan(points, brushRadius, pitch) {
+      const r = Math.max(1, brushRadius);
+      const p = Math.max(2, pitch);
+      const pairCount = Math.floor(points.length / 2);
+      if (points.length < 2) {
+        reset();
+        configR = r;
+        configP = p;
+        return [];
+      }
+      if (r !== configR || p !== configP || pairCount < consumedPairs) {
+        reset();
+        configR = r;
+        configP = p;
+      }
+      if (consumedPairs > 0) {
+        const lastIndex = consumedPairs - 1;
+        if (
+          points[lastIndex * 2] !== lastRawX
+          || points[lastIndex * 2 + 1] !== lastRawY
+        ) {
+          reset();
+        }
+      }
+
+      // 휘발 꼬리 되돌리기: 지난 호출의 끝점 도장을 걷는다.
+      for (const key of endStampKeys) seen.delete(key);
+      endStampKeys.length = 0;
+      dots.length = endStampDotStart;
+
+      const step = Math.max(1, r * 0.5);
+      for (let index = consumedPairs; index < pairCount; index += 1) {
+        const x = points[index * 2]!;
+        const y = points[index * 2 + 1]!;
+        if (index === 0) {
+          prevX = x;
+          prevY = y;
+          stampAt(prevX, prevY, null);
+        } else {
+          // 배치 루프 본문 그대로(carried 이월식 포함 — 비트 동일 재생).
+          const segLen = Math.hypot(x - prevX, y - prevY);
+          if (segLen !== 0) {
+            let traveled = step - carried;
+            while (traveled <= segLen) {
+              const t = traveled / segLen;
+              stampAt(prevX + (x - prevX) * t, prevY + (y - prevY) * t, null);
+              traveled += step;
+            }
+            carried = segLen - (traveled - step);
+            prevX = x;
+            prevY = y;
+          }
+        }
+        lastRawX = x;
+        lastRawY = y;
+        consumedPairs = index + 1;
+      }
+
+      // 끝점 도장(휘발): 도트/키를 기록해 다음 호출이 걷을 수 있게 한다.
+      endStampDotStart = dots.length;
+      stampAt(prevX, prevY, endStampKeys);
+      return dots;
+    },
+  };
+}
+
+const INCREMENTAL_SCREENTONE_CACHE = new Map<
+  string,
+  StudioIncrementalScreentoneDotsBuilder
+>();
+/** 활성 초안은 하나지만 draft/commit 리렌더가 겹치는 짧은 창을 위해 소수의 최근 획을 유지한다. */
+const INCREMENTAL_SCREENTONE_CACHE_LIMIT = 8;
+
+/**
+ * 획 키(요소 id)로 보관된 증분 스크린톤 도트 플랜 — `StudioDrawNode` 활성 초안의
+ * `screentoneDotsForStroke` 자리 교체용. 반환 배열은 내부 보관 배열이므로 수정하면 안 된다.
+ */
+export function screentoneDotsForStrokeIncremental(
+  strokeKey: string,
+  points: readonly number[],
+  brushRadius: number,
+  pitch: number,
+): number[] {
+  let builder = INCREMENTAL_SCREENTONE_CACHE.get(strokeKey);
+  if (builder) {
+    // LRU 갱신: 재삽입으로 삽입 순서를 최근 사용 순서로 유지한다.
+    INCREMENTAL_SCREENTONE_CACHE.delete(strokeKey);
+  } else {
+    builder = createStudioIncrementalScreentoneDotsBuilder();
+  }
+  INCREMENTAL_SCREENTONE_CACHE.set(strokeKey, builder);
+  while (INCREMENTAL_SCREENTONE_CACHE.size > INCREMENTAL_SCREENTONE_CACHE_LIMIT) {
+    const oldest = INCREMENTAL_SCREENTONE_CACHE.keys().next().value;
+    if (oldest === undefined) break;
+    INCREMENTAL_SCREENTONE_CACHE.delete(oldest);
+  }
+  return builder.plan(points, brushRadius, pitch);
+}
+
 /** 스크린톤 도트 반지름(피치에 비례하는 망점 크기). */
 export function screentoneDotRadius(pitch: number): number {
   return Math.max(0.8, pitch * 0.32);

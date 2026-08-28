@@ -84,9 +84,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createStudioIncrementalCalligraphySegmentBuilder,
+  createStudioIncrementalScreentoneDotsBuilder,
   resolveStudioBrushRenderFamily,
   resolveStudioFreehandRenderPath,
-  screentoneDotsForStroke,
 } from "../studio-brush";
 import {
   appendStudioCausalDynamicBrushDepositsV2,
@@ -154,7 +154,7 @@ import {
   planStudioOilRibbonCarrier,
   studioOilRibbonProgramsForBrush,
 } from "./studio-oil-ribbon-carrier";
-import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
+import { createStudioIncrementalAngledNibCoverageBuilder } from "./studio-stroke-local-coverage";
 import { planStudioWetWashLivePipeline } from "./studio-wet-wash-live-pipeline";
 
 import type { DrawEl } from "../studio-element-model";
@@ -779,17 +779,25 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
   {
     id: "angled-ribbon",
     brushId: "marker--chisel-ribbon",
-    path: "whole-prefix-replan",
-    entry: "planStudioAngledNibStrokeLocalCoverage",
-    makeStroke: () =>
-      wholePrefixStepper((stroke) =>
-        planStudioAngledNibStrokeLocalCoverage(
+    path: "live-incremental",
+    entry: "StudioDrawNode draft -> incremental angled-nib coverage builder",
+    makeStroke: () => {
+      // `StudioDrawNode`'s brush-family branch keeps one element-id-keyed builder per active
+      // draft: segment polygons/densities are strictly local to their two endpoints, so the
+      // retained prefix has no retroactive point at all. Tonal banding stays a per-call fold by
+      // design (it is normalized to the mark's own observed peak/floor); the no-pressure shape
+      // probed here collapses to the flat single layer, an O(1) assembly. The batch planner
+      // remains the commit/SVG chain.
+      const builder = createStudioIncrementalAngledNibCoverageBuilder();
+      return wholePrefixStepper((stroke) =>
+        builder.plan(
           freehandPath(stroke),
           18,
           -Math.PI / 6,
           null,
         ).polygons.length,
-      ),
+      );
+    },
   },
 
   // ── pencil retained media ───────────────────────────────────────────────────────────────────
@@ -834,12 +842,18 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
   {
     id: "stamp-tone",
     brushId: "screentone--sparse-grid",
-    path: "whole-prefix-replan",
-    entry: "screentoneDotsForStroke",
-    makeStroke: () =>
-      wholePrefixStepper((stroke) =>
-        screentoneDotsForStroke(stroke.points.slice(), 12, Math.max(3, 24 * 0.42)).length,
-      ),
+    path: "live-incremental",
+    entry: "StudioDrawNode draft -> incremental screentone dot builder",
+    makeStroke: () => {
+      // `StudioDrawNode`'s screentone family branch keeps one element-id-keyed builder per
+      // active draft: the stamp/dedupe walk retains its stable prefix and only the endpoint
+      // stamp (the batch's one retroactive emission) is undone and re-stamped per move. The
+      // batch `screentoneDotsForStroke` remains the commit/SVG chain.
+      const builder = createStudioIncrementalScreentoneDotsBuilder();
+      return wholePrefixStepper((stroke) =>
+        builder.plan(stroke.points, 12, Math.max(3, 24 * 0.42)).length,
+      );
+    },
   },
 
   // ── family-level retained branches (no lane id in the catalog) ──────────────────────────────

@@ -229,6 +229,26 @@ function pressureAtProgress(
   return lower + (upper - lower) * amount;
 }
 
+/**
+ * 시리즈의 `index` 번째 항목 하나 — 배치 시리즈와 같은 진행률 식이다. 증분 소비자는 소비
+ * 시점의 `count` 로 값을 잠근다: 필압 배열이 점과 나란하면 진행률 표본이 인덱스 조회로
+ * 환원되어 최종 배치와 최대 ulp 수준 차이만 남는다(fx 압력 경로 빌더와 같은 계약 —
+ * 커밋/재적재의 배치 리플랜이 정본을 다시 그린다).
+ */
+export function resolveStudioRetainedMediaPressureAt(
+  profileId: StudioRetainedMediaPressureProfileId,
+  pressures: readonly number[] | null | undefined,
+  index: number,
+  count: number,
+  minimumDiameterRatio?: unknown,
+): StudioRetainedMediaPressureResponse {
+  return resolveStudioRetainedMediaPressure(
+    profileId,
+    pressureAtProgress(pressures, count <= 1 ? 0 : index / (count - 1)),
+    minimumDiameterRatio,
+  );
+}
+
 /** Aligns an arbitrary persisted pressure journal to a renderer-owned point count. */
 export function resolveStudioRetainedMediaPressureSeries(
   profileId: StudioRetainedMediaPressureProfileId,
@@ -241,9 +261,11 @@ export function resolveStudioRetainedMediaPressureSeries(
     : 0;
   if (count === 0) return Object.freeze([]);
   return Object.freeze(Array.from({ length: count }, (_, index) => (
-    resolveStudioRetainedMediaPressure(
+    resolveStudioRetainedMediaPressureAt(
       profileId,
-      pressureAtProgress(pressures, count <= 1 ? 0 : index / (count - 1)),
+      pressures,
+      index,
+      count,
       minimumDiameterRatio,
     )
   )));
