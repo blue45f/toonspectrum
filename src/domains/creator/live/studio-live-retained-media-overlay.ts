@@ -451,6 +451,18 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     const context = this.prepared(target);
     if (!context) return false;
     try {
+      // 캡 포화 레짐: sampleStations 가 전체 호를 재배열해 어떤 prefix 도 살아남지 않고
+      // (FxOilDabPlanner 주석), 아래 `paintedDabs === dabs.length` 조기 반환이 길이가 캡에
+      // 고정된 그 결과를 매번 버린다 — 즉 이동당 전체 refit(측정 ~70ms)이 순수 낭비다.
+      // 활성 획이 이미 캡만큼 칠했으면 계획 자체를 걷는다. settled 재생·정착 경로
+      // (target !== activeContext)는 오늘처럼 항상 전체를 다시 계획한다.
+      if (
+        target === this.activeContext
+        && active.oilPlanner !== null
+        && active.paintedDabs >= FX_OIL_DAB_CAP
+      ) {
+        return true;
+      }
       const flatPoints = flatFinitePoints(element);
       if (flatPoints.length === 0) return true;
       const brush = element.brush ?? "oil";

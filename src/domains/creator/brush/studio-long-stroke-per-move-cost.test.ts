@@ -121,6 +121,7 @@ import {
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
 import {
   captureStudioOutlineStrokeContractV1,
+  createStudioIncrementalPerfectFreehandRenderPlanner,
   planStudioPerfectFreehandRender,
   type StudioOutlineStrokeContractV1,
 } from "../studio-outline-stroke-contract";
@@ -650,7 +651,39 @@ const LANE_PROBES: readonly LaneProbe[] = Object.freeze([
 
   // ── outline engines ─────────────────────────────────────────────────────────────────────────
   outlineProbe("perfect-outline", "pen--perfect-taper"),
-  outlineProbe("capsule-outline", "gpen--croquis-capsule"),
+  {
+    id: "capsule-outline",
+    brushId: "gpen--croquis-capsule",
+    path: "live-incremental",
+    entry: "StudioDrawNode draft -> incremental croquis capsule planner",
+    makeStroke: () => {
+      // `StudioDrawNode`'s active-draft outline branch keeps one element-id-keyed planner that
+      // retains the pulled-string follower, normalized stations, capsule rings and the pathData
+      // string across moves; only the raw-overridden last capsule point is rebuilt per move. The
+      // batch `planStudioPerfectFreehandRender` remains the commit/SVG chain, a cost no pointer
+      // move pays. (perfect-freehand engine lanes stay batch — global taper — hence the separate
+      // `perfect-outline` probe above.)
+      const contract: StudioOutlineStrokeContractV1 | null =
+        captureStudioOutlineStrokeContractV1({
+          brushId: "gpen--croquis-capsule",
+          pressureSource: "recorded",
+        });
+      if (!contract) throw new Error("gpen--croquis-capsule: no outline stroke contract");
+      const planner = createStudioIncrementalPerfectFreehandRenderPlanner();
+      return wholePrefixStepper((stroke) => {
+        const plan = planner.plan({
+          contract,
+          stroker: perfectStroker,
+          points: stroke.points,
+          pressures: stroke.pressures,
+          strokeWidth: 8,
+          sampleSpacing: 1,
+          legacyMinDistance: 1.2,
+        });
+        return plan.kind === "outline" ? plan.outline.length : 1;
+      });
+    },
+  },
 
   // ── oil ribbon: incremental dab bed + ribbon carrier ────────────────────────────────────────
   {

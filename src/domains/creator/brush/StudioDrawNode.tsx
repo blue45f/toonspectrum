@@ -72,7 +72,10 @@ import {
   resolveStudioLivingInkSettledBakeProgram,
 } from "../studio-living-ink-settled-bake-v1";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "../studio-material-pressure-model";
-import { planStudioPerfectFreehandRender } from "../studio-outline-stroke-contract";
+import {
+  planStudioPerfectFreehandRender,
+  planStudioPerfectFreehandRenderIncremental,
+} from "../studio-outline-stroke-contract";
 import {
   konvaPatternProps,
   loadPatternTileImage,
@@ -767,7 +770,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (outlineContractPresent) {
-            const outlinePlan = planStudioPerfectFreehandRender({
+            const outlinePlanInput = {
               contract: el.outlineStroke,
               stroker: perfectStroker,
               points,
@@ -778,7 +781,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               strokeWidth,
               sampleSpacing: el.sampleSpacing,
               legacyMinDistance: renderSampleDistance,
-            });
+            };
+            // 활성 초안은 요소 id 로 키된 증분 플래너가 크로키 캡슐 링·pathData 의 안정
+            // prefix 를 유지한다(장획 게이트 capsule-outline; 다른 엔진은 내부에서 배치 위임).
+            // 커밋 렌더는 배치 리플레이를 유지해 내부 점 재작성에도 항상 정본을 그린다.
+            const outlinePlan = activeDraft
+              ? planStudioPerfectFreehandRenderIncremental(el.id, outlinePlanInput)
+              : planStudioPerfectFreehandRender(outlinePlanInput);
             if (outlinePlan.kind === "outline") {
               return (
                 <Path

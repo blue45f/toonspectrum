@@ -402,23 +402,33 @@ export interface StudioCroquisCapsuleStrokeInput {
   readonly arcTolerancePx?: number;
 }
 
-/** croquis `stylusStateToCircle`: r = pressure × size × 0.5 (size = brush diameter). */
-export function studioCroquisCapsuleRadiiFromPressures(
-  pressures: readonly number[],
+/**
+ * croquis `stylusStateToCircle` for one sample: r = pressure × size × 0.5 (size = brush
+ * diameter). Shared by the batch array map below and the incremental outline planner so both
+ * produce the identical float per sample.
+ */
+export function studioCroquisCapsuleRadiusFromPressure(
+  pressure: unknown,
   strokeWidth: number,
-): number[] {
+): number {
   const diameter = clamp(
     Number.isFinite(strokeWidth) ? strokeWidth : 0,
     0,
     MAX_STROKE_DIAMETER,
   );
+  return typeof pressure === "number" && Number.isFinite(pressure)
+    ? clamp(pressure, 0, 1) * diameter * 0.5
+    : 0;
+}
+
+/** croquis `stylusStateToCircle`: r = pressure × size × 0.5 (size = brush diameter). */
+export function studioCroquisCapsuleRadiiFromPressures(
+  pressures: readonly number[],
+  strokeWidth: number,
+): number[] {
   const radii = new Array<number>(pressures.length);
   for (let index = 0; index < pressures.length; index += 1) {
-    const pressure = pressures[index];
-    radii[index] =
-      typeof pressure === "number" && Number.isFinite(pressure)
-        ? clamp(pressure, 0, 1) * diameter * 0.5
-        : 0;
+    radii[index] = studioCroquisCapsuleRadiusFromPressure(pressures[index], strokeWidth);
   }
   return radii;
 }
@@ -506,6 +516,45 @@ function round2(value: number): number {
 }
 
 /**
+ * Serializes ONE hull ring into its `M … L … Z` subpath, or `null` when the ring is invisible at
+ * serialization precision (fewer than 3 distinct 0.01px-grid vertices) or malformed. Extracted so
+ * the incremental outline planner appends the identical bytes per stable ring that the batch
+ * serializer below produces — single authority for the grid/dedupe/closing rules.
+ */
+export function studioCroquisCapsuleLoopToPathPart(
+  loop: readonly (readonly number[])[],
+): string | null {
+  if (loop.length < 3) return null;
+  const commands: string[] = [];
+  let previousX = Number.NaN;
+  let previousY = Number.NaN;
+  for (const vertex of loop) {
+    const rawX = vertex[0];
+    const rawY = vertex[1];
+    if (
+      vertex.length < 2
+      || typeof rawX !== "number" || !Number.isFinite(rawX)
+      || typeof rawY !== "number" || !Number.isFinite(rawY)
+    ) {
+      return null;
+    }
+    const x = round2(rawX);
+    const y = round2(rawY);
+    if (x === previousX && y === previousY) continue;
+    commands.push(commands.length === 0 ? `M${x} ${y}` : `L${x} ${y}`);
+    previousX = x;
+    previousY = y;
+  }
+  if (commands.length < 3) return null;
+  // Drop a closing vertex that landed back on the start of the ring.
+  const first = commands[0]!;
+  if (`M${previousX} ${previousY}` === first) commands.pop();
+  if (commands.length < 3) return null;
+  commands.push("Z");
+  return commands.join(" ");
+}
+
+/**
  * Serializes hull rings into one multi-subpath `d` string (`M … L … Z` per ring). Konva Path
  * and SVG `<path>` both fill with the nonzero rule by default, so the overlapping same-winding
  * rings render as their exact union on both surfaces. Consecutive vertices that collapse on the
@@ -517,36 +566,8 @@ export function studioCroquisCapsuleLoopsToPathData(
 ): string {
   const parts: string[] = [];
   for (const loop of loops) {
-    if (loop.length < 3) continue;
-    const commands: string[] = [];
-    let previousX = Number.NaN;
-    let previousY = Number.NaN;
-    let valid = true;
-    for (const vertex of loop) {
-      const rawX = vertex[0];
-      const rawY = vertex[1];
-      if (
-        vertex.length < 2
-        || typeof rawX !== "number" || !Number.isFinite(rawX)
-        || typeof rawY !== "number" || !Number.isFinite(rawY)
-      ) {
-        valid = false;
-        break;
-      }
-      const x = round2(rawX);
-      const y = round2(rawY);
-      if (x === previousX && y === previousY) continue;
-      commands.push(commands.length === 0 ? `M${x} ${y}` : `L${x} ${y}`);
-      previousX = x;
-      previousY = y;
-    }
-    if (!valid || commands.length < 3) continue;
-    // Drop a closing vertex that landed back on the start of the ring.
-    const first = commands[0]!;
-    if (`M${previousX} ${previousY}` === first) commands.pop();
-    if (commands.length < 3) continue;
-    commands.push("Z");
-    parts.push(commands.join(" "));
+    const part = studioCroquisCapsuleLoopToPathPart(loop);
+    if (part !== null) parts.push(part);
   }
   return parts.join(" ");
 }

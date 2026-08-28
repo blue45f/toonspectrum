@@ -14,11 +14,16 @@ import { resolveStudioBrushEngineLaneCroquisCapsuleProgramId } from "./brush/stu
 import { resolveStudioFreehandRenderPath } from "./studio-brush";
 import {
   STUDIO_CROQUIS_CAPSULE_PEN_ALGORITHM,
+  STUDIO_CROQUIS_PULLED_STRING_DEFAULT_LENGTH_PX,
   applyStudioCroquisPulledStringPrefilter,
   buildStudioCroquisCapsuleStrokeLoops,
   resolveStudioCroquisCapsulePenProgram,
+  solveStudioCroquisCapsule,
+  studioCroquisCapsuleLoop,
+  studioCroquisCapsuleLoopToPathPart,
   studioCroquisCapsuleLoopsToPathData,
   studioCroquisCapsuleRadiiFromPressures,
+  studioCroquisCapsuleRadiusFromPressure,
   type StudioCroquisCapsulePenProgramId,
 } from "./studio-croquis-capsule-pen-v1";
 import {
@@ -1051,4 +1056,494 @@ export function planStudioPerfectFreehandRender(
     pathData,
     metrics: metricsWithOutline,
   });
+}
+
+export interface StudioIncrementalPerfectFreehandRenderPlanner {
+  /**
+   * 배치 `planStudioPerfectFreehandRender`와 값이 정확히 같은 플랜을 돌려주되, 크로키 캡슐
+   * 엔진 획에서는 프리필터 팔로워·정규화 스테이션·캡슐 링·pathData 문자열의 안정 prefix 를
+   * 호출 사이에 유지해 이동당 기하 비용을 새 표본 수에만 비례시킨다. 이미 소비한 raw prefix 는
+   * 다시 읽지 않고(마지막 소비 점·필압 슬롯 하나로 O(1) 검증), 되돌리기·재작성·계약/폭 변경이
+   * 감지되면 전체를 다시 만든다. perfect-freehand 엔진 계약과 나란하지 않은 필압 입력은 배치
+   * 플래너로 위임한다(fail-closed). 반환 플랜의 `outline`은 내부 보관 배열이므로 수정하면 안
+   * 되고 다음 `plan()` 호출까지만 유효하다.
+   */
+  plan(input: StudioPerfectFreehandRenderPlanInput): StudioPerfectFreehandRenderPlan;
+}
+
+/** `normalizeStroke`의 반지름 클램프 상한(지름 클램프 8192 의 절반) — 크로키 모듈과 동율. */
+const CROQUIS_MAX_STROKE_RADIUS = 4_096;
+
+/**
+ * 증분 크로키 캡슐 렌더 플래너.
+ *
+ * 캡슐 체인은 모두 앞으로만 흐른다: pulled-string 팔로워는 인과 워크, 중복 병합은 마지막
+ * 정규화 항목만 소급 변형하고, 링은 인접 쌍의 국소 함수이며, pathData 는 링별 서브패스의
+ * 이어붙임이다. 단 하나의 소급점은 "마지막 캡슐 점"이다 — 배치 프리필터가 마지막 출력만 raw
+ * 포인터 위치로 덮으므로, 점 i 는 점 i+1 이 소비될 때에야 확정된다(랙 1). 그래서 확정 점만
+ * 안정 구조(소스 bbox·정규화 배열·링·outline·pathData)에 넣고, 마지막 점은 매 호출 raw 값으로
+ * 휘발 재구축한다. 각 단계가 배치와 같은 헬퍼를 같은 순서로 호출하므로 값이 완전히 일치한다.
+ */
+export function createStudioIncrementalPerfectFreehandRenderPlanner(): StudioIncrementalPerfectFreehandRenderPlanner {
+  let cachedContractValue: unknown = Symbol("unresolved");
+  let cachedResolution: StudioOutlineStrokeContractResolution | null = null;
+  let configRenderStrokeWidth = 0;
+
+  let consumedPoints = 0;
+  let lastRawX = 0;
+  let lastRawY = 0;
+  let lastRawPressure = 0;
+  let followerX = 0;
+  let followerY = 0;
+  /** 소비한 캡슐 좌표(프리필터 통과 후) — 희귀한 폴백 분기의 뷰 재구성용. */
+  const capsuleCoords: number[] = [];
+  let runningPressureSum = 0;
+  /** 확정(랙 1) 캡슐 점들의 소스 bbox. */
+  let sourceHasAny = false;
+  let sourceMinX = 0;
+  let sourceMaxX = 0;
+  let sourceMinY = 0;
+  let sourceMaxY = 0;
+
+  /** 정규화 스트림(중복 병합) — 마지막 항목은 병합 표적이라 스냅샷으로 복원한다. */
+  const normXs: number[] = [];
+  const normYs: number[] = [];
+  const normRs: number[] = [];
+  let stableNormCount = 0;
+  let lastNormSnapshot: { x: number; y: number; r: number } | null = null;
+  /** 다음에 안정 방출할 캡슐 쌍의 끝 정규화 인덱스. */
+  let stableLoopNextEnd = 1;
+
+  const outlinePoints: (readonly number[])[] = [];
+  let stableOutlineCount = 0;
+  let outlineHasAny = false;
+  let outlineMinX = 0;
+  let outlineMaxX = 0;
+  let outlineMinY = 0;
+  let outlineMaxY = 0;
+  let stablePathData = "";
+
+  const resetGeometry = (): void => {
+    consumedPoints = 0;
+    followerX = 0;
+    followerY = 0;
+    capsuleCoords.length = 0;
+    runningPressureSum = 0;
+    sourceHasAny = false;
+    normXs.length = 0;
+    normYs.length = 0;
+    normRs.length = 0;
+    stableNormCount = 0;
+    lastNormSnapshot = null;
+    stableLoopNextEnd = 1;
+    outlinePoints.length = 0;
+    stableOutlineCount = 0;
+    outlineHasAny = false;
+    stablePathData = "";
+  };
+
+  const foldSource = (x: number, y: number): void => {
+    if (!sourceHasAny) {
+      sourceHasAny = true;
+      sourceMinX = x;
+      sourceMaxX = x;
+      sourceMinY = y;
+      sourceMaxY = y;
+      return;
+    }
+    sourceMinX = Math.min(sourceMinX, x);
+    sourceMaxX = Math.max(sourceMaxX, x);
+    sourceMinY = Math.min(sourceMinY, y);
+    sourceMaxY = Math.max(sourceMaxY, y);
+  };
+
+  /** `normalizeStroke` 루프 본문 한 점 분 — 중복 위치는 최대 반지름으로 병합한다. */
+  const normalizeInto = (x: number, y: number, radius: number): void => {
+    const safeRadius = Math.min(
+      CROQUIS_MAX_STROKE_RADIUS,
+      Math.max(0, radius),
+    );
+    const lastIndex = normXs.length - 1;
+    if (lastIndex >= 0 && normXs[lastIndex] === x && normYs[lastIndex] === y) {
+      normRs[lastIndex] = Math.max(normRs[lastIndex]!, safeRadius);
+      return;
+    }
+    normXs.push(x);
+    normYs.push(y);
+    normRs.push(safeRadius);
+  };
+
+  return {
+    plan(input) {
+      // 계약은 포인터 다운에 스냅샷되어 획 내내 동일 참조로 재사용된다 — 동일성 캐시.
+      if (input.contract !== cachedContractValue) {
+        cachedContractValue = input.contract;
+        cachedResolution = resolveStudioOutlineStrokeContract(input.contract);
+        resetGeometry();
+      }
+      const contractResolution = cachedResolution!;
+      if (contractResolution.status === "legacy") {
+        return { kind: "legacy-contract", reason: "missing-contract" };
+      }
+      if (contractResolution.status === "unsupported") {
+        return { kind: "unsupported-contract", issue: contractResolution.issue };
+      }
+      const contract = contractResolution.contract;
+      if (contract.engine !== STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE) {
+        // perfect-freehand 엔진(글로벌 테이퍼)은 증분 대상이 아니다 — 배치로 위임.
+        return planStudioPerfectFreehandRender(input);
+      }
+      if (!Array.isArray(input.points) || input.points.length % 2 !== 0) {
+        return { kind: "invalid-input", reason: "invalid-points" };
+      }
+      if (
+        typeof input.strokeWidth !== "number"
+        || !Number.isFinite(input.strokeWidth)
+        || input.strokeWidth <= 0
+      ) {
+        return { kind: "invalid-input", reason: "invalid-stroke-width" };
+      }
+      const selectedDiameter = Math.min(8_192, Math.max(0.01, input.strokeWidth));
+      const renderStrokeWidth = Math.min(
+        8_192,
+        Math.max(0.01, selectedDiameter * contract.profile.diameterScale),
+      );
+      if (renderStrokeWidth !== configRenderStrokeWidth) {
+        resetGeometry();
+        configRenderStrokeWidth = renderStrokeWidth;
+      }
+      // 캡슐 계약의 필압 소스는 항상 recorded 다.
+      if (!Array.isArray(input.pressures) || input.pressures.length === 0) {
+        return { kind: "invalid-input", reason: "missing-recorded-pressure" };
+      }
+      const pressures = input.pressures;
+      const pointCount = input.points.length / 2;
+      if (pressures.length !== pointCount) {
+        // 전방 채움 정렬은 필압 배열 길이에 소급 의존한다 — 유지 불가, 배치로 위임한다.
+        resetGeometry();
+        return planStudioPerfectFreehandRender(input);
+      }
+
+      // O(1) 앵커 검증 + 수축 검사 — 실패 시 전체 재구축.
+      if (pointCount < consumedPoints) resetGeometry();
+      if (consumedPoints > 0) {
+        const lastIndex = consumedPoints - 1;
+        if (
+          input.points[lastIndex * 2] !== lastRawX
+          || input.points[lastIndex * 2 + 1] !== lastRawY
+          || pressures[lastIndex] !== lastRawPressure
+        ) {
+          resetGeometry();
+        }
+      }
+
+      // 새 suffix 검증 — 배치와 같은 순서(점 전체 → 필압 전체), 실패 시 소비하지 않는다.
+      for (let index = consumedPoints; index < pointCount; index += 1) {
+        const x = input.points[index * 2];
+        const y = input.points[index * 2 + 1];
+        if (
+          typeof x !== "number" || !Number.isFinite(x)
+          || typeof y !== "number" || !Number.isFinite(y)
+        ) {
+          return { kind: "invalid-input", reason: "invalid-points" };
+        }
+      }
+      for (let index = consumedPoints; index < pointCount; index += 1) {
+        const pressure = pressures[index];
+        if (
+          typeof pressure !== "number"
+          || !Number.isFinite(pressure)
+          || pressure < 0
+          || pressure > 1
+        ) {
+          return { kind: "invalid-input", reason: "invalid-recorded-pressure" };
+        }
+      }
+
+      // 휘발 오버레이 복원: 지난 호출의 꼬리(마지막 캡슐 점이 만든 정규화/링/outline)를 걷는다.
+      normXs.length = stableNormCount;
+      normYs.length = stableNormCount;
+      normRs.length = stableNormCount;
+      if (stableNormCount > 0 && lastNormSnapshot) {
+        normXs[stableNormCount - 1] = lastNormSnapshot.x;
+        normYs[stableNormCount - 1] = lastNormSnapshot.y;
+        normRs[stableNormCount - 1] = lastNormSnapshot.r;
+      }
+      outlinePoints.length = stableOutlineCount;
+
+      const pulledString = contract.profile.pulledStringLengthPx !== null;
+      // 배치 프리필터의 safeStringLength 그대로: 비유한 값은 기본 50, 1..512 클램프.
+      const rawStringLength = contract.profile.pulledStringLengthPx;
+      const stringLength = !pulledString
+        ? 0
+        : typeof rawStringLength === "number" && Number.isFinite(rawStringLength)
+          ? Math.min(512, Math.max(1, rawStringLength))
+          : STUDIO_CROQUIS_PULLED_STRING_DEFAULT_LENGTH_PX;
+      // 새 raw 표본 소비. 점 i 의 소비는 점 i-1 의 캡슐 좌표를 확정한다(랙 1) — 배치
+      // 프리필터가 마지막 출력만 raw 로 덮기 때문이다.
+      for (let index = consumedPoints; index < pointCount; index += 1) {
+        const rawX = input.points[index * 2]!;
+        const rawY = input.points[index * 2 + 1]!;
+        if (index === 0) {
+          followerX = rawX;
+          followerY = rawY;
+        } else if (pulledString) {
+          // croquis pulled-string 워크 본문(거리형 그대로 — 재생 비트 동일).
+          const deltaX = rawX - followerX;
+          const deltaY = rawY - followerY;
+          const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+          if (distance > stringLength) {
+            const t = Math.min((distance - stringLength) / stringLength, 1);
+            followerX += deltaX * t;
+            followerY += deltaY * t;
+          }
+        } else {
+          followerX = rawX;
+          followerY = rawY;
+        }
+        capsuleCoords.push(followerX, followerY);
+        runningPressureSum += pressures[index]!;
+        if (index >= 1) {
+          const finalX = capsuleCoords[(index - 1) * 2]!;
+          const finalY = capsuleCoords[(index - 1) * 2 + 1]!;
+          foldSource(finalX, finalY);
+          normalizeInto(
+            finalX,
+            finalY,
+            studioCroquisCapsuleRadiusFromPressure(
+              pressures[index - 1],
+              renderStrokeWidth,
+            ),
+          );
+        }
+        lastRawX = rawX;
+        lastRawY = rawY;
+        lastRawPressure = pressures[index]!;
+        consumedPoints = index + 1;
+      }
+
+      // 확정된 정규화 쌍만 안정 링으로 방출한다. 마지막 정규화 항목은 아직 병합 표적이므로
+      // 끝 인덱스는 length - 2 까지다.
+      const arcTolerancePx = contract.profile.arcTolerancePx;
+      const emitLoop = (endIndex: number): {
+        readonly points: readonly (readonly number[])[];
+        readonly part: string | null;
+      } | null => {
+        const solution = solveStudioCroquisCapsule(
+          { x: normXs[endIndex - 1]!, y: normYs[endIndex - 1]!, r: normRs[endIndex - 1]! },
+          { x: normXs[endIndex]!, y: normYs[endIndex]!, r: normRs[endIndex]! },
+        );
+        const loop = studioCroquisCapsuleLoop(solution, arcTolerancePx);
+        if (loop.length === 0) return null;
+        return { points: loop, part: studioCroquisCapsuleLoopToPathPart(loop) };
+      };
+      for (
+        let endIndex = stableLoopNextEnd;
+        endIndex <= normXs.length - 2;
+        endIndex += 1
+      ) {
+        const emitted = emitLoop(endIndex);
+        if (!emitted) continue;
+        for (const vertex of emitted.points) {
+          const frozen = Object.freeze([vertex[0]!, vertex[1]!]);
+          outlinePoints.push(frozen);
+          if (!outlineHasAny) {
+            outlineHasAny = true;
+            outlineMinX = vertex[0]!;
+            outlineMaxX = vertex[0]!;
+            outlineMinY = vertex[1]!;
+            outlineMaxY = vertex[1]!;
+          } else {
+            outlineMinX = Math.min(outlineMinX, vertex[0]!);
+            outlineMaxX = Math.max(outlineMaxX, vertex[0]!);
+            outlineMinY = Math.min(outlineMinY, vertex[1]!);
+            outlineMaxY = Math.max(outlineMaxY, vertex[1]!);
+          }
+        }
+        if (emitted.part !== null) {
+          stablePathData = stablePathData === ""
+            ? emitted.part
+            : `${stablePathData} ${emitted.part}`;
+        }
+      }
+      stableLoopNextEnd = Math.max(stableLoopNextEnd, normXs.length - 1);
+      stableNormCount = normXs.length;
+      const lastStable = stableNormCount - 1;
+      lastNormSnapshot = lastStable >= 0
+        ? { x: normXs[lastStable]!, y: normYs[lastStable]!, r: normRs[lastStable]! }
+        : null;
+      stableOutlineCount = outlinePoints.length;
+
+      // 휘발 꼬리 재구축: 마지막 캡슐 점(= raw 마지막 포인터 위치)과 그것이 만드는 정규화
+      // 병합·링·outline·pathData·bbox 를 이번 호출 값으로 다시 만든다.
+      let viewMinX = sourceMinX;
+      let viewMaxX = sourceMaxX;
+      let viewMinY = sourceMinY;
+      let viewMaxY = sourceMaxY;
+      let viewHasAny = sourceHasAny;
+      let viewOutlineMinX = outlineMinX;
+      let viewOutlineMaxX = outlineMaxX;
+      let viewOutlineMinY = outlineMinY;
+      let viewOutlineMaxY = outlineMaxY;
+      let viewOutlineHasAny = outlineHasAny;
+      let pathData = stablePathData;
+      const appendPart = (part: string | null): void => {
+        if (part === null) return;
+        pathData = pathData === "" ? part : `${pathData} ${part}`;
+      };
+      const foldOutlineView = (points: readonly (readonly number[])[]): void => {
+        for (const vertex of points) {
+          if (!viewOutlineHasAny) {
+            viewOutlineHasAny = true;
+            viewOutlineMinX = vertex[0]!;
+            viewOutlineMaxX = vertex[0]!;
+            viewOutlineMinY = vertex[1]!;
+            viewOutlineMaxY = vertex[1]!;
+            continue;
+          }
+          viewOutlineMinX = Math.min(viewOutlineMinX, vertex[0]!);
+          viewOutlineMaxX = Math.max(viewOutlineMaxX, vertex[0]!);
+          viewOutlineMinY = Math.min(viewOutlineMinY, vertex[1]!);
+          viewOutlineMaxY = Math.max(viewOutlineMaxY, vertex[1]!);
+        }
+      };
+
+      if (pointCount > 0) {
+        if (!viewHasAny) {
+          viewHasAny = true;
+          viewMinX = lastRawX;
+          viewMaxX = lastRawX;
+          viewMinY = lastRawY;
+          viewMaxY = lastRawY;
+        } else {
+          viewMinX = Math.min(viewMinX, lastRawX);
+          viewMaxX = Math.max(viewMaxX, lastRawX);
+          viewMinY = Math.min(viewMinY, lastRawY);
+          viewMaxY = Math.max(viewMaxY, lastRawY);
+        }
+        normalizeInto(
+          lastRawX,
+          lastRawY,
+          studioCroquisCapsuleRadiusFromPressure(
+            pressures[pointCount - 1],
+            renderStrokeWidth,
+          ),
+        );
+        if (normXs.length === 1) {
+          // 배치의 단일 점 특례: croquis 포인터 다운 점 원. 항상 휘발이라 두 번째 점이
+          // 생기는 순간 자연히 사라진다.
+          const radius = normRs[0]!;
+          if (radius > 0) {
+            const dot = studioCroquisCapsuleLoop(
+              { kind: "circle", circle: { x: normXs[0]!, y: normYs[0]!, r: radius } },
+              arcTolerancePx,
+            );
+            if (dot.length > 0) {
+              for (const vertex of dot) {
+                outlinePoints.push(Object.freeze([vertex[0]!, vertex[1]!]));
+              }
+              foldOutlineView(dot);
+              appendPart(studioCroquisCapsuleLoopToPathPart(dot));
+            }
+          }
+        } else {
+          for (
+            let endIndex = Math.max(1, stableNormCount - 1);
+            endIndex <= normXs.length - 1;
+            endIndex += 1
+          ) {
+            const emitted = emitLoop(endIndex);
+            if (!emitted) continue;
+            for (const vertex of emitted.points) {
+              outlinePoints.push(Object.freeze([vertex[0]!, vertex[1]!]));
+            }
+            foldOutlineView(emitted.points);
+            appendPart(emitted.part);
+          }
+        }
+      }
+
+      const sourceStrokeDistance = viewHasAny
+        ? Math.hypot(viewMaxX - viewMinX, viewMaxY - viewMinY)
+        : 0;
+      const metrics: StudioPerfectFreehandRenderPlanMetrics = pointCount === 0
+        ? { pointCount: 0, strokeDistance: 0, sparseSpacing: 0 }
+        : {
+            pointCount,
+            strokeDistance: sourceStrokeDistance,
+            sparseSpacing: sourceStrokeDistance / Math.max(1, pointCount - 1),
+          };
+      if (!pathData) {
+        // 배치의 fail-closed 분기: 유효 기하가 전혀 없다(예: 전 구간 0 필압). 캡슐 뷰 배열을
+        // 재구성해 같은 라운드 라인 폴백을 만든다 — 드문 경로라 O(n) 복사를 허용한다.
+        const viewPoints = capsuleCoords.slice();
+        if (viewPoints.length >= 2) {
+          viewPoints[viewPoints.length - 2] = lastRawX;
+          viewPoints[viewPoints.length - 1] = lastRawY;
+        }
+        const representativePressure = pointCount > 0
+          ? runningPressureSum / pointCount
+          : 0.5;
+        return fallbackLinePlan(
+          contract,
+          input,
+          viewPoints,
+          metrics,
+          "invalid-outline",
+          true,
+          Math.max(0.01, renderStrokeWidth * representativePressure),
+        );
+      }
+      return {
+        kind: "outline",
+        contract,
+        outline: outlinePoints,
+        pathData,
+        metrics: {
+          ...metrics,
+          outlinePointCount: outlinePoints.length,
+          outlineDistance: viewOutlineHasAny
+            ? Math.hypot(
+                viewOutlineMaxX - viewOutlineMinX,
+                viewOutlineMaxY - viewOutlineMinY,
+              )
+            : 0,
+        },
+      };
+    },
+  };
+}
+
+const INCREMENTAL_OUTLINE_PLANNER_CACHE = new Map<
+  string,
+  StudioIncrementalPerfectFreehandRenderPlanner
+>();
+/** 활성 초안은 하나지만 draft/commit 리렌더가 겹치는 짧은 창을 위해 소수의 최근 획을 유지한다. */
+const INCREMENTAL_OUTLINE_PLANNER_LIMIT = 8;
+
+/**
+ * 획 키(요소 id)로 보관된 증분 아웃라인 플랜. `StudioDrawNode` 활성 초안의
+ * `planStudioPerfectFreehandRender` 자리 교체용 — 크로키 캡슐 엔진은 증분으로, 그 외 엔진은
+ * 내부에서 배치로 위임한다. 반환 플랜의 `outline`은 내부 보관 배열이므로 수정하면 안 된다.
+ */
+export function planStudioPerfectFreehandRenderIncremental(
+  strokeKey: string,
+  input: StudioPerfectFreehandRenderPlanInput,
+): StudioPerfectFreehandRenderPlan {
+  let planner = INCREMENTAL_OUTLINE_PLANNER_CACHE.get(strokeKey);
+  if (planner) {
+    // LRU 갱신: 재삽입으로 삽입 순서를 최근 사용 순서로 유지한다.
+    INCREMENTAL_OUTLINE_PLANNER_CACHE.delete(strokeKey);
+  } else {
+    planner = createStudioIncrementalPerfectFreehandRenderPlanner();
+  }
+  INCREMENTAL_OUTLINE_PLANNER_CACHE.set(strokeKey, planner);
+  while (
+    INCREMENTAL_OUTLINE_PLANNER_CACHE.size > INCREMENTAL_OUTLINE_PLANNER_LIMIT
+  ) {
+    const oldest = INCREMENTAL_OUTLINE_PLANNER_CACHE.keys().next().value;
+    if (oldest === undefined) break;
+    INCREMENTAL_OUTLINE_PLANNER_CACHE.delete(oldest);
+  }
+  return planner.plan(input);
 }
