@@ -74,19 +74,24 @@ export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES = 2_000;
  * proxy for an allocating planner.
  *
  * `process.cpuUsage()` removes the scheduler directly instead, because time the process is not
- * running is time it does not accrue. Recorded min-of-5 user CPU over the same window
- * `elapsedMs` covers -- the product plan and coverage path, excluding fixture setup and the
- * receipt digest -- idle then loaded:
+ * running is time it does not accrue. USER PLUS SYSTEM, not user alone: a regression that
+ * allocates and zero-fills larger typed arrays, or pages more, spends that cost in the kernel,
+ * and a budget watching only user time would acquit a freeze the user would still feel.
+ * Including system also measured *tighter* rather than noisier -- the crayon row's spread went
+ * from 1.26x on user alone to 1.12x on the total.
+ *
+ * Recorded min-of-5 over the same window `elapsedMs` covers -- the product plan and coverage
+ * path, excluding fixture setup and the receipt digest -- idle then loaded:
  *
  *                 idle           loaded              spread   wall spread
- *   crayon        103-115ms      116-130ms           1.26x      2.35x
- *   oil-pastel     74-80ms        73-74ms            1.10x      2.41x
- *   charcoal       66ms           67-69ms            1.05x      2.46x
- *   chalk          48-66ms        65-68ms            1.42x      2.29x
- *   pastel         57-61ms        56-64ms            1.14x      2.13x
+ *   crayon        117-124ms      123-130ms           1.12x      2.35x
+ *   oil-pastel     72-73ms        78-79ms            1.09x      2.41x
+ *   charcoal       67ms           67-71ms            1.06x      2.46x
+ *   chalk          65-66ms        66-70ms            1.08x      2.29x
+ *   pastel         58-59ms        54-55ms            1.09x      2.13x
  *
- * 175ms carries 1.35x headroom over the worst honest reading here, while a doubled crayon plan --
- * 206ms even from its cheapest honest pass -- is convicted with 18% margin on every machine,
+ * 175ms carries 1.34x headroom over the worst honest reading here, while a doubled crayon plan --
+ * 234ms even from its cheapest honest pass -- is convicted with 33% margin on every machine,
  * where the wall form convicted it only when the box was idle. The lighter four rows share this
  * budget and have slack in it, exactly as they did under the wall form; what covers them is the
  * exact dab and mark pins in the colocated test, which convict a work regression for all five.
@@ -322,7 +327,8 @@ function evaluateCausalCoverage(
     markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   });
   const elapsedMs = performance.now() - startedAt;
-  const cpuMs = process.cpuUsage(cpuBefore).user / 1_000;
+  const cpuAfter = process.cpuUsage(cpuBefore);
+  const cpuMs = (cpuAfter.user + cpuAfter.system) / 1_000;
   if (!coverage.ok) {
     return {
       catalogId,

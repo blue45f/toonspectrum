@@ -124,9 +124,7 @@ describe("deterministic settled-bake memo cache", () => {
     // bytes, passthrough cores re-anchored to the CALLER's own objects, and a
     // repeat cost that is a cache hit rather than a solve.
     const replanned = makePlan(500);
-    const startedAt = performance.now();
     const second = augmentStudioLivingInkSettledBakeDabs(replanned, SETTLED_SUMI);
-    const repeatMs = performance.now() - startedAt;
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
     const secondCores = second.filter((dab) => dab.role === "core");
     const replannedCores = replanned.filter((dab) => dab.role === "core");
@@ -134,17 +132,37 @@ describe("deterministic settled-bake memo cache", () => {
     for (let index = 0; index < secondCores.length; index += 1) {
       expect(secondCores[index]).toBe(replannedCores[index]);
     }
-    // Graded against the COLD SOLVE in the line above, not against a millisecond count.
+    // Cost, graded against the COLD SOLVE timed at the top of this test rather than against a
+    // millisecond count.
     //
     // The claim is "this did not re-solve", and the two costs differ by three orders of
     // magnitude — 0.41-0.73ms against a solve of 171ms idle and 262-432ms under six spinning
     // hogs on four cores, a ratio of 0.0011-0.0040. An absolute 16.5ms bound stated that claim
-    // 23-40x looser than the truth and still failed under load, because a single preemption
-    // landing inside a 0.7ms window is worth more than the whole budget. The ratio cancels the
-    // machine: both halves are the same work on the same box, seconds apart.
+    // 23-40x looser than the truth and still failed under load at 17.4 and 20.7ms, because a
+    // single preemption landing inside a 0.7ms window is worth more than the whole budget.
+    //
+    // The numerator is the MINIMUM of several hits, and that is not decoration. Dividing one
+    // sub-millisecond reading by one 171ms reading does not cancel a machine: the two windows are
+    // seconds apart and wildly different lengths, so a 10ms pause landing on the hit alone — well
+    // inside what this window has been seen to absorb — would put the ratio at 0.063 and convict
+    // healthy code. Noise is additive, so the cheapest of 21 identical cache lookups is the
+    // honest one; at ~0.7ms each they cost ~15ms in total. The denominator stays a single
+    // reading because a cold solve happens once by definition, and because noise there only ever
+    // makes this gate LOOSER, which is the safe direction.
     //
     // 0.05 keeps 12x headroom over the worst honest reading, while the regression this exists to
     // catch — the cache missing and a full solve running again — scores ~1 and fails by 20x.
+    const CACHE_HIT_SAMPLES = 21;
+    let repeatMs = Number.POSITIVE_INFINITY;
+    for (let sample = 0; sample < CACHE_HIT_SAMPLES; sample += 1) {
+      const probe = makePlan(500);
+      const startedAt = performance.now();
+      const hit = augmentStudioLivingInkSettledBakeDabs(probe, SETTLED_SUMI);
+      repeatMs = Math.min(repeatMs, performance.now() - startedAt);
+      // Not `toBe(second)`: each caller gets its OWN core objects re-anchored into the cached
+      // plan, which is the passthrough contract asserted just above. Same shape, new wrapper.
+      expect(hit.length).toBe(second.length);
+    }
     expect(
       repeatMs / coldSolveMs,
       `memo repeat cost ${repeatMs.toFixed(3)}ms against a ${coldSolveMs.toFixed(1)}ms cold solve`,
@@ -180,6 +198,46 @@ describe("time-sliced settled bake at the planner cap", () => {
     resetStudioLivingInkSettledBakeCacheForTests();
 
     // 2. Cold render-path request: must NOT solve synchronously.
+    //
+    // Timed as a MINIMUM over several cold requests, in its own scheduler capture so the slices
+    // they enqueue are discarded rather than joining the measured run below. One reading of a
+    // ~1.3ms window divided by one reading of a ~171ms solve does not cancel a machine — the two
+    // are seconds apart and two orders of magnitude apart in length, so a pause landing on the
+    // request alone convicts healthy code. Each probe resets the cache first, so every one of
+    // them exercises the same COLD enqueue path rather than the cheaper join.
+    const REQUEST_SAMPLES = 7;
+    let requestMs = Number.POSITIVE_INFINITY;
+    const probeScheduler = captureScheduledSlices();
+    try {
+      for (let sample = 0; sample < REQUEST_SAMPLES; sample += 1) {
+        resetStudioLivingInkSettledBakeCacheForTests();
+        const probeInput = makePlan(PLANNER_DAB_CAP / 2);
+        const startedAt = performance.now();
+        const probeImmediate = requestStudioLivingInkSettledBakeDabs(
+          probeInput,
+          SETTLED_SUMI,
+          () => {},
+        );
+        requestMs = Math.min(requestMs, performance.now() - startedAt);
+        expect(probeImmediate).toBeNull();
+      }
+      // The scheduler arms itself once and refuses to re-arm while a drain is outstanding, and
+      // that latch is module state the cache reset does NOT clear. Leaving it set makes the
+      // measured request below enqueue without ever scheduling a slice — which is exactly what
+      // happened when this loop was first added: the run never progressed and the settled plan
+      // came back null.
+      //
+      // Order matters. Drop the pending jobs first, THEN run the one queued handler: it clears
+      // the latch on entry, finds nothing to work on, and so does not re-arm on the way out.
+      // Draining before the reset instead leaves a half-solved job pending and the latch set
+      // again, which is the same failure by a longer route.
+      resetStudioLivingInkSettledBakeCacheForTests();
+      probeScheduler.runNextSlice();
+    } finally {
+      probeScheduler.restore();
+    }
+    resetStudioLivingInkSettledBakeCacheForTests();
+
     const scheduler = captureScheduledSlices();
     try {
       const input = makePlan(PLANNER_DAB_CAP / 2);
@@ -187,13 +245,11 @@ describe("time-sliced settled bake at the planner cap", () => {
       const onReady = () => {
         readyCount += 1;
       };
-      const requestStartedAt = performance.now();
       const immediate = requestStudioLivingInkSettledBakeDabs(
         input,
         SETTLED_SUMI,
         onReady,
       );
-      const requestMs = performance.now() - requestStartedAt;
       expect(immediate).toBeNull();
       // The render-body call only snapshots + enqueues, and that is graded against the
       // SYNCHRONOUS SOLVE of the same input timed above rather than against a millisecond count.

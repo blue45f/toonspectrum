@@ -1808,11 +1808,25 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // append of 1.06-1.16ms. FIXED, never derived from a live reading -- sizing the denominator
     // from the numerator's own measurement makes every ratio 1.0 by construction.
     const APPEND_CALIBRATION_ROUNDS = 80;
-    // Recorded min(append)/min(reference) on the reference container: 1.113 / 1.114 / 1.126 /
-    // 1.160 / 1.190 / 1.230 / 1.240 idle, and 1.196 / 1.210 / 1.230 under six spinning hogs
-    // against four cores -- a 10% spread across a 3x contention swing. 1.5 carries ~21% headroom
-    // over the worst honest reading, while a doubled append (>=2.23) is convicted with 32% margin.
-    const APPEND_CALIBRATION_MAX_RATIO = 1.5;
+    // Recorded min(append)/min(reference), which is a two-machine number because one machine's
+    // population is not the baseline:
+    //
+    //   4-vCPU container   1.113 - 1.240 idle, 1.196 - 1.230 under six hogs on four cores
+    //   GitHub Actions     1.512 - 1.559
+    //
+    // The runner's REFERENCE matches the container's almost exactly (1.1ms against 0.95ms) while
+    // its append costs 60% more, so the two do not co-scale: a synthetic kernel cancels machine
+    // speed but not instruction mix, and an allocating append is not a cache-resident float loop.
+    // A gate of 1.5 set from the container's population alone failed CI at 1.512 -- 1% over, with
+    // nothing regressed, on the one test out of 32,199 that this change touches.
+    //
+    // The honest population therefore spans 1.113-1.559, a 1.40x cross-machine spread, and any
+    // gate has to sit above 1.559 and below 2 x 1.113 = 2.226 to keep convicting a doubling on
+    // the machine most favourable to one. 1.85 sits in that window with 19% headroom over the
+    // worst honest reading and 20% margin under the cheapest doubling. If a third machine ever
+    // narrows that window to nothing, the detection assertion below is what says so -- loudly,
+    // rather than by quietly passing.
+    const APPEND_CALIBRATION_MAX_RATIO = 1.85;
     const calibrationPasses: StudioPerfCalibrationPass[] = [];
     const halfGrowths: number[] = [];
     let maxAppendFrameMs = Number.POSITIVE_INFINITY;

@@ -155,8 +155,8 @@ describe("soak monotonic-degradation detector", () => {
 describe("studioBrushCrayonFamilyCpuFreezes", () => {
   // Every series below is a recorded min-of-5 CPU reading from the reference container, idle and
   // then against six spinning hogs on four cores.
-  const HONEST_CRAYON = [115.2, 103.2, 120.5, 129.7, 115.8] as const;
-  const HONEST_LIGHTEST = [61.1, 56.9, 59.9, 63.7, 56.0] as const;
+  const HONEST_CRAYON = [123.8, 116.8, 130.4, 123.3] as const;
+  const HONEST_LIGHTEST = [58.7, 57.6, 55.3, 54.0] as const;
 
   it("acquits every honest reading, on an idle machine and a heavily contended one", () => {
     expect(studioBrushCrayonFamilyCpuFreezes([...HONEST_CRAYON])).toBe(false);
@@ -167,7 +167,7 @@ describe("studioBrushCrayonFamilyCpuFreezes", () => {
 
   it("convicts a doubled crayon plan on both of those machines", () => {
     // The gate must not have been loosened into a no-op. A 2x regression puts the heaviest row at
-    // 206-259ms against a 175ms budget -- caught at its CHEAPEST pass, so no lucky pass rescues
+    // 234-261ms against a 175ms budget -- caught at its CHEAPEST pass, so no lucky pass rescues
     // it. The wall-clock form this replaces convicted the same doubling only when the box was
     // idle: 2 x 84ms wall cleared a 200ms number.
     expect(studioBrushCrayonFamilyCpuFreezes(HONEST_CRAYON.map((ms) => ms * 2))).toBe(true);
@@ -176,7 +176,7 @@ describe("studioBrushCrayonFamilyCpuFreezes", () => {
     // ...and it is not only a doubling: the smallest regression it still convicts.
     expect(
       STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS / Math.min(...HONEST_CRAYON),
-    ).toBeLessThan(1.75);
+    ).toBeLessThan(1.6);
   });
 
   it("requires the CHEAPEST pass to be over budget, so one preempted pass cannot convict", () => {
