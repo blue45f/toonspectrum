@@ -35,6 +35,17 @@ export interface StudioLiveTransformRenderRoute {
   readonly pointCount: number;
   /** True when the renderer draws an arrowhead for this stroke (`kind` line/arrow with a head). */
   readonly drawsArrowHead?: boolean;
+  /**
+   * True when the stroke renders through the perfect-freehand family.
+   *
+   * The distance cutoffs, the sparse-spacing predicate, the compact-dot floors and the 400px
+   * outline cap ALL live inside that branch in `StudioDrawNode` — gated there on
+   * `isPerfectAliasBrush`, `brushFamily === "perfect"` and `perfectProfile.id`. Applying them to
+   * every allowlisted stroke rejected previews that had nothing to cross: a causal-ink pen stroke
+   * spanning 10px lost its live preview at 2x for a 16px cutoff its renderer never consults.
+   * Only the 1px diameter floor is universal (`StudioDrawNode` floors every draw element).
+   */
+  readonly isPerfectFamily?: boolean;
   /** True for the `perfect-ink` profile, whose compact-dot floor is 3px rather than 1.4px. */
   readonly isPerfectInk?: boolean;
   /**
@@ -124,10 +135,14 @@ export function studioLiveTransformRouteSurvivesScale(
   const committedDiameter = Math.max(STUDIO_RENDER_ROUTE_MIN_DIAMETER, strokeWidth * scale);
   if (Math.abs(previewDiameter - committedDiameter) > 1e-9) return false;
 
+  const perfectFamily = route.isPerfectFamily === true;
+
   // The perfect-freehand outline cap, which the preview scales straight past.
+  if (perfectFamily) {
   const previewOutline = Math.min(STUDIO_RENDER_ROUTE_MAX_OUTLINE_WIDTH, strokeWidth) * scale;
   const committedOutline = Math.min(STUDIO_RENDER_ROUTE_MAX_OUTLINE_WIDTH, strokeWidth * scale);
   if (Math.abs(previewOutline - committedOutline) > 1e-9) return false;
+  }
 
   // The arrowhead floor, for strokes that draw one.
   if (route.drawsArrowHead === true) {
@@ -140,7 +155,8 @@ export function studioLiveTransformRouteSurvivesScale(
   // scale and still be non-affine: the preview scales the dot already drawn while the commit
   // regenerates it against the same absolute floor.
   if (
-    pointCount <= STUDIO_RENDER_ROUTE_COMPACT_MAX_POINTS
+    perfectFamily
+    && pointCount <= STUDIO_RENDER_ROUTE_COMPACT_MAX_POINTS
     && strokeDistance < STUDIO_RENDER_ROUTE_DISTANCE_THRESHOLDS[0]
   ) {
     const floor = route.isPerfectInk === true
@@ -164,10 +180,12 @@ export function studioLiveTransformRouteSurvivesScale(
   const highDistance = rotated
     ? strokeDistance * STUDIO_RENDER_ROUTE_ROTATION_SPAN * scale
     : strokeDistance * scale;
-  for (const threshold of STUDIO_RENDER_ROUTE_DISTANCE_THRESHOLDS) {
-    // Both the source reading and every reachable post-transform reading must agree.
-    if ((strokeDistance < threshold) !== (lowDistance < threshold)) return false;
-    if ((strokeDistance < threshold) !== (highDistance < threshold)) return false;
+  if (perfectFamily) {
+    for (const threshold of STUDIO_RENDER_ROUTE_DISTANCE_THRESHOLDS) {
+      // Both the source reading and every reachable post-transform reading must agree.
+      if ((strokeDistance < threshold) !== (lowDistance < threshold)) return false;
+      if ((strokeDistance < threshold) !== (highDistance < threshold)) return false;
+    }
   }
   // The sparse-long branch compares a scaled spacing against a floor that is NOT linear in scale
   // (`Math.max(20, w * 4)`), so it can flip even when both distance thresholds hold.
@@ -175,11 +193,13 @@ export function studioLiveTransformRouteSurvivesScale(
   // ROTATED points' AABB distance, so a turn can flip the predicate without crossing either
   // distance cutoff -- an 11-point diamond at 300px and width 7 is sparse upright (30 >= 28) and
   // not sparse at 45 degrees (21.2 < 28).
-  const divisor = Math.max(1, pointCount - 1);
-  const sparseBefore = strokeDistance / divisor >= sparseSpacingFloor(strokeWidth);
-  const floorAfter = sparseSpacingFloor(strokeWidth * scale);
-  if ((lowDistance / divisor >= floorAfter) !== sparseBefore) return false;
-  if ((highDistance / divisor >= floorAfter) !== sparseBefore) return false;
+  if (perfectFamily) {
+    const divisor = Math.max(1, pointCount - 1);
+    const sparseBefore = strokeDistance / divisor >= sparseSpacingFloor(strokeWidth);
+    const floorAfter = sparseSpacingFloor(strokeWidth * scale);
+    if ((lowDistance / divisor >= floorAfter) !== sparseBefore) return false;
+    if ((highDistance / divisor >= floorAfter) !== sparseBefore) return false;
+  }
 
   return true;
 }

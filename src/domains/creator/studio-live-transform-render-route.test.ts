@@ -6,7 +6,12 @@ import {
 } from "./studio-live-transform-render-route";
 
 /** A stroke comfortably inside every route: thick enough, long enough, densely sampled. */
-const SAFE = { strokeWidth: 8, strokeDistance: 100, pointCount: 40 } as const;
+const SAFE = {
+  strokeWidth: 8,
+  strokeDistance: 100,
+  pointCount: 40,
+  isPerfectFamily: true,
+} as const;
 
 describe("studioLiveTransformRouteSurvivesScale", () => {
   it("allows a stroke that stays well inside every route", () => {
@@ -33,21 +38,21 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
     // A 10px flick scaled 2x previews the enlarged compact fallback and commits a tapered outline.
     expect(
       studioLiveTransformRouteSurvivesScale(
-        { strokeWidth: 8, strokeDistance: 10, pointCount: 3 },
+        { strokeWidth: 8, strokeDistance: 10, pointCount: 3, isPerfectFamily: true },
         2,
       ),
     ).toBe(false);
     // And the reverse: a 20px stroke shrunk under the cutoff.
     expect(
       studioLiveTransformRouteSurvivesScale(
-        { strokeWidth: 8, strokeDistance: 20, pointCount: 3 },
+        { strokeWidth: 8, strokeDistance: 20, pointCount: 3, isPerfectFamily: true },
         0.5,
       ),
     ).toBe(false);
     // Comfortably short on both sides stays previewable.
     expect(
       studioLiveTransformRouteSurvivesScale(
-        { strokeWidth: 8, strokeDistance: 4, pointCount: 3 },
+        { strokeWidth: 8, strokeDistance: 4, pointCount: 3, isPerfectFamily: true },
         2,
       ),
     ).toBe(true);
@@ -63,7 +68,12 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
     // even when both distance cutoffs hold. Spacing 24px against a floor of 20 (width 2) is
     // sparse; at 4x the spacing is 96 and the floor becomes max(20, 32) = 32, still sparse -- but
     // shrinking makes the floor stick at 20 while the spacing falls below it.
-    const stroke = { strokeWidth: 2, strokeDistance: 240, pointCount: 11 } as const;
+    const stroke = {
+      strokeWidth: 2,
+      strokeDistance: 240,
+      pointCount: 11,
+      isPerfectFamily: true,
+    } as const;
     expect(studioLiveTransformRouteSurvivesScale(stroke, 0.5)).toBe(false);
   });
 
@@ -86,6 +96,7 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
       strokeDistance: 40,
       pointCount: 40,
       drawsArrowHead: true,
+      isPerfectFamily: true,
     } as const;
     expect(studioLiveTransformRouteSurvivesScale(arrow, 2)).toBe(false);
     // Above the floor on both sides, the head scales exactly.
@@ -102,7 +113,12 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
     // strokeDistance is an AABB DIAGONAL, not a rotation invariant: a 10x10 square spans 14.1px
     // upright and 20px at 45 degrees, crossing the 16px compact-dot cutoff on rotation alone.
     // The check grades the whole interval rotation can reach, so this stands down.
-    const square = { strokeWidth: 8, strokeDistance: 14.1, pointCount: 4 } as const;
+    const square = {
+      strokeWidth: 8,
+      strokeDistance: 14.1,
+      pointCount: 4,
+      isPerfectFamily: true,
+    } as const;
     expect(studioLiveTransformRouteSurvivesScale({ ...square, rotationDeg: 45 }, 1)).toBe(false);
     // Upright, the same stroke is comfortably inside its route.
     expect(studioLiveTransformRouteSurvivesScale(square, 1)).toBe(true);
@@ -111,7 +127,13 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
     // Far from every cutoff, a rotation is still previewable.
     expect(
       studioLiveTransformRouteSurvivesScale(
-        { strokeWidth: 8, strokeDistance: 60, pointCount: 40, rotationDeg: 45 },
+        {
+          strokeWidth: 8,
+          strokeDistance: 60,
+          pointCount: 40,
+          rotationDeg: 45,
+          isPerfectFamily: true,
+        },
         1,
       ),
     ).toBe(true);
@@ -126,6 +148,7 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
       strokeDistance: 5,
       pointCount: 4,
       isPerfectInk: true,
+      isPerfectFamily: true,
     } as const;
     expect(studioLiveTransformRouteSurvivesScale(dot, 2)).toBe(false);
     // Above the floor on both sides, the dot scales exactly: radius 6 previews at 7.2 and the
@@ -139,10 +162,33 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
     // The renderer derives this spacing from the ROTATED points' AABB distance, so a turn can
     // flip the predicate without crossing either distance cutoff: an 11-point diamond at 300px
     // and width 7 is sparse upright (30 >= 28) and not sparse at 45 degrees (21.2 < 28).
-    const diamond = { strokeWidth: 7, strokeDistance: 300, pointCount: 11 } as const;
+    const diamond = {
+      strokeWidth: 7,
+      strokeDistance: 300,
+      pointCount: 11,
+      isPerfectFamily: true,
+    } as const;
     expect(studioLiveTransformRouteSurvivesScale({ ...diamond, rotationDeg: 45 }, 1)).toBe(false);
     // Upright it stays previewable.
     expect(studioLiveTransformRouteSurvivesScale(diamond, 1)).toBe(true);
+  });
+
+  it("applies the perfect-only route branches ONLY to the perfect family", () => {
+    // The distance cutoffs, sparse predicate, dot floors and 400px outline cap all live inside
+    // StudioDrawNode's perfect-freehand branch. Applying them to every allowlisted stroke rejected
+    // previews over thresholds those renderers never consult: a causal-ink pen stroke spanning
+    // 10px lost its live preview at 2x for a 16px cutoff that does not apply to it.
+    const causalInk = { strokeWidth: 8, strokeDistance: 10, pointCount: 3 } as const;
+    expect(studioLiveTransformRouteSurvivesScale(causalInk, 2)).toBe(true);
+    // The identical stroke on the perfect family does cross, and is still refused.
+    expect(
+      studioLiveTransformRouteSurvivesScale({ ...causalInk, isPerfectFamily: true }, 2),
+    ).toBe(false);
+    // The 1px diameter floor is universal -- StudioDrawNode floors EVERY draw element -- so it
+    // still applies with no perfect flag.
+    expect(
+      studioLiveTransformRouteSurvivesScale({ ...causalInk, strokeWidth: 1 }, 0.5),
+    ).toBe(false);
   });
 
   it("refuses anything it cannot read, because an unreadable route is not a licence", () => {

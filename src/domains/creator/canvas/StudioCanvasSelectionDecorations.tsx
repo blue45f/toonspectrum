@@ -1,6 +1,7 @@
 import { Fragment, Suspense, type ReactNode, type RefObject } from "react";
 import { Group, Rect, Text, Transformer } from "react-konva/lib/ReactKonvaCore";
 
+import { resolveStudioBrushRuntimeContract } from "../brush/studio-brush-runtime-contract";
 import { studioLineDrawsArrowHead } from "../brush/studio-stroke-shapes";
 import { CANVAS_W } from "../studio-assets";
 import { elBounds } from "../studio-element-geometry";
@@ -261,6 +262,12 @@ export function renderStudioCanvasSelectionDecorations({
                     || (canvasSelectionEls[0].kind === "line"
                       && studioLineDrawsArrowHead(canvasSelectionEls[0].strokeStyle)),
                   // perfect-ink's compact dot never goes under a 3px radius; other profiles 1.4px.
+                  // The distance cutoffs, sparse predicate, dot floors and 400px outline cap all
+                  // live inside StudioDrawNode's perfect-freehand branch; applying them to other
+                  // renderers rejected previews over thresholds those renderers never consult.
+                  isPerfectFamily:
+                    resolveStudioBrushRuntimeContract(canvasSelectionEls[0].brush)?.engine
+                      === "perfect-outline",
                   isPerfectInk: canvasSelectionEls[0].brush === "perfect-ink",
                 }
               : undefined
