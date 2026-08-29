@@ -72,4 +72,12 @@ describe("Studio in-app browser harness boundary", () => {
   it("keeps the 44px tap contract as the measured minimum", () => {
     expect(harness).toContain("const MIN_TAP_PX = 43.5;");
   });
+
+  it("measures after entry animations settle, without waiting on infinite ones", () => {
+    // scale(0.98) 진입 중에 재면 44px 타깃이 43.1px 로 잡혀 없는 회귀를 보고한다. 반대로
+    // 무한 펄스까지 기다리면 조건이 영원히 참이 되지 않아 라우트마다 타임아웃만 태운다.
+    expect(harness).toContain("document.getAnimations()");
+    expect(harness).toContain("iterations === Infinity");
+    expect(harness).toContain("await settleAnimations(page);");
+  });
 });

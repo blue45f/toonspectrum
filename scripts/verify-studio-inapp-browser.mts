@@ -262,11 +262,19 @@ const AUDIT_SCRIPT = `(() => {
 /**
  * 진입 애니메이션이 끝나기를 기다린다. Studio 의 HUD·코치 배너는 `scale(0.98)` 에서 시작하므로
  * 재생 중에 재면 44px 타깃이 43.1px 로 잡힌다 — 존재하지 않는 회귀를 보고하게 된다.
+ *
+ * 무한 반복 애니메이션(펄스 스켈레톤, `--animate-pulse-soft`)은 제외한다. 그것들까지 기다리면
+ * 조건이 영원히 참이 되지 않아 라우트마다 타임아웃을 통째로 소진하면서 정작 아무것도 안정되지
+ * 않는다 — 크기를 왜곡하는 것은 한 번 재생되고 끝나는 진입 애니메이션뿐이다.
  */
 async function settleAnimations(page: Page): Promise<void> {
   await page
     .waitForFunction(
-      () => document.getAnimations().every((animation) => animation.playState !== "running"),
+      () => document.getAnimations().every((animation) => {
+        if (animation.playState !== "running") return true;
+        const iterations = animation.effect?.getComputedTiming().iterations ?? 1;
+        return iterations === Infinity;
+      }),
       undefined,
       { timeout: 5_000 },
     )
