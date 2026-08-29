@@ -85,30 +85,53 @@ function studioBrushEngineResamplesCoordinates(brushId: unknown): boolean {
 }
 
 /**
- * The web drawing-assist kit, blocked as a FAMILY rather than one member at a time.
+ * The clean-room web drawing kits -- competitive, coloring and assist -- blocked as one family.
  *
- * Every one of these generates its marks from parameters fixed in WORLD space, not from the stroke
- * alone, so the commit replans them on axes the gesture never turned. Sampled across the kit:
- * `planStudioWebGridInkSamples` rounds each sample to `Math.round(x / cell) * cell` on an unrotated
- * grid (and dedups by cell key, so the sample COUNT moves too); `planStudioWebKaleidoInkSamples`
- * replicates about a fixed `centerX`/`centerY`; `planStudioWebMirrorInkSamples` reflects across a
- * fixed `axisX`/`axisY`; `planStudioWebCrossHatchPenSamples` hatches at hard-coded +/-45deg. This is
- * the same non-commuting shape as the `symmetry` guard above -- `A ∘ G` is not `G ∘ A` when G is
- * pinned to the world.
+ * These brushes do not deposit along the stroke; a KIT authors their geometry from parameters
+ * fixed in WORLD space, which `studioWebDrawingKitOwnsStrokeGeometry` states as the bridge's own
+ * contract: "every surface must plan from kit samples rather than from the ordinary deposition
+ * planner". A preview is one affine over marks already placed; the commit re-runs the kit planner
+ * on axes the gesture never turned, so the two cannot agree. Verified across all three kits:
+ * `planStudioWebGridInkSamples` rounds to `Math.round(x / cell) * cell` on an unrotated grid (and
+ * dedups by cell key, so the sample COUNT moves too); `planStudioWebDotToneSamples` snaps back onto
+ * a global pitch; `planStudioWebGravityDripSamples` emits beads at `y + length`, downward, always;
+ * `planStudioWebKaleidoInkSamples` replicates about a fixed `centerX`/`centerY`;
+ * `planStudioWebMirrorInkSamples` reflects across a fixed `axisX`/`axisY`;
+ * `planStudioWebCrossHatchPenSamples` hatches at hard-coded +/-45deg. Same non-commuting shape as
+ * the `symmetry` guard above -- `A ∘ G` is not `G ∘ A` when G is pinned to the world.
  *
- * Taken as the whole family rather than the members verified one by one, because the asymmetry that
- * justifies every entry in this file applies with full force: over-blocking costs a member its live
- * preview and nothing else, since the commit is unchanged and correct, while under-blocking ships a
- * visible snap -- and each of the last several review rounds found exactly one more member of a
- * pattern already established.
+ * Taken as the whole union rather than the members verified one by one. Four review rounds each
+ * found one more member of a pattern already established, and the asymmetry that justifies every
+ * entry in this file settles it: over-blocking costs a member its live preview and nothing else,
+ * since the commit is unchanged and correct, while under-blocking ships a visible snap.
+ * `web-mirror-ink` and `web-kaleido-ink` are included even though the bridge excludes them from
+ * kit-owned geometry -- they get their fold from `resolveStudioBrushIntrinsicSymmetry`, which is
+ * derived from the BRUSH rather than stored on the element, so the symmetry guard above never sees
+ * it.
  *
- * Spelled out here rather than imported from `STUDIO_WEB_ASSIST_BRUSH_IDS`, which would pull that
- * kit's ~1,000 lines of sample planners into the eagerly-bundled canvas path just to read thirteen
- * strings -- the same bundle discipline `studio-selection-chrome-mirror` follows for the overlay's
- * node name. `studio-live-transform-preview-eligibility.test.ts` pins this set equal to the kit's
- * own exported list, so a brush added there fails the build rather than slipping past the guard.
+ * Spelled out here rather than imported from `STUDIO_WEB_DRAWING_ALL_BRUSH_IDS`, which would pull
+ * three kits' worth of sample planners into the eagerly-bundled canvas path just to read
+ * twenty-five strings -- the same bundle discipline `studio-selection-chrome-mirror` follows for
+ * the overlay's node name. `studio-live-transform-preview-eligibility.test.ts` pins this set equal
+ * to the bridge's own union, so a brush added to any kit fails the build rather than slipping past.
  */
 const STUDIO_WORLD_PARAMETERIZED_BRUSH_IDS: ReadonlySet<string> = new Set([
+  // competitive kit
+  "web-multi-agent",
+  "web-rough-ink",
+  "web-gravity-drip",
+  "web-soft-cloud",
+  "web-calligraphy-ribbon",
+  "web-dash-stitch",
+  "web-scatter-stamp",
+  "web-rainbow-flow",
+  "web-lazy-ink",
+  // coloring kit
+  "web-hatch-color",
+  "web-cel-flat",
+  "web-blend-softener",
+  "web-dot-tone",
+  // assist kit
   "web-kaleido-ink",
   "web-fur-strand",
   "web-contour-double",

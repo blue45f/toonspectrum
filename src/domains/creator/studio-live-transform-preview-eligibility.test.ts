@@ -4,7 +4,7 @@ import {
   STUDIO_LIVE_TRANSFORM_WORLD_PARAMETERIZED_BRUSH_IDS,
   studioLiveTransformPreviewBlockedForElement,
 } from "./studio-live-transform-preview-eligibility";
-import { STUDIO_WEB_ASSIST_BRUSH_IDS } from "./studio-web-drawing-assist-kit";
+import { STUDIO_WEB_DRAWING_ALL_BRUSH_IDS } from "./studio-web-drawing-stroke-bridge";
 
 import type { El } from "./studio-element-model";
 
@@ -133,22 +133,22 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     }
   });
 
-  it("refuses the whole web drawing-assist family, which is parameterized in world space", () => {
-    // Sampled and verified: web-grid-ink snaps to Math.round(x / cell) * cell on an unrotated
-    // grid, web-kaleido-ink replicates about a fixed centre, web-mirror-ink reflects across a
-    // fixed axis, web-cross-hatch-pen hatches at hard-coded +/-45deg. Blocked as the kit's own
-    // exported id list so a brush added there cannot slip past this guard.
-    for (const brush of STUDIO_WEB_ASSIST_BRUSH_IDS) {
+  it("refuses every web drawing kit brush, all of which are parameterized in world space", () => {
+    // Verified across all three kits: web-grid-ink snaps to Math.round(x / cell) * cell on an
+    // unrotated grid, web-dot-tone snaps back onto a global pitch, web-gravity-drip drips at
+    // y + length downward always, web-kaleido-ink replicates about a fixed centre, web-mirror-ink
+    // reflects across a fixed axis, web-cross-hatch-pen hatches at hard-coded +/-45deg.
+    for (const brush of STUDIO_WEB_DRAWING_ALL_BRUSH_IDS) {
       expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(true);
     }
   });
 
-  it("keeps that family list equal to the assist kit's own, so a new brush cannot slip past", () => {
-    // The guard spells the ids out to keep the kit's ~1,000 lines of planners out of the eager
-    // canvas bundle; this is what stops that copy from drifting. A brush added to the kit fails
+  it("keeps that family list equal to the bridge's own union, so a new brush cannot slip past", () => {
+    // The guard spells the ids out to keep three kits' worth of planners out of the eager canvas
+    // bundle; this is what stops that copy from drifting. A brush added to ANY of the kits fails
     // here rather than quietly gaining a preview its renderer cannot reproduce.
     expect([...STUDIO_LIVE_TRANSFORM_WORLD_PARAMETERIZED_BRUSH_IDS].sort())
-      .toEqual([...STUDIO_WEB_ASSIST_BRUSH_IDS].sort());
+      .toEqual([...STUDIO_WEB_DRAWING_ALL_BRUSH_IDS].sort());
   });
 
   it("refuses sketch-styled lines and arrows, whose Rough.js wobble is replanned", () => {

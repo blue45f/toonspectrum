@@ -3,6 +3,20 @@
  * engine in the shipped universe, and the next-gen challenger (Skia Graphite) must keep its
  * declared demotion chain — "모험 적용, 불안정하면 Skia로 교체" is a descriptor-level contract,
  * not a manual swap. Losing any of these fails the build here, loudly.
+ *
+ * WHAT THIS GATE DOES NOT PROVE, stated plainly so a green run is never read as more than it is:
+ * it checks DECLARATION, not activation. `STUDIO_KNOWN_ENGINE_DESCRIPTORS` is the known capability
+ * universe — its own docstring says so ("known universe 등재는 활성화가 아니다") — and a descriptor
+ * being present with the right tokens says the lane is nameable and selectable, not that it can
+ * render on the device in front of you. Today it demonstrably cannot: `createSkiaGpuIslandBackend`
+ * is documented as "probe-only backend used until CanvasKit MakeWebGLCanvasSurface is adopted on a
+ * worker" and returns `unavailable` on every uncached request, so the completion lane this file
+ * pins as the recovery for mask, image filter, backdrop blend and path effect has no working
+ * renderer behind it yet. That is a real gap, and it is a RENDERER gap: the honest response is to
+ * say so here rather than to loosen the descriptor contract, which would only hide it. What this
+ * gate buys in the meantime is that the chain cannot be quietly dismantled — a lane dropped or
+ * under-declared fails the build — so when the backend lands it lands into a chain that still
+ * names the right lanes.
  */
 import { validateVelloCapabilityGapCoverage } from "@toonspectrum/studio-engine-registry";
 import { describe, expect, it } from "vitest";
