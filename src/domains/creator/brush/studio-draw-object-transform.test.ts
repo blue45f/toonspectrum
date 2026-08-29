@@ -446,6 +446,29 @@ describe("orientation-dependent nibs", () => {
     ).toBe(20);
   });
 
+  it("refuses a transform whose coordinates the CRDT payload validator would reject", () => {
+    // validatePayload asserts every coordinate within +/-MAX_COORDINATE, so a stroke near that
+    // boundary can be moved to a finite-but-unpublishable position: it applies locally and then
+    // fails publication, leaving the author ahead of every collaborator.
+    expect(
+      planStudioDrawObjectTransform({
+        el: drawEl({ points: [0, 0, 10, 10] }),
+        sourceBounds: UNIT_SOURCE,
+        targetBounds: { x: 9_999_999, y: 0, width: 10, height: 10 },
+        rotationDeg: 0,
+      }),
+    ).toBeNull();
+    // A move that stays inside the range is fine.
+    expect(
+      planStudioDrawObjectTransform({
+        el: drawEl({ points: [0, 0, 10, 10] }),
+        sourceBounds: UNIT_SOURCE,
+        targetBounds: { x: 1_000, y: 0, width: 10, height: 10 },
+        rotationDeg: 0,
+      }),
+    ).not.toBeNull();
+  });
+
   it("drops the rotation for bounds-derived shapes instead of collapsing them", () => {
     // StudioDrawNode rebuilds these from drawBounds(points) as axis-aligned primitives, so a
     // rotated point array cannot carry the turn -- and destroys the shape trying. A square stored

@@ -135,6 +135,16 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
     ).toBe(true);
   });
 
+  it("grades the sparse-spacing predicate across the rotation interval too", () => {
+    // The renderer derives this spacing from the ROTATED points' AABB distance, so a turn can
+    // flip the predicate without crossing either distance cutoff: an 11-point diamond at 300px
+    // and width 7 is sparse upright (30 >= 28) and not sparse at 45 degrees (21.2 < 28).
+    const diamond = { strokeWidth: 7, strokeDistance: 300, pointCount: 11 } as const;
+    expect(studioLiveTransformRouteSurvivesScale({ ...diamond, rotationDeg: 45 }, 1)).toBe(false);
+    // Upright it stays previewable.
+    expect(studioLiveTransformRouteSurvivesScale(diamond, 1)).toBe(true);
+  });
+
   it("refuses anything it cannot read, because an unreadable route is not a licence", () => {
     expect(studioLiveTransformRouteSurvivesScale(SAFE, Number.NaN)).toBe(false);
     expect(studioLiveTransformRouteSurvivesScale(SAFE, 0)).toBe(false);

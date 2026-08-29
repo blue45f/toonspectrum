@@ -171,10 +171,15 @@ export function studioLiveTransformRouteSurvivesScale(
   }
   // The sparse-long branch compares a scaled spacing against a floor that is NOT linear in scale
   // (`Math.max(20, w * 4)`), so it can flip even when both distance thresholds hold.
-  const spacing = strokeDistance / Math.max(1, pointCount - 1);
-  const sparseBefore = spacing >= sparseSpacingFloor(strokeWidth);
-  const sparseAfter = spacing * scale >= sparseSpacingFloor(strokeWidth * scale);
-  if (sparseBefore !== sparseAfter) return false;
+  // Graded across the rotation interval as well: the renderer derives this spacing from the
+  // ROTATED points' AABB distance, so a turn can flip the predicate without crossing either
+  // distance cutoff -- an 11-point diamond at 300px and width 7 is sparse upright (30 >= 28) and
+  // not sparse at 45 degrees (21.2 < 28).
+  const divisor = Math.max(1, pointCount - 1);
+  const sparseBefore = strokeDistance / divisor >= sparseSpacingFloor(strokeWidth);
+  const floorAfter = sparseSpacingFloor(strokeWidth * scale);
+  if ((lowDistance / divisor >= floorAfter) !== sparseBefore) return false;
+  if ((highDistance / divisor >= floorAfter) !== sparseBefore) return false;
 
   return true;
 }

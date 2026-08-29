@@ -26,7 +26,7 @@
  * A rejected transform returns `null` rather than a partially transformed stroke: callers treat
  * that as "leave the document untouched", the same all-or-nothing discipline the group planner uses.
  */
-import { MAX_STROKE_WIDTH } from "../live/studio-crdt-document-constants";
+import { MAX_COORDINATE, MAX_STROKE_WIDTH } from "../live/studio-crdt-document-constants";
 
 import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
 
@@ -214,6 +214,13 @@ export function planStudioDrawObjectTransform(
     const v = (py - sourceBounds.y) * scale.scaleY;
     const x = targetBounds.x + u * cos - v * sin;
     const y = targetBounds.y + u * sin + v * cos;
+    // Same trap as the stroke width below: `validatePayload` asserts every coordinate within
+    // +/-MAX_COORDINATE, so a stroke near that boundary can be moved, scaled or rotated to a
+    // finite-but-unpublishable position. It would apply locally and then fail publication,
+    // leaving the author's document ahead of every collaborator's. Refusing the transform keeps
+    // the stroke where it was, which is the honest outcome for a gesture that cannot be persisted.
+    if (x < -MAX_COORDINATE || x > MAX_COORDINATE) return null;
+    if (y < -MAX_COORDINATE || y > MAX_COORDINATE) return null;
     return finite(x) && finite(y) ? { x, y } : null;
   };
 

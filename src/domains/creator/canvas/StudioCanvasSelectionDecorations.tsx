@@ -1,6 +1,7 @@
 import { Fragment, Suspense, type ReactNode, type RefObject } from "react";
 import { Group, Rect, Text, Transformer } from "react-konva/lib/ReactKonvaCore";
 
+import { studioLineDrawsArrowHead } from "../brush/studio-stroke-shapes";
 import { CANVAS_W } from "../studio-assets";
 import { elBounds } from "../studio-element-geometry";
 import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "../studio-layers";
@@ -251,10 +252,14 @@ export function renderStudioCanvasSelectionDecorations({
                     canvasSelectionEls[0].strokeWidth,
                   ),
                   // Arrowheads are sized Math.max(8, strokeWidth * 2) — an absolute floor the
-                  // preview scales straight past.
+                  // preview scales straight past. Only claimed when a head is actually drawn: the
+                  // `arrow` kind always has one, but a `line` draws one only where its stroke
+                  // style asks for it, and claiming it unconditionally cost plain lines a preview
+                  // over geometry they never render.
                   drawsArrowHead:
                     canvasSelectionEls[0].kind === "arrow"
-                    || canvasSelectionEls[0].kind === "line",
+                    || (canvasSelectionEls[0].kind === "line"
+                      && studioLineDrawsArrowHead(canvasSelectionEls[0].strokeStyle)),
                   // perfect-ink's compact dot never goes under a 3px radius; other profiles 1.4px.
                   isPerfectInk: canvasSelectionEls[0].brush === "perfect-ink",
                 }
