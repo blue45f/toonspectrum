@@ -16,6 +16,7 @@ import {
   STUDIO_BRUSH_CATALOGUE_SOAK_IDS,
   STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES,
   STUDIO_BRUSH_CATALOGUE_SOAK_RUNS,
+  STUDIO_BRUSH_CRAYON_FAMILY_CHUNK_BUDGET_MS,
   STUDIO_BRUSH_CRAYON_FAMILY_IDS,
   detectStudioBrushSoakMonotonicDegradation,
   evaluateStudioBrushCataloguePaintDeterminismProbe,
@@ -25,6 +26,7 @@ import {
   evaluateStudioBrushCrayonFamilyIncrementalChunks,
   listStudioBrushCatalogueDeterminismSampleIds,
   planStudioBrushCataloguePaintDynamics,
+  studioBrushChunkSeriesFreezes,
 } from "./studio-brush-catalogue-perf-matrix";
 
 /**
@@ -209,8 +211,11 @@ describe("studio brush catalogue paint performance matrix", () => {
     (catalogId) => {
       const result = evaluateStudioBrushCrayonFamilyIncrementalChunks(catalogId);
       expect(result.ok, catalogId).toBe(true);
+      // `freeze` is decided from the chunk SERIES, not the single worst chunk: a max over dozens
+      // of chunks is tripped by any one preempted by the scheduler (measured on CI at 46.3ms
+      // against 33ms, on a commit touching no brush code). More than one over-budget chunk, or a
+      // single catastrophic one, is still a freeze.
       expect(result.freeze, `${catalogId} maxChunk=${result.maxChunkMs}`).toBe(false);
-      expect(result.maxChunkMs).toBeLessThan(33);
       expect(result.totalMs).toBeLessThan(1_500);
       expect(result.chunkCount).toBeGreaterThan(10);
       expect(result.dabCount).toBeGreaterThan(500);
@@ -276,5 +281,30 @@ describe("studio brush catalogue paint performance matrix", () => {
       expect(soak.freezeCount, catalogId).toBe(0);
       expect(soak.ok, catalogId).toBe(true);
     }
+  });
+});
+
+describe("studioBrushChunkSeriesFreezes", () => {
+  const BUDGET = STUDIO_BRUSH_CRAYON_FAMILY_CHUNK_BUDGET_MS;
+
+  it("tolerates exactly one preempted chunk", () => {
+    // The recorded CI shape: every chunk inside the budget except one at 46.3ms against 33ms.
+    expect(studioBrushChunkSeriesFreezes([5, 6, 5, BUDGET + 13, 6, 5])).toBe(false);
+  });
+
+  it("calls a freeze when the budget is exceeded repeatedly", () => {
+    // Two is a pattern, not luck: the path itself is too slow.
+    expect(studioBrushChunkSeriesFreezes([5, BUDGET + 2, 6, BUDGET + 3, 5])).toBe(true);
+  });
+
+  it("calls a freeze on a single catastrophic chunk", () => {
+    // A lone chunk far past the budget is a real multi-frame stall however rare, so tolerance for
+    // one preempted chunk must not cover it.
+    expect(studioBrushChunkSeriesFreezes([5, 6, BUDGET * 2 + 1, 5])).toBe(true);
+  });
+
+  it("is false for a healthy series and abstains on an empty one", () => {
+    expect(studioBrushChunkSeriesFreezes([5, 6, 7, 8])).toBe(false);
+    expect(studioBrushChunkSeriesFreezes([])).toBe(false);
   });
 });
