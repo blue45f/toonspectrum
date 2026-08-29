@@ -49,6 +49,8 @@ vi.mock("three/webgpu", () => ({
 const { createStudioBg3dThreeWebGpuCaptureAdapter } = await import(
   "./studio-bg3d-three-webgpu-capture"
 );
+const { registerStudioBg3dCaptureExcludedObject, registerStudioBg3dDepthExcludedObject } =
+  await import("./studio-bg3d-capture-exclusion");
 
 interface FakeRendererOptions {
   readonly colorBytes?: Uint8Array;
@@ -70,12 +72,19 @@ function createFakeWebGpuRenderer(options: FakeRendererOptions = {}) {
     clearHex: 0x123456,
     clearAlpha: 0.25,
     renderCalls: 0,
+    watched: [] as THREE.Object3D[],
+    visibilityAtDraw: [] as Array<Array<{ name: string; visible: boolean }>>,
     getRenderTarget() { return state.renderTarget; },
     setRenderTarget(target: THREE.RenderTarget | null) { state.renderTarget = target; },
     getClearColor(target: THREE.Color) { target.setHex(state.clearHex); return target; },
     getClearAlpha() { return state.clearAlpha; },
     setClearColor(hex: number, alpha: number) { state.clearHex = hex; state.clearAlpha = alpha; },
-    render() { state.renderCalls += 1; },
+    render() {
+      state.renderCalls += 1;
+      state.visibilityAtDraw.push(
+        state.watched.map((object) => ({ name: object.name, visible: object.visible })),
+      );
+    },
     readRenderTargetPixelsAsync: vi.fn(async () => {
       const next = reads[Math.min(readIndex, reads.length - 1)];
       readIndex += 1;
@@ -200,5 +209,50 @@ describe("Studio BG3D Three WebGPU capture adapter", () => {
       includeDepth: false,
     })).rejects.toThrow(RangeError);
     expect(renderer.renderCalls).toBe(0);
+  });
+
+  it("keeps viewport-only objects hidden across both the colour and depth draws", async () => {
+    const target = scene();
+    const gizmo = new THREE.Object3D();
+    gizmo.name = "gizmo";
+    const contactShadow = new THREE.Object3D();
+    contactShadow.name = "contactShadow";
+    target.add(gizmo, contactShadow);
+    registerStudioBg3dCaptureExcludedObject(gizmo);
+    registerStudioBg3dDepthExcludedObject(contactShadow);
+
+    const renderer = createFakeWebGpuRenderer({
+      colorBytes: new Uint8Array(16),
+      depthBytes: new Uint8Array(16),
+    });
+    renderer.watched = [gizmo, contactShadow];
+    const adapter = createStudioBg3dThreeWebGpuCaptureAdapter({
+      renderer: renderer as never,
+      scene: target,
+      camera,
+    });
+
+    await adapter.capture({
+      width: 2,
+      height: 2,
+      background: { color: "#ffffff", alpha: 1 },
+      includeDepth: true,
+    });
+
+    // One scene draw per pass; the output quad renders through QuadMesh, not renderer.render.
+    expect(renderer.visibilityAtDraw).toHaveLength(2);
+    const [colorPass, depthPass] = renderer.visibilityAtDraw;
+    // A capture-excluded gizmo restored between the passes would be packed into the depth raster.
+    expect(colorPass).toEqual([
+      { name: "gizmo", visible: false },
+      { name: "contactShadow", visible: true },
+    ]);
+    expect(depthPass).toEqual([
+      { name: "gizmo", visible: false },
+      { name: "contactShadow", visible: false },
+    ]);
+    // Both exclusions are handed back once the submissions are done.
+    expect(gizmo.visible).toBe(true);
+    expect(contactShadow.visible).toBe(true);
   });
 });

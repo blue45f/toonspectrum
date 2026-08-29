@@ -11,6 +11,10 @@
 import * as THREE from "three";
 
 import {
+  registerStudioBg3dCaptureExcludedObject,
+  registerStudioBg3dDepthExcludedObject,
+} from "../src/domains/creator/bg3d/studio-bg3d-capture-exclusion";
+import {
   EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
   selectStudioBg3dEngine,
 } from "../src/domains/creator/bg3d/studio-bg3d-engine-selection";
@@ -90,6 +94,25 @@ function buildScene(): THREE.Scene {
   );
   far.position.set(0.7, 0.1, -1.6);
   scene.add(near, far);
+
+  // Viewport-only objects must not reach either raster. The gizmo is excluded from the whole
+  // capture; the contact shadow is beauty-only and must be absent from depth. Both sit in front of
+  // the boxes, so a backend that leaked one would move the depth raster far outside tolerance.
+  const gizmo = new THREE.Mesh(
+    new THREE.BoxGeometry(0.6, 0.6, 0.6),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+  );
+  gizmo.position.set(0, -0.6, 1.6);
+  registerStudioBg3dCaptureExcludedObject(gizmo);
+
+  const contactShadow = new THREE.Mesh(
+    new THREE.BoxGeometry(0.6, 0.6, 0.6),
+    new THREE.MeshBasicMaterial({ color: 0x111111 }),
+  );
+  contactShadow.position.set(0.9, -0.6, 1.6);
+  registerStudioBg3dDepthExcludedObject(contactShadow);
+
+  scene.add(gizmo, contactShadow);
   return scene;
 }
 

@@ -191,7 +191,13 @@ function restoreRendererState(renderer: WebGPURenderer, state: RendererCaptureSt
   renderer.xr.enabled = state.xrEnabled;
 }
 
-async function captureColor(input: {
+/**
+ * Submits the colour passes and returns the pending readback. Renderer and scene state are handed
+ * back before the first await, exactly like the WebGL adapter, so a live frame cannot render into
+ * the capture target while the GPU fence is still pending. The temporary targets are owned by the
+ * returned promise and disposed when it settles.
+ */
+function submitColorCapture(input: {
   readonly renderer: WebGPURenderer;
   readonly scene: THREE.Scene;
   readonly camera: THREE.Camera;
@@ -204,13 +210,13 @@ async function captureColor(input: {
   const sceneTarget = createCaptureTarget(request.width, request.height, true);
   const outputTarget = createCaptureTarget(request.width, request.height, false);
   let outputQuad: QuadMesh | null = null;
+  let readback: Promise<unknown>;
   try {
     renderer.xr.enabled = false;
     renderer.autoClear = true;
-    if (request.background.alpha === 0) {
-      scene.background = null;
-      scene.backgroundRotation.set(0, 0, 0);
-    }
+    // Equirectangular backgrounds are colour-only decoration; a transparent capture must not bake
+    // one into the alpha channel.
+    if (request.background.alpha === 0) scene.background = null;
     renderer.setRenderTarget(sceneTarget);
     renderer.setClearColor(
       new THREE.Color(request.background.color).getHex(),
@@ -223,32 +229,43 @@ async function captureColor(input: {
     renderer.setClearColor(0x000000, 0);
     outputQuad.render(renderer);
 
-    const raw = await renderer.readRenderTargetPixelsAsync(
+    readback = renderer.readRenderTargetPixelsAsync(
       outputTarget,
       0,
       0,
       request.width,
       request.height,
     );
-    return normalizeStudioBg3dRgbaReadback({
-      width: request.width,
-      height: request.height,
-      // WebGPU readback is already top-down; the WebGL adapter flips because GL is bottom-up. The
-      // normalizer still resolves the 256-byte row alignment WebGPU buffer copies require.
-      flipY: false,
-      rgba: toReadbackBytes(raw),
-    });
-  } finally {
+  } catch (error) {
     scene.background = capturedBackground;
     scene.backgroundRotation.copy(capturedBackgroundRotation);
     restoreRendererState(renderer, state);
     disposeQuadMaterial(outputQuad);
     sceneTarget.dispose();
     outputTarget.dispose();
+    throw error;
   }
+  scene.background = capturedBackground;
+  scene.backgroundRotation.copy(capturedBackgroundRotation);
+  restoreRendererState(renderer, state);
+  return readback.then(
+    (raw) => normalizeStudioBg3dRgbaReadback({
+      width: request.width,
+      height: request.height,
+      // WebGPU readback is already top-down; the WebGL adapter flips because GL is bottom-up. The
+      // normalizer still resolves the 256-byte row alignment WebGPU buffer copies require.
+      flipY: false,
+      rgba: toReadbackBytes(raw),
+    }),
+  ).finally(() => {
+    disposeQuadMaterial(outputQuad);
+    sceneTarget.dispose();
+    outputTarget.dispose();
+  });
 }
 
-async function captureDepth(input: {
+/** Submits the packed-depth pass; ownership and restore timing mirror the colour pass above. */
+function submitDepthCapture(input: {
   readonly renderer: WebGPURenderer;
   readonly scene: THREE.Scene;
   readonly camera: THREE.Camera;
@@ -264,6 +281,16 @@ async function captureDepth(input: {
   const target = createCaptureTarget(width, height, true);
   const depthMaterial = createDepthNodeMaterial();
   const restoreDepthExcludedObjects = hideStudioBg3dDepthExcludedObjects(scene);
+  const restoreSceneAndRenderer = (): void => {
+    scene.overrideMaterial = capturedOverride;
+    scene.background = capturedBackground;
+    scene.backgroundRotation.copy(capturedBackgroundRotation);
+    restoreRendererState(renderer, state);
+    // The submission already owns the draw, so beauty-only objects come back immediately rather
+    // than staying hidden in the live viewport while the readback fence settles.
+    restoreDepthExcludedObjects();
+  };
+  let readback: Promise<unknown>;
   try {
     renderer.xr.enabled = false;
     renderer.autoClear = true;
@@ -275,8 +302,16 @@ async function captureDepth(input: {
     // White is the packed far plane, matching the WebGL depth pass exactly.
     renderer.setClearColor(0xffffff, 1);
     renderer.render(scene, camera);
-    const packed = await renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
-    return decodeStudioBg3dThreeRgbaDepth({
+    readback = renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
+  } catch (error) {
+    restoreSceneAndRenderer();
+    depthMaterial.dispose();
+    target.dispose();
+    throw error;
+  }
+  restoreSceneAndRenderer();
+  return readback.then(
+    (packed) => decodeStudioBg3dThreeRgbaDepth({
       width,
       height,
       // Row alignment padding is stripped first so the decoder sees one tightly packed raster.
@@ -287,16 +322,11 @@ async function captureDepth(input: {
         rgba: toReadbackBytes(packed),
       }),
       flipY: false,
-    });
-  } finally {
-    scene.overrideMaterial = capturedOverride;
-    scene.background = capturedBackground;
-    scene.backgroundRotation.copy(capturedBackgroundRotation);
-    restoreRendererState(renderer, state);
-    restoreDepthExcludedObjects();
+    }),
+  ).finally(() => {
     depthMaterial.dispose();
     target.dispose();
-  }
+  });
 }
 
 /**
@@ -318,23 +348,35 @@ export function createStudioBg3dThreeWebGpuCaptureAdapter(
   async function capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster> {
     assertCaptureDimensions(request.width, request.height);
     const restoreCaptureExcludedObjects = hideStudioBg3dCaptureExcludedObjects(scene);
-    let rgba: Uint8ClampedArray;
+    let colorReadback: Promise<Uint8ClampedArray>;
+    let depthReadback: Promise<Float32Array> | undefined;
     try {
-      rgba = await captureColor({ camera, renderer, request, scene });
+      colorReadback = submitColorCapture({ camera, renderer, request, scene });
+      if (request.includeDepth) {
+        depthReadback = submitDepthCapture({
+          camera,
+          renderer,
+          scene,
+          width: request.width,
+          height: request.height,
+        });
+      }
     } finally {
+      // Both passes submit before their first await, so viewport-only objects stay hidden across
+      // the colour *and* depth draws — a gizmo restored between them would be packed into depth —
+      // and are restored while the GPU fences are still pending.
       restoreCaptureExcludedObjects();
     }
-    if (!request.includeDepth) {
-      return { width: request.width, height: request.height, rgba };
-    }
-    const depth = await captureDepth({
-      camera,
-      renderer,
-      scene,
+    const [rgba, depth] = await Promise.all([
+      colorReadback,
+      depthReadback ?? Promise.resolve(undefined),
+    ]);
+    return {
       width: request.width,
       height: request.height,
-    });
-    return { width: request.width, height: request.height, rgba, depth };
+      rgba,
+      ...(depth ? { depth } : {}),
+    };
   }
 
   return Object.freeze({
