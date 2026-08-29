@@ -481,6 +481,59 @@ export const STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH = 1.2;
  * compounding and clears this floor immediately, so the floor never shelters a genuine freeze.
  */
 export const STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS = 4;
+/**
+ * A half of fewer runs than this carries no measurable spread — one sample always reports spread
+ * 1.0, which is exactly the lucky-baseline shape behind the recorded false positives. Such a
+ * series abstains rather than guessing; the shipped soak runs ten, five per half.
+ */
+export const STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES = 2;
+
+/**
+ * Decides monotonic degradation from a soak's elapsed series — pure, so the decision itself is
+ * unit-testable against recorded CI series instead of only through a live 10-run measurement.
+ *
+ * Two halves, each represented by its cheapest run (a leak slows EVERY later plan, so minima
+ * cancel scheduler preemption better than means), plus a third, noise-aware condition:
+ *
+ *   growth = laterMin / earlyMin   must exceed BOTH the relative gate AND the first half's OWN
+ *                                  spread (earlyMax / earlyMin).
+ *
+ * The spread term is what makes the gate sound on a contended runner. Min-vs-min is one sample
+ * from each half's distribution, so whenever within-half noise exceeds the threshold the
+ * comparison is meaningless — measured CI failure on main, needle-graphite
+ * [29.77, 37.52, 51.01, 34.03, 34.87 | 53.45, 60.47, 62.61, 48.54, 38.32]ms: a lucky 29.77
+ * baseline against a 38.32 later-min reads as x1.29 "degradation" while the first half's own
+ * spread already spans x1.71. Widening the window (this gate's three previous hardenings) cannot
+ * fix that — the noise scales with it.
+ *
+ * Detection power for a real leak is preserved exactly: for compounding per-run growth g > 1,
+ * earlyMax/earlyMin = g^4 while laterMin/earlyMin = g^5, and g^5 > g^4 for every g > 1. So any
+ * leak that compounds still trips the gate, while pure noise (both minima drawn from the same
+ * distribution) does not.
+ */
+export function detectStudioBrushSoakMonotonicDegradation(
+  elapsedMs: readonly number[],
+): boolean {
+  const halfIndex = Math.floor(elapsedMs.length / 2);
+  const early = elapsedMs.slice(0, halfIndex);
+  const later = elapsedMs.slice(halfIndex);
+  if (
+    early.length < STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES
+    || later.length < STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES
+  ) {
+    return false;
+  }
+  const earlyMin = Math.min(...early);
+  const earlyMax = Math.max(...early);
+  const laterMin = Math.min(...later);
+  if (!(earlyMin > 0)) return false;
+  const growth = laterMin / earlyMin;
+  return (
+    growth > STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
+    && growth > earlyMax / earlyMin
+    && laterMin - earlyMin > STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS
+  );
+}
 
 export interface StudioBrushCataloguePaintSoakResult {
   readonly catalogId: string;
@@ -501,20 +554,17 @@ export interface StudioBrushCataloguePaintSoakResult {
  * Soak mode: plans the same stroke `runs` times back to back, mirroring a long editing session
  * replaying one heavy brush. A healthy planner stays flat (JIT warm-up may only speed it up) and
  * replays byte-identical geometry; per-plan state accumulating somewhere slows EVERY subsequent
- * plan, so the gate compares the cheapest run of the SECOND half against the cheapest run of the
- * FIRST half and trips only on >20% (and >4ms) sustained growth.
+ * plan, which `detectStudioBrushSoakMonotonicDegradation` decides from the elapsed series.
  *
- * Both halves must be minima over several runs. The original "strictly increasing" form was
- * satisfiable by sub-ms jitter plus ONE preempted final run (measured: oil-pastel
- * [7.22, 7.26, 18.90]ms), and the next form — min of the later runs against the single first
- * run — fell to the mirror image, one LUCKY first run before a starved stretch (measured:
- * acrylic-stiff-flat [6.55, 15.54, 13.59]ms). Three-run windows survived two scheduler
- * preemptions on either side but still fell to the same lucky-baseline shape at ~40ms plan
- * scale on a contended CI runner (measured: needle-graphite
- * [40.68, 38.13, 46.76, 46.16, 82.60, 63.89]ms — cheapest-later 46.16 vs lucky baseline 38.13
- * = x1.21, while the first half's OWN spread already spanned 38.1–46.8). Five-run windows make
- * each minimum an estimate over enough samples that one clean run per half suffices, while a
- * genuine compounding leak still slows every second-half run and clears the threshold at once.
+ * Window history, kept because each shape failed a different way: the original "strictly
+ * increasing" form was satisfiable by sub-ms jitter plus ONE preempted final run (measured:
+ * oil-pastel [7.22, 7.26, 18.90]ms); min-of-later against the single first run fell to the mirror
+ * image, one LUCKY first run before a starved stretch (acrylic-stiff-flat [6.55, 15.54, 13.59]ms);
+ * three-run windows fell to the same lucky-baseline shape at ~40ms plan scale (needle-graphite
+ * [40.68, 38.13, 46.76, 46.16, 82.60, 63.89]ms); and five-run windows fell to it again on a
+ * contended runner (see the detector's docstring). Widening the window was never the fix — the
+ * noise scales with it — so the detector measures the first half's own spread instead and only
+ * calls degradation when growth exceeds it.
  */
 export function evaluateStudioBrushCataloguePaintSoak(
   catalogId: string,
@@ -538,13 +588,7 @@ export function evaluateStudioBrushCataloguePaintSoak(
     ? null
     : measuredDigests.length === digests.length
       && measuredDigests.every((digest) => digest === measuredDigests[0]);
-  const halfIndex = Math.floor(elapsedMs.length / 2);
-  const baselineRun = Math.min(...elapsedMs.slice(0, Math.max(1, halfIndex)));
-  const cheapestLaterRun = Math.min(...elapsedMs.slice(Math.max(1, halfIndex)));
-  const monotonicDegradation =
-    cheapestLaterRun > baselineRun * STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
-    && cheapestLaterRun - baselineRun
-      > STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS;
+  const monotonicDegradation = detectStudioBrushSoakMonotonicDegradation(elapsedMs);
   const freezeCount = rows.filter((row) => row.freeze).length;
   return {
     catalogId,

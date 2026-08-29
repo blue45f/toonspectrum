@@ -14,8 +14,10 @@ import {
 
 import {
   STUDIO_BRUSH_CATALOGUE_SOAK_IDS,
+  STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES,
   STUDIO_BRUSH_CATALOGUE_SOAK_RUNS,
   STUDIO_BRUSH_CRAYON_FAMILY_IDS,
+  detectStudioBrushSoakMonotonicDegradation,
   evaluateStudioBrushCataloguePaintDeterminismProbe,
   evaluateStudioBrushCataloguePaintPerfMatrix,
   evaluateStudioBrushCataloguePaintPerfRow,
@@ -58,6 +60,59 @@ function* recipeDigestStream(
     yield recipe.roundness;
   }
 }
+
+describe("soak monotonic-degradation detector", () => {
+  /**
+   * Every noise series here is a RECORDED CI measurement from this gate's own hardening history
+   * (see the detector docstring), so the decision is pinned against the real shapes that broke
+   * it rather than against a live timing run that reproduces at most one of them.
+   */
+  it.each([
+    // main CI: lucky 29.77 baseline vs 38.32 later-min reads x1.29, while the first half's OWN
+    // spread already spans x1.71 — unresolvable noise, not degradation.
+    ["needle-graphite (main CI)", [29.77, 37.52, 51.01, 34.03, 34.87, 53.45, 60.47, 62.61, 48.54, 38.32]],
+    ["needle-graphite (three-run era)", [40.68, 38.13, 46.76, 46.16, 82.60, 63.89]],
+    // Series too short to estimate within-half noise abstain rather than guess.
+    ["acrylic-stiff-flat (lucky first run)", [6.55, 15.54, 13.59]],
+    ["oil-pastel (one preempted run)", [7.22, 7.26, 18.90]],
+    // A healthy planner that only warms up must never trip the gate.
+    ["JIT warm-up", [52.0, 31.0, 29.5, 28.9, 28.7, 28.6, 28.5, 28.5, 28.4, 28.4]],
+  ])("does not call degradation on recorded scheduler noise: %s", (_label, elapsed) => {
+    expect(detectStudioBrushSoakMonotonicDegradation(elapsed)).toBe(false);
+  });
+
+  it.each([
+    // Compounding growth: earlyMax/earlyMin = g^4 while laterMin/earlyMin = g^5, so every g > 1
+    // clears its own first-half spread.
+    ["20% per run", [10, 12, 14.4, 17.28, 20.74, 24.88, 29.86, 35.83, 43.0, 51.6]],
+    ["45% per run", [8, 11.6, 16.8, 24.4, 35.4, 51.3, 74.4, 107.9, 156.4, 226.8]],
+    // Step-change leak: a cache that starts thrashing halfway and stays slow.
+    ["sustained step change", [10, 10.2, 9.9, 10.1, 10.0, 31.0, 32.2, 30.8, 31.5, 30.9]],
+  ])("still catches a genuine compounding leak: %s", (_label, elapsed) => {
+    expect(detectStudioBrushSoakMonotonicDegradation(elapsed)).toBe(true);
+  });
+
+  it("keeps the absolute floor so sub-millisecond timer jitter cannot manufacture a leak", () => {
+    // x2 in ratio terms, but only ~1ms absolute — under the 4ms floor.
+    expect(
+      detectStudioBrushSoakMonotonicDegradation([1, 1.1, 1.05, 1.2, 1.1, 2, 2.1, 2.2, 2.05, 2.1]),
+    ).toBe(false);
+  });
+
+  it("abstains instead of throwing on degenerate series", () => {
+    expect(detectStudioBrushSoakMonotonicDegradation([])).toBe(false);
+    expect(detectStudioBrushSoakMonotonicDegradation([12.5])).toBe(false);
+    expect(detectStudioBrushSoakMonotonicDegradation([0, 0])).toBe(false);
+    // A half below the sample floor cannot estimate its own spread, so it never calls degradation.
+    expect(detectStudioBrushSoakMonotonicDegradation([1, 50, 60])).toBe(false);
+  });
+
+  it("the shipped soak runs enough samples for both halves to clear the sample floor", () => {
+    expect(Math.floor(STUDIO_BRUSH_CATALOGUE_SOAK_RUNS / 2)).toBeGreaterThanOrEqual(
+      STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES,
+    );
+  });
+});
 
 describe("studio brush catalogue paint performance matrix", () => {
   it("exercises every shipped paint catalogue id on product planner paths", () => {
