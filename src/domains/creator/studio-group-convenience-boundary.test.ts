@@ -372,11 +372,12 @@ describe("Studio PPT-style group convenience boundary", () => {
       'element.type === "draw"',
     );
     expect(viewportSource).toContain("liveNodeDisplayBounds(");
-    // Symmetry strokes are marked at render time so the live transform preview refuses them: the
-    // preview transforms already-generated copies while the commit regenerates them about
-    // unchanged world axes, and the model has no axis angle to reconcile the two.
+    // Routes whose commit cannot reproduce an affine preview are marked at render time, where the
+    // element is in hand, and refused by the preview. The verdict itself lives in one helper
+    // (studio-live-transform-preview-eligibility) rather than inline here, so the list stays in a
+    // single place as new render paths are found; this only pins that the wrapper carries it.
     expect(viewportSource).toContain("studioLiveTransformPreviewBlocked={");
-    expect(viewportSource).toContain('el.symmetry.type !== "none"');
+    expect(viewportSource).toContain("studioLiveTransformPreviewBlockedForElement(el, hitClosedShape)");
   });
 
   it("claims and releases the complete group lease around one stage commit", () => {

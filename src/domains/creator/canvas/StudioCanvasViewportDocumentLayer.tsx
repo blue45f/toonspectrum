@@ -15,6 +15,7 @@ import { imageFilterCacheKey } from "../render/studio-konva-filter-fields";
 import { studioAdjustmentStackToFilterFields } from "../studio-adjustment-stack";
 import { resolveTimelineComposite, resolveTimelineTransforms } from "../studio-anim-tracks";
 import { containingPanel, elBounds } from "../studio-element-geometry";
+import { studioLiveTransformPreviewBlockedForElement } from "../studio-live-transform-preview-eligibility";
 import { clampFrameIndex, frameIndexOf, onionSkinLayers } from "../studio-frame-animation";
 import { isEffectivelyHidden, isEffectivelyLocked } from "../studio-layers";
 import { MASTER_EDIT_GHOST_OPACITY } from "../studio-master-page";
@@ -559,7 +560,7 @@ export function StudioCanvasViewportDocumentLayer({
                       // preview never showed. Marked here, where the element is in hand, and
                       // refused by studioLiveTransformPreviewEligible.
                       studioLiveTransformPreviewBlocked={
-                        el.symmetry !== undefined && el.symmetry.type !== "none"
+                        studioLiveTransformPreviewBlockedForElement(el, hitClosedShape)
                           ? true
                           : undefined
                       }
