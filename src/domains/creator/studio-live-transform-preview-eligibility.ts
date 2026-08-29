@@ -85,6 +85,49 @@ function studioBrushEngineResamplesCoordinates(brushId: unknown): boolean {
 }
 
 /**
+ * The web drawing-assist kit, blocked as a FAMILY rather than one member at a time.
+ *
+ * Every one of these generates its marks from parameters fixed in WORLD space, not from the stroke
+ * alone, so the commit replans them on axes the gesture never turned. Sampled across the kit:
+ * `planStudioWebGridInkSamples` rounds each sample to `Math.round(x / cell) * cell` on an unrotated
+ * grid (and dedups by cell key, so the sample COUNT moves too); `planStudioWebKaleidoInkSamples`
+ * replicates about a fixed `centerX`/`centerY`; `planStudioWebMirrorInkSamples` reflects across a
+ * fixed `axisX`/`axisY`; `planStudioWebCrossHatchPenSamples` hatches at hard-coded +/-45deg. This is
+ * the same non-commuting shape as the `symmetry` guard above -- `A ∘ G` is not `G ∘ A` when G is
+ * pinned to the world.
+ *
+ * Taken as the whole family rather than the members verified one by one, because the asymmetry that
+ * justifies every entry in this file applies with full force: over-blocking costs a member its live
+ * preview and nothing else, since the commit is unchanged and correct, while under-blocking ships a
+ * visible snap -- and each of the last several review rounds found exactly one more member of a
+ * pattern already established.
+ *
+ * Spelled out here rather than imported from `STUDIO_WEB_ASSIST_BRUSH_IDS`, which would pull that
+ * kit's ~1,000 lines of sample planners into the eagerly-bundled canvas path just to read thirteen
+ * strings -- the same bundle discipline `studio-selection-chrome-mirror` follows for the overlay's
+ * node name. `studio-live-transform-preview-eligibility.test.ts` pins this set equal to the kit's
+ * own exported list, so a brush added there fails the build rather than slipping past the guard.
+ */
+const STUDIO_WORLD_PARAMETERIZED_BRUSH_IDS: ReadonlySet<string> = new Set([
+  "web-kaleido-ink",
+  "web-fur-strand",
+  "web-contour-double",
+  "web-radial-burst",
+  "web-mirror-ink",
+  "web-grid-ink",
+  "web-spiro-orbit",
+  "web-zigzag-edge",
+  "web-neon-tube",
+  "web-pressure-flat",
+  "web-smudge-trail",
+  "web-cross-hatch-pen",
+]);
+
+/** Exported for the drift test alone; the guard reads the set directly. */
+export const STUDIO_LIVE_TRANSFORM_WORLD_PARAMETERIZED_BRUSH_IDS =
+  STUDIO_WORLD_PARAMETERIZED_BRUSH_IDS;
+
+/**
  * @param isBoundDerivedShape the caller's own closed-shape verdict. Rect, ellipse, star, triangle
  *   and polygon are rebuilt by `StudioDrawNode` from `drawBounds(points)` as AXIS-ALIGNED
  *   primitives, so a rotation survives in the preview and is thrown away by the commit, which
@@ -132,6 +175,12 @@ export function studioLiveTransformPreviewBlockedForElement(
     return true;
   }
   if (typeof catalogId === "string" && STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS.has(catalogId)) {
+    return true;
+  }
+  if (typeof brushId === "string" && STUDIO_WORLD_PARAMETERIZED_BRUSH_IDS.has(brushId)) {
+    return true;
+  }
+  if (typeof catalogId === "string" && STUDIO_WORLD_PARAMETERIZED_BRUSH_IDS.has(catalogId)) {
     return true;
   }
   return false;

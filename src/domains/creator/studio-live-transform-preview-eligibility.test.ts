@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { studioLiveTransformPreviewBlockedForElement } from "./studio-live-transform-preview-eligibility";
+import {
+  STUDIO_LIVE_TRANSFORM_WORLD_PARAMETERIZED_BRUSH_IDS,
+  studioLiveTransformPreviewBlockedForElement,
+} from "./studio-live-transform-preview-eligibility";
+import { STUDIO_WEB_ASSIST_BRUSH_IDS } from "./studio-web-drawing-assist-kit";
 
 import type { El } from "./studio-element-model";
 
@@ -127,6 +131,24 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     for (const brush of ["pencil", "pencil-2b", "soft-pencil", "colored-pencil"]) {
       expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(true);
     }
+  });
+
+  it("refuses the whole web drawing-assist family, which is parameterized in world space", () => {
+    // Sampled and verified: web-grid-ink snaps to Math.round(x / cell) * cell on an unrotated
+    // grid, web-kaleido-ink replicates about a fixed centre, web-mirror-ink reflects across a
+    // fixed axis, web-cross-hatch-pen hatches at hard-coded +/-45deg. Blocked as the kit's own
+    // exported id list so a brush added there cannot slip past this guard.
+    for (const brush of STUDIO_WEB_ASSIST_BRUSH_IDS) {
+      expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(true);
+    }
+  });
+
+  it("keeps that family list equal to the assist kit's own, so a new brush cannot slip past", () => {
+    // The guard spells the ids out to keep the kit's ~1,000 lines of planners out of the eager
+    // canvas bundle; this is what stops that copy from drifting. A brush added to the kit fails
+    // here rather than quietly gaining a preview its renderer cannot reproduce.
+    expect([...STUDIO_LIVE_TRANSFORM_WORLD_PARAMETERIZED_BRUSH_IDS].sort())
+      .toEqual([...STUDIO_WEB_ASSIST_BRUSH_IDS].sort());
   });
 
   it("refuses sketch-styled lines and arrows, whose Rough.js wobble is replanned", () => {
