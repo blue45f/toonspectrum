@@ -57,6 +57,19 @@ jobs:
         run: pnpm run build
       - name: Sweep every Studio route under in-app browser conditions
         run: pnpm run verify:studio-inapp-browser
+      - name: Open the 3D editor inside those same in-app browsers
+        # The route sweep above proves every Studio route survives an embedded WebView; it never
+        # opens the 3D editor, which is where the engine-selection policy has to hold. This drives
+        # the routed bg3d surface at phone widths and reads the composited canvas back, failing on
+        # a blank viewport, an engine badge that is not WebGL2, a touch target under 44px,
+        # horizontal overflow, a viewport notice with no readable surface, or any page error.
+        #
+        # It belongs beside the route sweep rather than in the 3D runtime job: same browser matrix
+        # and build, and this job runs parallel to core instead of behind it, so the gate still
+        # reports when core is red.
+        run: |
+          xvfb-run -a --server-args="-screen 0 1920x1200x24" \
+            pnpm run verify:studio-bg3d-inapp-editor
 
   verify:
     # Keep this job ID because repository CI-policy tests inspect jobs.verify. The display name
@@ -318,11 +331,3 @@ jobs:
             exit 0
           fi
           exit "$status"
-      - name: Verify the 3D editor opens and renders inside Korean in-app browsers
-        # Opens the routed bg3d surface under KakaoTalk, Instagram and NAVER user agents at phone
-        # widths and reads the composited canvas back. It fails on a blank viewport, an engine
-        # badge that is not WebGL2, a touch target under 44px, horizontal overflow, a viewport
-        # notice with no readable surface of its own, or any page error.
-        run: |
-          xvfb-run -a --server-args="-screen 0 1920x1200x24" \
-            pnpm run verify:studio-bg3d-inapp-editor
