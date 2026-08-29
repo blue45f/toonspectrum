@@ -233,6 +233,10 @@ describe("studio impasto relief shading v1 (dli/paint MIT port)", () => {
    * fixed four in setup), and exactly four times for emboss-2tap, which never enters
    * `shadeNormal`. No other transcendental is called at all in either mode.
    *
+   * "No other" means every costly `Math` member, not the handful this shader happens to use today
+   * — a census scoped to the current call set says nothing about a regression that reaches for
+   * `Math.tan` or `Math.cbrt` tomorrow.
+   *
    * This is what the 40ms budget below was really protecting, and it protects it far better: a
    * normalize added per tap, a second sqrt in the visibility term, an `acos`/`pow` creeping into
    * the BRDF, or `(1 - lDotH) ** 5` becoming `Math.pow` all move these counts, and they move them

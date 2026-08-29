@@ -1,7 +1,10 @@
 import { getStroke } from "perfect-freehand";
 import { describe, expect, it } from "vitest";
 
-import { evaluateStudioCalibratedBudget } from "./brush/studio-perf-calibration";
+import {
+  evaluateStudioCalibratedBudget,
+  evaluateStudioCalibratedDetection,
+} from "./brush/studio-perf-calibration";
 import {
   applyStudioCroquisPulledStringPrefilter,
   buildStudioCroquisCapsuleStrokeLoops,
@@ -423,6 +426,11 @@ describe("capsule stroke loops", () => {
   });
 
   /** The 2000-point stroke both budget tests below measure. */
+  /** See the budget's own comment: five samples do not converge on a ~19ms window under load. */
+  const CROQUIS_LONG_STROKE_SAMPLES = 21;
+  /** Above the worst converged honest reading (0.835) and below a doubling (1.44). */
+  const CROQUIS_LONG_STROKE_MAX_RATIO = 1.2;
+
   function longStrokeInput(): { points: number[]; radii: readonly number[] } {
     const points: number[] = [];
     const pressures: number[] = [];
@@ -465,15 +473,24 @@ describe("capsule stroke loops", () => {
    * 40ms carried barely 2x headroom against four competing vitest workers.
    *
    * `referenceRounds` was sized by measurement, not prediction: 1573 rounds is the same window
-   * length as one build, and the resulting ratio held 0.879-0.986 on Node 22, 0.815-0.838 on
-   * Node 24 and 0.873-1.090 with a 1MB young generation — a ~±14% spread. That is the property
-   * the impasto relief shader does NOT have (0.97-1.04 vs 0.505-0.518 across the same two Node
-   * versions), which is why that budget went to a deterministic census instead and this one can
-   * keep a calibrated clock.
+   * length as one build. That is the property the impasto relief shader does NOT have (0.97-1.04
+   * vs 0.505-0.518 across the same two Node versions), which is why that budget went to a
+   * deterministic census instead and this one can keep a calibrated clock.
    *
-   * 1.4 sits above the worst honest verdict (0.879) with ~59% headroom while a doubling from the
-   * best-case baseline lands at 1.63 and still fails — confirmed by injecting a real doubling,
-   * which read 1.757-2.048 and failed on every confirmation pass.
+   * `samples` is 21, and that number is load-bearing rather than incidental. At five samples the
+   * pass ratio read 0.816-0.952 idle but 0.27-1.86 under six spinning hogs against four cores: a
+   * ~19ms window is long enough for a stall to land in every one of five samples, so neither
+   * minimum converges and the pair stops meaning anything. At 21 it reads 0.727-0.799 idle and
+   * 0.721-0.835 loaded — a 16% spread across the same 250% oversubscription. More short samples
+   * beat fewer long ones, which is the same lesson the append and freeze budgets in this change
+   * learned separately.
+   *
+   * That also moved the gate. With the baseline properly converged at ~0.75 rather than the ~0.9
+   * five samples reported, the old 1.4 sat 1.87x above it — a doubling landed at 1.44 and cleared
+   * it by 3%, which is a gate that had stopped catching what it claims to. 1.2 keeps 1.44x
+   * headroom over the worst honest reading recorded here while convicting a doubling with 27-31%
+   * margin. Confirmed by injection rather than arithmetic: building the path twice per workload
+   * read 1.524 / 1.561 / 1.568 and failed on every confirmation pass.
    */
   it("builds a 2000-point stroke path inside its calibrated budget", () => {
     const { points, radii } = longStrokeInput();
@@ -484,10 +501,35 @@ describe("capsule stroke loops", () => {
         sink += buildStudioCroquisCapsuleStrokePathData({ points, radii }).length;
       },
       referenceRounds: 1_573,
-      maxRatio: 1.4,
-      samples: 5,
+      maxRatio: CROQUIS_LONG_STROKE_MAX_RATIO,
+      samples: CROQUIS_LONG_STROKE_SAMPLES,
     });
     expect(verdict.ok, verdict.detail).toBe(true);
+
+    // The gate's mirror image, on this machine, from the passes it just judged: had the builder
+    // doubled, would 1.4 have convicted it?
+    //
+    // A recorded margin is not the same claim, and here it was not even the right one: the
+    // baseline the old 1.4 was set against was a five-sample reading that had not converged, and
+    // once it had, a doubling cleared that gate by 3%. On a CPU/V8 combination where the honest
+    // ratio sits lower still, a doubled builder would land under the gate and this budget would
+    // pass while catching nothing. The pinned path output above does not cover that either — a
+    // slower implementation emits identical bytes. So the claim is asserted live rather than
+    // argued from a recording, and it seeds the passes already measured, so a healthy run
+    // measures nothing extra.
+    const detection = evaluateStudioCalibratedDetection({
+      label: verdict.label,
+      workload: () => {
+        sink += buildStudioCroquisCapsuleStrokePathData({ points, radii }).length;
+      },
+      referenceRounds: 1_573,
+      maxRatio: CROQUIS_LONG_STROKE_MAX_RATIO,
+      samples: CROQUIS_LONG_STROKE_SAMPLES,
+      seed: verdict.passes,
+      factor: 2,
+    });
+    expect(detection.detected, detection.detail).toBe(true);
+
     expect(sink).toBeGreaterThan(0);
   });
 });

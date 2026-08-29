@@ -488,6 +488,41 @@ function appendMarkGrowthRatio(deltas: readonly number[]): number {
 }
 
 /**
+ * How much more a stroke's LATE appends cost than its early ones, with the machine divided out of
+ * both halves — the O(1) claim on the clock rather than on mark counts.
+ *
+ * The cheapest append over a whole stroke cannot answer this. It is always an early one, so a
+ * regression that only slows later appends leaves it exactly where it was; adding 100ms to every
+ * append in the second half moves neither that minimum nor any mark count, because a planner can
+ * recompute prior geometry and still render only the unseen suffix. Splitting the pass in two and
+ * calibrating each half against the references timed beside ITS OWN appends catches precisely
+ * that: both halves cancel the machine independently, so what survives the division is length
+ * dependence and nothing else.
+ */
+function appendCalibratedHalfGrowth(
+  samples: readonly StudioPerfCalibrationSample[],
+): number {
+  if (samples.length < 4) {
+    throw new Error("A half-growth ratio needs at least four appends.");
+  }
+  const half = Math.floor(samples.length / 2);
+  const early = reduceStudioPerfCalibrationSamples(samples.slice(0, half));
+  const late = reduceStudioPerfCalibrationSamples(samples.slice(half));
+  return late.ratio / early.ratio;
+}
+
+/**
+ * Recorded across idle and six-hogs-on-four-cores runs at 0.881 / 0.904 / 0.933 / 0.953 / 0.964 /
+ * 0.977 / 1.004 / 1.009 / 1.018 — a 14% spread, centred just below 1 because the second half of a
+ * stroke runs on a warmer JIT. 1.3 carries 28% headroom over the worst of those, while any real
+ * length dependence lands far above it: a linear replan puts this near 100, and even a leak that
+ * adds 1% of the base cost per append reaches ~2. Confirmed live rather than argued — slowing
+ * only the second half of the appends by 1.5x scored 1.357 / 1.492 / 1.621 and failed on every
+ * pass, while the global cheapest append, and every mark count, stayed exactly where they were.
+ */
+const APPEND_LENGTH_GROWTH_LIMIT = 1.3;
+
+/**
  * Recorded 0.9996 for the incremental appender, identically in every pass on every machine (mark
  * counts do not vary). 1.25 leaves room for a step-count change without admitting anything
  * asymptotic: the cheapest cumulative repaint this loop can express already lands near 3.
@@ -1779,6 +1814,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // over the worst honest reading, while a doubled append (>=2.23) is convicted with 32% margin.
     const APPEND_CALIBRATION_MAX_RATIO = 1.5;
     const calibrationPasses: StudioPerfCalibrationPass[] = [];
+    const halfGrowths: number[] = [];
     let maxAppendFrameMs = Number.POSITIVE_INFINITY;
     let totalAppendMs = Number.POSITIVE_INFINITY;
     let markDeltas: number[] = [];
@@ -1859,6 +1895,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       totalAppendMs = passTotalAppendMs;
     }
     calibrationPasses.push(reduceStudioPerfCalibrationSamples(passSamples));
+    halfGrowths.push(appendCalibratedHalfGrowth(passSamples));
     markDeltas = passMarkDeltas;
     appendCount = passAppendCount;
     liveMarks = activeCanvas.recordedMarks;
@@ -1934,6 +1971,19 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     );
     expect(detection.detected, detection.detail).toBe(true);
 
+    // ...and the same gate along the stroke, because the minimum above is always an EARLY append.
+    // A regression that recomputes prior geometry for later frames while still rendering only the
+    // unseen suffix moves no mark count and no global minimum — it is only visible as late
+    // appends costing more than early ones did. Each half is calibrated against the references
+    // timed beside its own appends, so the machine cancels twice and what is left is length
+    // dependence. Earned like every other verdict here: the cheapest of the three passes decides.
+    const halfGrowth = Math.min(...halfGrowths);
+    expect(
+      halfGrowth,
+      `late appends cost ${halfGrowth.toFixed(3)}x what early ones did `
+      + `(passes: ${halfGrowths.map((value) => value.toFixed(3)).join(", ")})`,
+    ).toBeLessThan(APPEND_LENGTH_GROWTH_LIMIT);
+
     // A blow-up bound, not a budget. The worst single append is a pure noise measurement -- 30.1
     // to 45.8ms idle on this container, where the median append is 1.8ms, because one GC pause
     // lands wherever it lands (the 1ms reference kernel itself was seen taking 7.2ms). It was
@@ -1952,6 +2002,60 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       .toBeLessThanOrEqual(STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET);
     const sealed = lastRenderer!.end(element);
     expect(sealed.status).toBe("settled");
+  });
+
+  it("convicts a length-dependent appender the cheapest append cannot see", () => {
+    // The blind spot the mark-count pins do NOT cover: a planner that recomputes prior geometry
+    // for later frames but still renders only the unseen suffix. Every mark delta is unchanged,
+    // so the counts above stay green, and the global cheapest append is unchanged too because it
+    // is always an early one. Stated as data, so it needs no clock and no machine.
+    const APPENDS = 200;
+    const REFERENCE_MS = 1;
+    const honest = Array.from({ length: APPENDS }, (_, index) => ({
+      referenceMs: REFERENCE_MS,
+      // The recorded shape's two levels: every eighth append re-plans a ribbon chunk.
+      workMs: index % 8 === 7 ? 9 : 1.1,
+    }));
+    expect(appendCalibratedHalfGrowth(honest)).toBeCloseTo(1, 6);
+    expect(appendCalibratedHalfGrowth(honest)).toBeLessThan(APPEND_LENGTH_GROWTH_LIMIT);
+
+    // Codex's case, verbatim: 100ms added to every append in the second half.
+    const lateStall = honest.map((sample, index) => (index < APPENDS / 2
+      ? sample
+      : { ...sample, workMs: sample.workMs + 100 }));
+    expect(appendCalibratedHalfGrowth(lateStall)).toBeGreaterThan(APPEND_LENGTH_GROWTH_LIMIT);
+    // ...and the statistic the global minimum reports for that same series is unchanged, which is
+    // exactly why this gate exists alongside it.
+    expect(reduceStudioPerfCalibrationSamples(lateStall).workMs)
+      .toBe(reduceStudioPerfCalibrationSamples(honest).workMs);
+
+    // A linear replan — append k re-derives k appends' worth — is convicted overwhelmingly.
+    const linear = honest.map((sample, index) => ({
+      ...sample,
+      workMs: sample.workMs * (index + 1),
+    }));
+    expect(appendCalibratedHalfGrowth(linear)).toBeGreaterThan(50);
+
+    // And a partial leak: 1% of the base cost re-derived per append behind the cursor.
+    const leak = honest.map((sample, index) => ({
+      ...sample,
+      workMs: sample.workMs * (1 + 0.01 * index),
+    }));
+    expect(appendCalibratedHalfGrowth(leak)).toBeGreaterThan(APPEND_LENGTH_GROWTH_LIMIT);
+
+    // Not vacuous in the other direction: a uniform 40% slowdown is NOT length dependence and
+    // must not be convicted here — that is the calibrated budget's job, and it catches it.
+    const uniform = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 1.4 }));
+    expect(appendCalibratedHalfGrowth(uniform)).toBeLessThan(APPEND_LENGTH_GROWTH_LIMIT);
+    // A machine 3x slower at everything, references included, is likewise not length dependence.
+    const slowBox = honest.map((sample) => ({
+      referenceMs: sample.referenceMs * 3,
+      workMs: sample.workMs * 3,
+    }));
+    expect(appendCalibratedHalfGrowth(slowBox)).toBeCloseTo(1, 6);
+
+    expect(() => appendCalibratedHalfGrowth(honest.slice(0, 3)))
+      .toThrow(/at least four appends/);
   });
 
   it("convicts a cumulative-repaint appender on mark counts alone", () => {

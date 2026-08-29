@@ -112,7 +112,9 @@ describe("deterministic settled-bake memo cache", () => {
   it("returns the identical plan without re-solving for byte-equal inputs", () => {
     const plan = makePlan(500);
 
+    const coldStartedAt = performance.now();
     const first = augmentStudioLivingInkSettledBakeDabs(plan, SETTLED_SUMI);
+    const coldSolveMs = performance.now() - coldStartedAt;
     expect(first.length).toBeGreaterThan(plan.length);
 
     // Same array instance → same output instance, no recompute.
@@ -120,7 +122,7 @@ describe("deterministic settled-bake memo cache", () => {
 
     // Content-equal but distinct array (every React render replans): identical
     // bytes, passthrough cores re-anchored to the CALLER's own objects, and a
-    // repeat cost far under the freeze budget (pre-fix: a full 30–116ms solve).
+    // repeat cost that is a cache hit rather than a solve.
     const replanned = makePlan(500);
     const startedAt = performance.now();
     const second = augmentStudioLivingInkSettledBakeDabs(replanned, SETTLED_SUMI);
@@ -132,7 +134,21 @@ describe("deterministic settled-bake memo cache", () => {
     for (let index = 0; index < secondCores.length; index += 1) {
       expect(secondCores[index]).toBe(replannedCores[index]);
     }
-    expect(repeatMs).toBeLessThan(CHUNK_FREEZE_BUDGET_MS / 2);
+    // Graded against the COLD SOLVE in the line above, not against a millisecond count.
+    //
+    // The claim is "this did not re-solve", and the two costs differ by three orders of
+    // magnitude — 0.41-0.73ms against a solve of 171ms idle and 262-432ms under six spinning
+    // hogs on four cores, a ratio of 0.0011-0.0040. An absolute 16.5ms bound stated that claim
+    // 23-40x looser than the truth and still failed under load, because a single preemption
+    // landing inside a 0.7ms window is worth more than the whole budget. The ratio cancels the
+    // machine: both halves are the same work on the same box, seconds apart.
+    //
+    // 0.05 keeps 12x headroom over the worst honest reading, while the regression this exists to
+    // catch — the cache missing and a full solve running again — scores ~1 and fails by 20x.
+    expect(
+      repeatMs / coldSolveMs,
+      `memo repeat cost ${repeatMs.toFixed(3)}ms against a ${coldSolveMs.toFixed(1)}ms cold solve`,
+    ).toBeLessThan(0.05);
   });
 
   it("keeps different seeds/settings in distinct entries", () => {
@@ -156,9 +172,11 @@ describe("time-sliced settled bake at the planner cap", () => {
     // 1. Synchronous reference (what SVG export computes) at the planner cap.
     const referenceInput = makePlan(PLANNER_DAB_CAP / 2);
     expect(referenceInput.length).toBe(PLANNER_DAB_CAP);
+    const referenceStartedAt = performance.now();
     const referenceBytes = JSON.stringify(
       augmentStudioLivingInkSettledBakeDabs(referenceInput, SETTLED_SUMI),
     );
+    const synchronousSolveMs = performance.now() - referenceStartedAt;
     resetStudioLivingInkSettledBakeCacheForTests();
 
     // 2. Cold render-path request: must NOT solve synchronously.
@@ -177,8 +195,18 @@ describe("time-sliced settled bake at the planner cap", () => {
       );
       const requestMs = performance.now() - requestStartedAt;
       expect(immediate).toBeNull();
-      // The render-body call only snapshots + enqueues — far under budget.
-      expect(requestMs).toBeLessThan(CHUNK_FREEZE_BUDGET_MS / 2);
+      // The render-body call only snapshots + enqueues, and that is graded against the
+      // SYNCHRONOUS SOLVE of the same input timed above rather than against a millisecond count.
+      // `immediate === null` already proves no plan came back; this proves the enqueue did not
+      // quietly do the work anyway. Recorded 1.3ms idle and 3.5-7.8ms under six spinning hogs
+      // against solves of 171ms and 262-432ms respectively — 0.008 and 0.008-0.018. The absolute
+      // 16.5ms form carried only 2-12x headroom over a sub-4ms measurement and failed under load
+      // at 17.4 and 20.7ms with nothing regressed; a synchronous solve here would score ~1.
+      expect(
+        requestMs / synchronousSolveMs,
+        `render-body request ${requestMs.toFixed(3)}ms against a `
+        + `${synchronousSolveMs.toFixed(1)}ms synchronous solve`,
+      ).toBeLessThan(0.1);
 
       // A joining request (content-equal array, e.g. a symmetry sibling or a
       // second render) shares the pending job instead of re-enqueueing.
@@ -216,10 +244,16 @@ describe("time-sliced settled bake at the planner cap", () => {
       // under heavy contention it went from 10.3 to 36.2ms — and the maximum is pure scheduling
       // noise, which is what failed this test at 39.0ms with nothing regressed.
       //
-      // A minimum still catches everything this budget is for. If slicing breaks, one slice
-      // absorbs the whole solve and the minimum IS that slice. If a single unit becomes
-      // expensive, every slice carries at least one and the minimum rises with it. The slicer
-      // cannot pass by being accidentally fast, because it is wall-clock bounded from the inside.
+      // A minimum catches the two regressions this budget is really for. If slicing breaks, one
+      // slice absorbs the whole solve and the minimum IS that slice. If a per-unit cost rises,
+      // every slice carries at least one unit and the minimum rises with it. The slicer cannot
+      // pass by being accidentally fast, because it is wall-clock bounded from the inside.
+      //
+      // What a minimum cannot see is a PHASE-SPECIFIC blow-up: seeding, or the final
+      // `deriveAugmentedSettledDabs` lowering, becoming expensive in the one slice that carries
+      // it while every other slice stays at its 8ms budget. That case is the ceiling's job below,
+      // which is why the ceiling is sized against the observed noise population rather than left
+      // as a token hang bound.
       expect(
         ordered[0],
         `cheapest slice over the ${CHUNK_FREEZE_BUDGET_MS}ms freeze budget: [${ordered
@@ -229,8 +263,16 @@ describe("time-sliced settled bake at the planner cap", () => {
       // Slicing actually happened. Idle produces 14 slices and a loaded box 24-25 (it packs less
       // work into each), so a collapse to one or two passes fails here as well as above.
       expect(sliceDurations.length).toBeGreaterThanOrEqual(8);
-      // Hang detector only, deliberately far above the 121.8ms a starved container produced.
-      expect(Math.max(...sliceDurations)).toBeLessThan(1_000);
+      // The worst slice, bounded against the observed noise population rather than against
+      // nothing in particular. Scheduling decides this number — 16.0ms idle, 55.0-57.1ms under
+      // heavy contention, 121.8ms on a starved container — so it cannot carry the 33ms freeze
+      // budget; that is what failed this test at 39.0ms. But 400ms is more than 3x the worst
+      // honest reading ever recorded here, and a phase-specific unit blowing up to the hundreds
+      // of milliseconds a user would actually feel fails it, which the minimum above cannot see.
+      expect(
+        Math.max(...sliceDurations),
+        `worst slice: [${ordered.map((duration) => duration.toFixed(1)).join(", ")}]`,
+      ).toBeLessThan(400);
 
       // 4. Completion: the cached plan is byte-identical to the synchronous
       //    solve — slicing changed scheduling, never bytes — and the cores are
