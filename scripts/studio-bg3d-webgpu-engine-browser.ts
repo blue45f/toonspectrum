@@ -304,7 +304,7 @@ async function probeKtx2Runtime(renderer: unknown) {
 /** WebGL-only features must pin the baseline even against an explicit WebGPU request. */
 function webglOnlyFeatureMatrix(probe: Awaited<ReturnType<typeof probeStudioBg3dWebGpuCapability>>) {
   const inApp = classifyStudioBg3dInAppBrowser({ userAgent: navigator.userAgent });
-  return (["webxr"] as const).map((feature) => {
+  return (["webxr", "vrmCharacters"] as const).map((feature) => {
     const request = {
       probe,
       inApp,
@@ -339,6 +339,12 @@ function probeVrmRequested(): boolean {
  * wrong one does not throw — Three simply never builds the shader and the character is missing
  * from a frame that otherwise renders fine. So this reports both halves: the material brands the
  * loader produced, and how much of the capture the character actually covers.
+ *
+ * The raster is returned as well, because coverage answers "is the character there" and nothing
+ * more. These are two independent upstream implementations of one spec, and the product now runs
+ * them side by side — the poser still owns a `WebGLRenderer` while the BG3D stage may be WebGPU —
+ * so an artist can grade a character under one shading path and deliver it through the other.
+ * Whether the two agree on colour is only knowable by comparing the pixels.
  */
 async function probeVrmMToon(
   variant: StudioVrmMaterialVariant,
@@ -396,6 +402,9 @@ async function probeVrmMToon(
       coveredPixels: summary.nonZeroAlpha,
       capturedPixels: CAPTURE_WIDTH * CAPTURE_HEIGHT,
       recordedVariant: readStudioVrmMaterialVariant(vrm),
+      // Kept in-page only. The caller compares the pair and reports the deltas; the bytes
+      // themselves would not survive the JSON hand-off to the harness.
+      rgba: raster.rgba,
     };
   } catch (error) {
     return {
@@ -406,6 +415,36 @@ async function probeVrmMToon(
   } finally {
     if (objectUrl) URL.revokeObjectURL(objectUrl);
   }
+}
+
+/**
+ * Runs both MToon implementations and compares what they actually drew.
+ *
+ * The raw RGBA bytes never leave this function: they are stripped from the reported shape so the
+ * result stays a small JSON document, and the harness gates on the deltas instead.
+ *
+ * Straight-alpha RGB is undefined where alpha is zero, so — exactly as the unlit scene comparison
+ * does — the composited delta is the one that describes what a reader sees.
+ */
+async function compareVrmMToon(
+  runWebgpu: () => Promise<Awaited<ReturnType<typeof probeVrmMToon>>>,
+  runWebgl: () => Promise<Awaited<ReturnType<typeof probeVrmMToon>>>,
+) {
+  if (!probeVrmRequested()) return { skipped: true as const };
+  const webgpu = await runWebgpu();
+  const webgl = await runWebgl();
+  const strip = (result: Awaited<ReturnType<typeof probeVrmMToon>>) => {
+    if (!result.ok) return result;
+    const { rgba: _rgba, ...rest } = result;
+    return rest;
+  };
+  return {
+    webgpu: strip(webgpu),
+    webgl: strip(webgl),
+    // Null rather than a zeroed comparison when either side failed: a load failure is already
+    // reported above, and a fabricated "identical" row would read as a pass.
+    raster: webgpu.ok && webgl.ok ? compareRasters(webgpu.rgba, webgl.rgba) : null,
+  };
 }
 
 async function run(): Promise<unknown> {
@@ -500,20 +539,20 @@ async function run(): Promise<unknown> {
       webgpu: await probeKtx2Runtime(webgpuRenderer),
       webgl: await probeKtx2Runtime(webglRenderer),
     },
-    vrmMToon: !probeVrmRequested() ? { skipped: true } : {
-      webgpu: await probeVrmMToon("webgpu-node", (vrmScene, vrmCamera) =>
+    vrmMToon: await compareVrmMToon(
+      () => probeVrmMToon("webgpu-node", (vrmScene, vrmCamera) =>
         createStudioBg3dThreeWebGpuCaptureAdapter({
           renderer: webgpuRenderer,
           scene: vrmScene,
           camera: vrmCamera,
         })),
-      webgl: await probeVrmMToon("webgl-shader", (vrmScene, vrmCamera) =>
+      () => probeVrmMToon("webgl-shader", (vrmScene, vrmCamera) =>
         createStudioBg3dThreeWebglCaptureAdapter({
           renderer: webglRenderer,
           scene: vrmScene,
           camera: vrmCamera,
         })),
-    },
+    ),
     liveUserAgent: {
       userAgent: navigator.userAgent,
       classified: classifyStudioBg3dInAppBrowser({ userAgent: navigator.userAgent }),

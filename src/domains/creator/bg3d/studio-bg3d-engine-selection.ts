@@ -44,7 +44,8 @@ export type StudioBg3dEngineSelectionReason =
   | "low-device-memory"
   | "repeated-webgpu-failure"
   | "runtime-capability-unavailable"
-  | "webgl-only-webxr";
+  | "webgl-only-webxr"
+  | "webgl-only-vrm-character";
 
 /**
  * Consecutive WebGPU initialization or device-loss failures after which `auto` stops retrying for
@@ -62,18 +63,32 @@ export const STUDIO_BG3D_WEBGPU_MIN_DEVICE_MEMORY_GB = 4;
  *
  * - `webxr`: the immersive session bridge drives `WebGLRenderer.xr`; Three's WebGPU XR path is not
  *   yet equivalent.
+ * - `vrmCharacters`: MToon does not shade the same on both backends. See below.
  *
- * VRM characters used to belong here, because MToon's appearance is a `ShaderMaterial` a WebGPU
- * renderer cannot build. They no longer do: the shared-character loader now asks
- * `@pixiv/three-vrm` for `MToonNodeMaterial` when a WebGPU renderer owns the canvas, and the
- * real-Chromium verifier renders the same VRM through both backends to the same silhouette.
+ * On VRM: a WebGPU renderer *can* now build MToon — the shared-character loader asks
+ * `@pixiv/three-vrm` for `MToonNodeMaterial`, and both backends put the character on screen with
+ * the same silhouette. Loading is not the problem; **shading is**. `MToonMaterial` and
+ * `MToonNodeMaterial` are two independent upstream implementations of one spec, and measured
+ * against each other on the same scene, lights, camera and tone mapping they disagree across the
+ * whole surface (see `docs/studio-bg3d-vrm-mtoon-backend-color-divergence-2026-08-29.md`):
+ * WebGPU renders ~5.7% darker in mean luminance, and rim highlights that read as near-white under
+ * WebGL come back as base colour, up to 169/255 on a single channel.
+ *
+ * That is a delivery problem, not a preference. A project has to render the same for every
+ * collaborator and on every machine, and it has to keep the colour of everything already
+ * published — all of which predates WebGPU. So a document holding a VRM character runs on the
+ * baseline, and the artist's poser preview (still WebGL2) matches what is delivered.
+ *
+ * This is a fence around an upstream difference, not a verdict on WebGPU. Backgrounds without a
+ * character are unaffected and still get the next-generation engine.
  */
 export interface StudioBg3dEngineWebglOnlyFeatures {
   readonly webxr: boolean;
+  readonly vrmCharacters: boolean;
 }
 
 export const EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES: StudioBg3dEngineWebglOnlyFeatures =
-  Object.freeze({ webxr: false });
+  Object.freeze({ webxr: false, vrmCharacters: false });
 
 /**
  * Latches a WebGL-only demand for the rest of the session. Leaving an immersive session does not
@@ -84,8 +99,13 @@ export function latchStudioBg3dWebglOnlyFeatures(
   current: StudioBg3dEngineWebglOnlyFeatures,
   observed: Partial<StudioBg3dEngineWebglOnlyFeatures>,
 ): StudioBg3dEngineWebglOnlyFeatures {
-  const next = { webxr: current.webxr || observed.webxr === true };
-  return next.webxr === current.webxr ? current : Object.freeze(next);
+  const next = {
+    webxr: current.webxr || observed.webxr === true,
+    vrmCharacters: current.vrmCharacters || observed.vrmCharacters === true,
+  };
+  return next.webxr === current.webxr && next.vrmCharacters === current.vrmCharacters
+    ? current
+    : Object.freeze(next);
 }
 
 export interface StudioBg3dEngineSelectionRequest {
@@ -140,6 +160,9 @@ const NOTICES: Readonly<Record<StudioBg3dEngineSelectionReason, string>> = Objec
   "runtime-capability-unavailable":
     "선택한 엔진이 편집기에 필요한 기능을 모두 제공하지 않아 WebGL2로 실행합니다.",
   "webgl-only-webxr": "몰입형(WebXR) 보기를 사용하는 동안에는 WebGL2 엔진으로 실행합니다.",
+  "webgl-only-vrm-character":
+    "3D 캐릭터가 있는 장면은 WebGL2 엔진으로 실행합니다. 두 엔진의 MToon 음영이 서로 달라, "
+    + "캐릭터 편집기에서 맞춘 색과 출력 색을 같게 유지하기 위해서입니다.",
 });
 
 export const STUDIO_BG3D_ENGINE_PREFERENCES: readonly StudioBg3dEnginePreference[] = Object.freeze([
@@ -202,6 +225,7 @@ function collectHardBlocks(
   }
   const features = request.webglOnlyFeatures;
   if (features?.webxr === true) blocks.push("webgl-only-webxr");
+  if (features?.vrmCharacters === true) blocks.push("webgl-only-vrm-character");
   return blocks;
 }
 

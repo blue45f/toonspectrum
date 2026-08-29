@@ -244,10 +244,40 @@ describe("Studio BG3D WebGL-only feature demand", () => {
     expect(latchStudioBg3dWebglOnlyFeatures(latched, { webxr: false })).toBe(latched);
   });
 
-  it("no longer treats VRM characters as a WebGL-only demand", () => {
-    // The shared-character loader asks for MToon node materials under a WebGPU renderer, so a
-    // scene full of characters is a normal WebGPU scene. Guarding the absence keeps a future
-    // reader from reintroducing the block without also reverting the loader.
-    expect(Object.keys(EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES)).toEqual(["webxr"]);
+  it("pins a scene holding a VRM character to the baseline, over an explicit WebGPU choice", () => {
+    // This block was removed once, on the grounds that the shared-character loader asks for MToon
+    // node materials under a WebGPU renderer and both backends draw the same silhouette. Loading
+    // was never the issue. Measured on one scene with one camera, one light rig and one tone
+    // mapping, the two upstream MToon implementations shade differently across the whole surface:
+    // WebGPU is ~5.7% darker in mean luminance and loses rim highlights by up to 169/255. The
+    // unlit control in the same harness is byte-identical, so this is MToon, not the pipeline.
+    //
+    // A delivered page has to look the same for every collaborator, on every machine, and next to
+    // everything already published — so the character scene runs where the poser runs.
+    expect(Object.keys(EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES).toSorted())
+      .toEqual(["vrmCharacters", "webxr"]);
+
+    // A hard block, not an auto-decline: an explicit WebGPU choice must not re-grade a character.
+    expect(selectStudioBg3dEngine({
+      ...BASE,
+      preference: "webgpu",
+      webglOnlyFeatures: { webxr: false, vrmCharacters: true },
+    })).toMatchObject({ backend: "webgl2", reason: "webgl-only-vrm-character" });
+
+    // And a background with no character still gets the next-generation engine.
+    expect(selectStudioBg3dEngine({
+      ...BASE,
+      webglOnlyFeatures: { webxr: false, vrmCharacters: false },
+    })).toMatchObject({ backend: "webgpu" });
+  });
+
+  it("latches a character demand so removing the character does not remount the viewport", () => {
+    const empty = EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES;
+    expect(latchStudioBg3dWebglOnlyFeatures(empty, { vrmCharacters: false })).toBe(empty);
+
+    const latched = latchStudioBg3dWebglOnlyFeatures(empty, { vrmCharacters: true });
+    expect(latched).toMatchObject({ webxr: false, vrmCharacters: true });
+    expect(Object.isFrozen(latched)).toBe(true);
+    expect(latchStudioBg3dWebglOnlyFeatures(latched, { vrmCharacters: false })).toBe(latched);
   });
 });

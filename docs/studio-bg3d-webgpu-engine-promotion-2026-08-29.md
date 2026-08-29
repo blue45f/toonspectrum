@@ -105,6 +105,13 @@ re-export하는 승인된 WebGPU entry)를 import하면 **포저의 청크까지
 커버리지가 같은 값이라는 게 핵심이다. 잘못된 빌드를 고르면 예외 없이 캐릭터만 프레임에서 빠지므로,
 "오류가 없었다"가 아니라 **실루엣이 같다**를 게이트로 삼았다.
 
+> **후속 정정.** 실루엣은 같지만 **색은 같지 않다.** 이 게이트는 래스터를 비교하지 않고 덮인
+> 픽셀 수만 봤고, 뒤에 같은 harness로 색을 비교해 보니 두 MToon 구현이 표면 전체에서 어긋난다
+> (WebGPU가 평균 휘도 5.7% 어둡고, 림 하이라이트는 최대 169/255 차이). 그래서 캐릭터가 있는
+> 장면은 다시 baseline으로 고정한다 — 로드가 안 돼서가 아니라 납품 색이 머신마다 달라지기
+> 때문이다. 측정과 결정은
+> `studio-bg3d-vrm-mtoon-backend-color-divergence-2026-08-29.md`.
+
 ### 모델 썸네일도 renderer를 가리지 않는다
 
 썸네일 캡처는 편집기의 renderer를 빌려 쓴다. 그 renderer가 WebGPU가 될 수 있게 된 순간
@@ -222,7 +229,9 @@ WebGPU 초기화 실패 배너가 첫 실패부터 "WebGL2 로 전환합니다" 
 
 - VRM 포저(`StudioVrmPoserViewport`)는 여전히 자체 `WebGLRenderer`를 소유한다. 이번 변경은 BG3D
   공유 스테이지의 캐릭터 경로만 backend를 따라가게 했다. 포저까지 옮기려면 그 뷰포트의 renderer
-  수명 자체를 정책 아래로 넣어야 하므로 별도 작업이다.
+  수명 자체를 정책 아래로 넣어야 하므로 별도 작업이다. **다만 시급하지는 않다**: 캐릭터가 있는
+  장면이 baseline으로 고정되면서 포저(WebGL2)와 출력이 이미 같은 경로가 됐다. 포저 이관은 상류
+  MToon이 수렴한 뒤에 다시 볼 문제다.
 - WebXR: Three의 WebGPU XR 경로가 현재 WebGL 세션 브리지와 동등해질 때까지 `three-webgpu`의
   capability 목록에서 제외한다.
 - 실기기 GPU 계측(프레임 타임·입력 지연)은 `studio-bg3d-engine-benchmark-contract.ts`의
