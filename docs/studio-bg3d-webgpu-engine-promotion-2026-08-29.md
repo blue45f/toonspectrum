@@ -95,6 +95,15 @@ node material 대응물이 없으므로 `packing.glsl.js`의 `packDepthToRGBA`�
 투명 배경의 원시 채널 차 205는 알파가 0인 픽셀에서만 나온다. straight-alpha 계약에서 그
 RGB는 정의되지 않으므로, 게이트는 **알파와 합성 결과**가 담당한다. 둘 다 비트 동일하다.
 
+검증 장면에는 capture-excluded 기즈모와 depth-excluded 접지 그림자가 기하 앞에 놓여 있다.
+두 pass는 어느 readback도 await하기 전에 모두 제출되므로 제외 객체가 색과 깊이 draw 양쪽에
+걸쳐 계속 숨겨진다. 사이에서 되살리면 기즈모가 깊이 raster에 구워져 선화 출력에 기하처럼
+나타난다. 위 수치는 이 객체들이 장면에 있는 상태의 결과다.
+
+KTX2 transcoder runtime도 두 renderer 각각에 대해 실제로 초기화해 본다. 넓힌 가드는 실제
+`WebGPURenderer`가 `detectSupport()`의 feature 질의에 답할 수 있어야만 의미가 있고, stub은
+그걸 증명하지 못한다.
+
 검증 스크립트는 같은 페이지를 카카오톡·네이버앱·인스타그램 user agent로 다시 열어
 분류와 정책이 실제 `navigator.userAgent`에서도 의도대로 동작하는지 확인한다.
 
@@ -114,3 +123,7 @@ WebGPU 엔진은 승인된 지연 entry 하나(`studio-bg3d-three-webgpu-entry.t
   capability 목록에서 제외한다.
 - 실기기 GPU 계측(프레임 타임·입력 지연)은 `studio-bg3d-engine-benchmark-contract.ts`의
   런을 실제 단말에서 수집한 뒤 별도로 기록한다. 이번 승격은 정확성 동등성까지만 증명한다.
+- capture마다 straight-alpha 출력 quad의 node material을 새로 만든다(WebGL adapter가 매번
+  `OutputPass`를 만드는 것과 같은 모양). WebGPU는 파이프라인 생성 비용이 더 크므로 shot batch
+  같은 연속 캡처에서 문제가 될 수 있다. 추측으로 캐시를 넣기보다, 실제 batch 지연을 먼저
+  측정한 뒤 대상 크기별 target/quad 재사용을 검토한다.
