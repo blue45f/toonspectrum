@@ -636,6 +636,39 @@ describe("StudioGroupUniformResizeProxy", () => {
       });
     });
 
+    it("균일 프레임 뒤 비균일로 바뀌면 직전 포즈를 유지하지 않고 중립으로 되돌린다", () => {
+      // 회귀 방지: 비균일 프레임을 단순히 "투영 없음"으로 처리하면 직전 균일 포즈가 그대로 남아,
+      // 핸들은 계속 움직이는데 잉크만 얼어붙었다가 릴리즈 때 튄다. 프리뷰를 아예 안 하는 것보다
+      // 나쁘므로, 유효하지만 표현 불가능한 프레임에서는 중립으로 되돌려 문서 위치에 머물게 한다.
+      const { wrapper, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rect.scaleY(2);
+        rectProps().onTransform({ target: rect });
+      });
+      expect(wrapper.state.scaleX).toBe(2);
+
+      act(() => {
+        rect.scaleY(3);
+        rectProps().onTransform({ target: rect });
+      });
+
+      expect(wrapper.state).toEqual({
+        x: 0,
+        y: 0,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        offsetX: 0,
+        offsetY: 0,
+      });
+    });
+
     it("transformend는 래퍼를 중립화한 뒤에야 정확히 한 번 커밋하고 인디케이터를 복구한다", () => {
       const { wrapper, indicator, props } = setupLivePreview();
       const rect = konvaHarness.rectNode as unknown as FakeRectNode;

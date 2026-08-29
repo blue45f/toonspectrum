@@ -415,7 +415,36 @@ describe("orientation-dependent nibs", () => {
     expect(rotated?.tiltYs?.[1]).toBeCloseTo(0, 9);
     // Scaling the box must not lengthen a direction vector.
     expect(Math.hypot(rotated!.tiltXs![0]!, rotated!.tiltYs![0]!)).toBeCloseTo(1, 9);
-    expect(rotated?.twists).toEqual([90, -100]);
+    // [0, 360), the field's real domain: the renderer clamps to [0, 359] so a negative sample
+    // would collapse to 0 rather than its equivalent angle, and CRDT validation rejects it.
+    expect(rotated?.twists).toEqual([90, 260]);
+  });
+
+  it("keeps every rotated stylus sample inside its persisted domain", () => {
+    // The renderer and CRDT payload validation both bound these: tilt to [-90, 90] and twist to
+    // [0, 359]. A sample outside them renders wrong AND fails publication, so the transform must
+    // never emit one -- including from the corners of the tilt square, which rotation leaves.
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({
+        tiltXs: [90, -90, 90, 0],
+        tiltYs: [90, -90, -90, 0],
+        twists: [0, 1, 359, 180],
+      }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    for (const tilt of [...rotated!.tiltXs!, ...rotated!.tiltYs!]) {
+      expect(tilt, `tilt ${tilt}`).toBeGreaterThanOrEqual(-90);
+      expect(tilt, `tilt ${tilt}`).toBeLessThanOrEqual(90);
+    }
+    for (const twist of rotated!.twists!) {
+      expect(twist, `twist ${twist}`).toBeGreaterThanOrEqual(0);
+      expect(twist, `twist ${twist}`).toBeLessThan(360);
+    }
+    // 359 + 45 wraps forward rather than going negative.
+    expect(rotated?.twists?.[2]).toBeCloseTo(44, 9);
   });
 
   it("leaves stylus channels alone when the transform carries no rotation", () => {

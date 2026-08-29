@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { planStudioDrawObjectTransform } from "./brush/studio-draw-object-transform";
 import {
+  classifyStudioLiveTransformPreviewFrame,
   STUDIO_LIVE_TRANSFORM_PREVIEW_NEUTRAL_ATTRS,
   planStudioLiveTransformPreviewAttrs,
   studioLiveTransformPreviewMat2d,
@@ -135,6 +136,49 @@ describe("studioLiveTransformPreviewMat2d", () => {
         rotationDeg: 0,
       })
     ).toBeNull();
+  });
+});
+
+describe("rejection reasons", () => {
+  const SOURCE = { x: 0, y: 0, width: 100, height: 100 } as const;
+
+  it("separates a valid-but-unsupported frame from a degenerate one", () => {
+    // The two need opposite handling: a degenerate box holds the last projection (the next frame
+    // recovers), while a valid non-uniform frame must neutralize or the ink freezes mid-gesture.
+    expect(
+      classifyStudioLiveTransformPreviewFrame({
+        sourceBounds: SOURCE,
+        targetBounds: { x: 0, y: 0, width: 200, height: 100 },
+        rotationDeg: 0,
+      }),
+    ).toEqual({ ok: false, reason: "unsupported-non-uniform" });
+
+    expect(
+      classifyStudioLiveTransformPreviewFrame({
+        sourceBounds: SOURCE,
+        targetBounds: { x: 0, y: 0, width: 0, height: 100 },
+        rotationDeg: 0,
+      }),
+    ).toEqual({ ok: false, reason: "invalid" });
+
+    expect(
+      classifyStudioLiveTransformPreviewFrame({
+        sourceBounds: SOURCE,
+        targetBounds: { x: 0, y: 0, width: 200, height: 100 },
+        rotationDeg: Number.NaN,
+      }),
+    ).toEqual({ ok: false, reason: "invalid" });
+  });
+
+  it("returns the attrs on a supported frame", () => {
+    const projection = classifyStudioLiveTransformPreviewFrame({
+      sourceBounds: SOURCE,
+      targetBounds: { x: 5, y: 6, width: 300, height: 300 },
+      rotationDeg: 15,
+    });
+
+    expect(projection.ok).toBe(true);
+    expect(projection.ok && projection.attrs.scaleX).toBeCloseTo(3, 9);
   });
 });
 

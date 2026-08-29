@@ -46,13 +46,26 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
   it("refuses coordinate-resampled dry media by brush id or catalogue id", () => {
     // The committed texture is replanned from dab-relative coordinates, so it is a DIFFERENT
     // texture rather than the previewed one transformed.
-    for (const id of ["crayon", "chalk", "charcoal", "pastel", "oil-pastel"]) {
+    // "dry-media" is the RENDERER id: pack descriptors persist it as runtimeBrushId next to an
+    // unrelated catalogue id, so classifying by catalogue name alone missed all of those strokes.
+    for (const id of ["dry-media", "crayon", "chalk", "charcoal", "pastel", "oil-pastel"]) {
       expect(studioLiveTransformPreviewBlockedForElement(draw({ brush: id }), false), id).toBe(true);
       expect(
         studioLiveTransformPreviewBlockedForElement(draw({ brushCatalogId: id }), false),
         `${id} (catalogue)`,
       ).toBe(true);
     }
+  });
+
+  it("refuses a pack stroke whose catalogue id is unrelated to its renderer", () => {
+    // The shape that motivated classifying by renderer: a sketch pencil stores
+    // brush = "dry-media" (runtimeBrushId) with a catalogue id of its own.
+    expect(
+      studioLiveTransformPreviewBlockedForElement(
+        draw({ brush: "dry-media", brushCatalogId: "정밀 연필" }),
+        false,
+      ),
+    ).toBe(true);
   });
 
   it("keeps the preview for brushes that are not coordinate-resampled", () => {

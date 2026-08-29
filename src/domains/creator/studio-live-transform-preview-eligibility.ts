@@ -22,6 +22,13 @@ import type { DrawEl, El } from "./studio-element-model";
  * texture. Nothing in the document can carry the old sampling forward, so these routes stand down.
  */
 const STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS: ReadonlySet<string> = new Set([
+  // The RENDERER id, which is what actually decides the texture path and is therefore the entry
+  // that matters most. Many pack descriptors persist `runtimeBrushId: "dry-media"` alongside an
+  // unrelated catalogue id (the sketch pencils in `studio-brush-pack-index`), and
+  // `applyStudioBrushCatalogSelection` stores the two separately -- so enumerating catalogue names
+  // alone let every one of those strokes through. Classify by renderer first.
+  "dry-media",
+  // The core presets, which carry their own name as the brush id rather than the renderer's.
   "crayon",
   "chalk",
   "charcoal",

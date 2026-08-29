@@ -239,8 +239,15 @@ export function planStudioDrawObjectTransform(
       const nx = tx * cos - ty * sin;
       const ny = tx * sin + ty * cos;
       if (!finite(nx) || !finite(ny)) return null;
-      rotatedX[index] = nx;
-      rotatedY[index] = ny;
+      // Clamped back into the PointerEvent domain. tiltX/tiltY are two INDEPENDENT angles, each
+      // valid over [-90, 90], so the valid region is a square and rotating the pair as a plane
+      // vector can leave it: (90, 90) turned 45deg reaches 127.3. The renderer clamps to the same
+      // range and `studio-crdt-document-payload` REJECTS anything outside it, so an unclamped
+      // value would render wrong and fail publication. Rotation is the right approximation for
+      // the tilts artists actually produce, well inside the square; the clamp only bites at the
+      // corners, where the value was already saturated.
+      rotatedX[index] = Math.min(90, Math.max(-90, nx));
+      rotatedY[index] = Math.min(90, Math.max(-90, ny));
     }
     tiltXs = rotatedX;
     tiltYs = rotatedY;
@@ -252,8 +259,12 @@ export function planStudioDrawObjectTransform(
     for (let index = 0; index < twists.length; index += 1) {
       const turned = twists[index]! + rotationDeg;
       if (!finite(turned)) return null;
-      const wrapped = ((((turned + 180) % 360) + 360) % 360) - 180;
-      rotatedTwists[index] = wrapped === -180 ? 180 : wrapped;
+      // Wrapped into [0, 360), which is this field's actual domain -- NOT the (-180, 180] used for
+      // the nib angle. Barrel rotation is stored unsigned: the renderer clamps to [0, 359]
+      // (`studio-causal-dynamic-brush-deposit-v2`), so a negative sample collapses to 0 rather
+      // than to its equivalent positive angle, and CRDT payload validation rejects it outright.
+      // 170 + 90 must therefore become 260, not -100.
+      rotatedTwists[index] = ((turned % 360) + 360) % 360;
     }
     twists = rotatedTwists;
   }

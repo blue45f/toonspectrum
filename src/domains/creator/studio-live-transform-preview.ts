@@ -80,6 +80,39 @@ export const STUDIO_LIVE_TRANSFORM_PREVIEW_NEUTRAL_ATTRS: StudioLiveTransformPre
  * rather than snapping the ink anywhere — transformend still decides commit vs cancel from its
  * own reading, so a rejected preview frame can never corrupt the document.
  */
+/**
+ * Why a frame produced no projection — the two cases need OPPOSITE handling at the call site.
+ *
+ * `invalid` is a degenerate or non-finite box, typically a transient mid-gesture reading. Holding
+ * the last good projection is right there: the next frame recovers and nothing visibly stalls.
+ *
+ * `unsupported-non-uniform` is a perfectly valid frame this projection cannot represent. Holding
+ * the last projection would freeze the ink at its last uniform pose while the handles keep moving,
+ * then jump at release — worse than not previewing at all, which is why the caller neutralizes
+ * instead and lets the stroke sit at its document position for the rest of the gesture.
+ */
+export type StudioLiveTransformPreviewRejection =
+  | "invalid"
+  | "unsupported-non-uniform";
+
+export type StudioLiveTransformPreviewProjection =
+  | { readonly ok: true; readonly attrs: StudioLiveTransformPreviewNodeAttrs }
+  | { readonly ok: false; readonly reason: StudioLiveTransformPreviewRejection };
+
+/** The projection with its rejection reason, for callers that must tell the two apart. */
+export function classifyStudioLiveTransformPreviewFrame(
+  frame: StudioLiveTransformPreviewFrame
+): StudioLiveTransformPreviewProjection {
+  const attrs = planStudioLiveTransformPreviewAttrs(frame);
+  if (attrs) return { ok: true, attrs };
+  const scale = studioDrawObjectTransformScale(frame.sourceBounds, frame.targetBounds);
+  const reason: StudioLiveTransformPreviewRejection =
+    scale && Number.isFinite(frame.rotationDeg) && !scale.uniform
+      ? "unsupported-non-uniform"
+      : "invalid";
+  return { ok: false, reason };
+}
+
 export function planStudioLiveTransformPreviewAttrs(
   frame: StudioLiveTransformPreviewFrame
 ): StudioLiveTransformPreviewNodeAttrs | null {

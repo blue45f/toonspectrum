@@ -1,7 +1,7 @@
 import { Fragment, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { Rect, Transformer } from "react-konva/lib/ReactKonvaCore";
 
-import { planStudioLiveTransformPreviewAttrs } from "./studio-live-transform-preview";
+import { classifyStudioLiveTransformPreviewFrame } from "./studio-live-transform-preview";
 import {
   applyStudioLiveTransformPreviewNodeAttrs,
   resetStudioLiveTransformPreviewNodeAttrs,
@@ -366,7 +366,7 @@ export function StudioGroupUniformResizeProxy({
     const preview = active?.livePreview;
     if (!active || !preview) return;
     const proxy = event.target as Konva.Rect;
-    const attrs = planStudioLiveTransformPreviewAttrs({
+    const projection = classifyStudioLiveTransformPreviewFrame({
       sourceBounds: active.sourceBounds,
       targetBounds: {
         x: proxy.x(),
@@ -376,9 +376,20 @@ export function StudioGroupUniformResizeProxy({
       },
       rotationDeg: freeTransform ? proxy.rotation() : 0,
     });
-    // A degenerate mid-gesture box keeps the last valid projection; transformend still decides
-    // commit vs cancel from its own reading, so a rejected frame can never corrupt the document.
-    if (attrs) applyStudioLiveTransformPreviewNodeAttrs(preview.node, attrs);
+    // Two rejections, handled oppositely. A degenerate mid-gesture box keeps the last valid
+    // projection, because the next frame recovers and nothing visibly stalls. A VALID but
+    // non-uniform frame is different: holding the last uniform pose freezes the ink while the
+    // handles keep moving and then jumps at release, so the projection is neutralized and the
+    // stroke sits at its document position for the rest of the gesture — today's behaviour, which
+    // is what a non-uniform gesture falls back to anyway.
+    //
+    // transformend still decides commit vs cancel from its own reading either way, so no rejected
+    // frame can corrupt the document.
+    if (projection.ok) {
+      applyStudioLiveTransformPreviewNodeAttrs(preview.node, projection.attrs);
+    } else if (projection.reason === "unsupported-non-uniform") {
+      resetStudioLiveTransformPreviewNodeAttrs(preview.node);
+    }
   }
 
   function handleTransformEnd(event: Konva.KonvaEventObject<Event>) {
