@@ -284,9 +284,8 @@ export function bindStudioBg3dEditorViewModel(h) {
     saveData: deviceSignals.saveData,
     deviceMemoryGb: deviceSignals.deviceMemoryGb,
     observedWebglOnlyFeatures: {
-      // VRM/MToon appearance is a ShaderMaterial with no node-material conversion, and the
-      // immersive session bridge drives WebGLRenderer.xr. Either one present pins WebGL2.
-      vrmCharacters: sharedCharacters.length > 0,
+      // The immersive session bridge drives WebGLRenderer.xr, so an active session pins WebGL2.
+      // VRM characters no longer do: they load MToon node materials under a WebGPU renderer.
       webxr: webXrSessionState.status !== "idle",
     },
   });

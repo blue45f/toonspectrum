@@ -55,10 +55,10 @@ import type {
   StudioGeneric3dSourceFormat,
 } from "../studio-generic-3d-model-mode";
 import type { StudioBg3dDestructiveMutationGuard } from "./studio-bg3d-destructive-mutation-guard";
+import type { StudioBg3dKtx2Renderer } from "./studio-bg3d-ktx2-renderer-runtime";
 import type { StudioBg3dImportProgress } from "./studio-bg3d-model-import";
 import type { StudioBg3dPlacementSessionState } from "./studio-bg3d-placement-session";
 import type { ChangeEvent, Dispatch, RefObject, SetStateAction } from "react";
-import type { WebGLRenderer } from "three";
 
 /** Authoritative live scene the editor advances between an event and React's next render. */
 interface StudioBg3dLiveSceneSnapshotRef {
@@ -89,7 +89,7 @@ export interface StudioBg3dModelImportActionsContext {
   readonly deviceQuality: StudioBg3dResolvedDeviceQuality;
   readonly genericModelClassifications: ReadonlyMap<string, StudioGeneric3dClassification>;
   readonly isRestoringScene: boolean;
-  readonly modelRenderer: WebGLRenderer | null;
+  readonly modelRenderer: StudioBg3dKtx2Renderer | null;
   readonly sceneBaseDocument: StudioBg3dSceneDocument;
 
   readonly setCustomModels: Dispatch<SetStateAction<BgCustomModelInstance[]>>;

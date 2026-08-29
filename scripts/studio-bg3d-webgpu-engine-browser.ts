@@ -24,8 +24,14 @@ import { createStudioBg3dThreeWebglCaptureAdapter } from "../src/domains/creator
 import {
   createStudioBg3dThreeWebGpuCaptureAdapter,
   createStudioBg3dThreeWebGpuRenderer,
+  MToonNodeMaterial,
 } from "../src/domains/creator/bg3d/studio-bg3d-three-webgpu-entry";
 import { probeStudioBg3dWebGpuCapability } from "../src/domains/creator/bg3d/studio-bg3d-webgpu-capability";
+import {
+  loadStudioVrmAsset,
+  readStudioVrmMaterialVariant,
+  type StudioVrmMaterialVariant,
+} from "../src/domains/creator/vrm/studio-vrm-asset-runtime";
 
 import type { StudioBg3dCaptureAdapter } from "../src/domains/creator/bg3d/studio-bg3d-capture-adapter";
 
@@ -298,7 +304,7 @@ async function probeKtx2Runtime(renderer: unknown) {
 /** WebGL-only features must pin the baseline even against an explicit WebGPU request. */
 function webglOnlyFeatureMatrix(probe: Awaited<ReturnType<typeof probeStudioBg3dWebGpuCapability>>) {
   const inApp = classifyStudioBg3dInAppBrowser({ userAgent: navigator.userAgent });
-  return (["vrmCharacters", "webxr"] as const).map((feature) => {
+  return (["webxr"] as const).map((feature) => {
     const request = {
       probe,
       inApp,
@@ -316,6 +322,90 @@ function webglOnlyFeatureMatrix(probe: Awaited<ReturnType<typeof probeStudioBg3d
       webgpuSelectable: forced.webgpuSelectable,
     };
   });
+}
+
+/** A bundled VRM0 model with MToon materials — the case the engine policy used to refuse. */
+const VRM_PROBE_URL = "/vrm/AliciaSolid.vrm";
+
+/** Only the primary run loads a character; the in-app replays exist to classify a user agent. */
+function probeVrmRequested(): boolean {
+  return new URLSearchParams(window.location.search).get("vrm") === "1";
+}
+
+/**
+ * Loads a real VRM under one renderer and proves the character actually reaches the raster.
+ *
+ * MToon ships one `ShaderMaterial` for WebGL and one TSL node material for WebGPU, and picking the
+ * wrong one does not throw — Three simply never builds the shader and the character is missing
+ * from a frame that otherwise renders fine. So this reports both halves: the material brands the
+ * loader produced, and how much of the capture the character actually covers.
+ */
+async function probeVrmMToon(
+  variant: StudioVrmMaterialVariant,
+  buildAdapter: (scene: THREE.Scene, camera: THREE.PerspectiveCamera) => StudioBg3dCaptureAdapter,
+) {
+  let objectUrl: string | null = null;
+  try {
+    // Fetched to a blob URL first, which is exactly how an uploaded character reaches the loader.
+    // The published-URL path adds a `HEAD` preflight whose only job is a friendlier message for a
+    // missing file; Chromium reports that HEAD as ERR_ABORTED against the dev server even though
+    // it succeeds, and this run treats any request failure as a defect.
+    const response = await fetch(VRM_PROBE_URL);
+    if (!response.ok) throw new Error(`VRM fixture ${VRM_PROBE_URL} responded ${response.status}`);
+    objectUrl = URL.createObjectURL(await response.blob());
+    const vrm = await loadStudioVrmAsset(objectUrl, {
+      mtoonMaterialType:
+        variant === "webgpu-node"
+          ? (MToonNodeMaterial as unknown as typeof THREE.Material)
+          : undefined,
+    });
+    const brands = { mtoonShader: 0, mtoonNode: 0, other: 0 };
+    vrm.scene.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (mesh.isMesh !== true) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        const brand = material as { isMToonMaterial?: boolean; isMToonNodeMaterial?: boolean };
+        if (brand?.isMToonNodeMaterial === true) brands.mtoonNode += 1;
+        else if (brand?.isMToonMaterial === true) brands.mtoonShader += 1;
+        else brands.other += 1;
+      }
+    });
+
+    const scene = new THREE.Scene();
+    scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+    scene.add(vrm.scene);
+    // Frame the head and torso: an empty crop would report "rendered" for a missing character.
+    const camera = new THREE.PerspectiveCamera(30, CAPTURE_WIDTH / CAPTURE_HEIGHT, 0.1, 20);
+    camera.position.set(0, 1.25, 1.5);
+    camera.lookAt(0, 1.25, 0);
+    camera.updateMatrixWorld(true);
+
+    const raster = await buildAdapter(scene, camera).capture({
+      width: CAPTURE_WIDTH,
+      height: CAPTURE_HEIGHT,
+      background: { color: "#ffffff", alpha: 0 },
+      includeDepth: false,
+    });
+    // Straight alpha: a covered pixel is one the character wrote, not the cleared background.
+    const summary = summarizeRaster(raster.rgba);
+    return {
+      ok: true as const,
+      variant,
+      brands,
+      coveredPixels: summary.nonZeroAlpha,
+      capturedPixels: CAPTURE_WIDTH * CAPTURE_HEIGHT,
+      recordedVariant: readStudioVrmMaterialVariant(vrm),
+    };
+  } catch (error) {
+    return {
+      ok: false as const,
+      variant,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
 }
 
 async function run(): Promise<unknown> {
@@ -409,6 +499,20 @@ async function run(): Promise<unknown> {
     ktx2: {
       webgpu: await probeKtx2Runtime(webgpuRenderer),
       webgl: await probeKtx2Runtime(webglRenderer),
+    },
+    vrmMToon: !probeVrmRequested() ? { skipped: true } : {
+      webgpu: await probeVrmMToon("webgpu-node", (vrmScene, vrmCamera) =>
+        createStudioBg3dThreeWebGpuCaptureAdapter({
+          renderer: webgpuRenderer,
+          scene: vrmScene,
+          camera: vrmCamera,
+        })),
+      webgl: await probeVrmMToon("webgl-shader", (vrmScene, vrmCamera) =>
+        createStudioBg3dThreeWebglCaptureAdapter({
+          renderer: webglRenderer,
+          scene: vrmScene,
+          camera: vrmCamera,
+        })),
     },
     liveUserAgent: {
       userAgent: navigator.userAgent,

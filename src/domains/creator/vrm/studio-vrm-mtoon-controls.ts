@@ -14,6 +14,11 @@
  *  - 저장 포맷은 kind/version 을 갖는 평면 JSON 이며, 파서는 손상 입력에 대해 절대 던지지 않는다.
  */
 
+import {
+  isStudioVrmMtoonMaterial,
+  type StudioVrmMtoonBrand,
+} from "./studio-vrm-mtoon-brand";
+
 export const STUDIO_VRM_MTOON_CONTROLS_KIND = "toonspectrum.vrm-mtoon-controls" as const;
 export const STUDIO_VRM_MTOON_CONTROLS_VERSION = 1 as const;
 
@@ -254,9 +259,13 @@ export interface StudioVrmMtoonColorLike {
   getHex(): number;
 }
 
-/** @pixiv MToonMaterial 의 구조적 부분집합. 표준 재질에는 이 속성들이 없다. */
-export interface StudioVrmMtoonMaterialLike {
-  isMToonMaterial?: boolean;
+/**
+ * @pixiv MToonMaterial 의 구조적 부분집합. 표준 재질에는 이 속성들이 없다.
+ *
+ * WebGPU 노드 포트(`MToonNodeMaterial`)는 같은 유니폼 이름을 쓰고 브랜드 플래그만 다르므로,
+ * 아래 본문은 그대로 쓰고 판정만 `studio-vrm-mtoon-brand` 에 위임한다.
+ */
+export interface StudioVrmMtoonMaterialLike extends StudioVrmMtoonBrand {
   outlineWidthMode?: StudioVrmMtoonOutlineWidthMode;
   outlineWidthFactor?: number;
   outlineColorFactor?: StudioVrmMtoonColorLike;
@@ -397,7 +406,7 @@ export function applyStudioVrmMtoonControls(
 ): StudioVrmMtoonApplyReport {
   if (typeof material !== "object" || material === null) return EMPTY_REPORT;
   const target = material as StudioVrmMtoonMaterialLike;
-  if (target.isMToonMaterial !== true) return EMPTY_REPORT;
+  if (!isStudioVrmMtoonMaterial(target)) return EMPTY_REPORT;
 
   const safe = sanitizeStudioVrmMtoonControls(controls);
   const original = captureOriginal(target);
@@ -530,7 +539,7 @@ export function applyStudioVrmMtoonControls(
 export function resetStudioVrmMtoonControls(material: unknown): boolean {
   if (typeof material !== "object" || material === null) return false;
   const target = material as StudioVrmMtoonMaterialLike;
-  if (target.isMToonMaterial !== true) return false;
+  if (!isStudioVrmMtoonMaterial(target)) return false;
   const cached = target.userData?.[STUDIO_VRM_MTOON_ORIGINAL_KEY];
   if (typeof cached !== "object" || cached === null) return false;
   const original = cached as MtoonOriginal;

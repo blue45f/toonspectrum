@@ -44,7 +44,6 @@ export type StudioBg3dEngineSelectionReason =
   | "low-device-memory"
   | "repeated-webgpu-failure"
   | "runtime-capability-unavailable"
-  | "webgl-only-vrm-characters"
   | "webgl-only-webxr";
 
 /**
@@ -61,35 +60,32 @@ export const STUDIO_BG3D_WEBGPU_MIN_DEVICE_MEMORY_GB = 4;
  * one would render incorrectly or fail to load on WebGPU, so any of them present forces the
  * baseline even when the artist explicitly asked for WebGPU.
  *
- * - `vrmCharacters`: VRM/MToon appearance is a `ShaderMaterial`, and Three's node-material library
- *   has no conversion for it, so a WebGPU renderer cannot build the shader at all.
  * - `webxr`: the immersive session bridge drives `WebGLRenderer.xr`; Three's WebGPU XR path is not
  *   yet equivalent.
+ *
+ * VRM characters used to belong here, because MToon's appearance is a `ShaderMaterial` a WebGPU
+ * renderer cannot build. They no longer do: the shared-character loader now asks
+ * `@pixiv/three-vrm` for `MToonNodeMaterial` when a WebGPU renderer owns the canvas, and the
+ * real-Chromium verifier renders the same VRM through both backends to the same silhouette.
  */
 export interface StudioBg3dEngineWebglOnlyFeatures {
-  readonly vrmCharacters: boolean;
   readonly webxr: boolean;
 }
 
 export const EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES: StudioBg3dEngineWebglOnlyFeatures =
-  Object.freeze({ vrmCharacters: false, webxr: false });
+  Object.freeze({ webxr: false });
 
 /**
- * Latches a WebGL-only demand for the rest of the session. Removing the last VRM character does
- * not release the latch on purpose: releasing it would swap the renderer and remount the canvas a
- * second time, so a scene that toggles a character would rebuild the viewport on every change.
+ * Latches a WebGL-only demand for the rest of the session. Leaving an immersive session does not
+ * release the latch on purpose: releasing it would swap the renderer and remount the canvas a
+ * second time, so a session that is entered and left would rebuild the viewport every time.
  */
 export function latchStudioBg3dWebglOnlyFeatures(
   current: StudioBg3dEngineWebglOnlyFeatures,
   observed: Partial<StudioBg3dEngineWebglOnlyFeatures>,
 ): StudioBg3dEngineWebglOnlyFeatures {
-  const next = {
-    vrmCharacters: current.vrmCharacters || observed.vrmCharacters === true,
-    webxr: current.webxr || observed.webxr === true,
-  };
-  return next.vrmCharacters === current.vrmCharacters && next.webxr === current.webxr
-    ? current
-    : Object.freeze(next);
+  const next = { webxr: current.webxr || observed.webxr === true };
+  return next.webxr === current.webxr ? current : Object.freeze(next);
 }
 
 export interface StudioBg3dEngineSelectionRequest {
@@ -143,7 +139,6 @@ const NOTICES: Readonly<Record<StudioBg3dEngineSelectionReason, string>> = Objec
   "repeated-webgpu-failure": "WebGPU 초기화가 반복 실패해 이번 세션은 WebGL2로 실행합니다.",
   "runtime-capability-unavailable":
     "선택한 엔진이 편집기에 필요한 기능을 모두 제공하지 않아 WebGL2로 실행합니다.",
-  "webgl-only-vrm-characters": "VRM 캐릭터가 있는 장면은 WebGL2 엔진에서만 정확히 그려집니다.",
   "webgl-only-webxr": "몰입형(WebXR) 보기를 사용하는 동안에는 WebGL2 엔진으로 실행합니다.",
 });
 
@@ -206,7 +201,6 @@ function collectHardBlocks(
     blocks.push("repeated-webgpu-failure");
   }
   const features = request.webglOnlyFeatures;
-  if (features?.vrmCharacters === true) blocks.push("webgl-only-vrm-characters");
   if (features?.webxr === true) blocks.push("webgl-only-webxr");
   return blocks;
 }

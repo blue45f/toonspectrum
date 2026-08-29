@@ -77,8 +77,46 @@ export interface StudioBg3dModelThumbnailThreeCaptureDependencies {
   readonly cloneRoot?: (root: THREE.Object3D) => Promise<THREE.Object3D>;
 }
 
+/**
+ * The renderer surface a thumbnail job needs, satisfied by `WebGLRenderer` and `WebGPURenderer`.
+ *
+ * The editor's renderer is chosen per session by the engine-selection policy, and this module
+ * borrows it rather than opening a second GPU context. Demanding `WebGLRenderer` here therefore
+ * stopped being a type refinement the moment WebGPU could own the canvas: it turned every imported
+ * model on a WebGPU session into a silent placeholder, because the caller treats thumbnail failure
+ * as best-effort. Both renderers expose the same accessors, so the state fence below is written
+ * against them rather than against one backend.
+ */
+export interface StudioBg3dModelThumbnailRenderer {
+  readonly isWebGLRenderer?: boolean;
+  readonly isWebGPURenderer?: boolean;
+  autoClear: boolean;
+  outputColorSpace: string;
+  toneMapping: THREE.ToneMapping;
+  toneMappingExposure: number;
+  readonly xr?: { enabled: boolean };
+  /**
+   * The bound render target is opaque here: this module reads it only to hand the identical value
+   * back afterwards. `WebGLRenderer` and `WebGPURenderer` declare incompatible target types, and
+   * naming either one would make the other unassignable for a value neither is ever inspected as.
+   */
+  getRenderTarget(): unknown;
+  getActiveCubeFace(): number;
+  getActiveMipmapLevel(): number;
+  getViewport(target: THREE.Vector4): THREE.Vector4;
+  getScissor(target: THREE.Vector4): THREE.Vector4;
+  getScissorTest(): boolean;
+  getClearColor(target: THREE.Color): THREE.Color;
+  getClearAlpha(): number;
+  setRenderTarget(target: never, activeCubeFace?: number, activeMipmapLevel?: number): void;
+  setViewport(viewport: THREE.Vector4): void;
+  setScissor(scissor: THREE.Vector4): void;
+  setScissorTest(enabled: boolean): void;
+  setClearColor(color: THREE.Color, alpha?: number): void;
+}
+
 export interface CreateStudioBg3dModelThumbnailThreeCaptureInput {
-  readonly renderer: THREE.WebGLRenderer;
+  readonly renderer: StudioBg3dModelThumbnailRenderer;
   readonly cachedRoot: THREE.Object3D;
   readonly width?: number;
   readonly height?: number;
@@ -90,7 +128,7 @@ export interface CreateStudioBg3dModelThumbnailThreeCaptureInput {
 }
 
 interface RendererStateSnapshot {
-  readonly renderTarget: THREE.WebGLRenderTarget | null;
+  readonly renderTarget: unknown;
   readonly activeCubeFace: number;
   readonly activeMipmapLevel: number;
   readonly viewport: THREE.Vector4;
@@ -99,7 +137,8 @@ interface RendererStateSnapshot {
   readonly clearColor: THREE.Color;
   readonly clearAlpha: number;
   readonly autoClear: boolean;
-  readonly xrEnabled: boolean;
+  /** `null` when the renderer exposes no XR manager; restoring then stays a no-op. */
+  readonly xrEnabled: boolean | null;
   readonly outputColorSpace: THREE.WebGLRenderer["outputColorSpace"];
   readonly toneMapping: THREE.WebGLRenderer["toneMapping"];
   readonly toneMappingExposure: number;
@@ -270,7 +309,7 @@ function createFittedCamera(input: {
   };
 }
 
-function rendererState(renderer: THREE.WebGLRenderer): RendererStateSnapshot {
+function rendererState(renderer: StudioBg3dModelThumbnailRenderer): RendererStateSnapshot {
   return {
     renderTarget: renderer.getRenderTarget(),
     activeCubeFace: renderer.getActiveCubeFace(),
@@ -278,10 +317,12 @@ function rendererState(renderer: THREE.WebGLRenderer): RendererStateSnapshot {
     viewport: renderer.getViewport(new THREE.Vector4()),
     scissor: renderer.getScissor(new THREE.Vector4()),
     scissorTest: renderer.getScissorTest(),
+    // WebGPU types this target as `Color4`, which only adds `a` on top of `Color`; the alpha the
+    // snapshot needs comes from `getClearAlpha()` either way, so one `Color` serves both.
     clearColor: renderer.getClearColor(new THREE.Color()),
     clearAlpha: renderer.getClearAlpha(),
     autoClear: renderer.autoClear,
-    xrEnabled: renderer.xr.enabled,
+    xrEnabled: renderer.xr ? renderer.xr.enabled : null,
     outputColorSpace: renderer.outputColorSpace,
     toneMapping: renderer.toneMapping,
     toneMappingExposure: renderer.toneMappingExposure,
@@ -289,7 +330,7 @@ function rendererState(renderer: THREE.WebGLRenderer): RendererStateSnapshot {
 }
 
 function restoreRendererState(
-  renderer: THREE.WebGLRenderer,
+  renderer: StudioBg3dModelThumbnailRenderer,
   previous: RendererStateSnapshot,
 ): void {
   let firstFailure: unknown;
@@ -302,7 +343,7 @@ function restoreRendererState(
   };
   // Render-target restoration comes first because Three changes viewport/scissor with the target.
   restore(() => renderer.setRenderTarget(
-    previous.renderTarget,
+    previous.renderTarget as never,
     previous.activeCubeFace,
     previous.activeMipmapLevel,
   ));
@@ -311,7 +352,9 @@ function restoreRendererState(
   restore(() => renderer.setScissorTest(previous.scissorTest));
   restore(() => renderer.setClearColor(previous.clearColor, previous.clearAlpha));
   restore(() => { renderer.autoClear = previous.autoClear; });
-  restore(() => { renderer.xr.enabled = previous.xrEnabled; });
+  restore(() => {
+    if (renderer.xr && previous.xrEnabled !== null) renderer.xr.enabled = previous.xrEnabled;
+  });
   restore(() => { renderer.outputColorSpace = previous.outputColorSpace; });
   restore(() => { renderer.toneMapping = previous.toneMapping; });
   restore(() => { renderer.toneMappingExposure = previous.toneMappingExposure; });
@@ -319,11 +362,11 @@ function restoreRendererState(
 }
 
 function applyThumbnailRendererState(
-  renderer: THREE.WebGLRenderer,
+  renderer: StudioBg3dModelThumbnailRenderer,
   width: number,
   height: number,
 ): void {
-  renderer.xr.enabled = false;
+  if (renderer.xr) renderer.xr.enabled = false;
   renderer.autoClear = true;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NeutralToneMapping;
@@ -355,14 +398,52 @@ function assertCaptureRequest(
  * the source transform snapshot atomic with respect to scene edits; this utility intentionally
  * does not invent a second global lock.
  */
+/** Which capture adapter this renderer needs, or `null` when it is not a renderer we can drive. */
+function thumbnailRendererBackend(
+  renderer: StudioBg3dModelThumbnailRenderer | undefined,
+): "webgl" | "webgpu" | null {
+  if (renderer?.isWebGPURenderer === true) return "webgpu";
+  if (renderer?.isWebGLRenderer === true) return "webgl";
+  return null;
+}
+
+/**
+ * Builds the capture adapter for the borrowed renderer.
+ *
+ * The WebGPU adapter is reached through the approved lazy entry and only when a WebGPU session is
+ * actually running, so a WebGL editor never downloads Three's WebGPU build to render a thumbnail.
+ */
+async function createThumbnailAdapter(
+  backend: "webgl" | "webgpu",
+  renderer: StudioBg3dModelThumbnailRenderer,
+  scene: THREE.Scene,
+  camera: THREE.PerspectiveCamera,
+): Promise<StudioBg3dCaptureAdapter> {
+  if (backend === "webgl") {
+    return createStudioBg3dThreeWebglCaptureAdapter({
+      renderer: renderer as unknown as THREE.WebGLRenderer,
+      scene,
+      camera,
+    });
+  }
+  const entry = await import("./studio-bg3d-three-webgpu-entry");
+  return entry.createStudioBg3dThreeWebGpuCaptureAdapter({
+    renderer: renderer as unknown as Parameters<
+      typeof entry.createStudioBg3dThreeWebGpuCaptureAdapter
+    >[0]["renderer"],
+    scene,
+    camera,
+  });
+}
+
 export async function createStudioBg3dModelThumbnailThreeCapture(
   input: CreateStudioBg3dModelThumbnailThreeCaptureInput,
 ): Promise<StudioBg3dModelThumbnailThreeCaptureHandle> {
+  const rendererBackend = thumbnailRendererBackend(input?.renderer);
   if (
     !input
     || typeof input !== "object"
-    || (input.renderer as THREE.WebGLRenderer & { readonly isWebGLRenderer?: boolean } | undefined)
-      ?.isWebGLRenderer !== true
+    || rendererBackend === null
     || !input.cachedRoot?.isObject3D
     || (input.isCurrent !== undefined && typeof input.isCurrent !== "function")
   ) throw operationError("invalid-input");
@@ -433,7 +514,7 @@ export async function createStudioBg3dModelThumbnailThreeCapture(
   scene.updateMatrixWorld(true);
 
   const renderer = input.renderer;
-  const isolatedAdapter = createStudioBg3dThreeWebglCaptureAdapter({ renderer, scene, camera });
+  const isolatedAdapter = await createThumbnailAdapter(rendererBackend, renderer, scene, camera);
   let disposed = false;
   let activeCaptures = 0;
   let releasePending = false;

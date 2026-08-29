@@ -140,14 +140,11 @@ export function useStudioBg3dEngineRuntime(
 
   const inApp = useMemo(() => classifyStudioBg3dInAppBrowser(readHostSignals()), []);
 
-  const observedVrmCharacters = observedWebglOnlyFeatures?.vrmCharacters === true;
   const observedWebxr = observedWebglOnlyFeatures?.webxr === true;
   useEffect(() => {
-    setWebglOnlyFeatures((current) => latchStudioBg3dWebglOnlyFeatures(current, {
-      vrmCharacters: observedVrmCharacters,
-      webxr: observedWebxr,
-    }));
-  }, [observedVrmCharacters, observedWebxr]);
+    setWebglOnlyFeatures((current) =>
+      latchStudioBg3dWebglOnlyFeatures(current, { webxr: observedWebxr }));
+  }, [observedWebxr]);
 
   useEffect(() => {
     if (!enabled) return;

@@ -12,6 +12,10 @@ import {
   parseStudioVrmIkConstraints,
 } from "./studio-vrm-ik-constraints";
 import {
+  isStudioVrmMtoonMaterial,
+  type StudioVrmMtoonBrand,
+} from "./studio-vrm-mtoon-brand";
+import {
   parseVrmPhysicsSettings,
   type VrmPhysicsSettings,
 } from "./studio-vrm-physics";
@@ -1785,8 +1789,10 @@ export const DEFAULT_VRM_MATERIAL_FX: VrmMaterialFx = {
 // MToonMaterial은 트랜지티브 의존성(@pixiv/three-vrm-materials-mtoon이 package.json 직접 의존성이
 // 아님)이라 패키지를 import하지 않고 구조적으로 타이핑한다 — applyVrmCustomColors의
 // `mat as THREE.Material & { color?: THREE.Color }` 패턴과 동일.
-interface MToonUniformMaterial {
-  isMToonMaterial?: boolean;
+//
+// 유니폼 이름은 WebGL `MToonMaterial` 과 WebGPU `MToonNodeMaterial` 이 동일하므로 아래 본문은
+// 두 구현에 그대로 적용된다. 다른 건 브랜드 플래그뿐이라 판정만 공용 술어에 위임한다.
+interface MToonUniformMaterial extends StudioVrmMtoonBrand {
   shadeColorFactor?: THREE.Color;
   outlineColorFactor?: THREE.Color;
   parametricRimColorFactor?: THREE.Color;
@@ -1802,7 +1808,9 @@ export function hasVrmMToonMaterial(vrm: VRM): boolean {
     if (found || !(obj as Partial<THREE.Mesh>).isMesh) return;
     const mesh = obj as THREE.Mesh;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    if (materials.some((m) => (m as MToonUniformMaterial | undefined)?.isMToonMaterial)) found = true;
+    if (materials.some((m) => isStudioVrmMtoonMaterial(m as MToonUniformMaterial | undefined))) {
+      found = true;
+    }
   });
   return found;
 }
@@ -1836,7 +1844,9 @@ export function applyVrmMaterialFx(vrm: VRM, fx: VrmMaterialFx) {
 
     materials.forEach((m) => {
       const mat = m as THREE.Material & MToonUniformMaterial & { userData: Record<string, unknown> };
-      if (!mat.isMToonMaterial) return; // MToon 전용 유니폼 — 표준 재질(MeshStandardMaterial 등)엔 없음
+      // MToon 전용 유니폼 — 표준 재질(MeshStandardMaterial 등)엔 없다. WebGPU 노드 포트도 같은
+      // 유니폼을 갖지만 브랜드 플래그가 달라, 여기서 놓치면 캐릭터가 오류 없이 무보정으로 남는다.
+      if (!isStudioVrmMtoonMaterial(mat)) return;
 
       let original = mat.userData.__vrmMaterialFxOriginal as VrmMaterialFxOriginal | undefined;
       if (!original) {

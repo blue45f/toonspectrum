@@ -401,13 +401,27 @@ if (!fs.existsSync(manifestPath)) {
     return targets;
   }
 
+  /** Everything an entry can reach by any import edge, static or dynamic, transitively. */
+  function reachableClosure(entryKey) {
+    const visited = new Set();
+    const queue = [entryKey];
+    while (queue.length > 0) {
+      const key = queue.pop();
+      if (visited.has(key)) continue;
+      const entry = manifest[key];
+      if (!entry) throw new Error(`manifest import ${JSON.stringify(key)} is missing`);
+      visited.add(key);
+      queue.push(...(entry.imports ?? []), ...(entry.dynamicImports ?? []));
+    }
+    return visited;
+  }
+
   function checkApprovedLazySpecialistBoundary({
     label,
     pattern,
     approvedEntrySource,
     requiredRuntimeChunkName,
     approvedParentEntryKey,
-    approvedParentStaticKeys,
     forbiddenStaticClosures,
   }) {
     const matching = matchingManifestEntries(pattern);
@@ -479,17 +493,30 @@ if (!fs.existsSync(manifestPath)) {
       );
     }
 
-    const directDynamicImporters = Object.entries(manifest)
-      .filter(([, entry]) => (entry.dynamicImports ?? []).includes(approvedEntryKey))
-      .map(([key]) => key);
-    if (
-      directDynamicImporters.length !== 1 ||
-      !approvedParentStaticKeys.has(directDynamicImporters[0]) ||
-      !dynamicTargetsFromStaticClosure(approvedParentEntryKey).has(approvedEntryKey)
-    ) {
+    // The specialist must be one hop from the approved parent — a nested waterfall would make
+    // activating it cost two round trips.
+    if (!dynamicTargetsFromStaticClosure(approvedParentEntryKey).has(approvedEntryKey)) {
       fail(
-        `${label} must have one analyzable dynamic import from the approved parent closure; found `
-          + (directDynamicImporters.length > 0 ? directDynamicImporters.join(", ") : "none"),
+        `${label} is not dynamically imported from the approved parent closure `
+          + `${approvedParentEntryKey}; activating it would cost a nested waterfall`,
+      );
+    }
+
+    // Every other call site must still belong to the approved parent's own graph. Counting the
+    // importers used to stand in for that, but the count says nothing about ownership: a second
+    // legitimate call site inside the editor (a thumbnail job borrowing the live renderer) reads
+    // identically to an unrelated feature pulling in a whole second renderer, which is the thing
+    // worth failing on. Reachability answers the real question, and the static-owner checks above
+    // still guarantee nothing downloads this graph without the editor.
+    const parentReachable = reachableClosure(approvedParentEntryKey);
+    const foreignDynamicImporters = Object.entries(manifest)
+      .filter(([key, entry]) =>
+        (entry.dynamicImports ?? []).includes(approvedEntryKey) && !parentReachable.has(key))
+      .map(([key]) => key);
+    if (foreignDynamicImporters.length > 0) {
+      fail(
+        `${label} is dynamically imported from outside the approved parent's graph: `
+          + foreignDynamicImporters.join(", "),
       );
     }
   }
@@ -704,7 +731,6 @@ if (!fs.existsSync(manifestPath)) {
         approvedEntrySource: approvedBabylonSpecialistEntry,
         requiredRuntimeChunkName: approvedBabylonRuntimeChunkName,
         approvedParentEntryKey: background3dEntries[0],
-        approvedParentStaticKeys: background3dKeys,
         forbiddenStaticClosures: [
           ["app entry", appKeys],
           ["Studio route", studioKeys],
@@ -717,7 +743,6 @@ if (!fs.existsSync(manifestPath)) {
         approvedEntrySource: approvedWebgpuRendererEntry,
         requiredRuntimeChunkName: approvedWebgpuRuntimeChunkName,
         approvedParentEntryKey: background3dEntries[0],
-        approvedParentStaticKeys: background3dKeys,
         forbiddenStaticClosures: [
           ["app entry", appKeys],
           ["Studio route", studioKeys],

@@ -47,20 +47,71 @@ WebGPU를 "지원되면 쓴다"로 켜면 한국 트래픽의 대부분인 인�
 | 인스타그램·페이스북·스레드 | WebGL2 | 거부 | `inapp-browser-blocked` |
 | 데이터 절약 모드 / 4GB 미만 모바일 | WebGL2 | WebGPU 가능 | `save-data-enabled`, `low-device-memory` |
 | WebGPU 초기화 2회 연속 실패 | WebGL2 | 거부(세션 한정) | `repeated-webgpu-failure` |
-| VRM 캐릭터가 있는 장면 | WebGL2 | 거부 | `webgl-only-vrm-characters` |
 | 몰입형(WebXR) 세션 진행 중 | WebGL2 | 거부 | `webgl-only-webxr` |
 
 ### WebGL2 전용 기능
 
-두 가지는 **선호가 아니라 렌더 불가**라서 명시 선택도 거부한다.
+하나는 **선호가 아니라 렌더 불가**라서 명시 선택도 거부한다.
 
-- **VRM 캐릭터**: VRM/MToon 외형은 `ShaderMaterial`이고 Three의 node material 라이브러리에
-  변환이 없다. WebGPU renderer는 셰이더를 빌드하지 못한다. 공유 3D 스테이지 캐릭터가 장면에
-  들어오면 정책이 WebGL2를 고른다.
-- **WebXR**: 몰입형 세션 브리지가 `WebGLRenderer.xr`을 구동한다.
+- **WebXR**: 몰입형 세션 브리지가 `WebGLRenderer.xr`을 구동한다. Three의 WebGPU XR 경로가
+  이 브리지와 동등해질 때까지 유지한다.
 
-관측은 **세션 동안 latch**한다. 캐릭터를 지웠다고 엔진을 되돌리면 Canvas를 두 번째로 remount
-하게 되고, 캐릭터를 껐다 켤 때마다 뷰포트가 재생성된다.
+관측은 **세션 동안 latch**한다. 세션을 나갔다고 엔진을 되돌리면 Canvas를 두 번째로 remount
+하게 되고, 몰입형을 드나들 때마다 뷰포트가 재생성된다.
+
+### VRM 캐릭터는 이제 WebGPU에서도 그려진다
+
+처음 설계에서 VRM은 두 번째 차단 대상이었다. MToon 외형이 `ShaderMaterial`이라 WebGPU renderer가
+셰이더를 빌드하지 못했기 때문이다. **막는 대신 올바른 재질을 로드하도록 바꿨다** — KTX2 때와 같은
+판단이다.
+
+`@pixiv/three-vrm`은 같은 명세의 두 구현을 배포한다. `MToonMaterial`(WebGL 전용 `ShaderMaterial`)과
+`MToonNodeMaterial`(WebGPU 전용 TSL 노드 포트)이며, **둘 다에서 동작하는 재질은 없다.** 그래서
+`StudioBg3dSharedVrmCharacter`가 자신을 그릴 renderer(`useThree`의 `gl`)를 보고 재질을 정한다 —
+선호가 아니라 **누가 그리는가**의 문제다. 엔진이 폴백하면 Canvas가 remount되고, 그 remount가 이
+컴포넌트를 다시 마운트해 교체된 renderer에 맞는 빌드로 다시 로드한다.
+
+재질 **클래스는 주입한다.** `loadStudioVrmAsset`은 `mtoonMaterialType`을 인자로 받을 뿐 스스로
+고르지 않는다. 이 모듈은 VRM 포저와 공유하는 리프이고, 여기서 `@pixiv/three-vrm/nodes`(또는 그것을
+re-export하는 승인된 WebGPU entry)를 import하면 **포저의 청크까지 Three의 WebGPU 그래프에 묶인다** —
+포저는 그 재질을 영원히 요청하지 않는데도. 그래서 동적 import는 BG3D 쪽
+(`studio-bg3d-shared-vrm-runtime.ts`)에만 있다.
+
+두 클래스는 유니폼 이름(`shadeColorFactor`, `outlineColorFactor`, `parametricRimColorFactor`,
+`rimLightingMixFactor` …)이 완전히 같고 **브랜드 플래그만 다르다**(`isMToonMaterial` 대
+`isMToonNodeMaterial`). 브랜드 하나만 보던 가드는 WebGPU 캐릭터에서 오류 없이 조용히 아무 일도
+하지 않는다 — 외곽선·셰이드·림이 안 먹는데 예외는 없고, 그건 LT 선화 추출 결과가 통째로 달라진다는
+뜻이다. 판정은 `studio-vrm-mtoon-brand.ts` 한 곳으로 모았다.
+
+`MToonNodeMaterial`은 승인된 WebGPU 지연 entry에서 re-export한다. `@pixiv/three-vrm/nodes`가
+`three/webgpu`를 정적으로 import하므로 별도 청크를 주면 Three의 WebGPU 빌드에 두 번째 정적 소유자가
+생겨 번들 경계가 깨진다. 실제 비용은 minify 기준 약 12 KiB이고, 정책이 WebGPU를 고른 뒤에만 받는다.
+
+그 결과 승인된 entry의 동적 import 지점이 하나에서 셋(뷰포트·공유 캐릭터·모델 썸네일)으로 늘었다.
+번들 검사는 "동적 import가 정확히 하나"를 요구했지만, 그 숫자는 지키려던 성질을 대신 세지 못한다 —
+편집기 안의 두 번째 정당한 호출 지점과, 무관한 기능이 두 번째 렌더러 그래프를 통째로 끌어오는 경우가
+숫자로는 똑같이 보인다. 그래서 규칙을 **도달 가능성**으로 바꿨다: 승인된 부모에서 한 홉으로 닿아야
+하고(워터폴 금지), 모든 직접 동적 import 지점은 그 부모의 그래프 안에 있어야 한다. 정적 소유자 검사는
+그대로라 "편집기 없이는 이 그래프를 내려받지 않는다"는 보장은 유지된다.
+
+검증은 실측이다(`verify:studio-bg3d-webgpu-engine`). 번들된 `AliciaSolid.vrm`을 두 backend로 각각
+로드해 재질 브랜드와 캡처 커버리지를 함께 본다.
+
+| backend | MToon 재질 | 커버리지 |
+| --- | --- | --- |
+| WebGPU | `MToonNodeMaterial` 35개, `MToonMaterial` 0개 | 1,874 / 6,144 px |
+| WebGL2 | `MToonMaterial` 35개, `MToonNodeMaterial` 0개 | 1,874 / 6,144 px |
+
+커버리지가 같은 값이라는 게 핵심이다. 잘못된 빌드를 고르면 예외 없이 캐릭터만 프레임에서 빠지므로,
+"오류가 없었다"가 아니라 **실루엣이 같다**를 게이트로 삼았다.
+
+### 모델 썸네일도 renderer를 가리지 않는다
+
+썸네일 캡처는 편집기의 renderer를 빌려 쓴다. 그 renderer가 WebGPU가 될 수 있게 된 순간
+`isWebGLRenderer !== true` 가드는 타입 정제가 아니라 **조용한 회귀**가 됐다 — 호출부가 썸네일 실패를
+best-effort로 삼키므로, WebGPU 세션에서 가져온 모델은 오류 없이 영원히 플레이스홀더로 남았다.
+두 renderer가 같은 접근자를 제공하므로 상태 펜스를 backend 중립으로 다시 썼고, 캡처 어댑터는
+`StudioBg3dCaptureBridge`와 같은 방식으로 renderer의 브랜드를 보고 고른다.
 
 KTX2 압축 텍스처는 처음엔 WebGL2 전용으로 막으려 했으나, `KTX2Loader.detectSupport()`가
 `isWebGPURenderer`를 분기해 GPU feature 이름으로 포맷을 고르므로 **막는 대신 우리 쪽 가드를
@@ -124,8 +175,9 @@ WebGPU 엔진은 승인된 지연 entry 하나(`studio-bg3d-three-webgpu-entry.t
 
 ## 남은 작업
 
-- VRM: `@pixiv/three-vrm`은 `three-vrm/nodes` 빌드를 제공한다. 이를 채택하면 VRM 장면도
-  WebGPU로 갈 수 있지만, 공유 스테이지 전체의 머티리얼 경로를 바꾸는 별도 작업이다.
+- VRM 포저(`StudioVrmPoserViewport`)는 여전히 자체 `WebGLRenderer`를 소유한다. 이번 변경은 BG3D
+  공유 스테이지의 캐릭터 경로만 backend를 따라가게 했다. 포저까지 옮기려면 그 뷰포트의 renderer
+  수명 자체를 정책 아래로 넣어야 하므로 별도 작업이다.
 - WebXR: Three의 WebGPU XR 경로가 현재 WebGL 세션 브리지와 동등해질 때까지 `three-webgpu`의
   capability 목록에서 제외한다.
 - 실기기 GPU 계측(프레임 타임·입력 지연)은 `studio-bg3d-engine-benchmark-contract.ts`의

@@ -207,24 +207,22 @@ describe("Studio BG3D engine runtime resolution", () => {
 });
 
 describe("Studio BG3D WebGL-only feature demand", () => {
-  it("refuses WebGPU for VRM characters and immersive sessions, even on request", () => {
-    for (const [feature, reason] of [
-      ["vrmCharacters", "webgl-only-vrm-characters"],
-      ["webxr", "webgl-only-webxr"],
-    ] as const) {
-      const request = {
-        ...BASE,
-        webglOnlyFeatures: { ...EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES, [feature]: true },
-      };
-      expect(selectStudioBg3dEngine(request)).toMatchObject({
-        backend: "webgl2",
-        reason,
-        webgpuSelectable: false,
-      });
-      // An explicit WebGPU choice cannot override a feature that would not render.
-      expect(selectStudioBg3dEngine({ ...request, preference: "webgpu" }))
-        .toMatchObject({ backend: "webgl2", reason, webgpuSelectable: false });
-    }
+  it("refuses WebGPU during an immersive session, even on request", () => {
+    const request = {
+      ...BASE,
+      webglOnlyFeatures: { ...EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES, webxr: true },
+    };
+    expect(selectStudioBg3dEngine(request)).toMatchObject({
+      backend: "webgl2",
+      reason: "webgl-only-webxr",
+      webgpuSelectable: false,
+    });
+    // An explicit WebGPU choice cannot override a feature that would not render.
+    expect(selectStudioBg3dEngine({ ...request, preference: "webgpu" })).toMatchObject({
+      backend: "webgl2",
+      reason: "webgl-only-webxr",
+      webgpuSelectable: false,
+    });
   });
 
   it("still promotes WebGPU when no WebGL-only feature is present", () => {
@@ -234,18 +232,22 @@ describe("Studio BG3D WebGL-only feature demand", () => {
     })).toMatchObject({ backend: "webgpu", reason: "auto-webgpu-promoted" });
   });
 
-  it("latches a demand so removing the feature does not remount the viewport again", () => {
+  it("latches a demand so leaving the feature does not remount the viewport again", () => {
     const empty = EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES;
     // No observation keeps the identical object, so the hook's state does not churn.
     expect(latchStudioBg3dWebglOnlyFeatures(empty, {})).toBe(empty);
-    expect(latchStudioBg3dWebglOnlyFeatures(empty, { vrmCharacters: false })).toBe(empty);
+    expect(latchStudioBg3dWebglOnlyFeatures(empty, { webxr: false })).toBe(empty);
 
-    const latched = latchStudioBg3dWebglOnlyFeatures(empty, { vrmCharacters: true });
-    expect(latched).toMatchObject({ vrmCharacters: true, webxr: false });
-    expect(latchStudioBg3dWebglOnlyFeatures(latched, { vrmCharacters: false })).toBe(latched);
+    const latched = latchStudioBg3dWebglOnlyFeatures(empty, { webxr: true });
+    expect(latched).toMatchObject({ webxr: true });
+    expect(Object.isFrozen(latched)).toBe(true);
+    expect(latchStudioBg3dWebglOnlyFeatures(latched, { webxr: false })).toBe(latched);
+  });
 
-    const both = latchStudioBg3dWebglOnlyFeatures(latched, { webxr: true });
-    expect(both).toMatchObject({ vrmCharacters: true, webxr: true });
-    expect(Object.isFrozen(both)).toBe(true);
+  it("no longer treats VRM characters as a WebGL-only demand", () => {
+    // The shared-character loader asks for MToon node materials under a WebGPU renderer, so a
+    // scene full of characters is a normal WebGPU scene. Guarding the absence keeps a future
+    // reader from reintroducing the block without also reverting the loader.
+    expect(Object.keys(EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES)).toEqual(["webxr"]);
   });
 });

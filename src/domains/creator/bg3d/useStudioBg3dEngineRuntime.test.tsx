@@ -235,22 +235,22 @@ describe("useStudioBg3dEngineRuntime", () => {
 
   it("pins WebGL2 while a WebGL-only feature is present and keeps it after it is gone", async () => {
     const { result, rerender } = renderHook(
-      (props: { vrm: boolean }) => useStudioBg3dEngineRuntime(options({
-        observedWebglOnlyFeatures: { vrmCharacters: props.vrm },
+      (props: { xr: boolean }) => useStudioBg3dEngineRuntime(options({
+        observedWebglOnlyFeatures: { webxr: props.xr },
       })),
-      { initialProps: { vrm: false } },
+      { initialProps: { xr: false } },
     );
     await waitFor(() => expect(result.current.plan.backend).toBe("webgpu"));
 
-    rerender({ vrm: true });
+    rerender({ xr: true });
     await waitFor(() => expect(result.current.plan.backend).toBe("webgl2"));
-    expect(result.current.plan.reason).toBe("webgl-only-vrm-characters");
+    expect(result.current.plan.reason).toBe("webgl-only-webxr");
     expect(result.current.plan.webgpuSelectable).toBe(false);
 
-    // Removing the character must not swap the renderer back and remount the canvas a second time.
-    rerender({ vrm: false });
+    // Leaving the session must not swap the renderer back and remount the canvas a second time.
+    rerender({ xr: false });
     await waitFor(() => expect(result.current.canvasKey).toBe("webgl2#0"));
     expect(result.current.plan.backend).toBe("webgl2");
-    expect(result.current.plan.reason).toBe("webgl-only-vrm-characters");
+    expect(result.current.plan.reason).toBe("webgl-only-webxr");
   });
 });

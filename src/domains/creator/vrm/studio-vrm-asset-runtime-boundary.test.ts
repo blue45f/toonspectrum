@@ -93,6 +93,8 @@ describe("Studio VRM asset runtime ownership boundary", () => {
     ]);
     expect(runtime.typeImports).toEqual(["@pixiv/three-vrm"]);
     expect(binding.allImports).toEqual([]);
+    // MToon 의 WebGPU 노드 재질은 이 리프가 아니라 BG3D 쪽에서 주입한다. 여기서 승인된 WebGPU
+    // 지연 entry 를 직접 import 하면 포저의 청크까지 Three 의 WebGPU 그래프에 묶인다.
     expect(runtime.dynamicImports).toEqual([
       "three/examples/jsm/loaders/GLTFLoader.js",
       "@pixiv/three-vrm",

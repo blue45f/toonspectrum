@@ -39,6 +39,12 @@ const DEPTH_TOLERANCE = 0.001;
  * silhouette pixels legitimately differ. The gate is on the share of the frame, not on zero.
  */
 const MAX_OVER_TOLERANCE_SHARE = 0.02;
+/**
+ * Share of the VRM crop the character must cover. The camera frames head and torso against a
+ * transparent clear, so a loaded-but-unbuilt material shows up as a near-empty raster; 20% is far
+ * above that floor and far below a framing change that would need this number revisited anyway.
+ */
+const VRM_MIN_COVERAGE = 0.2;
 const UNSUPPORTED_REASONS = new Set([
   "insecure-context",
   "api-unavailable",
@@ -183,6 +189,36 @@ function validateSuccess(result, diagnostics) {
       failures.push(`KTX2 transcoder on ${backend} reported an unusable runtime`);
     }
   }
+  // A real VRM must load and reach the raster on both backends. This is the gate that lets
+  // characters onto WebGPU at all: picking the wrong MToon build never throws, it just leaves the
+  // character out of an otherwise healthy frame, so coverage is asserted, not just "no error".
+  for (const [backend, expectedBrand] of [["webgpu", "mtoonNode"], ["webgl", "mtoonShader"]]) {
+    const vrm = result.vrmMToon?.[backend];
+    if (vrm?.ok !== true) {
+      failures.push(`VRM did not load on ${backend}: ${vrm?.message ?? "no result"}`);
+      continue;
+    }
+    const expectedVariant = backend === "webgpu" ? "webgpu-node" : "webgl-shader";
+    if (vrm.recordedVariant !== expectedVariant) {
+      failures.push(
+        `VRM on ${backend} recorded material variant ${vrm.recordedVariant}, expected ${expectedVariant}`,
+      );
+    }
+    if ((vrm.brands?.[expectedBrand] ?? 0) === 0) {
+      failures.push(
+        `VRM on ${backend} produced no ${expectedBrand} materials`
+        + ` (${JSON.stringify(vrm.brands)})`,
+      );
+    }
+    const coverage = vrm.coveredPixels / (vrm.capturedPixels || 1);
+    if (coverage < VRM_MIN_COVERAGE) {
+      failures.push(
+        `VRM on ${backend} covered ${(coverage * 100).toFixed(1)}% of the capture,`
+        + ` under the ${(VRM_MIN_COVERAGE * 100).toFixed(0)}% floor — the character did not render`,
+      );
+    }
+  }
+
   for (const row of result.webglOnlyFeatures ?? []) {
     if (row.autoBackend !== "webgl2" || row.forcedBackend !== "webgl2" || row.webgpuSelectable) {
       failures.push(
@@ -196,12 +232,20 @@ function validateSuccess(result, diagnostics) {
     failures.push(`WebGPU device was lost during the run: ${result.deviceLosses.join("; ")}`);
   }
   if (diagnostics.pageErrors.length !== 0 || diagnostics.requestFailures.length !== 0) {
-    failures.push("Chromium emitted page or request diagnostics");
+    // Naming them matters: "diagnostics were emitted" sends the reader back to the browser to
+    // rediscover what this run already saw.
+    failures.push(
+      "Chromium emitted page or request diagnostics: "
+      + [
+        ...diagnostics.pageErrors.map((entry) => `pageerror ${entry}`),
+        ...diagnostics.requestFailures.map((entry) => `request ${entry}`),
+      ].join(" | "),
+    );
   }
   return failures;
 }
 
-async function readHarnessResult(browser, port, { userAgent } = {}) {
+async function readHarnessResult(browser, port, { userAgent, probeVrm = false } = {}) {
   // Each run gets its own context so an emulated in-app user agent applies to the whole page.
   const context = await browser.newContext(userAgent ? { userAgent } : {});
   const page = await context.newPage();
@@ -223,7 +267,11 @@ async function readHarnessResult(browser, port, { userAgent } = {}) {
     );
   });
   try {
-    await page.goto(`http://127.0.0.1:${port}${HARNESS_PATH}`, { waitUntil: "domcontentloaded" });
+    // The VRM probe downloads a multi-megabyte model, so only the primary run asks for it. The
+    // in-app replays exist to classify a user agent; making them each reload a character would
+    // triple the run for evidence the first pass already produced.
+    const harnessUrl = `http://127.0.0.1:${port}${HARNESS_PATH}${probeVrm ? "?vrm=1" : ""}`;
+    await page.goto(harnessUrl, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(
       () => window.__studioBg3dWebGpuEngineResult !== undefined,
       undefined,
@@ -254,11 +302,23 @@ async function main() {
     appType: "custom",
     logLevel: "error",
     server: { host: "127.0.0.1", port, strictPort: true },
+    // Pre-bundle what the VRM probe reaches through a dynamic import. Discovering these mid-run
+    // makes Vite re-optimize and invalidate the module graph the page is already executing, which
+    // surfaces as "Failed to fetch dynamically imported module" rather than as a real defect.
+    optimizeDeps: {
+      include: [
+        "@pixiv/three-vrm",
+        "@pixiv/three-vrm/nodes",
+        "three/examples/jsm/loaders/GLTFLoader.js",
+      ],
+    },
     plugins: [{
       name: "studio-bg3d-webgpu-engine-verifier",
       configureServer(server) {
         server.middlewares.use((request, response, next) => {
-          if (request.url !== HARNESS_PATH) {
+          // Compare the path only: the primary run appends `?vrm=1` to ask for the VRM probe.
+          const [pathname] = (request.url ?? "").split("?");
+          if (pathname !== HARNESS_PATH) {
             next();
             return;
           }
@@ -288,7 +348,7 @@ async function main() {
         "--use-angle=swiftshader",
       ],
     });
-    const { result, diagnostics } = await readHarnessResult(browser, port);
+    const { result, diagnostics } = await readHarnessResult(browser, port, { probeVrm: true });
     invariant(result && typeof result === "object", "browser returned no structured result");
     writeJson("browser-result.json", result);
 
@@ -357,6 +417,7 @@ async function main() {
       selection: result.selection,
       webglOnlyFeatures: result.webglOnlyFeatures,
       ktx2: result.ktx2,
+      vrmMToon: result.vrmMToon,
       inAppRuns,
       failures,
       evidenceDirectory: SCRATCH,
