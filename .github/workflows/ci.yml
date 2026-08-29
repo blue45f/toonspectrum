@@ -268,3 +268,21 @@ jobs:
         # Linux headed Chromium requires Xvfb. A fixed 24-bit screen keeps the regular compositor
         # deterministic while the verifier still owns the exact viewport of every proof page.
         run: xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console
+      - name: Verify BG3D next-generation engine capture parity and in-app browser policy
+        # Renders one scene through both the WebGL2 and WebGPU capture adapters and fails if the
+        # composited raster or the depth samples diverge, then replays the page under KakaoTalk,
+        # NAVER app and Instagram user agents.
+        run: |
+          set +e
+          xvfb-run -a --server-args="-screen 0 1920x1200x24" \
+            pnpm run verify:studio-bg3d-webgpu-engine
+          status=$?
+          set -e
+          # Exit 2 is the verifier's explicit "no WebGPU on this runner" skip. The engine policy
+          # then keeps the editor on WebGL2, which the rest of CI already covers, so a runner
+          # without a GPU must not turn a supported-path gate into a red build.
+          if [ "$status" -eq 2 ]; then
+            echo "::notice::WebGPU unavailable on this runner; BG3D engine parity skipped."
+            exit 0
+          fi
+          exit "$status"
