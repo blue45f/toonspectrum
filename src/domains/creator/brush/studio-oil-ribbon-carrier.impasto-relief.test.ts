@@ -13,6 +13,7 @@ import {
 import {
   evaluateStudioCalibratedBudget,
   evaluateStudioCalibratedDetection,
+  STUDIO_PERF_CALIBRATION_MAX_GROWTH,
   type StudioCalibratedBudgetVerdict,
 } from "./studio-perf-calibration";
 
@@ -52,19 +53,59 @@ type PlannedDabs = Parameters<typeof planStudioOilRibbonCarrier>[0];
  * Min-of-N sampling removes what a transient stall ADDS; it cannot remove the machine, and
  * widening the number until the slowest box passes is how a budget stops catching regressions.
  *
- * The budget is therefore stated against `studio-perf-calibration`: a fixed reference kernel
- * measured in the same process, interleaved sample by sample with the plan itself. Both sides
- * scale with the machine, so the verdict does not — while a planner that got slower moves only
- * the workload side. `*_CALIBRATION_ROUNDS` is sized so an unregressed plan scores ≈1.0 against
- * the 1.5x gate; the synthetic-regression tests below hold the other end, and the deterministic
- * painted-work counts hold the part of the budget that never needed a clock at all.
+ * The budget is therefore stated against `studio-perf-calibration`: a reference measured in the
+ * same process, interleaved sample by sample with the plan itself. Both sides scale with the
+ * machine, so the verdict does not — while a planner that got slower moves only the workload side.
+ *
+ * That reference used to be the module's synthetic kernel, and the kernel does not co-scale with
+ * this planner. Sized so an unregressed plan scored ~1.0 on a 4-vCPU x86 container, the same plan
+ * scored 0.47-0.56 on Apple silicon: the kernel cost the same on both boxes while the planner ran
+ * ~1.6x faster on one of them. No round count repairs that. The gate needs the reading to stay
+ * under 1.5 and the 2x-detection assertion needs it to stay over 0.75, so a 2x spread between
+ * machines leaves no value to pin — which is the hazard `studio-perf-calibration.ts`'s own header
+ * documents under "pick the denominator that resembles the work", here landing on one of its
+ * first call sites.
+ *
+ * The denominator is now THE SAME PLAN WITH THE OVERLAY OFF. Nothing resembles this planner like
+ * this planner: same call, same stroke, same allocations, differing only in the feature the file
+ * is about. The carrier guarantees that difference is clean — `body`, `bodyOpacity` and
+ * `bristleLanes` stay byte-identical with `impastoRelief` disabled, which the first assertion
+ * below re-checks rather than trusting — so the ratio is exactly the overlay's cost over the plan
+ * it rides on, and it holds on any CPU.
+ *
+ * Detection power is not traded away for the portability: because the denominator is a fixed
+ * share of the same plan, the two formulations convict at almost the same relief slowdown, and
+ * this one is the tighter of the two. The old gate tripped when the whole plan grew 1.5x, which
+ * is a x2.41 overlay on the long stroke and x1.57 on the scribble; this one trips at x2.36 and
+ * x1.43.
+ *
+ * Two things this denominator cannot see, and where they are covered instead:
+ *   - A uniform slowdown of the shared carrier body moves both sides. That is the `oil-ribbon`
+ *     lane's own growth gate in studio-long-stroke-per-move-cost.test.ts.
+ *   - Conversely, making the carrier body FASTER raises this ratio without the overlay changing.
+ *     That is a re-pin with a red build attached, not a silent decay, and it is the honest
+ *     reading: the overlay really would have become a larger share of the plan.
+ * The deterministic painted-work counts below still hold the part of the budget that never needed
+ * a clock at all.
  */
 const LONG_STROKE_PLANS_PER_SAMPLE = 4;
-/** ~63ms of reference work — the same window length as four 2000-station plans. */
-const LONG_STROKE_CALIBRATION_ROUNDS = 5_200;
 const SCRIBBLE_PLANS_PER_SAMPLE = 2;
-/** ~126ms of reference work — the same window length as two scribble plans. */
-const SCRIBBLE_CALIBRATION_ROUNDS = 10_400;
+
+/**
+ * Recorded ratios of overlay-on to overlay-off, measured the way the gate measures them: the
+ * geometric centre of the band over sixteen runs on an Apple-silicon dev machine under Node 24,
+ * eight idle (long x1.31-x1.62, scribble x5.71-x6.94) and eight with the box deliberately
+ * oversubscribed at 8 spinning hogs against 12 cores (x1.28-x1.58, x4.88-x7.51). The budget is
+ * `STUDIO_PERF_CALIBRATION_MAX_GROWTH` x these, which puts the whole measured envelope inside the
+ * [x0.75, x1.5] band a pinned value buys with ~26% and ~14% left over for machine-to-machine
+ * drift on top of it.
+ *
+ * The scribble sits so much higher because the overlay is 87.5% of that plan against 35.5% of the
+ * long stroke's -- a self-crossing blob maximises grid area and splat density at once, which is
+ * the whole reason it is here.
+ */
+const LONG_STROKE_OVERLAY_RATIO = 1.36;
+const SCRIBBLE_OVERLAY_RATIO = 5.7;
 
 /** Kept live so no plan in a timed window can be optimized away as dead code. */
 let plannedLaneSink = 0;
@@ -75,6 +116,17 @@ function planReliefWorkload(dabs: PlannedDabs, plansPerSample: number): () => vo
       plannedLaneSink += planStudioOilRibbonCarrier(dabs, {
         impastoRelief: { enabled: true },
       }).impastoReliefLanes!.length;
+    }
+  };
+}
+
+/** The denominator: the identical plan with the overlay off, same count, same stroke. */
+function planWithoutReliefWorkload(dabs: PlannedDabs, plansPerSample: number): () => void {
+  return () => {
+    for (let plan = 0; plan < plansPerSample; plan += 1) {
+      plannedLaneSink += planStudioOilRibbonCarrier(dabs, {
+        impastoRelief: { enabled: false },
+      }).bristleLanes.length;
     }
   };
 }
@@ -265,15 +317,33 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
       longStroke = evaluateStudioCalibratedBudget({
         label: "2000-station impasto plan",
         workload: planReliefWorkload(longStrokeDabs(), LONG_STROKE_PLANS_PER_SAMPLE),
-        referenceRounds: LONG_STROKE_CALIBRATION_ROUNDS,
+        referenceWorkload: planWithoutReliefWorkload(longStrokeDabs(), LONG_STROKE_PLANS_PER_SAMPLE),
+        maxRatio: LONG_STROKE_OVERLAY_RATIO * STUDIO_PERF_CALIBRATION_MAX_GROWTH,
         samples: 5,
       });
       scribble = evaluateStudioCalibratedBudget({
         label: "self-crossing scribble impasto plan",
         workload: planReliefWorkload(scribbleDabs(), SCRIBBLE_PLANS_PER_SAMPLE),
-        referenceRounds: SCRIBBLE_CALIBRATION_ROUNDS,
+        referenceWorkload: planWithoutReliefWorkload(scribbleDabs(), SCRIBBLE_PLANS_PER_SAMPLE),
+        maxRatio: SCRIBBLE_OVERLAY_RATIO * STUDIO_PERF_CALIBRATION_MAX_GROWTH,
         samples: 4,
       });
+    });
+
+    it("plans the same body and bristles with the overlay off, so the denominator is honest", () => {
+      // The reference is only a measure of "this plan without the overlay" while the overlay is
+      // genuinely all that differs. If the carrier ever started varying the shared work behind the
+      // flag, the budget below would silently be dividing by a different plan -- so that is
+      // checked here, byte for byte, before any clock is involved.
+      for (const dabs of [longStrokeDabs(), scribbleDabs()]) {
+        const on = planStudioOilRibbonCarrier(dabs, { impastoRelief: { enabled: true } });
+        const off = planStudioOilRibbonCarrier(dabs, { impastoRelief: { enabled: false } });
+        expect(off.impastoReliefLanes ?? []).toEqual([]);
+        expect((on.impastoReliefLanes ?? []).length).toBeGreaterThan(0);
+        expect(off.body).toEqual(on.body);
+        expect(off.bodyOpacity).toEqual(on.bodyOpacity);
+        expect(off.bristleLanes).toEqual(on.bristleLanes);
+      }
     });
 
     it("plans a 2000-station impasto stroke inside its calibrated plan budget", () => {
@@ -300,16 +370,17 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
       // just measured — the healthy case measures nothing extra. The other half of the claim,
       // that the harness really does read a doubled hot path as 2x, is measured end to end in
       // studio-perf-calibration.test.ts, and against recorded series from these two strokes.
-      for (const [verdict, workload, referenceRounds] of [
+      for (const [verdict, workload, referenceWorkload] of [
         [longStroke, planReliefWorkload(longStrokeDabs(), LONG_STROKE_PLANS_PER_SAMPLE),
-          LONG_STROKE_CALIBRATION_ROUNDS],
+          planWithoutReliefWorkload(longStrokeDabs(), LONG_STROKE_PLANS_PER_SAMPLE)],
         [scribble, planReliefWorkload(scribbleDabs(), SCRIBBLE_PLANS_PER_SAMPLE),
-          SCRIBBLE_CALIBRATION_ROUNDS],
+          planWithoutReliefWorkload(scribbleDabs(), SCRIBBLE_PLANS_PER_SAMPLE)],
       ] as const) {
         const detection = evaluateStudioCalibratedDetection({
           label: verdict.label,
           workload,
-          referenceRounds,
+          referenceWorkload,
+          maxRatio: verdict.maxRatio,
           seed: verdict.passes,
           factor: 2,
           samples: 4,
