@@ -81,7 +81,7 @@ export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES = 2_000;
  * from 1.26x on user alone to 1.12x on the total.
  *
  * Recorded min-of-5 over the same window `elapsedMs` covers -- the product plan and coverage
- * path, excluding fixture setup and the receipt digest -- idle then loaded:
+ * path, excluding fixture setup and the receipt digest -- idle then loaded on a 4-vCPU container:
  *
  *                 idle           loaded              spread   wall spread
  *   crayon        117-124ms      123-130ms           1.12x      2.35x
@@ -90,17 +90,29 @@ export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES = 2_000;
  *   chalk          65-66ms        66-70ms            1.08x      2.29x
  *   pastel         58-59ms        54-55ms            1.09x      2.13x
  *
- * 175ms carries 1.34x headroom over the worst honest reading here, while a doubled crayon plan --
- * 234ms even from its cheapest honest pass -- is convicted with 33% margin on every machine,
- * where the wall form convicted it only when the box was idle. The lighter four rows share this
- * budget and have slack in it, exactly as they did under the wall form; what covers them is the
- * exact dab and mark pins in the colocated test, which convict a work regression for all five.
+ * **CPU time removes the scheduler, not the machine.** That distinction cost a CI run and is worth
+ * stating plainly: contention-dependence collapsed from 2.35x to 1.12x, but a different CPU still
+ * retires the same plan in a different number of CPU-milliseconds, and the GitHub Actions runner
+ * reads the crayon row at 191.5ms where this container reads 117-130. A budget of 175, set from
+ * one machine's population, failed there on code that had not regressed.
+ *
+ * So the budget is set for the SLOWEST machine this gate runs on, which is what an absolute freeze
+ * budget is for -- a slower machine genuinely does freeze longer, and the product statement has to
+ * hold there. 210ms clears the runner's 191.5 with 9.7% headroom, while a doubled crayon plan
+ * still convicts from the cheapest honest reading anywhere (2 x 116.8 = 234, 11% margin) and by a
+ * wide margin on the runner itself (383).
+ *
+ * That margin is thinner than the other gates in this change, and honestly so: it starts convicting
+ * at 1.80x rather than the 1.5x a single machine's population suggested. Widening it further would
+ * buy headroom by giving up the doubling, so the extra coverage comes from the exact dab and mark
+ * pins in the colocated test instead -- those are machine-independent and convict a work regression
+ * for all five rows, including the four with slack in this shared budget.
  *
  * Vitest runs this suite in a forked worker, so the measurement is this process alone; concurrent
  * GC threads are counted, which is why the reducer is a MINIMUM over passes -- the pass with the
  * least concurrent collection is the honest estimate of what the plan costs.
  */
-export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS = 175;
+export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS = 210;
 /** Passes per crayon-family row. Minimum-of-N, for the reason above. */
 export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES = 5;
 /**

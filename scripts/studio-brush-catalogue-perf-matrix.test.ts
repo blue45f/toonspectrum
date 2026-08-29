@@ -155,7 +155,10 @@ describe("soak monotonic-degradation detector", () => {
 describe("studioBrushCrayonFamilyCpuFreezes", () => {
   // Every series below is a recorded min-of-5 CPU reading from the reference container, idle and
   // then against six spinning hogs on four cores.
-  const HONEST_CRAYON = [123.8, 116.8, 130.4, 123.3] as const;
+  // The last entry is the GitHub Actions runner, which reads this row 1.47x more expensively than
+  // the container the rest were recorded on. It is in the honest population precisely because a
+  // budget set without it failed CI on unregressed code.
+  const HONEST_CRAYON = [123.8, 116.8, 130.4, 123.3, 191.5] as const;
   const HONEST_LIGHTEST = [58.7, 57.6, 55.3, 54.0] as const;
 
   it("acquits every honest reading, on an idle machine and a heavily contended one", () => {
@@ -167,16 +170,18 @@ describe("studioBrushCrayonFamilyCpuFreezes", () => {
 
   it("convicts a doubled crayon plan on both of those machines", () => {
     // The gate must not have been loosened into a no-op. A 2x regression puts the heaviest row at
-    // 234-261ms against a 175ms budget -- caught at its CHEAPEST pass, so no lucky pass rescues
-    // it. The wall-clock form this replaces convicted the same doubling only when the box was
-    // idle: 2 x 84ms wall cleared a 200ms number.
+    // 234-383ms against a 210ms budget -- caught at its CHEAPEST pass on either machine, so no
+    // lucky pass and no lucky runner rescues it. The wall-clock form this replaces convicted the
+    // same doubling only when the box was idle: 2 x 84ms wall cleared a 200ms number.
     expect(studioBrushCrayonFamilyCpuFreezes(HONEST_CRAYON.map((ms) => ms * 2))).toBe(true);
     expect(Math.min(...HONEST_CRAYON) * 2)
       .toBeGreaterThan(STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS);
     // ...and it is not only a doubling: the smallest regression it still convicts.
     expect(
       STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS / Math.min(...HONEST_CRAYON),
-    ).toBeLessThan(1.6);
+    // 1.80, not the 1.5 a single machine's population suggested: the budget has to clear the
+    // slowest machine this runs on, and buying more headroom than that would cost the doubling.
+    ).toBeLessThan(1.85);
   });
 
   it("requires the CHEAPEST pass to be over budget, so one preempted pass cannot convict", () => {
@@ -184,9 +189,14 @@ describe("studioBrushCrayonFamilyCpuFreezes", () => {
     // collection. A maximum, or any single sample, would call that a freeze.
     expect(studioBrushCrayonFamilyCpuFreezes([118, 121, 640, 117, 119])).toBe(false);
     // ...while a series that is over budget throughout is convicted however many passes it gets.
-    expect(studioBrushCrayonFamilyCpuFreezes([201, 640, 233, 202, 260])).toBe(true);
-    expect(studioBrushCrayonFamilyCpuFreezes([176, 176])).toBe(true);
-    expect(studioBrushCrayonFamilyCpuFreezes([176, 174])).toBe(false);
+    // These are the recorded honest readings doubled, so this is the regression itself and not an
+    // arbitrary series: every pass is over, and so is the cheapest.
+    expect(studioBrushCrayonFamilyCpuFreezes(HONEST_CRAYON.map((ms) => ms * 2))).toBe(true);
+    expect(studioBrushCrayonFamilyCpuFreezes([234, 640, 261, 247, 383])).toBe(true);
+    expect(studioBrushCrayonFamilyCpuFreezes([211, 211])).toBe(true);
+    expect(studioBrushCrayonFamilyCpuFreezes([211, 209])).toBe(false);
+    // The runner's own honest reading must not convict, which is the failure that set this budget.
+    expect(studioBrushCrayonFamilyCpuFreezes([191.5])).toBe(false);
   });
 
   it("is not evidence of anything without a pass", () => {
