@@ -50,11 +50,18 @@ function meanOfYs(points: readonly number[]): number {
 const PLAN_BUDGET_SAMPLES = 5;
 
 /**
- * Scribble plan cost over its sibling `planOilBrushDabs` cost, recorded on the reference container:
- * 3.77 / 4.42 / 4.55 idle. 5.7 clears the worst of those with the same ~1.25x margin the other
- * budgets carry, while a 2x regression (>=7.5) still fails.
+ * Scribble plan cost over its sibling `planOilBrushDabs` cost.
+ *
+ * Recorded 3.77 / 4.42 / 4.55 on the reference container, and 5.88 on a GitHub Actions runner --
+ * which is the number that matters, because the first gate set here (5.7, a ~1.25x margin over the
+ * container readings alone) failed CI at 113.4ms against 110.0ms. Sibling calibration cancels
+ * machine SPEED, but this stroke's ratio is not identical across microarchitectures: the carrier's
+ * grid work and the dab planner's do not scale together perfectly.
+ *
+ * 7.5 clears the worst measured reading (5.88) by ~1.28x while a 2x regression, which lands at
+ * >=7.5 from the container readings and >=11.8 from the CI one, still fails.
  */
-const RECORDED_SCRIBBLE_RATIO = 5.7;
+const RECORDED_SCRIBBLE_RATIO = 7.5;
 
 function fastestPlan(
   dabs: Parameters<typeof planStudioOilRibbonCarrier>[0],

@@ -251,14 +251,24 @@ export function StudioGroupUniformResizeProxy({
     // Return the lifted nodes to the document Layer first so the neutral reset below invalidates
     // the authoritative Layer once, and the mirrors re-converge from the same reset.
     restoreStudioSingleObjectDragLayer(preview.lift);
-    const stage = preview.node.getStage();
     preview.node.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, undefined);
     resetStudioLiveTransformPreviewNodeAttrs(preview.node);
     for (const indicator of preview.parkedIndicators) indicator.visible(true);
     // Chrome that mounted DURING the gesture is not in the start snapshot — the lazy overlay chunk
     // resolving mid-transform parks itself instead, and this is where that gets undone. Restoring
     // only the snapshot would leave such an indicator hidden for good.
-    drainStudioLateParkedChrome(stage);
+    //
+    // Strictly after the neutralization above, and isolated from it. Neutralizing the wrapper is
+    // what makes a cancel safe; draining parked chrome is cosmetic tidy-up. Reading the stage
+    // first threw on any node without `getStage` and took the neutralization down with it, which
+    // left a cancelled gesture holding its preview transform — the opposite of what cancel means.
+    // The contract is therefore the stronger one: however this tidy-up fails, the wrapper is
+    // already neutral, the snapshot is already un-parked, and the caller still gets its cancel.
+    try {
+      drainStudioLateParkedChrome(preview.node.getStage?.() ?? null);
+    } catch {
+      // Cosmetic cleanup only; a stale hidden indicator is recoverable, a stuck transform is not.
+    }
     preview.node.getLayer()?.batchDraw();
   }
 

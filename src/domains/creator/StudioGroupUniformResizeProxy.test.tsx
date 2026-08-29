@@ -669,6 +669,42 @@ describe("StudioGroupUniformResizeProxy", () => {
       expect(props.onCommit).not.toHaveBeenCalled();
     });
 
+    it("취소 경로의 정리 단계가 던져도 래퍼 중립화는 반드시 끝난다", () => {
+      // 회귀 방지: 프리뷰가 끝날 때 붙은 늦은-마운트 크롬 정리는 `stage`를 읽는데, 그 읽기가
+      // 중립화보다 먼저 실행되면서 `getStage`가 없는 노드에서 던졌다. 그러면 취소가 프리뷰
+      // 변환을 그대로 든 채 중단된다 — 취소의 정반대다. 중립화가 안전성의 핵심이고 크롬 정리는
+      // 부수적이므로, 정리가 어떤 이유로 실패해도 중립화·언파킹·onCancel은 완료되어야 한다.
+      const { wrapper, indicator, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      (wrapper as unknown as { getStage?: () => unknown }).getStage = () => {
+        throw new Error("stage lookup exploded");
+      };
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => {
+        rectProps().onTransformStart();
+        rect.position({ x: 50, y: 70 });
+        rect.scaleX(1.5);
+        rectProps().onTransform({ target: rect });
+      });
+      expect(wrapper.state.scaleX).toBe(1.5);
+
+      act(() => window.dispatchEvent(new Event("blur")));
+
+      expect(wrapper.state).toEqual({
+        x: 0,
+        y: 0,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        offsetX: 0,
+        offsetY: 0,
+      });
+      expect(indicator.state.visible).toBe(true);
+      expect(props.onCancel).toHaveBeenCalledTimes(1);
+      expect(props.onCommit).not.toHaveBeenCalled();
+    });
+
     it("캐시된 조상 아래 스트로크는 프리뷰 없이 커밋-지연 동작으로 폴백한다", () => {
       const { wrapper, indicator, props } = setupLivePreview({ cached: true });
       const rect = konvaHarness.rectNode as unknown as FakeRectNode;
