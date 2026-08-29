@@ -53,7 +53,10 @@ const RECORDED_PASSES = {
       { referenceMs: 327.13, workMs: 796.65 },
     ],
   },
-  "paper height sampler": {
+  // Recorded before the paper budget moved onto a frozen-baseline denominator, so this row is
+  // history rather than a live call site — it stays because it is the noisiest honest series in
+  // the corpus and the judge has to clear it.
+  "scalar sampler vs the built-in kernel (historical)": {
     honest: [
       { referenceMs: 157.64, workMs: 152.82 },
       { referenceMs: 165.90, workMs: 156.61 },
@@ -184,12 +187,13 @@ describe("studio perf calibration — gate", () => {
   });
 
   it("reports the evidence it convicted on", () => {
+    const label = "scalar sampler vs the built-in kernel (historical)";
     const verdict = judgeStudioCalibratedBudget(
-      "paper height sampler",
-      RECORDED_PASSES["paper height sampler"].doubled.map(passOf),
+      label,
+      RECORDED_PASSES[label].doubled.map(passOf),
     );
     expect(verdict.ok).toBe(false);
-    expect(verdict.detail).toContain("paper height sampler");
+    expect(verdict.detail).toContain(label);
     expect(verdict.detail).toContain("budget 1.50x");
     expect(verdict.passes).toHaveLength(4);
     expect(verdict.ratio).toBeCloseTo(324.70 / 164.03, 6);

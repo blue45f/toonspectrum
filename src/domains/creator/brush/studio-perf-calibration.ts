@@ -38,10 +38,21 @@
  *    failure to detect has to be earned exactly like a violation does.
  *
  * Detection power is unchanged by construction, and the recorded spread says so: across idle
- * and heavily contended runs of the three call sites, honest passes stayed at or under 1.39
- * while every 2x-regressed pass landed at or above 1.94. `STUDIO_PERF_CALIBRATION_MAX_GROWTH`
- * sits at 1.5, between the two populations — see studio-perf-calibration.test.ts, which pins
- * both populations as recorded series.
+ * and heavily contended runs, honest passes against this kernel stayed at or under 1.39 while
+ * every 2x-regressed pass landed at or above 1.94. `STUDIO_PERF_CALIBRATION_MAX_GROWTH` sits at
+ * 1.5, between the two populations — see studio-perf-calibration.test.ts, which pins both
+ * populations as recorded series.
+ *
+ * **Pick the denominator that resembles the work.** The built-in kernel is not universal, and
+ * the limit is measured. It tracks plan builders well — the impasto budgets hold against it on
+ * both a 4-vCPU Xeon container and a GitHub Actions runner — and pure scalar samplers badly:
+ * the 1e6-sample paper-height budget scored 0.93-1.00 on the container and 1.98-2.09 on the
+ * runner, because the sampler ran 2.8x slower there while the kernel ran only 1.3x slower. A
+ * 2.2x baseline spread admits no gate at all (above 2.09 to avoid false failures, below 1.88 to
+ * catch a doubling), and re-shaping the kernel to imitate the sampler's own documented cost
+ * model did not close it. `referenceWorkload` exists for that case: calibrate against a frozen
+ * copy of the implementation, whose instruction mix matches by construction. See the paper
+ * budget in studio-paper-media-profile-v1.test.ts for the worked example.
  */
 
 /**
@@ -111,11 +122,13 @@ export interface StudioCalibratedBudgetVerdict {
 }
 
 /**
- * Growth over the calibrated baseline that counts as a regression. Recorded honest passes top
- * out at 1.39 under heavy contention and recorded 2x-regressed passes bottom out at 1.94, so
- * 1.5 separates the populations with ~8% headroom below and ~29% margin above. Lowering it
- * buys detection power the recorded noise cannot support; raising it past 1.94 would start
- * hiding a doubling, which studio-perf-calibration.test.ts fails on.
+ * Default growth over the calibrated baseline that counts as a regression, for call sites that
+ * do not name their own. Recorded honest passes against the built-in kernel top out at 1.39
+ * under heavy contention and recorded 2x-regressed passes bottom out at 1.94, so 1.5 separates
+ * the populations with ~8% headroom below and ~29% margin above. Lowering it buys detection
+ * power the recorded noise cannot support; raising it past 1.94 would start hiding a doubling,
+ * which studio-perf-calibration.test.ts fails on. A call site whose baseline spread differs —
+ * anything on `referenceWorkload` — should pass its own `maxRatio` with its own recorded range.
  */
 export const STUDIO_PERF_CALIBRATION_MAX_GROWTH = 1.5;
 
@@ -191,6 +204,26 @@ export function scaleStudioPerfCalibrationPass(
   return { ...pass, workMs, ratio: workMs / pass.referenceMs };
 }
 
+/**
+ * Resolves the denominator, rejecting the two ambiguous shapes outright: a call site naming
+ * neither has no reference at all, and one naming both is silently ignoring one of them.
+ */
+function resolveStudioPerfCalibrationReference(
+  options: StudioCalibratedBudgetOptions,
+): () => void {
+  const { referenceRounds, referenceWorkload } = options;
+  if (referenceWorkload && referenceRounds !== undefined) {
+    throw new Error(`${options.label}: pass referenceRounds or referenceWorkload, not both.`);
+  }
+  if (referenceWorkload) return referenceWorkload;
+  if (referenceRounds === undefined) {
+    throw new Error(
+      `${options.label}: a calibrated budget needs referenceRounds or referenceWorkload.`,
+    );
+  }
+  return () => void runStudioPerfCalibrationRounds(referenceRounds);
+}
+
 export interface StudioCalibratedBudgetOptions {
   /** Named in the assertion message. */
   readonly label: string;
@@ -201,7 +234,29 @@ export interface StudioCalibratedBudgetOptions {
    * window lengths keep the two sides equally exposed to preemption, which is what makes the
    * ratio hold under contention.
    */
-  readonly referenceRounds: number;
+  readonly referenceRounds?: number;
+  /**
+   * Calibrate against a workload of your own instead of the built-in kernel.
+   *
+   * Reach for this when the built-in kernel does not co-scale with the hot loop, which is a
+   * measured hazard rather than a theoretical one. The 1e6-sample paper-height budget scored
+   * 0.93-1.00 against the kernel on a 4-vCPU Xeon container — identically under Node 22 and
+   * Node 24, an unbounded or bounded warm-up, and a 1MB young generation — and 1.98-2.09 on a
+   * GitHub Actions runner, where the sampler itself ran 2.8x slower while the kernel ran only
+   * 1.3x slower. No fixed gate survives a 2.2x baseline spread: never false-failing needs a
+   * gate above 2.09 and catching a doubling needs one below 1.88.
+   *
+   * Rewriting the kernel to imitate the workload's instruction mix does not close that gap —
+   * a value-noise-shaped kernel matching the sampler's own documented cost model (8 lattice
+   * hashes + 2 sines + 1 fleck hash) still came out 2.6x cheaper per sample, so the model of
+   * where the time goes was wrong and its cross-machine behaviour was guesswork.
+   *
+   * What does close it is calibrating against a FROZEN COPY of the implementation itself: same
+   * instruction mix by construction, so the ratio is ≈1.0 on every CPU, while a regression in
+   * the live code moves the numerator alone. The copy is a measuring stick — it must never be
+   * "improved", and what it cannot see (shared helpers both sides call) belongs in its comment.
+   */
+  readonly referenceWorkload?: () => void;
   readonly maxRatio?: number;
   readonly samples?: number;
   /** Full reference+workload iterations run before the first timed sample. */
@@ -219,18 +274,18 @@ export function evaluateStudioCalibratedBudget(
   const {
     label,
     workload,
-    referenceRounds,
     maxRatio = STUDIO_PERF_CALIBRATION_MAX_GROWTH,
     samples = 5,
     warmups = 2,
     passes = STUDIO_PERF_CALIBRATION_CONFIRMATION_PASSES,
   } = options;
 
-  warmStudioPerfCalibration(workload, referenceRounds, warmups);
+  const reference = resolveStudioPerfCalibrationReference(options);
+  warmStudioPerfCalibration(workload, reference, warmups);
 
   const recorded: StudioPerfCalibrationPass[] = [];
   for (let pass = 0; pass < passes; pass += 1) {
-    recorded.push(measureStudioPerfCalibrationPass(workload, referenceRounds, samples));
+    recorded.push(measureStudioPerfCalibrationPass(workload, reference, samples));
     const verdict = judgeStudioCalibratedBudget(label, recorded, maxRatio);
     if (verdict.ok) return verdict;
   }
@@ -250,26 +305,26 @@ export function measureStudioCalibratedPasses(
 ): readonly StudioPerfCalibrationPass[] {
   const {
     workload,
-    referenceRounds,
     samples = 5,
     warmups = 2,
     passes = STUDIO_PERF_CALIBRATION_CONFIRMATION_PASSES,
   } = options;
-  warmStudioPerfCalibration(workload, referenceRounds, warmups);
+  const reference = resolveStudioPerfCalibrationReference(options);
+  warmStudioPerfCalibration(workload, reference, warmups);
   const recorded: StudioPerfCalibrationPass[] = [];
   for (let pass = 0; pass < passes; pass += 1) {
-    recorded.push(measureStudioPerfCalibrationPass(workload, referenceRounds, samples));
+    recorded.push(measureStudioPerfCalibrationPass(workload, reference, samples));
   }
   return recorded;
 }
 
 function warmStudioPerfCalibration(
   workload: () => void,
-  referenceRounds: number,
+  reference: () => void,
   warmups: number,
 ): void {
   for (let warmup = 0; warmup < warmups; warmup += 1) {
-    runStudioPerfCalibrationRounds(referenceRounds);
+    reference();
     workload();
   }
 }
@@ -282,13 +337,13 @@ function warmStudioPerfCalibration(
  */
 function measureStudioPerfCalibrationPass(
   workload: () => void,
-  referenceRounds: number,
+  reference: () => void,
   samples: number,
 ): StudioPerfCalibrationPass {
   const taken: StudioPerfCalibrationSample[] = [];
   for (let sample = 0; sample < samples; sample += 1) {
     const referenceStarted = performance.now();
-    runStudioPerfCalibrationRounds(referenceRounds);
+    reference();
     const referenceMs = performance.now() - referenceStarted;
     const workStarted = performance.now();
     workload();
@@ -335,7 +390,6 @@ export function evaluateStudioCalibratedDetection(
   const {
     label,
     workload,
-    referenceRounds,
     factor,
     seed = [],
     maxRatio = STUDIO_PERF_CALIBRATION_MAX_GROWTH,
@@ -351,13 +405,14 @@ export function evaluateStudioCalibratedDetection(
   const best = (): number => Math.max(...recorded.map((pass) => pass.ratio));
   const detected = (): boolean => best() * factor > maxRatio;
 
+  const reference = resolveStudioPerfCalibrationReference(options);
   let warmed = false;
   for (let pass = recorded.length; pass < passes && !detected(); pass += 1) {
     if (!warmed) {
-      warmStudioPerfCalibration(workload, referenceRounds, warmups);
+      warmStudioPerfCalibration(workload, reference, warmups);
       warmed = true;
     }
-    recorded.push(measureStudioPerfCalibrationPass(workload, referenceRounds, samples));
+    recorded.push(measureStudioPerfCalibrationPass(workload, reference, samples));
   }
   if (recorded.length === 0) {
     throw new Error(`No calibration passes recorded for ${label}.`);
