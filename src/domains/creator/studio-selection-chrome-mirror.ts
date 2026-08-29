@@ -22,6 +22,14 @@ import type Konva from "konva";
 /** Scoped so `off` can never strip listeners the product installed on the same node. */
 export const STUDIO_SELECTION_CHROME_MIRROR_NAMESPACE = "studioSelectionChromeMirror";
 
+/**
+ * Name on each per-element draw selection indicator group (rendered by
+ * StudioDrawSelectionOverlay), for scene-graph assertions, perf probes, and gesture code that
+ * must park the chrome. Declared here — the eagerly-bundled mirror module — so the lazily-loaded
+ * overlay chunk is never pulled into the main bundle just to read a string.
+ */
+export const STUDIO_DRAW_SELECTION_INDICATOR_NAME = "studio-draw-selection-indicator";
+
 function konvaNodeDepth(node: Konva.Node): number {
   let depth = 0;
   let current: Konva.Node | null = node.getParent();

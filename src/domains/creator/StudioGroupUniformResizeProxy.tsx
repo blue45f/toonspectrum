@@ -1,7 +1,17 @@
 import { Fragment, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { Rect, Transformer } from "react-konva/lib/ReactKonvaCore";
 
-import { mirrorStudioDrawElementTranslation } from "./studio-selection-chrome-mirror";
+import { planStudioLiveTransformPreviewAttrs } from "./studio-live-transform-preview";
+import {
+  applyStudioLiveTransformPreviewNodeAttrs,
+  resetStudioLiveTransformPreviewNodeAttrs,
+  studioLiveTransformPreviewEligible,
+} from "./studio-live-transform-preview-konva";
+import {
+  STUDIO_DRAW_SELECTION_INDICATOR_NAME,
+  findStudioDrawWrapperNode,
+  mirrorStudioDrawElementTranslation,
+} from "./studio-selection-chrome-mirror";
 
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
 import type Konva from "konva";
@@ -64,6 +74,16 @@ export interface StudioGroupUniformResizeProxyProps {
    * proxy imperatively for group drags.
    */
   readonly mirrorDragElementId?: string;
+  /**
+   * Draw element whose ink should follow the handles live (PPT-style real-time transform).
+   *
+   * Each transform frame mirrors the gesture's affine onto the stroke's wrapper node
+   * imperatively — zero React commits, no per-frame point baking, no document mutation. The
+   * projection is `planStudioLiveTransformPreviewAttrs`, whose math is exactly the commit
+   * planner's, so the ink lands where `onCommit` will bake it. The single authoritative commit
+   * still happens exactly once at transformend; cancellation restores the neutral projection.
+   */
+  readonly livePreviewElementId?: string;
   /** Return false when effective locks or collaboration leases reject the gesture. */
   readonly onBegin: (sourceBounds: StudioGroupUniformResizeBounds) => boolean;
   /**
@@ -77,8 +97,15 @@ export interface StudioGroupUniformResizeProxyProps {
   readonly onCancel: () => void;
 }
 
+type ActiveLiveTransformPreview = {
+  readonly node: Konva.Node;
+  /** Dashed draw indicators hidden for the gesture; restored on commit and on every cancel path. */
+  readonly parkedIndicators: readonly Konva.Node[];
+};
+
 type ActiveResizeSession = {
   readonly sourceBounds: StudioGroupUniformResizeBounds;
+  readonly livePreview: ActiveLiveTransformPreview | null;
 };
 
 /**
@@ -96,6 +123,7 @@ export function StudioGroupUniformResizeProxy({
   enabled,
   freeTransform = false,
   mirrorDragElementId,
+  livePreviewElementId,
   onBegin,
   onCommit,
   onCancel,
@@ -120,6 +148,36 @@ export function StudioGroupUniformResizeProxy({
     onCancelRef.current = onCancel;
   }, [onCancel]);
 
+  /**
+   * Resolves the live-ink preview target for a starting gesture, or null when the stroke has no
+   * scene node or sits under a cached ancestor (whose bitmap our attrs could never repaint).
+   *
+   * The stroke's dashed indicator is parked for the duration: its translation mirror reads the
+   * wrapper's x/y as a drag offset, which the preview repurposes as the absolute target origin.
+   * The Transformer frame carries the "selected" affordance for the whole gesture, and un-parking
+   * re-converges the box through that same mirror once the wrapper resets to neutral.
+   */
+  function beginLiveTransformPreview(): ActiveLiveTransformPreview | null {
+    if (!livePreviewElementId) return null;
+    const stage = proxyRef.current?.getStage();
+    if (!stage) return null;
+    const node = findStudioDrawWrapperNode(stage, livePreviewElementId);
+    if (!node || !studioLiveTransformPreviewEligible(node)) return null;
+    const parkedIndicators = stage
+      .find(`.${STUDIO_DRAW_SELECTION_INDICATOR_NAME}`)
+      .filter((indicator) => indicator.visible());
+    for (const indicator of parkedIndicators) indicator.visible(false);
+    return { node, parkedIndicators };
+  }
+
+  /** Neutralize the preview projection and un-park the chrome — commit and cancel both end here. */
+  function clearLiveTransformPreview(preview: ActiveLiveTransformPreview | null) {
+    if (!preview) return;
+    resetStudioLiveTransformPreviewNodeAttrs(preview.node);
+    for (const indicator of preview.parkedIndicators) indicator.visible(true);
+    preview.node.getLayer()?.batchDraw();
+  }
+
   function restoreProxy(source: StudioGroupUniformResizeBounds) {
     const proxy = proxyRef.current;
     if (!proxy) return;
@@ -143,6 +201,7 @@ export function StudioGroupUniformResizeProxy({
     // Restore after stopTransform as well: a synchronous transformend may have projected newer
     // props onto the proxy, but cancellation must finish at the gesture's captured source box.
     restoreProxy(active.sourceBounds);
+    clearLiveTransformPreview(active.livePreview);
     onCancelRef.current();
     return true;
   });
@@ -182,7 +241,36 @@ export function StudioGroupUniformResizeProxy({
       restoreProxy(sourceBounds);
       return;
     }
-    activeSessionRef.current = { sourceBounds };
+    activeSessionRef.current = {
+      sourceBounds,
+      livePreview: beginLiveTransformPreview(),
+    };
+  }
+
+  /**
+   * Live ink projection, PPT-style: every transform frame maps the gesture onto the stroke's
+   * wrapper node through the same scale-then-rotate decomposition the commit planner bakes at
+   * transformend. Purely imperative — no React commit, no document mutation, no history entry —
+   * so the hot-path budget and the "exactly one commit per gesture" contract both hold.
+   */
+  function handleTransform(event: Konva.KonvaEventObject<Event>) {
+    const active = activeSessionRef.current;
+    const preview = active?.livePreview;
+    if (!active || !preview) return;
+    const proxy = event.target as Konva.Rect;
+    const attrs = planStudioLiveTransformPreviewAttrs({
+      sourceBounds: active.sourceBounds,
+      targetBounds: {
+        x: proxy.x(),
+        y: proxy.y(),
+        width: proxy.width() * proxy.scaleX(),
+        height: proxy.height() * proxy.scaleY(),
+      },
+      rotationDeg: freeTransform ? proxy.rotation() : 0,
+    });
+    // A degenerate mid-gesture box keeps the last valid projection; transformend still decides
+    // commit vs cancel from its own reading, so a rejected frame can never corrupt the document.
+    if (attrs) applyStudioLiveTransformPreviewNodeAttrs(preview.node, attrs);
   }
 
   function handleTransformEnd(event: Konva.KonvaEventObject<Event>) {
@@ -204,6 +292,10 @@ export function StudioGroupUniformResizeProxy({
     // scale-then-rotate decomposition the draw planner consumes.
     const rotationDeg = freeTransform ? proxy.rotation() : 0;
     restoreProxy(active.sourceBounds);
+    // Neutralize the ink projection in the same tick as the commit below: React re-renders with
+    // the baked points before the next paint, so the stroke never shows a reverted frame — the
+    // discipline the drag path already follows ("zero the wrapper before committing new points").
+    clearLiveTransformPreview(active.livePreview);
 
     if (!finitePositiveBounds(targetBounds) || !Number.isFinite(rotationDeg)) {
       onCancelRef.current();
@@ -321,6 +413,7 @@ export function StudioGroupUniformResizeProxy({
         strokeEnabled={false}
         perfectDrawEnabled={false}
         onTransformStart={handleTransformStart}
+        onTransform={handleTransform}
         onTransformEnd={handleTransformEnd}
       />
       <Transformer

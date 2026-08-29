@@ -228,6 +228,11 @@ export function renderStudioCanvasSelectionDecorations({
           mirrorDragElementId={
             singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
           }
+          // PPT-style real-time transform: the lone stroke's ink follows the handles live
+          // through the commit planner's own affine, applied imperatively per frame.
+          livePreviewElementId={
+            singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
+          }
           onBegin={beginCanvasSelectionResize}
           onCommit={commitCanvasSelectionResize}
           onCancel={cancelCanvasSelectionResize}

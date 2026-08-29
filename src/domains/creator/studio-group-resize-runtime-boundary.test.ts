@@ -88,6 +88,47 @@ describe("Studio group uniform-resize runtime boundary", () => {
     );
   });
 
+  it("previews the gesture imperatively through the engine-agnostic projection, never via document state", () => {
+    const previewSource = readFileSync(
+      new URL("./studio-live-transform-preview.ts", import.meta.url),
+      "utf8",
+    );
+    // The projection math is the next-gen-engine seam: renderer-free by contract. Konva-specific
+    // application must stay in the -konva adapter so a future scene backend swaps one file.
+    expect(previewSource).not.toContain('from "konva"');
+    expect(previewSource).not.toContain("react-konva");
+    expectSourceToken(
+      previewSource,
+      "studioLiveTransformPreviewMat2d",
+      "stable-IR projection",
+    );
+
+    expectSourceToken(
+      proxySource,
+      "onTransform={handleTransform}",
+      "live preview wiring",
+    );
+    expectSourceToken(
+      proxySource,
+      "planStudioLiveTransformPreviewAttrs",
+      "live preview projection",
+    );
+    // Both resolutions of a gesture — commit and every cancel path — must neutralize the ink
+    // projection, or a stale affine would double-apply once the baked points render.
+    expect(
+      occurrences(proxySource, "clearLiveTransformPreview(active.livePreview)"),
+    ).toBe(2);
+    // The live path may never touch the document: the one commit in
+    // commitCanvasSelectionResize stays the only mutation of the gesture.
+    expect(proxySource).not.toContain("patchEl(");
+    expect(proxySource).not.toContain("setPagesHistory");
+    expectSourceToken(
+      selectionDecorationsSource,
+      "livePreviewElementId={",
+      "single-stroke live preview opt-in",
+    );
+  });
+
   it("starts one exact multi-selection lease after validating IDs, locks, and source bounds", () => {
     const source = functionBody("beginCanvasSelectionResize");
     const idsHelper = functionBody("currentCanvasResizeSelectionIds");

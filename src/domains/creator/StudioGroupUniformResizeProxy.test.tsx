@@ -37,6 +37,7 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
 
 type FakeRectNode = {
   getLayer: () => { batchDraw: () => void };
+  getStage: () => FakeStage | null;
   height: (value?: number) => number;
   position: (value?: { x: number; y: number }) => {
     x: number;
@@ -50,6 +51,84 @@ type FakeRectNode = {
   y: () => number;
 };
 
+type FakeStage = {
+  find: (selector: unknown) => unknown[];
+};
+
+type FakeWrapperNode = ReturnType<typeof createWrapperNode>;
+
+type FakeIndicatorNode = ReturnType<typeof createIndicatorNode>;
+
+/** Draw wrapper double covering the finder (getAttr/getParent), eligibility, and attr surface. */
+function createWrapperNode(elementId: string, options: { cached?: boolean } = {}) {
+  const state = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 };
+  const layer = { batchDraw: vi.fn() };
+  return {
+    state,
+    layer,
+    getAttr: vi.fn((name: string) =>
+      name === "studioElementId" ? elementId : undefined
+    ),
+    getParent: vi.fn(() => null),
+    isCached: vi.fn(() => options.cached === true),
+    getLayer: vi.fn(() => layer),
+    position: vi.fn((value?: { x: number; y: number }) => {
+      if (value) {
+        state.x = value.x;
+        state.y = value.y;
+      }
+      return { x: state.x, y: state.y };
+    }),
+    rotation: vi.fn((value?: number) => {
+      if (value !== undefined) state.rotation = value;
+      return state.rotation;
+    }),
+    scale: vi.fn((value?: { x: number; y: number }) => {
+      if (value) {
+        state.scaleX = value.x;
+        state.scaleY = value.y;
+      }
+      return { x: state.scaleX, y: state.scaleY };
+    }),
+    offset: vi.fn((value?: { x: number; y: number }) => {
+      if (value) {
+        state.offsetX = value.x;
+        state.offsetY = value.y;
+      }
+      return { x: state.offsetX, y: state.offsetY };
+    }),
+  };
+}
+
+function createIndicatorNode() {
+  const state = { visible: true };
+  return {
+    state,
+    visible: vi.fn((value?: boolean) => {
+      if (value !== undefined) state.visible = value;
+      return state.visible;
+    }),
+  };
+}
+
+/** Answers the wrapper finder's predicate find and the indicator-name string find. */
+function createStage(
+  wrapper: FakeWrapperNode,
+  indicators: readonly FakeIndicatorNode[]
+): FakeStage {
+  return {
+    find: vi.fn((selector: unknown) => {
+      if (typeof selector === "function") {
+        return [wrapper].filter((node) =>
+          (selector as (node: FakeWrapperNode) => boolean)(node)
+        );
+      }
+      if (selector === ".studio-draw-selection-indicator") return [...indicators];
+      return [];
+    }),
+  };
+}
+
 type FakeTransformerNode = {
   forceUpdate: () => void;
   getLayer: () => { batchDraw: () => void };
@@ -60,7 +139,7 @@ type FakeTransformerNode = {
   stopTransform: () => void;
 };
 
-function createRectNode(): FakeRectNode {
+function createRectNode(stage: FakeStage | null = null): FakeRectNode {
   const state = {
     height: 0,
     rotation: 0,
@@ -73,6 +152,7 @@ function createRectNode(): FakeRectNode {
   const layer = { batchDraw: vi.fn() };
   const node = {
     getLayer: vi.fn(() => layer),
+    getStage: vi.fn(() => stage),
     height: vi.fn((value?: number) => {
       if (value !== undefined) state.height = value;
       return state.height;
@@ -125,11 +205,13 @@ function createTransformerNode(): FakeTransformerNode {
 }
 
 function rectProps(): {
+  onTransform: (event: { target: FakeRectNode }) => void;
   onTransformEnd: (event: { target: FakeRectNode }) => void;
   onTransformStart: () => void;
 } & CapturedProps {
   if (!konvaHarness.rectProps) throw new Error("Missing captured Rect props");
   return konvaHarness.rectProps as {
+    onTransform: (event: { target: FakeRectNode }) => void;
     onTransformEnd: (event: { target: FakeRectNode }) => void;
     onTransformStart: () => void;
   } & CapturedProps;
@@ -458,6 +540,156 @@ describe("StudioGroupUniformResizeProxy", () => {
     expect(transformer.stopTransform).toHaveBeenCalledTimes(1);
     expect(props.onCancel).toHaveBeenCalledTimes(1);
     expect(props.onCommit).not.toHaveBeenCalled();
+  });
+
+  describe("live transform preview (PPT-style real-time ink)", () => {
+    function setupLivePreview(options: { cached?: boolean } = {}) {
+      const wrapper = createWrapperNode("stroke-1", options);
+      const indicator = createIndicatorNode();
+      const stage = createStage(wrapper, [indicator]);
+      konvaHarness.rectNode = createRectNode(stage) as unknown as Record<
+        string,
+        unknown
+      >;
+      const props = {
+        ...commonProps(),
+        freeTransform: true,
+        livePreviewElementId: "stroke-1",
+      };
+      return { wrapper, indicator, props };
+    }
+
+    it("변형 프레임마다 커밋 플래너와 동일한 affine attrs를 래퍼에 명령형으로 투영한다", () => {
+      const { wrapper, indicator, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      // The dashed indicator is parked for the gesture — the Transformer frame is the affordance.
+      expect(indicator.state.visible).toBe(false);
+
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rect.scaleY(3);
+        rect.rotation(45);
+        rectProps().onTransform({ target: rect });
+      });
+
+      expect(wrapper.state).toEqual({
+        x: 30,
+        y: 40,
+        rotation: 45,
+        scaleX: 2,
+        scaleY: 3,
+        offsetX: bounds.x,
+        offsetY: bounds.y,
+      });
+    });
+
+    it("transformend는 래퍼를 중립화한 뒤에야 정확히 한 번 커밋하고 인디케이터를 복구한다", () => {
+      const { wrapper, indicator, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      props.onCommit.mockImplementation(() => {
+        // The neutral projection must precede the commit so the baked points repaint atomically.
+        expect(wrapper.state).toEqual({
+          x: 0,
+          y: 0,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          offsetX: 0,
+          offsetY: 0,
+        });
+        expect(indicator.state.visible).toBe(true);
+      });
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rect.scaleY(2);
+        rect.rotation(30);
+        rectProps().onTransform({ target: rect });
+        rectProps().onTransformEnd({ target: rect });
+      });
+
+      expect(props.onCommit).toHaveBeenCalledTimes(1);
+      expect(props.onCommit).toHaveBeenCalledWith(
+        { x: 30, y: 40, width: 200, height: 100 },
+        30,
+      );
+    });
+
+    it("blur 취소는 프리뷰 투영을 중립으로 되돌리고 커밋을 만들지 않는다", () => {
+      const { wrapper, indicator, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => {
+        rectProps().onTransformStart();
+        rect.position({ x: 50, y: 70 });
+        rect.scaleX(1.5);
+        rectProps().onTransform({ target: rect });
+      });
+      expect(wrapper.state.scaleX).toBe(1.5);
+
+      act(() => window.dispatchEvent(new Event("blur")));
+
+      expect(wrapper.state).toEqual({
+        x: 0,
+        y: 0,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        offsetX: 0,
+        offsetY: 0,
+      });
+      expect(indicator.state.visible).toBe(true);
+      expect(props.onCancel).toHaveBeenCalledTimes(1);
+      expect(props.onCommit).not.toHaveBeenCalled();
+    });
+
+    it("캐시된 조상 아래 스트로크는 프리뷰 없이 커밋-지연 동작으로 폴백한다", () => {
+      const { wrapper, indicator, props } = setupLivePreview({ cached: true });
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rectProps().onTransform({ target: rect });
+        rectProps().onTransformEnd({ target: rect });
+      });
+
+      expect(wrapper.position).not.toHaveBeenCalled();
+      expect(wrapper.rotation).not.toHaveBeenCalled();
+      expect(indicator.state.visible).toBe(true);
+      expect(props.onCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it("비유한 중간 프레임은 마지막 유효 투영을 유지한다", () => {
+      const { wrapper, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rectProps().onTransform({ target: rect });
+      });
+      const lastValid = { ...wrapper.state };
+
+      act(() => {
+        rect.scaleX(Number.NaN);
+        rectProps().onTransform({ target: rect });
+      });
+
+      expect(wrapper.state).toEqual(lastValid);
+    });
   });
 
   it("hidden visibility 전환만 활성 gesture를 취소하고 listener를 정리한다", () => {
