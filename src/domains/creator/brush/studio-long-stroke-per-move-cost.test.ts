@@ -1101,20 +1101,23 @@ const DOCUMENTED_GLOBAL_REPLAN_LANES: ReadonlyMap<
  * 3% of the same fate. The envelope is now twelve Apple-silicon runs — six idle and six with the
  * box deliberately oversubscribed (8 spinning hogs against 12 cores), because a runner is a
  * shared machine and a pin taken only on a quiet one would hand the whole band to contention —
- * combined with the runner's own reading of every lane. Per-lane spread across both is
- * x1.03-x1.75, leaving x1.19-x1.39 of the band for the next machine. The two
+ * combined with the runner's own reading of every lane, from TWO separate runner runs — the
+ * second one moved `particle-fx` from x5.29 to x6.97 against a x7.46 budget, 7% of margin, which
+ * is how the lane after `glow` would have gone red. Per-lane spread across everything is
+ * x1.14-x1.75, leaving x1.20-x1.34 of the band for the next machine. The two
  * windows are the same code at two lengths, which is the tightest instruction-mix match a
  * denominator can have, so these travel far better than a ratio taken against a synthetic kernel
  * does — the impasto budgets in studio-oil-ribbon-carrier.impasto-relief.test.ts, which do use
  * the synthetic kernel, read ~1.0 where they were pinned and ~0.5 on this machine.
  *
  * The three `DOCUMENTED_GLOBAL_REPLAN_LANES` are pinned here too, replacing the raw growth
- * ratchets they used to carry (x11.9, x24.6, x7.5 against x11, x26, x8). Two land under the old
+ * ratchets they used to carry (x11.6, x24.5, x8.5 against x11, x26, x8). Two land under the old
  * number and `perfect-outline` lands above it, because all three MEASURE higher than the old gate
  * did — interleaving stops a lane from warming its long window over 21 back-to-back reps, and
  * that lane read x6.76 there against x8.2-x8.8 here. Per unit of regression every one of them is
- * tighter than before: `perfect-outline` used to need x1.63 to trip and now needs x1.42,
- * `particle-fx` x3.4 and now x1.5.
+ * tighter than before: `perfect-outline` used to need x1.63 to trip and now needs x1.40,
+ * `particle-fx` x3.4 and now x1.5 — the one lane whose ratchet number rises, from x8 to x8.5,
+ * because the interleaved measurement reads it at x5.2-x7.0 where the floored one read x2.4.
  */
 interface LaneGrowthPin {
   /** Recorded calibrated growth: n=3200 per-move cost over n=400 per-move cost. */
@@ -1158,23 +1161,23 @@ interface LaneGrowthPin {
 
 const LANE_GROWTH_PINS: ReadonlyMap<string, LaneGrowthPin> = new Map([
   ["causal-ink", { growth: 1.14, detectionFactor: 2, movesPerWindow: 50 }],
-  ["perfect-outline", { growth: 7.96, detectionFactor: 2, movesPerWindow: 1 }],
+  ["perfect-outline", { growth: 7.72, detectionFactor: 2, movesPerWindow: 1 }],
   ["capsule-outline", { growth: 0.84, detectionFactor: 2, movesPerWindow: 1 }],
-  ["oil-ribbon", { growth: 16.37, detectionFactor: 2, movesPerWindow: 1 }],
+  ["oil-ribbon", { growth: 16.3, detectionFactor: 2, movesPerWindow: 1 }],
   ["oil-extrude", { growth: 1.09, detectionFactor: 2, movesPerWindow: 1 }],
   ["dry-dynamic", { growth: 1.07, detectionFactor: 2, movesPerWindow: 1 }],
-  ["spray-dynamic", { growth: 1.08, detectionFactor: 2, movesPerWindow: 1 }],
+  ["spray-dynamic", { growth: 1.12, detectionFactor: 2, movesPerWindow: 1 }],
   ["wet-dabs", { growth: 1.08, detectionFactor: 2, movesPerWindow: 1 }],
-  ["wet-stamp", { growth: 1.12, detectionFactor: 2, movesPerWindow: 6 }],
+  ["wet-stamp", { growth: 1.07, detectionFactor: 2, movesPerWindow: 6 }],
   ["dry-stamp", { growth: 1.44, detectionFactor: 2, movesPerWindow: 6 }],
-  ["spray-stamp", { growth: 1.08, detectionFactor: 2, movesPerWindow: 8 }],
-  ["particle-fx", { growth: 4.97, detectionFactor: 2, movesPerWindow: 1 }],
-  ["angled-ribbon", { growth: 1.41, detectionFactor: 3, movesPerWindow: 50 }],
+  ["spray-stamp", { growth: 1.04, detectionFactor: 2, movesPerWindow: 8 }],
+  ["particle-fx", { growth: 5.67, detectionFactor: 2, movesPerWindow: 1 }],
+  ["angled-ribbon", { growth: 1.37, detectionFactor: 3, movesPerWindow: 50 }],
   ["pencil-path", { growth: 1.42, detectionFactor: 3, movesPerWindow: 6 }],
-  ["stamp-tone", { growth: 1.08, detectionFactor: 2, movesPerWindow: 50 }],
-  ["family:highlighter", { growth: 1.52, detectionFactor: 2, movesPerWindow: 1 }],
+  ["stamp-tone", { growth: 1.16, detectionFactor: 2, movesPerWindow: 50 }],
+  ["family:highlighter", { growth: 1.51, detectionFactor: 2, movesPerWindow: 1 }],
   ["family:calligraphy", { growth: 1.01, detectionFactor: 2, movesPerWindow: 1 }],
-  ["family:neon", { growth: 1.53, detectionFactor: 3, movesPerWindow: 25 }],
+  ["family:neon", { growth: 1.52, detectionFactor: 3, movesPerWindow: 25 }],
   ["family:glow", { growth: 1.57, detectionFactor: 3, movesPerWindow: 25 }],
   ["family:pastel", { growth: 0.81, detectionFactor: 2, movesPerWindow: 1 }],
 ]);
