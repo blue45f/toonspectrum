@@ -86,6 +86,19 @@ export function planStudioLiveTransformPreviewAttrs(
   if (!Number.isFinite(frame.rotationDeg)) return null;
   const scale = studioDrawObjectTransformScale(frame.sourceBounds, frame.targetBounds);
   if (!scale) return null;
+  // A non-uniform frame is rejected, because this projection cannot show what the commit will do.
+  //
+  // Scaling the wrapper scales the rendered stroke ANISOTROPICALLY -- round caps become elliptical
+  // and thickness varies with direction -- while `planStudioDrawObjectTransform` applies its
+  // geometric mean `sqrt(scaleX * scaleY)` to a single strokeWidth and replans with round caps. A
+  // 2x horizontal-only resize previews unchanged vertical thickness and commits about 1.41x
+  // thickness everywhere, so the ink visibly snaps at release.
+  //
+  // Uniform frames are exact and stay live: sqrt(s * s) === s is precisely what scaling the node
+  // does, which is why this rejects only the anisotropic case rather than scaling generally. The
+  // `uniform` flag comes from the commit planner's own scale helper, so the two cannot disagree
+  // about where the boundary is.
+  if (!scale.uniform) return null;
   return {
     x: frame.targetBounds.x,
     y: frame.targetBounds.y,

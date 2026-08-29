@@ -588,8 +588,11 @@ describe("StudioGroupUniformResizeProxy", () => {
 
       act(() => {
         rect.position({ x: 30, y: 40 });
+        // Uniform on purpose: the projection only runs for uniform frames, because the commit
+        // applies sqrt(scaleX * scaleY) to one strokeWidth and an anisotropic frame could not be
+        // shown faithfully. The anisotropic case is asserted separately below.
         rect.scaleX(2);
-        rect.scaleY(3);
+        rect.scaleY(2);
         rect.rotation(45);
         rectProps().onTransform({ target: rect });
       });
@@ -599,9 +602,37 @@ describe("StudioGroupUniformResizeProxy", () => {
         y: 40,
         rotation: 45,
         scaleX: 2,
-        scaleY: 3,
+        scaleY: 2,
         offsetX: bounds.x,
         offsetY: bounds.y,
+      });
+    });
+
+    it("비균일 프레임은 투영하지 않고 래퍼를 중립으로 둔다", () => {
+      // 커밋은 sqrt(scaleX * scaleY)를 단일 strokeWidth에 적용하고 둥근 캡으로 다시 계획하는데,
+      // 래퍼를 비균일하게 스케일하면 캡이 타원이 되고 두께가 방향에 따라 달라진다. 즉 프리뷰가
+      // 커밋이 만들 그림을 보여줄 수 없으므로, 그런 프레임에서는 잉크를 움직이지 않고 오늘의
+      // 커밋-시점 동작으로 떨어진다. 커밋 자체는 transformend가 따로 판단하므로 영향받지 않는다.
+      const { wrapper, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rect.scaleY(3);
+        rectProps().onTransform({ target: rect });
+      });
+
+      expect(wrapper.state).toEqual({
+        x: 0,
+        y: 0,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        offsetX: 0,
+        offsetY: 0,
       });
     });
 
@@ -649,6 +680,7 @@ describe("StudioGroupUniformResizeProxy", () => {
         rectProps().onTransformStart();
         rect.position({ x: 50, y: 70 });
         rect.scaleX(1.5);
+        rect.scaleY(1.5);
         rectProps().onTransform({ target: rect });
       });
       expect(wrapper.state.scaleX).toBe(1.5);
@@ -685,6 +717,7 @@ describe("StudioGroupUniformResizeProxy", () => {
         rectProps().onTransformStart();
         rect.position({ x: 50, y: 70 });
         rect.scaleX(1.5);
+        rect.scaleY(1.5);
         rectProps().onTransform({ target: rect });
       });
       expect(wrapper.state.scaleX).toBe(1.5);
