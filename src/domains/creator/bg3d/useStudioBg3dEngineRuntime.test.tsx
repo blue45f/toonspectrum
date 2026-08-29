@@ -128,6 +128,11 @@ describe("useStudioBg3dEngineRuntime", () => {
 
     // Still WebGPU — the policy allows one retry — but on a fresh canvas.
     await waitFor(() => expect(result.current.canvasKey).toBe("webgpu#1"));
+    // The notice has to describe the retry that is actually happening. Saying "switching to
+    // WebGL2" here contradicted both the plan and the badge, which still read WebGPU.
+    expect(result.current.deviceLostMessage).toContain("WebGPU로 한 번 더 시도합니다");
+    expect(result.current.deviceLostMessage).not.toContain("WebGL2로 전환");
+    expect(result.current.plan.backend).toBe("webgpu");
   });
 
   it("falls back to WebGL2 and reports the loss when the renderer cannot start", async () => {
@@ -172,8 +177,49 @@ describe("useStudioBg3dEngineRuntime", () => {
       await Promise.resolve();
     });
 
-    await waitFor(() =>
-      expect(result.current.deviceLostMessage).toBe("GPU 프로세스가 종료되었습니다."));
+    // The renderer reports the cause; the hook appends the outcome it is about to take.
+    await waitFor(() => expect(result.current.deviceLostMessage)
+      .toBe("GPU 프로세스가 종료되었습니다. WebGPU로 한 번 더 시도합니다."));
+  });
+
+  it("keeps a choice made while a reopen's restored preference is still loading", async () => {
+    // Reopening a retained editor restarts the bootstrap. The restored value can land after the
+    // artist has already picked an engine in the reopened panel; applying it then would remount
+    // onto a backend nobody asked for and leave the panel disagreeing with what it just saved.
+    let releaseRestored: (value: StudioBg3dEnginePreference) => void = () => undefined;
+    const loadPreference = vi.fn(() => new Promise<StudioBg3dEnginePreference>((resolve) => {
+      releaseRestored = resolve;
+    }));
+    const probe = async () => SUPPORTED_PROBE;
+    const savePreference = vi.fn(async () => undefined);
+
+    const { result, rerender } = renderHook(
+      (props: { enabled: boolean }) => useStudioBg3dEngineRuntime(options({
+        enabled: props.enabled,
+        loadPreference,
+        probe,
+        savePreference,
+      })),
+      { initialProps: { enabled: true } },
+    );
+
+    // Close, then reopen: the bootstrap runs again with the restored value still in flight.
+    rerender({ enabled: false });
+    rerender({ enabled: true });
+    await waitFor(() => expect(result.current.phase).toBe("probing"));
+
+    act(() => result.current.setPreference("webgl2"));
+    expect(result.current.preference).toBe("webgl2");
+
+    await act(async () => {
+      releaseRestored("webgpu");
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+
+    // The stale restored value must not win over the newer explicit choice.
+    expect(result.current.preference).toBe("webgl2");
+    expect(savePreference).toHaveBeenCalledWith("webgl2");
   });
 
   it("keeps WebGL2 when the probe refuses the host", async () => {

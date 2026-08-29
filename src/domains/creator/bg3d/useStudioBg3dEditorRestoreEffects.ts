@@ -321,10 +321,96 @@ export function useStudioBg3dEditorRestoreEffects(h) {
 
 
 
+  // 이 effect 가 어떤 입력으로 이미 복원을 돌렸는지. renderer 아이덴티티는 일부러 넣지 않는다.
+  const restoredSourceRef = useRef(null);
+
   useEffect(() => {
     if (!open || !modelRenderer) return;
     const session = modalAssetSessionRef.current;
     if (!session) return;
+
+    // 모달 세션과 초기 장면이 그대로인데 renderer 만 새것이면 초기 복원이 아니라 **Canvas
+    // remount** 다 — 엔진 선호 변경·WebGPU 폴백·디바이스 손실 복구가 canvasKey 를 바꾼 결과다.
+    // 여기서 초기 장면 복원을 다시 돌리면 히스토리를 비우고 모달을 열었던 시점의 장면으로
+    // 되돌려, 아티스트가 그동안 편집한 내용을 조용히 날린다.
+    //
+    // renderer 에 실제로 묶여 있는 건 모델 캐시뿐이다: KTX2 는 backend 마다 지원 포맷이 달라
+    // transcode 대상이 갈린다. 그래서 캐시만 **현재 문서** 기준으로 다시 만들고 장면 상태는
+    // 건드리지 않는다. 인스턴스는 modelId 로 캐시를 조회하므로(StudioBg3dEditorSceneGraph),
+    // 같은 키로 다시 채우면 장면 그래프가 다음 렌더에서 새 root 를 집어 간다.
+    const previous = restoredSourceRef.current;
+    const isRendererRemount = previous !== null
+      && previous.session === session
+      && previous.initialScene === initialScene
+      && previous.initialDataUrl === initialDataUrl;
+    restoredSourceRef.current = { session, initialScene, initialDataUrl };
+
+    if (isRendererRemount) {
+      const rebuildController = new AbortController();
+      sceneRestoreAbortRef.current?.abort("scene-restoration-superseded");
+      sceneRestoreAbortRef.current = rebuildController;
+      let rebuildCancelled = false;
+      const isRebuildCurrent = () =>
+        !rebuildCancelled
+        && !rebuildController.signal.aborted
+        && isModalAssetSessionCurrent(session);
+      setIsRestoringScene(true);
+      void (async () => {
+        try {
+          await studioBg3dModalOperationCoordinator.waitForSceneMutationLane();
+          if (!isRebuildCurrent()) return;
+          const live = physicsRuntimeSourceRef.current;
+          const liveDocument = live?.document;
+          if (!liveDocument) return;
+          disposeModelCache(modelRootCacheRef.current);
+          modelLoadPendingRef.current.clear();
+          attachmentByStorageModelIdRef.current.clear();
+          storageModelIdByAttachmentIdRef.current.clear();
+          const quality = resolveDeviceQuality(liveDocument, viewportHostRef.current);
+          let cumulativeUsedBytes = 0;
+          for (const attachment of liveDocument.attachments) {
+            if (!isRebuildCurrent()) return;
+            try {
+              const resolution = await resolveBg3dModelHash(attachment.hash, {
+                signal: rebuildController.signal,
+              });
+              const record = resolution.record;
+              if (!record || !attachmentMatchesRecord(attachment, record)) continue;
+              await admitAndCacheModel({
+                record,
+                document: liveDocument,
+                quality,
+                cumulativeUsedBytes,
+                renderer: modelRenderer,
+                cache: modelRootCacheRef.current,
+                pending: modelLoadPendingRef.current,
+                isActive: isRebuildCurrent,
+                signal: rebuildController.signal,
+              });
+              bindModelAttachment({
+                attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
+                storageModelIdByAttachmentId: storageModelIdByAttachmentIdRef.current,
+              }, record, attachment);
+              cumulativeUsedBytes += attachment.byteSize;
+            } catch {
+              // 모델 하나가 새 backend 로 다시 안 올라오는 것은 편집 내용을 되돌릴 이유가 못 된다.
+              // 그 모델만 캐시에서 빠지고 나머지 장면은 그대로 유지된다.
+            }
+          }
+          if (isRebuildCurrent()) setRefTick((tick) => tick + 1);
+        } finally {
+          if (isRebuildCurrent()) setIsRestoringScene(false);
+        }
+      })();
+      return () => {
+        rebuildCancelled = true;
+        rebuildController.abort("scene-restoration-cancelled");
+        if (sceneRestoreAbortRef.current === rebuildController) {
+          sceneRestoreAbortRef.current = null;
+        }
+      };
+    }
+
     const restoreController = new AbortController();
     sceneRestoreAbortRef.current?.abort("scene-restoration-superseded");
     sceneRestoreAbortRef.current = restoreController;
