@@ -400,6 +400,20 @@ describe("orientation-dependent nibs", () => {
     expect(scaledOnly?.brushTip).toEqual(NIB);
   });
 
+  it("leaves the nib angle alone when the stroke carries per-sample orientation", () => {
+    // The renderer uses brushTip.angleDeg only as the fallback for samples WITHOUT tilt, and
+    // atan2(tiltY, tiltX) + twist for samples with it. Rotating the fallback on a mixed stroke
+    // would turn half the nib and leave the other half, distorting the commit.
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ brushTip: { ...NIB }, tiltXs: [1, 0], tiltYs: [0, 1] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    expect(rotated?.brushTip).toEqual(NIB);
+  });
+
   it("leaves a stroke without a tip snapshot untouched", () => {
     const rotated = planStudioDrawObjectTransform({
       el: drawEl(),

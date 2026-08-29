@@ -244,8 +244,18 @@ export function planStudioDrawObjectTransform(
   // points alone, snapping the nib back to its original orientation the moment the handle is
   // released. The flip path already transforms this field (studio-figma-selection-ux negates it on
   // mirror), so carrying it through a rotation is the established treatment, not a new rule.
+  // Only when the stroke has NO per-sample orientation. `calligraphySegmentStep` uses
+  // `brushTip.angleDeg` as the FALLBACK angle for samples without tilt and replaces it with
+  // `atan2(tiltY, tiltX) + twist` for samples that have it, so a stroke carrying both kinds would
+  // have half its nib turned by this rotation and half left alone -- the commit would distort the
+  // stroke rather than rotate it. Excluding these strokes from the preview does not help here:
+  // this is the commit path, which runs whether or not a preview did.
+  const hasPerSampleOrientation =
+    (el.tiltXs !== undefined && el.tiltXs.length > 0)
+    || (el.tiltYs !== undefined && el.tiltYs.length > 0)
+    || (el.twists !== undefined && el.twists.length > 0);
   let brushTip = el.brushTip;
-  if (brushTip && rotationDeg !== 0) {
+  if (brushTip && rotationDeg !== 0 && !hasPerSampleOrientation) {
     const rotatedAngle = brushTip.angleDeg + rotationDeg;
     if (!finite(rotatedAngle)) return null;
     // Wrapped to (-180, 180] so repeated rotations cannot drift the stored angle without bound.
