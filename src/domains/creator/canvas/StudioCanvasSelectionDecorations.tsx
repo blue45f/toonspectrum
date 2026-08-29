@@ -4,6 +4,7 @@ import { Group, Rect, Text, Transformer } from "react-konva/lib/ReactKonvaCore";
 import { CANVAS_W } from "../studio-assets";
 import { elBounds } from "../studio-element-geometry";
 import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "../studio-layers";
+import { studioLiveTransformRouteOfPoints } from "../studio-live-transform-render-route";
 import { StudioDrawSelectionOverlay } from "../studio-page-lazy-ui";
 import { unionBounds } from "../studio-selection";
 import { STUDIO_GROUP_SELECTION_OVERLAY_NAME } from "../studio-selection-chrome-mirror";
@@ -239,6 +240,16 @@ export function renderStudioCanvasSelectionDecorations({
           // through the commit planner's own affine, applied imperatively per frame.
           livePreviewElementId={
             singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
+          }
+          // …and stands down for any frame whose scale would carry the stroke across one of the
+          // renderer's absolute pixel thresholds, which no engine allowlist can see.
+          livePreviewRenderRoute={
+            singleDrawFreeScale && canvasSelectionEls[0]?.type === "draw"
+              ? studioLiveTransformRouteOfPoints(
+                  canvasSelectionEls[0].points,
+                  canvasSelectionEls[0].strokeWidth,
+                )
+              : undefined
           }
           // The gesture lifts stroke+proxy+Transformer into the small drag Layer so an
           // anchor frame no longer repaints the whole document Layer.

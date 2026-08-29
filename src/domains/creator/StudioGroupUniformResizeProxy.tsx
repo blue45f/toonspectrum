@@ -22,6 +22,7 @@ import {
 } from "./studio-single-object-drag-layer";
 
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
+import type { StudioLiveTransformRenderRoute } from "./studio-live-transform-render-route";
 import type { StudioSingleObjectDragLayerSession } from "./studio-single-object-drag-layer";
 import type Konva from "konva";
 import type { RefObject } from "react";
@@ -95,6 +96,16 @@ export interface StudioGroupUniformResizeProxyProps {
    */
   readonly livePreviewElementId?: string;
   /**
+   * The previewed stroke's scale-sensitive render-route inputs.
+   *
+   * The renderer branches on absolute pixel thresholds -- a 1px minimum diameter, `strokeDistance`
+   * route cutoffs -- that a scale can carry the stroke across, and when that happens the preview
+   * shows one route while the commit draws another. Supplied by the caller because only it holds
+   * the element; a gesture that omits it simply gets no route checking. See
+   * `studio-live-transform-render-route`.
+   */
+  readonly livePreviewRenderRoute?: StudioLiveTransformRenderRoute;
+  /**
    * Dedicated small Layer the live-preview gesture lifts into (the single-object drag Layer).
    *
    * Without the lift, every anchor frame repaints the whole document Layer (measured ~80-157ms
@@ -156,6 +167,7 @@ export function StudioGroupUniformResizeProxy({
   freeTransform = false,
   mirrorDragElementId,
   livePreviewElementId,
+  livePreviewRenderRoute,
   transformLiftLayerRef,
   externalCancelSignal,
   onBegin,
@@ -375,6 +387,9 @@ export function StudioGroupUniformResizeProxy({
         height: proxy.height() * proxy.scaleY(),
       },
       rotationDeg: freeTransform ? proxy.rotation() : 0,
+      ...(livePreviewRenderRoute !== undefined
+        ? { renderRoute: livePreviewRenderRoute }
+        : {}),
     });
     // Two rejections, handled oppositely. A degenerate mid-gesture box keeps the last valid
     // projection, because the next frame recovers and nothing visibly stalls. A VALID but
@@ -387,7 +402,10 @@ export function StudioGroupUniformResizeProxy({
     // frame can corrupt the document.
     if (projection.ok) {
       applyStudioLiveTransformPreviewNodeAttrs(preview.node, projection.attrs);
-    } else if (projection.reason === "unsupported-non-uniform") {
+    } else if (
+      projection.reason === "unsupported-non-uniform"
+      || projection.reason === "unsupported-render-route"
+    ) {
       resetStudioLiveTransformPreviewNodeAttrs(preview.node);
     }
   }

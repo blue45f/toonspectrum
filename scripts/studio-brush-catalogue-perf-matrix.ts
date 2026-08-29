@@ -528,6 +528,25 @@ function endpointRiseRatio(series: readonly number[]): number {
 const STUDIO_BRUSH_CATALOGUE_SOAK_TREND_RISE = 1.5;
 
 /** Largest fall below the running maximum, as a ratio. 1 for a non-decreasing series. */
+/**
+ * Middle value of a series — the later half's typical cost, robust to one outlier either way.
+ *
+ * The recovery guard below needs "did the later half SUBSIDE?", and its first form asked that of
+ * the single cheapest later run. One ordinary dip then suppressed a real detection: a sustained
+ * climb like [10, 12, 11, 20, 30 | 28, 40, 50, 60, 70] was dismissed because 28 fell a hair under
+ * the first half's peak, even though every other later run was far above it. A median answers the
+ * question that was actually being asked, and still separates the shape this guard exists for --
+ * a subsided ramp puts its WHOLE later half low, not one sample.
+ */
+function medianOf(series: readonly number[]): number {
+  if (series.length === 0) return Number.NaN;
+  const sorted = [...series].sort((a, b) => a - b);
+  const middle = sorted.length >> 1;
+  return sorted.length % 2 === 1
+    ? sorted[middle]!
+    : (sorted[middle - 1]! + sorted[middle]!) / 2;
+}
+
 function maxDrawdownRatio(series: readonly number[]): number {
   let runningMax = Number.NEGATIVE_INFINITY;
   let worst = 1;
@@ -589,14 +608,20 @@ export function detectStudioBrushSoakMonotonicDegradation(
     baselineIsEarned
     && laterMin / earlyMin > STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
     && laterMin - earlyMin > STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS
-    // ...and the later half never recovered below the first half's PEAK. A leak does not give
-    // time back: once a run is slow, every later run is at least that slow. Contention does,
+    // ...and the later half, TYPICALLY, never recovered below the first half's PEAK. A leak does
+    // not give time back: once a run is slow, later runs stay at least that slow. Contention does,
     // which is the shape found in review — [10, 10, 10, 30, 30 | 15 x5] climbs cleanly through
     // the first half, so its baseline is earned, and 15/10 clears both the relative gate and the
     // absolute floor, yet the whole second half runs at HALF the first half's peak. That is a
-    // ramp that subsided, not degradation. Comparing against earlyMax instead of earlyMin is
-    // what tells the two apart; the tolerance is the same drawdown allowance used above.
-    && laterMin >= earlyMax / STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE
+    // ramp that subsided, not degradation. Comparing against earlyMax instead of earlyMin is what
+    // tells the two apart; the tolerance is the same drawdown allowance used above.
+    //
+    // Graded on the later half's MEDIAN, not its minimum. The minimum let one ordinary dip
+    // suppress a real detection: [10, 12, 11, 20, 30 | 28, 40, 50, 60, 70] climbs relentlessly,
+    // yet a single 28 just under the 30/1.05 peak dismissed the whole series. A subsided ramp puts
+    // its entire later half low (median 15 against a 28.6 bar, still caught), while a climb with
+    // one dip does not (median 50, correctly convicted).
+    && medianOf(later) >= earlyMax / STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE
   );
 }
 

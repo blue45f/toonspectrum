@@ -108,6 +108,25 @@ describe("soak monotonic-degradation detector", () => {
     expect(detectStudioBrushSoakMonotonicDegradation(elapsed)).toBe(true);
   });
 
+  it("still convicts a relentless climb that dips once just after the midpoint", () => {
+    // The recovery guard's first form graded the later half's MINIMUM, so one ordinary dip
+    // suppressed a real detection: here 28 falls a hair under the first half's 30/1.05 peak while
+    // every other later run climbs far above it. Grading the MEDIAN asks the question the guard
+    // was always meant to ask -- did the later half subside? -- and this one plainly did not.
+    expect(
+      detectStudioBrushSoakMonotonicDegradation([10, 12, 11, 20, 30, 28, 40, 50, 60, 70]),
+    ).toBe(true);
+  });
+
+  it("still acquits a ramp whose WHOLE later half subsided", () => {
+    // The shape the guard exists for, and the one the median must not lose: a clean first-half
+    // climb whose entire second half runs at half the first half's peak. That is contention
+    // easing, not a leak -- a leak never gives time back.
+    expect(
+      detectStudioBrushSoakMonotonicDegradation([10, 10, 10, 30, 30, 15, 15, 15, 15, 15]),
+    ).toBe(false);
+  });
+
   it("keeps the absolute floor so sub-millisecond timer jitter cannot manufacture a leak", () => {
     // x2 in ratio terms, but only ~1ms absolute — under the 4ms floor.
     expect(

@@ -36,11 +36,21 @@ import {
 } from "@toonspectrum/studio-project-model";
 
 import { studioDrawObjectTransformScale } from "./brush/studio-draw-object-transform";
+import { studioLiveTransformRouteSurvivesScale } from "./studio-live-transform-render-route";
 
 import type { StudioDrawObjectTransformBounds } from "./brush/studio-draw-object-transform";
+import type { StudioLiveTransformRenderRoute } from "./studio-live-transform-render-route";
 import type { Mat2d } from "@toonspectrum/studio-project-model";
 
 export interface StudioLiveTransformPreviewFrame {
+  /**
+   * The stroke's scale-sensitive render-route inputs, when the caller can supply them.
+   *
+   * Optional so the pure projection helpers stay usable without an element, but a gesture that
+   * omits it gets NO route checking -- see `studio-live-transform-render-route` for why an engine
+   * allowlist cannot substitute.
+   */
+  readonly renderRoute?: StudioLiveTransformRenderRoute;
   /** The gesture's captured source box — same value the commit planner will consume. */
   readonly sourceBounds: StudioDrawObjectTransformBounds;
   /** Live target box *before* rotation — width/height are the scaled extents, as Konva reports. */
@@ -90,10 +100,16 @@ export const STUDIO_LIVE_TRANSFORM_PREVIEW_NEUTRAL_ATTRS: StudioLiveTransformPre
  * the last projection would freeze the ink at its last uniform pose while the handles keep moving,
  * then jump at release — worse than not previewing at all, which is why the caller neutralizes
  * instead and lets the stroke sit at its document position for the rest of the gesture.
+ *
+ * `unsupported-render-route` is the same shape as the non-uniform case and takes the same handling:
+ * the frame projects fine, but the scale would carry the stroke across one of the renderer's
+ * absolute pixel thresholds, so what the preview shows is not what the commit will draw. See
+ * `studio-live-transform-render-route`.
  */
 export type StudioLiveTransformPreviewRejection =
   | "invalid"
-  | "unsupported-non-uniform";
+  | "unsupported-non-uniform"
+  | "unsupported-render-route";
 
 export type StudioLiveTransformPreviewProjection =
   | { readonly ok: true; readonly attrs: StudioLiveTransformPreviewNodeAttrs }
@@ -104,8 +120,20 @@ export function classifyStudioLiveTransformPreviewFrame(
   frame: StudioLiveTransformPreviewFrame
 ): StudioLiveTransformPreviewProjection {
   const attrs = planStudioLiveTransformPreviewAttrs(frame);
-  if (attrs) return { ok: true, attrs };
   const scale = studioDrawObjectTransformScale(frame.sourceBounds, frame.targetBounds);
+  if (attrs) {
+    // A projectable frame can still be un-previewable, because the renderer branches on absolute
+    // pixel thresholds that a scale carries the stroke across. Uniform frames are the only ones
+    // that reach here, so `scaleX` is the whole scale.
+    if (
+      frame.renderRoute !== undefined
+      && scale !== null
+      && !studioLiveTransformRouteSurvivesScale(frame.renderRoute, scale.scaleX)
+    ) {
+      return { ok: false, reason: "unsupported-render-route" };
+    }
+    return { ok: true, attrs };
+  }
   const reason: StudioLiveTransformPreviewRejection =
     scale && Number.isFinite(frame.rotationDeg) && !scale.uniform
       ? "unsupported-non-uniform"
