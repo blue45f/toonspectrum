@@ -90,6 +90,54 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     ).toBe(false);
   });
 
+  it("refuses the watercolor renderer family, by engine rather than by brush id", () => {
+    // Two independent divergences in studio-watercolor-brush.ts: the station count is
+    // ceil(totalLength / spacing) + 1, so a scale re-seeds every hash2(stationIndex, …) draw; and
+    // createDiffuseDab's halo angle is hash2(stationIndex, 31, seed) * TAU, which does not follow
+    // the stroke's orientation, so even a pure rotation leaves every halo pointing the old way.
+    for (const brush of ["watercolor", "ink-wash", "gouache", "inkwash-bleed-wash"]) {
+      expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(true);
+    }
+    // Resolved through the runtime contract, so a lane whose catalogue id differs from its
+    // renderer is caught the same way.
+    expect(
+      studioLiveTransformPreviewBlockedForElement(
+        draw({ brush: "watercolor", brushCatalogId: "수채 · 과립 번짐" }),
+        false,
+      ),
+    ).toBe(true);
+  });
+
+  it("refuses sketch-styled lines and arrows, whose Rough.js wobble is replanned", () => {
+    // buildStudioRoughShapeRenderPlan derives its perturbations from the points it is handed, so
+    // the commit's replan wobbles differently from the previewed path even with the seed,
+    // roughness and bowing untouched.
+    expect(
+      studioLiveTransformPreviewBlockedForElement(
+        draw({ kind: "line", sketch: { enabled: true, roughness: 1.2, bowing: 1 } }),
+        false,
+      ),
+    ).toBe(true);
+    expect(
+      studioLiveTransformPreviewBlockedForElement(
+        draw({ kind: "arrow", sketch: { enabled: true } }),
+        false,
+      ),
+    ).toBe(true);
+    // A disabled sketch style renders through the clean primitive branch and keeps its preview.
+    expect(
+      studioLiveTransformPreviewBlockedForElement(
+        draw({ kind: "line", sketch: { enabled: false, roughness: 1.2 } }),
+        false,
+      ),
+    ).toBe(false);
+    // StudioDrawNode never builds a sketch plan for freehand strokes, so a stray style on one
+    // must not cost it the preview.
+    expect(
+      studioLiveTransformPreviewBlockedForElement(draw({ sketch: { enabled: true } }), false),
+    ).toBe(false);
+  });
+
   it("ignores non-draw elements entirely", () => {
     // Coordinate elements carry their transform in the document, so this guard has no say on them.
     expect(

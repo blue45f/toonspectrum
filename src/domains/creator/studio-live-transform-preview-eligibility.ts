@@ -13,6 +13,9 @@
  * deliberately one list rather than scattered checks, because every one of these was found the
  * same way and the next one will be too.
  */
+import { resolveStudioBrushRuntimeContract } from "./brush/studio-brush-runtime-contract";
+import { studioSketchStyleOfElement } from "./studio-rough-shape";
+
 import type { DrawEl, El } from "./studio-element-model";
 
 /**
@@ -35,6 +38,31 @@ const STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS: ReadonlySet<string> = new Set([
   "pastel",
   "oil-pastel",
 ]);
+
+/**
+ * Renderers whose per-dab geometry is replanned from the stroke's own arc length and index, so a
+ * scale or rotation re-seeds the whole texture rather than moving it.
+ *
+ * `watercolor-dabs` fails BOTH ways at once, verified in `studio-watercolor-brush.ts`:
+ * `idealStationCount = ceil(totalLength / spacing) + 1`, so any scale changes the station count and
+ * with it every `hash2(stationIndex, …)` draw; and `createDiffuseDab` places its halo at
+ * `hash2(stationIndex, 31, seed) * TAU`, an angle with no dependence on the stroke's orientation —
+ * so even a pure rotation, which leaves the station count alone, leaves every halo pointing the
+ * old way while the preview swings all of them round.
+ *
+ * Classified by RENDERER engine rather than by brush id: the watercolor engine backs `watercolor`,
+ * `ink-wash`, its `inkwash-*` profiles and `gouache`, plus every `engine-variant` lane in
+ * `studio-brush-engine-lane-catalog` that resolves to them, and an id list would silently miss the
+ * next one added.
+ */
+const STUDIO_COORDINATE_RESAMPLED_ENGINES: ReadonlySet<string> = new Set([
+  "watercolor-dabs",
+]);
+
+function studioBrushEngineResamplesCoordinates(brushId: unknown): boolean {
+  const engine = resolveStudioBrushRuntimeContract(brushId)?.engine;
+  return engine !== undefined && STUDIO_COORDINATE_RESAMPLED_ENGINES.has(engine);
+}
 
 /**
  * @param isBoundDerivedShape the caller's own closed-shape verdict. Rect, ellipse, star, triangle
@@ -65,8 +93,21 @@ export function studioLiveTransformPreviewBlockedForElement(
   ) {
     return true;
   }
+  // Hand-drawn (Rough.js) shapes. `StudioDrawNode` builds the sketch plan with
+  // `buildStudioRoughShapeRenderPlan(generator, { points, strokeWidth, … })` on every render, and
+  // rough.js derives its perturbations from that geometry — so the commit's replan wobbles
+  // differently from the previewed path even though `roughness`, `bowing` and the id-derived seed
+  // are untouched, and the wobble amplitude is in absolute units, so a scale changes how rough the
+  // line reads. Bound-derived shapes already stood down above; this is what catches sketch-styled
+  // lines and arrows, whose points survive an affine and so reach the preview.
+  if ((draw.kind ?? "freehand") !== "freehand" && studioSketchStyleOfElement(draw)?.enabled === true) {
+    return true;
+  }
   const brushId = draw.brush;
   const catalogId = draw.brushCatalogId;
+  if (studioBrushEngineResamplesCoordinates(brushId) || studioBrushEngineResamplesCoordinates(catalogId)) {
+    return true;
+  }
   if (typeof brushId === "string" && STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS.has(brushId)) {
     return true;
   }
