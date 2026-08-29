@@ -173,6 +173,51 @@ WebGPU 엔진은 승인된 지연 entry 하나(`studio-bg3d-three-webgpu-entry.t
 이름을 붙이면 rolldown이 그 공유 그래프의 집을 새 청크로 만들어 모든 three 소비자가
 897 KiB 청크를 정적으로 끌어오고 BG3D 편집기 활성화가 gzip 68 KiB 늘어났다.
 
+## 승격 직후 잡은 결함 — canvas 아이덴티티가 동적이 되면서 생긴 이음매
+
+`canvasKey` 를 도입해 Canvas 가 세션 중에 remount 될 수 있게 되자, **renderer 아이덴티티나 세션
+상태에 걸려 있던 코드가 전부 새로운 의미를 갖게 됐다.** 승격 자체와 달리 이 이음매들은 감사하지
+않았고, 넷 다 예외를 던지지 않는다.
+
+### 편집 내용이 사라지던 경로 (가장 심각)
+
+`useStudioBg3dEditorRestoreEffects` 의 초기 장면 복원 effect 는 `modelRenderer` 를 의존성으로
+가진다. 승격 전에는 그 아이덴티티가 세션 중에 바뀌지 않았으므로 무해했다. 이제는 엔진 선호
+변경·WebGPU 폴백·디바이스 손실 복구가 전부 새 renderer 를 만들고, 그때마다 이 effect 가 다시 돌아
+**히스토리를 비우고 모델 캐시를 dispose 하고 모달을 열었던 시점의 장면으로 되돌린다.** 편집 도중
+엔진을 바꾼 아티스트는 그동안의 작업을 잃는다.
+
+의존성 자체가 틀린 게 아니다 — KTX2 는 backend 마다 지원 포맷이 달라 transcode 대상이 갈리므로
+모델 캐시는 실제로 renderer 에 묶여 있다. 그래서 **무엇을 다시 만드는지**를 갈랐다: 모달 세션과
+초기 장면 입력이 그대로인데 renderer 만 새것이면 remount 로 보고, 캐시만 **현재 문서** 기준으로
+다시 채운다. 인스턴스는 `modelId` 로 캐시를 조회하므로 같은 키로 다시 채우면 장면 그래프가 다음
+렌더에서 새 root 를 집어 간다. 히스토리·프리미티브·문서는 건드리지 않는다.
+
+### 첫 몰입형 시도가 취소되던 경로
+
+WebXR latch 는 `webXrSessionState.status !== "idle"` 에서 파생된다. 그 상태는 `controller.start()`
+가 **이미** WebGPU canvas 의 controller 로 네이티브 세션을 요청한 뒤에만 참이 된다. 그러면 latch
+가 WebGL2 를 고르고, `canvasKey` 가 바뀌고, 요청 중이던 controller 가 파괴된다.
+
+remount 를 먼저 하고 `start()` 를 부르는 것도 답이 아니다 — 그 사이에 클릭의 user activation 이
+사라져 `requestSession` 이 거부된다. 그래서 **시작 자체를 막는다**: WebGPU 가 canvas 를 소유하는
+동안 `webXrDisabledReason` 이 "보기 탭에서 WebGL2 를 고른 뒤 다시 시도" 라고 답한다. latch 는 그대로
+두되(세션 중 WebGPU 로 바꾸는 것은 여전히 막아야 한다) 이제 remount 를 유발하지 않는다.
+
+### 배너가 실제 결정과 달랐던 것
+
+WebGPU 초기화 실패 배너가 첫 실패부터 "WebGL2 로 전환합니다" 라고 말했다. 한계는 2회이므로 첫
+실패 뒤에는 **WebGPU canvas 가 다시 뜨고** 배지도 WebGPU 를 가리킨다. 이제 호출부는 원인만
+보고하고, 문장의 결과 부분은 실제로 일어날 결정에서 파생한다.
+
+### 재오픈 중 저장한 선택이 덮이던 것
+
+유지된 편집기를 닫았다 열면 부트스트랩이 다시 도는데 `phase` 가 리셋되지 않아 엔진 버튼이 계속
+활성 상태였다. 그 사이 고른 선호를, 먼저 시작돼 있던 `loadPreference()` 가 나중에 돌아와 덮었다.
+이제 실제 닫힘→열림 전이에서만 `phase` 를 되돌리고(불안정한 콜백 아이덴티티로 effect 가 재실행될
+때는 되돌리지 않는다 — 그러면 ready↔probing 이 무한 진동한다), 명시적 선택마다 올라가는 revision
+과 대조해 오래된 복원값은 버린다.
+
 ## 남은 작업
 
 - VRM 포저(`StudioVrmPoserViewport`)는 여전히 자체 `WebGLRenderer`를 소유한다. 이번 변경은 BG3D
