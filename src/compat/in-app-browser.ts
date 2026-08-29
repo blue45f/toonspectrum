@@ -41,9 +41,20 @@ export type StudioInAppBrowserPlatform = "android" | "ios" | "unknown";
 export type StudioInAppEscapeKind = "link" | "manual" | "none";
 
 export interface StudioInAppBrowserDiagnosis {
-  /** 시스템 브라우저로 바로 여는 URL. `escape === "link"` 일 때만 존재한다. */
+  /**
+   * 시스템 브라우저로 바로 여는 URL. `escape === "link"` 일 때만 존재한다.
+   *
+   * 이건 **추가** 어포던스다. 링크를 렌더링할 수 있는 화면만 쓸 수 있고, 문자열만 받는
+   * 자리(예: 스튜디오 announce 파이프라인)는 아래 `escapeHint` 로 충분해야 한다.
+   */
   readonly escapeHref: string | null;
-  /** 네이티브 메뉴로만 나갈 수 있을 때 보여줄 한 줄 안내. */
+  /**
+   * 인앱 브라우저를 벗어나는 방법을 한 줄로 말한 것. 인앱이면 **항상** 채워진다.
+   *
+   * 예전에는 탈출 링크를 만들 수 있으면 이 값을 null 로 뒀는데, 그러면 링크를 렌더링하지
+   * 못하는 호출부가 "기본 브라우저로 여세요"까지만 말하고 방법은 못 알려주는 상태가 됐다.
+   * 링크는 있으면 좋은 것이고, 실행 가능한 지시는 없으면 안 되는 것이다.
+   */
   readonly escapeHint: string | null;
   readonly escape: StudioInAppEscapeKind;
   readonly id: StudioInAppBrowserId | null;
@@ -182,12 +193,8 @@ export function diagnoseStudioInAppBrowser({
   return Object.freeze({
     escape: escapeHref === null ? "manual" : "link",
     escapeHref,
-    escapeHint:
-      escapeHref !== null
-        ? null
-        : platform === "ios"
-          ? IOS_ESCAPE_HINT
-          : ANDROID_MANUAL_HINT,
+    // 링크를 만들 수 있어도 안내는 같이 준다 — 링크를 못 그리는 호출부가 있기 때문이다.
+    escapeHint: platform === "ios" ? IOS_ESCAPE_HINT : ANDROID_MANUAL_HINT,
     id,
     inApp: true,
     name,

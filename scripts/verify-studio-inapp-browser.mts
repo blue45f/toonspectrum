@@ -82,7 +82,25 @@ interface RouteProbe {
   readonly path: string;
   /** 이 라우트가 완전히 뜬 것으로 볼 selector. */
   readonly readySelector: string;
+  /**
+   * 특정 프로파일에서만 돌릴 라우트. 생략하면 전 프로파일.
+   *
+   * 폭·높이가 결과를 바꾸지 않는 검사(죽은 팝업 어포던스, 출구 유무 같은 DOM 모양)는 한
+   * 프로파일이면 신호가 다 나온다. 세 프로파일로 늘려 봐야 같은 실패를 세 번 보고할 뿐이다.
+   */
+  readonly profiles?: readonly string[];
 }
+
+/**
+ * 실제 공유 링크가 달고 오는 형태의 컴패니언 세션 ID.
+ *
+ * `isStudioCompanionSessionId` 의 `/^[A-Za-z0-9_-]{12,96}$/` 를 통과해야 한다
+ * (studio-tools-companion.ts). 통과해야 하는 이유가 핵심이다 — 형식이 유효하면 페이지는
+ * "세션 없음" 에러 경로를 타지 않고 BroadcastChannel 을 열어 기본 탭을 기다린다. 그 상태가
+ * 바로 인앱 브라우저 사용자가 갇혔던 곳인데, 세션 없는 URL 만 훑던 이전 게이트는 매번 에러
+ * 경로로 새서 초록불을 냈다.
+ */
+const VALID_COMPANION_SESSION = "studio-inapp-verify-session-0001";
 
 /**
  * Studio 가 소유한 라우트 전부. 편집기 서피스는 같은 셸을 공유하지만 각기 다른 지연 청크를
@@ -96,6 +114,20 @@ const ROUTES: readonly RouteProbe[] = Object.freeze([
   { id: "publish", path: "/studio/publish", readySelector: "h1" },
   { id: "companion-workspace", path: "/studio/companion/workspace", readySelector: "h1" },
   { id: "companion-review", path: "/studio/companion/review", readySelector: "h1" },
+  // 유효한 세션을 달고 들어오지만 응답할 기본 탭이 없는 상태 — 공유 링크를 탄 사용자가
+  // 실제로 도착하는 화면이다. 위 두 항목은 세션이 없어서 에러 경로로 빠지므로 이걸 못 잡는다.
+  {
+    id: "companion-workspace-session",
+    path: `/studio/companion/workspace?session=${VALID_COMPANION_SESSION}`,
+    profiles: ["kakaotalk-android-360"],
+    readySelector: "h1",
+  },
+  {
+    id: "companion-review-session",
+    path: `/studio/companion/review?session=${VALID_COMPANION_SESSION}`,
+    profiles: ["kakaotalk-android-360"],
+    readySelector: "h1",
+  },
   { id: "placeholder-projects", path: "/studio/projects", readySelector: "h1" },
   { id: "invalid", path: "/studio/nope", readySelector: "h1" },
 ]);
@@ -410,11 +442,18 @@ async function main(): Promise<void> {
     browser = await chromium.launch({ args: ["--no-sandbox"], headless: true });
 
     const results: RouteResult[] = [];
+    let skipped = 0;
     for (const profile of PROFILES) {
       for (const route of ROUTES) {
+        if (route.profiles && !route.profiles.includes(profile.id)) {
+          skipped += 1;
+          continue;
+        }
         results.push(await runRoute(browser, baseUrl, profile, route));
       }
     }
+    // 조용한 축소는 "전부 훑었다"로 읽힌다. 건너뛴 수를 남긴다.
+    if (skipped > 0) log(`skipped ${skipped} profile-scoped route runs`);
 
     await browser.close();
     browser = null;

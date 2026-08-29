@@ -35,19 +35,17 @@ export function studioCompanionPopupGuidanceFor(
 ): StudioCompanionPopupGuidance {
   if (!diagnosis.inApp) return POPUP_BLOCKED;
   const app = diagnosis.name === null ? "인앱 브라우저" : `${diagnosis.name} 인앱 브라우저`;
-  if (diagnosis.escape === "link" && diagnosis.escapeHref !== null) {
-    return Object.freeze({
-      escapeHref: diagnosis.escapeHref,
-      key: "studio.toolsCompanion.open.inAppBrowserEscapeLink",
-      text: `${app}에서는 새 창을 열 수 없어요. 기본 브라우저로 열고 다시 시도해 주세요.`,
-    });
-  }
+  // 문구는 링크 없이도 완결이어야 한다. 이 안내가 도착하는 곳(스튜디오 announce 파이프라인)은
+  // 문자열만 받는 aria-live 알림이라 링크를 그릴 수 없다 — "기본 브라우저로 여세요"까지만
+  // 말하고 방법을 빼면 사용자는 같은 버튼을 다시 누르는 것 말고 할 수 있는 게 없다.
+  const how = diagnosis.escapeHint ?? "기본 브라우저로 열어 주세요.";
   return Object.freeze({
-    escapeHref: null,
-    key: "studio.toolsCompanion.open.inAppBrowserManual",
-    text: `${app}에서는 새 창을 열 수 없어요. ${
-      diagnosis.escapeHint ?? "기본 브라우저로 열어 주세요."
-    }`,
+    // 링크는 그릴 수 있는 화면을 위해 실어 보내되, 문구가 그것에 의존하지는 않는다.
+    escapeHref: diagnosis.escapeHref,
+    key: diagnosis.escapeHref === null
+      ? "studio.toolsCompanion.open.inAppBrowserManual"
+      : "studio.toolsCompanion.open.inAppBrowserEscapeLink",
+    text: `${app}에서는 새 창을 열 수 없어요. ${how}`,
   });
 }
 
