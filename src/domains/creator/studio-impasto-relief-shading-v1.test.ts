@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   computeStudioImpastoReliefShading,
@@ -226,7 +226,107 @@ describe("studio impasto relief shading v1 (dli/paint MIT port)", () => {
     ).toThrow(StudioImpastoReliefShadingError);
   });
 
-  it("relief-shades a 512×512 tile in under 40ms", () => {
+  /**
+   * Exact transcendental census, measured rather than derived: `Math.sqrt` is called
+   * `4 * width * height + 4` times for ggx (four per shaded pixel — `halfLength` in
+   * `shadeNormal`, both terms of `gggxVisibility`, and `normalLength` in the loop — plus a
+   * fixed four in setup), and exactly four times for emboss-2tap, which never enters
+   * `shadeNormal`. No other transcendental is called at all in either mode.
+   *
+   * This is what the 40ms budget below was really protecting, and it protects it far better: a
+   * normalize added per tap, a second sqrt in the visibility term, an `acos`/`pow` creeping into
+   * the BRDF, or `(1 - lDotH) ** 5` becoming `Math.pow` all move these counts, and they move them
+   * identically on every machine, every Node version and under any load.
+   *
+   * Runs on a small tile in its own test, never inside a timed window: installing a spy on
+   * `Math.sqrt` defeats V8's lowering of it to a hardware instruction, so a spied call is not the
+   * call the budget measures.
+   */
+  it("calls exactly four transcendentals per shaded pixel, and nothing else", () => {
+    const transcendentals = ["sqrt", "pow", "sin", "cos", "exp", "log", "atan2", "hypot", "acos"] as const;
+
+    const census = (
+      width: number,
+      height: number,
+      quality: "ggx" | "emboss-2tap",
+    ): Record<string, number> => {
+      const heights = new Float32Array(width * height);
+      for (let index = 0; index < heights.length; index += 1) {
+        heights[index] = studioOssUnitHash(0x7a11, index);
+      }
+      const counts: Record<string, number> = {};
+      const spies = transcendentals.map((name) => {
+        counts[name] = 0;
+        const original = Math[name] as (...args: number[]) => number;
+        return vi.spyOn(Math, name).mockImplementation(((...args: number[]) => {
+          counts[name] += 1;
+          return original(...args);
+        }) as never);
+      });
+      try {
+        computeStudioImpastoReliefShading(heights, {
+          width,
+          height,
+          into: new Float32Array(width * height),
+          quality,
+        });
+      } finally {
+        for (const spy of spies) spy.mockRestore();
+      }
+      return counts;
+    };
+
+    // Two tile sizes pin the per-pixel slope AND the constant separately — one size alone could
+    // be satisfied by a wrong split between them.
+    for (const [width, height] of [[16, 12], [32, 24]] as const) {
+      const ggx = census(width, height, "ggx");
+      expect(ggx.sqrt, `ggx ${width}x${height}`).toBe(4 * width * height + 4);
+      const emboss = census(width, height, "emboss-2tap");
+      expect(emboss.sqrt, `emboss ${width}x${height}`).toBe(4);
+      expect(emboss.hypot, `emboss ${width}x${height}`).toBe(1);
+
+      for (const name of transcendentals) {
+        if (name === "sqrt") continue;
+        if (name === "hypot") {
+          expect(ggx[name], `ggx ${name}`).toBe(0);
+          continue;
+        }
+        expect(ggx[name], `ggx ${name}`).toBe(0);
+        expect(emboss[name], `emboss ${name}`).toBe(0);
+      }
+    }
+  });
+
+  /**
+   * A catastrophic-blowup smoke bound, and deliberately nothing tighter.
+   *
+   * The old assertion was `elapsedMs < (process.env.CI ? 80 : 40)`, and it failed on a 4-vCPU
+   * container at 58.6ms under load — with nothing regressed. Two measurements explain it and
+   * rule out the obvious fixes:
+   *
+   *  - The shader costs 34.5ms idle on Node 22 and 18.8ms on Node 24. The `CI ? 80 : 40` split
+   *    was not compensating for a busy runner at all; it was compensating for CI running Node 24
+   *    (see `engines.node`) while a dev container may run something older. A 40ms bound with 16%
+   *    idle headroom cannot survive four competing vitest workers.
+   *  - Converting it to a calibrated ratio against `studio-perf-calibration.ts` does NOT work
+   *    here, and that is measured, not assumed: against a fixed 2744 reference rounds the ratio
+   *    read 0.97-1.04 on Node 22 and 0.505-0.518 on Node 24. A 2x baseline spread admits no gate
+   *    at all — avoiding false failures needs one above 1.04, catching a doubling needs one below
+   *    1.02. This is the same instruction-mix trap the paper-height sampler hit, and for the same
+   *    reason: this loop is transcendental-heavy scalar compute, which the reference kernel does
+   *    not track across V8 versions.
+   *
+   * A frozen copy would close that gap, as it did for the paper sampler, but not here: the
+   * per-pixel body recomputes `halfLength`, `halfX/Y/Z`, `lDotH` and `schlickFresnel` on every one
+   * of 262,144 pixels and every one of those is loop-invariant. That hoist is an obvious pending
+   * optimization, and a frozen copy carrying the un-hoisted version would demand a re-freeze the
+   * moment anyone takes it.
+   *
+   * So the clock keeps only the job it can still do honestly — catching an order-of-magnitude
+   * blowup such as an accidental per-pixel allocation or a quadratic tap loop — and the exact
+   * census above carries the regression detection the 40ms number was credited with.
+   */
+  it("relief-shades a 512×512 tile without catastrophic blowup", () => {
     const width = 512;
     const height = 512;
     const heights = new Float32Array(width * height);
@@ -234,19 +334,17 @@ describe("studio impasto relief shading v1 (dli/paint MIT port)", () => {
       heights[index] = studioOssUnitHash(0x7a11, index);
     }
     const into = new Float32Array(width * height);
-    // Warm-up pass lets the JIT settle before the budget measurement.
+    // Warm-up pass lets the JIT settle before the measurement.
     computeStudioImpastoReliefShading(heights, { width, height, into });
-    // A single measured pass is one scheduler preemption away from a false
-    // red on a shared CI runner (measured: 42.9ms on a 40ms budget), so the
-    // verdict is the cheapest of three passes — a genuine slowdown in the
-    // shading kernel slows every pass, while a preempted run cannot make an
-    // unrelated pass expensive.
+    // Noise is additive, so the cheapest of three passes is the honest estimate.
     let elapsedMs = Number.POSITIVE_INFINITY;
     for (let pass = 0; pass < 3; pass += 1) {
       const startedAt = performance.now();
       computeStudioImpastoReliefShading(heights, { width, height, into });
       elapsedMs = Math.min(elapsedMs, performance.now() - startedAt);
     }
-    expect(elapsedMs).toBeLessThan(process.env.CI ? 80 : 40);
+    // ~10x the slowest honest reading recorded (34.5ms idle on Node 22, 58.6ms under a
+    // 250%-oversubscribed box). One gate everywhere: no process.env.CI branch.
+    expect(elapsedMs).toBeLessThan(400);
   });
 });

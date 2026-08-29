@@ -1,6 +1,7 @@
 import { getStroke } from "perfect-freehand";
 import { describe, expect, it } from "vitest";
 
+import { evaluateStudioCalibratedBudget } from "./brush/studio-perf-calibration";
 import {
   applyStudioCroquisPulledStringPrefilter,
   buildStudioCroquisCapsuleStrokeLoops,
@@ -421,29 +422,73 @@ describe("capsule stroke loops", () => {
       .toBe(buildStudioCroquisCapsuleStrokePathData(input));
   });
 
-  it("builds a 2000-point stroke path within the 40ms budget", () => {
+  /** The 2000-point stroke both budget tests below measure. */
+  function longStrokeInput(): { points: number[]; radii: readonly number[] } {
     const points: number[] = [];
     const pressures: number[] = [];
     for (let index = 0; index < 2_000; index += 1) {
       points.push(index * 1.8, Math.sin(index * 0.05) * 60);
       pressures.push(0.2 + 0.8 * Math.abs(Math.sin(index * 0.013)));
     }
-    const radii = studioCroquisCapsuleRadiiFromPressures(pressures, 12);
-    // Warm-up run keeps JIT variance out of the measured pass.
-    expect(buildStudioCroquisCapsuleStrokePathData({ points, radii }).length).toBeGreaterThan(0);
-    // Interference on a shared runner is additive, so the minimum of a few passes is the honest
-    // estimate of what the builder costs (the long-stroke gate's own statistic); one timed pass
-    // measured 53ms on a starved CI runner for a builder that costs a fraction of that. The CI
-    // allowance mirrors the impasto plan budget's busy-runner bound.
-    let elapsed = Number.POSITIVE_INFINITY;
-    let pathData = "";
-    for (let sample = 0; sample < 5; sample += 1) {
-      const startedAt = performance.now();
-      pathData = buildStudioCroquisCapsuleStrokePathData({ points, radii });
-      elapsed = Math.min(elapsed, performance.now() - startedAt);
-    }
-    expect(pathData.length).toBeGreaterThan(0);
-    expect(elapsed).toBeLessThan(process.env.CI ? 80 : 40);
+    return { points, radii: studioCroquisCapsuleRadiiFromPressures(pressures, 12) };
+  }
+
+  /**
+   * The builder is a pure function of (points, radii), so what it emits is pinnable exactly and
+   * holds on every machine with no clock involved. These counts ARE the cost model: the path is
+   * built by walking capsules and emitting their outlines, so a regression that tessellates
+   * finer, walks a segment twice, or stops merging collinear runs moves them.
+   *
+   * Recorded values, exact and reproduced across runs.
+   */
+  it("emits an exactly pinned capsule path for a 2000-point stroke", () => {
+    const { points, radii } = longStrokeInput();
+    const pathData = buildStudioCroquisCapsuleStrokePathData({ points, radii });
+    const occurrences = (pattern: RegExp) => (pathData.match(pattern) ?? []).length;
+
+    expect(radii).toHaveLength(2_000);
+    // 2000 points collapse to 1999 capsule segments, each a closed subpath.
+    expect(occurrences(/M/gu)).toBe(1_999);
+    expect(occurrences(/Z/gu)).toBe(1_999);
+    expect(occurrences(/L/gu)).toBe(32_317);
+    // Capsule outlines are polygonal: arcs or cubics here would mean a different emitter.
+    expect(occurrences(/A/gu)).toBe(0);
+    expect(occurrences(/C/gu)).toBe(0);
+    expect(pathData.length).toBe(513_581);
+  });
+
+  /**
+   * Budget as a RATIO against `studio-perf-calibration.ts`, not a millisecond count.
+   *
+   * The old assertion was `elapsed < (process.env.CI ? 80 : 40)` and it failed at 74.5ms on a
+   * 4-vCPU container under load with nothing regressed — the builder costs ~19ms idle there, so
+   * 40ms carried barely 2x headroom against four competing vitest workers.
+   *
+   * `referenceRounds` was sized by measurement, not prediction: 1573 rounds is the same window
+   * length as one build, and the resulting ratio held 0.879-0.986 on Node 22, 0.815-0.838 on
+   * Node 24 and 0.873-1.090 with a 1MB young generation — a ~±14% spread. That is the property
+   * the impasto relief shader does NOT have (0.97-1.04 vs 0.505-0.518 across the same two Node
+   * versions), which is why that budget went to a deterministic census instead and this one can
+   * keep a calibrated clock.
+   *
+   * 1.4 sits above the worst honest verdict (0.879) with ~59% headroom while a doubling from the
+   * best-case baseline lands at 1.63 and still fails — confirmed by injecting a real doubling,
+   * which read 1.757-2.048 and failed on every confirmation pass.
+   */
+  it("builds a 2000-point stroke path inside its calibrated budget", () => {
+    const { points, radii } = longStrokeInput();
+    let sink = 0;
+    const verdict = evaluateStudioCalibratedBudget({
+      label: "2000-point croquis capsule path",
+      workload: () => {
+        sink += buildStudioCroquisCapsuleStrokePathData({ points, radii }).length;
+      },
+      referenceRounds: 1_573,
+      maxRatio: 1.4,
+      samples: 5,
+    });
+    expect(verdict.ok, verdict.detail).toBe(true);
+    expect(sink).toBeGreaterThan(0);
   });
 });
 
