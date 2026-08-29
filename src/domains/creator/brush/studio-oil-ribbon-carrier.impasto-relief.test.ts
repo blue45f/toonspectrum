@@ -216,10 +216,35 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
     // test's own input and shares its footprint, but the carrier is different code, so a regression
     // here cannot move the denominator with it.
     //
-    // Healthy ratio on the reference container: 0.97-1.48 idle, 1.50 under 8-way contention. 1.85
-    // clears the worst of those with room while a 2x regression (>=2.0) still fails.
+    // DETERMINISTIC first, because the timing gate below cannot be tight for this stroke. The plan
+    // is deterministic, so the work it produces is pinnable exactly and holds on every machine: a
+    // regression that makes the carrier emit more geometry fails here regardless of clock speed,
+    // load, or microarchitecture.
+    const lanes = plan.impastoReliefLanes!;
+    const runCount = lanes.reduce((total, lane) => total + lane.runs.length, 0);
+    const pointCount = lanes.reduce(
+      (total, lane) => total + lane.runs.reduce((sum, run) => sum + run.points.length, 0),
+      0,
+    );
+    expect(longDabs.length).toBe(2048);
+    expect(lanes.length).toBe(6);
+    expect(runCount).toBe(124);
+    expect(pointCount).toBe(16_120);
+
+    // Then timing, at an HONEST cross-machine bound. Sibling calibration cancels machine speed but
+    // not microarchitecture: this planner's cost relative to `planOilBrushDabs` reads 0.97-1.50 on
+    // the reference container (idle and under 8-way contention alike) and 2.87 on a GitHub Actions
+    // runner, which is where the first gate at 1.85 failed -- 51.6ms against 33.3ms. The runner is
+    // ~2x slower on the ribbon carrier while comparable on the dab planner, so no single ratio is
+    // both tight everywhere and honest everywhere.
+    //
+    // 3.7 clears the worst measured ratio (2.87) by ~1.29x. Stated plainly: on a machine whose
+    // healthy ratio is ~1.5, a 2x regression lands at 3.0 and this gate would NOT catch it. That is
+    // why the deterministic counts above carry the real detection here, and why the scribble budget
+    // -- same planner, ratio spread narrow enough for a 7.5 gate -- remains the sensitive timing
+    // gate for this code path. This one guards gross blow-ups only.
     expect(elapsed).toBeLessThan(
-      studioPerfRatioBudgetMs(1.85, () => {
+      studioPerfRatioBudgetMs(3.7, () => {
         planOilBrushDabs({
           points: [0, 0, 1200, 40, 2400, -30, 3600, 20],
           pressures: [0.5, 0.75, 0.6, 0.8],
