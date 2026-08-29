@@ -136,17 +136,18 @@ describe("deterministic settled-bake memo cache", () => {
     // millisecond count.
     //
     // The claim is "this did not re-solve", and the two costs differ by three orders of
-    // magnitude — 0.41-0.73ms against a solve of 171ms idle and 262-432ms under six spinning
-    // hogs on four cores, a ratio of 0.0011-0.0040. An absolute 16.5ms bound stated that claim
-    // 23-40x looser than the truth and still failed under load at 17.4 and 20.7ms, because a
-    // single preemption landing inside a 0.7ms window is worth more than the whole budget.
+    // magnitude — 0.074-0.076ms against a solve of 155-157ms idle, and 0.081-0.100ms against
+    // 348-365ms under six spinning hogs on four cores: ratios of 0.0005 and 0.0002-0.0003. An
+    // absolute 16.5ms bound stated that claim more than four orders of magnitude looser than the
+    // truth and still failed under load at 17.4 and 20.7ms, because a single preemption landing
+    // inside a sub-millisecond window is worth more than the whole budget.
     //
     // The numerator is the MINIMUM of several hits, and that is not decoration. Dividing one
-    // sub-millisecond reading by one 171ms reading does not cancel a machine: the two windows are
-    // seconds apart and wildly different lengths, so a 10ms pause landing on the hit alone — well
-    // inside what this window has been seen to absorb — would put the ratio at 0.063 and convict
-    // healthy code. Noise is additive, so the cheapest of 21 identical cache lookups is the
-    // honest one; at ~0.7ms each they cost ~15ms in total. The denominator stays a single
+    // sub-millisecond reading by one ~155ms reading does not cancel a machine: the two windows
+    // are seconds apart and wildly different lengths, so a 10ms pause landing on the hit alone —
+    // well inside what this window has been seen to absorb — would put the ratio at 0.065 and
+    // convict healthy code. Noise is additive, so the cheapest of 21 identical cache lookups is
+    // the honest one, and they are cheap enough that 21 of them cost single-digit milliseconds. The denominator stays a single
     // reading because a cold solve happens once by definition, and because noise there only ever
     // makes this gate LOOSER, which is the safe direction.
     //
@@ -190,18 +191,22 @@ describe("time-sliced settled bake at the planner cap", () => {
     // 1. Synchronous reference (what SVG export computes) at the planner cap.
     const referenceInput = makePlan(PLANNER_DAB_CAP / 2);
     expect(referenceInput.length).toBe(PLANNER_DAB_CAP);
+    // The reference clock stops at the SOLVE. `JSON.stringify` over the result is this test's
+    // own parity bookkeeping, not work `requestStudioLivingInkSettledBakeDabs` performs, and
+    // folding it into the denominator would hand the request path a budget for work the request
+    // path never does: measured here at 18-20ms of serialisation on a 136-142ms solve, a 13%
+    // wider gate bought with no product work at all.
     const referenceStartedAt = performance.now();
-    const referenceBytes = JSON.stringify(
-      augmentStudioLivingInkSettledBakeDabs(referenceInput, SETTLED_SUMI),
-    );
+    const referencePlan = augmentStudioLivingInkSettledBakeDabs(referenceInput, SETTLED_SUMI);
     const synchronousSolveMs = performance.now() - referenceStartedAt;
+    const referenceBytes = JSON.stringify(referencePlan);
     resetStudioLivingInkSettledBakeCacheForTests();
 
     // 2. Cold render-path request: must NOT solve synchronously.
     //
     // Timed as a MINIMUM over several cold requests, in its own scheduler capture so the slices
     // they enqueue are discarded rather than joining the measured run below. One reading of a
-    // ~1.3ms window divided by one reading of a ~171ms solve does not cancel a machine — the two
+    // ~0.7ms window divided by one reading of a ~140ms solve does not cancel a machine — the two
     // are seconds apart and two orders of magnitude apart in length, so a pause landing on the
     // request alone convicts healthy code. Each probe resets the cache first, so every one of
     // them exercises the same COLD enqueue path rather than the cheaper join.
@@ -257,10 +262,15 @@ describe("time-sliced settled bake at the planner cap", () => {
       // The render-body call only snapshots + enqueues, and that is graded against the
       // SYNCHRONOUS SOLVE of the same input timed above rather than against a millisecond count.
       // `immediate === null` already proves no plan came back; this proves the enqueue did not
-      // quietly do the work anyway. Recorded 1.3ms idle and 3.5-7.8ms under six spinning hogs
-      // against solves of 171ms and 262-432ms respectively — 0.008 and 0.008-0.018. The absolute
-      // 16.5ms form carried only 2-12x headroom over a sub-4ms measurement and failed under load
-      // at 17.4 and 20.7ms with nothing regressed; a synchronous solve here would score ~1.
+      // quietly do the work anyway. Recorded against a solve-only denominator: 0.68-0.69ms idle
+      // and 0.72-0.74ms under six spinning hogs, against solves of 137-143ms and 261-307ms —
+      // 0.0049-0.0050 and 0.0024-0.0028. Load moves this ratio DOWN, not up, because contention
+      // inflates a 140ms solve far more than it inflates the cheapest of seven sub-millisecond
+      // requests, so a contended runner grades the request path more strictly rather than less.
+      // The absolute 16.5ms form carried only 2-12x headroom over a sub-4ms measurement and
+      // failed under load at 17.4 and 20.7ms with nothing regressed; a synchronous solve here
+      // would score ~1, so the gate keeps a 20x margin over its honest population and 200x
+      // sensitivity to the regression it exists to catch.
       expect(
         requestMs / synchronousSolveMs,
         `render-body request ${requestMs.toFixed(3)}ms against a `

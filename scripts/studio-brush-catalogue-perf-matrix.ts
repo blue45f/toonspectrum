@@ -138,6 +138,45 @@ export function studioBrushCrayonFamilyCpuFreezes(
   return Math.min(...cpuMsPerPass) > budgetMs;
 }
 
+/**
+ * Collapse the repeated long-stroke passes of one crayon-family row into a single verdict.
+ *
+ * The PERFORMANCE sample is the cheapest pass, because contention on a shared runner only ever
+ * adds CPU. CORRECTNESS is not a performance statistic and cannot be read off that same row: a
+ * pass the causal planner rejects returns before `cpuMs` is ever sampled, so it scores
+ * `Infinity`, can never win the minimum, and an intermittent product-path failure would be
+ * reported as a fully green row. One failing pass condemns the row, whichever pass is cheapest.
+ *
+ * The wall ceiling accumulates for the same reason: it is a HANG detector, so a cold or
+ * periodically initialising pass that stalls must survive a later warm pass becoming the sample.
+ *
+ * Pure, so all three rules can be pinned against recorded pass series instead of only through a
+ * live measurement.
+ */
+export function reduceStudioBrushCrayonFamilyPasses(
+  passes: readonly StudioBrushCataloguePerfRow[],
+  budgetMs: number = STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS,
+): StudioBrushCataloguePerfRow {
+  if (passes.length === 0) {
+    throw new Error("A crayon-family row needs at least one pass.");
+  }
+  const passCpuMs = (row: StudioBrushCataloguePerfRow) => row.cpuMs ?? Number.POSITIVE_INFINITY;
+  let cheapest = passes[0]!;
+  let anyPassWallFreeze = false;
+  let failedPass: StudioBrushCataloguePerfRow | null = null;
+  for (const row of passes) {
+    anyPassWallFreeze = anyPassWallFreeze || row.freeze;
+    if (!failedPass && !row.ok) failedPass = row;
+    if (passCpuMs(row) < passCpuMs(cheapest)) cheapest = row;
+  }
+  return {
+    ...cheapest,
+    ok: cheapest.ok && failedPass === null,
+    failure: failedPass ? failedPass.failure : cheapest.failure,
+    freeze: anyPassWallFreeze || studioBrushCrayonFamilyCpuFreezes(passes.map(passCpuMs), budgetMs),
+  };
+}
+
 export const STUDIO_BRUSH_CRAYON_FAMILY_IDS = [
   "crayon",
   "chalk",
@@ -833,31 +872,21 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
   // own comment for the two-machine measurements that forced that, and for why calibrating the
   // wall clock against a reference kernel did not work here. The row's wall reading is still
   // recorded and still bounded, as a hang detector.
+  //
+  // `cpuMs` is measured inside the evaluator over the same window as `elapsedMs`, so the budget
+  // covers the product path alone -- not the fixture setup or the receipt digest. The wall
+  // ceiling and the `ok` verdict are accumulated across every pass rather than read off the row
+  // that wins on CPU; `reduceStudioBrushCrayonFamilyPasses` carries the reasoning for both.
   const crayonFamily = STUDIO_BRUSH_CRAYON_FAMILY_IDS.map((catalogId) => {
-    let best: StudioBrushCataloguePerfRow | null = null;
-    let anyPassWallFreeze = false;
-    const cpuMsPerPass: number[] = [];
+    const passes: StudioBrushCataloguePerfRow[] = [];
     for (let pass = 0; pass < STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES; pass += 1) {
-      const row = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
+      passes.push(evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
         sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
         budgetMs: STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS,
         packById,
-      });
-      // `cpuMs` is measured inside the evaluator over the same window as `elapsedMs`, so the
-      // budget covers the product path alone -- not the fixture setup or the receipt digest.
-      const cpuMs = row.cpuMs ?? Number.POSITIVE_INFINITY;
-      cpuMsPerPass.push(cpuMs);
-      // The wall ceiling is a HANG detector, so it applies to every pass and is accumulated
-      // here rather than read off the row that happens to win on CPU. A cold or periodically
-      // initialising pass can blow it while a later warm pass costs less CPU and becomes `best`,
-      // and reading the wall verdict from `best` alone would drop that stall from the report.
-      anyPassWallFreeze = anyPassWallFreeze || row.freeze;
-      if (!best || cpuMs < best.cpuMs!) best = row;
+      }));
     }
-    return {
-      ...best!,
-      freeze: anyPassWallFreeze || studioBrushCrayonFamilyCpuFreezes(cpuMsPerPass),
-    };
+    return reduceStudioBrushCrayonFamilyPasses(passes);
   });
   const observed = new Set(rows.map((row) => row.catalogId));
   const missingCatalogIds = paintIds.filter((id) => !observed.has(id));

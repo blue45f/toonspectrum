@@ -112,10 +112,10 @@ describe("studio impasto relief shading v1 — wall-clock gates", () => {
     const EMBOSS_HEIGHT = 512;
     const CALLS_PER_SAMPLE = 30;
     const SAMPLES = 5;
-    // Recorded min-of-5 at 1.0247 / 1.0325 / 1.0476 idle and 0.8931 / 0.9025 / 1.0472 under six
+    // Recorded MEDIAN-of-5 at 1.0391 / 1.0405 / 1.0515 idle and 0.9742 / 1.0345 / 1.0945 under six
     // spinning hogs on four cores with five other suites in parallel workers — the load that broke
-    // both earlier forms. 1.35 carries 29% headroom over the worst of those, while a doubled ggx
-    // body reads 1.79-2.10 and is convicted with at least 32% margin.
+    // both earlier forms of this gate. 1.35 carries 23% headroom over the worst of those, while a
+    // doubled ggx body reads 1.95-2.19 and is convicted with at least 44% margin.
     const MAX_RATIO = 1.35;
 
     const fill = (length: number): Float32Array => {
@@ -158,21 +158,28 @@ describe("studio impasto relief shading v1 — wall-clock gates", () => {
 
     takeSample();
     takeSample();
-    let ratio = Number.POSITIVE_INFINITY;
-    let recorded = { ggxMs: 0, embossMs: 0 };
+    const taken: { ggxMs: number; embossMs: number; ratio: number }[] = [];
     for (let sample = 0; sample < SAMPLES; sample += 1) {
-      const taken = takeSample();
-      if (taken.ggxMs / taken.embossMs < ratio) {
-        ratio = taken.ggxMs / taken.embossMs;
-        recorded = taken;
-      }
+      const pair = takeSample();
+      taken.push({ ...pair, ratio: pair.ggxMs / pair.embossMs });
     }
 
-    expect(recorded.embossMs).toBeGreaterThan(1);
+    // The MEDIAN of the five ratios, not the minimum, for the same reason the chunk-cost gate in
+    // studio-live-dynamic-brush-overlay.test.ts takes a median: the quantity is already a ratio of
+    // two independently timed windows, so its noise is TWO-SIDED. A pause inside an emboss call
+    // alone inflates the denominator and lowers that sample's ratio, and a minimum then selects
+    // that outlier on purpose — with ~33ms baselines, a doubled 66ms ggx body is acquitted by a
+    // 17ms emboss-only pause (66 / 50 = 1.32 < 1.35). The minimum is the honest reducer for a
+    // COST, where noise is one-sided; it is the wrong one for a quotient.
+    const sorted = [...taken].sort((left, right) => left.ratio - right.ratio);
+    const middle = sorted[Math.floor(sorted.length / 2)]!;
+
+    expect(middle.embossMs).toBeGreaterThan(1);
     expect(
-      ratio,
-      `ggx ${recorded.ggxMs.toFixed(1)}ms against emboss ${recorded.embossMs.toFixed(1)}ms `
-      + `over ${CALLS_PER_SAMPLE} interleaved calls each = ${ratio.toFixed(4)}`,
+      middle.ratio,
+      `ggx ${middle.ggxMs.toFixed(1)}ms against emboss ${middle.embossMs.toFixed(1)}ms `
+      + `over ${CALLS_PER_SAMPLE} interleaved calls each = ${middle.ratio.toFixed(4)} `
+      + `(all: ${sorted.map((entry) => entry.ratio.toFixed(4)).join(", ")})`,
     ).toBeLessThan(MAX_RATIO);
   });
 });

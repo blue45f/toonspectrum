@@ -28,8 +28,10 @@ import {
   evaluateStudioBrushCrayonFamilyIncrementalChunks,
   listStudioBrushCatalogueDeterminismSampleIds,
   planStudioBrushCataloguePaintDynamics,
+  reduceStudioBrushCrayonFamilyPasses,
   studioBrushChunkSeriesFreezes,
   studioBrushCrayonFamilyCpuFreezes,
+  type StudioBrushCataloguePerfRow,
 } from "./studio-brush-catalogue-perf-matrix";
 
 /**
@@ -152,15 +154,15 @@ describe("soak monotonic-degradation detector", () => {
   });
 });
 
-describe("studioBrushCrayonFamilyCpuFreezes", () => {
-  // Every series below is a recorded min-of-5 CPU reading from the reference container, idle and
-  // then against six spinning hogs on four cores.
-  // The last entry is the GitHub Actions runner, which reads this row 1.47x more expensively than
-  // the container the rest were recorded on. It is in the honest population precisely because a
-  // budget set without it failed CI on unregressed code.
-  const HONEST_CRAYON = [123.8, 116.8, 130.4, 123.3, 191.5] as const;
-  const HONEST_LIGHTEST = [58.7, 57.6, 55.3, 54.0] as const;
+// Every series below is a recorded min-of-5 CPU reading from the reference container, idle and
+// then against six spinning hogs on four cores.
+// The last entry is the GitHub Actions runner, which reads this row 1.47x more expensively than
+// the container the rest were recorded on. It is in the honest population precisely because a
+// budget set without it failed CI on unregressed code.
+const HONEST_CRAYON = [123.8, 116.8, 130.4, 123.3, 191.5] as const;
+const HONEST_LIGHTEST = [58.7, 57.6, 55.3, 54.0] as const;
 
+describe("studioBrushCrayonFamilyCpuFreezes", () => {
   it("acquits every honest reading, on an idle machine and a heavily contended one", () => {
     expect(studioBrushCrayonFamilyCpuFreezes([...HONEST_CRAYON])).toBe(false);
     expect(studioBrushCrayonFamilyCpuFreezes([...HONEST_LIGHTEST])).toBe(false);
@@ -208,6 +210,105 @@ describe("studioBrushCrayonFamilyCpuFreezes", () => {
     // of 89-210ms. The ceiling has to sit clear of that whole population or it becomes the
     // load-dependent gate this change removed.
     expect(STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS).toBeGreaterThan(611 * 3);
+  });
+});
+
+describe("reduceStudioBrushCrayonFamilyPasses", () => {
+  /**
+   * One long-stroke pass. `cpuMs` is deliberately optional: the evaluator returns BEFORE it
+   * samples the CPU clock when the causal planner rejects, which is the whole hazard this
+   * reducer has to survive.
+   */
+  const pass = (
+    overrides: Partial<StudioBrushCataloguePerfRow> = {},
+  ): StudioBrushCataloguePerfRow => ({
+    catalogId: "crayon",
+    path: "causal-coverage",
+    engine: "dynamic-dabs",
+    dynamicsPreset: "crayon",
+    sampleCount: 1_024,
+    dabCount: 4_096,
+    markCount: 61_440,
+    elapsedMs: 140,
+    cpuMs: 124,
+    ok: true,
+    failure: null,
+    freeze: false,
+    digest: "d0",
+    ...overrides,
+  });
+
+  it("reports the cheapest pass, because contention only ever adds CPU", () => {
+    const reduced = reduceStudioBrushCrayonFamilyPasses([
+      pass({ cpuMs: 191.5, elapsedMs: 611 }),
+      pass({ cpuMs: 123.8, elapsedMs: 140 }),
+      pass({ cpuMs: 130.4, elapsedMs: 158 }),
+    ]);
+    expect(reduced.cpuMs).toBe(123.8);
+    expect(reduced.elapsedMs).toBe(140);
+    expect(reduced.ok).toBe(true);
+    expect(reduced.freeze).toBe(false);
+  });
+
+  it("condemns a row when ANY pass failed, even though that pass has no cpuMs to win with", () => {
+    // The hazard: a causal-planning rejection returns before the CPU clock is read, so it scores
+    // `Infinity` and can never become the cheapest pass. Reading `ok` off that winner would let
+    // an intermittent product-path failure ship a fully green matrix.
+    const reduced = reduceStudioBrushCrayonFamilyPasses([
+      pass({ cpuMs: 123.8 }),
+      pass({ cpuMs: undefined, elapsedMs: 3, ok: false, failure: "seed-drift", digest: null }),
+      pass({ cpuMs: 130.4 }),
+    ]);
+    expect(reduced.cpuMs).toBe(123.8);
+    expect(reduced.ok).toBe(false);
+    expect(reduced.failure).toBe("seed-drift");
+  });
+
+  it("condemns a failing pass that DOES carry cpuMs and is not the cheapest", () => {
+    // The coverage-rejection path samples the clock before returning, so this row is eligible to
+    // lose the minimum on its own merits. It must still condemn.
+    const reduced = reduceStudioBrushCrayonFamilyPasses([
+      pass({ cpuMs: 118 }),
+      pass({ cpuMs: 260, ok: false, failure: "mark-budget-exhausted", digest: null }),
+    ]);
+    expect(reduced.cpuMs).toBe(118);
+    expect(reduced.ok).toBe(false);
+    expect(reduced.failure).toBe("mark-budget-exhausted");
+  });
+
+  it("keeps a clean row clean and preserves the winner's own failure when it is the failing one", () => {
+    expect(reduceStudioBrushCrayonFamilyPasses([pass(), pass()]).failure).toBeNull();
+    const allFailed = reduceStudioBrushCrayonFamilyPasses([
+      pass({ cpuMs: 118, ok: false, failure: "seed-drift" }),
+    ]);
+    expect(allFailed.ok).toBe(false);
+    expect(allFailed.failure).toBe("seed-drift");
+  });
+
+  it("accumulates the wall-clock hang detector across every pass", () => {
+    // A cold or periodically initialising pass can blow the ceiling while a later warm pass costs
+    // less CPU and wins the sample. Reading `freeze` off the winner alone would drop that stall.
+    const reduced = reduceStudioBrushCrayonFamilyPasses([
+      pass({ cpuMs: 400, elapsedMs: 2_400, freeze: true }),
+      pass({ cpuMs: 123.8, elapsedMs: 140, freeze: false }),
+    ]);
+    expect(reduced.elapsedMs).toBe(140);
+    expect(reduced.freeze).toBe(true);
+  });
+
+  it("still folds in the CPU freeze verdict, so it has not been loosened into a correctness-only check", () => {
+    const doubled = HONEST_CRAYON.map((ms) => reduceStudioBrushCrayonFamilyPasses([pass({ cpuMs: ms * 2 })]));
+    expect(doubled.every((row) => row.freeze)).toBe(true);
+    expect(
+      reduceStudioBrushCrayonFamilyPasses(HONEST_CRAYON.map((ms) => pass({ cpuMs: ms }))).freeze,
+    ).toBe(false);
+    expect(
+      reduceStudioBrushCrayonFamilyPasses(HONEST_CRAYON.map((ms) => pass({ cpuMs: ms * 2 }))).freeze,
+    ).toBe(true);
+  });
+
+  it("is not evidence of anything without a pass", () => {
+    expect(() => reduceStudioBrushCrayonFamilyPasses([])).toThrow(/at least one pass/);
   });
 });
 
