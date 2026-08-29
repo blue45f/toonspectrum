@@ -155,8 +155,8 @@ describe("soak monotonic-degradation detector", () => {
 describe("studioBrushCrayonFamilyCpuFreezes", () => {
   // Every series below is a recorded min-of-5 CPU reading from the reference container, idle and
   // then against six spinning hogs on four cores.
-  const HONEST_CRAYON = [120.5, 117.0, 113.6, 111.4, 131.7] as const;
-  const HONEST_LIGHTEST = [61.7, 61.5, 56.0, 68.0, 62.5] as const;
+  const HONEST_CRAYON = [115.2, 103.2, 120.5, 129.7, 115.8] as const;
+  const HONEST_LIGHTEST = [61.1, 56.9, 59.9, 63.7, 56.0] as const;
 
   it("acquits every honest reading, on an idle machine and a heavily contended one", () => {
     expect(studioBrushCrayonFamilyCpuFreezes([...HONEST_CRAYON])).toBe(false);
@@ -167,16 +167,16 @@ describe("studioBrushCrayonFamilyCpuFreezes", () => {
 
   it("convicts a doubled crayon plan on both of those machines", () => {
     // The gate must not have been loosened into a no-op. A 2x regression puts the heaviest row at
-    // 223-263ms against a 200ms budget -- caught at its CHEAPEST pass, so no lucky pass rescues
+    // 206-259ms against a 175ms budget -- caught at its CHEAPEST pass, so no lucky pass rescues
     // it. The wall-clock form this replaces convicted the same doubling only when the box was
-    // idle: 2 x 89ms wall cleared the same 200ms number.
+    // idle: 2 x 84ms wall cleared a 200ms number.
     expect(studioBrushCrayonFamilyCpuFreezes(HONEST_CRAYON.map((ms) => ms * 2))).toBe(true);
     expect(Math.min(...HONEST_CRAYON) * 2)
       .toBeGreaterThan(STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS);
     // ...and it is not only a doubling: the smallest regression it still convicts.
     expect(
       STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS / Math.min(...HONEST_CRAYON),
-    ).toBeLessThan(1.8);
+    ).toBeLessThan(1.75);
   });
 
   it("requires the CHEAPEST pass to be over budget, so one preempted pass cannot convict", () => {
@@ -185,6 +185,8 @@ describe("studioBrushCrayonFamilyCpuFreezes", () => {
     expect(studioBrushCrayonFamilyCpuFreezes([118, 121, 640, 117, 119])).toBe(false);
     // ...while a series that is over budget throughout is convicted however many passes it gets.
     expect(studioBrushCrayonFamilyCpuFreezes([201, 640, 233, 202, 260])).toBe(true);
+    expect(studioBrushCrayonFamilyCpuFreezes([176, 176])).toBe(true);
+    expect(studioBrushCrayonFamilyCpuFreezes([176, 174])).toBe(false);
   });
 
   it("is not evidence of anything without a pass", () => {

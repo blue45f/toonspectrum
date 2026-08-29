@@ -260,9 +260,21 @@ describe("time-sliced settled bake at the planner cap", () => {
           .map((duration) => duration.toFixed(1))
           .join(", ")}]`,
       ).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
-      // Slicing actually happened. Idle produces 14 slices and a loaded box 24-25 (it packs less
-      // work into each), so a collapse to one or two passes fails here as well as above.
-      expect(sliceDurations.length).toBeGreaterThanOrEqual(8);
+      // Slicing actually happened — the async path ran at all, rather than the request having
+      // been served some other way.
+      //
+      // Deliberately NOT a floor on the slice COUNT. `runSettledBakeSlice` packs ticks until its
+      // own 8ms wall budget expires, so the count is a reading of the machine: this box produces
+      // 14 slices idle and 24-25 under load, and a faster CPU — or a legitimate solver
+      // optimisation — fits the same 24 ticks into fewer. A `>= 8` floor would then fail because
+      // the implementation got FASTER, which is the same machine-dependence this file is being
+      // cleaned of, pointing the other way.
+      //
+      // Nothing is lost by dropping it. A collapse to a single synchronous solve is already
+      // convicted three times over: `immediate` came back null above, that one slice would carry
+      // the whole solve and so BE the minimum graded against the 33ms budget, and it would fail
+      // the 400ms ceiling as well.
+      expect(sliceDurations.length).toBeGreaterThanOrEqual(1);
       // The worst slice, bounded against the observed noise population rather than against
       // nothing in particular. Scheduling decides this number — 16.0ms idle, 55.0-57.1ms under
       // heavy contention, 121.8ms on a starved container — so it cannot carry the 33ms freeze

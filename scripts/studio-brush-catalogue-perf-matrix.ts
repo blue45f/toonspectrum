@@ -74,24 +74,28 @@ export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES = 2_000;
  * proxy for an allocating planner.
  *
  * `process.cpuUsage()` removes the scheduler directly instead, because time the process is not
- * running is time it does not accrue. Recorded min-of-5 user CPU, idle then loaded:
+ * running is time it does not accrue. Recorded min-of-5 user CPU over the same window
+ * `elapsedMs` covers -- the product plan and coverage path, excluding fixture setup and the
+ * receipt digest -- idle then loaded:
  *
- *                 idle          loaded              spread   wall spread
- *   crayon        117-121ms     111-132ms           1.18x      2.35x
- *   oil-pastel     72-79ms       78-89ms            1.23x      2.41x
- *   chalk          67-68ms       69-92ms            1.38x      2.29x
- *   charcoal       67-70ms       73-78ms            1.17x      2.46x
- *   pastel         62ms          56-68ms            1.21x      2.13x
+ *                 idle           loaded              spread   wall spread
+ *   crayon        103-115ms      116-130ms           1.26x      2.35x
+ *   oil-pastel     74-80ms        73-74ms            1.10x      2.41x
+ *   charcoal       66ms           67-69ms            1.05x      2.46x
+ *   chalk          48-66ms        65-68ms            1.42x      2.29x
+ *   pastel         57-61ms        56-64ms            1.14x      2.13x
  *
- * The budget stays at the 200ms the product recorded. Against the heaviest row it now carries
- * 1.52x headroom over the worst honest reading while a doubled crayon plan (223-263ms) is
- * convicted on every machine, where the wall form convicted it only when the box was idle.
+ * 175ms carries 1.35x headroom over the worst honest reading here, while a doubled crayon plan --
+ * 206ms even from its cheapest honest pass -- is convicted with 18% margin on every machine,
+ * where the wall form convicted it only when the box was idle. The lighter four rows share this
+ * budget and have slack in it, exactly as they did under the wall form; what covers them is the
+ * exact dab and mark pins in the colocated test, which convict a work regression for all five.
  *
  * Vitest runs this suite in a forked worker, so the measurement is this process alone; concurrent
  * GC threads are counted, which is why the reducer is a MINIMUM over passes -- the pass with the
  * least concurrent collection is the honest estimate of what the plan costs.
  */
-export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS = 200;
+export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS = 175;
 /** Passes per crayon-family row. Minimum-of-N, for the reason above. */
 export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES = 5;
 /**
@@ -280,6 +284,11 @@ function evaluateCausalCoverage(
   budgetMs: number,
 ): StudioBrushCataloguePerfRow {
   const source = sourceArrays(sampleCount);
+  // CPU is sampled over exactly the window `elapsedMs` covers -- the product plan and coverage
+  // path and nothing else. Input setup above it and the receipt digest below it are test-only
+  // work, and a gate that charged them to the planner's freeze budget would call a freeze on a
+  // slower hash.
+  const cpuBefore = process.cpuUsage();
   const startedAt = performance.now();
   const causal = planStudioCausalDynamicBrushDepositSegmentsV3({
     ...source,
@@ -313,6 +322,7 @@ function evaluateCausalCoverage(
     markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   });
   const elapsedMs = performance.now() - startedAt;
+  const cpuMs = process.cpuUsage(cpuBefore).user / 1_000;
   if (!coverage.ok) {
     return {
       catalogId,
@@ -323,6 +333,7 @@ function evaluateCausalCoverage(
       dabCount: dabs.length,
       markCount: 0,
       elapsedMs,
+      cpuMs,
       ok: false,
       failure: coverage.reason,
       freeze: elapsedMs > budgetMs,
@@ -338,6 +349,7 @@ function evaluateCausalCoverage(
     dabCount: dabs.length,
     markCount: coverage.marks.length,
     elapsedMs,
+    cpuMs,
     ok: true,
     failure: null,
     freeze: elapsedMs > budgetMs,
@@ -807,15 +819,16 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
     let best: StudioBrushCataloguePerfRow | null = null;
     const cpuMsPerPass: number[] = [];
     for (let pass = 0; pass < STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES; pass += 1) {
-      const cpuBefore = process.cpuUsage();
       const row = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
         sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
         budgetMs: STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS,
         packById,
       });
-      const cpuMs = process.cpuUsage(cpuBefore).user / 1_000;
+      // `cpuMs` is measured inside the evaluator over the same window as `elapsedMs`, so the
+      // budget covers the product path alone -- not the fixture setup or the receipt digest.
+      const cpuMs = row.cpuMs ?? Number.POSITIVE_INFINITY;
       cpuMsPerPass.push(cpuMs);
-      if (!best || cpuMs < best.cpuMs!) best = { ...row, cpuMs };
+      if (!best || cpuMs < best.cpuMs!) best = row;
     }
     return {
       ...best!,
