@@ -124,11 +124,15 @@ export function classifyStudioLiveTransformPreviewFrame(
   if (attrs) {
     // A projectable frame can still be un-previewable, because the renderer branches on absolute
     // pixel thresholds that a scale carries the stroke across. Uniform frames are the only ones
-    // that reach here, so `scaleX` is the whole scale.
+    // that reach here, so `scaleX` is the whole scale. The frame's rotation goes in too:
+    // `strokeDistance` is an AABB diagonal, so rotation alone can cross a route cutoff at scale 1.
     if (
       frame.renderRoute !== undefined
       && scale !== null
-      && !studioLiveTransformRouteSurvivesScale(frame.renderRoute, scale.scaleX)
+      && !studioLiveTransformRouteSurvivesScale(
+        { ...frame.renderRoute, rotationDeg: frame.rotationDeg },
+        scale.scaleX,
+      )
     ) {
       return { ok: false, reason: "unsupported-render-route" };
     }

@@ -98,6 +98,43 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
     ).toBe(true);
   });
 
+  it("refuses a rotation that can carry the AABB span across a route cutoff at scale 1", () => {
+    // strokeDistance is an AABB DIAGONAL, not a rotation invariant: a 10x10 square spans 14.1px
+    // upright and 20px at 45 degrees, crossing the 16px compact-dot cutoff on rotation alone.
+    // The check grades the whole interval rotation can reach, so this stands down.
+    const square = { strokeWidth: 8, strokeDistance: 14.1, pointCount: 4 } as const;
+    expect(studioLiveTransformRouteSurvivesScale({ ...square, rotationDeg: 45 }, 1)).toBe(false);
+    // Upright, the same stroke is comfortably inside its route.
+    expect(studioLiveTransformRouteSurvivesScale(square, 1)).toBe(true);
+    // A full turn is not a rotation for this purpose.
+    expect(studioLiveTransformRouteSurvivesScale({ ...square, rotationDeg: 360 }, 1)).toBe(true);
+    // Far from every cutoff, a rotation is still previewable.
+    expect(
+      studioLiveTransformRouteSurvivesScale(
+        { strokeWidth: 8, strokeDistance: 60, pointCount: 40, rotationDeg: 45 },
+        1,
+      ),
+    ).toBe(true);
+  });
+
+  it("refuses a scale that changes a compact dot's floored radius", () => {
+    // A stroke can stay ON the compact-dot route and still be non-affine: perfect-ink never draws
+    // a dot under 3px radius, so a 1px 4-point stroke scaled 2x previews a 6px-radius dot against
+    // a regenerated 3px one.
+    const dot = {
+      strokeWidth: 1,
+      strokeDistance: 5,
+      pointCount: 4,
+      isPerfectInk: true,
+    } as const;
+    expect(studioLiveTransformRouteSurvivesScale(dot, 2)).toBe(false);
+    // Above the floor on both sides, the dot scales exactly: radius 6 previews at 7.2 and the
+    // commit regenerates 7.2 from the scaled width.
+    expect(
+      studioLiveTransformRouteSurvivesScale({ ...dot, strokeWidth: 12 }, 1.2),
+    ).toBe(true);
+  });
+
   it("refuses anything it cannot read, because an unreadable route is not a licence", () => {
     expect(studioLiveTransformRouteSurvivesScale(SAFE, Number.NaN)).toBe(false);
     expect(studioLiveTransformRouteSurvivesScale(SAFE, 0)).toBe(false);

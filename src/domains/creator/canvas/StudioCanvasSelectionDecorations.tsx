@@ -255,6 +255,8 @@ export function renderStudioCanvasSelectionDecorations({
                   drawsArrowHead:
                     canvasSelectionEls[0].kind === "arrow"
                     || canvasSelectionEls[0].kind === "line",
+                  // perfect-ink's compact dot never goes under a 3px radius; other profiles 1.4px.
+                  isPerfectInk: canvasSelectionEls[0].brush === "perfect-ink",
                 }
               : undefined
           }
