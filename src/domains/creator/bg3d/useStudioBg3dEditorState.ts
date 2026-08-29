@@ -30,6 +30,7 @@ export function useStudioBg3dEditorState(props) {
   } = R;
   const [primitiveGeometryPool] = useState(() => new StudioBg3dPrimitiveGeometryPool());
   const [adaptiveDprScale, setAdaptiveDprScale] = useState(1);
+  const [engineFrameTimeMs, setEngineFrameTimeMs] = useState<number | null>(null);
   const {
     commitSharedCharacterTransform,
     effectiveSelectedSharedCharacter,
@@ -443,6 +444,8 @@ export function useStudioBg3dEditorState(props) {
     primitiveGeometryPool,
     adaptiveDprScale,
     setAdaptiveDprScale,
+    engineFrameTimeMs,
+    setEngineFrameTimeMs,
     sharedCharacterCaptureAuthorityDraft,
     sharedCharacterCaptureAuthorityPayloadKey,
     sharedCharacterCaptureAuthorityRef,

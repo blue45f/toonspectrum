@@ -53,6 +53,7 @@ describe("StudioBg3dEnginePanel", () => {
         inApp={DESKTOP}
         probing={false}
         deviceLostMessage={null}
+        frameTimeMs={null}
         onPreferenceChange={() => undefined}
       />,
     );
@@ -71,6 +72,7 @@ describe("StudioBg3dEnginePanel", () => {
         inApp={DESKTOP}
         probing={false}
         deviceLostMessage={null}
+        frameTimeMs={null}
         onPreferenceChange={() => undefined}
       />,
     );
@@ -91,6 +93,7 @@ describe("StudioBg3dEnginePanel", () => {
         inApp={KAKAOTALK}
         probing={false}
         deviceLostMessage={null}
+        frameTimeMs={null}
         onPreferenceChange={onPreferenceChange}
       />,
     );
@@ -111,6 +114,7 @@ describe("StudioBg3dEnginePanel", () => {
         inApp={DESKTOP}
         probing={false}
         deviceLostMessage="WebGPU 디바이스 연결이 끊어졌습니다."
+        frameTimeMs={null}
         onPreferenceChange={() => undefined}
       />,
     );
@@ -128,6 +132,7 @@ describe("StudioBg3dEnginePanel", () => {
         inApp={DESKTOP}
         probing
         deviceLostMessage={null}
+        frameTimeMs={null}
         onPreferenceChange={() => undefined}
       />,
     );
@@ -147,6 +152,7 @@ describe("StudioBg3dEnginePanel", () => {
         inApp={DESKTOP}
         probing={false}
         deviceLostMessage={null}
+        frameTimeMs={null}
         onPreferenceChange={() => undefined}
       />,
     );
@@ -155,5 +161,34 @@ describe("StudioBg3dEnginePanel", () => {
       .toBe("true");
     expect(screen.getByTestId("studio-bg3d-engine-preference-auto").getAttribute("aria-pressed"))
       .toBe("false");
+  });
+
+  it("shows a measured frame time only once the governor has a usable average", () => {
+    const { rerender } = render(
+      <StudioBg3dEnginePanel
+        plan={planFor()}
+        preference="auto"
+        inApp={DESKTOP}
+        probing={false}
+        deviceLostMessage={null}
+        frameTimeMs={null}
+        onPreferenceChange={() => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("studio-bg3d-engine-frame-time")).toBeNull();
+
+    rerender(
+      <StudioBg3dEnginePanel
+        plan={planFor()}
+        preference="auto"
+        inApp={DESKTOP}
+        probing={false}
+        deviceLostMessage={null}
+        frameTimeMs={12.5}
+        onPreferenceChange={() => undefined}
+      />,
+    );
+    expect(screen.getByTestId("studio-bg3d-engine-frame-time").textContent)
+      .toContain("12.5ms · 약 80fps");
   });
 });

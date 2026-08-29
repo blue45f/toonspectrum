@@ -300,7 +300,9 @@ export function resolveStudioBg3dEngineRuntime(
     availableRuntimeIds: PRODUCTION_RUNTIME_IDS,
     primaryCapabilities: STUDIO_BG3D_EDITOR_REQUIRED_CAPABILITIES,
     allowLabRuntimes: false,
-    webgpuSupported: selected.backend === "webgpu",
+    // The device's real capability, not the choice: a WebGL2 session still confirms that the
+    // WebGPU runtime it declined would have satisfied the editor's capability requirements.
+    webgpuSupported: request.probe?.supported === true,
     maximumActivationGzipBytes: STUDIO_BG3D_EDITOR_ACTIVATION_BUDGET_GZIP_BYTES,
     preferredPrimaryRuntimeId: selected.runtimeId,
   });

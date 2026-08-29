@@ -36,6 +36,7 @@ import { CAMERA_PRESETS, DEFAULT_CAMERA_TARGET } from "./studio-bg3d-editor-deri
 import {
   advanceStudioBg3dFrameQuality,
   createStudioBg3dFrameQualityState,
+  STUDIO_BG3D_FRAME_QUALITY_WARMUP_SAMPLES,
 } from "./studio-bg3d-frame-quality-governor";
 import { projectStudioBg3dLodDiameterCssPx } from "./studio-bg3d-lod-selection";
 import { isBgObjectVisible } from "./studio-bg3d-object-ops";
@@ -349,25 +350,40 @@ export function BgPlacementPreview({
   );
 }
 
+/** Reporting cadence for the engine panel's frame-time readout. */
+const FRAME_TIME_REPORT_INTERVAL_MS = 500;
+
 export function BgAdaptiveDprController({
   targetFps,
   paused,
   onScaleChange,
+  onFrameTimeChange,
 }: {
   targetFps: number;
   paused: boolean;
   onScaleChange: (scale: number) => void;
+  /**
+   * Smoothed frame time for the engine status surface, or null while it would be misleading —
+   * before warm-up and whenever the governor is paused for capture or an immersive session. The
+   * governor already computes this, so no second per-frame subscriber is added for it.
+   */
+  onFrameTimeChange?: (frameTimeMs: number | null) => void;
 }) {
   const governorRef = useRef(createStudioBg3dFrameQualityState(targetFps));
   const scaleChangeRef = useRef(onScaleChange);
+  const frameTimeChangeRef = useRef(onFrameTimeChange);
+  const lastReportRef = useRef({ atMs: 0, value: null as number | null });
   useEffect(() => {
     scaleChangeRef.current = onScaleChange;
   }, [onScaleChange]);
   useEffect(() => {
+    frameTimeChangeRef.current = onFrameTimeChange;
+  }, [onFrameTimeChange]);
+  useEffect(() => {
     governorRef.current = createStudioBg3dFrameQualityState(targetFps);
     scaleChangeRef.current(1);
   }, [targetFps]);
-  useFrame((_state, deltaSeconds) => {
+  useFrame((state, deltaSeconds) => {
     const previous = governorRef.current;
     const next = advanceStudioBg3dFrameQuality(previous, {
       deltaSeconds,
@@ -376,6 +392,17 @@ export function BgAdaptiveDprController({
     });
     governorRef.current = next;
     if (next.dprScale !== previous.dprScale) scaleChangeRef.current(next.dprScale);
+
+    const report = frameTimeChangeRef.current;
+    if (!report) return;
+    const nowMs = state.clock.elapsedTime * 1_000;
+    const last = lastReportRef.current;
+    if (nowMs - last.atMs < FRAME_TIME_REPORT_INTERVAL_MS) return;
+    const value = paused || next.acceptedSamples < STUDIO_BG3D_FRAME_QUALITY_WARMUP_SAMPLES
+      ? null
+      : Math.round(next.smoothedFrameMs * 10) / 10;
+    lastReportRef.current = { atMs: nowMs, value };
+    if (value !== last.value) report(value);
   });
   return null;
 }

@@ -317,7 +317,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     snapToggleHint, lineArtPreviewHint, surfaceSnapHint,
     // 파일 분할 때 목록에서 빠져 ReferenceError 를 던지던 식별자들(런타임 값 위치) — 복구.
     ltUserPresetLibraryStatus, physicsGravityPreset, setPhysicsGravityPreset,
-    LazyStudioBg3dAssetLibraryPanel, babylonDiagnosticState, engineRuntime, genericModelClassifications, genericModelControlMode, layerListItems, measurementDocument, measurementDraft, measurementInference, measurementLockedLengthMeters, modelLibraryStatus, setMeasurementDocument, webXrController, webXrSessionState, webXrSupport,
+    LazyStudioBg3dAssetLibraryPanel, babylonDiagnosticState, engineRuntime, engineFrameTimeMs, genericModelClassifications, genericModelControlMode, layerListItems, measurementDocument, measurementDraft, measurementInference, measurementLockedLengthMeters, modelLibraryStatus, setMeasurementDocument, webXrController, webXrSessionState, webXrSupport,
   } = { ...R, ...h };
   return (
     <>
@@ -554,6 +554,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                 engineInAppBrowser={engineRuntime.inApp}
                 engineProbing={engineRuntime.phase === "probing"}
                 engineDeviceLostMessage={engineRuntime.deviceLostMessage}
+                engineFrameTimeMs={engineFrameTimeMs}
                 onEnginePreferenceChange={engineRuntime.setPreference}
                 aiReferenceBusy={isCapturing}
                 aiReferenceDisabled={

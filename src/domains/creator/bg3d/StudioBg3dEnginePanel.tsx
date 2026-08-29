@@ -21,6 +21,8 @@ export interface StudioBg3dEnginePanelProps {
   readonly inApp: StudioBg3dInAppBrowserProfile;
   readonly probing: boolean;
   readonly deviceLostMessage: string | null;
+  /** Smoothed viewport frame time, or null while it would be misleading. */
+  readonly frameTimeMs: number | null;
   readonly onPreferenceChange: (preference: StudioBg3dEnginePreference) => void;
 }
 
@@ -49,12 +51,18 @@ export function StudioBg3dEnginePanel({
   inApp,
   probing,
   deviceLostMessage,
+  frameTimeMs,
   onPreferenceChange,
 }: StudioBg3dEnginePanelProps) {
   const headingId = useId();
   const statusId = useId();
   const hintId = useId();
   const activeLabel = BACKEND_LABELS[plan.backend];
+  // Without a number the engine choice is unfalsifiable to the artist: both options just say
+  // "3D". One smoothed frame time makes switching a decision they can check.
+  const frameTimeLabel = frameTimeMs !== null && frameTimeMs > 0
+    ? `${frameTimeMs.toFixed(1)}ms · 약 ${Math.round(1_000 / frameTimeMs)}fps`
+    : null;
   const isNextGen = plan.backend === "webgpu";
   const statusText = probing
     ? "이 기기에서 쓸 수 있는 3D 엔진을 확인하고 있습니다."
@@ -137,9 +145,20 @@ export function StudioBg3dEnginePanel({
           })}
         </div>
 
-        <p id={hintId} className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">
-          {PREFERENCE_HINTS[preference]}
-        </p>
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <p id={hintId} className="text-[0.7rem] leading-relaxed text-fg-3">
+            {PREFERENCE_HINTS[preference]}
+          </p>
+          {frameTimeLabel ? (
+            <p
+              data-testid="studio-bg3d-engine-frame-time"
+              className="shrink-0 font-mono text-[0.68rem] tabular-nums text-fg-3"
+            >
+              <span className="sr-only">최근 뷰포트 프레임 시간 </span>
+              {frameTimeLabel}
+            </p>
+          ) : null}
+        </div>
 
         <div
           id={statusId}

@@ -25,7 +25,9 @@ export interface StudioBg3dFrameQualitySample {
   readonly paused?: boolean;
 }
 
-const WARMUP_SAMPLES = 30;
+/** Samples the smoothed average needs before it describes the scene rather than the first frame. */
+export const STUDIO_BG3D_FRAME_QUALITY_WARMUP_SAMPLES = 30;
+const WARMUP_SAMPLES = STUDIO_BG3D_FRAME_QUALITY_WARMUP_SAMPLES;
 const DEGRADE_SAMPLES = 45;
 const RECOVER_SAMPLES = 300;
 const CHANGE_COOLDOWN_SAMPLES = 120;

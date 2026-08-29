@@ -161,7 +161,7 @@ export function StudioBg3dEditorViewport({ h }) {
     sharedStageSessionScopeKey, sharedCharactersLinkedToOtherBackgroundCount, operation,
     recoveryScope, validateRecoveryAccess, onWebXrCleanupPendingChange, onClose, onInsert,
     onUseAsAiMethodReference, documentCanvasSize, primitiveGeometryPool, adaptiveDprScale,
-    engineRuntime, applyStudioBg3dThreeRenderSettings,
+    engineRuntime, applyStudioBg3dThreeRenderSettings, setEngineFrameTimeMs,
     setAdaptiveDprScale, sharedCharacterCaptureAuthorityDraft,
     sharedCharacterCaptureAuthorityPayloadKey, readSharedCharacterCaptureAuthorityDraft,
     sharedCharacterCaptureAuthorityPayloadKeyRef, sharedCharacterCaptureAuthorityRevisionRef,
@@ -397,6 +397,7 @@ export function StudioBg3dEditorViewport({ h }) {
                     targetFps={deviceQuality.targetFps}
                     paused={isCapturing || immersiveSceneActive || !open}
                     onScaleChange={setAdaptiveDprScale}
+                    onFrameTimeChange={setEngineFrameTimeMs}
                   />
                   <StudioBg3dPlacementPointerController
                     active={placementActive && !effectiveIsQuadView && !immersiveSceneActive}

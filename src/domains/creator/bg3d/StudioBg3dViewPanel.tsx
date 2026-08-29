@@ -195,6 +195,7 @@ export interface StudioBg3dViewPanelProps {
   readonly engineInAppBrowser: StudioBg3dInAppBrowserProfile;
   readonly engineProbing: boolean;
   readonly engineDeviceLostMessage: string | null;
+  readonly engineFrameTimeMs: number | null;
   readonly onEnginePreferenceChange: (preference: StudioBg3dEnginePreference) => void;
   readonly babylonDiagnosticState: StudioBg3dBabylonDiagnosticState;
   readonly onRunBabylonDiagnostic: (
@@ -413,6 +414,7 @@ export function StudioBg3dViewPanel({
   engineInAppBrowser,
   engineProbing,
   engineDeviceLostMessage,
+  engineFrameTimeMs,
   onEnginePreferenceChange,
   babylonDiagnosticState,
   onRunBabylonDiagnostic,
@@ -1653,6 +1655,7 @@ export function StudioBg3dViewPanel({
                   inApp={engineInAppBrowser}
                   probing={engineProbing}
                   deviceLostMessage={engineDeviceLostMessage}
+                  frameTimeMs={engineFrameTimeMs}
                   onPreferenceChange={onEnginePreferenceChange}
                 />
                 <StudioBg3dBabylonDiagnostic
