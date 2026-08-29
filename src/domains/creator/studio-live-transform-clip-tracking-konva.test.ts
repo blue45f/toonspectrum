@@ -96,8 +96,9 @@ describe("live transform panel-clip tracking (Konva)", () => {
   it("hosts the clip on the per-element Group for a stroke that starts INSIDE a panel", () => {
     const { wrapper, clipGroup } = addClippedStroke();
 
-    expect(findStudioLiveTransformClipHost(wrapper, dragLayer)).toBe(clipGroup);
-    expect(readStudioLiveTransformClip(clipGroup)).toEqual({
+    const host = findStudioLiveTransformClipHost(wrapper, dragLayer);
+    expect(host).toEqual({ node: clipGroup, mode: "attrs" });
+    expect(readStudioLiveTransformClip(host)).toEqual({
       x: 0,
       y: 0,
       width: 200,
@@ -118,22 +119,27 @@ describe("live transform panel-clip tracking (Konva)", () => {
     });
     expect(verdict).toBeNull();
     expect(applyStudioLiveTransformClip(host, verdict)).toBe(true);
-    expect(readStudioLiveTransformClip(clipGroup)).toBeNull();
+    expect(readStudioLiveTransformClip(host)).toBeNull();
 
     // …and the gesture ending puts the document back exactly as it was.
     expect(restoreStudioLiveTransformClip(host, original)).toBe(true);
-    expect(readStudioLiveTransformClip(clipGroup)).toEqual(original);
+    expect(readStudioLiveTransformClip(host)).toEqual(original);
     expect(clipGroup.getAttr(STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR)).toBeUndefined();
   });
 
-  it("adds the clip on the drag Layer when the gesture carries a free stroke INTO a panel", () => {
+  it("adds the clip on the WRAPPER when the gesture carries a free stroke INTO a panel", () => {
     // The case the in-place path cannot serve: an unclipped stroke renders with no clip Group at
-    // all, so the lift's dedicated Layer is the only node available to host a clip.
+    // all, so the lift is what gives us a node to drive — and it must be the wrapper, not the drag
+    // Layer, which also holds the proxy and the Transformer steering the gesture.
     const wrapper = addUnclippedStroke();
     wrapper.moveTo(dragLayer);
+    // Stands in for the proxy and Transformer the lift moves onto this Layer alongside the ink.
+    // A real Transformer needs a canvas the jsdom stub cannot provide; what matters here is only
+    // that the gesture chrome shares the Layer, so a Layer clip would swallow it.
+    dragLayer.add(new studioKonvaRuntime.Group());
 
     const host = findStudioLiveTransformClipHost(wrapper, dragLayer);
-    expect(host).toBe(dragLayer);
+    expect(host).toEqual({ node: wrapper, mode: "func" });
     expect(readStudioLiveTransformClip(host)).toBeNull();
 
     const verdict = studioLiveTransformCommittedClip({
@@ -142,18 +148,50 @@ describe("live transform panel-clip tracking (Konva)", () => {
       elements: [PANEL],
     });
     expect(applyStudioLiveTransformClip(host, verdict)).toBe(true);
-    expect(readStudioLiveTransformClip(dragLayer)).toEqual({
+    expect(readStudioLiveTransformClip(host)).toEqual({
       x: 0,
       y: 0,
       width: 200,
       height: 200,
     });
+    // The gesture chrome shares the drag Layer, so clipping it would swallow handles that are
+    // still controlling the gesture. Only the wrapper carries the clip.
+    expect(dragLayer.getAttr("clipWidth") ?? 0).toBe(0);
+    expect(typeof wrapper.clipFunc()).toBe("function");
 
-    // Restoring must clear it: the drag Layer is shared, and a clip left behind would silently
-    // clip whatever the NEXT gesture lifts onto it.
+    // Restoring must clear it: React never wrote this `clipFunc`, so leaving one behind would clip
+    // the stroke by a panel rect that no longer tracks anything.
     expect(restoreStudioLiveTransformClip(host, null)).toBe(true);
-    expect(readStudioLiveTransformClip(dragLayer)).toBeNull();
+    expect(wrapper.clipFunc()).toBeUndefined();
   });
+
+  it("paths the clip through the wrapper's own transform, so a scaled preview still clips right",
+    () => {
+      // The wrapper's local space is not document space — the preview writes position, scale and
+      // rotation onto it every frame — so a `clipFunc` has to map the panel rect back through the
+      // node's transform. At scale 2 about the origin, a 200-wide panel is 100 wide in local units.
+      const wrapper = addUnclippedStroke();
+      wrapper.moveTo(dragLayer);
+      wrapper.scaleX(2);
+      wrapper.scaleY(2);
+      const host = findStudioLiveTransformClipHost(wrapper, dragLayer);
+      expect(applyStudioLiveTransformClip(host, { x: 0, y: 0, width: 200, height: 200 })).toBe(true);
+
+      const traced: Array<{ x: number; y: number }> = [];
+      const recorder = {
+        beginPath: () => undefined,
+        moveTo: (x: number, y: number) => traced.push({ x, y }),
+        lineTo: (x: number, y: number) => traced.push({ x, y }),
+        closePath: () => undefined,
+      };
+      (wrapper.clipFunc() as unknown as (ctx: typeof recorder) => void)(recorder);
+      expect(traced).toEqual([
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 100 },
+        { x: 0, y: 100 },
+      ]);
+    });
 
   it("writes nothing on the frames where the verdict has not moved", () => {
     // The hot path: this runs per gesture frame, and the panel verdict changes at most once or
@@ -178,10 +216,28 @@ describe("live transform panel-clip tracking (Konva)", () => {
   it("never restores a host it did not take over", () => {
     // Same rule the parked-chrome restore follows: a clip the product changed for its own reasons
     // during the gesture must not be clobbered on the way out.
-    const { wrapper, clipGroup } = addClippedStroke();
+    const { wrapper } = addClippedStroke();
     const host = findStudioLiveTransformClipHost(wrapper, dragLayer);
 
     expect(restoreStudioLiveTransformClip(host, null)).toBe(false);
-    expect(readStudioLiveTransformClip(clipGroup)).not.toBeNull();
+    expect(readStudioLiveTransformClip(host)).not.toBeNull();
+  });
+
+  it("leaves a clip another owner rewrote mid-gesture alone", () => {
+    // A collaborator resizing the containing frame re-renders the clip `Group` with new props
+    // without changing the stroke's identity, so the gesture continues while React installs a
+    // newer rect. Restoring the pre-gesture rect over it would revert a change React considers
+    // already applied, and a later render with unchanged props would not repair the mutation.
+    const { wrapper, clipGroup } = addClippedStroke();
+    const host = findStudioLiveTransformClipHost(wrapper, dragLayer);
+    const original = readStudioLiveTransformClip(host);
+    expect(applyStudioLiveTransformClip(host, { x: 0, y: 0, width: 120, height: 200 })).toBe(true);
+
+    // React re-renders the frame at its new size, straight onto the same node.
+    clipGroup.setAttr("clipWidth", 320);
+
+    expect(restoreStudioLiveTransformClip(host, original)).toBe(false);
+    expect(readStudioLiveTransformClip(host)).toEqual({ x: 0, y: 0, width: 320, height: 200 });
+    expect(clipGroup.getAttr(STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR)).toBeUndefined();
   });
 });

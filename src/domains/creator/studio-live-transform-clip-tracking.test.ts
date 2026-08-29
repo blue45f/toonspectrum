@@ -27,7 +27,7 @@ describe("studioLiveTransformTargetBounds", () => {
     ).toEqual({ x: 10, y: 20, w: 30, h: 40 });
   });
 
-  it("grows the box to the rotated AABB, about the box's own centre", () => {
+  it("grows the box to the rotated AABB, about the target box's ORIGIN", () => {
     // containingPanel reads elBounds, which is axis-aligned, so a rotated stroke's verdict is
     // decided by the box AROUND the rotated ink. A 100x100 square at 45 degrees spans 141.4.
     const rotated = studioLiveTransformTargetBounds(
@@ -37,9 +37,27 @@ describe("studioLiveTransformTargetBounds", () => {
 
     expect(rotated?.w).toBeCloseTo(141.421, 3);
     expect(rotated?.h).toBeCloseTo(141.421, 3);
-    // Centre preserved: the decomposition rotates about the target box's centre.
-    expect((rotated!.x + rotated!.w / 2)).toBeCloseTo(50, 6);
-    expect((rotated!.y + rotated!.h / 2)).toBeCloseTo(50, 6);
+    // The shared decomposition, translate(target) ∘ rotate ∘ scale ∘ translate(−source), maps the
+    // source origin to the target origin for EVERY angle, so the pivot is the corner: the box
+    // hangs half its diagonal to the left of x=0 and its top edge stays at y=0.
+    expect(rotated?.x).toBeCloseTo(-70.711, 3);
+    expect(rotated?.y).toBeCloseTo(0, 6);
+  });
+
+  it("rotates a non-square box about the corner the commit planner uses", () => {
+    // Rotating about the CENTRE instead displaces the box by up to half its diagonal, which near a
+    // panel edge is enough to pick a different panel from the one the commit picks — the exact
+    // clip pop this module exists to remove. 40x20 at (40,40) turned 90 degrees commits to an AABB
+    // spanning x=20..40, y=40..80; a centre pivot would answer x=50..70, y=30..70.
+    const rotated = studioLiveTransformTargetBounds(
+      { x: 40, y: 40, width: 40, height: 20 },
+      90,
+    );
+
+    expect(rotated?.x).toBeCloseTo(20, 6);
+    expect(rotated?.y).toBeCloseTo(40, 6);
+    expect(rotated?.w).toBeCloseTo(20, 6);
+    expect(rotated?.h).toBeCloseTo(40, 6);
   });
 
   it("refuses a degenerate or non-finite frame rather than guessing", () => {

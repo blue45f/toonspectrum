@@ -49,15 +49,25 @@ export function studioLiveTransformTargetBounds(
   if (![x, y, width, height, rotationDeg].every((value) => Number.isFinite(value))) return null;
   if (width <= 0 || height <= 0) return null;
   const radians = (rotationDeg * Math.PI) / 180;
-  const cos = Math.abs(Math.cos(radians));
-  const sin = Math.abs(Math.sin(radians));
-  // The AABB of a rotated rectangle, about the box's own centre — which is where the preview's
-  // decomposition rotates it (translate(target) ∘ rotate ∘ scale ∘ translate(−source)).
-  const rotatedW = width * cos + height * sin;
-  const rotatedH = width * sin + height * cos;
-  const cx = x + width / 2;
-  const cy = y + height / 2;
-  return { x: cx - rotatedW / 2, y: cy - rotatedH / 2, w: rotatedW, h: rotatedH };
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  // The AABB of the rotated rectangle, about the target box's ORIGIN — not its centre.
+  //
+  // The preview and the commit share one decomposition,
+  // translate(target) ∘ rotate(θ) ∘ scale ∘ translate(−source), under which the source box's
+  // origin maps to (target.x, target.y) for EVERY θ. So the pivot is the corner, and rotating
+  // about the centre instead displaces the box by up to half its diagonal — enough, near a panel
+  // edge, to pick a different panel from the one the commit will pick, which is precisely the
+  // clip pop this module exists to remove.
+  //
+  // Local corners are (u, v) for u ∈ {0, width}, v ∈ {0, height}; each maps to
+  // (target.x + u·cos − v·sin, target.y + u·sin + v·cos), so the extents are the sums of the
+  // per-axis minima and maxima of those two independent terms.
+  const minX = x + Math.min(0, width * cos) + Math.min(0, -height * sin);
+  const minY = y + Math.min(0, width * sin) + Math.min(0, height * cos);
+  const w = width * Math.abs(cos) + height * Math.abs(sin);
+  const h = width * Math.abs(sin) + height * Math.abs(cos);
+  return { x: minX, y: minY, w, h };
 }
 
 /**

@@ -31,6 +31,7 @@ import {
 import type { El } from "./studio-element-model";
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
 import type { StudioLiveTransformClipRect } from "./studio-live-transform-clip-tracking";
+import type { StudioLiveTransformClipHost } from "./studio-live-transform-clip-tracking-konva";
 import type { StudioLiveTransformRenderRoute } from "./studio-live-transform-render-route";
 import type { StudioSingleObjectDragLayerSession } from "./studio-single-object-drag-layer";
 import type Konva from "konva";
@@ -167,11 +168,11 @@ type ActiveLiveTransformPreview = {
   /** Drag-layer lift session, or null when the lift was refused (gesture stays in the big Layer). */
   readonly lift: StudioSingleObjectDragLayerSession | null;
   /**
-   * Container whose clip attrs this gesture drives, or null when neither host exists — an
-   * unclipped stroke whose lift was refused for some other reason. That case keeps today's
-   * behaviour: position, scale and rotation still track, only the clip lands at release.
+   * Container whose clip this gesture drives, or null when neither host exists — a stroke whose
+   * lift was refused for some other reason. That case keeps today's behaviour: position, scale
+   * and rotation still track, only the clip lands at release.
    */
-  readonly clipHost: Konva.Node | null;
+  readonly clipHost: StudioLiveTransformClipHost | null;
   /** The host's clip before the gesture, restored verbatim when it ends. */
   readonly originalClip: StudioLiveTransformClipRect | null;
 };
@@ -286,9 +287,9 @@ export function StudioGroupUniformResizeProxy({
       dragLayer: transformLiftLayerRef?.current ?? null,
     });
     // The clip host is resolved AFTER the lift, because the lift decides which host exists: a
-    // lifted stroke is alone on the drag Layer and can be clipped there (the only way to ADD a
-    // clip to a stroke rendered without one), while a stroke that refused the lift keeps its
-    // per-element clip `Group` ancestor.
+    // lifted stroke gets a `clipFunc` on its own wrapper (the only way to ADD a clip to a stroke
+    // rendered without one, and the only container holding this stroke's ink and nothing else),
+    // while a stroke that refused the lift keeps its per-element clip `Group` ancestor.
     const clipHost = livePreviewClipContext
       ? findStudioLiveTransformClipHost(node, transformLiftLayerRef?.current ?? null)
       : null;
@@ -304,8 +305,8 @@ export function StudioGroupUniformResizeProxy({
   /** Neutralize the preview projection and un-park the chrome — commit and cancel both end here. */
   function clearLiveTransformPreview(preview: ActiveLiveTransformPreview | null) {
     if (!preview) return;
-    // Put the clip back BEFORE the nodes move home: once restored, the drag Layer is no longer
-    // this stroke's host, and a clip left on it would silently clip the next gesture's ink.
+    // Put the clip back BEFORE the nodes move home: a `clipFunc` left on the wrapper reads the
+    // wrapper's transform, which the restore below is about to change out from under it.
     restoreStudioLiveTransformClip(preview.clipHost, preview.originalClip);
     // Return the lifted nodes to the document Layer first so the neutral reset below invalidates
     // the authoritative Layer once, and the mirrors re-converge from the same reset.
@@ -449,9 +450,9 @@ export function StudioGroupUniformResizeProxy({
     // frame can corrupt the document.
     if (projection.ok) {
       applyStudioLiveTransformPreviewNodeAttrs(preview.node, projection.attrs);
-      // Re-point the panel clip to the verdict the COMMIT will reach for this frame. Four attr
-      // writes on one node, and only on the frames where the verdict actually moves — no
-      // reparenting, so the lift's restore guard and the parked-chrome bookkeeping are untouched.
+      // Re-point the panel clip to the verdict the COMMIT will reach for this frame. One node
+      // write, and only on the frames where the verdict actually moves — no reparenting, so the
+      // lift's restore guard and the parked-chrome bookkeeping are untouched.
       if (livePreviewClipContext && preview.clipHost) {
         applyStudioLiveTransformClip(
           preview.clipHost,
