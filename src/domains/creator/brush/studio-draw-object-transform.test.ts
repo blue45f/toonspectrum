@@ -398,6 +398,39 @@ describe("orientation-dependent nibs", () => {
     expect(scaledOnly?.brushTip).toEqual(NIB);
   });
 
+  it("rotates per-sample stylus tilt as a vector and twist as an angle", () => {
+    // tiltXs/tiltYs are a direction in canvas axes, so a 90deg turn maps (1, 0) -> (0, 1) with no
+    // translation and no scale applied. twists is barrel rotation in degrees and composes by
+    // addition, wrapped like the nib angle.
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ tiltXs: [1, 0], tiltYs: [0, 1], twists: [0, 170] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: { x: 0, y: 0, width: 20, height: 20 },
+      rotationDeg: 90,
+    });
+
+    expect(rotated?.tiltXs?.[0]).toBeCloseTo(0, 9);
+    expect(rotated?.tiltXs?.[1]).toBeCloseTo(-1, 9);
+    expect(rotated?.tiltYs?.[0]).toBeCloseTo(1, 9);
+    expect(rotated?.tiltYs?.[1]).toBeCloseTo(0, 9);
+    // Scaling the box must not lengthen a direction vector.
+    expect(Math.hypot(rotated!.tiltXs![0]!, rotated!.tiltYs![0]!)).toBeCloseTo(1, 9);
+    expect(rotated?.twists).toEqual([90, -100]);
+  });
+
+  it("leaves stylus channels alone when the transform carries no rotation", () => {
+    const scaledOnly = planStudioDrawObjectTransform({
+      el: drawEl({ tiltXs: [1, 0], tiltYs: [0, 1], twists: [0, 170] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: { x: 0, y: 0, width: 20, height: 20 },
+      rotationDeg: 0,
+    });
+
+    expect(scaledOnly?.tiltXs).toEqual([1, 0]);
+    expect(scaledOnly?.tiltYs).toEqual([0, 1]);
+    expect(scaledOnly?.twists).toEqual([0, 170]);
+  });
+
   it("leaves a stroke without a tip snapshot untouched", () => {
     const rotated = planStudioDrawObjectTransform({
       el: drawEl(),

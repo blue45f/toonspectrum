@@ -222,6 +222,42 @@ export function planStudioDrawObjectTransform(
     symmetry = { ...el.symmetry, centerX: center.x, centerY: center.y };
   }
 
+  // Per-sample stylus orientation turns with the stroke too, for the same reason and by the same
+  // rotation. `tiltXs`/`tiltYs` are a 2D tilt vector in canvas axes, so they rotate as a vector
+  // (the same cos/sin used for points, with no translation and no scale — a direction, not a
+  // position); `twists` is barrel rotation in degrees, so it composes by addition like the nib
+  // angle. Without this, rotating a calligraphy or particle stroke previews the whole subtree
+  // turned and then commits samples still pointing the old way.
+  let tiltXs = el.tiltXs;
+  let tiltYs = el.tiltYs;
+  if (rotationDeg !== 0 && tiltXs && tiltYs && tiltXs.length === tiltYs.length) {
+    const rotatedX = new Array<number>(tiltXs.length);
+    const rotatedY = new Array<number>(tiltYs.length);
+    for (let index = 0; index < tiltXs.length; index += 1) {
+      const tx = tiltXs[index]!;
+      const ty = tiltYs[index]!;
+      const nx = tx * cos - ty * sin;
+      const ny = tx * sin + ty * cos;
+      if (!finite(nx) || !finite(ny)) return null;
+      rotatedX[index] = nx;
+      rotatedY[index] = ny;
+    }
+    tiltXs = rotatedX;
+    tiltYs = rotatedY;
+  }
+
+  let twists = el.twists;
+  if (rotationDeg !== 0 && twists) {
+    const rotatedTwists = new Array<number>(twists.length);
+    for (let index = 0; index < twists.length; index += 1) {
+      const turned = twists[index]! + rotationDeg;
+      if (!finite(turned)) return null;
+      const wrapped = ((((turned + 180) % 360) + 360) % 360) - 180;
+      rotatedTwists[index] = wrapped === -180 ? 180 : wrapped;
+    }
+    twists = rotatedTwists;
+  }
+
   // Orientation-dependent nibs must turn with the stroke. A calligraphy tip's `angleDeg` feeds
   // Konva's `rotation` prop directly (StudioDrawNode renders the tap as a rotated Ellipse), the
   // same clockwise-degree convention as `rotationDeg`, so the two simply compose. Without this the
@@ -243,6 +279,9 @@ export function planStudioDrawObjectTransform(
     points,
     strokeWidth,
     ...(brushTip !== undefined ? { brushTip } : {}),
+    ...(tiltXs !== undefined ? { tiltXs } : {}),
+    ...(tiltYs !== undefined ? { tiltYs } : {}),
+    ...(twists !== undefined ? { twists } : {}),
     ...(sampleSpacing !== undefined ? { sampleSpacing } : {}),
     ...(shapeParams !== undefined ? { shapeParams } : {}),
     ...(symmetry !== undefined ? { symmetry } : {}),
