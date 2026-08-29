@@ -299,3 +299,26 @@ describe("studio-vrm-mtoon-controls apply", () => {
     expect(report.appliedFields).toBeGreaterThan(0);
   });
 });
+
+describe("MToon controls on the WebGPU node material", () => {
+  it("applies to a node-branded material, which carries the same uniforms", () => {
+    // The node port only differs by its brand flag. A guard that knows one brand leaves WebGPU
+    // characters unstyled without raising anything, which silently changes LT line extraction.
+    const material = {
+      isMToonNodeMaterial: true,
+      outlineWidthMode: "worldCoordinates" as const,
+      outlineWidthFactor: 0.004,
+      shadingToonyFactor: 0.5,
+      userData: {} as Record<string, unknown>,
+    };
+    const report = applyStudioVrmMtoonControls(
+      material,
+      { ...DEFAULT_STUDIO_VRM_MTOON_CONTROLS,
+        shading: { ...DEFAULT_STUDIO_VRM_MTOON_CONTROLS.shading, enabled: true, toony: 1 } },
+    );
+    expect(report.applied).toContain("shadingToonyFactor");
+    expect(material.shadingToonyFactor).toBe(1);
+    expect(resetStudioVrmMtoonControls(material)).toBe(true);
+    expect(material.shadingToonyFactor).toBe(0.5);
+  });
+});

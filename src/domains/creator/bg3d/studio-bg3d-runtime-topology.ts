@@ -8,7 +8,7 @@
 
 export type StudioBg3dRuntimeId =
   | "three-webgl"
-  | "three-webgpu-lab"
+  | "three-webgpu"
   | "three-spark-webgl-lab"
   | "babylon-webgl-lab"
   | "babylon-webgpu-lab"
@@ -192,17 +192,21 @@ export const STUDIO_BG3D_RUNTIME_CATALOG: Readonly<Record<
     ]),
     activationGzipBytes: 80_000,
   }),
-  "three-webgpu-lab": Object.freeze({
-    id: "three-webgpu-lab",
+  "three-webgpu": Object.freeze({
+    id: "three-webgpu",
     family: "three",
-    maturity: "lab",
+    maturity: "production",
     capabilities: runtimeCapabilities([
       "interactive-editing",
+      "capture-rgba-depth",
       "skinning",
       "morph-targets",
       "webgpu",
+      "compute",
     ]),
-    // Vite 8 production measurement: 197,119 gzip bytes; keep ~6% policy headroom.
+    // Vite 8 production measurement of the `three/webgpu` graph: 197,119 gzip bytes; keep ~6%
+    // policy headroom. WebXR stays off the capability list until Three's WebGPU XR path matches
+    // the WebGL session bridge this editor already ships.
     activationGzipBytes: 210_000,
   }),
   "three-spark-webgl-lab": Object.freeze({
@@ -368,6 +372,13 @@ export interface StudioBg3dRuntimeTopologyRequest {
   readonly allowLabRuntimes: boolean;
   readonly webgpuSupported: boolean;
   readonly maximumActivationGzipBytes: number;
+  /**
+   * Runtime the caller has already selected for this session (see `studio-bg3d-engine-selection`).
+   * It wins the primary slot only when it is available, eligible, and supports every required
+   * capability; otherwise planning falls back to the ordinary preference order and records
+   * `preferred-runtime-unavailable`.
+   */
+  readonly preferredPrimaryRuntimeId?: StudioBg3dRuntimeId;
 }
 
 export type StudioBg3dRuntimeTopologyDiagnostic =
@@ -376,7 +387,8 @@ export type StudioBg3dRuntimeTopologyDiagnostic =
   | "specialist-unavailable"
   | "lab-runtime-disabled"
   | "webgpu-unavailable"
-  | "activation-budget-exceeded";
+  | "activation-budget-exceeded"
+  | "preferred-runtime-unavailable";
 
 export interface StudioBg3dSpecialistAssignment {
   readonly jobId: string;
@@ -490,7 +502,14 @@ export function planStudioBg3dRuntimeTopology(
     .map((id) => STUDIO_BG3D_RUNTIME_CATALOG[id])
     .filter((runtime): runtime is StudioBg3dRuntimeDescriptor => Boolean(runtime))
     .filter((runtime) => eligibleRuntime(runtime, request, diagnostics));
-  const primary = available.filter((runtime) => supports(runtime, primaryCapabilities)).sort(compareRuntime)[0];
+  const primaryCandidates = available.filter((runtime) => supports(runtime, primaryCapabilities));
+  const preferred = request.preferredPrimaryRuntimeId === undefined
+    ? undefined
+    : primaryCandidates.find((runtime) => runtime.id === request.preferredPrimaryRuntimeId);
+  if (request.preferredPrimaryRuntimeId !== undefined && !preferred) {
+    diagnostics.push("preferred-runtime-unavailable");
+  }
+  const primary = preferred ?? primaryCandidates.sort(compareRuntime)[0];
   if (!primary) {
     diagnostics.push("no-primary-runtime");
     return Object.freeze({

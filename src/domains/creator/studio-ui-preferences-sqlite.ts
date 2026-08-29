@@ -1,4 +1,8 @@
 import {
+  normalizeStudioBg3dEnginePreference,
+  type StudioBg3dEnginePreference,
+} from "./bg3d/studio-bg3d-engine-selection";
+import {
   normalizeStudioAdvancedFillSettings,
   type StudioAdvancedFillSettings,
 } from "./studio-advanced-fill-settings";
@@ -43,6 +47,7 @@ export const STUDIO_PAGE_PREVIEW_SIZE_VALUES = [
 export type StudioPagePreviewSize = (typeof STUDIO_PAGE_PREVIEW_SIZE_VALUES)[number];
 
 const BACKGROUND_RECENT_KEY = "background-recent";
+const BG3D_ENGINE_PREFERENCE_KEY = "bg3d-engine-preference";
 const APP_SETTINGS_KEY = "app-settings";
 const ADVANCED_FILL_SETTINGS_KEY = "advanced-fill-settings";
 const EFFECT_FAVORITES_KEY = "effect-favorites";
@@ -72,6 +77,9 @@ export interface StudioUiPreferencesRepository {
   saveBooleanPreference(key: StudioUiBooleanPreferenceKey, value: boolean): Promise<void>;
   loadBackgroundRecent(): Promise<StudioBackgroundRecentState>;
   saveBackgroundRecent(state: StudioBackgroundRecentState): Promise<void>;
+  /** Which 3D engine the artist last chose for the background editor: auto, WebGPU, or WebGL2. */
+  loadBg3dEnginePreference(): Promise<StudioBg3dEnginePreference>;
+  saveBg3dEnginePreference(preference: StudioBg3dEnginePreference): Promise<void>;
   loadEffectFavorites(): Promise<StudioEffectFavoriteState>;
   saveEffectFavorites(state: StudioEffectFavoriteState): Promise<void>;
   loadElementsRecent(): Promise<StudioElementsRecentState>;
@@ -168,6 +176,15 @@ export function createStudioUiPreferencesRepository(
       return enqueue(
         BACKGROUND_RECENT_KEY,
         JSON.stringify(normalizeStudioBackgroundRecentState(state)),
+      );
+    },
+    async loadBg3dEnginePreference() {
+      return normalizeStudioBg3dEnginePreference(await store.get(BG3D_ENGINE_PREFERENCE_KEY));
+    },
+    saveBg3dEnginePreference(preference: StudioBg3dEnginePreference) {
+      return enqueue(
+        BG3D_ENGINE_PREFERENCE_KEY,
+        normalizeStudioBg3dEnginePreference(preference),
       );
     },
     async loadEffectFavorites() {

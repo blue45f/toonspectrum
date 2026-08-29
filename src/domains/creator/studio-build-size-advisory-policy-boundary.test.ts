@@ -101,7 +101,13 @@ describe("Studio quality-first build-size policy", () => {
     expect(specialistBoundaryBlock).toContain("forbiddenStaticClosures");
     expect(specialistBoundaryBlock).toContain("outsideApprovedClosure");
     expect(specialistBoundaryBlock).toContain("staticOwnersOutsideApprovedClosure");
-    expect(specialistBoundaryBlock).toContain("directDynamicImporters.length !== 1");
+    // The guard used to be "exactly one direct dynamic importer". That count stopped standing for
+    // the property once the editor gained a second legitimate call site (a thumbnail job borrowing
+    // the live renderer), which the count cannot tell apart from an unrelated feature dragging in a
+    // whole second renderer graph. Ownership is asserted by reachability instead, and the one-hop
+    // rule below still forbids a nested waterfall.
+    expect(specialistBoundaryBlock).toContain("foreignDynamicImporters");
+    expect(specialistBoundaryBlock).toContain("reachableClosure(approvedParentEntryKey)");
     expect(specialistBoundaryBlock).toContain(
       "dynamicTargetsFromStaticClosure(approvedParentEntryKey).has(approvedEntryKey)",
     );

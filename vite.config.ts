@@ -406,6 +406,13 @@ export default defineConfig(({ mode }) => ({
             // into the app, Studio route, or BG3D editor activation graphs.
             return "studio-bg3d-babylon-runtime";
           }
+          // NOTE (2026-08-29): naming a chunk for Three's `three.webgpu` build was tried and
+          // reverted for the same reason as the SQLite repositories below. `three.webgpu.js` is
+          // not a leaf — it shares `three.core.js` with `three.module.js` — so rolldown made the
+          // named chunk the home of that shared color. Every three importer then gained a static
+          // edge to an 897 KiB blob and the BG3D editor activation grew 68 KiB gzip. Left
+          // unnamed, `three.webgpu` lands in a chunk reachable only through the WebGPU renderer's
+          // dynamic import, which is exactly what the bundle audit requires.
           // NOTE (2026-08-14): naming a chunk for the launch-time SQLite repositories was tried and
           // reverted. Every entry above is a dependency-free leaf; these repositories are not, so
           // rolldown made the named chunk the home of their whole shared color — a 671 KiB blob that

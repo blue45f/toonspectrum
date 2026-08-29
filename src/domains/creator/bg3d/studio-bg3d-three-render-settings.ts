@@ -1,4 +1,4 @@
-/** Three/WebGL projection of the engine-neutral Studio 3D render settings. */
+/** Three projection of the engine-neutral Studio 3D render settings (WebGL2 and WebGPU). */
 
 import * as THREE from "three";
 
@@ -14,6 +14,20 @@ export type StudioBg3dWebglRendererSettingsTarget = Pick<
   THREE.WebGLRenderer,
   "outputColorSpace" | "toneMapping" | "toneMappingExposure"
 > & { readonly isWebGLRenderer?: boolean };
+
+/**
+ * Three's WebGPURenderer exposes the same three colour/tone properties, but it is a different
+ * class with a different brand flag. It is matched structurally here rather than imported, so the
+ * `three/webgpu` graph never enters this module's static closure.
+ */
+export type StudioBg3dWebgpuRendererSettingsTarget = Pick<
+  THREE.WebGLRenderer,
+  "outputColorSpace" | "toneMapping" | "toneMappingExposure"
+> & { readonly isWebGPURenderer?: boolean };
+
+export type StudioBg3dThreeRendererSettingsTarget =
+  | StudioBg3dWebglRendererSettingsTarget
+  | StudioBg3dWebgpuRendererSettingsTarget;
 
 /**
  * Resolves a persistence-safe render contract without relying on R3F's renderer defaults.
@@ -37,15 +51,10 @@ export function resolveStudioBg3dThreeRenderSettings(
   });
 }
 
-/**
- * Applies settings only to an admitted Three WebGL renderer. A future WebGPU renderer is owned by
- * its specialist adapter and is intentionally not duck-typed into this boundary.
- */
-export function applyStudioBg3dThreeWebglRenderSettings(
-  renderer: StudioBg3dWebglRendererSettingsTarget,
+function applyResolvedRenderSettings(
+  renderer: StudioBg3dThreeRendererSettingsTarget,
   render: StudioBg3dRenderSettings,
 ): boolean {
-  if (renderer.isWebGLRenderer !== true) return false;
   const resolved = resolveStudioBg3dThreeRenderSettings(render);
   const previous = {
     outputColorSpace: renderer.outputColorSpace,
@@ -68,4 +77,40 @@ export function applyStudioBg3dThreeWebglRenderSettings(
     }
     return false;
   }
+}
+
+/**
+ * Applies settings only to an admitted Three WebGL renderer. The brand check stays explicit so a
+ * WebGPU renderer can never be silently accepted by the WebGL entry point.
+ */
+export function applyStudioBg3dThreeWebglRenderSettings(
+  renderer: StudioBg3dWebglRendererSettingsTarget,
+  render: StudioBg3dRenderSettings,
+): boolean {
+  if (renderer.isWebGLRenderer !== true) return false;
+  return applyResolvedRenderSettings(renderer, render);
+}
+
+/** Applies the same engine-neutral settings to an admitted Three WebGPU renderer. */
+export function applyStudioBg3dThreeWebgpuRenderSettings(
+  renderer: StudioBg3dWebgpuRendererSettingsTarget,
+  render: StudioBg3dRenderSettings,
+): boolean {
+  if (renderer.isWebGPURenderer !== true) return false;
+  return applyResolvedRenderSettings(renderer, render);
+}
+
+/**
+ * Routes to the applier that matches the renderer's own brand flag. A renderer claiming neither
+ * brand — or both — is refused, so a partially constructed or spoofed object never silently
+ * receives the document's colour contract.
+ */
+export function applyStudioBg3dThreeRenderSettings(
+  renderer: StudioBg3dThreeRendererSettingsTarget,
+  render: StudioBg3dRenderSettings,
+): boolean {
+  const isWebgl = (renderer as StudioBg3dWebglRendererSettingsTarget).isWebGLRenderer === true;
+  const isWebgpu = (renderer as StudioBg3dWebgpuRendererSettingsTarget).isWebGPURenderer === true;
+  if (isWebgl === isWebgpu) return false;
+  return applyResolvedRenderSettings(renderer, render);
 }

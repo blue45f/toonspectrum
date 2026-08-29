@@ -17,15 +17,41 @@ export const STUDIO_VRM_BASE_ROTATION_Y_KEY = "studioVrmBaseRotationY";
 export const STUDIO_VRM_HTML_FALLBACK_ERROR =
   "VRM 파일 대신 웹 페이지가 응답했습니다. 배포에 해당 .vrm 파일이 포함되어 있는지 확인해 주세요.";
 
+/**
+ * Which MToon implementation the loaded VRM carries.
+ *
+ * MToon ships two materials for the same specification. `"webgl-shader"` is `MToonMaterial`, a
+ * `ShaderMaterial` that only `WebGLRenderer` can compile. `"webgpu-node"` is `MToonNodeMaterial`,
+ * the TSL node port, which only a `WebGPURenderer` can build. There is no material that works on
+ * both, so the choice belongs to whoever owns the renderer — never to a default in here.
+ */
+export type StudioVrmMaterialVariant = "webgl-shader" | "webgpu-node";
+
+export interface StudioVrmAssetLoadOptions {
+  /**
+   * MToon material class the loader must instantiate. Omitted means MToon's WebGL `ShaderMaterial`.
+   *
+   * The class is passed in rather than imported here on purpose. `MToonNodeMaterial` lives in
+   * `@pixiv/three-vrm/nodes`, which statically imports Three's WebGPU build, and this module is a
+   * leaf shared with the VRM poser — importing it from here would put the poser's chunk on the
+   * WebGPU graph for a material it never asks for. The caller that owns a WebGPU renderer supplies
+   * the class from the approved lazy entry instead.
+   */
+  readonly mtoonMaterialType?: typeof THREE.Material;
+}
+
 export type StudioVrmAssetRuntime = {
-  load: (url: string) => Promise<VRM>;
+  load: (url: string, options?: StudioVrmAssetLoadOptions) => Promise<VRM>;
   dispose: (vrm: VRM) => void;
 };
 
 export type StudioVrmAssetRuntimeDependencies = {
   resolveUrl: (url: string) => string;
   preflight: (resolvedUrl: string) => Promise<void>;
-  loadResolved: (resolvedUrl: string) => Promise<VRM>;
+  loadResolved: (
+    resolvedUrl: string,
+    mtoonMaterialType: typeof THREE.Material | undefined,
+  ) => Promise<VRM>;
   prepare: (vrm: VRM) => void;
   deepDispose: (scene: THREE.Object3D) => Promise<void>;
   fallbackDispose: (scene: THREE.Object3D) => void;
@@ -54,6 +80,26 @@ export function readStudioVrmAssetLicenseAuthority(
   vrm: VRM | null | undefined,
 ): StudioVrmLicenseAuthority | null {
   return vrm ? studioVrmLicenseAuthorityByAsset.get(vrm) ?? null : null;
+}
+
+const studioVrmMaterialVariantByAsset = new WeakMap<VRM, StudioVrmMaterialVariant>();
+
+/**
+ * Records which MToon implementation an asset was built with. A VRM loaded for one renderer can
+ * never be shown on the other, so callers that cache or hand assets around need to be able to ask
+ * rather than guess from the material class.
+ */
+export function stampStudioVrmMaterialVariant(
+  vrm: VRM,
+  variant: StudioVrmMaterialVariant,
+): void {
+  studioVrmMaterialVariantByAsset.set(vrm, variant);
+}
+
+export function readStudioVrmMaterialVariant(
+  vrm: VRM | null | undefined,
+): StudioVrmMaterialVariant | null {
+  return vrm ? studioVrmMaterialVariantByAsset.get(vrm) ?? null : null;
 }
 
 /**
@@ -86,11 +132,15 @@ export function createStudioVrmAssetRuntime(
   dependencies: StudioVrmAssetRuntimeDependencies,
 ): StudioVrmAssetRuntime {
   return {
-    async load(url) {
+    async load(url, options) {
       const resolvedUrl = dependencies.resolveUrl(url);
       await dependencies.preflight(resolvedUrl);
-      const vrm = await dependencies.loadResolved(resolvedUrl);
+      const vrm = await dependencies.loadResolved(resolvedUrl, options?.mtoonMaterialType);
       dependencies.prepare(vrm);
+      stampStudioVrmMaterialVariant(
+        vrm,
+        options?.mtoonMaterialType ? "webgpu-node" : "webgl-shader",
+      );
       return vrm;
     },
     dispose(vrm) {
@@ -136,13 +186,28 @@ async function preflightVrmUrl(url: string): Promise<void> {
   if (!isUsableVrmAssetResponse(response)) throw new Error(STUDIO_VRM_HTML_FALLBACK_ERROR);
 }
 
-async function loadResolvedVrm(url: string): Promise<VRM> {
-  const [{ GLTFLoader }, { VRMLoaderPlugin, VRMUtils }] = await Promise.all([
-    import("three/examples/jsm/loaders/GLTFLoader.js"),
-    import("@pixiv/three-vrm"),
-  ]);
+async function loadResolvedVrm(
+  url: string,
+  mtoonMaterialType: typeof THREE.Material | undefined,
+): Promise<VRM> {
+  const [{ GLTFLoader }, { VRMLoaderPlugin, VRMUtils, MToonMaterialLoaderPlugin }] =
+    await Promise.all([
+      import("three/examples/jsm/loaders/GLTFLoader.js"),
+      import("@pixiv/three-vrm"),
+    ]);
   const loader = new GLTFLoader();
-  loader.register((parser) => new VRMLoaderPlugin(parser));
+  if (mtoonMaterialType) {
+    loader.register(
+      (parser) =>
+        new VRMLoaderPlugin(parser, {
+          mtoonMaterialPlugin: new MToonMaterialLoaderPlugin(parser, {
+            materialType: mtoonMaterialType,
+          }),
+        }),
+    );
+  } else {
+    loader.register((parser) => new VRMLoaderPlugin(parser));
+  }
   const gltf = await loader.loadAsync(url);
   stampStudioVrmGltfMaterialAssociations(
     (gltf.parser as unknown as {
@@ -175,8 +240,11 @@ const defaultStudioVrmAssetRuntime = createStudioVrmAssetRuntime({
   fallbackDispose: fallbackDisposeVrmScene,
 });
 
-export function loadStudioVrmAsset(url: string): Promise<VRM> {
-  return defaultStudioVrmAssetRuntime.load(url);
+export function loadStudioVrmAsset(
+  url: string,
+  options?: StudioVrmAssetLoadOptions,
+): Promise<VRM> {
+  return defaultStudioVrmAssetRuntime.load(url, options);
 }
 
 export function disposeStudioVrmAsset(vrm: VRM): void {

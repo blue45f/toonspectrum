@@ -57,6 +57,19 @@ jobs:
         run: pnpm run build
       - name: Sweep every Studio route under in-app browser conditions
         run: pnpm run verify:studio-inapp-browser
+      - name: Open the 3D editor inside those same in-app browsers
+        # The route sweep above proves every Studio route survives an embedded WebView; it never
+        # opens the 3D editor, which is where the engine-selection policy has to hold. This drives
+        # the routed bg3d surface at phone widths and reads the composited canvas back, failing on
+        # a blank viewport, an engine badge that is not WebGL2, a touch target under 44px,
+        # horizontal overflow, a viewport notice with no readable surface, or any page error.
+        #
+        # It belongs beside the route sweep rather than in the 3D runtime job: same browser matrix
+        # and build, and this job runs parallel to core instead of behind it, so the gate still
+        # reports when core is red.
+        run: |
+          xvfb-run -a --server-args="-screen 0 1920x1200x24" \
+            pnpm run verify:studio-bg3d-inapp-editor
 
   verify:
     # Keep this job ID because repository CI-policy tests inspect jobs.verify. The display name
@@ -300,3 +313,21 @@ jobs:
         # Linux headed Chromium requires Xvfb. A fixed 24-bit screen keeps the regular compositor
         # deterministic while the verifier still owns the exact viewport of every proof page.
         run: xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console
+      - name: Verify BG3D next-generation engine capture parity and in-app browser policy
+        # Renders one scene through both the WebGL2 and WebGPU capture adapters and fails if the
+        # composited raster or the depth samples diverge, then replays the page under KakaoTalk,
+        # NAVER app and Instagram user agents.
+        run: |
+          set +e
+          xvfb-run -a --server-args="-screen 0 1920x1200x24" \
+            pnpm run verify:studio-bg3d-webgpu-engine
+          status=$?
+          set -e
+          # Exit 2 is the verifier's explicit "no WebGPU on this runner" skip. The engine policy
+          # then keeps the editor on WebGL2, which the rest of CI already covers, so a runner
+          # without a GPU must not turn a supported-path gate into a red build.
+          if [ "$status" -eq 2 ]; then
+            echo "::notice::WebGPU unavailable on this runner; BG3D engine parity skipped."
+            exit 0
+          fi
+          exit "$status"

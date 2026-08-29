@@ -27,6 +27,10 @@ vi.mock("../vrm/studio-vrm-asset-runtime", () => ({
   disposeStudioVrmAsset: vi.fn(),
   loadStudioVrmAsset,
 }));
+// Stubbed because the real entry statically pulls Three's whole WebGPU build; what matters here
+// is that the WebGPU path reaches for the node material and the WebGL path never does.
+const MToonNodeMaterial = class {};
+vi.mock("./studio-bg3d-three-webgpu-entry", () => ({ MToonNodeMaterial }));
 vi.mock("../vrm/vrm-library", () => ({
   getStoredVrmModelByHash,
   selectableSampleVrmUrl,
@@ -167,8 +171,25 @@ describe("Studio BG3D linked VRM runtime", () => {
 
     await expect(loadStudioBg3dLinkedVrm(createStudioVrmSceneDocument())).resolves.toBe(vrm);
     expect(selectableSampleVrmUrl).toHaveBeenCalledWith("sample-vrm");
-    expect(loadStudioVrmAsset).toHaveBeenCalledWith("/vrm/sample.vrm");
+    // No MToon class is injected on the WebGL path, so nothing here reaches the WebGPU entry.
+    expect(loadStudioVrmAsset).toHaveBeenCalledWith("/vrm/sample.vrm", {
+      mtoonMaterialType: undefined,
+    });
     expect(getStoredVrmModelByHash).not.toHaveBeenCalled();
+  });
+
+  it("loads the MToon node material only when a WebGPU renderer will draw the character", async () => {
+    // MToon compiles to one backend or the other, so the wrong build leaves the character out of
+    // an otherwise healthy frame without raising anything. The wiring is the whole guarantee.
+    const vrm = { scene: new THREE.Group() };
+    loadStudioVrmAsset.mockResolvedValue(vrm);
+
+    await expect(
+      loadStudioBg3dLinkedVrm(createStudioVrmSceneDocument(), { materialVariant: "webgpu-node" }),
+    ).resolves.toBe(vrm);
+    expect(loadStudioVrmAsset).toHaveBeenCalledWith("/vrm/sample.vrm", {
+      mtoonMaterialType: MToonNodeMaterial,
+    });
   });
 
   it("resolves an uploaded character by content hash and revokes its temporary URL", async () => {

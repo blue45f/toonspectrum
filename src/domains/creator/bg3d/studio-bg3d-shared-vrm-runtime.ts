@@ -3,6 +3,8 @@ import * as THREE from "three";
 import {
   STUDIO_VRM_BASE_ROTATION_Y_KEY,
   loadStudioVrmAsset,
+  type StudioVrmAssetLoadOptions,
+  type StudioVrmMaterialVariant,
 } from "../vrm/studio-vrm-asset-runtime";
 import { resolveStudioVrmFingerAuthority } from "../vrm/studio-vrm-auto-grip-authority";
 import { parseAvatarForgeState } from "../vrm/studio-vrm-avatar-forge";
@@ -337,20 +339,48 @@ export function createStudioBg3dLinkedVrmRuntimeOwner(
   return Object.freeze({ ok: true as const, owner: Object.freeze(owner) });
 }
 
+/**
+ * Resolves the MToon material class for the renderer that will draw the character.
+ *
+ * This is where the WebGPU node material enters the graph: `@pixiv/three-vrm/nodes` statically
+ * imports Three's WebGPU build, so it is reached only through the approved lazy entry and only
+ * once a WebGPU session actually exists. A WebGL session never touches this branch.
+ */
+async function resolveMToonMaterialType(
+  variant: StudioVrmMaterialVariant,
+): Promise<StudioVrmAssetLoadOptions["mtoonMaterialType"]> {
+  if (variant === "webgl-shader") return undefined;
+  const { MToonNodeMaterial } = await import("./studio-bg3d-three-webgpu-entry");
+  // `three/webgpu` re-exports Three's own `Material`, so the two `typeof Material` declarations
+  // describe the same runtime class reached through different module identities.
+  return MToonNodeMaterial as unknown as NonNullable<
+    StudioVrmAssetLoadOptions["mtoonMaterialType"]
+  >;
+}
+
+/**
+ * Loads a linked character for the renderer that is actually about to draw it.
+ *
+ * `materialVariant` is not a preference. MToon's `ShaderMaterial` and its TSL node port compile on
+ * exactly one backend each, so passing the wrong one produces a character that never appears.
+ */
 export async function loadStudioBg3dLinkedVrm(
   scene: StudioShared3dCharacterSource["scene"],
+  options?: { readonly materialVariant?: StudioVrmMaterialVariant },
 ): Promise<VRM> {
+  const mtoonMaterialType =
+    await resolveMToonMaterialType(options?.materialVariant ?? "webgl-shader");
   if (scene.model.source === "bundled") {
     const url = selectableSampleVrmUrl(scene.model.id);
     if (!url) throw new Error("bundled-model-unavailable");
-    return loadStudioVrmAsset(url);
+    return loadStudioVrmAsset(url, { mtoonMaterialType });
   }
 
   const stored = await getStoredVrmModelByHash(scene.model.hash);
   if (!stored) throw new Error("attachment-unavailable");
   const objectUrl = URL.createObjectURL(stored.blob);
   try {
-    return await loadStudioVrmAsset(objectUrl);
+    return await loadStudioVrmAsset(objectUrl, { mtoonMaterialType });
   } finally {
     URL.revokeObjectURL(objectUrl);
   }

@@ -64,7 +64,10 @@ describe("Studio 3D viewport Motion Coach integration", () => {
     const toolbar = sliceBetween(
       backgroundSource,
       '"absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col"',
-      "{!immersiveSceneActive && !physicsInteractionLocked && !viewportHinted ?"
+      // Marks the drag-hint block that follows the toolbar. The trailing `?` is deliberately not
+      // part of the token: the hint's guard gains clauses (it is now also suppressed while the
+      // scene is empty), and this slice is about where the toolbar ends, not how the hint is gated.
+      "{!immersiveSceneActive && !physicsInteractionLocked && !viewportHinted"
     );
 
     expect(toolbar).toContain("<StudioToolHintTarget");

@@ -1,3 +1,15 @@
+/**
+ * Production WebGPU capability probe for the Studio 3D editor.
+ *
+ * The probe answers one question — "can this host give us a usable WebGPU device?" — without
+ * allocating a `GPUDevice`, importing `three/webgpu`, or touching the renderer. Keeping it in its
+ * own module means the engine-selection policy and the editor's status surface can ask about
+ * WebGPU on every session while the WebGPU renderer graph stays behind its dynamic boundary.
+ *
+ * Every failure path is explicit: an unsupported host is reported with the reason it failed, never
+ * as a bare `false`, because the editor surfaces that reason to the artist.
+ */
+
 export interface StudioBg3dGpuAdapterLike {
   readonly features?: Iterable<string>;
   /** GPUSupportedLimits exposes WebIDL getters that are not guaranteed to be enumerable. */
@@ -37,8 +49,9 @@ export interface StudioBg3dWebGpuProbeResult {
   readonly limits: Readonly<Record<string, number>>;
 }
 
-const MINIMUM_MAX_BUFFER_SIZE = 128 * 1024 * 1024;
-const MINIMUM_STORAGE_BINDING_SIZE = 32 * 1024 * 1024;
+/** Minimum adapter allocation the editor needs before a WebGPU device is worth creating. */
+export const STUDIO_BG3D_WEBGPU_MIN_BUFFER_SIZE = 128 * 1024 * 1024;
+export const STUDIO_BG3D_WEBGPU_MIN_STORAGE_BINDING_SIZE = 32 * 1024 * 1024;
 const PROBED_LIMIT_NAMES = [
   "maxBufferSize",
   "maxStorageBufferBindingSize",
@@ -72,7 +85,7 @@ function probeResult(
 }
 
 /** Probes policy-level WebGPU suitability without allocating a GPUDevice or renderer. */
-export async function probeStudioBg3dThreeWebGpu(
+export async function probeStudioBg3dWebGpuCapability(
   signals: StudioBg3dWebGpuProbeSignals,
 ): Promise<StudioBg3dWebGpuProbeResult> {
   if (signals.signal?.aborted) return probeResult(false, "aborted");
@@ -102,8 +115,8 @@ export async function probeStudioBg3dThreeWebGpu(
     const features = new Set(outcome.features ?? []);
     const limits = readKnownGpuLimits(outcome.limits);
     if (
-      (limits.maxBufferSize ?? 0) < MINIMUM_MAX_BUFFER_SIZE ||
-      (limits.maxStorageBufferBindingSize ?? 0) < MINIMUM_STORAGE_BINDING_SIZE
+      (limits.maxBufferSize ?? 0) < STUDIO_BG3D_WEBGPU_MIN_BUFFER_SIZE ||
+      (limits.maxStorageBufferBindingSize ?? 0) < STUDIO_BG3D_WEBGPU_MIN_STORAGE_BINDING_SIZE
     ) {
       return probeResult(false, "insufficient-limits", features, limits);
     }
@@ -118,86 +131,3 @@ export async function probeStudioBg3dThreeWebGpu(
   }
 }
 
-export interface StudioBg3dThreeWebGpuLabRuntime {
-  readonly renderer: import("three/webgpu").WebGPURenderer;
-  dispose(): Promise<void>;
-}
-
-interface ThreeWebGpuBackendLifecycle {
-  readonly isWebGPUBackend?: unknown;
-  readonly parameters?: { readonly device?: unknown };
-  readonly device?: { destroy?: () => void } | null;
-  dispose?: () => void;
-}
-
-interface ThreeWebGpuRendererLifecycle {
-  /** Three r184's WebGPURenderer installs a WebGL fallback internally. This lab forbids it. */
-  _getFallback: null | ((error: unknown) => unknown);
-  readonly backend: ThreeWebGpuBackendLifecycle;
-}
-
-function disposeRejectedThreeWebGpuInitialization(backend: ThreeWebGpuBackendLifecycle): void {
-  try {
-    backend.dispose?.();
-  } catch {
-    // Three's public Renderer.dispose() calls async setAnimationLoop(), which retries a rejected
-    // init promise when initialization never completed. Tear the owned backend down directly.
-    if (backend.parameters?.device === undefined) {
-      try {
-        backend.device?.destroy?.();
-      } catch {
-        // Best-effort cleanup must not replace the original initialization error.
-      }
-    }
-  }
-}
-
-/**
- * Fully lazy lab factory. The `three/webgpu` graph stays out of the production WebGL editor chunk.
- * Callers must probe first and mount this renderer on a separate canvas; it never shares R3F state.
- */
-export async function createStudioBg3dThreeWebGpuLabRuntime(
-  canvas: HTMLCanvasElement,
-  options: { readonly antialias?: boolean; readonly alpha?: boolean } = {},
-): Promise<StudioBg3dThreeWebGpuLabRuntime> {
-  if (!(canvas instanceof HTMLCanvasElement)) throw new Error("invalid-webgpu-lab-canvas");
-  const { WebGPURenderer } = await import("three/webgpu");
-  const renderer = new WebGPURenderer({
-    canvas,
-    antialias: options.antialias ?? true,
-    alpha: options.alpha ?? true,
-    powerPreference: "high-performance",
-    requiredLimits: {
-      maxBufferSize: MINIMUM_MAX_BUFFER_SIZE,
-      maxStorageBufferBindingSize: MINIMUM_STORAGE_BINDING_SIZE,
-    },
-  });
-  const lifecycle = renderer as unknown as ThreeWebGpuRendererLifecycle;
-  const initializationBackend = lifecycle.backend;
-  if (typeof lifecycle._getFallback !== "function") {
-    disposeRejectedThreeWebGpuInitialization(initializationBackend);
-    throw new Error("webgpu-lab-version-contract-unsupported");
-  }
-  // WebGPURenderer silently installs a WebGL2 fallback. A runtime advertised as WebGPU must fail
-  // closed instead, so the coordinator can keep the production Three/WebGL renderer in charge.
-  lifecycle._getFallback = null;
-  try {
-    await renderer.init();
-  } catch (error) {
-    disposeRejectedThreeWebGpuInitialization(initializationBackend);
-    throw new Error("webgpu-lab-initialization-failed", { cause: error });
-  }
-  if (lifecycle.backend.isWebGPUBackend !== true) {
-    renderer.dispose();
-    throw new Error("webgpu-lab-backend-unavailable");
-  }
-  let disposed = false;
-  return Object.freeze({
-    renderer,
-    async dispose() {
-      if (disposed) return;
-      disposed = true;
-      await renderer.dispose();
-    },
-  });
-}
