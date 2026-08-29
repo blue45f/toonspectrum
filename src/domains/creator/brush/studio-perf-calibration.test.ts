@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateStudioCalibratedBudget,
   evaluateStudioCalibratedDetection,
+  evaluateStudioCalibratedSampledBudget,
+  evaluateStudioCalibratedSampledDetection,
   judgeStudioCalibratedBudget,
   judgeStudioCalibratedDetection,
   measureStudioCalibratedPasses,
@@ -453,5 +455,93 @@ describe("studio perf calibration — end to end", () => {
   it("catches a regression short of 2x — the gate is not a doubling detector", () => {
     const { verdict } = readMultipleOfReference("80% slower workload", 1.8);
     expect(verdict.ok, verdict.detail).toBe(false);
+  });
+});
+
+/**
+ * The caller-timed form. Two brush gates cannot hand over a workload closure — the idle-prewarm
+ * freeze gate's subject is the worst SLICE inside a drain, and the per-move growth gate has to
+ * keep each lane's `seek` outside the window it times — so they hand over the finished pair
+ * instead. Everything downstream of that is the same code, and these pin that it stays so.
+ */
+describe("studio perf calibration — caller-timed samples", () => {
+  /** A sampler that replays a fixed series of pairs, so the semantics can be pinned exactly. */
+  function replaying(pairs: readonly StudioPerfCalibrationSample[]): {
+    takeSample: () => StudioPerfCalibrationSample;
+    taken: () => number;
+  } {
+    let index = 0;
+    return {
+      takeSample: () => pairs[index++ % pairs.length]!,
+      taken: () => index,
+    };
+  }
+
+  it("reduces, judges and stops exactly as the closure-timed form does", () => {
+    const source = replaying([{ referenceMs: 100, workMs: 110 }]);
+    const verdict = evaluateStudioCalibratedSampledBudget({
+      label: "replayed pair",
+      takeSample: source.takeSample,
+      samples: 3,
+      warmups: 2,
+    });
+    expect(verdict.ok, verdict.detail).toBe(true);
+    expect(verdict.ratio).toBeCloseTo(1.1, 10);
+    expect(verdict.passes).toHaveLength(1);
+    // Warm-up samples are taken and thrown away, exactly like the closure form's warm-up work.
+    expect(source.taken()).toBe(5);
+  });
+
+  it("makes a caller-timed violation earn itself across every pass", () => {
+    // Alternating passes: the first violates, the second acquits, and the minimum of the two is
+    // what the gate reports — the same refusal to convict on one reading.
+    const source = replaying([
+      { referenceMs: 100, workMs: 400 },
+      { referenceMs: 100, workMs: 90 },
+    ]);
+    const verdict = evaluateStudioCalibratedSampledBudget({
+      label: "alternating pairs",
+      takeSample: source.takeSample,
+      samples: 1,
+      warmups: 0,
+      passes: 2,
+    });
+    expect(verdict.ok, verdict.detail).toBe(true);
+    expect(verdict.ratio).toBeCloseTo(0.9, 10);
+    expect(verdict.passes).toHaveLength(2);
+  });
+
+  it("proves detection from a caller-timed seed without measuring again", () => {
+    const source = replaying([{ referenceMs: 1, workMs: 1 }]);
+    const seed = [reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 100 }])];
+    const detection = evaluateStudioCalibratedSampledDetection({
+      label: "healthy caller-timed reading",
+      takeSample: source.takeSample,
+      seed,
+      factor: 2,
+      samples: 4,
+      warmups: 2,
+    });
+    expect(detection.detected, detection.detail).toBe(true);
+    expect(source.taken(), "a healthy seed must not cost another measurement").toBe(0);
+  });
+
+  it("re-measures a caller-timed attempt that failed to detect", () => {
+    // The seeded attempt reads 0.5, where a doubling lands at 1.0 and the gate would acquit. The
+    // failure has to be earned, so a whole second attempt is taken — and it detects.
+    const source = replaying([{ referenceMs: 100, workMs: 100 }]);
+    const starved = [reduceStudioPerfCalibrationSamples([{ referenceMs: 200, workMs: 100 }])];
+    const detection = evaluateStudioCalibratedSampledDetection({
+      label: "starved caller-timed reading",
+      takeSample: source.takeSample,
+      seed: starved,
+      factor: 2,
+      samples: 2,
+      warmups: 1,
+      passes: 1,
+    });
+    expect(detection.detected, detection.detail).toBe(true);
+    expect(detection.passes[0]).toBe(starved[0]);
+    expect(source.taken()).toBe(3);
   });
 });

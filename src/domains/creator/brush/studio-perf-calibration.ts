@@ -268,31 +268,72 @@ export interface StudioCalibratedBudgetOptions {
 }
 
 /**
- * Measures `workload` against the reference kernel and returns the verdict. Passes stop as soon
- * as one clears the gate, so the happy path costs exactly one pass.
+ * A budget whose interleaved pair is timed by the CALLER rather than by this module.
+ *
+ * `workload`/`referenceWorkload` cover the common shape, where the timed window IS the whole
+ * callback. Two brush gates are not that shape, and forcing them into it would change what they
+ * assert: the idle-prewarm freeze gate's subject is the WORST SLICE inside a drain, not the
+ * drain, and the per-move growth gate must leave each lane's `seek` — the state restore a real
+ * pointer move never pays — outside the window it times. Both still owe every property this
+ * module exists for, so they hand back the pair instead of the pair's two halves.
+ *
+ * The contract a caller takes on is exactly the one `measureStudioPerfCalibrationPass` keeps:
+ * time the reference immediately before the workload, in the same sample, with any setup left
+ * OUTSIDE both windows.
  */
-export function evaluateStudioCalibratedBudget(
-  options: StudioCalibratedBudgetOptions,
+export interface StudioCalibratedSampledBudgetOptions {
+  /** Named in the assertion message. */
+  readonly label: string;
+  /**
+   * One interleaved reference/workload pair. Called once per sample, and `warmups` times more
+   * before the first timed sample with its result discarded.
+   */
+  readonly takeSample: () => StudioPerfCalibrationSample;
+  readonly maxRatio?: number;
+  readonly samples?: number;
+  readonly warmups?: number;
+  readonly passes?: number;
+}
+
+/**
+ * Measures caller-timed samples and returns the verdict. Passes stop as soon as one clears the
+ * gate, so the happy path costs exactly one pass. This is the core `evaluateStudioCalibratedBudget`
+ * is built on, so both shapes earn a violation the same way.
+ */
+export function evaluateStudioCalibratedSampledBudget(
+  options: StudioCalibratedSampledBudgetOptions,
 ): StudioCalibratedBudgetVerdict {
   const {
     label,
-    workload,
+    takeSample,
     maxRatio = STUDIO_PERF_CALIBRATION_MAX_GROWTH,
     samples = 5,
     warmups = 2,
     passes = STUDIO_PERF_CALIBRATION_CONFIRMATION_PASSES,
   } = options;
 
-  const reference = resolveStudioPerfCalibrationReference(options);
-  warmStudioPerfCalibration(workload, reference, warmups);
+  warmStudioPerfCalibration(takeSample, warmups);
 
   const recorded: StudioPerfCalibrationPass[] = [];
   for (let pass = 0; pass < passes; pass += 1) {
-    recorded.push(measureStudioPerfCalibrationPass(workload, reference, samples));
+    recorded.push(measureStudioPerfCalibrationPass(takeSample, samples));
     const verdict = judgeStudioCalibratedBudget(label, recorded, maxRatio);
     if (verdict.ok) return verdict;
   }
   return judgeStudioCalibratedBudget(label, recorded, maxRatio);
+}
+
+/**
+ * Measures `workload` against the reference kernel and returns the verdict. Passes stop as soon
+ * as one clears the gate, so the happy path costs exactly one pass.
+ */
+export function evaluateStudioCalibratedBudget(
+  options: StudioCalibratedBudgetOptions,
+): StudioCalibratedBudgetVerdict {
+  return evaluateStudioCalibratedSampledBudget({
+    ...options,
+    takeSample: studioPerfCalibrationSampler(options),
+  });
 }
 
 /**
@@ -307,51 +348,59 @@ export function measureStudioCalibratedPasses(
   options: StudioCalibratedBudgetOptions,
 ): readonly StudioPerfCalibrationPass[] {
   const {
-    workload,
     samples = 5,
     warmups = 2,
     passes = STUDIO_PERF_CALIBRATION_CONFIRMATION_PASSES,
   } = options;
-  const reference = resolveStudioPerfCalibrationReference(options);
-  warmStudioPerfCalibration(workload, reference, warmups);
+  const takeSample = studioPerfCalibrationSampler(options);
+  warmStudioPerfCalibration(takeSample, warmups);
   const recorded: StudioPerfCalibrationPass[] = [];
   for (let pass = 0; pass < passes; pass += 1) {
-    recorded.push(measureStudioPerfCalibrationPass(workload, reference, samples));
+    recorded.push(measureStudioPerfCalibrationPass(takeSample, samples));
   }
   return recorded;
 }
 
-function warmStudioPerfCalibration(
-  workload: () => void,
-  reference: () => void,
-  warmups: number,
-): void {
-  for (let warmup = 0; warmup < warmups; warmup += 1) {
-    reference();
-    workload();
-  }
-}
-
 /**
- * One interleaved pass. The reference is timed immediately before the workload every sample, on
- * purpose: a contended stretch has to inflate BOTH windows, or the ratio stops meaning anything.
- * Warm-up timings are deliberately NOT folded in — a reference measured in a quieter moment than
- * the workload it divides is exactly how a false conviction is manufactured.
+ * The module-timed pair: the reference is timed immediately before the workload every sample, on
+ * purpose — a contended stretch has to inflate BOTH windows, or the ratio stops meaning anything.
  */
-function measureStudioPerfCalibrationPass(
-  workload: () => void,
-  reference: () => void,
-  samples: number,
-): StudioPerfCalibrationPass {
-  const taken: StudioPerfCalibrationSample[] = [];
-  for (let sample = 0; sample < samples; sample += 1) {
+function studioPerfCalibrationSampler(
+  options: StudioCalibratedBudgetOptions,
+): () => StudioPerfCalibrationSample {
+  const { workload } = options;
+  const reference = resolveStudioPerfCalibrationReference(options);
+  return () => {
     const referenceStarted = performance.now();
     reference();
     const referenceMs = performance.now() - referenceStarted;
     const workStarted = performance.now();
     workload();
     const workMs = performance.now() - workStarted;
-    taken.push({ referenceMs, workMs });
+    return { referenceMs, workMs };
+  };
+}
+
+function warmStudioPerfCalibration(
+  takeSample: () => StudioPerfCalibrationSample,
+  warmups: number,
+): void {
+  for (let warmup = 0; warmup < warmups; warmup += 1) {
+    takeSample();
+  }
+}
+
+/**
+ * One interleaved pass. Warm-up timings are deliberately NOT folded in — a reference measured in
+ * a quieter moment than the workload it divides is exactly how a false conviction is manufactured.
+ */
+function measureStudioPerfCalibrationPass(
+  takeSample: () => StudioPerfCalibrationSample,
+  samples: number,
+): StudioPerfCalibrationPass {
+  const taken: StudioPerfCalibrationSample[] = [];
+  for (let sample = 0; sample < samples; sample += 1) {
+    taken.push(takeSample());
   }
   return reduceStudioPerfCalibrationSamples(taken);
 }
@@ -396,9 +445,29 @@ export interface StudioCalibratedDetectionOptions extends StudioCalibratedBudget
 export function evaluateStudioCalibratedDetection(
   options: StudioCalibratedDetectionOptions,
 ): StudioCalibratedDetectionVerdict {
+  return evaluateStudioCalibratedSampledDetection({
+    ...options,
+    takeSample: studioPerfCalibrationSampler(options),
+  });
+}
+
+export interface StudioCalibratedSampledDetectionOptions
+  extends StudioCalibratedSampledBudgetOptions {
+  /** Regression multiple that must remain detectable. */
+  readonly factor: number;
+  /** Passes already measured for this workload, as ONE attempt. See the closure-based twin. */
+  readonly seed?: readonly StudioPerfCalibrationPass[];
+  /** Independent attempts a failure to detect must survive. */
+  readonly attemptCount?: number;
+}
+
+/** `evaluateStudioCalibratedDetection` over caller-timed samples. Identical semantics. */
+export function evaluateStudioCalibratedSampledDetection(
+  options: StudioCalibratedSampledDetectionOptions,
+): StudioCalibratedDetectionVerdict {
   const {
     label,
-    workload,
+    takeSample,
     factor,
     seed = [],
     maxRatio = STUDIO_PERF_CALIBRATION_MAX_GROWTH,
@@ -431,18 +500,17 @@ export function evaluateStudioCalibratedDetection(
   // reference window was starved harder than its workload window — understates the machine, so
   // another whole attempt is measured rather than letting that one condemn the calibration. Each
   // attempt stands on its own, and detection needs only one of them to hold.
-  const reference = resolveStudioPerfCalibrationReference(options);
   const detected = (): boolean =>
     attempts.some((attempt) => studioCalibratedAttemptRatio(attempt) * factor > maxRatio);
   let warmed = false;
   for (let attempt = attempts.length; attempt < attemptCount && !detected(); attempt += 1) {
     if (!warmed) {
-      warmStudioPerfCalibration(workload, reference, warmups);
+      warmStudioPerfCalibration(takeSample, warmups);
       warmed = true;
     }
     const fresh: StudioPerfCalibrationPass[] = [];
     for (let pass = 0; pass < passes; pass += 1) {
-      fresh.push(measureStudioPerfCalibrationPass(workload, reference, samples));
+      fresh.push(measureStudioPerfCalibrationPass(takeSample, samples));
     }
     attempts.push(fresh);
   }

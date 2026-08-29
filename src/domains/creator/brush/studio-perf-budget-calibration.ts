@@ -42,10 +42,17 @@
  * **Prefer `studio-perf-calibration.ts` for new call sites.** That module reaches the same goal by
  * interleaving the reference with the workload sample-for-sample and taking the minimum of both,
  * so a contended stretch inflates numerator and denominator together; it also makes a violation
- * earn confirmation passes. This module measures its reference in a separate window, which tracks
- * a slower machine well and a momentarily busier one less well. It stays for the two call sites
- * whose measured work is not a re-runnable `() => void` -- a per-slice budget inside an idle-pump
- * loop, and a stateful append pass -- which is the one shape the interleaved form cannot take.
+ * earn confirmation passes, and asserts live that a 2x regression would still be convicted. This
+ * module measures its reference in a separate window, which tracks a slower machine well and a
+ * momentarily busier one less well, and it proves nothing about its own detection power at the
+ * call site.
+ *
+ * The shape that used to keep call sites here -- measured work that is not a re-runnable
+ * `() => void`, because the timed window lives INSIDE the work rather than around it -- no longer
+ * does. `evaluateStudioCalibratedSampledBudget` takes the finished reference/workload pair from
+ * the caller, so a per-slice budget inside an idle-pump loop states its budget the interleaved
+ * way; the idle-prewarm freeze gate in studio-dry-media-long-stroke-regression.test.ts moved onto
+ * it. What is left here is the stateful append pass, and it should move too.
  */
 
 /**
