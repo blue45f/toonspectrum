@@ -28,9 +28,13 @@ import { studioCoreBrushCatalogSelection } from "../brush/studio-brush-selection
 import { clearStudioBrushTextureStampCache } from "../brush/studio-brush-textured-stamp";
 import { STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION } from "../brush/studio-dry-media-union-ribbon-carrier";
 import {
-  studioPerfRatioBudgetMs,
-  studioPerfSustainedCalibrationWorkload,
-} from "../brush/studio-perf-budget-calibration";
+  judgeStudioCalibratedBudget,
+  judgeStudioCalibratedDetection,
+  reduceStudioPerfCalibrationSamples,
+  runStudioPerfCalibrationRounds,
+  type StudioPerfCalibrationPass,
+  type StudioPerfCalibrationSample,
+} from "../brush/studio-perf-calibration";
 import { BRUSH_PRESETS } from "../studio-brush";
 import {
   planStudioCausalDynamicBrushDepositSegmentsV3,
@@ -464,6 +468,31 @@ function drawElement(
     ...overrides,
   };
 }
+
+/**
+ * How much more a stroke's late appends draw than its early ones -- the O(1) claim as a number.
+ *
+ * Pure and count-based, so both the healthy shape and the regression it must reject are pinned as
+ * data rather than measured on a clock. An incremental appender keeps this at ~1: each append
+ * deposits one step's worth of marks no matter how long the stroke behind it is. An appender that
+ * repaints the cumulative stroke makes append k draw O(k), which puts the second half at ~3x the
+ * first.
+ */
+function appendMarkGrowthRatio(deltas: readonly number[]): number {
+  if (deltas.length < 2) throw new Error("An append-growth ratio needs at least two appends.");
+  const half = Math.floor(deltas.length / 2);
+  const sum = (slice: readonly number[]): number => slice.reduce((total, d) => total + d, 0);
+  const early = sum(deltas.slice(0, half));
+  if (!(early > 0)) throw new Error("The first half of a stroke drew nothing.");
+  return sum(deltas.slice(half)) / early;
+}
+
+/**
+ * Recorded 0.9996 for the incremental appender, identically in every pass on every machine (mark
+ * counts do not vary). 1.25 leaves room for a step-count change without admitting anything
+ * asymptotic: the cheapest cumulative repaint this loop can express already lands near 3.
+ */
+const APPEND_MARK_GROWTH_LIMIT = 1.25;
 
 function attachedRenderer(surface: StudioLiveInkSurface = SURFACE) {
   vi.stubGlobal("OffscreenCanvas", class {
@@ -1739,8 +1768,20 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // maximum over frames, the repetition has to wrap the WHOLE pass and keep the lowest max -
     // taking a per-frame minimum would compare frames that never ran together.
     const APPEND_BUDGET_PASSES = 3;
+    // Reference rounds per append, sized so an unregressed append scores ~1.0 against the pinned
+    // calibration kernel: 80 rounds cost 0.88-1.00ms on the reference container against a cheapest
+    // append of 1.06-1.16ms. FIXED, never derived from a live reading -- sizing the denominator
+    // from the numerator's own measurement makes every ratio 1.0 by construction.
+    const APPEND_CALIBRATION_ROUNDS = 80;
+    // Recorded min(append)/min(reference) on the reference container: 1.113 / 1.114 / 1.126 /
+    // 1.160 / 1.190 / 1.230 / 1.240 idle, and 1.196 / 1.210 / 1.230 under six spinning hogs
+    // against four cores -- a 10% spread across a 3x contention swing. 1.5 carries ~21% headroom
+    // over the worst honest reading, while a doubled append (>=2.23) is convicted with 32% margin.
+    const APPEND_CALIBRATION_MAX_RATIO = 1.5;
+    const calibrationPasses: StudioPerfCalibrationPass[] = [];
     let maxAppendFrameMs = Number.POSITIVE_INFINITY;
     let totalAppendMs = Number.POSITIVE_INFINITY;
+    let markDeltas: number[] = [];
     let appendCount = 0;
     let liveMarks: ReturnType<typeof attachedRenderer>["activeCanvas"]["recordedMarks"] = [];
     let lastRenderer: ReturnType<typeof attachedRenderer>["renderer"] | null = null;
@@ -1754,6 +1795,9 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     let passTotalAppendMs = 0;
     let passAppendCount = 0;
     let activeClearsAfterFirstMove: number | null = null;
+    const passSamples: StudioPerfCalibrationSample[] = [];
+    const passMarkDeltas: number[] = [];
+    let markedBeforeAppend = 0;
 
     for (let pointCount = 60; pointCount <= fullPoints.length; pointCount += 30) {
       const prefixPoints = fullPoints.slice(0, pointCount);
@@ -1769,11 +1813,22 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         tiltYs: Array.from({ length: pointCount / 2 }, () => -9),
       });
 
+      // The reference is timed immediately before the append it calibrates, every append. Both
+      // windows are ~1ms and adjacent, so a contended stretch or a GC pause inflates the pair
+      // together -- which is precisely what the old form could not do, measuring its calibration
+      // in one separate window after all three passes had finished.
+      const referenceStartedMs = performance.now();
+      runStudioPerfCalibrationRounds(APPEND_CALIBRATION_ROUNDS);
+      const referenceMs = performance.now() - referenceStartedMs;
+
       const startMs = performance.now();
       const appended = renderer.appendFrom(prefixElement);
       const elapsedMs = performance.now() - startMs;
 
       expect(appended.status).toBe("appended");
+      passSamples.push({ referenceMs, workMs: elapsedMs });
+      passMarkDeltas.push(activeCanvas.recordedMarks.length - markedBeforeAppend);
+      markedBeforeAppend = activeCanvas.recordedMarks.length;
       passAppendCount += 1;
       passTotalAppendMs += elapsedMs;
       // The FIRST append is excluded from the outlier max, and only from that.
@@ -1803,48 +1858,90 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       maxAppendFrameMs = passMaxAppendFrameMs;
       totalAppendMs = passTotalAppendMs;
     }
+    calibrationPasses.push(reduceStudioPerfCalibrationSamples(passSamples));
+    markDeltas = passMarkDeltas;
     appendCount = passAppendCount;
     liveMarks = activeCanvas.recordedMarks;
     }
 
-    expect(appendCount).toBeGreaterThan(50);
-    // Budget basis (measured 2026-08-13, vitest node env on this repo's 4-worker config):
-    // - isolated single-test runs (cold JIT, the slower legitimate mode; 9 runs):
-    //   max-frame median 11.8ms / worst 17.2ms; total median 300ms / worst 322ms.
-    // - full-file runs (warm worker; 3 runs): max-frame median 7.6ms; total median 262ms.
-    // Bounds are the cold-mode medians with ~2.5x CI margin: 11.8ms → 30ms per frame and
-    // 300ms → 750ms total. Tighter bounds (e.g. 20ms) sit within one GC pause of the observed
-    // The worst frame is graded against this pass's OWN mean, not a millisecond count. That ratio
-    // is scale-free: it cancels machine speed and uniform contention exactly, because both move
-    // the numerator and denominator together, and what remains is the only thing this bound is
-    // really asserting -- that no single append is an outlier against its neighbours. The absolute
-    // form failed here at 44-67ms against 30 with nothing regressed.
+    // The append loop is fully determined -- 60 points, +30 each step, up to 6,000 -- so its shape
+    // is pinned exactly rather than bounded loosely.
+    expect(appendCount).toBe(199);
+
+    // ---------------------------------------------------------------------------------------
+    // What O(1) actually claims, asserted without a clock.
     //
-    // It does not stand alone: a regression that slows EVERY append leaves this ratio flat and is
-    // caught by the calibrated per-append budget below, while a spike in one frame leaves that
-    // budget nearly flat and is caught here. Recorded on the reference container at 5.51 / 5.87;
-    // 9 carries margin over the worst while a doubled worst frame (>=11) still fails. The max
-    // excludes the first append (see above), which does a structurally different amount of work;
-    // the mean still includes it, which only makes this bound stricter.
-    const meanAppendFrameMs = totalAppendMs / appendCount;
-    expect(maxAppendFrameMs / meanAppendFrameMs).toBeLessThan(9);
-    // The total is budgeted PER APPEND against a duration-matched calibration, not as an absolute
-    // sum, because the absolute form was wrong twice over.
+    // The regression this test exists to catch is an append that repaints the cumulative stroke:
+    // append k would then draw O(k) marks and the run would cost O(n^2). That is a statement about
+    // WORK, and the recorder counts work exactly -- so it is graded on mark counts, which are
+    // identical on every machine, under every load, in every pass. Every timing bound below is a
+    // second opinion, not the proof.
     //
-    // Stale: the recorded basis above is a 300ms total, but this stroke now performs 199 appends at
-    // ~10ms each -- roughly 2,000ms. Per-append cost is healthy (CI reads 1532ms/199 = 7.7ms); the
-    // fixed total simply never tracked the append count growing under it, so the gate had drifted
-    // into measuring the workload's size rather than its speed.
+    // Recorded shape: 76,565 marks over 199 appends. Every eighth append re-plans a ribbon chunk
+    // and deposits 1,695-1,780 marks; every other one deposits 150-240; the first, which starts a
+    // 60-point stroke from a cold renderer rather than extending by 30, deposits 320.
+    const totalMarkDeltas = markDeltas.reduce((sum, delta) => sum + delta, 0);
+    expect(totalMarkDeltas).toBe(76_565);
+    expect(totalMarkDeltas).toBe(liveMarks.length);
+    // No append draws more than one chunk's worth, however long the stroke behind it has grown.
+    // Under a cumulative repaint the last append alone would draw all 76,565.
+    expect(Math.max(...markDeltas), `heaviest append draws ${Math.max(...markDeltas)} marks`)
+      .toBeLessThanOrEqual(1_800);
+    // The asymptotic statement itself: the second half of the stroke costs what the first half
+    // did. Recorded 38,275 against 38,290 -- a ratio of 0.9996. A cumulative repaint makes the
+    // per-append cost grow linearly with the index, which puts this ratio at ~3.
+    expect(
+      appendMarkGrowthRatio(markDeltas),
+      `late appends draw ${appendMarkGrowthRatio(markDeltas).toFixed(3)}x what early ones did`,
+    ).toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // ---------------------------------------------------------------------------------------
+    // Constant-factor cost, calibrated per append against the pinned reference kernel.
     //
-    // Runner-dependent: `process.env.CI ? 1500 : 750` still failed CI at 1532.5ms with nothing
-    // regressed, and gave the busiest machines the loosest bound.
+    // The statistic is the CHEAPEST append, not the mean, and that is the whole fix. Contention
+    // only ever ADDS time, so the cheapest append is the honest estimate of what an append costs;
+    // the mean is dominated by whatever the scheduler did during the other 198. Measured on this
+    // container, idle then under six spinning hogs against four cores:
     //
-    // Per-append against the calibration fixes both: it scales with the workload and cancels the
-    // machine. Recorded on the reference container at 0.0254 / 0.0259 of one calibration unit;
-    // 0.034 carries ~1.3x margin while a 2x per-append regression (>=0.051) still fails.
-    expect(totalAppendMs / appendCount).toBeLessThan(
-      studioPerfRatioBudgetMs(0.034, studioPerfSustainedCalibrationWorkload, 2),
+    //                     idle      loaded    moved
+    //   min per append    1.08ms    1.14ms    x1.05
+    //   mean per append   5.36ms   13.09ms    x2.44
+    //   ratio on the min   1.13      1.21     +7%
+    //   ratio on the mean  5.36     13.92     +160%
+    //
+    // The mean-based form is what failed on main at 11.078ms against a 10.115ms budget with
+    // nothing regressed. It could not be rescued by a bigger margin either: a statistic that
+    // moves 2.4x on load has no threshold that both passes honest work and catches a doubling.
+    //
+    // A regression that slows every append raises the minimum with it, which is exactly the
+    // failure this bound is for. A regression that slows only SOME appends leaves the minimum
+    // flat -- that one is the mark-count pins' job above, where it is caught exactly.
+    const budget = judgeStudioCalibratedBudget(
+      "3,000-sample crayon live append",
+      calibrationPasses,
+      APPEND_CALIBRATION_MAX_RATIO,
     );
+    expect(budget.ok, budget.detail).toBe(true);
+
+    // ...and the gate is not allowed to decay into a friendlier no-op: on this machine, right now,
+    // a doubled append must still be convicted. Judged over the passes just measured, reduced the
+    // way the gate reduces them.
+    const detection = judgeStudioCalibratedDetection(
+      "3,000-sample crayon live append",
+      [calibrationPasses],
+      2,
+      APPEND_CALIBRATION_MAX_RATIO,
+    );
+    expect(detection.detected, detection.detail).toBe(true);
+
+    // A blow-up bound, not a budget. The worst single append is a pure noise measurement -- 30.1
+    // to 45.8ms idle on this container, where the median append is 1.8ms, because one GC pause
+    // lands wherever it lands (the 1ms reference kernel itself was seen taking 7.2ms). It was
+    // previously graded against the pass mean at a limit of 9 and read 9.6 in a single idle pass,
+    // one unlucky collection away from failing. Kept only wide enough to catch a hang.
+    expect(maxAppendFrameMs, `worst single append ${maxAppendFrameMs.toFixed(1)}ms`)
+      .toBeLessThan(1_000);
+    expect(totalAppendMs).toBeLessThan(60_000);
 
     expect(liveMarks.length).toBeGreaterThan(0);
     // Bounded by the complete-stroke ceiling, not the per-segment one: a 3,000-sample crayon
@@ -1855,6 +1952,37 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       .toBeLessThanOrEqual(STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET);
     const sealed = lastRenderer!.end(element);
     expect(sealed.status).toBe("settled");
+  });
+
+  it("convicts a cumulative-repaint appender on mark counts alone", () => {
+    // The counterfactual the O(1) pins above are worth, stated as data so it needs no clock and no
+    // machine. 199 appends either way.
+    const APPENDS = 199;
+    // Incremental: each append deposits one step's worth, every eighth a ribbon chunk -- the
+    // recorded shape, reduced to its two levels.
+    const incremental = Array.from({ length: APPENDS }, (_, index) =>
+      (index % 8 === 7 ? 1_740 : 210));
+    expect(appendMarkGrowthRatio(incremental)).toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // Cumulative repaint: append k redraws everything drawn so far, so it deposits k steps' worth.
+    // This is the regression -- an O(n^2) run whose per-append cost grows with the stroke.
+    const cumulative = incremental.map((_, index) => 210 * (index + 1));
+    expect(appendMarkGrowthRatio(cumulative)).toBeGreaterThan(2.9);
+    expect(appendMarkGrowthRatio(cumulative)).toBeGreaterThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // And it is not only the extreme case: even a HALF-strength leak -- every append redrawing
+    // half the stroke behind it on top of its own step -- clears the limit comfortably.
+    const halfLeak = incremental.map((delta, index) => delta + 105 * index);
+    expect(appendMarkGrowthRatio(halfLeak)).toBeGreaterThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // The limit is not vacuous in the other direction either: a 20% uniform increase in per-append
+    // work is NOT asymptotic and must not be convicted here -- that is the calibrated timing
+    // budget's job, not this one's.
+    expect(appendMarkGrowthRatio(incremental.map((delta) => delta * 1.2)))
+      .toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
+
+    expect(() => appendMarkGrowthRatio([])).toThrow(/at least two appends/);
+    expect(() => appendMarkGrowthRatio([0, 0, 5, 5])).toThrow(/drew nothing/);
   });
 
   it("audits every professional dry-media pack for live/pointer-up mark parity", () => {
