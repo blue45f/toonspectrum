@@ -125,6 +125,8 @@ export interface StudioGroupUniformResizeProxyProps {
    * behaviour.
    */
   readonly livePreviewClipContext?: {
+    /** The stroke's document-space points — the geometry the COMMIT re-derives its clip from. */
+    readonly points?: readonly number[];
     readonly elements: readonly El[];
     readonly noClip?: boolean;
   };
@@ -457,6 +459,10 @@ export function StudioGroupUniformResizeProxy({
         applyStudioLiveTransformClip(
           preview.clipHost,
           studioLiveTransformCommittedClip({
+            sourceBounds: active.sourceBounds,
+            ...(livePreviewClipContext.points !== undefined
+              ? { points: livePreviewClipContext.points }
+              : {}),
             targetBounds: {
               x: proxy.x(),
               y: proxy.y(),

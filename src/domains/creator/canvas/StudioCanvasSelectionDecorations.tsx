@@ -279,6 +279,9 @@ export function renderStudioCanvasSelectionDecorations({
             singleDrawFreeScale && canvasSelectionEls[0]?.type === "draw"
               ? {
                   elements,
+                  // The commit re-derives the clip from the transformed POINTS, not the selection
+                  // box, and the two disagree for any stroke whose points miss the box corners.
+                  points: canvasSelectionEls[0].points,
                   ...(canvasSelectionEls[0].noClip !== undefined
                     ? { noClip: canvasSelectionEls[0].noClip }
                     : {}),

@@ -18,6 +18,7 @@
  * This module is the renderer-free half: it answers "what rect, if any" from the gesture's target
  * bounds. Applying it to a Konva node lives in `studio-live-transform-clip-tracking-konva.ts`.
  */
+import { studioDrawObjectTransformScale } from "./brush/studio-draw-object-transform";
 import { panelContainingBounds } from "./studio-element-geometry";
 
 import type { StudioDrawObjectTransformBounds } from "./brush/studio-draw-object-transform";
@@ -71,19 +72,80 @@ export function studioLiveTransformTargetBounds(
 }
 
 /**
+ * The bounds the COMMIT will read for this frame, from the stroke's own transformed points.
+ *
+ * The box AABB is not a stand-in for this. `planStudioDrawObjectTransform` maps the POINT ARRAY,
+ * and `containingPanel` then takes `elBounds` of those points — and a stroke's points need not
+ * touch all four corners of its selection box. A two-point diagonal in a 100x100 box turned 45
+ * degrees collapses to a zero-width vertical line, where the box AABB is still 141.4 wide: beside
+ * a 100-wide panel the box reading fails the 1.4x cutoff and drops the clip, while the committed
+ * stroke passes it and is clipped again at release — the pop, back again.
+ *
+ * Falls back to the box AABB when there are no usable points, which is the honest answer for a
+ * caller that cannot supply them: same reading as before, no worse.
+ */
+function transformedPointBounds(
+  sourceBounds: StudioDrawObjectTransformBounds,
+  targetBounds: StudioDrawObjectTransformBounds,
+  rotationDeg: number,
+  points: readonly number[],
+): { readonly x: number; readonly y: number; readonly w: number; readonly h: number } | null {
+  if (points.length < 2) return null;
+  const scale = studioDrawObjectTransformScale(sourceBounds, targetBounds);
+  if (!scale) return null;
+  const radians = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i + 1 < points.length; i += 2) {
+    const px = points[i];
+    const py = points[i + 1];
+    if (px === undefined || py === undefined) return null;
+    // The commit planner's own point mapping, so the two cannot read different geometry.
+    const u = (px - sourceBounds.x) * scale.scaleX;
+    const v = (py - sourceBounds.y) * scale.scaleY;
+    const x = targetBounds.x + u * cos - v * sin;
+    const y = targetBounds.y + u * sin + v * cos;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  if (minX > maxX) return null;
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+/**
  * The clip the COMMIT will give this stroke for the supplied gesture frame, or `null` for none.
  *
+ * @param points the stroke's document-space point array. Supply it wherever it is available: the
+ *   commit reads the transformed points, and only that reading is guaranteed to agree with it.
  * @param noClip the element's own `noClip` flag — the document layer honours it before consulting
  *   `containingPanel`, so this must too or the preview would clip a stroke the commit leaves free.
  */
 export function studioLiveTransformCommittedClip(input: {
+  readonly sourceBounds?: StudioDrawObjectTransformBounds;
   readonly targetBounds: StudioDrawObjectTransformBounds;
   readonly rotationDeg: number;
+  readonly points?: readonly number[];
   readonly elements: readonly El[];
   readonly noClip?: boolean;
 }): StudioLiveTransformClipRect | null {
   if (input.noClip === true) return null;
-  const bounds = studioLiveTransformTargetBounds(input.targetBounds, input.rotationDeg);
+  const bounds =
+    (input.sourceBounds && input.points
+      ? transformedPointBounds(
+        input.sourceBounds,
+        input.targetBounds,
+        input.rotationDeg,
+        input.points,
+      )
+      : null)
+    ?? studioLiveTransformTargetBounds(input.targetBounds, input.rotationDeg);
   if (!bounds) return null;
   const panel = panelContainingBounds(bounds, input.elements);
   return panel

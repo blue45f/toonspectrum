@@ -60,6 +60,56 @@ describe("studioLiveTransformTargetBounds", () => {
     expect(rotated?.h).toBeCloseTo(40, 6);
   });
 
+  it("reads the transformed POINTS, not the box, when the caller supplies them", () => {
+    // A stroke's points need not touch all four corners of its selection box. A two-point diagonal
+    // in a 100x100 box turned 45 degrees collapses to a ZERO-WIDTH vertical line, while the box
+    // AABB is still 141.4 wide. Beside a 100-wide panel that difference flips the verdict: the box
+    // reading fails the 1.4x cutoff (141.4 > 140) and drops the clip, though the committed stroke
+    // passes it and gets clipped again at release — the pop this module exists to remove.
+    const panel = {
+      id: "frame-1",
+      type: "frame",
+      x: -50,
+      y: 0,
+      width: 100,
+      height: 200,
+    } as unknown as El;
+    const frame = {
+      sourceBounds: { x: 0, y: 0, width: 100, height: 100 },
+      targetBounds: { x: 0, y: 0, width: 100, height: 100 },
+      rotationDeg: 45,
+      elements: [panel],
+    };
+
+    // Both readings share the same centre (0, 70.7), so ONLY the width separates them.
+    expect(studioLiveTransformCommittedClip(frame)).toBeNull();
+    expect(studioLiveTransformCommittedClip({ ...frame, points: [0, 0, 100, 100] })).toEqual({
+      x: -50,
+      y: 0,
+      width: 100,
+      height: 200,
+    });
+  });
+
+  it("falls back to the box AABB when no points are supplied", () => {
+    // The honest answer for a caller that cannot supply them: the same reading as before, no worse.
+    const panel = {
+      id: "frame-1",
+      type: "frame",
+      x: 0,
+      y: 0,
+      width: 400,
+      height: 400,
+    } as unknown as El;
+    expect(
+      studioLiveTransformCommittedClip({
+        targetBounds: { x: 100, y: 100, width: 40, height: 40 },
+        rotationDeg: 0,
+        elements: [panel],
+      }),
+    ).toEqual({ x: 0, y: 0, width: 400, height: 400 });
+  });
+
   it("refuses a degenerate or non-finite frame rather than guessing", () => {
     expect(studioLiveTransformTargetBounds({ x: 0, y: 0, width: 0, height: 10 }, 0)).toBeNull();
     expect(studioLiveTransformTargetBounds({ x: 0, y: 0, width: 10, height: 10 }, Number.NaN))
