@@ -285,13 +285,21 @@ export function restoreStudioSingleObjectDragLayer(
 
   for (const { record, absolutePosition } of positions) {
     try {
-      // A node React destroyed or re-parented mid-gesture is no longer ours to place. `moveTo`
-      // has no destroyed-node guard, so re-adding one leaves an invisible zombie in the document
-      // Layer still carrying `studioElementId` — which `findStudioDrawWrapperNode` could later
-      // resolve instead of the live node. Restore only what is still parented somewhere.
+      // Restore ONLY nodes still sitting where the lift put them.
+      //
+      // Two ways a node stops being ours, and the earlier guard covered just the first. A node
+      // React destroyed has no parent at all: `moveTo` has no destroyed-node guard, so re-adding
+      // one leaves an invisible zombie in the document Layer still carrying `studioElementId`,
+      // which `findStudioDrawWrapperNode` could later resolve instead of the live node.
+      //
+      // A node ANOTHER OWNER re-parented is the second, and moving it back is actively wrong:
+      // reconciliation can place a stroke under a panel clipping group mid-gesture, React
+      // considers it to live there now, and dragging it back to the old main Layer would leave
+      // the wrapper outside its clip after cancellation. Anything no longer in `dragLayer` has
+      // been claimed by someone else, so it is left exactly where that owner put it.
       const currentParent = record.node.getParent();
-      if (!currentParent) continue;
-      if (currentParent !== record.parent) record.node.moveTo(record.parent);
+      if (currentParent !== session.dragLayer) continue;
+      record.node.moveTo(record.parent);
       // Defensive even though both Studio Layers are direct Stage children today: this preserves
       // the visual position if a future viewport gives either Layer its own transform.
       record.node.absolutePosition(absolutePosition);

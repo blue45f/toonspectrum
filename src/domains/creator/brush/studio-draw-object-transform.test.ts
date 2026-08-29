@@ -355,6 +355,8 @@ describe("agreement with the group uniform planner", () => {
 });
 
 describe("orientation-dependent nibs", () => {
+  // Per-sample stylus channels are NOT transformed here — see the planner's note. Strokes that
+  // carry them are excluded from the live preview instead, so the commit replays them as authored.
   const NIB = { tiltEnabled: false, angleDeg: -30, roundness: 0.35 } as const;
 
   it("turns the nib with the stroke so the commit matches what the preview showed", () => {
@@ -396,68 +398,6 @@ describe("orientation-dependent nibs", () => {
     });
 
     expect(scaledOnly?.brushTip).toEqual(NIB);
-  });
-
-  it("rotates per-sample stylus tilt as a vector and twist as an angle", () => {
-    // tiltXs/tiltYs are a direction in canvas axes, so a 90deg turn maps (1, 0) -> (0, 1) with no
-    // translation and no scale applied. twists is barrel rotation in degrees and composes by
-    // addition, wrapped like the nib angle.
-    const rotated = planStudioDrawObjectTransform({
-      el: drawEl({ tiltXs: [1, 0], tiltYs: [0, 1], twists: [0, 170] }),
-      sourceBounds: UNIT_SOURCE,
-      targetBounds: { x: 0, y: 0, width: 20, height: 20 },
-      rotationDeg: 90,
-    });
-
-    expect(rotated?.tiltXs?.[0]).toBeCloseTo(0, 9);
-    expect(rotated?.tiltXs?.[1]).toBeCloseTo(-1, 9);
-    expect(rotated?.tiltYs?.[0]).toBeCloseTo(1, 9);
-    expect(rotated?.tiltYs?.[1]).toBeCloseTo(0, 9);
-    // Scaling the box must not lengthen a direction vector.
-    expect(Math.hypot(rotated!.tiltXs![0]!, rotated!.tiltYs![0]!)).toBeCloseTo(1, 9);
-    // [0, 360), the field's real domain: the renderer clamps to [0, 359] so a negative sample
-    // would collapse to 0 rather than its equivalent angle, and CRDT validation rejects it.
-    expect(rotated?.twists).toEqual([90, 260]);
-  });
-
-  it("keeps every rotated stylus sample inside its persisted domain", () => {
-    // The renderer and CRDT payload validation both bound these: tilt to [-90, 90] and twist to
-    // [0, 359]. A sample outside them renders wrong AND fails publication, so the transform must
-    // never emit one -- including from the corners of the tilt square, which rotation leaves.
-    const rotated = planStudioDrawObjectTransform({
-      el: drawEl({
-        tiltXs: [90, -90, 90, 0],
-        tiltYs: [90, -90, -90, 0],
-        twists: [0, 1, 359, 180],
-      }),
-      sourceBounds: UNIT_SOURCE,
-      targetBounds: UNIT_SOURCE,
-      rotationDeg: 45,
-    });
-
-    for (const tilt of [...rotated!.tiltXs!, ...rotated!.tiltYs!]) {
-      expect(tilt, `tilt ${tilt}`).toBeGreaterThanOrEqual(-90);
-      expect(tilt, `tilt ${tilt}`).toBeLessThanOrEqual(90);
-    }
-    for (const twist of rotated!.twists!) {
-      expect(twist, `twist ${twist}`).toBeGreaterThanOrEqual(0);
-      expect(twist, `twist ${twist}`).toBeLessThan(360);
-    }
-    // 359 + 45 wraps forward rather than going negative.
-    expect(rotated?.twists?.[2]).toBeCloseTo(44, 9);
-  });
-
-  it("leaves stylus channels alone when the transform carries no rotation", () => {
-    const scaledOnly = planStudioDrawObjectTransform({
-      el: drawEl({ tiltXs: [1, 0], tiltYs: [0, 1], twists: [0, 170] }),
-      sourceBounds: UNIT_SOURCE,
-      targetBounds: { x: 0, y: 0, width: 20, height: 20 },
-      rotationDeg: 0,
-    });
-
-    expect(scaledOnly?.tiltXs).toEqual([1, 0]);
-    expect(scaledOnly?.tiltYs).toEqual([0, 1]);
-    expect(scaledOnly?.twists).toEqual([0, 170]);
   });
 
   it("leaves a stroke without a tip snapshot untouched", () => {

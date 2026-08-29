@@ -53,6 +53,18 @@ export function studioLiveTransformPreviewBlockedForElement(
   // Symmetry generates copies about WORLD axes and the model stores no axis angle, so the
   // preview's `A ∘ S` and the commit's `S ∘ A` diverge whenever the two do not commute.
   if (draw.symmetry !== undefined && draw.symmetry.type !== "none") return true;
+  // Per-sample stylus orientation. `calligraphySegmentStep` composes the nib angle as
+  // `atan2(tiltY, tiltX) + twist`, and only on the branch where the sample has tilt, so no
+  // transform of these channels is correct without replicating renderer-internal branching --
+  // three attempts proved it, two of them emitting values the CRDT payload validator rejects.
+  // The commit therefore replays them exactly as authored, which the affine preview cannot show.
+  if (
+    (draw.tiltXs !== undefined && draw.tiltXs.length > 0)
+    || (draw.tiltYs !== undefined && draw.tiltYs.length > 0)
+    || (draw.twists !== undefined && draw.twists.length > 0)
+  ) {
+    return true;
+  }
   const brushId = draw.brush;
   const catalogId = draw.brushCatalogId;
   if (typeof brushId === "string" && STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS.has(brushId)) {

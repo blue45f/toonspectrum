@@ -126,6 +126,57 @@ describe("single-object drag Layer", () => {
     expect(restoreStudioSingleObjectDragLayer(session)).toBe(false);
   });
 
+  it("leaves a node another owner re-parented mid-gesture exactly where they put it", () => {
+    // Reconciliation can move a stroke under a panel clipping group while the gesture runs. React
+    // considers it to live there now, so dragging it back to the old main Layer would leave the
+    // wrapper outside its clip after cancellation. Anything no longer in the drag Layer has been
+    // claimed by someone else.
+    const target = addSelectedNode(scene.mainLayer);
+    const newOwner = new studioKonvaRuntime.Group();
+    scene.mainLayer.add(newOwner);
+
+    const session = beginStudioSingleObjectDragLayer({
+      target,
+      selectedElementId: "object-1",
+      selectionSize: 1,
+      mainLayer: scene.mainLayer,
+      dragLayer: scene.dragLayer,
+      transformer: null,
+      selectedIsDraw: false,
+      hasMaskOrClip: false,
+    });
+    expect(session).not.toBeNull();
+    expect(target.getLayer()).toBe(scene.dragLayer);
+
+    // Another owner claims it mid-gesture.
+    target.moveTo(newOwner);
+
+    expect(restoreStudioSingleObjectDragLayer(session)).toBe(true);
+    expect(target.getParent()).toBe(newOwner);
+  });
+
+  it("still skips a node destroyed mid-gesture rather than resurrecting it", () => {
+    // The other way a node stops being ours: `moveTo` has no destroyed-node guard, so re-adding
+    // one would leave an invisible zombie still carrying studioElementId.
+    const target = addSelectedNode(scene.mainLayer);
+    const session = beginStudioSingleObjectDragLayer({
+      target,
+      selectedElementId: "object-1",
+      selectionSize: 1,
+      mainLayer: scene.mainLayer,
+      dragLayer: scene.dragLayer,
+      transformer: null,
+      selectedIsDraw: false,
+      hasMaskOrClip: false,
+    });
+    expect(session).not.toBeNull();
+
+    target.remove();
+
+    expect(restoreStudioSingleObjectDragLayer(session)).toBe(true);
+    expect(target.getParent()).toBeNull();
+  });
+
   it("keeps grouped and backdrop-sensitive movement on the authoritative main Layer", () => {
     const target = addSelectedNode(scene.mainLayer);
 

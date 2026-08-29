@@ -68,6 +68,21 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     ).toBe(true);
   });
 
+  it("refuses strokes carrying per-sample stylus orientation", () => {
+    // The renderer composes the nib angle from tilt AND twist together, on a branch that depends
+    // on whether the sample has tilt, so no transform of these channels here is correct.
+    expect(studioLiveTransformPreviewBlockedForElement(draw({ tiltXs: [1], tiltYs: [0] }), false))
+      .toBe(true);
+    expect(studioLiveTransformPreviewBlockedForElement(draw({ twists: [30] }), false)).toBe(true);
+    // Empty channels are not stylus data and must not cost an ordinary stroke its preview.
+    expect(
+      studioLiveTransformPreviewBlockedForElement(
+        draw({ tiltXs: [], tiltYs: [], twists: [] }),
+        false,
+      ),
+    ).toBe(false);
+  });
+
   it("keeps the preview for brushes that are not coordinate-resampled", () => {
     expect(studioLiveTransformPreviewBlockedForElement(draw({ brush: "pen" }), false)).toBe(false);
     expect(

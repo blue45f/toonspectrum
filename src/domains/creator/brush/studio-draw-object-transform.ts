@@ -222,52 +222,20 @@ export function planStudioDrawObjectTransform(
     symmetry = { ...el.symmetry, centerX: center.x, centerY: center.y };
   }
 
-  // Per-sample stylus orientation turns with the stroke too, for the same reason and by the same
-  // rotation. `tiltXs`/`tiltYs` are a 2D tilt vector in canvas axes, so they rotate as a vector
-  // (the same cos/sin used for points, with no translation and no scale — a direction, not a
-  // position); `twists` is barrel rotation in degrees, so it composes by addition like the nib
-  // angle. Without this, rotating a calligraphy or particle stroke previews the whole subtree
-  // turned and then commits samples still pointing the old way.
-  let tiltXs = el.tiltXs;
-  let tiltYs = el.tiltYs;
-  if (rotationDeg !== 0 && tiltXs && tiltYs && tiltXs.length === tiltYs.length) {
-    const rotatedX = new Array<number>(tiltXs.length);
-    const rotatedY = new Array<number>(tiltYs.length);
-    for (let index = 0; index < tiltXs.length; index += 1) {
-      const tx = tiltXs[index]!;
-      const ty = tiltYs[index]!;
-      const nx = tx * cos - ty * sin;
-      const ny = tx * sin + ty * cos;
-      if (!finite(nx) || !finite(ny)) return null;
-      // Clamped back into the PointerEvent domain. tiltX/tiltY are two INDEPENDENT angles, each
-      // valid over [-90, 90], so the valid region is a square and rotating the pair as a plane
-      // vector can leave it: (90, 90) turned 45deg reaches 127.3. The renderer clamps to the same
-      // range and `studio-crdt-document-payload` REJECTS anything outside it, so an unclamped
-      // value would render wrong and fail publication. Rotation is the right approximation for
-      // the tilts artists actually produce, well inside the square; the clamp only bites at the
-      // corners, where the value was already saturated.
-      rotatedX[index] = Math.min(90, Math.max(-90, nx));
-      rotatedY[index] = Math.min(90, Math.max(-90, ny));
-    }
-    tiltXs = rotatedX;
-    tiltYs = rotatedY;
-  }
-
-  let twists = el.twists;
-  if (rotationDeg !== 0 && twists) {
-    const rotatedTwists = new Array<number>(twists.length);
-    for (let index = 0; index < twists.length; index += 1) {
-      const turned = twists[index]! + rotationDeg;
-      if (!finite(turned)) return null;
-      // Wrapped into [0, 360), which is this field's actual domain -- NOT the (-180, 180] used for
-      // the nib angle. Barrel rotation is stored unsigned: the renderer clamps to [0, 359]
-      // (`studio-causal-dynamic-brush-deposit-v2`), so a negative sample collapses to 0 rather
-      // than to its equivalent positive angle, and CRDT payload validation rejects it outright.
-      // 170 + 90 must therefore become 260, not -100.
-      rotatedTwists[index] = ((turned % 360) + 360) % 360;
-    }
-    twists = rotatedTwists;
-  }
+  // Per-sample stylus orientation is deliberately NOT transformed here.
+  //
+  // Three attempts at rotating it were each wrong in a different way, and the third explains the
+  // other two: `calligraphySegmentStep` composes the nib angle as `atan2(tiltY, tiltX) + twist`
+  // (studio-brush.ts), and it takes that branch only when the sample HAS tilt -- otherwise the
+  // angle comes from twist alone. So the correct rotation is not "rotate both channels"; it
+  // depends on renderer-internal branching, and rotating both adds the gesture angle twice.
+  // Along the way the naive versions also produced values the CRDT payload validator rejects
+  // (negative twists, twists at 359.5, tilt outside its square).
+  //
+  // Rather than replicate that branching -- coupling this planner to renderer internals that can
+  // change underneath it -- strokes carrying these channels are excluded from the live preview
+  // (studio-live-transform-preview-eligibility) and keep commit-at-release, where the stored
+  // samples are replayed exactly as authored. Correct, just not live.
 
   // Orientation-dependent nibs must turn with the stroke. A calligraphy tip's `angleDeg` feeds
   // Konva's `rotation` prop directly (StudioDrawNode renders the tap as a rotated Ellipse), the
@@ -290,9 +258,6 @@ export function planStudioDrawObjectTransform(
     points,
     strokeWidth,
     ...(brushTip !== undefined ? { brushTip } : {}),
-    ...(tiltXs !== undefined ? { tiltXs } : {}),
-    ...(tiltYs !== undefined ? { tiltYs } : {}),
-    ...(twists !== undefined ? { twists } : {}),
     ...(sampleSpacing !== undefined ? { sampleSpacing } : {}),
     ...(shapeParams !== undefined ? { shapeParams } : {}),
     ...(symmetry !== undefined ? { symmetry } : {}),
