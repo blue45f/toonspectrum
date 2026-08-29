@@ -589,6 +589,14 @@ export function detectStudioBrushSoakMonotonicDegradation(
     baselineIsEarned
     && laterMin / earlyMin > STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
     && laterMin - earlyMin > STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS
+    // ...and the later half never recovered below the first half's PEAK. A leak does not give
+    // time back: once a run is slow, every later run is at least that slow. Contention does,
+    // which is the shape found in review — [10, 10, 10, 30, 30 | 15 x5] climbs cleanly through
+    // the first half, so its baseline is earned, and 15/10 clears both the relative gate and the
+    // absolute floor, yet the whole second half runs at HALF the first half's peak. That is a
+    // ramp that subsided, not degradation. Comparing against earlyMax instead of earlyMin is
+    // what tells the two apart; the tolerance is the same drawdown allowance used above.
+    && laterMin >= earlyMax / STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE
   );
 }
 

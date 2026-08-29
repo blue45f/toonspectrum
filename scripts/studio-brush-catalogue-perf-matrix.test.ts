@@ -77,6 +77,10 @@ describe("soak monotonic-degradation detector", () => {
     ["oil-pastel (one preempted run)", [7.22, 7.26, 18.90]],
     // A healthy planner that only warms up must never trip the gate.
     ["JIT warm-up", [52.0, 31.0, 29.5, 28.9, 28.7, 28.6, 28.5, 28.5, 28.4, 28.4]],
+    // Found in review: contention that RAMPS and then subsides. The first half climbs cleanly so
+    // its baseline is earned, and 15/10 clears the relative gate and the absolute floor — but the
+    // whole second half runs at half the first half's peak, which no leak ever does.
+    ["ramp that recovers", [10, 10, 10, 30, 30, 15, 15, 15, 15, 15]],
   ])("does not call degradation on recorded scheduler noise: %s", (_label, elapsed) => {
     expect(detectStudioBrushSoakMonotonicDegradation(elapsed)).toBe(false);
   });
