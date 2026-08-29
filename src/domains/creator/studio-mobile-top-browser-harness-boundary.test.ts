@@ -57,6 +57,27 @@ describe("Studio mobile top browser harness boundary", () => {
     );
   });
 
+  it("excuses only transport-level failures at the third-party font CDNs", () => {
+    // 이 게이트는 글자 모양이 아니라 기하학을 잰다. 폰트 CDN 도달 실패로 빨간불이 나면
+    // 제품 회귀가 아닌 것으로 CI 를 막게 되므로 면제하되, 두 겹으로 좁혀 둔다.
+    const start = harness.indexOf("const EXTERNAL_FONT_CDN_HOSTS");
+    expect(start).toBeGreaterThanOrEqual(0);
+    const hosts = harness.slice(start, harness.indexOf("]);", start));
+    for (const host of ["fonts.googleapis.com", "fonts.gstatic.com", "cdn.jsdelivr.net"]) {
+      expect(hosts).toContain(host);
+    }
+    // 동일 출처로는 절대 넓어지면 안 된다 — 그쪽 자산 실패가 이 수집기의 존재 이유다.
+    expect(hosts).not.toContain("localhost");
+    expect(hosts).not.toContain("127.0.0.1");
+    // 전송 계층 실패만. 이 접두사가 느슨해지면 폰트 href 오타가 만드는 404/403 까지 통과한다.
+    expect(harness).toContain('message.startsWith("Failed to load resource: net::ERR_")');
+    expect(harness).not.toContain('message.startsWith("Failed to load resource")\n');
+    // 호스트는 정확히 일치해야 한다. 부분 문자열이면 동일 출처 URL 이 호스트명을 품기만 해도 샌다.
+    expect(harness).toContain("EXTERNAL_FONT_CDN_HOSTS.has(url.hostname)");
+    // pageerror(앱이 던진 예외)는 이 면제와 무관하게 그대로 실패여야 한다.
+    expect(harness).toContain('page.on("pageerror", (error) => consoleErrors.push(String(error)));');
+  });
+
   it("does not suppress the retired visit ping from browser health failures", () => {
     expect(harness).not.toContain("/api/v1/apps/toonspectrum/visits/ping");
     expect(harness).toContain('"/api/kmas/merge-on-access"');
