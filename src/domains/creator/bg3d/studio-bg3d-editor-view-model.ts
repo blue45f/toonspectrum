@@ -285,8 +285,11 @@ export function bindStudioBg3dEditorViewModel(h) {
     deviceMemoryGb: deviceSignals.deviceMemoryGb,
     observedWebglOnlyFeatures: {
       // The immersive session bridge drives WebGLRenderer.xr, so an active session pins WebGL2.
-      // VRM characters no longer do: they load MToon node materials under a WebGPU renderer.
       webxr: webXrSessionState.status !== "idle",
+      // A character on the stage pins WebGL2 too — not because WebGPU cannot load MToon, but
+      // because the two MToon implementations shade differently, and the delivered frame has to
+      // match the poser and every other machine. See studio-bg3d-engine-selection.
+      vrmCharacters: sharedCharacters.length > 0,
     },
   });
   const hasCloneFailure = customModels.some((model) => failedCloneIds.has(model.id));

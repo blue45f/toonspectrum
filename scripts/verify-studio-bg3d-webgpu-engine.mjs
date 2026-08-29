@@ -45,6 +45,23 @@ const MAX_OVER_TOLERANCE_SHARE = 0.02;
  * above that floor and far below a framing change that would need this number revisited anyway.
  */
 const VRM_MIN_COVERAGE = 0.2;
+/**
+ * MToon does not shade the same on both backends, and this is the fence around that.
+ *
+ * `MToonMaterial` and `MToonNodeMaterial` are two independent upstream implementations of one
+ * spec. Rendered here from one scene, one camera, one light rig and one tone mapping, they differ
+ * across the whole surface — while the unlit scene above compares byte-identical, which is what
+ * rules out the pipeline and leaves MToon itself. Measured on 2026-08-29 against
+ * `@pixiv/three-vrm` 3.5.3 with `AliciaSolid.vrm`: composited max 169/255, 16.9% of channels over
+ * tolerance, WebGPU ~5.7% darker in mean luminance, and a same-backend control of exactly 0.
+ *
+ * The product answer is `webgl-only-vrm-character`: a scene holding a character runs on the
+ * baseline, so what is delivered matches the poser and every other machine. These numbers exist so
+ * the gap cannot widen unnoticed, and so that the day upstream converges is visible as this gate
+ * going quiet rather than as nobody remembering to look.
+ */
+const VRM_MAX_COMPOSITED_DELTA = 200;
+const VRM_MAX_OVER_TOLERANCE_SHARE = 0.25;
 const UNSUPPORTED_REASONS = new Set([
   "insecure-context",
   "api-unavailable",
@@ -215,6 +232,28 @@ function validateSuccess(result, diagnostics) {
       failures.push(
         `VRM on ${backend} covered ${(coverage * 100).toFixed(1)}% of the capture,`
         + ` under the ${(VRM_MIN_COVERAGE * 100).toFixed(0)}% floor — the character did not render`,
+      );
+    }
+  }
+  // Coverage answers "is the character there" and stops. Colour is a separate question, and for a
+  // long time nobody was asking it: the two backends agreed on the silhouette and that read as
+  // equivalence. They do not agree on shading. Assert the known gap so a regression that widens it
+  // is a failure rather than a number nobody re-reads.
+  const vrmRaster = result.vrmMToon?.raster;
+  if (result.vrmMToon && !result.vrmMToon.skipped && !vrmRaster) {
+    failures.push("VRM rendered on both backends but the harness reported no colour comparison");
+  } else if (vrmRaster) {
+    const overShare = vrmRaster.overToleranceCompositedChannels / (vrmRaster.comparedPixels * 3 || 1);
+    if (vrmRaster.maxCompositedDelta > VRM_MAX_COMPOSITED_DELTA) {
+      failures.push(
+        `VRM MToon backends now differ by ${vrmRaster.maxCompositedDelta}/255 on a channel,`
+        + ` over the ${VRM_MAX_COMPOSITED_DELTA} fence — the shading gap widened`,
+      );
+    }
+    if (overShare > VRM_MAX_OVER_TOLERANCE_SHARE) {
+      failures.push(
+        `VRM MToon backends now differ on ${(overShare * 100).toFixed(1)}% of channels,`
+        + ` over the ${(VRM_MAX_OVER_TOLERANCE_SHARE * 100).toFixed(0)}% fence`,
       );
     }
   }
@@ -418,6 +457,9 @@ async function main() {
       webglOnlyFeatures: result.webglOnlyFeatures,
       ktx2: result.ktx2,
       vrmMToon: result.vrmMToon,
+      // Reported, not asserted — see the harness. `first` well above `medianAfterFirst` is the
+      // shape that says pipeline cost is one-time and per-capture allocation needs no cache.
+      captureCost: result.captureCost,
       inAppRuns,
       failures,
       evidenceDirectory: SCRATCH,
