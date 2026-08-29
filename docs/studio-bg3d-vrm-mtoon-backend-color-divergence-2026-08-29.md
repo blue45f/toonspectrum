@@ -77,6 +77,33 @@ WebGPU를 고른 아티스트라도 캐릭터를 조용히 다시 그레이딩�
 `webglOnlyFeatures` 매트릭스에도 `vrmCharacters`를 넣어, 실제 Chromium에서 `auto`와 명시적 WebGPU
 선택 양쪽이 baseline으로 떨어지는지 매 실행 확인한다.
 
+## WebGPU MToon 로더는 지우지 않는다
+
+이 울타리 때문에 `studio-bg3d-shared-vrm-runtime.ts`의 `resolveMToonMaterialType`은 이제 실질적으로
+항상 `"webgl-shader"`를 반환하고, `StudioBg3dSharedVrmCharacter`가 `gl.isWebGPURenderer`를 보고
+분기하는 쪽은 **프로덕션에서 도달하지 않는다.** 그래도 남겨둔다.
+
+- 상류가 수렴하면 울타리를 걷는 것이 `vrmCharacters` 관측 한 줄을 되돌리는 일이 된다. 지우면
+  승격 때의 로더 작업을 통째로 다시 해야 한다.
+- 도달하지 않는 코드는 썩는다는 게 일반적인 우려인데, 여기서는 **검증기가 앱 정책과 무관하게 두
+  변종을 직접 로드**한다(`probeVrmMToon`이 `mtoonMaterialType`을 직접 넘긴다). 그래서 WebGPU MToon
+  경로는 프로덕션이 고르지 않아도 매 실행 실제 Chromium에서 증명된다. 위 표의 수치 자체가 그
+  경로가 살아 있다는 증거다.
+
+같은 이유로 `studio-bg3d-shared-vrm-runtime`과 `StudioBg3dSharedVrmCharacter`의 단위 테스트도
+그대로 둔다. "WebGPU renderer가 소유하면 `MToonNodeMaterial`을 고른다"는 명제는 여전히 참이고,
+울타리를 걷는 날 필요한 것도 정확히 그 명제다.
+
+## 캐릭터를 도중에 추가하면 어떻게 되나
+
+캐릭터가 없는 장면은 WebGPU로 돌 수 있다. 거기에 캐릭터를 넣으면 `vrmCharacters`가 래치되고,
+plan이 baseline으로 바뀌면서 **canvas가 remount된다.**
+
+이게 안전한 것은 [#43](https://github.com/blue45f/toonspectrum/pull/43)이 먼저 들어갔기 때문이다.
+그 전이라면 remount가 초기 장면 복원을 다시 돌려 아티스트의 편집을 조용히 날렸을 것이다. 지금은
+모달 세션과 초기 장면이 그대로이므로 remount 분기를 타고 모델 캐시만 다시 채운다. 히스토리·
+프리미티브·문서는 유지된다.
+
 ## 남은 것
 
 - 상류(`@pixiv/three-vrm`)에 두 MToon 구현의 음영 차이를 리포트할 가치가 있다. 이 문서의 수치가
