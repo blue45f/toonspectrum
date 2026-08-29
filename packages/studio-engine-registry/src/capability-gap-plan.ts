@@ -75,15 +75,43 @@ export interface VelloCapabilityGapCoverageIssue {
 }
 
 /**
+ * The capability a lane declares to mean "I complete whatever the Vello lanes cannot own".
+ *
+ * The gap features are V13 routing names (`render.blend.backdrop`, `render.path-effect`); the
+ * descriptor vocabulary is a different namespace and has no per-feature token for several of
+ * them. `surface.island.skia-complete` is the descriptor-level form of the same claim, so a lane
+ * covers a gap by declaring the feature itself OR by declaring island completion.
+ */
+export const STUDIO_ENGINE_ISLAND_COMPLETION_CAPABILITY = "surface.island.skia-complete";
+
+/** Minimal shape of what the caller must show about a shipped provider. */
+export interface VelloCapabilityGapProvider {
+  readonly id: string;
+  readonly capabilities: readonly string[];
+}
+
+function providerCoversGap(
+  provider: VelloCapabilityGapProvider,
+  feature: string,
+): boolean {
+  return (
+    provider.capabilities.includes(feature)
+    || provider.capabilities.includes(STUDIO_ENGINE_ISLAND_COMPLETION_CAPABILITY)
+  );
+}
+
+/**
  * Fails loud where `skiaMustCompleteFeature` would fail silent: every gap feature must be
  * completable by the Skia lane's contracts, and every provider named by the plan must exist in
  * the caller's shipped engine universe (`STUDIO_KNOWN_ENGINE_DESCRIPTORS` ids in the app).
  */
 export function validateVelloCapabilityGapCoverage(
-  knownProviderIds: ReadonlySet<string>
+  shippedProviders: readonly VelloCapabilityGapProvider[]
 ): readonly VelloCapabilityGapCoverageIssue[] {
   const plan = planVelloCapabilityGaps();
   const issues: VelloCapabilityGapCoverageIssue[] = [];
+  const byId = new Map(shippedProviders.map((provider) => [provider.id, provider]));
+
   for (const gap of plan.gaps) {
     const completion = supportForFeature(SKIA_GPU_FEATURE_CONTRACTS, gap.feature);
     if (completion.support !== "native" && completion.support !== "lowered") {
@@ -94,17 +122,36 @@ export function validateVelloCapabilityGapCoverage(
       });
     }
   }
+
   for (const providerId of [
     plan.completionProviderId,
     plan.terminalProviderId,
     plan.challengerProviderId,
   ]) {
-    if (!knownProviderIds.has(providerId)) {
+    if (!byId.has(providerId)) {
       issues.push({
         subject: providerId,
         reason:
           "gap-lane provider is missing from the shipped engine universe; the named alternative engine no longer exists",
       });
+    }
+  }
+
+  // The routing contracts above are constants in this package, so checking them alone proves
+  // nothing about the lanes the app actually ships. Registry queries and activation evidence read
+  // `descriptor.capabilities`, so the completion lane has to declare the gaps there too — else
+  // the chain this validator advertises could not qualify, and the silent drop it exists to
+  // prevent would happen anyway.
+  const completionProvider = byId.get(plan.completionProviderId);
+  if (completionProvider) {
+    for (const gap of plan.gaps) {
+      if (!providerCoversGap(completionProvider, gap.feature)) {
+        issues.push({
+          subject: `${plan.completionProviderId}:${gap.feature}`,
+          reason:
+            "the named completion lane does not declare this gap capability, so it cannot be selected to complete it",
+        });
+      }
     }
   }
   return issues;

@@ -359,6 +359,40 @@ describe("single-draw transform gesture Layer lift", () => {
     ).not.toBeNull();
   });
 
+  it("refuses when a later sibling depends on the stroke staying below it", () => {
+    // The drag Layer paints after the whole document Layer, so a lifted stroke rides above every
+    // later sibling. An eraser stroke above it (destination-out) would stop erasing it entirely:
+    // the erased pixels would reappear for the gesture and vanish again at commit.
+    const { wrapper, proxy, transformer } = addTransformScene();
+    const eraserAbove = new studioKonvaRuntime.Group();
+    eraserAbove.setAttr("globalCompositeOperation", "destination-out");
+    scene.mainLayer.add(eraserAbove);
+    expect(eraserAbove.zIndex()).toBeGreaterThan(wrapper.zIndex());
+
+    expect(
+      beginStudioSingleDrawTransformLayer({
+        elementId: "stroke-1",
+        wrapper,
+        proxy,
+        transformer,
+        dragLayer: scene.dragLayer,
+      }),
+    ).toBeNull();
+    expect(wrapper.getLayer()).toBe(scene.mainLayer);
+
+    // The same eraser BELOW the stroke cannot be affected by the lift, so it still lifts.
+    eraserAbove.zIndex(0);
+    expect(
+      beginStudioSingleDrawTransformLayer({
+        elementId: "stroke-1",
+        wrapper,
+        proxy,
+        transformer,
+        dragLayer: scene.dragLayer,
+      }),
+    ).not.toBeNull();
+  });
+
   it("never re-adds a node React destroyed or re-parented mid-gesture", () => {
     const { wrapper, proxy, transformer } = addTransformScene();
     const session = beginStudioSingleDrawTransformLayer({

@@ -8,11 +8,12 @@ import {
   VELLO_GAP_TERMINAL_PROVIDER_ID,
 } from "../capability-gap-plan";
 
-const FULL_UNIVERSE = new Set([
-  VELLO_GAP_COMPLETION_PROVIDER_ID,
-  VELLO_GAP_TERMINAL_PROVIDER_ID,
-  VELLO_GAP_CHALLENGER_PROVIDER_ID,
-]);
+/** The completion lane declares island completion, which is how a lane claims the gap set. */
+const FULL_UNIVERSE = [
+  { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: ["surface.island.skia-complete"] },
+  { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
+  { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: ["surface.island.skia-complete"] },
+];
 
 describe("planVelloCapabilityGaps", () => {
   it("derives exactly the features the Hybrid lane cannot own, from the contracts", () => {
@@ -58,14 +59,35 @@ describe("validateVelloCapabilityGapCoverage", () => {
   });
 
   it("reports each missing gap-lane provider by id", () => {
-    const issues = validateVelloCapabilityGapCoverage(
-      new Set([VELLO_GAP_TERMINAL_PROVIDER_ID])
-    );
+    const issues = validateVelloCapabilityGapCoverage([
+      { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: [] },
+    ]);
     expect(issues.map((issue) => issue.subject).sort()).toEqual(
       [VELLO_GAP_CHALLENGER_PROVIDER_ID, VELLO_GAP_COMPLETION_PROVIDER_ID].sort()
     );
     for (const issue of issues) {
       expect(issue.reason).toContain("shipped engine universe");
+    }
+  });
+
+  it("fails when the named completion lane does not declare the gaps it is advertised to complete", () => {
+    // Checking the routing contracts alone proved nothing about the lanes the app ships: registry
+    // queries and activation evidence read descriptor.capabilities, so an under-declared
+    // completion lane could never be selected to complete the gap it is named for.
+    const issues = validateVelloCapabilityGapCoverage([
+      { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
+      { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: [] },
+      { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: [] },
+    ]);
+
+    expect(issues.map((issue) => issue.subject)).toEqual([
+      `${VELLO_GAP_COMPLETION_PROVIDER_ID}:render.mask`,
+      `${VELLO_GAP_COMPLETION_PROVIDER_ID}:render.filter.image`,
+      `${VELLO_GAP_COMPLETION_PROVIDER_ID}:render.blend.backdrop`,
+      `${VELLO_GAP_COMPLETION_PROVIDER_ID}:render.path-effect`,
+    ]);
+    for (const issue of issues) {
+      expect(issue.reason).toContain("does not declare this gap capability");
     }
   });
 });

@@ -5323,6 +5323,12 @@ function StudioCuttoonEditor({
     }
     groupResizeRef.current = null;
     endLiveResourceEdit();
+    // The proxy component is REUSED when the selection moves to another valid draw — enabled and
+    // bounds stay true, so neither its cleanup nor its enablement effect fires. Without this the
+    // old stroke would keep following the handles on a session this page has already abandoned.
+    // Inlined rather than calling cancelCanvasSelectionResize() so the dependency array stays the
+    // documented [activePage.id, masterEditMode, marqueeIds, selectedId].
+    setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
   }, [activePage.id, masterEditMode, marqueeIds, selectedId]);
   // 그룹 선택 상태 3종을 한 번에 적용하는 어댑터. ref를 동기로 갱신해 같은 렌더 안에서 연달아
   // 발생하는 포인터 이벤트(예: 더블클릭의 2연속 mousedown)도 최신 진입 상태를 읽게 한다.

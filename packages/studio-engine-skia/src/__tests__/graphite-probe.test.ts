@@ -56,6 +56,41 @@ describe("probeSkiaGraphiteAdoption", () => {
     expect(noMethod.status).toBe("no-adapter");
   });
 
+  it("bounds a requestAdapter that never settles instead of parking the caller", async () => {
+    registerSkiaGraphiteArtifact(ARTIFACT);
+
+    const probe = await probeSkiaGraphiteAdoption({
+      gpu: gpuWith(() => new Promise<unknown>(() => undefined)),
+      timeoutMs: 5,
+    });
+
+    expect(probe.status).toBe("adapter-timeout");
+    if (probe.status === "adapter-timeout") expect(probe.reason).toContain("5ms");
+  });
+
+  it("honours an abort signal, including one already aborted", async () => {
+    registerSkiaGraphiteArtifact(ARTIFACT);
+    const listeners: Array<() => void> = [];
+
+    const pending = probeSkiaGraphiteAdoption({
+      gpu: gpuWith(() => new Promise<unknown>(() => undefined)),
+      timeoutMs: 60_000,
+      signal: {
+        aborted: false,
+        addEventListener: (_type, listener) => listeners.push(listener),
+      },
+    });
+    listeners.forEach((listener) => listener());
+    expect((await pending).status).toBe("no-adapter");
+
+    const preAborted = await probeSkiaGraphiteAdoption({
+      gpu: gpuWith(() => new Promise<unknown>(() => undefined)),
+      timeoutMs: 60_000,
+      signal: { aborted: true, addEventListener: () => undefined },
+    });
+    expect(preAborted.status).toBe("no-adapter");
+  });
+
   it("flips to adoptable once an artifact and a real adapter are both present", async () => {
     registerSkiaGraphiteArtifact(ARTIFACT);
 

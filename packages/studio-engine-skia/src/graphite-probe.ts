@@ -38,13 +38,23 @@ export type SkiaGraphiteAdoptionProbe =
   | { readonly status: "adoptable"; readonly artifact: SkiaGraphiteArtifact }
   | { readonly status: "missing-artifact"; readonly reason: string }
   | { readonly status: "no-adapter"; readonly reason: string }
+  | { readonly status: "adapter-timeout"; readonly reason: string }
   | { readonly status: "no-webgpu"; readonly reason: string };
 
 export interface SkiaGraphiteProbeEnvironment {
   readonly gpu?: unknown;
+  /** Bound on the adapter request. Matches the product capability probe's default. */
+  readonly timeoutMs?: number;
+  readonly signal?: { aborted: boolean; addEventListener: (type: "abort", listener: () => void, options?: { once?: boolean }) => void };
 }
 
 type AdapterRequester = { requestAdapter?: () => Promise<unknown> };
+
+export const SKIA_GRAPHITE_ADAPTER_TIMEOUT_MS = 3_000;
+
+/** Sentinels so a resolved-but-falsy adapter is never confused with a timeout or an abort. */
+const ADAPTER_TIMEOUT = Symbol("skia-graphite-adapter-timeout");
+const ADAPTER_ABORTED = Symbol("skia-graphite-adapter-aborted");
 
 function defaultEnvironment(): SkiaGraphiteProbeEnvironment {
   const navigatorLike = (globalThis as { navigator?: { gpu?: unknown } }).navigator;
@@ -77,13 +87,45 @@ export async function probeSkiaGraphiteAdoption(
   // rejects) on blocklisted drivers and software-only configurations. Admitting the challenger
   // there would defer the failure to initialization instead of routing around the device, which
   // is exactly what the other WebGPU probes in this repo refuse to do.
-  let adapter: unknown;
-  try {
-    adapter = (await (gpu as AdapterRequester).requestAdapter?.()) ?? null;
-  } catch {
-    adapter = null;
+  const requestAdapter = (gpu as AdapterRequester).requestAdapter;
+  if (typeof requestAdapter !== "function") {
+    return {
+      status: "no-adapter",
+      reason: "navigator.gpu exposes no requestAdapter on this device",
+    };
   }
-  if (!adapter) {
+
+  // Bounded, like the product capability probe: a driver whose requestAdapter promise never
+  // settles must not park the caller that is deciding whether to admit the challenger.
+  const timeoutMs = environment.timeoutMs ?? SKIA_GRAPHITE_ADAPTER_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let outcome: unknown;
+  try {
+    outcome = await Promise.race([
+      Promise.resolve(requestAdapter.call(gpu)),
+      new Promise<typeof ADAPTER_TIMEOUT>((resolve) => {
+        timer = setTimeout(() => resolve(ADAPTER_TIMEOUT), timeoutMs);
+      }),
+      new Promise<typeof ADAPTER_ABORTED>((resolve) => {
+        const signal = environment.signal;
+        if (!signal) return;
+        if (signal.aborted) resolve(ADAPTER_ABORTED);
+        else signal.addEventListener("abort", () => resolve(ADAPTER_ABORTED), { once: true });
+      }),
+    ]);
+  } catch {
+    outcome = null;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+
+  if (outcome === ADAPTER_TIMEOUT) {
+    return {
+      status: "adapter-timeout",
+      reason: `navigator.gpu.requestAdapter did not settle within ${timeoutMs}ms; Graphite is not adopted here`,
+    };
+  }
+  if (!outcome || outcome === ADAPTER_ABORTED) {
     return {
       status: "no-adapter",
       reason:

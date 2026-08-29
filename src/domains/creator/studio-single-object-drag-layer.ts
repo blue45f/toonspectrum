@@ -74,6 +74,25 @@ function authoredCompositeOperationIsLayerSensitive(
  * hangs `globalCompositeOperation` on the shapes it emits (highlighter/wash multiply passes among
  * them) — so the transform lift, whose whole subject is a stroke, has to look down instead.
  */
+/**
+ * Does anything painted ABOVE `node` in its Layer depend on `node` staying below it?
+ *
+ * The drag Layer is drawn after the whole document Layer, so a lifted node paints above every
+ * later sibling for the gesture's duration. For an opaque overlap that is the usual "manipulated
+ * object rides on top" convention, but a later `destination-out` eraser stroke — a first-class
+ * element in this editor — stops erasing the lifted stroke entirely: the erased pixels reappear
+ * for the whole gesture and vanish again at commit. Refuse the lift there rather than previewing
+ * artwork the commit will not produce.
+ */
+function laterSiblingDependsOnStackingBelow(node: Konva.Node): boolean {
+  const parent = node.getParent();
+  if (!parent) return false;
+  const index = node.zIndex();
+  return parent
+    .getChildren()
+    .some((sibling) => sibling.zIndex() > index && subtreeCompositeIsLayerSensitive(sibling));
+}
+
 function subtreeCompositeIsLayerSensitive(node: Konva.Node): boolean {
   if (nodeCompositeIsLayerSensitive(node)) return true;
   const children = (node as Konva.Container).getChildren?.();
@@ -221,6 +240,7 @@ export function beginStudioSingleDrawTransformLayer(
     || wrapper.getParent() !== mainLayer
     || wrapper.isCached()
     || subtreeCompositeIsLayerSensitive(wrapper)
+    || laterSiblingDependsOnStackingBelow(wrapper)
     || proxy.getLayer() !== mainLayer
     || transformer.getLayer() !== mainLayer
   ) {

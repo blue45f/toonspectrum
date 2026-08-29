@@ -15,9 +15,18 @@ const byId = new Map(
 
 describe("Vello capability-gap alternative-engine coverage", () => {
   it("every Vello gap feature has its named alternative engines in the shipped universe", () => {
+    // Validated against the SHIPPED descriptors' own declared capabilities, not against a
+    // constant in the registry package: registry queries and activation evidence read
+    // descriptor.capabilities, so that is where the completion claim has to hold.
     expect(
-      validateVelloCapabilityGapCoverage(new Set(byId.keys()))
+      validateVelloCapabilityGapCoverage(STUDIO_KNOWN_ENGINE_DESCRIPTORS)
     ).toEqual([]);
+  });
+
+  it("the completion lane's coverage comes from an explicit island-completion claim", () => {
+    expect(byId.get("skia-canvaskit-gpu")?.capabilities).toContain(
+      "surface.island.skia-complete",
+    );
   });
 
   it("the Graphite challenger demotes down its declared chain to the production baseline", () => {
