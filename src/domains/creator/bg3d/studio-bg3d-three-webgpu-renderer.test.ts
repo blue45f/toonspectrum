@@ -152,4 +152,26 @@ describe("Studio BG3D Three WebGPU renderer", () => {
     await Promise.resolve();
     expect(onDeviceLost).not.toHaveBeenCalled();
   });
+
+  it("treats disposal by the host renderer as teardown, not as a device loss", async () => {
+    let resolveLost: (value: { reason?: string }) => void = () => undefined;
+    rendererMock.deviceLost = new Promise<{ reason?: string }>((resolve) => {
+      resolveLost = resolve;
+    });
+    const canvas = stubCanvas();
+    const onDeviceLost = vi.fn();
+    const runtime = await createStudioBg3dThreeWebGpuRenderer(canvas, { onDeviceLost });
+
+    // React Three Fiber disposes the renderer directly on unmount, not through our runtime handle.
+    (runtime.renderer as unknown as { dispose: () => unknown }).dispose();
+    resolveLost({ reason: "destroyed" });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onDeviceLost).not.toHaveBeenCalled();
+    expect(rendererMock.dispose).toHaveBeenCalledOnce();
+    // The runtime handle stays idempotent after a host disposal.
+    await runtime.dispose();
+    expect(rendererMock.dispose).toHaveBeenCalledOnce();
+  });
 });

@@ -171,6 +171,20 @@ export async function createStudioBg3dThreeWebGpuRenderer(
     throw new StudioBg3dWebGpuRendererError("backend-unavailable");
   }
   let disposed = false;
+  // React Three Fiber owns the renderer it is handed and disposes it on unmount, so this runtime's
+  // own `dispose()` is not the only teardown path. `GPUDevice.lost` resolves with reason
+  // "destroyed" for a deliberate teardown exactly as it does for a real loss, so without this the
+  // editor would read an ordinary canvas remount as a WebGPU failure and count it against the
+  // engine. Marking disposal on the renderer's own method covers whichever caller tears it down.
+  const rendererDispose = renderer.dispose.bind(renderer);
+  Object.defineProperty(renderer, "dispose", {
+    configurable: true,
+    writable: true,
+    value: (): unknown => {
+      disposed = true;
+      return rendererDispose();
+    },
+  });
   if (options.onDeviceLost) {
     observeDeviceLoss(lifecycle.backend, () => disposed, options.onDeviceLost);
   }
@@ -178,7 +192,6 @@ export async function createStudioBg3dThreeWebGpuRenderer(
     renderer,
     async dispose() {
       if (disposed) return;
-      disposed = true;
       await renderer.dispose();
     },
   });
