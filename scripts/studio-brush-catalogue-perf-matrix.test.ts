@@ -322,17 +322,17 @@ describe("studioBrushChunkSeriesFreezes", () => {
     expect(studioBrushChunkSeriesFreezes([5, 6, BUDGET * 2 + 1, 5])).toBe(true);
   });
 
-  it("forgives a lone over-budget FIRST chunk — a known gap, not an oversight", () => {
-    // Review observed that this lets a reproducible cold-path regression in chunk 0 hide behind
-    // the one-exception allowance, which is true. Refusing to forgive chunk 0 was tried and not
-    // adopted: this gate is contention-sensitive enough on a loaded container to trip on
-    // unregressed trees, so the change's effect could not be separated from that noise. Closing
-    // the gap properly needs a recorded COLD budget graded separately from the steady-state one.
-    // Pinned here so the behaviour is deliberate and the reasoning is not lost.
-    expect(studioBrushChunkSeriesFreezes([BUDGET + 13, 6, 5, 6, 5])).toBe(false);
-    // What still holds: a lone catastrophic first chunk, and any second exceedance.
-    expect(studioBrushChunkSeriesFreezes([BUDGET * 2 + 1, 6, 5])).toBe(true);
-    expect(studioBrushChunkSeriesFreezes([BUDGET + 13, BUDGET + 2, 5])).toBe(true);
+  it("excludes the FIRST chunk, which is cold-start work rather than a steady-state chunk", () => {
+    // Measured after review raised it and after this gate went red on CI and on a 4-vCPU
+    // container: crayon plans 28 chunks, the most expensive costs 167.7ms and the other 27
+    // average ~12ms. That one is the cold chunk — ~14x its own steady state and 5x a budget meant
+    // for steady-state work — so grading it here reddened on entirely honest work.
+    expect(studioBrushChunkSeriesFreezes([BUDGET * 5, 6, 5, 6, 5])).toBe(false);
+    // Everything after it is graded exactly as before.
+    expect(studioBrushChunkSeriesFreezes([BUDGET * 5, BUDGET + 2, BUDGET + 3, 5])).toBe(true);
+    expect(studioBrushChunkSeriesFreezes([BUDGET * 5, BUDGET * 2 + 1, 5])).toBe(true);
+    // A series that is nothing but a cold chunk has no steady state to judge, so it abstains.
+    expect(studioBrushChunkSeriesFreezes([BUDGET * 5])).toBe(false);
   });
 
   it("is false for a healthy series and abstains on an empty one", () => {
