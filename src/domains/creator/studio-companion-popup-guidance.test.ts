@@ -43,10 +43,20 @@ describe("studioCompanionPopupGuidanceFor", () => {
       diagnoseStudioInAppBrowser({ href: HREF, userAgent: KAKAO_ANDROID }),
     );
     expect(guidance.text).toContain("카카오톡 인앱 브라우저");
-    expect(guidance.text).toContain("기본 브라우저");
     expect(guidance.escapeHref).toBe(
       `kakaotalk://web/openExternal?url=${encodeURIComponent(HREF)}`,
     );
+  });
+
+  it("tells the user HOW to escape, not just to escape — the link cannot be rendered", () => {
+    // 이 문구가 가는 곳은 문자열만 받는 announce 알림이다. 링크가 있어도 그릴 수 없으므로,
+    // 문구 자체가 "어떻게" 를 담지 않으면 사용자는 같은 버튼만 반복해서 누르게 된다.
+    for (const userAgent of [KAKAO_ANDROID, INSTAGRAM_IOS]) {
+      const diagnosis = diagnoseStudioInAppBrowser({ href: HREF, userAgent });
+      const guidance = studioCompanionPopupGuidanceFor(diagnosis);
+      expect(guidance.text, userAgent).toContain(diagnosis.escapeHint ?? "");
+      expect(guidance.text, userAgent).toMatch(/메뉴|Safari/u);
+    }
   });
 
   it("falls back to the native-menu hint where no scheme can hand the page off", () => {

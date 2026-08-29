@@ -112,7 +112,16 @@ describe("diagnoseStudioInAppBrowser", () => {
     expect(result.escapeHref).toBe(
       `kakaotalk://web/openExternal?url=${encodeURIComponent(HREF)}`,
     );
-    expect(result.escapeHint).toBeNull();
+  });
+
+  it("always carries a manual hint, even when a one-tap link exists", () => {
+    // 링크를 렌더링할 수 없는 호출부(문자열만 받는 announce 파이프라인)가 있으므로,
+    // 링크가 있다고 해서 안내를 비우면 그쪽에서는 실행 가능한 지시가 사라진다.
+    for (const userAgent of Object.values(IN_APP_UA)) {
+      const result = diagnoseStudioInAppBrowser({ href: HREF, userAgent });
+      expect(result.escapeHint, userAgent).not.toBeNull();
+      expect(result.escapeHint?.length ?? 0, userAgent).toBeGreaterThan(0);
+    }
   });
 
   it("falls back to an intent:// hand-off for other Android WebViews", () => {
