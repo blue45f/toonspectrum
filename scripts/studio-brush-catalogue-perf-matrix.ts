@@ -494,6 +494,39 @@ export const STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES = 2;
  */
 export const STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE = 1.05;
 
+/**
+ * How far a half rises from its opening samples to its closing ones.
+ *
+ * The third way to earn a baseline, and the one that tolerates ordinary jitter. Requiring a
+ * near-monotonic first half (the drawdown test) was too strict: a genuine leak with ONE small dip
+ * -- [10, 12, 11, 20, 30 | 40, 50, 60, 70, 80], found in review -- has a 12->11 drawdown of x1.09
+ * and so failed both earlier shapes, hiding a sustained 4x regression.
+ *
+ * A larger drawdown tolerance cannot fix that: the recorded false positive
+ * [40.68, 38.13, 46.76] dips x1.067, which is INSIDE the x1.09 it would have to admit. The two
+ * shapes are not separable by dip depth at all.
+ *
+ * They separate cleanly by how far the half travels: the leak rises x2.27 from its opening pair to
+ * its closing pair, while every recorded noise series moves x1.03-x1.17 (and JIT warm-up falls to
+ * x0.69). Ends are averaged rather than taken as single samples so one unlucky first or last run
+ * cannot decide it.
+ */
+function endpointRiseRatio(series: readonly number[]): number {
+  const edge = series.length >= 4 ? 2 : 1;
+  const mean = (values: readonly number[]) =>
+    values.reduce((total, value) => total + value, 0) / values.length;
+  const opening = mean(series.slice(0, edge));
+  const closing = mean(series.slice(-edge));
+  if (!(opening > 0)) return 1;
+  return closing / opening;
+}
+
+/**
+ * Rise from a half's opening samples to its closing ones that counts as a trend rather than noise.
+ * Recorded separation: noise x1.03-x1.17, leaks x2.27-x3.83.
+ */
+const STUDIO_BRUSH_CATALOGUE_SOAK_TREND_RISE = 1.5;
+
 /** Largest fall below the running maximum, as a ratio. 1 for a non-decreasing series. */
 function maxDrawdownRatio(series: readonly number[]): number {
   let runningMax = Number.NEGATIVE_INFINITY;
@@ -550,7 +583,8 @@ export function detectStudioBrushSoakMonotonicDegradation(
   if (!(earlyMin > 0)) return false;
   const baselineIsEarned =
     earlyMax / earlyMin <= STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
-    || maxDrawdownRatio(early) <= STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE;
+    || maxDrawdownRatio(early) <= STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE
+    || endpointRiseRatio(early) >= STUDIO_BRUSH_CATALOGUE_SOAK_TREND_RISE;
   return (
     baselineIsEarned
     && laterMin / earlyMin > STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH

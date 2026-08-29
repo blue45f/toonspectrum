@@ -109,6 +109,19 @@ export async function probeSkiaGraphiteAdoption(
   const signal = environment.signal;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let abortListener: (() => void) | undefined;
+  // Checked BEFORE requesting, not only inside the race. `Promise.race` settles on the FIRST
+  // fulfilled entry in list order, so when the caller has already aborted and `requestAdapter`
+  // returns an already-settled promise (a cached or polyfilled adapter), the adapter entry wins
+  // the tie and the probe reports `adoptable` for a lifecycle that was cancelled. The existing
+  // pre-abort test missed this because its adapter request never settles. The product capability
+  // probe checks the signal first for the same reason.
+  if (signal?.aborted === true) {
+    return {
+      status: "no-adapter",
+      reason:
+        "the caller aborted before the adapter was requested; Graphite is not adopted here",
+    };
+  }
   let outcome: unknown;
   try {
     outcome = await Promise.race([

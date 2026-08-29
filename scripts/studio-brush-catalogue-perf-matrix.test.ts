@@ -93,6 +93,11 @@ describe("soak monotonic-degradation detector", () => {
     // The first half still only climbs, which is what a leak does and contention does not.
     ["step starting inside the first half", [10, 10, 10, 30, 30, 30, 30, 30, 30, 30]],
     ["step starting at the second run", [12, 44, 45, 44.5, 46, 45, 47, 44.8, 46.2, 45.5]],
+    // Found in review: a rising first half with ONE ordinary jitter dip. The dip (12->11, x1.09)
+    // defeats the drawdown shape, and a larger tolerance cannot rescue it -- the recorded noise
+    // series [40.68, 38.13, 46.76] dips x1.067, inside what that would have to admit. The half's
+    // travel separates them: x2.27 here against x1.03-x1.17 for every recorded noise series.
+    ["rising first half with one jitter dip", [10, 12, 11, 20, 30, 40, 50, 60, 70, 80]],
   ])("still catches a genuine compounding leak: %s", (_label, elapsed) => {
     expect(detectStudioBrushSoakMonotonicDegradation(elapsed)).toBe(true);
   });

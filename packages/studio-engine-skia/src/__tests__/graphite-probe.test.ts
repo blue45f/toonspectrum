@@ -91,6 +91,22 @@ describe("probeSkiaGraphiteAdoption", () => {
     expect(preAborted.status).toBe("no-adapter");
   });
 
+  it("stays aborted when the adapter request is already settled", async () => {
+    registerSkiaGraphiteArtifact(ARTIFACT);
+
+    // The tie the pre-abort case above cannot reach. `Promise.race` settles on the first FULFILLED
+    // entry in list order, so a cached or polyfilled adapter that resolves immediately beats the
+    // abort entry and the probe would report `adoptable` for a lifecycle already cancelled. Only
+    // an already-settled adapter exposes it -- the never-settling request above always loses.
+    const preAbortedWithReadyAdapter = await probeSkiaGraphiteAdoption({
+      gpu: gpuWith(async () => ({ name: "cached-adapter" })),
+      timeoutMs: 60_000,
+      signal: { aborted: true, addEventListener: () => undefined },
+    });
+
+    expect(preAbortedWithReadyAdapter.status).toBe("no-adapter");
+  });
+
   it("never reports adoptable with a cleared artifact, even if it clears mid-flight", async () => {
     registerSkiaGraphiteArtifact(ARTIFACT);
 
