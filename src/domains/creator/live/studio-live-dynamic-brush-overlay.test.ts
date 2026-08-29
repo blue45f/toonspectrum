@@ -633,11 +633,21 @@ function appendColdStartCostRatio(
 }
 
 /**
- * Recorded 2.37 idle and 5.95 loaded as the cheapest pass. 20 carries 3.4x headroom over the
- * worst of those while a cold path that grew to 100ms reads ~100 and a two-second initialisation
- * reads ~2000. It does not catch a mere doubling of the cold start, and says so above.
+ * Graded on the FIRST pass, not the cheapest, and that distinction is the whole point of the gate.
+ *
+ * Initialisation that only the first renderer in the process pays is exactly the regression this
+ * covers, and it is invisible to every later pass — `[2000, 2.4, 2.4]` reduces to 2.4 under a
+ * minimum and acquits a two-second stall on the user's first stroke. The cheapest pass is the
+ * honest reducer for a cost that every pass pays; here it discards the only pass that is actually
+ * cold.
+ *
+ * That costs sensitivity, because a single cold reading is JIT-dominated and cannot be reduced:
+ * 15.09 idle against 30.10 under six spinning hogs on four cores. 60 carries 2x headroom over the
+ * worst of those, catches a cold path that grew to 100ms (~90) and the two-second case (~2000),
+ * and does not pretend to catch a doubling. What covers the cold path exactly is the mark pin
+ * beside it.
  */
-const APPEND_COLD_START_COST_LIMIT = 20;
+const APPEND_COLD_START_COST_LIMIT = 60;
 
 /**
  * Recorded 1.1062 / 1.1305 / 1.1537 idle and 1.0893 / 1.0898 / 1.0915 under six spinning hogs on
@@ -2196,12 +2206,17 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // it cannot move that ratio either — so a two-second initialisation regression would be
     // invisible to everything above and would clear both smoke bounds. Its WORK is pinned
     // exactly beside this; its cost is JIT-dominated and so carries a blow-up bound only.
+    //
+    // The FIRST pass, deliberately, where every other verdict here takes the cheapest. Process-wide
+    // initialisation is paid once, by the first renderer, so the later passes are not the cold path
+    // at all and a minimum across them acquits precisely the regression this exists for.
     expect(markDeltas[0], "cold first append marks").toBe(320);
-    const coldStartCostRatio = Math.min(...coldStartCostRatios);
+    const coldStartCostRatio = coldStartCostRatios[0]!;
     expect(
       coldStartCostRatio,
-      `the cold first append costs ${coldStartCostRatio.toFixed(2)} ordinary appends `
-      + `(passes: ${coldStartCostRatios.map((value) => value.toFixed(2)).join(", ")})`,
+      `the genuinely cold first append costs ${coldStartCostRatio.toFixed(2)} ordinary appends `
+      + `(all passes, warm ones included: `
+      + `${coldStartCostRatios.map((value) => value.toFixed(2)).join(", ")})`,
     ).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
 
     // A blow-up bound, not a budget. The worst single append is a pure noise measurement -- 30.1
@@ -2399,10 +2414,23 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       honest.map((sample, index) => (index === 0 ? { ...sample, workMs: 100 } : sample)),
       deltas,
     )).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
+    // ...but a 60ms one is not, which is the sensitivity this reducer costs and is worth pinning
+    // so nobody credits the gate with more than it does.
+    expect(appendColdStartCostRatio(
+      honest.map((sample, index) => (index === 0 ? { ...sample, workMs: 60 } : sample)),
+      deltas,
+    )).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
 
     // Not vacuous the other way: a uniformly 3x slower machine is not a cold-start regression.
     const slowBox = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 3 }));
     expect(appendColdStartCostRatio(slowBox, deltas)).toBeCloseTo(2.30, 1);
+
+    // The reducer matters as much as the statistic. Process-wide initialisation is paid ONCE, by
+    // the first renderer, so a minimum across passes acquits it using a warmed pass -- which is
+    // why this gate reads the first pass and not the cheapest.
+    const perPassRatios = [2_000, 2.4, 2.4];
+    expect(Math.min(...perPassRatios)).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
+    expect(perPassRatios[0]!).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
 
     expect(() => appendColdStartCostRatio(honest, deltas.slice(1)))
       .toThrow(/its own mark delta/);
