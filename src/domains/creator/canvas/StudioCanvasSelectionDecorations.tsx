@@ -48,6 +48,8 @@ export interface StudioCanvasSelectionDecorationsContext {
   readonly selected: El | null;
   readonly selectionLockState: "unlocked" | "locked" | "mixed";
   readonly singleDrawFreeScale: boolean;
+  /** Small dedicated Layer the live transform gesture lifts into (single-object drag Layer). */
+  readonly singleObjectDragLayerRef: RefObject<Konva.Layer | null>;
   readonly tool: Tool;
   readonly trRef: RefObject<Konva.Transformer | null>;
 }
@@ -73,6 +75,7 @@ export function renderStudioCanvasSelectionDecorations({
   selected,
   selectionLockState,
   singleDrawFreeScale,
+  singleObjectDragLayerRef,
   tool,
   trRef,
 }: StudioCanvasSelectionDecorationsContext): ReactNode {
@@ -233,6 +236,9 @@ export function renderStudioCanvasSelectionDecorations({
           livePreviewElementId={
             singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
           }
+          // The gesture lifts stroke+proxy+Transformer into the small drag Layer so an
+          // anchor frame no longer repaints the whole document Layer.
+          transformLiftLayerRef={singleObjectDragLayerRef}
           onBegin={beginCanvasSelectionResize}
           onCommit={commitCanvasSelectionResize}
           onCancel={cancelCanvasSelectionResize}

@@ -30,6 +30,17 @@ export const STUDIO_SELECTION_CHROME_MIRROR_NAMESPACE = "studioSelectionChromeMi
  */
 export const STUDIO_DRAW_SELECTION_INDICATOR_NAME = "studio-draw-selection-indicator";
 
+/**
+ * Wrapper attr set for the duration of a live transform preview (scale/rotate gesture).
+ *
+ * The preview repurposes the wrapper's x/y as the absolute target origin, so translation mirrors
+ * must not interpret those frames as drag offsets — and, once the gesture is lifted onto the
+ * dedicated drag Layer, a mirrored chrome write would re-invalidate the document Layer every
+ * frame and void the lift. Mirrors resume on the neutral reset that ends every gesture path.
+ */
+export const STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR =
+  "studioLiveTransformPreviewActive";
+
 function konvaNodeDepth(node: Konva.Node): number {
   let depth = 0;
   let current: Konva.Node | null = node.getParent();
@@ -85,6 +96,7 @@ export function mirrorStudioDrawElementTranslation(
   const wrapper = findStudioDrawWrapperNode(stage, elementId);
   if (!wrapper) return () => undefined;
   const sync = () => {
+    if (wrapper.getAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR) === true) return;
     apply({ x: wrapper.x(), y: wrapper.y() });
   };
   sync();

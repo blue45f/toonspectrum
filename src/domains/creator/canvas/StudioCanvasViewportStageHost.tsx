@@ -613,6 +613,7 @@ export function StudioCanvasViewportStageHost({
                 selected,
                 selectionLockState,
                 singleDrawFreeScale,
+                singleObjectDragLayerRef: interaction.singleObjectDragLayerRef,
                 tool,
                 trRef,
               })}

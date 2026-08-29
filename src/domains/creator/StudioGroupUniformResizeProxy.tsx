@@ -9,12 +9,19 @@ import {
 } from "./studio-live-transform-preview-konva";
 import {
   STUDIO_DRAW_SELECTION_INDICATOR_NAME,
+  STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR,
   findStudioDrawWrapperNode,
   mirrorStudioDrawElementTranslation,
 } from "./studio-selection-chrome-mirror";
+import {
+  beginStudioSingleDrawTransformLayer,
+  restoreStudioSingleObjectDragLayer,
+} from "./studio-single-object-drag-layer";
 
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
+import type { StudioSingleObjectDragLayerSession } from "./studio-single-object-drag-layer";
 import type Konva from "konva";
+import type { RefObject } from "react";
 
 const MINIMUM_VISUAL_SIZE_PX = 24;
 const DESKTOP_ANCHOR_VISUAL_SIZE_PX = 13;
@@ -84,6 +91,15 @@ export interface StudioGroupUniformResizeProxyProps {
    * still happens exactly once at transformend; cancellation restores the neutral projection.
    */
   readonly livePreviewElementId?: string;
+  /**
+   * Dedicated small Layer the live-preview gesture lifts into (the single-object drag Layer).
+   *
+   * Without the lift, every anchor frame repaints the whole document Layer (measured ~80-157ms
+   * per drawScene on stroke-heavy pages). With it, per-frame invalidation covers only the stroke,
+   * the proxy and the Transformer. Optional and fail-closed: when absent or refused (clipped,
+   * cached, layer-sensitive composite), the gesture keeps today's whole-layer behavior.
+   */
+  readonly transformLiftLayerRef?: RefObject<Konva.Layer | null>;
   /** Return false when effective locks or collaboration leases reject the gesture. */
   readonly onBegin: (sourceBounds: StudioGroupUniformResizeBounds) => boolean;
   /**
@@ -101,6 +117,8 @@ type ActiveLiveTransformPreview = {
   readonly node: Konva.Node;
   /** Dashed draw indicators hidden for the gesture; restored on commit and on every cancel path. */
   readonly parkedIndicators: readonly Konva.Node[];
+  /** Drag-layer lift session, or null when the lift was refused (gesture stays in the big Layer). */
+  readonly lift: StudioSingleObjectDragLayerSession | null;
 };
 
 type ActiveResizeSession = {
@@ -124,6 +142,7 @@ export function StudioGroupUniformResizeProxy({
   freeTransform = false,
   mirrorDragElementId,
   livePreviewElementId,
+  transformLiftLayerRef,
   onBegin,
   onCommit,
   onCancel,
@@ -159,20 +178,37 @@ export function StudioGroupUniformResizeProxy({
    */
   function beginLiveTransformPreview(): ActiveLiveTransformPreview | null {
     if (!livePreviewElementId) return null;
-    const stage = proxyRef.current?.getStage();
-    if (!stage) return null;
+    const proxy = proxyRef.current;
+    const transformer = transformerRef.current;
+    const stage = proxy?.getStage();
+    if (!proxy || !transformer || !stage) return null;
     const node = findStudioDrawWrapperNode(stage, livePreviewElementId);
     if (!node || !studioLiveTransformPreviewEligible(node)) return null;
     const parkedIndicators = stage
       .find(`.${STUDIO_DRAW_SELECTION_INDICATOR_NAME}`)
       .filter((indicator) => indicator.visible());
     for (const indicator of parkedIndicators) indicator.visible(false);
-    return { node, parkedIndicators };
+    // Gate the translation mirrors before the first preview frame: the wrapper's x/y stops being
+    // a drag offset for the whole gesture, and (once lifted) a chrome write in the document
+    // Layer would re-invalidate it every frame.
+    node.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, true);
+    const lift = beginStudioSingleDrawTransformLayer({
+      elementId: livePreviewElementId,
+      wrapper: node,
+      proxy,
+      transformer,
+      dragLayer: transformLiftLayerRef?.current ?? null,
+    });
+    return { node, parkedIndicators, lift };
   }
 
   /** Neutralize the preview projection and un-park the chrome — commit and cancel both end here. */
   function clearLiveTransformPreview(preview: ActiveLiveTransformPreview | null) {
     if (!preview) return;
+    // Return the lifted nodes to the document Layer first so the neutral reset below invalidates
+    // the authoritative Layer once, and the mirrors re-converge from the same reset.
+    restoreStudioSingleObjectDragLayer(preview.lift);
+    preview.node.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, undefined);
     resetStudioLiveTransformPreviewNodeAttrs(preview.node);
     for (const indicator of preview.parkedIndicators) indicator.visible(true);
     preview.node.getLayer()?.batchDraw();

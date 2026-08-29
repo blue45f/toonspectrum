@@ -157,6 +157,75 @@ export function beginStudioSingleObjectDragLayer(
   };
 }
 
+export interface BeginStudioSingleDrawTransformLayerOptions {
+  readonly elementId: string;
+  /** The stroke's draggable wrapper — the node the live transform preview projects onto. */
+  readonly wrapper: Konva.Node;
+  /** The invisible gesture Rect the group-resize Transformer manipulates. */
+  readonly proxy: Konva.Node;
+  readonly transformer: Konva.Transformer;
+  readonly dragLayer: Konva.Layer | null;
+}
+
+/**
+ * Lift a single draw stroke plus its transform gesture chrome for a scale/rotate gesture.
+ *
+ * The drag lift above deliberately excludes draw elements because their selection chrome mirrors
+ * live in the document Layer — chrome writes would re-invalidate the big Layer every frame and
+ * void the lift. A transform gesture is different: the live preview parks that chrome and gates
+ * its mirrors (`STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR`), so for the gesture's duration the
+ * only per-frame invalidations are the stroke, the proxy and the Transformer — exactly the nodes
+ * moved here. On a stroke-heavy page this turns "repaint the whole document per anchor frame"
+ * (measured ~80-157ms per drawScene) into repainting one stroke plus handles.
+ *
+ * Same fail-closed exclusions as the drag lift: a clipped wrapper (not a direct Layer child), a
+ * cached root, or a layer-sensitive composite (eraser destination-out, authored blend modes needs
+ * the document backdrop) refuses the lift and the gesture keeps today's whole-layer behavior.
+ */
+export function beginStudioSingleDrawTransformLayer(
+  options: BeginStudioSingleDrawTransformLayerOptions,
+): StudioSingleObjectDragLayerSession | null {
+  const { elementId, wrapper, proxy, transformer, dragLayer } = options;
+  const mainLayer = wrapper.getLayer();
+  if (
+    !mainLayer
+    || !dragLayer
+    || mainLayer === dragLayer
+    || mainLayer.getStage() === null
+    || mainLayer.getStage() !== dragLayer.getStage()
+    || wrapper.getAttr("studioElementId") !== elementId
+    || wrapper.getParent() !== mainLayer
+    || wrapper.isCached()
+    || authoredCompositeOperationIsLayerSensitive(wrapper, wrapper)
+    || proxy.getLayer() !== mainLayer
+    || transformer.getLayer() !== mainLayer
+  ) {
+    return null;
+  }
+
+  const roots: Konva.Node[] = [wrapper, proxy, transformer];
+  const lifted: LiftedNodeRecord[] = roots.map((node) => ({
+    node,
+    parent: mainLayer,
+    zIndex: node.zIndex(),
+  }));
+  for (const record of lifted) record.node.moveTo(dragLayer);
+  transformer.forceUpdate();
+
+  mainLayer.batchDraw();
+  dragLayer.batchDraw();
+
+  return {
+    elementId,
+    mainLayer,
+    dragLayer,
+    target: wrapper,
+    transformer,
+    lifted,
+    restored: false,
+  };
+}
+
 /** Restore the imperative lift without changing the object's live drag position or transform. */
 export function restoreStudioSingleObjectDragLayer(
   session: StudioSingleObjectDragLayerSession | null,

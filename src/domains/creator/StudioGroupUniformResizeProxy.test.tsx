@@ -69,6 +69,7 @@ function createWrapperNode(elementId: string, options: { cached?: boolean } = {}
     getAttr: vi.fn((name: string) =>
       name === "studioElementId" ? elementId : undefined
     ),
+    setAttr: vi.fn(),
     getParent: vi.fn(() => null),
     isCached: vi.fn(() => options.cached === true),
     getLayer: vi.fn(() => layer),
