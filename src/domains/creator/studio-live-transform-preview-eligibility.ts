@@ -50,6 +50,16 @@ const STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS: ReadonlySet<string> = new Set([
  * so even a pure rotation, which leaves the station count alone, leaves every halo pointing the
  * old way while the preview swings all of them round.
  *
+ * `screentone-dots` is the starkest case: `screentoneDotsForStroke` places every dot on a GLOBAL
+ * lattice (`ix * pitch`, `iy * pitch`, with the half-pitch honeycomb offset on odd rows), in world
+ * coordinates that owe nothing to the stroke. That is the point of the design -- overlapping passes
+ * fill the same halftone grid -- and it is exactly why a rotation cannot be previewed: the commit
+ * re-lays the dots on the unrotated lattice while the preview swung them.
+ *
+ * `particle-scatter` fails the same way watercolor's halo does: `planGlitterBrushParticles` takes
+ * each spark's angle from `hash2(si, …) * TAU`, a station-index draw with no dependence on the
+ * stroke's orientation, so a rotation leaves the whole scatter field pointing where it was.
+ *
  * Classified by RENDERER engine rather than by brush id: the watercolor engine backs `watercolor`,
  * `ink-wash`, its `inkwash-*` profiles and `gouache`, plus every `engine-variant` lane in
  * `studio-brush-engine-lane-catalog` that resolves to them, and an id list would silently miss the
@@ -57,6 +67,8 @@ const STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS: ReadonlySet<string> = new Set([
  */
 const STUDIO_COORDINATE_RESAMPLED_ENGINES: ReadonlySet<string> = new Set([
   "watercolor-dabs",
+  "screentone-dots",
+  "particle-scatter",
 ]);
 
 function studioBrushEngineResamplesCoordinates(brushId: unknown): boolean {

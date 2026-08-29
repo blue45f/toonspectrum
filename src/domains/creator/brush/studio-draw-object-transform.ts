@@ -26,6 +26,8 @@
  * A rejected transform returns `null` rather than a partially transformed stroke: callers treat
  * that as "leave the document untouched", the same all-or-nothing discipline the group planner uses.
  */
+import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
+
 import type { DrawEl } from "../studio-element-model";
 
 export interface StudioDrawObjectTransformBounds {
@@ -254,13 +256,23 @@ export function planStudioDrawObjectTransform(
     (el.tiltXs !== undefined && el.tiltXs.length > 0)
     || (el.tiltYs !== undefined && el.tiltYs.length > 0)
     || (el.twists !== undefined && el.twists.length > 0);
-  let brushTip = el.brushTip;
+  // Pre-nib-table documents carry no `brushTip` at all, and StudioDrawNode recovers one for them
+  // from the catalogue (`resolveStudioCalligraphyRenderTip`) before building the ribbon. Skipping
+  // those would leave the recovered nib at its catalogue angle through every rotation while the
+  // preview turned it, so the rotation is applied to the SAME tip the renderer would have used and
+  // the result is persisted -- materializing what the render already assumed, at the angle the
+  // gesture asked for. A brush with no nib profile still resolves to undefined and is left alone.
+  let brushTip = el.brushTip ?? resolveStudioCalligraphyRenderTip(el.brush, undefined);
   if (brushTip && rotationDeg !== 0 && !hasPerSampleOrientation) {
     const rotatedAngle = brushTip.angleDeg + rotationDeg;
     if (!finite(rotatedAngle)) return null;
     // Wrapped to (-180, 180] so repeated rotations cannot drift the stored angle without bound.
     const wrapped = ((((rotatedAngle + 180) % 360) + 360) % 360) - 180;
     brushTip = { ...brushTip, angleDeg: wrapped === -180 ? 180 : wrapped };
+  } else {
+    // Nothing rotated, so nothing is materialized: a stroke that only moved or scaled keeps the
+    // document exactly as authored rather than acquiring a tip it never stored.
+    brushTip = el.brushTip;
   }
 
   return {

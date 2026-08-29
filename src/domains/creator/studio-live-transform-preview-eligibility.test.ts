@@ -108,6 +108,19 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     ).toBe(true);
   });
 
+  it("refuses the world-axis renderers, which regenerate marks the stroke never turns", () => {
+    // screentoneDotsForStroke lays every dot on a global lattice in world coordinates -- the whole
+    // point of the design, and the reason a rotation cannot be previewed.
+    for (const brush of ["screentone", "crosshatch"]) {
+      expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(true);
+    }
+    // planGlitterBrushParticles takes each spark's angle from hash2(stationIndex, ...) * TAU, which
+    // does not follow the stroke's orientation.
+    for (const brush of ["glitter", "star-dust", "sparkle-star"]) {
+      expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(true);
+    }
+  });
+
   it("refuses sketch-styled lines and arrows, whose Rough.js wobble is replanned", () => {
     // buildStudioRoughShapeRenderPlan derives its perturbations from the points it is handed, so
     // the commit's replan wobbles differently from the previewed path even with the seed,

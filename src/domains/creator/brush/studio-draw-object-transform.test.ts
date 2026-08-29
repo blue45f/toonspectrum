@@ -414,6 +414,49 @@ describe("orientation-dependent nibs", () => {
     expect(rotated?.brushTip).toEqual(NIB);
   });
 
+  it("materializes a legacy stroke's catalogue nib so the rotation survives the commit", () => {
+    // Pre-nib-table documents store no brushTip, and StudioDrawNode recovers one from the
+    // catalogue before building the ribbon (resolveStudioCalligraphyRenderTip). Skipping those
+    // would leave the recovered nib at its catalogue angle through every rotation while the
+    // preview turned it, so the tip the renderer would have used is rotated and persisted.
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ brush: "fountain-pen" }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    // The catalogue nib sits at 30 degrees; the gesture adds 45.
+    expect(rotated?.brushTip?.angleDeg).toBe(75);
+    expect(rotated?.brushTip?.roundness).toBe(0.5);
+    expect(rotated?.brushTip?.tiltEnabled).toBe(true);
+  });
+
+  it("does not materialize a nib for a legacy stroke that only moved or scaled", () => {
+    // Nothing turned, so the document must not acquire a tip it never stored.
+    const scaled = planStudioDrawObjectTransform({
+      el: drawEl({ brush: "fountain-pen" }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: { x: 0, y: 0, width: 20, height: 20 },
+      rotationDeg: 0,
+    });
+
+    expect(scaled).not.toBeNull();
+    expect("brushTip" in scaled!).toBe(false);
+  });
+
+  it("leaves a legacy stroke's nib alone when it carries per-sample orientation", () => {
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ brush: "fountain-pen", tiltXs: [1, 0], tiltYs: [0, 1] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    expect(rotated).not.toBeNull();
+    expect("brushTip" in rotated!).toBe(false);
+  });
+
   it("leaves a stroke without a tip snapshot untouched", () => {
     const rotated = planStudioDrawObjectTransform({
       el: drawEl(),
