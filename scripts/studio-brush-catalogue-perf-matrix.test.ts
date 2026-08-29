@@ -88,6 +88,11 @@ describe("soak monotonic-degradation detector", () => {
     ["45% per run", [8, 11.6, 16.8, 24.4, 35.4, 51.3, 74.4, 107.9, 156.4, 226.8]],
     // Step-change leak: a cache that starts thrashing halfway and stays slow.
     ["sustained step change", [10, 10.2, 9.9, 10.1, 10.0, 31.0, 32.2, 30.8, 31.5, 30.9]],
+    // Found in review: a step that begins BEFORE the midpoint contaminates the first half, so
+    // growth and first-half spread are both 3x and a spread comparison alone would suppress it.
+    // The first half still only climbs, which is what a leak does and contention does not.
+    ["step starting inside the first half", [10, 10, 10, 30, 30, 30, 30, 30, 30, 30]],
+    ["step starting at the second run", [12, 44, 45, 44.5, 46, 45, 47, 44.8, 46.2, 45.5]],
   ])("still catches a genuine compounding leak: %s", (_label, elapsed) => {
     expect(detectStudioBrushSoakMonotonicDegradation(elapsed)).toBe(true);
   });

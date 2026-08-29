@@ -37,11 +37,14 @@ export function clearSkiaGraphiteArtifact(): void {
 export type SkiaGraphiteAdoptionProbe =
   | { readonly status: "adoptable"; readonly artifact: SkiaGraphiteArtifact }
   | { readonly status: "missing-artifact"; readonly reason: string }
+  | { readonly status: "no-adapter"; readonly reason: string }
   | { readonly status: "no-webgpu"; readonly reason: string };
 
 export interface SkiaGraphiteProbeEnvironment {
   readonly gpu?: unknown;
 }
+
+type AdapterRequester = { requestAdapter?: () => Promise<unknown> };
 
 function defaultEnvironment(): SkiaGraphiteProbeEnvironment {
   const navigatorLike = (globalThis as { navigator?: { gpu?: unknown } }).navigator;
@@ -52,10 +55,11 @@ function defaultEnvironment(): SkiaGraphiteProbeEnvironment {
  * Same honesty contract as `createSkiaGpuIslandBackend`: callers must treat anything but
  * `adoptable` as "keep the current lane" — the challenger simply does not enter the tournament.
  */
-export function probeSkiaGraphiteAdoption(
+export async function probeSkiaGraphiteAdoption(
   environment: SkiaGraphiteProbeEnvironment = defaultEnvironment()
-): SkiaGraphiteAdoptionProbe {
-  if (environment.gpu === undefined || environment.gpu === null) {
+): Promise<SkiaGraphiteAdoptionProbe> {
+  const gpu = environment.gpu;
+  if (gpu === undefined || gpu === null) {
     return {
       status: "no-webgpu",
       reason: "WebGPU is unavailable on this device; Graphite requires navigator.gpu",
@@ -67,6 +71,23 @@ export function probeSkiaGraphiteAdoption(
       reason:
         "no Graphite-enabled CanvasKit build is registered — upstream canvaskit-wasm ships "
         + "Ganesh only and Skia has not published a production Graphite web artifact yet",
+    };
+  }
+  // A truthy `navigator.gpu` is not a usable device: requestAdapter still returns null (or
+  // rejects) on blocklisted drivers and software-only configurations. Admitting the challenger
+  // there would defer the failure to initialization instead of routing around the device, which
+  // is exactly what the other WebGPU probes in this repo refuse to do.
+  let adapter: unknown;
+  try {
+    adapter = (await (gpu as AdapterRequester).requestAdapter?.()) ?? null;
+  } catch {
+    adapter = null;
+  }
+  if (!adapter) {
+    return {
+      status: "no-adapter",
+      reason:
+        "navigator.gpu exposes no usable adapter on this device; Graphite cannot be adopted here",
     };
   }
   return { status: "adoptable", artifact: registeredArtifact };

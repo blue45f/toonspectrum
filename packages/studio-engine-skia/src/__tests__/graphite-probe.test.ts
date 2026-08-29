@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   clearSkiaGraphiteArtifact,
@@ -7,42 +7,66 @@ import {
   SKIA_GRAPHITE_PROVIDER_ID,
 } from "../graphite-probe";
 
+const ARTIFACT = {
+  loadCanvasKit: async () => ({}),
+  sourcePin: { version: "m0.0.0-test", commit: "0".repeat(40) },
+};
+
+/** A `navigator.gpu` double whose adapter answer the test controls. */
+function gpuWith(adapter: unknown | (() => Promise<unknown>)) {
+  return {
+    requestAdapter: typeof adapter === "function"
+      ? (adapter as () => Promise<unknown>)
+      : vi.fn(async () => adapter),
+  };
+}
+
 afterEach(() => {
   clearSkiaGraphiteArtifact();
 });
 
 describe("probeSkiaGraphiteAdoption", () => {
-  it("refuses without WebGPU, naming the precondition", () => {
-    const probe = probeSkiaGraphiteAdoption({ gpu: undefined });
+  it("refuses without WebGPU, naming the precondition", async () => {
+    const probe = await probeSkiaGraphiteAdoption({ gpu: undefined });
     expect(probe.status).toBe("no-webgpu");
-    if (probe.status === "no-webgpu") {
-      expect(probe.reason).toContain("navigator.gpu");
-    }
+    if (probe.status === "no-webgpu") expect(probe.reason).toContain("navigator.gpu");
   });
 
-  it("refuses without a registered Graphite build and names the upstream gap honestly", () => {
-    const probe = probeSkiaGraphiteAdoption({ gpu: {} });
+  it("refuses without a registered Graphite build and names the upstream gap honestly", async () => {
+    const probe = await probeSkiaGraphiteAdoption({ gpu: gpuWith({}) });
     expect(probe.status).toBe("missing-artifact");
-    if (probe.status === "missing-artifact") {
-      expect(probe.reason).toContain("Ganesh");
-    }
+    if (probe.status === "missing-artifact") expect(probe.reason).toContain("Ganesh");
   });
 
-  it("flips to adoptable the moment an artifact is registered, and back after clearing", () => {
-    const artifact = {
-      loadCanvasKit: async () => ({}),
-      sourcePin: { version: "m0.0.0-test", commit: "0".repeat(40) },
-    };
-    registerSkiaGraphiteArtifact(artifact);
+  it("refuses when the device exposes no usable adapter, rather than deferring the failure", async () => {
+    registerSkiaGraphiteArtifact(ARTIFACT);
 
-    const probe = probeSkiaGraphiteAdoption({ gpu: {} });
+    // Blocklisted driver / software-only configuration: gpu exists, adapter does not.
+    const nullAdapter = await probeSkiaGraphiteAdoption({ gpu: gpuWith(null) });
+    expect(nullAdapter.status).toBe("no-adapter");
+
+    // A rejecting requestAdapter is the same verdict, not an unhandled rejection.
+    const rejected = await probeSkiaGraphiteAdoption({
+      gpu: gpuWith(() => Promise.reject(new Error("adapter request failed"))),
+    });
+    expect(rejected.status).toBe("no-adapter");
+
+    // A realm without requestAdapter at all must not be admitted either.
+    const noMethod = await probeSkiaGraphiteAdoption({ gpu: {} });
+    expect(noMethod.status).toBe("no-adapter");
+  });
+
+  it("flips to adoptable once an artifact and a real adapter are both present", async () => {
+    registerSkiaGraphiteArtifact(ARTIFACT);
+
+    const probe = await probeSkiaGraphiteAdoption({ gpu: gpuWith({ name: "test-adapter" }) });
     expect(probe.status).toBe("adoptable");
-    if (probe.status === "adoptable") {
-      expect(probe.artifact).toBe(artifact);
-    }
+    if (probe.status === "adoptable") expect(probe.artifact).toBe(ARTIFACT);
 
     clearSkiaGraphiteArtifact();
-    expect(probeSkiaGraphiteAdoption({ gpu: {} }).status).toBe("missing-artifact");
+    expect((await probeSkiaGraphiteAdoption({ gpu: gpuWith({}) })).status).toBe(
+      "missing-artifact",
+    );
   });
 
   it("pins the challenger provider id the tournament and fallback chain use", () => {

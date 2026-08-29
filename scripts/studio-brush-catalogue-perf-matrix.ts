@@ -487,29 +487,50 @@ export const STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS = 4;
  * series abstains rather than guessing; the shipped soak runs ten, five per half.
  */
 export const STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES = 2;
+/**
+ * How far the first half may fall back below its own running maximum and still count as
+ * "climbing" rather than "oscillating". A contended runner recovers (a preempted run is followed
+ * by a fast one); accumulating state only climbs.
+ */
+export const STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE = 1.05;
+
+/** Largest fall below the running maximum, as a ratio. 1 for a non-decreasing series. */
+function maxDrawdownRatio(series: readonly number[]): number {
+  let runningMax = Number.NEGATIVE_INFINITY;
+  let worst = 1;
+  for (const value of series) {
+    if (runningMax > 0 && value > 0) worst = Math.max(worst, runningMax / value);
+    if (value > runningMax) runningMax = value;
+  }
+  return worst;
+}
 
 /**
  * Decides monotonic degradation from a soak's elapsed series — pure, so the decision itself is
  * unit-testable against recorded CI series instead of only through a live 10-run measurement.
  *
  * Two halves, each represented by its cheapest run (a leak slows EVERY later plan, so minima
- * cancel scheduler preemption better than means), plus a third, noise-aware condition:
- *
- *   growth = laterMin / earlyMin   must exceed BOTH the relative gate AND the first half's OWN
- *                                  spread (earlyMax / earlyMin).
- *
- * The spread term is what makes the gate sound on a contended runner. Min-vs-min is one sample
- * from each half's distribution, so whenever within-half noise exceeds the threshold the
- * comparison is meaningless — measured CI failure on main, needle-graphite
- * [29.77, 37.52, 51.01, 34.03, 34.87 | 53.45, 60.47, 62.61, 48.54, 38.32]ms: a lucky 29.77
+ * cancel scheduler preemption better than means): `growth = laterMin / earlyMin` must clear the
+ * relative gate and the absolute floor. Min-vs-min is one sample from each half's distribution
+ * though, so when the first half is itself unsettled its minimum is not a baseline at all —
+ * measured CI failure on main, needle-graphite
+ * [29.77, 37.52, 51.01, 34.03, 34.87 | 53.45, 60.47, 62.61, 48.54, 38.32]ms, where a lucky 29.77
  * baseline against a 38.32 later-min reads as x1.29 "degradation" while the first half's own
  * spread already spans x1.71. Widening the window (this gate's three previous hardenings) cannot
  * fix that — the noise scales with it.
  *
- * Detection power for a real leak is preserved exactly: for compounding per-run growth g > 1,
- * earlyMax/earlyMin = g^4 while laterMin/earlyMin = g^5, and g^5 > g^4 for every g > 1. So any
- * leak that compounds still trips the gate, while pure noise (both minima drawn from the same
- * distribution) does not.
+ * So the baseline has to be earned, by one of two shapes:
+ *
+ *   settled — the first half stays inside the relative gate (earlyMax/earlyMin <= growth gate),
+ *             so its minimum represents the whole half; or
+ *   climbing — the first half never falls back below its own running maximum by more than
+ *             `DRAWDOWN_TOLERANCE`, so its low values are its EARLY values.
+ *
+ * Climbing is what keeps the gate sensitive to a leak that begins before the midpoint. Such a
+ * leak contaminates the first half — for a step to 3x at run 3, both growth and the first half's
+ * spread are 3, so a spread comparison alone would suppress it (found in review). But a leak,
+ * unlike contention, never recovers: [10, 10, 10, 30, 30] climbs monotonically and is detected,
+ * while the contended shapes above all dip back below their running max and abstain.
  */
 export function detectStudioBrushSoakMonotonicDegradation(
   elapsedMs: readonly number[],
@@ -527,10 +548,12 @@ export function detectStudioBrushSoakMonotonicDegradation(
   const earlyMax = Math.max(...early);
   const laterMin = Math.min(...later);
   if (!(earlyMin > 0)) return false;
-  const growth = laterMin / earlyMin;
+  const baselineIsEarned =
+    earlyMax / earlyMin <= STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
+    || maxDrawdownRatio(early) <= STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE;
   return (
-    growth > STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
-    && growth > earlyMax / earlyMin
+    baselineIsEarned
+    && laterMin / earlyMin > STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
     && laterMin - earlyMin > STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS
   );
 }
