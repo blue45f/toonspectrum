@@ -42,7 +42,7 @@ describe("Studio BG3D mood/render integration boundary", () => {
 
   it("projects saved render settings on creation and on later document updates", () => {
     const controllerStart = background3dSource.indexOf(
-      "function StudioBg3dWebglRenderSettingsController",
+      "function StudioBg3dThreeRenderSettingsController",
     );
     const controllerEnd = background3dSource.indexOf(
       "function SkyClearColorController",
@@ -53,13 +53,13 @@ describe("Studio BG3D mood/render integration boundary", () => {
     const canvasEnd = background3dSource.indexOf("<BgAdaptiveDprController", canvasStart);
     const canvas = background3dSource.slice(canvasStart, canvasEnd);
 
-    expect(controller).toContain("applyStudioBg3dThreeWebglRenderSettings(gl, render)");
+    expect(controller).toContain("applyStudioBg3dThreeRenderSettings(gl, render)");
     expect(controller).toContain("[gl, render]");
     expect(background3dSource).toContain(
-      "<StudioBg3dWebglRenderSettingsController render={sceneBaseDocument.render} />",
+      "<StudioBg3dThreeRenderSettingsController render={sceneBaseDocument.render} />",
     );
     expect(canvas).toContain(
-      "applyStudioBg3dThreeWebglRenderSettings(gl, sceneBaseDocument.render)",
+      "applyStudioBg3dThreeRenderSettings(gl, sceneBaseDocument.render)",
     );
   });
 

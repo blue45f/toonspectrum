@@ -7,6 +7,15 @@ import {
   StudioBg3dModelThumbnailThreeCaptureError,
 } from "./studio-bg3d-model-thumbnail-three-capture";
 
+import type { StudioBg3dCaptureAdapter } from "./studio-bg3d-capture-adapter";
+
+// The WebGPU adapter lives behind the approved lazy entry, which pulls Three's whole WebGPU build.
+// Thumbnails only need to prove they route to it, so the module is stubbed here.
+const webgpuAdapterFactory = vi.hoisted(() => vi.fn());
+vi.mock("./studio-bg3d-three-webgpu-entry", () => ({
+  createStudioBg3dThreeWebGpuCaptureAdapter: webgpuAdapterFactory,
+}));
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -464,5 +473,62 @@ describe("isolated Three model thumbnail capture", () => {
       includeDepth: false,
       background: { color: "#ffffff", alpha: 1 },
     })).rejects.toMatchObject({ code: "disposed" });
+  });
+});
+
+describe("thumbnail capture on a WebGPU editor session", () => {
+  it("routes to the WebGPU adapter instead of refusing the renderer", async () => {
+    // Before this, the guard demanded `isWebGLRenderer`, and the caller swallows thumbnail
+    // failures — so every imported model on a WebGPU session kept its placeholder card silently.
+    const model = modelFixture();
+    const base = rendererFixture();
+    let isolatedScene: THREE.Scene | null = null;
+    webgpuAdapterFactory.mockImplementation((input: {
+      readonly scene: THREE.Scene;
+    }): StudioBg3dCaptureAdapter => {
+      isolatedScene = input.scene;
+      return {
+        backend: "three-webgpu",
+        engineId: "three",
+        engineVersion: "test",
+        implementationRevision: "test",
+        graphicsApi: "webgpu",
+        profileId: "STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1",
+        getSourceSize: () => ({ width: 2, height: 2 }),
+        capture: () => Promise.reject(new Error("not exercised")),
+      } as unknown as StudioBg3dCaptureAdapter;
+    });
+
+    const renderer = {
+      ...(base.renderer as unknown as Record<string, unknown>),
+      isWebGLRenderer: undefined,
+      isWebGPURenderer: true,
+      // Three's WebGPU renderer may expose no XR manager; the state fence must survive that.
+      xr: undefined,
+    };
+
+    const handle = await createStudioBg3dModelThumbnailThreeCapture({
+      renderer: renderer as never,
+      cachedRoot: model.cachedRoot,
+      width: 2,
+      height: 2,
+      dependencies: { cloneRoot },
+    });
+
+    expect(webgpuAdapterFactory).toHaveBeenCalledTimes(1);
+    expect(handle.adapter.backend).toBe("three-webgpu");
+    // The isolated scene is still the module's own clone graph, not the cache-owned root.
+    expect(isolatedScene).not.toBeNull();
+    expect(model.cachedRoot.parent).toBe(model.parent);
+    handle.dispose();
+  });
+
+  it("still refuses a renderer that is neither backend", async () => {
+    const model = modelFixture();
+    await expect(createStudioBg3dModelThumbnailThreeCapture({
+      renderer: { isWebGLRenderer: false } as never,
+      cachedRoot: model.cachedRoot,
+      dependencies: { cloneRoot },
+    })).rejects.toBeInstanceOf(StudioBg3dModelThumbnailThreeCaptureError);
   });
 });

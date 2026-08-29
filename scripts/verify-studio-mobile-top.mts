@@ -98,6 +98,41 @@ function isExpectedStaticPreviewError(message: string, studioUrl: string): boole
   }
 }
 
+/**
+ * 서드파티 웹폰트 CDN 의 로드 실패는 앱 결함이 아니라 환경 잡음이다.
+ *
+ * index.html 은 Space Grotesk(fonts.googleapis.com)와 Pretendard(cdn.jsdelivr.net)를 렌더
+ * 블로킹 스타일시트로 불러오는데, 오프라인이거나 프록시 뒤에 있는 감사 머신에서는 이 두 요청이
+ * 그냥 실패한다. 이 게이트가 재는 것은 글자 모양이 아니라 기하학 — 겹침, 히트테스트, 44px 타깃,
+ * 가로 넘침 — 이고, 앱의 font-family 스택은 전부 실제 폴백을 갖고 있다.
+ *
+ * 범위를 두 번 좁힌다. 전송 계층 실패(`net::ERR_*`)여야 하고, 메시지 안의 URL 호스트가 아래
+ * 집합에 정확히 들어맞아야 한다. 그래서 폰트 href 오타로 생기는 404/403 은 그대로 실패로 남고,
+ * `cdn.jsdelivr.net` 이라는 문자열이 우연히 들어간 동일 출처 자산 실패도 빠져나가지 못한다.
+ */
+const EXTERNAL_FONT_CDN_HOSTS: ReadonlySet<string> = new Set([
+  "cdn.jsdelivr.net",
+  "fonts.googleapis.com",
+  "fonts.gstatic.com",
+]);
+
+function messageUrls(message: string): URL[] {
+  const urls: URL[] = [];
+  for (const token of message.split(/\s+/u)) {
+    try {
+      urls.push(new URL(token));
+    } catch {
+      // 콘솔 텍스트는 대부분 산문이다 — URL 이 아닌 토큰은 조용히 건너뛴다.
+    }
+  }
+  return urls;
+}
+
+function isExpectedExternalFontCdnError(message: string): boolean {
+  return message.startsWith("Failed to load resource: net::ERR_")
+    && messageUrls(message).some((url) => EXTERNAL_FONT_CDN_HOSTS.has(url.hostname));
+}
+
 type ShellMode = "immersive" | "windowed";
 
 interface TopChromeRectIssue {
@@ -659,7 +694,9 @@ async function runMode(
     if (message.type() !== "error") return;
     const location = message.location().url;
     const text = location ? `${message.text()} @ ${location}` : message.text();
-    if (!isExpectedStaticPreviewError(text, url)) consoleErrors.push(text);
+    if (isExpectedStaticPreviewError(text, url)) return;
+    if (isExpectedExternalFontCdnError(text)) return;
+    consoleErrors.push(text);
   });
   page.on("pageerror", (error) => consoleErrors.push(String(error)));
   await installStudioGuestSessionBoundary(page);

@@ -16,7 +16,10 @@ import { solveTwoBoneTarget } from "./studio-rig-two-bone-ik";
 
 import type { Bg3dModelFormat } from "./bg3d/bg3d-model-library";
 import type { StudioBg3dGlbValidationSuccess } from "./bg3d/studio-bg3d-glb-validation";
-import type { StudioBg3dKtx2RendererRuntime } from "./bg3d/studio-bg3d-ktx2-renderer-runtime";
+import type {
+  StudioBg3dKtx2Renderer,
+  StudioBg3dKtx2RendererRuntime,
+} from "./bg3d/studio-bg3d-ktx2-renderer-runtime";
 import type {
   StudioBg3dAnimationPlayback,
   StudioBg3dConstraintLayer,
@@ -1766,7 +1769,12 @@ export async function loadVerifiedStudioBg3dGlbWithThree(
   verification: StudioBg3dGlbValidationSuccess,
   budgets: StudioBg3dSceneBudgets,
   options: {
-    readonly renderer?: THREE.WebGLRenderer | null;
+    /**
+     * The renderer that owns the editor canvas, used only to pick KTX2 transcode formats. Either
+     * interactive backend is accepted; the KTX2 runtime reads whichever capability API that
+     * renderer exposes.
+     */
+    readonly renderer?: StudioBg3dKtx2Renderer | null;
   } = {},
 ): Promise<StudioBg3dThreeLoadResult> {
   if (!validBudgets(budgets)) return threeFailure("invalid-budgets");
@@ -1802,7 +1810,7 @@ export async function loadVerifiedStudioBg3dGlbWithThree(
     // selects that standards-defined fallback when no KTX2Loader is attached.
     const ktx2RuntimePromise = verification.requiresBasisTextures
       ? import("./bg3d/studio-bg3d-ktx2-renderer-runtime").then(({ createStudioBg3dKtx2RendererRuntime }) =>
-          createStudioBg3dKtx2RendererRuntime({ renderer: options.renderer as THREE.WebGLRenderer })
+          createStudioBg3dKtx2RendererRuntime({ renderer: options.renderer as StudioBg3dKtx2Renderer })
         )
       : Promise.resolve(null);
     const [baseLoaderResult, ktx2RuntimeResult] = await Promise.allSettled([

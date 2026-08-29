@@ -523,7 +523,12 @@ export {
   calculateStudioBg3dThreeWorldDeltaTransform,
 } from "./studio-bg3d-three-hierarchy";
 export { resolveStudioBg3dThreeCenterGroundLocalPosition } from "./studio-bg3d-three-model-alignment";
-export { applyStudioBg3dThreeWebglRenderSettings } from "./studio-bg3d-three-render-settings";
+export {
+  applyStudioBg3dThreeRenderSettings,
+  applyStudioBg3dThreeWebglRenderSettings,
+} from "./studio-bg3d-three-render-settings";
+export { useStudioBg3dEngineRuntime } from "./useStudioBg3dEngineRuntime";
+export { StudioBg3dEnginePanel } from "./StudioBg3dEnginePanel";
 export {
   ADD_BUTTONS,
   BG_PANEL_TABS,
@@ -584,7 +589,7 @@ export {
   BgSectionPlaneController,
   BgViewportController,
   SkyClearColorController,
-  StudioBg3dWebglRenderSettingsController,
+  StudioBg3dThreeRenderSettingsController,
   type StudioBg3dPlacementPreviewAsset,
   type StudioBg3dRigBakeReader,
 } from "./StudioBg3dSceneNodes";

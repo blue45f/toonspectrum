@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createStudioVrmAssetRuntime,
   readStudioVrmAssetLicenseAuthority,
+  readStudioVrmMaterialVariant,
   stampStudioVrmAssetLicenseAuthority,
   stampStudioVrmGltfMaterialAssociations,
   type StudioVrmAssetRuntimeDependencies,
@@ -108,8 +109,35 @@ describe("studio VRM asset runtime", () => {
     expect(order).toEqual(["resolve", "preflight", "load", "prepare"]);
     expect(injected.resolveUrl).toHaveBeenCalledOnce();
     expect(injected.preflight).toHaveBeenCalledExactlyOnceWith("https://assets.example/avatar.vrm");
-    expect(injected.loadResolved).toHaveBeenCalledExactlyOnceWith("https://assets.example/avatar.vrm");
+    expect(injected.loadResolved).toHaveBeenCalledExactlyOnceWith(
+      "https://assets.example/avatar.vrm",
+      // No class was injected, so the loader builds MToon's WebGL ShaderMaterial. Defaulting the
+      // other way would hand a WebGL renderer a node material it cannot compile.
+      undefined,
+    );
     expect(injected.prepare).toHaveBeenCalledExactlyOnceWith(vrm);
+  });
+
+  it("hands an injected MToon class to the loader and records the resulting variant", async () => {
+    // MToon's ShaderMaterial and its TSL node port each compile on exactly one backend, so the
+    // class travels with the request from whoever owns the renderer — this leaf never picks one,
+    // which is what keeps the VRM poser's chunk off Three's WebGPU graph.
+    const vrm = fakeVrm();
+    const injected = dependencies({
+      resolveUrl: vi.fn(() => "https://assets.example/avatar.vrm"),
+      loadResolved: vi.fn(async () => vrm),
+    });
+    const runtime = createStudioVrmAssetRuntime(injected);
+    const nodeMaterial = class extends THREE.Material {} as unknown as typeof THREE.Material;
+
+    await expect(runtime.load("/vrm/avatar.vrm", { mtoonMaterialType: nodeMaterial }))
+      .resolves.toBe(vrm);
+    expect(injected.loadResolved).toHaveBeenCalledExactlyOnceWith(
+      "https://assets.example/avatar.vrm",
+      nodeMaterial,
+    );
+    expect(readStudioVrmMaterialVariant(vrm)).toBe("webgpu-node");
+    expect(readStudioVrmMaterialVariant(null)).toBeNull();
   });
 
   it("fails closed before loader and preparation when preflight rejects", async () => {

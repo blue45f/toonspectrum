@@ -35,7 +35,15 @@ interface StudioBg3dRuntimeAssetQualityMaterialTextureInput {
 export interface StudioBg3dRuntimeAssetQualityInput {
   castShadow: boolean;
   receiveShadow: boolean;
-  readonly renderer?: THREE.WebGLRenderer | null;
+  /**
+   * Renderer that will draw the asset, used only to read the device anisotropy ceiling.
+   *
+   * WebGL exposes it under `capabilities`; WebGPU exposes it on the renderer itself. Naming one
+   * type would silently fall back to the constant on the other, so both shapes are accepted.
+   */
+  readonly renderer?:
+    | (Partial<THREE.WebGLRenderer> & { getMaxAnisotropy?: () => number })
+    | null;
   /** qualityBudget lowers anisotropy only; mesh lighting/casting is still controlled by flags. */
   readonly qualityBudget?: number;
 }
@@ -171,7 +179,9 @@ export function applyStudioBg3dRuntimeAssetQuality(
     1,
     Math.min(
       STUDIO_BG3D_RUNTIME_MAX_ANISOTROPY,
-      quality.renderer?.capabilities?.getMaxAnisotropy?.() ?? STUDIO_BG3D_RUNTIME_MAX_ANISOTROPY,
+      quality.renderer?.capabilities?.getMaxAnisotropy?.()
+        ?? quality.renderer?.getMaxAnisotropy?.()
+        ?? STUDIO_BG3D_RUNTIME_MAX_ANISOTROPY,
     ),
   );
 

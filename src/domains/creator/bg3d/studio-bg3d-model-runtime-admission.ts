@@ -47,7 +47,7 @@ import type {
   StudioGeneric3dManifestHints,
   StudioGeneric3dSourceFormat,
 } from "../studio-generic-3d-model-mode";
-import type { WebGLRenderer } from "three";
+import type { StudioBg3dKtx2Renderer } from "./studio-bg3d-ktx2-renderer-runtime";
 
 export type StudioBg3dModelRootCacheEntry = Pick<
   StudioBg3dThreeLoadSuccess,
@@ -158,7 +158,8 @@ export async function admitAndCacheStudioBg3dModel(args: {
   readonly document: StudioBg3dSceneDocument;
   readonly quality: StudioBg3dResolvedDeviceQuality;
   readonly cumulativeUsedBytes: number;
-  readonly renderer: WebGLRenderer | null;
+  /** Either interactive backend; used only for KTX2 format selection and the anisotropy cap. */
+  readonly renderer: StudioBg3dKtx2Renderer | null;
   readonly cache: Map<string, StudioBg3dModelRootCacheEntry>;
   readonly pending: Map<string, Promise<StudioBg3dModelRootCacheEntry>>;
   readonly isActive: () => boolean;

@@ -6,6 +6,8 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 
+import type { StudioBg3dKtx2Renderer } from "./studio-bg3d-ktx2-renderer-runtime";
+
 export function useStudioBg3dEditorState(props) {
   const hostRef = R.useRef<Record<string, any> | null>(null);
   if (hostRef.current == null) hostRef.current = {};
@@ -30,6 +32,7 @@ export function useStudioBg3dEditorState(props) {
   } = R;
   const [primitiveGeometryPool] = useState(() => new StudioBg3dPrimitiveGeometryPool());
   const [adaptiveDprScale, setAdaptiveDprScale] = useState(1);
+  const [engineFrameTimeMs, setEngineFrameTimeMs] = useState<number | null>(null);
   const {
     commitSharedCharacterTransform,
     effectiveSelectedSharedCharacter,
@@ -274,8 +277,11 @@ export function useStudioBg3dEditorState(props) {
     useState<StudioBg3dPlacementPreviewAsset | null>(null);
   const placementSessionRef = useRef<StudioBg3dPlacementSessionState>(placementSession);
   const placementTokenSequenceRef = useRef(0);
-  const [modelRenderer, setModelRenderer] = useState<THREE.WebGLRenderer | null>(null);
-  const modelRendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  // The engine-selection policy decides per session which renderer owns the canvas, so this holds
+  // whichever one `onCreated` handed back. Typing it as `WebGLRenderer` used to be true and is now
+  // a lie that pushes every consumer into a narrowing guard that silently drops a WebGPU session.
+  const [modelRenderer, setModelRenderer] = useState<StudioBg3dKtx2Renderer | null>(null);
+  const modelRendererRef = useRef<StudioBg3dKtx2Renderer | null>(null);
   const [isUploadingModel, setIsUploadingModel] = useState(false);
   const [modelImportProgress, setModelImportProgress] = useState<StudioBg3dImportProgress | null>(null);
   const modelImportAbortRef = useRef<AbortController | null>(null);
@@ -443,6 +449,8 @@ export function useStudioBg3dEditorState(props) {
     primitiveGeometryPool,
     adaptiveDprScale,
     setAdaptiveDprScale,
+    engineFrameTimeMs,
+    setEngineFrameTimeMs,
     sharedCharacterCaptureAuthorityDraft,
     sharedCharacterCaptureAuthorityPayloadKey,
     sharedCharacterCaptureAuthorityRef,
