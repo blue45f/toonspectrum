@@ -67,6 +67,37 @@ describe("studioLiveTransformRouteSurvivesScale", () => {
     expect(studioLiveTransformRouteSurvivesScale(stroke, 0.5)).toBe(false);
   });
 
+  it("refuses a scale that crosses the perfect-freehand 400px outline cap", () => {
+    // studioPerfectFreehandStrokeOptions clamps the committed outline to 400px, so a 300px stroke
+    // scaled 2x previews a 600px outline and re-renders at 400px.
+    expect(studioLiveTransformRouteSurvivesScale({ ...SAFE, strokeWidth: 300 }, 2)).toBe(false);
+    expect(studioLiveTransformRouteSurvivesScale({ ...SAFE, strokeWidth: 500 }, 0.5)).toBe(false);
+    // Both readings under the cap: exact.
+    expect(studioLiveTransformRouteSurvivesScale({ ...SAFE, strokeWidth: 100 }, 1.5)).toBe(true);
+  });
+
+  it("refuses a scale that crosses the 8px arrowhead floor, for strokes that draw one", () => {
+    // The head is Math.max(8, strokeWidth * 2). A 2px arrow scaled 2x previews its existing 8px
+    // head at 16px while the commit regenerates it at 8px.
+    // strokeDistance 40 keeps both readings inside the 16/180 cutoffs at 2x, so this assertion
+    // isolates the head floor rather than tripping a distance branch.
+    const arrow = {
+      strokeWidth: 2,
+      strokeDistance: 40,
+      pointCount: 40,
+      drawsArrowHead: true,
+    } as const;
+    expect(studioLiveTransformRouteSurvivesScale(arrow, 2)).toBe(false);
+    // Above the floor on both sides, the head scales exactly.
+    expect(
+      studioLiveTransformRouteSurvivesScale({ ...arrow, strokeWidth: 20 }, 2),
+    ).toBe(true);
+    // A stroke that draws no head does not pay for the check.
+    expect(
+      studioLiveTransformRouteSurvivesScale({ ...arrow, drawsArrowHead: false }, 2),
+    ).toBe(true);
+  });
+
   it("refuses anything it cannot read, because an unreadable route is not a licence", () => {
     expect(studioLiveTransformRouteSurvivesScale(SAFE, Number.NaN)).toBe(false);
     expect(studioLiveTransformRouteSurvivesScale(SAFE, 0)).toBe(false);

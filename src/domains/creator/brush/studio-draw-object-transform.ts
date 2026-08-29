@@ -26,7 +26,10 @@
  * A rejected transform returns `null` rather than a partially transformed stroke: callers treat
  * that as "leave the document untouched", the same all-or-nothing discipline the group planner uses.
  */
+import { MAX_STROKE_WIDTH } from "../live/studio-crdt-document-constants";
+
 import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
+
 
 import type { DrawEl } from "../studio-element-model";
 
@@ -224,12 +227,20 @@ export function planStudioDrawObjectTransform(
 
   const widthFactor = strokeWidthPolicy === "scale" ? scale.uniformEquivalent : 1;
   const strokeWidth = el.strokeWidth * widthFactor;
-  if (!finite(strokeWidth)) return null;
+  // Finite is not enough: `validatePayload` in live/studio-crdt-document-payload asserts
+  // strokeWidth within [0.01, MAX_STROKE_WIDTH] and sampleSpacing within [0, MAX_STROKE_WIDTH],
+  // so a large enough enlargement produces an element that applies locally and then FAILS CRDT
+  // publication -- the collaborator's document silently diverges from the author's. Refusing the
+  // transform leaves the stroke as it was, which is the honest outcome for a gesture whose result
+  // cannot be persisted. The same trap caught the stylus-channel rotation earlier in this file.
+  if (!finite(strokeWidth) || strokeWidth < 0.01 || strokeWidth > MAX_STROKE_WIDTH) return null;
 
   let sampleSpacing: number | undefined;
   if (el.sampleSpacing !== undefined) {
     sampleSpacing = el.sampleSpacing * widthFactor;
-    if (!finite(sampleSpacing)) return null;
+    if (!finite(sampleSpacing) || sampleSpacing < 0 || sampleSpacing > MAX_STROKE_WIDTH) {
+      return null;
+    }
   }
 
   let shapeParams: DrawEl["shapeParams"];

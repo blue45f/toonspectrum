@@ -245,10 +245,17 @@ export function renderStudioCanvasSelectionDecorations({
           // renderer's absolute pixel thresholds, which no engine allowlist can see.
           livePreviewRenderRoute={
             singleDrawFreeScale && canvasSelectionEls[0]?.type === "draw"
-              ? studioLiveTransformRouteOfPoints(
-                  canvasSelectionEls[0].points,
-                  canvasSelectionEls[0].strokeWidth,
-                )
+              ? {
+                  ...studioLiveTransformRouteOfPoints(
+                    canvasSelectionEls[0].points,
+                    canvasSelectionEls[0].strokeWidth,
+                  ),
+                  // Arrowheads are sized Math.max(8, strokeWidth * 2) — an absolute floor the
+                  // preview scales straight past.
+                  drawsArrowHead:
+                    canvasSelectionEls[0].kind === "arrow"
+                    || canvasSelectionEls[0].kind === "line",
+                }
               : undefined
           }
           // The gesture lifts stroke+proxy+Transformer into the small drag Layer so an

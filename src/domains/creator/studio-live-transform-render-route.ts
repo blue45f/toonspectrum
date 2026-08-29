@@ -33,6 +33,8 @@ export interface StudioLiveTransformRenderRoute {
   readonly strokeDistance: number;
   /** Source point count (pairs), for the sparse-spacing predicate. */
   readonly pointCount: number;
+  /** True when the renderer draws an arrowhead for this stroke (`kind` line/arrow with a head). */
+  readonly drawsArrowHead?: boolean;
 }
 
 /** Absolute px thresholds `StudioDrawNode` compares `strokeDistance` against. */
@@ -40,6 +42,21 @@ const STUDIO_RENDER_ROUTE_DISTANCE_THRESHOLDS = [16, 180] as const;
 
 /** The renderer's minimum drawn diameter, from `StudioDrawNode`. */
 const STUDIO_RENDER_ROUTE_MIN_DIAMETER = 1;
+
+/**
+ * `studioPerfectFreehandStrokeOptions` clamps the committed outline size to `[0.5, 400]`, so a
+ * 300px stroke scaled 2x previews a 600px affine outline and re-renders at 400px on commit. The
+ * floor is below the 1px diameter floor above, so only the cap adds a distinct crossing.
+ */
+const STUDIO_RENDER_ROUTE_MAX_OUTLINE_WIDTH = 400;
+
+/**
+ * Arrowheads are sized `Math.max(8, strokeWidth * 2)` in `StudioDrawNode`, an absolute floor that
+ * does not scale: a 2px arrow scaled 2x previews its existing 8px head at 16px while the commit
+ * stores width 4 and regenerates the head at 8px. Only strokes that draw a head care, so callers
+ * say so rather than every stroke paying for it.
+ */
+const STUDIO_RENDER_ROUTE_MIN_ARROW_HEAD = 8;
 
 /** Sparse-long-stroke spacing floor: `Math.max(20, strokeWidth * 4)`. */
 function sparseSpacingFloor(strokeWidth: number): number {
@@ -67,6 +84,18 @@ export function studioLiveTransformRouteSurvivesScale(
   const previewDiameter = Math.max(STUDIO_RENDER_ROUTE_MIN_DIAMETER, strokeWidth) * scale;
   const committedDiameter = Math.max(STUDIO_RENDER_ROUTE_MIN_DIAMETER, strokeWidth * scale);
   if (Math.abs(previewDiameter - committedDiameter) > 1e-9) return false;
+
+  // The perfect-freehand outline cap, which the preview scales straight past.
+  const previewOutline = Math.min(STUDIO_RENDER_ROUTE_MAX_OUTLINE_WIDTH, strokeWidth) * scale;
+  const committedOutline = Math.min(STUDIO_RENDER_ROUTE_MAX_OUTLINE_WIDTH, strokeWidth * scale);
+  if (Math.abs(previewOutline - committedOutline) > 1e-9) return false;
+
+  // The arrowhead floor, for strokes that draw one.
+  if (route.drawsArrowHead === true) {
+    const previewHead = Math.max(STUDIO_RENDER_ROUTE_MIN_ARROW_HEAD, strokeWidth * 2) * scale;
+    const committedHead = Math.max(STUDIO_RENDER_ROUTE_MIN_ARROW_HEAD, strokeWidth * scale * 2);
+    if (Math.abs(previewHead - committedHead) > 1e-9) return false;
+  }
 
   // The distance-keyed route branches.
   const scaledDistance = strokeDistance * scale;

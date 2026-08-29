@@ -414,6 +414,38 @@ describe("orientation-dependent nibs", () => {
     expect(rotated?.brushTip).toEqual(NIB);
   });
 
+  it("refuses a transform whose width the CRDT payload validator would reject", () => {
+    // validatePayload asserts strokeWidth within [0.01, MAX_STROKE_WIDTH]. Without this the
+    // transform applies locally and then fails publication, so the collaborator's document
+    // silently diverges from the author's.
+    expect(
+      planStudioDrawObjectTransform({
+        el: drawEl({ strokeWidth: 5_000 }),
+        sourceBounds: UNIT_SOURCE,
+        targetBounds: { x: 0, y: 0, width: 20, height: 20 },
+        rotationDeg: 0,
+      }),
+    ).toBeNull();
+    // And the other end of the range.
+    expect(
+      planStudioDrawObjectTransform({
+        el: drawEl({ strokeWidth: 0.02 }),
+        sourceBounds: UNIT_SOURCE,
+        targetBounds: { x: 0, y: 0, width: 1, height: 1 },
+        rotationDeg: 0,
+      }),
+    ).toBeNull();
+    // Well inside the range, the same gesture is fine.
+    expect(
+      planStudioDrawObjectTransform({
+        el: drawEl({ strokeWidth: 10 }),
+        sourceBounds: UNIT_SOURCE,
+        targetBounds: { x: 0, y: 0, width: 20, height: 20 },
+        rotationDeg: 0,
+      })?.strokeWidth,
+    ).toBe(20);
+  });
+
   it("drops the rotation for bounds-derived shapes instead of collapsing them", () => {
     // StudioDrawNode rebuilds these from drawBounds(points) as axis-aligned primitives, so a
     // rotated point array cannot carry the turn -- and destroys the shape trying. A square stored

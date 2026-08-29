@@ -15,6 +15,9 @@ function draw(overrides: Record<string, unknown> = {}): El {
     // "pen" is causal-ink, one of the audited transform-safe engines, so the base fixture
     // exercises the allowed path and each test below varies exactly one thing.
     brush: "pen",
+    // A stored sampleSpacing is required for the preview: legacy strokes without one are
+    // reprocessed against a fixed 3px distance that does not scale.
+    sampleSpacing: 2,
     ...overrides,
   } as unknown as El;
 }
@@ -120,10 +123,9 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
   });
 
   it("allows only the audited transform-safe engines", () => {
-    // pen/g-pen are causal-ink, calligraphy is calligraphy-segments, highlighter is
-    // highlighter-path -- each checked against its planner for world constants, index-derived
-    // noise and document-grid snapping.
-    for (const brush of ["pen", "calligraphy", "highlighter"]) {
+    // pen/g-pen are causal-ink and calligraphy is calligraphy-segments -- each checked against its
+    // planner for world constants, index-derived noise and document-grid snapping.
+    for (const brush of ["pen", "calligraphy"]) {
       expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(false);
     }
   });
@@ -166,6 +168,26 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     expect(
       studioLiveTransformPreviewBlockedForElement(draw({ brush: "pen", twists: [30] }), false),
     ).toBe(true);
+  });
+
+  it("refuses legacy strokes that carry no sampleSpacing", () => {
+    // resolveStudioFreehandRenderPath reprocesses those points against a FIXED 3px legacy
+    // distance, so enlarging a densely sampled stroke keeps points the source render discarded
+    // and the committed centerline is not the previewed one scaled. A stored sampleSpacing scales
+    // with the transform, which is what makes the two resamplings agree.
+    expect(
+      studioLiveTransformPreviewBlockedForElement(draw({ sampleSpacing: undefined }), false),
+    ).toBe(true);
+  });
+
+  it("no longer previews capsule outlines or highlighters, whose clamps it cannot model", () => {
+    // The croquis capsule reruns a pulled-string follower against a persisted length clamped to
+    // 1-512px; the highlighter wash picks its subdivision count from an absolute 0.1-0.55px
+    // flattening tolerance and derives rim detail from the resulting section indices. Neither
+    // reduces to a threshold the route check can compare before and after.
+    for (const brush of ["highlighter", "croquis-capsule"]) {
+      expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(true);
+    }
   });
 
   it("ignores non-draw elements entirely", () => {

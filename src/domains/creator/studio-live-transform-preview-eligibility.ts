@@ -51,13 +51,21 @@ import type { DrawEl, El } from "./studio-element-model";
  * known bad: `stamp-dabs` drains charge by `stampIndex` and offers a world-`fixed` tip rotation
  * plus a `random-jitter` one; `oil-ribbon`, `pencil-path`, `watercolor-dabs`, `particle-scatter`
  * and `screentone-dots` were each confirmed in review.
+ *
+ * `capsule-outline` and `highlighter-path` WERE listed here and have been removed. Review found
+ * absolute-pixel state in both that this file cannot model: the croquis capsule reruns a
+ * pulled-string follower against a persisted `pulledStringLengthPx` clamped to 1-512px and
+ * compared against transformed point distances, so a scale changes the follower's trajectory
+ * rather than scaling its result; and `planStudioHighlighterWashRibbon` picks its subdivision
+ * count from an absolute 0.1-0.55px flattening tolerance and then derives rim and fibre detail
+ * from the resulting section indices. Neither reduces to a threshold the route check can compare
+ * before and after, so they are out until someone models them properly. Removing them is cheap --
+ * those strokes keep commit-at-release -- and that is the point of the asymmetry.
  */
 const STUDIO_TRANSFORM_SAFE_ENGINES: ReadonlySet<string> = new Set([
   "causal-ink",
   "calligraphy-segments",
   "perfect-outline",
-  "capsule-outline",
-  "highlighter-path",
 ]);
 
 /**
@@ -127,5 +135,11 @@ export function studioLiveTransformPreviewBlockedForElement(
   if (!studioBrushEngineIsTransformSafe(draw.brush, draw.brushCatalogId)) {
     return true;
   }
+  // Legacy strokes with no `sampleSpacing`. `resolveStudioFreehandRenderPath` reprocesses those
+  // points against a FIXED 3px legacy distance, so enlarging a densely sampled stroke keeps points
+  // the source render discarded and the committed centerline is not the previewed one scaled. A
+  // stored `sampleSpacing` scales with the transform (the commit planner multiplies it by the same
+  // width factor), which is what makes the resampling agree.
+  if (draw.sampleSpacing === undefined) return true;
   return false;
 }
