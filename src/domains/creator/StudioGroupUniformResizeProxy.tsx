@@ -476,6 +476,12 @@ export function StudioGroupUniformResizeProxy({
       || projection.reason === "unsupported-render-route"
     ) {
       resetStudioLiveTransformPreviewNodeAttrs(preview.node);
+      // The clip has to go back with the attrs, not just the pose. An earlier uniform frame can
+      // already have re-pointed it, and abandoning the preview parks the ink at its DOCUMENT
+      // position — under a clip belonging to a frame the stroke is no longer previewing. A panel
+      // member would leak outside its panel, or a free stroke sit clipped by a panel it is not in,
+      // for the rest of the gesture.
+      applyStudioLiveTransformClip(preview.clipHost, preview.originalClip);
     }
   }
 
