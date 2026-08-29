@@ -10,6 +10,8 @@ import {
   traceStudioOilRibbonPath,
   type StudioOilRibbonImpastoReliefKind,
 } from "./studio-oil-ribbon-carrier";
+import { studioPerfBudgetMs } from "./studio-perf-budget-calibration";
+
 
 const HORIZONTAL_STROKE = {
   points: [0, 60, 90, 60, 180, 60, 270, 60],
@@ -193,10 +195,12 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
     expect(longDabs.length).toBeGreaterThanOrEqual(2000);
     const { plan, elapsed } = fastestPlan(longDabs);
     expect(plan.impastoReliefLanes!.length).toBeGreaterThan(0);
-    // Same busy-runner allowance as the scribble budget below (its rationale comment applies):
-    // even the min-of-5 statistic measured 39.5ms on a starved shared runner that passed the
-    // identical commit's local run at a third of that.
-    expect(elapsed).toBeLessThan(process.env.CI ? 60 : 30);
+    // Recorded against the calibration reference, not against a runner: min-of-5 measures 20.7ms
+    // on the reference container in isolation and 32.5ms inside the full suite, which is why the
+    // old absolute 30ms could not survive `pnpm test` off CI. 26ms is that isolated cost plus the
+    // same ~1.25x margin the scribble budget carries — comfortably clear of healthy noise, and
+    // less than half the 41ms a 2x regression would read at this scale.
+    expect(elapsed).toBeLessThan(studioPerfBudgetMs(26));
   });
 
   it("stays within the plan budget on a dense self-crossing scribble too", () => {
@@ -226,8 +230,11 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
     // splatted twice, and each ridge segment is one capsule distance field instead of a chain of
     // overlapping discs that was quadrature for exactly that field.
     //
-    // The bound is 60 (or 120 under busy CI runners) to prevent flaky failures on cloud VMs.
-    const timingBudget = process.env.CI ? 120 : 60;
-    expect(elapsed).toBeLessThan(timingBudget);
+    // Recorded on the calibration reference container at 78.4ms min-of-5 (three rounds: 78.4,
+    // 70.0, 69.9), so 98ms is that worst steady-state reading plus ~1.25x. The old 60/120 split
+    // was an absolute count that failed here at 78.5ms with nothing regressed; scaling by the
+    // calibration removes the runner from the verdict without admitting the 157ms a 2x regression
+    // would read.
+    expect(elapsed).toBeLessThan(studioPerfBudgetMs(98));
   });
 });
