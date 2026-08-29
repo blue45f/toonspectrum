@@ -5,6 +5,7 @@ import {
   evaluateStudioCalibratedDetection,
   judgeStudioCalibratedBudget,
   measureStudioCalibratedPasses,
+  STUDIO_PERF_CALIBRATION_DETECTION_ATTEMPTS,
   readStudioPerfCalibrationSink,
   scaleStudioPerfCalibrationPass,
   reduceStudioPerfCalibrationSamples,
@@ -325,6 +326,57 @@ describe("studio perf calibration — end to end", () => {
     expect(detection.detected, detection.detail).toBe(true);
     // The budget's own passes lead, and any pass added to prove detection follows them.
     expect(detection.passes.slice(0, budget.passes.length)).toEqual(budget.passes);
+  });
+
+  it("reduces an attempt the way the gate does, so it cannot claim detection the gate misses", () => {
+    // Regression test for a real defect: detection reduced a flat pool of passes by the MAXIMUM
+    // while the gate reduces by the minimum. Ratios of 1.0 and 0.5 at factor 2 then reported
+    // "detectable" (1.0 x 2 > 1.5) even though a genuinely doubled workload measures 2.0 and 1.0,
+    // whose minimum (1.0) clears the 1.5 gate and acquits. Reported by Codex on #39.
+    const passes = [
+      reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 100 }]),
+      reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 50 }]),
+    ];
+    expect(passes.map((pass) => pass.ratio)).toEqual([1, 0.5]);
+
+    const detection = evaluateStudioCalibratedDetection({
+      label: "mixed attempt",
+      workload: () => {
+        throw new Error("must not measure again");
+      },
+      referenceRounds: 1,
+      seed: passes,
+      factor: 2,
+      attemptCount: 1,
+    });
+    expect(detection.detected, detection.detail).toBe(false);
+
+    // And the claim it refuses to make is exactly the one the gate would refuse: doubling this
+    // very attempt's workload leaves a minimum the gate acquits.
+    const doubled = passes.map((pass) => scaleStudioPerfCalibrationPass(pass, 2));
+    expect(judgeStudioCalibratedBudget("mixed attempt (doubled)", doubled).ok).toBe(true);
+  });
+
+  it("lets a clean attempt override a distorted one, but never a clean pass inside one", () => {
+    const distorted = [
+      reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 100 }]),
+      reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 50 }]),
+    ];
+    // A second, healthy attempt is measured because the seeded one cannot show detection, and
+    // one whole attempt holding is enough — that is where "earn it" belongs.
+    const detection = evaluateStudioCalibratedDetection({
+      label: "recovering calibration",
+      workload: () => void runStudioPerfCalibrationRounds(ROUNDS),
+      referenceRounds: ROUNDS,
+      seed: distorted,
+      factor: 2,
+      samples: 4,
+      warmups: 1,
+      passes: 2,
+    });
+    expect(detection.detected, detection.detail).toBe(true);
+    expect(detection.passes.length).toBeGreaterThan(distorted.length);
+    expect(STUDIO_PERF_CALIBRATION_DETECTION_ATTEMPTS).toBeGreaterThanOrEqual(2);
   });
 
   it("re-measures rather than letting one starved reference condemn the calibration", () => {

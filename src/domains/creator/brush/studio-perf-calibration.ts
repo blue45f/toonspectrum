@@ -135,6 +135,9 @@ export const STUDIO_PERF_CALIBRATION_MAX_GROWTH = 1.5;
 /** Passes a violation must survive before it counts. */
 export const STUDIO_PERF_CALIBRATION_CONFIRMATION_PASSES = 3;
 
+/** Independent attempts a *failure to detect* must survive before it counts. */
+export const STUDIO_PERF_CALIBRATION_DETECTION_ATTEMPTS = 2;
+
 /**
  * Reduces interleaved samples to one pass. Both sides take their MINIMUM: contention only ever
  * adds time, so the cheapest reference and the cheapest workload window are the honest
@@ -358,7 +361,7 @@ export interface StudioCalibratedDetectionVerdict {
   /** True when a `factor`x slowdown of this workload would have tripped the gate. */
   readonly detected: boolean;
   readonly factor: number;
-  /** Smallest slowdown the best-calibrated pass would have convicted. */
+  /** Smallest slowdown the best-calibrated attempt would have convicted. */
   readonly detectableFactor: number;
   readonly passes: readonly StudioPerfCalibrationPass[];
   readonly detail: string;
@@ -367,8 +370,13 @@ export interface StudioCalibratedDetectionVerdict {
 export interface StudioCalibratedDetectionOptions extends StudioCalibratedBudgetOptions {
   /** Regression multiple that must remain detectable. */
   readonly factor: number;
-  /** Passes already measured for this workload — reused before any new measuring happens. */
+  /**
+   * Passes already measured for this workload, as ONE attempt — the set a budget verdict judged
+   * together. Reused before any new measuring happens, so the healthy case measures nothing.
+   */
   readonly seed?: readonly StudioPerfCalibrationPass[];
+  /** Independent attempts a failure to detect must survive. */
+  readonly attemptCount?: number;
 }
 
 /**
@@ -376,13 +384,14 @@ export interface StudioCalibratedDetectionOptions extends StudioCalibratedBudget
  * no-op: it asserts that a `factor`x regression of this very workload, on this very machine,
  * would still be convicted.
  *
- * Where a violation must be earned by EVERY pass (so the gate takes the minimum ratio), a
- * *failure to detect* must be earned the same way — so this takes the MAXIMUM. A pass whose
- * reference window happened to be starved harder than its workload window understates the
- * machine and therefore understates detection power; another pass is measured rather than
- * letting that one reading condemn the calibration. Passes already measured by
- * `evaluateStudioCalibratedBudget` are reused via `seed`, so the ordinary case — a healthy
- * reading that already proves detection — measures nothing at all.
+ * It reduces each attempt exactly as the gate does — by the MINIMUM — because that is the
+ * counterfactual being claimed: had these passes come from a workload `factor`x slower, would
+ * the gate have convicted? Only if every pass violated. Where a violation must be earned by
+ * every pass, a *failure to detect* is earned between whole ATTEMPTS: an attempt whose
+ * reference window was starved harder than its workload window understates the machine, so
+ * another complete attempt is measured rather than letting that one condemn the calibration.
+ * Passes already measured by `evaluateStudioCalibratedBudget` seed the first attempt, so the
+ * ordinary case — a healthy reading that already proves detection — measures nothing at all.
  */
 export function evaluateStudioCalibratedDetection(
   options: StudioCalibratedDetectionOptions,
@@ -396,29 +405,47 @@ export function evaluateStudioCalibratedDetection(
     samples = 5,
     warmups = 2,
     passes = STUDIO_PERF_CALIBRATION_CONFIRMATION_PASSES,
+    attemptCount = STUDIO_PERF_CALIBRATION_DETECTION_ATTEMPTS,
   } = options;
   if (!(factor > 1) || !Number.isFinite(factor)) {
     throw new Error(`A detection factor must be greater than 1, got ${factor}.`);
   }
 
-  const recorded: StudioPerfCalibrationPass[] = [...seed];
-  const best = (): number => Math.max(...recorded.map((pass) => pass.ratio));
-  const detected = (): boolean => best() * factor > maxRatio;
+  // An ATTEMPT is one complete counterfactual: the passes the gate would have judged together,
+  // reduced the way the gate reduces them. That reduction is the MINIMUM, because a regressed
+  // workload is convicted only when every pass violates — so it escapes if any one pass reads
+  // low. Reducing by the maximum instead claims detection the gate would not deliver: seeded
+  // ratios of 1.0 and 0.5 at factor 2 would report "detectable" on max (1.0 x 2 > 1.5) while a
+  // genuinely doubled workload measures 2.0 and 1.0, whose minimum acquits.
+  const attemptRatio = (attempt: readonly StudioPerfCalibrationPass[]): number =>
+    Math.min(...attempt.map((pass) => pass.ratio));
+  const attempts: StudioPerfCalibrationPass[][] = seed.length > 0 ? [[...seed]] : [];
 
+  // "Earn it" belongs BETWEEN attempts, not inside one. A single distorted attempt — one whose
+  // reference window was starved harder than its workload window — understates the machine, so
+  // another whole attempt is measured rather than letting that one condemn the calibration. Each
+  // attempt stands on its own, and detection needs only one of them to hold.
   const reference = resolveStudioPerfCalibrationReference(options);
+  const detected = (): boolean =>
+    attempts.some((attempt) => attemptRatio(attempt) * factor > maxRatio);
   let warmed = false;
-  for (let pass = recorded.length; pass < passes && !detected(); pass += 1) {
+  for (let attempt = attempts.length; attempt < attemptCount && !detected(); attempt += 1) {
     if (!warmed) {
       warmStudioPerfCalibration(workload, reference, warmups);
       warmed = true;
     }
-    recorded.push(measureStudioPerfCalibrationPass(workload, reference, samples));
+    const fresh: StudioPerfCalibrationPass[] = [];
+    for (let pass = 0; pass < passes; pass += 1) {
+      fresh.push(measureStudioPerfCalibrationPass(workload, reference, samples));
+    }
+    attempts.push(fresh);
   }
-  if (recorded.length === 0) {
+  if (attempts.length === 0) {
     throw new Error(`No calibration passes recorded for ${label}.`);
   }
 
-  const detectableFactor = maxRatio / best();
+  const recorded = attempts.flat();
+  const detectableFactor = maxRatio / Math.max(...attempts.map(attemptRatio));
   return {
     label,
     detected: detected(),
