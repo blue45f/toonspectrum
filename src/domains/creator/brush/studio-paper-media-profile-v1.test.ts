@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import {
   STUDIO_PAPER_DEFAULT_PRESET_BY_BRUSH_FAMILY_V1,
@@ -20,6 +20,11 @@ import {
   type StudioPaperMediumV1,
   type StudioPaperPresetV1,
 } from "./studio-paper-media-profile-v1";
+import {
+  evaluateStudioCalibratedBudget,
+  evaluateStudioCalibratedDetection,
+  type StudioCalibratedBudgetVerdict,
+} from "./studio-perf-calibration";
 
 const SEED = 41;
 
@@ -705,28 +710,82 @@ describe("브러시 패밀리 기본 종이·매체 지도", () => {
 // ---------------------------------------------------------------------------
 
 describe("성능 예산 — 스칼라 샘플러", () => {
-  it("1e6 샘플이 200ms(샘플당 200ns) 안에 끝난다", () => {
-    const preset = STUDIO_PAPER_PRESETS_V1["canvas-weave"];
-    // 워밍업 — 파생 상수 캐시와 JIT를 채운다.
-    let sink = 0;
-    for (let index = 0; index < 10_000; index += 1) {
-      sink += samplePaperHeightV1(preset, index * 0.83, index * 0.57, SEED);
-    }
-    // 전체 스위트(2400여 파일) 안에서 벽시계를 한 번만 재면 그 순간의 스케줄링 운이 판정에 섞인다.
-    // 노이즈는 시간을 더하기만 하므로 여러 번 중 최솟값이 샘플러 실제 비용의 정직한 추정치다.
-    // 기준은 200ms 그대로 — 진짜로 느려졌다면 어떤 회차도 실제 작업량보다 빠를 수 없다.
-    // (이 레포의 bestMs·physicsBest 예산이 이미 같은 방식을 쓴다.)
-    let elapsedMs = Number.POSITIVE_INFINITY;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const start = performance.now();
-      for (let index = 0; index < 1_000_000; index += 1) {
-        sink += samplePaperHeightV1(preset, (index % 1024) * 0.83, (index / 1024) * 0.57, SEED);
+  /** 1e6 샘플 창(≈157ms)과 길이를 맞춘 기준 커널 라운드 수. */
+  const CALIBRATION_ROUNDS = 13_000;
+  const SAMPLE_COUNT = 1_000_000;
+
+  let sink = 0;
+
+  function sampleSweep(sweeps: number): () => void {
+    return () => {
+      for (let sweep = 0; sweep < sweeps; sweep += 1) {
+        for (let index = 0; index < SAMPLE_COUNT; index += 1) {
+          sink += samplePaperHeightV1(
+            STUDIO_PAPER_PRESETS_V1["canvas-weave"],
+            (index % 1024) * 0.83,
+            (index / 1024) * 0.57,
+            SEED,
+          );
+        }
       }
-      elapsedMs = Math.min(elapsedMs, performance.now() - start);
+    };
+  }
+
+  // 예산은 "샘플당 200ns"였지만, 밀리초는 샘플러가 아니라 그 아래 기계까지 함께 잰다. 같은
+  // 커밋이 CI 러너에서 170ms에 끝나고 스로틀된 4-vCPU 개발 컨테이너에서 241.7ms가 나오면,
+  // 절대 예산은 느린 기계에서 정직한 코드를 떨어뜨리거나 아무도 못 잡을 때까지 늘어난다.
+  // 최솟값 표본은 "일시적 정지가 더한 시간"만 걷어낼 뿐 기계 자체는 못 걷어낸다.
+  //
+  // 그래서 예산을 같은 프로세스에서 표본마다 번갈아 재는 고정 기준 커널과의 '비율'로 옮겼다
+  // (studio-perf-calibration). 분자·분모가 함께 기계 속도를 타므로 판정은 기계에 안 흔들리고,
+  // 샘플러만 느려지면 분자만 움직여 그대로 걸린다. CALIBRATION_ROUNDS는 회귀 없는 샘플러가
+  // ≈1.0을 받도록 맞췄고, 게이트는 1.5x다 — 아래 합성 회귀 테스트가 반대편 끝을 잡는다.
+  let budget: StudioCalibratedBudgetVerdict;
+
+  beforeAll(() => {
+    // 워밍업 — 파생 상수 캐시와 JIT를 채운다.
+    for (let index = 0; index < 10_000; index += 1) {
+      sink += samplePaperHeightV1(
+        STUDIO_PAPER_PRESETS_V1["canvas-weave"],
+        index * 0.83,
+        index * 0.57,
+        SEED,
+      );
     }
+    budget = evaluateStudioCalibratedBudget({
+      label: "1e6 paper height samples",
+      workload: sampleSweep(1),
+      referenceRounds: CALIBRATION_ROUNDS,
+      samples: 3,
+      warmups: 1,
+    });
+  });
+
+  it("1e6 샘플이 보정된 스칼라 샘플러 예산 안에서 끝난다", () => {
+    expect(budget.ok, budget.detail).toBe(true);
     expect(Number.isFinite(sink)).toBe(true);
     expect(sink).toBeGreaterThan(0);
-    const budgetMs = process.env.CI ? 500 : 200;
-    expect(elapsedMs).toBeLessThan(budgetMs);
+  });
+
+  it("샘플러가 2배 비싸졌다면 같은 측정이 예산을 넘겼다", () => {
+    // 보정된 예산의 요점은 "느린 기계에서 살아남되 무의미해지지 않는 것"이므로, 2배 회귀 탐지
+    // 여부는 같은 기계·같은 기준 창·같은 실행 안에서 확인해야 한다. 방금 잰 패스를 그대로 재사용
+    // 하므로 건강한 측정에서는 추가 측정 비용이 0이다. 나머지 절반 — 실제로 2배 느려진 코드를
+    // 하네스가 2배로 읽는다는 것 — 은 studio-perf-calibration.test.ts에서 실측으로 잡는다.
+    //
+    // 이 단언은 보정 자체의 자기 점검이기도 하다. 어떤 기계가 기준 커널과 샘플러를 그 정도로
+    // 벌려놓으면, 조용히 3배짜리만 잡는 예산으로 썩는 대신 이 테스트가 먼저 터진다.
+    const detection = evaluateStudioCalibratedDetection({
+      label: budget.label,
+      workload: sampleSweep(1),
+      referenceRounds: CALIBRATION_ROUNDS,
+      seed: budget.passes,
+      factor: 2,
+      samples: 3,
+      warmups: 1,
+    });
+    // detectableFactor = 이 측정이 유죄로 잡아냈을 최소 감속 배수. 기록된 정직한 측정에서는
+    // 1.4x 근방이라 2배 한참 전에 이미 걸린다. 놓쳐선 안 되는 선이 2x이고, 그걸 단언한다.
+    expect(detection.detected, detection.detail).toBe(true);
   });
 });
