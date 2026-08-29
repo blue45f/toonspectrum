@@ -247,7 +247,22 @@ describe("studio impasto relief shading v1 (dli/paint MIT port)", () => {
    * call the budget measures.
    */
   it("calls exactly four transcendentals per shaded pixel, and nothing else", () => {
-    const transcendentals = ["sqrt", "pow", "sin", "cos", "exp", "log", "atan2", "hypot", "acos"] as const;
+    // EVERY `Math` member whose cost is more than a machine instruction, not a hand-picked few.
+    // A census listing only the functions the shader happens to call today convicts nothing when
+    // it starts calling one it does not: a per-pixel `Math.tan`, `Math.cbrt` or `Math.log2` would
+    // leave every count below unchanged and clear the smoke bound as well.
+    //
+    // The cheap arithmetic members (`abs`, `min`, `max`, `floor`, `ceil`, `round`, `sign`,
+    // `trunc`, `imul`, `clz32`, `random`) are excluded deliberately: they compile to instructions,
+    // so counting them would pin the shader's arithmetic shape rather than its transcendental
+    // cost. `random` is excluded for a different reason -- this path must never call it, and the
+    // determinism test above is what proves that.
+    const transcendentals = [
+      "sqrt", "cbrt", "pow", "exp", "expm1", "log", "log2", "log10", "log1p",
+      "sin", "cos", "tan", "asin", "acos", "atan", "atan2",
+      "sinh", "cosh", "tanh", "asinh", "acosh", "atanh",
+      "hypot", "fround",
+    ] as const;
 
     const census = (
       width: number,

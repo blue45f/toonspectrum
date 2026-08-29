@@ -220,19 +220,22 @@ describe("time-sliced settled bake at the planner cap", () => {
         );
         requestMs = Math.min(requestMs, performance.now() - startedAt);
         expect(probeImmediate).toBeNull();
+
+        // Clear the latch this request just armed, INSIDE the loop, so the next sample is cold
+        // too. `scheduleSettledBakeSlice` refuses to re-arm while a drain is outstanding, and
+        // that flag is module state `resetStudioLivingInkSettledBakeCacheForTests` does not
+        // clear — so draining only after the loop would leave six of these seven samples
+        // skipping the arming path entirely, and the minimum would pick one of those. A
+        // regression in the arm itself would then have nothing timing it.
+        //
+        // Order matters. Drop the pending jobs FIRST, then run the one queued handler: it
+        // clears the latch on entry, finds nothing to work on, and so does not re-arm on the
+        // way out. Draining before the reset leaves a half-solved job pending and sets the
+        // latch again, which is the same failure by a longer route — and it is how the measured
+        // run below once ended up never progressing, returning a null settled plan.
+        resetStudioLivingInkSettledBakeCacheForTests();
+        probeScheduler.runNextSlice();
       }
-      // The scheduler arms itself once and refuses to re-arm while a drain is outstanding, and
-      // that latch is module state the cache reset does NOT clear. Leaving it set makes the
-      // measured request below enqueue without ever scheduling a slice — which is exactly what
-      // happened when this loop was first added: the run never progressed and the settled plan
-      // came back null.
-      //
-      // Order matters. Drop the pending jobs first, THEN run the one queued handler: it clears
-      // the latch on entry, finds nothing to work on, and so does not re-arm on the way out.
-      // Draining before the reset instead leaves a half-solved job pending and the latch set
-      // again, which is the same failure by a longer route.
-      resetStudioLivingInkSettledBakeCacheForTests();
-      probeScheduler.runNextSlice();
     } finally {
       probeScheduler.restore();
     }

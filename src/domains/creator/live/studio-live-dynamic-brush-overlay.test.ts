@@ -534,6 +534,49 @@ function appendChunkCostRatio(
 }
 
 /**
+ * What the COLD first append costs in units of one ordinary append.
+ *
+ * The first append is its own structural class, with exactly one member per pass: it starts a
+ * 60-point stroke from a fresh renderer where every later one extends by 30. It is excluded from
+ * the outlier max for that reason, its mark delta is a fixed 320 whatever the planner does
+ * internally, and it is never the global minimum — so a regression confined to it (a two-second
+ * initialisation, say) moves nothing this file otherwise measures, and clears both smoke bounds.
+ *
+ * This is a BLOW-UP bound and not a budget, and the reason is measured. The reading is dominated
+ * by JIT warm-up of the whole renderer path: 15.6ms on the first pass, 3.4 on the second, 2.4 on
+ * the third, idle — and 32.5 / 8.4 / 6.3 under six spinning hogs on four cores. Reduced by the
+ * cheapest pass, as every verdict here is, that leaves 2.37 idle against 5.95 loaded. A 2.5x
+ * honest spread admits no gate that also convicts a doubling (that would need one below 4.74 and
+ * above 5.95), so this one does not pretend to: it is sized to catch the class blowing up, which
+ * is the regression that is actually invisible elsewhere.
+ *
+ * What covers the cold path exactly is the mark pin beside it — 320 marks, on every machine.
+ */
+function appendColdStartCostRatio(
+  samples: readonly StudioPerfCalibrationSample[],
+  markDeltas: readonly number[],
+): number {
+  if (samples.length !== markDeltas.length) {
+    throw new Error("Every append sample needs its own mark delta.");
+  }
+  const ordinary = samples.filter((_, index) => index > 0
+    && markDeltas[index]! <= APPEND_CHUNK_MARK_THRESHOLD);
+  if (ordinary.length === 0) throw new Error("No ordinary append to grade the cold start against.");
+  const cheapestOrdinaryMs = Math.min(...ordinary.map((sample) => sample.workMs));
+  if (!(cheapestOrdinaryMs > 0)) {
+    throw new Error("An ordinary append that costs nothing is not a denominator.");
+  }
+  return samples[0]!.workMs / cheapestOrdinaryMs;
+}
+
+/**
+ * Recorded 2.37 idle and 5.95 loaded as the cheapest pass. 20 carries 3.4x headroom over the
+ * worst of those while a cold path that grew to 100ms reads ~100 and a two-second initialisation
+ * reads ~2000. It does not catch a mere doubling of the cold start, and says so above.
+ */
+const APPEND_COLD_START_COST_LIMIT = 20;
+
+/**
  * Recorded 11.69 / 11.83 / 12.30 / 12.72 / 12.75 as the cheapest pass across idle and
  * six-hogs-on-four-cores runs — a 9% spread, because both sides of the division are the same code
  * on the same machine. A chunk append draws 8.3x an ordinary one's marks and costs ~12x, the gap
@@ -1887,6 +1930,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     const calibrationPasses: StudioPerfCalibrationPass[] = [];
     const halfGrowths: number[] = [];
     const chunkCostRatios: number[] = [];
+    const coldStartCostRatios: number[] = [];
     let maxAppendFrameMs = Number.POSITIVE_INFINITY;
     let totalAppendMs = Number.POSITIVE_INFINITY;
     let markDeltas: number[] = [];
@@ -1969,6 +2013,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     calibrationPasses.push(reduceStudioPerfCalibrationSamples(passSamples));
     halfGrowths.push(appendCalibratedHalfGrowth(passSamples));
     chunkCostRatios.push(appendChunkCostRatio(passSamples, passMarkDeltas));
+    coldStartCostRatios.push(appendColdStartCostRatio(passSamples, passMarkDeltas));
     markDeltas = passMarkDeltas;
     appendCount = passAppendCount;
     liveMarks = activeCanvas.recordedMarks;
@@ -2069,6 +2114,19 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       `a ribbon-chunk append costs ${chunkCostRatio.toFixed(2)} ordinary appends `
       + `(passes: ${chunkCostRatios.map((value) => value.toFixed(2)).join(", ")})`,
     ).toBeLessThan(APPEND_CHUNK_COST_LIMIT);
+
+    // ...and the cold first append, the one class with a single member per pass. It is excluded
+    // from the outlier max, it is never the global minimum, and it sits in the early half where
+    // it cannot move that ratio either — so a two-second initialisation regression would be
+    // invisible to everything above and would clear both smoke bounds. Its WORK is pinned
+    // exactly beside this; its cost is JIT-dominated and so carries a blow-up bound only.
+    expect(markDeltas[0], "cold first append marks").toBe(320);
+    const coldStartCostRatio = Math.min(...coldStartCostRatios);
+    expect(
+      coldStartCostRatio,
+      `the cold first append costs ${coldStartCostRatio.toFixed(2)} ordinary appends `
+      + `(passes: ${coldStartCostRatios.map((value) => value.toFixed(2)).join(", ")})`,
+    ).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
 
     // A blow-up bound, not a budget. The worst single append is a pure noise measurement -- 30.1
     // to 45.8ms idle on this container, where the median append is 1.8ms, because one GC pause
@@ -2193,6 +2251,52 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       .toThrow(/its own mark delta/);
     expect(() => appendChunkCostRatio(honest, deltas.map(() => 210)))
       .toThrow(/Both append classes/);
+  });
+
+  it("convicts a cold-start regression the other three bounds cannot see", () => {
+    // The fourth blind spot: the first append, one member per pass. It is excluded from the
+    // outlier max, it is never the global minimum, and it sits in the early half so it cannot
+    // move the early/late ratio either. Stated as data.
+    const APPENDS = 200;
+    const deltas: number[] = Array.from(
+      { length: APPENDS },
+      (_, index) => (index % 8 === 7 ? 1_740 : 210),
+    );
+    deltas[0] = 320;
+    const honest: StudioPerfCalibrationSample[] = Array.from({ length: APPENDS }, (_, index) => ({
+      referenceMs: 1,
+      workMs: index % 8 === 7 ? 13.4 : 1.13,
+    }));
+    honest[0] = { referenceMs: 1, workMs: 2.6 };
+    expect(appendColdStartCostRatio(honest, deltas)).toBeCloseTo(2.30, 1);
+    expect(appendColdStartCostRatio(honest, deltas)).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
+
+    // Codex's case, verbatim: a two-second initialisation on the cold path alone.
+    const coldStall = honest.map((sample, index) => (index === 0
+      ? { ...sample, workMs: 2_000 }
+      : sample));
+    expect(appendColdStartCostRatio(coldStall, deltas)).toBeGreaterThan(1_500);
+    expect(appendColdStartCostRatio(coldStall, deltas))
+      .toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
+    // ...and every bound it slips past, which is the whole reason this gate exists.
+    expect(reduceStudioPerfCalibrationSamples(coldStall).workMs)
+      .toBe(reduceStudioPerfCalibrationSamples(honest).workMs);
+    expect(appendChunkCostRatio(coldStall, deltas))
+      .toBeCloseTo(appendChunkCostRatio(honest, deltas), 6);
+    expect(appendMarkGrowthRatio(deltas)).toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // A 100ms cold start is convicted too, not only a catastrophe.
+    expect(appendColdStartCostRatio(
+      honest.map((sample, index) => (index === 0 ? { ...sample, workMs: 100 } : sample)),
+      deltas,
+    )).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
+
+    // Not vacuous the other way: a uniformly 3x slower machine is not a cold-start regression.
+    const slowBox = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 3 }));
+    expect(appendColdStartCostRatio(slowBox, deltas)).toBeCloseTo(2.30, 1);
+
+    expect(() => appendColdStartCostRatio(honest, deltas.slice(1)))
+      .toThrow(/its own mark delta/);
   });
 
   it("convicts a cumulative-repaint appender on mark counts alone", () => {
