@@ -1,5 +1,6 @@
 export * from "./descriptor";
 export * from "./feature-contract";
+export * from "./capability-gap-plan";
 export * from "./workload-fingerprint";
 export * from "./island-compiler";
 export * from "./registry";
