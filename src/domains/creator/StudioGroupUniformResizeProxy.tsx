@@ -100,6 +100,17 @@ export interface StudioGroupUniformResizeProxyProps {
    * cached, layer-sensitive composite), the gesture keeps today's whole-layer behavior.
    */
   readonly transformLiftLayerRef?: RefObject<Konva.Layer | null>;
+  /**
+   * Monotonic counter the page bumps when something outside this proxy cancels the gesture —
+   * Escape, stage pointer-cancel, a collaboration lease loss.
+   *
+   * Without it the page's cancel only cleared ITS session (and released the lease) while the
+   * Konva gesture kept running: the handles, and since the live preview landed the ink too, kept
+   * following the pointer after the user had been told the resize was cancelled, then snapped
+   * back at pointer-up with the commit silently dropped. A number rather than a callback because
+   * cancellation must survive a re-render that changes nothing else.
+   */
+  readonly externalCancelSignal?: number;
   /** Return false when effective locks or collaboration leases reject the gesture. */
   readonly onBegin: (sourceBounds: StudioGroupUniformResizeBounds) => boolean;
   /**
@@ -143,6 +154,7 @@ export function StudioGroupUniformResizeProxy({
   mirrorDragElementId,
   livePreviewElementId,
   transformLiftLayerRef,
+  externalCancelSignal,
   onBegin,
   onCommit,
   onCancel,
@@ -257,6 +269,16 @@ export function StudioGroupUniformResizeProxy({
       document.removeEventListener("visibilitychange", cancelForHiddenDocument);
     };
   }, []);
+
+  // Mount value is the baseline, never a cancellation. `cancelActiveTransform` calls back into
+  // the page's cancel, which bumps this counter again — that pass finds no session on either
+  // side and stops, so the round trip cannot loop.
+  const lastExternalCancelSignalRef = useRef(externalCancelSignal);
+  useLayoutEffect(() => {
+    if (externalCancelSignal === lastExternalCancelSignalRef.current) return;
+    lastExternalCancelSignalRef.current = externalCancelSignal;
+    cancelActiveTransform();
+  }, [externalCancelSignal]);
 
   function handleTransformStart() {
     const sourceBounds = copyBounds(bounds);

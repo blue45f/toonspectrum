@@ -5256,6 +5256,9 @@ function StudioCuttoonEditor({
   // 그룹/다중 선택 리사이즈는 child Transformer를 직접 건드리지 않는다. 시작 시점의 선택,
   // 문서 스코프, 요소 참조를 캡처하고 전용 proxy가 끝날 때 모두 그대로인 경우에만 affine
   // 결과를 한 번 커밋한다. 팀 동기화나 다른 입력이 중간에 요소를 바꾸면 전체를 fail-close한다.
+  // Escape/포인터 취소는 이 세션 ref만 지우고 lease를 반납할 뿐, proxy의 Konva 제스처까지
+  // 닿지 않는다. 이 카운터가 그 채널이다 — proxy가 값 변화를 보고 자기 제스처를 중단한다.
+  const [canvasSelectionResizeCancelSignal, setCanvasSelectionResizeCancelSignal] = useState(0);
   const groupResizeRef = useRef<{
     selectedIds: string[];
     sourceBounds: StudioGroupUniformResizeBounds;
@@ -5443,6 +5446,9 @@ function StudioCuttoonEditor({
     if (!groupResizeRef.current) return;
     groupResizeRef.current = null;
     endLiveResourceEdit();
+    // Only bumped when a session actually existed, so the proxy's own cancel path — which calls
+    // back into here — finds nothing to cancel on the second pass and the round trip terminates.
+    setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
   }
   function commitCanvasSelectionResize(
     targetBounds: StudioGroupUniformResizeBounds,
@@ -31043,6 +31049,7 @@ function clearSelectionForEdit() {
       canvasInteractionBlocked={canvasInteractionBlocked}
       canvasOnlyMode={canvasOnlyMode}
       canvasRotation={canvasRotation}
+      canvasSelectionResizeCancelSignal={canvasSelectionResizeCancelSignal}
       captureStudioMutationTicket={captureStudioMutationTicket}
       changeStudioCommentThreadReplyDraft={changeStudioCommentThreadReplyDraft}
       changeStudioCommentThreadResolution={changeStudioCommentThreadResolution}

@@ -597,6 +597,7 @@ export function StudioCanvasViewportStageHost({
                 activeSurfaceReviewLocked,
                 beginCanvasSelectionResize,
                 cancelCanvasSelectionResize,
+                canvasSelectionResizeCancelSignal: viewport.canvasSelectionResizeCancelSignal,
                 canvasH,
                 canvasSelectionEls,
                 commitCanvasSelectionResize,

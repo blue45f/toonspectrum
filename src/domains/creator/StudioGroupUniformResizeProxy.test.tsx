@@ -693,6 +693,44 @@ describe("StudioGroupUniformResizeProxy", () => {
     });
   });
 
+  it("외부 취소 신호(Escape·포인터 취소)는 진행 중인 gesture를 즉시 중단시킨다", () => {
+    // 페이지가 Escape로 세션을 지우고 lease를 반납해도 proxy의 Konva 제스처는 계속 돌았다 —
+    // 라이브 프리뷰가 붙은 뒤로는 "취소했습니다" 안내 후에도 잉크가 핸들을 따라다녔다.
+    const props = commonProps();
+    const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+    const view = render(
+      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={0} />,
+    );
+
+    act(() => rectProps().onTransformStart());
+    act(() => {
+      rect.position({ x: 80, y: 90 });
+      rect.scaleX(2);
+    });
+
+    view.rerender(
+      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={1} />,
+    );
+
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
+    expect(props.onCommit).not.toHaveBeenCalled();
+    // 취소는 캡처된 source box로 원복한다.
+    expect(rect.position()).toEqual({ x: bounds.x, y: bounds.y });
+    expect(rect.scaleX()).toBe(1);
+
+    // 같은 값 재렌더는 아무 것도 하지 않는다(마운트 값은 기준선일 뿐 취소가 아니다).
+    view.rerender(
+      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={1} />,
+    );
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
+
+    // 활성 gesture가 없을 때의 신호 변화도 조용히 무시된다(왕복 루프 방지).
+    view.rerender(
+      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={2} />,
+    );
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
+  });
+
   it("hidden visibility 전환만 활성 gesture를 취소하고 listener를 정리한다", () => {
     let visibilityState: DocumentVisibilityState = "visible";
     vi.spyOn(document, "visibilityState", "get").mockImplementation(

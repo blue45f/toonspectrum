@@ -43,22 +43,43 @@ function directChildOfLayer(
   return null;
 }
 
+function nodeCompositeIsLayerSensitive(node: Konva.Node): boolean {
+  const operation = node.getAttr("globalCompositeOperation");
+  return (
+    typeof operation === "string"
+    && operation.length > 0
+    && operation !== "source-over"
+  );
+}
+
 function authoredCompositeOperationIsLayerSensitive(
   target: Konva.Node,
   root: Konva.Node,
 ): boolean {
   let current: Konva.Node | null = target;
   while (current) {
-    const operation = current.getAttr("globalCompositeOperation");
-    if (
-      typeof operation === "string"
-      && operation.length > 0
-      && operation !== "source-over"
-    ) {
-      return true;
-    }
+    if (nodeCompositeIsLayerSensitive(current)) return true;
     if (current === root) break;
     current = current.getParent();
+  }
+  return false;
+}
+
+/**
+ * Layer-sensitive composite anywhere in `node`'s subtree, itself included.
+ *
+ * The ancestor walk above answers the drag lift's question ("does anything between the dragged
+ * node and the Layer blend against the backdrop?"), and that sufficed there because draw elements
+ * were excluded outright. A stroke's own paint nodes live BELOW its wrapper — StudioDrawNode
+ * hangs `globalCompositeOperation` on the shapes it emits (highlighter/wash multiply passes among
+ * them) — so the transform lift, whose whole subject is a stroke, has to look down instead.
+ */
+function subtreeCompositeIsLayerSensitive(node: Konva.Node): boolean {
+  if (nodeCompositeIsLayerSensitive(node)) return true;
+  const children = (node as Konva.Container).getChildren?.();
+  if (!children) return false;
+  for (const child of children) {
+    if (subtreeCompositeIsLayerSensitive(child)) return true;
   }
   return false;
 }
@@ -179,8 +200,11 @@ export interface BeginStudioSingleDrawTransformLayerOptions {
  * (measured ~80-157ms per drawScene) into repainting one stroke plus handles.
  *
  * Same fail-closed exclusions as the drag lift: a clipped wrapper (not a direct Layer child), a
- * cached root, or a layer-sensitive composite (eraser destination-out, authored blend modes needs
- * the document backdrop) refuses the lift and the gesture keeps today's whole-layer behavior.
+ * cached root, or a layer-sensitive composite refuses the lift and the gesture keeps today's
+ * whole-layer behavior. Composite is checked over the whole SUBTREE, not just the wrapper: the
+ * eraser's destination-out rides the wrapper, but a highlighter's multiply passes are emitted by
+ * StudioDrawNode as descendant shapes, and lifting those onto an empty Layer would blend them
+ * against transparency instead of the artwork — a visible appearance change for the gesture.
  */
 export function beginStudioSingleDrawTransformLayer(
   options: BeginStudioSingleDrawTransformLayerOptions,
@@ -196,7 +220,7 @@ export function beginStudioSingleDrawTransformLayer(
     || wrapper.getAttr("studioElementId") !== elementId
     || wrapper.getParent() !== mainLayer
     || wrapper.isCached()
-    || authoredCompositeOperationIsLayerSensitive(wrapper, wrapper)
+    || subtreeCompositeIsLayerSensitive(wrapper)
     || proxy.getLayer() !== mainLayer
     || transformer.getLayer() !== mainLayer
   ) {
@@ -241,7 +265,13 @@ export function restoreStudioSingleObjectDragLayer(
 
   for (const { record, absolutePosition } of positions) {
     try {
-      if (record.node.getParent() !== record.parent) record.node.moveTo(record.parent);
+      // A node React destroyed or re-parented mid-gesture is no longer ours to place. `moveTo`
+      // has no destroyed-node guard, so re-adding one leaves an invisible zombie in the document
+      // Layer still carrying `studioElementId` — which `findStudioDrawWrapperNode` could later
+      // resolve instead of the live node. Restore only what is still parented somewhere.
+      const currentParent = record.node.getParent();
+      if (!currentParent) continue;
+      if (currentParent !== record.parent) record.node.moveTo(record.parent);
       // Defensive even though both Studio Layers are direct Stage children today: this preserves
       // the visual position if a future viewport gives either Layer its own transform.
       record.node.absolutePosition(absolutePosition);

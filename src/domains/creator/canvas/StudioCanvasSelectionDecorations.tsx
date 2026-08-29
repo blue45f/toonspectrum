@@ -29,6 +29,8 @@ export interface StudioCanvasSelectionDecorationsContext {
     sourceBounds: StudioGroupUniformResizeBounds
   ) => boolean;
   readonly cancelCanvasSelectionResize: () => void;
+  /** Bumped when Escape/pointer-cancel cancels the gesture outside the proxy's own Konva events. */
+  readonly canvasSelectionResizeCancelSignal: number;
   readonly canvasH: number;
   readonly canvasSelectionEls: readonly El[];
   readonly commitCanvasSelectionResize: (
@@ -59,6 +61,7 @@ export function renderStudioCanvasSelectionDecorations({
   activeSurfaceReviewLocked,
   beginCanvasSelectionResize,
   cancelCanvasSelectionResize,
+  canvasSelectionResizeCancelSignal,
   canvasH,
   canvasSelectionEls,
   commitCanvasSelectionResize,
@@ -239,6 +242,7 @@ export function renderStudioCanvasSelectionDecorations({
           // The gesture lifts stroke+proxy+Transformer into the small drag Layer so an
           // anchor frame no longer repaints the whole document Layer.
           transformLiftLayerRef={singleObjectDragLayerRef}
+          externalCancelSignal={canvasSelectionResizeCancelSignal}
           onBegin={beginCanvasSelectionResize}
           onCommit={commitCanvasSelectionResize}
           onCancel={cancelCanvasSelectionResize}

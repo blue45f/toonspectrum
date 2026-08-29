@@ -144,6 +144,7 @@ export type StudioCuttoonEditorViewSessionCore = {
   canvasInteractionBlocked: any;
   canvasOnlyMode: any;
   canvasRotation: any;
+  canvasSelectionResizeCancelSignal: any;
   captureStudioMutationTicket: any;
   changeStudioCommentThreadReplyDraft: any;
   changeStudioCommentThreadResolution: any;

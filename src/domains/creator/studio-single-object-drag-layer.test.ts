@@ -324,6 +324,66 @@ describe("single-draw transform gesture Layer lift", () => {
     expect([...scene.mainLayer.getChildren()]).toEqual(originalOrder);
   });
 
+  it("refuses a stroke whose backdrop-sensitive composite lives on a DESCENDANT shape", () => {
+    // StudioDrawNode hangs globalCompositeOperation on the shapes it emits — a highlighter's
+    // multiply passes are children of the wrapper, not the wrapper itself. Lifting those onto an
+    // empty Layer would blend them against transparency instead of the artwork underneath.
+    const { wrapper, proxy, transformer } = addTransformScene();
+    const paint = new studioKonvaRuntime.Group();
+    const multiplyPass = new studioKonvaRuntime.Rect({ width: 10, height: 10 });
+    multiplyPass.setAttr("globalCompositeOperation", "multiply");
+    paint.add(multiplyPass);
+    wrapper.add(paint);
+
+    expect(
+      beginStudioSingleDrawTransformLayer({
+        elementId: "stroke-1",
+        wrapper,
+        proxy,
+        transformer,
+        dragLayer: scene.dragLayer,
+      }),
+    ).toBeNull();
+    expect(wrapper.getLayer()).toBe(scene.mainLayer);
+
+    // A plain source-over descendant must still lift — the guard rejects blending, not depth.
+    multiplyPass.setAttr("globalCompositeOperation", "source-over");
+    expect(
+      beginStudioSingleDrawTransformLayer({
+        elementId: "stroke-1",
+        wrapper,
+        proxy,
+        transformer,
+        dragLayer: scene.dragLayer,
+      }),
+    ).not.toBeNull();
+  });
+
+  it("never re-adds a node React destroyed or re-parented mid-gesture", () => {
+    const { wrapper, proxy, transformer } = addTransformScene();
+    const session = beginStudioSingleDrawTransformLayer({
+      elementId: "stroke-1",
+      wrapper,
+      proxy,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+    expect(session).not.toBeNull();
+
+    // What react-konva's removeChild does when a collaborator deletes the stroke mid-gesture.
+    wrapper.destroy();
+    expect(restoreStudioSingleObjectDragLayer(session)).toBe(true);
+
+    // The zombie must not come back as a main-Layer child carrying studioElementId.
+    const strokeChildren = scene.mainLayer
+      .getChildren()
+      .filter((node) => (node as Konva.Node).getAttr("studioElementId") === "stroke-1");
+    expect(strokeChildren).toEqual([]);
+    // Its gesture chrome still returns home.
+    expect(proxy.getLayer()).toBe(scene.mainLayer);
+    expect(transformer.getLayer()).toBe(scene.mainLayer);
+  });
+
   it("refuses without a drag Layer, for clipped wrappers, and for backdrop-sensitive strokes", () => {
     const { wrapper, proxy, transformer } = addTransformScene();
 
@@ -364,6 +424,32 @@ describe("single-draw transform gesture Layer lift", () => {
       }),
     ).toBeNull();
     expect(wrapper.getLayer()).toBe(scene.mainLayer);
+  });
+
+  it("refuses a concurrent wrapper drag while the preview owns the node, in both drag phases", () => {
+    // The wrapper's drag-end bakes `event.target.x()/y()` into `points` as a DELTA, but a live
+    // preview parks the gesture's ABSOLUTE target origin there. A second finger dragging the
+    // stroke body while the first holds an anchor would otherwise commit that projection as a
+    // document translation. Source-scanned: the guard lives in the document layer's JSX.
+    const drawWrapperStart = studioCanvasViewportSource.indexOf(
+      "onDragStart={(event) => {",
+    );
+    const drawWrapperEnd = studioCanvasViewportSource.indexOf(
+      "<StudioDrawNode",
+      drawWrapperStart,
+    );
+    expect(drawWrapperStart).toBeGreaterThan(-1);
+    expect(drawWrapperEnd).toBeGreaterThan(drawWrapperStart);
+    const dragHandlers = studioCanvasViewportSource.slice(drawWrapperStart, drawWrapperEnd);
+
+    // Both phases guard, and the bake stays behind the guard.
+    expect(
+      dragHandlers.split("STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR").length - 1,
+    ).toBe(2);
+    expect(
+      dragHandlers.lastIndexOf("STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR"),
+    ).toBeLessThan(dragHandlers.indexOf("patchEl(el.id, {"));
+    expect(dragHandlers).toContain("event.target.stopDrag();");
   });
 
   it("gates translation mirrors while the preview-active attr is set and resumes after", () => {
