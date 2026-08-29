@@ -1,8 +1,10 @@
 # ToonSpectrum Studio 3D 엔진·전문 런타임 확장 검토
 
 - 작성일: 2026-07-18
-- 상태: SceneDocument v3·범용 2-bone IK·Rapier Worker 물리 preview/bake·Three WebGPU 격리 lab 구현,
-  프로덕션 기본은 Three/R3F 유지
+- 상태: SceneDocument v3·범용 2-bone IK·Rapier Worker 물리 preview/bake 구현.
+  **2026-08-29 갱신**: Three WebGPU는 격리 lab에서 production runtime으로 승격됐고, 대화형
+  backend는 세션마다 정책이 고른다(WebGL2가 기준선). 자세한 내용은
+  [3D 차세대 엔진 승격](./studio-bg3d-webgpu-engine-promotion-2026-08-29.md) 참조
 - 연계 ADR: [Babylon.js 도입 평가](./studio-babylonjs-adoption-evaluation-2026-07-11.md), [3D 런타임 지연 로딩·WebGPU 벤치마크](./studio-3d-runtime-loading-benchmark-2026-07-13.md)
 - 구현 계약: `studio-bg3d-runtime-topology.ts`, `studio-bg3d-runtime-adapter.ts`,
   `studio-bg3d-three-webgpu-lab.ts`
@@ -50,9 +52,10 @@
 - 전문 런타임 경계: factory가 만든 canonical document + verified GLB 스냅샷만 허용하고 위조된
   구조적 복사본을 거부한다. 엔진별 작업은 직렬화하며 활성·대기 작업을 모두 비운 뒤 dispose한다.
   캡처는 16Mpx, metric/transform DTO는 길이·수치·quaternion 범위로 제한한다.
-- Three WebGPU lab: secure context/API/실제 adapter limits를 사전 검사하고 `three/webgpu`를 완전
-  지연 로드한다. Three의 WebGL2 자동 fallback을 비활성화하고 실제 WebGPU backend가 아닐 때
-  실패 폐쇄한다. 현재 측정된 동적 청크는 197,119 gzip bytes이며 정책 예산은 210,000 bytes다.
+- Three WebGPU production runtime: secure context/API/실제 adapter limits를 사전 검사하고
+  `three/webgpu`를 승인된 지연 entry(`studio-bg3d-three-webgpu-entry.ts`) 뒤에서만 로드한다.
+  Three의 WebGL2 자동 fallback을 비활성화해 실제 WebGPU backend가 아니면 실패 폐쇄하고,
+  fallback 결정은 엔진 선택 정책이 소유한다. 정책 예산은 210,000 gzip bytes다.
 - 계층/제약: primitive와 model이 섞인 실제 렌더 트리, 순환·고아 부모 복구, 월드 구도를 보존하는
   재부모화, 서로 다른 부모를 가진 다중 선택의 월드 행렬 delta, 애니메이션·포즈 뒤 비파괴 joint
   aim과 model-local target/pole 기반 analytic two-bone IK를 제공한다. IK solver는 VRM과 generic
@@ -93,9 +96,9 @@
   항목만 개별 scene graph로 되돌아와 편집된다. 배치/개별 클론 전환 동안에는 해당 항목을 pending으로
   두어 캡처를 막는다. instance buffer만 batch가 dispose하고 geometry/material/texture는 기존 검증 cache가
   계속 소유한다.
-- WebGPU lab: GPUDevice를 만들지 않는 보수적 capability/limit probe와 완전 지연
-  `three/webgpu` renderer factory를 별도 Canvas 계약으로 구현했다. 현재 WebGL 편집 Canvas를 소유하거나
-  자동 교체하지 않는다.
+- WebGPU 엔진 선택: GPUDevice를 만들지 않는 보수적 capability/limit probe, 인앱 브라우저 분류,
+  기기 신호, 아티스트 선택, 세션 실패 횟수를 하나의 순수 정책으로 합쳐 대화형 backend를 정한다.
+  선택된 backend가 편집 Canvas를 소유하며, capture adapter도 같은 renderer에서 파생된다.
 - 물리 specialist DTO: static/dynamic/kinematic body, box/sphere/capsule/convex/triangle-mesh collider,
   질량·마찰·반발·감쇠·solver substep, hull vertex/mesh triangle, 전체 body-substep과 narrow-phase 작업량을
   엔진 중립 예산으로 제한한다. dynamic triangle mesh, 잠긴/parented/자식을 가진 dynamic body는 거부하고,

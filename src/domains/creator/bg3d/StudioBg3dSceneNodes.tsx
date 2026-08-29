@@ -56,7 +56,7 @@ import {
   createStudioBg3dThreeStaticInstanceBatch,
   type StudioBg3dThreeInstancingSuccess,
 } from "./studio-bg3d-three-instancing";
-import { applyStudioBg3dThreeWebglRenderSettings } from "./studio-bg3d-three-render-settings";
+import { applyStudioBg3dThreeRenderSettings } from "./studio-bg3d-three-render-settings";
 
 import type { BgPrimitive } from "../studio-background-3d-primitives";
 import type { StudioBg3dPlacementPreviewState } from "./studio-bg3d-placement-session";
@@ -78,14 +78,18 @@ export interface StudioBg3dPlacementPreviewAsset {
 }
 
 /** Keeps persisted exposure/tone-mapping authoritative after R3F creates or reuses WebGLRenderer. */
-export function StudioBg3dWebglRenderSettingsController({
+/**
+ * Re-projects the document's colour/tone contract whenever it changes, for whichever Three
+ * renderer the engine-selection policy put in charge of this canvas.
+ */
+export function StudioBg3dThreeRenderSettingsController({
   render,
 }: {
   readonly render: StudioBg3dSceneDocument["render"];
 }) {
   const gl = useThree((state) => state.gl);
   useLayoutEffect(() => {
-    applyStudioBg3dThreeWebglRenderSettings(gl, render);
+    applyStudioBg3dThreeRenderSettings(gl, render);
   }, [gl, render]);
   return null;
 }

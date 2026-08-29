@@ -16,6 +16,17 @@ const approvedBabylonSpecialistEntry =
   "src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry.ts";
 const approvedBabylonRuntimeChunkName = "studio-bg3d-babylon-runtime";
 const babylonManifestPattern = /(?:@babylonjs|babylon(?:\.js)?)/i;
+// The next-generation Three WebGPU renderer is production code, not a lab, but it carries a second
+// ~200 KiB gzip renderer graph. It is admitted only behind this analyzable dynamic import so the
+// WebGL editor activation never pays for it and no other owner can share the chunk.
+const approvedWebgpuRendererEntry =
+  "src/domains/creator/bg3d/studio-bg3d-three-webgpu-entry.ts";
+// The entry chunk itself carries Three's `three.webgpu`/`three.tsl` builds. They are deliberately
+// NOT forced into a named manual chunk: see the note in vite.config.ts — naming one drags the
+// shared `three.core` graph in with it and every three importer then pays for the WebGPU engine.
+const approvedWebgpuRuntimeChunkName = "studio-bg3d-three-webgpu";
+const webgpuRendererManifestPattern =
+  /(?:three\.webgpu|three\.tsl|studio-bg3d-three-webgpu)/i;
 
 // Product policy (2026-07-27): bundle bytes and static request counts are
 // telemetry, not release vetoes. Quality, drawing latency and feature breadth
@@ -667,7 +678,7 @@ if (!fs.existsSync(manifestPath)) {
     }
 
     const emittedUnapprovedProductionEngineLabs = matchingManifestEntries(
-      /(?:studio-bg3d-(?:three-webgpu-lab|engine-benchmark-browser)|playcanvas)/i,
+      /(?:studio-bg3d-engine-benchmark-browser|playcanvas)/i,
     );
     if (emittedUnapprovedProductionEngineLabs.length > 0) {
       fail(
@@ -692,6 +703,19 @@ if (!fs.existsSync(manifestPath)) {
         pattern: babylonManifestPattern,
         approvedEntrySource: approvedBabylonSpecialistEntry,
         requiredRuntimeChunkName: approvedBabylonRuntimeChunkName,
+        approvedParentEntryKey: background3dEntries[0],
+        approvedParentStaticKeys: background3dKeys,
+        forbiddenStaticClosures: [
+          ["app entry", appKeys],
+          ["Studio route", studioKeys],
+          ["BG3D editor activation", background3dKeys],
+        ],
+      });
+      checkApprovedLazySpecialistBoundary({
+        label: "Three WebGPU renderer",
+        pattern: webgpuRendererManifestPattern,
+        approvedEntrySource: approvedWebgpuRendererEntry,
+        requiredRuntimeChunkName: approvedWebgpuRuntimeChunkName,
         approvedParentEntryKey: background3dEntries[0],
         approvedParentStaticKeys: background3dKeys,
         forbiddenStaticClosures: [

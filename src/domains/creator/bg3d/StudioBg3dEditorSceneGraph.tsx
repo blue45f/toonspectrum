@@ -101,7 +101,7 @@ export function bindStudioBg3dEditorSceneGraph(h) {
     StudioBg3dPhysicsTransport, StudioBg3dPlacementPointerController, StudioBg3dRoomBuilderPanel, StudioBg3dSceneFog,
     BgAdaptiveDprController, BgCustomModelInstanceBatch, BgCustomModelMesh, BgGroundHelper,
     BgPlacementPreview, BgPrimitiveMesh, BgScaleGuide, BgSectionPlaneController,
-    BgViewportController, SkyClearColorController, StudioBg3dWebglRenderSettingsController, StudioBg3dScenePanorama,
+    BgViewportController, SkyClearColorController, StudioBg3dThreeRenderSettingsController, StudioBg3dScenePanorama,
     StudioBg3dSceneTemplatePanel, StudioBg3dShapesPanel, StudioBg3dSharedCharacterSceneContent, StudioBg3dSharedCharacterStatusOverlay,
     StudioBg3dSharedStagePanel, StudioBg3dViewPanel, StudioBg3dImmersiveRenderBridge, StudioBg3dWebXrSessionBridge,
     StudioBg3dCaptureAdapter, StudioBg3dCaptureRequest, StudioBg3dImmersiveStagePlan, StudioBg3dImportProgress,
@@ -321,7 +321,7 @@ export function bindStudioBg3dEditorSceneGraph(h) {
   );
   const sceneContent = (
     <Fragment>
-      <StudioBg3dWebglRenderSettingsController render={sceneBaseDocument.render} />
+      <StudioBg3dThreeRenderSettingsController render={sceneBaseDocument.render} />
       <SkyClearColorController
         clearColor={immersiveStagePlan?.mode === "immersive-ar"
           ? "#000000"

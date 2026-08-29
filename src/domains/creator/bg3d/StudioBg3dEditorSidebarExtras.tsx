@@ -145,7 +145,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     StudioBg3dRoomBuilderPanel, StudioBg3dSceneFog, BgAdaptiveDprController,
     BgCustomModelInstanceBatch, BgCustomModelMesh, BgGroundHelper, BgPlacementPreview,
     BgPrimitiveMesh, BgScaleGuide, BgSectionPlaneController, BgViewportController,
-    SkyClearColorController, StudioBg3dWebglRenderSettingsController, StudioBg3dScenePanorama,
+    SkyClearColorController, StudioBg3dThreeRenderSettingsController, StudioBg3dScenePanorama,
     StudioBg3dSceneTemplatePanel, StudioBg3dShapesPanel, StudioBg3dSharedCharacterSceneContent,
     StudioBg3dSharedCharacterStatusOverlay, StudioBg3dSharedStagePanel, StudioBg3dViewPanel,
     StudioBg3dImmersiveRenderBridge, StudioBg3dWebXrSessionBridge, StudioBg3dCaptureAdapter,
@@ -317,7 +317,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     snapToggleHint, lineArtPreviewHint, surfaceSnapHint,
     // 파일 분할 때 목록에서 빠져 ReferenceError 를 던지던 식별자들(런타임 값 위치) — 복구.
     ltUserPresetLibraryStatus, physicsGravityPreset, setPhysicsGravityPreset,
-    LazyStudioBg3dAssetLibraryPanel, babylonDiagnosticState, genericModelClassifications, genericModelControlMode, layerListItems, measurementDocument, measurementDraft, measurementInference, measurementLockedLengthMeters, modelLibraryStatus, setMeasurementDocument, webXrController, webXrSessionState, webXrSupport,
+    LazyStudioBg3dAssetLibraryPanel, babylonDiagnosticState, engineRuntime, genericModelClassifications, genericModelControlMode, layerListItems, measurementDocument, measurementDraft, measurementInference, measurementLockedLengthMeters, modelLibraryStatus, setMeasurementDocument, webXrController, webXrSessionState, webXrSupport,
   } = { ...R, ...h };
   return (
     <>
@@ -549,6 +549,12 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                 hidden={hideOnTab("view")}
                 babylonDiagnosticState={babylonDiagnosticState}
                 onRunBabylonDiagnostic={(backend) => void runBabylonDiagnostic(backend)}
+                enginePlan={engineRuntime.plan}
+                enginePreference={engineRuntime.preference}
+                engineInAppBrowser={engineRuntime.inApp}
+                engineProbing={engineRuntime.phase === "probing"}
+                engineDeviceLostMessage={engineRuntime.deviceLostMessage}
+                onEnginePreferenceChange={engineRuntime.setPreference}
                 aiReferenceBusy={isCapturing}
                 aiReferenceDisabled={
                   insertBlocked || (primitives.length === 0 && customModels.length === 0)

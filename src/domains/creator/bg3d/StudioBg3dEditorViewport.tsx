@@ -146,7 +146,7 @@ export function StudioBg3dEditorViewport({ h }) {
     StudioBg3dRoomBuilderPanel, StudioBg3dSceneFog, BgAdaptiveDprController,
     BgCustomModelInstanceBatch, BgCustomModelMesh, BgGroundHelper, BgPlacementPreview,
     BgPrimitiveMesh, BgScaleGuide, BgSectionPlaneController, BgViewportController,
-    SkyClearColorController, StudioBg3dWebglRenderSettingsController, StudioBg3dScenePanorama,
+    SkyClearColorController, StudioBg3dThreeRenderSettingsController, StudioBg3dScenePanorama,
     StudioBg3dSceneTemplatePanel, StudioBg3dShapesPanel, StudioBg3dSharedCharacterSceneContent,
     StudioBg3dSharedCharacterStatusOverlay, StudioBg3dSharedStagePanel, StudioBg3dViewPanel,
     StudioBg3dImmersiveRenderBridge, StudioBg3dWebXrSessionBridge, StudioBg3dCaptureAdapter,
@@ -161,6 +161,7 @@ export function StudioBg3dEditorViewport({ h }) {
     sharedStageSessionScopeKey, sharedCharactersLinkedToOtherBackgroundCount, operation,
     recoveryScope, validateRecoveryAccess, onWebXrCleanupPendingChange, onClose, onInsert,
     onUseAsAiMethodReference, documentCanvasSize, primitiveGeometryPool, adaptiveDprScale,
+    engineRuntime, applyStudioBg3dThreeRenderSettings,
     setAdaptiveDprScale, sharedCharacterCaptureAuthorityDraft,
     sharedCharacterCaptureAuthorityPayloadKey, readSharedCharacterCaptureAuthorityDraft,
     sharedCharacterCaptureAuthorityPayloadKeyRef, sharedCharacterCaptureAuthorityRevisionRef,
@@ -337,7 +338,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   </div>
                 )}
                 <Canvas
-                  key={webXrCanvasGeneration}
+                  key={`${webXrCanvasGeneration}:${engineRuntime.canvasKey}`}
                   eventSource={viewportHostRef as unknown as React.RefObject<HTMLElement>}
                   camera={{
                     fov: sceneBaseDocument.camera.fovDegrees,
@@ -356,11 +357,16 @@ export function StudioBg3dEditorViewport({ h }) {
                   dpr={deviceQuality.effectiveDpr * adaptiveDprScale}
                   frameloop={bg3dFrameLoop}
                   shadows={{ enabled: deviceQuality.shadows, type: THREE.PCFShadowMap }}
-                  gl={{ antialias: sceneBaseDocument.render.antialias, alpha: true }}
+                  gl={
+                    engineRuntime.glFactory
+                      ?? { antialias: sceneBaseDocument.render.antialias, alpha: true }
+                  }
                   onCreated={({ gl }) => {
                     modelRendererRef.current = gl;
                     setModelRenderer(gl);
-                    applyStudioBg3dThreeWebglRenderSettings(gl, sceneBaseDocument.render);
+                    // Routes by the renderer's own brand flag so the WebGPU renderer receives the
+                    // same document colour contract instead of being silently skipped.
+                    applyStudioBg3dThreeRenderSettings(gl, sceneBaseDocument.render);
                     gl.setClearColor(getSkyPreset(renderedSkyPresetId).clearColor, 1);
                   }}
                   onPointerMissed={(event) => {
@@ -933,6 +939,17 @@ export function StudioBg3dEditorViewport({ h }) {
                     )}
                   >
                     {surfaceSnapStatus.message}
+                  </div>
+                ) : null}
+
+                {engineRuntime.deviceLostMessage && !immersiveSceneActive ? (
+                  <div
+                    role="alert"
+                    aria-live="assertive"
+                    data-testid="bg3d-engine-fallback-status"
+                    className="pointer-events-none absolute inset-x-3 top-3 z-20 mx-auto max-w-md rounded-xl border border-bad/50 bg-panel/95 px-3 py-2 text-center text-xs font-semibold leading-relaxed text-bad shadow-lg backdrop-blur"
+                  >
+                    {engineRuntime.deviceLostMessage}
                   </div>
                 ) : null}
 
