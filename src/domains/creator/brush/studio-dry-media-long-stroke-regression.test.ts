@@ -387,7 +387,17 @@ describe("cold-start first-chunk freeze gate (adversarial-review regression)", (
     //    slice may exceed it -- the CI failure that prompted this was a single pump preempted at
     //    35.5ms against 33 -- and even that one may not reach a second 30fps frame, so a genuine
     //    multi-frame freeze fails no matter how few slices it affects.
-    const sliceBudgetMs = studioPerfBudgetMs(CHUNK_FREEZE_BUDGET_MS);
+    // Floored at the recorded budget: calibration may LOOSEN this gate on a slow machine, never
+    // tighten it. `studioPerfBudgetMs` deliberately has no lower clamp — a genuinely faster
+    // machine should get a tighter budget — but its calibration workload is core-bound, so a
+    // CONTENDED machine reads as a fast one. Measured on a 4-vCPU container under `pnpm test`,
+    // it scaled this 33ms budget down to 24.2ms and then reported 18 slices over it, with
+    // nothing regressed. The harness's own docstring names this limit ("tracks a slower machine
+    // but not a busy one"); this call site simply refuses the direction it cannot measure.
+    const sliceBudgetMs = Math.max(
+      CHUNK_FREEZE_BUDGET_MS,
+      studioPerfBudgetMs(CHUNK_FREEZE_BUDGET_MS),
+    );
     const overBudget = sliceDurationsMs.filter((elapsed) => elapsed >= sliceBudgetMs);
     expect(overBudget.length, `slices over ${sliceBudgetMs.toFixed(1)}ms`).toBeLessThanOrEqual(1);
     expect(Math.max(...sliceDurationsMs)).toBeLessThan(sliceBudgetMs * 1.5);
