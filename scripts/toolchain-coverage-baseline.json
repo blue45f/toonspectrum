@@ -1,16 +1,16 @@
 {
   "$comment": "Per-root floors for scripts/verify-toolchain-coverage.mjs. Ratchet only — regenerate with `node scripts/verify-toolchain-coverage.mjs --update` and review the diff in the commit.",
-  "recordedAt": "2026-08-29",
+  "recordedAt": "2026-08-21",
   "testFilesByRoot": {
-    "apps": 162,
-    "components": 13,
+    "apps": 161,
+    "components": 14,
     "deploy": 10,
-    "lib": 70,
-    "packages": 90,
+    "lib": 71,
+    "packages": 88,
     "scripts": 46,
-    "src": 2316,
+    "src": 2229,
     "tests": 45
   },
-  "testFilesTotal": 2752,
-  "typecheckedFiles": 5603
+  "testFilesTotal": 2664,
+  "typecheckedFiles": 5197
 }

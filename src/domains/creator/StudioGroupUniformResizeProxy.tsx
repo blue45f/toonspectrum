@@ -11,6 +11,7 @@ import {
 import {
   STUDIO_DRAW_SELECTION_INDICATOR_NAME,
   STUDIO_GROUP_SELECTION_OVERLAY_NAME,
+  drainStudioLateParkedChrome,
   STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR,
   findStudioDrawWrapperNode,
   mirrorStudioDrawElementTranslation,
@@ -250,9 +251,14 @@ export function StudioGroupUniformResizeProxy({
     // Return the lifted nodes to the document Layer first so the neutral reset below invalidates
     // the authoritative Layer once, and the mirrors re-converge from the same reset.
     restoreStudioSingleObjectDragLayer(preview.lift);
+    const stage = preview.node.getStage();
     preview.node.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, undefined);
     resetStudioLiveTransformPreviewNodeAttrs(preview.node);
     for (const indicator of preview.parkedIndicators) indicator.visible(true);
+    // Chrome that mounted DURING the gesture is not in the start snapshot — the lazy overlay chunk
+    // resolving mid-transform parks itself instead, and this is where that gets undone. Restoring
+    // only the snapshot would leave such an indicator hidden for good.
+    drainStudioLateParkedChrome(stage);
     preview.node.getLayer()?.batchDraw();
   }
 

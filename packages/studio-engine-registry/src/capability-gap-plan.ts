@@ -150,5 +150,23 @@ export function validateVelloCapabilityGapCoverage(
       }
     }
   }
+
+  // The challenger is held to the same standard, and for the same reason. A lane that cannot be
+  // SELECTED for a gap cannot challenge on it: `HybridExecutionPlanner` picks islands through the
+  // same exact capability query, so an under-declared challenger would sit in the chain looking
+  // like coverage while never being eligible for any of it. This checks declaration, not
+  // readiness — `maturity` and the tournament gate still decide admission.
+  const challengerProvider = byId.get(plan.challengerProviderId);
+  if (challengerProvider) {
+    for (const gap of plan.gaps) {
+      if (!providerCoversGap(challengerProvider, gap.feature)) {
+        issues.push({
+          subject: `${plan.challengerProviderId}:${gap.feature}`,
+          reason:
+            "the named challenger lane does not declare this gap capability, so it could never be selected to challenge on it",
+        });
+      }
+    }
+  }
   return issues;
 }

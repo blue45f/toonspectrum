@@ -28,6 +28,7 @@ describe("Vello capability-gap alternative-engine coverage", () => {
     // so an island-completion claim alone would leave this lane unselectable for the gaps it is
     // named to complete.
     const completion = byId.get("skia-canvaskit-gpu");
+    const challenger = byId.get("skia-graphite-webgpu");
     for (const feature of [
       "render.text.paragraph",
       "render.mask",
@@ -36,6 +37,9 @@ describe("Vello capability-gap alternative-engine coverage", () => {
       "render.path-effect",
     ]) {
       expect(completion?.capabilities, feature).toContain(feature);
+      // The challenger is held to the same standard: a lane that cannot be selected for a gap
+      // cannot challenge on it, however it is ranked.
+      expect(challenger?.capabilities, feature).toContain(feature);
     }
   });
 

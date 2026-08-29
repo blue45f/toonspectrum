@@ -20,7 +20,10 @@ import {
   type StudioPaperMediumV1,
   type StudioPaperPresetV1,
 } from "./studio-paper-media-profile-v1";
-import { studioPerfBudgetMs } from "./studio-perf-budget-calibration";
+import {
+  studioPerfRatioBudgetMs,
+  studioPerfSustainedCalibrationWorkload,
+} from "./studio-perf-budget-calibration";
 
 const SEED = 41;
 
@@ -727,10 +730,15 @@ describe("성능 예산 — 스칼라 샘플러", () => {
     }
     expect(Number.isFinite(sink)).toBe(true);
     expect(sink).toBeGreaterThan(0);
-    // 예산은 절대 밀리초가 아니라 보정 기준 대비 비율이다. 기준 컨테이너에서 min-of-3로 218~224ms를
-    // 재므로 280ms는 그 최악 정상치에 ~1.25배 여유를 둔 값이고, 2배 회귀(448ms)는 여전히 잡힌다.
-    // 기존의 200/500 분기는 절대값이라 회귀 없이도 208.8ms로 실패했고, CI 쪽 500은 가장 바쁜 머신에
-    // 가장 느슨한 게이트를 주는 역방향이었다.
-    expect(elapsedMs).toBeLessThan(studioPerfBudgetMs(280));
+    // 예산은 절대 밀리초가 아니라 "같은 길이의 보정 작업" 대비 비율이다. 절대값(200/500)은 회귀 없이도
+    // 208.8ms로 실패했고, 짧은 합성 보정도 이 루프를 따라가지 못했다 — 8-way 부하에서 이 샘플러는
+    // x10.13 느려지는데 2ms 합성 작업은 x0.99로 꿈쩍도 하지 않아 비율이 +925% 움직였다. 같은 길이의
+    // 보정 작업은 x9.83으로 함께 느려져 비율이 +3%(1.06 → 1.10)에 그친다.
+    //
+    // 기준 컨테이너 정상 비율 1.06(유휴) / 1.10(경합). 1.4는 그 최악치에 여유를 두면서도 2배 회귀
+    // (>=2.12)는 그대로 실패시킨다. 보정 1회가 ~200ms라 샘플은 2회만 잡는다.
+    expect(elapsedMs).toBeLessThan(
+      studioPerfRatioBudgetMs(1.4, studioPerfSustainedCalibrationWorkload, 2),
+    );
   });
 });

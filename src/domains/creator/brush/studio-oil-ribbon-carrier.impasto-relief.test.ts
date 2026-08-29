@@ -10,7 +10,7 @@ import {
   traceStudioOilRibbonPath,
   type StudioOilRibbonImpastoReliefKind,
 } from "./studio-oil-ribbon-carrier";
-import { studioPerfBudgetMs } from "./studio-perf-budget-calibration";
+import { studioPerfRatioBudgetMs } from "./studio-perf-budget-calibration";
 
 
 const HORIZONTAL_STROKE = {
@@ -48,6 +48,13 @@ function meanOfYs(points: readonly number[]): number {
  * samples, because none of them can come in faster than the work actually takes.
  */
 const PLAN_BUDGET_SAMPLES = 5;
+
+/**
+ * Scribble plan cost over its sibling `planOilBrushDabs` cost, recorded on the reference container:
+ * 3.77 / 4.42 / 4.55 idle. 5.7 clears the worst of those with the same ~1.25x margin the other
+ * budgets carry, while a 2x regression (>=7.5) still fails.
+ */
+const RECORDED_SCRIBBLE_RATIO = 5.7;
 
 function fastestPlan(
   dabs: Parameters<typeof planStudioOilRibbonCarrier>[0],
@@ -195,12 +202,26 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
     expect(longDabs.length).toBeGreaterThanOrEqual(2000);
     const { plan, elapsed } = fastestPlan(longDabs);
     expect(plan.impastoReliefLanes!.length).toBeGreaterThan(0);
-    // Recorded against the calibration reference, not against a runner: min-of-5 measures 20.7ms
-    // on the reference container in isolation and 32.5ms inside the full suite, which is why the
-    // old absolute 30ms could not survive `pnpm test` off CI. 26ms is that isolated cost plus the
-    // same ~1.25x margin the scribble budget carries — comfortably clear of healthy noise, and
-    // less than half the 41ms a 2x regression would read at this scale.
-    expect(elapsed).toBeLessThan(studioPerfBudgetMs(26));
+    // Budgeted against a SIBLING operation rather than a millisecond count, because this planner is
+    // memory/GC-bound and neither an absolute budget nor a synthetic calibration survives a busy
+    // machine (measured: under load this plan slows x4.31 while a synthetic float loop slows x1.03,
+    // so plan/synthetic moves +320% -- plan/sibling moves +5%). `planOilBrushDabs` produces this
+    // test's own input and shares its footprint, but the carrier is different code, so a regression
+    // here cannot move the denominator with it.
+    //
+    // Healthy ratio on the reference container: 0.97-1.48 idle, 1.50 under 8-way contention. 1.85
+    // clears the worst of those with room while a 2x regression (>=2.0) still fails.
+    expect(elapsed).toBeLessThan(
+      studioPerfRatioBudgetMs(1.85, () => {
+        planOilBrushDabs({
+          points: [0, 0, 1200, 40, 2400, -30, 3600, 20],
+          pressures: [0.5, 0.75, 0.6, 0.8],
+          baseWidth: 24,
+          seed: 7,
+          maxDabs: 2048,
+        });
+      }),
+    );
   });
 
   it("stays within the plan budget on a dense self-crossing scribble too", () => {
@@ -230,11 +251,12 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
     // splatted twice, and each ridge segment is one capsule distance field instead of a chain of
     // overlapping discs that was quadrature for exactly that field.
     //
-    // Recorded on the calibration reference container at 78.4ms min-of-5 (three rounds: 78.4,
-    // 70.0, 69.9), so 98ms is that worst steady-state reading plus ~1.25x. The old 60/120 split
-    // was an absolute count that failed here at 78.5ms with nothing regressed; scaling by the
-    // calibration removes the runner from the verdict without admitting the 157ms a 2x regression
-    // would read.
-    expect(elapsed).toBeLessThan(studioPerfBudgetMs(98));
+    // Same sibling-ratio form as the 2000-station budget above, for the same measured reason; the
+    // ratio differs because this blob-shaped scribble maximises grid area and splat density per dab.
+    expect(elapsed).toBeLessThan(
+      studioPerfRatioBudgetMs(RECORDED_SCRIBBLE_RATIO, () => {
+        planOilBrushDabs({ points, baseWidth: 26, seed: 3, maxDabs: 2048 });
+      }),
+    );
   });
 });

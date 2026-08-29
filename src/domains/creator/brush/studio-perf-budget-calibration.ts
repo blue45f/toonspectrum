@@ -58,6 +58,12 @@ export const STUDIO_PERF_CALIBRATION_REFERENCE_MS = 2.3;
  */
 export const STUDIO_PERF_CALIBRATION_MAX_SLOWDOWN = 4;
 
+/**
+ * Smallest sibling measurement `studioPerfRatioBudgetMs` will divide a budget by. Below this the
+ * reading is mostly timer resolution and call overhead, so it says nothing about the machine.
+ */
+export const STUDIO_PERF_CALIBRATION_MIN_SIBLING_MS = 0.05;
+
 /** Samples per calibration measurement. Minimum-of-N, for the additive-noise reason above. */
 const STUDIO_PERF_CALIBRATION_SAMPLES = 5;
 
@@ -126,7 +132,87 @@ export function studioCalibratedBudgetMs(
   return recordedBudgetMs * slowdown;
 }
 
-/** Convenience for the assertion site: measures this machine and scales `recordedBudgetMs`. */
+/**
+ * Convenience for the assertion site: measures this machine and scales `recordedBudgetMs`.
+ *
+ * Only sound for budgets whose measured code has the SAME resource profile as the workload above —
+ * a tight numeric loop over a small resident working set. See the profile note on
+ * `studioPerfRatioBudgetMs` for what to use when it does not.
+ */
 export function studioPerfBudgetMs(recordedBudgetMs: number): number {
   return studioCalibratedBudgetMs(recordedBudgetMs, measureStudioPerfCalibrationMs());
+}
+
+/**
+ * Budget for code the synthetic workload CANNOT calibrate, expressed against a sibling operation.
+ *
+ * The synthetic workload above tracks a slower machine but not a busy one, and that distinction was
+ * measured, not assumed. Running the 2000-station impasto plan against 8 competing CPU hogs on the
+ * reference container:
+ *
+ *              idle      loaded     slowdown
+ *   plan       30.94ms   133.24ms   x4.31
+ *   synthetic   2.30ms     2.36ms   x1.03   -> plan/synthetic moved x13.5 -> x56.5  (+320%)
+ *   sibling    21.71ms    88.61ms   x4.08   -> plan/sibling   moved x1.43 -> x1.50  (+5%)
+ *
+ * The reason is resource profile. A 1024-element float loop is core-bound and stays in cache, so
+ * concurrent load barely touches it; a stroke planner is bound by memory bandwidth and GC, which
+ * is exactly what contention takes away. Minimum-of-N does not rescue this either -- it cancels a
+ * single preempted sample, not a floor that has risen under every sample.
+ *
+ * So for those budgets the calibration is a REAL sibling operation: same domain and comparable
+ * footprint, so contention cancels, but different code, so a regression in the measured path does
+ * not move the denominator with it. `planOilBrushDabs` calibrates the ribbon carrier for that
+ * reason -- the carrier consumes its output and neither calls the other.
+ *
+ * @param recordedRatio measured-over-sibling, recorded on the reference container with margin.
+ * @param calibrate the sibling operation; called once to warm, then sampled.
+ */
+export function studioPerfRatioBudgetMs(
+  recordedRatio: number,
+  calibrate: () => void,
+  samples: number = STUDIO_PERF_CALIBRATION_SAMPLES,
+): number {
+  calibrate();
+  let best = Number.POSITIVE_INFINITY;
+  for (let sample = 0; sample < Math.max(1, samples); sample += 1) {
+    const startedAt = performance.now();
+    calibrate();
+    best = Math.min(best, performance.now() - startedAt);
+  }
+  // A sibling this cheap is not a denominator: below it, timer resolution and call overhead are
+  // most of the reading, and multiplying it by the ratio would gate healthy code to a few
+  // microseconds. Refusing to gate is the safe direction -- a broken calibration must never
+  // manufacture a failure in code that never regressed.
+  if (!Number.isFinite(best) || best < STUDIO_PERF_CALIBRATION_MIN_SIBLING_MS) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return recordedRatio * best;
+}
+
+/**
+ * Repeats the base workload to ~200ms, for calibrating budgets that measure work of that duration.
+ *
+ * Duration, not just memory profile, decides whether a calibration tracks a busy machine, and that
+ * was measured too. The 1e6-sample paper sampler against 8 competing CPU hogs on the reference
+ * container:
+ *
+ *                    idle      loaded      slowdown
+ *   paper sampler    223.9ms   2268.9ms    x10.13
+ *   base workload      2.38ms     2.36ms    x0.99  -> ratio moved x94.0 -> x963.3  (+925%)
+ *   this workload    210.8ms   2072.0ms    x9.83   -> ratio moved x1.06 -> x1.10   (+3%)
+ *
+ * A 2ms workload usually completes inside one scheduler quantum, so oversubscription barely
+ * touches it; a 200ms one is descheduled repeatedly, exactly like the code it is calibrating.
+ * Minimum-of-N cannot recover this because every sample is long enough to be preempted.
+ *
+ * Callers should pass a small `samples` count to `studioPerfRatioBudgetMs` for this workload -- at
+ * ~200ms a call, the default five would cost a second of wall clock per assertion.
+ */
+export function studioPerfSustainedCalibrationWorkload(): number {
+  let accumulator = 0;
+  for (let repeat = 0; repeat < 90; repeat += 1) {
+    accumulator += studioPerfCalibrationWorkload();
+  }
+  return accumulator;
 }

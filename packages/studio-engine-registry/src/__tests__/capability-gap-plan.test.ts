@@ -24,7 +24,7 @@ const GAP_CAPABILITIES = [
 const FULL_UNIVERSE = [
   { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
   { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
-  { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: ["surface.island.skia-complete"] },
+  { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
 ];
 
 describe("planVelloCapabilityGaps", () => {
@@ -86,10 +86,12 @@ describe("validateVelloCapabilityGapCoverage", () => {
     // Checking the routing contracts alone proved nothing about the lanes the app ships: registry
     // queries and activation evidence read descriptor.capabilities, so an under-declared
     // completion lane could never be selected to complete the gap it is named for.
+    // The challenger is fully declared here so the assertion isolates the completion lane; its own
+    // under-declaration is covered by the next test.
     const issues = validateVelloCapabilityGapCoverage([
       { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
       { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: [] },
-      { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: [] },
+      { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
     ]);
 
     expect(issues.map((issue) => issue.subject)).toEqual([
@@ -100,6 +102,27 @@ describe("validateVelloCapabilityGapCoverage", () => {
     ]);
     for (const issue of issues) {
       expect(issue.reason).toContain("does not declare this gap capability");
+    }
+  });
+
+  it("fails when the challenger cannot be selected for the gaps it is named to challenge on", () => {
+    // An island-completion claim alone is invisible to the registry's exact-token match, so a
+    // challenger declaring only that would sit in the chain looking like coverage while never
+    // being eligible for any of it.
+    const issues = validateVelloCapabilityGapCoverage([
+      { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
+      { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: [] },
+      {
+        id: VELLO_GAP_CHALLENGER_PROVIDER_ID,
+        capabilities: ["surface.island.skia-complete"],
+      },
+    ]);
+
+    expect(issues.map((issue) => issue.subject)).toEqual(
+      GAP_CAPABILITIES.map((gap) => `${VELLO_GAP_CHALLENGER_PROVIDER_ID}:${gap}`)
+    );
+    for (const issue of issues) {
+      expect(issue.reason).toContain("could never be selected to challenge on it");
     }
   });
 });
