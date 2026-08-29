@@ -104,6 +104,7 @@ export function formatStudio3dWebGpuDiagnosticConsoleMessage(
 }
 export type Studio3dWebGpuProofShard =
   (typeof STUDIO_3D_WEBGPU_PROOF_SHARDS)[number];
+// Linux CI has no hardware adapter, so pin both Dawn and ANGLE to Vulkan-backed SwiftShader.
 // Playwright 1.62 already enables CDPScreenshotNewSurface. Chromium treats duplicate
 // --enable-features switches as last-wins, so preserve that default while adding Vulkan.
 export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
@@ -117,6 +118,24 @@ export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--use-angle=swiftshader",
   "--enable-unsafe-swiftshader",
 ]);
+export const STUDIO_3D_WEBGPU_DARWIN_NATIVE_LAUNCH_ARGS = Object.freeze([
+  "--no-sandbox",
+  "--enable-unsafe-webgpu",
+  "--use-gpu-in-tests",
+]);
+
+/**
+ * Chromium 151 on macOS can obtain a forced SwiftShader adapter but then wedge requestDevice(),
+ * while its native Metal adapter initializes normally. Keep the software adapter pin on Linux CI
+ * and use the hardware-backed path on Darwin; other platforms retain the established CI flags.
+ */
+export function resolveStudio3dWebGpuLaunchArgs(
+  platform: NodeJS.Platform = process.platform,
+): readonly string[] {
+  return platform === "darwin"
+    ? STUDIO_3D_WEBGPU_DARWIN_NATIVE_LAUNCH_ARGS
+    : STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS;
+}
 export const STUDIO_VRM_CHROMA_DELTA_THRESHOLD = 40;
 export const STUDIO_VRM_COLOR_MIN_RATIO = 0.002;
 export const STUDIO_VRM_MANNEQUIN_MAX_RATIO = 0.005;
@@ -3028,18 +3047,20 @@ async function runStudio3dWebGpuConformanceBrowserAttempt(
 ): Promise<void> {
   // Keep the conformance browser process exclusive. Chromium/Dawn SwiftShader has a materially
   // smaller device-lifetime surface when the normal Studio browser has not been launched yet.
+  const webGpuLaunchArgs = resolveStudio3dWebGpuLaunchArgs();
   const webGpuBrowser = await chromium.launch({
     channel: STUDIO_3D_WEBGPU_BROWSER_CHANNEL,
     // GitHub's GPU-less Linux runners repeatedly lose Dawn's SwiftShader device on the first
-    // Babylon readback in Chromium's new-headless path. Keep the exact browser build, adapter
-    // flags, proof shards, and assertions while exercising the regular headed compositor under
-    // the workflow-owned Xvfb display.
+    // Babylon readback in Chromium's new-headless path. Exercise the regular headed compositor
+    // under Xvfb there, but do not force that Linux Vulkan adapter on macOS where it wedges device
+    // creation; resolveStudio3dWebGpuLaunchArgs keeps Darwin on its native Metal adapter.
     headless: false,
-    args: [...STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS],
+    args: [...webGpuLaunchArgs],
   });
   console.log(
     `[verify-studio-3d-console] WebGPU browser ` +
       `mode=headed channel=${STUDIO_3D_WEBGPU_BROWSER_CHANNEL} ` +
+      `adapterPath=${process.platform === "darwin" ? "native" : "forced-swiftshader"} ` +
       `version=${webGpuBrowser.version()}`,
   );
   let webGpuContext: BrowserContext | null = null;
@@ -3101,9 +3122,10 @@ async function main(): Promise<void> {
     await waitForServer(rootUrl, {
       notReadyMessage: `preview server did not become ready: ${rootUrl}`,
     });
-    // Use Playwright's pinned Chromium rather than a machine-global Chrome channel. Pin Dawn's
-    // WebGPU adapter as well as ANGLE's WebGL adapter: --use-angle alone does not select the
-    // WebGPU device, so a GPU-less runner can otherwise lose its default Dawn device mid-proof.
+    // Use Playwright's pinned Chromium rather than a machine-global Chrome channel. Linux pins
+    // Dawn and ANGLE to SwiftShader because --use-angle alone does not select the WebGPU device;
+    // Darwin deliberately keeps Chromium's native Metal adapter because forced Vulkan SwiftShader
+    // can obtain an adapter there but leave requestDevice() permanently pending.
     // No normal Chromium process exists until every proof shard has closed. Each shard gets at
     // most two fresh-process retries only for classified device/context lifetime failures; semantic
     // and parity failures remain immediate hard failures and completed shards are never replayed.

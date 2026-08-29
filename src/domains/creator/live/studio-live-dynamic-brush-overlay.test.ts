@@ -2173,6 +2173,97 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(settledCanvas.height).toBe(SURFACE.height * devicePixelRatio);
   });
 
+  it("parks only hidden coverage while idle and restores it before first-contact drawing", () => {
+    vi.stubGlobal("devicePixelRatio", 2);
+    const {
+      activeCanvas,
+      presentationCanvas,
+      renderer,
+      settledCanvas,
+    } = attachedRenderer();
+
+    expect([activeCanvas.width, activeCanvas.height]).toEqual([1, 1]);
+    expect([presentationCanvas.width, presentationCanvas.height]).toEqual([
+      SURFACE.width * 2,
+      SURFACE.height * 2,
+    ]);
+    expect([settledCanvas.width, settledCanvas.height]).toEqual([
+      SURFACE.width * 2,
+      SURFACE.height * 2,
+    ]);
+
+    const element = drawElement("idle-coverage-restore", [24, 28, 70, 52]);
+    expect(renderer.begin(element).status).toBe("started");
+    expect([activeCanvas.width, activeCanvas.height]).toEqual([
+      SURFACE.width * 2,
+      SURFACE.height * 2,
+    ]);
+    expect(presentationCanvas.recordedMarks.length).toBeGreaterThan(0);
+    expect(renderer.end(element).status).toBe("settled");
+
+    expect([activeCanvas.width, activeCanvas.height]).toEqual([1, 1]);
+    expect([presentationCanvas.width, presentationCanvas.height]).toEqual([
+      SURFACE.width * 2,
+      SURFACE.height * 2,
+    ]);
+    expect([settledCanvas.width, settledCanvas.height]).toEqual([
+      SURFACE.width * 2,
+      SURFACE.height * 2,
+    ]);
+    expect(settledCanvas.recordedComposites).toHaveLength(1);
+  });
+
+  it("re-parks restored coverage when another required surface context is unavailable", () => {
+    const activeCanvas = recordingCanvas();
+    const presentationCanvas = recordingCanvas();
+    presentationCanvas.getContext = () => null;
+    const settledCanvas = recordingCanvas();
+    const renderer = new StudioLiveDynamicBrushOverlayRenderer();
+    renderer.attach({ activeCanvas, presentationCanvas, settledCanvas });
+    renderer.setSurface(SURFACE);
+
+    expect([activeCanvas.width, activeCanvas.height]).toEqual([1, 1]);
+    expect(renderer.begin(drawElement("missing-presentation-context", [24, 28]))).toEqual({
+      status: "fallback",
+      reason: "surface-unavailable",
+    });
+    expect([activeCanvas.width, activeCanvas.height]).toEqual([1, 1]);
+    expect([settledCanvas.width, settledCanvas.height]).toEqual([
+      SURFACE.width,
+      SURFACE.height,
+    ]);
+  });
+
+  it("re-parks deferred coverage when append flushes after the surface becomes unavailable", () => {
+    let pendingFrame: FrameRequestCallback | null = null;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      pendingFrame = callback;
+      return 1;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    vi.stubGlobal("PerformanceObserver", class {
+      static readonly supportedEntryTypes = ["longtask"];
+    });
+    const { activeCanvas, renderer } = attachedRenderer();
+    const element = drawElement("deferred-surface-unavailable", [24, 28, 70, 52]);
+
+    expect(renderer.begin(element)).toMatchObject({ status: "started" });
+    expect(renderer.hasPendingBegin).toBe(true);
+    expect(pendingFrame).not.toBeNull();
+    expect([activeCanvas.width, activeCanvas.height]).toEqual([
+      SURFACE.width,
+      SURFACE.height,
+    ]);
+
+    renderer.setSurface(null);
+    expect(renderer.appendFrom(element)).toEqual({
+      status: "fallback",
+      reason: "surface-budget",
+    });
+    expect(renderer.hasPendingBegin).toBe(false);
+    expect([activeCanvas.width, activeCanvas.height]).toEqual([1, 1]);
+  });
+
   it("fails closed and keeps only three cleared 1x1 stores when native DPR exceeds budget", () => {
     vi.stubGlobal("devicePixelRatio", 3);
     const dimension = Math.floor(
@@ -2223,7 +2314,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       height: dimension,
       documentWidth: dimension,
     });
-    expect(renderer.backingPixelCount).toBeGreaterThan(15_000_000);
+    expect(renderer.backingPixelCount).toBe(2 * dimension * dimension + 1);
 
     renderer.setSurface({
       ...SURFACE,
@@ -2264,7 +2355,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       height: dimension,
       documentWidth: dimension,
     });
-    expect(renderer.backingPixelCount).toBe(3 * dimension * dimension);
+    expect(renderer.backingPixelCount).toBe(2 * dimension * dimension + 1);
 
     vi.stubGlobal("devicePixelRatio", 3);
     renderer.setSurface({
@@ -2321,8 +2412,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     const [cropX, cropY, cropWidth, cropHeight] = settleCopy.sourceRect;
     expect(cropWidth).toBeGreaterThan(0);
     expect(cropHeight).toBeGreaterThan(0);
-    expect(cropWidth).toBeLessThan(live.activeCanvas.width);
-    expect(cropHeight).toBeLessThan(live.activeCanvas.height);
+    expect(cropWidth).toBeLessThan(live.presentationCanvas.width);
+    expect(cropHeight).toBeLessThan(live.presentationCanvas.height);
 
     // Pixel identity: every retained mark footprint sits inside the crop, so the pixels outside
     // the crop that the flatten no longer copies were never painted on the active surface.

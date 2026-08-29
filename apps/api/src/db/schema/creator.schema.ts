@@ -63,8 +63,8 @@ export const creatorWorks = pgTable(
     index("idx_creator_work_user_created").on(t.userId, t.createdAt), // 내 작품/작가 보드
     index("idx_creator_work_title_created").on(t.titleId, t.createdAt), // 작품별 팬 창작물
     index("idx_creator_work_status_created").on(t.status, t.createdAt), // 공개 보드 최신순
-    index("idx_creator_work_series_episode").on(t.seriesId, t.episodeNo), // 시리즈 회차 정렬
-    index("idx_creator_work_challenge_created").on(t.challengeId, t.createdAt), // 챌린지 참여작
+    index("creator_work_series_idx").on(t.seriesId, t.episodeNo), // 시리즈 회차 정렬
+    index("creator_work_challenge_idx").on(t.challengeId), // 챌린지 참여작
     index("idx_creator_work_remix").on(t.remixFromId), // 리믹스 쿼리 최적화
     check("creator_work_revision_value_positive_check", sql`${t.revision} >= 1`),
   ]
@@ -1073,24 +1073,28 @@ export const creatorWorkTeamCommentMutations = pgTable(
 
 // ── 창작 연재 시리즈 — 회차(creator_work.seriesId)를 묶는 단위 ──────────────
 // author/avatar는 게시 시점 스냅샷(표시는 항상 users 조인 값 우선, 탈퇴/조인 실패 시 폴백).
-export const creatorSeries = pgTable("creator_series", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  author: text("author").notNull().default(""),
-  avatar: text("avatar").notNull().default(""),
-  title: text("title").notNull(),
-  description: text("description").notNull().default(""),
-  cover: text("cover").notNull().default(""), // 대표 커버(데이터 URL 또는 외부 URL)
-  tags: jsonb("tags").$type<string[]>().notNull().default([]),
-  status: text("status").notNull().default("ongoing"), // ongoing(연재중) | completed(완결)
-  hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
-  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
-  updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
-});
+export const creatorSeries = pgTable(
+  "creator_series",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    author: text("author").notNull().default(""),
+    avatar: text("avatar").notNull().default(""),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    cover: text("cover").notNull().default(""), // 대표 커버(데이터 URL 또는 외부 URL)
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    status: text("status").notNull().default("ongoing"), // ongoing(연재중) | completed(완결)
+    hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
+    createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+    updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
+  },
+  (t) => [index("creator_series_user_idx").on(t.userId)]
+);
 
 
 // ── 창작 챌린지(주간 주제 이벤트) — 기본 시드는 apps/api/src/server/creator.ts가 idempotent 보장 ──

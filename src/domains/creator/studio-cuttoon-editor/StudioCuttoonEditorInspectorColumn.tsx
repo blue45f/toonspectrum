@@ -385,6 +385,9 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
     tipRoundness,
     title,
     titleInputRef,
+    pendingSaveIntent,
+    onContinuePendingSave,
+    onClearWorkMetadataError,
     tool,
     useVelocityPressure,
     userGuides,
@@ -817,6 +820,9 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
           tipRoundness={tipRoundness}
           title={title}
           titleInputRef={titleInputRef}
+          pendingSaveIntent={pendingSaveIntent}
+          onContinuePendingSave={onContinuePendingSave}
+          onClearWorkMetadataError={onClearWorkMetadataError}
           tool={tool}
           userGuides={userGuides}
           useVelocityPressure={useVelocityPressure}

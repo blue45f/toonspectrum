@@ -1,4 +1,4 @@
-import { Suspense, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import {
@@ -70,6 +70,23 @@ function StudioEditorRoute({ resolution }: {
     remixId: route.remixSourceWorkId,
     workId: route.workId,
   });
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined"
+      || typeof window.matchMedia !== "function"
+      || window.matchMedia("(max-width: 1023px)").matches
+    ) {
+      return;
+    }
+
+    // The desktop inspector is always part of the first workspace, but its large chunk used to
+    // begin loading only after the editor chunk had mounted. Start it beside the editor request so
+    // the canvas stays the critical paint while the properties rail arrives without a waterfall.
+    void import("../studio-inspector-aside-loader")
+      .then(({ preloadStudioInspectorAside }) => preloadStudioInspectorAside())
+      .catch(() => undefined);
+  }, []);
 
   return (
     <StudioDocumentRuntimeBoundary documentKey={editorKey}>

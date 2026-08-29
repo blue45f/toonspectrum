@@ -271,6 +271,7 @@ export interface StudioLazyPanelStackProps {
   effectivePublishPackageSettings: StudioPublishPackageSettings;
   elementById: Map<string, El>;
   fxPanelOpen: boolean;
+  followingStudioSessionId: string | null;
   isMobile: boolean;
   loadedWork: WorkDetail | null;
   loggedIn: boolean;
@@ -347,6 +348,7 @@ export interface StudioLazyPanelStackProps {
   setStudioCommentPinsHidden: Dispatch<SetStateAction<boolean>>;
   setContinuityOpen: Dispatch<SetStateAction<boolean>>;
   setFxPanelOpen: Dispatch<SetStateAction<boolean>>;
+  setFollowingStudioSessionId: Dispatch<SetStateAction<string | null>>;
   setLoadedWork: Dispatch<SetStateAction<WorkDetail | null>>;
   setMannequinPoserOpen: Dispatch<SetStateAction<boolean>>;
   setPageReviewOpen: Dispatch<SetStateAction<boolean>>;
@@ -397,6 +399,31 @@ export interface StudioLazyPanelStackProps {
   writerRoomCanvasPlan: StudioWriterRoomCanvasProjectionResult | null;
   writerRoomOpen: boolean;
   stableHandlers: StudioLazyPanelStackHandlers;
+}
+
+function StudioReferencePanelLoadingFallback() {
+  return (
+    <div
+      role="status"
+      aria-label="참고 이미지 창 불러오는 중"
+      aria-live="polite"
+      data-studio-reference-panel-loading="true"
+      className="fixed right-3 top-20 z-[70] flex min-h-24 w-[min(300px,calc(100vw-1.5rem))] items-center gap-3 rounded-xl border border-line bg-panel px-4 py-3 shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)]"
+    >
+      <span
+        aria-hidden
+        className="relative grid size-9 shrink-0 place-items-center rounded-lg border border-accent/30 bg-accent-soft"
+      >
+        <span className="size-2 rounded-full bg-accent motion-safe:animate-pulse" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xs font-bold text-fg">참고 이미지 창</span>
+        <span className="mt-0.5 block text-[0.7rem] leading-relaxed text-fg-3">
+          보드와 저장된 배치를 준비하고 있어요…
+        </span>
+      </span>
+    </div>
+  );
 }
 
 export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
@@ -528,6 +555,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   setStudioCommentPinsHidden,
   setContinuityOpen,
   setFxPanelOpen,
+  setFollowingStudioSessionId,
   setLoadedWork,
   setMannequinPoserOpen,
   setPageReviewOpen,
@@ -564,6 +592,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   studioComments,
   studioRevisionProjectGenerationRef,
   teamPanelOpen,
+  followingStudioSessionId,
   textAiConfigured,
   timelapseOpen,
   title,
@@ -710,8 +739,14 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             open
             authScopeKey={studioAuthUserId}
             draftCollaboration={draftCollaboration}
+            followingSessionId={followingStudioSessionId}
             onClose={() => setTeamPanelOpen(false)}
             onDraftShareRequest={() => void requestStudioDraftCollaborationShare()}
+            onToggleFollow={(sessionId) =>
+              setFollowingStudioSessionId((current) =>
+                current === sessionId ? null : sessionId
+              )
+            }
             workId={teamWorkId}
             loggedIn={loggedIn}
           />
@@ -1061,7 +1096,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         </div>
       ) : null}
 
-      <Suspense fallback={null}>
+      <Suspense fallback={<StudioReferencePanelLoadingFallback />}>
         {referencePanelOpen ? (
           <StudioReferencePanel
             open

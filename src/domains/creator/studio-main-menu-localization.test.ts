@@ -32,7 +32,7 @@ function groups(): StudioMainMenuGroup[] {
       id: "file",
       label: "파일",
       items: [
-        { id: "save-draft", label: "임시저장", onSelect },
+        { id: "save-draft", label: "초안 저장", onSelect },
         { id: "publish", label: "게시", onSelect },
         {
           id: "import-ora-cbz",
@@ -92,6 +92,40 @@ function item(
 }
 
 describe("localizeStudioMainMenuGroups", () => {
+  it("does not let the legacy Korean locale term override the server draft label", () => {
+    const projected = localizeStudioMainMenuGroups(
+      groups(),
+      BASE_STATE,
+      translator({
+        "studio.mainMenu.item.file.save-draft": "임시저장",
+      }),
+    );
+
+    expect(item(projected, "file", "save-draft").label).toBe("초안 저장");
+  });
+
+  it("keeps the Korean reference-window checkbox label stable across toggle states", () => {
+    const projected = localizeStudioMainMenuGroups(
+      [{
+        id: "window",
+        label: "창",
+        items: [{
+          id: "reference-window",
+          legacyPath: "view/reference-window",
+          label: "참고 이미지 창",
+          checked: false,
+          onSelect: vi.fn(),
+        }],
+      }],
+      BASE_STATE,
+      translator({
+        "studio.mainMenu.item.view.reference-window": "참고 이미지 창 열기",
+      }),
+    );
+
+    expect(item(projected, "window", "reference-window").label).toBe("참고 이미지 창");
+  });
+
   it("projects dynamic translation keys without mutating catalogue groups or callbacks", () => {
     const source = groups();
     const onSelect = source[0].items[0].onSelect;

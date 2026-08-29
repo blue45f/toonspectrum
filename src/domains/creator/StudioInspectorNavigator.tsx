@@ -64,7 +64,7 @@ const PRIMARY_TABS: readonly {
   { id: "properties", label: "속성", icon: SlidersHorizontal },
   { id: "layers", label: "레이어", icon: Layers3 },
   { id: "document", label: "페이지", icon: PanelsTopLeft },
-  { id: "publish", label: "게시", icon: Send },
+  { id: "publish", label: "작품 정보", icon: Send },
 ];
 
 const IMAGE_TABS: readonly {
@@ -134,7 +134,7 @@ function contextualSummary({
   if (layout.primary === "document") {
     return DOCUMENT_TABS.find((tab) => tab.id === layout.document)?.label ?? "페이지";
   }
-  if (layout.primary === "publish") return "제목·설명·태그";
+  if (layout.primary === "publish") return "초안·게시 공통 정보";
   if (selectionLabel) return selectionLabel;
   if (drawing) return "그리기 도구";
   // Empty canvas coaching — competitive apps never leave a dead "select something" dead-end.
@@ -248,7 +248,7 @@ export function StudioInspectorNavigator({
             <button
               type="button"
               onClick={onRequestClose}
-              aria-label="속성 시트 닫기"
+              aria-label="작업 패널 닫기"
               data-autofocus
               className={cn(
                 "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg lg:hidden",

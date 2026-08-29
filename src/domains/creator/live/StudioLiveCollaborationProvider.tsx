@@ -272,6 +272,19 @@ export function StudioLiveCollaborationProvider({
     // 새 room 세대로 진입하는 순간 이전 pair를 먼저 폐기해 부모 편집기가 즉시 잠기게 한다.
     onCrdtDocumentChange?.(null, null);
 
+    // Authorization revocation is the strongest terminal boundary. A CRDT rejection can race the
+    // transport event that caused it, but recovery must never reopen or relabel a revoked work.
+    if (latchedRevocation) {
+      setAvailability("error");
+      setMode(latchedRevocation.mode);
+      setError(latchedRevocation.message);
+      setTerminalTransportState("revoked");
+      setRecovery(null);
+      setLocalFallbackAllowed(false);
+      onRoomChange?.(null);
+      return;
+    }
+
     if (latchedRecovery) {
       setAvailability("error");
       setMode(transportPreference);
@@ -345,17 +358,6 @@ export function StudioLiveCollaborationProvider({
         cancelled = true;
         if (retryTimer !== null) clearTimeout(retryTimer);
       };
-    }
-
-    if (latchedRevocation) {
-      setAvailability("error");
-      setMode(latchedRevocation.mode);
-      setError(latchedRevocation.message);
-      setTerminalTransportState("revoked");
-      setRecovery(null);
-      setLocalFallbackAllowed(false);
-      onRoomChange?.(null);
-      return;
     }
 
     setError(null);
@@ -505,6 +507,9 @@ export function StudioLiveCollaborationProvider({
 
         if (!event.status.recoverable) {
           if (recoveryBoundaryScopeKey) {
+            if (recoveryBoundaryRef.current?.scopeKey === recoveryBoundaryScopeKey) {
+              recoveryBoundaryRef.current = null;
+            }
             revocationBoundaryRef.current = {
               scopeKey: recoveryBoundaryScopeKey,
               mode: nextRoom.mode ?? transportPreference,
@@ -512,6 +517,7 @@ export function StudioLiveCollaborationProvider({
             };
           }
           setTerminalTransportState("revoked");
+          setRecovery(null);
           setOperationSyncReady(false);
           onAuthoritativeSaveBarrierChange?.(null);
           onCrdtDocumentChange?.(null, null);
@@ -576,6 +582,12 @@ export function StudioLiveCollaborationProvider({
             outboxScope,
             onStatus: (status) => {
               if (cancelled) return;
+              // Transport revocation rejects pending CRDT operations before or after its status
+              // event depending on scheduling. The synchronously latched boundary makes both
+              // orders converge on the same user-visible terminal state.
+              if (
+                revocationBoundaryRef.current?.scopeKey === recoveryBoundaryScopeKey
+              ) return;
               setSyncTelemetry((previous) => mergeBindingTelemetry({
                 previous,
                 status,

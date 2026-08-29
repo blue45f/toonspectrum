@@ -1090,6 +1090,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 ref={imageFileInputRef}
                 type="file"
                 accept={STUDIO_CANVAS_IMAGE_ACCEPT}
+                aria-label="캔버스 이미지 파일 선택"
                 className="sr-only"
                 tabIndex={-1}
                 onChange={onPickImage}

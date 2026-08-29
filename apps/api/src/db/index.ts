@@ -1,7 +1,11 @@
+import { Logger } from "@nestjs/common";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-import { normalizePgConnectionStringForTls } from "./pg-connection";
+import {
+  normalizePgConnectionStringForTls,
+  observePgPoolIdleErrors,
+} from "./pg-connection";
 import * as schema from "./schema";
 
 // PostgreSQL(Neon) — node-postgres 드라이버. 로컬 검증은 docker postgres(:55432), 운영/원격은 Neon.
@@ -47,6 +51,10 @@ export function resolvePgPoolOptions(env: EnvLike = process.env): {
 const pool = new Pool({
   connectionString,
   ...resolvePgPoolOptions(),
+});
+observePgPoolIdleErrors(pool, {
+  connectionString,
+  logger: new Logger("PostgresPool"),
 });
 
 export const db = drizzle(pool, { schema });

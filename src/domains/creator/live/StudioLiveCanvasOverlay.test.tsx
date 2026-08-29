@@ -1290,7 +1290,7 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).not.toContain("안전하게 동기화됨");
   });
 
-  it("keeps save protection at 44px through 411px and expands presence chrome from 412px", () => {
+  it("keeps presence chrome compact throughout mobile and expands only in the desktop shell", () => {
     const onOpenTeam = vi.fn();
     render(
       <StudioLivePresenceDock
@@ -1321,7 +1321,8 @@ describe("StudioLiveCanvasOverlay", () => {
     );
 
     const team = screen.getByRole("button", { name: "팀 작업 공간 열기" });
-    expect(team.className).toContain("max-[411px]:hidden");
+    expect(team.className).toContain("hidden");
+    expect(team.className).toContain("sm:grid");
 
     const sync = screen.getByRole("button", {
       name: /저장 보호 필요.*팀 작업 공간 열기/u,
@@ -1329,16 +1330,16 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(sync.className).toContain("size-11");
     expect(sync.className).toContain("min-h-11");
     expect(sync.className).toContain("min-w-11");
-    expect(sync.className).toContain("min-[412px]:w-[13.5rem]");
     expect(sync.className).toContain("sm:w-[16.5rem]");
-    expect(sync.querySelector("span")?.className).toContain("max-[411px]:hidden");
+    expect(sync.className).not.toContain("min-[412px]");
+    expect(sync.querySelector("span")?.className).toContain("sm:inline");
     expect(sync.querySelector("span")?.className).toContain("tabular-nums");
 
     expect(screen.getByRole("group", { name: "참여자" }).className)
-      .toContain("max-[411px]:hidden");
+      .toContain("sm:flex");
     expect(
       screen.getAllByRole("button", { name: "민호 따라가기 중지" })
-        .some((button) => button.className.includes("max-[411px]:hidden"))
+        .some((button) => button.className.includes("sm:inline-flex"))
     ).toBe(true);
 
     fireEvent.click(sync);
@@ -1366,7 +1367,8 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).toContain("오프라인 · 12개 보관");
     expect(html).toContain("motion-reduce:transition-none");
     expect(html).toContain('data-studio-presence-link="offline-queued"');
-    expect(html).toContain("min-[412px]:w-[13.5rem]");
+    expect(html).toContain("sm:w-[16.5rem]");
+    expect(html).not.toContain("min-[412px]:w-[13.5rem]");
     expect(html).toContain("tabular-nums");
   });
 

@@ -47,6 +47,7 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
     effectiveWorkId,
     executeStudioQuickAccessCommand,
     hybridDccOpen,
+    hybridDccPersistenceReceipt,
     hybridDccPersistenceStatus,
     hybridDccReturnFocusRef,
     hybridDccRouteAccess,
@@ -253,6 +254,7 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
           onClose={() => setHybridDccOpen(false)}
           initialWorkspace={scopedHybridDccWorkspace}
           onWorkbenchModeChange={setHybridDccWorkbenchMode}
+          persistenceReceipt={hybridDccPersistenceReceipt}
           persistenceStatus={hybridDccPersistenceStatus}
           presentation="workspace"
           returnFocus={hybridDccReturnFocusRef.current}

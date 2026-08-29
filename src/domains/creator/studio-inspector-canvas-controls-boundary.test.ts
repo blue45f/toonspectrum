@@ -50,6 +50,7 @@ describe("Studio inspector canvas-controls boundary", () => {
 
   it("leaves document mutation, collaboration policy, ids, and shared notices in the parent", () => {
     const inspector = readStudioInspectorAsideSurface();
+    const shell = moduleEdges("./StudioInspectorAsideShell.tsx").source;
     const leaf = moduleEdges("./StudioInspectorCanvasControls.tsx").source;
 
     for (const forbidden of [
@@ -62,10 +63,37 @@ describe("Studio inspector canvas-controls boundary", () => {
       expect(leaf).not.toContain(forbidden);
     }
     expect(inspector).toContain("if (collaborationDocumentLocked) return;");
+    expect(shell).toContain("resolveStudioTemplateGutterCapability(currentTemplate)");
     expect(inspector).toContain("regenerateTemplate(currentTemplate, nextGutter)");
     expect(inspector).toContain("commit(nextElements);");
     expect(inspector).toContain("setSharedDocumentNotice(null);");
     expect(inspector).toContain("id: uid(),");
+
+    const handlerStart = shell.indexOf("onPanelGutterChange={withCanvasControlsGuard");
+    const handler = shell.slice(handlerStart, handlerStart + 700);
+    expect(handlerStart).toBeGreaterThanOrEqual(0);
+    expect(handler).toContain("if (!currentTemplate || !templateGutterCapability.supported) return;");
+    expect(handler.indexOf("const nextElements = regenerateTemplate")).toBeLessThan(
+      handler.indexOf("if (!nextElements) return;"),
+    );
+    expect(handler.indexOf("if (!nextElements) return;")).toBeLessThan(
+      handler.indexOf("setPanelGutter(nextGutter);"),
+    );
+    expect(handler.indexOf("setPanelGutter(nextGutter);")).toBeLessThan(
+      handler.indexOf("commit(nextElements);"),
+    );
+    expect(leaf).toContain("aria-describedby={panelGutterDisabledReason");
+    expect(leaf).toContain("data-studio-panel-gutter-reason");
+  });
+
+  it("keeps authored frames when applying a template whose gutter topology is unsupported", () => {
+    const page = moduleEdges("./StudioPage.tsx").source;
+    const applyTemplateStart = page.indexOf("async function applyTemplate");
+    const applyTemplate = page.slice(applyTemplateStart, applyTemplateStart + 1_300);
+
+    expect(applyTemplateStart).toBeGreaterThanOrEqual(0);
+    expect(applyTemplate).toContain("regenerateTemplate(tpl, panelGutter, [])");
+    expect(applyTemplate).toContain("?? instantiateTemplateFrames(tpl.frames, [])");
   });
 
   it("keeps the leaf bounded and compatible with the React Compiler", () => {
@@ -73,7 +101,8 @@ describe("Studio inspector canvas-controls boundary", () => {
     const leaf = moduleEdges("./StudioInspectorCanvasControls.tsx").source;
 
     // 의도적 확장(2026-08-12): paper surface / grain controls + async pixel-edit wiring.
-    expect(leaf.split("\n").length).toBeLessThanOrEqual(560);
+    // 의도적 확장(2026-08-29): gutter 비활성 사유와 aria-describedby 연결.
+    expect(leaf.split("\n").length).toBeLessThanOrEqual(580);
     // 의도적 변경(2026-07-24): 필터 마스크 페인팅 + 자동 채색 힌트 worker onRun 배선
     // (3_300 → 3_380 → 3_400).
     // 의도적 변경(2026-07-24): auto-color 새 채색 레이어 onApplyNewLayer + setSelectedId 배선

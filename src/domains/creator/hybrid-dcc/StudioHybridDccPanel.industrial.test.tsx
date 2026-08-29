@@ -91,6 +91,28 @@ afterEach(() => {
 });
 
 describe("StudioHybridDccPanel industrial wiring", () => {
+  it("exposes the durable receipt sequence and matching document hash without relying on a transient saving badge", () => {
+    render(
+      <StudioHybridDccPanel
+        persistenceStatus="saved"
+        persistenceReceipt={{
+          sequence: 7,
+          sourceHash: `sha256:${"a".repeat(64)}`,
+          documentStateHash: "state-hash-7",
+        }}
+      />,
+    );
+
+    const status = screen.getByRole("status");
+    expect(status.getAttribute("data-studio-hybrid-dcc-persistence")).toBe("saved");
+    expect(status.getAttribute("data-studio-hybrid-dcc-persistence-sequence")).toBe("7");
+    expect(status.getAttribute("data-studio-hybrid-dcc-persistence-source-hash"))
+      .toBe(`sha256:${"a".repeat(64)}`);
+    expect(status.getAttribute("data-studio-hybrid-dcc-persistence-document-state-hash"))
+      .toBe("state-hash-7");
+    expect(document.querySelector('[data-studio-hybrid-dcc-state-hash]')).not.toBeNull();
+  });
+
   it("uses the route-owned workbench mode without duplicating mode authority", () => {
     const onWorkbenchModeChange = vi.fn();
     const view = render(

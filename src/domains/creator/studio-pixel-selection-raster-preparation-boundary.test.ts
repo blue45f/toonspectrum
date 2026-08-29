@@ -133,6 +133,9 @@ describe("Studio pixel marquee vector-only raster preparation boundary", () => {
     expect(finish).toContain("stage.setPointersPositions(pointerEvent)");
     expect(finish).toContain("pending.released = true");
     expect(finish).toContain("pending.cancelled = cancelled");
+    expect(finish).toContain("if (pending.released) return true");
+    expect(finish.indexOf("if (pending.released) return true"))
+      .toBeLessThan(finish.indexOf("pending.cancelled = cancelled"));
     expect(prepare).toContain("beginSelectionDrag(");
     expect(prepare).toContain("updateSelectionDrag(");
     expect(prepare).toMatch(

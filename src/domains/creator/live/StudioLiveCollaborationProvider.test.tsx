@@ -672,6 +672,92 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     expect(rooms.instances[1]?.options.workId).toBe("work-b");
   });
 
+  it("keeps transport revocation terminal when CRDT recovery reports afterward", async () => {
+    lifecycle.roomStart = "resolve";
+    const options = { serverRequired: true, outboxScope: "user-a" };
+    await renderProvider(options);
+    await vi.waitFor(() => expect(lifecycle.bindings).toHaveLength(1));
+
+    rooms.instances[0]?.emit({
+      type: "transport-status",
+      status: {
+        state: "revoked",
+        recoverable: false,
+        message: "작품 접근 권한이 회수되었습니다.",
+      },
+    });
+    lifecycle.bindings[0]?.onStatus?.({
+      state: "recovery-required",
+      message: "거부된 변경 때문에 권위 원고 복구가 필요합니다.",
+      code: "access_revoked",
+      updateId: "private-update-id",
+      recoveryUpdateCount: 1,
+      collaborativeEditsBlocked: true,
+      retryable: false,
+      recoveryVaultId: "private-vault-id",
+      recoveryExportAvailable: true,
+    });
+
+    const live = await renderProvider(options);
+    expect(live.sync).toMatchObject({
+      phase: "revoked",
+      operationSyncReady: false,
+      editsDurablyProtected: false,
+    });
+    expect(live.recovery).toBeNull();
+    expect(live.error).toBe("작품 접근 권한이 회수되었습니다.");
+    expect(live.localFallbackAllowed).toBe(false);
+  });
+
+  it("replaces CRDT recovery with transport revocation and keeps it across rotation", async () => {
+    lifecycle.roomStart = "resolve";
+    const options = { serverRequired: true, outboxScope: "user-a" };
+    await renderProvider(options);
+    await vi.waitFor(() => expect(lifecycle.bindings).toHaveLength(1));
+
+    lifecycle.bindings[0]?.onStatus?.({
+      state: "recovery-required",
+      message: "거부된 변경 때문에 권위 원고 복구가 필요합니다.",
+      code: "access_revoked",
+      updateId: "private-update-id",
+      recoveryUpdateCount: 1,
+      collaborativeEditsBlocked: true,
+      retryable: false,
+      recoveryVaultId: "private-vault-id",
+      recoveryExportAvailable: true,
+    });
+    expect((await renderProvider(options)).sync.phase).toBe("recovery-required");
+
+    rooms.instances[0]?.emit({
+      type: "transport-status",
+      status: {
+        state: "revoked",
+        recoverable: false,
+        message: "작품 접근 권한이 회수되었습니다.",
+      },
+    });
+    const revoked = await renderProvider(options);
+    expect(revoked.sync.phase).toBe("revoked");
+    expect(revoked.recovery).toBeNull();
+    expect(revoked.error).toBe("작품 접근 권한이 회수되었습니다.");
+
+    const rotatedTransportFactory: StudioLiveTransportFactory = () => {
+      throw new Error("A revoked work must not open a replacement transport.");
+    };
+    const afterRotation = await renderProvider({
+      ...options,
+      transportFactory: rotatedTransportFactory,
+    });
+    expect(rooms.instances).toHaveLength(1);
+    expect(afterRotation.sync).toMatchObject({
+      phase: "revoked",
+      operationSyncReady: false,
+      editsDurablyProtected: false,
+    });
+    expect(afterRotation.recovery).toBeNull();
+    expect(afterRotation.localFallbackAllowed).toBe(false);
+  });
+
   it("unsubscribes, closes, and clears the exposed room on unmount", async () => {
     lifecycle.roomStart = "resolve";
     const onRoomChange = vi.fn();

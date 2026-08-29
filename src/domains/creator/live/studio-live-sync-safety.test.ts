@@ -41,6 +41,75 @@ describe("studio live sync safety", () => {
     expect(presentStudioLiveSyncSnapshot(snapshot).shortLabel).toBe("안전하게 동기화됨");
   });
 
+  it("presents the ready-to-runtime boot gap as preparation without weakening the edit lock", () => {
+    const snapshot = projectStudioLiveSyncSnapshot({
+      availability: "ready",
+      mode: "server",
+      canEdit: true,
+      operationSyncReady: false,
+      telemetry: telemetry(),
+    });
+
+    expect(snapshot).toMatchObject({
+      phase: "initializing",
+      operationSyncReady: false,
+      editsDurablyProtected: false,
+      message: "원고 보호 경로를 마무리하는 중입니다.",
+    });
+    const presentation = presentStudioLiveSyncSnapshot(snapshot);
+    expect(presentation).toMatchObject({
+      shortLabel: "협업 준비 중",
+      tone: "neutral",
+      assertive: false,
+    });
+    expect(presentation.detail).not.toContain("저장 보호 필요");
+  });
+
+  it("promotes the same ready telemetry to synced after the operation runtime is exposed", () => {
+    const snapshot = projectStudioLiveSyncSnapshot({
+      availability: "ready",
+      mode: "server",
+      canEdit: true,
+      operationSyncReady: true,
+      telemetry: telemetry(),
+    });
+
+    expect(snapshot).toMatchObject({
+      phase: "synced",
+      operationSyncReady: true,
+      editsDurablyProtected: true,
+    });
+  });
+
+  it("keeps explicit boot-time storage and availability failures assertive", () => {
+    const storageRisk = projectStudioLiveSyncSnapshot({
+      availability: "ready",
+      mode: "server",
+      canEdit: true,
+      operationSyncReady: false,
+      telemetry: telemetry({ durabilityAtRisk: true }),
+    });
+    const availabilityFailure = projectStudioLiveSyncSnapshot({
+      availability: "error",
+      mode: "server",
+      canEdit: true,
+      operationSyncReady: false,
+      telemetry: telemetry(),
+    });
+
+    for (const snapshot of [storageRisk, availabilityFailure]) {
+      expect(snapshot).toMatchObject({
+        phase: "durability-risk",
+        editsDurablyProtected: false,
+      });
+      expect(presentStudioLiveSyncSnapshot(snapshot)).toMatchObject({
+        shortLabel: "저장 보호 필요",
+        tone: "bad",
+        assertive: true,
+      });
+    }
+  });
+
   it("never shows the green synced label on a tab that cannot persist", () => {
     // The measured two-tab fork: a follower tab's every save was rejected by the leader's lease,
     // yet `mode === "local"` alone counted as durable and the rail showed "안전하게 동기화됨" on

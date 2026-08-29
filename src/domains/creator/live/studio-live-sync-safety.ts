@@ -171,6 +171,25 @@ export function projectStudioLiveSyncSnapshot({
     return { ...common, phase: telemetry.state === "syncing" ? "syncing" : "initializing" };
   }
 
+  // The binding publishes its authoritative `ready` frontier before `start()` has finished
+  // draining the restored outbox and exposing the operation runtime to Studio. During that boot
+  // gap edits must remain locked, but it is not a durability failure: presenting the fail-closed
+  // lock as the assertive red "저장 보호 필요" warning makes a healthy cold start look broken.
+  // Keep the real safety flags false and soften only the user-facing phase until the runtime is
+  // exposed. Explicit storage/transport risk still falls through to the risk branch below.
+  if (
+    telemetry.state === "ready" &&
+    !operationSyncReady &&
+    availability !== "error" &&
+    !telemetry.durabilityAtRisk
+  ) {
+    return {
+      ...common,
+      phase: "initializing",
+      message: "원고 보호 경로를 마무리하는 중입니다.",
+    };
+  }
+
   if (telemetry.durabilityAtRisk || (canEdit && !editsDurablyProtected)) {
     return { ...common, phase: "durability-risk" };
   }

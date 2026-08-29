@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_NATIVE_RASTER_REQUIRED_SCENARIOS,
+  studioNativeRasterFixtureGeometryEquivalent,
+  studioNativeRasterFixturePixelsSimilar,
   studioNativeRasterMatrixViolations,
+  studioNativeRasterNoiseExcludedChangedPixels,
   studioNativeRasterPerformanceWarnings,
   studioNativeRasterScenarioViolations,
   type StudioNativeRasterPerformanceEvidence,
@@ -157,6 +160,8 @@ function passingPerformanceEvidence(): StudioNativeRasterPerformanceEvidence {
 function passingEvidence(
   id: StudioNativeRasterScenarioEvidence["id"] = "smudge",
 ): StudioNativeRasterScenarioEvidence {
+  const selectionOnly = id.startsWith("selection-");
+  const pixelTransform = id === "pixel-transform";
   return {
     id,
     status: "passed",
@@ -181,6 +186,8 @@ function passingEvidence(
     firstGesture: {
       expected: true,
       replayed: true,
+      fixtureControlDiff: null,
+      noiseExcludedChangedPixels: 180,
       rasterControlDiff: {
         changedPixels: 180,
         totalPixels: 20_000,
@@ -198,12 +205,23 @@ function passingEvidence(
       attempted: true,
       restored: true,
       retainedEditableRasterWhenExpected: true,
+      rawDiffFromBefore: {
+        changedPixels: 3,
+        totalPixels: 20_000,
+        maxChannelDelta: 3,
+        meanChangedChannelDelta: 1,
+      },
       diffFromBefore: {
         changedPixels: 3,
         totalPixels: 20_000,
         maxChannelDelta: 3,
         meanChangedChannelDelta: 1,
       },
+      selectionStateCleared: selectionOnly ? true : null,
+      durableSnapshotRetained: selectionOnly ? true : null,
+      durableImageRestored: pixelTransform ? true : null,
+      exactRestoredImagePresented: pixelTransform ? true : null,
+      documentRedoEnabledAfterUndo: pixelTransform ? true : null,
     },
     performance: null,
     browserErrors: [],
@@ -212,6 +230,147 @@ function passingEvidence(
 }
 
 describe("Studio native-raster browser gate policy", () => {
+  it("accepts equivalent fixture endpoints when adaptive stabilization changes point counts", () => {
+    const measured = [
+      {
+        pointCount: 25,
+        firstPoint: { x: 170, y: 280 },
+        lastPoint: { x: 170, y: 280 },
+        hidden: false,
+      },
+      {
+        pointCount: 21,
+        firstPoint: { x: 205, y: 500 },
+        lastPoint: { x: 515, y: 500 },
+        hidden: false,
+      },
+    ];
+    const control = [
+      { ...measured[0]!, pointCount: 23 },
+      { ...measured[1]!, pointCount: 23 },
+    ];
+
+    expect(studioNativeRasterFixtureGeometryEquivalent(measured, control)).toBe(true);
+  });
+
+  it("rejects fixture endpoint drift, incomplete draws, and missing geometry", () => {
+    const measured = [
+      {
+        pointCount: 25,
+        firstPoint: { x: 170, y: 280 },
+        lastPoint: { x: 170, y: 280 },
+        hidden: false,
+      },
+      {
+        pointCount: 21,
+        firstPoint: { x: 205, y: 500 },
+        lastPoint: { x: 515, y: 500 },
+        hidden: false,
+      },
+    ];
+    const shiftedEndpoint = [
+      measured[0]!,
+      { ...measured[1]!, lastPoint: { x: 516, y: 500 } },
+    ];
+    const incompleteInternalLine = [
+      measured[0]!,
+      { ...measured[1]!, pointCount: 2 },
+    ];
+
+    expect(studioNativeRasterFixtureGeometryEquivalent(measured, shiftedEndpoint)).toBe(false);
+    expect(studioNativeRasterFixtureGeometryEquivalent(measured, incompleteInternalLine)).toBe(false);
+    expect(studioNativeRasterFixtureGeometryEquivalent(measured, measured.slice(0, 1))).toBe(false);
+  });
+
+  it("accepts measured fixture AA variance and rejects each strict pixel boundary", () => {
+    expect(studioNativeRasterFixturePixelsSimilar({
+      changedPixels: 1_989,
+      totalPixels: 179_010,
+      maxChannelDelta: 149,
+      meanChangedChannelDelta: 13.15,
+    })).toBe(true);
+    expect(studioNativeRasterFixturePixelsSimilar({
+      changedPixels: 2_255,
+      totalPixels: 179_010,
+      maxChannelDelta: 150,
+      meanChangedChannelDelta: 18.94,
+    })).toBe(true);
+    expect(studioNativeRasterFixturePixelsSimilar({
+      changedPixels: 2_501,
+      totalPixels: 179_010,
+      maxChannelDelta: 149,
+      meanChangedChannelDelta: 13.15,
+    })).toBe(false);
+    expect(studioNativeRasterFixturePixelsSimilar({
+      changedPixels: 1_989,
+      totalPixels: 179_010,
+      maxChannelDelta: 161,
+      meanChangedChannelDelta: 13.15,
+    })).toBe(false);
+    expect(studioNativeRasterFixturePixelsSimilar({
+      changedPixels: 1_989,
+      totalPixels: 179_010,
+      maxChannelDelta: 149,
+      meanChangedChannelDelta: 22.77,
+    })).toBe(true);
+    expect(studioNativeRasterFixturePixelsSimilar({
+      changedPixels: 1_989,
+      totalPixels: 179_010,
+      maxChannelDelta: 149,
+      meanChangedChannelDelta: 24.01,
+    })).toBe(false);
+    expect(studioNativeRasterFixturePixelsSimilar({
+      changedPixels: 200,
+      totalPixels: 100,
+      maxChannelDelta: 10,
+      meanChangedChannelDelta: 5,
+    })).toBe(false);
+    expect(studioNativeRasterFixturePixelsSimilar({
+      changedPixels: 1.5,
+      totalPixels: 179_010,
+      maxChannelDelta: 10,
+      meanChangedChannelDelta: 5,
+    })).toBe(false);
+  });
+
+  it("excludes cold-effect pixels inside a dilated fixture-noise mask", () => {
+    const fixtureNoise = new Uint8Array(25);
+    fixtureNoise[12] = 1;
+    const effectChange = new Uint8Array(25);
+    effectChange[12] = 1;
+    effectChange[0] = 1;
+    effectChange[24] = 1;
+
+    expect(studioNativeRasterNoiseExcludedChangedPixels(
+      fixtureNoise,
+      effectChange,
+      5,
+      5,
+      1,
+    )).toBe(2);
+    expect(studioNativeRasterNoiseExcludedChangedPixels(
+      fixtureNoise,
+      effectChange,
+      4,
+      5,
+      1,
+    )).toBe(0);
+
+    const diskNoise = new Uint8Array(49);
+    diskNoise[24] = 1;
+    const diskEffect = new Uint8Array(49);
+    diskEffect[24] = 1;
+    diskEffect[26] = 1;
+    diskEffect[40] = 1;
+    expect(studioNativeRasterNoiseExcludedChangedPixels(
+      diskNoise,
+      diskEffect,
+      7,
+      7,
+      2,
+    )).toBe(1);
+  });
+
   it("accepts complete trusted-pointer, raster-copy, pixel-diff and Undo evidence", () => {
     expect(studioNativeRasterScenarioViolations(passingEvidence())).toEqual([]);
   });
@@ -229,6 +388,42 @@ describe("Studio native-raster browser gate policy", () => {
     ]));
   });
 
+  it("rejects a no-op selection Undo even when generic Undo fields claim success", () => {
+    const evidence = passingEvidence("selection-rect");
+    evidence.undo.selectionStateCleared = false;
+
+    expect(studioNativeRasterScenarioViolations(evidence)).toContain(
+      "selection-rect: selection Undo did not clear transient state while retaining the durable document",
+    );
+
+    evidence.undo.selectionStateCleared = true;
+    evidence.undo.durableSnapshotRetained = false;
+    expect(studioNativeRasterScenarioViolations(evidence)).toContain(
+      "selection-rect: selection Undo did not clear transient state while retaining the durable document",
+    );
+  });
+
+  it("rejects pixel-transform Undo without exact durable pixels and Redo UI authority", () => {
+    const evidence = passingEvidence("pixel-transform");
+    evidence.undo.durableImageRestored = false;
+
+    expect(studioNativeRasterScenarioViolations(evidence)).toContain(
+      "pixel-transform: Undo lacked exact durable-image restoration or document Redo authority",
+    );
+
+    evidence.undo.durableImageRestored = true;
+    evidence.undo.exactRestoredImagePresented = false;
+    expect(studioNativeRasterScenarioViolations(evidence)).toContain(
+      "pixel-transform: Undo lacked exact durable-image restoration or document Redo authority",
+    );
+
+    evidence.undo.exactRestoredImagePresented = true;
+    evidence.undo.documentRedoEnabledAfterUndo = false;
+    expect(studioNativeRasterScenarioViolations(evidence)).toContain(
+      "pixel-transform: Undo lacked exact durable-image restoration or document Redo authority",
+    );
+  });
+
   it("does not accept vector-to-raster conversion as cold retouch replay evidence", () => {
     const evidence = passingEvidence("smudge");
     evidence.firstGesture.replayed = true;
@@ -241,6 +436,15 @@ describe("Studio native-raster browser gate policy", () => {
 
     expect(studioNativeRasterScenarioViolations(evidence)).toContain(
       "smudge: cold first gesture was not distinguished from raster preparation",
+    );
+  });
+
+  it("does not accept cold replay evidence confined to expanded fixture noise", () => {
+    const evidence = passingEvidence("smudge");
+    evidence.firstGesture.noiseExcludedChangedPixels = 127;
+
+    expect(studioNativeRasterScenarioViolations(evidence)).toContain(
+      "smudge: cold first gesture did not exceed the expanded fixture-noise mask",
     );
   });
 
@@ -357,6 +561,16 @@ describe("Studio native-raster browser gate policy", () => {
     expect(source).toContain("page.mouse.up()");
     expect(source).toContain("NATIVE_OUTLINE_DOCUMENT_POINTS");
     expect(source).toContain("NATIVE_INTERNAL_LINE_DOCUMENT_POINTS");
+    expect(source).toContain("NATIVE_RASTER_INTERACTION_DOCUMENT_POINTS");
+    expect(source).toContain("NATIVE_RASTER_INTERACTION_MARGIN_PX");
+    expect(source).toContain("NATIVE_FIXTURE_POINTER_STEP_DELAY_MS");
+    expect(source).toContain("ensureNativeRasterInteractionRegion");
+    expect(source).toContain("waitForNativeFixturePresentation");
+    expect(source).toContain("studioNativeRasterFixtureGeometryEquivalent");
+    expect(source).toContain("studioNativeRasterFixturePixelsSimilar");
+    expect(source).toContain("rasterControlNoiseExcludedChangedPixels");
+    expect(source).toContain('getByRole("group", { name: "캔버스 상태 및 보기" })');
+    expect(source).toContain('getByRole("button", { name: "축소", exact: true })');
     expect(source).toContain("PerformanceObserver");
     expect(source).toContain('entryTypes: ["longtask"]');
     expect(source).toContain("requestAnimationFrame");
@@ -371,6 +585,9 @@ describe("Studio native-raster browser gate policy", () => {
     expect(source).toContain("__studioRasterImagePresentationProbe");
     expect(source).toContain("waitForRasterDurableAutosaveAfterOperation");
     expect(source).toContain("createStudioAutosaveOpfsSession");
+    expect(source).toContain("Object.values(runtime)");
+    expect(source).toContain("namespace?.createStudioAutosaveOpfsSession");
+    expect(source).toContain("{ readOnly: true }");
     expect(source).toContain("readLatest");
     expect(source).toContain("studio-autosave-opfs-session-");
     expect(source).toContain("studio-autosave-opfs-session\\.ts");
@@ -378,6 +595,28 @@ describe("Studio native-raster browser gate policy", () => {
     expect(source).toContain("__studioNativeRasterAutosaveReadError");
     expect(source).toContain("선택 후 변형");
     expect(source).toContain("markRasterOperationSettled");
+    expect(source).toContain("waitForClearedPixelSelectionUiState");
+    expect(source).toContain("exposePixelSelectionUi");
+    expect(source).toContain('[data-studio-inspector-primary-tab="properties"]:visible');
+    expect(source).toContain("/^선택·리터치$/u");
+    expect(source).toContain("durableDocumentFingerprint");
+    expect(source).toContain("selectionUndoDurableSnapshotRetained");
+    expect(source).not.toContain("selectionUndoVisualDiff");
+    expect(source).toContain("filter ${scope} first dialog open did not expose");
+    expect(source).toContain("preparedBaselineScreenshot");
+    expect(source).toContain("warmUndoBaselineSnapshot = result.preparedSnapshot");
+    expect(source).toContain("transformBaselineScreenshot");
+    expect(source).toContain("warmUndoBaselineSnapshot = result.selectionSnapshot");
+    expect(source).toContain("pixelTransformDocumentDiff");
+    expect(source).toContain("PIXEL_TRANSFORM_SELECTION_CHROME_RADIUS_PX");
+    expect(source).toContain('await enabledHistoryButton(page, "다시실행")');
+    expect(source).toContain("durableImageRestored");
+    expect(source).toContain("exactImageSignature");
+    expect(source).toContain("srcSha256");
+    expect(source).toContain("exactRestoredImagePresented");
+    expect(source).toContain("pixel-transform Undo restored durable src but did not draw that exact src");
+    expect(source).toContain("rawDiffFromBefore");
+    expect(source).toContain("01-operation-baseline.png");
     expect(source).toContain('computeSettleFence: "tool-busy-control-enabled"');
     expect(source).toContain('operationSettleFence: "exact-raster-src-konva-layer-draw"');
     expect(source).toContain('persistenceFence: "post-effect-autosave-image-signature"');
@@ -388,7 +627,8 @@ describe("Studio native-raster browser gate policy", () => {
     expect(source).toContain("warmUndoBaselineSnapshot");
     expect(source).toContain("capturePreparedRasterOnlyControl");
     expect(source).toContain("assertEquivalentNativeFixture");
-    expect(source).toContain("measured.screenshot.equals(control.screenshot)");
+    expect(source).toContain("fixtureControlDiff");
+    expect(source).toContain("controlFixture");
     expect(source).toContain("operationTimeoutMs");
     expect(source).toContain("persistenceTimeoutMs");
     expect(source).toContain("00-cold-raster-only-control.png");
@@ -402,6 +642,7 @@ describe("Studio native-raster browser gate policy", () => {
     expect(source).toContain('[data-studio-background-panel="true"]');
     expect(source).toContain('resizer.locator("#studio-canvas-h-input")');
     expect(source).toContain("process.env.TOONSPECTRUM_NATIVE_RASTER_CONCURRENCY ?? 1");
+    expect(source.match(/locale: "ko-KR"/gu)).toHaveLength(3);
     expect(source).toContain("--cancellation-race=");
     expect(source).toContain("installRasterPreparationCancellationProbe");
     expect(source).toContain("__studioRasterPreparationCancellationProbe");
@@ -416,6 +657,36 @@ describe("Studio native-raster browser gate policy", () => {
     expect(source).not.toContain("data:image/");
     expect(source).not.toContain("_clip");
     expect(source).not.toContain("FilePayload");
+
+    const fixtureStart = source.indexOf("async function drawNativeFixture");
+    const fixtureEnd = source.indexOf("async function capturePreparedRasterOnlyControl");
+    const fixtureSource = source.slice(fixtureStart, fixtureEnd);
+    const normalizationIndex = fixtureSource.indexOf("ensureNativeRasterInteractionRegion");
+    const pointerAuditIndex = fixtureSource.indexOf("installTrustedPointerAudit");
+    expect(fixtureStart).toBeGreaterThan(-1);
+    expect(fixtureEnd).toBeGreaterThan(fixtureStart);
+    expect(normalizationIndex).toBeGreaterThan(-1);
+    expect(pointerAuditIndex).toBeGreaterThan(normalizationIndex);
+
+    const filterStart = source.indexOf("async function performFilter");
+    const filterEnd = source.indexOf("async function performPixelTransform");
+    const filterSource = source.slice(filterStart, filterEnd);
+    expect(filterStart).toBeGreaterThan(-1);
+    expect(filterEnd).toBeGreaterThan(filterStart);
+    expect(filterSource).not.toContain("scopeStartedAt");
+    expect(filterSource.match(/openFilterDialog\(/gu)).toHaveLength(1);
+    expect(filterSource).toContain("scopeRadioCount === 3");
+
+    const selectionUndoStart = source.indexOf("if (selectionOnlyUndo)");
+    const selectionUndoEnd = source.indexOf("} else {", selectionUndoStart);
+    const selectionUndoSource = source.slice(selectionUndoStart, selectionUndoEnd);
+    expect(selectionUndoStart).toBeGreaterThan(-1);
+    expect(selectionUndoEnd).toBeGreaterThan(selectionUndoStart);
+    expect(selectionUndoSource).toContain("await exposePixelSelectionUi(page)");
+    expect(selectionUndoSource).toContain('await page.keyboard.press("Meta+z")');
+    expect(selectionUndoSource).toContain("await waitForClearedPixelSelectionUiState(page)");
+    expect(selectionUndoSource).toContain("durableDocumentFingerprint(candidate) === durableBeforeUndo");
+    expect(selectionUndoSource).not.toContain("waitForTimeout");
   });
 
   it("fixes the operation fence before autosave JSON polling begins", () => {

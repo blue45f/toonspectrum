@@ -26,3 +26,4 @@ apps/api/src/db/migrations/0025_auth_lifecycle_contract.sql
 apps/api/src/db/migrations/0026_creator_draft_cloud_save_intent.sql
 apps/api/src/db/migrations/0027_creator_draft_atomic_publication.sql
 apps/api/src/db/migrations/0028_studio_ai_openrouter_provider.sql
+apps/api/src/db/migrations/0029_creator_community_runtime_indexes.sql

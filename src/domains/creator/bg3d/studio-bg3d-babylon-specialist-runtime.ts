@@ -144,8 +144,22 @@ export interface StudioBg3dBabylonRuntimeBindings {
   createWebGpuEngine(
     canvas: HTMLCanvasElement | OffscreenCanvas,
     settings: StudioBg3dBabylonEngineSettings,
+    initialization: StudioBg3dBabylonEngineInitializationControl,
   ): Promise<StudioBg3dBabylonEngineHandle>;
   createScene(engine: StudioBg3dBabylonEngineHandle): StudioBg3dBabylonSceneHandle;
+}
+
+/**
+ * Gives the runtime ownership of a WebGPU engine as soon as the binding constructs it, rather than
+ * only after the asynchronous Babylon initialization promise resolves. The binding supplies an
+ * idempotent disposer so a timeout, caller abort, and late promise settlement can race safely.
+ */
+export interface StudioBg3dBabylonEngineInitializationControl {
+  readonly signal: AbortSignal;
+  registerPartialEngine(
+    engine: StudioBg3dBabylonEngineHandle,
+    dispose: () => void,
+  ): void;
 }
 
 export interface StudioBg3dBabylonSpecialistExecutionContext {
@@ -661,38 +675,100 @@ function engineInitializationTimeoutCause(timeoutMs: number): Error {
 }
 
 function awaitBabylonEngineInitialization(
-  operation: Promise<StudioBg3dBabylonEngineHandle>,
+  startOperation: (
+    initialization: StudioBg3dBabylonEngineInitializationControl,
+  ) => Promise<StudioBg3dBabylonEngineHandle> | StudioBg3dBabylonEngineHandle,
   signal: AbortSignal,
   timeoutMs: number,
 ): Promise<StudioBg3dBabylonEngineHandle> {
   return new Promise((resolve, reject) => {
     let acceptingResult = true;
-    const finish = (callback: () => void): void => {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    let partialEngine: StudioBg3dBabylonEngineHandle | null = null;
+    let disposePartialEngine: (() => void) | null = null;
+    let partialEngineReleaseRequested = false;
+    const initializationController = new AbortController();
+    const disposedLateEngines = new Set<StudioBg3dBabylonEngineHandle>();
+    const releasePartialEngine = (repeat = false): void => {
+      const release = disposePartialEngine;
+      if (!release || (partialEngineReleaseRequested && !repeat)) return;
+      partialEngineReleaseRequested = true;
+      try {
+        release();
+      } catch {
+        // Initialization timeout/abort remains authoritative over best-effort partial cleanup.
+      }
+    };
+    const releaseLateEngine = (engine: StudioBg3dBabylonEngineHandle): void => {
+      if (engine === partialEngine) {
+        // A first partial dispose may have run before Babylon acquired its GPUDevice/managers.
+        // The binding disposer is idempotent and must get one more chance after late settlement.
+        releasePartialEngine(true);
+        return;
+      }
+      if (disposedLateEngines.has(engine)) return;
+      disposedLateEngines.add(engine);
+      safeDispose(engine);
+    };
+    const finish = (
+      callback: () => void,
+      cancelInitialization = false,
+    ): void => {
       if (!acceptingResult) return;
       acceptingResult = false;
-      clearTimeout(timeout);
+      if (timeout !== null) clearTimeout(timeout);
       signal.removeEventListener("abort", onAbort);
+      if (cancelInitialization) {
+        initializationController.abort();
+        releasePartialEngine();
+      }
       callback();
     };
-    const onAbort = () => finish(() => reject(specialistError("aborted")));
-    const timeout = setTimeout(
+    const onAbort = () => finish(
+      () => reject(specialistError("aborted")),
+      true,
+    );
+    timeout = setTimeout(
       () => finish(() => reject(specialistError(
         "engine-init-failed",
         engineInitializationTimeoutCause(timeoutMs),
-      ))),
+      )), true),
       timeoutMs,
     );
     signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    const initialization: StudioBg3dBabylonEngineInitializationControl = {
+      signal: initializationController.signal,
+      registerPartialEngine(engine, dispose) {
+        if (partialEngine && partialEngine !== engine) {
+          throw new Error("Babylon binding registered more than one partial WebGPU engine.");
+        }
+        partialEngine = engine;
+        disposePartialEngine = dispose;
+        partialEngineReleaseRequested = false;
+        if (!acceptingResult || initializationController.signal.aborted) {
+          releasePartialEngine();
+        }
+      },
+    };
+    const operation = Promise.resolve().then(() => startOperation(initialization));
     operation.then(
       (engine) => {
         if (!acceptingResult) {
-          safeDispose(engine);
+          releaseLateEngine(engine);
           return;
         }
         finish(() => resolve(engine));
       },
       (error: unknown) => {
-        if (!acceptingResult) return;
+        if (!acceptingResult) {
+          releasePartialEngine(true);
+          return;
+        }
+        releasePartialEngine();
         finish(() => reject(error));
       },
     );
@@ -915,9 +991,9 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
     let engine: StudioBg3dBabylonEngineHandle;
     try {
       engine = await awaitBabylonEngineInitialization(
-        Promise.resolve().then(() => this.#backend === "webgpu"
-          ? bindings.createWebGpuEngine(this.#canvas, this.#settings)
-          : bindings.createWebGlEngine(this.#canvas, this.#settings)),
+        (initialization) => this.#backend === "webgpu"
+          ? bindings.createWebGpuEngine(this.#canvas, this.#settings, initialization)
+          : bindings.createWebGlEngine(this.#canvas, this.#settings),
         signal,
         this.#engineInitializationTimeoutMs,
       );

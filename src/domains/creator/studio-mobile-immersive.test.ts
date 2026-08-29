@@ -85,6 +85,18 @@ describe("Studio mobile immersive preference", () => {
     expect(studioGlobalsSource).toContain("--studio-canvas-bottom-inset");
   });
 
+  it("keeps compact desktop HUD actions named and at least 24px tall", () => {
+    expect(studioCanvasStageHudSource).toContain(
+      'className="inline-flex min-h-6 min-w-0 items-center gap-1 rounded-full px-1.5',
+    );
+    expect(studioCanvasStageHudSource).toContain(
+      'localizeText(t, "` · 캔버스만 보기", "studio.canvas.canvasOnlyModeShowCanvasOnly")',
+    );
+    expect(studioCanvasStageHudSource).toContain(
+      'className="min-h-6 min-w-6 rounded-full px-1.5 py-0.5',
+    );
+  });
+
   it("clears a temporary inspector override when entering the super-simple layout", () => {
     const densitySetter = studioPageSource.slice(
       studioPageSource.indexOf("function setStudioUiDensity("),

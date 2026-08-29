@@ -717,7 +717,7 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
   Object.freeze({
     id: "publish",
     name: "게시",
-    description: "게시 정보와 최종 화면 맞춤 검사를 바로 엽니다.",
+    description: "작품 정보와 최종 화면 맞춤 검사를 바로 엽니다.",
     layout: createBuiltinLayout(
       { primary: "publish", image: "quick", document: "canvas" },
       { leftPanelOpen: false, rightPanelOpen: true },

@@ -26,6 +26,7 @@ import {
 import { normalizePageReviewState } from "./studio-page-review";
 import { withStudioLinked3dCloudSaveRecoveryState } from "./studio-page-shell-runtime";
 import { validateStudioPublishPreflight } from "./studio-publish-preflight";
+import { validateStudioWorkMetadata } from "./studio-work-metadata";
 
 import type { StudioCrdtDocument } from "./live/studio-crdt-document";
 import type { StudioCrdtAuthoritativeSaveBarrier } from "./live/StudioLiveCollaborationProvider";
@@ -137,7 +138,8 @@ export interface StudioPageSavePipelineDeps {
   ) => StudioPublishPreflightInput;
   readonly setPageReviewOpen: (open: boolean) => void;
   readonly setPublishPreflightOpen: (open: boolean) => void;
-  readonly openPublishStep: () => void;
+  readonly openWorkMetadataStep: (status: "published" | "draft") => void;
+  readonly clearPendingSaveIntent: () => void;
   // ── 캡처 파이프라인
   readonly captureReadyStageForPage: (page: PageState) => Promise<Konva.Stage>;
   readonly preserveStudioViewBeforeCapture: () => void;
@@ -241,7 +243,8 @@ export async function runStudioPageSavePipeline(
     buildPublishPreflightInput,
     setPageReviewOpen,
     setPublishPreflightOpen,
-    openPublishStep,
+    openWorkMetadataStep,
+    clearPendingSaveIntent,
     captureReadyStageForPage,
     preserveStudioViewBeforeCapture,
     hideStrokeGuide,
@@ -286,7 +289,11 @@ export async function runStudioPageSavePipeline(
       }
     );
   if (!loggedIn) {
-    setError("로그인 후 게시할 수 있어요.");
+    setError(
+      status === "draft"
+        ? "로그인 후 서버 초안으로 저장할 수 있어요."
+        : "로그인 후 게시할 수 있어요."
+    );
     return;
   }
   if (collaborationDocumentLocked) {
@@ -298,9 +305,10 @@ export async function runStudioPageSavePipeline(
     setError("공동 편집자는 원고 내용만 저장할 수 있어요. 게시 상태 변경은 작품 소유자에게 요청해 주세요.");
     return;
   }
-  if (!title.trim()) {
-    setError("제목을 입력해주세요.");
-    openPublishStep();
+  const metadataError = validateStudioWorkMetadata({ title, description, tagsText });
+  if (metadataError) {
+    setError(metadataError);
+    openWorkMetadataStep(status);
     return;
   }
   // 저장 DTO와 캡처 준비 검사는 첫 화면에 필요 없는 사용자 의도 런타임이다. 캡처가 시작되기
@@ -331,6 +339,7 @@ export async function runStudioPageSavePipeline(
     status === "published" &&
     savePages.some((page) => normalizePageReviewState(page.review).status === "changes-requested")
   ) {
+    clearPendingSaveIntent();
     setError("수정 요청 상태인 페이지가 있어 게시할 수 없어요. 검토 메모를 반영한 뒤 상태를 변경해 주세요.");
     setPageReviewOpen(true);
     return;
@@ -345,6 +354,7 @@ export async function runStudioPageSavePipeline(
     );
     if (!structuralResult.canPublish || !publishComplianceResult.readyForDestinationReview) {
       const blockedCount = structuralResult.errors.length + publishComplianceResult.errors.length;
+      clearPendingSaveIntent();
       setError(`게시 전 필수 점검 ${blockedCount}개를 확인해 주세요.`);
       setPublishPreflightOpen(true);
       return;
@@ -356,6 +366,9 @@ export async function runStudioPageSavePipeline(
   saveSignal = saveController.signal;
   // 이미 진행 중인 AI/PSD/pixel continuation을 저장 스냅샷과 경쟁하지 못하게 세대 장벽을 세운다.
   if (!markStudioDocumentChanged()) return;
+  // 메타데이터 단계의 CTA는 저장 중 중복 제출을 막기 위해 닫는다. 아래 catch에서는 같은
+  // draft/published 의도를 다시 열어 API·캡처 실패 뒤 사용자가 상단 버튼을 찾지 않아도 된다.
+  clearPendingSaveIntent();
   documentSaveInFlightRef.current = true;
   const saveMutationTicket = captureStudioMutationTicket();
   preserveStudioViewBeforeCapture();
@@ -833,7 +846,10 @@ export async function runStudioPageSavePipeline(
           }
         }
       }
-      if (saveScopeStillCurrent()) setError(message);
+      if (saveScopeStillCurrent()) {
+        setError(message);
+        openWorkMetadataStep(status);
+      }
     }
   } finally {
     if (

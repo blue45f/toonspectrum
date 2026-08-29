@@ -1397,64 +1397,25 @@ async function runDesktopGroupAudit(
     await activateSelectionTool(page);
     await page.keyboard.press("Meta+A");
     await waitForWholeGroupSelection(page, 3);
-    // 그룹화 클릭은 저장 진행 중 가드(documentSaveInFlightRef)의 짧은 거부 창과 경합할 수
-    // 있다. 사람처럼 스냅샷이 응답할 때까지 몇 번 다시 누른다 — 각 시도는 새 클릭이다.
     const groupButton = page.getByRole("button", { name: "선택 요소 그룹화", exact: true });
-    // 2026-08-24 그룹화 지속 실패 — 확정 사실:
-    // (1) 네이티브 click 도달, 핸들러가 memberIds 3개로 updateActivePage 실행(커밋 로그),
-    // (2) 94295b31 더티 마크 이후에도 savedAt 동결(자동저장 이펙트 재무장 없음),
-    // (3) 4회 재클릭(수 초 경과)에도 불구 지속 → 과도 창이 아니라 구조적 미트리거.
-    // 유력 용의: updateActivePage→commitPages(engine)가 그룹 메타데이터 전용 패치를
-    // 지연/coalesced 레인으로 보내 React pages 식별자를 즉시 바꾸지 않는 경우 — 이펙트 deps
-    // ([pages, ...])가 재무장 신호로 작동하지 못한다. 다음 단계: commitPages의 메타데이터
-    // 패치 레인에서 setPages 동기 반영 또는 스케줄러 명시 재무장.
-    let groupClickPersisted = false;
-    for (let attempt = 1; attempt <= 4 && !groupClickPersisted; attempt += 1) {
-      if ((await groupButton.count()) === 0) { groupClickPersisted = true; break; }
-      await groupButton.click();
-      if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
-        await page.evaluate(() => {
-          (globalThis as { __studioGroupsDebug?: boolean }).__studioGroupsDebug = true;
-        });
-        page.on("pageerror", (error) => {
-          console.log(`[groups-debug] pageerror: ${error.message}`);
-        });
-        page.on("console", (message) => {
-          console.log(`[groups-debug] console.${message.type()}: ${message.text()}`);
-        });
-      }
-      const deadline = Date.now() + 1_200;
-      while (Date.now() < deadline) {
-        // The debounced durable write can lag the UI by >1s. The rail swaps the group button for
-        // "선택 그룹 해제" the moment grouping commits to React state — trust that first.
-        const ungroupVisible = await page
-          .getByRole("button", { name: "선택 그룹 해제", exact: true })
-          .isVisible()
-          .catch(() => false);
-        if (ungroupVisible) {
-          groupClickPersisted = true;
-          break;
-        }
-        const snap = await readLatestSnapshot(page).catch(() => null);
-        if (
-          snap
-          && snap.groups.length > 0
-          && snap.elements.every((element) => element.groupId !== null)
-        ) {
-          groupClickPersisted = true;
-          break;
-        }
-        await page.waitForTimeout(150);
-      }
-      if (!groupClickPersisted && (await groupButton.count()) === 0) {
-        // The command lane no longer offers grouping at all; treat as committed.
-        groupClickPersisted = true;
-      }
-      if (!groupClickPersisted && attempt < 4) {
-        console.log(`[verify-groups] group click attempt ${attempt} did not persist; retrying`);
-        await page.waitForTimeout(400);
-      }
+    if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
+      page.on("pageerror", (error) => {
+        console.log(`[groups-debug] pageerror: ${error.message}`);
+      });
+      page.on("console", (message) => {
+        console.log(`[groups-debug] console.${message.type()}: ${message.text()}`);
+      });
+      await page.evaluate(() => {
+        (globalThis as { __studioGroupsDebug?: boolean }).__studioGroupsDebug = true;
+      });
     }
+    // One deliberate click is the product contract. Retrying hid a stale select-all ref: the
+    // visible rail said "3개 선택" while every click still read the previous selection authority.
+    await groupButton.click();
+    await page.getByRole("button", { name: "선택 그룹 해제", exact: true }).waitFor({
+      state: "visible",
+      timeout: 3_000,
+    });
     if (process.env.TOONSPECTRUM_GROUPS_DEBUG === "1") {
       for (let sample = 0; sample < 12; sample += 1) {
         await page.waitForTimeout(700);

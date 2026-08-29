@@ -21,10 +21,45 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(28);
+  expect(manifest).toHaveLength(29);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0028_studio_ai_openrouter_provider");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(28);
+  expect(manifest.at(-1).id).toBe("0029_creator_community_runtime_indexes");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(29);
+});
+
+test("creator community migration aligns canonical runtime indexes and records readiness", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0029_creator_community_runtime_indexes",
+  );
+  expect(migration?.id).toBe("0029_creator_community_runtime_indexes");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'DROP INDEX IF EXISTS public."idx_creator_work_series_episode"',
+    'DROP INDEX IF EXISTS public."idx_creator_work_challenge_created"',
+    'CREATE INDEX "creator_work_series_idx"',
+    'CREATE INDEX "creator_work_challenge_idx"',
+    'CREATE INDEX "creator_series_user_idx"',
+    "creator community runtime indexes are incomplete",
+    "0029_creator_community_runtime_indexes",
+    'INSERT INTO public."toonspectrum_schema_migration"',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+
+  const drizzleSchema = readFileSync(
+    new URL("../apps/api/src/db/schema/creator.schema.ts", import.meta.url),
+    "utf8",
+  );
+  for (const canonicalIndex of [
+    'index("creator_work_series_idx").on(t.seriesId, t.episodeNo)',
+    'index("creator_work_challenge_idx").on(t.challengeId)',
+    'index("creator_series_user_idx").on(t.userId)',
+  ]) {
+    expect(drizzleSchema).toContain(canonicalIndex);
+  }
+  expect(drizzleSchema).not.toContain("idx_creator_work_series_episode");
+  expect(drizzleSchema).not.toContain("idx_creator_work_challenge_created");
 });
 
 test("auth lifecycle migration owns schema repair and a durable readiness marker", () => {

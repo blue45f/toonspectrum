@@ -105,6 +105,7 @@ import {
 import { StudioHybridDccViewport } from "./StudioHybridDccViewport";
 
 import type { StudioHybridDccBg3dHandoffResult } from "./studio-hybrid-dcc-bg3d-handoff";
+import type { StudioHybridDccPersistenceReceiptEvidence } from "./studio-hybrid-dcc-persistence";
 import type { StudioDccWorkbenchMode } from "../studio-workspace-route";
 
 const STUDIO_HYBRID_DCC_WORKBENCH_MODES = [
@@ -241,6 +242,7 @@ export interface StudioHybridDccPanelProps {
   readonly initialWorkspace?: StudioHybridDccWorkspace;
   readonly workspaceDocumentId?: string;
   readonly onWorkspaceChange?: (workspace: StudioHybridDccWorkspace) => void;
+  readonly persistenceReceipt?: StudioHybridDccPersistenceReceiptEvidence;
   readonly persistenceStatus?: StudioHybridDccPersistenceStatus;
   readonly workbenchMode?: StudioDccWorkbenchMode;
   readonly onWorkbenchModeChange?: (mode: StudioDccWorkbenchMode) => void;
@@ -271,6 +273,7 @@ export function StudioHybridDccPanel({
   onOpenInBackground3D,
   onWorkspaceChange,
   onWorkbenchModeChange,
+  persistenceReceipt,
   persistenceStatus,
   workbenchMode: controlledWorkbenchMode,
   workspaceDocumentId,
@@ -1014,6 +1017,11 @@ export function StudioHybridDccPanel({
                   : "rounded-full border border-line bg-panel px-2 py-1 text-fg-2"}
               role="status"
               data-studio-hybrid-dcc-persistence={persistenceStatus}
+              data-studio-hybrid-dcc-persistence-sequence={persistenceReceipt?.sequence}
+              data-studio-hybrid-dcc-persistence-source-hash={persistenceReceipt?.sourceHash}
+              data-studio-hybrid-dcc-persistence-document-state-hash={
+                persistenceReceipt?.documentStateHash ?? undefined
+              }
             >
               {STUDIO_HYBRID_DCC_PERSISTENCE_LABEL[persistenceStatus]}
             </span>
@@ -1952,6 +1960,7 @@ export function StudioHybridDccPanel({
         <p
           className="mt-1 min-w-0 break-words text-[10px] text-fg-3 [overflow-wrap:anywhere]"
           data-studio-hybrid-dcc-stats="true"
+          data-studio-hybrid-dcc-state-hash={ws.session.state.stateHash}
           data-assets={Object.keys(ws.session.state.geometry.records).length}
           data-active={ws.activeAssetId ?? "none"}
           data-shots={ws.bridge.shots.length}

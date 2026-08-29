@@ -55,7 +55,7 @@ export function buildStudioFileMenuItems({
     {
       id: "save-draft",
       commandId: "file.save-draft",
-      label: state.sharedNonOwnerSave ? "공동 저장" : "임시저장",
+      label: state.sharedNonOwnerSave ? "공동 저장" : "초안 저장",
       icon: Bookmark,
       shortcut: "⌘S",
       disabled: state.saving || state.collaborationDocumentLocked,

@@ -75,6 +75,7 @@ function canvasProps(
     background: "#ffffff",
     canvasHeight: 12_000,
     controlsDisabled: false,
+    controlsDisabledReason: null,
     gridSize: 40,
     hidden: false,
     magicResizeStrategy: "reposition",
@@ -86,7 +87,7 @@ function canvasProps(
     showAlignmentGuides: true,
     showWebtoonGuides: false,
     snapEnabled: true,
-    templateGutterAvailable: true,
+    templateGutterUnavailableReason: null,
     userGuides: [
       { id: "guide-v", type: "v", pos: 320 },
       { id: "guide-h", type: "h", pos: 1_800 },
@@ -313,7 +314,7 @@ describe("StudioInspectorCanvasControls", () => {
       <StudioInspectorCanvasControls
         {...props}
         controlsDisabled
-        templateGutterAvailable={false}
+        controlsDisabledReason="검토 잠금을 해제한 뒤 변경할 수 있어요."
       />
     );
     expect(
@@ -329,6 +330,55 @@ describe("StudioInspectorCanvasControls", () => {
 
     rerender(<StudioInspectorCanvasControls {...props} masterEditMode />);
     expect(screen.queryByRole("region", { name: /매직 리사이즈/u })).toBeNull();
+  });
+
+  it("패널 여백 비활성 이유를 인라인으로 설명하고 슬라이더에 연결한다", () => {
+    const view = render(
+      <StudioInspectorCanvasControls
+        {...canvasProps({ templateGutterUnavailableReason: "no-template" })}
+      />,
+    );
+    openSection("크기·여백");
+
+    const slider = screen.getByRole("slider", { name: /패널 여백/u });
+    expect((slider as HTMLInputElement).disabled).toBe(true);
+    const reasonId = slider.getAttribute("aria-describedby");
+    expect(reasonId).toBeTruthy();
+    expect(document.getElementById(reasonId!)?.textContent).toContain("패널 템플릿을 적용");
+
+    view.rerender(
+      <StudioInspectorCanvasControls
+        {...canvasProps({ templateGutterUnavailableReason: "no-panels" })}
+      />,
+    );
+    expect(screen.getByText("빈 캔버스에는 여백을 조절할 패널이 없어요.")).toBeTruthy();
+
+    view.rerender(
+      <StudioInspectorCanvasControls
+        {...canvasProps({ templateGutterUnavailableReason: "unsupported-topology" })}
+      />,
+    );
+    expect(screen.getByText(/비정형 패널 배치/u)).toBeTruthy();
+  });
+
+  it("문서 잠금 사유를 템플릿 미지원보다 우선해 서로 구분한다", () => {
+    render(
+      <StudioInspectorCanvasControls
+        {...canvasProps({
+          controlsDisabled: true,
+          controlsDisabledReason: "공동 문서 편집 권한이 없어 변경할 수 없어요.",
+          templateGutterUnavailableReason: "unsupported-topology",
+        })}
+      />,
+    );
+    openSection("크기·여백");
+
+    const slider = screen.getByRole("slider", { name: /패널 여백/u });
+    const reasonId = slider.getAttribute("aria-describedby");
+    expect(document.getElementById(reasonId!)?.textContent).toBe(
+      "공동 문서 편집 권한이 없어 변경할 수 없어요.",
+    );
+    expect(screen.queryByText(/비정형 패널 배치/u)).toBeNull();
   });
 });
 

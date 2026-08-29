@@ -6,6 +6,7 @@ import {
   LoaderCircle,
   MessageCircle,
   MonitorUp,
+  MousePointer2,
   Radio,
   RefreshCw,
   Copy,
@@ -29,6 +30,9 @@ import {
   type StudioScreenShareViewer,
 } from "../studio-screen-share";
 
+import {
+  studioLiveParticipantColor,
+} from "./studio-live-canvas-overlay-model";
 import {
   useStudioLiveCollaboration,
   type StudioLiveAvailability,
@@ -71,6 +75,28 @@ const EMPTY_SCREEN_STATE: StudioScreenShareState = {
   viewers: [],
 };
 
+const MAX_VISIBLE_LIVE_PEERS = 8;
+
+function visibleLivePeers(
+  peers: readonly StudioLivePeer[],
+  followingSessionId: string | null
+): StudioLivePeer[] {
+  const visible = peers.slice(0, MAX_VISIBLE_LIVE_PEERS);
+  if (
+    !followingSessionId ||
+    visible.some((peer) => peer.sessionId === followingSessionId)
+  ) {
+    return visible;
+  }
+
+  const followedPeer = peers.find(
+    (peer) => peer.sessionId === followingSessionId
+  );
+  if (!followedPeer) return visible;
+
+  return [...visible.slice(0, MAX_VISIBLE_LIVE_PEERS - 1), followedPeer];
+}
+
 export interface StudioLiveCollaborationPanelViewProps {
   availability: StudioLiveAvailability;
   mode: StudioLiveTransportMode | null;
@@ -91,6 +117,7 @@ export interface StudioLiveCollaborationPanelViewProps {
   inviteLinkNotice?: string | null;
   syncSnapshot?: StudioLiveSyncSnapshot;
   recovery?: StudioLiveRecoveryState | null;
+  followingSessionId?: string | null;
   videoRef?: Ref<HTMLVideoElement>;
   onChatDraftChange: (value: string) => void;
   onChatSubmit: () => void;
@@ -101,6 +128,7 @@ export interface StudioLiveCollaborationPanelViewProps {
   onUseLocalFallback: () => void;
   onExportRecovery: () => void;
   onReloadAuthoritative: () => void;
+  onToggleFollow?: (sessionId: string) => void;
   onApproveRequest: (request: StudioScreenShareRequest) => void;
   onRejectRequest: (request: StudioScreenShareRequest) => void;
   onStopViewer: (viewer: StudioScreenShareViewer) => void;
@@ -179,6 +207,7 @@ export function StudioLiveCollaborationPanelView({
   inviteLinkNotice,
   syncSnapshot,
   recovery,
+  followingSessionId = null,
   videoRef,
   onChatDraftChange,
   onChatSubmit,
@@ -189,6 +218,7 @@ export function StudioLiveCollaborationPanelView({
   onUseLocalFallback,
   onExportRecovery,
   onReloadAuthoritative,
+  onToggleFollow,
   onApproveRequest,
   onRejectRequest,
   onStopViewer,
@@ -206,6 +236,7 @@ export function StudioLiveCollaborationPanelView({
   const screenConnectionLoading =
     screenNetworkMode === null &&
     (busyAction === "start-share" || busyAction?.startsWith("[") === true);
+  const renderedPeers = visibleLivePeers(peers, followingSessionId);
 
   useEffect(() => {
     const log = chatLogRef.current;
@@ -463,28 +494,68 @@ export function StudioLiveCollaborationPanelView({
         </div>
         {peers.length > 0 ? (
           <ul aria-label="연결된 다른 작업 탭" className="mt-2 flex flex-wrap gap-2">
-            {peers.slice(0, 8).map((peer) => (
-              <li
-                className="inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-line bg-panel px-2 text-xs text-fg-2"
-                key={peer.sessionId}
-              >
-                <span
-                  aria-hidden="true"
-                  className="grid size-5 shrink-0 place-items-center rounded-full bg-raised text-[0.62rem] font-bold"
-                >
-                  {tabInitial(peer.displayName)}
-                </span>
-                <span className="max-w-28 truncate">{peer.displayName}</span>
-                <span className="text-fg-3">· {ROLE_LABEL[peer.role]}</span>
-                <span
-                  aria-label={peer.visibility === "active" ? "활성 탭" : "백그라운드 탭"}
-                  className={cn(
-                    "size-1.5 shrink-0 rounded-full",
-                    peer.visibility === "active" ? "bg-good" : "bg-fg-3"
+            {renderedPeers.map((peer) => {
+              const following = peer.sessionId === followingSessionId;
+              const participant = (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="grid size-7 shrink-0 place-items-center rounded-full text-[0.62rem] font-bold text-[oklch(0.96_0.01_85)]"
+                    style={{ backgroundColor: studioLiveParticipantColor(peer.sessionId) }}
+                  >
+                    {tabInitial(peer.displayName)}
+                  </span>
+                  <span className="min-w-0 max-w-32 flex-1 truncate text-left">
+                    {peer.displayName}
+                  </span>
+                  <span className="shrink-0 text-fg-3">· {ROLE_LABEL[peer.role]}</span>
+                  <span
+                    aria-label={peer.visibility === "active" ? "활성 탭" : "백그라운드 탭"}
+                    className={cn(
+                      "size-1.5 shrink-0 rounded-full",
+                      peer.visibility === "active" ? "bg-good" : "bg-fg-3"
+                    )}
+                  />
+                </>
+              );
+              return (
+                <li className="max-w-full" key={peer.sessionId}>
+                  {onToggleFollow ? (
+                    <button
+                      aria-label={
+                        following
+                          ? `${peer.displayName} 따라가기 중지`
+                          : `${peer.displayName} 작업 페이지 따라가기`
+                      }
+                      aria-pressed={following}
+                      className={cn(
+                        "inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border bg-panel px-2 text-xs text-fg-2 transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+                        following ? "border-accent/60 bg-accent-soft/55" : "border-line"
+                      )}
+                      data-studio-live-peer-follow={following ? "active" : "idle"}
+                      type="button"
+                      onClick={() => onToggleFollow(peer.sessionId)}
+                    >
+                      {participant}
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "ml-0.5 inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-1 text-[0.65rem] font-semibold",
+                          following ? "bg-accent text-on-accent" : "bg-raised text-fg-2"
+                        )}
+                      >
+                        {following ? <Check size={11} /> : <MousePointer2 size={11} />}
+                        {following ? "중지" : "따라가기"}
+                      </span>
+                    </button>
+                  ) : (
+                    <span className="inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-line bg-panel px-2 text-xs text-fg-2">
+                      {participant}
+                    </span>
                   )}
-                />
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         ) : ready ? (
           <p className="mt-2 text-xs leading-relaxed text-fg-3">
@@ -811,7 +882,17 @@ export function StudioLiveCollaborationPanelView({
   );
 }
 
-export function StudioLiveCollaborationPanel({ workId }: { workId: string }) {
+export interface StudioLiveCollaborationPanelProps {
+  workId: string;
+  followingSessionId?: string | null;
+  onToggleFollow?: (sessionId: string) => void;
+}
+
+export function StudioLiveCollaborationPanel({
+  workId,
+  followingSessionId = null,
+  onToggleFollow,
+}: StudioLiveCollaborationPanelProps) {
   const live = useStudioLiveCollaboration();
   const screenControllerRef = useRef<StudioScreenShareController | null>(null);
   const screenIceSessionRef = useRef<{
@@ -1096,6 +1177,7 @@ export function StudioLiveCollaborationPanel({ workId }: { workId: string }) {
       inviteLinkNotice={inviteLinkNotice}
       syncSnapshot={live.sync}
       recovery={live.recovery}
+      followingSessionId={followingSessionId}
       mode={live.mode}
       peers={live.peers}
       screenState={screenState}
@@ -1120,6 +1202,7 @@ export function StudioLiveCollaborationPanel({ workId }: { workId: string }) {
       onUseLocalFallback={live.useLocalFallback}
       onExportRecovery={() => void handleExportRecovery()}
       onReloadAuthoritative={live.reloadAuthoritative}
+      onToggleFollow={onToggleFollow}
       onStopViewer={handleStopViewer}
       onStopWatching={() => screenControllerRef.current?.stopWatching()}
       onWatchShare={(share) => void handleWatchShare(share)}

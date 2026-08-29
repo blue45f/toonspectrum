@@ -1015,6 +1015,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       : null;
     this.applySurface();
     if (this.active || this.settled.length > 0) this.replay();
+    this.parkCoverageBackingStoreIfIdle();
   }
 
   setSurface(surface: StudioLiveInkSurface | null): void {
@@ -1032,6 +1033,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     if (!changed) return;
     this.applySurface();
     if (this.active || this.settled.length > 0) this.replay();
+    this.parkCoverageBackingStoreIfIdle();
   }
 
   get isActive(): boolean {
@@ -1061,12 +1063,18 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   }
 
   begin(element: DrawEl): StudioLiveDynamicBrushBeginResult {
-    if (!studioLiveDynamicBrushOverlaySupportsElement(element) || !this.surfaceReady()) {
+    if (!studioLiveDynamicBrushOverlaySupportsElement(element)) {
       return {
         status: "fallback",
-        reason: this.surfaceReady() ? "unsupported-style" : (
-          this.surfaceUsable ? "surface-unavailable" : "surface-budget"
-        ),
+        reason: "unsupported-style",
+      };
+    }
+    this.restoreCoverageBackingStore();
+    if (!this.surfaceReady()) {
+      this.parkCoverageBackingStoreIfIdle();
+      return {
+        status: "fallback",
+        reason: this.surfaceUsable ? "surface-unavailable" : "surface-budget",
       };
     }
     this.paintContactFromElement(element);
@@ -1077,11 +1085,16 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         this.pendingBeginRaf = 0;
         const pending = this.pendingBeginElement;
         this.pendingBeginElement = null;
-        if (pending) this.finishBegin(pending);
+        if (pending) {
+          const result = this.finishBegin(pending);
+          if (result.status === "fallback") this.parkCoverageBackingStoreIfIdle();
+        }
       });
       return { status: "started", dabCount: 0, markCount: 0 };
     }
-    return this.finishBegin(element);
+    const result = this.finishBegin(element);
+    if (result.status === "fallback") this.parkCoverageBackingStoreIfIdle();
+    return result;
   }
 
   private finishBegin(element: DrawEl): StudioLiveDynamicBrushBeginResult {
@@ -1188,11 +1201,13 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       }
       const started = this.finishBegin(pending);
       if (started.status !== "started") {
+        this.parkCoverageBackingStoreIfIdle();
         return { status: "fallback", reason: started.reason };
       }
     }
     const active = this.active;
     if (!active) {
+      this.parkCoverageBackingStoreIfIdle();
       return {
         status: "fallback",
         reason: this.fallbackReason ?? "surface-unavailable",
@@ -1362,6 +1377,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       };
       this.resetActiveState();
       this.clearActiveRect();
+      this.parkCoverageBackingStoreIfIdle();
       return result;
     }
 
@@ -1402,6 +1418,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     };
     this.resetActiveState();
     this.clearActiveRect();
+    this.parkCoverageBackingStoreIfIdle();
     return result;
   }
 
@@ -1416,6 +1433,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     this.settled = this.settled.slice(released);
     this.recordReleaseDebug("release-prefix", { released, remaining: this.settled.length });
     this.replay();
+    this.parkCoverageBackingStoreIfIdle();
     return released;
   }
 
@@ -1445,6 +1463,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     if (!this.active) return false;
     this.resetActiveState();
     this.clearActiveRect();
+    this.parkCoverageBackingStoreIfIdle();
     return true;
   }
 
@@ -1453,6 +1472,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     this.settled = [];
     this.clearActiveRect();
     this.clearSettledRect();
+    this.parkCoverageBackingStoreIfIdle();
   }
 
   private appendDabs(
@@ -2347,6 +2367,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     }).__studioDynamicOverlayDebug = { lastFailure: reason, at: performance.now() };
     this.resetActiveState();
     this.clearActiveRect();
+    this.parkCoverageBackingStoreIfIdle();
     return { status: "fallback", reason };
   }
 
@@ -2571,6 +2592,31 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     this.surfaceUsable =
       width * height * 3 <= STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS;
     if (!this.surfaceUsable) this.releaseSurfaceBackingStores();
+  }
+
+  /**
+   * The coverage surface is an internal R8-like accumulation bitmap and is never presented in the
+   * DOM. Keep only that hidden store parked between contacts; the presentation and settled canvases
+   * remain untouched because they can still own visible handoff pixels. `begin()` restores this
+   * store synchronously before painting the immediate contact, so first-use rendering stays on the
+   * existing same-task path.
+   */
+  private parkCoverageBackingStoreIfIdle(): void {
+    if (this.active !== null || this.pendingBeginElement !== null) return;
+    const canvas = this.activeCanvas;
+    if (!canvas) return;
+    if (canvas.width !== 1) canvas.width = 1;
+    if (canvas.height !== 1) canvas.height = 1;
+  }
+
+  private restoreCoverageBackingStore(): void {
+    const canvas = this.activeCanvas;
+    const surface = this.surface;
+    if (!canvas || !surface || !this.surfaceUsable) return;
+    const width = Math.max(1, Math.round(surface.width * this.dpr));
+    const height = Math.max(1, Math.round(surface.height * this.dpr));
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
   }
 
   private releaseSurfaceBackingStores(): void {
