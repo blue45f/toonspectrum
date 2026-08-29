@@ -150,11 +150,20 @@ export function useStudioBg3dEngineRuntime(
 
   const inApp = useMemo(() => classifyStudioBg3dInAppBrowser(readHostSignals()), []);
 
+  // Read every field by name rather than forwarding the object. The caller rebuilds that object
+  // each render, so passing it straight through would re-run this effect on every render; naming
+  // the fields keeps the dependency on the values. The cost is that a field added to
+  // `StudioBg3dEngineWebglOnlyFeatures` and not added here is silently never latched — which is
+  // exactly what happened to `vrmCharacters`, so `studio-bg3d-engine-latch-wiring.test.ts` now
+  // fails when the two lists drift apart.
   const observedWebxr = observedWebglOnlyFeatures?.webxr === true;
+  const observedVrmCharacters = observedWebglOnlyFeatures?.vrmCharacters === true;
   useEffect(() => {
-    setWebglOnlyFeatures((current) =>
-      latchStudioBg3dWebglOnlyFeatures(current, { webxr: observedWebxr }));
-  }, [observedWebxr]);
+    setWebglOnlyFeatures((current) => latchStudioBg3dWebglOnlyFeatures(current, {
+      webxr: observedWebxr,
+      vrmCharacters: observedVrmCharacters,
+    }));
+  }, [observedWebxr, observedVrmCharacters]);
 
   useEffect(() => {
     if (!enabled) {
