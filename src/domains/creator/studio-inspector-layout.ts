@@ -70,6 +70,10 @@ export interface StudioInspectorAction {
   route: StudioInspectorRoute;
 }
 
+/**
+ * Generic normalization/legacy-storage fallback. Studio startup is owned by the active workspace;
+ * the shipped storyboard workspace intentionally opens Page on its navigator/minimap subtab.
+ */
 export const DEFAULT_STUDIO_INSPECTOR_LAYOUT: StudioInspectorLayout = {
   primary: "properties",
   image: "quick",
@@ -182,9 +186,9 @@ const ALWAYS_AVAILABLE_ACTIONS: readonly StudioInspectorAction[] = [
   },
   {
     id: "publish",
-    label: "게시 정보",
-    description: "제목, 설명과 태그를 입력합니다.",
-    keywords: ["publish", "제목", "설명", "태그", "업로드"],
+    label: "작품 정보",
+    description: "초안 저장과 게시에 공통으로 쓰는 제목, 설명과 태그를 입력합니다.",
+    keywords: ["publish", "게시", "작품", "제목", "설명", "태그", "업로드"],
     route: { primary: "publish" },
   },
 ];

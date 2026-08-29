@@ -78,6 +78,8 @@ export async function loadChunkWithReloadRecovery<T>(
     reload.call(globalThis.location);
     return await new Promise<never>(() => {
       // Keep the current Suspense or in-panel loading state mounted until navigation replaces it.
+      // In Studio, a cancelled unsaved-work prompt intentionally leaves this request pending: the
+      // in-memory document is more valuable than replacing the editor with a route error screen.
     });
   }
 }

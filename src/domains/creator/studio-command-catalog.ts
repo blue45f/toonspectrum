@@ -560,7 +560,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
     /* ---------------------------------------------------------------- file */
     defineCommand({
       id: "file.save-draft",
-      labels: [ko("임시저장", "현재 원고를 임시저장합니다."), en("Save draft")],
+      labels: [ko("초안 저장", "현재 원고를 서버 초안으로 저장합니다."), en("Save draft")],
       aliases: [csp("저장"), cspEn("Save"), ps("Save"), krita("Save"), procreate("자동 저장", "Procreate saves continuously; no explicit command.")],
       shortcut: "⌘S",
       origins: [

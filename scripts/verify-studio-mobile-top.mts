@@ -150,6 +150,7 @@ interface ModeRunResult {
   width: number;
   mode: ShellMode;
   ok: boolean;
+  workspaceToggleInitiallyVisible: boolean;
   hardFailures: string[];
   warnings: string[];
   metrics: TopChromeMetrics;
@@ -704,7 +705,29 @@ async function runMode(
   const workspaceToggle = page.locator(
     '[data-studio-mobile-workspace-toggle="true"]',
   ).first();
+  let workspaceToggleInitiallyVisible = false;
   if (await workspaceToggle.count() > 0) {
+    workspaceToggleInitiallyVisible = await workspaceToggle.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const dockBounds = element
+        .closest<HTMLElement>('[data-studio-mobile-editing-dock="true"]')
+        ?.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        bounds.left + bounds.width / 2,
+        bounds.top + bounds.height / 2,
+      );
+      return Boolean(
+        dockBounds
+        && !element.closest('[data-studio-mobile-dock-scroll]')
+        && bounds.width >= 44
+        && bounds.height >= 44
+        && bounds.left >= dockBounds.left - 0.5
+        && bounds.right <= dockBounds.right + 0.5
+        && bounds.left >= -0.5
+        && bounds.right <= window.innerWidth + 0.5
+        && (hit === element || element.contains(hit))
+      );
+    });
     await workspaceToggle.click();
     await page
       .locator(
@@ -784,6 +807,9 @@ async function runMode(
   const hardFailures: string[] = [];
   const warnings: string[] = [];
 
+  if (!workspaceToggleInitiallyVisible) {
+    hardFailures.push("workspace tools toggle is not initially visible and pinned outside the drawing scroller");
+  }
   if (!metrics.menubarVisible) hardFailures.push("menubar not visible");
   if (metrics.docOverflowX > 0) {
     hardFailures.push(`document horizontal overflow ${metrics.docOverflowX}px`);
@@ -926,6 +952,7 @@ async function runMode(
     `dockPad=${metrics.canvasViewportPaddingBottom?.toFixed(0) ?? "-"} ` +
     `expandedDock=${expandedDock.dockHeight?.toFixed(0) ?? "-"} ` +
     `expandedPad=${expandedDock.canvasViewportPaddingBottom?.toFixed(0) ?? "-"} ` +
+    `workspaceToggleVisible=${workspaceToggleInitiallyVisible} ` +
     `menus=${menus.map((menu) => `${menu.id}:${menu.opened && menu.withinViewport && menu.closed}`).join(",") || "-"} ` +
     `errs=${consoleErrors.length} ok=${ok}`,
   );
@@ -940,6 +967,7 @@ async function runMode(
     width,
     mode,
     ok,
+    workspaceToggleInitiallyVisible,
     hardFailures,
     warnings,
     metrics,

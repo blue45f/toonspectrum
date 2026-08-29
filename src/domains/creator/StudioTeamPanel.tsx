@@ -69,6 +69,8 @@ export interface StudioTeamPanelProps {
   authScopeKey: string | null;
   draftCollaboration?: StudioDraftCollaborationReadiness | null;
   onDraftShareRequest?: () => void;
+  followingSessionId?: string | null;
+  onToggleFollow?: (sessionId: string) => void;
 }
 
 const ROLE_COPY: Record<StudioTeamRole, { label: string; description: string }> = {
@@ -1145,6 +1147,8 @@ export function StudioTeamPanel({
   authScopeKey,
   draftCollaboration = null,
   onDraftShareRequest,
+  followingSessionId = null,
+  onToggleFollow,
 }: StudioTeamPanelProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -1698,6 +1702,8 @@ export function StudioTeamPanel({
           visibleSnapshot?.viewer.status === "active" &&
           visibleSnapshot.viewer.capabilities.view ? (
             <StudioLiveCollaborationPanel
+              followingSessionId={followingSessionId}
+              onToggleFollow={onToggleFollow}
               workId={workId}
             />
           ) : null}

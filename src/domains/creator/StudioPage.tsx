@@ -209,6 +209,7 @@ import {
   type TemplateSpec,
   type FrameSpec,
 } from "./studio-assets";
+import { regenerateStudioTemplateFrames } from "./studio-template-gutter-layout";
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
   readStudioAutosave,
@@ -967,6 +968,7 @@ import {
   type PageReviewState,
 } from "./studio-page-review";
 import { runStudioPageSavePipeline } from "./studio-page-save-pipeline";
+import { clearStudioWorkMetadataValidationError } from "./studio-work-metadata";
 import {
   clampZoom,
   closedStudioLayerLiftUiState,
@@ -1476,6 +1478,7 @@ import {
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
+import { shouldSuppressStudioQuickStartAutoOpen } from "./studio-quick-start-auto-open";
 import type {
   StudioCanvasViewportHandlers,
   StudioHokusaiLiveOverlaySurfaceBinding,
@@ -3912,6 +3915,7 @@ function StudioCuttoonEditor({
   const hybridDccReturnFocusRef = useRef<HTMLElement | null>(null);
   const {
     flushHybridDccWorkspacePersistence,
+    hybridDccPersistenceReceipt,
     hybridDccPersistenceStatus,
     hybridDccWorkspaceDocumentId,
     hybridDccWorkspaceScope,
@@ -7915,6 +7919,31 @@ function StudioCuttoonEditor({
   const quickStartDismissedRef = useRef(quickStartDismissed);
   quickStartDismissedRef.current = quickStartDismissed;
   const [quickStartOpen, setQuickStartOpen] = useState(false);
+  const dismissQuickStartFromEarlyInteraction = useEffectEvent(() => dismissQuickStart());
+  useEffect(() => {
+    if (quickStartDismissed || typeof globalThis.document === "undefined") return;
+    const ownerDocument = globalThis.document;
+    const suppressLateAutomaticCoach = (event: Event) => {
+      if (!shouldSuppressStudioQuickStartAutoOpen({
+        isTrusted: event.isTrusted,
+        ownerDocument,
+        target: event.target,
+      })) return;
+      dismissQuickStartFromEarlyInteraction();
+    };
+
+    // Pointer and keyboard cover mouse, touch, pen, and normal keyboard activation. `click` also
+    // covers assistive-technology activation that has no preceding pointer/key event. The guard
+    // stops listening after the first match, and never handles events once the coach DOM exists.
+    ownerDocument.addEventListener("pointerdown", suppressLateAutomaticCoach, true);
+    ownerDocument.addEventListener("keydown", suppressLateAutomaticCoach, true);
+    ownerDocument.addEventListener("click", suppressLateAutomaticCoach, true);
+    return () => {
+      ownerDocument.removeEventListener("pointerdown", suppressLateAutomaticCoach, true);
+      ownerDocument.removeEventListener("keydown", suppressLateAutomaticCoach, true);
+      ownerDocument.removeEventListener("click", suppressLateAutomaticCoach, true);
+    };
+  }, [quickStartDismissed]);
   const [quickComicOpen, setQuickComicOpen] = useState(false);
   useLayoutEffect(() => {
     if (!hybridDccRouteRequested) return;
@@ -7948,6 +7977,7 @@ function StudioCuttoonEditor({
   });
 
   const [title, setTitleState] = useState("");
+  const [pendingSaveIntent, setPendingSaveIntent] = useState<"draft" | "published" | null>(null);
   const setTitle = (next: Parameters<typeof setTitleState>[0]) => {
     if (!markStudioDocumentChanged()) return;
     setTitleState(next);
@@ -8016,6 +8046,9 @@ function StudioCuttoonEditor({
   };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(linked3dCloudSaveRecoveryNotice);
+  function clearWorkMetadataValidationError() {
+    setError(clearStudioWorkMetadataValidationError);
+  }
   useEffect(() => {
     if (!linked3dCloudSaveRecoveryNotice) return;
     const currentState = typeof location.state === "object"
@@ -16087,8 +16120,10 @@ const puppetWarpArmed =
   );
   const contextMenuBg3dEditSource = resolveBg3dEditSource(contextMenuEl);
   // Auto-coach only while the page is still idle. Late work/autosave hydration must not
-  // cover the canvas after the artist already opened Draw or placed content (backdrop was
-  // intercepting the primary brush tray in live tests).
+  // cover the canvas after the artist already opened Draw, placed content, or operated any
+  // Studio control while the lazy coach/preferences were still loading. The eager interaction
+  // guard records that intent through the normal dismissal/revision fence before a late modal can
+  // steal focus; an explicit File > Quick start command still wins.
   const showQuickStart = !canvasOnlyMode && !quickComicOpen && (
     quickStartOpen ||
     (uiBooleanPreferencesReady
@@ -19459,6 +19494,7 @@ const puppetWarpArmed =
   }
   function dismissQuickStart() {
     setQuickStartOpen(false);
+    if (quickStartDismissedRef.current) return;
     quickStartDismissedRef.current = true;
     setQuickStartDismissed(true);
     persistStudioUiBooleanPreference("quick-start-dismissed", true);
@@ -19489,7 +19525,8 @@ const puppetWarpArmed =
     setMenu(nextMenu);
     dismissQuickStart();
   }
-  function openPublishStep() {
+  function openWorkMetadataStep(status: "published" | "draft") {
+    setPendingSaveIntent(status);
     preloadStudioCaptureReadinessRuntime();
     preloadStudioSavePayloadRuntime();
     setTool("select");
@@ -22553,47 +22590,10 @@ const puppetWarpArmed =
       (current) => deleteSavedClipInMemory(current, id),
     );
   }
-  function regenerateTemplate(tpl: TemplateSpec, gutter: number, currentEls: El[] = elements) {
-    let nextFrames: FrameSpec[] = [];
-    if (tpl.id === "blank") {
-      nextFrames = [];
-    } else if (tpl.id === "grid4") {
-      nextFrames = [
-        { x: gutter, y: gutter, width: (CANVAS_W - gutter * 3) / 2, height: (1080 - gutter * 3) / 2 },
-        { x: gutter * 2 + (CANVAS_W - gutter * 3) / 2, y: gutter, width: (CANVAS_W - gutter * 3) / 2, height: (1080 - gutter * 3) / 2 },
-        { x: gutter, y: gutter * 2 + (1080 - gutter * 3) / 2, width: (CANVAS_W - gutter * 3) / 2, height: (1080 - gutter * 3) / 2 },
-        { x: gutter * 2 + (CANVAS_W - gutter * 3) / 2, y: gutter * 2 + (1080 - gutter * 3) / 2, width: (CANVAS_W - gutter * 3) / 2, height: (1080 - gutter * 3) / 2 },
-      ];
-    } else {
-      const isStack = tpl.id.startsWith("webtoon") || tpl.id === "strip4" || tpl.id === "single";
-      const isGrid = tpl.id.startsWith("grid");
-      if (isStack) {
-        const count = tpl.frames.length || 1;
-        const h = Math.round((tpl.canvasH - gutter * (count + 1)) / count);
-        nextFrames = Array.from({ length: count }, (_, i) => ({
-          x: gutter,
-          y: gutter + i * (h + gutter),
-          width: CANVAS_W - gutter * 2,
-          height: h,
-        }));
-      } else if (isGrid) {
-        const cols = 2;
-        const rows = tpl.id === "grid6" ? 3 : 4;
-        const w = (CANVAS_W - gutter * (cols + 1)) / cols;
-        const h = (tpl.canvasH - gutter * (rows + 1)) / rows;
-        nextFrames = Array.from({ length: rows * cols }, (_, i) => {
-          const col = i % cols;
-          const row = Math.floor(i / cols);
-          return {
-            x: gutter + col * (w + gutter),
-            y: gutter + row * (h + gutter),
-            width: w,
-            height: h,
-          };
-        });
-      }
-    }
-
+  function instantiateTemplateFrames(
+    nextFrames: readonly FrameSpec[],
+    currentEls: El[],
+  ): El[] {
     const nonFrames = currentEls.filter((el) => el.type !== "frame");
     const newFrames = nextFrames.map((f) => ({
       id: uid(),
@@ -22605,6 +22605,15 @@ const puppetWarpArmed =
     }));
 
     return [...newFrames, ...nonFrames];
+  }
+
+  function regenerateTemplate(
+    tpl: TemplateSpec,
+    gutter: number,
+    currentEls: El[] = elements,
+  ): El[] | null {
+    const nextFrames = regenerateStudioTemplateFrames(tpl, gutter);
+    return nextFrames ? instantiateTemplateFrames(nextFrames, currentEls) : null;
   }
 
   async function applyTemplate(tpl: TemplateSpec) {
@@ -22619,7 +22628,10 @@ const puppetWarpArmed =
     setBg("#ffffff");
     setBgGrad(null);
     setCurrentTemplate(tpl);
-    const nextEls = regenerateTemplate(tpl, panelGutter, []);
+    // Irregular templates keep their authored frames. They are intentionally excluded from the
+    // gutter slider because regenerating their geometry would require destructive guesswork.
+    const nextEls = regenerateTemplate(tpl, panelGutter, [])
+      ?? instantiateTemplateFrames(tpl.frames, []);
     settleStudioDestructiveCommit(templateRequest, commit(nextEls), undo);
     setSelectedId(null);
     announceDrawingShortcut(
@@ -23623,6 +23635,10 @@ const puppetWarpArmed =
     const pending = pendingPixelSelectionRasterGestureRef.current;
     const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
     if (!pending || pending.pointerId !== pointerId) return false;
+    // Releasing capture after a successful pointerup emits lostpointercapture in Chromium. Keep the
+    // completed journal authoritative instead of relabelling and deleting it as a cancellation
+    // before the async raster preparation continuation can replay the first selection gesture.
+    if (pending.released) return true;
     if (!cancelled && stage) {
       try {
         stage.setPointersPositions(pointerEvent);
@@ -26893,7 +26909,8 @@ const puppetWarpArmed =
       buildPublishPreflightInput,
       setPageReviewOpen,
       setPublishPreflightOpen,
-      openPublishStep,
+      openWorkMetadataStep,
+      clearPendingSaveIntent: () => setPendingSaveIntent(null),
       captureReadyStageForPage,
       preserveStudioViewBeforeCapture,
       hideStrokeGuide,
@@ -26927,6 +26944,11 @@ const puppetWarpArmed =
     });
   }
 
+  function continuePendingSaveIntent() {
+    if (pendingSaveIntent === null) return;
+    void handleSave(pendingSaveIntent);
+  }
+
   // 터치 기기(작은 폰)에서는 도구 버튼을 키워 thumb 로 누르기 쉽게 한다(pointer-coarse: h-10).
   // 데스크톱(fine pointer)은 기존 컴팩트 h-9 유지 — 정밀 조작·공간 효율.
   // 시각 토큰은 studio-panel-ui / studio-chrome-ui 와 공유한다(경쟁사 수준의 일관 어포던스).
@@ -26945,10 +26967,17 @@ const puppetWarpArmed =
 
   // 커밋마다 메뉴 그룹 useMemo가 무효화되지 않도록 elements 읽기는 이벤트 시점 번들로 승격.
   function selectAllElements() {
+    const ids = elements.map((el) => el.id);
     setTool("select");
     setEyedropperActive(false);
-    setSelectedId(null);
-    setMarqueeIds(elements.map((el) => el.id));
+    // Cmd/Ctrl+A 직후 같은 입력 턴에서 그룹·정렬 같은 명령이 이어져도 ref 기반 명령 경계가
+    // 이전 선택을 읽지 않게 한다. 개별 setter는 React 커밋 뒤에만 mirror ref가 갱신되지만,
+    // 이 어댑터는 세 선택 권위(state + refs)를 한 번에 동기화한다.
+    applyGroupSelectionState({
+      selectedId: null,
+      marqueeIds: ids,
+      activeGroupId: null,
+    });
   }
   function selectAllForEdit() {
     if (selected?.type === "image" && (pixelTool || pixelSel)) {
@@ -31497,6 +31526,7 @@ function clearSelectionForEdit() {
       sceneTemplatesError={sceneTemplatesError}
       sceneTemplatesLoading={sceneTemplatesLoading}
       scheduleHybridDccWorkspacePersistence={scheduleHybridDccWorkspacePersistence}
+      hybridDccPersistenceReceipt={hybridDccPersistenceReceipt}
       scopedHybridDccWorkspace={scopedHybridDccWorkspace}
       scrollPos={scrollPos}
       scrollPreviewOpen={scrollPreviewOpen}
@@ -31919,6 +31949,9 @@ function clearSelectionForEdit() {
       tipRoundness={tipRoundness}
       title={title}
       titleInputRef={titleInputRef}
+      pendingSaveIntent={pendingSaveIntent}
+      onContinuePendingSave={continuePendingSaveIntent}
+      onClearWorkMetadataError={clearWorkMetadataValidationError}
       toggleCanvasWideMode={toggleCanvasWideMode}
       toggleSelectedElementsLocked={toggleSelectedElementsLocked}
       toneSearchQuery={toneSearchQuery}

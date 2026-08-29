@@ -454,15 +454,49 @@ export default defineConfig(({ mode }) => ({
             || id.endsWith("/src/domains/creator/studio-story-beats.ts")
             || id.endsWith("/src/domains/creator/studio-element-model.ts")
             || id.endsWith("/src/domains/creator/render/studio-raster-image-presentation.ts")
+            || id.endsWith("/src/domains/creator/brush/studio-brush-engine-program-set.ts")
           ) {
             // These lightweight contracts are shared by several Studio lazy entries. Similar-style
             // and story-beat helpers are also synchronously needed by StudioPage, so leaving their
             // tiny bodies as separate shared chunks costs launch requests without preserving lazy
             // bytes. Element-model and raster-presentation are dependency-free linked-surface
-            // contracts, so co-locating them also avoids recursive 3D dependency capture. The
+            // contracts, and the program-set leaf's owners are a subset of this chunk's owners, so
+            // co-locating them also avoids recursive dependency capture. The
             // procedural descriptor index is deliberately excluded so its 160 labels/previews stay
             // behind the full-library and saved-pro-brush dynamic boundaries.
             return "studio-core-micro-contracts";
+          }
+          if (
+            id.endsWith("/src/domains/creator/studio-panel-split.ts")
+            || id.endsWith("/src/domains/creator/studio-edit-controls.ts")
+          ) {
+            // Dependency-free leaves with the same entry-owner set; merging removes one request
+            // without changing any static or lazy closure.
+            return "studio-editing-micro-models";
+          }
+          if (
+            id.endsWith("/src/domains/creator/studio-id.ts")
+            || id.endsWith("/src/domains/creator/live/studio-live-local-transport-support.ts")
+            || id.endsWith("/src/domains/creator/studio-content-aware-fill-contract.ts")
+            || id.endsWith("/src/domains/creator/studio-z-index.ts")
+          ) {
+            // These dependency-free leaves total less than 1 KiB, so co-locating their bounded
+            // capability constants removes three requests without capturing a feature runtime.
+            return "studio-tiny-capability-contracts";
+          }
+          if (
+            id.endsWith("/src/domains/creator/studio-layers.ts")
+            || id.endsWith("/src/domains/creator/studio-work-metadata.ts")
+          ) {
+            // Work metadata is a dependency-free leaf whose owner set is contained by layers.
+            return "studio-document-micro-models";
+          }
+          if (
+            id.endsWith("/src/domains/creator/studio-assets.ts")
+            || id.endsWith("/src/domains/creator/studio-raster-assets.ts")
+          ) {
+            // Both are dependency-free models; every raster-asset owner already loads assets.
+            return "studio-asset-micro-models";
           }
           if (
             id.endsWith("/src/domains/creator/brush/studio-paper-brush-response.ts")

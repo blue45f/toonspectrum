@@ -23,6 +23,7 @@ import {
   studioDeletePagesBulkRequest,
 } from "./studio-destructive-command-catalog";
 import {
+  STUDIO_MOBILE_PAGES_SHEET_ID,
   studioMobileSheetSizeStyle,
   type StudioMobileSheetSnap,
 } from "./studio-mobile-sheet-snap";
@@ -279,6 +280,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
           />
         )}
         <div
+          id={STUDIO_MOBILE_PAGES_SHEET_ID}
           ref={pagesSheetRef}
           role={isMobile && mobileSheet === "pages" ? "dialog" : undefined}
           aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
@@ -348,10 +350,12 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                 <button
                   type="button"
                   data-testid="studio-add-page"
+                  aria-label="새 페이지 추가"
+                  title="새 페이지 추가"
                   onClick={addPage}
                   className="flex min-h-11 items-center gap-1 rounded-lg bg-accent px-3 text-[0.7rem] font-semibold text-on-accent hover:bg-accent-hover lg:min-h-6 lg:px-2 lg:text-[10px]"
                 >
-                  <Plus size={12} aria-hidden /> 추가
+                  <Plus size={12} aria-hidden /> 페이지 추가
                 </button>
               </div>
             </div>

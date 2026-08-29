@@ -11,7 +11,7 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 
-import { chromium, type Page } from "playwright";
+import { chromium, type Locator, type Page } from "playwright";
 
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
@@ -19,7 +19,7 @@ const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 
 const MAIN_MENU: Record<string, string[]> = {
   파일: [
-    "임시저장",
+    "초안 저장",
     "게시",
     "프로젝트 가져오기…",
     "PSD 가져오기…",
@@ -116,9 +116,8 @@ const MAIN_MENU: Record<string, string[]> = {
     "패널 접어 넓게",
     "캔버스만",
     "템플릿 · 에셋",
-    "참고 이미지",
+    "참고 이미지 창",
     "멀티 디스플레이 작업공간…",
-    "애플리케이션 설정",
   ],
   AI: ["AI 어시스트", "스톡 이미지", "연동 설정"],
   도움말: [
@@ -217,6 +216,26 @@ async function openMainMenuGroup(page: Page, label: string): Promise<void> {
   await page.locator(`[role="menu"][aria-label="${label}"]`).waitFor({ state: "visible", timeout: 5000 });
 }
 
+async function hasVisibleMenuItem(menu: Locator, name: string): Promise<boolean> {
+  for (const role of ["menuitem", "menuitemcheckbox", "menuitemradio"] as const) {
+    // Shortcut badges are intentionally part of the rendered row and therefore extend the
+    // computed accessible name (for example `초안 저장 ⌘S`).  Keep the semantic-role check while
+    // requiring the row's visible label span to match exactly; a partial role-name query alone
+    // would let `게시` pass by finding `게시 패키지…`.
+    const matches = menu.getByRole(role, { name, exact: false });
+    const count = await matches.count();
+    for (let index = 0; index < count; index += 1) {
+      const row = matches.nth(index);
+      // Scope the exact text lookup to this row. Passing a locator rooted at `menu` into
+      // `filter({ has })` would look for a nested menu below the row and incorrectly return zero.
+      if ((await row.getByText(name, { exact: true }).count()) === 0) continue;
+      await row.scrollIntoViewIfNeeded().catch(() => undefined);
+      if (await row.isVisible().catch(() => false)) return true;
+    }
+  }
+  return false;
+}
+
 async function hasVisibleText(page: Page, text: string): Promise<boolean> {
   const matches = page.getByText(text);
   const count = await matches.count();
@@ -297,10 +316,7 @@ async function assertMainMenus(page: Page): Promise<string[]> {
       await openMainMenuGroup(page, group);
       const menu = page.locator(`[role="menu"][aria-label="${group}"]`);
       for (const item of items) {
-        const row = menu.getByRole("menuitem", { name: item });
-        const visible =
-          (await row.isVisible().catch(() => false)) ||
-          (await menu.getByText(item, { exact: true }).first().isVisible().catch(() => false));
+        const visible = await hasVisibleMenuItem(menu, item);
         if (!visible) failures.push(`메인 메뉴 [${group}] 항목 없음: ${item}`);
       }
       await page.keyboard.press("Escape");
@@ -308,6 +324,66 @@ async function assertMainMenus(page: Page): Promise<string[]> {
     } catch (err) {
       failures.push(`메인 메뉴 [${group}] 열기 실패: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+  return failures;
+}
+
+async function assertReferenceWindowToggle(page: Page): Promise<string[]> {
+  const failures: string[] = [];
+  const panel = page.getByRole("region", { name: "포즈 참고 보드" });
+  const openWindowMenu = async (): Promise<Locator> => {
+    await openMainMenuGroup(page, "창");
+    return page
+      .locator('[role="menu"][aria-label="창"]')
+      .locator('[data-studio-menu-item-id="reference-window"]');
+  };
+
+  let row = await openWindowMenu();
+  if ((await row.getAttribute("role")) !== "menuitemcheckbox") {
+    failures.push("참고 이미지 창이 menuitemcheckbox 의미를 노출하지 않음");
+  }
+  if ((await row.getAttribute("aria-checked")) === "true") {
+    await row.click();
+    await panel.waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
+    row = await openWindowMenu();
+  }
+  if ((await row.getAttribute("aria-checked")) !== "false") {
+    failures.push("참고 이미지 창 닫힘 상태를 aria-checked=false로 노출하지 않음");
+  }
+
+  await row.click();
+  const openedAt = Date.now();
+  const immediateFeedback = page.locator(
+    '[data-studio-reference-panel-loading="true"], [role="region"][aria-label="포즈 참고 보드"]',
+  );
+  const feedbackVisible = await immediateFeedback.first()
+    .waitFor({ state: "visible", timeout: 1_500 })
+    .then(() => true)
+    .catch(() => false);
+  if (!feedbackVisible) {
+    failures.push("참고 이미지 창을 여는 동안 즉각적인 로딩 피드백을 노출하지 않음");
+  }
+  const panelVisible = await panel
+    .waitFor({ state: "visible", timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!panelVisible) {
+    failures.push("창 → 참고 이미지 창으로 포즈 참고 보드를 열 수 없음");
+    return failures;
+  }
+
+  row = await openWindowMenu();
+  if ((await row.getAttribute("aria-checked")) !== "true") {
+    failures.push("참고 이미지 창 열림 상태를 aria-checked=true로 노출하지 않음");
+  }
+  await row.click();
+  await panel.waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
+  if (await panel.isVisible().catch(() => false)) {
+    failures.push("창 → 참고 이미지 창으로 포즈 참고 보드를 닫을 수 없음");
+  }
+
+  if (failures.length === 0) {
+    log(`  reference window toggle ok: open + checked + close (${Date.now() - openedAt}ms)`);
   }
   return failures;
 }
@@ -536,6 +612,7 @@ async function main() {
     const failures = [
       ...(await assertChrome(page)),
       ...(await assertMainMenus(page)),
+      ...(await assertReferenceWindowToggle(page)),
       ...(await assertRailTools(page)),
       ...(await assertMenuDrivenPopovers(page)),
       ...(await assertWorkspaceDeviceEditor(page)),

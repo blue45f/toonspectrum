@@ -89,6 +89,7 @@ describe("StudioWorkspaceMenu selector and built-in workspaces", () => {
     expect(html).toContain("대사·레터링");
     expect(html).toContain("검수");
     expect(html).toContain("게시");
+    expect(html).toContain("작품 정보와 최종 화면 맞춤 검사");
     expect(html).toContain("프로 만화");
     expect(html).toContain('data-workspace-id="pro-comic"');
     expect(html).toContain("수정 불가");
@@ -295,6 +296,7 @@ describe("StudioWorkspaceMenu responsive settings", () => {
     );
 
     expect(html).toContain("변경은 이 세션에서만 유지");
+    expect(html).toContain("작업공간: 스토리보드 세션, 변경은 이 세션에서만 유지");
     expect(html).toContain("브라우저 저장에 실패해 이 세션에서만 유지");
     expect(html).toContain(">세션</span>");
     expect(html).not.toContain("이 기기 저장 확인됨");

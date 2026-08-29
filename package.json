@@ -120,6 +120,7 @@
     "verify:studio-menus": "tsx scripts/verify-studio-menus.mts",
     "verify:studio-mobile-top": "tsx scripts/verify-studio-mobile-top.mts",
     "verify:studio-canvas-chrome": "tsx scripts/verify-studio-canvas-chrome.mts",
+    "verify:studio-canvas-surfaces": "tsx scripts/verify-studio-canvas-surfaces.mts",
     "verify:studio-icons": "tsx scripts/verify-studio-icons.mts",
     "verify:studio-companion": "tsx scripts/verify-studio-companion.mts",
     "verify:studio-inspector-walkthrough": "tsx scripts/verify-studio-inspector-walkthrough.mts",

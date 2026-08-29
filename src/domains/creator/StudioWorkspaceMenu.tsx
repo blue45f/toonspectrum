@@ -176,7 +176,7 @@ const INSPECTOR_PRIMARY_LABELS: Record<
   properties: "도구 속성",
   layers: "레이어",
   document: "페이지 설정",
-  publish: "게시 정보",
+  publish: "작품 정보",
 };
 
 const PRO_COMIC_PALETTE_LABELS: Record<
@@ -1137,7 +1137,7 @@ export function StudioWorkspaceMenu({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={dialogId}
-        aria-label={`작업공간: ${activeWorkspace?.name ?? "알 수 없음"}${dirty ? ", 저장되지 않은 배치 변경 있음" : ""}${effectivePersistence.status === "session-only" ? ", 변경은 이 세션에서만 유지" : ", 이 기기 저장 확인됨"}`}
+        aria-label={`작업공간: ${activeWorkspace?.name ?? "알 수 없음"}${dirty ? " 변경됨" : ""}${effectivePersistence.status === "session-only" ? " 세션" : ""}${dirty ? ", 저장되지 않은 배치 변경 있음" : ""}${effectivePersistence.status === "session-only" ? ", 변경은 이 세션에서만 유지" : ", 이 기기 저장 확인됨"}`}
         className={cn(
           // StudioWorkspaceMenuGate 트리거와 같은 칩 박스 규약(이름만 shrink, 배지는 shrink-0).
           // `overflow-hidden` 을 더하지 않는 이유는 그쪽 주석 참고 — 배지를 잘리게 만든다.
@@ -1153,11 +1153,13 @@ export function StudioWorkspaceMenu({
           className={studioChromeIconClass({ tone: "default" })}
         />
         <span className="min-w-0 truncate">{activeWorkspace?.name ?? "작업공간"}</span>
+        {" "}
         {dirty ? (
           <span className="shrink-0 rounded-full bg-warn/15 px-1.5 py-0.5 text-[0.6875rem] font-bold text-warn">
             변경됨
           </span>
         ) : null}
+        {" "}
         {effectivePersistence.status === "session-only" ? (
           <span className="shrink-0 rounded-full bg-cool/15 px-1.5 py-0.5 text-[0.6875rem] font-bold text-cool">
             세션

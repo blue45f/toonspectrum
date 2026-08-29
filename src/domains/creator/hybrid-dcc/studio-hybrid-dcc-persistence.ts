@@ -18,6 +18,12 @@ import { resolveStudioHybridDccPersistenceAuthGate } from "./studio-hybrid-dcc-p
 
 import type { StudioHybridDccWorkspace } from "./studio-hybrid-dcc-workspace";
 
+export interface StudioHybridDccPersistenceReceiptEvidence {
+  readonly sequence: number;
+  readonly sourceHash: `sha256:${string}`;
+  readonly documentStateHash: string | null;
+}
+
 /**
  * Hybrid DCC 지속성 오케스트레이션 — StudioPage에서 추출한 상태/스코프 전환 ref 클러스터.
  * 라우트 내비게이션 절반(open/close/mode 전환)은 StudioPage에 남고, 이 훅은 OPFS 복구·
@@ -36,6 +42,7 @@ export interface StudioHybridDccPersistenceContext {
 export interface StudioHybridDccPersistenceResult {
   readonly flushHybridDccWorkspacePersistence: () => void;
   readonly hybridDccPersistenceStatus: StudioHybridDccPersistenceUiState["status"];
+  readonly hybridDccPersistenceReceipt: StudioHybridDccPersistenceReceiptEvidence | null;
   readonly hybridDccWorkspaceDocumentId: string;
   readonly hybridDccWorkspaceScope: string;
   readonly scheduleHybridDccWorkspacePersistence: (
@@ -205,10 +212,18 @@ export function useStudioHybridDccPersistence(
       scope: hybridDccWorkspaceScope,
       status: resolveStudioHybridDccPersistenceAuthGate(studioAuthReady).status,
     }));
+  const [hybridDccPersistenceReceiptState, setHybridDccPersistenceReceiptState] = useState<{
+    readonly scope: string;
+    readonly receipt: StudioHybridDccPersistenceReceiptEvidence;
+  } | null>(null);
   const hybridDccPersistenceStatus =
     hybridDccPersistenceUiState.scope === hybridDccWorkspaceScope
       ? hybridDccPersistenceUiState.status
       : "checking";
+  const hybridDccPersistenceReceipt =
+    hybridDccPersistenceReceiptState?.scope === hybridDccWorkspaceScope
+      ? hybridDccPersistenceReceiptState.receipt
+      : null;
   const hybridDccPersistenceCurrentScopeRef = useRef(hybridDccWorkspaceScope);
   trackStudioHybridDccPersistenceScope(
     hybridDccPersistenceCurrentScopeRef,
@@ -312,7 +327,7 @@ export function useStudioHybridDccPersistence(
         // `load()` has already admitted any prior durable authority. Saving the uninterrupted
         // session-only edit now creates a newer checkpoint, so neither side of the auth transition
         // is silently discarded.
-        await persistence.save(pendingWorkspace);
+        const receipt = await persistence.save(pendingWorkspace);
         if (hybridDccScopeTransferRef.current === scopeTransfer) {
           hybridDccScopeTransferRef.current = null;
         }
@@ -322,6 +337,10 @@ export function useStudioHybridDccPersistence(
         setHybridDccPersistenceUiState({
           scope: hybridDccWorkspaceScope,
           status: "saved",
+        });
+        setHybridDccPersistenceReceiptState({
+          scope: hybridDccWorkspaceScope,
+          receipt,
         });
         return persistence;
       }
@@ -404,12 +423,16 @@ export function useStudioHybridDccPersistence(
             status: "saving",
           });
         }
-        await persistence.save(pending.workspace);
+        const receipt = await persistence.save(pending.workspace);
         if (generation === hybridDccPersistenceGenerationRef.current
           && pending.scope === hybridDccPersistenceCurrentScopeRef.current) {
           setHybridDccPersistenceUiState({
             scope: pending.scope,
             status: "saved",
+          });
+          setHybridDccPersistenceReceiptState({
+            scope: pending.scope,
+            receipt,
           });
         }
       },
@@ -462,6 +485,7 @@ export function useStudioHybridDccPersistence(
 
   return {
     flushHybridDccWorkspacePersistence,
+    hybridDccPersistenceReceipt,
     hybridDccPersistenceStatus,
     hybridDccWorkspaceDocumentId,
     hybridDccWorkspaceScope,

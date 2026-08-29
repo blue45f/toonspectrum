@@ -8,6 +8,7 @@ import {
   setStudioDestructiveConfirmPresenter,
   type StudioDestructiveActionRequest,
 } from "./studio-destructive-action-preview";
+import { STUDIO_MOBILE_PAGES_SHEET_ID } from "./studio-mobile-sheet-snap";
 import { createStudioUiPreferencesRepository } from "./studio-ui-preferences-sqlite";
 import {
   StudioPageListPane,
@@ -270,7 +271,9 @@ describe("StudioPageListPane", () => {
     const props = createProps({ metaEditPageId: "page-1" });
     render(<StudioPageListPane {...props} />);
 
-    fireEvent.click(screen.getByTestId("studio-add-page"));
+    const addPage = screen.getByRole("button", { name: "새 페이지 추가" });
+    expect(addPage.textContent).toContain("페이지 추가");
+    fireEvent.click(addPage);
     fireEvent.click(screen.getByRole("button", { name: "그레이드 전체" }));
     fireEvent.click(screen.getByRole("button", { name: "배경 전체" }));
     expect(props.stableHandlers.addPage).toHaveBeenCalledOnce();
@@ -358,6 +361,7 @@ describe("StudioPageListPane", () => {
     let sheet = document.querySelector<HTMLElement>('[data-studio-sheet-id="pages"]');
 
     expect(sheet).not.toBeNull();
+    expect(sheet?.id).toBe(STUDIO_MOBILE_PAGES_SHEET_ID);
     expect(sheet?.hasAttribute("inert")).toBe(true);
     expect(sheet?.getAttribute("aria-hidden")).toBe("true");
     expect(sheet?.getAttribute("aria-modal")).toBeNull();
@@ -365,6 +369,7 @@ describe("StudioPageListPane", () => {
     expect(sheet?.getAttribute("aria-label")).toBeNull();
     expect(sheet?.getAttribute("tabindex")).toBeNull();
     expect(sheet?.style.bottom).toBe("24px");
+    expect(screen.queryByRole("button", { name: "새 페이지 추가" })).toBeNull();
 
     view.rerender(<StudioPageListPane {...props} mobileSheet="pages" />);
     sheet = document.querySelector<HTMLElement>('[data-studio-sheet-id="pages"]');
@@ -376,6 +381,9 @@ describe("StudioPageListPane", () => {
     expect(sheet?.getAttribute("tabindex")).toBe("-1");
     expect(sheet?.getAttribute("data-popup-kind")).toBe("sheet");
     expect(sheet?.getAttribute("data-studio-sheet-snap")).toBe("medium");
+    const addPage = within(sheet!).getByRole("button", { name: "새 페이지 추가" });
+    fireEvent.click(addPage);
+    expect(props.stableHandlers.addPage).toHaveBeenCalledOnce();
 
     fireEvent.click(await screen.findByRole("slider", { name: /페이지 시트 크기 조절/ }));
     expect(sheet?.getAttribute("data-studio-sheet-snap")).toBe("full");

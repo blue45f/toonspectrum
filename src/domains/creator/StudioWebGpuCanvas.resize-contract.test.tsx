@@ -136,6 +136,11 @@ vi.mock("./render/studio-webgpu-engine", () => {
       this.calls.push({ method: "suspend", requestId });
     }
 
+    releaseSuspendedSurfaceBackingStores() {
+      this.calls.push({ method: "release-backing", requestId: "suspended" });
+      return true;
+    }
+
     dispose() {}
 
     private emit(method: string, requestId: string) {
@@ -193,6 +198,71 @@ afterEach(() => {
 });
 
 describe("StudioWebGpuCanvas resize/request boundary", () => {
+  it("keeps inactive surfaces parked through resize signals and syncs before first ink", async () => {
+    const view = render(
+      <StudioWebGpuCanvas
+        width={800}
+        height={1_200}
+        surfaceBounds={{ left: 0, top: 0, width: 640, height: 480 }}
+      />
+    );
+    await waitFor(() => expect(engineHarness.instances).toHaveLength(1));
+    const engine = engineHarness.instances[0]!;
+
+    expect(engine.calls).toContainEqual({
+      method: "release-backing",
+      requestId: "suspended",
+    });
+    expect(engine.viewportKey).toBeNull();
+
+    act(() => {
+      resizeObserverCallback?.(
+        [{ contentRect: { width: 720, height: 540 } } as ResizeObserverEntry],
+        {} as ResizeObserver,
+      );
+      globalThis.dispatchEvent(new Event("resize"));
+    });
+    expect(engine.viewportKey).toBeNull();
+
+    view.rerender(
+      <StudioWebGpuCanvas
+        width={800}
+        height={1_200}
+        surfaceBounds={{ left: 0, top: 0, width: 720, height: 540 }}
+        strokes={[stroke]}
+      />
+    );
+    expect(engine.viewportKey).not.toBeNull();
+    expect(engine.calls).toContainEqual({
+      method: "render",
+      requestId: expect.stringMatching(/^frame:\d+$/),
+    });
+
+    const activeViewportKey = engine.viewportKey;
+    const releasedBeforeReset = engine.calls.filter(
+      ({ method }) => method === "release-backing",
+    ).length;
+    view.rerender(
+      <StudioWebGpuCanvas
+        width={800}
+        height={1_200}
+        surfaceBounds={{ left: 0, top: 0, width: 720, height: 540 }}
+      />
+    );
+    expect(engine.calls.filter(({ method }) => method === "release-backing")).toHaveLength(
+      releasedBeforeReset + 1,
+    );
+
+    act(() => {
+      resizeObserverCallback?.(
+        [{ contentRect: { width: 800, height: 600 } } as ResizeObserverEntry],
+        {} as ResizeObserver,
+      );
+      globalThis.dispatchEvent(new Event("resize"));
+    });
+    expect(engine.viewportKey).toBe(activeViewportKey);
+  });
+
   it("returns the exact issued request id from legacy pinned feed commands", async () => {
     const handle = createRef<StudioWebGpuCanvasHandle>();
     render(

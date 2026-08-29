@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 
 import { AdminCampaignsService } from "./admin-campaigns.service";
 import { AdminMembersService } from "./admin-members.service";
@@ -20,10 +20,15 @@ import {
 @Injectable()
 export class AdminService {
   constructor(
+    @Inject(AdminMetricsService)
     private readonly adminMetricsService: AdminMetricsService,
+    @Inject(AdminMembersService)
     private readonly adminMembersService: AdminMembersService,
+    @Inject(AdminModerationService)
     private readonly adminModerationService: AdminModerationService,
+    @Inject(AdminRevenueService)
     private readonly adminRevenueService: AdminRevenueService,
+    @Inject(AdminCampaignsService)
     private readonly adminCampaignsService: AdminCampaignsService
   ) {}
 

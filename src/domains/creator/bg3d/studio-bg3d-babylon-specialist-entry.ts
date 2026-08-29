@@ -17,6 +17,7 @@ import {
   STUDIO_BG3D_BABYLON_ADAPTER_DIAGNOSTIC,
   STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL,
   type StudioBg3dBabylonEngineHandle,
+  type StudioBg3dBabylonEngineInitializationControl,
   type StudioBg3dBabylonEngineSettings,
   type StudioBg3dBabylonRuntimeBindings,
   type StudioBg3dBabylonSpecialistRuntime,
@@ -89,9 +90,26 @@ function webGpuFallbackAdapter(engine: WebGPUEngine): unknown {
 
 export async function initializeStudioBg3dBabylonWebGpuEngine(
   engine: WebGPUEngine,
+  disposeEngine: () => void = () => engine.dispose(),
+  signal?: AbortSignal,
 ): Promise<StudioBg3dBabylonEngineHandle> {
+  const disposeAfterAbort = () => {
+    try {
+      disposeEngine();
+    } catch {
+      // The initialization/abort result remains authoritative over best-effort cleanup.
+    }
+  };
+  if (signal?.aborted) {
+    disposeAfterAbort();
+    throw new DOMException("Babylon WebGPU initialization was aborted.", "AbortError");
+  }
+  signal?.addEventListener("abort", disposeAfterAbort, { once: true });
   try {
     await engine.initAsync();
+    if (signal?.aborted) {
+      throw new DOMException("Babylon WebGPU initialization was aborted.", "AbortError");
+    }
     return attachStudioBg3dBabylonDeviceLossSignal(
       engine as StudioBg3dBabylonEngineHandle,
       engine._device.lost,
@@ -102,13 +120,45 @@ export async function initializeStudioBg3dBabylonWebGpuEngine(
     // The runtime has no engine handle until this promise resolves. Dispose here so both an
     // initAsync rejection and a post-init diagnostic-binding failure release the GPU device.
     try {
-      engine.dispose();
+      disposeEngine();
     } catch {
       // Preserve the authoritative initialization/binding failure when a partially initialized
       // Babylon engine also rejects its best-effort cleanup.
     }
     throw error;
+  } finally {
+    signal?.removeEventListener("abort", disposeAfterAbort);
   }
+}
+
+/**
+ * Babylon's partial WebGPUEngine.dispose() can throw before requestDevice() has populated the
+ * managers/device it dereferences. Treat only a completed public dispose as terminal: if the
+ * asynchronous initialization settles later, another call can release resources created after the
+ * first partial attempt. An already-acquired private device is still destroyed as a fallback.
+ */
+export function createStudioBg3dBabylonPartialEngineDisposer(
+  engine: WebGPUEngine,
+): () => void {
+  let fullyDisposed = false;
+  return () => {
+    if (fullyDisposed) return;
+    try {
+      engine.dispose();
+      fullyDisposed = true;
+      return;
+    } catch {
+      // A WebGPUEngine can be cancelled before all of its private managers exist.
+    }
+    try {
+      const device = Reflect.get(engine as unknown as object, "_device") as {
+        destroy?: () => void;
+      } | undefined;
+      device?.destroy?.();
+    } catch {
+      // The runtime's timeout/abort result remains authoritative over best-effort cleanup.
+    }
+  };
 }
 
 const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze({
@@ -135,6 +185,7 @@ const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze
   async createWebGpuEngine(
     canvas: HTMLCanvasElement | OffscreenCanvas,
     settings: StudioBg3dBabylonEngineSettings,
+    initialization: StudioBg3dBabylonEngineInitializationControl,
   ) {
     const engine = new WebGPUEngine(canvas, {
       adaptToDeviceRatio: settings.adaptToDeviceRatio,
@@ -148,7 +199,16 @@ const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze
       timeStep: settings.timeStepSeconds,
       useHighPrecisionMatrix: true,
     });
-    return initializeStudioBg3dBabylonWebGpuEngine(engine);
+    const disposeEngine = createStudioBg3dBabylonPartialEngineDisposer(engine);
+    initialization.registerPartialEngine(
+      engine as StudioBg3dBabylonEngineHandle,
+      disposeEngine,
+    );
+    return initializeStudioBg3dBabylonWebGpuEngine(
+      engine,
+      disposeEngine,
+      initialization.signal,
+    );
   },
   createScene(engine: StudioBg3dBabylonEngineHandle) {
     return new Scene(engine as AbstractEngine);

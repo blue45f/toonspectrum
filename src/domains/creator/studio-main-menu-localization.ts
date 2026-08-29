@@ -85,6 +85,22 @@ function localizeItemLabel(
   t: StudioMainMenuTranslate,
 ): string {
   const label = localizeText(t, item.label, itemLabelKey(path, item, state));
+  // 한국어 팩의 기존 용어가 새 서버 초안 명칭을 되돌리지 않게 한다. 다른 언어의
+  // 번역값과 공동 편집자의 `공동 저장`은 그대로 유지한다.
+  if (path === "file/save-draft" && item.label === "초안 저장" && label === "임시저장") {
+    return item.label;
+  }
+  // The Korean pack still phrases this checkbox row as the one-way action "창 열기".  The row is
+  // now a real menuitemcheckbox, so a stable noun is clearer in both unchecked and checked states
+  // and agrees with the command catalogue. Other locales keep their authored translation until
+  // their packs adopt the state-neutral wording.
+  if (
+    path === "view/reference-window"
+    && item.label === "참고 이미지 창"
+    && label === "참고 이미지 창 열기"
+  ) {
+    return item.label;
+  }
   if (path === "file/import-ora-cbz" && !/\bWILL\b/iu.test(label)) {
     const withWill = label.replace(
       /ORA\s*\/\s*CBZ/iu,

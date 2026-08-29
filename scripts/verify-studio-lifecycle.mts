@@ -421,7 +421,7 @@ async function captureDownload(
   page: Page,
   destination: string,
 ): Promise<{ bytes: Buffer; download: Download; scale: number }> {
-  const button = page.locator('button[aria-label="현재 페이지 다운로드"]:visible').first();
+  const button = page.locator('button[aria-label$="· 현재 페이지"]:visible').first();
   await button.waitFor({ state: "visible" });
   invariant(await button.isEnabled(), "current-page download button is disabled");
   const label = (await button.textContent()) ?? "";

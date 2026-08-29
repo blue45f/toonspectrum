@@ -1188,9 +1188,7 @@ export function StudioLivePresenceDock({
         : null;
   const visibleCount = studioPresenceVisiblePeerCount(peers.length, 5);
   const visiblePeers = peers.slice(0, visibleCount);
-  const mobileHiddenPeerCount = Math.max(0, peers.length - 2);
   const desktopHiddenPeerCount = Math.max(0, peers.length - visiblePeers.length);
-  const mobileOverflow = studioPresenceOverflowLabel(mobileHiddenPeerCount);
   const desktopOverflow = studioPresenceOverflowLabel(desktopHiddenPeerCount);
   const connectionLabel = studioPresenceConnectionLabel(connected);
   const resolvedSync = syncSnapshot ?? {
@@ -1242,7 +1240,7 @@ export function StudioLivePresenceDock({
         aria-label="팀 작업 공간 열기"
         title="팀"
         data-studio-presence-team-action="true"
-        className="grid size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none max-[411px]:hidden"
+        className="hidden size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none sm:grid"
         onClick={onOpenTeam}
       >
         <UsersRound size={16} strokeWidth={1.75} aria-hidden />
@@ -1254,13 +1252,17 @@ export function StudioLivePresenceDock({
         data-studio-presence-link={resolvedSync.phase}
         data-studio-presence-sync-action="true"
         className={cn(
-          "inline-flex size-11 min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border p-0 text-[0.7rem] font-bold transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none min-[412px]:h-11 min-[412px]:w-[13.5rem] min-[412px]:justify-start min-[412px]:px-3 sm:w-[16.5rem]",
+          // Keep the canvas presence dock icon-only throughout the mobile shell. Expanding its
+          // status copy at 412px covered the 430px project/save/publish controls because immersive
+          // Studio deliberately overlays both chrome rows at the canvas top. The full label and
+          // secondary team controls have room only from the desktop `sm` layout onward.
+          "inline-flex size-11 min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border p-0 text-[0.7rem] font-bold transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none sm:w-[16.5rem] sm:justify-start sm:px-3",
           syncToneClass(syncPresentation.tone)
         )}
         onClick={onOpenTeam}
       >
         <StudioSyncStatusIcon phase={resolvedSync.phase} />
-        <span className="hidden min-w-0 flex-1 truncate text-left tabular-nums max-[411px]:hidden min-[412px]:inline">
+        <span className="hidden min-w-0 flex-1 truncate text-left tabular-nums sm:inline">
           {syncPresentation.shortLabel}
         </span>
       </button>
@@ -1278,12 +1280,12 @@ export function StudioLivePresenceDock({
           onClick={onOpenTeam}
         >
           <ShieldCheck size={14} strokeWidth={2} aria-hidden />
-          <span className="max-[411px]:hidden">{lockCount}</span>
+          <span className="hidden sm:inline">{lockCount}</span>
         </button>
       ) : null}
 
       <div
-        className="flex items-center -space-x-1.5 pl-0.5 max-[411px]:hidden"
+        className="hidden items-center -space-x-1.5 pl-0.5 sm:flex"
         role="group"
         aria-label="참여자"
         data-studio-presence-stack="true"
@@ -1330,17 +1332,6 @@ export function StudioLivePresenceDock({
         })}
       </div>
 
-      {mobileOverflow ? (
-        <button
-          type="button"
-          aria-label={`추가 팀원 ${mobileHiddenPeerCount}명, 팀 작업 공간 열기`}
-          className="grid size-11 shrink-0 place-items-center rounded-full border border-line bg-raised text-[0.65rem] font-bold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent max-[411px]:hidden sm:hidden"
-          onClick={onOpenTeam}
-        >
-          {mobileOverflow}
-        </button>
-      ) : null}
-
       {desktopOverflow ? (
         <button
           type="button"
@@ -1356,7 +1347,7 @@ export function StudioLivePresenceDock({
         <button
           type="button"
           aria-label={`${followedPeer.displayName} 따라가기 중지`}
-          className="order-last ml-auto inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-bold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent max-[411px]:hidden sm:ml-1 sm:max-w-40"
+          className="order-last ml-auto hidden min-h-11 max-w-full items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-bold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:ml-1 sm:inline-flex sm:max-w-40"
           onClick={() => onToggleFollow(followedPeer.sessionId)}
         >
           <span className="truncate">{followedPeer.displayName} 따라가기</span>

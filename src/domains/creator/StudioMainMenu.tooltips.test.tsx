@@ -14,7 +14,7 @@ const GROUPS: readonly StudioMainMenuGroup[] = [
   {
     id: "file",
     label: "파일",
-    items: [{ id: "save", label: "임시저장", onSelect: vi.fn() }],
+    items: [{ id: "save", label: "초안 저장", onSelect: vi.fn() }],
   },
   {
     id: "edit",
@@ -143,7 +143,7 @@ describe("StudioMainMenu tooltips", () => {
     expect(document.activeElement).toBe(filter);
 
     fireEvent.click(file);
-    const save = screen.getByRole("menuitem", { name: "임시저장" });
+    const save = screen.getByRole("menuitem", { name: "초안 저장" });
     expect(document.activeElement).toBe(save);
     fireEvent.keyDown(save, { key: "ArrowRight" });
 

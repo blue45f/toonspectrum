@@ -117,6 +117,9 @@ function localizeText(
   key: string,
 ): string {
   const translated = t(key);
+  // 한국어 팩에 남은 이전 `임시저장` 번역만 새 서버 초안 용어로 승격한다. 다른 언어의
+  // Save draft 번역은 건드리지 않고, 팩이 갱신되면 이 분기는 자연스럽게 타지 않는다.
+  if (fallback === "초안 저장" && translated === "임시저장") return fallback;
   return translated === key ? fallback : translated;
 }
 
@@ -203,8 +206,8 @@ const MENUBAR_HINTS = {
   },
   draft: {
     id: "menubar-save-draft",
-    title: "임시저장",
-    description: "현재 원고와 편집 상태를 게시하지 않고 안전하게 저장합니다.",
+    title: "초안 저장",
+    description: "현재 원고와 편집 상태를 게시하지 않고 서버 초안으로 저장합니다.",
     shortcut: "⌘S",
     preview: "save",
   },
@@ -259,7 +262,7 @@ const COMMAND_BAR_COMMAND_LABELS: Readonly<Record<StudioCommandBarCommandId, str
 /**
  * 이 스트립이 화면에서 **유일한** 컨트롤인 명령들.
  *
- * 나머지 명령은 고정 메뉴바 컨트롤과 이름이 그대로 겹친다 — 임시저장·게시하기는 액션 레인
+ * 나머지 명령은 고정 메뉴바 컨트롤과 이름이 그대로 겹친다 — 초안 저장·게시하기는 액션 레인
  * (`data-studio-menubar-actions`), 현재 페이지 다운로드·내보내기 옵션은 내보내기 클러스터,
  * 템플릿·에셋·말풍선은 xl 삽입 바로가기, 프로젝트 작업은 프로젝트 시트 트리거. 한 화면에
  * 같은 접근명이 둘이면 스크린리더는 물론 자동화(`getByRole("button", { name })`)도 갈라내지
@@ -1469,7 +1472,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           className={cn(
             "flex shrink-0 flex-nowrap items-center gap-1",
             // Immersive pill is content-width only — keep a real 4px gap so buttons never
-            // paint under each other (the old sticky canvas ring used to cover "임시저장").
+            // paint under each other (the old sticky canvas ring used to cover "초안 저장").
             mobileImmersive && "min-w-0 gap-1"
           )}
         >
@@ -1530,13 +1533,14 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               <button
                 type="button"
                 onClick={() => handleDownload()}
-                aria-label="현재 페이지 다운로드"
+                aria-label={`다운로드 ${exportScale}× ${exportFormat.toUpperCase()}${exportTransparent && exportFormat === "png" ? " · 투명" : ""} · 현재 페이지`}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
                   isMobile && "min-h-11"
                 )}
               >
                 <Download size={14} aria-hidden /> <span className="max-xl:sr-only">다운로드</span>
+                {" "}
                 <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-xl:hidden">
                   {exportScale}× {exportFormat.toUpperCase()}
                   {exportTransparent && exportFormat === "png" ? " · 투명" : null}
@@ -1642,7 +1646,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 })}
               >
                 <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
-                {/* 320px 창모드 메뉴바는 [전체 화면 드로잉][프로젝트][임시저장][게시하기]로
+                {/* 320px 창모드 메뉴바는 [전체 화면 드로잉][프로젝트][초안 저장][게시하기]로
                     320px를 5px 넘겨 `overflow-hidden` 레인이 게시 버튼을 잘랐다
                     (`verify:studio-mobile-top`의 하드 실패). 셰브론은 순수 장식이고
                     열림 상태는 `aria-expanded`가 이미 전달하므로, 가장 좁은 폭에서만 접는다. */}
@@ -2075,7 +2079,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           <StudioToolHintTarget
             hint={{
               ...MENUBAR_HINTS.draft,
-              title: sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장",
+              title: sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장",
             }}
             disabled={saving || collaborationDocumentLocked}
             unavailableReason={
@@ -2091,7 +2095,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               type="button"
               onClick={() => handleSave("draft")}
               disabled={saving || collaborationDocumentLocked}
-              aria-label={sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
+              aria-label={sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
               className={cn(
                 buttonClass({
                   size: "sm",
@@ -2109,7 +2113,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 <Save size={14} className="hidden max-[359px]:block" aria-hidden />
               )}
               <span className="max-[359px]:sr-only">
-                {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
+                {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
               </span>
             </button>
           </StudioToolHintTarget>

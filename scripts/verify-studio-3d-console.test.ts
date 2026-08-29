@@ -23,6 +23,7 @@ import {
   runStudio3dWebGpuProofShardsWithFreshBrowserRetry,
   runStudio3dWebGpuShardWithCleanup,
   STUDIO_3D_WEBGPU_BROWSER_CHANNEL,
+  STUDIO_3D_WEBGPU_DARWIN_NATIVE_LAUNCH_ARGS,
   STUDIO_3D_WEBGPU_DIAGNOSTIC_MAX_LOG_LENGTH,
   STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX,
   STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS,
@@ -31,6 +32,7 @@ import {
   STUDIO_VRM_CHROMA_DELTA_THRESHOLD,
   STUDIO_VRM_COLOR_MIN_RATIO,
   STUDIO_VRM_MANNEQUIN_MAX_RATIO,
+  resolveStudio3dWebGpuLaunchArgs,
 } from "./verify-studio-3d-console.mts";
 
 const PREVIEW_URL = "http://127.0.0.1:51758/studio";
@@ -230,6 +232,10 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(webGpuAttempt).toContain(
       "mode=headed channel=${STUDIO_3D_WEBGPU_BROWSER_CHANNEL}",
     );
+    expect(webGpuAttempt).toContain("resolveStudio3dWebGpuLaunchArgs()");
+    expect(webGpuAttempt).toContain(
+      'adapterPath=${process.platform === "darwin" ? "native" : "forced-swiftshader"}',
+    );
     expect(webGpuAttempt).toContain(
       "version=${webGpuBrowser.version()}",
     );
@@ -298,7 +304,7 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(formatted?.startsWith(STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX)).toBe(true);
   });
 
-  it("pins Chromium Vulkan, Dawn WebGPU, and ANGLE WebGL to SwiftShader", () => {
+  it("pins Chromium Vulkan, Dawn WebGPU, and ANGLE WebGL to SwiftShader on Linux", () => {
     expect(Object.isFrozen(STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS)).toBe(true);
     expect(STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS).toEqual([
       "--no-sandbox",
@@ -311,6 +317,27 @@ describe("3D WebGPU conformance browser boundary", () => {
       "--use-angle=swiftshader",
       "--enable-unsafe-swiftshader",
     ]);
+    expect(resolveStudio3dWebGpuLaunchArgs("linux")).toBe(
+      STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS,
+    );
+  });
+
+  it("keeps Darwin on native Metal instead of the wedged forced-SwiftShader path", () => {
+    expect(Object.isFrozen(STUDIO_3D_WEBGPU_DARWIN_NATIVE_LAUNCH_ARGS)).toBe(true);
+    expect(resolveStudio3dWebGpuLaunchArgs("darwin")).toBe(
+      STUDIO_3D_WEBGPU_DARWIN_NATIVE_LAUNCH_ARGS,
+    );
+    expect(STUDIO_3D_WEBGPU_DARWIN_NATIVE_LAUNCH_ARGS).toEqual([
+      "--no-sandbox",
+      "--enable-unsafe-webgpu",
+      "--use-gpu-in-tests",
+    ]);
+    expect(STUDIO_3D_WEBGPU_DARWIN_NATIVE_LAUNCH_ARGS).not.toContain(
+      "--use-vulkan=swiftshader",
+    );
+    expect(STUDIO_3D_WEBGPU_DARWIN_NATIVE_LAUNCH_ARGS).not.toContain(
+      "--use-webgpu-adapter=swiftshader",
+    );
   });
 
   it("keeps unaligned parity captures limited to compact stable-ID planes", () => {

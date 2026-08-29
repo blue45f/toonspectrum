@@ -1,4 +1,5 @@
 import { normalizeStudioLinked3dSaveProjection } from "./studio-linked-3d-save-projection";
+import { parseStudioWorkTagTokens } from "./studio-work-metadata";
 
 import type { StudioProjectSnapshot } from "./studio-project-snapshot";
 import type { UpdateStudioSharedDocumentInput } from "./studio-shared-document-client";
@@ -52,11 +53,7 @@ export interface BuildStudioSavePayloadInput {
 }
 
 export function normalizeStudioSaveTags(tagsText: string): string[] {
-  return tagsText
-    .split(/[,\s]+/)
-    .map((tag) => tag.trim().replace(/^#/, ""))
-    .filter(Boolean)
-    .slice(0, 8);
+  return parseStudioWorkTagTokens(tagsText).slice(0, 8);
 }
 
 /**

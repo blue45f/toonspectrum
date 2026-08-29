@@ -18,6 +18,8 @@ import {
   sanitizeStudioBg3dBabylonSpecialistResult,
   type StudioBg3dBabylonDiagnostic,
   type StudioBg3dBabylonEngineHandle,
+  type StudioBg3dBabylonEngineInitializationControl,
+  type StudioBg3dBabylonEngineSettings,
   type StudioBg3dBabylonObservableLike,
   type StudioBg3dBabylonRuntimeBindings,
   type StudioBg3dBabylonSceneHandle,
@@ -86,9 +88,19 @@ function bindingHarness(): BindingHarness {
     engines.push(engine);
     return engine;
   });
-  const webGpu = vi.fn(async () => {
+  const webGpu = vi.fn(async (
+    _canvas: HTMLCanvasElement | OffscreenCanvas,
+    _settings: StudioBg3dBabylonEngineSettings,
+    initialization: StudioBg3dBabylonEngineInitializationControl,
+  ) => {
     const engine = new FakeEngine();
     engines.push(engine);
+    let disposed = false;
+    initialization.registerPartialEngine(engine, () => {
+      if (disposed) return;
+      disposed = true;
+      engine.dispose();
+    });
     return engine;
   });
   return {
@@ -241,7 +253,20 @@ describe("Studio Babylon isolated specialist runtime", () => {
   it("aborts a pending WebGPU initialization and disposes a late engine result", async () => {
     const harness = bindingHarness();
     const initialization = deferred<StudioBg3dBabylonEngineHandle>();
-    harness.webGpu.mockImplementationOnce(() => initialization.promise);
+    const partialEngine = new FakeEngine();
+    harness.webGpu.mockImplementationOnce((
+      _canvas: HTMLCanvasElement | OffscreenCanvas,
+      _settings: StudioBg3dBabylonEngineSettings,
+      control: StudioBg3dBabylonEngineInitializationControl,
+    ) => {
+      let disposed = false;
+      control.registerPartialEngine(partialEngine, () => {
+        if (disposed) return;
+        disposed = true;
+        partialEngine.dispose();
+      });
+      return initialization.promise;
+    });
     const controller = new AbortController();
     const runtime = createStudioBg3dBabylonSpecialistRuntime({
       backend: "webgpu",
@@ -257,10 +282,11 @@ describe("Studio Babylon isolated specialist runtime", () => {
     await vi.waitFor(() => expect(harness.webGpu).toHaveBeenCalledOnce());
     controller.abort();
     await expect(pending).rejects.toMatchObject({ code: "aborted" });
+    expect(partialEngine.dispose).toHaveBeenCalledOnce();
 
-    const lateEngine = new FakeEngine();
-    initialization.resolve(lateEngine);
-    await vi.waitFor(() => expect(lateEngine.dispose).toHaveBeenCalledOnce());
+    initialization.resolve(partialEngine);
+    await Promise.resolve();
+    expect(partialEngine.dispose).toHaveBeenCalledOnce();
     expect(runtime.getState().engineInitialized).toBe(false);
     await runtime.dispose();
   });
@@ -268,7 +294,20 @@ describe("Studio Babylon isolated specialist runtime", () => {
   it("bounds an explicit engine initialization budget and disposes a result that arrives late", async () => {
     const harness = bindingHarness();
     const initialization = deferred<StudioBg3dBabylonEngineHandle>();
-    harness.webGpu.mockImplementationOnce(() => initialization.promise);
+    const partialEngine = new FakeEngine();
+    harness.webGpu.mockImplementationOnce((
+      _canvas: HTMLCanvasElement | OffscreenCanvas,
+      _settings: StudioBg3dBabylonEngineSettings,
+      control: StudioBg3dBabylonEngineInitializationControl,
+    ) => {
+      let disposed = false;
+      control.registerPartialEngine(partialEngine, () => {
+        if (disposed) return;
+        disposed = true;
+        partialEngine.dispose();
+      });
+      return initialization.promise;
+    });
 
     expect(() => createStudioBg3dBabylonSpecialistRuntime({
       backend: "webgpu",
@@ -308,15 +347,95 @@ describe("Studio Babylon isolated specialist runtime", () => {
         engineInitialized: false,
         status: "idle",
       });
+      expect(partialEngine.dispose).toHaveBeenCalledOnce();
 
-      const lateEngine = new FakeEngine();
-      initialization.resolve(lateEngine);
+      initialization.resolve(partialEngine);
       await vi.advanceTimersByTimeAsync(0);
-      expect(lateEngine.dispose).toHaveBeenCalledOnce();
+      expect(partialEngine.dispose).toHaveBeenCalledOnce();
       await runtime.dispose();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("keeps the timeout authoritative when a partial-engine disposer throws", async () => {
+    const harness = bindingHarness();
+    const initialization = deferred<StudioBg3dBabylonEngineHandle>();
+    const partialEngine = new FakeEngine();
+    const cleanupFailure = new Error("partial Babylon cleanup failed");
+    harness.webGpu.mockImplementationOnce((
+      _canvas: HTMLCanvasElement | OffscreenCanvas,
+      _settings: StudioBg3dBabylonEngineSettings,
+      control: StudioBg3dBabylonEngineInitializationControl,
+    ) => {
+      control.registerPartialEngine(partialEngine, () => {
+        partialEngine.dispose();
+        throw cleanupFailure;
+      });
+      return initialization.promise;
+    });
+
+    vi.useFakeTimers();
+    try {
+      const runtime = createStudioBg3dBabylonSpecialistRuntime({
+        backend: "webgpu",
+        canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
+        engineInitializationTimeoutMs: 1_000,
+        loadBindings: async () => harness.bindings,
+      });
+      const pending = runtime.runIsolated(job("throwing-partial-cleanup"));
+      const rejection = expect(pending).rejects.toMatchObject({
+        code: "engine-init-failed",
+        cause: {
+          message: "Babylon engine initialization exceeded 1000 milliseconds.",
+          name: "TimeoutError",
+        },
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      await rejection;
+      expect(partialEngine.dispose).toHaveBeenCalledOnce();
+      await runtime.dispose();
+    } finally {
+      initialization.reject(cleanupFailure);
+      await vi.advanceTimersByTimeAsync(0);
+      vi.useRealTimers();
+    }
+  });
+
+  it("disposes a partial WebGPU engine when runtime disposal races initialization", async () => {
+    const harness = bindingHarness();
+    const initialization = deferred<StudioBg3dBabylonEngineHandle>();
+    const partialEngine = new FakeEngine();
+    harness.webGpu.mockImplementationOnce((
+      _canvas: HTMLCanvasElement | OffscreenCanvas,
+      _settings: StudioBg3dBabylonEngineSettings,
+      control: StudioBg3dBabylonEngineInitializationControl,
+    ) => {
+      let disposed = false;
+      control.registerPartialEngine(partialEngine, () => {
+        if (disposed) return;
+        disposed = true;
+        partialEngine.dispose();
+      });
+      return initialization.promise;
+    });
+    const runtime = createStudioBg3dBabylonSpecialistRuntime({
+      backend: "webgpu",
+      canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
+      loadBindings: async () => harness.bindings,
+    });
+
+    const pending = runtime.runIsolated(job("dispose-during-webgpu-initialization"));
+    await vi.waitFor(() => expect(harness.webGpu).toHaveBeenCalledOnce());
+    const disposal = runtime.dispose();
+
+    await expect(pending).rejects.toMatchObject({ code: "disposed" });
+    await disposal;
+    expect(partialEngine.dispose).toHaveBeenCalledOnce();
+    initialization.resolve(partialEngine);
+    await Promise.resolve();
+    expect(partialEngine.dispose).toHaveBeenCalledOnce();
   });
 
   it("serializes direct adapter calls and gives each fresh scene a monotonic epoch", async () => {

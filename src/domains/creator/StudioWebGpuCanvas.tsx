@@ -495,6 +495,7 @@ function StudioWebGpuCanvas({
     // Resizing an active engine historically renders its last (initially blank) operation set.
     // Suspend first so an empty Studio page neither paints a blank frame nor starts WebGPU.
     engine.suspend(desiredRequestIdRef.current);
+    engine.releaseSuspendedSurfaceBackingStores();
     callbacksRef.current.onBackendChange?.(engine.getBackend());
 
     const syncViewport = (
@@ -587,6 +588,7 @@ function StudioWebGpuCanvas({
         || (requiresFullValidation && !isStudioWebGpuCanvasActive(latest.strokes))
       ) {
         engine.resetStrokeFeed(requestId);
+        engine.releaseSuspendedSurfaceBackingStores();
         return { status: "accepted", requestId };
       }
       // Resizing is part of this request, not a separate old-feed render. The engine invalidates
@@ -649,7 +651,6 @@ function StudioWebGpuCanvas({
           if (!entry) return;
           const latest = latestEffectiveRequestRef.current;
           if (!isStudioWebGpuCanvasActive(latest.strokes)) {
-            syncViewport(entry.contentRect.width, entry.contentRect.height);
             return;
           }
           const requestId = `frame:${requestSequenceRef.current + 1}`;
@@ -664,7 +665,6 @@ function StudioWebGpuCanvas({
     const handleWindowResize = () => {
       const latest = latestEffectiveRequestRef.current;
       if (!isStudioWebGpuCanvasActive(latest.strokes)) {
-        syncViewport();
         return;
       }
       const requestId = `frame:${requestSequenceRef.current + 1}`;

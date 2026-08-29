@@ -2,6 +2,9 @@ import type { CSSProperties } from "react";
 
 export const STUDIO_MOBILE_SHEET_SNAPS = ["compact", "medium", "full"] as const;
 
+/** Shared DOM relationship between the mobile page launcher and its lazy page-list sheet. */
+export const STUDIO_MOBILE_PAGES_SHEET_ID = "studio-mobile-pages-sheet";
+
 export type StudioMobileSheetSnap = (typeof STUDIO_MOBILE_SHEET_SNAPS)[number];
 
 /**

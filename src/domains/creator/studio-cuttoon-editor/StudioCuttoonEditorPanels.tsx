@@ -126,6 +126,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
     setCommentsOpen,
     setContinuityOpen,
     setFxPanelOpen,
+    setFollowingStudioSessionId,
     setLoadedWork,
     setMannequinPoserOpen,
     setPageReviewOpen,
@@ -176,6 +177,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
     studioTeamCommentsWorkId,
     studioTeamUnreadCommentIdSet,
     teamPanelOpen,
+    followingStudioSessionId,
     textAiConfigured,
     timelapseOpen,
     title,
@@ -321,6 +323,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
           setStudioCommentPinsHidden={setStudioCommentPinsHidden}
           setContinuityOpen={setContinuityOpen}
           setFxPanelOpen={setFxPanelOpen}
+          setFollowingStudioSessionId={setFollowingStudioSessionId}
           setLoadedWork={setLoadedWork}
           setPageReviewOpen={setPageReviewOpen}
           setPoserInitialDataUrl={setPoserInitialDataUrl}
@@ -357,6 +360,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
           studioComments={studioCommentViewDocument}
           studioRevisionProjectGenerationRef={studioRevisionProjectGenerationRef}
           teamPanelOpen={teamPanelOpen}
+          followingStudioSessionId={followingStudioSessionId}
           textAiConfigured={textAiConfigured}
           timelapseOpen={timelapseOpen}
           title={title}

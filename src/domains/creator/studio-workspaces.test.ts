@@ -146,6 +146,19 @@ const WIDTH_TUNED_WORKSPACE_IDS = new Set<string>([
 ]);
 
 describe("built-in Studio workspaces", () => {
+  it("starts in the storyboard workspace with Page routed to navigator/minimap", () => {
+    expect(DEFAULT_STUDIO_WORKSPACE_STATE.activeWorkspaceId).toBe("storyboard");
+    expect(DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout.inspector).toEqual({
+      primary: "document",
+      image: "quick",
+      document: "navigator",
+    });
+    expect(
+      STUDIO_DEFAULT_WORKSPACES.find((workspace) => workspace.id === "storyboard")
+        ?.layout.inspector,
+    ).toEqual(DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout.inspector);
+  });
+
   it("preserves the seven shipped presets and completes an immutable twelve-profile catalogue", () => {
     expect(STUDIO_CLASSIC_WORKSPACE_IDS).toEqual([
       "storyboard",

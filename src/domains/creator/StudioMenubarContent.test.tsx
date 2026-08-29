@@ -506,7 +506,7 @@ describe("StudioMenubarContent", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "전체 화면 드로잉" }));
-    fireEvent.click(screen.getByRole("button", { name: "임시저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
     fireEvent.click(screen.getByRole("button", { name: "게시하기" }));
 
     expect(stableHandlers.changeMobileImmersiveMode).toHaveBeenCalledWith(true);
@@ -517,7 +517,7 @@ describe("StudioMenubarContent", () => {
   it("keeps every windowed action touchable while exposing the primary lane at 320px", () => {
     render(<StudioMenubarContent {...createProps({ isMobile: true })} />);
 
-    for (const name of ["전체 화면 드로잉", "임시저장", "게시하기"] as const) {
+    for (const name of ["전체 화면 드로잉", "초안 저장", "게시하기"] as const) {
       const action = screen.getByRole("button", { name });
       expect(action.className).toContain("max-[359px]:size-11");
       const label = [...action.querySelectorAll("span")].find((span) =>
@@ -564,7 +564,7 @@ describe("StudioMenubarContent", () => {
     expect(context.className).toContain("sr-only");
     expect(context.className).not.toContain("flex-1");
     const exit = screen.getByRole("button", { name: "전체 화면 드로잉 종료" });
-    const draft = screen.getByRole("button", { name: "임시저장" });
+    const draft = screen.getByRole("button", { name: "초안 저장" });
     const publish = screen.getByRole("button", { name: "게시하기" });
     expect(exit).toBeTruthy();
     expect(draft).toBeTruthy();
@@ -812,8 +812,8 @@ describe("StudioMenubarContent", () => {
       "zoom-fit",
     ]);
 
-    // 슬롯 3의 저장 명령은 액션 레인의 "임시저장"과 이름이 겹치므로 슬롯 번호로 갈린다.
-    fireEvent.click(within(bar).getByRole("button", { name: "슬롯 3: 임시저장" }));
+    // 슬롯 3의 저장 명령은 액션 레인의 "초안 저장"과 이름이 겹치므로 슬롯 번호로 갈린다.
+    fireEvent.click(within(bar).getByRole("button", { name: "슬롯 3: 초안 저장" }));
     expect(stableHandlers.handleSave).toHaveBeenCalledWith("draft");
 
     // zoom-fit stays honestly disabled until the host provides the handler.
@@ -894,7 +894,7 @@ describe("StudioMenubarContent", () => {
     expect(screen.getByRole("button", { name: "슬롯 2: 실행취소" })).toBeTruthy();
     // 고정 컨트롤과 겹치는 명령은 전부 슬롯 번호로 한정된다.
     for (const name of [
-      "슬롯 3: 임시저장",
+      "슬롯 3: 초안 저장",
       "슬롯 4: 내보내기 옵션",
       "슬롯 5: 현재 페이지 다운로드",
       "슬롯 6: 템플릿·에셋",
@@ -1018,17 +1018,17 @@ describe("StudioMenubarContent", () => {
     for (const name of [
       "실행취소",
       "다시실행",
-      "슬롯 3: 임시저장",
+      "슬롯 3: 초안 저장",
       "슬롯 4: 내보내기 옵션",
       "화면 폭 맞춤",
       "작업 내역",
       "명령 바 설정",
       "템플릿·에셋",
       "말풍선",
-      "현재 페이지 다운로드",
+      "다운로드 2× PNG · 현재 페이지",
       "내보내기 옵션",
       "프로젝트 작업",
-      "임시저장",
+      "초안 저장",
       "게시하기",
     ]) {
       for (const control of screen.getAllByRole("button", { name })) {

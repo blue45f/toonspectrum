@@ -48,10 +48,27 @@ describe("StudioInspectorNavigator", () => {
     expect(html).toContain("속성");
     expect(html).toContain("레이어");
     expect(html).toContain("페이지");
-    expect(html).toContain("게시");
+    expect(html).toContain("작품 정보");
     expect(html).toContain("99+");
     expect(html).toContain('data-studio-inspector-primary-tab="layers"');
     expect(html).toContain('aria-label="패널과 기능 찾기"');
+  });
+
+  it("uses the shared work-panel name for the mobile close action", () => {
+    const html = renderToStaticMarkup(
+      <StudioInspectorNavigator
+        layout={{ primary: "layers", image: "quick", document: "canvas" }}
+        selectedType={null}
+        selectionLabel={null}
+        drawing={false}
+        layerCount={0}
+        onRequestClose={noop}
+        onChange={noop}
+      />,
+    );
+
+    expect(html).toContain('aria-label="작업 패널 닫기"');
+    expect(html).not.toContain('aria-label="속성 시트 닫기"');
   });
 
   it("shows image categories only for an image selection", () => {

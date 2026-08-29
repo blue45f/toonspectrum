@@ -13,6 +13,7 @@ import { StudioHybridDccPanel } from "./StudioHybridDccPanel";
 import type { StudioHybridDccBg3dHandoffResult } from "./studio-hybrid-dcc-bg3d-handoff";
 import type { StudioHybridDccWorkspace } from "./studio-hybrid-dcc-workspace";
 import type { StudioDccWorkbenchMode } from "../studio-workspace-route";
+import type { StudioHybridDccPersistenceReceiptEvidence } from "./studio-hybrid-dcc-persistence";
 import type { StudioHybridDccPersistenceStatus } from "./StudioHybridDccPanel";
 
 export type StudioHybridDccPresentation = "modal" | "workspace";
@@ -24,6 +25,7 @@ export interface StudioHybridDccDialogProps {
   readonly initialWorkspace?: StudioHybridDccWorkspace;
   readonly workspaceDocumentId: string;
   readonly onWorkspaceChange: (workspace: StudioHybridDccWorkspace) => void;
+  readonly persistenceReceipt?: StudioHybridDccPersistenceReceiptEvidence;
   readonly persistenceStatus?: StudioHybridDccPersistenceStatus;
   readonly loading?: boolean;
   readonly onWorkbenchModeChange?: (mode: StudioDccWorkbenchMode) => void;
@@ -39,6 +41,7 @@ export function StudioHybridDccDialog({
   initialWorkspace,
   workspaceDocumentId,
   onWorkspaceChange,
+  persistenceReceipt,
   persistenceStatus,
   loading = false,
   onWorkbenchModeChange,
@@ -177,6 +180,7 @@ export function StudioHybridDccDialog({
               onWorkspaceChange={onWorkspaceChange}
               onOpenInBackground3D={onOpenInBackground3D}
               onWorkbenchModeChange={onWorkbenchModeChange}
+              persistenceReceipt={persistenceReceipt}
               persistenceStatus={persistenceStatus}
               workbenchMode={workbenchMode}
             />

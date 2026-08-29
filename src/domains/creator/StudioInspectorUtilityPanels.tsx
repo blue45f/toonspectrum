@@ -5,10 +5,17 @@ import {
   MousePointer2,
   Pipette,
 } from "lucide-react";
-import { Suspense, type RefObject } from "react";
+import { Suspense, useId, useLayoutEffect, type RefObject } from "react";
 
 import { DRAW_COLOR_SWATCHES } from "./brush/studio-draw-color-swatches";
 import { StudioPageGradePanel } from "./studio-page-lazy-ui";
+import {
+  STUDIO_WORK_DESCRIPTION_MAX_LENGTH,
+  STUDIO_WORK_TAG_MAX_COUNT,
+  STUDIO_WORK_TAG_MAX_LENGTH,
+  STUDIO_WORK_TITLE_MAX_LENGTH,
+  parseStudioWorkTagTokens,
+} from "./studio-work-metadata";
 import { StudioActiveBrushSummary } from "./StudioActiveBrushSummary";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 
@@ -357,62 +364,199 @@ export function StudioInspectorEmptySelection({
 
 export function StudioInspectorPublishPanel({
   active,
+  autoFocusTitle,
   description,
+  pendingSaveIntent,
   readOnly,
+  saving,
   tags,
   title,
   titleInputRef,
+  onContinuePendingSave,
   onDescriptionChange,
   onTagsChange,
   onTitleChange,
 }: {
   active: boolean;
+  autoFocusTitle: boolean;
   description: string;
+  pendingSaveIntent: "draft" | "published" | null;
   readOnly: boolean;
+  saving: boolean;
   tags: string;
   title: string;
   titleInputRef: RefObject<HTMLInputElement | null>;
+  onContinuePendingSave: () => void;
   onDescriptionChange: (value: string) => void;
   onTagsChange: (value: string) => void;
   onTitleChange: (value: string) => void;
 }) {
+  const fieldId = useId();
+  const titleId = `${fieldId}-title`;
+  const titleHelpId = `${titleId}-help`;
+  const descriptionId = `${fieldId}-description`;
+  const descriptionHelpId = `${descriptionId}-help`;
+  const tagsId = `${fieldId}-tags`;
+  const tagsHelpId = `${tagsId}-help`;
+  const parsedTags = parseStudioWorkTagTokens(tags);
+  const titleOverLength = title.length > STUDIO_WORK_TITLE_MAX_LENGTH;
+  const descriptionOverLength =
+    description.length > STUDIO_WORK_DESCRIPTION_MAX_LENGTH;
+  const titleInvalid =
+    titleOverLength || (pendingSaveIntent !== null && !title.trim());
+  const tagsOverCount = parsedTags.length > STUDIO_WORK_TAG_MAX_COUNT;
+  const tagsOverLength = parsedTags.some(
+    (tag) => tag.length > STUDIO_WORK_TAG_MAX_LENGTH,
+  );
+  const tagsInvalid = tagsOverCount || tagsOverLength;
+  const continueLabel =
+    pendingSaveIntent === "published" ? "게시 계속" : "초안 저장 계속";
+
+  useLayoutEffect(() => {
+    if (!active || !autoFocusTitle) return;
+    titleInputRef.current?.focus({ preventScroll: true });
+  }, [active, autoFocusTitle, titleInputRef]);
+
   return (
-    <div
+    <form
       role="tabpanel"
-      aria-label="게시 정보"
+      aria-label="작품 정보"
       hidden={!active}
       className="rounded-xl border border-line bg-panel/40 p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (
+          pendingSaveIntent === null
+          || readOnly
+          || saving
+          || titleInvalid
+          || descriptionOverLength
+          || tagsInvalid
+        ) return;
+        onContinuePendingSave();
+      }}
     >
-      <p className="mb-2 text-xs font-semibold text-fg-3">게시 정보</p>
+      <p className="text-xs font-semibold text-fg">작품 정보</p>
+      <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
+        초안 저장과 게시에 함께 쓰는 기본 정보입니다.
+      </p>
+      <label
+        htmlFor={titleId}
+        className="mt-3 block text-[0.7rem] font-semibold text-fg-2"
+      >
+        작품 제목 (필수)
+      </label>
       <input
+        id={titleId}
         ref={titleInputRef}
         value={title}
         onChange={(event) => onTitleChange(event.target.value)}
-        aria-label="게시 제목 (필수)"
-        placeholder="제목 *"
-        maxLength={80}
+        aria-describedby={titleHelpId}
+        aria-invalid={titleInvalid || undefined}
+        aria-required="true"
+        placeholder="작품 제목"
+        required
+        maxLength={STUDIO_WORK_TITLE_MAX_LENGTH}
         spellCheck
         readOnly={readOnly}
-        className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
+        className="mt-1 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
       />
-      <textarea
-        value={description}
-        onChange={(event) => onDescriptionChange(event.target.value)}
-        aria-label="게시 설명 (선택)"
-        placeholder="설명 (선택)"
-        spellCheck
-        rows={2}
-        readOnly={readOnly}
-        className="mt-2 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
-      />
-      <input
-        value={tags}
-        onChange={(event) => onTagsChange(event.target.value)}
-        aria-label="게시 태그 (쉼표로 구분, 선택)"
-        placeholder="태그 (쉼표로 구분)"
-        readOnly={readOnly}
-        className="mt-2 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
-      />
-    </div>
+      <p
+        id={titleHelpId}
+        className={cn("mt-1 text-[0.62rem]", titleOverLength ? "text-bad" : "text-fg-3")}
+      >
+        {titleOverLength
+          ? `${title.length}/${STUDIO_WORK_TITLE_MAX_LENGTH}자 · ${STUDIO_WORK_TITLE_MAX_LENGTH}자 이하로 줄여 주세요.`
+          : `초안 저장과 게시에 공통으로 사용됩니다. ${title.length}/${STUDIO_WORK_TITLE_MAX_LENGTH}자`}
+      </p>
+
+      <fieldset className="mt-3 border-t border-line/70 pt-3">
+        <legend className="pr-2 text-[0.7rem] font-semibold text-fg-2">
+          게시용 정보 (선택)
+        </legend>
+        <label
+          htmlFor={descriptionId}
+          className="mt-1 block text-[0.68rem] font-medium text-fg-2"
+        >
+          게시용 설명
+        </label>
+        <textarea
+          id={descriptionId}
+          value={description}
+          onChange={(event) => onDescriptionChange(event.target.value)}
+          aria-describedby={descriptionHelpId}
+          aria-invalid={descriptionOverLength || undefined}
+          placeholder="작품을 소개해 주세요."
+          maxLength={STUDIO_WORK_DESCRIPTION_MAX_LENGTH}
+          spellCheck
+          rows={3}
+          readOnly={readOnly}
+          className="mt-1 w-full resize-y rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
+        />
+        <p
+          id={descriptionHelpId}
+          className={cn(
+            "mt-1 text-right text-[0.62rem]",
+            descriptionOverLength ? "text-bad" : "text-fg-3",
+          )}
+        >
+          {description.length.toLocaleString("ko-KR")}/{STUDIO_WORK_DESCRIPTION_MAX_LENGTH.toLocaleString("ko-KR")}자
+          {descriptionOverLength ? " · 입력 제한 이하로 줄여 주세요." : null}
+        </p>
+
+        <label
+          htmlFor={tagsId}
+          className="mt-2 block text-[0.68rem] font-medium text-fg-2"
+        >
+          게시용 태그
+        </label>
+        <input
+          id={tagsId}
+          value={tags}
+          onChange={(event) => onTagsChange(event.target.value)}
+          aria-describedby={tagsHelpId}
+          aria-invalid={tagsInvalid || undefined}
+          placeholder="로맨스, 일상"
+          readOnly={readOnly}
+          className="mt-1 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
+        />
+        <p
+          id={tagsHelpId}
+          className={cn("mt-1 text-[0.62rem]", tagsInvalid ? "text-bad" : "text-fg-3")}
+        >
+          {tagsOverCount
+            ? `${parsedTags.length}개 입력됨 · 최대 ${STUDIO_WORK_TAG_MAX_COUNT}개까지 입력할 수 있어요.`
+            : tagsOverLength
+              ? `태그 하나는 ${STUDIO_WORK_TAG_MAX_LENGTH}자 이하여야 합니다.`
+              : `최대 ${STUDIO_WORK_TAG_MAX_COUNT}개 · 태그당 ${STUDIO_WORK_TAG_MAX_LENGTH}자 · 쉼표 또는 공백으로 구분`}
+        </p>
+      </fieldset>
+
+      {pendingSaveIntent ? (
+        <div className="mt-3 rounded-lg border border-accent/35 bg-accent-soft/45 p-2.5">
+          <p className="text-[0.65rem] leading-relaxed text-fg-2">
+            필수 정보와 입력 제한을 확인하면 요청한 저장 흐름을 여기서 바로 이어갈 수 있어요.
+          </p>
+          <button
+            type="submit"
+            disabled={
+              readOnly
+              || saving
+              || !title.trim()
+              || titleOverLength
+              || descriptionOverLength
+              || tagsInvalid
+            }
+            className={buttonClass({
+              size: "md",
+              variant: "solid",
+              className: "mt-2 w-full pointer-coarse:min-h-11",
+            })}
+          >
+            {saving ? "저장 중…" : continueLabel}
+          </button>
+        </div>
+      ) : null}
+    </form>
   );
 }

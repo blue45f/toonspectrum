@@ -59,6 +59,7 @@ import { localizeStudioText } from "./studio-localize-text";
 import {
   STUDIO_MOBILE_DRAW_SHEET_COMPACT_MIN_HEIGHT,
   STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP,
+  STUDIO_MOBILE_PAGES_SHEET_ID,
   STUDIO_MOBILE_SHEET_DEFAULT_SNAP,
   studioMobileSheetSizeStyle,
   type StudioMobileSheetSnap,
@@ -635,6 +636,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     undo,
   } = stableHandlers;
   const t = useT();
+  const localizedWorkspaceToggle = localizeStudioText(
+    t,
+    "도구",
+    "studio.mobileDock.workspaceToggle",
+  );
   // 도크 라벨은 로케일 팩 키를 우선하고, 팩이 아직 안 붙었거나 키가 없으면 저작 한국어로 되돌아온다.
   // 기존 키가 정확히 같은 의미면 새 키를 만들지 않고 재사용한다(75개 팩 전부에 이미 번역이 있다).
   const label = {
@@ -657,7 +663,10 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
       "브러시 설정 (굵기·색·프리셋)",
       "studio.mobileDock.brushSettings",
     ),
-    workspaceToggle: localizeStudioText(t, "작업", "studio.mobileDock.workspaceToggle"),
+    // 한국어 팩의 레거시 "작업"은 바로 옆 인스펙터 런처와 같은 이름이었다. 기존 키와
+    // 다른 로케일 번역(Tools 등)은 유지하면서 한국어 표시만 동작에 맞는 "도구"로 정리한다.
+    workspaceToggle:
+      localizedWorkspaceToggle === "작업" ? "도구" : localizedWorkspaceToggle,
     collapse: localizeStudioText(t, "접기", "studio.toolsCompanion.layoutSettings.collapse"),
     expandWorkspaceTools: localizeStudioText(
       t,
@@ -1563,7 +1572,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
         ) : null}
 
         {/* 모바일 하단 드로잉 도크 — 한 손으로 그리기 위한 핵심 도구를 thumb 사정권에.
-            1행: 그리기 도구(선택·펜·지우개·채우기·도형·실행취소·다시·브러시). 2행: 보조 내비(페이지·추가·속성·줌). */}
+            1행: 가로 스크롤 그리기 도구 + 고정 도구 disclosure. 2행: 보조 내비와 작업 패널. */}
         {isMobile && (
           <nav
             aria-label={label.dock}
@@ -1578,24 +1587,22 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             style={{ bottom: safeMobileKeyboardInset }}
           >
             {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/채우기/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
-            <div
-              className="relative min-w-0"
-              data-studio-mobile-scroll-host="primary"
-            >
+            <div className="flex min-w-0 items-stretch gap-1">
               <div
-                ref={primaryDockScrollRef}
-                // 간격이 도크의 "다음 버튼이 반쯤 보이는" 어포던스를 결정한다. 44px 타깃 10개는
-                // 어느 폰에서도 한 줄에 들어가지 않으므로, 잘리는 지점이 버튼 한복판에 오도록
-                // 간격을 맞춘다. 4px 간격을 360px 부터 켜면 트랙(348px)이 8번째 버튼 시작점
-                // 바로 뒤(344px)에서 끝나 4px 만 노출되고, 그 4px 은 20px 페이드에 완전히
-                // 덮여 "더 없음"으로 읽힌다(실측). 4px 간격은 390px 이상에서만 켠다 —
-                // 320/360 은 2px 간격에서 각각 26px·20px 이 노출돼 반 버튼 피크가 된다.
-                className="flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain pr-1 [scrollbar-width:none] min-[390px]:gap-1 [&::-webkit-scrollbar]:hidden"
-                role="toolbar"
-                aria-label={label.drawingTools}
-                aria-describedby={`${scrollDescriptionId}-primary`}
-                data-studio-mobile-dock-scroll="primary"
+                className="relative min-w-0 flex-1"
+                data-studio-mobile-scroll-host="primary"
               >
+                <div
+                  ref={primaryDockScrollRef}
+                  // 44px 드로잉 타깃 9개는 어느 폰에서도 한 줄에 들어가지 않는다. 우측 44px
+                  // disclosure 를 고정해도 다음 도구의 일부와 페이드 큐가 남도록 작은 간격을 쓰고,
+                  // 여유가 생기는 390px 부터만 4px 간격으로 넓힌다.
+                  className="flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain pr-1 [scrollbar-width:none] min-[390px]:gap-1 [&::-webkit-scrollbar]:hidden"
+                  role="toolbar"
+                  aria-label={label.drawingTools}
+                  aria-describedby={`${scrollDescriptionId}-primary`}
+                  data-studio-mobile-dock-scroll="primary"
+                >
               <StudioDockButton
                 icon={MousePointer2}
                 label={label.select}
@@ -1790,19 +1797,27 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   />
                 )}
               />
+                </div>
+                <StudioMobileScrollCues
+                  descriptionId={`${scrollDescriptionId}-primary`}
+                  placement="primary"
+                />
+              </div>
+              {/* 보조 도구 disclosure 는 가로 스크롤 밖에 고정한다. 320px 에서도 사용자가
+                  숨은 도구를 찾기 위해 먼저 드로잉 행을 밀지 않도록 하는 발견성 계약이다. */}
               <button
                 type="button"
                 aria-controls={MOBILE_WORKSPACE_TOOLS_ID}
                 aria-expanded={workspaceDockExpanded}
                 aria-label={workspaceDockExpanded ? label.collapseWorkspaceTools : label.expandWorkspaceTools}
-                title={workspaceDockExpanded ? "작업 공간 도구 접기" : "댓글·페이지·레이어·줌 도구 펼치기"}
+                title={workspaceDockExpanded ? "작업 공간 도구 접기" : "댓글·페이지·필터·새 작업·작업 패널·색각·줌 도구 펼치기"}
                 data-studio-mobile-workspace-toggle="true"
                 onFocus={preloadStudioInspectorDrawingSurface}
                 onPointerDown={preloadStudioInspectorDrawingSurface}
                 onPointerEnter={preloadStudioInspectorDrawingSurface}
                 onClick={() => setWorkspaceDockExpanded((expanded) => !expanded)}
                 className={cn(
-                  "relative flex min-h-11 min-w-11 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-line/70 bg-raised/75 px-1 text-[0.6rem] font-bold leading-none text-fg-2",
+                  "relative flex min-h-11 min-w-11 flex-none flex-col items-center justify-center gap-0.5 rounded-xl border border-line/70 bg-raised/75 px-1 text-[0.6rem] font-bold leading-none text-fg-2",
                   STUDIO_EASE,
                   "hover:bg-raised",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
@@ -1822,14 +1837,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   />
                 ) : null}
               </button>
-              </div>
-              <StudioMobileScrollCues
-                descriptionId={`${scrollDescriptionId}-primary`}
-                placement="primary"
-              />
             </div>
 
-            {/* 2행: 보조 내비 — 페이지·추가·6방향 퀵 메뉴·속성(레이어)·줌 */}
+            {/* 2행: 보조 내비 — 댓글·퀵 메뉴·작업 패널·페이지·필터·새 작업·색각·줌 */}
             <div
               id={MOBILE_WORKSPACE_TOOLS_ID}
               hidden={!workspaceDockExpanded}
@@ -1871,35 +1881,16 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   data-studio-mobile-dock-scroll="secondary"
                 >
                 <StudioDockNavButton
-                  icon={Files}
-                  label="페이지"
-                  aria-label="페이지"
-                  active={mobileSheet === "pages"}
-                  aria-pressed={mobileSheet === "pages"}
-                  onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
-                />
-                <StudioMobileFilterSelect
-                  filterMutationLocked={filterMutationLocked}
-                  filterPreparationBusy={filterPreparationBusy}
-                  filterTargetLabel={filterTargetLabel}
-                  filterUnavailableReason={filterUnavailableReason}
-                  onSelect={openStudioFilter}
-                  placement="workspace"
-                />
-                <StudioDockNavButton
-                  icon={Plus}
-                  label="추가"
-                  onClick={() => {
-                    setMobileSheet(null);
-                    setQuickStartOpen(true);
-                  }}
-                />
-                <StudioDockNavButton
                   icon={Layers}
-                  label="작업"
-                  aria-label="작업"
+                  label="패널"
+                  aria-label={
+                    mobileSheet === "props"
+                      ? "작업 패널 닫기"
+                      : "속성·레이어·페이지·작품 정보 패널 열기"
+                  }
+                  aria-haspopup="dialog"
+                  aria-expanded={mobileSheet === "props"}
                   active={mobileSheet === "props"}
-                  aria-pressed={mobileSheet === "props"}
                   onFocus={preloadStudioInspectorDrawingSurface}
                   onPointerDown={preloadStudioInspectorDrawingSurface}
                   onPointerEnter={preloadStudioInspectorDrawingSurface}
@@ -1917,6 +1908,35 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       },
                       "props"
                     );
+                  }}
+                />
+                <StudioDockNavButton
+                  icon={Files}
+                  label="페이지"
+                  aria-label={mobileSheet === "pages" ? "페이지 목록 닫기" : "페이지 목록 열기"}
+                  aria-controls={STUDIO_MOBILE_PAGES_SHEET_ID}
+                  aria-haspopup="dialog"
+                  aria-expanded={mobileSheet === "pages"}
+                  active={mobileSheet === "pages"}
+                  onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
+                />
+                <StudioMobileFilterSelect
+                  filterMutationLocked={filterMutationLocked}
+                  filterPreparationBusy={filterPreparationBusy}
+                  filterTargetLabel={filterTargetLabel}
+                  filterUnavailableReason={filterUnavailableReason}
+                  onSelect={openStudioFilter}
+                  placement="workspace"
+                />
+                <StudioDockNavButton
+                  icon={WandSparkles}
+                  label="새 작업"
+                  aria-label="빠른 시작 · 새 작업 열기"
+                  aria-haspopup="dialog"
+                  title="템플릿과 웹툰 마법사로 새 작업 시작"
+                  onClick={() => {
+                    setMobileSheet(null);
+                    setQuickStartOpen(true);
                   }}
                 />
                 <StudioDockNavButton

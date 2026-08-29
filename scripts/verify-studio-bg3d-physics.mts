@@ -264,17 +264,20 @@ async function openMobileBackground3d(page: Page): Promise<Locator> {
     );
   }
   const workspaceToolbar = dock.getByRole("toolbar", { name: "작업 공간" });
-  const addToolButton = workspaceToolbar.getByRole("button", { name: "추가", exact: true });
+  const newWorkButton = workspaceToolbar.getByRole("button", {
+    name: "빠른 시작 · 새 작업 열기",
+    exact: true,
+  });
   await poll(
-    "mobile workspace add tool visible",
+    "mobile workspace new-work tool visible",
     async () => {
-      return (await addToolButton.isVisible()) && (await addToolButton.isEnabled());
+      return (await newWorkButton.isVisible()) && (await newWorkButton.isEnabled());
     },
     Boolean,
     5_000,
     50,
   );
-  await addToolButton.click();
+  await newWorkButton.click();
   const starter = page.locator('[data-studio-creative-starter="true"]');
   await starter.waitFor({ state: "visible", timeout: 5_000 });
   const moreTools = starter.locator('[data-studio-quickstart-more="true"]');

@@ -45,7 +45,10 @@ import {
 } from "./lib/studio-verify-preview-harness.mjs";
 import {
   STUDIO_NATIVE_RASTER_REQUIRED_SCENARIOS,
+  studioNativeRasterFixtureGeometryEquivalent,
+  studioNativeRasterFixturePixelsSimilar,
   studioNativeRasterMatrixViolations,
+  studioNativeRasterNoiseExcludedChangedPixels,
   studioNativeRasterPerformanceWarnings,
   type StudioNativeRasterPixelDiff,
   type StudioNativeRasterPerformanceEvidence,
@@ -57,6 +60,12 @@ type Point = { x: number; y: number };
 type Tier = "quick" | "deep";
 type RetouchScenarioId = "smudge" | "wet-mix" | "dodge-burn" | "liquify";
 type RasterPreparationCancellationAction = "escape" | "tool-switch";
+
+interface CanvasPointHitResult extends Point {
+  blockedAt: Point | null;
+  blocker: string | null;
+  reachesCanvas: boolean;
+}
 
 const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
 const AUTOSAVE_KEY = `${AUTOSAVE_PREFIX}:v12:guest:new`;
@@ -105,6 +114,32 @@ const FIXTURE_CLIP_DOCUMENT_POINTS: readonly Point[] = [
   { x: 590, y: 635 },
 ];
 
+const RECT_SELECTION_DOCUMENT_POINTS: readonly [Point, Point] = [
+  { x: 150, y: 260 },
+  { x: 405, y: 565 },
+];
+const PIXEL_TRANSFORM_SELECTION_CHROME_RADIUS_PX = 4;
+
+/**
+ * Complete document-space region used by the native fixture and its first tool gestures.
+ *
+ * Studio intentionally layers the status HUD and active draw options over the canvas. A
+ * width-fitted document can therefore be a valid editing surface while a fixed document point is
+ * outside the viewport or underneath chrome. The verifier must normalize through shipped zoom UI
+ * instead of treating that responsive presentation detail as a product pointer-routing failure.
+ */
+const NATIVE_RASTER_INTERACTION_DOCUMENT_POINTS: readonly Point[] = [
+  { x: 130, y: 245 },
+  { x: 590, y: 245 },
+  { x: 590, y: 720 },
+  { x: 130, y: 720 },
+  { x: 205, y: 500 },
+  { x: 515, y: 500 },
+];
+const NATIVE_RASTER_INTERACTION_MARGIN_PX = 16;
+const NATIVE_RASTER_VIEW_NORMALIZATION_MAX_ZOOM_OUT_STEPS = 4;
+const NATIVE_FIXTURE_POINTER_STEP_DELAY_MS = 2;
+
 interface BrowserErrorCollector {
   messages: string[];
   failedResponses: string[];
@@ -119,6 +154,7 @@ interface PersistedElementSummary {
   firstPoint: Point | null;
   lastPoint: Point | null;
   srcSignature: string | null;
+  srcSha256: `sha256:${string}` | null;
   width: number | null;
   height: number | null;
   pixelWidth: number | null;
@@ -158,7 +194,9 @@ interface PreparedRasterControlEvidence {
 interface ScenarioArtifacts {
   directory: string;
   coldRasterControl: string;
+  controlFixture: string;
   fixture: string;
+  operationBaseline: string;
   after: string;
   undone: string;
   diagnostic: string;
@@ -326,7 +364,9 @@ function createArtifacts(id: string): ScenarioArtifacts {
   return {
     directory,
     coldRasterControl: join(directory, "00-cold-raster-only-control.png"),
+    controlFixture: join(directory, "01-control-native-fixture.png"),
     fixture: join(directory, "01-native-fixture.png"),
+    operationBaseline: join(directory, "01-operation-baseline.png"),
     after: join(directory, "02-operation-after.png"),
     undone: join(directory, "03-one-step-undo.png"),
     diagnostic: join(directory, "99-diagnostic-page.png"),
@@ -572,12 +612,126 @@ async function documentPointsToScreen(page: Page, points: readonly Point[]): Pro
   return transformed;
 }
 
+async function canvasPointHitResults(
+  page: Page,
+  points: readonly Point[],
+  marginPx = 0,
+): Promise<CanvasPointHitResult[]> {
+  return page.evaluate(({ targets, margin }) => {
+    const offsets = margin > 0
+      ? [-margin, 0, margin].flatMap((y) =>
+          [-margin, 0, margin].map((x) => ({ x, y }))
+        )
+      : [{ x: 0, y: 0 }];
+    const describe = (target: Element | null): string => {
+      if (!target) return "viewport boundary";
+      const owner = target.closest<HTMLElement>(
+        "[data-studio-status-bar], [data-studio-draw-options], [aria-label], [title]",
+      ) ?? target;
+      const label = owner.getAttribute("aria-label") ?? owner.getAttribute("title");
+      const marker = owner.hasAttribute("data-studio-status-bar")
+        ? "data-studio-status-bar"
+        : owner.hasAttribute("data-studio-draw-options")
+          ? "data-studio-draw-options"
+          : null;
+      return `${owner.tagName.toLowerCase()}${label ? `[${label}]` : marker ? `[${marker}]` : ""}`;
+    };
+    return targets.map(({ x, y }) => {
+      const blocked = offsets
+        .map((offset) => ({ x: x + offset.x, y: y + offset.y }))
+        .find((sample) =>
+          !document.elementFromPoint(sample.x, sample.y)?.closest(".konvajs-content")
+        );
+      return {
+        x,
+        y,
+        reachesCanvas: blocked === undefined,
+        blockedAt: blocked ?? null,
+        blocker: blocked
+          ? describe(document.elementFromPoint(blocked.x, blocked.y))
+          : null,
+      };
+    });
+  }, { targets: points, margin: marginPx });
+}
+
+function canvasPointFailureSummary(results: readonly CanvasPointHitResult[]): string {
+  return results
+    .filter((result) => !result.reachesCanvas)
+    .map((result) => {
+      const blocked = result.blockedAt ?? result;
+      return `(${result.x.toFixed(1)},${result.y.toFixed(1)}) sample `
+        + `(${blocked.x.toFixed(1)},${blocked.y.toFixed(1)}) hit ${result.blocker ?? "unknown"}`;
+    })
+    .join(" | ");
+}
+
 async function assertCanvasPoints(page: Page, points: readonly Point[], label: string): Promise<void> {
-  const results = await page.evaluate((targets) => targets.map(({ x, y }) => {
-    const target = document.elementFromPoint(x, y);
-    return Boolean(target?.closest(".konvajs-content"));
-  }), points);
-  invariant(results.every(Boolean), `${label} is covered by Studio chrome`);
+  const results = await canvasPointHitResults(page, points);
+  invariant(
+    results.every((result) => result.reachesCanvas),
+    `${label} is covered by Studio chrome: ${canvasPointFailureSummary(results)}`,
+  );
+}
+
+async function waitForDocumentPointMappingChange(
+  page: Page,
+  documentPoint: Point,
+  previousScreenPoint: Point,
+): Promise<void> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 2_000) {
+    const [current] = await documentPointsToScreen(page, [documentPoint]);
+    if (
+      current
+      && Math.hypot(
+        current.x - previousScreenPoint.x,
+        current.y - previousScreenPoint.y,
+      ) > 0.5
+    ) return;
+    await page.waitForTimeout(40);
+  }
+  throw new Error("Studio zoom control did not update the document-to-screen transform");
+}
+
+async function ensureNativeRasterInteractionRegion(page: Page): Promise<void> {
+  const statusBar = page.getByRole("group", { name: "캔버스 상태 및 보기" });
+  const zoomOut = statusBar.getByRole("button", { name: "축소", exact: true });
+
+  for (
+    let step = 0;
+    step <= NATIVE_RASTER_VIEW_NORMALIZATION_MAX_ZOOM_OUT_STEPS;
+    step += 1
+  ) {
+    const screenPoints = await documentPointsToScreen(
+      page,
+      NATIVE_RASTER_INTERACTION_DOCUMENT_POINTS,
+    );
+    const results = await canvasPointHitResults(
+      page,
+      screenPoints,
+      NATIVE_RASTER_INTERACTION_MARGIN_PX,
+    );
+    if (results.every((result) => result.reachesCanvas)) return;
+    invariant(
+      step < NATIVE_RASTER_VIEW_NORMALIZATION_MAX_ZOOM_OUT_STEPS,
+      `could not expose the native raster interaction region: ${canvasPointFailureSummary(results)}`,
+    );
+    await zoomOut.waitFor({ state: "visible", timeout: 8_000 });
+    invariant(
+      await zoomOut.getAttribute("aria-disabled") !== "true",
+      `native raster interaction region remains covered at minimum zoom: `
+        + canvasPointFailureSummary(results),
+    );
+    const previousScreenPoint = screenPoints[0];
+    invariant(previousScreenPoint, "native raster interaction region has no anchor point");
+    await zoomOut.press("Enter");
+    await waitForDocumentPointMappingChange(
+      page,
+      NATIVE_RASTER_INTERACTION_DOCUMENT_POINTS[0]!,
+      previousScreenPoint,
+    );
+  }
 }
 
 async function drawPointerPath(page: Page, points: readonly Point[], steps = 5): Promise<void> {
@@ -789,24 +943,42 @@ async function markRasterOperationSettled(
   }, presentation);
 }
 
-async function armRasterImagePresentationProbe(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    (window as typeof window & {
+async function armRasterImagePresentationProbe(
+  page: Page,
+  expected?: {
+    readonly elementId: string;
+    readonly srcSha256: `sha256:${string}`;
+  },
+): Promise<void> {
+  await page.evaluate((expectedInput) => {
+    const target = window as typeof window & {
+      __studioNativeRasterDurableImageSources?: Map<string, string>;
       __studioRasterImagePresentationProbe?: {
         version: 1;
         expectationEpoch: number;
-        expected: null;
+        expected: { elementId: string; epoch: number; src: string } | null;
         receiptEpoch: number;
         receipt: null;
       };
-    }).__studioRasterImagePresentationProbe = {
+    };
+    const expectedSrc = expectedInput
+      ? target.__studioNativeRasterDurableImageSources?.get(expectedInput.srcSha256)
+      : undefined;
+    if (expectedInput && !expectedSrc) {
+      throw new Error(
+        `durable baseline source ${expectedInput.srcSha256} is unavailable for presentation proof`,
+      );
+    }
+    target.__studioRasterImagePresentationProbe = {
       version: 1,
-      expectationEpoch: 0,
-      expected: null,
+      expectationEpoch: expectedInput ? 1 : 0,
+      expected: expectedInput && expectedSrc
+        ? { elementId: expectedInput.elementId, epoch: 1, src: expectedSrc }
+        : null,
       receiptEpoch: 0,
       receipt: null,
     };
-  });
+  }, expected ?? null);
 }
 
 async function readExactRasterImagePresentation(
@@ -971,10 +1143,13 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
     type BrowserAutosaveSession = {
       readLatest: () => Promise<BrowserAutosaveReadResult>;
     };
+    type BrowserAutosaveSessionFactory = (
+      key: string,
+      scope?: unknown,
+      options?: { readOnly?: boolean },
+    ) => Promise<BrowserAutosaveSession | null>;
     type BrowserAutosaveRuntime = {
-      createStudioAutosaveOpfsSession: (
-        key: string,
-      ) => Promise<BrowserAutosaveSession | null>;
+      createStudioAutosaveOpfsSession?: BrowserAutosaveSessionFactory;
     };
     type NativeRasterAutosaveReader = {
       key: string;
@@ -983,6 +1158,7 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
     const browserWindow = window as typeof window & {
       __studioNativeRasterAutosaveReader?: NativeRasterAutosaveReader;
       __studioNativeRasterAutosaveReadError?: string;
+      __studioNativeRasterDurableImageSources?: Map<string, string>;
     };
     let latest: { key: string; payload: RawPayload } | null = null;
     for (let index = 0; index < window.localStorage.length; index += 1) {
@@ -1031,7 +1207,25 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
         }
         if (moduleUrl) {
           const runtime = await import(moduleUrl) as BrowserAutosaveRuntime;
-          const session = await runtime.createStudioAutosaveOpfsSession(autosaveKey);
+          let factory = runtime.createStudioAutosaveOpfsSession;
+          if (typeof factory !== "function") {
+            // Rollup minifies production chunk exports (`export { namespace as n }`). The authored
+            // factory remains on that namespace object, which is also how the shipped app reaches
+            // it. Dev modules retain the direct named export and take the fast path above.
+            for (const exported of Object.values(runtime)) {
+              const candidate = await Promise.resolve(exported as BrowserAutosaveRuntime)
+                .then((namespace) => namespace?.createStudioAutosaveOpfsSession)
+                .catch(() => undefined);
+              if (typeof candidate === "function") {
+                factory = candidate;
+                break;
+              }
+            }
+          }
+          if (typeof factory !== "function") {
+            throw new Error(`no autosave session factory export was found in ${moduleUrl}`);
+          }
+          const session = await factory(autosaveKey, undefined, { readOnly: true });
           if (session) {
             reader = { key: autosaveKey, session };
             browserWindow.__studioNativeRasterAutosaveReader = reader;
@@ -1064,8 +1258,8 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
     const page = latest.payload.pagesList.find((candidate) => candidate.id === currentPageId)
       ?? latest.payload.pagesList[0];
     if (!page) return null;
-    const elements = (page.elements ?? []).flatMap((rawElement) => {
-      if (!rawElement || typeof rawElement !== "object" || Array.isArray(rawElement)) return [];
+    const elements = (await Promise.all((page.elements ?? []).map(async (rawElement) => {
+      if (!rawElement || typeof rawElement !== "object" || Array.isArray(rawElement)) return null;
       const element = rawElement as Record<string, unknown>;
       const points = Array.isArray(element.points)
         ? element.points.filter((value): value is number =>
@@ -1105,6 +1299,7 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
         }
       }
       let signature: string | null = null;
+      let srcSha256: `sha256:${string}` | null = null;
       if (src) {
         // PNG length and footer alone can collide across two edits. Sample a fixed number of
         // positions so autosave polling observes content changes without hashing the full data URL
@@ -1116,8 +1311,24 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
           sampledHash = Math.imul(sampledHash, 16_777_619) >>> 0;
         }
         signature = `${src.length}:${sampledHash.toString(16)}:${src.slice(-24)}`;
+        const digest = await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(src),
+        );
+        srcSha256 = `sha256:${[...new Uint8Array(digest)]
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("")}`;
+        const sourceCache = browserWindow.__studioNativeRasterDurableImageSources
+          ?? new Map<string, string>();
+        sourceCache.set(srcSha256, src);
+        while (sourceCache.size > 8) {
+          const oldestKey = sourceCache.keys().next().value;
+          if (!oldestKey) break;
+          sourceCache.delete(oldestKey);
+        }
+        browserWindow.__studioNativeRasterDurableImageSources = sourceCache;
       }
-      return [{
+      return {
         id: typeof element.id === "string" ? element.id : "",
         type: typeof element.type === "string" ? element.type : "unknown",
         hidden: element.hidden === true,
@@ -1128,6 +1339,7 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
           ? { x: points.at(-2)!, y: points.at(-1)! }
           : null,
         srcSignature: signature,
+        srcSha256,
         width: typeof element.width === "number" ? element.width : null,
         height: typeof element.height === "number" ? element.height : null,
         pixelWidth,
@@ -1145,8 +1357,8 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
           blurRadius: element.blurRadius ?? null,
           motionBlurDistance: element.motionBlurDistance ?? null,
         }),
-      }];
-    });
+      };
+    }))).filter((element) => element !== null);
     return {
       key: latest.key,
       savedAt: String(latest.payload.savedAt ?? ""),
@@ -1306,7 +1518,11 @@ async function waitForRasterEffectBusyAndDurableAutosave(
   };
 }
 
-function screenshotPixelDiff(first: Buffer, second: Buffer): StudioNativeRasterPixelDiff {
+function screenshotPixelDiffWithExclusion(
+  first: Buffer,
+  second: Buffer,
+  excluded?: (x: number, y: number) => boolean,
+): StudioNativeRasterPixelDiff {
   const before = decodePng(new Uint8Array(first.buffer, first.byteOffset, first.byteLength));
   const after = decodePng(new Uint8Array(second.buffer, second.byteOffset, second.byteLength));
   const beforeRaw = before.getRawImage();
@@ -1322,9 +1538,14 @@ function screenshotPixelDiff(first: Buffer, second: Buffer): StudioNativeRasterP
   }
   const channels = Math.min(before.channels, after.channels);
   let changedPixels = 0;
+  let totalPixels = 0;
   let maxChannelDelta = 0;
   let changedDeltaTotal = 0;
   for (let pixel = 0; pixel < before.width * before.height; pixel += 1) {
+    const x = pixel % before.width;
+    const y = Math.floor(pixel / before.width);
+    if (excluded?.(x, y)) continue;
+    totalPixels += 1;
     let pixelDelta = 0;
     let pixelDeltaTotal = 0;
     for (let channel = 0; channel < channels; channel += 1) {
@@ -1342,10 +1563,92 @@ function screenshotPixelDiff(first: Buffer, second: Buffer): StudioNativeRasterP
   }
   return {
     changedPixels,
-    totalPixels: before.width * before.height,
+    totalPixels,
     maxChannelDelta,
     meanChangedChannelDelta: changedPixels > 0 ? changedDeltaTotal / changedPixels : 0,
   };
+}
+
+function screenshotPixelDiff(first: Buffer, second: Buffer): StudioNativeRasterPixelDiff {
+  return screenshotPixelDiffWithExclusion(first, second);
+}
+
+function pixelTransformDocumentDiff(
+  first: Buffer,
+  second: Buffer,
+): StudioNativeRasterPixelDiff {
+  const clipStart = FIXTURE_CLIP_DOCUMENT_POINTS[0]!;
+  const clipEnd = FIXTURE_CLIP_DOCUMENT_POINTS[1]!;
+  const selectionStart = RECT_SELECTION_DOCUMENT_POINTS[0];
+  const selectionEnd = RECT_SELECTION_DOCUMENT_POINTS[1];
+  const decoded = decodePng(new Uint8Array(first.buffer, first.byteOffset, first.byteLength));
+  const scaleX = decoded.width / Math.abs(clipEnd.x - clipStart.x);
+  const scaleY = decoded.height / Math.abs(clipEnd.y - clipStart.y);
+  const left = (Math.min(selectionStart.x, selectionEnd.x) - clipStart.x) * scaleX;
+  const right = (Math.max(selectionStart.x, selectionEnd.x) - clipStart.x) * scaleX;
+  const top = (Math.min(selectionStart.y, selectionEnd.y) - clipStart.y) * scaleY;
+  const bottom = (Math.max(selectionStart.y, selectionEnd.y) - clipStart.y) * scaleY;
+  const radius = PIXEL_TRANSFORM_SELECTION_CHROME_RADIUS_PX;
+  return screenshotPixelDiffWithExclusion(first, second, (x, y) => {
+    const onVerticalEdge = (Math.abs(x - left) <= radius || Math.abs(x - right) <= radius)
+      && y >= top - radius
+      && y <= bottom + radius;
+    const onHorizontalEdge = (Math.abs(y - top) <= radius || Math.abs(y - bottom) <= radius)
+      && x >= left - radius
+      && x <= right + radius;
+    return onVerticalEdge || onHorizontalEdge;
+  });
+}
+
+function screenshotPixelChangeMask(
+  first: Buffer,
+  second: Buffer,
+): { width: number; height: number; pixels: Uint8Array } {
+  const before = decodePng(new Uint8Array(first.buffer, first.byteOffset, first.byteLength));
+  const after = decodePng(new Uint8Array(second.buffer, second.byteOffset, second.byteLength));
+  invariant(
+    before.width === after.width && before.height === after.height,
+    "native fixture noise masks have different dimensions",
+  );
+  const beforeRaw = before.getRawImage();
+  const afterRaw = after.getRawImage();
+  const channels = Math.min(before.channels, after.channels);
+  const pixels = new Uint8Array(before.width * before.height);
+  for (let pixel = 0; pixel < pixels.length; pixel += 1) {
+    let pixelDelta = 0;
+    for (let channel = 0; channel < channels; channel += 1) {
+      pixelDelta = Math.max(
+        pixelDelta,
+        Math.abs(
+          beforeRaw.data[pixel * before.channels + channel]!
+          - afterRaw.data[pixel * after.channels + channel]!,
+        ),
+      );
+    }
+    if (pixelDelta > 3) pixels[pixel] = 1;
+  }
+  return { width: before.width, height: before.height, pixels };
+}
+
+function rasterControlNoiseExcludedChangedPixels(input: {
+  measuredFixture: Buffer;
+  controlFixture: Buffer;
+  rasterControl: Buffer;
+  coldEffect: Buffer;
+}): number {
+  const fixtureNoise = screenshotPixelChangeMask(input.measuredFixture, input.controlFixture);
+  const effectChange = screenshotPixelChangeMask(input.rasterControl, input.coldEffect);
+  invariant(
+    fixtureNoise.width === effectChange.width && fixtureNoise.height === effectChange.height,
+    "native fixture and cold-effect masks have different dimensions",
+  );
+  return studioNativeRasterNoiseExcludedChangedPixels(
+    fixtureNoise.pixels,
+    effectChange.pixels,
+    fixtureNoise.width,
+    fixtureNoise.height,
+    2,
+  );
 }
 
 function meaningfulPixelChange(diff: StudioNativeRasterPixelDiff | null): boolean {
@@ -1410,6 +1713,18 @@ async function setPrimaryColor(page: Page, color: string): Promise<void> {
   await input.fill(color);
 }
 
+async function waitForNativeFixturePresentation(
+  page: Page,
+  blankBaseline: Buffer,
+): Promise<Buffer> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 4_000) {
+    const screenshot = await captureClip(page, 80);
+    if (meaningfulPixelChange(screenshotPixelDiff(blankBaseline, screenshot))) return screenshot;
+  }
+  throw new Error("native pointer fixture persisted but did not reach the Konva presentation");
+}
+
 async function drawNativeFixture(
   page: Page,
   artifacts: ScenarioArtifacts | null,
@@ -1420,21 +1735,23 @@ async function drawNativeFixture(
   const pen = drawOptions.getByRole("button", { name: "펜", exact: true });
   if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
   await setPrimaryColor(page, "#6b7280");
+  await ensureNativeRasterInteractionRegion(page);
+  const blankBaseline = await captureClip(page, 80);
   await installTrustedPointerAudit(page);
 
   const outline = await documentPointsToScreen(page, NATIVE_OUTLINE_DOCUMENT_POINTS);
   const internalLine = await documentPointsToScreen(page, NATIVE_INTERNAL_LINE_DOCUMENT_POINTS);
-  await drawPointerPath(page, outline, 6);
+  await drawMeasuredPointerPath(page, outline, 6, NATIVE_FIXTURE_POINTER_STEP_DELAY_MS);
   await page.waitForTimeout(100);
-  await drawPointerPath(page, internalLine, 5);
+  await drawMeasuredPointerPath(page, internalLine, 5, NATIVE_FIXTURE_POINTER_STEP_DELAY_MS);
   await page.mouse.move(4, 4);
 
+  const screenshot = await waitForNativeFixturePresentation(page, blankBaseline);
   const snapshot = await waitForDocumentSnapshot(
     page,
     (candidate) => candidate.drawCount === 2 && candidate.imageCount === 0,
     "native pointer fixture did not persist exactly two draw elements",
   );
-  const screenshot = await captureClip(page);
   if (artifacts) writeFileSync(artifacts.fixture, screenshot);
   return {
     snapshot,
@@ -1452,6 +1769,7 @@ async function capturePreparedRasterOnlyControl(
   const context = await browser.newContext({
     viewport: { width: 1600, height: 1050 },
     reducedMotion: "reduce",
+    locale: "ko-KR",
   });
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, `${id}-raster-only-control`, studioUrl);
@@ -1517,7 +1835,7 @@ function assertEquivalentNativeFixture(
   scenarioId: RetouchScenarioId,
   measured: FixtureEvidence,
   control: FixtureEvidence,
-): void {
+): StudioNativeRasterPixelDiff {
   const drawGeometry = (fixture: FixtureEvidence) => fixture.snapshot.elements
     .filter((element) => element.type === "draw")
     .map((element) => ({
@@ -1527,13 +1845,19 @@ function assertEquivalentNativeFixture(
       hidden: element.hidden,
     }));
   invariant(
-    JSON.stringify(drawGeometry(measured)) === JSON.stringify(drawGeometry(control)),
-    `${scenarioId} raster-only control fixture geometry differed from the measured fixture`,
+    studioNativeRasterFixtureGeometryEquivalent(
+      drawGeometry(measured),
+      drawGeometry(control),
+    ),
+    `${scenarioId} raster-only control fixture semantic geometry differed from the measured fixture`,
   );
+  const pixelDiff = screenshotPixelDiff(measured.screenshot, control.screenshot);
   invariant(
-    measured.screenshot.equals(control.screenshot),
-    `${scenarioId} raster-only control fixture pixels differed from the measured fixture`,
+    studioNativeRasterFixturePixelsSimilar(pixelDiff),
+    `${scenarioId} raster-only control fixture pixels differed from the measured fixture: `
+      + JSON.stringify(pixelDiff),
   );
+  return pixelDiff;
 }
 
 function imageSignature(snapshot: DocumentSnapshot | null): string {
@@ -1549,6 +1873,41 @@ function imageSignature(snapshot: DocumentSnapshot | null): string {
       element.filterFieldSignature,
     ].join(":"))
     .join("|");
+}
+
+function exactImageSignature(snapshot: DocumentSnapshot | null): string {
+  return (snapshot?.elements ?? [])
+    .filter((element) => element.type === "image")
+    .map((element) => [
+      element.id,
+      element.srcSha256,
+      element.width,
+      element.height,
+      element.smartFilterCount,
+      element.filterMaskPresent,
+      element.filterFieldSignature,
+    ].join(":"))
+    .join("|");
+}
+
+function durableDocumentFingerprint(snapshot: DocumentSnapshot | null): string {
+  return (snapshot?.elements ?? []).map((element) => JSON.stringify([
+    element.id,
+    element.type,
+    element.hidden,
+    element.pointCount,
+    element.firstPoint,
+    element.lastPoint,
+    element.srcSignature,
+    element.srcSha256,
+    element.width,
+    element.height,
+    element.pixelWidth,
+    element.pixelHeight,
+    element.smartFilterCount,
+    element.filterMaskPresent,
+    element.filterFieldSignature,
+  ])).join("|");
 }
 
 function roundedMilliseconds(value: number | null): number | null {
@@ -1853,8 +2212,11 @@ function restoredWithinTolerance(
   return diff.changedPixels <= allowed;
 }
 
-async function enabledHistoryButton(page: Page): Promise<Locator> {
-  const candidates = page.locator('button[aria-label="실행취소"]:visible');
+async function enabledHistoryButton(
+  page: Page,
+  label: "실행취소" | "다시실행" = "실행취소",
+): Promise<Locator> {
+  const candidates = page.locator(`button[aria-label="${label}"]:visible`);
   const startedAt = Date.now();
   while (Date.now() - startedAt < 12_000) {
     const count = await candidates.count();
@@ -1864,7 +2226,7 @@ async function enabledHistoryButton(page: Page): Promise<Locator> {
     }
     await page.waitForTimeout(80);
   }
-  throw new Error("document Undo button did not become enabled");
+  throw new Error(`document ${label} button did not become enabled`);
 }
 
 async function openFilterDialog(
@@ -1897,6 +2259,78 @@ async function setFilterBrightness(dialog: Locator, value: number): Promise<void
   await input.press("Enter");
 }
 
+interface PixelSelectionUiState {
+  visiblePanelCount: number;
+  clearDisabled: boolean | null;
+  undoDisabled: boolean | null;
+  redoDisabled: boolean | null;
+}
+
+async function readPixelSelectionUiState(page: Page): Promise<PixelSelectionUiState> {
+  return page.evaluate(() => {
+    const panels = [...document.querySelectorAll<HTMLElement>(
+      '[data-studio-pixel-selection="true"]',
+    )].filter((panel) => {
+      const style = getComputedStyle(panel);
+      return !panel.hidden
+        && style.display !== "none"
+        && style.visibility !== "hidden"
+        && panel.getClientRects().length > 0;
+    });
+    const panel = panels[0];
+    const disabled = (label: string): boolean | null => {
+      const button = panel?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+      return button ? button.disabled : null;
+    };
+    return {
+      visiblePanelCount: panels.length,
+      clearDisabled: disabled("선택 해제"),
+      undoDisabled: disabled("선택 작업 실행 취소"),
+      redoDisabled: disabled("선택 작업 다시 실행"),
+    };
+  });
+}
+
+async function exposePixelSelectionUi(page: Page): Promise<PixelSelectionUiState> {
+  const propertiesTab = page.locator(
+    '[data-studio-inspector-primary-tab="properties"]:visible',
+  );
+  await propertiesTab.first().waitFor({ state: "visible", timeout: 10_000 });
+  if (await propertiesTab.first().getAttribute("aria-selected") !== "true") {
+    await propertiesTab.first().click();
+  }
+
+  const retouchTab = page
+    .locator('[role="tab"]:visible')
+    .filter({ hasText: /^선택·리터치$/u });
+  await retouchTab.first().waitFor({ state: "visible", timeout: 10_000 });
+  if (await retouchTab.first().getAttribute("aria-selected") !== "true") {
+    await retouchTab.first().click();
+  }
+
+  await page.locator('[data-studio-pixel-selection="true"]:visible').first().waitFor({
+    state: "visible",
+    timeout: 10_000,
+  });
+  return readPixelSelectionUiState(page);
+}
+
+async function waitForClearedPixelSelectionUiState(page: Page): Promise<PixelSelectionUiState> {
+  const startedAt = Date.now();
+  let state = await readPixelSelectionUiState(page);
+  while (Date.now() - startedAt < 8_000) {
+    if (
+      state.visiblePanelCount === 1
+      && state.clearDisabled === true
+      && state.undoDisabled === true
+      && state.redoDisabled === false
+    ) return state;
+    await page.waitForTimeout(50);
+    state = await readPixelSelectionUiState(page);
+  }
+  throw new Error(`selection Undo did not clear its UI authority: ${JSON.stringify(state)}`);
+}
+
 async function performRectLikeSelection(
   page: Page,
   kind: "rect" | "circle",
@@ -1907,7 +2341,7 @@ async function performRectLikeSelection(
   );
   const inactiveBefore = await button.getAttribute("aria-pressed") !== "true";
   const documentRoute = kind === "rect"
-    ? [{ x: 150, y: 260 }, { x: 405, y: 565 }]
+    ? RECT_SELECTION_DOCUMENT_POINTS
     : [{ x: 185, y: 285 }, { x: 455, y: 575 }];
   const route = await documentPointsToScreen(page, documentRoute);
   await button.click();
@@ -2247,9 +2681,16 @@ async function performPaintBucket(
 
 async function performCrop(
   page: Page,
-): Promise<{ inactiveBefore: boolean; activeAfter: boolean; snapshot: DocumentSnapshot }> {
+): Promise<{
+  inactiveBefore: boolean;
+  activeAfter: boolean;
+  snapshot: DocumentSnapshot;
+  preparedSnapshot: DocumentSnapshot;
+  preparedBaselineScreenshot: Buffer;
+}> {
   const button = await toolButton(page, "자르기 (C)");
   const inactiveBefore = await button.getAttribute("aria-pressed") !== "true";
+  await armRasterImagePresentationProbe(page);
   await button.click();
   await waitForPressed(button, true);
   const prepared = await waitForDocumentSnapshot(
@@ -2257,6 +2698,12 @@ async function performCrop(
     (candidate) => candidate.imageCount === 1 && candidate.hiddenDrawCount === 2,
     "crop did not create its editable raster target",
   );
+  await waitForExactRasterImagePresentation(
+    page,
+    "crop editable raster target did not draw its exact prepared src",
+    24_000,
+  );
+  const preparedBaselineScreenshot = await captureClip(page);
   const preparedSignature = imageSignature(prepared);
   const [start, end] = await documentPointsToScreen(page, [
     { x: 3, y: 3 },
@@ -2280,6 +2727,8 @@ async function performCrop(
     inactiveBefore,
     activeAfter: true,
     snapshot,
+    preparedSnapshot: prepared,
+    preparedBaselineScreenshot,
   };
 }
 
@@ -2319,10 +2768,6 @@ async function performFilter(
     const selection = await performRectLikeSelection(page, "rect");
     selectionSnapshot = selection.snapshot;
     selectionBaseline = await captureClip(page);
-    // The editable image commit and the owner-scoped pixel-selection replay are separate React
-    // transitions.  The transform label is shipped UI proof that the latter is now usable; opening
-    // the menu before it appears would capture a transient session without selection scope.
-    await waitForToolButton(page, "변형 (⇧T)");
     log(`filter-${scope}: selection UI before menu ${JSON.stringify(await selectionUiDiagnostic())}`);
   }
   const dialogBefore = await page.getByRole("dialog", { name: "명도 / 대비" }).count() > 0;
@@ -2334,6 +2779,16 @@ async function performFilter(
           log(`filter-${scope}: selection UI after menu open ${JSON.stringify(await selectionUiDiagnostic())}`);
         },
   );
+  if (scope !== "whole") {
+    const scopeRadioCount = await dialog
+      .locator('input[name="studio-filter-application-scope"]')
+      .count();
+    invariant(
+      scopeRadioCount === 3,
+      `filter ${scope} first dialog open did not expose all three selection scopes `
+        + `(found ${scopeRadioCount})`,
+    );
+  }
   const activeAfter = await dialog.isVisible();
   if (scope !== "whole") {
     log(
@@ -2401,7 +2856,7 @@ async function performPixelTransform(
   activeAfter: boolean;
   snapshot: DocumentSnapshot;
   selectionSnapshot: DocumentSnapshot;
-  selectionBaseline: Buffer;
+  transformBaselineScreenshot: Buffer;
 }> {
   const recovery = await toolButton(
     page,
@@ -2409,12 +2864,15 @@ async function performPixelTransform(
   );
   const inactiveBefore = await recovery.getAttribute("aria-pressed") !== "true";
   const selection = await performRectLikeSelection(page, "rect");
-  const selectionBaseline = await captureClip(page);
   const transform = await waitForToolButton(page, "변형 (⇧T)");
   await waitForEnabled(transform);
   await transform.click();
   const flip = page.getByRole("button", { name: "픽셀 내용 좌우 반전", exact: true });
   await waitForEnabled(flip, 18_000);
+  // Capture the visual Undo baseline only after transform mode has mounted. A selection-only
+  // screenshot predates this mode's chrome, so its residual can measure UI entry rather than the
+  // transform being reverted. The persisted selection snapshot remains the durable authority.
+  const transformBaselineScreenshot = await captureClip(page);
   const beforeSignature = imageSignature(selection.snapshot);
   await flip.click();
   const snapshot = await waitForDocumentSnapshot(
@@ -2431,7 +2889,7 @@ async function performPixelTransform(
     activeAfter: await flip.isEnabled(),
     snapshot,
     selectionSnapshot: selection.snapshot,
-    selectionBaseline,
+    transformBaselineScreenshot,
   };
 }
 
@@ -2460,6 +2918,8 @@ function emptyScenarioEvidence(definition: ScenarioDefinition): StudioNativeRast
     firstGesture: {
       expected: definition.firstGestureExpected,
       replayed: definition.firstGestureExpected ? false : null,
+      fixtureControlDiff: null,
+      noiseExcludedChangedPixels: null,
       rasterControlDiff: null,
     },
     operationDiff: null,
@@ -2467,7 +2927,13 @@ function emptyScenarioEvidence(definition: ScenarioDefinition): StudioNativeRast
       attempted: false,
       restored: false,
       retainedEditableRasterWhenExpected: false,
+      rawDiffFromBefore: null,
       diffFromBefore: null,
+      selectionStateCleared: null,
+      durableSnapshotRetained: null,
+      durableImageRestored: null,
+      exactRestoredImagePresented: null,
+      documentRedoEnabledAfterUndo: null,
     },
     performance: null,
     browserErrors: [],
@@ -2564,6 +3030,7 @@ async function runRasterPreparationCancellationScenario(
   const context = await browser.newContext({
     viewport: { width: 1600, height: 1050 },
     reducedMotion: "reduce",
+    locale: "ko-KR",
   });
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, `cancellation-${action}`, studioUrl);
@@ -2714,6 +3181,7 @@ async function runScenario(
   const context: BrowserContext = await browser.newContext({
     viewport: { width: 1600, height: 1050 },
     reducedMotion: "reduce",
+    locale: "ko-KR",
   });
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, definition.id, studioUrl);
@@ -2798,8 +3266,20 @@ async function runScenario(
           definition.id,
           configuredCanvasHeight,
         );
-        assertEquivalentNativeFixture(definition.id, fixture, rasterOnlyControl.fixture);
+        writeFileSync(artifacts.controlFixture, rasterOnlyControl.fixture.screenshot);
+        evidence.firstGesture.fixtureControlDiff = assertEquivalentNativeFixture(
+          definition.id,
+          fixture,
+          rasterOnlyControl.fixture,
+        );
         writeFileSync(artifacts.coldRasterControl, rasterOnlyControl.screenshot);
+        evidence.firstGesture.noiseExcludedChangedPixels =
+          rasterControlNoiseExcludedChangedPixels({
+            measuredFixture: fixture.screenshot,
+            controlFixture: rasterOnlyControl.fixture.screenshot,
+            rasterControl: rasterOnlyControl.screenshot,
+            coldEffect: result.coldBaselineScreenshot,
+          });
         selectionGestureDiff = screenshotPixelDiff(
           rasterOnlyControl.screenshot,
           result.coldBaselineScreenshot,
@@ -2822,14 +3302,20 @@ async function runScenario(
         const result = await performCrop(page);
         activation = result;
         afterSnapshot = result.snapshot;
+        beforeOperation = result.preparedBaselineScreenshot;
+        warmUndoBaselineSnapshot = result.preparedSnapshot;
         break;
       }
       case "pixel-transform": {
         const result = await performPixelTransform(page);
         activation = result;
         afterSnapshot = result.snapshot;
-        beforeOperation = result.selectionBaseline;
-        selectionGestureDiff = screenshotPixelDiff(fixture.screenshot, result.selectionBaseline);
+        beforeOperation = result.transformBaselineScreenshot;
+        selectionGestureDiff = screenshotPixelDiff(
+          fixture.screenshot,
+          result.transformBaselineScreenshot,
+        );
+        warmUndoBaselineSnapshot = result.selectionSnapshot;
         break;
       }
       case "dodge-burn-burn":
@@ -2842,14 +3328,16 @@ async function runScenario(
       activeAfter: activation.activeAfter,
     };
     invariant(afterSnapshot, `${definition.id}: operation did not expose a persisted snapshot`);
+    const persistedAfterSnapshot = afterSnapshot;
     evidence.editableRaster = {
       expected: definition.expectedEditableRaster,
-      createdImage: afterSnapshot.imageCount >= 1,
-      nativeDrawCount: afterSnapshot.drawCount,
-      hiddenNativeDrawCount: afterSnapshot.hiddenDrawCount,
+      createdImage: persistedAfterSnapshot.imageCount >= 1,
+      nativeDrawCount: persistedAfterSnapshot.drawCount,
+      hiddenNativeDrawCount: persistedAfterSnapshot.hiddenDrawCount,
       selectedImageObserved: await selectedImageObserved(page),
     };
 
+    writeFileSync(artifacts.operationBaseline, beforeOperation);
     const after = await captureClip(page, tier === "deep" ? 450 : 260);
     writeFileSync(artifacts.after, after);
     const operationDiff = screenshotPixelDiff(beforeOperation, after);
@@ -2861,15 +3349,55 @@ async function runScenario(
 
     evidence.undo.attempted = true;
     const selectionOnlyUndo = definition.id.startsWith("selection-");
+    let selectionUndoStateCleared = false;
+    let selectionUndoDurableSnapshotRetained = false;
+    let documentRedoEnabledAfterUndo = false;
+    let exactRestoredImagePresented = false;
     if (selectionOnlyUndo) {
+      const selectionUiBeforeUndo = await exposePixelSelectionUi(page);
+      invariant(
+        selectionUiBeforeUndo.visiblePanelCount === 1
+        && selectionUiBeforeUndo.clearDisabled === false
+        && selectionUiBeforeUndo.undoDisabled === false
+        && selectionUiBeforeUndo.redoDisabled === true,
+        `selection Undo precondition is not authoritative: ${JSON.stringify(selectionUiBeforeUndo)}`,
+      );
+      const durableBeforeUndo = durableDocumentFingerprint(persistedAfterSnapshot);
       await page.keyboard.press("Meta+z");
-      await page.waitForTimeout(tier === "deep" ? 650 : 400);
-      undoneSnapshot = await readDocumentSnapshot(page);
+      await waitForClearedPixelSelectionUiState(page);
+      selectionUndoStateCleared = true;
+      undoneSnapshot = await waitForDocumentSnapshot(
+        page,
+        (candidate) =>
+          candidate.imageCount === 1
+          && candidate.drawCount === persistedAfterSnapshot.drawCount
+          && candidate.hiddenDrawCount === persistedAfterSnapshot.hiddenDrawCount
+          && candidate.visibleDrawCount === persistedAfterSnapshot.visibleDrawCount
+          && durableDocumentFingerprint(candidate) === durableBeforeUndo,
+        `${definition.id}: selection Undo changed or lost the durable raster document`,
+        12_000,
+      );
+      selectionUndoDurableSnapshotRetained =
+        durableDocumentFingerprint(undoneSnapshot) === durableBeforeUndo;
     } else {
       const undo = await enabledHistoryButton(page);
+      if (definition.id === "pixel-transform") {
+        const baselineImage = warmUndoBaselineSnapshot?.elements.find(
+          (element) => element.type === "image",
+        );
+        invariant(
+          baselineImage?.id
+          && baselineImage.srcSha256,
+          "pixel-transform Undo baseline lacks an exact durable image identity",
+        );
+        await armRasterImagePresentationProbe(page, {
+          elementId: baselineImage.id,
+          srcSha256: baselineImage.srcSha256,
+        });
+      }
       await undo.click();
       if (definition.editableRasterRetainedAfterUndo) {
-        const warmUndoBaselineSignature = imageSignature(warmUndoBaselineSnapshot);
+        const warmUndoBaselineSignature = exactImageSignature(warmUndoBaselineSnapshot);
         undoneSnapshot = await waitForDocumentSnapshot(
           page,
           (candidate) =>
@@ -2877,8 +3405,8 @@ async function runScenario(
             && candidate.hiddenDrawCount === 2
             && (
               warmUndoBaselineSnapshot
-                ? imageSignature(candidate) === warmUndoBaselineSignature
-                : imageSignature(candidate) !== imageSignature(afterSnapshot)
+                ? exactImageSignature(candidate) === warmUndoBaselineSignature
+                : imageSignature(candidate) !== imageSignature(persistedAfterSnapshot)
             ),
           `${definition.id}: one-step Undo removed the editable copy or did not revert the operation`,
           18_000,
@@ -2894,29 +3422,63 @@ async function runScenario(
           18_000,
         );
       }
+      if (definition.id === "pixel-transform") {
+        const undoPresentation = await waitForExactRasterImagePresentation(
+          page,
+          "pixel-transform Undo restored durable src but did not draw that exact src",
+          18_000,
+        );
+        exactRestoredImagePresented = undoPresentation.expectationEpoch > 0;
+        await enabledHistoryButton(page, "다시실행");
+        documentRedoEnabledAfterUndo = true;
+      }
     }
 
     const undone = await captureClip(page, tier === "deep" ? 500 : 300);
     writeFileSync(artifacts.undone, undone);
-    const undoDiff = screenshotPixelDiff(beforeOperation, undone);
+    const rawUndoDiff = screenshotPixelDiff(beforeOperation, undone);
+    const undoDiff = definition.id === "pixel-transform"
+      ? pixelTransformDocumentDiff(beforeOperation, undone)
+      : rawUndoDiff;
+    // Selection history is transient UI authority: one Undo must clear that state while retaining
+    // the exact durable raster document. Marquee animation pixels are diagnostic only and are not
+    // accepted as history proof.
+    const selectionUndoRestored = selectionOnlyUndo
+      && selectionUndoStateCleared
+      && selectionUndoDurableSnapshotRetained;
     const retainedAsExpected = definition.editableRasterRetainedAfterUndo
       ? Boolean(undoneSnapshot && undoneSnapshot.imageCount === 1 && undoneSnapshot.hiddenDrawCount === 2)
       : Boolean(undoneSnapshot && undoneSnapshot.imageCount === 0 && undoneSnapshot.visibleDrawCount === 2);
     const historyChanged = selectionOnlyUndo
-      ? true
-      : imageSignature(afterSnapshot) !== imageSignature(undoneSnapshot);
+      ? selectionUndoStateCleared
+      : imageSignature(persistedAfterSnapshot) !== imageSignature(undoneSnapshot);
     const warmUndoRestoredColdBaseline = warmUndoBaselineSnapshot
-      ? imageSignature(undoneSnapshot) === imageSignature(warmUndoBaselineSnapshot)
+      ? exactImageSignature(undoneSnapshot) === exactImageSignature(warmUndoBaselineSnapshot)
       : true;
     evidence.undo = {
       attempted: true,
       restored:
-        restoredWithinTolerance(undoDiff, operationDiff)
+        (selectionOnlyUndo
+          ? selectionUndoRestored
+          : restoredWithinTolerance(undoDiff, operationDiff))
         && retainedAsExpected
         && historyChanged
         && warmUndoRestoredColdBaseline,
       retainedEditableRasterWhenExpected: retainedAsExpected,
+      rawDiffFromBefore: rawUndoDiff,
       diffFromBefore: undoDiff,
+      selectionStateCleared: selectionOnlyUndo ? selectionUndoStateCleared : null,
+      durableSnapshotRetained:
+        selectionOnlyUndo ? selectionUndoDurableSnapshotRetained : null,
+      durableImageRestored: warmUndoBaselineSnapshot
+        ? warmUndoRestoredColdBaseline
+        : null,
+      exactRestoredImagePresented: definition.id === "pixel-transform"
+        ? exactRestoredImagePresented
+        : null,
+      documentRedoEnabledAfterUndo: definition.id === "pixel-transform"
+        ? documentRedoEnabledAfterUndo
+        : null,
     };
     if (evidence.performance) {
       evidence.performance.warm.completion.undoRestoredColdBaseline =
@@ -2955,7 +3517,11 @@ async function runScenario(
       : "";
     log(
       `${definition.id}: PASS diff=${operationDiff.changedPixels}/${operationDiff.totalPixels} `
-      + `undoResidual=${undoDiff.changedPixels} rasterAfterUndo=${undoneSnapshot?.imageCount ?? -1}`
+      + `undoResidual=${undoDiff.changedPixels}`
+      + (definition.id === "pixel-transform"
+        ? ` rawUndoResidual=${rawUndoDiff.changedPixels}`
+        : "")
+      + ` rasterAfterUndo=${undoneSnapshot?.imageCount ?? -1}`
       + perfSummary,
     );
   } catch (error) {

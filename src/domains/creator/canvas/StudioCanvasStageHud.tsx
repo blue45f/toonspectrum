@@ -194,7 +194,7 @@ export function renderStudioCanvasStageHud({
             aria-expanded={pageSequenceOpen}
             aria-label={`페이지 시퀀스 ${pageSequenceOpen ? "닫기" : "열기"} · ${pageDisplayName(activePage, activePageIndex)}`}
             onClick={() => setPageSequenceOpen((current) => !current)}
-            className="inline-flex min-w-0 items-center gap-1 rounded-full px-0.5 text-fg transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="inline-flex min-h-6 min-w-0 items-center gap-1 rounded-full px-1.5 text-fg transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <Clapperboard size={11} aria-hidden />
             <span className="truncate">{pageDisplayName(activePage, activePageIndex)}</span>
@@ -344,7 +344,10 @@ export function renderStudioCanvasStageHud({
             if (canvasOnlyMode) setCanvasOnlyMode(false);
             else enterCanvasOnlyMode();
           }}
-          className="rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+          aria-label={canvasOnlyMode
+            ? localizeText(t, "도구 보기", "studio.canvas.canvasOnlyModeShowTools")
+            : localizeText(t, "` · 캔버스만 보기", "studio.canvas.canvasOnlyModeShowCanvasOnly")}
+          className="min-h-6 min-w-6 rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
           title={localizeText(t, "` — 캔버스만 / 도구 토글", "studio.canvas.canvasOnlyModeTitle")}
         >
           {canvasOnlyMode ? localizeText(t, "도구", "studio.canvas.canvasOnlyModeTool") : "`"}

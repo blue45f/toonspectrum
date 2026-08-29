@@ -10,10 +10,17 @@
  */
 
 import { Droplets } from "lucide-react";
+import { useId } from "react";
 
 import { BG_PRESETS, CANVAS_W, type BgPreset } from "./studio-assets";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import { MAGIC_RESIZE_DEFAULT_STRATEGY } from "./studio-magic-resize";
+import {
+  STUDIO_TEMPLATE_GUTTER_MAX,
+  STUDIO_TEMPLATE_GUTTER_MIN,
+  STUDIO_TEMPLATE_GUTTER_STEP,
+  type StudioTemplateGutterUnavailableReason,
+} from "./studio-template-gutter-layout";
 import { StudioInspectorSection } from "./StudioInspectorSection";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioPaperSurfacePicker } from "./StudioPaperSurfacePicker";
@@ -36,6 +43,7 @@ export interface StudioInspectorCanvasControlsProps {
   readonly background: string;
   readonly canvasHeight: number;
   readonly controlsDisabled: boolean;
+  readonly controlsDisabledReason: string | null | undefined;
   readonly gridSize: number;
   readonly showAlignmentGuides: boolean;
   readonly hidden: boolean;
@@ -49,7 +57,7 @@ export interface StudioInspectorCanvasControlsProps {
   readonly showGrid: boolean;
   readonly showWebtoonGuides: boolean;
   readonly snapEnabled: boolean;
-  readonly templateGutterAvailable: boolean;
+  readonly templateGutterUnavailableReason: StudioTemplateGutterUnavailableReason | null;
   readonly userGuides: readonly StudioInspectorUserGuide[];
   readonly webtoonGuides: typeof import("./studio-webtoon-guides") | null;
   readonly webtoonTheme: "classic" | "soft" | "vivid";
@@ -86,6 +94,26 @@ function localizeText(
   return translated === key ? fallback : translated;
 }
 
+function templateGutterUnavailableCopy(
+  t: (key: string) => string,
+  reason: StudioTemplateGutterUnavailableReason,
+): string {
+  const korean = {
+    "no-template": "패널 템플릿을 적용하면 전체 패널의 여백을 한 번에 조절할 수 있어요.",
+    "no-panels": "빈 캔버스에는 여백을 조절할 패널이 없어요.",
+    "unsupported-topology": "이 템플릿의 비정형 패널 배치는 자동 여백 조절을 지원하지 않아요.",
+  } as const;
+  const english = {
+    "no-template": "Apply a panel template to adjust all panel gaps together.",
+    "no-panels": "A blank canvas has no panel gaps to adjust.",
+    "unsupported-topology": "Automatic gap adjustment is unavailable for this template's irregular panel layout.",
+  } as const;
+  const probeKey = "studio.settings.tool.select";
+  const probe = t(probeKey);
+  const hasStudioLocalePack = probe !== probeKey && !probe.startsWith("studio.");
+  return hasStudioLocalePack && probe !== "선택" ? english[reason] : korean[reason];
+}
+
 /**
  * 밀도 토큰 — 이 패널은 행마다 `mt-2`/`mt-3` 를 손으로 붙이고 라벨 크기도
  * `text-sm`/`text-xs` 가 섞여 있었다. 인스펙터 나머지 크롬은 `text-xs` 한 단계이므로
@@ -107,6 +135,7 @@ export function StudioInspectorCanvasControls({
   background,
   canvasHeight,
   controlsDisabled,
+  controlsDisabledReason,
   showAlignmentGuides,
   gridSize,
   hidden,
@@ -118,7 +147,7 @@ export function StudioInspectorCanvasControls({
   showGrid,
   showWebtoonGuides,
   snapEnabled,
-  templateGutterAvailable,
+  templateGutterUnavailableReason,
   userGuides,
   webtoonGuides,
   webtoonTheme,
@@ -146,7 +175,13 @@ export function StudioInspectorCanvasControls({
   onWebtoonThemeChange,
 }: StudioInspectorCanvasControlsProps) {
   const t = useT();
+  const panelGutterReasonId = useId();
   const fixedAmount = 240;
+  const panelGutterDisabledReason = controlsDisabled
+    ? controlsDisabledReason ?? "문서 설정이 잠겨 있어 패널 여백을 변경할 수 없어요."
+    : templateGutterUnavailableReason
+      ? templateGutterUnavailableCopy(t, templateGutterUnavailableReason)
+      : null;
   const guideAxisLabel = (type: StudioInspectorUserGuide["type"]) =>
     localizeText(t, type === "v" ? "세로" : "가로", `studio.canvas.guideType.${type === "v" ? "vertical" : "horizontal"}`);
 
@@ -372,22 +407,34 @@ export function StudioInspectorCanvasControls({
             onApplyPreset={onApplyMagicResizePreset}
           />
         )}
-        <label className={rowClass}>
-          {localizeText(t, "패널 여백 (Gutter)", "studio.canvas.panelGutter")}
-          <span className="flex items-center gap-1.5">
-            <input
-              type="range"
-              min={8}
-              max={48}
-              step={2}
-              value={panelGutter}
-              onChange={(event) => onPanelGutterChange(Number(event.currentTarget.value))}
-              className="w-24 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={controlsDisabled || !templateGutterAvailable}
-            />
-            <span className="w-5 text-right text-xs tabular-nums text-fg-3">{panelGutter}</span>
-          </span>
-        </label>
+        <div>
+          <label className={rowClass}>
+            {localizeText(t, "패널 여백 (Gutter)", "studio.canvas.panelGutter")}
+            <span className="flex items-center gap-1.5">
+              <input
+                type="range"
+                min={STUDIO_TEMPLATE_GUTTER_MIN}
+                max={STUDIO_TEMPLATE_GUTTER_MAX}
+                step={STUDIO_TEMPLATE_GUTTER_STEP}
+                value={panelGutter}
+                onChange={(event) => onPanelGutterChange(Number(event.currentTarget.value))}
+                aria-describedby={panelGutterDisabledReason ? panelGutterReasonId : undefined}
+                className="w-24 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={panelGutterDisabledReason !== null}
+              />
+              <span className="w-5 text-right text-xs tabular-nums text-fg-3">{panelGutter}</span>
+            </span>
+          </label>
+          {panelGutterDisabledReason && (
+            <p
+              id={panelGutterReasonId}
+              data-studio-panel-gutter-reason
+              className="mt-1 text-[0.68rem] leading-relaxed text-fg-3"
+            >
+              {panelGutterDisabledReason}
+            </p>
+          )}
+        </div>
       </StudioInspectorSection>
 
       <StudioInspectorSection

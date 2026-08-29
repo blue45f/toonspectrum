@@ -1,9 +1,12 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
   auditStudioArtistJourneyReports,
+  createStudioArtistJourneyRunDirectory,
   createStudioArtistJourneyVerifierPlan,
 } from "./verify-studio-artist-journey.mts";
 
@@ -19,11 +22,11 @@ function lifecycleReport(overrides: Record<string, unknown> = {}) {
   return {
     ok: true,
     autosave: {
-      drawCount: 1,
-      stroke: {
-        pointCount: 25,
-        fingerprint: "a".repeat(64),
-      },
+      authority: "durable-reload-recovery",
+      recoveryBannerObserved: true,
+      restoreActionCompleted: true,
+      browserCompatibilityKeysBeforeReload: 0,
+      browserCompatibilityKeysAtRecovery: 0,
     },
     visual: {
       blankToCommitted: diff(2_000),
@@ -145,7 +148,11 @@ describe("Studio artist journey evidence audit", () => {
       },
       lifecycle: {
         committedPixels: 2_000,
-        autosavedPointCount: 25,
+        persistenceAuthority: "durable-reload-recovery",
+        recoveryBannerObserved: true,
+        restoreActionCompleted: true,
+        browserCompatibilityKeysBeforeReload: 0,
+        browserCompatibilityKeysAtRecovery: 0,
         reloadChangedPixels: 3,
         exportChangedPixels: 0,
         exportByteIdentical: true,
@@ -265,8 +272,11 @@ describe("Studio artist journey evidence audit", () => {
     const audit = auditStudioArtistJourneyReports(
       lifecycleReport({
         autosave: {
-          drawCount: 2,
-          stroke: { pointCount: 1, fingerprint: "invalid" },
+          authority: "durable-reload-recovery",
+          recoveryBannerObserved: false,
+          restoreActionCompleted: false,
+          browserCompatibilityKeysBeforeReload: 1,
+          browserCompatibilityKeysAtRecovery: 1,
         },
         visual: {
           ...lifecycleReport().visual,
@@ -291,13 +301,35 @@ describe("Studio artist journey evidence audit", () => {
       "lifecycle: 1 unexpected 5xx responses",
       "lifecycle: reload did not restore the saved stroke",
       "lifecycle: PNG export pixels changed across save/reload",
-      "lifecycle: autosave does not contain exactly one non-degenerate hashed stroke",
+      "lifecycle: durable autosave/recovery authority evidence is incomplete",
       "lifecycle: pre/post reload PNG exports are not pixel-identical",
     ]));
   });
 });
 
 describe("Studio artist journey verifier orchestration", () => {
+  it("isolates repeated and concurrent runs beneath a fixed artifact root", () => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), "artist-journey-root-"));
+    try {
+      const first = createStudioArtistJourneyRunDirectory(artifactRoot);
+      const second = createStudioArtistJourneyRunDirectory(artifactRoot);
+
+      expect(first).not.toBe(second);
+      expect(dirname(first)).toBe(resolve(artifactRoot));
+      expect(dirname(second)).toBe(resolve(artifactRoot));
+      expect(basename(first)).toMatch(/^run-/u);
+      expect(basename(second)).toMatch(/^run-/u);
+
+      const firstPlan = createStudioArtistJourneyVerifierPlan("/repo", first);
+      const secondPlan = createStudioArtistJourneyVerifierPlan("/repo", second);
+      expect(firstPlan[1]?.outputDirectory).not.toBe(
+        secondPlan[1]?.outputDirectory
+      );
+    } finally {
+      rmSync(artifactRoot, { force: true, recursive: true });
+    }
+  });
+
   it("reuses the existing lifecycle and brush Playwright verifiers", () => {
     const plans = createStudioArtistJourneyVerifierPlan(
       "/repo",
