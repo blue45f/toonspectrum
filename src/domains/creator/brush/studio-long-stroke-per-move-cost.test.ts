@@ -1095,18 +1095,21 @@ const DOCUMENTED_GLOBAL_REPLAN_LANES: ReadonlyMap<
  * earned by every confirmation pass and a failure to detect by every attempt — so a lone outlier
  * on either side is re-measured rather than believed.
  *
- * Recorded as the geometric centre of that band over twelve runs on an Apple-silicon dev machine
- * under Node 24 — six idle and six with the box deliberately oversubscribed (8 spinning hogs
- * against 12 cores), because a runner is a shared machine and a pin taken only on a quiet one
- * would hand the whole band to contention. The combined per-lane spread came to x1.02-x1.61,
- * leaving roughly x1.1-x1.4 of the band for machine-to-machine drift on top of that. The two
+ * Recorded as the geometric centre of that band over TWO machine classes, because one is not
+ * enough and this gate proved it: pinned from Apple silicon alone, `family:glow` reddened a
+ * GitHub runner at x1.80 against a x1.78 budget, with `angled-ribbon` and `pencil-path` inside
+ * 3% of the same fate. The envelope is now twelve Apple-silicon runs — six idle and six with the
+ * box deliberately oversubscribed (8 spinning hogs against 12 cores), because a runner is a
+ * shared machine and a pin taken only on a quiet one would hand the whole band to contention —
+ * combined with the runner's own reading of every lane. Per-lane spread across both is
+ * x1.03-x1.75, leaving x1.19-x1.39 of the band for the next machine. The two
  * windows are the same code at two lengths, which is the tightest instruction-mix match a
  * denominator can have, so these travel far better than a ratio taken against a synthetic kernel
  * does — the impasto budgets in studio-oil-ribbon-carrier.impasto-relief.test.ts, which do use
  * the synthetic kernel, read ~1.0 where they were pinned and ~0.5 on this machine.
  *
  * The three `DOCUMENTED_GLOBAL_REPLAN_LANES` are pinned here too, replacing the raw growth
- * ratchets they used to carry (x12.0, x26.3, x7.4 against x11, x26, x8). Two land under the old
+ * ratchets they used to carry (x11.9, x24.6, x7.5 against x11, x26, x8). Two land under the old
  * number and `perfect-outline` lands above it, because all three MEASURE higher than the old gate
  * did — interleaving stops a lane from warming its long window over 21 back-to-back reps, and
  * that lane read x6.76 there against x8.2-x8.8 here. Per unit of regression every one of them is
@@ -1116,6 +1119,23 @@ const DOCUMENTED_GLOBAL_REPLAN_LANES: ReadonlyMap<
 interface LaneGrowthPin {
   /** Recorded calibrated growth: n=3200 per-move cost over n=400 per-move cost. */
   readonly growth: number;
+  /**
+   * The regression this lane's gate is asserted to convict, per run, on the machine at hand.
+   *
+   * It is pinned rather than fixed at 2 everywhere because the tolerance band a pin buys is
+   * EXACTLY this factor wide — budget `1.5 x pin` on top, detection `1.5/factor x pin` beneath —
+   * and some lanes do not have 2x of room to spare. A lane costing a few microseconds per move
+   * spends a large and machine-dependent share of its window on fixed overhead, so its honest
+   * ratio moves between machines even though nothing regressed: `family:glow` reads x1.02-x1.68
+   * on Apple silicon and x1.80 on a GitHub runner, a x1.76 spread that leaves 6% of a 2x band.
+   * That is the hazard #44 answered with the 0.1ms denominator floor, and the floor's cost was
+   * that those lanes asserted NOTHING about detection at all.
+   *
+   * Naming the factor keeps the claim instead of dropping it: every lane still proves, live, that
+   * it convicts something, and a lane that can only prove x3 says so out loud rather than looking
+   * like it proves x2. Four lanes here are at x3 — the sub-10us ones — and the other sixteen hold x2.
+   */
+  readonly detectionFactor: number;
   /**
    * Moves planned into one timed window. Each is timed on its own and the deltas summed, so no
    * `seek` is ever inside the window — this repeats one move, it does not advance the stroke.
@@ -1137,26 +1157,26 @@ interface LaneGrowthPin {
 }
 
 const LANE_GROWTH_PINS: ReadonlyMap<string, LaneGrowthPin> = new Map([
-  ["causal-ink", { growth: 1.1, movesPerWindow: 50 }],
-  ["perfect-outline", { growth: 8.0, movesPerWindow: 1 }],
-  ["capsule-outline", { growth: 0.85, movesPerWindow: 1 }],
-  ["oil-ribbon", { growth: 17.5, movesPerWindow: 1 }],
-  ["oil-extrude", { growth: 1.26, movesPerWindow: 1 }],
-  ["dry-dynamic", { growth: 1.13, movesPerWindow: 1 }],
-  ["spray-dynamic", { growth: 1.24, movesPerWindow: 1 }],
-  ["wet-dabs", { growth: 1.07, movesPerWindow: 1 }],
-  ["wet-stamp", { growth: 1.1, movesPerWindow: 6 }],
-  ["dry-stamp", { growth: 1.38, movesPerWindow: 6 }],
-  ["spray-stamp", { growth: 1.07, movesPerWindow: 8 }],
-  ["particle-fx", { growth: 4.95, movesPerWindow: 1 }],
-  ["angled-ribbon", { growth: 1.06, movesPerWindow: 50 }],
-  ["pencil-path", { growth: 1.05, movesPerWindow: 6 }],
-  ["stamp-tone", { growth: 1.25, movesPerWindow: 50 }],
-  ["family:highlighter", { growth: 1.64, movesPerWindow: 1 }],
-  ["family:calligraphy", { growth: 0.96, movesPerWindow: 1 }],
-  ["family:neon", { growth: 1.25, movesPerWindow: 25 }],
-  ["family:glow", { growth: 1.19, movesPerWindow: 25 }],
-  ["family:pastel", { growth: 0.83, movesPerWindow: 1 }],
+  ["causal-ink", { growth: 1.14, detectionFactor: 2, movesPerWindow: 50 }],
+  ["perfect-outline", { growth: 7.96, detectionFactor: 2, movesPerWindow: 1 }],
+  ["capsule-outline", { growth: 0.84, detectionFactor: 2, movesPerWindow: 1 }],
+  ["oil-ribbon", { growth: 16.37, detectionFactor: 2, movesPerWindow: 1 }],
+  ["oil-extrude", { growth: 1.09, detectionFactor: 2, movesPerWindow: 1 }],
+  ["dry-dynamic", { growth: 1.07, detectionFactor: 2, movesPerWindow: 1 }],
+  ["spray-dynamic", { growth: 1.08, detectionFactor: 2, movesPerWindow: 1 }],
+  ["wet-dabs", { growth: 1.08, detectionFactor: 2, movesPerWindow: 1 }],
+  ["wet-stamp", { growth: 1.12, detectionFactor: 2, movesPerWindow: 6 }],
+  ["dry-stamp", { growth: 1.44, detectionFactor: 2, movesPerWindow: 6 }],
+  ["spray-stamp", { growth: 1.08, detectionFactor: 2, movesPerWindow: 8 }],
+  ["particle-fx", { growth: 4.97, detectionFactor: 2, movesPerWindow: 1 }],
+  ["angled-ribbon", { growth: 1.41, detectionFactor: 3, movesPerWindow: 50 }],
+  ["pencil-path", { growth: 1.42, detectionFactor: 3, movesPerWindow: 6 }],
+  ["stamp-tone", { growth: 1.08, detectionFactor: 2, movesPerWindow: 50 }],
+  ["family:highlighter", { growth: 1.52, detectionFactor: 2, movesPerWindow: 1 }],
+  ["family:calligraphy", { growth: 1.01, detectionFactor: 2, movesPerWindow: 1 }],
+  ["family:neon", { growth: 1.53, detectionFactor: 3, movesPerWindow: 25 }],
+  ["family:glow", { growth: 1.57, detectionFactor: 3, movesPerWindow: 25 }],
+  ["family:pastel", { growth: 0.81, detectionFactor: 2, movesPerWindow: 1 }],
 ]);
 
 // ── Measurement ───────────────────────────────────────────────────────────────────────────────
@@ -1494,13 +1514,13 @@ describe("long-stroke per-move planning cost", () => {
         takeSample: run.takeSample,
         maxRatio,
         seed: verdict.passes,
-        factor: 2,
+        factor: pin!.detectionFactor,
         samples,
         warmups: 0,
       });
       expect(
         detection.detected,
-        `THIS LANE'S GROWTH GATE WOULD NO LONGER CATCH A DOUBLING — re-pin its`
+        `THIS LANE'S GROWTH GATE WOULD NO LONGER CATCH THE REGRESSION IT CLAIMS — re-pin its`
           + ` LANE_GROWTH_PINS entry to what it now measures.\n${context}`
           + `\n  ${detection.detail}`,
       ).toBe(true);
