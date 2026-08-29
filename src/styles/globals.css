@@ -1144,6 +1144,13 @@ body[data-studio-app="true"] .route-stage::before,
     scroll-padding-inline-end: 3rem;
   }
 
+  [data-studio-editor="true"][data-studio-mobile-immersive="true"] {
+    /* 좌상단 플로팅 알약이 뷰포트 위에서 실제로 차지하는 세로 띠.
+       top(0.375rem) + 레인 min-height(2.75rem) + 레인 세로 패딩(0.5rem) + 알약 테두리(2px).
+       캔버스 위에 겹쳐 뜨는 다른 크롬은 이 값을 넘겨서 시작해야 알약을 덮지 않는다. */
+    --studio-immersive-menubar-block: calc(0.375rem + 2.75rem + 0.5rem + 2px);
+  }
+
   /* 몰입 헤더는 44px 접근성 타깃을 보존하되 레이아웃 높이를 점유하지 않는 작은 플로팅
      컨트롤로 만든다. 상태 메시지가 실제로 있을 때만 그 아래 공간을 다시 확보한다.
      셸이 이미 safe-area padding을 주므로 top/left는 0(이중 인셋 방지). */
@@ -1187,6 +1194,23 @@ body[data-studio-app="true"] .route-stage::before,
   [data-studio-editor="true"][data-studio-mobile-immersive="true"]
     [data-studio-global-status-rail]:not(:empty) {
     padding-top: 2.75rem;
+  }
+
+  /* 프레즌스 도크(동기화 상태·같이 그리기)는 캔버스 스크롤포트 우상단에 sticky 로 붙고,
+     몰입형 메뉴 알약은 셸에 absolute 로 뜬다. 서로 다른 포지셔닝 컨텍스트라 어느 쪽도
+     상대 폭을 알 수 없어서, 320~430px 에서 도크가 알약의 게시하기 버튼을 덮어 탭이
+     도크로 새어 나갔다(verify:studio-mobile-top 의 hit-test 유실). 가로로는 둘 다 들어갈
+     자리가 없으므로 — 320px 에서 알약만으로 폭이 거의 찬다 — 세로로 분리해 겹침 자체를
+     구조적으로 없앤다. 데스크톱은 알약이 없으니 그대로 둔다. */
+  [data-studio-editor="true"][data-studio-mobile-immersive="true"]
+    [data-studio-presence-dock="true"] {
+    /* 호스트가 이미 상단 0.5rem 을 쓰므로 그만큼 빼고, 알약 아래 0.25rem 숨통을 남긴다.
+       폴백은 필수다 — 변수가 사라지면 calc() 가 무효가 되어 margin-top 이 0 으로 돌아가고
+       겹침이 조용히 되살아난다. */
+    margin-top: calc(
+      var(--studio-immersive-menubar-block, calc(0.375rem + 2.75rem + 0.5rem + 2px))
+        - 0.5rem + 0.25rem
+    );
   }
 
   [data-studio-mobile-immersive="true"] [data-studio-status-bar="true"] {

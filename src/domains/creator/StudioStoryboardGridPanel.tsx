@@ -138,7 +138,7 @@ export function StudioStoryboardGridPanel({
             <button
               type="button"
               onClick={onAddPage}
-              className="flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-on-accent hover:bg-accent-hover"
+              className="flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-on-accent hover:bg-accent-hover pointer-coarse:min-h-11 pointer-coarse:px-3"
             >
               <Plus size={12} /> 추가
             </button>
@@ -147,7 +147,7 @@ export function StudioStoryboardGridPanel({
               aria-label="닫기"
               title="닫기 (Esc)"
               onClick={onClose}
-              className="grid size-8 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent"
+              className="grid size-8 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent pointer-coarse:size-11"
             >
               <X size={15} aria-hidden />
             </button>
@@ -220,14 +220,17 @@ export function StudioStoryboardGridPanel({
                       없고 이 레이어가 pointer-events-none이면 탭이 아래의 전체 선택 버튼으로 그대로
                       새어나가 "복제/삭제를 누르려다 페이지 이동+모달 닫힘"이 벌어진다 — pointer-coarse
                       (터치)에서는 항상 보이고 항상 클릭 가능하게 강제로 켠다. */}
-                  <div className="pointer-coarse:pointer-events-auto pointer-coarse:opacity-100 absolute right-1 top-1 z-20 flex items-center gap-0.5 pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                  <div className="pointer-coarse:pointer-events-auto pointer-coarse:opacity-100 pointer-coarse:gap-1.5 absolute right-1 top-1 z-20 flex items-center gap-0.5 pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                    {/* 19×19 는 WCAG 2.2 최소 타깃(24px)에도 못 미치는데, 바로 옆이 되돌릴 수 없는
+                        삭제라 오탭 비용이 크다. 가장 작은 셀이 5rem 이라 44px 두 개는 카드를
+                        넘치므로 36px + 간격으로 올린다 — 터치에서만 적용해 마우스 밀도는 그대로. */}
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         onDuplicatePage(p.id);
                       }}
-                      className="rounded bg-black/55 p-1 text-white hover:bg-black/70"
+                      className="grid place-items-center rounded bg-black/55 p-1 text-white hover:bg-black/70 pointer-coarse:size-9 pointer-coarse:rounded-lg"
                       title="페이지 복제"
                       aria-label={`${displayName} 복제`}
                     >
@@ -251,7 +254,7 @@ export function StudioStoryboardGridPanel({
                         })();
                       }}
                       disabled={!canDelete}
-                      className="rounded bg-black/55 p-1 text-white hover:bg-bad/80 disabled:opacity-30"
+                      className="grid place-items-center rounded bg-black/55 p-1 text-white hover:bg-bad/80 disabled:opacity-30 pointer-coarse:size-9 pointer-coarse:rounded-lg"
                       title="페이지 삭제"
                       aria-label={`${displayName} 삭제`}
                     >

@@ -90,6 +90,7 @@ import { useStudioCompanionWindowLayout } from "./use-studio-companion-window-la
 import { buttonClass } from "@/components/ui/button-utils";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import Link from "@/src/compat/router-link";
 
 const HEARTBEAT_INTERVAL_MS = 4_000;
 const PRIMARY_STALE_AFTER_MS = 12_000;
@@ -1469,9 +1470,21 @@ export function StudioToolsCompanionPage() {
         dedicatedLayout ? "flex min-h-0 flex-1 flex-col gap-4" : "space-y-4"
       )}>
         {lastError ? (
-          <p role="alert" className="rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">
-            {lastError}
-          </p>
+          <div role="alert" className="rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">
+            <p>{lastError}</p>
+            {/*
+              이 창은 보통 기본 스튜디오가 window.open 으로 띄운다. 팝업이라면 사용자가 그냥 닫으면
+              되지만, 인앱 브라우저(카카오톡·인스타그램)에서 이 주소로 바로 들어오면 창 크롬도
+              주소창도 없어서 앱을 끄는 것 말고는 길이 없었다. 세션이 없다고 말할 때는 갈 곳도 같이 준다.
+            */}
+            <Link
+              href="/studio"
+              data-studio-route-exit="editor"
+              className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              Studio 편집기 열기
+            </Link>
+          </div>
         ) : null}
         {screenPlacementStatus ? (
           <p

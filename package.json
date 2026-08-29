@@ -120,6 +120,7 @@
     "studio:avatar-reference-catalogue:check": "tsx scripts/generate-studio-vrm-avatar-reference-catalogue.mts --check",
     "verify:studio-menus": "tsx scripts/verify-studio-menus.mts",
     "verify:studio-mobile-top": "tsx scripts/verify-studio-mobile-top.mts",
+    "verify:studio-inapp-browser": "tsx scripts/verify-studio-inapp-browser.mts",
     "verify:studio-canvas-chrome": "tsx scripts/verify-studio-canvas-chrome.mts",
     "verify:studio-canvas-surfaces": "tsx scripts/verify-studio-canvas-surfaces.mts",
     "verify:studio-icons": "tsx scripts/verify-studio-icons.mts",

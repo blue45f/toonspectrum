@@ -1,3 +1,5 @@
+import { studioCompanionPopupGuidance } from "./studio-companion-popup-guidance";
+
 import type { StudioCompanionPrimaryRuntime } from "./studio-tools-companion";
 
 export type StudioToolsCompanionProtocol = typeof import("./studio-tools-companion");
@@ -105,12 +107,9 @@ export function openStudioToolsCompanionForMenu(input: {
     reservation = null;
   }
   if (!reservation) {
-    input.announce(
-      localize(
-        "studio.toolsCompanion.open.popupBlocked",
-        "팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.",
-      ),
-    );
+    // 인앱 브라우저에는 팝업 허용 설정이 없다 — 환경에 맞는 실행 가능한 안내로 바꾼다.
+    const guidance = studioCompanionPopupGuidance();
+    input.announce(localize(guidance.key, guidance.text));
     return;
   }
   try {

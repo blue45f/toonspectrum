@@ -32,9 +32,14 @@ export interface StudioPanelShotTagFieldsProps {
   className?: string;
 }
 
+/**
+ * 마우스에서는 카드 안에 들어가는 촘촘한 칩, 터치에서는 44px 타깃.
+ * 20px(compact)·32px(default) 셀렉트는 손가락으로 열기 어려워 컷 태깅이 사실상 데스크톱
+ * 전용 기능이었다 — `pointer-coarse` 는 이 저장소가 이미 쓰는 터치 승격 규칙이다.
+ */
 const SIZE_CLASS: Record<NonNullable<StudioPanelShotTagFieldsProps["size"]>, string> = {
-  compact: "h-5 px-1 text-[9px]",
-  default: "h-8 px-2 text-xs",
+  compact: "h-5 px-1 text-[9px] pointer-coarse:h-11 pointer-coarse:px-1.5 pointer-coarse:text-[11px]",
+  default: "h-8 px-2 text-xs pointer-coarse:h-11",
 };
 
 const SELECT_BASE_CLASS =

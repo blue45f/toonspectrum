@@ -6,6 +6,7 @@
  * Not a CRDT — no document merge.
  */
 
+import { studioCompanionPopupGuidance } from "./studio-companion-popup-guidance";
 import {
   STUDIO_COMPANION_REFERENCE_FAILURE_BACKOFF_MS,
   isStudioCompanionReferenceControl,
@@ -2010,11 +2011,9 @@ export function openReadyStudioToolsCompanionForMenu(input: {
     input.workId,
   );
   if (!companionWindow) {
-    input.announce(localizeCompanionText(
-      input.t,
-      "팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.",
-      "studio.toolsCompanion.open.popupBlocked"
-    ));
+    // 인앱 브라우저에는 팝업 허용 설정이 없다 — 환경에 맞는 실행 가능한 안내로 바꾼다.
+    const guidance = studioCompanionPopupGuidance();
+    input.announce(localizeCompanionText(input.t, guidance.text, guidance.key));
     return;
   }
   input.windowRef.current = companionWindow;
