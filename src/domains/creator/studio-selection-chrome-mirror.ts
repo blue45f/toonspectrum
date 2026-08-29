@@ -152,12 +152,17 @@ export function mirrorStudioDrawElementTranslation(
     apply({ x: wrapper.x(), y: wrapper.y() });
   };
   sync();
-  wrapper.on(
-    `xChange.${STUDIO_SELECTION_CHROME_MIRROR_NAMESPACE} yChange.${STUDIO_SELECTION_CHROME_MIRROR_NAMESPACE}`,
-    sync
-  );
+  const events =
+    `xChange.${STUDIO_SELECTION_CHROME_MIRROR_NAMESPACE}`
+    + ` yChange.${STUDIO_SELECTION_CHROME_MIRROR_NAMESPACE}`;
+  wrapper.on(events, sync);
+  // Detach THIS handler, not the namespace. Several mirrors legitimately share one wrapper -- the
+  // resize proxy subscribes for `mirrorDragElementId` while the dashed indicator subscribes for
+  // the same selected stroke -- and a namespace-wide `off` tore down the other one too. The proxy
+  // then reattached only its own, while the indicator's effect did not re-run (its element id was
+  // unchanged), so after one drag commit the dashed box silently stopped following the ink.
   return () => {
-    wrapper.off(`.${STUDIO_SELECTION_CHROME_MIRROR_NAMESPACE}`);
+    wrapper.off(events, sync);
   };
 }
 

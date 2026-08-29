@@ -1,6 +1,13 @@
 import { Fragment, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { Rect, Transformer } from "react-konva/lib/ReactKonvaCore";
 
+import { studioLiveTransformCommittedClip } from "./studio-live-transform-clip-tracking";
+import {
+  applyStudioLiveTransformClip,
+  findStudioLiveTransformClipHost,
+  readStudioLiveTransformClip,
+  restoreStudioLiveTransformClip,
+} from "./studio-live-transform-clip-tracking-konva";
 import { classifyStudioLiveTransformPreviewFrame } from "./studio-live-transform-preview";
 import {
   applyStudioLiveTransformPreviewNodeAttrs,
@@ -21,7 +28,10 @@ import {
   restoreStudioSingleObjectDragLayer,
 } from "./studio-single-object-drag-layer";
 
+import type { El } from "./studio-element-model";
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
+import type { StudioLiveTransformClipRect } from "./studio-live-transform-clip-tracking";
+import type { StudioLiveTransformClipHost } from "./studio-live-transform-clip-tracking-konva";
 import type { StudioLiveTransformRenderRoute } from "./studio-live-transform-render-route";
 import type { StudioSingleObjectDragLayerSession } from "./studio-single-object-drag-layer";
 import type Konva from "konva";
@@ -106,6 +116,21 @@ export interface StudioGroupUniformResizeProxyProps {
    */
   readonly livePreviewRenderRoute?: StudioLiveTransformRenderRoute;
   /**
+   * Everything the panel verdict reads, plus the stroke's own `noClip`.
+   *
+   * Panel membership is geometry-derived (`containingPanel`), so a scale or rotation can move a
+   * stroke out of its panel or pull an unclipped one in, and the commit re-derives that verdict
+   * while the preview carries the clip the stroke started with. Supplying the frames here lets the
+   * gesture re-point the clip per frame instead of popping it at release. Omit to keep the old
+   * behaviour.
+   */
+  readonly livePreviewClipContext?: {
+    /** The stroke's document-space points — the geometry the COMMIT re-derives its clip from. */
+    readonly points?: readonly number[];
+    readonly elements: readonly El[];
+    readonly noClip?: boolean;
+  };
+  /**
    * Dedicated small Layer the live-preview gesture lifts into (the single-object drag Layer).
    *
    * Without the lift, every anchor frame repaints the whole document Layer (measured ~80-157ms
@@ -144,6 +169,14 @@ type ActiveLiveTransformPreview = {
   readonly parkedIndicators: readonly Konva.Node[];
   /** Drag-layer lift session, or null when the lift was refused (gesture stays in the big Layer). */
   readonly lift: StudioSingleObjectDragLayerSession | null;
+  /**
+   * Container whose clip this gesture drives, or null when neither host exists — a stroke whose
+   * lift was refused for some other reason. That case keeps today's behaviour: position, scale
+   * and rotation still track, only the clip lands at release.
+   */
+  readonly clipHost: StudioLiveTransformClipHost | null;
+  /** The host's clip before the gesture, restored verbatim when it ends. */
+  readonly originalClip: StudioLiveTransformClipRect | null;
 };
 
 type ActiveResizeSession = {
@@ -168,6 +201,7 @@ export function StudioGroupUniformResizeProxy({
   mirrorDragElementId,
   livePreviewElementId,
   livePreviewRenderRoute,
+  livePreviewClipContext,
   transformLiftLayerRef,
   externalCancelSignal,
   onBegin,
@@ -254,12 +288,28 @@ export function StudioGroupUniformResizeProxy({
       transformer,
       dragLayer: transformLiftLayerRef?.current ?? null,
     });
-    return { node, parkedIndicators, lift };
+    // The clip host is resolved AFTER the lift, because the lift decides which host exists: a
+    // lifted stroke gets a `clipFunc` on its own wrapper (the only way to ADD a clip to a stroke
+    // rendered without one, and the only container holding this stroke's ink and nothing else),
+    // while a stroke that refused the lift keeps its per-element clip `Group` ancestor.
+    const clipHost = livePreviewClipContext
+      ? findStudioLiveTransformClipHost(node, transformLiftLayerRef?.current ?? null)
+      : null;
+    return {
+      node,
+      parkedIndicators,
+      lift,
+      clipHost,
+      originalClip: readStudioLiveTransformClip(clipHost),
+    };
   }
 
   /** Neutralize the preview projection and un-park the chrome — commit and cancel both end here. */
   function clearLiveTransformPreview(preview: ActiveLiveTransformPreview | null) {
     if (!preview) return;
+    // Put the clip back BEFORE the nodes move home: a `clipFunc` left on the wrapper reads the
+    // wrapper's transform, which the restore below is about to change out from under it.
+    restoreStudioLiveTransformClip(preview.clipHost, preview.originalClip);
     // Return the lifted nodes to the document Layer first so the neutral reset below invalidates
     // the authoritative Layer once, and the mirrors re-converge from the same reset.
     restoreStudioSingleObjectDragLayer(preview.lift);
@@ -402,11 +452,42 @@ export function StudioGroupUniformResizeProxy({
     // frame can corrupt the document.
     if (projection.ok) {
       applyStudioLiveTransformPreviewNodeAttrs(preview.node, projection.attrs);
+      // Re-point the panel clip to the verdict the COMMIT will reach for this frame. One node
+      // write, and only on the frames where the verdict actually moves — no reparenting, so the
+      // lift's restore guard and the parked-chrome bookkeeping are untouched.
+      if (livePreviewClipContext && preview.clipHost) {
+        applyStudioLiveTransformClip(
+          preview.clipHost,
+          studioLiveTransformCommittedClip({
+            sourceBounds: active.sourceBounds,
+            ...(livePreviewClipContext.points !== undefined
+              ? { points: livePreviewClipContext.points }
+              : {}),
+            targetBounds: {
+              x: proxy.x(),
+              y: proxy.y(),
+              width: proxy.width() * proxy.scaleX(),
+              height: proxy.height() * proxy.scaleY(),
+            },
+            rotationDeg: freeTransform ? proxy.rotation() : 0,
+            elements: livePreviewClipContext.elements,
+            ...(livePreviewClipContext.noClip !== undefined
+              ? { noClip: livePreviewClipContext.noClip }
+              : {}),
+          }),
+        );
+      }
     } else if (
       projection.reason === "unsupported-non-uniform"
       || projection.reason === "unsupported-render-route"
     ) {
       resetStudioLiveTransformPreviewNodeAttrs(preview.node);
+      // The clip has to go back with the attrs, not just the pose. An earlier uniform frame can
+      // already have re-pointed it, and abandoning the preview parks the ink at its DOCUMENT
+      // position — under a clip belonging to a frame the stroke is no longer previewing. A panel
+      // member would leak outside its panel, or a free stroke sit clipped by a panel it is not in,
+      // for the rest of the gesture.
+      applyStudioLiveTransformClip(preview.clipHost, preview.originalClip);
     }
   }
 

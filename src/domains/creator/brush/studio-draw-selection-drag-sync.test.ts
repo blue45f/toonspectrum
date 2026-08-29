@@ -391,3 +391,52 @@ describe("live transform preview eligibility", () => {
     }
   });
 });
+
+describe("mirror detach isolation", () => {
+  let scene: Scene;
+  let restoreCanvas: () => void;
+
+  beforeEach(() => {
+    restoreCanvas = installCanvasContextStub();
+    scene = createScene();
+  });
+
+  afterEach(() => {
+    scene.stage.destroy();
+    scene.container.remove();
+    restoreCanvas();
+  });
+
+  it("detaching one mirror leaves every other mirror on the same wrapper attached", () => {
+    // Two mirrors legitimately share one wrapper: the resize proxy subscribes for
+    // `mirrorDragElementId` while the dashed indicator subscribes for the same selected stroke.
+    // A namespace-wide `off` tore down BOTH, and only the proxy reattached (the indicator's effect
+    // did not re-run, its element id being unchanged), so after one drag commit the dashed box
+    // silently stopped following the ink.
+    const wrapper = addDrawElement(scene.layer, "draw-1");
+    const proxySeen: number[] = [];
+    const indicatorSeen: number[] = [];
+
+    const detachProxy = mirrorStudioDrawElementTranslation(scene.stage, "draw-1", (offset) => {
+      proxySeen.push(offset.x);
+    });
+    const detachIndicator = mirrorStudioDrawElementTranslation(scene.stage, "draw-1", (offset) => {
+      indicatorSeen.push(offset.x);
+    });
+
+    wrapper.x(10);
+    expect(proxySeen.at(-1)).toBe(10);
+    expect(indicatorSeen.at(-1)).toBe(10);
+
+    // The proxy's effect cleans up after a drag commit; the indicator's subscription must survive.
+    detachProxy();
+    wrapper.x(25);
+
+    expect(indicatorSeen.at(-1), "indicator stopped following after the proxy detached").toBe(25);
+    expect(proxySeen.at(-1), "detached proxy kept receiving").toBe(10);
+
+    detachIndicator();
+    wrapper.x(40);
+    expect(indicatorSeen.at(-1)).toBe(25);
+  });
+});

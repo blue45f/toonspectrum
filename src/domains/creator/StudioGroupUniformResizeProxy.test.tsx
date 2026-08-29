@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioGroupUniformResizeProxy } from "./StudioGroupUniformResizeProxy";
 
+import type { El } from "./studio-element-model";
+
 type CapturedProps = Record<string, unknown>;
 
 const konvaHarness = vi.hoisted(() => ({
@@ -62,7 +64,7 @@ type FakeIndicatorNode = ReturnType<typeof createIndicatorNode>;
 /** Draw wrapper double covering the finder (getAttr/getParent), eligibility, and attr surface. */
 function createWrapperNode(
   elementId: string,
-  options: { cached?: boolean; dragging?: boolean } = {},
+  options: { cached?: boolean; dragging?: boolean; parent?: unknown } = {},
 ) {
   const state = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 };
   const layer = { batchDraw: vi.fn() };
@@ -73,7 +75,7 @@ function createWrapperNode(
       name === "studioElementId" ? elementId : undefined
     ),
     setAttr: vi.fn(),
-    getParent: vi.fn(() => null),
+    getParent: vi.fn(() => options.parent ?? null),
     isCached: vi.fn(() => options.cached === true),
     isDragging: vi.fn(() => options.dragging === true),
     getLayer: vi.fn(() => layer),
@@ -102,6 +104,35 @@ function createWrapperNode(
       }
       return { x: state.offsetX, y: state.offsetY };
     }),
+  };
+}
+
+/**
+ * The per-element clip `Group` the document layer renders around a panel member.
+ *
+ * Real attr storage, not a spy: the clip tracker READS the host back to decide whether a frame
+ * changed anything and whether its own write still stands, so a node that forgets what was written
+ * to it would pass every assertion here while failing in the product.
+ */
+function createClipGroupNode(clip: { x: number; y: number; width: number; height: number }) {
+  const attrs: Record<string, unknown> = {
+    clipX: clip.x,
+    clipY: clip.y,
+    clipWidth: clip.width,
+    clipHeight: clip.height,
+  };
+  return {
+    attrs,
+    getAttr: vi.fn((name: string) => attrs[name]),
+    setAttr: vi.fn((name: string, value: unknown) => {
+      attrs[name] = value;
+    }),
+    getParent: vi.fn(() => null),
+    // The preview eligibility walk climbs ancestors too, so the host answers its probes.
+    isCached: vi.fn(() => false),
+    getClipWidth: vi.fn(() => (attrs.clipWidth as number | undefined) ?? 0),
+    getClipHeight: vi.fn(() => (attrs.clipHeight as number | undefined) ?? 0),
+    clipFunc: vi.fn(),
   };
 }
 
@@ -547,8 +578,20 @@ describe("StudioGroupUniformResizeProxy", () => {
     expect(props.onCommit).not.toHaveBeenCalled();
   });
 
+  /** A panel comfortably containing the source bounds, so the stroke starts clipped by it. */
+  const CLIP_PANEL = {
+    id: "frame-1",
+    type: "frame",
+    x: 0,
+    y: 0,
+    width: 400,
+    height: 400,
+  } as unknown as El;
+
   describe("live transform preview (PPT-style real-time ink)", () => {
-    function setupLivePreview(options: { cached?: boolean; dragging?: boolean } = {}) {
+    function setupLivePreview(
+      options: { cached?: boolean; dragging?: boolean; parent?: unknown } = {},
+    ) {
       const wrapper = createWrapperNode("stroke-1", options);
       const indicator = createIndicatorNode();
       const stage = createStage(wrapper, [indicator]);
@@ -666,6 +709,43 @@ describe("StudioGroupUniformResizeProxy", () => {
         scaleY: 1,
         offsetX: 0,
         offsetY: 0,
+      });
+    });
+
+    it("표현 불가 프레임으로 프리뷰를 접을 때 패널 클립도 함께 되돌린다", () => {
+      // 회귀 방지: 앞선 균일 프레임이 이미 클립을 옮겨놨는데, 뒤이어 비균일 프레임이 오면
+      // 잉크만 문서 위치로 돌아가고 클립은 옮겨진 채 남았다. 패널 소속 획이 패널 밖으로 새거나,
+      // 자유 획이 있지도 않은 패널에 잘린 채로 제스처가 끝날 때까지 남는다.
+      const clipGroup = createClipGroupNode({ x: 0, y: 0, width: 400, height: 400 });
+      const { props } = setupLivePreview({ parent: clipGroup });
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(
+        <StudioGroupUniformResizeProxy
+          {...props}
+          livePreviewClipContext={{ elements: [CLIP_PANEL] }}
+        />,
+      );
+
+      act(() => rectProps().onTransformStart());
+
+      // 균일 프레임: 획을 패널 밖으로 끌고 나가므로 커밋 판정은 "클립 없음"이다.
+      act(() => {
+        rect.position({ x: 900, y: 900 });
+        rectProps().onTransform({ target: rect });
+      });
+      expect(clipGroup.getClipWidth()).toBe(0);
+
+      // 비균일 프레임: 프리뷰를 접으면서 클립도 제스처 시작 시점 값으로 돌아와야 한다.
+      act(() => {
+        rect.scaleY(3);
+        rectProps().onTransform({ target: rect });
+      });
+
+      expect(clipGroup.attrs).toMatchObject({
+        clipX: 0,
+        clipY: 0,
+        clipWidth: 400,
+        clipHeight: 400,
       });
     });
 

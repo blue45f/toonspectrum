@@ -272,6 +272,22 @@ export function renderStudioCanvasSelectionDecorations({
                 }
               : undefined
           }
+          // Panel membership is geometry-derived, so a transform can move a stroke out of its
+          // panel or pull an unclipped one in. Supplying the frames lets the gesture re-point the
+          // clip per frame instead of popping it at release.
+          livePreviewClipContext={
+            singleDrawFreeScale && canvasSelectionEls[0]?.type === "draw"
+              ? {
+                  elements,
+                  // The commit re-derives the clip from the transformed POINTS, not the selection
+                  // box, and the two disagree for any stroke whose points miss the box corners.
+                  points: canvasSelectionEls[0].points,
+                  ...(canvasSelectionEls[0].noClip !== undefined
+                    ? { noClip: canvasSelectionEls[0].noClip }
+                    : {}),
+                }
+              : undefined
+          }
           // The gesture lifts stroke+proxy+Transformer into the small drag Layer so an
           // anchor frame no longer repaints the whole document Layer.
           transformLiftLayerRef={singleObjectDragLayerRef}
