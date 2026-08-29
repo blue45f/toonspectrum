@@ -4,8 +4,8 @@ import {
   evaluateStudioCalibratedBudget,
   evaluateStudioCalibratedDetection,
   judgeStudioCalibratedBudget,
+  judgeStudioCalibratedDetection,
   measureStudioCalibratedPasses,
-  STUDIO_PERF_CALIBRATION_DETECTION_ATTEMPTS,
   readStudioPerfCalibrationSink,
   scaleStudioPerfCalibrationPass,
   reduceStudioPerfCalibrationSamples,
@@ -358,25 +358,63 @@ describe("studio perf calibration — end to end", () => {
   });
 
   it("lets a clean attempt override a distorted one, but never a clean pass inside one", () => {
-    const distorted = [
-      reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 100 }]),
-      reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 50 }]),
-    ];
-    // A second, healthy attempt is measured because the seeded one cannot show detection, and
-    // one whole attempt holding is enough — that is where "earn it" belongs.
-    const detection = evaluateStudioCalibratedDetection({
-      label: "recovering calibration",
-      workload: () => void runStudioPerfCalibrationRounds(ROUNDS),
-      referenceRounds: ROUNDS,
-      seed: distorted,
-      factor: 2,
-      samples: 4,
-      warmups: 1,
-      passes: 2,
-    });
-    expect(detection.detected, detection.detail).toBe(true);
-    expect(detection.passes.length).toBeGreaterThan(distorted.length);
-    expect(STUDIO_PERF_CALIBRATION_DETECTION_ATTEMPTS).toBeGreaterThanOrEqual(2);
+    // Pinned on controlled pass data, not a live measurement. A wall-clock attempt here would
+    // flake on an oversubscribed runner for exactly the reason this module documents: the same
+    // kernel measured against itself read 2.133 and then 0.538 in consecutive passes, and one
+    // sub-0.75 reading would flip `detected`. Semantics get pinned without a clock.
+    const pass = (ratio: number) =>
+      reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 100 * ratio }]);
+    const distorted = [pass(1), pass(0.5)];
+    const clean = [pass(1.05), pass(1.1)];
+
+    // A whole clean attempt beside a distorted one carries the claim.
+    expect(
+      judgeStudioCalibratedDetection("recovering", [distorted, clean], 2).detected,
+    ).toBe(true);
+    // The distorted attempt alone does not, even though it holds a 1.0 pass.
+    expect(judgeStudioCalibratedDetection("distorted only", [distorted], 2).detected).toBe(false);
+    // And a clean pass sitting INSIDE a distorted attempt never rescues it — only another
+    // attempt does. This is the asymmetry the whole fix turns on.
+    expect(
+      judgeStudioCalibratedDetection("one attempt, mixed", [[...distorted, pass(1.2)]], 2).detected,
+    ).toBe(false);
+
+    const verdict = judgeStudioCalibratedDetection("recovering", [distorted, clean], 2);
+    expect(verdict.detectableFactor).toBeCloseTo(1.5 / 1.05, 10);
+    expect(verdict.passes).toHaveLength(4);
+    expect(verdict.detail).toContain("#2 min 1.050");
+  });
+
+  it("refuses to treat an empty attempt as evidence", () => {
+    // Math.min() of nothing is Infinity, which would certify detection without measuring at all.
+    expect(() => judgeStudioCalibratedDetection("empty attempt", [[]], 2))
+      .toThrow(/not evidence/u);
+    expect(() => judgeStudioCalibratedDetection("nothing", [], 2))
+      .toThrow(/No calibration passes/u);
+    for (const bad of [0, -1, 1.5]) {
+      expect(() =>
+        evaluateStudioCalibratedDetection({
+          label: "zero passes",
+          workload: () => {
+            throw new Error("must not measure");
+          },
+          referenceRounds: 1,
+          factor: 2,
+          passes: bad,
+        }),
+      ).toThrow(/at least one pass/u);
+    }
+    expect(() =>
+      evaluateStudioCalibratedDetection({
+        label: "zero attempts",
+        workload: () => {
+          throw new Error("must not measure");
+        },
+        referenceRounds: 1,
+        factor: 2,
+        attemptCount: 0,
+      }),
+    ).toThrow(/at least one attempt/u);
   });
 
   it("re-measures rather than letting one starved reference condemn the calibration", () => {

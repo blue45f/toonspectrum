@@ -410,6 +410,14 @@ export function evaluateStudioCalibratedDetection(
   if (!(factor > 1) || !Number.isFinite(factor)) {
     throw new Error(`A detection factor must be greater than 1, got ${factor}.`);
   }
+  // An attempt of zero passes reduces to Math.min() === Infinity, which would certify detection
+  // without measuring anything at all — the one failure this whole mechanism exists to prevent.
+  if (!Number.isInteger(passes) || passes < 1) {
+    throw new Error(`A detection attempt needs at least one pass, got ${passes}.`);
+  }
+  if (!Number.isInteger(attemptCount) || attemptCount < 1) {
+    throw new Error(`Detection needs at least one attempt, got ${attemptCount}.`);
+  }
 
   // An ATTEMPT is one complete counterfactual: the passes the gate would have judged together,
   // reduced the way the gate reduces them. That reduction is the MINIMUM, because a regressed
@@ -417,8 +425,6 @@ export function evaluateStudioCalibratedDetection(
   // low. Reducing by the maximum instead claims detection the gate would not deliver: seeded
   // ratios of 1.0 and 0.5 at factor 2 would report "detectable" on max (1.0 x 2 > 1.5) while a
   // genuinely doubled workload measures 2.0 and 1.0, whose minimum acquits.
-  const attemptRatio = (attempt: readonly StudioPerfCalibrationPass[]): number =>
-    Math.min(...attempt.map((pass) => pass.ratio));
   const attempts: StudioPerfCalibrationPass[][] = seed.length > 0 ? [[...seed]] : [];
 
   // "Earn it" belongs BETWEEN attempts, not inside one. A single distorted attempt — one whose
@@ -427,7 +433,7 @@ export function evaluateStudioCalibratedDetection(
   // attempt stands on its own, and detection needs only one of them to hold.
   const reference = resolveStudioPerfCalibrationReference(options);
   const detected = (): boolean =>
-    attempts.some((attempt) => attemptRatio(attempt) * factor > maxRatio);
+    attempts.some((attempt) => studioCalibratedAttemptRatio(attempt) * factor > maxRatio);
   let warmed = false;
   for (let attempt = attempts.length; attempt < attemptCount && !detected(); attempt += 1) {
     if (!warmed) {
@@ -440,26 +446,55 @@ export function evaluateStudioCalibratedDetection(
     }
     attempts.push(fresh);
   }
+  return judgeStudioCalibratedDetection(label, attempts, factor, maxRatio);
+}
+
+/** Minimum ratio in an attempt — the reduction the gate itself applies. */
+function studioCalibratedAttemptRatio(
+  attempt: readonly StudioPerfCalibrationPass[],
+): number {
+  if (attempt.length === 0) {
+    throw new Error("An empty attempt is not evidence of anything.");
+  }
+  return Math.min(...attempt.map((pass) => pass.ratio));
+}
+
+/**
+ * Pure verdict over already-measured attempts, so the semantics can be pinned without a clock.
+ * Minimum WITHIN an attempt (what the gate does); any-of ACROSS attempts (where "earn it"
+ * belongs). A lucky pass inside an otherwise distorted attempt never rescues it — only another
+ * whole attempt does.
+ */
+export function judgeStudioCalibratedDetection(
+  label: string,
+  attempts: readonly (readonly StudioPerfCalibrationPass[])[],
+  factor: number,
+  maxRatio: number = STUDIO_PERF_CALIBRATION_MAX_GROWTH,
+): StudioCalibratedDetectionVerdict {
   if (attempts.length === 0) {
     throw new Error(`No calibration passes recorded for ${label}.`);
   }
-
+  const ratios = attempts.map(studioCalibratedAttemptRatio);
+  const detected = ratios.some((ratio) => ratio * factor > maxRatio);
   const recorded = attempts.flat();
-  const detectableFactor = maxRatio / Math.max(...attempts.map(attemptRatio));
+  const detectableFactor = maxRatio / Math.max(...ratios);
   return {
     label,
-    detected: detected(),
+    detected,
     factor,
     detectableFactor,
     passes: recorded,
     detail:
-      `${label}: a ${factor.toFixed(2)}x regression ${detected() ? "is" : "is NOT"} detectable `
+      `${label}: a ${factor.toFixed(2)}x regression ${detected ? "is" : "is NOT"} detectable `
       + `here — the gate (${maxRatio.toFixed(2)}x) starts convicting at `
-      + `${detectableFactor.toFixed(2)}x. Passes: `
-      + recorded
-        .map((pass) => `${pass.ratio.toFixed(3)} (${pass.workMs.toFixed(1)}ms work / `
-          + `${pass.referenceMs.toFixed(1)}ms reference, ${pass.sampleCount} samples)`)
-        .join("; ")
+      + `${detectableFactor.toFixed(2)}x. Attempts: `
+      + attempts
+        .map((attempt, index) => `#${index + 1} min ${ratios[index]!.toFixed(3)} [`
+          + attempt.map((pass) => `${pass.ratio.toFixed(3)} (${pass.workMs.toFixed(1)}ms work / `
+            + `${pass.referenceMs.toFixed(1)}ms reference, ${pass.sampleCount} samples)`)
+            .join("; ")
+          + "]")
+        .join(" ")
       + ".",
   };
 }
