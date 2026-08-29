@@ -91,6 +91,41 @@ describe("probeSkiaGraphiteAdoption", () => {
     expect(preAborted.status).toBe("no-adapter");
   });
 
+  it("never reports adoptable with a cleared artifact, even if it clears mid-flight", async () => {
+    registerSkiaGraphiteArtifact(ARTIFACT);
+
+    const probe = await probeSkiaGraphiteAdoption({
+      gpu: gpuWith(async () => {
+        // What a teardown racing the adapter request looks like.
+        clearSkiaGraphiteArtifact();
+        return { name: "late-adapter" };
+      }),
+    });
+
+    // The union promises callers a non-null artifact on `adoptable`; the snapshot keeps that true.
+    expect(probe.status).toBe("adoptable");
+    if (probe.status === "adoptable") expect(probe.artifact).toBe(ARTIFACT);
+  });
+
+  it("detaches its abort listener once the probe settles", async () => {
+    registerSkiaGraphiteArtifact(ARTIFACT);
+    const added: Array<() => void> = [];
+    const removed: Array<() => void> = [];
+
+    await probeSkiaGraphiteAdoption({
+      gpu: gpuWith({ name: "adapter" }),
+      signal: {
+        aborted: false,
+        addEventListener: (_type, listener) => added.push(listener),
+        removeEventListener: (_type, listener) => removed.push(listener),
+      },
+    });
+
+    // `{ once: true }` alone would leak one resolver closure per probe on a long-lived signal.
+    expect(added).toHaveLength(1);
+    expect(removed).toEqual(added);
+  });
+
   it("flips to adoptable once an artifact and a real adapter are both present", async () => {
     registerSkiaGraphiteArtifact(ARTIFACT);
 

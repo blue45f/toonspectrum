@@ -188,6 +188,23 @@ export function StudioGroupUniformResizeProxy({
    * The Transformer frame carries the "selected" affordance for the whole gesture, and un-parking
    * re-converges the box through that same mirror once the wrapper resets to neutral.
    */
+  /**
+   * Is the live-preview stroke already being dragged by another pointer?
+   *
+   * A drag and a transform both write the wrapper's transform, and the page-side guard only
+   * tracks group drags — so a second touch starting the Transformer while a first is dragging the
+   * stroke body left two writers on one node, with a last-writer position surviving depending on
+   * event order. Refuse the transform rather than arbitrating: the drag already owns the node,
+   * and the user gets the gesture back by lifting that finger.
+   */
+  function livePreviewStrokeIsAlreadyDragging(): boolean {
+    if (!livePreviewElementId) return false;
+    const stage = proxyRef.current?.getStage();
+    if (!stage) return false;
+    const node = findStudioDrawWrapperNode(stage, livePreviewElementId);
+    return node?.isDragging() === true;
+  }
+
   function beginLiveTransformPreview(): ActiveLiveTransformPreview | null {
     if (!livePreviewElementId) return null;
     const proxy = proxyRef.current;
@@ -282,7 +299,11 @@ export function StudioGroupUniformResizeProxy({
 
   function handleTransformStart() {
     const sourceBounds = copyBounds(bounds);
-    if (!enabled || !finitePositiveBounds(sourceBounds)) {
+    if (
+      !enabled
+      || !finitePositiveBounds(sourceBounds)
+      || livePreviewStrokeIsAlreadyDragging()
+    ) {
       transformerRef.current?.stopTransform();
       if (finitePositiveBounds(sourceBounds)) restoreProxy(sourceBounds);
       return;

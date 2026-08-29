@@ -45,7 +45,11 @@ export interface SkiaGraphiteProbeEnvironment {
   readonly gpu?: unknown;
   /** Bound on the adapter request. Matches the product capability probe's default. */
   readonly timeoutMs?: number;
-  readonly signal?: { aborted: boolean; addEventListener: (type: "abort", listener: () => void, options?: { once?: boolean }) => void };
+  readonly signal?: {
+    aborted: boolean;
+    addEventListener: (type: "abort", listener: () => void, options?: { once?: boolean }) => void;
+    removeEventListener?: (type: "abort", listener: () => void) => void;
+  };
 }
 
 type AdapterRequester = { requestAdapter?: () => Promise<unknown> };
@@ -75,7 +79,11 @@ export async function probeSkiaGraphiteAdoption(
       reason: "WebGPU is unavailable on this device; Graphite requires navigator.gpu",
     };
   }
-  if (!registeredArtifact) {
+  // Snapshotted before any await: `clearSkiaGraphiteArtifact()` can land while requestAdapter is
+  // pending, and returning the live module variable would then hand back `adoptable` with a null
+  // artifact — a shape the discriminated union promises callers can never see.
+  const artifact = registeredArtifact;
+  if (!artifact) {
     return {
       status: "missing-artifact",
       reason:
@@ -98,7 +106,9 @@ export async function probeSkiaGraphiteAdoption(
   // Bounded, like the product capability probe: a driver whose requestAdapter promise never
   // settles must not park the caller that is deciding whether to admit the challenger.
   const timeoutMs = environment.timeoutMs ?? SKIA_GRAPHITE_ADAPTER_TIMEOUT_MS;
+  const signal = environment.signal;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let abortListener: (() => void) | undefined;
   let outcome: unknown;
   try {
     outcome = await Promise.race([
@@ -107,16 +117,22 @@ export async function probeSkiaGraphiteAdoption(
         timer = setTimeout(() => resolve(ADAPTER_TIMEOUT), timeoutMs);
       }),
       new Promise<typeof ADAPTER_ABORTED>((resolve) => {
-        const signal = environment.signal;
         if (!signal) return;
-        if (signal.aborted) resolve(ADAPTER_ABORTED);
-        else signal.addEventListener("abort", () => resolve(ADAPTER_ABORTED), { once: true });
+        if (signal.aborted) {
+          resolve(ADAPTER_ABORTED);
+          return;
+        }
+        abortListener = () => resolve(ADAPTER_ABORTED);
+        signal.addEventListener("abort", abortListener, { once: true });
       }),
     ]);
   } catch {
     outcome = null;
   } finally {
     if (timer !== undefined) clearTimeout(timer);
+    // `{ once: true }` only detaches after an abort actually fires, so a long-lived lifecycle
+    // signal reused across probes would retain one resolver closure per completed probe.
+    if (abortListener) signal?.removeEventListener?.("abort", abortListener);
   }
 
   if (outcome === ADAPTER_TIMEOUT) {
@@ -132,5 +148,5 @@ export async function probeSkiaGraphiteAdoption(
         "navigator.gpu exposes no usable adapter on this device; Graphite cannot be adopted here",
     };
   }
-  return { status: "adoptable", artifact: registeredArtifact };
+  return { status: "adoptable", artifact };
 }

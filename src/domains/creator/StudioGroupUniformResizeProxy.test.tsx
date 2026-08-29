@@ -60,7 +60,10 @@ type FakeWrapperNode = ReturnType<typeof createWrapperNode>;
 type FakeIndicatorNode = ReturnType<typeof createIndicatorNode>;
 
 /** Draw wrapper double covering the finder (getAttr/getParent), eligibility, and attr surface. */
-function createWrapperNode(elementId: string, options: { cached?: boolean } = {}) {
+function createWrapperNode(
+  elementId: string,
+  options: { cached?: boolean; dragging?: boolean } = {},
+) {
   const state = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 };
   const layer = { batchDraw: vi.fn() };
   return {
@@ -72,6 +75,7 @@ function createWrapperNode(elementId: string, options: { cached?: boolean } = {}
     setAttr: vi.fn(),
     getParent: vi.fn(() => null),
     isCached: vi.fn(() => options.cached === true),
+    isDragging: vi.fn(() => options.dragging === true),
     getLayer: vi.fn(() => layer),
     position: vi.fn((value?: { x: number; y: number }) => {
       if (value) {
@@ -544,7 +548,7 @@ describe("StudioGroupUniformResizeProxy", () => {
   });
 
   describe("live transform preview (PPT-style real-time ink)", () => {
-    function setupLivePreview(options: { cached?: boolean } = {}) {
+    function setupLivePreview(options: { cached?: boolean; dragging?: boolean } = {}) {
       const wrapper = createWrapperNode("stroke-1", options);
       const indicator = createIndicatorNode();
       const stage = createStage(wrapper, [indicator]);
@@ -559,6 +563,19 @@ describe("StudioGroupUniformResizeProxy", () => {
       };
       return { wrapper, indicator, props };
     }
+
+    it("이미 드래그 중인 획에는 변형 세션을 시작하지 않는다", () => {
+      // 드래그와 변형은 둘 다 래퍼 transform에 쓴다. 한 손가락이 획을 끄는 중에 다른 손가락이
+      // 앵커를 잡으면 두 writer가 한 노드를 놓고 경쟁해, 이벤트 순서에 따라 엉뚱한 위치가 남는다.
+      const { wrapper, indicator, props } = setupLivePreview({ dragging: true });
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+
+      expect(props.onBegin).not.toHaveBeenCalled();
+      expect(wrapper.setAttr).not.toHaveBeenCalled();
+      expect(indicator.state.visible).toBe(true);
+    });
 
     it("변형 프레임마다 커밋 플래너와 동일한 affine attrs를 래퍼에 명령형으로 투영한다", () => {
       const { wrapper, indicator, props } = setupLivePreview();
