@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import { readStudioCuttoonEditorSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
+import { STUDIO_GROUP_SELECTION_OVERLAY_NAME } from "./studio-selection-chrome-mirror";
 
 const pageSource = readStudioCuttoonEditorSource();
 const viewportSource = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
@@ -351,7 +352,14 @@ describe("Studio PPT-style group convenience boundary", () => {
       "studioGroupLocked={completeSelectionGroup?.locked === true}",
     );
     expect(selectionDecorationsSource).toContain('name="studio-group-selection-lock-marker"');
-    expect(selectionDecorationsSource).toContain('name="studio-group-selection-overlay"');
+    // The overlay's name is now a shared constant rather than a literal here: the live transform
+    // preview has to park this exact group, so the decorations and the parking code must never
+    // drift apart. Both halves are pinned -- the markup binds the constant, and the constant still
+    // carries the name the scene-graph assertions and perf probes look up.
+    expect(selectionDecorationsSource).toContain(
+      "name={STUDIO_GROUP_SELECTION_OVERLAY_NAME}",
+    );
+    expect(STUDIO_GROUP_SELECTION_OVERLAY_NAME).toBe("studio-group-selection-overlay");
     expect(selectionDecorationsSource).toContain('name="studio-group-selection-badge"');
     expect(selectionDecorationsSource).toContain('? "잠금"');
     expect(selectionDecorationsSource).toContain('? "일부 잠금"');
