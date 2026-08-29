@@ -20,8 +20,10 @@ describe("Studio BG3D runtime topology policy", () => {
     expect("add" in capabilities).toBe(false);
     expect("delete" in capabilities).toBe(false);
     expect(Object.isFrozen(capabilities)).toBe(true);
-    expect(STUDIO_BG3D_RUNTIME_CATALOG["three-webgpu-lab"].capabilities.has("webxr"))
+    expect(STUDIO_BG3D_RUNTIME_CATALOG["three-webgpu"].capabilities.has("webxr"))
       .toBe(false);
+    expect(STUDIO_BG3D_RUNTIME_CATALOG["three-webgpu"].capabilities.has("compute")).toBe(true);
+    expect(STUDIO_BG3D_RUNTIME_CATALOG["three-webgpu"].maturity).toBe("production");
     expect(capabilities.has("multi-artifact-capture")).toBe(false);
     expect(STUDIO_BG3D_RUNTIME_CATALOG["babylon-webgl-lab"].capabilities
       .has("multi-artifact-capture")).toBe(true);
@@ -250,11 +252,10 @@ describe("Studio BG3D runtime topology policy", () => {
     expect(plan.diagnostics).toEqual(["activation-budget-exceeded", "specialist-unavailable"]);
   });
 
-  it("selects WebGPU only when a lab adapter is enabled and the device supports it", () => {
+  it("selects WebGPU only when the device actually supports it", () => {
     const unsupported = planStudioBg3dRuntimeTopology({
       ...baseRequest,
-      availableRuntimeIds: ["three-webgpu-lab"],
-      allowLabRuntimes: true,
+      availableRuntimeIds: ["three-webgpu"],
       primaryCapabilities: ["interactive-editing", "webgpu"],
     });
     expect(unsupported).toMatchObject({ ok: false, primaryRuntimeId: null });
@@ -262,12 +263,39 @@ describe("Studio BG3D runtime topology policy", () => {
 
     const supported = planStudioBg3dRuntimeTopology({
       ...baseRequest,
-      availableRuntimeIds: ["three-webgpu-lab", "babylon-webgpu-lab"],
+      availableRuntimeIds: ["three-webgpu", "babylon-webgpu-lab"],
       allowLabRuntimes: true,
       webgpuSupported: true,
       primaryCapabilities: ["interactive-editing", "webgpu"],
     });
-    expect(supported).toMatchObject({ ok: true, primaryRuntimeId: "three-webgpu-lab" });
+    expect(supported).toMatchObject({ ok: true, primaryRuntimeId: "three-webgpu" });
+  });
+
+  it("honors a caller-selected primary runtime over the default preference order", () => {
+    const bothAvailable = {
+      ...baseRequest,
+      availableRuntimeIds: ["three-webgl", "three-webgpu"] as const,
+      webgpuSupported: true,
+    };
+    // Default ordering prefers the cheaper production runtime.
+    expect(planStudioBg3dRuntimeTopology({ ...bothAvailable }))
+      .toMatchObject({ ok: true, primaryRuntimeId: "three-webgl" });
+
+    expect(planStudioBg3dRuntimeTopology({
+      ...bothAvailable,
+      preferredPrimaryRuntimeId: "three-webgpu",
+    })).toMatchObject({ ok: true, primaryRuntimeId: "three-webgpu", diagnostics: [] });
+  });
+
+  it("records an unavailable preference and still plans the default primary", () => {
+    const plan = planStudioBg3dRuntimeTopology({
+      ...baseRequest,
+      availableRuntimeIds: ["three-webgl", "three-webgpu"],
+      webgpuSupported: false,
+      preferredPrimaryRuntimeId: "three-webgpu",
+    });
+    expect(plan).toMatchObject({ ok: true, primaryRuntimeId: "three-webgl" });
+    expect(plan.diagnostics).toContain("preferred-runtime-unavailable");
   });
 
   it("fails closed for malformed requests and unavailable primary capabilities", () => {

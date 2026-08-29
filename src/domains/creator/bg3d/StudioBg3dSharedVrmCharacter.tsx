@@ -306,13 +306,22 @@ export default function StudioBg3dSharedVrmCharacter({
   onGrounding,
 }: StudioBg3dSharedVrmCharacterProps) {
   const threeScene = useThree((state) => state.scene);
+  // MToon compiles to one backend or the other, never both, so the renderer that will draw this
+  // character decides which build gets loaded. Reading it from the R3F store keeps the decision at
+  // the only place that actually knows — an engine fallback remounts the Canvas, which remounts
+  // this component, which reloads the character against the renderer that replaced it.
+  const materialVariant = useThree((state) =>
+    (state.gl as { readonly isWebGPURenderer?: boolean }).isWebGPURenderer === true
+      ? ("webgpu-node" as const)
+      : ("webgl-shader" as const));
   const [asset, setAsset] = useState<StudioBg3dSharedVrmAsset | null>(null);
   const appearanceReadyIdentityRef = useRef<string | null>(null);
   const reportCurrentStatus = useEffectEvent(
     (status: StudioShared3dCharacterRuntimeStatus) =>
       onStatus(source.runtimeKey, status),
   );
-  const loadCurrentModel = useEffectEvent(() => loadStudioBg3dLinkedVrm(source.scene));
+  const loadCurrentModel = useEffectEvent(() =>
+    loadStudioBg3dLinkedVrm(source.scene, { materialVariant }));
   const reportCurrentGrounding = useEffectEvent(
     (result: StudioBg3dSharedCharacterGroundingResult | null) =>
       onGrounding?.(source.runtimeKey, result),

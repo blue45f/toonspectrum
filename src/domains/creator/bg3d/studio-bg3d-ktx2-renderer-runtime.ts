@@ -39,8 +39,21 @@ export interface StudioBg3dKtx2RendererRuntimeSignals {
   readonly workerAvailable: boolean;
 }
 
+/**
+ * Either interactive renderer can drive the transcoder. `KTX2Loader.detectSupport()` branches on
+ * `isWebGPURenderer` and reads GPU feature names instead of WebGL extensions, so admitting a WebGPU
+ * renderer here is what lets compressed-texture models keep working on the next-generation engine
+ * rather than failing the import.
+ */
+export type StudioBg3dKtx2Renderer =
+  | THREE.WebGLRenderer
+  | (Pick<THREE.WebGLRenderer, "domElement"> & {
+    readonly isWebGPURenderer?: boolean;
+    hasFeature(name: string): boolean;
+  });
+
 export interface CreateStudioBg3dKtx2RendererRuntimeOptions {
-  readonly renderer: THREE.WebGLRenderer;
+  readonly renderer: StudioBg3dKtx2Renderer;
   readonly signal?: AbortSignal;
   /** Integrity remains mandatory; this seam only replaces transport in deterministic tests. */
   readonly loadAssets?: (
@@ -90,13 +103,28 @@ function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw new StudioBg3dKtx2RendererRuntimeError("aborted");
 }
 
-function assertRendererAvailable(renderer: THREE.WebGLRenderer): void {
+/**
+ * Admits exactly one initialized Three renderer, checked through the API that backend actually
+ * exposes: a live WebGL context with an extension registry, or a WebGPU renderer that can answer
+ * feature queries. Anything else — including a renderer claiming both brands — is refused so the
+ * transcoder never selects a GPU format the active device cannot sample.
+ */
+function assertRendererAvailable(renderer: StudioBg3dKtx2Renderer): void {
+  const webgl = renderer as THREE.WebGLRenderer & { readonly isWebGLRenderer?: unknown };
+  const webgpu = renderer as Extract<StudioBg3dKtx2Renderer, { hasFeature(name: string): boolean }>;
+  const isWebgl = webgl?.isWebGLRenderer === true;
+  const isWebgpu = webgpu?.isWebGPURenderer === true;
+  if (isWebgl === isWebgpu) throw new StudioBg3dKtx2RendererRuntimeError("renderer-unavailable");
   try {
-    if (
-      (renderer as unknown as { readonly isWebGLRenderer?: unknown })?.isWebGLRenderer !== true
-      || typeof renderer.extensions?.has !== "function"
-      || renderer.getContext().isContextLost()
-    ) {
+    if (isWebgpu) {
+      if (typeof webgpu.hasFeature !== "function") {
+        throw new StudioBg3dKtx2RendererRuntimeError("renderer-unavailable");
+      }
+      // Probe once: an uninitialized WebGPU renderer throws rather than reporting false.
+      webgpu.hasFeature("texture-compression-bc");
+      return;
+    }
+    if (typeof webgl.extensions?.has !== "function" || webgl.getContext().isContextLost()) {
       throw new StudioBg3dKtx2RendererRuntimeError("renderer-unavailable");
     }
   } catch (error) {
@@ -139,7 +167,7 @@ function createAssetObjectUrls(assets: StudioBg3dKtx2TranscoderAssets): {
 /**
  * Creates a renderer-specific KTX2Loader only after the exact executable assets are attested in
  * this window realm. Validation pretranscode remains in its dedicated Worker; this runtime performs
- * the distinct GPU-format transcode selected from the active WebGLRenderer's extension support.
+ * the distinct GPU-format transcode selected from the active renderer's own supported formats.
  */
 export async function createStudioBg3dKtx2RendererRuntime(
   options: CreateStudioBg3dKtx2RendererRuntimeOptions,
@@ -164,7 +192,7 @@ export async function createStudioBg3dKtx2RendererRuntime(
   const manager = new THREE.LoadingManager();
   const loader = new Ktx2LoaderConstructor(manager);
   try {
-    loader.detectSupport(options.renderer);
+    loader.detectSupport(options.renderer as THREE.WebGLRenderer);
   } catch {
     throw new StudioBg3dKtx2RendererRuntimeError("renderer-unavailable");
   }

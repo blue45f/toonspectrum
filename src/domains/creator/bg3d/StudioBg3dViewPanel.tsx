@@ -22,8 +22,14 @@ import {
   roundStudioBg3dNumber as round,
   studioBg3dClassNames as cx,
 } from "./studio-bg3d-editor-ui";
+import { StudioBg3dEnginePanel } from "./StudioBg3dEnginePanel";
 import { StudioBg3dLightingStudio } from "./StudioBg3dLightingStudio";
 
+import type {
+  StudioBg3dEnginePreference,
+  StudioBg3dEngineSelectionPlan,
+} from "./studio-bg3d-engine-selection";
+import type { StudioBg3dInAppBrowserProfile } from "./studio-bg3d-inapp-browser";
 import type {
   StudioBg3dPhysicsGravityPreset,
   StudioBg3dPhysicsPhase,
@@ -184,6 +190,13 @@ interface StudioBg3dViewPanelContext {
 export interface StudioBg3dViewPanelProps {
   readonly hidden: boolean;
   readonly context: StudioBg3dViewPanelContext;
+  readonly enginePlan: StudioBg3dEngineSelectionPlan;
+  readonly enginePreference: StudioBg3dEnginePreference;
+  readonly engineInAppBrowser: StudioBg3dInAppBrowserProfile;
+  readonly engineProbing: boolean;
+  readonly engineDeviceLostMessage: string | null;
+  readonly engineFrameTimeMs: number | null;
+  readonly onEnginePreferenceChange: (preference: StudioBg3dEnginePreference) => void;
   readonly babylonDiagnosticState: StudioBg3dBabylonDiagnosticState;
   readonly onRunBabylonDiagnostic: (
     backend: StudioBg3dBabylonDiagnosticBackend,
@@ -396,6 +409,13 @@ export function StudioBg3dBabylonDiagnostic({
 export function StudioBg3dViewPanel({
   hidden,
   context,
+  enginePlan,
+  enginePreference,
+  engineInAppBrowser,
+  engineProbing,
+  engineDeviceLostMessage,
+  engineFrameTimeMs,
+  onEnginePreferenceChange,
   babylonDiagnosticState,
   onRunBabylonDiagnostic,
   onUseCurrentFrameAsAiReference,
@@ -1629,6 +1649,15 @@ export function StudioBg3dViewPanel({
                     </span>
                   </label>
                 </div>
+                <StudioBg3dEnginePanel
+                  plan={enginePlan}
+                  preference={enginePreference}
+                  inApp={engineInAppBrowser}
+                  probing={engineProbing}
+                  deviceLostMessage={engineDeviceLostMessage}
+                  frameTimeMs={engineFrameTimeMs}
+                  onPreferenceChange={onEnginePreferenceChange}
+                />
                 <StudioBg3dBabylonDiagnostic
                   state={babylonDiagnosticState}
                   onRun={onRunBabylonDiagnostic}

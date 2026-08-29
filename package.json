@@ -90,6 +90,8 @@
     "verify:studio-engine-webgpu-brush-parity": "node scripts/verify-studio-engine-webgpu-brush-parity.mjs",
     "verify:studio-engine-webgpu-filter-parity": "node scripts/verify-studio-engine-webgpu-filter-parity.mjs",
     "verify:studio-engine-webgpu-presentation": "node scripts/verify-studio-engine-webgpu-presentation.mjs",
+    "verify:studio-bg3d-webgpu-engine": "node scripts/verify-studio-bg3d-webgpu-engine.mjs",
+    "verify:studio-bg3d-inapp-editor": "tsx scripts/verify-studio-bg3d-inapp-editor.mts",
     "verify:studio-engine-webgpu-textured-brush": "node scripts/verify-studio-engine-webgpu-textured-brush.mjs",
     "build:studio-hokusai-wasm": "node scripts/verify-studio-hokusai-wasm.mjs --build",
     "test:studio-hokusai-wasm": "node scripts/verify-studio-hokusai-wasm.mjs --test",

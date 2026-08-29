@@ -4,6 +4,7 @@ import {
   evaluateStudioCalibratedBudget,
   evaluateStudioCalibratedDetection,
   judgeStudioCalibratedBudget,
+  judgeStudioCalibratedDetection,
   measureStudioCalibratedPasses,
   readStudioPerfCalibrationSink,
   scaleStudioPerfCalibrationPass,
@@ -325,6 +326,95 @@ describe("studio perf calibration — end to end", () => {
     expect(detection.detected, detection.detail).toBe(true);
     // The budget's own passes lead, and any pass added to prove detection follows them.
     expect(detection.passes.slice(0, budget.passes.length)).toEqual(budget.passes);
+  });
+
+  it("reduces an attempt the way the gate does, so it cannot claim detection the gate misses", () => {
+    // Regression test for a real defect: detection reduced a flat pool of passes by the MAXIMUM
+    // while the gate reduces by the minimum. Ratios of 1.0 and 0.5 at factor 2 then reported
+    // "detectable" (1.0 x 2 > 1.5) even though a genuinely doubled workload measures 2.0 and 1.0,
+    // whose minimum (1.0) clears the 1.5 gate and acquits. Reported by Codex on #39.
+    const passes = [
+      reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 100 }]),
+      reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 50 }]),
+    ];
+    expect(passes.map((pass) => pass.ratio)).toEqual([1, 0.5]);
+
+    const detection = evaluateStudioCalibratedDetection({
+      label: "mixed attempt",
+      workload: () => {
+        throw new Error("must not measure again");
+      },
+      referenceRounds: 1,
+      seed: passes,
+      factor: 2,
+      attemptCount: 1,
+    });
+    expect(detection.detected, detection.detail).toBe(false);
+
+    // And the claim it refuses to make is exactly the one the gate would refuse: doubling this
+    // very attempt's workload leaves a minimum the gate acquits.
+    const doubled = passes.map((pass) => scaleStudioPerfCalibrationPass(pass, 2));
+    expect(judgeStudioCalibratedBudget("mixed attempt (doubled)", doubled).ok).toBe(true);
+  });
+
+  it("lets a clean attempt override a distorted one, but never a clean pass inside one", () => {
+    // Pinned on controlled pass data, not a live measurement. A wall-clock attempt here would
+    // flake on an oversubscribed runner for exactly the reason this module documents: the same
+    // kernel measured against itself read 2.133 and then 0.538 in consecutive passes, and one
+    // sub-0.75 reading would flip `detected`. Semantics get pinned without a clock.
+    const pass = (ratio: number) =>
+      reduceStudioPerfCalibrationSamples([{ referenceMs: 100, workMs: 100 * ratio }]);
+    const distorted = [pass(1), pass(0.5)];
+    const clean = [pass(1.05), pass(1.1)];
+
+    // A whole clean attempt beside a distorted one carries the claim.
+    expect(
+      judgeStudioCalibratedDetection("recovering", [distorted, clean], 2).detected,
+    ).toBe(true);
+    // The distorted attempt alone does not, even though it holds a 1.0 pass.
+    expect(judgeStudioCalibratedDetection("distorted only", [distorted], 2).detected).toBe(false);
+    // And a clean pass sitting INSIDE a distorted attempt never rescues it — only another
+    // attempt does. This is the asymmetry the whole fix turns on.
+    expect(
+      judgeStudioCalibratedDetection("one attempt, mixed", [[...distorted, pass(1.2)]], 2).detected,
+    ).toBe(false);
+
+    const verdict = judgeStudioCalibratedDetection("recovering", [distorted, clean], 2);
+    expect(verdict.detectableFactor).toBeCloseTo(1.5 / 1.05, 10);
+    expect(verdict.passes).toHaveLength(4);
+    expect(verdict.detail).toContain("#2 min 1.050");
+  });
+
+  it("refuses to treat an empty attempt as evidence", () => {
+    // Math.min() of nothing is Infinity, which would certify detection without measuring at all.
+    expect(() => judgeStudioCalibratedDetection("empty attempt", [[]], 2))
+      .toThrow(/not evidence/u);
+    expect(() => judgeStudioCalibratedDetection("nothing", [], 2))
+      .toThrow(/No calibration passes/u);
+    for (const bad of [0, -1, 1.5]) {
+      expect(() =>
+        evaluateStudioCalibratedDetection({
+          label: "zero passes",
+          workload: () => {
+            throw new Error("must not measure");
+          },
+          referenceRounds: 1,
+          factor: 2,
+          passes: bad,
+        }),
+      ).toThrow(/at least one pass/u);
+    }
+    expect(() =>
+      evaluateStudioCalibratedDetection({
+        label: "zero attempts",
+        workload: () => {
+          throw new Error("must not measure");
+        },
+        referenceRounds: 1,
+        factor: 2,
+        attemptCount: 0,
+      }),
+    ).toThrow(/at least one attempt/u);
   });
 
   it("re-measures rather than letting one starved reference condemn the calibration", () => {

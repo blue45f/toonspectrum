@@ -40,6 +40,7 @@ export function bindStudioBg3dEditorViewModel(h) {
     normalizeStudioBg3dCaptureAspectRatio, resolveStudioBg3dCaptureFrame, resolveStudioBg3dCaptureFrameCameraSettings, applyStudioBg3dCaptureFrameViewOffset,
     BgAnimationPlayhead, LtRangeControl, LtToggleRow, PanoramaRotationNumberField,
     Vec3Field, StudioBg3dDestructiveMutationGuard, deriveStudioBg3dGlbValidationPolicy, resolveStudioBg3dDeviceQuality,
+    useStudioBg3dEngineRuntime,
     acquireStudioBg3dCaptureAdapterAfterViewTransition, CAMERA_PRESETS, canonicalSceneDocument, captureStudioBg3dRaster,
     collectDeviceSignals, createStudioBg3dHistorySnapshot, createStudioBg3dShotId, degToRad,
     describeStudioBg3dPhysicsStatus, eulerDegreesToQuaternion, formatBg3dSunTime, generateLtUserPresetId,
@@ -100,7 +101,7 @@ export function bindStudioBg3dEditorViewModel(h) {
     StudioBg3dPhysicsTransport, StudioBg3dPlacementPointerController, StudioBg3dRoomBuilderPanel, StudioBg3dSceneFog,
     BgAdaptiveDprController, BgCustomModelInstanceBatch, BgCustomModelMesh, BgGroundHelper,
     BgPlacementPreview, BgPrimitiveMesh, BgScaleGuide, BgSectionPlaneController,
-    BgViewportController, SkyClearColorController, StudioBg3dWebglRenderSettingsController, StudioBg3dScenePanorama,
+    BgViewportController, SkyClearColorController, StudioBg3dThreeRenderSettingsController, StudioBg3dScenePanorama,
     StudioBg3dSceneTemplatePanel, StudioBg3dShapesPanel, StudioBg3dSharedCharacterSceneContent, StudioBg3dSharedCharacterStatusOverlay,
     StudioBg3dSharedStagePanel, StudioBg3dViewPanel, StudioBg3dImmersiveRenderBridge, StudioBg3dWebXrSessionBridge,
     StudioBg3dCaptureAdapter, StudioBg3dCaptureRequest, StudioBg3dImmersiveStagePlan, StudioBg3dImportProgress,
@@ -119,7 +120,7 @@ export function bindStudioBg3dEditorViewModel(h) {
     setTransformMode, lineArtPreview, setLineArtPreview, magicLayerEnabled,
     setMagicLayerEnabled, isTransforming, setIsTransforming, isQuadView,
     setIsQuadView, webXrBridgeGeneration, setWebXrBridgeGeneration, webXrCanvasGeneration,
-    setWebXrCanvasGeneration, webXrSessionStateRef, webXrControllerRef, webXrRestoreCameraRef,
+    setWebXrCanvasGeneration, webXrSessionState, webXrSessionStateRef, webXrControllerRef, webXrRestoreCameraRef,
     webXrCleanupPromiseRef, webXrRendererRecreationPendingRef, webXrCloseRequestedRef, webXrOpenRef,
     webXrMountedRef, viewTopRef, viewFrontRef, viewRightRef,
     viewPerspRef, isCapturing, setIsCapturing, error,
@@ -273,6 +274,21 @@ export function bindStudioBg3dEditorViewModel(h) {
     mode: isCapturing ? "capture" : "edit",
     signals: deviceSignals,
   });
+  // Next-generation engine admission. The plan owns which renderer the R3F Canvas builds, so it is
+  // resolved beside device quality rather than inside the viewport, where a late decision would
+  // remount the canvas after the scene had already been hydrated.
+  const engineRuntime = useStudioBg3dEngineRuntime({
+    enabled: open,
+    deviceProfile: deviceQuality.profile,
+    antialias: sceneBaseDocument.render.antialias,
+    saveData: deviceSignals.saveData,
+    deviceMemoryGb: deviceSignals.deviceMemoryGb,
+    observedWebglOnlyFeatures: {
+      // The immersive session bridge drives WebGLRenderer.xr, so an active session pins WebGL2.
+      // VRM characters no longer do: they load MToon node materials under a WebGPU renderer.
+      webxr: webXrSessionState.status !== "idle",
+    },
+  });
   const hasCloneFailure = customModels.some((model) => failedCloneIds.has(model.id));
   const hasPendingClone = customModels.some(
     (model) => !readyCloneIds.has(model.id) && !failedCloneIds.has(model.id)
@@ -371,6 +387,7 @@ export function bindStudioBg3dEditorViewModel(h) {
     insertBackgroundIntent,
     transparentInsert,
     deviceQuality,
+    engineRuntime,
     hasCloneFailure,
     hasPendingClone,
     hasPendingSharedCharacter,
