@@ -60,6 +60,13 @@ const STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS: ReadonlySet<string> = new Set([
  * each spark's angle from `hash2(si, …) * TAU`, a station-index draw with no dependence on the
  * stroke's orientation, so a rotation leaves the whole scatter field pointing where it was.
  *
+ * `pencil-path` is the smallest divergence in this set and still a real one: `processPencilPoints`
+ * offsets every sample by a fixed +/-0.75px drawn from its INDEX, in world axes, so the committed
+ * grain neither scales nor turns while the preview scales and turns the grain already drawn. At
+ * gentle transforms the difference is sub-pixel; at a large scale-up it is not (an 8x scale
+ * previews +/-6px of jitter against a committed +/-0.75px), and the gate cannot know in advance
+ * which gesture it is looking at.
+ *
  * Classified by RENDERER engine rather than by brush id: the watercolor engine backs `watercolor`,
  * `ink-wash`, its `inkwash-*` profiles and `gouache`, plus every `engine-variant` lane in
  * `studio-brush-engine-lane-catalog` that resolves to them, and an id list would silently miss the
@@ -69,6 +76,7 @@ const STUDIO_COORDINATE_RESAMPLED_ENGINES: ReadonlySet<string> = new Set([
   "watercolor-dabs",
   "screentone-dots",
   "particle-scatter",
+  "pencil-path",
 ]);
 
 function studioBrushEngineResamplesCoordinates(brushId: unknown): boolean {

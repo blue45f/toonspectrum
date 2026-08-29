@@ -121,6 +121,14 @@ describe("studioLiveTransformPreviewBlockedForElement", () => {
     }
   });
 
+  it("refuses the pencil family, whose index-derived grain neither scales nor turns", () => {
+    // processPencilPoints offsets each sample by a fixed +/-0.75px drawn from its index, in world
+    // axes. Sub-pixel at gentle transforms, plainly visible at a large scale-up.
+    for (const brush of ["pencil", "pencil-2b", "soft-pencil", "colored-pencil"]) {
+      expect(studioLiveTransformPreviewBlockedForElement(draw({ brush }), false), brush).toBe(true);
+    }
+  });
+
   it("refuses sketch-styled lines and arrows, whose Rough.js wobble is replanned", () => {
     // buildStudioRoughShapeRenderPlan derives its perturbations from the points it is handed, so
     // the commit's replan wobbles differently from the previewed path even with the seed,

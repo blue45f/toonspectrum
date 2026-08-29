@@ -414,6 +414,48 @@ describe("orientation-dependent nibs", () => {
     expect(rotated?.brushTip).toEqual(NIB);
   });
 
+  it("drops the rotation for bounds-derived shapes instead of collapsing them", () => {
+    // StudioDrawNode rebuilds these from drawBounds(points) as axis-aligned primitives, so a
+    // rotated point array cannot carry the turn -- and destroys the shape trying. A square stored
+    // as its diagonal puts both endpoints on one vertical line under a 45deg rotation.
+    for (const kind of ["rect", "ellipse", "star", "triangle", "polygon"] as const) {
+      const rotated = planStudioDrawObjectTransform({
+        el: drawEl({ kind, points: [0, 0, 40, 40] }),
+        sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+        targetBounds: { x: 0, y: 0, width: 40, height: 40 },
+        rotationDeg: 45,
+      });
+
+      expect(rotated, kind).not.toBeNull();
+      // Unrotated: the stored diagonal survives, so the shape still has both extents.
+      expect(rotated?.points, kind).toEqual([0, 0, 40, 40]);
+    }
+  });
+
+  it("still moves and resizes a bounds-derived shape while dropping its rotation", () => {
+    // Only the turn is refused -- the handle's move and resize must still land.
+    const resized = planStudioDrawObjectTransform({
+      el: drawEl({ kind: "rect", points: [0, 0, 40, 40] }),
+      sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+      targetBounds: { x: 10, y: 10, width: 80, height: 40 },
+      rotationDeg: 45,
+    });
+
+    expect(resized?.points).toEqual([10, 10, 90, 50]);
+  });
+
+  it("still rotates a freehand stroke, which absorbs it exactly", () => {
+    // The refusal is scoped to the bounds-derived kinds; nothing else loses its rotation.
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ points: [0, 0, 40, 0] }),
+      sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+      targetBounds: { x: 0, y: 0, width: 40, height: 40 },
+      rotationDeg: 90,
+    });
+
+    expect(maxPointError(rotated!.points, [0, 0, 0, 40])).toBeLessThan(1e-9);
+  });
+
   it("materializes a legacy stroke's catalogue nib so the rotation survives the commit", () => {
     // Pre-nib-table documents store no brushTip, and StudioDrawNode recovers one from the
     // catalogue before building the ribbon (resolveStudioCalligraphyRenderTip). Skipping those

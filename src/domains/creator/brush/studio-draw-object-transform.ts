@@ -30,6 +30,19 @@ import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-prof
 
 import type { DrawEl } from "../studio-element-model";
 
+/**
+ * Kinds `StudioDrawNode` reconstructs from `drawBounds(points)` as AXIS-ALIGNED primitives, so
+ * nothing an affine writes into `points` can carry an orientation for them. Kept beside the
+ * planner that has to refuse them; the canvas layer derives the same verdict for the preview.
+ */
+export function studioDrawShapeIsBoundsDerived(kind: unknown): boolean {
+  return kind === "rect"
+    || kind === "ellipse"
+    || kind === "star"
+    || kind === "triangle"
+    || kind === "polygon";
+}
+
 export interface StudioDrawObjectTransformBounds {
   readonly x: number;
   readonly y: number;
@@ -161,11 +174,21 @@ export function planStudioDrawObjectTransform(
   input: StudioDrawObjectTransformInput
 ): DrawEl | null {
   const { el, sourceBounds, targetBounds } = input;
-  const rotationDeg = input.rotationDeg ?? 0;
+  const requestedRotationDeg = input.rotationDeg ?? 0;
   const strokeWidthPolicy = input.strokeWidthPolicy ?? "scale";
 
   if (el.type !== "draw") return null;
-  if (!finite(rotationDeg)) return null;
+  if (!finite(requestedRotationDeg)) return null;
+  // Bounds-derived primitives cannot absorb a rotation into `points`, and rotating them anyway
+  // DESTROYS them. StudioDrawNode rebuilds rect/ellipse/star/triangle/polygon from
+  // `drawBounds(points)` as axis-aligned shapes, so only the bounding box of the rotated endpoints
+  // survives -- and for a square stored as its diagonal `[0, 0, 40, 40]`, a 45deg rotation puts
+  // both endpoints on the same vertical line, collapsing the committed width to the renderer's
+  // 0.1px floor (measured: the rotated x-extent comes out at 3.6e-15). The bounds mapping still
+  // applies, so the handle's move and resize land; only the turn is dropped, which is what the
+  // renderer would have done with it regardless. These kinds are excluded from the live preview
+  // for the same reason (studio-live-transform-preview-eligibility), so the two agree.
+  const rotationDeg = studioDrawShapeIsBoundsDerived(el.kind) ? 0 : requestedRotationDeg;
   if (
     !finiteEvenPoints(el.points) ||
     !finiteNonNegative(el.strokeWidth) ||
