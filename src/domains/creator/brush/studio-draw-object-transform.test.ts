@@ -502,6 +502,57 @@ describe("orientation-dependent nibs", () => {
     expect(rotated).toBe(el);
   });
 
+  it("returns the ORIGINAL element for a rotate-only shape that carries metadata", () => {
+    // shapeParams and symmetry are cloned by the transform, and the no-op guard compares by
+    // identity (as commitCanvasSelectionResize does), so an always-fresh clone defeated it: a
+    // rotate-only gesture on a star still pushed an undo entry and a CRDT mutation. The clones
+    // now keep the original reference when nothing moved.
+    const el = drawEl({
+      kind: "star",
+      points: [0, 0, 40, 40],
+      shapeParams: {
+        starPoints: 5,
+        starInnerRatio: 0.5,
+        polygonSides: 6,
+        cornerRadius: 4,
+      },
+    });
+    const rotated = planStudioDrawObjectTransform({
+      el,
+      sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+      targetBounds: { x: 0, y: 0, width: 40, height: 40 },
+      rotationDeg: 45,
+    });
+
+    expect(rotated).toBe(el);
+  });
+
+  it("rotates a legacy TAP from the fallback nib its own route renders", () => {
+    // The two legacy routes disagree on the base nib: the multi-point ribbon resolves the
+    // catalogue profile, while the single-point tap branch hardcodes angle -30 / roundness 0.35
+    // and never consults the catalogue. Materializing the catalogue nib for a tap would rotate
+    // from the wrong base — a fountain-pen tap would jump an extra 60 degrees at commit.
+    const tap = planStudioDrawObjectTransform({
+      el: drawEl({ brush: "fountain-pen", points: [5, 5] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    // -30 (the tap's own fallback) + 45, not 30 (the catalogue profile) + 45.
+    expect(tap?.brushTip?.angleDeg).toBe(15);
+    expect(tap?.brushTip?.roundness).toBe(0.35);
+    // The multi-point stroke still rotates from the catalogue profile.
+    const ribbon = planStudioDrawObjectTransform({
+      el: drawEl({ brush: "fountain-pen", points: [0, 0, 10, 10] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    expect(ribbon?.brushTip?.angleDeg).toBe(75);
+  });
+
   it("still moves and resizes a bounds-derived shape while dropping its rotation", () => {
     // Only the turn is refused -- the handle's move and resize must still land.
     const resized = planStudioDrawObjectTransform({

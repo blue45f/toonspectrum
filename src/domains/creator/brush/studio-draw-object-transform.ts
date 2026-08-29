@@ -34,6 +34,17 @@ import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-prof
 import type { DrawEl } from "../studio-element-model";
 
 /**
+ * The nib a single-sample calligraphy TAP actually renders, from `StudioDrawNode`'s tap branch:
+ * angle -30 and roundness 0.35, hardcoded there rather than resolved from the catalogue. Kept
+ * beside the planner that has to rotate from the same base the render used.
+ */
+const STUDIO_LEGACY_CALLIGRAPHY_TAP_TIP = {
+  tiltEnabled: false,
+  angleDeg: -30,
+  roundness: 0.35,
+} as const;
+
+/**
  * Kinds `StudioDrawNode` reconstructs from `drawBounds(points)` as AXIS-ALIGNED primitives, so
  * nothing an affine writes into `points` can carry an orientation for them. Kept beside the
  * planner that has to refuse them; the canvas layer derives the same verdict for the preview.
@@ -255,14 +266,21 @@ export function planStudioDrawObjectTransform(
     // Only the radial corner radius carries a length; counts and ratios are scale-free.
     const cornerRadius = el.shapeParams.cornerRadius * scale.uniformEquivalent;
     if (!finite(cornerRadius)) return null;
-    shapeParams = { ...el.shapeParams, cornerRadius };
+    // Keep the original reference when nothing moved: the no-op guard below compares by identity
+    // (as `commitCanvasSelectionResize` does), so an always-fresh clone would defeat it and push
+    // an undo entry plus a CRDT mutation for a gesture that changed nothing.
+    shapeParams = cornerRadius === el.shapeParams.cornerRadius
+      ? el.shapeParams
+      : { ...el.shapeParams, cornerRadius };
   }
 
   let symmetry: DrawEl["symmetry"];
   if (el.symmetry !== undefined) {
     const center = mapPoint(el.symmetry.centerX, el.symmetry.centerY);
     if (!center) return null;
-    symmetry = { ...el.symmetry, centerX: center.x, centerY: center.y };
+    symmetry = center.x === el.symmetry.centerX && center.y === el.symmetry.centerY
+      ? el.symmetry
+      : { ...el.symmetry, centerX: center.x, centerY: center.y };
   }
 
   // Per-sample stylus orientation is deliberately NOT transformed here.
@@ -303,7 +321,17 @@ export function planStudioDrawObjectTransform(
   // preview turned it, so the rotation is applied to the SAME tip the renderer would have used and
   // the result is persisted -- materializing what the render already assumed, at the angle the
   // gesture asked for. A brush with no nib profile still resolves to undefined and is left alone.
-  let brushTip = el.brushTip ?? resolveStudioCalligraphyRenderTip(el.brush, undefined);
+  // A legacy stroke's base nib depends on WHICH route renders it, and the two disagree. The
+  // multi-point ribbon calls `resolveStudioCalligraphyRenderTip`, so the catalogue profile is its
+  // base; the single-point TAP branch renders a hardcoded fallback instead (angle -30, roundness
+  // 0.35, `StudioDrawNode` around line 1063) and never consults the catalogue. Materializing the
+  // catalogue nib for a tap would rotate from the wrong base -- a fountain-pen tap would jump an
+  // extra 60 degrees at commit -- so a tap materializes the fallback it actually rendered.
+  const isSingleSampleTap = el.points.length <= 2;
+  let brushTip = el.brushTip
+    ?? (isSingleSampleTap
+      ? STUDIO_LEGACY_CALLIGRAPHY_TAP_TIP
+      : resolveStudioCalligraphyRenderTip(el.brush, undefined));
   if (brushTip && rotationDeg !== 0 && !hasPerSampleOrientation) {
     const rotatedAngle = brushTip.angleDeg + rotationDeg;
     if (!finite(rotatedAngle)) return null;
