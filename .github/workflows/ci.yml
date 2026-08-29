@@ -237,7 +237,7 @@ jobs:
     # 3D gate instead of a potentially merge-neutral skipped downstream check.
     if: ${{ always() }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
@@ -290,7 +290,7 @@ jobs:
         # Opens the routed bg3d surface under KakaoTalk, Instagram and NAVER user agents at phone
         # widths and reads the composited canvas back. It fails on a blank viewport, an engine
         # badge that is not WebGL2, a touch target under 44px, horizontal overflow, a viewport
-        # notice landing on the control clusters, or any page error.
+        # notice with no readable surface of its own, or any page error.
         run: |
           xvfb-run -a --server-args="-screen 0 1920x1200x24" \
             pnpm run verify:studio-bg3d-inapp-editor
