@@ -29,6 +29,7 @@
 import { MAX_COORDINATE, MAX_STROKE_WIDTH } from "../live/studio-crdt-document-constants";
 
 import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
+import { SHAPE_PARAM_RANGES } from "./studio-stroke-shapes";
 
 
 import type { DrawEl } from "../studio-element-model";
@@ -264,7 +265,19 @@ export function planStudioDrawObjectTransform(
   let shapeParams: DrawEl["shapeParams"];
   if (el.shapeParams !== undefined) {
     // Only the radial corner radius carries a length; counts and ratios are scale-free.
-    const cornerRadius = el.shapeParams.cornerRadius * scale.uniformEquivalent;
+    // Clamped to the editor's own range. `normalizeShapeParams` clamps to
+    // SHAPE_PARAM_RANGES.cornerRadius (0-120) whenever the shape RENDERS, and the live payload
+    // validator enforces the same bounds, so an unclamped product is both invisible and
+    // unpublishable: scaling a radius-100 rectangle by 2 stored 200 while the canvas drew 120, and
+    // the next resize then compounded from the hidden 200 instead of the visible 120, moving the
+    // radius non-proportionally and handing the inspector an out-of-range value.
+    const cornerRadius = Math.min(
+      SHAPE_PARAM_RANGES.cornerRadius.max,
+      Math.max(
+        SHAPE_PARAM_RANGES.cornerRadius.min,
+        el.shapeParams.cornerRadius * scale.uniformEquivalent,
+      ),
+    );
     if (!finite(cornerRadius)) return null;
     // Keep the original reference when nothing moved: the no-op guard below compares by identity
     // (as `commitCanvasSelectionResize` does), so an always-fresh clone would defeat it and push

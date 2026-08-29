@@ -502,6 +502,29 @@ describe("orientation-dependent nibs", () => {
     expect(rotated).toBe(el);
   });
 
+  it("clamps the scaled corner radius to the editor's own range", () => {
+    // normalizeShapeParams clamps cornerRadius to 0-120 whenever the shape renders, and the live
+    // payload validator enforces the same bounds, so an unclamped product is both invisible and
+    // unpublishable — and the NEXT resize would compound from the hidden value.
+    const scaled = planStudioDrawObjectTransform({
+      el: drawEl({
+        kind: "rect",
+        points: [0, 0, 40, 40],
+        shapeParams: {
+          starPoints: 5,
+          starInnerRatio: 0.5,
+          polygonSides: 6,
+          cornerRadius: 100,
+        },
+      }),
+      sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+      targetBounds: { x: 0, y: 0, width: 80, height: 80 },
+      rotationDeg: 0,
+    });
+
+    expect(scaled?.shapeParams?.cornerRadius).toBe(120);
+  });
+
   it("returns the ORIGINAL element for a rotate-only shape that carries metadata", () => {
     // shapeParams and symmetry are cloned by the transform, and the no-op guard compares by
     // identity (as commitCanvasSelectionResize does), so an always-fresh clone defeated it: a
