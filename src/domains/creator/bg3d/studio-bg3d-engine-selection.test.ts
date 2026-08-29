@@ -6,6 +6,7 @@ import {
   recordStudioBg3dWebGpuFailure,
   resolveStudioBg3dEngineRuntime,
   selectStudioBg3dEngine,
+  STUDIO_BG3D_ENGINE_SELECTION_NOTICES,
   STUDIO_BG3D_EDITOR_ACTIVATION_BUDGET_GZIP_BYTES,
   STUDIO_BG3D_EDITOR_REQUIRED_CAPABILITIES,
   STUDIO_BG3D_WEBGPU_FAILURE_LIMIT,
@@ -269,6 +270,18 @@ describe("Studio BG3D WebGL-only feature demand", () => {
       ...BASE,
       webglOnlyFeatures: { webxr: false, vrmCharacters: false },
     })).toMatchObject({ backend: "webgpu" });
+  });
+
+  it("keeps every engine notice short enough to read in the panel at 360px", () => {
+    // The notice renders inside a narrow status box in the View panel, and the editor is used at
+    // 360px in Korean in-app browsers. The first draft of the VRM notice ran to 94 characters —
+    // more than double every other one — by explaining the shading implementations rather than
+    // what the artist should do. The budget is what stops that being rediscovered by a reader on
+    // a phone; the reasoning belongs in the docs, which have room for it.
+    for (const [reason, notice] of Object.entries(STUDIO_BG3D_ENGINE_SELECTION_NOTICES)) {
+      expect(notice.length, `${reason}: ${notice.length}자`).toBeLessThanOrEqual(80);
+      expect(notice.trim(), `${reason} must not be blank`).not.toBe("");
+    }
   });
 
   it("latches a character demand so removing the character does not remount the viewport", () => {

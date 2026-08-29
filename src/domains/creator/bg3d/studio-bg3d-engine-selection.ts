@@ -143,7 +143,13 @@ const BACKEND_RUNTIME_IDS: Readonly<Record<StudioBg3dEngineBackend, StudioBg3dRu
     webgpu: "three-webgpu",
   });
 
-const NOTICES: Readonly<Record<StudioBg3dEngineSelectionReason, string>> = Object.freeze({
+/**
+ * Artist-facing sentence for each reason. Exported so the panel's width budget can be asserted:
+ * this box is narrow and the editor is used at 360px, so a notice that explains the engineering
+ * instead of the artist's next step stops being read at all.
+ */
+export const STUDIO_BG3D_ENGINE_SELECTION_NOTICES:
+  Readonly<Record<StudioBg3dEngineSelectionReason, string>> = Object.freeze({
   "auto-webgpu-promoted": "차세대 WebGPU 엔진으로 실행 중입니다.",
   "auto-webgl2-baseline": "안정성 기준인 WebGL2 엔진으로 실행 중입니다.",
   "user-webgpu-override": "직접 선택한 WebGPU 엔진으로 실행 중입니다.",
@@ -160,9 +166,12 @@ const NOTICES: Readonly<Record<StudioBg3dEngineSelectionReason, string>> = Objec
   "runtime-capability-unavailable":
     "선택한 엔진이 편집기에 필요한 기능을 모두 제공하지 않아 WebGL2로 실행합니다.",
   "webgl-only-webxr": "몰입형(WebXR) 보기를 사용하는 동안에는 WebGL2 엔진으로 실행합니다.",
+  // 왜인지까지 말하는 이유: "빠른 엔진을 왜 못 쓰냐"가 아티스트에게 당연한 질문이라서다. 다만
+  // 이유는 아티스트의 언어로만 말한다 — MToon 이니 셰이딩 구현이니는 이 문장이 답할 질문이
+  // 아니고, 좁은 화면에서 읽히지도 않는다. 근거는 승격 문서와 색 불일치 문서에 있다.
   "webgl-only-vrm-character":
-    "3D 캐릭터가 있는 장면은 WebGL2 엔진으로 실행합니다. 두 엔진의 MToon 음영이 서로 달라, "
-    + "캐릭터 편집기에서 맞춘 색과 출력 색을 같게 유지하기 위해서입니다.",
+    "3D 캐릭터가 있는 장면은 WebGL2 엔진으로 실행합니다. 캐릭터 편집기에서 맞춘 색을 "
+    + "출력까지 그대로 유지하기 위해서입니다.",
 });
 
 export const STUDIO_BG3D_ENGINE_PREFERENCES: readonly StudioBg3dEnginePreference[] = Object.freeze([
@@ -199,7 +208,7 @@ function plan(
     fallbackBackend: backend === "webgpu" ? "webgl2" : null,
     reason,
     webgpuSelectable,
-    notice: NOTICES[reason],
+    notice: STUDIO_BG3D_ENGINE_SELECTION_NOTICES[reason],
     diagnostics: Object.freeze([...new Set(diagnostics)]),
   });
 }
