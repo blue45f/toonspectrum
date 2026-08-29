@@ -171,6 +171,27 @@ function validateSuccess(result, diagnostics) {
     failures.push("a blocked in-app browser was allowed onto WebGPU");
   }
 
+  // The KTX2 transcoder must initialize against both live renderers, or compressed-texture models
+  // would fail to import on whichever backend the policy picked.
+  for (const backend of ["webgpu", "webgl"]) {
+    const ktx2 = result.ktx2?.[backend];
+    if (ktx2?.ok !== true) {
+      failures.push(
+        `KTX2 transcoder did not initialize on ${backend}: ${ktx2?.code ?? ktx2?.message ?? "no result"}`,
+      );
+    } else if (ktx2.decodeFailure !== false || !ktx2.transcoderId) {
+      failures.push(`KTX2 transcoder on ${backend} reported an unusable runtime`);
+    }
+  }
+  for (const row of result.webglOnlyFeatures ?? []) {
+    if (row.autoBackend !== "webgl2" || row.forcedBackend !== "webgl2" || row.webgpuSelectable) {
+      failures.push(
+        `${row.feature}: WebGL-only feature did not pin the baseline`
+        + ` (auto=${row.autoBackend}, forced=${row.forcedBackend})`,
+      );
+    }
+  }
+
   if ((result.deviceLosses ?? []).length !== 0) {
     failures.push(`WebGPU device was lost during the run: ${result.deviceLosses.join("; ")}`);
   }
@@ -334,6 +355,8 @@ async function main() {
         maxOverToleranceShare: MAX_OVER_TOLERANCE_SHARE,
       },
       selection: result.selection,
+      webglOnlyFeatures: result.webglOnlyFeatures,
+      ktx2: result.ktx2,
       inAppRuns,
       failures,
       evidenceDirectory: SCRATCH,

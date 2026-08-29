@@ -10,8 +10,12 @@
 
 import * as THREE from "three";
 
-import { selectStudioBg3dEngine } from "../src/domains/creator/bg3d/studio-bg3d-engine-selection";
+import {
+  EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
+  selectStudioBg3dEngine,
+} from "../src/domains/creator/bg3d/studio-bg3d-engine-selection";
 import { classifyStudioBg3dInAppBrowser } from "../src/domains/creator/bg3d/studio-bg3d-inapp-browser";
+import { createStudioBg3dKtx2RendererRuntime } from "../src/domains/creator/bg3d/studio-bg3d-ktx2-renderer-runtime";
 import { createStudioBg3dThreeWebglCaptureAdapter } from "../src/domains/creator/bg3d/studio-bg3d-three-webgl-capture";
 import {
   createStudioBg3dThreeWebGpuCaptureAdapter,
@@ -241,6 +245,56 @@ function selectionMatrix(probe: Awaited<ReturnType<typeof probeStudioBg3dWebGpuC
   });
 }
 
+/**
+ * The KTX2 transcoder guard was widened to admit a WebGPU renderer, which only means something if
+ * a real `WebGPURenderer` can actually answer the feature queries the loader makes. A stub cannot
+ * prove that, so the runtime is built against the live renderer here.
+ */
+async function probeKtx2Runtime(renderer: unknown) {
+  try {
+    const runtime = await createStudioBg3dKtx2RendererRuntime({
+      renderer: renderer as Parameters<typeof createStudioBg3dKtx2RendererRuntime>[0]["renderer"],
+    });
+    const result = {
+      ok: true as const,
+      transcoderId: runtime.transcoderId,
+      workerLimit: runtime.workerLimit,
+      decodeFailure: runtime.hasDecodeFailure(),
+    };
+    runtime.dispose();
+    return result;
+  } catch (error) {
+    return {
+      ok: false as const,
+      code: (error as { code?: string } | null)?.code ?? null,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/** WebGL-only features must pin the baseline even against an explicit WebGPU request. */
+function webglOnlyFeatureMatrix(probe: Awaited<ReturnType<typeof probeStudioBg3dWebGpuCapability>>) {
+  const inApp = classifyStudioBg3dInAppBrowser({ userAgent: navigator.userAgent });
+  return (["vrmCharacters", "webxr"] as const).map((feature) => {
+    const request = {
+      probe,
+      inApp,
+      deviceProfile: "desktop" as const,
+      webgpuRuntimeAvailable: true,
+      webglOnlyFeatures: { ...EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES, [feature]: true },
+    };
+    const auto = selectStudioBg3dEngine({ ...request, preference: "auto" });
+    const forced = selectStudioBg3dEngine({ ...request, preference: "webgpu" });
+    return {
+      feature,
+      autoBackend: auto.backend,
+      forcedBackend: forced.backend,
+      reason: forced.reason,
+      webgpuSelectable: forced.webgpuSelectable,
+    };
+  });
+}
+
 async function run(): Promise<unknown> {
   const probe = await probeStudioBg3dWebGpuCapability({
     secureContext: window.isSecureContext,
@@ -328,6 +382,11 @@ async function run(): Promise<unknown> {
       worstDepthSamples: sampleDepthDeltas(transparentWebgpu.depth, transparentWebgl.depth),
     },
     selection: selectionMatrix(probe),
+    webglOnlyFeatures: webglOnlyFeatureMatrix(probe),
+    ktx2: {
+      webgpu: await probeKtx2Runtime(webgpuRenderer),
+      webgl: await probeKtx2Runtime(webglRenderer),
+    },
     liveUserAgent: {
       userAgent: navigator.userAgent,
       classified: classifyStudioBg3dInAppBrowser({ userAgent: navigator.userAgent }),
