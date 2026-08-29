@@ -19,136 +19,66 @@ import { studioSketchStyleOfElement } from "./studio-rough-shape";
 import type { DrawEl, El } from "./studio-element-model";
 
 /**
- * Dry media replans its tooth and patch noise from DAB-RELATIVE coordinates
- * (`studio-dry-media-kernel-tip.ts`), so scaling or rotating resamples those fields and the
- * committed texture is not the previewed texture affinely transformed — it is a different
- * texture. Nothing in the document can carry the old sampling forward, so these routes stand down.
+ * Renderers PROVEN to draw a pure function of the stroke's transformable state, and therefore the
+ * only ones that may preview.
+ *
+ * This started as a denylist of renderers that resample, and that shape was wrong: it fails OPEN.
+ * Six review rounds each found one more renderer that had to be added -- dry media, then
+ * watercolor, then screentone and glitter, then pencil, then one web kit, then two more -- and the
+ * seventh would have found stamp presets and the pixel-pencil grid. Every miss shipped a visible
+ * snap. Inverted, the same mistake costs a renderer its live preview and nothing else: the commit
+ * is untouched and correct, so an un-listed brush simply keeps today's commit-at-release
+ * behaviour. That asymmetry is the whole reason this file exists, and the list should have obeyed
+ * it from the start.
+ *
+ * An engine earns a place here only by reading as a pure function of points, width and pressure --
+ * no world-fixed constant, no index- or arc-length-derived noise, no snapping to a document grid.
+ * Each entry below was checked against its planner for those tells:
+ *
+ *   - `causal-ink` and `calligraphy-segments` build a ribbon from the path itself
+ *     (`studio-causal-ink.ts`, `studio-calligraphy-ribbon.ts`: no hash, no station index, no
+ *     world-space rounding). The nib angle IS orientation-dependent, and the commit path rotates
+ *     it explicitly -- see `studio-draw-object-transform`, which also refuses that rotation when
+ *     per-sample stylus channels are present, in which case the guard below stands the stroke down.
+ *   - `perfect-outline` and `capsule-outline` are outline geometry over the points
+ *     (`studio-perfect-freehand.ts`, `studio-outline-stroke-contract.ts`: same, no tells).
+ *   - `highlighter-path` is a plain path; its multiply composite is a separate concern already
+ *     handled by the drag lift's subtree composite guard.
+ *
+ * Everything else stands down until someone audits its planner and adds it here with the same
+ * evidence -- including engines that may well be safe (`neon-halo`, `glow-halo`, `angled-ribbon`),
+ * which are omitted because they have not been checked, not because they are known bad. Some are
+ * known bad: `stamp-dabs` drains charge by `stampIndex` and offers a world-`fixed` tip rotation
+ * plus a `random-jitter` one; `oil-ribbon`, `pencil-path`, `watercolor-dabs`, `particle-scatter`
+ * and `screentone-dots` were each confirmed in review.
  */
-const STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS: ReadonlySet<string> = new Set([
-  // The RENDERER id, which is what actually decides the texture path and is therefore the entry
-  // that matters most. Many pack descriptors persist `runtimeBrushId: "dry-media"` alongside an
-  // unrelated catalogue id (the sketch pencils in `studio-brush-pack-index`), and
-  // `applyStudioBrushCatalogSelection` stores the two separately -- so enumerating catalogue names
-  // alone let every one of those strokes through. Classify by renderer first.
-  "dry-media",
-  // The core presets, which carry their own name as the brush id rather than the renderer's.
-  "crayon",
-  "chalk",
-  "charcoal",
-  "pastel",
-  "oil-pastel",
+const STUDIO_TRANSFORM_SAFE_ENGINES: ReadonlySet<string> = new Set([
+  "causal-ink",
+  "calligraphy-segments",
+  "perfect-outline",
+  "capsule-outline",
+  "highlighter-path",
 ]);
 
 /**
- * Renderers whose per-dab geometry is replanned from the stroke's own arc length and index, so a
- * scale or rotation re-seeds the whole texture rather than moving it.
+ * True only when the renderer is known safe from EVERY id the element carries.
  *
- * `watercolor-dabs` fails BOTH ways at once, verified in `studio-watercolor-brush.ts`:
- * `idealStationCount = ceil(totalLength / spacing) + 1`, so any scale changes the station count and
- * with it every `hash2(stationIndex, …)` draw; and `createDiffuseDab` places its halo at
- * `hash2(stationIndex, 31, seed) * TAU`, an angle with no dependence on the stroke's orientation —
- * so even a pure rotation, which leaves the station count alone, leaves every halo pointing the
- * old way while the preview swings all of them round.
- *
- * `screentone-dots` is the starkest case: `screentoneDotsForStroke` places every dot on a GLOBAL
- * lattice (`ix * pitch`, `iy * pitch`, with the half-pitch honeycomb offset on odd rows), in world
- * coordinates that owe nothing to the stroke. That is the point of the design -- overlapping passes
- * fill the same halftone grid -- and it is exactly why a rotation cannot be previewed: the commit
- * re-lays the dots on the unrotated lattice while the preview swung them.
- *
- * `particle-scatter` fails the same way watercolor's halo does: `planGlitterBrushParticles` takes
- * each spark's angle from `hash2(si, …) * TAU`, a station-index draw with no dependence on the
- * stroke's orientation, so a rotation leaves the whole scatter field pointing where it was.
- *
- * `pencil-path` is the smallest divergence in this set and still a real one: `processPencilPoints`
- * offsets every sample by a fixed +/-0.75px drawn from its INDEX, in world axes, so the committed
- * grain neither scales nor turns while the preview scales and turns the grain already drawn. At
- * gentle transforms the difference is sub-pixel; at a large scale-up it is not (an 8x scale
- * previews +/-6px of jitter against a committed +/-0.75px), and the gate cannot know in advance
- * which gesture it is looking at.
- *
- * Classified by RENDERER engine rather than by brush id: the watercolor engine backs `watercolor`,
- * `ink-wash`, its `inkwash-*` profiles and `gouache`, plus every `engine-variant` lane in
- * `studio-brush-engine-lane-catalog` that resolves to them, and an id list would silently miss the
- * next one added.
+ * `brush` (the runtime brush id) decides the texture path and so must resolve to a safe engine on
+ * its own -- an unresolvable one is not a licence, it is an unknown. `brushCatalogId` is checked
+ * too rather than used as a fallback: the two are stored independently and often disagree (pack
+ * presets persist `runtimeBrushId: "dry-media"` beside an unrelated catalogue name), so a
+ * catalogue id that resolves to an unsafe engine stands the stroke down even when the runtime id
+ * looks fine. Fail closed on disagreement; there is no reading of a contradictory pair that is
+ * worth a preview.
  */
-const STUDIO_COORDINATE_RESAMPLED_ENGINES: ReadonlySet<string> = new Set([
-  "watercolor-dabs",
-  "screentone-dots",
-  "particle-scatter",
-  "pencil-path",
-]);
-
-function studioBrushEngineResamplesCoordinates(brushId: unknown): boolean {
-  const engine = resolveStudioBrushRuntimeContract(brushId)?.engine;
-  return engine !== undefined && STUDIO_COORDINATE_RESAMPLED_ENGINES.has(engine);
+function studioBrushEngineIsTransformSafe(brushId: unknown, catalogId: unknown): boolean {
+  const runtimeEngine = resolveStudioBrushRuntimeContract(brushId)?.engine;
+  if (runtimeEngine === undefined || !STUDIO_TRANSFORM_SAFE_ENGINES.has(runtimeEngine)) {
+    return false;
+  }
+  const catalogEngine = resolveStudioBrushRuntimeContract(catalogId)?.engine;
+  return catalogEngine === undefined || STUDIO_TRANSFORM_SAFE_ENGINES.has(catalogEngine);
 }
-
-/**
- * The clean-room web drawing kits -- competitive, coloring and assist -- blocked as one family.
- *
- * These brushes do not deposit along the stroke; a KIT authors their geometry from parameters
- * fixed in WORLD space, which `studioWebDrawingKitOwnsStrokeGeometry` states as the bridge's own
- * contract: "every surface must plan from kit samples rather than from the ordinary deposition
- * planner". A preview is one affine over marks already placed; the commit re-runs the kit planner
- * on axes the gesture never turned, so the two cannot agree. Verified across all three kits:
- * `planStudioWebGridInkSamples` rounds to `Math.round(x / cell) * cell` on an unrotated grid (and
- * dedups by cell key, so the sample COUNT moves too); `planStudioWebDotToneSamples` snaps back onto
- * a global pitch; `planStudioWebGravityDripSamples` emits beads at `y + length`, downward, always;
- * `planStudioWebKaleidoInkSamples` replicates about a fixed `centerX`/`centerY`;
- * `planStudioWebMirrorInkSamples` reflects across a fixed `axisX`/`axisY`;
- * `planStudioWebCrossHatchPenSamples` hatches at hard-coded +/-45deg. Same non-commuting shape as
- * the `symmetry` guard above -- `A ∘ G` is not `G ∘ A` when G is pinned to the world.
- *
- * Taken as the whole union rather than the members verified one by one. Four review rounds each
- * found one more member of a pattern already established, and the asymmetry that justifies every
- * entry in this file settles it: over-blocking costs a member its live preview and nothing else,
- * since the commit is unchanged and correct, while under-blocking ships a visible snap.
- * `web-mirror-ink` and `web-kaleido-ink` are included even though the bridge excludes them from
- * kit-owned geometry -- they get their fold from `resolveStudioBrushIntrinsicSymmetry`, which is
- * derived from the BRUSH rather than stored on the element, so the symmetry guard above never sees
- * it.
- *
- * Spelled out here rather than imported from `STUDIO_WEB_DRAWING_ALL_BRUSH_IDS`, which would pull
- * three kits' worth of sample planners into the eagerly-bundled canvas path just to read
- * twenty-five strings -- the same bundle discipline `studio-selection-chrome-mirror` follows for
- * the overlay's node name. `studio-live-transform-preview-eligibility.test.ts` pins this set equal
- * to the bridge's own union, so a brush added to any kit fails the build rather than slipping past.
- */
-const STUDIO_WORLD_PARAMETERIZED_BRUSH_IDS: ReadonlySet<string> = new Set([
-  // competitive kit
-  "web-multi-agent",
-  "web-rough-ink",
-  "web-gravity-drip",
-  "web-soft-cloud",
-  "web-calligraphy-ribbon",
-  "web-dash-stitch",
-  "web-scatter-stamp",
-  "web-rainbow-flow",
-  "web-lazy-ink",
-  // coloring kit
-  "web-hatch-color",
-  "web-cel-flat",
-  "web-blend-softener",
-  "web-dot-tone",
-  // assist kit
-  "web-kaleido-ink",
-  "web-fur-strand",
-  "web-contour-double",
-  "web-radial-burst",
-  "web-mirror-ink",
-  "web-grid-ink",
-  "web-spiro-orbit",
-  "web-zigzag-edge",
-  "web-neon-tube",
-  "web-pressure-flat",
-  "web-smudge-trail",
-  "web-cross-hatch-pen",
-]);
-
-/** Exported for the drift test alone; the guard reads the set directly. */
-export const STUDIO_LIVE_TRANSFORM_WORLD_PARAMETERIZED_BRUSH_IDS =
-  STUDIO_WORLD_PARAMETERIZED_BRUSH_IDS;
 
 /**
  * @param isBoundDerivedShape the caller's own closed-shape verdict. Rect, ellipse, star, triangle
@@ -189,21 +119,12 @@ export function studioLiveTransformPreviewBlockedForElement(
   if ((draw.kind ?? "freehand") !== "freehand" && studioSketchStyleOfElement(draw)?.enabled === true) {
     return true;
   }
-  const brushId = draw.brush;
-  const catalogId = draw.brushCatalogId;
-  if (studioBrushEngineResamplesCoordinates(brushId) || studioBrushEngineResamplesCoordinates(catalogId)) {
-    return true;
-  }
-  if (typeof brushId === "string" && STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS.has(brushId)) {
-    return true;
-  }
-  if (typeof catalogId === "string" && STUDIO_COORDINATE_RESAMPLED_BRUSH_IDS.has(catalogId)) {
-    return true;
-  }
-  if (typeof brushId === "string" && STUDIO_WORLD_PARAMETERIZED_BRUSH_IDS.has(brushId)) {
-    return true;
-  }
-  if (typeof catalogId === "string" && STUDIO_WORLD_PARAMETERIZED_BRUSH_IDS.has(catalogId)) {
+  // THE ALLOWLIST. Everything above is a property of the ELEMENT that disqualifies it whatever it
+  // is drawn with; this is the renderer itself, and it must be positively known safe. A brush with
+  // no runtime contract at all -- an unknown id, a persisted render mode like `pixel-grid-v1` that
+  // is not an engine, a preset from a pack this build does not know -- resolves to undefined and
+  // stands down here, which is the behaviour the denylist could never give.
+  if (!studioBrushEngineIsTransformSafe(draw.brush, draw.brushCatalogId)) {
     return true;
   }
   return false;

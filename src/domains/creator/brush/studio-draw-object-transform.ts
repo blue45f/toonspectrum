@@ -298,6 +298,24 @@ export function planStudioDrawObjectTransform(
     brushTip = el.brushTip;
   }
 
+  // A dropped rotation must not publish a mutation. `commitCanvasSelectionResize` decides whether
+  // anything changed by OBJECT IDENTITY, so returning a fresh element whose numbers all match the
+  // input would push an undo entry, a CRDT mutation and a "resized" announcement for a gesture
+  // that changed nothing -- which is exactly what a rotate-only gesture on a bounds-derived shape
+  // now is. Hand back the original reference instead.
+  if (
+    rotationDeg !== requestedRotationDeg
+    && strokeWidth === el.strokeWidth
+    && brushTip === el.brushTip
+    && sampleSpacing === el.sampleSpacing
+    && shapeParams === el.shapeParams
+    && symmetry === el.symmetry
+    && points.length === el.points.length
+    && points.every((value, index) => value === el.points[index])
+  ) {
+    return el;
+  }
+
   return {
     ...el,
     points,

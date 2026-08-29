@@ -432,6 +432,21 @@ describe("orientation-dependent nibs", () => {
     }
   });
 
+  it("returns the ORIGINAL element for a rotate-only gesture on a bounds-derived shape", () => {
+    // commitCanvasSelectionResize decides "did anything change?" by object identity, so a fresh
+    // element with identical numbers would publish an undo entry, a CRDT mutation and a "resized"
+    // announcement for a gesture that changed nothing.
+    const el = drawEl({ kind: "rect", points: [0, 0, 40, 40] });
+    const rotated = planStudioDrawObjectTransform({
+      el,
+      sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+      targetBounds: { x: 0, y: 0, width: 40, height: 40 },
+      rotationDeg: 45,
+    });
+
+    expect(rotated).toBe(el);
+  });
+
   it("still moves and resizes a bounds-derived shape while dropping its rotation", () => {
     // Only the turn is refused -- the handle's move and resize must still land.
     const resized = planStudioDrawObjectTransform({
