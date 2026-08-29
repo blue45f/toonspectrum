@@ -24,17 +24,33 @@
  *
  * ## Designing against timer noise on shared CI
  *
- *  - Every number is the MINIMUM of `REPS` timed moves, never a single sample. Interference is
- *    additive, so the minimum is the least-contaminated estimate and by far the most reproducible;
- *    the median and p90 are reported alongside it but not asserted on.
- *  - The primary assertion is a RATIO between two measurements taken back-to-back in the same
- *    process, which cancels machine speed. Only the ceiling is absolute, and it is set at one
- *    quarter of a 30 fps frame rather than at the observed value.
- *  - The n=400 baseline is floored at `GROWTH_BASE_FLOOR_MS` before the ratio is applied. Under
- *    ~0.1 ms a `performance.now()` delta is mostly quantisation, and a ratio taken against noise
- *    fails at random. KNOWN CONSEQUENCE: a lane that is linear in n but whose absolute cost is deep
- *    under the floor (say 0.02 ms -> 0.16 ms) passes the ratio. That is deliberate — the ceiling is
- *    the backstop for anything that could actually be felt, and a flaky gate gets deleted.
+ *  - Every number is the MINIMUM of the timed moves in its pass, never a single sample.
+ *    Interference is additive, so the minimum is the least-contaminated estimate and by far the
+ *    most reproducible; the median and p90 are reported alongside it but not asserted on. A
+ *    median over a handful of reps on a cheap lane swings by 3-5x here, which is exactly how a
+ *    ratio gate becomes a flaky gate.
+ *  - The primary assertion is a RATIO between the two lengths, measured INTERLEAVED — short move
+ *    immediately before long move, every sample — so a contended stretch inflates both windows and
+ *    cancels. Two separate back-to-back loops did NOT cancel it: contention lands inside one loop
+ *    and moves the ratio by itself, which is how CI once read `dry-dynamic` at 0.092 ms for n=400
+ *    and 0.209 ms for n=3200, faster than a local container at one length and slower at the other.
+ *    Only the ceiling is absolute, and it is set at one quarter of a 30 fps frame rather than at
+ *    the observed value.
+ *  - A violation must be EARNED. Samples are reduced and judged by `studio-perf-calibration.ts`,
+ *    so each pass reduces to min(long)/min(short) and the verdict is the minimum across
+ *    `GROWTH_PASSES` passes: one unlucky pass cannot redden the gate, while a lane that genuinely
+ *    replans trips every pass. A clean pass ends the measurement, so a healthy lane pays 7 timed
+ *    moves per length where this gate used to spend 21 unconditionally; the passes a suspicious
+ *    lane earns are funded out of that saving.
+ *  - The n=400 baseline is still floored at `GROWTH_BASE_FLOOR_MS`, but NOT for the reason first
+ *    recorded here: Node's `performance.now()` resolves to ~51 ns, so a 0.1 ms window is not
+ *    quantisation. The floor exempts lanes whose per-move cost is small enough that fixed
+ *    overhead dominates the window — see the constant for the measurement that shows a 4 µs lane
+ *    reading a stable x2 on overhead alone. KNOWN CONSEQUENCE, unchanged: a lane that is linear
+ *    in n but whose absolute cost is deep under the floor passes the ratio. That is deliberate —
+ *    the ceiling is the backstop for anything that could actually be felt — and every run now
+ *    prints the smallest slowdown its own reading could have convicted, so the blind spot is
+ *    visible per lane rather than only described here.
  *  - Failure messages carry the lane id, the representative brush, the planner chain and the whole
  *    measured curve, so a red build names the offender instead of printing "expected 12 < 8".
  *
@@ -165,6 +181,12 @@ import {
   planStudioOilRibbonCarrier,
   studioOilRibbonProgramsForBrush,
 } from "./studio-oil-ribbon-carrier";
+import {
+  judgeStudioCalibratedBudget,
+  reduceStudioPerfCalibrationSamples,
+  type StudioPerfCalibrationPass,
+  type StudioPerfCalibrationSample,
+} from "./studio-perf-calibration";
 import { createStudioIncrementalAngledNibCoverageBuilder } from "./studio-stroke-local-coverage";
 import { planStudioWetWashLivePipeline } from "./studio-wet-wash-live-pipeline";
 
@@ -178,17 +200,6 @@ const LONG_N = 3_200;
 const SHORT_N = 400;
 /** Pointer samples appended between replans: ~240 Hz input against a 60 Hz rAF. */
 const MOVE_STEP = 4;
-/**
- * Timed moves per (lane, length).
- *
- * The gate statistic is the MINIMUM of these, not the median. Interference on a shared runner is
- * strictly additive — a scheduler preemption or a GC pause can only make a sample slower, never
- * faster — so the minimum is the least-contaminated estimate of what the planner actually costs,
- * and it is dramatically more reproducible run to run. A median over a handful of reps on a cheap
- * lane swings by 3-5x here, which is exactly how a ratio gate becomes a flaky gate. The median and
- * the p90 are still reported, because a wide min-to-p90 spread is itself worth seeing.
- */
-const REPS = 21;
 /** Minimum timed moves kept when a slow lane trips the time budget below. */
 const MIN_REPS = 5;
 /** Wall-clock ceiling per (lane, length) measurement, so one pathological lane cannot hang CI. */
@@ -204,8 +215,47 @@ const MEASURE_BUDGET_MS = 4_000;
  * 100% slack over what a correct lane actually measures.
  */
 const GROWTH_MULTIPLE = 2;
-/** Ratio denominator floor — see the timer-noise note in the file header. */
+/**
+ * Ratio denominator floor — see the timer-noise note in the file header.
+ *
+ * The VALUE is unchanged; the reason recorded for it was wrong, and the correction matters
+ * because it says what the floor does and does not buy.
+ *
+ * Not quantisation. This gate runs under Node, where `performance.now()` is `hrtime`-backed
+ * rather than coarsened for Spectre the way a browser clock is: measured on this tree the
+ * smallest non-zero delta is ~5.1e-5 ms (51 ns), so at the 0.092 ms baseline that once failed CI
+ * quantisation was 0.055% of the window. A ratio at 0.1 ms is not "taken against noise".
+ *
+ * What the floor really buys is exemption for lanes whose per-move cost is so small that fixed
+ * overhead — the call, the stepper bookkeeping, the cache state the seek leaves behind — is most
+ * of the window, so the ratio measures that overhead rather than the planner. Dropping the floor
+ * to 0.005 ms to test this made `family:neon` (0.004 ms -> 0.011 ms) read a perfectly stable
+ * x2.13 across all three passes and redden the gate, with no planner defect: 7 µs of overhead
+ * against a 4 µs baseline is x2 on its own. That is the hazard, and 0.1 ms is where it stops.
+ *
+ * The cost of the floor is real and is why the two mechanisms above exist: for a lane sitting
+ * JUST under it the gate is no longer a ratio at all but an absolute `0.1 x GROWTH_MULTIPLE` ms
+ * budget, which is exactly how `dry-dynamic` (short move 0.092 ms) once failed CI at 0.209 ms
+ * against a 0.200 ms limit. Interleaving and earned passes are what keep that from being a coin
+ * flip; the floor is what keeps the sub-10 µs lanes off a hair trigger.
+ */
 const GROWTH_BASE_FLOOR_MS = 0.1;
+
+/**
+ * Confirmation passes and samples per pass.
+ *
+ * A pass that clears the gate ends the measurement, so a healthy lane pays ONE pass — 7 timed
+ * moves per length instead of the 21 this gate used to spend unconditionally. The saved budget
+ * is what pays for the extra passes a suspicious lane gets, and those passes are worth most
+ * exactly where the pairing helps least: `oil-ribbon` times a 49 ms long move against a 2.5 ms
+ * short one, and a window 20x longer catches 20x more preemption, so interleaving cannot
+ * equalise their exposure the way it does for lanes whose windows are comparable. Measured under
+ * 150% oversubscription (6 spinning hogs on 4 cores), its honest x18 read x40/x37/x26 across
+ * three separate runs of the old gate; taking the minimum of more passes is what pulls that back
+ * under the lane's pinned ratchet.
+ */
+const GROWTH_PASSES = 5;
+const GROWTH_SAMPLES_PER_PASS = 7;
 /** Absolute per-move ceiling: a quarter of a 30 fps frame, leaving the rest for paint and layout. */
 const PER_MOVE_CEILING_MS = 8;
 
@@ -1037,39 +1087,107 @@ function quantile(sorted: readonly number[], q: number): number {
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))]!;
 }
 
-function measurePerMove(probe: LaneProbe, pointCount: number): Measurement {
-  const before = prefix(pointCount - MOVE_STEP);
-  const at = prefix(pointCount);
-  const stepper = probe.makeStroke();
-  // Prime: JIT warm-up plus, for incremental lanes, the state a real stroke would already hold by
-  // the time it reaches this length.
-  stepper.seek(before);
-  let outputSize = stepper.move(at);
-  const samples: number[] = [];
-  const startedAt = performance.now();
-  for (let rep = 0; rep < REPS; rep += 1) {
-    stepper.seek(before); // untimed: restore the pre-move state
-    const t0 = performance.now();
-    outputSize = stepper.move(at); // timed: ONE pointer move
-    samples.push(performance.now() - t0);
-    if (samples.length >= MIN_REPS && performance.now() - startedAt > MEASURE_BUDGET_MS) break;
-  }
-  samples.sort((left, right) => left - right);
+function summarize(
+  pointCount: number,
+  samples: readonly number[],
+  outputSize: number,
+): Measurement {
+  const sorted = [...samples].sort((left, right) => left - right);
   return {
     pointCount,
-    min: samples[0]!,
-    p50: quantile(samples, 0.5),
-    p90: quantile(samples, 0.9),
-    reps: samples.length,
+    min: sorted[0]!,
+    p50: quantile(sorted, 0.5),
+    p90: quantile(sorted, 0.9),
+    reps: sorted.length,
     outputSize,
   };
 }
 
-function growthRatio(short: Measurement, long: Measurement): number {
-  return long.min / Math.max(short.min, GROWTH_BASE_FLOOR_MS);
+/** Both lengths, plus the earned growth verdict the gate asserts on. */
+interface LaneMeasurement {
+  readonly short: Measurement;
+  readonly long: Measurement;
+  readonly passes: readonly StudioPerfCalibrationPass[];
+  /** MINIMUM ratio across confirmation passes — the growth the lane has to EARN. */
+  readonly growth: number;
 }
 
-function describeCurve(probe: LaneProbe, short: Measurement, long: Measurement): string {
+/**
+ * Measures both lengths INTERLEAVED, short move immediately before long move, every sample.
+ *
+ * The two lengths used to be measured in separate back-to-back loops, and the file header called
+ * the result "a RATIO ... which cancels machine speed". It does not: it cancels a machine that is
+ * uniformly slower, but a contended stretch lands inside ONE of the two loops and moves the ratio
+ * on its own. Measured on CI, `dry-dynamic` read 0.092 ms at n=400 and 0.209 ms at n=3200 — a
+ * runner FASTER than a local container at the short length and slower at the long one, which no
+ * uniform speed difference can produce. Pairing the windows is what makes the cancellation real,
+ * the same reason `studio-perf-calibration.ts` times its reference immediately before its
+ * workload rather than once up front.
+ *
+ * Reduction and judgement are that module's, so "earned violation" means the same thing here as
+ * everywhere else: each pass reduces to min(long)/min(short), and the verdict is the MINIMUM
+ * across passes, so a single unlucky pass can never redden the gate while a lane that genuinely
+ * replans trips every one.
+ */
+function measureGrowth(probe: LaneProbe): LaneMeasurement {
+  const shortBefore = prefix(SHORT_N - MOVE_STEP);
+  const shortAt = prefix(SHORT_N);
+  const longBefore = prefix(LONG_N - MOVE_STEP);
+  const longAt = prefix(LONG_N);
+  const shortStepper = probe.makeStroke();
+  const longStepper = probe.makeStroke();
+
+  // Prime: JIT warm-up plus, for incremental lanes, the state a real stroke would already hold by
+  // the time it reaches each length.
+  shortStepper.seek(shortBefore);
+  let shortOutput = shortStepper.move(shortAt);
+  longStepper.seek(longBefore);
+  let longOutput = longStepper.move(longAt);
+
+  const shortSamples: number[] = [];
+  const longSamples: number[] = [];
+  const passes: StudioPerfCalibrationPass[] = [];
+  const startedAt = performance.now();
+
+  for (let pass = 0; pass < GROWTH_PASSES; pass += 1) {
+    const paired: StudioPerfCalibrationSample[] = [];
+    for (let sample = 0; sample < GROWTH_SAMPLES_PER_PASS; sample += 1) {
+      shortStepper.seek(shortBefore); // untimed: restore the pre-move state
+      const shortStartedAt = performance.now();
+      shortOutput = shortStepper.move(shortAt); // timed: ONE pointer move
+      const shortMs = performance.now() - shortStartedAt;
+
+      longStepper.seek(longBefore); // untimed
+      const longStartedAt = performance.now();
+      longOutput = longStepper.move(longAt); // timed
+      const longMs = performance.now() - longStartedAt;
+
+      shortSamples.push(shortMs);
+      longSamples.push(longMs);
+      // The floor lands on the DENOMINATOR only, so a lane whose short move is genuinely near the
+      // clock cannot divide by noise. Reported reference costs carry it for the same reason.
+      paired.push({ referenceMs: Math.max(shortMs, GROWTH_BASE_FLOOR_MS), workMs: longMs });
+    }
+    passes.push(reduceStudioPerfCalibrationSamples(paired));
+    // A pass that clears the gate ends the measurement, exactly as
+    // `evaluateStudioCalibratedBudget` does: innocence needs no confirming, only guilt does.
+    if (judgeStudioCalibratedBudget(probe.id, passes, GROWTH_MULTIPLE).ok) break;
+    if (shortSamples.length >= MIN_REPS && performance.now() - startedAt > MEASURE_BUDGET_MS * 2) {
+      break;
+    }
+  }
+
+  return {
+    short: summarize(SHORT_N, shortSamples, shortOutput),
+    long: summarize(LONG_N, longSamples, longOutput),
+    passes,
+    growth: judgeStudioCalibratedBudget(probe.id, passes, GROWTH_MULTIPLE).ratio,
+  };
+}
+
+function describeCurve(probe: LaneProbe, measured: LaneMeasurement): string {
+  const { short, long } = measured;
+  const perPass = measured.passes.map((pass) => `x${pass.ratio.toFixed(2)}`).join(" ");
   return [
     `lane ${probe.id} (brush ${probe.brushId})`,
     `  path:  ${probe.path}`,
@@ -1078,9 +1196,15 @@ function describeCurve(probe: LaneProbe, short: Measurement, long: Measurement):
       + `  p90 ${short.p90.toFixed(3)}ms  out ${short.outputSize}  (${short.reps} reps)`,
     `  n=${LONG_N}: min ${long.min.toFixed(3)}ms  p50 ${long.p50.toFixed(3)}ms`
       + `  p90 ${long.p90.toFixed(3)}ms  out ${long.outputSize}  (${long.reps} reps)`,
-    `  measured growth x${growthRatio(short, long).toFixed(1)}`
+    `  earned growth x${measured.growth.toFixed(2)} from interleaved passes [${perPass}]`
       + ` (linear-in-n would be x${LONG_N / SHORT_N};`
       + ` gate allows x${GROWTH_MULTIPLE} over a ${GROWTH_BASE_FLOOR_MS}ms baseline floor)`,
+    // The gate's blind spot, printed rather than left to the header: a lane measuring far below
+    // the allowance would survive a slowdown of this factor. Above x8 means even a fully linear
+    // planner would pass here, and the CEILING is the only thing still guarding this lane.
+    `  smallest slowdown this reading would convict: x${
+      (GROWTH_MULTIPLE / measured.growth).toFixed(1)
+    }`,
   ].join("\n");
 }
 
@@ -1091,7 +1215,7 @@ function describeCurve(probe: LaneProbe, short: Measurement, long: Measurement):
  * tripping. `process.stdout.write` rather than `console.log` because the runner intercepts the
  * latter and buries it under the failing test that produced it.
  */
-const MEASURED: { probe: LaneProbe; short: Measurement; long: Measurement }[] = [];
+const MEASURED: { probe: LaneProbe; measured: LaneMeasurement }[] = [];
 
 function summaryTable(): string {
   const header = [
@@ -1102,8 +1226,9 @@ function summaryTable(): string {
     "growth".padStart(8),
     "  verdict",
   ].join("");
-  const rows = MEASURED.map(({ probe, short, long }) => {
-    const ratio = growthRatio(short, long);
+  const rows = MEASURED.map(({ probe, measured }) => {
+    const { short, long } = measured;
+    const ratio = measured.growth;
     const flat = ratio < GROWTH_MULTIPLE;
     const underCeiling = long.min < PER_MOVE_CEILING_MS;
     const documented = DOCUMENTED_GLOBAL_REPLAN_LANES.has(probe.id);
@@ -1175,10 +1300,10 @@ describe("long-stroke per-move planning cost", () => {
   it.each(LANE_PROBES.map((probe) => [probe.id, probe] as const))(
     "keeps %s per-move planning flat as the stroke grows",
     (_id, probe) => {
-      const short = measurePerMove(probe, SHORT_N);
-      const long = measurePerMove(probe, LONG_N);
-      MEASURED.push({ probe, short, long });
-      const curve = describeCurve(probe, short, long);
+      const measured = measureGrowth(probe);
+      const { short, long } = measured;
+      MEASURED.push({ probe, measured });
+      const curve = describeCurve(probe, measured);
 
       // The stroke really did get longer — a planner that saturated its own cap at n=400 would
       // otherwise pass both assertions without ever having been stressed.
@@ -1193,7 +1318,7 @@ describe("long-stroke per-move planning cost", () => {
           + `\n  reason: ${documented.reason}`
           + `\n  ratchet: growth < x${documented.maxGrowth}, move < ${documented.maxMoveMs}ms`;
         expect(
-          growthRatio(short, long),
+          measured.growth,
           `DOCUMENTED GLOBAL-REPLAN LANE REGRESSED past its pinned growth ratchet.\n${ratchetContext}`,
         ).toBeLessThan(documented.maxGrowth);
         expect(
@@ -1203,13 +1328,15 @@ describe("long-stroke per-move planning cost", () => {
         return;
       }
 
-      // 1. GROWTH — the load-bearing assertion. Ratio, so machine speed cancels out.
-      const growthLimit = Math.max(short.min, GROWTH_BASE_FLOOR_MS) * GROWTH_MULTIPLE;
+      // 1. GROWTH — the load-bearing assertion. A ratio between INTERLEAVED windows, so a
+      // contended stretch inflates both and cancels, and the verdict is the minimum across
+      // confirmation passes, so it has to be earned rather than caught on one unlucky reading.
+      const growth = judgeStudioCalibratedBudget(probe.id, measured.passes, GROWTH_MULTIPLE);
       expect(
-        long.min,
+        growth.ok,
         `PER-MOVE COST GROWS WITH STROKE LENGTH — this lane replans work it already planned.\n${curve}`
-          + `\n  allowed at n=${LONG_N}: ${growthLimit.toFixed(3)}ms`,
-      ).toBeLessThan(growthLimit);
+          + `\n  ${growth.detail}`,
+      ).toBe(true);
 
       // 2. CEILING — stops a lane from passing the ratio by being uniformly slow.
       expect(
