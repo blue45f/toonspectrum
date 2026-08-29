@@ -18,7 +18,7 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
     id: "file",
     label: "파일",
     items: [
-      { id: "save-draft", label: "임시저장", shortcut: "⌘S", onSelect: vi.fn() },
+      { id: "save-draft", label: "초안 저장", shortcut: "⌘S", onSelect: vi.fn() },
       { id: "publish", label: "게시", onSelect: vi.fn(), separatorAfter: true },
       { id: "import-json", label: "프로젝트 가져오기…", onSelect: vi.fn() },
       { id: "import-psd", label: "PSD 가져오기…", onSelect: vi.fn() },
@@ -252,7 +252,7 @@ describe("StudioMainMenu", () => {
     ]);
     const itemLabels = PRODUCTION_MENU_CATALOG.flatMap((g) => g.items.map((i) => i.label));
     for (const required of [
-      "임시저장",
+      "초안 저장",
       "게시",
       "내보내기 / 다운로드",
       "프로젝트 가져오기…",

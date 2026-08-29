@@ -4,7 +4,10 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
-import { STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP } from "./studio-mobile-sheet-snap";
+import {
+  STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP,
+  STUDIO_MOBILE_PAGES_SHEET_ID,
+} from "./studio-mobile-sheet-snap";
 import {
   StudioBrushLibraryPanel,
   StudioBrushStudio,
@@ -29,6 +32,7 @@ import { useI18n } from "@/lib/i18n";
 interface MockDockButtonProps {
   readonly "aria-controls"?: string;
   readonly "aria-expanded"?: boolean;
+  readonly "aria-haspopup"?: "dialog";
   readonly "aria-label"?: string;
   readonly "aria-pressed"?: boolean;
   readonly "data-studio-mobile-comment-trigger"?: string;
@@ -95,6 +99,9 @@ vi.mock("./studio-chrome-ui", () => ({
     </button>
   ),
   StudioDockNavButton: ({
+    "aria-controls": ariaControls,
+    "aria-expanded": ariaExpanded,
+    "aria-haspopup": ariaHasPopup,
     "aria-label": ariaLabel,
     "aria-pressed": ariaPressed,
     "data-studio-mobile-comment-trigger": mobileCommentTrigger,
@@ -109,6 +116,9 @@ vi.mock("./studio-chrome-ui", () => ({
   }: MockDockButtonProps) => (
     <button
       type="button"
+      aria-controls={ariaControls}
+      aria-expanded={ariaExpanded}
+      aria-haspopup={ariaHasPopup}
       aria-label={ariaLabel ?? label}
       aria-pressed={ariaPressed}
       className={className}
@@ -358,12 +368,14 @@ describe("StudioMobileEditingDock", () => {
     const workspaceToggle = within(dock).getByRole<HTMLButtonElement>("button", {
       name: "작업 공간 도구 펼치기",
     });
-    expect(workspaceToggle.parentElement).toBe(drawingToolbar);
+    expect(workspaceToggle.closest('[data-studio-mobile-dock-scroll="primary"]')).toBeNull();
+    expect(drawingToolbar.parentElement?.nextElementSibling).toBe(workspaceToggle);
     expect(workspaceToggle.getAttribute("aria-controls")).toBe("studio-mobile-workspace-tools");
     expect(workspaceToggle.getAttribute("aria-expanded")).toBe("false");
+    expect(workspaceToggle.textContent).toBe("도구");
     expect(workspaceToggle.className).toContain("min-h-11");
     expect(workspaceToggle.className).toContain("min-w-11");
-    expect(workspaceToggle.className).toContain("shrink-0");
+    expect(workspaceToggle.className).toContain("flex-none");
     expect(workspaceToggle.className).not.toContain("absolute");
     expect(dock.querySelector("#studio-mobile-workspace-tools")?.hasAttribute("hidden")).toBe(true);
     fireEvent.click(workspaceToggle);
@@ -399,7 +411,7 @@ describe("StudioMobileEditingDock", () => {
     expect(within(dock).getByRole("button", { name: "다시실행" }).getAttribute("data-hint-unavailable-reason")).toContain("문서 잠금");
   });
 
-  it("opens tool properties first from Work while drawing without a selection", () => {
+  it("opens tool properties first from the Panel launcher while drawing without a selection", () => {
     const stableHandlers = createHandlers();
     const view = render(
       <StudioMobileEditingDock
@@ -416,7 +428,17 @@ describe("StudioMobileEditingDock", () => {
       screen.getByRole("button", { name: "작업 공간 도구 펼치기" }),
     );
     const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
-    fireEvent.click(within(workspace).getByRole("button", { name: "작업" }));
+    const panelLauncher = within(workspace).getByRole("button", {
+      name: "속성·레이어·페이지·작품 정보 패널 열기",
+    });
+    expect(panelLauncher.textContent).toBe("패널");
+    expect(
+      panelLauncher.getAttribute("aria-haspopup"),
+      panelLauncher.outerHTML,
+    ).toBe("dialog");
+    expect(panelLauncher.getAttribute("aria-expanded")).toBe("false");
+    expect(panelLauncher.getAttribute("aria-pressed")).toBeNull();
+    fireEvent.click(panelLauncher);
     expect(stableHandlers.openInspectorRoute).toHaveBeenLastCalledWith(
       { primary: "properties" },
       "props",
@@ -436,7 +458,7 @@ describe("StudioMobileEditingDock", () => {
     fireEvent.click(
       within(screen.getByRole("toolbar", { name: "작업 공간" })).getByRole(
         "button",
-        { name: "작업" },
+        { name: "속성·레이어·페이지·작품 정보 패널 열기" },
       ),
     );
     expect(stableHandlers.openInspectorRoute).toHaveBeenLastCalledWith(
@@ -445,7 +467,56 @@ describe("StudioMobileEditingDock", () => {
     );
   });
 
-  it("warms the inspector and drawing palettes from both mobile Work intent paths", () => {
+  it("distinguishes page management from the quick-start new-work action", () => {
+    const setMobileSheet = vi.fn();
+    const setQuickStartOpen = vi.fn();
+    const view = render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          setMobileSheet,
+          setQuickStartOpen,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
+    let workspace = screen.getByRole("toolbar", { name: "작업 공간" });
+    const pages = within(workspace).getByRole("button", { name: "페이지 목록 열기" });
+    expect(pages.textContent).toBe("페이지");
+    expect(pages.getAttribute("aria-controls")).toBe(STUDIO_MOBILE_PAGES_SHEET_ID);
+    expect(pages.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(pages.getAttribute("aria-expanded")).toBe("false");
+    expect(pages.getAttribute("aria-pressed")).toBeNull();
+    fireEvent.click(pages);
+    expect(setMobileSheet).toHaveBeenCalledWith(expect.any(Function));
+
+    const newWork = within(workspace).getByRole("button", {
+      name: "빠른 시작 · 새 작업 열기",
+    });
+    expect(newWork.textContent).toBe("새 작업");
+    expect(newWork.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(within(workspace).queryByRole("button", { name: "추가" })).toBeNull();
+    fireEvent.click(newWork);
+    expect(setMobileSheet).toHaveBeenLastCalledWith(null);
+    expect(setQuickStartOpen).toHaveBeenCalledWith(true);
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileSheet: "pages",
+          setMobileSheet,
+          setQuickStartOpen,
+        })}
+      />,
+    );
+    workspace = screen.getByRole("toolbar", { name: "작업 공간" });
+    const closePages = within(workspace).getByRole("button", { name: "페이지 목록 닫기" });
+    expect(closePages.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("warms the inspector and drawing palettes from both mobile panel intent paths", () => {
     mobileInspectorPreload.drawingSurface.mockClear();
     render(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
 
@@ -461,7 +532,7 @@ describe("StudioMobileEditingDock", () => {
     fireEvent.click(workspaceToggle);
     const workButton = within(
       screen.getByRole("toolbar", { name: "작업 공간" }),
-    ).getByRole("button", { name: "작업" });
+    ).getByRole("button", { name: "속성·레이어·페이지·작품 정보 패널 열기" });
     fireEvent.pointerEnter(workButton);
     fireEvent.pointerDown(workButton);
     fireEvent.focus(workButton);
@@ -530,11 +601,15 @@ describe("StudioMobileEditingDock", () => {
       name: "캔버스 위치 댓글",
     });
     const scrollLane = workspace.querySelector('[data-studio-mobile-dock-scroll="secondary"]');
+    const panelLauncher = within(scrollLane as HTMLElement).getByRole("button", {
+      name: "속성·레이어·페이지·작품 정보 패널 열기",
+    });
     const quickSlot = workspace.querySelector('[data-studio-mobile-quick-actions-slot="left"]');
     expect(workspace.getAttribute("data-studio-mobile-control-side")).toBe("left");
     expect(scrollLane?.className).toContain("overflow-x-auto");
     expect(workspace.firstElementChild).toBe(comment);
     expect(workspace.children.item(1)).toBe(quickSlot);
+    expect(scrollLane?.firstElementChild).toBe(panelLauncher);
     expect(within(quickSlot as HTMLElement).getByRole("button", { name: "빠른 작업" })).not.toBeNull();
     expect(quickSlot?.className).toContain("size-11");
     expect(comment.className).toContain("min-h-11");
@@ -584,10 +659,14 @@ describe("StudioMobileEditingDock", () => {
     const comment = within(workspace).getByRole("button", { name: "캔버스 위치 댓글" });
     const quickSlot = workspace.querySelector('[data-studio-mobile-quick-actions-slot="right"]');
     const scrollLane = workspace.querySelector('[data-studio-mobile-dock-scroll="secondary"]');
+    const panelLauncher = within(scrollLane as HTMLElement).getByRole("button", {
+      name: "속성·레이어·페이지·작품 정보 패널 열기",
+    });
 
     expect(workspace.getAttribute("data-studio-mobile-control-side")).toBe("right");
     expect(workspace.firstElementChild).toBe(comment);
     expect(workspace.lastElementChild).toBe(quickSlot);
+    expect(scrollLane?.firstElementChild).toBe(panelLauncher);
     expect(
       scrollLane?.closest('[data-studio-mobile-scroll-host="secondary"]')?.nextElementSibling,
     ).toBe(quickSlot);

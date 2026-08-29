@@ -201,7 +201,11 @@ function resolveMainMenuHint(
       hint.descriptionKey,
     ),
     ...(hint.tipKey
-      ? { tip: localizeText(t, tipFallback, hint.tipKey) }
+      ? {
+        tip: group.id === "file"
+          ? localizeText(t, tipFallback, hint.tipKey).replaceAll("임시저장", "초안 저장")
+          : localizeText(t, tipFallback, hint.tipKey),
+      }
       : {}),
   };
   // `hint` is a valid discriminated StudioToolHintSpec with only its localized

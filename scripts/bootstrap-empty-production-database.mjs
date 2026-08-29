@@ -37,6 +37,7 @@ const REQUIRED_PENDING_MIGRATION_IDS = Object.freeze([
   "0025_auth_lifecycle_contract",
   "0026_creator_draft_cloud_save_intent",
   "0027_creator_draft_atomic_publication",
+  "0029_creator_community_runtime_indexes",
 ]);
 const DRIZZLE_SCHEMA_PATHS = Object.freeze([
   "drizzle.config.ts",

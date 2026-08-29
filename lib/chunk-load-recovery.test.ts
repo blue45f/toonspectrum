@@ -4,6 +4,7 @@ import {
   CHUNK_RELOAD_FLAG,
   loadChunkWithReloadRecovery,
 } from "./chunk-load-recovery";
+import { consumeStudioProgrammaticReloadAllowance } from "./programmatic-reload";
 
 function createStorage(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial));
@@ -19,6 +20,7 @@ function createStorage(initial: Record<string, string> = {}) {
 }
 
 afterEach(() => {
+  consumeStudioProgrammaticReloadAllowance();
   vi.unstubAllGlobals();
 });
 
@@ -56,6 +58,7 @@ describe("loadChunkWithReloadRecovery", () => {
       "1"
     );
     expect(storage.setItem).toHaveBeenCalledWith(CHUNK_RELOAD_FLAG, "1");
+    expect(consumeStudioProgrammaticReloadAllowance()).toBe(false);
   });
 
   it("preserves the import error instead of reloading twice", async () => {

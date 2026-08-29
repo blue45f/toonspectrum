@@ -86,6 +86,12 @@ describe("studio inspector layout", () => {
       image: "retouch",
       document: "grade",
     });
+    expect(
+      navigateStudioInspector(
+        { primary: "properties", image: "quick", document: "navigator" },
+        { primary: "document" },
+      ),
+    ).toEqual({ primary: "document", image: "quick", document: "navigator" });
   });
 
   it("exposes image-only professional tools and searches Korean or English aliases", () => {

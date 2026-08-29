@@ -83,6 +83,9 @@ describe("PostgresHealthReadinessRepository", () => {
     expect(catalogQuery).toContain(
       "indexed_attribute.attname = 'tags'",
     );
+    expect(catalogQuery).not.toContain("creator_work_series_idx");
+    expect(catalogQuery).not.toContain("creator_work_challenge_idx");
+    expect(catalogQuery).not.toContain("creator_series_user_idx");
     expect(catalogQuery).toContain(
       ") = 'hidden = false'",
     );

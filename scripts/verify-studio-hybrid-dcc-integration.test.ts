@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION,
+  countStudioHybridDccFreshOpfsFiles,
   normalizeStudioHybridDccHeadlessGpuDiagnostics,
   type StudioHybridDccIntegrationResult,
   validateStudioHybridDccIntegrationResult,
@@ -12,6 +13,8 @@ import {
 const ASSET_ID = "unit-cube-1";
 const SOURCE_HASH = `sha256:${"a".repeat(64)}`;
 const FILE_HASH = `sha256:${"b".repeat(64)}` as const;
+const BASELINE_FILE_HASH = `sha256:${"c".repeat(64)}` as const;
+const WORKSPACE_STATE_HASH = `sha256:${"d".repeat(64)}`;
 const INITIAL_TRANSFORM = {
   position: [0, 0, 0],
   rotationDeg: [0, 0, 0],
@@ -30,6 +33,10 @@ const OPFS_FILE = {
   path: "toonspectrum-hybrid-dcc-v1/dcc-workspaces/document/cp-1-e1-c0.bin",
   byteLength: 8_192,
   sha256: FILE_HASH,
+} as const;
+const OPFS_BASELINE_FILE = {
+  ...OPFS_FILE,
+  sha256: BASELINE_FILE_HASH,
 } as const;
 
 function successfulResult(): StudioHybridDccIntegrationResult {
@@ -77,6 +84,13 @@ function successfulResult(): StudioHybridDccIntegrationResult {
     persistence: {
       opfsGetDirectoryAvailable: true,
       webLocksAvailable: true,
+      redoBaselineSequence: 6,
+      redoPersistedSequence: 7,
+      redoReceiptSourceHash: FILE_HASH,
+      redoReceiptDocumentStateHash: WORKSPACE_STATE_HASH,
+      redoWorkspaceStateHash: WORKSPACE_STATE_HASH,
+      filesBeforeRedo: [OPFS_BASELINE_FILE],
+      freshRedoFileCount: 1,
       statusBeforeReload: "saved",
       filesBeforeReload: [OPFS_FILE],
       totalBytesBeforeReload: OPFS_FILE.byteLength,
@@ -267,6 +281,59 @@ describe("Studio Hybrid DCC production-preview integration evidence", () => {
     );
   });
 
+  it("rejects a saved badge without a newer Redo receipt, matching document hash, and OPFS file", () => {
+    const base = successfulResult();
+    const result: StudioHybridDccIntegrationResult = {
+      ...base,
+      persistence: {
+        ...base.persistence!,
+        redoPersistedSequence: base.persistence!.redoBaselineSequence,
+        redoReceiptDocumentStateHash: "stale-undo-hash",
+        filesBeforeReload: [OPFS_BASELINE_FILE],
+        freshRedoFileCount: 0,
+      },
+    };
+    expect(validateStudioHybridDccIntegrationResult(result)).toContain(
+      "OPFS autosave did not survive an actual page reload with stable ID and TRS",
+    );
+  });
+
+  it("fails closed on missing, malformed, or duplicate OPFS file arrays", () => {
+    const base = successfulResult();
+    const cases = [
+      {
+        ...base.persistence!,
+        filesBeforeRedo: undefined,
+      },
+      {
+        ...base.persistence!,
+        filesBeforeRedo: [{ ...OPFS_BASELINE_FILE, sha256: "not-a-sha256" }],
+      },
+      {
+        ...base.persistence!,
+        filesBeforeReload: [OPFS_FILE, OPFS_FILE],
+        filesAfterReload: [OPFS_FILE, OPFS_FILE],
+        totalBytesBeforeReload: OPFS_FILE.byteLength * 2,
+        unchangedDurableFileCount: 2,
+      },
+    ];
+
+    for (const persistence of cases) {
+      expect(validateStudioHybridDccIntegrationResult({
+        ...base,
+        persistence,
+      })).toContain(
+        "OPFS autosave did not survive an actual page reload with stable ID and TRS",
+      );
+    }
+  });
+
+  it("counts only new or content-changed OPFS identities as a fresh durable generation", () => {
+    expect(countStudioHybridDccFreshOpfsFiles([OPFS_BASELINE_FILE], [OPFS_FILE])).toBe(1);
+    expect(countStudioHybridDccFreshOpfsFiles([OPFS_FILE], [OPFS_FILE])).toBe(0);
+    expect(countStudioHybridDccFreshOpfsFiles([], [OPFS_FILE])).toBe(1);
+  });
+
   it("rejects a sync/fake export, malformed GLB, or over-budget diagnostics", () => {
     const base = successfulResult();
     const request = base.workerExport!.request!;
@@ -359,7 +426,8 @@ describe("Studio Hybrid DCC production-preview integration evidence", () => {
       consoleWarnings: [
         "[.WebGL-0x12c001c1500]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:5199/studio",
         "No available adapters. @ http://127.0.0.1:5199/studio",
-        "No available adapters. @ http://127.0.0.1:5199/studio",
+        "No available adapters. @ http://127.0.0.1:5199/studio?room=work-instant-test",
+        "[.WebGL-0x12c001c1500]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat) @ http://127.0.0.1:5199/studio/3d/dcc/model?room=work-instant-test",
       ],
       pageErrors: [],
       requestFailures: [],
@@ -386,6 +454,7 @@ describe("Studio Hybrid DCC production-preview integration evidence", () => {
       "WebGPU validation failed: No available adapters. @ http://127.0.0.1:5199/studio",
       "[.WebGL-0x12c001c1500]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels @ http://127.0.0.1:5199/admin",
       "[.WebGL-0x12c001c1500]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to TextureUpload @ http://127.0.0.1:5199/studio",
+      "No available adapters. @ http://127.0.0.1:5200/studio/3d/dcc/model?room=work-instant-test",
     ];
     expect(normalizeStudioHybridDccHeadlessGpuDiagnostics({
       consoleErrors: [],
@@ -418,12 +487,34 @@ describe("Studio Hybrid DCC production-preview integration evidence", () => {
     expect(source).toContain("navigator.storage?.getDirectory");
     expect(source).toContain("new Proxy(nativeWorker");
     expect(source).toContain('value.kind === "export-batch"');
-    expect(source).toContain('name: /^3D 배경·Shot 편집기로 열기/u');
+    expect(source).toContain('name: /^3D 배경·컷 편집기로 열기/u');
     expect(source).toContain('page.getByTestId("studio-bg3d-dialog")');
     expect(source).toContain('canvas[aria-label="편집 메시 3D 렌더"], canvas[data-engine^="three.js"]');
     expect(source).not.toContain(".isVisible({ timeout:");
     expect(source).not.toContain("setInputFiles");
     expect(source).not.toContain("page.evaluate(() => import(");
     expect(source).not.toMatch(/(?:pnpm|npm|yarn)[^\n]*\bbuild\b/u);
+  });
+
+  it("anchors a durable receipt and OPFS signature before Redo, then requires a matching generation", () => {
+    const source = readFileSync(
+      new URL("./verify-studio-hybrid-dcc-integration.mts", import.meta.url),
+      "utf8",
+    );
+    const anchorIndex = source.indexOf(
+      "const redoPersistenceAnchor = await readPersistenceAnchor(page, panel)",
+    );
+    const redoIndex = source.indexOf("await redo.click()", anchorIndex);
+    const persistenceIndex = source.indexOf(
+      "const redoPersistence = await waitForFreshSavedPersistence(",
+      redoIndex,
+    );
+
+    expect(anchorIndex).toBeGreaterThan(-1);
+    expect(redoIndex).toBeGreaterThan(anchorIndex);
+    expect(persistenceIndex).toBeGreaterThan(redoIndex);
+    expect(source).toContain("sequence > baselineSequence");
+    expect(source).toContain("=== expectedHash");
+    expect(source).not.toContain('[data-studio-hybrid-dcc-persistence="saving"]');
   });
 });

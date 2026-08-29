@@ -1897,10 +1897,14 @@ describe("StudioWebGpuEngine", () => {
     vi.mocked(fake.encoder.beginRenderPass).mockClear();
     vi.mocked(fake.device.queue.submit).mockClear();
     engine.suspend("suspend:empty");
+    expect(engine.releaseSuspendedSurfaceBackingStores()).toBe(true);
 
     expect(onFrameInvalid).toHaveBeenCalledTimes(1);
     expect(gpuCanvas.style.visibility).toBe("hidden");
     expect(fallback.canvas.style.visibility).toBe("hidden");
+    expect([gpuCanvas.width, gpuCanvas.height]).toEqual([1, 1]);
+    expect([fallback.canvas.width, fallback.canvas.height]).toEqual([1, 1]);
+    expect(context.unconfigure).toHaveBeenCalledTimes(1);
     expect(snapshotTexture.destroy).toHaveBeenCalledTimes(1);
     expect(fake.texture.destroy).toHaveBeenCalledTimes(1);
     expect(vi.mocked(fake.device.destroy)).not.toHaveBeenCalled();
@@ -1916,6 +1920,8 @@ describe("StudioWebGpuEngine", () => {
       cssHeight: 96,
     });
     await Promise.resolve();
+    expect([gpuCanvas.width, gpuCanvas.height]).toEqual([120, 96]);
+    expect([fallback.canvas.width, fallback.canvas.height]).toEqual([120, 96]);
     expect(fake.encoder.beginRenderPass).not.toHaveBeenCalled();
     expect(vi.mocked(fake.device.queue.submit)).not.toHaveBeenCalled();
     expect(onFrameReady).not.toHaveBeenCalled();

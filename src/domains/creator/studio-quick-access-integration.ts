@@ -96,8 +96,8 @@ const COMMAND_CATALOG: readonly Omit<
   },
   {
     id: "save",
-    label: "임시저장",
-    description: "현재 원고를 임시저장합니다.",
+    label: "초안 저장",
+    description: "현재 원고를 서버 초안으로 저장합니다.",
     category: "파일",
     keywords: ["저장", "save"],
     shortcut: "⌘S",

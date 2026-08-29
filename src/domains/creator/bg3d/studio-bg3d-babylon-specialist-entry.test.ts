@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   attachStudioBg3dBabylonDeviceLossSignal,
+  createStudioBg3dBabylonPartialEngineDisposer,
   initializeStudioBg3dBabylonWebGpuEngine,
   STUDIO_BG3D_BABYLON_DELEGATES_CONTEXT_LOSS_TO_RUNTIME,
 } from "./studio-bg3d-babylon-specialist-entry";
@@ -94,5 +95,59 @@ describe("Babylon specialist context-loss ownership", () => {
       "A valid GPUDevice.lost promise is required.",
     );
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries partial disposal after a late device finishes initialization", async () => {
+    const deviceDestroy = vi.fn();
+    const dispose = vi.fn()
+      .mockImplementationOnce(() => {
+        throw new TypeError("timestamp query is not initialized");
+      })
+      .mockImplementationOnce(() => undefined);
+    const engine = {
+      dispose,
+    } as unknown as Parameters<typeof createStudioBg3dBabylonPartialEngineDisposer>[0];
+    const disposePartialEngine = createStudioBg3dBabylonPartialEngineDisposer(engine);
+
+    disposePartialEngine();
+    Reflect.set(engine as unknown as object, "_device", { destroy: deviceDestroy });
+    disposePartialEngine();
+    disposePartialEngine();
+
+    expect(dispose).toHaveBeenCalledTimes(2);
+    expect(deviceDestroy).not.toHaveBeenCalled();
+  });
+
+  it("disposes again after an aborted initialization settles late", async () => {
+    let resolveInitialization!: () => void;
+    const initialization = new Promise<void>((resolve) => {
+      resolveInitialization = resolve;
+    });
+    const dispose = vi.fn()
+      .mockImplementationOnce(() => {
+        throw new TypeError("device is not initialized");
+      })
+      .mockImplementationOnce(() => undefined);
+    const engine = {
+      _device: { lost: new Promise<unknown>(() => undefined) },
+      dispose,
+      initAsync: vi.fn(() => initialization),
+    } as unknown as Parameters<typeof initializeStudioBg3dBabylonWebGpuEngine>[0];
+    const controller = new AbortController();
+    const disposePartialEngine = createStudioBg3dBabylonPartialEngineDisposer(engine);
+
+    const pending = initializeStudioBg3dBabylonWebGpuEngine(
+      engine,
+      disposePartialEngine,
+      controller.signal,
+    );
+    controller.abort();
+    expect(dispose).toHaveBeenCalledTimes(1);
+    resolveInitialization();
+
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(dispose).toHaveBeenCalledTimes(2);
+    disposePartialEngine();
+    expect(dispose).toHaveBeenCalledTimes(2);
   });
 });

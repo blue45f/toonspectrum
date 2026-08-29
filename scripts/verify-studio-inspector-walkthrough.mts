@@ -351,7 +351,7 @@ async function walkDesktop(
       ["properties", "속성", "선택 요소 속성|시작 안내|그리기 도구 설정|전문 픽셀 도구"],
       ["layers", "레이어", "레이어"],
       ["document", "페이지", "캔버스 설정|페이지 색보정|미니맵과 페이지 탐색"],
-      ["publish", "게시", "게시 정보"],
+      ["publish", "작품 정보", "작품 정보"],
     ] as const) {
       const selected = await selectPrimaryTab(page, tab);
       // 탭패널은 lazy 마운트/트랜지션을 지날 수 있으므로 잠깐 폴링한다.
@@ -436,6 +436,12 @@ async function walkDesktop(
     /* ---- B. 페이지 ▸ 캔버스 (변경된 패널) -------------------------------- */
 
     await selectPrimaryTab(page, "document");
+    const activeWorkspaceLabel = await page
+      .getByRole("button", { name: /^작업공간:/u })
+      .first()
+      .getAttribute("aria-label");
+    const defaultStoryboardActive = activeWorkspaceLabel?.startsWith("작업공간: 스토리보드")
+      ?? false;
     const landedOn = await page.evaluate(
       (panelSelector) =>
         [
@@ -450,13 +456,13 @@ async function walkDesktop(
       control: "페이지 탭 하위 착지 지점 (캔버스 / 색보정 / 미니맵)",
       state: "페이지 탭",
       path: "페이지 탭 클릭 (1 스텝)",
-      verdict: landedOn ? "reachable" : "blocked",
-      effect: `기본 워크스페이스에서 '${landedOn}' 하위 탭으로 착지한다`,
-      defect:
-        landedOn === "캔버스"
-          ? undefined
-          : `DEFAULT_STUDIO_INSPECTOR_LAYOUT.document 는 "canvas" 인데 실제 착지는 '${landedOn}' 이다 `
-            + "— 활성 워크스페이스 프로필(기본 '스토리보드')이 이겨서, 페이지 탭을 눌러도 캔버스 설정은 한 번 더 눌러야 나온다",
+      verdict: defaultStoryboardActive && landedOn === "미니맵" ? "reachable" : "blocked",
+      effect: `활성 ${activeWorkspaceLabel ?? "작업공간 확인 불가"}; '${landedOn}' 하위 탭으로 착지한다`,
+      defect: !defaultStoryboardActive
+        ? `새 Studio가 기본 '스토리보드' 작업공간으로 시작하지 않았다 (${activeWorkspaceLabel ?? "라벨 없음"})`
+        : landedOn !== "미니맵"
+          ? `스토리보드 작업공간의 Page 계약은 '미니맵'인데 실제 착지는 '${landedOn}' 이다`
+          : undefined,
     });
 
     await selectDocumentTab(page, "캔버스");
@@ -575,17 +581,28 @@ async function walkDesktop(
     const gutterSlider = canvasPanel.getByRole("slider", { name: /패널 여백/u });
     const gutterExists = (await gutterSlider.count()) > 0;
     const gutterDisabled = gutterExists ? await gutterSlider.isDisabled() : true;
+    const gutterReason = canvasPanel.locator("[data-studio-panel-gutter-reason]");
+    const gutterReasonText = (await gutterReason.textContent().catch(() => null))?.trim() ?? null;
+    const gutterReasonId = await gutterReason.getAttribute("id").catch(() => null);
+    const gutterDescribedBy = gutterExists
+      ? await gutterSlider.getAttribute("aria-describedby")
+      : null;
+    const gutterUnavailableExplained = !gutterDisabled || (
+      Boolean(gutterReasonText) && gutterReasonId === gutterDescribedBy
+    );
     record(rows, {
       control: "패널 여백 (Gutter) — 접기 뒤",
       state: "페이지 ▸ 캔버스 ▸ 크기·여백 펼침",
       path: "페이지 탭 → 캔버스 → '크기·여백' 펼치기 → 슬라이더 (3 스텝)",
-      verdict: gutterExists ? "reachable" : "blocked",
+      verdict: gutterExists && gutterUnavailableExplained ? "reachable" : "blocked",
       effect: gutterDisabled
-        ? "노출되지만 비활성 — 템플릿이 있는 문서에서만 의미가 있다"
+        ? `비활성 사유가 인라인으로 노출되고 aria-describedby로 연결됨: ${gutterReasonText ?? "사유 없음"}`
         : "슬라이더가 활성 상태로 노출됨",
-      defect: gutterDisabled
-        ? "빈 문서에서는 비활성인데 '왜 비활성인지'를 그 자리에서 알려 주지 않는다"
-        : undefined,
+      defect: !gutterExists
+        ? "패널 여백 슬라이더가 렌더되지 않는다"
+        : gutterDisabled && !gutterUnavailableExplained
+          ? "비활성 사유가 없거나 슬라이더의 aria-describedby와 연결되지 않았다"
+          : undefined,
     });
 
     for (const [name, note] of [
@@ -701,17 +718,18 @@ async function walkDesktop(
     /* ---- D. 게시 -------------------------------------------------------- */
 
     await selectPrimaryTab(page, "publish");
-    const titleInput = page.locator(`${PANEL} input[aria-label="게시 제목 (필수)"]`);
+    const inspectorPanel = page.locator(PANEL);
+    const titleInput = inspectorPanel.getByRole("textbox", { name: "작품 제목 (필수)", exact: true });
     await titleInput.fill("워크스루 제목");
     const titleKept = (await titleInput.inputValue()) === "워크스루 제목";
-    const descriptionInput = page.locator(`${PANEL} textarea[aria-label="게시 설명 (선택)"]`);
+    const descriptionInput = inspectorPanel.getByRole("textbox", { name: "게시용 설명", exact: true });
     await descriptionInput.fill("설명");
-    const tagsInput = page.locator(`${PANEL} input[aria-label*="게시 태그"]`);
+    const tagsInput = inspectorPanel.getByRole("textbox", { name: "게시용 태그", exact: true });
     await tagsInput.fill("태그1,태그2");
     record(rows, {
-      control: "게시 정보 (제목·설명·태그)",
-      state: "게시 탭",
-      path: "게시 탭 → 입력 (2 스텝)",
+      control: "작품 정보 (제목·설명·태그)",
+      state: "작품 정보 탭",
+      path: "작품 정보 탭 → 입력 (2 스텝)",
       verdict: titleKept ? "reachable" : "blocked",
       effect: `제목이 문서 상태로 반영됨=${titleKept}, 설명/태그 입력 수용됨`,
     });
@@ -1019,31 +1037,84 @@ async function walkMobile(
       .locator('nav[aria-label="스튜디오 모바일 도구막대"]')
       .waitFor({ state: "visible", timeout: 20_000 });
 
-    // 360px 에서 인스펙터 런처('작업')는 하단 도크의 **2행**에 있고, 그 2행은
-    // 기본이 접힘이다. 그래서 인스펙터에 닿으려면 먼저 작업공간 토글을 펼쳐야 한다.
+    // 인스펙터 런처('패널')는 접힌 2행에 있다. 1행의 '도구' disclosure 는 가로
+    // 드로잉 스크롤 밖에 고정되어, 360px 첫 화면에서도 스와이프 없이 보여야 한다.
     const workspaceToggle = page.locator('[data-studio-mobile-workspace-toggle="true"]');
+    const toggleInitiallyVisible = await workspaceToggle.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const dockBounds = element
+        .closest<HTMLElement>('[data-studio-mobile-editing-dock="true"]')
+        ?.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        bounds.left + bounds.width / 2,
+        bounds.top + bounds.height / 2,
+      );
+      return Boolean(
+        dockBounds
+        && !element.closest('[data-studio-mobile-dock-scroll]')
+        && bounds.width >= 44
+        && bounds.height >= 44
+        && bounds.left >= dockBounds.left - 0.5
+        && bounds.right <= dockBounds.right + 0.5
+        && bounds.left >= -0.5
+        && bounds.right <= window.innerWidth + 0.5
+        && (hit === element || element.contains(hit))
+      );
+    });
     const toggleExpandedBefore = await workspaceToggle.getAttribute("aria-expanded");
     await workspaceToggle.click();
     const toggleExpandedAfter = await workspaceToggle.getAttribute("aria-expanded");
     record(rows, {
       control: "모바일 작업공간 도구 펼치기 (인스펙터 진입 선행 단계)",
       state: "360px",
-      path: "하단 도크 1행의 ∧ '작업' 토글 (1 스텝)",
-      verdict: toggleExpandedAfter === "true" ? "reachable" : "blocked",
+      path: "하단 도크 1행의 고정 ∧ '도구' 토글 (1 스텝)",
+      verdict:
+        toggleInitiallyVisible && toggleExpandedAfter === "true"
+          ? "reachable"
+          : "blocked",
       effect:
-        `aria-expanded ${toggleExpandedBefore} → ${toggleExpandedAfter}; `
-        + "2행(댓글·페이지·추가·작업·줌)이 나타난다",
+        `초기 고정·히트 가능=${toggleInitiallyVisible}; `
+        + `aria-expanded ${toggleExpandedBefore} → ${toggleExpandedAfter}; `
+        + "2행(댓글·페이지·필터·새 작업·패널·색각·줌)이 나타난다",
       defect:
-        toggleExpandedAfter === "true"
-          ? "인스펙터가 접힌 2행 뒤에 있어 360px 에서 진입이 2탭이다 — 토글에 aria-expanded 와 활성 도구 점 힌트는 있으나, 아이콘만 보고 '레이어/속성이 저 안에 있다'를 알기 어렵다"
-          : "작업공간 토글이 2행을 펼치지 못한다",
+        !toggleInitiallyVisible
+          ? "도구 토글이 첫 화면에 고정되지 않았거나 실제 히트테스트를 통과하지 못한다"
+          : toggleExpandedAfter !== "true"
+            ? "작업공간 토글이 2행을 펼치지 못한다"
+            : undefined,
     });
 
-    const launcher = page.locator('nav[aria-label="스튜디오 모바일 도구막대"] button[aria-label="작업"]');
-    // 가로 오버플로 행에 잘린 컨트롤은 Playwright 가 보이지 않는 것으로 판정한다.
-    await launcher
-      .evaluate((element) => element.scrollIntoView({ block: "nearest", inline: "nearest" }))
-      .catch(() => undefined);
+    const launcher = page.locator(
+      'nav[aria-label="스튜디오 모바일 도구막대"] button[aria-label="속성·레이어·페이지·작품 정보 패널 열기"]',
+    );
+    const launcherInitiallyVisible = await launcher.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const scrollBounds = element
+        .closest<HTMLElement>('[data-studio-mobile-dock-scroll="secondary"]')
+        ?.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        bounds.left + bounds.width / 2,
+        bounds.top + bounds.height / 2,
+      );
+      return Boolean(
+        scrollBounds
+        && bounds.width >= 44
+        && bounds.height >= 44
+        && bounds.left >= scrollBounds.left - 0.5
+        && bounds.right <= scrollBounds.right + 0.5
+        && (hit === element || element.contains(hit))
+      );
+    });
+    if (!launcherInitiallyVisible) {
+      record(rows, {
+        control: "모바일 작업 패널 열기",
+        state: "360px · 도구 행 펼침",
+        path: "하단 도구막대 '도구' → '패널' (2 스텝)",
+        verdict: "blocked",
+        effect: "패널 런처가 2행의 초기 가시 영역에 없거나 실제 히트테스트를 통과하지 못함",
+      });
+      return;
+    }
     await launcher.click();
 
     const sheet = page.locator(PANEL);
@@ -1052,11 +1123,11 @@ async function walkMobile(
       .then(() => true)
       .catch(() => false);
     record(rows, {
-      control: "모바일 속성 시트 열기",
+      control: "모바일 작업 패널 열기",
       state: "360px",
-      path: "하단 도구막대 '작업' 탭 (1 스텝)",
+      path: "하단 도구막대 '도구' → '패널' (2 스텝)",
       verdict: opened ? "reachable" : "blocked",
-      effect: `role=dialog 시트가 올라옴=${opened}`,
+      effect: `런처 초기 가시·히트 가능=${launcherInitiallyVisible}; role=dialog 시트가 올라옴=${opened}`,
       defect: opened ? undefined : "360px 에서 인스펙터에 도달할 수 없다",
     });
     if (!opened) return;
@@ -1152,7 +1223,7 @@ async function walkMobile(
       defect: snapChanged ? undefined : "핸들 탭이 스냅을 바꾸지 않는다",
     });
 
-    const closeButton = page.getByRole("button", { name: "속성 시트 닫기", exact: true });
+    const closeButton = page.getByRole("button", { name: "작업 패널 닫기", exact: true });
     let closed = false;
     if ((await closeButton.count()) > 0) {
       await closeButton.click();

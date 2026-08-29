@@ -29,8 +29,10 @@ export const PANEL_RANGE_CLASS =
   "h-6 w-24 accent-accent cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:h-11 pointer-coarse:min-h-11 pointer-coarse:w-32";
 export const PANEL_READOUT_CLASS =
   "w-8 pointer-coarse:w-9 text-right text-[0.72rem] pointer-coarse:text-[0.75rem] tabular-nums text-fg-3";
+// 터치 승격은 높이만 44px 로 올려 두고 폭은 콘텐츠에 맡겼는데, "소·중·대" 처럼 한 글자짜리
+// 칩은 34px 밖에 되지 않아 44px 계약을 세로로만 지키고 있었다. 폭도 함께 올린다.
 export const PANEL_CHIP_CLASS =
-  "min-h-6 rounded-md border border-line bg-card px-2 py-0.5 text-[0.72rem] text-fg-2 transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg disabled:pointer-events-none disabled:opacity-45 pointer-coarse:min-h-11 pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.75rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "min-h-6 rounded-md border border-line bg-card px-2 py-0.5 text-[0.72rem] text-fg-2 transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg disabled:pointer-events-none disabled:opacity-45 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.75rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 /** 툴바 도구 버튼 — 활성은 accent soft, 비활성은 quiet. dense = canvas-max draw-app belt. */
 export function studioToolButtonClass(active: boolean, options?: { dense?: boolean }): string {

@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+
+import { studioOssUnitHash } from "../studio-oss-brush-kernels";
 
 import {
   STUDIO_PAPER_DEFAULT_PRESET_BY_BRUSH_FAMILY_V1,
@@ -21,9 +23,10 @@ import {
   type StudioPaperPresetV1,
 } from "./studio-paper-media-profile-v1";
 import {
-  studioPerfRatioBudgetMs,
-  studioPerfSustainedCalibrationWorkload,
-} from "./studio-perf-budget-calibration";
+  evaluateStudioCalibratedBudget,
+  evaluateStudioCalibratedDetection,
+  type StudioCalibratedBudgetVerdict,
+} from "./studio-perf-calibration";
 
 const SEED = 41;
 
@@ -708,37 +711,222 @@ describe("브러시 패밀리 기본 종이·매체 지도", () => {
 // 성능 예산
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// 동결된 기준 구현 — 성능 예산의 분모
+// ---------------------------------------------------------------------------
+
+/**
+ * FROZEN COPY of samplePaperHeightV1 as it was measured and blessed. Do not "improve" it, do
+ * not deduplicate it against the live sampler, and do not let a linter fold the two together:
+ * it is a measuring stick, and the whole point is that it does NOT move when the live sampler
+ * does.
+ *
+ * 왜 복제인가 — 밀리초 예산은 기계까지 함께 잰다. 1e6 샘플이 이 컨테이너(4-vCPU Xeon)에서
+ * 152ms, GitHub Actions 러너에서 420ms로 2.8배 벌어진다(원본 테스트가 `process.env.CI ? 500
+ * : 200`으로 숨기고 있던 격차가 정확히 이것이다). 독립적인 합성 커널을 분모로 쓰면 그 2.8배가
+ * 그대로 기준선 격차로 남는다 — 실측 0.93-1.00(컨테이너) 대 1.98-2.09(러너). 어떤 고정 게이트도
+ * 살아남지 못한다: 오탐을 피하려면 2.09 위여야 하고 2배 회귀를 잡으려면 1.88 아래여야 한다.
+ * 커널을 샘플러의 명령어 조합에 맞춰 다시 써도 닫히지 않았다(문서화된 비용 모델 그대로 만든
+ * 값노이즈 커널이 샘플당 2.6배 쌌다 — 비용이 어디로 가는지에 대한 모델 자체가 틀렸다는 뜻).
+ *
+ * 같은 구현을 동결해 분모로 쓰면 명령어 조합이 정의상 동일하므로 어떤 CPU에서도 비율이 ≈1.0이고,
+ * 살아있는 샘플러만 느려지면 분자만 움직인다. 그래서 게이트를 1.25까지 조일 수 있다 — 원래
+ * 200ms 예산이 잡을 수 있던 것보다 훨씬 민감하다.
+ *
+ * 못 보는 것 하나: 양쪽이 함께 호출하는 `studioOssUnitHash`. 일부러 공유한다 — 복제본이 해시를
+ * 인라인해버리면 호출 형태가 달라져 V8의 인라이닝 결정이 갈리고, 분모가 다시 기계를 타기
+ * 시작한다. 그 해시는 자체 테스트를 가진 별도 원시 연산이고, 이 예산의 범위 밖이다.
+ */
+const FROZEN_TAU = Math.PI * 2;
+const FROZEN_TOOTH_DEPTH_GAIN = 1.6;
+const FROZEN_FIBER_ELONGATION_GAIN = 3;
+const FROZEN_OCTAVE_SEED_STRIDE = 0x9e37;
+const FROZEN_FLECK_SEED_SALT = 0x5f1e_cc01;
+const FROZEN_WEAVE_SEED_PHASE = FROZEN_TAU / 0x1_0000;
+const FROZEN_WEAVE_PHASE_SPLIT = 0.618_033_988_749_895;
+
+interface FrozenSamplerConstants {
+  readonly cosAxis: number;
+  readonly sinAxis: number;
+  readonly fiberCompression: number;
+  readonly invToothScale: number;
+  readonly depthGain: number;
+  readonly weaveFrequencyX: number;
+  readonly weaveFrequencyY: number;
+  readonly weaveHalfContrast: number;
+  readonly fleckInvCell: number;
+  readonly fleckDensity: number;
+  readonly fleckDepth: number;
+}
+
+const frozenClamp = (value: number, minimum: number, maximum: number): number =>
+  Math.min(maximum, Math.max(minimum, value));
+const frozenClamp01 = (value: number): number => (value <= 0 ? 0 : value >= 1 ? 1 : value);
+const frozenFinite = (value: unknown, fallback: number): number =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+const frozenConstantsCache = new WeakMap<object, FrozenSamplerConstants>();
+
+function frozenSamplerConstants(preset: StudioPaperPresetV1): FrozenSamplerConstants {
+  const cached = frozenConstantsCache.get(preset);
+  if (cached) return cached;
+  const axisRadians = frozenFinite(preset.fiberAnisotropy?.axisRadians, 0);
+  const strength = frozenClamp01(frozenFinite(preset.fiberAnisotropy?.strength, 0));
+  const toothScale = frozenClamp(frozenFinite(preset.toothScale, 8), 0.5, 512);
+  const toothDepth = frozenClamp01(frozenFinite(preset.toothDepth, 0.5));
+  const pitchX = frozenClamp(frozenFinite(preset.weave?.pitchX, 0), 2, 4096);
+  const pitchY = frozenClamp(frozenFinite(preset.weave?.pitchY, 0), 2, 4096);
+  const weaveContrast = frozenClamp01(frozenFinite(preset.weave?.contrast, 0));
+  const fleckCell = frozenClamp(frozenFinite(preset.fleck?.cellPx, 0), 1, 512);
+  const constants: FrozenSamplerConstants = Object.freeze({
+    cosAxis: Math.cos(axisRadians),
+    sinAxis: Math.sin(axisRadians),
+    fiberCompression: 1 / (1 + FROZEN_FIBER_ELONGATION_GAIN * strength),
+    invToothScale: 1 / toothScale,
+    depthGain: toothDepth * FROZEN_TOOTH_DEPTH_GAIN,
+    weaveFrequencyX: preset.weave ? FROZEN_TAU / pitchX : 0,
+    weaveFrequencyY: preset.weave ? FROZEN_TAU / pitchY : 0,
+    weaveHalfContrast: preset.weave ? weaveContrast * 0.5 : 0,
+    fleckInvCell: preset.fleck ? 1 / fleckCell : 0,
+    fleckDensity: preset.fleck ? frozenClamp01(frozenFinite(preset.fleck.density, 0)) : 0,
+    fleckDepth: preset.fleck ? frozenClamp(frozenFinite(preset.fleck.depth, 0), -1, 1) : 0,
+  });
+  frozenConstantsCache.set(preset, constants);
+  return constants;
+}
+
+function frozenLatticeNoise(gx: number, gy: number, seed: number): number {
+  const cellX = Math.floor(gx);
+  const cellY = Math.floor(gy);
+  const rawTx = gx - cellX;
+  const rawTy = gy - cellY;
+  const tx = rawTx * rawTx * rawTx * (rawTx * (rawTx * 6 - 15) + 10);
+  const ty = rawTy * rawTy * rawTy * (rawTy * (rawTy * 6 - 15) + 10);
+  const n00 = studioOssUnitHash(seed, cellX, cellY);
+  const n10 = studioOssUnitHash(seed, cellX + 1, cellY);
+  const n01 = studioOssUnitHash(seed, cellX, cellY + 1);
+  const n11 = studioOssUnitHash(seed, cellX + 1, cellY + 1);
+  const top = n00 + (n10 - n00) * tx;
+  const bottom = n01 + (n11 - n01) * tx;
+  return top + (bottom - top) * ty;
+}
+
+function frozenSamplePaperHeight(
+  preset: StudioPaperPresetV1,
+  x: number,
+  y: number,
+  seed: number,
+): number {
+  const constants = frozenSamplerConstants(preset);
+  const safeX = Number.isFinite(x) ? x : 0;
+  const safeY = Number.isFinite(y) ? y : 0;
+  const safeSeed = Number.isFinite(seed) ? seed >>> 0 : 0;
+  const fiberU =
+    (safeX * constants.cosAxis + safeY * constants.sinAxis)
+    * constants.fiberCompression
+    * constants.invToothScale;
+  const fiberV =
+    (safeY * constants.cosAxis - safeX * constants.sinAxis) * constants.invToothScale;
+  const octaveA = frozenLatticeNoise(fiberU, fiberV, safeSeed);
+  const octaveB = frozenLatticeNoise(
+    fiberU * 2 + 37.19,
+    fiberV * 2 + 11.53,
+    safeSeed + FROZEN_OCTAVE_SEED_STRIDE,
+  );
+  let height = 0.5 + (octaveA * (2 / 3) + octaveB * (1 / 3) - 0.5) * constants.depthGain;
+  if (constants.weaveHalfContrast > 0) {
+    const weavePhase = (safeSeed & 0xffff) * FROZEN_WEAVE_SEED_PHASE;
+    height +=
+      constants.weaveHalfContrast
+      * Math.sin(safeX * constants.weaveFrequencyX + weavePhase)
+      * Math.sin(safeY * constants.weaveFrequencyY + weavePhase * FROZEN_WEAVE_PHASE_SPLIT);
+  }
+  if (constants.fleckDensity > 0 && constants.fleckDepth !== 0) {
+    const fleckCellX = Math.floor(safeX * constants.fleckInvCell);
+    const fleckCellY = Math.floor(safeY * constants.fleckInvCell);
+    const fleckRoll = studioOssUnitHash(
+      safeSeed ^ FROZEN_FLECK_SEED_SALT,
+      fleckCellX,
+      fleckCellY,
+    );
+    if (fleckRoll < constants.fleckDensity) {
+      height += constants.fleckDepth * (1 - fleckRoll / constants.fleckDensity);
+    }
+  }
+  return height <= 0 ? 0 : height >= 1 ? 1 : height;
+}
+
 describe("성능 예산 — 스칼라 샘플러", () => {
-  it("1e6 샘플이 200ms(샘플당 200ns) 안에 끝난다", () => {
-    const preset = STUDIO_PAPER_PRESETS_V1["canvas-weave"];
-    // 워밍업 — 파생 상수 캐시와 JIT를 채운다.
-    let sink = 0;
-    for (let index = 0; index < 10_000; index += 1) {
-      sink += samplePaperHeightV1(preset, index * 0.83, index * 0.57, SEED);
+  const SAMPLE_COUNT = 1_000_000;
+  /**
+   * 분모가 같은 알고리즘이라 기준선이 실측 1.079-1.100으로 좁다 — Node 22/24, 1MB young
+   * generation을 가로질러 ±2%다(합성 커널은 같은 축에서 ±52%, 기계를 바꾸면 2.2배까지 벌어졌다).
+   * 살아있는 샘플러가 8% 비싼 것은 모듈 경계를 건너는 호출 형태 차이이고, 기계마다 인라이닝
+   * 결정이 갈릴 수 있는 만큼은 여유로 남긴다.
+   *
+   * 1.5는 실측 기준선 위로 39% 여유를 두면서 1.39배 감속부터 잡는다 — 반드시 잡아야 하는 2배는
+   * 한참 전에 걸린다(주입 실험에서 2.16x). 더 조이면(1.25) 여유가 16%로 줄어 기계 간 차이를
+   * 감당하지 못하고, 더 풀면 2배 탐지 여유가 얇아진다.
+   */
+  const MAX_RATIO = 1.5;
+
+  let sink = 0;
+
+  const sweep = (sample: (x: number, y: number) => number) => () => {
+    for (let index = 0; index < SAMPLE_COUNT; index += 1) {
+      sink += sample((index % 1024) * 0.83, (index / 1024) * 0.57);
     }
-    // 전체 스위트(2400여 파일) 안에서 벽시계를 한 번만 재면 그 순간의 스케줄링 운이 판정에 섞인다.
-    // 노이즈는 시간을 더하기만 하므로 여러 번 중 최솟값이 샘플러 실제 비용의 정직한 추정치다.
-    // 기준은 200ms 그대로 — 진짜로 느려졌다면 어떤 회차도 실제 작업량보다 빠를 수 없다.
-    // (이 레포의 bestMs·physicsBest 예산이 이미 같은 방식을 쓴다.)
-    let elapsedMs = Number.POSITIVE_INFINITY;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const start = performance.now();
-      for (let index = 0; index < 1_000_000; index += 1) {
-        sink += samplePaperHeightV1(preset, (index % 1024) * 0.83, (index / 1024) * 0.57, SEED);
+  };
+  const liveSweep = sweep((x, y) =>
+    samplePaperHeightV1(STUDIO_PAPER_PRESETS_V1["canvas-weave"], x, y, SEED));
+  const frozenSweep = sweep((x, y) =>
+    frozenSamplePaperHeight(STUDIO_PAPER_PRESETS_V1["canvas-weave"], x, y, SEED));
+
+  let budget: StudioCalibratedBudgetVerdict;
+
+  beforeAll(() => {
+    budget = evaluateStudioCalibratedBudget({
+      label: "1e6 paper height samples vs the frozen baseline sampler",
+      workload: liveSweep,
+      referenceWorkload: frozenSweep,
+      maxRatio: MAX_RATIO,
+      samples: 3,
+      warmups: 1,
+    });
+  });
+
+  it("동결된 기준 구현이 살아있는 샘플러와 여전히 같은 높이를 낸다", () => {
+    // 분모가 비용 모델로서 유효하려면 같은 일을 하고 있어야 한다. 값이 갈라지면 복제본이
+    // 낡았다는 뜻이고, 그때는 예산이 아니라 이 단언이 먼저 터져야 한다.
+    for (const id of STUDIO_PAPER_PRESET_IDS_V1) {
+      const preset = getStudioPaperPresetV1(id);
+      for (const [x, y] of sampleGrid(6, 7.3)) {
+        expect(frozenSamplePaperHeight(preset, x, y, SEED), `${id} @${x},${y}`)
+          .toBeCloseTo(samplePaperHeightV1(preset, x, y, SEED), 12);
       }
-      elapsedMs = Math.min(elapsedMs, performance.now() - start);
     }
+  });
+
+  it("1e6 샘플이 동결 기준 대비 예산 안에서 끝난다", () => {
+    expect(budget.ok, budget.detail).toBe(true);
     expect(Number.isFinite(sink)).toBe(true);
     expect(sink).toBeGreaterThan(0);
-    // 예산은 절대 밀리초가 아니라 "같은 길이의 보정 작업" 대비 비율이다. 절대값(200/500)은 회귀 없이도
-    // 208.8ms로 실패했고, 짧은 합성 보정도 이 루프를 따라가지 못했다 — 8-way 부하에서 이 샘플러는
-    // x10.13 느려지는데 2ms 합성 작업은 x0.99로 꿈쩍도 하지 않아 비율이 +925% 움직였다. 같은 길이의
-    // 보정 작업은 x9.83으로 함께 느려져 비율이 +3%(1.06 → 1.10)에 그친다.
-    //
-    // 기준 컨테이너 정상 비율 1.06(유휴) / 1.10(경합). 1.4는 그 최악치에 여유를 두면서도 2배 회귀
-    // (>=2.12)는 그대로 실패시킨다. 보정 1회가 ~200ms라 샘플은 2회만 잡는다.
-    expect(elapsedMs).toBeLessThan(
-      studioPerfRatioBudgetMs(1.4, studioPerfSustainedCalibrationWorkload, 2),
-    );
+  });
+
+  it("샘플러가 2배 비싸졌다면 같은 측정이 예산을 넘겼다", () => {
+    // 방금 잰 패스를 재사용하므로 건강한 측정에서는 추가 비용이 0이다. 이 단언은 보정 자체의
+    // 자기 점검이기도 하다 — 살아있는 샘플러가 동결본보다 충분히 빨라져 게이트가 2배도 못 잡을
+    // 만큼 헐거워지면, 조용히 썩는 대신 여기서 먼저 터지고 기준을 다시 동결하라고 알려준다.
+    const detection = evaluateStudioCalibratedDetection({
+      label: budget.label,
+      workload: liveSweep,
+      referenceWorkload: frozenSweep,
+      maxRatio: MAX_RATIO,
+      seed: budget.passes,
+      factor: 2,
+      samples: 3,
+      warmups: 1,
+    });
+    expect(detection.detected, detection.detail).toBe(true);
   });
 });

@@ -235,6 +235,8 @@ interface MobileRunResult {
 interface MobileDockLayoutResult {
   width: number;
   ok: boolean;
+  workspaceToggleInitiallyVisible: boolean;
+  panelLauncherInitiallyVisible: boolean;
   primaryTargetCount: number;
   secondaryTargetCount: number;
   targetsReady: boolean;
@@ -709,7 +711,10 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   // The 160-profile Pro catalogue is an intentional lazy boundary. Cold CI and a concurrently
   // exercised preview can legitimately need more than one materialization animation to mount it.
   await builtInBrushCatalog.waitFor({ state: "visible", timeout: 10_000 });
-  await builtInBrushCatalog.getByRole("tab", { name: "페인트", exact: true }).click();
+  // The catalogue groups paint brushes by artist-facing material, not by the retired
+  // paint/erase implementation axis. Drive the matching material tab so this gate verifies the
+  // current information architecture as well as the requested expressive brush selection.
+  await builtInBrushCatalog.getByRole("tab", { name: "에어브러시", exact: true }).click();
   await builtInBrushCatalog.getByRole("button", { name: "소프트 에어브러시 선택", exact: true }).click();
   await builtInBrushCatalog.waitFor({ state: "detached", timeout: 3000 });
   const airbrushPreset = sheet.locator('[data-studio-brush-chip="airbrush"]');
@@ -1270,8 +1275,52 @@ async function runMobileDockLayout(
     name: "작업 공간 도구 펼치기",
     exact: true,
   });
+  const workspaceToggleInitiallyVisible = await workspaceToolsToggle.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const dockBounds = element
+      .closest<HTMLElement>('[data-studio-mobile-editing-dock="true"]')
+      ?.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      bounds.left + bounds.width / 2,
+      bounds.top + bounds.height / 2,
+    );
+    return Boolean(
+      dockBounds
+      && !element.closest('[data-studio-mobile-dock-scroll]')
+      && bounds.width >= 44
+      && bounds.height >= 44
+      && bounds.left >= dockBounds.left - 0.5
+      && bounds.right <= dockBounds.right + 0.5
+      && bounds.left >= -0.5
+      && bounds.right <= window.innerWidth + 0.5
+      && (hit === element || element.contains(hit))
+    );
+  });
   await workspaceToolsToggle.click();
   await secondary.waitFor({ state: "visible", timeout: 3000 });
+  const propsLauncher = dock.locator(
+    'button[aria-label="속성·레이어·페이지·작품 정보 패널 열기"]',
+  );
+  const panelLauncherInitiallyVisible = await propsLauncher.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const scrollBounds = element
+      .closest<HTMLElement>('[data-studio-mobile-dock-scroll="secondary"]')
+      ?.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      bounds.left + bounds.width / 2,
+      bounds.top + bounds.height / 2,
+    );
+    return Boolean(
+      scrollBounds
+      && bounds.width >= 44
+      && bounds.height >= 44
+      && bounds.left >= scrollBounds.left - 0.5
+      && bounds.right <= scrollBounds.right + 0.5
+      && bounds.left >= -0.5
+      && bounds.right <= window.innerWidth + 0.5
+      && (hit === element || element.contains(hit))
+    );
+  });
   const primaryTargets = primary.locator(
     ':scope > button, :scope > [data-studio-tool-hint-target="true"]',
   );
@@ -1345,8 +1394,7 @@ async function runMobileDockLayout(
   // Role locators can be re-resolved inconsistently while an overflow toolbar is scrolled in
   // Playwright/WebKit-style mobile layouts. The explicit labels are also the product's stable
   // accessibility contract, so keep the launcher identity independent of clipping geometry.
-  const pagesLauncher = dock.locator('button[aria-label="페이지"]');
-  const propsLauncher = dock.locator('button[aria-label="작업"]');
+  const pagesLauncher = dock.locator('button[aria-label="페이지 목록 열기"]');
   const brushDockLauncher = dock.getByRole("button", {
     name: "브러시 설정 (굵기·색·프리셋)",
     exact: true,
@@ -1371,10 +1419,9 @@ async function runMobileDockLayout(
     dialog: propsDialog,
     dock,
     id: "props",
-    initialFocus: propsDialog.getByRole("button", { name: "속성 시트 닫기", exact: true }),
+    initialFocus: propsDialog.getByRole("button", { name: "작업 패널 닫기", exact: true }),
     launcher: propsLauncher,
     open: async () => {
-      await revealOverflowTarget(propsLauncher);
       await propsLauncher.click();
     },
     page,
@@ -1437,6 +1484,8 @@ async function runMobileDockLayout(
 
   await page.screenshot({ path: shot, fullPage: false });
   const ok =
+    workspaceToggleInitiallyVisible &&
+    panelLauncherInitiallyVisible &&
     targetsReady &&
     (width !== 320 || primaryScrollable) &&
     noDocumentOverflow &&
@@ -1447,7 +1496,9 @@ async function runMobileDockLayout(
     sheets.every((sheet) => sheet.ok) &&
     consoleErrors.length === 0;
   log(
-    `mobile-dock-${width}: targets=${primaryTargetCount}+${secondaryTargetCount} pinned=${pinnedPlacementReady} ` +
+    `mobile-dock-${width}: workspaceToggleVisible=${workspaceToggleInitiallyVisible} ` +
+    `panelLauncherVisible=${panelLauncherInitiallyVisible} ` +
+    `targets=${primaryTargetCount}+${secondaryTargetCount} pinned=${pinnedPlacementReady} ` +
     `widths=${[...primaryWidths, ...secondaryWidths].join(",")} ` +
     `primaryScrollable=${primaryScrollable} documentOverflow=${!noDocumentOverflow} ` +
     `historyFocusReady=${historyFocusReady} drawInteractive=${drawSheetCanvasInteractive} ` +
@@ -1464,6 +1515,8 @@ async function runMobileDockLayout(
   return {
     width,
     ok,
+    workspaceToggleInitiallyVisible,
+    panelLauncherInitiallyVisible,
     primaryTargetCount,
     secondaryTargetCount,
     targetsReady,

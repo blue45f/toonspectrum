@@ -470,6 +470,9 @@ export type StudioCuttoonEditorViewSessionRest = {
   tipRoundness: any;
   title: any;
   titleInputRef: any;
+  pendingSaveIntent: any;
+  onContinuePendingSave: any;
+  onClearWorkMetadataError: any;
   toggleCanvasWideMode: any;
   toggleSelectedElementsLocked: any;
   toneSearchQuery: any;

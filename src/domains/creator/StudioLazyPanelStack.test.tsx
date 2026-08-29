@@ -32,6 +32,22 @@ vi.mock("./studio-page-lazy-ui", async () => {
     );
   }
 
+  function MockStudioTeamPanel({
+    followingSessionId = null,
+    onToggleFollow,
+  }: {
+    followingSessionId?: string | null;
+    onToggleFollow?: (sessionId: string) => void;
+  }) {
+    return (
+      <div data-following-session={followingSessionId ?? "none"} data-optional-panel="team">
+        <button type="button" onClick={() => onToggleFollow?.("peer-mobile-follow")}>
+          팀 패널 참가자
+        </button>
+      </div>
+    );
+  }
+
   return {
     StudioAiProvenancePanel: panel("ai-provenance"),
     StudioAutoActionsPanel: panel("auto-actions"),
@@ -56,7 +72,7 @@ vi.mock("./studio-page-lazy-ui", async () => {
     StudioScenarioAutoLayoutPanel: panel("scenario"),
     StudioScrollPreviewPanel: panel("scroll-preview"),
     StudioStoryboardGridPanel: panel("storyboard"),
-    StudioTeamPanel: panel("team"),
+    StudioTeamPanel: MockStudioTeamPanel,
     StudioTimelapsePanel: panel("timelapse"),
     StudioVrmPoser: ({
       initialScene,
@@ -186,6 +202,31 @@ describe("StudioLazyPanelStack", () => {
     expect(reopenedSession).toBe(openedSession);
     expect(reopenedSession?.getAttribute("data-open")).toBe("true");
     expect(reopenedSession?.getAttribute("data-instance-id")).toBe("1");
+  });
+
+  it("wires caller-owned follow state and toggle semantics into the Team panel", () => {
+    const setFollowingStudioSessionId = vi.fn();
+    render(withRetainedBg3dHost(
+      <StudioLazyPanelStack
+        {...createProps({
+          followingStudioSessionId: "peer-mobile-follow",
+          setFollowingStudioSessionId,
+          teamPanelOpen: true,
+        })}
+      />
+    ));
+
+    expect(screen.getByText("팀 패널 참가자").parentElement?.dataset.followingSession).toBe(
+      "peer-mobile-follow"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "팀 패널 참가자" }));
+
+    expect(setFollowingStudioSessionId).toHaveBeenCalledOnce();
+    const update = setFollowingStudioSessionId.mock.calls[0]?.[0] as (
+      current: string | null
+    ) => string | null;
+    expect(update("peer-mobile-follow")).toBeNull();
+    expect(update(null)).toBe("peer-mobile-follow");
   });
 
   it("delegates semantic VRM insertion and clears the caller-owned initial scene on close", () => {

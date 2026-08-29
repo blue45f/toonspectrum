@@ -30,6 +30,26 @@ export interface StudioNativeRasterPixelDiff {
   meanChangedChannelDelta: number;
 }
 
+export interface StudioNativeRasterFixturePoint {
+  x: number;
+  y: number;
+}
+
+export interface StudioNativeRasterFixtureDrawGeometry {
+  pointCount: number;
+  firstPoint: StudioNativeRasterFixturePoint | null;
+  lastPoint: StudioNativeRasterFixturePoint | null;
+  hidden: boolean;
+}
+
+export const STUDIO_NATIVE_RASTER_FIXTURE_PIXEL_LIMITS = {
+  maxChangedPixels: 2_500,
+  maxChannelDelta: 160,
+  maxMeanChangedChannelDelta: 24,
+} as const;
+
+export const STUDIO_NATIVE_RASTER_COLD_REPLAY_MIN_NOISE_EXCLUDED_PIXELS = 128;
+
 export interface StudioNativeRasterFrameIntervalStats {
   sampleCount: number;
   intervalCount: number;
@@ -170,6 +190,10 @@ export interface StudioNativeRasterScenarioEvidence {
   firstGesture: {
     expected: boolean;
     replayed: boolean | null;
+    /** Bounded visual variation between independently drawn native fixtures. */
+    fixtureControlDiff: StudioNativeRasterPixelDiff | null;
+    /** Cold-effect pixels remaining after the fixture-noise mask is expanded by two pixels. */
+    noiseExcludedChangedPixels: number | null;
     /** Cold retouch output compared with a separately prepared raster-only control. */
     rasterControlDiff: StudioNativeRasterPixelDiff | null;
   };
@@ -178,7 +202,15 @@ export interface StudioNativeRasterScenarioEvidence {
     attempted: boolean;
     restored: boolean;
     retainedEditableRasterWhenExpected: boolean;
+    /** Raw diagnostic diff, including transient selection chrome. */
+    rawDiffFromBefore: StudioNativeRasterPixelDiff | null;
+    /** Authoritative document-pixel diff after scenario-specific chrome exclusion. */
     diffFromBefore: StudioNativeRasterPixelDiff | null;
+    selectionStateCleared: boolean | null;
+    durableSnapshotRetained: boolean | null;
+    durableImageRestored: boolean | null;
+    exactRestoredImagePresented: boolean | null;
+    documentRedoEnabledAfterUndo: boolean | null;
   };
   performance: StudioNativeRasterPerformanceEvidence | null;
   browserErrors: readonly string[];
@@ -369,6 +401,106 @@ function meaningfulPixelChange(diff: StudioNativeRasterPixelDiff | null): boolea
   );
 }
 
+function fixturePointDistance(
+  first: StudioNativeRasterFixturePoint,
+  second: StudioNativeRasterFixturePoint,
+): number {
+  return Math.hypot(first.x - second.x, first.y - second.y);
+}
+
+/**
+ * Compares the fixture's user-visible geometry rather than its scheduler-dependent internal
+ * sampling cardinality. Adaptive stabilization may persist a different number of intermediate
+ * points for two trusted pointer sessions even when their endpoints and rendered pixels match.
+ */
+export function studioNativeRasterFixtureGeometryEquivalent(
+  measured: readonly StudioNativeRasterFixtureDrawGeometry[],
+  control: readonly StudioNativeRasterFixtureDrawGeometry[],
+  endpointTolerance = 0.75,
+): boolean {
+  if (measured.length !== 2 || control.length !== 2) return false;
+  return measured.every((measuredDraw, index) => {
+    const controlDraw = control[index];
+    const minimumPointCount = index === 0 ? 5 : 3;
+    return Boolean(
+      controlDraw
+      && measuredDraw.pointCount >= minimumPointCount
+      && controlDraw.pointCount >= minimumPointCount
+      && measuredDraw.hidden === controlDraw.hidden
+      && measuredDraw.firstPoint
+      && controlDraw.firstPoint
+      && fixturePointDistance(measuredDraw.firstPoint, controlDraw.firstPoint)
+        <= endpointTolerance
+      && measuredDraw.lastPoint
+      && controlDraw.lastPoint
+      && fixturePointDistance(measuredDraw.lastPoint, controlDraw.lastPoint)
+        <= endpointTolerance
+    );
+  });
+}
+
+/**
+ * Allows only the bounded anti-aliasing variation measured between independent trusted-pointer
+ * sessions. The semantic geometry and nonblank presentation guards run before this pixel policy.
+ */
+export function studioNativeRasterFixturePixelsSimilar(
+  diff: StudioNativeRasterPixelDiff,
+): boolean {
+  return Number.isSafeInteger(diff.changedPixels)
+    && Number.isSafeInteger(diff.totalPixels)
+    && diff.totalPixels > 0
+    && diff.changedPixels >= 0
+    && diff.changedPixels <= diff.totalPixels
+    && diff.changedPixels <= STUDIO_NATIVE_RASTER_FIXTURE_PIXEL_LIMITS.maxChangedPixels
+    && Number.isFinite(diff.maxChannelDelta)
+    && diff.maxChannelDelta >= 0
+    && diff.maxChannelDelta <= STUDIO_NATIVE_RASTER_FIXTURE_PIXEL_LIMITS.maxChannelDelta
+    && Number.isFinite(diff.meanChangedChannelDelta)
+    && diff.meanChangedChannelDelta >= 0
+    && diff.meanChangedChannelDelta
+      <= STUDIO_NATIVE_RASTER_FIXTURE_PIXEL_LIMITS.maxMeanChangedChannelDelta;
+}
+
+export function studioNativeRasterNoiseExcludedChangedPixels(
+  fixtureNoise: Uint8Array,
+  effectChange: Uint8Array,
+  width: number,
+  height: number,
+  radius = 2,
+): number {
+  if (
+    !Number.isSafeInteger(width)
+    || !Number.isSafeInteger(height)
+    || width <= 0
+    || height <= 0
+    || fixtureNoise.length !== width * height
+    || effectChange.length !== fixtureNoise.length
+    || !Number.isSafeInteger(radius)
+    || radius < 0
+  ) return 0;
+  const excluded = new Uint8Array(fixtureNoise.length);
+  for (let pixel = 0; pixel < fixtureNoise.length; pixel += 1) {
+    if (fixtureNoise[pixel] !== 1) continue;
+    const x = pixel % width;
+    const y = Math.floor(pixel / width);
+    for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
+      const candidateY = y + offsetY;
+      if (candidateY < 0 || candidateY >= height) continue;
+      for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
+        const candidateX = x + offsetX;
+        if (candidateX < 0 || candidateX >= width) continue;
+        if (offsetX * offsetX + offsetY * offsetY > radius * radius) continue;
+        excluded[candidateY * width + candidateX] = 1;
+      }
+    }
+  }
+  let uniqueChangedPixels = 0;
+  for (let pixel = 0; pixel < effectChange.length; pixel += 1) {
+    if (effectChange[pixel] === 1 && excluded[pixel] !== 1) uniqueChangedPixels += 1;
+  }
+  return uniqueChangedPixels;
+}
+
 export function studioNativeRasterScenarioViolations(
   evidence: StudioNativeRasterScenarioEvidence,
 ): string[] {
@@ -434,6 +566,15 @@ export function studioNativeRasterScenarioViolations(
       `${evidence.id}: cold first gesture was not distinguished from raster preparation`,
     );
   }
+  if (
+    STUDIO_NATIVE_RASTER_COLD_REPLAY_SCENARIOS.has(evidence.id)
+    && (evidence.firstGesture.noiseExcludedChangedPixels ?? 0)
+      < STUDIO_NATIVE_RASTER_COLD_REPLAY_MIN_NOISE_EXCLUDED_PIXELS
+  ) {
+    issues.push(
+      `${evidence.id}: cold first gesture did not exceed the expanded fixture-noise mask`,
+    );
+  }
   if (!meaningfulPixelChange(evidence.operationDiff)) {
     issues.push(`${evidence.id}: before/after evidence has no meaningful pixel change`);
   }
@@ -443,6 +584,29 @@ export function studioNativeRasterScenarioViolations(
     || !evidence.undo.retainedEditableRasterWhenExpected
   ) {
     issues.push(`${evidence.id}: one-step Undo contract failed`);
+  }
+  if (
+    evidence.id.startsWith("selection-")
+    && (
+      evidence.undo.selectionStateCleared !== true
+      || evidence.undo.durableSnapshotRetained !== true
+    )
+  ) {
+    issues.push(
+      `${evidence.id}: selection Undo did not clear transient state while retaining the durable document`,
+    );
+  }
+  if (
+    evidence.id === "pixel-transform"
+    && (
+      evidence.undo.durableImageRestored !== true
+      || evidence.undo.exactRestoredImagePresented !== true
+      || evidence.undo.documentRedoEnabledAfterUndo !== true
+    )
+  ) {
+    issues.push(
+      "pixel-transform: Undo lacked exact durable-image restoration or document Redo authority",
+    );
   }
   if (evidence.browserErrors.length > 0) {
     issues.push(`${evidence.id}: ${evidence.browserErrors.length} unexpected browser error(s)`);

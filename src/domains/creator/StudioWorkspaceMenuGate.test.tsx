@@ -98,7 +98,7 @@ describe("StudioWorkspaceMenuGate", () => {
     expect(html).toContain("max-[359px]:justify-center");
     expect(html).toContain("max-[359px]:sr-only");
     expect(html.match(/max-\[359px\]:hidden/g)?.length).toBeGreaterThanOrEqual(2);
-    expect(html).toContain("작업공간: 스토리보드, 변경은 이 세션에서만 유지");
+    expect(html).toContain("작업공간: 스토리보드 세션, 변경은 이 세션에서만 유지");
   });
 
   it("uses one analyzable lazy import and all three intent preload signals", () => {

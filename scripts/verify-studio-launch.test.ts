@@ -27,8 +27,23 @@ describe("Studio launch static-preview diagnostics", () => {
     expect(launchHarness).toContain(
       'page.locator(\'[data-studio-brush-catalog-session="true"]\')',
     );
+    expect(launchHarness).toContain(
+      'getByRole("tab", { name: "에어브러시", exact: true })',
+    );
     expect(launchHarness).not.toContain('name: "기본 프리셋 전체 보기"');
     expect(launchHarness).not.toContain('name: "앱 브러시"');
+    expect(launchHarness).not.toContain(
+      'getByRole("tab", { name: "페인트", exact: true })',
+    );
+  });
+
+  it("opens the mobile page dialog through its explicit launcher contract", () => {
+    expect(launchHarness).toContain(
+      'dock.locator(\'button[aria-label="페이지 목록 열기"]\')',
+    );
+    expect(launchHarness).not.toContain(
+      'dock.locator(\'button[aria-label="페이지"]\')',
+    );
   });
 
   it("checks every rendered Brush Studio category target without fixing the product category count", () => {

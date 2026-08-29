@@ -3,6 +3,11 @@
  * 브라우저 호환성 문제를 정밀 진단하고, 런타임 오류가 브라우저 호환성으로 인한 것인지 구분합니다.
  */
 
+import {
+  diagnoseStudioInAppBrowserFromGlobals,
+  type StudioInAppBrowserDiagnosis,
+} from "./in-app-browser";
+
 export interface BrowserCompatibilityResult {
   isSupported: boolean;
   isLegacy: boolean;
@@ -13,6 +18,12 @@ export interface BrowserCompatibilityResult {
     version: string;
     os: string;
   };
+  /**
+   * 임베디드 WebView 판정. 여기서 막지는 않는다 — 인앱 브라우저는 대개 최신 Chromium 이라
+   * 기능이 없는 게 아니라 팝업·저장소 정책이 다를 뿐이다. 다만 오류 안내 문구는 달라야 한다:
+   * 설정 화면이 없는 브라우저에 "업데이트하세요"는 실행할 수 없는 지시다.
+   */
+  inAppBrowser: StudioInAppBrowserDiagnosis;
 }
 
 export type ErrorClassificationType = "compatibility" | "network" | "chunk_load" | "general";
@@ -78,6 +89,7 @@ export function checkBrowserCompatibility(): BrowserCompatibilityResult {
       missingFeatures: [],
       recommendUpdate: false,
       browserInfo: { name: "Server", version: "0", os: "Server" },
+      inAppBrowser: diagnoseStudioInAppBrowserFromGlobals(),
     };
   }
 
@@ -126,6 +138,7 @@ export function checkBrowserCompatibility(): BrowserCompatibilityResult {
     missingFeatures,
     recommendUpdate,
     browserInfo: info,
+    inAppBrowser: diagnoseStudioInAppBrowserFromGlobals(),
   };
 }
 
@@ -208,10 +221,16 @@ export function classifyError(error: unknown): ErrorAnalysis {
       ? `미지원 주요 기능: ${compatResult.missingFeatures.join(", ")}`
       : `${compatResult.browserInfo.name} ${compatResult.browserInfo.version} 환경`;
 
+    // 인앱 브라우저에는 업데이트할 브라우저도, 설정 화면도 없다. 같은 진단이라도 실행할 수
+    // 있는 행동은 하나뿐이다 — 기본 브라우저로 열기.
+    const inApp = compatResult.inAppBrowser;
     return {
       type: "compatibility",
-      title: "브라우저 호환성 경고",
-      message: "사용 중인 브라우저가 최신 웹 표준 또는 그래픽 기능을 지원하지 않아 사이트가 정상 작동하지 않을 수 있습니다.",
+      title: inApp.inApp ? "인앱 브라우저 제한" : "브라우저 호환성 경고",
+      message: inApp.inApp
+        ? `${inApp.name ?? "인앱"} 브라우저에서는 이 기능을 쓸 수 없어요. ` +
+          `${inApp.escapeHint ?? "주소를 복사해 기본 브라우저에서 열어 주세요."}`
+        : "사용 중인 브라우저가 최신 웹 표준 또는 그래픽 기능을 지원하지 않아 사이트가 정상 작동하지 않을 수 있습니다.",
       details: `${missingInfo} (${errMessage})`,
       isCompatibilityIssue: true,
       missingFeatures: compatResult.missingFeatures,

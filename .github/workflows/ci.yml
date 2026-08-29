@@ -26,6 +26,38 @@ jobs:
       - name: Verify real p5.brush Worker WebGL2 runtime
         run: pnpm run verify:studio-p5-brush-real-runtime
 
+  studio-inapp-browser:
+    # 인앱 브라우저(카카오톡·인스타그램·네이버앱) 스윕. 이 게이트가 잡는 회귀 — 화면 밖으로
+    # 밀린 컨트롤, 눌러도 아무 일 없는 팝업 버튼, 나갈 문이 없는 막다른 라우트 — 는 유닛 테스트가
+    # 볼 수 없는 실제 레이아웃·DOM 문제라서 브라우저를 띄워야만 확인된다.
+    #
+    # core 와 병렬로 돈다: 자체적으로 dist 를 만들므로 의존이 없고, 27분짜리 core 뒤에 줄 세우면
+    # 벽시계 시간만 두 배가 된다.
+    runs-on: ubuntu-latest
+    # 프로파일 3종 × 라우트 9개 + 세션 프로브 2개 = 29회 페이지 로드. 무거운 Studio 번들이라
+    # 스윕만 약 11분이고, 여기에 install 과 프로덕션 빌드가 더 붙는다.
+    timeout-minutes: 40
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # 빌드·브라우저 코드가 PR 에서 오므로 체크아웃 토큰을 물려주지 않는다.
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      # 게이트는 vite preview 로 dist/ 를 서빙하므로 프로덕션 빌드가 먼저 있어야 한다.
+      - name: Build production Studio assets
+        run: pnpm run build
+      - name: Sweep every Studio route under in-app browser conditions
+        run: pnpm run verify:studio-inapp-browser
+
   verify:
     # Keep this job ID because repository CI-policy tests inspect jobs.verify. The display name
     # moves so the fresh 3D job can retain the stable "CI / verify" check context.

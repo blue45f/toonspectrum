@@ -100,6 +100,16 @@ describe("Studio inspector module boundary", () => {
     expect(registry.dynamicImports).not.toContain("./StudioInspectorAside");
   });
 
+  it("warms the always-visible desktop inspector beside the editor without taxing mobile startup", () => {
+    const router = moduleShape("./studio-router/StudioRouter.tsx");
+
+    expect(router.dynamicImports).toContain("../studio-inspector-aside-loader");
+    expect(router.valueImports).not.toContain("../studio-inspector-aside-loader");
+    expect(router.source).toContain('typeof window.matchMedia !== "function"');
+    expect(router.source).toContain('window.matchMedia("(max-width: 1023px)").matches');
+    expect(router.source).toContain("preloadStudioInspectorAside())");
+  });
+
   it("moves the handler contract and component while leaving page orchestration behind", () => {
     const page = moduleShape("./StudioPage.tsx");
     const editorView = moduleShape("./studio-cuttoon-editor/StudioCuttoonEditorInspectorColumn.tsx");

@@ -347,6 +347,7 @@ describe("StudioLeftToolRail", () => {
       'input[type="file"][accept]',
     );
     expect(imageFileInput).not.toBeNull();
+    expect(imageFileInput?.getAttribute("aria-label")).toBe("캔버스 이미지 파일 선택");
     const openPicker = vi.spyOn(imageFileInput!, "click");
     fireEvent.click(screen.getByRole("button", { name: "이미지 추가" }));
     expect(openPicker).toHaveBeenCalledOnce();

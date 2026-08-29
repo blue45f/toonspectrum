@@ -39,7 +39,7 @@ import {
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
 
-export const STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION = 1 as const;
+export const STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION = 2 as const;
 
 const SCRATCH =
   process.env.TOONSPECTRUM_HYBRID_DCC_VERIFY_DIR
@@ -132,6 +132,13 @@ export interface StudioHybridDccTrsHistoryEvidence {
 export interface StudioHybridDccPersistenceEvidence {
   readonly opfsGetDirectoryAvailable: boolean;
   readonly webLocksAvailable: boolean;
+  readonly redoBaselineSequence: number;
+  readonly redoPersistedSequence: number;
+  readonly redoReceiptSourceHash: `sha256:${string}`;
+  readonly redoReceiptDocumentStateHash: string;
+  readonly redoWorkspaceStateHash: string;
+  readonly filesBeforeRedo: readonly StudioHybridDccOpfsFileEvidence[];
+  readonly freshRedoFileCount: number;
   readonly statusBeforeReload: string;
   readonly filesBeforeReload: readonly StudioHybridDccOpfsFileEvidence[];
   readonly totalBytesBeforeReload: number;
@@ -330,6 +337,23 @@ function screenshotPath(value: unknown): boolean {
   return string(value) && value.endsWith(".png") && value.length > 4;
 }
 
+function opfsFileEvidence(value: unknown): value is StudioHybridDccOpfsFileEvidence {
+  return record(value)
+    && string(value.path)
+    && value.path.startsWith(`${HYBRID_DCC_OPFS_ROOT}/`)
+    && integer(value.byteLength, 1)
+    && string(value.sha256)
+    && /^sha256:[a-f0-9]{64}$/u.test(value.sha256);
+}
+
+function opfsFileEvidenceArray(
+  value: unknown,
+): value is StudioHybridDccOpfsFileEvidence[] {
+  return array(value)
+    && value.every(opfsFileEvidence)
+    && new Set(value.map((file) => file.path)).size === value.length;
+}
+
 /** Pure policy gate: incomplete, blocked, fallback, or browser-diagnostic evidence is rejected. */
 export function validateStudioHybridDccIntegrationResult(candidate: unknown): string[] {
   const issues: string[] = [];
@@ -422,28 +446,38 @@ export function validateStudioHybridDccIntegrationResult(candidate: unknown): st
   if (!record(persistence)) {
     issues.push("native OPFS autosave and real reload/recovery evidence is missing");
   } else {
-    const beforeFiles = array(persistence.filesBeforeReload)
-      ? persistence.filesBeforeReload.filter(record)
-      : [];
-    const afterFiles = array(persistence.filesAfterReload)
-      ? persistence.filesAfterReload.filter(record)
-      : [];
-    const beforeBytes = beforeFiles.reduce(
-      (total, file) => total + (integer(file.byteLength, 1) ? file.byteLength : 0),
+    const redoBaselineFiles = opfsFileEvidenceArray(persistence.filesBeforeRedo)
+      ? persistence.filesBeforeRedo
+      : null;
+    const beforeFiles = opfsFileEvidenceArray(persistence.filesBeforeReload)
+      ? persistence.filesBeforeReload
+      : null;
+    const afterFiles = opfsFileEvidenceArray(persistence.filesAfterReload)
+      ? persistence.filesAfterReload
+      : null;
+    const beforeBytes = (beforeFiles ?? []).reduce(
+      (total, file) => total + file.byteLength,
       0,
     );
-    const filesValid = beforeFiles.length > 0
-      && afterFiles.length > 0
-      && [...beforeFiles, ...afterFiles].every((file) => (
-        string(file.path)
-        && file.path.startsWith(`${HYBRID_DCC_OPFS_ROOT}/`)
-        && integer(file.byteLength, 1)
-        && string(file.sha256)
-        && /^sha256:[a-f0-9]{64}$/u.test(file.sha256)
-      ));
+    const filesValid = redoBaselineFiles !== null
+      && beforeFiles !== null
+      && beforeFiles.length > 0
+      && afterFiles !== null
+      && afterFiles.length > 0;
+    const expectedFreshFileCount = redoBaselineFiles && beforeFiles
+      ? countStudioHybridDccFreshOpfsFiles(redoBaselineFiles, beforeFiles)
+      : -1;
     if (
       persistence.opfsGetDirectoryAvailable !== true
       || persistence.webLocksAvailable !== true
+      || !integer(persistence.redoBaselineSequence)
+      || !integer(persistence.redoPersistedSequence, persistence.redoBaselineSequence + 1)
+      || !string(persistence.redoReceiptSourceHash)
+      || !/^sha256:[a-f0-9]{64}$/u.test(persistence.redoReceiptSourceHash)
+      || !string(persistence.redoReceiptDocumentStateHash)
+      || persistence.redoReceiptDocumentStateHash !== persistence.redoWorkspaceStateHash
+      || !integer(persistence.freshRedoFileCount, 1)
+      || persistence.freshRedoFileCount !== expectedFreshFileCount
       || persistence.statusBeforeReload !== "saved"
       || persistence.pageReloadObserved !== true
       || persistence.navigationType !== "reload"
@@ -453,7 +487,7 @@ export function validateStudioHybridDccIntegrationResult(candidate: unknown): st
       || !sameTransform(persistence.recoveredTransform, targetTransform)
       || !filesValid
       || persistence.totalBytesBeforeReload !== beforeBytes
-      || !integer(persistence.unchangedDurableFileCount, 1)
+      || persistence.unchangedDurableFileCount !== beforeFiles?.length
       || !screenshotPath(persistence.screenshot)
     ) {
       issues.push("OPFS autosave did not survive an actual page reload with stable ID and TRS");
@@ -630,6 +664,28 @@ function expectedStaticPreviewDiagnostic(message: string, studioUrl: string): bo
   }
 }
 
+function expectedStudioHybridDccHeadlessGpuWarning(message: string, studioUrl: URL): boolean {
+  const sourceSeparator = message.lastIndexOf(" @ ");
+  if (sourceSeparator < 0) return false;
+  let sourceUrl: URL;
+  try {
+    sourceUrl = new URL(message.slice(sourceSeparator + 3));
+  } catch {
+    return false;
+  }
+  if (
+    sourceUrl.origin !== studioUrl.origin
+    || sourceUrl.hash !== ""
+    || !/^\/studio(?:\/3d\/dcc\/(?:model|build|cad|sculpt|material|shot))?$/u.test(
+      sourceUrl.pathname,
+    )
+  ) return false;
+  const diagnostic = message.slice(0, sourceSeparator);
+  if (diagnostic === "No available adapters.") return true;
+  return /^\[\.WebGL-0x[0-9A-Fa-f]+\]GL Driver Message \(OpenGL, Performance, GL_CLOSE_PATH_NV, High\): GPU stall due to ReadPixels(?: \(this message will no longer repeat\))?$/u
+    .test(diagnostic);
+}
+
 export function normalizeStudioHybridDccHeadlessGpuDiagnostics(
   diagnostics: StudioHybridDccBrowserDiagnostics,
   studioUrl: string,
@@ -648,16 +704,10 @@ export function normalizeStudioHybridDccHeadlessGpuDiagnostics(
   } catch {
     return diagnostics;
   }
-  const exactSource = `${pageUrl.origin}${pageUrl.pathname}`;
-  const noAdapterWarning = `No available adapters. @ ${exactSource}`;
-  const readPixelsWarningPrefix =
-    /^\[\.WebGL-0x[0-9A-Fa-f]+\]GL Driver Message \(OpenGL, Performance, GL_CLOSE_PATH_NV, High\): GPU stall due to ReadPixels @ $/u;
   return {
     consoleErrors: [...diagnostics.consoleErrors],
     consoleWarnings: diagnostics.consoleWarnings.filter((message) => (
-      message !== noAdapterWarning
-      && !(message.endsWith(exactSource)
-        && readPixelsWarningPrefix.test(message.slice(0, -exactSource.length)))
+      !expectedStudioHybridDccHeadlessGpuWarning(message, pageUrl)
     )),
     pageErrors: [...diagnostics.pageErrors],
     requestFailures: [...diagnostics.requestFailures],
@@ -995,6 +1045,20 @@ async function readHybridDccOpfsFiles(page: Page): Promise<readonly StudioHybrid
   return files;
 }
 
+function studioHybridDccOpfsFileIdentity(file: StudioHybridDccOpfsFileEvidence): string {
+  return `${file.path}\u0000${file.byteLength}\u0000${file.sha256}`;
+}
+
+export function countStudioHybridDccFreshOpfsFiles(
+  baseline: readonly StudioHybridDccOpfsFileEvidence[],
+  candidate: readonly StudioHybridDccOpfsFileEvidence[],
+): number {
+  const baselineIdentity = new Set(baseline.map(studioHybridDccOpfsFileIdentity));
+  return candidate.reduce((count, file) => (
+    baselineIdentity.has(studioHybridDccOpfsFileIdentity(file)) ? count : count + 1
+  ), 0);
+}
+
 async function prepareStudio(page: Page, studioUrl: string): Promise<void> {
   page.setDefaultTimeout(12_000);
   await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
@@ -1142,6 +1206,23 @@ async function openProjectActions(page: Page): Promise<Locator> {
 }
 
 async function openHybridDcc(page: Page): Promise<Locator> {
+  const dialog = page.locator('[data-studio-hybrid-dcc-dialog="true"]');
+  const panel = dialog.locator('[data-studio-hybrid-dcc-panel="true"]');
+  // A real reload preserves the route-owned DCC surface. Reuse that already-visible shipped
+  // workspace instead of requiring the canvas-only project menu to exist on the DCC route.
+  if (await panel.isVisible().catch(() => false)) return panel;
+  const currentPath = new URL(page.url()).pathname;
+  if (/^\/studio\/3d\/dcc\/(?:model|build|cad|sculpt|material|shot)$/u.test(currentPath)) {
+    if (await panel.waitFor({ state: "visible", timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false)) return panel;
+    const recoveryGate = dialog.locator('[data-studio-hybrid-dcc-recovery-gate="true"]');
+    const detail = await recoveryGate.textContent().catch(() => null);
+    block(
+      "hybrid-dcc-recovery-gate",
+      detail?.trim() || "Route-owned Hybrid DCC panel never passed recovery after reload",
+    );
+  }
   const projectActions = await openProjectActions(page);
   const entry = projectActions.locator('[data-studio-hybrid-dcc-open="true"]');
   await visibleOrBlock(
@@ -1151,9 +1232,7 @@ async function openHybridDcc(page: Page): Promise<Locator> {
   );
   await entry.scrollIntoViewIfNeeded();
   await entry.click();
-  const dialog = page.locator('[data-studio-hybrid-dcc-dialog="true"]');
   await visibleOrBlock(dialog, "hybrid-dcc-dialog", "Hybrid DCC dialog did not open from its UI entry");
-  const panel = dialog.locator('[data-studio-hybrid-dcc-panel="true"]');
   if (!await panel.waitFor({ state: "visible", timeout: 20_000 })
     .then(() => true)
     .catch(() => false)) {
@@ -1262,31 +1341,109 @@ async function selectVisibleFace(page: Page, panel: Locator): Promise<number> {
   );
 }
 
-async function waitForSavedPersistence(panel: Locator): Promise<string> {
+interface StudioHybridDccPersistenceAnchor {
+  readonly sequence: number;
+  readonly files: readonly StudioHybridDccOpfsFileEvidence[];
+}
+
+interface StudioHybridDccFreshPersistenceReceipt {
+  readonly status: string;
+  readonly sequence: number;
+  readonly sourceHash: `sha256:${string}`;
+  readonly documentStateHash: string;
+  readonly files: readonly StudioHybridDccOpfsFileEvidence[];
+  readonly freshFileCount: number;
+}
+
+async function readPersistenceAnchor(
+  page: Page,
+  panel: Locator,
+): Promise<StudioHybridDccPersistenceAnchor> {
   const status = panel.locator('[data-studio-hybrid-dcc-persistence]');
   await status.waitFor({ state: "visible", timeout: 12_000 });
-  // The badge may still say `saved` for the preceding command while the 900 ms debounce for the
-  // latest TRS/history generation is pending. Require the new generation's saving transition so a
-  // reload cannot accidentally prove an older checkpoint.
-  await panel.locator('[data-studio-hybrid-dcc-persistence="saving"]')
-    .waitFor({ state: "visible", timeout: 12_000 })
+  const rawSequence = await status.getAttribute(
+    "data-studio-hybrid-dcc-persistence-sequence",
+  );
+  const parsedSequence = Number(rawSequence);
+  return {
+    sequence: Number.isSafeInteger(parsedSequence) && parsedSequence >= 0 ? parsedSequence : 0,
+    files: await readHybridDccOpfsFiles(page),
+  };
+}
+
+async function waitForFreshSavedPersistence(
+  page: Page,
+  panel: Locator,
+  anchor: StudioHybridDccPersistenceAnchor,
+  expectedDocumentStateHash: string,
+): Promise<StudioHybridDccFreshPersistenceReceipt> {
+  const status = panel.locator('[data-studio-hybrid-dcc-persistence]');
+  await page.waitForFunction(({ baselineSequence, expectedHash }) => {
+    const node = document.querySelector('[data-studio-hybrid-dcc-persistence]');
+    if (!node || node.getAttribute("data-studio-hybrid-dcc-persistence") !== "saved") {
+      return false;
+    }
+    const sequence = Number(
+      node.getAttribute("data-studio-hybrid-dcc-persistence-sequence"),
+    );
+    return Number.isSafeInteger(sequence)
+      && sequence > baselineSequence
+      && node.getAttribute("data-studio-hybrid-dcc-persistence-document-state-hash")
+        === expectedHash;
+  }, {
+    baselineSequence: anchor.sequence,
+    expectedHash: expectedDocumentStateHash,
+  }, { timeout: 18_000 })
     .catch(async () => {
       const value = await status.getAttribute("data-studio-hybrid-dcc-persistence");
+      const sequence = await status.getAttribute(
+        "data-studio-hybrid-dcc-persistence-sequence",
+      );
+      const documentStateHash = await status.getAttribute(
+        "data-studio-hybrid-dcc-persistence-document-state-hash",
+      );
       block(
         "opfs-autosave-generation",
-        `Hybrid DCC did not expose a fresh saving generation (status=${value ?? "missing"})`,
+        "Hybrid DCC did not publish a fresh durable Redo receipt "
+          + `(status=${value ?? "missing"}, sequence=${sequence ?? "missing"}, `
+          + `document=${documentStateHash ?? "missing"}, expected=${expectedDocumentStateHash})`,
       );
     });
-  await panel.locator('[data-studio-hybrid-dcc-persistence="saved"]')
-    .waitFor({ state: "visible", timeout: 18_000 })
-    .catch(async () => {
-      const value = await status.getAttribute("data-studio-hybrid-dcc-persistence");
-      block(
-        "opfs-autosave-status",
-        `Hybrid DCC never reported durable autosave (status=${value ?? "missing"})`,
-      );
-    });
-  return await status.getAttribute("data-studio-hybrid-dcc-persistence") ?? "missing";
+  const statusValue = await status.getAttribute("data-studio-hybrid-dcc-persistence")
+    ?? "missing";
+  const sequence = Number(await status.getAttribute(
+    "data-studio-hybrid-dcc-persistence-sequence",
+  ));
+  const sourceHash = await status.getAttribute(
+    "data-studio-hybrid-dcc-persistence-source-hash",
+  );
+  const documentStateHash = await status.getAttribute(
+    "data-studio-hybrid-dcc-persistence-document-state-hash",
+  );
+  const files = await readHybridDccOpfsFiles(page);
+  const freshFileCount = countStudioHybridDccFreshOpfsFiles(anchor.files, files);
+  if (
+    !Number.isSafeInteger(sequence)
+    || sequence <= anchor.sequence
+    || !sourceHash
+    || !/^sha256:[a-f0-9]{64}$/u.test(sourceHash)
+    || documentStateHash !== expectedDocumentStateHash
+    || freshFileCount < 1
+  ) {
+    block(
+      "opfs-autosave-receipt",
+      "Fresh Redo receipt did not match a new durable OPFS generation "
+        + `(sequence=${sequence}, baseline=${anchor.sequence}, fresh-files=${freshFileCount})`,
+    );
+  }
+  return {
+    status: statusValue,
+    sequence,
+    sourceHash: sourceHash as `sha256:${string}`,
+    documentStateHash,
+    files,
+    freshFileCount,
+  };
 }
 
 async function runVerticalSlice(
@@ -1395,10 +1552,17 @@ async function runVerticalSlice(
   const redo = panel.getByRole("button", { name: "되돌린 3D 편집 다시 실행", exact: true });
   const redoEnabledAfterUndo = await redo.isEnabled();
   if (!redoEnabledAfterUndo) block("hybrid-dcc-redo", "Hybrid DCC Redo is disabled after one Undo");
+  // Anchor the last durable receipt and exact OPFS file identities before the mutation. Unlike the
+  // short `saving` badge, receipt sequence/hash attributes remain observable after a fast write.
+  const redoPersistenceAnchor = await readPersistenceAnchor(page, panel);
   await redo.click();
   await waitForTransformField(page, "크기 Z", TARGET_TRANSFORM.scale[2]);
   const afterOneRedo = await readTransform(panel);
   const historyAssetId = await stats.getAttribute("data-active");
+  const redoWorkspaceStateHash = await stats.getAttribute("data-studio-hybrid-dcc-state-hash");
+  if (!redoWorkspaceStateHash) {
+    block("opfs-autosave-workspace-hash", "Redo workspace did not expose its authoritative state hash");
+  }
   evidence.trsHistory = {
     assetId,
     before,
@@ -1410,8 +1574,14 @@ async function runVerticalSlice(
     stableIdThroughHistory: historyAssetId === assetId,
     screenshot: screenshotTrs,
   };
-  const statusBeforeReload = await waitForSavedPersistence(panel);
-  const filesBeforeReload = await readHybridDccOpfsFiles(page);
+  const redoPersistence = await waitForFreshSavedPersistence(
+    page,
+    panel,
+    redoPersistenceAnchor,
+    redoWorkspaceStateHash,
+  );
+  const statusBeforeReload = redoPersistence.status;
+  const filesBeforeReload = redoPersistence.files;
   if (filesBeforeReload.length === 0) {
     block("opfs-autosave-files", "Saved status produced no nonempty Hybrid DCC OPFS files");
   }
@@ -1442,6 +1612,13 @@ async function runVerticalSlice(
     webLocksAvailable: await page.evaluate(() => (
       typeof navigator.locks?.request === "function"
     )),
+    redoBaselineSequence: redoPersistenceAnchor.sequence,
+    redoPersistedSequence: redoPersistence.sequence,
+    redoReceiptSourceHash: redoPersistence.sourceHash,
+    redoReceiptDocumentStateHash: redoPersistence.documentStateHash,
+    redoWorkspaceStateHash,
+    filesBeforeRedo: redoPersistenceAnchor.files,
+    freshRedoFileCount: redoPersistence.freshFileCount,
     statusBeforeReload,
     filesBeforeReload,
     totalBytesBeforeReload: filesBeforeReload.reduce((total, file) => total + file.byteLength, 0),
@@ -1467,11 +1644,15 @@ async function runVerticalSlice(
   });
   await visibleOrBlock(shotMode, "bg3d-handoff-mode", "Shot workbench mode is not visible");
   await shotMode.click();
-  const recoveredQuickTools = recoveredPanel.locator(
+  await page.waitForURL((url) => url.pathname.endsWith("/studio/3d/dcc/shot"), {
+    timeout: 12_000,
+  });
+  const shotPanel = await openHybridDcc(page);
+  const recoveredQuickTools = shotPanel.locator(
     'section[aria-labelledby="studio-dcc-quick-tools-title"]',
   );
   const handoff = recoveredQuickTools.getByRole("button", {
-    name: /^3D 배경·Shot 편집기로 열기/u,
+    name: /^3D 배경·컷 편집기로 열기/u,
   });
   await visibleOrBlock(handoff, "bg3d-handoff-button", "Verified GLB handoff is not visible");
   const handoffButtonVisible = await handoff.isVisible();
@@ -1494,7 +1675,7 @@ async function runVerticalSlice(
   if (!await bg3dDialog.waitFor({ state: "visible", timeout: 5_000 })
     .then(() => true)
     .catch(() => false)) {
-    const handoffLog = await recoveredPanel.locator('[data-studio-hybrid-dcc-log="true"]')
+    const handoffLog = await shotPanel.locator('[data-studio-hybrid-dcc-log="true"]')
       .textContent().catch(() => null);
     block("bg3d-handoff", handoffLog?.trim() || "BG3D handoff did not open its shipped dialog");
   }

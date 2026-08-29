@@ -335,6 +335,7 @@ export type StudioCuttoonEditorViewSessionCore = {
   historyBrushSourceSrc: any;
   historyPanelOpen: any;
   hybridDccOpen: any;
+  hybridDccPersistenceReceipt: any;
   hybridDccPersistenceStatus: any;
   hybridDccReturnFocusRef: any;
   hybridDccRouteAccess: any;

@@ -16,11 +16,19 @@ const variants: Record<Variant, string> = {
     "text-fg-2 hover:text-fg hover:bg-raised/60 focus-visible:bg-raised/60",
 };
 
+/**
+ * 마우스 밀도는 그대로, 손가락에는 44px.
+ *
+ * `sm`(32px)·`md`(40px)·`icon`(36px)은 데스크톱 패널 밀도에 맞춰 고른 값이라 터치에서는
+ * 모두 44px 계약에 미달했다. 스튜디오 패널 대부분이 `size="sm"` 을 쓰므로 모바일에서
+ * 재생·클립 추가 같은 상시 조작이 32px 로 잡혀 있었다. 저장소가 이미 쓰는 `pointer-coarse`
+ * 승격 규칙을 토큰 한곳에 넣어 호출부가 함께 올라오게 한다. `lg`(48px)는 이미 충분하다.
+ */
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-[0.8125rem]",
-  md: "h-10 px-4 text-sm",
+  sm: "h-8 px-3 text-[0.8125rem] pointer-coarse:h-11 pointer-coarse:px-3.5",
+  md: "h-10 px-4 text-sm pointer-coarse:h-11",
   lg: "h-12 px-6 text-base",
-  icon: "h-9 w-9",
+  icon: "h-9 w-9 pointer-coarse:size-11",
 };
 
 export function buttonClass(opts: { variant?: Variant; size?: Size; className?: string } = {}) {

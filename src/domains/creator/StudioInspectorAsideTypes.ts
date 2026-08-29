@@ -20,11 +20,7 @@ import type { PaperGrainKind } from "./brush/studio-paper-texture";
 import type { FilterMaskPaintMode } from "./filter/studio-filter-mask";
 import type { StudioFilterKind } from "./filter/studio-filter-menu";
 import type { LayerMaskPaintMode } from "./layer/studio-layer-mask";
-import type {
-  StudioLayerColor,
-  StudioLayerNavigatorItem,
-  StudioLayerRole,
-} from "./layer/studio-layer-navigator";
+import type { StudioLayerNavigatorItem } from "./layer/studio-layer-navigator";
 import type { StudioLayerNavigatorAction } from "./layer/StudioLayerNavigator";
 import type { BubbleShapeGeometry } from "./lettering/studio-bubble-custom-shape";
 import type { ImageFilterFields } from "./render/studio-konva-filter-fields";
@@ -46,16 +42,7 @@ import type {
 } from "./studio-dodge-burn";
 import type { DrawMode, DrawShapeKind, StudioMenu, Tool } from "./studio-editor-tool-model";
 import type { StudioEffectFavoriteState, StudioEffectId } from "./studio-effect-favorites";
-import type {
-  BubbleEl,
-  DrawEl,
-  El,
-  FocusLinesEl,
-  ImageEl,
-  SpeedLinesEl,
-  StickerEl,
-  TextEl,
-} from "./studio-element-model";
+import type { El } from "./studio-element-model";
 import type { StudioExtendedBlendModeId } from "./studio-extended-blend";
 import type { StudioFigmaSelectionLayoutPatch } from "./studio-figma-selection-ux";
 import type { HealCloneMode } from "./studio-heal-clone";
@@ -172,7 +159,11 @@ export interface StudioInspectorAsideHandlers {
   patchEl: (id: string, patch: Partial<El>) => void;
   patchPageGrade: (patch: Partial<PageGrade>) => void;
   queueBrushDelete: (deleted: DeletedBrushRecord) => void;
-  regenerateTemplate: (tpl: TemplateSpec, gutter: number, currentEls?: El[]) => ((ImageEl & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean; layerRole?: StudioLayerRole; layerColor?: StudioLayerColor; emeresSourceId?: string; }) | (TextEl & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean; layerRole?: StudioLayerRole; layerColor?: StudioLayerColor; emeresSourceId?: string; }) | (BubbleEl & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean; layerRole?: StudioLayerRole; layerColor?: StudioLayerColor; emeresSourceId?: string; }) | (StickerEl & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean; layerRole?: StudioLayerRole; layerColor?: StudioLayerColor; emeresSourceId?: string; }) | (DrawEl & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean; layerRole?: StudioLayerRole; layerColor?: StudioLayerColor; emeresSourceId?: string; }) | (FocusLinesEl & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean; layerRole?: StudioLayerRole; layerColor?: StudioLayerColor; emeresSourceId?: string; }) | (SpeedLinesEl & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean; layerRole?: StudioLayerRole; layerColor?: StudioLayerColor; emeresSourceId?: string; }) | { id: `${string}-${string}-${string}-${string}-${string}`; type: "frame"; x: number; y: number; width: number; height: number; })[];
+  regenerateTemplate: (
+    tpl: TemplateSpec,
+    gutter: number,
+    currentEls?: El[],
+  ) => El[] | null;
   rememberColor: (c: string) => void;
   rememberEffectRecent: (effectId: StudioEffectId) => void;
   removeSelected: () => void;
@@ -574,6 +565,9 @@ export interface StudioInspectorAsideProps {
   tipRoundness: number;
   title: string;
   titleInputRef: import("react").RefObject<HTMLInputElement | null>;
+  pendingSaveIntent: "draft" | "published" | null;
+  onContinuePendingSave: () => void;
+  onClearWorkMetadataError: () => void;
   tool: Tool;
   userGuides: { id: string; type: "v" | "h"; pos: number; }[];
   useVelocityPressure: boolean;

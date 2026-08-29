@@ -1198,6 +1198,28 @@ export class StudioWebGpuEngine {
   }
 
   /**
+   * Releases only the display backing stores after `suspend()` has revoked frame authority. The GPU
+   * device and pipelines stay warm; a later component-owned `resize()` restores exact viewport
+   * dimensions before the first resumed stroke is rendered.
+   */
+  public releaseSuspendedSurfaceBackingStores(): boolean {
+    if (this.disposed || !this.suspended) return false;
+    safeUnconfigure(this.context);
+    let released = false;
+    for (const surface of new Set([this.canvas, this.fallbackCanvas])) {
+      if (surface.width !== 1) {
+        surface.width = 1;
+        released = true;
+      }
+      if (surface.height !== 1) {
+        surface.height = 1;
+        released = true;
+      }
+    }
+    return released;
+  }
+
+  /**
    * Reads only a receipt-authorized immutable frame. Any render, resize, backend switch, device
    * loss, or disposal that happens before completion turns the result into a stale rejection.
    */

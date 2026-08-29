@@ -60,6 +60,16 @@ describe("Studio PPT-style group convenience boundary", () => {
     expect(clickHandler).toContain("marqueeIds: marqueeIdsRef.current");
   });
 
+  it("publishes select-all through the synchronous selection authority before a rapid group command", () => {
+    const selectAllSource = functionBody("selectAllElements", "selectAllForEdit");
+
+    expect(selectAllSource).toContain("applyGroupSelectionState({");
+    expect(selectAllSource).toContain("selectedId: null");
+    expect(selectAllSource).toContain("marqueeIds: ids");
+    expect(selectAllSource).toContain("activeGroupId: null");
+    expect(selectAllSource).not.toContain("setMarqueeIds(");
+  });
+
   it("keeps a complete child selection in internal-edit mode", () => {
     const pageGroupSource = functionBody(
       "completeSelectedGroupId",

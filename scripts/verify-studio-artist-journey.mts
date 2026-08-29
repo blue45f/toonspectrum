@@ -20,6 +20,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import {
   appendFileSync,
   existsSync,
+  mkdtempSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -47,7 +48,7 @@ const LIVE_CAPTURE_SEQUENCE = [
   "03-settled-autosaved",
 ] as const;
 
-export const STUDIO_ARTIST_JOURNEY_REPORT_SCHEMA_VERSION = 1 as const;
+export const STUDIO_ARTIST_JOURNEY_REPORT_SCHEMA_VERSION = 2 as const;
 
 export interface StudioArtistJourneyChildPlan {
   readonly id: "lifecycle" | "live-commit";
@@ -77,7 +78,11 @@ export interface StudioArtistJourneyAudit {
   }>;
   readonly lifecycle: Readonly<{
     committedPixels: number;
-    autosavedPointCount: number;
+    persistenceAuthority: "durable-reload-recovery" | "invalid";
+    recoveryBannerObserved: boolean;
+    restoreActionCompleted: boolean;
+    browserCompatibilityKeysBeforeReload: number;
+    browserCompatibilityKeysAtRecovery: number;
     reloadChangedPixels: number;
     exportChangedPixels: number;
     exportByteIdentical: boolean;
@@ -104,6 +109,19 @@ interface StudioArtistJourneyRunReport {
   readonly audit: StudioArtistJourneyAudit;
 }
 
+/**
+ * Give every orchestrator invocation its own evidence tree. The child brush verifier creates
+ * timestamped report directories and intentionally preserves them, so reusing one fixed parent
+ * would make a later recursive report lookup observe artifacts from earlier or concurrent runs.
+ */
+export function createStudioArtistJourneyRunDirectory(
+  artifactRoot: string
+): string {
+  const resolvedRoot = resolve(artifactRoot);
+  mkdirSync(resolvedRoot, { recursive: true });
+  return mkdtempSync(join(resolvedRoot, "run-"));
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -116,6 +134,12 @@ function finiteNumber(value: unknown): number | null {
 
 function positiveInteger(value: unknown): number | null {
   return Number.isSafeInteger(value) && (value as number) > 0
+    ? value as number
+    : null;
+}
+
+function nonNegativeInteger(value: unknown): number | null {
+  return Number.isSafeInteger(value) && (value as number) >= 0
     ? value as number
     : null;
 }
@@ -220,19 +244,24 @@ function auditLifecycleReport(
   for (const issue of visualIssues) issues.push(`lifecycle: ${issue}`);
 
   const autosave = record(report?.autosave);
-  const stroke = record(autosave?.stroke);
-  const drawCount = positiveInteger(autosave?.drawCount);
-  const pointCount = positiveInteger(stroke?.pointCount);
-  const fingerprint =
-    typeof stroke?.fingerprint === "string" ? stroke.fingerprint : "";
+  const persistenceAuthority = autosave?.authority === "durable-reload-recovery";
+  const recoveryBannerObserved = autosave?.recoveryBannerObserved === true;
+  const restoreActionCompleted = autosave?.restoreActionCompleted === true;
+  const browserCompatibilityKeysBeforeReload = nonNegativeInteger(
+    autosave?.browserCompatibilityKeysBeforeReload
+  );
+  const browserCompatibilityKeysAtRecovery = nonNegativeInteger(
+    autosave?.browserCompatibilityKeysAtRecovery
+  );
   const save =
-    drawCount === 1
-    && pointCount !== null
-    && pointCount >= 8
-    && SHA256.test(fingerprint);
+    persistenceAuthority
+    && recoveryBannerObserved
+    && restoreActionCompleted
+    && browserCompatibilityKeysBeforeReload === 0
+    && browserCompatibilityKeysAtRecovery === 0;
   if (!save) {
     issues.push(
-      "lifecycle: autosave does not contain exactly one non-degenerate hashed stroke"
+      "lifecycle: durable autosave/recovery authority evidence is incomplete"
     );
   }
 
@@ -297,7 +326,15 @@ function auditLifecycleReport(
   );
   return {
     committedPixels: visual?.blankToCommitted.changedPixels ?? 0,
-    autosavedPointCount: pointCount ?? 0,
+    persistenceAuthority: persistenceAuthority
+      ? "durable-reload-recovery"
+      : "invalid",
+    recoveryBannerObserved,
+    restoreActionCompleted,
+    browserCompatibilityKeysBeforeReload:
+      browserCompatibilityKeysBeforeReload ?? -1,
+    browserCompatibilityKeysAtRecovery:
+      browserCompatibilityKeysAtRecovery ?? -1,
     reloadChangedPixels: visual?.redoneToReloaded.changedPixels ?? -1,
     exportChangedPixels:
       visual?.beforeToAfterReloadExport.changedPixels ?? -1,
@@ -500,7 +537,13 @@ export function auditStudioArtistJourneyReports(
     }),
     lifecycle: Object.freeze({
       committedPixels: lifecycle.committedPixels,
-      autosavedPointCount: lifecycle.autosavedPointCount,
+      persistenceAuthority: lifecycle.persistenceAuthority,
+      recoveryBannerObserved: lifecycle.recoveryBannerObserved,
+      restoreActionCompleted: lifecycle.restoreActionCompleted,
+      browserCompatibilityKeysBeforeReload:
+        lifecycle.browserCompatibilityKeysBeforeReload,
+      browserCompatibilityKeysAtRecovery:
+        lifecycle.browserCompatibilityKeysAtRecovery,
       reloadChangedPixels: lifecycle.reloadChangedPixels,
       exportChangedPixels: lifecycle.exportChangedPixels,
       exportByteIdentical: lifecycle.exportByteIdentical,
@@ -627,12 +670,12 @@ async function main(): Promise<void> {
       "dist/index.html is missing; run `pnpm run build` before the artist journey verifier"
     );
   }
-  const artifactDirectory = resolve(
+  const artifactRoot = resolve(
     process.env.TOONSPECTRUM_ARTIST_JOURNEY_VERIFY_DIR
     ?? process.env.TOONSPECTRUM_VERIFY_DIR
     ?? join(tmpdir(), "toonspectrum-studio-artist-journey")
   );
-  mkdirSync(artifactDirectory, { recursive: true });
+  const artifactDirectory = createStudioArtistJourneyRunDirectory(artifactRoot);
   const logPath = join(artifactDirectory, "studio-artist-journey.log");
   const reportPath = join(
     artifactDirectory,

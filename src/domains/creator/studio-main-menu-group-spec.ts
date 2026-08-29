@@ -50,7 +50,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       gap("원본 파일 연결"),
       part(
         "저장·다른 이름·버전 체크포인트",
-        "임시저장·게시·명명 체크포인트. ‘다른 이름으로 저장’은 여전히 없다.",
+        "초안 저장·게시·명명 체크포인트. ‘다른 이름으로 저장’은 여전히 없다.",
         "file/save-draft",
         "file/publish",
         "file/checkpoints",
@@ -588,7 +588,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       has("Quick Deck", "window/quick-access-palette"),
       part(
         "Action Bar",
-        "메뉴바의 상시 명령 바 — 표시 전환과 8슬롯 사용자화(기본: 실행취소·다시실행·임시저장·내보내기 옵션·화면 맞춤). 드래그 재배치와 구분자 편집은 없다.",
+        "메뉴바의 상시 명령 바 — 표시 전환과 8슬롯 사용자화(기본: 실행취소·다시실행·초안 저장·내보내기 옵션·화면 맞춤). 드래그 재배치와 구분자 편집은 없다.",
         "window/command-bar",
       ),
       part("Asset Vault", "템플릿·에셋 패널.", "window/template"),

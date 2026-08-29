@@ -166,7 +166,7 @@ export function StudioAnimTimelinePanel({
           type="button"
           onClick={onClose}
           aria-label="다중 레이어 타임라인 패널 닫기"
-          className="grid size-6 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className="grid size-6 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
         >
           <X size={13} />
         </button>
@@ -195,7 +195,7 @@ export function StudioAnimTimelinePanel({
                 const raw = Number(e.target.value);
                 if (Number.isFinite(raw)) onDocChange(setFrameCount(doc, raw));
               }}
-              className="w-16 rounded-md border border-line bg-canvas px-2 py-1 text-right text-xs text-fg outline-none focus:border-accent/50"
+              className="w-16 rounded-md border border-line bg-canvas px-2 py-1 text-right text-xs text-fg outline-none focus:border-accent/50 pointer-coarse:h-11"
             />
           </label>
           <div className="flex items-center justify-between gap-2">

@@ -6,7 +6,10 @@
  * immersive (default) and windowed mobile shells, measures:
  * - (a) horizontal overflow contributors (element rects exceeding the viewport
  *   outside any horizontal scroll row) + document scrollWidth overflow
- * - (b) bounding-box overlap between distinct interactive top-chrome controls
+ * - (b) bounding-box overlap between distinct interactive top-chrome controls —
+ *   including the canvas-sticky live-presence dock, which shares the immersive
+ *   shell's top band with the floating menubar pill from a different
+ *   positioning context
  * - (c) menubar clipping (overflow-hidden lane scrollWidth > clientWidth),
  *   hit-test clipped buttons, top-bar height blowup across widths
  *   (h@320 must be ≤ 1.6 × h@430) and canvas-below-the-fold regressions
@@ -150,6 +153,7 @@ interface ModeRunResult {
   width: number;
   mode: ShellMode;
   ok: boolean;
+  workspaceToggleInitiallyVisible: boolean;
   hardFailures: string[];
   warnings: string[];
   metrics: TopChromeMetrics;
@@ -279,8 +283,14 @@ async function measureTopChrome(page: Page, mode: ShellMode): Promise<TopChromeM
       '[data-studio-mobile-editing-dock="true"]',
     );
 
+    // The live-presence dock is not shell chrome — it is sticky inside the canvas scrollport —
+    // but on the immersive mobile shell it paints in the very same band as the floating menubar
+    // pill, and neither positioning context can see the other's width. Including it here is what
+    // turns "게시하기 hit-test lost to div" into an overlap pair that names the real culprit.
+    const presenceDock = document.querySelector('[data-studio-presence-dock="true"]');
+
     const containers: Element[] = [];
-    for (const candidate of [siteHeader, menubar, statusRail, toolBelt]) {
+    for (const candidate of [siteHeader, menubar, statusRail, toolBelt, presenceDock]) {
       if (candidate && isVisible(candidate)) containers.push(candidate);
     }
 
@@ -704,7 +714,29 @@ async function runMode(
   const workspaceToggle = page.locator(
     '[data-studio-mobile-workspace-toggle="true"]',
   ).first();
+  let workspaceToggleInitiallyVisible = false;
   if (await workspaceToggle.count() > 0) {
+    workspaceToggleInitiallyVisible = await workspaceToggle.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const dockBounds = element
+        .closest<HTMLElement>('[data-studio-mobile-editing-dock="true"]')
+        ?.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        bounds.left + bounds.width / 2,
+        bounds.top + bounds.height / 2,
+      );
+      return Boolean(
+        dockBounds
+        && !element.closest('[data-studio-mobile-dock-scroll]')
+        && bounds.width >= 44
+        && bounds.height >= 44
+        && bounds.left >= dockBounds.left - 0.5
+        && bounds.right <= dockBounds.right + 0.5
+        && bounds.left >= -0.5
+        && bounds.right <= window.innerWidth + 0.5
+        && (hit === element || element.contains(hit))
+      );
+    });
     await workspaceToggle.click();
     await page
       .locator(
@@ -784,6 +816,9 @@ async function runMode(
   const hardFailures: string[] = [];
   const warnings: string[] = [];
 
+  if (!workspaceToggleInitiallyVisible) {
+    hardFailures.push("workspace tools toggle is not initially visible and pinned outside the drawing scroller");
+  }
   if (!metrics.menubarVisible) hardFailures.push("menubar not visible");
   if (metrics.docOverflowX > 0) {
     hardFailures.push(`document horizontal overflow ${metrics.docOverflowX}px`);
@@ -926,6 +961,7 @@ async function runMode(
     `dockPad=${metrics.canvasViewportPaddingBottom?.toFixed(0) ?? "-"} ` +
     `expandedDock=${expandedDock.dockHeight?.toFixed(0) ?? "-"} ` +
     `expandedPad=${expandedDock.canvasViewportPaddingBottom?.toFixed(0) ?? "-"} ` +
+    `workspaceToggleVisible=${workspaceToggleInitiallyVisible} ` +
     `menus=${menus.map((menu) => `${menu.id}:${menu.opened && menu.withinViewport && menu.closed}`).join(",") || "-"} ` +
     `errs=${consoleErrors.length} ok=${ok}`,
   );
@@ -940,6 +976,7 @@ async function runMode(
     width,
     mode,
     ok,
+    workspaceToggleInitiallyVisible,
     hardFailures,
     warnings,
     metrics,

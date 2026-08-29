@@ -15,6 +15,7 @@ import { normalizeStudioInspectorLayout } from "./studio-inspector-layout";
 import { executeStudioInspectorRouteTransition } from "./studio-inspector-tool-transition";
 import { isEffectivelyHidden } from "./studio-layers";
 import { studioMobileSheetSizeStyle } from "./studio-mobile-sheet-snap";
+import { resolveStudioTemplateGutterCapability } from "./studio-template-gutter-layout";
 import { StudioLayerNavigator } from "./studio-page-lazy-ui";
 import { STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH } from "./studio-workspaces";
 import { StudioCommandSearchHost } from "./StudioCommandSearchHost";
@@ -97,6 +98,7 @@ export function StudioInspectorAsideShell({
     rightPanelDisabledReasons,
     rightResize,
     safeMobileKeyboardInset,
+    saving,
     scrollViewportStore,
     selectLayersFromNavigator,
     selected,
@@ -132,6 +134,9 @@ export function StudioInspectorAsideShell({
     tagsText,
     title,
     titleInputRef,
+    pendingSaveIntent,
+    onContinuePendingSave,
+    onClearWorkMetadataError,
     toggleLayerSolo,
     toggleLocalHidden,
     userGuides,
@@ -140,6 +145,7 @@ export function StudioInspectorAsideShell({
     webtoonTheme,
     withCanvasControlsGuard,
   } = model;
+  const templateGutterCapability = resolveStudioTemplateGutterCapability(currentTemplate);
   return (
         <aside
           ref={propsSheetRef}
@@ -149,7 +155,7 @@ export function StudioInspectorAsideShell({
           data-studio-mobile-sheet={isMobile && mobileSheet === "props" ? "true" : undefined}
           data-studio-sheet-snap={isMobile ? mobileInspectorSnap : undefined}
           data-popup-kind={isMobile && mobileSheet === "props" ? "sheet" : undefined}
-          aria-label={isMobile ? "속성" : undefined}
+          aria-label={isMobile ? "작업 패널" : undefined}
           tabIndex={isMobile ? -1 : undefined}
           inert={isMobile && mobileSheet !== "props" ? true : undefined}
           className={cn(
@@ -237,7 +243,7 @@ export function StudioInspectorAsideShell({
               <StudioMobileSheetHandle
                 active={isMobile && mobileSheet === "props"}
                 kind="props"
-                label="속성 시트"
+                label="작업 패널"
                 onDismiss={() => setMobileSheet(null)}
                 onSnapChange={setMobileInspectorSnap}
                 sheetRef={propsSheetRef}
@@ -265,6 +271,7 @@ export function StudioInspectorAsideShell({
             background={bg}
             canvasHeight={canvasH}
             controlsDisabled={canvasControlsDisabled}
+            controlsDisabledReason={inspectorInteractionPolicy.page.reason}
             gridSize={gridSize}
             hidden={
               inspectorLayout.primary !== "document" ||
@@ -279,8 +286,8 @@ export function StudioInspectorAsideShell({
             showGrid={showGrid}
             showWebtoonGuides={showWebtoonGuides}
             snapEnabled={snapEnabled}
-            templateGutterAvailable={
-              currentTemplate !== null && currentTemplate.id !== "blank"
+            templateGutterUnavailableReason={
+              templateGutterCapability.supported ? null : templateGutterCapability.reason
             }
             userGuides={userGuides}
             webtoonGuides={webtoonGuides}
@@ -322,12 +329,12 @@ export function StudioInspectorAsideShell({
             onPaperGrainVisibleChange={withCanvasControlsGuard(setPaperGrainVisible)}
             onApplyPaperTintBackground={withCanvasControlsGuard(applyPaperTintBackground)}
             onPanelGutterChange={withCanvasControlsGuard((nextGutter) => {
+              if (!currentTemplate || !templateGutterCapability.supported) return;
+              const nextElements = regenerateTemplate(currentTemplate, nextGutter);
+              if (!nextElements) return;
               setPanelGutter(nextGutter);
               setSharedDocumentNotice(null);
-              if (currentTemplate) {
-                const nextElements = regenerateTemplate(currentTemplate, nextGutter);
-                commit(nextElements);
-              }
+              commit(nextElements);
             })}
             onShowAlignmentGuidesChange={withCanvasControlsGuard(setShowAlignmentGuides)}
             onShowGridChange={withCanvasControlsGuard(setShowGrid)}
@@ -497,21 +504,30 @@ export function StudioInspectorAsideShell({
           </div>
           <StudioInspectorPublishPanel
             active={inspectorLayout.primary === "publish"}
+            autoFocusTitle={
+              isMobile && mobileSheet === "props" && pendingSaveIntent !== null
+            }
             description={description}
             readOnly={inspectorInteractionPolicy.global.disabled}
             tags={tagsText}
             title={title}
             titleInputRef={titleInputRef}
+            pendingSaveIntent={pendingSaveIntent}
+            saving={saving}
+            onContinuePendingSave={onContinuePendingSave}
             onDescriptionChange={(value) => {
               setDescription(value);
+              onClearWorkMetadataError();
               setSharedDocumentNotice(null);
             }}
             onTagsChange={(value) => {
               setTagsText(value);
+              onClearWorkMetadataError();
               setSharedDocumentNotice(null);
             }}
             onTitleChange={(value) => {
               setTitle(value);
+              onClearWorkMetadataError();
               setSharedDocumentNotice(null);
             }}
           />
