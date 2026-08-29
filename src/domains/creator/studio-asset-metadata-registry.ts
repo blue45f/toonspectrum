@@ -23,7 +23,11 @@ import {
   hokusaiProviderDescriptor,
   perfectFreehandProviderDescriptor,
 } from "../../../packages/studio-brush-platform/src/providers";
-import { canvasKitProviderDescriptor } from "../../../packages/studio-engine-skia/src/descriptor";
+import {
+  canvasKitGpuProviderDescriptor,
+  canvasKitProviderDescriptor,
+  skiaGraphiteWebgpuProviderDescriptor,
+} from "../../../packages/studio-engine-skia/src/descriptor";
 import {
   velloCpuProviderDescriptor,
   velloGpuBrowserProviderDescriptor,
@@ -69,6 +73,11 @@ import type {
  */
 export const STUDIO_KNOWN_ENGINE_DESCRIPTORS: readonly ProviderDescriptor[] = [
   canvasKitProviderDescriptor,
+  // Vello 갭(text.paragraph/mask/filter.image/backdrop/path-effect)의 지정 완성 레인과 그
+  // WebGPU 챌린저(ADR 0017). known universe 등재는 활성화가 아니다 — 등록 권한(evidence)은
+  // 그대로이며, capability-gap 커버리지 테스트가 이 두 id의 존재를 강제한다.
+  canvasKitGpuProviderDescriptor,
+  skiaGraphiteWebgpuProviderDescriptor,
   velloCpuProviderDescriptor,
   velloGpuBrowserProviderDescriptor,
   velloSvgNativeProviderDescriptor,

@@ -26,7 +26,37 @@
  * A rejected transform returns `null` rather than a partially transformed stroke: callers treat
  * that as "leave the document untouched", the same all-or-nothing discipline the group planner uses.
  */
+import { MAX_COORDINATE, MAX_STROKE_WIDTH } from "../live/studio-crdt-document-constants";
+
+import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
+import { SHAPE_PARAM_RANGES } from "./studio-stroke-shapes";
+
+
 import type { DrawEl } from "../studio-element-model";
+
+/**
+ * The nib a single-sample calligraphy TAP actually renders, from `StudioDrawNode`'s tap branch:
+ * angle -30 and roundness 0.35, hardcoded there rather than resolved from the catalogue. Kept
+ * beside the planner that has to rotate from the same base the render used.
+ */
+const STUDIO_LEGACY_CALLIGRAPHY_TAP_TIP = {
+  tiltEnabled: false,
+  angleDeg: -30,
+  roundness: 0.35,
+} as const;
+
+/**
+ * Kinds `StudioDrawNode` reconstructs from `drawBounds(points)` as AXIS-ALIGNED primitives, so
+ * nothing an affine writes into `points` can carry an orientation for them. Kept beside the
+ * planner that has to refuse them; the canvas layer derives the same verdict for the preview.
+ */
+export function studioDrawShapeIsBoundsDerived(kind: unknown): boolean {
+  return kind === "rect"
+    || kind === "ellipse"
+    || kind === "star"
+    || kind === "triangle"
+    || kind === "polygon";
+}
 
 export interface StudioDrawObjectTransformBounds {
   readonly x: number;
@@ -159,11 +189,21 @@ export function planStudioDrawObjectTransform(
   input: StudioDrawObjectTransformInput
 ): DrawEl | null {
   const { el, sourceBounds, targetBounds } = input;
-  const rotationDeg = input.rotationDeg ?? 0;
+  const requestedRotationDeg = input.rotationDeg ?? 0;
   const strokeWidthPolicy = input.strokeWidthPolicy ?? "scale";
 
   if (el.type !== "draw") return null;
-  if (!finite(rotationDeg)) return null;
+  if (!finite(requestedRotationDeg)) return null;
+  // Bounds-derived primitives cannot absorb a rotation into `points`, and rotating them anyway
+  // DESTROYS them. StudioDrawNode rebuilds rect/ellipse/star/triangle/polygon from
+  // `drawBounds(points)` as axis-aligned shapes, so only the bounding box of the rotated endpoints
+  // survives -- and for a square stored as its diagonal `[0, 0, 40, 40]`, a 45deg rotation puts
+  // both endpoints on the same vertical line, collapsing the committed width to the renderer's
+  // 0.1px floor (measured: the rotated x-extent comes out at 3.6e-15). The bounds mapping still
+  // applies, so the handle's move and resize land; only the turn is dropped, which is what the
+  // renderer would have done with it regardless. These kinds are excluded from the live preview
+  // for the same reason (studio-live-transform-preview-eligibility), so the two agree.
+  const rotationDeg = studioDrawShapeIsBoundsDerived(el.kind) ? 0 : requestedRotationDeg;
   if (
     !finiteEvenPoints(el.points) ||
     !finiteNonNegative(el.strokeWidth) ||
@@ -186,6 +226,13 @@ export function planStudioDrawObjectTransform(
     const v = (py - sourceBounds.y) * scale.scaleY;
     const x = targetBounds.x + u * cos - v * sin;
     const y = targetBounds.y + u * sin + v * cos;
+    // Same trap as the stroke width below: `validatePayload` asserts every coordinate within
+    // +/-MAX_COORDINATE, so a stroke near that boundary can be moved, scaled or rotated to a
+    // finite-but-unpublishable position. It would apply locally and then fail publication,
+    // leaving the author's document ahead of every collaborator's. Refusing the transform keeps
+    // the stroke where it was, which is the honest outcome for a gesture that cannot be persisted.
+    if (x < -MAX_COORDINATE || x > MAX_COORDINATE) return null;
+    if (y < -MAX_COORDINATE || y > MAX_COORDINATE) return null;
     return finite(x) && finite(y) ? { x, y } : null;
   };
 
@@ -199,33 +246,140 @@ export function planStudioDrawObjectTransform(
 
   const widthFactor = strokeWidthPolicy === "scale" ? scale.uniformEquivalent : 1;
   const strokeWidth = el.strokeWidth * widthFactor;
-  if (!finite(strokeWidth)) return null;
+  // Finite is not enough: `validatePayload` in live/studio-crdt-document-payload asserts
+  // strokeWidth within [0.01, MAX_STROKE_WIDTH] and sampleSpacing within [0, MAX_STROKE_WIDTH],
+  // so a large enough enlargement produces an element that applies locally and then FAILS CRDT
+  // publication -- the collaborator's document silently diverges from the author's. Refusing the
+  // transform leaves the stroke as it was, which is the honest outcome for a gesture whose result
+  // cannot be persisted. The same trap caught the stylus-channel rotation earlier in this file.
+  if (!finite(strokeWidth) || strokeWidth < 0.01 || strokeWidth > MAX_STROKE_WIDTH) return null;
 
   let sampleSpacing: number | undefined;
   if (el.sampleSpacing !== undefined) {
     sampleSpacing = el.sampleSpacing * widthFactor;
-    if (!finite(sampleSpacing)) return null;
+    if (!finite(sampleSpacing) || sampleSpacing < 0 || sampleSpacing > MAX_STROKE_WIDTH) {
+      return null;
+    }
   }
 
   let shapeParams: DrawEl["shapeParams"];
   if (el.shapeParams !== undefined) {
     // Only the radial corner radius carries a length; counts and ratios are scale-free.
-    const cornerRadius = el.shapeParams.cornerRadius * scale.uniformEquivalent;
+    // Clamped to the editor's own range. `normalizeShapeParams` clamps to
+    // SHAPE_PARAM_RANGES.cornerRadius (0-120) whenever the shape RENDERS, and the live payload
+    // validator enforces the same bounds, so an unclamped product is both invisible and
+    // unpublishable: scaling a radius-100 rectangle by 2 stored 200 while the canvas drew 120, and
+    // the next resize then compounded from the hidden 200 instead of the visible 120, moving the
+    // radius non-proportionally and handing the inspector an out-of-range value.
+    const cornerRadius = Math.min(
+      SHAPE_PARAM_RANGES.cornerRadius.max,
+      Math.max(
+        SHAPE_PARAM_RANGES.cornerRadius.min,
+        el.shapeParams.cornerRadius * scale.uniformEquivalent,
+      ),
+    );
     if (!finite(cornerRadius)) return null;
-    shapeParams = { ...el.shapeParams, cornerRadius };
+    // Keep the original reference when nothing moved: the no-op guard below compares by identity
+    // (as `commitCanvasSelectionResize` does), so an always-fresh clone would defeat it and push
+    // an undo entry plus a CRDT mutation for a gesture that changed nothing.
+    shapeParams = cornerRadius === el.shapeParams.cornerRadius
+      ? el.shapeParams
+      : { ...el.shapeParams, cornerRadius };
   }
 
   let symmetry: DrawEl["symmetry"];
   if (el.symmetry !== undefined) {
     const center = mapPoint(el.symmetry.centerX, el.symmetry.centerY);
     if (!center) return null;
-    symmetry = { ...el.symmetry, centerX: center.x, centerY: center.y };
+    symmetry = center.x === el.symmetry.centerX && center.y === el.symmetry.centerY
+      ? el.symmetry
+      : { ...el.symmetry, centerX: center.x, centerY: center.y };
+  }
+
+  // Per-sample stylus orientation is deliberately NOT transformed here.
+  //
+  // Three attempts at rotating it were each wrong in a different way, and the third explains the
+  // other two: `calligraphySegmentStep` composes the nib angle as `atan2(tiltY, tiltX) + twist`
+  // (studio-brush.ts), and it takes that branch only when the sample HAS tilt -- otherwise the
+  // angle comes from twist alone. So the correct rotation is not "rotate both channels"; it
+  // depends on renderer-internal branching, and rotating both adds the gesture angle twice.
+  // Along the way the naive versions also produced values the CRDT payload validator rejects
+  // (negative twists, twists at 359.5, tilt outside its square).
+  //
+  // Rather than replicate that branching -- coupling this planner to renderer internals that can
+  // change underneath it -- strokes carrying these channels are excluded from the live preview
+  // (studio-live-transform-preview-eligibility) and keep commit-at-release, where the stored
+  // samples are replayed exactly as authored. Correct, just not live.
+
+  // Orientation-dependent nibs must turn with the stroke. A calligraphy tip's `angleDeg` feeds
+  // Konva's `rotation` prop directly (StudioDrawNode renders the tap as a rotated Ellipse), the
+  // same clockwise-degree convention as `rotationDeg`, so the two simply compose. Without this the
+  // preview rotates the whole rendered subtree — nib included — and the commit then replans from
+  // points alone, snapping the nib back to its original orientation the moment the handle is
+  // released. The flip path already transforms this field (studio-figma-selection-ux negates it on
+  // mirror), so carrying it through a rotation is the established treatment, not a new rule.
+  // Only when the stroke has NO per-sample orientation. `calligraphySegmentStep` uses
+  // `brushTip.angleDeg` as the FALLBACK angle for samples without tilt and replaces it with
+  // `atan2(tiltY, tiltX) + twist` for samples that have it, so a stroke carrying both kinds would
+  // have half its nib turned by this rotation and half left alone -- the commit would distort the
+  // stroke rather than rotate it. Excluding these strokes from the preview does not help here:
+  // this is the commit path, which runs whether or not a preview did.
+  const hasPerSampleOrientation =
+    (el.tiltXs !== undefined && el.tiltXs.length > 0)
+    || (el.tiltYs !== undefined && el.tiltYs.length > 0)
+    || (el.twists !== undefined && el.twists.length > 0);
+  // Pre-nib-table documents carry no `brushTip` at all, and StudioDrawNode recovers one for them
+  // from the catalogue (`resolveStudioCalligraphyRenderTip`) before building the ribbon. Skipping
+  // those would leave the recovered nib at its catalogue angle through every rotation while the
+  // preview turned it, so the rotation is applied to the SAME tip the renderer would have used and
+  // the result is persisted -- materializing what the render already assumed, at the angle the
+  // gesture asked for. A brush with no nib profile still resolves to undefined and is left alone.
+  // A legacy stroke's base nib depends on WHICH route renders it, and the two disagree. The
+  // multi-point ribbon calls `resolveStudioCalligraphyRenderTip`, so the catalogue profile is its
+  // base; the single-point TAP branch renders a hardcoded fallback instead (angle -30, roundness
+  // 0.35, `StudioDrawNode` around line 1063) and never consults the catalogue. Materializing the
+  // catalogue nib for a tap would rotate from the wrong base -- a fountain-pen tap would jump an
+  // extra 60 degrees at commit -- so a tap materializes the fallback it actually rendered.
+  const isSingleSampleTap = el.points.length <= 2;
+  let brushTip = el.brushTip
+    ?? (isSingleSampleTap
+      ? STUDIO_LEGACY_CALLIGRAPHY_TAP_TIP
+      : resolveStudioCalligraphyRenderTip(el.brush, undefined));
+  if (brushTip && rotationDeg !== 0 && !hasPerSampleOrientation) {
+    const rotatedAngle = brushTip.angleDeg + rotationDeg;
+    if (!finite(rotatedAngle)) return null;
+    // Wrapped to (-180, 180] so repeated rotations cannot drift the stored angle without bound.
+    const wrapped = ((((rotatedAngle + 180) % 360) + 360) % 360) - 180;
+    brushTip = { ...brushTip, angleDeg: wrapped === -180 ? 180 : wrapped };
+  } else {
+    // Nothing rotated, so nothing is materialized: a stroke that only moved or scaled keeps the
+    // document exactly as authored rather than acquiring a tip it never stored.
+    brushTip = el.brushTip;
+  }
+
+  // A dropped rotation must not publish a mutation. `commitCanvasSelectionResize` decides whether
+  // anything changed by OBJECT IDENTITY, so returning a fresh element whose numbers all match the
+  // input would push an undo entry, a CRDT mutation and a "resized" announcement for a gesture
+  // that changed nothing -- which is exactly what a rotate-only gesture on a bounds-derived shape
+  // now is. Hand back the original reference instead.
+  if (
+    rotationDeg !== requestedRotationDeg
+    && strokeWidth === el.strokeWidth
+    && brushTip === el.brushTip
+    && sampleSpacing === el.sampleSpacing
+    && shapeParams === el.shapeParams
+    && symmetry === el.symmetry
+    && points.length === el.points.length
+    && points.every((value, index) => value === el.points[index])
+  ) {
+    return el;
   }
 
   return {
     ...el,
     points,
     strokeWidth,
+    ...(brushTip !== undefined ? { brushTip } : {}),
     ...(sampleSpacing !== undefined ? { sampleSpacing } : {}),
     ...(shapeParams !== undefined ? { shapeParams } : {}),
     ...(symmetry !== undefined ? { symmetry } : {}),

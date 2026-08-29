@@ -221,6 +221,19 @@ function lastSegmentAngle(points: number[]): number | null {
  * 선(폴리라인 [x0,y0,...,xn,yn])의 시작/끝 화살촉 지오메트리 목록.
  * 시작 화살촉은 선 바깥(진행 반대) 방향을 향한다. 점이 부족하거나 길이가 0이면 [].
  */
+/**
+ * True when a `line` actually renders an arrowhead, from its stroke style.
+ *
+ * The head is sized `Math.max(8, strokeWidth * 2)` — an absolute floor that does not scale — so
+ * the live transform preview has to know whether one exists. Claiming it for every line cost
+ * plain lines a preview over geometry they never draw.
+ */
+export function studioLineDrawsArrowHead(style: Partial<StrokeStyle> | undefined): boolean {
+  const start = style?.arrowStart ?? DEFAULT_STROKE_STYLE.arrowStart;
+  const end = style?.arrowEnd ?? DEFAULT_STROKE_STYLE.arrowEnd;
+  return start !== "none" || end !== "none";
+}
+
 export function lineArrowHeadGeoms(points: number[], style: StrokeStyle, strokeWidth: number): ArrowHeadGeom[] {
   if (points.length < 4 || points.length % 2 !== 0) return [];
   if (points.some((v) => typeof v !== "number" || !Number.isFinite(v))) return [];

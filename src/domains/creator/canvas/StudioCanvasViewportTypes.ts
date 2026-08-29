@@ -372,6 +372,8 @@ export interface StudioCanvasViewportProps {
   liveDraftVisualRef: import("react").RefObject<DrawEl | null>;
   liveInkOverlayRendererRef: import("react").RefObject<StudioLiveInkOverlayRenderer>;
   mainLayerRef: import("react").RefObject<import("konva/lib/Layer").Layer | null>;
+  /** Bumped when Escape/pointer-cancel cancels an in-flight selection resize outside Konva. */
+  canvasSelectionResizeCancelSignal: number;
   marqueeIds: string[];
   /** 그룹 진입(더블클릭) 편집 중인 그룹 id — 경계 오버레이 표시용. */
   activeGroupId: string | null;

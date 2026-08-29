@@ -1,11 +1,15 @@
 import { Fragment, Suspense, type ReactNode, type RefObject } from "react";
 import { Group, Rect, Text, Transformer } from "react-konva/lib/ReactKonvaCore";
 
+import { resolveStudioBrushRuntimeContract } from "../brush/studio-brush-runtime-contract";
+import { studioLineDrawsArrowHead } from "../brush/studio-stroke-shapes";
 import { CANVAS_W } from "../studio-assets";
 import { elBounds } from "../studio-element-geometry";
 import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "../studio-layers";
+import { studioLiveTransformRouteOfPoints } from "../studio-live-transform-render-route";
 import { StudioDrawSelectionOverlay } from "../studio-page-lazy-ui";
 import { unionBounds } from "../studio-selection";
+import { STUDIO_GROUP_SELECTION_OVERLAY_NAME } from "../studio-selection-chrome-mirror";
 import { StudioGroupUniformResizeProxy } from "../StudioGroupUniformResizeProxy";
 
 import type { Tool } from "../studio-editor-tool-model";
@@ -29,6 +33,8 @@ export interface StudioCanvasSelectionDecorationsContext {
     sourceBounds: StudioGroupUniformResizeBounds
   ) => boolean;
   readonly cancelCanvasSelectionResize: () => void;
+  /** Bumped when Escape/pointer-cancel cancels the gesture outside the proxy's own Konva events. */
+  readonly canvasSelectionResizeCancelSignal: number;
   readonly canvasH: number;
   readonly canvasSelectionEls: readonly El[];
   readonly commitCanvasSelectionResize: (
@@ -48,6 +54,8 @@ export interface StudioCanvasSelectionDecorationsContext {
   readonly selected: El | null;
   readonly selectionLockState: "unlocked" | "locked" | "mixed";
   readonly singleDrawFreeScale: boolean;
+  /** Small dedicated Layer the live transform gesture lifts into (single-object drag Layer). */
+  readonly singleObjectDragLayerRef: RefObject<Konva.Layer | null>;
   readonly tool: Tool;
   readonly trRef: RefObject<Konva.Transformer | null>;
 }
@@ -57,6 +65,7 @@ export function renderStudioCanvasSelectionDecorations({
   activeSurfaceReviewLocked,
   beginCanvasSelectionResize,
   cancelCanvasSelectionResize,
+  canvasSelectionResizeCancelSignal,
   canvasH,
   canvasSelectionEls,
   commitCanvasSelectionResize,
@@ -73,6 +82,7 @@ export function renderStudioCanvasSelectionDecorations({
   selected,
   selectionLockState,
   singleDrawFreeScale,
+  singleObjectDragLayerRef,
   tool,
   trRef,
 }: StudioCanvasSelectionDecorationsContext): ReactNode {
@@ -128,7 +138,7 @@ export function renderStudioCanvasSelectionDecorations({
                 );
           return (
             <Group
-              name="studio-group-selection-overlay"
+              name={STUDIO_GROUP_SELECTION_OVERLAY_NAME}
               listening={false}
               studioSelectionRole="group-bounds"
               studioGroupId={completeSelectionGroup?.id ?? ""}
@@ -228,6 +238,44 @@ export function renderStudioCanvasSelectionDecorations({
           mirrorDragElementId={
             singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
           }
+          // PPT-style real-time transform: the lone stroke's ink follows the handles live
+          // through the commit planner's own affine, applied imperatively per frame.
+          livePreviewElementId={
+            singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
+          }
+          // …and stands down for any frame whose scale would carry the stroke across one of the
+          // renderer's absolute pixel thresholds, which no engine allowlist can see.
+          livePreviewRenderRoute={
+            singleDrawFreeScale && canvasSelectionEls[0]?.type === "draw"
+              ? {
+                  ...studioLiveTransformRouteOfPoints(
+                    canvasSelectionEls[0].points,
+                    canvasSelectionEls[0].strokeWidth,
+                  ),
+                  // Arrowheads are sized Math.max(8, strokeWidth * 2) — an absolute floor the
+                  // preview scales straight past. Only claimed when a head is actually drawn: the
+                  // `arrow` kind always has one, but a `line` draws one only where its stroke
+                  // style asks for it, and claiming it unconditionally cost plain lines a preview
+                  // over geometry they never render.
+                  drawsArrowHead:
+                    canvasSelectionEls[0].kind === "arrow"
+                    || (canvasSelectionEls[0].kind === "line"
+                      && studioLineDrawsArrowHead(canvasSelectionEls[0].strokeStyle)),
+                  // perfect-ink's compact dot never goes under a 3px radius; other profiles 1.4px.
+                  // The distance cutoffs, sparse predicate, dot floors and 400px outline cap all
+                  // live inside StudioDrawNode's perfect-freehand branch; applying them to other
+                  // renderers rejected previews over thresholds those renderers never consult.
+                  isPerfectFamily:
+                    resolveStudioBrushRuntimeContract(canvasSelectionEls[0].brush)?.engine
+                      === "perfect-outline",
+                  isPerfectInk: canvasSelectionEls[0].brush === "perfect-ink",
+                }
+              : undefined
+          }
+          // The gesture lifts stroke+proxy+Transformer into the small drag Layer so an
+          // anchor frame no longer repaints the whole document Layer.
+          transformLiftLayerRef={singleObjectDragLayerRef}
+          externalCancelSignal={canvasSelectionResizeCancelSignal}
           onBegin={beginCanvasSelectionResize}
           onCommit={commitCanvasSelectionResize}
           onCancel={cancelCanvasSelectionResize}

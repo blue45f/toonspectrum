@@ -22,6 +22,77 @@ import type Konva from "konva";
 /** Scoped so `off` can never strip listeners the product installed on the same node. */
 export const STUDIO_SELECTION_CHROME_MIRROR_NAMESPACE = "studioSelectionChromeMirror";
 
+/**
+ * Name on each per-element draw selection indicator group (rendered by
+ * StudioDrawSelectionOverlay), for scene-graph assertions, perf probes, and gesture code that
+ * must park the chrome. Declared here — the eagerly-bundled mirror module — so the lazily-loaded
+ * overlay chunk is never pulled into the main bundle just to read a string.
+ */
+export const STUDIO_DRAW_SELECTION_INDICATOR_NAME = "studio-draw-selection-indicator";
+
+/**
+ * Name on the single/multi selection overlay group (label badge, lock marker, fallback boundary)
+ * rendered by StudioCanvasSelectionDecorations. Like the indicator, it is pinned to pre-gesture
+ * bounds and has to be parked while a live transform preview moves the ink.
+ */
+export const STUDIO_GROUP_SELECTION_OVERLAY_NAME = "studio-group-selection-overlay";
+
+/**
+ * Wrapper attr set for the duration of a live transform preview (scale/rotate gesture).
+ *
+ * The preview repurposes the wrapper's x/y as the absolute target origin, so translation mirrors
+ * must not interpret those frames as drag offsets — and, once the gesture is lifted onto the
+ * dedicated drag Layer, a mirrored chrome write would re-invalidate the document Layer every
+ * frame and void the lift. Mirrors resume on the neutral reset that ends every gesture path.
+ */
+export const STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR =
+  "studioLiveTransformPreviewActive";
+
+/**
+ * Stage attr holding the chrome nodes an active live transform preview has parked.
+ *
+ * The gesture parks the chrome it can see when it starts, but the draw selection overlay is a
+ * lazily loaded chunk: if it resolves mid-gesture its indicator mounts VISIBLE at the pre-gesture
+ * bounds, and the mirror below deliberately refuses to reposition it while the preview owns the
+ * wrapper's x/y — so the stale box would sit onscreen until release. Late mounts therefore park
+ * themselves here, and the gesture drains this set on the neutral reset that ends every path.
+ *
+ * A stage attr rather than a module-level global so the set cannot outlive its stage or leak
+ * between them, and so the parking and un-parking code share one channel they both already hold.
+ */
+export const STUDIO_LIVE_TRANSFORM_PARKED_CHROME_ATTR =
+  "studioLiveTransformParkedChrome";
+
+/**
+ * Records `node` as parked by the active preview so the gesture can restore exactly what it hid.
+ *
+ * Only ever called for chrome this module just hid, which keeps the un-park symmetric: chrome the
+ * product hid for its own reasons is never in the set and is never revealed by the restore.
+ */
+function registerStudioParkedChrome(stage: Konva.Stage, node: Konva.Node): void {
+  const existing = stage.getAttr(STUDIO_LIVE_TRANSFORM_PARKED_CHROME_ATTR);
+  const parked: Set<Konva.Node> = existing instanceof Set ? existing : new Set<Konva.Node>();
+  parked.add(node);
+  stage.setAttr(STUDIO_LIVE_TRANSFORM_PARKED_CHROME_ATTR, parked);
+}
+
+/**
+ * Un-parks and clears everything late-mounted chrome parked itself into, for the gesture's reset.
+ *
+ * @returns the nodes restored, so the caller can keep its own accounting honest.
+ */
+export function drainStudioLateParkedChrome(
+  stage: Konva.Stage | null
+): readonly Konva.Node[] {
+  if (!stage) return [];
+  const existing = stage.getAttr(STUDIO_LIVE_TRANSFORM_PARKED_CHROME_ATTR);
+  if (!(existing instanceof Set)) return [];
+  const restored = [...existing] as Konva.Node[];
+  for (const node of restored) node.visible(true);
+  stage.setAttr(STUDIO_LIVE_TRANSFORM_PARKED_CHROME_ATTR, new Set<Konva.Node>());
+  return restored;
+}
+
 function konvaNodeDepth(node: Konva.Node): number {
   let depth = 0;
   let current: Konva.Node | null = node.getParent();
@@ -77,6 +148,7 @@ export function mirrorStudioDrawElementTranslation(
   const wrapper = findStudioDrawWrapperNode(stage, elementId);
   if (!wrapper) return () => undefined;
   const sync = () => {
+    if (wrapper.getAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR) === true) return;
     apply({ x: wrapper.x(), y: wrapper.y() });
   };
   sync();
@@ -102,6 +174,16 @@ export function mirrorStudioDrawSelectionIndicators(
   for (const [elementId, indicator] of indicators) {
     const stage = indicator.getStage();
     if (!stage) continue;
+    // Mounted into a gesture already in flight (the lazy overlay chunk resolving mid-transform):
+    // park it now, because `sync` below will refuse to move it while the preview owns the wrapper.
+    const wrapper = findStudioDrawWrapperNode(stage, elementId);
+    if (
+      wrapper?.getAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR) === true
+      && indicator.visible()
+    ) {
+      indicator.visible(false);
+      registerStudioParkedChrome(stage, indicator);
+    }
     detachers.push(
       mirrorStudioDrawElementTranslation(stage, elementId, (offset) => {
         indicator.position(offset);

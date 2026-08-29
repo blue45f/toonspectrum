@@ -27,6 +27,10 @@ import {
 import { studioCoreBrushCatalogSelection } from "../brush/studio-brush-selection";
 import { clearStudioBrushTextureStampCache } from "../brush/studio-brush-textured-stamp";
 import { STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION } from "../brush/studio-dry-media-union-ribbon-carrier";
+import {
+  studioPerfRatioBudgetMs,
+  studioPerfSustainedCalibrationWorkload,
+} from "../brush/studio-perf-budget-calibration";
 import { BRUSH_PRESETS } from "../studio-brush";
 import {
   planStudioCausalDynamicBrushDepositSegmentsV3,
@@ -1772,7 +1776,17 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       expect(appended.status).toBe("appended");
       passAppendCount += 1;
       passTotalAppendMs += elapsedMs;
-      if (elapsedMs > passMaxAppendFrameMs) {
+      // The FIRST append is excluded from the outlier max, and only from that.
+      //
+      // It is not an outlier against its neighbours; it is a different amount of work. This loop
+      // starts at 60 points and grows by 30, and `appendFrom` is incremental, so the first call
+      // plans a 60-point chunk from a cold renderer while every later one extends by 30. On the
+      // reference container that structural gap hid inside a 5.51-5.87 ratio; on a slower CI
+      // runner it surfaced as 9.84 against this bound of 9, with nothing regressed. Grading the
+      // steady-state frames says what this bound is actually for -- no ordinary append is an
+      // outlier against the appends around it -- and a first frame that truly blew up is still
+      // caught by the calibrated per-append budget below, which includes it.
+      if (passAppendCount > 1 && elapsedMs > passMaxAppendFrameMs) {
         passMaxAppendFrameMs = elapsedMs;
       }
       // Structural O(1) proof alongside the timing budget: after the tap-replacing first movement
@@ -1800,10 +1814,37 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // - full-file runs (warm worker; 3 runs): max-frame median 7.6ms; total median 262ms.
     // Bounds are the cold-mode medians with ~2.5x CI margin: 11.8ms → 30ms per frame and
     // 300ms → 750ms total. Tighter bounds (e.g. 20ms) sit within one GC pause of the observed
-    const frameBudgetMs = process.env.CI ? 60 : 30;
-    const totalBudgetMs = process.env.CI ? 1500 : 750;
-    expect(maxAppendFrameMs).toBeLessThan(frameBudgetMs);
-    expect(totalAppendMs).toBeLessThan(totalBudgetMs);
+    // The worst frame is graded against this pass's OWN mean, not a millisecond count. That ratio
+    // is scale-free: it cancels machine speed and uniform contention exactly, because both move
+    // the numerator and denominator together, and what remains is the only thing this bound is
+    // really asserting -- that no single append is an outlier against its neighbours. The absolute
+    // form failed here at 44-67ms against 30 with nothing regressed.
+    //
+    // It does not stand alone: a regression that slows EVERY append leaves this ratio flat and is
+    // caught by the calibrated per-append budget below, while a spike in one frame leaves that
+    // budget nearly flat and is caught here. Recorded on the reference container at 5.51 / 5.87;
+    // 9 carries margin over the worst while a doubled worst frame (>=11) still fails. The max
+    // excludes the first append (see above), which does a structurally different amount of work;
+    // the mean still includes it, which only makes this bound stricter.
+    const meanAppendFrameMs = totalAppendMs / appendCount;
+    expect(maxAppendFrameMs / meanAppendFrameMs).toBeLessThan(9);
+    // The total is budgeted PER APPEND against a duration-matched calibration, not as an absolute
+    // sum, because the absolute form was wrong twice over.
+    //
+    // Stale: the recorded basis above is a 300ms total, but this stroke now performs 199 appends at
+    // ~10ms each -- roughly 2,000ms. Per-append cost is healthy (CI reads 1532ms/199 = 7.7ms); the
+    // fixed total simply never tracked the append count growing under it, so the gate had drifted
+    // into measuring the workload's size rather than its speed.
+    //
+    // Runner-dependent: `process.env.CI ? 1500 : 750` still failed CI at 1532.5ms with nothing
+    // regressed, and gave the busiest machines the loosest bound.
+    //
+    // Per-append against the calibration fixes both: it scales with the workload and cancels the
+    // machine. Recorded on the reference container at 0.0254 / 0.0259 of one calibration unit;
+    // 0.034 carries ~1.3x margin while a 2x per-append regression (>=0.051) still fails.
+    expect(totalAppendMs / appendCount).toBeLessThan(
+      studioPerfRatioBudgetMs(0.034, studioPerfSustainedCalibrationWorkload, 2),
+    );
 
     expect(liveMarks.length).toBeGreaterThan(0);
     // Bounded by the complete-stroke ceiling, not the per-segment one: a 3,000-sample crayon

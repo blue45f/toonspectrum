@@ -597,6 +597,7 @@ export function StudioCanvasViewportStageHost({
                 activeSurfaceReviewLocked,
                 beginCanvasSelectionResize,
                 cancelCanvasSelectionResize,
+                canvasSelectionResizeCancelSignal: viewport.canvasSelectionResizeCancelSignal,
                 canvasH,
                 canvasSelectionEls,
                 commitCanvasSelectionResize,
@@ -613,6 +614,7 @@ export function StudioCanvasViewportStageHost({
                 selected,
                 selectionLockState,
                 singleDrawFreeScale,
+                singleObjectDragLayerRef: interaction.singleObjectDragLayerRef,
                 tool,
                 trRef,
               })}

@@ -95,6 +95,13 @@ export const canvasKitGpuProviderDescriptor: ProviderDescriptor =
       "render.image",
       "render.mask",
       "render.filter.image",
+      // The two V13 gaps no Vello lane can own even as a texture island. They were absent while
+      // SKIA_GPU_FEATURE_CONTRACTS already declared both native, so the descriptor understated a
+      // lane the router was routing to — and EngineCapabilityRegistry.query matches capability
+      // strings exactly, with no wildcard, so the completion lane could never be selected for
+      // them. Declared here to make the claim queryable, not merely documented.
+      "render.blend.backdrop",
+      "render.path-effect",
       "surface.island.skia-complete",
     ],
     limitations: [
@@ -141,6 +148,17 @@ export const skiaGraphiteWebgpuProviderDescriptor: ProviderDescriptor =
       "render.vector.fill",
       "render.gpu.webgpu",
       "surface.island.skia-complete",
+      // Graphite is a Skia GPU backend, so SKIA_GPU_FEATURE_CONTRACTS declares all five Vello gap
+      // features native for it too. Without the exact tokens the registry's
+      // `capabilities.includes(capability)` match cannot select the challenger for any gap it is
+      // named to challenge on — the same understatement corrected on the CanvasKit GPU lane.
+      // Selectability is not promotion: `maturity: "experimental"` and the tournament gate still
+      // decide whether it is admitted at all.
+      "render.text.paragraph",
+      "render.mask",
+      "render.filter.image",
+      "render.blend.backdrop",
+      "render.path-effect",
     ],
     limitations: [
       "same-device Graphite is gated until the visual/performance tournament passes",

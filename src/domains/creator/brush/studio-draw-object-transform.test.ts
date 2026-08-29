@@ -353,3 +353,305 @@ describe("agreement with the group uniform planner", () => {
     expect(single?.sampleSpacing).toBe(groupedDraw.sampleSpacing);
   });
 });
+
+describe("orientation-dependent nibs", () => {
+  // Per-sample stylus channels are NOT transformed here — see the planner's note. Strokes that
+  // carry them are excluded from the live preview instead, so the commit replays them as authored.
+  const NIB = { tiltEnabled: false, angleDeg: -30, roundness: 0.35 } as const;
+
+  it("turns the nib with the stroke so the commit matches what the preview showed", () => {
+    // The preview rotates the whole rendered subtree, nib included. `brushTip.angleDeg` feeds
+    // Konva's `rotation` prop for the calligraphy Ellipse in the same clockwise-degree convention,
+    // so the commit has to compose the two or the nib snaps back at pointer-up.
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ brushTip: { ...NIB } }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    expect(rotated?.brushTip?.angleDeg).toBe(15);
+    // Everything else about the tip is carried through untouched.
+    expect(rotated?.brushTip?.roundness).toBe(NIB.roundness);
+    expect(rotated?.brushTip?.tiltEnabled).toBe(NIB.tiltEnabled);
+  });
+
+  it("wraps to (-180, 180] so repeated rotations cannot drift the stored angle", () => {
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ brushTip: { ...NIB, angleDeg: 170 } }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 30,
+    });
+
+    // 200deg is the same orientation as -160deg; storing the wrapped form keeps the field bounded
+    // however many times a stroke is rotated.
+    expect(rotated?.brushTip?.angleDeg).toBe(-160);
+  });
+
+  it("leaves the nib alone when the transform carries no rotation", () => {
+    const scaledOnly = planStudioDrawObjectTransform({
+      el: drawEl({ brushTip: { ...NIB } }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: { x: 0, y: 0, width: 20, height: 20 },
+      rotationDeg: 0,
+    });
+
+    expect(scaledOnly?.brushTip).toEqual(NIB);
+  });
+
+  it("leaves the nib angle alone when the stroke carries per-sample orientation", () => {
+    // The renderer uses brushTip.angleDeg only as the fallback for samples WITHOUT tilt, and
+    // atan2(tiltY, tiltX) + twist for samples with it. Rotating the fallback on a mixed stroke
+    // would turn half the nib and leave the other half, distorting the commit.
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ brushTip: { ...NIB }, tiltXs: [1, 0], tiltYs: [0, 1] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    expect(rotated?.brushTip).toEqual(NIB);
+  });
+
+  it("refuses a transform whose width the CRDT payload validator would reject", () => {
+    // validatePayload asserts strokeWidth within [0.01, MAX_STROKE_WIDTH]. Without this the
+    // transform applies locally and then fails publication, so the collaborator's document
+    // silently diverges from the author's.
+    expect(
+      planStudioDrawObjectTransform({
+        el: drawEl({ strokeWidth: 5_000 }),
+        sourceBounds: UNIT_SOURCE,
+        targetBounds: { x: 0, y: 0, width: 20, height: 20 },
+        rotationDeg: 0,
+      }),
+    ).toBeNull();
+    // And the other end of the range.
+    expect(
+      planStudioDrawObjectTransform({
+        el: drawEl({ strokeWidth: 0.02 }),
+        sourceBounds: UNIT_SOURCE,
+        targetBounds: { x: 0, y: 0, width: 1, height: 1 },
+        rotationDeg: 0,
+      }),
+    ).toBeNull();
+    // Well inside the range, the same gesture is fine.
+    expect(
+      planStudioDrawObjectTransform({
+        el: drawEl({ strokeWidth: 10 }),
+        sourceBounds: UNIT_SOURCE,
+        targetBounds: { x: 0, y: 0, width: 20, height: 20 },
+        rotationDeg: 0,
+      })?.strokeWidth,
+    ).toBe(20);
+  });
+
+  it("refuses a transform whose coordinates the CRDT payload validator would reject", () => {
+    // validatePayload asserts every coordinate within +/-MAX_COORDINATE, so a stroke near that
+    // boundary can be moved to a finite-but-unpublishable position: it applies locally and then
+    // fails publication, leaving the author ahead of every collaborator.
+    expect(
+      planStudioDrawObjectTransform({
+        el: drawEl({ points: [0, 0, 10, 10] }),
+        sourceBounds: UNIT_SOURCE,
+        targetBounds: { x: 9_999_999, y: 0, width: 10, height: 10 },
+        rotationDeg: 0,
+      }),
+    ).toBeNull();
+    // A move that stays inside the range is fine.
+    expect(
+      planStudioDrawObjectTransform({
+        el: drawEl({ points: [0, 0, 10, 10] }),
+        sourceBounds: UNIT_SOURCE,
+        targetBounds: { x: 1_000, y: 0, width: 10, height: 10 },
+        rotationDeg: 0,
+      }),
+    ).not.toBeNull();
+  });
+
+  it("drops the rotation for bounds-derived shapes instead of collapsing them", () => {
+    // StudioDrawNode rebuilds these from drawBounds(points) as axis-aligned primitives, so a
+    // rotated point array cannot carry the turn -- and destroys the shape trying. A square stored
+    // as its diagonal puts both endpoints on one vertical line under a 45deg rotation.
+    for (const kind of ["rect", "ellipse", "star", "triangle", "polygon"] as const) {
+      const rotated = planStudioDrawObjectTransform({
+        el: drawEl({ kind, points: [0, 0, 40, 40] }),
+        sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+        targetBounds: { x: 0, y: 0, width: 40, height: 40 },
+        rotationDeg: 45,
+      });
+
+      expect(rotated, kind).not.toBeNull();
+      // Unrotated: the stored diagonal survives, so the shape still has both extents.
+      expect(rotated?.points, kind).toEqual([0, 0, 40, 40]);
+    }
+  });
+
+  it("returns the ORIGINAL element for a rotate-only gesture on a bounds-derived shape", () => {
+    // commitCanvasSelectionResize decides "did anything change?" by object identity, so a fresh
+    // element with identical numbers would publish an undo entry, a CRDT mutation and a "resized"
+    // announcement for a gesture that changed nothing.
+    const el = drawEl({ kind: "rect", points: [0, 0, 40, 40] });
+    const rotated = planStudioDrawObjectTransform({
+      el,
+      sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+      targetBounds: { x: 0, y: 0, width: 40, height: 40 },
+      rotationDeg: 45,
+    });
+
+    expect(rotated).toBe(el);
+  });
+
+  it("clamps the scaled corner radius to the editor's own range", () => {
+    // normalizeShapeParams clamps cornerRadius to 0-120 whenever the shape renders, and the live
+    // payload validator enforces the same bounds, so an unclamped product is both invisible and
+    // unpublishable — and the NEXT resize would compound from the hidden value.
+    const scaled = planStudioDrawObjectTransform({
+      el: drawEl({
+        kind: "rect",
+        points: [0, 0, 40, 40],
+        shapeParams: {
+          starPoints: 5,
+          starInnerRatio: 0.5,
+          polygonSides: 6,
+          cornerRadius: 100,
+        },
+      }),
+      sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+      targetBounds: { x: 0, y: 0, width: 80, height: 80 },
+      rotationDeg: 0,
+    });
+
+    expect(scaled?.shapeParams?.cornerRadius).toBe(120);
+  });
+
+  it("returns the ORIGINAL element for a rotate-only shape that carries metadata", () => {
+    // shapeParams and symmetry are cloned by the transform, and the no-op guard compares by
+    // identity (as commitCanvasSelectionResize does), so an always-fresh clone defeated it: a
+    // rotate-only gesture on a star still pushed an undo entry and a CRDT mutation. The clones
+    // now keep the original reference when nothing moved.
+    const el = drawEl({
+      kind: "star",
+      points: [0, 0, 40, 40],
+      shapeParams: {
+        starPoints: 5,
+        starInnerRatio: 0.5,
+        polygonSides: 6,
+        cornerRadius: 4,
+      },
+    });
+    const rotated = planStudioDrawObjectTransform({
+      el,
+      sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+      targetBounds: { x: 0, y: 0, width: 40, height: 40 },
+      rotationDeg: 45,
+    });
+
+    expect(rotated).toBe(el);
+  });
+
+  it("rotates a legacy TAP from the fallback nib its own route renders", () => {
+    // The two legacy routes disagree on the base nib: the multi-point ribbon resolves the
+    // catalogue profile, while the single-point tap branch hardcodes angle -30 / roundness 0.35
+    // and never consults the catalogue. Materializing the catalogue nib for a tap would rotate
+    // from the wrong base — a fountain-pen tap would jump an extra 60 degrees at commit.
+    const tap = planStudioDrawObjectTransform({
+      el: drawEl({ brush: "fountain-pen", points: [5, 5] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    // -30 (the tap's own fallback) + 45, not 30 (the catalogue profile) + 45.
+    expect(tap?.brushTip?.angleDeg).toBe(15);
+    expect(tap?.brushTip?.roundness).toBe(0.35);
+    // The multi-point stroke still rotates from the catalogue profile.
+    const ribbon = planStudioDrawObjectTransform({
+      el: drawEl({ brush: "fountain-pen", points: [0, 0, 10, 10] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    expect(ribbon?.brushTip?.angleDeg).toBe(75);
+  });
+
+  it("still moves and resizes a bounds-derived shape while dropping its rotation", () => {
+    // Only the turn is refused -- the handle's move and resize must still land.
+    const resized = planStudioDrawObjectTransform({
+      el: drawEl({ kind: "rect", points: [0, 0, 40, 40] }),
+      sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+      targetBounds: { x: 10, y: 10, width: 80, height: 40 },
+      rotationDeg: 45,
+    });
+
+    expect(resized?.points).toEqual([10, 10, 90, 50]);
+  });
+
+  it("still rotates a freehand stroke, which absorbs it exactly", () => {
+    // The refusal is scoped to the bounds-derived kinds; nothing else loses its rotation.
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ points: [0, 0, 40, 0] }),
+      sourceBounds: { x: 0, y: 0, width: 40, height: 40 },
+      targetBounds: { x: 0, y: 0, width: 40, height: 40 },
+      rotationDeg: 90,
+    });
+
+    expect(maxPointError(rotated!.points, [0, 0, 0, 40])).toBeLessThan(1e-9);
+  });
+
+  it("materializes a legacy stroke's catalogue nib so the rotation survives the commit", () => {
+    // Pre-nib-table documents store no brushTip, and StudioDrawNode recovers one from the
+    // catalogue before building the ribbon (resolveStudioCalligraphyRenderTip). Skipping those
+    // would leave the recovered nib at its catalogue angle through every rotation while the
+    // preview turned it, so the tip the renderer would have used is rotated and persisted.
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ brush: "fountain-pen" }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    // The catalogue nib sits at 30 degrees; the gesture adds 45.
+    expect(rotated?.brushTip?.angleDeg).toBe(75);
+    expect(rotated?.brushTip?.roundness).toBe(0.5);
+    expect(rotated?.brushTip?.tiltEnabled).toBe(true);
+  });
+
+  it("does not materialize a nib for a legacy stroke that only moved or scaled", () => {
+    // Nothing turned, so the document must not acquire a tip it never stored.
+    const scaled = planStudioDrawObjectTransform({
+      el: drawEl({ brush: "fountain-pen" }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: { x: 0, y: 0, width: 20, height: 20 },
+      rotationDeg: 0,
+    });
+
+    expect(scaled).not.toBeNull();
+    expect("brushTip" in scaled!).toBe(false);
+  });
+
+  it("leaves a legacy stroke's nib alone when it carries per-sample orientation", () => {
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ brush: "fountain-pen", tiltXs: [1, 0], tiltYs: [0, 1] }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    expect(rotated).not.toBeNull();
+    expect("brushTip" in rotated!).toBe(false);
+  });
+
+  it("leaves a stroke without a tip snapshot untouched", () => {
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl(),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    expect(rotated).not.toBeNull();
+    expect("brushTip" in rotated!).toBe(false);
+  });
+});

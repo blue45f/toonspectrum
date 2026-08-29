@@ -14,6 +14,17 @@ export {
   createSkiaGpuIslandBackend,
   SKIA_GPU_ISLAND_PROVIDER_ID,
 } from "./gpu-island";
+export {
+  clearSkiaGraphiteArtifact,
+  probeSkiaGraphiteAdoption,
+  registerSkiaGraphiteArtifact,
+  SKIA_GRAPHITE_PROVIDER_ID,
+} from "./graphite-probe";
+export type {
+  SkiaGraphiteAdoptionProbe,
+  SkiaGraphiteArtifact,
+  SkiaGraphiteProbeEnvironment,
+} from "./graphite-probe";
 export type {
   SkiaGpuIslandBackend,
   SkiaGpuIslandRequest,

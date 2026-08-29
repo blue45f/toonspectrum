@@ -18,9 +18,15 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { studioKonvaRuntime } from "../render/studio-konva-runtime";
 import {
+  STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR,
+  studioLiveTransformPreviewEligible,
+} from "../studio-live-transform-preview-konva";
+import {
+  drainStudioLateParkedChrome,
   findStudioDrawWrapperNode,
   mirrorStudioDrawElementTranslation,
   mirrorStudioDrawSelectionIndicators,
+  STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR,
 } from "../studio-selection-chrome-mirror";
 
 import type Konva from "konva";
@@ -283,5 +289,105 @@ describe("free-scale handle frame follows its stroke during a drag", () => {
 
     expect(applied).toEqual([]);
     expect(detach).not.toThrow();
+  });
+});
+
+/**
+ * Chrome that mounts INTO a gesture already in flight.
+ *
+ * `StudioDrawSelectionOverlay` is a lazily loaded chunk, so a transform started before it resolves
+ * finds no indicator to park. When it then mounts mid-gesture it arrives visible at the pre-gesture
+ * bounds, and the mirror deliberately refuses to reposition it while the preview owns the wrapper's
+ * x/y — so without this it would sit onscreen, stale, until release.
+ */
+describe("selection chrome mounting during an active transform preview", () => {
+  it("parks an indicator that mounts after the gesture started", () => {
+    const wrapper = addDrawElement(scene.layer, "draw-1");
+    wrapper.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, true);
+    // The preview repurposes the wrapper's x/y as the absolute target origin.
+    wrapper.position({ x: 240, y: 130 });
+
+    const lateIndicator = addIndicator(scene.layer);
+    const detach = mirrorStudioDrawSelectionIndicators(new Map([["draw-1", lateIndicator]]));
+
+    // Hidden rather than left at the stale origin the mirror will not move it away from.
+    expect(lateIndicator.visible()).toBe(false);
+    detach();
+  });
+
+  it("restores exactly the chrome it parked when the gesture ends", () => {
+    const wrapper = addDrawElement(scene.layer, "draw-1");
+    wrapper.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, true);
+    const lateIndicator = addIndicator(scene.layer);
+    const detach = mirrorStudioDrawSelectionIndicators(new Map([["draw-1", lateIndicator]]));
+    expect(lateIndicator.visible()).toBe(false);
+
+    const restored = drainStudioLateParkedChrome(scene.stage);
+
+    expect(restored).toEqual([lateIndicator]);
+    expect(lateIndicator.visible()).toBe(true);
+    // Draining twice must not re-reveal anything: the set is emptied, so a later product-driven
+    // hide cannot be undone by the next gesture's reset.
+    expect(drainStudioLateParkedChrome(scene.stage)).toEqual([]);
+    detach();
+  });
+
+  it("leaves chrome alone when no preview owns the stroke", () => {
+    addDrawElement(scene.layer, "draw-1");
+    const indicator = addIndicator(scene.layer);
+
+    const detach = mirrorStudioDrawSelectionIndicators(new Map([["draw-1", indicator]]));
+
+    // No preview attr: this is the ordinary drag path, which mirrors rather than parks.
+    expect(indicator.visible()).toBe(true);
+    expect(drainStudioLateParkedChrome(scene.stage)).toEqual([]);
+    detach();
+  });
+
+  it("never reveals chrome the product itself had hidden", () => {
+    const wrapper = addDrawElement(scene.layer, "draw-1");
+    wrapper.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR, true);
+    const productHidden = addIndicator(scene.layer);
+    productHidden.visible(false);
+
+    const detach = mirrorStudioDrawSelectionIndicators(new Map([["draw-1", productHidden]]));
+    drainStudioLateParkedChrome(scene.stage);
+
+    // Only chrome this module hid is registered, so the restore stays symmetric.
+    expect(productHidden.visible()).toBe(false);
+    detach();
+  });
+});
+
+describe("live transform preview eligibility", () => {
+  it("refuses a wrapper the document layer marked as unable to reproduce the affine", () => {
+    // Symmetry generates copies about world axes and the model stores no axis angle, so the
+    // preview's `A ∘ S` and the commit's `S ∘ A` diverge when the two do not commute. Such a
+    // stroke falls back to commit-at-release rather than showing artwork the commit will not
+    // produce.
+    const wrapper = addDrawElement(scene.layer, "draw-1");
+    expect(studioLiveTransformPreviewEligible(wrapper)).toBe(true);
+
+    wrapper.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR, true);
+
+    expect(studioLiveTransformPreviewEligible(wrapper)).toBe(false);
+  });
+
+  it("refuses when an ANCESTOR carries the mark, not only the wrapper itself", () => {
+    const wrapper = addDrawElement(scene.layer, "draw-1");
+    scene.layer.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR, true);
+
+    expect(studioLiveTransformPreviewEligible(wrapper)).toBe(false);
+    scene.layer.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR, undefined);
+  });
+
+  it("treats only an explicit true as a refusal", () => {
+    // A falsy or absent attr must never be read as blocking, or an ordinary stroke would silently
+    // lose its preview.
+    const wrapper = addDrawElement(scene.layer, "draw-1");
+    for (const value of [undefined, false, 0, ""]) {
+      wrapper.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR, value);
+      expect(studioLiveTransformPreviewEligible(wrapper), String(value)).toBe(true);
+    }
   });
 });

@@ -37,6 +37,7 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
 
 type FakeRectNode = {
   getLayer: () => { batchDraw: () => void };
+  getStage: () => FakeStage | null;
   height: (value?: number) => number;
   position: (value?: { x: number; y: number }) => {
     x: number;
@@ -50,6 +51,89 @@ type FakeRectNode = {
   y: () => number;
 };
 
+type FakeStage = {
+  find: (selector: unknown) => unknown[];
+};
+
+type FakeWrapperNode = ReturnType<typeof createWrapperNode>;
+
+type FakeIndicatorNode = ReturnType<typeof createIndicatorNode>;
+
+/** Draw wrapper double covering the finder (getAttr/getParent), eligibility, and attr surface. */
+function createWrapperNode(
+  elementId: string,
+  options: { cached?: boolean; dragging?: boolean } = {},
+) {
+  const state = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 };
+  const layer = { batchDraw: vi.fn() };
+  return {
+    state,
+    layer,
+    getAttr: vi.fn((name: string) =>
+      name === "studioElementId" ? elementId : undefined
+    ),
+    setAttr: vi.fn(),
+    getParent: vi.fn(() => null),
+    isCached: vi.fn(() => options.cached === true),
+    isDragging: vi.fn(() => options.dragging === true),
+    getLayer: vi.fn(() => layer),
+    position: vi.fn((value?: { x: number; y: number }) => {
+      if (value) {
+        state.x = value.x;
+        state.y = value.y;
+      }
+      return { x: state.x, y: state.y };
+    }),
+    rotation: vi.fn((value?: number) => {
+      if (value !== undefined) state.rotation = value;
+      return state.rotation;
+    }),
+    scale: vi.fn((value?: { x: number; y: number }) => {
+      if (value) {
+        state.scaleX = value.x;
+        state.scaleY = value.y;
+      }
+      return { x: state.scaleX, y: state.scaleY };
+    }),
+    offset: vi.fn((value?: { x: number; y: number }) => {
+      if (value) {
+        state.offsetX = value.x;
+        state.offsetY = value.y;
+      }
+      return { x: state.offsetX, y: state.offsetY };
+    }),
+  };
+}
+
+function createIndicatorNode() {
+  const state = { visible: true };
+  return {
+    state,
+    visible: vi.fn((value?: boolean) => {
+      if (value !== undefined) state.visible = value;
+      return state.visible;
+    }),
+  };
+}
+
+/** Answers the wrapper finder's predicate find and the indicator-name string find. */
+function createStage(
+  wrapper: FakeWrapperNode,
+  indicators: readonly FakeIndicatorNode[]
+): FakeStage {
+  return {
+    find: vi.fn((selector: unknown) => {
+      if (typeof selector === "function") {
+        return [wrapper].filter((node) =>
+          (selector as (node: FakeWrapperNode) => boolean)(node)
+        );
+      }
+      if (selector === ".studio-draw-selection-indicator") return [...indicators];
+      return [];
+    }),
+  };
+}
+
 type FakeTransformerNode = {
   forceUpdate: () => void;
   getLayer: () => { batchDraw: () => void };
@@ -60,7 +144,7 @@ type FakeTransformerNode = {
   stopTransform: () => void;
 };
 
-function createRectNode(): FakeRectNode {
+function createRectNode(stage: FakeStage | null = null): FakeRectNode {
   const state = {
     height: 0,
     rotation: 0,
@@ -73,6 +157,7 @@ function createRectNode(): FakeRectNode {
   const layer = { batchDraw: vi.fn() };
   const node = {
     getLayer: vi.fn(() => layer),
+    getStage: vi.fn(() => stage),
     height: vi.fn((value?: number) => {
       if (value !== undefined) state.height = value;
       return state.height;
@@ -125,11 +210,13 @@ function createTransformerNode(): FakeTransformerNode {
 }
 
 function rectProps(): {
+  onTransform: (event: { target: FakeRectNode }) => void;
   onTransformEnd: (event: { target: FakeRectNode }) => void;
   onTransformStart: () => void;
 } & CapturedProps {
   if (!konvaHarness.rectProps) throw new Error("Missing captured Rect props");
   return konvaHarness.rectProps as {
+    onTransform: (event: { target: FakeRectNode }) => void;
     onTransformEnd: (event: { target: FakeRectNode }) => void;
     onTransformStart: () => void;
   } & CapturedProps;
@@ -458,6 +545,309 @@ describe("StudioGroupUniformResizeProxy", () => {
     expect(transformer.stopTransform).toHaveBeenCalledTimes(1);
     expect(props.onCancel).toHaveBeenCalledTimes(1);
     expect(props.onCommit).not.toHaveBeenCalled();
+  });
+
+  describe("live transform preview (PPT-style real-time ink)", () => {
+    function setupLivePreview(options: { cached?: boolean; dragging?: boolean } = {}) {
+      const wrapper = createWrapperNode("stroke-1", options);
+      const indicator = createIndicatorNode();
+      const stage = createStage(wrapper, [indicator]);
+      konvaHarness.rectNode = createRectNode(stage) as unknown as Record<
+        string,
+        unknown
+      >;
+      const props = {
+        ...commonProps(),
+        freeTransform: true,
+        livePreviewElementId: "stroke-1",
+      };
+      return { wrapper, indicator, props };
+    }
+
+    it("이미 드래그 중인 획에는 변형 세션을 시작하지 않는다", () => {
+      // 드래그와 변형은 둘 다 래퍼 transform에 쓴다. 한 손가락이 획을 끄는 중에 다른 손가락이
+      // 앵커를 잡으면 두 writer가 한 노드를 놓고 경쟁해, 이벤트 순서에 따라 엉뚱한 위치가 남는다.
+      const { wrapper, indicator, props } = setupLivePreview({ dragging: true });
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+
+      expect(props.onBegin).not.toHaveBeenCalled();
+      expect(wrapper.setAttr).not.toHaveBeenCalled();
+      expect(indicator.state.visible).toBe(true);
+    });
+
+    it("변형 프레임마다 커밋 플래너와 동일한 affine attrs를 래퍼에 명령형으로 투영한다", () => {
+      const { wrapper, indicator, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      // The dashed indicator is parked for the gesture — the Transformer frame is the affordance.
+      expect(indicator.state.visible).toBe(false);
+
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        // Uniform on purpose: the projection only runs for uniform frames, because the commit
+        // applies sqrt(scaleX * scaleY) to one strokeWidth and an anisotropic frame could not be
+        // shown faithfully. The anisotropic case is asserted separately below.
+        rect.scaleX(2);
+        rect.scaleY(2);
+        rect.rotation(45);
+        rectProps().onTransform({ target: rect });
+      });
+
+      expect(wrapper.state).toEqual({
+        x: 30,
+        y: 40,
+        rotation: 45,
+        scaleX: 2,
+        scaleY: 2,
+        offsetX: bounds.x,
+        offsetY: bounds.y,
+      });
+    });
+
+    it("비균일 프레임은 투영하지 않고 래퍼를 중립으로 둔다", () => {
+      // 커밋은 sqrt(scaleX * scaleY)를 단일 strokeWidth에 적용하고 둥근 캡으로 다시 계획하는데,
+      // 래퍼를 비균일하게 스케일하면 캡이 타원이 되고 두께가 방향에 따라 달라진다. 즉 프리뷰가
+      // 커밋이 만들 그림을 보여줄 수 없으므로, 그런 프레임에서는 잉크를 움직이지 않고 오늘의
+      // 커밋-시점 동작으로 떨어진다. 커밋 자체는 transformend가 따로 판단하므로 영향받지 않는다.
+      const { wrapper, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rect.scaleY(3);
+        rectProps().onTransform({ target: rect });
+      });
+
+      expect(wrapper.state).toEqual({
+        x: 0,
+        y: 0,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        offsetX: 0,
+        offsetY: 0,
+      });
+    });
+
+    it("균일 프레임 뒤 비균일로 바뀌면 직전 포즈를 유지하지 않고 중립으로 되돌린다", () => {
+      // 회귀 방지: 비균일 프레임을 단순히 "투영 없음"으로 처리하면 직전 균일 포즈가 그대로 남아,
+      // 핸들은 계속 움직이는데 잉크만 얼어붙었다가 릴리즈 때 튄다. 프리뷰를 아예 안 하는 것보다
+      // 나쁘므로, 유효하지만 표현 불가능한 프레임에서는 중립으로 되돌려 문서 위치에 머물게 한다.
+      const { wrapper, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rect.scaleY(2);
+        rectProps().onTransform({ target: rect });
+      });
+      expect(wrapper.state.scaleX).toBe(2);
+
+      act(() => {
+        rect.scaleY(3);
+        rectProps().onTransform({ target: rect });
+      });
+
+      expect(wrapper.state).toEqual({
+        x: 0,
+        y: 0,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        offsetX: 0,
+        offsetY: 0,
+      });
+    });
+
+    it("transformend는 래퍼를 중립화한 뒤에야 정확히 한 번 커밋하고 인디케이터를 복구한다", () => {
+      const { wrapper, indicator, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      props.onCommit.mockImplementation(() => {
+        // The neutral projection must precede the commit so the baked points repaint atomically.
+        expect(wrapper.state).toEqual({
+          x: 0,
+          y: 0,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          offsetX: 0,
+          offsetY: 0,
+        });
+        expect(indicator.state.visible).toBe(true);
+      });
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rect.scaleY(2);
+        rect.rotation(30);
+        rectProps().onTransform({ target: rect });
+        rectProps().onTransformEnd({ target: rect });
+      });
+
+      expect(props.onCommit).toHaveBeenCalledTimes(1);
+      expect(props.onCommit).toHaveBeenCalledWith(
+        { x: 30, y: 40, width: 200, height: 100 },
+        30,
+      );
+    });
+
+    it("blur 취소는 프리뷰 투영을 중립으로 되돌리고 커밋을 만들지 않는다", () => {
+      const { wrapper, indicator, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => {
+        rectProps().onTransformStart();
+        rect.position({ x: 50, y: 70 });
+        rect.scaleX(1.5);
+        rect.scaleY(1.5);
+        rectProps().onTransform({ target: rect });
+      });
+      expect(wrapper.state.scaleX).toBe(1.5);
+
+      act(() => window.dispatchEvent(new Event("blur")));
+
+      expect(wrapper.state).toEqual({
+        x: 0,
+        y: 0,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        offsetX: 0,
+        offsetY: 0,
+      });
+      expect(indicator.state.visible).toBe(true);
+      expect(props.onCancel).toHaveBeenCalledTimes(1);
+      expect(props.onCommit).not.toHaveBeenCalled();
+    });
+
+    it("취소 경로의 정리 단계가 던져도 래퍼 중립화는 반드시 끝난다", () => {
+      // 회귀 방지: 프리뷰가 끝날 때 붙은 늦은-마운트 크롬 정리는 `stage`를 읽는데, 그 읽기가
+      // 중립화보다 먼저 실행되면서 `getStage`가 없는 노드에서 던졌다. 그러면 취소가 프리뷰
+      // 변환을 그대로 든 채 중단된다 — 취소의 정반대다. 중립화가 안전성의 핵심이고 크롬 정리는
+      // 부수적이므로, 정리가 어떤 이유로 실패해도 중립화·언파킹·onCancel은 완료되어야 한다.
+      const { wrapper, indicator, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      (wrapper as unknown as { getStage?: () => unknown }).getStage = () => {
+        throw new Error("stage lookup exploded");
+      };
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => {
+        rectProps().onTransformStart();
+        rect.position({ x: 50, y: 70 });
+        rect.scaleX(1.5);
+        rect.scaleY(1.5);
+        rectProps().onTransform({ target: rect });
+      });
+      expect(wrapper.state.scaleX).toBe(1.5);
+
+      act(() => window.dispatchEvent(new Event("blur")));
+
+      expect(wrapper.state).toEqual({
+        x: 0,
+        y: 0,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        offsetX: 0,
+        offsetY: 0,
+      });
+      expect(indicator.state.visible).toBe(true);
+      expect(props.onCancel).toHaveBeenCalledTimes(1);
+      expect(props.onCommit).not.toHaveBeenCalled();
+    });
+
+    it("캐시된 조상 아래 스트로크는 프리뷰 없이 커밋-지연 동작으로 폴백한다", () => {
+      const { wrapper, indicator, props } = setupLivePreview({ cached: true });
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rectProps().onTransform({ target: rect });
+        rectProps().onTransformEnd({ target: rect });
+      });
+
+      expect(wrapper.position).not.toHaveBeenCalled();
+      expect(wrapper.rotation).not.toHaveBeenCalled();
+      expect(indicator.state.visible).toBe(true);
+      expect(props.onCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it("비유한 중간 프레임은 마지막 유효 투영을 유지한다", () => {
+      const { wrapper, props } = setupLivePreview();
+      const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+      render(<StudioGroupUniformResizeProxy {...props} />);
+
+      act(() => rectProps().onTransformStart());
+      act(() => {
+        rect.position({ x: 30, y: 40 });
+        rect.scaleX(2);
+        rectProps().onTransform({ target: rect });
+      });
+      const lastValid = { ...wrapper.state };
+
+      act(() => {
+        rect.scaleX(Number.NaN);
+        rectProps().onTransform({ target: rect });
+      });
+
+      expect(wrapper.state).toEqual(lastValid);
+    });
+  });
+
+  it("외부 취소 신호(Escape·포인터 취소)는 진행 중인 gesture를 즉시 중단시킨다", () => {
+    // 페이지가 Escape로 세션을 지우고 lease를 반납해도 proxy의 Konva 제스처는 계속 돌았다 —
+    // 라이브 프리뷰가 붙은 뒤로는 "취소했습니다" 안내 후에도 잉크가 핸들을 따라다녔다.
+    const props = commonProps();
+    const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+    const view = render(
+      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={0} />,
+    );
+
+    act(() => rectProps().onTransformStart());
+    act(() => {
+      rect.position({ x: 80, y: 90 });
+      rect.scaleX(2);
+    });
+
+    view.rerender(
+      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={1} />,
+    );
+
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
+    expect(props.onCommit).not.toHaveBeenCalled();
+    // 취소는 캡처된 source box로 원복한다.
+    expect(rect.position()).toEqual({ x: bounds.x, y: bounds.y });
+    expect(rect.scaleX()).toBe(1);
+
+    // 같은 값 재렌더는 아무 것도 하지 않는다(마운트 값은 기준선일 뿐 취소가 아니다).
+    view.rerender(
+      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={1} />,
+    );
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
+
+    // 활성 gesture가 없을 때의 신호 변화도 조용히 무시된다(왕복 루프 방지).
+    view.rerender(
+      <StudioGroupUniformResizeProxy {...props} externalCancelSignal={2} />,
+    );
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
   });
 
   it("hidden visibility 전환만 활성 gesture를 취소하고 listener를 정리한다", () => {

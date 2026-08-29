@@ -1,0 +1,215 @@
+/**
+ * Vello capability-gap coverage plan (V13 §5.1 complement, ADR 0017).
+ *
+ * The product rule behind the Vello-first document hub: every V13 render feature the Vello lanes
+ * cannot own must have a NAMED alternative engine — never an implicit "some other layer will draw
+ * it". `skiaMustCompleteFeature` answers per-feature routing, but it returns `false` both when
+ * Vello owns a feature AND when nothing does; a feature that silently loses its completion lane
+ * would drop from the hub without any test noticing. This module derives the gap list from the
+ * feature contracts (single source of truth) and exposes a validation the app-level governance
+ * test runs against the shipped engine universe, so losing an alternative engine fails the build.
+ *
+ * Alternative next-gen engines surveyed for the gap lanes (2026-08, ADR 0017):
+ * - Skia/CanvasKit — production baseline; its GPU island completes every gap feature today.
+ * - Skia Graphite (`skia-graphite-webgpu`) — the WebGPU-native challenger, adopted ADR-0010-style:
+ *   admitted through the tournament's quality gate, and demoted down its own declared
+ *   `fallbackProviderId` chain (→ CanvasKit GPU island → CanvasKit CPU) the moment it is
+ *   quarantined or killed. "모험 적용, 불안정하면 Skia로 교체" is this chain, not a manual swap.
+ * - Google Forma — evaluated and rejected: upstream archived read-only 2024-07; its niche
+ *   (parallel CPU rasterization) is already owned by vello_cpu / resvg reference lanes.
+ */
+import {
+  SKIA_GPU_FEATURE_CONTRACTS,
+  supportForFeature,
+  V13_RENDER_FEATURES,
+  VELLO_CLASSIC_FEATURE_CONTRACTS,
+  VELLO_HYBRID_FEATURE_CONTRACTS,
+  velloCanOwnFeature,
+} from "./feature-contract";
+
+import type { ProviderSupportLevel, V13RenderFeature } from "./feature-contract";
+
+/** Interactive completion lane in production routing today (ImageBitmap island, no readPixels). */
+export const VELLO_GAP_COMPLETION_PROVIDER_ID = "skia-canvaskit-gpu";
+/** Production-baseline terminal fallback — reference/recovery scope, never the interactive frame. */
+export const VELLO_GAP_TERMINAL_PROVIDER_ID = "skia-canvaskit";
+/** Next-gen challenger: enters only through the tournament, demotes down its fallback chain. */
+export const VELLO_GAP_CHALLENGER_PROVIDER_ID = "skia-graphite-webgpu";
+
+export interface VelloCapabilityGapEntry {
+  readonly feature: V13RenderFeature;
+  readonly classicSupport: ProviderSupportLevel;
+  readonly hybridSupport: ProviderSupportLevel;
+}
+
+export interface VelloCapabilityGapPlan {
+  readonly completionProviderId: typeof VELLO_GAP_COMPLETION_PROVIDER_ID;
+  readonly terminalProviderId: typeof VELLO_GAP_TERMINAL_PROVIDER_ID;
+  readonly challengerProviderId: typeof VELLO_GAP_CHALLENGER_PROVIDER_ID;
+  /** Features the most capable Vello lane (Hybrid) cannot own natively or lowered. */
+  readonly gaps: readonly VelloCapabilityGapEntry[];
+}
+
+/** Derives the gap list from the V13 feature contracts — no hand-maintained feature list. */
+export function planVelloCapabilityGaps(): VelloCapabilityGapPlan {
+  const gaps = V13_RENDER_FEATURES.filter(
+    (feature) => !velloCanOwnFeature(feature, true)
+  ).map((feature) => ({
+    feature,
+    classicSupport: supportForFeature(VELLO_CLASSIC_FEATURE_CONTRACTS, feature)
+      .support,
+    hybridSupport: supportForFeature(VELLO_HYBRID_FEATURE_CONTRACTS, feature)
+      .support,
+  }));
+  return {
+    completionProviderId: VELLO_GAP_COMPLETION_PROVIDER_ID,
+    terminalProviderId: VELLO_GAP_TERMINAL_PROVIDER_ID,
+    challengerProviderId: VELLO_GAP_CHALLENGER_PROVIDER_ID,
+    gaps,
+  };
+}
+
+export interface VelloCapabilityGapCoverageIssue {
+  readonly subject: string;
+  readonly reason: string;
+}
+
+/** Minimal shape of what the caller must show about a shipped provider. */
+export interface VelloCapabilityGapProvider {
+  readonly id: string;
+  readonly capabilities: readonly string[];
+}
+
+/**
+ * Coverage means the EXACT capability token, because that is what selection uses:
+ * `EngineCapabilityRegistry.query` filters on `descriptor.capabilities.includes(capability)`, and
+ * asset requirements resolve the same way. A blanket "island completion" claim reads as coverage
+ * to a human but is invisible to those code paths, so accepting it here would let a lane pass
+ * this validator while remaining unselectable for the very gap it is named to complete — the
+ * silent drop this module exists to prevent (found in review, after a first attempt did exactly
+ * that).
+ */
+function providerCoversGap(
+  provider: VelloCapabilityGapProvider,
+  feature: string,
+): boolean {
+  return provider.capabilities.includes(feature);
+}
+
+/**
+ * Fails loud where `skiaMustCompleteFeature` would fail silent: every gap feature must be
+ * completable by the Skia lane's contracts, and every provider named by the plan must exist in
+ * the caller's shipped engine universe (`STUDIO_KNOWN_ENGINE_DESCRIPTORS` ids in the app).
+ */
+/**
+ * Gap features the CPU terminal lane can actually render, and therefore must declare.
+ *
+ * Deliberately not "all of them": see the note in the terminal check below. The CPU renderer
+ * implements paragraph text but not mask, image filter, backdrop blend or path effect, so those
+ * four terminate at the completion lane and this set records where the chain really ends.
+ */
+const STUDIO_TERMINAL_PRESERVED_GAP_FEATURES: ReadonlySet<string> = new Set([
+  "render.text.paragraph",
+]);
+
+export function validateVelloCapabilityGapCoverage(
+  shippedProviders: readonly VelloCapabilityGapProvider[]
+): readonly VelloCapabilityGapCoverageIssue[] {
+  const plan = planVelloCapabilityGaps();
+  const issues: VelloCapabilityGapCoverageIssue[] = [];
+  const byId = new Map(shippedProviders.map((provider) => [provider.id, provider]));
+
+  for (const gap of plan.gaps) {
+    const completion = supportForFeature(SKIA_GPU_FEATURE_CONTRACTS, gap.feature);
+    if (completion.support !== "native" && completion.support !== "lowered") {
+      issues.push({
+        subject: gap.feature,
+        reason:
+          "no alternative engine completes this Vello gap — the feature would silently drop from the document hub",
+      });
+    }
+  }
+
+  for (const providerId of [
+    plan.completionProviderId,
+    plan.terminalProviderId,
+    plan.challengerProviderId,
+  ]) {
+    if (!byId.has(providerId)) {
+      issues.push({
+        subject: providerId,
+        reason:
+          "gap-lane provider is missing from the shipped engine universe; the named alternative engine no longer exists",
+      });
+    }
+  }
+
+  // The routing contracts above are constants in this package, so checking them alone proves
+  // nothing about the lanes the app actually ships. Registry queries and activation evidence read
+  // `descriptor.capabilities`, so the completion lane has to declare the gaps there too — else
+  // the chain this validator advertises could not qualify, and the silent drop it exists to
+  // prevent would happen anyway.
+  const completionProvider = byId.get(plan.completionProviderId);
+  if (completionProvider) {
+    for (const gap of plan.gaps) {
+      if (!providerCoversGap(completionProvider, gap.feature)) {
+        issues.push({
+          subject: `${plan.completionProviderId}:${gap.feature}`,
+          reason:
+            "the named completion lane does not declare this gap capability, so it cannot be selected to complete it",
+        });
+      }
+    }
+  }
+
+  // The challenger is held to the same standard, and for the same reason. A lane that cannot be
+  // SELECTED for a gap cannot challenge on it: `HybridExecutionPlanner` picks islands through the
+  // same exact capability query, so an under-declared challenger would sit in the chain looking
+  // like coverage while never being eligible for any of it. This checks declaration, not
+  // readiness — `maturity` and the tournament gate still decide admission.
+  const challengerProvider = byId.get(plan.challengerProviderId);
+  if (challengerProvider) {
+    for (const gap of plan.gaps) {
+      if (!providerCoversGap(challengerProvider, gap.feature)) {
+        issues.push({
+          subject: `${plan.challengerProviderId}:${gap.feature}`,
+          reason:
+            "the named challenger lane does not declare this gap capability, so it could never be selected to challenge on it",
+        });
+      }
+    }
+  }
+
+  // The TERMINAL lane is validated only for what it can actually render, which is a narrower
+  // claim than it first looks and worth stating rather than papering over.
+  //
+  // Review asked for the same exact-token check here, on the reasoning that completion and
+  // challenger can both be demoted and this is what the chain falls back to. The reasoning is
+  // right; the remedy would have been a lie. `packages/studio-engine-skia/src/render.ts` — the
+  // CPU lane's actual renderer — implements clip but NOT mask, image filter, backdrop blend or
+  // path effect, and a descriptor test pins that lane to exactly what render.ts implements. So
+  // declaring the four tokens would have made the descriptor claim capabilities the code does not
+  // have, which is the failure this whole validator exists to prevent, pointed the other way.
+  //
+  // (`SKIA_CPU_REFERENCE_FEATURE_CONTRACTS` lowers every GPU `native` to `reference` rather than
+  // `unsupported`, which overstates this lane against its own renderer. The contracts constant is
+  // not the authority here; the descriptor and render.ts are.)
+  //
+  // The honest model: only `render.text.paragraph` survives all the way to the CPU terminal. The
+  // other four gaps terminate at the completion lane, so if IT is demoted the feature is gone —
+  // a real limitation of the CPU renderer, recorded here instead of hidden behind a declaration.
+  const terminalProvider = byId.get(plan.terminalProviderId);
+  if (terminalProvider) {
+    for (const gap of plan.gaps) {
+      if (!STUDIO_TERMINAL_PRESERVED_GAP_FEATURES.has(gap.feature)) continue;
+      if (!providerCoversGap(terminalProvider, gap.feature)) {
+        issues.push({
+          subject: `${plan.terminalProviderId}:${gap.feature}`,
+          reason:
+            "the named terminal fallback does not declare a gap capability its own renderer implements, so the last-resort chain could not preserve it",
+        });
+      }
+    }
+  }
+  return issues;
+}

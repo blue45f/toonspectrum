@@ -25,6 +25,7 @@ import {
   studioDryMediaKernelTipCacheSizeForTests,
   studioDryMediaKernelTipWorkingSet,
 } from "./studio-dry-media-kernel-tip";
+import { studioPerfBudgetMs } from "./studio-perf-budget-calibration";
 
 
 const CORE_DRY_MEDIA = [
@@ -346,12 +347,21 @@ describe("cold-start first-chunk freeze gate (adversarial-review regression)", (
       0,
     );
     let slices = 0;
-    let maxSliceMs = 0;
+    const sliceDurationsMs: number[] = [];
+    let worstSliceBakes = 0;
     while (pending.length > 0 && slices < expectedKeys + 8) {
       const pump = pending.shift()!;
+      const cacheSizeBefore = studioDryMediaKernelTipCacheSizeForTests();
       const sliceStartedAt = performance.now();
       pump();
-      maxSliceMs = Math.max(maxSliceMs, performance.now() - sliceStartedAt);
+      sliceDurationsMs.push(performance.now() - sliceStartedAt);
+      // The bake count is the invariant's DETERMINISTIC witness -- no clock involved, so it holds
+      // identically on every machine. A slice that bakes several tip maps grows the cache by more
+      // than one, whether or not the runner was fast enough to hide it in the timing.
+      worstSliceBakes = Math.max(
+        worstSliceBakes,
+        studioDryMediaKernelTipCacheSizeForTests() - cacheSizeBefore,
+      );
       slices += 1;
     }
     expect(pending).toHaveLength(0);
@@ -361,7 +371,26 @@ describe("cold-start first-chunk freeze gate (adversarial-review regression)", (
     );
     expect(slices).toBeGreaterThanOrEqual(Math.min(expectedKeys, 64));
     // One 128×128 bake per idle slice: far under the 33ms chunk freeze budget.
-    expect(maxSliceMs).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+    //
+    // Graded twice, because the clock alone cannot express this invariant honestly. A percentile
+    // over the ~64 slices was tried and rejected in review: it lets the worst 5% -- three slices --
+    // stall arbitrarily, and a user feels each of those as a dropped frame.
+    //
+    // 1. DETERMINISTIC: no slice may bake more than one tip map. This is the invariant in the
+    //    test's name, it needs no clock, and it is what actually catches a slice that quietly
+    //    starts baking several -- the failure a timing gate can only catch on a machine slow
+    //    enough to make it visible.
+    expect(worstSliceBakes, "tip maps baked in a single idle slice").toBeLessThanOrEqual(1);
+
+    // 2. TIMING: every slice stays inside the freeze budget, scaled to this machine so the gate
+    //    measures the code and not the runner (see studio-perf-budget-calibration). Exactly one
+    //    slice may exceed it -- the CI failure that prompted this was a single pump preempted at
+    //    35.5ms against 33 -- and even that one may not reach a second 30fps frame, so a genuine
+    //    multi-frame freeze fails no matter how few slices it affects.
+    const sliceBudgetMs = studioPerfBudgetMs(CHUNK_FREEZE_BUDGET_MS);
+    const overBudget = sliceDurationsMs.filter((elapsed) => elapsed >= sliceBudgetMs);
+    expect(overBudget.length, `slices over ${sliceBudgetMs.toFixed(1)}ms`).toBeLessThanOrEqual(1);
+    expect(Math.max(...sliceDurationsMs)).toBeLessThan(sliceBudgetMs * 1.5);
     resetStudioDryMediaKernelTipCacheForTests();
   });
 

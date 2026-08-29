@@ -15,6 +15,7 @@ import { imageFilterCacheKey } from "../render/studio-konva-filter-fields";
 import { studioAdjustmentStackToFilterFields } from "../studio-adjustment-stack";
 import { resolveTimelineComposite, resolveTimelineTransforms } from "../studio-anim-tracks";
 import { containingPanel, elBounds } from "../studio-element-geometry";
+import { studioLiveTransformPreviewBlockedForElement } from "../studio-live-transform-preview-eligibility";
 import { clampFrameIndex, frameIndexOf, onionSkinLayers } from "../studio-frame-animation";
 import { isEffectivelyHidden, isEffectivelyLocked } from "../studio-layers";
 import { MASTER_EDIT_GHOST_OPACITY } from "../studio-master-page";
@@ -22,6 +23,7 @@ import {
   StudioOnionSkinImage,
 } from "../studio-page-lazy-ui";
 import { isEligibleForPanelAutoFit } from "../studio-panel-autofit";
+import { STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR } from "../studio-selection-chrome-mirror";
 import { materializeStudioAdvancedFillVectorTarget } from "../studio-vector-fill-reference";
 import { StudioKonvaBubbleNode } from "../StudioKonvaBubbleNode";
 import { StudioKonvaImageNode } from "../StudioKonvaImageNode";
@@ -549,6 +551,19 @@ export function StudioCanvasViewportDocumentLayer({
                     <Group
                       key={el.id}
                       studioElementId={el.id}
+                      // Symmetry generates its copies about WORLD axes, and the model stores no
+                      // axis angle (type/centerX/centerY/radialCount only). So a live affine
+                      // preview shows `A ∘ S` — every already-generated copy transformed — while
+                      // the commit transforms the base points and centre and lets the renderer
+                      // regenerate copies as `S ∘ A`. Those differ whenever the two do not
+                      // commute, so a rotated mirror-symmetry stroke would commit artwork the
+                      // preview never showed. Marked here, where the element is in hand, and
+                      // refused by studioLiveTransformPreviewEligible.
+                      studioLiveTransformPreviewBlocked={
+                        studioLiveTransformPreviewBlockedForElement(el, hitClosedShape)
+                          ? true
+                          : undefined
+                      }
                       ref={setRef}
                       x={0}
                       y={0}
@@ -558,9 +573,30 @@ export function StudioCanvasViewportDocumentLayer({
                       onMouseDown={onSelect}
                       onTap={onSelect}
                       onDragStart={(event) => {
+                        // A live transform preview repurposes this wrapper's x/y as the gesture's
+                        // ABSOLUTE target-box origin, not a drag offset. A concurrent drag (second
+                        // finger on a touch device while the first holds a Transformer anchor)
+                        // would end up reading that projection as a delta below and baking it into
+                        // `points`. The gesture owns the node until it neutralizes the attr.
+                        if (
+                          (event.target as Konva.Node)
+                            .getAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR) === true
+                        ) {
+                          event.target.stopDrag();
+                          return;
+                        }
                         if (!nodeInteractionBegin(el.id)) event.target.stopDrag();
                       }}
                       onDragEnd={(event) => {
+                        // Same guard on the trailing edge: a drag that began before the transform
+                        // (or one Konva ends after the preview took the node) must not bake the
+                        // preview projection, and must not release a lease it never took.
+                        if (
+                          (event.target as Konva.Node)
+                            .getAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR) === true
+                        ) {
+                          return;
+                        }
                         try {
                           // 다중선택은 Stage onDragEnd가 좌표형 자식과 함께 한 히스토리 스냅샷으로
                           // 확정한다. 단일 선화만 끌었을 때는 wrapper 오프셋을 points에 직접 굽는다.

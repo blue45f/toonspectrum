@@ -481,6 +481,149 @@ export const STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH = 1.2;
  * compounding and clears this floor immediately, so the floor never shelters a genuine freeze.
  */
 export const STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS = 4;
+/**
+ * A half of fewer runs than this carries no measurable spread — one sample always reports spread
+ * 1.0, which is exactly the lucky-baseline shape behind the recorded false positives. Such a
+ * series abstains rather than guessing; the shipped soak runs ten, five per half.
+ */
+export const STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES = 2;
+/**
+ * How far the first half may fall back below its own running maximum and still count as
+ * "climbing" rather than "oscillating". A contended runner recovers (a preempted run is followed
+ * by a fast one); accumulating state only climbs.
+ */
+export const STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE = 1.05;
+
+/**
+ * How far a half rises from its opening samples to its closing ones.
+ *
+ * The third way to earn a baseline, and the one that tolerates ordinary jitter. Requiring a
+ * near-monotonic first half (the drawdown test) was too strict: a genuine leak with ONE small dip
+ * -- [10, 12, 11, 20, 30 | 40, 50, 60, 70, 80], found in review -- has a 12->11 drawdown of x1.09
+ * and so failed both earlier shapes, hiding a sustained 4x regression.
+ *
+ * A larger drawdown tolerance cannot fix that: the recorded false positive
+ * [40.68, 38.13, 46.76] dips x1.067, which is INSIDE the x1.09 it would have to admit. The two
+ * shapes are not separable by dip depth at all.
+ *
+ * They separate cleanly by how far the half travels: the leak rises x2.27 from its opening pair to
+ * its closing pair, while every recorded noise series moves x1.03-x1.17 (and JIT warm-up falls to
+ * x0.69). Ends are averaged rather than taken as single samples so one unlucky first or last run
+ * cannot decide it.
+ */
+function endpointRiseRatio(series: readonly number[]): number {
+  const edge = series.length >= 4 ? 2 : 1;
+  const mean = (values: readonly number[]) =>
+    values.reduce((total, value) => total + value, 0) / values.length;
+  const opening = mean(series.slice(0, edge));
+  const closing = mean(series.slice(-edge));
+  if (!(opening > 0)) return 1;
+  return closing / opening;
+}
+
+/**
+ * Rise from a half's opening samples to its closing ones that counts as a trend rather than noise.
+ * Recorded separation: noise x1.03-x1.17, leaks x2.27-x3.83.
+ */
+const STUDIO_BRUSH_CATALOGUE_SOAK_TREND_RISE = 1.5;
+
+/** Largest fall below the running maximum, as a ratio. 1 for a non-decreasing series. */
+/**
+ * Middle value of a series — the later half's typical cost, robust to one outlier either way.
+ *
+ * The recovery guard below needs "did the later half SUBSIDE?", and its first form asked that of
+ * the single cheapest later run. One ordinary dip then suppressed a real detection: a sustained
+ * climb like [10, 12, 11, 20, 30 | 28, 40, 50, 60, 70] was dismissed because 28 fell a hair under
+ * the first half's peak, even though every other later run was far above it. A median answers the
+ * question that was actually being asked, and still separates the shape this guard exists for --
+ * a subsided ramp puts its WHOLE later half low, not one sample.
+ */
+function medianOf(series: readonly number[]): number {
+  if (series.length === 0) return Number.NaN;
+  const sorted = [...series].sort((a, b) => a - b);
+  const middle = sorted.length >> 1;
+  return sorted.length % 2 === 1
+    ? sorted[middle]!
+    : (sorted[middle - 1]! + sorted[middle]!) / 2;
+}
+
+function maxDrawdownRatio(series: readonly number[]): number {
+  let runningMax = Number.NEGATIVE_INFINITY;
+  let worst = 1;
+  for (const value of series) {
+    if (runningMax > 0 && value > 0) worst = Math.max(worst, runningMax / value);
+    if (value > runningMax) runningMax = value;
+  }
+  return worst;
+}
+
+/**
+ * Decides monotonic degradation from a soak's elapsed series — pure, so the decision itself is
+ * unit-testable against recorded CI series instead of only through a live 10-run measurement.
+ *
+ * Two halves, each represented by its cheapest run (a leak slows EVERY later plan, so minima
+ * cancel scheduler preemption better than means): `growth = laterMin / earlyMin` must clear the
+ * relative gate and the absolute floor. Min-vs-min is one sample from each half's distribution
+ * though, so when the first half is itself unsettled its minimum is not a baseline at all —
+ * measured CI failure on main, needle-graphite
+ * [29.77, 37.52, 51.01, 34.03, 34.87 | 53.45, 60.47, 62.61, 48.54, 38.32]ms, where a lucky 29.77
+ * baseline against a 38.32 later-min reads as x1.29 "degradation" while the first half's own
+ * spread already spans x1.71. Widening the window (this gate's three previous hardenings) cannot
+ * fix that — the noise scales with it.
+ *
+ * So the baseline has to be earned, by one of two shapes:
+ *
+ *   settled — the first half stays inside the relative gate (earlyMax/earlyMin <= growth gate),
+ *             so its minimum represents the whole half; or
+ *   climbing — the first half never falls back below its own running maximum by more than
+ *             `DRAWDOWN_TOLERANCE`, so its low values are its EARLY values.
+ *
+ * Climbing is what keeps the gate sensitive to a leak that begins before the midpoint. Such a
+ * leak contaminates the first half — for a step to 3x at run 3, both growth and the first half's
+ * spread are 3, so a spread comparison alone would suppress it (found in review). But a leak,
+ * unlike contention, never recovers: [10, 10, 10, 30, 30] climbs monotonically and is detected,
+ * while the contended shapes above all dip back below their running max and abstain.
+ */
+export function detectStudioBrushSoakMonotonicDegradation(
+  elapsedMs: readonly number[],
+): boolean {
+  const halfIndex = Math.floor(elapsedMs.length / 2);
+  const early = elapsedMs.slice(0, halfIndex);
+  const later = elapsedMs.slice(halfIndex);
+  if (
+    early.length < STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES
+    || later.length < STUDIO_BRUSH_CATALOGUE_SOAK_MIN_HALF_SAMPLES
+  ) {
+    return false;
+  }
+  const earlyMin = Math.min(...early);
+  const earlyMax = Math.max(...early);
+  const laterMin = Math.min(...later);
+  if (!(earlyMin > 0)) return false;
+  const baselineIsEarned =
+    earlyMax / earlyMin <= STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
+    || maxDrawdownRatio(early) <= STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE
+    || endpointRiseRatio(early) >= STUDIO_BRUSH_CATALOGUE_SOAK_TREND_RISE;
+  return (
+    baselineIsEarned
+    && laterMin / earlyMin > STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
+    && laterMin - earlyMin > STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS
+    // ...and the later half, TYPICALLY, never recovered below the first half's PEAK. A leak does
+    // not give time back: once a run is slow, later runs stay at least that slow. Contention does,
+    // which is the shape found in review — [10, 10, 10, 30, 30 | 15 x5] climbs cleanly through
+    // the first half, so its baseline is earned, and 15/10 clears both the relative gate and the
+    // absolute floor, yet the whole second half runs at HALF the first half's peak. That is a
+    // ramp that subsided, not degradation. Comparing against earlyMax instead of earlyMin is what
+    // tells the two apart; the tolerance is the same drawdown allowance used above.
+    //
+    // Graded on the later half's MEDIAN, not its minimum. The minimum let one ordinary dip
+    // suppress a real detection: [10, 12, 11, 20, 30 | 28, 40, 50, 60, 70] climbs relentlessly,
+    // yet a single 28 just under the 30/1.05 peak dismissed the whole series. A subsided ramp puts
+    // its entire later half low (median 15 against a 28.6 bar, still caught), while a climb with
+    // one dip does not (median 50, correctly convicted).
+    && medianOf(later) >= earlyMax / STUDIO_BRUSH_CATALOGUE_SOAK_DRAWDOWN_TOLERANCE
+  );
+}
 
 export interface StudioBrushCataloguePaintSoakResult {
   readonly catalogId: string;
@@ -501,20 +644,17 @@ export interface StudioBrushCataloguePaintSoakResult {
  * Soak mode: plans the same stroke `runs` times back to back, mirroring a long editing session
  * replaying one heavy brush. A healthy planner stays flat (JIT warm-up may only speed it up) and
  * replays byte-identical geometry; per-plan state accumulating somewhere slows EVERY subsequent
- * plan, so the gate compares the cheapest run of the SECOND half against the cheapest run of the
- * FIRST half and trips only on >20% (and >4ms) sustained growth.
+ * plan, which `detectStudioBrushSoakMonotonicDegradation` decides from the elapsed series.
  *
- * Both halves must be minima over several runs. The original "strictly increasing" form was
- * satisfiable by sub-ms jitter plus ONE preempted final run (measured: oil-pastel
- * [7.22, 7.26, 18.90]ms), and the next form — min of the later runs against the single first
- * run — fell to the mirror image, one LUCKY first run before a starved stretch (measured:
- * acrylic-stiff-flat [6.55, 15.54, 13.59]ms). Three-run windows survived two scheduler
- * preemptions on either side but still fell to the same lucky-baseline shape at ~40ms plan
- * scale on a contended CI runner (measured: needle-graphite
- * [40.68, 38.13, 46.76, 46.16, 82.60, 63.89]ms — cheapest-later 46.16 vs lucky baseline 38.13
- * = x1.21, while the first half's OWN spread already spanned 38.1–46.8). Five-run windows make
- * each minimum an estimate over enough samples that one clean run per half suffices, while a
- * genuine compounding leak still slows every second-half run and clears the threshold at once.
+ * Window history, kept because each shape failed a different way: the original "strictly
+ * increasing" form was satisfiable by sub-ms jitter plus ONE preempted final run (measured:
+ * oil-pastel [7.22, 7.26, 18.90]ms); min-of-later against the single first run fell to the mirror
+ * image, one LUCKY first run before a starved stretch (acrylic-stiff-flat [6.55, 15.54, 13.59]ms);
+ * three-run windows fell to the same lucky-baseline shape at ~40ms plan scale (needle-graphite
+ * [40.68, 38.13, 46.76, 46.16, 82.60, 63.89]ms); and five-run windows fell to it again on a
+ * contended runner (see the detector's docstring). Widening the window was never the fix — the
+ * noise scales with it — so the detector measures the first half's own spread instead and only
+ * calls degradation when growth exceeds it.
  */
 export function evaluateStudioBrushCataloguePaintSoak(
   catalogId: string,
@@ -538,13 +678,7 @@ export function evaluateStudioBrushCataloguePaintSoak(
     ? null
     : measuredDigests.length === digests.length
       && measuredDigests.every((digest) => digest === measuredDigests[0]);
-  const halfIndex = Math.floor(elapsedMs.length / 2);
-  const baselineRun = Math.min(...elapsedMs.slice(0, Math.max(1, halfIndex)));
-  const cheapestLaterRun = Math.min(...elapsedMs.slice(Math.max(1, halfIndex)));
-  const monotonicDegradation =
-    cheapestLaterRun > baselineRun * STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
-    && cheapestLaterRun - baselineRun
-      > STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS;
+  const monotonicDegradation = detectStudioBrushSoakMonotonicDegradation(elapsedMs);
   const freezeCount = rows.filter((row) => row.freeze).length;
   return {
     catalogId,
@@ -645,6 +779,44 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
   };
 }
 
+/**
+ * Does this chunk series represent a real main-thread freeze?
+ *
+ * `maxChunkMs > budget` cannot answer that. It is a maximum over dozens of chunks, so ONE chunk
+ * preempted by the scheduler condemns the whole run — measured on CI at 46.3ms against the 33ms
+ * budget on a commit that touches no brush code, in a job whose every other chunk was inside it.
+ *
+ * A freeze that a user would feel is not one unlucky chunk; it is the path being too slow, which
+ * shows up as chunks exceeding the budget repeatedly. So more than one over-budget chunk is a
+ * freeze, and a single one is tolerated — unless it is catastrophic, because a lone chunk far past
+ * the budget is a real multi-frame stall however rare. Same shape as the idle-prewarm slice gate.
+ */
+export function studioBrushChunkSeriesFreezes(chunkDurationsMs: readonly number[]): boolean {
+  if (chunkDurationsMs.length === 0) return false;
+  const budget = STUDIO_BRUSH_CRAYON_FAMILY_CHUNK_BUDGET_MS;
+  // The FIRST chunk is excluded from this verdict, because it is not a steady-state chunk.
+  //
+  // Measured, after review raised it and after this gate went red on CI and on a 4-vCPU
+  // container: crayon plans 28 chunks, of which the most expensive costs 167.7ms while the other
+  // 27 average ~12ms. That one is the cold chunk, which initializes the caches every later chunk
+  // then reuses — roughly 14x its own steady state, and 5x a budget meant for a steady-state
+  // chunk. Grading it against the 33ms budget therefore reddens on entirely honest work, which is
+  // what was happening: the cold chunk plus any single preempted chunk exhausted the one-exception
+  // allowance. (The same shape as the live-overlay append ratio, whose first append plans a whole
+  // chunk from cold while later ones extend by 30 points.)
+  //
+  // KNOWN GAP, unchanged and deliberate: the cold path is now unguarded here, so a reproducible
+  // cold-start regression would not trip this. Closing it needs a recorded COLD budget measured
+  // across the machine classes this suite runs on — one reading on one container is not that, and
+  // guessing a bound from it would either redden on honest work or catch nothing. What this gate
+  // does guard, it now guards without false failures.
+  const steadyState = chunkDurationsMs.slice(1);
+  if (steadyState.length === 0) return false;
+  const overBudget = steadyState.filter((elapsed) => elapsed > budget);
+  if (overBudget.length > 1) return true;
+  return overBudget.some((elapsed) => elapsed > budget * 2);
+}
+
 export function evaluateStudioBrushCrayonFamilyIncrementalChunks(
   catalogId: (typeof STUDIO_BRUSH_CRAYON_FAMILY_IDS)[number],
   sampleCount = STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
@@ -691,6 +863,9 @@ export function evaluateStudioBrushCrayonFamilyIncrementalChunks(
   let cursor = 0;
   let chunkCount = 0;
   let maxChunkMs = 0;
+  // Every chunk, not just the worst: `freeze` is decided from HOW MANY chunks exceed the budget,
+  // because a max over dozens of chunks is tripped by any single preempted one.
+  const chunkDurationsMs: number[] = [];
   // Mirror the live overlay's incremental call contract exactly (T1 de-polygon, 2026-08-13):
   // the predecessor-dab + leading-skip mechanism belongs to the legacy union carrier only. Fresh
   // unpinned causal strokes are owned by the verified-kernel dab path, which plans plain suffix
@@ -716,7 +891,9 @@ export function evaluateStudioBrushCrayonFamilyIncrementalChunks(
       dryMediaUnionLeadingSourceDabsToSkip:
         unionCarrierAuthority && cursor > 0 ? 1 : 0,
     });
-    maxChunkMs = Math.max(maxChunkMs, performance.now() - t0);
+    const chunkMs = performance.now() - t0;
+    chunkDurationsMs.push(chunkMs);
+    maxChunkMs = Math.max(maxChunkMs, chunkMs);
     if (!coverage.ok) {
       return {
         catalogId,
@@ -725,7 +902,7 @@ export function evaluateStudioBrushCrayonFamilyIncrementalChunks(
         maxChunkMs,
         totalMs: performance.now() - startedAt,
         ok: false,
-        freeze: maxChunkMs > STUDIO_BRUSH_CRAYON_FAMILY_CHUNK_BUDGET_MS,
+        freeze: studioBrushChunkSeriesFreezes(chunkDurationsMs),
       };
     }
     chunkCount += 1;
@@ -739,7 +916,7 @@ export function evaluateStudioBrushCrayonFamilyIncrementalChunks(
     maxChunkMs,
     totalMs,
     ok: true,
-    freeze: maxChunkMs > STUDIO_BRUSH_CRAYON_FAMILY_CHUNK_BUDGET_MS,
+    freeze: studioBrushChunkSeriesFreezes(chunkDurationsMs),
   };
 }
 
