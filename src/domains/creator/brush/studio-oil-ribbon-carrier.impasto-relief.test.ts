@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { planOilBrushDabs } from "../studio-fx-brush";
 
@@ -10,6 +10,11 @@ import {
   traceStudioOilRibbonPath,
   type StudioOilRibbonImpastoReliefKind,
 } from "./studio-oil-ribbon-carrier";
+import {
+  evaluateStudioCalibratedBudget,
+  evaluateStudioCalibratedDetection,
+  type StudioCalibratedBudgetVerdict,
+} from "./studio-perf-calibration";
 
 const HORIZONTAL_STROKE = {
   points: [0, 60, 90, 60, 180, 60, 270, 60],
@@ -37,28 +42,95 @@ function meanOfYs(points: readonly number[]): number {
   return count > 0 ? sum / count : Number.NaN;
 }
 
-/**
- * Wall-clock budgets measure the planner, not the machine's scheduling luck. A single sample also
- * captures whatever else the 2400-file suite was doing in that instant: this budget failed a push
- * at 30.11ms against 30ms — 0.4% over — while passing every isolated run. Scheduler noise only
- * ever ADDS time, so the fastest of a few samples is the honest estimate of the planner's cost.
- * The requirement is unchanged at 30ms; a planner that genuinely regressed misses it on all
- * samples, because none of them can come in faster than the work actually takes.
- */
-const PLAN_BUDGET_SAMPLES = 5;
+type PlannedDabs = Parameters<typeof planStudioOilRibbonCarrier>[0];
 
-function fastestPlan(
-  dabs: Parameters<typeof planStudioOilRibbonCarrier>[0],
-): { plan: ReturnType<typeof planStudioOilRibbonCarrier>; elapsed: number } {
-  // Warm-up pass so the budget measures steady state, not first-call JIT.
-  let plan = planStudioOilRibbonCarrier(dabs, { impastoRelief: { enabled: true } });
-  let elapsed = Number.POSITIVE_INFINITY;
-  for (let sample = 0; sample < PLAN_BUDGET_SAMPLES; sample += 1) {
-    const started = performance.now();
-    plan = planStudioOilRibbonCarrier(dabs, { impastoRelief: { enabled: true } });
-    elapsed = Math.min(elapsed, performance.now() - started);
+/**
+ * Wall-clock budgets used to measure the planner AND the machine underneath it. A raw "under
+ * 30ms" bound failed a push at 30.11ms — 0.4% over — while passing every isolated run, and a
+ * throttled 4-vCPU dev container reproduced 32.5ms (and 88.7ms against the 60ms scribble bound)
+ * on the merge-base commit, so `pnpm test` could not be run to completion there at all.
+ * Min-of-N sampling removes what a transient stall ADDS; it cannot remove the machine, and
+ * widening the number until the slowest box passes is how a budget stops catching regressions.
+ *
+ * The budget is therefore stated against `studio-perf-calibration`: a fixed reference kernel
+ * measured in the same process, interleaved sample by sample with the plan itself. Both sides
+ * scale with the machine, so the verdict does not — while a planner that got slower moves only
+ * the workload side. `*_CALIBRATION_ROUNDS` is sized so an unregressed plan scores ≈1.0 against
+ * the 1.5x gate; the synthetic-regression tests below hold the other end, and the deterministic
+ * painted-work counts hold the part of the budget that never needed a clock at all.
+ */
+const LONG_STROKE_PLANS_PER_SAMPLE = 4;
+/** ~63ms of reference work — the same window length as four 2000-station plans. */
+const LONG_STROKE_CALIBRATION_ROUNDS = 5_200;
+const SCRIBBLE_PLANS_PER_SAMPLE = 2;
+/** ~126ms of reference work — the same window length as two scribble plans. */
+const SCRIBBLE_CALIBRATION_ROUNDS = 10_400;
+
+/** Kept live so no plan in a timed window can be optimized away as dead code. */
+let plannedLaneSink = 0;
+
+function planReliefWorkload(dabs: PlannedDabs, plansPerSample: number): () => void {
+  return () => {
+    for (let plan = 0; plan < plansPerSample; plan += 1) {
+      plannedLaneSink += planStudioOilRibbonCarrier(dabs, {
+        impastoRelief: { enabled: true },
+      }).impastoReliefLanes!.length;
+    }
+  };
+}
+
+/**
+ * Deterministic proxy for the work the budget is really protecting: every run and vertex the
+ * planner hands to the painter. It is a pure function of the stroke, so it holds on any machine
+ * and catches the pathological-blowup case (grid area x splat density) with no clock involved.
+ */
+function paintedWorkOf(plan: ReturnType<typeof planStudioOilRibbonCarrier>): {
+  reliefLanes: number;
+  reliefRuns: number;
+  reliefVertices: number;
+  bristleLanes: number;
+  bristleRuns: number;
+  bristleVertices: number;
+} {
+  const reliefLanes = plan.impastoReliefLanes ?? [];
+  const countRuns = (lanes: readonly { runs: readonly { points: readonly number[] }[] }[]) =>
+    lanes.reduce((total, lane) => total + lane.runs.length, 0);
+  const countVertices = (lanes: readonly { runs: readonly { points: readonly number[] }[] }[]) =>
+    lanes.reduce(
+      (total, lane) =>
+        total + lane.runs.reduce((runTotal, run) => runTotal + run.points.length / 2, 0),
+      0,
+    );
+  return {
+    reliefLanes: reliefLanes.length,
+    reliefRuns: countRuns(reliefLanes),
+    reliefVertices: countVertices(reliefLanes),
+    bristleLanes: plan.bristleLanes.length,
+    bristleRuns: countRuns(plan.bristleLanes),
+    bristleVertices: countVertices(plan.bristleLanes),
+  };
+}
+
+function longStrokeDabs(): PlannedDabs {
+  return planOilBrushDabs({
+    points: [0, 0, 1200, 40, 2400, -30, 3600, 20],
+    pressures: [0.5, 0.75, 0.6, 0.8],
+    baseWidth: 24,
+    seed: 7,
+    maxDabs: 2048,
+  });
+}
+
+function scribbleDabs(): PlannedDabs {
+  // A blob-shaped self-crossing scribble: maximises grid area AND splat density at once.
+  const points: number[] = [];
+  for (let step = 0; step <= 160; step += 1) {
+    points.push(
+      20 + (step % 2 === 0 ? 0 : 190) + Math.sin(step * 0.7) * 20,
+      20 + step * 1.35,
+    );
   }
-  return { plan, elapsed };
+  return planOilBrushDabs({ points, baseWidth: 26, seed: 3, maxDabs: 2048 });
 }
 
 describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-relief program)", () => {
@@ -182,52 +254,102 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
     expect(plan.impastoReliefLanes).toEqual([]);
   });
 
-  it("plans a 2000-station impasto stroke in under 30ms", () => {
-    const longDabs = planOilBrushDabs({
-      points: [0, 0, 1200, 40, 2400, -30, 3600, 20],
-      pressures: [0.5, 0.75, 0.6, 0.8],
-      baseWidth: 24,
-      seed: 7,
-      maxDabs: 2048,
+  describe("calibrated plan budgets", () => {
+    let longStroke: StudioCalibratedBudgetVerdict;
+    let scribble: StudioCalibratedBudgetVerdict;
+
+    // Measured once and shared: the budget assertion and its synthetic-regression twin are two
+    // readings of the SAME measurement, so the regression proof is anchored to what this machine
+    // actually just did rather than to a number recorded on some other box.
+    beforeAll(() => {
+      longStroke = evaluateStudioCalibratedBudget({
+        label: "2000-station impasto plan",
+        workload: planReliefWorkload(longStrokeDabs(), LONG_STROKE_PLANS_PER_SAMPLE),
+        referenceRounds: LONG_STROKE_CALIBRATION_ROUNDS,
+        samples: 5,
+      });
+      scribble = evaluateStudioCalibratedBudget({
+        label: "self-crossing scribble impasto plan",
+        workload: planReliefWorkload(scribbleDabs(), SCRIBBLE_PLANS_PER_SAMPLE),
+        referenceRounds: SCRIBBLE_CALIBRATION_ROUNDS,
+        samples: 4,
+      });
     });
-    expect(longDabs.length).toBeGreaterThanOrEqual(2000);
-    const { plan, elapsed } = fastestPlan(longDabs);
-    expect(plan.impastoReliefLanes!.length).toBeGreaterThan(0);
-    // Same busy-runner allowance as the scribble budget below (its rationale comment applies):
-    // even the min-of-5 statistic measured 39.5ms on a starved shared runner that passed the
-    // identical commit's local run at a third of that.
-    expect(elapsed).toBeLessThan(process.env.CI ? 60 : 30);
+
+    it("plans a 2000-station impasto stroke inside its calibrated plan budget", () => {
+      expect(longStrokeDabs().length).toBeGreaterThanOrEqual(2000);
+      expect(longStroke.ok, longStroke.detail).toBe(true);
+      expect(plannedLaneSink).toBeGreaterThan(0);
+    });
+
+    it("stays within the plan budget on a dense self-crossing scribble too", () => {
+      // Held through a 7 -> 20 hair bed on this stroke. The bed scaling alone took it to 65ms;
+      // every millisecond of that came back out as redundancy rather than as texture, and the
+      // ridge count is unchanged at twenty: runs are quantised once instead of once per shell
+      // they appear in, the ridges and flank stripes stride the bed so hairs finer than the
+      // field's own cell are not splatted twice, and each ridge segment is one capsule distance
+      // field instead of a chain of overlapping discs that was quadrature for exactly that field.
+      expect(scribbleDabs().length).toBeGreaterThan(1200);
+      expect(scribble.ok, scribble.detail).toBe(true);
+    });
+
+    it("would have failed both budgets had the planner become 2x more expensive", () => {
+      // The point of a calibrated budget is that it survives a slow machine WITHOUT becoming a
+      // no-op, so the doubling has to be checked on the same machine, against the same reference
+      // windows, in the same run. That is exactly what this asserts, and it reuses the passes
+      // just measured — the healthy case measures nothing extra. The other half of the claim,
+      // that the harness really does read a doubled hot path as 2x, is measured end to end in
+      // studio-perf-calibration.test.ts, and against recorded series from these two strokes.
+      for (const [verdict, workload, referenceRounds] of [
+        [longStroke, planReliefWorkload(longStrokeDabs(), LONG_STROKE_PLANS_PER_SAMPLE),
+          LONG_STROKE_CALIBRATION_ROUNDS],
+        [scribble, planReliefWorkload(scribbleDabs(), SCRIBBLE_PLANS_PER_SAMPLE),
+          SCRIBBLE_CALIBRATION_ROUNDS],
+      ] as const) {
+        const detection = evaluateStudioCalibratedDetection({
+          label: verdict.label,
+          workload,
+          referenceRounds,
+          seed: verdict.passes,
+          factor: 2,
+          samples: 4,
+          warmups: 1,
+        });
+        // `detectableFactor` is the smallest slowdown this reading would have convicted;
+        // recorded honest readings put it around 1.3x-1.6x, so the budget is not merely a
+        // doubling detector. 2x is the line it must never lose, and that is what is asserted.
+        expect(detection.detected, detection.detail).toBe(true);
+      }
+    });
   });
 
-  it("stays within the plan budget on a dense self-crossing scribble too", () => {
-    const points: number[] = [];
-    for (let step = 0; step <= 160; step += 1) {
-      points.push(
-        20 + (step % 2 === 0 ? 0 : 190) + Math.sin(step * 0.7) * 20,
-        20 + step * 1.35,
-      );
+  it("keeps the painted work of both budget strokes bounded, with no clock involved", () => {
+    // Recorded counts (deterministic, so these are exact): the 2000-station stroke plans 6
+    // relief lanes / 124 runs / 8060 vertices over 25 bristle lanes / 5093 runs / 125401
+    // vertices; the scribble plans 6 / 954 / 4288 over 25 / 5140 / 132568. The bounds below
+    // carry ~20% headroom for tuning, and are what actually guards pathological blowup: an
+    // algorithmic explosion in grid area or splat density shows up here identically on a
+    // laptop, a CI runner and a starved container.
+    const long = paintedWorkOf(
+      planStudioOilRibbonCarrier(longStrokeDabs(), { impastoRelief: { enabled: true } }),
+    );
+    const scribble = paintedWorkOf(
+      planStudioOilRibbonCarrier(scribbleDabs(), { impastoRelief: { enabled: true } }),
+    );
+
+    for (const [label, work] of [["long", long], ["scribble", scribble]] as const) {
+      expect(work.reliefLanes, label).toBeGreaterThan(0);
+      expect(work.reliefLanes, label).toBeLessThanOrEqual(6);
+      expect(work.bristleLanes, label).toBeLessThanOrEqual(30);
+      expect(work.bristleRuns, label).toBeLessThanOrEqual(6_200);
+      expect(work.bristleVertices, label).toBeLessThanOrEqual(160_000);
     }
-    const dabs = planOilBrushDabs({
-      points,
-      baseWidth: 26,
-      seed: 3,
-      maxDabs: 2048,
-    });
-    expect(dabs.length).toBeGreaterThan(1200);
-    const { plan, elapsed } = fastestPlan(dabs);
-    expect(plan.impastoReliefLanes!.length).toBeGreaterThan(0);
-    // The canonical <30ms budget case is the 2000-station stroke above; this blob-shaped
-    // scribble maximises grid area AND splat density, so it only guards pathological blowup.
-    //
-    // Held through a 7 -> 20 hair bed on this stroke. The bed scaling alone took it to 65ms; every
-    // millisecond of that came back out as redundancy rather than as texture, and the ridge count
-    // is unchanged at twenty: runs are quantised once instead of once per shell they appear in,
-    // the ridges and flank stripes stride the bed so hairs finer than the field's own cell are not
-    // splatted twice, and each ridge segment is one capsule distance field instead of a chain of
-    // overlapping discs that was quadrature for exactly that field.
-    //
-    // The bound is 60 (or 120 under busy CI runners) to prevent flaky failures on cloud VMs.
-    const timingBudget = process.env.CI ? 120 : 60;
-    expect(elapsed).toBeLessThan(timingBudget);
+    expect(long.reliefRuns).toBeLessThanOrEqual(160);
+    expect(long.reliefVertices).toBeLessThanOrEqual(9_700);
+    // The scribble crosses itself, so it quantises into ~8x more (but shorter) relief runs than
+    // the long stroke while painting FEWER vertices. Both directions are pinned: run count is
+    // where a de-quantisation bug would explode, vertex count is where a splat-density bug would.
+    expect(scribble.reliefRuns).toBeLessThanOrEqual(1_200);
+    expect(scribble.reliefVertices).toBeLessThanOrEqual(5_200);
   });
 });
