@@ -320,6 +320,10 @@ export function StudioBg3dEditorViewport({ h }) {
     // 파일 분할 때 목록에서 빠져 ReferenceError 를 던지던 식별자들(런타임 값 위치) — 복구.
     canPlaceSelectedModelRecipe, centerGroundSelectionDisabledReason, groundSelectionDisabledReason, measurementDraft, measurementStartWorld, placementPreviewAsset, setTransformSpaceOverride, setWebXrSupport, transformSpace,
   } = { ...R, ...h, CaptureBridge };
+  // 빈 장면에서는 "끌어서 회전 · 도형 클릭으로 선택" 이 가리킬 대상이 없다. 안내 두 개가 같은
+  // 아래쪽 슬롯을 다투는 것도 여기서 끊는다 — 좁은 화면의 뷰포트는 두 줄을 담을 높이가 없다.
+  const sceneIsEmpty =
+    primitives.length === 0 && customModels.length === 0 && sharedCharacters.length === 0;
   return (
           <section className="relative min-h-0 overflow-hidden bg-[oklch(0.98_0_0)] lg:min-h-0">
             <div className="relative mx-auto flex h-full max-h-full min-h-0 w-full max-w-[min(92vw,960px)] items-center justify-center p-2 sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]">
@@ -464,7 +468,10 @@ export function StudioBg3dEditorViewport({ h }) {
                   <div
                     role={sharedStageResolution.phase === "ready" ? "status" : "alert"}
                     data-testid="studio-bg3d-shared-stage-status"
-                    className="pointer-events-none absolute left-2 top-2 z-30 max-w-[min(88%,24rem)] rounded-lg border border-line/80 bg-panel/92 px-2.5 py-2 text-[0.68rem] font-semibold leading-relaxed text-fg-2 shadow-lg backdrop-blur sm:left-3 sm:top-3"
+                    // 좁은 화면에서 top-2/left-2 는 변형 모드 클러스터가 이미 차지한 자리다.
+                    // z-30 으로 덮으면 버튼이 반투명 배지 뒤로 비쳐 둘 다 읽히지 않으므로, sm
+                    // 미만에서는 같은 파일의 다른 뷰포트 알림들이 쓰는 아래쪽 슬롯으로 내린다.
+                    className="pointer-events-none absolute inset-x-3 bottom-12 z-30 mx-auto max-w-[24rem] rounded-lg border border-line/80 bg-panel/92 px-2.5 py-2 text-[0.68rem] font-semibold leading-relaxed text-fg-2 shadow-lg backdrop-blur sm:inset-x-auto sm:bottom-auto sm:left-3 sm:top-3 sm:mx-0 sm:max-w-[min(88%,24rem)]"
                   >
                     {sharedStageResolution.message}
                   </div>
@@ -992,7 +999,8 @@ export function StudioBg3dEditorViewport({ h }) {
                   {describeStudioBg3dPhysicsStatus(physicsPhase, physicsError)}
                 </output>
 
-                {!immersiveSceneActive && !physicsInteractionLocked && !viewportHinted ? (
+                {!immersiveSceneActive && !physicsInteractionLocked && !viewportHinted
+                && !sceneIsEmpty ? (
                   <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
                     <span className="rounded-full border border-line/70 bg-panel/85 px-3 py-1 text-center text-[0.66rem] font-medium text-fg-3 shadow-sm backdrop-blur">
                       끌어서 회전 · 오른쪽 드래그로 이동 · 도형 클릭으로 선택
@@ -1000,14 +1008,28 @@ export function StudioBg3dEditorViewport({ h }) {
                   </div>
                 ) : null}
 
-                {primitives.length === 0 && customModels.length === 0 && sharedCharacters.length === 0 ? (
-                  <div className="pointer-events-none absolute inset-0 grid place-items-center p-6 text-center">
-                    <div className="max-w-[18rem]">
+                {sceneIsEmpty ? (
+                  // 360px 인앱 브라우저에서 이 뷰포트의 높이는 240px 안팎이고, 위쪽 모서리는
+                  // 조작 클러스터 두 개가 이미 다 쓴다. 그 안에 카드를 띄우면 어떤 여백을 줘도
+                  // 버튼과 글자가 서로를 뚫고 겹쳐 둘 다 못 읽는다 — 그래서 좁은 화면에서는
+                  // 아래쪽 한 줄로 내리고, 공간이 생기는 sm 이상에서만 카드로 세운다.
+                  <div
+                    data-testid="studio-bg3d-empty-scene-guide"
+                    className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex justify-center sm:inset-0 sm:bottom-auto sm:grid sm:place-items-center sm:p-6"
+                  >
+                    {/* 컨트롤 패널은 lg 미만에서 뷰포트 "아래"에 쌓인다(lg:border-l). 방향을
+                        말하면 휴대폰과 태블릿에서 틀린 안내가 되므로 탭 이름만 부른다. */}
+                    <span className="rounded-full border border-line/70 bg-panel/90 px-3 py-1 text-center text-[0.66rem] font-semibold text-fg-2 shadow-sm backdrop-blur sm:hidden">
+                      템플릿 · 도형 · 에셋 탭에서 장면을 채워보세요
+                    </span>
+                    <div className="hidden max-w-[18rem] rounded-2xl border border-line/70 bg-panel/92 px-4 py-4 text-center shadow-lg backdrop-blur sm:block">
                       <div className="mx-auto grid size-12 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">
                         <Boxes size={22} aria-hidden />
                       </div>
-                      <p className="mt-4 text-sm font-bold text-fg">
-                        오른쪽 &ldquo;템플릿&rdquo; 탭에서 교실·거리 같은 완성된 공간을 통째로 추가하거나, &ldquo;도형&rdquo; 탭에서 상자·원기둥·평면을 하나씩 추가하고 &ldquo;에셋&rdquo; 탭에서 캐릭터·크리처·소품과 3D 파일을 배치해 장면을 잡아보세요.
+                      <p className="mt-3 text-sm font-bold leading-relaxed text-fg">
+                        &ldquo;템플릿&rdquo; 탭에서 완성된 공간을 통째로,
+                        &ldquo;도형&rdquo; 탭에서 상자·원기둥·평면을 하나씩,
+                        &ldquo;에셋&rdquo; 탭에서 캐릭터·소품을 놓아 장면을 잡아보세요.
                       </p>
                     </div>
                   </div>
