@@ -447,6 +447,28 @@ async function compareVrmMToon(
   };
 }
 
+/** Consecutive same-size captures, to separate one-time pipeline cost from per-capture cost. */
+async function measureCaptureCost(adapter: StudioBg3dCaptureAdapter, runs: number) {
+  const timings: number[] = [];
+  for (let run = 0; run < runs; run += 1) {
+    const started = performance.now();
+    await adapter.capture({
+      width: CAPTURE_WIDTH,
+      height: CAPTURE_HEIGHT,
+      background: { color: "#ffffff", alpha: 0 },
+      includeDepth: false,
+    });
+    timings.push(Number((performance.now() - started).toFixed(2)));
+  }
+  const rest = [...timings.slice(1)].sort((left, right) => left - right);
+  return {
+    backend: adapter.backend,
+    timings,
+    first: timings[0] ?? 0,
+    medianAfterFirst: rest.length > 0 ? (rest[Math.floor(rest.length / 2)] ?? 0) : 0,
+  };
+}
+
 async function run(): Promise<unknown> {
   const probe = await probeStudioBg3dWebGpuCapability({
     secureContext: window.isSecureContext,
@@ -500,8 +522,22 @@ async function run(): Promise<unknown> {
   const transparentWebgpu = await captureWith(webgpuAdapter, 0);
   const transparentWebgl = await captureWith(webglAdapter, 0);
 
+  // Every capture builds a fresh straight-alpha quad and two targets, and on WebGPU a new node
+  // material means a shader build plus a render pipeline. That looked like a reason to cache
+  // per-size targets for a shot batch — so measure before caching on a guess.
+  //
+  // Reported, deliberately not asserted: a wall-clock threshold in CI buys flakes, not signal.
+  // What matters is the *shape* — `first` well above `medianAfterFirst` means the pipeline cost is
+  // paid once and Three/Dawn is caching by graph structure, so per-capture allocation is free and
+  // a cache would be complexity for nothing. The two converging is the signal to revisit.
+  const captureCost = {
+    webgpu: await measureCaptureCost(webgpuAdapter, 6),
+    webgl: await measureCaptureCost(webglAdapter, 6),
+  };
+
   const result = {
     status: "ok",
+    captureCost,
     backend: "real-chromium-three-webgpu",
     probe,
     adapters: {

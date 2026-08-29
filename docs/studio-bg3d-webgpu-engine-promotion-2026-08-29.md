@@ -236,7 +236,22 @@ WebGPU 초기화 실패 배너가 첫 실패부터 "WebGL2 로 전환합니다" 
   capability 목록에서 제외한다.
 - 실기기 GPU 계측(프레임 타임·입력 지연)은 `studio-bg3d-engine-benchmark-contract.ts`의
   런을 실제 단말에서 수집한 뒤 별도로 기록한다. 이번 승격은 정확성 동등성까지만 증명한다.
-- capture마다 straight-alpha 출력 quad의 node material을 새로 만든다(WebGL adapter가 매번
-  `OutputPass`를 만드는 것과 같은 모양). WebGPU는 파이프라인 생성 비용이 더 크므로 shot batch
-  같은 연속 캡처에서 문제가 될 수 있다. 추측으로 캐시를 넣기보다, 실제 batch 지연을 먼저
-  측정한 뒤 대상 크기별 target/quad 재사용을 검토한다.
+- ~~capture마다 straight-alpha 출력 quad의 node material을 새로 만든다~~ — **측정했고, 문제가
+  아니었다.** 같은 크기로 연속 캡처했을 때(SwiftShader, 96×64):
+
+  | backend | 첫 캡처 | 이후 중앙값 |
+  | --- | --- | --- |
+  | WebGPU | 11.7ms | **5.3ms** |
+  | WebGL2 | 28.1ms | 27.1ms |
+
+  파이프라인 생성 비용은 첫 캡처에서 한 번만 지불된다. Three/Dawn이 노드 그래프 구조로 캐시하므로
+  `NodeMaterial` 인스턴스를 매번 새로 만들어도 재컴파일이 일어나지 않는다. 크기별 target/quad
+  재사용은 **넣지 않는다** — 얻을 것이 없는 복잡도다. WebGL2에는 애초에 warm-up 효과가 없고, 그
+  대신 캡처당 5배 느리다.
+
+  수치는 `verify:studio-bg3d-webgpu-engine`이 매 실행 보고하되 **단언하지 않는다**. CI의 wall-clock
+  임계값은 신호가 아니라 flake를 산다. 봐야 할 것은 값이 아니라 모양이다: `first`가
+  `medianAfterFirst`보다 뚜렷이 크면 캐싱이 살아 있다는 뜻이고, 둘이 붙으면 그때 다시 볼 문제다.
+
+  (소프트웨어 어댑터 측정이라 실제 GPU에서 절대값은 다르다. 다만 "첫 번째만 비싸다"는 모양 자체는
+  하드웨어가 아니라 Dawn의 파이프라인 캐시 동작이라 그대로 간다.)

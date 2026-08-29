@@ -457,6 +457,9 @@ async function main() {
       webglOnlyFeatures: result.webglOnlyFeatures,
       ktx2: result.ktx2,
       vrmMToon: result.vrmMToon,
+      // Reported, not asserted — see the harness. `first` well above `medianAfterFirst` is the
+      // shape that says pipeline cost is one-time and per-capture allocation needs no cache.
+      captureCost: result.captureCost,
       inAppRuns,
       failures,
       evidenceDirectory: SCRATCH,
