@@ -18,6 +18,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { studioKonvaRuntime } from "../render/studio-konva-runtime";
 import {
+  STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR,
+  studioLiveTransformPreviewEligible,
+} from "../studio-live-transform-preview-konva";
+import {
   drainStudioLateParkedChrome,
   findStudioDrawWrapperNode,
   mirrorStudioDrawElementTranslation,
@@ -352,5 +356,38 @@ describe("selection chrome mounting during an active transform preview", () => {
     // Only chrome this module hid is registered, so the restore stays symmetric.
     expect(productHidden.visible()).toBe(false);
     detach();
+  });
+});
+
+describe("live transform preview eligibility", () => {
+  it("refuses a wrapper the document layer marked as unable to reproduce the affine", () => {
+    // Symmetry generates copies about world axes and the model stores no axis angle, so the
+    // preview's `A ∘ S` and the commit's `S ∘ A` diverge when the two do not commute. Such a
+    // stroke falls back to commit-at-release rather than showing artwork the commit will not
+    // produce.
+    const wrapper = addDrawElement(scene.layer, "draw-1");
+    expect(studioLiveTransformPreviewEligible(wrapper)).toBe(true);
+
+    wrapper.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR, true);
+
+    expect(studioLiveTransformPreviewEligible(wrapper)).toBe(false);
+  });
+
+  it("refuses when an ANCESTOR carries the mark, not only the wrapper itself", () => {
+    const wrapper = addDrawElement(scene.layer, "draw-1");
+    scene.layer.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR, true);
+
+    expect(studioLiveTransformPreviewEligible(wrapper)).toBe(false);
+    scene.layer.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR, undefined);
+  });
+
+  it("treats only an explicit true as a refusal", () => {
+    // A falsy or absent attr must never be read as blocking, or an ordinary stroke would silently
+    // lose its preview.
+    const wrapper = addDrawElement(scene.layer, "draw-1");
+    for (const value of [undefined, false, 0, ""]) {
+      wrapper.setAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR, value);
+      expect(studioLiveTransformPreviewEligible(wrapper), String(value)).toBe(true);
+    }
   });
 });

@@ -53,10 +53,21 @@ export function studioLiveTransformPreviewHasCachedDuplicate(
     .some((node) => node !== previewNode && !studioLiveTransformPreviewEligible(node));
 }
 
+/**
+ * Attr the document layer sets on a wrapper whose commit cannot reproduce an affine preview.
+ *
+ * Today that means symmetry: copies are generated about world axes and the model stores no axis
+ * angle, so the preview's `A ∘ S` and the commit's `S ∘ A` diverge whenever the two do not
+ * commute. Marked at render time, where the element is in hand, and read here.
+ */
+export const STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR =
+  "studioLiveTransformPreviewBlocked";
+
 export function studioLiveTransformPreviewEligible(node: Konva.Node): boolean {
   let current: Konva.Node | null = node;
   while (current) {
     if (current.isCached()) return false;
+    if (current.getAttr(STUDIO_LIVE_TRANSFORM_PREVIEW_BLOCKED_ATTR) === true) return false;
     current = current.getParent();
   }
   return true;

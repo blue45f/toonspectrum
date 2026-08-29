@@ -550,6 +550,19 @@ export function StudioCanvasViewportDocumentLayer({
                     <Group
                       key={el.id}
                       studioElementId={el.id}
+                      // Symmetry generates its copies about WORLD axes, and the model stores no
+                      // axis angle (type/centerX/centerY/radialCount only). So a live affine
+                      // preview shows `A ∘ S` — every already-generated copy transformed — while
+                      // the commit transforms the base points and centre and lets the renderer
+                      // regenerate copies as `S ∘ A`. Those differ whenever the two do not
+                      // commute, so a rotated mirror-symmetry stroke would commit artwork the
+                      // preview never showed. Marked here, where the element is in hand, and
+                      // refused by studioLiveTransformPreviewEligible.
+                      studioLiveTransformPreviewBlocked={
+                        el.symmetry !== undefined && el.symmetry.type !== "none"
+                          ? true
+                          : undefined
+                      }
                       ref={setRef}
                       x={0}
                       y={0}

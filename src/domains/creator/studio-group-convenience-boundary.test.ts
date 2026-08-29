@@ -372,6 +372,11 @@ describe("Studio PPT-style group convenience boundary", () => {
       'element.type === "draw"',
     );
     expect(viewportSource).toContain("liveNodeDisplayBounds(");
+    // Symmetry strokes are marked at render time so the live transform preview refuses them: the
+    // preview transforms already-generated copies while the commit regenerates them about
+    // unchanged world axes, and the model has no axis angle to reconcile the two.
+    expect(viewportSource).toContain("studioLiveTransformPreviewBlocked={");
+    expect(viewportSource).toContain('el.symmetry.type !== "none"');
   });
 
   it("claims and releases the complete group lease around one stage commit", () => {
