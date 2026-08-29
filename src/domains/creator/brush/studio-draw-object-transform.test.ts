@@ -353,3 +353,60 @@ describe("agreement with the group uniform planner", () => {
     expect(single?.sampleSpacing).toBe(groupedDraw.sampleSpacing);
   });
 });
+
+describe("orientation-dependent nibs", () => {
+  const NIB = { tiltEnabled: false, angleDeg: -30, roundness: 0.35 } as const;
+
+  it("turns the nib with the stroke so the commit matches what the preview showed", () => {
+    // The preview rotates the whole rendered subtree, nib included. `brushTip.angleDeg` feeds
+    // Konva's `rotation` prop for the calligraphy Ellipse in the same clockwise-degree convention,
+    // so the commit has to compose the two or the nib snaps back at pointer-up.
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ brushTip: { ...NIB } }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    expect(rotated?.brushTip?.angleDeg).toBe(15);
+    // Everything else about the tip is carried through untouched.
+    expect(rotated?.brushTip?.roundness).toBe(NIB.roundness);
+    expect(rotated?.brushTip?.tiltEnabled).toBe(NIB.tiltEnabled);
+  });
+
+  it("wraps to (-180, 180] so repeated rotations cannot drift the stored angle", () => {
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl({ brushTip: { ...NIB, angleDeg: 170 } }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 30,
+    });
+
+    // 200deg is the same orientation as -160deg; storing the wrapped form keeps the field bounded
+    // however many times a stroke is rotated.
+    expect(rotated?.brushTip?.angleDeg).toBe(-160);
+  });
+
+  it("leaves the nib alone when the transform carries no rotation", () => {
+    const scaledOnly = planStudioDrawObjectTransform({
+      el: drawEl({ brushTip: { ...NIB } }),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: { x: 0, y: 0, width: 20, height: 20 },
+      rotationDeg: 0,
+    });
+
+    expect(scaledOnly?.brushTip).toEqual(NIB);
+  });
+
+  it("leaves a stroke without a tip snapshot untouched", () => {
+    const rotated = planStudioDrawObjectTransform({
+      el: drawEl(),
+      sourceBounds: UNIT_SOURCE,
+      targetBounds: UNIT_SOURCE,
+      rotationDeg: 45,
+    });
+
+    expect(rotated).not.toBeNull();
+    expect("brushTip" in rotated!).toBe(false);
+  });
+});

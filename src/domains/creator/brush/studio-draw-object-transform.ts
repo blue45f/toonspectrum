@@ -222,10 +222,27 @@ export function planStudioDrawObjectTransform(
     symmetry = { ...el.symmetry, centerX: center.x, centerY: center.y };
   }
 
+  // Orientation-dependent nibs must turn with the stroke. A calligraphy tip's `angleDeg` feeds
+  // Konva's `rotation` prop directly (StudioDrawNode renders the tap as a rotated Ellipse), the
+  // same clockwise-degree convention as `rotationDeg`, so the two simply compose. Without this the
+  // preview rotates the whole rendered subtree — nib included — and the commit then replans from
+  // points alone, snapping the nib back to its original orientation the moment the handle is
+  // released. The flip path already transforms this field (studio-figma-selection-ux negates it on
+  // mirror), so carrying it through a rotation is the established treatment, not a new rule.
+  let brushTip = el.brushTip;
+  if (brushTip && rotationDeg !== 0) {
+    const rotatedAngle = brushTip.angleDeg + rotationDeg;
+    if (!finite(rotatedAngle)) return null;
+    // Wrapped to (-180, 180] so repeated rotations cannot drift the stored angle without bound.
+    const wrapped = ((((rotatedAngle + 180) % 360) + 360) % 360) - 180;
+    brushTip = { ...brushTip, angleDeg: wrapped === -180 ? 180 : wrapped };
+  }
+
   return {
     ...el,
     points,
     strokeWidth,
+    ...(brushTip !== undefined ? { brushTip } : {}),
     ...(sampleSpacing !== undefined ? { sampleSpacing } : {}),
     ...(shapeParams !== undefined ? { shapeParams } : {}),
     ...(symmetry !== undefined ? { symmetry } : {}),
