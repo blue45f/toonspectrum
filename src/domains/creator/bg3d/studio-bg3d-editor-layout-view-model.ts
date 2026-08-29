@@ -239,7 +239,7 @@ export function bindStudioBg3dEditorLayoutViewModel(h) {
     // 파일 분할 때 목록에서 빠져 ReferenceError 를 던지던 식별자들(런타임 값 위치) — 복구.
     canPlaceSelectedModelRecipe, centerGroundSelectionDisabledReason, groundSelectionDisabledReason, magicLayerEffectivelyVisibleIds, sharedStageUpdateBlockedReason, transformSpace,
     captureBackgroundSnapshot, immersiveStagePlan, placementPreviewAsset, sceneRecoveryError,
-    webXrController, webXrSessionState,
+    webXrController, webXrSessionState, engineRuntime,
   } = { ...R, ...h };
 
   const snapSettingsSummary = studioBg3dSnapSettingsSummary(snapSettings);
@@ -603,7 +603,15 @@ export function bindStudioBg3dEditorLayoutViewModel(h) {
     mapSize: shadowMapSize,
   });
 
-  const webXrDisabledReason = !webXrController
+  // 몰입형 브리지는 `WebGLRenderer.xr` 을 구동한다. WebGPU 세션에서 시작을 허용하면
+  // `controller.start()` 가 WebGPU canvas 의 controller 로 네이티브 세션을 이미 요청한 뒤에야
+  // 엔진 정책이 WebGL2 를 latch 하고, 그 latch 가 canvasKey 를 바꿔 요청 중인 controller 를
+  // 파괴한다 — 아티스트의 첫 시도가 조용히 취소된다. 먼저 remount 한 뒤 start 를 부르는 것도
+  // 답이 아니다: 클릭의 user activation 이 그 사이에 사라진다. 그래서 시작 자체를 막고,
+  // 무엇을 해야 하는지 말해 준다.
+  const webXrDisabledReason = engineRuntime?.plan?.backend === "webgpu"
+    ? "몰입형(AR·VR) 미리보기는 WebGL2 엔진에서만 열립니다. 보기 탭의 3D 렌더 엔진에서 WebGL2를 고른 뒤 다시 시도해 주세요."
+    : !webXrController
     ? "기존 Three.js 렌더러의 WebXR 연결을 준비하는 중입니다."
     : sceneRecoveryError
       ? "3D 장면 복원 오류를 해결한 뒤 AR·VR 미리보기를 열어 주세요."

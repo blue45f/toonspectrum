@@ -12,10 +12,11 @@
  * remount is both cheaper and safer than trying to migrate live engine objects.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
+  STUDIO_BG3D_WEBGPU_FAILURE_LIMIT,
   latchStudioBg3dWebglOnlyFeatures,
   normalizeStudioBg3dEnginePreference,
   recordStudioBg3dWebGpuFailure,
@@ -138,6 +139,15 @@ export function useStudioBg3dEngineRuntime(
     EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
   );
 
+  // Mirrors `webgpuFailureCount` so the device-loss notice can name the outcome this failure
+  // actually causes. Deriving it inside the state updater would make that updater impure.
+  const webgpuFailureCountRef = useRef(0);
+  // Bumped by every explicit choice. The bootstrap effect compares against it so a restored value
+  // that was already in flight cannot overwrite a choice the artist made while it loaded.
+  const preferenceRevisionRef = useRef(0);
+  // Distinguishes a genuine closed→open transition from an effect re-run caused by unstable deps.
+  const wasEnabledRef = useRef(false);
+
   const inApp = useMemo(() => classifyStudioBg3dInAppBrowser(readHostSignals()), []);
 
   const observedWebxr = observedWebglOnlyFeatures?.webxr === true;
@@ -147,9 +157,23 @@ export function useStudioBg3dEngineRuntime(
   }, [observedWebxr]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      wasEnabledRef.current = false;
+      return;
+    }
+    // Reopening a retained editor runs this again. Without resetting the phase the engine controls
+    // stay live while the restored preference and a fresh probe are still in flight.
+    //
+    // Only an actual closed→open transition resets it. Callers may pass fresh callback identities
+    // each render, which re-runs this effect; resetting on every run would flip the phase back to
+    // probing right after it reached ready, then render, re-run and flip again without end.
+    const reopened = !wasEnabledRef.current;
+    wasEnabledRef.current = true;
+    if (reopened) setPhase("probing");
+
     let cancelled = false;
     const controller = new AbortController();
+    const revisionAtStart = preferenceRevisionRef.current;
     void (async () => {
       const [restored, probed] = await Promise.all([
         loadPreference().catch(() => "auto" as StudioBg3dEnginePreference),
@@ -160,7 +184,12 @@ export function useStudioBg3dEngineRuntime(
         }).catch(() => PENDING_PROBE),
       ]);
       if (cancelled) return;
-      setPreferenceState(normalizeStudioBg3dEnginePreference(restored));
+      // A choice made while this was loading is newer than what storage returned. Applying the
+      // restored value then would remount onto a backend the artist did not ask for and leave the
+      // panel disagreeing with the preference it just saved.
+      if (preferenceRevisionRef.current === revisionAtStart) {
+        setPreferenceState(normalizeStudioBg3dEnginePreference(restored));
+      }
       setProbe(probed);
       setPhase("ready");
     })();
@@ -197,17 +226,30 @@ export function useStudioBg3dEngineRuntime(
   );
 
   const setPreference = useCallback((next: StudioBg3dEnginePreference) => {
+    preferenceRevisionRef.current += 1;
     const normalized = normalizeStudioBg3dEnginePreference(next);
     setPreferenceState(normalized);
     setDeviceLostMessage(null);
     // An explicit choice is the artist telling us the previous failures are not the whole story.
-    if (normalized !== "auto") setWebgpuFailureCount(0);
+    if (normalized !== "auto") {
+      webgpuFailureCountRef.current = 0;
+      setWebgpuFailureCount(0);
+    }
     void savePreference(normalized).catch(() => undefined);
   }, [savePreference]);
 
-  const handleWebGpuFailure = useCallback((message: string) => {
-    setDeviceLostMessage(message);
-    setWebgpuFailureCount(recordStudioBg3dWebGpuFailure);
+  const handleWebGpuFailure = useCallback((cause: string) => {
+    const next = recordStudioBg3dWebGpuFailure(webgpuFailureCountRef.current);
+    webgpuFailureCountRef.current = next;
+    setWebgpuFailureCount(next);
+    // The caller reports the cause; the outcome sentence is derived from the decision that is
+    // actually about to happen. Announcing "switching to WebGL2" on the first failure was wrong:
+    // the limit is two, so the canvas remounts on WebGPU again and the badge still reads WebGPU.
+    setDeviceLostMessage(
+      next >= STUDIO_BG3D_WEBGPU_FAILURE_LIMIT
+        ? `${cause} WebGL2로 전환합니다.`
+        : `${cause} WebGPU로 한 번 더 시도합니다.`,
+    );
     // A lost device leaves the canvas holding an unusable renderer, so it is rebuilt even when the
     // policy is still willing to try WebGPU once more.
     setRecoveryGeneration((generation) => generation + 1);
@@ -233,9 +275,7 @@ export function useStudioBg3dEngineRuntime(
         });
         return runtime.renderer as unknown as { render: (scene: never, camera: never) => unknown };
       } catch (error) {
-        handleWebGpuFailure(
-          "WebGPU 엔진을 시작하지 못해 WebGL2로 전환합니다.",
-        );
+        handleWebGpuFailure("WebGPU 엔진을 시작하지 못했습니다.");
         throw error;
       }
     };
