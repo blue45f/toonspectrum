@@ -18,6 +18,8 @@ import {
   STUDIO_BRUSH_CATALOGUE_SOAK_RUNS,
   STUDIO_BRUSH_CRAYON_FAMILY_CHUNK_BUDGET_MS,
   STUDIO_BRUSH_CRAYON_FAMILY_IDS,
+  STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS,
+  STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS,
   detectStudioBrushSoakMonotonicDegradation,
   evaluateStudioBrushCataloguePaintDeterminismProbe,
   evaluateStudioBrushCataloguePaintPerfMatrix,
@@ -27,6 +29,7 @@ import {
   listStudioBrushCatalogueDeterminismSampleIds,
   planStudioBrushCataloguePaintDynamics,
   studioBrushChunkSeriesFreezes,
+  studioBrushCrayonFamilyCpuFreezes,
 } from "./studio-brush-catalogue-perf-matrix";
 
 /**
@@ -149,6 +152,53 @@ describe("soak monotonic-degradation detector", () => {
   });
 });
 
+describe("studioBrushCrayonFamilyCpuFreezes", () => {
+  // Every series below is a recorded min-of-5 CPU reading from the reference container, idle and
+  // then against six spinning hogs on four cores.
+  const HONEST_CRAYON = [120.5, 117.0, 113.6, 111.4, 131.7] as const;
+  const HONEST_LIGHTEST = [61.7, 61.5, 56.0, 68.0, 62.5] as const;
+
+  it("acquits every honest reading, on an idle machine and a heavily contended one", () => {
+    expect(studioBrushCrayonFamilyCpuFreezes([...HONEST_CRAYON])).toBe(false);
+    expect(studioBrushCrayonFamilyCpuFreezes([...HONEST_LIGHTEST])).toBe(false);
+    // Even one pass at the worst honest reading, with nothing cheaper to rescue it.
+    expect(studioBrushCrayonFamilyCpuFreezes([Math.max(...HONEST_CRAYON)])).toBe(false);
+  });
+
+  it("convicts a doubled crayon plan on both of those machines", () => {
+    // The gate must not have been loosened into a no-op. A 2x regression puts the heaviest row at
+    // 223-263ms against a 200ms budget -- caught at its CHEAPEST pass, so no lucky pass rescues
+    // it. The wall-clock form this replaces convicted the same doubling only when the box was
+    // idle: 2 x 89ms wall cleared the same 200ms number.
+    expect(studioBrushCrayonFamilyCpuFreezes(HONEST_CRAYON.map((ms) => ms * 2))).toBe(true);
+    expect(Math.min(...HONEST_CRAYON) * 2)
+      .toBeGreaterThan(STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS);
+    // ...and it is not only a doubling: the smallest regression it still convicts.
+    expect(
+      STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS / Math.min(...HONEST_CRAYON),
+    ).toBeLessThan(1.8);
+  });
+
+  it("requires the CHEAPEST pass to be over budget, so one preempted pass cannot convict", () => {
+    // The failure mode this reducer exists for: four honest passes and one that ran during a
+    // collection. A maximum, or any single sample, would call that a freeze.
+    expect(studioBrushCrayonFamilyCpuFreezes([118, 121, 640, 117, 119])).toBe(false);
+    // ...while a series that is over budget throughout is convicted however many passes it gets.
+    expect(studioBrushCrayonFamilyCpuFreezes([201, 640, 233, 202, 260])).toBe(true);
+  });
+
+  it("is not evidence of anything without a pass", () => {
+    expect(() => studioBrushCrayonFamilyCpuFreezes([])).toThrow(/at least one pass/);
+  });
+
+  it("keeps the wall-clock ceiling a hang detector, not a second budget", () => {
+    // Worst single wall pass observed under heavy load was 611ms, against a min-of-5 wall spread
+    // of 89-210ms. The ceiling has to sit clear of that whole population or it becomes the
+    // load-dependent gate this change removed.
+    expect(STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS).toBeGreaterThan(611 * 3);
+  });
+});
+
 describe("studio brush catalogue paint performance matrix", () => {
   it("exercises every shipped paint catalogue id on product planner paths", () => {
     const report = evaluateStudioBrushCataloguePaintPerfMatrix();
@@ -165,11 +215,36 @@ describe("studio brush catalogue paint performance matrix", () => {
     expect(failures, JSON.stringify(failures.slice(0, 8))).toEqual([]);
     expect(freezes, JSON.stringify(freezes.slice(0, 8))).toEqual([]);
 
+    // How much work each crayon-family row plans, pinned exactly.
+    //
+    // This is the half of the freeze gate that owes nothing to a clock. The plan is deterministic
+    // -- the determinism probe below proves the digests repeat -- so these counts are identical on
+    // every machine under every load, and a regression that makes a planner emit more geometry is
+    // convicted here exactly, for all five brushes, including the four whose CPU budget has slack.
+    // Recorded on the reference container and reproduced unchanged idle and under six spinning
+    // hogs on four cores.
+    const PLANNED_WORK: Readonly<Record<string, readonly [number, number]>> = {
+      crayon: [3_538, 11_231],
+      chalk: [2_000, 10_000],
+      charcoal: [1_979, 9_895],
+      pastel: [1_658, 8_290],
+      "oil-pastel": [2_295, 11_475],
+    };
+    expect(Object.keys(PLANNED_WORK).sort()).toEqual([...STUDIO_BRUSH_CRAYON_FAMILY_IDS].sort());
     for (const family of report.crayonFamily) {
       expect(family.ok, `${family.catalogId}: ${family.failure}`).toBe(true);
-      expect(family.freeze, `${family.catalogId}: ${family.elapsedMs}ms`).toBe(false);
-      expect(family.dabCount).toBeGreaterThan(200);
-      expect(family.markCount).toBeGreaterThan(0);
+      expect(
+        family.freeze,
+        `${family.catalogId}: ${family.cpuMs?.toFixed(1)}ms CPU / ${family.elapsedMs}ms wall`,
+      ).toBe(false);
+      const [dabCount, markCount] = PLANNED_WORK[family.catalogId]!;
+      expect(family.dabCount, `${family.catalogId} dabs`).toBe(dabCount);
+      expect(family.markCount, `${family.catalogId} marks`).toBe(markCount);
+      // The verdict has to have been measured: a row reporting no CPU cost would pass the freeze
+      // gate by saying nothing, which is the one failure this whole mechanism exists to prevent.
+      expect(family.cpuMs, `${family.catalogId} cpu`).toBeGreaterThan(0);
+      expect(family.cpuMs!).toBeLessThanOrEqual(STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS);
+      expect(family.elapsedMs).toBeLessThan(STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS);
     }
 
     expect(report.determinism.probeCount).toBe(

@@ -57,6 +57,65 @@ export const STUDIO_BRUSH_CATALOGUE_PERF_PLAN_BUDGET_MS = 450;
 /** Stricter freeze budget for crayon-family long incremental suffix chunks. */
 export const STUDIO_BRUSH_CRAYON_FAMILY_CHUNK_BUDGET_MS = 33;
 export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES = 2_000;
+/**
+ * Freeze budget for one crayon-family long plan+coverage cycle, in CPU milliseconds.
+ *
+ * CPU time, not wall time, and the difference is the whole point. A freeze budget in wall
+ * milliseconds asserts the machine as much as the code: measured on a 4-vCPU container, the crayon
+ * row's min-of-5 wall cost went 89-92ms idle and 131-210ms against six spinning hogs on four
+ * cores, a 2.35x spread with nothing regressed, which is how this gate reached 311.4ms against a
+ * flat 200ms inside a full `pnpm test`. A minimum cannot cancel that -- it removes the noise a
+ * *transient* stall adds, not a floor that has risen under every pass.
+ *
+ * Calibrating against a reference workload does not close it either, and that was measured rather
+ * than assumed: the pinned scalar kernel, sized to ~113ms so its window matched the row's, still
+ * read 116-117ms under the same load that stretched the row to 224-243ms. A synthetic kernel
+ * cancels machine SPEED but not instruction mix, and a tight cache-resident float loop is not a
+ * proxy for an allocating planner.
+ *
+ * `process.cpuUsage()` removes the scheduler directly instead, because time the process is not
+ * running is time it does not accrue. Recorded min-of-5 user CPU, idle then loaded:
+ *
+ *                 idle          loaded              spread   wall spread
+ *   crayon        117-121ms     111-132ms           1.18x      2.35x
+ *   oil-pastel     72-79ms       78-89ms            1.23x      2.41x
+ *   chalk          67-68ms       69-92ms            1.38x      2.29x
+ *   charcoal       67-70ms       73-78ms            1.17x      2.46x
+ *   pastel         62ms          56-68ms            1.21x      2.13x
+ *
+ * The budget stays at the 200ms the product recorded. Against the heaviest row it now carries
+ * 1.52x headroom over the worst honest reading while a doubled crayon plan (223-263ms) is
+ * convicted on every machine, where the wall form convicted it only when the box was idle.
+ *
+ * Vitest runs this suite in a forked worker, so the measurement is this process alone; concurrent
+ * GC threads are counted, which is why the reducer is a MINIMUM over passes -- the pass with the
+ * least concurrent collection is the honest estimate of what the plan costs.
+ */
+export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS = 200;
+/** Passes per crayon-family row. Minimum-of-N, for the reason above. */
+export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES = 5;
+/**
+ * Wall-clock ceiling for one crayon-family pass. Not a budget -- a hang detector. Wall time on
+ * this path is a 2.4x-spread measurement of the scheduler, so it is kept only wide enough that a
+ * genuine lock-up still fails (worst single pass observed under heavy load: 611ms).
+ */
+export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS = 2_000;
+
+/**
+ * Does this crayon-family row freeze? True only when the CHEAPEST pass is still over budget.
+ *
+ * Pure, so the rule can be pinned against recorded series -- honest and regressed -- instead of
+ * only through a live measurement.
+ */
+export function studioBrushCrayonFamilyCpuFreezes(
+  cpuMsPerPass: readonly number[],
+  budgetMs: number = STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS,
+): boolean {
+  if (cpuMsPerPass.length === 0) {
+    throw new Error("A crayon-family freeze verdict needs at least one pass.");
+  }
+  return Math.min(...cpuMsPerPass) > budgetMs;
+}
 
 export const STUDIO_BRUSH_CRAYON_FAMILY_IDS = [
   "crayon",
@@ -80,6 +139,12 @@ export interface StudioBrushCataloguePerfRow {
   readonly dabCount: number;
   readonly markCount: number;
   readonly elapsedMs: number;
+  /**
+   * User CPU milliseconds the row consumed, where it was measured. Absent on the short catalogue
+   * rows, whose 450ms wall budget covers a 256-sample plan with an order of magnitude of margin;
+   * present on the crayon-family long rows, whose verdict it decides.
+   */
+  readonly cpuMs?: number;
   readonly ok: boolean;
   readonly failure: string | null;
   readonly freeze: boolean;
@@ -728,22 +793,34 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
   const rows = paintIds.map((catalogId) =>
     evaluateStudioBrushCataloguePaintPerfRow(catalogId, { packById }),
   );
-  // Freeze verdicts here come from the MINIMUM of a few identical evaluations, the long-stroke
+  // Freeze verdicts here come from the MINIMUM of several identical evaluations, the long-stroke
   // gate's own statistic: shared-runner interference is additive, so one preempted pass cannot
   // manufacture a freeze (measured CI flake: crayon 205.3ms single-sample against the 200ms
   // budget on a runner that passed the identical commit at a fraction of that). The plan is
   // deterministic, so the digest is identical across passes and only the clock varies.
+  //
+  // What varies is graded in CPU milliseconds rather than wall milliseconds -- see the budget's
+  // own comment for the two-machine measurements that forced that, and for why calibrating the
+  // wall clock against a reference kernel did not work here. The row's wall reading is still
+  // recorded and still bounded, as a hang detector.
   const crayonFamily = STUDIO_BRUSH_CRAYON_FAMILY_IDS.map((catalogId) => {
     let best: StudioBrushCataloguePerfRow | null = null;
-    for (let pass = 0; pass < 3; pass += 1) {
+    const cpuMsPerPass: number[] = [];
+    for (let pass = 0; pass < STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES; pass += 1) {
+      const cpuBefore = process.cpuUsage();
       const row = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
         sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
-        budgetMs: 200,
+        budgetMs: STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS,
         packById,
       });
-      if (!best || row.elapsedMs < best.elapsedMs) best = row;
+      const cpuMs = process.cpuUsage(cpuBefore).user / 1_000;
+      cpuMsPerPass.push(cpuMs);
+      if (!best || cpuMs < best.cpuMs!) best = { ...row, cpuMs };
     }
-    return best!;
+    return {
+      ...best!,
+      freeze: best!.freeze || studioBrushCrayonFamilyCpuFreezes(cpuMsPerPass),
+    };
   });
   const observed = new Set(rows.map((row) => row.catalogId));
   const missingCatalogIds = paintIds.filter((id) => !observed.has(id));
@@ -942,6 +1019,7 @@ function runStudioBrushCataloguePerfMatrixCli(): void {
     if (row.ok && !row.freeze) continue;
     logMatrix(
       `FAIL ${row.catalogId} path=${row.path} elapsed=${row.elapsedMs.toFixed(1)}ms `
+      + (row.cpuMs === undefined ? "" : `cpu=${row.cpuMs.toFixed(1)}ms `)
       + `freeze=${row.freeze} failure=${row.failure ?? "-"}`,
     );
   }
