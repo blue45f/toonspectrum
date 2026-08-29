@@ -8,9 +8,21 @@ import {
   VELLO_GAP_TERMINAL_PROVIDER_ID,
 } from "../capability-gap-plan";
 
-/** The completion lane declares island completion, which is how a lane claims the gap set. */
+/**
+ * The completion lane must declare each gap by its EXACT token — the registry matches
+ * `capabilities.includes(capability)` with no wildcard, so a blanket island-completion claim is
+ * invisible to selection.
+ */
+const GAP_CAPABILITIES = [
+  "render.text.paragraph",
+  "render.mask",
+  "render.filter.image",
+  "render.blend.backdrop",
+  "render.path-effect",
+];
+
 const FULL_UNIVERSE = [
-  { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: ["surface.island.skia-complete"] },
+  { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
   { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
   { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: ["surface.island.skia-complete"] },
 ];

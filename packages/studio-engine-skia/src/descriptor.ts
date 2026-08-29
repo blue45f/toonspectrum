@@ -95,6 +95,13 @@ export const canvasKitGpuProviderDescriptor: ProviderDescriptor =
       "render.image",
       "render.mask",
       "render.filter.image",
+      // The two V13 gaps no Vello lane can own even as a texture island. They were absent while
+      // SKIA_GPU_FEATURE_CONTRACTS already declared both native, so the descriptor understated a
+      // lane the router was routing to — and EngineCapabilityRegistry.query matches capability
+      // strings exactly, with no wildcard, so the completion lane could never be selected for
+      // them. Declared here to make the claim queryable, not merely documented.
+      "render.blend.backdrop",
+      "render.path-effect",
       "surface.island.skia-complete",
     ],
     limitations: [

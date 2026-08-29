@@ -74,30 +74,26 @@ export interface VelloCapabilityGapCoverageIssue {
   readonly reason: string;
 }
 
-/**
- * The capability a lane declares to mean "I complete whatever the Vello lanes cannot own".
- *
- * The gap features are V13 routing names (`render.blend.backdrop`, `render.path-effect`); the
- * descriptor vocabulary is a different namespace and has no per-feature token for several of
- * them. `surface.island.skia-complete` is the descriptor-level form of the same claim, so a lane
- * covers a gap by declaring the feature itself OR by declaring island completion.
- */
-export const STUDIO_ENGINE_ISLAND_COMPLETION_CAPABILITY = "surface.island.skia-complete";
-
 /** Minimal shape of what the caller must show about a shipped provider. */
 export interface VelloCapabilityGapProvider {
   readonly id: string;
   readonly capabilities: readonly string[];
 }
 
+/**
+ * Coverage means the EXACT capability token, because that is what selection uses:
+ * `EngineCapabilityRegistry.query` filters on `descriptor.capabilities.includes(capability)`, and
+ * asset requirements resolve the same way. A blanket "island completion" claim reads as coverage
+ * to a human but is invisible to those code paths, so accepting it here would let a lane pass
+ * this validator while remaining unselectable for the very gap it is named to complete — the
+ * silent drop this module exists to prevent (found in review, after a first attempt did exactly
+ * that).
+ */
 function providerCoversGap(
   provider: VelloCapabilityGapProvider,
   feature: string,
 ): boolean {
-  return (
-    provider.capabilities.includes(feature)
-    || provider.capabilities.includes(STUDIO_ENGINE_ISLAND_COMPLETION_CAPABILITY)
-  );
+  return provider.capabilities.includes(feature);
 }
 
 /**

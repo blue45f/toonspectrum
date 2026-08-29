@@ -33,6 +33,26 @@ export function resetStudioLiveTransformPreviewNodeAttrs(node: Konva.Node): void
  * subtree to a bitmap) must fall back to commit-at-release: mutating attrs below a cache never
  * repaints, so the gesture would look dead while actually rearming a stale raster.
  */
+/**
+ * Does this element also exist as a CACHED second copy somewhere in the scene?
+ *
+ * `clipBelow` renders the stroke twice: the visible node, and a copy inside a cached
+ * `ClipMaskGroup` acting as the upper element's mask. The preview drives the visible node only,
+ * so the mask copy would keep the old geometry — the clipped artwork above would not follow the
+ * ink, then snap to a different result at commit once both copies re-render from the new points.
+ * Our attrs can never repaint a cached subtree, so the honest answer is to skip the preview and
+ * let this gesture commit at release.
+ */
+export function studioLiveTransformPreviewHasCachedDuplicate(
+  stage: Konva.Stage,
+  elementId: string,
+  previewNode: Konva.Node
+): boolean {
+  return stage
+    .find((node: Konva.Node) => node.getAttr("studioElementId") === elementId)
+    .some((node) => node !== previewNode && !studioLiveTransformPreviewEligible(node));
+}
+
 export function studioLiveTransformPreviewEligible(node: Konva.Node): boolean {
   let current: Konva.Node | null = node;
   while (current) {

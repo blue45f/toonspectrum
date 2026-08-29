@@ -486,6 +486,33 @@ describe("single-draw transform gesture Layer lift", () => {
     expect(dragHandlers).toContain("event.target.stopDrag();");
   });
 
+  it("refuses the preview when a cached duplicate of the same stroke exists", async () => {
+    // clipBelow renders the stroke twice: the visible node, and a copy inside a cached
+    // ClipMaskGroup acting as the upper element's mask. Driving only the visible one would leave
+    // the clipped artwork above at the old geometry until commit.
+    const { studioLiveTransformPreviewHasCachedDuplicate } = await import(
+      "./studio-live-transform-preview-konva"
+    );
+    const wrapper = addSelectedNode(scene.mainLayer, "stroke-1");
+
+    expect(
+      studioLiveTransformPreviewHasCachedDuplicate(scene.stage, "stroke-1", wrapper),
+    ).toBe(false);
+
+    const maskSandwich = new studioKonvaRuntime.Group();
+    const maskCopy = new studioKonvaRuntime.Group();
+    maskCopy.setAttr("studioElementId", "stroke-1");
+    maskSandwich.add(maskCopy);
+    scene.mainLayer.add(maskSandwich);
+    // ClipMaskGroup caches its sandwich; jsdom's stubbed canvas makes a real cache() a no-op, so
+    // the cached state is declared directly — the logic under test is the ancestor walk.
+    vi.spyOn(maskSandwich, "isCached").mockReturnValue(true);
+
+    expect(
+      studioLiveTransformPreviewHasCachedDuplicate(scene.stage, "stroke-1", wrapper),
+    ).toBe(true);
+  });
+
   it("gates translation mirrors while the preview-active attr is set and resumes after", () => {
     const { wrapper } = addTransformScene();
     const applied: Array<{ x: number; y: number }> = [];

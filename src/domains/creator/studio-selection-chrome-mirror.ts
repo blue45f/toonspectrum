@@ -31,6 +31,13 @@ export const STUDIO_SELECTION_CHROME_MIRROR_NAMESPACE = "studioSelectionChromeMi
 export const STUDIO_DRAW_SELECTION_INDICATOR_NAME = "studio-draw-selection-indicator";
 
 /**
+ * Name on the single/multi selection overlay group (label badge, lock marker, fallback boundary)
+ * rendered by StudioCanvasSelectionDecorations. Like the indicator, it is pinned to pre-gesture
+ * bounds and has to be parked while a live transform preview moves the ink.
+ */
+export const STUDIO_GROUP_SELECTION_OVERLAY_NAME = "studio-group-selection-overlay";
+
+/**
  * Wrapper attr set for the duration of a live transform preview (scale/rotate gesture).
  *
  * The preview repurposes the wrapper's x/y as the absolute target origin, so translation mirrors

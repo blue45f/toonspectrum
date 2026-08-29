@@ -6,6 +6,7 @@ import { elBounds } from "../studio-element-geometry";
 import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "../studio-layers";
 import { StudioDrawSelectionOverlay } from "../studio-page-lazy-ui";
 import { unionBounds } from "../studio-selection";
+import { STUDIO_GROUP_SELECTION_OVERLAY_NAME } from "../studio-selection-chrome-mirror";
 import { StudioGroupUniformResizeProxy } from "../StudioGroupUniformResizeProxy";
 
 import type { Tool } from "../studio-editor-tool-model";
@@ -134,7 +135,7 @@ export function renderStudioCanvasSelectionDecorations({
                 );
           return (
             <Group
-              name="studio-group-selection-overlay"
+              name={STUDIO_GROUP_SELECTION_OVERLAY_NAME}
               listening={false}
               studioSelectionRole="group-bounds"
               studioGroupId={completeSelectionGroup?.id ?? ""}

@@ -6,9 +6,11 @@ import {
   applyStudioLiveTransformPreviewNodeAttrs,
   resetStudioLiveTransformPreviewNodeAttrs,
   studioLiveTransformPreviewEligible,
+  studioLiveTransformPreviewHasCachedDuplicate,
 } from "./studio-live-transform-preview-konva";
 import {
   STUDIO_DRAW_SELECTION_INDICATOR_NAME,
+  STUDIO_GROUP_SELECTION_OVERLAY_NAME,
   STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR,
   findStudioDrawWrapperNode,
   mirrorStudioDrawElementTranslation,
@@ -212,10 +214,21 @@ export function StudioGroupUniformResizeProxy({
     const stage = proxy?.getStage();
     if (!proxy || !transformer || !stage) return null;
     const node = findStudioDrawWrapperNode(stage, livePreviewElementId);
-    if (!node || !studioLiveTransformPreviewEligible(node)) return null;
-    const parkedIndicators = stage
-      .find(`.${STUDIO_DRAW_SELECTION_INDICATOR_NAME}`)
-      .filter((indicator) => indicator.visible());
+    if (
+      !node
+      || !studioLiveTransformPreviewEligible(node)
+      || studioLiveTransformPreviewHasCachedDuplicate(stage, livePreviewElementId, node)
+    ) {
+      return null;
+    }
+    // Both pieces of single-draw chrome are pinned to the pre-gesture bounds: the dashed
+    // indicator and the selection overlay carrying the "선화 레이어 · 1개" badge. Left up, they
+    // sit at the old box while the ink moves — and once the stroke is lifted, the badge can even
+    // be painted over by it. Park both; the Transformer frame carries the affordance.
+    const parkedIndicators = [
+      ...stage.find(`.${STUDIO_DRAW_SELECTION_INDICATOR_NAME}`),
+      ...stage.find(`.${STUDIO_GROUP_SELECTION_OVERLAY_NAME}`),
+    ].filter((indicator) => indicator.visible());
     for (const indicator of parkedIndicators) indicator.visible(false);
     // Gate the translation mirrors before the first preview frame: the wrapper's x/y stops being
     // a drag offset for the whole gesture, and (once lifted) a chrome write in the document

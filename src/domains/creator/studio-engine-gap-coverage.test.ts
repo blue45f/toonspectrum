@@ -23,10 +23,20 @@ describe("Vello capability-gap alternative-engine coverage", () => {
     ).toEqual([]);
   });
 
-  it("the completion lane's coverage comes from an explicit island-completion claim", () => {
-    expect(byId.get("skia-canvaskit-gpu")?.capabilities).toContain(
-      "surface.island.skia-complete",
-    );
+  it("the completion lane declares every gap by the exact token the registry queries", () => {
+    // EngineCapabilityRegistry.query matches capabilities.includes(capability) with no wildcard,
+    // so an island-completion claim alone would leave this lane unselectable for the gaps it is
+    // named to complete.
+    const completion = byId.get("skia-canvaskit-gpu");
+    for (const feature of [
+      "render.text.paragraph",
+      "render.mask",
+      "render.filter.image",
+      "render.blend.backdrop",
+      "render.path-effect",
+    ]) {
+      expect(completion?.capabilities, feature).toContain(feature);
+    }
   });
 
   it("the Graphite challenger demotes down its declared chain to the production baseline", () => {
