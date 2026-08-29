@@ -40,13 +40,19 @@ import type { StudioLiveTransformClipRect } from "./studio-live-transform-clip-t
 import type Konva from "konva";
 
 /**
- * Attr recording the clip THIS module last wrote to a container, for its own restore.
+ * Attr holding this gesture's claim on a container: what it last WROTE, and the value to restore.
  *
- * It holds the rect (or `null` for "cleared"), not just a flag, so cleanup can tell its own write
- * from a newer one. A collaborator resizing the containing frame mid-gesture re-renders the clip
- * `Group` with new props without changing the stroke's identity, so the gesture continues while
- * React installs a newer rect; blindly restoring the pre-gesture rect would overwrite it, and a
- * later render with unchanged props would not repair an imperative mutation.
+ * Both halves are needed because the clip can change under us. A collaborator resizing the
+ * containing frame mid-gesture re-renders the clip `Group` with new props without changing the
+ * stroke's identity, so the gesture continues while React installs a newer rect. `written` lets
+ * cleanup tell its own write from that newer one and stand down instead of clobbering it; React
+ * has already rendered the new props, so a later render with unchanged values would not repair an
+ * imperative mutation.
+ *
+ * `restore` is the baseline, and it is re-taken whenever such a divergence is seen — the pointer
+ * leaving and re-entering the frame is enough to make this module write again, and a claim that
+ * simply reset itself would then restore the stale PRE-resize rect at release, leaving the stroke
+ * clipped to a frame size that no longer exists.
  */
 export const STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR = "studioLiveTransformClipOwned";
 
@@ -70,11 +76,17 @@ function asContainer(node: Konva.Node | null | undefined): ClipContainer | null 
   return typeof candidate.clipFunc === "function" ? candidate : null;
 }
 
-function ownedRect(node: Konva.Node): StudioLiveTransformClipRect | null | undefined {
-  const owned = node.getAttr(STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR) as
-    | { readonly rect: StudioLiveTransformClipRect | null }
+interface StudioLiveTransformClipClaim {
+  /** The last rect this module wrote — `null` when it cleared the clip. */
+  readonly written: StudioLiveTransformClipRect | null;
+  /** What the host should go back to when the gesture ends. */
+  readonly restore: StudioLiveTransformClipRect | null;
+}
+
+function readClaim(node: Konva.Node): StudioLiveTransformClipClaim | undefined {
+  return node.getAttr(STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR) as
+    | StudioLiveTransformClipClaim
     | undefined;
-  return owned ? owned.rect : undefined;
 }
 
 /**
@@ -115,7 +127,7 @@ export function readStudioLiveTransformClip(
   if (host.mode === "func") {
     // A `clipFunc` is a closure, not readable geometry, so what this module wrote is the only
     // honest answer — and nothing else writes `clipFunc` on a stroke wrapper.
-    return ownedRect(host.node) ?? null;
+    return readClaim(host.node)?.written ?? null;
   }
   const node = asContainer(host.node);
   if (!node) return null;
@@ -168,8 +180,36 @@ export function applyStudioLiveTransformClip(
   if (!host) return false;
   const node = asContainer(host.node);
   if (!node) return false;
-  if (!studioLiveTransformClipChanged(readStudioLiveTransformClip(host), rect)) return false;
-  if (host.mode === "func") {
+  const current = readStudioLiveTransformClip(host);
+  const claim = readClaim(node);
+  // Re-take the baseline whenever the host no longer holds what this module last wrote: someone
+  // else owns that value now, and the pre-gesture rect it replaced is no longer what "restore"
+  // means. Without this, a frame written after an external update would silently re-claim the host
+  // and cleanup would put the stale rect back.
+  const restore =
+    claim === undefined || studioLiveTransformClipChanged(current, claim.written)
+      ? current
+      : claim.restore;
+  if (!studioLiveTransformClipChanged(current, rect)) {
+    // Nothing to write, but a re-taken baseline still has to be recorded — the divergence is just
+    // as real on a frame whose verdict happens to match what the other owner wrote.
+    if (claim !== undefined) {
+      node.setAttr(STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR, { written: rect, restore });
+    }
+    return false;
+  }
+  writeClip(node, host.mode, rect);
+  node.setAttr(STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR, { written: rect, restore });
+  return true;
+}
+
+/** The raw scene-graph write, with no claim bookkeeping. */
+function writeClip(
+  node: ClipContainer,
+  mode: StudioLiveTransformClipHostMode,
+  rect: StudioLiveTransformClipRect | null,
+): void {
+  if (mode === "func") {
     node.clipFunc?.(rect ? documentRectClipFunc(node, rect) : undefined);
   } else if (rect) {
     node.setAttr("clipX", rect.x);
@@ -181,32 +221,40 @@ export function applyStudioLiveTransformClip(
     node.setAttr("clipWidth", undefined);
     node.setAttr("clipHeight", undefined);
   }
-  node.setAttr(STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR, { rect });
-  return true;
 }
 
 /**
- * Restores the clip this module took over, back to `original`.
+ * Restores the clip this module took over, to the baseline recorded in its claim.
  *
- * Only touches a host it marked AND still holding exactly what it last wrote, so a clip the
- * product changed for its own reasons mid-gesture — a collaborator resizing the frame, say — is
- * left as the newer value rather than reverted to a rect that is no longer true.
+ * Only touches a host it claimed AND still holding exactly what it last wrote, so a clip the
+ * product changed for its own reasons mid-gesture is left as the newer value rather than reverted.
+ *
+ * @param fallback used only when the claim carries no baseline of its own.
  */
 export function restoreStudioLiveTransformClip(
   host: StudioLiveTransformClipHost | null,
-  original: StudioLiveTransformClipRect | null,
+  fallback: StudioLiveTransformClipRect | null,
 ): boolean {
   if (!host) return false;
   const node = asContainer(host.node);
   if (!node) return false;
-  const lastWritten = ownedRect(node);
-  if (lastWritten === undefined) return false;
-  if (studioLiveTransformClipChanged(readStudioLiveTransformClip(host), lastWritten)) {
-    // Someone else owns this clip now. Drop our claim without touching their value.
-    node.setAttr(STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR, undefined);
+  const claim = readClaim(node);
+  if (claim === undefined) return false;
+  // Read BEFORE dropping the claim: in `func` mode the claim IS the readable state.
+  const diverged = studioLiveTransformClipChanged(
+    readStudioLiveTransformClip(host),
+    claim.written,
+  );
+  node.setAttr(STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR, undefined);
+  if (diverged) {
+    // Someone else owns this clip now. Drop the claim without touching their value.
     return false;
   }
-  const changed = applyStudioLiveTransformClip(host, original);
-  node.setAttr(STUDIO_LIVE_TRANSFORM_CLIP_OWNED_ATTR, undefined);
-  return changed;
+  // `restore` is legitimately `null` for "no clip", so the fallback is only for a claim that
+  // carries no baseline at all — never a nullish coalesce, which would turn "clear it" into
+  // "put the caller's rect back".
+  const target = claim.restore === undefined ? fallback : claim.restore;
+  if (!studioLiveTransformClipChanged(claim.written, target)) return false;
+  writeClip(node, host.mode, target);
+  return true;
 }

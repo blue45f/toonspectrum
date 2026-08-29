@@ -223,6 +223,35 @@ describe("live transform panel-clip tracking (Konva)", () => {
     expect(readStudioLiveTransformClip(host)).not.toBeNull();
   });
 
+  it("re-baselines when a later frame writes after another owner changed the clip", () => {
+    // The sequence the plain divergence check misses: the collaborator resizes the frame, then the
+    // pointer leaves and RE-ENTERS it, so this module writes again. A claim that simply reset
+    // itself would restore the stale pre-resize rect at release, leaving the stroke clipped to a
+    // frame size that no longer exists.
+    const { wrapper, clipGroup } = addClippedStroke();
+    const host = findStudioLiveTransformClipHost(wrapper, dragLayer);
+    const preGesture = readStudioLiveTransformClip(host);
+    expect(preGesture).toEqual({ x: 0, y: 0, width: 200, height: 200 });
+
+    // Frame 1: the stroke leaves the panel, so this module clears the clip.
+    expect(applyStudioLiveTransformClip(host, null)).toBe(true);
+
+    // A collaborator resizes the frame; React renders the new rect straight onto the same node.
+    clipGroup.setAttr("clipX", 0);
+    clipGroup.setAttr("clipY", 0);
+    clipGroup.setAttr("clipWidth", 320);
+    clipGroup.setAttr("clipHeight", 200);
+
+    // Frame 2: the stroke re-enters, so this module writes the new panel rect.
+    expect(applyStudioLiveTransformClip(host, { x: 0, y: 0, width: 320, height: 200 })).toBe(false);
+    // Frame 3: it leaves again — a real write, on top of the collaborator's value.
+    expect(applyStudioLiveTransformClip(host, null)).toBe(true);
+
+    // Release: back to the RESIZED rect, not the 200-wide one the gesture started with.
+    expect(restoreStudioLiveTransformClip(host, preGesture)).toBe(true);
+    expect(readStudioLiveTransformClip(host)).toEqual({ x: 0, y: 0, width: 320, height: 200 });
+  });
+
   it("leaves a clip another owner rewrote mid-gesture alone", () => {
     // A collaborator resizing the containing frame re-renders the clip `Group` with new props
     // without changing the stroke's identity, so the gesture continues while React installs a
