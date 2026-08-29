@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   measureStudioPerfCalibrationMs,
   STUDIO_PERF_CALIBRATION_MAX_SLOWDOWN,
+  STUDIO_PERF_CALIBRATION_MIN_SIBLING_MS,
   STUDIO_PERF_CALIBRATION_REFERENCE_MS,
   studioCalibratedBudgetMs,
   studioPerfCalibrationWorkload,
   studioPerfRatioBudgetMs,
   studioPerfSustainedCalibrationWorkload,
+  studioRatioBudgetFromSiblingMs,
 } from "./studio-perf-budget-calibration";
 
 /**
@@ -137,13 +139,35 @@ describe("studioPerfRatioBudgetMs", () => {
   it("scales the recorded ratio by the sibling's measured cost", () => {
     // A sibling that measures ~0 would divide the gate away, so the contract is simply
     // budget = ratio x sibling: a sibling twice as slow buys twice the budget, and nothing else.
+    //
+    // Pinned against the pure half, EXACTLY. Timing it instead meant measuring the same sibling
+    // twice, non-interleaved, and asserting the two readings agreed within 1.5-2.5x; under
+    // contention they do not (12.18 and 0.258 were both recorded here), so that form graded the
+    // machine rather than the rule. Nothing is weakened by moving it: the rule now has to hold
+    // for every sibling cost, not just the one this run happened to measure.
+    expect(studioRatioBudgetFromSiblingMs(2, 3)).toBe(6);
+    expect(studioRatioBudgetFromSiblingMs(1, 3)).toBe(3);
+    expect(studioRatioBudgetFromSiblingMs(2, 3) / studioRatioBudgetFromSiblingMs(1, 3)).toBe(2);
+    // A sibling twice as slow buys twice the budget, at any ratio.
+    expect(studioRatioBudgetFromSiblingMs(0.034, 400)).toBeCloseTo(13.6, 10);
+    expect(studioRatioBudgetFromSiblingMs(0.034, 800)).toBeCloseTo(27.2, 10);
+    // And the live form still measures a real sibling and produces a usable number.
     const budget = studioPerfRatioBudgetMs(2, () => studioPerfCalibrationWorkload(), 2);
-    const half = studioPerfRatioBudgetMs(1, () => studioPerfCalibrationWorkload(), 2);
     expect(budget).toBeGreaterThan(0);
     expect(Number.isFinite(budget)).toBe(true);
-    // Same sibling, double the ratio: within measurement noise the budget doubles.
-    expect(budget / half).toBeGreaterThan(1.5);
-    expect(budget / half).toBeLessThan(2.5);
+  });
+
+  it("refuses to gate below the sibling floor, whatever the ratio", () => {
+    // Below the floor a reading is timer resolution, not machine speed, and multiplying it would
+    // manufacture a failure in code that never regressed.
+    expect(studioRatioBudgetFromSiblingMs(2, STUDIO_PERF_CALIBRATION_MIN_SIBLING_MS / 2))
+      .toBe(Number.POSITIVE_INFINITY);
+    expect(studioRatioBudgetFromSiblingMs(2, Number.NaN)).toBe(Number.POSITIVE_INFINITY);
+    expect(studioRatioBudgetFromSiblingMs(2, Number.POSITIVE_INFINITY))
+      .toBe(Number.POSITIVE_INFINITY);
+    // Exactly at the floor it still gates -- the floor is a minimum, not an exclusive bound.
+    expect(studioRatioBudgetFromSiblingMs(2, STUDIO_PERF_CALIBRATION_MIN_SIBLING_MS))
+      .toBeCloseTo(2 * STUDIO_PERF_CALIBRATION_MIN_SIBLING_MS, 10);
   });
 
   it("refuses to gate at all rather than gate on an unmeasurable sibling", () => {

@@ -38,6 +38,14 @@
  *     speed but something pathological, and an unbounded scale factor would quietly turn every
  *     budget in this directory into a no-op. Beyond the clamp the gate stays where the clamp puts
  *     it and fails rather than dissolving.
+ *
+ * **Prefer `studio-perf-calibration.ts` for new call sites.** That module reaches the same goal by
+ * interleaving the reference with the workload sample-for-sample and taking the minimum of both,
+ * so a contended stretch inflates numerator and denominator together; it also makes a violation
+ * earn confirmation passes. This module measures its reference in a separate window, which tracks
+ * a slower machine well and a momentarily busier one less well. It stays for the two call sites
+ * whose measured work is not a re-runnable `() => void` -- a per-slice budget inside an idle-pump
+ * loop, and a stateful append pass -- which is the one shape the interleaved form cannot take.
  */
 
 /**
@@ -180,14 +188,31 @@ export function studioPerfRatioBudgetMs(
     calibrate();
     best = Math.min(best, performance.now() - startedAt);
   }
+  return studioRatioBudgetFromSiblingMs(recordedRatio, best);
+}
+
+/**
+ * The pure half of the sibling form: what a recorded ratio is worth once the sibling has been
+ * measured at `siblingMs`.
+ *
+ * Split out so the contract -- linear in the ratio, and refusing to gate below the floor -- can be
+ * pinned exactly rather than within the spread of two live measurements. Timing that linearity
+ * meant measuring the same sibling twice, non-interleaved, and asserting the readings agreed; on a
+ * contended box they do not (recorded at 12.18 against a 2.5 ceiling, and 0.258 against a 1.5
+ * floor, in the same suite), so the test was failing on the machine rather than on the code.
+ */
+export function studioRatioBudgetFromSiblingMs(
+  recordedRatio: number,
+  siblingMs: number,
+): number {
   // A sibling this cheap is not a denominator: below it, timer resolution and call overhead are
   // most of the reading, and multiplying it by the ratio would gate healthy code to a few
   // microseconds. Refusing to gate is the safe direction -- a broken calibration must never
   // manufacture a failure in code that never regressed.
-  if (!Number.isFinite(best) || best < STUDIO_PERF_CALIBRATION_MIN_SIBLING_MS) {
+  if (!Number.isFinite(siblingMs) || siblingMs < STUDIO_PERF_CALIBRATION_MIN_SIBLING_MS) {
     return Number.POSITIVE_INFINITY;
   }
-  return recordedRatio * best;
+  return recordedRatio * siblingMs;
 }
 
 /**
