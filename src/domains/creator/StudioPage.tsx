@@ -5330,6 +5330,31 @@ function StudioCuttoonEditor({
     // documented [activePage.id, masterEditMode, marqueeIds, selectedId].
     setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
   }, [activePage.id, masterEditMode, marqueeIds, selectedId]);
+  // A session captures its source elements BY IDENTITY, and reconciliation — a remote CRDT apply,
+  // an undo, any same-selection document update — replaces those objects without changing the
+  // page, the mode or the selected ids. The effect above therefore cannot see it: its dependency
+  // array is a documented boundary, pinned by the runtime-boundary contract, so this watches
+  // element identity separately rather than widening it.
+  //
+  // The commit already refuses this case (`sourceStillMatches`), so nothing corrupt can be
+  // written — but only at pointer-up. Until then the preview keeps transforming the reconciled
+  // stroke against source bounds that no longer describe it, and keeps holding the edit lease for
+  // a gesture that cannot succeed. Cancelling at the moment identity changes ends both.
+  //
+  // Inert on the hot path: a gesture makes no React commits, so `elements` does not change during
+  // one, and an unrelated re-render leaves every element identity intact and returns here.
+  useEffect(() => {
+    const session = groupResizeRef.current;
+    if (!session) return;
+    const byId = new Map(elements.map((element) => [element.id, element]));
+    const sourceStillMatches = session.sourceElements.every(
+      (element) => byId.get(element.id) === element
+    );
+    if (sourceStillMatches) return;
+    groupResizeRef.current = null;
+    endLiveResourceEdit();
+    setCanvasSelectionResizeCancelSignal((signal) => signal + 1);
+  }, [elements]);
   // 그룹 선택 상태 3종을 한 번에 적용하는 어댑터. ref를 동기로 갱신해 같은 렌더 안에서 연달아
   // 발생하는 포인터 이벤트(예: 더블클릭의 2연속 mousedown)도 최신 진입 상태를 읽게 한다.
   function applyGroupSelectionState(next: GroupSelectionState) {

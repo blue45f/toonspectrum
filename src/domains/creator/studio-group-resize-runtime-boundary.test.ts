@@ -257,6 +257,30 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expectSourceToken(proxySource, "onCancelRef.current()", "proxy cancellation");
   });
 
+  it("cancels an active session when reconciliation replaces its source elements", () => {
+    // A session captures its sources BY IDENTITY, and the selection-invalidation effect cannot see
+    // a replacement: its dependency array is the documented
+    // [activePage.id, masterEditMode, marqueeIds, selectedId] boundary, which carries no element
+    // state. The commit refuses the case already (`sourceStillMatches`), so nothing corrupt is
+    // written — but only at pointer-up, leaving the preview transforming a stroke it no longer
+    // describes and holding the edit lease meanwhile. A separate identity watch ends it at once,
+    // rather than widening the pinned array.
+    const watchStart = pageSource.indexOf("const session = groupResizeRef.current;\n    if (!session) return;\n    const byId = new Map(elements.map(");
+    expect(watchStart, "reconciliation identity watch").toBeGreaterThan(-1);
+    const watchSource = pageSource.slice(watchStart, watchStart + 900);
+
+    expectSourceToken(watchSource, "session.sourceElements.every", "reconciliation watch");
+    expectSourceToken(watchSource, "groupResizeRef.current = null", "reconciliation watch");
+    expectSourceToken(watchSource, "endLiveResourceEdit()", "reconciliation watch");
+    expectSourceToken(
+      watchSource,
+      "setCanvasSelectionResizeCancelSignal",
+      "reconciliation watch",
+    );
+    // Watches element identity, so an unrelated re-render cannot cancel a healthy gesture.
+    expectSourceToken(watchSource, "}, [elements]);", "reconciliation watch");
+  });
+
   it("keeps the existing single-object Transformer detached for every multi/group selection", () => {
     const transformerEffectStart = pageSource.indexOf(
       "// 트랜스포머를 선택 노드",
