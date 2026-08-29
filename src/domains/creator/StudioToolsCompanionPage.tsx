@@ -90,6 +90,7 @@ import { useStudioCompanionWindowLayout } from "./use-studio-companion-window-la
 import { buttonClass } from "@/components/ui/button-utils";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { studioCanOpenAuxiliaryWindow } from "@/src/compat/in-app-browser";
 import Link from "@/src/compat/router-link";
 
 const HEARTBEAT_INTERVAL_MS = 4_000;
@@ -296,6 +297,19 @@ export function StudioToolsCompanionPage() {
   const [screenPlacementStatus, setScreenPlacementStatus] = useState<ScreenPlacementStatus | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const interactionReady = connected && targetPrimaryInstanceId !== null;
+  /**
+   * 이 창을 벗어날 방법이 환경마다 다르다.
+   *
+   * 보조 창을 열 수 있는 브라우저에서 이 페이지는 보통 기본 스튜디오가 띄운 팝업이라,
+   * 사용자는 창을 닫으면 된다 — 거기에 같은 탭 `/studio` 링크를 놓으면 도구 창이 두 번째
+   * 편집기로 바뀌어 버린다. 반대로 인앱 브라우저(카카오톡·인스타그램)에서 공유 링크를 타고
+   * 이 주소로 들어오면 창 크롬도 주소창도 뒤로 가기도 없어서, 화면 안 링크가 유일한 문이다.
+   * 그래서 탈출구는 팝업을 못 여는 환경에서만 내보내고, 재연결 링크도 같은 신호로 target 을 고른다.
+   */
+  const canOpenAuxiliaryWindow = studioCanOpenAuxiliaryWindow();
+  const reconnectTargetProps = canOpenAuxiliaryWindow
+    ? ({ rel: "noopener noreferrer", target: "_blank" } as const)
+    : ({} as const);
   const companionWindowLayout = useStudioCompanionWindowLayout({
     surface: effectiveSurface,
     enabled: sessionId !== null,
@@ -1470,19 +1484,37 @@ export function StudioToolsCompanionPage() {
         dedicatedLayout ? "flex min-h-0 flex-1 flex-col gap-4" : "space-y-4"
       )}>
         {lastError ? (
-          <div role="alert" className="rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">
-            <p>{lastError}</p>
-            {/*
-              이 창은 보통 기본 스튜디오가 window.open 으로 띄운다. 팝업이라면 사용자가 그냥 닫으면
-              되지만, 인앱 브라우저(카카오톡·인스타그램)에서 이 주소로 바로 들어오면 창 크롬도
-              주소창도 없어서 앱을 끄는 것 말고는 길이 없었다. 세션이 없다고 말할 때는 갈 곳도 같이 준다.
-            */}
+          <p role="alert" className="rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">
+            {lastError}
+          </p>
+        ) : null}
+        {/*
+          막다른 상태의 문.
+
+          처음에는 `lastError` 안에만 뒀는데, 그러면 실제로 갇히는 경우를 놓친다. 세션 ID 가
+          형식상 유효하면 BroadcastChannel 생성이 성공해서 `lastError` 는 계속 null 이고,
+          기본 탭이 하나도 응답하지 않아도 `expirePrimary` 는 `connected` 만 내린다 — 에러가
+          영원히 없는 채로 연결만 안 되는 상태다. 그래서 조건은 에러가 아니라 `interactionReady` 다.
+
+          팝업을 열 수 있는 환경에서는 내보내지 않는다. 거기서 이 페이지는 기본 스튜디오가 띄운
+          팝업이라 사용자는 창을 닫으면 되고, 같은 탭 이동은 도구 창을 두 번째 편집기로 바꿔
+          버린다. 문이 필요한 쪽은 창 크롬도 주소창도 없는 인앱 브라우저다.
+        */}
+        {!interactionReady && !canOpenAuxiliaryWindow ? (
+          <div className="shrink-0 rounded-xl border border-line/70 bg-card/55 px-3 py-2.5">
+            <p className="text-xs text-fg-2">
+              {localizeText(
+                t,
+                "기본 스튜디오와 연결되지 않았습니다.",
+                "studio.toolsCompanion.exit.disconnected",
+              )}
+            </p>
             <Link
               href="/studio"
               data-studio-route-exit="editor"
-              className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              Studio 편집기 열기
+              {localizeText(t, "Studio 편집기 열기", "studio.toolsCompanion.exit.editor")}
             </Link>
           </div>
         ) : null}
@@ -1517,8 +1549,7 @@ export function StudioToolsCompanionPage() {
               typeof window !== "undefined" ? window.location.origin : "",
               location.search
             )}
-            target="_blank"
-            rel="noopener noreferrer"
+            {...reconnectTargetProps}
             className={cn(buttonClass({ size: "sm", variant: "solid" }), "min-h-11 justify-start gap-2 no-underline")}
           >
             <WandSparkles className="size-3.5" aria-hidden />
@@ -1611,8 +1642,7 @@ export function StudioToolsCompanionPage() {
                       typeof window !== "undefined" ? window.location.origin : "",
                       location.search
                     )}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    {...reconnectTargetProps}
                   className={cn(buttonClass({ size: "sm", variant: "solid" }), "min-h-11 justify-start gap-2 no-underline")}
                 >
                   <WandSparkles className="size-3.5" aria-hidden />

@@ -32,7 +32,10 @@ describe("Studio lazy i18n assets", () => {
     for (const locale of STUDIO_I18N_ASSET_LOCALES) {
       const dictionary = parseStudioI18nDictionary(readAsset(locale));
       expect(dictionary).not.toBeNull();
-      expect(Object.keys(dictionary ?? {})).toHaveLength(1_323);
+      // 1_323 → 1_325: 컴패니언 창의 막다른 상태에 붙인 탈출구 두 줄
+      // (studio.toolsCompanion.exit.disconnected / .editor). 이 숫자는 래칫이므로 키를
+      // 늘리거나 줄이는 변경은 여기서 한 번 더 눈에 띄어야 한다.
+      expect(Object.keys(dictionary ?? {})).toHaveLength(1_325);
     }
     // The mobile dock used to hardcode Korean labels; every pack must now carry the keys that
     // replaced them, so an `en` viewport cannot fall back to Korean chrome.
