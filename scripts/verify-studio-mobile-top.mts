@@ -6,7 +6,10 @@
  * immersive (default) and windowed mobile shells, measures:
  * - (a) horizontal overflow contributors (element rects exceeding the viewport
  *   outside any horizontal scroll row) + document scrollWidth overflow
- * - (b) bounding-box overlap between distinct interactive top-chrome controls
+ * - (b) bounding-box overlap between distinct interactive top-chrome controls —
+ *   including the canvas-sticky live-presence dock, which shares the immersive
+ *   shell's top band with the floating menubar pill from a different
+ *   positioning context
  * - (c) menubar clipping (overflow-hidden lane scrollWidth > clientWidth),
  *   hit-test clipped buttons, top-bar height blowup across widths
  *   (h@320 must be ≤ 1.6 × h@430) and canvas-below-the-fold regressions
@@ -280,8 +283,14 @@ async function measureTopChrome(page: Page, mode: ShellMode): Promise<TopChromeM
       '[data-studio-mobile-editing-dock="true"]',
     );
 
+    // The live-presence dock is not shell chrome — it is sticky inside the canvas scrollport —
+    // but on the immersive mobile shell it paints in the very same band as the floating menubar
+    // pill, and neither positioning context can see the other's width. Including it here is what
+    // turns "게시하기 hit-test lost to div" into an overlap pair that names the real culprit.
+    const presenceDock = document.querySelector('[data-studio-presence-dock="true"]');
+
     const containers: Element[] = [];
-    for (const candidate of [siteHeader, menubar, statusRail, toolBelt]) {
+    for (const candidate of [siteHeader, menubar, statusRail, toolBelt, presenceDock]) {
       if (candidate && isVisible(candidate)) containers.push(candidate);
     }
 

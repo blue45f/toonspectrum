@@ -62,6 +62,7 @@ import type { StudioCommentAnchor } from "../studio-comments";
 import type { StudioLivePeer } from "./studio-live-collaboration-room";
 
 import { cn } from "@/lib/utils";
+import { studioCanOpenAuxiliaryWindow } from "@/src/compat/in-app-browser";
 
 export interface StudioLiveCanvasCursor {
   participant: StudioLiveParticipant;
@@ -1392,7 +1393,10 @@ export function StudioLivePresenceDockConnected({
       operationSyncReady={operationSyncReady}
       alwaysOn
       onOpenCompanionTab={
-        room
+        // 인앱 브라우저(카카오톡·인스타그램·네이버앱 …)에서는 window.open 이 언제나 null 을
+        // 돌려주므로 이 버튼은 눌러도 아무 일이 없는 죽은 컨트롤이 된다. 실패를 사후에
+        // 안내하는 대신 아예 내보내지 않는다 — 모바일 상단 크롬에서 44px 을 되찾는 효과도 있다.
+        room && studioCanOpenAuxiliaryWindow()
           ? () => {
               openStudioLiveCompanionTab(room.workId);
             }

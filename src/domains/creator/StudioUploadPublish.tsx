@@ -734,9 +734,11 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
       className={STUDIO_UPLOAD_CONTAINER_CLASS}
     >
       <div className="mb-5 flex flex-wrap items-center gap-3">
+        {/* 인앱 브라우저에는 주소창도 뒤로 가기 크롬도 없다 — 이 링크가 게시 화면을 벗어나는
+            유일한 문이다. 20px 텍스트 링크로 두면 손가락으로 잡기 어려우니 터치에서만 44px 로 올린다. */}
         <Link
           href="/create"
-          className="inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"
+          className="inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg pointer-coarse:min-h-11 pointer-coarse:-mx-1 pointer-coarse:px-1"
         >
           <ArrowLeft size={15} />
           창작 게시판

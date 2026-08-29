@@ -45,6 +45,18 @@ describe("Studio mobile top browser harness boundary", () => {
     );
   });
 
+  it("measures the canvas-sticky presence dock as top-chrome, not as canvas content", () => {
+    // The immersive pill (absolute, shell-owned) and the presence dock (sticky, viewport-owned)
+    // cannot see each other's width. Leaving the dock out of the container set is what let it
+    // cover the publish CTA at 320/360px while only an anonymous hit-test loss was reported.
+    expect(harness).toContain(
+      'const presenceDock = document.querySelector(\'[data-studio-presence-dock="true"]\');',
+    );
+    expect(harness).toContain(
+      "for (const candidate of [siteHeader, menubar, statusRail, toolBelt, presenceDock]) {",
+    );
+  });
+
   it("does not suppress the retired visit ping from browser health failures", () => {
     expect(harness).not.toContain("/api/v1/apps/toonspectrum/visits/ping");
     expect(harness).toContain('"/api/kmas/merge-on-access"');
