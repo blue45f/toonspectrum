@@ -823,6 +823,7 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
   // recorded and still bounded, as a hang detector.
   const crayonFamily = STUDIO_BRUSH_CRAYON_FAMILY_IDS.map((catalogId) => {
     let best: StudioBrushCataloguePerfRow | null = null;
+    let anyPassWallFreeze = false;
     const cpuMsPerPass: number[] = [];
     for (let pass = 0; pass < STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES; pass += 1) {
       const row = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
@@ -834,11 +835,16 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
       // budget covers the product path alone -- not the fixture setup or the receipt digest.
       const cpuMs = row.cpuMs ?? Number.POSITIVE_INFINITY;
       cpuMsPerPass.push(cpuMs);
+      // The wall ceiling is a HANG detector, so it applies to every pass and is accumulated
+      // here rather than read off the row that happens to win on CPU. A cold or periodically
+      // initialising pass can blow it while a later warm pass costs less CPU and becomes `best`,
+      // and reading the wall verdict from `best` alone would drop that stall from the report.
+      anyPassWallFreeze = anyPassWallFreeze || row.freeze;
       if (!best || cpuMs < best.cpuMs!) best = row;
     }
     return {
       ...best!,
-      freeze: best!.freeze || studioBrushCrayonFamilyCpuFreezes(cpuMsPerPass),
+      freeze: anyPassWallFreeze || studioBrushCrayonFamilyCpuFreezes(cpuMsPerPass),
     };
   });
   const observed = new Set(rows.map((row) => row.catalogId));
