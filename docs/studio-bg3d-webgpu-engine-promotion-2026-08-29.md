@@ -105,6 +105,13 @@ re-export하는 승인된 WebGPU entry)를 import하면 **포저의 청크까지
 커버리지가 같은 값이라는 게 핵심이다. 잘못된 빌드를 고르면 예외 없이 캐릭터만 프레임에서 빠지므로,
 "오류가 없었다"가 아니라 **실루엣이 같다**를 게이트로 삼았다.
 
+> **후속 정정.** 실루엣은 같지만 **색은 같지 않다.** 이 게이트는 래스터를 비교하지 않고 덮인
+> 픽셀 수만 봤고, 뒤에 같은 harness로 색을 비교해 보니 두 MToon 구현이 표면 전체에서 어긋난다
+> (WebGPU가 평균 휘도 5.7% 어둡고, 림 하이라이트는 최대 169/255 차이). 그래서 캐릭터가 있는
+> 장면은 다시 baseline으로 고정한다 — 로드가 안 돼서가 아니라 납품 색이 머신마다 달라지기
+> 때문이다. 측정과 결정은
+> `studio-bg3d-vrm-mtoon-backend-color-divergence-2026-08-29.md`.
+
 ### 모델 썸네일도 renderer를 가리지 않는다
 
 썸네일 캡처는 편집기의 renderer를 빌려 쓴다. 그 renderer가 WebGPU가 될 수 있게 된 순간
@@ -173,16 +180,78 @@ WebGPU 엔진은 승인된 지연 entry 하나(`studio-bg3d-three-webgpu-entry.t
 이름을 붙이면 rolldown이 그 공유 그래프의 집을 새 청크로 만들어 모든 three 소비자가
 897 KiB 청크를 정적으로 끌어오고 BG3D 편집기 활성화가 gzip 68 KiB 늘어났다.
 
+## 승격 직후 잡은 결함 — canvas 아이덴티티가 동적이 되면서 생긴 이음매
+
+`canvasKey` 를 도입해 Canvas 가 세션 중에 remount 될 수 있게 되자, **renderer 아이덴티티나 세션
+상태에 걸려 있던 코드가 전부 새로운 의미를 갖게 됐다.** 승격 자체와 달리 이 이음매들은 감사하지
+않았고, 넷 다 예외를 던지지 않는다.
+
+### 편집 내용이 사라지던 경로 (가장 심각)
+
+`useStudioBg3dEditorRestoreEffects` 의 초기 장면 복원 effect 는 `modelRenderer` 를 의존성으로
+가진다. 승격 전에는 그 아이덴티티가 세션 중에 바뀌지 않았으므로 무해했다. 이제는 엔진 선호
+변경·WebGPU 폴백·디바이스 손실 복구가 전부 새 renderer 를 만들고, 그때마다 이 effect 가 다시 돌아
+**히스토리를 비우고 모델 캐시를 dispose 하고 모달을 열었던 시점의 장면으로 되돌린다.** 편집 도중
+엔진을 바꾼 아티스트는 그동안의 작업을 잃는다.
+
+의존성 자체가 틀린 게 아니다 — KTX2 는 backend 마다 지원 포맷이 달라 transcode 대상이 갈리므로
+모델 캐시는 실제로 renderer 에 묶여 있다. 그래서 **무엇을 다시 만드는지**를 갈랐다: 모달 세션과
+초기 장면 입력이 그대로인데 renderer 만 새것이면 remount 로 보고, 캐시만 **현재 문서** 기준으로
+다시 채운다. 인스턴스는 `modelId` 로 캐시를 조회하므로 같은 키로 다시 채우면 장면 그래프가 다음
+렌더에서 새 root 를 집어 간다. 히스토리·프리미티브·문서는 건드리지 않는다.
+
+### 첫 몰입형 시도가 취소되던 경로
+
+WebXR latch 는 `webXrSessionState.status !== "idle"` 에서 파생된다. 그 상태는 `controller.start()`
+가 **이미** WebGPU canvas 의 controller 로 네이티브 세션을 요청한 뒤에만 참이 된다. 그러면 latch
+가 WebGL2 를 고르고, `canvasKey` 가 바뀌고, 요청 중이던 controller 가 파괴된다.
+
+remount 를 먼저 하고 `start()` 를 부르는 것도 답이 아니다 — 그 사이에 클릭의 user activation 이
+사라져 `requestSession` 이 거부된다. 그래서 **시작 자체를 막는다**: WebGPU 가 canvas 를 소유하는
+동안 `webXrDisabledReason` 이 "보기 탭에서 WebGL2 를 고른 뒤 다시 시도" 라고 답한다. latch 는 그대로
+두되(세션 중 WebGPU 로 바꾸는 것은 여전히 막아야 한다) 이제 remount 를 유발하지 않는다.
+
+### 배너가 실제 결정과 달랐던 것
+
+WebGPU 초기화 실패 배너가 첫 실패부터 "WebGL2 로 전환합니다" 라고 말했다. 한계는 2회이므로 첫
+실패 뒤에는 **WebGPU canvas 가 다시 뜨고** 배지도 WebGPU 를 가리킨다. 이제 호출부는 원인만
+보고하고, 문장의 결과 부분은 실제로 일어날 결정에서 파생한다.
+
+### 재오픈 중 저장한 선택이 덮이던 것
+
+유지된 편집기를 닫았다 열면 부트스트랩이 다시 도는데 `phase` 가 리셋되지 않아 엔진 버튼이 계속
+활성 상태였다. 그 사이 고른 선호를, 먼저 시작돼 있던 `loadPreference()` 가 나중에 돌아와 덮었다.
+이제 실제 닫힘→열림 전이에서만 `phase` 를 되돌리고(불안정한 콜백 아이덴티티로 effect 가 재실행될
+때는 되돌리지 않는다 — 그러면 ready↔probing 이 무한 진동한다), 명시적 선택마다 올라가는 revision
+과 대조해 오래된 복원값은 버린다.
+
 ## 남은 작업
 
 - VRM 포저(`StudioVrmPoserViewport`)는 여전히 자체 `WebGLRenderer`를 소유한다. 이번 변경은 BG3D
   공유 스테이지의 캐릭터 경로만 backend를 따라가게 했다. 포저까지 옮기려면 그 뷰포트의 renderer
-  수명 자체를 정책 아래로 넣어야 하므로 별도 작업이다.
+  수명 자체를 정책 아래로 넣어야 하므로 별도 작업이다. **다만 시급하지는 않다**: 캐릭터가 있는
+  장면이 baseline으로 고정되면서 포저(WebGL2)와 출력이 이미 같은 경로가 됐다. 포저 이관은 상류
+  MToon이 수렴한 뒤에 다시 볼 문제다.
 - WebXR: Three의 WebGPU XR 경로가 현재 WebGL 세션 브리지와 동등해질 때까지 `three-webgpu`의
   capability 목록에서 제외한다.
 - 실기기 GPU 계측(프레임 타임·입력 지연)은 `studio-bg3d-engine-benchmark-contract.ts`의
   런을 실제 단말에서 수집한 뒤 별도로 기록한다. 이번 승격은 정확성 동등성까지만 증명한다.
-- capture마다 straight-alpha 출력 quad의 node material을 새로 만든다(WebGL adapter가 매번
-  `OutputPass`를 만드는 것과 같은 모양). WebGPU는 파이프라인 생성 비용이 더 크므로 shot batch
-  같은 연속 캡처에서 문제가 될 수 있다. 추측으로 캐시를 넣기보다, 실제 batch 지연을 먼저
-  측정한 뒤 대상 크기별 target/quad 재사용을 검토한다.
+- ~~capture마다 straight-alpha 출력 quad의 node material을 새로 만든다~~ — **측정했고, 문제가
+  아니었다.** 같은 크기로 연속 캡처했을 때(SwiftShader, 96×64):
+
+  | backend | 첫 캡처 | 이후 중앙값 |
+  | --- | --- | --- |
+  | WebGPU | 11.7ms | **5.3ms** |
+  | WebGL2 | 28.1ms | 27.1ms |
+
+  파이프라인 생성 비용은 첫 캡처에서 한 번만 지불된다. Three/Dawn이 노드 그래프 구조로 캐시하므로
+  `NodeMaterial` 인스턴스를 매번 새로 만들어도 재컴파일이 일어나지 않는다. 크기별 target/quad
+  재사용은 **넣지 않는다** — 얻을 것이 없는 복잡도다. WebGL2에는 애초에 warm-up 효과가 없고, 그
+  대신 캡처당 5배 느리다.
+
+  수치는 `verify:studio-bg3d-webgpu-engine`이 매 실행 보고하되 **단언하지 않는다**. CI의 wall-clock
+  임계값은 신호가 아니라 flake를 산다. 봐야 할 것은 값이 아니라 모양이다: `first`가
+  `medianAfterFirst`보다 뚜렷이 크면 캐싱이 살아 있다는 뜻이고, 둘이 붙으면 그때 다시 볼 문제다.
+
+  (소프트웨어 어댑터 측정이라 실제 GPU에서 절대값은 다르다. 다만 "첫 번째만 비싸다"는 모양 자체는
+  하드웨어가 아니라 Dawn의 파이프라인 캐시 동작이라 그대로 간다.)

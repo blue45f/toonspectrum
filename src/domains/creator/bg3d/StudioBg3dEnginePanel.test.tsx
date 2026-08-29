@@ -84,6 +84,38 @@ describe("StudioBg3dEnginePanel", () => {
       .toContain("WebGPU를 지원하지 않아");
   });
 
+  it("says why a character scene cannot leave the baseline, in the artist's terms", () => {
+    render(
+      <StudioBg3dEnginePanel
+        plan={planFor({
+          preference: "webgpu",
+          webglOnlyFeatures: { webxr: false, vrmCharacters: true },
+        })}
+        preference="webgpu"
+        inApp={DESKTOP}
+        probing={false}
+        deviceLostMessage={null}
+        frameTimeMs={null}
+        onPreferenceChange={() => undefined}
+      />,
+    );
+
+    // The artist asked for WebGPU and did not get it. Saying only "WebGL2 사용 중" would read as
+    // the control being broken, so the reason has to be on screen next to it.
+    expect(screen.getByTestId("studio-bg3d-engine-active-backend").textContent)
+      .toContain("WebGL2 사용 중");
+    const status = screen.getByTestId("studio-bg3d-engine-status").textContent ?? "";
+    expect(status).toContain("3D 캐릭터가 있는 장면");
+    expect(status).toContain("색");
+    // In the artist's terms: the shading implementations behind this are not a thing they can act
+    // on, and naming them here would spend a narrow status box on vocabulary.
+    expect(status).not.toContain("MToon");
+    expect(status).not.toContain("셰이더");
+
+    expect((screen.getByTestId("studio-bg3d-engine-preference-webgpu") as HTMLButtonElement)
+      .disabled).toBe(true);
+  });
+
   it("tells the artist which in-app browser they are in and offers the opt-in", () => {
     const onPreferenceChange = vi.fn();
     render(

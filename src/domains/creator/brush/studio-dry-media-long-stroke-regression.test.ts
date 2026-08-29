@@ -25,7 +25,11 @@ import {
   studioDryMediaKernelTipCacheSizeForTests,
   studioDryMediaKernelTipWorkingSet,
 } from "./studio-dry-media-kernel-tip";
-import { studioPerfBudgetMs } from "./studio-perf-budget-calibration";
+import {
+  evaluateStudioCalibratedSampledBudget,
+  evaluateStudioCalibratedSampledDetection,
+  STUDIO_PERF_CALIBRATION_MAX_GROWTH,
+} from "./studio-perf-calibration";
 
 
 const CORE_DRY_MEDIA = [
@@ -294,6 +298,40 @@ describe("cold-start first-chunk freeze gate (adversarial-review regression)", (
   // inside the stroke, exceeding the budget on the banded materials.
   const FIRST_CHUNK_SAMPLES = 24;
   const CHUNK_FREEZE_BUDGET_MS = 33;
+  /** Softness the idle-prewarm gate drives every core material at. */
+  const IDLE_PREWARM_SOFTNESS = 0.4;
+  /**
+   * Denominator material for the idle-slice budget: the priciest bake in the authored working
+   * set, so an honest one-bake slice reads ≈1x rather than banking credit against a cheap
+   * neighbour. Measured mean bake at softness 0.4 — charcoal 4.05-4.24ms against crayon
+   * 2.14-2.33, chalk 2.44-2.59, pastel 2.26-2.41, oil-pastel 2.07-2.20 — and the worst slice of
+   * a full drain is always one of charcoal's, which is why the ratio sits just above 1.
+   */
+  const IDLE_PREWARM_REFERENCE_MATERIAL = "charcoal" as const;
+  /**
+   * Growth over one bake that counts as a regression. The module default: recorded honest drains
+   * read x0.94-x1.10 — four idle runs and five with the box oversubscribed 8 hogs against 12
+   * cores, which land in the same range — so 1.5 leaves ~36% headroom while convicting from x1.5,
+   * and a 2x slice is caught with 33% to spare. The detection assertion below proves that last
+   * claim live on the running machine rather than assuming it.
+   */
+  const IDLE_PREWARM_MAX_SLICE_RATIO = STUDIO_PERF_CALIBRATION_MAX_GROWTH;
+  /**
+   * Drains reduced into one sample, by taking each slice's MINIMUM across them.
+   *
+   * The numerator here is a MAX over the drain's ~108 slices, and a maximum collects stalls
+   * instead of shedding them: min-of-N over whole samples cannot help, because under contention
+   * essentially every drain has some preempted slice, so every sample's maximum is inflated.
+   * Measured on a deliberately oversubscribed box (8 spinning hogs against 12 cores), that read
+   * 1.92 / 2.28 / 1.78 against a 1.50 budget on an unregressed tree — a false conviction of
+   * exactly the kind this file is being repaired for.
+   *
+   * Reducing per SLICE fixes it at the right level: slice i bakes the same key in every drain, so
+   * its minimum across drains is the honest cost of that bake, and the worst honest slice is the
+   * maximum of those. Three drains put the odds of the same slice being starved in all of them
+   * low enough that the oversubscribed readings come back in line with the idle ones.
+   */
+  const IDLE_PREWARM_DRAIN_REPEATS = 3;
 
   it.each(CORE_DRY_MEDIA)(
     "plans the admission-prewarmed cold first chunk for %s under the freeze budget with zero tip bakes",
@@ -326,81 +364,143 @@ describe("cold-start first-chunk freeze gate (adversarial-review regression)", (
   );
 
   it("pumps the idle prewarm one bounded bake per slice until the working set is resident", () => {
-    resetStudioDryMediaKernelTipCacheForTests();
-    const pending: Array<() => void> = [];
-    const scheduled = ensureStudioDryMediaKernelTipIdlePrewarm(
-      () => CORE_DRY_MEDIA.map((materialId) => ({ materialId, softness: 0.4 })),
-      (pump) => pending.push(pump),
-    );
-    expect(scheduled).toBe(true);
-    // Re-entry is a no-op while a pump is scheduled (StrictMode/dual-import safety).
-    expect(
-      ensureStudioDryMediaKernelTipIdlePrewarm(
-        () => CORE_DRY_MEDIA.map((materialId) => ({ materialId, softness: 0.4 })),
-        (pump) => pending.push(pump),
-      ),
-    ).toBe(false);
-
     const expectedKeys = CORE_DRY_MEDIA.reduce(
       (total, materialId) =>
-        total + studioDryMediaKernelTipWorkingSet(materialId, 0.4).length,
+        total + studioDryMediaKernelTipWorkingSet(materialId, IDLE_PREWARM_SOFTNESS).length,
       0,
     );
-    let slices = 0;
-    const sliceDurationsMs: number[] = [];
-    let worstSliceBakes = 0;
-    while (pending.length > 0 && slices < expectedKeys + 8) {
-      const pump = pending.shift()!;
-      const cacheSizeBefore = studioDryMediaKernelTipCacheSizeForTests();
-      const sliceStartedAt = performance.now();
-      pump();
-      sliceDurationsMs.push(performance.now() - sliceStartedAt);
-      // The bake count is the invariant's DETERMINISTIC witness -- no clock involved, so it holds
-      // identically on every machine. A slice that bakes several tip maps grows the cache by more
-      // than one, whether or not the runner was fast enough to hide it in the timing.
-      worstSliceBakes = Math.max(
-        worstSliceBakes,
-        studioDryMediaKernelTipCacheSizeForTests() - cacheSizeBefore,
-      );
-      slices += 1;
-    }
-    expect(pending).toHaveLength(0);
-    expect(studioDryMediaKernelTipCacheSizeForTests()).toBeGreaterThanOrEqual(
-      // The 64-entry LRU bounds residency; every slice stays a single bake.
-      Math.min(expectedKeys, 64),
-    );
-    expect(slices).toBeGreaterThanOrEqual(Math.min(expectedKeys, 64));
-    // One 128×128 bake per idle slice: far under the 33ms chunk freeze budget.
-    //
-    // Graded twice, because the clock alone cannot express this invariant honestly. A percentile
-    // over the ~64 slices was tried and rejected in review: it lets the worst 5% -- three slices --
-    // stall arbitrarily, and a user feels each of those as a dropped frame.
-    //
-    // 1. DETERMINISTIC: no slice may bake more than one tip map. This is the invariant in the
-    //    test's name, it needs no clock, and it is what actually catches a slice that quietly
-    //    starts baking several -- the failure a timing gate can only catch on a machine slow
-    //    enough to make it visible.
-    expect(worstSliceBakes, "tip maps baked in a single idle slice").toBeLessThanOrEqual(1);
+    const referenceKeys = studioDryMediaKernelTipWorkingSet(
+      IDLE_PREWARM_REFERENCE_MATERIAL,
+      IDLE_PREWARM_SOFTNESS,
+    ).length;
 
-    // 2. TIMING: every slice stays inside the freeze budget, scaled to this machine so the gate
-    //    measures the code and not the runner (see studio-perf-budget-calibration). Exactly one
-    //    slice may exceed it -- the CI failure that prompted this was a single pump preempted at
-    //    35.5ms against 33 -- and even that one may not reach a second 30fps frame, so a genuine
-    //    multi-frame freeze fails no matter how few slices it affects.
-    // Floored at the recorded budget: calibration may LOOSEN this gate on a slow machine, never
-    // tighten it. `studioPerfBudgetMs` deliberately has no lower clamp — a genuinely faster
-    // machine should get a tighter budget — but its calibration workload is core-bound, so a
-    // CONTENDED machine reads as a fast one. Measured on a 4-vCPU container under `pnpm test`,
-    // it scaled this 33ms budget down to 24.2ms and then reported 18 slices over it, with
-    // nothing regressed. The harness's own docstring names this limit ("tracks a slower machine
-    // but not a busy one"); this call site simply refuses the direction it cannot measure.
-    const sliceBudgetMs = Math.max(
-      CHUNK_FREEZE_BUDGET_MS,
-      studioPerfBudgetMs(CHUNK_FREEZE_BUDGET_MS),
-    );
-    const overBudget = sliceDurationsMs.filter((elapsed) => elapsed >= sliceBudgetMs);
-    expect(overBudget.length, `slices over ${sliceBudgetMs.toFixed(1)}ms`).toBeLessThanOrEqual(1);
-    expect(Math.max(...sliceDurationsMs)).toBeLessThan(sliceBudgetMs * 1.5);
+    /**
+     * The denominator: one cold 128×128 bake of the priciest material in the authored working
+     * set, timed immediately before the drain it divides.
+     *
+     * A raw `< 33ms` ceiling measured the baker AND the machine, and the machine is what made it
+     * red on a shared runner (34.93ms against 33). The pump's contract is not "N milliseconds" —
+     * it is ONE BAKE PER IDLE SLICE, so a bake is the honest unit to state the budget in, and
+     * `studio-perf-calibration.ts`'s "pick the denominator that resembles the work" has no closer
+     * match available: numerator and denominator are the same 128×128 shaping loop, so they
+     * co-scale exactly and no CPU can move the verdict. That is the property the built-in scalar
+     * kernel could not offer here — a tip bake is a pure per-texel sampler, the class the module's
+     * header records as scoring 0.93-1.00 on one box and 1.98-2.09 on another.
+     *
+     * Measured 12 charcoal keys back to back rather than one, so the window (~49ms) is long
+     * enough that neither side is reading clock quantisation, then divided back down to one bake.
+     *
+     * What this reference deliberately CANNOT see, because it moves with the numerator: a
+     * uniformly slower baker. That is the shaping kernel's own budget, not the pump's, and the
+     * cold first-chunk gate above still holds it to a wall-clock frame.
+     */
+    const measureOneColdBakeMs = (): number => {
+      resetStudioDryMediaKernelTipCacheForTests();
+      const startedAt = performance.now();
+      const baked = prewarmStudioDryMediaKernelTipMaps(
+        IDLE_PREWARM_REFERENCE_MATERIAL,
+        IDLE_PREWARM_SOFTNESS,
+      );
+      const elapsedMs = performance.now() - startedAt;
+      // A cache hit here would silently shrink the denominator and manufacture a violation.
+      expect(baked, "reference bake was not cold").toBe(referenceKeys);
+      return elapsedMs / referenceKeys;
+    };
+
+    /** One full cold drain, returning every slice's cost in pump order. */
+    const drainSliceCosts = (): readonly number[] => {
+      resetStudioDryMediaKernelTipCacheForTests();
+      const pending: Array<() => void> = [];
+      const listMaterials = () =>
+        CORE_DRY_MEDIA.map((materialId) => ({ materialId, softness: IDLE_PREWARM_SOFTNESS }));
+      const scheduled = ensureStudioDryMediaKernelTipIdlePrewarm(
+        listMaterials,
+        (pump) => pending.push(pump),
+      );
+      expect(scheduled).toBe(true);
+      // Re-entry is a no-op while a pump is scheduled (StrictMode/dual-import safety).
+      expect(
+        ensureStudioDryMediaKernelTipIdlePrewarm(listMaterials, (pump) => pending.push(pump)),
+      ).toBe(false);
+
+      const sliceMs: number[] = [];
+      let maxResidentGrowth = 0;
+      while (pending.length > 0 && sliceMs.length < expectedKeys + 8) {
+        const pump = pending.shift()!;
+        const residentBefore = studioDryMediaKernelTipCacheSizeForTests();
+        const sliceStartedAt = performance.now();
+        pump();
+        sliceMs.push(performance.now() - sliceStartedAt);
+        maxResidentGrowth = Math.max(
+          maxResidentGrowth,
+          studioDryMediaKernelTipCacheSizeForTests() - residentBefore,
+        );
+      }
+      const slices = sliceMs.length;
+      expect(pending).toHaveLength(0);
+      expect(studioDryMediaKernelTipCacheSizeForTests()).toBeGreaterThanOrEqual(
+        // The 64-entry LRU bounds residency; every slice stays a single bake.
+        Math.min(expectedKeys, 64),
+      );
+      expect(slices).toBeGreaterThanOrEqual(Math.min(expectedKeys, 64));
+      // The invariant's DETERMINISTIC witness -- no clock involved, so it holds identically on
+      // every machine. A slice that bakes several tip maps grows the cache by more than one,
+      // whether or not the runner was fast enough to hide it in the timing. Stated as a bound
+      // rather than an equality so an LRU eviction (a slice that bakes and evicts, netting zero)
+      // still reads honestly.
+      expect(maxResidentGrowth, "tip maps baked in a single idle slice").toBeLessThanOrEqual(1);
+      return sliceMs;
+    };
+
+    /**
+     * One interleaved pair. Both halves are reduced across `IDLE_PREWARM_DRAIN_REPEATS` runs
+     * before they meet: the reference by its own minimum, the drain slice by slice, so the
+     * numerator is the worst HONEST bake rather than the worst scheduling accident.
+     */
+    const takeSample = () => {
+      let referenceMs = Infinity;
+      let honestSliceMs: number[] = [];
+      for (let repeat = 0; repeat < IDLE_PREWARM_DRAIN_REPEATS; repeat += 1) {
+        referenceMs = Math.min(referenceMs, measureOneColdBakeMs());
+        const slices = drainSliceCosts();
+        honestSliceMs = repeat === 0
+          ? [...slices]
+          : honestSliceMs.map((best, index) => Math.min(best, slices[index] ?? Infinity));
+      }
+      return { referenceMs, workMs: Math.max(...honestSliceMs) };
+    };
+
+    // Warmed by hand rather than through `warmups`, so the JIT pass costs one drain instead of
+    // one whole reduced sample.
+    measureOneColdBakeMs();
+    drainSliceCosts();
+    const budget = evaluateStudioCalibratedSampledBudget({
+      label: "worst idle prewarm slice vs one cold kernel-tip bake",
+      takeSample,
+      maxRatio: IDLE_PREWARM_MAX_SLICE_RATIO,
+      samples: 2,
+      warmups: 0,
+    });
+    // One 128×128 bake per idle slice, and the freeze budget it buys: the worst slice is a single
+    // bake plus the pump's own queue walk, which measures x0.94-x1.10 both idle and with the box
+    // oversubscribed 8 hogs against 12 cores. Against the 33ms frame the raw ceiling named that is
+    // the same >6x margin it always had, now stated without measuring the machine to find out.
+    expect(budget.ok, budget.detail).toBe(true);
+
+    // The gate's mirror image, on this machine, from the passes just measured: a slice that
+    // started doing twice a bake's work — a second bake, or an unbounded queue walk — would have
+    // been convicted. This is what stops the calibrated form from decaying into a no-op.
+    const detection = evaluateStudioCalibratedSampledDetection({
+      label: budget.label,
+      takeSample,
+      maxRatio: IDLE_PREWARM_MAX_SLICE_RATIO,
+      seed: budget.passes,
+      factor: 2,
+      samples: 2,
+      warmups: 0,
+    });
+    expect(detection.detected, detection.detail).toBe(true);
+
     resetStudioDryMediaKernelTipCacheForTests();
   });
 
