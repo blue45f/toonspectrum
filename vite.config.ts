@@ -493,7 +493,7 @@ export default defineConfig(({ mode }) => ({
           }
           if (
             id.endsWith("/src/domains/creator/studio-assets.ts")
-            || id.endsWith("/src/domains/creator/studio-raster-assets.ts")
+            || id.endsWith("/src/domains/creator/render/studio-raster-assets.ts")
           ) {
             // Both are dependency-free models; every raster-asset owner already loads assets.
             return "studio-asset-micro-models";

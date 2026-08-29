@@ -84,6 +84,8 @@ export const REQUIRED_DATABASE_RELATIONS = [
 /**
  * Only cutovers that cannot be proven by a final-looking Drizzle schema use the durable ledger.
  * Migrations 0018+ are represented by required relations/capabilities below.
+ * Secondary-index migrations such as 0029 remain outside runtime readiness during the expand
+ * release; the strict production capability verifier owns that post-migration contract.
  */
 export const REQUIRED_DATABASE_MIGRATIONS = [
   "0017_creator_work_live_lock_revision",

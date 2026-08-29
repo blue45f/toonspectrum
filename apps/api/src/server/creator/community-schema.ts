@@ -504,6 +504,9 @@ function isRepairableCommunitySchemaShapeError(error: unknown): boolean {
 }
 
 async function verifyCreatorCommunitySchema(): Promise<boolean> {
+  // Secondary indexes are a post-migration performance contract, not a request-path correctness
+  // requirement. Keeping them out of this probe lets the expand runtime serve a pre-0029 database
+  // without attempting DDL through the least-privileged runtime role.
   const result = await dbPool.query<{ ready: boolean }>(VERIFY_COMMUNITY_SCHEMA_SQL);
   return result.rows[0]?.ready === true;
 }
