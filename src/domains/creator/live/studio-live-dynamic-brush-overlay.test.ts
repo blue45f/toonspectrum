@@ -510,6 +510,14 @@ const APPEND_CHUNK_MARK_THRESHOLD = 1_000;
  * ORDINARY class instead removes the machine exactly rather than approximately: both classes are
  * the same code on the same box interleaved through the same stroke, so a machine 60% slower at
  * appends (which is what CI is) cancels completely, and only the classes' relative cost survives.
+ *
+ * Which ordinary appends, and reduced how, both had to be measured rather than assumed. Cheapest
+ * chunk over cheapest ordinary anywhere in the stroke does NOT hold: the two windows are 13ms and
+ * 1ms, so the longer one absorbs more preemption, and under six spinning hogs plus five other
+ * suites in parallel workers that form read 17.08-19.91 where it had recorded 11.69-12.75. Each
+ * chunk against the seven ordinary appends of its own cycle (~7.9ms against ~13.4ms, adjacent in
+ * time) removes that asymmetry, and the median across cycles removes the two-sided noise the
+ * ratio then carries: 1.089-1.154 across the same conditions, a 6% spread.
  */
 function appendChunkCostRatio(
   samples: readonly StudioPerfCalibrationSample[],
@@ -518,20 +526,75 @@ function appendChunkCostRatio(
   if (samples.length !== markDeltas.length) {
     throw new Error("Every append sample needs its own mark delta.");
   }
-  const chunk = samples.filter((_, index) => markDeltas[index]! > APPEND_CHUNK_MARK_THRESHOLD);
-  const ordinary = samples.filter((_, index) => markDeltas[index]! <= APPEND_CHUNK_MARK_THRESHOLD);
-  if (chunk.length === 0 || ordinary.length === 0) {
-    throw new Error(
-      `Both append classes must be present: ${chunk.length} chunk, ${ordinary.length} ordinary.`,
-    );
+  // Each chunk is graded against the ordinary appends of ITS OWN cycle -- the seven that precede
+  // it -- rather than against the cheapest ordinary append anywhere in the stroke. Those seven
+  // cost ~7.9ms together against the chunk's ~13.4ms, so the two windows span comparable
+  // durations and comparable stretches of wall clock.
+  const cycles: number[] = [];
+  for (let index = 0; index < samples.length; index += 1) {
+    if (markDeltas[index]! <= APPEND_CHUNK_MARK_THRESHOLD) continue;
+    let ordinaryMs = 0;
+    let ordinaryCount = 0;
+    for (let back = Math.max(0, index - 7); back < index; back += 1) {
+      if (markDeltas[back]! > APPEND_CHUNK_MARK_THRESHOLD) continue;
+      ordinaryMs += samples[back]!.workMs;
+      ordinaryCount += 1;
+    }
+    if (ordinaryCount < 5 || !(ordinaryMs > 0)) continue;
+    cycles.push(samples[index]!.workMs / ordinaryMs);
   }
-  const cheapestChunkMs = Math.min(...chunk.map((sample) => sample.workMs));
-  const cheapestOrdinaryMs = Math.min(...ordinary.map((sample) => sample.workMs));
-  if (!(cheapestOrdinaryMs > 0)) {
-    throw new Error("An ordinary append that costs nothing is not a denominator.");
+  if (cycles.length < 8) {
+    throw new Error(`Chunk cost needs at least eight complete cycles, got ${cycles.length}.`);
   }
-  return cheapestChunkMs / cheapestOrdinaryMs;
+  // The MEDIAN, not the minimum, and that is the one place in this file where the minimum is the
+  // wrong reducer. Everywhere else the quantity is a cost and noise is one-sided, so the cheapest
+  // reading is the honest one. Here the quantity is already a ratio of two same-duration windows,
+  // so a stall lands on either side with equal ease and the noise is two-sided: across 24 cycles
+  // the extremes ran 0.34-2.44 while the median moved only 1.089-1.154. Taking the minimum of a
+  // two-sided distribution measures the luckiest cycle, not the class.
+  const sorted = [...cycles].sort((left, right) => left - right);
+  return sorted[Math.floor(sorted.length / 2)]!;
 }
+
+/**
+ * How much more the stroke's LATE ribbon-chunk appends cost than its early ones.
+ *
+ * The two growth gates above reduce different populations, and the gap between them is real: the
+ * early/late ratio picks an ORDINARY append from each half, while the chunk/ordinary ratio picks
+ * the cheapest chunk across the WHOLE stroke. So re-planning that becomes length-dependent only
+ * on the chunk path — the append that actually does the extra planning — leaves an unaffected
+ * early chunk as the cheapest one, moves neither ratio, and changes no mark count.
+ *
+ * Both halves are chunk appends on the same machine, so this is machine-independent by the same
+ * construction as the chunk/ordinary ratio: what survives the division is length dependence
+ * within the class and nothing else.
+ */
+function appendChunkGrowthRatio(
+  samples: readonly StudioPerfCalibrationSample[],
+  markDeltas: readonly number[],
+): number {
+  if (samples.length !== markDeltas.length) {
+    throw new Error("Every append sample needs its own mark delta.");
+  }
+  const chunks = samples.filter((_, index) => markDeltas[index]! > APPEND_CHUNK_MARK_THRESHOLD);
+  if (chunks.length < 4) {
+    throw new Error(`Chunk growth needs at least four chunk appends, got ${chunks.length}.`);
+  }
+  const half = Math.floor(chunks.length / 2);
+  const cheapest = (slice: readonly StudioPerfCalibrationSample[]): number =>
+    Math.min(...slice.map((sample) => sample.workMs));
+  const early = cheapest(chunks.slice(0, half));
+  if (!(early > 0)) throw new Error("An early chunk append that costs nothing is not a denominator.");
+  return cheapest(chunks.slice(half)) / early;
+}
+
+/**
+ * Recorded 0.807 / 0.828 / 0.967 idle and 0.728 / 0.822 / 0.833 under six spinning hogs on four
+ * cores — consistently below 1, because later chunks run on a warmer JIT. 1.25 carries 29%
+ * headroom over the worst honest reading while a doubled late-chunk class (>=1.46) is convicted
+ * with 17% margin, and 500ms added to late chunks alone reads ~34.
+ */
+const APPEND_CHUNK_GROWTH_LIMIT = 1.25;
 
 /**
  * What the COLD first append costs in units of one ordinary append.
@@ -577,15 +640,15 @@ function appendColdStartCostRatio(
 const APPEND_COLD_START_COST_LIMIT = 20;
 
 /**
- * Recorded 11.69 / 11.83 / 12.30 / 12.72 / 12.75 as the cheapest pass across idle and
- * six-hogs-on-four-cores runs — a 9% spread, because both sides of the division are the same code
- * on the same machine. A chunk append draws 8.3x an ordinary one's marks and costs ~12x, the gap
- * being its fixed re-plan overhead.
+ * Recorded 1.1062 / 1.1305 / 1.1537 idle and 1.0893 / 1.0898 / 1.0915 under six spinning hogs on
+ * four cores WITH five other heavy suites in parallel workers — the load that broke the previous
+ * form of this statistic. A 6% spread, because both sides of the division are the same code on
+ * the same machine over comparable durations.
  *
- * 16 carries 25% headroom over the worst of those, while a doubled chunk class (>=23.4) is
- * convicted with 46% margin and the 500ms-every-eighth-frame case reads ~440.
+ * 1.45 carries 26% headroom over the worst of those, while a doubled chunk class (>=2.18) is
+ * convicted with 50% margin and the 500ms-every-eighth-frame case reads in the tens.
  */
-const APPEND_CHUNK_COST_LIMIT = 16;
+const APPEND_CHUNK_COST_LIMIT = 1.45;
 
 /**
  * How much more a stroke's LATE appends cost than its early ones, with the machine divided out of
@@ -1931,6 +1994,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     const halfGrowths: number[] = [];
     const chunkCostRatios: number[] = [];
     const coldStartCostRatios: number[] = [];
+    const chunkGrowthRatios: number[] = [];
     let maxAppendFrameMs = Number.POSITIVE_INFINITY;
     let totalAppendMs = Number.POSITIVE_INFINITY;
     let markDeltas: number[] = [];
@@ -2014,6 +2078,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     halfGrowths.push(appendCalibratedHalfGrowth(passSamples));
     chunkCostRatios.push(appendChunkCostRatio(passSamples, passMarkDeltas));
     coldStartCostRatios.push(appendColdStartCostRatio(passSamples, passMarkDeltas));
+    chunkGrowthRatios.push(appendChunkGrowthRatio(passSamples, passMarkDeltas));
     markDeltas = passMarkDeltas;
     appendCount = passAppendCount;
     liveMarks = activeCanvas.recordedMarks;
@@ -2111,9 +2176,20 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     const chunkCostRatio = Math.min(...chunkCostRatios);
     expect(
       chunkCostRatio,
-      `a ribbon-chunk append costs ${chunkCostRatio.toFixed(2)} ordinary appends `
+      `a ribbon-chunk append costs ${chunkCostRatio.toFixed(3)}x its cycle's ordinary appends `
       + `(passes: ${chunkCostRatios.map((value) => value.toFixed(2)).join(", ")})`,
     ).toBeLessThan(APPEND_CHUNK_COST_LIMIT);
+
+    // ...and length dependence WITHIN the chunk class, which the two ratios above miss between
+    // them: the early/late gate reduces ordinary appends in each half, this class's own gate
+    // reduces the cheapest chunk across the whole stroke, so re-planning that grows only on the
+    // chunk path leaves an unaffected early chunk as the cheapest and moves neither.
+    const chunkGrowthRatio = Math.min(...chunkGrowthRatios);
+    expect(
+      chunkGrowthRatio,
+      `late ribbon-chunk appends cost ${chunkGrowthRatio.toFixed(3)}x what early ones did `
+      + `(passes: ${chunkGrowthRatios.map((value) => value.toFixed(3)).join(", ")})`,
+    ).toBeLessThan(APPEND_CHUNK_GROWTH_LIMIT);
 
     // ...and the cold first append, the one class with a single member per pass. It is excluded
     // from the outlier max, it is never the global minimum, and it sits in the early half where
@@ -2209,18 +2285,20 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // move at all. Stated as data, so it needs no clock and no machine.
     const APPENDS = 200;
     const deltas = Array.from({ length: APPENDS }, (_, index) => (index % 8 === 7 ? 1_740 : 210));
+    // Ordinary appends at their MEAN (1.74ms), not their minimum: the cycle sums seven of them,
+    // so the recorded ~1.10 median comes out of the mean rather than the noise floor.
     const honest = Array.from({ length: APPENDS }, (_, index) => ({
       referenceMs: 1,
-      workMs: index % 8 === 7 ? 13.4 : 1.13,
+      workMs: index % 8 === 7 ? 13.4 : 1.74,
     }));
-    expect(appendChunkCostRatio(honest, deltas)).toBeCloseTo(11.86, 1);
+    expect(appendChunkCostRatio(honest, deltas)).toBeCloseTo(1.10, 1);
     expect(appendChunkCostRatio(honest, deltas)).toBeLessThan(APPEND_CHUNK_COST_LIMIT);
 
     // Codex's case, verbatim: every eighth append at 500ms, ordinary ones untouched.
     const periodicStall = honest.map((sample, index) => (index % 8 === 7
       ? { ...sample, workMs: 500 }
       : sample));
-    expect(appendChunkCostRatio(periodicStall, deltas)).toBeGreaterThan(400);
+    expect(appendChunkCostRatio(periodicStall, deltas)).toBeGreaterThan(30);
     expect(appendChunkCostRatio(periodicStall, deltas))
       .toBeGreaterThan(APPEND_CHUNK_COST_LIMIT);
     // ...and the bounds it slips past, which is why this gate exists alongside them.
@@ -2239,7 +2317,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // Not vacuous in the other direction. A uniformly slower machine — every append 3x, chunk
     // and ordinary alike — is not a class regression and must not convict here.
     const slowBox = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 3 }));
-    expect(appendChunkCostRatio(slowBox, deltas)).toBeCloseTo(11.86, 1);
+    expect(appendChunkCostRatio(slowBox, deltas)).toBeCloseTo(1.10, 1);
     // Nor is a slowdown confined to the ORDINARY class, which the calibrated budget catches
     // instead — this ratio moves DOWN there, and a lower ratio is never a failure.
     const ordinaryStall = honest.map((sample, index) => (index % 8 === 7
@@ -2250,7 +2328,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(() => appendChunkCostRatio(honest, deltas.slice(1)))
       .toThrow(/its own mark delta/);
     expect(() => appendChunkCostRatio(honest, deltas.map(() => 210)))
-      .toThrow(/Both append classes/);
+      .toThrow(/at least eight complete cycles/);
   });
 
   it("convicts a cold-start regression the other three bounds cannot see", () => {
@@ -2284,6 +2362,37 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(appendChunkCostRatio(coldStall, deltas))
       .toBeCloseTo(appendChunkCostRatio(honest, deltas), 6);
     expect(appendMarkGrowthRatio(deltas)).toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // The fifth blind spot, and the one the four bounds share BETWEEN them: re-planning that
+    // grows only on the chunk path. The early/late gate reduces ordinary appends in each half;
+    // the chunk/ordinary gate reduces the cheapest chunk across the whole stroke — so an
+    // unaffected early chunk stays cheapest and neither ratio moves.
+    const lateChunkStall = honest.map((sample, index) => (index % 8 === 7 && index > APPENDS / 2
+      ? { ...sample, workMs: sample.workMs + 500 }
+      : sample));
+    expect(appendChunkGrowthRatio(lateChunkStall, deltas))
+      .toBeGreaterThan(APPEND_CHUNK_GROWTH_LIMIT);
+    expect(appendChunkGrowthRatio(lateChunkStall, deltas)).toBeGreaterThan(30);
+    // The chunk-cost gate catches this one too, now that it reduces by the MEDIAN across cycles
+    // rather than the cheapest chunk: half the cycles are late and stalled, so the median moves
+    // with them. Under the cheapest-chunk form it did not, and that is what this growth gate was
+    // added for — the fix to the OTHER finding happened to close this hole as well. They are kept
+    // separate because they answer different questions (is the class expensive / does it grow),
+    // not because one catches a leak the other misses; on this regression both convict.
+    expect(appendChunkCostRatio(lateChunkStall, deltas))
+      .toBeGreaterThan(APPEND_CHUNK_COST_LIMIT);
+    // ...and the bounds that do NOT see it.
+    expect(appendCalibratedHalfGrowth(lateChunkStall))
+      .toBeCloseTo(appendCalibratedHalfGrowth(honest), 6);
+    expect(reduceStudioPerfCalibrationSamples(lateChunkStall).workMs)
+      .toBe(reduceStudioPerfCalibrationSamples(honest).workMs);
+    // Not vacuous: a uniformly 3x slower machine is not growth within the class.
+    expect(appendChunkGrowthRatio(
+      honest.map((sample) => ({ ...sample, workMs: sample.workMs * 3 })),
+      deltas,
+    )).toBeCloseTo(appendChunkGrowthRatio(honest, deltas), 6);
+    expect(() => appendChunkGrowthRatio(honest.slice(0, 8), deltas.slice(0, 8)))
+      .toThrow(/at least four chunk appends/);
 
     // A 100ms cold start is convicted too, not only a catastrophe.
     expect(appendColdStartCostRatio(
