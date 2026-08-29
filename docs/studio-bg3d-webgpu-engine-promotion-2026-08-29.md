@@ -5,7 +5,8 @@
   "Three WebGPU는 격리 lab" 항목과
   [하이브리드 DCC 엔진 아키텍처](./studio-hybrid-dcc-engine-architecture-2026-08-02.md)의
   "기본 제품 renderer라고 표시 금지" 항목.
-- 구현 계약: `studio-bg3d-webgpu-capability.ts`, `studio-bg3d-inapp-browser.ts`,
+- 구현 계약: `studio-bg3d-webgpu-capability.ts`, `studio-bg3d-inapp-browser.ts`
+  (판별은 `src/compat/in-app-browser.ts` 재사용, 여기서는 GPU 신뢰도만 결정),
   `studio-bg3d-engine-selection.ts`, `studio-bg3d-three-webgpu-entry.ts`
   (→ `-renderer.ts`, `-capture.ts`), `useStudioBg3dEngineRuntime.ts`,
   `StudioBg3dEnginePanel.tsx`.
@@ -33,10 +34,16 @@ WebGPU를 "지원되면 쓴다"로 켜면 한국 트래픽의 대부분인 인�
 그래서 `studio-bg3d-engine-selection.ts`는 **모르는 것은 WebGL2로 내려간다**를 원칙으로 삼고,
 모든 결정에 기계가 읽는 사유와 사용자에게 보여줄 한국어 문장을 함께 붙인다.
 
+호스트 **판별 자체는 새로 만들지 않고** 모바일 셸이 이미 쓰는 `src/compat/in-app-browser.ts`의
+`diagnoseStudioInAppBrowser`를 재사용한다. UA 정규식을 두 벌 두면 반드시 어긋나고, 그쪽은
+전용 route sweep 게이트로 검증된다. `studio-bg3d-inapp-browser.ts`는 그 판별이 답하지 않는
+것 — **이 호스트를 WebGPU 디바이스로 얼마나 믿을 수 있는가** — 만 결정한다. 덕분에 틱톡·위챗
+처럼 이 정책이 따로 열거한 적 없는 호스트도 이미 분류된 채로 들어온다.
+
 | 호스트 | `auto` | 명시 선택 시 | 이유 |
 | --- | --- | --- | --- |
 | 일반 브라우저 | WebGPU | WebGPU | `auto-webgpu-promoted` |
-| 카카오톡·네이버앱·라인·밴드·토스·쿠팡·다음, 일반 WebView | WebGL2 | WebGPU 가능 | `inapp-browser-opt-in-required` |
+| 카카오톡·네이버·라인·밴드·다음·틱톡·위챗, 일반 WebView | WebGL2 | WebGPU 가능 | `inapp-browser-opt-in-required` |
 | 인스타그램·페이스북·스레드 | WebGL2 | 거부 | `inapp-browser-blocked` |
 | 데이터 절약 모드 / 4GB 미만 모바일 | WebGL2 | WebGPU 가능 | `save-data-enabled`, `low-device-memory` |
 | WebGPU 초기화 2회 연속 실패 | WebGL2 | 거부(세션 한정) | `repeated-webgpu-failure` |

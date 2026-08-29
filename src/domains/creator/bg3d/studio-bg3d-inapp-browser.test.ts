@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  classifyStudioBg3dInAppBrowser,
-  STUDIO_BG3D_INAPP_USER_AGENT_MAX_LENGTH,
-} from "./studio-bg3d-inapp-browser";
+import { classifyStudioBg3dInAppBrowser } from "./studio-bg3d-inapp-browser";
 
 const IOS_SAFARI =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1";
@@ -14,79 +11,68 @@ const ANDROID_CHROME =
 const ANDROID_WEBVIEW =
   "Mozilla/5.0 (Linux; Android 15; SM-S928N; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/133.0.0.0 Mobile Safari/537.36";
 
-describe("Studio BG3D in-app browser classification", () => {
-  it("identifies KakaoTalk on either platform and asks for an explicit WebGPU opt-in", () => {
-    const android = classifyStudioBg3dInAppBrowser({
+describe("Studio BG3D host GPU trust", () => {
+  it("asks for an explicit WebGPU opt-in in a messenger WebView", () => {
+    expect(classifyStudioBg3dInAppBrowser({
       userAgent: `${ANDROID_WEBVIEW} KAKAOTALK 10.6.5`,
-    });
-    expect(android).toMatchObject({
-      family: "kakaotalk",
+    })).toMatchObject({
+      id: "kakaotalk",
       platform: "android",
       isInApp: true,
       gpuTrust: "opt-in",
-      confidence: "high",
+      label: "카카오톡 인앱 브라우저",
     });
 
-    expect(classifyStudioBg3dInAppBrowser({ userAgent: `${IOS_WEBVIEW} KAKAOTALK 10.6.5` }))
-      .toMatchObject({ family: "kakaotalk", platform: "ios", gpuTrust: "opt-in" });
-  });
-
-  it("identifies the NAVER app even though it also carries the Android WebView marker", () => {
     expect(classifyStudioBg3dInAppBrowser({
       userAgent: `${ANDROID_WEBVIEW} NAVER(inapp; search; 2000; 12.9.6)`,
-    })).toMatchObject({ family: "naver-app", gpuTrust: "opt-in", confidence: "high" });
+    })).toMatchObject({ id: "naver", gpuTrust: "opt-in", label: "네이버 인앱 브라우저" });
   });
 
-  it("prefers the specific app token over the shared Facebook in-app token", () => {
-    expect(classifyStudioBg3dInAppBrowser({
-      userAgent: `${IOS_WEBVIEW} Instagram 350.0.0.0 (iPhone16,2; iOS 18_2) FBAN/Instagram`,
-    })).toMatchObject({ family: "instagram", gpuTrust: "blocked" });
-
-    expect(classifyStudioBg3dInAppBrowser({
-      userAgent: `${IOS_WEBVIEW} [FBAN/FBIOS;FBAV/500.0.0.0]`,
-    })).toMatchObject({ family: "facebook", gpuTrust: "blocked" });
-
-    expect(classifyStudioBg3dInAppBrowser({ userAgent: `${ANDROID_WEBVIEW} Barcelona 350.0` }))
-      .toMatchObject({ family: "threads", gpuTrust: "blocked" });
+  it("refuses WebGPU outright in the hosts that cannot keep a device", () => {
+    for (const [userAgent, id] of [
+      [`${IOS_WEBVIEW} Instagram 350.0.0.0`, "instagram"],
+      [`${IOS_WEBVIEW} [FBAN/FBIOS;FBAV/500.0.0.0]`, "facebook"],
+      [`${ANDROID_WEBVIEW} Barcelona 350.0`, "threads"],
+    ] as const) {
+      expect(classifyStudioBg3dInAppBrowser({ userAgent }))
+        .toMatchObject({ id, isInApp: true, gpuTrust: "blocked" });
+    }
   });
 
-  it("treats a bare Android WebView and a bare iOS WKWebView as in-app hosts", () => {
+  it("covers hosts the shared detector knows that this policy never enumerated", () => {
+    // Consolidating onto `diagnoseStudioInAppBrowser` means new families arrive already classified.
+    expect(classifyStudioBg3dInAppBrowser({
+      userAgent: `${ANDROID_WEBVIEW} musical_ly_2023 trill_310`,
+    })).toMatchObject({ id: "tiktok", gpuTrust: "opt-in", label: "틱톡 인앱 브라우저" });
+    expect(classifyStudioBg3dInAppBrowser({
+      userAgent: `${ANDROID_WEBVIEW} MicroMessenger/8.0.44`,
+    })).toMatchObject({ id: "wechat", gpuTrust: "opt-in", label: "위챗 인앱 브라우저" });
+  });
+
+  it("labels a bare embedded WebView without inventing an app name", () => {
     expect(classifyStudioBg3dInAppBrowser({ userAgent: ANDROID_WEBVIEW }))
-      .toMatchObject({ family: "android-webview", isInApp: true, gpuTrust: "opt-in" });
+      .toMatchObject({ id: "android-webview", gpuTrust: "opt-in", label: "안드로이드 웹뷰" });
     expect(classifyStudioBg3dInAppBrowser({ userAgent: IOS_WEBVIEW }))
-      .toMatchObject({ family: "ios-webview", isInApp: true, gpuTrust: "opt-in" });
+      .toMatchObject({ id: "ios-webview", gpuTrust: "opt-in", label: "iOS 웹뷰" });
   });
 
-  it("treats standalone browsers, WebKit-based iOS browsers, and home-screen apps as trusted", () => {
-    expect(classifyStudioBg3dInAppBrowser({ userAgent: ANDROID_CHROME }))
-      .toMatchObject({ family: "standalone", isInApp: false, gpuTrust: "trusted" });
-    expect(classifyStudioBg3dInAppBrowser({ userAgent: IOS_SAFARI }))
-      .toMatchObject({ family: "standalone", gpuTrust: "trusted" });
-    expect(classifyStudioBg3dInAppBrowser({
-      userAgent: `${IOS_WEBVIEW} CriOS/133.0.0.0`,
-    })).toMatchObject({ family: "standalone", gpuTrust: "trusted" });
-    expect(classifyStudioBg3dInAppBrowser({
-      userAgent: IOS_WEBVIEW,
-      displayModeStandalone: true,
-    })).toMatchObject({ family: "standalone", gpuTrust: "trusted" });
+  it("trusts standalone browsers, including WebKit-based iOS ones", () => {
+    for (const userAgent of [ANDROID_CHROME, IOS_SAFARI, `${IOS_WEBVIEW} CriOS/133.0.0.0`]) {
+      expect(classifyStudioBg3dInAppBrowser({ userAgent }))
+        .toMatchObject({ id: null, isInApp: false, gpuTrust: "trusted" });
+    }
   });
 
-  it("falls back to a trusted standalone profile with low confidence for an absent user agent", () => {
+  it("treats an absent user agent as a trusted standalone browser", () => {
+    // The adapter probe already fails closed, so a missing UA must not block a capable desktop.
     expect(classifyStudioBg3dInAppBrowser({}))
-      .toMatchObject({ family: "standalone", confidence: "low", platform: "other" });
-    expect(classifyStudioBg3dInAppBrowser({ userAgent: "" }))
-      .toMatchObject({ family: "standalone", confidence: "low" });
-  });
-
-  it("bounds how much of a hostile user agent it is willing to scan", () => {
-    const padding = "x".repeat(STUDIO_BG3D_INAPP_USER_AGENT_MAX_LENGTH);
-    expect(classifyStudioBg3dInAppBrowser({ userAgent: `${padding} KAKAOTALK 10.6.5` }))
-      .toMatchObject({ family: "standalone" });
-    expect(classifyStudioBg3dInAppBrowser({ userAgent: `KAKAOTALK 10.6.5 ${padding}` }))
-      .toMatchObject({ family: "kakaotalk" });
+      .toMatchObject({ id: null, isInApp: false, gpuTrust: "trusted" });
   });
 
   it("returns frozen profiles so a status surface cannot mutate the classification", () => {
     expect(Object.isFrozen(classifyStudioBg3dInAppBrowser({ userAgent: ANDROID_CHROME }))).toBe(true);
+    expect(Object.isFrozen(classifyStudioBg3dInAppBrowser({
+      userAgent: `${ANDROID_WEBVIEW} KAKAOTALK 10.6.5`,
+    }))).toBe(true);
   });
 });

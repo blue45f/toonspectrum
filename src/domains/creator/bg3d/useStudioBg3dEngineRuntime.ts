@@ -107,12 +107,9 @@ async function persistPreference(preference: StudioBg3dEnginePreference): Promis
   await repository.saveBg3dEnginePreference(preference);
 }
 
-function readHostSignals(): { userAgent?: string; displayModeStandalone?: boolean } {
+function readHostSignals(): { userAgent?: string } {
   if (typeof navigator === "undefined") return {};
-  const standalone = typeof window !== "undefined" && typeof window.matchMedia === "function"
-    ? window.matchMedia("(display-mode: standalone)").matches
-    : undefined;
-  return { userAgent: navigator.userAgent, displayModeStandalone: standalone };
+  return { userAgent: navigator.userAgent };
 }
 
 export function useStudioBg3dEngineRuntime(

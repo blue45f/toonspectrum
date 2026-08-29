@@ -54,19 +54,19 @@ const UNSUPPORTED_REASONS = new Set([
 const IN_APP_USER_AGENTS = [
   {
     id: "kakaotalk",
-    expectedFamily: "kakaotalk",
+    expectedId: "kakaotalk",
     userAgent:
       "Mozilla/5.0 (Linux; Android 15; SM-S928N; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/133.0.0.0 Mobile Safari/537.36 KAKAOTALK 10.6.5",
   },
   {
     id: "naver-app",
-    expectedFamily: "naver-app",
+    expectedId: "naver",
     userAgent:
       "Mozilla/5.0 (Linux; Android 15; SM-S928N; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/133.0.0.0 Mobile Safari/537.36 NAVER(inapp; search; 2000; 12.9.6)",
   },
   {
     id: "instagram",
-    expectedFamily: "instagram",
+    expectedId: "instagram",
     userAgent:
       "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0.0.0",
   },
@@ -322,7 +322,7 @@ async function main() {
       const row = {
         id: host.id,
         status: run.result?.status,
-        classifiedFamily: classified?.family ?? null,
+        classifiedId: classified?.id ?? null,
         gpuTrust: classified?.gpuTrust ?? null,
         pageErrors: run.diagnostics.pageErrors,
         requestFailures: run.diagnostics.requestFailures,
@@ -331,9 +331,9 @@ async function main() {
       if (run.result?.status !== "ok") {
         failures.push(`${host.id}: harness did not complete (${run.result?.status})`);
       }
-      if (classified?.family !== host.expectedFamily) {
+      if (classified?.id !== host.expectedId) {
         failures.push(
-          `${host.id}: live user agent classified as ${classified?.family} instead of ${host.expectedFamily}`,
+          `${host.id}: live user agent classified as ${classified?.id} instead of ${host.expectedId}`,
         );
       }
       if (run.diagnostics.pageErrors.length > 0) {

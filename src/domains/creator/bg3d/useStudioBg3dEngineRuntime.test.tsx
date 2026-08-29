@@ -197,7 +197,7 @@ describe("useStudioBg3dEngineRuntime", () => {
     const { result } = renderHook(() => useStudioBg3dEngineRuntime(options()));
 
     await waitFor(() => expect(result.current.phase).toBe("ready"));
-    expect(result.current.inApp).toMatchObject({ family: "kakaotalk", isInApp: true });
+    expect(result.current.inApp).toMatchObject({ id: "kakaotalk", isInApp: true });
     expect(result.current.plan).toMatchObject({
       backend: "webgl2",
       reason: "inapp-browser-opt-in-required",

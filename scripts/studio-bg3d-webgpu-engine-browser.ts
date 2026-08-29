@@ -257,7 +257,7 @@ function selectionMatrix(probe: Awaited<ReturnType<typeof probeStudioBg3dWebGpuC
     });
     return {
       id,
-      family: inApp.family,
+      hostId: inApp.id,
       gpuTrust: inApp.gpuTrust,
       autoBackend: auto.backend,
       autoReason: auto.reason,
