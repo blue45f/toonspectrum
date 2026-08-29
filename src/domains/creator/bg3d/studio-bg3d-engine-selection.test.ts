@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
+  latchStudioBg3dWebglOnlyFeatures,
   recordStudioBg3dWebGpuFailure,
   resolveStudioBg3dEngineRuntime,
   selectStudioBg3dEngine,
@@ -201,5 +203,49 @@ describe("Studio BG3D engine runtime resolution", () => {
   it("carries the host reason through when the baseline is chosen", () => {
     const plan = resolveStudioBg3dEngineRuntime({ ...BASE, inApp: INSTAGRAM });
     expect(plan).toMatchObject({ backend: "webgl2", reason: "inapp-browser-blocked" });
+  });
+});
+
+describe("Studio BG3D WebGL-only feature demand", () => {
+  it("refuses WebGPU for VRM characters and immersive sessions, even on request", () => {
+    for (const [feature, reason] of [
+      ["vrmCharacters", "webgl-only-vrm-characters"],
+      ["webxr", "webgl-only-webxr"],
+    ] as const) {
+      const request = {
+        ...BASE,
+        webglOnlyFeatures: { ...EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES, [feature]: true },
+      };
+      expect(selectStudioBg3dEngine(request)).toMatchObject({
+        backend: "webgl2",
+        reason,
+        webgpuSelectable: false,
+      });
+      // An explicit WebGPU choice cannot override a feature that would not render.
+      expect(selectStudioBg3dEngine({ ...request, preference: "webgpu" }))
+        .toMatchObject({ backend: "webgl2", reason, webgpuSelectable: false });
+    }
+  });
+
+  it("still promotes WebGPU when no WebGL-only feature is present", () => {
+    expect(selectStudioBg3dEngine({
+      ...BASE,
+      webglOnlyFeatures: EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
+    })).toMatchObject({ backend: "webgpu", reason: "auto-webgpu-promoted" });
+  });
+
+  it("latches a demand so removing the feature does not remount the viewport again", () => {
+    const empty = EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES;
+    // No observation keeps the identical object, so the hook's state does not churn.
+    expect(latchStudioBg3dWebglOnlyFeatures(empty, {})).toBe(empty);
+    expect(latchStudioBg3dWebglOnlyFeatures(empty, { vrmCharacters: false })).toBe(empty);
+
+    const latched = latchStudioBg3dWebglOnlyFeatures(empty, { vrmCharacters: true });
+    expect(latched).toMatchObject({ vrmCharacters: true, webxr: false });
+    expect(latchStudioBg3dWebglOnlyFeatures(latched, { vrmCharacters: false })).toBe(latched);
+
+    const both = latchStudioBg3dWebglOnlyFeatures(latched, { webxr: true });
+    expect(both).toMatchObject({ vrmCharacters: true, webxr: true });
+    expect(Object.isFrozen(both)).toBe(true);
   });
 });

@@ -232,4 +232,25 @@ describe("useStudioBg3dEngineRuntime", () => {
       vi.useRealTimers();
     }
   });
+
+  it("pins WebGL2 while a WebGL-only feature is present and keeps it after it is gone", async () => {
+    const { result, rerender } = renderHook(
+      (props: { vrm: boolean }) => useStudioBg3dEngineRuntime(options({
+        observedWebglOnlyFeatures: { vrmCharacters: props.vrm },
+      })),
+      { initialProps: { vrm: false } },
+    );
+    await waitFor(() => expect(result.current.plan.backend).toBe("webgpu"));
+
+    rerender({ vrm: true });
+    await waitFor(() => expect(result.current.plan.backend).toBe("webgl2"));
+    expect(result.current.plan.reason).toBe("webgl-only-vrm-characters");
+    expect(result.current.plan.webgpuSelectable).toBe(false);
+
+    // Removing the character must not swap the renderer back and remount the canvas a second time.
+    rerender({ vrm: false });
+    await waitFor(() => expect(result.current.canvasKey).toBe("webgl2#0"));
+    expect(result.current.plan.backend).toBe("webgl2");
+    expect(result.current.plan.reason).toBe("webgl-only-vrm-characters");
+  });
 });

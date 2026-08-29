@@ -26,6 +26,15 @@ const CAPABLE_SIGNALS: StudioBg3dKtx2RendererRuntimeSignals = Object.freeze({
   workerAvailable: true,
 });
 
+function webgpuRendererStub(
+  hasFeature: (name: string) => boolean = () => true,
+): THREE.WebGLRenderer {
+  return {
+    isWebGPURenderer: true,
+    hasFeature,
+  } as unknown as THREE.WebGLRenderer;
+}
+
 function rendererStub(contextLost = false): THREE.WebGLRenderer {
   return {
     isWebGLRenderer: true,
@@ -144,6 +153,51 @@ describe("Studio KTX2 renderer runtime", () => {
       signals: { ...CAPABLE_SIGNALS, workerAvailable: false },
       loadAssets,
     })).rejects.toMatchObject({ code: "environment-unavailable" });
+    expect(loadAssets).not.toHaveBeenCalled();
+  });
+
+  it("admits an initialized WebGPU renderer through its own feature query", async () => {
+    const assets = await installedAssets();
+    const hasFeature = vi.fn(() => true);
+    const runtime = await createStudioBg3dKtx2RendererRuntime({
+      renderer: webgpuRendererStub(hasFeature),
+      signals: CAPABLE_SIGNALS,
+      loadAssets: async () => assets,
+    });
+    // The admission probe and KTX2Loader's own detectSupport both read GPU feature names.
+    expect(hasFeature).toHaveBeenCalled();
+    expect(runtime.transcoderId).toBeTruthy();
+    runtime.dispose();
+  });
+
+  it("refuses a WebGPU renderer that cannot answer feature queries yet", async () => {
+    const loadAssets = vi.fn(installedAssets);
+    await expect(createStudioBg3dKtx2RendererRuntime({
+      renderer: { isWebGPURenderer: true } as unknown as THREE.WebGLRenderer,
+      signals: CAPABLE_SIGNALS,
+      loadAssets,
+    })).rejects.toMatchObject({ code: "renderer-unavailable" });
+
+    await expect(createStudioBg3dKtx2RendererRuntime({
+      renderer: webgpuRendererStub(() => { throw new Error("device not ready"); }),
+      signals: CAPABLE_SIGNALS,
+      loadAssets,
+    })).rejects.toMatchObject({ code: "renderer-unavailable" });
+    expect(loadAssets).not.toHaveBeenCalled();
+  });
+
+  it("refuses a renderer claiming both backends or neither", async () => {
+    const loadAssets = vi.fn(installedAssets);
+    for (const renderer of [
+      { isWebGLRenderer: true, isWebGPURenderer: true },
+      { extensions: { has: () => false } },
+    ]) {
+      await expect(createStudioBg3dKtx2RendererRuntime({
+        renderer: renderer as unknown as THREE.WebGLRenderer,
+        signals: CAPABLE_SIGNALS,
+        loadAssets,
+      })).rejects.toMatchObject({ code: "renderer-unavailable" });
+    }
     expect(loadAssets).not.toHaveBeenCalled();
   });
 });

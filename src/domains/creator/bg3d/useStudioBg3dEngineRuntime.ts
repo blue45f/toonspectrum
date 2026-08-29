@@ -15,11 +15,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
+  latchStudioBg3dWebglOnlyFeatures,
   normalizeStudioBg3dEnginePreference,
   recordStudioBg3dWebGpuFailure,
   resolveStudioBg3dEngineRuntime,
   type StudioBg3dEnginePreference,
   type StudioBg3dEngineSelectionPlan,
+  type StudioBg3dEngineWebglOnlyFeatures,
 } from "./studio-bg3d-engine-selection";
 import { classifyStudioBg3dInAppBrowser } from "./studio-bg3d-inapp-browser";
 import { probeStudioBg3dWebGpuCapability } from "./studio-bg3d-webgpu-capability";
@@ -68,6 +71,11 @@ export interface UseStudioBg3dEngineRuntimeOptions {
   readonly antialias: boolean;
   readonly saveData?: boolean;
   readonly deviceMemoryGb?: number;
+  /**
+   * Features observed in this session that only the WebGL2 renderer can serve. Observations latch,
+   * so a scene that adds and removes a VRM character does not rebuild the viewport twice.
+   */
+  readonly observedWebglOnlyFeatures?: Partial<StudioBg3dEngineWebglOnlyFeatures>;
   /** Test seam; production reads the browser. */
   readonly probe?: typeof probeStudioBg3dWebGpuCapability;
   readonly loadPreference?: () => Promise<StudioBg3dEnginePreference>;
@@ -116,6 +124,7 @@ export function useStudioBg3dEngineRuntime(
     antialias,
     saveData,
     deviceMemoryGb,
+    observedWebglOnlyFeatures,
     probe: probeCapability = probeStudioBg3dWebGpuCapability,
     loadPreference = loadPersistedPreference,
     savePreference = persistPreference,
@@ -128,8 +137,20 @@ export function useStudioBg3dEngineRuntime(
   const [webgpuFailureCount, setWebgpuFailureCount] = useState(0);
   const [deviceLostMessage, setDeviceLostMessage] = useState<string | null>(null);
   const [recoveryGeneration, setRecoveryGeneration] = useState(0);
+  const [webglOnlyFeatures, setWebglOnlyFeatures] = useState<StudioBg3dEngineWebglOnlyFeatures>(
+    EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
+  );
 
   const inApp = useMemo(() => classifyStudioBg3dInAppBrowser(readHostSignals()), []);
+
+  const observedVrmCharacters = observedWebglOnlyFeatures?.vrmCharacters === true;
+  const observedWebxr = observedWebglOnlyFeatures?.webxr === true;
+  useEffect(() => {
+    setWebglOnlyFeatures((current) => latchStudioBg3dWebglOnlyFeatures(current, {
+      vrmCharacters: observedVrmCharacters,
+      webxr: observedWebxr,
+    }));
+  }, [observedVrmCharacters, observedWebxr]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -167,8 +188,18 @@ export function useStudioBg3dEngineRuntime(
       saveData,
       deviceMemoryGb,
       webgpuFailureCount,
+      webglOnlyFeatures,
     }),
-    [preference, probe, inApp, deviceProfile, saveData, deviceMemoryGb, webgpuFailureCount],
+    [
+      preference,
+      probe,
+      inApp,
+      deviceProfile,
+      saveData,
+      deviceMemoryGb,
+      webgpuFailureCount,
+      webglOnlyFeatures,
+    ],
   );
 
   const setPreference = useCallback((next: StudioBg3dEnginePreference) => {

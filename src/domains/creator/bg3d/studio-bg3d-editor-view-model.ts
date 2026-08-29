@@ -120,7 +120,7 @@ export function bindStudioBg3dEditorViewModel(h) {
     setTransformMode, lineArtPreview, setLineArtPreview, magicLayerEnabled,
     setMagicLayerEnabled, isTransforming, setIsTransforming, isQuadView,
     setIsQuadView, webXrBridgeGeneration, setWebXrBridgeGeneration, webXrCanvasGeneration,
-    setWebXrCanvasGeneration, webXrSessionStateRef, webXrControllerRef, webXrRestoreCameraRef,
+    setWebXrCanvasGeneration, webXrSessionState, webXrSessionStateRef, webXrControllerRef, webXrRestoreCameraRef,
     webXrCleanupPromiseRef, webXrRendererRecreationPendingRef, webXrCloseRequestedRef, webXrOpenRef,
     webXrMountedRef, viewTopRef, viewFrontRef, viewRightRef,
     viewPerspRef, isCapturing, setIsCapturing, error,
@@ -283,6 +283,12 @@ export function bindStudioBg3dEditorViewModel(h) {
     antialias: sceneBaseDocument.render.antialias,
     saveData: deviceSignals.saveData,
     deviceMemoryGb: deviceSignals.deviceMemoryGb,
+    observedWebglOnlyFeatures: {
+      // VRM/MToon appearance is a ShaderMaterial with no node-material conversion, and the
+      // immersive session bridge drives WebGLRenderer.xr. Either one present pins WebGL2.
+      vrmCharacters: sharedCharacters.length > 0,
+      webxr: webXrSessionState.status !== "idle",
+    },
   });
   const hasCloneFailure = customModels.some((model) => failedCloneIds.has(model.id));
   const hasPendingClone = customModels.some(

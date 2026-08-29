@@ -40,6 +40,24 @@ WebGPU를 "지원되면 쓴다"로 켜면 한국 트래픽의 대부분인 인�
 | 인스타그램·페이스북·스레드 | WebGL2 | 거부 | `inapp-browser-blocked` |
 | 데이터 절약 모드 / 4GB 미만 모바일 | WebGL2 | WebGPU 가능 | `save-data-enabled`, `low-device-memory` |
 | WebGPU 초기화 2회 연속 실패 | WebGL2 | 거부(세션 한정) | `repeated-webgpu-failure` |
+| VRM 캐릭터가 있는 장면 | WebGL2 | 거부 | `webgl-only-vrm-characters` |
+| 몰입형(WebXR) 세션 진행 중 | WebGL2 | 거부 | `webgl-only-webxr` |
+
+### WebGL2 전용 기능
+
+두 가지는 **선호가 아니라 렌더 불가**라서 명시 선택도 거부한다.
+
+- **VRM 캐릭터**: VRM/MToon 외형은 `ShaderMaterial`이고 Three의 node material 라이브러리에
+  변환이 없다. WebGPU renderer는 셰이더를 빌드하지 못한다. 공유 3D 스테이지 캐릭터가 장면에
+  들어오면 정책이 WebGL2를 고른다.
+- **WebXR**: 몰입형 세션 브리지가 `WebGLRenderer.xr`을 구동한다.
+
+관측은 **세션 동안 latch**한다. 캐릭터를 지웠다고 엔진을 되돌리면 Canvas를 두 번째로 remount
+하게 되고, 캐릭터를 껐다 켤 때마다 뷰포트가 재생성된다.
+
+KTX2 압축 텍스처는 처음엔 WebGL2 전용으로 막으려 했으나, `KTX2Loader.detectSupport()`가
+`isWebGPURenderer`를 분기해 GPU feature 이름으로 포맷을 고르므로 **막는 대신 우리 쪽 가드를
+넓혔다.** 이제 두 backend 모두 압축 텍스처 모델을 연다.
 
 아티스트 선택은 SQLite/OPFS 환경설정에 남고, 뷰 패널의 "3D 렌더 엔진" 카드가 현재 backend,
 사유, 선택지를 함께 보여준다. WebGPU를 쓸 수 없는 호스트에서도 선택지를 숨기지 않고
@@ -87,7 +105,9 @@ WebGPU 엔진은 승인된 지연 entry 하나(`studio-bg3d-three-webgpu-entry.t
 
 ## 남은 작업
 
+- VRM: `@pixiv/three-vrm`은 `three-vrm/nodes` 빌드를 제공한다. 이를 채택하면 VRM 장면도
+  WebGPU로 갈 수 있지만, 공유 스테이지 전체의 머티리얼 경로를 바꾸는 별도 작업이다.
 - WebXR: Three의 WebGPU XR 경로가 현재 WebGL 세션 브리지와 동등해질 때까지 `three-webgpu`의
-  capability 목록에서 제외한다. XR을 켜면 정책이 WebGL2를 고른다.
+  capability 목록에서 제외한다.
 - 실기기 GPU 계측(프레임 타임·입력 지연)은 `studio-bg3d-engine-benchmark-contract.ts`의
   런을 실제 단말에서 수집한 뒤 별도로 기록한다. 이번 승격은 정확성 동등성까지만 증명한다.
