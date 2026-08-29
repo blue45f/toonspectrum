@@ -39,9 +39,12 @@
  *  - A violation must be EARNED. Samples are reduced and judged by `studio-perf-calibration.ts`,
  *    so each pass reduces to min(long)/min(short) and the verdict is the minimum across
  *    `GROWTH_PASSES` passes: one unlucky pass cannot redden the gate, while a lane that genuinely
- *    replans trips every pass. A clean pass ends the measurement, so a healthy lane pays 7 timed
- *    moves per length where this gate used to spend 21 unconditionally; the passes a suspicious
- *    lane earns are funded out of that saving.
+ *    replans trips every pass. A clean pass ends the measurement — unless the lane is within
+ *    half the absolute ceiling, which is graded on samples rather than on a ratio and so keeps
+ *    sampling — so a healthy lane usually pays 7 timed moves per length where this gate used to
+ *    spend 21 unconditionally, and the passes a suspicious lane earns are funded out of that
+ *    saving. A violation is never reported from one pass: the elapsed-time stop cannot fire
+ *    until a confirmation exists.
  *  - The n=400 baseline is still floored at `GROWTH_BASE_FLOOR_MS`, but NOT for the reason first
  *    recorded here: Node's `performance.now()` resolves to ~51 ns, so a 0.1 ms window is not
  *    quantisation. The floor exempts lanes whose per-move cost is small enough that fixed
@@ -1152,6 +1155,17 @@ function measureGrowth(probe: LaneProbe): LaneMeasurement {
   for (let pass = 0; pass < GROWTH_PASSES; pass += 1) {
     const paired: StudioPerfCalibrationSample[] = [];
     for (let sample = 0; sample < GROWTH_SAMPLES_PER_PASS; sample += 1) {
+      // Each seek stays immediately before the move it restores state for, and NOT hoisted so
+      // that both timed windows become adjacent. Hoisting looks like it would tighten the
+      // pairing — the long seek is expensive, so contention starting inside it lands on the long
+      // move alone — but it was measured and it is a bad trade: the long seek allocates heavily
+      // while replaying its prefix, and running the short move next charges the SHORT window for
+      // that collection. Measured here, hoisting lifted the short baseline from ~0.09 ms to
+      // 0.130-0.156 ms while the long move fell, and an injected 0.15 ms regression that reads
+      // x2.42-x2.72 with this ordering read x1.5-x1.7 with the hoisted one and passed the gate
+      // three times out of three. An inflated denominator swallows exactly what the gate exists
+      // to catch, so seek-warmth fidelity wins; contention inside a seek is what the earned
+      // confirmation passes are for.
       shortStepper.seek(shortBefore); // untimed: restore the pre-move state
       const shortStartedAt = performance.now();
       shortOutput = shortStepper.move(shortAt); // timed: ONE pointer move
@@ -1169,10 +1183,27 @@ function measureGrowth(probe: LaneProbe): LaneMeasurement {
       paired.push({ referenceMs: Math.max(shortMs, GROWTH_BASE_FLOOR_MS), workMs: longMs });
     }
     passes.push(reduceStudioPerfCalibrationSamples(paired));
+    const verdict = judgeStudioCalibratedBudget(probe.id, passes, GROWTH_MULTIPLE);
     // A pass that clears the gate ends the measurement, exactly as
     // `evaluateStudioCalibratedBudget` does: innocence needs no confirming, only guilt does.
-    if (judgeStudioCalibratedBudget(probe.id, passes, GROWTH_MULTIPLE).ok) break;
-    if (shortSamples.length >= MIN_REPS && performance.now() - startedAt > MEASURE_BUDGET_MS * 2) {
+    //
+    // The CEILING is the exception, because it is graded on `long.min` against an ABSOLUTE
+    // budget rather than a ratio, so its estimate does not improve by cancelling anything — it
+    // improves only by taking more samples. A lane that stops after one clean pass hands that
+    // assertion 7 windows where this gate used to give it 21, which is a false-failure risk for
+    // a lane sitting near the ceiling. Nothing measures near it today (the slowest undocumented
+    // lane is ~0.4 ms against 8 ms), so the check costs nothing now and is what keeps the early
+    // exit from quietly weakening the ceiling if a lane ever climbs toward it.
+    if (verdict.ok && Math.min(...longSamples) < PER_MOVE_CEILING_MS / 2) break;
+    // A violation may never be reported from a single pass, so the budget stop cannot fire until
+    // one confirmation exists. Letting it fire earlier would restore exactly the unlucky-pass
+    // failure this gate is being rebuilt to remove: one contended pass that is both slow enough
+    // to exhaust the budget and high enough to violate would end the measurement and convict.
+    if (
+      passes.length >= 2
+      && shortSamples.length >= MIN_REPS
+      && performance.now() - startedAt > MEASURE_BUDGET_MS * 2
+    ) {
       break;
     }
   }
