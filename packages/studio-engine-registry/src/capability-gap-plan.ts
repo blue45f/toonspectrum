@@ -101,6 +101,17 @@ function providerCoversGap(
  * completable by the Skia lane's contracts, and every provider named by the plan must exist in
  * the caller's shipped engine universe (`STUDIO_KNOWN_ENGINE_DESCRIPTORS` ids in the app).
  */
+/**
+ * Gap features the CPU terminal lane can actually render, and therefore must declare.
+ *
+ * Deliberately not "all of them": see the note in the terminal check below. The CPU renderer
+ * implements paragraph text but not mask, image filter, backdrop blend or path effect, so those
+ * four terminate at the completion lane and this set records where the chain really ends.
+ */
+const STUDIO_TERMINAL_PRESERVED_GAP_FEATURES: ReadonlySet<string> = new Set([
+  "render.text.paragraph",
+]);
+
 export function validateVelloCapabilityGapCoverage(
   shippedProviders: readonly VelloCapabilityGapProvider[]
 ): readonly VelloCapabilityGapCoverageIssue[] {
@@ -164,6 +175,38 @@ export function validateVelloCapabilityGapCoverage(
           subject: `${plan.challengerProviderId}:${gap.feature}`,
           reason:
             "the named challenger lane does not declare this gap capability, so it could never be selected to challenge on it",
+        });
+      }
+    }
+  }
+
+  // The TERMINAL lane is validated only for what it can actually render, which is a narrower
+  // claim than it first looks and worth stating rather than papering over.
+  //
+  // Review asked for the same exact-token check here, on the reasoning that completion and
+  // challenger can both be demoted and this is what the chain falls back to. The reasoning is
+  // right; the remedy would have been a lie. `packages/studio-engine-skia/src/render.ts` — the
+  // CPU lane's actual renderer — implements clip but NOT mask, image filter, backdrop blend or
+  // path effect, and a descriptor test pins that lane to exactly what render.ts implements. So
+  // declaring the four tokens would have made the descriptor claim capabilities the code does not
+  // have, which is the failure this whole validator exists to prevent, pointed the other way.
+  //
+  // (`SKIA_CPU_REFERENCE_FEATURE_CONTRACTS` lowers every GPU `native` to `reference` rather than
+  // `unsupported`, which overstates this lane against its own renderer. The contracts constant is
+  // not the authority here; the descriptor and render.ts are.)
+  //
+  // The honest model: only `render.text.paragraph` survives all the way to the CPU terminal. The
+  // other four gaps terminate at the completion lane, so if IT is demoted the feature is gone —
+  // a real limitation of the CPU renderer, recorded here instead of hidden behind a declaration.
+  const terminalProvider = byId.get(plan.terminalProviderId);
+  if (terminalProvider) {
+    for (const gap of plan.gaps) {
+      if (!STUDIO_TERMINAL_PRESERVED_GAP_FEATURES.has(gap.feature)) continue;
+      if (!providerCoversGap(terminalProvider, gap.feature)) {
+        issues.push({
+          subject: `${plan.terminalProviderId}:${gap.feature}`,
+          reason:
+            "the named terminal fallback does not declare a gap capability its own renderer implements, so the last-resort chain could not preserve it",
         });
       }
     }
