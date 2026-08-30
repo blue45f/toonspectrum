@@ -9,7 +9,7 @@ import {
   UserPlus,
   WandSparkles,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import {
   AVATAR_FORGE_BANG_STYLE_OPTIONS,
@@ -20,6 +20,7 @@ import {
   AVATAR_FORGE_PRESETS,
   createAvatarForgeState,
   sanitizeAvatarForgeState,
+  serializeAvatarForgeState,
   type AvatarForgeFaceAccentId,
   type AvatarForgeFaceParams,
   type AvatarForgeHairParams,
@@ -101,6 +102,30 @@ export function StudioVrmAvatarForgePanel({
   // 헤어 실루엣을 **직접 골랐는지**를 기억한다. 기본값이 이미 "없음"이라 목록에서 "없음"을
   // 눌러도 상태가 그대로여서, 상태 비교만으로는 의도한 민머리를 알아볼 수 없다.
   const [hairStyleChosen, setHairStyleChosen] = useState(false);
+
+  // 이 의도는 **지금 편집 중인 조형 상태**에만 붙는다. 새 VRM 을 설치하면 부모가 조형 상태를
+  // 통째로 초기화하는데(useStudioVrmPoserInstall) 패널은 마운트된 채로 남으므로, 그대로 두면
+  // 이전 캐릭터에서 고른 헤어 의도가 살아남아 새 캐릭터를 민머리로 생성한다. 패널이 방금
+  // 내보낸 값이 아닌 상태가 들어오면 외부 교체로 보고 의도를 지운다.
+  //
+  // 부모가 `parseAvatarForgeState` 로 정규화해 되돌려 주므로 객체 동일성으로는 우리 편집을
+  // 알아볼 수 없다. 같은 정규화를 거친 서명으로 비교한다.
+  const forgeSignature = useMemo(() => JSON.stringify(serializeAvatarForgeState(state)), [state]);
+  const emittedSignatureRef = useRef<string | null>(null);
+  const seenSignatureRef = useRef(forgeSignature);
+  if (seenSignatureRef.current !== forgeSignature) {
+    const mine = emittedSignatureRef.current === forgeSignature;
+    seenSignatureRef.current = forgeSignature;
+    emittedSignatureRef.current = null;
+    if (!mine && hairStyleChosen) setHairStyleChosen(false);
+  }
+
+  /** 조형 상태를 부모로 올린다. 되돌아온 상태가 우리 것인지 알아보려고 서명을 남긴다. */
+  const emit = (next: AvatarForgeState) => {
+    emittedSignatureRef.current = JSON.stringify(serializeAvatarForgeState(next));
+    onChange(next);
+  };
+
   const previewRecipe = createStudioVrmGenerateRecipe({
     presetId: state.presetId,
     state,
@@ -108,11 +133,11 @@ export function StudioVrmAvatarForgePanel({
   });
 
   const updateFace = <K extends keyof AvatarForgeFaceParams>(key: K, value: AvatarForgeFaceParams[K]) => {
-    onChange({ ...state, presetId: undefined, face: { ...state.face, [key]: value } });
+    emit({ ...state, presetId: undefined, face: { ...state.face, [key]: value } });
   };
 
   const updateProportion = (key: StudioVrmProportionKey, value: number) => {
-    onChange(sanitizeAvatarForgeState({
+    emit(sanitizeAvatarForgeState({
       ...state,
       presetId: undefined,
       bodyPresetId: undefined,
@@ -125,14 +150,14 @@ export function StudioVrmAvatarForgePanel({
   };
 
   const updateHair = <K extends keyof AvatarForgeHairParams>(key: K, value: AvatarForgeHairParams[K]) => {
-    onChange({ ...state, presetId: undefined, hair: { ...state.hair, [key]: value } });
+    emit({ ...state, presetId: undefined, hair: { ...state.hair, [key]: value } });
   };
 
   const updateAccent = (
     id: AvatarForgeFaceAccentId,
     patch: Partial<NonNullable<AvatarForgeState["faceAccents"]>[number]>
   ) => {
-    onChange({
+    emit({
       ...state,
       presetId: undefined,
       faceAccents: (state.faceAccents ?? []).map((accent) =>
@@ -179,7 +204,7 @@ export function StudioVrmAvatarForgePanel({
               // 조형 상태를 통째로 되돌리면 "머리 없음을 골랐다"는 의도도 같이 사라져야 한다.
               // 남겨 두면 초기화한 패널이 기본 프리셋 대신 대머리를 만든다.
               setHairStyleChosen(false);
-              onChange(createAvatarForgeState());
+              emit(createAvatarForgeState());
             }}
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg disabled:opacity-40"
             aria-label="아바타 조형 초기화"
@@ -233,7 +258,7 @@ export function StudioVrmAvatarForgePanel({
                     aria-pressed={selected}
                     onClick={() => {
                       setHairStyleChosen(false);
-                      onChange(createAvatarForgeState(preset.id));
+                      emit(createAvatarForgeState(preset.id));
                     }}
                     className={`min-h-[5.6rem] w-[8.4rem] shrink-0 snap-start rounded-xl border p-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
                       selected
@@ -261,7 +286,7 @@ export function StudioVrmAvatarForgePanel({
                     disabled={disabled}
                     aria-label={`${variant.label} 베리언트: ${variant.description}`}
                     title={variant.tags.join(" · ")}
-                    onClick={() => onChange(applyStudioVrmCharacterVariant(state, variant.id))}
+                    onClick={() => emit(applyStudioVrmCharacterVariant(state, variant.id))}
                     className="min-h-[5.2rem] w-[8.4rem] shrink-0 snap-start rounded-xl border border-line bg-card p-2.5 text-left text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
                   >
                     <span className="text-lg" aria-hidden>{variant.emoji}</span>
@@ -302,7 +327,7 @@ export function StudioVrmAvatarForgePanel({
                       disabled={proportionControlsDisabled}
                       aria-pressed={selected}
                       aria-label={`${preset.label} 체형: ${preset.hint}`}
-                      onClick={() => onChange(sanitizeAvatarForgeState({
+                      onClick={() => emit(sanitizeAvatarForgeState({
                         ...state,
                         presetId: undefined,
                         bodyPresetId: undefined,

@@ -201,11 +201,10 @@ function smoothstep(edge0: number, edge1: number, value: number): number {
 function torsoSkin(rig: StudioVrmRig, y: number, h: number): MeshSkinBinding {
   const hipsY = rig.worldRest.hips[1];
   const spineY = rig.worldRest.spine[1];
-  const headY = rig.worldRest.head[1];
-  const neckStart = headY - 0.085 * h;
+  const { neckBaseY, neckTopY } = torsoAnchors(rig);
 
-  if (y >= neckStart) {
-    return mix(rig, "spine", "head", smoothstep(neckStart, headY + 0.01 * h, y));
+  if (y >= neckBaseY) {
+    return mix(rig, "spine", "head", smoothstep(neckBaseY, neckTopY, y));
   }
   return mix(rig, "hips", "spine", smoothstep(hipsY - 0.03 * h, spineY + 0.11 * h, y));
 }
@@ -267,40 +266,98 @@ function heightScale(rig: StudioVrmRig): number {
 /** 몸통 단면 계획 — [높이, 좌우 반지름 비율, 앞뒤 반지름 비율, 초타원 지수]. */
 type TorsoProfile = readonly [y: number, radiusX: number, radiusZ: number, exponent: number];
 
-/** 몸통·상의가 공유하는 높이 앵커. */
+/**
+ * 몸통·상의가 공유하는 높이 앵커.
+ *
+ * 목 구간은 어깨(사다리꼴근 꼭대기)에서 **위로만** 쌓는다. 예전에는 목 단면을 머리 관절
+ * 기준 고정 오프셋(`headY − 0.085h` …)으로 잡았는데, 머리 관절과 어깨 관절의 간격이
+ * `0.1088·neckLength − 0.0188·torsoLength` 배(키 기준)라서 목을 짧게 잡으면 그 높이가
+ * 어깨 위 단면보다 **아래로** 내려갔다(중립에서도 1.315 < 1.34, 몸통 1.35·목 0.3 에서는
+ * 1.358 < 1.466). 로프트 단면이 역행하면 표면이 가슴 쪽으로 되접혀 목 밑동에 뒤집힌 깔때기가
+ * 생긴다. 여기서 단조 증가를 구조적으로 보장한다.
+ */
 function torsoAnchors(rig: StudioVrmRig) {
   const h = heightScale(rig);
   const hipsY = rig.worldRest.hips[1];
   const shoulderY = rig.worldRest.leftUpperArm[1];
+  const headY = rig.worldRest.head[1];
+  /** 사다리꼴근 꼭대기 — 몸통 로프트의 마지막 "어깨" 단면. */
+  const trapY = shoulderY + 0.03 * h;
+  /**
+   * 목 단면의 위 끝. 두개골(중심 `headY + 0.088h`, 세로 반경 `0.115h`) 안쪽에 묻히므로
+   * 최소 구간을 확보하려고 위로 밀어도 실루엣에는 나타나지 않는다.
+   */
+  const neckTopY = Math.max(headY + 0.03 * h, trapY + 0.05 * h);
+  const neckSpan = neckTopY - trapY;
   return {
     h,
     hipsY,
     shoulderY,
-    headY: rig.worldRest.head[1],
+    headY,
+    trapY,
+    neckTopY,
+    /** 목 밑동 — 어깨 단면 바로 위. */
+    neckBaseY: trapY + 0.12 * neckSpan,
+    neckMidY: trapY + 0.55 * neckSpan,
     crotchY: hipsY - 0.075 * h,
     waistY: hipsY + 0.13 * h,
     chestY: shoulderY - 0.06 * h,
   };
 }
 
+/**
+ * 몸통 단면의 **모양** 계획 — [좌우 반지름 비율, 앞뒤 반지름 비율, 초타원 지수].
+ * 높이는 {@link studioVrmTorsoSectionHeights} 가 준다. 두 배열의 길이는 같아야 한다.
+ */
+const TORSO_SECTION_SHAPES: readonly (readonly [rx: number, rz: number, exponent: number])[] =
+  Object.freeze([
+    [0.085, 0.068, 2.2],
+    [0.094, 0.076, 2.3],
+    [0.096, 0.077, 2.3],
+    [0.078, 0.066, 2.3],
+    [0.09, 0.07, 2.3],
+    [0.106, 0.076, 2.4],
+    [0.116, 0.073, 2.5],
+    [0.098, 0.062, 2.4],
+    [0.036, 0.034, 2.1],
+    [0.03, 0.03, 2],
+    [0.029, 0.029, 2],
+  ] as const);
+
+/**
+ * 몸통 로프트가 실제로 쓰는 단면 높이(아래 → 위).
+ *
+ * **반드시 순증가한다.** 역행하면 로프트가 같은 구간을 두 번 지나 표면이 되접히고, 목 밑동에
+ * 아래를 보는 깔때기가 생긴다. 체형 파라미터 전 구간에서 이 불변식이 유지되는지 회귀
+ * 테스트가 이 배열을 직접 본다.
+ */
+export function studioVrmTorsoSectionHeights(rig: StudioVrmRig): readonly number[] {
+  const { h, hipsY, shoulderY, crotchY, waistY, chestY, trapY, neckBaseY, neckMidY, neckTopY } =
+    torsoAnchors(rig);
+  return [
+    crotchY,
+    hipsY - 0.035 * h,
+    hipsY + 0.025 * h,
+    waistY,
+    meshLerp(waistY, chestY, 0.55),
+    chestY,
+    shoulderY - 0.012 * h,
+    trapY,
+    neckBaseY,
+    neckMidY,
+    neckTopY,
+  ];
+}
+
 function buildTorso(builder: SurfaceBuilder, rig: StudioVrmRig, state: AvatarForgeState): void {
-  const { h, hipsY, shoulderY, headY, crotchY, waistY, chestY } = torsoAnchors(rig);
+  const { h, waistY, shoulderY } = torsoAnchors(rig);
   const unit = bodyUnit(rig);
   const shoulder = meshClamp(state.proportions.shoulderWidth, 0.7, 1.4);
 
-  const profiles: readonly TorsoProfile[] = [
-    [crotchY, 0.085, 0.068, 2.2],
-    [hipsY - 0.035 * h, 0.094, 0.076, 2.3],
-    [hipsY + 0.025 * h, 0.096, 0.077, 2.3],
-    [waistY, 0.078, 0.066, 2.3],
-    [meshLerp(waistY, chestY, 0.55), 0.09, 0.07, 2.3],
-    [chestY, 0.106, 0.076, 2.4],
-    [shoulderY - 0.012 * h, 0.116, 0.073, 2.5],
-    [shoulderY + 0.03 * h, 0.098, 0.062, 2.4],
-    [headY - 0.085 * h, 0.036, 0.034, 2.1],
-    [headY - 0.045 * h, 0.03, 0.03, 2],
-    [headY + 0.03 * h, 0.029, 0.029, 2],
-  ];
+  const profiles: readonly TorsoProfile[] = studioVrmTorsoSectionHeights(rig).map((y, index) => {
+    const [rx, rz, exponent] = TORSO_SECTION_SHAPES[index];
+    return [y, rx, rz, exponent] as const;
+  });
 
   // 어깨 너비는 위쪽 단면에만 실린다 — 골반까지 같이 넓어지면 체형이 무너진다.
   const rings: LoftRing[] = profiles.map(([y, rx, rz, exponent], index) => {
@@ -509,15 +566,98 @@ const HEAD_COLUMNS = 30;
 const HEAD_ROWS = 22;
 
 /**
+ * 두개골 표면의 **모양 파라미터**. 두상 격자({@link buildHead})와 이목구비 투영
+ * ({@link facePatchPoint})이 반드시 같은 값을 공유해야 한다.
+ */
+export type StudioVrmHeadSurface = {
+  readonly fit: StudioVrmRigHeadFit;
+  /** 아래 절반 세로 신장(턱 길이). */
+  readonly chin: number;
+  /** 광대 볼륨 0~1. */
+  readonly cheek: number;
+};
+
+function headSurface(rig: StudioVrmRig, state: AvatarForgeState): StudioVrmHeadSurface {
+  return {
+    fit: rig.head,
+    chin: meshClamp(state.face.chinLength, 0.8, 1.25),
+    cheek: meshClamp(state.face.cheekVolume, 0, 1),
+  };
+}
+
+/**
+ * 위도(구면 `cosθ`)에 대한 두개골 변형 계수.
+ *
+ *  - `narrow` — 아래 절반 좌우·앞뒤 공통 수축(턱).
+ *  - `cheekGain` — 눈높이 살짝 아래에서 **좌우로만** 붙는 광대 볼륨.
+ *  - `stretch` — 아래 절반 세로 신장.
+ */
+function headLatitudeShape(
+  surface: StudioVrmHeadSurface,
+  cosTheta: number,
+): { narrow: number; cheekGain: number; stretch: number } {
+  const lower = meshClamp(-cosTheta, 0, 1);
+  const cheekFalloff = Math.exp(-(((cosTheta + 0.18) / 0.34) ** 2));
+  return {
+    narrow: 1 - 0.42 * lower ** 1.45,
+    cheekGain: 1 + surface.cheek * 0.13 * cheekFalloff,
+    stretch: cosTheta < 0 ? surface.chin : 1,
+  };
+}
+
+/** 정면은 살짝 눌러 애니메 특유의 평평한 얼굴 면을 만든다. `zUnit` 은 단위 구면의 +Z 성분. */
+function headFrontFlatten(zUnit: number): number {
+  return zUnit > 0 ? 1 - 0.13 * zUnit : 1;
+}
+
+/**
+ * 두개골 **정면 표면의 깊이**(+Z, 두개골 중심 기준) — 얼굴 평면 좌표 `(fx, fy)` 에서.
+ * {@link buildHead} 가 격자를 찍는 식과 정확히 같다.
+ *
+ * 변형식이 위도·경도에 대해 단조라 역산이 닫힌 형태로 나온다: 세로 위치에서 위도를 얻고
+ * (아래 절반은 턱 신장을 되돌린다), 가로 위치에서 `narrow · cheekGain` 을 나눠 경도를 얻은 뒤,
+ * 정면 반구(+Z)를 골라 같은 식으로 깊이를 계산한다.
+ */
+function headSurfaceDepth(surface: StudioVrmHeadSurface, fx: number, fy: number): number {
+  const head = surface.fit;
+  // 두상은 `y = radiusY · cosθ · stretch` 이고 아래 절반에만 stretch(=chin)가 걸리므로,
+  // 부호로 어느 절반인지 가른 뒤 그 배율만 되돌린다.
+  const cosTheta = meshClamp(
+    fy < 0 ? fy / (head.radiusY * surface.chin) : fy / head.radiusY,
+    -1,
+    1,
+  );
+  const sinTheta = Math.sqrt(Math.max(0, 1 - cosTheta * cosTheta));
+  const { narrow, cheekGain } = headLatitudeShape(surface, cosTheta);
+  // `x = radiusX · xUnit · narrow · cheekGain` 를 뒤집고, 단위 구면에서
+  // `xUnit² + zUnit² = sin²θ` 로 정면 반구의 깊이를 얻는다.
+  const xUnit = fx / (head.radiusX * narrow * cheekGain);
+  // 0.05 하한은 피처가 두개골 옆면으로 넘어가 깊이가 0 에 붙는 것을 막는다.
+  const zUnit = Math.sqrt(Math.max(0.0025, sinTheta * sinTheta - xUnit * xUnit));
+  return head.radiusZ * zUnit * narrow * headFrontFlatten(zUnit);
+}
+
+/**
+ * 조형 상태 하나에 대한 두개골 정면 표면의 깊이. 이목구비가 실제 살갗에 붙어 있는지
+ * 검증할 때 쓴다(회귀 테스트의 기준면).
+ */
+export function studioVrmHeadSurfaceDepth(
+  rig: StudioVrmRig,
+  state: AvatarForgeState,
+  planarX: number,
+  planarY: number,
+): number {
+  return headSurfaceDepth(headSurface(rig, state), planarX, planarY);
+}
+
+/**
  * 두개골 — 타원체를 아래쪽에서 턱으로 좁히고 광대에 볼륨을 얹은 형태.
  * 얼굴 비율(headWidth/Height/Depth)은 여기서 굽지 않는다. 머리 **노드 스케일**로 들어가므로
  * 이중 적용이 된다(리그 파일의 바인드 규약 참고).
  */
-function buildHead(builder: SurfaceBuilder, rig: StudioVrmRig, state: AvatarForgeState): void {
+function buildHead(builder: SurfaceBuilder, rig: StudioVrmRig, surface: StudioVrmHeadSurface): void {
   const head = rig.head;
   const skin = only(rig, "head");
-  const chin = meshClamp(state.face.chinLength, 0.8, 1.25);
-  const cheek = meshClamp(state.face.cheekVolume, 0, 1);
   const [u0, v0, u1, v1] = UV.head;
 
   const grid: number[][] = [];
@@ -525,28 +665,19 @@ function buildHead(builder: SurfaceBuilder, rig: StudioVrmRig, state: AvatarForg
     const theta = (row / HEAD_ROWS) * Math.PI;
     const cosTheta = Math.cos(theta);
     const sinTheta = Math.sin(theta);
+    const { narrow, cheekGain, stretch } = headLatitudeShape(surface, cosTheta);
     const line: number[] = [];
     for (let column = 0; column <= HEAD_COLUMNS; column += 1) {
       const phi = (column / HEAD_COLUMNS) * Math.PI * 2;
-      // 턱: 아래 절반에서 좌우·앞뒤를 좁히고 세로로 늘인다.
-      const lower = meshClamp(-cosTheta, 0, 1);
-      const narrow = 1 - 0.42 * lower ** 1.45;
-      const stretch = cosTheta < 0 ? chin : 1;
-      // 광대: 눈높이 살짝 아래에서 좌우로만 부풀린다.
-      const cheekFalloff = Math.exp(-(((cosTheta + 0.18) / 0.34) ** 2));
-      const cheekGain = 1 + cheek * 0.13 * cheekFalloff;
-
       const x = -Math.cos(phi) * sinTheta;
       const z = Math.sin(phi) * sinTheta;
-      // 정면은 살짝 눌러 애니메 특유의 평평한 얼굴 면을 만든다.
-      const frontFlatten = z > 0 ? 1 - 0.13 * z : 1;
 
       line.push(
         builder.vertex(
           [
             head.center[0] + head.radiusX * x * narrow * cheekGain,
             head.center[1] + head.radiusY * cosTheta * stretch,
-            head.center[2] + head.radiusZ * z * narrow * frontFlatten,
+            head.center[2] + head.radiusZ * z * narrow * headFrontFlatten(z),
           ],
           [
             meshLerp(u0, u1, column / HEAD_COLUMNS),
@@ -718,13 +849,22 @@ type FacePatchInstance = {
   readonly vertices: readonly (readonly [index: number, lx: number, ly: number])[];
 };
 
+/**
+ * 얼굴 평면 좌표 → 두개골 표면 위의 월드 좌표.
+ *
+ * 깊이는 {@link headSurfaceDepth} 가 준다 — 즉 **{@link buildHead} 가 실제로 찍는 변형된
+ * 표면** 위다. 예전에는 변형 전 타원체에 투영했는데, 두상은 아래 절반을 최대 42% 좁히고(턱)
+ * 정면을 13% 누르므로(애니메 평면) 이목구비가 살갗보다 앞에 떠 버렸다 — 기본 조형에서
+ * 입이 1.82cm, 눈이 1.32cm 공중부양했다.
+ */
 function facePatchPoint(
-  head: StudioVrmRigHeadFit,
+  surface: StudioVrmHeadSurface,
   params: FacePatchParams,
   mirrored: boolean,
   lx: number,
   ly: number,
 ): MeshVec3 {
+  const head = surface.fit;
   const sx = lx * params.radiusX;
   const sy = ly * params.radiusY + params.bow * (1 - lx * lx);
   const cos = Math.cos(params.tilt);
@@ -733,14 +873,10 @@ function facePatchPoint(
   const planarY = params.centerY + sx * sin + sy * cos;
   const fx = (mirrored ? -planarX : planarX) + params.worldOffsetX;
 
-  const nx = fx / head.radiusX;
-  const ny = planarY / head.radiusY;
-  // 0.05 하한은 피처가 두개골 옆면으로 넘어가 z 가 0 에 붙는 것을 막는다.
-  const nz = Math.sqrt(Math.max(0.05, 1 - nx * nx - ny * ny));
   return [
     head.center[0] + fx,
     head.center[1] + planarY,
-    head.center[2] + (head.radiusZ + params.outset) * nz,
+    head.center[2] + headSurfaceDepth(surface, fx, planarY) + params.outset,
   ];
 }
 
@@ -783,6 +919,7 @@ function facePatchSample(exponent: number, t: number, angle: number): MeshVec2 {
 function addFacePatch(
   builder: SurfaceBuilder,
   rig: StudioVrmRig,
+  surface: StudioVrmHeadSurface,
   patch: Omit<FacePatchInstance, "vertices">,
   uvRect: MeshUvRect,
 ): FacePatchInstance {
@@ -792,7 +929,7 @@ function addFacePatch(
 
   const push = (lx: number, ly: number): number => {
     const index = builder.vertex(
-      facePatchPoint(rig.head, patch.base, patch.mirrored, lx, ly),
+      facePatchPoint(surface, patch.base, patch.mirrored, lx, ly),
       [meshLerp(u0, u1, (lx + 1) / 2), meshLerp(v0, v1, (ly + 1) / 2)],
       skin,
     );
@@ -859,7 +996,10 @@ function facePatchParams(overrides: Partial<FacePatchParams>): FacePatchParams {
  * FaceBrow / FaceMouth)을 실측해 맞췄다. 특히 `eyeline`(윗눈꺼풀 선)이 빠지면 흰자와 홍채만
  * 남아 눈이 고글처럼 보인다 — 애니메 눈매를 만드는 것은 사실상 이 선이다.
  */
-function buildFacePatches(rig: StudioVrmRig): {
+function buildFacePatches(
+  rig: StudioVrmRig,
+  surface: StudioVrmHeadSurface,
+): {
   readonly builders: Record<FaceGroup, SurfaceBuilder>;
   readonly patches: readonly FacePatchInstance[];
 } {
@@ -955,17 +1095,17 @@ function buildFacePatches(rig: StudioVrmRig): {
   };
 
   const patches: FacePatchInstance[] = [
-    addFacePatch(builders.eyeWhite, rig, eye("left"), [0.02, 0.52, 0.46, 0.98]),
-    addFacePatch(builders.eyeWhite, rig, eye("right"), [0.52, 0.52, 0.96, 0.98]),
-    addFacePatch(builders.eyeWhite, rig, glint("left"), [0.04, 0.06, 0.22, 0.24]),
-    addFacePatch(builders.eyeWhite, rig, glint("right"), [0.54, 0.06, 0.72, 0.24]),
-    addFacePatch(builders.iris, rig, iris("left"), [0.02, 0.02, 0.48, 0.98]),
-    addFacePatch(builders.iris, rig, iris("right"), [0.52, 0.02, 0.98, 0.98]),
-    addFacePatch(builders.brow, rig, brow("left"), [0.02, 0.52, 0.48, 0.98]),
-    addFacePatch(builders.brow, rig, brow("right"), [0.52, 0.52, 0.98, 0.98]),
-    addFacePatch(builders.brow, rig, eyeline("left"), [0.02, 0.02, 0.48, 0.48]),
-    addFacePatch(builders.brow, rig, eyeline("right"), [0.52, 0.02, 0.98, 0.48]),
-    addFacePatch(builders.mouth, rig, mouth, [0.02, 0.02, 0.98, 0.98]),
+    addFacePatch(builders.eyeWhite, rig, surface, eye("left"), [0.02, 0.52, 0.46, 0.98]),
+    addFacePatch(builders.eyeWhite, rig, surface, eye("right"), [0.52, 0.52, 0.96, 0.98]),
+    addFacePatch(builders.eyeWhite, rig, surface, glint("left"), [0.04, 0.06, 0.22, 0.24]),
+    addFacePatch(builders.eyeWhite, rig, surface, glint("right"), [0.54, 0.06, 0.72, 0.24]),
+    addFacePatch(builders.iris, rig, surface, iris("left"), [0.02, 0.02, 0.48, 0.98]),
+    addFacePatch(builders.iris, rig, surface, iris("right"), [0.52, 0.02, 0.98, 0.98]),
+    addFacePatch(builders.brow, rig, surface, brow("left"), [0.02, 0.52, 0.48, 0.98]),
+    addFacePatch(builders.brow, rig, surface, brow("right"), [0.52, 0.52, 0.98, 0.98]),
+    addFacePatch(builders.brow, rig, surface, eyeline("left"), [0.02, 0.02, 0.48, 0.48]),
+    addFacePatch(builders.brow, rig, surface, eyeline("right"), [0.52, 0.02, 0.98, 0.48]),
+    addFacePatch(builders.mouth, rig, surface, mouth, [0.02, 0.02, 0.98, 0.98]),
   ];
 
   return { builders, patches };
@@ -973,7 +1113,7 @@ function buildFacePatches(rig: StudioVrmRig): {
 
 /** 한 얼굴 그룹의 모프 타깃 배열. 적용 대상이 없는 타깃도 0 델타로 반드시 채운다. */
 function buildFaceMorphTargets(
-  rig: StudioVrmRig,
+  surface: StudioVrmHeadSurface,
   group: FaceGroup,
   builder: SurfaceBuilder,
   patches: readonly FacePatchInstance[],
@@ -986,9 +1126,9 @@ function buildFaceMorphTargets(
       if (morph.side !== undefined && patch.side !== morph.side) continue;
       const op = morph.ops[patch.id];
       if (!op) continue;
-      const params = morphedParams(patch.base, op, rig.head);
+      const params = morphedParams(patch.base, op, surface.fit);
       for (const [index, lx, ly] of patch.vertices) {
-        const target = facePatchPoint(rig.head, params, patch.mirrored, lx, ly);
+        const target = facePatchPoint(surface, params, patch.mirrored, lx, ly);
         const base = builder.positionAt(index);
         positions[index * 3] = target[0] - base[0];
         positions[index * 3 + 1] = target[1] - base[1];
@@ -1438,9 +1578,11 @@ function primitiveOf(
 export function buildStudioVrmHumanoidMesh(state: AvatarForgeState): StudioVrmHumanoidMesh {
   const rig = buildStudioVrmRig({ proportions: state.proportions, face: state.face });
 
+  const surface = headSurface(rig, state);
+
   const body = new SurfaceBuilder();
   buildTorso(body, rig, state);
-  buildHead(body, rig, state);
+  buildHead(body, rig, surface);
   buildArm(body, rig, 1, UV.armLeft);
   buildArm(body, rig, -1, UV.armRight);
   buildHand(body, rig, 1, UV.handLeft, UV.thumbLeft);
@@ -1450,7 +1592,7 @@ export function buildStudioVrmHumanoidMesh(state: AvatarForgeState): StudioVrmHu
   buildFoot(body, rig, 1, UV.footLeft);
   buildFoot(body, rig, -1, UV.footRight);
 
-  const face = buildFacePatches(rig);
+  const face = buildFacePatches(rig, surface);
   const faceGroups: readonly (readonly [FaceGroup, number])[] = [
     ["eyeWhite", STUDIO_VRM_HUMANOID_MATERIALS.eyeWhite],
     ["iris", STUDIO_VRM_HUMANOID_MATERIALS.iris],
@@ -1471,7 +1613,7 @@ export function buildStudioVrmHumanoidMesh(state: AvatarForgeState): StudioVrmHu
         primitiveOf(
           face.builders[group],
           material,
-          buildFaceMorphTargets(rig, group, face.builders[group], face.patches),
+          buildFaceMorphTargets(surface, group, face.builders[group], face.patches),
         ),
       ),
     },

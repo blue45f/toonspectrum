@@ -10,6 +10,8 @@ import { STUDIO_VRM_EXPORT_EXPRESSION_PRESETS } from "./studio-vrm-export-vrm-ex
 import {
   buildStudioVrmHumanoidMesh,
   STUDIO_VRM_HUMANOID_MORPH_TARGET_NAMES,
+  studioVrmHeadSurfaceDepth,
+  studioVrmTorsoSectionHeights,
   type StudioVrmHumanoidMeshPart,
 } from "./studio-vrm-humanoid-mesh";
 import {
@@ -338,5 +340,67 @@ describe("studio VRM humanoid mesh", () => {
     // 정수리 위로 솟지 않는다(가닥 뿌리 앵커링). 두께만큼의 여유는 둔다.
     expect(maxY).toBeLessThan(head.center[1] + head.radiusY * 1.35);
     expect(maxY).toBeGreaterThan(head.center[1] + head.radiusY * 0.6);
+  });
+
+  it("stacks the torso cross-sections strictly upwards for every body proportion", () => {
+    // 목 단면을 머리 관절 기준 고정 오프셋으로 잡던 시절, 머리·어깨 관절 간격이
+    // `0.1088·neckLength − 0.0188·torsoLength` 배(키 기준)라서 목을 짧게 잡으면 목 밑동이
+    // 어깨 위 단면보다 아래로 내려갔다(중립 1.315 < 1.34, 몸통 1.35·목 0.3 은 1.358 < 1.466).
+    // 단면이 역행하면 로프트가 되접혀 목 밑동에 아래를 보는 깔때기가 생긴다.
+    const limits = { torsoLength: [0.7, 1, 1.35], neckLength: [0.3, 1, 1.8], overallHeight: [0.55, 1, 1.6] };
+    for (const torsoLength of limits.torsoLength) {
+      for (const neckLength of limits.neckLength) {
+        for (const overallHeight of limits.overallHeight) {
+          const rig = buildStudioVrmRig({
+            proportions: { ...NEUTRAL.proportions, torsoLength, neckLength, overallHeight },
+            face: NEUTRAL.face,
+          });
+          const heights = studioVrmTorsoSectionHeights(rig);
+          const label = `torso ${torsoLength} · neck ${neckLength} · height ${overallHeight}`;
+          for (let index = 1; index < heights.length; index += 1) {
+            expect(heights[index], `${label} @ ${index}`).toBeGreaterThan(heights[index - 1]);
+          }
+          // 위로 밀린 목 상단은 두개골 안에 묻혀야 한다. 정수리를 뚫으면 실루엣에 나온다.
+          expect(heights[heights.length - 1], label).toBeLessThan(
+            rig.head.center[1] + rig.head.radiusY,
+          );
+        }
+      }
+    }
+  });
+
+  it("lays every facial feature on the sculpted skull instead of floating it in front", () => {
+    // 이목구비를 변형 **전** 타원체에 투영하면 턱(최대 42% 수축)과 애니메 평면(13% 압축)만큼
+    // 살갗에서 떠 버린다 — 기본 조형에서 입 1.82cm, 눈 1.32cm 가 공중에 있었다.
+    // 피처마다 앞뒤 순서를 정하는 outset(최대 0.05·radiusX)만큼만 앞에 있어야 한다.
+    for (const face of [
+      NEUTRAL.face,
+      { ...NEUTRAL.face, chinLength: 1.25, cheekVolume: 0 },
+      { ...NEUTRAL.face, chinLength: 0.8, cheekVolume: 1 },
+    ]) {
+      const state: AvatarForgeState = { ...NEUTRAL, face };
+      const built = buildStudioVrmHumanoidMesh(state);
+      const head = built.rig.head;
+      const budget = head.radiusX * 0.05 + 1e-9;
+      let worst = 0;
+      for (const primitive of built.parts[built.facePartIndex].primitives) {
+        const positions = numbers(primitive.positions);
+        for (let index = 0; index < positions.length; index += 3) {
+          const gap = positions[index + 2]
+            - head.center[2]
+            - studioVrmHeadSurfaceDepth(
+              built.rig,
+              state,
+              positions[index] - head.center[0],
+              positions[index + 1] - head.center[1],
+            );
+          expect(gap, `chin ${face.chinLength} cheek ${face.cheekVolume}`).toBeGreaterThan(0);
+          worst = Math.max(worst, gap);
+        }
+      }
+      expect(worst).toBeLessThanOrEqual(budget);
+      // 실제로 띄우기는 한다 — 0 으로 눌러 z-fighting 을 만들지 않았는지 확인한다.
+      expect(worst).toBeGreaterThan(head.radiusX * 0.02);
+    }
   });
 });
