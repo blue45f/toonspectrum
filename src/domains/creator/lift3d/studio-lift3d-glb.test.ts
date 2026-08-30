@@ -61,11 +61,25 @@ describe("Studio Lift 3D GLB 인코더", () => {
     expect(encoded.value.metrics.triangleCount).toBeGreaterThan(0);
   });
 
-  it("파일명에서 경로 구분자와 공백을 털어낸다", () => {
+  it("저장 이름은 저장소의 GLB 이름 규칙을 그대로 따른다", () => {
     const encoded = encodeStudioLift3dGlb(liftedDiscGeometry(32), { name: "../위험한 이름/x" });
     expect(encoded.ok).toBe(true);
     if (!encoded.ok) return;
-    expect(encoded.value.fileName).toBe("위험한-이름-x.glb");
+    expect(encoded.value.fileName).toBe("위험한 이름 x.glb");
+  });
+
+  it("Windows 예약 이름과 서로게이트 쌍을 자체 구현처럼 흘리지 않는다", () => {
+    // 이 두 가지가 자체 sanitizer 를 버리고 공용 규칙을 쓰기로 한 이유다.
+    const reserved = encodeStudioLift3dGlb(liftedDiscGeometry(32), { name: "con" });
+    expect(reserved.ok).toBe(true);
+    if (!reserved.ok) return;
+    expect(reserved.value.fileName).not.toBe("con.glb");
+
+    const astral = encodeStudioLift3dGlb(liftedDiscGeometry(32), { name: "𝔘".repeat(200) });
+    expect(astral.ok).toBe(true);
+    if (!astral.ok) return;
+    // 코드 단위로 자르면 짝 없는 서로게이트가 남는다.
+    expect(/[\uD800-\uDFFF](?![\uDC00-\uDFFF])/u.test(astral.value.fileName)).toBe(false);
   });
 
   it("KHR_materials_unlit 을 required 가 아니라 used 로만 선언한다", () => {

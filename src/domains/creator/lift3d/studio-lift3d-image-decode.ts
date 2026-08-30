@@ -63,6 +63,7 @@ export interface StudioLift3dDecodedFile {
 export type StudioLift3dDecodeErrorCode =
   | "decode-failed"
   | "too-large"
+  | "too-narrow"
   | "too-small"
   | "unsupported-type";
 
@@ -79,6 +80,7 @@ export class StudioLift3dDecodeError extends Error {
 const DECODE_ERROR_MESSAGES: Readonly<Record<StudioLift3dDecodeErrorCode, string>> = Object.freeze({
   "decode-failed": "이미지를 읽지 못했습니다. 파일이 손상되지 않았는지 확인해 주세요.",
   "too-large": "이미지가 너무 큽니다. 한 변 8192px, 32MP 이하로 줄여 주세요.",
+  "too-narrow": "가로세로 비가 너무 극단적입니다. 긴 스트립은 장면 단위로 잘라서 올려 주세요.",
   "too-small": "이미지가 너무 작습니다. 한 변 8px 이상이어야 합니다.",
   "unsupported-type": "PNG · JPEG · WebP 이미지만 변환할 수 있습니다.",
 });
@@ -121,6 +123,12 @@ export async function decodeStudioLift3dFile(file: File): Promise<StudioLift3dDe
     }
 
     const size = studioLift3dDecodeSize(bitmap.width, bitmap.height);
+    // 축소 뒤의 크기로 한 번 더 본다. 8192×30 같은 극단적 세로비는 원본 기준으로는 통과하지만
+    // 축소하면 한 변이 8px 밑으로 내려간다 — 그대로 넘기면 파이프라인이 "원본이 작다"는,
+    // 사용자가 올린 것과 맞지 않는 사유로 뒤늦게 거절한다.
+    if (size.width < minSourceDimension || size.height < minSourceDimension) {
+      throw new StudioLift3dDecodeError("too-narrow", DECODE_ERROR_MESSAGES["too-narrow"]);
+    }
     const canvas = document.createElement("canvas");
     canvas.width = size.width;
     canvas.height = size.height;

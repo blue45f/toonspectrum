@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_LIFT3D_LIMITS } from "./studio-lift3d-contract";
 import {
   STUDIO_LIFT3D_DECODE_MAX_DIMENSION,
   studioLift3dDecodeErrorMessage,
@@ -27,8 +28,21 @@ describe("Studio Lift 3D 이미지 디코드 경계", () => {
     expect(studioLift3dDecodeSize(9000, 3).height).toBe(1);
   });
 
+  it("극단적 세로비는 축소 뒤 한 변이 최소치 밑으로 내려간다", () => {
+    // 원본(8192×30)은 한 변 8px 이상이라 원본 기준 검사는 통과한다. 축소 결과를 함께 보지
+    // 않으면 이 이미지가 파이프라인까지 내려가 엉뚱한 사유로 거절된다.
+    const reduced = studioLift3dDecodeSize(8192, 30);
+    expect(reduced.height).toBeLessThan(STUDIO_LIFT3D_LIMITS.minSourceDimension);
+  });
+
   it("실패 사유마다 사용자가 읽을 문장이 있다", () => {
-    for (const code of ["decode-failed", "too-large", "too-small", "unsupported-type"] as const) {
+    for (const code of [
+      "decode-failed",
+      "too-large",
+      "too-narrow",
+      "too-small",
+      "unsupported-type",
+    ] as const) {
       expect(studioLift3dDecodeErrorMessage(code).length).toBeGreaterThan(0);
     }
   });

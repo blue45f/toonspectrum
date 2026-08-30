@@ -9,6 +9,7 @@
  * 좌표 그대로라서 재인코딩은 화질만 깎을 뿐 얻는 것이 없다.
  */
 
+import { canonicalStudioBg3dGlbFileName } from "../bg3d/studio-bg3d-canonical-glb-download";
 import {
   STUDIO_VRM_EXPORT_MIME_TYPE,
   writeStudioVrmExportGlb,
@@ -24,7 +25,10 @@ import {
   type StudioLift3dTexture,
   type StudioLift3dWarning,
 } from "./studio-lift3d-contract";
-import { buildStudioLift3dRenderBuffers } from "./studio-lift3d-render-buffers";
+import {
+  buildStudioLift3dRenderBuffers,
+  type StudioLift3dRenderBuffers,
+} from "./studio-lift3d-render-buffers";
 
 import type { StudioLift3dGeometry } from "./studio-lift3d-mesh";
 
@@ -56,6 +60,8 @@ export interface StudioLift3dGlbFile {
   readonly bytes: Uint8Array<ArrayBuffer>;
   readonly fileName: string;
   readonly mimeType: typeof STUDIO_VRM_EXPORT_MIME_TYPE;
+  /** 이 파일에 실제로 실린 버퍼. 미리보기가 재계산 없이 같은 것을 그린다. */
+  readonly buffers: StudioLift3dRenderBuffers;
   readonly metrics: {
     readonly vertexCount: number;
     readonly triangleCount: number;
@@ -66,13 +72,6 @@ export interface StudioLift3dGlbFile {
 
 function align4(value: number): number {
   return (value + 3) & ~3;
-}
-
-function safeFileName(name: string): string {
-  const cleaned = name
-    .replace(/[^\p{L}\p{N}._-]+/gu, "-")
-    .replace(/^[-.]+|[-.]+$/gu, "");
-  return `${cleaned.length > 0 ? cleaned.slice(0, 80) : "lift3d"}.glb`;
 }
 
 /**
@@ -216,8 +215,11 @@ export function encodeStudioLift3dGlb(
   return studioLift3dSuccess(
     {
       bytes,
-      fileName: safeFileName(options.name),
+      // GLB 저장 이름 규칙은 이 저장소에 이미 있다 — NFKC 정규화, 제어문자 제거, Windows
+      // 예약 이름 회피, 코드포인트 단위 절단(서로게이트 쌍을 가르지 않는다).
+      fileName: canonicalStudioBg3dGlbFileName(options.name),
       mimeType: STUDIO_VRM_EXPORT_MIME_TYPE,
+      buffers,
       metrics: {
         vertexCount,
         triangleCount: buffers.triangleCount,

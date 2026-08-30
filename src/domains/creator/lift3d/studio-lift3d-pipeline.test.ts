@@ -119,6 +119,58 @@ describe("Studio Lift 3D 파이프라인", () => {
     expect(base.value.meshHash).not.toBe(deeper.value.meshHash);
   });
 
+  it("최대 해상도의 배경 리프트가 예외 없이 끝난다", () => {
+    // 이미지 전체가 피사체인 배경은 격자 한 변에 대해 사각형이 가장 많이 나온다. 면 개수만
+    // 보고 통과시키던 시절에는 편집 메시 preflight 가 코너 예산에서 예외를 던졌다.
+    const lifted = liftStudioImageTo3d(verticalGradientImage(256), {
+      subject: "background",
+      resolution: STUDIO_LIFT3D_LIMITS.maxResolution,
+    });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.metrics.closed).toBe(true);
+    expect(lifted.warnings.map((warning) => warning.code)).not.toContain("resolution-clamped");
+  });
+
+  it("가는 부위가 있어도 위상 오류 없이 닫힌 solid 로 보고한다", () => {
+    // 얇은 팔·꼬리에서 비다양체가 나던 시절에는 boundaryEdgeCount 만 보고 "닫힌 solid" 라고
+    // 표시했다. 지금은 위상 오류 수까지 함께 봐야 closed 가 참이 된다.
+    const lifted = liftStudioImageTo3d(discImage(128), { subject: "character" });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.metrics.topologyErrorCount).toBe(0);
+    expect(lifted.value.metrics.closed).toBe(true);
+  });
+
+  it("UV 가 작업 격자 셀의 중심을 가리킨다", () => {
+    const lifted = liftStudioImageTo3d(verticalGradientImage(128), {
+      subject: "background",
+      resolution: 32,
+    });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    const { gridWidth } = lifted.value.metrics;
+    const us = lifted.value.geometry.uvs.map((uv) => uv.u);
+    // 셀 0 의 중심은 0.5/gw, 마지막 셀의 중심은 (gw-0.5)/gw. 예전처럼 x/(gw-1) 로 잡으면
+    // 0 과 1 이 나오면서 텍스처가 gw/(gw-1) 배로 늘어난다.
+    expect(Math.min(...us)).toBeCloseTo(0.5 / gridWidth, 6);
+    expect(Math.max(...us)).toBeCloseTo((gridWidth - 0.5) / gridWidth, 6);
+  });
+
+  it("유한하지 않은 두께 값을 예외 대신 사유 코드로 거절한다", () => {
+    const lifted = liftStudioImageTo3d(discImage(64), {
+      subject: "character",
+      depthScale: Number.NaN,
+    });
+
+    expect(lifted.ok).toBe(false);
+    if (lifted.ok) return;
+    expect(lifted.code).toBe("invalid-option");
+  });
+
   it("리프트와 GLB 인코딩을 한 번에 돌려준다", () => {
     const source = discImage(96);
     const exported = liftStudioImageTo3dGlb(
@@ -132,6 +184,9 @@ describe("Studio Lift 3D 파이프라인", () => {
     expect(exported.value.glb.fileName).toBe("주인공.glb");
     expect(exported.value.glb.metrics.textureByteLength).toBeGreaterThan(0);
     expect(exported.value.lift.metrics.closed).toBe(true);
+    // 미리보기가 다시 계산하지 않도록 GLB 에 실린 버퍼가 함께 나온다.
+    expect(exported.value.buffers).toBe(exported.value.glb.buffers);
+    expect(exported.value.buffers.triangleCount).toBe(exported.value.glb.metrics.triangleCount);
     // GLB 매직 "glTF".
     expect(Array.from(exported.value.glb.bytes.slice(0, 4)))
       .toEqual([0x67, 0x6c, 0x54, 0x46]);

@@ -10,6 +10,7 @@
 
 import {
   STUDIO_LIFT3D_LIMITS,
+  clampStudioLift3dUnit as clamp01,
   studioLift3dWarning,
   type StudioLift3dMaskMode,
   type StudioLift3dResolvedMaskMode,
@@ -65,11 +66,6 @@ const DEFAULT_KEY_TOLERANCE = 0.14;
 const ALPHA_PRESENCE_RATIO = 0.005;
 /** 버려진 조각이 이 비율을 넘으면 사용자에게 알린다. */
 const DROPPED_PART_NOTICE_RATIO = 0.04;
-
-function clamp01(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return value < 0 ? 0 : value > 1 ? 1 : value;
-}
 
 /**
  * 원본을 작업 격자로 내려받는다(박스 필터 평균).

@@ -11,6 +11,8 @@
  * 메시 빌더가 곱한다.
  */
 
+import { clampStudioLift3dUnit as clamp01 } from "./studio-lift3d-contract";
+
 import type { StudioLift3dDepthProfile } from "./studio-lift3d-contract";
 import type { StudioLift3dMask, StudioLift3dSampleGrid } from "./studio-lift3d-mask";
 
@@ -38,11 +40,6 @@ export interface StudioLift3dDepthOptions {
   readonly edgeTaper?: number;
   /** 라플라시안 평활 반복 횟수. chamfer 특유의 능선을 지운다. */
   readonly smoothing?: number;
-}
-
-function clamp01(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return value < 0 ? 0 : value > 1 ? 1 : value;
 }
 
 /**
@@ -139,9 +136,13 @@ export function smoothStudioLift3dHeights(
   pinRim: boolean,
 ): Float64Array {
   if (iterations <= 0) return heights;
-  let current = heights;
+  // 버퍼 두 개를 번갈아 쓴다. 패스마다 새로 복사하면 256 격자 × 12회에서 512KB 배열을
+  // 열두 번 할당하고, 슬라이더를 끌 때마다 그 비용을 다시 낸다.
+  let current: Float64Array = heights;
+  let scratch: Float64Array = new Float64Array(heights.length);
   for (let pass = 0; pass < iterations; pass += 1) {
-    const next = new Float64Array(current);
+    const next = scratch;
+    next.set(current);
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         const index = y * width + x;
@@ -166,6 +167,7 @@ export function smoothStudioLift3dHeights(
         next[index] = (current[index]! + sum / count) / 2;
       }
     }
+    scratch = current === heights ? new Float64Array(heights.length) : current;
     current = next;
   }
   return current;

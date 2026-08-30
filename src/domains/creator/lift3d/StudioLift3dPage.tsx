@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { downloadBlob } from "../export/studio-export";
 import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 import {
@@ -24,7 +25,6 @@ import {
   paintStudioLift3dDepthPreview,
   paintStudioLift3dMaskPreview,
 } from "./studio-lift3d-preview-raster";
-import { buildStudioLift3dRenderBuffers } from "./studio-lift3d-render-buffers";
 
 import { lazyRetry } from "@/lib/lazy-retry";
 import Link from "@/src/compat/router-link";
@@ -246,41 +246,53 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     }
     setBusy(true);
     const handle = globalThis.setTimeout(() => {
-      const lifted = liftStudioImageTo3dGlb(
-        decoded.source,
-        {
-          subject,
-          resolution,
-          depthScale,
-          smoothing,
-          invertRelief,
-        },
-        {
-          name: decoded.fileName.length > 0 ? decoded.fileName : "lift3d",
-          texture: decoded.texture,
-          unlit,
-        },
-      );
-      if (lifted.ok) {
-        setResult(lifted.value);
-        setWarnings(lifted.warnings);
-        setLiftError(null);
-      } else {
+      // 타이머 콜백의 예외는 React 에러 경계가 잡지 못한다. 감싸지 않으면 busy 가 영원히
+      // true 로 남아 저장 버튼이 잠기고, 화면에는 이전 결과와 지표가 그대로 남는다.
+      try {
+        const lifted = liftStudioImageTo3dGlb(
+          decoded.source,
+          {
+            subject,
+            resolution,
+            depthScale,
+            smoothing,
+            invertRelief,
+          },
+          {
+            name: decoded.fileName.length > 0 ? decoded.fileName : "lift3d",
+            texture: decoded.texture,
+            unlit,
+          },
+        );
+        if (lifted.ok) {
+          setResult(lifted.value);
+          setWarnings(lifted.warnings);
+          setLiftError(null);
+        } else {
+          setResult(null);
+          setWarnings([]);
+          setLiftError(lifted.detail);
+        }
+      } catch (error) {
         setResult(null);
         setWarnings([]);
-        setLiftError(lifted.detail);
+        setLiftError(
+          error instanceof Error
+            ? `변환 중 문제가 생겼습니다: ${error.message}`
+            : "변환 중 알 수 없는 문제가 생겼습니다. 해상도를 낮춰 다시 시도해 주세요.",
+        );
+      } finally {
+        setBusy(false);
       }
-      setBusy(false);
     }, 32);
     return () => {
       globalThis.clearTimeout(handle);
     };
   }, [decoded, subject, resolution, depthScale, smoothing, invertRelief, unlit]);
 
-  const buffers = useMemo(
-    () => (result === null ? null : buildStudioLift3dRenderBuffers(result.lift.geometry)),
-    [result],
-  );
+  // 내보내기가 이미 만들어 둔 버퍼를 그대로 쓴다. 여기서 다시 만들면 슬라이더를 한 칸 옮길
+  // 때마다 삼각형화와 법선 계산을 두 번씩 하게 된다.
+  const buffers = result?.buffers ?? null;
   const maskPixels = useMemo(
     () => (result === null ? null : paintStudioLift3dMaskPreview(result.lift.mask)),
     [result],
@@ -292,15 +304,10 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
 
   const onDownload = useCallback(() => {
     if (result === null) return;
-    const blob = new Blob([result.glb.bytes as BlobPart], { type: result.glb.mimeType });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = result.glb.fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+    downloadBlob(
+      new Blob([result.glb.bytes as BlobPart], { type: result.glb.mimeType }),
+      result.glb.fileName,
+    );
   }, [result]);
 
   const metrics = result?.lift.metrics ?? null;
@@ -550,7 +557,14 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                   ["삼각형", metrics.triangleCount.toLocaleString("ko-KR")],
                   ["정점", metrics.vertexCount.toLocaleString("ko-KR")],
                   ["작업 격자", `${metrics.gridWidth}×${metrics.gridHeight}`],
-                  ["위상", metrics.closed ? "닫힌 solid" : `열린 변 ${metrics.boundaryEdgeCount}`],
+                  [
+                    "위상",
+                    metrics.closed
+                      ? "닫힌 solid"
+                      : metrics.boundaryEdgeCount > 0
+                        ? `열린 변 ${metrics.boundaryEdgeCount}`
+                        : `위상 오류 ${metrics.topologyErrorCount}`,
+                  ],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border border-line bg-card/60 px-3 py-2">
                     <dt className="text-fg-3">{label}</dt>

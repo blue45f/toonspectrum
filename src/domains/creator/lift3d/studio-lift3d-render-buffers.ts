@@ -40,11 +40,17 @@ export function computeStudioLift3dNormals(
     const nx = aby * acz - abz * acy;
     const ny = abz * acx - abx * acz;
     const nz = abx * acy - aby * acx;
-    for (const base of [a, b, c]) {
-      normals[base] += nx;
-      normals[base + 1] += ny;
-      normals[base + 2] += nz;
-    }
+    // 세 정점 누적을 펼쳐 쓴다. `for (const base of [a, b, c])` 는 삼각형마다 임시 배열을
+    // 하나씩 만드는데, 배경 프리셋이면 한 번 호출에 20만 개다.
+    normals[a] += nx;
+    normals[a + 1] += ny;
+    normals[a + 2] += nz;
+    normals[b] += nx;
+    normals[b + 1] += ny;
+    normals[b + 2] += nz;
+    normals[c] += nx;
+    normals[c + 1] += ny;
+    normals[c + 2] += nz;
   }
   for (let i = 0; i < normals.length; i += 3) {
     const length = Math.hypot(normals[i]!, normals[i + 1]!, normals[i + 2]!);

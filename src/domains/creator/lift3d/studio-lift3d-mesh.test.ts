@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  diagnoseStudioEditableMesh,
   hashStudioEditableMesh,
   studioEditableMeshStats,
   studioEditableMeshToTriangleSoup,
@@ -148,7 +149,9 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(studioEditableMeshStats(built.value.mesh).boundaryEdgeCount).toBe(0);
   });
 
-  it("부피를 만들 수 없을 만큼 얇으면 사유를 붙여 거절한다", () => {
+  it("정점이 전부 테두리인 얇은 형상도 닫힌 solid 로 만든다", () => {
+    // 폭이 두 칸뿐이라 내부 정점이 하나도 없다. 테두리에도 최소 두께를 주고 옆벽으로 막으므로
+    // 거절 대상이 아니라 얇은 solid 가 나와야 한다.
     const width = 12;
     const height = 12;
     const cells = new Uint8Array(width * height);
@@ -166,9 +169,84 @@ describe("Studio Lift 3D 메시 빌더", () => {
       targetHeight: 1,
     });
 
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(studioEditableMeshStats(built.value.mesh).boundaryEdgeCount).toBe(0);
+    const soup = studioEditableMeshToTriangleSoup(built.value.mesh);
+    expect(signedVolume(soup.positions, soup.indices)).toBeGreaterThan(0);
+  });
+
+  it("가는 돌기가 붙어 있어도 비다양체 변을 만들지 않는다", () => {
+    // 이전 방식은 테두리 정점을 앞뒤가 공유했다. 폭 두 칸짜리 팔·꼬리·머리카락에서는 모든
+    // 정점이 테두리라, 이웃한 두 사각형이 공유하는 변이 half-edge 를 네 번 쓰며 깨졌다.
+    const width = 16;
+    const height = 16;
+    const cells = new Uint8Array(width * height);
+    for (let y = 2; y < 8; y += 1) {
+      for (let x = 2; x < 8; x += 1) cells[y * width + x] = 1;
+    }
+    for (let y = 4; y < 6; y += 1) {
+      for (let x = 8; x < 14; x += 1) cells[y * width + x] = 1;
+    }
+    const mask = maskFromCells(width, height, cells);
+    const grid = resampleStudioLift3dImage(discImage(width), width);
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "round", smoothing: 0 });
+
+    const built = buildStudioLift3dGeometry(mask, depth, {
+      mode: "inflate",
+      depthScale: 0.3,
+      targetHeight: 1,
+    });
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const errors = diagnoseStudioEditableMesh(built.value.mesh)
+      .filter((diagnostic) => diagnostic.severity === "error");
+    expect(errors).toEqual([]);
+    expect(studioEditableMeshStats(built.value.mesh).boundaryEdgeCount).toBe(0);
+  });
+
+  it("유한하지 않은 두께 값을 예외 대신 사유 코드로 거절한다", () => {
+    const grid = resampleStudioLift3dImage(discImage(32), 32);
+    const mask = extractStudioLift3dMask(grid, { mode: "alpha" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "round", smoothing: 0 });
+
+    for (const depthScale of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+      const built = buildStudioLift3dGeometry(mask, depth, {
+        mode: "inflate",
+        depthScale,
+        targetHeight: 1,
+      });
+      expect(built.ok).toBe(false);
+      if (built.ok) continue;
+      expect(built.code).toBe("invalid-option");
+    }
+  });
+
+  it("코너 예산을 넘으면 예외 대신 사유 코드로 거절한다", () => {
+    // 편집 메시 preflight 는 면 개수가 아니라 코너 합을 maxEdges 와 비교한다. 면 개수만 보면
+    // 여기서 통과시킨 뒤 그 preflight 가 예외를 던진다.
+    const side = 260;
+    const cells = new Uint8Array(side * side).fill(1);
+    const mask = maskFromCells(side, side, cells);
+    const grid = resampleStudioLift3dImage(discImage(64), 64);
+    const depth = {
+      width: side,
+      height: side,
+      heights: new Float64Array(side * side).fill(1),
+      maxDistance: side / 2,
+    };
+    void grid;
+
+    const built = buildStudioLift3dGeometry(mask, depth, {
+      mode: "inflate",
+      depthScale: 0.3,
+      targetHeight: 1,
+    });
+
     expect(built.ok).toBe(false);
     if (built.ok) return;
-    expect(built.code).toBe("degenerate-geometry");
+    expect(built.code).toBe("budget-exceeded");
   });
 
   it("relief 는 변위된 앞면·평평한 뒷판·옆벽으로 닫힌 슬래브를 만든다", () => {
