@@ -49,9 +49,14 @@ export function StudioLift3dPreview({ buffers, textureUrl, unlit }: StudioLift3d
     geometry.setIndex(new THREE.BufferAttribute(buffers.indices, 1));
     geometry.computeBoundingSphere();
 
+    let dirty = true;
     let texture: THREE.Texture | null = null;
     if (textureUrl !== null) {
-      texture = new THREE.TextureLoader().load(textureUrl);
+      // 텍스처는 비동기로 도착한다. 도착을 알리지 않으면 루프가 이미 한 프레임을 그리고
+      // 멈춘 뒤라, 사용자가 드래그하기 전까지 모델이 무채색으로 남는다.
+      texture = new THREE.TextureLoader().load(textureUrl, () => {
+        dirty = true;
+      });
       texture.colorSpace = THREE.SRGBColorSpace;
       // 이 파이프라인의 UV 는 glTF 규약(좌상단 원점)이라 three 의 기본 뒤집기를 꺼야 맞는다.
       texture.flipY = false;
@@ -102,7 +107,6 @@ export function StudioLift3dPreview({ buffers, textureUrl, unlit }: StudioLift3d
     };
 
     let frame = 0;
-    let dirty = true;
     const render = () => {
       frame = globalThis.requestAnimationFrame(render);
       if (!dirty) return;

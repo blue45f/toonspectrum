@@ -35,6 +35,21 @@ import type { StudioLift3dMask } from "./studio-lift3d-mask";
 
 /** 내부 정점의 최소 두께 비율. 0 이면 앞뒤 껍질이 겹쳐 부피가 사라진다. */
 const MIN_INTERIOR_HEIGHT = 0.05;
+/**
+ * 실루엣 테두리의 최소 두께 비율.
+ *
+ * 앞뒤 껍질을 테두리에서 **같은 정점으로 봉합**하던 이전 방식은 얇은 부위에서 깨졌다. 폭이
+ * 사각형 두 칸뿐인 팔·꼬리·머리카락은 모든 정점이 테두리라, 이웃한 두 사각형이 공유하는 변을
+ * 앞뒤가 똑같은 정점쌍으로 잡아 half-edge 가 네 번 쓰인다(비다양체). 지금은 테두리도 앞뒤를
+ * 각각 두고 그 사이를 옆벽으로 막는다 — 얇든 두껍든 위상이 같은 방식으로 닫힌다.
+ */
+const MIN_RIM_HEIGHT = 0.03;
+/**
+ * 코너(= 면 루프 길이의 합) 예산. `createStudioEditableMeshFromPolygons` 의 preflight 는
+ * 코너 합을 `maxEdges` 와 비교하므로, 사각형만 쓰는 이 빌더의 실질 상한은 면 125,000개다.
+ * 면 개수만 보고 통과시키면 그 preflight 가 사유 코드 대신 예외를 던진다.
+ */
+const QUAD_CORNERS = 4;
 
 export interface StudioLift3dGeometryOptions {
   readonly mode: StudioLift3dGeometryMode;
@@ -156,6 +171,15 @@ export function buildStudioLift3dGeometry(
   if (!Number.isFinite(options.targetHeight) || options.targetHeight <= 0) {
     return studioLift3dFailure("invalid-option", "targetHeight 는 양수여야 합니다");
   }
+  // 유한성 검사를 건너뛰면 NaN 이 두께를 타고 정점 좌표까지 흘러가, 이 모듈이 약속한
+  // "실패는 사유 코드로" 대신 createStudioEditableMeshFromPolygons 가 예외를 던진다.
+  if (!Number.isFinite(options.depthScale) || options.depthScale < 0) {
+    return studioLift3dFailure("invalid-option", "depthScale 은 0 이상의 유한한 값이어야 합니다");
+  }
+  if (options.baseScale !== undefined
+    && (!Number.isFinite(options.baseScale) || options.baseScale < 0)) {
+    return studioLift3dFailure("invalid-option", "baseScale 은 0 이상의 유한한 값이어야 합니다");
+  }
   if (estimatedVertexBudget(mask) > STUDIO_EDITABLE_MESH_LIMITS.maxVertices) {
     return studioLift3dFailure("budget-exceeded", "해상도를 낮춰 주세요(정점 예산 초과)");
   }
@@ -175,15 +199,17 @@ export function buildStudioLift3dGeometry(
   const spanY = Math.max(1, mask.bounds.maxY - mask.bounds.minY);
   const thickness = Math.max(spanX, spanY) * Math.max(0, options.depthScale);
   const baseThickness = Math.max(spanX, spanY) * Math.max(0, options.baseScale ?? 0.05);
-  const uScale = 1 / Math.max(1, gridWidth - 1);
-  const vScale = 1 / Math.max(1, gridHeight - 1);
+  // 정점은 작업 격자 **셀의 중심**에 놓인다. 셀 x 가 덮는 원본 열은 [x·W/gw, (x+1)·W/gw) 이므로
+  // 그 중심의 정규화 좌표는 (x+0.5)/gw 다. x/(gw−1) 로 잡으면 텍스처가 gw/(gw−1) 배로 늘어나고
+  // 반 칸 밀려, 낮은 해상도일수록 선화가 실루엣에서 눈에 띄게 어긋난다.
+  const uScale = 1 / gridWidth;
+  const vScale = 1 / gridHeight;
   const centerX = (gridWidth - 1) / 2;
   const centerY = (gridHeight - 1) / 2;
 
   const accumulator: Accumulator = { positions: [], uvs: [], faces: [] };
   const frontIndex = new Int32Array(gridWidth * gridHeight).fill(-1);
   const backIndex = new Int32Array(gridWidth * gridHeight).fill(-1);
-  let interiorCount = 0;
 
   for (let y = 0; y < gridHeight; y += 1) {
     for (let x = 0; x < gridWidth; x += 1) {
@@ -192,20 +218,18 @@ export function buildStudioLift3dGeometry(
       if (degree === 0) continue;
       const worldX = x - centerX;
       const worldY = centerY - y;
-      const u = x * uScale;
-      const v = y * vScale;
+      const u = (x + 0.5) * uScale;
+      const v = (y + 0.5) * vScale;
       const rim = degree < 4;
-      if (!rim) interiorCount += 1;
 
       if (options.mode === "inflate") {
-        const half = rim
-          ? 0
-          : (thickness / 2) * Math.max(MIN_INTERIOR_HEIGHT, depth.heights[key]!);
+        // 테두리도 앞뒤를 따로 둔다. 정점을 공유하면 얇은 부위에서 비다양체가 되고(MIN_RIM_HEIGHT
+        // 주석 참고), 여기서 벌려 둔 만큼이 아래 옆벽의 폭이 된다.
+        const half = (thickness / 2) * (rim
+          ? MIN_RIM_HEIGHT
+          : Math.max(MIN_INTERIOR_HEIGHT, depth.heights[key]!));
         frontIndex[key] = pushVertex(accumulator, worldX, worldY, half, u, v);
-        // 봉합선에서는 앞뒤가 같은 정점을 공유한다 — 여기가 닫힌 solid 를 만드는 지점이다.
-        backIndex[key] = rim
-          ? frontIndex[key]!
-          : pushVertex(accumulator, worldX, worldY, -half, u, v);
+        backIndex[key] = pushVertex(accumulator, worldX, worldY, -half, u, v);
       } else {
         frontIndex[key] = pushVertex(
           accumulator,
@@ -220,13 +244,8 @@ export function buildStudioLift3dGeometry(
     }
   }
 
-  if (options.mode === "inflate" && interiorCount === 0) {
-    return studioLift3dFailure(
-      "degenerate-geometry",
-      "피사체가 너무 얇아 부피를 만들 수 없습니다. 해상도를 올리거나 원화를 확대해 보세요",
-    );
-  }
-
+  // 예전에는 내부 정점이 하나도 없으면(= 전부 테두리) 부피가 0 이라 거절했다. 이제 테두리에도
+  // MIN_RIM_HEIGHT 만큼 두께가 있으므로 아주 얇은 형상도 정상적인 얇은 solid 로 나온다.
   const corner = (x: number, y: number): number => y * gridWidth + x;
   let quadCount = 0;
   for (let j = 0; j < grid.height; j += 1) {
@@ -244,35 +263,35 @@ export function buildStudioLift3dGeometry(
     }
   }
 
-  if (options.mode === "relief") {
-    const hasFace = (i: number, j: number): boolean => (
-      i >= 0 && j >= 0 && i < grid.width && j < grid.height && grid.present[j * grid.width + i] === 1
-    );
-    for (let j = 0; j < grid.height; j += 1) {
-      for (let i = 0; i < grid.width; i += 1) {
-        if (grid.present[j * grid.width + i] === 0) continue;
-        const a = corner(i, j);
-        const b = corner(i + 1, j);
-        const c = corner(i + 1, j + 1);
-        const d = corner(i, j + 1);
-        // 앞면 CCW 루프(a→d→c→b)의 각 변과, 그 변 너머 이웃 사각형.
-        const edges: readonly (readonly [number, number, boolean])[] = [
-          [a, d, hasFace(i - 1, j)],
-          [d, c, hasFace(i, j + 1)],
-          [c, b, hasFace(i + 1, j)],
-          [b, a, hasFace(i, j - 1)],
-        ];
-        for (const [from, to, shared] of edges) {
-          if (shared) continue;
-          // 바깥을 향하도록: 앞(from) → 뒤(from) → 뒤(to) → 앞(to).
-          accumulator.faces.push([
-            frontIndex[from]!,
-            backIndex[from]!,
-            backIndex[to]!,
-            frontIndex[to]!,
-          ]);
-          quadCount += 1;
-        }
+  // 껍질 경계(이웃 사각형이 없는 변)를 옆벽으로 막는다. 두 모드가 같은 방식으로 닫히므로
+  // 얇은 부위에서만 위상이 달라지는 경우가 없다.
+  const hasFace = (i: number, j: number): boolean => (
+    i >= 0 && j >= 0 && i < grid.width && j < grid.height && grid.present[j * grid.width + i] === 1
+  );
+  for (let j = 0; j < grid.height; j += 1) {
+    for (let i = 0; i < grid.width; i += 1) {
+      if (grid.present[j * grid.width + i] === 0) continue;
+      const a = corner(i, j);
+      const b = corner(i + 1, j);
+      const c = corner(i + 1, j + 1);
+      const d = corner(i, j + 1);
+      // 앞면 CCW 루프(a→d→c→b)의 각 변과, 그 변 너머 이웃 사각형.
+      const edges: readonly (readonly [number, number, boolean])[] = [
+        [a, d, hasFace(i - 1, j)],
+        [d, c, hasFace(i, j + 1)],
+        [c, b, hasFace(i + 1, j)],
+        [b, a, hasFace(i, j - 1)],
+      ];
+      for (const [from, to, shared] of edges) {
+        if (shared) continue;
+        // 바깥을 향하도록: 앞(from) → 뒤(from) → 뒤(to) → 앞(to).
+        accumulator.faces.push([
+          frontIndex[from]!,
+          backIndex[from]!,
+          backIndex[to]!,
+          frontIndex[to]!,
+        ]);
+        quadCount += 1;
       }
     }
   }
@@ -280,7 +299,10 @@ export function buildStudioLift3dGeometry(
   if (accumulator.faces.length === 0) {
     return studioLift3dFailure("degenerate-geometry", "면을 하나도 만들지 못했습니다");
   }
-  if (accumulator.faces.length > STUDIO_EDITABLE_MESH_LIMITS.maxFaces) {
+  if (
+    accumulator.faces.length > STUDIO_EDITABLE_MESH_LIMITS.maxFaces
+    || accumulator.faces.length * QUAD_CORNERS > STUDIO_EDITABLE_MESH_LIMITS.maxEdges
+  ) {
     return studioLift3dFailure("budget-exceeded", "해상도를 낮춰 주세요(면 예산 초과)");
   }
 
