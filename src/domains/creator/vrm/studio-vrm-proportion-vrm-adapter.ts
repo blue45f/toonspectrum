@@ -168,12 +168,78 @@ export function measureStudioVrmProportionHeadLength(
 }
 
 /** Creates the concrete three-vrm lifecycle adapter used by Poser and shared BG3D. */
+/**
+ * A collider's authored geometry, captured once so every resize is absolute from rest. Rescaling
+ * the live values in place would compound across slider moves.
+ */
+type CapturedColliderShape = {
+  readonly shape: {
+    offset?: THREE.Vector3;
+    tail?: THREE.Vector3;
+    radius?: number;
+  };
+  readonly offset: THREE.Vector3 | null;
+  readonly tail: THREE.Vector3 | null;
+  readonly radius: number | null;
+};
+
+/**
+ * Captures every spring-bone collider's authored shape.
+ *
+ * `VRMSpringBoneManager.colliders` is a derived getter over the joints' collider groups, so the
+ * set is read here and the individual shapes are held by reference.
+ */
+function captureSpringBoneColliderShapes(vrm: VRM): readonly CapturedColliderShape[] {
+  const colliders = vrm.springBoneManager?.colliders ?? [];
+  const captured: CapturedColliderShape[] = [];
+  for (const collider of colliders) {
+    const shape = (collider as unknown as { shape?: CapturedColliderShape["shape"] }).shape;
+    if (!shape) continue;
+    captured.push({
+      shape,
+      offset: shape.offset ? shape.offset.clone() : null,
+      tail: shape.tail ? shape.tail.clone() : null,
+      radius: typeof shape.radius === "number" ? shape.radius : null,
+    });
+  }
+  return captured;
+}
+
+/**
+ * Resizes collider geometry to a body scaled by `uniformScale`.
+ *
+ * Collider shapes live in their node's local space, and the proportion runtime translates joints
+ * without ever scaling the frames colliders hang from -- only `head`, the hands and the feet take a
+ * scale, and a collider under those already rides it through the scene graph. So everything else
+ * keeps the size it was authored at while the body grows around it: at `overallHeight` 1.6 the
+ * generated torso capsule ended 17 cm below the shoulders it was authored to reach.
+ *
+ * Only the uniform body scale is applied. Girth is not a proportion parameter -- the model is
+ * "translate joints, never stretch bones" -- so a slider that only redistributes length (say
+ * `torsoLength`) legitimately leaves collider geometry alone, and a capsule spanning two joints
+ * then keeps its size while the span between them shifts. That residual is bounded by the
+ * redistribution itself (~4 cm at the hips for `torsoLength` 1.5) and is not what this corrects.
+ */
+function resizeSpringBoneColliderShapes(
+  captured: readonly CapturedColliderShape[],
+  uniformScale: number,
+): boolean {
+  if (!Number.isFinite(uniformScale) || uniformScale <= 0) return false;
+  for (const entry of captured) {
+    if (entry.offset) entry.shape.offset?.copy(entry.offset).multiplyScalar(uniformScale);
+    if (entry.tail) entry.shape.tail?.copy(entry.tail).multiplyScalar(uniformScale);
+    if (entry.radius !== null) entry.shape.radius = entry.radius * uniformScale;
+  }
+  return true;
+}
+
 export function createStudioVrmProportionVrmAdapter(
   input: StudioVrmProportionVrmAdapterInput,
 ): StudioVrmProportionRigAdapter {
   const { vrm } = input;
   const nodeConstraintManager = vrm.nodeConstraintManager;
   const springBoneManager = vrm.springBoneManager;
+  const capturedColliderShapes = captureSpringBoneColliderShapes(vrm);
   const resetNormalizedPoseAndSyncRawRest = () => {
     const humanoid = vrm.humanoid;
     if (!humanoid) return false;
@@ -206,10 +272,14 @@ export function createStudioVrmProportionVrmAdapter(
         } }
       : {}),
     ...(springBoneManager
-      ? { setSpringBoneInitState: () => {
-          springBoneManager.setInitState();
-          return true;
-        } }
+      ? {
+          setSpringBoneInitState: () => {
+            springBoneManager.setInitState();
+            return true;
+          },
+          syncSpringBoneColliderShapes: (uniformScale: number) =>
+            resizeSpringBoneColliderShapes(capturedColliderShapes, uniformScale),
+        }
       : {}),
     reapplyAuthoredPose: input.reapplyAuthoredPose,
   };

@@ -16,6 +16,12 @@ import {
 } from "./studio-vrm-generate-recipe";
 import { buildStudioVrmHumanoidMesh } from "./studio-vrm-humanoid-mesh";
 import { countSpringBoneJoints } from "./studio-vrm-physics";
+import { NEUTRAL_STUDIO_VRM_PROPORTIONS } from "./studio-vrm-proportion-core";
+import { createStudioVrmProportionRigRuntime } from "./studio-vrm-proportion-rig-runtime";
+import {
+  createStudioVrmProportionVrmAdapter,
+  measureStudioVrmProportionHeadLength,
+} from "./studio-vrm-proportion-vrm-adapter";
 
 (globalThis as unknown as { self: typeof globalThis }).self = globalThis;
 
@@ -372,4 +378,92 @@ describe("generate recipe → .vrm file reload", () => {
       }
     }
   });
+
+  it.each(AVATAR_FORGE_PRESETS.map((preset) => preset.id))(
+    "lets the studio's body sliders drive %s",
+    async (presetId) => {
+      // The face sculpt rides on the `head` node as a non-uniform scale. The proportion runtime
+      // used to demand a uniform scale on every frame from the root to each bone, so generating a
+      // character with any face proportion other than 1 made every body slider fail outright --
+      // 18 of the 21 shipped presets. `head` carries no humanoid bone beneath it, which is exactly
+      // what licenses the sculpt to live there.
+      const vrm = await loadVrmBytes(
+        exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
+      );
+      const headLength = measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2;
+      const adapter = createStudioVrmProportionVrmAdapter({
+        vrm,
+        getCurrentModelGeneration: () => 1,
+        reapplyAuthoredPose: () => true,
+      });
+      const created = createStudioVrmProportionRigRuntime(adapter, { headLength });
+      expect(created.ok, `${presetId}: 체형 런타임이 생성 캐릭터를 거부했다`).toBe(true);
+      if (!created.ok) return;
+
+      const head = vrm.humanoid?.getRawBoneNode("head");
+      if (!head) throw new Error(`${presetId}: expected a head bone`);
+      const authored = head.scale.clone();
+      const applied = created.runtime.apply({
+        ...NEUTRAL_STUDIO_VRM_PROPORTIONS,
+        overallHeight: 1.6,
+      });
+      expect(applied.ok, `${presetId}: 체형 적용이 실패했다`).toBe(true);
+
+      // The sculpt survives, multiplied by exactly the uniform body scale.
+      expect(head.scale.x).toBeCloseTo(authored.x * 1.6, 9);
+      expect(head.scale.y).toBeCloseTo(authored.y * 1.6, 9);
+      expect(head.scale.z).toBeCloseTo(authored.z * 1.6, 9);
+    },
+    60_000,
+  );
+
+  it("keeps the torso capsule on the torso after the body is resized", async () => {
+    // Collider shapes live in their node's local space and `setInitState()` never touches them, so
+    // before this the capsule kept its authored size while the body grew around it: at
+    // `overallHeight` 1.6 its top ended 17cm below the shoulders it was authored to reach.
+    const presetId = "hime-noble";
+    const spans: number[] = [];
+    for (const overallHeight of [1, 1.6]) {
+      const vrm = await loadVrmBytes(
+        exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
+      );
+      const headLength = measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2;
+      const adapter = createStudioVrmProportionVrmAdapter({
+        vrm,
+        getCurrentModelGeneration: () => 1,
+        reapplyAuthoredPose: () => true,
+      });
+      const created = createStudioVrmProportionRigRuntime(adapter, { headLength });
+      if (!created.ok) throw new Error(`${presetId}: ${created.message}`);
+      expect(created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, overallHeight }).ok).toBe(
+        true,
+      );
+      vrm.scene.updateMatrixWorld(true);
+
+      const hips = vrm.humanoid?.getRawBoneNode("hips")?.getWorldPosition(new Vector3());
+      const shoulder = vrm.humanoid
+        ?.getRawBoneNode("leftUpperArm")
+        ?.getWorldPosition(new Vector3());
+      const torso = [...(vrm.springBoneManager?.colliders ?? [])][0];
+      if (!hips || !shoulder || !torso) throw new Error(`${presetId}: expected a torso capsule`);
+      const shape = (torso as unknown as {
+        shape: { offset: Vector3; tail?: Vector3; radius: number };
+      }).shape;
+      torso.updateWorldMatrix(true, false);
+      const a = shape.offset.clone().applyMatrix4(torso.matrixWorld);
+      const b = (shape.tail ?? shape.offset).clone().applyMatrix4(torso.matrixWorld);
+      const bottom = Math.min(a.y, b.y) - shape.radius;
+      const top = Math.max(a.y, b.y) + shape.radius;
+      // The capsule's outer extent must sit on the torso, not float above or below it.
+      expect(Math.abs(bottom - hips.y), `overallHeight ${overallHeight}: 캡슐 아래가 엉덩이를 벗어났다`).toBeLessThan(
+        0.04 * overallHeight,
+      );
+      expect(Math.abs(top - shoulder.y), `overallHeight ${overallHeight}: 캡슐 위가 어깨를 벗어났다`).toBeLessThan(
+        0.04 * overallHeight,
+      );
+      spans.push(top - bottom);
+    }
+    // And the span tracks the body rather than staying frozen at its authored size.
+    expect(spans[1] / spans[0]).toBeCloseTo(1.6, 3);
+  }, 60_000);
 });

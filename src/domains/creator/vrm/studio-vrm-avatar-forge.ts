@@ -997,7 +997,11 @@ export function buildAvatarForgeHairParts(
       hairPart(hair, "pixie-nape", "back", "tapered-capsule", [0, -0.12 * l, -0.36], [-0.12, 0, 0], [0.16 * w, 0.2 * l, 0.1 * w], 0.66, wave),
       hairPart(hair, "pixie-sideburn-left", "side", "tapered-capsule", [-0.41, -0.06, 0.14], [0.04, 0, 0.06], [0.06 * w, 0.19 * l, 0.055 * w], 0.82),
       hairPart(hair, "pixie-sideburn-right", "side", "tapered-capsule", [0.41, -0.06, 0.14], [0.04, 0, -0.06], [0.06 * w, 0.19 * l, 0.055 * w], 0.82),
-      hairPart(hair, "pixie-crown-flick", "side", "tapered-capsule", [-0.22, 0.3 * v, -0.24], [-0.42, 0, 0.3], [0.07 * w, 0.2 * l, 0.06 * w], 0.8)
+      // 기울기 부호가 형제 가닥들과 반대였다. 그대로 두면 굵은 뿌리가 두피 밖 1.5cm 에 떠
+      // 있고 가는 끝이 두개골 안으로 파고든다(정규거리 1.180 → 0.707). 옆·뒷머리 가닥은
+      // 전부 뿌리가 두피에 묻히고 끝이 밖으로 뻗는다(`pixie-nape` 0.989 → 1.220,
+      // 사이드번 0.954 → 1.190). 부호를 뒤집으면 0.827 → 1.099 로 같은 형태가 된다.
+      hairPart(hair, "pixie-crown-flick", "side", "tapered-capsule", [-0.22, 0.3 * v, -0.24], [0.42, 0, -0.3], [0.07 * w, 0.2 * l, 0.06 * w], 0.8)
     );
   }
 

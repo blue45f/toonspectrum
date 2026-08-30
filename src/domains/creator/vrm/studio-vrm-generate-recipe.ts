@@ -330,8 +330,13 @@ function buildHairSpringBone(
   const spanBottom = rig.worldRest.hips[1] - 0.02 * rig.heightScale;
   const spanTop = rig.worldRest.leftUpperArm[1] - 0.02 * rig.heightScale;
   const torsoMid = (spanBottom + spanTop) / 2;
-  const bottomY = Math.min(torsoMid, spanBottom + torsoNominal);
-  const topY = Math.max(torsoMid, spanTop - torsoNominal);
+  // 끝점은 **최종** 반경만큼 안으로 넣어야 겉면이 정확히 엉덩이~어깨가 된다. 명목 반경으로
+  // 넣어 두고 반경만 줄이면 그 차이만큼 겉면이 모자라, 중립 상태에서도 캡슐이 어깨보다
+  // 8cm 아래에서 끝났다. 그래서 끝점을 반경의 함수로 두고 fit 과 함께 푼다.
+  const torsoEnds = (radius: number): { readonly bottom: number; readonly top: number } => ({
+    bottom: Math.min(torsoMid, spanBottom + radius),
+    top: Math.max(torsoMid, spanTop - radius),
+  });
 
   // 두개골 캡슐 — 앞머리·옆머리가 이제 스프링 체인이라, 이게 없으면 고개를 흔들 때
   // 얼굴을 그대로 통과한다(실측: 두개골 정규거리 0.19~0.24 까지, 1.0 이 표면이다).
@@ -360,13 +365,13 @@ function buildHairSpringBone(
   // 그러지 않으면 rest 자체가 평형이 아니어서, 고개를 전혀 움직이지 않아도 첫 프레임부터
   // 앞머리가 앞으로 튀어나간다.
   // 몸통도 같은 원칙으로 정지 헤어 안쪽에 넣는다. 끝점은 위에서 정한 채로 반경만 줄인다.
-  const torsoRadius = fitRadiusInsideHair(
-    torsoNominal,
-    (radius) =>
-      hairJointClearance(hairRig, [0, 0, 0], (point) =>
-        segmentDistance(point, [spine[0], bottomY, spine[2]], [spine[0], topY, spine[2]]) - radius,
-      ),
-  );
+  const torsoRadius = fitRadiusInsideHair(torsoNominal, (radius) => {
+    const { bottom, top } = torsoEnds(radius);
+    return hairJointClearance(hairRig, [0, 0, 0], (point) =>
+      segmentDistance(point, [spine[0], bottom, spine[2]], [spine[0], top, spine[2]]) - radius,
+    );
+  });
+  const { bottom: bottomY, top: topY } = torsoEnds(torsoRadius);
   const fit = skullColliderFit(skull, hairRig, headJoint);
   const verticalRadius = fit * Math.min(skull.radiusX, skull.radiusZ);
   const verticalHalf = Math.max(0, fit * skull.radiusY - verticalRadius);
