@@ -45,10 +45,11 @@ export type StudioLift3dResolvedMaskMode = Exclude<StudioLift3dMaskMode, "auto">
 export const STUDIO_LIFT3D_DEPTH_PROFILES = ["round", "soft", "slab", "relief"] as const;
 export type StudioLift3dDepthProfile = (typeof STUDIO_LIFT3D_DEPTH_PROFILES)[number];
 
-export const STUDIO_LIFT3D_GEOMETRY_MODES = ["inflate", "relief"] as const;
+export const STUDIO_LIFT3D_GEOMETRY_MODES = ["inflate", "relief", "parallax"] as const;
 /**
- * `inflate` — 실루엣을 앞뒤 두 겹으로 부풀려 테두리에서 봉합한 닫힌 solid(캐릭터·소품).
- * `relief`  — 앞면만 변위시키고 평평한 뒷판과 옆벽으로 막은 부조 슬래브(배경).
+ * `inflate`  — 실루엣을 앞뒤 두 겹으로 부풀린 닫힌 solid(캐릭터·소품).
+ * `relief`   — 앞면만 변위시키고 평평한 뒷판과 옆벽으로 막은 부조 슬래브(배경).
+ * `parallax` — 깊이를 밴드로 잘라 층마다 평평한 카드를 세운 시차 레이어(배경).
  */
 export type StudioLift3dGeometryMode = (typeof STUDIO_LIFT3D_GEOMETRY_MODES)[number];
 
@@ -60,6 +61,12 @@ export const STUDIO_LIFT3D_WARNING_CODES = [
   "pinch-faces-dropped",
   /** 그러고도 위상 오류가 **남았다** — 위와 뜻이 반대이므로 코드를 나눠 둔다. */
   "non-manifold-residual",
+  /** 좌우대칭으로 보기 어려워 대칭 보정을 걸지 않았다. */
+  "symmetry-skipped",
+  /** 실루엣에 안쪽 정점이 없어 앞쪽 두께 비율이 형태를 바꾸지 못했다. */
+  "front-ratio-inert",
+  /** 요청한 시차 레이어 수가 지원 범위를 벗어나 조였다. */
+  "layer-bands-clamped",
   "resolution-clamped",
   "shallow-subject",
   "texture-omitted",
@@ -181,31 +188,43 @@ export function validateStudioLift3dSource(
   return studioLift3dSuccess(source);
 }
 
-/** 작업 격자 해상도를 예산 안으로 조인다. 조정되면 경고를 함께 돌려준다. */
-export function clampStudioLift3dResolution(requested: number | undefined): {
+/**
+ * 작업 격자 해상도를 예산 안으로 조인다. 조정되면 경고를 함께 돌려준다.
+ *
+ * `ceiling` 은 위상이 따로 깎는 상한이다. 지금 이 값을 넘기는 곳은 시차 레이어뿐이라
+ * 조정 문구도 레이어를 지목한다 — 다른 사유가 생기면 문구도 함께 갈라야 한다.
+ * 레이어는 밴드 수만큼 껍질을 겹쳐 쌓으므로 `maxResolution` 을 그대로 쓰면 해상도·레이어
+ * 슬라이더의 최대값 두 개가 **항상 함께 실패한다**. 상한을 여기서 낮춰 두면 사용자가 고를 수
+ * 있는 조합은 언제나 만들어진다.
+ */
+export function clampStudioLift3dResolution(
+  requested: number | undefined,
+  ceiling?: number,
+): {
   readonly resolution: number;
   readonly warning: StudioLift3dWarning | null;
 } {
   const { defaultResolution, maxResolution, minResolution } = STUDIO_LIFT3D_LIMITS;
-  if (requested === undefined) return { resolution: defaultResolution, warning: null };
+  const requestedCeiling = ceiling !== undefined && Number.isFinite(ceiling)
+    ? Math.floor(ceiling)
+    : maxResolution;
+  const upper = Math.max(minResolution, Math.min(maxResolution, requestedCeiling));
+  const fallback = Math.min(defaultResolution, upper);
+  if (requested === undefined) return { resolution: fallback, warning: null };
   if (!Number.isFinite(requested)) {
     return {
-      resolution: defaultResolution,
+      resolution: fallback,
       warning: studioLift3dWarning(
         "resolution-clamped",
-        `해상도 값이 유효하지 않아 기본값 ${defaultResolution}으로 대체했습니다`,
+        `해상도 값이 유효하지 않아 기본값 ${fallback}으로 대체했습니다`,
       ),
     };
   }
   const rounded = Math.round(requested);
-  const clamped = Math.min(maxResolution, Math.max(minResolution, rounded));
-  return {
-    resolution: clamped,
-    warning: clamped === rounded
-      ? null
-      : studioLift3dWarning(
-        "resolution-clamped",
-        `해상도를 ${minResolution}~${maxResolution} 범위의 ${clamped}으로 조정했습니다`,
-      ),
-  };
+  const clamped = Math.min(upper, Math.max(minResolution, rounded));
+  if (clamped === rounded) return { resolution: clamped, warning: null };
+  const reason = upper < maxResolution
+    ? `레이어를 겹쳐 쌓느라 상한이 ${upper}으로 내려가, 해상도를 ${clamped}으로 조정했습니다`
+    : `해상도를 ${minResolution}~${upper} 범위의 ${clamped}으로 조정했습니다`;
+  return { resolution: clamped, warning: studioLift3dWarning("resolution-clamped", reason) };
 }

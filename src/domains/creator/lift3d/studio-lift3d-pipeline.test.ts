@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 
+import { hashStudioEditableMesh } from "../studio-editable-half-edge-mesh";
+
 import { STUDIO_LIFT3D_LIMITS, STUDIO_LIFT3D_SUBJECTS } from "./studio-lift3d-contract";
+import { STUDIO_LIFT3D_MAX_DEPTH_BANDS } from "./studio-lift3d-depth";
+import { buildStudioLift3dGeometry } from "./studio-lift3d-mesh";
 import {
   STUDIO_LIFT3D_PRESETS,
   liftStudioImageTo3d,
   liftStudioImageTo3dGlb,
 } from "./studio-lift3d-pipeline";
+import { STUDIO_LIFT3D_SYMMETRY_CONFIDENT_SCORE } from "./studio-lift3d-symmetry";
 import {
   discImage,
   encodeTestPng,
+  flatImage,
   opaqueSquareImage,
   verticalGradientImage,
 } from "./studio-lift3d.test-fixture";
@@ -133,6 +139,58 @@ describe("Studio Lift 3D 파이프라인", () => {
     expect(lifted.warnings.map((warning) => warning.code)).not.toContain("resolution-clamped");
   });
 
+  it("최대 해상도와 최대 레이어를 함께 골라도 만들어진다", () => {
+    // 두 슬라이더를 각각 끝까지 올린 조합은 사용자가 가장 먼저 시도하는 값이다. 레이어가
+    // 해상도 상한을 깎지 않던 시절에는 이 조합이 결정론적으로 budget-exceeded 로만 끝났다.
+    const lifted = liftStudioImageTo3d(verticalGradientImage(256), {
+      subject: "background",
+      resolution: STUDIO_LIFT3D_LIMITS.maxResolution,
+      layerBands: STUDIO_LIFT3D_MAX_DEPTH_BANDS,
+    });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.geometry.mode).toBe("parallax");
+    expect(lifted.value.metrics.layerCount).toBeGreaterThan(1);
+    // 상한을 내린 사실은 조용히 넘기지 않는다 — 결과가 왜 덜 촘촘한지 알 수 있어야 한다.
+    expect(lifted.warnings.map((warning) => warning.code)).toContain("resolution-clamped");
+    expect(Math.max(lifted.value.metrics.gridWidth, lifted.value.metrics.gridHeight))
+      .toBeLessThan(STUDIO_LIFT3D_LIMITS.maxResolution);
+  });
+
+  it("지원 범위를 넘는 레이어 수는 한 번만 조이고 그 사실을 알린다", () => {
+    // 유한하지만 24 를 넘는 값을 그대로 쓰면 해상도 상한만 쓸데없이 깎이고, MAX_VALUE 근처에서는
+    // 상한 공식이 NaN 이 되어 상한 자체가 무시된다 — 그러면 최대 해상도로 24층을 쌓게 된다.
+    for (const layerBands of [1_000, Number.MAX_VALUE]) {
+      const lifted = liftStudioImageTo3d(verticalGradientImage(256), {
+        subject: "background",
+        resolution: STUDIO_LIFT3D_LIMITS.maxResolution,
+        layerBands,
+      });
+
+      expect(lifted.ok).toBe(true);
+      if (!lifted.ok) return;
+      expect(lifted.warnings.map((warning) => warning.code)).toContain("layer-bands-clamped");
+      expect(lifted.value.metrics.layerCount).toBeLessThanOrEqual(STUDIO_LIFT3D_MAX_DEPTH_BANDS);
+      expect(Math.max(lifted.value.metrics.gridWidth, lifted.value.metrics.gridHeight))
+        .toBeLessThan(STUDIO_LIFT3D_LIMITS.maxResolution);
+    }
+  });
+
+  it("명암이 고르면 시차 레이어가 카드 한 장으로 주저앉는다", () => {
+    // 밴드는 깊이 구간으로 나눈다. 깊이가 어디서나 같으면 한 구간만 차고 나머지는 비어
+    // 버려진다. 위상은 여전히 parallax 인데 층은 하나다 — 화면이 그 사실을 감추면 안 된다.
+    const lifted = liftStudioImageTo3d(flatImage(96), {
+      subject: "background",
+      layerBands: 12,
+    });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.geometry.mode).toBe("parallax");
+    expect(lifted.value.metrics.layerCount).toBe(1);
+  });
+
   it("가는 부위가 있어도 위상 오류 없이 닫힌 solid 로 보고한다", () => {
     // 얇은 팔·꼬리에서 비다양체가 나던 시절에는 boundaryEdgeCount 만 보고 "닫힌 solid" 라고
     // 표시했다. 지금은 위상 오류 수까지 함께 봐야 closed 가 참이 된다.
@@ -169,6 +227,110 @@ describe("Studio Lift 3D 파이프라인", () => {
     expect(lifted.ok).toBe(false);
     if (lifted.ok) return;
     expect(lifted.code).toBe("invalid-option");
+  });
+
+  it("캐릭터 프리셋은 좌우대칭 보정을 걸고 그 사실을 지표에 남긴다", () => {
+    const lifted = liftStudioImageTo3d(discImage(96), { subject: "character" });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.metrics.symmetryScore).toBeGreaterThan(0.9);
+    expect(lifted.value.metrics.symmetryApplied).toBe(true);
+  });
+
+  it("좌우가 다른 실루엣에는 보정을 걸지 않고 이유를 알린다", () => {
+    // 몸통 한쪽에만 그만한 덩어리가 붙은 형상 — 옆모습이나 비대칭 포즈가 그렇다. 어떤 축으로
+    // 접어도 실루엣의 상당 부분이 짝을 찾지 못한다.
+    const size = 96;
+    const source = discImage(size, 0.22);
+    const pixels = source.pixels;
+    for (let y = Math.round(size * 0.34); y < Math.round(size * 0.66); y += 1) {
+      for (let x = Math.round(size * 0.5); x < size - 6; x += 1) {
+        const offset = (y * size + x) * 4;
+        pixels[offset] = 220;
+        pixels[offset + 1] = 90;
+        pixels[offset + 2] = 60;
+        pixels[offset + 3] = 255;
+      }
+    }
+
+    const lifted = liftStudioImageTo3d(source, { subject: "character" });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.metrics.symmetryScore)
+      .toBeLessThan(STUDIO_LIFT3D_SYMMETRY_CONFIDENT_SCORE);
+    expect(lifted.value.metrics.symmetryApplied).toBe(false);
+    expect(lifted.warnings.map((warning) => warning.code)).toContain("symmetry-skipped");
+  });
+
+  it("소품 프리셋은 대칭 보정을 아예 시도하지 않는다", () => {
+    const lifted = liftStudioImageTo3d(discImage(96), { subject: "prop" });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.metrics.symmetryScore).toBeNull();
+    expect(lifted.value.metrics.symmetryApplied).toBe(false);
+  });
+
+  it("레이어를 2 이상 주면 배경이 시차 카드로 나뉜다", () => {
+    const flat = liftStudioImageTo3d(verticalGradientImage(96), { subject: "background" });
+    const layered = liftStudioImageTo3d(verticalGradientImage(96), {
+      subject: "background",
+      layerBands: 5,
+    });
+
+    expect(flat.ok && layered.ok).toBe(true);
+    if (!flat.ok || !layered.ok) return;
+    expect(flat.value.geometry.mode).toBe("relief");
+    expect(flat.value.metrics.layerCount).toBe(1);
+    expect(layered.value.geometry.mode).toBe("parallax");
+    expect(layered.value.metrics.layerCount).toBe(5);
+    // 층으로 나뉘어도 유효한 solid 여야 한다.
+    expect(layered.value.metrics.closed).toBe(true);
+  });
+
+  it("앞쪽 두께 비율이 결과 형상을 바꾼다", () => {
+    const even = liftStudioImageTo3d(discImage(96), { subject: "character", frontRatio: 0.5 });
+    const forward = liftStudioImageTo3d(discImage(96), { subject: "character", frontRatio: 0.8 });
+
+    expect(even.ok && forward.ok).toBe(true);
+    if (!even.ok || !forward.ok) return;
+    expect(even.value.meshHash).not.toBe(forward.value.meshHash);
+  });
+
+  it("돌려주는 깊이장이 메시를 만든 바로 그것이다", () => {
+    // 대칭 보정을 걸어 놓고 원본 깊이장을 돌려주면 깊이 미리보기와 실제 형상이 어긋난다.
+    const lifted = liftStudioImageTo3d(discImage(96), { subject: "character" });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.metrics.symmetryApplied).toBe(true);
+
+    const preset = STUDIO_LIFT3D_PRESETS.character;
+    const rebuilt = buildStudioLift3dGeometry(lifted.value.mask, lifted.value.depth, {
+      mode: preset.geometryMode,
+      depthScale: preset.depthScale,
+      baseScale: preset.baseScale,
+      targetHeight: preset.targetHeight,
+      frontRatio: preset.frontRatio,
+      layerBands: 1,
+    });
+    expect(rebuilt.ok).toBe(true);
+    if (!rebuilt.ok) return;
+    expect(hashStudioEditableMesh(rebuilt.value.mesh)).toBe(lifted.value.meshHash);
+  });
+
+  it("유한하지 않은 레이어 수를 예외 대신 사유 코드로 거절한다", () => {
+    for (const layerBands of [Number.NaN, Number.POSITIVE_INFINITY, 0]) {
+      const lifted = liftStudioImageTo3d(verticalGradientImage(64), {
+        subject: "background",
+        layerBands,
+      });
+      expect(lifted.ok).toBe(false);
+      if (lifted.ok) continue;
+      expect(lifted.code).toBe("invalid-option");
+    }
   });
 
   it("리프트와 GLB 인코딩을 한 번에 돌려준다", () => {

@@ -20,6 +20,7 @@ import {
 } from "../studio-editable-half-edge-mesh";
 
 import {
+  clampStudioLift3dUnit,
   studioLift3dFailure,
   studioLift3dSuccess,
   studioLift3dWarning,
@@ -29,8 +30,13 @@ import {
   type StudioLift3dVec3,
   type StudioLift3dWarning,
 } from "./studio-lift3d-contract";
+import {
+  STUDIO_LIFT3D_MAX_DEPTH_BANDS,
+  buildStudioLift3dDepthBands,
+  clampStudioLift3dBandCount,
+} from "./studio-lift3d-depth";
 
-import type { StudioLift3dDepthField } from "./studio-lift3d-depth";
+import type { StudioLift3dDepthBand, StudioLift3dDepthField } from "./studio-lift3d-depth";
 import type { StudioLift3dMask } from "./studio-lift3d-mask";
 
 /** 내부 정점의 최소 두께 비율. 0 이면 앞뒤 껍질이 겹쳐 부피가 사라진다. */
@@ -57,6 +63,15 @@ export interface StudioLift3dGeometryOptions {
   readonly depthScale: number;
   /** relief 뒷판 두께(같은 비율 기준). */
   readonly baseScale?: number;
+  /**
+   * 전체 두께 중 앞쪽이 가져갈 비율(0..1, 기본 0.5).
+   *
+   * 정면을 보는 캐릭터는 가슴이 등보다 더 나온다. 0.5 를 넘기면 그 비대칭을 만들 수 있고,
+   * 총 두께는 바뀌지 않는다. `inflate` 에서만 의미가 있다.
+   */
+  readonly frontRatio?: number;
+  /** `parallax` 에서 쌓을 깊이 밴드 수(기본 6). */
+  readonly layerBands?: number;
   /** 완성 모델의 세로 높이(scene unit). 캐릭터 1.7 = 사람 키. */
   readonly targetHeight: number;
 }
@@ -67,6 +82,8 @@ export interface StudioLift3dGeometry {
   readonly uvs: readonly StudioLift3dUv[];
   readonly bounds: { readonly min: StudioLift3dVec3; readonly max: StudioLift3dVec3 };
   readonly quadCount: number;
+  /** 서로 떨어진 조각 수. `parallax` 가 아니면 1 이다. */
+  readonly layerCount: number;
   readonly mode: StudioLift3dGeometryMode;
 }
 
@@ -84,22 +101,22 @@ interface FaceGrid {
  * 갈라져 non-manifold 가 된다. glTF 로는 나가지만 CSG·섭디비전·법선 계산이 전부 어긋나므로
  * 한 쪽 면을 떨어뜨려 위상을 지킨다.
  */
-function buildFaceGrid(mask: StudioLift3dMask): FaceGrid {
-  const width = mask.width - 1;
-  const height = mask.height - 1;
+function buildFaceGrid(cells: Uint8Array, gridWidth: number, gridHeight: number): FaceGrid {
+  const width = gridWidth - 1;
+  const height = gridHeight - 1;
   const present = new Uint8Array(Math.max(0, width * height));
   for (let j = 0; j < height; j += 1) {
     for (let i = 0; i < width; i += 1) {
-      const a = mask.cells[j * mask.width + i]!;
-      const b = mask.cells[j * mask.width + i + 1]!;
-      const c = mask.cells[(j + 1) * mask.width + i + 1]!;
-      const d = mask.cells[(j + 1) * mask.width + i]!;
+      const a = cells[j * gridWidth + i]!;
+      const b = cells[j * gridWidth + i + 1]!;
+      const c = cells[(j + 1) * gridWidth + i + 1]!;
+      const d = cells[(j + 1) * gridWidth + i]!;
       present[j * width + i] = a === 1 && b === 1 && c === 1 && d === 1 ? 1 : 0;
     }
   }
   let droppedPinches = 0;
-  for (let y = 1; y < mask.height - 1; y += 1) {
-    for (let x = 1; x < mask.width - 1; x += 1) {
+  for (let y = 1; y < gridHeight - 1; y += 1) {
+    for (let x = 1; x < gridWidth - 1; x += 1) {
       const nw = present[(y - 1) * width + (x - 1)]!;
       const ne = present[(y - 1) * width + x]!;
       const sw = present[y * width + (x - 1)]!;
@@ -116,6 +133,28 @@ function buildFaceGrid(mask: StudioLift3dMask): FaceGrid {
   return { present, width, height, droppedPinches };
 }
 
+/**
+ * 사각형 네 개에 모두 둘러싸인 정점(=안쪽 정점)이 하나라도 있는지.
+ *
+ * 없으면 실루엣이 어디서나 두 칸 이하라 모든 정점이 테두리다. 그때 앞뒤 두께는 정점마다
+ * `MIN_RIM_HEIGHT` 로 같아, `frontRatio` 는 두 껍질을 통째로 z 로 평행이동시킬 뿐 형태를
+ * 바꾸지 못한다. 그 평행이동은 `normalizeStudioLift3dPositions` 의 z 중심 맞추기가 곧바로
+ * 되돌린다 — 나눌 부피가 애초에 없기 때문이다.
+ */
+function hasInteriorVertex(grid: FaceGrid): boolean {
+  for (let y = 1; y < grid.height; y += 1) {
+    for (let x = 1; x < grid.width; x += 1) {
+      if (grid.present[(y - 1) * grid.width + (x - 1)] === 1
+        && grid.present[(y - 1) * grid.width + x] === 1
+        && grid.present[y * grid.width + (x - 1)] === 1
+        && grid.present[y * grid.width + x] === 1) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** 정점이 속한 사각형 개수. 4 면 내부, 1~3 이면 껍질 경계, 0 이면 미사용. */
 function faceDegree(grid: FaceGrid, x: number, y: number): number {
   let degree = 0;
@@ -127,6 +166,32 @@ function faceDegree(grid: FaceGrid, x: number, y: number): number {
   if (has(x - 1, y)) degree += 1;
   if (has(x, y)) degree += 1;
   return degree;
+}
+
+/**
+ * 격자 하나가 방출할 사각형 수를 **방출 전에** 정확히 센다.
+ *
+ * `emitStudioLift3dShell` 과 같은 규칙이다 — 살아남은 사각형마다 앞뒤 2개, 이웃 사각형이 없는
+ * 변마다 옆벽 1개. 시차 레이어는 밴드가 몇 개로 잘리느냐에 따라 옆벽 총량이 크게 달라져
+ * 해상도만으로는 예산을 예측할 수 없다(밴드가 잘게 번갈아 나오는 원화는 옆벽이 면적에 비례한다).
+ * 여기서 먼저 세면 정점 배열을 수십만 개 쌓은 뒤에야 예산 초과를 알리는 일이 없다.
+ */
+function countShellQuads(grid: FaceGrid): number {
+  const has = (i: number, j: number): boolean => (
+    i >= 0 && j >= 0 && i < grid.width && j < grid.height && grid.present[j * grid.width + i] === 1
+  );
+  let quads = 0;
+  for (let j = 0; j < grid.height; j += 1) {
+    for (let i = 0; i < grid.width; i += 1) {
+      if (grid.present[j * grid.width + i] === 0) continue;
+      quads += 2;
+      if (!has(i - 1, j)) quads += 1;
+      if (!has(i, j + 1)) quads += 1;
+      if (!has(i + 1, j)) quads += 1;
+      if (!has(i, j - 1)) quads += 1;
+    }
+  }
+  return quads;
 }
 
 interface Accumulator {
@@ -148,10 +213,184 @@ function pushVertex(
   return accumulator.positions.length - 1;
 }
 
+/**
+ * 레이어 `layerBands` 장을 쌓을 때 코너 예산 안에 들어오는 작업 격자 한 변의 상한.
+ *
+ * 화면 전체가 피사체인 최악의 경우를 기준으로 잡는다. 한 변 n(u = n−1)에서
+ * 앞뒤 껍질이 2u², 밴드 경계에서 중복되는 사각형과 카드마다 서는 옆벽이 합쳐 4uB 쯤 되고,
+ * 사각형 하나가 코너 4개를 쓰므로 8u² + 16uB 코너다. 밴드가 가로 띠가 아니라 동심 고리로
+ * 잘릴 때 경계가 더 길어지므로 밴드 항에 2배 여유를 두어 8u² + 32uB ≤ maxEdges 로 푼다.
+ *
+ *   u ≤ −2B + √(4B² + maxEdges/8)
+ *
+ * B=1 이면 248(= `maxResolution`)이라 단일 껍질 경로는 그대로고, B=24 에서 207 까지 내려간다.
+ *
+ * 밴드 수는 지오메트리와 **같은 함수**로 조인다. 여기서만 원값을 쓰면 24 를 넘는 요청이
+ * 필요 없이 해상도를 깎고, `Number.MAX_VALUE` 근처에서는 4B² 가 Infinity 로 넘쳐 식이 NaN 이
+ * 되어 상한 자체가 무시된다.
+ */
+export function maxStudioLift3dResolutionForLayers(layerBands: number): number {
+  const bands = clampStudioLift3dBandCount(layerBands);
+  const quarter = STUDIO_EDITABLE_MESH_LIMITS.maxEdges / 8;
+  const span = -2 * bands + Math.sqrt(4 * bands * bands + quarter);
+  return Math.max(2, Math.floor(span) + 1);
+}
+
 function estimatedVertexBudget(mask: StudioLift3dMask): number {
   let inside = 0;
   for (let index = 0; index < mask.cells.length; index += 1) inside += mask.cells[index]!;
   return inside * 2;
+}
+
+interface ShellContext {
+  readonly gridWidth: number;
+  readonly gridHeight: number;
+  readonly centerX: number;
+  readonly centerY: number;
+  readonly uScale: number;
+  readonly vScale: number;
+}
+
+/** 한 샘플 점의 앞/뒤 z. `rim` 은 이 점이 껍질 경계에 닿아 있는지다. */
+type ShellDepthAt = (key: number, rim: boolean) => readonly [number, number];
+
+/**
+ * 사각형 격자 하나를 앞면 + 뒷면 + 옆벽으로 굳혀 누산기에 덧붙인다.
+ *
+ * 세 모드가 이 한 벌을 공유한다. 셸을 여러 번 부르면(시차 밴드) 서로 떨어진 조각들이 한
+ * 메시 안에 함께 담긴다 — 조각끼리는 정점을 나누지 않으므로 각자 닫힌 solid 로 남는다.
+ */
+function emitStudioLift3dShell(
+  accumulator: Accumulator,
+  context: ShellContext,
+  grid: FaceGrid,
+  depthAt: ShellDepthAt,
+): number {
+  const { gridWidth, gridHeight, centerX, centerY, uScale, vScale } = context;
+  const frontIndex = new Int32Array(gridWidth * gridHeight).fill(-1);
+  const backIndex = new Int32Array(gridWidth * gridHeight).fill(-1);
+
+  for (let y = 0; y < gridHeight; y += 1) {
+    for (let x = 0; x < gridWidth; x += 1) {
+      const key = y * gridWidth + x;
+      const degree = faceDegree(grid, x, y);
+      if (degree === 0) continue;
+      const worldX = x - centerX;
+      const worldY = centerY - y;
+      const u = (x + 0.5) * uScale;
+      const v = (y + 0.5) * vScale;
+      const [frontZ, backZ] = depthAt(key, degree < 4);
+      frontIndex[key] = pushVertex(accumulator, worldX, worldY, frontZ, u, v);
+      backIndex[key] = pushVertex(accumulator, worldX, worldY, backZ, u, v);
+    }
+  }
+
+  const corner = (x: number, y: number): number => y * gridWidth + x;
+  const hasFace = (i: number, j: number): boolean => (
+    i >= 0 && j >= 0 && i < grid.width && j < grid.height && grid.present[j * grid.width + i] === 1
+  );
+  let quadCount = 0;
+
+  for (let j = 0; j < grid.height; j += 1) {
+    for (let i = 0; i < grid.width; i += 1) {
+      if (grid.present[j * grid.width + i] === 0) continue;
+      const a = corner(i, j);
+      const b = corner(i + 1, j);
+      const c = corner(i + 1, j + 1);
+      const d = corner(i, j + 1);
+      // +Z 에서 봤을 때 CCW: 좌상 → 좌하 → 우하 → 우상.
+      accumulator.faces.push([frontIndex[a]!, frontIndex[d]!, frontIndex[c]!, frontIndex[b]!]);
+      // 뒷면은 −Z 를 향해야 하므로 같은 루프를 뒤집는다.
+      accumulator.faces.push([backIndex[a]!, backIndex[b]!, backIndex[c]!, backIndex[d]!]);
+      quadCount += 2;
+
+      // 껍질 경계(이웃 사각형이 없는 변)를 옆벽으로 막는다. 앞면 CCW 루프 a→d→c→b 의 각 변과,
+      // 그 변 너머 이웃 사각형.
+      const edges: readonly (readonly [number, number, boolean])[] = [
+        [a, d, hasFace(i - 1, j)],
+        [d, c, hasFace(i, j + 1)],
+        [c, b, hasFace(i + 1, j)],
+        [b, a, hasFace(i, j - 1)],
+      ];
+      for (const [from, to, shared] of edges) {
+        if (shared) continue;
+        // 바깥을 향하도록: 앞(from) → 뒤(from) → 뒤(to) → 앞(to).
+        accumulator.faces.push([
+          frontIndex[from]!,
+          backIndex[from]!,
+          backIndex[to]!,
+          frontIndex[to]!,
+        ]);
+        quadCount += 1;
+      }
+    }
+  }
+  return quadCount;
+}
+
+interface PlannedShell {
+  readonly grid: FaceGrid;
+  readonly depthAt: ShellDepthAt;
+}
+
+interface PlannedGrids {
+  readonly grids: readonly FaceGrid[];
+  readonly bands: readonly StudioLift3dDepthBand[];
+  /** 빈 밴드를 버리기 **전** 개수. 카드 두께와 간격이 같은 수에서 나와야 한다. */
+  readonly bandCount: number;
+}
+
+/**
+ * 방출할 격자를 세운다. 정점은 아직 만들지 않는다.
+ *
+ * 시차는 밴드마다 독립된 카드를 쌓는다. 한 파일 안에서 서로 떨어져 있으므로 카메라가
+ * 움직이면 층이 다른 속도로 흐르고, DCC 로 가져가 층별로 분리하기도 쉽다.
+ */
+function planStudioLift3dShellGrids(
+  mask: StudioLift3dMask,
+  depth: StudioLift3dDepthField,
+  mode: StudioLift3dGeometryMode,
+  layerBands: number | undefined,
+): PlannedGrids {
+  if (mode !== "parallax") {
+    return {
+      grids: [buildFaceGrid(mask.cells, mask.width, mask.height)],
+      bands: [],
+      bandCount: 1,
+    };
+  }
+  const bandCount = clampStudioLift3dBandCount(layerBands ?? 6);
+  const bands = buildStudioLift3dDepthBands(mask, depth, bandCount);
+  return {
+    grids: bands.map((band) => buildFaceGrid(band.cells, mask.width, mask.height)),
+    bands,
+    bandCount,
+  };
+}
+
+/**
+ * 방출하면 나올 사각형 수. **정점을 하나도 만들기 전에** 정확히 센다.
+ *
+ * 해상도 상한(`maxStudioLift3dResolutionForLayers`)은 밴드 경계 길이가 O(uB) 라는 가정 위에
+ * 서 있다. 밴드가 화면 전체에서 잘게 번갈아 나오는 원화는 옆벽이 면적에 비례해 그 가정을
+ * 깨뜨린다. 그런 입력도 격자 단계에서 걸러야 수십만 개를 쌓은 뒤에야 예산 초과를 알리는 일이
+ * 없다. 화면이 예산을 미리 보여줄 때도 이 값을 쓴다.
+ */
+export function countStudioLift3dPlannedQuads(
+  mask: StudioLift3dMask,
+  depth: StudioLift3dDepthField,
+  options: Pick<StudioLift3dGeometryOptions, "mode" | "layerBands">,
+): number {
+  const planned = planStudioLift3dShellGrids(mask, depth, options.mode, options.layerBands);
+  let quads = 0;
+  for (const grid of planned.grids) quads += countShellQuads(grid);
+  return quads;
+}
+
+/** 사각형 수가 편집 메시의 면·코너 예산을 넘는지. 사각형 하나가 코너 4개를 쓴다. */
+function exceedsFaceBudget(quads: number): boolean {
+  return quads > STUDIO_EDITABLE_MESH_LIMITS.maxFaces
+    || quads * QUAD_CORNERS > STUDIO_EDITABLE_MESH_LIMITS.maxEdges;
 }
 
 /**
@@ -176,22 +415,46 @@ export function buildStudioLift3dGeometry(
   if (!Number.isFinite(options.depthScale) || options.depthScale < 0) {
     return studioLift3dFailure("invalid-option", "depthScale 은 0 이상의 유한한 값이어야 합니다");
   }
+  // depthScale 0 이 뜻을 갖는 건 부조뿐이다 — 뒷판(baseScale)이 따로 두께를 주므로 납작한 판이
+  // 나온다. inflate·parallax 는 모든 두께가 depthScale 에서 나오므로 0 이면 앞껍질과 뒷껍질이
+  // 같은 평면에 겹치고 옆벽 넓이도 0 이 된다. 그런데도 "닫힌 메시" 로 보고되어 부피 0 짜리
+  // GLB 가 라이브러리까지 흘러가므로, 만들기 전에 막는다.
+  if (options.mode !== "relief" && options.depthScale <= 0) {
+    return studioLift3dFailure(
+      "invalid-option",
+      "depthScale 은 0보다 커야 합니다(두께 0 은 부피 없는 메시가 됩니다)",
+    );
+  }
   if (options.baseScale !== undefined
     && (!Number.isFinite(options.baseScale) || options.baseScale < 0)) {
     return studioLift3dFailure("invalid-option", "baseScale 은 0 이상의 유한한 값이어야 합니다");
+  }
+  // clampStudioLift3dUnit 은 비유한 값을 조용히 0 으로 떨어뜨린다. 여기서 걸러내지 않으면
+  // NaN 을 넣은 호출이 "앞쪽 두께 0" 이라는 엉뚱한 결과로 성공해 버린다.
+  if (options.frontRatio !== undefined
+    && (!Number.isFinite(options.frontRatio) || options.frontRatio < 0 || options.frontRatio > 1)) {
+    return studioLift3dFailure("invalid-option", "frontRatio 는 0..1 사이의 유한한 값이어야 합니다");
+  }
+  // 이 함수는 파이프라인을 거치지 않고도 불릴 수 있다. clampStudioLift3dBandCount 는 비유한 값을
+  // 조용히 1 로 떨어뜨리므로, 여기서 걸러내지 않으면 "카드 한 장짜리 시차 레이어" 라는 앞뒤 안
+  // 맞는 결과가 parallax 로 성공해 버린다. 다른 수치 옵션과 같은 자리에서 같은 방식으로 막는다.
+  // 위쪽 한도도 같이 본다. planStudioLift3dShellGrids 가 조용히 조이면 요청한 층 수와 다른
+  // 결과가 성공으로 나가는데, 이 경계에는 파이프라인 같은 경고 통로를 두지 않는다 —
+  // frontRatio 가 범위를 벗어날 때와 같이 거절하는 것이 이 함수의 규칙이다.
+  if (options.layerBands !== undefined
+    && (!Number.isFinite(options.layerBands)
+      || options.layerBands < 1
+      || options.layerBands > STUDIO_LIFT3D_MAX_DEPTH_BANDS)) {
+    return studioLift3dFailure(
+      "invalid-option",
+      `layerBands 는 1~${STUDIO_LIFT3D_MAX_DEPTH_BANDS} 사이의 유한한 값이어야 합니다`,
+    );
   }
   if (estimatedVertexBudget(mask) > STUDIO_EDITABLE_MESH_LIMITS.maxVertices) {
     return studioLift3dFailure("budget-exceeded", "해상도를 낮춰 주세요(정점 예산 초과)");
   }
 
   const warnings: StudioLift3dWarning[] = [];
-  const grid = buildFaceGrid(mask);
-  if (grid.droppedPinches > 0) {
-    warnings.push(studioLift3dWarning(
-      "pinch-faces-dropped",
-      `위상이 꼬이는 대각 연결 ${grid.droppedPinches}곳을 정리했습니다`,
-    ));
-  }
 
   const gridWidth = mask.width;
   const gridHeight = mask.height;
@@ -199,110 +462,106 @@ export function buildStudioLift3dGeometry(
   const spanY = Math.max(1, mask.bounds.maxY - mask.bounds.minY);
   const thickness = Math.max(spanX, spanY) * Math.max(0, options.depthScale);
   const baseThickness = Math.max(spanX, spanY) * Math.max(0, options.baseScale ?? 0.05);
-  // 정점은 작업 격자 **셀의 중심**에 놓인다. 셀 x 가 덮는 원본 열은 [x·W/gw, (x+1)·W/gw) 이므로
-  // 그 중심의 정규화 좌표는 (x+0.5)/gw 다. x/(gw−1) 로 잡으면 텍스처가 gw/(gw−1) 배로 늘어나고
-  // 반 칸 밀려, 낮은 해상도일수록 선화가 실루엣에서 눈에 띄게 어긋난다.
-  const uScale = 1 / gridWidth;
-  const vScale = 1 / gridHeight;
-  const centerX = (gridWidth - 1) / 2;
-  const centerY = (gridHeight - 1) / 2;
+  const context: ShellContext = {
+    gridWidth,
+    gridHeight,
+    // 정점은 작업 격자 **셀의 중심**에 놓인다. 셀 x 가 덮는 원본 열은 [x·W/gw, (x+1)·W/gw) 이므로
+    // 그 중심의 정규화 좌표는 (x+0.5)/gw 다. x/(gw−1) 로 잡으면 텍스처가 gw/(gw−1) 배로 늘어나고
+    // 반 칸 밀려, 낮은 해상도일수록 선화가 실루엣에서 눈에 띄게 어긋난다.
+    uScale: 1 / gridWidth,
+    vScale: 1 / gridHeight,
+    centerX: (gridWidth - 1) / 2,
+    centerY: (gridHeight - 1) / 2,
+  };
 
   const accumulator: Accumulator = { positions: [], uvs: [], faces: [] };
-  const frontIndex = new Int32Array(gridWidth * gridHeight).fill(-1);
-  const backIndex = new Int32Array(gridWidth * gridHeight).fill(-1);
-
-  for (let y = 0; y < gridHeight; y += 1) {
-    for (let x = 0; x < gridWidth; x += 1) {
-      const key = y * gridWidth + x;
-      const degree = faceDegree(grid, x, y);
-      if (degree === 0) continue;
-      const worldX = x - centerX;
-      const worldY = centerY - y;
-      const u = (x + 0.5) * uScale;
-      const v = (y + 0.5) * vScale;
-      const rim = degree < 4;
-
-      if (options.mode === "inflate") {
-        // 테두리도 앞뒤를 따로 둔다. 정점을 공유하면 얇은 부위에서 비다양체가 되고(MIN_RIM_HEIGHT
-        // 주석 참고), 여기서 벌려 둔 만큼이 아래 옆벽의 폭이 된다.
-        const half = (thickness / 2) * (rim
-          ? MIN_RIM_HEIGHT
-          : Math.max(MIN_INTERIOR_HEIGHT, depth.heights[key]!));
-        frontIndex[key] = pushVertex(accumulator, worldX, worldY, half, u, v);
-        backIndex[key] = pushVertex(accumulator, worldX, worldY, -half, u, v);
-      } else {
-        frontIndex[key] = pushVertex(
-          accumulator,
-          worldX,
-          worldY,
-          thickness * depth.heights[key]!,
-          u,
-          v,
-        );
-        backIndex[key] = pushVertex(accumulator, worldX, worldY, -baseThickness, u, v);
-      }
-    }
-  }
-
-  // 예전에는 내부 정점이 하나도 없으면(= 전부 테두리) 부피가 0 이라 거절했다. 이제 테두리에도
-  // MIN_RIM_HEIGHT 만큼 두께가 있으므로 아주 얇은 형상도 정상적인 얇은 solid 로 나온다.
-  const corner = (x: number, y: number): number => y * gridWidth + x;
   let quadCount = 0;
-  for (let j = 0; j < grid.height; j += 1) {
-    for (let i = 0; i < grid.width; i += 1) {
-      if (grid.present[j * grid.width + i] === 0) continue;
-      const a = corner(i, j);
-      const b = corner(i + 1, j);
-      const c = corner(i + 1, j + 1);
-      const d = corner(i, j + 1);
-      // +Z 에서 봤을 때 CCW: 좌상 → 좌하 → 우하 → 우상.
-      accumulator.faces.push([frontIndex[a]!, frontIndex[d]!, frontIndex[c]!, frontIndex[b]!]);
-      // 뒷면은 −Z 를 향해야 하므로 같은 루프를 뒤집는다.
-      accumulator.faces.push([backIndex[a]!, backIndex[b]!, backIndex[c]!, backIndex[d]!]);
-      quadCount += 2;
-    }
+  let droppedPinches = 0;
+
+  // 앞뒤를 반씩 나누는 것이 기본이지만, 정면을 보는 캐릭터는 가슴이 등보다 더 나온다.
+  // frontRatio 로 그 비율을 옮겨도 총 두께는 그대로다.
+  const frontRatio = clampStudioLift3dUnit(options.frontRatio ?? 0.5);
+  // 격자를 먼저 다 세운다. 방출은 그 다음이다 — 실제로 나올 사각형 수를 정확히 알기 전에
+  // 정점을 쌓기 시작하면, 예산 초과를 수십만 개를 만든 뒤에야 알게 된다.
+  const planned = planStudioLift3dShellGrids(mask, depth, options.mode, options.layerBands);
+  // 카드 두께와 카드 간격이 **같은** 밴드 수에서 나와야 한다. 빈 밴드가 버려졌을 때
+  // 살아남은 개수로 두께를 잡으면, 간격은 그대로인데 카드만 두꺼워져 층이 서로 파고든다.
+  const cardHalf = thickness / Math.max(8, planned.bandCount * 4);
+  const shells: readonly PlannedShell[] = options.mode === "parallax"
+    ? planned.grids.map((grid, index) => {
+      const center = thickness * (planned.bands[index]!.center - 0.5);
+      return {
+        grid,
+        depthAt: (): readonly [number, number] => [center + cardHalf, center - cardHalf],
+      };
+    })
+    : [{
+      grid: planned.grids[0]!,
+      depthAt: (key, rim): readonly [number, number] => {
+        if (options.mode === "inflate") {
+          // 테두리도 앞뒤를 따로 둔다. 정점을 공유하면 얇은 부위에서 비다양체가 되고
+          // (MIN_RIM_HEIGHT 주석 참고), 여기서 벌려 둔 만큼이 옆벽의 폭이 된다.
+          const height = rim
+            ? MIN_RIM_HEIGHT
+            : Math.max(MIN_INTERIOR_HEIGHT, depth.heights[key]!);
+          return [thickness * frontRatio * height, -thickness * (1 - frontRatio) * height];
+        }
+        return [thickness * depth.heights[key]!, -baseThickness];
+      },
+    }];
+
+
+  let plannedQuads = 0;
+  // 사각형을 하나도 못 만드는 껍질은 버린다. 밴드가 한 칸 폭 부위에만 걸리면 부풀린 뒤에도
+  // 2×2 가 안 나와 정점이 하나도 안 나가는데, 세어만 두면 존재하지 않는 층이 지표와 화면에
+  // 광고된다.
+  const emitting: PlannedShell[] = [];
+  for (const shell of shells) {
+    droppedPinches += shell.grid.droppedPinches;
+    const quads = countShellQuads(shell.grid);
+    if (quads === 0) continue;
+    plannedQuads += quads;
+    emitting.push(shell);
   }
 
-  // 껍질 경계(이웃 사각형이 없는 변)를 옆벽으로 막는다. 두 모드가 같은 방식으로 닫히므로
-  // 얇은 부위에서만 위상이 달라지는 경우가 없다.
-  const hasFace = (i: number, j: number): boolean => (
-    i >= 0 && j >= 0 && i < grid.width && j < grid.height && grid.present[j * grid.width + i] === 1
-  );
-  for (let j = 0; j < grid.height; j += 1) {
-    for (let i = 0; i < grid.width; i += 1) {
-      if (grid.present[j * grid.width + i] === 0) continue;
-      const a = corner(i, j);
-      const b = corner(i + 1, j);
-      const c = corner(i + 1, j + 1);
-      const d = corner(i, j + 1);
-      // 앞면 CCW 루프(a→d→c→b)의 각 변과, 그 변 너머 이웃 사각형.
-      const edges: readonly (readonly [number, number, boolean])[] = [
-        [a, d, hasFace(i - 1, j)],
-        [d, c, hasFace(i, j + 1)],
-        [c, b, hasFace(i + 1, j)],
-        [b, a, hasFace(i, j - 1)],
-      ];
-      for (const [from, to, shared] of edges) {
-        if (shared) continue;
-        // 바깥을 향하도록: 앞(from) → 뒤(from) → 뒤(to) → 앞(to).
-        accumulator.faces.push([
-          frontIndex[from]!,
-          backIndex[from]!,
-          backIndex[to]!,
-          frontIndex[to]!,
-        ]);
-        quadCount += 1;
-      }
-    }
-  }
+  const layerCount = options.mode === "parallax" ? emitting.length : 1;
 
-  if (accumulator.faces.length === 0) {
+  if (plannedQuads === 0) {
     return studioLift3dFailure("degenerate-geometry", "면을 하나도 만들지 못했습니다");
   }
-  if (
-    accumulator.faces.length > STUDIO_EDITABLE_MESH_LIMITS.maxFaces
-    || accumulator.faces.length * QUAD_CORNERS > STUDIO_EDITABLE_MESH_LIMITS.maxEdges
-  ) {
+  if (exceedsFaceBudget(plannedQuads)) {
+    // 시차 레이어는 해상도와 레이어 수가 **함께** 예산을 먹는다. "해상도를 낮추라" 고만 하면
+    // 레이어를 줄이는 쪽이 더 나은 경우에도 사용자가 그 손잡이를 못 찾는다.
+    return studioLift3dFailure(
+      "budget-exceeded",
+      options.mode === "parallax"
+        ? `해상도(${gridWidth}) 또는 레이어 수(${layerCount})를 낮춰 주세요(면 예산 초과)`
+        : "해상도를 낮춰 주세요(면 예산 초과)",
+    );
+  }
+
+  for (const shell of emitting) {
+    quadCount += emitStudioLift3dShell(accumulator, context, shell.grid, shell.depthAt);
+  }
+
+  if (droppedPinches > 0) {
+    warnings.push(studioLift3dWarning(
+      "pinch-faces-dropped",
+      `위상이 꼬이는 대각 연결 ${droppedPinches}곳을 정리했습니다`,
+    ));
+  }
+  // 앞쪽 두께를 옮겨 달라고 했는데 나눌 부피가 없으면 조용히 넘기지 않는다. 슬라이더를 끝까지
+  // 밀어도 화면이 그대로인 이유를 사용자가 알 수 있어야 한다.
+  if (options.mode === "inflate" && frontRatio !== 0.5 && !hasInteriorVertex(shells[0]!.grid)) {
+    warnings.push(studioLift3dWarning(
+      "front-ratio-inert",
+      "실루엣이 어디서나 두 칸 이하라 앞쪽 두께 비율이 형태를 바꾸지 못합니다. 해상도를 올려 보세요",
+    ));
+  }
+
+  // 예산은 위에서 이미 봤다. 이 검사는 countShellQuads 와 방출기가 어긋났을 때를 위한 그물이다 —
+  // 어긋난 채로 넘기면 createStudioEditableMeshFromPolygons 가 사유 코드 대신 예외를 던진다.
+  if (exceedsFaceBudget(accumulator.faces.length)) {
     return studioLift3dFailure("budget-exceeded", "해상도를 낮춰 주세요(면 예산 초과)");
   }
 
@@ -315,6 +574,7 @@ export function buildStudioLift3dGeometry(
       uvs: Object.freeze([...accumulator.uvs]),
       bounds: scaled.bounds,
       quadCount,
+      layerCount,
       mode: options.mode,
     },
     warnings,

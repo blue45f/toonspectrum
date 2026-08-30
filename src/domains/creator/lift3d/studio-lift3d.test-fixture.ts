@@ -64,6 +64,19 @@ export function opaqueSquareImage(
   return { width: size, height: size, pixels };
 }
 
+/**
+ * 명암이 완전히 고른 불투명 이미지. relief 깊이장이 어디서나 같은 값이 되므로 밴드가 하나로
+ * 뭉친다 — 시차 레이어가 카드 한 장으로 주저앉는 경우를 만들 때 쓴다.
+ */
+export function flatImage(
+  size: number,
+  colour: TestRgba = { r: 128, g: 128, b: 128, a: 255 },
+): StudioLift3dSourceImage {
+  const pixels = new Uint8ClampedArray(size * size * 4);
+  for (let index = 0; index < size * size; index += 1) writePixel(pixels, index * 4, colour);
+  return { width: size, height: size, pixels };
+}
+
 /** 위에서 아래로 밝아지는 불투명 그라데이션. relief(명암→높이) 경로용. */
 export function verticalGradientImage(size: number): StudioLift3dSourceImage {
   const pixels = new Uint8ClampedArray(size * size * 4);

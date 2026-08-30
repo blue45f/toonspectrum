@@ -31,14 +31,28 @@ import {
   type StudioLift3dTexture,
   type StudioLift3dWarning,
 } from "./studio-lift3d-contract";
-import { buildStudioLift3dDepthField, type StudioLift3dDepthField } from "./studio-lift3d-depth";
+import {
+  STUDIO_LIFT3D_MAX_DEPTH_BANDS,
+  buildStudioLift3dDepthField,
+  clampStudioLift3dBandCount,
+  type StudioLift3dDepthField,
+} from "./studio-lift3d-depth";
 import { encodeStudioLift3dGlb, type StudioLift3dGlbFile } from "./studio-lift3d-glb";
 import {
   extractStudioLift3dMask,
   resampleStudioLift3dImage,
   type StudioLift3dMask,
 } from "./studio-lift3d-mask";
-import { buildStudioLift3dGeometry, type StudioLift3dGeometry } from "./studio-lift3d-mesh";
+import {
+  buildStudioLift3dGeometry,
+  maxStudioLift3dResolutionForLayers,
+  type StudioLift3dGeometry,
+} from "./studio-lift3d-mesh";
+import {
+  findStudioLift3dSymmetryAxis,
+  symmetrizeStudioLift3dHeights,
+  type StudioLift3dSymmetry,
+} from "./studio-lift3d-symmetry";
 
 import type { StudioLift3dRenderBuffers } from "./studio-lift3d-render-buffers";
 
@@ -54,6 +68,10 @@ export interface StudioLift3dPreset {
   readonly keepLargestPart: boolean;
   /** scene unit 기준 완성 높이. */
   readonly targetHeight: number;
+  /** 전체 두께 중 앞쪽 비율. inflate 에서만 쓰인다. */
+  readonly frontRatio: number;
+  /** 좌우대칭 보정 강도(0..1). 축이 충분히 대칭일 때만 실제로 걸린다. */
+  readonly symmetryStrength: number;
   readonly alphaMode: "MASK" | "OPAQUE";
   readonly label: string;
   readonly hint: string;
@@ -77,6 +95,9 @@ export const STUDIO_LIFT3D_PRESETS: Readonly<Record<StudioLift3dSubject, StudioL
       maskMode: "auto",
       keepLargestPart: true,
       targetHeight: 1.7,
+      // 정면을 보는 인물은 가슴이 등보다 나온다. 앞을 조금 더 준다.
+      frontRatio: 0.62,
+      symmetryStrength: 0.7,
       alphaMode: "MASK",
       label: "캐릭터",
       hint: "배경을 지운 PNG 를 넣으면 실루엣을 앞뒤로 부풀려 닫힌 입체로 만듭니다",
@@ -91,6 +112,9 @@ export const STUDIO_LIFT3D_PRESETS: Readonly<Record<StudioLift3dSubject, StudioL
       maskMode: "auto",
       keepLargestPart: true,
       targetHeight: 0.4,
+      frontRatio: 0.5,
+      // 소품은 좌우대칭이라는 보장이 없다(컵 손잡이, 칼자루).
+      symmetryStrength: 0,
       alphaMode: "MASK",
       label: "소품 · 오브젝트",
       hint: "컵·의자·무기처럼 손에 드는 물건. 캐릭터보다 두툼하게 부풀립니다",
@@ -105,6 +129,8 @@ export const STUDIO_LIFT3D_PRESETS: Readonly<Record<StudioLift3dSubject, StudioL
       maskMode: "full",
       keepLargestPart: false,
       targetHeight: 6,
+      frontRatio: 0.5,
+      symmetryStrength: 0,
       alphaMode: "OPAQUE",
       label: "배경",
       hint: "명암을 높이로 읽어 부조로 세웁니다. 카메라를 움직이면 원근이 살아납니다",
@@ -124,6 +150,15 @@ export interface StudioLift3dRequest {
   /** 어두운 면이 앞으로 나오게 뒤집는다(역광 배경). relief 프로파일에서만 의미가 있다. */
   readonly invertRelief?: boolean;
   readonly keepLargestPart?: boolean;
+  /** 전체 두께 중 앞쪽 비율(0..1). inflate 에서만 의미가 있다. */
+  readonly frontRatio?: number;
+  /** 좌우대칭 보정 강도(0..1). 축이 충분히 대칭일 때만 걸린다. */
+  readonly symmetryStrength?: number;
+  /**
+   * 2 이상이면 깊이를 그만큼의 밴드로 잘라 시차 카드를 세운다(`parallax`).
+   * 비우거나 1 이면 프리셋의 기본 위상을 쓴다.
+   */
+  readonly layerBands?: number;
 }
 
 export interface StudioLift3dMetrics {
@@ -137,6 +172,12 @@ export interface StudioLift3dMetrics {
   /** 남은 비다양체/나비 진단 건수. 0 이어야 유효한 solid 다. */
   readonly topologyErrorCount: number;
   readonly closed: boolean;
+  /** 서로 떨어진 조각 수. 시차 레이어가 아니면 1 이다. */
+  readonly layerCount: number;
+  /** 좌우대칭 점수(0..1). 축을 찾지 못했으면 null. */
+  readonly symmetryScore: number | null;
+  /** 대칭 보정을 실제로 걸었는지. */
+  readonly symmetryApplied: boolean;
 }
 
 export interface StudioLift3dLift {
@@ -150,14 +191,19 @@ export interface StudioLift3dLift {
   readonly meshHash: string;
 }
 
-function resolveRequest(request: StudioLift3dRequest): {
+function resolveRequest(request: StudioLift3dRequest, layerBands: number): {
   readonly preset: StudioLift3dPreset;
   readonly resolution: number;
   readonly warnings: StudioLift3dWarning[];
 } {
   const preset = STUDIO_LIFT3D_PRESETS[request.subject];
   const warnings: StudioLift3dWarning[] = [];
-  const clamped = clampStudioLift3dResolution(request.resolution ?? preset.resolution);
+  // 레이어를 쌓으면 같은 해상도가 몇 배의 면을 만든다. 상한을 여기서 미리 낮춰 두면
+  // 두 슬라이더를 각각 최대로 올린 조합이 "항상 예산 초과" 로만 끝나는 일이 없다.
+  const clamped = clampStudioLift3dResolution(
+    request.resolution ?? preset.resolution,
+    layerBands >= 2 ? maxStudioLift3dResolutionForLayers(layerBands) : undefined,
+  );
   if (clamped.warning !== null) warnings.push(clamped.warning);
   return { preset, resolution: clamped.resolution, warnings };
 }
@@ -180,6 +226,59 @@ function countStudioLift3dTriangles(geometry: StudioLift3dGeometry): number {
   return Math.max(0, loopHalfEdges - 2 * geometry.mesh.faces.length);
 }
 
+interface SymmetryOutcome {
+  readonly depth: StudioLift3dDepthField;
+  readonly detected: StudioLift3dSymmetry | null;
+  readonly applied: boolean;
+  readonly skipped: StudioLift3dWarning | null;
+}
+
+/**
+ * 좌우대칭 축을 찾아 깊이를 고르게 편다.
+ *
+ * 점수가 낮으면 **걸지 않는다**. 옆모습이거나 한 장에 여러 대상이 있는 원화를 억지로 접으면
+ * 없던 두께가 생긴다. 그 사실은 조용히 넘기지 않고 경고로 알린다 — 캐릭터 프리셋에서
+ * 기대한 보정이 안 걸린 이유를 사용자가 알 수 있어야 한다.
+ */
+function applySymmetry(
+  mask: StudioLift3dMask,
+  depth: StudioLift3dDepthField,
+  options: { readonly strength: number; readonly enabled: boolean },
+): SymmetryOutcome {
+  if (!options.enabled || options.strength <= 0) {
+    return { depth, detected: null, applied: false, skipped: null };
+  }
+  const detected = findStudioLift3dSymmetryAxis(mask);
+  if (detected === null) {
+    return { depth, detected: null, applied: false, skipped: null };
+  }
+  if (!detected.confident) {
+    return {
+      depth,
+      detected,
+      applied: false,
+      skipped: studioLift3dWarning(
+        "symmetry-skipped",
+        `좌우대칭이 뚜렷하지 않아(${Math.round(detected.score * 100)}%) 대칭 보정을 걸지 않았습니다`,
+      ),
+    };
+  }
+  return {
+    depth: {
+      ...depth,
+      heights: symmetrizeStudioLift3dHeights(
+        depth.heights,
+        mask,
+        detected.axisX,
+        options.strength,
+      ),
+    },
+    detected,
+    applied: true,
+    skipped: null,
+  };
+}
+
 /**
  * 원화 한 장을 3D 지오메트리로 들어올린다.
  *
@@ -195,8 +294,35 @@ export function liftStudioImageTo3d(
   if (!(request.subject in STUDIO_LIFT3D_PRESETS)) {
     return studioLift3dFailure("invalid-option", "알 수 없는 피사체 종류입니다");
   }
+  // 아래 clampStudioLift3dUnit 이 비유한 값을 0 으로 떨구므로, 걸러내지 않으면 "보정을 걸었다"고
+  // 보고하면서 실제로는 아무것도 하지 않는 상태가 된다.
+  if (request.symmetryStrength !== undefined
+    && (!Number.isFinite(request.symmetryStrength)
+      || request.symmetryStrength < 0
+      || request.symmetryStrength > 1)) {
+    return studioLift3dFailure(
+      "invalid-option",
+      "symmetryStrength 는 0..1 사이의 유한한 값이어야 합니다",
+    );
+  }
+  // NaN 은 프리셋 위상으로 조용히 흘러가고, Infinity 는 parallax 를 고른 뒤 밴드 하나로 조여져
+  // "카드 한 장짜리 시차 레이어" 라는 앞뒤 안 맞는 결과가 된다. 모드를 고르기 전에 막는다.
+  if (request.layerBands !== undefined
+    && (!Number.isFinite(request.layerBands) || request.layerBands < 1)) {
+    return studioLift3dFailure("invalid-option", "layerBands 는 1 이상의 유한한 값이어야 합니다");
+  }
 
-  const { preset, resolution, warnings } = resolveRequest(request);
+  // 밴드 수는 **위상·해상도를 고르기 전에 한 번** 조인다. 원값을 그대로 쓰면 24 를 넘는 요청이
+  // 해상도 상한만 쓸데없이 깎고, 지오메트리는 뒤늦게 24 로 조여 둘이 어긋난다.
+  const requestedBands = Math.round(request.layerBands ?? 1);
+  const layerBands = clampStudioLift3dBandCount(requestedBands);
+  const { preset, resolution, warnings } = resolveRequest(request, layerBands);
+  if (layerBands !== requestedBands) {
+    warnings.push(studioLift3dWarning(
+      "layer-bands-clamped",
+      `시차 레이어를 1~${STUDIO_LIFT3D_MAX_DEPTH_BANDS} 범위의 ${layerBands}층으로 조정했습니다`,
+    ));
+  }
   const grid = resampleStudioLift3dImage(validated.value, resolution);
   const mask = extractStudioLift3dMask(grid, {
     mode: request.maskMode ?? preset.maskMode,
@@ -233,11 +359,22 @@ export function liftStudioImageTo3d(
     ));
   }
 
-  const built = buildStudioLift3dGeometry(mask, depth, {
-    mode: preset.geometryMode,
+  const mode = layerBands >= 2 ? "parallax" : preset.geometryMode;
+  const symmetry = applySymmetry(mask, depth, {
+    strength: request.symmetryStrength ?? preset.symmetryStrength,
+    // 대칭 보정은 앞뒤를 부풀리는 위상에서만 뜻이 있다. 부조·시차 카드의 높이는 명암이
+    // 정하므로 좌우로 평균 내면 원화에 없는 형태가 생긴다.
+    enabled: mode === "inflate",
+  });
+  if (symmetry.skipped !== null) warnings.push(symmetry.skipped);
+
+  const built = buildStudioLift3dGeometry(mask, symmetry.depth, {
+    mode,
     depthScale: request.depthScale ?? preset.depthScale,
     baseScale: preset.baseScale,
     targetHeight: request.targetHeight ?? preset.targetHeight,
+    frontRatio: request.frontRatio ?? preset.frontRatio,
+    layerBands,
   });
   if (!built.ok) return built;
   warnings.push(...built.warnings);
@@ -257,7 +394,9 @@ export function liftStudioImageTo3d(
       revision: STUDIO_LIFT3D_REVISION,
       subject: request.subject,
       mask,
-      depth,
+      // 메시를 만든 것과 **같은** 깊이장을 돌려준다. 대칭 보정을 걸어 놓고 원본을 돌려주면
+      // 깊이 미리보기와 실제 형상이 어긋난다.
+      depth: symmetry.depth,
       geometry,
       metrics: {
         gridWidth: grid.width,
@@ -268,6 +407,9 @@ export function liftStudioImageTo3d(
         triangleCount: countStudioLift3dTriangles(geometry),
         boundaryEdgeCount: stats.boundaryEdgeCount,
         topologyErrorCount: topologyErrors,
+        layerCount: geometry.layerCount,
+        symmetryScore: symmetry.detected?.score ?? null,
+        symmetryApplied: symmetry.applied,
         // 열린 변이 없다고 곧바로 solid 인 것은 아니다. 비다양체 변이 남아 있으면 경계는
         // 닫혀 있어도 유효한 solid 가 아니므로, 두 조건을 모두 만족할 때만 닫혔다고 말한다.
         closed: stats.boundaryEdgeCount === 0 && topologyErrors === 0,
