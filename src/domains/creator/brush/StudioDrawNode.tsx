@@ -426,20 +426,27 @@ export const StudioDrawNode = memo(function StudioDrawNode({
     ? [el.points]
     : getSymmetricPoints(el.points, el.symmetry);
   // 활성 초안의 대칭 카피는 매 프레임 고정 인덱스 순서로 전부 그려지므로, 획 키 캐시가 보는
-  // 작업 집합은 1이 아니라 카피 수다. LRU 가 그보다 작으면 각 카피가 바로 다음 사용 직전에
-  // 밀려나 적중률이 정확히 0이 되고, 그 위에 플래너 생성과 매번 실패하는 검증 패스까지 얹혀
-  // 캐시가 없느니만 못해진다. 부채꼴이 한도를 넘으면 배치 플래너로 보내 캐시 도입 이전 비용으로
-  // 떨어지게 한다.
+  // 작업 집합은 1이 아니라 카피 수다. 보관 한도보다 부채꼴이 넓으면 배치 플래너로 보내, 캐시가
+  // 매 프레임 전멸하며 도입 이전보다 느려지는 일이 없게 한다.
   const oilDraftPlannersRetained = activeDraft
     && symmetricVariations.length <= STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
-  // 초안이 끝나면 이 요소는 activeDraft=false 로 다시 그려진다 — 그 시점이 보관 베드를 놓는
-  // 지점이다. 캡 포화 오일 획은 카피당 ~27k 런 객체를 들고 있어서, 다음 초안이 시작될 때까지
-  // 붙들고 있으면 그리기가 끝난 뒤에도 수십만 객체가 살아 있게 된다. 두 해제 모두 다른 초안이
-  // 이미 자리를 차지했으면 no-op 이라 순서에 안전하다.
+  // 보관 베드를 놓는 지점은 둘이다. 캡 포화 오일 획은 카피당 ~27k 런 객체를 들고 있어서, 그리기가
+  // 끝난 뒤에도 붙들고 있으면 수십만 객체가 살아 있게 된다.
+  //
+  //  1. 초안이 끝나면 이 요소가 activeDraft=false 로 다시 그려진다 — 가장 흔한 종료 경로다.
+  //  2. 그 렌더가 아예 오지 않는 종료 경로(제스처 취소, 미리보기 레이어 제거, 캔버스 언마운트)는
+  //     아래 정리가 유일한 해제 지점이다. 의존성이 el.id 뿐이라 activeDraft 가 켜질 때는 돌지
+  //     않으므로, 방금 렌더가 채운 슬롯을 지우지 않는다.
+  //
+  // 두 해제 모두 다른 초안이 이미 자리를 차지했으면 no-op 이라 순서에 안전하다.
   if (!activeDraft) {
     releaseStudioOilRibbonDraftPlanners(el.id);
     releaseOilBrushDabDraftPlanners(el.id);
   }
+  useEffect(() => () => {
+    releaseStudioOilRibbonDraftPlanners(el.id);
+    releaseOilBrushDabDraftPlanners(el.id);
+  }, [el.id]);
   const dynamicBrushPlanResult = dynamicBrushId
     ? planStudioDynamicBrushRender(el, dynamicBrushId, activeDraft, paperSurface)
     : null;
