@@ -17,9 +17,15 @@ import {
   type StudioVrmExportExpressionPreset,
   type StudioVrmExportFirstPersonAnnotation,
   type StudioVrmExportHumanoidBones,
+  type StudioVrmExportSpringBoneConfig,
 } from "./studio-vrm-export-vrm-extension";
+import {
+  studioVrmHairRigInverseBindMatrices,
+  type StudioVrmHairRig,
+} from "./studio-vrm-hair-rig";
 import { buildStudioVrmHumanoidMesh } from "./studio-vrm-humanoid-mesh";
 import {
+  STUDIO_VRM_RIG_NEUTRAL_HEIGHT,
   STUDIO_VRM_RIG_PARENTS,
   studioVrmRigInverseBindMatrices,
   type StudioVrmRig,
@@ -159,8 +165,16 @@ function humanoidBones(): StudioVrmExportHumanoidBones {
   ) as StudioVrmExportHumanoidBones;
 }
 
-/** 리그의 부모 체인을 glTF 노드 트리로 편다. */
-function buildBoneNodes(rig: StudioVrmRig): StudioVrmExportNode[] {
+/**
+ * 리그의 부모 체인을 glTF 노드 트리로 편다.
+ *
+ * `hairChainRoots` 는 각 헤어 체인의 첫 조인트 노드 인덱스다. 전부 `head` 의 자식으로 달아야
+ * 머리를 돌릴 때 체인 루트가 따라오고, 그 아래 마디들이 스프링으로 뒤따른다.
+ */
+function buildBoneNodes(
+  rig: StudioVrmRig,
+  hairChainRoots: readonly number[] = [],
+): StudioVrmExportNode[] {
   const childrenOf = new Map<string, number[]>();
   STUDIO_VRM_EXPORT_REQUIRED_BONES.forEach((bone, index) => {
     const parent = STUDIO_VRM_RIG_PARENTS[bone];
@@ -169,6 +183,9 @@ function buildBoneNodes(rig: StudioVrmRig): StudioVrmExportNode[] {
     siblings.push(index + FIRST_BONE_NODE);
     childrenOf.set(parent, siblings);
   });
+  if (hairChainRoots.length > 0) {
+    childrenOf.set("head", [...(childrenOf.get("head") ?? []), ...hairChainRoots]);
+  }
 
   return STUDIO_VRM_EXPORT_REQUIRED_BONES.map((bone) => {
     const children = childrenOf.get(bone);
@@ -180,6 +197,53 @@ function buildBoneNodes(rig: StudioVrmRig): StudioVrmExportNode[] {
       ...(children && children.length > 0 ? { children } : {}),
     } satisfies StudioVrmExportNode;
   });
+}
+
+/**
+ * 헤어 체인을 `VRMC_springBone` 으로 낸다.
+ *
+ * 콜라이더는 **몸통 캡슐 하나**다. 이게 없으면 긴 머리가 흔들릴 때마다 등을 그대로 통과한다.
+ * 반지름은 가슴 단면의 앞뒤 반경(`0.076 · 신장단위`)에 맞춘다 — 뒷머리가 실제 등 표면에
+ * 얹히는 값이다. 좌우로는 몸통이 더 넓으므로 어깨 옆에서는 살짝 파고들 수 있지만, 머리카락은
+ * 대부분 뒤로 흐르므로 앞뒤를 기준으로 잡는 쪽이 눈에 덜 띈다.
+ *
+ * 캡슐이 붙는 노드는 `spine` 이고 오프셋·꼬리는 그 로컬 좌표다(rest 에서 회전이 없으므로
+ * 월드 차이가 곧 로컬 차이다).
+ */
+function buildHairSpringBone(
+  hairRig: StudioVrmHairRig,
+  rig: StudioVrmRig,
+  firstHairNode: number,
+): StudioVrmExportSpringBoneConfig {
+  const spine = rig.worldRest.spine;
+  const unit = rig.heightScale * STUDIO_VRM_RIG_NEUTRAL_HEIGHT;
+  const spineNode = STUDIO_VRM_EXPORT_REQUIRED_BONES.indexOf("spine") + FIRST_BONE_NODE;
+  const bottomY = rig.worldRest.hips[1] - 0.02 * rig.heightScale;
+  const topY = rig.worldRest.leftUpperArm[1] - 0.02 * rig.heightScale;
+
+  return {
+    colliders: [
+      {
+        node: spineNode,
+        shape: "capsule",
+        offset: [0, bottomY - spine[1], 0],
+        radius: 0.076 * unit,
+        tail: [0, topY - spine[1], 0],
+      },
+    ],
+    colliderGroups: [{ name: "Torso", colliders: [0] }],
+    springs: hairRig.chains.map((chain) => ({
+      name: `Hair_${chain.partId}`,
+      colliderGroups: [0],
+      joints: chain.joints.map((joint, index) => ({
+        node: firstHairNode + chain.jointOffset + index,
+        hitRadius: joint.hitRadius,
+        stiffness: chain.stiffness,
+        gravityPower: chain.gravityPower,
+        dragForce: chain.dragForce,
+      })),
+    })),
+  };
 }
 
 /**
@@ -202,6 +266,26 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
     skin: 0,
   }));
 
+  // 헤어 조인트는 메시 노드 **뒤에** 붙인다 — 앞에 끼우면 본·메시 노드 인덱스가 전부 밀려
+  // 표정 바인딩·1인칭 주석이 함께 흔들린다.
+  const firstHairNode = FIRST_MESH_NODE + humanoid.parts.length;
+  const hairRig = humanoid.hairRig;
+  const hairNodes: StudioVrmExportNode[] = (hairRig?.joints ?? []).map((joint, index) => {
+    // 체인 안에서 다음 조인트가 자식이다. 체인의 마지막 마디만 자식이 없다.
+    const chain = hairRig?.chains.find(
+      (entry) => index >= entry.jointOffset && index < entry.jointOffset + entry.joints.length,
+    );
+    const isLast = chain !== undefined && index === chain.jointOffset + chain.joints.length - 1;
+    return {
+      name: joint.name,
+      translation: joint.localTranslation,
+      ...(isLast ? {} : { children: [firstHairNode + index + 1] }),
+    } satisfies StudioVrmExportNode;
+  });
+  const hairChainRoots = (hairRig?.chains ?? []).map(
+    (chain) => firstHairNode + chain.jointOffset,
+  );
+
   const nodes: StudioVrmExportNode[] = [
     {
       name: "Armature",
@@ -210,8 +294,9 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
         ...humanoid.parts.map((_part, index) => meshNodeIndex(index)),
       ],
     },
-    ...buildBoneNodes(rig),
+    ...buildBoneNodes(rig, hairChainRoots),
     ...meshNodes,
+    ...hairNodes,
   ];
 
   const meshes: StudioVrmExportMesh[] = humanoid.parts.map((part) => ({
@@ -251,14 +336,21 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
     meshes,
     skins: [
       {
-        joints: Array.from({ length: BONE_COUNT }, (_unused, index) => index + FIRST_BONE_NODE),
+        joints: [
+          ...Array.from({ length: BONE_COUNT }, (_unused, index) => index + FIRST_BONE_NODE),
+          ...(hairRig?.joints ?? []).map((_joint, index) => firstHairNode + index),
+        ],
         skeleton: FIRST_BONE_NODE,
-        inverseBindMatrices: studioVrmRigInverseBindMatrices(rig),
+        inverseBindMatrices: [
+          ...studioVrmRigInverseBindMatrices(rig),
+          ...(hairRig ? studioVrmHairRigInverseBindMatrices(hairRig) : []),
+        ],
       },
     ],
     materials: humanoid.materials,
     expressions: { preset },
     firstPerson,
+    ...(hairRig ? { springBone: buildHairSpringBone(hairRig, rig, firstHairNode) } : {}),
   };
 }
 

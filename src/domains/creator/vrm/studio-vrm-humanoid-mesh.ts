@@ -26,6 +26,12 @@ import {
 } from "./studio-vrm-avatar-forge";
 import { hexToRgb, hslToRgb, rgbToHsl } from "./studio-vrm-costume";
 import {
+  buildStudioVrmHairRig,
+  studioVrmHairStrandSpine,
+  type StudioVrmHairChain,
+  type StudioVrmHairRig,
+} from "./studio-vrm-hair-rig";
+import {
   addLoft,
   applyTrs,
   eulerXyzMatrix,
@@ -1248,14 +1254,10 @@ function addHairStrand(
   builder: SurfaceBuilder,
   part: AvatarForgeHairPart,
   transform: HairTransform,
-  skin: MeshSkinBinding,
+  skin: (t: number) => MeshSkinBinding,
   uvRect: MeshUvRect,
 ): void {
   const [u0, v0, u1, v1] = uvRect;
-  const waveAmount = part.wave ?? 0;
-  const waveFrequency = part.waveFrequency ?? 2.4;
-  const aspectX = meshClamp(part.scale[1] / Math.max(1e-4, Math.abs(part.scale[0])), 1, 10);
-  const aspectZ = meshClamp(part.scale[1] / Math.max(1e-4, Math.abs(part.scale[2])), 1, 10);
 
   const place = (unit: MeshVec3): MeshVec3 =>
     applyTrs(unit, transform.translation, transform.rotation, transform.scale);
@@ -1263,18 +1265,10 @@ function addHairStrand(
   const grid: number[][] = [];
   for (let row = 0; row <= HAIR_STRAND_LENGTH; row += 1) {
     const t = row / HAIR_STRAND_LENGTH;
-    const y = 1 - t * 2;
+    // 중심선은 헤어 리그와 **같은 식**을 쓴다 — 어긋나면 흔들릴 때 가닥이 축을 중심으로 비틀린다.
+    const [curveX, y, curveZ] = studioVrmHairStrandSpine(part, t);
     const radius = Math.max(0.08, 1 - part.taper * t ** 0.72);
-    const spineCurveX = Math.sin(t * Math.PI * 2.15) * part.curl * 0.58 * t;
-    const spineCurveZ = Math.sin(t * Math.PI) * part.curl * 0.34;
-    const curveX =
-      waveAmount > 0
-        ? spineCurveX + Math.sin(t * Math.PI * waveFrequency) * waveAmount * 0.17 * aspectX * t
-        : spineCurveX;
-    const curveZ =
-      waveAmount > 0
-        ? spineCurveZ + Math.cos(t * Math.PI * waveFrequency) * waveAmount * 0.07 * aspectZ * t
-        : spineCurveZ;
+    const rowSkin = skin(t);
 
     const line: number[] = [];
     for (let column = 0; column <= HAIR_STRAND_RADIAL; column += 1) {
@@ -1283,7 +1277,7 @@ function addHairStrand(
         builder.vertex(
           place([curveX + Math.cos(angle) * radius, y, curveZ + Math.sin(angle) * radius]),
           [meshLerp(u0, u1, column / HAIR_STRAND_RADIAL), meshLerp(v0, v1, 1 - t)],
-          skin,
+          rowSkin,
         ),
       );
     }
@@ -1301,8 +1295,8 @@ function addHairStrand(
     }
   }
 
-  const top = builder.vertex(place([0, 1, 0]), [meshLerp(u0, u1, 0.5), v1], skin);
-  const bottom = builder.vertex(place([0, -1, 0]), [meshLerp(u0, u1, 0.5), v0], skin);
+  const top = builder.vertex(place([0, 1, 0]), [meshLerp(u0, u1, 0.5), v1], skin(0));
+  const bottom = builder.vertex(place([0, -1, 0]), [meshLerp(u0, u1, 0.5), v0], skin(1));
   for (let column = 0; column < HAIR_STRAND_RADIAL; column += 1) {
     builder.triangle(top, grid[0][column], grid[0][column + 1]);
     const last = HAIR_STRAND_LENGTH;
@@ -1421,23 +1415,59 @@ function pushOutsideSkull(
   return [head.center[0] + dx * gain, translation[1], head.center[2] + dz * gain];
 }
 
-function buildHair(rig: StudioVrmRig, state: AvatarForgeState): SurfaceBuilder | null {
+/**
+ * 가닥 정점을 체인 조인트에 배분한다. `t` 0(뿌리) → 1(끝).
+ *
+ * 이웃한 두 마디에만 실어 선형 보간한다 — 뿌리 링은 체인의 첫 조인트에 100% 실리는데,
+ * 그 조인트는 흔들리지 않는 루트라 두피에 붙은 것과 같아진다.
+ */
+function hairStrandSkin(chain: StudioVrmHairChain, jointBase: number, t: number): MeshSkinBinding {
+  const span = chain.joints.length - 1;
+  const position = meshClamp(t, 0, 1) * span;
+  const lower = Math.min(span - 1, Math.floor(position));
+  const blend = position - lower;
+  const first = jointBase + chain.jointOffset + lower;
+  if (blend <= 0) return [[first, 1]];
+  return [
+    [first, 1 - blend],
+    [first + 1, blend],
+  ];
+}
+
+function buildHair(
+  rig: StudioVrmRig,
+  state: AvatarForgeState,
+): { readonly builder: SurfaceBuilder; readonly hairRig: StudioVrmHairRig | null } | null {
   const parts = buildAvatarForgeHairParts(state);
   if (parts.length === 0) return null;
 
   const builder = new SurfaceBuilder();
   const skin = only(rig, "head");
+
+  // 가닥마다 두개골 적합까지 끝난 변환을 먼저 확정한다 — 체인 조인트가 그 변환 위에 놓인다.
+  const transforms = parts.map((part) =>
+    fitHairPartToSkull(part, hairPartTransform(part, rig.head), rig.head, state.hair.fringe),
+  );
+  const strands = parts
+    .map((part, index) => ({ part, transform: transforms[index] }))
+    .filter((entry) => entry.part.primitive === "tapered-capsule");
+  const hairRig = buildStudioVrmHairRig(strands, rig.worldRest.head);
+  const chainByPartId = new Map(hairRig?.chains.map((chain) => [chain.partId, chain]) ?? []);
+  const jointBase = rig.bones.length;
+
   parts.forEach((part, index) => {
     // 파츠마다 세로 띠 하나씩 — 같은 머티리얼을 쓰므로 UV 가 겹치면 안 된다.
     const uvRect: MeshUvRect = [0, index / parts.length, 1, (index + 1) / parts.length];
-    const transform = fitHairPartToSkull(
-      part,
-      hairPartTransform(part, rig.head),
-      rig.head,
-      state.hair.fringe,
-    );
+    const transform = transforms[index];
     if (part.primitive === "tapered-capsule") {
-      addHairStrand(builder, part, transform, skin, uvRect);
+      const chain = chainByPartId.get(part.id);
+      addHairStrand(
+        builder,
+        part,
+        transform,
+        chain ? (t) => hairStrandSkin(chain, jointBase, t) : () => skin,
+        uvRect,
+      );
       return;
     }
     if (part.role === "cap") {
@@ -1457,7 +1487,7 @@ function buildHair(rig: StudioVrmRig, state: AvatarForgeState): SurfaceBuilder |
       thetaBack: Math.PI,
     });
   });
-  return builder;
+  return { builder, hairRig };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1584,6 +1614,11 @@ export type StudioVrmHumanoidMesh = {
   /** `parts` 안에서 표정 모프를 들고 있는 파트의 인덱스. */
   readonly facePartIndex: number;
   readonly morphTargetNames: readonly string[];
+  /**
+   * 헤어 가닥이 매달린 체인 조인트. 가닥이 없으면(짧은 머리·헤어 없음) `null`.
+   * 스킨 `joints` 는 휴머노이드 15본 **뒤에** 이 순서대로 이어 붙는다.
+   */
+  readonly hairRig: StudioVrmHairRig | null;
 };
 
 function primitiveOf(
@@ -1655,7 +1690,7 @@ export function buildStudioVrmHumanoidMesh(state: AvatarForgeState): StudioVrmHu
     parts.push({
       nodeName: "Hair",
       meshName: "Hair",
-      primitives: [primitiveOf(hair, STUDIO_VRM_HUMANOID_MATERIALS.hair)],
+      primitives: [primitiveOf(hair.builder, STUDIO_VRM_HUMANOID_MATERIALS.hair)],
     });
   }
 
@@ -1684,5 +1719,6 @@ export function buildStudioVrmHumanoidMesh(state: AvatarForgeState): StudioVrmHu
     parts,
     facePartIndex,
     morphTargetNames: STUDIO_VRM_HUMANOID_MORPH_TARGET_NAMES,
+    hairRig: hair?.hairRig ?? null,
   };
 }
