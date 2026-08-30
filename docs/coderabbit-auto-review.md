@@ -32,6 +32,20 @@ Plan: Pro Plus
 설정 파일은 공식 JSON 스키마(`https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json`,
 draft 2020-12)로 검증했다.
 
+### 적용 확인 (PR #69, draft 상태에서 실측)
+
+CodeRabbit 은 `.coderabbit.yaml` 을 **PR 헤드 브랜치에서 읽는다.** 따라서 이 설정이
+main 에 머지되기 전에도 효과가 검증된다. 설정을 담은 PR #69(역시 draft)에서 봇이
+남긴 실행 설정을 #65 와 비교하면:
+
+| | PR #65 (설정 없음) | PR #69 (이 설정) |
+| --- | --- | --- |
+| `Configuration used` | `defaults` | **`Path: .coderabbit.yaml`** |
+| draft 관련 메시지 | "Draft PRs are not automatically reviewed by default." | **사라짐** |
+| 남은 차단 사유 | (star 게이트는 ready 전환 후에야 등장) | star 게이트만 |
+
+즉 설정 파일이 실제로 로드되고 있고, **draft 차단은 제거됐다.** 남은 것은 아래 2번뿐이다.
+
 ## 2번은 이 레포에서 해결할 수 없다
 
 "fewer than 10 stars" 는 `.coderabbit.yaml` 의 어떤 키로도 바꿀 수 없다. 스키마에
