@@ -18,6 +18,7 @@ const REMOTE_TEST_URL =
   "postgresql://ci:remote-secret@db.example.test/toonspectrum_integration?sslmode=verify-full&channel_binding=require";
 const REMOTE_PRODUCTION_URL =
   "postgresql://app:production-secret@db.example.com/toonspectrum?sslmode=verify-full";
+const RUNTIME_ROLE = "webdex_runtime";
 
 describe("PostgreSQL integration test runner", () => {
   it("requires a dedicated TEST_DATABASE_URL instead of inheriting DATABASE_URL", () => {
@@ -93,13 +94,21 @@ describe("PostgreSQL integration test runner", () => {
   it("accepts one explicit CLI or environment test URL and rejects ambiguity", () => {
     expect(
       resolvePostgresIntegrationTarget({
-        arguments_: ["--database-url", LOCAL_URL],
+        arguments_: [
+          "--database-url",
+          LOCAL_URL,
+          "--runtime-database-role",
+          RUNTIME_ROLE,
+        ],
         environment: {},
       }).loopback,
     ).toBe(true);
     expect(
       resolvePostgresIntegrationTarget({
-        environment: { TEST_DATABASE_URL: LOCAL_URL },
+        environment: {
+          TEST_DATABASE_URL: LOCAL_URL,
+          TEST_RUNTIME_DATABASE_ROLE: RUNTIME_ROLE,
+        },
       }).databaseName,
     ).toBe("webdex");
     expect(() =>
@@ -107,9 +116,42 @@ describe("PostgreSQL integration test runner", () => {
         arguments_: ["--database-url", LOCAL_URL],
         environment: {
           TEST_DATABASE_URL: LOCAL_URL.replace("webdex", "other"),
+          TEST_RUNTIME_DATABASE_ROLE: RUNTIME_ROLE,
         },
       }),
     ).toThrow(/Conflicting/u);
+  });
+
+  it("requires one validated runtime role for the owner-backed test target", () => {
+    expect(() =>
+      resolvePostgresIntegrationTarget({
+        environment: { TEST_DATABASE_URL: LOCAL_URL },
+      }),
+    ).toThrow(/lowercase PostgreSQL role name/u);
+    expect(() =>
+      resolvePostgresIntegrationTarget({
+        arguments_: [
+          "--database-url",
+          LOCAL_URL,
+          "--runtime-database-role",
+          "Webdex_Runtime",
+        ],
+        environment: {},
+      }),
+    ).toThrow(/lowercase PostgreSQL role name/u);
+    expect(() =>
+      resolvePostgresIntegrationTarget({
+        arguments_: [
+          "--database-url",
+          LOCAL_URL,
+          "--runtime-database-role",
+          RUNTIME_ROLE,
+        ],
+        environment: {
+          TEST_RUNTIME_DATABASE_ROLE: "other_runtime",
+        },
+      }),
+    ).toThrow(/Conflicting runtime database roles/u);
   });
 
   it("blocks remote and production targets unless every test-only guard passes", () => {
@@ -163,12 +205,17 @@ describe("PostgreSQL integration test runner", () => {
   });
 
   it("injects only the selected test target over inherited database variables", () => {
-    const childEnvironment = createPostgresIntegrationEnvironment(LOCAL_URL, {
-      DATABASE_URL: REMOTE_PRODUCTION_URL,
-      NODE_ENV: "development",
-      STUDIO_LIVE_POSTGRES_INTEGRATION_URL: REMOTE_PRODUCTION_URL,
-      STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL: REMOTE_PRODUCTION_URL,
-    });
+    const childEnvironment = createPostgresIntegrationEnvironment(
+      LOCAL_URL,
+      {
+        DATABASE_URL: REMOTE_PRODUCTION_URL,
+        NODE_ENV: "development",
+        STUDIO_LIVE_POSTGRES_INTEGRATION_URL: REMOTE_PRODUCTION_URL,
+        STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: "unsafe_inherited_role",
+        STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL: REMOTE_PRODUCTION_URL,
+      },
+      { runtimeDatabaseRole: RUNTIME_ROLE },
+    );
 
     expect(childEnvironment.NODE_ENV).toBe("test");
     expect(childEnvironment.DATABASE_URL).toBe(LOCAL_URL);
@@ -177,12 +224,16 @@ describe("PostgreSQL integration test runner", () => {
     expect(childEnvironment.STUDIO_LIVE_POSTGRES_INTEGRATION_URL).toBe(
       LOCAL_URL,
     );
+    expect(childEnvironment.STUDIO_LIVE_POSTGRES_RUNTIME_ROLE).toBe(
+      RUNTIME_ROLE,
+    );
     expect(childEnvironment.STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL).toBe(
       LOCAL_URL,
     );
 
     expect(
       createPostgresIntegrationEnvironment(REMOTE_TEST_URL, {}, {
+        runtimeDatabaseRole: RUNTIME_ROLE,
         validatedRemoteDatabase: true,
       })[VITEST_VALIDATED_REMOTE_DATABASE_MARKER],
     ).toBe("true");
@@ -218,6 +269,7 @@ describe("PostgreSQL integration test runner", () => {
       allowRemoteTestDatabase: false,
       databaseUrl: undefined,
       help: true,
+      runtimeDatabaseRole: undefined,
     });
     expect(() =>
       parsePostgresIntegrationArguments([
@@ -225,6 +277,13 @@ describe("PostgreSQL integration test runner", () => {
         LOCAL_URL,
         "--database-url",
         LOCAL_URL,
+      ]),
+    ).toThrow(/exactly once/u);
+    expect(() =>
+      parsePostgresIntegrationArguments([
+        "--runtime-database-role",
+        RUNTIME_ROLE,
+        `--runtime-database-role=${RUNTIME_ROLE}`,
       ]),
     ).toThrow(/exactly once/u);
     expect(() =>
