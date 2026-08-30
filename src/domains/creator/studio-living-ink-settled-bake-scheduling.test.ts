@@ -4,8 +4,13 @@ import {
   augmentStudioLivingInkSettledBakeDabs,
   requestStudioLivingInkSettledBakeDabs,
   resetStudioLivingInkSettledBakeCacheForTests,
-  STUDIO_LIVING_INK_SETTLED_BAKE_PROGRAMS,
 } from "./studio-living-ink-settled-bake-v1";
+import {
+  captureScheduledSlices,
+  makePlan,
+  PLANNER_DAB_CAP,
+  SETTLED_SUMI,
+} from "./studio-living-ink-settled-bake.fixture";
 
 import type { WatercolorBrushDab } from "./brush/studio-watercolor-brush";
 
@@ -97,61 +102,7 @@ function settledBakeLoweringSliceRatio(sliceDurations: readonly number[]): numbe
 
 
 /** The causal watercolor planner caps plans at DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS. */
-const PLANNER_DAB_CAP = 8_192;
-
-const SETTLED_SUMI = {
-  ...STUDIO_LIVING_INK_SETTLED_BAKE_PROGRAMS["sumi-flow-bake"],
-  seed: 4242,
-  phase: "settled",
-} as const;
-
-function makePlan(stations: number): WatercolorBrushDab[] {
-  const dabs: WatercolorBrushDab[] = [];
-  for (let index = 0; index < stations; index += 1) {
-    const t = index / Math.max(1, stations - 1);
-    const x = 40 + t * 900 + Math.sin(t * 19) * 30;
-    const y = 300 + Math.sin(t * 6.2) * 140;
-    const radius = 6 + Math.sin(t * 12) * 2.5;
-    dabs.push({ x, y, radius, opacity: 0.42, role: "core" });
-    dabs.push({
-      x: x + 1.5,
-      y: y - 1,
-      radius: radius * 1.7,
-      opacity: 0.18,
-      role: "diffuse",
-    });
-  }
-  return dabs;
-}
-
-type TimeoutLike = typeof globalThis.setTimeout;
-
 /** Captures the module's macrotask slices so the test can run and time each one. */
-function captureScheduledSlices(): {
-  runNextSlice: () => number | null;
-  restore: () => void;
-} {
-  const queue: Array<() => void> = [];
-  const original = globalThis.setTimeout;
-  const capture = ((handler: () => void) => {
-    queue.push(handler);
-    return 0 as unknown as ReturnType<TimeoutLike>;
-  }) as unknown as TimeoutLike;
-  globalThis.setTimeout = capture;
-  return {
-    runNextSlice: () => {
-      const slice = queue.shift();
-      if (!slice) return null;
-      const startedAt = performance.now();
-      slice();
-      return performance.now() - startedAt;
-    },
-    restore: () => {
-      globalThis.setTimeout = original;
-    },
-  };
-}
-
 beforeEach(() => {
   resetStudioLivingInkSettledBakeCacheForTests();
 });
@@ -443,7 +394,14 @@ describe("time-sliced settled bake at the planner cap", () => {
 
     // 2. Cold render-path request: must NOT solve synchronously.
     //
-    // Timed as a MINIMUM over several cold requests, in its own scheduler capture so the slices
+    // STEADY-STATE enqueue cost, and deliberately not the cold one. Resetting the cache clears the
+    // memo and the scheduler latch but not module-level or JIT initialisation, so only the first
+    // request in a PROCESS pays that — measured at 4.9-5.2ms against the 0.68-0.69ms this
+    // minimum reports. That one-time cost is graded in
+    // `studio-living-ink-settled-bake-cold-start.test.ts`, which vitest gives its own module
+    // process; here the minimum is the honest reducer for the repeated cost every render pays.
+    //
+    // Timed as a MINIMUM over several cold-CACHE requests, in its own scheduler capture so the slices
     // they enqueue are discarded rather than joining the measured run below. One reading of a
     // ~0.7ms window divided by one reading of a ~140ms solve does not cancel a machine — the two
     // are seconds apart and two orders of magnitude apart in length, so a pause landing on the
