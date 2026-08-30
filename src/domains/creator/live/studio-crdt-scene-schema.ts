@@ -121,7 +121,7 @@ export const STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE: Record<
     "strokeWidth", "letterSpacing", "lineHeight", "vertical", "align", "fontStyle",
     "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY", "shadowOpacity",
     "fillType", "gradientColorStart", "gradientColorEnd", "gradientDirection", "gradient",
-    "textPath", "skewX", "skewY",
+    "textPath", "skewX", "skewY", "stickyNotePresetId", "stickyNoteFill",
     // 의도적 변경(2026-08-08): 루비(후리가나) 구간은 대사 요소(text·bubble)의 렌더·내보내기가
     // 이미 읽는 저작 상태다. 값 검증은 parseStudioCrdtRubySpans가 담당한다.
     "rubySpans",
@@ -474,8 +474,13 @@ export function validateStudioCrdtSceneElementPayload(
   if ("text" in props && !boundedString(props.text)) {
     throw new Error("장면 요소의 텍스트가 올바르지 않습니다.");
   }
+  if ("stickyNotePresetId" in props && !exactIdentifier(props.stickyNotePresetId)) {
+    throw new Error("장면 요소의 스티키 노트 프리셋 ID가 올바르지 않습니다.");
+  }
   if ("rubySpans" in props) props.rubySpans = parseStudioCrdtRubySpans(props.rubySpans);
-  for (const key of ["fill", "textFill", "stroke", "variant", "direction"] as const) {
+  for (const key of [
+    "fill", "textFill", "stroke", "variant", "direction", "stickyNoteFill",
+  ] as const) {
     if (key in props && !boundedString(props[key], 512)) {
       throw new Error(`장면 요소의 ${key} 값이 올바르지 않습니다.`);
     }

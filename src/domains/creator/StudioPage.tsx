@@ -5940,7 +5940,7 @@ function StudioCuttoonEditor({
       text: "아이디어",
     });
     // Sticky notes ride the TextEl pipeline; stickyNoteFill is presentation metadata for hosts.
-    addEl(note as import("./studio-element-model").El);
+    addEl(note);
   }
   /** Photoshop/CSP foreground-background pair — X swaps. */
   const [secondaryColor, setSecondaryColor] = useState("#ffffff");

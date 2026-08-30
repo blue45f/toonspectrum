@@ -421,6 +421,61 @@ function validateScene(type: "bubble" | "text", props: StudioCrdtJsonObject) {
   });
 }
 
+describe("studio CRDT sticky-note metadata", () => {
+  it("syncs current and forward-compatible sticky-note metadata on text elements", () => {
+    const current = validateScene("text", textProps({
+      stickyNotePresetId: "mint",
+      stickyNoteFill: "#bbf7d0",
+    }));
+    expect(current.props).toMatchObject({
+      stickyNotePresetId: "mint",
+      stickyNoteFill: "#bbf7d0",
+    });
+
+    // Preset identifiers are bounded rather than frozen to today's palette so an older peer can
+    // preserve a future preset instead of rejecting the entire shared scene.
+    expect(() => validateScene("text", textProps({
+      stickyNotePresetId: "future-coral",
+    }))).not.toThrow();
+    expect(() => validateScene("text", textProps({
+      stickyNoteFill: "color(display-p3 1 0.45 0.4)",
+    }))).not.toThrow();
+  });
+
+  it("rejects malformed sticky-note metadata and keeps it text-only", () => {
+    const invalidPresetIds: StudioCrdtJsonValue[] = [
+      null,
+      false,
+      42,
+      "",
+      "bad\u0000preset",
+      "bad\npreset",
+      "x".repeat(161),
+    ];
+    for (const stickyNotePresetId of invalidPresetIds) {
+      expect(() => validateScene("text", textProps({ stickyNotePresetId })))
+        .toThrow(/스티키 노트 프리셋 ID/u);
+    }
+
+    const invalidFills: StudioCrdtJsonValue[] = [
+      null,
+      false,
+      42,
+      "bad\u0000fill",
+      "x".repeat(513),
+    ];
+    for (const stickyNoteFill of invalidFills) {
+      expect(() => validateScene("text", textProps({ stickyNoteFill })))
+        .toThrow(/stickyNoteFill 값/u);
+    }
+
+    expect(() => validateScene("bubble", bubbleProps({
+      stickyNotePresetId: "mint",
+      stickyNoteFill: "#bbf7d0",
+    }))).toThrow(/stickyNotePresetId 속성은 동기화할 수 없습니다/u);
+  });
+});
+
 describe("studio CRDT dialogue ruby spans", () => {
   it("syncs ruby spans on both dialogue element types with an identical canonical shape", () => {
     const rubySpans = [
