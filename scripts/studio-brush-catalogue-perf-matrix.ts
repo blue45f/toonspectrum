@@ -121,6 +121,48 @@ export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES = 5;
  * genuine lock-up still fails (worst single pass observed under heavy load: 611ms).
  */
 export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS = 2_000;
+/**
+ * Denominator stroke for the crayon-family SCALING verdict: the same call, the same material, a
+ * quarter of the input.
+ *
+ * This is a second property, not a second opinion on the CPU budget above. That budget answers
+ * "does this plan cost too much", and it is the right question -- but CPU time removes the
+ * scheduler, not the machine. The recorded populations say so: crayon's min-of-5 CPU cost is
+ * 58.5ms on an Apple-silicon dev machine against the runner's 191.5ms, a 3.3x spread that leaves
+ * the 210ms budget 9.7% of headroom and, by its own note, a sensitivity of 1.80x on the tightest
+ * row and only 7.4x-11.0x on the other four.
+ *
+ * A ratio answers a different question -- "does this plan still scale linearly" -- and answers it
+ * with no machine in the numerator or denominator, because both sides are the same planner on the
+ * same material moments apart. It convicts the superlinear class from ~1.8x on EVERY row rather
+ * than on one, and it cannot be moved by a slower runner at all.
+ */
+export const STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES = 500;
+/**
+ * Growth allowed in WALL cost from a quarter stroke to a full one.
+ *
+ * Wall, not CPU, and that was measured rather than assumed. CPU time is the right reducer for the
+ * absolute budget above, where it removes the scheduler outright -- but it is the WRONG one for a
+ * ratio of two different-sized windows, because it counts concurrent GC and the 2000-sample
+ * working set provokes disproportionately more of it than the 500-sample one. Under 8 spinning
+ * hogs on 12 cores the CPU ratio stretched crayon to x7.34 against this bound where the wall ratio
+ * held at x5.53: scheduler noise inflates two paired wall windows together, GC pressure does not.
+ *
+ * Taken from the input ratio rather than from any machine's clock, deliberately: a bound derived
+ * from first principles never needs re-recording on a new runner, which is the failure mode this
+ * whole family of gates keeps hitting. Linear in the sample count is x4 exactly and is the
+ * contract this path holds, so the bound is TWICE LINEAR -- honest superlinearity from cache
+ * behaviour is admitted, and the quadratic blowup the gate exists for (x16 at these lengths) is
+ * convicted with 2x to spare.
+ *
+ * Recorded across fourteen runs on Apple silicon, six idle and eight under 8 spinning hogs on 12
+ * cores: x3.70-x4.63 idle and x3.63-x5.64 loaded, leaving x1.42-x1.75 over the worst of it.
+ * Not tightened to the observed x4.6 because no runner reading exists yet -- the test prints every
+ * row's growth on every run, so that reading arrives without anything going red first. That is the
+ * discipline the per-move gate learned the hard way: pins taken from one machine reddened three
+ * separate lanes on CI before being reverted.
+ */
+export const STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH = 8;
 
 /**
  * Does this crayon-family row freeze? True only when the CHEAPEST pass is still over budget.
@@ -153,6 +195,19 @@ export function studioBrushCrayonFamilyCpuFreezes(
  * Pure, so all three rules can be pinned against recorded pass series instead of only through a
  * live measurement.
  */
+/**
+ * A crayon-family row, carrying the quarter-stroke reading its scaling verdict divides by.
+ * `cpuMs`/`elapsedMs` stay the full-stroke costs, so every existing reader is unchanged.
+ */
+export interface StudioBrushCrayonFamilyRow extends StudioBrushCataloguePerfRow {
+  /** Cheapest wall cost of the same plan at `STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES`. */
+  readonly shortElapsedMs: number;
+  /** Cheapest wall cost at the full length, which is what `growth` divides. */
+  readonly longElapsedMs: number;
+  /** Full-stroke wall cost over quarter-stroke wall cost. Linear in the input would be x4. */
+  readonly growth: number;
+}
+
 export function reduceStudioBrushCrayonFamilyPasses(
   passes: readonly StudioBrushCataloguePerfRow[],
   budgetMs: number = STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS,
@@ -242,7 +297,7 @@ export interface StudioBrushCataloguePerfMatrixReport {
   readonly ok: boolean;
   readonly freezeCount: number;
   readonly failureCount: number;
-  readonly crayonFamily: readonly StudioBrushCataloguePerfRow[];
+  readonly crayonFamily: readonly StudioBrushCrayonFamilyRow[];
   readonly rows: readonly StudioBrushCataloguePerfRow[];
   readonly missingCatalogIds: readonly string[];
   readonly determinism: StudioBrushCataloguePerfDeterminismSummary;
@@ -879,14 +934,38 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
   // that wins on CPU; `reduceStudioBrushCrayonFamilyPasses` carries the reasoning for both.
   const crayonFamily = STUDIO_BRUSH_CRAYON_FAMILY_IDS.map((catalogId) => {
     const passes: StudioBrushCataloguePerfRow[] = [];
+    let shortElapsedMs = Number.POSITIVE_INFINITY;
+    let longElapsedMs = Number.POSITIVE_INFINITY;
     for (let pass = 0; pass < STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES; pass += 1) {
-      passes.push(evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
+      // The quarter stroke is measured beside the full one on every pass, not in a loop of its
+      // own. Two separate loops are a ratio in name only: a contended stretch lands inside one of
+      // them and moves the verdict by itself, which is the defect #44 found in the per-move gate
+      // and which showed up here too -- separate loops put oil-pastel at x5.87 against this bound
+      // under load, where pairing the windows brought the same reading back to x4.87.
+      const short = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
+        sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES,
+        budgetMs: STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS,
+        packById,
+      });
+      shortElapsedMs = Math.min(shortElapsedMs, short.elapsedMs);
+      const long = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
         sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
         budgetMs: STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS,
         packById,
-      }));
+      });
+      longElapsedMs = Math.min(longElapsedMs, long.elapsedMs);
+      passes.push(long);
     }
-    return reduceStudioBrushCrayonFamilyPasses(passes);
+    // Minimum over passes on BOTH sides, for the reducer's own reason: interference is additive,
+    // so the cheapest pass is the honest one. Taken independently of the CPU reduction above,
+    // because the pass with the least concurrent GC need not be the pass with the least
+    // preemption.
+    return {
+      ...reduceStudioBrushCrayonFamilyPasses(passes),
+      shortElapsedMs,
+      longElapsedMs,
+      growth: shortElapsedMs > 0 ? longElapsedMs / shortElapsedMs : Number.POSITIVE_INFINITY,
+    } satisfies StudioBrushCrayonFamilyRow;
   });
   const observed = new Set(rows.map((row) => row.catalogId));
   const missingCatalogIds = paintIds.filter((id) => !observed.has(id));

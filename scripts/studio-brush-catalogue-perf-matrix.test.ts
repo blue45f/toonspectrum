@@ -32,6 +32,9 @@ import {
   studioBrushChunkSeriesFreezes,
   studioBrushCrayonFamilyCpuFreezes,
   type StudioBrushCataloguePerfRow,
+  STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES,
+  STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH,
+  STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
 } from "./studio-brush-catalogue-perf-matrix";
 
 /**
@@ -358,7 +361,37 @@ describe("studio brush catalogue paint performance matrix", () => {
       expect(family.cpuMs, `${family.catalogId} cpu`).toBeGreaterThan(0);
       expect(family.cpuMs!).toBeLessThanOrEqual(STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS);
       expect(family.elapsedMs).toBeLessThan(STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS);
+      // SCALING, a separate property from the CPU budget above and machine-immune where that one
+      // is not: both sides are the same planner on the same material, so a slower runner moves
+      // neither. See STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES for why both are wanted.
+      expect(
+        family.growth,
+        `${family.catalogId}: wall cost grew x${family.growth.toFixed(2)} from`
+          + ` ${STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES} to`
+          + ` ${STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES} samples`
+          + ` (${family.shortElapsedMs.toFixed(1)}ms -> ${family.longElapsedMs.toFixed(1)}ms),`
+          + ` allowed x${STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH};`
+          + " linear in the input would be x4, and this bound is twice that",
+      ).toBeLessThanOrEqual(STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH);
     }
+
+    // Printed every run, passing or not. This gate has no runner reading yet, and a bound is only
+    // tightened honestly from two machine classes; printing is how the second one arrives without
+    // a red build being the messenger.
+    process.stdout.write(
+      `\ncrayon-family plan scaling (${STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES} -> `
+      + `${STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES} samples, allowed x`
+      + `${STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH})\n`
+      + report.crayonFamily
+        .map((family) =>
+          `  ${family.catalogId.padEnd(12)} x${family.growth.toFixed(2)}`
+          + `  ${family.shortElapsedMs.toFixed(1)}ms -> ${family.longElapsedMs.toFixed(1)}ms`
+          + `  convicts from x${
+            (STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH / family.growth).toFixed(2)
+          }`)
+        .join("\n")
+      + "\n",
+    );
 
     expect(report.determinism.probeCount).toBe(
       listStudioBrushCatalogueDeterminismSampleIds().length,
