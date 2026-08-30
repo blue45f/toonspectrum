@@ -425,7 +425,12 @@ export function listStudioCommunityShareCandidates(input: {
   const palettes = input.palettes ?? [];
   return [
     ...brushes
-      .filter((brush) => isStudioCommunityShareableLocalResourceId(brush.id))
+      .filter((brush) =>
+        isStudioCommunityShareableLocalResourceId(brush.id)
+        && (
+          brush.sourcePresetId === undefined
+          || isStudioCommunityShareableLocalResourceId(brush.sourcePresetId)
+        ))
       .map((brush) => ({
       id: brush.id,
       kind: "brush" as const,

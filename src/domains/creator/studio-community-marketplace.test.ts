@@ -215,6 +215,26 @@ describe("studio community marketplace projection", () => {
         },
         {
           ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+          id: "duplicated-installed-brush",
+          sourcePresetId: `${installedPrefix}:brush/ink`,
+          name: "복제한 설치 브러시",
+          createdAt: 1,
+          updatedAt: 2,
+          pinned: false,
+          lastUsedAt: null,
+        },
+        {
+          ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+          id: "builtin-derived-brush",
+          sourcePresetId: "essentials:rough-pencil",
+          name: "내장 프리셋 기반 브러시",
+          createdAt: 1,
+          updatedAt: 2,
+          pinned: false,
+          lastUsedAt: null,
+        },
+        {
+          ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
           id: "creator-brush-1",
           name: "직접 만든 브러시",
           createdAt: 1,
@@ -264,6 +284,7 @@ describe("studio community marketplace projection", () => {
     });
 
     expect(candidates.map(({ id, kind }) => ({ id, kind }))).toEqual([
+      { id: "builtin-derived-brush", kind: "brush" },
       { id: "creator-brush-1", kind: "brush" },
       { id: "my-creator-pack-inspired-filter", kind: "filter" },
       { id: "palette-creator-pack-study", kind: "palette" },
