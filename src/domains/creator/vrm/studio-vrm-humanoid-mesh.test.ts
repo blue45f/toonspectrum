@@ -594,4 +594,51 @@ describe("studio VRM humanoid mesh", () => {
       expect(counts[1].inside, preset.id).toBe(counts[0].inside);
     }
   });
+
+  it("bakes head shaping after the part rotation, exactly as the head node would", () => {
+    // 파츠 스케일에 미리 곱해 넣으면 `R·S` 가 되는데, 두상 노드가 적용하던 변형은 `S·R` 이다.
+    // 비가환이라 회전이 붙은 파츠(옆으로 쓸어넘긴 앞머리 등)에서 어긋난다 — 배포 프리셋에서
+    // 0.2~1.9mm, 얼굴 비율 극단에서 4.7mm. 저작이 끝난 정점에 한 번에 얹어야 정확하다.
+    for (const [presetId, face, headBodyRatio] of [
+      ["pixie-sport", null, 1],
+      ["wolf-rebel", null, 1],
+      ["hime-noble", { headWidth: 1.6, headHeight: 0.6, headDepth: 1 }, 2.5],
+      ["hime-noble", { headWidth: 0.6, headHeight: 1.6, headDepth: 1 }, 2.5],
+    ] as const) {
+      const preset = createAvatarForgeState(presetId);
+      const shaped = sanitizeAvatarForgeState({
+        ...preset,
+        face: face ? { ...preset.face, ...face } : preset.face,
+        proportions: { ...preset.proportions, headBodyRatio },
+      });
+      // 머리 스케일이 정확히 1 이 되도록 중립화한 기준 상태.
+      const neutral = sanitizeAvatarForgeState({
+        ...shaped,
+        face: { ...shaped.face, headWidth: 1, headHeight: 1, headDepth: 1 },
+        proportions: { ...shaped.proportions, headBodyRatio: 1 },
+      });
+
+      const actual = buildStudioVrmHumanoidMesh(shaped);
+      const reference = buildStudioVrmHumanoidMesh(neutral);
+      const scale = actual.rig.nodeScale.head ?? [1, 1, 1];
+      const joint = actual.rig.worldRest.head;
+      const actualHair = actual.parts.find((part) => part.nodeName === "Hair");
+      const referenceHair = reference.parts.find((part) => part.nodeName === "Hair");
+      if (!actualHair || !referenceHair) throw new Error(`${presetId}: expected hair`);
+
+      const label = `${presetId} ${JSON.stringify(face)} @ ${headBodyRatio}`;
+      for (let index = 0; index < actualHair.primitives.length; index += 1) {
+        const got = numbers(actualHair.primitives[index].positions);
+        const base = numbers(referenceHair.primitives[index].positions);
+        expect(got.length, label).toBe(base.length);
+        for (let offset = 0; offset < got.length; offset += 3) {
+          for (let axis = 0; axis < 3; axis += 1) {
+            const expected =
+              joint[axis] + (base[offset + axis] - joint[axis]) * scale[axis];
+            expect(got[offset + axis], `${label} @ ${offset / 3}`).toBeCloseTo(expected, 9);
+          }
+        }
+      }
+    }
+  });
 });

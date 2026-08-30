@@ -387,3 +387,61 @@ export function studioVrmHairRigInverseBindMatrices(rig: StudioVrmHairRig): numb
   }
   return matrices;
 }
+
+/**
+ * 리그를 **머리 조형 스케일이 적용된** 좌표로 옮긴다.
+ *
+ * 리그 계산(낙차 문턱·체인 길이)은 스케일 이전 좌표에서 하는 것이 안정적이다 — 문턱이
+ * `heightScale` 기준이라 두신비가 끼어들면 어떤 파츠가 "매달렸는지"의 판정이 흔들린다.
+ * 그래서 판정이 끝난 뒤 위치만 옮긴다.
+ *
+ * 사상은 머리 관절을 원점으로 하는 축별 스케일이므로(`p ↦ j + S⊙(p−j)`), 부모-자식 차이는
+ * 그냥 `S⊙d` 가 된다 — 체인을 다시 걸을 필요가 없다. 체인 뿌리의 부모는 머리 관절이고
+ * 그 점은 사상의 고정점이다.
+ *
+ * 충돌 반경만은 스칼라라 정확히 옮길 수 없다. 축 평균을 쓴다.
+ */
+export function shapeStudioVrmHairRig(
+  rig: StudioVrmHairRig | null,
+  headWorldRest: MeshVec3,
+  scale: MeshVec3,
+): StudioVrmHairRig | null {
+  if (rig === null) return null;
+  if (scale[0] === 1 && scale[1] === 1 && scale[2] === 1) return rig;
+  const radial = (scale[0] + scale[1] + scale[2]) / 3;
+  const moved = new Map<StudioVrmHairJoint, StudioVrmHairJoint>();
+  const shapeJoint = (joint: StudioVrmHairJoint): StudioVrmHairJoint => {
+    const existing = moved.get(joint);
+    if (existing) return existing;
+    const next: StudioVrmHairJoint = {
+      name: joint.name,
+      localTranslation: [
+        joint.localTranslation[0] * scale[0],
+        joint.localTranslation[1] * scale[1],
+        joint.localTranslation[2] * scale[2],
+      ],
+      worldRest: [
+        headWorldRest[0] + (joint.worldRest[0] - headWorldRest[0]) * scale[0],
+        headWorldRest[1] + (joint.worldRest[1] - headWorldRest[1]) * scale[1],
+        headWorldRest[2] + (joint.worldRest[2] - headWorldRest[2]) * scale[2],
+      ],
+      hitRadius: joint.hitRadius * radial,
+    };
+    moved.set(joint, next);
+    return next;
+  };
+
+  const joints = rig.joints.map(shapeJoint);
+  const chains = rig.chains.map((chain) => ({ ...chain, joints: chain.joints.map(shapeJoint) }));
+  const chainById = new Map(chains.map((chain) => [chain.id, chain]));
+  const bindings = new Map<string, StudioVrmHairBinding>();
+  for (const [partId, binding] of rig.bindings) {
+    bindings.set(
+      partId,
+      binding.kind === "blend"
+        ? { kind: "blend", chain: chainById.get(binding.chain.id) ?? binding.chain }
+        : binding,
+    );
+  }
+  return { version: rig.version, chains, joints, bindings };
+}

@@ -27,6 +27,7 @@ import {
 import { hexToRgb, hslToRgb, rgbToHsl } from "./studio-vrm-costume";
 import {
   buildStudioVrmHairRig,
+  shapeStudioVrmHairRig,
   studioVrmHairStrandSpine,
   type StudioVrmHairChain,
   type StudioVrmHairRig,
@@ -1348,28 +1349,6 @@ function fitHairPartToSkull(
   return { ...transform, translation };
 }
 
-/**
- * 머리 **노드 스케일이 적용된** 두개골 치수.
- *
- * 리그의 `head` fit 은 스케일 이전 값이다. 두상 메시는 `head` 조인트에 묶여 런타임에
- * `T·S·T⁻¹` 로 커지므로 그 좌표를 그대로 써도 되지만, 헤어는 역스케일 피벗 아래에 있어
- * 그 스케일을 받지 않는다. 그래서 헤어만 **미리 적용된** 치수로 저작한다.
- */
-function shapeHeadFit(rig: StudioVrmRig): StudioVrmRigHeadFit {
-  const scale = rig.nodeScale.head ?? [1, 1, 1];
-  const joint = rig.worldRest.head;
-  return {
-    center: [
-      joint[0] + (rig.head.center[0] - joint[0]) * scale[0],
-      joint[1] + (rig.head.center[1] - joint[1]) * scale[1],
-      joint[2] + (rig.head.center[2] - joint[2]) * scale[2],
-    ],
-    radiusX: rig.head.radiusX * scale[0],
-    radiusY: rig.head.radiusY * scale[1],
-    radiusZ: rig.head.radiusZ * scale[2],
-  };
-}
-
 /** 캡 껍질의 최소 두께(두개골 반경 대비). 0 이면 두개골 표면과 정확히 겹쳐 z-fighting 이 난다. */
 const HAIR_CAP_MIN_SHELL = 0.05;
 
@@ -1467,20 +1446,19 @@ function buildHair(
   const builder = new SurfaceBuilder();
   const skin = only(rig, "head");
 
-  // 헤어는 **조형 스케일이 적용된 두개골** 좌표로 저작한다. 몸통·두상 메시는 `head` 노드에
-  // 묶여 런타임에 `T·S·T⁻¹` 로 커지지만, 헤어는 역스케일 피벗 아래라 그 스케일을 받지
-  // 않는다 — 저작 단계에서 미리 반영하지 않으면 두신비를 키웠을 때 머리카락만 원래
-  // 크기로 남아 커진 두개골 속에 파묻힌다(두신비 2.5 에서 체인 묶임 정점의 67~100%).
-  const shapedHead = shapeHeadFit(rig);
-
   // 가닥마다 두개골 적합까지 끝난 변환을 먼저 확정한다 — 체인 조인트가 그 변환 위에 놓인다.
+  // 여기까지는 **조형 스케일 이전** 좌표다.
   const transforms = parts.map((part) =>
-    fitHairPartToSkull(part, hairPartTransform(part, shapedHead), shapedHead, state.hair.fringe),
+    fitHairPartToSkull(part, hairPartTransform(part, rig.head), rig.head, state.hair.fringe),
   );
-  const hairRig = buildStudioVrmHairRig(
-    parts.map((part, index) => ({ part, transform: transforms[index] })),
+  const hairRig = shapeStudioVrmHairRig(
+    buildStudioVrmHairRig(
+      parts.map((part, index) => ({ part, transform: transforms[index] })),
+      rig.worldRest.head,
+      rig.heightScale,
+    ),
     rig.worldRest.head,
-    rig.heightScale,
+    rig.nodeScale.head ?? [1, 1, 1],
   );
 
   const jointBase = rig.bones.length;
@@ -1528,7 +1506,31 @@ function buildHair(
       thetaBack: Math.PI,
     });
   });
+
+  // 마지막에 **머리 조형 스케일**을 한 번에 얹는다.
+  //
+  // 두상 메시는 `head` 조인트에 묶여 런타임에 `T·S·T⁻¹` 로 커지지만, 헤어는 역스케일 피벗
+  // 아래라 그 스케일을 받지 않는다 — 저작 단계에서 반영하지 않으면 두신비를 키웠을 때
+  // 머리카락만 원래 크기로 남아 커진 두개골 속에 파묻힌다(두신비 2.5 에서 체인 묶임 정점의
+  // 67~100%).
+  //
+  // 파츠 스케일에 미리 곱해 넣을 수는 없다. 파츠에 회전이 있으면 `R·S ≠ S·R` 이라
+  // 파츠 로컬 TRS 로는 표현할 수 없는 변환이고, 실제로 배포 프리셋에서 0.2~1.9mm,
+  // 얼굴 비율 극단에서 4.7mm 어긋났다. 저작이 끝난 정점에 직접 적용해야 정확하다.
+  shapeAboutHead(builder, rig);
   return { builder, hairRig };
+}
+
+/** 저작이 끝난 헤어 정점에 머리 조형 스케일(`T·S·T⁻¹`)을 얹는다. */
+function shapeAboutHead(builder: SurfaceBuilder, rig: StudioVrmRig): void {
+  const scale = rig.nodeScale.head ?? [1, 1, 1];
+  if (scale[0] === 1 && scale[1] === 1 && scale[2] === 1) return;
+  const joint = rig.worldRest.head;
+  builder.transformPositions(([x, y, z]) => [
+    joint[0] + (x - joint[0]) * scale[0],
+    joint[1] + (y - joint[1]) * scale[1],
+    joint[2] + (z - joint[2]) * scale[2],
+  ]);
 }
 
 /* -------------------------------------------------------------------------- */
