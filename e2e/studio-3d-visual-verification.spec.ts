@@ -33,6 +33,11 @@ interface FrameStats {
   /** 가장 흔한 색이 차지하는 비율. 빈 뷰포트는 1에 가깝다. */
   readonly dominantShare: number;
   readonly meanLuma: number;
+  /**
+   * 16×12 칸의 평균 휘도. 프레임 비교의 근거는 이쪽이다 — 화면 한쪽에만 생긴 변화(작은
+   * 오브젝트 하나)는 전체 평균을 거의 움직이지 않지만 해당 칸은 크게 움직인다.
+   */
+  readonly tiles: readonly number[];
 }
 
 /** 렌더된 프레임의 픽셀 통계. 디코딩은 브라우저가 한다(Node 측 이미지 의존성 없음). */
@@ -60,14 +65,70 @@ async function frameStats(page: Page, selector: string): Promise<FrameStats> {
     }
     const total = width * height;
     const dominant = Math.max(...histogram.values());
+    const tileCols = 16;
+    const tileRows = 12;
+    const tileSums = new Float64Array(tileCols * tileRows);
+    const tileCounts = new Float64Array(tileCols * tileRows);
+    for (let y = 0; y < height; y += 1) {
+      const row = Math.min(tileRows - 1, Math.floor((y / height) * tileRows));
+      for (let x = 0; x < width; x += 1) {
+        const column = Math.min(tileCols - 1, Math.floor((x / width) * tileCols));
+        const offset = (y * width + x) * 4;
+        const tile = row * tileCols + column;
+        tileSums[tile] += (data[offset] + data[offset + 1] + data[offset + 2]) / 3;
+        tileCounts[tile] += 1;
+      }
+    }
     return {
       width: bitmap.width,
       height: bitmap.height,
       distinctColors: histogram.size,
       dominantShare: dominant / total,
       meanLuma: lumaSum / total,
+      tiles: Array.from(tileSums, (sum, index) => sum / Math.max(1, tileCounts[index])),
     };
   }, shot.toString("base64"));
+}
+
+/** 두 프레임이 가장 크게 달라진 칸의 휘도 차. 안티에일리어싱 잡음은 한 자리를 넘지 않는다. */
+function peakTileDelta(a: FrameStats, b: FrameStats): number {
+  let peak = 0;
+  for (let index = 0; index < a.tiles.length; index += 1) {
+    peak = Math.max(peak, Math.abs(a.tiles[index] - (b.tiles[index] ?? 0)));
+  }
+  return peak;
+}
+
+/**
+ * 프레임이 실제로 달라질 때까지 폴링한다.
+ *
+ * 두 가지를 함께 고친다. 고정 대기 뒤에 한 번 재는 방식은 이 스위트가 판정하려는 것("장면을
+ * 바꾸면 그림이 바뀐다")을 러너 속도에 걸어 버린다 — GitHub 러너의 소프트웨어 래스터라이저는
+ * 로컬보다 2~3배 느리다. 그리고 판정 자체를 전체 평균 휘도로 하면 안 된다: 이미 상자가 있는
+ * 장면에 원기둥을 더해도 평균은 200.5 → 199.9로 거의 그대로다. 실제로 바뀐 것은 그 오브젝트가
+ * 덮은 칸이므로, 가장 크게 움직인 칸을 본다.
+ */
+async function waitForFrameChange(
+  page: Page,
+  selector: string,
+  baseline: FrameStats,
+  label: string,
+  timeoutMs = 90_000,
+): Promise<FrameStats> {
+  const deadline = Date.now() + timeoutMs;
+  let latest = baseline;
+  let peak = 0;
+  while (Date.now() < deadline) {
+    latest = await frameStats(page, selector);
+    peak = peakTileDelta(latest, baseline);
+    if (peak > 3) return latest;
+    await page.waitForTimeout(2_000);
+  }
+  throw new Error(
+    `${label}: 프레임이 바뀌지 않았습니다 `
+    + `(칸 최대 휘도차 ${peak.toFixed(1)}, `
+    + `색 ${baseline.distinctColors} → ${latest.distinctColors}).`,
+  );
 }
 
 /** 3D 표면은 치명적 런타임 오류 없이 렌더되어야 한다. */
@@ -113,13 +174,15 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await openStudio(page);
     await openBg3d(page);
 
-    // 엔진은 선택한 백엔드를 보고해야 한다. WebGPU가 없으면 WebGL2로 내려간다.
-    const backend = await page
+    // 엔진은 선택한 백엔드로 정착해야 한다. WebGPU가 없으면 WebGL2로 내려간다. 능력 probe가
+    // 끝나기 전 배지는 "확인 중"이므로, 한 번 읽지 않고 정착할 때까지 폴링한다 — 영원히 "확인 중"에
+    // 머무는 것 자체가 이 스위트가 잡아야 할 회귀다.
+    const backendBadge = page
       .locator('[data-testid="studio-bg3d-engine-active-backend"]')
-      .first()
-      .textContent()
-      .catch(() => null);
-    if (backend !== null) expect(backend).toMatch(/WebGL2|WebGPU/);
+      .first();
+    if (await backendBadge.count()) {
+      await expect(backendBadge).toHaveText(/WebGL2|WebGPU/, { timeout: 120_000 });
+    }
 
     // 빈 장면에도 접지 그리드가 있어 완전한 단색이 아니다 — 즉 렌더 루프가 살아 있다.
     const empty = await frameStats(page, BG3D_VIEWPORT);
@@ -128,14 +191,11 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
 
     // 도형을 넣으면 프레임이 실제로 달라져야 한다. 여기가 "3D 배경이 깨진다"를 잡는 지점이다.
     await page.locator('[aria-label="상자 추가"]').first().click();
-    await page.waitForTimeout(5_000);
-    const withBox = await frameStats(page, BG3D_VIEWPORT);
+    const withBox = await waitForFrameChange(page, BG3D_VIEWPORT, empty, "상자 추가");
     expect(withBox.distinctColors).toBeGreaterThan(1);
-    expect(Math.abs(withBox.meanLuma - empty.meanLuma)).toBeGreaterThan(1);
 
     await page.locator('[aria-label="원기둥 추가"]').first().click();
-    await page.waitForTimeout(4_000);
-    const withCylinder = await frameStats(page, BG3D_VIEWPORT);
+    const withCylinder = await waitForFrameChange(page, BG3D_VIEWPORT, withBox, "원기둥 추가");
     expect(withCylinder.distinctColors).toBeGreaterThan(1);
     // 셰이딩된 솔리드는 뷰포트를 한 색으로 덮지 않는다.
     expect(withCylinder.dominantShare).toBeLessThan(0.95);
@@ -153,17 +213,13 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await roomShell.scrollIntoViewIfNeeded();
     const beforeAsset = await frameStats(page, BG3D_VIEWPORT);
     await roomShell.click();
-    await page.waitForTimeout(9_000);
-    const withRoom = await frameStats(page, BG3D_VIEWPORT);
-    expect(Math.abs(withRoom.meanLuma - beforeAsset.meanLuma)).toBeGreaterThan(1);
+    const withRoom = await waitForFrameChange(page, BG3D_VIEWPORT, beforeAsset, "오픈 룸 셸 추가");
 
     // 선화(LT) 미리보기는 웹툰 산출물의 절반이다. 켜면 같은 장면이 다르게 래스터화된다.
     const linePreview = page.locator('[aria-label*="선화 미리보기"]').first();
     await linePreview.click();
-    await page.waitForTimeout(8_000);
-    const lineArt = await frameStats(page, BG3D_VIEWPORT);
+    const lineArt = await waitForFrameChange(page, BG3D_VIEWPORT, withRoom, "선화 미리보기");
     expect(lineArt.distinctColors).toBeGreaterThan(1);
-    expect(Math.abs(lineArt.meanLuma - withRoom.meanLuma)).toBeGreaterThan(1);
 
     expect(fatal).toEqual([]);
   });
@@ -179,8 +235,10 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     await openStudio(page);
     await openBg3d(page);
 
+    const emptyScene = await frameStats(page, BG3D_VIEWPORT);
     await page.locator('[aria-label="상자 추가"]').first().click();
-    await page.waitForTimeout(4_000);
+    // 빈 장면을 캡처해 놓고 삽입하면 이 테스트가 무엇도 증명하지 못한다.
+    await waitForFrameChange(page, BG3D_VIEWPORT, emptyScene, "상자 추가");
     await page.getByRole("button", { name: /컬러 배경 추가/ }).first().click();
 
     // 삽입이 성공하면 편집기가 닫힌다. 실패로 닫히는 분기에서는 열린 채 오류만 남았다.
