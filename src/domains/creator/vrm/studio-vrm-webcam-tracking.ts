@@ -83,6 +83,11 @@ export interface TrackingOptions {
    * 합계가 1 을 크게 넘길 수 있다. 유도식 자체를 검증할 때만 끈다.
    */
   resolveExpressionConflicts?: boolean;
+  /**
+   * 현재 모델이 실제로 가진 표정 이름. 충돌 해소가 이 목록 밖의 표정을 지배 표정으로
+   * 뽑아 지원되는 표정만 깎는 일을 막는다(모델에 없는 이름은 적용 단계에서 버려진다).
+   */
+  availableExpressions?: readonly string[];
 }
 
 /** VRM 캐릭터에 적용할 뼈 회전 + 표정 가중치. */
@@ -997,7 +1002,9 @@ export function convertChannelsToVrmData(
   const resolved =
     options.resolveExpressionConflicts === false
       ? expressions
-      : resolveStudioVrmExpressionConflicts(expressions).weights;
+      : resolveStudioVrmExpressionConflicts(expressions, {
+          available: options.availableExpressions,
+        }).weights;
 
   return { bones, expressions: resolved, lookAt };
 }

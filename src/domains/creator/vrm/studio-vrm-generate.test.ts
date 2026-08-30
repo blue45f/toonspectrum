@@ -115,6 +115,28 @@ describe("studio VRM generate default preset", () => {
     expect(tweakedSeed.state.proportions.legLength).toBeCloseTo(1.22, 6);
   });
 
+  it("honours an explicit no-hair choice the state cannot express", () => {
+    // 기본 헤어가 이미 "없음"이라, 목록에서 "없음"을 눌러도 상태는 순정과 똑같다.
+    // 그 선택은 UI 만 알 수 있으므로 플래그로 전달받는다.
+    const seed = resolveStudioVrmGenerateSeed({
+      state: createAvatarForgeState(),
+      allowDefaultPreset: false,
+    });
+    expect(seed.appliedDefaultPresetId).toBeNull();
+    expect(seed.state.hair.style).toBe("none");
+
+    const snapshot = buildStudioVrmGenerateAuthoringSnapshot(
+      createStudioVrmGenerateRecipe({ allowDefaultPreset: false }),
+    );
+    expect(snapshot.meshes?.some((mesh) => mesh.name === "Hair")).toBe(false);
+  });
+
+  it("wires the explicit choice from the panel's hair silhouette buttons", () => {
+    const panel = readFileSync(new URL("./StudioVrmAvatarForgePanel.tsx", import.meta.url), "utf8");
+    expect(panel).toContain("setHairStyleChosen(true)");
+    expect(panel).toContain("allowDefaultPreset: !hairStyleChosen");
+  });
+
   it("gives the untouched state a hairy, named character instead of a bald custom one", () => {
     const recipe = createStudioVrmGenerateRecipe({});
     expect(recipe.label).not.toBe("커스텀 캐릭터");

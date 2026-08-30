@@ -103,6 +103,31 @@ describe("resolveStudioVrmExpressionConflicts", () => {
     expect(result.weights).toEqual(input);
   });
 
+  it("ignores emotions the model cannot show", () => {
+    // 모델에 surprised 가 없으면 적용 단계에서 버려진다. 그걸 지배 표정으로 뽑으면
+    // happy 만 깎이고 놀람은 나타나지 않아, 미소가 이유 없이 약해진다.
+    const available = ["happy", "aa", "blink", "blinkLeft", "blinkRight"];
+    const result = resolveStudioVrmExpressionConflicts(
+      { happy: 0.8, surprised: 0.9, aa: 0.3 },
+      { available },
+    );
+    expect(result.dominantEmotion).toBe("happy");
+    expect(result.weights.happy).toBeCloseTo(0.8, 10);
+    // 지원되지 않는 이름은 예산에서도 빠지므로 입 계열이 괜히 줄지 않는다.
+    expect(result.weights.aa).toBeCloseTo(0.3, 10);
+    expect(result.mouthScale).toBe(1);
+  });
+
+  it("still resolves normally when the model supports everything", () => {
+    const full = ["happy", "surprised", "aa"];
+    const scoped = resolveStudioVrmExpressionConflicts({ happy: 0.8, surprised: 0.9, aa: 0.3 }, {
+      available: full,
+    });
+    const unscoped = resolveStudioVrmExpressionConflicts({ happy: 0.8, surprised: 0.9, aa: 0.3 });
+    expect(scoped.dominantEmotion).toBe("surprised");
+    expect(scoped.weights).toEqual(unscoped.weights);
+  });
+
   it("is pure — repeated calls on the same input agree and the input is not mutated", () => {
     const input = { happy: 0.8, sad: 0.42, angry: 0.38, aa: 0.7 };
     const snapshot = { ...input };

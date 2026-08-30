@@ -81,6 +81,7 @@ export async function generateStudioVrmCharacter(
   input: {
     readonly presetId?: string | null;
     readonly state?: unknown;
+    readonly allowDefaultPreset?: boolean;
   } = {},
   dependencies: {
     readonly host?: StudioVrmGenerateMcpHost;

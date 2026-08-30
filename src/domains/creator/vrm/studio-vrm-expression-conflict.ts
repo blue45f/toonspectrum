@@ -71,6 +71,14 @@ export type StudioVrmExpressionConflictOptions = {
   readonly exclusivity?: number;
   readonly mouthCeiling?: number;
   readonly priority?: Readonly<Partial<Record<string, number>>>;
+  /**
+   * 실제로 적용할 수 있는 표정 이름. 주면 그 밖의 표정은 지배 판정과 입 예산에서 제외한다.
+   *
+   * VRM 마다 선택 프리셋(surprised/angry/sad …)이 없을 수 있고, 적용 단계는 모델에 없는
+   * 이름을 그냥 버린다. 그 이름이 지배 표정으로 뽑히면 **지원되는 표정만 깎이고** 정작
+   * 그 표정은 화면에 나타나지 않는다 — 눈을 크게 뜬 미소가 미소만 잃는 식이다.
+   */
+  readonly available?: Iterable<string>;
 };
 
 export type StudioVrmExpressionConflictResult = {
@@ -119,12 +127,15 @@ export function resolveStudioVrmExpressionConflicts(
   const resolved: Record<string, number> = {};
   for (const [name, value] of Object.entries(weights)) resolved[name] = clamp01(value);
 
+  const available = options.available === undefined ? null : new Set(options.available);
+  const applicable = (name: string): boolean => available === null || available.has(name);
+
   // 1. 지배 감정 — 동점이면 선언 순서(= 신뢰도 순)가 이긴다.
   let dominant: StudioVrmExpressionEmotion | null = null;
   let dominantScore = 0;
   for (const emotion of STUDIO_VRM_EXPRESSION_EMOTIONS) {
     const weight = resolved[emotion] ?? 0;
-    if (weight <= 0) continue;
+    if (weight <= 0 || !applicable(emotion)) continue;
     const priority = options.priority?.[emotion] ?? STUDIO_VRM_EXPRESSION_PRIORITY[emotion];
     const score = weight * (Number.isFinite(priority) ? priority : 1);
     if (score > dominantScore) {
@@ -138,7 +149,7 @@ export function resolveStudioVrmExpressionConflicts(
   if (dominant !== null && exclusivity > 0) {
     const gain = 1 - exclusivity * (resolved[dominant] ?? 0);
     for (const emotion of STUDIO_VRM_EXPRESSION_EMOTIONS) {
-      if (emotion === dominant) continue;
+      if (emotion === dominant || !applicable(emotion)) continue;
       const weight = resolved[emotion] ?? 0;
       if (weight <= 0) continue;
       resolved[emotion] = weight * gain;
@@ -146,14 +157,16 @@ export function resolveStudioVrmExpressionConflicts(
     }
   }
 
-  // 3. 입 계열 누적 상한.
+  // 3. 입 계열 누적 상한 — 적용되지 않을 표정은 예산에서도 빼고 줄이지도 않는다.
   let mouthTotal = 0;
-  for (const name of STUDIO_VRM_EXPRESSION_MOUTH_GROUP) mouthTotal += resolved[name] ?? 0;
+  for (const name of STUDIO_VRM_EXPRESSION_MOUTH_GROUP) {
+    if (applicable(name)) mouthTotal += resolved[name] ?? 0;
+  }
   let mouthScale = 1;
   if (mouthTotal > mouthCeiling && mouthTotal > 0) {
     mouthScale = mouthCeiling / mouthTotal;
     for (const name of STUDIO_VRM_EXPRESSION_MOUTH_GROUP) {
-      if (resolved[name] === undefined) continue;
+      if (resolved[name] === undefined || !applicable(name)) continue;
       resolved[name] *= mouthScale;
     }
   }

@@ -98,9 +98,13 @@ export function StudioVrmAvatarForgePanel({
   const [view, setView] = useState<ForgeView>("presets");
   const [generateResult, setGenerateResult] = useState<StudioVrmGenerateResult | null>(null);
   const [generateBusy, setGenerateBusy] = useState(false);
+  // 헤어 실루엣을 **직접 골랐는지**를 기억한다. 기본값이 이미 "없음"이라 목록에서 "없음"을
+  // 눌러도 상태가 그대로여서, 상태 비교만으로는 의도한 민머리를 알아볼 수 없다.
+  const [hairStyleChosen, setHairStyleChosen] = useState(false);
   const previewRecipe = createStudioVrmGenerateRecipe({
     presetId: state.presetId,
     state,
+    allowDefaultPreset: !hairStyleChosen,
   });
 
   const updateFace = <K extends keyof AvatarForgeFaceParams>(key: K, value: AvatarForgeFaceParams[K]) => {
@@ -401,7 +405,10 @@ export function StudioVrmAvatarForgePanel({
                       disabled={disabled}
                       aria-pressed={selected}
                       title={option.hint}
-                      onClick={() => updateHair("style", option.id)}
+                      onClick={() => {
+                        setHairStyleChosen(true);
+                        updateHair("style", option.id);
+                      }}
                       className={`flex min-h-14 flex-col items-center justify-center rounded-xl border px-1 py-1.5 text-[0.62rem] font-bold transition-colors disabled:opacity-40 ${
                         selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
                       }`}
@@ -711,6 +718,7 @@ export function StudioVrmAvatarForgePanel({
               void generateStudioVrmCharacter({
                 presetId: state.presetId,
                 state,
+                allowDefaultPreset: !hairStyleChosen,
               }).then((result) => {
                 setGenerateResult(result);
                 setGenerateBusy(false);

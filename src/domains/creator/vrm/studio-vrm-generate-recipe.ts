@@ -67,6 +67,14 @@ function isPristineAvatarForgeState(state: AvatarForgeState): boolean {
 export function resolveStudioVrmGenerateSeed(input: {
   readonly presetId?: string | null;
   readonly state?: unknown;
+  /**
+   * false 면 순정 기본 상태여도 기본 프리셋을 넣지 않는다.
+   *
+   * 상태 비교만으로는 "아직 아무것도 안 골랐다"와 "일부러 머리 없음을 골랐다"를 가를 수
+   * 없다 — 기본 헤어가 이미 `none` 이라 목록에서 "없음"을 눌러도 상태가 그대로다. 그래서
+   * 실제 선택 행위는 UI 가 알려 준다.
+   */
+  readonly allowDefaultPreset?: boolean;
 } = {}): StudioVrmGenerateSeed {
   const requestedPresetId = typeof input.presetId === "string" && input.presetId.trim()
     ? input.presetId.trim()
@@ -76,7 +84,11 @@ export function resolveStudioVrmGenerateSeed(input: {
     : sanitizeAvatarForgeState(input.state);
   const presetId = state.presetId ?? requestedPresetId ?? null;
 
-  if (presetId !== null || !isPristineAvatarForgeState(state)) {
+  if (
+    presetId !== null ||
+    input.allowDefaultPreset === false ||
+    !isPristineAvatarForgeState(state)
+  ) {
     return { state, presetId, appliedDefaultPresetId: null };
   }
   return {
@@ -109,6 +121,7 @@ export function resolveStudioVrmGeneratePresetLabel(presetId: string | null): st
 export function createStudioVrmGenerateRecipe(input: {
   readonly presetId?: string | null;
   readonly state?: unknown;
+  readonly allowDefaultPreset?: boolean;
 } = {}): StudioVrmGenerateRecipe {
   const seed = resolveStudioVrmGenerateSeed(input);
   return {

@@ -178,7 +178,10 @@ export function buildStudioVrmRig(input: {
   const shoulderHalf = n.shoulderHalf * p.shoulderWidth * height;
   const upperArm = n.upperArm * p.armLength * height;
   const lowerArm = n.lowerArm * p.armLength * height;
-  const hipHalf = n.hipHalf * p.shoulderWidth * height;
+  // 골반 간격은 어깨 너비와 무관하다. `shoulderWidth` 는 쇄골 좌우 오프셋이고 골반 메시도
+  // 그 값으로 넓어지지 않는다 — 여기에 곱하면 어깨를 좁혔을 때 두 허벅지가 겹치고 넓히면
+  // 스탠스가 바뀐다. 골반 폭 파라미터가 생기기 전까지는 키에만 비례시킨다.
+  const hipHalf = n.hipHalf * height;
   const thigh = n.thigh * p.legLength * height;
   const shin = n.shin * p.legLength * height;
   // 다리가 길어져도 발바닥이 지면(y=0)에 남도록 골반을 같이 올린다.

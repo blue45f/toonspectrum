@@ -482,6 +482,19 @@ export function useStudioVrmPoserState({
   const [webcamConsentGranted, setWebcamConsentGranted] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [trackingOptions, setTrackingOptions] = useState<TrackingOptions>(DEFAULT_TRACKING_OPTIONS);
+  // 표정 충돌 해소는 **이 모델이 실제로 가진 표정**만 대상으로 삼아야 한다. VRM 마다 선택
+  // 프리셋(surprised/angry/sad …)이 빠져 있을 수 있고, 적용 단계(StudioVrmActor)는 모델에
+  // 없는 이름을 그냥 버린다. 없는 이름이 지배 표정으로 뽑히면 지원되는 표정만 깎이고 정작
+  // 그 표정은 나타나지 않는다.
+  const trackingOptionsForSession = useMemo<TrackingOptions>(
+    () => ({
+      ...trackingOptions,
+      availableExpressions: vrm?.expressionManager
+        ? Object.keys(vrm.expressionManager.expressionMap)
+        : undefined,
+    }),
+    [trackingOptions, vrm],
+  );
   const [browserPermissionState, setBrowserPermissionState] = useState<"granted" | "denied" | "prompt" | "unsupported">("prompt");
   // 정면 캘리브레이션 UI 상태(studio-vrm-tracking-calibration).
   const [calibrating, setCalibrating] = useState(false);
@@ -875,7 +888,7 @@ export function useStudioVrmPoserState({
     setWebcamConsentGranted,
     faceDetected,
     setFaceDetected,
-    trackingOptions,
+    trackingOptions: trackingOptionsForSession,
     setTrackingOptions,
     browserPermissionState,
     setBrowserPermissionState,
