@@ -323,9 +323,10 @@ describe("StudioLift3dPage", () => {
     });
   });
 
-  it("등록 중에 이용 권리를 바꾸면 어느 표기로 저장됐는지 밝힌다", async () => {
-    // 모델은 그대로인데 표기만 바뀌는 경우가 더 위험하다. 화면에는 "공개 이용" 이 떠 있는데
-    // 라이브러리에는 "확인 전" 로 박힌 모델이 남고, 무자격 성공 문구가 그 어긋남을 덮는다.
+  it("등록이 도는 동안에는 이용 권리를 잠근다", async () => {
+    // 같은 GLB 가 이미 저장된 뒤에 표기만 바꿔 다시 등록하면 라이브러리가 해시 중복을
+    // rightsMatch 로 대조해 rights-conflict 를 던진다. 사용자가 고칠 방법이 없는 상태로
+    // 밀어 넣지 않으려면, 표기를 바꿀 수 있는 창 자체를 닫아야 한다.
     decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
     let release: (value: unknown) => void = () => undefined;
     saveStudioLift3dToBg3dLibrary.mockReturnValue(
@@ -338,22 +339,47 @@ describe("StudioLift3dPage", () => {
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
     });
+    const rights = screen.getByLabelText("이용 권리") as HTMLSelectElement;
+    expect(rights.disabled).toBe(false);
 
     libraryButton().click();
-    fireEvent.change(screen.getByLabelText("이용 권리"), { target: { value: "public-domain" } });
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("이용 권리") as HTMLSelectElement).disabled).toBe(true);
+    });
+    expect((screen.getByLabelText(/상업적 이용 가능/u) as HTMLInputElement).disabled).toBe(true);
+
     release({ ok: true, record: { id: "m1" } });
 
     await waitFor(() => {
-      const notice = screen.getByRole("status").textContent ?? "";
-      expect(notice).toContain("누른 시점의 모델");
-      // 저장된 표기는 클릭 시점의 기본값이다. 화면의 새 표기로 말하면 안 된다.
-      expect(notice).toContain("확인 전");
-      expect(notice).not.toContain("공개 이용(퍼블릭 도메인)");
+      expect((screen.getByLabelText("이용 권리") as HTMLSelectElement).disabled).toBe(false);
     });
-    expect(saveStudioLift3dToBg3dLibrary).toHaveBeenCalledWith(
-      expect.anything(),
-      { status: "unknown", commercialUse: false },
-    );
+    // 표기가 바뀔 수 없었으므로 무자격 성공 문구가 맞다.
+    expect(screen.getByRole("status").textContent).toContain("모델 목록에 등록");
+  });
+
+  it("새 파일을 고르면 이전 모델의 등록 문구를 즉시 지운다", async () => {
+    // 디코딩에 실패하면 변환 효과는 decoded === null 로 일찍 빠져나가 문구를 지우지 못한다.
+    // 그러면 새 파일의 오류 옆에 이전 모델의 "등록했습니다" 가 그대로 남는다.
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    saveStudioLift3dToBg3dLibrary.mockResolvedValue({ ok: true, record: { id: "m1" } });
+    renderPage();
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+    libraryButton().click();
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toContain("모델 목록에 등록");
+    });
+
+    decodeStudioLift3dFile.mockRejectedValue(new Error("broken"));
+    pickFile();
+
+    await waitFor(() => {
+      expect(screen.getByText(/이미지를 여는 중 문제가 생겼습니다/u)).toBeDefined();
+    });
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("라이선스 이름을 받지 않으므로 구매·허가 선택지는 내주지 않는다", () => {

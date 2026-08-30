@@ -87,14 +87,6 @@ function rightsLabel(rights: StudioLift3dRightsDeclaration): string {
   return `${status} · ${rights.commercialUse ? "상업 이용 가능" : "상업 이용 확인 필요"}`;
 }
 
-/** 두 권리 선언이 같은지. 등록 완료 시점에 화면이 그대로인지 판단할 때 쓴다. */
-function sameRights(
-  left: StudioLift3dRightsDeclaration,
-  right: StudioLift3dRightsDeclaration,
-): boolean {
-  return left.status === right.status && left.commercialUse === right.commercialUse;
-}
-
 interface SliderFieldProps {
   readonly label: string;
   readonly value: number;
@@ -262,6 +254,10 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     if (!file) return;
     setDecodeError(null);
     setLiftError(null);
+    // 등록 문구는 방금 올린 파일이 아니라 **이전** 모델 이야기다. 변환 효과가 지워 주기를
+    // 기다리면 안 된다 — 새 파일이 디코딩에 실패하면 그 효과는 decoded === null 로 일찍
+    // 빠져나가고, 화면에는 새 파일의 오류 옆에 이전 모델의 "등록했습니다" 가 그대로 남는다.
+    setLibraryNotice(null);
     setBusy(true);
     try {
       const next = await decodeStudioLift3dFile(file);
@@ -387,8 +383,6 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
 
   // 등록은 비동기라, 그 사이에 사용자가 원화나 설정을 바꾸면 화면의 모델과 저장된 모델이
   // 달라진다. 클릭 시점의 결과를 기억해 두고, 완료 시점에 화면이 그대로인지 확인한다.
-  // 권리 표기도 같이 본다 — 모델은 그대로인데 표기만 바뀌면 화면에는 "공개 이용" 이 떠 있는데
-  // 라이브러리에는 "확인 전" 로 박힌 모델이 남고, 성공 문구가 그 어긋남을 덮어 버린다.
   const latestResultRef = useRef<StudioLift3dExport | null>(null);
   latestResultRef.current = result;
   // `unknown` 은 라이브러리가 상업 이용을 언제나 false 로 굳힌다. 화면에서도 같은 규칙을 써야
@@ -400,9 +394,6 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     }),
     [libraryRights, commercialUse],
   );
-  const latestRightsRef = useRef<StudioLift3dRightsDeclaration>(rightsDeclaration);
-  latestRightsRef.current = rightsDeclaration;
-
   const onSaveToLibrary = useCallback(async () => {
     const target = result;
     const targetRights = rightsDeclaration;
@@ -419,9 +410,10 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
       // 남아 있어, 화면이 이미 다른 설정을 보여주는데도 "그대로" 로 읽힌다.
       const staleModel = latestResultRef.current !== target
         || latestRevisionRef.current !== targetRevision;
-      const staleRights = !sameRights(latestRightsRef.current, targetRights);
       setLibraryNotice(saved.ok
-        ? staleModel || staleRights
+        ? staleModel
+          // 모델이 달라졌으면 GLB 해시도 달라, 지금 설정으로 다시 등록하는 것이 실제로 통한다.
+          // 권리 표기는 저장 중 잠겨 있으므로 이 문구가 통하지 않는 조합을 권할 일이 없다.
           ? `등록을 누른 시점의 모델을 "${rightsLabel(targetRights)}" 로 등록했습니다. `
             + "지금 화면의 설정으로는 다시 등록해 주세요."
           : "배경 3D 편집기의 모델 목록에 등록했습니다."
@@ -614,13 +606,19 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                 <span className={FIELD_LABEL_CLASS}>
                   <span>이용 권리</span>
                 </span>
+                {/*
+                  등록 중에는 잠근다. 같은 GLB 가 이미 저장된 뒤라 표기만 바꿔 다시 등록하면
+                  saveVerifiedBg3dModelV12 가 해시 중복을 rightsMatch 로 대조해
+                  `rights-conflict` 를 던진다 — 사용자가 고칠 방법이 없는 상태로 밀어 넣는 셈이다.
+                */}
                 <select
                   value={libraryRights}
+                  disabled={librarySaving}
                   onChange={(event) => {
                     setLibraryRights(event.target.value as StudioLift3dLibraryRights);
                     setLibraryNotice(null);
                   }}
-                  className="min-h-11 w-full rounded-lg border border-line bg-raised px-3 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="min-h-11 w-full rounded-lg border border-line bg-raised px-3 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60"
                 >
                   {LIBRARY_RIGHTS_OPTIONS.map((option) => (
                     <option key={option.id} value={option.id}>{option.label}</option>
@@ -636,7 +634,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                 <input
                   type="checkbox"
                   checked={rightsDeclaration.commercialUse}
-                  disabled={libraryRights === "unknown"}
+                  disabled={librarySaving || libraryRights === "unknown"}
                   onChange={(event) => {
                     setCommercialUse(event.target.checked);
                     setLibraryNotice(null);

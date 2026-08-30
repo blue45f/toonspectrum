@@ -519,6 +519,28 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(noisy * QUAD_CORNERS).toBeGreaterThan(CORNER_BUDGET);
   });
 
+  it("이 함수만 직접 불러도 비유한 레이어 수를 거절한다", () => {
+    // 파이프라인을 거치지 않는 호출자가 있다(이 테스트 파일부터가 그렇다).
+    // clampStudioLift3dBandCount 는 비유한 값을 조용히 1 로 떨어뜨리므로 여기서 막지 않으면
+    // "카드 한 장짜리 시차 레이어" 가 parallax 로 성공해 버린다.
+    const grid = resampleStudioLift3dImage(discImage(48), 32);
+    const mask = extractStudioLift3dMask(grid, { mode: "alpha" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "round", smoothing: 0 });
+
+    for (const layerBands of [Number.NaN, Number.POSITIVE_INFINITY, 0]) {
+      const built = buildStudioLift3dGeometry(mask, depth, {
+        mode: "parallax",
+        depthScale: 0.3,
+        targetHeight: 1,
+        layerBands,
+      });
+
+      expect(built.ok).toBe(false);
+      if (built.ok) return;
+      expect(built.code).toBe("invalid-option");
+    }
+  });
+
   it("나눌 부피가 없으면 앞쪽 두께 비율이 먹히지 않는다고 알린다", () => {
     // 두 칸 폭 실루엣은 모든 정점이 테두리라 앞뒤 두께가 어디서나 같다. frontRatio 는 두 껍질을
     // 통째로 z 로 옮길 뿐이고, 정규화의 z 중심 맞추기가 그 이동을 곧바로 되돌린다. 슬라이더를
