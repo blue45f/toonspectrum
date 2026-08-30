@@ -183,6 +183,26 @@ type ChainDraft = {
   readonly blend: readonly string[];
 };
 
+/**
+ * 체인 길이로 흔들림 세기를 정한다 — 0.10 m 안팎의 삐침머리는 거의 굳게, 0.45 m 롱헤어는
+ * 느슨하게. 짧은 가닥이 롱헤어처럼 출렁이면 어색하다.
+ *
+ * **길이는 조형 스케일까지 반영된 값**이어야 한다. 두신비를 키우면 같은 가닥이 실제로
+ * 길어지므로(두신비 3.6 에서 0.175 m → 0.630 m), 스케일 이전 길이로 굳혀 두면 60cm 짜리
+ * 머리카락이 17cm 용 튜닝(거의 강체)으로 남는다.
+ */
+function springTuning(
+  length: number,
+  heightScale: number,
+): { stiffness: number; gravityPower: number; dragForce: number } {
+  const slack = meshClamp((length - 0.08 * heightScale) / (0.32 * heightScale), 0, 1);
+  return {
+    stiffness: 1.6 - 0.9 * slack,
+    gravityPower: 0.06 + 0.14 * slack,
+    dragForce: 0.72 - 0.3 * slack,
+  };
+}
+
 function chainLength(joints: readonly StudioVrmHairJoint[]): number {
   let total = 0;
   for (let index = 1; index < joints.length; index += 1) {
@@ -350,15 +370,11 @@ export function buildStudioVrmHairRig(
   const bindings = new Map<string, StudioVrmHairBinding>();
 
   for (const draft of drafts) {
-    // 0.10 m 안팎의 삐침머리는 거의 굳게, 0.45 m 롱헤어는 느슨하게.
-    const slack = meshClamp((draft.length - 0.08 * heightScale) / (0.32 * heightScale), 0, 1);
     const chain: StudioVrmHairChain = {
       id: draft.id,
       joints: draft.joints,
       jointOffset: joints.length,
-      stiffness: 1.6 - 0.9 * slack,
-      gravityPower: 0.06 + 0.14 * slack,
-      dragForce: 0.72 - 0.3 * slack,
+      ...springTuning(draft.length, heightScale),
     };
     chains.push(chain);
     joints.push(...draft.joints);
@@ -405,10 +421,15 @@ export function shapeStudioVrmHairRig(
   rig: StudioVrmHairRig | null,
   headWorldRest: MeshVec3,
   scale: MeshVec3,
+  heightScale = 1,
 ): StudioVrmHairRig | null {
   if (rig === null) return null;
   if (scale[0] === 1 && scale[1] === 1 && scale[2] === 1) return rig;
-  const radial = (scale[0] + scale[1] + scale[2]) / 3;
+  // 충돌 반경은 스칼라라 축별 스케일을 정확히 담을 수 없다. **가장 큰 축**을 쓴다 —
+  // 평균을 쓰면 가장 두꺼워진 축을 감싸지 못한다(얼굴 깊이 1.6 · 폭·높이 0.6 에서 Z 두께는
+  // 1.14 배인데 평균은 0.95 배라 20% 가 콜라이더를 뚫고 들어간다). 과하게 잡는 쪽은
+  // 머리카락이 살짝 더 밀려날 뿐이지만, 모자라면 몸통을 통과한다.
+  const radial = Math.max(scale[0], scale[1], scale[2]);
   const moved = new Map<StudioVrmHairJoint, StudioVrmHairJoint>();
   const shapeJoint = (joint: StudioVrmHairJoint): StudioVrmHairJoint => {
     const existing = moved.get(joint);
@@ -432,7 +453,11 @@ export function shapeStudioVrmHairRig(
   };
 
   const joints = rig.joints.map(shapeJoint);
-  const chains = rig.chains.map((chain) => ({ ...chain, joints: chain.joints.map(shapeJoint) }));
+  const chains = rig.chains.map((chain) => {
+    const shapedJoints = chain.joints.map(shapeJoint);
+    // 길이가 달라졌으므로 흔들림 세기를 다시 뽑는다.
+    return { ...chain, joints: shapedJoints, ...springTuning(chainLength(shapedJoints), heightScale) };
+  });
   const chainById = new Map(chains.map((chain) => [chain.id, chain]));
   const bindings = new Map<string, StudioVrmHairBinding>();
   for (const [partId, binding] of rig.bindings) {

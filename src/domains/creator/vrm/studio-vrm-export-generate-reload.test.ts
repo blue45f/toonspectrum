@@ -223,4 +223,73 @@ describe("generate recipe → .vrm file reload", () => {
     }
     expect(jointNodes.size).toBeGreaterThan(0);
   });
+
+  it.each(["natural-short", "hime-noble", "wolf-rebel"])(
+    "keeps %s's dynamic bangs from swinging through the skull",
+    async (presetId) => {
+      // 앞머리·옆머리가 스프링 체인이 되면서, 몸통 콜라이더만으로는 고개를 흔들 때 머리카락이
+      // 얼굴을 그대로 통과한다 — 두개골 콜라이더를 빼고 재면 두개골 정규거리 0.57 까지
+      // 들어간다(1.0 이 표면). 예전처럼 `head` 에 강체로 묶여 있을 때는 불가능한 일이었다.
+      const mesh = buildStudioVrmHumanoidMesh(createAvatarForgeState(presetId));
+      const vrm = await loadVrmBytes(
+        exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
+      );
+      const head = vrm.humanoid?.getNormalizedBoneNode("head");
+      const joints = [...(vrm.springBoneManager?.joints ?? [])];
+      if (!head || joints.length === 0) throw new Error(`${presetId}: expected a spring rig`);
+
+      // 콜라이더와 같은 프레임에서 잰다 — 헤어 피벗은 월드 스케일이 1 이고 머리 회전을 따라간다.
+      let pivot: Object3D | null = null;
+      vrm.scene.traverse((object) => {
+        if (object.name === "HairRoot") pivot = object;
+      });
+      if (!pivot) throw new Error(`${presetId}: expected a HairRoot pivot`);
+      const anchored = pivot as Object3D;
+
+      const scale = mesh.rig.nodeScale.head ?? [1, 1, 1];
+      const joint = mesh.rig.worldRest.head;
+      const center = [0, 1, 2].map(
+        (axis) => (mesh.rig.head.center[axis] - joint[axis]) * scale[axis],
+      );
+      const radii = [
+        mesh.rig.head.radiusX * scale[0],
+        mesh.rig.head.radiusY * scale[1],
+        mesh.rig.head.radiusZ * scale[2],
+      ];
+      const skullDistance = (bone: Object3D): number => {
+        const point = anchored.worldToLocal(bone.getWorldPosition(new Vector3()));
+        return Math.hypot(
+          (point.x - center[0]) / radii[0],
+          (point.y - center[1]) / radii[1],
+          (point.z - center[2]) / radii[2],
+        );
+      };
+
+      let deepest = Infinity;
+      for (let step = 0; step < 180; step += 1) {
+        head.rotation.y = Math.sin(step / 8) * 1.1;
+        head.rotation.x = Math.sin(step / 11) * 0.5;
+        vrm.scene.updateMatrixWorld(true);
+        vrm.update(1 / 60);
+        if (step < 60) continue;
+        for (const spring of joints) deepest = Math.min(deepest, skullDistance(spring.bone));
+      }
+      // 두개골 캡슐은 타원체에 내접하므로 가장 넓은 축에서는 약간의 여유가 남는다.
+      expect(deepest, `${presetId}: 머리카락이 두개골을 파고들었다`).toBeGreaterThan(0.9);
+    },
+    60_000,
+  );
+
+  it("assigns both the torso and skull collider groups to every hair spring", () => {
+    const snapshot = buildStudioVrmGenerateAuthoringSnapshot(
+      createStudioVrmGenerateRecipe({ presetId: "hime-noble" }),
+    );
+    const groups = snapshot.springBone?.colliderGroups ?? [];
+    expect(groups.map((group) => group.name)).toEqual(["Torso", "Skull"]);
+    const springs = snapshot.springBone?.springs ?? [];
+    expect(springs.length).toBeGreaterThan(0);
+    for (const spring of springs) {
+      expect(spring.colliderGroups, spring.name).toEqual([0, 1]);
+    }
+  });
 });

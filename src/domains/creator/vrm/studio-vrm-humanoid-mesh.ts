@@ -1459,6 +1459,7 @@ function buildHair(
     ),
     rig.worldRest.head,
     rig.nodeScale.head ?? [1, 1, 1],
+    rig.heightScale,
   );
 
   const jointBase = rig.bones.length;

@@ -641,4 +641,80 @@ describe("studio VRM humanoid mesh", () => {
       }
     }
   });
+
+  it("bounds collision radii by the largest shaped axis, not the average", () => {
+    // 충돌 반경은 스칼라라 축별 스케일을 담을 수 없다. 평균을 쓰면 가장 두꺼워진 축을
+    // 감싸지 못한다 — 얼굴 깊이 1.6 · 폭·높이 0.6 에서 Z 는 1.14배가 되는데 평균은
+    // 0.95배라 20% 가 콜라이더를 뚫고 들어간다.
+    // 기준은 머리 스케일이 정확히 1 인 상태여야 한다 — 배포 프리셋은 대부분 얼굴 비율이
+    // 1 이 아니라 이미 한 번 shaping 을 거친다.
+    const preset = createAvatarForgeState("hime-noble");
+    const base = sanitizeAvatarForgeState({
+      ...preset,
+      face: { ...preset.face, headWidth: 1, headHeight: 1, headDepth: 1 },
+      proportions: { ...preset.proportions, headBodyRatio: 1 },
+    });
+    const neutral = buildStudioVrmHumanoidMesh(base).hairRig;
+    if (!neutral) throw new Error("expected a hair rig");
+
+    for (const face of [
+      { headWidth: 0.6, headHeight: 0.6, headDepth: 1.6 },
+      { headWidth: 1.6, headHeight: 1.6, headDepth: 0.6 },
+    ]) {
+      const state = sanitizeAvatarForgeState({ ...base, face: { ...base.face, ...face } });
+      const built = buildStudioVrmHumanoidMesh(state);
+      const shaped = built.hairRig;
+      if (!shaped) throw new Error("expected a hair rig");
+      const scale = built.rig.nodeScale.head ?? [1, 1, 1];
+      const largest = Math.max(scale[0], scale[1], scale[2]);
+
+      expect(shaped.joints.length).toBe(neutral.joints.length);
+      for (let index = 0; index < shaped.joints.length; index += 1) {
+        const ratio = shaped.joints[index].hitRadius / neutral.joints[index].hitRadius;
+        expect(ratio, `${JSON.stringify(face)} @ ${shaped.joints[index].name}`).toBeCloseTo(
+          largest,
+          9,
+        );
+      }
+    }
+  });
+
+  it("retunes the springs from the shaped chain length, not the pre-scale one", () => {
+    // 흔들림 세기는 체인 길이에서 뽑는다. 두신비를 키우면 같은 가닥이 실제로 길어지는데
+    // (0.175m → 0.630m) 스케일 이전 길이로 굳혀 두면 60cm 머리카락이 17cm 용 튜닝
+    // (거의 강체)으로 남는다.
+    const base = createAvatarForgeState("natural-short");
+    const longest = (headBodyRatio: number) => {
+      const state = sanitizeAvatarForgeState({
+        ...base,
+        proportions: { ...base.proportions, headBodyRatio },
+      });
+      const hairRig = buildStudioVrmHumanoidMesh(state).hairRig;
+      if (!hairRig) throw new Error("expected a hair rig");
+      let best = hairRig.chains[0];
+      let bestLength = 0;
+      for (const chain of hairRig.chains) {
+        let length = 0;
+        for (let index = 1; index < chain.joints.length; index += 1) {
+          const from = chain.joints[index - 1].worldRest;
+          const to = chain.joints[index].worldRest;
+          length += Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
+        }
+        if (length > bestLength) {
+          bestLength = length;
+          best = chain;
+        }
+      }
+      return { chain: best, length: bestLength };
+    };
+
+    const small = longest(1);
+    const big = longest(3.6);
+    // 같은 가닥이 3.6배 길어진다.
+    expect(big.length / small.length).toBeCloseTo(3.6, 1);
+    // 짧을 때는 뻣뻣하고, 길어지면 느슨해져야 한다.
+    expect(small.chain.stiffness).toBeGreaterThan(big.chain.stiffness);
+    expect(small.chain.dragForce).toBeGreaterThan(big.chain.dragForce);
+    expect(big.chain.gravityPower).toBeGreaterThan(small.chain.gravityPower);
+  });
 });

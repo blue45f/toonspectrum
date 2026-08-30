@@ -214,12 +214,35 @@ function buildHairSpringBone(
   hairRig: StudioVrmHairRig,
   rig: StudioVrmRig,
   firstHairNode: number,
+  hairPivotNode: number,
 ): StudioVrmExportSpringBoneConfig {
   const spine = rig.worldRest.spine;
   const unit = rig.heightScale * STUDIO_VRM_RIG_NEUTRAL_HEIGHT;
   const spineNode = STUDIO_VRM_EXPORT_REQUIRED_BONES.indexOf("spine") + FIRST_BONE_NODE;
   const bottomY = rig.worldRest.hips[1] - 0.02 * rig.heightScale;
   const topY = rig.worldRest.leftUpperArm[1] - 0.02 * rig.heightScale;
+
+  // 두개골 캡슐 — 앞머리·옆머리가 이제 스프링 체인이라, 이게 없으면 고개를 흔들 때
+  // 얼굴을 그대로 통과한다(실측: 두개골 정규거리 0.19~0.24 까지, 1.0 이 표면이다).
+  // 예전에는 헤어가 `head` 에 강체로 묶여 있어 애초에 일어날 수 없던 일이다.
+  //
+  // 콜라이더는 **헤어 피벗**에 붙인다. 그 노드는 월드 스케일이 정확히 1 이라(머리 노드의
+  // 조형 스케일을 상쇄한다) 반경·오프셋을 조형이 반영된 월드 단위로 그대로 줄 수 있다.
+  // `head` 에 붙이면 비균등 스케일이 구/캡슐 반경에 모호하게 걸린다.
+  const headScale = rig.nodeScale.head ?? [1, 1, 1];
+  const headJoint = rig.worldRest.head;
+  const skull = {
+    center: [0, 1, 2].map(
+      (axis) => (rig.head.center[axis] - headJoint[axis]) * headScale[axis],
+    ) as [number, number, number],
+    radiusX: rig.head.radiusX * headScale[0],
+    radiusY: rig.head.radiusY * headScale[1],
+    radiusZ: rig.head.radiusZ * headScale[2],
+  };
+  // 타원체에 **내접**하는 캡슐 — 가로 단면의 작은 축을 반경으로 삼고 세로로 늘린다.
+  // 넘치게 잡으면 앞머리가 이마에서 떠 보인다.
+  const skullRadius = Math.min(skull.radiusX, skull.radiusZ);
+  const skullHalf = Math.max(0, skull.radiusY - skullRadius);
 
   return {
     colliders: [
@@ -230,11 +253,21 @@ function buildHairSpringBone(
         radius: 0.076 * unit,
         tail: [0, topY - spine[1], 0],
       },
+      {
+        node: hairPivotNode,
+        shape: "capsule",
+        offset: [skull.center[0], skull.center[1] - skullHalf, skull.center[2]],
+        radius: skullRadius,
+        tail: [skull.center[0], skull.center[1] + skullHalf, skull.center[2]],
+      },
     ],
-    colliderGroups: [{ name: "Torso", colliders: [0] }],
+    colliderGroups: [
+      { name: "Torso", colliders: [0] },
+      { name: "Skull", colliders: [1] },
+    ],
     springs: hairRig.chains.map((chain) => ({
       name: `Hair_${chain.id}`,
-      colliderGroups: [0],
+      colliderGroups: [0, 1],
       joints: chain.joints.map((joint, index) => ({
         node: firstHairNode + chain.jointOffset + index,
         hitRadius: joint.hitRadius,
@@ -382,7 +415,9 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
     materials: humanoid.materials,
     expressions: { preset },
     firstPerson,
-    ...(hairRig ? { springBone: buildHairSpringBone(hairRig, rig, firstHairJointNode) } : {}),
+    ...(hairRig
+      ? { springBone: buildHairSpringBone(hairRig, rig, firstHairJointNode, hairPivotNode) }
+      : {}),
   };
 }
 
