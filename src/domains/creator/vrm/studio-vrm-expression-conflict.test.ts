@@ -112,13 +112,18 @@ describe("resolveStudioVrmExpressionConflicts", () => {
     expect(input).toEqual(snapshot);
   });
 
-  it("declares emotion and mouth groups that overlap only where a preset moves both", () => {
-    const emotions = new Set<string>(STUDIO_VRM_EXPRESSION_EMOTIONS);
-    const mouth = new Set<string>(STUDIO_VRM_EXPRESSION_MOUTH_GROUP);
-    const shared = [...emotions].filter((name) => mouth.has(name));
-    expect(shared.sort()).toEqual(["happy", "relaxed", "sad"]);
-    // 놀람·분노는 눈·눈썹이 주도해 입 누적 상한에 넣지 않는다.
-    expect(mouth.has("surprised")).toBe(false);
-    expect(mouth.has("angry")).toBe(false);
+  it("counts every mouth-moving emotion toward the ceiling", () => {
+    // 놀람·분노도 입을 움직인다(생성 캐릭터의 surprised 는 입을 2.4배로 벌린다). 상한에서
+    // 빼 두면 `surprised 1 + aa 1` 이 입 가중치 2.0 으로 통과해 가산 변형이 되살아난다.
+    for (const emotion of STUDIO_VRM_EXPRESSION_EMOTIONS) {
+      expect(STUDIO_VRM_EXPRESSION_MOUTH_GROUP, emotion).toContain(emotion);
+    }
+  });
+
+  it("holds a shouting-surprise frame under the ceiling", () => {
+    const result = resolveStudioVrmExpressionConflicts({ surprised: 1, aa: 1 });
+    expect(mouthSum(result.weights)).toBeCloseTo(STUDIO_VRM_EXPRESSION_DEFAULT_MOUTH_CEILING, 6);
+    expect(result.weights.surprised).toBeLessThan(1);
+    expect(result.weights.aa).toBeLessThan(1);
   });
 });

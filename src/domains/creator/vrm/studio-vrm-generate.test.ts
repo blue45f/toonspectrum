@@ -131,6 +131,29 @@ describe("studio VRM generate default preset", () => {
   });
 });
 
+describe("studio VRM generate blink overrides", () => {
+  it("stops eye-moving emotions from stacking their morphs on top of blink", () => {
+    const snapshot = buildStudioVrmGenerateAuthoringSnapshot(
+      createStudioVrmGenerateRecipe({ presetId: PRESET_A }),
+    );
+    const preset = snapshot.expressions?.preset ?? {};
+
+    // 표정 가중치는 런타임에서 델타로 더해진다. happy(눈을 30%로 접음)와 blink(6%로 접음)를
+    // 함께 적용하면 눈꺼풀이 닫히는 게 아니라 아래 가장자리를 지나쳐 뒤집힌다.
+    expect(preset.happy?.overrideBlink).toBe("block");
+    expect(preset.relaxed?.overrideBlink).toBe("block");
+    expect(preset.surprised?.overrideBlink).toBe("block");
+    // 눈 변화가 완만한 표정은 세기에 비례해 깜빡임을 줄이기만 한다.
+    expect(preset.angry?.overrideBlink).toBe("blend");
+    expect(preset.sad?.overrideBlink).toBe("blend");
+
+    // 깜빡임 자체와 입모양·시선에는 오버라이드가 붙지 않는다.
+    for (const name of ["blink", "blinkLeft", "blinkRight", "aa", "lookUp"] as const) {
+      expect(preset[name]?.overrideBlink, name).toBeUndefined();
+    }
+  });
+});
+
 describe("exportStudioVrmFromGenerateRecipe", () => {
   it("emits valid VRM 1.0 humanoids for two distinct presets", async () => {
     const recipeA = createStudioVrmGenerateRecipe({ presetId: PRESET_A });

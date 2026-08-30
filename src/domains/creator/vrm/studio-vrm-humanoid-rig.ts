@@ -88,6 +88,8 @@ export const STUDIO_VRM_RIG_NEUTRAL = Object.freeze({
   hipHalf: 0.09,
   thigh: 0.45,
   shin: 0.41,
+  /** 중립 발목 높이(지면 → 발목). hipHeight − thigh − shin 과 같아야 한다. */
+  ankleHeight: 0.09,
   /** head 관절 → 두개골 중심 */
   headCenterRise: 0.088,
   headForward: -0.006,
@@ -123,6 +125,14 @@ export type StudioVrmRigHeadFit = {
 export type StudioVrmRig = {
   readonly version: typeof STUDIO_VRM_HUMANOID_RIG_VERSION;
   readonly bones: readonly StudioVrmRigBone[];
+  /**
+   * 중립 리그 대비 **균등 배율**(중립에서 정확히 1) = `overallHeight`.
+   *
+   * 메시 실루엣 상수는 전부 이 값에 곱해야 한다. 골반 높이로 배율을 유추하면 안 된다 —
+   * 골반은 다리가 길어져도 발바닥이 지면에 남도록 보정되므로 `legLength` 가 섞여 들어간다
+   * (legLength 1.55 에서 골반 기준 배율은 1.50 이 되어 몸통·팔다리·의상이 50% 부풀었다).
+   */
+  readonly heightScale: number;
   /** 부모 기준 로컬 이동. glTF 노드 `translation` 에 그대로 들어간다. */
   readonly localTranslation: Readonly<Record<StudioVrmRigBone, StudioVrmRigVec3>>;
   /** rest 월드 위치. 메시 저작 좌표계이자 IBM 의 기준. */
@@ -212,6 +222,7 @@ export function buildStudioVrmRig(input: {
   return {
     version: STUDIO_VRM_HUMANOID_RIG_VERSION,
     bones: STUDIO_VRM_EXPORT_REQUIRED_BONES,
+    heightScale: height,
     localTranslation: local,
     worldRest: world,
     nodeScale: {

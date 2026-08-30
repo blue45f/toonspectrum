@@ -120,6 +120,25 @@ export function createStudioVrmGenerateRecipe(input: {
   };
 }
 
+/**
+ * 눈을 움직이는 감정 표정이 깜빡임과 **겹쳐 쌓이지 않게** 하는 VRM 메타데이터.
+ *
+ * 표정 가중치는 런타임에서 모프 델타로 더해진다. 그래서 웃으면서 깜빡이는 평범한 상황에서
+ * `happy`(눈을 30% 높이로 접음)와 `blink`(6% 로 접음)의 델타가 합산돼, 눈꺼풀이 닫히는 게
+ * 아니라 아래 가장자리를 지나쳐 뒤집힌다.
+ *
+ * 눈이 크게 변형되는 표정은 깜빡임을 아예 막고(`block`), 눈 변화가 완만한 표정은 표정 세기에
+ * 비례해 깜빡임을 줄인다(`blend`). 둘 다 VRM 1.0 이 이 문제를 위해 둔 장치다.
+ */
+const STUDIO_VRM_GENERATE_BLINK_OVERRIDES: Readonly<Record<string, "block" | "blend" | undefined>> =
+  Object.freeze({
+    happy: "block",
+    relaxed: "block",
+    surprised: "block",
+    angry: "blend",
+    sad: "blend",
+  });
+
 /** 본 인덱스 맵. `humanBones` 와 노드 자식 배열이 같은 규약을 쓰도록 한 곳에서 만든다. */
 function humanoidBones(): StudioVrmExportHumanoidBones {
   return Object.fromEntries(
@@ -191,8 +210,10 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
   const faceNode = meshNodeIndex(humanoid.facePartIndex);
   const preset: Partial<Record<StudioVrmExportExpressionPreset, StudioVrmExportExpression>> = {};
   humanoid.morphTargetNames.forEach((name, index) => {
+    const overrideBlink = STUDIO_VRM_GENERATE_BLINK_OVERRIDES[name];
     preset[name as StudioVrmExportExpressionPreset] = {
       morphTargetBinds: [{ node: faceNode, index, weight: 1 }],
+      ...(overrideBlink ? { overrideBlink } : {}),
     };
   });
 

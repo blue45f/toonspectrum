@@ -43,7 +43,6 @@ import {
 } from "./studio-vrm-humanoid-mesh-geometry";
 import {
   buildStudioVrmRig,
-  STUDIO_VRM_RIG_NEUTRAL,
   STUDIO_VRM_RIG_NEUTRAL_HEIGHT,
   type StudioVrmRig,
   type StudioVrmRigBone,
@@ -112,13 +111,18 @@ function toonMaterial(
   name: string,
   base: Rgb,
   shade: Rgb,
-  options: { readonly outline?: number; readonly doubleSided?: boolean; readonly toony?: number } = {},
+  options: {
+    readonly outline?: number;
+    readonly doubleSided?: boolean;
+    readonly toony?: number;
+    readonly roughness?: number;
+  } = {},
 ): StudioVrmExportMaterial {
   return {
     name,
     baseColorFactor: [base[0], base[1], base[2], 1],
     metallicFactor: 0,
-    roughnessFactor: 0.85,
+    roughnessFactor: options.roughness ?? 0.85,
     doubleSided: options.doubleSided,
     mtoon: {
       shadeColorFactor: [shade[0], shade[1], shade[2]],
@@ -153,6 +157,8 @@ function buildMaterials(state: AvatarForgeState): StudioVrmExportMaterial[] {
       outline: 0.0022,
       doubleSided: true,
       toony: 0.94,
+      // 조형 패널의 광택 슬라이더가 내보낸 VRM 에 실제로 반영되게 한다.
+      roughness: meshClamp(1 - state.hair.shine, 0.2, 1),
     }),
     toonMaterial("Tops", tops, darken(tops, 0.68), { outline: 0.002 }),
     toonMaterial("Bottoms", bottoms, darken(bottoms, 0.68), { outline: 0.002 }),
@@ -248,9 +254,14 @@ function bodyUnit(rig: StudioVrmRig): number {
   return heightScale(rig) * STUDIO_VRM_RIG_NEUTRAL_HEIGHT;
 }
 
-/** 중립 대비 선형 배율(중립에서 정확히 1). 세로 오프셋은 이 값을 쓴다. */
+/**
+ * 중립 대비 선형 배율(중립에서 정확히 1). 세로 오프셋도 이 값을 쓴다.
+ *
+ * 리그가 직접 주는 값을 쓴다. 골반 높이에서 유추하면 안 된다 — 다리를 늘려도 발바닥이
+ * 지면에 남도록 골반이 보정되므로 `legLength` 가 배율에 새어 든다.
+ */
 function heightScale(rig: StudioVrmRig): number {
-  return rig.worldRest.hips[1] / STUDIO_VRM_RIG_NEUTRAL.hipHeight;
+  return rig.heightScale;
 }
 
 /** 몸통 단면 계획 — [높이, 좌우 반지름 비율, 앞뒤 반지름 비율, 초타원 지수]. */
@@ -455,7 +466,11 @@ function buildFoot(
   const unit = bodyUnit(rig);
   const foot = side > 0 ? "leftFoot" : "rightFoot";
   const [x, ankleY] = rig.worldRest[foot];
-  const soleY = rig.groundY;
+  // 발 노드의 균등 스케일은 **발목을 원점으로** 걸린다. 밑창을 지면에 그대로 저작하면
+  // footScale>1 은 발을 바닥 아래로 밀고 <1 은 띄운다(1.6 에서 5.4cm 관통). 스케일 후
+  // 밑창이 지면에 앉도록 저작 높이를 미리 되돌려 둔다: A + (s·(y−A)) = groundY 를 y 로 푼 값.
+  const footScale = rig.nodeScale[foot]?.[1] ?? 1;
+  const soleY = ankleY - (ankleY - rig.groundY) / (footScale === 0 ? 1 : footScale);
   const halfHeight = (ankleY - soleY) / 2 + outset;
   const centerY = soleY + halfHeight;
 
@@ -480,7 +495,9 @@ function buildFoot(
         2.4,
       ),
     ),
-    { segments: 14, uvRect, capStart: true, capEnd: true },
+    // 4의 배수여야 단면의 최저점에 정점이 놓여 밑창이 지면에 정확히 닿는다.
+    // 14각형이면 최저 샘플이 0.979 지점이라 발이 1mm 가량 떠 보인다.
+    { segments: 16, uvRect, capStart: true, capEnd: true },
   );
 }
 

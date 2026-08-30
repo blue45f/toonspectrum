@@ -105,6 +105,20 @@ describe("studio VRM humanoid rig", () => {
     expect(tall).toBeGreaterThan(short * 1.5);
   });
 
+  it("reports a height scale that leg length cannot contaminate", () => {
+    // 골반은 다리를 늘려도 발바닥이 지면에 남도록 보정된다. 그 높이로 배율을 유추하면
+    // legLength 1.55 에서 1.50 이 나와 몸통·팔다리·의상이 50% 부푼다.
+    for (const legLength of [0.55, 1, 1.55]) {
+      const rig = buildStudioVrmRig({ proportions: { ...NEUTRAL.proportions, legLength } });
+      expect(rig.heightScale, `legLength ${legLength}`).toBeCloseTo(1, 10);
+      expect(rig.worldRest.hips[1] / 0.95).not.toBeCloseTo(legLength === 1 ? 0 : 1, 2);
+    }
+    for (const overallHeight of [0.8, 1.3]) {
+      const rig = buildStudioVrmRig({ proportions: { ...NEUTRAL.proportions, overallHeight } });
+      expect(rig.heightScale).toBeCloseTo(overallHeight, 10);
+    }
+  });
+
   it("only scales leaf bones, so no rotated child can inherit a shear", () => {
     const rig = buildStudioVrmRig({ proportions: NEUTRAL.proportions, face: NEUTRAL.face });
     const parents = new Set(
@@ -169,6 +183,64 @@ describe("studio VRM humanoid mesh", () => {
     expect(minY).toBeLessThan(0.01);
     expect(maxY).toBeGreaterThan(1.4);
     expect(maxY).toBeLessThan(1.9);
+  });
+
+  it("keeps body width independent of leg length", () => {
+    const widthOf = (legLength: number) => {
+      const built = buildStudioVrmHumanoidMesh({
+        ...NEUTRAL,
+        proportions: { ...NEUTRAL.proportions, legLength },
+      });
+      const positions = numbers(built.parts[0].primitives[0].positions);
+      let maxX = 0;
+      for (let index = 0; index < positions.length; index += 3) {
+        maxX = Math.max(maxX, Math.abs(positions[index]));
+      }
+      return maxX;
+    };
+    // 팔 끝까지의 폭은 팔 길이가 정한다 — 다리 길이가 바꾸면 안 된다.
+    expect(widthOf(1.55)).toBeCloseTo(widthOf(1), 6);
+    expect(widthOf(0.55)).toBeCloseTo(widthOf(1), 6);
+  });
+
+  it("keeps scaled feet standing on the ground plane", () => {
+    const posedSoleFor = (footScale: number) => {
+      const built = buildStudioVrmHumanoidMesh({
+        ...NEUTRAL,
+        proportions: { ...NEUTRAL.proportions, footScale },
+      });
+      const ankleY = built.rig.worldRest.leftFoot[1];
+      const scale = built.rig.nodeScale.leftFoot?.[1] ?? 1;
+      let lowest = Infinity;
+      for (const part of built.parts) {
+        if (part.nodeName !== "Body" && part.nodeName !== "Shoes") continue;
+        for (const primitive of part.primitives) {
+          const positions = numbers(primitive.positions);
+          for (let index = 1; index < positions.length; index += 3) {
+            lowest = Math.min(lowest, positions[index]);
+          }
+        }
+      }
+      // 발 노드의 균등 스케일은 발목을 원점으로 걸린다 — 그 변환을 거친 뒤의 밑창 높이.
+      return { posed: ankleY + (lowest - ankleY) * scale, ground: built.rig.groundY };
+    };
+
+    for (const footScale of [0.6, 1, 1.6]) {
+      const { posed, ground } = posedSoleFor(footScale);
+      expect(posed, `footScale ${footScale}`).toBeCloseTo(ground, 6);
+    }
+  });
+
+  it("carries the forge hair shine into the exported hair material", () => {
+    const glossy = buildStudioVrmHumanoidMesh({
+      ...HAIRED,
+      hair: { ...HAIRED.hair, shine: 0.9 },
+    }).materials.find((material) => material.name === "Hair");
+    const matte = buildStudioVrmHumanoidMesh({
+      ...HAIRED,
+      hair: { ...HAIRED.hair, shine: 0.05 },
+    }).materials.find((material) => material.name === "Hair");
+    expect(glossy?.roughnessFactor).toBeLessThan(matte?.roughnessFactor ?? 0);
   });
 
   it("names parts and materials so the wardrobe and hair systems classify them", () => {

@@ -25,7 +25,14 @@ export const STUDIO_VRM_EXPRESSION_EMOTIONS = Object.freeze([
   "relaxed",
 ] as const);
 
-/** 입 모양을 함께 움직여 가중치가 누적되는 표정. 합계에 상한을 건다. */
+/**
+ * 입 모양을 함께 움직여 가중치가 누적되는 표정. 합계에 상한을 건다.
+ *
+ * 감정 다섯 개가 **전부** 들어 있다. 놀람·분노는 눈·눈썹이 주도하지만 입도 함께 움직이므로
+ * (생성 캐릭터의 `surprised` 는 입을 2.4배로 벌리고 `angry` 는 입꼬리를 내린다), 상한에서
+ * 빼 두면 `surprised 1 + aa 1` 같은 조합이 입 가중치 2.0 으로 그대로 통과해 이 해소기가
+ * 막으려던 가산 변형이 다시 생긴다.
+ */
 export const STUDIO_VRM_EXPRESSION_MOUTH_GROUP = Object.freeze([
   "aa",
   "ih",
@@ -35,6 +42,8 @@ export const STUDIO_VRM_EXPRESSION_MOUTH_GROUP = Object.freeze([
   "happy",
   "sad",
   "relaxed",
+  "surprised",
+  "angry",
 ] as const);
 
 export type StudioVrmExpressionEmotion = (typeof STUDIO_VRM_EXPRESSION_EMOTIONS)[number];
