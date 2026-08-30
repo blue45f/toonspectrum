@@ -123,68 +123,53 @@ describe("Studio Lift 3D 깊이장", () => {
     expect(Array.from(first.heights)).toEqual(Array.from(second.heights));
   });
 
-  it("밴드가 한 칸씩 겹쳐 경계 사각형을 잃지 않는다", () => {
-    // 깔끔한 분할이면 두 밴드가 맞닿는 사각형은 네 꼭짓점이 한 밴드에 다 들어가지 못해
-    // 어느 카드도 만들지 않는다. 겹치기 전에는 부드러운 그라데이션에서도 13%가 사라졌다.
-    const source = verticalGradientImage(64);
-    const grid = resampleStudioLift3dImage(source, 32);
+  it("밴드는 마스크 셀을 정확히 한 번씩 나눠 갖는다", () => {
+    // 한때는 밴드를 한 칸씩 부풀려 경계 사각형을 양쪽 카드에 다 넣었다. 구멍은 막혔지만 깊이가
+    // 셀 단위로 번갈아 나오는 원화에서 그 한 칸이 밴드를 마스크 전체로 넓혀, 불투명 카드끼리
+    // 서로를 가려 시차가 사라졌다. 지금은 셀이 겹치지 않는다 — 경계는 면 단위로 나눈다.
+    const grid = resampleStudioLift3dImage(verticalGradientImage(64), 32);
     const mask = extractStudioLift3dMask(grid, { mode: "full" });
     const depth = buildStudioLift3dDepthField(mask, grid, { profile: "relief", smoothing: 0 });
+
     const bands = buildStudioLift3dDepthBands(mask, depth, 5);
 
-    const quadsOf = (cells: Uint8Array): number => {
-      let count = 0;
-      for (let j = 0; j + 1 < mask.height; j += 1) {
-        for (let i = 0; i + 1 < mask.width; i += 1) {
-          const a = cells[j * mask.width + i]!;
-          const b = cells[j * mask.width + i + 1]!;
-          const c = cells[(j + 1) * mask.width + i + 1]!;
-          const d = cells[(j + 1) * mask.width + i]!;
-          if (a === 1 && b === 1 && c === 1 && d === 1) count += 1;
-        }
-      }
-      return count;
-    };
-
-    const whole = quadsOf(mask.cells);
-    const covered = bands.reduce((sum, band) => sum + quadsOf(band.cells), 0);
-    expect(whole).toBeGreaterThan(0);
-    // 겹침 덕에 합이 전체보다 크거나 같다 — 빠진 띠가 없다는 뜻이다.
-    expect(covered).toBeGreaterThanOrEqual(whole);
+    const seen = new Int32Array(mask.width * mask.height);
+    for (const band of bands) {
+      for (let index = 0; index < band.cells.length; index += 1) seen[index]! += band.cells[index]!;
+    }
+    let inside = 0;
+    for (let index = 0; index < mask.cells.length; index += 1) {
+      inside += mask.cells[index]!;
+      // 피사체 셀은 정확히 하나, 배경 셀은 하나도 아닌 밴드에 속한다.
+      expect(seen[index]).toBe(mask.cells[index]);
+    }
+    expect(inside).toBeGreaterThan(0);
+    expect(bands.reduce((sum, band) => sum + band.cellCount, 0)).toBe(inside);
   });
 
-  it("2×2 안에서 밴드가 대각으로 엇갈려도 빠지는 사각형이 없다", () => {
-    // 4방향으로만 부풀리면 2×2 네 칸이 서로 다른 밴드로 갈릴 때 **어느 밴드도** 그 2×2 를
-    // 전부 갖지 못해 사각형이 통째로 사라진다. 실루엣에 구멍이 뚫리는데 경고도 없다.
-    const width = 12;
-    const height = 12;
-    const mask = solidMask(width, height, 0);
-    const heights = new Float64Array(width * height);
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        // 체커보드로 네 버킷을 깔면 **어떤 2×2 든 네 칸이 모두 다른 밴드**가 된다.
-        heights[y * width + x] = ((x % 2) + 2 * (y % 2) + 0.5) / 4;
+  it("깊이가 셀 단위로 번갈아도 한 밴드가 마스크를 통째로 삼키지 않는다", () => {
+    // 이것이 부풀리기를 걷어낸 이유다. 체커보드에서는 모든 셀이 모든 밴드와 체비쇼프 거리 1
+    // 안에 있어, 부풀린 밴드가 저마다 마스크 전체(100%)를 덮었다.
+    const side = 24;
+    const mask = solidMask(side, side, 0);
+    const heights = new Float64Array(side * side);
+    for (let y = 0; y < side; y += 1) {
+      for (let x = 0; x < side; x += 1) {
+        heights[y * side + x] = ((x % 2) + 2 * (y % 2) + 0.5) / 4;
       }
     }
-    const depth = { width, height, heights, maxDistance: 6 };
 
-    const bands = buildStudioLift3dDepthBands(mask, depth, 4);
+    const bands = buildStudioLift3dDepthBands(
+      mask,
+      { width: side, height: side, heights, maxDistance: 4 },
+      4,
+    );
 
     expect(bands).toHaveLength(4);
-    const covers = (cells: Uint8Array, x: number, y: number): boolean =>
-      cells[y * width + x] === 1
-      && cells[y * width + x + 1] === 1
-      && cells[(y + 1) * width + x] === 1
-      && cells[(y + 1) * width + x + 1] === 1;
-    const orphans: string[] = [];
-    for (let y = 0; y + 1 < height; y += 1) {
-      for (let x = 0; x + 1 < width; x += 1) {
-        if (!covers(mask.cells, x, y)) continue;
-        if (!bands.some((band) => covers(band.cells, x, y))) orphans.push(`${x},${y}`);
-      }
+    for (const band of bands) {
+      // 네 밴드가 고르게 나눠 가지므로 어느 하나도 마스크의 절반을 넘지 않는다.
+      expect(band.cellCount).toBeLessThan((side * side) / 2);
     }
-
-    expect(orphans).toEqual([]);
   });
 
   it("밴드는 마스크 밖으로 새어 나가지 않는다", () => {

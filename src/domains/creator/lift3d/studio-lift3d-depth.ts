@@ -255,22 +255,6 @@ export interface StudioLift3dDepthBand {
   readonly cellCount: number;
 }
 
-/**
- * 깊이장을 같은 폭의 구간으로 잘라 밴드별 셀 집합을 만든다.
- *
- * 시차(parallax) 레이어의 재료다. 연속된 부조를 몇 장의 평평한 카드로 바꾸면 카메라가 움직일 때
- * 층이 서로 다른 속도로 흘러, 웹툰 배경이 기대하는 깊이감이 훨씬 또렷하게 읽힌다.
- *
- * **밴드는 한 칸씩 겹친다.** 깔끔한 분할로 두면 두 밴드가 맞닿는 경계의 사각형은 네 꼭짓점이
- * 한 밴드에 다 들어가지 못해 어느 카드도 만들지 않는다 — 부드러운 그라데이션 하나에서도
- * 전체 사각형의 13%가 사라져 카드 사이에 구멍 띠가 남았고, 잡음이 많은 원화라면 같은 밴드
- * 2×2 블록이 아예 없어 면 없는 지오메트리가 될 수도 있다. 각 밴드를 마스크 안쪽으로 한 칸
- * 부풀리면 경계 사각형이 양쪽 카드에 모두 들어가고, 겹친 한 칸은 실제 컷아웃 레이어가
- * 서로 살짝 겹치는 모습 그대로 읽힌다.
- *
- * 비어 있는 밴드는 버린다 — 하늘만 있는 원화에서 중간 밴드가 통째로 비는 일은 흔하고,
- * 빈 카드는 면 없는 지오메트리로만 남는다.
- */
 export const STUDIO_LIFT3D_MAX_DEPTH_BANDS = 24;
 
 /** 밴드 수를 허용 범위로 조인다. 카드 두께 계산이 같은 값을 써야 층이 겹치지 않는다. */
@@ -279,63 +263,72 @@ export function clampStudioLift3dBandCount(bandCount: number): number {
   return Math.max(1, Math.min(STUDIO_LIFT3D_MAX_DEPTH_BANDS, Math.round(bandCount)));
 }
 
+/**
+ * 셀마다 어느 깊이 밴드에 속하는지. 마스크 밖은 −1.
+ *
+ * 밴드 소속의 **단일 출처**다. 셀 집합(`buildStudioLift3dDepthBands`)과 면 배정(메시 빌더)이
+ * 각자 구간을 계산하면 둘이 어긋날 수 있어, 둘 다 이 배열을 받아 쓴다.
+ */
+export function studioLift3dBandBuckets(
+  mask: StudioLift3dMask,
+  depth: StudioLift3dDepthField,
+  bandCount: number,
+): Int32Array {
+  const bands = clampStudioLift3dBandCount(bandCount);
+  const size = mask.width * mask.height;
+  const buckets = new Int32Array(size).fill(-1);
+  for (let index = 0; index < size; index += 1) {
+    if (mask.cells[index] === 0) continue;
+    const height = clamp01(depth.heights[index] ?? 0);
+    // 1 은 마지막 밴드에 속한다. floor 만 쓰면 밴드가 하나 더 생긴다.
+    buckets[index] = Math.min(bands - 1, Math.floor(height * bands));
+  }
+  return buckets;
+}
+
+/**
+ * 깊이장을 같은 폭의 구간으로 잘라 밴드별 셀 집합을 만든다.
+ *
+ * 시차(parallax) 레이어의 재료다. 연속된 부조를 몇 장의 평평한 카드로 바꾸면 카메라가 움직일 때
+ * 층이 서로 다른 속도로 흘러, 웹툰 배경이 기대하는 깊이감이 훨씬 또렷하게 읽힌다.
+ *
+ * **밴드는 겹치지 않는다.** 한때는 각 밴드를 한 칸씩 부풀려 경계 사각형이 양쪽 카드에 모두
+ * 들어가게 했는데, 깊이가 셀 단위로 번갈아 나오는 원화에서는 그 한 칸이 밴드를 마스크 전체로
+ * 넓혔다(측정: 체커보드 100%, `(x+3y)%12` 74.5%). 배경은 껍질마다 불투명 재질에 원본 전체
+ * 텍스처를 쓰므로, 그렇게 커진 앞 카드가 뒤 카드를 통째로 가려 시차가 사라졌다. 지금은 경계
+ * 사각형을 **면 단위로 한 밴드에만** 준다(메시 빌더의 면 배정 참고) — 구멍도 없고 겹침도 없다.
+ *
+ * 비어 있는 밴드는 버린다 — 하늘만 있는 원화에서 중간 밴드가 통째로 비는 일은 흔하고,
+ * 빈 카드는 면 없는 지오메트리로만 남는다.
+ */
 export function buildStudioLift3dDepthBands(
   mask: StudioLift3dMask,
   depth: StudioLift3dDepthField,
   bandCount: number,
 ): readonly StudioLift3dDepthBand[] {
   const bands = clampStudioLift3dBandCount(bandCount);
+  const buckets = studioLift3dBandBuckets(mask, depth, bands);
   const size = mask.width * mask.height;
-  const buckets: Uint8Array[] = Array.from({ length: bands }, () => new Uint8Array(size));
+  const cellSets: Uint8Array[] = Array.from({ length: bands }, () => new Uint8Array(size));
   const counts = new Int32Array(bands);
 
   for (let index = 0; index < size; index += 1) {
-    if (mask.cells[index] === 0) continue;
-    const height = clamp01(depth.heights[index] ?? 0);
-    // 1 은 마지막 밴드에 속한다. floor 만 쓰면 밴드가 하나 더 생긴다.
-    const bucket = Math.min(bands - 1, Math.floor(height * bands));
-    buckets[bucket]![index] = 1;
+    const bucket = buckets[index]!;
+    if (bucket < 0) continue;
+    cellSets[bucket]![index] = 1;
     counts[bucket] += 1;
   }
 
   const out: StudioLift3dDepthBand[] = [];
   for (let index = 0; index < bands; index += 1) {
     if (counts[index] === 0) continue;
-    const cells = dilateWithinMask(buckets[index]!, mask);
-    let cellCount = 0;
-    for (let cell = 0; cell < cells.length; cell += 1) cellCount += cells[cell]!;
-    out.push({ index, cells, center: (index + 0.5) / bands, cellCount });
+    out.push({
+      index,
+      cells: cellSets[index]!,
+      center: (index + 0.5) / bands,
+      cellCount: counts[index]!,
+    });
   }
   return Object.freeze(out);
 }
 
-/**
- * 마스크 안쪽으로만 한 칸 부풀린다. 피사체 밖으로 새어 나가지 않는다.
- *
- * 8 방향(체비쇼프 거리 1)으로 부풀리는 이유는 면 누락을 막기 위해서다.
- * `buildFaceGrid` 는 2×2 셀이 모두 같은 밴드에 있어야 사각형을 만든다.
- * 4 방향만 부풀리면 2×2 안에서 대각선으로 마주 본 두 셀이 서로 다른 밴드일 때
- * 어느 밴드도 그 2×2 를 전부 갖지 못해 사각형이 통째로 사라진다.
- * 8 방향이면 2×2 안의 모든 셀이 서로 체비쇼프 거리 1 이내이므로,
- * 그 2×2 에 속한 임의의 셀이 가진 밴드가 항상 2×2 전체를 덮는다.
- */
-function dilateWithinMask(cells: Uint8Array, mask: StudioLift3dMask): Uint8Array {
-  const { width, height } = mask;
-  const out = new Uint8Array(cells);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      if (cells[y * width + x] === 0) continue;
-      const minY = Math.max(0, y - 1);
-      const maxY = Math.min(height - 1, y + 1);
-      const minX = Math.max(0, x - 1);
-      const maxX = Math.min(width - 1, x + 1);
-      for (let ny = minY; ny <= maxY; ny += 1) {
-        for (let nx = minX; nx <= maxX; nx += 1) {
-          const neighbour = ny * width + nx;
-          if (mask.cells[neighbour] === 1) out[neighbour] = 1;
-        }
-      }
-    }
-  }
-  return out;
-}

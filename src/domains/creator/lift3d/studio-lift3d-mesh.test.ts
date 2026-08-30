@@ -12,6 +12,7 @@ import { STUDIO_LIFT3D_LIMITS } from "./studio-lift3d-contract";
 import {
   STUDIO_LIFT3D_MAX_DEPTH_BANDS,
   buildStudioLift3dDepthField,
+  studioLift3dBandBuckets,
 } from "./studio-lift3d-depth";
 import {
   extractStudioLift3dMask,
@@ -21,6 +22,7 @@ import {
 import {
   buildStudioLift3dGeometry,
   countStudioLift3dPlannedQuads,
+  partitionStudioLift3dBandFaces,
   maxStudioLift3dResolutionForLayers,
   normalizeStudioLift3dPositions,
 } from "./studio-lift3d-mesh";
@@ -417,6 +419,34 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(previous).toBeLessThan(STUDIO_LIFT3D_LIMITS.maxResolution);
   });
 
+  it("동심 고리처럼 경계가 긴 밴드도 상한 해상도에서 예산 안이다", () => {
+    // 상한 공식의 여유는 옆벽 4uB 를 가정한다. 가로 띠보다 경계가 긴 동심 고리가 그 가정을
+    // 시험하는 모양이라, 최대 레이어와 함께 걸어 본다.
+    const bands = STUDIO_LIFT3D_MAX_DEPTH_BANDS;
+    const side = Math.min(
+      maxStudioLift3dResolutionForLayers(bands),
+      STUDIO_LIFT3D_LIMITS.maxResolution,
+    );
+    const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+    const heights = new Float64Array(side * side);
+    for (let y = 0; y < side; y += 1) {
+      for (let x = 0; x < side; x += 1) {
+        heights[y * side + x] = Math.min(
+          1,
+          Math.hypot(x - side / 2, y - side / 2) / (side / 2),
+        );
+      }
+    }
+
+    const planned = countStudioLift3dPlannedQuads(
+      mask,
+      { width: side, height: side, heights, maxDistance: side / 2 },
+      { mode: "parallax", layerBands: bands },
+    );
+
+    expect(planned * QUAD_CORNERS).toBeLessThanOrEqual(CORNER_BUDGET);
+  });
+
   it("상한 해상도에서 최대 레이어를 쌓아도 면 예산 안에 들어온다", () => {
     // 화면 전체가 피사체인 배경이 사각형을 가장 많이 만든다. 여기서 통과하지 못하면
     // 슬라이더 두 개를 각각 최대로 올린 조합이 사용자에게는 늘 실패로만 보인다.
@@ -519,6 +549,49 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(noisy * QUAD_CORNERS).toBeGreaterThan(CORNER_BUDGET);
   });
 
+  it("카드는 마스크 사각형을 정확히 한 번씩 나눠 갖는다", () => {
+    // 시차 카드가 서로를 가리지 않는 근거다. 면이 두 카드에 들어가지 않으므로(겹침 0) 앞 카드가
+    // 뒤 카드를 덮을 수 없고, 빠지는 면이 없으므로(덮임 100%) 구멍도 없다.
+    const side = 40;
+    const cases: ReadonlyArray<readonly [string, (x: number, y: number) => number]> = [
+      ["세로 그라데이션", (_x, y) => y / side],
+      ["동심 고리", (x, y) => Math.hypot(x - side / 2, y - side / 2) / side],
+      // 병리적 입력 두 가지 — 부풀리기 시절 카드가 마스크의 100% / 74.5% 를 덮던 값들이다.
+      ["체커보드", (x, y) => ((x % 2) + 2 * (y % 2)) / 4],
+      ["(x+3y)%12", (x, y) => ((x + 3 * y) % 12) / 12],
+    ];
+
+    for (const [label, heightAt] of cases) {
+      const mask = maskFromCells(side, side, new Uint8Array(side * side).fill(1));
+      const heights = new Float64Array(side * side);
+      for (let y = 0; y < side; y += 1) {
+        for (let x = 0; x < side; x += 1) heights[y * side + x] = heightAt(x, y);
+      }
+      const depth = { width: side, height: side, heights, maxDistance: side / 2 };
+      const bandCount = 8;
+
+      const faces = partitionStudioLift3dBandFaces(
+        mask,
+        studioLift3dBandBuckets(mask, depth, bandCount),
+        bandCount,
+      );
+
+      const seen = new Int32Array((side - 1) * (side - 1));
+      for (const band of faces) {
+        for (let face = 0; face < band.length; face += 1) seen[face]! += band[face]!;
+      }
+      const orphans: number[] = [];
+      const shared: number[] = [];
+      for (let face = 0; face < seen.length; face += 1) {
+        if (seen[face] === 0) orphans.push(face);
+        if (seen[face]! > 1) shared.push(face);
+      }
+
+      expect({ label, orphans: orphans.length, shared: shared.length })
+        .toEqual({ label, orphans: 0, shared: 0 });
+    }
+  });
+
   it("사각형을 하나도 못 만드는 밴드는 층 수에서 뺀다", () => {
     // 한 칸 폭 부위에만 걸린 밴드는 부풀린 뒤에도 2×2 가 안 나와 정점이 하나도 안 나간다.
     // 그 껍질을 세어만 두면 존재하지 않는 층이 지표와 화면에 광고된다.
@@ -562,6 +635,8 @@ describe("Studio Lift 3D 메시 빌더", () => {
       0,
       // 위쪽 한도도 같다. 조용히 조이면 요청한 층 수와 다른 결과가 성공으로 나간다.
       STUDIO_LIFT3D_MAX_DEPTH_BANDS + 1,
+      // 분수도 마찬가지다. 반올림하면 1.5 가 2 로 올라가 위상이 조용히 바뀐다.
+      1.5,
     ]) {
       const built = buildStudioLift3dGeometry(mask, depth, {
         mode: "parallax",

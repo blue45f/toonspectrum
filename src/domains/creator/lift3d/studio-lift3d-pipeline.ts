@@ -156,7 +156,8 @@ export interface StudioLift3dRequest {
   readonly symmetryStrength?: number;
   /**
    * 2 이상이면 깊이를 그만큼의 밴드로 잘라 시차 카드를 세운다(`parallax`).
-   * 비우거나 1 이면 프리셋의 기본 위상을 쓴다.
+   * 비우거나 1 이면 프리셋의 기본 위상을 쓴다. **정수**여야 한다 — 층은 개수이고,
+   * 분수를 반올림하면 위상이 조용히 바뀐다.
    */
   readonly layerBands?: number;
 }
@@ -307,14 +308,17 @@ export function liftStudioImageTo3d(
   }
   // NaN 은 프리셋 위상으로 조용히 흘러가고, Infinity 는 parallax 를 고른 뒤 밴드 하나로 조여져
   // "카드 한 장짜리 시차 레이어" 라는 앞뒤 안 맞는 결과가 된다. 모드를 고르기 전에 막는다.
+  // 층 수는 **개수**다. 분수를 받아 반올림하면 1.5 가 조용히 2 로 올라가 프리셋 위상 대신
+  // parallax 가 되는데, 비교가 이미 반올림된 값으로 이뤄져 조정 경고조차 나가지 않는다.
+  // 값을 고치지 말고 계약을 분명히 한다.
   if (request.layerBands !== undefined
-    && (!Number.isFinite(request.layerBands) || request.layerBands < 1)) {
-    return studioLift3dFailure("invalid-option", "layerBands 는 1 이상의 유한한 값이어야 합니다");
+    && (!Number.isInteger(request.layerBands) || request.layerBands < 1)) {
+    return studioLift3dFailure("invalid-option", "layerBands 는 1 이상의 정수여야 합니다");
   }
 
   // 밴드 수는 **위상·해상도를 고르기 전에 한 번** 조인다. 원값을 그대로 쓰면 24 를 넘는 요청이
   // 해상도 상한만 쓸데없이 깎고, 지오메트리는 뒤늦게 24 로 조여 둘이 어긋난다.
-  const requestedBands = Math.round(request.layerBands ?? 1);
+  const requestedBands = request.layerBands ?? 1;
   const layerBands = clampStudioLift3dBandCount(requestedBands);
   const { preset, resolution, warnings } = resolveRequest(request, layerBands);
   if (layerBands !== requestedBands) {

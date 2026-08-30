@@ -34,6 +34,7 @@ import {
   STUDIO_LIFT3D_MAX_DEPTH_BANDS,
   buildStudioLift3dDepthBands,
   clampStudioLift3dBandCount,
+  studioLift3dBandBuckets,
 } from "./studio-lift3d-depth";
 
 import type { StudioLift3dDepthBand, StudioLift3dDepthField } from "./studio-lift3d-depth";
@@ -70,7 +71,7 @@ export interface StudioLift3dGeometryOptions {
    * 총 두께는 바뀌지 않는다. `inflate` 에서만 의미가 있다.
    */
   readonly frontRatio?: number;
-  /** `parallax` 에서 쌓을 깊이 밴드 수(기본 6). */
+  /** `parallax` 에서 쌓을 깊이 밴드 수(기본 6). 1~24 의 **정수**. */
   readonly layerBands?: number;
   /** 완성 모델의 세로 높이(scene unit). 캐릭터 1.7 = 사람 키. */
   readonly targetHeight: number;
@@ -101,7 +102,12 @@ interface FaceGrid {
  * 갈라져 non-manifold 가 된다. glTF 로는 나가지만 CSG·섭디비전·법선 계산이 전부 어긋나므로
  * 한 쪽 면을 떨어뜨려 위상을 지킨다.
  */
-function buildFaceGrid(cells: Uint8Array, gridWidth: number, gridHeight: number): FaceGrid {
+/** 2×2 셀이 모두 피사체인 자리에만 사각형이 선다. */
+function facePresenceFromCells(
+  cells: Uint8Array,
+  gridWidth: number,
+  gridHeight: number,
+): Uint8Array {
   const width = gridWidth - 1;
   const height = gridHeight - 1;
   const present = new Uint8Array(Math.max(0, width * height));
@@ -114,6 +120,12 @@ function buildFaceGrid(cells: Uint8Array, gridWidth: number, gridHeight: number)
       present[j * width + i] = a === 1 && b === 1 && c === 1 && d === 1 ? 1 : 0;
     }
   }
+  return present;
+}
+
+/** 대각으로만 이어진 사각형 하나를 떨어뜨려 위상을 지킨다. 떨어뜨린 개수를 돌려준다. */
+function removeFacePinches(present: Uint8Array, gridWidth: number, gridHeight: number): number {
+  const width = gridWidth - 1;
   let droppedPinches = 0;
   for (let y = 1; y < gridHeight - 1; y += 1) {
     for (let x = 1; x < gridWidth - 1; x += 1) {
@@ -130,7 +142,24 @@ function buildFaceGrid(cells: Uint8Array, gridWidth: number, gridHeight: number)
       }
     }
   }
-  return { present, width, height, droppedPinches };
+  return droppedPinches;
+}
+
+function faceGridFromPresence(
+  present: Uint8Array,
+  gridWidth: number,
+  gridHeight: number,
+): FaceGrid {
+  return {
+    present,
+    width: gridWidth - 1,
+    height: gridHeight - 1,
+    droppedPinches: removeFacePinches(present, gridWidth, gridHeight),
+  };
+}
+
+function buildFaceGrid(cells: Uint8Array, gridWidth: number, gridHeight: number): FaceGrid {
+  return faceGridFromPresence(facePresenceFromCells(cells, gridWidth, gridHeight), gridWidth, gridHeight);
 }
 
 /**
@@ -216,14 +245,15 @@ function pushVertex(
 /**
  * 레이어 `layerBands` 장을 쌓을 때 코너 예산 안에 들어오는 작업 격자 한 변의 상한.
  *
- * 화면 전체가 피사체인 최악의 경우를 기준으로 잡는다. 한 변 n(u = n−1)에서
- * 앞뒤 껍질이 2u², 밴드 경계에서 중복되는 사각형과 카드마다 서는 옆벽이 합쳐 4uB 쯤 되고,
- * 사각형 하나가 코너 4개를 쓰므로 8u² + 16uB 코너다. 밴드가 가로 띠가 아니라 동심 고리로
- * 잘릴 때 경계가 더 길어지므로 밴드 항에 2배 여유를 두어 8u² + 32uB ≤ maxEdges 로 푼다.
+ * 화면 전체가 피사체인 최악의 경우를 기준으로 잡는다. 카드는 마스크 사각형을 **나눠 갖지
+ * 겹쳐 갖지 않으므로**(면 분할) 앞뒤 껍질은 밴드 수와 무관하게 2u² 다. 밴드 수에 비례하는 것은
+ * 옆벽뿐이다 — 밴드 경계마다 양쪽 카드가 벽을 세우므로 가로 띠든 동심 고리든 4uB 안팎이다.
+ * 사각형 하나가 코너 4개를 쓰니 8u² + 16uB ≤ maxEdges 를 푼다.
  *
- *   u ≤ −2B + √(4B² + maxEdges/8)
+ *   u ≤ −B + √(B² + maxEdges/8)
  *
- * B=1 이면 248(= `maxResolution`)이라 단일 껍질 경로는 그대로고, B=24 에서 207 까지 내려간다.
+ * B=1 이면 249 라 `maxResolution`(248) 이 그대로 남고, B=24 에서 228 까지 내려간다.
+ * 부풀리기로 앞뒤까지 밴드마다 복사하던 시절에는 같은 자리가 207 이었다.
  *
  * 밴드 수는 지오메트리와 **같은 함수**로 조인다. 여기서만 원값을 쓰면 24 를 넘는 요청이
  * 필요 없이 해상도를 깎고, `Number.MAX_VALUE` 근처에서는 4B² 가 Infinity 로 넘쳐 식이 NaN 이
@@ -232,7 +262,7 @@ function pushVertex(
 export function maxStudioLift3dResolutionForLayers(layerBands: number): number {
   const bands = clampStudioLift3dBandCount(layerBands);
   const quarter = STUDIO_EDITABLE_MESH_LIMITS.maxEdges / 8;
-  const span = -2 * bands + Math.sqrt(4 * bands * bands + quarter);
+  const span = -bands + Math.sqrt(bands * bands + quarter);
   return Math.max(2, Math.floor(span) + 1);
 }
 
@@ -328,6 +358,98 @@ function emitStudioLift3dShell(
   return quadCount;
 }
 
+/** 꼬집힘을 옮겨 풀 때 도는 최대 횟수. 한 번 옮기면 다른 자리가 생길 수 있어 몇 번 반복한다. */
+const PINCH_RELOCATION_PASSES = 4;
+
+/**
+ * 마스크 사각형을 밴드에 **하나씩** 나눠 준다 — 겹치지도, 빠지지도 않는 분할.
+ *
+ * 네 꼭짓점의 밴드가 갈리는 경계 사각형은 **가장 앞 밴드**(번호 최대)가 가져간다. 앞 카드의
+ * 실루엣이 온전해지고, 뒤 카드는 그만큼만 물러난다 — 가까운 물체가 먼 물체를 가리는 실제
+ * 순서와 같다.
+ *
+ * 예전에는 각 밴드를 한 칸 부풀려 경계 사각형을 양쪽에 다 넣었다. 구멍은 막혔지만 깊이가 셀
+ * 단위로 번갈아 나오는 원화에서 그 한 칸이 밴드를 마스크 전체로 넓혔고(체커보드 100%,
+ * `(x+3y)%12` 74.5%), 불투명 카드끼리 서로를 통째로 가려 시차가 사라졌다. 분할은 그 두 가지를
+ * 동시에 없앤다: 모든 마스크 사각형이 정확히 한 카드에 들어가므로 구멍도 겹침도 없다.
+ *
+ * 분할이 만드는 새 문제는 하나뿐이다 — 한 밴드의 사각형끼리 대각으로만 이어지는 자리(꼬집힘)가
+ * 생길 수 있다. 그 사각형을 **버리면 구멍**이 되므로, 직교로 맞닿은 이웃 사각형이 속한 밴드로
+ * **옮긴다**. 면 개수가 보존되니 덮임은 그대로고, 옮겨 간 쪽에서는 이웃이 생겨 꼬집히지 않는다.
+ * 옮길 이웃이 아예 없는 자리만 마지막 `removeFacePinches` 가 떨어뜨리고 경고를 남긴다.
+ */
+export function partitionStudioLift3dBandFaces(
+  mask: StudioLift3dMask,
+  buckets: Int32Array,
+  bandCount: number,
+): readonly Uint8Array[] {
+  // 버킷과 **같은 함수로** 조인다. 호출자가 둘에 다른 수를 넘기면 배열 길이가 어긋나
+  // 밴드 번호가 배열 밖을 가리킬 수 있다.
+  const bands = clampStudioLift3dBandCount(bandCount);
+  const gridWidth = mask.width;
+  const gridHeight = mask.height;
+  const width = gridWidth - 1;
+  const height = gridHeight - 1;
+  const maskFaces = facePresenceFromCells(mask.cells, gridWidth, gridHeight);
+  const owner = new Int32Array(Math.max(0, width * height)).fill(-1);
+
+  for (let j = 0; j < height; j += 1) {
+    for (let i = 0; i < width; i += 1) {
+      const face = j * width + i;
+      if (maskFaces[face] === 0) continue;
+      const corners = [
+        buckets[j * gridWidth + i]!,
+        buckets[j * gridWidth + i + 1]!,
+        buckets[(j + 1) * gridWidth + i]!,
+        buckets[(j + 1) * gridWidth + i + 1]!,
+      ];
+      owner[face] = Math.max(...corners);
+    }
+  }
+
+  for (let pass = 0; pass < PINCH_RELOCATION_PASSES; pass += 1) {
+    let moved = 0;
+    for (let y = 1; y < height; y += 1) {
+      for (let x = 1; x < width; x += 1) {
+        const nw = (y - 1) * width + (x - 1);
+        const ne = (y - 1) * width + x;
+        const sw = y * width + (x - 1);
+        const se = y * width + x;
+        // 같은 밴드가 대각으로만 마주 본 자리를 찾는다. 옮길 면과, 그 면이 갈 곳을 정한다.
+        let stranded = -1;
+        let orthogonal: readonly number[] = [];
+        if (owner[nw] !== -1 && owner[nw] === owner[se] && owner[ne] !== owner[nw]
+          && owner[sw] !== owner[nw]) {
+          stranded = se;
+          orthogonal = [ne, sw];
+        } else if (owner[ne] !== -1 && owner[ne] === owner[sw] && owner[nw] !== owner[ne]
+          && owner[se] !== owner[ne]) {
+          stranded = sw;
+          orthogonal = [nw, se];
+        }
+        if (stranded === -1) continue;
+        for (const neighbour of orthogonal) {
+          if (owner[neighbour] === -1) continue;
+          owner[stranded] = owner[neighbour]!;
+          moved += 1;
+          break;
+        }
+      }
+    }
+    if (moved === 0) break;
+  }
+
+  const out: Uint8Array[] = Array.from(
+    { length: bands },
+    () => new Uint8Array(Math.max(0, width * height)),
+  );
+  for (let face = 0; face < owner.length; face += 1) {
+    const band = owner[face]!;
+    if (band >= 0) out[band]![face] = 1;
+  }
+  return out;
+}
+
 interface PlannedShell {
   readonly grid: FaceGrid;
   readonly depthAt: ShellDepthAt;
@@ -360,12 +482,20 @@ function planStudioLift3dShellGrids(
     };
   }
   const bandCount = clampStudioLift3dBandCount(layerBands ?? 6);
+  // 카드는 셀이 아니라 **면**으로 나눈다. 셀 집합에서 사각형을 다시 따면 경계 사각형이 어느
+  // 밴드에도 들어가지 못해 구멍이 생기고, 그걸 부풀리기로 막으면 카드가 서로를 가린다.
+  const buckets = studioLift3dBandBuckets(mask, depth, bandCount);
+  const faces = partitionStudioLift3dBandFaces(mask, buckets, bandCount);
   const bands = buildStudioLift3dDepthBands(mask, depth, bandCount);
-  return {
-    grids: bands.map((band) => buildFaceGrid(band.cells, mask.width, mask.height)),
-    bands,
-    bandCount,
-  };
+  // 밴드 번호로 맞춘다 — 빈 밴드가 빠진 `bands` 와 면 배열의 순서가 어긋나면 카드가 엉뚱한
+  // 깊이에 놓인다.
+  const grids: FaceGrid[] = [];
+  const placed: StudioLift3dDepthBand[] = [];
+  for (const band of bands) {
+    grids.push(faceGridFromPresence(faces[band.index]!, mask.width, mask.height));
+    placed.push(band);
+  }
+  return { grids, bands: placed, bandCount };
 }
 
 /**
@@ -442,12 +572,12 @@ export function buildStudioLift3dGeometry(
   // 결과가 성공으로 나가는데, 이 경계에는 파이프라인 같은 경고 통로를 두지 않는다 —
   // frontRatio 가 범위를 벗어날 때와 같이 거절하는 것이 이 함수의 규칙이다.
   if (options.layerBands !== undefined
-    && (!Number.isFinite(options.layerBands)
+    && (!Number.isInteger(options.layerBands)
       || options.layerBands < 1
       || options.layerBands > STUDIO_LIFT3D_MAX_DEPTH_BANDS)) {
     return studioLift3dFailure(
       "invalid-option",
-      `layerBands 는 1~${STUDIO_LIFT3D_MAX_DEPTH_BANDS} 사이의 유한한 값이어야 합니다`,
+      `layerBands 는 1~${STUDIO_LIFT3D_MAX_DEPTH_BANDS} 사이의 정수여야 합니다`,
     );
   }
   if (estimatedVertexBudget(mask) > STUDIO_EDITABLE_MESH_LIMITS.maxVertices) {
