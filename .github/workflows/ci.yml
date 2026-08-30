@@ -280,6 +280,37 @@ jobs:
       - run: pnpm run check:studio-bundle
       - run: pnpm run build:all
 
+  studio-3d-visual:
+    # 렌더된 프레임을 근거로 하는 Studio 3D 표면 회귀.
+    #
+    # `studio-3d-runtime`은 WebGPU/WebGL2 캡처 동등성이라는 릴리스 오라클을 본다. 이 잡은 그
+    # 위에서 사용자가 실제로 밟는 경로를 본다 — 3D 배경·캐릭터·데생 인형이 캔버스에 붙는지.
+    # 그 경로 하나가 실사용 진입점 전부에서 막혀 있었는데도 기존 3D E2E는 다이얼로그가 열리는지만
+    # 보느라 초록이었다.
+    #
+    # 오라클 잡의 20분 예산을 잠식하지 않도록 분리한다. GPU 없는 러너에서도 실제 프레임이 나오게
+    # playwright.config.ts가 ANGLE/SwiftShader로 Chromium을 띄우므로 Xvfb는 필요 없다.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      # Empty selects Playwright's own bundled Chromium — the build `playwright install chromium`
+      # puts on the runner. The config otherwise defaults to the `chrome` channel, which needs
+      # Google Chrome and would not resolve here.
+      PLAYWRIGHT_CHANNEL: ""
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify Studio 3D surfaces against rendered frames
+        run: pnpm run verify:studio-3d-visual
+
   studio-3d-runtime:
     # Preserve the existing "CI / verify" check context while moving the GPU proof onto
     # a clean GitHub-hosted VM so CPU/memory contention cannot affect the release oracle. The

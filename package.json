@@ -115,6 +115,7 @@
     "verify:studio-gpu-filters": "tsx scripts/verify-studio-gpu-filters.mts",
     "verify:studio-bg3d-physics": "tsx scripts/verify-studio-bg3d-physics.mts",
     "verify:studio-3d-console": "tsx scripts/verify-studio-3d-console.mts",
+    "verify:studio-3d-visual": "playwright test e2e/studio-3d-visual-verification.spec.ts",
     "studio:vrm-generate": "tsx scripts/studio-vrm-generate-mcp-host.mts generate",
     "studio:vrm-generate-mcp": "tsx scripts/studio-vrm-generate-mcp-host.mts",
     "studio:avatar-reference-catalogue:write": "tsx scripts/generate-studio-vrm-avatar-reference-catalogue.mts --write",

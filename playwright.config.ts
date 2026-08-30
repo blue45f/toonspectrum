@@ -1,13 +1,26 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Hybrid DCC industrial E2E — lightweight harness page, not full Studio shell.
+ * Studio E2E. Two shapes share this config: the Hybrid DCC industrial harness page, and the 3D
+ * surface suites that drive the full Studio shell and judge real rendered frames.
  */
 const SOFTWARE_GPU_ARGS = [
   "--use-gl=angle",
   "--use-angle=swiftshader",
   "--enable-unsafe-swiftshader",
 ];
+
+/**
+ * Which Chromium to drive, in precedence order:
+ *
+ *   1. `PLAYWRIGHT_EXECUTABLE_PATH` — a pinned build supplied by the image.
+ *   2. `PLAYWRIGHT_CHANNEL`, including the empty string, which selects Playwright's own bundled
+ *      Chromium. That is what CI wants: the workflow runs `playwright install chromium`, which
+ *      installs the bundled build and not Google Chrome, so a `chrome` channel would not resolve.
+ *   3. `chrome` — the historical default, kept because Playwright's bundled Chromium fails to
+ *      spawn (errno -88) on some local and agent images.
+ */
+const CHANNEL = process.env.PLAYWRIGHT_CHANNEL ?? "chrome";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -42,8 +55,7 @@ export default defineConfig({
               },
             }
           : {
-              // Prefer system Chrome when Playwright's bundled Chromium fails to spawn (errno -88).
-              channel: process.env.PLAYWRIGHT_CHANNEL ?? "chrome",
+              ...(CHANNEL ? { channel: CHANNEL } : {}),
               launchOptions: { args: SOFTWARE_GPU_ARGS },
             }),
       },

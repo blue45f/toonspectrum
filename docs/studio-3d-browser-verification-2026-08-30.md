@@ -2,8 +2,8 @@
 
 - 상태: 검증 완료 · 결함 2건 수정 · 회귀 스위트 상설화.
 - 검증 환경: Chromium(headless) + ANGLE/SwiftShader WebGL2, Vite dev 서버, Studio API 서버 없음.
-- 상설 스위트: `e2e/studio-3d-visual-verification.spec.ts`
-  (`pnpm exec playwright test e2e/studio-3d-visual-verification.spec.ts`).
+- 상설 스위트: `e2e/studio-3d-visual-verification.spec.ts` (`pnpm run verify:studio-3d-visual`),
+  CI 잡 `studio-3d-visual`.
 
 ## 왜 DOM 검사로는 부족했나
 
@@ -18,6 +18,11 @@
 
 `playwright.config.ts`는 GPU 없는 머신에서도 실제 프레임이 나오도록 ANGLE/SwiftShader 인자를
 넘긴다. 이는 WebGPU가 없는 브라우저에서 BG3D가 실제로 내려가는 기준선과 같은 경로다.
+
+CI에서는 전용 잡 `studio-3d-visual`이 이 스위트를 돌린다. 릴리스 오라클인 `studio-3d-runtime`
+(WebGPU/WebGL2 캡처 동등성)의 20분 예산을 잠식하지 않도록 분리했고, 그 잡과 달리 Xvfb 없이
+헤드리스로 돈다. 러너에는 `playwright install chromium`이 놓는 번들 Chromium만 있으므로 잡이
+`PLAYWRIGHT_CHANNEL: ""`로 채널 조회를 끈다(설정 기본값은 `chrome` 채널이다).
 
 ## 결함 1 — 3D 배경을 캔버스에 붙일 수 없었다
 
