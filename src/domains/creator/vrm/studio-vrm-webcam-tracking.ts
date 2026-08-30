@@ -15,6 +15,7 @@ import {
   runStudioMediaPipeVisionTaskCreation,
 } from "../studio-mediapipe-vision-init-arbiter";
 
+import { resolveStudioVrmExpressionConflicts } from "./studio-vrm-expression-conflict";
 import { TrackingChannelFilterBank } from "./studio-vrm-one-euro";
 import { solvePoseToVrmBones } from "./studio-vrm-pose-solver";
 
@@ -75,6 +76,13 @@ export interface TrackingOptions {
   smoothing: number;
   /** true이면 손가락 추적(HandLandmarker) 사용. */
   fingerTracking: boolean;
+  /**
+   * 표정 충돌 해소(studio-vrm-expression-conflict) 사용 여부. 기본 true.
+   *
+   * 끄면 채널에서 유도한 원본 가중치가 그대로 나간다 — 여러 감정이 동시에 켜지고 입 계열
+   * 합계가 1 을 크게 넘길 수 있다. 유도식 자체를 검증할 때만 끈다.
+   */
+  resolveExpressionConflicts?: boolean;
 }
 
 /** VRM 캐릭터에 적용할 뼈 회전 + 표정 가중치. */
@@ -101,6 +109,7 @@ export const DEFAULT_TRACKING_OPTIONS: Readonly<TrackingOptions> = {
   sensitivity: 1,
   smoothing: 0.35,
   fingerTracking: true,
+  resolveExpressionConflicts: true,
 };
 
 /** 얼굴 미검출 시 복귀 기준이 되는 중립 채널(전부 0). */
@@ -983,7 +992,14 @@ export function convertChannelsToVrmData(
     sad: clamp01((channels.mouthFrown * 0.7 + channels.browInnerUp * 0.3) * s),
   };
 
-  return { bones, expressions, lookAt };
+  // 감정·입 표정은 서로 겹치는 모프를 건드린다. 유도식은 채널마다 독립이므로 여기서 한 번
+  // 조정하지 않으면 한 프레임에 여러 감정이 함께 켜져 얼굴이 상쇄·왜곡된다.
+  const resolved =
+    options.resolveExpressionConflicts === false
+      ? expressions
+      : resolveStudioVrmExpressionConflicts(expressions).weights;
+
+  return { bones, expressions: resolved, lookAt };
 }
 
 /**
