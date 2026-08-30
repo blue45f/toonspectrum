@@ -197,6 +197,59 @@ describe("Studio local database Worker host", () => {
     expect(scope.responses.map((response) => response.requestId)).toEqual([1, 2]);
   });
 
+  it("serializes a UI put submitted between CAS comparison and restore behind the RPC", async () => {
+    const scope = new FakeScope();
+    const events: string[] = [];
+    const deferred: { resolve?: () => void } = {};
+    const casTransaction = new Promise<void>((resolve) => {
+      deferred.resolve = resolve;
+    });
+    const compareAndRestoreBrushLibraryRecords = vi.fn(async () => {
+      // The real database method performs both phases synchronously inside BEGIN IMMEDIATE. This
+      // pause models the narrowest possible comparison/restore window at the Worker RPC boundary.
+      events.push("cas-compare");
+      await casTransaction;
+      events.push("cas-restore-and-commit");
+      return { restoredIds: ["pack-brush"], conflictIds: [] };
+    });
+    const putBrushLibraryRecord = vi.fn(async () => {
+      events.push("user-put");
+    });
+    const close = vi.fn(async () => undefined);
+    attachStudioLocalDatabaseWorkerHost(scope, {
+      openDatabase: async () => structuralDatabase({
+        compareAndRestoreBrushLibraryRecords,
+        putBrushLibraryRecord,
+        close,
+      }),
+    });
+
+    scope.send(request(1, {
+      kind: "call",
+      method: "compareAndRestoreBrushLibraryRecords",
+      args: [[{
+        id: "pack-brush",
+        expected: { id: "pack-brush" },
+        restore: null,
+      }], []],
+    }));
+    scope.send(request(2, {
+      kind: "call",
+      method: "putBrushLibraryRecord",
+      args: [{ id: "pack-brush", payload: "newer-user-edit" }],
+    }));
+    await flushQueue();
+
+    expect(events).toEqual(["cas-compare"]);
+    expect(putBrushLibraryRecord).not.toHaveBeenCalled();
+
+    deferred.resolve?.();
+    await vi.waitFor(() => expect(scope.responses).toHaveLength(2));
+
+    expect(events).toEqual(["cas-compare", "cas-restore-and-commit", "user-put"]);
+    expect(scope.responses.map((response) => response.requestId)).toEqual([1, 2]);
+  });
+
   it("orders close after prior calls and fails closed for later calls", async () => {
     const scope = new FakeScope();
     const kvGet = vi.fn(async () => "hero-json");

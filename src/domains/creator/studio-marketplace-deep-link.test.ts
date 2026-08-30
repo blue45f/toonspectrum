@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
+import { isStudioEditorMutationContinuationAllowed } from "./studio-editor-scope";
 import {
   applyStudioMarketplaceDeepLink,
   beginStudioMarketplaceDeepLinkOperation,
@@ -12,7 +15,13 @@ import {
   retainStudioMarketplaceDeepLinkLifecycle,
 } from "./studio-marketplace-deep-link";
 
+import type { StudioMarketplaceInstallGuard } from "./studio-marketplace-deep-link";
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
+
+const studioPageSource = readFileSync(
+  new URL("./StudioPage.tsx", import.meta.url),
+  "utf8",
+);
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -51,7 +60,10 @@ function dependencies(options: {
     projectPack: vi.fn(() => options.projection === "unsupported"
       ? { status: "unsupported" as const, pack: null, reason: "호환되지 않는 엔진입니다." }
       : { status: "installable" as const, pack: "pack-1", reason: null }),
-    installPack: vi.fn(async () => ({
+    installPack: vi.fn(async (
+      _pack: string,
+      _guard: StudioMarketplaceInstallGuard,
+    ) => ({
       status: options.installStatus ?? "installed",
       message: options.installStatus === "conflict"
         ? "같은 버전에 다른 내용이 있습니다."
@@ -75,6 +87,66 @@ function dependencies(options: {
 }
 
 describe("Studio marketplace deep link", () => {
+  it("captures the editor scope before loading and rejects a stale asset before render-local insertion", () => {
+    const start = studioPageSource.indexOf(
+      "const openAssetMarketDeepLink = useEffectEvent(async () => {",
+    );
+    const end = studioPageSource.indexOf("// 마운트 직후가 아니라", start);
+    const handler = studioPageSource.slice(start, end);
+    const captureIndex = handler.indexOf("const mutationTicket = captureStudioMutationTicket();");
+    const executeIndex = handler.indexOf("await executeStudioMarketplaceDeepLinkOperation(");
+    const guardIndex = handler.indexOf("if (!isStudioPasteScopeCurrent({", executeIndex);
+    const insertIndex = handler.indexOf("return addRenderedImage(asset.dataUrl", guardIndex);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(captureIndex).toBeGreaterThan(handler.indexOf("if (!installResourceId) return;"));
+    expect(captureIndex).toBeLessThan(executeIndex);
+    expect(handler).toContain("const targetPageId = activePage.id;");
+    expect(handler).toContain("const targetMasterEditMode = masterEditMode;");
+    expect(guardIndex).toBeGreaterThan(executeIndex);
+    expect(handler).toContain("mutationAllowed: canApplyStudioMutation(mutationTicket)");
+    expect(handler).toContain("reviewLocked: activeSurfaceReviewLockedRef.current");
+    expect(handler).toContain("currentPageId: currentPageIdRef.current");
+    expect(handler).toContain("currentMasterEditMode: masterEditModeRef.current");
+    expect(insertIndex).toBeGreaterThan(guardIndex);
+  });
+
+  it("does not reach render-local insertion when the document changes during resource loading", async () => {
+    const pendingRecord = deferred<CreatorMarketplaceResourceRecord | null>();
+    const deps = dependencies({ kind: "asset", assets: ["asset-record"] });
+    const mutationTicket = {
+      authScopeKey: "account-a",
+      workId: "work-a",
+      accessGeneration: 3,
+      documentGeneration: 7,
+    };
+    let documentGeneration = mutationTicket.documentGeneration;
+    const renderLocalInsert = vi.fn(() => true);
+    deps.loadResource.mockImplementationOnce(() => pendingRecord.promise);
+    deps.insertAsset.mockImplementationOnce(() => {
+      if (!isStudioEditorMutationContinuationAllowed(mutationTicket, {
+        ...mutationTicket,
+        documentGeneration,
+        mounted: true,
+        aborted: false,
+        locked: false,
+      })) return false;
+      return renderLocalInsert();
+    });
+
+    const execution = applyStudioMarketplaceDeepLink("asset-1", deps);
+    await vi.waitFor(() => {
+      expect(deps.loadResource).toHaveBeenCalledOnce();
+    });
+    documentGeneration += 1;
+    pendingRecord.resolve(record("asset"));
+
+    await expect(execution).resolves.toMatchObject({ status: "error" });
+    expect(deps.insertAsset).toHaveBeenCalledOnce();
+    expect(renderLocalInsert).not.toHaveBeenCalled();
+  });
+
   it("reports a durable pack installation and keeps the result inspectable", async () => {
     const deps = dependencies();
     const result = await applyStudioMarketplaceDeepLink("resource-1", deps);
@@ -82,9 +154,63 @@ describe("Studio marketplace deep link", () => {
     expect(result.status).toBe("success");
     expect(result.message).toContain("로컬 SQL 카탈로그");
     expect(result.message).toContain("커뮤니티 목록");
-    expect(deps.installPack).toHaveBeenCalledWith("pack-1");
+    expect(deps.installPack).toHaveBeenCalledWith(
+      "pack-1",
+      expect.objectContaining({
+        isCurrent: expect.any(Function),
+        assertCurrent: expect.any(Function),
+      }),
+    );
     expect(deps.openBundledPackCatalog).not.toHaveBeenCalled();
   });
+
+  it.each(["unmount", "new-operation"] as const)(
+    "does not leave a durable pack write when %s makes repository initialization stale",
+    async (staleCause) => {
+      const pendingRepository = deferred<void>();
+      const deps = dependencies();
+      const durablePackIds = new Set<string>();
+      const repositoryMutation = vi.fn((packId: string) => {
+        durablePackIds.add(packId);
+      });
+      deps.installPack.mockImplementationOnce(async (pack, guard) => {
+        await pendingRepository.promise;
+        guard.assertCurrent();
+        repositoryMutation(pack);
+        return {
+          status: "installed",
+          message: "1개 항목을 로컬 SQL 카탈로그에 설치했습니다.",
+        };
+      });
+      const lifecycle = createStudioMarketplaceDeepLinkLifecycleState();
+      const lifecycleGeneration = retainStudioMarketplaceDeepLinkLifecycle(lifecycle);
+      const operationGeneration = beginStudioMarketplaceDeepLinkOperation(lifecycle);
+
+      const execution = executeStudioMarketplaceDeepLinkOperation("resource-1", {
+        consumeInstallQuery: vi.fn(),
+        isCurrent: () => isStudioMarketplaceDeepLinkOperationCurrent(
+          lifecycle,
+          operationGeneration,
+        ),
+        loadDependencies: async () => deps,
+      });
+      await vi.waitFor(() => {
+        expect(deps.installPack).toHaveBeenCalledOnce();
+      });
+
+      if (staleCause === "unmount") {
+        releaseStudioMarketplaceDeepLinkLifecycleSoon(lifecycle, lifecycleGeneration);
+        await Promise.resolve();
+      } else {
+        beginStudioMarketplaceDeepLinkOperation(lifecycle);
+      }
+      pendingRepository.resolve();
+
+      await expect(execution).resolves.toMatchObject({ status: "stale" });
+      expect(repositoryMutation).not.toHaveBeenCalled();
+      expect(durablePackIds).toEqual(new Set());
+    },
+  );
 
   it("opens a validated bundled pack catalog through the injected callback", async () => {
     const deps = dependencies({ kind: "template", installStatus: "bundled" });

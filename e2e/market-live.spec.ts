@@ -13,8 +13,10 @@ test.describe("creator marketplace opt-in live API", () => {
   test("real signup/login issues an HttpOnly cookie and the public list endpoint responds", async ({
     request,
   }) => {
-    const apiOrigin = process.env.TOONSPECTRUM_MARKET_LIVE_API_URL!.replace(/\/+$/u, "");
-    const email = process.env.TOONSPECTRUM_MARKET_LIVE_EMAIL!;
+    const apiOrigin = process.env.TOONSPECTRUM_MARKET_LIVE_API_URL!
+      .trim()
+      .replace(/\/+$/u, "");
+    const email = process.env.TOONSPECTRUM_MARKET_LIVE_EMAIL!.trim().toLowerCase();
     const password = process.env.TOONSPECTRUM_MARKET_LIVE_PASSWORD!;
     const name = process.env.TOONSPECTRUM_MARKET_LIVE_NAME?.trim() || "마켓 라이브 검증";
     const mutationHeaders = {

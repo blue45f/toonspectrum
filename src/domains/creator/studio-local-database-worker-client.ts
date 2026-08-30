@@ -539,6 +539,8 @@ function createClientPair(
     putBrushLibraryRecord: (record) => session.call("putBrushLibraryRecord", record),
     putBrushLibraryRecords: (records) =>
       session.call("putBrushLibraryRecords", records),
+    compareAndRestoreBrushLibraryRecords: (entries, sidecars) =>
+      session.call("compareAndRestoreBrushLibraryRecords", entries, sidecars),
     insertMissingBrushLibraryRecords: (records) =>
       session.call("insertMissingBrushLibraryRecords", records),
     deleteBrushLibraryRecord: (id) => session.call("deleteBrushLibraryRecord", id),
@@ -549,6 +551,8 @@ function createClientPair(
     putFilterLibraryRecord: (record) => session.call("putFilterLibraryRecord", record),
     putFilterLibraryRecords: (records) =>
       session.call("putFilterLibraryRecords", records),
+    compareAndRestoreFilterLibraryRecords: (entries) =>
+      session.call("compareAndRestoreFilterLibraryRecords", entries),
     insertMissingFilterLibraryRecords: (records) =>
       session.call("insertMissingFilterLibraryRecords", records),
     deleteFilterLibraryRecord: (id) => session.call("deleteFilterLibraryRecord", id),

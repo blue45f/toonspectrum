@@ -17532,6 +17532,9 @@ const puppetWarpArmed =
       setAssetTab("community");
     }
     if (!installResourceId) return;
+    const mutationTicket = captureStudioMutationTicket();
+    const targetPageId = activePage.id;
+    const targetMasterEditMode = masterEditMode;
     const operationGeneration = beginStudioMarketplaceDeepLinkOperation(
       studioMarketplaceDeepLinkLifecycleRef.current,
     );
@@ -17581,7 +17584,10 @@ const puppetWarpArmed =
             return {
               loadResource: getCreatorMarketplaceResource,
               projectPack: projectCreatorMarketplaceRecordToStudioPack,
-              installPack: (pack) => installStudioCreatorPackProduct(pack, { storage }),
+              installPack: (pack, guard) => installStudioCreatorPackProduct(pack, {
+                storage,
+                isInstallCurrent: guard.isCurrent,
+              }),
               openBundledPackCatalog: (pack) => {
                 const resolution = resolveStudioCreatorBundledCatalogTarget(pack);
                 if (resolution.status === "unsupported") {
@@ -17606,6 +17612,14 @@ const puppetWarpArmed =
               },
               projectAssets: projectCreatorMarketplaceRecordToAssets,
               insertAsset: (projectedAsset) => {
+                if (!isStudioPasteScopeCurrent({
+                  mutationAllowed: canApplyStudioMutation(mutationTicket),
+                  reviewLocked: activeSurfaceReviewLockedRef.current,
+                  targetPageId,
+                  currentPageId: currentPageIdRef.current,
+                  targetMasterEditMode,
+                  currentMasterEditMode: masterEditModeRef.current,
+                })) return false;
                 const asset = createStudioOriginalFreeAssetRecord(projectedAsset);
                 return addRenderedImage(asset.dataUrl, asset.width, asset.height);
               },

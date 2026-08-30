@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
@@ -248,12 +249,14 @@ function CommunityRecordCard({
   onUseAsset,
   onDelete,
   onStatus,
+  onInstallStateChanged,
   refreshToken,
 }: {
   readonly record: CreatorMarketplaceResourceRecord;
   readonly onUseAsset?: (asset: StudioAsset) => boolean;
   readonly onDelete?: (record: CreatorMarketplaceResourceRecord) => void;
   readonly onStatus: (message: string, error: boolean) => void;
+  readonly onInstallStateChanged: () => void;
   readonly refreshToken: number;
 }) {
   const projection = projectCreatorMarketplaceRecordToStudioPack(record);
@@ -362,6 +365,7 @@ function CommunityRecordCard({
       "conflict",
       "storage-error",
     ].includes(result.status));
+    onInstallStateChanged();
   }
 
   function handleUseAsset() {
@@ -900,6 +904,12 @@ export function StudioCommunityMarketplacePanel({
   const loadMoreRequestControllerRef = useRef<AbortController | null>(null);
   const confirmedPublishedRecordRef = useRef<CreatorMarketplaceResourceRecord | null>(null);
   const t = useT();
+  const reportRecordStatus = useCallback((message: string, statusError: boolean) => {
+    setStatus({ message, error: statusError });
+  }, []);
+  const refreshInstallStates = useCallback(() => {
+    setRefreshToken((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     const requestGeneration = listingRequestGenerationRef.current + 1;
@@ -911,6 +921,10 @@ export function StudioCommunityMarketplacePanel({
     setLoadingMore(false);
     setNextCursor(null);
     setHasMore(false);
+    const confirmedPublishedRecord = view === "mine"
+      ? confirmedPublishedRecordRef.current
+      : null;
+    setRecords(confirmedPublishedRecord ? [confirmedPublishedRecord] : []);
     if (!open || view === "share") {
       setLoading(false);
       return;
@@ -1252,15 +1266,13 @@ export function StudioCommunityMarketplacePanel({
                 <div className="mt-2 grid gap-2">
                   {records.map((record) => (
                     <CommunityRecordCard
-                      key={`${record.id}:${refreshToken}`}
+                      key={record.id}
                       record={record}
                       onUseAsset={onUseAsset}
                       onDelete={record.isOwner ? deleteRecord : undefined}
                       refreshToken={refreshToken}
-                      onStatus={(message, statusError) => {
-                        setStatus({ message, error: statusError });
-                        setRefreshToken((value) => value + 1);
-                      }}
+                      onStatus={reportRecordStatus}
+                      onInstallStateChanged={refreshInstallStates}
                     />
                   ))}
                 </div>

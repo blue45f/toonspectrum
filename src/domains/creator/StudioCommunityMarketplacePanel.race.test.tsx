@@ -29,8 +29,11 @@ const mocks = vi.hoisted(() => ({
   listMine: vi.fn(),
   listPalettes: vi.fn(),
   listPublic: vi.fn(),
+  inspectInstallState: vi.fn(),
   openBrushRepository: vi.fn(),
+  projectPack: vi.fn(),
   publishResource: vi.fn(),
+  storage: {},
 }));
 
 vi.mock("@/src/infrastructure/creator-marketplace-client", () => ({
@@ -47,10 +50,7 @@ vi.mock("./studio-community-marketplace", () => ({
     assets: [],
     reason: "테스트에서는 에셋 투영을 사용하지 않습니다.",
   }),
-  projectCreatorMarketplaceRecordToStudioPack: () => ({
-    status: "unsupported",
-    reason: "테스트에서는 설치 투영을 사용하지 않습니다.",
-  }),
+  projectCreatorMarketplaceRecordToStudioPack: mocks.projectPack,
 }));
 
 vi.mock("./filter/studio-filter-library-sqlite-repository", () => ({
@@ -72,12 +72,12 @@ vi.mock("./studio-palette-sqlite-repository", () => ({
 }));
 
 vi.mock("./studio-creator-pack-runtime", () => ({
-  browserStudioCreatorPackStorage: () => ({}),
+  browserStudioCreatorPackStorage: () => mocks.storage,
   inspectStudioCreatorPackInstallState: () => "available",
 }));
 
 vi.mock("./studio-creator-pack-product-runtime", () => ({
-  inspectStudioCreatorPackInstallStateProduct: vi.fn().mockResolvedValue("available"),
+  inspectStudioCreatorPackInstallStateProduct: mocks.inspectInstallState,
   installStudioCreatorPackProduct: vi.fn(),
   uninstallStudioCreatorPackProduct: vi.fn(),
 }));
@@ -140,6 +140,11 @@ beforeEach(() => {
     { id: "brush-1", kind: "brush", name: "게시 후보" },
   ]);
   mocks.createPublishManifest.mockResolvedValue({});
+  mocks.inspectInstallState.mockResolvedValue("available");
+  mocks.projectPack.mockReturnValue({
+    status: "unsupported",
+    reason: "테스트에서는 설치 투영을 사용하지 않습니다.",
+  });
 });
 
 afterEach(() => {
@@ -147,6 +152,29 @@ afterEach(() => {
 });
 
 describe("StudioCommunityMarketplacePanel request races", () => {
+  it("설치 상태 조회 실패를 한 번만 알리고 같은 카드를 무한 재조회하지 않는다", async () => {
+    const packRecord = resource("pack-1", "상태 오류 브러시", false);
+    mocks.listPublic.mockResolvedValue(page([packRecord]));
+    mocks.projectPack.mockReturnValue({
+      status: "installable",
+      pack: { metadata: { kind: "brush" } },
+    });
+    mocks.inspectInstallState.mockRejectedValue(new Error("SQLite receipt corrupt"));
+
+    render(<StudioCommunityMarketplacePanel initialOpen />);
+
+    expect(await screen.findByText(packRecord.name)).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("SQLite receipt corrupt");
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.inspectInstallState).toHaveBeenCalledTimes(1);
+  });
+
   it("abort를 무시하고 늦게 끝난 공개 첫 페이지도 mine 결과를 덮지 못한다", async () => {
     const stalePublicRecord = resource("public-1", "늦은 공개 첫 페이지", false);
     const mineRecord = resource("mine-1", "현재 내 공유", true);
@@ -271,5 +299,83 @@ describe("StudioCommunityMarketplacePanel request races", () => {
 
     expect(screen.getByText(mineRecord.name)).toBeTruthy();
     expect(screen.queryByText(stalePublicRecord.name)).toBeNull();
+  });
+
+  it("새 필터 첫 페이지가 시작되면 이전 records와 cursor를 즉시 비운다", async () => {
+    const publicRecord = resource("public-1", "이전 전체 자료", false);
+    const filteredRecord = resource("brush-1", "새 브러시 자료", false);
+    const filteredResponse = deferred<CreatorMarketplaceResourceListPage>();
+    mocks.listPublic
+      .mockResolvedValueOnce(page([publicRecord], "public_cursor"))
+      .mockReturnValueOnce(filteredResponse.promise);
+
+    render(<StudioCommunityMarketplacePanel initialOpen />);
+    expect(await screen.findByText(publicRecord.name)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "더 불러오기" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "브러시" }));
+    await waitFor(() => expect(mocks.listPublic).toHaveBeenCalledTimes(2));
+
+    expect(screen.queryByText(publicRecord.name)).toBeNull();
+    expect(screen.queryByRole("button", { name: "더 불러오기" })).toBeNull();
+    expect(mocks.listPublic).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: "brush" }),
+      expect.any(AbortSignal),
+    );
+    const filteredRequest = mocks.listPublic.mock.lastCall?.[0] as {
+      cursor?: string;
+    };
+    expect(filteredRequest.cursor).toBeUndefined();
+
+    await act(async () => {
+      filteredResponse.resolve(page([filteredRecord]));
+      await filteredResponse.promise;
+    });
+
+    expect(screen.getByText(filteredRecord.name)).toBeTruthy();
+  });
+
+  it("stale loadMore 오류와 finally가 현재 mine loadMore 상태를 바꾸지 않는다", async () => {
+    const publicRecord = resource("public-1", "공개 첫 페이지", false);
+    const mineRecord = resource("mine-1", "내 공유 첫 페이지", true);
+    const nextMineRecord = resource("mine-2", "내 공유 다음 페이지", true);
+    const stalePublicLoadMore = deferred<CreatorMarketplaceResourceListPage>();
+    const currentMineLoadMore = deferred<CreatorMarketplaceResourceListPage>();
+    mocks.listPublic
+      .mockResolvedValueOnce(page([publicRecord], "public_cursor"))
+      .mockReturnValueOnce(stalePublicLoadMore.promise);
+    mocks.listMine
+      .mockResolvedValueOnce(page([mineRecord], "mine_cursor"))
+      .mockReturnValueOnce(currentMineLoadMore.promise);
+
+    render(<StudioCommunityMarketplacePanel initialOpen />);
+    expect(await screen.findByText(publicRecord.name)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "더 불러오기" }));
+    await waitFor(() => expect(mocks.listPublic).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(screen.getByRole("tab", { name: "내 공유" }));
+    expect(await screen.findByText(mineRecord.name)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "더 불러오기" }));
+    await waitFor(() => expect(mocks.listMine).toHaveBeenCalledTimes(2));
+    const currentLoadMoreButton = screen.getByRole("button", { name: "더 불러오기" });
+    expect((currentLoadMoreButton as HTMLButtonElement).disabled).toBe(true);
+
+    await act(async () => {
+      stalePublicLoadMore.reject(new Error("폐기된 공개 다음 페이지 오류"));
+      await stalePublicLoadMore.promise.catch(() => undefined);
+    });
+
+    expect(screen.queryByText("폐기된 공개 다음 페이지 오류")).toBeNull();
+    expect((screen.getByRole("button", { name: "더 불러오기" }) as HTMLButtonElement).disabled)
+      .toBe(true);
+
+    await act(async () => {
+      currentMineLoadMore.resolve(page([nextMineRecord]));
+      await currentMineLoadMore.promise;
+    });
+
+    expect(screen.getByText(mineRecord.name)).toBeTruthy();
+    expect(screen.getByText(nextMineRecord.name)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "더 불러오기" })).toBeNull();
   });
 });

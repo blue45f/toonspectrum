@@ -39,7 +39,7 @@
     "test": "vitest run",
     "test:postgres:integration": "node scripts/run-postgres-integration-tests.mjs",
     "verify:creator-marketplace-db": "tsx scripts/verify-creator-marketplace-db.mts",
-    "test:market:e2e": "playwright test --config playwright.market.config.ts e2e/market.spec.ts",
+    "test:market:e2e": "playwright test --config playwright.market.config.ts",
     "test:market:live": "node e2e/run-market-live-e2e.mjs",
     "test:redis:integration": "node scripts/run-redis-integration-tests.mjs",
     "test:cloudflare-realtime": "vitest run --config deploy/cloudflare-realtime/vitest.config.mts",

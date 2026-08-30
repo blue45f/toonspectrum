@@ -105,7 +105,9 @@ const envSchema = z.object({
   ),
   // 포트 류: 숫자 문자열만 경고 대상(빈 값/미설정은 폴백 허용).
   PORT: z.string().regex(/^\d+$/, "PORT must be numeric").optional(),
+  NEST_API_HOST: z.string().min(1).max(253).optional(),
   NEST_API_PORT: z.string().regex(/^\d+$/, "NEST_API_PORT must be numeric").optional(),
+  API_LOCAL_ENV_FILE_ENABLED: z.enum(["true", "false"]).optional(),
   // 허용할 브라우저 Origin(쉼표 구분, 선택).
   API_CORS_ALLOWED_ORIGINS: z.string().optional(),
   // 인증/요청 경계: production은 topology를 명시하고, development/test만 Upstash 유무에

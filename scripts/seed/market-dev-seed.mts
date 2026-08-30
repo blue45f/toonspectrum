@@ -3,6 +3,7 @@
  * 다양한 종류·라이선스·태그의 샘플 리소스를 게시한다.
  *
  * Usage:
+ *   TEST_DATABASE_URL="postgresql://.../toonspectrum_market_test" \
  *   TOONSPECTRUM_MARKET_SEED_EMAIL="..." \
  *   TOONSPECTRUM_MARKET_SEED_PASSWORD="..." \
  *   TOONSPECTRUM_MARKET_SEED_NAME="마켓 시드" \
@@ -39,10 +40,15 @@ import {
 import {
   findStudioOriginalFreeAsset,
 } from "../../src/domains/creator/studio-original-free-asset-packs";
+import {
+  startIsolatedMarketApi,
+  stopIsolatedMarketApi,
+  validateIsolatedMarketApiTarget,
+} from "../isolated-market-api.mjs";
 
 import {
   inspectOwnedMarketSeed,
-  isLoopbackMarketSeedApiUrl,
+  isExactLegacyMarketSeed,
   sameMarketSeedPackageVersion,
 } from "./market-dev-seed-integrity";
 
@@ -54,6 +60,7 @@ import type {
   CreatorMarketplaceResourceManifest,
   CreatorMarketplaceResourceRecord,
 } from "../../lib/creator-marketplace-resource-contract";
+import type { ChildProcess } from "node:child_process";
 
 const MEDIA_TYPE_BY_KIND = {
   asset: "application/vnd.toonspectrum.asset+json",
@@ -70,6 +77,7 @@ function sha256(value: string): string {
 
 interface SeedSpec {
   readonly packageId: string;
+  readonly resourceVersion?: string;
   readonly name: string;
   readonly description: string;
   readonly kind: CreatorMarketplaceResourceKind;
@@ -97,6 +105,7 @@ const CITY_BICYCLE_ASSET = requiredOriginalAsset("original-city-bicycle");
 const SEEDS: readonly SeedSpec[] = [
   {
     packageId: "seed/brush/ink-gpen-fine",
+    resourceVersion: "2.0.0",
     name: "정석 G펜 파인 — 선화용 잉크 브러시",
     description:
       "웹툰 선화 작업에 바로 쓰는 압력 반응 G펜. 가는 복선과 굵은 주선을 하나의 필악 커브로 처리합니다.",
@@ -124,6 +133,7 @@ const SEEDS: readonly SeedSpec[] = [
   },
   {
     packageId: "seed/brush/soft-water-wash",
+    resourceVersion: "2.0.0",
     name: "수채 워시 소프트",
     description: "배경 하늘과 물감 번짐 표현용 수채 워시 브러시.",
     kind: "brush",
@@ -148,6 +158,7 @@ const SEEDS: readonly SeedSpec[] = [
   },
   {
     packageId: "seed/filter/webtoon-duotone-dusk",
+    resourceVersion: "2.0.0",
     name: "두톤 던스크 색보정",
     description: "야간 장면의 어두운 영역은 보랏빛, 밝은 영역은 따뜻한 복숭아색으로 다시 매핑합니다.",
     kind: "filter",
@@ -202,6 +213,7 @@ const SEEDS: readonly SeedSpec[] = [
   },
   {
     packageId: "seed/palette/pastel-cafe-morning",
+    resourceVersion: "2.0.0",
     name: "파스텔 카페 모닝 8색",
     description: "일상 힐링물의 카페 장면에 맞춘 크림·살구·장미·청회색 8색 팔레트입니다.",
     kind: "palette",
@@ -319,7 +331,7 @@ function buildManifest(spec: SeedSpec): CreatorMarketplaceResourceManifest {
     name: spec.name,
     description: spec.description,
     kind: spec.kind,
-    resourceVersion: "1.0.0",
+    resourceVersion: spec.resourceVersion ?? "1.0.0",
     minimumStudioVersion: "1.0.0",
     tags: spec.tags,
     license: spec.license,
@@ -436,6 +448,13 @@ function parseArgs(argv: string[]): Record<string, string> {
 }
 
 const CSRF_HEADERS = { "x-toonspectrum-csrf": "1" } as const;
+const TERMINATION_SIGNAL_EXIT_CODE = {
+  SIGINT: 130,
+  SIGTERM: 143,
+} as const;
+
+let receivedTerminationSignal: keyof typeof TERMINATION_SIGNAL_EXIT_CODE | null = null;
+let signalCleanupFailed = false;
 
 interface PreparedSeed {
   readonly spec: SeedSpec;
@@ -513,6 +532,29 @@ async function listOwnedResources(
   return items;
 }
 
+async function removeExactLegacySeeds(
+  api: string,
+  cookie: string,
+  owned: readonly CreatorMarketplaceResourceRecord[],
+): Promise<void> {
+  const legacyRecords = owned.filter(isExactLegacyMarketSeed);
+  for (const record of legacyRecords) {
+    const response = await fetch(
+      `${api}/api/creator/marketplace/resources/${encodeURIComponent(record.id)}`,
+      {
+        method: "DELETE",
+        headers: { Origin: api, cookie, ...CSRF_HEADERS },
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `legacy seed cleanup failed (${response.status}): ${(await response.text()).slice(0, 300)}`,
+      );
+    }
+    console.log(`removedLegacy: ${record.packageId}@${record.resourceVersion}`);
+  }
+}
+
 function verifyExactRecord(
   record: CreatorMarketplaceResourceRecord,
   seed: PreparedSeed,
@@ -545,19 +587,13 @@ async function main(): Promise<void> {
       throw new Error(`--${key} is not accepted; seed account identity must be supplied through environment variables.`);
     }
   }
-  const parsedApi = new URL(args.api ?? "http://127.0.0.1:4001");
-  if (!isLoopbackMarketSeedApiUrl(parsedApi)) {
-    throw new Error("market-dev-seed refuses non-loopback APIs; use an isolated local QA server");
-  }
-  const api = parsedApi.origin;
-
   const seeds = prepareSeeds();
   if ("dry-run" in args) {
     console.log(`validated ${seeds.length} Studio-compatible, semantically aligned market manifests`);
     return;
   }
 
-  const email = process.env.TOONSPECTRUM_MARKET_SEED_EMAIL?.trim();
+  const email = process.env.TOONSPECTRUM_MARKET_SEED_EMAIL?.trim().toLowerCase();
   const password = process.env.TOONSPECTRUM_MARKET_SEED_PASSWORD;
   const name = process.env.TOONSPECTRUM_MARKET_SEED_NAME?.trim() || "마켓 시드";
   if (!email || !password) {
@@ -566,130 +602,202 @@ async function main(): Promise<void> {
     );
   }
 
-  const signup = await fetch(`${api}/api/auth/signup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Origin: api, ...CSRF_HEADERS },
-    body: JSON.stringify({ email, password, name }),
+  const target = validateIsolatedMarketApiTarget({
+    rawApiUrl: args.api ?? "http://127.0.0.1:4001",
+    rawDatabaseUrl: process.env.TEST_DATABASE_URL,
   });
-  if (!signup.ok && signup.status !== 409) {
-    throw new Error(`signup failed (${signup.status}): ${(await signup.text()).slice(0, 300)}`);
+  const api = target.apiOrigin;
+  let apiProcess: ChildProcess | null = null;
+  let apiCleanup: Promise<void> | null = null;
+  const cleanupApi = async (): Promise<void> => {
+    if (!apiProcess) return;
+    apiCleanup ??= stopIsolatedMarketApi(apiProcess);
+    await apiCleanup;
+  };
+  const signalHandlers = new Map<
+    keyof typeof TERMINATION_SIGNAL_EXIT_CODE,
+    () => void
+  >();
+  for (const signal of Object.keys(
+    TERMINATION_SIGNAL_EXIT_CODE,
+  ) as Array<keyof typeof TERMINATION_SIGNAL_EXIT_CODE>) {
+    const handler = (): void => {
+      if (receivedTerminationSignal) return;
+      receivedTerminationSignal = signal;
+      void cleanupApi()
+        .catch((error: unknown) => {
+          signalCleanupFailed = true;
+          const message = error instanceof Error ? error.message : "unknown API cleanup failure";
+          console.error(`market-dev-seed signal cleanup failed: ${message}`);
+          process.exitCode = 1;
+        })
+        .finally(() => {
+          if (!signalCleanupFailed) {
+            process.exitCode = TERMINATION_SIGNAL_EXIT_CODE[signal];
+          }
+        });
+    };
+    signalHandlers.set(signal, handler);
+    process.once(signal, handler);
   }
 
-  const login = await fetch(`${api}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Origin: api, ...CSRF_HEADERS },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!login.ok) {
-    throw new Error(`login failed (${login.status}): ${(await login.text()).slice(0, 300)}`);
-  }
-  const setCookie = login.headers.getSetCookie?.() ?? [];
-  const cookie = setCookie.map((value) => value.split(";")[0]).join("; ");
-  if (!cookie) {
-    throw new Error("login returned no session cookie");
-  }
-  const session = await fetch(`${api}/api/auth/session`, { headers: { cookie } });
-  const sessionBody = await responseBody(session);
-  const sessionRecord = sessionBody.json && typeof sessionBody.json === "object"
-    ? sessionBody.json as { authenticated?: unknown; user?: { email?: unknown } }
-    : null;
-  if (
-    !session.ok
-    || sessionRecord?.authenticated !== true
-    || sessionRecord.user?.email !== email
-  ) {
-    throw new Error(`authenticated session verification failed (${session.status})`);
-  }
-  console.log("session: authenticated seed account verified");
-
-  let published = 0;
-  let exactExisting = 0;
-  let failed = 0;
-  let owned = await listOwnedResources(api, cookie);
-  for (const seed of seeds) {
-    try {
-      const beforePublish = inspectOwnedMarketSeed(owned, seed);
-      if (beforePublish.status === "exact") {
-        verifyExactRecord(beforePublish.record, seed);
-        exactExisting += 1;
-        console.log(`exactExisting: ${seed.spec.name}`);
-        continue;
-      }
-      if (beforePublish.status === "duplicate-exact") {
-        throw new Error("authenticated /mine returned duplicate exact records");
-      }
-      if (beforePublish.status === "mismatch") {
-        throw new Error(mismatchMessage(owned, seed));
-      }
-
-      const response = await fetch(`${api}/api/creator/marketplace/resources`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Origin: api, cookie, ...CSRF_HEADERS },
-        body: JSON.stringify(seed.manifest),
-      });
-      if (response.ok) {
-        const body = await responseBody(response);
-        const record = CreatorMarketplaceResourceRecordSchema.parse(body.json);
-        verifyExactRecord(record, seed);
-        owned = [...owned, record];
-        published += 1;
-        console.log(`published: ${seed.spec.name}`);
-        continue;
-      }
-      if (response.status === 409) {
-        // A conflict can also mean the package/version or manifest hash belongs to some other
-        // record. Only a complete authenticated /mine walk proving all three identity fields is
-        // safe to treat as an idempotent retry.
-        owned = await listOwnedResources(api, cookie);
-        const afterConflict = inspectOwnedMarketSeed(owned, seed);
-        if (afterConflict.status !== "exact") {
-          throw new Error(`409 rejected: ${mismatchMessage(owned, seed)}`);
+  try {
+    apiProcess = await startIsolatedMarketApi(target, {
+      onSpawn(child: ChildProcess) {
+        apiProcess = child;
+        if (receivedTerminationSignal) {
+          throw new Error("The marketplace seed was interrupted during API startup.");
         }
-        verifyExactRecord(afterConflict.record, seed);
-        exactExisting += 1;
-        console.log(`exactExisting (409 verified): ${seed.spec.name}`);
-        continue;
-      }
-      throw new Error(`publish failed (${response.status}): ${(await response.text()).slice(0, 300)}`);
-    } catch (error) {
-      failed += 1;
-      const message = error instanceof Error ? error.message : "unknown seed failure";
-      console.error(`FAILED: ${seed.spec.name}: ${message}`);
-    }
-  }
+      },
+    });
+    if (receivedTerminationSignal) return;
 
-  owned = await listOwnedResources(api, cookie);
-  let verified = 0;
-  let verificationFailed = 0;
-  for (const seed of seeds) {
-    try {
-      const inspection = inspectOwnedMarketSeed(owned, seed);
-      if (inspection.status !== "exact") {
-        throw new Error(
-          inspection.status === "duplicate-exact"
-            ? `expected one exact owned record, found ${inspection.records.length}`
-            : mismatchMessage(owned, seed),
-        );
-      }
-      verifyExactRecord(inspection.record, seed);
-      verified += 1;
-    } catch (error) {
-      verificationFailed += 1;
-      const message = error instanceof Error ? error.message : "unknown verification failure";
-      console.error(`POST-RUN VERIFY FAILED: ${seed.spec.name}: ${message}`);
+    const signup = await fetch(`${api}/api/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: api, ...CSRF_HEADERS },
+      body: JSON.stringify({ email, password, name }),
+    });
+    if (!signup.ok && signup.status !== 409) {
+      throw new Error(`signup failed (${signup.status}): ${(await signup.text()).slice(0, 300)}`);
     }
-  }
-  console.log(
-    `done. published=${published} exactExisting=${exactExisting} verified=${verified}/${seeds.length}`,
-  );
-  if (failed > 0 || verificationFailed > 0) {
-    throw new Error(
-      `market seed integrity failed: publishFailures=${failed}, verificationFailures=${verificationFailed}`,
+
+    const login = await fetch(`${api}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: api, ...CSRF_HEADERS },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!login.ok) {
+      throw new Error(`login failed (${login.status}): ${(await login.text()).slice(0, 300)}`);
+    }
+    const setCookie = login.headers.getSetCookie?.() ?? [];
+    const cookie = setCookie.map((value) => value.split(";")[0]).join("; ");
+    if (!cookie) {
+      throw new Error("login returned no session cookie");
+    }
+    const session = await fetch(`${api}/api/auth/session`, { headers: { cookie } });
+    const sessionBody = await responseBody(session);
+    const sessionRecord = sessionBody.json && typeof sessionBody.json === "object"
+      ? sessionBody.json as { authenticated?: unknown; user?: { email?: unknown } }
+      : null;
+    if (
+      !session.ok
+      || sessionRecord?.authenticated !== true
+      || sessionRecord.user?.email !== email
+    ) {
+      throw new Error(`authenticated session verification failed (${session.status})`);
+    }
+    console.log("session: authenticated seed account verified");
+
+    let published = 0;
+    let exactExisting = 0;
+    let failed = 0;
+    let owned = await listOwnedResources(api, cookie);
+    for (const seed of seeds) {
+      try {
+        const beforePublish = inspectOwnedMarketSeed(owned, seed);
+        if (beforePublish.status === "exact") {
+          verifyExactRecord(beforePublish.record, seed);
+          exactExisting += 1;
+          console.log(`exactExisting: ${seed.spec.name}`);
+          continue;
+        }
+        if (beforePublish.status === "duplicate-exact") {
+          throw new Error("authenticated /mine returned duplicate exact records");
+        }
+        if (beforePublish.status === "mismatch") {
+          throw new Error(mismatchMessage(owned, seed));
+        }
+
+        const response = await fetch(`${api}/api/creator/marketplace/resources`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Origin: api, cookie, ...CSRF_HEADERS },
+          body: JSON.stringify(seed.manifest),
+        });
+        if (response.ok) {
+          const body = await responseBody(response);
+          const record = CreatorMarketplaceResourceRecordSchema.parse(body.json);
+          verifyExactRecord(record, seed);
+          owned = [...owned, record];
+          published += 1;
+          console.log(`published: ${seed.spec.name}`);
+          continue;
+        }
+        if (response.status === 409) {
+          // A conflict can also mean the package/version or manifest hash belongs to some other
+          // record. Only a complete authenticated /mine walk proving all three identity fields is
+          // safe to treat as an idempotent retry.
+          owned = await listOwnedResources(api, cookie);
+          const afterConflict = inspectOwnedMarketSeed(owned, seed);
+          if (afterConflict.status !== "exact") {
+            throw new Error(`409 rejected: ${mismatchMessage(owned, seed)}`);
+          }
+          verifyExactRecord(afterConflict.record, seed);
+          exactExisting += 1;
+          console.log(`exactExisting (409 verified): ${seed.spec.name}`);
+          continue;
+        }
+        throw new Error(`publish failed (${response.status}): ${(await response.text()).slice(0, 300)}`);
+      } catch (error) {
+        failed += 1;
+        const message = error instanceof Error ? error.message : "unknown seed failure";
+        console.error(`FAILED: ${seed.spec.name}: ${message}`);
+      }
+    }
+
+    owned = await listOwnedResources(api, cookie);
+    let verified = 0;
+    let verificationFailed = 0;
+    for (const seed of seeds) {
+      try {
+        const inspection = inspectOwnedMarketSeed(owned, seed);
+        if (inspection.status !== "exact") {
+          throw new Error(
+            inspection.status === "duplicate-exact"
+              ? `expected one exact owned record, found ${inspection.records.length}`
+              : mismatchMessage(owned, seed),
+          );
+        }
+        verifyExactRecord(inspection.record, seed);
+        verified += 1;
+      } catch (error) {
+        verificationFailed += 1;
+        const message = error instanceof Error ? error.message : "unknown verification failure";
+        console.error(`POST-RUN VERIFY FAILED: ${seed.spec.name}: ${message}`);
+      }
+    }
+    if (failed > 0 || verificationFailed > 0) {
+      throw new Error(
+        `market seed integrity failed: publishFailures=${failed}, verificationFailures=${verificationFailed}`,
+      );
+    }
+
+    // 현재 세대 11종이 모두 인증된 뒤에만 구세대를 지운다. publish rate-limit, 네트워크
+    // 오류 또는 충돌이 생겨도 기존의 완전한 QA 카탈로그를 먼저 훼손하지 않는다.
+    await removeExactLegacySeeds(api, cookie, owned);
+    owned = await listOwnedResources(api, cookie);
+    const remainingLegacy = owned.filter(isExactLegacyMarketSeed);
+    if (remainingLegacy.length > 0) {
+      throw new Error(`legacy seed cleanup left ${remainingLegacy.length} exact record(s)`);
+    }
+    console.log(
+      `done. published=${published} exactExisting=${exactExisting} verified=${verified}/${seeds.length}`,
     );
+  } finally {
+    for (const [signal, handler] of signalHandlers) {
+      process.removeListener(signal, handler);
+    }
+    await cleanupApi();
+    if (receivedTerminationSignal && !signalCleanupFailed) {
+      process.exitCode = TERMINATION_SIGNAL_EXIT_CODE[receivedTerminationSignal];
+    }
   }
 }
 
 await main().catch((error: unknown) => {
+  if (receivedTerminationSignal) {
+    if (signalCleanupFailed) process.exitCode = 1;
+    return;
+  }
   const message = error instanceof Error ? error.message : "unknown market seed failure";
   console.error(`market-dev-seed failed: ${message}`);
   process.exitCode = 1;

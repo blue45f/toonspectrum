@@ -5,14 +5,23 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { validatePostgresIntegrationUrl } from "../scripts/run-postgres-integration-tests.mjs";
+import {
+  startIsolatedMarketApi,
+  stopDetachedProcessTree,
+  stopIsolatedMarketApi,
+  validateIsolatedMarketApiTarget,
+} from "../scripts/isolated-market-api.mjs";
 
 const require = createRequire(import.meta.url);
 const PLAYWRIGHT_ENTRYPOINT = require.resolve("@playwright/test/cli");
 const REPOSITORY_ROOT = resolve(fileURLToPath(new URL("../", import.meta.url)));
-const TEST_DATABASE_NAME_PATTERN =
-  /(?:^|[_-])test(?:$|[_-])/iu;
-const LOOPBACK_API_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+const SIGNAL_EXIT_CODE = Object.freeze({ SIGINT: 130, SIGTERM: 143 });
+
+let apiProcess = null;
+let playwrightProcess = null;
+let cleanupPromise = null;
+let receivedSignal = null;
+let signalCleanupFailed = false;
 
 function fail(message) {
   throw new Error(message);
@@ -23,34 +32,9 @@ function requireLiveEnvironment() {
     fail("Set TOONSPECTRUM_MARKET_LIVE_E2E=1 to opt into the live marketplace gate.");
   }
 
-  const databaseUrl = process.env.TEST_DATABASE_URL?.trim();
-  const database = validatePostgresIntegrationUrl(databaseUrl, {
-    environment: process.env,
-  });
-  if (!database.loopback || !TEST_DATABASE_NAME_PATTERN.test(database.databaseName)) {
-    fail("The live marketplace gate requires a loopback database with a test-scoped name.");
-  }
-
   const rawApiUrl = process.env.TOONSPECTRUM_MARKET_LIVE_API_URL?.trim();
   if (!rawApiUrl) {
     fail("TOONSPECTRUM_MARKET_LIVE_API_URL is required.");
-  }
-  let apiUrl;
-  try {
-    apiUrl = new URL(rawApiUrl);
-  } catch {
-    fail("TOONSPECTRUM_MARKET_LIVE_API_URL is malformed.");
-  }
-  if (
-    apiUrl.protocol !== "http:"
-    || !LOOPBACK_API_HOSTS.has(apiUrl.hostname.toLowerCase())
-    || apiUrl.username
-    || apiUrl.password
-    || apiUrl.pathname !== "/"
-    || apiUrl.search
-    || apiUrl.hash
-  ) {
-    fail("The live marketplace API must be an unauthenticated loopback HTTP origin.");
   }
 
   const email = process.env.TOONSPECTRUM_MARKET_LIVE_EMAIL?.trim();
@@ -59,26 +43,60 @@ function requireLiveEnvironment() {
     fail("Explicit live test-account email and password values are required.");
   }
 
-  return { apiOrigin: apiUrl.origin };
+  return validateIsolatedMarketApiTarget({
+    rawApiUrl,
+    rawDatabaseUrl: process.env.TEST_DATABASE_URL,
+  });
 }
 
-async function requireRunningApi(apiOrigin) {
-  let response;
-  try {
-    response = await fetch(`${apiOrigin}/api/health/live`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(5_000),
+async function cleanupChildren() {
+  if (cleanupPromise) {
+    await cleanupPromise;
+    return;
+  }
+  const playwright = playwrightProcess;
+  const api = apiProcess;
+  cleanupPromise = (async () => {
+    const stops = [
+      ...(playwright ? [stopDetachedProcessTree(playwright)] : []),
+      ...(api ? [stopIsolatedMarketApi(api)] : []),
+    ];
+    const results = await Promise.allSettled(stops);
+    const failures = results
+      .filter((result) => result.status === "rejected")
+      .map((result) => result.reason);
+    if (failures.length > 0) {
+      throw new AggregateError(failures, "Marketplace live child cleanup failed.");
+    }
+  })().finally(() => {
+    if (playwrightProcess === playwright) playwrightProcess = null;
+    if (apiProcess === api) apiProcess = null;
+    cleanupPromise = null;
+  });
+  await cleanupPromise;
+}
+
+function installSignalHandlers() {
+  for (const signal of Object.keys(SIGNAL_EXIT_CODE)) {
+    process.once(signal, () => {
+      if (receivedSignal) return;
+      receivedSignal = signal;
+      void cleanupChildren()
+        .catch((error) => {
+          signalCleanupFailed = true;
+          const message = error instanceof Error ? error.message : "Unknown child cleanup failure.";
+          console.error(`Live marketplace signal cleanup failed: ${message}`);
+          process.exitCode = 1;
+        })
+        .finally(() => {
+          if (!signalCleanupFailed) process.exitCode = SIGNAL_EXIT_CODE[signal];
+        });
     });
-  } catch {
-    fail("The opted-in marketplace API is not reachable; start it before running this gate.");
-  }
-  if (!response.ok) {
-    fail("The opted-in marketplace API did not pass its liveness endpoint.");
   }
 }
 
-function runPlaywright() {
-  const child = spawn(
+function runPlaywright(apiOrigin) {
+  playwrightProcess = spawn(
     process.execPath,
     [
       PLAYWRIGHT_ENTRYPOINT,
@@ -87,15 +105,19 @@ function runPlaywright() {
     ],
     {
       cwd: REPOSITORY_ROOT,
-      env: process.env,
+      detached: process.platform !== "win32",
+      env: {
+        ...process.env,
+        TOONSPECTRUM_MARKET_LIVE_API_URL: apiOrigin,
+      },
       stdio: "inherit",
     },
   );
   return new Promise((resolvePromise, rejectPromise) => {
-    child.once("error", () => {
+    playwrightProcess.once("error", () => {
       rejectPromise(new Error("The live marketplace Playwright process could not start."));
     });
-    child.once("exit", (code, signal) => {
+    playwrightProcess.once("exit", (code, signal) => {
       if (signal) {
         rejectPromise(new Error("The live marketplace Playwright process was interrupted."));
         return;
@@ -110,14 +132,45 @@ function runPlaywright() {
 }
 
 async function main() {
-  const { apiOrigin } = requireLiveEnvironment();
-  await requireRunningApi(apiOrigin);
-  console.log("Live marketplace API preflight passed (loopback test target; credentials hidden).");
-  await runPlaywright();
+  const target = requireLiveEnvironment();
+  apiProcess = await startIsolatedMarketApi(target, {
+    onSpawn(child) {
+      apiProcess = child;
+      if (receivedSignal) {
+        throw new Error("The live marketplace gate was interrupted during API startup.");
+      }
+    },
+  });
+  try {
+    if (receivedSignal) return;
+    console.log(
+      "Live marketplace API preflight passed (self-started isolated DB target; credentials hidden).",
+    );
+    await runPlaywright(target.apiOrigin);
+  } finally {
+    await cleanupChildren();
+  }
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : "Unknown live marketplace E2E failure.";
-  console.error(`Live marketplace E2E failed: ${message}`);
-  process.exitCode = 1;
-});
+installSignalHandlers();
+main()
+  .catch((error) => {
+    if (receivedSignal) return;
+    const message = error instanceof Error
+      ? error.message
+      : "Unknown live marketplace E2E failure.";
+    console.error(`Live marketplace E2E failed: ${message}`);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await cleanupChildren();
+    if (receivedSignal && !signalCleanupFailed) {
+      process.exitCode = SIGNAL_EXIT_CODE[receivedSignal];
+    }
+  })
+  .catch((error) => {
+    if (signalCleanupFailed) return;
+    const message = error instanceof Error ? error.message : "Unknown final child cleanup failure.";
+    console.error(`Live marketplace final cleanup failed: ${message}`);
+    process.exitCode = 1;
+  });

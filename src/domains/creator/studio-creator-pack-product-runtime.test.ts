@@ -16,6 +16,7 @@ import {
 import { STUDIO_CREATOR_PACK_CATALOG } from "./studio-creator-pack-catalog";
 import {
   STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+  StudioCreatorPackInstallStaleError,
   inspectStudioCreatorPackInstallStateProduct,
   installStudioCreatorPackProduct,
   uninstallStudioCreatorPackProduct,
@@ -28,12 +29,24 @@ import {
 import { STUDIO_MARKETPLACE_LIBRARY_STORAGE_KEY } from "./studio-marketplace-packages";
 import { PALETTE_LIBRARY_KEY } from "./studio-palette-library";
 import {
+  STUDIO_PALETTE_SQLITE_KEY,
+  STUDIO_PALETTE_SQLITE_NAMESPACE,
   createStudioPaletteSqliteRepository,
   type StudioPaletteSqliteRepository,
 } from "./studio-palette-sqlite-repository";
 
 let sqlite3: StudioSqliteApiHandle;
 const opened: StudioLocalDatabase[] = [];
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 beforeAll(async () => {
   const module = await import("@sqlite.org/sqlite-wasm");
@@ -366,6 +379,449 @@ describe("Creator Pack product SQLite authority", () => {
     expect(removed.status).toBe("uninstalled");
     expect((await product.repository.query()).totalCount).toBe(0);
     expect(storage.values.has(STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY)).toBe(true);
+  });
+
+  it("rolls a brush pack back when its SQLite write resolves after the install becomes stale", async () => {
+    const database = await openDatabase();
+    const product = await openProductBrushLibraryRepository({
+      acquireDatabase: () => Promise.resolve(database),
+    });
+    const pack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "brush"
+        && candidate.entries.every((entry) => entry.delivery.mode === "portable-json"),
+    )!;
+    await installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(product),
+      acquireDatabase: () => Promise.resolve(database),
+      now: () => 12_000,
+    });
+    await database.kvDelete(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    );
+    const beforePage = await product.repository.query({ limit: 100 });
+    const beforeReceipt = await database.kvGet(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    );
+    const writeCommitted = deferred<void>();
+    const releaseWrite = deferred<void>();
+    let delayFirstWrite = true;
+    const delayedProduct: ProductBrushLibraryRepository = {
+      ...product,
+      repository: {
+        ...product.repository,
+        putMany: async (brushes) => {
+          const result = await product.repository.putMany(brushes);
+          if (delayFirstWrite) {
+            delayFirstWrite = false;
+            writeCommitted.resolve();
+            await releaseWrite.promise;
+          }
+          return result;
+        },
+      },
+    };
+    let current = true;
+
+    const installation = installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(delayedProduct),
+      acquireDatabase: () => Promise.resolve(database),
+      isInstallCurrent: () => current,
+      now: () => 13_000,
+    });
+    await writeCommitted.promise;
+    current = false;
+    releaseWrite.resolve();
+
+    await expect(installation).rejects.toBeInstanceOf(StudioCreatorPackInstallStaleError);
+    expect(await product.repository.query({ limit: 100 })).toEqual(beforePage);
+    expect(await database.kvGet(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    )).toBe(beforeReceipt);
+  });
+
+  it("restores brush rows and receipt in one CAS after the receipt commit becomes stale", async () => {
+    const database = await openDatabase();
+    const product = await openProductBrushLibraryRepository({
+      acquireDatabase: () => Promise.resolve(database),
+    });
+    const pack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "brush"
+        && candidate.entries.every((entry) => entry.delivery.mode === "portable-json"),
+    )!;
+    await installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(product),
+      acquireDatabase: () => Promise.resolve(database),
+      now: () => 12_500,
+    });
+    await database.kvDelete(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    );
+    const beforePage = await product.repository.query({ limit: 100 });
+    const receiptWriteCommitted = deferred<void>();
+    const releaseReceiptWrite = deferred<void>();
+    let delayReceiptWrite = true;
+    const delayedDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            await target.kvSet(namespace, key, value);
+            if (
+              delayReceiptWrite
+              && namespace === STUDIO_CREATOR_PACK_SQLITE_NAMESPACE
+              && key === `brush:${pack.metadata.id}`
+            ) {
+              delayReceiptWrite = false;
+              receiptWriteCommitted.resolve();
+              await releaseReceiptWrite.promise;
+            }
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    let current = true;
+
+    const installation = installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(product),
+      acquireDatabase: () => Promise.resolve(delayedDatabase),
+      isInstallCurrent: () => current,
+      now: () => 13_500,
+    });
+    await receiptWriteCommitted.promise;
+    current = false;
+    releaseReceiptWrite.resolve();
+
+    await expect(installation).rejects.toBeInstanceOf(StudioCreatorPackInstallStaleError);
+    expect(await product.repository.query({ limit: 100 })).toEqual(beforePage);
+    expect(await database.kvGet(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    )).toBeNull();
+  });
+
+  it("rolls a filter pack back when its SQLite write resolves after the install becomes stale", async () => {
+    const database = await openDatabase();
+    const product = await openProductFilterLibraryRepository({
+      acquireDatabase: () => Promise.resolve(database),
+    });
+    const pack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "filter",
+    )!;
+    await installStudioCreatorPackProduct(pack, {
+      acquireFilterRepository: () => Promise.resolve(product),
+      now: () => 13_000,
+    });
+    await product.repository.delete(
+      `creator-pack:${pack.metadata.id}:${pack.entries[0]!.id}`,
+    );
+    const beforePage = await product.repository.query({ limit: 100 });
+    const writeCommitted = deferred<void>();
+    const releaseWrite = deferred<void>();
+    let delayFirstWrite = true;
+    const delayedProduct: ProductFilterLibraryRepository = {
+      ...product,
+      repository: {
+        ...product.repository,
+        putMany: async (presets) => {
+          const result = await product.repository.putMany(presets);
+          if (delayFirstWrite) {
+            delayFirstWrite = false;
+            writeCommitted.resolve();
+            await releaseWrite.promise;
+          }
+          return result;
+        },
+      },
+    };
+    let current = true;
+
+    const installation = installStudioCreatorPackProduct(pack, {
+      acquireFilterRepository: () => Promise.resolve(delayedProduct),
+      isInstallCurrent: () => current,
+      now: () => 14_000,
+    });
+    await writeCommitted.promise;
+    current = false;
+    releaseWrite.resolve();
+
+    await expect(installation).rejects.toBeInstanceOf(StudioCreatorPackInstallStaleError);
+    expect(await product.repository.query({ limit: 100 })).toEqual(beforePage);
+  });
+
+  it("preserves a newer brush edit while compensating a stale in-flight install", async () => {
+    const database = await openDatabase();
+    const product = await openProductBrushLibraryRepository({
+      acquireDatabase: () => Promise.resolve(database),
+    });
+    const pack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "brush"
+        && candidate.entries.every((entry) => entry.delivery.mode === "portable-json"),
+    )!;
+    await installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(product),
+      acquireDatabase: () => Promise.resolve(database),
+      now: () => 17_000,
+    });
+    await database.kvDelete(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    );
+    const before = await Promise.all(pack.entries.map((entry) =>
+      product.repository.getById(`creator-pack:${pack.metadata.id}:${entry.id}`)));
+    const writeCommitted = deferred<void>();
+    const releaseWrite = deferred<void>();
+    let delayFirstWrite = true;
+    const delayedProduct: ProductBrushLibraryRepository = {
+      ...product,
+      repository: {
+        ...product.repository,
+        putMany: async (brushes) => {
+          const result = await product.repository.putMany(brushes);
+          if (delayFirstWrite) {
+            delayFirstWrite = false;
+            writeCommitted.resolve();
+            await releaseWrite.promise;
+          }
+          return result;
+        },
+      },
+    };
+    let current = true;
+    const installation = installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(delayedProduct),
+      acquireDatabase: () => Promise.resolve(database),
+      isInstallCurrent: () => current,
+      now: () => 18_000,
+    });
+    await writeCommitted.promise;
+    const editedId = `creator-pack:${pack.metadata.id}:${pack.entries[0]!.id}`;
+    const installedCandidate = await product.repository.getById(editedId);
+    if (!installedCandidate) throw new Error("Expected the delayed brush candidate");
+    const newerBrush = {
+      ...installedCandidate,
+      name: `${installedCandidate.name} 사용자 편집`,
+      updatedAt: 18_500,
+    };
+    await product.repository.put(newerBrush);
+    current = false;
+    releaseWrite.resolve();
+
+    await expect(installation).rejects.toBeInstanceOf(StudioCreatorPackInstallStaleError);
+    expect(await product.repository.getById(editedId)).toEqual(newerBrush);
+    for (let index = 1; index < pack.entries.length; index += 1) {
+      expect(await product.repository.getById(
+        `creator-pack:${pack.metadata.id}:${pack.entries[index]!.id}`,
+      )).toEqual(before[index]);
+    }
+  });
+
+  it("keeps a brush UI write that is queued after the atomic compensation RPC", async () => {
+    const database = await openDatabase();
+    const product = await openProductBrushLibraryRepository({
+      acquireDatabase: () => Promise.resolve(database),
+    });
+    const atomicCompensation = product.compareAndRestoreInstallSnapshot;
+    if (!atomicCompensation) throw new Error("Expected atomic brush compensation");
+    const pack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "brush"
+        && candidate.entries.every((entry) => entry.delivery.mode === "portable-json"),
+    )!;
+    await installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(product),
+      acquireDatabase: () => Promise.resolve(database),
+      now: () => 21_000,
+    });
+    await database.kvDelete(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    );
+    const before = await Promise.all(pack.entries.map((entry) =>
+      product.repository.getById(`creator-pack:${pack.metadata.id}:${entry.id}`)));
+    const installWriteCommitted = deferred<void>();
+    const releaseInstallWrite = deferred<void>();
+    const casCommitted = deferred<void>();
+    const releaseCasResponse = deferred<void>();
+    let delayFirstWrite = true;
+    const delayedProduct: ProductBrushLibraryRepository = {
+      ...product,
+      repository: {
+        ...product.repository,
+        putMany: async (brushes) => {
+          const result = await product.repository.putMany(brushes);
+          if (delayFirstWrite) {
+            delayFirstWrite = false;
+            installWriteCommitted.resolve();
+            await releaseInstallWrite.promise;
+          }
+          return result;
+        },
+      },
+      compareAndRestoreInstallSnapshot: async (entries, sidecars) => {
+        const result = await atomicCompensation(entries, sidecars);
+        casCommitted.resolve();
+        await releaseCasResponse.promise;
+        return result;
+      },
+    };
+    let current = true;
+    const installation = installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(delayedProduct),
+      acquireDatabase: () => Promise.resolve(database),
+      isInstallCurrent: () => current,
+      now: () => 22_000,
+    });
+    await installWriteCommitted.promise;
+    const editedId = `creator-pack:${pack.metadata.id}:${pack.entries[0]!.id}`;
+    const installedCandidate = await product.repository.getById(editedId);
+    if (!installedCandidate) throw new Error("Expected the delayed brush candidate");
+    const queuedUserEdit = {
+      ...installedCandidate,
+      name: `${installedCandidate.name} CAS 이후 편집`,
+      updatedAt: 22_500,
+    };
+
+    current = false;
+    releaseInstallWrite.resolve();
+    await casCommitted.promise;
+    await product.repository.put(queuedUserEdit);
+    releaseCasResponse.resolve();
+
+    await expect(installation).rejects.toBeInstanceOf(StudioCreatorPackInstallStaleError);
+    expect(await product.repository.getById(editedId)).toEqual(queuedUserEdit);
+    for (let index = 1; index < pack.entries.length; index += 1) {
+      expect(await product.repository.getById(
+        `creator-pack:${pack.metadata.id}:${pack.entries[index]!.id}`,
+      )).toEqual(before[index]);
+    }
+  });
+
+  it("preserves a newer filter edit while compensating a stale in-flight install", async () => {
+    const database = await openDatabase();
+    const product = await openProductFilterLibraryRepository({
+      acquireDatabase: () => Promise.resolve(database),
+    });
+    const pack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "filter",
+    )!;
+    await installStudioCreatorPackProduct(pack, {
+      acquireFilterRepository: () => Promise.resolve(product),
+      now: () => 19_000,
+    });
+    const missingId = `creator-pack:${pack.metadata.id}:${pack.entries.at(-1)!.id}`;
+    await product.repository.delete(missingId);
+    const before = await Promise.all(pack.entries.map((entry) =>
+      product.repository.getById(`creator-pack:${pack.metadata.id}:${entry.id}`)));
+    const writeCommitted = deferred<void>();
+    const releaseWrite = deferred<void>();
+    let delayFirstWrite = true;
+    const delayedProduct: ProductFilterLibraryRepository = {
+      ...product,
+      repository: {
+        ...product.repository,
+        putMany: async (presets) => {
+          const result = await product.repository.putMany(presets);
+          if (delayFirstWrite) {
+            delayFirstWrite = false;
+            writeCommitted.resolve();
+            await releaseWrite.promise;
+          }
+          return result;
+        },
+      },
+    };
+    let current = true;
+    const installation = installStudioCreatorPackProduct(pack, {
+      acquireFilterRepository: () => Promise.resolve(delayedProduct),
+      isInstallCurrent: () => current,
+      now: () => 20_000,
+    });
+    await writeCommitted.promise;
+    const editedId = `creator-pack:${pack.metadata.id}:${pack.entries[0]!.id}`;
+    const installedCandidate = await product.repository.getById(editedId);
+    if (!installedCandidate) throw new Error("Expected the delayed filter candidate");
+    const newerPreset = {
+      ...installedCandidate,
+      name: `${installedCandidate.name} 사용자 편집`,
+      favorite: !installedCandidate.favorite,
+      updatedAt: 20_500,
+    };
+    await product.repository.put(newerPreset);
+    current = false;
+    releaseWrite.resolve();
+
+    await expect(installation).rejects.toBeInstanceOf(StudioCreatorPackInstallStaleError);
+    expect(await product.repository.getById(editedId)).toEqual(newerPreset);
+    expect(await product.repository.getById(missingId)).toBeNull();
+    for (let index = 1; index < pack.entries.length - 1; index += 1) {
+      expect(await product.repository.getById(
+        `creator-pack:${pack.metadata.id}:${pack.entries[index]!.id}`,
+      )).toEqual(before[index]);
+    }
+  });
+
+  it("rolls palette rows and their sidecar back when commitBatch becomes stale after its first write", async () => {
+    const database = await openDatabase();
+    const initialRepository = paletteRepository(database);
+    const pack = palettePack();
+    await installStudioCreatorPackProduct(pack, {
+      acquirePaletteRepository: () => initialRepository,
+      now: () => 15_000,
+    });
+    await database.kvDelete(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `palette:${pack.metadata.id}`,
+    );
+    const beforeItems = await initialRepository.list();
+    const beforeReceipt = await database.kvGet(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `palette:${pack.metadata.id}`,
+    );
+    const writeCommitted = deferred<void>();
+    const releaseWrite = deferred<void>();
+    let delayNextLibraryWrite = true;
+    const delayedDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            await target.kvSet(namespace, key, value);
+            if (
+              delayNextLibraryWrite
+              && namespace === STUDIO_PALETTE_SQLITE_NAMESPACE
+              && key === STUDIO_PALETTE_SQLITE_KEY
+            ) {
+              delayNextLibraryWrite = false;
+              writeCommitted.resolve();
+              await releaseWrite.promise;
+            }
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const delayedRepository = paletteRepository(delayedDatabase);
+    let current = true;
+
+    const installation = installStudioCreatorPackProduct(pack, {
+      acquirePaletteRepository: () => delayedRepository,
+      isInstallCurrent: () => current,
+      now: () => 16_000,
+    });
+    await writeCommitted.promise;
+    current = false;
+    releaseWrite.resolve();
+
+    await expect(installation).rejects.toBeInstanceOf(StudioCreatorPackInstallStaleError);
+    expect(await initialRepository.list()).toEqual(beforeItems);
+    expect(await database.kvGet(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `palette:${pack.metadata.id}`,
+    )).toBe(beforeReceipt);
   });
 
   it("surfaces repository failures as storage errors without invoking another authority", async () => {

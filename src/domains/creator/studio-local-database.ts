@@ -510,6 +510,17 @@ export interface StudioDeletedBrushLibrarySqlRecord {
 }
 
 /**
+ * A stale higher-level mutation may restore a row only while the durable value still equals the
+ * exact candidate that mutation wrote. The SQLite implementation compares and restores every
+ * safe candidate in one transaction while preserving conflicting user mutations.
+ */
+export interface StudioBrushLibrarySqlCompareAndRestoreEntry {
+  readonly id: string;
+  readonly expected: StudioBrushLibrarySqlRecord;
+  readonly restore: StudioBrushLibrarySqlRecord | null;
+}
+
+/**
  * 필터 본문은 canonical Studio preset JSON으로 보존하고, 검색·정렬 열은
  * SQLite가 payload 역직렬화 없이 무제한 카탈로그를 탐색하도록 중복 저장한다.
  * repository는 읽을 때 payload와 모든 인덱스 열의 일치를 검증한다.
@@ -558,6 +569,26 @@ export interface StudioDeletedFilterLibrarySqlRecord {
   record: StudioFilterLibrarySqlRecord;
   /** 삭제 직전 결정적 정렬에서의 0-based 위치. */
   index: number;
+}
+
+export interface StudioFilterLibrarySqlCompareAndRestoreEntry {
+  readonly id: string;
+  readonly expected: StudioFilterLibrarySqlRecord;
+  readonly restore: StudioFilterLibrarySqlRecord | null;
+}
+
+export interface StudioKeyValueSqlCompareAndRestoreEntry {
+  readonly namespace: string;
+  readonly key: string;
+  readonly expected: string | null;
+  readonly restore: string | null;
+}
+
+export interface StudioSqlCompareAndRestoreResult {
+  /** Rows / sidecars that still matched the stale mutation and were restored. */
+  readonly restoredIds: readonly string[];
+  /** Stable row ids preserved as newer mutations, or a sidecar key that blocked the whole restore. */
+  readonly conflictIds: readonly string[];
 }
 
 /**
@@ -745,6 +776,10 @@ export interface StudioBrushLibraryDatabase extends StudioLocalDatabase {
   getBrushLibraryRecord(id: string): Promise<StudioBrushLibrarySqlRecord | null>;
   putBrushLibraryRecord(record: StudioBrushLibrarySqlRecord): Promise<void>;
   putBrushLibraryRecords(records: readonly StudioBrushLibrarySqlRecord[]): Promise<void>;
+  compareAndRestoreBrushLibraryRecords(
+    entries: readonly StudioBrushLibrarySqlCompareAndRestoreEntry[],
+    sidecars?: readonly StudioKeyValueSqlCompareAndRestoreEntry[],
+  ): Promise<StudioSqlCompareAndRestoreResult>;
   /** 레거시 최초 병합 전용 — 기존 SQL 행은 절대 덮어쓰지 않는다. */
   insertMissingBrushLibraryRecords(
     records: readonly StudioBrushLibrarySqlRecord[],
@@ -761,6 +796,9 @@ export interface StudioFilterLibraryDatabase extends StudioLocalDatabase {
   getFilterLibraryRecord(id: string): Promise<StudioFilterLibrarySqlRecord | null>;
   putFilterLibraryRecord(record: StudioFilterLibrarySqlRecord): Promise<void>;
   putFilterLibraryRecords(records: readonly StudioFilterLibrarySqlRecord[]): Promise<void>;
+  compareAndRestoreFilterLibraryRecords(
+    entries: readonly StudioFilterLibrarySqlCompareAndRestoreEntry[],
+  ): Promise<StudioSqlCompareAndRestoreResult>;
   /** 레거시 최초 병합 전용 — 기존 SQL 행은 절대 덮어쓰지 않는다. */
   insertMissingFilterLibraryRecords(
     records: readonly StudioFilterLibrarySqlRecord[],
@@ -818,6 +856,7 @@ const BRUSH_DATABASE_METHODS = Object.freeze([
   "getBrushLibraryRecord",
   "putBrushLibraryRecord",
   "putBrushLibraryRecords",
+  "compareAndRestoreBrushLibraryRecords",
   "insertMissingBrushLibraryRecords",
   "deleteBrushLibraryRecord",
   "listBrushLibraryNames",
@@ -844,6 +883,7 @@ const FILTER_DATABASE_METHODS = Object.freeze([
   "getFilterLibraryRecord",
   "putFilterLibraryRecord",
   "putFilterLibraryRecords",
+  "compareAndRestoreFilterLibraryRecords",
   "insertMissingFilterLibraryRecords",
   "deleteFilterLibraryRecord",
   "deleteFilterLibraryRecords",
@@ -1297,6 +1337,58 @@ function filterRecordBindValues(
   ];
 }
 
+function sameSqlBindValues(
+  left: readonly StudioSqliteBindValue[],
+  right: readonly StudioSqliteBindValue[],
+): boolean {
+  return left.length === right.length
+    && left.every((value, index) => Object.is(value, right[index]));
+}
+
+function sameBrushLibraryRecord(
+  left: StudioBrushLibrarySqlRecord,
+  right: StudioBrushLibrarySqlRecord,
+): boolean {
+  return sameSqlBindValues(brushRecordBindValues(left), brushRecordBindValues(right));
+}
+
+function sameFilterLibraryRecord(
+  left: StudioFilterLibrarySqlRecord,
+  right: StudioFilterLibrarySqlRecord,
+): boolean {
+  return sameSqlBindValues(filterRecordBindValues(left), filterRecordBindValues(right));
+}
+
+function assertCompareAndRestoreRecordEntries<
+  T extends { readonly id: string; readonly expected: { readonly id: string }; readonly restore: { readonly id: string } | null },
+>(entries: readonly T[], kind: string): void {
+  const ids = new Set<string>();
+  for (const entry of entries) {
+    if (
+      entry.id.length === 0
+      || entry.expected.id !== entry.id
+      || (entry.restore !== null && entry.restore.id !== entry.id)
+      || ids.has(entry.id)
+    ) {
+      throw new Error(`studio local database: invalid ${kind} compare-and-restore entry`);
+    }
+    ids.add(entry.id);
+  }
+}
+
+function assertCompareAndRestoreSidecars(
+  sidecars: readonly StudioKeyValueSqlCompareAndRestoreEntry[],
+): void {
+  const keys = new Set<string>();
+  for (const sidecar of sidecars) {
+    const identity = `${sidecar.namespace}\u0000${sidecar.key}`;
+    if (sidecar.namespace.length === 0 || sidecar.key.length === 0 || keys.has(identity)) {
+      throw new Error("studio local database: invalid KV compare-and-restore entry");
+    }
+    keys.add(identity);
+  }
+}
+
 class SqliteStudioLocalDatabase implements
   StudioBrushLibraryDatabase,
   StudioFilterLibraryDatabase,
@@ -1613,6 +1705,63 @@ class SqliteStudioLocalDatabase implements
     });
   }
 
+  async compareAndRestoreBrushLibraryRecords(
+    entries: readonly StudioBrushLibrarySqlCompareAndRestoreEntry[],
+    sidecars: readonly StudioKeyValueSqlCompareAndRestoreEntry[] = [],
+  ): Promise<StudioSqlCompareAndRestoreResult> {
+    assertCompareAndRestoreRecordEntries(entries, "brush-library");
+    assertCompareAndRestoreSidecars(sidecars);
+    const restoredIds: string[] = [];
+    const conflictIds: string[] = [];
+    this.transaction(() => {
+      const sidecarsToRestore: StudioKeyValueSqlCompareAndRestoreEntry[] = [];
+      for (const sidecar of sidecars) {
+        const identity = `${sidecar.namespace}\u0000${sidecar.key}`;
+        const row = this.selectRows(KV_GET_SQL, [sidecar.namespace, sidecar.key], 1)[0];
+        const current = row === undefined ? null : expectString(row[0], "value");
+        if (current === sidecar.restore) continue;
+        if (current !== sidecar.expected) {
+          // A newer package operation owns this sidecar. Do not restore any row from the stale
+          // snapshot, even if an individual row still happens to equal its old install candidate.
+          conflictIds.push(identity);
+          return;
+        }
+        sidecarsToRestore.push(sidecar);
+      }
+
+      for (const entry of entries) {
+        const row = this.selectRows(BRUSH_RECORD_GET_SQL, [entry.id], 11)[0];
+        const current = row === undefined ? null : rowToBrushLibraryRecord(row);
+        const alreadyRestored = current === null
+          ? entry.restore === null
+          : entry.restore !== null && sameBrushLibraryRecord(current, entry.restore);
+        if (alreadyRestored) continue;
+        if (current === null || !sameBrushLibraryRecord(current, entry.expected)) {
+          conflictIds.push(entry.id);
+          continue;
+        }
+        if (entry.restore === null) this.run(BRUSH_RECORD_DELETE_SQL, [entry.id]);
+        else this.run(BRUSH_RECORD_PUT_SQL, brushRecordBindValues(entry.restore));
+        restoredIds.push(entry.id);
+      }
+      for (const sidecar of sidecarsToRestore) {
+        const identity = `${sidecar.namespace}\u0000${sidecar.key}`;
+        if (sidecar.restore === null) {
+          this.run(KV_DELETE_SQL, [sidecar.namespace, sidecar.key]);
+        } else {
+          this.run(KV_SET_SQL, [
+            sidecar.namespace,
+            sidecar.key,
+            sidecar.restore,
+            this.now(),
+          ]);
+        }
+        restoredIds.push(identity);
+      }
+    });
+    return { restoredIds, conflictIds };
+  }
+
   async insertMissingBrushLibraryRecords(
     records: readonly StudioBrushLibrarySqlRecord[],
   ): Promise<number> {
@@ -1756,6 +1905,32 @@ class SqliteStudioLocalDatabase implements
         this.run(FILTER_RECORD_PUT_SQL, filterRecordBindValues(record));
       }
     });
+  }
+
+  async compareAndRestoreFilterLibraryRecords(
+    entries: readonly StudioFilterLibrarySqlCompareAndRestoreEntry[],
+  ): Promise<StudioSqlCompareAndRestoreResult> {
+    assertCompareAndRestoreRecordEntries(entries, "filter-library");
+    const restoredIds: string[] = [];
+    const conflictIds: string[] = [];
+    this.transaction(() => {
+      for (const entry of entries) {
+        const row = this.selectRows(FILTER_RECORD_GET_SQL, [entry.id], 12)[0];
+        const current = row === undefined ? null : rowToFilterLibraryRecord(row);
+        const alreadyRestored = current === null
+          ? entry.restore === null
+          : entry.restore !== null && sameFilterLibraryRecord(current, entry.restore);
+        if (alreadyRestored) continue;
+        if (current === null || !sameFilterLibraryRecord(current, entry.expected)) {
+          conflictIds.push(entry.id);
+          continue;
+        }
+        if (entry.restore === null) this.run(FILTER_RECORD_DELETE_SQL, [entry.id]);
+        else this.run(FILTER_RECORD_PUT_SQL, filterRecordBindValues(entry.restore));
+        restoredIds.push(entry.id);
+      }
+    });
+    return { restoredIds, conflictIds };
   }
 
   async insertMissingFilterLibraryRecords(

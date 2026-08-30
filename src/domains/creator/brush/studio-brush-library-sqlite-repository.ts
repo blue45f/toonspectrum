@@ -15,7 +15,9 @@ import {
   SqliteUnavailableError,
   type StudioBrushLibraryDatabase,
   type StudioBrushLibrarySqlRecord,
+  type StudioKeyValueSqlCompareAndRestoreEntry,
   type StudioLocalDatabase,
+  type StudioSqlCompareAndRestoreResult,
 } from "../studio-local-database";
 import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
 
@@ -74,6 +76,17 @@ export interface ProductBrushLibraryRepository {
   readonly authority: ProductBrushLibraryAuthority;
   readonly repository: BrushLibraryRepositoryPort;
   readonly migration: LegacyBrushLibraryMigrationResult | null;
+  /** Product-only stale-install compensation. SQLite executes compare+restore in one transaction. */
+  readonly compareAndRestoreInstallSnapshot?: (
+    entries: readonly StudioBrushLibraryInstallCompareAndRestoreEntry[],
+    sidecars?: readonly StudioKeyValueSqlCompareAndRestoreEntry[],
+  ) => Promise<StudioSqlCompareAndRestoreResult>;
+}
+
+export interface StudioBrushLibraryInstallCompareAndRestoreEntry {
+  readonly id: string;
+  readonly expected: StudioSavedBrush;
+  readonly restore: StudioSavedBrush | null;
 }
 
 interface SqliteBrushLibraryAdapterOptions {
@@ -123,8 +136,10 @@ export function createLegacyV12FallbackBrushLibraryRepository(
   return createStorageBrushLibraryRepository(createV12FallbackStorage(storage));
 }
 
-/** A fresh, non-persistent repository whose lifetime is the returned product session. */
-export function createMemorySessionBrushLibraryRepository(): BrushLibraryRepositoryPort {
+function createMemorySessionBrushLibraryProduct(): Pick<
+  ProductBrushLibraryRepository,
+  "repository" | "compareAndRestoreInstallSnapshot"
+> {
   const values = new Map<string, string>();
   const storage: BrushLibraryStorage = {
     getItem(key) {
@@ -134,7 +149,98 @@ export function createMemorySessionBrushLibraryRepository(): BrushLibraryReposit
       values.set(key, value);
     },
   };
-  return createStorageBrushLibraryRepository(storage);
+  const repository = createStorageBrushLibraryRepository(storage);
+  return {
+    repository,
+    async compareAndRestoreInstallSnapshot(entries, sidecars = []) {
+      const seen = new Set<string>();
+      for (const entry of entries) {
+        if (
+          entry.id.length === 0
+          || seen.has(entry.id)
+          || entry.expected.id !== entry.id
+          || (entry.restore !== null && entry.restore.id !== entry.id)
+        ) {
+          throw new BrushLibraryRepositoryError(
+            "write-error",
+            "Memory brush compare-and-restore input is invalid",
+          );
+        }
+        seen.add(entry.id);
+      }
+      const sidecarKeys = new Set<string>();
+      const unsupportedSidecars: string[] = [];
+      for (const { namespace, key } of sidecars) {
+        const identity = `${namespace}\u0000${key}`;
+        if (namespace.length === 0 || key.length === 0 || sidecarKeys.has(identity)) {
+          throw new BrushLibraryRepositoryError(
+            "write-error",
+            "Memory brush compare-and-restore sidecar input is invalid",
+          );
+        }
+        sidecarKeys.add(identity);
+        unsupportedSidecars.push(identity);
+      }
+      if (unsupportedSidecars.length > 0) {
+        // This authority cannot atomically share a transaction with the SQLite receipt. Treat the
+        // unverifiable sidecar as a global newer-operation conflict and preserve every row.
+        return { restoredIds: [], conflictIds: unsupportedSidecars };
+      }
+      const read = readBrushLibrary(storage);
+      if (read.status !== "ok" && read.status !== "empty") {
+        throw new BrushLibraryRepositoryError(
+          "read-error",
+          `Memory brush library cannot be compensated safely (${read.status})`,
+        );
+      }
+      const currentById = new Map(read.brushes.map((brush) => [brush.id, brush]));
+      const conflictIds: string[] = [];
+      const restoredIds: string[] = [];
+      const eligibleIds = new Set<string>();
+      for (const entry of entries) {
+        const current = currentById.get(entry.id) ?? null;
+        const currentRecord = current === null ? null : studioBrushToSqlRecord(current);
+        const restoreRecord = entry.restore === null
+          ? null
+          : studioBrushToSqlRecord(entry.restore);
+        const alreadyRestored = currentRecord === null
+          ? restoreRecord === null
+          : restoreRecord !== null
+            && canonicalJson(currentRecord) === canonicalJson(restoreRecord);
+        if (
+          !alreadyRestored
+          && (
+            currentRecord === null
+            || canonicalJson(currentRecord)
+              !== canonicalJson(studioBrushToSqlRecord(entry.expected))
+          )
+        ) {
+          conflictIds.push(entry.id);
+          continue;
+        }
+        if (!alreadyRestored) eligibleIds.add(entry.id);
+      }
+
+      for (const entry of entries) {
+        if (!eligibleIds.has(entry.id)) continue;
+        if (entry.restore === null) currentById.delete(entry.id);
+        else currentById.set(entry.id, sqlRecordToStudioBrush(studioBrushToSqlRecord(entry.restore)));
+        restoredIds.push(entry.id);
+      }
+      if (restoredIds.length > 0) {
+        storage.setItem(BRUSH_LIBRARY_KEY, JSON.stringify({
+          version: BRUSH_LIBRARY_STORAGE_VERSION,
+          brushes: [...currentById.values()],
+        }));
+      }
+      return { restoredIds, conflictIds };
+    },
+  };
+}
+
+/** A fresh, non-persistent repository whose lifetime is the returned product session. */
+export function createMemorySessionBrushLibraryRepository(): BrushLibraryRepositoryPort {
+  return createMemorySessionBrushLibraryProduct().repository;
 }
 
 function normalizeSearch(value: string): string {
@@ -474,10 +580,12 @@ async function openProductBrushLibraryRepositoryInternal(
     database = await (options.acquireDatabase ?? acquireStudioLocalDatabase)();
   } catch (error) {
     if (!(error instanceof SqliteUnavailableError)) throw error;
+    const memory = createMemorySessionBrushLibraryProduct();
     return {
       authority: "memory-session",
-      repository: createMemorySessionBrushLibraryRepository(),
+      repository: memory.repository,
       migration: null,
+      compareAndRestoreInstallSnapshot: memory.compareAndRestoreInstallSnapshot,
     };
   }
 
@@ -489,13 +597,23 @@ async function openProductBrushLibraryRepositoryInternal(
   const migration = options.legacyDataPolicy === "import-explicit"
     ? await migrateLegacyBrushLibraryToSqlite(database, storage, options.now)
     : null;
+  const brushDatabase = requireStudioBrushLibraryDatabase(database);
   return {
     authority: "sqlite",
-    repository: createSqliteBrushLibraryRepository(database, {
+    repository: createBrushLibraryRepository(createSqliteBrushLibraryAdapter(brushDatabase, {
       now: options.now,
       uuid: options.uuid,
-    }),
+    })),
     migration,
+    compareAndRestoreInstallSnapshot: (entries, sidecars = []) =>
+      brushDatabase.compareAndRestoreBrushLibraryRecords(
+        entries.map((entry) => ({
+          id: entry.id,
+          expected: studioBrushToSqlRecord(entry.expected),
+          restore: entry.restore === null ? null : studioBrushToSqlRecord(entry.restore),
+        })),
+        sidecars,
+      ),
   };
 }
 

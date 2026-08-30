@@ -42,6 +42,16 @@ interface AssetProjection<TAsset> {
   readonly reason: string | null;
 }
 
+/**
+ * 설치 구현은 저장소를 획득하거나 읽은 뒤 실제 mutation을 시작하기 직전에 이 guard를
+ * 다시 확인해야 한다. 호출 시점의 boolean snapshot이 아니라 live callback을 전달해
+ * 화면 이탈이나 더 최신 딥링크 operation을 installer 내부 await 경계에서도 감지한다.
+ */
+export interface StudioMarketplaceInstallGuard {
+  readonly isCurrent: () => boolean;
+  readonly assertCurrent: () => void;
+}
+
 export type StudioMarketplaceBundledCatalogOpenResult =
   | Readonly<{
       status: "opened";
@@ -59,7 +69,10 @@ export interface StudioMarketplaceDeepLinkDependencies<TPack, TAsset> {
   readonly projectPack: (
     record: CreatorMarketplaceResourceRecord,
   ) => PackProjection<TPack>;
-  readonly installPack: (pack: TPack) => Promise<InstallResult>;
+  readonly installPack: (
+    pack: TPack,
+    guard: StudioMarketplaceInstallGuard,
+  ) => Promise<InstallResult>;
   readonly openBundledPackCatalog: (
     pack: TPack,
     record: CreatorMarketplaceResourceRecord,
@@ -102,6 +115,13 @@ function staleResult(resourceId: string): StudioMarketplaceDeepLinkResult {
     message: "종료된 Studio 작업의 마켓 설치 결과를 무시했습니다.",
     resourceId,
   };
+}
+
+class StudioMarketplaceStaleInstallError extends Error {
+  constructor() {
+    super("Studio marketplace install operation is stale");
+    this.name = "StudioMarketplaceStaleInstallError";
+  }
 }
 
 export function createStudioMarketplaceDeepLinkLifecycleState(): StudioMarketplaceDeepLinkLifecycleState {
@@ -219,7 +239,14 @@ export async function applyStudioMarketplaceDeepLink<TPack, TAsset>(
       };
     }
 
-    const installResult = await dependencies.installPack(projection.pack);
+    const installGuard: StudioMarketplaceInstallGuard = {
+      isCurrent,
+      assertCurrent: () => {
+        if (!isCurrent()) throw new StudioMarketplaceStaleInstallError();
+      },
+    };
+    installGuard.assertCurrent();
+    const installResult = await dependencies.installPack(projection.pack, installGuard);
     if (!isCurrent()) return staleResult(normalizedResourceId);
     if (!SUCCESSFUL_INSTALL_STATUSES.has(installResult.status)) {
       return {
@@ -255,7 +282,9 @@ export async function applyStudioMarketplaceDeepLink<TPack, TAsset>(
       resourceId: normalizedResourceId,
     };
   } catch (caught) {
-    if (!isCurrent()) return staleResult(normalizedResourceId);
+    if (caught instanceof StudioMarketplaceStaleInstallError || !isCurrent()) {
+      return staleResult(normalizedResourceId);
+    }
     return {
       status: "error",
       message: `마켓 리소스를 Studio로 가져오지 못했어요. ${caughtMessage(caught)}`,

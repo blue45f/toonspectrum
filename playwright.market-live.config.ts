@@ -1,8 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
 /**
- * Opt-in live API gate. The API and its isolated PostgreSQL database must already be running;
- * e2e/run-market-live-e2e.mjs validates that contract and deliberately starts neither service.
+ * Opt-in live API gate. e2e/run-market-live-e2e.mjs validates the isolated PostgreSQL target,
+ * requires an unused loopback port, and starts the API with that exact DATABASE_URL.
  */
 export default defineConfig({
   testDir: "./e2e",
