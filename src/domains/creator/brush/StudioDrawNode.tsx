@@ -51,6 +51,7 @@ import {
   planNeonBrushPasses,
   planOilBrushDabs,
   planOilBrushDabsIncremental,
+  releaseOilBrushDabDraftPlanners,
   studioOilPaintBodyForBrush,
   studioOilTipProfileForBrush,
   planPastelBrushDabs,
@@ -152,6 +153,7 @@ import {
   paintStudioOilRibbonHit,
   planStudioOilRibbonCarrier,
   planStudioOilRibbonCarrierIncremental,
+  releaseStudioOilRibbonDraftPlanners,
   studioOilRibbonProgramsForBrush,
 } from "./studio-oil-ribbon-carrier";
 import { paintStudioOilRibbonCarrierIncremental } from "./studio-oil-ribbon-incremental-paint";
@@ -430,6 +432,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   // 떨어지게 한다.
   const oilDraftPlannersRetained = activeDraft
     && symmetricVariations.length <= STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
+  // 초안이 끝나면 이 요소는 activeDraft=false 로 다시 그려진다 — 그 시점이 보관 베드를 놓는
+  // 지점이다. 캡 포화 오일 획은 카피당 ~27k 런 객체를 들고 있어서, 다음 초안이 시작될 때까지
+  // 붙들고 있으면 그리기가 끝난 뒤에도 수십만 객체가 살아 있게 된다. 두 해제 모두 다른 초안이
+  // 이미 자리를 차지했으면 no-op 이라 순서에 안전하다.
+  if (!activeDraft) {
+    releaseStudioOilRibbonDraftPlanners(el.id);
+    releaseOilBrushDabDraftPlanners(el.id);
+  }
   const dynamicBrushPlanResult = dynamicBrushId
     ? planStudioDynamicBrushRender(el, dynamicBrushId, activeDraft, paperSurface)
     : null;
@@ -2459,9 +2469,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // 스스로 검증한 접두만 재사용하므로 플랜은 배치와 바이트 동일하다. 커밋 렌더는
             // 배치 리플레이를 유지해 내부 점 재작성에도 항상 정본을 그린다. 대칭 변형은 같은
             // 요소를 변형된 점 배열로 여러 번 그리므로 변형 인덱스를 획 키에 포함한다.
-            const oilStrokeKey = `${el.id}#${index}`;
             const dabs = oilDraftPlannersRetained
-              ? planOilBrushDabsIncremental(oilStrokeKey, oilPlanInput)
+              ? planOilBrushDabsIncremental(el.id, index, oilPlanInput)
               : planOilBrushDabs(oilPlanInput);
             // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
             // dli GGX 릴리프 오버레이는 brush--impasto-relief 와 oil--impasto-ribbon 두 레인이 켠다,
@@ -2474,7 +2483,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               el.brushEnginePrograms?.oil,
             );
             const carrier = oilDraftPlannersRetained
-              ? planStudioOilRibbonCarrierIncremental(oilStrokeKey, dabs, oilPrograms)
+              ? planStudioOilRibbonCarrierIncremental(el.id, index, dabs, oilPrograms)
               : planStudioOilRibbonCarrier(dabs, oilPrograms);
             return (
               <Shape

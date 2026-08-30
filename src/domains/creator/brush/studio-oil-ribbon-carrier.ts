@@ -2106,13 +2106,26 @@ export class StudioOilRibbonCarrierPlanner {
   }
 }
 
-const OIL_CARRIER_PLANNER_CACHE = new Map<string, StudioOilRibbonCarrierPlanner>();
 /**
- * One active draft's symmetry copies, which a retained renderer walks in a fixed order every
- * frame — see `STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS` for why a smaller LRU makes the
- * cache strictly worse than none. Callers with a wider fan must use `planStudioOilRibbonCarrier`.
+ * Planners retained for the ONE draft currently being drawn.
+ *
+ * A single slot, not an LRU over strokes: only one stroke is ever active, and its symmetry copies
+ * are the whole working set. An LRU got this wrong twice over — sized below the fan it evicted
+ * every copy just before its next use (0% hit rate, and worse than no cache once construction and
+ * a doomed verification pass are charged), and sized above it, a finished stroke's beds stayed
+ * strongly reachable while later single-copy strokes aged out one stale entry at a time. At the
+ * dab cap one copy holds ~27k run objects, so a 16-copy stroke is hundreds of thousands of objects
+ * that must not outlive the stroke that needed them.
+ *
+ * Starting a different draft therefore drops the previous one outright, and
+ * `releaseStudioOilRibbonDraftPlanners` frees the last one when its committed render arrives.
  */
-const OIL_CARRIER_PLANNER_LIMIT = STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
+interface RetainedOilCarrierDraft {
+  readonly draftId: string;
+  readonly planners: Map<number, StudioOilRibbonCarrierPlanner>;
+}
+
+let retainedOilCarrierDraft: RetainedOilCarrierDraft | null = null;
 
 /**
  * Stroke-keyed `StudioOilRibbonCarrierPlanner`, for renderers that cannot hold one themselves.
@@ -2121,37 +2134,50 @@ const OIL_CARRIER_PLANNER_LIMIT = STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATION
  * ACTIVE DRAFT only. Committed and export renders must keep calling the batch planner: they render
  * arbitrary strokes in arbitrary order and would evict each other's beds for nothing.
  *
- * A symmetry transform draws one element several times from different point arrays, so callers
- * must include the transform index in the key or the copies will share a bed.
+ * A symmetry transform draws one element several times from different point arrays, so the copy's
+ * `variationIndex` selects its own planner. A fan wider than
+ * `STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS` falls back to the batch planner rather than
+ * retaining beds without bound; callers should not reach that guard, since they are expected to
+ * check the same bound before routing here.
  */
 export function planStudioOilRibbonCarrierIncremental(
-  strokeKey: string,
+  draftId: string,
+  variationIndex: number,
   dabs: readonly FxOilDab[],
   options?: StudioOilRibbonCarrierOptions,
 ): StudioOilRibbonCarrierPlan {
-  let planner = OIL_CARRIER_PLANNER_CACHE.get(strokeKey);
-  if (planner) {
-    // LRU touch: re-inserting keeps insertion order in most-recently-used order.
-    OIL_CARRIER_PLANNER_CACHE.delete(strokeKey);
-  } else {
-    planner = new StudioOilRibbonCarrierPlanner();
+  if (retainedOilCarrierDraft?.draftId !== draftId) {
+    retainedOilCarrierDraft = { draftId, planners: new Map() };
   }
-  OIL_CARRIER_PLANNER_CACHE.set(strokeKey, planner);
-  while (OIL_CARRIER_PLANNER_CACHE.size > OIL_CARRIER_PLANNER_LIMIT) {
-    const oldest = OIL_CARRIER_PLANNER_CACHE.keys().next().value;
-    if (oldest === undefined) break;
-    OIL_CARRIER_PLANNER_CACHE.delete(oldest);
+  const planners = retainedOilCarrierDraft.planners;
+  let planner = planners.get(variationIndex);
+  if (!planner) {
+    if (planners.size >= STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS) {
+      return planStudioOilRibbonCarrier(dabs, options);
+    }
+    planner = new StudioOilRibbonCarrierPlanner();
+    planners.set(variationIndex, planner);
   }
   return planner.plan(dabs, options);
 }
 
+/** Frees `draftId`'s retained beds. A no-op once a different draft has already replaced them. */
+export function releaseStudioOilRibbonDraftPlanners(draftId: string): void {
+  if (retainedOilCarrierDraft?.draftId === draftId) retainedOilCarrierDraft = null;
+}
+
 /**
- * Runs the keyed planner for `strokeKey` reused on its last call, or `null` when the cache is not
- * holding one. @internal — the colocated cache-sizing contract test only; a caller cannot act on
- * this, and a hit/miss is never a correctness signal (every plan is byte-identical either way).
+ * Runs the retained planner for one copy of `draftId` reused on its last call, or `null` when no
+ * planner is held for it. @internal — the colocated retention contract test only; a caller cannot
+ * act on this, and a hit/miss is never a correctness signal (every plan is byte-identical either
+ * way).
  */
-export function studioOilRibbonCarrierRetainedReuse(strokeKey: string): number | null {
-  return OIL_CARRIER_PLANNER_CACHE.get(strokeKey)?.reusedRuns ?? null;
+export function studioOilRibbonCarrierRetainedReuse(
+  draftId: string,
+  variationIndex: number,
+): number | null {
+  if (retainedOilCarrierDraft?.draftId !== draftId) return null;
+  return retainedOilCarrierDraft.planners.get(variationIndex)?.reusedRuns ?? null;
 }
 
 /**

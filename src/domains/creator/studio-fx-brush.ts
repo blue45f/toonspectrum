@@ -2303,13 +2303,18 @@ export class FxOilDabPlanner {
   }
 }
 
-const OIL_DAB_PLANNER_CACHE = new Map<string, FxOilDabPlanner>();
 /**
- * One active draft's symmetry copies, which a retained renderer walks in a fixed order every
- * frame — see `STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS` for why a smaller LRU makes the
- * cache strictly worse than none. Callers with a wider fan must use `planOilBrushDabs` instead.
+ * Planners retained for the ONE draft currently being drawn — a single slot, not an LRU over
+ * strokes. See `planStudioOilRibbonCarrierIncremental` for why an LRU is the wrong shape here:
+ * sized below the draft's symmetry fan it never hits, and sized above it a finished stroke's beds
+ * outlive the stroke. Starting a different draft drops the previous one outright.
  */
-const OIL_DAB_PLANNER_LIMIT = STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
+interface RetainedOilDabDraft {
+  readonly draftId: string;
+  readonly planners: Map<number, FxOilDabPlanner>;
+}
+
+let retainedOilDabDraft: RetainedOilDabDraft | null = null;
 
 /**
  * Stroke-keyed `FxOilDabPlanner`, for renderers that cannot hold one themselves.
@@ -2319,27 +2324,33 @@ const OIL_DAB_PLANNER_LIMIT = STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
  * Committed and export renders keep calling the batch planner: they walk arbitrary strokes in
  * arbitrary order and would evict each other's beds for nothing.
  *
- * A symmetry transform draws one element several times from different point arrays, so callers
- * must include the transform index in the key or the copies will share a bed.
+ * A symmetry transform draws one element several times from different point arrays, so the copy's
+ * `variationIndex` selects its own planner; a fan wider than the retained bound falls back to the
+ * batch planner rather than retaining beds without bound.
  */
 export function planOilBrushDabsIncremental(
-  strokeKey: string,
+  draftId: string,
+  variationIndex: number,
   input: FxOilPlanInput,
 ): FxOilDab[] {
-  let planner = OIL_DAB_PLANNER_CACHE.get(strokeKey);
-  if (planner) {
-    // LRU touch: re-inserting keeps insertion order in most-recently-used order.
-    OIL_DAB_PLANNER_CACHE.delete(strokeKey);
-  } else {
-    planner = new FxOilDabPlanner();
+  if (retainedOilDabDraft?.draftId !== draftId) {
+    retainedOilDabDraft = { draftId, planners: new Map() };
   }
-  OIL_DAB_PLANNER_CACHE.set(strokeKey, planner);
-  while (OIL_DAB_PLANNER_CACHE.size > OIL_DAB_PLANNER_LIMIT) {
-    const oldest = OIL_DAB_PLANNER_CACHE.keys().next().value;
-    if (oldest === undefined) break;
-    OIL_DAB_PLANNER_CACHE.delete(oldest);
+  const planners = retainedOilDabDraft.planners;
+  let planner = planners.get(variationIndex);
+  if (!planner) {
+    if (planners.size >= STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS) {
+      return planOilBrushDabs(input);
+    }
+    planner = new FxOilDabPlanner();
+    planners.set(variationIndex, planner);
   }
   return planner.plan(input);
+}
+
+/** Frees `draftId`'s retained beds. A no-op once a different draft has already replaced them. */
+export function releaseOilBrushDabDraftPlanners(draftId: string): void {
+  if (retainedOilDabDraft?.draftId === draftId) retainedOilDabDraft = null;
 }
 
 // ---------------------------------------------------------------------------

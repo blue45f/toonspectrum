@@ -37,6 +37,7 @@ import {
   StudioOilRibbonCarrierPlanner,
   planStudioOilRibbonCarrier,
   planStudioOilRibbonCarrierIncremental,
+  releaseStudioOilRibbonDraftPlanners,
   studioOilRibbonCarrierRetainedReuse,
   studioOilRibbonProgramsForBrush,
   type StudioOilRibbonCarrierOptions,
@@ -211,18 +212,45 @@ describe("StudioOilRibbonCarrierPlanner", () => {
     const beds = dabPlanners.map((planner) => dabsAt("oil--flat-ribbon", 700, planner));
     // Frame 1: every copy plans cold.
     beds.forEach((dabs, index) => {
-      planStudioOilRibbonCarrierIncremental(`${ELEMENT_ID}#${index}`, dabs, undefined);
+      planStudioOilRibbonCarrierIncremental(ELEMENT_ID, index, dabs, undefined);
     });
     // Frame 2: the stroke grew by a few samples in every copy.
     const grown = dabPlanners.map((planner) => dabsAt("oil--flat-ribbon", 704, planner));
     for (const [index, dabs] of grown.entries()) {
-      const key = `${ELEMENT_ID}#${index}`;
-      const plan = planStudioOilRibbonCarrierIncremental(key, dabs, undefined);
+      const plan = planStudioOilRibbonCarrierIncremental(ELEMENT_ID, index, dabs, undefined);
       // Still exact…
       expect(plan).toEqual(planStudioOilRibbonCarrier(dabs, undefined));
       // …and the copy's own bed survived the frame rather than being evicted by its siblings.
-      expect(studioOilRibbonCarrierRetainedReuse(key)).toBeGreaterThan(0);
+      expect(studioOilRibbonCarrierRetainedReuse(ELEMENT_ID, index)).toBeGreaterThan(0);
     }
+    releaseStudioOilRibbonDraftPlanners(ELEMENT_ID);
+  });
+
+  it("does not let a finished draft's beds outlive it", () => {
+    // Regression: the retained planners lived in a module-level LRU, so a committed 16-copy stroke
+    // stayed strongly reachable — hundreds of thousands of run objects at the dab cap — and a
+    // later single-copy stroke aged out exactly one stale entry per stroke.
+    const draft = `${ELEMENT_ID}:finished`;
+    const dabs = dabsAt("oil--flat-ribbon", 400);
+    planStudioOilRibbonCarrierIncremental(draft, 0, dabs, undefined);
+    planStudioOilRibbonCarrierIncremental(draft, 1, dabs, undefined);
+    expect(studioOilRibbonCarrierRetainedReuse(draft, 0)).not.toBeNull();
+
+    // The committed render releases it.
+    releaseStudioOilRibbonDraftPlanners(draft);
+    expect(studioOilRibbonCarrierRetainedReuse(draft, 0)).toBeNull();
+    expect(studioOilRibbonCarrierRetainedReuse(draft, 1)).toBeNull();
+
+    // Releasing a draft that has already been replaced is a no-op, so a late committed render
+    // cannot drop the beds of the stroke being drawn now.
+    planStudioOilRibbonCarrierIncremental(draft, 0, dabs, undefined);
+    releaseStudioOilRibbonDraftPlanners(`${ELEMENT_ID}:someone-else`);
+    expect(studioOilRibbonCarrierRetainedReuse(draft, 0)).not.toBeNull();
+
+    // Starting a different draft drops the previous one outright, not one entry at a time.
+    planStudioOilRibbonCarrierIncremental(`${ELEMENT_ID}:next`, 0, dabs, undefined);
+    expect(studioOilRibbonCarrierRetainedReuse(draft, 0)).toBeNull();
+    releaseStudioOilRibbonDraftPlanners(`${ELEMENT_ID}:next`);
   });
 
   it("reset() drops the retained bed", () => {
