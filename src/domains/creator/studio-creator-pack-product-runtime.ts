@@ -218,6 +218,27 @@ async function rollbackAndRethrowStaleInstall(
   throw staleError;
 }
 
+async function rollbackAndRethrowInstallFailure(
+  error: unknown,
+  rollback: () => Promise<void>,
+): Promise<never> {
+  const staleError = nestedStaleInstallError(error);
+  try {
+    await rollback();
+  } catch (rollbackError) {
+    const cause = new AggregateError(
+      [error, rollbackError],
+      "Creator Pack install rollback failed",
+    );
+    if (staleError) {
+      throw new StudioCreatorPackInstallStaleError({ cause });
+    }
+    throw cause;
+  }
+  if (staleError) throw staleError;
+  throw error;
+}
+
 function compensationConflict(kind: string, ids: readonly string[]): Error {
   return new Error(
     `Stale ${kind} install preserved ${ids.length} newer user mutation(s): ${ids.join(", ")}`,
@@ -670,15 +691,18 @@ async function installStudioCreatorPackProductUnlocked(
       );
       const installedReceiptRaw = brushReceipt(pack, now);
       assertInstallCurrent(options);
+      let rowsCommitted = false;
       const saved = await (async () => {
         try {
           const result = await product.repository.putMany(incoming);
+          rowsCommitted = true;
           assertInstallCurrent(options);
           await saveBrushReceipt(pack, installedReceiptRaw, database, options);
           assertInstallCurrent(options);
           return result;
         } catch (error) {
-          return rollbackAndRethrowStaleInstall(
+          if (!rowsCommitted && !nestedStaleInstallError(error)) throw error;
+          return rollbackAndRethrowInstallFailure(
             error,
             () => restoreBrushInstallSnapshot(
               pack,

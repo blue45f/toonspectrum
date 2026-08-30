@@ -15,13 +15,11 @@ import {
   X,
 } from "lucide-react";
 import { Suspense } from "react";
-import { useSearchParams } from "react-router-dom";
 
 import { completeStudioAssetInsertion } from "./studio-asset-insertion-outcome";
 import { CANVAS_W, TEMPLATES, groupTemplates } from "./studio-assets";
 import { svgToDataUrl } from "./studio-characters";
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "./studio-chrome-ui";
-import { resolveStudioCommunityMarketplaceInitialView } from "./studio-community-marketplace-view";
 import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
 import {
   StudioAssetMenuPanel,
@@ -34,6 +32,7 @@ import {
 } from "./studio-page-lazy-ui";
 import { hasSameCategorySiblings } from "./studio-similar-style";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
+import { useStudioCommunityMarketplaceInitialView } from "./use-studio-community-marketplace-initial-view";
 
 import type { StudioMenu } from "./studio-editor-tool-model";
 import type { ImageEl } from "./studio-element-model";
@@ -65,9 +64,8 @@ export interface StudioAssetToolPopoverBodyProps {
 export function StudioAssetToolPopoverBody({
   toolBelt,
 }: StudioAssetToolPopoverBodyProps) {
-  const [searchParams] = useSearchParams();
   const communityMarketplaceInitialView =
-    resolveStudioCommunityMarketplaceInitialView(searchParams);
+    useStudioCommunityMarketplaceInitialView();
   const {
     assetFavoriteOnly,
     assetFavoriteState,

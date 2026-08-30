@@ -119,9 +119,8 @@ describe("StudioCommunityMarketplacePanel", () => {
     expect(assetMenuSource).toContain("initialOpen");
     expect(assetMenuSource).toContain("initialView={initialView}");
     expect(assetMenuSource).toContain("onUseAsset={onUseLocalAsset}");
-    expect(assetPopoverSource).toContain("useSearchParams()");
     expect(assetPopoverSource).toContain(
-      "resolveStudioCommunityMarketplaceInitialView(searchParams)",
+      "useStudioCommunityMarketplaceInitialView()",
     );
     expect(assetPopoverSource).toContain(
       "communityMarketplaceInitialView={communityMarketplaceInitialView}",

@@ -442,6 +442,117 @@ describe("Creator Pack product SQLite authority", () => {
     )).toBe(beforeReceipt);
   });
 
+  it("rolls brush rows back when the receipt write fails after putMany commits", async () => {
+    const database = await openDatabase();
+    const product = await openProductBrushLibraryRepository({
+      acquireDatabase: () => Promise.resolve(database),
+    });
+    const pack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "brush"
+        && candidate.entries.every((entry) => entry.delivery.mode === "portable-json"),
+    )!;
+    await installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(product),
+      acquireDatabase: () => Promise.resolve(database),
+      now: () => 12_100,
+    });
+    await database.kvDelete(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    );
+    const beforePage = await product.repository.query({ limit: 100 });
+    let failOnce = true;
+    const failingDatabase = faultingDatabase(database, (operation, namespace, key) => {
+      const matches = operation === "set"
+        && namespace === STUDIO_CREATOR_PACK_SQLITE_NAMESPACE
+        && key === `brush:${pack.metadata.id}`
+        && failOnce;
+      if (matches) failOnce = false;
+      return matches;
+    });
+
+    const result = await installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(product),
+      acquireDatabase: () => Promise.resolve(failingDatabase),
+      now: () => 12_200,
+    });
+
+    expect(result.status).toBe("storage-error");
+    expect(result.message).toContain("injected receipt set failure");
+    expect(await product.repository.query({ limit: 100 })).toEqual(beforePage);
+    expect(await database.kvGet(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    )).toBeNull();
+  });
+
+  it("preserves a newer brush edit while compensating a failed receipt write", async () => {
+    const database = await openDatabase();
+    const product = await openProductBrushLibraryRepository({
+      acquireDatabase: () => Promise.resolve(database),
+    });
+    const pack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "brush"
+        && candidate.entries.every((entry) => entry.delivery.mode === "portable-json"),
+    )!;
+    await installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(product),
+      acquireDatabase: () => Promise.resolve(database),
+      now: () => 12_300,
+    });
+    await database.kvDelete(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    );
+    const before = await Promise.all(pack.entries.map((entry) =>
+      product.repository.getById(`creator-pack:${pack.metadata.id}:${entry.id}`)));
+    const editedId = `creator-pack:${pack.metadata.id}:${pack.entries[0]!.id}`;
+    let newerBrush = before[0];
+    const failingDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            if (
+              namespace === STUDIO_CREATOR_PACK_SQLITE_NAMESPACE
+              && key === `brush:${pack.metadata.id}`
+            ) {
+              const installedCandidate = await product.repository.getById(editedId);
+              if (!installedCandidate) throw new Error("Expected the installed brush candidate");
+              newerBrush = {
+                ...installedCandidate,
+                name: `${installedCandidate.name} 영수증 실패 중 사용자 편집`,
+                updatedAt: 12_500,
+              };
+              await product.repository.put(newerBrush);
+              throw new Error("injected receipt set failure after user edit");
+            }
+            await target.kvSet(namespace, key, value);
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+    const result = await installStudioCreatorPackProduct(pack, {
+      acquireBrushRepository: () => Promise.resolve(product),
+      acquireDatabase: () => Promise.resolve(failingDatabase),
+      now: () => 12_400,
+    });
+
+    expect(result.status).toBe("storage-error");
+    expect(await product.repository.getById(editedId)).toEqual(newerBrush);
+    for (let index = 1; index < pack.entries.length; index += 1) {
+      expect(await product.repository.getById(
+        `creator-pack:${pack.metadata.id}:${pack.entries[index]!.id}`,
+      )).toEqual(before[index]);
+    }
+    expect(await database.kvGet(
+      STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      `brush:${pack.metadata.id}`,
+    )).toBeNull();
+  });
+
   it("restores brush rows and receipt in one CAS after the receipt commit becomes stale", async () => {
     const database = await openDatabase();
     const product = await openProductBrushLibraryRepository({

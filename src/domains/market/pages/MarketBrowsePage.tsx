@@ -20,6 +20,8 @@ import Link from "@/src/compat/router-link";
 import { useJsonLd } from "@/src/hooks/use-document-title";
 
 const PAGE_SIZE = 12;
+const MARKET_PUBLISHER_UUID_PATTERN =
+  /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/iu;
 
 function readParam(
   searchParams: URLSearchParams,
@@ -40,6 +42,13 @@ function readLicense(searchParams: URLSearchParams): CreatorMarketplaceResourceL
   const value = searchParams.get("license");
   return MARKET_LICENSES.some((meta) => meta.license === value)
     ? (value as CreatorMarketplaceResourceLicense)
+    : undefined;
+}
+
+function readPublisher(searchParams: URLSearchParams): string | undefined {
+  const value = readParam(searchParams, "publisher");
+  return value && MARKET_PUBLISHER_UUID_PATTERN.test(value)
+    ? value
     : undefined;
 }
 
@@ -66,7 +75,7 @@ export function MarketBrowsePage() {
     kind: readKind(searchParams),
     license: readLicense(searchParams),
     tag: readParam(searchParams, "tag"),
-    publisher: readParam(searchParams, "publisher"),
+    publisher: readPublisher(searchParams),
   };
   const page = useMarketResources(query);
 

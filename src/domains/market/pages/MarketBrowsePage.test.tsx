@@ -147,6 +147,21 @@ describe("MarketBrowsePage", () => {
     expect(publisherFilter.textContent).not.toContain(publisherId);
   });
 
+  it("ignores a malformed publisher query instead of sending it to the UUID-only API", () => {
+    render(
+      <MemoryRouter initialEntries={["/market/browse?publisher=not-a-uuid"]}>
+        <MarketBrowsePage />
+      </MemoryRouter>
+    );
+
+    expect(useResources).toHaveBeenLastCalledWith(
+      expect.objectContaining({ publisher: undefined })
+    );
+    expect(
+      screen.queryByRole("button", { name: "배급자 필터 제거" })
+    ).toBeNull();
+  });
+
   it("renders a visible load-more failure and retries from the same action", () => {
     const loadMore = vi.fn();
     useResources.mockReturnValue(marketPage({
