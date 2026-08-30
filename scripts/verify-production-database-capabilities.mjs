@@ -11,6 +11,7 @@ import {
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
+  buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   loadMigrationManifest,
 } from "./run-production-database-migrations.mjs";
@@ -402,6 +403,11 @@ BEGIN
   IF ${buildAuthRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact authentication lifecycle privileges';
+  END IF;
+
+  IF ${buildRuntimeCutoverLedgerAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact cutover-readiness ledger privileges';
   END IF;
 
   IF ${buildCreatorMarketplaceRuntimeAclViolationSql(runtimeDatabaseRole)} THEN

@@ -29,10 +29,20 @@ if (
   );
 }
 const describeWithDirectPostgres = INTEGRATION_URL ? describe : describe.skip;
+const itWithRuntimeRole = INTEGRATION_RUNTIME_ROLE ? it : it.skip;
 
 describeWithDirectPostgres("Health PostgreSQL readiness contract", () => {
   let pool: Pool;
   let client: PoolClient;
+
+  async function expectRuntimePermissionDenied(sql: string): Promise<void> {
+    await client.query("BEGIN");
+    try {
+      await expect(client.query(sql)).rejects.toMatchObject({ code: "42501" });
+    } finally {
+      await client.query("ROLLBACK");
+    }
+  }
 
   beforeAll(async () => {
     if (!INTEGRATION_URL) {
@@ -86,4 +96,38 @@ describeWithDirectPostgres("Health PostgreSQL readiness contract", () => {
       [...REQUIRED_DATABASE_RELATIONS],
     );
   });
+
+  itWithRuntimeRole(
+    "limits runtime cutover evidence to non-delegable marker-id reads",
+    async () => {
+      const marker = await client.query<{ id: string }>(
+        `
+        SELECT "id"
+        FROM public.toonspectrum_schema_migration
+        ORDER BY "id"
+        LIMIT 1
+      `,
+      );
+      expect(marker.rows[0]?.id).toEqual(expect.any(String));
+
+      await expectRuntimePermissionDenied(
+        `SELECT "appliedAt" FROM public.toonspectrum_schema_migration LIMIT 1`,
+      );
+      await expectRuntimePermissionDenied(
+        `INSERT INTO public.toonspectrum_schema_migration ("id") VALUES ('runtime_acl_probe')`,
+      );
+      await expectRuntimePermissionDenied(
+        `UPDATE public.toonspectrum_schema_migration SET "appliedAt" = "appliedAt" WHERE false`,
+      );
+      await expectRuntimePermissionDenied(
+        `DELETE FROM public.toonspectrum_schema_migration WHERE false`,
+      );
+      await expectRuntimePermissionDenied(
+        `TRUNCATE TABLE public.toonspectrum_schema_migration`,
+      );
+      await expectRuntimePermissionDenied(
+        `SELECT "id" FROM toonspectrum_ops.deployment_migration LIMIT 1`,
+      );
+    },
+  );
 });

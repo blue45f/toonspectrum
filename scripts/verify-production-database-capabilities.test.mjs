@@ -11,6 +11,7 @@ import {
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
+  buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
 } from "./run-production-database-migrations.mjs";
 
@@ -34,6 +35,9 @@ test("generated verification covers runtime capabilities and exact migration che
   );
   expect(sql).toContain(
     buildCreatorMarketplaceRuntimeAclViolationSql("webdex_runtime"),
+  );
+  expect(sql).toContain(
+    buildRuntimeCutoverLedgerAclViolationSql("webdex_runtime"),
   );
   expect(sql).toContain(
     buildMigrationLedgerRuntimeAclViolationSql("webdex_runtime"),
@@ -74,6 +78,7 @@ test("generated verification covers runtime capabilities and exact migration che
     "runtime database role owns the migration ledger",
     "runtime role lacks the exact creator object-storage privileges",
     "runtime role lacks the exact creator marketplace privileges",
+    "runtime role lacks the exact cutover-readiness ledger privileges",
     "authentication lifecycle schema capability is incomplete",
     "runtime role lacks the exact authentication lifecycle privileges",
     "idx_user_status_created",

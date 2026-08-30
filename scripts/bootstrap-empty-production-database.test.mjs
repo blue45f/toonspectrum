@@ -292,7 +292,12 @@ describe("bootstrap SQL and repository contract", () => {
   test("runtime ACL preserves migration and object-storage boundaries", () => {
     const sql = buildRuntimeBootstrapAclSql("toonspectrum_runtime");
     expect(sql).toContain("REVOKE ALL ON ALL TABLES IN SCHEMA public");
-    expect(sql).toContain("GRANT SELECT ON TABLE public.toonspectrum_schema_migration");
+    expect(sql).toContain(
+      "REVOKE ALL ON TABLE public.toonspectrum_schema_migration FROM PUBLIC",
+    );
+    expect(sql).toContain(
+      'GRANT SELECT ("id") ON TABLE public.toonspectrum_schema_migration',
+    );
     expect(sql).toContain("creator_asset_storage_object");
     expect(sql).toContain("creator_work_asset_storage_reference");
     expect(sql).toContain("\\gexec");

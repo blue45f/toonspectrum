@@ -14,6 +14,8 @@ import {
   buildMigrationLedgerRuntimeAclSql,
   buildMigrationLedgerRuntimeAclViolationSql,
   buildRepairLockTakeoverSql,
+  buildRuntimeCutoverLedgerAclSql,
+  buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   decideMigrationAction,
   loadMigrationManifest,
@@ -317,6 +319,49 @@ test("runtime role boundary rejects membership, DDL and ownership capabilities",
       requireLogin: "sometimes",
     }),
   ).toThrow(/login boundary mode/u);
+});
+
+test("runtime cutover ledger ACL is exact, read-only and private", () => {
+  const normalization = buildRuntimeCutoverLedgerAclSql(
+    "toonspectrum_runtime",
+  );
+  expect(normalization).toContain(
+    "REVOKE ALL ON TABLE public.toonspectrum_schema_migration FROM PUBLIC",
+  );
+  expect(normalization).toContain(
+    'REVOKE ALL ON TABLE public.toonspectrum_schema_migration FROM "toonspectrum_runtime"',
+  );
+  expect(normalization).toContain(
+    'GRANT SELECT ("id") ON TABLE public.toonspectrum_schema_migration TO "toonspectrum_runtime"',
+  );
+
+  const violation = buildRuntimeCutoverLedgerAclViolationSql(
+    "toonspectrum_runtime",
+  );
+  expect(violation).toContain("public.toonspectrum_schema_migration");
+  expect(violation).toContain("'SELECT WITH GRANT OPTION'");
+  expect(violation).toContain("'appliedAt'");
+  expect(violation).toContain("has_column_privilege");
+  expect(violation).toContain("has_any_column_privilege");
+  expect(violation).toContain("0::oid");
+  for (const privilege of [
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "TRUNCATE",
+    "REFERENCES",
+    "TRIGGER",
+  ]) {
+    expect(violation).toContain(`'${privilege}'`);
+  }
+
+  const runner = readFileSync(
+    new URL("./run-production-database-migrations.mjs", import.meta.url),
+    "utf8",
+  );
+  expect(runner).toContain(
+    "buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole)",
+  );
 });
 
 test("migration ledger ACL revokes PUBLIC and runtime access and verifies effective denial", () => {

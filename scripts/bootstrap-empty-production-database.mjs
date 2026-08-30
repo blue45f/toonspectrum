@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 
 import {
   buildCreatorAssetObjectStorageRuntimeAclSql,
+  buildRuntimeCutoverLedgerAclSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   loadMigrationManifest,
   runProductionDatabaseMigrations,
@@ -688,7 +689,7 @@ BEGIN
 END
 $toonspectrum_runtime_acl$;
 
-GRANT SELECT ON TABLE public.toonspectrum_schema_migration TO ${quotedRole};
+${buildRuntimeCutoverLedgerAclSql(role)}
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${quotedRole};
 ${buildCreatorAssetObjectStorageRuntimeAclSql(role)}
 `;
