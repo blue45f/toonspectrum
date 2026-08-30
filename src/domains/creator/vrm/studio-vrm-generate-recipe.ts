@@ -24,6 +24,7 @@ import {
   type StudioVrmHairRig,
 } from "./studio-vrm-hair-rig";
 import { buildStudioVrmHumanoidMesh } from "./studio-vrm-humanoid-mesh";
+import { meshClamp } from "./studio-vrm-humanoid-mesh-geometry";
 import {
   STUDIO_VRM_RIG_NEUTRAL_HEIGHT,
   STUDIO_VRM_RIG_PARENTS,
@@ -200,16 +201,119 @@ function buildBoneNodes(
 }
 
 /**
- * 헤어 체인을 `VRMC_springBone` 으로 낸다.
- *
- * 콜라이더는 **몸통 캡슐 하나**다. 이게 없으면 긴 머리가 흔들릴 때마다 등을 그대로 통과한다.
- * 반지름은 가슴 단면의 앞뒤 반경(`0.076 · 신장단위`)에 맞춘다 — 뒷머리가 실제 등 표면에
- * 얹히는 값이다. 좌우로는 몸통이 더 넓으므로 어깨 옆에서는 살짝 파고들 수 있지만, 머리카락은
- * 대부분 뒤로 흐르므로 앞뒤를 기준으로 잡는 쪽이 눈에 덜 띈다.
- *
- * 캡슐이 붙는 노드는 `spine` 이고 오프셋·꼬리는 그 로컬 좌표다(rest 에서 회전이 없으므로
- * 월드 차이가 곧 로컬 차이다).
+ * 콜라이더 배율의 하한. 정지 헤어에 맞추려면 대개 0.6 근처까지 줄어드는데, 그건 이상 현상이
+ * 아니라 표준적인 값이다 — 콜라이더는 살갗이 아니라 **살갗에서 가닥 반경만큼 안쪽**에 있어야
+ * 가닥이 표면에 얹힌 채로 평형이 된다. 하한은 병적인 경우에 보호가 통째로 사라지는 것만 막는다.
  */
+const COLLIDER_MIN_FIT = 0.5;
+
+type SkullEllipsoid = {
+  readonly center: readonly [number, number, number];
+  readonly radiusX: number;
+  readonly radiusY: number;
+  readonly radiusZ: number;
+};
+
+/** 점에서 선분까지의 거리. three-vrm 의 캡슐 판정과 같은 식이다. */
+function segmentDistance(
+  point: readonly [number, number, number],
+  from: readonly [number, number, number],
+  to: readonly [number, number, number],
+): number {
+  const ax = to[0] - from[0];
+  const ay = to[1] - from[1];
+  const az = to[2] - from[2];
+  const lengthSq = ax * ax + ay * ay + az * az;
+  const px = point[0] - from[0];
+  const py = point[1] - from[1];
+  const pz = point[2] - from[2];
+  const t = lengthSq === 0 ? 0 : meshClamp((px * ax + py * ay + pz * az) / lengthSq, 0, 1);
+  return Math.hypot(px - ax * t, py - ay * t, pz - az * t);
+}
+
+/**
+ * 헤어 마디들이 콜라이더에 남기는 최소 여유. `surfaceGap` 은 마디 위치에서 콜라이더 표면까지의
+ * 거리이고, 거기서 마디의 `hitRadius` 를 뺀 값이 스프링 해석이 보는 침투량이다.
+ */
+function hairJointClearance(
+  hairRig: StudioVrmHairRig,
+  origin: readonly [number, number, number],
+  surfaceGap: (point: readonly [number, number, number]) => number,
+): number {
+  let worst = Number.POSITIVE_INFINITY;
+  for (const chain of hairRig.chains) {
+    for (const joint of chain.joints) {
+      const point: [number, number, number] = [
+        joint.worldRest[0] - origin[0],
+        joint.worldRest[1] - origin[1],
+        joint.worldRest[2] - origin[2],
+      ];
+      worst = Math.min(worst, surfaceGap(point) - joint.hitRadius);
+    }
+  }
+  return worst;
+}
+
+/**
+ * 정지 헤어를 밀어내지 않는 가장 큰 반경을 찾는다. 여유는 반경에 대해 단조감소라 이분법으로
+ * 정확히 푼다.
+ */
+function fitRadiusInsideHair(nominal: number, clearance: (radius: number) => number): number {
+  if (clearance(nominal) >= 0) return nominal;
+  const floor = nominal * COLLIDER_MIN_FIT;
+  if (clearance(floor) < 0) return floor;
+  let low = floor;
+  let high = nominal;
+  for (let step = 0; step < 24; step += 1) {
+    const mid = (low + high) / 2;
+    if (clearance(mid) >= 0) low = mid;
+    else high = mid;
+  }
+  return low;
+}
+
+/** 배율 `fit` 로 줄인 두개골 캡슐 두 개에 대해, 모든 헤어 마디가 남기는 최소 여유. */
+function skullClearance(
+  skull: SkullEllipsoid,
+  hairRig: StudioVrmHairRig,
+  headJoint: readonly [number, number, number],
+  fit: number,
+): number {
+  const verticalRadius = fit * Math.min(skull.radiusX, skull.radiusZ);
+  const verticalHalf = Math.max(0, fit * skull.radiusY - verticalRadius);
+  const lateralRadius = fit * Math.min(skull.radiusY, skull.radiusZ);
+  const lateralHalf = Math.max(0, fit * skull.radiusX - lateralRadius);
+  const [cx, cy, cz] = skull.center;
+  return hairJointClearance(hairRig, headJoint, (point) =>
+    Math.min(
+      segmentDistance(point, [cx, cy - verticalHalf, cz], [cx, cy + verticalHalf, cz]) -
+        verticalRadius,
+      segmentDistance(point, [cx - lateralHalf, cy, cz], [cx + lateralHalf, cy, cz]) - lateralRadius,
+    ),
+  );
+}
+
+/**
+ * 두개골 콜라이더를 **정지 상태의 헤어 안쪽**에 맞추는 배율을 찾는다.
+ *
+ * 헤어는 렌더링된 두상 표면에 붙도록 저작된다. 그 표면은 원 타원체가 아니다 — 정면은
+ * `headFrontFlatten` 으로 0.87 배 눌린다. 그래서 원 타원체에서 뽑은 캡슐은 이마 앞으로 1cm 넘게
+ * 삐져나오고, 거기에 마디의 `hitRadius` 까지 더해져 **머리를 전혀 움직이지 않아도** 스프링
+ * 해석이 앞머리를 4.5cm 앞으로 밀어냈다.
+ *
+ * 고칠 지점은 헤어가 아니라 콜라이더다. 정지 포즈가 곧 보이길 원하는 포즈이므로, 콜라이더는
+ * 그 포즈를 밀어내지 않으면서 **그보다 더 파고드는 것만** 막아야 한다. 즉 정지 헤어에
+ * 내접해야 한다 — 손으로 만든 VRM 에서 두상 콜라이더를 살갗보다 작게 두는 것과 같은 이유다.
+ */
+function skullColliderFit(
+  skull: SkullEllipsoid,
+  hairRig: StudioVrmHairRig,
+  headJoint: readonly [number, number, number],
+): number {
+  if (hairRig.chains.length === 0) return 1;
+  return fitRadiusInsideHair(1, (fit) => skullClearance(skull, hairRig, headJoint, fit));
+}
+
 function buildHairSpringBone(
   hairRig: StudioVrmHairRig,
   rig: StudioVrmRig,
@@ -219,8 +323,15 @@ function buildHairSpringBone(
   const spine = rig.worldRest.spine;
   const unit = rig.heightScale * STUDIO_VRM_RIG_NEUTRAL_HEIGHT;
   const spineNode = STUDIO_VRM_EXPORT_REQUIRED_BONES.indexOf("spine") + FIRST_BONE_NODE;
-  const bottomY = rig.worldRest.hips[1] - 0.02 * rig.heightScale;
-  const topY = rig.worldRest.leftUpperArm[1] - 0.02 * rig.heightScale;
+  const torsoNominal = 0.076 * unit;
+  // 캡슐의 **외곽**이 엉덩이~어깨가 되도록 끝점을 반경만큼 안으로 넣는다. 예전처럼 끝점을
+  // 그대로 두면 위쪽 반구가 어깨보다 반경만큼(12cm) 더 올라가 목과 목덜미를 통째로 삼켰고,
+  // 정지 상태의 나페·포니테일 뿌리가 그 안에 들어가 첫 프레임부터 3cm 밀려났다.
+  const spanBottom = rig.worldRest.hips[1] - 0.02 * rig.heightScale;
+  const spanTop = rig.worldRest.leftUpperArm[1] - 0.02 * rig.heightScale;
+  const torsoMid = (spanBottom + spanTop) / 2;
+  const bottomY = Math.min(torsoMid, spanBottom + torsoNominal);
+  const topY = Math.max(torsoMid, spanTop - torsoNominal);
 
   // 두개골 캡슐 — 앞머리·옆머리가 이제 스프링 체인이라, 이게 없으면 고개를 흔들 때
   // 얼굴을 그대로 통과한다(실측: 두개골 정규거리 0.19~0.24 까지, 1.0 이 표면이다).
@@ -241,13 +352,26 @@ function buildHairSpringBone(
   };
   // 타원체를 캡슐 **두 개의 합집합**으로 덮는다. 하나로는 가로 두 축 중 작은 쪽밖에 못
   // 감싼다 — 폭 1.6 · 깊이 0.6 처럼 가로가 크게 찌그러진 머리에서 옆머리가 두개골 안으로
-  // 10% 들어갔다. 둘 다 타원체에 **내접**시키므로 넘쳐서 머리카락을 띄우지도 않는다.
+  // 10% 들어갔다.
   //  - 세로 캡슐: 반경 min(rx, rz), Y 축으로 신장 → 정수리·턱과 좁은 가로 축을 덮는다.
   //  - 가로 캡슐: 반경 min(ry, rz), X 축으로 신장 → 넓은 가로 축을 끝까지 덮는다.
-  const verticalRadius = Math.min(skull.radiusX, skull.radiusZ);
-  const verticalHalf = Math.max(0, skull.radiusY - verticalRadius);
-  const lateralRadius = Math.min(skull.radiusY, skull.radiusZ);
-  const lateralHalf = Math.max(0, skull.radiusX - lateralRadius);
+  //
+  // 그리고 그 합집합을 **정지 상태의 머리카락 안쪽으로** 집어넣는다(`skullColliderFit`).
+  // 그러지 않으면 rest 자체가 평형이 아니어서, 고개를 전혀 움직이지 않아도 첫 프레임부터
+  // 앞머리가 앞으로 튀어나간다.
+  // 몸통도 같은 원칙으로 정지 헤어 안쪽에 넣는다. 끝점은 위에서 정한 채로 반경만 줄인다.
+  const torsoRadius = fitRadiusInsideHair(
+    torsoNominal,
+    (radius) =>
+      hairJointClearance(hairRig, [0, 0, 0], (point) =>
+        segmentDistance(point, [spine[0], bottomY, spine[2]], [spine[0], topY, spine[2]]) - radius,
+      ),
+  );
+  const fit = skullColliderFit(skull, hairRig, headJoint);
+  const verticalRadius = fit * Math.min(skull.radiusX, skull.radiusZ);
+  const verticalHalf = Math.max(0, fit * skull.radiusY - verticalRadius);
+  const lateralRadius = fit * Math.min(skull.radiusY, skull.radiusZ);
+  const lateralHalf = Math.max(0, fit * skull.radiusX - lateralRadius);
 
   return {
     colliders: [
@@ -255,7 +379,7 @@ function buildHairSpringBone(
         node: spineNode,
         shape: "capsule",
         offset: [0, bottomY - spine[1], 0],
-        radius: 0.076 * unit,
+        radius: torsoRadius,
         tail: [0, topY - spine[1], 0],
       },
       {

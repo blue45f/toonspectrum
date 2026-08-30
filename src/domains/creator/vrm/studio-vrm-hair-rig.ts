@@ -234,6 +234,11 @@ function jointsFrom(
 /** 가닥 — 곡선 중심선을 따라 균등하게. */
 function draftStrandChain(input: StudioVrmHairPartInput, headWorldRest: MeshVec3): ChainDraft {
   const { part, transform } = input;
+  // 충돌 반경은 스칼라 하나뿐인데 가닥 단면은 납작하다(앞머리는 폭 0.16 · 두께 0.09). 콜라이더를
+  // 마주 보는 쪽은 **두께**이므로 평균값은 이미 두께를 39% 넘겨 잡고 있다. 여기서 최대축까지
+  // 가면 가닥 전체가 이마에서 3mm 더 떠오르고 콜라이더도 그만큼 더 줄어든다 —
+  // `skullColliderFit` 이 정지 헤어에 맞춰 콜라이더를 넣기 때문이다. 넓은 축은 두피에 **접하는**
+  // 방향이라 파고들지 않으므로, 두께와 폭 사이의 평균을 절충값으로 쓴다.
   const girth = (Math.abs(transform.scale[0]) + Math.abs(transform.scale[2])) / 2;
   const samples = Array.from({ length: STUDIO_VRM_HAIR_CHAIN_JOINTS }, (_unused, index) => {
     const t = index / (STUDIO_VRM_HAIR_CHAIN_JOINTS - 1);

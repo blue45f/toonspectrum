@@ -4,6 +4,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { describe, expect, it } from "vitest";
 
 import {
+  AVATAR_FORGE_PRESETS,
   createAvatarForgeState,
   sanitizeAvatarForgeState,
 } from "./studio-vrm-avatar-forge";
@@ -225,11 +226,14 @@ describe("generate recipe → .vrm file reload", () => {
   });
 
   it.each(["natural-short", "hime-noble", "wolf-rebel"])(
-    "keeps %s's dynamic bangs from swinging through the skull",
+    "keeps %s's dynamic bangs from swinging deeper than they rest",
     async (presetId) => {
       // 앞머리·옆머리가 스프링 체인이 되면서, 몸통 콜라이더만으로는 고개를 흔들 때 머리카락이
-      // 얼굴을 그대로 통과한다 — 두개골 콜라이더를 빼고 재면 두개골 정규거리 0.57 까지
-      // 들어간다(1.0 이 표면). 예전처럼 `head` 에 강체로 묶여 있을 때는 불가능한 일이었다.
+      // 얼굴을 그대로 통과한다. 예전처럼 `head` 에 강체로 묶여 있을 때는 불가능한 일이었다.
+      //
+      // 기준은 **정지 상태의 깊이**다. 앞머리는 눌린 이마에 붙도록 저작되므로 원 타원체
+      // 기준으로는 이미 0.75 쯤에 있다(1.0 이 타원체 표면). 콜라이더가 할 일은 그 자리에서
+      // 머리카락을 끌어내는 것이 아니라 **그보다 더 파고드는 것만** 막는 것이다.
       const mesh = buildStudioVrmHumanoidMesh(createAvatarForgeState(presetId));
       const vrm = await loadVrmBytes(
         exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
@@ -265,6 +269,10 @@ describe("generate recipe → .vrm file reload", () => {
         );
       };
 
+      vrm.scene.updateMatrixWorld(true);
+      let rest = Infinity;
+      for (const spring of joints) rest = Math.min(rest, skullDistance(spring.bone));
+
       let deepest = Infinity;
       for (let step = 0; step < 180; step += 1) {
         head.rotation.y = Math.sin(step / 8) * 1.1;
@@ -274,8 +282,47 @@ describe("generate recipe → .vrm file reload", () => {
         if (step < 60) continue;
         for (const spring of joints) deepest = Math.min(deepest, skullDistance(spring.bone));
       }
-      // 두개골 캡슐은 타원체에 내접하므로 가장 넓은 축에서는 약간의 여유가 남는다.
-      expect(deepest, `${presetId}: 머리카락이 두개골을 파고들었다`).toBeGreaterThan(0.9);
+      // 콜라이더를 떼면 −0.19 아래까지 가라앉는다. 0.14 는 그 절반보다도 빡빡한 문턱이다.
+      expect(deepest - rest, `${presetId}: 머리카락이 정지 상태보다 깊이 파고들었다`).toBeGreaterThan(
+        -0.14,
+      );
+    },
+    60_000,
+  );
+
+  it.each(AVATAR_FORGE_PRESETS.map((preset) => preset.id))(
+    "leaves %s's hair at rest when the head never moves",
+    async (presetId) => {
+      // 콜라이더가 정지 헤어를 뚫고 있으면, 고개를 전혀 움직이지 않아도 첫 프레임부터 스프링
+      // 해석이 머리카락을 바깥으로 밀어낸다. 예전에는 앞머리가 4.5cm 앞으로 튀어나갔다 —
+      // 두개골 캡슐을 눌리지 않은 원 타원체에서 뽑았고(렌더링된 이마는 0.87배로 눌린다),
+      // 몸통 캡슐의 위쪽 반구가 반경만큼 어깨 위로 솟아 목덜미를 삼켰기 때문이다.
+      const vrm = await loadVrmBytes(
+        exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
+      );
+      const joints = [...(vrm.springBoneManager?.joints ?? [])];
+      if (joints.length === 0) return;
+      const head = vrm.humanoid?.getNormalizedBoneNode("head");
+      if (!head) throw new Error(`${presetId}: expected a head bone`);
+      vrm.scene.updateMatrixWorld(true);
+      const skull = head.getWorldPosition(new Vector3());
+      const rest = joints.map((spring) => spring.bone.getWorldPosition(new Vector3()).clone());
+
+      for (let step = 0; step < 200; step += 1) vrm.update(1 / 60);
+      vrm.scene.updateMatrixWorld(true);
+
+      let pushed = 0;
+      let worst = "";
+      joints.forEach((spring, index) => {
+        const now = spring.bone.getWorldPosition(new Vector3());
+        // 머리 관절에서 바깥으로 향하는 성분만 본다. 아래로 처지는 것은 중력이고 정상이다.
+        const outward = now.sub(rest[index]).dot(rest[index].clone().sub(skull).normalize());
+        if (outward > pushed) {
+          pushed = outward;
+          worst = spring.bone.name;
+        }
+      });
+      expect(pushed, `${presetId}: ${worst} 가 정지 상태에서 밀려났다`).toBeLessThan(0.012);
     },
     60_000,
   );
@@ -292,6 +339,37 @@ describe("generate recipe → .vrm file reload", () => {
     expect(springs.length).toBeGreaterThan(0);
     for (const spring of springs) {
       expect(spring.colliderGroups, spring.name).toEqual([0, 1]);
+    }
+  });
+  it("keeps the torso capsule's outer extent between the hips and the shoulders", () => {
+    // 캡슐의 겉면은 끝점에서 반경만큼 더 뻗는다. 끝점을 어깨 높이에 그대로 두면 겉면이
+    // 어깨보다 반경(12cm)만큼 위로 솟아 목과 목덜미를 통째로 감쌌다.
+    const recipe = createStudioVrmGenerateRecipe({ presetId: "action-pony" });
+    const snapshot = buildStudioVrmGenerateAuthoringSnapshot(recipe);
+    const rig = buildStudioVrmHumanoidMesh(recipe.state).rig;
+    const torso = (snapshot.springBone?.colliders ?? [])[0];
+    if (!torso || torso.shape !== "capsule" || !torso.tail) throw new Error("expected a torso capsule");
+    const spineY = rig.worldRest.spine[1];
+    const bottom = spineY + torso.offset[1] - torso.radius;
+    const top = spineY + torso.tail[1] + torso.radius;
+    expect(bottom).toBeGreaterThan(rig.worldRest.hips[1] - 0.05);
+    expect(top).toBeLessThan(rig.worldRest.leftUpperArm[1] + 0.001);
+  });
+
+  it("keeps every skull collider inside the hair it has to protect", () => {
+    // 콜라이더는 정지 헤어에 **내접**해야 한다. 그러지 않으면 rest 가 평형이 아니다.
+    for (const presetId of ["natural-short", "hime-noble", "pixie-sport"]) {
+      const recipe = createStudioVrmGenerateRecipe({ presetId });
+      const snapshot = buildStudioVrmGenerateAuthoringSnapshot(recipe);
+      const mesh = buildStudioVrmHumanoidMesh(recipe.state);
+      const scale = mesh.rig.nodeScale.head ?? [1, 1, 1];
+      // 두개골 캡슐 반경은 조형된 타원체의 가장 작은 가로 반경보다 확실히 작아야 한다.
+      const smallest = Math.min(mesh.rig.head.radiusX * scale[0], mesh.rig.head.radiusZ * scale[2]);
+      const skull = (snapshot.springBone?.colliders ?? []).slice(1);
+      expect(skull.length, presetId).toBe(2);
+      for (const collider of skull) {
+        expect(collider.radius, `${presetId}: 두개골 콜라이더가 줄지 않았다`).toBeLessThan(smallest);
+      }
     }
   });
 });
