@@ -468,6 +468,13 @@ export interface BristleBrushState {
   lastDeposited: number;
   /** Ink units deposited since the brush was created or reset. */
   totalDeposited: number;
+  /**
+   * Sum of every hair's capacity, in layout order. Fixed at construction — the layout never
+   * changes — so `stepBristles` reads it instead of re-summing the whole tuft on every step.
+   */
+  readonly capacityTotal: number;
+  /** Capillary scratch, `count - 1` long. Fully overwritten by each step that uses it. */
+  readonly capillaryFlux: Float64Array;
 }
 
 function tipProfileValue(
@@ -578,6 +585,10 @@ export function createBristleBrush(config: BristleBrushConfig): BristleBrushStat
     stepCount: 0,
     lastDeposited: 0,
     totalDeposited: 0,
+    // Same loop, same order as the per-step sum it replaces, so the ratio is bit-for-bit what
+    // re-summing produced.
+    capacityTotal: layout.reduce((total, entry) => total + entry.capacity, 0),
+    capillaryFlux: new Float64Array(Math.max(0, count - 1)),
   };
 }
 
@@ -748,11 +759,10 @@ export function stepBristles(
 
   // --- (b) split drive: dryness + speed above threshold --------------------
   let inkTotal = 0;
-  let capacityTotal = 0;
   for (let index = 0; index < state.layout.length; index += 1) {
     inkTotal += state.ink[index];
-    capacityTotal += state.layout[index].capacity;
   }
+  const capacityTotal = state.capacityTotal;
   const inkRatio = capacityTotal > 0 ? clamp(inkTotal / capacityTotal, 0, 1) : 0;
   const dryness = 1 - inkRatio;
   const speedTerm = clamp(velocity / config.splitSpeedRefPxPerMs, 0, 1);
@@ -845,7 +855,10 @@ export function stepBristles(
   const exchange = clamp(config.capillary * dtSec, 0, 0.4);
   if (exchange > 0 && state.layout.length > 1) {
     const count = state.layout.length;
-    const flux = new Float64Array(count - 1);
+    // Scratch owned by the state: a planned oil stroke steps this 4096 times per pointer move,
+    // and a fresh Float64Array per step was 4096 allocations a frame for numbers that are
+    // overwritten before they are read.
+    const flux = state.capillaryFlux;
     for (let index = 0; index < count - 1; index += 1) {
       flux[index] = exchange * (state.ink[index + 1] - state.ink[index]);
     }
