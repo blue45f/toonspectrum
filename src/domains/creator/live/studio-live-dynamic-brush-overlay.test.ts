@@ -126,8 +126,8 @@ function appendMarkGrowthRatio(deltas: readonly number[]): number {
  * The cheapest append over a whole stroke is always an ordinary one, and both halves of the
  * stroke contain the same 1:8 mix, so a slowdown confined to the CHUNK class moves neither the
  * whole-stroke floor nor the early/late ratio, and draws exactly the same marks. Every eighth frame
- * growing to 25ms can remain inside the absolute 30ms ceiling while becoming a visible periodic
- * hitch, so the class needs its own relative gate.
+ * growing to 25ms can remain inside the absolute 30ms append ceiling while becoming a visible
+ * periodic hitch, so the class needs its own relative gate.
  *
  * The obvious fix — calibrating the chunk class against the reference kernel like everything else
  * — does not survive measurement: 24 samples of a ~13ms window do not converge under contention,
@@ -1529,7 +1529,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     },
   );
 
-  it("keeps 3,000-sample crayon live appends O(1) inside the measured 30ms/frame budget", () => {
+  it("keeps 3,000-sample crayon live appends O(1) inside the 30ms main-thread CPU budget", () => {
     const selection = materializeStudioBrushPackSelection("crayon-wax-bold");
     if (!selection) throw new Error("missing crayon-wax-bold selection");
     const pointPairs = Array.from({ length: 3000 }, (_, index) => [
@@ -1561,11 +1561,17 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       tiltYs: Array.from({ length: 30 }, () => -9),
     });
 
-    // A frame budget should measure CPU spent by the appender, not time when the worker was not
-    // scheduled. `process.cpuUsage()` removes that scheduler time directly and keeps user + system
-    // work, including allocation and zero-fill costs the user still pays. The fastest COMPLETE pass
-    // is the honest estimate: taking a per-frame minimum would splice together frames that never ran
-    // as one stroke, while a genuine over-budget frame survives every complete pass.
+    // A synchronous appender CPU budget should measure work on the JavaScript worker that executes
+    // the appender, not time when it was descheduled or CPU used concurrently by V8 helper threads.
+    // `process.threadCpuUsage()` provides that current-thread user + system cost. In contrast,
+    // `process.cpuUsage()` aggregates every thread in the process, so sibling V8 helper-thread CPU
+    // (parallel or concurrent) can make an append appear to consume more CPU than its executing
+    // JavaScript thread did; keep that process-wide reading only in failure diagnostics.
+    // This is not end-to-end browser frame latency: off-CPU waits and compositor presentation are
+    // outside this Node fixture, while the wide wall-clock assertion below remains hang protection.
+    // The fastest COMPLETE pass is the honest estimate: taking a per-frame minimum would splice
+    // together frames that never ran as one stroke, while a genuine steady over-budget frame
+    // survives every complete pass.
     const APPEND_BUDGET_PASSES = 3;
     // The reference remains only for relative early/late and chunk-growth comparisons. Those
     // compare the appender with itself inside one stroke, where a nearby reference removes a
@@ -1574,7 +1580,10 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     const halfGrowths: number[] = [];
     const chunkCostRatios: number[] = [];
     const chunkGrowthRatios: number[] = [];
-    let maxAppendCpuMs = Number.POSITIVE_INFINITY;
+    const appendCpuPasses: Array<{
+      readonly mainThreadMaxMs: number;
+      readonly processMaxMs: number;
+    }> = [];
     let maxAppendFrameMs = Number.POSITIVE_INFINITY;
     let totalAppendMs = Number.POSITIVE_INFINITY;
     let markDeltas: number[] = [];
@@ -1587,7 +1596,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     lastRenderer = renderer;
     expect(renderer.begin(firstChunk).status).toBe("started");
 
-    let passMaxAppendCpuMs = 0;
+    let passMaxAppendMainThreadCpuMs = 0;
+    let passMaxAppendProcessCpuMs = 0;
     let passMaxAppendFrameMs = 0;
     let passTotalAppendMs = 0;
     let passAppendCount = 0;
@@ -1618,12 +1628,15 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       runStudioPerfCalibrationRounds(APPEND_CALIBRATION_ROUNDS);
       const referenceMs = performance.now() - referenceStartedMs;
 
-      const cpuBefore = process.cpuUsage();
+      const processCpuBefore = process.cpuUsage();
+      const threadCpuBefore = process.threadCpuUsage();
       const startMs = performance.now();
       const appended = renderer.appendFrom(prefixElement);
       const elapsedMs = performance.now() - startMs;
-      const cpuAfter = process.cpuUsage(cpuBefore);
-      const cpuMs = (cpuAfter.user + cpuAfter.system) / 1_000;
+      const threadCpuAfter = process.threadCpuUsage(threadCpuBefore);
+      const processCpuAfter = process.cpuUsage(processCpuBefore);
+      const mainThreadCpuMs = (threadCpuAfter.user + threadCpuAfter.system) / 1_000;
+      const processCpuMs = (processCpuAfter.user + processCpuAfter.system) / 1_000;
 
       expect(appended.status).toBe("appended");
       passSamples.push({ referenceMs, workMs: elapsedMs });
@@ -1631,7 +1644,14 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       markedBeforeAppend = activeCanvas.recordedMarks.length;
       passAppendCount += 1;
       passTotalAppendMs += elapsedMs;
-      passMaxAppendCpuMs = Math.max(passMaxAppendCpuMs, cpuMs);
+      passMaxAppendMainThreadCpuMs = Math.max(
+        passMaxAppendMainThreadCpuMs,
+        mainThreadCpuMs,
+      );
+      passMaxAppendProcessCpuMs = Math.max(
+        passMaxAppendProcessCpuMs,
+        processCpuMs,
+      );
       // The FIRST append is excluded from the outlier max, and only from that.
       //
       // It is not an outlier against its neighbours; it is a different amount of work. This loop
@@ -1655,7 +1675,10 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     }
 
     // Keep the fastest complete pass, not the fastest frames from different passes.
-    maxAppendCpuMs = Math.min(maxAppendCpuMs, passMaxAppendCpuMs);
+    appendCpuPasses.push({
+      mainThreadMaxMs: passMaxAppendMainThreadCpuMs,
+      processMaxMs: passMaxAppendProcessCpuMs,
+    });
     if (passMaxAppendFrameMs < maxAppendFrameMs) {
       maxAppendFrameMs = passMaxAppendFrameMs;
       totalAppendMs = passTotalAppendMs;
@@ -1700,7 +1723,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     ).toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
 
     // ---------------------------------------------------------------------------------------
-    // The stable absolute requirement: every measured warm-process append uses under 30ms CPU.
+    // The stable absolute requirement: at least one clean, complete warm-process pass keeps every
+    // append under 30ms CPU on the JavaScript worker that synchronously executes it.
     //
     // The former synthetic-kernel ratio cannot make a valid constant-factor claim on this path.
     // The allocating appender and the cache-resident float kernel do not co-scale: honest ratios
@@ -1708,20 +1732,30 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // append at 1.208. No fixed threshold can clear both honest populations and convict a doubling.
     // Raising or lowering that threshold would only choose which machine to fail.
     //
-    // CPU time removes the scheduler, not the machine: a slower gated CPU that spends more than
-    // 30ms still violates this absolute SLO. The deterministic mark total,
+    // Current-thread CPU removes scheduler descheduling and sibling V8 helper-thread CPU, not the
+    // machine: a slower gated JS worker that spends more than 30ms still violates this warm-process
+    // ceiling. Synchronous allocation, zero-fill and GC work on that worker remain included.
+    // The deterministic mark total,
     // per-append mark ceiling, mark-growth ratio and no-clear invariant above remain the stronger,
     // machine-independent proof against cumulative repaint and extra mark work. This clock only
     // covers constant arithmetic/allocating work that does not alter those receipts, and it claims
     // exactly 30ms in this warm process rather than pretending every sub-millisecond doubling is
     // a visible regression. True process-cold first use stays in the dedicated cold-start suite.
+    const bestCpuPass = appendCpuPasses.reduce((best, candidate) =>
+      candidate.mainThreadMaxMs < best.mainThreadMaxMs ? candidate : best
+    );
     expect(
-      maxAppendCpuMs,
-      `worst complete-pass append used ${maxAppendCpuMs.toFixed(2)}ms CPU`,
+      bestCpuPass.mainThreadMaxMs,
+      `worst append in the fastest complete pass used `
+        + `${bestCpuPass.mainThreadMaxMs.toFixed(2)}ms main-thread CPU `
+        + `(same-pass process CPU max ${bestCpuPass.processMaxMs.toFixed(2)}ms; `
+        + `main-thread pass maxima ${appendCpuPasses
+          .map((pass) => pass.mainThreadMaxMs.toFixed(2))
+          .join(", ")})`,
     ).toBeLessThan(30);
 
     // The absolute ceiling alone cannot say whether cost grows with stroke length while every
-    // frame remains below 30ms. A regression can recompute prior geometry for later frames while
+    // append remains below 30ms. A regression can recompute prior geometry for later frames while
     // still rendering only the unseen suffix, moving no mark count. Each half is calibrated
     // against references timed beside its own appends, so a mid-stroke machine-speed shift cancels
     // and what is left is length dependence. The cheapest of the three passes decides.
@@ -1774,8 +1808,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       + `(passes: ${chunkGrowthRatios.map((value) => value.toFixed(3)).join(", ")})`,
     ).toBeLessThan(APPEND_CHUNK_GROWTH_LIMIT);
 
-    // The CPU ceiling above includes this renderer's first append. It still cannot measure true
-    // PROCESS-COLD initialisation here: fourteen tests in this file construct
+    // The main-thread CPU ceiling above includes this renderer's first append. It still cannot
+    // measure true PROCESS-COLD initialisation here: fourteen tests in this file construct
     // renderers and drive appends before this one runs, so whatever the process pays once has
     // already been paid by the time the first pass here is measured. That is measured, not
     // supposed: this same reading is 4.05 and 4.62 in file order against 14.69 and 14.42 when the
@@ -1810,10 +1844,10 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(sealed.status).toBe("settled");
   });
 
-  it("convicts length-dependent appends before the absolute frame ceiling", () => {
+  it("convicts length-dependent appends before the absolute append ceiling", () => {
     // The blind spot the mark-count pins do NOT cover: a planner that recomputes prior geometry
     // for later frames but still renders only the unseen suffix. Every mark delta is unchanged,
-    // so the counts above stay green, while every frame can remain under 30ms. Stated as data, so
+    // so the counts above stay green, while every append can remain under 30ms. Stated as data, so
     // it needs no clock and no machine.
     const APPENDS = 200;
     const REFERENCE_MS = 1;
@@ -1852,7 +1886,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(appendCalibratedHalfGrowth(leak)).toBeGreaterThan(APPEND_LENGTH_GROWTH_LIMIT);
 
     // Not vacuous in the other direction: a uniform 40% slowdown is NOT length dependence and
-    // remains inside the absolute frame budget, so this gate must not convict it.
+    // remains inside the absolute append ceiling, so this gate must not convict it.
     const uniform = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 1.4 }));
     expect(Math.max(...uniform.map((sample) => sample.workMs))).toBeLessThan(30);
     expect(appendCalibratedHalfGrowth(uniform)).toBeLessThan(APPEND_LENGTH_GROWTH_LIMIT);
