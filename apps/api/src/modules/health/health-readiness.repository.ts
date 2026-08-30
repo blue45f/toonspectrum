@@ -107,6 +107,8 @@ interface SchemaCatalogRow {
   authAccountConstraintsReady: boolean;
   authAccountUserIndexReady: boolean;
   authRuntimeDmlReady: boolean;
+  marketplaceResourceAclReady: boolean;
+  marketplacePublishGateAclReady: boolean;
   marketplaceSearchGenerated: boolean;
   marketplaceSearchIndexReady: boolean;
   marketplaceTagIndexReady: boolean;
@@ -397,6 +399,76 @@ export class PostgresHealthReadinessRepository
                 'public.account',
                 'SELECT, INSERT, UPDATE, DELETE'
               ) AS "authRuntimeDmlReady",
+            pg_catalog.has_table_privilege(
+              current_user,
+              'public.creator_marketplace_resource',
+              'SELECT'
+            )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource',
+                'INSERT'
+              )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource',
+                'DELETE'
+              )
+              AND NOT pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource',
+                'UPDATE'
+              )
+              AND NOT pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource',
+                'TRUNCATE'
+              )
+              AND NOT pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource',
+                'REFERENCES'
+              )
+              AND NOT pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_resource',
+                'TRIGGER'
+              ) AS "marketplaceResourceAclReady",
+            pg_catalog.has_table_privilege(
+              current_user,
+              'public.creator_marketplace_publish_gate',
+              'SELECT'
+            )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_publish_gate',
+                'INSERT'
+              )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_publish_gate',
+                'UPDATE'
+              )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_publish_gate',
+                'DELETE'
+              )
+              AND NOT pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_publish_gate',
+                'TRUNCATE'
+              )
+              AND NOT pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_publish_gate',
+                'REFERENCES'
+              )
+              AND NOT pg_catalog.has_table_privilege(
+                current_user,
+                'public.creator_marketplace_publish_gate',
+                'TRIGGER'
+              ) AS "marketplacePublishGateAclReady",
             EXISTS (
               SELECT 1
               FROM pg_catalog.pg_attribute AS attribute
@@ -580,6 +652,8 @@ export class PostgresHealthReadinessRepository
       state.authAccountConstraintsReady !== true ||
       state.authAccountUserIndexReady !== true ||
       state.authRuntimeDmlReady !== true ||
+      state.marketplaceResourceAclReady !== true ||
+      state.marketplacePublishGateAclReady !== true ||
       state.marketplaceSearchGenerated !== true ||
       state.marketplaceSearchIndexReady !== true ||
       state.marketplaceTagIndexReady !== true ||

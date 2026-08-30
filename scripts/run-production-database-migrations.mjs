@@ -201,6 +201,102 @@ export function buildAuthRuntimeAclViolationSql(runtimeDatabaseRole) {
   )`;
 }
 
+export function buildCreatorMarketplaceRuntimeAclSql(
+  runtimeDatabaseRole,
+) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+REVOKE ALL ON TABLE
+  public.creator_marketplace_resource,
+  public.creator_marketplace_publish_gate
+FROM PUBLIC;
+
+REVOKE ALL ON TABLE
+  public.creator_marketplace_resource,
+  public.creator_marketplace_publish_gate
+FROM ${quotedRole};
+
+GRANT SELECT, INSERT, DELETE
+  ON TABLE public.creator_marketplace_resource
+  TO ${quotedRole};
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE public.creator_marketplace_publish_gate
+  TO ${quotedRole};
+`;
+}
+
+/**
+ * Marketplace reads and writes run through a dedicated, non-owning runtime role. Keep its resource
+ * and distributed admission tables on the smallest table-level contract used by the repositories:
+ * catalog resources are immutable after insert, while publish-gate rows require bounded updates.
+ */
+export function buildCreatorMarketplaceRuntimeAclViolationSql(
+  runtimeDatabaseRole,
+) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  return `(
+    NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_resource',
+      'SELECT'
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_resource',
+      'INSERT'
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_resource',
+      'DELETE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'UPDATE',
+        'TRUNCATE',
+        'REFERENCES',
+        'TRIGGER'
+      ]::text[]) AS unexpected_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_resource',
+        unexpected_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT',
+        'INSERT',
+        'UPDATE',
+        'DELETE'
+      ]::text[]) AS required_privilege
+      WHERE NOT pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_publish_gate',
+        required_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'TRUNCATE',
+        'REFERENCES',
+        'TRIGGER'
+      ]::text[]) AS unexpected_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_publish_gate',
+        unexpected_privilege
+      )
+    )
+  )`;
+}
+
 export function buildCreatorAssetObjectStorageRuntimeAclSql(
   runtimeDatabaseRole,
 ) {
@@ -1556,6 +1652,10 @@ export function runProductionDatabaseMigrations({
     // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
+    psql(
+      databaseUrl,
+      buildCreatorMarketplaceRuntimeAclSql(runtimeDatabaseRole),
+    );
     psql(
       databaseUrl,
       buildCreatorAssetObjectStorageRuntimeAclSql(runtimeDatabaseRole),
