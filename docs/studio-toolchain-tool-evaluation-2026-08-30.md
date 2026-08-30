@@ -28,7 +28,34 @@ pnpm run typecheck:trace:report   # 둘을 이어서
 `--incremental false` 를 명시한다. 루트 tsconfig 는 `incremental: true` 라, 워밍된
 `.tsbuildinfo` 가 있으면 trace 가 실제 작업의 일부만 담아 조용히 오해를 부른다.
 
-`.tstrace/` 는 `.gitignore` 에 넣었다 — 매번 재생성되는 산출물이다.
+`.tstrace/` 는 `.gitignore` 에 넣었다 — 매번 재생성되는 산출물이고, **약 505MB** 를
+쓴다(`trace.json` 25MB + `types.json` 503MB). 리포트를 읽고 나면 지우는 편이 좋다.
+
+### 첫 측정 (2026-08-30, 컨테이너)
+
+콜드 캐시 전체 typecheck 은 **5분 49초**였다(`--incremental false`, 루트 tsconfig 만.
+`pnpm run typecheck` 은 여기에 `@webtoon-nest/api` 필터가 더 붙는다). 하드웨어에 따라
+크게 달라지므로 절대값보다 **순위**를 본다:
+
+| 파일 | Check 시간 |
+| --- | --- |
+| `src/domains/creator/StudioPage.tsx` | 6127ms |
+| `src/domains/creator/components/StudioToolHintPreview.tsx` | 4077ms |
+| `src/domains/creator/vrm/studio-vrm-texture-paint-runtime.test.ts` | 3269ms |
+| `src/domains/creator/vrm/studio-vrm-procedural-scene-props.tsx` | 2295ms |
+| `src/domains/creator/bg3d/studio-bg3d-three-webgpu-capture.ts` | 1800ms |
+
+두 가지가 바로 보인다:
+
+1. **단일 표현식 하나가 파일 시간을 지배하는 경우가 있다.** `StudioToolHintPreview.tsx`
+   는 4077ms 중 **2679ms 가 line 2751 의 변수 선언 하나**다. 파일 크기가 아니라 그 한 줄이
+   비용이므로, 명시적 타입 주석 하나로 회수 가능한 종류의 비용이다.
+2. **`@types/three` 의 TSL 노드 타입이 실측 비용이다.** `studio-bg3d-three-webgpu-capture.ts`
+   의 1454ms 중 604ms 가 `@types/three@0.184.1` 의 `VarNode`
+   (`AliasedIntersection` → `NodeExtensions`/`NumOrBoolExtensions` 조건부 타입 사슬)
+   variance 계산이다. three.js 노드 머티리얼 타입을 넓게 노출하는 경계일수록 비싸다.
+
+이 표는 최적화 지시가 아니라 **기준선**이다. 다음 측정과 비교할 때 의미가 생긴다.
 
 ## 2. Khronos `gltf-validator` — 채택
 
