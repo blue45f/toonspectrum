@@ -232,6 +232,40 @@ describe("StudioLift3dPage", () => {
     });
   });
 
+  it("디코딩이 끝나기 전에 등록이 끝나도 최신이 아니라고 본다", async () => {
+    // 파일을 고른 직후부터 디코딩이 끝날 때까지는 decoded 도 지문도 아직 옛 값이다.
+    // 그 창에서 등록이 끝나면 "지금 보이는 모델" 이라고 잘못 말하고, 이어서 디코딩이
+    // 실패하면 그 문구가 새 파일의 오류 옆에 그대로 남는다.
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    let release: (value: unknown) => void = () => undefined;
+    saveStudioLift3dToBg3dLibrary.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    renderPage("character");
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+
+    libraryButton().click();
+    // 새 파일을 고르되 디코딩은 끝내지 않는다.
+    let finishDecode: (value: unknown) => void = () => undefined;
+    decodeStudioLift3dFile.mockReturnValue(
+      new Promise((resolve) => {
+        finishDecode = resolve;
+      }),
+    );
+    pickFile();
+    release({ ok: true, record: { id: "m1" } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toContain("누른 시점의 모델");
+    });
+    finishDecode(decodedDisc());
+  });
+
   it("등록 실패 사유에도 어느 시점의 모델인지 단서를 단다", async () => {
     // 옛 GLB 의 실패 사유가, 이미 등록될 수 있는 새 모델 옆에 그대로 붙어 남으면
     // 사용자는 지금 보이는 모델이 거절당한 것으로 읽는다.

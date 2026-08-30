@@ -125,6 +125,32 @@ describe("Studio Lift 3D 라이브러리 등록", () => {
     expect(result.detail).toContain("취소");
   });
 
+  it("취소가 아닌 워커 오류도 내부 식별자 대신 읽을 문장으로 바꾼다", async () => {
+    // StudioBg3dValidationWorkerError 의 message 는 studio-bg3d-validation-worker:timeout
+    // 같은 내부 식별자다. 취소만 알아보면 나머지가 그대로 화면에 뜬다.
+    const cases: ReadonlyArray<readonly [
+      ConstructorParameters<typeof StudioBg3dValidationWorkerError>[0],
+      string,
+    ]> = [
+      ["timeout", "제한 시간"],
+      ["protocol", "끊겼습니다"],
+      ["worker-failed", "끊겼습니다"],
+      ["disposed", "끊겼습니다"],
+      ["basis-worker-attestation-required", "새로고침"],
+    ];
+
+    for (const [code, expected] of cases) {
+      const result = await saveStudioLift3dToBg3dLibrary(liftedGlb(), UNKNOWN_RIGHTS, {}, {
+        saveVerifiedModel: vi.fn().mockRejectedValue(new StudioBg3dValidationWorkerError(code)),
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.detail).toContain(expected);
+      expect(result.detail).not.toContain("studio-bg3d-validation-worker");
+    }
+  });
+
   it("라이브러리의 진짜 취소(검증 워커 오류)도 취소로 알아본다", async () => {
     // signal 로 끊으면 오는 것은 AbortError 가 아니라 StudioBg3dValidationWorkerError("aborted") 다.
     // 이름만 보면 놓치고 studio-bg3d-validation-worker:aborted 를 사용자에게 그대로 보여준다.

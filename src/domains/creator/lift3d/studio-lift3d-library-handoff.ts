@@ -131,6 +131,30 @@ function isAbort(error: unknown): boolean {
   return (error as { readonly code?: unknown }).code === "aborted";
 }
 
+/**
+ * 검증 워커 오류를 사람이 읽을 문장으로 옮긴다.
+ *
+ * `StudioBg3dValidationWorkerError` 의 `message` 는 `studio-bg3d-validation-worker:timeout`
+ * 같은 내부 식별자다. 취소만 알아보고 나머지를 그대로 흘려보내면, 이 모듈이 약속한 "읽을 수
+ * 있는 실패 사유" 대신 내부 문자열이 화면에 뜬다. 사유마다 다음에 할 일이 다르므로 함께 적는다.
+ */
+function workerFailureDetail(error: unknown): string | null {
+  if (!(error instanceof Error) || error.name !== "StudioBg3dValidationWorkerError") return null;
+  const { code } = error as { readonly code?: unknown };
+  switch (code) {
+    case "timeout":
+      return "3D 모델 검사가 제한 시간을 넘겼습니다. 해상도를 낮춰 다시 만들어 등록해 보세요.";
+    case "basis-worker-attestation-required":
+      return "3D 모델 검사기를 신뢰할 수 없어 등록을 멈췄습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.";
+    case "disposed":
+    case "protocol":
+    case "worker-failed":
+      return "3D 모델 검사가 중간에 끊겼습니다. 잠시 후 다시 등록해 주세요.";
+    default:
+      return null;
+  }
+}
+
 export type StudioLift3dLibrarySaveResult =
   | { readonly ok: true; readonly record: Bg3dVerifiedStoredRecord }
   | { readonly ok: false; readonly detail: string };
@@ -157,6 +181,8 @@ export async function saveStudioLift3dToBg3dLibrary(
     if (isAbort(error)) {
       return { ok: false, detail: "3D 모델 등록을 취소했습니다." };
     }
+    const workerDetail = workerFailureDetail(error);
+    if (workerDetail !== null) return { ok: false, detail: workerDetail };
     return {
       ok: false,
       detail: error instanceof Error && error.message.length > 0

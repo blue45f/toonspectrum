@@ -250,10 +250,23 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     setLibraryNotice(null);
   }, []);
 
+  /**
+   * 파일을 고르는 **순간** 올라가는 번호.
+   *
+   * `decoded` 는 비동기 디코딩이 끝나야 바뀌므로, 고른 직후부터 그때까지는 지문이 여전히 옛
+   * 원화를 가리킨다. 그 창에서 등록이 끝나면 "지금 보이는 모델을 등록했다" 고 잘못 말하고,
+   * 이어서 디코딩이 실패하면 그 문구가 새 파일의 오류 옆에 그대로 남는다.
+   *
+   * 렌더에는 쓰지 않고 ref 로 둔다 — 상태로 두면 변환 효과가 **옛 이미지로** 한 번 더 돌아,
+   * 곧 버려질 결과를 만드느라 파이프라인을 통째로 낭비한다.
+   */
+  const sourceRevisionRef = useRef(0);
+
   const onPickFile = useCallback(async (file: File | null | undefined) => {
     if (!file) return;
     setDecodeError(null);
     setLiftError(null);
+    sourceRevisionRef.current += 1;
     // 등록 문구는 방금 올린 파일이 아니라 **이전** 모델 이야기다. 변환 효과가 지워 주기를
     // 기다리면 안 된다 — 새 파일이 디코딩에 실패하면 그 효과는 decoded === null 로 일찍
     // 빠져나가고, 화면에는 새 파일의 오류 옆에 이전 모델의 "등록했습니다" 가 그대로 남는다.
@@ -398,6 +411,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     const target = result;
     const targetRights = rightsDeclaration;
     const targetRevision = resultRevisionRef.current;
+    const targetSource = sourceRevisionRef.current;
     if (target === null) return;
     setLibrarySaving(true);
     setLibraryNotice(null);
@@ -408,8 +422,11 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
       const saved = await saveStudioLift3dToBg3dLibrary(target.glb, targetRights);
       // 입력 지문까지 본다. `result` 만 비교하면 디바운스 창 안에서 이전 결과가 그대로
       // 남아 있어, 화면이 이미 다른 설정을 보여주는데도 "그대로" 로 읽힌다.
+      // 원화 번호까지 본다. 디코딩이 끝나기 전 창에서는 `decoded` 도 지문도 아직 옛 값이라,
+      // 이 둘만 보면 "그대로" 로 읽힌다.
       const staleModel = latestResultRef.current !== target
-        || latestRevisionRef.current !== targetRevision;
+        || latestRevisionRef.current !== targetRevision
+        || sourceRevisionRef.current !== targetSource;
       // 성공만 단서를 다는 것으로는 부족하다. 실패 사유도 **누른 시점의 모델** 이야기다 —
       // 예를 들어 옛 GLB 의 rights-conflict 가, 이미 등록될 수 있는 새 모델 옆에 그대로 붙어
       // 남는다. 성공·실패 모두 같은 단서를 단다.
