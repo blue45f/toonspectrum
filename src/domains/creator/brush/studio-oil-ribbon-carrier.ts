@@ -2017,6 +2017,17 @@ export class StudioOilRibbonCarrierPlanner {
     const shared = Math.min(previous.length, dabs.length);
     let identical = 0;
     while (identical < shared && previous[identical] === dabs[identical]) identical += 1;
+    if (identical === 0) {
+      // Nothing survives — the lattice refit at the dab cap, a new stroke, an undo. Drop the
+      // retained bed BEFORE building the replacement rather than holding two full generations
+      // of 4096 stations × 7–44 hairs alive next to each other; `FxOilDabPlanner` measured that
+      // overlap at +4.5 ms per move in GC alone, and bailing out here can only ever cause a full
+      // rebuild, never a wrong reuse.
+      this.dabs = [];
+      this.geometry = [];
+      this.stations = [];
+      this.runsByHair = [];
+    }
 
     const settledGeometry = Math.max(0, identical - OIL_GEOMETRY_SMOOTHING_RADIUS);
     // `tangentAt` reaches two entries past the station it builds.
