@@ -22,6 +22,7 @@ import {
 } from "./studio-brush-engine-program-set";
 import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./studio-brush-symmetry";
 import {
+  StudioOilBristleLoadDynamicsPlanner,
   planStudioOilBristleLoadDynamics,
   type StudioOilBristleLoadDynamicsPlan,
 } from "./studio-oil-bristle-load-dynamics-v1";
@@ -1258,6 +1259,11 @@ function planBristlePhysics(
 function planLoadDynamics(
   stations: readonly OilCarrierStation[],
   options: StudioOilRibbonCarrierBristleLoadDynamicsOptions,
+  /**
+   * Live stroke only: a retained march plus the station prefix this planner has already proven
+   * byte-identical. Absent (batch, export, settle) marches the whole stroke as before.
+   */
+  resume?: { readonly planner: StudioOilBristleLoadDynamicsPlanner; readonly settled: number },
 ): StudioOilBristleLoadDynamicsPlan | undefined {
   if (stations.length < 2) return undefined;
   const laneCount = resolveBristleCount(stations);
@@ -1265,7 +1271,7 @@ function planLoadDynamics(
   const pressures = options.pressures && options.pressures.length > 0
     ? options.pressures
     : stations.map((station) => pressureProxyFromStationOpacity(station.opacity));
-  return planStudioOilBristleLoadDynamics({
+  const input = {
     stationCount: stations.length,
     laneCount,
     seed: Math.floor(finite(options.seed, 0)),
@@ -1275,7 +1281,12 @@ function planLoadDynamics(
     ...(options.depletionRate !== undefined
       ? { depletionRate: options.depletionRate }
       : {}),
-  });
+  };
+  // One construction site for the input, so the resumable path cannot be fed a different stroke
+  // than the batch path would have been.
+  return resume
+    ? resume.planner.plan(input, resume.settled)
+    : planStudioOilBristleLoadDynamics(input);
 }
 
 // ---------------------------------------------------------------------------
@@ -1980,6 +1991,12 @@ export class StudioOilRibbonCarrierPlanner {
   private runsByHair: PlannedBristleRun[][] = [];
   private lastReusedRuns = 0;
   private lastSettledStations = 0;
+  /**
+   * Retained load-dynamics march. The program is strictly causal in the station index, so unlike
+   * the bristle-physics program (whose `baseRadiusPx` is a stroke-global mean) its settled prefix
+   * is byte-stable under an append and is kept across pointer frames.
+   */
+  private readonly loadDynamics = new StudioOilBristleLoadDynamicsPlanner();
 
   /** Runs reused from the previous call. Diagnostics and identity tests only. */
   get reusedRuns(): number {
@@ -1999,6 +2016,7 @@ export class StudioOilRibbonCarrierPlanner {
     this.runsByHair = [];
     this.lastReusedRuns = 0;
     this.lastSettledStations = 0;
+    this.loadDynamics.reset();
   }
 
   plan(
@@ -2028,6 +2046,8 @@ export class StudioOilRibbonCarrierPlanner {
       this.geometry = [];
       this.stations = [];
       this.runsByHair = [];
+      // Same reason: the retained march holds stationCount x laneCount doubles.
+      this.loadDynamics.reset();
     }
 
     const settledGeometry = Math.max(0, identical - OIL_GEOMETRY_SMOOTHING_RADIUS);
@@ -2039,7 +2059,10 @@ export class StudioOilRibbonCarrierPlanner {
     const bodyOnly = options?.bodyOnly === true;
     const loadDynamicsOptions = options?.bristleLoadDynamics;
     const dynamics = !bodyOnly && loadDynamicsOptions?.enabled === true
-      ? planLoadDynamics(stations, loadDynamicsOptions)
+      ? planLoadDynamics(stations, loadDynamicsOptions, {
+        planner: this.loadDynamics,
+        settled: settledStations,
+      })
       : undefined;
     const bristlePhysicsOptions = options?.bristlePhysics;
     const physics = !bodyOnly && bristlePhysicsOptions?.enabled === true
