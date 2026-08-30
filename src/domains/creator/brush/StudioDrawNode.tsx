@@ -50,6 +50,7 @@ import {
   createStudioIncrementalFxPressurePathBuilder,
   planNeonBrushPasses,
   planOilBrushDabs,
+  planOilBrushDabsIncremental,
   studioOilPaintBodyForBrush,
   studioOilTipProfileForBrush,
   planPastelBrushDabs,
@@ -149,6 +150,7 @@ import {
   paintStudioOilRibbonCarrier,
   paintStudioOilRibbonHit,
   planStudioOilRibbonCarrier,
+  planStudioOilRibbonCarrierIncremental,
   studioOilRibbonProgramsForBrush,
 } from "./studio-oil-ribbon-carrier";
 import { paintStudioOilRibbonCarrierIncremental } from "./studio-oil-ribbon-incremental-paint";
@@ -2430,7 +2432,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (brushFamily === "oil" && el.mode !== "eraser") {
-            const dabs = planOilBrushDabs({
+            const oilPlanInput = {
               points: resolveStudioFreehandRenderPath(points, {
                 sampleSpacing: el.sampleSpacing,
                 legacyMinDistance: renderSampleDistance,
@@ -2443,16 +2445,29 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               paintBody: studioOilPaintBodyForBrush(brush),
               tipProfile: studioOilTipProfileForBrush(brush),
               stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
-            });
+            };
+            // 활성 초안만 요소 id 로 키된 증분 플래너를 쓴다. 대브 베드와 캐리어 모두 이동당
+            // 전체를 다시 세우고 있었고(2906-대브 베드 기준 캐리어만 14.6ms), 두 플래너 모두
+            // 스스로 검증한 접두만 재사용하므로 플랜은 배치와 바이트 동일하다. 커밋 렌더는
+            // 배치 리플레이를 유지해 내부 점 재작성에도 항상 정본을 그린다. 대칭 변형은 같은
+            // 요소를 변형된 점 배열로 여러 번 그리므로 변형 인덱스를 획 키에 포함한다.
+            const oilStrokeKey = `${el.id}#${index}`;
+            const dabs = activeDraft
+              ? planOilBrushDabsIncremental(oilStrokeKey, oilPlanInput)
+              : planOilBrushDabs(oilPlanInput);
             // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
             // dli GGX 릴리프 오버레이는 brush--impasto-relief 와 oil--impasto-ribbon 두 레인이 켠다,
             // brush--bristle-physics 레인만 WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3).
             // 옵션이 없는 다른 모든 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하며, SVG
             // 내보내기의 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다.
-            const carrier = planStudioOilRibbonCarrier(
-              dabs,
-              studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id), el.brushEnginePrograms?.oil),
+            const oilPrograms = studioOilRibbonProgramsForBrush(
+              brush,
+              fxBrushSeedFromKey(el.id),
+              el.brushEnginePrograms?.oil,
             );
+            const carrier = activeDraft
+              ? planStudioOilRibbonCarrierIncremental(oilStrokeKey, dabs, oilPrograms)
+              : planStudioOilRibbonCarrier(dabs, oilPrograms);
             return (
               <Shape
                 key={index}
