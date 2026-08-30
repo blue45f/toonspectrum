@@ -233,7 +233,7 @@ function buildHairSpringBone(
     ],
     colliderGroups: [{ name: "Torso", colliders: [0] }],
     springs: hairRig.chains.map((chain) => ({
-      name: `Hair_${chain.partId}`,
+      name: `Hair_${chain.id}`,
       colliderGroups: [0],
       joints: chain.joints.map((joint, index) => ({
         node: firstHairNode + chain.jointOffset + index,

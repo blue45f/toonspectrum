@@ -30,8 +30,8 @@ const NEUTRAL = createAvatarForgeState();
  */
 const HAIRED = createAvatarForgeState("romance-long");
 
-function numbers(source: readonly number[] | Float32Array | Float64Array | undefined): number[] {
-  return source === undefined ? [] : Array.from(source as ArrayLike<number>);
+function numbers(source: ArrayLike<number> | undefined): number[] {
+  return source === undefined ? [] : Array.from(source);
 }
 
 function allPrimitives(parts: readonly StudioVrmHumanoidMeshPart[]) {
@@ -436,5 +436,66 @@ describe("studio VRM humanoid mesh", () => {
     }
     // 껍질이지 풍선이 아니다 — 가장 얇은 캡도 두개골의 1.2배를 넘지 않는다.
     expect(thinnest).toBeLessThan(1.2);
+  });
+
+  it("rigs every hanging hair part, not just the tapered strands", () => {
+    // 처음에는 `tapered-capsule` 만 체인에 실었다. 그런데 롱헤어의 큰 뒷머리 시트는
+    // `ellipsoid` 고(hime-noble 은 머리 관절 아래 0.43m 로 어느 가닥보다 깊다), 땋은 머리
+    // 본체는 `sphere` 세그먼트 열이라, 정작 가장 크게 매달린 부분이 `head` 100% 로 남아
+    // 고개를 돌릴 때 강체로 휩쓸렸다 — 이 리그가 없애려던 바로 그 동작이다.
+    for (const preset of AVATAR_FORGE_PRESETS) {
+      const built = buildStudioVrmHumanoidMesh(preset.state);
+      const hairPart = built.parts.find((part) => part.nodeName === "Hair");
+      if (!hairPart) continue;
+      const headJoint = built.rig.jointIndex.head;
+      const headY = built.rig.worldRest.head[1];
+      const hanging = 0.12 * built.rig.heightScale;
+
+      let headOnly = 0;
+      for (const primitive of hairPart.primitives) {
+        const positions = numbers(primitive.positions);
+        const joints = numbers(primitive.joints);
+        const weights = numbers(primitive.weights);
+        for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
+          if (headY - positions[vertex * 3 + 1] < hanging) continue;
+          let headWeight = 0;
+          for (let slot = 0; slot < 4; slot += 1) {
+            if (joints[vertex * 4 + slot] === headJoint) headWeight += weights[vertex * 4 + slot];
+          }
+          if (headWeight > 0.99) headOnly += 1;
+        }
+      }
+      expect(headOnly, `${preset.id}: 매달린 정점이 head 에만 묶여 있다`).toBe(0);
+    }
+  });
+
+  it("leaves the skull cap and crown-mounted buns off the spring rig", () => {
+    // 정수리에 얹힌 번은 흔들릴 이유가 없다 — 흔들리면 두피에서 떠 보인다.
+    // (실측: 번은 머리 관절보다 위(−0.10m), 뒷머리 시트는 0.14~0.43m 아래.)
+    for (const presetId of ["elegant-bun", "sakura-bun", "action-pony"]) {
+      const state = createAvatarForgeState(presetId);
+      const built = buildStudioVrmHumanoidMesh(state);
+      const bindings = built.hairRig?.bindings;
+      if (!bindings) throw new Error(`${presetId}: expected a hair rig`);
+      const rig = built.rig;
+      const scaleY = rig.head.radiusY / 0.46;
+
+      for (const part of buildAvatarForgeHairParts(state)) {
+        // 두피 껍질은 머리 그 자체다 — 절대 흔들리면 안 된다.
+        if (part.role === "cap") {
+          expect(bindings.has(part.id), `${presetId}: cap 이 스프링에 실렸다`).toBe(false);
+          continue;
+        }
+        if (part.primitive === "tapered-capsule") continue;
+        // 파츠 아래 끝이 머리 관절 위에 있으면 매달린 것이 아니다.
+        const bottom =
+          rig.head.center[1] + (part.position[1] - 0.18) * scaleY - Math.abs(part.scale[1]) * scaleY;
+        if (bottom < rig.worldRest.head[1]) continue;
+        expect(
+          bindings.has(part.id),
+          `${presetId}: ${part.id} 는 관절 위에 있는데 스프링에 실렸다`,
+        ).toBe(false);
+      }
+    }
   });
 });

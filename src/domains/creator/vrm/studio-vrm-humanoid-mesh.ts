@@ -1196,7 +1196,7 @@ function hairPartTransform(part: AvatarForgeHairPart, head: StudioVrmRigHeadFit)
 function addHairSphere(
   builder: SurfaceBuilder,
   transform: HairTransform,
-  skin: MeshSkinBinding,
+  skin: (t: number) => MeshSkinBinding,
   uvRect: MeshUvRect,
   options: {
     readonly columns: number;
@@ -1227,7 +1227,8 @@ function addHairSphere(
             meshLerp(u0, u1, column / options.columns),
             meshLerp(v0, v1, 1 - row / options.rows),
           ],
-          skin,
+          // 로컬 Y +1(위) → −1(아래) 을 체인 파라미터 0 → 1 로 옮긴다.
+          skin((1 - cosTheta) / 2),
         ),
       );
     }
@@ -1416,12 +1417,12 @@ function pushOutsideSkull(
 }
 
 /**
- * 가닥 정점을 체인 조인트에 배분한다. `t` 0(뿌리) → 1(끝).
+ * 정점을 체인 조인트에 배분한다. `t` 0(뿌리·위) → 1(끝·아래).
  *
  * 이웃한 두 마디에만 실어 선형 보간한다 — 뿌리 링은 체인의 첫 조인트에 100% 실리는데,
  * 그 조인트는 흔들리지 않는 루트라 두피에 붙은 것과 같아진다.
  */
-function hairStrandSkin(chain: StudioVrmHairChain, jointBase: number, t: number): MeshSkinBinding {
+function hairChainSkin(chain: StudioVrmHairChain, jointBase: number, t: number): MeshSkinBinding {
   const span = chain.joints.length - 1;
   const position = meshClamp(t, 0, 1) * span;
   const lower = Math.min(span - 1, Math.floor(position));
@@ -1448,31 +1449,41 @@ function buildHair(
   const transforms = parts.map((part) =>
     fitHairPartToSkull(part, hairPartTransform(part, rig.head), rig.head, state.hair.fringe),
   );
-  const strands = parts
-    .map((part, index) => ({ part, transform: transforms[index] }))
-    .filter((entry) => entry.part.primitive === "tapered-capsule");
-  const hairRig = buildStudioVrmHairRig(strands, rig.worldRest.head);
-  const chainByPartId = new Map(hairRig?.chains.map((chain) => [chain.partId, chain]) ?? []);
+  const hairRig = buildStudioVrmHairRig(
+    parts.map((part, index) => ({ part, transform: transforms[index] })),
+    rig.worldRest.head,
+    rig.heightScale,
+  );
   const jointBase = rig.bones.length;
+
+  /**
+   * 파츠 하나의 스킨을 축 방향 파라미터의 함수로 준다. 리그가 없는 파츠는 `head` 에 그대로
+   * 묶인다 — 캡·앞머리처럼 두피에 붙어 있어야 하는 것들이다.
+   */
+  const skinFor = (partId: string): ((t: number) => MeshSkinBinding) => {
+    const binding = hairRig?.bindings.get(partId);
+    if (binding === undefined) return () => skin;
+    if (binding.kind === "rigid") {
+      const joint: MeshSkinBinding = [
+        [jointBase + binding.chain.jointOffset + binding.jointInChain, 1],
+      ];
+      return () => joint;
+    }
+    return (t) => hairChainSkin(binding.chain, jointBase, t);
+  };
 
   parts.forEach((part, index) => {
     // 파츠마다 세로 띠 하나씩 — 같은 머티리얼을 쓰므로 UV 가 겹치면 안 된다.
     const uvRect: MeshUvRect = [0, index / parts.length, 1, (index + 1) / parts.length];
     const transform = transforms[index];
+    const partSkin = skinFor(part.id);
     if (part.primitive === "tapered-capsule") {
-      const chain = chainByPartId.get(part.id);
-      addHairStrand(
-        builder,
-        part,
-        transform,
-        chain ? (t) => hairStrandSkin(chain, jointBase, t) : () => skin,
-        uvRect,
-      );
+      addHairStrand(builder, part, transform, partSkin, uvRect);
       return;
     }
     if (part.role === "cap") {
       // 앞은 헤어라인에서 끊고 뒤는 목덜미까지 — 대칭 캡은 눈·눈썹까지 덮어 버린다.
-      addHairSphere(builder, transform, skin, uvRect, {
+      addHairSphere(builder, transform, partSkin, uvRect, {
         columns: HAIR_CAP_COLUMNS,
         rows: HAIR_CAP_ROWS,
         thetaFront: Math.PI * 0.4,
@@ -1480,7 +1491,7 @@ function buildHair(
       });
       return;
     }
-    addHairSphere(builder, transform, skin, uvRect, {
+    addHairSphere(builder, transform, partSkin, uvRect, {
       columns: HAIR_SPHERE_COLUMNS,
       rows: HAIR_SPHERE_ROWS,
       thetaFront: Math.PI,

@@ -78,28 +78,35 @@ describe("generate recipe → .vrm file reload", () => {
     expect(reloaded.humanoid?.getNormalizedBoneNode("hips")).not.toBeNull();
   }, 60_000);
 
-  it("gives long hair a spring chain the studio's physics runtime can actually drive", async () => {
+  it.each(["hime-noble", "braid-scholar"])(
+    "gives %s a spring chain the studio's physics runtime can actually drive",
+    async (presetId) => {
     // 헤어가 전 정점 `head` 100% 였을 때는 고개를 돌리면 긴 머리가 강체로 휩쓸렸고,
     // 리그에 헤어 조인트가 없어 스프링본이 물릴 곳도 없었다(생성 캐릭터의 스프링 조인트 0개).
+    // `braid-scholar` 는 땋은 머리가 `sphere` 세그먼트 열이라, 가닥만 리그하던 시절에는
+    // 본체 전체가 리그 밖이었다.
     const vrm = await loadVrmBytes(
-      exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId: "hime-noble" })),
+      exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
     );
     expect(countSpringBoneJoints(vrm as never)).toBeGreaterThan(0);
 
-    // 스프링이 실제로 움직이는지 — 머리를 돌린 뒤 고정 dt 로 돌리면 끝 마디가 따라와야 한다.
+    // 스프링이 실제로 움직이는지 — 머리를 돌린 뒤 고정 dt 로 돌리면 마디들이 따라와야 한다.
     const head = vrm.humanoid?.getNormalizedBoneNode("head");
     if (!head) throw new Error("expected a head bone");
     const joints = [...(vrm.springBoneManager?.joints ?? [])];
     expect(joints.length).toBeGreaterThan(0);
-    const tip = joints[joints.length - 1].bone;
 
     vrm.scene.updateMatrixWorld(true);
-    const before = tip.getWorldPosition(new Vector3()).clone();
+    const before = joints.map((joint) => joint.bone.getWorldPosition(new Vector3()).clone());
     head.rotation.y = 0.9;
+    head.rotation.x = 0.35;
     vrm.scene.updateMatrixWorld(true);
-    for (let step = 0; step < 30; step += 1) vrm.update(1 / 60);
-    const after = tip.getWorldPosition(new Vector3());
-    expect(after.distanceTo(before)).toBeGreaterThan(0.01);
+    for (let step = 0; step < 60; step += 1) vrm.update(1 / 60);
+    const moved = joints.filter(
+      (joint, index) => joint.bone.getWorldPosition(new Vector3()).distanceTo(before[index]) > 0.005,
+    );
+    // 일부만 움직이면 어딘가가 아직 `head` 에 강체로 붙어 있다는 뜻이다.
+    expect(moved.length).toBe(joints.length);
 
     // 몸통 콜라이더가 없으면 흔들리는 머리카락이 등을 그대로 통과한다. 시뮬레이션이 끝난 뒤
     // 어느 마디도 몸통 캡슐 안에 들어가 있으면 안 된다.
@@ -121,7 +128,9 @@ describe("generate recipe → .vrm file reload", () => {
       // 콜라이더는 마디의 중심을 반지름 + hitRadius 밖으로 밀어낸다. 수치 오차만 허용한다.
       expect(point.distanceTo(closest)).toBeGreaterThan(shape.radius * 0.98);
     }
-  }, 60_000);
+    },
+    60_000,
+  );
 
   it("keeps every shipped preset's skin joints and inverse bind matrices in step", async () => {
     // 헤어 조인트를 스킨에 이어 붙이면서 IBM 을 같이 늘리지 않으면 로더가 조용히
