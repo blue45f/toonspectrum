@@ -106,6 +106,11 @@ describe("PostgresHealthReadinessRepository", () => {
     expect(catalogQuery).toContain("public.creator_marketplace_resource");
     expect(catalogQuery).toContain("public.creator_marketplace_publish_gate");
     expect(catalogQuery).toContain("SELECT, INSERT, UPDATE, DELETE");
+    expect(catalogQuery).toContain("has_any_column_privilege");
+    expect(catalogQuery).toContain("WITH GRANT OPTION");
+    expect(catalogQuery).toContain("0::oid");
+    expect(catalogQuery).toContain("public_column_privilege");
+    expect(catalogQuery).toContain("public_table_privilege");
     expect(query.mock.calls[1]?.[0]).toMatchObject({
       query_timeout: HEALTH_READINESS_QUERY_TIMEOUT_MS,
       values: [[...REQUIRED_DATABASE_MIGRATIONS]],

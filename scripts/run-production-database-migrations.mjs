@@ -257,15 +257,42 @@ export function buildCreatorMarketplaceRuntimeAclViolationSql(
       SELECT 1
       FROM unnest(ARRAY[
         'UPDATE',
+        'REFERENCES'
+      ]::text[]) AS unexpected_column_privilege
+      WHERE pg_catalog.has_any_column_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_resource',
+        unexpected_column_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
         'TRUNCATE',
-        'REFERENCES',
         'TRIGGER'
-      ]::text[]) AS unexpected_privilege
+      ]::text[]) AS unexpected_table_privilege
       WHERE pg_catalog.has_table_privilege(
         ${roleLiteral},
         'public.creator_marketplace_resource',
-        unexpected_privilege
+        unexpected_table_privilege
       )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT',
+        'INSERT'
+      ]::text[]) AS delegable_column_privilege
+      WHERE pg_catalog.has_any_column_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_resource',
+        delegable_column_privilege || ' WITH GRANT OPTION'
+      )
+    )
+    OR pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_resource',
+      'DELETE WITH GRANT OPTION'
     )
     OR EXISTS (
       SELECT 1
@@ -285,13 +312,70 @@ export function buildCreatorMarketplaceRuntimeAclViolationSql(
       SELECT 1
       FROM unnest(ARRAY[
         'TRUNCATE',
-        'REFERENCES',
         'TRIGGER'
-      ]::text[]) AS unexpected_privilege
+      ]::text[]) AS unexpected_table_privilege
       WHERE pg_catalog.has_table_privilege(
         ${roleLiteral},
         'public.creator_marketplace_publish_gate',
-        unexpected_privilege
+        unexpected_table_privilege
+      )
+    )
+    OR pg_catalog.has_any_column_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_publish_gate',
+      'REFERENCES'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT',
+        'INSERT',
+        'UPDATE'
+      ]::text[]) AS delegable_column_privilege
+      WHERE pg_catalog.has_any_column_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_publish_gate',
+        delegable_column_privilege || ' WITH GRANT OPTION'
+      )
+    )
+    OR pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_publish_gate',
+      'DELETE WITH GRANT OPTION'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'public.creator_marketplace_resource',
+        'public.creator_marketplace_publish_gate'
+      ]::text[]) AS public_relation(relation_name)
+      CROSS JOIN unnest(ARRAY[
+        'SELECT',
+        'INSERT',
+        'UPDATE',
+        'REFERENCES'
+      ]::text[]) AS public_column_privilege(privilege_name)
+      WHERE pg_catalog.has_any_column_privilege(
+        0::oid,
+        public_relation.relation_name,
+        public_column_privilege.privilege_name
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'public.creator_marketplace_resource',
+        'public.creator_marketplace_publish_gate'
+      ]::text[]) AS public_relation(relation_name)
+      CROSS JOIN unnest(ARRAY[
+        'DELETE',
+        'TRUNCATE',
+        'TRIGGER'
+      ]::text[]) AS public_table_privilege(privilege_name)
+      WHERE pg_catalog.has_table_privilege(
+        0::oid,
+        public_relation.relation_name,
+        public_table_privilege.privilege_name
       )
     )
   )`;

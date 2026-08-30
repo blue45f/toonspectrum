@@ -414,25 +414,73 @@ export class PostgresHealthReadinessRepository
                 'public.creator_marketplace_resource',
                 'DELETE'
               )
-              AND NOT pg_catalog.has_table_privilege(
-                current_user,
-                'public.creator_marketplace_resource',
-                'UPDATE'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'UPDATE',
+                  'REFERENCES'
+                ]::text[]) AS unexpected_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_resource',
+                  unexpected_column_privilege
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS unexpected_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  current_user,
+                  'public.creator_marketplace_resource',
+                  unexpected_table_privilege
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'SELECT',
+                  'INSERT'
+                ]::text[]) AS delegable_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_resource',
+                  delegable_column_privilege || ' WITH GRANT OPTION'
+                )
               )
               AND NOT pg_catalog.has_table_privilege(
                 current_user,
                 'public.creator_marketplace_resource',
-                'TRUNCATE'
+                'DELETE WITH GRANT OPTION'
               )
-              AND NOT pg_catalog.has_table_privilege(
-                current_user,
-                'public.creator_marketplace_resource',
-                'REFERENCES'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'SELECT',
+                  'INSERT',
+                  'UPDATE',
+                  'REFERENCES'
+                ]::text[]) AS public_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  0::oid,
+                  'public.creator_marketplace_resource',
+                  public_column_privilege
+                )
               )
-              AND NOT pg_catalog.has_table_privilege(
-                current_user,
-                'public.creator_marketplace_resource',
-                'TRIGGER'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'DELETE',
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS public_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  0::oid,
+                  'public.creator_marketplace_resource',
+                  public_table_privilege
+                )
               ) AS "marketplaceResourceAclReady",
             pg_catalog.has_table_privilege(
               current_user,
@@ -454,20 +502,67 @@ export class PostgresHealthReadinessRepository
                 'public.creator_marketplace_publish_gate',
                 'DELETE'
               )
-              AND NOT pg_catalog.has_table_privilege(
-                current_user,
-                'public.creator_marketplace_publish_gate',
-                'TRUNCATE'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS unexpected_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  current_user,
+                  'public.creator_marketplace_publish_gate',
+                  unexpected_table_privilege
+                )
               )
-              AND NOT pg_catalog.has_table_privilege(
+              AND NOT pg_catalog.has_any_column_privilege(
                 current_user,
                 'public.creator_marketplace_publish_gate',
                 'REFERENCES'
               )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'SELECT',
+                  'INSERT',
+                  'UPDATE'
+                ]::text[]) AS delegable_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  current_user,
+                  'public.creator_marketplace_publish_gate',
+                  delegable_column_privilege || ' WITH GRANT OPTION'
+                )
+              )
               AND NOT pg_catalog.has_table_privilege(
                 current_user,
                 'public.creator_marketplace_publish_gate',
-                'TRIGGER'
+                'DELETE WITH GRANT OPTION'
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'SELECT',
+                  'INSERT',
+                  'UPDATE',
+                  'REFERENCES'
+                ]::text[]) AS public_column_privilege
+                WHERE pg_catalog.has_any_column_privilege(
+                  0::oid,
+                  'public.creator_marketplace_publish_gate',
+                  public_column_privilege
+                )
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unnest(ARRAY[
+                  'DELETE',
+                  'TRUNCATE',
+                  'TRIGGER'
+                ]::text[]) AS public_table_privilege
+                WHERE pg_catalog.has_table_privilege(
+                  0::oid,
+                  'public.creator_marketplace_publish_gate',
+                  public_table_privilege
+                )
               ) AS "marketplacePublishGateAclReady",
             EXISTS (
               SELECT 1

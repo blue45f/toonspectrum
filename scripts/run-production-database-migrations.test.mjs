@@ -272,6 +272,11 @@ test("creator marketplace runtime ACL is normalized to the repository contract",
   expect(violation).toContain("public.creator_marketplace_resource");
   expect(violation).toContain("public.creator_marketplace_publish_gate");
   expect(violation).toContain("'toonspectrum_runtime'");
+  expect(violation).toContain("has_any_column_privilege");
+  expect(violation).toContain("WITH GRANT OPTION");
+  expect(violation).toContain("0::oid");
+  expect(violation).toContain("public_column_privilege");
+  expect(violation).toContain("public_table_privilege");
 
   const runner = readFileSync(
     new URL("./run-production-database-migrations.mjs", import.meta.url),
