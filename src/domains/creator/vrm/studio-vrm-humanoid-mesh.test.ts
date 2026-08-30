@@ -642,10 +642,10 @@ describe("studio VRM humanoid mesh", () => {
     }
   });
 
-  it("bounds collision radii by the largest shaped axis, not the average", () => {
-    // 충돌 반경은 스칼라라 축별 스케일을 담을 수 없다. 평균을 쓰면 가장 두꺼워진 축을
-    // 감싸지 못한다 — 얼굴 깊이 1.6 · 폭·높이 0.6 에서 Z 는 1.14배가 되는데 평균은
-    // 0.95배라 20% 가 콜라이더를 뚫고 들어간다.
+  it("derives collision radii from the chain's radial plane, not an unrelated axis", () => {
+    // 체인은 가닥·덩어리·구슬 모두 로컬 Y 가 축이라 굵기는 X·Z 평면에서 정해진다.
+    // 평균을 쓰면 가장 두꺼워진 축을 못 감싸고(깊이를 키우면 Z 가 뚫린다), 세 축 전체의
+    // 최대를 쓰면 무관한 축이 새어 든다(높이만 키워도 반경이 커져 두피에서 밀려난다).
     // 기준은 머리 스케일이 정확히 1 인 상태여야 한다 — 배포 프리셋은 대부분 얼굴 비율이
     // 1 이 아니라 이미 한 번 shaping 을 거친다.
     const preset = createAvatarForgeState("hime-noble");
@@ -660,19 +660,21 @@ describe("studio VRM humanoid mesh", () => {
     for (const face of [
       { headWidth: 0.6, headHeight: 0.6, headDepth: 1.6 },
       { headWidth: 1.6, headHeight: 1.6, headDepth: 0.6 },
+      // 높이만 키운 경우 — 가로 단면은 그대로이므로 반경도 그대로여야 한다.
+      { headWidth: 1, headHeight: 1.6, headDepth: 1 },
     ]) {
       const state = sanitizeAvatarForgeState({ ...base, face: { ...base.face, ...face } });
       const built = buildStudioVrmHumanoidMesh(state);
       const shaped = built.hairRig;
       if (!shaped) throw new Error("expected a hair rig");
       const scale = built.rig.nodeScale.head ?? [1, 1, 1];
-      const largest = Math.max(scale[0], scale[1], scale[2]);
+      const radial = Math.max(scale[0], scale[2]);
 
       expect(shaped.joints.length).toBe(neutral.joints.length);
       for (let index = 0; index < shaped.joints.length; index += 1) {
         const ratio = shaped.joints[index].hitRadius / neutral.joints[index].hitRadius;
         expect(ratio, `${JSON.stringify(face)} @ ${shaped.joints[index].name}`).toBeCloseTo(
-          largest,
+          radial,
           9,
         );
       }

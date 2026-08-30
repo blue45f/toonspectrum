@@ -425,11 +425,14 @@ export function shapeStudioVrmHairRig(
 ): StudioVrmHairRig | null {
   if (rig === null) return null;
   if (scale[0] === 1 && scale[1] === 1 && scale[2] === 1) return rig;
-  // 충돌 반경은 스칼라라 축별 스케일을 정확히 담을 수 없다. **가장 큰 축**을 쓴다 —
-  // 평균을 쓰면 가장 두꺼워진 축을 감싸지 못한다(얼굴 깊이 1.6 · 폭·높이 0.6 에서 Z 두께는
-  // 1.14 배인데 평균은 0.95 배라 20% 가 콜라이더를 뚫고 들어간다). 과하게 잡는 쪽은
-  // 머리카락이 살짝 더 밀려날 뿐이지만, 모자라면 몸통을 통과한다.
-  const radial = Math.max(scale[0], scale[1], scale[2]);
+  // 충돌 반경은 스칼라라 축별 스케일을 정확히 담을 수 없다. 체인의 **가로 단면**(X·Z)에서
+  // 가장 큰 축을 쓴다 — 이 리그의 체인은 가닥·덩어리·구슬 모두 로컬 Y 를 축으로 하므로
+  // 굵기는 X·Z 평면에서 정해진다.
+  //
+  // 세 축 전체의 최대를 쓰면 무관한 축이 새어 든다(머리 높이만 1.6 배로 키우면 단면은
+  // 그대로인데 반경만 1.6 배가 돼 머리카락이 두피에서 밀려난다). 평균을 쓰면 반대로 가장
+  // 두꺼워진 축을 감싸지 못한다(깊이를 키우면 Z 두께가 커지는데 반경은 덜 커져 뚫린다).
+  const radial = Math.max(scale[0], scale[2]);
   const moved = new Map<StudioVrmHairJoint, StudioVrmHairJoint>();
   const shapeJoint = (joint: StudioVrmHairJoint): StudioVrmHairJoint => {
     const existing = moved.get(joint);

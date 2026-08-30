@@ -286,6 +286,8 @@ describe("generate recipe → .vrm file reload", () => {
     );
     const groups = snapshot.springBone?.colliderGroups ?? [];
     expect(groups.map((group) => group.name)).toEqual(["Torso", "Skull"]);
+    // 두개골은 캡슐 두 개의 합집합이다 — 하나로는 가로 두 축 중 작은 쪽밖에 못 감싼다.
+    expect(groups[1]?.colliders).toEqual([1, 2]);
     const springs = snapshot.springBone?.springs ?? [];
     expect(springs.length).toBeGreaterThan(0);
     for (const spring of springs) {

@@ -239,10 +239,15 @@ function buildHairSpringBone(
     radiusY: rig.head.radiusY * headScale[1],
     radiusZ: rig.head.radiusZ * headScale[2],
   };
-  // 타원체에 **내접**하는 캡슐 — 가로 단면의 작은 축을 반경으로 삼고 세로로 늘린다.
-  // 넘치게 잡으면 앞머리가 이마에서 떠 보인다.
-  const skullRadius = Math.min(skull.radiusX, skull.radiusZ);
-  const skullHalf = Math.max(0, skull.radiusY - skullRadius);
+  // 타원체를 캡슐 **두 개의 합집합**으로 덮는다. 하나로는 가로 두 축 중 작은 쪽밖에 못
+  // 감싼다 — 폭 1.6 · 깊이 0.6 처럼 가로가 크게 찌그러진 머리에서 옆머리가 두개골 안으로
+  // 10% 들어갔다. 둘 다 타원체에 **내접**시키므로 넘쳐서 머리카락을 띄우지도 않는다.
+  //  - 세로 캡슐: 반경 min(rx, rz), Y 축으로 신장 → 정수리·턱과 좁은 가로 축을 덮는다.
+  //  - 가로 캡슐: 반경 min(ry, rz), X 축으로 신장 → 넓은 가로 축을 끝까지 덮는다.
+  const verticalRadius = Math.min(skull.radiusX, skull.radiusZ);
+  const verticalHalf = Math.max(0, skull.radiusY - verticalRadius);
+  const lateralRadius = Math.min(skull.radiusY, skull.radiusZ);
+  const lateralHalf = Math.max(0, skull.radiusX - lateralRadius);
 
   return {
     colliders: [
@@ -256,14 +261,21 @@ function buildHairSpringBone(
       {
         node: hairPivotNode,
         shape: "capsule",
-        offset: [skull.center[0], skull.center[1] - skullHalf, skull.center[2]],
-        radius: skullRadius,
-        tail: [skull.center[0], skull.center[1] + skullHalf, skull.center[2]],
+        offset: [skull.center[0], skull.center[1] - verticalHalf, skull.center[2]],
+        radius: verticalRadius,
+        tail: [skull.center[0], skull.center[1] + verticalHalf, skull.center[2]],
+      },
+      {
+        node: hairPivotNode,
+        shape: "capsule",
+        offset: [skull.center[0] - lateralHalf, skull.center[1], skull.center[2]],
+        radius: lateralRadius,
+        tail: [skull.center[0] + lateralHalf, skull.center[1], skull.center[2]],
       },
     ],
     colliderGroups: [
       { name: "Torso", colliders: [0] },
-      { name: "Skull", colliders: [1] },
+      { name: "Skull", colliders: [1, 2] },
     ],
     springs: hairRig.chains.map((chain) => ({
       name: `Hair_${chain.id}`,
