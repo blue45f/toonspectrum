@@ -296,6 +296,33 @@ describe("StudioLift3dPage", () => {
     });
   });
 
+  it("변환이 다시 돌기 전이라도 설정이 바뀌면 최신이 아니라고 본다", async () => {
+    // 변환은 32ms 디바운스 뒤에야 돈다. 그 창이 열려 있는 동안 result 는 아직 이전 값이라,
+    // result 만 비교하면 화면이 이미 다른 설정을 보여주는데도 "그대로" 로 읽힌다.
+    // 슬라이더를 계속 잡고 있으면 그 창은 무한정 늘어난다.
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    let release: (value: unknown) => void = () => undefined;
+    saveStudioLift3dToBg3dLibrary.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    renderPage("character");
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+
+    libraryButton().click();
+    // 디바운스가 끝나기를 **기다리지 않고** 곧바로 등록을 완료시킨다.
+    fireEvent.change(screen.getByLabelText(/앞쪽 두께 비율/u), { target: { value: "0.8" } });
+    release({ ok: true, record: { id: "m1" } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toContain("누른 시점의 모델");
+    });
+  });
+
   it("등록 중에 이용 권리를 바꾸면 어느 표기로 저장됐는지 밝힌다", async () => {
     // 모델은 그대로인데 표기만 바뀌는 경우가 더 위험하다. 화면에는 "공개 이용" 이 떠 있는데
     // 라이브러리에는 "확인 전" 로 박힌 모델이 남고, 무자격 성공 문구가 그 어긋남을 덮는다.

@@ -282,10 +282,32 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
 
   // 설정이 바뀔 때마다 변환을 다시 돌린다. 한 프레임 미뤄 두면 슬라이더를 끄는 동안의
   // 중간 값들이 자연스럽게 합쳐지고, 무거운 계산이 입력 반응을 막지 않는다.
+  /**
+   * 화면의 입력이 가리키는 결과의 지문. 슬라이더를 움직이면 **그 순간** 새 객체가 된다.
+   *
+   * `result` 만으로는 최신 여부를 알 수 없다. 변환은 32ms 디바운스 뒤에야 돌고, 그 창이
+   * 열려 있는 동안 `result` 는 아직 이전 값이다. 슬라이더를 계속 잡고 있으면 창이 무한정
+   * 늘어나므로, 등록 완료가 그 사이에 떨어지면 "지금 보이는 모델을 등록했다" 고 잘못 알린다.
+   */
+  const conversionRevision = useMemo(
+    () => ({
+      decoded,
+      key: JSON.stringify([
+        subject, resolution, depthScale, smoothing, invertRelief, unlit, frontRatio, layerBands,
+      ]),
+    }),
+    [decoded, subject, resolution, depthScale, smoothing, invertRelief, unlit, frontRatio, layerBands],
+  );
+  const latestRevisionRef = useRef(conversionRevision);
+  latestRevisionRef.current = conversionRevision;
+  /** 지금 화면에 있는 `result` 를 만든 지문. 결과가 없으면 null. */
+  const resultRevisionRef = useRef<typeof conversionRevision | null>(null);
+
   useEffect(() => {
     if (decoded === null) {
       setResult(null);
       setWarnings([]);
+      resultRevisionRef.current = null;
       return;
     }
     setBusy(true);
@@ -315,14 +337,17 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
           setResult(lifted.value);
           setWarnings(lifted.warnings);
           setLiftError(null);
+          resultRevisionRef.current = conversionRevision;
         } else {
           setResult(null);
           setWarnings([]);
           setLiftError(lifted.detail);
+          resultRevisionRef.current = null;
         }
       } catch (error) {
         setResult(null);
         setWarnings([]);
+        resultRevisionRef.current = null;
         setLiftError(
           error instanceof Error
             ? `변환 중 문제가 생겼습니다: ${error.message}`
@@ -335,7 +360,10 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     return () => {
       globalThis.clearTimeout(handle);
     };
-  }, [decoded, subject, resolution, depthScale, smoothing, invertRelief, unlit, frontRatio, layerBands]);
+  }, [
+    conversionRevision,
+    decoded, subject, resolution, depthScale, smoothing, invertRelief, unlit, frontRatio, layerBands,
+  ]);
 
   // 내보내기가 이미 만들어 둔 버퍼를 그대로 쓴다. 여기서 다시 만들면 슬라이더를 한 칸 옮길
   // 때마다 삼각형화와 법선 계산을 두 번씩 하게 된다.
@@ -378,6 +406,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
   const onSaveToLibrary = useCallback(async () => {
     const target = result;
     const targetRights = rightsDeclaration;
+    const targetRevision = resultRevisionRef.current;
     if (target === null) return;
     setLibrarySaving(true);
     setLibraryNotice(null);
@@ -386,7 +415,10 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
       // 불러와, 변환만 하고 나가는 사용자가 그 비용을 내지 않게 한다.
       const { saveStudioLift3dToBg3dLibrary } = await import("./studio-lift3d-library-handoff");
       const saved = await saveStudioLift3dToBg3dLibrary(target.glb, targetRights);
-      const staleModel = latestResultRef.current !== target;
+      // 입력 지문까지 본다. `result` 만 비교하면 디바운스 창 안에서 이전 결과가 그대로
+      // 남아 있어, 화면이 이미 다른 설정을 보여주는데도 "그대로" 로 읽힌다.
+      const staleModel = latestResultRef.current !== target
+        || latestRevisionRef.current !== targetRevision;
       const staleRights = !sameRights(latestRightsRef.current, targetRights);
       setLibraryNotice(saved.ok
         ? staleModel || staleRights
