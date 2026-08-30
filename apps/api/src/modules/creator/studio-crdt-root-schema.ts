@@ -351,7 +351,7 @@ const STUDIO_CRDT_SCENE_KEYS_BY_TYPE = {
     "strokeWidth", "letterSpacing", "lineHeight", "vertical", "align", "fontStyle",
     "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY", "shadowOpacity",
     "fillType", "gradientColorStart", "gradientColorEnd", "gradientDirection", "gradient",
-    "textPath", "skewX", "skewY",
+    "textPath", "skewX", "skewY", "stickyNotePresetId", "stickyNoteFill",
   ]),
   bubble: new Set([
     ...STUDIO_CRDT_COMMON_SCENE_KEYS,
@@ -1367,7 +1367,12 @@ function validateSceneElementRoot(id: string, record: Y.Map<unknown>): boolean {
     if (key in props && typeof props[key] !== "boolean") return false;
   }
   if ("text" in props && !boundedString(props.text, STUDIO_CRDT_JSON_MAX_STRING_LENGTH)) return false;
-  for (const key of ["fill", "textFill", "stroke", "variant", "direction"]) {
+  if ("stickyNotePresetId" in props && !boundedExactText(props.stickyNotePresetId, 160)) {
+    return false;
+  }
+  for (const key of [
+    "fill", "textFill", "stroke", "variant", "direction", "stickyNoteFill",
+  ]) {
     if (key in props && !boundedString(props[key], 512)) return false;
   }
   const enumValues: Readonly<Record<string, readonly string[]>> = {

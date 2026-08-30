@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { createStudioStickyNoteElement } from "../studio-sticky-note";
+
 import { StudioCrdtDocument, type StudioCrdtStrokeInput } from "./studio-crdt-document";
+import { studioCrdtElementToSceneElement } from "./studio-crdt-page-bridge";
 import {
   planStudioCrdtOrderMoves,
   publishStudioCrdtDrawGraphDiff,
@@ -86,6 +89,46 @@ function stroke(id: string, pageId = "page-a"): StudioCrdtStrokeInput {
 }
 
 describe("studio CRDT scene publisher", () => {
+  it("publishes sticky-note text metadata to every peer", () => {
+    const source = new StudioCrdtDocument();
+    const stickyNote: TestElement = {
+      ...createStudioStickyNoteElement({
+        id: "sticky-note",
+        x: 80,
+        y: 120,
+        presetId: "mint",
+        text: "공유 아이디어",
+      }),
+    };
+
+    const result = publishStudioCrdtSceneGraphDiff(
+      source,
+      [page("page-a")],
+      [page("page-a", [stickyNote])]
+    );
+
+    expect(result.sceneElementMutations).toBe(1);
+    expect(source.getSceneElement("sticky-note")?.payload.props).toMatchObject({
+      stickyNotePresetId: "mint",
+      stickyNoteFill: "#bbf7d0",
+    });
+
+    const peer = new StudioCrdtDocument(source.encodeStateAsUpdate());
+    const peerRecord = peer.getSceneElement("sticky-note");
+    expect(peerRecord?.payload.props).toMatchObject({
+      stickyNotePresetId: "mint",
+      stickyNoteFill: "#bbf7d0",
+    });
+    expect(studioCrdtElementToSceneElement(peerRecord!)).toMatchObject({
+      id: "sticky-note",
+      type: "text",
+      stickyNotePresetId: "mint",
+      stickyNoteFill: "#bbf7d0",
+    });
+    peer.destroy();
+    source.destroy();
+  });
+
   it("plans minimum tail-to-head moves while retaining an LIS", () => {
     expect(planStudioCrdtOrderMoves(["a", "b", "c"], ["b", "c", "a"]))
       .toEqual([{ id: "a", beforeId: null }]);

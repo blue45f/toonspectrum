@@ -280,6 +280,10 @@ export interface TextEl {
   rubySpans?: readonly StudioDialogueRubySpan[];
   /** Optional range-local typography retained independently of the base text style. */
   rangeFormats?: readonly StudioDialogueRangeFormat[];
+  /** Forward-compatible sticky-note identity carried through project and realtime documents. */
+  stickyNotePresetId?: string;
+  /** Sticky-card presentation colour; absent on ordinary text elements. */
+  stickyNoteFill?: string;
   skewX?: number; // 가로 기울임(도, -60..60) — studio-skew 직렬화 규약. 미설정=0.
   skewY?: number; // 세로 기울임(도) — studio-skew 직렬화 규약. 미설정=0.
 }
