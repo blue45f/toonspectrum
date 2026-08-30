@@ -105,3 +105,6 @@ crates/*/target/
 /.continue/
 /.omo/
 
+
+# tsc --generateTrace output (pnpm run typecheck:trace); regenerated, never committed
+/.tstrace/

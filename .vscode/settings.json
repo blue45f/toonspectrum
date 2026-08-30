@@ -1,0 +1,41 @@
+{
+  // This repository has no root Cargo.toml, and must not grow one: a root
+  // `[workspace]` manifest would pull `crates/vendor/wgpu-toon` (the pinned
+  // wgpu 29.0.4 fork behind `[patch.crates-io]`) and `packages/studio-hokusai-wasm`
+  // (the `=0.3.0` hokusai pins) into a single dependency-resolution graph, which
+  // is exactly what `crates/vendor/wgpu-toon/UPSTREAM.sha256` and
+  // `tests/vendor_patch_parity.rs` exist to keep frozen.
+  //
+  // Without a manifest at the root, rust-analyzer's project discovery
+  // (`ProjectManifest::discover_single`) fails with `Error: no projects`, the
+  // server comes up with an empty workspace, and every hover/goto/completion
+  // silently returns nothing — the process just sits at a flat RSS and 0% CPU.
+  //
+  // `linkedProjects` is the supported way to hand rust-analyzer the manifests
+  // explicitly instead. Each entry is its own single-crate cargo workspace.
+  // See docs/rust-analyzer-workspace-setup.md.
+  "rust-analyzer.linkedProjects": [
+    "crates/studio-engine-vello/Cargo.toml",
+    "packages/studio-hokusai-wasm/Cargo.toml"
+  ],
+
+  // `crates/vendor/wgpu-toon` is intentionally NOT linked: it is already indexed
+  // as the `[patch.crates-io]` path dependency of studio-engine-vello, so goto and
+  // hover resolve into it. Linking it as a third workspace loads all of wgpu a
+  // second time (~1GB extra RSS) and yields duplicate symbols. Add it here only
+  // while editing the six vendored patch hunks and you need live diagnostics
+  // inside the fork itself.
+
+  // The vello crate pulls ~2.9M lines of dependencies. Proc-macro and build-script
+  // support keeps wasm-bindgen/serde derive expansion resolvable rather than
+  // degrading those types to `{unknown}`.
+  "rust-analyzer.procMacro.enable": true,
+  "rust-analyzer.cargo.buildScripts.enable": true,
+
+  // Default features only. `fabric`/`gpu`/`lottie`/`svg` are build-track features
+  // (see the Cargo.toml header); enabling them here would make the editor disagree
+  // with what `cargo test` actually compiles on track A.
+  "rust-analyzer.cargo.features": [],
+
+  "rust-analyzer.check.command": "clippy"
+}
