@@ -527,7 +527,13 @@ describe("Studio Lift 3D 메시 빌더", () => {
     const mask = extractStudioLift3dMask(grid, { mode: "alpha" });
     const depth = buildStudioLift3dDepthField(mask, grid, { profile: "round", smoothing: 0 });
 
-    for (const layerBands of [Number.NaN, Number.POSITIVE_INFINITY, 0]) {
+    for (const layerBands of [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      0,
+      // 위쪽 한도도 같다. 조용히 조이면 요청한 층 수와 다른 결과가 성공으로 나간다.
+      STUDIO_LIFT3D_MAX_DEPTH_BANDS + 1,
+    ]) {
       const built = buildStudioLift3dGeometry(mask, depth, {
         mode: "parallax",
         depthScale: 0.3,

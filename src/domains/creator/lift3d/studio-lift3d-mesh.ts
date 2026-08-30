@@ -31,6 +31,7 @@ import {
   type StudioLift3dWarning,
 } from "./studio-lift3d-contract";
 import {
+  STUDIO_LIFT3D_MAX_DEPTH_BANDS,
   buildStudioLift3dDepthBands,
   clampStudioLift3dBandCount,
 } from "./studio-lift3d-depth";
@@ -437,9 +438,17 @@ export function buildStudioLift3dGeometry(
   // 이 함수는 파이프라인을 거치지 않고도 불릴 수 있다. clampStudioLift3dBandCount 는 비유한 값을
   // 조용히 1 로 떨어뜨리므로, 여기서 걸러내지 않으면 "카드 한 장짜리 시차 레이어" 라는 앞뒤 안
   // 맞는 결과가 parallax 로 성공해 버린다. 다른 수치 옵션과 같은 자리에서 같은 방식으로 막는다.
+  // 위쪽 한도도 같이 본다. planStudioLift3dShellGrids 가 조용히 조이면 요청한 층 수와 다른
+  // 결과가 성공으로 나가는데, 이 경계에는 파이프라인 같은 경고 통로를 두지 않는다 —
+  // frontRatio 가 범위를 벗어날 때와 같이 거절하는 것이 이 함수의 규칙이다.
   if (options.layerBands !== undefined
-    && (!Number.isFinite(options.layerBands) || options.layerBands < 1)) {
-    return studioLift3dFailure("invalid-option", "layerBands 는 1 이상의 유한한 값이어야 합니다");
+    && (!Number.isFinite(options.layerBands)
+      || options.layerBands < 1
+      || options.layerBands > STUDIO_LIFT3D_MAX_DEPTH_BANDS)) {
+    return studioLift3dFailure(
+      "invalid-option",
+      `layerBands 는 1~${STUDIO_LIFT3D_MAX_DEPTH_BANDS} 사이의 유한한 값이어야 합니다`,
+    );
   }
   if (estimatedVertexBudget(mask) > STUDIO_EDITABLE_MESH_LIMITS.maxVertices) {
     return studioLift3dFailure("budget-exceeded", "해상도를 낮춰 주세요(정점 예산 초과)");

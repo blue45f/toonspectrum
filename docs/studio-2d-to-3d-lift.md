@@ -224,7 +224,9 @@ GLB 의 `rights-conflict` 가 이미 등록될 수 있는 새 모델 옆에 그�
 - 시차 레이어 수: 1~24(`STUDIO_LIFT3D_MAX_DEPTH_BANDS`). 위상과 해상도를 고르기 **전에 한 번**
   조인다. 원값을 그대로 쓰면 24 를 넘는 요청이 해상도 상한만 쓸데없이 깎고, `Number.MAX_VALUE`
   근처에서는 상한 공식의 4B² 가 Infinity 로 넘쳐 NaN 이 되어 상한 자체가 무시된다.
-  조여지면 `layer-bands-clamped` 경고로 알린다
+  조여지면 `layer-bands-clamped` 경고로 알린다. `buildStudioLift3dGeometry` 를 직접 부르는
+  경로에는 그 경고 통로가 없으므로, 거기서는 범위를 벗어난 값을 조이지 않고 `invalid-option`
+  으로 **거절한다** — `frontRatio` 등 다른 수치 옵션과 같은 규칙이다
 - 시차 레이어의 작업 격자: 위 상한을 밴드 수 B 로 다시 깎는다
   (`maxStudioLift3dResolutionForLayers`). 레이어는 껍질을 통째로 한 벌씩 더 만들므로
   8(n−1)² + 16(n−1)B 코너가 들고, 밴드가 가로 띠가 아니라 동심 고리로 잘릴 때를 감안해 밴드 항에
