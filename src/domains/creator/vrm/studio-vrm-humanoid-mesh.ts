@@ -28,6 +28,7 @@ import { hexToRgb, hslToRgb, rgbToHsl } from "./studio-vrm-costume";
 import {
   buildStudioVrmHairRig,
   shapeStudioVrmHairRig,
+  STUDIO_VRM_HAIR_ANCHOR_JOINT,
   studioVrmHairStrandSpine,
   type StudioVrmHairChain,
   type StudioVrmHairRig,
@@ -1418,21 +1419,28 @@ function pushOutsideSkull(
 }
 
 /**
- * 정점을 체인 조인트에 배분한다. `t` 0(뿌리·위) → 1(끝·아래).
+ * 정점을 체인 조인트에 배분한다. `t` 0(뿌리·위) → 1(끝·아래). 이웃한 두 마디에만 실어
+ * 선형 보간한다.
  *
- * 이웃한 두 마디에만 실어 선형 보간한다 — 뿌리 링은 체인의 첫 조인트에 100% 실리는데,
- * 그 조인트는 흔들리지 않는 루트라 두피에 붙은 것과 같아진다.
+ * **뿌리 쪽은 체인의 첫 조인트가 아니라 고정 앵커에 싣는다.** VRM 스프링에서 체인의 첫
+ * 항목은 "움직이지 않는 루트"가 아니다 — three-vrm 은 (본, 자식) 쌍마다 조인트를 만들어
+ * **첫 본의 회전도 시뮬레이션한다**. 거기에 부착 링을 100% 실으면 링이 축을 중심으로
+ * 함께 돌아 두피에서 어긋난다. 앵커는 어떤 스프링에도 들어가지 않으므로 머리만 따라간다.
  */
 function hairChainSkin(chain: StudioVrmHairChain, jointBase: number, t: number): MeshSkinBinding {
   const span = chain.joints.length - 1;
   const position = meshClamp(t, 0, 1) * span;
   const lower = Math.min(span - 1, Math.floor(position));
   const blend = position - lower;
-  const first = jointBase + chain.jointOffset + lower;
+  const stop = (index: number): number =>
+    index === 0
+      ? jointBase + STUDIO_VRM_HAIR_ANCHOR_JOINT
+      : jointBase + chain.jointOffset + index;
+  const first = stop(lower);
   if (blend <= 0) return [[first, 1]];
   return [
     [first, 1 - blend],
-    [first + 1, blend],
+    [stop(lower + 1), blend],
   ];
 }
 

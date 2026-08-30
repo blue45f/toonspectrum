@@ -309,6 +309,8 @@ export function buildStudioVrmHairRig(
   const braidSegments = new Map<string, StudioVrmHairPartInput[]>();
   const ties = new Map<string, StudioVrmHairPartInput>();
   const singles: StudioVrmHairPartInput[] = [];
+  /** 체인을 만들지 않고 고정 앵커에 묶을 파츠. */
+  const anchoredParts: StudioVrmHairPartInput[] = [];
   for (const input of parts) {
     const match = BRAID_SEGMENT_ID.exec(input.part.id);
     if (match !== null && input.part.role === "braid") {
@@ -319,6 +321,14 @@ export function buildStudioVrmHairRig(
     }
     if (input.part.id.endsWith("-tie")) {
       ties.set(input.part.id.slice(0, -"-tie".length), input);
+      continue;
+    }
+    // 묶음 부착부(`<prefix>-root`)는 매듭이다 — 아래 가닥이 자기 체인을 갖고, 이 구는
+    // 그 뿌리를 두피에 고정하는 역할이다. 낙차만 보고 덩어리 체인으로 만들면 매듭이
+    // 시트처럼 늘어지고 흔들린다(포니테일 `tailHeight 0` · `volume 1.45` 에서 낙차
+    // 0.063m 로 문턱 0.06m 를 겨우 넘겨 걸렸다).
+    if (input.part.id.endsWith("-root")) {
+      anchoredParts.push(input);
       continue;
     }
     singles.push(input);
@@ -384,7 +394,7 @@ export function buildStudioVrmHairRig(
     }
   }
 
-  // 체인에 들어가지 않은 파츠(캡·정수리 번·짧은 덩어리)는 고정 앵커에 묶는다.
+  // 체인에 들어가지 않은 파츠(캡·정수리 번·짧은 덩어리·묶음 부착부)는 고정 앵커에 묶는다.
   for (const input of parts) {
     if (!bindings.has(input.part.id)) {
       bindings.set(input.part.id, { kind: "rigid", jointOffset: STUDIO_VRM_HAIR_ANCHOR_JOINT });

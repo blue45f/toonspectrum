@@ -719,4 +719,44 @@ describe("studio VRM humanoid mesh", () => {
     expect(small.chain.dragForce).toBeGreaterThan(big.chain.dragForce);
     expect(big.chain.gravityPower).toBeGreaterThan(small.chain.gravityPower);
   });
+
+  it("never binds hair to a chain's first joint, which the spring runtime rotates", () => {
+    // VRM 스프링에서 체인의 첫 항목은 "움직이지 않는 루트"가 아니다 — three-vrm 은
+    // (본, 자식) 쌍마다 조인트를 만들어 첫 본의 회전도 시뮬레이션한다. 거기에 부착 링을
+    // 실으면 링이 축을 중심으로 함께 돌아 두피에서 어긋난다(natural-short 60 정점).
+    for (const preset of AVATAR_FORGE_PRESETS.slice(0, 6)) {
+      const built = buildStudioVrmHumanoidMesh(preset.state);
+      const hairPart = built.parts.find((part) => part.nodeName === "Hair");
+      const hairRig = built.hairRig;
+      if (!hairPart || !hairRig) continue;
+      const jointBase = built.rig.bones.length;
+      const chainRoots = new Set(hairRig.chains.map((chain) => jointBase + chain.jointOffset));
+
+      let onChainRoot = 0;
+      for (const primitive of hairPart.primitives) {
+        const joints = numbers(primitive.joints);
+        const weights = numbers(primitive.weights);
+        for (let slot = 0; slot < joints.length; slot += 1) {
+          if (weights[slot] > 0 && chainRoots.has(joints[slot])) onChainRoot += 1;
+        }
+      }
+      expect(onChainRoot, `${preset.id}: 시뮬레이션되는 체인 첫 조인트에 정점이 실렸다`).toBe(0);
+    }
+  });
+
+  it("anchors ponytail attachment spheres instead of turning them into blob chains", () => {
+    // 낙차만 보고 분류하면 부착부가 걸린다 — `tailHeight 0` · `volume 1.45` 에서
+    // `pony-root` 의 낙차가 0.063m 로 문턱 0.06m 를 겨우 넘겨, 매듭이 시트처럼 늘어졌다.
+    const base = createAvatarForgeState("action-pony");
+    for (const hair of [{}, { tailHeight: 0, volume: 1.45 }, { tailHeight: 0, volume: 1.5 }]) {
+      const state = sanitizeAvatarForgeState({ ...base, hair: { ...base.hair, ...hair } });
+      const hairRig = buildStudioVrmHumanoidMesh(state).hairRig;
+      if (!hairRig) throw new Error("expected a hair rig");
+      for (const part of buildAvatarForgeHairParts(state)) {
+        if (!part.id.endsWith("-root") && !part.id.endsWith("-tie")) continue;
+        const binding = hairRig.bindings.get(part.id);
+        expect(binding?.kind, `${JSON.stringify(hair)}: ${part.id}`).toBe("rigid");
+      }
+    }
+  });
 });
