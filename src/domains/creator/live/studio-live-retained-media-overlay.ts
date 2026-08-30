@@ -206,17 +206,22 @@ function oilDabPoints(
 }
 
 /**
- * Source samples a capped oil bed must gain before the live preview rebuilds it.
+ * How much of the pointer's own time a capped oil bed may spend rebuilding itself.
  *
  * At `FX_OIL_DAB_CAP` the bed stops growing and starts redistributing: `sampleStations` refits a
- * fixed 4096-station lattice across the whole arc, so every station shifts slightly on every new
- * sample and a faithful preview would replan the entire bed per pointer move (~35-55 ms measured,
- * carrier-dominated). That is why the overlay used to stop repainting a capped stroke entirely —
- * but a frozen preview is worse than a coalesced one: the stroke simply stopped following the
- * cursor. Rebuilding once per this many samples keeps it live at roughly a millisecond per move
- * amortised, and the shift being coalesced is sub-pixel per sample at this bed size.
+ * fixed 4096-station lattice across the whole arc, so every append rebuilds the whole bed. That is
+ * why the overlay used to stop repainting a capped stroke — but the same refit pins the LAST
+ * station to the last source point, so freezing froze the stroke's tip on screen and detached it
+ * from the cursor for the rest of the drag.
+ *
+ * A fixed sample stride cannot bound that: how far the tip falls behind depends on how fast the
+ * cursor is moving and how long the rebuild takes on this machine, neither of which a constant
+ * knows. The bound is therefore the rebuild's OWN measured cost — after a repaint that took `t`,
+ * the next one waits `t * (DIVISOR - 1)`, so the bed never occupies more than `1 / DIVISOR` of the
+ * pointer's time no matter what it costs here. A fast machine repaints often and stays glued to
+ * the cursor; a slow one repaints less but still follows it, and neither can be starved.
  */
-const OIL_CAP_REPAINT_SAMPLE_STRIDE = 32;
+const OIL_CAP_REPAINT_DUTY_DIVISOR = 3;
 
 interface ActiveRetainedStroke {
   readonly id: string;
@@ -240,6 +245,16 @@ interface ActiveRetainedStroke {
    * bed is planned rather than after.
    */
   paintedOilSourceSamples: number;
+  /**
+   * Last source point the painted bed ended on. The sample count alone cannot see an authoritative
+   * draft that REPLACES a predicted tail with the same number of samples, and leaving that on
+   * screen strands retracted pixels.
+   */
+  paintedOilTailX: number;
+  paintedOilTailY: number;
+  /** Wall clock and duration of the last capped repaint, for the duty budget above. */
+  lastOilCapRepaintAt: number;
+  lastOilCapRepaintMs: number;
   paintedPencilMarks: number;
   paintedSourceSegments: number;
   /**
@@ -297,6 +312,13 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   private settled: DrawEl[] = [];
   private settledHasPixels = false;
   private activePaintedOntoSettled = false;
+
+  /**
+   * Monotonic clock the capped-repaint budget reads. Injectable so the budget's timing is
+   * exercised deterministically rather than by how fast the machine running the tests happens
+   * to be.
+   */
+  constructor(private readonly now: () => number = () => performance.now()) {}
 
   attach(canvases: {
     readonly activeCanvas: HTMLCanvasElement;
@@ -369,6 +391,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedDabs: 0,
       paintedOilPasses: 0,
       paintedOilSourceSamples: -1,
+      paintedOilTailX: Number.NaN,
+      paintedOilTailY: Number.NaN,
+      lastOilCapRepaintAt: 0,
+      lastOilCapRepaintMs: 0,
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
       oilPlanner: kind === "oil" ? new FxOilDabPlanner() : null,
@@ -383,7 +409,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     return { status: "started", kind };
   }
 
-  appendFrom(element: DrawEl): StudioLiveRetainedMediaAppendResult {
+  appendFrom(
+    element: DrawEl,
+    /** Internal: pointer-up, so the capped-repaint budget must not defer this paint. */
+    finalize = false,
+  ): StudioLiveRetainedMediaAppendResult {
     const active = this.active;
     if (!active) return { status: "fallback", reason: "surface-unavailable" };
     if (element.id !== active.id || retainedKind(element) !== active.kind) {
@@ -395,7 +425,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     active.element = element;
     const before = active.paintedDabs + active.paintedOilPasses
       + active.paintedPencilMarks + active.paintedSourceSegments;
-    if (!this.paintSuffix(active, element, this.activeContext)) {
+    if (!this.paintSuffix(active, element, this.activeContext, finalize)) {
       return { status: "fallback", reason: "surface-unavailable" };
     }
     const after = active.paintedDabs + active.paintedOilPasses
@@ -415,6 +445,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedDabs: 0,
         paintedOilPasses: 0,
         paintedOilSourceSamples: -1,
+        paintedOilTailX: Number.NaN,
+        paintedOilTailY: Number.NaN,
+        lastOilCapRepaintAt: 0,
+        lastOilCapRepaintMs: 0,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -424,12 +458,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         return { status: "fallback" };
       }
     } else {
-      // Pointer-up seals whatever is on the active canvas into settled, so the final append must
-      // paint even when the stroke gained fewer samples than the capped-repaint stride. Clearing
-      // the painted-source mark reopens that guard for this one call; the dab-count guard below
-      // the cap still skips a genuinely unchanged bed.
-      this.active.paintedOilSourceSamples = -1;
-      const appended = this.appendFrom(element);
+      // Pointer-up seals whatever is on the active canvas into settled, so a capped bed that is
+      // still holding a deferred tail has to flush it here. It stays a normal append otherwise:
+      // a bed that already matches this element is still skipped rather than rebuilt for nothing.
+      const appended = this.appendFrom(element, true);
       if (appended.status === "fallback") return { status: "fallback" };
     }
     if (!this.activePaintedOntoSettled && !this.flattenActiveToSettled()) {
@@ -484,8 +516,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     active: ActiveRetainedStroke,
     element: DrawEl,
     target: CanvasRenderingContext2D | null,
+    /** Pointer-up. The active canvas is about to be sealed into settled, so nothing is deferred. */
+    finalize = false,
   ): boolean {
-    if (active.kind === "oil") return this.paintOilSuffix(active, element, target);
+    if (active.kind === "oil") return this.paintOilSuffix(active, element, target, finalize);
     if (active.kind === "pencil") return this.paintPencilSuffix(active, element, target);
     if (active.kind === "calligraphy") {
       return this.paintCalligraphySuffix(active, element, target);
@@ -498,6 +532,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     active: ActiveRetainedStroke,
     element: DrawEl,
     target: CanvasRenderingContext2D | null,
+    finalizeOil = false,
   ): boolean {
     const context = this.prepared(target);
     if (!context) return false;
@@ -505,27 +540,34 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       const flatPoints = flatFinitePoints(element);
       if (flatPoints.length === 0) return true;
       // Nothing new arrived, so there is nothing to plan. Checked on the source rather than on
-      // the dab count because the count saturates at the cap (see below), and checked here rather
-      // than after planning because a plan whose result is discarded is pure cost.
+      // the dab count — that count saturates at the cap and stops being evidence there — and
+      // checked here rather than after planning, because a plan whose result is discarded is
+      // pure cost.
       //
-      // Past the cap the same check also coalesces: a capped bed is a fixed-size resampling of
-      // the WHOLE arc, so a new sample nudges every station a little instead of extending the
-      // stroke, and rebuilding all 4096 dabs for one nudge blocks the pointer for tens of
-      // milliseconds. Redrawing once per `OIL_CAP_REPAINT_SAMPLE_STRIDE` samples keeps the preview
-      // following the cursor at a bounded amortised cost — the alternative this replaces was to
-      // stop repainting altogether, which left a long oil stroke frozen on screen for the rest of
-      // the drag.
-      // `flatPoints` is interleaved `[x, y, ...]`, so the stride has to be applied to the pair
-      // count or it fires twice as often as it reads.
+      // The tail point is part of the test: an authoritative draft can replace a predicted one
+      // with the SAME sample count, and skipping that would strand the retracted pixels.
       const sourceSamples = flatPoints.length / 2;
-      const grownSamples = sourceSamples - active.paintedOilSourceSamples;
-      const capReached = active.paintedDabs >= FX_OIL_DAB_CAP;
+      const tailX = flatPoints[flatPoints.length - 2] ?? Number.NaN;
+      const tailY = flatPoints[flatPoints.length - 1] ?? Number.NaN;
+      const unchanged = sourceSamples === active.paintedOilSourceSamples
+        && Object.is(tailX, active.paintedOilTailX)
+        && Object.is(tailY, active.paintedOilTailY);
+      if (target === this.activeContext && unchanged) return true;
+
+      // Past the cap every append rebuilds all 4096 dabs, so the bed is held to a share of the
+      // pointer's time (see `OIL_CAP_REPAINT_DUTY_DIVISOR`). `finalizeOil` is pointer-up, which
+      // seals the active canvas into settled and so must never be deferred.
+      const now = this.now();
       if (
         target === this.activeContext
-        && grownSamples < (capReached ? OIL_CAP_REPAINT_SAMPLE_STRIDE : 1)
+        && !finalizeOil
+        && active.paintedDabs >= FX_OIL_DAB_CAP
+        && now - active.lastOilCapRepaintAt
+          < active.lastOilCapRepaintMs * (OIL_CAP_REPAINT_DUTY_DIVISOR - 1)
       ) {
         return true;
       }
+
       const brush = element.brush ?? "oil";
       const planInput = {
         points: flatPoints,
@@ -594,6 +636,12 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       if (target === this.activeContext) {
         active.paintedOilPasses += 1;
         active.paintedOilSourceSamples = sourceSamples;
+        active.paintedOilTailX = tailX;
+        active.paintedOilTailY = tailY;
+        if (dabs.length >= FX_OIL_DAB_CAP) {
+          active.lastOilCapRepaintMs = this.now() - now;
+          active.lastOilCapRepaintAt = now;
+        }
       }
       if (target === this.settledContext) this.settledHasPixels = true;
       return true;
@@ -986,6 +1034,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedDabs: 0,
         paintedOilPasses: 0,
         paintedOilSourceSamples: -1,
+        paintedOilTailX: Number.NaN,
+        paintedOilTailY: Number.NaN,
+        lastOilCapRepaintAt: 0,
+        lastOilCapRepaintMs: 0,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -1008,6 +1060,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedDabs: 0,
         paintedOilPasses: 0,
         paintedOilSourceSamples: -1,
+        paintedOilTailX: Number.NaN,
+        paintedOilTailY: Number.NaN,
+        lastOilCapRepaintAt: 0,
+        lastOilCapRepaintMs: 0,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -1020,6 +1076,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedDabs: 0,
       paintedOilPasses: 0,
       paintedOilSourceSamples: -1,
+      paintedOilTailX: Number.NaN,
+      paintedOilTailY: Number.NaN,
+      lastOilCapRepaintAt: 0,
+      lastOilCapRepaintMs: 0,
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
     };

@@ -81,7 +81,16 @@ function mockCanvas(width = 256, height = 128) {
 }
 
 function attachedRenderer() {
-  const renderer = new StudioLiveRetainedMediaOverlayRenderer();
+  // A clock the test drives: `tick` is what the renderer reads, and it only advances when a test
+  // says so, so the capped-repaint budget is exercised exactly rather than by machine speed.
+  // `stepMs` is how much the clock advances per read, which is how a test gives a repaint a
+  // measurable cost without depending on how fast this machine actually is.
+  const clock = { nowMs: 0, stepMs: 0 };
+  const renderer = new StudioLiveRetainedMediaOverlayRenderer(() => {
+    const reading = clock.nowMs;
+    clock.nowMs += clock.stepMs;
+    return reading;
+  });
   const active = mockCanvas();
   const settled = mockCanvas();
   renderer.attach({ activeCanvas: active.canvas, settledCanvas: settled.canvas });
@@ -95,7 +104,7 @@ function attachedRenderer() {
     flipX: false,
   };
   renderer.setSurface(surface);
-  return { renderer, active };
+  return { renderer, active, clock };
 }
 
 describe("studioLiveRetainedMediaOverlaySupportsElement", () => {
@@ -281,53 +290,64 @@ describe("oil live preview past the dab cap", () => {
     expect(after).toBeGreaterThan(before);
   });
 
-  it("coalesces capped repaints rather than rebuilding 4096 dabs per sample", () => {
-    // A capped bed redistributes rather than grows, so one new sample shifts every station by a
-    // sub-pixel amount. Replanning the whole bed for that blocks the pointer; skipping forever
-    // freezes the stroke. The overlay waits for a batch of samples and then rebuilds.
-    const { renderer, active } = attachedRenderer();
-    const base = longOilStroke("oil-cap-coalesce", 3000);
+  it("defers a capped repaint in proportion to what the last one cost", () => {
+    // A fixed sample stride cannot bound how far the tip falls behind — that depends on cursor
+    // speed and on how slow the rebuild is here. The budget is the rebuild's own measured cost, so
+    // an expensive repaint buys a proportional pause and the bed can never monopolise the pointer.
+    const { renderer, active, clock } = attachedRenderer();
+    const base = longOilStroke("oil-cap-duty", 3000);
     expect(renderer.begin(base).status).toBe("started");
-    renderer.appendFrom(base);
 
-    const afterFirst = active.stats().strokeCalls;
-    // A handful of samples is not yet worth a full rebuild.
-    expect(renderer.appendFrom(longOilStroke("oil-cap-coalesce", 3004)).status).toBe("noop");
-    expect(active.stats().strokeCalls).toBe(afterFirst);
+    // Charge this capped repaint 15ms: the clock moves that much between the two readings the
+    // renderer takes around the paint.
+    const beforeExpensive = active.stats().strokeCalls;
+    clock.nowMs = 1_000;
+    clock.stepMs = 15;
+    expect(renderer.appendFrom(longOilStroke("oil-cap-duty", 3040)).status).toBe("appended");
+    expect(active.stats().strokeCalls).toBeGreaterThan(beforeExpensive);
+    const afterExpensive = active.stats().strokeCalls;
+    clock.stepMs = 0;
 
-    // A batch of them is.
-    expect(renderer.appendFrom(longOilStroke("oil-cap-coalesce", 3064)).status)
-      .toBe("appended");
-    expect(active.stats().strokeCalls).toBeGreaterThan(afterFirst);
+    // 15ms cost buys a 30ms pause (duty 1/3), so an append 20ms later still waits.
+    clock.nowMs = 1_020;
+    expect(renderer.appendFrom(longOilStroke("oil-cap-duty", 3080)).status).toBe("noop");
+    expect(active.stats().strokeCalls).toBe(afterExpensive);
+
+    // Once it is paid off the bed rebuilds again.
+    clock.nowMs = 1_040;
+    expect(renderer.appendFrom(longOilStroke("oil-cap-duty", 3120)).status).toBe("appended");
+    expect(active.stats().strokeCalls).toBeGreaterThan(afterExpensive);
   });
 
-  it("applies the stride to samples, not to interleaved coordinates", () => {
-    // `flatFinitePoints` returns `[x, y, ...]`, so comparing its length against a sample stride
-    // fires after half as many samples as the constant reads. 20 samples is under the stride and
-    // must still coalesce; it is over half of it, which is what a coordinate-counting guard would
-    // have repainted on.
+  it("repaints an authoritative draft that replaces a predicted tail of the same length", () => {
+    // The prediction path can hand the overlay a same-length draft whose tail was retracted.
+    // Counting samples alone would call that "nothing new" and strand the predicted pixels.
     const { renderer, active } = attachedRenderer();
-    const base = longOilStroke("oil-cap-units", 3000);
-    expect(renderer.begin(base).status).toBe("started");
-    renderer.appendFrom(base);
+    const predicted = longOilStroke("oil-cap-predict", 3000);
+    expect(renderer.begin(predicted).status).toBe("started");
+    renderer.appendFrom(predicted);
 
-    const afterFirst = active.stats().strokeCalls;
-    expect(renderer.appendFrom(longOilStroke("oil-cap-units", 3020)).status).toBe("noop");
-    expect(active.stats().strokeCalls).toBe(afterFirst);
+    const before = active.stats().strokeCalls;
+    const authoritative = drawElement("oil-cap-predict", "oil", [
+      ...predicted.points.slice(0, predicted.points.length - 2),
+      predicted.points[predicted.points.length - 2]! + 40,
+      predicted.points[predicted.points.length - 1]! - 25,
+    ]);
+    expect(renderer.appendFrom(authoritative).status).toBe("appended");
+    expect(active.stats().strokeCalls).toBeGreaterThan(before);
   });
 
-  it("seals the final tail on end() even when the stroke is mid-stride", () => {
-    // `end()` flattens the active canvas into settled, so a coalesced final append would settle a
-    // bed that is missing the last samples and still carries the previous lattice.
+  it("does not rebuild a capped bed on end() when it already matches the element", () => {
+    // Pointer-up must flush a deferred tail, but a bed that is already up to date must not be
+    // rebuilt for nothing — that would put the full refit back on the pointer-up frame.
     const { renderer, active } = attachedRenderer();
-    const base = longOilStroke("oil-cap-end", 3000);
-    expect(renderer.begin(base).status).toBe("started");
-    renderer.appendFrom(base);
+    const stroke = longOilStroke("oil-cap-end-noop", 3000);
+    expect(renderer.begin(stroke).status).toBe("started");
+    renderer.appendFrom(stroke);
 
-    const afterFirst = active.stats().strokeCalls;
-    const finished = longOilStroke("oil-cap-end", 3008);
-    expect(renderer.end(finished).status).toBe("settled");
-    expect(active.stats().strokeCalls).toBeGreaterThan(afterFirst);
+    const before = active.stats().strokeCalls;
+    expect(renderer.end(stroke).status).toBe("settled");
+    expect(active.stats().strokeCalls).toBe(before);
   });
 
   it("still skips a capped append that brought no new samples", () => {
