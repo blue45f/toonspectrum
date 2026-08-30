@@ -20,6 +20,7 @@ import {
   studioOilRibbonProgramsFromSet,
   type StudioBrushOilProgramSet,
 } from "./studio-brush-engine-program-set";
+import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./studio-brush-symmetry";
 import {
   planStudioOilBristleLoadDynamics,
   type StudioOilBristleLoadDynamicsPlan,
@@ -313,7 +314,30 @@ function weightedMovingAverage(
   return totalWeight > 0 ? weighted / totalWeight : values[index] ?? 0;
 }
 
+/**
+ * Widest smoothing radius any channel below reads, so an entry is settled once its whole window
+ * lies inside the verified dab prefix. Keep in step with the `weightedMovingAverage` radii.
+ */
+const OIL_GEOMETRY_SMOOTHING_RADIUS = 6;
+
 function smoothGeometry(dabs: readonly FxOilDab[]): readonly SmoothedOilCarrierGeometry[] {
+  return smoothGeometryFrom(dabs, [], 0);
+}
+
+/**
+ * Smoothed geometry for `dabs`, keeping the first `settled` entries of `cached`.
+ *
+ * A caller may only pass a non-zero `settled` once it has proven that `dabs` shares a byte-equal
+ * prefix with the array `cached` was built from AND that `settled + OIL_GEOMETRY_SMOOTHING_RADIUS`
+ * still lands inside it: every kept entry then read the same window, with the same edge clamps, as
+ * it would on a full rebuild. The raw channel arrays are refilled whole — four typed-array writes
+ * per dab, against thirteen multiply-adds per channel in the window walk this skips.
+ */
+function smoothGeometryFrom(
+  dabs: readonly FxOilDab[],
+  cached: readonly SmoothedOilCarrierGeometry[],
+  settled: number,
+): readonly SmoothedOilCarrierGeometry[] {
   const len = dabs.length;
   const xs = new Float64Array(len);
   const ys = new Float64Array(len);
@@ -326,8 +350,10 @@ function smoothGeometry(dabs: readonly FxOilDab[]): readonly SmoothedOilCarrierG
     radiusXs[i] = dab.radiusX;
     radiusYs[i] = dab.radiusY;
   }
+  const from = Math.max(0, Math.min(settled, len, cached.length));
   const result: SmoothedOilCarrierGeometry[] = new Array(len);
-  for (let index = 0; index < len; index += 1) {
+  for (let index = 0; index < from; index += 1) result[index] = cached[index]!;
+  for (let index = from; index < len; index += 1) {
     const dab = dabs[index]!;
     result[index] = Object.freeze({
       // Normal-offset jitter belonged to the old overlapping-dab texture. Smooth it out of the
@@ -367,8 +393,24 @@ function tangentAt(
 }
 
 function collectStations(dabs: readonly FxOilDab[]): readonly OilCarrierStation[] {
-  const geometry = smoothGeometry(dabs);
+  return collectStationsFrom(dabs, smoothGeometry(dabs), [], 0);
+}
+
+/**
+ * Stations for `geometry`, keeping the first `settled` entries of `cached`.
+ *
+ * `tangentAt` reads ±2 neighbours, so a station is settled two entries behind the settled
+ * geometry; the caller owns that arithmetic (`StudioOilRibbonCarrierPlanner`).
+ */
+function collectStationsFrom(
+  dabs: readonly FxOilDab[],
+  geometry: readonly SmoothedOilCarrierGeometry[],
+  cached: readonly OilCarrierStation[],
+  settled: number,
+): readonly OilCarrierStation[] {
+  const from = Math.max(0, Math.min(settled, dabs.length, cached.length));
   return Object.freeze(dabs.map((source, index) => {
+    if (index < from) return cached[index]!;
     const planned = geometry[index]!;
     const [tangentX, tangentY] = tangentAt(geometry, index, source.angleRad);
     return Object.freeze({
@@ -506,6 +548,20 @@ function variableWidthBody(stations: readonly OilCarrierStation[]): StudioOilRib
 function mean(values: readonly number[]): number {
   if (values.length === 0) return 0;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+/**
+ * `mean(items.map(select))` without the intermediate array.
+ *
+ * Bit-identical: the same values are added in the same left-to-right order onto the same zero.
+ * The carrier took these means once per width gauge and once per occupied load band on every
+ * pointer frame, each one allocating an array the length of its member list.
+ */
+function meanBy<TItem>(items: readonly TItem[], select: (item: TItem) => number): number {
+  if (items.length === 0) return 0;
+  let sum = 0;
+  for (const item of items) sum += select(item);
+  return sum / items.length;
 }
 
 /**
@@ -712,7 +768,7 @@ function widthGauges(planned: readonly PlannedBristleRun[]): readonly BristleWid
     else byHair.set(run.bristleIndex, [run]);
   }
   const hairs = [...byHair.values()]
-    .map((runs) => ({ runs, width: mean(runs.map(({ width }) => width)) }))
+    .map((runs) => ({ runs, width: meanBy(runs, (run) => run.width) }))
     .sort((left, right) => left.width - right.width);
   const gauges: BristleWidthGauge[] = [];
   const size = Math.ceil(hairs.length / STUDIO_OIL_BRISTLE_WIDTH_GAUGES);
@@ -720,7 +776,7 @@ function widthGauges(planned: readonly PlannedBristleRun[]): readonly BristleWid
     const group = hairs.slice(start, start + size);
     if (group.length === 0) continue;
     const runs = group.flatMap(({ runs: hairRuns }) => hairRuns);
-    gauges.push({ runs, lineWidth: mean(runs.map(({ width }) => width)) });
+    gauges.push({ runs, lineWidth: meanBy(runs, (run) => run.width) });
   }
   return gauges;
 }
@@ -789,15 +845,21 @@ function bandRunsAlongEachHair(
   return bandByRun;
 }
 
-/** One frozen, quantised path per run, memoised so the shells above it can share it. */
-function quantizedRun(
-  run: PlannedBristleRun,
-  cache: Map<PlannedBristleRun, StudioOilRibbonPath>,
-): StudioOilRibbonPath {
-  const cached = cache.get(run);
+/**
+ * One frozen, quantised path per run, memoised so the shells above it can share it.
+ *
+ * The memo is a module-level `WeakMap` rather than a per-call `Map` so it also spans pointer
+ * frames: a run object the incremental planner reused keeps the path it was already quantised
+ * into, and a run that is dropped takes its entry with it. `PlannedBristleRun` is immutable once
+ * emitted — the weld hands its buffer over and never writes to it again — so a hit is exact.
+ */
+const QUANTIZED_RUN_PATHS = new WeakMap<PlannedBristleRun, StudioOilRibbonPath>();
+
+function quantizedRun(run: PlannedBristleRun): StudioOilRibbonPath {
+  const cached = QUANTIZED_RUN_PATHS.get(run);
   if (cached) return cached;
   const frozen = Object.freeze({ points: quantizedPoints(run.points) });
-  cache.set(run, frozen);
+  QUANTIZED_RUN_PATHS.set(run, frozen);
   return frozen;
 }
 
@@ -866,14 +928,13 @@ function planFixedAnchorBristleLanes(
     if (group) group.push(run);
     else runsByKey.set(key, [run]);
   }
-  const quantizedByRun = new Map<PlannedBristleRun, StudioOilRibbonPath>();
   const lanes: StudioOilRibbonBristleLane[] = [];
   for (const key of [...runsByKey.keys()].sort((left, right) => left - right)) {
     const band = Math.floor(key / BRISTLE_V2_WIDTH_BUCKETS);
     const bucket = key % BRISTLE_V2_WIDTH_BUCKETS;
     lanes.push(Object.freeze({
       runs: Object.freeze(
-        weldRuns(runsByKey.get(key)!).map((run) => quantizedRun(run, quantizedByRun)),
+        weldRuns(runsByKey.get(key)!).map((run) => quantizedRun(run)),
       ),
       lineWidth: quantize((bucket + 0.5) * BRISTLE_V2_WIDTH_BUCKET),
       opacity: quantize(bandAnchorDeposit(band)),
@@ -883,21 +944,44 @@ function planFixedAnchorBristleLanes(
   return Object.freeze(lanes);
 }
 
-function planBristleLanes(
+/**
+ * Hairs the bed can carry — the shortest bristle list any station offers.
+ *
+ * Spread-free on purpose: `Math.min(...stations.map(...))` allocated a whole array and then pushed
+ * one argument per station onto the call stack, which a 4096-station bed paid on every pointer
+ * move. Same value, same order of comparison.
+ */
+function resolveBristleCount(stations: readonly OilCarrierStation[]): number {
+  let count = Number.POSITIVE_INFINITY;
+  for (const station of stations) {
+    const length = station.source.bristles.length;
+    if (length < count) count = length;
+  }
+  return count;
+}
+
+/**
+ * Every run one hair emits along the bed, in emission order.
+ *
+ * `reusable` names how many LEADING runs the caller has already proven unchanged and is handing
+ * back in `cached`; the walk then resumes at the first run past them. Run boundaries are a
+ * function of `bristleIndex` and the station index alone, and a run reads only the stations it
+ * spans, so a reused run is exactly the object the full walk would have built — see
+ * `StudioOilRibbonCarrierPlanner` for how a caller earns a non-zero `reusable`.
+ */
+function buildBristleRunsForHair(
   stations: readonly OilCarrierStation[],
-  dynamics?: StudioOilBristleLoadDynamicsPlan,
-  physics?: StudioBristlePhysicsOilPlan,
-  banding: "observed-span-v1" | "fixed-anchor-v2" = "observed-span-v1",
-): readonly StudioOilRibbonBristleLane[] {
-  if (stations.length < 2) return [];
-  const bristleCount = Math.min(
-    ...stations.map((station) => station.source.bristles.length),
-  );
-  const fixedAnchor = banding === "fixed-anchor-v2";
-  const planned: PlannedBristleRun[] = [];
-  let minimumLoad = Number.POSITIVE_INFINITY;
-  let maximumLoad = Number.NEGATIVE_INFINITY;
-  for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
+  bristleIndex: number,
+  dynamics: StudioOilBristleLoadDynamicsPlan | undefined,
+  physics: StudioBristlePhysicsOilPlan | undefined,
+  cached: readonly PlannedBristleRun[] = [],
+  reusable = 0,
+): PlannedBristleRun[] {
+  const emitted: PlannedBristleRun[] = reusable > 0
+    ? cached.slice(0, reusable)
+    : [];
+  let produced = 0;
+  {
     // Each hair cuts its runs on a different phase. A run carries ONE load, so a run boundary is a
     // hard tonal step; with every hair cutting at stations 0, 5, 10, … those steps lined up across
     // the whole ribbon and the bed rendered as a stack of rectangular blocks with seams running
@@ -915,6 +999,11 @@ function planBristleLanes(
       const runStart = Math.max(0, runOrigin);
       const runEnd = Math.min(stations.length - 1, runOrigin + BRISTLE_RUN_STATIONS);
       if (runEnd <= runStart) continue;
+      if (produced < reusable) {
+        // Same walk, same boundaries — this run is already sitting in `emitted`.
+        produced += 1;
+        continue;
+      }
       const points: number[] = [];
       for (let index = runStart; index <= runEnd; index += 1) {
         const station = stations[index]!;
@@ -971,20 +1060,40 @@ function planBristleLanes(
         );
         width *= physics.laneWidthScale[sampleIndex * physics.laneCount + bristleIndex]!;
       }
-      minimumLoad = Math.min(minimumLoad, load);
-      maximumLoad = Math.max(maximumLoad, load);
-      planned.push({ points, load, width, bristleIndex, runIndex });
+      emitted.push({ points, load, width, bristleIndex, runIndex });
+      produced += 1;
     }
   }
+  return emitted;
+}
+
+/**
+ * Bands, welds and shells a finished run bed into lanes.
+ *
+ * Split out of `planBristleLanes` so an incremental caller can hand over a run bed it assembled
+ * from a verified prefix. Everything from here down reads the WHOLE bed by design — the load span,
+ * the band means and the telescoping shell deltas are all stroke-global — so this stage always
+ * runs in full, and it is the one that decides tone. The saved work is upstream, in the geometry
+ * the runs carry.
+ */
+function planBristleLanesFromRuns(
+  planned: readonly PlannedBristleRun[],
+  banding: "observed-span-v1" | "fixed-anchor-v2",
+): readonly StudioOilRibbonBristleLane[] {
   if (planned.length === 0) return [];
 
-  if (fixedAnchor) {
+  if (banding === "fixed-anchor-v2") {
     return planFixedAnchorBristleLanes(planned);
   }
 
+  let minimumLoad = Number.POSITIVE_INFINITY;
+  let maximumLoad = Number.NEGATIVE_INFINITY;
+  for (const run of planned) {
+    minimumLoad = Math.min(minimumLoad, run.load);
+    maximumLoad = Math.max(maximumLoad, run.load);
+  }
   const span = maximumLoad - minimumLoad;
   const bandByRun = bandRunsAlongEachHair(planned, minimumLoad, span);
-  const quantizedByRun = new Map<PlannedBristleRun, StudioOilRibbonPath>();
   const lanes: StudioOilRibbonBristleLane[] = [];
   for (const gauge of widthGauges(planned)) {
     const bands: PlannedBristleRun[][] = Array.from(
@@ -1009,7 +1118,7 @@ function planBristleLanes(
       if (runs.length === 0) continue;
       const target = Math.max(
         previousTarget,
-        accumulatedOpacity(mean(runs.map(({ load }) => load)), BRISTLE_VIRTUAL_OVERLAPS),
+        accumulatedOpacity(meanBy(runs, (run) => run.load), BRISTLE_VIRTUAL_OVERLAPS),
       );
       occupied.push({ band, target, runs });
       previousTarget = target;
@@ -1062,7 +1171,7 @@ function planBristleLanes(
       const to = emitted[slot + 1]?.index ?? occupied.length;
       const own: StudioOilRibbonPath[] = [];
       for (let index = from; index < to; index += 1) {
-        for (const run of occupied[index]!.runs) own.push(quantizedRun(run, quantizedByRun));
+        for (const run of occupied[index]!.runs) own.push(quantizedRun(run));
       }
       const outer = shells[slot + 1];
       shells[slot] = outer ? own.concat(outer) : own;
@@ -1077,6 +1186,23 @@ function planBristleLanes(
     }
   }
   return Object.freeze(lanes);
+}
+
+function planBristleLanes(
+  stations: readonly OilCarrierStation[],
+  dynamics?: StudioOilBristleLoadDynamicsPlan,
+  physics?: StudioBristlePhysicsOilPlan,
+  banding: "observed-span-v1" | "fixed-anchor-v2" = "observed-span-v1",
+): readonly StudioOilRibbonBristleLane[] {
+  if (stations.length < 2) return [];
+  const bristleCount = resolveBristleCount(stations);
+  const planned: PlannedBristleRun[] = [];
+  for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
+    for (const run of buildBristleRunsForHair(stations, bristleIndex, dynamics, physics)) {
+      planned.push(run);
+    }
+  }
+  return planBristleLanesFromRuns(planned, banding);
 }
 
 /**
@@ -1101,9 +1227,7 @@ function planBristlePhysics(
   options: StudioOilRibbonCarrierBristlePhysicsOptions,
 ): StudioBristlePhysicsOilPlan | undefined {
   if (stations.length < 2) return undefined;
-  const laneCount = Math.min(
-    ...stations.map((station) => station.source.bristles.length),
-  );
+  const laneCount = resolveBristleCount(stations);
   if (laneCount <= 0) return undefined;
   const pressures = options.pressures && options.pressures.length > 0
     ? options.pressures
@@ -1114,7 +1238,10 @@ function planBristlePhysics(
     laneCount,
     seed: Math.floor(finite(options.seed, 0)),
     // Tuft rest half-width — the offset stream's normalization radius.
-    baseRadiusPx: mean(stations.map((station) => station.radiusY)),
+    // Stroke-global by design — and the reason a physics program's bristle runs are never reused
+    // across a pointer move: this normalization radius moves with every appended station, so the
+    // whole simulated bed legitimately differs. See `StudioOilRibbonCarrierPlanner`.
+    baseRadiusPx: meanBy(stations, (station) => station.radiusY),
     pressures,
     ...(options.speeds ? { speeds: options.speeds } : {}),
     ...(options.tiltX !== undefined ? { tiltX: options.tiltX } : {}),
@@ -1133,9 +1260,7 @@ function planLoadDynamics(
   options: StudioOilRibbonCarrierBristleLoadDynamicsOptions,
 ): StudioOilBristleLoadDynamicsPlan | undefined {
   if (stations.length < 2) return undefined;
-  const laneCount = Math.min(
-    ...stations.map((station) => station.source.bristles.length),
-  );
+  const laneCount = resolveBristleCount(stations);
   if (laneCount <= 0) return undefined;
   const pressures = options.pressures && options.pressures.length > 0
     ? options.pressures
@@ -1752,7 +1877,7 @@ function planImpastoReliefOverlayLanes(
         }))),
         // Width and opacity stay the bucket's means over its RUNS, not over the welded stripes:
         // welding is a geometry join and must not re-weight the tone by stripe length.
-        lineWidth: quantize(mean(entry.runs.map(({ width }) => width))),
+        lineWidth: quantize(meanBy(entry.runs, (run) => run.width)),
         opacity: quantize(mean(entry.opacities)),
         kind: entry.kind,
       });
@@ -1766,7 +1891,7 @@ export function planStudioOilRibbonCarrier(
 ): StudioOilRibbonCarrierPlan {
   const dabs = normalizedDabs(Array.isArray(inputDabs) ? inputDabs : []);
   const stations = collectStations(dabs);
-  const averageOpacity = mean(stations.map((station) => station.opacity));
+  const averageOpacity = meanStationOpacity(stations);
   const bodyOnly = options?.bodyOnly === true;
   const loadDynamicsOptions = options?.bristleLoadDynamics;
   const dynamics = !bodyOnly && loadDynamicsOptions?.enabled === true
@@ -1804,6 +1929,301 @@ export function planStudioOilRibbonCarrier(
     repeatedBodyStampCount: 0,
     ...(impastoReliefLanes ? { impastoReliefLanes } : {}),
   });
+}
+
+/**
+ * Growing-stroke carrier planner: the same plan `planStudioOilRibbonCarrier` returns, without
+ * rebuilding the parts of it that an append cannot have changed.
+ *
+ * ## Why the batch planner is the wrong shape for a live stroke
+ *
+ * A live oil stroke replans the whole carrier on every pointer frame. Measured on this tree at a
+ * 2906-dab bed that is ~17 ms per move, and at the 4096-dab cap ~28 ms — both past a 60 Hz frame
+ * on their own, before a single pixel is painted, and both paid again on the next move.
+ *
+ * ## What is settled, and why it is exactly settled
+ *
+ * The chain is `dabs → smoothed geometry → stations → bristle runs`, and every stage reads a
+ * BOUNDED window:
+ *   - `smoothGeometry` weights ±6 neighbours at most, and its first/last raw passthrough only
+ *     touches the two ends;
+ *   - `tangentAt` reads ±2 geometry entries;
+ *   - a bristle run reads only the stations it spans, plus the cap at index 0.
+ * So with a byte-equal dab prefix of `identical`, geometry is settled to `identical - 6` entries
+ * and stations to `identical - 8` — the N−8 settled prefix the 2026-08-22 carrier anatomy
+ * measured. A run is settled while its UNCLAMPED end index stays inside that station prefix,
+ * which also keeps it clear of the end cap the last station carries.
+ *
+ * The verification is object identity on the dab array, not a field compare: `FxOilDabPlanner`
+ * hands its own verified prefix back as the same `FxOilDab` objects, so identity is both the
+ * cheapest test available and strictly stronger than comparing the fields this planner reads.
+ * Anything it cannot prove is rebuilt, so a wrong reuse is not expressible.
+ *
+ * ## What is NOT settled, and stays a full pass
+ *
+ * Banding, band means and the telescoping shell deltas are stroke-global by design: the load span
+ * comes from the observed minimum and maximum, so one append can re-band every run. That stage
+ * therefore always runs in full (`planBristleLanesFromRuns`), and the plan this class returns is
+ * byte-identical to the batch planner's rather than an incremental approximation of it. Removing
+ * the global aggregation itself is the separate, tone-changing `fixed-anchor-v2` work
+ * (docs/perf/brush-advancement-roadmap-2026-08-22.md §3).
+ *
+ * The v1 load-dynamics and bristle-physics programs publish per-station arrays that are replanned
+ * across the whole bed, so their runs are never reused — geometry and stations still are. The
+ * impasto relief overlay reads stations only and is always recomputed.
+ */
+export class StudioOilRibbonCarrierPlanner {
+  private optionsKey: string | null = null;
+  private dabs: readonly FxOilDab[] = [];
+  private geometry: readonly SmoothedOilCarrierGeometry[] = [];
+  private stations: readonly OilCarrierStation[] = [];
+  private runsByHair: PlannedBristleRun[][] = [];
+  private lastReusedRuns = 0;
+  private lastSettledStations = 0;
+
+  /** Runs reused from the previous call. Diagnostics and identity tests only. */
+  get reusedRuns(): number {
+    return this.lastReusedRuns;
+  }
+
+  /** Stations proven settled on the previous call. Diagnostics and identity tests only. */
+  get settledStations(): number {
+    return this.lastSettledStations;
+  }
+
+  reset(): void {
+    this.optionsKey = null;
+    this.dabs = [];
+    this.geometry = [];
+    this.stations = [];
+    this.runsByHair = [];
+    this.lastReusedRuns = 0;
+    this.lastSettledStations = 0;
+  }
+
+  plan(
+    inputDabs: readonly FxOilDab[],
+    options?: StudioOilRibbonCarrierOptions,
+  ): StudioOilRibbonCarrierPlan {
+    const dabs = normalizedDabs(Array.isArray(inputDabs) ? inputDabs : []);
+    // Any option that reaches the plan invalidates the retained bed when it moves. Cheap: the
+    // options object is a handful of flags and scalars, never per-sample data of stroke length.
+    const optionsKey = JSON.stringify(options ?? null);
+    if (optionsKey !== this.optionsKey) {
+      this.reset();
+      this.optionsKey = optionsKey;
+    }
+
+    const previous = this.dabs;
+    const shared = Math.min(previous.length, dabs.length);
+    let identical = 0;
+    while (identical < shared && previous[identical] === dabs[identical]) identical += 1;
+    if (identical === 0) {
+      // Nothing survives — the lattice refit at the dab cap, a new stroke, an undo. Drop the
+      // retained bed BEFORE building the replacement rather than holding two full generations
+      // of 4096 stations × 7–44 hairs alive next to each other; `FxOilDabPlanner` measured that
+      // overlap at +4.5 ms per move in GC alone, and bailing out here can only ever cause a full
+      // rebuild, never a wrong reuse.
+      this.dabs = [];
+      this.geometry = [];
+      this.stations = [];
+      this.runsByHair = [];
+    }
+
+    const settledGeometry = Math.max(0, identical - OIL_GEOMETRY_SMOOTHING_RADIUS);
+    // `tangentAt` reaches two entries past the station it builds.
+    const settledStations = Math.max(0, settledGeometry - 2);
+    const geometry = smoothGeometryFrom(dabs, this.geometry, settledGeometry);
+    const stations = collectStationsFrom(dabs, geometry, this.stations, settledStations);
+
+    const bodyOnly = options?.bodyOnly === true;
+    const loadDynamicsOptions = options?.bristleLoadDynamics;
+    const dynamics = !bodyOnly && loadDynamicsOptions?.enabled === true
+      ? planLoadDynamics(stations, loadDynamicsOptions)
+      : undefined;
+    const bristlePhysicsOptions = options?.bristlePhysics;
+    const physics = !bodyOnly && bristlePhysicsOptions?.enabled === true
+      ? planBristlePhysics(stations, bristlePhysicsOptions)
+      : undefined;
+    const impastoReliefLanes = !bodyOnly && options?.impastoRelief?.enabled === true
+      ? planImpastoReliefOverlayLanes(stations)
+      : undefined;
+
+    let bristleLanes: readonly StudioOilRibbonBristleLane[] = Object.freeze([]);
+    let reusedRuns = 0;
+    if (!bodyOnly && stations.length >= 2) {
+      const bristleCount = resolveBristleCount(stations);
+      // A depletion/physics program republishes per-station arrays across the whole bed, so its
+      // runs carry stroke-global loads and widths that a settled prefix cannot vouch for.
+      const reusableStations = dynamics || physics ? 0 : settledStations;
+      const runsByHair: PlannedBristleRun[][] = new Array(bristleCount);
+      const planned: PlannedBristleRun[] = [];
+      for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
+        const cached = this.runsByHair[bristleIndex] ?? [];
+        const reusable = reusableRunCountForHair(
+          bristleIndex,
+          stations.length,
+          reusableStations,
+          cached.length,
+        );
+        reusedRuns += reusable;
+        const runs = buildBristleRunsForHair(
+          stations,
+          bristleIndex,
+          dynamics,
+          physics,
+          cached,
+          reusable,
+        );
+        runsByHair[bristleIndex] = runs;
+        for (const run of runs) planned.push(run);
+      }
+      this.runsByHair = runsByHair;
+      bristleLanes = planBristleLanesFromRuns(planned, options?.bristleBanding ?? "observed-span-v1");
+    } else {
+      this.runsByHair = [];
+    }
+
+    this.dabs = dabs;
+    this.geometry = geometry;
+    this.stations = stations;
+    this.lastReusedRuns = reusedRuns;
+    this.lastSettledStations = settledStations;
+
+    return Object.freeze({
+      version: STUDIO_OIL_RIBBON_CARRIER_VERSION,
+      sourceStationCount: stations.length,
+      body: stations.length === 0
+        ? null
+        : stations.length === 1
+          ? directionalTap(stations[0]!)
+          : variableWidthBody(stations),
+      bodyOpacity: quantize(accumulatedOpacity(meanStationOpacity(stations), 1)),
+      bristleLanes,
+      repeatedBodyStampCount: 0,
+      ...(impastoReliefLanes ? { impastoReliefLanes } : {}),
+    });
+  }
+}
+
+/**
+ * Planners retained for the ONE draft currently being drawn.
+ *
+ * A single slot, not an LRU over strokes: only one stroke is ever active, and its symmetry copies
+ * are the whole working set. An LRU got this wrong twice over — sized below the fan it evicted
+ * every copy just before its next use (0% hit rate, and worse than no cache once construction and
+ * a doomed verification pass are charged), and sized above it, a finished stroke's beds stayed
+ * strongly reachable while later single-copy strokes aged out one stale entry at a time. At the
+ * dab cap one copy holds ~27k run objects, so a 16-copy stroke is hundreds of thousands of objects
+ * that must not outlive the stroke that needed them.
+ *
+ * Starting a different draft therefore drops the previous one outright, and
+ * `releaseStudioOilRibbonDraftPlanners` frees the last one when its committed render arrives.
+ */
+interface RetainedOilCarrierDraft {
+  readonly draftId: string;
+  readonly planners: Map<number, StudioOilRibbonCarrierPlanner>;
+}
+
+let retainedOilCarrierDraft: RetainedOilCarrierDraft | null = null;
+
+/**
+ * Stroke-keyed `StudioOilRibbonCarrierPlanner`, for renderers that cannot hold one themselves.
+ *
+ * Same plan as `planStudioOilRibbonCarrier` — see the class for why — so this is a drop-in for the
+ * ACTIVE DRAFT only. Committed and export renders must keep calling the batch planner: they render
+ * arbitrary strokes in arbitrary order and would evict each other's beds for nothing.
+ *
+ * A symmetry transform draws one element several times from different point arrays, so the copy's
+ * `variationIndex` selects its own planner. A fan wider than
+ * `STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS` falls back to the batch planner rather than
+ * retaining beds without bound; callers should not reach that guard, since they are expected to
+ * check the same bound before routing here.
+ */
+export function planStudioOilRibbonCarrierIncremental(
+  draftId: string,
+  variationIndex: number,
+  dabs: readonly FxOilDab[],
+  options?: StudioOilRibbonCarrierOptions,
+): StudioOilRibbonCarrierPlan {
+  if (retainedOilCarrierDraft?.draftId !== draftId) {
+    retainedOilCarrierDraft = { draftId, planners: new Map() };
+  }
+  const planners = retainedOilCarrierDraft.planners;
+  let planner = planners.get(variationIndex);
+  if (!planner) {
+    if (planners.size >= STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS) {
+      return planStudioOilRibbonCarrier(dabs, options);
+    }
+    planner = new StudioOilRibbonCarrierPlanner();
+    planners.set(variationIndex, planner);
+  }
+  return planner.plan(dabs, options);
+}
+
+/** Frees `draftId`'s retained beds. A no-op once a different draft has already replaced them. */
+export function releaseStudioOilRibbonDraftPlanners(draftId: string): void {
+  if (retainedOilCarrierDraft?.draftId === draftId) retainedOilCarrierDraft = null;
+}
+
+/**
+ * Runs the retained planner for one copy of `draftId` reused on its last call, or `null` when no
+ * planner is held for it. @internal — the colocated retention contract test only; a caller cannot
+ * act on this, and a hit/miss is never a correctness signal (every plan is byte-identical either
+ * way).
+ */
+export function studioOilRibbonCarrierRetainedReuse(
+  draftId: string,
+  variationIndex: number,
+): number | null {
+  if (retainedOilCarrierDraft?.draftId !== draftId) return null;
+  return retainedOilCarrierDraft.planners.get(variationIndex)?.reusedRuns ?? null;
+}
+
+/**
+ * Leading runs of one hair whose spans lie wholly inside the settled station prefix.
+ *
+ * Walks the same origins the builder does rather than closing the form, so the two can never
+ * disagree about which run is which — the count is what matters, and each step is a comparison.
+ */
+function reusableRunCountForHair(
+  bristleIndex: number,
+  stationCount: number,
+  settledStations: number,
+  cachedLength: number,
+): number {
+  if (settledStations < 2 || cachedLength === 0) return 0;
+  const phase = (bristleIndex * BRISTLE_RUN_PHASE_STRIDE) % BRISTLE_RUN_STATIONS;
+  let count = 0;
+  for (
+    let runOrigin = -phase;
+    runOrigin < stationCount - 1;
+    runOrigin += BRISTLE_RUN_STATIONS
+  ) {
+    const runStart = Math.max(0, runOrigin);
+    const runEnd = Math.min(stationCount - 1, runOrigin + BRISTLE_RUN_STATIONS);
+    if (runEnd <= runStart) continue;
+    // The UNCLAMPED end has to be inside the settled prefix: a run that ends on the clamp read
+    // the bed's last station, whose end cap and smoothing both move when the stroke grows.
+    if (runOrigin + BRISTLE_RUN_STATIONS > settledStations - 1) break;
+    count += 1;
+    if (count >= cachedLength) break;
+  }
+  return count;
+}
+
+/**
+ * Stroke-mean station opacity, accumulated left to right.
+ *
+ * `mean(stations.map((s) => s.opacity))` allocated one array per pointer frame the length of the
+ * bed to add its members in the same order; this adds them in that order directly, so the value
+ * is bit-identical.
+ */
+function meanStationOpacity(stations: readonly OilCarrierStation[]): number {
+  if (stations.length === 0) return 0;
+  let sum = 0;
+  for (const station of stations) sum += station.opacity;
+  return sum / stations.length;
 }
 
 export function traceStudioOilRibbonPath(

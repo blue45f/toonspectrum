@@ -1039,7 +1039,12 @@ const SKIPPED_LANES: readonly { readonly id: string; readonly reason: string }[]
  *   pass the knot/quality browser gates first
  *   (`docs/perf/brush-advancement-roadmap-2026-08-22.md` §3-1·2, completion plan §3-3). At the
  *   dab cap the live overlay no longer pays this planner at all (capped-refit skip in
- *   `studio-live-retained-media-overlay`), so the pinned cost is the pre-cap regime's.
+ *   `studio-live-retained-media-overlay`), so the pinned cost is the pre-cap regime's. This probe
+ *   measures n=3200, where the dab bed saturates `FX_OIL_DAB_CAP` and `sampleStations` refits the
+ *   whole lattice, so NO prefix survives into the carrier and the number below is the full-replan
+ *   one by construction. Below the cap the live path now keeps its settled prefix
+ *   (`StudioOilRibbonCarrierPlanner`, 2026-08-30) and the same bed plans in about two thirds the
+ *   time; that regime is not what this row reads.
  * - `perfect-outline`: perfect-freehand's start/end taper reads the stroke's TOTAL running
  *   length, so the outline is a global function of the point array, and the stroker is an
  *   external kernel consumed whole-array (roadmap §4 stages this gate separately behind

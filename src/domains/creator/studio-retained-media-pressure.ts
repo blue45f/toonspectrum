@@ -230,10 +230,15 @@ function pressureAtProgress(
 }
 
 /**
- * 시리즈의 `index` 번째 항목 하나 — 배치 시리즈와 같은 진행률 식이다. 증분 소비자는 소비
- * 시점의 `count` 로 값을 잠근다: 필압 배열이 점과 나란하면 진행률 표본이 인덱스 조회로
- * 환원되어 최종 배치와 최대 ulp 수준 차이만 남는다(fx 압력 경로 빌더와 같은 계약 —
- * 커밋/재적재의 배치 리플랜이 정본을 다시 그린다).
+ * 시리즈의 `index` 번째 항목 하나 — 배치 시리즈와 같은 진행률 식이다.
+ *
+ * 필압 배열이 점과 나란하면 진행률 식이 가리키는 슬롯을 그대로 읽는다. `(index / (count - 1))
+ * * (count - 1)` 은 이진 부동소수에서 `index` 로 정확히 되돌아오지 않아(count = 800 일 때
+ * index = 357 은 356.99999999999994 로 떨어져 이웃 값이 섞인다) **앞선 표본의 값이 획이
+ * 얼마나 자랐는지에 따라 달라졌다**. 오차 자체는 ~1e-15 로 보이지 않지만, 증분 플래너들이
+ * 접두 재사용을 판정하는 바이트 동일성 비교를 깨서 이동마다 전체 재계획을 물게 했다. 슬롯을
+ * 직접 읽으면 반올림과 그 의존성이 함께 사라지고, 증분 소비자와 최종 배치가 ulp 까지 같아진다.
+ * 길이가 어긋난 저널(레거시 문서·재표본화 시리즈)은 정규화 경로를 그대로 쓴다.
  */
 export function resolveStudioRetainedMediaPressureAt(
   profileId: StudioRetainedMediaPressureProfileId,
@@ -242,9 +247,12 @@ export function resolveStudioRetainedMediaPressureAt(
   count: number,
   minimumDiameterRatio?: unknown,
 ): StudioRetainedMediaPressureResponse {
+  const aligned = pressures && pressures.length === count && index >= 0 && index < count;
   return resolveStudioRetainedMediaPressure(
     profileId,
-    pressureAtProgress(pressures, count <= 1 ? 0 : index / (count - 1)),
+    aligned
+      ? normalizedPressure(pressures[index])
+      : pressureAtProgress(pressures, count <= 1 ? 0 : index / (count - 1)),
     minimumDiameterRatio,
   );
 }

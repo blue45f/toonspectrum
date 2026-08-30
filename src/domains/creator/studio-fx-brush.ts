@@ -5,6 +5,7 @@
  * No Math.random / DOM / Konva — seed + stroke geometry only.
  */
 
+import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./brush/studio-brush-symmetry";
 import { hash2 } from "./studio-grain";
 import {
   STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
@@ -91,15 +92,44 @@ function pressureAt(pressures: unknown, progress: number): number {
   return a + (b - a) * t;
 }
 
+/**
+ * Reads point `i`'s pressure directly when the caller's journal is aligned with its point array,
+ * and falls back to the normalised resample when it is not.
+ *
+ * `pressureAt` samples a NORMALISED progress, and `(i / (n - 1)) * (n - 1)` does not round-trip to
+ * `i` in binary floating point: at n = 800 the sample for i = 357 lands on 356.99999999999994 and
+ * blends in a sliver of its neighbour. The value error is ~1e-15 and invisible on screen, but the
+ * dependence on `n` is not — every appended sample re-derived EVERY earlier sample slightly
+ * differently, so `FxOilDabPlanner`'s byte-equality verification found its prefix ending a few
+ * hundred stations in and replanned the whole rest of the bed on every pointer move. Measured on a
+ * 1600-sample oil sweep: 357 of 1458 dabs reused before, 1456 of 1458 after.
+ *
+ * Reading the slot the progress expression is trying to name removes the rounding and the
+ * dependence together. A journal whose length does NOT match the point count (legacy documents,
+ * resampled or symmetry-mirrored series) keeps the interpolating path, where the normalisation is
+ * doing real work.
+ */
+function alignedPressureJournal(
+  rawPressures: unknown,
+  pairCount: number,
+): readonly unknown[] | null {
+  return Array.isArray(rawPressures) && rawPressures.length === pairCount
+    ? rawPressures
+    : null;
+}
+
 function sanitizePoints(rawPoints: unknown, rawPressures: unknown): StrokePoint[] {
   if (!Array.isArray(rawPoints)) return [];
   const pairCount = Math.floor(rawPoints.length / 2);
+  const aligned = alignedPressureJournal(rawPressures, pairCount);
   const out: StrokePoint[] = [];
   for (let i = 0; i < pairCount; i++) {
     const x = safeCoord(rawPoints[i * 2]);
     const y = safeCoord(rawPoints[i * 2 + 1]);
     if (x === null || y === null) continue;
-    const pressure = pressureAt(rawPressures, pairCount <= 1 ? 0 : i / (pairCount - 1));
+    const pressure = aligned
+      ? clamp01(finiteNumber(aligned[i], DEFAULT_PRESSURE))
+      : pressureAt(rawPressures, pairCount <= 1 ? 0 : i / (pairCount - 1));
     const prev = out.at(-1);
     if (prev && Math.hypot(x - prev.x, y - prev.y) <= POINT_EPS) {
       prev.pressure = pressure;
@@ -507,6 +537,20 @@ interface FxPressurePoint {
   readonly pressure: number;
 }
 
+/**
+ * Point `index`'s pressure when the journal runs parallel to the points, which every live stroke's
+ * does. Same reason as `alignedPressureJournal` above: the normalised progress expression does not
+ * round-trip through binary floating point, so an earlier point's pressure came out fractionally
+ * different depending on how far the stroke had grown — enough to make the batch planner and the
+ * incremental builder disagree in the last ulp, and to defeat prefix verification downstream.
+ */
+function parallelPathPressureAt(
+  pressures: readonly number[],
+  index: number,
+): number {
+  return clamp(finiteNumber(pressures[index], 0), 0, 1);
+}
+
 function fixedPathPressureAt(
   pressures: readonly number[] | null | undefined,
   progress: number,
@@ -533,15 +577,18 @@ function sanitizeFxPressurePathPoints(
   pressures: readonly number[] | null | undefined,
 ): FxPressurePoint[] {
   const pairCount = Math.min(1_000_000, Math.floor(points.length / 2));
+  const parallel = pressures && pressures.length === pairCount ? pressures : null;
   const result: FxPressurePoint[] = [];
   for (let pointIndex = 0; pointIndex < pairCount; pointIndex += 1) {
     const x = safeCoord(points[pointIndex * 2]);
     const y = safeCoord(points[pointIndex * 2 + 1]);
     if (x === null || y === null) break;
-    const pressure = fixedPathPressureAt(
-      pressures,
-      pairCount <= 1 ? 0 : pointIndex / (pairCount - 1),
-    );
+    const pressure = parallel
+      ? parallelPathPressureAt(parallel, pointIndex)
+      : fixedPathPressureAt(
+          pressures,
+          pairCount <= 1 ? 0 : pointIndex / (pairCount - 1),
+        );
     const previous = result.at(-1);
     if (previous && Math.hypot(x - previous.x, y - previous.y) <= POINT_EPS) {
       result[result.length - 1] = { x, y, pressure };
@@ -843,10 +890,15 @@ export function createStudioIncrementalFxPressurePathBuilder(): StudioIncrementa
         const x = safeCoord(input.points[pointIndex * 2]);
         const y = safeCoord(input.points[pointIndex * 2 + 1]);
         if (x === null || y === null) break;
-        const pressure = fixedPathPressureAt(
-          pressures,
-          pairCount <= 1 ? 0 : pointIndex / (pairCount - 1),
-        );
+        // Parallel journals read their own slot, so a point consumed at one stroke length keeps
+        // exactly the value the batch planner gives it at any other — the ulp gap between the
+        // live builder and the commit replay closes rather than being documented.
+        const pressure = pressuresParallel
+          ? parallelPathPressureAt(pressures!, pointIndex)
+          : fixedPathPressureAt(
+              pressures,
+              pairCount <= 1 ? 0 : pointIndex / (pairCount - 1),
+            );
         const previous = sanitized.at(-1);
         if (previous && Math.hypot(x - previous.x, y - previous.y) <= POINT_EPS) {
           sanitized[sanitized.length - 1] = { x, y, pressure };
@@ -2249,6 +2301,56 @@ export class FxOilDabPlanner {
     this.dabs = [];
     this.lastReusedDabs = 0;
   }
+}
+
+/**
+ * Planners retained for the ONE draft currently being drawn — a single slot, not an LRU over
+ * strokes. See `planStudioOilRibbonCarrierIncremental` for why an LRU is the wrong shape here:
+ * sized below the draft's symmetry fan it never hits, and sized above it a finished stroke's beds
+ * outlive the stroke. Starting a different draft drops the previous one outright.
+ */
+interface RetainedOilDabDraft {
+  readonly draftId: string;
+  readonly planners: Map<number, FxOilDabPlanner>;
+}
+
+let retainedOilDabDraft: RetainedOilDabDraft | null = null;
+
+/**
+ * Stroke-keyed `FxOilDabPlanner`, for renderers that cannot hold one themselves.
+ *
+ * Same dabs as `planOilBrushDabs` — the planner verifies its retained prefix byte-for-byte and
+ * re-derives everything it cannot vouch for — so this is a drop-in for the ACTIVE DRAFT only.
+ * Committed and export renders keep calling the batch planner: they walk arbitrary strokes in
+ * arbitrary order and would evict each other's beds for nothing.
+ *
+ * A symmetry transform draws one element several times from different point arrays, so the copy's
+ * `variationIndex` selects its own planner; a fan wider than the retained bound falls back to the
+ * batch planner rather than retaining beds without bound.
+ */
+export function planOilBrushDabsIncremental(
+  draftId: string,
+  variationIndex: number,
+  input: FxOilPlanInput,
+): FxOilDab[] {
+  if (retainedOilDabDraft?.draftId !== draftId) {
+    retainedOilDabDraft = { draftId, planners: new Map() };
+  }
+  const planners = retainedOilDabDraft.planners;
+  let planner = planners.get(variationIndex);
+  if (!planner) {
+    if (planners.size >= STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS) {
+      return planOilBrushDabs(input);
+    }
+    planner = new FxOilDabPlanner();
+    planners.set(variationIndex, planner);
+  }
+  return planner.plan(input);
+}
+
+/** Frees `draftId`'s retained beds. A no-op once a different draft has already replaced them. */
+export function releaseOilBrushDabDraftPlanners(draftId: string): void {
+  if (retainedOilDabDraft?.draftId === draftId) retainedOilDabDraft = null;
 }
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import { planStudioCalligraphyRibbon } from "../brush/studio-calligraphy-ribbon"
 import { studioFluidPaintStationSpacingRatio } from "../brush/studio-fluid-paint-reference";
 import { studioLiveVisibleTapDocumentRadius } from "../brush/studio-live-visible-tap";
 import {
+  StudioOilRibbonCarrierPlanner,
   paintStudioOilRibbonCarrier,
   planStudioOilRibbonCarrier,
   studioOilRibbonProgramsForBrush,
@@ -218,6 +219,13 @@ interface ActiveRetainedStroke {
    */
   oilPlanner: FxOilDabPlanner | null;
   /**
+   * Per-stroke carrier planner, paired with `oilPlanner`. Present only for the live in-progress
+   * stroke; settled replays pass `null` and route through the batch `planStudioOilRibbonCarrier`
+   * exactly as before. The plan is byte-identical either way — see
+   * `StudioOilRibbonCarrierPlanner`.
+   */
+  oilCarrierPlanner: StudioOilRibbonCarrierPlanner | null;
+  /**
    * Per-stroke incremental highlighter planners (fx pressure path + wash ribbon), created lazily
    * on first paint. A live append then pays only for new samples; settled replays build throwaway
    * actives whose fresh builder pair reproduces the batch plan in one cold append, so replay
@@ -332,6 +340,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
       oilPlanner: kind === "oil" ? new FxOilDabPlanner() : null,
+      oilCarrierPlanner: kind === "oil" ? new StudioOilRibbonCarrierPlanner() : null,
     };
     this.activePaintedOntoSettled = false;
     const painted = this.paintSuffix(this.active, element, this.activeContext);
@@ -373,6 +382,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
+        oilCarrierPlanner: null,
       };
       if (!this.paintSuffix(fullActive, element, this.activeContext)) {
         return { status: "fallback" };
@@ -493,14 +503,18 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         // zero surviving pixels. Wet-into-wet feel stays owned by the committed renderer.
         this.clearCanvas(this.activeContext, this.activeCanvas);
       }
-      const carrier = planStudioOilRibbonCarrier(
-        dabs,
-        studioOilRibbonProgramsForBrush(
-          brush,
-          fxBrushSeedFromKey(element.id),
-          element.brushEnginePrograms?.oil,
-        ),
+      const programs = studioOilRibbonProgramsForBrush(
+        brush,
+        fxBrushSeedFromKey(element.id),
+        element.brushEnginePrograms?.oil,
       );
+      // The dab bed is already prefix-stable across a pointer move (`FxOilDabPlanner`); the
+      // carrier was rebuilding its smoothed geometry, its stations and every bristle run on top
+      // of it regardless — measured 14.6 ms per move at a 2906-dab bed, against 9.2 ms once the
+      // settled prefix is kept. Same plan, so the painted pixels do not move.
+      const carrier = active.oilCarrierPlanner
+        ? active.oilCarrierPlanner.plan(dabs, programs)
+        : planStudioOilRibbonCarrier(dabs, programs);
       paintStudioOilRibbonCarrier(
         context as unknown as StudioOilRibbonPaintContext,
         {
@@ -905,6 +919,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
+        oilCarrierPlanner: null,
       }, stroke, this.settledContext);
     }
   }
@@ -924,6 +939,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
+        oilCarrierPlanner: null,
       }, stroke, this.settledContext);
     }
     if (!this.active) return;

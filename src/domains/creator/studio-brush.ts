@@ -1192,7 +1192,20 @@ export function resampleStrokePressures(
   // Clamp only the two source samples needed by each output station. The previous implementation
   // first allocated a full sanitized copy and then allocated the result, doubling traversal and
   // transient memory on every retained/live symmetry render of a long pressure stroke.
+  //
+  // An already-aligned journal skips the normalisation entirely. `(index / (count - 1)) *
+  // (count - 1)` does not round-trip to `index` in binary floating point — at count = 800 the
+  // station for index = 357 lands on 356.99999999999994 and blends in a sliver of its neighbour —
+  // so the resampled value of an EARLIER station depended on how long the stroke had grown by.
+  // The error is ~1e-15 and invisible, but it broke the byte-equality prefix checks the
+  // incremental planners rely on and cost them a full replan per pointer move.
   const result = new Array<number>(count);
+  if (pressures.length === count) {
+    for (let index = 0; index < count; index++) {
+      result[index] = clamp01(finiteNumber(pressures[index], safeFallback));
+    }
+    return result;
+  }
   for (let index = 0; index < count; index++) {
     const sourcePosition = (index / (count - 1)) * (pressures.length - 1);
     const lowerIndex = Math.floor(sourcePosition);
