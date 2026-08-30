@@ -17,7 +17,7 @@
 
 | # (구 §4) | 위치 | 2026-08-30 실측 판정 |
 | --- | --- | --- |
-| 1 | Konva 유지 폴백 sceneFunc 재계획 (perfect-outline 계열) | **여전히 유효.** 게이트 x8.3 · 3.4ms(계획만). perfect-freehand 의 taper 가 전체 길이를 읽어 기하가 전역 함수 — 로드맵 §4 의 2단(Path2D 캐시)이 남은 경로 |
+| 1 | Konva 유지 폴백 sceneFunc 재계획 (perfect-outline 계열) | **여전히 유효.** 게이트 x8.3 · 3.4ms(계획만). 차단자는 taper 가 아니라 외부 커널의 통배열 소비 + 닫힌 루프 아웃라인이다(§4-4 에서 기존 설명을 정정) |
 | 2 | 오일 라이브 캐리어 전체 재계획+clear+전체 재칠 | **부분 해소 — 이번 착지(§3).** 계획 단계는 증분화, 칠 단계는 여전히 전체(§4-1) |
 | 3 | 형광펜 전체 리플레이 | **해소됨.** 게이트 `family:highlighter` x1.4 flat (wash-ribbon 증분 빌더) |
 | 4 | 연필/캘리 전체 곡선 재계획 | **해소됨.** `pencil-path` x0.5 · `family:calligraphy` x1.0 flat |
@@ -134,21 +134,54 @@ relief)·load-dynamics·bodyOnly·fixed-anchor-v2 일곱 프로그램, 대브 �
 로드맵 §5 안은 유효하지만, 사용자가 보고한 상시 끊김의 원인은 아니므로 우선순위를 내렸다.
 
 ### 4-4. perfect-outline / G펜 (구 §4 #1)
-perfect-freehand 의 시작·끝 taper 가 획의 **총 길이**를 읽어 아웃라인이 점 배열의 전역 함수다. 캡슐
-엔진은 이미 증분(`capsule-outline` x0.5)이지만 perfect-freehand 엔진은 외부 커널을 배열 통째로
-소비한다. 게이트 x8.3 · 3.4ms 는 계획만의 값이고, 실사용에서는 Konva `Path` 가 매 프레임 O(N)
-pathData 문자열을 다시 파싱하는 비용이 더 크다. **재개 조건**: 로드맵 §4 2단(sceneFunc 가 캐시된
-Path2D 를 재사용) — 출력 동일이라 버저닝이 필요 없는 작업이다.
+
+**2026-08-30 정정**: 로드맵 §4 와 이 문서 초판은 "perfect-freehand 의 taper 가 획의 총 길이를
+읽어 아웃라인이 전역 함수"라고 적었는데, **사실이 아니다**. `studioPerfectFreehandStrokeOptions`
+의 `taperFor` 는 `min(size · factor, taperBudget · factor/totalFactor)` 이고 taperBudget 은
+`길이 − 1.4·size` 다. 즉 taper 는 짧은 획에서만 길이에 비례하고, 그 위로는 **상수로 포화**한다 —
+gpen(size 6) 실측: 길이 40 · 4,000 · 40,000 모두 start 5.1 / end 7.2 로 동일. 길이 의존성은 장획
+구간에 존재하지 않는다.
+
+실제 차단자는 두 가지고, 둘 다 taper 와 무관하다:
+1. `buildStudioPerfectFreehandOutline` 이 외부 커널(perfect-freehand `getStroke`)을 **배열 통째로**
+   소비한다 — 접미 API 가 없다.
+2. 아웃라인이 **닫힌 루프**다(왼쪽 변 start→end 뒤에 오른쪽 변을 뒤집어 이어붙인 형태). 획이
+   자라면 왼쪽 변 꼬리에 추가되는 동시에 오른쪽 변 블록 전체가 인덱스로 밀린다. 그래서 안정
+   접두는 배열의 대략 절반(왼쪽 변)까지뿐이고, 그 경계(leftLen)를 외부 커널이 노출하지 않는다.
+
+**단계별 실측(gpen, 이동 1회, 이 컨테이너)** — 지배항은 스트로커가 아니라 직렬화다:
+
+| 표본 | `getStroke` | `outlineToPathData` |
+| --- | --- | --- |
+| 400 | 0.86ms | 0.43ms |
+| 1600 | 1.70ms | 1.16ms |
+| 3200 | 0.80ms | **2.26ms** |
+
+**시도했다가 접은 것**: `outlineToPathData` 의 배열+join 을 단일 순회 이어붙이기로 바꿔 봤다.
+문자 단위로 동일함은 확인했지만(퇴화 입력 포함) 2.13ms → 1.92ms, **약 10%** 에 그친다 — V8 이
+이미 그 형태를 잘 최적화한다. 픽셀을 만드는 경로를 그 정도 이득으로 바꿀 이유가 없어 되돌렸다.
+
+**재개 조건**: 의미 있는 개선은 로드맵 §4 2단(캐시된 Path2D 재사용)뿐인데, 위 2번 때문에 안정
+접두가 절반으로 제한되므로 상한이 대략 pathData 비용의 절반(3200 표본에서 ~1.1ms)이다. 커널을
+직접 감싸 leftLen 을 얻거나 자체 아웃라인 구현으로 교체하는 선행 작업이 필요하다.
 
 ## 5. 검증
 
+- **CI 전부 통과** (PR #54, head `0c296bb`): `core` · `verify` · `studio-p5-brush-real-runtime` ·
+  `studio-inapp-browser` · SonarQube · Vercel. `core` 가 **Node 24** 에서 `pnpm run test`(전체
+  루트 Vitest 스위트)를 돌려 통과한 것이 최종 판정이다.
 - `studio-aligned-pressure-journal.test.ts` 6건, `studio-oil-ribbon-carrier.incremental.test.ts`
   13건 신규 — 전부 통과.
 - `studio-long-stroke-per-move-cost.test.ts` 21건 통과(수정 전후 동일 — 게이트의 oil-ribbon 프로브는
   n=3200 에서 대브 캡이 포화하는 구간을 재며, 그 구간은 `sampleStations` 가 격자를 전면 재적합해
   어떤 접두도 남지 않는 것이 설계상 정확한 동작이다. 이번 개선은 캡 이하 구간의 것이다).
 - `src/domains/creator/brush` · `src/domains/creator/live` 및 관련 파일 스윕: 3622/3623 통과.
-- 유일한 실패는 **변경 전 HEAD 에서도 동일하게 적색**인
+- **로컬 전체 스위트 실패는 런타임 불일치였다**: 개발 컨테이너는 Node v22.22.2 인데 이 레포는
+  `.nvmrc` 24.16.0 · CI 는 `node-version: 24` 를 요구한다(`pnpm install` 도 Unsupported engine 을
+  경고한다). 로컬 33건 실패에는 WASM Memory64 capability 테스트처럼 런타임 차이로만 갈리는 것들이
+  섞여 있었고, 같은 스위트가 Node 24 CI 에서는 통과했다. **로컬 전체 스위트 결과는 이 레포에서
+  판정 근거로 쓸 수 없다.**
+- (참고) 로컬에서만 적색이던 **변경 전 HEAD 에서도 동일하게 적색**인
   `studio-brush-dynamics.test.ts > pins byte-identical capped redistribution output` 의 인라인
   스냅샷(airbrush·ink-particle 다이제스트). 같은 digest 로 재현되며 이번 변경과 무관하다 —
   `git stash` 후 동일 실패를 확인했다.
