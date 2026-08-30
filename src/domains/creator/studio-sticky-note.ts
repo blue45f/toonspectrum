@@ -75,9 +75,6 @@ export function createStudioStickyNoteElement(
     // Background color is not on TextEl — stored for host chrome via sticky field
     stickyNotePresetId: preset.id,
     stickyNoteFill: preset.fill,
-  } as TextEl & {
-    stickyNotePresetId: StudioStickyNotePresetId;
-    stickyNoteFill: string;
   };
 }
 
