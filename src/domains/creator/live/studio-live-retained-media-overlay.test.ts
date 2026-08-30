@@ -86,10 +86,24 @@ function attachedRenderer() {
   // `stepMs` is how much the clock advances per read, which is how a test gives a repaint a
   // measurable cost without depending on how fast this machine actually is.
   const clock = { nowMs: 0, stepMs: 0 };
-  const renderer = new StudioLiveRetainedMediaOverlayRenderer(() => {
-    const reading = clock.nowMs;
-    clock.nowMs += clock.stepMs;
-    return reading;
+  // Deferred repaints schedule a wake-up; the test drives it by hand so nothing depends on real
+  // timers firing.
+  const wakes: { run: () => void; delayMs: number }[] = [];
+  const renderer = new StudioLiveRetainedMediaOverlayRenderer({
+    now: () => {
+      const reading = clock.nowMs;
+      clock.nowMs += clock.stepMs;
+      return reading;
+    },
+    scheduleWake: (run, delayMs) => {
+      const wake = { run, delayMs };
+      wakes.push(wake);
+      return wake;
+    },
+    cancelWake: (handle) => {
+      const at = wakes.indexOf(handle as { run: () => void; delayMs: number });
+      if (at >= 0) wakes.splice(at, 1);
+    },
   });
   const active = mockCanvas();
   const settled = mockCanvas();
@@ -104,7 +118,7 @@ function attachedRenderer() {
     flipX: false,
   };
   renderer.setSurface(surface);
-  return { renderer, active, clock };
+  return { renderer, active, clock, wakes };
 }
 
 describe("studioLiveRetainedMediaOverlaySupportsElement", () => {
@@ -299,7 +313,7 @@ describe("oil live preview past the dab cap", () => {
     expect(renderer.begin(base).status).toBe("started");
 
     // Charge this capped repaint 15ms: the clock moves that much between the two readings the
-    // renderer takes around the paint.
+    // renderer takes around the paint, and the cooldown runs from the second one.
     const beforeExpensive = active.stats().strokeCalls;
     clock.nowMs = 1_000;
     clock.stepMs = 15;
@@ -308,15 +322,48 @@ describe("oil live preview past the dab cap", () => {
     const afterExpensive = active.stats().strokeCalls;
     clock.stepMs = 0;
 
-    // 15ms cost buys a 30ms pause (duty 1/3), so an append 20ms later still waits.
+    // 15ms of paint ending at 1015 buys a 30ms pause, so an append at 1020 still waits.
     clock.nowMs = 1_020;
     expect(renderer.appendFrom(longOilStroke("oil-cap-duty", 3080)).status).toBe("noop");
     expect(active.stats().strokeCalls).toBe(afterExpensive);
 
-    // Once it is paid off the bed rebuilds again.
+    // Still waiting at 1040: the cooldown runs from when the paint FINISHED (1015), not from when
+    // it started (1000). Charging it from the start would hand back the paint's own 15ms and let
+    // the bed take half the interval instead of a third.
     clock.nowMs = 1_040;
+    expect(renderer.appendFrom(longOilStroke("oil-cap-duty", 3100)).status).toBe("noop");
+    expect(active.stats().strokeCalls).toBe(afterExpensive);
+
+    // Once it is paid off the bed rebuilds again.
+    clock.nowMs = 1_050;
     expect(renderer.appendFrom(longOilStroke("oil-cap-duty", 3120)).status).toBe("appended");
     expect(active.stats().strokeCalls).toBeGreaterThan(afterExpensive);
+  });
+
+  it("wakes itself to paint a deferred tail when the cursor stops moving", () => {
+    // Deferring drops the only event carrying the new endpoint. If the user then holds still,
+    // nothing would ask again, and the preview would sit detached from a stationary cursor — the
+    // original freeze in miniature. The deferral schedules its own wake-up for the remaining
+    // cooldown instead.
+    const { renderer, active, clock, wakes } = attachedRenderer();
+    expect(renderer.begin(longOilStroke("oil-cap-wake", 3000)).status).toBe("started");
+
+    clock.nowMs = 1_000;
+    clock.stepMs = 15;
+    renderer.appendFrom(longOilStroke("oil-cap-wake", 3040));
+    clock.stepMs = 0;
+
+    // This append is inside the cooldown, so it is deferred — and it leaves a wake-up behind.
+    clock.nowMs = 1_020;
+    expect(renderer.appendFrom(longOilStroke("oil-cap-wake", 3080)).status).toBe("noop");
+    expect(wakes).toHaveLength(1);
+    expect(wakes[0]!.delayMs).toBe(25);
+
+    // Nothing else arrives; the wake-up is what paints the tail.
+    const beforeWake = active.stats().strokeCalls;
+    clock.nowMs = 1_045;
+    wakes[0]!.run();
+    expect(active.stats().strokeCalls).toBeGreaterThan(beforeWake);
   });
 
   it("repaints an authoritative draft that replaces a predicted tail of the same length", () => {

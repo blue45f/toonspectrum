@@ -313,12 +313,35 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   private settledHasPixels = false;
   private activePaintedOntoSettled = false;
 
+  /** Pending wake-up for a capped repaint this overlay deferred. */
+  private capRepaintWake: unknown = null;
+
+  private readonly now: () => number;
+  private readonly scheduleWake: (run: () => void, delayMs: number) => unknown;
+  private readonly cancelWake: (handle: unknown) => void;
+
   /**
-   * Monotonic clock the capped-repaint budget reads. Injectable so the budget's timing is
-   * exercised deterministically rather than by how fast the machine running the tests happens
-   * to be.
+   * The clock and the timer the capped-repaint budget uses are injectable so the budget's timing
+   * is exercised deterministically in tests rather than by how fast the machine happens to be.
    */
-  constructor(private readonly now: () => number = () => performance.now()) {}
+  constructor(options: {
+    readonly now?: () => number;
+    readonly scheduleWake?: (run: () => void, delayMs: number) => unknown;
+    readonly cancelWake?: (handle: unknown) => void;
+  } = {}) {
+    this.now = options.now ?? (() => performance.now());
+    this.scheduleWake = options.scheduleWake
+      ?? ((run, delayMs) => setTimeout(run, delayMs));
+    this.cancelWake = options.cancelWake
+      ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
+  }
+
+  /** Drop a pending wake-up: whatever it was going to repaint is gone or already painted. */
+  private clearCapRepaintWake(): void {
+    if (this.capRepaintWake === null) return;
+    this.cancelWake(this.capRepaintWake);
+    this.capRepaintWake = null;
+  }
 
   attach(canvases: {
     readonly activeCanvas: HTMLCanvasElement;
@@ -558,15 +581,23 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       // pointer's time (see `OIL_CAP_REPAINT_DUTY_DIVISOR`). `finalizeOil` is pointer-up, which
       // seals the active canvas into settled and so must never be deferred.
       const now = this.now();
-      if (
-        target === this.activeContext
-        && !finalizeOil
-        && active.paintedDabs >= FX_OIL_DAB_CAP
-        && now - active.lastOilCapRepaintAt
-          < active.lastOilCapRepaintMs * (OIL_CAP_REPAINT_DUTY_DIVISOR - 1)
-      ) {
+      const cooldownRemaining = active.paintedDabs >= FX_OIL_DAB_CAP
+        ? active.lastOilCapRepaintAt
+          + active.lastOilCapRepaintMs * (OIL_CAP_REPAINT_DUTY_DIVISOR - 1)
+          - now
+        : 0;
+      if (target === this.activeContext && !finalizeOil && cooldownRemaining > 0) {
+        // Deferring the newest pointer event drops the only carrier of the new endpoint, so if the
+        // user then holds still nothing would ever ask again and the preview would sit detached
+        // from a stationary cursor. Wake ourselves when the budget is paid off instead.
+        this.clearCapRepaintWake();
+        this.capRepaintWake = this.scheduleWake(() => {
+          this.capRepaintWake = null;
+          if (this.active === active) this.paintOilSuffix(active, active.element, target);
+        }, cooldownRemaining);
         return true;
       }
+      this.clearCapRepaintWake();
 
       const brush = element.brush ?? "oil";
       const planInput = {
@@ -639,8 +670,12 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         active.paintedOilTailX = tailX;
         active.paintedOilTailY = tailY;
         if (dabs.length >= FX_OIL_DAB_CAP) {
-          active.lastOilCapRepaintMs = this.now() - now;
-          active.lastOilCapRepaintAt = now;
+          // Measured from the start, but the cooldown runs from the END of the paint: charging it
+          // from the start would hand back the paint's own duration and leave the bed taking half
+          // the interval instead of the documented share.
+          const finishedAt = this.now();
+          active.lastOilCapRepaintMs = finishedAt - now;
+          active.lastOilCapRepaintAt = finishedAt;
         }
       }
       if (target === this.settledContext) this.settledHasPixels = true;
@@ -1090,6 +1125,12 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     this.active.paintedDabs = replayActive.paintedDabs;
     this.active.paintedOilPasses = replayActive.paintedOilPasses;
     this.active.paintedOilSourceSamples = replayActive.paintedOilSourceSamples;
+    this.active.paintedOilTailX = replayActive.paintedOilTailX;
+    this.active.paintedOilTailY = replayActive.paintedOilTailY;
+    // The replay just performed a full capped repaint; its cost is what the next append must
+    // budget against, or a resize mid-stroke hands out a free rebuild.
+    this.active.lastOilCapRepaintAt = replayActive.lastOilCapRepaintAt;
+    this.active.lastOilCapRepaintMs = replayActive.lastOilCapRepaintMs;
     this.active.paintedPencilMarks = replayActive.paintedPencilMarks;
     this.active.paintedSourceSegments = replayActive.paintedSourceSegments;
   }
@@ -1146,6 +1187,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   }
 
   private resetActiveState(): void {
+    this.clearCapRepaintWake();
     this.active = null;
     this.activePaintedOntoSettled = false;
   }
