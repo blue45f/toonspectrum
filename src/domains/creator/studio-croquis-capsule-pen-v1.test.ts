@@ -421,7 +421,7 @@ describe("capsule stroke loops", () => {
       .toBe(buildStudioCroquisCapsuleStrokePathData(input));
   });
 
-  /** Per-build CPU ceiling across one clean, complete warm-process measurement pass. */
+  /** Per-build current-JavaScript-thread CPU ceiling in one clean, complete warm-process pass. */
   const CROQUIS_LONG_STROKE_CPU_BUDGET_MS = 40;
   /** Every build in a pass is graded so one unusually fast sample cannot hide repeated hitches. */
   const CROQUIS_LONG_STROKE_SAMPLES_PER_PASS = 5;
@@ -472,62 +472,80 @@ describe("capsule stroke loops", () => {
    * of about 1.0. It could therefore pass while detecting nothing on the faster machine.
    *
    * This assertion makes the narrower product promise the original local gate was actually
-   * intended to make: a warm 2000-point path consumes less than 40ms of user + system CPU. It
-   * deliberately does not claim that every sub-40ms constant-factor slowdown is detectable.
+   * intended to make: a warm 2000-point path consumes less than 40ms of user + system CPU on the
+   * JavaScript worker that synchronously builds it. It deliberately does not claim that every
+   * sub-40ms constant-factor slowdown is detectable.
    * The command census and byte length above remain machine-independent receipts for emitted
    * segment, tessellation, and path-size growth. They do not claim full-byte correctness.
    *
    * Five samples make one complete pass and its maximum is graded, so one fast build cannot hide
    * repeated allocation or GC hitches. An apparent violation earns two fresh complete passes; the
    * fastest complete pass decides, rather than splicing the fastest builds from different passes.
-   * Vitest's default fork pool isolates this file in a process, so `process.cpuUsage()` excludes
-   * sibling-worker CPU and scheduler descheduling while retaining this builder's allocation and
-   * GC CPU. The claim is one clean warm-process pass with all five builds below 40ms, not a
-   * universal worst-case guarantee or detection of every sub-40ms relative slowdown.
+   * Vitest's default fork pool isolates this file from other suite workers, but
+   * `process.cpuUsage()` still adds sibling V8 helper-thread CPU from parallel or concurrent GC
+   * and JIT work. `process.threadCpuUsage()` grades only the current JavaScript worker; the
+   * process-wide clock remains in the failure diagnostic. Synchronous allocation, zero-fill and
+   * GC work on the current worker remain included. This is not end-to-end browser latency because
+   * off-CPU waits and presentation are outside this Node fixture. The claim is one clean
+   * warm-process pass with all five builds below 40ms, not a universal worst-case guarantee or
+   * detection of every sub-40ms relative slowdown.
    */
-  it("builds a 2000-point stroke path inside its CPU budget", () => {
+  it("builds a 2000-point stroke path inside its main-thread CPU budget", () => {
     const { points, radii } = longStrokeInput();
     let sink = 0;
 
     const buildPath = () => {
       sink += buildStudioCroquisCapsuleStrokePathData({ points, radii }).length;
     };
-    const measurePassCpuMs = (): number[] => {
-      const samples: number[] = [];
+    const measurePassCpuMs = (): {
+      readonly mainThreadMs: readonly number[];
+      readonly processMs: readonly number[];
+    } => {
+      const mainThreadMs: number[] = [];
+      const processMs: number[] = [];
       for (
         let sample = 0;
         sample < CROQUIS_LONG_STROKE_SAMPLES_PER_PASS;
         sample += 1
       ) {
-        const before = process.cpuUsage();
+        const processBefore = process.cpuUsage();
+        const threadBefore = process.threadCpuUsage();
         buildPath();
-        const after = process.cpuUsage(before);
-        samples.push((after.user + after.system) / 1_000);
+        const threadAfter = process.threadCpuUsage(threadBefore);
+        const processAfter = process.cpuUsage(processBefore);
+        mainThreadMs.push((threadAfter.user + threadAfter.system) / 1_000);
+        processMs.push((processAfter.user + processAfter.system) / 1_000);
       }
-      return samples;
+      return { mainThreadMs, processMs };
     };
 
     buildPath();
     buildPath();
-    const passCpuSamples = [measurePassCpuMs()];
+    const cpuPasses = [measurePassCpuMs()];
     const worstCpuMs = (samples: readonly number[]) => Math.max(...samples);
-    if (worstCpuMs(passCpuSamples[0]!) >= CROQUIS_LONG_STROKE_CPU_BUDGET_MS) {
+    if (worstCpuMs(cpuPasses[0]!.mainThreadMs) >= CROQUIS_LONG_STROKE_CPU_BUDGET_MS) {
       for (
         let confirmation = 0;
         confirmation < CROQUIS_LONG_STROKE_CONFIRMATION_PASSES;
         confirmation += 1
       ) {
-        passCpuSamples.push(measurePassCpuMs());
+        cpuPasses.push(measurePassCpuMs());
       }
     }
 
-    const passWorstCpuMs = passCpuSamples.map(worstCpuMs);
-    const bestPassWorstCpuMs = Math.min(...passWorstCpuMs);
+    const bestCpuPass = cpuPasses.reduce((best, candidate) =>
+      worstCpuMs(candidate.mainThreadMs) < worstCpuMs(best.mainThreadMs) ? candidate : best
+    );
+    const bestPassWorstMainThreadCpuMs = worstCpuMs(bestCpuPass.mainThreadMs);
     expect(
-      bestPassWorstCpuMs,
-      `2000-point croquis capsule path worst build used ${bestPassWorstCpuMs.toFixed(2)}ms CPU `
-        + `(passes: ${passCpuSamples
-          .map((samples) => `[${samples.map((value) => value.toFixed(2)).join(", ")}]`)
+      bestPassWorstMainThreadCpuMs,
+      `2000-point croquis capsule path worst build used `
+        + `${bestPassWorstMainThreadCpuMs.toFixed(2)}ms main-thread CPU `
+        + `(same-pass process CPU max ${worstCpuMs(bestCpuPass.processMs).toFixed(2)}ms; `
+        + `main-thread passes: ${cpuPasses
+          .map(({ mainThreadMs }) => (
+            `[${mainThreadMs.map((value) => value.toFixed(2)).join(", ")}]`
+          ))
           .join("; ")})`,
     ).toBeLessThan(CROQUIS_LONG_STROKE_CPU_BUDGET_MS);
 
