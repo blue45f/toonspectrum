@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AVATAR_FORGE_PRESETS,
+  buildAvatarForgeHairParts,
   createAvatarForgeState,
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
@@ -402,5 +403,38 @@ describe("studio VRM humanoid mesh", () => {
       // 실제로 띄우기는 한다 — 0 으로 눌러 z-fighting 을 만들지 않았는지 확인한다.
       expect(worst).toBeGreaterThan(head.radiusX * 0.02);
     }
+  });
+
+  it("keeps every shipped hairstyle's cap outside the skull instead of inside it", () => {
+    // 캡 스케일은 두개골 반경의 배수(volume × 스타일 계수)로 들어온다. 그대로 쓰면 두께가
+    // 아니라 포함 여부가 바뀌어, 21개 프리셋 중 5개는 캡이 통째로 두개골 안에 들어가
+    // 정수리가 민머리로 보였고(pixie-sport 0.826배), 배수가 정확히 1인 9개는 표면과
+    // 완전히 겹쳐 z-fighting 이 났다.
+    let thinnest = Infinity;
+    for (const preset of AVATAR_FORGE_PRESETS) {
+      if (!buildAvatarForgeHairParts(preset.state).some((part) => part.role === "cap")) continue;
+      const built = buildStudioVrmHumanoidMesh(preset.state);
+      const hair = built.parts.find((part) => part.nodeName === "Hair");
+      if (!hair) throw new Error(`expected hair for ${preset.id}`);
+      const head = built.rig.head;
+      // 캡은 두상 정수리를 덮으므로, 정수리 바로 위 정점이 반드시 두개골 밖에 있어야 한다.
+      let crown = -Infinity;
+      for (const primitive of hair.primitives) {
+        const positions = numbers(primitive.positions);
+        for (let index = 0; index < positions.length; index += 3) {
+          const horizontal = Math.hypot(
+            (positions[index] - head.center[0]) / head.radiusX,
+            (positions[index + 2] - head.center[2]) / head.radiusZ,
+          );
+          if (horizontal > 0.2) continue;
+          crown = Math.max(crown, (positions[index + 1] - head.center[1]) / head.radiusY);
+        }
+      }
+      // 최소 껍질 두께(2.5%)만큼은 두개골 정수리 위로 올라와 있어야 겹치지 않는다.
+      expect(crown, preset.id).toBeGreaterThan(1.025);
+      thinnest = Math.min(thinnest, crown);
+    }
+    // 껍질이지 풍선이 아니다 — 가장 얇은 캡도 두개골의 1.2배를 넘지 않는다.
+    expect(thinnest).toBeLessThan(1.2);
   });
 });

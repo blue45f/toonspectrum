@@ -58,6 +58,11 @@ type ForgeView = "presets" | "body" | "hair" | "face";
 
 type StudioVrmAvatarForgePanelProps = {
   state: AvatarForgeState;
+  /**
+   * 지금 조형 중인 대상의 신원(로드된 모델 id). 바뀌면 패널이 기억하던 편집 의도를 버린다 —
+   * 상태 서명만으로는 새 모델 설치를 알아볼 수 없다(둘 다 순정이면 서명이 같다).
+   */
+  sculptSessionId?: string;
   disabled?: boolean;
   detectedOriginalHairCount?: number;
   proportionMetrics?: StudioVrmProportionMetrics | null;
@@ -86,6 +91,7 @@ function formatValue(value: number, unit?: string) {
 
 export function StudioVrmAvatarForgePanel({
   state,
+  sculptSessionId,
   disabled = false,
   detectedOriginalHairCount = 0,
   proportionMetrics: runtimeProportionMetrics = null,
@@ -113,7 +119,15 @@ export function StudioVrmAvatarForgePanel({
   const forgeSignature = useMemo(() => JSON.stringify(serializeAvatarForgeState(state)), [state]);
   const emittedSignatureRef = useRef<string | null>(null);
   const seenSignatureRef = useRef(forgeSignature);
-  if (seenSignatureRef.current !== forgeSignature) {
+  const seenSessionRef = useRef(sculptSessionId);
+  if (seenSessionRef.current !== sculptSessionId) {
+    // 다른 모델로 갈아탔다. 서명 비교로는 못 잡는 경우가 있다 — 순정 상태에서 "헤어 없음"을
+    // 고른 뒤 새 모델이 설치되면 양쪽 상태가 모두 순정이라 서명이 같다.
+    seenSessionRef.current = sculptSessionId;
+    seenSignatureRef.current = forgeSignature;
+    emittedSignatureRef.current = null;
+    if (hairStyleChosen) setHairStyleChosen(false);
+  } else if (seenSignatureRef.current !== forgeSignature) {
     const mine = emittedSignatureRef.current === forgeSignature;
     seenSignatureRef.current = forgeSignature;
     emittedSignatureRef.current = null;

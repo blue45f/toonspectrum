@@ -228,13 +228,21 @@ describe("StudioVrmAvatarForgePanel default-style intent", () => {
   function renderControlled(initial: AvatarForgeState) {
     function Host() {
       const [state, setState] = useState(initial);
+      const [modelId, setModelId] = useState("model-a");
       return (
         <>
-          <button type="button" onClick={() => setState(createAvatarForgeState())}>
+          <button
+            type="button"
+            onClick={() => {
+              setModelId((current) => (current === "model-a" ? "model-b" : "model-a"));
+              setState(createAvatarForgeState());
+            }}
+          >
             새 VRM 설치
           </button>
           <StudioVrmAvatarForgePanel
             state={state}
+            sculptSessionId={modelId}
             detectedOriginalHairCount={2}
             proportionMetrics={null}
             proportionPresetNote={null}
@@ -270,6 +278,20 @@ describe("StudioVrmAvatarForgePanel default-style intent", () => {
 
     // 새 VRM 설치는 조형 상태를 통째로 초기화하지만 패널은 마운트된 채로 남는다.
     // 이전 캐릭터의 헤어 의도가 살아남으면 새 캐릭터가 민머리로 생성된다.
+    fireEvent.click(screen.getByRole("button", { name: "새 VRM 설치" }));
+    expect(defaultPresetNotice()?.getAttribute("data-studio-vrm-generate-default-preset")).toBe(
+      STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID,
+    );
+  });
+
+  it("forgets an explicit no-hair choice when a different model is installed", () => {
+    // 순정 상태에서 "헤어 없음"을 고르면 상태가 그대로라 서명이 바뀌지 않는다. 새 모델의
+    // 조형 상태도 순정이므로 서명 비교로는 교체를 알아볼 수 없다 — 모델 신원이 필요하다.
+    renderControlled(createAvatarForgeState());
+    fireEvent.click(screen.getByRole("tab", { name: "헤어" }));
+    fireEvent.click(screen.getByRole("button", { name: "헤어 없음" }));
+    expect(defaultPresetNotice()).toBeNull();
+
     fireEvent.click(screen.getByRole("button", { name: "새 VRM 설치" }));
     expect(defaultPresetNotice()?.getAttribute("data-studio-vrm-generate-default-preset")).toBe(
       STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID,

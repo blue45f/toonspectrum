@@ -1328,7 +1328,7 @@ function fitHairPartToSkull(
   head: StudioVrmRigHeadFit,
   fringe: number,
 ): HairTransform {
-  if (part.role === "cap") return transform;
+  if (part.role === "cap") return fitHairCapToSkull(transform, head);
 
   if (part.role === "bang") {
     const hairlineY = head.center[1] + 0.62 * head.radiusY;
@@ -1351,6 +1351,36 @@ function fitHairPartToSkull(
     topY <= ceiling ? pushed : [pushed[0], pushed[1] - (topY - ceiling), pushed[2]];
 
   return { ...transform, translation };
+}
+
+/** 캡 껍질의 최소 두께(두개골 반경 대비). 0 이면 두개골 표면과 정확히 겹쳐 z-fighting 이 난다. */
+const HAIR_CAP_MIN_SHELL = 0.05;
+
+/**
+ * 캡을 **두개골 바깥의 껍질**로 만든다.
+ *
+ * 계획의 캡 스케일은 두개골 반경의 배수(`volume × 스타일 계수`)로 들어오는데, 그대로 쓰면
+ * 두께가 아니라 **포함 여부**가 바뀐다. 배포 프리셋 21개 중 5개(`pixie-sport` 0.826,
+ * `hero-crop` 0.880, `androgynous-crop`·`silver-senior` 0.900, `elegant-bun` 0.950)는 캡이
+ * 통째로 두개골 안으로 들어가 정수리가 민머리로 보였고, 배수가 정확히 1인 9개는 표면과
+ * 완전히 겹쳐 z-fighting 이 났다.
+ *
+ * 그래서 두께는 **항상 바깥으로만** 준다. 1을 넘는 부피는 그대로 살리고, 1 이하는 최소
+ * 두께 안에서만 얇아진다 — `volume` 의 대소 관계는 유지되면서 캡이 살갗 밑으로는 못 간다.
+ * 중심이 어긋난 캡도 덮이도록 중심 오프셋만큼 반경을 더 준다.
+ */
+function fitHairCapToSkull(transform: HairTransform, head: StudioVrmRigHeadFit): HairTransform {
+  const radii: MeshVec3 = [head.radiusX, head.radiusY, head.radiusZ];
+  const fitted = radii.map((radius, axis) => {
+    const planned = Math.abs(transform.scale[axis]) / radius;
+    const shell =
+      planned >= 1
+        ? HAIR_CAP_MIN_SHELL + (planned - 1)
+        : HAIR_CAP_MIN_SHELL * meshClamp(planned, 0.5, 1);
+    const offset = Math.abs(transform.translation[axis] - head.center[axis]);
+    return radius * (1 + shell) + offset;
+  });
+  return { ...transform, scale: [fitted[0], fitted[1], fitted[2]] };
 }
 
 /**
