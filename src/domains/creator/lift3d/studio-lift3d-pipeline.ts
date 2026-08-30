@@ -40,6 +40,8 @@ import {
 } from "./studio-lift3d-mask";
 import { buildStudioLift3dGeometry, type StudioLift3dGeometry } from "./studio-lift3d-mesh";
 
+import type { StudioLift3dRenderBuffers } from "./studio-lift3d-render-buffers";
+
 export interface StudioLift3dPreset {
   readonly geometryMode: StudioLift3dGeometryMode;
   readonly depthProfile: StudioLift3dDepthProfile;
@@ -132,6 +134,8 @@ export interface StudioLift3dMetrics {
   readonly faceCount: number;
   readonly triangleCount: number;
   readonly boundaryEdgeCount: number;
+  /** 남은 비다양체/나비 진단 건수. 0 이어야 유효한 solid 다. */
+  readonly topologyErrorCount: number;
   readonly closed: boolean;
 }
 
@@ -158,18 +162,13 @@ function resolveRequest(request: StudioLift3dRequest): {
   return { preset, resolution: clamped.resolution, warnings };
 }
 
-/** 남은 위상 오류(비다양체 변·나비 정점)를 한 줄 경고로 접는다. */
-function diagnoseTopology(geometry: StudioLift3dGeometry): StudioLift3dWarning[] {
+/** 남은 위상 오류(비다양체 변·나비 정점) 개수. `closed` 판정과 경고가 함께 쓴다. */
+function countStudioLift3dTopologyErrors(geometry: StudioLift3dGeometry): number {
   let errors = 0;
   for (const diagnostic of diagnoseStudioEditableMesh(geometry.mesh)) {
     if (diagnostic.severity === "error") errors += 1;
   }
-  return errors === 0
-    ? []
-    : [studioLift3dWarning(
-      "pinch-faces-dropped",
-      `위상 경고 ${errors}건이 남았습니다. 3D 프린팅용으로 쓰려면 해상도를 낮춰 다시 만들어 보세요`,
-    )];
+  return errors;
 }
 
 /** 면 루프 길이 합에서 삼각형 수를 센다(부채꼴 분할 기준: n각형 → n−2개). */
@@ -244,7 +243,13 @@ export function liftStudioImageTo3d(
   warnings.push(...built.warnings);
 
   const geometry = built.value;
-  warnings.push(...diagnoseTopology(geometry));
+  const topologyErrors = countStudioLift3dTopologyErrors(geometry);
+  if (topologyErrors > 0) {
+    warnings.push(studioLift3dWarning(
+      "non-manifold-residual",
+      `위상 경고 ${topologyErrors}건이 남았습니다. 3D 프린팅용으로 쓰려면 해상도를 낮춰 다시 만들어 보세요`,
+    ));
+  }
   const stats = studioEditableMeshStats(geometry.mesh);
 
   return studioLift3dSuccess(
@@ -262,7 +267,10 @@ export function liftStudioImageTo3d(
         faceCount: stats.faceCount,
         triangleCount: countStudioLift3dTriangles(geometry),
         boundaryEdgeCount: stats.boundaryEdgeCount,
-        closed: stats.boundaryEdgeCount === 0,
+        topologyErrorCount: topologyErrors,
+        // 열린 변이 없다고 곧바로 solid 인 것은 아니다. 비다양체 변이 남아 있으면 경계는
+        // 닫혀 있어도 유효한 solid 가 아니므로, 두 조건을 모두 만족할 때만 닫혔다고 말한다.
+        closed: stats.boundaryEdgeCount === 0 && topologyErrors === 0,
       },
       meshHash: hashStudioEditableMesh(geometry.mesh),
     },
@@ -273,6 +281,11 @@ export function liftStudioImageTo3d(
 export interface StudioLift3dExport {
   readonly lift: StudioLift3dLift;
   readonly glb: StudioLift3dGlbFile;
+  /**
+   * GLB 에 실린 것과 **같은** 버퍼. 화면 미리보기가 이걸 그대로 쓰면 삼각형화와 법선 계산을
+   * 두 번 하지 않고, 파일과 화면이 어긋날 여지도 없다.
+   */
+  readonly buffers: StudioLift3dRenderBuffers;
 }
 
 export interface StudioLift3dExportOptions {
@@ -299,7 +312,7 @@ export function liftStudioImageTo3dGlb(
   });
   if (!encoded.ok) return encoded;
   return studioLift3dSuccess(
-    { lift: lifted.value, glb: encoded.value },
+    { lift: lifted.value, glb: encoded.value, buffers: encoded.value.buffers },
     [...lifted.warnings, ...encoded.warnings],
   );
 }

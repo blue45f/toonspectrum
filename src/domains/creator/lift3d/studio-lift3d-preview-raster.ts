@@ -18,8 +18,14 @@ const DEPTH_RAMP: readonly (readonly [number, number, number])[] = [
 ];
 
 const BACKGROUND: readonly [number, number, number] = [18, 17, 16];
+const SUBJECT: readonly [number, number, number] = [236, 232, 226];
 
-function rampColor(t: number): readonly [number, number, number] {
+/** 램프 색을 픽셀 버퍼에 직접 쓴다. 픽셀마다 튜플을 만들면 한 번 그릴 때 6만 개가 된다. */
+function writeRampColor(
+  pixels: Uint8ClampedArray,
+  offset: number,
+  t: number,
+): void {
   const clamped = t <= 0 ? 0 : t >= 1 ? 1 : t;
   const scaled = clamped * (DEPTH_RAMP.length - 1);
   const low = Math.min(DEPTH_RAMP.length - 1, Math.floor(scaled));
@@ -27,36 +33,32 @@ function rampColor(t: number): readonly [number, number, number] {
   const mix = scaled - low;
   const a = DEPTH_RAMP[low]!;
   const b = DEPTH_RAMP[high]!;
-  return [
-    Math.round(a[0] + (b[0] - a[0]) * mix),
-    Math.round(a[1] + (b[1] - a[1]) * mix),
-    Math.round(a[2] + (b[2] - a[2]) * mix),
-  ];
+  pixels[offset] = Math.round(a[0] + (b[0] - a[0]) * mix);
+  pixels[offset + 1] = Math.round(a[1] + (b[1] - a[1]) * mix);
+  pixels[offset + 2] = Math.round(a[2] + (b[2] - a[2]) * mix);
+  pixels[offset + 3] = 255;
 }
 
-function paint(
-  width: number,
-  height: number,
-  colorAt: (index: number) => readonly [number, number, number],
-): Uint8ClampedArray<ArrayBuffer> {
-  const pixels = new Uint8ClampedArray(width * height * 4);
-  for (let index = 0; index < width * height; index += 1) {
-    const [r, g, b] = colorAt(index);
-    pixels[index * 4] = r;
-    pixels[index * 4 + 1] = g;
-    pixels[index * 4 + 2] = b;
-    pixels[index * 4 + 3] = 255;
-  }
-  return pixels;
+function writeSolidColor(
+  pixels: Uint8ClampedArray,
+  offset: number,
+  color: readonly [number, number, number],
+): void {
+  pixels[offset] = color[0];
+  pixels[offset + 1] = color[1];
+  pixels[offset + 2] = color[2];
+  pixels[offset + 3] = 255;
 }
 
 /** 피사체는 밝게, 배경은 어둡게. 실루엣이 어디서 새는지 한눈에 보인다. */
 export function paintStudioLift3dMaskPreview(
   mask: StudioLift3dMask,
 ): Uint8ClampedArray<ArrayBuffer> {
-  return paint(mask.width, mask.height, (index) => (
-    mask.cells[index] === 1 ? [236, 232, 226] : BACKGROUND
-  ));
+  const pixels = new Uint8ClampedArray(mask.width * mask.height * 4);
+  for (let index = 0; index < mask.width * mask.height; index += 1) {
+    writeSolidColor(pixels, index * 4, mask.cells[index] === 1 ? SUBJECT : BACKGROUND);
+  }
+  return pixels;
 }
 
 /** 두께 0(봉합선) → 최대 두께를 램프 색으로 보여준다. */
@@ -64,7 +66,11 @@ export function paintStudioLift3dDepthPreview(
   mask: StudioLift3dMask,
   depth: StudioLift3dDepthField,
 ): Uint8ClampedArray<ArrayBuffer> {
-  return paint(mask.width, mask.height, (index) => (
-    mask.cells[index] === 1 ? rampColor(depth.heights[index] ?? 0) : BACKGROUND
-  ));
+  const pixels = new Uint8ClampedArray(mask.width * mask.height * 4);
+  for (let index = 0; index < mask.width * mask.height; index += 1) {
+    const offset = index * 4;
+    if (mask.cells[index] === 1) writeRampColor(pixels, offset, depth.heights[index] ?? 0);
+    else writeSolidColor(pixels, offset, BACKGROUND);
+  }
+  return pixels;
 }

@@ -14,9 +14,16 @@ export const STUDIO_LIFT3D_LIMITS = Object.freeze({
   maxSourceDimension: 8192,
   /** 원본 총 픽셀 수 상한(대략 32MP). 그 이상은 업로드 단계에서 걸러야 한다. */
   maxSourcePixels: 32_000_000,
-  /** 작업 격자(한 변) 범위. 상한은 편집 메시 정점 예산에서 역산한다. */
+  /**
+   * 작업 격자(한 변) 범위.
+   *
+   * 상한은 편집 메시의 **코너** 예산(`maxEdges` 500,000)에서 역산한다. 이미지 전체가 피사체인
+   * 배경 리프트는 한 변 n 에서 앞뒤 2(n−1)² 개 + 옆벽 4(n−1) 개의 사각형을 만들고, 사각형 하나가
+   * 코너 4개를 쓴다. n=248 이면 492,024 코너로 예산 안이고, n=252 부터 넘는다. 슬라이더 스텝(8)에
+   * 맞춰 248 로 둔다 — 정점 예산만 보고 256 을 열어두면 최대 해상도가 실패로만 끝난다.
+   */
   minResolution: 24,
-  maxResolution: 256,
+  maxResolution: 248,
   defaultResolution: 160,
   /** GLB 에 그대로 실어보내는 원본 텍스처 바이트 상한. */
   maxTextureBytes: 16 * 1024 * 1024,
@@ -49,7 +56,10 @@ export const STUDIO_LIFT3D_WARNING_CODES = [
   "alpha-absent",
   "background-key-ambiguous",
   "detached-parts-dropped",
+  /** 격자 단계에서 대각 꼬집힘을 **잘라냈다**. */
   "pinch-faces-dropped",
+  /** 그러고도 위상 오류가 **남았다** — 위와 뜻이 반대이므로 코드를 나눠 둔다. */
+  "non-manifold-residual",
   "resolution-clamped",
   "shallow-subject",
   "texture-omitted",
@@ -101,6 +111,12 @@ export interface StudioLift3dSourceImage {
 export interface StudioLift3dTexture {
   readonly mimeType: "image/jpeg" | "image/png" | "image/webp";
   readonly bytes: Uint8Array;
+}
+
+/** 0..1 로 조이고 비유한 값은 0 으로 떨어뜨린다. 마스크·깊이 커널이 함께 쓴다. */
+export function clampStudioLift3dUnit(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return value < 0 ? 0 : value > 1 ? 1 : value;
 }
 
 export function studioLift3dWarning(
