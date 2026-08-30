@@ -288,7 +288,14 @@ function draftBraidChain(
   }));
   const joints = jointsFrom(samples, prefix, headWorldRest);
   const rigid = new Map<string, number>();
-  members.forEach((member, index) => rigid.set(member.part.id, index));
+  // 매듭은 체인의 **위상상** 뿌리지만 정점은 싣지 않는다. VRM 스프링에서 첫 조인트도
+  // 회전이 시뮬레이션되므로(three-vrm 은 (본, 자식) 쌍마다 조인트를 만든다) 여기 매듭을
+  // 실으면 납작한 매듭 타원체가 땋은 머리를 따라 기울고 흔들린다. 바인딩을 비워 두면
+  // 아래 기본 경로가 고정 앵커에 묶는다.
+  members.forEach((member, index) => {
+    if (tie !== undefined && index === 0) return;
+    rigid.set(member.part.id, index);
+  });
   return { id: prefix, joints, length: chainLength(joints), rigid, blend: [] };
 }
 

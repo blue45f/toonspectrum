@@ -724,7 +724,12 @@ describe("studio VRM humanoid mesh", () => {
     // VRM 스프링에서 체인의 첫 항목은 "움직이지 않는 루트"가 아니다 — three-vrm 은
     // (본, 자식) 쌍마다 조인트를 만들어 첫 본의 회전도 시뮬레이션한다. 거기에 부착 링을
     // 실으면 링이 축을 중심으로 함께 돌아 두피에서 어긋난다(natural-short 60 정점).
-    for (const preset of AVATAR_FORGE_PRESETS.slice(0, 6)) {
+    // 땋은 머리 프리셋을 반드시 포함한다 — 매듭은 blend 가 아니라 rigid 경로로 묶이므로
+    // `hairChainSkin` 의 앵커 리다이렉트를 우회한다.
+    for (const preset of [
+      ...AVATAR_FORGE_PRESETS.slice(0, 6),
+      ...AVATAR_FORGE_PRESETS.filter((entry) => entry.id.includes("braid")),
+    ]) {
       const built = buildStudioVrmHumanoidMesh(preset.state);
       const hairPart = built.parts.find((part) => part.nodeName === "Hair");
       const hairRig = built.hairRig;
