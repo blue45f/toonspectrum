@@ -10,6 +10,7 @@ import {
 } from "./studio-vrm-avatar-forge";
 import { classifyMeshName } from "./studio-vrm-costume";
 import { STUDIO_VRM_EXPORT_EXPRESSION_PRESETS } from "./studio-vrm-export-vrm-extension";
+import { STUDIO_VRM_HAIR_ANCHOR_JOINT } from "./studio-vrm-hair-rig";
 import {
   buildStudioVrmHumanoidMesh,
   STUDIO_VRM_HUMANOID_MORPH_TARGET_NAMES,
@@ -482,10 +483,18 @@ describe("studio VRM humanoid mesh", () => {
       const rig = built.rig;
       const scaleY = rig.head.radiusY / 0.46;
 
+      // 흔들리지 않는 파츠도 바인딩은 갖는다 — 고정 앵커에 묶여야 역스케일 피벗 아래에
+      // 모이고 머리 조형 스케일이 두 번 걸리지 않는다. "흔들리지 않는다"는
+      // **앵커에 강체로 묶인다**는 뜻이다.
+      const isAnchored = (partId: string): boolean => {
+        const binding = bindings.get(partId);
+        return binding?.kind === "rigid" && binding.jointOffset === STUDIO_VRM_HAIR_ANCHOR_JOINT;
+      };
+
       for (const part of buildAvatarForgeHairParts(state)) {
         // 두피 껍질은 머리 그 자체다 — 절대 흔들리면 안 된다.
         if (part.role === "cap") {
-          expect(bindings.has(part.id), `${presetId}: cap 이 스프링에 실렸다`).toBe(false);
+          expect(isAnchored(part.id), `${presetId}: cap 이 스프링에 실렸다`).toBe(true);
           continue;
         }
         if (part.primitive === "tapered-capsule") continue;
@@ -494,9 +503,9 @@ describe("studio VRM humanoid mesh", () => {
           rig.head.center[1] + (part.position[1] - 0.18) * scaleY - Math.abs(part.scale[1]) * scaleY;
         if (bottom < rig.worldRest.head[1]) continue;
         expect(
-          bindings.has(part.id),
+          isAnchored(part.id),
           `${presetId}: ${part.id} 는 관절 위에 있는데 스프링에 실렸다`,
-        ).toBe(false);
+        ).toBe(true);
       }
     }
   });
@@ -534,6 +543,55 @@ describe("studio VRM humanoid mesh", () => {
           ).toBe(true);
         }
       }
+    }
+  });
+
+  it("scales the hair with the head so a big-headed character is not swallowed by it", () => {
+    // 두상 메시는 `head` 조인트에 묶여 런타임에 `T·S·T⁻¹` 로 커진다. 헤어는 전단을 피하려고
+    // 역스케일 피벗 아래에 있어 그 스케일을 받지 않으므로, 저작 단계에서 미리 반영해야 한다.
+    // 반영하지 않았을 때 두신비 2.5 에서 체인 묶임 정점의 67~100% 가 커진 두개골 속에
+    // 파묻혔다(`elegant-bun` 100%).
+    for (const preset of AVATAR_FORGE_PRESETS.slice(0, 8)) {
+      const counts = [1, 2.5].map((headBodyRatio) => {
+        const state = sanitizeAvatarForgeState({
+          ...preset.state,
+          proportions: { ...preset.state.proportions, headBodyRatio },
+        });
+        const built = buildStudioVrmHumanoidMesh(state);
+        const hairPart = built.parts.find((part) => part.nodeName === "Hair");
+        if (!hairPart) return null;
+        const rig = built.rig;
+        const scale = rig.nodeScale.head ?? [1, 1, 1];
+        const joint = rig.worldRest.head;
+        // 스케일이 적용된 두개골 타원체
+        const center = [0, 1, 2].map(
+          (axis) => joint[axis] + (rig.head.center[axis] - joint[axis]) * scale[axis],
+        );
+        const radii = [
+          rig.head.radiusX * scale[0],
+          rig.head.radiusY * scale[1],
+          rig.head.radiusZ * scale[2],
+        ];
+        let inside = 0;
+        let total = 0;
+        for (const primitive of hairPart.primitives) {
+          const positions = numbers(primitive.positions);
+          for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
+            total += 1;
+            const normalized = Math.hypot(
+              (positions[vertex * 3] - center[0]) / radii[0],
+              (positions[vertex * 3 + 1] - center[1]) / radii[1],
+              (positions[vertex * 3 + 2] - center[2]) / radii[2],
+            );
+            if (normalized < 1) inside += 1;
+          }
+        }
+        return { inside, total };
+      });
+      if (counts[0] === null || counts[1] === null) continue;
+      // 두개골 대비 헤어의 상대 배치가 두신비에 **불변**이어야 한다 = 함께 커진 것이다.
+      expect(counts[1].total, preset.id).toBe(counts[0].total);
+      expect(counts[1].inside, preset.id).toBe(counts[0].inside);
     }
   });
 });

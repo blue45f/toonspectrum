@@ -100,18 +100,30 @@ export type StudioVrmHairChain = {
 /**
  * 파츠 하나를 어떻게 스킨할지.
  *  - `blend` — 축 방향 파라미터로 이웃한 두 마디에 나눠 싣는다(가닥·덩어리).
- *  - `rigid` — 파츠 전체를 마디 하나에 싣는다(땋은 머리 세그먼트·매듭).
+ *  - `rigid` — 파츠 전체를 마디 하나에 싣는다(땋은 머리 세그먼트·매듭·흔들리지 않는 파츠).
+ *
+ * `jointOffset` 은 펼친 조인트 목록 기준 **절대** 인덱스다.
  */
 export type StudioVrmHairBinding =
   | { readonly kind: "blend"; readonly chain: StudioVrmHairChain }
-  | { readonly kind: "rigid"; readonly chain: StudioVrmHairChain; readonly jointInChain: number };
+  | { readonly kind: "rigid"; readonly jointOffset: number };
+
+/** 흔들리지 않는 고정 조인트의 위치. 항상 펼친 목록의 0번이다. */
+export const STUDIO_VRM_HAIR_ANCHOR_JOINT = 0;
 
 export type StudioVrmHairRig = {
   readonly version: typeof STUDIO_VRM_HAIR_RIG_VERSION;
   readonly chains: readonly StudioVrmHairChain[];
-  /** 체인들을 펼친 조인트 목록. 스킨 `joints` 확장 순서이자 조인트 인덱스 순서다. */
+  /**
+   * 체인들을 펼친 조인트 목록. 스킨 `joints` 확장 순서이자 조인트 인덱스 순서다.
+   * 0번은 항상 고정 앵커이고 어떤 스프링에도 들어가지 않는다.
+   */
   readonly joints: readonly StudioVrmHairJoint[];
-  /** 파츠 id → 스킨 방법. 여기 없는 파츠는 `head` 에 그대로 묶인다. */
+  /**
+   * 파츠 id → 스킨 방법. **모든 헤어 파츠가 여기 들어 있다** — 흔들리지 않는 캡·정수리
+   * 파츠도 고정 앵커에 묶는다. 헤어가 통째로 역스케일 피벗 아래에 있어야 머리 조형
+   * 스케일이 두 번 걸리지 않는다(리그 파일 상단 참고).
+   */
   readonly bindings: ReadonlyMap<string, StudioVrmHairBinding>;
 };
 
@@ -322,10 +334,19 @@ export function buildStudioVrmHairRig(
     drafts.push(draftBlobChain(input, headWorldRest));
   }
 
-  if (drafts.length === 0) return null;
+  if (parts.length === 0) return null;
 
   const chains: StudioVrmHairChain[] = [];
-  const joints: StudioVrmHairJoint[] = [];
+  // 0번은 고정 앵커 — 머리 관절에 놓이고 절대 움직이지 않는다. 흔들리지 않는 파츠가 여기
+  // 묶여야 헤어 전체가 역스케일 피벗 아래에 모인다.
+  const joints: StudioVrmHairJoint[] = [
+    {
+      name: "HairAnchor",
+      localTranslation: [0, 0, 0],
+      worldRest: headWorldRest,
+      hitRadius: 0.01,
+    },
+  ];
   const bindings = new Map<string, StudioVrmHairBinding>();
 
   for (const draft of drafts) {
@@ -343,7 +364,14 @@ export function buildStudioVrmHairRig(
     joints.push(...draft.joints);
     for (const partId of draft.blend) bindings.set(partId, { kind: "blend", chain });
     for (const [partId, jointInChain] of draft.rigid) {
-      bindings.set(partId, { kind: "rigid", chain, jointInChain });
+      bindings.set(partId, { kind: "rigid", jointOffset: chain.jointOffset + jointInChain });
+    }
+  }
+
+  // 체인에 들어가지 않은 파츠(캡·정수리 번·짧은 덩어리)는 고정 앵커에 묶는다.
+  for (const input of parts) {
+    if (!bindings.has(input.part.id)) {
+      bindings.set(input.part.id, { kind: "rigid", jointOffset: STUDIO_VRM_HAIR_ANCHOR_JOINT });
     }
   }
 

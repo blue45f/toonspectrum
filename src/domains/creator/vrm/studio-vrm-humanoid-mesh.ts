@@ -1348,6 +1348,28 @@ function fitHairPartToSkull(
   return { ...transform, translation };
 }
 
+/**
+ * 머리 **노드 스케일이 적용된** 두개골 치수.
+ *
+ * 리그의 `head` fit 은 스케일 이전 값이다. 두상 메시는 `head` 조인트에 묶여 런타임에
+ * `T·S·T⁻¹` 로 커지므로 그 좌표를 그대로 써도 되지만, 헤어는 역스케일 피벗 아래에 있어
+ * 그 스케일을 받지 않는다. 그래서 헤어만 **미리 적용된** 치수로 저작한다.
+ */
+function shapeHeadFit(rig: StudioVrmRig): StudioVrmRigHeadFit {
+  const scale = rig.nodeScale.head ?? [1, 1, 1];
+  const joint = rig.worldRest.head;
+  return {
+    center: [
+      joint[0] + (rig.head.center[0] - joint[0]) * scale[0],
+      joint[1] + (rig.head.center[1] - joint[1]) * scale[1],
+      joint[2] + (rig.head.center[2] - joint[2]) * scale[2],
+    ],
+    radiusX: rig.head.radiusX * scale[0],
+    radiusY: rig.head.radiusY * scale[1],
+    radiusZ: rig.head.radiusZ * scale[2],
+  };
+}
+
 /** 캡 껍질의 최소 두께(두개골 반경 대비). 0 이면 두개골 표면과 정확히 겹쳐 z-fighting 이 난다. */
 const HAIR_CAP_MIN_SHELL = 0.05;
 
@@ -1445,28 +1467,36 @@ function buildHair(
   const builder = new SurfaceBuilder();
   const skin = only(rig, "head");
 
+  // 헤어는 **조형 스케일이 적용된 두개골** 좌표로 저작한다. 몸통·두상 메시는 `head` 노드에
+  // 묶여 런타임에 `T·S·T⁻¹` 로 커지지만, 헤어는 역스케일 피벗 아래라 그 스케일을 받지
+  // 않는다 — 저작 단계에서 미리 반영하지 않으면 두신비를 키웠을 때 머리카락만 원래
+  // 크기로 남아 커진 두개골 속에 파묻힌다(두신비 2.5 에서 체인 묶임 정점의 67~100%).
+  const shapedHead = shapeHeadFit(rig);
+
   // 가닥마다 두개골 적합까지 끝난 변환을 먼저 확정한다 — 체인 조인트가 그 변환 위에 놓인다.
   const transforms = parts.map((part) =>
-    fitHairPartToSkull(part, hairPartTransform(part, rig.head), rig.head, state.hair.fringe),
+    fitHairPartToSkull(part, hairPartTransform(part, shapedHead), shapedHead, state.hair.fringe),
   );
   const hairRig = buildStudioVrmHairRig(
     parts.map((part, index) => ({ part, transform: transforms[index] })),
     rig.worldRest.head,
     rig.heightScale,
   );
+
   const jointBase = rig.bones.length;
 
   /**
-   * 파츠 하나의 스킨을 축 방향 파라미터의 함수로 준다. 리그가 없는 파츠는 `head` 에 그대로
-   * 묶인다 — 캡·앞머리처럼 두피에 붙어 있어야 하는 것들이다.
+   * 파츠 하나의 스킨을 축 방향 파라미터의 함수로 준다.
+   *
+   * **헤어는 전부 헤어 조인트에 묶는다** — 흔들리지 않는 캡·정수리 파츠도 고정 앵커에
+   * 묶어 역스케일 피벗 아래에 둔다. `head` 에 직접 묶으면 그 노드의 조형 스케일이
+   * 한 번 더 걸려, 이미 조형 좌표로 저작한 헤어가 두 배로 커진다.
    */
   const skinFor = (partId: string): ((t: number) => MeshSkinBinding) => {
     const binding = hairRig?.bindings.get(partId);
     if (binding === undefined) return () => skin;
     if (binding.kind === "rigid") {
-      const joint: MeshSkinBinding = [
-        [jointBase + binding.chain.jointOffset + binding.jointInChain, 1],
-      ];
+      const joint: MeshSkinBinding = [[jointBase + binding.jointOffset, 1]];
       return () => joint;
     }
     return (t) => hairChainSkin(binding.chain, jointBase, t);

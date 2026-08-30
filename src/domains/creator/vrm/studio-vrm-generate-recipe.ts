@@ -277,7 +277,9 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
     const chain = hairRig?.chains.find(
       (entry) => index >= entry.jointOffset && index < entry.jointOffset + entry.joints.length,
     );
-    const isLast = chain !== undefined && index === chain.jointOffset + chain.joints.length - 1;
+    // 체인에 속하지 않는 조인트(고정 앵커)와 체인의 마지막 마디는 자식이 없다. 앵커에
+    // 자식을 달면 다음 체인의 뿌리를 중복으로 입양해 노드 트리가 깨진다.
+    const isLast = chain === undefined || index === chain.jointOffset + chain.joints.length - 1;
     return {
       name: joint.name,
       translation: joint.localTranslation,
@@ -307,9 +309,13 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
   const hairPivot: StudioVrmExportNode = {
     name: "HairRoot",
     scale: [1 / headScale[0], 1 / headScale[1], 1 / headScale[2]],
-    children: (hairRig?.chains ?? []).map(
-      (chain) => firstHairJointNode + chain.jointOffset,
-    ),
+    // 고정 앵커(0번)와 각 체인의 첫 조인트가 피벗의 직계 자식이다.
+    children: hairRig
+      ? [
+          firstHairJointNode,
+          ...hairRig.chains.map((chain) => firstHairJointNode + chain.jointOffset),
+        ]
+      : [],
   };
 
   const nodes: StudioVrmExportNode[] = [
