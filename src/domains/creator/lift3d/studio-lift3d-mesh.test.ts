@@ -17,7 +17,11 @@ import {
   buildStudioLift3dGeometry,
   normalizeStudioLift3dPositions,
 } from "./studio-lift3d-mesh";
-import { discImage, signedVolume } from "./studio-lift3d.test-fixture";
+import {
+  discImage,
+  signedVolume,
+  verticalGradientImage,
+} from "./studio-lift3d.test-fixture";
 
 function maskFromCells(width: number, height: number, cells: Uint8Array): StudioLift3dMask {
   let minX = width;
@@ -268,6 +272,78 @@ describe("Studio Lift 3D 메시 빌더", () => {
     const soup = studioEditableMeshToTriangleSoup(built.value.mesh);
     expect(signedVolume(soup.positions, soup.indices)).toBeGreaterThan(0);
     expect(built.value.bounds.max.z).toBeGreaterThan(built.value.bounds.min.z);
+  });
+
+  it("앞/뒤 비율을 옮겨도 총 두께는 그대로다", () => {
+    const grid = resampleStudioLift3dImage(discImage(48), 48);
+    const mask = extractStudioLift3dMask(grid, { mode: "alpha" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "round", smoothing: 1 });
+    const build = (frontRatio: number) => buildStudioLift3dGeometry(mask, depth, {
+      mode: "inflate",
+      depthScale: 0.4,
+      targetHeight: 1.7,
+      frontRatio,
+    });
+
+    const even = build(0.5);
+    const forward = build(0.8);
+    expect(even.ok && forward.ok).toBe(true);
+    if (!even.ok || !forward.ok) return;
+
+    const depthOf = (bounds: { min: { z: number }; max: { z: number } }) =>
+      bounds.max.z - bounds.min.z;
+    // 총 두께는 같고, 무게중심만 앞으로 옮겨간다(정규화가 XZ 를 원점에 맞추므로 두께로 비교).
+    expect(depthOf(forward.value.bounds)).toBeCloseTo(depthOf(even.value.bounds), 5);
+    expect(hashStudioEditableMesh(forward.value.mesh))
+      .not.toBe(hashStudioEditableMesh(even.value.mesh));
+  });
+
+  it("parallax 는 밴드마다 떨어진 카드를 세우고 각각 닫아 둔다", () => {
+    const grid = resampleStudioLift3dImage(verticalGradientImage(64), 48);
+    const mask = extractStudioLift3dMask(grid, { mode: "full" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "relief", smoothing: 0 });
+
+    const built = buildStudioLift3dGeometry(mask, depth, {
+      mode: "parallax",
+      depthScale: 0.4,
+      targetHeight: 6,
+      layerBands: 5,
+    });
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.value.mode).toBe("parallax");
+    expect(built.value.layerCount).toBe(5);
+    // 조각끼리 정점을 나누지 않으므로 전부 닫혀 있어야 한다.
+    expect(studioEditableMeshStats(built.value.mesh).boundaryEdgeCount).toBe(0);
+    expect(
+      diagnoseStudioEditableMesh(built.value.mesh)
+        .filter((diagnostic) => diagnostic.severity === "error"),
+    ).toEqual([]);
+    const soup = studioEditableMeshToTriangleSoup(built.value.mesh);
+    expect(signedVolume(soup.positions, soup.indices)).toBeGreaterThan(0);
+  });
+
+  it("밴드를 늘리면 층이 늘고 깊이 범위는 유지된다", () => {
+    const grid = resampleStudioLift3dImage(verticalGradientImage(64), 48);
+    const mask = extractStudioLift3dMask(grid, { mode: "full" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "relief", smoothing: 0 });
+    const build = (layerBands: number) => buildStudioLift3dGeometry(mask, depth, {
+      mode: "parallax",
+      depthScale: 0.4,
+      targetHeight: 6,
+      layerBands,
+    });
+
+    const few = build(3);
+    const many = build(9);
+    expect(few.ok && many.ok).toBe(true);
+    if (!few.ok || !many.ok) return;
+    expect(many.value.layerCount).toBeGreaterThan(few.value.layerCount);
+    // 카드는 밴드 중앙에 놓이므로 층이 늘어도 전체 깊이 범위는 비슷하다.
+    const range = (bounds: { min: { z: number }; max: { z: number } }) =>
+      bounds.max.z - bounds.min.z;
+    expect(range(many.value.bounds)).toBeGreaterThan(range(few.value.bounds) * 0.8);
   });
 
   it("같은 입력이면 같은 메시 해시가 나온다", () => {

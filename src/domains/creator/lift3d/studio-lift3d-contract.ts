@@ -45,10 +45,11 @@ export type StudioLift3dResolvedMaskMode = Exclude<StudioLift3dMaskMode, "auto">
 export const STUDIO_LIFT3D_DEPTH_PROFILES = ["round", "soft", "slab", "relief"] as const;
 export type StudioLift3dDepthProfile = (typeof STUDIO_LIFT3D_DEPTH_PROFILES)[number];
 
-export const STUDIO_LIFT3D_GEOMETRY_MODES = ["inflate", "relief"] as const;
+export const STUDIO_LIFT3D_GEOMETRY_MODES = ["inflate", "relief", "parallax"] as const;
 /**
- * `inflate` — 실루엣을 앞뒤 두 겹으로 부풀려 테두리에서 봉합한 닫힌 solid(캐릭터·소품).
- * `relief`  — 앞면만 변위시키고 평평한 뒷판과 옆벽으로 막은 부조 슬래브(배경).
+ * `inflate`  — 실루엣을 앞뒤 두 겹으로 부풀린 닫힌 solid(캐릭터·소품).
+ * `relief`   — 앞면만 변위시키고 평평한 뒷판과 옆벽으로 막은 부조 슬래브(배경).
+ * `parallax` — 깊이를 밴드로 잘라 층마다 평평한 카드를 세운 시차 레이어(배경).
  */
 export type StudioLift3dGeometryMode = (typeof STUDIO_LIFT3D_GEOMETRY_MODES)[number];
 
@@ -60,6 +61,8 @@ export const STUDIO_LIFT3D_WARNING_CODES = [
   "pinch-faces-dropped",
   /** 그러고도 위상 오류가 **남았다** — 위와 뜻이 반대이므로 코드를 나눠 둔다. */
   "non-manifold-residual",
+  /** 좌우대칭으로 보기 어려워 대칭 보정을 걸지 않았다. */
+  "symmetry-skipped",
   "resolution-clamped",
   "shallow-subject",
   "texture-omitted",

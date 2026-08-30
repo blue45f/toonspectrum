@@ -26,6 +26,8 @@ import {
   paintStudioLift3dMaskPreview,
 } from "./studio-lift3d-preview-raster";
 
+import type { StudioLift3dLibraryRights } from "./studio-lift3d-library-handoff";
+
 import { lazyRetry } from "@/lib/lazy-retry";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
@@ -58,6 +60,17 @@ const SECONDARY_BUTTON_CLASS =
   "disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
   "focus-visible:outline-accent";
 const FIELD_LABEL_CLASS = "flex items-center justify-between text-xs font-semibold text-fg-2";
+
+/** 배경 3D 편집기의 업로드 패널과 같은 선택지·같은 문구. */
+const LIBRARY_RIGHTS_OPTIONS: ReadonlyArray<{
+  readonly id: StudioLift3dLibraryRights;
+  readonly label: string;
+}> = [
+  { id: "unknown", label: "확인 전 — 상업 이용 보류" },
+  { id: "owned", label: "직접 제작 — 내가 만든 원화" },
+  { id: "licensed", label: "구매·허가받은 원화" },
+  { id: "public-domain", label: "공개 이용(퍼블릭 도메인)" },
+];
 const CARD_CLASS = "rounded-xl border border-line bg-card/60 p-4";
 
 interface SliderFieldProps {
@@ -182,7 +195,12 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
   const [smoothing, setSmoothing] = useState(preset.smoothing);
   const [unlit, setUnlit] = useState(true);
   const [invertRelief, setInvertRelief] = useState(false);
+  const [frontRatio, setFrontRatio] = useState(preset.frontRatio);
+  const [layerBands, setLayerBands] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [librarySaving, setLibrarySaving] = useState(false);
+  const [libraryRights, setLibraryRights] = useState<StudioLift3dLibraryRights>("unknown");
+  const [libraryNotice, setLibraryNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<StudioLift3dPreviewTab>("source");
   const [result, setResult] = useState<StudioLift3dExport | null>(null);
   const [warnings, setWarnings] = useState<readonly StudioLift3dWarning[]>([]);
@@ -212,6 +230,9 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     setResolution(nextPreset.resolution);
     setDepthScale(nextPreset.depthScale);
     setSmoothing(nextPreset.smoothing);
+    setFrontRatio(nextPreset.frontRatio);
+    setLayerBands(1);
+    setLibraryNotice(null);
   }, []);
 
   const onPickFile = useCallback(async (file: File | null | undefined) => {
@@ -245,6 +266,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
       return;
     }
     setBusy(true);
+    setLibraryNotice(null);
     const handle = globalThis.setTimeout(() => {
       // 타이머 콜백의 예외는 React 에러 경계가 잡지 못한다. 감싸지 않으면 busy 가 영원히
       // true 로 남아 저장 버튼이 잠기고, 화면에는 이전 결과와 지표가 그대로 남는다.
@@ -257,6 +279,8 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
             depthScale,
             smoothing,
             invertRelief,
+            frontRatio,
+            layerBands,
           },
           {
             name: decoded.fileName.length > 0 ? decoded.fileName : "lift3d",
@@ -288,7 +312,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     return () => {
       globalThis.clearTimeout(handle);
     };
-  }, [decoded, subject, resolution, depthScale, smoothing, invertRelief, unlit]);
+  }, [decoded, subject, resolution, depthScale, smoothing, invertRelief, unlit, frontRatio, layerBands]);
 
   // 내보내기가 이미 만들어 둔 버퍼를 그대로 쓴다. 여기서 다시 만들면 슬라이더를 한 칸 옮길
   // 때마다 삼각형화와 법선 계산을 두 번씩 하게 된다.
@@ -309,6 +333,25 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
       result.glb.fileName,
     );
   }, [result]);
+
+  const onSaveToLibrary = useCallback(async () => {
+    if (result === null) return;
+    setLibrarySaving(true);
+    setLibraryNotice(null);
+    try {
+      // 모델 라이브러리는 OPFS·SQLite 까지 끌고 오는 큰 그래프다. 저장을 누르는 순간에만
+      // 불러와, 변환만 하고 나가는 사용자가 그 비용을 내지 않게 한다.
+      const { saveStudioLift3dToBg3dLibrary } = await import("./studio-lift3d-library-handoff");
+      const saved = await saveStudioLift3dToBg3dLibrary(result.glb, libraryRights);
+      setLibraryNotice(saved.ok
+        ? "배경 3D 편집기의 모델 목록에 등록했습니다."
+        : saved.detail);
+    } catch {
+      setLibraryNotice("3D 모델 라이브러리를 열 수 없습니다. 대신 GLB 파일로 저장해 주세요.");
+    } finally {
+      setLibrarySaving(false);
+    }
+  }, [result, libraryRights]);
 
   const metrics = result?.lift.metrics ?? null;
   // 텍스처가 빠진 채 내보내졌다면 미리보기도 무채색이어야 한다 — 파일과 화면이 달라지면
@@ -437,6 +480,27 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                   display={`${smoothing}회`}
                   onChange={setSmoothing}
                 />
+                {preset.geometryMode === "inflate" ? (
+                  <SliderField
+                    label="앞쪽 두께 비율"
+                    value={frontRatio}
+                    min={0.2}
+                    max={0.8}
+                    step={0.02}
+                    display={`앞 ${Math.round(frontRatio * 100)}%`}
+                    onChange={setFrontRatio}
+                  />
+                ) : (
+                  <SliderField
+                    label="시차 레이어"
+                    value={layerBands}
+                    min={1}
+                    max={12}
+                    step={1}
+                    display={layerBands < 2 ? "연속 부조" : `${layerBands}층`}
+                    onChange={setLayerBands}
+                  />
+                )}
                 {preset.geometryMode === "relief" ? (
                   <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
                     <input
@@ -462,18 +526,50 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
 
             <div className={CARD_CLASS}>
               <h2 className="text-sm font-semibold">4. 내보내기</h2>
+              {/*
+                이용 권리는 원화의 권리를 따르는데 그건 이 코드가 알 수 없다. 편집기 업로드
+                패널이 사용자에게 묻는 것과 같은 네 가지를, 같은 문구로 묻는다.
+              */}
+              <label className="mt-3 block space-y-1.5">
+                <span className={FIELD_LABEL_CLASS}>
+                  <span>이용 권리</span>
+                </span>
+                <select
+                  value={libraryRights}
+                  onChange={(event) => {
+                    setLibraryRights(event.target.value as StudioLift3dLibraryRights);
+                    setLibraryNotice(null);
+                  }}
+                  className="min-h-11 w-full rounded-lg border border-line bg-raised px-3 text-sm text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  {LIBRARY_RIGHTS_OPTIONS.map((option) => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => void onSaveToLibrary()}
+                disabled={result === null || busy || librarySaving}
+                className={`${PRIMARY_BUTTON_CLASS} mt-3 w-full`}
+              >
+                {librarySaving ? "등록하는 중..." : "배경 3D 모델로 등록"}
+              </button>
+              <p className="mt-2 text-xs leading-relaxed text-fg-3">
+                배경 3D 편집기의 모델 목록에 바로 올라갑니다. 파일을 내려받았다가 다시 올릴
+                필요가 없습니다.
+              </p>
+              {libraryNotice !== null ? (
+                <p role="status" className="mt-2 text-xs leading-relaxed text-fg-2">{libraryNotice}</p>
+              ) : null}
               <button
                 type="button"
                 onClick={onDownload}
                 disabled={result === null || busy}
-                className={`${PRIMARY_BUTTON_CLASS} mt-3 w-full`}
+                className={`${SECONDARY_BUTTON_CLASS} mt-3 w-full`}
               >
                 GLB 파일로 저장
               </button>
-              <p className="mt-2 text-xs leading-relaxed text-fg-3">
-                저장한 GLB 는 Studio 의 배경 3D 편집기에서 <strong className="font-semibold text-fg-2">모델 가져오기</strong>
-                로 그대로 불러올 수 있습니다.
-              </p>
               {liftError !== null ? (
                 <p role="alert" className="mt-3 text-xs leading-relaxed text-danger">{liftError}</p>
               ) : null}
@@ -556,7 +652,14 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                 {[
                   ["삼각형", metrics.triangleCount.toLocaleString("ko-KR")],
                   ["정점", metrics.vertexCount.toLocaleString("ko-KR")],
-                  ["작업 격자", `${metrics.gridWidth}×${metrics.gridHeight}`],
+                  metrics.layerCount > 1
+                    ? ["레이어", `${metrics.layerCount}층`]
+                    : metrics.symmetryScore !== null
+                      ? [
+                        "좌우대칭",
+                        `${Math.round(metrics.symmetryScore * 100)}%${metrics.symmetryApplied ? " · 보정" : ""}`,
+                      ]
+                      : ["작업 격자", `${metrics.gridWidth}×${metrics.gridHeight}`],
                   [
                     "위상",
                     metrics.closed

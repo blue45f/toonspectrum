@@ -245,3 +245,61 @@ export function buildStudioLift3dDepthField(
 
   return { width, height, heights: smoothed, maxDistance };
 }
+
+export interface StudioLift3dDepthBand {
+  readonly index: number;
+  /** 이 밴드에 속한 셀만 1. 마스크와 같은 크기·인덱스. */
+  readonly cells: Uint8Array;
+  /** 0..1 밴드 대표 깊이(구간 중앙). 카드가 놓일 z 를 정한다. */
+  readonly center: number;
+  readonly cellCount: number;
+}
+
+/**
+ * 깊이장을 같은 폭의 구간으로 잘라 밴드별 셀 집합을 만든다.
+ *
+ * 시차(parallax) 레이어의 재료다. 연속된 부조를 몇 장의 평평한 카드로 바꾸면 카메라가 움직일 때
+ * 층이 서로 다른 속도로 흘러, 웹툰 배경이 기대하는 깊이감이 훨씬 또렷하게 읽힌다.
+ *
+ * 비어 있는 밴드는 버린다 — 하늘만 있는 원화에서 중간 밴드가 통째로 비는 일은 흔하고,
+ * 빈 카드는 면 없는 지오메트리로만 남는다.
+ */
+export const STUDIO_LIFT3D_MAX_DEPTH_BANDS = 24;
+
+/** 밴드 수를 허용 범위로 조인다. 카드 두께 계산이 같은 값을 써야 층이 겹치지 않는다. */
+export function clampStudioLift3dBandCount(bandCount: number): number {
+  if (!Number.isFinite(bandCount)) return 1;
+  return Math.max(1, Math.min(STUDIO_LIFT3D_MAX_DEPTH_BANDS, Math.round(bandCount)));
+}
+
+export function buildStudioLift3dDepthBands(
+  mask: StudioLift3dMask,
+  depth: StudioLift3dDepthField,
+  bandCount: number,
+): readonly StudioLift3dDepthBand[] {
+  const bands = clampStudioLift3dBandCount(bandCount);
+  const size = mask.width * mask.height;
+  const buckets: Uint8Array[] = Array.from({ length: bands }, () => new Uint8Array(size));
+  const counts = new Int32Array(bands);
+
+  for (let index = 0; index < size; index += 1) {
+    if (mask.cells[index] === 0) continue;
+    const height = clamp01(depth.heights[index] ?? 0);
+    // 1 은 마지막 밴드에 속한다. floor 만 쓰면 밴드가 하나 더 생긴다.
+    const bucket = Math.min(bands - 1, Math.floor(height * bands));
+    buckets[bucket]![index] = 1;
+    counts[bucket] += 1;
+  }
+
+  const out: StudioLift3dDepthBand[] = [];
+  for (let index = 0; index < bands; index += 1) {
+    if (counts[index] === 0) continue;
+    out.push({
+      index,
+      cells: buckets[index]!,
+      center: (index + 0.5) / bands,
+      cellCount: counts[index]!,
+    });
+  }
+  return Object.freeze(out);
+}

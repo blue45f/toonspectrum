@@ -1,17 +1,22 @@
 /** @vitest-environment jsdom */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { discImage } from "./studio-lift3d.test-fixture";
+import { discImage, verticalGradientImage } from "./studio-lift3d.test-fixture";
 import { StudioLift3dPage } from "./StudioLift3dPage";
 
 const decodeStudioLift3dFile = vi.hoisted(() => vi.fn());
+const saveStudioLift3dToBg3dLibrary = vi.hoisted(() => vi.fn());
 
 vi.mock("./studio-lift3d-image-decode", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./studio-lift3d-image-decode")>()),
   decodeStudioLift3dFile,
 }));
+
+// 모델 라이브러리는 OPFS·SQLite 그래프를 끌고 온다. 페이지가 그것을 **동적으로만** 부르는지가
+// 여기서 확인하려는 계약이라, 모듈 자체를 대체한다.
+vi.mock("./studio-lift3d-library-handoff", () => ({ saveStudioLift3dToBg3dLibrary }));
 
 beforeAll(() => {
   // jsdom 에는 object URL 이 없다. 미리보기 <img> 와 GLB 저장 경로가 둘 다 쓴다.
@@ -30,6 +35,22 @@ function renderPage(initialSubject: string | null = null) {
       <StudioLift3dPage initialSubject={initialSubject} />
     </MemoryRouter>,
   );
+}
+
+function libraryButton(): HTMLButtonElement {
+  return screen.getByRole("button", { name: /배경 3D 모델로 등록|등록하는 중/u }) as HTMLButtonElement;
+}
+
+function decodedDisc() {
+  return {
+    source: discImage(96),
+    bytes: new Uint8Array([1, 2, 3]),
+    mimeType: "image/png" as const,
+    texture: { mimeType: "image/png" as const, bytes: new Uint8Array([1, 2, 3]) },
+    fileName: "주인공",
+    naturalWidth: 96,
+    naturalHeight: 96,
+  };
 }
 
 function downloadButton(): HTMLButtonElement {
@@ -66,16 +87,7 @@ describe("StudioLift3dPage", () => {
   });
 
   it("원화를 고르면 변환해 지표와 저장 버튼을 연다", async () => {
-    const source = discImage(96);
-    decodeStudioLift3dFile.mockResolvedValue({
-      source,
-      bytes: new Uint8Array([1, 2, 3]),
-      mimeType: "image/png",
-      texture: { mimeType: "image/png", bytes: new Uint8Array([1, 2, 3]) },
-      fileName: "주인공",
-      naturalWidth: 96,
-      naturalHeight: 96,
-    });
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
     renderPage();
 
     expect(downloadButton().disabled).toBe(true);
@@ -119,5 +131,107 @@ describe("StudioLift3dPage", () => {
       expect(screen.getByRole("alert").textContent).toContain("피사체를 찾지 못했습니다");
     });
     expect(downloadButton().disabled).toBe(true);
+  });
+
+  it("변환이 끝나면 라이브러리 등록 버튼이 열린다", async () => {
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    saveStudioLift3dToBg3dLibrary.mockResolvedValue({ ok: true, record: { id: "m1" } });
+    renderPage();
+
+    expect(libraryButton().disabled).toBe(true);
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+  });
+
+  it("등록에 성공하면 어디에 올라갔는지 알려준다", async () => {
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    saveStudioLift3dToBg3dLibrary.mockResolvedValue({ ok: true, record: { id: "m1" } });
+    renderPage();
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+
+    libraryButton().click();
+
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toContain("모델 목록에 등록");
+    });
+    expect(saveStudioLift3dToBg3dLibrary).toHaveBeenCalledTimes(1);
+  });
+
+  it("등록에 실패하면 라이브러리가 준 사유를 그대로 보여준다", async () => {
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    saveStudioLift3dToBg3dLibrary.mockResolvedValue({
+      ok: false,
+      detail: "3D 모델은 파일 하나당 최대 100MiB까지 등록할 수 있습니다.",
+    });
+    renderPage();
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+
+    libraryButton().click();
+
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toContain("100MiB");
+    });
+  });
+
+  it("배경 프리셋에는 시차 레이어 슬라이더가, 캐릭터에는 앞쪽 두께 슬라이더가 나온다", () => {
+    renderPage("background");
+    expect(screen.queryByLabelText(/시차 레이어/u)).not.toBeNull();
+    expect(screen.queryByLabelText(/앞쪽 두께 비율/u)).toBeNull();
+
+    cleanup();
+    renderPage("character");
+    expect(screen.queryByLabelText(/앞쪽 두께 비율/u)).not.toBeNull();
+    expect(screen.queryByLabelText(/시차 레이어/u)).toBeNull();
+  });
+
+  it("시차 레이어 슬라이더가 실제로 결과를 바꾼다", async () => {
+    // 이 슬라이더는 한 번 무동작이었다 — 값이 effect 의존성에는 있는데 요청 객체에는 빠져,
+    // 끌 때마다 파이프라인만 다시 돌고 결과는 그대로였다.
+    decodeStudioLift3dFile.mockResolvedValue({
+      ...decodedDisc(),
+      source: verticalGradientImage(96),
+    });
+    renderPage("background");
+    pickFile();
+    await waitFor(() => {
+      expect(downloadButton().disabled).toBe(false);
+    });
+    expect(screen.queryByText("레이어")).toBeNull();
+
+    const slider = screen.getByLabelText(/시차 레이어/u) as HTMLInputElement;
+    fireEvent.change(slider, { target: { value: "4" } });
+
+    // 슬라이더 표시에도 "4층" 이 나오므로 지표 타일(dt + dd) 안에서만 확인한다.
+    await waitFor(() => {
+      expect(screen.getByText("레이어").parentElement?.textContent).toContain("4층");
+    });
+  });
+
+  it("고른 이용 권리를 등록 경로에 그대로 넘긴다", async () => {
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    saveStudioLift3dToBg3dLibrary.mockResolvedValue({ ok: true, record: { id: "m1" } });
+    renderPage();
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+
+    fireEvent.change(screen.getByLabelText("이용 권리"), { target: { value: "owned" } });
+    libraryButton().click();
+
+    await waitFor(() => {
+      expect(saveStudioLift3dToBg3dLibrary).toHaveBeenCalledWith(
+        expect.anything(),
+        "owned",
+      );
+    });
   });
 });

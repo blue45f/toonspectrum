@@ -6,6 +6,7 @@ import {
   liftStudioImageTo3d,
   liftStudioImageTo3dGlb,
 } from "./studio-lift3d-pipeline";
+import { STUDIO_LIFT3D_SYMMETRY_CONFIDENT_SCORE } from "./studio-lift3d-symmetry";
 import {
   discImage,
   encodeTestPng,
@@ -169,6 +170,76 @@ describe("Studio Lift 3D 파이프라인", () => {
     expect(lifted.ok).toBe(false);
     if (lifted.ok) return;
     expect(lifted.code).toBe("invalid-option");
+  });
+
+  it("캐릭터 프리셋은 좌우대칭 보정을 걸고 그 사실을 지표에 남긴다", () => {
+    const lifted = liftStudioImageTo3d(discImage(96), { subject: "character" });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.metrics.symmetryScore).toBeGreaterThan(0.9);
+    expect(lifted.value.metrics.symmetryApplied).toBe(true);
+  });
+
+  it("좌우가 다른 실루엣에는 보정을 걸지 않고 이유를 알린다", () => {
+    // 몸통 한쪽에만 그만한 덩어리가 붙은 형상 — 옆모습이나 비대칭 포즈가 그렇다. 어떤 축으로
+    // 접어도 실루엣의 상당 부분이 짝을 찾지 못한다.
+    const size = 96;
+    const source = discImage(size, 0.22);
+    const pixels = source.pixels;
+    for (let y = Math.round(size * 0.34); y < Math.round(size * 0.66); y += 1) {
+      for (let x = Math.round(size * 0.5); x < size - 6; x += 1) {
+        const offset = (y * size + x) * 4;
+        pixels[offset] = 220;
+        pixels[offset + 1] = 90;
+        pixels[offset + 2] = 60;
+        pixels[offset + 3] = 255;
+      }
+    }
+
+    const lifted = liftStudioImageTo3d(source, { subject: "character" });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.metrics.symmetryScore)
+      .toBeLessThan(STUDIO_LIFT3D_SYMMETRY_CONFIDENT_SCORE);
+    expect(lifted.value.metrics.symmetryApplied).toBe(false);
+    expect(lifted.warnings.map((warning) => warning.code)).toContain("symmetry-skipped");
+  });
+
+  it("소품 프리셋은 대칭 보정을 아예 시도하지 않는다", () => {
+    const lifted = liftStudioImageTo3d(discImage(96), { subject: "prop" });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.metrics.symmetryScore).toBeNull();
+    expect(lifted.value.metrics.symmetryApplied).toBe(false);
+  });
+
+  it("레이어를 2 이상 주면 배경이 시차 카드로 나뉜다", () => {
+    const flat = liftStudioImageTo3d(verticalGradientImage(96), { subject: "background" });
+    const layered = liftStudioImageTo3d(verticalGradientImage(96), {
+      subject: "background",
+      layerBands: 5,
+    });
+
+    expect(flat.ok && layered.ok).toBe(true);
+    if (!flat.ok || !layered.ok) return;
+    expect(flat.value.geometry.mode).toBe("relief");
+    expect(flat.value.metrics.layerCount).toBe(1);
+    expect(layered.value.geometry.mode).toBe("parallax");
+    expect(layered.value.metrics.layerCount).toBe(5);
+    // 층으로 나뉘어도 유효한 solid 여야 한다.
+    expect(layered.value.metrics.closed).toBe(true);
+  });
+
+  it("앞쪽 두께 비율이 결과 형상을 바꾼다", () => {
+    const even = liftStudioImageTo3d(discImage(96), { subject: "character", frontRatio: 0.5 });
+    const forward = liftStudioImageTo3d(discImage(96), { subject: "character", frontRatio: 0.8 });
+
+    expect(even.ok && forward.ok).toBe(true);
+    if (!even.ok || !forward.ok) return;
+    expect(even.value.meshHash).not.toBe(forward.value.meshHash);
   });
 
   it("리프트와 GLB 인코딩을 한 번에 돌려준다", () => {
