@@ -61,14 +61,18 @@ const SECONDARY_BUTTON_CLASS =
   "focus-visible:outline-accent";
 const FIELD_LABEL_CLASS = "flex items-center justify-between text-xs font-semibold text-fg-2";
 
-/** 배경 3D 편집기의 업로드 패널과 같은 선택지·같은 문구. */
+/**
+ * 배경 3D 편집기의 업로드 패널과 같은 문구.
+ *
+ * "구매·허가"(licensed)는 라이선스 이름을 함께 받아야 저장되는데 여기엔 그 입력이 없다.
+ * 받을 수 없는 선언은 제안하지 않는다 — 자세한 이유는 StudioLift3dLibraryRights 참고.
+ */
 const LIBRARY_RIGHTS_OPTIONS: ReadonlyArray<{
   readonly id: StudioLift3dLibraryRights;
   readonly label: string;
 }> = [
   { id: "unknown", label: "확인 전 — 상업 이용 보류" },
   { id: "owned", label: "직접 제작 — 내가 만든 원화" },
-  { id: "licensed", label: "구매·허가받은 원화" },
   { id: "public-domain", label: "공개 이용(퍼블릭 도메인)" },
 ];
 const CARD_CLASS = "rounded-xl border border-line bg-card/60 p-4";
@@ -334,17 +338,26 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     );
   }, [result]);
 
+  // 등록은 비동기라, 그 사이에 사용자가 원화나 설정을 바꾸면 화면의 모델과 저장된 모델이
+  // 달라진다. 클릭 시점의 결과를 기억해 두고, 완료 시점에 화면이 그대로인지 확인한다.
+  const latestResultRef = useRef<StudioLift3dExport | null>(null);
+  latestResultRef.current = result;
+
   const onSaveToLibrary = useCallback(async () => {
-    if (result === null) return;
+    const target = result;
+    if (target === null) return;
     setLibrarySaving(true);
     setLibraryNotice(null);
     try {
       // 모델 라이브러리는 OPFS·SQLite 까지 끌고 오는 큰 그래프다. 저장을 누르는 순간에만
       // 불러와, 변환만 하고 나가는 사용자가 그 비용을 내지 않게 한다.
       const { saveStudioLift3dToBg3dLibrary } = await import("./studio-lift3d-library-handoff");
-      const saved = await saveStudioLift3dToBg3dLibrary(result.glb, libraryRights);
+      const saved = await saveStudioLift3dToBg3dLibrary(target.glb, libraryRights);
+      const stale = latestResultRef.current !== target;
       setLibraryNotice(saved.ok
-        ? "배경 3D 편집기의 모델 목록에 등록했습니다."
+        ? stale
+          ? "등록을 누른 시점의 모델을 등록했습니다. 지금 화면의 설정으로는 다시 등록해 주세요."
+          : "배경 3D 편집기의 모델 목록에 등록했습니다."
         : saved.detail);
     } catch {
       setLibraryNotice("3D 모델 라이브러리를 열 수 없습니다. 대신 GLB 파일로 저장해 주세요.");

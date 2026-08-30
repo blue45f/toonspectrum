@@ -261,6 +261,13 @@ export interface StudioLift3dDepthBand {
  * 시차(parallax) 레이어의 재료다. 연속된 부조를 몇 장의 평평한 카드로 바꾸면 카메라가 움직일 때
  * 층이 서로 다른 속도로 흘러, 웹툰 배경이 기대하는 깊이감이 훨씬 또렷하게 읽힌다.
  *
+ * **밴드는 한 칸씩 겹친다.** 깔끔한 분할로 두면 두 밴드가 맞닿는 경계의 사각형은 네 꼭짓점이
+ * 한 밴드에 다 들어가지 못해 어느 카드도 만들지 않는다 — 부드러운 그라데이션 하나에서도
+ * 전체 사각형의 13%가 사라져 카드 사이에 구멍 띠가 남았고, 잡음이 많은 원화라면 같은 밴드
+ * 2×2 블록이 아예 없어 면 없는 지오메트리가 될 수도 있다. 각 밴드를 마스크 안쪽으로 한 칸
+ * 부풀리면 경계 사각형이 양쪽 카드에 모두 들어가고, 겹친 한 칸은 실제 컷아웃 레이어가
+ * 서로 살짝 겹치는 모습 그대로 읽힌다.
+ *
  * 비어 있는 밴드는 버린다 — 하늘만 있는 원화에서 중간 밴드가 통째로 비는 일은 흔하고,
  * 빈 카드는 면 없는 지오메트리로만 남는다.
  */
@@ -294,12 +301,27 @@ export function buildStudioLift3dDepthBands(
   const out: StudioLift3dDepthBand[] = [];
   for (let index = 0; index < bands; index += 1) {
     if (counts[index] === 0) continue;
-    out.push({
-      index,
-      cells: buckets[index]!,
-      center: (index + 0.5) / bands,
-      cellCount: counts[index]!,
-    });
+    const cells = dilateWithinMask(buckets[index]!, mask);
+    let cellCount = 0;
+    for (let cell = 0; cell < cells.length; cell += 1) cellCount += cells[cell]!;
+    out.push({ index, cells, center: (index + 0.5) / bands, cellCount });
   }
   return Object.freeze(out);
+}
+
+/** 마스크 안쪽으로만 한 칸 부풀린다. 피사체 밖으로 새어 나가지 않는다. */
+function dilateWithinMask(cells: Uint8Array, mask: StudioLift3dMask): Uint8Array {
+  const { width, height } = mask;
+  const out = new Uint8Array(cells);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      if (cells[index] === 0) continue;
+      if (x > 0 && mask.cells[index - 1] === 1) out[index - 1] = 1;
+      if (x + 1 < width && mask.cells[index + 1] === 1) out[index + 1] = 1;
+      if (y > 0 && mask.cells[index - width] === 1) out[index - width] = 1;
+      if (y + 1 < height && mask.cells[index + width] === 1) out[index + width] = 1;
+    }
+  }
+  return out;
 }

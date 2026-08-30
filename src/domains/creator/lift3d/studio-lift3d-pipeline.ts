@@ -291,6 +291,12 @@ export function liftStudioImageTo3d(
       "symmetryStrength 는 0..1 사이의 유한한 값이어야 합니다",
     );
   }
+  // NaN 은 프리셋 위상으로 조용히 흘러가고, Infinity 는 parallax 를 고른 뒤 밴드 하나로 조여져
+  // "카드 한 장짜리 시차 레이어" 라는 앞뒤 안 맞는 결과가 된다. 모드를 고르기 전에 막는다.
+  if (request.layerBands !== undefined
+    && (!Number.isFinite(request.layerBands) || request.layerBands < 1)) {
+    return studioLift3dFailure("invalid-option", "layerBands 는 1 이상의 유한한 값이어야 합니다");
+  }
 
   const { preset, resolution, warnings } = resolveRequest(request);
   const grid = resampleStudioLift3dImage(validated.value, resolution);
@@ -365,7 +371,9 @@ export function liftStudioImageTo3d(
       revision: STUDIO_LIFT3D_REVISION,
       subject: request.subject,
       mask,
-      depth,
+      // 메시를 만든 것과 **같은** 깊이장을 돌려준다. 대칭 보정을 걸어 놓고 원본을 돌려주면
+      // 깊이 미리보기와 실제 형상이 어긋난다.
+      depth: symmetry.depth,
       geometry,
       metrics: {
         gridWidth: grid.width,

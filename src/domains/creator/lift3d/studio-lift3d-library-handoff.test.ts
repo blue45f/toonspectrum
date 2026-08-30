@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { Bg3dModelLibraryError } from "../bg3d/bg3d-model-library";
+import { StudioBg3dValidationWorkerError } from "../bg3d/studio-bg3d-glb-validation-worker-client";
 
 import { buildStudioLift3dDepthField } from "./studio-lift3d-depth";
 import { encodeStudioLift3dGlb } from "./studio-lift3d-glb";
@@ -92,5 +93,19 @@ describe("Studio Lift 3D 라이브러리 등록", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.detail).toContain("취소");
+  });
+
+  it("라이브러리의 진짜 취소(검증 워커 오류)도 취소로 알아본다", async () => {
+    // signal 로 끊으면 오는 것은 AbortError 가 아니라 StudioBg3dValidationWorkerError("aborted") 다.
+    // 이름만 보면 놓치고 studio-bg3d-validation-worker:aborted 를 사용자에게 그대로 보여준다.
+    const workerAbort = new StudioBg3dValidationWorkerError("aborted");
+    const result = await saveStudioLift3dToBg3dLibrary(liftedGlb(), "unknown", {}, {
+      saveVerifiedModel: vi.fn().mockRejectedValue(workerAbort),
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.detail).toContain("취소");
+    expect(result.detail).not.toContain("studio-bg3d-validation-worker");
   });
 });

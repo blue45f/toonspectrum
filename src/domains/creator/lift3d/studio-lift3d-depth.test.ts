@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildStudioLift3dDepthBands,
   buildStudioLift3dDepthField,
   smoothStudioLift3dHeights,
   studioLift3dDistanceField,
@@ -120,5 +121,47 @@ describe("Studio Lift 3D 깊이장", () => {
     const second = buildStudioLift3dDepthField(mask, grid, { profile: "round", smoothing: 2 });
 
     expect(Array.from(first.heights)).toEqual(Array.from(second.heights));
+  });
+
+  it("밴드가 한 칸씩 겹쳐 경계 사각형을 잃지 않는다", () => {
+    // 깔끔한 분할이면 두 밴드가 맞닿는 사각형은 네 꼭짓점이 한 밴드에 다 들어가지 못해
+    // 어느 카드도 만들지 않는다. 겹치기 전에는 부드러운 그라데이션에서도 13%가 사라졌다.
+    const source = verticalGradientImage(64);
+    const grid = resampleStudioLift3dImage(source, 32);
+    const mask = extractStudioLift3dMask(grid, { mode: "full" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "relief", smoothing: 0 });
+    const bands = buildStudioLift3dDepthBands(mask, depth, 5);
+
+    const quadsOf = (cells: Uint8Array): number => {
+      let count = 0;
+      for (let j = 0; j + 1 < mask.height; j += 1) {
+        for (let i = 0; i + 1 < mask.width; i += 1) {
+          const a = cells[j * mask.width + i]!;
+          const b = cells[j * mask.width + i + 1]!;
+          const c = cells[(j + 1) * mask.width + i + 1]!;
+          const d = cells[(j + 1) * mask.width + i]!;
+          if (a === 1 && b === 1 && c === 1 && d === 1) count += 1;
+        }
+      }
+      return count;
+    };
+
+    const whole = quadsOf(mask.cells);
+    const covered = bands.reduce((sum, band) => sum + quadsOf(band.cells), 0);
+    expect(whole).toBeGreaterThan(0);
+    // 겹침 덕에 합이 전체보다 크거나 같다 — 빠진 띠가 없다는 뜻이다.
+    expect(covered).toBeGreaterThanOrEqual(whole);
+  });
+
+  it("밴드는 마스크 밖으로 새어 나가지 않는다", () => {
+    const grid = resampleStudioLift3dImage(discImage(64), 32);
+    const mask = extractStudioLift3dMask(grid, { mode: "alpha" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "round", smoothing: 0 });
+
+    for (const band of buildStudioLift3dDepthBands(mask, depth, 4)) {
+      for (let index = 0; index < band.cells.length; index += 1) {
+        if (band.cells[index] === 1) expect(mask.cells[index]).toBe(1);
+      }
+    }
   });
 });

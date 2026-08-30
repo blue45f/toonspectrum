@@ -234,4 +234,48 @@ describe("StudioLift3dPage", () => {
       );
     });
   });
+
+  it("등록 중에 설정을 바꾸면 어느 시점의 모델이 저장됐는지 밝힌다", async () => {
+    // 등록은 비동기다. 그 사이에 사용자가 설정을 바꾸면 화면의 모델과 저장된 모델이 달라지는데,
+    // 그때도 "등록했습니다" 라고만 하면 지금 보이는 모델이 올라간 줄로 믿게 된다.
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    let release: (value: unknown) => void = () => undefined;
+    saveStudioLift3dToBg3dLibrary.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    renderPage("character");
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+
+    libraryButton().click();
+    // 등록이 끝나기 전에 두께를 바꿔 다른 결과를 만든다. 변환이 실제로 다시 돌아
+    // 새 결과가 나올 때까지 기다린다(변환 중에는 저장 버튼이 잠긴다).
+    fireEvent.change(screen.getByLabelText(/앞쪽 두께 비율/u), { target: { value: "0.8" } });
+    await waitFor(() => {
+      expect(downloadButton().disabled).toBe(true);
+    });
+    await waitFor(() => {
+      expect(downloadButton().disabled).toBe(false);
+    });
+    release({ ok: true, record: { id: "m1" } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toContain("누른 시점의 모델");
+    });
+  });
+
+  it("라이선스 이름을 받지 않으므로 구매·허가 선택지는 내주지 않는다", () => {
+    renderPage();
+    const options = Array.from(
+      (screen.getByLabelText("이용 권리") as HTMLSelectElement).options,
+      (option) => option.value,
+    );
+
+    expect(options).toEqual(["unknown", "owned", "public-domain"]);
+    expect(options).not.toContain("licensed");
+  });
 });

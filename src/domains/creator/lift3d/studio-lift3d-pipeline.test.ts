@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { hashStudioEditableMesh } from "../studio-editable-half-edge-mesh";
+
 import { STUDIO_LIFT3D_LIMITS, STUDIO_LIFT3D_SUBJECTS } from "./studio-lift3d-contract";
+import { buildStudioLift3dGeometry } from "./studio-lift3d-mesh";
 import {
   STUDIO_LIFT3D_PRESETS,
   liftStudioImageTo3d,
@@ -240,6 +243,40 @@ describe("Studio Lift 3D 파이프라인", () => {
     expect(even.ok && forward.ok).toBe(true);
     if (!even.ok || !forward.ok) return;
     expect(even.value.meshHash).not.toBe(forward.value.meshHash);
+  });
+
+  it("돌려주는 깊이장이 메시를 만든 바로 그것이다", () => {
+    // 대칭 보정을 걸어 놓고 원본 깊이장을 돌려주면 깊이 미리보기와 실제 형상이 어긋난다.
+    const lifted = liftStudioImageTo3d(discImage(96), { subject: "character" });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.metrics.symmetryApplied).toBe(true);
+
+    const preset = STUDIO_LIFT3D_PRESETS.character;
+    const rebuilt = buildStudioLift3dGeometry(lifted.value.mask, lifted.value.depth, {
+      mode: preset.geometryMode,
+      depthScale: preset.depthScale,
+      baseScale: preset.baseScale,
+      targetHeight: preset.targetHeight,
+      frontRatio: preset.frontRatio,
+      layerBands: 1,
+    });
+    expect(rebuilt.ok).toBe(true);
+    if (!rebuilt.ok) return;
+    expect(hashStudioEditableMesh(rebuilt.value.mesh)).toBe(lifted.value.meshHash);
+  });
+
+  it("유한하지 않은 레이어 수를 예외 대신 사유 코드로 거절한다", () => {
+    for (const layerBands of [Number.NaN, Number.POSITIVE_INFINITY, 0]) {
+      const lifted = liftStudioImageTo3d(verticalGradientImage(64), {
+        subject: "background",
+        layerBands,
+      });
+      expect(lifted.ok).toBe(false);
+      if (lifted.ok) continue;
+      expect(lifted.code).toBe("invalid-option");
+    }
   });
 
   it("리프트와 GLB 인코딩을 한 번에 돌려준다", () => {

@@ -21,8 +21,16 @@ import { STUDIO_BG3D_GLB_MIME } from "../bg3d/studio-bg3d-scene-document";
 
 import type { StudioLift3dGlbFile } from "./studio-lift3d-glb";
 
-/** 편집기 업로드 패널이 묻는 것과 같은 네 가지. */
-export type StudioLift3dLibraryRights = "owned" | "licensed" | "public-domain" | "unknown";
+/**
+ * 등록 시 선언할 수 있는 이용 권리.
+ *
+ * 편집기 업로드 패널의 네 가지 중 `licensed` 는 뺐다. `normalizeBg3dModelRights` 는 그 상태에서
+ * 비어 있지 않은 `licenseName` 을 요구하고, 없으면 값 전체를 기본값(unknown)으로 되돌린다.
+ * 라이선스 이름을 받는 입력이 없는 채로 그 선택지를 내주면 "구매·허가로 등록했다"고 알리면서
+ * 실제로는 unknown 으로 저장되고, 나중에 같은 해시를 진짜 라이선스 정보와 함께 올릴 때
+ * `rights-conflict` 까지 난다. 받을 수 없는 선언은 아예 제안하지 않는다.
+ */
+export type StudioLift3dLibraryRights = "owned" | "public-domain" | "unknown";
 
 export interface StudioLift3dLibraryPorts {
   readonly saveVerifiedModel: (
@@ -81,6 +89,19 @@ export function createStudioLift3dImportItem(
   };
 }
 
+/**
+ * 취소 판정.
+ *
+ * `signal` 로 끊으면 라이브러리의 검증 워커가 던지는 것은 `AbortError` 가 아니라
+ * `StudioBg3dValidationWorkerError("aborted")` 다. 이름만 보면 진짜 취소를 놓치고
+ * `studio-bg3d-validation-worker:aborted` 라는 내부 문자열을 사용자에게 그대로 보여주게 된다.
+ */
+function isAbort(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.name === "AbortError") return true;
+  return (error as { readonly code?: unknown }).code === "aborted";
+}
+
 export type StudioLift3dLibrarySaveResult =
   | { readonly ok: true; readonly record: Bg3dVerifiedStoredRecord }
   | { readonly ok: false; readonly detail: string };
@@ -104,7 +125,7 @@ export async function saveStudioLift3dToBg3dLibrary(
     );
     return { ok: true, record };
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (isAbort(error)) {
       return { ok: false, detail: "3D 모델 등록을 취소했습니다." };
     }
     return {
