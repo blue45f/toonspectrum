@@ -5,6 +5,7 @@
  * No Math.random / DOM / Konva — seed + stroke geometry only.
  */
 
+import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./brush/studio-brush-symmetry";
 import { hash2 } from "./studio-grain";
 import {
   STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
@@ -2303,8 +2304,12 @@ export class FxOilDabPlanner {
 }
 
 const OIL_DAB_PLANNER_CACHE = new Map<string, FxOilDabPlanner>();
-/** One active draft at a time, with room for the draft/commit re-render overlap. */
-const OIL_DAB_PLANNER_LIMIT = 8;
+/**
+ * One active draft's symmetry copies, which a retained renderer walks in a fixed order every
+ * frame — see `STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS` for why a smaller LRU makes the
+ * cache strictly worse than none. Callers with a wider fan must use `planOilBrushDabs` instead.
+ */
+const OIL_DAB_PLANNER_LIMIT = STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
 
 /**
  * Stroke-keyed `FxOilDabPlanner`, for renderers that cannot hold one themselves.

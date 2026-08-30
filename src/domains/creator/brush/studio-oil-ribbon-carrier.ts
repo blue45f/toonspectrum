@@ -20,6 +20,7 @@ import {
   studioOilRibbonProgramsFromSet,
   type StudioBrushOilProgramSet,
 } from "./studio-brush-engine-program-set";
+import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./studio-brush-symmetry";
 import {
   planStudioOilBristleLoadDynamics,
   type StudioOilBristleLoadDynamicsPlan,
@@ -2106,8 +2107,12 @@ export class StudioOilRibbonCarrierPlanner {
 }
 
 const OIL_CARRIER_PLANNER_CACHE = new Map<string, StudioOilRibbonCarrierPlanner>();
-/** One active draft at a time, with room for the draft/commit re-render overlap. */
-const OIL_CARRIER_PLANNER_LIMIT = 8;
+/**
+ * One active draft's symmetry copies, which a retained renderer walks in a fixed order every
+ * frame — see `STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS` for why a smaller LRU makes the
+ * cache strictly worse than none. Callers with a wider fan must use `planStudioOilRibbonCarrier`.
+ */
+const OIL_CARRIER_PLANNER_LIMIT = STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
 
 /**
  * Stroke-keyed `StudioOilRibbonCarrierPlanner`, for renderers that cannot hold one themselves.
@@ -2138,6 +2143,15 @@ export function planStudioOilRibbonCarrierIncremental(
     OIL_CARRIER_PLANNER_CACHE.delete(oldest);
   }
   return planner.plan(dabs, options);
+}
+
+/**
+ * Runs the keyed planner for `strokeKey` reused on its last call, or `null` when the cache is not
+ * holding one. @internal — the colocated cache-sizing contract test only; a caller cannot act on
+ * this, and a hit/miss is never a correctness signal (every plan is byte-identical either way).
+ */
+export function studioOilRibbonCarrierRetainedReuse(strokeKey: string): number | null {
+  return OIL_CARRIER_PLANNER_CACHE.get(strokeKey)?.reusedRuns ?? null;
 }
 
 /**

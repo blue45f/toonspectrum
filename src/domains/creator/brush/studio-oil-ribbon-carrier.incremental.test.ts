@@ -31,15 +31,19 @@ import {
   type FxOilDab,
 } from "../studio-fx-brush";
 
+import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./studio-brush-symmetry";
 import { studioFluidPaintStationSpacingRatio } from "./studio-fluid-paint-reference";
 import {
   StudioOilRibbonCarrierPlanner,
   planStudioOilRibbonCarrier,
+  planStudioOilRibbonCarrierIncremental,
+  studioOilRibbonCarrierRetainedReuse,
   studioOilRibbonProgramsForBrush,
   type StudioOilRibbonCarrierOptions,
 } from "./studio-oil-ribbon-carrier";
 
 const SEED = fxBrushSeedFromKey("oil-incremental-contract");
+const ELEMENT_ID = "oil-incremental-contract-element";
 
 function strokePoints(count: number): number[] {
   const points: number[] = [];
@@ -193,6 +197,31 @@ describe("StudioOilRibbonCarrierPlanner", () => {
       expect(planner.plan(dabs, undefined)).toEqual(
         planStudioOilRibbonCarrier(dabs, undefined),
       );
+    }
+  });
+
+  it("keeps reuse across a symmetry fan the renderer walks every frame", () => {
+    // Regression: the keyed caches were sized at 8 while `StudioDrawNode` draws every symmetry
+    // copy of one active draft per frame, in a fixed index order. A kaleidoscope of 8 directions
+    // is 16 copies, so an 8-entry LRU evicted each copy immediately before its next use — a 0%
+    // hit rate, with planner construction and a doomed verification pass charged on top of the
+    // full rebuild the cache existed to prevent. Walking the fan twice must show real reuse.
+    const variations = STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
+    const dabPlanners = Array.from({ length: variations }, () => new FxOilDabPlanner());
+    const beds = dabPlanners.map((planner) => dabsAt("oil--flat-ribbon", 700, planner));
+    // Frame 1: every copy plans cold.
+    beds.forEach((dabs, index) => {
+      planStudioOilRibbonCarrierIncremental(`${ELEMENT_ID}#${index}`, dabs, undefined);
+    });
+    // Frame 2: the stroke grew by a few samples in every copy.
+    const grown = dabPlanners.map((planner) => dabsAt("oil--flat-ribbon", 704, planner));
+    for (const [index, dabs] of grown.entries()) {
+      const key = `${ELEMENT_ID}#${index}`;
+      const plan = planStudioOilRibbonCarrierIncremental(key, dabs, undefined);
+      // Still exact…
+      expect(plan).toEqual(planStudioOilRibbonCarrier(dabs, undefined));
+      // …and the copy's own bed survived the frame rather than being evicted by its siblings.
+      expect(studioOilRibbonCarrierRetainedReuse(key)).toBeGreaterThan(0);
     }
   });
 

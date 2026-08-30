@@ -28,6 +28,23 @@ export const STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS = 32;
 export const STUDIO_BRUSH_MAX_SYMMETRY_VARIATIONS =
   STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS * 2;
 
+/**
+ * Symmetry copies of ONE active draft whose per-stroke planners are worth retaining at once.
+ *
+ * A retained renderer draws every copy of the active draft on each frame, walking them in a fixed
+ * index order, so a stroke-keyed planner cache sees a working set of `variations`, not one. An LRU
+ * smaller than that is the textbook cyclic worst case: every copy is evicted just before its next
+ * use, so the hit rate is exactly zero AND each miss now pays planner construction plus a
+ * verification pass on top of the full rebuild the cache existed to avoid — strictly worse than no
+ * cache. Callers therefore size their cache by this number and route a wider fan straight to the
+ * batch planners, so a big kaleidoscope degrades to the uncached cost instead of below it.
+ *
+ * Sixteen is the inspector's largest radial count (16) and equally its 8-way kaleidoscope
+ * (8 rotations + 8 mirrors). Past that the retained beds — a capped oil stroke holds ~27k run
+ * objects per copy — cost more memory than the reuse is worth.
+ */
+export const STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS = 16;
+
 function finite(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }

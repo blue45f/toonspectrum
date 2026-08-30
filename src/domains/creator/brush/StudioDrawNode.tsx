@@ -132,6 +132,7 @@ import {
 import {
   resolveStudioStampBrushKind,
 } from "./studio-brush-stamp-engine";
+import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./studio-brush-symmetry";
 import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import {
@@ -422,6 +423,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const symmetricVariations = stampBrushKind || dynamicBrushId
     ? [el.points]
     : getSymmetricPoints(el.points, el.symmetry);
+  // 활성 초안의 대칭 카피는 매 프레임 고정 인덱스 순서로 전부 그려지므로, 획 키 캐시가 보는
+  // 작업 집합은 1이 아니라 카피 수다. LRU 가 그보다 작으면 각 카피가 바로 다음 사용 직전에
+  // 밀려나 적중률이 정확히 0이 되고, 그 위에 플래너 생성과 매번 실패하는 검증 패스까지 얹혀
+  // 캐시가 없느니만 못해진다. 부채꼴이 한도를 넘으면 배치 플래너로 보내 캐시 도입 이전 비용으로
+  // 떨어지게 한다.
+  const oilDraftPlannersRetained = activeDraft
+    && symmetricVariations.length <= STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
   const dynamicBrushPlanResult = dynamicBrushId
     ? planStudioDynamicBrushRender(el, dynamicBrushId, activeDraft, paperSurface)
     : null;
@@ -2452,7 +2460,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // 배치 리플레이를 유지해 내부 점 재작성에도 항상 정본을 그린다. 대칭 변형은 같은
             // 요소를 변형된 점 배열로 여러 번 그리므로 변형 인덱스를 획 키에 포함한다.
             const oilStrokeKey = `${el.id}#${index}`;
-            const dabs = activeDraft
+            const dabs = oilDraftPlannersRetained
               ? planOilBrushDabsIncremental(oilStrokeKey, oilPlanInput)
               : planOilBrushDabs(oilPlanInput);
             // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
@@ -2465,7 +2473,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               fxBrushSeedFromKey(el.id),
               el.brushEnginePrograms?.oil,
             );
-            const carrier = activeDraft
+            const carrier = oilDraftPlannersRetained
               ? planStudioOilRibbonCarrierIncremental(oilStrokeKey, dabs, oilPrograms)
               : planStudioOilRibbonCarrier(dabs, oilPrograms);
             return (
