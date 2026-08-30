@@ -1,15 +1,19 @@
 import { VRMLoaderPlugin, type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
-import { Vector3 } from "three";
+import { Vector3, type Object3D } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { describe, expect, it } from "vitest";
 
-import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
+import {
+  createAvatarForgeState,
+  sanitizeAvatarForgeState,
+} from "./studio-vrm-avatar-forge";
 import { STUDIO_VRM_EXPORT_REQUIRED_BONES } from "./studio-vrm-export-vrm-extension";
 import {
   buildStudioVrmGenerateAuthoringSnapshot,
   createStudioVrmGenerateRecipe,
   exportStudioVrmFromGenerateRecipe,
 } from "./studio-vrm-generate-recipe";
+import { buildStudioVrmHumanoidMesh } from "./studio-vrm-humanoid-mesh";
 import { countSpringBoneJoints } from "./studio-vrm-physics";
 
 (globalThis as unknown as { self: typeof globalThis }).self = globalThis;
@@ -149,4 +153,74 @@ describe("generate recipe → .vrm file reload", () => {
       expect(vrm.humanoid?.getNormalizedBoneNode("head"), presetId).not.toBeNull();
     }
   }, 60_000);
+
+  it.each([1, 1.5, 2.5])(
+    "lands every hair joint on its intended rest position at headBodyRatio %s",
+    async (headBodyRatio) => {
+      // `head` 노드에는 조형 스케일이 붙어 있다. 체인을 그 밑에 바로 달면 조인트의 로컬
+      // 이동에 그 스케일이 곱해져 rest 위치가 어긋난다 — 두신비 1.5 에서 28cm,
+      // 2.5(SD)에서 81cm 어긋나 머리카락이 캐릭터에서 통째로 이탈했다.
+      const base = createAvatarForgeState("hime-noble");
+      const state = sanitizeAvatarForgeState({
+        ...base,
+        proportions: { ...base.proportions, headBodyRatio },
+        face: { ...base.face, headWidth: 1.3 },
+      });
+      const mesh = buildStudioVrmHumanoidMesh(state);
+      const hairRig = mesh.hairRig;
+      if (!hairRig) throw new Error("expected a hair rig");
+
+      const vrm = await loadVrmBytes(
+        exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ state })),
+      );
+      vrm.scene.updateMatrixWorld(true);
+      const nodeByName = new Map<string, Object3D>();
+      vrm.scene.traverse((object) => nodeByName.set(object.name, object));
+
+      for (const joint of hairRig.joints) {
+        const node = nodeByName.get(joint.name);
+        expect(node, `${joint.name} 노드가 없다`).toBeDefined();
+        const actual = node!.getWorldPosition(new Vector3());
+        expect(
+          actual.distanceTo(new Vector3(...joint.worldRest)),
+          `${joint.name} 이 의도한 rest 위치에서 벗어났다`,
+        ).toBeLessThan(1e-4);
+      }
+    },
+    60_000,
+  );
+
+  it("hangs the hair chains under a scale-cancelling pivot, not the scaled head node", async () => {
+    // 스케일이 붙은 본 아래에서 회전하면 전단·이방성 신축이 생긴다(리그의 "스케일이 붙은
+    // 본은 말단" 불변식). 배포 프리셋 21개 중 18개가 비균등 머리 스케일을 쓴다.
+    // 피벗이 S⁻¹ 이므로 `S · T(t) · S⁻¹ = T(S·t)` 로 아래쪽 선형부가 항등이 된다.
+    const state = createAvatarForgeState("hime-noble");
+    const snapshot = buildStudioVrmGenerateAuthoringSnapshot(
+      createStudioVrmGenerateRecipe({ state }),
+    );
+    const nodes = snapshot.nodes ?? [];
+    const headIndex = nodes.findIndex((node) => node.name === "head");
+    const headScale = nodes[headIndex]?.scale ?? [1, 1, 1];
+    const headChildren = nodes[headIndex]?.children ?? [];
+
+    const pivotIndex = headChildren.find((child) => nodes[child]?.name === "HairRoot");
+    expect(pivotIndex, "head 아래에 HairRoot 피벗이 없다").toBeDefined();
+    const pivot = nodes[pivotIndex as number];
+    // 피벗은 머리 스케일을 정확히 되돌린다.
+    for (let axis = 0; axis < 3; axis += 1) {
+      expect((pivot.scale ?? [1, 1, 1])[axis] * headScale[axis]).toBeCloseTo(1, 10);
+    }
+    // 스프링 조인트는 전부 피벗 아래에만 있다 — head 의 직계 자식이면 안 된다.
+    const jointNodes = new Set(
+      (snapshot.springBone?.springs ?? []).flatMap((spring) =>
+        spring.joints.map((joint) => joint.node),
+      ),
+    );
+    for (const child of headChildren) {
+      expect(jointNodes.has(child), `노드 ${child} 가 head 직계 자식인데 스프링 조인트다`).toBe(
+        false,
+      );
+    }
+    expect(jointNodes.size).toBeGreaterThan(0);
+  });
 });

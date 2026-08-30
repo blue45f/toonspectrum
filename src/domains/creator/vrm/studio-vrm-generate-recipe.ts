@@ -168,12 +168,12 @@ function humanoidBones(): StudioVrmExportHumanoidBones {
 /**
  * 리그의 부모 체인을 glTF 노드 트리로 편다.
  *
- * `hairChainRoots` 는 각 헤어 체인의 첫 조인트 노드 인덱스다. 전부 `head` 의 자식으로 달아야
- * 머리를 돌릴 때 체인 루트가 따라오고, 그 아래 마디들이 스프링으로 뒤따른다.
+ * `headChildren` 은 `head` 에 추가로 달 노드(헤어 역스케일 피벗)다. 머리를 돌릴 때 체인이
+ * 따라오려면 `head` 아래에 있어야 한다.
  */
 function buildBoneNodes(
   rig: StudioVrmRig,
-  hairChainRoots: readonly number[] = [],
+  headChildren: readonly number[] = [],
 ): StudioVrmExportNode[] {
   const childrenOf = new Map<string, number[]>();
   STUDIO_VRM_EXPORT_REQUIRED_BONES.forEach((bone, index) => {
@@ -183,8 +183,8 @@ function buildBoneNodes(
     siblings.push(index + FIRST_BONE_NODE);
     childrenOf.set(parent, siblings);
   });
-  if (hairChainRoots.length > 0) {
-    childrenOf.set("head", [...(childrenOf.get("head") ?? []), ...hairChainRoots]);
+  if (headChildren.length > 0) {
+    childrenOf.set("head", [...(childrenOf.get("head") ?? []), ...headChildren]);
   }
 
   return STUDIO_VRM_EXPORT_REQUIRED_BONES.map((bone) => {
@@ -266,12 +266,14 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
     skin: 0,
   }));
 
-  // 헤어 조인트는 메시 노드 **뒤에** 붙인다 — 앞에 끼우면 본·메시 노드 인덱스가 전부 밀려
+  // 헤어 노드는 메시 노드 **뒤에** 붙인다 — 앞에 끼우면 본·메시 노드 인덱스가 전부 밀려
   // 표정 바인딩·1인칭 주석이 함께 흔들린다.
-  const firstHairNode = FIRST_MESH_NODE + humanoid.parts.length;
+  const hairPivotNode = FIRST_MESH_NODE + humanoid.parts.length;
+  const firstHairJointNode = hairPivotNode + 1;
   const hairRig = humanoid.hairRig;
-  const hairNodes: StudioVrmExportNode[] = (hairRig?.joints ?? []).map((joint, index) => {
-    // 체인 안에서 다음 조인트가 자식이다. 체인의 마지막 마디만 자식이 없다.
+  const hairJointNodes: StudioVrmExportNode[] = (hairRig?.joints ?? []).map((joint, index) => {
+    // 체인 안에서 다음 조인트가 자식이다. 체인의 마지막 마디만 자식이 없다 — VRM 1.0 에서
+    // 체인의 끝은 꼬리(tail)라 스스로 회전하지 않고, 부모가 회전하면 위치가 따라 움직인다.
     const chain = hairRig?.chains.find(
       (entry) => index >= entry.jointOffset && index < entry.jointOffset + entry.joints.length,
     );
@@ -279,12 +281,36 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
     return {
       name: joint.name,
       translation: joint.localTranslation,
-      ...(isLast ? {} : { children: [firstHairNode + index + 1] }),
+      ...(isLast ? {} : { children: [firstHairJointNode + index + 1] }),
     } satisfies StudioVrmExportNode;
   });
-  const hairChainRoots = (hairRig?.chains ?? []).map(
-    (chain) => firstHairNode + chain.jointOffset,
-  );
+
+  /**
+   * 헤어 체인이 매달리는 **역스케일 피벗**.
+   *
+   * `head` 노드에는 조형 스케일 S 가 붙어 있다(두신비 × 얼굴 비율). 체인을 그 밑에 바로
+   * 달면 두 가지가 깨진다:
+   *
+   *  1. **rest 위치가 어긋난다.** 리그는 조인트 로컬 이동을 월드 차이로 계산하는데 부모의
+   *     S 가 거기 곱해진다 — 두신비 1.5 에서 28cm, 2.5(SD)에서 81cm 어긋나 머리카락이
+   *     캐릭터에서 이탈했다. 배포 프리셋에서도 1.5cm 떴다.
+   *  2. **회전이 전단·이방성 신축을 받는다.** 리그가 세운 "스케일이 붙은 본은 말단"
+   *     불변식을 깨는 경로다(얼굴 비율이 다르면 S 가 비균등하다 — 배포 프리셋 21개 중
+   *     18개가 그렇고 최대 1.083배).
+   *
+   * 피벗은 S⁻¹ 스케일에 이동 0 이다. 스케일로 이동을 감싸면 이동만 남으므로
+   * (`S · T(t) · S⁻¹ = T(S·t)`) 피벗 아래는 **선형부가 항등**이 된다 — rest 위치가
+   * 정확해지고, 아래에서 일어나는 회전에 S 가 섞이지 않는다. 피벗 자신은 절대 회전하지
+   * 않으므로 `head` 는 여전히 전단을 전파하지 않는다.
+   */
+  const headScale = rig.nodeScale.head ?? [1, 1, 1];
+  const hairPivot: StudioVrmExportNode = {
+    name: "HairRoot",
+    scale: [1 / headScale[0], 1 / headScale[1], 1 / headScale[2]],
+    children: (hairRig?.chains ?? []).map(
+      (chain) => firstHairJointNode + chain.jointOffset,
+    ),
+  };
 
   const nodes: StudioVrmExportNode[] = [
     {
@@ -294,9 +320,9 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
         ...humanoid.parts.map((_part, index) => meshNodeIndex(index)),
       ],
     },
-    ...buildBoneNodes(rig, hairChainRoots),
+    ...buildBoneNodes(rig, hairRig ? [hairPivotNode] : []),
     ...meshNodes,
-    ...hairNodes,
+    ...(hairRig ? [hairPivot, ...hairJointNodes] : []),
   ];
 
   const meshes: StudioVrmExportMesh[] = humanoid.parts.map((part) => ({
@@ -338,7 +364,7 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
       {
         joints: [
           ...Array.from({ length: BONE_COUNT }, (_unused, index) => index + FIRST_BONE_NODE),
-          ...(hairRig?.joints ?? []).map((_joint, index) => firstHairNode + index),
+          ...(hairRig?.joints ?? []).map((_joint, index) => firstHairJointNode + index),
         ],
         skeleton: FIRST_BONE_NODE,
         inverseBindMatrices: [
@@ -350,7 +376,7 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
     materials: humanoid.materials,
     expressions: { preset },
     firstPerson,
-    ...(hairRig ? { springBone: buildHairSpringBone(hairRig, rig, firstHairNode) } : {}),
+    ...(hairRig ? { springBone: buildHairSpringBone(hairRig, rig, firstHairJointNode) } : {}),
   };
 }
 
