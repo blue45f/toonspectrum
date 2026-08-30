@@ -230,7 +230,35 @@ describe("StudioLift3dPage", () => {
     await waitFor(() => {
       expect(saveStudioLift3dToBg3dLibrary).toHaveBeenCalledWith(
         expect.anything(),
-        "owned",
+        { status: "owned", commercialUse: false },
+      );
+    });
+  });
+
+  it("상업 이용 선언을 함께 넘기고, 확인 전 표기에서는 잠근다", async () => {
+    // status 만 넘기면 라이브러리가 commercialUse 를 false 로 굳힌다. 퍼블릭 도메인 모델이
+    // "상업 이용 확인 필요" 로 뜨고, 같은 GLB 를 업로드 패널에서 true 로 다시 넣으면
+    // rights-conflict 까지 난다.
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    saveStudioLift3dToBg3dLibrary.mockResolvedValue({ ok: true, record: { id: "m1" } });
+    renderPage();
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+
+    const commercial = screen.getByLabelText(/상업적 이용 가능/u) as HTMLInputElement;
+    // 확인 전(unknown)에서는 선언 자체가 불가능해야 한다 — 저장 레코드 불변식이 그렇다.
+    expect(commercial.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("이용 권리"), { target: { value: "public-domain" } });
+    fireEvent.click(screen.getByLabelText(/상업적 이용 가능/u));
+    libraryButton().click();
+
+    await waitFor(() => {
+      expect(saveStudioLift3dToBg3dLibrary).toHaveBeenCalledWith(
+        expect.anything(),
+        { status: "public-domain", commercialUse: true },
       );
     });
   });
@@ -295,7 +323,10 @@ describe("StudioLift3dPage", () => {
       expect(notice).toContain("확인 전");
       expect(notice).not.toContain("공개 이용(퍼블릭 도메인)");
     });
-    expect(saveStudioLift3dToBg3dLibrary).toHaveBeenCalledWith(expect.anything(), "unknown");
+    expect(saveStudioLift3dToBg3dLibrary).toHaveBeenCalledWith(
+      expect.anything(),
+      { status: "unknown", commercialUse: false },
+    );
   });
 
   it("라이선스 이름을 받지 않으므로 구매·허가 선택지는 내주지 않는다", () => {

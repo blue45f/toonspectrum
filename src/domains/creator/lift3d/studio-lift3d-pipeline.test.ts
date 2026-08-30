@@ -157,6 +157,25 @@ describe("Studio Lift 3D 파이프라인", () => {
       .toBeLessThan(STUDIO_LIFT3D_LIMITS.maxResolution);
   });
 
+  it("지원 범위를 넘는 레이어 수는 한 번만 조이고 그 사실을 알린다", () => {
+    // 유한하지만 24 를 넘는 값을 그대로 쓰면 해상도 상한만 쓸데없이 깎이고, MAX_VALUE 근처에서는
+    // 상한 공식이 NaN 이 되어 상한 자체가 무시된다 — 그러면 최대 해상도로 24층을 쌓게 된다.
+    for (const layerBands of [1_000, Number.MAX_VALUE]) {
+      const lifted = liftStudioImageTo3d(verticalGradientImage(256), {
+        subject: "background",
+        resolution: STUDIO_LIFT3D_LIMITS.maxResolution,
+        layerBands,
+      });
+
+      expect(lifted.ok).toBe(true);
+      if (!lifted.ok) return;
+      expect(lifted.warnings.map((warning) => warning.code)).toContain("layer-bands-clamped");
+      expect(lifted.value.metrics.layerCount).toBeLessThanOrEqual(STUDIO_LIFT3D_MAX_DEPTH_BANDS);
+      expect(Math.max(lifted.value.metrics.gridWidth, lifted.value.metrics.gridHeight))
+        .toBeLessThan(STUDIO_LIFT3D_LIMITS.maxResolution);
+    }
+  });
+
   it("가는 부위가 있어도 위상 오류 없이 닫힌 solid 로 보고한다", () => {
     // 얇은 팔·꼬리에서 비다양체가 나던 시절에는 boundaryEdgeCount 만 보고 "닫힌 solid" 라고
     // 표시했다. 지금은 위상 오류 수까지 함께 봐야 closed 가 참이 된다.

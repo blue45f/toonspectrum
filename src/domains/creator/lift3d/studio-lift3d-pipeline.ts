@@ -31,7 +31,12 @@ import {
   type StudioLift3dTexture,
   type StudioLift3dWarning,
 } from "./studio-lift3d-contract";
-import { buildStudioLift3dDepthField, type StudioLift3dDepthField } from "./studio-lift3d-depth";
+import {
+  STUDIO_LIFT3D_MAX_DEPTH_BANDS,
+  buildStudioLift3dDepthField,
+  clampStudioLift3dBandCount,
+  type StudioLift3dDepthField,
+} from "./studio-lift3d-depth";
 import { encodeStudioLift3dGlb, type StudioLift3dGlbFile } from "./studio-lift3d-glb";
 import {
   extractStudioLift3dMask,
@@ -307,8 +312,17 @@ export function liftStudioImageTo3d(
     return studioLift3dFailure("invalid-option", "layerBands 는 1 이상의 유한한 값이어야 합니다");
   }
 
-  const layerBands = Math.round(request.layerBands ?? 1);
+  // 밴드 수는 **위상·해상도를 고르기 전에 한 번** 조인다. 원값을 그대로 쓰면 24 를 넘는 요청이
+  // 해상도 상한만 쓸데없이 깎고, 지오메트리는 뒤늦게 24 로 조여 둘이 어긋난다.
+  const requestedBands = Math.round(request.layerBands ?? 1);
+  const layerBands = clampStudioLift3dBandCount(requestedBands);
   const { preset, resolution, warnings } = resolveRequest(request, layerBands);
+  if (layerBands !== requestedBands) {
+    warnings.push(studioLift3dWarning(
+      "layer-bands-clamped",
+      `시차 레이어를 1~${STUDIO_LIFT3D_MAX_DEPTH_BANDS} 범위의 ${layerBands}층으로 조정했습니다`,
+    ));
+  }
   const grid = resampleStudioLift3dImage(validated.value, resolution);
   const mask = extractStudioLift3dMask(grid, {
     mode: request.maskMode ?? preset.maskMode,

@@ -26,7 +26,10 @@ import {
   paintStudioLift3dMaskPreview,
 } from "./studio-lift3d-preview-raster";
 
-import type { StudioLift3dLibraryRights } from "./studio-lift3d-library-handoff";
+import type {
+  StudioLift3dLibraryRights,
+  StudioLift3dRightsDeclaration,
+} from "./studio-lift3d-library-handoff";
 
 import { lazyRetry } from "@/lib/lazy-retry";
 import Link from "@/src/compat/router-link";
@@ -78,8 +81,18 @@ const LIBRARY_RIGHTS_OPTIONS: ReadonlyArray<{
 const CARD_CLASS = "rounded-xl border border-line bg-card/60 p-4";
 
 /** 등록 결과 문구에 쓸 권리 표기 이름. 목록에 없는 값이면 식별자를 그대로 보여준다. */
-function rightsLabel(rights: StudioLift3dLibraryRights): string {
-  return LIBRARY_RIGHTS_OPTIONS.find((option) => option.id === rights)?.label ?? rights;
+function rightsLabel(rights: StudioLift3dRightsDeclaration): string {
+  const status = LIBRARY_RIGHTS_OPTIONS.find((option) => option.id === rights.status)?.label
+    ?? rights.status;
+  return `${status} · ${rights.commercialUse ? "상업 이용 가능" : "상업 이용 확인 필요"}`;
+}
+
+/** 두 권리 선언이 같은지. 등록 완료 시점에 화면이 그대로인지 판단할 때 쓴다. */
+function sameRights(
+  left: StudioLift3dRightsDeclaration,
+  right: StudioLift3dRightsDeclaration,
+): boolean {
+  return left.status === right.status && left.commercialUse === right.commercialUse;
 }
 
 interface SliderFieldProps {
@@ -209,6 +222,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
   const [busy, setBusy] = useState(false);
   const [librarySaving, setLibrarySaving] = useState(false);
   const [libraryRights, setLibraryRights] = useState<StudioLift3dLibraryRights>("unknown");
+  const [commercialUse, setCommercialUse] = useState(false);
   const [libraryNotice, setLibraryNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<StudioLift3dPreviewTab>("source");
   const [result, setResult] = useState<StudioLift3dExport | null>(null);
@@ -349,12 +363,21 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
   // 라이브러리에는 "확인 전" 로 박힌 모델이 남고, 성공 문구가 그 어긋남을 덮어 버린다.
   const latestResultRef = useRef<StudioLift3dExport | null>(null);
   latestResultRef.current = result;
-  const latestRightsRef = useRef<StudioLift3dLibraryRights>(libraryRights);
-  latestRightsRef.current = libraryRights;
+  // `unknown` 은 라이브러리가 상업 이용을 언제나 false 로 굳힌다. 화면에서도 같은 규칙을 써야
+  // 체크 상태와 저장될 값이 갈라지지 않는다.
+  const rightsDeclaration = useMemo<StudioLift3dRightsDeclaration>(
+    () => ({
+      status: libraryRights,
+      commercialUse: libraryRights !== "unknown" && commercialUse,
+    }),
+    [libraryRights, commercialUse],
+  );
+  const latestRightsRef = useRef<StudioLift3dRightsDeclaration>(rightsDeclaration);
+  latestRightsRef.current = rightsDeclaration;
 
   const onSaveToLibrary = useCallback(async () => {
     const target = result;
-    const targetRights = libraryRights;
+    const targetRights = rightsDeclaration;
     if (target === null) return;
     setLibrarySaving(true);
     setLibraryNotice(null);
@@ -364,7 +387,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
       const { saveStudioLift3dToBg3dLibrary } = await import("./studio-lift3d-library-handoff");
       const saved = await saveStudioLift3dToBg3dLibrary(target.glb, targetRights);
       const staleModel = latestResultRef.current !== target;
-      const staleRights = latestRightsRef.current !== targetRights;
+      const staleRights = !sameRights(latestRightsRef.current, targetRights);
       setLibraryNotice(saved.ok
         ? staleModel || staleRights
           ? `등록을 누른 시점의 모델을 "${rightsLabel(targetRights)}" 로 등록했습니다. `
@@ -376,7 +399,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     } finally {
       setLibrarySaving(false);
     }
-  }, [result, libraryRights]);
+  }, [result, rightsDeclaration]);
 
   const metrics = result?.lift.metrics ?? null;
   // 텍스처가 빠진 채 내보내졌다면 미리보기도 무채색이어야 한다 — 파일과 화면이 달라지면
@@ -571,6 +594,27 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                     <option key={option.id} value={option.id}>{option.label}</option>
                   ))}
                 </select>
+              </label>
+              {/*
+                상업 이용은 상태와 **함께** 저장된다. 넘기지 않으면 라이브러리가 false 로 굳혀,
+                퍼블릭 도메인으로 올린 모델도 "확인 필요" 로 뜨고 같은 파일을 업로드 패널에서
+                다시 넣을 때 rights-conflict 까지 난다.
+              */}
+              <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-fg-2">
+                <input
+                  type="checkbox"
+                  checked={rightsDeclaration.commercialUse}
+                  disabled={libraryRights === "unknown"}
+                  onChange={(event) => {
+                    setCommercialUse(event.target.checked);
+                    setLibraryNotice(null);
+                  }}
+                  className="size-4 accent-accent disabled:opacity-40"
+                />
+                상업적 이용 가능
+                {libraryRights === "unknown" ? (
+                  <span className="font-normal text-fg-3">(확인 전에는 선언할 수 없습니다)</span>
+                ) : null}
               </label>
               <button
                 type="button"

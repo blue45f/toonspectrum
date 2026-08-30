@@ -32,6 +32,34 @@ import type { StudioLift3dGlbFile } from "./studio-lift3d-glb";
  */
 export type StudioLift3dLibraryRights = "owned" | "public-domain" | "unknown";
 
+/**
+ * 등록에 실어 보낼 권리 선언 한 벌.
+ *
+ * 상태만 넘기면 안 된다. `normalizeBg3dModelRights` 는 `commercialUse` 를 받지 못하면 `false`
+ * 로 굳히므로, 퍼블릭 도메인으로 올린 모델조차 "상업 이용 확인 필요" 로 표시된다. 게다가 중복
+ * 판정이 이 필드까지 비교하는 탓에, 같은 GLB 를 나중에 업로드 패널에서 `commercialUse: true`
+ * 로 다시 넣으면 `rights-conflict` 가 난다. 상태와 상업 이용은 함께 정해야 한다.
+ */
+export interface StudioLift3dRightsDeclaration {
+  readonly status: StudioLift3dLibraryRights;
+  readonly commercialUse: boolean;
+}
+
+/**
+ * 라이브러리가 실제로 저장할 값으로 굳힌다.
+ *
+ * `unknown` 은 언제나 상업 이용 불가다 — 저장 레코드 불변식이 그렇게 되어 있어서, 여기서
+ * 맞춰 두지 않으면 화면의 체크와 저장된 값이 조용히 갈라진다.
+ */
+function normalizeDeclaration(
+  rights: StudioLift3dRightsDeclaration,
+): { readonly status: StudioLift3dLibraryRights; readonly commercialUse: boolean } {
+  return {
+    status: rights.status,
+    commercialUse: rights.status !== "unknown" && rights.commercialUse,
+  };
+}
+
 export interface StudioLift3dLibraryPorts {
   readonly saveVerifiedModel: (
     item: Bg3dModelImportItem,
@@ -78,14 +106,15 @@ export function createStudioLift3dUploadSource(
  *
  * `rights` 는 호출자가 반드시 정해야 한다. 리프트 결과의 이용 권리는 **원화의 권리**를 따르는데
  * 그건 이 코드가 알 수 없다 — 편집기 업로드 경로가 사용자에게 묻는 것과 같은 이유다.
+ * 상업 이용 여부까지 함께 받는 이유는 `StudioLift3dRightsDeclaration` 주석에 적어 두었다.
  */
 export function createStudioLift3dImportItem(
   glb: StudioLift3dGlbFile,
-  rights: StudioLift3dLibraryRights,
+  rights: StudioLift3dRightsDeclaration,
 ): Bg3dModelImportItem {
   return {
     file: createStudioLift3dUploadSource(glb),
-    rights: { status: rights },
+    rights: normalizeDeclaration(rights),
   };
 }
 
@@ -114,7 +143,7 @@ export type StudioLift3dLibrarySaveResult =
  */
 export async function saveStudioLift3dToBg3dLibrary(
   glb: StudioLift3dGlbFile,
-  rights: StudioLift3dLibraryRights,
+  rights: StudioLift3dRightsDeclaration,
   options: Bg3dModelVerificationOptions = {},
   ports: StudioLift3dLibraryPorts = DEFAULT_STUDIO_LIFT3D_LIBRARY_PORTS,
 ): Promise<StudioLift3dLibrarySaveResult> {

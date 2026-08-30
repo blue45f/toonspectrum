@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_EDITABLE_MESH_LIMITS,
   diagnoseStudioEditableMesh,
   hashStudioEditableMesh,
   studioEditableMeshStats,
@@ -19,6 +20,7 @@ import {
 } from "./studio-lift3d-mask";
 import {
   buildStudioLift3dGeometry,
+  countStudioLift3dPlannedQuads,
   maxStudioLift3dResolutionForLayers,
   normalizeStudioLift3dPositions,
 } from "./studio-lift3d-mesh";
@@ -27,6 +29,10 @@ import {
   signedVolume,
   verticalGradientImage,
 } from "./studio-lift3d.test-fixture";
+
+/** 사각형 하나가 쓰는 코너 수와 편집 메시의 코너 예산. 예산 계산을 테스트에서도 같은 말로 쓴다. */
+const QUAD_CORNERS = 4;
+const CORNER_BUDGET = STUDIO_EDITABLE_MESH_LIMITS.maxEdges;
 
 function maskFromCells(width: number, height: number, cells: Uint8Array): StudioLift3dMask {
   let minX = width;
@@ -431,6 +437,86 @@ describe("Studio Lift 3D 메시 빌더", () => {
     });
 
     expect(built.ok).toBe(true);
+  });
+
+  it("밴드가 잘게 번갈아 나오면 정점을 쌓기 전에 예산 초과로 돌려보낸다", () => {
+    // 해상도 상한은 밴드 경계 길이가 O(uB) 라고 보고 세운 값이다. 밴드가 화면 전체에서 잘게
+    // 번갈아 나오면 옆벽이 면적에 비례해(O(u²B)) 그 가정이 깨진다. 그때도 수십만 개를 만든
+    // 뒤가 아니라 격자 단계에서 정확히 세어 돌려보내야 한다.
+    const bands = 12;
+    const side = maxStudioLift3dResolutionForLayers(bands);
+    const cells = new Uint8Array(side * side).fill(1);
+    const mask = maskFromCells(side, side, cells);
+    const heights = new Float64Array(side * side);
+    for (let y = 0; y < side; y += 1) {
+      for (let x = 0; x < side; x += 1) {
+        heights[y * side + x] = (((x + 3 * y) % bands) + 0.5) / bands;
+      }
+    }
+
+    const built = buildStudioLift3dGeometry(
+      mask,
+      { width: side, height: side, heights, maxDistance: side / 2 },
+      { mode: "parallax", depthScale: 0.25, targetHeight: 6, layerBands: bands },
+    );
+
+    expect(built.ok).toBe(false);
+    if (built.ok) return;
+    expect(built.code).toBe("budget-exceeded");
+    // 해상도만 지목하면 레이어를 줄이는 쪽이 더 나은 경우에 손잡이를 못 찾는다.
+    expect(built.detail).toContain("해상도");
+    expect(built.detail).toContain("레이어");
+  });
+
+  it("방출 전에 센 사각형 수가 실제로 나온 면 수와 정확히 같다", () => {
+    // 예산은 방출 **전에** 센 값으로 판정한다. 그 카운터가 실제 방출량과 갈라지면, 적게 세면
+    // 예산을 통과한 메시가 createStudioEditableMeshFromPolygons 에서 예외로 끝나고, 많이 세면
+    // 만들 수 있는 조합을 괜히 거절한다.
+    const grid = resampleStudioLift3dImage(verticalGradientImage(64), 48);
+    const mask = extractStudioLift3dMask(grid, { mode: "full" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "relief", smoothing: 0 });
+
+    for (const mode of ["relief", "inflate", "parallax"] as const) {
+      const layerBands = mode === "parallax" ? 6 : 1;
+      const planned = countStudioLift3dPlannedQuads(mask, depth, { mode, layerBands });
+      const built = buildStudioLift3dGeometry(mask, depth, {
+        mode,
+        depthScale: 0.2,
+        targetHeight: 4,
+        layerBands,
+      });
+
+      expect(built.ok).toBe(true);
+      if (!built.ok) return;
+      expect(planned).toBe(built.value.mesh.faces.length);
+      expect(built.value.quadCount).toBe(planned);
+    }
+  });
+
+  it("잘게 번갈아 나오는 밴드는 해상도 상한만으로 예측되지 않는다", () => {
+    // 상한 공식은 밴드 경계 길이가 O(uB) 라는 가정 위에 있다. 이 입력은 그 가정을 깨뜨리므로
+    // 상한 안쪽 해상도인데도 예산을 넘는다 — 정확한 사전 집계가 필요한 이유다.
+    const bands = 12;
+    const side = maxStudioLift3dResolutionForLayers(bands);
+    const cells = new Uint8Array(side * side).fill(1);
+    const mask = maskFromCells(side, side, cells);
+    const heights = new Float64Array(side * side);
+    for (let y = 0; y < side; y += 1) {
+      for (let x = 0; x < side; x += 1) {
+        heights[y * side + x] = (((x + 3 * y) % bands) + 0.5) / bands;
+      }
+    }
+    const depth = { width: side, height: side, heights, maxDistance: side / 2 };
+
+    const smooth = countStudioLift3dPlannedQuads(
+      mask,
+      { ...depth, heights: new Float64Array(side * side).fill(0.5) },
+      { mode: "parallax", layerBands: bands },
+    );
+    const noisy = countStudioLift3dPlannedQuads(mask, depth, { mode: "parallax", layerBands: bands });
+
+    expect(smooth * QUAD_CORNERS).toBeLessThanOrEqual(CORNER_BUDGET);
+    expect(noisy * QUAD_CORNERS).toBeGreaterThan(CORNER_BUDGET);
   });
 
   it("정규화는 XZ 중심을 원점에 두고 균일 스케일만 쓴다", () => {
