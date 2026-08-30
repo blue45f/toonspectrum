@@ -605,6 +605,9 @@ const APPEND_CHUNK_GROWTH_LIMIT = 1.25;
  * internally, and it is never the global minimum — so a regression confined to it (a two-second
  * initialisation, say) moves nothing this file otherwise measures, and clears both smoke bounds.
  *
+ * Covers PER-RENDERER cold start rather than process-wide initialisation; the gate's own comment
+ * at the assertion carries the measurement that distinguishes the two.
+ *
  * This is a BLOW-UP bound and not a budget, and the reason is measured. The reading is dominated
  * by JIT warm-up of the whole renderer path: 15.6ms on the first pass, 3.4 on the second, 2.4 on
  * the third, idle — and 32.5 / 8.4 / 6.3 under six spinning hogs on four cores. Reduced by the
@@ -689,7 +692,8 @@ const APPEND_COLD_START_COST_LIMIT = 60;
 /**
  * Blow-up bound for the COLD FIRST ribbon-chunk append, graded on the FIRST pass.
  *
- * Same shape and same reasoning as `APPEND_COLD_START_COST_LIMIT`, one structural path over: a
+ * Same shape and same reasoning as `APPEND_COLD_START_COST_LIMIT` — including that it covers
+ * per-renderer cold start and not process-wide initialisation — one structural path over: a
  * chunk append is ~12 ordinary appends by construction (it re-plans a ribbon chunk rather than
  * extending by 30 points), so the ratio is large before anything is wrong and the gate can only
  * be a blow-up bound.
@@ -2263,9 +2267,18 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // invisible to everything above and would clear both smoke bounds. Its WORK is pinned
     // exactly beside this; its cost is JIT-dominated and so carries a blow-up bound only.
     //
-    // The FIRST pass, deliberately, where every other verdict here takes the cheapest. Process-wide
-    // initialisation is paid once, by the first renderer, so the later passes are not the cold path
-    // at all and a minimum across them acquits precisely the regression this exists for.
+    // The FIRST pass, deliberately, where every other verdict here takes the cheapest: a fresh
+    // renderer's first append is the cold path, and a minimum across passes acquits precisely the
+    // regression this exists for.
+    //
+    // What it covers is PER-RENDERER cold start, and not process-wide initialisation, which is a
+    // narrower claim than this comment used to make. Fourteen tests in this file construct
+    // renderers and drive appends before this one runs, so whatever the process pays once has
+    // already been paid by the time the first pass here is measured. That is measured, not
+    // supposed: this same reading is 4.05 and 4.62 in file order against 14.69 and 14.42 when the
+    // test is run on its own, so roughly ten ordinary appends of one-time cost sit outside the
+    // window. Closing that gap needs this measurement in its OWN file, the way the impasto shader
+    // gates were split from their census, rather than a different statistic here.
     expect(markDeltas[0], "cold first append marks").toBe(320);
     const coldStartCostRatio = coldStartCostRatios[0]!;
     expect(
