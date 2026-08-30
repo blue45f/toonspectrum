@@ -103,11 +103,26 @@ describe("StudioLiveDynamicBrushOverlayRenderer cold start", () => {
     expect(markDeltas.findIndex((delta) => delta > 1_000), "first ribbon chunk").toBe(7);
 
     // Both are BLOW-UP bounds, not budgets, and the reason is measured: a single cold reading is
-    // JIT-dominated and cannot be reduced, because a process is cold exactly once. Recorded from
-    // this file: 9.58 / 14.55 / 15.84 idle and 10.02 / 20.86 / 22.52 under six spinning hogs on
-    // four cores for the ordinary cold append, and 19.54 / 19.57 / 20.28 idle against 41.83 /
-    // 46.32 / 52.39 loaded for the first chunk. Contention costs a single unreducible sample a
-    // factor of 2.5, which is the whole reason these are bounds and not budgets.
+    // JIT-dominated and CANNOT be reduced, because a process is cold exactly once. Every other
+    // gate in this suite answers noise with a minimum over repeats; this one has nothing to
+    // repeat, and the tail that leaves is long.
+    //
+    //   ordinary cold append   9.58 - 15.84 idle    10.02 - 65.98 loaded
+    //   first chunk           19.54 - 20.28 idle    41.83 - 128.05 loaded
+    //
+    // Nineteen runs each, loaded meaning six spinning hogs on four cores with the sibling suites
+    // in parallel workers — a 250%-oversubscribed box, harsher than CI, where these read under 60
+    // and 110 respectively. Two earlier passes were too tight and both are recorded because the
+    // lesson is the same one twice: 60/110 came from three loaded samples and failed at 65.98
+    // with nothing regressed, and the tail only showed itself at eight and then nineteen. An
+    // unreducible sample has a long tail, and three readings do not show it.
+    //
+    // What that buys and what it costs, stated rather than implied: the cheapest ordinary append
+    // is ~0.65ms, so these convict a one-time cost of roughly 160ms and 260ms upward. The 500ms
+    // first-use stall and the two-second initialisation that motivated these gates read in the
+    // hundreds and thousands and are convicted with margin. A 100ms one-time cost is NOT caught,
+    // and no bound on a single unreducible sample can catch it without failing honest code on a
+    // busy machine — which is exactly what the two earlier passes did.
     //
     // What covers the cold path exactly is the mark pin above.
     const coldStartRatio = appendColdStartCostRatio(samples, markDeltas);

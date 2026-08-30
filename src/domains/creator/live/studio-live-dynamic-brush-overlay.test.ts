@@ -253,12 +253,12 @@ function appendChunkGrowthRatio(
 }
 
 /**
- * Recorded on the CALIBRATED form, median-of-3 per run: 0.9611 / 0.9656 idle and 0.6406 / 0.8800 /
- * 0.9572 under six spinning hogs on four cores; the individual passes behind those span
- * 0.8749-0.9785 idle and 0.4845-0.9987 loaded. Consistently below 1, because later chunks run on
- * a warmer JIT, and load pushes it DOWN rather than up — the acquitting direction.
+ * Recorded on the CALIBRATED form, cheapest-of-3 per run: 0.8749 / 0.9172 idle and 0.4845 /
+ * 0.5034 / 0.5191 / 0.769 under six spinning hogs on four cores. The individual passes behind
+ * those are much wider — 0.8749-0.9785 idle and 0.4845-1.683 loaded — which is why the reduction
+ * across passes is a minimum here; see the comment at the assertion.
  *
- * 1.25 carries 29% headroom over the worst honest median while a doubled late-chunk class
+ * 1.25 carries 36% headroom over the worst honest reading while a doubled late-chunk class
  * (>=1.46) is convicted with 17% margin, and 500ms added to late chunks alone reads ~34.
  */
 const APPEND_CHUNK_GROWTH_LIMIT = 1.25;
@@ -1794,13 +1794,21 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // them: the early/late gate reduces ordinary appends in each half, this class's own gate
     // reduces the cheapest chunk across the whole stroke, so re-planning that grows only on the
     // chunk path leaves an unaffected early chunk as the cheapest and moves neither.
-    // The MEDIAN across passes, like the chunk-cost gate above and for the same reason: this is a
-    // quotient of two calibrated ratios, so its noise is two-sided and a minimum selects the pass
-    // whose early half happened to read high.
-    const orderedChunkGrowthRatios = [...chunkGrowthRatios].sort((left, right) => left - right);
-    const chunkGrowthRatio = orderedChunkGrowthRatios[
-      Math.floor(orderedChunkGrowthRatios.length / 2)
-    ]!;
+    // The MINIMUM across passes, unlike the chunk-cost gate above, and that asymmetry is measured
+    // rather than stylistic.
+    //
+    // A median was tried here first, on the argument that a quotient of two calibrated ratios has
+    // two-sided noise and deserves the same reducer the cost gate needs. Under six spinning hogs
+    // on four cores that form read passes of 1.337 / 1.683 / 0.769 and failed at 1.337 against
+    // 1.25 with nothing regressed: this quotient's upward tail is far wider than the cost gate's,
+    // because it divides two per-half floors that are each drawn from only ~12 chunk appends.
+    //
+    // So it keeps this file's existing convention — a violation must be earned by EVERY pass —
+    // which costs nothing against the regression it exists for: length dependence on the chunk
+    // path raises all three passes together, so the minimum rises with them. The cost gate cannot
+    // use a minimum for the reason Codex gave, and this one cannot use a median for the reason
+    // the machine gave.
+    const chunkGrowthRatio = Math.min(...chunkGrowthRatios);
     expect(
       chunkGrowthRatio,
       `late ribbon-chunk appends cost ${chunkGrowthRatio.toFixed(3)}x what early ones did `
@@ -2176,17 +2184,19 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(() => appendChunkGrowthRatio(honest.slice(0, 8), deltas.slice(0, 8)))
       .toThrow(/at least four chunk appends/);
 
-    // A 100ms cold start is convicted too, not only a catastrophe.
-    expect(appendColdStartCostRatio(
-      honest.map((sample, index) => (index === 0 ? { ...sample, workMs: 100 } : sample)),
+    // The sensitivity boundary, pinned from both sides so nobody credits this gate with more
+    // than it does. A single process-cold sample cannot be reduced, its loaded tail reaches 65.98
+    // on a 250%-oversubscribed box, and the limit has to clear that — so the smallest one-time
+    // cost this convicts is ~285ms against this fixture's 1.13ms ordinary append.
+    const withColdStart = (workMs: number) => appendColdStartCostRatio(
+      honest.map((sample, index) => (index === 0 ? { ...sample, workMs } : sample)),
       deltas,
-    )).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
-    // ...but a 60ms one is not, which is the sensitivity this reducer costs and is worth pinning
-    // so nobody credits the gate with more than it does.
-    expect(appendColdStartCostRatio(
-      honest.map((sample, index) => (index === 0 ? { ...sample, workMs: 60 } : sample)),
-      deltas,
-    )).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
+    );
+    expect(withColdStart(300)).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
+    expect(withColdStart(200)).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
+    // The regression it exists for is not a 100ms one, though: it is a first-use initialisation
+    // measured in hundreds of milliseconds or seconds, and that is convicted overwhelmingly.
+    expect(withColdStart(2_000)).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT * 7);
 
     // Not vacuous the other way: a uniformly 3x slower machine is not a cold-start regression.
     const slowBox = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 3 }));

@@ -476,13 +476,14 @@ export function appendColdStartCostRatio(
  * cold.
  *
  * That costs sensitivity, because a single cold reading is JIT-dominated and cannot be reduced.
- * Measured PROCESS-COLD, in the file that exists so it can be: 9.58 / 14.55 / 15.84 idle and
- * 10.02 / 20.86 / 22.52 under six spinning hogs on four cores. 60 carries 2.7x headroom over the
- * worst of those, catches a cold path that grew to ~40ms and the two-second case (~2000), and
- * does not pretend to catch a doubling. What covers the cold path exactly is the mark pin beside
- * it.
+ * Measured PROCESS-COLD, in the file that exists so it can be: 9.58-15.84 idle and 10.02-65.98
+ * under six spinning hogs on four cores, over nineteen runs. 250 carries 3.8x headroom over the
+ * worst of those, catches a cold path that grew past ~160ms and the two-second case (~3000), and
+ * does not pretend to catch a doubling. A first pass at 60, set from three loaded samples, failed
+ * CI-adjacent runs at 65.98 with nothing regressed: an unreducible sample has a long tail and
+ * three readings do not show it. What covers the cold path exactly is the mark pin beside it.
  */
-export const APPEND_COLD_START_COST_LIMIT = 60;
+export const APPEND_COLD_START_COST_LIMIT = 250;
 
 /**
  * What the COLD FIRST ribbon-chunk append costs in units of one ordinary append.
@@ -529,15 +530,16 @@ export function appendFirstChunkColdStartCostRatio(
  * extending by 30 points), so the ratio is large before anything is wrong and the gate can only
  * be a blow-up bound.
  *
- * Measured PROCESS-COLD: 19.54 / 19.57 / 20.28 idle, and 41.83 / 46.32 / 52.39 under six spinning
- * hogs on four cores. Contention costs this single unreducible sample a factor of 2.5, and that
- * is what sets the limit rather than the idle reading.
+ * Measured PROCESS-COLD over nineteen runs: 19.54-20.28 idle, and 41.83-128.05 under six spinning
+ * hogs on four cores with sibling suites in parallel workers. Contention costs this single
+ * unreducible sample a factor of six, and that is what sets the limit rather than the idle
+ * reading.
  *
- * 110 carries 2.1x headroom over the worst of those. The earlier 75 was set against WARM
- * file-order readings and clears the loaded process-cold population by only 1.43x — inside the
- * 1.47x this repository has already measured between this container and its CI runner, so it
- * would have failed honest code there. A one-time initialisation deferred to the chunk path reads
- * its own cost in ordinary appends, so a 500ms stall reads in the hundreds and ~70ms is the
- * smallest this still convicts.
+ * 400 carries 3.1x headroom over the worst of those. Two earlier passes were too tight and both
+ * are worth recording: 75 was set from WARM file-order readings, and 110 from only three loaded
+ * process-cold ones. A one-time initialisation deferred to the chunk path reads its own cost in
+ * ordinary appends, so a 500ms stall reads in the hundreds; ~260ms is the smallest this still
+ * convicts, and nothing smaller can be caught on a single unreducible sample without failing
+ * honest code on a busy machine.
  */
-export const APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT = 110;
+export const APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT = 400;
