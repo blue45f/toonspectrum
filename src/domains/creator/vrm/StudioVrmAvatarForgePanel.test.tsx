@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createAvatarForgeState, type AvatarForgeState } from "./studio-vrm-avatar-forge";
+import {
+  createAvatarForgeState,
+  parseAvatarForgeState,
+  type AvatarForgeState,
+} from "./studio-vrm-avatar-forge";
+import { STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID } from "./studio-vrm-generate-recipe";
 import { StudioVrmAvatarForgePanel } from "./StudioVrmAvatarForgePanel";
 
 import type { StudioVrmProportionMetrics } from "./studio-vrm-proportion-core";
@@ -211,5 +217,92 @@ describe("StudioVrmAvatarForgePanel body creator", () => {
     fireEvent.click(screen.getByRole("tab", { name: "체형" }));
     expect(screen.getByText(/골격 8\.0두신/u)).toBeTruthy();
     expect(screen.getByText(/현재 얼굴 조형 7\.4두신/u)).toBeTruthy();
+  });
+});
+
+describe("StudioVrmAvatarForgePanel default-style intent", () => {
+  /**
+   * 부모(useStudioVrmPoserRuntimeC)처럼 올라온 상태를 정규화해 되돌려 주는 제어 래퍼.
+   * "새 VRM 설치" 버튼은 useStudioVrmPoserInstall 이 하는 조형 상태 전면 교체를 흉내낸다.
+   */
+  function renderControlled(initial: AvatarForgeState) {
+    function Host() {
+      const [state, setState] = useState(initial);
+      const [modelId, setModelId] = useState("model-a");
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setModelId((current) => (current === "model-a" ? "model-b" : "model-a"));
+              setState(createAvatarForgeState());
+            }}
+          >
+            새 VRM 설치
+          </button>
+          <StudioVrmAvatarForgePanel
+            state={state}
+            sculptSessionId={modelId}
+            detectedOriginalHairCount={2}
+            proportionMetrics={null}
+            proportionPresetNote={null}
+            proportionUnavailableReason={null}
+            onChange={(next) => setState(parseAvatarForgeState(next))}
+            onGeneratedFile={vi.fn()}
+          />
+        </>
+      );
+    }
+    return render(<Host />);
+  }
+
+  const defaultPresetNotice = () =>
+    document.querySelector("[data-studio-vrm-generate-default-preset]");
+
+  it("stops applying the default style once a hair silhouette is picked", () => {
+    renderControlled(createAvatarForgeState());
+    expect(defaultPresetNotice()).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: "헤어" }));
+    fireEvent.click(screen.getByRole("button", { name: /트윈테일/u }));
+
+    // 부모가 정규화해 되돌려 준 뒤에도 "직접 골랐다"는 의도가 살아남아야 한다.
+    expect(defaultPresetNotice()).toBeNull();
+  });
+
+  it("forgets the hair choice when the forge state is replaced from outside", () => {
+    renderControlled(createAvatarForgeState());
+    fireEvent.click(screen.getByRole("tab", { name: "헤어" }));
+    fireEvent.click(screen.getByRole("button", { name: /트윈테일/u }));
+    expect(defaultPresetNotice()).toBeNull();
+
+    // 새 VRM 설치는 조형 상태를 통째로 초기화하지만 패널은 마운트된 채로 남는다.
+    // 이전 캐릭터의 헤어 의도가 살아남으면 새 캐릭터가 민머리로 생성된다.
+    fireEvent.click(screen.getByRole("button", { name: "새 VRM 설치" }));
+    expect(defaultPresetNotice()?.getAttribute("data-studio-vrm-generate-default-preset")).toBe(
+      STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID,
+    );
+  });
+
+  it("forgets an explicit no-hair choice when a different model is installed", () => {
+    // 순정 상태에서 "헤어 없음"을 고르면 상태가 그대로라 서명이 바뀌지 않는다. 새 모델의
+    // 조형 상태도 순정이므로 서명 비교로는 교체를 알아볼 수 없다 — 모델 신원이 필요하다.
+    renderControlled(createAvatarForgeState());
+    fireEvent.click(screen.getByRole("tab", { name: "헤어" }));
+    fireEvent.click(screen.getByRole("button", { name: "헤어 없음" }));
+    expect(defaultPresetNotice()).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "새 VRM 설치" }));
+    expect(defaultPresetNotice()?.getAttribute("data-studio-vrm-generate-default-preset")).toBe(
+      STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID,
+    );
+  });
+
+  it("keeps an explicit no-hair choice through the parent's normalisation", () => {
+    renderControlled(createAvatarForgeState());
+    fireEvent.click(screen.getByRole("tab", { name: "헤어" }));
+    // "없음"은 이미 기본값이라 상태가 그대로다 — 서명이 같아도 의도는 지워지면 안 된다.
+    fireEvent.click(screen.getByRole("button", { name: "헤어 없음" }));
+    expect(defaultPresetNotice()).toBeNull();
   });
 });

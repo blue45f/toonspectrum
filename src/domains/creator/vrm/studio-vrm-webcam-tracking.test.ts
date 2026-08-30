@@ -55,12 +55,14 @@ describe("studio-vrm-webcam-tracking", () => {
 
   describe("convertChannelsToVrmData", () => {
     it("기본 옵션(미러링 활성)으로 적절하게 매핑한다", () => {
+      // 채널 → 가중치 유도식 자체를 보는 테스트라 충돌 해소는 끈다.
       const options: TrackingOptions = {
         gazeLock: false,
         mirrorMode: true,
         sensitivity: 1.0,
         smoothing: 0.35,
         fingerTracking: true,
+        resolveExpressionConflicts: false,
       };
 
       const result = convertChannelsToVrmData(mockChannels, options);
@@ -83,6 +85,7 @@ describe("studio-vrm-webcam-tracking", () => {
         sensitivity: 1.0,
         smoothing: 0.35,
         fingerTracking: true,
+        resolveExpressionConflicts: false,
       };
       const result = convertChannelsToVrmData(mockChannels, options);
       // eyeWide 0.35, browInnerUp 0.1 → surprised ≈ 0.35*0.85 + 0.1*0.25
@@ -91,6 +94,59 @@ describe("studio-vrm-webcam-tracking", () => {
       expect(result.expressions.angry).toBeCloseTo(0.15 * 0.95, 4);
       // mouthFrown 0.25, browInnerUp 0.1 → sad ≈ 0.25*0.7 + 0.1*0.3
       expect(result.expressions.sad).toBeCloseTo(0.25 * 0.7 + 0.1 * 0.3, 4);
+    });
+
+    it("기본값에서는 감정이 하나로 읽히고 입 계열 합계가 상한 아래로 내려온다", () => {
+      const options: TrackingOptions = {
+        gazeLock: false,
+        mirrorMode: false,
+        sensitivity: 1.0,
+        smoothing: 0.35,
+        fingerTracking: true,
+      };
+      // 웃으면서 입을 벌리고 눈썹을 올린 평범한 한 프레임 — 유도식만으로는 네 감정이 함께 켜진다.
+      const channels = {
+        ...mockChannels,
+        mouthSmile: 0.8,
+        mouthOpen: 0.7,
+        eyeWide: 0.6,
+        browInnerUp: 0.7,
+        browDown: 0.4,
+        mouthFrown: 0.3,
+      };
+
+      const raw = convertChannelsToVrmData(channels, {
+        ...options,
+        resolveExpressionConflicts: false,
+      }).expressions;
+      const resolved = convertChannelsToVrmData(channels, options).expressions;
+
+      // relaxed 는 이 유도식이 내보내지 않는다 — 해소기가 없는 키를 건드리지 않는지도 함께 본다.
+      const emotions = ["happy", "sad", "angry", "surprised"] as const;
+      const mouthSum = (weights: Record<string, number>) =>
+        ["aa", "ih", "ou", "ee", "oh", "happy", "sad", "relaxed"].reduce(
+          (total, name) => total + (weights[name] ?? 0),
+          0,
+        );
+
+      // 해소 전: 네 감정 동시 발화 + 입 계열 합계가 1을 크게 넘는다.
+      expect(emotions.filter((name) => raw[name] > 0.2).length).toBeGreaterThan(2);
+      expect(resolved.relaxed).toBeUndefined();
+      expect(mouthSum(raw)).toBeGreaterThan(1.5);
+
+      // 해소 후: 가장 강한 감정은 그대로 남고 나머지는 확실히 눌린다.
+      const dominant = emotions.reduce((best, name) =>
+        resolved[name] > resolved[best] ? name : best,
+      );
+      for (const name of emotions) {
+        if (name === dominant) continue;
+        expect(resolved[name]).toBeLessThan(resolved[dominant] * 0.6);
+      }
+      expect(mouthSum(resolved)).toBeLessThanOrEqual(1.25 + 1e-6);
+
+      // 깜빡임·시선은 감정과 독립이라 해소가 건드리지 않는다.
+      expect(resolved.blinkLeft).toBeCloseTo(raw.blinkLeft, 10);
+      expect(resolved.lookRight).toBeCloseTo(raw.lookRight, 10);
     });
 
     it("미러링 비활성화 상태에서 부호 및 좌우 채널을 유지한다", () => {
@@ -134,6 +190,7 @@ describe("studio-vrm-webcam-tracking", () => {
         sensitivity: 1.5,
         smoothing: 0.35,
         fingerTracking: true,
+        resolveExpressionConflicts: false,
       };
 
       const result = convertChannelsToVrmData(mockChannels, options);

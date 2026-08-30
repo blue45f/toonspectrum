@@ -292,6 +292,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
               >
                 <StudioVrmAvatarForgePanel
                   state={avatarForgeState}
+                  sculptSessionId={activeModelId}
                   disabled={
                     isCapturing
                     || isSharingPose

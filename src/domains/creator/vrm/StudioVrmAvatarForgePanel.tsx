@@ -9,7 +9,7 @@ import {
   UserPlus,
   WandSparkles,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import {
   AVATAR_FORGE_BANG_STYLE_OPTIONS,
@@ -20,6 +20,7 @@ import {
   AVATAR_FORGE_PRESETS,
   createAvatarForgeState,
   sanitizeAvatarForgeState,
+  serializeAvatarForgeState,
   type AvatarForgeFaceAccentId,
   type AvatarForgeFaceParams,
   type AvatarForgeHairParams,
@@ -57,6 +58,11 @@ type ForgeView = "presets" | "body" | "hair" | "face";
 
 type StudioVrmAvatarForgePanelProps = {
   state: AvatarForgeState;
+  /**
+   * 지금 조형 중인 대상의 신원(로드된 모델 id). 바뀌면 패널이 기억하던 편집 의도를 버린다 —
+   * 상태 서명만으로는 새 모델 설치를 알아볼 수 없다(둘 다 순정이면 서명이 같다).
+   */
+  sculptSessionId?: string;
   disabled?: boolean;
   detectedOriginalHairCount?: number;
   proportionMetrics?: StudioVrmProportionMetrics | null;
@@ -85,6 +91,7 @@ function formatValue(value: number, unit?: string) {
 
 export function StudioVrmAvatarForgePanel({
   state,
+  sculptSessionId,
   disabled = false,
   detectedOriginalHairCount = 0,
   proportionMetrics: runtimeProportionMetrics = null,
@@ -98,17 +105,53 @@ export function StudioVrmAvatarForgePanel({
   const [view, setView] = useState<ForgeView>("presets");
   const [generateResult, setGenerateResult] = useState<StudioVrmGenerateResult | null>(null);
   const [generateBusy, setGenerateBusy] = useState(false);
+  // 헤어 실루엣을 **직접 골랐는지**를 기억한다. 기본값이 이미 "없음"이라 목록에서 "없음"을
+  // 눌러도 상태가 그대로여서, 상태 비교만으로는 의도한 민머리를 알아볼 수 없다.
+  const [hairStyleChosen, setHairStyleChosen] = useState(false);
+
+  // 이 의도는 **지금 편집 중인 조형 상태**에만 붙는다. 새 VRM 을 설치하면 부모가 조형 상태를
+  // 통째로 초기화하는데(useStudioVrmPoserInstall) 패널은 마운트된 채로 남으므로, 그대로 두면
+  // 이전 캐릭터에서 고른 헤어 의도가 살아남아 새 캐릭터를 민머리로 생성한다. 패널이 방금
+  // 내보낸 값이 아닌 상태가 들어오면 외부 교체로 보고 의도를 지운다.
+  //
+  // 부모가 `parseAvatarForgeState` 로 정규화해 되돌려 주므로 객체 동일성으로는 우리 편집을
+  // 알아볼 수 없다. 같은 정규화를 거친 서명으로 비교한다.
+  const forgeSignature = useMemo(() => JSON.stringify(serializeAvatarForgeState(state)), [state]);
+  const emittedSignatureRef = useRef<string | null>(null);
+  const seenSignatureRef = useRef(forgeSignature);
+  const seenSessionRef = useRef(sculptSessionId);
+  if (seenSessionRef.current !== sculptSessionId) {
+    // 다른 모델로 갈아탔다. 서명 비교로는 못 잡는 경우가 있다 — 순정 상태에서 "헤어 없음"을
+    // 고른 뒤 새 모델이 설치되면 양쪽 상태가 모두 순정이라 서명이 같다.
+    seenSessionRef.current = sculptSessionId;
+    seenSignatureRef.current = forgeSignature;
+    emittedSignatureRef.current = null;
+    if (hairStyleChosen) setHairStyleChosen(false);
+  } else if (seenSignatureRef.current !== forgeSignature) {
+    const mine = emittedSignatureRef.current === forgeSignature;
+    seenSignatureRef.current = forgeSignature;
+    emittedSignatureRef.current = null;
+    if (!mine && hairStyleChosen) setHairStyleChosen(false);
+  }
+
+  /** 조형 상태를 부모로 올린다. 되돌아온 상태가 우리 것인지 알아보려고 서명을 남긴다. */
+  const emit = (next: AvatarForgeState) => {
+    emittedSignatureRef.current = JSON.stringify(serializeAvatarForgeState(next));
+    onChange(next);
+  };
+
   const previewRecipe = createStudioVrmGenerateRecipe({
     presetId: state.presetId,
     state,
+    allowDefaultPreset: !hairStyleChosen,
   });
 
   const updateFace = <K extends keyof AvatarForgeFaceParams>(key: K, value: AvatarForgeFaceParams[K]) => {
-    onChange({ ...state, presetId: undefined, face: { ...state.face, [key]: value } });
+    emit({ ...state, presetId: undefined, face: { ...state.face, [key]: value } });
   };
 
   const updateProportion = (key: StudioVrmProportionKey, value: number) => {
-    onChange(sanitizeAvatarForgeState({
+    emit(sanitizeAvatarForgeState({
       ...state,
       presetId: undefined,
       bodyPresetId: undefined,
@@ -121,14 +164,14 @@ export function StudioVrmAvatarForgePanel({
   };
 
   const updateHair = <K extends keyof AvatarForgeHairParams>(key: K, value: AvatarForgeHairParams[K]) => {
-    onChange({ ...state, presetId: undefined, hair: { ...state.hair, [key]: value } });
+    emit({ ...state, presetId: undefined, hair: { ...state.hair, [key]: value } });
   };
 
   const updateAccent = (
     id: AvatarForgeFaceAccentId,
     patch: Partial<NonNullable<AvatarForgeState["faceAccents"]>[number]>
   ) => {
-    onChange({
+    emit({
       ...state,
       presetId: undefined,
       faceAccents: (state.faceAccents ?? []).map((accent) =>
@@ -171,7 +214,12 @@ export function StudioVrmAvatarForgePanel({
           <button
             type="button"
             disabled={disabled}
-            onClick={() => onChange(createAvatarForgeState())}
+            onClick={() => {
+              // 조형 상태를 통째로 되돌리면 "머리 없음을 골랐다"는 의도도 같이 사라져야 한다.
+              // 남겨 두면 초기화한 패널이 기본 프리셋 대신 대머리를 만든다.
+              setHairStyleChosen(false);
+              emit(createAvatarForgeState());
+            }}
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg disabled:opacity-40"
             aria-label="아바타 조형 초기화"
             title="기본 조형으로 초기화"
@@ -222,7 +270,10 @@ export function StudioVrmAvatarForgePanel({
                     type="button"
                     disabled={disabled}
                     aria-pressed={selected}
-                    onClick={() => onChange(createAvatarForgeState(preset.id))}
+                    onClick={() => {
+                      setHairStyleChosen(false);
+                      emit(createAvatarForgeState(preset.id));
+                    }}
                     className={`min-h-[5.6rem] w-[8.4rem] shrink-0 snap-start rounded-xl border p-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
                       selected
                         ? "border-accent bg-accent-soft text-accent"
@@ -249,7 +300,7 @@ export function StudioVrmAvatarForgePanel({
                     disabled={disabled}
                     aria-label={`${variant.label} 베리언트: ${variant.description}`}
                     title={variant.tags.join(" · ")}
-                    onClick={() => onChange(applyStudioVrmCharacterVariant(state, variant.id))}
+                    onClick={() => emit(applyStudioVrmCharacterVariant(state, variant.id))}
                     className="min-h-[5.2rem] w-[8.4rem] shrink-0 snap-start rounded-xl border border-line bg-card p-2.5 text-left text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
                   >
                     <span className="text-lg" aria-hidden>{variant.emoji}</span>
@@ -290,7 +341,7 @@ export function StudioVrmAvatarForgePanel({
                       disabled={proportionControlsDisabled}
                       aria-pressed={selected}
                       aria-label={`${preset.label} 체형: ${preset.hint}`}
-                      onClick={() => onChange(sanitizeAvatarForgeState({
+                      onClick={() => emit(sanitizeAvatarForgeState({
                         ...state,
                         presetId: undefined,
                         bodyPresetId: undefined,
@@ -401,7 +452,10 @@ export function StudioVrmAvatarForgePanel({
                       disabled={disabled}
                       aria-pressed={selected}
                       title={option.hint}
-                      onClick={() => updateHair("style", option.id)}
+                      onClick={() => {
+                        setHairStyleChosen(true);
+                        updateHair("style", option.id);
+                      }}
                       className={`flex min-h-14 flex-col items-center justify-center rounded-xl border px-1 py-1.5 text-[0.62rem] font-bold transition-colors disabled:opacity-40 ${
                         selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
                       }`}
@@ -645,27 +699,40 @@ export function StudioVrmAvatarForgePanel({
           </span>
         </div>
 
+        {/* 미리보기는 편집 중인 상태가 아니라 **실제로 생성될 상태**를 보여준다. 아무것도 고르지
+            않았을 때 기본 프리셋이 대신 들어가므로 둘이 갈릴 수 있다. */}
         <div
           data-studio-vrm-generate-preview=""
           className="flex items-center gap-2 rounded-xl border border-line bg-card/70 px-3 py-2"
         >
           <span
             className="size-7 rounded-full border border-line"
-            style={{ background: state.hair.baseColor }}
+            style={{ background: previewRecipe.state.hair.baseColor }}
             aria-hidden
           />
           <span
             className="size-7 rounded-full border border-line"
-            style={{ background: state.hair.tipColor }}
+            style={{ background: previewRecipe.state.hair.tipColor }}
             aria-hidden
           />
           <div className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
             <p>
-              헤어 {state.hair.style} · 얼굴 폭 {state.face.headWidth.toFixed(2)}× · 다리{" "}
-              {state.proportions.legLength.toFixed(2)}×
+              헤어 {previewRecipe.state.hair.style} · 얼굴 폭{" "}
+              {previewRecipe.state.face.headWidth.toFixed(2)}× · 다리{" "}
+              {previewRecipe.state.proportions.legLength.toFixed(2)}×
             </p>
           </div>
         </div>
+
+        {previewRecipe.appliedDefaultPresetId ? (
+          <p
+            data-studio-vrm-generate-default-preset={previewRecipe.appliedDefaultPresetId}
+            className="rounded-xl border border-line bg-raised/60 px-3 py-2 text-[0.66rem] leading-relaxed text-fg-3"
+          >
+            아직 고른 스타일이 없어 기본 스타일 <b className="text-fg-2">{previewRecipe.label}</b>로
+            생성됩니다. 위에서 다른 스타일을 고르거나 슬라이더를 조절하면 그 설정이 그대로 쓰입니다.
+          </p>
+        ) : null}
 
         {generateResult?.status === "unavailable" ? (
           <p
@@ -698,6 +765,7 @@ export function StudioVrmAvatarForgePanel({
               void generateStudioVrmCharacter({
                 presetId: state.presetId,
                 state,
+                allowDefaultPreset: !hairStyleChosen,
               }).then((result) => {
                 setGenerateResult(result);
                 setGenerateBusy(false);
