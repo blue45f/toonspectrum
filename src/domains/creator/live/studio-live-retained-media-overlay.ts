@@ -233,12 +233,13 @@ interface ActiveRetainedStroke {
    */
   paintedOilPasses: number;
   /**
-   * Source samples the painted oil bed was built from, or -1 before the first paint.
+   * Source samples — pointer positions, NOT the interleaved coordinates — the painted oil bed was
+   * built from, or -1 before the first paint.
    *
    * This is the honest "has anything arrived?" test at any bed size, and it is checked before the
    * bed is planned rather than after.
    */
-  paintedOilSourcePoints: number;
+  paintedOilSourceSamples: number;
   paintedPencilMarks: number;
   paintedSourceSegments: number;
   /**
@@ -366,8 +367,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       kind,
       element,
       paintedDabs: 0,
-    paintedOilPasses: 0,
-    paintedOilSourcePoints: -1,
+      paintedOilPasses: 0,
+      paintedOilSourceSamples: -1,
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
       oilPlanner: kind === "oil" ? new FxOilDabPlanner() : null,
@@ -412,8 +413,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         kind: this.active.kind,
         element,
         paintedDabs: 0,
-    paintedOilPasses: 0,
-    paintedOilSourcePoints: -1,
+        paintedOilPasses: 0,
+        paintedOilSourceSamples: -1,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -423,6 +424,11 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         return { status: "fallback" };
       }
     } else {
+      // Pointer-up seals whatever is on the active canvas into settled, so the final append must
+      // paint even when the stroke gained fewer samples than the capped-repaint stride. Clearing
+      // the painted-source mark reopens that guard for this one call; the dab-count guard below
+      // the cap still skips a genuinely unchanged bed.
+      this.active.paintedOilSourceSamples = -1;
       const appended = this.appendFrom(element);
       if (appended.status === "fallback") return { status: "fallback" };
     }
@@ -509,7 +515,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       // following the cursor at a bounded amortised cost — the alternative this replaces was to
       // stop repainting altogether, which left a long oil stroke frozen on screen for the rest of
       // the drag.
-      const grownSamples = flatPoints.length - active.paintedOilSourcePoints;
+      // `flatPoints` is interleaved `[x, y, ...]`, so the stride has to be applied to the pair
+      // count or it fires twice as often as it reads.
+      const sourceSamples = flatPoints.length / 2;
+      const grownSamples = sourceSamples - active.paintedOilSourceSamples;
       const capReached = active.paintedDabs >= FX_OIL_DAB_CAP;
       if (
         target === this.activeContext
@@ -584,7 +593,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       active.paintedDabs = dabs.length;
       if (target === this.activeContext) {
         active.paintedOilPasses += 1;
-        active.paintedOilSourcePoints = flatPoints.length;
+        active.paintedOilSourceSamples = sourceSamples;
       }
       if (target === this.settledContext) this.settledHasPixels = true;
       return true;
@@ -975,8 +984,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         kind,
         element: stroke,
         paintedDabs: 0,
-    paintedOilPasses: 0,
-    paintedOilSourcePoints: -1,
+        paintedOilPasses: 0,
+        paintedOilSourceSamples: -1,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -997,8 +1006,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         kind,
         element: stroke,
         paintedDabs: 0,
-    paintedOilPasses: 0,
-    paintedOilSourcePoints: -1,
+        paintedOilPasses: 0,
+        paintedOilSourceSamples: -1,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -1009,8 +1018,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     const replayActive: ActiveRetainedStroke = {
       ...this.active,
       paintedDabs: 0,
-    paintedOilPasses: 0,
-    paintedOilSourcePoints: -1,
+      paintedOilPasses: 0,
+      paintedOilSourceSamples: -1,
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
     };
@@ -1020,7 +1029,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     this.paintSuffix(replayActive, this.active.element, this.activeContext);
     this.active.paintedDabs = replayActive.paintedDabs;
     this.active.paintedOilPasses = replayActive.paintedOilPasses;
-    this.active.paintedOilSourcePoints = replayActive.paintedOilSourcePoints;
+    this.active.paintedOilSourceSamples = replayActive.paintedOilSourceSamples;
     this.active.paintedPencilMarks = replayActive.paintedPencilMarks;
     this.active.paintedSourceSegments = replayActive.paintedSourceSegments;
   }

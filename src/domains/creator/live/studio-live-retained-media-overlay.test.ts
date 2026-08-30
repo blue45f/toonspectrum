@@ -301,6 +301,35 @@ describe("oil live preview past the dab cap", () => {
     expect(active.stats().strokeCalls).toBeGreaterThan(afterFirst);
   });
 
+  it("applies the stride to samples, not to interleaved coordinates", () => {
+    // `flatFinitePoints` returns `[x, y, ...]`, so comparing its length against a sample stride
+    // fires after half as many samples as the constant reads. 20 samples is under the stride and
+    // must still coalesce; it is over half of it, which is what a coordinate-counting guard would
+    // have repainted on.
+    const { renderer, active } = attachedRenderer();
+    const base = longOilStroke("oil-cap-units", 3000);
+    expect(renderer.begin(base).status).toBe("started");
+    renderer.appendFrom(base);
+
+    const afterFirst = active.stats().strokeCalls;
+    expect(renderer.appendFrom(longOilStroke("oil-cap-units", 3020)).status).toBe("noop");
+    expect(active.stats().strokeCalls).toBe(afterFirst);
+  });
+
+  it("seals the final tail on end() even when the stroke is mid-stride", () => {
+    // `end()` flattens the active canvas into settled, so a coalesced final append would settle a
+    // bed that is missing the last samples and still carries the previous lattice.
+    const { renderer, active } = attachedRenderer();
+    const base = longOilStroke("oil-cap-end", 3000);
+    expect(renderer.begin(base).status).toBe("started");
+    renderer.appendFrom(base);
+
+    const afterFirst = active.stats().strokeCalls;
+    const finished = longOilStroke("oil-cap-end", 3008);
+    expect(renderer.end(finished).status).toBe("settled");
+    expect(active.stats().strokeCalls).toBeGreaterThan(afterFirst);
+  });
+
   it("still skips a capped append that brought no new samples", () => {
     // The other half of the guard: repainting whenever the bed *could* have changed would repaint
     // on every call at the cap, including calls the pointer did not contribute to.
