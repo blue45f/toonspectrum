@@ -20,6 +20,7 @@ import {
 import {
   useEffect,
   useId,
+  useRef,
   useState,
   type FormEvent,
   type ReactElement,
@@ -65,6 +66,7 @@ import {
 
 import type { StudioSavedBrush } from "./brush/studio-brush-library";
 import type { StudioAsset } from "./studio-asset-library";
+import type { StudioCommunityMarketplaceView } from "./studio-community-marketplace-view";
 import type { StudioNamedPalette } from "./studio-palette-library";
 import type {
   CreatorMarketplaceResourceKind,
@@ -90,8 +92,6 @@ const PRIMARY =
   `min-h-11 rounded-lg bg-accent px-3 text-[0.65rem] font-bold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS}`;
 
 type StudioCommunityT = (key: string, fallback?: string) => string;
-type CommunityView = "community" | "mine" | "share";
-
 function localizeText(t: StudioCommunityT, fallback: string, key: string): string {
   return t(key) === key ? fallback : t(key);
 }
@@ -568,9 +568,14 @@ function CommunityRecordCard({
 function ShareResourceForm({
   onPublished,
 }: {
-  readonly onPublished: (record: CreatorMarketplaceResourceRecord) => void;
+  readonly onPublished: (
+    record: CreatorMarketplaceResourceRecord,
+    successMessage: string,
+  ) => void;
 }) {
   const t = useT();
+  const mountedRef = useRef(false);
+  const submissionGenerationRef = useRef(0);
   const [refreshToken, setRefreshToken] = useState(0);
   const [filterPresets, setFilterPresets] = useState<
     readonly StudioFilterLibraryPreset[]
@@ -657,6 +662,13 @@ function ShareResourceForm({
   const [notMarketplaceDerivative, setNotMarketplaceDerivative] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      submissionGenerationRef.current += 1;
+    };
+  }, []);
   const candidate = candidates.find(
     (item) => candidateKey(item) === selectedCandidateKey,
   )
@@ -673,6 +685,11 @@ function ShareResourceForm({
   async function handlePublish(event: FormEvent) {
     event.preventDefault();
     if (!candidate || !ready) return;
+    const submissionGeneration = submissionGenerationRef.current + 1;
+    submissionGenerationRef.current = submissionGeneration;
+    const canApplySubmissionResult = () =>
+      mountedRef.current
+      && submissionGenerationRef.current === submissionGeneration;
     setPublishing(true);
     setStatus(null);
     try {
@@ -685,17 +702,20 @@ function ShareResourceForm({
         recognizableMarketplaceDerivative: !notMarketplaceDerivative,
       });
       const published = await publishCreatorMarketplaceResource(manifest);
+      if (!canApplySubmissionResult()) return;
+      const successMessage = tText(
+        t,
+        '"{resourceName}"을(를) 무료 공유 마켓에 게시했습니다.',
+        "studio.community.share.publishSuccess",
+        { resourceName: published.name },
+      );
       setStatus({
-        message: tText(
-          t,
-          '"{resourceName}"을(를) 무료 공유 마켓에 게시했습니다.',
-          "studio.community.share.publishSuccess",
-          { resourceName: published.name },
-        ),
+        message: successMessage,
         error: false,
       });
-      onPublished(published);
+      onPublished(published, successMessage);
     } catch (caught) {
+      if (!canApplySubmissionResult()) return;
       setStatus({
         message: errorText(
           caught,
@@ -704,7 +724,9 @@ function ShareResourceForm({
         error: true,
       });
     } finally {
-      setPublishing(false);
+      if (canApplySubmissionResult()) {
+        setPublishing(false);
+      }
     }
   }
 
@@ -851,14 +873,16 @@ function ShareResourceForm({
 export function StudioCommunityMarketplacePanel({
   onUseAsset,
   initialOpen = false,
+  initialView = "community",
 }: {
   readonly onUseAsset?: (asset: StudioAsset) => boolean;
   readonly initialOpen?: boolean;
+  readonly initialView?: StudioCommunityMarketplaceView;
 }): ReactElement {
   const searchId = useId();
   const tabBaseId = useId();
   const [open, setOpen] = useState(initialOpen);
-  const [view, setView] = useState<CommunityView>("community");
+  const [view, setView] = useState<StudioCommunityMarketplaceView>(initialView);
   const [kind, setKind] = useState<CreatorMarketplaceResourceKind | "all">("all");
   const [queryDraft, setQueryDraft] = useState("");
   const [query, setQuery] = useState("");
@@ -871,11 +895,31 @@ export function StudioCommunityMarketplacePanel({
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
+  const listingRequestGenerationRef = useRef(0);
+  const listingRequestControllerRef = useRef<AbortController | null>(null);
+  const loadMoreRequestControllerRef = useRef<AbortController | null>(null);
+  const confirmedPublishedRecordRef = useRef<CreatorMarketplaceResourceRecord | null>(null);
   const t = useT();
 
   useEffect(() => {
-    if (!open || view === "share") return;
+    const requestGeneration = listingRequestGenerationRef.current + 1;
+    listingRequestGenerationRef.current = requestGeneration;
+    listingRequestControllerRef.current?.abort();
+    listingRequestControllerRef.current = null;
+    loadMoreRequestControllerRef.current?.abort();
+    loadMoreRequestControllerRef.current = null;
+    setLoadingMore(false);
+    setNextCursor(null);
+    setHasMore(false);
+    if (!open || view === "share") {
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
+    listingRequestControllerRef.current = controller;
+    const isCurrentRequest = () =>
+      !controller.signal.aborted
+      && listingRequestGenerationRef.current === requestGeneration;
     setLoading(true);
     setError(null);
     const request = view === "mine"
@@ -887,13 +931,25 @@ export function StudioCommunityMarketplacePanel({
       kind: kind === "all" ? undefined : kind,
     }, controller.signal)
       .then((page) => {
+        if (!isCurrentRequest()) return;
         setRecords(page.items);
+        if (view === "mine") {
+          confirmedPublishedRecordRef.current = null;
+        }
         setNextCursor(page.nextCursor);
         setHasMore(page.hasMore);
       })
       .catch((caught) => {
-        if (controller.signal.aborted) return;
-        setRecords([]);
+        if (!isCurrentRequest()) return;
+        const confirmedPublishedRecord = view === "mine"
+          ? confirmedPublishedRecordRef.current
+          : null;
+        setRecords((current) => {
+          if (!confirmedPublishedRecord) return [];
+          return current.some((record) => record.id === confirmedPublishedRecord.id)
+            ? current
+            : [confirmedPublishedRecord, ...current];
+        });
         setNextCursor(null);
         setHasMore(false);
         setError(
@@ -906,13 +962,38 @@ export function StudioCommunityMarketplacePanel({
         );
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!isCurrentRequest()) return;
+        if (listingRequestControllerRef.current === controller) {
+          listingRequestControllerRef.current = null;
+        }
+        setLoading(false);
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (listingRequestControllerRef.current === controller) {
+        listingRequestControllerRef.current = null;
+      }
+      const loadMoreController = loadMoreRequestControllerRef.current;
+      loadMoreController?.abort();
+      if (loadMoreRequestControllerRef.current === loadMoreController) {
+        loadMoreRequestControllerRef.current = null;
+      }
+      if (listingRequestGenerationRef.current === requestGeneration) {
+        listingRequestGenerationRef.current += 1;
+      }
+    };
   }, [kind, open, query, reloadToken, t, view]);
 
   async function loadMore() {
-    if (!nextCursor || loadingMore || view === "share") return;
+    const cursor = nextCursor;
+    if (!cursor || loading || loadingMore || view === "share") return;
+    const requestGeneration = listingRequestGenerationRef.current;
+    const controller = new AbortController();
+    loadMoreRequestControllerRef.current?.abort();
+    loadMoreRequestControllerRef.current = controller;
+    const isCurrentRequest = () =>
+      !controller.signal.aborted
+      && listingRequestGenerationRef.current === requestGeneration;
     setLoadingMore(true);
     setError(null);
     const request = view === "mine"
@@ -921,10 +1002,11 @@ export function StudioCommunityMarketplacePanel({
     try {
       const page = await request({
         limit: 12,
-        cursor: nextCursor,
+        cursor,
         search: query || undefined,
         kind: kind === "all" ? undefined : kind,
-      });
+      }, controller.signal);
+      if (!isCurrentRequest()) return;
       setRecords((current) => [
         ...current,
         ...page.items.filter(
@@ -934,16 +1016,50 @@ export function StudioCommunityMarketplacePanel({
       setNextCursor(page.nextCursor);
       setHasMore(page.hasMore);
     } catch (caught) {
+      if (!isCurrentRequest()) return;
       setError(errorText(caught, t("studio.community.error.loadMore")));
     } finally {
-      setLoadingMore(false);
+      if (loadMoreRequestControllerRef.current === controller) {
+        loadMoreRequestControllerRef.current = null;
+        setLoadingMore(false);
+      }
     }
+  }
+
+  function transitionMarketplaceView(
+    nextView: StudioCommunityMarketplaceView,
+    nextRecords: CreatorMarketplaceResourceRecord[] = [],
+  ): void {
+    if (nextView === view) {
+      setStatus(null);
+      setError(null);
+      return;
+    }
+    if (nextView !== "mine") {
+      confirmedPublishedRecordRef.current = null;
+    }
+    listingRequestGenerationRef.current += 1;
+    listingRequestControllerRef.current?.abort();
+    listingRequestControllerRef.current = null;
+    loadMoreRequestControllerRef.current?.abort();
+    loadMoreRequestControllerRef.current = null;
+    setLoading(nextView !== "share");
+    setLoadingMore(false);
+    setRecords(nextRecords);
+    setNextCursor(null);
+    setHasMore(false);
+    setView(nextView);
+    setStatus(null);
+    setError(null);
   }
 
   async function deleteRecord(record: CreatorMarketplaceResourceRecord) {
     setStatus(null);
     try {
       await deleteCreatorMarketplaceResource(record.id);
+      if (confirmedPublishedRecordRef.current?.id === record.id) {
+        confirmedPublishedRecordRef.current = null;
+      }
       setRecords((current) => current.filter((item) => item.id !== record.id));
       setStatus({
         message: tText(
@@ -1014,9 +1130,7 @@ export function StudioCommunityMarketplacePanel({
                   aria-selected={view === id}
                   aria-controls={`${tabBaseId}-${id}-panel`}
                   onClick={() => {
-                    setView(id);
-                    setStatus(null);
-                    setError(null);
+                    transitionMarketplaceView(id);
                   }}
                   className={cx(
                     "min-h-11 rounded-lg border px-2 text-[0.6rem] font-bold",
@@ -1039,9 +1153,10 @@ export function StudioCommunityMarketplacePanel({
                 className="mt-2"
               >
                 <ShareResourceForm
-                  onPublished={(published) => {
-                    setRecords((current) => [published, ...current]);
-                    setView("mine");
+                  onPublished={(published, successMessage) => {
+                    confirmedPublishedRecordRef.current = published;
+                    transitionMarketplaceView("mine", [published]);
+                    setStatus({ message: successMessage, error: false });
                     setReloadToken((value) => value + 1);
                   }}
                 />
@@ -1154,7 +1269,7 @@ export function StudioCommunityMarketplacePanel({
                     {t("studio.community.panel.empty")}
                   </p>
                 ) : null}
-                {hasMore ? (
+                {hasMore && !loading ? (
                   <button
                     type="button"
                     onClick={() => void loadMore()}

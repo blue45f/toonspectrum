@@ -13,6 +13,7 @@ import {
   installStudioCreatorPack,
   listStudioCreatorFilterPresets,
   materializeStudioCreatorFilterPresetPatch,
+  resolveStudioCreatorBundledCatalogTarget,
   STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY,
   uninstallStudioCreatorPack,
   validateStudioCreatorPack,
@@ -274,5 +275,111 @@ describe("Studio Creator Pack runtime", () => {
       }],
     } as unknown as StudioCreatorPackDefinition;
     expect(validateStudioCreatorPack(invalid).valid).toBe(false);
+  });
+
+  it("resolves only allowlisted single builtin references into catalog targets", () => {
+    const templatePack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "template",
+    )!;
+    const templateEntry = templatePack.entries[0]!;
+    const singleTemplatePack = {
+      ...templatePack,
+      entries: [templateEntry],
+      runtimeDescriptor: {
+        ...templatePack.runtimeDescriptor,
+        budget: {
+          ...templatePack.runtimeDescriptor.budget,
+          entries: 1,
+        },
+      },
+    } satisfies StudioCreatorPackDefinition;
+    expect(resolveStudioCreatorBundledCatalogTarget(singleTemplatePack)).toEqual({
+      status: "supported",
+      target: {
+        kind: "scene-template-catalog",
+        templateId: "confession",
+      },
+    });
+
+    const bg3dPack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "3d-preset",
+    )!;
+    expect(resolveStudioCreatorBundledCatalogTarget(bg3dPack)).toMatchObject({
+      status: "supported",
+      target: {
+        kind: "bg3d-procedural-catalog",
+        runtimeRef: "toonspectrum-bg3d-procedural-starter-v1",
+      },
+    });
+  });
+
+  it("rejects unknown and multi-entry builtin references before opening UI", () => {
+    const templatePack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "template",
+    )!;
+    expect(resolveStudioCreatorBundledCatalogTarget(templatePack)).toMatchObject({
+      status: "unsupported",
+      reason: expect.stringContaining("하나"),
+    });
+
+    const singleEntry = templatePack.entries[0]!;
+    const unknown = {
+      ...templatePack,
+      entries: [{
+        ...singleEntry,
+        delivery: {
+          mode: "builtin-ref" as const,
+          runtimeRef: "studio-scene-template:not-allowlisted",
+        },
+      }],
+      runtimeDescriptor: {
+        ...templatePack.runtimeDescriptor,
+        budget: {
+          ...templatePack.runtimeDescriptor.budget,
+          entries: 1,
+        },
+      },
+    } as StudioCreatorPackDefinition;
+    expect(resolveStudioCreatorBundledCatalogTarget(unknown)).toMatchObject({
+      status: "unsupported",
+      reason: expect.stringContaining("알 수 없는 내장 장면 템플릿 참조"),
+    });
+
+    const bg3dPack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "3d-preset",
+    )!;
+    const unknownBg3d = {
+      ...bg3dPack,
+      entries: [{
+        ...bg3dPack.entries[0]!,
+        delivery: {
+          mode: "builtin-ref" as const,
+          runtimeRef: "unknown-bg3d-pack",
+        },
+      }],
+    } as StudioCreatorPackDefinition;
+    expect(resolveStudioCreatorBundledCatalogTarget(unknownBg3d)).toMatchObject({
+      status: "unsupported",
+      reason: expect.stringContaining("알 수 없는 내장 3D 팩 참조"),
+    });
+
+    const brushPack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (candidate) => candidate.metadata.kind === "brush",
+    )!;
+    const singlePortablePack = {
+      ...brushPack,
+      entries: [brushPack.entries[0]!],
+      runtimeDescriptor: {
+        ...brushPack.runtimeDescriptor,
+        budget: {
+          ...brushPack.runtimeDescriptor.budget,
+          entries: 1,
+        },
+      },
+    } satisfies StudioCreatorPackDefinition;
+    expect(resolveStudioCreatorBundledCatalogTarget(singlePortablePack)).toMatchObject({
+      status: "unsupported",
+      reason: expect.stringContaining("내장 카탈로그 참조가 아닙니다"),
+    });
   });
 });

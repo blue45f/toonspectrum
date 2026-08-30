@@ -1,6 +1,6 @@
 import { RotateCcw, Search, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigationType, useSearchParams } from "react-router-dom";
 
 import { MarketResourceCard } from "../components/MarketResourceCard";
 import { StaleNoticeBar } from "../components/StaleNoticeBar";
@@ -45,7 +45,7 @@ function readLicense(searchParams: URLSearchParams): CreatorMarketplaceResourceL
 
 function filterChipClass(active: boolean): string {
   return cn(
-    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-150",
+    "inline-flex min-h-6 items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-150 pointer-coarse:min-h-11",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
     active
       ? "border-transparent text-fg shadow-sm"
@@ -55,8 +55,10 @@ function filterChipClass(active: boolean): string {
 
 export function MarketBrowsePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigationType = useNavigationType();
   const searchInputId = "market-browse-search";
   const [draftSearch, setDraftSearch] = useState(() => searchParams.get("q") ?? "");
+  const pendingSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const query = {
     limit: PAGE_SIZE,
@@ -89,15 +91,56 @@ export function MarketBrowsePage() {
 
   const activeKind = query.kind;
   const activeLicense = query.license;
+  const activePublisherLabel = query.publisher
+    ? page.items.find((record) => record.publisher.id === query.publisher)?.publisher.name
+      ?? "선택한 배급자"
+    : null;
 
   const committedSearch = query.search ?? "";
+  const cancelPendingSearchCommit = useCallback(() => {
+    if (pendingSearchTimerRef.current === null) return;
+    clearTimeout(pendingSearchTimerRef.current);
+    pendingSearchTimerRef.current = null;
+  }, []);
+
   useEffect(() => {
-    if (draftSearch === committedSearch) return;
-    const timer = setTimeout(() => {
-      patchParams({ q: draftSearch.trim() || null });
+    cancelPendingSearchCommit();
+    setDraftSearch(committedSearch);
+    return cancelPendingSearchCommit;
+  }, [cancelPendingSearchCommit, committedSearch]);
+
+  const serializedSearchParams = searchParams.toString();
+  useEffect(() => {
+    if (navigationType !== "POP") return;
+    cancelPendingSearchCommit();
+    setDraftSearch(committedSearch);
+  }, [
+    cancelPendingSearchCommit,
+    committedSearch,
+    navigationType,
+    serializedSearchParams,
+  ]);
+
+  const updateDraftSearch = useCallback((value: string) => {
+    setDraftSearch(value);
+    cancelPendingSearchCommit();
+    pendingSearchTimerRef.current = setTimeout(() => {
+      pendingSearchTimerRef.current = null;
+      patchParams({ q: value.trim() || null });
     }, 300);
-    return () => clearTimeout(timer);
-  }, [draftSearch, committedSearch, patchParams]);
+  }, [cancelPendingSearchCommit, patchParams]);
+
+  const clearSearch = useCallback(() => {
+    cancelPendingSearchCommit();
+    setDraftSearch("");
+    patchParams({ q: null });
+  }, [cancelPendingSearchCommit, patchParams]);
+
+  const resetFilters = useCallback(() => {
+    cancelPendingSearchCommit();
+    setDraftSearch("");
+    patchParams({ q: null, tag: null, publisher: null, kind: null, license: null });
+  }, [cancelPendingSearchCommit, patchParams]);
 
   const hasActiveFilters = Boolean(
     query.search || query.tag || query.publisher || activeKind || activeLicense
@@ -120,6 +163,7 @@ export function MarketBrowsePage() {
             className="mt-5 flex max-w-xl items-center gap-2"
             onSubmit={(event) => {
               event.preventDefault();
+              cancelPendingSearchCommit();
               patchParams({ q: draftSearch.trim() || null });
             }}
           >
@@ -130,19 +174,16 @@ export function MarketBrowsePage() {
                 type="search"
                 aria-label="마켓 리소스 검색"
                 value={draftSearch}
-                onChange={(event) => setDraftSearch(event.target.value)}
+                onChange={(event) => updateDraftSearch(event.target.value)}
                 placeholder="리소스·태그·배급자 검색 (예: 잉크, 수채화, 4컷, 배경)"
-                className="h-10 w-full rounded-[0.7rem] border border-line bg-card pl-9 pr-9 text-sm text-fg placeholder:text-fg-3 outline-none transition-colors duration-150 focus:border-accent"
+                className="h-10 w-full appearance-none rounded-[0.7rem] border border-line bg-card pl-9 pr-9 text-sm text-fg placeholder:text-fg-3 outline-none transition-colors duration-150 focus:border-accent pointer-coarse:h-11 pointer-coarse:pr-12 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
               />
               {draftSearch ? (
                 <button
                   type="button"
                   aria-label="검색어 지우기"
-                  onClick={() => {
-                    setDraftSearch("");
-                    patchParams({ q: null });
-                  }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-3 transition-colors duration-150 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                  onClick={clearSearch}
+                  className="absolute right-1 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded text-fg-3 transition-colors duration-150 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:right-0 pointer-coarse:size-11"
                 >
                   <X className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
@@ -228,7 +269,7 @@ export function MarketBrowsePage() {
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-3">
           {!page.loading && !page.error ? (
             <p className="text-xs text-fg-3" aria-live="polite">
-              조건 검색 결과 <span className="numeral tnum font-semibold text-fg">{page.items.length}</span>개 리소스
+              현재 <span className="numeral tnum font-semibold text-fg">{page.items.length}</span>개 표시
             </p>
           ) : (
             <span />
@@ -237,20 +278,33 @@ export function MarketBrowsePage() {
           {hasActiveFilters ? (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
               {query.search ? (
-                <span className="rounded bg-raised px-2 py-0.5 text-fg-2">
+                <button
+                  type="button"
+                  aria-label={`검색 필터 ${query.search} 제거`}
+                  onClick={clearSearch}
+                  className="inline-flex min-h-6 items-center gap-1 rounded bg-raised px-2 py-0.5 text-fg-2 hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-3"
+                >
                   검색: “{query.search}”
-                </span>
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
               ) : null}
               {query.tag ? (
-                <span className="rounded bg-raised px-2 py-0.5 text-fg-2">
+                <button
+                  type="button"
+                  aria-label={`태그 필터 ${query.tag} 제거`}
+                  onClick={() => patchParams({ tag: null })}
+                  className="inline-flex min-h-6 items-center gap-1 rounded bg-raised px-2 py-0.5 text-fg-2 hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-3"
+                >
                   #{query.tag}
-                </span>
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
               ) : null}
               {activeKind ? (
                 <button
                   type="button"
+                  aria-label={`${marketKindMeta(activeKind).label} 필터 제거`}
                   onClick={() => patchParams({ kind: null })}
-                  className="inline-flex items-center gap-1 rounded bg-raised px-2 py-0.5 text-fg-2 hover:text-fg"
+                  className="inline-flex min-h-6 items-center gap-1 rounded bg-raised px-2 py-0.5 text-fg-2 hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-3"
                 >
                   {marketKindMeta(activeKind).label}
                   <X className="h-3 w-3" aria-hidden="true" />
@@ -259,22 +313,29 @@ export function MarketBrowsePage() {
               {activeLicense ? (
                 <button
                   type="button"
+                  aria-label={`${MARKET_LICENSES.find((meta) => meta.license === activeLicense)?.label ?? activeLicense} 필터 제거`}
                   onClick={() => patchParams({ license: null })}
-                  className="inline-flex items-center gap-1 rounded bg-raised px-2 py-0.5 text-fg-2 hover:text-fg"
+                  className="inline-flex min-h-6 items-center gap-1 rounded bg-raised px-2 py-0.5 text-fg-2 hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-3"
                 >
                   {MARKET_LICENSES.find((meta) => meta.license === activeLicense)?.label}
                   <X className="h-3 w-3" aria-hidden="true" />
                 </button>
               ) : null}
               {query.publisher ? (
-                <span className="rounded bg-raised px-2 py-0.5 text-fg-2">
-                  배급자: {query.publisher}
-                </span>
+                <button
+                  type="button"
+                  aria-label="배급자 필터 제거"
+                  onClick={() => patchParams({ publisher: null })}
+                  className="inline-flex min-h-6 min-w-0 max-w-full items-center gap-1 rounded bg-raised px-2 py-0.5 text-fg-2 hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-3"
+                >
+                  <span className="max-w-64 truncate">배급자: {activePublisherLabel}</span>
+                  <X className="h-3 w-3 shrink-0" aria-hidden="true" />
+                </button>
               ) : null}
               <button
                 type="button"
-                onClick={() => patchParams({ q: null, tag: null, publisher: null, kind: null, license: null })}
-                className="inline-flex items-center gap-1 rounded bg-bad/10 px-2 py-0.5 text-xs text-bad hover:bg-bad/20"
+                onClick={resetFilters}
+                className="inline-flex min-h-6 items-center gap-1 rounded bg-bad/10 px-2 py-0.5 text-xs text-bad hover:bg-bad/20 pointer-coarse:min-h-11 pointer-coarse:px-3"
               >
                 <RotateCcw className="h-3 w-3" aria-hidden="true" />
                 조건 초기화
@@ -337,7 +398,7 @@ export function MarketBrowsePage() {
                   {hasActiveFilters ? (
                     <button
                       type="button"
-                      onClick={() => patchParams({ q: null, tag: null, publisher: null, kind: null, license: null })}
+                      onClick={resetFilters}
                       className={buttonClass({ variant: "outline", size: "sm" })}
                     >
                       필터 조건 초기화
@@ -347,7 +408,22 @@ export function MarketBrowsePage() {
               </div>
             ) : null}
 
-            {!page.loading && page.hasMore && !page.error ? (
+            {!page.loading && page.loadMoreError && !page.error ? (
+              <div
+                className="mt-8 flex flex-wrap items-center justify-center gap-2 text-center text-xs text-bad"
+                role="alert"
+              >
+                <span>{page.loadMoreError}</span>
+                <button
+                  type="button"
+                  onClick={page.loadMore}
+                  disabled={page.loadingMore}
+                  className={buttonClass({ variant: "outline", size: "sm" })}
+                >
+                  {page.loadingMore ? "다시 불러오는 중…" : "다시 시도"}
+                </button>
+              </div>
+            ) : !page.loading && page.hasMore && !page.error ? (
               <div className="mt-8 text-center">
                 <button
                   type="button"

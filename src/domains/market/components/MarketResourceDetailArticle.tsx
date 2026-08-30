@@ -51,27 +51,38 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
 }
 
 function ShareLinkButton() {
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<"idle" | "shared" | "copied" | "failed">("idle");
 
   async function shareCurrentLink() {
     const url = window.location.href;
+    setStatus("idle");
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({ url, title: document.title });
+        setStatus("shared");
         return;
-      } catch {
-        // 사용자가 공유를 취소한 경우
-        return;
+      } catch (error) {
+        if ((error as { name?: unknown } | null)?.name === "AbortError") return;
+        // 공유 시트가 실패하면 클립보드 복사를 한 번 더 시도한다.
       }
     }
     try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard_unavailable");
       await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setStatus("copied");
+      setTimeout(() => setStatus("idle"), 2000);
     } catch {
-      // 클립보드 접근 거부 환경
+      setStatus("failed");
     }
   }
+
+  const label = status === "shared"
+    ? "공유했어요"
+    : status === "copied"
+      ? "링크를 복사했어요"
+      : status === "failed"
+        ? "공유할 수 없어요 · 다시 시도"
+        : "링크 공유";
 
   return (
     <button
@@ -81,19 +92,21 @@ function ShareLinkButton() {
       aria-live="polite"
     >
       <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
-      {copied ? "링크를 복사했어요" : "링크 공유"}
+      {label}
     </button>
   );
 }
 
-function downloadManifestJson(record: CreatorMarketplaceResourceRecord): void {
+function downloadMetadataSnapshot(record: CreatorMarketplaceResourceRecord): void {
   const blob = new Blob([JSON.stringify(record, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${record.packageId}-${record.resourceVersion}.json`;
+  link.download = `${record.packageId.replace(/[^a-z0-9._-]+/giu, "-")}-${record.resourceVersion}-metadata-snapshot.json`;
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  globalThis.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export interface MarketResourceDetailArticleProps {
@@ -118,6 +131,21 @@ export function MarketResourceDetailArticle({
   const filterPreviews = filterPreviewData(record);
   const templatePreviews = templatePreviewData(record);
   const recipePreviews = recipePreviewData(record);
+  const isDirectAsset = record.kind === "asset";
+  const studioActionLabel = isDirectAsset
+    ? "스튜디오 캔버스에 에셋 삽입"
+    : record.kind === "template"
+      ? "장면 템플릿 카탈로그 열기"
+      : record.kind === "3d-preset"
+        ? "3D 배경 카탈로그 열기"
+        : "스튜디오에 리소스 팩 설치";
+  const studioActionSummary = isDirectAsset
+    ? "Studio 커뮤니티 마켓을 열고 지원되는 첫 에셋을 현재 캔버스에 삽입합니다."
+    : record.kind === "template"
+      ? "Studio 장면 템플릿 카탈로그와 참조된 템플릿 계열을 엽니다. 장면 카드를 눌러야 현재 컷에 적용됩니다."
+      : record.kind === "3d-preset"
+        ? "Studio 배경 3D 도형·절차형 카탈로그를 엽니다. 항목을 직접 선택해야 장면에 추가됩니다."
+        : "Studio 커뮤니티 마켓을 열고 이 리소스 팩을 로컬 도구 라이브러리에 설치합니다.";
 
   return (
     <article className="mt-6">
@@ -129,30 +157,23 @@ export function MarketResourceDetailArticle({
         />
       ) : null}
       <header
-        className="relative overflow-hidden rounded-xl border border-line p-6 sm:p-8"
-        style={{
-          background: `linear-gradient(140deg, oklch(0.30 0.07 ${kind.hue}) 0%, oklch(0.22 0.04 ${kind.hue}) 60%, oklch(0.19 0.02 ${kind.hue}) 100%)`,
-        }}
+        className="relative overflow-hidden rounded-xl border border-line bg-[linear-gradient(140deg,var(--color-card)_0%,var(--color-panel)_60%,var(--color-canvas)_100%)] p-6 text-fg sm:p-8"
       >
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className="rounded-md px-2 py-0.5 text-xs font-bold"
-            style={{
-              backgroundColor: `oklch(0.75 0.12 ${kind.hue} / 0.25)`,
-              color: `oklch(0.85 0.12 ${kind.hue})`,
-            }}
+            className="inline-flex min-h-6 items-center rounded-md bg-accent px-2 text-xs font-bold text-on-accent"
           >
             {kind.label}
           </span>
-          <span className="rounded-md bg-white/10 px-2 py-0.5 text-xs font-semibold text-fg/90 backdrop-blur-sm">
+          <span className="inline-flex min-h-6 items-center rounded-md bg-raised px-2 text-xs font-semibold text-fg">
             v{record.resourceVersion}
           </span>
           {record.containsAi ? (
-            <span className="rounded-md bg-warn/20 px-2 py-0.5 text-xs font-semibold text-warn">
+            <span className="inline-flex min-h-6 items-center rounded-md border border-warn/40 bg-raised px-2 text-xs font-semibold text-fg">
               AI 포함
             </span>
           ) : (
-            <span className="rounded-md bg-good/20 px-2 py-0.5 text-xs font-semibold text-good">
+            <span className="inline-flex min-h-6 items-center rounded-md border border-good/40 bg-raised px-2 text-xs font-semibold text-fg">
               순수 창작
             </span>
           )}
@@ -162,7 +183,7 @@ export function MarketResourceDetailArticle({
           {record.name}
         </h1>
         {record.description ? (
-          <p className="mt-2.5 max-w-xl text-pretty font-serif text-sm italic leading-relaxed text-fg/85 sm:text-base">
+          <p className="mt-2.5 max-w-xl text-pretty font-serif text-sm italic leading-relaxed text-fg sm:text-base">
             {record.description}
           </p>
         ) : null}
@@ -173,33 +194,23 @@ export function MarketResourceDetailArticle({
         <div className="min-w-0 space-y-6">
           {/* Dynamic Interactive Previews by Kind */}
           {paletteColors ? (
-            <section aria-labelledby="market-palette-heading">
-              <MarketPalettePreview colors={paletteColors} paletteName={record.name} />
-            </section>
+            <MarketPalettePreview colors={paletteColors} paletteName={record.name} />
           ) : null}
 
           {brushPreviews && brushPreviews[0] ? (
-            <section aria-labelledby="market-brush-heading">
-              <MarketBrushPreview brush={brushPreviews[0]} />
-            </section>
+            <MarketBrushPreview brush={brushPreviews[0]} />
           ) : null}
 
           {filterPreviews && filterPreviews[0] ? (
-            <section aria-labelledby="market-filter-heading">
-              <MarketFilterPreview filter={filterPreviews[0]} />
-            </section>
+            <MarketFilterPreview filter={filterPreviews[0]} />
           ) : null}
 
           {templatePreviews && templatePreviews[0] ? (
-            <section aria-labelledby="market-template-heading">
-              <MarketTemplatePreview template={templatePreviews[0]} />
-            </section>
+            <MarketTemplatePreview template={templatePreviews[0]} />
           ) : null}
 
           {record.kind === "3d-preset" && recipePreviews && recipePreviews[0] ? (
-            <section aria-labelledby="market-3d-heading">
-              <MarketScene3dPreview recipe={recipePreviews[0]} />
-            </section>
+            <MarketScene3dPreview recipe={recipePreviews[0]} />
           ) : null}
 
           {/* Contents Section */}
@@ -240,7 +251,7 @@ export function MarketResourceDetailArticle({
                   <li key={tag}>
                     <Link
                       href={`/market/browse?tag=${encodeURIComponent(tag)}`}
-                      className="rounded bg-raised px-2 py-1 text-xs text-fg-2 transition-colors duration-150 hover:text-accent"
+                      className="inline-flex min-h-6 items-center rounded bg-raised px-2.5 text-xs text-fg-2 transition-colors duration-150 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11 pointer-coarse:px-3"
                     >
                       #{tag}
                     </Link>
@@ -274,15 +285,15 @@ export function MarketResourceDetailArticle({
               className={buttonClass({ variant: "solid", size: "md", className: "w-full" })}
             >
               <Download className="h-4 w-4" aria-hidden="true" />
-              스튜디오에서 불러오기 & 설치
+              {studioActionLabel}
             </Link>
             <button
               type="button"
-              onClick={() => downloadManifestJson(record)}
+              onClick={() => downloadMetadataSnapshot(record)}
               className={buttonClass({ variant: "outline", size: "sm", className: "w-full" })}
             >
               <FileJson className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
-              패키지 JSON 다운로드
+              메타데이터 스냅샷 다운로드
             </button>
             <Link
               href={`/market/browse?kind=${record.kind}`}
@@ -292,7 +303,7 @@ export function MarketResourceDetailArticle({
             </Link>
             <ShareLinkButton />
             <p className="text-center text-[0.68rem] leading-relaxed text-fg-3">
-              Studio 자산 메뉴의 커뮤니티 마켓에서 1클릭으로 설치 및 캔버스 삽입이 가능합니다.
+              {studioActionSummary}
             </p>
           </div>
 
@@ -307,8 +318,8 @@ export function MarketResourceDetailArticle({
                 />
               ) : null}
               <Link
-                href={`/market/browse?q=${encodeURIComponent(record.publisher.name)}`}
-                className="underline-offset-2 transition-colors duration-150 hover:text-accent hover:underline"
+                href={`/market/browse?publisher=${encodeURIComponent(record.publisher.id)}`}
+                className="inline-flex min-h-6 items-center underline-offset-2 transition-colors duration-150 hover:text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11"
               >
                 {record.publisher.name}
               </Link>
@@ -320,9 +331,28 @@ export function MarketResourceDetailArticle({
               <span className="numeral tnum">v{record.resourceVersion}</span>
             </MetaRow>
             <MetaRow label="라이선스">
-              <span className="inline-flex items-center gap-1">
-                <ShieldCheck className="h-3.5 w-3.5 text-good" aria-hidden="true" />
-                {license.label}
+              <span className="flex max-w-[190px] flex-col items-end gap-1">
+                <span className="inline-flex items-center gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5 text-good" aria-hidden="true" />
+                  {license.url ? (
+                    <a
+                      href={license.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-6 items-center underline decoration-line-strong underline-offset-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11"
+                    >
+                      {license.label}
+                    </a>
+                  ) : (
+                    <Link
+                      href="/terms"
+                      className="inline-flex min-h-6 items-center underline decoration-line-strong underline-offset-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11"
+                    >
+                      {license.label}
+                    </Link>
+                  )}
+                </span>
+                <span className="font-normal leading-relaxed text-fg-2">{license.summary}</span>
               </span>
             </MetaRow>
             <MetaRow label="호환 엔진">
@@ -361,7 +391,7 @@ export function MarketResourceDetailArticle({
                 href={record.provenance.sourceUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="break-all text-cool underline-offset-2 hover:underline"
+                className="inline-flex min-h-6 items-center break-all text-cool underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11"
               >
                 원본 소스 ↗
               </a>

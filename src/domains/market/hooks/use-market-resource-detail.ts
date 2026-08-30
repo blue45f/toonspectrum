@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { readCachedMarketResource, writeCachedMarketResource } from "../models/market-resource-cache";
+import {
+  readCachedMarketResource,
+  removeCachedMarketResource,
+  writeCachedMarketResource,
+} from "../models/market-resource-cache";
 import { getCreatorMarketplaceResource } from "../remotes/market-resource-remote";
 
 import type { CreatorMarketplaceResourceRecord } from "@/lib/creator-marketplace-resource-contract";
@@ -49,6 +53,7 @@ export function useMarketResourceDetail(id: string | undefined): MarketResourceD
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
         if (cause instanceof NotFoundError) {
+          removeCachedMarketResource(id);
           setNotFound(true);
           setLoading(false);
           return;

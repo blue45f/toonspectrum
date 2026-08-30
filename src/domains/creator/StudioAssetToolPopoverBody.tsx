@@ -15,11 +15,13 @@ import {
   X,
 } from "lucide-react";
 import { Suspense } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { completeStudioAssetInsertion } from "./studio-asset-insertion-outcome";
 import { CANVAS_W, TEMPLATES, groupTemplates } from "./studio-assets";
 import { svgToDataUrl } from "./studio-characters";
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "./studio-chrome-ui";
+import { resolveStudioCommunityMarketplaceInitialView } from "./studio-community-marketplace-view";
 import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
 import {
   StudioAssetMenuPanel,
@@ -63,6 +65,9 @@ export interface StudioAssetToolPopoverBodyProps {
 export function StudioAssetToolPopoverBody({
   toolBelt,
 }: StudioAssetToolPopoverBodyProps) {
+  const [searchParams] = useSearchParams();
+  const communityMarketplaceInitialView =
+    resolveStudioCommunityMarketplaceInitialView(searchParams);
   const {
     assetFavoriteOnly,
     assetFavoriteState,
@@ -761,6 +766,7 @@ export function StudioAssetToolPopoverBody({
                   <StudioAssetMenuPanel
                     assetTab={assetTab}
                     setAssetTab={setAssetTab}
+                    communityMarketplaceInitialView={communityMarketplaceInitialView}
                     onUploadAsset={onUploadAsset}
                     assetPrompt={assetPrompt}
                     setAssetPrompt={setAssetPrompt}

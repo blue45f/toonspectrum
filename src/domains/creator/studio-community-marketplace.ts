@@ -401,6 +401,18 @@ function filterSnapshot(brush: StudioSavedBrush): Record<string, CreatorMarketpl
   >;
 }
 
+/**
+ * Product pack entries retain a `creator-pack:` id in every SQLite library. Their source
+ * licence/provenance is intentionally not flattened into the editable brush/filter/palette
+ * record, so treating them as an authored local resource would silently relabel marketplace
+ * content as `provenance: original`. Keep the publish boundary fail-closed until an explicit,
+ * verifiable derivative/redistribution contract is available.
+ */
+export function isStudioCommunityShareableLocalResourceId(id: string): boolean {
+  const normalized = id.trim().toLowerCase();
+  return normalized.length > 0 && !normalized.startsWith("creator-pack:");
+}
+
 export function listStudioCommunityShareCandidates(input: {
   readonly brushes?: readonly StudioSavedBrush[];
   readonly filters?: readonly StudioCreatorInstalledFilterPreset[];
@@ -412,13 +424,17 @@ export function listStudioCommunityShareCandidates(input: {
   const filters = input.filters ?? [];
   const palettes = input.palettes ?? [];
   return [
-    ...brushes.map((brush) => ({
+    ...brushes
+      .filter((brush) => isStudioCommunityShareableLocalResourceId(brush.id))
+      .map((brush) => ({
       id: brush.id,
       kind: "brush" as const,
       name: brush.name,
       definition: { snapshot: filterSnapshot(brush) },
-    })),
-    ...filters.map((filter) => ({
+      })),
+    ...filters
+      .filter((filter) => isStudioCommunityShareableLocalResourceId(filter.id))
+      .map((filter) => ({
       id: filter.id,
       kind: "filter" as const,
       name: filter.name,
@@ -426,8 +442,9 @@ export function listStudioCommunityShareCandidates(input: {
         engine: filter.engine,
         values: filter.values as Record<string, CreatorMarketplaceJsonValue>,
       },
-    })),
+      })),
     ...palettes
+      .filter((palette) => isStudioCommunityShareableLocalResourceId(palette.id))
       .map((palette) => ({
         ...palette,
         colors: [...new Set(
@@ -469,6 +486,11 @@ export async function createStudioCommunityPublishManifest(
   candidate: StudioCommunityShareCandidate,
   options: StudioCommunityPublishOptions,
 ): Promise<CreatorMarketplaceResourceManifest> {
+  if (!isStudioCommunityShareableLocalResourceId(candidate.id)) {
+    throw new Error(
+      "마켓이나 Creator Pack에서 설치한 자료는 원본 출처·재배포 권한을 보존한 게시 경로가 없어 다시 공유할 수 없습니다.",
+    );
+  }
   if (!options.creatorOwnsRights) {
     throw new Error("직접 제작했거나 게시·재배포 권리를 보유한 리소스만 공유할 수 있습니다.");
   }

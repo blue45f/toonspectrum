@@ -42,6 +42,7 @@ import type {
   StudioAssetFavoriteState,
 } from "./studio-asset-favorites";
 import type { StudioAsset } from "./studio-asset-library";
+import type { StudioCommunityMarketplaceView } from "./studio-community-marketplace-view";
 import type { CreatorAssetReportReason } from "@/lib/creator-asset-contract";
 import type {
   GeneratedAssetQuality,
@@ -124,8 +125,10 @@ function preloadStudioAssetMarketplacePanels(): void {
  * 형제 lazy 를 순차(워터폴)로 깨우므로, 프리로드 없이는 첫 진입이 청크 3개 직렬 로드가 된다.
  */
 function StudioAssetMarketplacePanels({
+  initialView,
   onUseLocalAsset,
 }: {
+  initialView: StudioCommunityMarketplaceView;
   onUseLocalAsset: StudioAssetMenuPanelProps["onUseLocalAsset"];
 }) {
   useEffect(() => {
@@ -136,7 +139,11 @@ function StudioAssetMarketplacePanels({
       <div data-studio-asset-marketplace-lazy-boundary="true">
         <LazyStudioOriginalAssetMarketplacePanel onUseAsset={onUseLocalAsset} />
         <LazyStudioCreatorPackMarketplacePanel />
-        <LazyStudioCommunityMarketplacePanel onUseAsset={onUseLocalAsset} />
+        <LazyStudioCommunityMarketplacePanel
+          initialOpen
+          initialView={initialView}
+          onUseAsset={onUseLocalAsset}
+        />
       </div>
     </Suspense>
   );
@@ -184,6 +191,7 @@ function StudioAssetMarketplaceLoading() {
 export interface StudioAssetMenuPanelProps {
   assetTab: StudioAssetTab;
   setAssetTab: Dispatch<SetStateAction<StudioAssetTab>>;
+  communityMarketplaceInitialView?: StudioCommunityMarketplaceView;
   onUploadAsset: (event: ChangeEvent<HTMLInputElement>) => void;
   assetPrompt: string;
   setAssetPrompt: Dispatch<SetStateAction<string>>;
@@ -330,6 +338,7 @@ function AssetFavoriteButton({
 export function StudioAssetMenuPanel({
   assetTab,
   setAssetTab,
+  communityMarketplaceInitialView = "community",
   onUploadAsset,
   assetPrompt,
   setAssetPrompt,
@@ -597,7 +606,10 @@ export function StudioAssetMenuPanel({
       )}
 
       {assetTab === "community" ? (
-        <StudioAssetMarketplacePanels onUseLocalAsset={onUseLocalAsset} />
+        <StudioAssetMarketplacePanels
+          initialView={communityMarketplaceInitialView}
+          onUseLocalAsset={onUseLocalAsset}
+        />
       ) : null}
 
       <div className="mb-2 grid grid-cols-2 gap-1.5">

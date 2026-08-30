@@ -24,15 +24,14 @@ describe("CreatorMarketplaceController ownership boundary", () => {
     expect(marketplaceService.list).toHaveBeenCalledWith({ limit: 20 });
   });
 
-  it("단건 조회는 공개 cache projection으로 위임하고 뷰어 id만 isOwner에 쓴다", async () => {
+  it("단건 조회는 인증 헤더와 무관한 공개 cache projection만 사용한다", async () => {
     marketplaceService.getById.mockResolvedValue({ id: "resource" });
     const id = "123e4567-e89b-42d3-a456-426614174000";
 
     await controller.getById({ id });
-    await controller.getById({ id }, "viewer");
 
-    expect(marketplaceService.getById).toHaveBeenNthCalledWith(1, id, { viewerId: undefined });
-    expect(marketplaceService.getById).toHaveBeenNthCalledWith(2, id, { viewerId: "viewer" });
+    expect(marketplaceService.getById).toHaveBeenCalledOnce();
+    expect(marketplaceService.getById).toHaveBeenCalledWith(id);
   });
 
   it("내 목록·게시·삭제는 로그인 사용자 id를 소유권 범위로 전달한다", async () => {

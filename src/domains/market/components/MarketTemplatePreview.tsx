@@ -8,27 +8,32 @@ interface MarketTemplatePreviewProps {
 }
 
 export function MarketTemplatePreview({ template, className }: MarketTemplatePreviewProps) {
-  // Infer panel layout configuration based on templateId
+  // This is deliberately labelled as an illustration: templateId is not a render contract.
   const isScroll = template.templateId.includes("scroll") || template.templateId.includes("vertical") || template.templateId.includes("webtoon");
   const is4Cut = template.templateId.includes("4cut") || template.templateId.includes("4-cut") || template.templateId.includes("yonkoma");
 
   return (
-    <div className={`overflow-hidden rounded-xl border border-line bg-card ${className ?? ""}`}>
-      <div className="flex items-center justify-between border-b border-line px-4 py-2.5 bg-panel/50">
+    <div
+      role="region"
+      aria-labelledby="market-template-heading"
+      aria-describedby="market-template-preview-note"
+      className={`overflow-hidden rounded-xl border border-line bg-card ${className ?? ""}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-panel/50 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <LayoutTemplate className="h-4 w-4 text-accent" aria-hidden="true" />
-          <h3 id="market-template-heading" className="text-xs font-semibold text-fg">템플릿 레이아웃 구조</h3>
+          <h3 id="market-template-heading" className="text-xs font-semibold text-fg">템플릿 참고 레이아웃 ({template.name})</h3>
         </div>
-        <span className="rounded bg-raised px-2 py-0.5 text-[0.65rem] text-fg-3">
+        <span className="inline-flex min-h-6 max-w-full items-center truncate rounded bg-raised px-2 text-[0.65rem] text-fg-3">
           ID: {template.templateId}
         </span>
       </div>
 
-      <div className="flex items-center justify-center p-6 bg-canvas/40">
+      <div aria-hidden="true" className="flex items-center justify-center bg-canvas/40 p-6">
         <div className="relative w-full max-w-[280px] rounded-lg border-2 border-dashed border-accent/40 bg-panel/80 p-3 shadow-inner">
           <div className="mb-2 flex items-center justify-between text-[0.62rem] text-fg-3">
-            <span>웹툰 캔버스 규격 (690x1000+)</span>
-            <span className="font-semibold text-accent">{is4Cut ? "4컷 연출" : isScroll ? "스크롤 배치" : "표준 컷 분할"}</span>
+            <span>캔버스 구성 예시</span>
+            <span className="font-semibold text-accent">{is4Cut ? "4컷 표현" : isScroll ? "스크롤 표현" : "컷 분할 표현"}</span>
           </div>
 
           {is4Cut ? (
@@ -36,7 +41,7 @@ export function MarketTemplatePreview({ template, className }: MarketTemplatePre
               {[1, 2, 3, 4].map((cut) => (
                 <div
                   key={cut}
-                  className="flex h-14 items-center justify-center rounded border border-line bg-card/90 text-xs font-bold text-fg-2 shadow-sm transition-colors hover:border-accent hover:text-accent"
+                  className="flex h-14 items-center justify-center rounded border border-line bg-card/90 text-xs font-bold text-fg-2 shadow-sm"
                 >
                   컷 #{cut}
                 </div>
@@ -83,9 +88,9 @@ export function MarketTemplatePreview({ template, className }: MarketTemplatePre
         </div>
       </div>
 
-      <div className="border-t border-line px-4 py-2 text-[0.68rem] text-fg-3 bg-panel/30 flex items-center justify-between">
-        <span>스튜디오 캔버스에서 1클릭으로 해당 컷 가이드와 여백을 자동 설정합니다.</span>
-      </div>
+      <p id="market-template-preview-note" className="border-t border-line bg-panel/30 px-4 py-2 text-[0.68rem] leading-relaxed text-fg-3">
+        템플릿 ID를 바탕으로 단순화한 참고 일러스트이며 실제 Studio 적용 결과와 다를 수 있습니다.
+      </p>
     </div>
   );
 }
