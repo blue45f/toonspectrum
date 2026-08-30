@@ -239,3 +239,78 @@ describe("StudioLiveRetainedMediaOverlayRenderer", () => {
     expect(afterAppend.getCalls).toBe(0);
   });
 });
+
+describe("oil live preview past the dab cap", () => {
+  /**
+   * A long oil stroke must keep following the cursor.
+   *
+   * `dabs.length` was the overlay's evidence that nothing had changed since the last paint — but
+   * it saturates at `FX_OIL_DAB_CAP`, and that is exactly where it stops being evidence: past the
+   * cap `sampleStations` refits the lattice across the WHOLE arc, so an append moves every station
+   * in the bed while the count stays pinned at 4096. The overlay read the pinned count as "no
+   * change" and stopped repainting, so the stroke froze on screen while the user was still drawing
+   * it.
+   */
+  function longOilStroke(id: string, sampleCount: number): DrawEl {
+    const points: number[] = [];
+    for (let index = 0; index < sampleCount; index += 1) {
+      const t = index / 23;
+      // 3px per sample keeps the arc long enough that the bed saturates FX_OIL_DAB_CAP.
+      points.push(
+        6 + index * 3 + Math.sin(t) * 5,
+        60 + Math.cos(t * 0.7) * 34,
+      );
+    }
+    return drawElement(id, "oil", points);
+  }
+
+  it("keeps repainting after the dab count saturates at the cap", () => {
+    const { renderer, active } = attachedRenderer();
+    // Long enough that the bed is pinned at the cap and every append redistributes the lattice.
+    const first = longOilStroke("oil-cap", 3000);
+    expect(renderer.begin(first).status).toBe("started");
+    renderer.appendFrom(first);
+
+    const before = active.stats().strokeCalls;
+    const grown = longOilStroke("oil-cap", 3400);
+    const result = renderer.appendFrom(grown);
+    const after = active.stats().strokeCalls;
+
+    // The bed genuinely differs — the whole lattice moved — so this append is not a no-op.
+    expect(result.status).not.toBe("noop");
+    expect(after).toBeGreaterThan(before);
+  });
+
+  it("coalesces capped repaints rather than rebuilding 4096 dabs per sample", () => {
+    // A capped bed redistributes rather than grows, so one new sample shifts every station by a
+    // sub-pixel amount. Replanning the whole bed for that blocks the pointer; skipping forever
+    // freezes the stroke. The overlay waits for a batch of samples and then rebuilds.
+    const { renderer, active } = attachedRenderer();
+    const base = longOilStroke("oil-cap-coalesce", 3000);
+    expect(renderer.begin(base).status).toBe("started");
+    renderer.appendFrom(base);
+
+    const afterFirst = active.stats().strokeCalls;
+    // A handful of samples is not yet worth a full rebuild.
+    expect(renderer.appendFrom(longOilStroke("oil-cap-coalesce", 3004)).status).toBe("noop");
+    expect(active.stats().strokeCalls).toBe(afterFirst);
+
+    // A batch of them is.
+    expect(renderer.appendFrom(longOilStroke("oil-cap-coalesce", 3064)).status)
+      .toBe("appended");
+    expect(active.stats().strokeCalls).toBeGreaterThan(afterFirst);
+  });
+
+  it("still skips a capped append that brought no new samples", () => {
+    // The other half of the guard: repainting whenever the bed *could* have changed would repaint
+    // on every call at the cap, including calls the pointer did not contribute to.
+    const { renderer, active } = attachedRenderer();
+    const stroke = longOilStroke("oil-cap-idle", 3000);
+    expect(renderer.begin(stroke).status).toBe("started");
+    renderer.appendFrom(stroke);
+
+    const before = active.stats().strokeCalls;
+    expect(renderer.appendFrom(stroke).status).toBe("noop");
+    expect(active.stats().strokeCalls).toBe(before);
+  });
+});

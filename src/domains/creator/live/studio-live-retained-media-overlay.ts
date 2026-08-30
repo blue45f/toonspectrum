@@ -205,11 +205,40 @@ function oilDabPoints(
   return mapped;
 }
 
+/**
+ * Source samples a capped oil bed must gain before the live preview rebuilds it.
+ *
+ * At `FX_OIL_DAB_CAP` the bed stops growing and starts redistributing: `sampleStations` refits a
+ * fixed 4096-station lattice across the whole arc, so every station shifts slightly on every new
+ * sample and a faithful preview would replan the entire bed per pointer move (~35-55 ms measured,
+ * carrier-dominated). That is why the overlay used to stop repainting a capped stroke entirely —
+ * but a frozen preview is worse than a coalesced one: the stroke simply stopped following the
+ * cursor. Rebuilding once per this many samples keeps it live at roughly a millisecond per move
+ * amortised, and the shift being coalesced is sub-pixel per sample at this bed size.
+ */
+const OIL_CAP_REPAINT_SAMPLE_STRIDE = 32;
+
 interface ActiveRetainedStroke {
   readonly id: string;
   readonly kind: StudioLiveRetainedMediaKind;
   element: DrawEl;
   paintedDabs: number;
+  /**
+   * Oil paints actually issued for this stroke.
+   *
+   * `paintedDabs` cannot answer "did this append change the canvas?" once the bed saturates
+   * `FX_OIL_DAB_CAP` — the count is pinned at 4096 while every station keeps moving — so the
+   * append result was reporting `noop` for repaints that really happened. This advances on every
+   * oil paint and is what the append result reads. Non-oil kinds leave it at 0.
+   */
+  paintedOilPasses: number;
+  /**
+   * Source samples the painted oil bed was built from, or -1 before the first paint.
+   *
+   * This is the honest "has anything arrived?" test at any bed size, and it is checked before the
+   * bed is planned rather than after.
+   */
+  paintedOilSourcePoints: number;
   paintedPencilMarks: number;
   paintedSourceSegments: number;
   /**
@@ -337,6 +366,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       kind,
       element,
       paintedDabs: 0,
+    paintedOilPasses: 0,
+    paintedOilSourcePoints: -1,
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
       oilPlanner: kind === "oil" ? new FxOilDabPlanner() : null,
@@ -361,11 +392,13 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       return { status: "fallback", reason: "surface-unavailable" };
     }
     active.element = element;
-    const before = active.paintedDabs + active.paintedPencilMarks + active.paintedSourceSegments;
+    const before = active.paintedDabs + active.paintedOilPasses
+      + active.paintedPencilMarks + active.paintedSourceSegments;
     if (!this.paintSuffix(active, element, this.activeContext)) {
       return { status: "fallback", reason: "surface-unavailable" };
     }
-    const after = active.paintedDabs + active.paintedPencilMarks + active.paintedSourceSegments;
+    const after = active.paintedDabs + active.paintedOilPasses
+      + active.paintedPencilMarks + active.paintedSourceSegments;
     return { status: after > before ? "appended" : "noop" };
   }
 
@@ -379,6 +412,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         kind: this.active.kind,
         element,
         paintedDabs: 0,
+    paintedOilPasses: 0,
+    paintedOilSourcePoints: -1,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -461,20 +496,27 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     const context = this.prepared(target);
     if (!context) return false;
     try {
-      // 캡 포화 레짐: sampleStations 가 전체 호를 재배열해 어떤 prefix 도 살아남지 않고
-      // (FxOilDabPlanner 주석), 아래 `paintedDabs === dabs.length` 조기 반환이 길이가 캡에
-      // 고정된 그 결과를 매번 버린다 — 즉 이동당 전체 refit(측정 ~70ms)이 순수 낭비다.
-      // 활성 획이 이미 캡만큼 칠했으면 계획 자체를 걷는다. settled 재생·정착 경로
-      // (target !== activeContext)는 오늘처럼 항상 전체를 다시 계획한다.
+      const flatPoints = flatFinitePoints(element);
+      if (flatPoints.length === 0) return true;
+      // Nothing new arrived, so there is nothing to plan. Checked on the source rather than on
+      // the dab count because the count saturates at the cap (see below), and checked here rather
+      // than after planning because a plan whose result is discarded is pure cost.
+      //
+      // Past the cap the same check also coalesces: a capped bed is a fixed-size resampling of
+      // the WHOLE arc, so a new sample nudges every station a little instead of extending the
+      // stroke, and rebuilding all 4096 dabs for one nudge blocks the pointer for tens of
+      // milliseconds. Redrawing once per `OIL_CAP_REPAINT_SAMPLE_STRIDE` samples keeps the preview
+      // following the cursor at a bounded amortised cost — the alternative this replaces was to
+      // stop repainting altogether, which left a long oil stroke frozen on screen for the rest of
+      // the drag.
+      const grownSamples = flatPoints.length - active.paintedOilSourcePoints;
+      const capReached = active.paintedDabs >= FX_OIL_DAB_CAP;
       if (
         target === this.activeContext
-        && active.oilPlanner !== null
-        && active.paintedDabs >= FX_OIL_DAB_CAP
+        && grownSamples < (capReached ? OIL_CAP_REPAINT_SAMPLE_STRIDE : 1)
       ) {
         return true;
       }
-      const flatPoints = flatFinitePoints(element);
-      if (flatPoints.length === 0) return true;
       const brush = element.brush ?? "oil";
       const planInput = {
         points: flatPoints,
@@ -493,7 +535,20 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         ? active.oilPlanner.plan(planInput)
         : planOilBrushDabs(planInput);
       if (dabs.length === 0) return true;
-      if (active.paintedDabs === dabs.length && target === this.activeContext) {
+      // The dab count is evidence that the bed is unchanged only while it is still free to grow.
+      // At `FX_OIL_DAB_CAP` it saturates, and that is precisely where it stops being evidence:
+      // past the cap `sampleStations` refits the lattice across the WHOLE arc, so every station
+      // moves on every append while the count stays pinned at 4096. Reading the pinned count as
+      // "nothing changed" froze the live preview — a long oil stroke stopped following the cursor
+      // for the rest of the drag, and the already-drawn part stopped re-distributing with it.
+      //
+      // A capped bed therefore always repaints. That costs a full replan per move, which is what
+      // it honestly is; the refit itself is no longer the ~70 ms this guard was written against.
+      if (
+        active.paintedDabs === dabs.length
+        && dabs.length < FX_OIL_DAB_CAP
+        && target === this.activeContext
+      ) {
         return true;
       }
       const radiusPx = extendOilRadiusMean(active, dabs);
@@ -527,6 +582,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         },
       );
       active.paintedDabs = dabs.length;
+      if (target === this.activeContext) {
+        active.paintedOilPasses += 1;
+        active.paintedOilSourcePoints = flatPoints.length;
+      }
       if (target === this.settledContext) this.settledHasPixels = true;
       return true;
     } finally {
@@ -916,6 +975,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         kind,
         element: stroke,
         paintedDabs: 0,
+    paintedOilPasses: 0,
+    paintedOilSourcePoints: -1,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -936,6 +997,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         kind,
         element: stroke,
         paintedDabs: 0,
+    paintedOilPasses: 0,
+    paintedOilSourcePoints: -1,
         paintedPencilMarks: 0,
         paintedSourceSegments: 0,
         oilPlanner: null,
@@ -946,6 +1009,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     const replayActive: ActiveRetainedStroke = {
       ...this.active,
       paintedDabs: 0,
+    paintedOilPasses: 0,
+    paintedOilSourcePoints: -1,
       paintedPencilMarks: 0,
       paintedSourceSegments: 0,
     };
@@ -954,6 +1019,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
 
     this.paintSuffix(replayActive, this.active.element, this.activeContext);
     this.active.paintedDabs = replayActive.paintedDabs;
+    this.active.paintedOilPasses = replayActive.paintedOilPasses;
+    this.active.paintedOilSourcePoints = replayActive.paintedOilSourcePoints;
     this.active.paintedPencilMarks = replayActive.paintedPencilMarks;
     this.active.paintedSourceSegments = replayActive.paintedSourceSegments;
   }
