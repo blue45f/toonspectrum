@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { resolveStudioCommunityMarketplaceInitialView } from "./studio-community-marketplace-view";
 import { StudioCommunityMarketplacePanel } from "./StudioCommunityMarketplacePanel";
 
 import { useI18n } from "@/lib/i18n";
@@ -13,6 +14,10 @@ const source = readFileSync(
 );
 const assetMenuSource = readFileSync(
   new URL("./StudioAssetMenuPanel.tsx", import.meta.url),
+  "utf8",
+);
+const assetPopoverSource = readFileSync(
+  new URL("./StudioAssetToolPopoverBody.tsx", import.meta.url),
   "utf8",
 );
 
@@ -48,6 +53,37 @@ describe("StudioCommunityMarketplacePanel", () => {
     expect(html).toContain("검색");
   });
 
+  it("share 딥링크는 패널을 연 채 자료 게시 탭을 최초 선택한다", () => {
+    const searchParams = new URLSearchParams(
+      "assetMarket=community&communityView=share",
+    );
+    const html = renderToStaticMarkup(
+      <StudioCommunityMarketplacePanel
+        initialOpen={searchParams.get("assetMarket") === "community"}
+        initialView={resolveStudioCommunityMarketplaceInitialView(searchParams)}
+        onUseAsset={() => true}
+      />,
+    );
+
+    expect(html).toMatch(/<details open=""[^>]*>/u);
+    expect(html).toMatch(
+      /role="tab" aria-selected="true"[^>]*>자료 게시<\/button>/u,
+    );
+    expect(html).toContain('role="tabpanel"');
+    expect(html).toContain("무료 공유 마켓에 게시");
+    expect(html).not.toContain("이름·설명·태그 검색");
+  });
+
+  it("communityView를 읽을 때 다른 Studio query를 변경하지 않는다", () => {
+    const searchParams = new URLSearchParams(
+      "room=live-1&assetMarket=community&communityView=share&titleId=title-1",
+    );
+    const originalSearch = searchParams.toString();
+
+    expect(resolveStudioCommunityMarketplaceInitialView(searchParams)).toBe("share");
+    expect(searchParams.toString()).toBe(originalSearch);
+  });
+
   it("실제 서버 목록·게시·소유자 삭제와 로컬 설치·제거 경로를 연결한다", () => {
     expect(source).toContain("listCreatorMarketplaceResources");
     expect(source).toContain("listMyCreatorMarketplaceResources");
@@ -79,8 +115,15 @@ describe("StudioCommunityMarketplacePanel", () => {
     expect(assetMenuSource).toContain(
       'import("./StudioCommunityMarketplacePanel")',
     );
-    expect(assetMenuSource).toContain(
-      "<LazyStudioCommunityMarketplacePanel onUseAsset={onUseLocalAsset} />",
+    expect(assetMenuSource).toContain("<LazyStudioCommunityMarketplacePanel");
+    expect(assetMenuSource).toContain("initialOpen");
+    expect(assetMenuSource).toContain("initialView={initialView}");
+    expect(assetMenuSource).toContain("onUseAsset={onUseLocalAsset}");
+    expect(assetPopoverSource).toContain(
+      "useStudioCommunityMarketplaceInitialView()",
+    );
+    expect(assetPopoverSource).toContain(
+      "communityMarketplaceInitialView={communityMarketplaceInitialView}",
     );
   });
 });

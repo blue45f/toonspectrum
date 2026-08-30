@@ -233,6 +233,69 @@ describe("SQLite unlimited brush repository", () => {
     await expect(repository.getById(record.id)).rejects.toMatchObject({ code: "corrupt" });
   });
 
+  it("compares rows and a receipt inside one transaction while preserving newer edits", async () => {
+    const database = await openMemoryDatabase();
+    const sql = requireStudioBrushLibraryDatabase(database);
+    const namespace = "creator-pack-cas-test";
+    const receiptKey = "brush:pack-a";
+    const receiptIdentity = `${namespace}\u0000${receiptKey}`;
+    const previous = studioBrushToSqlRecord(brush(31, { name: "설치 전" }));
+    const installed = studioBrushToSqlRecord(brush(31, { name: "설치 후보", updatedAt: 310 }));
+    const inserted = studioBrushToSqlRecord(brush(32, { name: "새 설치 후보", updatedAt: 320 }));
+    const newer = studioBrushToSqlRecord(brush(31, { name: "사용자 편집", updatedAt: 311 }));
+    const entries = [
+      { id: installed.id, expected: installed, restore: previous },
+      { id: inserted.id, expected: inserted, restore: null },
+    ] as const;
+    const sidecars = [{
+      namespace,
+      key: receiptKey,
+      expected: "installed-receipt",
+      restore: "previous-receipt",
+    }] as const;
+    await sql.putBrushLibraryRecords([installed, inserted]);
+    await database.kvSet(namespace, receiptKey, "newer-pack-receipt");
+
+    await expect(sql.compareAndRestoreBrushLibraryRecords(entries, sidecars)).resolves.toEqual({
+      restoredIds: [],
+      conflictIds: [receiptIdentity],
+    });
+    expect(await sql.getBrushLibraryRecord(installed.id)).toEqual(installed);
+    expect(await sql.getBrushLibraryRecord(inserted.id)).toEqual(inserted);
+
+    await sql.putBrushLibraryRecord(newer);
+    await database.kvSet(namespace, receiptKey, "installed-receipt");
+    await expect(sql.compareAndRestoreBrushLibraryRecords(entries, sidecars)).resolves.toEqual({
+      restoredIds: [inserted.id, receiptIdentity],
+      conflictIds: [installed.id],
+    });
+    expect(await sql.getBrushLibraryRecord(installed.id)).toEqual(newer);
+    expect(await sql.getBrushLibraryRecord(inserted.id)).toBeNull();
+    expect(await database.kvGet(namespace, receiptKey)).toBe("previous-receipt");
+  });
+
+  it("rolls every CAS restore back when a later restore violates SQLite", async () => {
+    const database = await openMemoryDatabase();
+    const sql = requireStudioBrushLibraryDatabase(database);
+    const installedA = studioBrushToSqlRecord(brush(41, { name: "설치 A", updatedAt: 410 }));
+    const installedB = studioBrushToSqlRecord(brush(42, { name: "설치 B", updatedAt: 420 }));
+    const previousA = studioBrushToSqlRecord(brush(41, { name: "이전 A" }));
+    const previousB = studioBrushToSqlRecord(brush(42, { name: "이전 B" }));
+    const invalidPreviousB = {
+      ...previousB,
+      activityAt: previousB.updatedAt + 1,
+      lastUsedAt: null,
+    };
+    await sql.putBrushLibraryRecords([installedA, installedB]);
+
+    await expect(sql.compareAndRestoreBrushLibraryRecords([
+      { id: installedA.id, expected: installedA, restore: previousA },
+      { id: installedB.id, expected: installedB, restore: invalidPreviousB },
+    ])).rejects.toThrow(/CHECK|constraint/iu);
+    expect(await sql.getBrushLibraryRecord(installedA.id)).toEqual(installedA);
+    expect(await sql.getBrushLibraryRecord(installedB.id)).toEqual(installedB);
+  });
+
   it("keeps SQLite disk-full/quota failures distinct from generic write failures", async () => {
     const database = await openMemoryDatabase();
     const sql = requireStudioBrushLibraryDatabase(database);
@@ -302,6 +365,51 @@ describe("legacy localStorage migration and product memory session", () => {
     await expect(second.repository.getById("brush-00007")).resolves.toMatchObject({
       name: "현재 탭 공유 브러시",
     });
+
+    const compensate = first.compareAndRestoreInstallSnapshot;
+    if (!compensate) throw new Error("Expected memory compare-and-restore support");
+    const previous = brush(7, { name: "설치 전 브러시", updatedAt: 70 });
+    const installed = brush(7, { name: "설치 후보", updatedAt: 71 });
+    const newer = brush(7, { name: "사용자 후속 편집", updatedAt: 72 });
+    const inserted = brush(8, { name: "새 설치 후보", updatedAt: 80 });
+    await first.repository.put(previous);
+    await first.repository.put(installed);
+    await first.repository.put(inserted);
+    await first.repository.put(newer);
+
+    await expect(compensate([
+      { id: installed.id, expected: installed, restore: previous },
+      { id: inserted.id, expected: inserted, restore: null },
+    ])).resolves.toEqual({
+      restoredIds: [inserted.id],
+      conflictIds: [installed.id],
+    });
+    await expect(first.repository.getById(installed.id)).resolves.toEqual(newer);
+    await expect(first.repository.getById(inserted.id)).resolves.toBeNull();
+
+    await first.repository.put(installed);
+    await expect(compensate(
+      [{ id: installed.id, expected: installed, restore: previous }],
+      [{
+        namespace: "creator-pack-receipts",
+        key: "brush:pack-1",
+        expected: "installed-receipt",
+        restore: "previous-receipt",
+      }],
+    )).resolves.toEqual({
+      restoredIds: [],
+      conflictIds: ["creator-pack-receipts\u0000brush:pack-1"],
+    });
+    await expect(first.repository.getById(installed.id)).resolves.toEqual(installed);
+
+    await first.repository.put(previous);
+    await expect(compensate([
+      { id: installed.id, expected: installed, restore: previous },
+    ])).resolves.toEqual({
+      restoredIds: [],
+      conflictIds: [],
+    });
+    await expect(first.repository.getById(installed.id)).resolves.toEqual(previous);
   });
 
   it("retries a failed product open instead of retaining an arbitrary rejection", async () => {

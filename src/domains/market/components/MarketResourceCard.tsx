@@ -35,14 +35,11 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
     >
       <div
         aria-hidden="true"
-        className="relative flex aspect-[16/9] items-end justify-between overflow-hidden p-3.5"
-        style={
-          paletteColors
-            ? undefined
-            : {
-                background: `linear-gradient(140deg, oklch(0.34 0.075 ${kind.hue}) 0%, oklch(0.24 0.045 ${kind.hue}) 55%, oklch(0.20 0.025 ${kind.hue}) 100%)`,
-              }
-        }
+        className={cn(
+          "relative flex aspect-[16/9] items-end justify-between overflow-hidden p-3.5",
+          !paletteColors
+            && "bg-[linear-gradient(140deg,var(--color-card)_0%,var(--color-panel)_55%,var(--color-canvas)_100%)] text-fg"
+        )}
       >
         {paletteColors ? (
           <span className="absolute inset-0 flex">
@@ -73,25 +70,20 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
         {/* Template Cut preview simulation for template cards */}
         {record.kind === "template" && !paletteColors ? (
           <div className="absolute inset-4 grid grid-cols-2 gap-1.5 opacity-25 transition-opacity duration-200 group-hover:opacity-45">
-            <div className="rounded border border-dashed border-white" />
-            <div className="rounded border border-dashed border-white" />
-            <div className="col-span-2 rounded border border-dashed border-white" />
+            <div className="rounded border border-dashed border-fg" />
+            <div className="rounded border border-dashed border-fg" />
+            <div className="col-span-2 rounded border border-dashed border-fg" />
           </div>
         ) : null}
 
         <span
-          className={cn(
-            "font-display text-[0.6rem] font-medium uppercase tracking-[0.14em]",
-            paletteColors
-              ? "rounded-md bg-canvas/65 px-1.5 py-0.5 text-fg backdrop-blur-sm shadow-sm"
-              : "text-fg/90"
-          )}
+          className="rounded-md bg-canvas px-1.5 py-1 font-display text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-fg shadow-sm"
         >
           {kind.english}
         </span>
 
         {!paletteColors ? (
-          <KindIcon strokeWidth={1.5} className="h-9 w-9 text-fg/35 transition-colors duration-200 group-hover:text-fg/70" />
+          <KindIcon strokeWidth={1.5} className="h-9 w-9 text-fg/45 transition-colors duration-200 group-hover:text-fg/75" />
         ) : null}
 
         {!paletteColors ? (
@@ -103,9 +95,9 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
           />
         ) : null}
 
-        <span className="numeral tnum absolute right-3.5 top-3 inline-flex items-center gap-1 rounded-md bg-canvas/55 px-1.5 py-0.5 text-[0.65rem] font-semibold text-fg/90 backdrop-blur-sm shadow-sm">
+        <span className="numeral tnum absolute right-3.5 top-3 inline-flex min-h-6 items-center gap-1 rounded-md bg-canvas px-1.5 text-[0.65rem] font-semibold text-fg shadow-sm">
           <Layers className="h-3 w-3" aria-hidden="true" />
-          {record.entries.length}
+          {record.entries.length}개
         </span>
       </div>
 
@@ -116,11 +108,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
         <p className="truncate text-xs text-fg-2">{record.publisher.name}</p>
         <div className="mt-auto flex items-center gap-1.5 pt-1.5 text-[0.68rem] text-fg-3">
           <span
-            className="rounded px-1.5 py-0.5 font-medium"
-            style={{
-              backgroundColor: `oklch(0.72 0.10 ${kind.hue} / 0.15)`,
-              color: `oklch(0.85 0.10 ${kind.hue})`,
-            }}
+            className="inline-flex min-h-6 items-center rounded bg-accent px-2 font-semibold text-on-accent"
           >
             {kind.label}
           </span>

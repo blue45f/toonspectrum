@@ -146,14 +146,15 @@ describe("Studio local database Worker client", () => {
   it("also preserves mutation ambiguity on response deserialization failure", async () => {
     const worker = new FakeWorker();
     const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: () => worker });
-    const mutation = database.putBrushLibraryRecords([]);
+    const mutation = database.compareAndRestoreBrushLibraryRecords([], []);
     worker.succeed(1, undefined);
     await flushMicrotasks();
     worker.messageError();
 
-    await expect(mutation).rejects.toBeInstanceOf(
-      StudioLocalDatabaseCommitOutcomeUnknownError,
-    );
+    await expect(mutation).rejects.toMatchObject({
+      name: "StudioLocalDatabaseCommitOutcomeUnknownError",
+      method: "compareAndRestoreBrushLibraryRecords",
+    });
   });
 
   it("times out an unresponsive mutation as unknown and terminates the session", async () => {

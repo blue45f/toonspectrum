@@ -4,8 +4,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 
 import {
+  MARKET_CACHE_MAX_AGE_MS,
   readCachedMarketPage,
   readCachedMarketResource,
+  removeCachedMarketResource,
   writeCachedMarketPage,
   writeCachedMarketResource,
 } from "./market-resource-cache";
@@ -120,13 +122,79 @@ afterEach(() => {
 
 describe("market-resource-cache", () => {
   it("writes and reads back a page roundtrip", () => {
-    writeCachedMarketPage('{"limit":8}', { items: [record], hasMore: true });
+    writeCachedMarketPage('{"limit":8}', {
+      items: [record],
+      hasMore: true,
+      nextCursor: "cursor-2",
+    });
     const cached = readCachedMarketPage('{"limit":8}');
     expect(cached).not.toBeNull();
     expect(cached?.items).toHaveLength(1);
     expect(cached?.items[0]?.id).toBe(record.id);
     expect(cached?.hasMore).toBe(true);
+    expect(cached?.nextCursor).toBe("cursor-2");
     expect(Number.isFinite(new Date(cached!.savedAt).getTime())).toBe(true);
+  });
+
+  it("keeps legacy pages readable without exposing an inert load-more action", () => {
+    localStorage.setItem(
+      'toonspectrum.market.page.v1:{"limit":8}',
+      JSON.stringify({ savedAt: new Date().toISOString(), items: [record], hasMore: true })
+    );
+
+    expect(readCachedMarketPage('{"limit":8}')).toMatchObject({
+      items: [record],
+      hasMore: false,
+      nextCursor: null,
+    });
+  });
+
+  it("normalizes inconsistent pagination metadata before persisting", () => {
+    writeCachedMarketPage("inconsistent", {
+      items: [record],
+      hasMore: true,
+      nextCursor: null,
+    });
+
+    expect(readCachedMarketPage("inconsistent")).toMatchObject({
+      hasMore: false,
+      nextCursor: null,
+    });
+  });
+
+  it("does not revive a stored cursor when the cached page declared no next page", () => {
+    localStorage.setItem(
+      "toonspectrum.market.page.v1:inconsistent-read",
+      JSON.stringify({
+        savedAt: new Date().toISOString(),
+        items: [record],
+        hasMore: false,
+        nextCursor: "orphaned-cursor",
+      })
+    );
+
+    expect(readCachedMarketPage("inconsistent-read")).toMatchObject({
+      hasMore: false,
+      nextCursor: null,
+    });
+  });
+
+  it("accepts the 24-hour boundary and evicts an older cached page", () => {
+    const nowMs = Date.parse("2026-08-30T12:00:00.000Z");
+    const pageKey = "toonspectrum.market.page.v1:age-boundary";
+    localStorage.setItem(
+      pageKey,
+      JSON.stringify({
+        savedAt: new Date(nowMs - MARKET_CACHE_MAX_AGE_MS).toISOString(),
+        items: [record],
+        hasMore: false,
+        nextCursor: null,
+      })
+    );
+
+    expect(readCachedMarketPage("age-boundary", nowMs)?.items).toHaveLength(1);
+    expect(readCachedMarketPage("age-boundary", nowMs + 1)).toBeNull();
+    expect(localStorage.getItem(pageKey)).toBeNull();
   });
 
   it("returns null for corrupted JSON", () => {
@@ -144,7 +212,7 @@ describe("market-resource-cache", () => {
 
   it("skips writing payloads beyond the size cap", () => {
     const huge = { ...record, name: "x".repeat(400_000) };
-    writeCachedMarketPage("huge", { items: [huge], hasMore: false });
+    writeCachedMarketPage("huge", { items: [huge], hasMore: false, nextCursor: null });
     expect(readCachedMarketPage("huge")).toBeNull();
   });
 
@@ -157,5 +225,40 @@ describe("market-resource-cache", () => {
 
   it("returns null for a missing resource entry", () => {
     expect(readCachedMarketResource("nope")).toBeNull();
+  });
+
+  it("evicts expired and explicitly removed detail records", () => {
+    const nowMs = Date.parse("2026-08-30T12:00:00.000Z");
+    const resourceKey = `toonspectrum.resource.v1:${record.id}`;
+    localStorage.setItem(
+      resourceKey,
+      JSON.stringify({
+        savedAt: new Date(nowMs - MARKET_CACHE_MAX_AGE_MS - 1).toISOString(),
+        record,
+      })
+    );
+
+    expect(readCachedMarketResource(record.id, nowMs)).toBeNull();
+    expect(localStorage.getItem(resourceKey)).toBeNull();
+
+    writeCachedMarketResource(record);
+    expect(localStorage.getItem(resourceKey)).not.toBeNull();
+    removeCachedMarketResource(record.id);
+    expect(localStorage.getItem(resourceKey)).toBeNull();
+  });
+
+  it("rejects future-dated entries so a clock-skewed cache cannot remain fresh indefinitely", () => {
+    const nowMs = Date.parse("2026-08-30T12:00:00.000Z");
+    const resourceKey = `toonspectrum.resource.v1:${record.id}`;
+    localStorage.setItem(
+      resourceKey,
+      JSON.stringify({
+        savedAt: new Date(nowMs + 1).toISOString(),
+        record,
+      })
+    );
+
+    expect(readCachedMarketResource(record.id, nowMs)).toBeNull();
+    expect(localStorage.getItem(resourceKey)).toBeNull();
   });
 });

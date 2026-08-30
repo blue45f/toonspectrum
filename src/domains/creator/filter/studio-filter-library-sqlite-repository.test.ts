@@ -76,7 +76,10 @@ function legacyPreset(index: number): StudioCreatorInstalledFilterPreset {
   };
 }
 
-function preset(index: number): StudioFilterLibraryPreset {
+function preset(
+  index: number,
+  overrides: Partial<StudioFilterLibraryPreset> = {},
+): StudioFilterLibraryPreset {
   const category = index % 2 === 0 ? "comic" : "photo";
   return {
     ...legacyPreset(index),
@@ -91,6 +94,7 @@ function preset(index: number): StudioFilterLibraryPreset {
     sortOrder: index % 19,
     packageVersion: "12.0.0",
     packageFingerprint: `fingerprint-${index % 11}`,
+    ...overrides,
   };
 }
 
@@ -130,6 +134,25 @@ describe("V12 filter-library discard policy", () => {
       expect((await product.repository.query()).items.map((item) => item.id)).toEqual([
         preset(2).id,
       ]);
+      const compensate = product.compareAndRestoreInstallSnapshot;
+      if (!compensate) throw new Error("Expected memory compare-and-restore support");
+      const previous = preset(2, { name: "설치 전 필터", updatedAt: 20 });
+      const installed = preset(2, { name: "설치 후보", updatedAt: 21 });
+      const newer = preset(2, { name: "사용자 후속 편집", updatedAt: 22 });
+      const inserted = preset(3, { name: "새 설치 후보", updatedAt: 30 });
+      await product.repository.put(previous);
+      await product.repository.put(installed);
+      await product.repository.put(inserted);
+      await product.repository.put(newer);
+      await expect(compensate([
+        { id: installed.id, expected: installed, restore: previous },
+        { id: inserted.id, expected: inserted, restore: null },
+      ])).resolves.toEqual({
+        restoredIds: [inserted.id],
+        conflictIds: [installed.id],
+      });
+      await expect(product.repository.getById(installed.id)).resolves.toEqual(newer);
+      await expect(product.repository.getById(inserted.id)).resolves.toBeNull();
       expect(getItem).not.toHaveBeenCalled();
       expect(setItem).not.toHaveBeenCalled();
     } finally {
@@ -180,6 +203,75 @@ describe("V12 filter-library discard policy", () => {
 });
 
 describe("SQLite filter-library repository", () => {
+  it("preserves a newer row while restoring eligible filter rows with one CAS", async () => {
+    const db = await database();
+    const sql = requireStudioFilterLibraryDatabase(db);
+    const previousA = studioFilterPresetToSqlRecord(preset(41, {
+      name: "설치 전 A",
+      updatedAt: 401,
+    }));
+    const previousB = studioFilterPresetToSqlRecord(preset(42, {
+      name: "설치 전 B",
+      updatedAt: 402,
+    }));
+    const installedA = studioFilterPresetToSqlRecord(preset(41, {
+      name: "설치 후보 A",
+      updatedAt: 411,
+    }));
+    const installedB = studioFilterPresetToSqlRecord(preset(42, {
+      name: "설치 후보 B",
+      updatedAt: 412,
+    }));
+    const newerA = studioFilterPresetToSqlRecord(preset(41, {
+      name: "사용자 후속 편집 A",
+      updatedAt: 421,
+    }));
+    await sql.putFilterLibraryRecords([installedA, installedB]);
+    await sql.putFilterLibraryRecord(newerA);
+
+    await expect(sql.compareAndRestoreFilterLibraryRecords([
+      { id: installedA.id, expected: installedA, restore: previousA },
+      { id: installedB.id, expected: installedB, restore: previousB },
+    ])).resolves.toEqual({
+      restoredIds: [installedB.id],
+      conflictIds: [installedA.id],
+    });
+    expect(await sql.getFilterLibraryRecord(installedA.id)).toEqual(newerA);
+    expect(await sql.getFilterLibraryRecord(installedB.id)).toEqual(previousB);
+  });
+
+  it("rolls prior filter restores back when a later CAS write fails in SQLite", async () => {
+    const db = await database();
+    const sql = requireStudioFilterLibraryDatabase(db);
+    const installedA = studioFilterPresetToSqlRecord(preset(51, {
+      name: "설치 후보 A",
+      updatedAt: 511,
+    }));
+    const installedB = studioFilterPresetToSqlRecord(preset(52, {
+      name: "설치 후보 B",
+      updatedAt: 512,
+    }));
+    const previousA = studioFilterPresetToSqlRecord(preset(51, {
+      name: "설치 전 A",
+      updatedAt: 501,
+    }));
+    const invalidPreviousB = {
+      ...studioFilterPresetToSqlRecord(preset(52, {
+        name: "설치 전 B",
+        updatedAt: 502,
+      })),
+      createdAt: null as unknown as number,
+    };
+    await sql.putFilterLibraryRecords([installedA, installedB]);
+
+    await expect(sql.compareAndRestoreFilterLibraryRecords([
+      { id: installedA.id, expected: installedA, restore: previousA },
+      { id: installedB.id, expected: installedB, restore: invalidPreviousB },
+    ])).rejects.toThrow(/NOT NULL|constraint/iu);
+    expect(await sql.getFilterLibraryRecord(installedA.id)).toEqual(installedA);
+    expect(await sql.getFilterLibraryRecord(installedB.id)).toEqual(installedB);
+  });
+
   it("round-trips uncapped deterministic keyset pages without duplicates", async () => {
     const db = await database();
     const repository = createSqliteFilterLibraryRepository(db);

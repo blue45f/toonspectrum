@@ -839,6 +839,15 @@ import {
   studioMobileImmersiveSessionStorage,
 } from "./studio-mobile-immersive";
 import {
+  beginStudioMarketplaceDeepLinkOperation,
+  consumeStudioMarketplaceInstallLocation,
+  createStudioMarketplaceDeepLinkLifecycleState,
+  executeStudioMarketplaceDeepLinkOperation,
+  isStudioMarketplaceDeepLinkOperationCurrent,
+  releaseStudioMarketplaceDeepLinkLifecycleSoon,
+  retainStudioMarketplaceDeepLinkLifecycle,
+} from "./studio-marketplace-deep-link";
+import {
   beginNodeDrag,
   decimateStrokeHandles,
   hitTestNodeHandle,
@@ -17501,6 +17510,21 @@ const puppetWarpArmed =
 
   // 마켓 상세의 "스튜디오에서 불러오기" 딥링크(?assetMarket=community 또는 ?installMarketResource=...)
   // 자산 메뉴의 커뮤니티 탭을 열고, 전달된 리소스 ID가 있으면 백그라운드에서 SQLite 설치 및 캔버스 로드를 수행한다.
+  const studioMarketplaceDeepLinkLifecycleRef = useRef(
+    createStudioMarketplaceDeepLinkLifecycleState(),
+  );
+  useEffect(() => {
+    const lifecycle = studioMarketplaceDeepLinkLifecycleRef.current;
+    const lifecycleGeneration = retainStudioMarketplaceDeepLinkLifecycle(
+      lifecycle,
+    );
+    return () => {
+      releaseStudioMarketplaceDeepLinkLifecycleSoon(
+        lifecycle,
+        lifecycleGeneration,
+      );
+    };
+  }, []);
   const openAssetMarketDeepLink = useEffectEvent(async () => {
     const installResourceId = params.get("installMarketResource");
     if (params.get("assetMarket") === "community" || installResourceId) {
@@ -17508,29 +17532,120 @@ const puppetWarpArmed =
       setAssetTab("community");
     }
     if (!installResourceId) return;
+    const mutationTicket = captureStudioMutationTicket();
+    const targetPageId = activePage.id;
+    const targetMasterEditMode = masterEditMode;
+    const operationGeneration = beginStudioMarketplaceDeepLinkOperation(
+      studioMarketplaceDeepLinkLifecycleRef.current,
+    );
+    const isCurrentOperation = () => isStudioMarketplaceDeepLinkOperationCurrent(
+      studioMarketplaceDeepLinkLifecycleRef.current,
+      operationGeneration,
+    );
+    setError(null);
+    setStatusNotice("마켓 리소스와 기기 저장소를 확인하고 있어요…");
     try {
-      const { getCreatorMarketplaceResource } = await import("@/src/infrastructure/creator-marketplace-client");
-      const { projectCreatorMarketplaceRecordToStudioPack, projectCreatorMarketplaceRecordToAssets } = await import("./studio-community-marketplace");
-      const { installStudioCreatorPackProduct } = await import("./studio-creator-pack-product-runtime");
-      const { browserStudioCreatorPackStorage } = await import("./studio-creator-pack-runtime");
-      const { createStudioOriginalFreeAssetRecord } = await import("./studio-original-free-asset-packs");
+      const outcome = await executeStudioMarketplaceDeepLinkOperation(
+        installResourceId,
+        {
+          consumeInstallQuery: () => {
+            const consumedLocation = consumeStudioMarketplaceInstallLocation(location);
+            navigate(
+              {
+                pathname: consumedLocation.pathname,
+                search: consumedLocation.search,
+                hash: consumedLocation.hash,
+              },
+              { replace: true, state: consumedLocation.state },
+            );
+          },
+          isCurrent: isCurrentOperation,
+          loadDependencies: async () => {
+            const [
+              { getCreatorMarketplaceResource },
+              {
+                projectCreatorMarketplaceRecordToStudioPack,
+                projectCreatorMarketplaceRecordToAssets,
+              },
+              { installStudioCreatorPackProduct },
+              {
+                browserStudioCreatorPackStorage,
+                resolveStudioCreatorBundledCatalogTarget,
+              },
+              { createStudioOriginalFreeAssetRecord },
+            ] = await Promise.all([
+              import("@/src/infrastructure/creator-marketplace-client"),
+              import("./studio-community-marketplace"),
+              import("./studio-creator-pack-product-runtime"),
+              import("./studio-creator-pack-runtime"),
+              import("./studio-original-free-asset-packs"),
+            ]);
+            const storage = browserStudioCreatorPackStorage();
+            return {
+              loadResource: getCreatorMarketplaceResource,
+              projectPack: projectCreatorMarketplaceRecordToStudioPack,
+              installPack: (pack, guard) => installStudioCreatorPackProduct(pack, {
+                storage,
+                isInstallCurrent: guard.isCurrent,
+              }),
+              openBundledPackCatalog: (pack) => {
+                const resolution = resolveStudioCreatorBundledCatalogTarget(pack);
+                if (resolution.status === "unsupported") {
+                  return {
+                    status: "unsupported" as const,
+                    message: resolution.reason,
+                  };
+                }
+                if (resolution.target.kind === "scene-template-catalog") {
+                  setMenu("scene");
+                  setSceneSimilarAnchorId(resolution.target.templateId);
+                  return {
+                    status: "opened" as const,
+                    message: "장면 템플릿 카탈로그를 열었어요. 원하는 장면 카드를 눌러 현재 컷에 적용하세요.",
+                  };
+                }
+                openBackground3dFromMenu();
+                return {
+                  status: "opened" as const,
+                  message: "배경 3D 도형·절차형 카탈로그를 열었어요. 원하는 항목을 직접 선택해 장면에 추가하세요.",
+                };
+              },
+              projectAssets: projectCreatorMarketplaceRecordToAssets,
+              insertAsset: (projectedAsset) => {
+                if (!isStudioPasteScopeCurrent({
+                  mutationAllowed: canApplyStudioMutation(mutationTicket),
+                  reviewLocked: activeSurfaceReviewLockedRef.current,
+                  targetPageId,
+                  currentPageId: currentPageIdRef.current,
+                  targetMasterEditMode,
+                  currentMasterEditMode: masterEditModeRef.current,
+                })) return false;
+                const asset = createStudioOriginalFreeAssetRecord(projectedAsset);
+                return addRenderedImage(asset.dataUrl, asset.width, asset.height);
+              },
+            };
+          },
+        },
+      );
 
-      const record = await getCreatorMarketplaceResource(installResourceId);
-      if (!record) return;
-
-      const packProjection = projectCreatorMarketplaceRecordToStudioPack(record);
-      if (packProjection.status === "installable") {
-        const storage = browserStudioCreatorPackStorage();
-        await installStudioCreatorPackProduct(packProjection.pack, { storage });
-      } else if (record.kind === "asset") {
-        const assetProjection = projectCreatorMarketplaceRecordToAssets(record);
-        if (assetProjection.assets[0]) {
-          const asset = createStudioOriginalFreeAssetRecord(assetProjection.assets[0]);
-          addRenderedImage(asset.dataUrl, asset.width, asset.height);
-        }
+      if (!isCurrentOperation() || outcome.status === "stale") return;
+      if (outcome.status === "success") {
+        setError(null);
+        setStatusNotice(outcome.message);
+      } else {
+        setStatusNotice(null);
+        setError(outcome.message);
       }
-    } catch {
-      // Safe catch for network or parsing issues
+    } catch (caught) {
+      if (!isCurrentOperation()) return;
+      setStatusNotice(null);
+      setError(
+        `마켓 설치 도구를 준비하지 못했어요. ${
+          caught instanceof Error && caught.message
+            ? `${caught.message} `
+            : ""
+        }마켓 상세에서 ‘Studio에서 불러오기’를 다시 눌러 주세요.`,
+      );
     }
   });
   // 마운트 직후가 아니라 퀵스타트 코치와 같은 "부팅 완료" 게이트 뒤에서 연다 — 작업/자동저장

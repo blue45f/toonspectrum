@@ -86,6 +86,26 @@ export interface StudioCreatorPackValidation {
   readonly byteSize: number;
 }
 
+export type StudioCreatorBundledCatalogTarget =
+  | Readonly<{
+      kind: "scene-template-catalog";
+      templateId: string;
+    }>
+  | Readonly<{
+      kind: "bg3d-procedural-catalog";
+      runtimeRef: typeof STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID;
+    }>;
+
+export type StudioCreatorBundledCatalogResolution =
+  | Readonly<{
+      status: "supported";
+      target: StudioCreatorBundledCatalogTarget;
+    }>
+  | Readonly<{
+      status: "unsupported";
+      reason: string;
+    }>;
+
 export type StudioCreatorPackInstallState =
   | "available"
   | "installed"
@@ -374,6 +394,68 @@ export function validateStudioCreatorPack(
     issues.push("팩의 portable JSON 크기가 허용 범위를 벗어났습니다.");
   }
   return { valid: issues.length === 0, issues, byteSize };
+}
+
+/**
+ * Resolves only a validated, single-entry builtin reference into a non-mutating catalog target.
+ * Multi-entry packs stay unsupported because one market click cannot truthfully identify which
+ * referenced template the user intended to inspect.
+ */
+export function resolveStudioCreatorBundledCatalogTarget(
+  pack: StudioCreatorPackDefinition,
+): StudioCreatorBundledCatalogResolution {
+  const validation = validateStudioCreatorPack(pack);
+  if (!validation.valid) {
+    return {
+      status: "unsupported",
+      reason: validation.issues[0] ?? "내장 리소스 참조 검증에 실패했습니다.",
+    };
+  }
+  if (pack.entries.length !== 1) {
+    return {
+      status: "unsupported",
+      reason: "내장 참조가 하나인 팩만 Studio 카탈로그에서 바로 열 수 있어요.",
+    };
+  }
+
+  const [entry] = pack.entries;
+  if (!entry || entry.delivery.mode !== "builtin-ref") {
+    return {
+      status: "unsupported",
+      reason: "이 팩은 Studio 내장 카탈로그 참조가 아닙니다.",
+    };
+  }
+
+  if (entry.kind === "template") {
+    const prefix = "studio-scene-template:";
+    const templateId = entry.delivery.runtimeRef.startsWith(prefix)
+      ? entry.delivery.runtimeRef.slice(prefix.length)
+      : "";
+    if (SCENE_TEMPLATES.some((template) => template.id === templateId)) {
+      return {
+        status: "supported",
+        target: { kind: "scene-template-catalog", templateId },
+      };
+    }
+  }
+
+  if (
+    entry.kind === "3d-preset"
+    && entry.delivery.runtimeRef === STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID
+  ) {
+    return {
+      status: "supported",
+      target: {
+        kind: "bg3d-procedural-catalog",
+        runtimeRef: STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID,
+      },
+    };
+  }
+
+  return {
+    status: "unsupported",
+    reason: "이 내장 참조를 여는 안전한 Studio 카탈로그가 없습니다.",
+  };
 }
 
 export function browserStudioCreatorPackStorage(): StudioCreatorPackStorage | null {

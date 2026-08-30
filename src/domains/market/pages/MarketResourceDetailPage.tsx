@@ -9,16 +9,22 @@ import { marketResourceJsonLd } from "../models/market-jsonld";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import Link from "@/src/compat/router-link";
-import { useJsonLd } from "@/src/hooks/use-document-title";
+import {
+  useDocumentTitle,
+  useJsonLd,
+  useMetaDescription,
+} from "@/src/hooks/use-document-title";
 
 export function MarketResourceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { record, loading, notFound, error, staleSavedAt, reload } = useMarketResourceDetail(id);
 
+  useDocumentTitle(record?.name ?? (notFound ? "리소스를 찾을 수 없어요" : "창작 마켓"));
+  useMetaDescription(record?.description);
   useJsonLd(record ? marketResourceJsonLd(record) : null);
 
   const related = useMarketResources(
-    record ? { kind: record.kind, limit: 4 } : null
+    record ? { kind: record.kind, limit: 5 } : null
   );
   const relatedItems = related.items.filter((item) => item.id !== record?.id).slice(0, 4);
 
@@ -26,7 +32,7 @@ export function MarketResourceDetailPage() {
     <Container size="wide" className="py-7 sm:py-10">
       <Link
         href="/market/browse"
-        className="inline-flex items-center gap-1.5 text-sm text-fg-2 transition-colors duration-150 hover:text-fg"
+        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-fg-2 transition-colors duration-150 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         마켓으로 돌아가기

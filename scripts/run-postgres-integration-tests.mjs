@@ -16,6 +16,9 @@ const VITEST_ENTRYPOINT = resolve(
   dirname(require.resolve("vitest/package.json")),
   "vitest.mjs",
 );
+const TSX_ENTRYPOINT = require.resolve("tsx/cli");
+const CREATOR_MARKETPLACE_DB_VERIFIER =
+  "scripts/verify-creator-marketplace-db.mts";
 
 export const POSTGRES_INTEGRATION_SUITES = Object.freeze([
   "scripts/bootstrap-runtime-login-gate.integration.test.mjs",
@@ -420,6 +423,50 @@ function runVitest(databaseUrl, { validatedRemoteDatabase = false } = {}) {
   });
 }
 
+function runCreatorMarketplaceDatabaseVerifier(
+  databaseUrl,
+  { validatedRemoteDatabase = false } = {},
+) {
+  const verifierPath = resolve(REPOSITORY_ROOT, CREATOR_MARKETPLACE_DB_VERIFIER);
+  if (!existsSync(verifierPath)) {
+    fail("The creator marketplace PostgreSQL verifier is missing.");
+  }
+
+  const child = spawn(process.execPath, [TSX_ENTRYPOINT, verifierPath], {
+    cwd: REPOSITORY_ROOT,
+    env: {
+      ...createPostgresIntegrationEnvironment(databaseUrl, process.env, {
+        validatedRemoteDatabase,
+      }),
+      TOONSPECTRUM_MARKETPLACE_DB_RUNNER_VALIDATED: "1",
+      TOONSPECTRUM_MARKETPLACE_DB_TEST: "1",
+    },
+    stdio: "inherit",
+  });
+  return new Promise((resolvePromise, rejectPromise) => {
+    child.once("error", () => {
+      rejectPromise(
+        new Error("The creator marketplace PostgreSQL verifier could not start."),
+      );
+    });
+    child.once("exit", (code, signal) => {
+      if (signal) {
+        rejectPromise(
+          new Error("The creator marketplace PostgreSQL verifier was interrupted."),
+        );
+        return;
+      }
+      if (code !== 0) {
+        rejectPromise(
+          new Error("The creator marketplace PostgreSQL verifier failed."),
+        );
+        return;
+      }
+      resolvePromise();
+    });
+  });
+}
+
 export async function runPostgresIntegrationTests({
   arguments_: commandArguments = process.argv.slice(2),
   environment = process.env,
@@ -444,6 +491,12 @@ export async function runPostgresIntegrationTests({
     `Running ${POSTGRES_INTEGRATION_SUITES.length} direct PostgreSQL suites without file parallelism.`,
   );
   await runVitest(target.databaseUrl, {
+    validatedRemoteDatabase: !target.loopback,
+  });
+  console.log(
+    "Running the creator marketplace repository and publish-gate verifier against the validated target.",
+  );
+  await runCreatorMarketplaceDatabaseVerifier(target.databaseUrl, {
     validatedRemoteDatabase: !target.loopback,
   });
 }

@@ -54,6 +54,42 @@ export interface StudioCreatorPackProductRuntimeOptions {
     | Promise<StudioPaletteSqliteRepository>;
   readonly acquireDatabase?: () => Promise<StudioLocalDatabase>;
   readonly now?: () => number;
+  /**
+   * 딥링크 installer가 화면 생명주기와 operation 세대를 live로 전달하는 취소 경계다.
+   * 저장소 획득/조회 await 뒤 실제 영속 mutation을 시작하기 직전에 다시 확인한다.
+   */
+  readonly isInstallCurrent?: () => boolean;
+}
+
+export class StudioCreatorPackInstallStaleError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("Studio Creator Pack install operation is stale", options);
+    this.name = "StudioCreatorPackInstallStaleError";
+  }
+}
+
+const creatorPackMutationTails = new Map<string, Promise<void>>();
+
+async function withCreatorPackMutationLock<T>(
+  packageId: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  const previous = creatorPackMutationTails.get(packageId) ?? Promise.resolve();
+  let release!: () => void;
+  const turn = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.catch(() => undefined).then(() => turn);
+  creatorPackMutationTails.set(packageId, tail);
+  await previous.catch(() => undefined);
+  try {
+    return await work();
+  } finally {
+    release();
+    if (creatorPackMutationTails.get(packageId) === tail) {
+      creatorPackMutationTails.delete(packageId);
+    }
+  }
 }
 
 interface StudioCreatorPackSqliteReceipt {
@@ -146,24 +182,166 @@ async function loadBrushReceipt(
   return receipt;
 }
 
-async function saveBrushReceipt(
+function assertInstallCurrent(options: StudioCreatorPackProductRuntimeOptions): void {
+  if (options.isInstallCurrent?.() === false) {
+    throw new StudioCreatorPackInstallStaleError();
+  }
+}
+
+function nestedStaleInstallError(error: unknown): StudioCreatorPackInstallStaleError | null {
+  let candidate = error;
+  const seen = new Set<unknown>();
+  while (candidate instanceof Error && !seen.has(candidate)) {
+    if (candidate instanceof StudioCreatorPackInstallStaleError) return candidate;
+    seen.add(candidate);
+    candidate = candidate.cause;
+  }
+  return null;
+}
+
+async function rollbackAndRethrowStaleInstall(
+  error: unknown,
+  rollback: () => Promise<void>,
+): Promise<never> {
+  const staleError = nestedStaleInstallError(error);
+  if (!staleError) throw error;
+  try {
+    await rollback();
+  } catch (rollbackError) {
+    throw new StudioCreatorPackInstallStaleError({
+      cause: new AggregateError(
+        [staleError, rollbackError],
+        "Stale Creator Pack install rollback failed",
+      ),
+    });
+  }
+  throw staleError;
+}
+
+async function rollbackAndRethrowInstallFailure(
+  error: unknown,
+  rollback: () => Promise<void>,
+): Promise<never> {
+  const staleError = nestedStaleInstallError(error);
+  try {
+    await rollback();
+  } catch (rollbackError) {
+    const cause = new AggregateError(
+      [error, rollbackError],
+      "Creator Pack install rollback failed",
+    );
+    if (staleError) {
+      throw new StudioCreatorPackInstallStaleError({ cause });
+    }
+    throw cause;
+  }
+  if (staleError) throw staleError;
+  throw error;
+}
+
+function compensationConflict(kind: string, ids: readonly string[]): Error {
+  return new Error(
+    `Stale ${kind} install preserved ${ids.length} newer user mutation(s): ${ids.join(", ")}`,
+  );
+}
+
+async function restoreBrushInstallSnapshot(
   pack: StudioCreatorPackDefinition,
-  now: number,
-  options: StudioCreatorPackProductRuntimeOptions,
+  product: ProductBrushLibraryRepository,
+  previous: readonly (StudioSavedBrush | null)[],
+  incoming: readonly StudioSavedBrush[],
+  previousReceiptRaw: string | null,
+  installedReceiptRaw: string,
 ): Promise<void> {
-  const database = await localDatabase(options);
-  const receipt: StudioCreatorPackSqliteReceipt = {
+  const ids = pack.entries.map((entry) => runtimeItemId(pack.metadata.id, entry.id));
+  const receiptId = receiptKey("brush", pack.metadata.id);
+  const compareAndRestore = product.compareAndRestoreInstallSnapshot;
+  if (!compareAndRestore) {
+    throw new Error("Brush product repository does not support atomic install compensation");
+  }
+  const restored = await compareAndRestore(
+    ids.map((id, index) => ({
+      id,
+      expected: incoming[index]!,
+      restore: previous[index] ?? null,
+    })),
+    [{
+      namespace: STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      key: receiptId,
+      expected: installedReceiptRaw,
+      restore: previousReceiptRaw,
+    }],
+  );
+  if (restored.conflictIds.length > 0) {
+    throw compensationConflict("brush", restored.conflictIds);
+  }
+}
+
+async function restoreFilterInstallSnapshot(
+  pack: StudioCreatorPackDefinition,
+  product: ProductFilterLibraryRepository,
+  previous: readonly (StudioFilterLibraryPreset | null)[],
+  incoming: readonly StudioFilterLibraryPreset[],
+): Promise<void> {
+  const ids = pack.entries.map((entry) => runtimeItemId(pack.metadata.id, entry.id));
+  const compareAndRestore = product.compareAndRestoreInstallSnapshot;
+  if (!compareAndRestore) {
+    throw new Error("Filter product repository does not support atomic install compensation");
+  }
+  const restored = await compareAndRestore(ids.map((id, index) => ({
+    id,
+    expected: incoming[index]!,
+    restore: previous[index] ?? null,
+  })));
+  if (restored.conflictIds.length > 0) {
+    throw compensationConflict("filter", restored.conflictIds);
+  }
+}
+
+async function restorePaletteInstallSnapshot(
+  pack: StudioCreatorPackDefinition,
+  product: StudioPaletteSqliteRepository,
+  previous: readonly (StudioNamedPalette | null)[],
+  previousReceiptRaw: string | null,
+): Promise<void> {
+  await product.commitBatch({
+    upsert: previous.filter(
+      (palette): palette is StudioNamedPalette => palette !== null,
+    ),
+    deleteIds: pack.entries.flatMap((entry, index) =>
+      previous[index] === null
+        ? [runtimeItemId(pack.metadata.id, entry.id)]
+        : []),
+    sidecars: [{
+      namespace: STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+      key: receiptKey("palette", pack.metadata.id),
+      value: previousReceiptRaw,
+    }],
+  });
+}
+
+function brushReceipt(pack: StudioCreatorPackDefinition, now: number): string {
+  return JSON.stringify({
     version: 1,
     packageId: pack.metadata.id,
     packageVersion: pack.metadata.version,
     packageFingerprint: pack.metadata.packageFingerprint,
     kind: "brush",
     updatedAt: now,
-  };
+  } satisfies StudioCreatorPackSqliteReceipt);
+}
+
+async function saveBrushReceipt(
+  pack: StudioCreatorPackDefinition,
+  receipt: string,
+  database: StudioLocalDatabase,
+  options: StudioCreatorPackProductRuntimeOptions,
+): Promise<void> {
+  assertInstallCurrent(options);
   await database.kvSet(
     STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
     receiptKey("brush", pack.metadata.id),
-    JSON.stringify(receipt),
+    receipt,
   );
 }
 
@@ -209,6 +387,13 @@ async function currentBrushes(
   options: StudioCreatorPackProductRuntimeOptions,
 ): Promise<(StudioSavedBrush | null)[]> {
   const product = await brushRepository(options);
+  return currentBrushesFromRepository(pack, product);
+}
+
+async function currentBrushesFromRepository(
+  pack: StudioCreatorPackDefinition,
+  product: ProductBrushLibraryRepository,
+): Promise<(StudioSavedBrush | null)[]> {
   return Promise.all(
     pack.entries.map((entry) =>
       product.repository.getById(runtimeItemId(pack.metadata.id, entry.id)),
@@ -417,6 +602,8 @@ function paletteFromEntry(
 }
 
 function errorResult(action: string, error: unknown): StudioCreatorPackInstallResult {
+  const staleError = nestedStaleInstallError(error);
+  if (staleError) throw staleError;
   if (
     error instanceof StudioPaletteSqliteRepositoryError
     && error.code === "limit"
@@ -435,15 +622,17 @@ function errorResult(action: string, error: unknown): StudioCreatorPackInstallRe
   };
 }
 
-export async function installStudioCreatorPackProduct(
+async function installStudioCreatorPackProductUnlocked(
   pack: StudioCreatorPackDefinition,
   options: StudioCreatorPackProductRuntimeOptions = {},
 ): Promise<StudioCreatorPackInstallResult> {
+  assertInstallCurrent(options);
   if (
     pack.metadata.kind !== "filter"
     && pack.metadata.kind !== "brush"
     && pack.metadata.kind !== "palette"
   ) {
+    assertInstallCurrent(options);
     return installStudioCreatorPack(
       pack,
       optionsStorage(options),
@@ -468,6 +657,7 @@ export async function installStudioCreatorPackProduct(
   if (pack.metadata.kind === "brush") {
     try {
       const state = await inspectStudioCreatorPackInstallStateProduct(pack, options);
+      assertInstallCurrent(options);
       if (state === "installed") {
         return {
           status: "already-installed",
@@ -485,13 +675,46 @@ export async function installStudioCreatorPackProduct(
         };
       }
       const product = await brushRepository(options);
-      const current = await currentBrushes(pack, options);
+      assertInstallCurrent(options);
+      const current = await currentBrushesFromRepository(pack, product);
+      assertInstallCurrent(options);
+      const database = await localDatabase(options);
+      assertInstallCurrent(options);
+      const previousReceiptRaw = await database.kvGet(
+        STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+        receiptKey("brush", pack.metadata.id),
+      );
+      assertInstallCurrent(options);
       const now = (options.now ?? Date.now)();
       const incoming = pack.entries.map((_, index) =>
         brushFromEntry(pack, index, current[index] ?? null, now),
       );
-      const saved = await product.repository.putMany(incoming);
-      await saveBrushReceipt(pack, now, options);
+      const installedReceiptRaw = brushReceipt(pack, now);
+      assertInstallCurrent(options);
+      let rowsCommitted = false;
+      const saved = await (async () => {
+        try {
+          const result = await product.repository.putMany(incoming);
+          rowsCommitted = true;
+          assertInstallCurrent(options);
+          await saveBrushReceipt(pack, installedReceiptRaw, database, options);
+          assertInstallCurrent(options);
+          return result;
+        } catch (error) {
+          if (!rowsCommitted && !nestedStaleInstallError(error)) throw error;
+          return rollbackAndRethrowInstallFailure(
+            error,
+            () => restoreBrushInstallSnapshot(
+              pack,
+              product,
+              current,
+              incoming,
+              previousReceiptRaw,
+              installedReceiptRaw,
+            ),
+          );
+        }
+      })();
       notifyStudioBrushLibraryChanged();
       return {
         status: "installed",
@@ -507,6 +730,7 @@ export async function installStudioCreatorPackProduct(
   if (pack.metadata.kind === "palette") {
     try {
       const state = await inspectStudioCreatorPackInstallStateProduct(pack, options);
+      assertInstallCurrent(options);
       if (state === "installed") {
         return {
           status: "already-installed",
@@ -524,19 +748,48 @@ export async function installStudioCreatorPackProduct(
         };
       }
       const product = await paletteRepository(options);
+      assertInstallCurrent(options);
       const current = await currentPalettes(pack, product);
+      assertInstallCurrent(options);
+      const previousReceiptRaw = await product.readSidecar(
+        STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+        receiptKey("palette", pack.metadata.id),
+      );
+      assertInstallCurrent(options);
       const now = (options.now ?? Date.now)();
       const incoming = pack.entries.map((_, index) =>
         paletteFromEntry(pack, index, current[index] ?? null, now),
       );
-      const committed = await product.commitBatch({
-        upsert: incoming,
-        sidecars: [{
-          namespace: STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
-          key: receiptKey("palette", pack.metadata.id),
-          value: paletteReceipt(pack, now),
-        }],
-      });
+      assertInstallCurrent(options);
+      let commitCompleted = false;
+      const committed = await (async () => {
+        try {
+          const result = await product.commitBatch({
+            upsert: incoming,
+            sidecars: [{
+              namespace: STUDIO_CREATOR_PACK_SQLITE_NAMESPACE,
+              key: receiptKey("palette", pack.metadata.id),
+              value: paletteReceipt(pack, now),
+            }],
+            assertCurrent: () => assertInstallCurrent(options),
+          });
+          commitCompleted = true;
+          assertInstallCurrent(options);
+          return result;
+        } catch (error) {
+          return rollbackAndRethrowStaleInstall(
+            error,
+            commitCompleted
+              ? () => restorePaletteInstallSnapshot(
+                  pack,
+                  product,
+                  current,
+                  previousReceiptRaw,
+                )
+              : async () => undefined,
+          );
+        }
+      })();
       return {
         status: "installed",
         installedCount: committed.upsertedCount,
@@ -548,6 +801,7 @@ export async function installStudioCreatorPackProduct(
   }
   try {
     const state = await inspectStudioCreatorPackInstallStateProduct(pack, options);
+    assertInstallCurrent(options);
     if (state === "installed") {
       return {
         status: "already-installed",
@@ -565,16 +819,30 @@ export async function installStudioCreatorPackProduct(
       };
     }
     const product = await filterRepository(options);
+    assertInstallCurrent(options);
     const current = await Promise.all(
       pack.entries.map((entry) =>
         product.repository.getById(runtimeItemId(pack.metadata.id, entry.id)),
       ),
     );
+    assertInstallCurrent(options);
     const now = (options.now ?? Date.now)();
     const incoming = pack.entries.map((_, index) =>
       filterPresetFromEntry(pack, index, current[index] ?? null, now),
     );
-    const installedCount = await product.repository.putMany(incoming);
+    assertInstallCurrent(options);
+    const installedCount = await (async () => {
+      try {
+        const result = await product.repository.putMany(incoming);
+        assertInstallCurrent(options);
+        return result;
+      } catch (error) {
+        return rollbackAndRethrowStaleInstall(
+          error,
+          () => restoreFilterInstallSnapshot(pack, product, current, incoming),
+        );
+      }
+    })();
     notifyStudioFilterLibraryChanged();
     return {
       status: "installed",
@@ -588,7 +856,18 @@ export async function installStudioCreatorPackProduct(
   }
 }
 
-export async function uninstallStudioCreatorPackProduct(
+export async function installStudioCreatorPackProduct(
+  pack: StudioCreatorPackDefinition,
+  options: StudioCreatorPackProductRuntimeOptions = {},
+): Promise<StudioCreatorPackInstallResult> {
+  assertInstallCurrent(options);
+  return withCreatorPackMutationLock(pack.metadata.id, async () => {
+    assertInstallCurrent(options);
+    return installStudioCreatorPackProductUnlocked(pack, options);
+  });
+}
+
+async function uninstallStudioCreatorPackProductUnlocked(
   pack: StudioCreatorPackDefinition,
   options: StudioCreatorPackProductRuntimeOptions = {},
 ): Promise<StudioCreatorPackInstallResult> {
@@ -686,4 +965,14 @@ export async function uninstallStudioCreatorPackProduct(
   } catch (error) {
     return errorResult("필터 팩 제거", error);
   }
+}
+
+export async function uninstallStudioCreatorPackProduct(
+  pack: StudioCreatorPackDefinition,
+  options: StudioCreatorPackProductRuntimeOptions = {},
+): Promise<StudioCreatorPackInstallResult> {
+  return withCreatorPackMutationLock(
+    pack.metadata.id,
+    () => uninstallStudioCreatorPackProductUnlocked(pack, options),
+  );
 }
