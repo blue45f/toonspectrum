@@ -63,355 +63,19 @@ import {
   StudioLiveDynamicBrushOverlayRenderer,
   studioLiveDynamicBrushOverlaySupportsElement,
 } from "./studio-live-dynamic-brush-overlay";
-
-import type { DrawEl } from "../studio-element-model";
-import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
-
-interface RecordedEllipse {
-  readonly x: number;
-  readonly y: number;
-  readonly radiusX: number;
-  readonly radiusY: number;
-  readonly angleRadians: number;
-  readonly alpha: number;
-  readonly color: string;
-  readonly unionGeometry?: Readonly<{
-    readonly coordinateCount: number;
-    readonly byteLength: number;
-    readonly sha256: string;
-    /**
-     * Raw rounded coordinate stream of this one fill command. Incremental union appends paint one
-     * suffix fill per pointer frame, so semantic live/pointer-up parity is asserted by comparing
-     * the order-preserving concatenation of these streams against the canonical one-fill union.
-     */
-    readonly coordinates: readonly number[];
-  }>;
-}
-
-interface RecordedComposite {
-  readonly opacity: number;
-  readonly marks: readonly RecordedEllipse[];
-}
-
-interface RecordedCopy {
-  readonly opacity: number;
-  readonly sourceRect: readonly [number, number, number, number];
-  readonly destinationRect: readonly [number, number, number, number];
-}
-
-interface RecordingCanvas extends HTMLCanvasElement {
-  readonly recordedMarks: RecordedEllipse[];
-  readonly recordedComposites: RecordedComposite[];
-  readonly recordedCopies: RecordedCopy[];
-  readonly clearCount: () => number;
-  readonly radialGradientCount: () => number;
-  textureStamp: boolean;
-  textureColor: string;
-}
-
-function rounded(value: number): number {
-  return Number(value.toFixed(9));
-}
-
-function recordingCanvas(): RecordingCanvas {
-  const recordedMarks: RecordedEllipse[] = [];
-  const recordedComposites: RecordedComposite[] = [];
-  const recordedCopies: RecordedCopy[] = [];
-  let clears = 0;
-  let radialGradients = 0;
-  let alpha = 1;
-  let color = "#000000";
-  let composite: GlobalCompositeOperation = "source-over";
-  let translatedX = 0;
-  let translatedY = 0;
-  let rotation = 0;
-  let scaleX = 1;
-  let scaleY = 1;
-  let path: Omit<RecordedEllipse, "alpha" | "color"> | null = null;
-  let polygonPath: number[] = [];
-  const stack: Array<{
-    readonly alpha: number;
-    readonly color: string;
-    readonly composite: GlobalCompositeOperation;
-    readonly translatedX: number;
-    readonly translatedY: number;
-    readonly rotation: number;
-    readonly scaleX: number;
-    readonly scaleY: number;
-  }> = [];
-
-  const canvas = {
-    width: 0,
-    height: 0,
-    style: { opacity: "1" },
-    recordedMarks,
-    recordedComposites,
-    recordedCopies,
-    clearCount: () => clears,
-    radialGradientCount: () => radialGradients,
-    textureStamp: false,
-    textureColor: "#000000",
-    getContext: () => context,
-  } as unknown as RecordingCanvas;
-
-  const context = {
-    save: () => {
-      stack.push({
-        alpha,
-        color,
-        composite,
-        translatedX,
-        translatedY,
-        rotation,
-        scaleX,
-        scaleY,
-      });
-    },
-    restore: () => {
-      const state = stack.pop();
-      if (!state) return;
-      alpha = state.alpha;
-      color = state.color;
-      composite = state.composite;
-      translatedX = state.translatedX;
-      translatedY = state.translatedY;
-      rotation = state.rotation;
-      scaleX = state.scaleX;
-      scaleY = state.scaleY;
-    },
-    setTransform: () => {
-      translatedX = 0;
-      translatedY = 0;
-      rotation = 0;
-      scaleX = 1;
-      scaleY = 1;
-    },
-    clearRect: () => {
-      clears += 1;
-      recordedMarks.length = 0;
-      recordedComposites.length = 0;
-    },
-    beginPath: () => {
-      path = null;
-      polygonPath = [];
-    },
-    moveTo: (x: number, y: number) => {
-      polygonPath.push(x, y);
-    },
-    lineTo: (x: number, y: number) => {
-      polygonPath.push(x, y);
-    },
-    closePath: () => undefined,
-    createRadialGradient: () => {
-      radialGradients += 1;
-      return {
-        addColorStop: () => undefined,
-      } as CanvasGradient;
-    },
-    arc: (
-      x: number,
-      y: number,
-      radius: number,
-    ) => {
-      path = {
-        x: rounded(x),
-        y: rounded(y),
-        radiusX: rounded(radius),
-        radiusY: rounded(radius),
-        angleRadians: 0,
-      };
-    },
-    ellipse: (
-      x: number,
-      y: number,
-      radiusX: number,
-      radiusY: number,
-      angleRadians: number,
-    ) => {
-      path = {
-        x: rounded(x),
-        y: rounded(y),
-        radiusX: rounded(radiusX),
-        radiusY: rounded(radiusY),
-        angleRadians: rounded(angleRadians),
-      };
-    },
-    translate: (x: number, y: number) => {
-      translatedX += x;
-      translatedY += y;
-    },
-    rotate: (angle: number) => {
-      rotation += angle;
-    },
-    scale: (x: number, y: number) => {
-      scaleX *= x;
-      scaleY *= y;
-    },
-    fill: () => {
-      let unionGeometry: RecordedEllipse["unionGeometry"];
-      if (!path && polygonPath.length >= 6) {
-        const xs = polygonPath.filter((_, index) => index % 2 === 0);
-        const ys = polygonPath.filter((_, index) => index % 2 === 1);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-        path = {
-          x: rounded((minX + maxX) / 2),
-          y: rounded((minY + maxY) / 2),
-          radiusX: rounded((maxX - minX) / 2),
-          radiusY: rounded((maxY - minY) / 2),
-          angleRadians: 0,
-        };
-        const roundedCoordinates = polygonPath.map(rounded);
-        const geometryBytes = new TextEncoder().encode(
-          roundedCoordinates.join(","),
-        );
-        unionGeometry = Object.freeze({
-          coordinateCount: polygonPath.length,
-          byteLength: geometryBytes.byteLength,
-          sha256: sha256HexPortable(geometryBytes),
-          coordinates: Object.freeze(roundedCoordinates),
-        });
-      }
-      if (!path) return;
-      recordedMarks.push({
-        ...path,
-        alpha: rounded(alpha),
-        color,
-        ...(unionGeometry ? { unionGeometry } : {}),
-      });
-    },
-    createImageData: (width: number, height: number) => ({
-      width,
-      height,
-      colorSpace: "srgb",
-      data: new Uint8ClampedArray(width * height * 4),
-    } as ImageData),
-    putImageData: (imageData: ImageData) => {
-      canvas.textureStamp = true;
-      const [red = 0, green = 0, blue = 0] = imageData.data;
-      canvas.textureColor = `#${[red, green, blue]
-        .map((channel) => channel.toString(16).padStart(2, "0"))
-        .join("")}`;
-    },
-    fillRect: () => {
-      if (composite === "source-in") {
-        canvas.textureStamp = true;
-        canvas.textureColor = color;
-      }
-    },
-    drawImage: (
-      source: CanvasImageSource,
-      ...args: readonly number[]
-    ) => {
-      const sourceCanvas = source as RecordingCanvas;
-      if (composite === "copy" && sourceCanvas.textureStamp) {
-        canvas.textureStamp = true;
-        canvas.textureColor = sourceCanvas.textureColor;
-        return;
-      }
-      if (sourceCanvas.textureStamp && args.length === 8) {
-        const destinationX = args[4] ?? 0;
-        const destinationY = args[5] ?? 0;
-        const destinationWidth = args[6] ?? 0;
-        const destinationHeight = args[7] ?? 0;
-        recordedMarks.push({
-          x: rounded(translatedX + (destinationX + destinationWidth / 2) * scaleX),
-          y: rounded(translatedY + (destinationY + destinationHeight / 2) * scaleY),
-          radiusX: rounded(Math.abs(destinationWidth * scaleX) / 2),
-          radiusY: rounded(Math.abs(destinationHeight * scaleY) / 2),
-          angleRadians: rounded(rotation),
-          alpha: rounded(alpha),
-          color: sourceCanvas.textureColor,
-        });
-        return;
-      }
-      if (args.length === 8) {
-        recordedCopies.push({
-          opacity: rounded(alpha),
-          sourceRect: [
-            args[0] ?? 0,
-            args[1] ?? 0,
-            args[2] ?? 0,
-            args[3] ?? 0,
-          ],
-          destinationRect: [
-            args[4] ?? 0,
-            args[5] ?? 0,
-            args[6] ?? 0,
-            args[7] ?? 0,
-          ],
-        });
-      }
-      recordedComposites.push({
-        opacity: rounded(alpha),
-        marks: sourceCanvas.recordedMarks.map((mark) => ({ ...mark })),
-      });
-    },
-    set globalAlpha(value: number) {
-      alpha = value;
-    },
-    get globalAlpha() {
-      return alpha;
-    },
-    set fillStyle(value: string | CanvasGradient | CanvasPattern) {
-      color = String(value);
-    },
-    get fillStyle() {
-      return color;
-    },
-    set globalCompositeOperation(value: GlobalCompositeOperation) {
-      composite = value;
-    },
-    get globalCompositeOperation() {
-      return composite;
-    },
-  } as unknown as CanvasRenderingContext2D;
-
-  return canvas;
-}
-
-const SURFACE: StudioLiveInkSurface = {
-  left: 0,
-  top: 0,
-  width: 240,
-  height: 160,
-  documentScale: 1,
-  documentWidth: 240,
-  flipX: false,
-};
-
-function complexDynamics() {
-  const legacyDryMedia = studioBrushDynamicsPresetSettings("dry-media");
-  delete legacyDryMedia.depositPipeline;
-  return normalizeStudioBrushDynamicsSettings({
-    ...legacyDryMedia,
-    seed: 821,
-    tip: { shape: "grain", softness: 0.28 },
-    grain: {
-      space: "stroke-fixed",
-      amount: 0.58,
-      scale: 5.5,
-      contrast: 0.62,
-      seed: 731,
-    },
-    tipLayers: [
-      { tip: { shape: "star", softness: 0.12 }, opacity: 0.48, scale: 0.62 },
-    ],
-    dualBrush: {
-      enabled: true,
-      tip: { shape: "bristle", softness: 0.18 },
-      blendMode: "multiply",
-      sizeRatio: 0.78,
-    },
-    colorDynamics: {
-      hueJitterDegrees: 8,
-      saturationJitter: 0.12,
-      lightnessJitter: 0.08,
-    },
-  });
-}
+import {
+  APPEND_CHUNK_MARK_THRESHOLD,
+  APPEND_COLD_START_COST_LIMIT,
+  APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT,
+  appendColdStartCostRatio,
+  appendFirstChunkColdStartCostRatio,
+  attachedRenderer,
+  complexDynamics,
+  drawElement,
+  recordingCanvas,
+  SURFACE,
+  type RecordedEllipse,
+} from "./studio-live-dynamic-brush-overlay.fixture";
 
 function segmentedCausalOverlayDynamics() {
   return normalizeStudioBrushDynamicsSettings({
@@ -440,35 +104,6 @@ function segmentedCausalOverlayRoute(): number[] {
   ]).flat();
 }
 
-function drawElement(
-  id: string,
-  points: readonly number[],
-  overrides: Partial<DrawEl> = {},
-): DrawEl {
-  const count = Math.floor(points.length / 2);
-  return {
-    id,
-    type: "draw",
-    kind: "freehand",
-    mode: "pen",
-    points: [...points],
-    stroke: "#3257d6",
-    strokeWidth: 18,
-    opacity: 0.67,
-    brush: "airbrush",
-    sampleSpacing: 1,
-    paintModel: "bounded-flow-v2",
-    pressures: Array.from({ length: count }, (_, index) => 0.25 + index * 0.1),
-    tangentialPressures: Array.from({ length: count }, (_, index) => index * 0.02),
-    speeds: Array.from({ length: count }, (_, index) => 0.3 + index * 0.08),
-    tiltXs: Array.from({ length: count }, (_, index) => 8 + index * 2),
-    tiltYs: Array.from({ length: count }, (_, index) => -4 + index),
-    twists: Array.from({ length: count }, (_, index) => 15 + index * 11),
-    brushDynamics: complexDynamics(),
-    ...overrides,
-  };
-}
-
 /**
  * How much more a stroke's late appends draw than its early ones -- the O(1) claim as a number.
  *
@@ -486,14 +121,6 @@ function appendMarkGrowthRatio(deltas: readonly number[]): number {
   if (!(early > 0)) throw new Error("The first half of a stroke drew nothing.");
   return sum(deltas.slice(half)) / early;
 }
-
-/**
- * Mark delta separating this stroke's two structural append classes.
- *
- * Every eighth append re-plans a ribbon chunk and deposits 1,695-1,780 marks; every other one
- * deposits 150-320. Nothing lands between, so the split is unambiguous rather than a percentile.
- */
-const APPEND_CHUNK_MARK_THRESHOLD = 1_000;
 
 /**
  * What one ribbon-chunk append costs in units of one ordinary append — the periodic class graded
@@ -580,138 +207,69 @@ function appendChunkGrowthRatio(
   if (chunks.length < 4) {
     throw new Error(`Chunk growth needs at least four chunk appends, got ${chunks.length}.`);
   }
-  const half = Math.floor(chunks.length / 2);
-  const cheapest = (slice: readonly StudioPerfCalibrationSample[]): number =>
-    Math.min(...slice.map((sample) => sample.workMs));
-  const early = cheapest(chunks.slice(0, half));
+  // Split by POSITION IN THE STROKE, and calibrate each half against the reference floor of that
+  // same stretch. This stroke runs for seconds, so a runner that gets busier partway through
+  // moves the two halves' raw milliseconds by different amounts, and a raw comparison reports
+  // that machine-speed shift as length growth.
+  //
+  // The machine-speed estimate is the cheapest reference window over EVERY append in the half —
+  // roughly ninety of them — not over the dozen chunks. That distinction is measured, not
+  // stylistic: a reference window is ~1ms, so its own noise is large next to the append it
+  // calibrates, and estimating it from the chunks alone injects more variance than the drift it
+  // removes. Reducing each half with `reduceStudioPerfCalibrationSamples` reads 0.5052-1.6583
+  // under load and pairing sample-by-sample reads 0.4002-1.1978, both worse than the uncalibrated
+  // form's 0.728-0.833; drawing the floor from all ninety appends is what makes calibration pay.
+  const half = Math.floor(samples.length / 2);
+  const referenceFloorMs = (from: number, to: number): number => {
+    let best = Number.POSITIVE_INFINITY;
+    for (let index = from; index < to; index += 1) {
+      best = Math.min(best, samples[index]!.referenceMs);
+    }
+    return best;
+  };
+  const chunkFloorMs = (from: number, to: number): number => {
+    let best = Number.POSITIVE_INFINITY;
+    for (let index = from; index < to; index += 1) {
+      if (markDeltas[index]! > APPEND_CHUNK_MARK_THRESHOLD) {
+        best = Math.min(best, samples[index]!.workMs);
+      }
+    }
+    return best;
+  };
+  const calibratedHalf = (from: number, to: number): number => {
+    const reference = referenceFloorMs(from, to);
+    const chunk = chunkFloorMs(from, to);
+    if (!(reference > 0)) {
+      throw new Error("A zero-length reference window cannot calibrate a chunk append.");
+    }
+    if (!Number.isFinite(chunk)) {
+      throw new Error("Chunk growth needs chunk appends in both halves of the stroke.");
+    }
+    return chunk / reference;
+  };
+  const early = calibratedHalf(0, half);
   if (!(early > 0)) throw new Error("An early chunk append that costs nothing is not a denominator.");
-  return cheapest(chunks.slice(half)) / early;
+  return calibratedHalf(half, samples.length) / early;
 }
 
 /**
- * Recorded 0.807 / 0.828 / 0.967 idle and 0.728 / 0.822 / 0.833 under six spinning hogs on four
- * cores — consistently below 1, because later chunks run on a warmer JIT. 1.25 carries 29%
- * headroom over the worst honest reading while a doubled late-chunk class (>=1.46) is convicted
- * with 17% margin, and 500ms added to late chunks alone reads ~34.
+ * Recorded on the CALIBRATED form, cheapest-of-3 per run: 0.8749 / 0.9172 idle and 0.4845 /
+ * 0.5034 / 0.5191 / 0.769 under six spinning hogs on four cores. The individual passes behind
+ * those are much wider — 0.8749-0.9785 idle and 0.4845-1.683 loaded — which is why the reduction
+ * across passes is a minimum here; see the comment at the assertion.
+ *
+ * 1.25 carries 36% headroom over the worst honest reading while a doubled late-chunk class
+ * (>=1.46) is convicted with 17% margin, and 500ms added to late chunks alone reads ~34.
  */
 const APPEND_CHUNK_GROWTH_LIMIT = 1.25;
 
 /**
- * What the COLD first append costs in units of one ordinary append.
+ * Recorded on the median-of-3-passes form: 1.1218 / 1.1356 / 1.2028 idle and 1.0835 / 1.1808 /
+ * 1.2123 under six spinning hogs on four cores; the individual passes behind those span
+ * 1.1157-1.2089 idle and 1.0742-1.2544 loaded. A 12% spread, because both sides of the division
+ * are the same code on the same machine over comparable durations.
  *
- * The first append is its own structural class, with exactly one member per pass: it starts a
- * 60-point stroke from a fresh renderer where every later one extends by 30. It is excluded from
- * the outlier max for that reason, its mark delta is a fixed 320 whatever the planner does
- * internally, and it is never the global minimum — so a regression confined to it (a two-second
- * initialisation, say) moves nothing this file otherwise measures, and clears both smoke bounds.
- *
- * Covers PER-RENDERER cold start rather than process-wide initialisation; the gate's own comment
- * at the assertion carries the measurement that distinguishes the two.
- *
- * This is a BLOW-UP bound and not a budget, and the reason is measured. The reading is dominated
- * by JIT warm-up of the whole renderer path: 15.6ms on the first pass, 3.4 on the second, 2.4 on
- * the third, idle — and 32.5 / 8.4 / 6.3 under six spinning hogs on four cores. Reduced by the
- * cheapest pass, as every verdict here is, that leaves 2.37 idle against 5.95 loaded. A 2.5x
- * honest spread admits no gate that also convicts a doubling (that would need one below 4.74 and
- * above 5.95), so this one does not pretend to: it is sized to catch the class blowing up, which
- * is the regression that is actually invisible elsewhere.
- *
- * What covers the cold path exactly is the mark pin beside it — 320 marks, on every machine.
- */
-function appendColdStartCostRatio(
-  samples: readonly StudioPerfCalibrationSample[],
-  markDeltas: readonly number[],
-): number {
-  if (samples.length !== markDeltas.length) {
-    throw new Error("Every append sample needs its own mark delta.");
-  }
-  const ordinary = samples.filter((_, index) => index > 0
-    && markDeltas[index]! <= APPEND_CHUNK_MARK_THRESHOLD);
-  if (ordinary.length === 0) throw new Error("No ordinary append to grade the cold start against.");
-  const cheapestOrdinaryMs = Math.min(...ordinary.map((sample) => sample.workMs));
-  if (!(cheapestOrdinaryMs > 0)) {
-    throw new Error("An ordinary append that costs nothing is not a denominator.");
-  }
-  return samples[0]!.workMs / cheapestOrdinaryMs;
-}
-
-/**
- * What the COLD FIRST ribbon-chunk append costs in units of one ordinary append.
- *
- * The cold gate above grades `samples[0]`, which is an ORDINARY append. The first chunk append is
- * a different structural path and its own cold start: if the renderer defers any initialisation
- * until a chunk actually arrives, nothing above sees it. `appendChunkCostRatio` is a median over
- * roughly two dozen cycles and discards a single stalled cycle by construction; the chunk-growth
- * ratio and the ordinary-append calibration take minima; and `samples[0]` is a different append
- * entirely. So a 500ms one-time stall on the first chunk moves nothing and clears both smoke
- * bounds — the same hole the ordinary cold gate was written to close, one path over.
- *
- * The denominator is the cheapest ordinary append, as above: this is a COST, whose noise is
- * one-sided, so the cheapest reading is the honest one.
- */
-function appendFirstChunkColdStartCostRatio(
-  samples: readonly StudioPerfCalibrationSample[],
-  markDeltas: readonly number[],
-): number {
-  if (samples.length !== markDeltas.length) {
-    throw new Error("Every append sample needs its own mark delta.");
-  }
-  const firstChunkIndex = markDeltas.findIndex((delta) => delta > APPEND_CHUNK_MARK_THRESHOLD);
-  if (firstChunkIndex < 0) {
-    throw new Error("No ribbon-chunk append to grade a cold chunk start against.");
-  }
-  const ordinary = samples.filter((_, index) => index > 0
-    && markDeltas[index]! <= APPEND_CHUNK_MARK_THRESHOLD);
-  if (ordinary.length === 0) {
-    throw new Error("No ordinary append to grade the cold chunk start against.");
-  }
-  const cheapestOrdinaryMs = Math.min(...ordinary.map((sample) => sample.workMs));
-  if (!(cheapestOrdinaryMs > 0)) {
-    throw new Error("An ordinary append that costs nothing is not a denominator.");
-  }
-  return samples[firstChunkIndex]!.workMs / cheapestOrdinaryMs;
-}
-
-/**
- * Graded on the FIRST pass, not the cheapest, and that distinction is the whole point of the gate.
- *
- * Initialisation that only the first renderer in the process pays is exactly the regression this
- * covers, and it is invisible to every later pass — `[2000, 2.4, 2.4]` reduces to 2.4 under a
- * minimum and acquits a two-second stall on the user's first stroke. The cheapest pass is the
- * honest reducer for a cost that every pass pays; here it discards the only pass that is actually
- * cold.
- *
- * That costs sensitivity, because a single cold reading is JIT-dominated and cannot be reduced:
- * 15.09 idle against 30.10 under six spinning hogs on four cores. 60 carries 2x headroom over the
- * worst of those, catches a cold path that grew to 100ms (~90) and the two-second case (~2000),
- * and does not pretend to catch a doubling. What covers the cold path exactly is the mark pin
- * beside it.
- */
-const APPEND_COLD_START_COST_LIMIT = 60;
-
-/**
- * Blow-up bound for the COLD FIRST ribbon-chunk append, graded on the FIRST pass.
- *
- * Same shape and same reasoning as `APPEND_COLD_START_COST_LIMIT` — including that it covers
- * per-renderer cold start and not process-wide initialisation — one structural path over: a
- * chunk append is ~12 ordinary appends by construction (it re-plans a ribbon chunk rather than
- * extending by 30 points), so the ratio is large before anything is wrong and the gate can only
- * be a blow-up bound.
- *
- * Recorded first-pass readings: 12.32 / 13.73 / 15.28 idle, and 14.74 / 25.35 / 28.99 under six
- * spinning hogs on four cores. 75 carries 2.6x headroom over the worst of those; a one-time
- * initialisation deferred to the first chunk reads its own cost in ordinary appends, so the
- * 500ms case reads in the hundreds and even a 50ms one is convicted.
- */
-const APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT = 75;
-
-/**
- * Recorded 1.1062 / 1.1305 / 1.1537 idle and 1.0893 / 1.0898 / 1.0915 under six spinning hogs on
- * four cores WITH five other heavy suites in parallel workers — the load that broke the previous
- * form of this statistic. A 6% spread, because both sides of the division are the same code on
- * the same machine over comparable durations.
- *
- * 1.45 carries 26% headroom over the worst of those, while a doubled chunk class (>=2.18) is
+ * 1.45 carries 21% headroom over the worst honest median, while a doubled chunk class (>=2.18) is
  * convicted with 50% margin and the 500ms-every-eighth-frame case reads in the tens.
  */
 const APPEND_CHUNK_COST_LIMIT = 1.45;
@@ -757,24 +315,6 @@ const APPEND_LENGTH_GROWTH_LIMIT = 1.3;
  * asymptotic: the cheapest cumulative repaint this loop can express already lands near 3.
  */
 const APPEND_MARK_GROWTH_LIMIT = 1.25;
-
-function attachedRenderer(surface: StudioLiveInkSurface = SURFACE) {
-  vi.stubGlobal("OffscreenCanvas", class {
-    constructor(width: number, height: number) {
-      const canvas = recordingCanvas();
-      canvas.width = width;
-      canvas.height = height;
-      return canvas;
-    }
-  });
-  const activeCanvas = recordingCanvas();
-  const presentationCanvas = recordingCanvas();
-  const settledCanvas = recordingCanvas();
-  const renderer = new StudioLiveDynamicBrushOverlayRenderer();
-  renderer.attach({ activeCanvas, presentationCanvas, settledCanvas });
-  renderer.setSurface(surface);
-  return { activeCanvas, presentationCanvas, renderer, settledCanvas };
-}
 
 function maximumLongitudinalCoverageGap(
   marks: readonly RecordedEllipse[],
@@ -2059,8 +1599,6 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     const calibrationPasses: StudioPerfCalibrationPass[] = [];
     const halfGrowths: number[] = [];
     const chunkCostRatios: number[] = [];
-    const coldStartCostRatios: number[] = [];
-    const firstChunkColdStartCostRatios: number[] = [];
     const chunkGrowthRatios: number[] = [];
     let maxAppendFrameMs = Number.POSITIVE_INFINITY;
     let totalAppendMs = Number.POSITIVE_INFINITY;
@@ -2144,10 +1682,6 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     calibrationPasses.push(reduceStudioPerfCalibrationSamples(passSamples));
     halfGrowths.push(appendCalibratedHalfGrowth(passSamples));
     chunkCostRatios.push(appendChunkCostRatio(passSamples, passMarkDeltas));
-    coldStartCostRatios.push(appendColdStartCostRatio(passSamples, passMarkDeltas));
-    firstChunkColdStartCostRatios.push(
-      appendFirstChunkColdStartCostRatio(passSamples, passMarkDeltas),
-    );
     chunkGrowthRatios.push(appendChunkGrowthRatio(passSamples, passMarkDeltas));
     markDeltas = passMarkDeltas;
     appendCount = passAppendCount;
@@ -2243,7 +1777,13 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // exactly the same marks. Earned like the rest — the cheapest of the three passes decides,
     // which is what discards the one contended pass that read 20.94 where its neighbours read
     // 11.69 and 12.75.
-    const chunkCostRatio = Math.min(...chunkCostRatios);
+    // The MEDIAN across passes, not the minimum, for the same reason the reduction INSIDE each
+    // pass is a median: this is a ratio of two independently timed windows, so its noise is
+    // two-sided. A pass whose seven ordinary-append denominators absorbed more delay than its
+    // chunk windows produces a low quotient, and a minimum selects that pass on purpose. The
+    // inner median handles a stalled cycle; the outer one has to handle a stalled pass.
+    const orderedChunkCostRatios = [...chunkCostRatios].sort((left, right) => left - right);
+    const chunkCostRatio = orderedChunkCostRatios[Math.floor(orderedChunkCostRatios.length / 2)]!;
     expect(
       chunkCostRatio,
       `a ribbon-chunk append costs ${chunkCostRatio.toFixed(3)}x its cycle's ordinary appends `
@@ -2254,6 +1794,20 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // them: the early/late gate reduces ordinary appends in each half, this class's own gate
     // reduces the cheapest chunk across the whole stroke, so re-planning that grows only on the
     // chunk path leaves an unaffected early chunk as the cheapest and moves neither.
+    // The MINIMUM across passes, unlike the chunk-cost gate above, and that asymmetry is measured
+    // rather than stylistic.
+    //
+    // A median was tried here first, on the argument that a quotient of two calibrated ratios has
+    // two-sided noise and deserves the same reducer the cost gate needs. Under six spinning hogs
+    // on four cores that form read passes of 1.337 / 1.683 / 0.769 and failed at 1.337 against
+    // 1.25 with nothing regressed: this quotient's upward tail is far wider than the cost gate's,
+    // because it divides two per-half floors that are each drawn from only ~12 chunk appends.
+    //
+    // So it keeps this file's existing convention — a violation must be earned by EVERY pass —
+    // which costs nothing against the regression it exists for: length dependence on the chunk
+    // path raises all three passes together, so the minimum rises with them. The cost gate cannot
+    // use a minimum for the reason Codex gave, and this one cannot use a median for the reason
+    // the machine gave.
     const chunkGrowthRatio = Math.min(...chunkGrowthRatios);
     expect(
       chunkGrowthRatio,
@@ -2280,27 +1834,12 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // window. Closing that gap needs this measurement in its OWN file, the way the impasto shader
     // gates were split from their census, rather than a different statistic here.
     expect(markDeltas[0], "cold first append marks").toBe(320);
-    const coldStartCostRatio = coldStartCostRatios[0]!;
-    expect(
-      coldStartCostRatio,
-      `the genuinely cold first append costs ${coldStartCostRatio.toFixed(2)} ordinary appends `
-      + `(all passes, warm ones included: `
-      + `${coldStartCostRatios.map((value) => value.toFixed(2)).join(", ")})`,
-    ).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
-
-    // The same hole, one structural path over: the first RIBBON-CHUNK append. Initialisation
-    // deferred until a chunk actually arrives is invisible to the cold gate just above (which
-    // grades an ordinary append), to the chunk-cost median (which discards one stalled cycle in
-    // two dozen by construction), to the chunk-growth minima and to both smoke bounds. Read on
-    // the FIRST pass for the same reason as its sibling: a process pays one-time initialisation
-    // once, so a minimum across passes acquits precisely what this exists to catch.
-    const firstChunkColdStartCostRatio = firstChunkColdStartCostRatios[0]!;
-    expect(
-      firstChunkColdStartCostRatio,
-      `the genuinely cold first ribbon-chunk append costs `
-      + `${firstChunkColdStartCostRatio.toFixed(2)} ordinary appends (all passes, warm ones `
-      + `included: ${firstChunkColdStartCostRatios.map((value) => value.toFixed(2)).join(", ")})`,
-    ).toBeLessThan(APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT);
+    // The cold-start COST gates are not here, deliberately. Fourteen tests in this file build
+    // renderers before this one runs, so whatever the process pays once is already paid by the
+    // time the first pass is measured -- 4.05 in file order against 14.69 with the measurement
+    // alone in its own process. They live in
+    // `studio-live-dynamic-brush-overlay.cold-start.test.ts`, which vitest gives its own module
+    // process, and this mark pin stays because a count does not care how warm the process is.
 
     // A blow-up bound, not a budget. The worst single append is a pure noise measurement -- 30.1
     // to 45.8ms idle on this container, where the median append is 1.8ms, because one GC pause
@@ -2427,6 +1966,71 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       .toThrow(/its own mark delta/);
     expect(() => appendChunkCostRatio(honest, deltas.map(() => 210)))
       .toThrow(/at least eight complete cycles/);
+  });
+
+  it("cancels a mid-stroke machine-speed shift instead of reporting it as chunk growth", () => {
+    // The failure this calibration exists for: the runner gets busier partway through a
+    // several-second stroke. Every append in the late half costs more, the reference kernel timed
+    // beside each one costs proportionally more, and an uncalibrated comparison of raw `workMs`
+    // reports that shift as length dependence. Stated as data, so it needs no busy machine.
+    const APPENDS = 200;
+    const deltas: number[] = Array.from(
+      { length: APPENDS },
+      (_, index) => (index % 8 === 7 ? 1_740 : 210),
+    );
+    deltas[0] = 320;
+    const honest: StudioPerfCalibrationSample[] = Array.from({ length: APPENDS }, (_, index) => ({
+      referenceMs: 1,
+      workMs: index % 8 === 7 ? 13.4 : 1.13,
+    }));
+    expect(appendChunkGrowthRatio(honest, deltas)).toBeCloseTo(1, 6);
+
+    // The whole machine runs 1.7x slower from the midpoint on — work AND reference alike.
+    const SLOWDOWN = 1.7;
+    const drifted = honest.map((sample, index) => (index < APPENDS / 2 ? sample : {
+      referenceMs: sample.referenceMs * SLOWDOWN,
+      workMs: sample.workMs * SLOWDOWN,
+    }));
+    expect(appendChunkGrowthRatio(drifted, deltas)).toBeCloseTo(1, 6);
+    expect(appendChunkGrowthRatio(drifted, deltas)).toBeLessThan(APPEND_CHUNK_GROWTH_LIMIT);
+    // ...where the uncalibrated form this replaced reported exactly the slowdown as growth, and
+    // 1.7 clears the 1.25 limit, so it would have failed healthy code on a runner that got busy.
+    const rawGrowth = (series: readonly StudioPerfCalibrationSample[]): number => {
+      const chunks = series.filter((_, index) => deltas[index]! > APPEND_CHUNK_MARK_THRESHOLD);
+      const half = Math.floor(chunks.length / 2);
+      const cheapest = (slice: readonly StudioPerfCalibrationSample[]) =>
+        Math.min(...slice.map((sample) => sample.workMs));
+      return cheapest(chunks.slice(half)) / cheapest(chunks.slice(0, half));
+    };
+    expect(rawGrowth(drifted)).toBeCloseTo(SLOWDOWN, 6);
+    expect(rawGrowth(drifted)).toBeGreaterThan(APPEND_CHUNK_GROWTH_LIMIT);
+
+    // And the converse: real length dependence on the chunk path is still convicted, because the
+    // reference kernel does NOT grow with it. This is the regression the gate is for.
+    const lengthDependent = honest.map((sample, index) => (
+      index >= APPENDS / 2 && index % 8 === 7
+        ? { ...sample, workMs: sample.workMs * 2 }
+        : sample
+    ));
+    expect(appendChunkGrowthRatio(lengthDependent, deltas)).toBeCloseTo(2, 6);
+    expect(appendChunkGrowthRatio(lengthDependent, deltas))
+      .toBeGreaterThan(APPEND_CHUNK_GROWTH_LIMIT);
+
+    // A drifting machine AND a real regression together still convict: the drift divides out and
+    // the regression does not.
+    const both = drifted.map((sample, index) => (
+      index >= APPENDS / 2 && index % 8 === 7
+        ? { ...sample, workMs: sample.workMs * 2 }
+        : sample
+    ));
+    expect(appendChunkGrowthRatio(both, deltas)).toBeCloseTo(2, 6);
+    expect(appendChunkGrowthRatio(both, deltas)).toBeGreaterThan(APPEND_CHUNK_GROWTH_LIMIT);
+
+    // A zero-length reference window is not a calibration.
+    expect(() => appendChunkGrowthRatio(
+      honest.map((sample) => ({ ...sample, referenceMs: 0 })),
+      deltas,
+    )).toThrow(/zero-length reference window/);
   });
 
   it("convicts a cold FIRST-CHUNK regression every other bound discards", () => {
@@ -2580,17 +2184,19 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(() => appendChunkGrowthRatio(honest.slice(0, 8), deltas.slice(0, 8)))
       .toThrow(/at least four chunk appends/);
 
-    // A 100ms cold start is convicted too, not only a catastrophe.
-    expect(appendColdStartCostRatio(
-      honest.map((sample, index) => (index === 0 ? { ...sample, workMs: 100 } : sample)),
+    // The sensitivity boundary, pinned from both sides so nobody credits this gate with more
+    // than it does. A single process-cold sample cannot be reduced, its loaded tail reaches 65.98
+    // on a 250%-oversubscribed box, and the limit has to clear that — so the smallest one-time
+    // cost this convicts is ~285ms against this fixture's 1.13ms ordinary append.
+    const withColdStart = (workMs: number) => appendColdStartCostRatio(
+      honest.map((sample, index) => (index === 0 ? { ...sample, workMs } : sample)),
       deltas,
-    )).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
-    // ...but a 60ms one is not, which is the sensitivity this reducer costs and is worth pinning
-    // so nobody credits the gate with more than it does.
-    expect(appendColdStartCostRatio(
-      honest.map((sample, index) => (index === 0 ? { ...sample, workMs: 60 } : sample)),
-      deltas,
-    )).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
+    );
+    expect(withColdStart(300)).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
+    expect(withColdStart(200)).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
+    // The regression it exists for is not a 100ms one, though: it is a first-use initialisation
+    // measured in hundreds of milliseconds or seconds, and that is convicted overwhelmingly.
+    expect(withColdStart(2_000)).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT * 7);
 
     // Not vacuous the other way: a uniformly 3x slower machine is not a cold-start regression.
     const slowBox = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 3 }));
