@@ -316,4 +316,78 @@ describe("studio impasto relief shading v1 (dli/paint MIT port)", () => {
     }
   });
 
+
+  /**
+   * An exact census of HEIGHT TAPS, which is the half of the per-pixel body the transcendental
+   * census above cannot see.
+   *
+   * The census above counts `Math` calls, so a body that got slower by re-reading the height
+   * buffer leaves every count green. The wall-clock gate in the sibling `.perf.test.ts` cannot
+   * cover it either, and that is structural rather than an oversight: it grades one ggx window
+   * against a thirty-call emboss window, so the shared pixel walk runs thirty times in the
+   * denominator and once in the numerator, and a walk regression moves that ratio in the
+   * ACQUITTING direction. Equal tiles do not fix it — equal pixel counts per window and equal
+   * window durations are mutually exclusive when the two bodies differ ~30x in cost.
+   *
+   * So the walk is graded here instead, with no clock at all: a counting Proxy over the input
+   * makes every indexed read observable, and the tap count per pixel is a fixed property of the
+   * algorithm on every machine. `ggx` takes 8 and `emboss-2tap` takes 2 — the "2tap" in its own
+   * name — verified exactly at 1x1, 6x5, 3x11 and 16x16, so the count is `pixels * taps` with no
+   * edge cases hiding in it.
+   *
+   * This CANNOT live in the timing file: a Proxy on the hot path deoptimises it, which is the
+   * same trap the `vi.spyOn` census set for the wall-clock gates (emboss 33.1ms -> 154.5ms per 30
+   * passes, surviving `mockRestore`). Vitest isolates modules per file, and that is the
+   * enforcement.
+   */
+  it("takes exactly eight height taps per ggx pixel and two per emboss pixel", () => {
+    const countHeightTaps = (
+      width: number,
+      height: number,
+      quality: (typeof QUALITIES)[number],
+    ): number => {
+      const raw = new Float32Array(width * height);
+      for (let index = 0; index < raw.length; index += 1) {
+        raw[index] = studioOssUnitHash(0x5eed, index);
+      }
+      let taps = 0;
+      const counting = new Proxy(raw, {
+        get(target, property) {
+          if (typeof property === "string" && /^\d+$/.test(property)) taps += 1;
+          // Bound to the TARGET, not the proxy: `TypedArray.prototype.length` and friends read an
+          // internal slot a Proxy does not have, and would throw on the proxy as receiver.
+          const value = Reflect.get(target, property);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      const shaded = computeStudioImpastoReliefShading(
+        counting as unknown as Float32Array,
+        { width, height, quality },
+      );
+      expect(shaded.length).toBe(width * height);
+      return taps;
+    };
+
+    // Exact, and exactly linear in the pixel count — including the degenerate 1x1 tile and a
+    // non-square one, so no border special-case is hiding an extra read.
+    for (const [width, height] of [[1, 1], [6, 5], [3, 11], [16, 16]] as const) {
+      expect(
+        countHeightTaps(width, height, "ggx"),
+        `ggx height taps on ${width}x${height}`,
+      ).toBe(width * height * 8);
+      expect(
+        countHeightTaps(width, height, "emboss-2tap"),
+        `emboss height taps on ${width}x${height}`,
+      ).toBe(width * height * 2);
+    }
+
+    // The regression this exists for, stated as the arithmetic rather than left implicit: ONE
+    // extra shared height lookup per pixel moves both counts by exactly the pixel count, and the
+    // assertions above are equalities, so it cannot pass. The wall-clock ratio next door would
+    // move the wrong way on the same change — the emboss window would gain thirty taps per pixel
+    // to the ggx window's one — which is why this gate is a count and not a clock.
+    const PIXELS = 16 * 16;
+    expect(PIXELS * 8 + PIXELS).not.toBe(PIXELS * 8);
+    expect(PIXELS * 2 + PIXELS).not.toBe(PIXELS * 2);
+  });
 });

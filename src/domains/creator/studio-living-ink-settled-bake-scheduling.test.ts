@@ -29,6 +29,25 @@ import type { WatercolorBrushDab } from "./brush/studio-watercolor-brush";
 
 /** Repo main-thread freeze budget per chunk (docs/toonstudio quality gates). */
 const CHUNK_FREEZE_BUDGET_MS = 33;
+
+/**
+ * The cheapest TICK-BEARING slice, which is not the same thing as the cheapest slice.
+ *
+ * Slice 0 carries planner-cap seeding and can exhaust the slicer's own 8ms wall budget before a
+ * single solver tick runs — measured at 13.09ms against an interior of 8.42-9.93ms and a final
+ * lowering slice of 15.48ms. It is therefore not evidence about per-tick cost, and leaving it in
+ * the population lets it RESCUE this gate: if every solver tick regressed to 100ms, the seed-only
+ * slice would still be the minimum, the minimum would still clear 33ms, and the ceiling would
+ * still clear 400ms, so two dozen user-visible 100ms stalls would ship green.
+ *
+ * Pure, so that rescue can be pinned as data rather than waited for on a machine.
+ */
+function settledBakeTickSliceFloorMs(sliceDurations: readonly number[]): number {
+  if (sliceDurations.length < 2) {
+    throw new Error("A sliced solve needs a seeding slice and at least one tick-bearing slice.");
+  }
+  return Math.min(...sliceDurations.slice(1));
+}
 /*
  * There is no longer a `process.env.CI ? 80 : 33` wall limit. That split handed the busiest
  * machines the loosest gate — exactly backwards — and off CI it took the strict 33ms arm and
@@ -186,6 +205,59 @@ describe("deterministic settled-bake memo cache", () => {
   });
 });
 
+describe("settledBakeTickSliceFloorMs", () => {
+  // The recorded slice series, in order, from this file's own gate on an idle container: a
+  // seeding slice, eleven tick-bearing slices, and the final lowering slice.
+  const HONEST = [
+    13.09, 9.93, 11.68, 9.42, 8.63, 8.42, 9.08, 9.17, 9.49, 9.44, 9.57, 9.80, 15.48,
+  ] as const;
+
+  it("reads the cheapest tick-bearing slice, not the cheapest slice", () => {
+    expect(settledBakeTickSliceFloorMs([...HONEST])).toBeCloseTo(8.42, 2);
+    expect(settledBakeTickSliceFloorMs([...HONEST])).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+    // Excluding the seeding slice costs the honest reading almost nothing: it was never the
+    // minimum to begin with, because seeding is more expensive than a tick, not less.
+    expect(settledBakeTickSliceFloorMs([...HONEST]) - Math.min(...HONEST)).toBeLessThan(0.01);
+  });
+
+  it("cannot be rescued by the seed-only slice when every tick regresses", () => {
+    // Codex's case: seeding is untouched, and every solver tick regresses to ~100ms. A tick is
+    // indivisible, so the slicer's 8ms wall budget cannot subdivide it — every tick-bearing slice
+    // becomes one 100ms stall, and the user sees a dozen of them.
+    const regressed = HONEST.map((duration, index) => (index === 0 ? duration : duration + 91));
+    expect(settledBakeTickSliceFloorMs(regressed)).toBeGreaterThan(CHUNK_FREEZE_BUDGET_MS);
+
+    // ...and here is what acquitted it before, which is the whole reason for the exclusion.
+    // The minimum over ALL slices is the untouched 13.09ms seeding slice.
+    expect(Math.min(...regressed)).toBeCloseTo(13.09, 2);
+    expect(Math.min(...regressed)).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+    // The ceiling acquits it too — every slice is far under 400ms — so nothing else in this file
+    // covers the case.
+    expect(Math.max(...regressed)).toBeLessThan(400);
+  });
+
+  it("still convicts a collapse to one slice, and still acquits an honest slow machine", () => {
+    // Slicing broken entirely: seeding, then one slice carrying the whole solve.
+    expect(settledBakeTickSliceFloorMs([13.09, 171])).toBeGreaterThan(CHUNK_FREEZE_BUDGET_MS);
+    // A box 3.4x slower across the board still passes, because every slice is wall-clock bounded
+    // from the inside — the slicer's budget is the invariant, not the machine's speed.
+    expect(settledBakeTickSliceFloorMs(HONEST.map((duration) => duration * 3.4)))
+      .toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+    // A phase-specific blow-up in the FINAL lowering slice is not this statistic's job — it is
+    // the ceiling's, and the two are kept separate rather than overlapping.
+    const lowered = HONEST.map((duration, index) => (index === HONEST.length - 1
+      ? duration + 500
+      : duration));
+    expect(settledBakeTickSliceFloorMs(lowered)).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+    expect(Math.max(...lowered)).toBeGreaterThan(400);
+  });
+
+  it("is not evidence of anything without a tick-bearing slice", () => {
+    expect(() => settledBakeTickSliceFloorMs([13.09])).toThrow(/at least one tick-bearing slice/);
+    expect(() => settledBakeTickSliceFloorMs([])).toThrow(/at least one tick-bearing slice/);
+  });
+});
+
 describe("time-sliced settled bake at the planner cap", () => {
   it("keeps every main-thread slice under the 33ms chunk freeze budget and matches the synchronous bytes", () => {
     // 1. Synchronous reference (what SVG export computes) at the planner cap.
@@ -323,11 +395,17 @@ describe("time-sliced settled bake at the planner cap", () => {
       // it while every other slice stays at its 8ms budget. That case is the ceiling's job below,
       // which is why the ceiling is sized against the observed noise population rather than left
       // as a token hang bound.
+      //
+      // ...over the TICK-BEARING slices. The seeding slice is excluded because it can exhaust the
+      // slicer's budget before running a tick and so is not evidence about per-tick cost; see
+      // `settledBakeTickSliceFloorMs`. Excluding it costs this reading almost nothing — 8.06 to
+      // 8.42ms on the recorded series — and closes the case where it rescues the whole gate.
+      const tickFloorMs = settledBakeTickSliceFloorMs(sliceDurations);
       expect(
-        ordered[0],
-        `cheapest slice over the ${CHUNK_FREEZE_BUDGET_MS}ms freeze budget: [${ordered
-          .map((duration) => duration.toFixed(1))
-          .join(", ")}]`,
+        tickFloorMs,
+        `cheapest tick-bearing slice over the ${CHUNK_FREEZE_BUDGET_MS}ms freeze budget: `
+        + `[${ordered.map((duration) => duration.toFixed(1)).join(", ")}] `
+        + `(seeding slice ${sliceDurations[0]!.toFixed(1)}ms excluded)`,
       ).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
       // Slicing actually happened — the async path ran at all, rather than the request having
       // been served some other way.
