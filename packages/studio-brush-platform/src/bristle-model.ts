@@ -614,6 +614,93 @@ export function reloadBristleBrush(state: BristleBrushState, load = 1): void {
   }
 }
 
+/**
+ * Everything `stepBristles` carries from one sample to the next.
+ *
+ * The tuft is a forward simulation: a step reads this and the incoming sample, and nothing else.
+ * A caller marching a long planned stroke can therefore stop on a sample it knows will not move,
+ * keep this, and resume from it rather than replaying the stroke from the first sample — which is
+ * what the oil ribbon carrier does on every pointer frame.
+ *
+ * Deliberately NOT included: `contactX/Y/Radius/Alpha`. Every step writes all four for every hair
+ * before anything reads them, so they carry nothing across a boundary. `layout`, `config` and
+ * `clumpDirection` are fixed at construction and shared rather than copied.
+ */
+export interface BristleBrushCarry {
+  readonly ink: Float64Array;
+  readonly spread: number;
+  readonly splitDrive: number;
+  readonly x: number;
+  readonly y: number;
+  readonly tangentX: number;
+  readonly tangentY: number;
+  readonly normalX: number;
+  readonly normalY: number;
+  readonly tiltX: number;
+  readonly tiltY: number;
+  readonly pressure: number;
+  readonly arcLengthPx: number;
+  readonly tMs: number;
+  readonly stepCount: number;
+  readonly lastDeposited: number;
+  readonly totalDeposited: number;
+}
+
+/** Snapshot the simulation state. The ink array is copied; the caller owns the result. */
+export function captureBristleBrushCarry(state: BristleBrushState): BristleBrushCarry {
+  return {
+    ink: state.ink.slice(),
+    spread: state.spread,
+    splitDrive: state.splitDrive,
+    x: state.x,
+    y: state.y,
+    tangentX: state.tangentX,
+    tangentY: state.tangentY,
+    normalX: state.normalX,
+    normalY: state.normalY,
+    tiltX: state.tiltX,
+    tiltY: state.tiltY,
+    pressure: state.pressure,
+    arcLengthPx: state.arcLengthPx,
+    tMs: state.tMs,
+    stepCount: state.stepCount,
+    lastDeposited: state.lastDeposited,
+    totalDeposited: state.totalDeposited,
+  };
+}
+
+/**
+ * Put a brush back into a captured state. The carry must come from a brush built with the same
+ * config — a differing hair count is rejected rather than silently truncated.
+ */
+export function restoreBristleBrushCarry(
+  state: BristleBrushState,
+  carry: BristleBrushCarry,
+): void {
+  if (carry.ink.length !== state.ink.length) {
+    throw new BristleModelError(
+      `carry has ${carry.ink.length} hairs, brush has ${state.ink.length}`,
+    );
+  }
+  state.ink.set(carry.ink);
+  state.spread = carry.spread;
+  state.splitDrive = carry.splitDrive;
+  state.x = carry.x;
+  state.y = carry.y;
+  state.tangentX = carry.tangentX;
+  state.tangentY = carry.tangentY;
+  state.normalX = carry.normalX;
+  state.normalY = carry.normalY;
+  state.tiltX = carry.tiltX;
+  state.tiltY = carry.tiltY;
+  state.pressure = carry.pressure;
+  state.arcLengthPx = carry.arcLengthPx;
+  state.stepCount = carry.stepCount;
+  state.tMs = carry.tMs;
+  state.lastDeposited = carry.lastDeposited;
+  state.totalDeposited = carry.totalDeposited;
+}
+
 /** Lift the brush: fan relaxes, contact clears, ink is kept. */
 export function resetBristleStroke(state: BristleBrushState): void {
   state.spread = 0;

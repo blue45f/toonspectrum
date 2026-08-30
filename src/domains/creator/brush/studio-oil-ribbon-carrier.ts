@@ -13,6 +13,7 @@ import {
 } from "../studio-impasto-relief-shading-v1";
 
 import {
+  StudioBristlePhysicsOilPlanner,
   planStudioBristlePhysicsOil,
   type StudioBristlePhysicsOilPlan,
 } from "./studio-bristle-physics-oil-v1";
@@ -1303,6 +1304,11 @@ function tuftRestRadiusIsFrozen(
 function planBristlePhysics(
   stations: readonly OilCarrierStation[],
   options: StudioOilRibbonCarrierBristlePhysicsOptions,
+  /**
+   * Live stroke only: a retained tuft plus the station prefix this planner has already proven
+   * byte-identical. Absent (batch, export, settle) simulates the whole stroke as before.
+   */
+  resume?: { readonly planner: StudioBristlePhysicsOilPlanner; readonly settled: number },
 ): StudioBristlePhysicsOilPlan | undefined {
   if (stations.length < 2) return undefined;
   const laneCount = resolveBristleCount(stations);
@@ -1310,7 +1316,7 @@ function planBristlePhysics(
   const pressures = options.pressures && options.pressures.length > 0
     ? options.pressures
     : stations.map((station) => pressureProxyFromStationOpacity(station.opacity));
-  return planStudioBristlePhysicsOil({
+  const input = {
     stationXs: stations.map((station) => station.x),
     stationYs: stations.map((station) => station.y),
     laneCount,
@@ -1330,7 +1336,12 @@ function planBristlePhysics(
     ...(options.initialLoad !== undefined
       ? { initialLoad: options.initialLoad }
       : {}),
-  });
+  };
+  // One construction site for the input, so the resumable path cannot be fed a different stroke
+  // than the batch path would have been.
+  return resume
+    ? resume.planner.plan(input, resume.settled)
+    : planStudioBristlePhysicsOil(input);
 }
 
 function planLoadDynamics(
@@ -2076,6 +2087,12 @@ export class StudioOilRibbonCarrierPlanner {
    * is byte-stable under an append and is kept across pointer frames.
    */
   private readonly loadDynamics = new StudioOilBristleLoadDynamicsPlanner();
+  /**
+   * Retained bristle-physics tuft. Causal in the station index once the rest-radius anchor is
+   * frozen (`restRadiusAnchor`), which is what lets the already-drawn hairs stop being
+   * re-simulated on every pointer frame.
+   */
+  private readonly bristlePhysics = new StudioBristlePhysicsOilPlanner();
 
   /** Runs reused from the previous call. Diagnostics and identity tests only. */
   get reusedRuns(): number {
@@ -2097,6 +2114,7 @@ export class StudioOilRibbonCarrierPlanner {
     this.lastSettledStations = 0;
     this.lastBristleCount = -1;
     this.loadDynamics.reset();
+    this.bristlePhysics.reset();
   }
 
   plan(
@@ -2128,6 +2146,7 @@ export class StudioOilRibbonCarrierPlanner {
       this.runsByHair = [];
       // Same reason: the retained march holds stationCount x laneCount doubles.
       this.loadDynamics.reset();
+      this.bristlePhysics.reset();
     }
 
     const settledGeometry = Math.max(0, identical - OIL_GEOMETRY_SMOOTHING_RADIUS);
@@ -2146,7 +2165,14 @@ export class StudioOilRibbonCarrierPlanner {
       : undefined;
     const bristlePhysicsOptions = options?.bristlePhysics;
     const physics = !bodyOnly && bristlePhysicsOptions?.enabled === true
-      ? planBristlePhysics(stations, bristlePhysicsOptions)
+      ? planBristlePhysics(stations, bristlePhysicsOptions, {
+        planner: this.bristlePhysics,
+        // The tuft may only resume where its own anchor has stopped moving. Below the window the
+        // anchor is still a running mean, so the settled station prefix is not a settled tuft.
+        settled: tuftRestRadiusIsFrozen(stations, bristlePhysicsOptions.restRadiusAnchor)
+          ? settledStations
+          : 0,
+      })
       : undefined;
     const impastoReliefLanes = !bodyOnly && options?.impastoRelief?.enabled === true
       ? planImpastoReliefOverlayLanes(stations)

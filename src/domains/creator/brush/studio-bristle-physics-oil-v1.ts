@@ -32,8 +32,11 @@
  */
 
 import {
+  captureBristleBrushCarry,
   createBristleBrush,
+  restoreBristleBrushCarry,
   stepBristles,
+  type BristleBrushCarry,
   type BristleBrushConfig,
   type BristleBrushState,
 } from "../../../../packages/studio-brush-platform/src/bristle-model";
@@ -243,6 +246,190 @@ function createPhysicsTuft(
   return state;
 }
 
+
+/** Output buffers one plan writes, one row per station. */
+interface PhysicsOilBuffers {
+  readonly laneOffsetRatio: Float64Array;
+  readonly laneLoadMultiplier: Float64Array;
+  readonly laneWidthScale: Float64Array;
+  readonly spread: Float64Array;
+  readonly splitDrive: Float64Array;
+  readonly inkRatio: Float64Array;
+}
+
+/**
+ * Everything the station march carries besides the tuft itself.
+ *
+ * `heldOffset` / `heldWidth` are hold-last lane geometry, so they cross a station boundary and are
+ * part of the state; `groupOf` / `groupSize` are fixed by the hair-to-lane mapping; the four sums
+ * are per-station scratch, refilled before use.
+ */
+interface PhysicsOilMarch {
+  station: number;
+  previousX: number;
+  previousY: number;
+  readonly heldOffset: Float64Array;
+  readonly heldWidth: Float64Array;
+  readonly groupOf: Int32Array;
+  readonly groupSize: Float64Array;
+  readonly offsetSum: Float64Array;
+  readonly alphaSum: Float64Array;
+  readonly radiusSum: Float64Array;
+  readonly touchCount: Float64Array;
+}
+
+interface PhysicsOilMarchInputs {
+  readonly laneCount: number;
+  readonly bristleCount: number;
+  readonly baseRadiusPx: number;
+  readonly restBristleRadiusPx: number;
+  readonly fallbackPressure: number;
+  readonly tiltX: number;
+  readonly tiltY: number;
+  readonly explicitSpeeds: boolean;
+  readonly stationXs: readonly number[];
+  readonly stationYs: readonly number[];
+  readonly pressures?: readonly number[];
+  readonly speeds?: readonly number[];
+}
+
+function createPhysicsMarch(
+  state: BristleBrushState,
+  laneCount: number,
+  bristleCount: number,
+): PhysicsOilMarch {
+  // Hold-last lane state so a fully lifted lane keeps its geometry instead of
+  // snapping to the centreline; initialized at each group's rest centroid.
+  const heldOffset = new Float64Array(laneCount);
+  const heldWidth = new Float64Array(laneCount).fill(1);
+  const groupOf = new Int32Array(bristleCount);
+  const groupSize = new Float64Array(laneCount);
+  for (let hair = 0; hair < bristleCount; hair += 1) {
+    const lane = Math.min(laneCount - 1, Math.floor((hair * laneCount) / bristleCount));
+    groupOf[hair] = lane;
+    groupSize[lane]! += 1;
+    heldOffset[lane]! += state.layout[hair]!.restOffset;
+  }
+  for (let lane = 0; lane < laneCount; lane += 1) {
+    heldOffset[lane] = groupSize[lane]! > 0
+      ? clamp(heldOffset[lane]! / groupSize[lane]!, -MAX_OFFSET_RATIO, MAX_OFFSET_RATIO)
+      : 0;
+  }
+
+  const offsetSum = new Float64Array(laneCount);
+  const alphaSum = new Float64Array(laneCount);
+  const radiusSum = new Float64Array(laneCount);
+  const touchCount = new Float64Array(laneCount);
+  return {
+    station: 0,
+    previousX: 0,
+    previousY: 0,
+    heldOffset,
+    heldWidth,
+    groupOf,
+    groupSize,
+    offsetSum,
+    alphaSum,
+    radiusSum,
+    touchCount,
+  };
+}
+
+/**
+ * Advance the tuft to `until`, writing one output row per station.
+ *
+ * The one and only implementation of the march: the batch planner runs it once from station 0, the
+ * incremental planner runs it over two disjoint ranges. Two callers, one loop, so a resumed stroke
+ * cannot drift away from the batch answer.
+ */
+function marchPhysicsOil(
+  state: BristleBrushState,
+  march: PhysicsOilMarch,
+  buffers: PhysicsOilBuffers,
+  inputs: PhysicsOilMarchInputs,
+  until: number,
+): void {
+  const {
+    laneCount, bristleCount, baseRadiusPx, restBristleRadiusPx,
+    fallbackPressure, tiltX, tiltY, explicitSpeeds,
+  } = inputs;
+  // Only ever used as the fallback for a non-finite station, and a non-finite station 0 folds to
+  // 0 either way — so resuming from the last marched position is what the from-scratch march did.
+  let previousX = march.previousX;
+  let previousY = march.previousY;
+  for (let station = march.station; station < until; station += 1) {
+    // Carrier stations are finite by construction; a malformed caller value
+    // deterministically reuses the previous position instead of throwing.
+    const x = finiteNumber(inputs.stationXs[station], previousX);
+    const y = finiteNumber(inputs.stationYs[station], previousY);
+    previousX = x;
+    previousY = y;
+    const pressure = sampleSeries(inputs.pressures, station, fallbackPressure);
+    const report = stepBristles(state, {
+      x,
+      y,
+      pressure,
+      tiltX,
+      tiltY,
+      dtMs: STUDIO_BRISTLE_PHYSICS_OIL_STEP_MS,
+      ...(explicitSpeeds
+        ? {
+          velocity: sampleSeries(inputs.speeds, station, 0)
+            * STUDIO_BRISTLE_PHYSICS_OIL_SPEED_REF_PX_PER_MS,
+        }
+        : {}),
+    });
+    buffers.spread[station] = report.spread;
+    buffers.splitDrive[station] = report.splitDrive;
+    buffers.inkRatio[station] = report.inkRatio;
+
+    march.offsetSum.fill(0);
+    march.alphaSum.fill(0);
+    march.radiusSum.fill(0);
+    march.touchCount.fill(0);
+    for (let hair = 0; hair < bristleCount; hair += 1) {
+      const alpha = state.contactAlpha[hair]!;
+      if (alpha <= 0) continue;
+      const lane = march.groupOf[hair]!;
+      const lateral = (state.contactX[hair]! - x) * state.normalX
+        + (state.contactY[hair]! - y) * state.normalY;
+      march.offsetSum[lane]! += lateral * alpha;
+      march.alphaSum[lane]! += alpha;
+      march.radiusSum[lane]! += state.contactRadius[hair]!;
+      march.touchCount[lane]! += 1;
+    }
+
+    const rowOffset = station * laneCount;
+    for (let lane = 0; lane < laneCount; lane += 1) {
+      const touching = march.touchCount[lane]!;
+      if (touching > 0 && march.alphaSum[lane]! > 0) {
+        march.heldOffset[lane] = clamp(
+          march.offsetSum[lane]! / march.alphaSum[lane]! / baseRadiusPx,
+          -MAX_OFFSET_RATIO,
+          MAX_OFFSET_RATIO,
+        );
+        march.heldWidth[lane] = clamp(
+          march.radiusSum[lane]! / touching / restBristleRadiusPx,
+          WIDTH_SCALE_RANGE.min,
+          WIDTH_SCALE_RANGE.max,
+        );
+      }
+      buffers.laneOffsetRatio[rowOffset + lane] = march.heldOffset[lane]!;
+      buffers.laneWidthScale[rowOffset + lane] = march.heldWidth[lane]!;
+      // Lifted/dry hairs count as zero deposit: a starving lane thins honestly.
+      buffers.laneLoadMultiplier[rowOffset + lane] = clamp(
+        (march.alphaSum[lane]! / march.groupSize[lane]!) / REFERENCE_CONTACT_ALPHA,
+        0,
+        MAX_LOAD_MULTIPLIER,
+      );
+    }
+  }
+
+  march.station = Math.max(march.station, until);
+  march.previousX = previousX;
+  march.previousY = previousY;
+}
+
 /**
  * Plan one stroke's physics streams. Pure and deterministic — the sim state is
  * local to the call; identical input produces identical typed arrays.
@@ -282,116 +469,200 @@ export function planStudioBristlePhysicsOil(
     (state.config.coverage * state.config.baseRadiusPx)
     / Math.max(1, state.config.bristleCount - 1);
 
-  const laneOffsetRatio = new Float64Array(stationCount * laneCount);
-  const laneLoadMultiplier = new Float64Array(stationCount * laneCount);
-  const laneWidthScale = new Float64Array(stationCount * laneCount);
-  const spread = new Float64Array(stationCount);
-  const splitDrive = new Float64Array(stationCount);
-  const inkRatio = new Float64Array(stationCount);
-
-  // Hold-last lane state so a fully lifted lane keeps its geometry instead of
-  // snapping to the centreline; initialized at each group's rest centroid.
-  const heldOffset = new Float64Array(laneCount);
-  const heldWidth = new Float64Array(laneCount).fill(1);
-  const groupOf = new Int32Array(bristleCount);
-  const groupSize = new Float64Array(laneCount);
-  for (let hair = 0; hair < bristleCount; hair += 1) {
-    const lane = Math.min(laneCount - 1, Math.floor((hair * laneCount) / bristleCount));
-    groupOf[hair] = lane;
-    groupSize[lane]! += 1;
-    heldOffset[lane]! += state.layout[hair]!.restOffset;
-  }
-  for (let lane = 0; lane < laneCount; lane += 1) {
-    heldOffset[lane] = groupSize[lane]! > 0
-      ? clamp(heldOffset[lane]! / groupSize[lane]!, -MAX_OFFSET_RATIO, MAX_OFFSET_RATIO)
-      : 0;
-  }
-
-  const offsetSum = new Float64Array(laneCount);
-  const alphaSum = new Float64Array(laneCount);
-  const radiusSum = new Float64Array(laneCount);
-  const touchCount = new Float64Array(laneCount);
-
-  let previousX = finiteNumber(input.stationXs[0], 0);
-  let previousY = finiteNumber(input.stationYs[0], 0);
-  for (let station = 0; station < stationCount; station += 1) {
-    // Carrier stations are finite by construction; a malformed caller value
-    // deterministically reuses the previous position instead of throwing.
-    const x = finiteNumber(input.stationXs[station], previousX);
-    const y = finiteNumber(input.stationYs[station], previousY);
-    previousX = x;
-    previousY = y;
-    const pressure = sampleSeries(input.pressures, station, fallbackPressure);
-    const report = stepBristles(state, {
-      x,
-      y,
-      pressure,
-      tiltX,
-      tiltY,
-      dtMs: STUDIO_BRISTLE_PHYSICS_OIL_STEP_MS,
-      ...(explicitSpeeds
-        ? {
-          velocity: sampleSeries(input.speeds, station, 0)
-            * STUDIO_BRISTLE_PHYSICS_OIL_SPEED_REF_PX_PER_MS,
-        }
-        : {}),
-    });
-    spread[station] = report.spread;
-    splitDrive[station] = report.splitDrive;
-    inkRatio[station] = report.inkRatio;
-
-    offsetSum.fill(0);
-    alphaSum.fill(0);
-    radiusSum.fill(0);
-    touchCount.fill(0);
-    for (let hair = 0; hair < bristleCount; hair += 1) {
-      const alpha = state.contactAlpha[hair]!;
-      if (alpha <= 0) continue;
-      const lane = groupOf[hair]!;
-      const lateral = (state.contactX[hair]! - x) * state.normalX
-        + (state.contactY[hair]! - y) * state.normalY;
-      offsetSum[lane]! += lateral * alpha;
-      alphaSum[lane]! += alpha;
-      radiusSum[lane]! += state.contactRadius[hair]!;
-      touchCount[lane]! += 1;
-    }
-
-    const rowOffset = station * laneCount;
-    for (let lane = 0; lane < laneCount; lane += 1) {
-      const touching = touchCount[lane]!;
-      if (touching > 0 && alphaSum[lane]! > 0) {
-        heldOffset[lane] = clamp(
-          offsetSum[lane]! / alphaSum[lane]! / baseRadiusPx,
-          -MAX_OFFSET_RATIO,
-          MAX_OFFSET_RATIO,
-        );
-        heldWidth[lane] = clamp(
-          radiusSum[lane]! / touching / restBristleRadiusPx,
-          WIDTH_SCALE_RANGE.min,
-          WIDTH_SCALE_RANGE.max,
-        );
-      }
-      laneOffsetRatio[rowOffset + lane] = heldOffset[lane]!;
-      laneWidthScale[rowOffset + lane] = heldWidth[lane]!;
-      // Lifted/dry hairs count as zero deposit: a starving lane thins honestly.
-      laneLoadMultiplier[rowOffset + lane] = clamp(
-        (alphaSum[lane]! / groupSize[lane]!) / REFERENCE_CONTACT_ALPHA,
-        0,
-        MAX_LOAD_MULTIPLIER,
-      );
-    }
-  }
+  const buffers: PhysicsOilBuffers = {
+    laneOffsetRatio: new Float64Array(stationCount * laneCount),
+    laneLoadMultiplier: new Float64Array(stationCount * laneCount),
+    laneWidthScale: new Float64Array(stationCount * laneCount),
+    spread: new Float64Array(stationCount),
+    splitDrive: new Float64Array(stationCount),
+    inkRatio: new Float64Array(stationCount),
+  };
+  const march = createPhysicsMarch(state, laneCount, bristleCount);
+  marchPhysicsOil(state, march, buffers, {
+    laneCount,
+    bristleCount,
+    baseRadiusPx,
+    restBristleRadiusPx,
+    fallbackPressure,
+    tiltX,
+    tiltY,
+    explicitSpeeds,
+    stationXs: input.stationXs,
+    stationYs: input.stationYs,
+    ...(input.pressures ? { pressures: input.pressures } : {}),
+    ...(input.speeds ? { speeds: input.speeds } : {}),
+  }, stationCount);
 
   return Object.freeze({
     version: STUDIO_BRISTLE_PHYSICS_OIL_V1_VERSION,
     stationCount,
     laneCount,
     bristleCount,
-    laneOffsetRatio,
-    laneLoadMultiplier,
-    laneWidthScale,
-    spread,
-    splitDrive,
-    inkRatio,
+    laneOffsetRatio: buffers.laneOffsetRatio,
+    laneLoadMultiplier: buffers.laneLoadMultiplier,
+    laneWidthScale: buffers.laneWidthScale,
+    spread: buffers.spread,
+    splitDrive: buffers.splitDrive,
+    inkRatio: buffers.inkRatio,
   });
+}
+
+/**
+ * Growing-stroke bristle physics: the plan `planStudioBristlePhysicsOil` returns, without
+ * re-simulating the hairs an append cannot have moved.
+ *
+ * The march is strictly causal — station k reads `stationXs[k]`, `stationYs[k]`, `pressures[k]`,
+ * `speeds[k]` and the tuft state station k-1 left behind, and never looks ahead. The one input
+ * that was NOT per-station is `baseRadiusPx`; the carrier now freezes it (see the ribbon carrier's
+ * `restRadiusAnchor`), so a byte-identical station prefix produces a byte-identical output prefix
+ * and a live stroke can resume the tuft instead of replaying it from station 0.
+ *
+ * The caller must have proven the prefix; this class only trusts it. Anything it cannot line up
+ * with the retained carry — a different lane or hair count, a moved anchor, tilt or a dial, a
+ * shrinking stroke, a series that no longer spans the stroke — falls back to a full march.
+ */
+export class StudioBristlePhysicsOilPlanner {
+  private key: string | null = null;
+  /** Stations whose tuft state is retained — the only point the march can resume from. */
+  private marched = 0;
+  private carry: BristleBrushCarry | null = null;
+  private heldOffset = new Float64Array(0);
+  private heldWidth = new Float64Array(0);
+  private previousX = 0;
+  private previousY = 0;
+  /** Output rows [0, marched), copied forward rather than recomputed. */
+  private buffers: PhysicsOilBuffers | null = null;
+
+  reset(): void {
+    this.key = null;
+    this.marched = 0;
+    this.carry = null;
+    this.heldOffset = new Float64Array(0);
+    this.heldWidth = new Float64Array(0);
+    this.previousX = 0;
+    this.previousY = 0;
+    this.buffers = null;
+  }
+
+  /**
+   * `settled` is how many LEADING stations the caller has proven byte-identical to the previous
+   * call. Passing 0 is always correct and simply re-marches everything.
+   */
+  plan(
+    input: StudioBristlePhysicsOilInput,
+    settled: number,
+  ): StudioBristlePhysicsOilPlan {
+    const laneCount = Number.isInteger(input.laneCount) && input.laneCount > 0
+      ? input.laneCount
+      : 0;
+    const bristleCount = Math.max(laneCount, normalizedBristleCount(input.bristleCount));
+    const stationCount = Math.min(
+      Array.isArray(input.stationXs) ? input.stationXs.length : 0,
+      Array.isArray(input.stationYs) ? input.stationYs.length : 0,
+    );
+    if (stationCount === 0 || laneCount === 0 || bristleCount > 512) {
+      this.reset();
+      return planStudioBristlePhysicsOil(input);
+    }
+
+    const fallbackPressure = finite01(input.fallbackPressure, FALLBACK_PRESSURE);
+    const initialLoad = finite01(input.initialLoad, 1);
+    const tiltX = clamp(finiteNumber(input.tiltX, 0), -1, 1);
+    const tiltY = clamp(finiteNumber(input.tiltY, 0), -1, 1);
+    const baseRadiusPx = clamp(finiteNumber(input.baseRadiusPx, 14), 0.25, 512);
+
+    // A series shorter than the stroke is held at its last value by `sampleSeries`, so an
+    // already-marched station would read a number that moves as the stroke grows.
+    const spans = (series: readonly number[] | undefined): boolean =>
+      series === undefined || series.length === 0 || series.length >= stationCount;
+    // `baseRadiusPx` is in the key on purpose: it decides the tuft layout, so a moved anchor
+    // invalidates the carry even though every published stream divides it back out.
+    const key = `${laneCount}|${bristleCount}|${input.seed}|${baseRadiusPx}|${initialLoad}`
+      + `|${fallbackPressure}|${tiltX}|${tiltY}|${input.speeds === undefined}`;
+    const canResume = spans(input.pressures)
+      && spans(input.speeds)
+      && this.marched > 0
+      && this.marched <= stationCount
+      && settled >= this.marched
+      && this.key === key
+      && this.carry !== null
+      && this.buffers !== null;
+
+    const state = createPhysicsTuft(bristleCount, input.seed, baseRadiusPx, initialLoad);
+    const restBristleRadiusPx =
+      (state.config.coverage * state.config.baseRadiusPx)
+      / Math.max(1, state.config.bristleCount - 1);
+    const explicitSpeeds = Array.isArray(input.speeds) && input.speeds.length > 0;
+
+    const buffers: PhysicsOilBuffers = {
+      laneOffsetRatio: new Float64Array(stationCount * laneCount),
+      laneLoadMultiplier: new Float64Array(stationCount * laneCount),
+      laneWidthScale: new Float64Array(stationCount * laneCount),
+      spread: new Float64Array(stationCount),
+      splitDrive: new Float64Array(stationCount),
+      inkRatio: new Float64Array(stationCount),
+    };
+    const march = createPhysicsMarch(state, laneCount, bristleCount);
+
+    if (canResume) {
+      const reusable = this.marched;
+      const previous = this.buffers!;
+      restoreBristleBrushCarry(state, this.carry!);
+      march.heldOffset.set(this.heldOffset);
+      march.heldWidth.set(this.heldWidth);
+      march.station = reusable;
+      march.previousX = this.previousX;
+      march.previousY = this.previousY;
+      buffers.laneOffsetRatio.set(previous.laneOffsetRatio.subarray(0, reusable * laneCount));
+      buffers.laneLoadMultiplier.set(previous.laneLoadMultiplier.subarray(0, reusable * laneCount));
+      buffers.laneWidthScale.set(previous.laneWidthScale.subarray(0, reusable * laneCount));
+      buffers.spread.set(previous.spread.subarray(0, reusable));
+      buffers.splitDrive.set(previous.splitDrive.subarray(0, reusable));
+      buffers.inkRatio.set(previous.inkRatio.subarray(0, reusable));
+    }
+
+    const marchInputs = {
+      laneCount,
+      bristleCount,
+      baseRadiusPx,
+      restBristleRadiusPx,
+      fallbackPressure,
+      tiltX,
+      tiltY,
+      explicitSpeeds,
+      stationXs: input.stationXs,
+      stationYs: input.stationYs,
+      ...(input.pressures ? { pressures: input.pressures } : {}),
+      ...(input.speeds ? { speeds: input.speeds } : {}),
+    };
+
+    // Advance the retained march to this frame's settled boundary and snapshot the tuft there,
+    // then run the unsettled tail. Only the settled part is promoted, so the next frame always
+    // resumes from a boundary the caller has proven.
+    const boundary = Math.max(march.station, Math.min(settled, stationCount));
+    marchPhysicsOil(state, march, buffers, marchInputs, boundary);
+    this.key = key;
+    this.marched = march.station;
+    this.carry = captureBristleBrushCarry(state);
+    this.heldOffset = march.heldOffset.slice();
+    this.heldWidth = march.heldWidth.slice();
+    this.previousX = march.previousX;
+    this.previousY = march.previousY;
+    this.buffers = buffers;
+
+    marchPhysicsOil(state, march, buffers, marchInputs, stationCount);
+
+    return Object.freeze({
+      version: STUDIO_BRISTLE_PHYSICS_OIL_V1_VERSION,
+      stationCount,
+      laneCount,
+      bristleCount,
+      laneOffsetRatio: buffers.laneOffsetRatio,
+      laneLoadMultiplier: buffers.laneLoadMultiplier,
+      laneWidthScale: buffers.laneWidthScale,
+      spread: buffers.spread,
+      splitDrive: buffers.splitDrive,
+      inkRatio: buffers.inkRatio,
+    });
+  }
 }
