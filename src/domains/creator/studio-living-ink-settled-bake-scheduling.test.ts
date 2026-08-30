@@ -54,13 +54,32 @@ function settledBakeTickSliceFloorMs(sliceDurations: readonly number[]): number 
     throw new Error("A sliced solve needs at least a seeding slice and a lowering slice.");
   }
   const tickBearing = sliceDurations.slice(1, -1);
-  // Nothing between the two phase-only ends means slicing COLLAPSED: seeding, then one slice
-  // carrying every tick and the lowering together. That is among the regressions this gate exists
-  // for, so it is convicted rather than excused — and convicting is why this returns a value
-  // instead of throwing, since a throw would report a broken fixture where the truth is a broken
-  // slicer.
-  if (tickBearing.length === 0) return Number.POSITIVE_INFINITY;
+  // Nothing between the two phase-only ends means the ticks and the lowering shared ONE slice.
+  // That slice is not evidence about per-tick cost in isolation, but it still BOUNDS it: every
+  // tick ran inside it, so if it clears the freeze budget then so did each tick. Returning its
+  // duration is therefore the honest reduction — it convicts a slicer that collapsed into one
+  // long stall, and it acquits the legitimately fast case where every tick fits in a single 8ms
+  // slice, which an unconditional `Infinity` failed on healthy code.
+  if (tickBearing.length === 0) return sliceDurations[sliceDurations.length - 1]!;
   return Math.min(...tickBearing);
+}
+
+/**
+ * The LOWERING slice's cost, in units of one tick-bearing slice.
+ *
+ * `deriveAugmentedSettledDabs` gets its own slice and runs no tick, so the tick floor above
+ * excludes it by construction — and a phase with exactly ONE member per run is the single shape
+ * no order statistic over slices can ever reach. Its only other cover is the 400ms ceiling, which
+ * a regression from ~15ms to 100-300ms clears while visibly freezing the main thread.
+ *
+ * Graded against the tick floor of the SAME run rather than a millisecond count: both are slices
+ * of one solve on one machine, seconds apart at most, so machine speed divides out. The
+ * denominator is the slicer's own 8ms budget, the most stable number this file has.
+ */
+function settledBakeLoweringSliceRatio(sliceDurations: readonly number[]): number {
+  const floorMs = settledBakeTickSliceFloorMs(sliceDurations);
+  if (!(floorMs > 0)) throw new Error("A tick slice that costs nothing is not a denominator.");
+  return sliceDurations[sliceDurations.length - 1]! / floorMs;
 }
 /*
  * There is no longer a `process.env.CI ? 80 : 33` wall limit. That split handed the busiest
@@ -219,6 +238,100 @@ describe("deterministic settled-bake memo cache", () => {
   });
 });
 
+describe("the lowering slice carries its own budget", () => {
+  /**
+   * A single sliced solve yields exactly ONE lowering slice, and one sample cannot be reduced.
+   * Measured that way it swings 14.46-41.76ms idle and 30.13-101.16ms under six spinning hogs on
+   * four cores — a 7x spread, because `deriveAugmentedSettledDabs` allocates the whole augmented
+   * plan and a collection landing inside it is charged to the phase.
+   *
+   * So the solve is repeated and the CHEAPEST run's ratio is taken. This is a cost, whose noise
+   * is one-sided — contention only ever adds — so the minimum is the honest reducer, the same
+   * statistic the tick floor and the crayon-family CPU budget use for the same reason.
+   */
+  const LOWERING_RUNS = 5;
+  const LOWERING_RATIO_LIMIT = 4.5;
+
+  it("keeps the final lowering slice within a few tick slices, not merely under the ceiling", () => {
+    const ratios: number[] = [];
+    for (let run = 0; run < LOWERING_RUNS; run += 1) {
+      resetStudioLivingInkSettledBakeCacheForTests();
+      const scheduler = captureScheduledSlices();
+      try {
+        let readyCount = 0;
+        const immediate = requestStudioLivingInkSettledBakeDabs(
+          makePlan(PLANNER_DAB_CAP / 2),
+          SETTLED_SUMI,
+          () => { readyCount += 1; },
+        );
+        expect(immediate).toBeNull();
+        const sliceDurations: number[] = [];
+        for (let slice = 0; slice < 200 && readyCount === 0; slice += 1) {
+          const elapsed = scheduler.runNextSlice();
+          expect(elapsed).not.toBeNull();
+          sliceDurations.push(elapsed ?? 0);
+        }
+        expect(readyCount).toBe(1);
+        expect(sliceDurations.length).toBeGreaterThan(2);
+        ratios.push(settledBakeLoweringSliceRatio(sliceDurations));
+      } finally {
+        scheduler.restore();
+      }
+    }
+    resetStudioLivingInkSettledBakeCacheForTests();
+
+    // Recorded cheapest-of-5: 1.151 / 1.662 / 1.741 idle and 1.712 / 2.237 / 2.239 under six
+    // spinning hogs on four cores. The per-run spread behind those is wide — individual runs read
+    // 1.15-2.73 idle and 1.71-4.97 loaded — which is exactly why the minimum is taken rather than
+    // any single run.
+    //
+    // 4.5 carries 2x headroom over the worst honest reading, while the regression this exists for
+    // — lowering at 100ms against an 8.4ms tick floor — reads 11.9 and is convicted with 2.6x
+    // margin. The 400ms ceiling acquits that same case entirely, and the tick floor excludes the
+    // slice by construction.
+    const cheapest = Math.min(...ratios);
+    expect(
+      cheapest,
+      `cheapest lowering slice costs ${cheapest.toFixed(2)} tick slices `
+      + `(all runs: ${ratios.map((value) => value.toFixed(2)).join(", ")})`,
+    ).toBeLessThan(LOWERING_RATIO_LIMIT);
+  });
+
+  it("convicts the lowering regression every other statistic here discards", () => {
+    // Codex's case as data: ticks honest, lowering alone at 100ms.
+    const honest = [13.09, 9.93, 11.68, 9.42, 8.63, 8.42, 9.08, 9.17, 9.49, 9.44, 9.57, 9.80, 15.48];
+    expect(settledBakeLoweringSliceRatio(honest)).toBeCloseTo(1.84, 1);
+    expect(settledBakeLoweringSliceRatio(honest)).toBeLessThan(LOWERING_RATIO_LIMIT);
+
+    const loweringStall = honest.map((duration, index) => (index === honest.length - 1
+      ? 100
+      : duration));
+    expect(settledBakeLoweringSliceRatio(loweringStall)).toBeGreaterThan(LOWERING_RATIO_LIMIT);
+    // ...and every bound that lets it through, which is why this gate exists.
+    expect(settledBakeTickSliceFloorMs(loweringStall)).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+    expect(Math.max(...loweringStall)).toBeLessThan(400);
+    expect(Math.min(...loweringStall)).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+
+    // The smallest lowering regression still convicted, so this is a budget and not a blow-up bound.
+    const atLimit = honest.map((duration, index) => (index === honest.length - 1 ? 38 : duration));
+    expect(settledBakeLoweringSliceRatio(atLimit)).toBeGreaterThan(LOWERING_RATIO_LIMIT);
+    const underLimit = honest.map((duration, index) => (index === honest.length - 1 ? 37 : duration));
+    expect(settledBakeLoweringSliceRatio(underLimit)).toBeLessThan(LOWERING_RATIO_LIMIT);
+
+    // A machine 3.4x slower moves both sides together and changes nothing.
+    expect(settledBakeLoweringSliceRatio(honest.map((duration) => duration * 3.4)))
+      .toBeCloseTo(settledBakeLoweringSliceRatio(honest), 6);
+
+    // A TICK regression is not this statistic's job — it inflates the denominator, so this ratio
+    // falls while the tick floor convicts. The two cover disjoint phases rather than overlapping.
+    const tickStall = honest.map((duration, index) => (index === 0 || index === honest.length - 1
+      ? duration
+      : duration + 91));
+    expect(settledBakeLoweringSliceRatio(tickStall)).toBeLessThan(LOWERING_RATIO_LIMIT);
+    expect(settledBakeTickSliceFloorMs(tickStall)).toBeGreaterThan(CHUNK_FREEZE_BUDGET_MS);
+  });
+});
+
 describe("settledBakeTickSliceFloorMs", () => {
   // The recorded slice series, in order, from this file's own gate on an idle container: a
   // seeding slice, eleven tick-bearing slices, and the final lowering slice.
@@ -279,8 +392,14 @@ describe("settledBakeTickSliceFloorMs", () => {
 
   it("still convicts a collapse to one slice, and still acquits an honest slow machine", () => {
     // Slicing broken entirely: seeding, then one slice carrying every tick and the lowering.
-    // No tick-bearing slice survives the exclusion, which is a conviction and not a bad fixture.
+    // No tick-bearing slice survives the exclusion, so that combined slice is graded directly —
+    // it bounds every tick inside it — and at 171ms it is convicted.
     expect(settledBakeTickSliceFloorMs([13.09, 171])).toBeGreaterThan(CHUNK_FREEZE_BUDGET_MS);
+    // ...and the converse, which an unconditional `Infinity` used to fail on healthy code: a
+    // solver fast enough to finish all 24 ticks inside one 8ms slice legitimately produces two
+    // slices, and that run has no freeze in it. It needs a ~12x speedup to occur, so this is a
+    // guard against a future optimisation being greeted by a red test, not a live case.
+    expect(settledBakeTickSliceFloorMs([13.09, 22.4])).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
     // A box 3.4x slower across the board still passes, because every slice is wall-clock bounded
     // from the inside — the slicer's budget is the invariant, not the machine's speed.
     expect(settledBakeTickSliceFloorMs(HONEST.map((duration) => duration * 3.4)))
@@ -299,10 +418,10 @@ describe("settledBakeTickSliceFloorMs", () => {
   it("is not evidence of anything without a tick-bearing slice", () => {
     expect(() => settledBakeTickSliceFloorMs([13.09])).toThrow(/seeding slice and a lowering/);
     expect(() => settledBakeTickSliceFloorMs([])).toThrow(/seeding slice and a lowering/);
-    // Seeding plus lowering with nothing between them is a collapsed slicer, not a bad fixture,
-    // so it is convicted rather than thrown on.
-    expect(settledBakeTickSliceFloorMs([13.09, 15.48]))
-      .toBeGreaterThan(CHUNK_FREEZE_BUDGET_MS);
+    // Seeding plus one combined slice is graded on that slice's own duration rather than thrown
+    // on: under budget it is a fast solve, over budget it is a collapsed slicer.
+    expect(settledBakeTickSliceFloorMs([13.09, 15.48])).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+    expect(settledBakeTickSliceFloorMs([13.09, 400])).toBeGreaterThan(CHUNK_FREEZE_BUDGET_MS);
   });
 });
 

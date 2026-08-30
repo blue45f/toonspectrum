@@ -580,19 +580,59 @@ function appendChunkGrowthRatio(
   if (chunks.length < 4) {
     throw new Error(`Chunk growth needs at least four chunk appends, got ${chunks.length}.`);
   }
-  const half = Math.floor(chunks.length / 2);
-  const cheapest = (slice: readonly StudioPerfCalibrationSample[]): number =>
-    Math.min(...slice.map((sample) => sample.workMs));
-  const early = cheapest(chunks.slice(0, half));
+  // Split by POSITION IN THE STROKE, and calibrate each half against the reference floor of that
+  // same stretch. This stroke runs for seconds, so a runner that gets busier partway through
+  // moves the two halves' raw milliseconds by different amounts, and a raw comparison reports
+  // that machine-speed shift as length growth.
+  //
+  // The machine-speed estimate is the cheapest reference window over EVERY append in the half —
+  // roughly ninety of them — not over the dozen chunks. That distinction is measured, not
+  // stylistic: a reference window is ~1ms, so its own noise is large next to the append it
+  // calibrates, and estimating it from the chunks alone injects more variance than the drift it
+  // removes. Reducing each half with `reduceStudioPerfCalibrationSamples` reads 0.5052-1.6583
+  // under load and pairing sample-by-sample reads 0.4002-1.1978, both worse than the uncalibrated
+  // form's 0.728-0.833; drawing the floor from all ninety appends is what makes calibration pay.
+  const half = Math.floor(samples.length / 2);
+  const referenceFloorMs = (from: number, to: number): number => {
+    let best = Number.POSITIVE_INFINITY;
+    for (let index = from; index < to; index += 1) {
+      best = Math.min(best, samples[index]!.referenceMs);
+    }
+    return best;
+  };
+  const chunkFloorMs = (from: number, to: number): number => {
+    let best = Number.POSITIVE_INFINITY;
+    for (let index = from; index < to; index += 1) {
+      if (markDeltas[index]! > APPEND_CHUNK_MARK_THRESHOLD) {
+        best = Math.min(best, samples[index]!.workMs);
+      }
+    }
+    return best;
+  };
+  const calibratedHalf = (from: number, to: number): number => {
+    const reference = referenceFloorMs(from, to);
+    const chunk = chunkFloorMs(from, to);
+    if (!(reference > 0)) {
+      throw new Error("A zero-length reference window cannot calibrate a chunk append.");
+    }
+    if (!Number.isFinite(chunk)) {
+      throw new Error("Chunk growth needs chunk appends in both halves of the stroke.");
+    }
+    return chunk / reference;
+  };
+  const early = calibratedHalf(0, half);
   if (!(early > 0)) throw new Error("An early chunk append that costs nothing is not a denominator.");
-  return cheapest(chunks.slice(half)) / early;
+  return calibratedHalf(half, samples.length) / early;
 }
 
 /**
- * Recorded 0.807 / 0.828 / 0.967 idle and 0.728 / 0.822 / 0.833 under six spinning hogs on four
- * cores — consistently below 1, because later chunks run on a warmer JIT. 1.25 carries 29%
- * headroom over the worst honest reading while a doubled late-chunk class (>=1.46) is convicted
- * with 17% margin, and 500ms added to late chunks alone reads ~34.
+ * Recorded on the CALIBRATED form, median-of-3 per run: 0.9611 / 0.9656 idle and 0.6406 / 0.8800 /
+ * 0.9572 under six spinning hogs on four cores; the individual passes behind those span
+ * 0.8749-0.9785 idle and 0.4845-0.9987 loaded. Consistently below 1, because later chunks run on
+ * a warmer JIT, and load pushes it DOWN rather than up — the acquitting direction.
+ *
+ * 1.25 carries 29% headroom over the worst honest median while a doubled late-chunk class
+ * (>=1.46) is convicted with 17% margin, and 500ms added to late chunks alone reads ~34.
  */
 const APPEND_CHUNK_GROWTH_LIMIT = 1.25;
 
@@ -706,12 +746,12 @@ const APPEND_COLD_START_COST_LIMIT = 60;
 const APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT = 75;
 
 /**
- * Recorded 1.1062 / 1.1305 / 1.1537 idle and 1.0893 / 1.0898 / 1.0915 under six spinning hogs on
- * four cores WITH five other heavy suites in parallel workers — the load that broke the previous
- * form of this statistic. A 6% spread, because both sides of the division are the same code on
- * the same machine over comparable durations.
+ * Recorded on the median-of-3-passes form: 1.1218 / 1.1356 / 1.2028 idle and 1.0835 / 1.1808 /
+ * 1.2123 under six spinning hogs on four cores; the individual passes behind those span
+ * 1.1157-1.2089 idle and 1.0742-1.2544 loaded. A 12% spread, because both sides of the division
+ * are the same code on the same machine over comparable durations.
  *
- * 1.45 carries 26% headroom over the worst of those, while a doubled chunk class (>=2.18) is
+ * 1.45 carries 21% headroom over the worst honest median, while a doubled chunk class (>=2.18) is
  * convicted with 50% margin and the 500ms-every-eighth-frame case reads in the tens.
  */
 const APPEND_CHUNK_COST_LIMIT = 1.45;
@@ -2243,7 +2283,13 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // exactly the same marks. Earned like the rest — the cheapest of the three passes decides,
     // which is what discards the one contended pass that read 20.94 where its neighbours read
     // 11.69 and 12.75.
-    const chunkCostRatio = Math.min(...chunkCostRatios);
+    // The MEDIAN across passes, not the minimum, for the same reason the reduction INSIDE each
+    // pass is a median: this is a ratio of two independently timed windows, so its noise is
+    // two-sided. A pass whose seven ordinary-append denominators absorbed more delay than its
+    // chunk windows produces a low quotient, and a minimum selects that pass on purpose. The
+    // inner median handles a stalled cycle; the outer one has to handle a stalled pass.
+    const orderedChunkCostRatios = [...chunkCostRatios].sort((left, right) => left - right);
+    const chunkCostRatio = orderedChunkCostRatios[Math.floor(orderedChunkCostRatios.length / 2)]!;
     expect(
       chunkCostRatio,
       `a ribbon-chunk append costs ${chunkCostRatio.toFixed(3)}x its cycle's ordinary appends `
@@ -2254,7 +2300,13 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // them: the early/late gate reduces ordinary appends in each half, this class's own gate
     // reduces the cheapest chunk across the whole stroke, so re-planning that grows only on the
     // chunk path leaves an unaffected early chunk as the cheapest and moves neither.
-    const chunkGrowthRatio = Math.min(...chunkGrowthRatios);
+    // The MEDIAN across passes, like the chunk-cost gate above and for the same reason: this is a
+    // quotient of two calibrated ratios, so its noise is two-sided and a minimum selects the pass
+    // whose early half happened to read high.
+    const orderedChunkGrowthRatios = [...chunkGrowthRatios].sort((left, right) => left - right);
+    const chunkGrowthRatio = orderedChunkGrowthRatios[
+      Math.floor(orderedChunkGrowthRatios.length / 2)
+    ]!;
     expect(
       chunkGrowthRatio,
       `late ribbon-chunk appends cost ${chunkGrowthRatio.toFixed(3)}x what early ones did `
@@ -2427,6 +2479,71 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       .toThrow(/its own mark delta/);
     expect(() => appendChunkCostRatio(honest, deltas.map(() => 210)))
       .toThrow(/at least eight complete cycles/);
+  });
+
+  it("cancels a mid-stroke machine-speed shift instead of reporting it as chunk growth", () => {
+    // The failure this calibration exists for: the runner gets busier partway through a
+    // several-second stroke. Every append in the late half costs more, the reference kernel timed
+    // beside each one costs proportionally more, and an uncalibrated comparison of raw `workMs`
+    // reports that shift as length dependence. Stated as data, so it needs no busy machine.
+    const APPENDS = 200;
+    const deltas: number[] = Array.from(
+      { length: APPENDS },
+      (_, index) => (index % 8 === 7 ? 1_740 : 210),
+    );
+    deltas[0] = 320;
+    const honest: StudioPerfCalibrationSample[] = Array.from({ length: APPENDS }, (_, index) => ({
+      referenceMs: 1,
+      workMs: index % 8 === 7 ? 13.4 : 1.13,
+    }));
+    expect(appendChunkGrowthRatio(honest, deltas)).toBeCloseTo(1, 6);
+
+    // The whole machine runs 1.7x slower from the midpoint on — work AND reference alike.
+    const SLOWDOWN = 1.7;
+    const drifted = honest.map((sample, index) => (index < APPENDS / 2 ? sample : {
+      referenceMs: sample.referenceMs * SLOWDOWN,
+      workMs: sample.workMs * SLOWDOWN,
+    }));
+    expect(appendChunkGrowthRatio(drifted, deltas)).toBeCloseTo(1, 6);
+    expect(appendChunkGrowthRatio(drifted, deltas)).toBeLessThan(APPEND_CHUNK_GROWTH_LIMIT);
+    // ...where the uncalibrated form this replaced reported exactly the slowdown as growth, and
+    // 1.7 clears the 1.25 limit, so it would have failed healthy code on a runner that got busy.
+    const rawGrowth = (series: readonly StudioPerfCalibrationSample[]): number => {
+      const chunks = series.filter((_, index) => deltas[index]! > APPEND_CHUNK_MARK_THRESHOLD);
+      const half = Math.floor(chunks.length / 2);
+      const cheapest = (slice: readonly StudioPerfCalibrationSample[]) =>
+        Math.min(...slice.map((sample) => sample.workMs));
+      return cheapest(chunks.slice(half)) / cheapest(chunks.slice(0, half));
+    };
+    expect(rawGrowth(drifted)).toBeCloseTo(SLOWDOWN, 6);
+    expect(rawGrowth(drifted)).toBeGreaterThan(APPEND_CHUNK_GROWTH_LIMIT);
+
+    // And the converse: real length dependence on the chunk path is still convicted, because the
+    // reference kernel does NOT grow with it. This is the regression the gate is for.
+    const lengthDependent = honest.map((sample, index) => (
+      index >= APPENDS / 2 && index % 8 === 7
+        ? { ...sample, workMs: sample.workMs * 2 }
+        : sample
+    ));
+    expect(appendChunkGrowthRatio(lengthDependent, deltas)).toBeCloseTo(2, 6);
+    expect(appendChunkGrowthRatio(lengthDependent, deltas))
+      .toBeGreaterThan(APPEND_CHUNK_GROWTH_LIMIT);
+
+    // A drifting machine AND a real regression together still convict: the drift divides out and
+    // the regression does not.
+    const both = drifted.map((sample, index) => (
+      index >= APPENDS / 2 && index % 8 === 7
+        ? { ...sample, workMs: sample.workMs * 2 }
+        : sample
+    ));
+    expect(appendChunkGrowthRatio(both, deltas)).toBeCloseTo(2, 6);
+    expect(appendChunkGrowthRatio(both, deltas)).toBeGreaterThan(APPEND_CHUNK_GROWTH_LIMIT);
+
+    // A zero-length reference window is not a calibration.
+    expect(() => appendChunkGrowthRatio(
+      honest.map((sample) => ({ ...sample, referenceMs: 0 })),
+      deltas,
+    )).toThrow(/zero-length reference window/);
   });
 
   it("convicts a cold FIRST-CHUNK regression every other bound discards", () => {
