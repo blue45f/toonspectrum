@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AVATAR_FORGE_HAIR_STYLE_OPTIONS,
   AVATAR_FORGE_PRESETS,
   buildAvatarForgeHairParts,
   createAvatarForgeState,
+  sanitizeAvatarForgeState,
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
 import { classifyMeshName } from "./studio-vrm-costume";
@@ -495,6 +497,42 @@ describe("studio VRM humanoid mesh", () => {
           bindings.has(part.id),
           `${presetId}: ${part.id} 는 관절 위에 있는데 스프링에 실렸다`,
         ).toBe(false);
+      }
+    }
+  });
+
+  it("keeps spring parameters inside the exporter's valid ranges for every hairstyle", () => {
+    // 익스포터는 `dragForce` 를 0~1 로, `stiffness`/`gravityPower`/`hitRadius` 를 음수 아님으로
+    // 검증하고 벗어나면 throw 한다. 흔들림 세기를 체인 길이에서 뽑으므로, 길이 극단에서도
+    // 식이 범위를 벗어나지 않는지 잠근다.
+    const base = createAvatarForgeState();
+    for (const style of AVATAR_FORGE_HAIR_STYLE_OPTIONS) {
+      for (const extreme of [
+        { headBodyRatio: 3.6, overallHeight: 0.55 },
+        { headBodyRatio: 0.5, overallHeight: 1.6 },
+      ]) {
+        const state = sanitizeAvatarForgeState({
+          ...base,
+          proportions: { ...base.proportions, ...extreme },
+          hair: { ...base.hair, style: style.id },
+        });
+        const hairRig = buildStudioVrmHumanoidMesh(state).hairRig;
+        if (!hairRig) continue;
+        const label = `${style.id} @ ${JSON.stringify(extreme)}`;
+        for (const chain of hairRig.chains) {
+          expect(chain.dragForce, label).toBeGreaterThanOrEqual(0);
+          expect(chain.dragForce, label).toBeLessThanOrEqual(1);
+          expect(chain.stiffness, label).toBeGreaterThanOrEqual(0);
+          expect(chain.gravityPower, label).toBeGreaterThanOrEqual(0);
+        }
+        for (const joint of hairRig.joints) {
+          expect(joint.hitRadius, `${label}: ${joint.name}`).toBeGreaterThan(0);
+          expect(joint.worldRest.every(Number.isFinite), `${label}: ${joint.name}`).toBe(true);
+          expect(
+            joint.localTranslation.every(Number.isFinite),
+            `${label}: ${joint.name}`,
+          ).toBe(true);
+        }
       }
     }
   });
