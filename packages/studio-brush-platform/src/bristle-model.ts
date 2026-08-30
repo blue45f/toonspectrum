@@ -468,6 +468,13 @@ export interface BristleBrushState {
   lastDeposited: number;
   /** Ink units deposited since the brush was created or reset. */
   totalDeposited: number;
+  /**
+   * Sum of every hair's capacity, in layout order. Fixed at construction — the layout never
+   * changes — so `stepBristles` reads it instead of re-summing the whole tuft on every step.
+   */
+  readonly capacityTotal: number;
+  /** Capillary scratch, `count - 1` long. Fully overwritten by each step that uses it. */
+  readonly capillaryFlux: Float64Array;
 }
 
 function tipProfileValue(
@@ -578,6 +585,10 @@ export function createBristleBrush(config: BristleBrushConfig): BristleBrushStat
     stepCount: 0,
     lastDeposited: 0,
     totalDeposited: 0,
+    // Same loop, same order as the per-step sum it replaces, so the ratio is bit-for-bit what
+    // re-summing produced.
+    capacityTotal: layout.reduce((total, entry) => total + entry.capacity, 0),
+    capillaryFlux: new Float64Array(Math.max(0, count - 1)),
   };
 }
 
@@ -601,6 +612,93 @@ export function reloadBristleBrush(state: BristleBrushState, load = 1): void {
   for (let index = 0; index < state.layout.length; index += 1) {
     state.ink[index] = state.layout[index].capacity * load;
   }
+}
+
+/**
+ * Everything `stepBristles` carries from one sample to the next.
+ *
+ * The tuft is a forward simulation: a step reads this and the incoming sample, and nothing else.
+ * A caller marching a long planned stroke can therefore stop on a sample it knows will not move,
+ * keep this, and resume from it rather than replaying the stroke from the first sample — which is
+ * what the oil ribbon carrier does on every pointer frame.
+ *
+ * Deliberately NOT included: `contactX/Y/Radius/Alpha`. Every step writes all four for every hair
+ * before anything reads them, so they carry nothing across a boundary. `layout`, `config` and
+ * `clumpDirection` are fixed at construction and shared rather than copied.
+ */
+export interface BristleBrushCarry {
+  readonly ink: Float64Array;
+  readonly spread: number;
+  readonly splitDrive: number;
+  readonly x: number;
+  readonly y: number;
+  readonly tangentX: number;
+  readonly tangentY: number;
+  readonly normalX: number;
+  readonly normalY: number;
+  readonly tiltX: number;
+  readonly tiltY: number;
+  readonly pressure: number;
+  readonly arcLengthPx: number;
+  readonly tMs: number;
+  readonly stepCount: number;
+  readonly lastDeposited: number;
+  readonly totalDeposited: number;
+}
+
+/** Snapshot the simulation state. The ink array is copied; the caller owns the result. */
+export function captureBristleBrushCarry(state: BristleBrushState): BristleBrushCarry {
+  return {
+    ink: state.ink.slice(),
+    spread: state.spread,
+    splitDrive: state.splitDrive,
+    x: state.x,
+    y: state.y,
+    tangentX: state.tangentX,
+    tangentY: state.tangentY,
+    normalX: state.normalX,
+    normalY: state.normalY,
+    tiltX: state.tiltX,
+    tiltY: state.tiltY,
+    pressure: state.pressure,
+    arcLengthPx: state.arcLengthPx,
+    tMs: state.tMs,
+    stepCount: state.stepCount,
+    lastDeposited: state.lastDeposited,
+    totalDeposited: state.totalDeposited,
+  };
+}
+
+/**
+ * Put a brush back into a captured state. The carry must come from a brush built with the same
+ * config — a differing hair count is rejected rather than silently truncated.
+ */
+export function restoreBristleBrushCarry(
+  state: BristleBrushState,
+  carry: BristleBrushCarry,
+): void {
+  if (carry.ink.length !== state.ink.length) {
+    throw new BristleModelError(
+      `carry has ${carry.ink.length} hairs, brush has ${state.ink.length}`,
+    );
+  }
+  state.ink.set(carry.ink);
+  state.spread = carry.spread;
+  state.splitDrive = carry.splitDrive;
+  state.x = carry.x;
+  state.y = carry.y;
+  state.tangentX = carry.tangentX;
+  state.tangentY = carry.tangentY;
+  state.normalX = carry.normalX;
+  state.normalY = carry.normalY;
+  state.tiltX = carry.tiltX;
+  state.tiltY = carry.tiltY;
+  state.pressure = carry.pressure;
+  state.arcLengthPx = carry.arcLengthPx;
+  state.stepCount = carry.stepCount;
+  state.tMs = carry.tMs;
+  state.lastDeposited = carry.lastDeposited;
+  state.totalDeposited = carry.totalDeposited;
 }
 
 /** Lift the brush: fan relaxes, contact clears, ink is kept. */
@@ -748,11 +846,10 @@ export function stepBristles(
 
   // --- (b) split drive: dryness + speed above threshold --------------------
   let inkTotal = 0;
-  let capacityTotal = 0;
   for (let index = 0; index < state.layout.length; index += 1) {
     inkTotal += state.ink[index];
-    capacityTotal += state.layout[index].capacity;
   }
+  const capacityTotal = state.capacityTotal;
   const inkRatio = capacityTotal > 0 ? clamp(inkTotal / capacityTotal, 0, 1) : 0;
   const dryness = 1 - inkRatio;
   const speedTerm = clamp(velocity / config.splitSpeedRefPxPerMs, 0, 1);
@@ -845,7 +942,10 @@ export function stepBristles(
   const exchange = clamp(config.capillary * dtSec, 0, 0.4);
   if (exchange > 0 && state.layout.length > 1) {
     const count = state.layout.length;
-    const flux = new Float64Array(count - 1);
+    // Scratch owned by the state: a planned oil stroke steps this 4096 times per pointer move,
+    // and a fresh Float64Array per step was 4096 allocations a frame for numbers that are
+    // overwritten before they are read.
+    const flux = state.capillaryFlux;
     for (let index = 0; index < count - 1; index += 1) {
       flux[index] = exchange * (state.ink[index + 1] - state.ink[index]);
     }

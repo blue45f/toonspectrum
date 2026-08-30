@@ -551,3 +551,49 @@ describe("determinism", () => {
     );
   });
 });
+
+/**
+ * The two per-step values `stepBristles` stopped recomputing.
+ *
+ * A planned oil stroke steps this model once per station — 4096 times per pointer move, paid again
+ * on the next move — so re-summing a constant and allocating a scratch array inside the step were
+ * both pure waste. Neither may change a number the model reports, and these pin that: the capacity
+ * total must stay the layout's own sum in layout order, and the capillary scratch must behave
+ * exactly like the fresh array it replaced (i.e. carry nothing between steps).
+ */
+describe("stepBristles per-step invariants", () => {
+  it("keeps capacityTotal equal to the layout sum, and constant across a stroke", () => {
+    const state = createBristleBrush({ ...BRISTLE_PRESETS.flat, bristleCount: 24, seed: 4242 });
+    const layoutSum = state.layout.reduce((total, entry) => total + entry.capacity, 0);
+    expect(state.capacityTotal).toBe(layoutSum);
+
+    for (let step = 0; step < 40; step += 1) {
+      stepBristles(state, { x: step * 3, y: 12 + Math.sin(step / 4) * 5, pressure: 0.6, dtMs: 8 });
+    }
+    // Ink drains; capacity does not.
+    expect(state.capacityTotal).toBe(layoutSum);
+  });
+
+  it("reports the same stream as a model whose scratch is never reused", () => {
+    // Two brushes with identical config and seed must agree step for step. A scratch that leaked
+    // state between steps would make the longer-lived one diverge from a freshly built brush
+    // replayed to the same point.
+    const config = { ...BRISTLE_PRESETS.flat, bristleCount: 19, seed: 90210 };
+    const marched = createBristleBrush(config);
+    const samples = Array.from({ length: 24 }, (_, step) => ({
+      x: step * 2.5,
+      y: 40 + Math.cos(step / 3) * 7,
+      pressure: 0.3 + 0.4 * Math.abs(Math.sin(step / 5)),
+      dtMs: 8,
+    }));
+
+    for (const [index, sample] of samples.entries()) {
+      const report = stepBristles(marched, sample);
+      const replay = createBristleBrush(config);
+      for (const earlier of samples.slice(0, index)) stepBristles(replay, earlier);
+      const replayed = stepBristles(replay, sample);
+      expect(report).toEqual(replayed);
+      expect([...marched.ink]).toEqual([...replay.ink]);
+    }
+  });
+});

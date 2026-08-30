@@ -143,6 +143,70 @@ describe("StudioOilRibbonCarrierPlanner", () => {
     expect(plan).toEqual(planStudioOilRibbonCarrier(grown, undefined));
   });
 
+  it.each([
+    ["oil", "oil"],
+    ["acrylic", "acrylic"],
+    ["filbert", "oil--filbert-ribbon"],
+    ["impasto", "oil--impasto-ribbon"],
+  ])(
+    "reuses runs for the program-bearing %s preset, and still equals the batch plan",
+    (_label, brushId) => {
+      // The point of the whole exercise. These presets run bristle physics, and the physics
+      // program used to force `reusableStations` to 0 because its `baseRadiusPx` was a
+      // stroke-global mean — so `oil` and `acrylic`, the two presets a user means by "the oil
+      // brushes", re-simulated their entire hair bed on every pointer frame. With the anchor
+      // frozen past its window the march is causal and the settled prefix survives.
+      //
+      // Both halves are asserted together on purpose: reuse without equality is a wrong answer
+      // delivered quickly, and equality without reuse passes trivially.
+      const planner = new StudioOilRibbonCarrierPlanner();
+      const dabPlanner = new FxOilDabPlanner();
+      const options = studioOilRibbonProgramsForBrush(brushId, SEED);
+      expect(options?.bristlePhysics?.enabled).toBe(true);
+
+      planner.plan(dabsAt(brushId, 900, dabPlanner), options);
+      const grown = dabsAt(brushId, 940, dabPlanner);
+      const plan = planner.plan(grown, options);
+
+      expect(planner.settledStations).toBeGreaterThan(grown.length * 0.9);
+      expect(planner.reusedRuns).toBeGreaterThan(0);
+      expect(plan).toEqual(planStudioOilRibbonCarrier(grown, options));
+    },
+  );
+
+  it("keeps the frozen anchor plan-identical to the stroke-mean anchor it replaced", () => {
+    // The anchor divides back out of every stream the program publishes, so freezing it is a
+    // change of derivation and not of picture. If that ever stops being true this fails, and the
+    // reuse above is no longer free.
+    for (const brushId of ["oil", "acrylic"]) {
+      const options = studioOilRibbonProgramsForBrush(brushId, SEED);
+      for (const sampleCount of [300, 900, 1600]) {
+        const dabs = dabsAt(brushId, sampleCount);
+        expect(planStudioOilRibbonCarrier(dabs, options)).toEqual(
+          planStudioOilRibbonCarrier(dabs, {
+            ...options,
+            bristlePhysics: { ...options!.bristlePhysics!, restRadiusAnchor: "stroke-mean-v1" },
+          }),
+        );
+      }
+    }
+  });
+
+  it("refuses to reuse when a program series is shorter than the stroke", () => {
+    // `sampleSeries` holds a short series at its last value, so station 300 reads a different
+    // number once the stroke passes 400 stations. Reuse there would be silently wrong.
+    const planner = new StudioOilRibbonCarrierPlanner();
+    const dabPlanner = new FxOilDabPlanner();
+    const options: StudioOilRibbonCarrierOptions = {
+      bristlePhysics: { enabled: true, seed: SEED, pressures: [0.2, 0.9, 0.45] },
+    };
+    planner.plan(dabsAt("oil--filbert-ribbon", 900, dabPlanner), options);
+    const grown = dabsAt("oil--filbert-ribbon", 940, dabPlanner);
+    const plan = planner.plan(grown, options);
+    expect(planner.reusedRuns).toBe(0);
+    expect(plan).toEqual(planStudioOilRibbonCarrier(grown, options));
+  });
+
   it("rebuilds instead of reusing when the lattice refits at the dab cap", () => {
     const planner = new StudioOilRibbonCarrierPlanner();
     const dabPlanner = new FxOilDabPlanner();

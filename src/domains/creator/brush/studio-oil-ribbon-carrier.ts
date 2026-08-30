@@ -13,6 +13,7 @@ import {
 } from "../studio-impasto-relief-shading-v1";
 
 import {
+  StudioBristlePhysicsOilPlanner,
   planStudioBristlePhysicsOil,
   type StudioBristlePhysicsOilPlan,
 } from "./studio-bristle-physics-oil-v1";
@@ -22,6 +23,7 @@ import {
 } from "./studio-brush-engine-program-set";
 import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./studio-brush-symmetry";
 import {
+  StudioOilBristleLoadDynamicsPlanner,
   planStudioOilBristleLoadDynamics,
   type StudioOilBristleLoadDynamicsPlan,
 } from "./studio-oil-bristle-load-dynamics-v1";
@@ -151,7 +153,44 @@ export interface StudioOilRibbonCarrierBristlePhysicsOptions {
   readonly bristleCount?: number;
   /** Ink dip at stroke start, 0..1 (default 1 = fully loaded). */
   readonly initialLoad?: number;
+  /**
+   * How the tuft's rest half-width — the offset stream's normalization radius — is taken from
+   * the bed. Default `settled-prefix-v2`.
+   *
+   * `stroke-mean-v1` averages EVERY station's `radiusY`, so the number moves on every append
+   * (measured 18.2% across one sweep, still moving 0.05%/frame at 3200 samples). That is what
+   * made the live carrier re-simulate the whole hair bed each pointer frame: nothing downstream
+   * of a moving stroke-global input can be called settled.
+   *
+   * It did not have to. Every stream this program publishes divides the anchor back out —
+   * `laneOffsetRatio` is `lateral / baseRadiusPx` and `lateral` is a sum of terms each carrying a
+   * `radius` factor (the tilt shift included); `laneWidthScale` is `contactRadius /
+   * restBristleRadiusPx` and `contactRadius` carries `bristleRadiusPx`, which IS
+   * `restBristleRadiusPx`; and the load, spread, split and ink streams never see the radius at
+   * all. So the anchor cancels, and the published plan is the same whichever value it took.
+   *
+   * `settled-prefix-v2` averages the first `STUDIO_OIL_PHYSICS_REST_RADIUS_ANCHOR_STATIONS`
+   * stations and then stops. That makes the march *exactly* causal — the settled prefix is
+   * settled by construction rather than by a cancellation holding up in floating point — which is
+   * what lets `StudioOilRibbonCarrierPlanner` reuse bristle runs for `oil` and `acrylic`. It is
+   * also the physically honest reading: a tuft's rest width is a property of the brush and the
+   * pressure on it, not of how far the stroke has gone since.
+   *
+   * Verified plan-identical to v1 over 70 beds (both brushes x 5 stroke shapes x 7 lengths up to
+   * the dab cap, plus a tilted bed), and pixel-identical (max delta 0/255) when rasterised.
+   * `stroke-mean-v1` stays available as an explicit opt-out.
+   */
+  readonly restRadiusAnchor?: "stroke-mean-v1" | "settled-prefix-v2";
 }
+
+/**
+ * Stations the `settled-prefix-v2` rest-radius anchor averages before it freezes.
+ *
+ * Long enough that the mean has left the pressure ramp-in behind (measured: the running mean is
+ * within 0.3% of the full-stroke mean by ~250 stations on a normal sweep), short enough that the
+ * anchor freezes while the stroke is still cheap to plan.
+ */
+export const STUDIO_OIL_PHYSICS_REST_RADIUS_ANCHOR_STATIONS = 256;
 
 export interface StudioOilRibbonCarrierOptions {
   readonly bristleLoadDynamics?: StudioOilRibbonCarrierBristleLoadDynamicsOptions;
@@ -1222,9 +1261,54 @@ function pressureProxyFromStationOpacity(opacity: number): number {
  * the band walker iterates, so the returned streams index it 1:1 by
  * construction.
  */
+/**
+ * The tuft's rest half-width for this bed. See `restRadiusAnchor`.
+ *
+ * The default window sums the same values in the same order `meanBy` does, so a stroke shorter
+ * than the window produces a bit-for-bit identical anchor — and past it the anchor cancels out of
+ * everything the program publishes anyway.
+ */
+function tuftRestRadiusPx(
+  stations: readonly OilCarrierStation[],
+  anchor: "stroke-mean-v1" | "settled-prefix-v2" | undefined,
+): number {
+  if (anchor === "stroke-mean-v1") return meanBy(stations, (station) => station.radiusY);
+  const count = Math.min(stations.length, STUDIO_OIL_PHYSICS_REST_RADIUS_ANCHOR_STATIONS);
+  if (count === 0) return 0;
+  let sum = 0;
+  for (let index = 0; index < count; index += 1) sum += stations[index]!.radiusY;
+  return sum / count;
+}
+
+/**
+ * A per-station series both programs read through `sampleSeries`, which HOLDS a short series at
+ * its last value — so a station already marched would read a number that moves as the stroke
+ * grows. Absent or exactly station-length is stable; anything else is not.
+ */
+function seriesSpansStations(
+  series: readonly number[] | undefined,
+  stationCount: number,
+): boolean {
+  return series === undefined || series.length === 0 || series.length >= stationCount;
+}
+
+/** True once the anchor can no longer move, which is what makes the physics prefix reusable. */
+function tuftRestRadiusIsFrozen(
+  stations: readonly OilCarrierStation[],
+  anchor: "stroke-mean-v1" | "settled-prefix-v2" | undefined,
+): boolean {
+  return anchor !== "stroke-mean-v1"
+    && stations.length >= STUDIO_OIL_PHYSICS_REST_RADIUS_ANCHOR_STATIONS;
+}
+
 function planBristlePhysics(
   stations: readonly OilCarrierStation[],
   options: StudioOilRibbonCarrierBristlePhysicsOptions,
+  /**
+   * Live stroke only: a retained tuft plus the station prefix this planner has already proven
+   * byte-identical. Absent (batch, export, settle) simulates the whole stroke as before.
+   */
+  resume?: { readonly planner: StudioBristlePhysicsOilPlanner; readonly settled: number },
 ): StudioBristlePhysicsOilPlan | undefined {
   if (stations.length < 2) return undefined;
   const laneCount = resolveBristleCount(stations);
@@ -1232,7 +1316,7 @@ function planBristlePhysics(
   const pressures = options.pressures && options.pressures.length > 0
     ? options.pressures
     : stations.map((station) => pressureProxyFromStationOpacity(station.opacity));
-  return planStudioBristlePhysicsOil({
+  const input = {
     stationXs: stations.map((station) => station.x),
     stationYs: stations.map((station) => station.y),
     laneCount,
@@ -1241,7 +1325,7 @@ function planBristlePhysics(
     // Stroke-global by design — and the reason a physics program's bristle runs are never reused
     // across a pointer move: this normalization radius moves with every appended station, so the
     // whole simulated bed legitimately differs. See `StudioOilRibbonCarrierPlanner`.
-    baseRadiusPx: meanBy(stations, (station) => station.radiusY),
+    baseRadiusPx: tuftRestRadiusPx(stations, options.restRadiusAnchor),
     pressures,
     ...(options.speeds ? { speeds: options.speeds } : {}),
     ...(options.tiltX !== undefined ? { tiltX: options.tiltX } : {}),
@@ -1252,12 +1336,22 @@ function planBristlePhysics(
     ...(options.initialLoad !== undefined
       ? { initialLoad: options.initialLoad }
       : {}),
-  });
+  };
+  // One construction site for the input, so the resumable path cannot be fed a different stroke
+  // than the batch path would have been.
+  return resume
+    ? resume.planner.plan(input, resume.settled)
+    : planStudioBristlePhysicsOil(input);
 }
 
 function planLoadDynamics(
   stations: readonly OilCarrierStation[],
   options: StudioOilRibbonCarrierBristleLoadDynamicsOptions,
+  /**
+   * Live stroke only: a retained march plus the station prefix this planner has already proven
+   * byte-identical. Absent (batch, export, settle) marches the whole stroke as before.
+   */
+  resume?: { readonly planner: StudioOilBristleLoadDynamicsPlanner; readonly settled: number },
 ): StudioOilBristleLoadDynamicsPlan | undefined {
   if (stations.length < 2) return undefined;
   const laneCount = resolveBristleCount(stations);
@@ -1265,7 +1359,7 @@ function planLoadDynamics(
   const pressures = options.pressures && options.pressures.length > 0
     ? options.pressures
     : stations.map((station) => pressureProxyFromStationOpacity(station.opacity));
-  return planStudioOilBristleLoadDynamics({
+  const input = {
     stationCount: stations.length,
     laneCount,
     seed: Math.floor(finite(options.seed, 0)),
@@ -1275,7 +1369,12 @@ function planLoadDynamics(
     ...(options.depletionRate !== undefined
       ? { depletionRate: options.depletionRate }
       : {}),
-  });
+  };
+  // One construction site for the input, so the resumable path cannot be fed a different stroke
+  // than the batch path would have been.
+  return resume
+    ? resume.planner.plan(input, resume.settled)
+    : planStudioOilBristleLoadDynamics(input);
 }
 
 // ---------------------------------------------------------------------------
@@ -1980,6 +2079,20 @@ export class StudioOilRibbonCarrierPlanner {
   private runsByHair: PlannedBristleRun[][] = [];
   private lastReusedRuns = 0;
   private lastSettledStations = 0;
+  /** Hair count the retained runs were built for; -1 until the first plan. */
+  private lastBristleCount = -1;
+  /**
+   * Retained load-dynamics march. The program is strictly causal in the station index, so unlike
+   * the bristle-physics program (whose `baseRadiusPx` is a stroke-global mean) its settled prefix
+   * is byte-stable under an append and is kept across pointer frames.
+   */
+  private readonly loadDynamics = new StudioOilBristleLoadDynamicsPlanner();
+  /**
+   * Retained bristle-physics tuft. Causal in the station index once the rest-radius anchor is
+   * frozen (`restRadiusAnchor`), which is what lets the already-drawn hairs stop being
+   * re-simulated on every pointer frame.
+   */
+  private readonly bristlePhysics = new StudioBristlePhysicsOilPlanner();
 
   /** Runs reused from the previous call. Diagnostics and identity tests only. */
   get reusedRuns(): number {
@@ -1999,6 +2112,9 @@ export class StudioOilRibbonCarrierPlanner {
     this.runsByHair = [];
     this.lastReusedRuns = 0;
     this.lastSettledStations = 0;
+    this.lastBristleCount = -1;
+    this.loadDynamics.reset();
+    this.bristlePhysics.reset();
   }
 
   plan(
@@ -2028,6 +2144,9 @@ export class StudioOilRibbonCarrierPlanner {
       this.geometry = [];
       this.stations = [];
       this.runsByHair = [];
+      // Same reason: the retained march holds stationCount x laneCount doubles.
+      this.loadDynamics.reset();
+      this.bristlePhysics.reset();
     }
 
     const settledGeometry = Math.max(0, identical - OIL_GEOMETRY_SMOOTHING_RADIUS);
@@ -2039,11 +2158,21 @@ export class StudioOilRibbonCarrierPlanner {
     const bodyOnly = options?.bodyOnly === true;
     const loadDynamicsOptions = options?.bristleLoadDynamics;
     const dynamics = !bodyOnly && loadDynamicsOptions?.enabled === true
-      ? planLoadDynamics(stations, loadDynamicsOptions)
+      ? planLoadDynamics(stations, loadDynamicsOptions, {
+        planner: this.loadDynamics,
+        settled: settledStations,
+      })
       : undefined;
     const bristlePhysicsOptions = options?.bristlePhysics;
     const physics = !bodyOnly && bristlePhysicsOptions?.enabled === true
-      ? planBristlePhysics(stations, bristlePhysicsOptions)
+      ? planBristlePhysics(stations, bristlePhysicsOptions, {
+        planner: this.bristlePhysics,
+        // The tuft may only resume where its own anchor has stopped moving. Below the window the
+        // anchor is still a running mean, so the settled station prefix is not a settled tuft.
+        settled: tuftRestRadiusIsFrozen(stations, bristlePhysicsOptions.restRadiusAnchor)
+          ? settledStations
+          : 0,
+      })
       : undefined;
     const impastoReliefLanes = !bodyOnly && options?.impastoRelief?.enabled === true
       ? planImpastoReliefOverlayLanes(stations)
@@ -2053,9 +2182,30 @@ export class StudioOilRibbonCarrierPlanner {
     let reusedRuns = 0;
     if (!bodyOnly && stations.length >= 2) {
       const bristleCount = resolveBristleCount(stations);
-      // A depletion/physics program republishes per-station arrays across the whole bed, so its
-      // runs carry stroke-global loads and widths that a settled prefix cannot vouch for.
-      const reusableStations = dynamics || physics ? 0 : settledStations;
+      // Both programs publish per-station arrays that a run reads by station index, so a run is
+      // only reusable while every array it reads is settled too.
+      //
+      //  - load dynamics is a strictly causal march and is now resumed rather than replanned
+      //    (`StudioOilBristleLoadDynamicsPlanner`), so its prefix is byte-stable by construction;
+      //  - bristle physics is causal as well, but its `baseRadiusPx` anchor decides the whole
+      //    simulation. Under the shipped `stroke-mean-v1` anchor that number moves on every
+      //    append, so nothing it produces is settled. Under `settled-prefix-v2` it stops moving
+      //    once the window is full, and from there the physics prefix is settled too.
+      //
+      // The hair count also has to hold: both programs are indexed `station * laneCount + lane`,
+      // so a bed that re-resolved its lane count is reading a different array shape and the
+      // cached runs belong to a different tuft.
+      const physicsSettled = physics === undefined
+        || (tuftRestRadiusIsFrozen(stations, bristlePhysicsOptions?.restRadiusAnchor)
+          && seriesSpansStations(bristlePhysicsOptions?.pressures, stations.length)
+          && seriesSpansStations(bristlePhysicsOptions?.speeds, stations.length));
+      const dynamicsSettled = dynamics === undefined
+        || (seriesSpansStations(loadDynamicsOptions?.pressures, stations.length)
+          && seriesSpansStations(loadDynamicsOptions?.speeds, stations.length));
+      const programsSettled =
+        physicsSettled && dynamicsSettled && bristleCount === this.lastBristleCount;
+      const reusableStations = programsSettled ? settledStations : 0;
+      this.lastBristleCount = bristleCount;
       const runsByHair: PlannedBristleRun[][] = new Array(bristleCount);
       const planned: PlannedBristleRun[] = [];
       for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
