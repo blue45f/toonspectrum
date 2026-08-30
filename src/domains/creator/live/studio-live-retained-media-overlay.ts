@@ -187,12 +187,18 @@ function extendOilRadiusMean(
     || active.oilRadiusSumDabCount === undefined
     || active.oilRadiusSumDabCount > dabs.length
   ) {
+    // Clamped to what `dabs` actually holds. The seed covers the prefix already painted, but a
+    // bed can SHRINK — an authoritative draft that retracts a predicted suffix replans to fewer
+    // dabs — and seeding from the previous, longer count then reads past the end of the new array
+    // and throws. Clamping seeds the whole short array instead, which is the same strictly
+    // left-to-right sum a full reduce would produce.
+    const seeded = Math.min(active.paintedDabs, dabs.length);
     let sum = 0;
-    for (let index = 0; index < active.paintedDabs; index += 1) {
+    for (let index = 0; index < seeded; index += 1) {
       sum += dabs[index]!.radiusY;
     }
     active.oilRadiusSum = sum;
-    active.oilRadiusSumDabCount = active.paintedDabs;
+    active.oilRadiusSumDabCount = seeded;
   }
   for (
     let index = active.oilRadiusSumDabCount;
@@ -462,14 +468,20 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       return { status: "fallback", reason: "surface-unavailable" };
     }
     active.element = element;
-    const before = active.paintedDabs + active.paintedOilPasses
+    // The oil pass counter is read on its own rather than added to the others. `paintedDabs` can
+    // FALL — an authoritative draft that retracts a predicted suffix replans to fewer dabs — and a
+    // drop of hundreds would swallow the `+1` a real repaint contributes, reporting `noop` for a
+    // frame that cleared and repainted the canvas.
+    const beforeOilPasses = active.paintedOilPasses;
+    const before = active.paintedDabs
       + active.paintedPencilMarks + active.paintedSourceSegments;
     if (!this.paintSuffix(active, element, this.activeContext, finalize)) {
       return { status: "fallback", reason: "surface-unavailable" };
     }
-    const after = active.paintedDabs + active.paintedOilPasses
+    const after = active.paintedDabs
       + active.paintedPencilMarks + active.paintedSourceSegments;
-    return { status: after > before ? "appended" : "noop" };
+    const painted = active.paintedOilPasses > beforeOilPasses || after > before;
+    return { status: painted ? "appended" : "noop" };
   }
 
   end(element: DrawEl): { readonly status: "settled" | "fallback" } {
@@ -575,19 +587,15 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     const context = this.prepared(target);
     if (!context) return false;
     try {
-      const flatPoints = flatFinitePoints(element);
-      if (flatPoints.length === 0) return true;
-      // Nothing new arrived, so there is nothing to plan. Compared against the inputs themselves
-      // rather than the dab count — that count saturates at the cap and stops being evidence
-      // there — and checked here rather than after planning, because a plan whose result is
-      // discarded is pure cost.
-      const unchanged = sameNumberSeries(flatPoints, active.paintedOilPoints)
-        && sameNumberSeries(element.pressures, active.paintedOilPressures);
-      if (target === this.activeContext && unchanged) return true;
-
       // Past the cap every append rebuilds all 4096 dabs, so the bed is held to a share of the
       // pointer's time (see `OIL_CAP_REPAINT_DUTY_DIVISOR`). `finalizeOil` is pointer-up, which
       // seals the active canvas into settled and so must never be deferred.
+      //
+      // This runs before the point copy below on purpose. A deferred event is decided from state
+      // alone — a counter and two timestamps — while `flatFinitePoints` walks and copies the whole
+      // accumulated history. Copying it for events that are about to be dropped would put an O(N)
+      // allocation on every pointer frame past the cap, quadratic over the drag, and it would sit
+      // outside the very budget this guard exists to enforce.
       const now = this.now();
       const cooldownRemaining = active.paintedDabs >= FX_OIL_DAB_CAP
         ? active.lastOilCapRepaintAt
@@ -606,6 +614,16 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         return true;
       }
       this.clearCapRepaintWake();
+
+      const flatPoints = flatFinitePoints(element);
+      if (flatPoints.length === 0) return true;
+      // Nothing new arrived, so there is nothing to plan. Compared against the inputs themselves
+      // rather than the dab count — that count saturates at the cap and stops being evidence
+      // there — and checked here rather than after planning, because a plan whose result is
+      // discarded is pure cost.
+      const unchanged = sameNumberSeries(flatPoints, active.paintedOilPoints)
+        && sameNumberSeries(element.pressures, active.paintedOilPressures);
+      if (target === this.activeContext && unchanged) return true;
 
       const brush = element.brush ?? "oil";
       const planInput = {

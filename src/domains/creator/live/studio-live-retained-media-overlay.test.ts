@@ -428,6 +428,46 @@ describe("oil live preview past the dab cap", () => {
     expect(active.stats().strokeCalls).toBe(before);
   });
 
+  it("reports a repaint that shrank the bed as an append, not a noop", () => {
+    // An authoritative draft can retract a predicted suffix: the bed falls from the cap to a few
+    // hundred dabs. Summing the oil pass counter into `paintedDabs` let that drop swallow the
+    // pass, so a frame that cleared and repainted the canvas reported `noop`.
+    const { renderer, active } = attachedRenderer();
+    expect(renderer.begin(longOilStroke("oil-cap-shrink", 3000)).status).toBe("started");
+    renderer.appendFrom(longOilStroke("oil-cap-shrink", 3000));
+
+    const before = active.stats().strokeCalls;
+    const retracted = longOilStroke("oil-cap-shrink", 400);
+    expect(renderer.appendFrom(retracted).status).toBe("appended");
+    expect(active.stats().strokeCalls).toBeGreaterThan(before);
+  });
+
+  it("decides a capped deferral without copying the point history", () => {
+    // The deferral is decided from a counter and two timestamps. Reading the element's points
+    // first would copy the whole accumulated history on every pointer frame past the cap — an
+    // O(N) allocation per event, quadratic over the drag, and outside the duty budget itself.
+    const { renderer, clock } = attachedRenderer();
+    expect(renderer.begin(longOilStroke("oil-cap-nocopy", 3000)).status).toBe("started");
+
+    clock.nowMs = 1_000;
+    clock.stepMs = 15;
+    renderer.appendFrom(longOilStroke("oil-cap-nocopy", 3040));
+    clock.stepMs = 0;
+
+    clock.nowMs = 1_020;
+    const grown = longOilStroke("oil-cap-nocopy", 3080);
+    let reads = 0;
+    const counted: DrawEl = {
+      ...grown,
+      get points() {
+        reads += 1;
+        return grown.points;
+      },
+    };
+    expect(renderer.appendFrom(counted).status).toBe("noop");
+    expect(reads).toBe(0);
+  });
+
   it("still skips a capped append that brought no new samples", () => {
     // The other half of the guard: repainting whenever the bed *could* have changed would repaint
     // on every call at the cap, including calls the pointer did not contribute to.
