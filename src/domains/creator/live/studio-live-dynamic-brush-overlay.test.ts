@@ -28,9 +28,13 @@ import { studioCoreBrushCatalogSelection } from "../brush/studio-brush-selection
 import { clearStudioBrushTextureStampCache } from "../brush/studio-brush-textured-stamp";
 import { STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION } from "../brush/studio-dry-media-union-ribbon-carrier";
 import {
-  studioPerfRatioBudgetMs,
-  studioPerfSustainedCalibrationWorkload,
-} from "../brush/studio-perf-budget-calibration";
+  judgeStudioCalibratedBudget,
+  judgeStudioCalibratedDetection,
+  reduceStudioPerfCalibrationSamples,
+  runStudioPerfCalibrationRounds,
+  type StudioPerfCalibrationPass,
+  type StudioPerfCalibrationSample,
+} from "../brush/studio-perf-calibration";
 import { BRUSH_PRESETS } from "../studio-brush";
 import {
   planStudioCausalDynamicBrushDepositSegmentsV3,
@@ -464,6 +468,295 @@ function drawElement(
     ...overrides,
   };
 }
+
+/**
+ * How much more a stroke's late appends draw than its early ones -- the O(1) claim as a number.
+ *
+ * Pure and count-based, so both the healthy shape and the regression it must reject are pinned as
+ * data rather than measured on a clock. An incremental appender keeps this at ~1: each append
+ * deposits one step's worth of marks no matter how long the stroke behind it is. An appender that
+ * repaints the cumulative stroke makes append k draw O(k), which puts the second half at ~3x the
+ * first.
+ */
+function appendMarkGrowthRatio(deltas: readonly number[]): number {
+  if (deltas.length < 2) throw new Error("An append-growth ratio needs at least two appends.");
+  const half = Math.floor(deltas.length / 2);
+  const sum = (slice: readonly number[]): number => slice.reduce((total, d) => total + d, 0);
+  const early = sum(deltas.slice(0, half));
+  if (!(early > 0)) throw new Error("The first half of a stroke drew nothing.");
+  return sum(deltas.slice(half)) / early;
+}
+
+/**
+ * Mark delta separating this stroke's two structural append classes.
+ *
+ * Every eighth append re-plans a ribbon chunk and deposits 1,695-1,780 marks; every other one
+ * deposits 150-320. Nothing lands between, so the split is unambiguous rather than a percentile.
+ */
+const APPEND_CHUNK_MARK_THRESHOLD = 1_000;
+
+/**
+ * What one ribbon-chunk append costs in units of one ordinary append — the periodic class graded
+ * against the steady one, inside a single pass.
+ *
+ * The cheapest append over a whole stroke is always an ordinary one, and both halves of the
+ * stroke contain the same 1:8 mix, so a slowdown confined to the CHUNK class moves neither the
+ * global minimum nor the early/late ratio, and draws exactly the same marks. Every eighth frame
+ * jumping from 9ms to 500ms is a freeze a user would feel, and it clears every other bound here.
+ *
+ * The obvious fix — calibrating the chunk class against the reference kernel like everything else
+ * — does not survive measurement: 24 samples of a ~13ms window do not converge under contention,
+ * and the class read 12.72-22.30 against the kernel across idle and loaded runs. Dividing by the
+ * ORDINARY class instead removes the machine exactly rather than approximately: both classes are
+ * the same code on the same box interleaved through the same stroke, so a machine 60% slower at
+ * appends (which is what CI is) cancels completely, and only the classes' relative cost survives.
+ *
+ * Which ordinary appends, and reduced how, both had to be measured rather than assumed. Cheapest
+ * chunk over cheapest ordinary anywhere in the stroke does NOT hold: the two windows are 13ms and
+ * 1ms, so the longer one absorbs more preemption, and under six spinning hogs plus five other
+ * suites in parallel workers that form read 17.08-19.91 where it had recorded 11.69-12.75. Each
+ * chunk against the seven ordinary appends of its own cycle (~7.9ms against ~13.4ms, adjacent in
+ * time) removes that asymmetry, and the median across cycles removes the two-sided noise the
+ * ratio then carries: 1.089-1.154 across the same conditions, a 6% spread.
+ */
+function appendChunkCostRatio(
+  samples: readonly StudioPerfCalibrationSample[],
+  markDeltas: readonly number[],
+): number {
+  if (samples.length !== markDeltas.length) {
+    throw new Error("Every append sample needs its own mark delta.");
+  }
+  // Each chunk is graded against the ordinary appends of ITS OWN cycle -- the seven that precede
+  // it -- rather than against the cheapest ordinary append anywhere in the stroke. Those seven
+  // cost ~7.9ms together against the chunk's ~13.4ms, so the two windows span comparable
+  // durations and comparable stretches of wall clock.
+  const cycles: number[] = [];
+  for (let index = 0; index < samples.length; index += 1) {
+    if (markDeltas[index]! <= APPEND_CHUNK_MARK_THRESHOLD) continue;
+    let ordinaryMs = 0;
+    let ordinaryCount = 0;
+    for (let back = Math.max(0, index - 7); back < index; back += 1) {
+      if (markDeltas[back]! > APPEND_CHUNK_MARK_THRESHOLD) continue;
+      ordinaryMs += samples[back]!.workMs;
+      ordinaryCount += 1;
+    }
+    if (ordinaryCount < 5 || !(ordinaryMs > 0)) continue;
+    cycles.push(samples[index]!.workMs / ordinaryMs);
+  }
+  if (cycles.length < 8) {
+    throw new Error(`Chunk cost needs at least eight complete cycles, got ${cycles.length}.`);
+  }
+  // The MEDIAN, not the minimum, and that is the one place in this file where the minimum is the
+  // wrong reducer. Everywhere else the quantity is a cost and noise is one-sided, so the cheapest
+  // reading is the honest one. Here the quantity is already a ratio of two same-duration windows,
+  // so a stall lands on either side with equal ease and the noise is two-sided: across 24 cycles
+  // the extremes ran 0.34-2.44 while the median moved only 1.089-1.154. Taking the minimum of a
+  // two-sided distribution measures the luckiest cycle, not the class.
+  const sorted = [...cycles].sort((left, right) => left - right);
+  return sorted[Math.floor(sorted.length / 2)]!;
+}
+
+/**
+ * How much more the stroke's LATE ribbon-chunk appends cost than its early ones.
+ *
+ * The two growth gates above reduce different populations, and the gap between them is real: the
+ * early/late ratio picks an ORDINARY append from each half, while the chunk/ordinary ratio picks
+ * the cheapest chunk across the WHOLE stroke. So re-planning that becomes length-dependent only
+ * on the chunk path — the append that actually does the extra planning — leaves an unaffected
+ * early chunk as the cheapest one, moves neither ratio, and changes no mark count.
+ *
+ * Both halves are chunk appends on the same machine, so this is machine-independent by the same
+ * construction as the chunk/ordinary ratio: what survives the division is length dependence
+ * within the class and nothing else.
+ */
+function appendChunkGrowthRatio(
+  samples: readonly StudioPerfCalibrationSample[],
+  markDeltas: readonly number[],
+): number {
+  if (samples.length !== markDeltas.length) {
+    throw new Error("Every append sample needs its own mark delta.");
+  }
+  const chunks = samples.filter((_, index) => markDeltas[index]! > APPEND_CHUNK_MARK_THRESHOLD);
+  if (chunks.length < 4) {
+    throw new Error(`Chunk growth needs at least four chunk appends, got ${chunks.length}.`);
+  }
+  const half = Math.floor(chunks.length / 2);
+  const cheapest = (slice: readonly StudioPerfCalibrationSample[]): number =>
+    Math.min(...slice.map((sample) => sample.workMs));
+  const early = cheapest(chunks.slice(0, half));
+  if (!(early > 0)) throw new Error("An early chunk append that costs nothing is not a denominator.");
+  return cheapest(chunks.slice(half)) / early;
+}
+
+/**
+ * Recorded 0.807 / 0.828 / 0.967 idle and 0.728 / 0.822 / 0.833 under six spinning hogs on four
+ * cores — consistently below 1, because later chunks run on a warmer JIT. 1.25 carries 29%
+ * headroom over the worst honest reading while a doubled late-chunk class (>=1.46) is convicted
+ * with 17% margin, and 500ms added to late chunks alone reads ~34.
+ */
+const APPEND_CHUNK_GROWTH_LIMIT = 1.25;
+
+/**
+ * What the COLD first append costs in units of one ordinary append.
+ *
+ * The first append is its own structural class, with exactly one member per pass: it starts a
+ * 60-point stroke from a fresh renderer where every later one extends by 30. It is excluded from
+ * the outlier max for that reason, its mark delta is a fixed 320 whatever the planner does
+ * internally, and it is never the global minimum — so a regression confined to it (a two-second
+ * initialisation, say) moves nothing this file otherwise measures, and clears both smoke bounds.
+ *
+ * Covers PER-RENDERER cold start rather than process-wide initialisation; the gate's own comment
+ * at the assertion carries the measurement that distinguishes the two.
+ *
+ * This is a BLOW-UP bound and not a budget, and the reason is measured. The reading is dominated
+ * by JIT warm-up of the whole renderer path: 15.6ms on the first pass, 3.4 on the second, 2.4 on
+ * the third, idle — and 32.5 / 8.4 / 6.3 under six spinning hogs on four cores. Reduced by the
+ * cheapest pass, as every verdict here is, that leaves 2.37 idle against 5.95 loaded. A 2.5x
+ * honest spread admits no gate that also convicts a doubling (that would need one below 4.74 and
+ * above 5.95), so this one does not pretend to: it is sized to catch the class blowing up, which
+ * is the regression that is actually invisible elsewhere.
+ *
+ * What covers the cold path exactly is the mark pin beside it — 320 marks, on every machine.
+ */
+function appendColdStartCostRatio(
+  samples: readonly StudioPerfCalibrationSample[],
+  markDeltas: readonly number[],
+): number {
+  if (samples.length !== markDeltas.length) {
+    throw new Error("Every append sample needs its own mark delta.");
+  }
+  const ordinary = samples.filter((_, index) => index > 0
+    && markDeltas[index]! <= APPEND_CHUNK_MARK_THRESHOLD);
+  if (ordinary.length === 0) throw new Error("No ordinary append to grade the cold start against.");
+  const cheapestOrdinaryMs = Math.min(...ordinary.map((sample) => sample.workMs));
+  if (!(cheapestOrdinaryMs > 0)) {
+    throw new Error("An ordinary append that costs nothing is not a denominator.");
+  }
+  return samples[0]!.workMs / cheapestOrdinaryMs;
+}
+
+/**
+ * What the COLD FIRST ribbon-chunk append costs in units of one ordinary append.
+ *
+ * The cold gate above grades `samples[0]`, which is an ORDINARY append. The first chunk append is
+ * a different structural path and its own cold start: if the renderer defers any initialisation
+ * until a chunk actually arrives, nothing above sees it. `appendChunkCostRatio` is a median over
+ * roughly two dozen cycles and discards a single stalled cycle by construction; the chunk-growth
+ * ratio and the ordinary-append calibration take minima; and `samples[0]` is a different append
+ * entirely. So a 500ms one-time stall on the first chunk moves nothing and clears both smoke
+ * bounds — the same hole the ordinary cold gate was written to close, one path over.
+ *
+ * The denominator is the cheapest ordinary append, as above: this is a COST, whose noise is
+ * one-sided, so the cheapest reading is the honest one.
+ */
+function appendFirstChunkColdStartCostRatio(
+  samples: readonly StudioPerfCalibrationSample[],
+  markDeltas: readonly number[],
+): number {
+  if (samples.length !== markDeltas.length) {
+    throw new Error("Every append sample needs its own mark delta.");
+  }
+  const firstChunkIndex = markDeltas.findIndex((delta) => delta > APPEND_CHUNK_MARK_THRESHOLD);
+  if (firstChunkIndex < 0) {
+    throw new Error("No ribbon-chunk append to grade a cold chunk start against.");
+  }
+  const ordinary = samples.filter((_, index) => index > 0
+    && markDeltas[index]! <= APPEND_CHUNK_MARK_THRESHOLD);
+  if (ordinary.length === 0) {
+    throw new Error("No ordinary append to grade the cold chunk start against.");
+  }
+  const cheapestOrdinaryMs = Math.min(...ordinary.map((sample) => sample.workMs));
+  if (!(cheapestOrdinaryMs > 0)) {
+    throw new Error("An ordinary append that costs nothing is not a denominator.");
+  }
+  return samples[firstChunkIndex]!.workMs / cheapestOrdinaryMs;
+}
+
+/**
+ * Graded on the FIRST pass, not the cheapest, and that distinction is the whole point of the gate.
+ *
+ * Initialisation that only the first renderer in the process pays is exactly the regression this
+ * covers, and it is invisible to every later pass — `[2000, 2.4, 2.4]` reduces to 2.4 under a
+ * minimum and acquits a two-second stall on the user's first stroke. The cheapest pass is the
+ * honest reducer for a cost that every pass pays; here it discards the only pass that is actually
+ * cold.
+ *
+ * That costs sensitivity, because a single cold reading is JIT-dominated and cannot be reduced:
+ * 15.09 idle against 30.10 under six spinning hogs on four cores. 60 carries 2x headroom over the
+ * worst of those, catches a cold path that grew to 100ms (~90) and the two-second case (~2000),
+ * and does not pretend to catch a doubling. What covers the cold path exactly is the mark pin
+ * beside it.
+ */
+const APPEND_COLD_START_COST_LIMIT = 60;
+
+/**
+ * Blow-up bound for the COLD FIRST ribbon-chunk append, graded on the FIRST pass.
+ *
+ * Same shape and same reasoning as `APPEND_COLD_START_COST_LIMIT` — including that it covers
+ * per-renderer cold start and not process-wide initialisation — one structural path over: a
+ * chunk append is ~12 ordinary appends by construction (it re-plans a ribbon chunk rather than
+ * extending by 30 points), so the ratio is large before anything is wrong and the gate can only
+ * be a blow-up bound.
+ *
+ * Recorded first-pass readings: 12.32 / 13.73 / 15.28 idle, and 14.74 / 25.35 / 28.99 under six
+ * spinning hogs on four cores. 75 carries 2.6x headroom over the worst of those; a one-time
+ * initialisation deferred to the first chunk reads its own cost in ordinary appends, so the
+ * 500ms case reads in the hundreds and even a 50ms one is convicted.
+ */
+const APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT = 75;
+
+/**
+ * Recorded 1.1062 / 1.1305 / 1.1537 idle and 1.0893 / 1.0898 / 1.0915 under six spinning hogs on
+ * four cores WITH five other heavy suites in parallel workers — the load that broke the previous
+ * form of this statistic. A 6% spread, because both sides of the division are the same code on
+ * the same machine over comparable durations.
+ *
+ * 1.45 carries 26% headroom over the worst of those, while a doubled chunk class (>=2.18) is
+ * convicted with 50% margin and the 500ms-every-eighth-frame case reads in the tens.
+ */
+const APPEND_CHUNK_COST_LIMIT = 1.45;
+
+/**
+ * How much more a stroke's LATE appends cost than its early ones, with the machine divided out of
+ * both halves — the O(1) claim on the clock rather than on mark counts.
+ *
+ * The cheapest append over a whole stroke cannot answer this. It is always an early one, so a
+ * regression that only slows later appends leaves it exactly where it was; adding 100ms to every
+ * append in the second half moves neither that minimum nor any mark count, because a planner can
+ * recompute prior geometry and still render only the unseen suffix. Splitting the pass in two and
+ * calibrating each half against the references timed beside ITS OWN appends catches precisely
+ * that: both halves cancel the machine independently, so what survives the division is length
+ * dependence and nothing else.
+ */
+function appendCalibratedHalfGrowth(
+  samples: readonly StudioPerfCalibrationSample[],
+): number {
+  if (samples.length < 4) {
+    throw new Error("A half-growth ratio needs at least four appends.");
+  }
+  const half = Math.floor(samples.length / 2);
+  const early = reduceStudioPerfCalibrationSamples(samples.slice(0, half));
+  const late = reduceStudioPerfCalibrationSamples(samples.slice(half));
+  return late.ratio / early.ratio;
+}
+
+/**
+ * Recorded across idle and six-hogs-on-four-cores runs at 0.881 / 0.904 / 0.933 / 0.953 / 0.964 /
+ * 0.977 / 1.004 / 1.009 / 1.018 — a 14% spread, centred just below 1 because the second half of a
+ * stroke runs on a warmer JIT. 1.3 carries 28% headroom over the worst of those, while any real
+ * length dependence lands far above it: a linear replan puts this near 100, and even a leak that
+ * adds 1% of the base cost per append reaches ~2. Confirmed live rather than argued — slowing
+ * only the second half of the appends by 1.5x scored 1.357 / 1.492 / 1.621 and failed on every
+ * pass, while the global cheapest append, and every mark count, stayed exactly where they were.
+ */
+const APPEND_LENGTH_GROWTH_LIMIT = 1.3;
+
+/**
+ * Recorded 0.9996 for the incremental appender, identically in every pass on every machine (mark
+ * counts do not vary). 1.25 leaves room for a step-count change without admitting anything
+ * asymptotic: the cheapest cumulative repaint this loop can express already lands near 3.
+ */
+const APPEND_MARK_GROWTH_LIMIT = 1.25;
 
 function attachedRenderer(surface: StudioLiveInkSurface = SURFACE) {
   vi.stubGlobal("OffscreenCanvas", class {
@@ -1739,8 +2032,39 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // maximum over frames, the repetition has to wrap the WHOLE pass and keep the lowest max -
     // taking a per-frame minimum would compare frames that never ran together.
     const APPEND_BUDGET_PASSES = 3;
+    // Reference rounds per append, sized so an unregressed append scores ~1.0 against the pinned
+    // calibration kernel: 80 rounds cost 0.88-1.00ms on the reference container against a cheapest
+    // append of 1.06-1.16ms. FIXED, never derived from a live reading -- sizing the denominator
+    // from the numerator's own measurement makes every ratio 1.0 by construction.
+    const APPEND_CALIBRATION_ROUNDS = 80;
+    // Recorded min(append)/min(reference), which is a two-machine number because one machine's
+    // population is not the baseline:
+    //
+    //   4-vCPU container   1.113 - 1.240 idle, 1.196 - 1.230 under six hogs on four cores
+    //   GitHub Actions     1.512 - 1.559
+    //
+    // The runner's REFERENCE matches the container's almost exactly (1.1ms against 0.95ms) while
+    // its append costs 60% more, so the two do not co-scale: a synthetic kernel cancels machine
+    // speed but not instruction mix, and an allocating append is not a cache-resident float loop.
+    // A gate of 1.5 set from the container's population alone failed CI at 1.512 -- 1% over, with
+    // nothing regressed, on the one test out of 32,199 that this change touches.
+    //
+    // The honest population therefore spans 1.113-1.559, a 1.40x cross-machine spread, and any
+    // gate has to sit above 1.559 and below 2 x 1.113 = 2.226 to keep convicting a doubling on
+    // the machine most favourable to one. 1.85 sits in that window with 19% headroom over the
+    // worst honest reading and 20% margin under the cheapest doubling. If a third machine ever
+    // narrows that window to nothing, the detection assertion below is what says so -- loudly,
+    // rather than by quietly passing.
+    const APPEND_CALIBRATION_MAX_RATIO = 1.85;
+    const calibrationPasses: StudioPerfCalibrationPass[] = [];
+    const halfGrowths: number[] = [];
+    const chunkCostRatios: number[] = [];
+    const coldStartCostRatios: number[] = [];
+    const firstChunkColdStartCostRatios: number[] = [];
+    const chunkGrowthRatios: number[] = [];
     let maxAppendFrameMs = Number.POSITIVE_INFINITY;
     let totalAppendMs = Number.POSITIVE_INFINITY;
+    let markDeltas: number[] = [];
     let appendCount = 0;
     let liveMarks: ReturnType<typeof attachedRenderer>["activeCanvas"]["recordedMarks"] = [];
     let lastRenderer: ReturnType<typeof attachedRenderer>["renderer"] | null = null;
@@ -1754,6 +2078,9 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     let passTotalAppendMs = 0;
     let passAppendCount = 0;
     let activeClearsAfterFirstMove: number | null = null;
+    const passSamples: StudioPerfCalibrationSample[] = [];
+    const passMarkDeltas: number[] = [];
+    let markedBeforeAppend = 0;
 
     for (let pointCount = 60; pointCount <= fullPoints.length; pointCount += 30) {
       const prefixPoints = fullPoints.slice(0, pointCount);
@@ -1769,11 +2096,22 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         tiltYs: Array.from({ length: pointCount / 2 }, () => -9),
       });
 
+      // The reference is timed immediately before the append it calibrates, every append. Both
+      // windows are ~1ms and adjacent, so a contended stretch or a GC pause inflates the pair
+      // together -- which is precisely what the old form could not do, measuring its calibration
+      // in one separate window after all three passes had finished.
+      const referenceStartedMs = performance.now();
+      runStudioPerfCalibrationRounds(APPEND_CALIBRATION_ROUNDS);
+      const referenceMs = performance.now() - referenceStartedMs;
+
       const startMs = performance.now();
       const appended = renderer.appendFrom(prefixElement);
       const elapsedMs = performance.now() - startMs;
 
       expect(appended.status).toBe("appended");
+      passSamples.push({ referenceMs, workMs: elapsedMs });
+      passMarkDeltas.push(activeCanvas.recordedMarks.length - markedBeforeAppend);
+      markedBeforeAppend = activeCanvas.recordedMarks.length;
       passAppendCount += 1;
       passTotalAppendMs += elapsedMs;
       // The FIRST append is excluded from the outlier max, and only from that.
@@ -1803,48 +2141,175 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       maxAppendFrameMs = passMaxAppendFrameMs;
       totalAppendMs = passTotalAppendMs;
     }
+    calibrationPasses.push(reduceStudioPerfCalibrationSamples(passSamples));
+    halfGrowths.push(appendCalibratedHalfGrowth(passSamples));
+    chunkCostRatios.push(appendChunkCostRatio(passSamples, passMarkDeltas));
+    coldStartCostRatios.push(appendColdStartCostRatio(passSamples, passMarkDeltas));
+    firstChunkColdStartCostRatios.push(
+      appendFirstChunkColdStartCostRatio(passSamples, passMarkDeltas),
+    );
+    chunkGrowthRatios.push(appendChunkGrowthRatio(passSamples, passMarkDeltas));
+    markDeltas = passMarkDeltas;
     appendCount = passAppendCount;
     liveMarks = activeCanvas.recordedMarks;
     }
 
-    expect(appendCount).toBeGreaterThan(50);
-    // Budget basis (measured 2026-08-13, vitest node env on this repo's 4-worker config):
-    // - isolated single-test runs (cold JIT, the slower legitimate mode; 9 runs):
-    //   max-frame median 11.8ms / worst 17.2ms; total median 300ms / worst 322ms.
-    // - full-file runs (warm worker; 3 runs): max-frame median 7.6ms; total median 262ms.
-    // Bounds are the cold-mode medians with ~2.5x CI margin: 11.8ms → 30ms per frame and
-    // 300ms → 750ms total. Tighter bounds (e.g. 20ms) sit within one GC pause of the observed
-    // The worst frame is graded against this pass's OWN mean, not a millisecond count. That ratio
-    // is scale-free: it cancels machine speed and uniform contention exactly, because both move
-    // the numerator and denominator together, and what remains is the only thing this bound is
-    // really asserting -- that no single append is an outlier against its neighbours. The absolute
-    // form failed here at 44-67ms against 30 with nothing regressed.
+    // The append loop is fully determined -- 60 points, +30 each step, up to 6,000 -- so its shape
+    // is pinned exactly rather than bounded loosely.
+    expect(appendCount).toBe(199);
+
+    // ---------------------------------------------------------------------------------------
+    // What O(1) actually claims, asserted without a clock.
     //
-    // It does not stand alone: a regression that slows EVERY append leaves this ratio flat and is
-    // caught by the calibrated per-append budget below, while a spike in one frame leaves that
-    // budget nearly flat and is caught here. Recorded on the reference container at 5.51 / 5.87;
-    // 9 carries margin over the worst while a doubled worst frame (>=11) still fails. The max
-    // excludes the first append (see above), which does a structurally different amount of work;
-    // the mean still includes it, which only makes this bound stricter.
-    const meanAppendFrameMs = totalAppendMs / appendCount;
-    expect(maxAppendFrameMs / meanAppendFrameMs).toBeLessThan(9);
-    // The total is budgeted PER APPEND against a duration-matched calibration, not as an absolute
-    // sum, because the absolute form was wrong twice over.
+    // The regression this test exists to catch is an append that repaints the cumulative stroke:
+    // append k would then draw O(k) marks and the run would cost O(n^2). That is a statement about
+    // WORK, and the recorder counts work exactly -- so it is graded on mark counts, which are
+    // identical on every machine, under every load, in every pass. Every timing bound below is a
+    // second opinion, not the proof.
     //
-    // Stale: the recorded basis above is a 300ms total, but this stroke now performs 199 appends at
-    // ~10ms each -- roughly 2,000ms. Per-append cost is healthy (CI reads 1532ms/199 = 7.7ms); the
-    // fixed total simply never tracked the append count growing under it, so the gate had drifted
-    // into measuring the workload's size rather than its speed.
+    // Recorded shape: 76,565 marks over 199 appends. Every eighth append re-plans a ribbon chunk
+    // and deposits 1,695-1,780 marks; every other one deposits 150-240; the first, which starts a
+    // 60-point stroke from a cold renderer rather than extending by 30, deposits 320.
+    const totalMarkDeltas = markDeltas.reduce((sum, delta) => sum + delta, 0);
+    expect(totalMarkDeltas).toBe(76_565);
+    expect(totalMarkDeltas).toBe(liveMarks.length);
+    // No append draws more than one chunk's worth, however long the stroke behind it has grown.
+    // Under a cumulative repaint the last append alone would draw all 76,565.
+    expect(Math.max(...markDeltas), `heaviest append draws ${Math.max(...markDeltas)} marks`)
+      .toBeLessThanOrEqual(1_800);
+    // The asymptotic statement itself: the second half of the stroke costs what the first half
+    // did. Recorded 38,275 against 38,290 -- a ratio of 0.9996. A cumulative repaint makes the
+    // per-append cost grow linearly with the index, which puts this ratio at ~3.
+    expect(
+      appendMarkGrowthRatio(markDeltas),
+      `late appends draw ${appendMarkGrowthRatio(markDeltas).toFixed(3)}x what early ones did`,
+    ).toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // ---------------------------------------------------------------------------------------
+    // Constant-factor cost, calibrated per append against the pinned reference kernel.
     //
-    // Runner-dependent: `process.env.CI ? 1500 : 750` still failed CI at 1532.5ms with nothing
-    // regressed, and gave the busiest machines the loosest bound.
+    // The statistic is the CHEAPEST append, not the mean, and that is the whole fix. Contention
+    // only ever ADDS time, so the cheapest append is the honest estimate of what an append costs;
+    // the mean is dominated by whatever the scheduler did during the other 198. Measured on this
+    // container, idle then under six spinning hogs against four cores:
     //
-    // Per-append against the calibration fixes both: it scales with the workload and cancels the
-    // machine. Recorded on the reference container at 0.0254 / 0.0259 of one calibration unit;
-    // 0.034 carries ~1.3x margin while a 2x per-append regression (>=0.051) still fails.
-    expect(totalAppendMs / appendCount).toBeLessThan(
-      studioPerfRatioBudgetMs(0.034, studioPerfSustainedCalibrationWorkload, 2),
+    //                     idle      loaded    moved
+    //   min per append    1.08ms    1.14ms    x1.05
+    //   mean per append   5.36ms   13.09ms    x2.44
+    //   ratio on the min   1.13      1.21     +7%
+    //   ratio on the mean  5.36     13.92     +160%
+    //
+    // The mean-based form is what failed on main at 11.078ms against a 10.115ms budget with
+    // nothing regressed. It could not be rescued by a bigger margin either: a statistic that
+    // moves 2.4x on load has no threshold that both passes honest work and catches a doubling.
+    //
+    // A regression that slows every append raises the minimum with it, which is exactly the
+    // failure this bound is for. A regression that slows only SOME appends leaves the minimum
+    // flat -- that one is the mark-count pins' job above, where it is caught exactly.
+    const budget = judgeStudioCalibratedBudget(
+      "3,000-sample crayon live append",
+      calibrationPasses,
+      APPEND_CALIBRATION_MAX_RATIO,
     );
+    expect(budget.ok, budget.detail).toBe(true);
+
+    // ...and the gate is not allowed to decay into a friendlier no-op: on this machine, right now,
+    // a doubled append must still be convicted. Judged over the passes just measured, reduced the
+    // way the gate reduces them.
+    const detection = judgeStudioCalibratedDetection(
+      "3,000-sample crayon live append",
+      [calibrationPasses],
+      2,
+      APPEND_CALIBRATION_MAX_RATIO,
+    );
+    expect(detection.detected, detection.detail).toBe(true);
+
+    // ...and the same gate along the stroke, because the minimum above is always an EARLY append.
+    // A regression that recomputes prior geometry for later frames while still rendering only the
+    // unseen suffix moves no mark count and no global minimum — it is only visible as late
+    // appends costing more than early ones did. Each half is calibrated against the references
+    // timed beside its own appends, so the machine cancels twice and what is left is length
+    // dependence. Earned like every other verdict here: the cheapest of the three passes decides.
+    const halfGrowth = Math.min(...halfGrowths);
+    expect(
+      halfGrowth,
+      `late appends cost ${halfGrowth.toFixed(3)}x what early ones did `
+      + `(passes: ${halfGrowths.map((value) => value.toFixed(3)).join(", ")})`,
+    ).toBeLessThan(APPEND_LENGTH_GROWTH_LIMIT);
+
+    // ...and the periodic class graded against the steady one, because the two bounds above are
+    // both blind to it: a slowdown confined to the every-eighth ribbon-chunk append leaves the
+    // global minimum on an ordinary append, leaves both half-minima ordinary too, and draws
+    // exactly the same marks. Earned like the rest — the cheapest of the three passes decides,
+    // which is what discards the one contended pass that read 20.94 where its neighbours read
+    // 11.69 and 12.75.
+    const chunkCostRatio = Math.min(...chunkCostRatios);
+    expect(
+      chunkCostRatio,
+      `a ribbon-chunk append costs ${chunkCostRatio.toFixed(3)}x its cycle's ordinary appends `
+      + `(passes: ${chunkCostRatios.map((value) => value.toFixed(2)).join(", ")})`,
+    ).toBeLessThan(APPEND_CHUNK_COST_LIMIT);
+
+    // ...and length dependence WITHIN the chunk class, which the two ratios above miss between
+    // them: the early/late gate reduces ordinary appends in each half, this class's own gate
+    // reduces the cheapest chunk across the whole stroke, so re-planning that grows only on the
+    // chunk path leaves an unaffected early chunk as the cheapest and moves neither.
+    const chunkGrowthRatio = Math.min(...chunkGrowthRatios);
+    expect(
+      chunkGrowthRatio,
+      `late ribbon-chunk appends cost ${chunkGrowthRatio.toFixed(3)}x what early ones did `
+      + `(passes: ${chunkGrowthRatios.map((value) => value.toFixed(3)).join(", ")})`,
+    ).toBeLessThan(APPEND_CHUNK_GROWTH_LIMIT);
+
+    // ...and the cold first append, the one class with a single member per pass. It is excluded
+    // from the outlier max, it is never the global minimum, and it sits in the early half where
+    // it cannot move that ratio either — so a two-second initialisation regression would be
+    // invisible to everything above and would clear both smoke bounds. Its WORK is pinned
+    // exactly beside this; its cost is JIT-dominated and so carries a blow-up bound only.
+    //
+    // The FIRST pass, deliberately, where every other verdict here takes the cheapest: a fresh
+    // renderer's first append is the cold path, and a minimum across passes acquits precisely the
+    // regression this exists for.
+    //
+    // What it covers is PER-RENDERER cold start, and not process-wide initialisation, which is a
+    // narrower claim than this comment used to make. Fourteen tests in this file construct
+    // renderers and drive appends before this one runs, so whatever the process pays once has
+    // already been paid by the time the first pass here is measured. That is measured, not
+    // supposed: this same reading is 4.05 and 4.62 in file order against 14.69 and 14.42 when the
+    // test is run on its own, so roughly ten ordinary appends of one-time cost sit outside the
+    // window. Closing that gap needs this measurement in its OWN file, the way the impasto shader
+    // gates were split from their census, rather than a different statistic here.
+    expect(markDeltas[0], "cold first append marks").toBe(320);
+    const coldStartCostRatio = coldStartCostRatios[0]!;
+    expect(
+      coldStartCostRatio,
+      `the genuinely cold first append costs ${coldStartCostRatio.toFixed(2)} ordinary appends `
+      + `(all passes, warm ones included: `
+      + `${coldStartCostRatios.map((value) => value.toFixed(2)).join(", ")})`,
+    ).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
+
+    // The same hole, one structural path over: the first RIBBON-CHUNK append. Initialisation
+    // deferred until a chunk actually arrives is invisible to the cold gate just above (which
+    // grades an ordinary append), to the chunk-cost median (which discards one stalled cycle in
+    // two dozen by construction), to the chunk-growth minima and to both smoke bounds. Read on
+    // the FIRST pass for the same reason as its sibling: a process pays one-time initialisation
+    // once, so a minimum across passes acquits precisely what this exists to catch.
+    const firstChunkColdStartCostRatio = firstChunkColdStartCostRatios[0]!;
+    expect(
+      firstChunkColdStartCostRatio,
+      `the genuinely cold first ribbon-chunk append costs `
+      + `${firstChunkColdStartCostRatio.toFixed(2)} ordinary appends (all passes, warm ones `
+      + `included: ${firstChunkColdStartCostRatios.map((value) => value.toFixed(2)).join(", ")})`,
+    ).toBeLessThan(APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT);
+
+    // A blow-up bound, not a budget. The worst single append is a pure noise measurement -- 30.1
+    // to 45.8ms idle on this container, where the median append is 1.8ms, because one GC pause
+    // lands wherever it lands (the 1ms reference kernel itself was seen taking 7.2ms). It was
+    // previously graded against the pass mean at a limit of 9 and read 9.6 in a single idle pass,
+    // one unlucky collection away from failing. Kept only wide enough to catch a hang.
+    expect(maxAppendFrameMs, `worst single append ${maxAppendFrameMs.toFixed(1)}ms`)
+      .toBeLessThan(1_000);
+    expect(totalAppendMs).toBeLessThan(60_000);
 
     expect(liveMarks.length).toBeGreaterThan(0);
     // Bounded by the complete-stroke ceiling, not the per-segment one: a 3,000-sample crayon
@@ -1855,6 +2320,322 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       .toBeLessThanOrEqual(STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET);
     const sealed = lastRenderer!.end(element);
     expect(sealed.status).toBe("settled");
+  });
+
+  it("convicts a length-dependent appender the cheapest append cannot see", () => {
+    // The blind spot the mark-count pins do NOT cover: a planner that recomputes prior geometry
+    // for later frames but still renders only the unseen suffix. Every mark delta is unchanged,
+    // so the counts above stay green, and the global cheapest append is unchanged too because it
+    // is always an early one. Stated as data, so it needs no clock and no machine.
+    const APPENDS = 200;
+    const REFERENCE_MS = 1;
+    const honest = Array.from({ length: APPENDS }, (_, index) => ({
+      referenceMs: REFERENCE_MS,
+      // The recorded shape's two levels: every eighth append re-plans a ribbon chunk.
+      workMs: index % 8 === 7 ? 9 : 1.1,
+    }));
+    expect(appendCalibratedHalfGrowth(honest)).toBeCloseTo(1, 6);
+    expect(appendCalibratedHalfGrowth(honest)).toBeLessThan(APPEND_LENGTH_GROWTH_LIMIT);
+
+    // Codex's case, verbatim: 100ms added to every append in the second half.
+    const lateStall = honest.map((sample, index) => (index < APPENDS / 2
+      ? sample
+      : { ...sample, workMs: sample.workMs + 100 }));
+    expect(appendCalibratedHalfGrowth(lateStall)).toBeGreaterThan(APPEND_LENGTH_GROWTH_LIMIT);
+    // ...and the statistic the global minimum reports for that same series is unchanged, which is
+    // exactly why this gate exists alongside it.
+    expect(reduceStudioPerfCalibrationSamples(lateStall).workMs)
+      .toBe(reduceStudioPerfCalibrationSamples(honest).workMs);
+
+    // A linear replan — append k re-derives k appends' worth — is convicted overwhelmingly.
+    const linear = honest.map((sample, index) => ({
+      ...sample,
+      workMs: sample.workMs * (index + 1),
+    }));
+    expect(appendCalibratedHalfGrowth(linear)).toBeGreaterThan(50);
+
+    // And a partial leak: 1% of the base cost re-derived per append behind the cursor.
+    const leak = honest.map((sample, index) => ({
+      ...sample,
+      workMs: sample.workMs * (1 + 0.01 * index),
+    }));
+    expect(appendCalibratedHalfGrowth(leak)).toBeGreaterThan(APPEND_LENGTH_GROWTH_LIMIT);
+
+    // Not vacuous in the other direction: a uniform 40% slowdown is NOT length dependence and
+    // must not be convicted here — that is the calibrated budget's job, and it catches it.
+    const uniform = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 1.4 }));
+    expect(appendCalibratedHalfGrowth(uniform)).toBeLessThan(APPEND_LENGTH_GROWTH_LIMIT);
+    // A machine 3x slower at everything, references included, is likewise not length dependence.
+    const slowBox = honest.map((sample) => ({
+      referenceMs: sample.referenceMs * 3,
+      workMs: sample.workMs * 3,
+    }));
+    expect(appendCalibratedHalfGrowth(slowBox)).toBeCloseTo(1, 6);
+
+    expect(() => appendCalibratedHalfGrowth(honest.slice(0, 3)))
+      .toThrow(/at least four appends/);
+  });
+
+  it("convicts a periodically slow append class the other two bounds cannot see", () => {
+    // The third blind spot, and the one the first two gates share: a slowdown confined to the
+    // every-eighth ribbon-chunk append. The global minimum stays on an ordinary append, both
+    // half-minima stay ordinary so the early/late ratio stays flat, and the mark counts do not
+    // move at all. Stated as data, so it needs no clock and no machine.
+    const APPENDS = 200;
+    const deltas = Array.from({ length: APPENDS }, (_, index) => (index % 8 === 7 ? 1_740 : 210));
+    // Ordinary appends at their MEAN (1.74ms), not their minimum: the cycle sums seven of them,
+    // so the recorded ~1.10 median comes out of the mean rather than the noise floor.
+    const honest = Array.from({ length: APPENDS }, (_, index) => ({
+      referenceMs: 1,
+      workMs: index % 8 === 7 ? 13.4 : 1.74,
+    }));
+    expect(appendChunkCostRatio(honest, deltas)).toBeCloseTo(1.10, 1);
+    expect(appendChunkCostRatio(honest, deltas)).toBeLessThan(APPEND_CHUNK_COST_LIMIT);
+
+    // Codex's case, verbatim: every eighth append at 500ms, ordinary ones untouched.
+    const periodicStall = honest.map((sample, index) => (index % 8 === 7
+      ? { ...sample, workMs: 500 }
+      : sample));
+    expect(appendChunkCostRatio(periodicStall, deltas)).toBeGreaterThan(30);
+    expect(appendChunkCostRatio(periodicStall, deltas))
+      .toBeGreaterThan(APPEND_CHUNK_COST_LIMIT);
+    // ...and the bounds it slips past, which is why this gate exists alongside them.
+    expect(reduceStudioPerfCalibrationSamples(periodicStall).workMs)
+      .toBe(reduceStudioPerfCalibrationSamples(honest).workMs);
+    expect(appendCalibratedHalfGrowth(periodicStall))
+      .toBeCloseTo(appendCalibratedHalfGrowth(honest), 6);
+
+    // A mere doubling of the class is convicted too, not just a catastrophe.
+    const doubledClass = honest.map((sample, index) => (index % 8 === 7
+      ? { ...sample, workMs: sample.workMs * 2 }
+      : sample));
+    expect(appendChunkCostRatio(doubledClass, deltas))
+      .toBeGreaterThan(APPEND_CHUNK_COST_LIMIT);
+
+    // Not vacuous in the other direction. A uniformly slower machine — every append 3x, chunk
+    // and ordinary alike — is not a class regression and must not convict here.
+    const slowBox = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 3 }));
+    expect(appendChunkCostRatio(slowBox, deltas)).toBeCloseTo(1.10, 1);
+    // Nor is a slowdown confined to the ORDINARY class, which the calibrated budget catches
+    // instead — this ratio moves DOWN there, and a lower ratio is never a failure.
+    const ordinaryStall = honest.map((sample, index) => (index % 8 === 7
+      ? sample
+      : { ...sample, workMs: sample.workMs * 2 }));
+    expect(appendChunkCostRatio(ordinaryStall, deltas)).toBeLessThan(APPEND_CHUNK_COST_LIMIT);
+
+    expect(() => appendChunkCostRatio(honest, deltas.slice(1)))
+      .toThrow(/its own mark delta/);
+    expect(() => appendChunkCostRatio(honest, deltas.map(() => 210)))
+      .toThrow(/at least eight complete cycles/);
+  });
+
+  it("convicts a cold FIRST-CHUNK regression every other bound discards", () => {
+    // The sixth blind spot: the first ribbon-chunk append. Deferring initialisation to the chunk
+    // path rather than to the renderer's first ordinary append moves it out of reach of every
+    // gate in this file. Stated as data, so it needs no clock and no machine.
+    const APPENDS = 200;
+    const deltas: number[] = Array.from(
+      { length: APPENDS },
+      (_, index) => (index % 8 === 7 ? 1_740 : 210),
+    );
+    deltas[0] = 320;
+    const honest: StudioPerfCalibrationSample[] = Array.from({ length: APPENDS }, (_, index) => ({
+      referenceMs: 1,
+      workMs: index % 8 === 7 ? 13.4 : 1.13,
+    }));
+    honest[0] = { referenceMs: 1, workMs: 2.6 };
+    // ~12 ordinary appends before anything is wrong, which is why this is a blow-up bound: a
+    // chunk append re-plans a ribbon chunk where an ordinary one extends by 30 points.
+    expect(appendFirstChunkColdStartCostRatio(honest, deltas)).toBeCloseTo(11.86, 1);
+    expect(appendFirstChunkColdStartCostRatio(honest, deltas))
+      .toBeLessThan(APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT);
+
+    // Codex's case, verbatim: a 500ms first-use stall on the structural chunk path.
+    const coldChunkStall = honest.map((sample, index) => (index === 7
+      ? { ...sample, workMs: sample.workMs + 500 }
+      : sample));
+    expect(appendFirstChunkColdStartCostRatio(coldChunkStall, deltas)).toBeGreaterThan(450);
+    expect(appendFirstChunkColdStartCostRatio(coldChunkStall, deltas))
+      .toBeGreaterThan(APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT);
+
+    // ...and here is every bound it slips past, which is the whole reason this gate exists.
+    // The global minimum is an ordinary append and never moves.
+    expect(reduceStudioPerfCalibrationSamples(coldChunkStall).workMs)
+      .toBe(reduceStudioPerfCalibrationSamples(honest).workMs);
+    // The chunk-cost gate is a MEDIAN over ~24 cycles, so one stalled cycle is discarded by
+    // construction — the same property that makes it robust to a scheduler pause makes it blind
+    // here, which is precisely why a separate first-chunk gate is needed rather than a tighter
+    // chunk-cost limit.
+    // (Equality, not "under the limit": this fixture's two-level shape is not calibrated to that
+    // gate's budget. The claim is that the 500ms stall does not move its verdict AT ALL.)
+    expect(appendChunkCostRatio(coldChunkStall, deltas))
+      .toBeCloseTo(appendChunkCostRatio(honest, deltas), 6);
+    // The chunk-growth gate takes the cheapest chunk in each half; the stalled chunk is the first
+    // one, in the early half, where the other early chunks are unaffected and stay cheapest.
+    expect(appendChunkGrowthRatio(coldChunkStall, deltas))
+      .toBeCloseTo(appendChunkGrowthRatio(honest, deltas), 6);
+    expect(appendChunkGrowthRatio(coldChunkStall, deltas)).toBeLessThan(APPEND_CHUNK_GROWTH_LIMIT);
+    // The ordinary cold-start gate grades `samples[0]`, a different append entirely.
+    expect(appendColdStartCostRatio(coldChunkStall, deltas))
+      .toBeCloseTo(appendColdStartCostRatio(honest, deltas), 6);
+    // The early/late calibration reduces ordinary appends in each half and never sees a chunk.
+    expect(appendCalibratedHalfGrowth(coldChunkStall))
+      .toBeCloseTo(appendCalibratedHalfGrowth(honest), 6);
+    // And the mark counts are identical, because no extra geometry was planned.
+    expect(appendMarkGrowthRatio(deltas)).toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // A stall on a LATER chunk is not this gate's business and it says so, rather than
+    // overlapping the growth gate that does cover it.
+    const lateChunkStall = honest.map((sample, index) => (index % 8 === 7 && index > APPENDS / 2
+      ? { ...sample, workMs: sample.workMs + 500 }
+      : sample));
+    expect(appendFirstChunkColdStartCostRatio(lateChunkStall, deltas))
+      .toBeCloseTo(appendFirstChunkColdStartCostRatio(honest, deltas), 6);
+    expect(appendChunkGrowthRatio(lateChunkStall, deltas))
+      .toBeGreaterThan(APPEND_CHUNK_GROWTH_LIMIT);
+
+    // A slower machine moves both sides of the division together and changes nothing.
+    const slowBox = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 3.4 }));
+    expect(appendFirstChunkColdStartCostRatio(slowBox, deltas)).toBeCloseTo(11.86, 1);
+
+    // Read on the FIRST pass, not the cheapest: process-wide initialisation is paid once, so a
+    // minimum across passes acquits exactly the regression this exists for.
+    const perPassRatios = [
+      appendFirstChunkColdStartCostRatio(coldChunkStall, deltas),
+      appendFirstChunkColdStartCostRatio(honest, deltas),
+      appendFirstChunkColdStartCostRatio(honest, deltas),
+    ];
+    expect(Math.min(...perPassRatios)).toBeLessThan(APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT);
+    expect(perPassRatios[0]!).toBeGreaterThan(APPEND_FIRST_CHUNK_COLD_START_COST_LIMIT);
+
+    // It is not evidence of anything without matched inputs or a chunk to grade.
+    expect(() => appendFirstChunkColdStartCostRatio(honest, deltas.slice(1)))
+      .toThrow(/its own mark delta/);
+    expect(() => appendFirstChunkColdStartCostRatio(honest, deltas.map(() => 210)))
+      .toThrow(/No ribbon-chunk append/);
+    expect(() => appendFirstChunkColdStartCostRatio(honest, deltas.map(() => 1_740)))
+      .toThrow(/No ordinary append/);
+  });
+
+  it("convicts a cold-start regression the other three bounds cannot see", () => {
+    // The fourth blind spot: the first append, one member per pass. It is excluded from the
+    // outlier max, it is never the global minimum, and it sits in the early half so it cannot
+    // move the early/late ratio either. Stated as data.
+    const APPENDS = 200;
+    const deltas: number[] = Array.from(
+      { length: APPENDS },
+      (_, index) => (index % 8 === 7 ? 1_740 : 210),
+    );
+    deltas[0] = 320;
+    const honest: StudioPerfCalibrationSample[] = Array.from({ length: APPENDS }, (_, index) => ({
+      referenceMs: 1,
+      workMs: index % 8 === 7 ? 13.4 : 1.13,
+    }));
+    honest[0] = { referenceMs: 1, workMs: 2.6 };
+    expect(appendColdStartCostRatio(honest, deltas)).toBeCloseTo(2.30, 1);
+    expect(appendColdStartCostRatio(honest, deltas)).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
+
+    // Codex's case, verbatim: a two-second initialisation on the cold path alone.
+    const coldStall = honest.map((sample, index) => (index === 0
+      ? { ...sample, workMs: 2_000 }
+      : sample));
+    expect(appendColdStartCostRatio(coldStall, deltas)).toBeGreaterThan(1_500);
+    expect(appendColdStartCostRatio(coldStall, deltas))
+      .toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
+    // ...and every bound it slips past, which is the whole reason this gate exists.
+    expect(reduceStudioPerfCalibrationSamples(coldStall).workMs)
+      .toBe(reduceStudioPerfCalibrationSamples(honest).workMs);
+    expect(appendChunkCostRatio(coldStall, deltas))
+      .toBeCloseTo(appendChunkCostRatio(honest, deltas), 6);
+    expect(appendMarkGrowthRatio(deltas)).toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // The fifth blind spot, and the one the four bounds share BETWEEN them: re-planning that
+    // grows only on the chunk path. The early/late gate reduces ordinary appends in each half;
+    // the chunk/ordinary gate reduces the cheapest chunk across the whole stroke — so an
+    // unaffected early chunk stays cheapest and neither ratio moves.
+    const lateChunkStall = honest.map((sample, index) => (index % 8 === 7 && index > APPENDS / 2
+      ? { ...sample, workMs: sample.workMs + 500 }
+      : sample));
+    expect(appendChunkGrowthRatio(lateChunkStall, deltas))
+      .toBeGreaterThan(APPEND_CHUNK_GROWTH_LIMIT);
+    expect(appendChunkGrowthRatio(lateChunkStall, deltas)).toBeGreaterThan(30);
+    // The chunk-cost gate catches this one too, now that it reduces by the MEDIAN across cycles
+    // rather than the cheapest chunk: half the cycles are late and stalled, so the median moves
+    // with them. Under the cheapest-chunk form it did not, and that is what this growth gate was
+    // added for — the fix to the OTHER finding happened to close this hole as well. They are kept
+    // separate because they answer different questions (is the class expensive / does it grow),
+    // not because one catches a leak the other misses; on this regression both convict.
+    expect(appendChunkCostRatio(lateChunkStall, deltas))
+      .toBeGreaterThan(APPEND_CHUNK_COST_LIMIT);
+    // ...and the bounds that do NOT see it.
+    expect(appendCalibratedHalfGrowth(lateChunkStall))
+      .toBeCloseTo(appendCalibratedHalfGrowth(honest), 6);
+    expect(reduceStudioPerfCalibrationSamples(lateChunkStall).workMs)
+      .toBe(reduceStudioPerfCalibrationSamples(honest).workMs);
+    // Not vacuous: a uniformly 3x slower machine is not growth within the class.
+    expect(appendChunkGrowthRatio(
+      honest.map((sample) => ({ ...sample, workMs: sample.workMs * 3 })),
+      deltas,
+    )).toBeCloseTo(appendChunkGrowthRatio(honest, deltas), 6);
+    expect(() => appendChunkGrowthRatio(honest.slice(0, 8), deltas.slice(0, 8)))
+      .toThrow(/at least four chunk appends/);
+
+    // A 100ms cold start is convicted too, not only a catastrophe.
+    expect(appendColdStartCostRatio(
+      honest.map((sample, index) => (index === 0 ? { ...sample, workMs: 100 } : sample)),
+      deltas,
+    )).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
+    // ...but a 60ms one is not, which is the sensitivity this reducer costs and is worth pinning
+    // so nobody credits the gate with more than it does.
+    expect(appendColdStartCostRatio(
+      honest.map((sample, index) => (index === 0 ? { ...sample, workMs: 60 } : sample)),
+      deltas,
+    )).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
+
+    // Not vacuous the other way: a uniformly 3x slower machine is not a cold-start regression.
+    const slowBox = honest.map((sample) => ({ ...sample, workMs: sample.workMs * 3 }));
+    expect(appendColdStartCostRatio(slowBox, deltas)).toBeCloseTo(2.30, 1);
+
+    // The reducer matters as much as the statistic. Process-wide initialisation is paid ONCE, by
+    // the first renderer, so a minimum across passes acquits it using a warmed pass -- which is
+    // why this gate reads the first pass and not the cheapest.
+    const perPassRatios = [2_000, 2.4, 2.4];
+    expect(Math.min(...perPassRatios)).toBeLessThan(APPEND_COLD_START_COST_LIMIT);
+    expect(perPassRatios[0]!).toBeGreaterThan(APPEND_COLD_START_COST_LIMIT);
+
+    expect(() => appendColdStartCostRatio(honest, deltas.slice(1)))
+      .toThrow(/its own mark delta/);
+  });
+
+  it("convicts a cumulative-repaint appender on mark counts alone", () => {
+    // The counterfactual the O(1) pins above are worth, stated as data so it needs no clock and no
+    // machine. 199 appends either way.
+    const APPENDS = 199;
+    // Incremental: each append deposits one step's worth, every eighth a ribbon chunk -- the
+    // recorded shape, reduced to its two levels.
+    const incremental = Array.from({ length: APPENDS }, (_, index) =>
+      (index % 8 === 7 ? 1_740 : 210));
+    expect(appendMarkGrowthRatio(incremental)).toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // Cumulative repaint: append k redraws everything drawn so far, so it deposits k steps' worth.
+    // This is the regression -- an O(n^2) run whose per-append cost grows with the stroke.
+    const cumulative = incremental.map((_, index) => 210 * (index + 1));
+    expect(appendMarkGrowthRatio(cumulative)).toBeGreaterThan(2.9);
+    expect(appendMarkGrowthRatio(cumulative)).toBeGreaterThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // And it is not only the extreme case: even a HALF-strength leak -- every append redrawing
+    // half the stroke behind it on top of its own step -- clears the limit comfortably.
+    const halfLeak = incremental.map((delta, index) => delta + 105 * index);
+    expect(appendMarkGrowthRatio(halfLeak)).toBeGreaterThan(APPEND_MARK_GROWTH_LIMIT);
+
+    // The limit is not vacuous in the other direction either: a 20% uniform increase in per-append
+    // work is NOT asymptotic and must not be convicted here -- that is the calibrated timing
+    // budget's job, not this one's.
+    expect(appendMarkGrowthRatio(incremental.map((delta) => delta * 1.2)))
+      .toBeLessThan(APPEND_MARK_GROWTH_LIMIT);
+
+    expect(() => appendMarkGrowthRatio([])).toThrow(/at least two appends/);
+    expect(() => appendMarkGrowthRatio([0, 0, 5, 5])).toThrow(/drew nothing/);
   });
 
   it("audits every professional dry-media pack for live/pointer-up mark parity", () => {

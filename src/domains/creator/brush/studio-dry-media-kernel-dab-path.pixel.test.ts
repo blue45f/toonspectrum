@@ -414,12 +414,22 @@ function blindMetricsOf(field: Float32Array): BlindMetrics {
 }
 
 /**
- * Planning five materials and rasterizing their union baselines costs tens of seconds of pure
- * CPU. Nothing here asserts a duration — the assertions are deterministic parity and texture
- * comparisons — so the clock only decides whether a busy machine turns a real verdict into a
- * spurious failure. Latency is gated by the dedicated budget suites, not by this file.
+ * A HANG DETECTOR, not a latency budget. Planning five materials and rasterizing their union
+ * baselines costs tens of seconds of pure CPU, and nothing in this file asserts a duration — the
+ * assertions are deterministic parity and texture comparisons. So the only thing this number
+ * decides is whether a busy machine turns a real verdict into a spurious failure.
+ *
+ * At 180s it did exactly that: the file took 227s under `pnpm test` on a 4-vCPU container
+ * (vitest.config.ts runs four workers, so all three cases here compete with the rest of the
+ * suite), which aborted a run that had nothing wrong with it. Raised to 10 minutes, which is
+ * still far below the CI job caps in .github/workflows/ci.yml (12-75 minutes), so a genuine
+ * hang surfaces here rather than burning the whole job.
+ *
+ * Do NOT tighten this back into a latency gate. Latency for this path is gated by
+ * src/domains/creator/brush/studio-dry-media-long-stroke-regression.test.ts (including its
+ * pinned legacy-union soak sentinel) and src/domains/creator/brush/studio-long-stroke-per-move-cost.test.ts.
  */
-const PIXEL_PARITY_TIMEOUT_MS = 180_000;
+const PIXEL_PARITY_TIMEOUT_MS = 600_000;
 
 describe("dry-media kernel dab path (de-polygon)", () => {
   it("plans fresh core dry strokes with zero union polygons and kernel-textured primaries", () => {

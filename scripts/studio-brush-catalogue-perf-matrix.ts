@@ -57,6 +57,125 @@ export const STUDIO_BRUSH_CATALOGUE_PERF_PLAN_BUDGET_MS = 450;
 /** Stricter freeze budget for crayon-family long incremental suffix chunks. */
 export const STUDIO_BRUSH_CRAYON_FAMILY_CHUNK_BUDGET_MS = 33;
 export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES = 2_000;
+/**
+ * Freeze budget for one crayon-family long plan+coverage cycle, in CPU milliseconds.
+ *
+ * CPU time, not wall time, and the difference is the whole point. A freeze budget in wall
+ * milliseconds asserts the machine as much as the code: measured on a 4-vCPU container, the crayon
+ * row's min-of-5 wall cost went 89-92ms idle and 131-210ms against six spinning hogs on four
+ * cores, a 2.35x spread with nothing regressed, which is how this gate reached 311.4ms against a
+ * flat 200ms inside a full `pnpm test`. A minimum cannot cancel that -- it removes the noise a
+ * *transient* stall adds, not a floor that has risen under every pass.
+ *
+ * Calibrating against a reference workload does not close it either, and that was measured rather
+ * than assumed: the pinned scalar kernel, sized to ~113ms so its window matched the row's, still
+ * read 116-117ms under the same load that stretched the row to 224-243ms. A synthetic kernel
+ * cancels machine SPEED but not instruction mix, and a tight cache-resident float loop is not a
+ * proxy for an allocating planner.
+ *
+ * `process.cpuUsage()` removes the scheduler directly instead, because time the process is not
+ * running is time it does not accrue. USER PLUS SYSTEM, not user alone: a regression that
+ * allocates and zero-fills larger typed arrays, or pages more, spends that cost in the kernel,
+ * and a budget watching only user time would acquit a freeze the user would still feel.
+ * Including system also measured *tighter* rather than noisier -- the crayon row's spread went
+ * from 1.26x on user alone to 1.12x on the total.
+ *
+ * Recorded min-of-5 over the same window `elapsedMs` covers -- the product plan and coverage
+ * path, excluding fixture setup and the receipt digest -- idle then loaded on a 4-vCPU container:
+ *
+ *                 idle           loaded              spread   wall spread
+ *   crayon        117-124ms      123-130ms           1.12x      2.35x
+ *   oil-pastel     72-73ms        78-79ms            1.09x      2.41x
+ *   charcoal       67ms           67-71ms            1.06x      2.46x
+ *   chalk          65-66ms        66-70ms            1.08x      2.29x
+ *   pastel         58-59ms        54-55ms            1.09x      2.13x
+ *
+ * **CPU time removes the scheduler, not the machine.** That distinction cost a CI run and is worth
+ * stating plainly: contention-dependence collapsed from 2.35x to 1.12x, but a different CPU still
+ * retires the same plan in a different number of CPU-milliseconds, and the GitHub Actions runner
+ * reads the crayon row at 191.5ms where this container reads 117-130. A budget of 175, set from
+ * one machine's population, failed there on code that had not regressed.
+ *
+ * So the budget is set for the SLOWEST machine this gate runs on, which is what an absolute freeze
+ * budget is for -- a slower machine genuinely does freeze longer, and the product statement has to
+ * hold there. 210ms clears the runner's 191.5 with 9.7% headroom, while a doubled crayon plan
+ * still convicts from the cheapest honest reading anywhere (2 x 116.8 = 234, 11% margin) and by a
+ * wide margin on the runner itself (383).
+ *
+ * That margin is thinner than the other gates in this change, and honestly so: it starts convicting
+ * at 1.80x rather than the 1.5x a single machine's population suggested. Widening it further would
+ * buy headroom by giving up the doubling, so the extra coverage comes from the exact dab and mark
+ * pins in the colocated test instead -- those are machine-independent and convict a work regression
+ * for all five rows, including the four with slack in this shared budget.
+ *
+ * Vitest runs this suite in a forked worker, so the measurement is this process alone; concurrent
+ * GC threads are counted, which is why the reducer is a MINIMUM over passes -- the pass with the
+ * least concurrent collection is the honest estimate of what the plan costs.
+ */
+export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS = 210;
+/** Passes per crayon-family row. Minimum-of-N, for the reason above. */
+export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES = 5;
+/**
+ * Wall-clock ceiling for one crayon-family pass. Not a budget -- a hang detector. Wall time on
+ * this path is a 2.4x-spread measurement of the scheduler, so it is kept only wide enough that a
+ * genuine lock-up still fails (worst single pass observed under heavy load: 611ms).
+ */
+export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS = 2_000;
+
+/**
+ * Does this crayon-family row freeze? True only when the CHEAPEST pass is still over budget.
+ *
+ * Pure, so the rule can be pinned against recorded series -- honest and regressed -- instead of
+ * only through a live measurement.
+ */
+export function studioBrushCrayonFamilyCpuFreezes(
+  cpuMsPerPass: readonly number[],
+  budgetMs: number = STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS,
+): boolean {
+  if (cpuMsPerPass.length === 0) {
+    throw new Error("A crayon-family freeze verdict needs at least one pass.");
+  }
+  return Math.min(...cpuMsPerPass) > budgetMs;
+}
+
+/**
+ * Collapse the repeated long-stroke passes of one crayon-family row into a single verdict.
+ *
+ * The PERFORMANCE sample is the cheapest pass, because contention on a shared runner only ever
+ * adds CPU. CORRECTNESS is not a performance statistic and cannot be read off that same row: a
+ * pass the causal planner rejects returns before `cpuMs` is ever sampled, so it scores
+ * `Infinity`, can never win the minimum, and an intermittent product-path failure would be
+ * reported as a fully green row. One failing pass condemns the row, whichever pass is cheapest.
+ *
+ * The wall ceiling accumulates for the same reason: it is a HANG detector, so a cold or
+ * periodically initialising pass that stalls must survive a later warm pass becoming the sample.
+ *
+ * Pure, so all three rules can be pinned against recorded pass series instead of only through a
+ * live measurement.
+ */
+export function reduceStudioBrushCrayonFamilyPasses(
+  passes: readonly StudioBrushCataloguePerfRow[],
+  budgetMs: number = STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS,
+): StudioBrushCataloguePerfRow {
+  if (passes.length === 0) {
+    throw new Error("A crayon-family row needs at least one pass.");
+  }
+  const passCpuMs = (row: StudioBrushCataloguePerfRow) => row.cpuMs ?? Number.POSITIVE_INFINITY;
+  let cheapest = passes[0]!;
+  let anyPassWallFreeze = false;
+  let failedPass: StudioBrushCataloguePerfRow | null = null;
+  for (const row of passes) {
+    anyPassWallFreeze = anyPassWallFreeze || row.freeze;
+    if (!failedPass && !row.ok) failedPass = row;
+    if (passCpuMs(row) < passCpuMs(cheapest)) cheapest = row;
+  }
+  return {
+    ...cheapest,
+    ok: cheapest.ok && failedPass === null,
+    failure: failedPass ? failedPass.failure : cheapest.failure,
+    freeze: anyPassWallFreeze || studioBrushCrayonFamilyCpuFreezes(passes.map(passCpuMs), budgetMs),
+  };
+}
 
 export const STUDIO_BRUSH_CRAYON_FAMILY_IDS = [
   "crayon",
@@ -80,6 +199,12 @@ export interface StudioBrushCataloguePerfRow {
   readonly dabCount: number;
   readonly markCount: number;
   readonly elapsedMs: number;
+  /**
+   * User CPU milliseconds the row consumed, where it was measured. Absent on the short catalogue
+   * rows, whose 450ms wall budget covers a 256-sample plan with an order of magnitude of margin;
+   * present on the crayon-family long rows, whose verdict it decides.
+   */
+  readonly cpuMs?: number;
   readonly ok: boolean;
   readonly failure: string | null;
   readonly freeze: boolean;
@@ -215,6 +340,11 @@ function evaluateCausalCoverage(
   budgetMs: number,
 ): StudioBrushCataloguePerfRow {
   const source = sourceArrays(sampleCount);
+  // CPU is sampled over exactly the window `elapsedMs` covers -- the product plan and coverage
+  // path and nothing else. Input setup above it and the receipt digest below it are test-only
+  // work, and a gate that charged them to the planner's freeze budget would call a freeze on a
+  // slower hash.
+  const cpuBefore = process.cpuUsage();
   const startedAt = performance.now();
   const causal = planStudioCausalDynamicBrushDepositSegmentsV3({
     ...source,
@@ -248,6 +378,8 @@ function evaluateCausalCoverage(
     markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   });
   const elapsedMs = performance.now() - startedAt;
+  const cpuAfter = process.cpuUsage(cpuBefore);
+  const cpuMs = (cpuAfter.user + cpuAfter.system) / 1_000;
   if (!coverage.ok) {
     return {
       catalogId,
@@ -258,6 +390,7 @@ function evaluateCausalCoverage(
       dabCount: dabs.length,
       markCount: 0,
       elapsedMs,
+      cpuMs,
       ok: false,
       failure: coverage.reason,
       freeze: elapsedMs > budgetMs,
@@ -273,6 +406,7 @@ function evaluateCausalCoverage(
     dabCount: dabs.length,
     markCount: coverage.marks.length,
     elapsedMs,
+    cpuMs,
     ok: true,
     failure: null,
     freeze: elapsedMs > budgetMs,
@@ -728,22 +862,31 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
   const rows = paintIds.map((catalogId) =>
     evaluateStudioBrushCataloguePaintPerfRow(catalogId, { packById }),
   );
-  // Freeze verdicts here come from the MINIMUM of a few identical evaluations, the long-stroke
+  // Freeze verdicts here come from the MINIMUM of several identical evaluations, the long-stroke
   // gate's own statistic: shared-runner interference is additive, so one preempted pass cannot
   // manufacture a freeze (measured CI flake: crayon 205.3ms single-sample against the 200ms
   // budget on a runner that passed the identical commit at a fraction of that). The plan is
   // deterministic, so the digest is identical across passes and only the clock varies.
+  //
+  // What varies is graded in CPU milliseconds rather than wall milliseconds -- see the budget's
+  // own comment for the two-machine measurements that forced that, and for why calibrating the
+  // wall clock against a reference kernel did not work here. The row's wall reading is still
+  // recorded and still bounded, as a hang detector.
+  //
+  // `cpuMs` is measured inside the evaluator over the same window as `elapsedMs`, so the budget
+  // covers the product path alone -- not the fixture setup or the receipt digest. The wall
+  // ceiling and the `ok` verdict are accumulated across every pass rather than read off the row
+  // that wins on CPU; `reduceStudioBrushCrayonFamilyPasses` carries the reasoning for both.
   const crayonFamily = STUDIO_BRUSH_CRAYON_FAMILY_IDS.map((catalogId) => {
-    let best: StudioBrushCataloguePerfRow | null = null;
-    for (let pass = 0; pass < 3; pass += 1) {
-      const row = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
+    const passes: StudioBrushCataloguePerfRow[] = [];
+    for (let pass = 0; pass < STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES; pass += 1) {
+      passes.push(evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
         sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
-        budgetMs: 200,
+        budgetMs: STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS,
         packById,
-      });
-      if (!best || row.elapsedMs < best.elapsedMs) best = row;
+      }));
     }
-    return best!;
+    return reduceStudioBrushCrayonFamilyPasses(passes);
   });
   const observed = new Set(rows.map((row) => row.catalogId));
   const missingCatalogIds = paintIds.filter((id) => !observed.has(id));
@@ -942,6 +1085,7 @@ function runStudioBrushCataloguePerfMatrixCli(): void {
     if (row.ok && !row.freeze) continue;
     logMatrix(
       `FAIL ${row.catalogId} path=${row.path} elapsed=${row.elapsedMs.toFixed(1)}ms `
+      + (row.cpuMs === undefined ? "" : `cpu=${row.cpuMs.toFixed(1)}ms `)
       + `freeze=${row.freeze} failure=${row.failure ?? "-"}`,
     );
   }

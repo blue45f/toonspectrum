@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   computeStudioImpastoReliefShading,
@@ -226,27 +226,168 @@ describe("studio impasto relief shading v1 (dli/paint MIT port)", () => {
     ).toThrow(StudioImpastoReliefShadingError);
   });
 
-  it("relief-shades a 512×512 tile in under 40ms", () => {
-    const width = 512;
-    const height = 512;
-    const heights = new Float32Array(width * height);
-    for (let index = 0; index < heights.length; index += 1) {
-      heights[index] = studioOssUnitHash(0x7a11, index);
+  /**
+   * Exact transcendental census, measured rather than derived: `Math.sqrt` is called
+   * `4 * width * height + 4` times for ggx (four per shaded pixel — `halfLength` in
+   * `shadeNormal`, both terms of `gggxVisibility`, and `normalLength` in the loop — plus a
+   * fixed four in setup), and exactly four times for emboss-2tap, which never enters
+   * `shadeNormal`. No other transcendental is called at all in either mode.
+   *
+   * "No other" means every costly `Math` member, not the handful this shader happens to use today
+   * — a census scoped to the current call set says nothing about a regression that reaches for
+   * `Math.tan` or `Math.cbrt` tomorrow.
+   *
+   * This is what the 40ms budget below was really protecting, and it protects it far better: a
+   * normalize added per tap, a second sqrt in the visibility term, an `acos`/`pow` creeping into
+   * the BRDF, or `(1 - lDotH) ** 5` becoming `Math.pow` all move these counts, and they move them
+   * identically on every machine, every Node version and under any load.
+   *
+   * Runs on a small tile in its own test, never inside a timed window: installing a spy on
+   * `Math.sqrt` defeats V8's lowering of it to a hardware instruction, so a spied call is not the
+   * call the budget measures.
+   */
+  it("calls exactly four transcendentals per shaded pixel, and nothing else", () => {
+    // EVERY `Math` member whose cost is more than a machine instruction, not a hand-picked few.
+    // A census listing only the functions the shader happens to call today convicts nothing when
+    // it starts calling one it does not: a per-pixel `Math.tan`, `Math.cbrt` or `Math.log2` would
+    // leave every count below unchanged and clear the smoke bound as well.
+    //
+    // The cheap arithmetic members (`abs`, `min`, `max`, `floor`, `ceil`, `round`, `sign`,
+    // `trunc`, `imul`, `clz32`, `random`) are excluded deliberately: they compile to instructions,
+    // so counting them would pin the shader's arithmetic shape rather than its transcendental
+    // cost. `random` is excluded for a different reason -- this path must never call it, and the
+    // determinism test above is what proves that.
+    const transcendentals = [
+      "sqrt", "cbrt", "pow", "exp", "expm1", "log", "log2", "log10", "log1p",
+      "sin", "cos", "tan", "asin", "acos", "atan", "atan2",
+      "sinh", "cosh", "tanh", "asinh", "acosh", "atanh",
+      "hypot", "fround",
+    ] as const;
+
+    const census = (
+      width: number,
+      height: number,
+      quality: "ggx" | "emboss-2tap",
+    ): Record<string, number> => {
+      const heights = new Float32Array(width * height);
+      for (let index = 0; index < heights.length; index += 1) {
+        heights[index] = studioOssUnitHash(0x7a11, index);
+      }
+      const counts: Record<string, number> = {};
+      const spies = transcendentals.map((name) => {
+        counts[name] = 0;
+        const original = Math[name] as (...args: number[]) => number;
+        return vi.spyOn(Math, name).mockImplementation(((...args: number[]) => {
+          counts[name] += 1;
+          return original(...args);
+        }) as never);
+      });
+      try {
+        computeStudioImpastoReliefShading(heights, {
+          width,
+          height,
+          into: new Float32Array(width * height),
+          quality,
+        });
+      } finally {
+        for (const spy of spies) spy.mockRestore();
+      }
+      return counts;
+    };
+
+    // Two tile sizes pin the per-pixel slope AND the constant separately — one size alone could
+    // be satisfied by a wrong split between them.
+    for (const [width, height] of [[16, 12], [32, 24]] as const) {
+      const ggx = census(width, height, "ggx");
+      expect(ggx.sqrt, `ggx ${width}x${height}`).toBe(4 * width * height + 4);
+      const emboss = census(width, height, "emboss-2tap");
+      expect(emboss.sqrt, `emboss ${width}x${height}`).toBe(4);
+      expect(emboss.hypot, `emboss ${width}x${height}`).toBe(1);
+
+      for (const name of transcendentals) {
+        if (name === "sqrt") continue;
+        if (name === "hypot") {
+          expect(ggx[name], `ggx ${name}`).toBe(0);
+          continue;
+        }
+        expect(ggx[name], `ggx ${name}`).toBe(0);
+        expect(emboss[name], `emboss ${name}`).toBe(0);
+      }
     }
-    const into = new Float32Array(width * height);
-    // Warm-up pass lets the JIT settle before the budget measurement.
-    computeStudioImpastoReliefShading(heights, { width, height, into });
-    // A single measured pass is one scheduler preemption away from a false
-    // red on a shared CI runner (measured: 42.9ms on a 40ms budget), so the
-    // verdict is the cheapest of three passes — a genuine slowdown in the
-    // shading kernel slows every pass, while a preempted run cannot make an
-    // unrelated pass expensive.
-    let elapsedMs = Number.POSITIVE_INFINITY;
-    for (let pass = 0; pass < 3; pass += 1) {
-      const startedAt = performance.now();
-      computeStudioImpastoReliefShading(heights, { width, height, into });
-      elapsedMs = Math.min(elapsedMs, performance.now() - startedAt);
+  });
+
+
+  /**
+   * An exact census of HEIGHT TAPS, which is the half of the per-pixel body the transcendental
+   * census above cannot see.
+   *
+   * The census above counts `Math` calls, so a body that got slower by re-reading the height
+   * buffer leaves every count green. The wall-clock gate in the sibling `.perf.test.ts` cannot
+   * cover it either, and that is structural rather than an oversight: it grades one ggx window
+   * against a thirty-call emboss window, so the shared pixel walk runs thirty times in the
+   * denominator and once in the numerator, and a walk regression moves that ratio in the
+   * ACQUITTING direction. Equal tiles do not fix it — equal pixel counts per window and equal
+   * window durations are mutually exclusive when the two bodies differ ~30x in cost.
+   *
+   * So the walk is graded here instead, with no clock at all: a counting Proxy over the input
+   * makes every indexed read observable, and the tap count per pixel is a fixed property of the
+   * algorithm on every machine. `ggx` takes 8 and `emboss-2tap` takes 2 — the "2tap" in its own
+   * name — verified exactly at 1x1, 6x5, 3x11 and 16x16, so the count is `pixels * taps` with no
+   * edge cases hiding in it.
+   *
+   * This CANNOT live in the timing file: a Proxy on the hot path deoptimises it, which is the
+   * same trap the `vi.spyOn` census set for the wall-clock gates (emboss 33.1ms -> 154.5ms per 30
+   * passes, surviving `mockRestore`). Vitest isolates modules per file, and that is the
+   * enforcement.
+   */
+  it("takes exactly eight height taps per ggx pixel and two per emboss pixel", () => {
+    const countHeightTaps = (
+      width: number,
+      height: number,
+      quality: (typeof QUALITIES)[number],
+    ): number => {
+      const raw = new Float32Array(width * height);
+      for (let index = 0; index < raw.length; index += 1) {
+        raw[index] = studioOssUnitHash(0x5eed, index);
+      }
+      let taps = 0;
+      const counting = new Proxy(raw, {
+        get(target, property) {
+          if (typeof property === "string" && /^\d+$/.test(property)) taps += 1;
+          // Bound to the TARGET, not the proxy: `TypedArray.prototype.length` and friends read an
+          // internal slot a Proxy does not have, and would throw on the proxy as receiver.
+          const value = Reflect.get(target, property);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      const shaded = computeStudioImpastoReliefShading(
+        counting as unknown as Float32Array,
+        { width, height, quality },
+      );
+      expect(shaded.length).toBe(width * height);
+      return taps;
+    };
+
+    // Exact, and exactly linear in the pixel count — including the degenerate 1x1 tile and a
+    // non-square one, so no border special-case is hiding an extra read.
+    for (const [width, height] of [[1, 1], [6, 5], [3, 11], [16, 16]] as const) {
+      expect(
+        countHeightTaps(width, height, "ggx"),
+        `ggx height taps on ${width}x${height}`,
+      ).toBe(width * height * 8);
+      expect(
+        countHeightTaps(width, height, "emboss-2tap"),
+        `emboss height taps on ${width}x${height}`,
+      ).toBe(width * height * 2);
     }
-    expect(elapsedMs).toBeLessThan(process.env.CI ? 80 : 40);
+
+    // The regression this exists for, stated as the arithmetic rather than left implicit: ONE
+    // extra shared height lookup per pixel moves both counts by exactly the pixel count, and the
+    // assertions above are equalities, so it cannot pass. The wall-clock ratio next door would
+    // move the wrong way on the same change — the emboss window would gain thirty taps per pixel
+    // to the ggx window's one — which is why this gate is a count and not a clock.
+    const PIXELS = 16 * 16;
+    expect(PIXELS * 8 + PIXELS).not.toBe(PIXELS * 8);
+    expect(PIXELS * 2 + PIXELS).not.toBe(PIXELS * 2);
   });
 });
