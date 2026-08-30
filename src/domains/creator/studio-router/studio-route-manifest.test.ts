@@ -8,7 +8,7 @@ import {
 
 describe("Studio route manifest", () => {
   it("declares one owner for each Studio route family", () => {
-    expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(4);
+    expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(5);
     expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.id)).size).toBe(
       STUDIO_ROUTE_MANIFEST.length,
     );
@@ -107,6 +107,20 @@ describe("Studio route manifest", () => {
       "/studio/companion/review",
     ],
     [
+      "/studio/lift3d",
+      "?subject=background",
+      "lift3d",
+      "/studio/lift3d?subject=background",
+      "/studio/lift3d",
+    ],
+    [
+      "/studio/lift3d",
+      "?subject=nope",
+      "lift3d",
+      "/studio/lift3d",
+      "/studio/lift3d",
+    ],
+    [
       "/studio/projects",
       "",
       "placeholder",
@@ -189,6 +203,7 @@ describe("Studio route manifest", () => {
       pathname: "/studio/companion/navigator",
       search: "?view=navigator",
     })).toBe(true);
+    expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/lift3d" })).toBe(true);
     expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/projects" })).toBe(false);
     expect(studioRouteOwnsDocumentTitle({ pathname: "/studio/avatar" })).toBe(false);
   });
