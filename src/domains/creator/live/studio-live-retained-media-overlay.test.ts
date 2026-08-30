@@ -442,6 +442,31 @@ describe("oil live preview past the dab cap", () => {
     expect(active.stats().strokeCalls).toBeGreaterThan(before);
   });
 
+  it("repaints a below-cap bed that retracts to a smaller below-cap bed", () => {
+    // The retraction above starts at the cap, which is the path this file's guard changes. The
+    // radius accumulator's overrun is not a cap phenomenon though — its reseed compares the
+    // previous count against the new array length, so ANY shrink walks off the end. This pins the
+    // case that never reaches the cap at all, which is the one that was already reachable before
+    // the capped-repaint work: predicted samples retracted mid-stroke on a short stroke.
+    const { renderer, active } = attachedRenderer();
+    const belowCapStroke = (id: string, samples: number) => {
+      const points: number[] = [];
+      for (let index = 0; index < samples; index += 1) {
+        points.push(6 + index * 3, 60 + Math.cos(index / 23) * 34);
+      }
+      return drawElement(id, "oil", points);
+    };
+
+    const predicted = belowCapStroke("oil-below-cap-shrink", 200);
+    expect(renderer.begin(predicted).status).toBe("started");
+    renderer.appendFrom(predicted);
+
+    const before = active.stats().strokeCalls;
+    expect(renderer.appendFrom(belowCapStroke("oil-below-cap-shrink", 60)).status)
+      .toBe("appended");
+    expect(active.stats().strokeCalls).toBeGreaterThan(before);
+  });
+
   it("decides a capped deferral without copying the point history", () => {
     // The deferral is decided from a counter and two timestamps. Reading the element's points
     // first would copy the whole accumulated history on every pointer frame past the cap — an
