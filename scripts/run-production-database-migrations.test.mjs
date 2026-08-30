@@ -8,10 +8,14 @@ import {
   buildAuthRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclSql,
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
+  buildCreatorMarketplaceRuntimeAclSql,
+  buildCreatorMarketplaceRuntimeAclViolationSql,
   buildHistoricalAdoptionVerificationSql,
   buildMigrationLedgerRuntimeAclSql,
   buildMigrationLedgerRuntimeAclViolationSql,
   buildRepairLockTakeoverSql,
+  buildRuntimeCutoverLedgerAclSql,
+  buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   decideMigrationAction,
   loadMigrationManifest,
@@ -237,6 +241,54 @@ test("creator object-storage grants and verification share one exact SQL contrac
   expect(violation).toContain("'toonspectrum_runtime'");
 });
 
+test("creator marketplace runtime ACL is normalized to the repository contract", () => {
+  const sql = buildCreatorMarketplaceRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildCreatorMarketplaceRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+
+  expect(sql).toContain(
+    "REVOKE ALL ON TABLE\n  public.creator_marketplace_resource,\n  public.creator_marketplace_publish_gate\nFROM PUBLIC;",
+  );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT, DELETE\n  ON TABLE public.creator_marketplace_resource",
+  );
+  expect(sql).not.toContain(
+    "GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public.creator_marketplace_resource",
+  );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public.creator_marketplace_publish_gate",
+  );
+  expect(sql).toContain('FROM "toonspectrum_runtime";');
+  for (const privilege of [
+    "SELECT",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "TRUNCATE",
+    "REFERENCES",
+    "TRIGGER",
+  ]) {
+    expect(violation).toContain(`'${privilege}'`);
+  }
+  expect(violation).toContain("public.creator_marketplace_resource");
+  expect(violation).toContain("public.creator_marketplace_publish_gate");
+  expect(violation).toContain("'toonspectrum_runtime'");
+  expect(violation).toContain("has_any_column_privilege");
+  expect(violation).toContain("WITH GRANT OPTION");
+  expect(violation).toContain("0::oid");
+  expect(violation).toContain("public_column_privilege");
+  expect(violation).toContain("public_table_privilege");
+
+  const runner = readFileSync(
+    new URL("./run-production-database-migrations.mjs", import.meta.url),
+    "utf8",
+  );
+  expect(runner).toContain(
+    "buildCreatorMarketplaceRuntimeAclSql(runtimeDatabaseRole)",
+  );
+});
+
 test("runtime role boundary rejects membership, DDL and ownership capabilities", () => {
   const sql = buildRuntimeDatabaseRoleBoundaryStateSql(
     "toonspectrum_runtime",
@@ -267,6 +319,49 @@ test("runtime role boundary rejects membership, DDL and ownership capabilities",
       requireLogin: "sometimes",
     }),
   ).toThrow(/login boundary mode/u);
+});
+
+test("runtime cutover ledger ACL is exact, read-only and private", () => {
+  const normalization = buildRuntimeCutoverLedgerAclSql(
+    "toonspectrum_runtime",
+  );
+  expect(normalization).toContain(
+    "REVOKE ALL ON TABLE public.toonspectrum_schema_migration FROM PUBLIC",
+  );
+  expect(normalization).toContain(
+    'REVOKE ALL ON TABLE public.toonspectrum_schema_migration FROM "toonspectrum_runtime"',
+  );
+  expect(normalization).toContain(
+    'GRANT SELECT ("id") ON TABLE public.toonspectrum_schema_migration TO "toonspectrum_runtime"',
+  );
+
+  const violation = buildRuntimeCutoverLedgerAclViolationSql(
+    "toonspectrum_runtime",
+  );
+  expect(violation).toContain("public.toonspectrum_schema_migration");
+  expect(violation).toContain("'SELECT WITH GRANT OPTION'");
+  expect(violation).toContain("'appliedAt'");
+  expect(violation).toContain("has_column_privilege");
+  expect(violation).toContain("has_any_column_privilege");
+  expect(violation).toContain("0::oid");
+  for (const privilege of [
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "TRUNCATE",
+    "REFERENCES",
+    "TRIGGER",
+  ]) {
+    expect(violation).toContain(`'${privilege}'`);
+  }
+
+  const runner = readFileSync(
+    new URL("./run-production-database-migrations.mjs", import.meta.url),
+    "utf8",
+  );
+  expect(runner).toContain(
+    "buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole)",
+  );
 });
 
 test("migration ledger ACL revokes PUBLIC and runtime access and verifies effective denial", () => {

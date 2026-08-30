@@ -201,6 +201,290 @@ export function buildAuthRuntimeAclViolationSql(runtimeDatabaseRole) {
   )`;
 }
 
+/**
+ * Runtime readiness reads the legacy product-schema ledger only to prove destructive cutovers.
+ * Keep that narrow read boundary separate from the deployment-only toonspectrum_ops ledger, which
+ * the application role must never be able to inspect.
+ */
+export function buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+REVOKE ALL ON TABLE public.toonspectrum_schema_migration FROM PUBLIC;
+REVOKE ALL ON TABLE public.toonspectrum_schema_migration FROM ${quotedRole};
+GRANT SELECT ("id") ON TABLE public.toonspectrum_schema_migration TO ${quotedRole};
+`;
+}
+
+/**
+ * A true result means the readiness ledger is unreadable, writable, publicly exposed, or
+ * delegable by the runtime role. Table and column checks are both required because PostgreSQL can
+ * retain column grants independently of the table ACL.
+ */
+export function buildRuntimeCutoverLedgerAclViolationSql(
+  runtimeDatabaseRole,
+) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  return `(
+    NOT pg_catalog.has_column_privilege(
+      ${roleLiteral},
+      'public.toonspectrum_schema_migration',
+      'id',
+      'SELECT'
+    )
+    OR pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.toonspectrum_schema_migration',
+      'SELECT'
+    )
+    OR pg_catalog.has_column_privilege(
+      ${roleLiteral},
+      'public.toonspectrum_schema_migration',
+      'appliedAt',
+      'SELECT'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'INSERT',
+        'UPDATE',
+        'REFERENCES'
+      ]::text[]) AS unexpected_column_privilege
+      WHERE pg_catalog.has_any_column_privilege(
+        ${roleLiteral},
+        'public.toonspectrum_schema_migration',
+        unexpected_column_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'DELETE',
+        'TRUNCATE',
+        'TRIGGER'
+      ]::text[]) AS unexpected_table_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.toonspectrum_schema_migration',
+        unexpected_table_privilege
+      )
+    )
+    OR pg_catalog.has_any_column_privilege(
+      ${roleLiteral},
+      'public.toonspectrum_schema_migration',
+      'SELECT WITH GRANT OPTION'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT',
+        'INSERT',
+        'UPDATE',
+        'REFERENCES'
+      ]::text[]) AS public_column_privilege
+      WHERE pg_catalog.has_any_column_privilege(
+        0::oid,
+        'public.toonspectrum_schema_migration',
+        public_column_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'DELETE',
+        'TRUNCATE',
+        'TRIGGER'
+      ]::text[]) AS public_table_privilege
+      WHERE pg_catalog.has_table_privilege(
+        0::oid,
+        'public.toonspectrum_schema_migration',
+        public_table_privilege
+      )
+    )
+  )`;
+}
+
+export function buildCreatorMarketplaceRuntimeAclSql(
+  runtimeDatabaseRole,
+) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+REVOKE ALL ON TABLE
+  public.creator_marketplace_resource,
+  public.creator_marketplace_publish_gate
+FROM PUBLIC;
+
+REVOKE ALL ON TABLE
+  public.creator_marketplace_resource,
+  public.creator_marketplace_publish_gate
+FROM ${quotedRole};
+
+GRANT SELECT, INSERT, DELETE
+  ON TABLE public.creator_marketplace_resource
+  TO ${quotedRole};
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE public.creator_marketplace_publish_gate
+  TO ${quotedRole};
+`;
+}
+
+/**
+ * Marketplace reads and writes run through a dedicated, non-owning runtime role. Keep its resource
+ * and distributed admission tables on the smallest table-level contract used by the repositories:
+ * catalog resources are immutable after insert, while publish-gate rows require bounded updates.
+ */
+export function buildCreatorMarketplaceRuntimeAclViolationSql(
+  runtimeDatabaseRole,
+) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  return `(
+    NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_resource',
+      'SELECT'
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_resource',
+      'INSERT'
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_resource',
+      'DELETE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'UPDATE',
+        'REFERENCES'
+      ]::text[]) AS unexpected_column_privilege
+      WHERE pg_catalog.has_any_column_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_resource',
+        unexpected_column_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'TRUNCATE',
+        'TRIGGER'
+      ]::text[]) AS unexpected_table_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_resource',
+        unexpected_table_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT',
+        'INSERT'
+      ]::text[]) AS delegable_column_privilege
+      WHERE pg_catalog.has_any_column_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_resource',
+        delegable_column_privilege || ' WITH GRANT OPTION'
+      )
+    )
+    OR pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_resource',
+      'DELETE WITH GRANT OPTION'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT',
+        'INSERT',
+        'UPDATE',
+        'DELETE'
+      ]::text[]) AS required_privilege
+      WHERE NOT pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_publish_gate',
+        required_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'TRUNCATE',
+        'TRIGGER'
+      ]::text[]) AS unexpected_table_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_publish_gate',
+        unexpected_table_privilege
+      )
+    )
+    OR pg_catalog.has_any_column_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_publish_gate',
+      'REFERENCES'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT',
+        'INSERT',
+        'UPDATE'
+      ]::text[]) AS delegable_column_privilege
+      WHERE pg_catalog.has_any_column_privilege(
+        ${roleLiteral},
+        'public.creator_marketplace_publish_gate',
+        delegable_column_privilege || ' WITH GRANT OPTION'
+      )
+    )
+    OR pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_marketplace_publish_gate',
+      'DELETE WITH GRANT OPTION'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'public.creator_marketplace_resource',
+        'public.creator_marketplace_publish_gate'
+      ]::text[]) AS public_relation(relation_name)
+      CROSS JOIN unnest(ARRAY[
+        'SELECT',
+        'INSERT',
+        'UPDATE',
+        'REFERENCES'
+      ]::text[]) AS public_column_privilege(privilege_name)
+      WHERE pg_catalog.has_any_column_privilege(
+        0::oid,
+        public_relation.relation_name,
+        public_column_privilege.privilege_name
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'public.creator_marketplace_resource',
+        'public.creator_marketplace_publish_gate'
+      ]::text[]) AS public_relation(relation_name)
+      CROSS JOIN unnest(ARRAY[
+        'DELETE',
+        'TRUNCATE',
+        'TRIGGER'
+      ]::text[]) AS public_table_privilege(privilege_name)
+      WHERE pg_catalog.has_table_privilege(
+        0::oid,
+        public_relation.relation_name,
+        public_table_privilege.privilege_name
+      )
+    )
+  )`;
+}
+
 export function buildCreatorAssetObjectStorageRuntimeAclSql(
   runtimeDatabaseRole,
 ) {
@@ -1556,6 +1840,11 @@ export function runProductionDatabaseMigrations({
     // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole));
+    psql(
+      databaseUrl,
+      buildCreatorMarketplaceRuntimeAclSql(runtimeDatabaseRole),
+    );
     psql(
       databaseUrl,
       buildCreatorAssetObjectStorageRuntimeAclSql(runtimeDatabaseRole),

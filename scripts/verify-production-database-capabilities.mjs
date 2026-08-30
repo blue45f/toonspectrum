@@ -9,7 +9,9 @@ import { spawnSync } from "node:child_process";
 import {
   buildAuthRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
+  buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
+  buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   loadMigrationManifest,
 } from "./run-production-database-migrations.mjs";
@@ -40,6 +42,8 @@ const EXPECTED_SPECIAL_CAPABILITIES = Object.freeze([
   "commentActivityReanchorReady",
   "commentMutationMessageNullable",
   "commentMutationReanchorReady",
+  "marketplacePublishGateAclReady",
+  "marketplaceResourceAclReady",
   "marketplaceSearchGenerated",
   "marketplaceSearchIndexReady",
   "marketplaceTagIndexReady",
@@ -399,6 +403,16 @@ BEGIN
   IF ${buildAuthRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact authentication lifecycle privileges';
+  END IF;
+
+  IF ${buildRuntimeCutoverLedgerAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact cutover-readiness ledger privileges';
+  END IF;
+
+  IF ${buildCreatorMarketplaceRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact creator marketplace privileges';
   END IF;
 
   IF NOT EXISTS (

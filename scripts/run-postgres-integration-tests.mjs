@@ -8,6 +8,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import pg from "pg";
 
+import { validateRuntimeDatabaseRole } from "./run-production-database-migrations.mjs";
+
 const { Pool } = pg;
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIRECTORY, "..");
@@ -65,9 +67,10 @@ export const VITEST_VALIDATED_REMOTE_DATABASE_MARKER =
 
 export const POSTGRES_INTEGRATION_USAGE = [
   "Usage:",
-  "  TEST_DATABASE_URL='postgresql://…' pnpm test:postgres:integration",
-  "  pnpm test:postgres:integration -- --database-url 'postgresql://…'",
+  "  TEST_DATABASE_URL='postgresql://…' TEST_RUNTIME_DATABASE_ROLE='<role>' pnpm test:postgres:integration",
+  "  pnpm test:postgres:integration -- --database-url 'postgresql://…' --runtime-database-role '<role>'",
   "",
+  "The owner test connection must be able to SET ROLE to the non-owning runtime role.",
   "The default policy accepts only localhost, 127.0.0.1, or ::1.",
   "A disposable remote database additionally requires --allow-remote-test-database",
   "and a database name containing test, testing, ci, integration, preview, or staging.",
@@ -91,6 +94,7 @@ export function parsePostgresIntegrationArguments(arguments_) {
   let allowRemoteTestDatabase = false;
   let databaseUrl;
   let help = false;
+  let runtimeDatabaseRole;
 
   for (let index = 0; index < arguments_.length; index += 1) {
     const argument = arguments_[index];
@@ -128,10 +132,39 @@ export function parsePostgresIntegrationArguments(arguments_) {
       if (!databaseUrl) fail("--database-url requires a value.");
       continue;
     }
+    if (argument === "--runtime-database-role") {
+      if (runtimeDatabaseRole !== undefined) {
+        fail("--runtime-database-role must be supplied exactly once.");
+      }
+      const value = arguments_[index + 1];
+      if (!value || value.startsWith("--")) {
+        fail("--runtime-database-role requires a value.");
+      }
+      runtimeDatabaseRole = value.trim();
+      index += 1;
+      continue;
+    }
+    if (argument?.startsWith("--runtime-database-role=")) {
+      if (runtimeDatabaseRole !== undefined) {
+        fail("--runtime-database-role must be supplied exactly once.");
+      }
+      runtimeDatabaseRole = argument
+        .slice("--runtime-database-role=".length)
+        .trim();
+      if (!runtimeDatabaseRole) {
+        fail("--runtime-database-role requires a value.");
+      }
+      continue;
+    }
     fail("Unsupported PostgreSQL integration-test argument.");
   }
 
-  return Object.freeze({ allowRemoteTestDatabase, databaseUrl, help });
+  return Object.freeze({
+    allowRemoteTestDatabase,
+    databaseUrl,
+    help,
+    runtimeDatabaseRole,
+  });
 }
 
 function databaseNameFromUrl(url) {
@@ -318,23 +351,42 @@ export function resolvePostgresIntegrationTarget({
     allowRemoteTestDatabase: options.allowRemoteTestDatabase,
     environment,
   });
+  const environmentRuntimeDatabaseRole =
+    environment.TEST_RUNTIME_DATABASE_ROLE?.trim();
+  if (
+    options.runtimeDatabaseRole &&
+    environmentRuntimeDatabaseRole &&
+    options.runtimeDatabaseRole !== environmentRuntimeDatabaseRole
+  ) {
+    fail(
+      "Conflicting runtime database roles were supplied; keep exactly one explicit source.",
+    );
+  }
+  const runtimeDatabaseRole = validateRuntimeDatabaseRole(
+    options.runtimeDatabaseRole || environmentRuntimeDatabaseRole || "",
+  );
   return Object.freeze({
     ...target,
     databaseUrl,
     help: false,
+    runtimeDatabaseRole,
   });
 }
 
 export function createPostgresIntegrationEnvironment(
   databaseUrl,
   environment = process.env,
-  { validatedRemoteDatabase = false } = {},
+  { runtimeDatabaseRole, validatedRemoteDatabase = false } = {},
 ) {
+  const validatedRuntimeDatabaseRole = validateRuntimeDatabaseRole(
+    runtimeDatabaseRole,
+  );
   return {
     ...environment,
     DATABASE_URL: databaseUrl,
     NODE_ENV: "test",
     STUDIO_LIVE_POSTGRES_INTEGRATION_URL: databaseUrl,
+    STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: validatedRuntimeDatabaseRole,
     STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL: databaseUrl,
     TEST_DATABASE_URL: databaseUrl,
     [VITEST_VALIDATED_REMOTE_DATABASE_MARKER]: validatedRemoteDatabase
@@ -352,7 +404,11 @@ export function createVitestArguments() {
   ];
 }
 
-async function preflightPostgresIntegrationDatabase(databaseUrl, expectedDatabaseName) {
+async function preflightPostgresIntegrationDatabase(
+  databaseUrl,
+  expectedDatabaseName,
+  runtimeDatabaseRole,
+) {
   const pool = new Pool({
     application_name: "toonspectrum-postgres-integration-preflight",
     connectionString: databaseUrl,
@@ -367,14 +423,28 @@ async function preflightPostgresIntegrationDatabase(databaseUrl, expectedDatabas
     const result = await pool.query(
       `SELECT
          current_database() AS "databaseName",
-         current_setting('transaction_read_only') AS "transactionReadOnly"`,
+         current_setting('transaction_read_only') AS "transactionReadOnly",
+         EXISTS (
+           SELECT 1
+           FROM pg_catalog.pg_roles AS runtime_role
+           WHERE runtime_role.rolname = $1
+             AND pg_catalog.pg_has_role(
+               current_user,
+               runtime_role.oid,
+               'SET'
+             )
+         ) AS "canSetRuntimeRole"`,
+      [runtimeDatabaseRole],
     );
     const row = result.rows[0];
     if (
       row?.databaseName !== expectedDatabaseName ||
-      row?.transactionReadOnly !== "off"
+      row?.transactionReadOnly !== "off" ||
+      row?.canSetRuntimeRole !== true
     ) {
-      fail("The PostgreSQL test database is not the selected writable database.");
+      fail(
+        "The PostgreSQL test database is not writable or cannot assume the selected runtime role.",
+      );
     }
   } catch {
     fail(
@@ -385,7 +455,10 @@ async function preflightPostgresIntegrationDatabase(databaseUrl, expectedDatabas
   }
 }
 
-function runVitest(databaseUrl, { validatedRemoteDatabase = false } = {}) {
+function runVitest(
+  databaseUrl,
+  { runtimeDatabaseRole, validatedRemoteDatabase = false } = {},
+) {
   for (const suite of POSTGRES_INTEGRATION_SUITES) {
     if (!existsSync(resolve(REPOSITORY_ROOT, suite))) {
       fail("A required PostgreSQL integration suite is missing.");
@@ -395,6 +468,7 @@ function runVitest(databaseUrl, { validatedRemoteDatabase = false } = {}) {
   const child = spawn(process.execPath, createVitestArguments(), {
     cwd: REPOSITORY_ROOT,
     env: createPostgresIntegrationEnvironment(databaseUrl, process.env, {
+      runtimeDatabaseRole,
       validatedRemoteDatabase,
     }),
     stdio: "inherit",
@@ -425,7 +499,7 @@ function runVitest(databaseUrl, { validatedRemoteDatabase = false } = {}) {
 
 function runCreatorMarketplaceDatabaseVerifier(
   databaseUrl,
-  { validatedRemoteDatabase = false } = {},
+  { runtimeDatabaseRole, validatedRemoteDatabase = false } = {},
 ) {
   const verifierPath = resolve(REPOSITORY_ROOT, CREATOR_MARKETPLACE_DB_VERIFIER);
   if (!existsSync(verifierPath)) {
@@ -436,6 +510,7 @@ function runCreatorMarketplaceDatabaseVerifier(
     cwd: REPOSITORY_ROOT,
     env: {
       ...createPostgresIntegrationEnvironment(databaseUrl, process.env, {
+        runtimeDatabaseRole,
         validatedRemoteDatabase,
       }),
       TOONSPECTRUM_MARKETPLACE_DB_RUNNER_VALIDATED: "1",
@@ -483,6 +558,7 @@ export async function runPostgresIntegrationTests({
   await preflightPostgresIntegrationDatabase(
     target.databaseUrl,
     target.databaseName,
+    target.runtimeDatabaseRole,
   );
   console.log(
     `PostgreSQL integration preflight passed (${target.loopback ? "loopback" : "explicit remote test"} target; credentials hidden).`,
@@ -491,12 +567,14 @@ export async function runPostgresIntegrationTests({
     `Running ${POSTGRES_INTEGRATION_SUITES.length} direct PostgreSQL suites without file parallelism.`,
   );
   await runVitest(target.databaseUrl, {
+    runtimeDatabaseRole: target.runtimeDatabaseRole,
     validatedRemoteDatabase: !target.loopback,
   });
   console.log(
     "Running the creator marketplace repository and publish-gate verifier against the validated target.",
   );
   await runCreatorMarketplaceDatabaseVerifier(target.databaseUrl, {
+    runtimeDatabaseRole: target.runtimeDatabaseRole,
     validatedRemoteDatabase: !target.loopback,
   });
 }

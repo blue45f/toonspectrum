@@ -19,6 +19,8 @@ function completeSchemaCatalog() {
     authAccountConstraintsReady: true,
     authAccountUserIndexReady: true,
     authRuntimeDmlReady: true,
+    marketplaceResourceAclReady: true,
+    marketplacePublishGateAclReady: true,
     marketplaceSearchGenerated: true,
     marketplaceSearchIndexReady: true,
     marketplaceTagIndexReady: true,
@@ -99,7 +101,16 @@ describe("PostgresHealthReadinessRepository", () => {
     expect(catalogQuery).toContain("user_status_check");
     expect(catalogQuery).toContain("user_session_version_check");
     expect(catalogQuery).toContain("authRuntimeDmlReady");
+    expect(catalogQuery).toContain("marketplaceResourceAclReady");
+    expect(catalogQuery).toContain("marketplacePublishGateAclReady");
+    expect(catalogQuery).toContain("public.creator_marketplace_resource");
+    expect(catalogQuery).toContain("public.creator_marketplace_publish_gate");
     expect(catalogQuery).toContain("SELECT, INSERT, UPDATE, DELETE");
+    expect(catalogQuery).toContain("has_any_column_privilege");
+    expect(catalogQuery).toContain("WITH GRANT OPTION");
+    expect(catalogQuery).toContain("0::oid");
+    expect(catalogQuery).toContain("public_column_privilege");
+    expect(catalogQuery).toContain("public_table_privilege");
     expect(query.mock.calls[1]?.[0]).toMatchObject({
       query_timeout: HEALTH_READINESS_QUERY_TIMEOUT_MS,
       values: [[...REQUIRED_DATABASE_MIGRATIONS]],
@@ -129,6 +140,8 @@ describe("PostgresHealthReadinessRepository", () => {
     "authAccountConstraintsReady",
     "authAccountUserIndexReady",
     "authRuntimeDmlReady",
+    "marketplaceResourceAclReady",
+    "marketplacePublishGateAclReady",
     "marketplaceSearchGenerated",
     "marketplaceSearchIndexReady",
     "marketplaceTagIndexReady",

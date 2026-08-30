@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -52,6 +53,34 @@ interface CreatorMarketplaceCursorEnvelope {
   version: 1;
   createdAt: string;
   id: string;
+}
+
+type CreatorMarketplaceFailureOperation =
+  | "delete"
+  | "detail"
+  | "list"
+  | "publish"
+  | "publish-gate-acquire"
+  | "publish-gate-release";
+
+function creatorMarketplaceFailureReasonCode(error: unknown): string {
+  try {
+    if (error && typeof error === "object") {
+      const code = Reflect.get(error, "code");
+      if (
+        typeof code === "string" &&
+        (/^[0-9A-Z]{5}$/u.test(code) || /^E[A-Z0-9_]{1,63}$/u.test(code))
+      ) {
+        return code;
+      }
+    }
+  } catch {
+    return "uninspectable-error";
+  }
+  if (error instanceof Error) {
+    return "Error";
+  }
+  return typeof error;
 }
 
 function sha256(value: string): string {
@@ -149,12 +178,25 @@ function projectRecord(
 
 @Injectable()
 export class CreatorMarketplaceService {
+  private readonly logger = new Logger(CreatorMarketplaceService.name);
+
   constructor(
     @Inject(CREATOR_MARKETPLACE_RESOURCE_REPOSITORY)
     private readonly repository: CreatorMarketplaceResourceRepository,
     @Inject(CREATOR_MARKETPLACE_PUBLISH_GATE)
     private readonly publishGate: CreatorMarketplacePublishGate
   ) {}
+
+  private logFailure(
+    operation: CreatorMarketplaceFailureOperation,
+    error: unknown
+  ): void {
+    this.logger.error({
+      event: "creator-marketplace.operation.failed",
+      operation,
+      reasonCode: creatorMarketplaceFailureReasonCode(error),
+    });
+  }
 
   async list(
     query: CreatorMarketplaceResourceListQueryDto,
@@ -184,6 +226,7 @@ export class CreatorMarketplaceService {
       });
     } catch (error) {
       if (error instanceof HttpException) throw error;
+      this.logFailure("list", error);
       throw new ServiceUnavailableException({
         code: "creator_marketplace_unavailable",
         message: "공유 리소스 마켓을 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.",
@@ -201,6 +244,7 @@ export class CreatorMarketplaceService {
       return projectRecord(row, options.viewerId);
     } catch (error) {
       if (error instanceof HttpException) throw error;
+      this.logFailure("detail", error);
       throw new ServiceUnavailableException({
         code: "creator_marketplace_unavailable",
         message: "공유 리소스를 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.",
@@ -249,6 +293,7 @@ export class CreatorMarketplaceService {
       publishLease = admission.lease;
     } catch (error) {
       if (error instanceof HttpException) throw error;
+      this.logFailure("publish-gate-acquire", error);
       throw new ServiceUnavailableException({
         code: "creator_marketplace_publish_gate_unavailable",
         message:
@@ -273,6 +318,7 @@ export class CreatorMarketplaceService {
         });
       }
       if (error instanceof HttpException) throw error;
+      this.logFailure("publish", error);
       throw new ServiceUnavailableException({
         code: "creator_marketplace_publish_unavailable",
         message: "공유 패키지를 게시할 수 없습니다. 잠시 후 다시 시도해 주세요.",
@@ -280,7 +326,8 @@ export class CreatorMarketplaceService {
     } finally {
       try {
         await this.publishGate.release(publishLease);
-      } catch {
+      } catch (error) {
+        this.logFailure("publish-gate-release", error);
         // The short database lease expires automatically. A release outage must not turn a
         // committed resource into an ambiguous client retry, and cannot increase admission.
       }
@@ -295,6 +342,7 @@ export class CreatorMarketplaceService {
       return { deleted: true };
     } catch (error) {
       if (error instanceof HttpException) throw error;
+      this.logFailure("delete", error);
       throw new ServiceUnavailableException({
         code: "creator_marketplace_delete_unavailable",
         message: "공유 리소스를 삭제할 수 없습니다. 잠시 후 다시 시도해 주세요.",

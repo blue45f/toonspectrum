@@ -111,6 +111,7 @@ jobs:
       # 같은 direct PostgreSQL에 Socket.IO adapter migration을 적용한 뒤 2-node integration을
       # 필수 실행한다. 이 값이 있으면 해당 테스트는 skip이 아니라 CI gate가 된다.
       STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgres://webdex:webdex@localhost:5432/webdex
+      STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: webdex_runtime
       # StudioPage.tsx 등 초대형 모듈 ESLint/tsc 힙 고갈 방지 (GitHub-hosted ~7GB 한도 내).
       NODE_OPTIONS: --max-old-space-size=8192
     steps:

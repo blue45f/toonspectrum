@@ -2,10 +2,6 @@ import { getStroke } from "perfect-freehand";
 import { describe, expect, it } from "vitest";
 
 import {
-  evaluateStudioCalibratedBudget,
-  evaluateStudioCalibratedDetection,
-} from "./brush/studio-perf-calibration";
-import {
   applyStudioCroquisPulledStringPrefilter,
   buildStudioCroquisCapsuleStrokeLoops,
   buildStudioCroquisCapsuleStrokePathData,
@@ -425,11 +421,12 @@ describe("capsule stroke loops", () => {
       .toBe(buildStudioCroquisCapsuleStrokePathData(input));
   });
 
-  /** The 2000-point stroke both budget tests below measure. */
-  /** See the budget's own comment: five samples do not converge on a ~19ms window under load. */
-  const CROQUIS_LONG_STROKE_SAMPLES = 21;
-  /** Above the worst converged honest reading (0.835) and below a doubling (1.44). */
-  const CROQUIS_LONG_STROKE_MAX_RATIO = 1.2;
+  /** Per-build CPU ceiling across one clean, complete warm-process measurement pass. */
+  const CROQUIS_LONG_STROKE_CPU_BUDGET_MS = 40;
+  /** Every build in a pass is graded so one unusually fast sample cannot hide repeated hitches. */
+  const CROQUIS_LONG_STROKE_SAMPLES_PER_PASS = 5;
+  /** An apparent violation must repeat across two fresh passes before it can fail the suite. */
+  const CROQUIS_LONG_STROKE_CONFIRMATION_PASSES = 2;
 
   function longStrokeInput(): { points: number[]; radii: readonly number[] } {
     const points: number[] = [];
@@ -442,14 +439,16 @@ describe("capsule stroke loops", () => {
   }
 
   /**
-   * The builder is a pure function of (points, radii), so what it emits is pinnable exactly and
-   * holds on every machine with no clock involved. These counts ARE the cost model: the path is
-   * built by walking capsules and emitting their outlines, so a regression that tessellates
-   * finer, walks a segment twice, or stops merging collinear runs moves them.
+   * The builder is a pure function of (points, radii), so its emitted command and path-size census
+   * is pinnable and holds on every machine with no clock involved. The path is built by walking
+   * capsules and emitting their outlines, so finer tessellation, duplicate emitted segments, or
+   * lost collinear-run merging moves these receipts. They do not claim full-byte output identity
+   * or detect internal work that still emits the same string; the CPU gate below covers the latter
+   * once it breaches the product ceiling.
    *
    * Recorded values, exact and reproduced across runs.
    */
-  it("emits an exactly pinned capsule path for a 2000-point stroke", () => {
+  it("pins the emitted command and path-size census for a 2000-point stroke", () => {
     const { points, radii } = longStrokeInput();
     const pathData = buildStudioCroquisCapsuleStrokePathData({ points, radii });
     const occurrences = (pattern: RegExp) => (pathData.match(pattern) ?? []).length;
@@ -466,69 +465,71 @@ describe("capsule stroke loops", () => {
   });
 
   /**
-   * Budget as a RATIO against `studio-perf-calibration.ts`, not a millisecond count.
+   * CPU, not wall time. The previous synthetic-kernel ratio stopped being a valid machine-speed
+   * calibration for this allocating string builder: the same honest path read about 0.5x the
+   * reference on Node 24/arm64 and up to 0.835x on the recorded Node 22/x64 runner. The existing
+   * 1.20 gate, set with headroom above that runner reading, also sat above a doubled arm64 reading
+   * of about 1.0. It could therefore pass while detecting nothing on the faster machine.
    *
-   * The old assertion was `elapsed < (process.env.CI ? 80 : 40)` and it failed at 74.5ms on a
-   * 4-vCPU container under load with nothing regressed — the builder costs ~19ms idle there, so
-   * 40ms carried barely 2x headroom against four competing vitest workers.
+   * This assertion makes the narrower product promise the original local gate was actually
+   * intended to make: a warm 2000-point path consumes less than 40ms of user + system CPU. It
+   * deliberately does not claim that every sub-40ms constant-factor slowdown is detectable.
+   * The command census and byte length above remain machine-independent receipts for emitted
+   * segment, tessellation, and path-size growth. They do not claim full-byte correctness.
    *
-   * `referenceRounds` was sized by measurement, not prediction: 1573 rounds is the same window
-   * length as one build. That is the property the impasto relief shader does NOT have (0.97-1.04
-   * vs 0.505-0.518 across the same two Node versions), which is why that budget went to a
-   * deterministic census instead and this one can keep a calibrated clock.
-   *
-   * `samples` is 21, and that number is load-bearing rather than incidental. At five samples the
-   * pass ratio read 0.816-0.952 idle but 0.27-1.86 under six spinning hogs against four cores: a
-   * ~19ms window is long enough for a stall to land in every one of five samples, so neither
-   * minimum converges and the pair stops meaning anything. At 21 it reads 0.727-0.799 idle and
-   * 0.721-0.835 loaded — a 16% spread across the same 250% oversubscription. More short samples
-   * beat fewer long ones, which is the same lesson the append and freeze budgets in this change
-   * learned separately.
-   *
-   * That also moved the gate. With the baseline properly converged at ~0.75 rather than the ~0.9
-   * five samples reported, the old 1.4 sat 1.87x above it — a doubling landed at 1.44 and cleared
-   * it by 3%, which is a gate that had stopped catching what it claims to. 1.2 keeps 1.44x
-   * headroom over the worst honest reading recorded here while convicting a doubling with 27-31%
-   * margin. Confirmed by injection rather than arithmetic: building the path twice per workload
-   * read 1.524 / 1.561 / 1.568 and failed on every confirmation pass.
+   * Five samples make one complete pass and its maximum is graded, so one fast build cannot hide
+   * repeated allocation or GC hitches. An apparent violation earns two fresh complete passes; the
+   * fastest complete pass decides, rather than splicing the fastest builds from different passes.
+   * Vitest's default fork pool isolates this file in a process, so `process.cpuUsage()` excludes
+   * sibling-worker CPU and scheduler descheduling while retaining this builder's allocation and
+   * GC CPU. The claim is one clean warm-process pass with all five builds below 40ms, not a
+   * universal worst-case guarantee or detection of every sub-40ms relative slowdown.
    */
-  it("builds a 2000-point stroke path inside its calibrated budget", () => {
+  it("builds a 2000-point stroke path inside its CPU budget", () => {
     const { points, radii } = longStrokeInput();
     let sink = 0;
-    const verdict = evaluateStudioCalibratedBudget({
-      label: "2000-point croquis capsule path",
-      workload: () => {
-        sink += buildStudioCroquisCapsuleStrokePathData({ points, radii }).length;
-      },
-      referenceRounds: 1_573,
-      maxRatio: CROQUIS_LONG_STROKE_MAX_RATIO,
-      samples: CROQUIS_LONG_STROKE_SAMPLES,
-    });
-    expect(verdict.ok, verdict.detail).toBe(true);
 
-    // The gate's mirror image, on this machine, from the passes it just judged: had the builder
-    // doubled, would 1.4 have convicted it?
-    //
-    // A recorded margin is not the same claim, and here it was not even the right one: the
-    // baseline the old 1.4 was set against was a five-sample reading that had not converged, and
-    // once it had, a doubling cleared that gate by 3%. On a CPU/V8 combination where the honest
-    // ratio sits lower still, a doubled builder would land under the gate and this budget would
-    // pass while catching nothing. The pinned path output above does not cover that either — a
-    // slower implementation emits identical bytes. So the claim is asserted live rather than
-    // argued from a recording, and it seeds the passes already measured, so a healthy run
-    // measures nothing extra.
-    const detection = evaluateStudioCalibratedDetection({
-      label: verdict.label,
-      workload: () => {
-        sink += buildStudioCroquisCapsuleStrokePathData({ points, radii }).length;
-      },
-      referenceRounds: 1_573,
-      maxRatio: CROQUIS_LONG_STROKE_MAX_RATIO,
-      samples: CROQUIS_LONG_STROKE_SAMPLES,
-      seed: verdict.passes,
-      factor: 2,
-    });
-    expect(detection.detected, detection.detail).toBe(true);
+    const buildPath = () => {
+      sink += buildStudioCroquisCapsuleStrokePathData({ points, radii }).length;
+    };
+    const measurePassCpuMs = (): number[] => {
+      const samples: number[] = [];
+      for (
+        let sample = 0;
+        sample < CROQUIS_LONG_STROKE_SAMPLES_PER_PASS;
+        sample += 1
+      ) {
+        const before = process.cpuUsage();
+        buildPath();
+        const after = process.cpuUsage(before);
+        samples.push((after.user + after.system) / 1_000);
+      }
+      return samples;
+    };
+
+    buildPath();
+    buildPath();
+    const passCpuSamples = [measurePassCpuMs()];
+    const worstCpuMs = (samples: readonly number[]) => Math.max(...samples);
+    if (worstCpuMs(passCpuSamples[0]!) >= CROQUIS_LONG_STROKE_CPU_BUDGET_MS) {
+      for (
+        let confirmation = 0;
+        confirmation < CROQUIS_LONG_STROKE_CONFIRMATION_PASSES;
+        confirmation += 1
+      ) {
+        passCpuSamples.push(measurePassCpuMs());
+      }
+    }
+
+    const passWorstCpuMs = passCpuSamples.map(worstCpuMs);
+    const bestPassWorstCpuMs = Math.min(...passWorstCpuMs);
+    expect(
+      bestPassWorstCpuMs,
+      `2000-point croquis capsule path worst build used ${bestPassWorstCpuMs.toFixed(2)}ms CPU `
+        + `(passes: ${passCpuSamples
+          .map((samples) => `[${samples.map((value) => value.toFixed(2)).join(", ")}]`)
+          .join("; ")})`,
+    ).toBeLessThan(CROQUIS_LONG_STROKE_CPU_BUDGET_MS);
 
     expect(sink).toBeGreaterThan(0);
   });

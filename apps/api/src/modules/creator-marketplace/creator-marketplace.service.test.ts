@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   HttpException,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -280,6 +281,52 @@ describe("CreatorMarketplaceService", () => {
     );
     expect(repository.publish).not.toHaveBeenCalled();
     expect(publishGate.release).not.toHaveBeenCalled();
+  });
+
+  it("저장소 실패는 비밀 메시지 없이 bounded reason code만 운영 로그에 남긴다", async () => {
+    const logger = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    const repositoryError = Object.assign(
+      new Error("postgresql://runtime:production-secret@database.example/market"),
+      { code: "42501" },
+    );
+    repository.list.mockRejectedValueOnce(repositoryError);
+
+    try {
+      await expect(service.list({ limit: 1 })).rejects.toMatchObject({
+        status: 503,
+      });
+      expect(logger).toHaveBeenCalledWith({
+        event: "creator-marketplace.operation.failed",
+        operation: "list",
+        reasonCode: "42501",
+      });
+      expect(JSON.stringify(logger.mock.calls)).not.toContain(
+        "production-secret",
+      );
+
+      logger.mockClear();
+      const attackerControlledError = Object.assign(
+        new Error("another production secret"),
+        {
+          code: "production-secret",
+          name: "another-production-secret",
+        },
+      );
+      repository.list.mockRejectedValueOnce(attackerControlledError);
+      await expect(service.list({ limit: 1 })).rejects.toMatchObject({
+        status: 503,
+      });
+      expect(logger).toHaveBeenCalledWith({
+        event: "creator-marketplace.operation.failed",
+        operation: "list",
+        reasonCode: "Error",
+      });
+      expect(JSON.stringify(logger.mock.calls)).not.toContain(
+        "production-secret",
+      );
+    } finally {
+      logger.mockRestore();
+    }
   });
 
   it("commit 뒤 release 장애는 성공을 모호하게 만들지 않고 짧은 lease 만료에 맡긴다", async () => {
