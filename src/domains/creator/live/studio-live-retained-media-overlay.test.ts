@@ -468,6 +468,27 @@ describe("oil live preview past the dab cap", () => {
     expect(reads).toBe(0);
   });
 
+  it("repaints a below-cap correction that leaves the dab count alone", () => {
+    // A draft that corrects only pressures keeps every point, so the station lattice and the dab
+    // count are identical while the dabs themselves are not. The old post-plan count check read
+    // that as "nothing changed" and discarded the corrected plan, leaving the retracted pixels on
+    // the canvas until some later update happened to move the count.
+    const { renderer, active } = attachedRenderer();
+    const points: number[] = [];
+    for (let index = 0; index < 40; index += 1) points.push(10 + index * 4, 50);
+    const predicted = drawElement("oil-below-cap-pressure", "oil", points);
+    expect(renderer.begin(predicted).status).toBe("started");
+    renderer.appendFrom(predicted);
+
+    const corrected: DrawEl = {
+      ...predicted,
+      pressures: predicted.pressures!.map((value, index) => (index > 30 ? 0.2 : value)),
+    };
+    const before = active.stats().strokeCalls;
+    expect(renderer.appendFrom(corrected).status).toBe("appended");
+    expect(active.stats().strokeCalls).toBeGreaterThan(before);
+  });
+
   it("still skips a capped append that brought no new samples", () => {
     // The other half of the guard: repainting whenever the bed *could* have changed would repaint
     // on every call at the cap, including calls the pointer did not contribute to.

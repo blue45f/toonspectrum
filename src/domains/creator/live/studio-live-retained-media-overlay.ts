@@ -643,22 +643,15 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         ? active.oilPlanner.plan(planInput)
         : planOilBrushDabs(planInput);
       if (dabs.length === 0) return true;
-      // The dab count is evidence that the bed is unchanged only while it is still free to grow.
-      // At `FX_OIL_DAB_CAP` it saturates, and that is precisely where it stops being evidence:
-      // past the cap `sampleStations` refits the lattice across the WHOLE arc, so every station
-      // moves on every append while the count stays pinned at 4096. Reading the pinned count as
-      // "nothing changed" froze the live preview — a long oil stroke stopped following the cursor
-      // for the rest of the drag, and the already-drawn part stopped re-distributing with it.
-      //
-      // A capped bed therefore always repaints. That costs a full replan per move, which is what
-      // it honestly is; the refit itself is no longer the ~70 ms this guard was written against.
-      if (
-        active.paintedDabs === dabs.length
-        && dabs.length < FX_OIL_DAB_CAP
-        && target === this.activeContext
-      ) {
-        return true;
-      }
+      // There is no second "nothing changed" test here, and there must not be. This used to
+      // return early when the new plan had the same dab count as the painted one, which is not
+      // evidence of anything: the count saturates at `FX_OIL_DAB_CAP` while `sampleStations`
+      // keeps refitting the lattice across the whole arc (that is what froze a long stroke's tip
+      // on screen), and below the cap it is equally blind — a draft that corrects only pressures
+      // keeps every station, so the count is unchanged while the dabs are not, and the retracted
+      // pixels stayed on the canvas. The exact input comparison above already answers the
+      // question, before the plan rather than after it, so anything that reaches this line has
+      // inputs the canvas has not been painted from and is repainted.
       const radiusPx = extendOilRadiusMean(active, dabs);
       if (target === this.activeContext) {
         // The wet-mix readback that used to run here sampled and rewrote active-canvas pixels
