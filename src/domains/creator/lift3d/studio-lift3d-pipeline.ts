@@ -38,7 +38,11 @@ import {
   resampleStudioLift3dImage,
   type StudioLift3dMask,
 } from "./studio-lift3d-mask";
-import { buildStudioLift3dGeometry, type StudioLift3dGeometry } from "./studio-lift3d-mesh";
+import {
+  buildStudioLift3dGeometry,
+  maxStudioLift3dResolutionForLayers,
+  type StudioLift3dGeometry,
+} from "./studio-lift3d-mesh";
 import {
   findStudioLift3dSymmetryAxis,
   symmetrizeStudioLift3dHeights,
@@ -182,14 +186,19 @@ export interface StudioLift3dLift {
   readonly meshHash: string;
 }
 
-function resolveRequest(request: StudioLift3dRequest): {
+function resolveRequest(request: StudioLift3dRequest, layerBands: number): {
   readonly preset: StudioLift3dPreset;
   readonly resolution: number;
   readonly warnings: StudioLift3dWarning[];
 } {
   const preset = STUDIO_LIFT3D_PRESETS[request.subject];
   const warnings: StudioLift3dWarning[] = [];
-  const clamped = clampStudioLift3dResolution(request.resolution ?? preset.resolution);
+  // 레이어를 쌓으면 같은 해상도가 몇 배의 면을 만든다. 상한을 여기서 미리 낮춰 두면
+  // 두 슬라이더를 각각 최대로 올린 조합이 "항상 예산 초과" 로만 끝나는 일이 없다.
+  const clamped = clampStudioLift3dResolution(
+    request.resolution ?? preset.resolution,
+    layerBands >= 2 ? maxStudioLift3dResolutionForLayers(layerBands) : undefined,
+  );
   if (clamped.warning !== null) warnings.push(clamped.warning);
   return { preset, resolution: clamped.resolution, warnings };
 }
@@ -298,7 +307,8 @@ export function liftStudioImageTo3d(
     return studioLift3dFailure("invalid-option", "layerBands 는 1 이상의 유한한 값이어야 합니다");
   }
 
-  const { preset, resolution, warnings } = resolveRequest(request);
+  const layerBands = Math.round(request.layerBands ?? 1);
+  const { preset, resolution, warnings } = resolveRequest(request, layerBands);
   const grid = resampleStudioLift3dImage(validated.value, resolution);
   const mask = extractStudioLift3dMask(grid, {
     mode: request.maskMode ?? preset.maskMode,
@@ -335,7 +345,6 @@ export function liftStudioImageTo3d(
     ));
   }
 
-  const layerBands = Math.round(request.layerBands ?? 1);
   const mode = layerBands >= 2 ? "parallax" : preset.geometryMode;
   const symmetry = applySymmetry(mask, depth, {
     strength: request.symmetryStrength ?? preset.symmetryStrength,

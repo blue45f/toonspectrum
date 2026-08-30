@@ -7,7 +7,11 @@ import {
   studioEditableMeshToTriangleSoup,
 } from "../studio-editable-half-edge-mesh";
 
-import { buildStudioLift3dDepthField } from "./studio-lift3d-depth";
+import { STUDIO_LIFT3D_LIMITS } from "./studio-lift3d-contract";
+import {
+  STUDIO_LIFT3D_MAX_DEPTH_BANDS,
+  buildStudioLift3dDepthField,
+} from "./studio-lift3d-depth";
 import {
   extractStudioLift3dMask,
   resampleStudioLift3dImage,
@@ -15,6 +19,7 @@ import {
 } from "./studio-lift3d-mask";
 import {
   buildStudioLift3dGeometry,
+  maxStudioLift3dResolutionForLayers,
   normalizeStudioLift3dPositions,
 } from "./studio-lift3d-mesh";
 import {
@@ -354,6 +359,78 @@ describe("Studio Lift 3D 메시 빌더", () => {
 
     expect(hashStudioEditableMesh(first.value.mesh))
       .toBe(hashStudioEditableMesh(second.value.mesh));
+  });
+
+  it("두께가 0 이면 부피 없는 메시를 만들지 않고 거절한다", () => {
+    // depthScale 0 은 앞뒤 껍질을 같은 평면에 겹치고 옆벽 넓이도 0 으로 만든다.
+    // 그런데도 경계 변이 없어 "닫힌 solid" 로 보고되므로, 만들기 전에 막아야 한다.
+    const grid = resampleStudioLift3dImage(discImage(48), 32);
+    const mask = extractStudioLift3dMask(grid, { mode: "alpha" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "round", smoothing: 0 });
+
+    for (const mode of ["inflate", "parallax"] as const) {
+      const built = buildStudioLift3dGeometry(mask, depth, {
+        mode,
+        depthScale: 0,
+        targetHeight: 1,
+        layerBands: 4,
+      });
+
+      expect(built.ok).toBe(false);
+      if (built.ok) return;
+      expect(built.code).toBe("invalid-option");
+    }
+  });
+
+  it("부조는 뒷판이 두께를 주므로 depthScale 0 도 받는다", () => {
+    const grid = resampleStudioLift3dImage(discImage(48), 32);
+    const mask = extractStudioLift3dMask(grid, { mode: "full" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "relief", smoothing: 0 });
+
+    const built = buildStudioLift3dGeometry(mask, depth, {
+      mode: "relief",
+      depthScale: 0,
+      baseScale: 0.05,
+      targetHeight: 1,
+    });
+
+    expect(built.ok).toBe(true);
+  });
+
+  it("레이어 상한은 밴드가 늘수록 낮아지고, 한 장짜리는 기존 상한 그대로다", () => {
+    const single = maxStudioLift3dResolutionForLayers(1);
+    expect(single).toBeGreaterThanOrEqual(STUDIO_LIFT3D_LIMITS.maxResolution);
+
+    let previous = single;
+    for (let bands = 2; bands <= STUDIO_LIFT3D_MAX_DEPTH_BANDS; bands += 1) {
+      const cap = maxStudioLift3dResolutionForLayers(bands);
+      expect(cap).toBeLessThanOrEqual(previous);
+      expect(cap).toBeGreaterThan(STUDIO_LIFT3D_LIMITS.minResolution);
+      previous = cap;
+    }
+    expect(previous).toBeLessThan(STUDIO_LIFT3D_LIMITS.maxResolution);
+  });
+
+  it("상한 해상도에서 최대 레이어를 쌓아도 면 예산 안에 들어온다", () => {
+    // 화면 전체가 피사체인 배경이 사각형을 가장 많이 만든다. 여기서 통과하지 못하면
+    // 슬라이더 두 개를 각각 최대로 올린 조합이 사용자에게는 늘 실패로만 보인다.
+    const bands = STUDIO_LIFT3D_MAX_DEPTH_BANDS;
+    const side = Math.min(
+      maxStudioLift3dResolutionForLayers(bands),
+      STUDIO_LIFT3D_LIMITS.maxResolution,
+    );
+    const grid = resampleStudioLift3dImage(verticalGradientImage(256), side);
+    const mask = extractStudioLift3dMask(grid, { mode: "full" });
+    const depth = buildStudioLift3dDepthField(mask, grid, { profile: "relief", smoothing: 0 });
+
+    const built = buildStudioLift3dGeometry(mask, depth, {
+      mode: "parallax",
+      depthScale: 0.25,
+      targetHeight: 6,
+      layerBands: bands,
+    });
+
+    expect(built.ok).toBe(true);
   });
 
   it("정규화는 XZ 중심을 원점에 두고 균일 스케일만 쓴다", () => {

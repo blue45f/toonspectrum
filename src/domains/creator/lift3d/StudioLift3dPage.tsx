@@ -77,6 +77,11 @@ const LIBRARY_RIGHTS_OPTIONS: ReadonlyArray<{
 ];
 const CARD_CLASS = "rounded-xl border border-line bg-card/60 p-4";
 
+/** 등록 결과 문구에 쓸 권리 표기 이름. 목록에 없는 값이면 식별자를 그대로 보여준다. */
+function rightsLabel(rights: StudioLift3dLibraryRights): string {
+  return LIBRARY_RIGHTS_OPTIONS.find((option) => option.id === rights)?.label ?? rights;
+}
+
 interface SliderFieldProps {
   readonly label: string;
   readonly value: number;
@@ -340,11 +345,16 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
 
   // 등록은 비동기라, 그 사이에 사용자가 원화나 설정을 바꾸면 화면의 모델과 저장된 모델이
   // 달라진다. 클릭 시점의 결과를 기억해 두고, 완료 시점에 화면이 그대로인지 확인한다.
+  // 권리 표기도 같이 본다 — 모델은 그대로인데 표기만 바뀌면 화면에는 "공개 이용" 이 떠 있는데
+  // 라이브러리에는 "확인 전" 로 박힌 모델이 남고, 성공 문구가 그 어긋남을 덮어 버린다.
   const latestResultRef = useRef<StudioLift3dExport | null>(null);
   latestResultRef.current = result;
+  const latestRightsRef = useRef<StudioLift3dLibraryRights>(libraryRights);
+  latestRightsRef.current = libraryRights;
 
   const onSaveToLibrary = useCallback(async () => {
     const target = result;
+    const targetRights = libraryRights;
     if (target === null) return;
     setLibrarySaving(true);
     setLibraryNotice(null);
@@ -352,11 +362,13 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
       // 모델 라이브러리는 OPFS·SQLite 까지 끌고 오는 큰 그래프다. 저장을 누르는 순간에만
       // 불러와, 변환만 하고 나가는 사용자가 그 비용을 내지 않게 한다.
       const { saveStudioLift3dToBg3dLibrary } = await import("./studio-lift3d-library-handoff");
-      const saved = await saveStudioLift3dToBg3dLibrary(target.glb, libraryRights);
-      const stale = latestResultRef.current !== target;
+      const saved = await saveStudioLift3dToBg3dLibrary(target.glb, targetRights);
+      const staleModel = latestResultRef.current !== target;
+      const staleRights = latestRightsRef.current !== targetRights;
       setLibraryNotice(saved.ok
-        ? stale
-          ? "등록을 누른 시점의 모델을 등록했습니다. 지금 화면의 설정으로는 다시 등록해 주세요."
+        ? staleModel || staleRights
+          ? `등록을 누른 시점의 모델을 "${rightsLabel(targetRights)}" 로 등록했습니다. `
+            + "지금 화면의 설정으로는 다시 등록해 주세요."
           : "배경 3D 편집기의 모델 목록에 등록했습니다."
         : saved.detail);
     } catch {

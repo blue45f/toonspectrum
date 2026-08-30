@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { hashStudioEditableMesh } from "../studio-editable-half-edge-mesh";
 
 import { STUDIO_LIFT3D_LIMITS, STUDIO_LIFT3D_SUBJECTS } from "./studio-lift3d-contract";
+import { STUDIO_LIFT3D_MAX_DEPTH_BANDS } from "./studio-lift3d-depth";
 import { buildStudioLift3dGeometry } from "./studio-lift3d-mesh";
 import {
   STUDIO_LIFT3D_PRESETS,
@@ -135,6 +136,25 @@ describe("Studio Lift 3D 파이프라인", () => {
     if (!lifted.ok) return;
     expect(lifted.value.metrics.closed).toBe(true);
     expect(lifted.warnings.map((warning) => warning.code)).not.toContain("resolution-clamped");
+  });
+
+  it("최대 해상도와 최대 레이어를 함께 골라도 만들어진다", () => {
+    // 두 슬라이더를 각각 끝까지 올린 조합은 사용자가 가장 먼저 시도하는 값이다. 레이어가
+    // 해상도 상한을 깎지 않던 시절에는 이 조합이 결정론적으로 budget-exceeded 로만 끝났다.
+    const lifted = liftStudioImageTo3d(verticalGradientImage(256), {
+      subject: "background",
+      resolution: STUDIO_LIFT3D_LIMITS.maxResolution,
+      layerBands: STUDIO_LIFT3D_MAX_DEPTH_BANDS,
+    });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.geometry.mode).toBe("parallax");
+    expect(lifted.value.metrics.layerCount).toBeGreaterThan(1);
+    // 상한을 내린 사실은 조용히 넘기지 않는다 — 결과가 왜 덜 촘촘한지 알 수 있어야 한다.
+    expect(lifted.warnings.map((warning) => warning.code)).toContain("resolution-clamped");
+    expect(Math.max(lifted.value.metrics.gridWidth, lifted.value.metrics.gridHeight))
+      .toBeLessThan(STUDIO_LIFT3D_LIMITS.maxResolution);
   });
 
   it("가는 부위가 있어도 위상 오류 없이 닫힌 solid 로 보고한다", () => {

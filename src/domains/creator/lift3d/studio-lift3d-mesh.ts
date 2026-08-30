@@ -164,6 +164,25 @@ function pushVertex(
   return accumulator.positions.length - 1;
 }
 
+/**
+ * 레이어 `layerBands` 장을 쌓을 때 코너 예산 안에 들어오는 작업 격자 한 변의 상한.
+ *
+ * 화면 전체가 피사체인 최악의 경우를 기준으로 잡는다. 한 변 n(u = n−1)에서
+ * 앞뒤 껍질이 2u², 밴드 경계에서 중복되는 사각형과 카드마다 서는 옆벽이 합쳐 4uB 쯤 되고,
+ * 사각형 하나가 코너 4개를 쓰므로 8u² + 16uB 코너다. 밴드가 가로 띠가 아니라 동심 고리로
+ * 잘릴 때 경계가 더 길어지므로 밴드 항에 2배 여유를 두어 8u² + 32uB ≤ maxEdges 로 푼다.
+ *
+ *   u ≤ −2B + √(4B² + maxEdges/8)
+ *
+ * B=1 이면 248(= `maxResolution`)이라 단일 껍질 경로는 그대로고, B=24 에서 207 까지 내려간다.
+ */
+export function maxStudioLift3dResolutionForLayers(layerBands: number): number {
+  const bands = Number.isFinite(layerBands) ? Math.max(1, Math.round(layerBands)) : 1;
+  const quarter = STUDIO_EDITABLE_MESH_LIMITS.maxEdges / 8;
+  const span = -2 * bands + Math.sqrt(4 * bands * bands + quarter);
+  return Math.max(2, Math.floor(span) + 1);
+}
+
 function estimatedVertexBudget(mask: StudioLift3dMask): number {
   let inside = 0;
   for (let index = 0; index < mask.cells.length; index += 1) inside += mask.cells[index]!;
@@ -278,6 +297,16 @@ export function buildStudioLift3dGeometry(
   if (!Number.isFinite(options.depthScale) || options.depthScale < 0) {
     return studioLift3dFailure("invalid-option", "depthScale 은 0 이상의 유한한 값이어야 합니다");
   }
+  // depthScale 0 이 뜻을 갖는 건 부조뿐이다 — 뒷판(baseScale)이 따로 두께를 주므로 납작한 판이
+  // 나온다. inflate·parallax 는 모든 두께가 depthScale 에서 나오므로 0 이면 앞껍질과 뒷껍질이
+  // 같은 평면에 겹치고 옆벽 넓이도 0 이 된다. 그런데도 "닫힌 메시" 로 보고되어 부피 0 짜리
+  // GLB 가 라이브러리까지 흘러가므로, 만들기 전에 막는다.
+  if (options.mode !== "relief" && options.depthScale <= 0) {
+    return studioLift3dFailure(
+      "invalid-option",
+      "depthScale 은 0보다 커야 합니다(두께 0 은 부피 없는 메시가 됩니다)",
+    );
+  }
   if (options.baseScale !== undefined
     && (!Number.isFinite(options.baseScale) || options.baseScale < 0)) {
     return studioLift3dFailure("invalid-option", "baseScale 은 0 이상의 유한한 값이어야 합니다");
@@ -370,7 +399,14 @@ export function buildStudioLift3dGeometry(
     accumulator.faces.length > STUDIO_EDITABLE_MESH_LIMITS.maxFaces
     || accumulator.faces.length * QUAD_CORNERS > STUDIO_EDITABLE_MESH_LIMITS.maxEdges
   ) {
-    return studioLift3dFailure("budget-exceeded", "해상도를 낮춰 주세요(면 예산 초과)");
+    // 시차 레이어는 해상도와 레이어 수가 **함께** 예산을 먹는다. "해상도를 낮추라" 고만 하면
+    // 레이어를 줄이는 쪽이 더 나은 경우에도 사용자가 그 손잡이를 못 찾는다.
+    return studioLift3dFailure(
+      "budget-exceeded",
+      options.mode === "parallax"
+        ? `해상도(${gridWidth}) 또는 레이어 수(${layerCount})를 낮춰 주세요(면 예산 초과)`
+        : "해상도를 낮춰 주세요(면 예산 초과)",
+    );
   }
 
   const scaled = normalizeStudioLift3dPositions(accumulator.positions, options.targetHeight);

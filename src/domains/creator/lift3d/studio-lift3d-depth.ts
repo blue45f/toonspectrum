@@ -309,18 +309,32 @@ export function buildStudioLift3dDepthBands(
   return Object.freeze(out);
 }
 
-/** 마스크 안쪽으로만 한 칸 부풀린다. 피사체 밖으로 새어 나가지 않는다. */
+/**
+ * 마스크 안쪽으로만 한 칸 부풀린다. 피사체 밖으로 새어 나가지 않는다.
+ *
+ * 8 방향(체비쇼프 거리 1)으로 부풀리는 이유는 면 누락을 막기 위해서다.
+ * `buildFaceGrid` 는 2×2 셀이 모두 같은 밴드에 있어야 사각형을 만든다.
+ * 4 방향만 부풀리면 2×2 안에서 대각선으로 마주 본 두 셀이 서로 다른 밴드일 때
+ * 어느 밴드도 그 2×2 를 전부 갖지 못해 사각형이 통째로 사라진다.
+ * 8 방향이면 2×2 안의 모든 셀이 서로 체비쇼프 거리 1 이내이므로,
+ * 그 2×2 에 속한 임의의 셀이 가진 밴드가 항상 2×2 전체를 덮는다.
+ */
 function dilateWithinMask(cells: Uint8Array, mask: StudioLift3dMask): Uint8Array {
   const { width, height } = mask;
   const out = new Uint8Array(cells);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      const index = y * width + x;
-      if (cells[index] === 0) continue;
-      if (x > 0 && mask.cells[index - 1] === 1) out[index - 1] = 1;
-      if (x + 1 < width && mask.cells[index + 1] === 1) out[index + 1] = 1;
-      if (y > 0 && mask.cells[index - width] === 1) out[index - width] = 1;
-      if (y + 1 < height && mask.cells[index + width] === 1) out[index + width] = 1;
+      if (cells[y * width + x] === 0) continue;
+      const minY = Math.max(0, y - 1);
+      const maxY = Math.min(height - 1, y + 1);
+      const minX = Math.max(0, x - 1);
+      const maxX = Math.min(width - 1, x + 1);
+      for (let ny = minY; ny <= maxY; ny += 1) {
+        for (let nx = minX; nx <= maxX; nx += 1) {
+          const neighbour = ny * width + nx;
+          if (mask.cells[neighbour] === 1) out[neighbour] = 1;
+        }
+      }
     }
   }
   return out;

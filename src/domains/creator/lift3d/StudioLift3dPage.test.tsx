@@ -268,6 +268,36 @@ describe("StudioLift3dPage", () => {
     });
   });
 
+  it("등록 중에 이용 권리를 바꾸면 어느 표기로 저장됐는지 밝힌다", async () => {
+    // 모델은 그대로인데 표기만 바뀌는 경우가 더 위험하다. 화면에는 "공개 이용" 이 떠 있는데
+    // 라이브러리에는 "확인 전" 로 박힌 모델이 남고, 무자격 성공 문구가 그 어긋남을 덮는다.
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    let release: (value: unknown) => void = () => undefined;
+    saveStudioLift3dToBg3dLibrary.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    renderPage("character");
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+
+    libraryButton().click();
+    fireEvent.change(screen.getByLabelText("이용 권리"), { target: { value: "public-domain" } });
+    release({ ok: true, record: { id: "m1" } });
+
+    await waitFor(() => {
+      const notice = screen.getByRole("status").textContent ?? "";
+      expect(notice).toContain("누른 시점의 모델");
+      // 저장된 표기는 클릭 시점의 기본값이다. 화면의 새 표기로 말하면 안 된다.
+      expect(notice).toContain("확인 전");
+      expect(notice).not.toContain("공개 이용(퍼블릭 도메인)");
+    });
+    expect(saveStudioLift3dToBg3dLibrary).toHaveBeenCalledWith(expect.anything(), "unknown");
+  });
+
   it("라이선스 이름을 받지 않으므로 구매·허가 선택지는 내주지 않는다", () => {
     renderPage();
     const options = Array.from(
