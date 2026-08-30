@@ -366,6 +366,23 @@ describe("oil live preview past the dab cap", () => {
     expect(active.stats().strokeCalls).toBeGreaterThan(beforeWake);
   });
 
+  it("repaints an authoritative draft that corrects the interior at the same length", () => {
+    // The endpoint alone is not enough evidence either: a correction can land entirely inside the
+    // stroke and keep both the count and the last point. Only the inputs themselves settle it.
+    const { renderer, active } = attachedRenderer();
+    const predicted = longOilStroke("oil-cap-interior", 3000);
+    expect(renderer.begin(predicted).status).toBe("started");
+    renderer.appendFrom(predicted);
+
+    const before = active.stats().strokeCalls;
+    const corrected = [...predicted.points];
+    corrected[1000] = corrected[1000]! + 17;
+    corrected[1001] = corrected[1001]! - 11;
+    expect(renderer.appendFrom(drawElement("oil-cap-interior", "oil", corrected)).status)
+      .toBe("appended");
+    expect(active.stats().strokeCalls).toBeGreaterThan(before);
+  });
+
   it("repaints an authoritative draft that replaces a predicted tail of the same length", () => {
     // The prediction path can hand the overlay a same-length draft whose tail was retracted.
     // Counting samples alone would call that "nothing new" and strand the predicted pixels.

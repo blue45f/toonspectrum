@@ -140,6 +140,24 @@ function flatPairs(pairs: readonly { x: number; y: number }[]): number[] {
  * both on every pointer frame, allocating O(N) `{x,y}` objects per frame over one drag. Same
  * finite-validation semantics — stop at the first non-finite coordinate.
  */
+/**
+ * Exact equality for the numeric series an oil bed is planned from.
+ *
+ * Length is checked first, so the growth case — the common one — costs a single comparison; the
+ * full scan only runs when a same-length draft has to be told apart from the one already painted.
+ */
+function sameNumberSeries(
+  next: readonly number[] | undefined,
+  previous: readonly number[] | null | undefined,
+): boolean {
+  if (!previous || !next) return false;
+  if (next.length !== previous.length) return false;
+  for (let index = 0; index < next.length; index += 1) {
+    if (!Object.is(next[index], previous[index])) return false;
+  }
+  return true;
+}
+
 function flatFinitePoints(element: DrawEl): number[] {
   const points: number[] = [];
   const count = Math.floor(element.points.length / 2);
@@ -238,20 +256,18 @@ interface ActiveRetainedStroke {
    */
   paintedOilPasses: number;
   /**
-   * Source samples — pointer positions, NOT the interleaved coordinates — the painted oil bed was
-   * built from, or -1 before the first paint.
+   * The exact inputs the painted oil bed was planned from, or null before the first paint.
    *
-   * This is the honest "has anything arrived?" test at any bed size, and it is checked before the
-   * bed is planned rather than after.
+   * A cheaper fingerprint does not work here. Counting samples cannot see an authoritative draft
+   * that REPLACES a predicted one of the same length, and adding the endpoint still misses a
+   * correction to the interior — both leave retracted predicted pixels on screen. Comparing the
+   * inputs themselves is exact, and it is a numeric scan that only runs to completion when the
+   * lengths match, against a plan that costs tens of milliseconds.
    */
+  paintedOilPoints: readonly number[] | null;
+  paintedOilPressures: readonly number[] | null;
+  /** Source samples the painted bed was built from; -1 before the first paint. */
   paintedOilSourceSamples: number;
-  /**
-   * Last source point the painted bed ended on. The sample count alone cannot see an authoritative
-   * draft that REPLACES a predicted tail with the same number of samples, and leaving that on
-   * screen strands retracted pixels.
-   */
-  paintedOilTailX: number;
-  paintedOilTailY: number;
   /** Wall clock and duration of the last capped repaint, for the duty budget above. */
   lastOilCapRepaintAt: number;
   lastOilCapRepaintMs: number;
@@ -414,8 +430,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedDabs: 0,
       paintedOilPasses: 0,
       paintedOilSourceSamples: -1,
-      paintedOilTailX: Number.NaN,
-      paintedOilTailY: Number.NaN,
+      paintedOilPoints: null,
+      paintedOilPressures: null,
       lastOilCapRepaintAt: 0,
       lastOilCapRepaintMs: 0,
       paintedPencilMarks: 0,
@@ -468,8 +484,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedDabs: 0,
         paintedOilPasses: 0,
         paintedOilSourceSamples: -1,
-        paintedOilTailX: Number.NaN,
-        paintedOilTailY: Number.NaN,
+        paintedOilPoints: null,
+        paintedOilPressures: null,
         lastOilCapRepaintAt: 0,
         lastOilCapRepaintMs: 0,
         paintedPencilMarks: 0,
@@ -562,19 +578,13 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     try {
       const flatPoints = flatFinitePoints(element);
       if (flatPoints.length === 0) return true;
-      // Nothing new arrived, so there is nothing to plan. Checked on the source rather than on
-      // the dab count — that count saturates at the cap and stops being evidence there — and
-      // checked here rather than after planning, because a plan whose result is discarded is
-      // pure cost.
-      //
-      // The tail point is part of the test: an authoritative draft can replace a predicted one
-      // with the SAME sample count, and skipping that would strand the retracted pixels.
+      // Nothing new arrived, so there is nothing to plan. Compared against the inputs themselves
+      // rather than the dab count — that count saturates at the cap and stops being evidence
+      // there — and checked here rather than after planning, because a plan whose result is
+      // discarded is pure cost.
       const sourceSamples = flatPoints.length / 2;
-      const tailX = flatPoints[flatPoints.length - 2] ?? Number.NaN;
-      const tailY = flatPoints[flatPoints.length - 1] ?? Number.NaN;
-      const unchanged = sourceSamples === active.paintedOilSourceSamples
-        && Object.is(tailX, active.paintedOilTailX)
-        && Object.is(tailY, active.paintedOilTailY);
+      const unchanged = sameNumberSeries(flatPoints, active.paintedOilPoints)
+        && sameNumberSeries(element.pressures, active.paintedOilPressures);
       if (target === this.activeContext && unchanged) return true;
 
       // Past the cap every append rebuilds all 4096 dabs, so the bed is held to a share of the
@@ -667,8 +677,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       if (target === this.activeContext) {
         active.paintedOilPasses += 1;
         active.paintedOilSourceSamples = sourceSamples;
-        active.paintedOilTailX = tailX;
-        active.paintedOilTailY = tailY;
+        active.paintedOilPoints = flatPoints;
+        active.paintedOilPressures = element.pressures ? [...element.pressures] : null;
         if (dabs.length >= FX_OIL_DAB_CAP) {
           // Measured from the start, but the cooldown runs from the END of the paint: charging it
           // from the start would hand back the paint's own duration and leave the bed taking half
@@ -1069,8 +1079,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedDabs: 0,
         paintedOilPasses: 0,
         paintedOilSourceSamples: -1,
-        paintedOilTailX: Number.NaN,
-        paintedOilTailY: Number.NaN,
+        paintedOilPoints: null,
+        paintedOilPressures: null,
         lastOilCapRepaintAt: 0,
         lastOilCapRepaintMs: 0,
         paintedPencilMarks: 0,
@@ -1095,8 +1105,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         paintedDabs: 0,
         paintedOilPasses: 0,
         paintedOilSourceSamples: -1,
-        paintedOilTailX: Number.NaN,
-        paintedOilTailY: Number.NaN,
+        paintedOilPoints: null,
+        paintedOilPressures: null,
         lastOilCapRepaintAt: 0,
         lastOilCapRepaintMs: 0,
         paintedPencilMarks: 0,
@@ -1111,8 +1121,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       paintedDabs: 0,
       paintedOilPasses: 0,
       paintedOilSourceSamples: -1,
-      paintedOilTailX: Number.NaN,
-      paintedOilTailY: Number.NaN,
+      paintedOilPoints: null,
+      paintedOilPressures: null,
       lastOilCapRepaintAt: 0,
       lastOilCapRepaintMs: 0,
       paintedPencilMarks: 0,
@@ -1125,8 +1135,8 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     this.active.paintedDabs = replayActive.paintedDabs;
     this.active.paintedOilPasses = replayActive.paintedOilPasses;
     this.active.paintedOilSourceSamples = replayActive.paintedOilSourceSamples;
-    this.active.paintedOilTailX = replayActive.paintedOilTailX;
-    this.active.paintedOilTailY = replayActive.paintedOilTailY;
+    this.active.paintedOilPoints = replayActive.paintedOilPoints;
+    this.active.paintedOilPressures = replayActive.paintedOilPressures;
     // The replay just performed a full capped repaint; its cost is what the next append must
     // budget against, or a resize mid-stroke hands out a free rebuild.
     this.active.lastOilCapRepaintAt = replayActive.lastOilCapRepaintAt;
