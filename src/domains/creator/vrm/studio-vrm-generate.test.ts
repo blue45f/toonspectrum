@@ -21,6 +21,8 @@ import {
 import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
 import { validateVrmGlbBytes } from "./vrm-library";
 
+import type { StudioVrmExportSceneSnapshot } from "./studio-vrm-export-plan";
+
 const PRESET_A = "natural-short";
 const PRESET_B = "romance-long";
 
@@ -53,9 +55,19 @@ describe("studio VRM generate recipe", () => {
     const snapshotB = buildStudioVrmGenerateAuthoringSnapshot(recipeB);
     expect(snapshotA.meta.name).toBe(recipeA.label);
     expect(snapshotB.meta.name).toBe(recipeB.label);
-    expect(snapshotA.materials?.[0]?.baseColorFactor).not.toEqual(
+    // 피부 톤은 조형 상태에 파라미터가 없어 두 프리셋이 같은 값을 공유한다. 프리셋을
+    // 가르는 것은 헤어(와 거기서 파생된 의상) 색이므로, 그 머티리얼로 구분을 확인한다.
+    const hairMaterial = (snapshot: StudioVrmExportSceneSnapshot) =>
+      snapshot.materials?.find((material) => material.name === "Hair");
+    expect(hairMaterial(snapshotA)?.baseColorFactor).toBeDefined();
+    expect(hairMaterial(snapshotA)?.baseColorFactor).not.toEqual(
+      hairMaterial(snapshotB)?.baseColorFactor,
+    );
+    expect(snapshotA.materials?.[0]?.name).toBe("Skin");
+    expect(snapshotA.materials?.[0]?.baseColorFactor).toEqual(
       snapshotB.materials?.[0]?.baseColorFactor,
     );
+    expect(snapshotA.nodes[3]?.name).toBe("head");
     expect(snapshotA.nodes[3]?.scale).not.toEqual(snapshotB.nodes[3]?.scale);
   });
 });
