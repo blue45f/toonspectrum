@@ -414,6 +414,20 @@ describe("oil live preview past the dab cap", () => {
     expect(active.stats().strokeCalls).toBe(before);
   });
 
+  it("skips an idle capped append for a stroke that carries no pressures at all", () => {
+    // Mouse input leaves `pressures` undefined. Comparing an absent series as "different from
+    // everything" made that case fail the unchanged check forever, so an idle append past the cap
+    // replanned and repainted 4096 identical dabs — and the self-scheduled wake-up did it again.
+    const { renderer, active } = attachedRenderer();
+    const stroke = { ...longOilStroke("oil-cap-no-pressure", 3000), pressures: undefined };
+    expect(renderer.begin(stroke).status).toBe("started");
+    renderer.appendFrom(stroke);
+
+    const before = active.stats().strokeCalls;
+    expect(renderer.appendFrom(stroke).status).toBe("noop");
+    expect(active.stats().strokeCalls).toBe(before);
+  });
+
   it("still skips a capped append that brought no new samples", () => {
     // The other half of the guard: repainting whenever the bed *could* have changed would repaint
     // on every call at the cap, including calls the pointer did not contribute to.

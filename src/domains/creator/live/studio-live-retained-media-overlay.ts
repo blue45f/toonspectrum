@@ -150,7 +150,10 @@ function sameNumberSeries(
   next: readonly number[] | undefined,
   previous: readonly number[] | null | undefined,
 ): boolean {
-  if (!previous || !next) return false;
+  // A stroke carrying no pressures at all (mouse input) has to be able to match a previous paint
+  // that also carried none; only an unpainted bed -- a real series against `null` -- differs.
+  if (next === undefined) return previous === undefined || previous === null;
+  if (previous === undefined || previous === null) return false;
   if (next.length !== previous.length) return false;
   for (let index = 0; index < next.length; index += 1) {
     if (!Object.is(next[index], previous[index])) return false;
@@ -266,8 +269,6 @@ interface ActiveRetainedStroke {
    */
   paintedOilPoints: readonly number[] | null;
   paintedOilPressures: readonly number[] | null;
-  /** Source samples the painted bed was built from; -1 before the first paint. */
-  paintedOilSourceSamples: number;
   /** Wall clock and duration of the last capped repaint, for the duty budget above. */
   lastOilCapRepaintAt: number;
   lastOilCapRepaintMs: number;
@@ -429,7 +430,6 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       element,
       paintedDabs: 0,
       paintedOilPasses: 0,
-      paintedOilSourceSamples: -1,
       paintedOilPoints: null,
       paintedOilPressures: null,
       lastOilCapRepaintAt: 0,
@@ -483,7 +483,6 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         element,
         paintedDabs: 0,
         paintedOilPasses: 0,
-        paintedOilSourceSamples: -1,
         paintedOilPoints: null,
         paintedOilPressures: null,
         lastOilCapRepaintAt: 0,
@@ -582,7 +581,6 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       // rather than the dab count — that count saturates at the cap and stops being evidence
       // there — and checked here rather than after planning, because a plan whose result is
       // discarded is pure cost.
-      const sourceSamples = flatPoints.length / 2;
       const unchanged = sameNumberSeries(flatPoints, active.paintedOilPoints)
         && sameNumberSeries(element.pressures, active.paintedOilPressures);
       if (target === this.activeContext && unchanged) return true;
@@ -676,7 +674,6 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       active.paintedDabs = dabs.length;
       if (target === this.activeContext) {
         active.paintedOilPasses += 1;
-        active.paintedOilSourceSamples = sourceSamples;
         active.paintedOilPoints = flatPoints;
         active.paintedOilPressures = element.pressures ? [...element.pressures] : null;
         if (dabs.length >= FX_OIL_DAB_CAP) {
@@ -1078,7 +1075,6 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         element: stroke,
         paintedDabs: 0,
         paintedOilPasses: 0,
-        paintedOilSourceSamples: -1,
         paintedOilPoints: null,
         paintedOilPressures: null,
         lastOilCapRepaintAt: 0,
@@ -1104,7 +1100,6 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         element: stroke,
         paintedDabs: 0,
         paintedOilPasses: 0,
-        paintedOilSourceSamples: -1,
         paintedOilPoints: null,
         paintedOilPressures: null,
         lastOilCapRepaintAt: 0,
@@ -1120,7 +1115,6 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       ...this.active,
       paintedDabs: 0,
       paintedOilPasses: 0,
-      paintedOilSourceSamples: -1,
       paintedOilPoints: null,
       paintedOilPressures: null,
       lastOilCapRepaintAt: 0,
@@ -1134,7 +1128,6 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     this.paintSuffix(replayActive, this.active.element, this.activeContext);
     this.active.paintedDabs = replayActive.paintedDabs;
     this.active.paintedOilPasses = replayActive.paintedOilPasses;
-    this.active.paintedOilSourceSamples = replayActive.paintedOilSourceSamples;
     this.active.paintedOilPoints = replayActive.paintedOilPoints;
     this.active.paintedOilPressures = replayActive.paintedOilPressures;
     // The replay just performed a full capped repaint; its cost is what the next append must
