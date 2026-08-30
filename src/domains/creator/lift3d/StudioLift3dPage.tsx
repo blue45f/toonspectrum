@@ -266,7 +266,12 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     if (!file) return;
     setDecodeError(null);
     setLiftError(null);
-    sourceRevisionRef.current += 1;
+    // 이 호출이 맡은 번호를 **붙잡아 둔다**. 디코딩은 파일마다 걸리는 시간이 달라, 먼저 고른
+    // 큰 파일이 나중에 고른 작은 파일보다 늦게 끝날 수 있다. ref 만 보면 늦게 끝난 옛 파일이
+    // 마지막에 화면을 차지한다(last-write-wins).
+    const revision = sourceRevisionRef.current + 1;
+    sourceRevisionRef.current = revision;
+    const superseded = (): boolean => sourceRevisionRef.current !== revision;
     // 등록 문구는 방금 올린 파일이 아니라 **이전** 모델 이야기다. 변환 효과가 지워 주기를
     // 기다리면 안 된다 — 새 파일이 디코딩에 실패하면 그 효과는 decoded === null 로 일찍
     // 빠져나가고, 화면에는 새 파일의 오류 옆에 이전 모델의 "등록했습니다" 가 그대로 남는다.
@@ -274,9 +279,11 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
     setBusy(true);
     try {
       const next = await decodeStudioLift3dFile(file);
+      if (superseded()) return;
       setDecoded(next);
       setTab("source");
     } catch (error) {
+      if (superseded()) return;
       setDecoded(null);
       setResult(null);
       setDecodeError(
@@ -285,7 +292,8 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
           : "이미지를 여는 중 문제가 생겼습니다. 다른 파일로 다시 시도해 주세요.",
       );
     } finally {
-      setBusy(false);
+      // 뒤늦게 끝난 호출이 아직 도는 최신 디코딩의 "변환 중" 을 풀어 버리면 안 된다.
+      if (!superseded()) setBusy(false);
     }
   }, []);
 

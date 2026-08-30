@@ -232,6 +232,38 @@ describe("StudioLift3dPage", () => {
     });
   });
 
+  it("먼저 고른 파일이 늦게 끝나도 나중에 고른 파일을 밀어내지 않는다", async () => {
+    // 디코딩 시간은 파일마다 다르다. 큰 파일 A 를 고른 뒤 곧바로 작은 파일 B 를 고르면
+    // A 가 나중에 끝날 수 있는데, 그때 A 가 화면을 차지하면 사용자가 고른 것은 B 인데
+    // 보이는 것은 A 가 된다.
+    let finishA: (value: unknown) => void = () => undefined;
+    decodeStudioLift3dFile.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishA = resolve;
+      }),
+    );
+    const second = { ...decodedDisc(), fileName: "두번째" };
+    decodeStudioLift3dFile.mockResolvedValueOnce(second);
+
+    renderPage("character");
+    pickFile();
+    pickFile();
+    await waitFor(() => {
+      expect(downloadButton().disabled).toBe(false);
+    });
+    // B 가 먼저 끝나 화면을 차지했다.
+    expect(screen.getByText(/두번째/u)).toBeDefined();
+
+    finishA({ ...decodedDisc(), fileName: "첫번째" });
+
+    // A 가 뒤늦게 끝나도 화면은 B 그대로여야 한다.
+    await waitFor(() => {
+      expect(downloadButton().disabled).toBe(false);
+    });
+    expect(screen.queryByText(/첫번째/u)).toBeNull();
+    expect(screen.getByText(/두번째/u)).toBeDefined();
+  });
+
   it("디코딩이 끝나기 전에 등록이 끝나도 최신이 아니라고 본다", async () => {
     // 파일을 고른 직후부터 디코딩이 끝날 때까지는 decoded 도 지문도 아직 옛 값이다.
     // 그 창에서 등록이 끝나면 "지금 보이는 모델" 이라고 잘못 말하고, 이어서 디코딩이

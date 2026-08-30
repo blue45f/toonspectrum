@@ -509,13 +509,22 @@ export function buildStudioLift3dGeometry(
         return [thickness * depth.heights[key]!, -baseThickness];
       },
     }];
-  const layerCount = options.mode === "parallax" ? shells.length : 1;
+
 
   let plannedQuads = 0;
+  // 사각형을 하나도 못 만드는 껍질은 버린다. 밴드가 한 칸 폭 부위에만 걸리면 부풀린 뒤에도
+  // 2×2 가 안 나와 정점이 하나도 안 나가는데, 세어만 두면 존재하지 않는 층이 지표와 화면에
+  // 광고된다.
+  const emitting: PlannedShell[] = [];
   for (const shell of shells) {
     droppedPinches += shell.grid.droppedPinches;
-    plannedQuads += countShellQuads(shell.grid);
+    const quads = countShellQuads(shell.grid);
+    if (quads === 0) continue;
+    plannedQuads += quads;
+    emitting.push(shell);
   }
+
+  const layerCount = options.mode === "parallax" ? emitting.length : 1;
 
   if (plannedQuads === 0) {
     return studioLift3dFailure("degenerate-geometry", "면을 하나도 만들지 못했습니다");
@@ -531,7 +540,7 @@ export function buildStudioLift3dGeometry(
     );
   }
 
-  for (const shell of shells) {
+  for (const shell of emitting) {
     quadCount += emitStudioLift3dShell(accumulator, context, shell.grid, shell.depthAt);
   }
 

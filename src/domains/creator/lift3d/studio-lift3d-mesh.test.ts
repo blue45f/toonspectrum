@@ -519,6 +519,35 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(noisy * QUAD_CORNERS).toBeGreaterThan(CORNER_BUDGET);
   });
 
+  it("사각형을 하나도 못 만드는 밴드는 층 수에서 뺀다", () => {
+    // 한 칸 폭 부위에만 걸린 밴드는 부풀린 뒤에도 2×2 가 안 나와 정점이 하나도 안 나간다.
+    // 그 껍질을 세어만 두면 존재하지 않는 층이 지표와 화면에 광고된다.
+    const side = 16;
+    const cells = new Uint8Array(side * side);
+    for (let y = 2; y <= 8; y += 1) {
+      for (let x = 2; x <= 8; x += 1) cells[y * side + x] = 1;
+      // 본체와 떨어진 한 칸 폭 가시. 마스크가 여기서 한 칸이라 부풀려도 2×2 가 안 된다.
+      cells[y * side + 12] = 1;
+    }
+    const mask = maskFromCells(side, side, cells);
+    const heights = new Float64Array(side * side);
+    for (let y = 2; y <= 8; y += 1) {
+      for (let x = 2; x <= 8; x += 1) heights[y * side + x] = 0.9;
+      heights[y * side + 12] = 0.1;
+    }
+
+    const built = buildStudioLift3dGeometry(
+      mask,
+      { width: side, height: side, heights, maxDistance: 4 },
+      { mode: "parallax", depthScale: 0.3, targetHeight: 2, layerBands: 2 },
+    );
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    // 밴드는 둘이지만 면이 나오는 껍질은 하나뿐이다.
+    expect(built.value.layerCount).toBe(1);
+  });
+
   it("이 함수만 직접 불러도 비유한 레이어 수를 거절한다", () => {
     // 파이프라인을 거치지 않는 호출자가 있다(이 테스트 파일부터가 그렇다).
     // clampStudioLift3dBandCount 는 비유한 값을 조용히 1 로 떨어뜨리므로 여기서 막지 않으면
