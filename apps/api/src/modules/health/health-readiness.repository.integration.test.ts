@@ -15,9 +15,10 @@ if (process.env.CI && !INTEGRATION_URL) {
     "CI must provide STUDIO_LIVE_POSTGRES_INTEGRATION_URL; deployment readiness cannot be skipped",
   );
 }
-if (process.env.CI && !INTEGRATION_RUNTIME_ROLE) {
+if (INTEGRATION_URL && !INTEGRATION_RUNTIME_ROLE) {
   throw new Error(
-    "CI must provide STUDIO_LIVE_POSTGRES_RUNTIME_ROLE; readiness must run as the application role",
+    "STUDIO_LIVE_POSTGRES_RUNTIME_ROLE is required with "
+      + "STUDIO_LIVE_POSTGRES_INTEGRATION_URL; readiness must run as the application role",
   );
 }
 if (
