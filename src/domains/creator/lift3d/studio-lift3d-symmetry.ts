@@ -54,9 +54,14 @@ function symmetryScoreAt(mask: StudioLift3dMask, axisX: number): number {
     for (let x = 0; x < width; x += 1) {
       const here = cells[row + x] === 1;
       const mirrorX = Math.round(2 * axisX - x);
-      const mirrored = mirrorX >= 0 && mirrorX < width && cells[row + mirrorX] === 1;
+      const inGrid = mirrorX >= 0 && mirrorX < width;
+      const mirrored = inGrid && cells[row + mirrorX] === 1;
       if (here && mirrored) intersection += 1;
       if (here || mirrored) union += 1;
+      // 격자를 벗어난 거울상 셀은 이 루프가 **절대 방문하지 않는다**. 합집합에만 있는 셀이니
+      // 여기서 따로 더해야 한다. 빠뜨리면 어긋남 하나를 두 번이 아니라 한 번만 세어 점수가
+      // 부풀고, 실루엣이 가장자리에 붙은 비대칭 원화에 대칭 보정이 걸린다.
+      if (here && !inGrid) union += 1;
     }
   }
   return union === 0 ? 0 : intersection / union;

@@ -63,6 +63,8 @@ export const STUDIO_LIFT3D_WARNING_CODES = [
   "non-manifold-residual",
   /** 좌우대칭으로 보기 어려워 대칭 보정을 걸지 않았다. */
   "symmetry-skipped",
+  /** 실루엣에 안쪽 정점이 없어 앞쪽 두께 비율이 형태를 바꾸지 못했다. */
+  "front-ratio-inert",
   /** 요청한 시차 레이어 수가 지원 범위를 벗어나 조였다. */
   "layer-bands-clamped",
   "resolution-clamped",

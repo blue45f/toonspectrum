@@ -132,6 +132,28 @@ function buildFaceGrid(cells: Uint8Array, gridWidth: number, gridHeight: number)
   return { present, width, height, droppedPinches };
 }
 
+/**
+ * 사각형 네 개에 모두 둘러싸인 정점(=안쪽 정점)이 하나라도 있는지.
+ *
+ * 없으면 실루엣이 어디서나 두 칸 이하라 모든 정점이 테두리다. 그때 앞뒤 두께는 정점마다
+ * `MIN_RIM_HEIGHT` 로 같아, `frontRatio` 는 두 껍질을 통째로 z 로 평행이동시킬 뿐 형태를
+ * 바꾸지 못한다. 그 평행이동은 `normalizeStudioLift3dPositions` 의 z 중심 맞추기가 곧바로
+ * 되돌린다 — 나눌 부피가 애초에 없기 때문이다.
+ */
+function hasInteriorVertex(grid: FaceGrid): boolean {
+  for (let y = 1; y < grid.height; y += 1) {
+    for (let x = 1; x < grid.width; x += 1) {
+      if (grid.present[(y - 1) * grid.width + (x - 1)] === 1
+        && grid.present[(y - 1) * grid.width + x] === 1
+        && grid.present[y * grid.width + (x - 1)] === 1
+        && grid.present[y * grid.width + x] === 1) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** 정점이 속한 사각형 개수. 4 면 내부, 1~3 이면 껍질 경계, 0 이면 미사용. */
 function faceDegree(grid: FaceGrid, x: number, y: number): number {
   let degree = 0;
@@ -501,6 +523,14 @@ export function buildStudioLift3dGeometry(
     warnings.push(studioLift3dWarning(
       "pinch-faces-dropped",
       `위상이 꼬이는 대각 연결 ${droppedPinches}곳을 정리했습니다`,
+    ));
+  }
+  // 앞쪽 두께를 옮겨 달라고 했는데 나눌 부피가 없으면 조용히 넘기지 않는다. 슬라이더를 끝까지
+  // 밀어도 화면이 그대로인 이유를 사용자가 알 수 있어야 한다.
+  if (options.mode === "inflate" && frontRatio !== 0.5 && !hasInteriorVertex(shells[0]!.grid)) {
+    warnings.push(studioLift3dWarning(
+      "front-ratio-inert",
+      "실루엣이 어디서나 두 칸 이하라 앞쪽 두께 비율이 형태를 바꾸지 못합니다. 해상도를 올려 보세요",
     ));
   }
 

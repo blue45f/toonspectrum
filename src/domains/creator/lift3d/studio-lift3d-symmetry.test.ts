@@ -38,6 +38,27 @@ function maskFrom(width: number, height: number, cells: Uint8Array): StudioLift3
 }
 
 describe("Studio Lift 3D 대칭 축", () => {
+  it("격자를 벗어난 거울상까지 합집합에 넣어 점수를 부풀리지 않는다", () => {
+    // `.#.#####` 를 축 5 에서 접으면 열 1 의 거울상이 열 9 로 격자 밖에 떨어진다. 그 셀을
+    // 합집합에서 빠뜨리면 어긋남 하나를 한 번만 세어 5/6 = 0.833 이 되고, 0.82 문턱을 넘어
+    // 비대칭 실루엣에 대칭 보정이 걸린다. 참값은 5/7 = 0.714 다.
+    const width = 8;
+    const height = 4;
+    const row = [0, 1, 0, 1, 1, 1, 1, 1];
+    const cells = new Uint8Array(width * height);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) cells[y * width + x] = row[x]!;
+    }
+
+    const found = findStudioLift3dSymmetryAxis(maskFrom(width, height, cells));
+
+    expect(found).not.toBeNull();
+    if (found === null) return;
+    // 최적 축이 5 가 아닐 수도 있지만, 어떤 축을 고르든 부풀린 0.833 을 넘어서는 안 된다.
+    expect(found.score).toBeLessThan(0.83);
+    expect(found.confident).toBe(false);
+  });
+
   it("원반의 축을 중심에서 반 칸 안으로 찾아낸다", () => {
     const grid = resampleStudioLift3dImage(discImage(64), 48);
     const mask = extractStudioLift3dMask(grid, { mode: "alpha" });

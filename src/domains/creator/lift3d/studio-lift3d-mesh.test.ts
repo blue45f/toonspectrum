@@ -519,6 +519,81 @@ describe("Studio Lift 3D 메시 빌더", () => {
     expect(noisy * QUAD_CORNERS).toBeGreaterThan(CORNER_BUDGET);
   });
 
+  it("나눌 부피가 없으면 앞쪽 두께 비율이 먹히지 않는다고 알린다", () => {
+    // 두 칸 폭 실루엣은 모든 정점이 테두리라 앞뒤 두께가 어디서나 같다. frontRatio 는 두 껍질을
+    // 통째로 z 로 옮길 뿐이고, 정규화의 z 중심 맞추기가 그 이동을 곧바로 되돌린다. 슬라이더를
+    // 끝까지 밀어도 화면이 그대로인데 아무 말이 없으면 사용자는 고장으로 읽는다.
+    const side = 16;
+    const cells = new Uint8Array(side * side);
+    for (let y = 1; y < side - 1; y += 1) {
+      cells[y * side + 7] = 1;
+      cells[y * side + 8] = 1;
+    }
+    const mask = maskFromCells(side, side, cells);
+    const depth = {
+      width: side,
+      height: side,
+      heights: new Float64Array(side * side).fill(1),
+      maxDistance: 1,
+    };
+
+    const shifted = buildStudioLift3dGeometry(mask, depth, {
+      mode: "inflate",
+      depthScale: 0.4,
+      targetHeight: 2,
+      frontRatio: 0.8,
+    });
+    const even = buildStudioLift3dGeometry(mask, depth, {
+      mode: "inflate",
+      depthScale: 0.4,
+      targetHeight: 2,
+      frontRatio: 0.5,
+    });
+
+    expect(shifted.ok && even.ok).toBe(true);
+    if (!shifted.ok || !even.ok) return;
+    expect(shifted.warnings.map((warning) => warning.code)).toContain("front-ratio-inert");
+    // 앞뒤를 반씩 나눠 달라고 한 쪽은 옮길 것이 없으니 경고할 것도 없다.
+    expect(even.warnings.map((warning) => warning.code)).not.toContain("front-ratio-inert");
+    // 경고가 참말인지도 확인한다 — 두 결과의 z 가 실제로 같아야 한다.
+    const zOf = (built: typeof shifted): number[] => (built.ok
+      ? built.value.mesh.vertices.map((vertex) => vertex.position.z)
+      : []);
+    const left = zOf(shifted);
+    const right = zOf(even);
+    expect(left).toHaveLength(right.length);
+    for (let index = 0; index < left.length; index += 1) {
+      expect(left[index]!).toBeCloseTo(right[index]!, 12);
+    }
+  });
+
+  it("안쪽 정점이 있으면 앞쪽 두께 비율이 형태를 실제로 바꾼다", () => {
+    // 위 경고가 과잉이 아닌지 확인한다. 세 칸만 되어도 가운데 정점이 안쪽이 되어 부피가 생긴다.
+    const side = 16;
+    const cells = new Uint8Array(side * side);
+    for (let y = 1; y < side - 1; y += 1) {
+      for (let x = 6; x <= 9; x += 1) cells[y * side + x] = 1;
+    }
+    const mask = maskFromCells(side, side, cells);
+    const depth = {
+      width: side,
+      height: side,
+      heights: new Float64Array(side * side).fill(1),
+      maxDistance: 2,
+    };
+
+    const built = buildStudioLift3dGeometry(mask, depth, {
+      mode: "inflate",
+      depthScale: 0.4,
+      targetHeight: 2,
+      frontRatio: 0.8,
+    });
+
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.warnings.map((warning) => warning.code)).not.toContain("front-ratio-inert");
+  });
+
   it("정규화는 XZ 중심을 원점에 두고 균일 스케일만 쓴다", () => {
     const normalized = normalizeStudioLift3dPositions(
       [
