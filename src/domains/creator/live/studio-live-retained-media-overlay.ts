@@ -129,17 +129,6 @@ function pairsFromElement(element: DrawEl): { x: number; y: number }[] {
   return pairs;
 }
 
-function flatPairs(pairs: readonly { x: number; y: number }[]): number[] {
-  const points: number[] = [];
-  for (const pair of pairs) points.push(pair.x, pair.y);
-  return points;
-}
-
-/**
- * `pairsFromElement` + `flatPairs` without the intermediate object array: the oil hot path ran
- * both on every pointer frame, allocating O(N) `{x,y}` objects per frame over one drag. Same
- * finite-validation semantics — stop at the first non-finite coordinate.
- */
 /**
  * Exact equality for the numeric series an oil bed is planned from.
  *
@@ -151,7 +140,7 @@ function sameNumberSeries(
   previous: readonly number[] | null | undefined,
 ): boolean {
   // A stroke carrying no pressures at all (mouse input) has to be able to match a previous paint
-  // that also carried none; only an unpainted bed -- a real series against `null` -- differs.
+  // that also carried none; only an unpainted bed — a real series against `null` — differs.
   if (next === undefined) return previous === undefined || previous === null;
   if (previous === undefined || previous === null) return false;
   if (next.length !== previous.length) return false;
@@ -161,6 +150,17 @@ function sameNumberSeries(
   return true;
 }
 
+function flatPairs(pairs: readonly { x: number; y: number }[]): number[] {
+  const points: number[] = [];
+  for (const pair of pairs) points.push(pair.x, pair.y);
+  return points;
+}
+
+/**
+ * `pairsFromElement` + `flatPairs` without the intermediate object array: the oil hot path ran
+ * both on every pointer frame, allocating O(N) `{x,y}` objects per frame over one drag. Same
+ * finite-validation semantics — stop at the first non-finite coordinate.
+ */
 function flatFinitePoints(element: DrawEl): number[] {
   const points: number[] = [];
   const count = Math.floor(element.points.length / 2);
