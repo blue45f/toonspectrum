@@ -144,6 +144,7 @@ export type StudioCuttoonEditorViewSessionRest = {
   setEmeresTab: any;
   setEraseToIntersection: any;
   setError: any;
+  setStudioStatusNotice: any;
   setExportFormat: any;
   setExportMenuOpen: any;
   setExportPresetId: any;
@@ -438,6 +439,7 @@ export type StudioCuttoonEditorViewSessionRest = {
   studioRevisionProjectGenerationRef: any;
   studioRootRef: any;
   studioSfx: any;
+  studioStatusNotice: any;
   studioStickerAssetsError: any;
   studioStickerAssetsLoaded: any;
   studioStickerAssetsLoading: any;

@@ -142,6 +142,8 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
     isFullscreen,
     isMobile,
     layerMergeBusy,
+    setStudioStatusNotice,
+    studioStatusNotice,
     liveWorkspaceLayout,
     loadedWork,
     macroSession,
@@ -508,6 +510,20 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
               aria-label="오류 메시지 닫기"
               className="-mr-1 shrink-0 rounded p-0.5 transition hover:bg-bad/15"
               onClick={() => setError(null)}
+            >
+              <X size={12} strokeWidth={2.5} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+        {densityShowsStatusRail && studioStatusNotice ? (
+          <div role="status" className="my-1 flex items-start justify-between gap-2 rounded-lg border border-accent/35 bg-accent-soft/30 px-2.5 py-1.5 text-xs text-fg-2">
+            <span className="min-w-0 break-words">{studioStatusNotice}</span>
+            <button
+              type="button"
+              data-studio-status-notice-dismiss
+              aria-label="알림 닫기"
+              className="-mr-1 shrink-0 rounded p-0.5 transition hover:bg-accent-soft/60"
+              onClick={() => setStudioStatusNotice(null)}
             >
               <X size={12} strokeWidth={2.5} aria-hidden="true" />
             </button>

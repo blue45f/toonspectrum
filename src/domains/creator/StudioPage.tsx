@@ -1876,6 +1876,12 @@ function StudioCuttoonEditor({
   effectFavoriteStateRef.current = effectFavoriteState;
   const [macroSession, setMacroSession] = useState<StudioMacroSession>(() => createStudioMacroSession());
   const [layerMergeBusy, setLayerMergeBusy] = useState(false);
+  /**
+   * 상태 레일의 중립 알림. `error`는 "bad" 톤 하나로만 렌더되므로, 작업이 성공했지만 결과가
+   * 요청한 모양과 다를 때(예: 실시간 룸에서 3D LT 번들 대신 병합 합성이 추가될 때)를 실패처럼
+   * 보이게 만들지 않고 알리기 위한 별도 채널이다.
+   */
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
   // 확장 블렌드(포토샵 전용 10모드) — 라이브 합성 불가(Konva 백드롭 미지원)라 "아래와 병합" bake 전용.
   // 엔진은 lazy 청크에 남기려고 기본값을 리터럴로 초기화한다(type-only import).
   const [extendedBlendMode, setExtendedBlendMode] = useState<StudioExtendedBlendModeId>("linear-dodge");
@@ -3950,6 +3956,7 @@ function StudioCuttoonEditor({
     dccRouteAccess: hybridDccRouteAccess,
     dccRouteRequested: hybridDccRouteRequested,
     onAnnounce: announceDrawingShortcut,
+    onBlockedNotice: setStatusNotice,
     onCaptureReturnFocus: captureHybridDccReturnFocus,
     onFlushWorkspacePersistence: flushHybridDccWorkspacePersistence,
     studioRoute,
@@ -18984,28 +18991,27 @@ const puppetWarpArmed =
     targetElementId?: string
   ): Promise<boolean> {
     setError(null);
+    setStatusNotice(null);
     const anchorLayer = result.layers.at(-1);
     if (!anchorLayer) {
       setError("삽입할 3D LT 레이어가 없습니다.");
       return false;
     }
-    // linked3dRender, shared3dStage, the anchor Scene and LT raster bodies do not yet share one
-    // bounded CRDT/CAS receipt. Publishing only the image topology would create a hollow remote
-    // reference, so live-room materialization stays fail-closed until that durable contract ships.
-    if (isRealtimeTeamSession) {
-      setError(
-        "실시간 공동 편집에서는 3D Shot·Stage·Canvas 레이어를 함께 동기화하는 기능을 준비 중이에요. 일반 작업 문서에서 적용해 주세요.",
-      );
-      return false;
-    }
-
-    // 문서 마스터는 의도적으로 그룹을 지원하지 않는다. 이 표면에서는 분리 레이어를 거짓으로
-    // 그룹화하지 않고 같은 LT 결과의 투명 합성 PNG를 사용하며, 장면 원본은 계속 재편집 가능하다.
-    if (masterEditMode) {
+    /**
+     * 하나의 자기완결 이미지 레이어 — 래스터 본문과 그 안에 담긴 장면 문서가 전부다. LT 번들
+     * 아이디도, 공유 스테이지 연결도, `linked3dRender`도 남기지 않는다. 즉 요소 바깥에 사는
+     * 상태를 가리키는 참조가 하나도 없다. 정확히 이 모양을 필요로 하는 표면이 둘 있다.
+     *
+     *   - 문서 마스터: 분리 번들을 담을 레이어 그룹을 의도적으로 갖지 않는다.
+     *   - 실시간 룸: 번들 아이디를 발행하면 그 Scene·LT 래스터 본문을 원격 참가자가 해석할 수
+     *     없는 빈 참조가 된다.
+     *
+     * 장면 원본은 요소에 그대로 실려 다시 편집할 수 있으므로, "병합"이 잃는 것은 분리된
+     * 컬러·톤·선화 레이어이지 3D 원본이 아니다.
+     */
+    function materializeBg3dMergedComposite(magicMaskMessage: string): boolean {
       if (result.magicFilterMask) {
-        setError(
-          "매직 레이어 마스크는 일반 페이지의 분리된 컬러·톤 레이어에서만 안전하게 만들 수 있어요. 문서 마스터를 닫고 새 3D 배경으로 추가해 주세요.",
-        );
+        setError(magicMaskMessage);
         return false;
       }
       if (targetElementId) {
@@ -19027,22 +19033,46 @@ const puppetWarpArmed =
           bg3dLtRenderMode: undefined,
           name: "3D LT 배경 · 병합",
         })) return false;
-      } else {
-        const masterImage = createCanvasImageElement({
-          id: uid(),
-          src: result.compositePngDataUrl,
-          canvasWidth: CANVAS_W,
-          canvasHeight: canvasH,
-          sourceWidth: result.width,
-          sourceHeight: result.height,
-        });
-        if (!addEl({
-          ...masterImage,
-          name: "3D LT 배경 · 병합",
-          bg3dScene: result.bg3dScene,
-        })) return false;
+        return true;
       }
+      const mergedImage = createCanvasImageElement({
+        id: uid(),
+        src: result.compositePngDataUrl,
+        canvasWidth: CANVAS_W,
+        canvasHeight: canvasH,
+        sourceWidth: result.width,
+        sourceHeight: result.height,
+      });
+      if (!addEl({
+        ...mergedImage,
+        name: "3D LT 배경 · 병합",
+        bg3dScene: result.bg3dScene,
+      })) return false;
       return true;
+    }
+
+    // linked3dRender, shared3dStage, the anchor Scene and LT raster bodies do not yet share one
+    // bounded CRDT/CAS receipt, so the separated LT bundle stays out of a realtime room. What the
+    // room does get is the merged composite above: a raster body plus an embedded scene document,
+    // which is the same shape any pasted image already replicates. That keeps the "no hollow
+    // remote reference" property that made this fail closed, without leaving the 3D background
+    // unattachable — `/studio` opens an instant jam room, so this branch is the default path.
+    if (isRealtimeTeamSession) {
+      if (!materializeBg3dMergedComposite(
+        "매직 레이어 마스크는 분리된 컬러·톤 레이어가 있어야 만들 수 있어요. 실시간 공동 편집에서는 매직 레이어를 끄고 다시 추가해 주세요.",
+      )) return false;
+      setStatusNotice(
+        "실시간 공동 편집이라 컬러·톤·선화를 한 레이어로 합쳐 추가했어요. 3D 장면 원본은 그대로 남아 다시 편집할 수 있어요.",
+      );
+      return true;
+    }
+
+    // 문서 마스터는 의도적으로 그룹을 지원하지 않는다. 이 표면에서는 분리 레이어를 거짓으로
+    // 그룹화하지 않고 같은 LT 결과의 투명 합성 PNG를 사용하며, 장면 원본은 계속 재편집 가능하다.
+    if (masterEditMode) {
+      return materializeBg3dMergedComposite(
+        "매직 레이어 마스크는 일반 페이지의 분리된 컬러·톤 레이어에서만 안전하게 만들 수 있어요. 문서 마스터를 닫고 새 3D 배경으로 추가해 주세요.",
+      );
     }
 
     const linkedSceneResolution = resolveStudioBg3dLtLinkedScene({
@@ -31661,6 +31691,7 @@ function clearSelectionForEdit() {
       setEmeresTab={setEmeresTab}
       setEraseToIntersection={setEraseToIntersection}
       setError={setError}
+      setStudioStatusNotice={setStatusNotice}
       setExportFormat={setExportFormat}
       setExportMenuOpen={setExportMenuOpen}
       setExportPresetId={setExportPresetId}
@@ -31955,6 +31986,7 @@ function clearSelectionForEdit() {
       studioRevisionProjectGenerationRef={studioRevisionProjectGenerationRef}
       studioRootRef={studioRootRef}
       studioSfx={studioSfx}
+      studioStatusNotice={statusNotice}
       studioStickerAssetsError={studioStickerAssetsError}
       studioStickerAssetsLoaded={studioStickerAssetsLoaded}
       studioStickerAssetsLoading={studioStickerAssetsLoading}
