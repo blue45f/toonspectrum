@@ -135,6 +135,11 @@ describe("studio VRM generate default preset", () => {
     const panel = readFileSync(new URL("./StudioVrmAvatarForgePanel.tsx", import.meta.url), "utf8");
     expect(panel).toContain("setHairStyleChosen(true)");
     expect(panel).toContain("allowDefaultPreset: !hairStyleChosen");
+    // 조형 상태를 통째로 갈아끼우는 곳에서는 선택 의도도 같이 지워야 한다. 남으면 초기화한
+    // 패널이나 프리셋을 새로 고른 패널이 기본 프리셋 대신 대머리를 만든다.
+    const replacements = panel.match(/onChange\(createAvatarForgeState\(/g) ?? [];
+    expect(replacements.length).toBeGreaterThan(0);
+    expect(panel.match(/setHairStyleChosen\(false\)/g) ?? []).toHaveLength(replacements.length);
   });
 
   it("gives the untouched state a hairy, named character instead of a bald custom one", () => {

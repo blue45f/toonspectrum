@@ -175,7 +175,12 @@ export function StudioVrmAvatarForgePanel({
           <button
             type="button"
             disabled={disabled}
-            onClick={() => onChange(createAvatarForgeState())}
+            onClick={() => {
+              // 조형 상태를 통째로 되돌리면 "머리 없음을 골랐다"는 의도도 같이 사라져야 한다.
+              // 남겨 두면 초기화한 패널이 기본 프리셋 대신 대머리를 만든다.
+              setHairStyleChosen(false);
+              onChange(createAvatarForgeState());
+            }}
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg disabled:opacity-40"
             aria-label="아바타 조형 초기화"
             title="기본 조형으로 초기화"
@@ -226,7 +231,10 @@ export function StudioVrmAvatarForgePanel({
                     type="button"
                     disabled={disabled}
                     aria-pressed={selected}
-                    onClick={() => onChange(createAvatarForgeState(preset.id))}
+                    onClick={() => {
+                      setHairStyleChosen(false);
+                      onChange(createAvatarForgeState(preset.id));
+                    }}
                     className={`min-h-[5.6rem] w-[8.4rem] shrink-0 snap-start rounded-xl border p-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
                       selected
                         ? "border-accent bg-accent-soft text-accent"
