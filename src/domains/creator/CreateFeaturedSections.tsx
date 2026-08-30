@@ -1,4 +1,4 @@
-import { Flame, Sparkles, Trophy, WandSparkles } from "lucide-react";
+import { Boxes, Flame, Sparkles, Trophy, WandSparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { WorkCard, WorkGridSkeleton } from "./creator-community-ui";
@@ -212,7 +212,7 @@ export function CreateFeaturedSections() {
         title="오늘 바로 시작하기"
         description="그리기가 부담스럽다면 이미지 업로드, 컷 구성이 필요하면 스튜디오로."
       >
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           <Link
             href={buildStudioHref({ mode: "upload" })}
             className="flex items-center gap-3 rounded-xl border border-line bg-card/60 px-4 py-3 transition-colors hover:border-accent/45 hover:bg-card"
@@ -235,6 +235,18 @@ export function CreateFeaturedSections() {
             <span>
               <span className="block text-sm font-semibold text-fg">컷툰 스튜디오</span>
               <span className="mt-0.5 block text-xs text-fg-3">템플릿·말풍선·VRM으로 제작</span>
+            </span>
+          </Link>
+          <Link
+            href="/studio/lift3d"
+            className="flex items-center gap-3 rounded-xl border border-line bg-card/60 px-4 py-3 transition-colors hover:border-accent/45 hover:bg-card"
+          >
+            <span className="grid size-10 place-items-center rounded-lg bg-accent-soft text-accent">
+              <Boxes size={18} />
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-fg">2D → 3D 변환</span>
+              <span className="mt-0.5 block text-xs text-fg-3">원화를 3D 모델·배경으로 세우기</span>
             </span>
           </Link>
         </div>

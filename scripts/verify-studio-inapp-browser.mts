@@ -128,6 +128,7 @@ const ROUTES: readonly RouteProbe[] = Object.freeze([
     profiles: ["kakaotalk-android-360"],
     readySelector: "h1",
   },
+  { id: "lift3d", path: "/studio/lift3d", readySelector: "h1" },
   { id: "placeholder-projects", path: "/studio/projects", readySelector: "h1" },
   { id: "invalid", path: "/studio/nope", readySelector: "h1" },
 ]);
