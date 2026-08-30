@@ -33,6 +33,13 @@ export interface StudioDccWorkbenchNavigationInput {
   readonly dccRouteAccess: StudioDccRouteAccess;
   /** 대기/거부 사유를 라이브 리전으로 알리는 편집기 announcer. */
   readonly onAnnounce: (message: string) => void;
+  /**
+   * 같은 사유를 화면에도 남기는 상태 알림. announcer는 aria-live 전용이라 보이는 피드백이
+   * 없었고, 그래서 권한이 아직 확인되지 않은 동안 3D 도구 버튼이 눌러도 아무 일도 일어나지
+   * 않는 것처럼 보였다. 라우트에 진입하지 못하면 `StudioHybridDccRouteGate`도 마운트되지
+   * 않으므로, 이 채널이 그 상태를 알리는 유일한 표면이다.
+   */
+  readonly onBlockedNotice: (message: string) => void;
   /** 열기 직전 포커스 복귀 지점을 잡아 두는 편집기 UI 훅. */
   readonly onCaptureReturnFocus: () => void;
   /** 지속성 절반의 flush. 닫기 경로에서 반드시 먼저 호출된다. */
@@ -57,6 +64,7 @@ export function useStudioDccWorkbenchNavigation({
   dccRouteAccess,
   dccRouteRequested,
   onAnnounce,
+  onBlockedNotice,
   onCaptureReturnFocus,
   onFlushWorkspacePersistence,
   studioRoute,
@@ -84,11 +92,11 @@ export function useStudioDccWorkbenchNavigation({
   const openHybridDccWorkspace = (mode: StudioDccWorkbenchMode) => {
     if (dccRouteRequested) return;
     if (dccRouteAccess !== "allowed") {
-      onAnnounce(
-        dccRouteAccess === "pending"
-          ? "3D 작업 권한과 원고를 확인하는 중입니다. 잠시 뒤 다시 시도해 주세요."
-          : "이 작품에서는 3D 원본을 편집할 권한이 없습니다.",
-      );
+      const reason = dccRouteAccess === "pending"
+        ? "3D 작업 권한과 원고를 확인하는 중입니다. 잠시 뒤 다시 시도해 주세요."
+        : "이 작품에서는 3D 원본을 편집할 권한이 없습니다.";
+      onAnnounce(reason);
+      onBlockedNotice(reason);
       return;
     }
     onCaptureReturnFocus();
