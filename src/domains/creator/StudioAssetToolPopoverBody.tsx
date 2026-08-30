@@ -32,6 +32,7 @@ import {
 } from "./studio-page-lazy-ui";
 import { hasSameCategorySiblings } from "./studio-similar-style";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
+import { useStudioCommunityMarketplaceInitialView } from "./use-studio-community-marketplace-initial-view";
 
 import type { StudioMenu } from "./studio-editor-tool-model";
 import type { ImageEl } from "./studio-element-model";
@@ -63,6 +64,8 @@ export interface StudioAssetToolPopoverBodyProps {
 export function StudioAssetToolPopoverBody({
   toolBelt,
 }: StudioAssetToolPopoverBodyProps) {
+  const communityMarketplaceInitialView =
+    useStudioCommunityMarketplaceInitialView();
   const {
     assetFavoriteOnly,
     assetFavoriteState,
@@ -761,6 +764,7 @@ export function StudioAssetToolPopoverBody({
                   <StudioAssetMenuPanel
                     assetTab={assetTab}
                     setAssetTab={setAssetTab}
+                    communityMarketplaceInitialView={communityMarketplaceInitialView}
                     onUploadAsset={onUploadAsset}
                     assetPrompt={assetPrompt}
                     setAssetPrompt={setAssetPrompt}

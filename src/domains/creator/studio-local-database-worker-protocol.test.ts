@@ -168,11 +168,15 @@ describe("Studio local database Worker protocol", () => {
   it("classifies durable writes separately from reads", () => {
     expect(isStudioLocalDatabaseWorkerMutationMethod("kvSet")).toBe(true);
     expect(isStudioLocalDatabaseWorkerMutationMethod("putCrdtRecoveryRecord")).toBe(true);
+    expect(isStudioLocalDatabaseWorkerMutationMethod("compareAndRestoreBrushLibraryRecords"))
+      .toBe(true);
+    expect(isStudioLocalDatabaseWorkerMutationMethod("compareAndRestoreFilterLibraryRecords"))
+      .toBe(true);
     expect(isStudioLocalDatabaseWorkerMutationMethod("kvGet")).toBe(false);
     expect(isStudioLocalDatabaseWorkerMutationMethod("listJournalEntries")).toBe(false);
-    expect(STUDIO_LOCAL_DATABASE_WORKER_METHODS).toHaveLength(37);
-    expect(STUDIO_LOCAL_DATABASE_WORKER_MUTATION_METHODS).toHaveLength(22);
-    expect(new Set(STUDIO_LOCAL_DATABASE_WORKER_MUTATION_METHODS).size).toBe(22);
+    expect(STUDIO_LOCAL_DATABASE_WORKER_METHODS).toHaveLength(39);
+    expect(STUDIO_LOCAL_DATABASE_WORKER_MUTATION_METHODS).toHaveLength(24);
+    expect(new Set(STUDIO_LOCAL_DATABASE_WORKER_MUTATION_METHODS).size).toBe(24);
   });
 });
 

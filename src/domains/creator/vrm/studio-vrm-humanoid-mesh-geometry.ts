@@ -91,6 +91,22 @@ export class SurfaceBuilder {
     this.triangle(a, c, d);
   }
 
+  /**
+   * 이미 쌓인 모든 정점 위치를 옮긴다. `build()` **전에** 불러야 한다 — 스무스 노멀은
+   * 빌드 시점의 위치에서 계산되므로, 여기서 옮기면 노멀도 함께 따라온다.
+   *
+   * 비균등 스케일처럼 파츠 TRS 로는 표현할 수 없는 변환(회전과 교환되지 않는다)을
+   * 저작이 끝난 뒤 한 번에 적용하려고 둔다.
+   */
+  transformPositions(map: (point: MeshVec3) => MeshVec3): void {
+    for (let index = 0; index < this.positions.length; index += 3) {
+      const moved = map([this.positions[index], this.positions[index + 1], this.positions[index + 2]]);
+      this.positions[index] = moved[0];
+      this.positions[index + 1] = moved[1];
+      this.positions[index + 2] = moved[2];
+    }
+  }
+
   /** 이미 쌓인 삼각형 중 [from, to) 구간의 감김 방향을 뒤집는다. */
   flipWindingFrom(firstIndexOffset: number): void {
     for (let offset = firstIndexOffset; offset + 2 < this.indices.length; offset += 3) {

@@ -65,5 +65,24 @@ describe("MarketResourceCard", () => {
     expect(html).toContain("CC BY 4.0");
     expect(html).toContain("#야경");
     expect(html).toContain(`href="/market/resource/${record.id}"`);
+    expect(html).toContain("bg-canvas");
+    expect(html).toContain("bg-accent");
+    expect(html).toContain("text-on-accent");
+    expect(html).not.toContain("text-white");
+    expect(html).not.toContain("text-black");
+
+    const brushHtml = renderToStaticMarkup(
+      <MemoryRouter>
+        <MarketResourceCard
+          record={{
+            ...record,
+            kind: "brush",
+            entries: record.entries.map((entry) => ({ ...entry, kind: "brush" as const })),
+          }}
+        />
+      </MemoryRouter>,
+    );
+    expect(brushHtml).toContain("var(--color-card)");
+    expect(brushHtml).toContain("var(--color-canvas)");
   });
 });

@@ -91,8 +91,9 @@ async function bootstrap() {
 
     // PaaS(Render/Railway/Fly 등)는 PORT를 주입한다. 로컬은 NEST_API_PORT, 둘 다 없으면 4001.
     const port = Number(process.env.PORT ?? process.env.NEST_API_PORT ?? "4001");
-    await app.listen(port, "0.0.0.0"); // 외부 트래픽 수신을 위해 모든 인터페이스에 바인딩
-    console.log(`Nest backend started on port ${port}`);
+    const host = process.env.NEST_API_HOST?.trim() || "0.0.0.0";
+    await app.listen(port, host);
+    console.log(`Nest backend started on ${host}:${port}`);
   } catch (error) {
     // app.close()가 이미 adapter.close()를 호출했더라도 disposePool()은 멱등이다. listen 이전
     // 실패에서도 preflight용 전용 풀을 남기지 않는다.

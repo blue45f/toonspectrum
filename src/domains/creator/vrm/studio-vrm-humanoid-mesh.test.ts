@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AVATAR_FORGE_HAIR_STYLE_OPTIONS,
   AVATAR_FORGE_PRESETS,
   buildAvatarForgeHairParts,
   createAvatarForgeState,
+  sanitizeAvatarForgeState,
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
 import { classifyMeshName } from "./studio-vrm-costume";
 import { STUDIO_VRM_EXPORT_EXPRESSION_PRESETS } from "./studio-vrm-export-vrm-extension";
+import { STUDIO_VRM_HAIR_ANCHOR_JOINT } from "./studio-vrm-hair-rig";
 import {
   buildStudioVrmHumanoidMesh,
   STUDIO_VRM_HUMANOID_MORPH_TARGET_NAMES,
@@ -30,8 +33,8 @@ const NEUTRAL = createAvatarForgeState();
  */
 const HAIRED = createAvatarForgeState("romance-long");
 
-function numbers(source: readonly number[] | Float32Array | Float64Array | undefined): number[] {
-  return source === undefined ? [] : Array.from(source as ArrayLike<number>);
+function numbers(source: ArrayLike<number> | undefined): number[] {
+  return source === undefined ? [] : Array.from(source);
 }
 
 function allPrimitives(parts: readonly StudioVrmHumanoidMeshPart[]) {
@@ -436,5 +439,329 @@ describe("studio VRM humanoid mesh", () => {
     }
     // 껍질이지 풍선이 아니다 — 가장 얇은 캡도 두개골의 1.2배를 넘지 않는다.
     expect(thinnest).toBeLessThan(1.2);
+  });
+
+  it("rigs every hanging hair part, not just the tapered strands", () => {
+    // 처음에는 `tapered-capsule` 만 체인에 실었다. 그런데 롱헤어의 큰 뒷머리 시트는
+    // `ellipsoid` 고(hime-noble 은 머리 관절 아래 0.43m 로 어느 가닥보다 깊다), 땋은 머리
+    // 본체는 `sphere` 세그먼트 열이라, 정작 가장 크게 매달린 부분이 `head` 100% 로 남아
+    // 고개를 돌릴 때 강체로 휩쓸렸다 — 이 리그가 없애려던 바로 그 동작이다.
+    for (const preset of AVATAR_FORGE_PRESETS) {
+      const built = buildStudioVrmHumanoidMesh(preset.state);
+      const hairPart = built.parts.find((part) => part.nodeName === "Hair");
+      if (!hairPart) continue;
+      const headJoint = built.rig.jointIndex.head;
+      const headY = built.rig.worldRest.head[1];
+      const hanging = 0.12 * built.rig.heightScale;
+
+      let headOnly = 0;
+      for (const primitive of hairPart.primitives) {
+        const positions = numbers(primitive.positions);
+        const joints = numbers(primitive.joints);
+        const weights = numbers(primitive.weights);
+        for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
+          if (headY - positions[vertex * 3 + 1] < hanging) continue;
+          let headWeight = 0;
+          for (let slot = 0; slot < 4; slot += 1) {
+            if (joints[vertex * 4 + slot] === headJoint) headWeight += weights[vertex * 4 + slot];
+          }
+          if (headWeight > 0.99) headOnly += 1;
+        }
+      }
+      expect(headOnly, `${preset.id}: 매달린 정점이 head 에만 묶여 있다`).toBe(0);
+    }
+  });
+
+  it("leaves the skull cap and crown-mounted buns off the spring rig", () => {
+    // 정수리에 얹힌 번은 흔들릴 이유가 없다 — 흔들리면 두피에서 떠 보인다.
+    // (실측: 번은 머리 관절보다 위(−0.10m), 뒷머리 시트는 0.14~0.43m 아래.)
+    for (const presetId of ["elegant-bun", "sakura-bun", "action-pony"]) {
+      const state = createAvatarForgeState(presetId);
+      const built = buildStudioVrmHumanoidMesh(state);
+      const bindings = built.hairRig?.bindings;
+      if (!bindings) throw new Error(`${presetId}: expected a hair rig`);
+      const rig = built.rig;
+      const scaleY = rig.head.radiusY / 0.46;
+
+      // 흔들리지 않는 파츠도 바인딩은 갖는다 — 고정 앵커에 묶여야 역스케일 피벗 아래에
+      // 모이고 머리 조형 스케일이 두 번 걸리지 않는다. "흔들리지 않는다"는
+      // **앵커에 강체로 묶인다**는 뜻이다.
+      const isAnchored = (partId: string): boolean => {
+        const binding = bindings.get(partId);
+        return binding?.kind === "rigid" && binding.jointOffset === STUDIO_VRM_HAIR_ANCHOR_JOINT;
+      };
+
+      for (const part of buildAvatarForgeHairParts(state)) {
+        // 두피 껍질은 머리 그 자체다 — 절대 흔들리면 안 된다.
+        if (part.role === "cap") {
+          expect(isAnchored(part.id), `${presetId}: cap 이 스프링에 실렸다`).toBe(true);
+          continue;
+        }
+        if (part.primitive === "tapered-capsule") continue;
+        // 파츠 아래 끝이 머리 관절 위에 있으면 매달린 것이 아니다.
+        const bottom =
+          rig.head.center[1] + (part.position[1] - 0.18) * scaleY - Math.abs(part.scale[1]) * scaleY;
+        if (bottom < rig.worldRest.head[1]) continue;
+        expect(
+          isAnchored(part.id),
+          `${presetId}: ${part.id} 는 관절 위에 있는데 스프링에 실렸다`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("keeps spring parameters inside the exporter's valid ranges for every hairstyle", () => {
+    // 익스포터는 `dragForce` 를 0~1 로, `stiffness`/`gravityPower`/`hitRadius` 를 음수 아님으로
+    // 검증하고 벗어나면 throw 한다. 흔들림 세기를 체인 길이에서 뽑으므로, 길이 극단에서도
+    // 식이 범위를 벗어나지 않는지 잠근다.
+    const base = createAvatarForgeState();
+    for (const style of AVATAR_FORGE_HAIR_STYLE_OPTIONS) {
+      for (const extreme of [
+        { headBodyRatio: 3.6, overallHeight: 0.55 },
+        { headBodyRatio: 0.5, overallHeight: 1.6 },
+      ]) {
+        const state = sanitizeAvatarForgeState({
+          ...base,
+          proportions: { ...base.proportions, ...extreme },
+          hair: { ...base.hair, style: style.id },
+        });
+        const hairRig = buildStudioVrmHumanoidMesh(state).hairRig;
+        if (!hairRig) continue;
+        const label = `${style.id} @ ${JSON.stringify(extreme)}`;
+        for (const chain of hairRig.chains) {
+          expect(chain.dragForce, label).toBeGreaterThanOrEqual(0);
+          expect(chain.dragForce, label).toBeLessThanOrEqual(1);
+          expect(chain.stiffness, label).toBeGreaterThanOrEqual(0);
+          expect(chain.gravityPower, label).toBeGreaterThanOrEqual(0);
+        }
+        for (const joint of hairRig.joints) {
+          expect(joint.hitRadius, `${label}: ${joint.name}`).toBeGreaterThan(0);
+          expect(joint.worldRest.every(Number.isFinite), `${label}: ${joint.name}`).toBe(true);
+          expect(
+            joint.localTranslation.every(Number.isFinite),
+            `${label}: ${joint.name}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("scales the hair with the head so a big-headed character is not swallowed by it", () => {
+    // 두상 메시는 `head` 조인트에 묶여 런타임에 `T·S·T⁻¹` 로 커진다. 헤어는 전단을 피하려고
+    // 역스케일 피벗 아래에 있어 그 스케일을 받지 않으므로, 저작 단계에서 미리 반영해야 한다.
+    // 반영하지 않았을 때 두신비 2.5 에서 체인 묶임 정점의 67~100% 가 커진 두개골 속에
+    // 파묻혔다(`elegant-bun` 100%).
+    for (const preset of AVATAR_FORGE_PRESETS.slice(0, 8)) {
+      const counts = [1, 2.5].map((headBodyRatio) => {
+        const state = sanitizeAvatarForgeState({
+          ...preset.state,
+          proportions: { ...preset.state.proportions, headBodyRatio },
+        });
+        const built = buildStudioVrmHumanoidMesh(state);
+        const hairPart = built.parts.find((part) => part.nodeName === "Hair");
+        if (!hairPart) return null;
+        const rig = built.rig;
+        const scale = rig.nodeScale.head ?? [1, 1, 1];
+        const joint = rig.worldRest.head;
+        // 스케일이 적용된 두개골 타원체
+        const center = [0, 1, 2].map(
+          (axis) => joint[axis] + (rig.head.center[axis] - joint[axis]) * scale[axis],
+        );
+        const radii = [
+          rig.head.radiusX * scale[0],
+          rig.head.radiusY * scale[1],
+          rig.head.radiusZ * scale[2],
+        ];
+        let inside = 0;
+        let total = 0;
+        for (const primitive of hairPart.primitives) {
+          const positions = numbers(primitive.positions);
+          for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
+            total += 1;
+            const normalized = Math.hypot(
+              (positions[vertex * 3] - center[0]) / radii[0],
+              (positions[vertex * 3 + 1] - center[1]) / radii[1],
+              (positions[vertex * 3 + 2] - center[2]) / radii[2],
+            );
+            if (normalized < 1) inside += 1;
+          }
+        }
+        return { inside, total };
+      });
+      if (counts[0] === null || counts[1] === null) continue;
+      // 두개골 대비 헤어의 상대 배치가 두신비에 **불변**이어야 한다 = 함께 커진 것이다.
+      expect(counts[1].total, preset.id).toBe(counts[0].total);
+      expect(counts[1].inside, preset.id).toBe(counts[0].inside);
+    }
+  });
+
+  it("bakes head shaping after the part rotation, exactly as the head node would", () => {
+    // 파츠 스케일에 미리 곱해 넣으면 `R·S` 가 되는데, 두상 노드가 적용하던 변형은 `S·R` 이다.
+    // 비가환이라 회전이 붙은 파츠(옆으로 쓸어넘긴 앞머리 등)에서 어긋난다 — 배포 프리셋에서
+    // 0.2~1.9mm, 얼굴 비율 극단에서 4.7mm. 저작이 끝난 정점에 한 번에 얹어야 정확하다.
+    for (const [presetId, face, headBodyRatio] of [
+      ["pixie-sport", null, 1],
+      ["wolf-rebel", null, 1],
+      ["hime-noble", { headWidth: 1.6, headHeight: 0.6, headDepth: 1 }, 2.5],
+      ["hime-noble", { headWidth: 0.6, headHeight: 1.6, headDepth: 1 }, 2.5],
+    ] as const) {
+      const preset = createAvatarForgeState(presetId);
+      const shaped = sanitizeAvatarForgeState({
+        ...preset,
+        face: face ? { ...preset.face, ...face } : preset.face,
+        proportions: { ...preset.proportions, headBodyRatio },
+      });
+      // 머리 스케일이 정확히 1 이 되도록 중립화한 기준 상태.
+      const neutral = sanitizeAvatarForgeState({
+        ...shaped,
+        face: { ...shaped.face, headWidth: 1, headHeight: 1, headDepth: 1 },
+        proportions: { ...shaped.proportions, headBodyRatio: 1 },
+      });
+
+      const actual = buildStudioVrmHumanoidMesh(shaped);
+      const reference = buildStudioVrmHumanoidMesh(neutral);
+      const scale = actual.rig.nodeScale.head ?? [1, 1, 1];
+      const joint = actual.rig.worldRest.head;
+      const actualHair = actual.parts.find((part) => part.nodeName === "Hair");
+      const referenceHair = reference.parts.find((part) => part.nodeName === "Hair");
+      if (!actualHair || !referenceHair) throw new Error(`${presetId}: expected hair`);
+
+      const label = `${presetId} ${JSON.stringify(face)} @ ${headBodyRatio}`;
+      for (let index = 0; index < actualHair.primitives.length; index += 1) {
+        const got = numbers(actualHair.primitives[index].positions);
+        const base = numbers(referenceHair.primitives[index].positions);
+        expect(got.length, label).toBe(base.length);
+        for (let offset = 0; offset < got.length; offset += 3) {
+          for (let axis = 0; axis < 3; axis += 1) {
+            const expected =
+              joint[axis] + (base[offset + axis] - joint[axis]) * scale[axis];
+            expect(got[offset + axis], `${label} @ ${offset / 3}`).toBeCloseTo(expected, 9);
+          }
+        }
+      }
+    }
+  });
+
+  it("derives collision radii from the chain's radial plane, not an unrelated axis", () => {
+    // 체인은 가닥·덩어리·구슬 모두 로컬 Y 가 축이라 굵기는 X·Z 평면에서 정해진다.
+    // 평균을 쓰면 가장 두꺼워진 축을 못 감싸고(깊이를 키우면 Z 가 뚫린다), 세 축 전체의
+    // 최대를 쓰면 무관한 축이 새어 든다(높이만 키워도 반경이 커져 두피에서 밀려난다).
+    // 기준은 머리 스케일이 정확히 1 인 상태여야 한다 — 배포 프리셋은 대부분 얼굴 비율이
+    // 1 이 아니라 이미 한 번 shaping 을 거친다.
+    const preset = createAvatarForgeState("hime-noble");
+    const base = sanitizeAvatarForgeState({
+      ...preset,
+      face: { ...preset.face, headWidth: 1, headHeight: 1, headDepth: 1 },
+      proportions: { ...preset.proportions, headBodyRatio: 1 },
+    });
+    const neutral = buildStudioVrmHumanoidMesh(base).hairRig;
+    if (!neutral) throw new Error("expected a hair rig");
+
+    for (const face of [
+      { headWidth: 0.6, headHeight: 0.6, headDepth: 1.6 },
+      { headWidth: 1.6, headHeight: 1.6, headDepth: 0.6 },
+      // 높이만 키운 경우 — 가로 단면은 그대로이므로 반경도 그대로여야 한다.
+      { headWidth: 1, headHeight: 1.6, headDepth: 1 },
+    ]) {
+      const state = sanitizeAvatarForgeState({ ...base, face: { ...base.face, ...face } });
+      const built = buildStudioVrmHumanoidMesh(state);
+      const shaped = built.hairRig;
+      if (!shaped) throw new Error("expected a hair rig");
+      const scale = built.rig.nodeScale.head ?? [1, 1, 1];
+      const radial = Math.max(scale[0], scale[2]);
+
+      expect(shaped.joints.length).toBe(neutral.joints.length);
+      for (let index = 0; index < shaped.joints.length; index += 1) {
+        const ratio = shaped.joints[index].hitRadius / neutral.joints[index].hitRadius;
+        expect(ratio, `${JSON.stringify(face)} @ ${shaped.joints[index].name}`).toBeCloseTo(
+          radial,
+          9,
+        );
+      }
+    }
+  });
+
+  it("retunes the springs from the shaped chain length, not the pre-scale one", () => {
+    // 흔들림 세기는 체인 길이에서 뽑는다. 두신비를 키우면 같은 가닥이 실제로 길어지는데
+    // (0.175m → 0.630m) 스케일 이전 길이로 굳혀 두면 60cm 머리카락이 17cm 용 튜닝
+    // (거의 강체)으로 남는다.
+    const base = createAvatarForgeState("natural-short");
+    const longest = (headBodyRatio: number) => {
+      const state = sanitizeAvatarForgeState({
+        ...base,
+        proportions: { ...base.proportions, headBodyRatio },
+      });
+      const hairRig = buildStudioVrmHumanoidMesh(state).hairRig;
+      if (!hairRig) throw new Error("expected a hair rig");
+      let best = hairRig.chains[0];
+      let bestLength = 0;
+      for (const chain of hairRig.chains) {
+        let length = 0;
+        for (let index = 1; index < chain.joints.length; index += 1) {
+          const from = chain.joints[index - 1].worldRest;
+          const to = chain.joints[index].worldRest;
+          length += Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
+        }
+        if (length > bestLength) {
+          bestLength = length;
+          best = chain;
+        }
+      }
+      return { chain: best, length: bestLength };
+    };
+
+    const small = longest(1);
+    const big = longest(3.6);
+    // 같은 가닥이 3.6배 길어진다.
+    expect(big.length / small.length).toBeCloseTo(3.6, 1);
+    // 짧을 때는 뻣뻣하고, 길어지면 느슨해져야 한다.
+    expect(small.chain.stiffness).toBeGreaterThan(big.chain.stiffness);
+    expect(small.chain.dragForce).toBeGreaterThan(big.chain.dragForce);
+    expect(big.chain.gravityPower).toBeGreaterThan(small.chain.gravityPower);
+  });
+
+  it("never binds hair to a chain's first joint, which the spring runtime rotates", () => {
+    // VRM 스프링에서 체인의 첫 항목은 "움직이지 않는 루트"가 아니다 — three-vrm 은
+    // (본, 자식) 쌍마다 조인트를 만들어 첫 본의 회전도 시뮬레이션한다. 거기에 부착 링을
+    // 실으면 링이 축을 중심으로 함께 돌아 두피에서 어긋난다(natural-short 60 정점).
+    // 땋은 머리 프리셋을 반드시 포함한다 — 매듭은 blend 가 아니라 rigid 경로로 묶이므로
+    // `hairChainSkin` 의 앵커 리다이렉트를 우회한다.
+    for (const preset of [
+      ...AVATAR_FORGE_PRESETS.slice(0, 6),
+      ...AVATAR_FORGE_PRESETS.filter((entry) => entry.id.includes("braid")),
+    ]) {
+      const built = buildStudioVrmHumanoidMesh(preset.state);
+      const hairPart = built.parts.find((part) => part.nodeName === "Hair");
+      const hairRig = built.hairRig;
+      if (!hairPart || !hairRig) continue;
+      const jointBase = built.rig.bones.length;
+      const chainRoots = new Set(hairRig.chains.map((chain) => jointBase + chain.jointOffset));
+
+      let onChainRoot = 0;
+      for (const primitive of hairPart.primitives) {
+        const joints = numbers(primitive.joints);
+        const weights = numbers(primitive.weights);
+        for (let slot = 0; slot < joints.length; slot += 1) {
+          if (weights[slot] > 0 && chainRoots.has(joints[slot])) onChainRoot += 1;
+        }
+      }
+      expect(onChainRoot, `${preset.id}: 시뮬레이션되는 체인 첫 조인트에 정점이 실렸다`).toBe(0);
+    }
+  });
+
+  it("anchors ponytail attachment spheres instead of turning them into blob chains", () => {
+    // 낙차만 보고 분류하면 부착부가 걸린다 — `tailHeight 0` · `volume 1.45` 에서
+    // `pony-root` 의 낙차가 0.063m 로 문턱 0.06m 를 겨우 넘겨, 매듭이 시트처럼 늘어졌다.
+    const base = createAvatarForgeState("action-pony");
+    for (const hair of [{}, { tailHeight: 0, volume: 1.45 }, { tailHeight: 0, volume: 1.5 }]) {
+      const state = sanitizeAvatarForgeState({ ...base, hair: { ...base.hair, ...hair } });
+      const hairRig = buildStudioVrmHumanoidMesh(state).hairRig;
+      if (!hairRig) throw new Error("expected a hair rig");
+      for (const part of buildAvatarForgeHairParts(state)) {
+        if (!part.id.endsWith("-root") && !part.id.endsWith("-tie")) continue;
+        const binding = hairRig.bindings.get(part.id);
+        expect(binding?.kind, `${JSON.stringify(hair)}: ${part.id}`).toBe("rigid");
+      }
+    }
   });
 });

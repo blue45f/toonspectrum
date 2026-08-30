@@ -20,6 +20,7 @@ import {
   type StudioFilterLibrarySqlCursor,
   type StudioFilterLibrarySqlRecord,
   type StudioLocalDatabase,
+  type StudioSqlCompareAndRestoreResult,
 } from "../studio-local-database";
 import { acquireStudioLocalDatabase } from "../studio-local-database-runtime";
 
@@ -81,6 +82,16 @@ export interface ProductFilterLibraryRepository {
   readonly authority: ProductFilterLibraryAuthority;
   readonly repository: StudioFilterLibraryRepository;
   readonly legacyDataPolicy: typeof STUDIO_FILTER_LIBRARY_DATA_POLICY;
+  /** Product-only stale-install compensation with one SQLite transaction / memory turn. */
+  readonly compareAndRestoreInstallSnapshot?: (
+    entries: readonly StudioFilterLibraryInstallCompareAndRestoreEntry[],
+  ) => Promise<StudioSqlCompareAndRestoreResult>;
+}
+
+export interface StudioFilterLibraryInstallCompareAndRestoreEntry {
+  readonly id: string;
+  readonly expected: StudioFilterLibraryPreset;
+  readonly restore: StudioFilterLibraryPreset | null;
 }
 
 export interface OpenProductFilterLibraryRepositoryOptions {
@@ -572,15 +583,67 @@ function createMutableFilterLibraryRepository(
   };
 }
 
-/** A fresh, non-persistent repository whose lifetime is the returned product session. */
-export function createMemorySessionFilterLibraryRepository(): StudioFilterLibraryRepository {
+function createMemorySessionFilterLibraryProduct(): Pick<
+  ProductFilterLibraryRepository,
+  "repository" | "compareAndRestoreInstallSnapshot"
+> {
   let presets: StudioFilterLibraryPreset[] = [];
-  return createMutableFilterLibraryRepository({
+  const store: MutableFilterLibraryStore = {
     read: () => [...presets],
     write: (next) => {
       presets = [...next];
     },
-  });
+  };
+  const repository = createMutableFilterLibraryRepository(store);
+  return {
+    repository,
+    async compareAndRestoreInstallSnapshot(entries) {
+      const ids = new Set<string>();
+      for (const entry of entries) {
+        if (
+          entry.id.length === 0
+          || ids.has(entry.id)
+          || entry.expected.id !== entry.id
+          || (entry.restore !== null && entry.restore.id !== entry.id)
+        ) {
+          throw new FilterLibraryRepositoryError(
+            "write-error",
+            "Memory filter compare-and-restore input is invalid",
+          );
+        }
+        ids.add(entry.id);
+      }
+
+      const current = store.read();
+      const byId = new Map(current.map((preset) => [preset.id, preset]));
+      const restoredIds: string[] = [];
+      const conflictIds: string[] = [];
+      for (const entry of entries) {
+        const candidate = byId.get(entry.id) ?? null;
+        const candidateRaw = candidate === null
+          ? null
+          : canonicalJson(studioFilterPresetToSqlRecord(candidate));
+        const restoreRaw = entry.restore === null
+          ? null
+          : canonicalJson(studioFilterPresetToSqlRecord(entry.restore));
+        if (candidateRaw === restoreRaw) continue;
+        if (candidateRaw !== canonicalJson(studioFilterPresetToSqlRecord(entry.expected))) {
+          conflictIds.push(entry.id);
+          continue;
+        }
+        if (entry.restore === null) byId.delete(entry.id);
+        else byId.set(entry.id, normalizeStudioFilterLibraryPreset(entry.restore));
+        restoredIds.push(entry.id);
+      }
+      if (restoredIds.length > 0) store.write([...byId.values()]);
+      return { restoredIds, conflictIds };
+    },
+  };
+}
+
+/** A fresh, non-persistent repository whose lifetime is the returned product session. */
+export function createMemorySessionFilterLibraryRepository(): StudioFilterLibraryRepository {
+  return createMemorySessionFilterLibraryProduct().repository;
 }
 
 /**
@@ -725,16 +788,25 @@ export async function openProductFilterLibraryRepository(
     database = await (options.acquireDatabase ?? acquireStudioLocalDatabase)();
   } catch (error) {
     if (!(error instanceof SqliteUnavailableError)) throw error;
+    const memory = createMemorySessionFilterLibraryProduct();
     return {
       authority: "memory-session",
-      repository: createMemorySessionFilterLibraryRepository(),
+      repository: memory.repository,
       legacyDataPolicy: STUDIO_FILTER_LIBRARY_DATA_POLICY,
+      compareAndRestoreInstallSnapshot: memory.compareAndRestoreInstallSnapshot,
     };
   }
+  const sql = requireStudioFilterLibraryDatabase(database);
   return {
     authority: "sqlite",
     repository: createSqliteFilterLibraryRepository(database),
     legacyDataPolicy: STUDIO_FILTER_LIBRARY_DATA_POLICY,
+    compareAndRestoreInstallSnapshot: (entries) =>
+      sql.compareAndRestoreFilterLibraryRecords(entries.map((entry) => ({
+        id: entry.id,
+        expected: studioFilterPresetToSqlRecord(entry.expected),
+        restore: entry.restore === null ? null : studioFilterPresetToSqlRecord(entry.restore),
+      }))),
   };
 }
 

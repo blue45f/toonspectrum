@@ -64,11 +64,12 @@ export class CreatorMarketplaceController {
   @Header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=300")
   async getById(
     @Param(new ZodValidationPipe(CreatorMarketplaceResourceParamsDto))
-    params: CreatorMarketplaceResourceParamsDto,
-    @Headers("x-user-id") userId?: string
+    params: CreatorMarketplaceResourceParamsDto
   ) {
-    // Viewer-agnostic public cache like the list endpoint; x-user-id only enriches isOwner.
-    return this.marketplaceService.getById(params.id, { viewerId: userId });
+    // Public detail is byte-for-byte viewer-agnostic. Ownership is available only from the
+    // private `/mine` projection; otherwise a shared edge cache could replay `isOwner: true`
+    // from a publisher request to another viewer (or the inverse).
+    return this.marketplaceService.getById(params.id);
   }
 
   @Post()

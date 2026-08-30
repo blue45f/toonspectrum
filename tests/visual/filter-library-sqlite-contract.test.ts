@@ -123,7 +123,13 @@ describe("filter-library SQLite benchmark contract", () => {
       repositorySource.indexOf("export async function openProductFilterLibraryRepository"),
       repositorySource.indexOf("let sharedProductRepository"),
     );
-    expect(productOpen).toContain("createMemorySessionFilterLibraryRepository()");
+    expect(productOpen).toContain(
+      "const memory = createMemorySessionFilterLibraryProduct();",
+    );
+    expect(productOpen).toContain("repository: memory.repository");
+    expect(productOpen).toContain(
+      "compareAndRestoreInstallSnapshot: memory.compareAndRestoreInstallSnapshot",
+    );
     expect(productOpen).toContain("STUDIO_FILTER_LIBRARY_DATA_POLICY");
     expect(productOpen).not.toContain("importLegacyFilterLibraryToSqlite");
     expect(productOpen).not.toContain("createV12FallbackFilterLibraryRepository");

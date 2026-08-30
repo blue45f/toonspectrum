@@ -14,6 +14,8 @@ import { useJsonLd } from "@/src/hooks/use-document-title";
 
 export function MarketHomePage() {
   const latest = useMarketResources({ limit: 8 });
+  const hasLatestItems = latest.items.length > 0;
+  const hasFatalLatestError = Boolean(latest.error) && !hasLatestItems;
 
   useJsonLd(marketHomeJsonLd(latest.items));
 
@@ -37,14 +39,17 @@ export function MarketHomePage() {
             창작 마켓
           </h1>
           <p className="mt-3 max-w-xl text-pretty font-serif text-base italic leading-relaxed text-fg-2 sm:mt-4 sm:text-lg">
-            스튜디오에서 태어난 브러시·팔레트·템플릿이 다음 작가의 도구가 되는 곳.
+            스튜디오에서 태어난 창작 리소스가 다음 작가의 도구가 되는 곳.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-2.5 border-t border-line pt-5 sm:mt-9 sm:pt-6">
             <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "md" })}>
               <Store className="h-4 w-4" aria-hidden="true" />
               리소스 둘러보기
             </Link>
-            <Link href="/studio" className={buttonClass({ variant: "outline", size: "md" })}>
+            <Link
+              href="/studio?assetMarket=community&communityView=share"
+              className={buttonClass({ variant: "outline", size: "md" })}
+            >
               <Upload className="h-4 w-4" aria-hidden="true" />
               스튜디오에서 공유하기
             </Link>
@@ -56,7 +61,7 @@ export function MarketHomePage() {
       </section>
 
       <Container size="wide" className="py-8 sm:py-10 lg:py-12">
-        <h2 className="eyebrow text-fg-3">Categories</h2>
+        <h2 className="eyebrow text-fg-3">리소스 종류</h2>
         <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
           {MARKET_KINDS.map((kind) => {
             const KindIcon = kind.icon;
@@ -83,13 +88,13 @@ export function MarketHomePage() {
 
       {popularTags.length >= 3 ? (
         <Container size="wide" className="pb-10 sm:pb-12">
-          <h2 className="eyebrow text-fg-3">Popular Tags</h2>
+          <h2 className="eyebrow text-fg-3">최신 리소스 태그</h2>
           <ul className="mt-3 flex flex-wrap gap-1.5">
             {popularTags.map((tag) => (
               <li key={tag}>
                 <Link
                   href={`/market/browse?tag=${encodeURIComponent(tag)}`}
-                  className="inline-block rounded bg-raised px-2 py-1 text-xs text-fg-2 transition-colors duration-150 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                  className="inline-flex min-h-11 items-center rounded bg-raised px-3 py-2 text-xs text-fg-2 transition-colors duration-150 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 >
                   #{tag}
                 </Link>
@@ -101,12 +106,15 @@ export function MarketHomePage() {
 
       <Container size="wide" className="pb-10 sm:pb-12">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="eyebrow text-fg-3">Latest</h2>
-          <Link href="/market/browse" className="text-sm text-accent hover:text-accent-2">
+          <h2 className="eyebrow text-fg-3">최근 공유</h2>
+          <Link
+            href="/market/browse"
+            className="inline-flex min-h-6 items-center text-sm text-accent hover:text-accent-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:min-h-11"
+          >
             전체 보기 →
           </Link>
         </div>
-        {latest.error ? (
+        {hasFatalLatestError ? (
           <StaleNoticeBar
             message="지금은 새 목록을 불러올 수 없어요. 잠시 후 다시 시도해 주세요."
             onRetry={latest.reload}
@@ -120,7 +128,7 @@ export function MarketHomePage() {
             className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg-2 [&>button]:ml-auto"
           />
         ) : null}
-        {latest.error || latest.stale ? null : (
+        {hasFatalLatestError ? null : (
           <>
             <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
               {latest.loading
@@ -142,7 +150,10 @@ export function MarketHomePage() {
             {!latest.loading && latest.items.length === 0 ? (
               <p className="mt-6 rounded-xl border border-dashed border-line bg-panel p-8 text-center text-sm text-fg-2">
                 아직 공유된 리소스가 없어요.{" "}
-                <Link href="/studio" className="text-accent underline-offset-2 hover:underline">
+                <Link
+                  href="/studio?assetMarket=community&communityView=share"
+                  className="inline-flex min-h-6 items-center text-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:min-h-11"
+                >
                   스튜디오에서 첫 리소스를 공유해 보세요.
                 </Link>
               </p>
@@ -152,22 +163,20 @@ export function MarketHomePage() {
       </Container>
 
       <Container size="wide" className="pb-14">
-        <h2 className="eyebrow text-fg-3">Licenses</h2>
+        <h2 className="eyebrow text-fg-3">사용권 안내</h2>
         <ul className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
           {MARKET_LICENSES.map((license) => (
             <li key={license.license} className="rounded-xl border border-line bg-card p-4">
               <h3 className="text-sm font-semibold text-fg">{license.label}</h3>
               <p className="mt-1.5 text-xs leading-relaxed text-fg-2">{license.summary}</p>
-              {license.url ? (
-                <a
-                  href={license.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-block text-xs text-cool underline-offset-2 hover:underline"
-                >
-                  라이선스 전문 보기 ↗
-                </a>
-              ) : null}
+              <a
+                href={license.url ?? "/terms"}
+                target={license.url ? "_blank" : undefined}
+                rel={license.url ? "noreferrer" : undefined}
+                className="mt-2 inline-flex min-h-11 items-center text-xs text-cool underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+              >
+                사용권 전문 보기{license.url ? " ↗" : ""}
+              </a>
             </li>
           ))}
         </ul>

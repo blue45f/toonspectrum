@@ -4,9 +4,112 @@ import {
   creatorMarketplaceJsonByteSize,
 } from "../lib/creator-marketplace-resource-contract";
 
+const canonicalUnmappedBrushProperty = (base: number, min: number, max: number) => ({
+  base,
+  min,
+  max,
+  mappings: [],
+  jitter: null,
+});
+
+// Keep the mock install payload JSON-only. Importing the Studio brush runtime into Playwright's
+// Node test process would couple the fixture to its browser-only import.meta module graph.
+const CANONICAL_TEST_BRUSH_SNAPSHOT = {
+  brushId: "pen",
+  strokeWidth: 20,
+  brushOpacity: 0.9,
+  color: "#0f172a",
+  stabilizer: 3,
+  stabilizerMode: "adaptive",
+  postCorrection: 0,
+  preserveCorners: true,
+  pressureCurve: 1,
+  pressureMinSize: 0,
+  useVelocityPressure: true,
+  velocitySensitivity: 0.65,
+  tiltEnabled: true,
+  tipAngle: -30,
+  tipRoundness: 0.24,
+  brushDynamics: {
+    version: 1,
+    seed: 1,
+    fallbackPressure: 0.5,
+    maxSpeed: 1.6,
+    spacingRatio: 0.34,
+    scatterRatio: null,
+    taper: {
+      enabled: false,
+      startLength: 0.12,
+      endLength: 0.18,
+      minSizeRatio: 0.2,
+      minOpacityRatio: 0.55,
+      curve: 1,
+    },
+    tip: {
+      shape: "round",
+      softness: 0.35,
+      alphaMapBase64: null,
+      alphaMapSize: 128,
+    },
+    colorDynamics: {
+      backgroundColor: null,
+      foregroundBackgroundMix: 0,
+      foregroundBackgroundJitter: 0,
+      hueJitter: 0,
+      saturationJitter: 0,
+      valueJitter: 0,
+    },
+    grain: {
+      space: "canvas-fixed",
+      amount: 0,
+      scale: 8,
+      contrast: 0.35,
+      seed: 1,
+    },
+    tipLayers: [],
+    width: {
+      base: 6,
+      min: 0.05,
+      max: 4_096,
+      mappings: [{
+        source: "pressure",
+        mode: "multiply",
+        from: 0.3,
+        to: 1.7,
+        amount: 1,
+        curve: 1,
+        invert: false,
+      }],
+      jitter: null,
+    },
+    opacity: canonicalUnmappedBrushProperty(1, 0, 1),
+    flow: canonicalUnmappedBrushProperty(1, 0, 1),
+    spacing: canonicalUnmappedBrushProperty(2.04, 0.25, 4_096),
+    scatter: canonicalUnmappedBrushProperty(0, 0, 4_096),
+    angle: {
+      base: 0,
+      min: -180,
+      max: 180,
+      mappings: [{
+        source: "direction",
+        mode: "add",
+        from: 0,
+        to: 360,
+        amount: 1,
+        curve: 1,
+        invert: false,
+      }],
+      jitter: null,
+    },
+    roundness: canonicalUnmappedBrushProperty(1, 0.08, 1),
+  },
+  stampTuning: null,
+  enginePrograms: null,
+} as const;
+
 /**
- * ToonSpectrum 스튜디오 및 창작 마켓 전 기능 전수 실 브라우저 E2E 검증
- * - 실제 테스트 계정 생성 및 세션 인증
+ * ToonSpectrum 스튜디오 및 창작 마켓 mock 브라우저 상호작용 검증
+ * - 탭 범위 공개 프로필 캐시를 사용한 로그인 UI 초기 상태
  * - 스튜디오 캔버스 드로잉 엔진 (펜, 지우개, 브러시 크기, 색상, Undo/Redo)
  * - 레이어 관리 시스템
  * - 웹툰 컷/패널 레이아웃 및 롱스크롤 뷰
@@ -14,11 +117,11 @@ import {
  * - 스튜디오 자산 허브 (13 Creator Packs, CC0 라이브러리, 커뮤니티 마켓, 자료 게시 폼)
  * - 3D 씬 및 배경 엔진
  * - 마켓 인터랙티브 멀티모델 프리뷰 (브러시, 팔레트, 필터, 템플릿, 3D)
- * - 웹 마켓 -> 스튜디오 딥링크 1클릭 자동 설치 & 캔버스 로드
+ * - 웹 마켓 -> 스튜디오 딥링크 탐색과 리소스 요청 전달
  */
 
-test.describe("스튜디오 & 창작 마켓 전수 E2E 검증", () => {
-  const TEST_CREATOR_SESSION = {
+test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
+  const MOCK_CREATOR_PUBLIC_PROFILE = {
     user: {
       id: "11111111-2222-4333-8444-555555555555",
       name: "테스트 크리에이터",
@@ -26,17 +129,28 @@ test.describe("스튜디오 & 창작 마켓 전수 E2E 검증", () => {
       image: null,
       role: "creator",
     },
-    expires: new Date(Date.now() + 86400000).toISOString(),
   };
 
   test.beforeEach(async ({ page }) => {
-    // 세션 주입을 통해 인증된 크리에이터 상태로 시작
+    // HttpOnly 인증 쿠키가 아닌, UI 초기 렌더링용 탭 범위 공개 프로필 캐시다.
     await page.addInitScript((session) => {
-      localStorage.setItem("toonspectrum-auth-session-v1", JSON.stringify(session));
-    }, TEST_CREATOR_SESSION);
+      sessionStorage.setItem("toonspectrum-auth-session", JSON.stringify(session));
+    }, MOCK_CREATOR_PUBLIC_PROFILE);
+
+    // 이 스위트는 실제 계정 인증이 아니라 mock 서버 세션과 공개 프로필 캐시의 UI 계약을 검증한다.
+    await page.route(/\/api\/auth\/session(?:\?.*)?$/u, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          authenticated: true,
+          user: MOCK_CREATOR_PUBLIC_PROFILE.user,
+        }),
+      });
+    });
   });
 
-  test("1. 스튜디오 캔버스 로드 및 기본 UI 요소 전수 확인", async ({ page }) => {
+  test("1. 스튜디오 캔버스 로드 및 기본 UI smoke 확인", async ({ page }) => {
     await page.goto("/studio");
     await expect(page.locator("body")).toBeVisible();
 
@@ -73,7 +187,7 @@ test.describe("스튜디오 & 창작 마켓 전수 E2E 검증", () => {
     }
   });
 
-  test("3. 스튜디오 자산 메뉴 및 커뮤니티 마켓플레이스 탭 계층 전수 검증", async ({ page }) => {
+  test("3. 스튜디오 자산 메뉴 및 커뮤니티 마켓플레이스 탭 계층 검증", async ({ page }) => {
     // 딥링크 파라미터로 자산 커뮤니티 탭 직행
     await page.goto("/studio?assetMarket=community");
 
@@ -82,20 +196,14 @@ test.describe("스튜디오 & 창작 마켓 전수 E2E 검증", () => {
     await expect(page.getByText(/커뮤니티|내 에셋|자산|에셋/).first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test("4. 창작 마켓 홈 -> 탐색 -> 상세 -> 스튜디오 1클릭 설치 전체 흐름(Full Journey) 검증", async ({ page }) => {
+  test("4. 창작 마켓 홈 -> 탐색 -> mock 상세 -> 스튜디오 딥링크 요청 전달 검증", async ({ page }) => {
     const mockResourceId = "123e4567-e89b-12d3-a456-426614174999";
     const payload = {
       schemaVersion: 1 as const,
       resourceKind: "brush" as const,
       runtime: "studio-brush-v1" as const,
       definition: {
-        snapshot: {
-          size: 20,
-          opacity: 0.9,
-          flow: 0.85,
-          family: "pen",
-          color: "#0f172a",
-        },
+        snapshot: CANONICAL_TEST_BRUSH_SNAPSHOT,
       },
     };
     const byteSize = creatorMarketplaceJsonByteSize(payload);
@@ -153,7 +261,9 @@ test.describe("스튜디오 & 창작 마켓 전수 E2E 검증", () => {
     await expect(page).toHaveURL(/market\/browse\?kind=brush/);
 
     // 4) 상세 페이지 API Mocking & 이동
+    let mockResourceRequestCount = 0;
     await page.route(new RegExp(`/creator/marketplace/resources/${mockResourceId}`), async (route) => {
+      mockResourceRequestCount += 1;
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -166,9 +276,11 @@ test.describe("스튜디오 & 창작 마켓 전수 E2E 검증", () => {
     await expect(page.getByText("웹툰 콘티 및 메인 펜선 작업을 위한 프로급 잉크 브러시")).toBeVisible();
 
     // 브러시 실시간 드로잉 캔버스 인터랙션
-    const brushCanvas = page.locator("canvas.touch-none");
+    const brushCanvas = page.getByRole("application", {
+      name: "마스터 잉크 펜 브러시 연습 캔버스",
+    });
     await expect(brushCanvas).toBeVisible();
-    await expect(page.getByText("마우스나 터치로 직접 그려보세요")).toBeVisible();
+    await expect(page.getByText("포인터 또는 키보드로 직접 그려보세요")).toBeVisible();
 
     // 브러시 프리뷰 캔버스에 직접 획 긋기
     const canvasBox = await brushCanvas.boundingBox();
@@ -182,24 +294,40 @@ test.describe("스튜디오 & 창작 마켓 전수 E2E 검증", () => {
     // 캔버스 초기화 버튼 클릭
     await page.getByRole("button", { name: "초기화" }).click();
 
-    // 패키지 JSON 다운로드 버튼 확인
-    await expect(page.getByRole("button", { name: "패키지 JSON 다운로드" })).toBeVisible();
+    // 메타데이터 스냅샷 다운로드 버튼 확인
+    await expect(page.getByRole("button", { name: "메타데이터 스냅샷 다운로드" })).toBeVisible();
 
-    // 5) 스튜디오에서 불러오기 & 설치 버튼 클릭
-    const installLink = page.getByRole("link", { name: "스튜디오에서 불러오기 & 설치" });
+    // 5) 스튜디오 딥링크 확인 및 클릭
+    const installLink = page.getByRole("link", { name: "스튜디오에 리소스 팩 설치" });
     await expect(installLink).toBeVisible();
     await expect(installLink).toHaveAttribute(
       "href",
       `/studio?installMarketResource=${mockResourceId}&assetMarket=community`
     );
 
-    // 6) 딥링크를 통한 스튜디오 진입 검증
+    // 6) 딥링크가 Studio에서 실제 리소스 요청과 가시적 설치 상태로 소비되는지 검증
     await installLink.click();
-    await expect(page).toHaveURL(/studio\?installMarketResource=.*&assetMarket=community/);
-    await expect(page.locator("body")).toBeVisible();
+    await expect(page.locator("[data-studio-community-marketplace]")).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect.poll(() => mockResourceRequestCount).toBeGreaterThanOrEqual(2);
+    await expect(
+      page.locator("[data-studio-global-status-rail]").getByRole("status")
+        .filter({ hasText: "마스터 잉크 펜" }),
+    ).toContainText(/설치|내장/u);
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return {
+        assetMarket: url.searchParams.get("assetMarket"),
+        installMarketResource: url.searchParams.get("installMarketResource"),
+      };
+    }).toEqual({
+      assetMarket: "community",
+      installMarketResource: null,
+    });
   });
 
-  test("5. 마켓 멀티모델 프리뷰 (팔레트, 필터, 템플릿, 3D) 렌더링 전수 검증", async ({ page }) => {
+  test("5. 마켓 팔레트·필터 mock 상세 프리뷰 렌더링 검증", async ({ page }) => {
     // 1) 팔레트 상세 및 색상 복사
     const paletteId = "123e4567-e89b-12d3-a456-426614174888";
     const palettePayload = {
@@ -325,17 +453,19 @@ test.describe("스튜디오 & 창작 마켓 전수 E2E 검증", () => {
 
     await page.goto(`/market/resource/${filterId}`);
     await expect(page.getByRole("heading", { name: "드라마틱 무드 필터" })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("필터 효과 미리보기 (드라마틱 무드)")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "필터 효과 참고 일러스트 (드라마틱 무드)" }),
+    ).toBeVisible();
     await expect(page.getByLabel("필터 전후 비교 슬라이더")).toBeVisible();
   });
 
-  test("6. 실제 테스트 계정 로그인 및 세션 동기화 검증", async ({ page }) => {
-    // 세션이 유지된 상태로 프로필/스튜디오 접속
+  test("6. 탭 범위 mock 공개 프로필 캐시 유지 검증", async ({ page }) => {
+    // 이 검증은 서버 쿠키 인증이 아니라, 같은 탭의 공개 프로필 캐시 계약만 다룬다.
     await page.goto("/studio");
     await expect(page.locator("body")).toBeVisible();
 
     const storedSession = await page.evaluate(() => {
-      return localStorage.getItem("toonspectrum-auth-session-v1");
+      return sessionStorage.getItem("toonspectrum-auth-session");
     });
     expect(storedSession).not.toBeNull();
     const parsed = JSON.parse(storedSession ?? "{}");

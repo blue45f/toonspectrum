@@ -9,20 +9,25 @@ interface MarketScene3dPreviewProps {
 
 export function MarketScene3dPreview({ recipe, className }: MarketScene3dPreviewProps) {
   return (
-    <div className={`overflow-hidden rounded-xl border border-line bg-card ${className ?? ""}`}>
+    <div
+      role="region"
+      aria-labelledby="market-3d-heading"
+      aria-describedby="market-3d-preview-note"
+      className={`overflow-hidden rounded-xl border border-line bg-card ${className ?? ""}`}
+    >
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5 bg-panel/50">
         <div className="flex items-center gap-2">
           <Box className="h-4 w-4 text-accent" aria-hidden="true" />
-          <h3 id="market-3d-heading" className="text-xs font-semibold text-fg">3D 공간 & 카메라 프리셋</h3>
+          <h3 id="market-3d-heading" className="text-xs font-semibold text-fg">3D 프리셋 참고 일러스트 ({recipe.name})</h3>
         </div>
-        <span className="rounded bg-raised px-2 py-0.5 text-[0.65rem] text-fg-3">
+        <span className="inline-flex min-h-6 items-center rounded bg-raised px-2 text-[0.65rem] text-fg-3">
           레시피: {recipe.recipeId}
         </span>
       </div>
 
       <div className="relative flex aspect-[16/9] w-full items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-raised via-canvas to-panel p-6">
         {/* Isometric 3D Room / Camera Mockup SVG */}
-        <svg className="h-full w-full max-w-[340px]" viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+        <svg aria-hidden="true" className="h-full w-full max-w-[340px]" viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="wallLeft" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="#475569" stopOpacity="0.4" />
@@ -58,19 +63,19 @@ export function MarketScene3dPreview({ recipe, className }: MarketScene3dPreview
           <polygon points="80,250 160,180 210,210" fill="#3b82f6" opacity="0.15" stroke="#60a5fa" strokeWidth="1" strokeDasharray="3,3" />
         </svg>
 
-        <div className="absolute left-3 bottom-3 flex items-center gap-2 rounded bg-black/60 px-2 py-1 text-[0.65rem] text-white backdrop-blur-sm">
+        <div className="absolute bottom-3 left-3 flex min-h-6 items-center gap-2 rounded bg-canvas px-2 text-[0.65rem] text-fg shadow-sm">
           <Camera className="h-3 w-3 text-accent" aria-hidden="true" />
-          <span>시점: 3점 투시 표준 앵글</span>
+          <span>구도 예시</span>
         </div>
-        <div className="absolute right-3 bottom-3 flex items-center gap-2 rounded bg-black/60 px-2 py-1 text-[0.65rem] text-white backdrop-blur-sm">
+        <div className="absolute bottom-3 right-3 flex min-h-6 items-center gap-2 rounded bg-canvas px-2 text-[0.65rem] text-fg shadow-sm">
           <Sun className="h-3 w-3 text-warn" aria-hidden="true" />
-          <span>광원: 45도 자연광</span>
+          <span>조명 예시</span>
         </div>
       </div>
 
-      <div className="border-t border-line px-4 py-2 text-[0.68rem] text-fg-3 bg-panel/30 flex items-center justify-between">
-        <span>스튜디오의 3D 뷰포트에서 실시간 렌더링 및 카메라 회전이 지원됩니다.</span>
-      </div>
+      <p id="market-3d-preview-note" className="border-t border-line bg-panel/30 px-4 py-2 text-[0.68rem] leading-relaxed text-fg-3">
+        레시피 메타데이터를 설명하기 위한 단순화된 일러스트이며 실제 Studio 렌더 결과가 아닙니다.
+      </p>
     </div>
   );
 }

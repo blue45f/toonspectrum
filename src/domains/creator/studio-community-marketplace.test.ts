@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./brush/studio-brush-library";
 import {
   createStudioCommunityPublishManifest,
+  isStudioCommunityShareableLocalResourceId,
   listStudioCommunityShareCandidates,
   projectCreatorMarketplaceRecordToAssets,
   projectCreatorMarketplaceRecordToStudioPack,
@@ -199,6 +200,100 @@ describe("studio community marketplace projection", () => {
     });
   });
 
+  it("마켓·Creator Pack에서 설치된 세 종류는 출처를 원본으로 세탁하지 않고 게시 후보에서 제외한다", () => {
+    const installedPrefix = "creator-pack:community:resource-1";
+    const candidates = listStudioCommunityShareCandidates({
+      brushes: [
+        {
+          ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+          id: `${installedPrefix}:brush/ink`,
+          name: "설치 브러시",
+          createdAt: 1,
+          updatedAt: 2,
+          pinned: false,
+          lastUsedAt: null,
+        },
+        {
+          ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+          id: "duplicated-installed-brush",
+          sourcePresetId: `${installedPrefix}:brush/ink`,
+          name: "복제한 설치 브러시",
+          createdAt: 1,
+          updatedAt: 2,
+          pinned: false,
+          lastUsedAt: null,
+        },
+        {
+          ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+          id: "builtin-derived-brush",
+          sourcePresetId: "essentials:rough-pencil",
+          name: "내장 프리셋 기반 브러시",
+          createdAt: 1,
+          updatedAt: 2,
+          pinned: false,
+          lastUsedAt: null,
+        },
+        {
+          ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+          id: "creator-brush-1",
+          name: "직접 만든 브러시",
+          createdAt: 1,
+          updatedAt: 2,
+          pinned: false,
+          lastUsedAt: null,
+        },
+      ],
+      filters: [
+        {
+          id: `${installedPrefix}:filter/duotone`,
+          packageId: "community:resource-1",
+          entryId: "filter/duotone",
+          name: "설치 필터",
+          engine: "duotone",
+          values: { shadow: "#111111", highlight: "#eeeeee" },
+          installedAt: 1,
+          updatedAt: 2,
+        },
+        {
+          id: "my-creator-pack-inspired-filter",
+          packageId: "local",
+          entryId: "filter/local",
+          name: "직접 만든 필터",
+          engine: "duotone",
+          values: { shadow: "#222222", highlight: "#dddddd" },
+          installedAt: 1,
+          updatedAt: 2,
+        },
+      ],
+      palettes: [
+        {
+          id: `${installedPrefix}:palette/neon`,
+          name: "설치 팔레트",
+          createdAt: 1,
+          updatedAt: 2,
+          colors: ["#112233"],
+        },
+        {
+          id: "palette-creator-pack-study",
+          name: "직접 만든 팔레트",
+          createdAt: 1,
+          updatedAt: 2,
+          colors: ["#445566"],
+        },
+      ],
+    });
+
+    expect(candidates.map(({ id, kind }) => ({ id, kind }))).toEqual([
+      { id: "builtin-derived-brush", kind: "brush" },
+      { id: "creator-brush-1", kind: "brush" },
+      { id: "my-creator-pack-inspired-filter", kind: "filter" },
+      { id: "palette-creator-pack-study", kind: "palette" },
+    ]);
+    expect(isStudioCommunityShareableLocalResourceId(" CREATOR-PACK:community:x ")).toBe(false);
+    expect(isStudioCommunityShareableLocalResourceId("my-creator-pack:study")).toBe(true);
+    expect(isStudioCommunityShareableLocalResourceId("   ")).toBe(false);
+  });
+
   it("직접 제작 확인을 전제로 결정적인 무료 공유 manifest를 만든다", async () => {
     const candidate = listStudioCommunityShareCandidates({
       brushes: [],
@@ -274,5 +369,15 @@ describe("studio community marketplace projection", () => {
       creatorOwnsRights: true,
       recognizableMarketplaceDerivative: true,
     })).rejects.toThrow("다른 마켓");
+
+    await expect(createStudioCommunityPublishManifest({
+      ...candidate,
+      id: "creator-pack:community:resource-1:palette/night",
+    }, {
+      license: "cc0-1.0",
+      containsAi: false,
+      creatorOwnsRights: true,
+      recognizableMarketplaceDerivative: false,
+    })).rejects.toThrow("다시 공유할 수 없습니다");
   });
 });

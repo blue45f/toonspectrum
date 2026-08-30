@@ -58,6 +58,8 @@ export interface StudioPaletteSqliteBatchInput {
    * every write and restores the exact prior values before releasing the queue on failure.
    */
   readonly sidecars?: readonly StudioPaletteSqliteSidecarMutation[];
+  /** Live lifecycle/operation checkpoint evaluated after queued reads and around each write. */
+  readonly assertCurrent?: () => void;
 }
 
 export interface StudioPaletteSqliteBatchResult {
@@ -232,14 +234,18 @@ export function createStudioPaletteSqliteRepository(
           }
           const nextLibraryRaw = serializeStudioPaletteLibrary(next);
           const deletedCount = previousItems.filter((palette) => deleteIds.has(palette.id)).length;
+          let mutationStarted = false;
 
           try {
+            input.assertCurrent?.();
+            mutationStarted = true;
             await database.kvSet(
               STUDIO_PALETTE_SQLITE_NAMESPACE,
               STUDIO_PALETTE_SQLITE_KEY,
               nextLibraryRaw,
             );
             for (const sidecar of sidecars) {
+              input.assertCurrent?.();
               await restoreRawValue(
                 database,
                 sidecar.namespace,
@@ -247,6 +253,7 @@ export function createStudioPaletteSqliteRepository(
                 sidecar.value,
               );
             }
+            input.assertCurrent?.();
             const verifiedLibraryRaw = await database.kvGet(
               STUDIO_PALETTE_SQLITE_NAMESPACE,
               STUDIO_PALETTE_SQLITE_KEY,
@@ -259,7 +266,9 @@ export function createStudioPaletteSqliteRepository(
             ) {
               throw new Error("팔레트 SQLite batch 저장 검증에 실패했습니다.");
             }
+            input.assertCurrent?.();
           } catch (error) {
+            if (!mutationStarted) throw error;
             const rollbackErrors: unknown[] = [];
             try {
               await restoreRawValue(

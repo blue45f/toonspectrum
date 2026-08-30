@@ -3,14 +3,14 @@ import { expect, test } from "@playwright/test";
 import { creatorMarketplaceJsonByteSize } from "../lib/creator-marketplace-resource-contract";
 
 /**
- * 실 브라우저 전수 기능 인터랙션 및 런타임 에러/버그 감사 E2E 스위트
+ * Mock 공개 프로필 캐시를 사용하는 브라우저 인터랙션 및 런타임 오류 감사 스위트
  * - 페이지 내 콘솔 에러(Unhandled rejection, React error, TypeError 등) 실시간 감지
  * - 스튜디오 캔버스, 레이어, 말풍선, 컷 분할, 자산 허브, 3D 엔진, 내보내기 전수 조작
- * - 마켓 6종 리소스(브러시, 팔레트, 필터, 템플릿, 3D, 에셋) 상세 및 프리뷰 조작
+ * - 마켓 브러시, 템플릿, 3D 리소스 상세 및 프리뷰 조작
  */
 
-test.describe("스튜디오 & 마켓 실 브라우저 전수 감사", () => {
-  const TEST_SESSION = {
+test.describe("스튜디오 & 마켓 mock 브라우저 상호작용 감사", () => {
+  const MOCK_PUBLIC_PROFILE = {
     user: {
       id: "123e4567-e89b-12d3-a456-426614174000",
       name: "테스트 마스터",
@@ -18,14 +18,25 @@ test.describe("스튜디오 & 마켓 실 브라우저 전수 감사", () => {
       image: null,
       role: "creator",
     },
-    expires: new Date(Date.now() + 86400000).toISOString(),
   };
 
   test.beforeEach(async ({ page }) => {
-    // 세션 주입
+    // HttpOnly 인증 쿠키가 아닌, UI 초기 렌더링용 탭 범위 공개 프로필 캐시다.
     await page.addInitScript((session) => {
-      localStorage.setItem("toonspectrum-auth-session-v1", JSON.stringify(session));
-    }, TEST_SESSION);
+      sessionStorage.setItem("toonspectrum-auth-session", JSON.stringify(session));
+    }, MOCK_PUBLIC_PROFILE);
+
+    // 이 스위트는 실제 계정 인증이 아니라 mock 서버 세션과 공개 프로필 캐시의 UI 계약을 검증한다.
+    await page.route(/\/api\/auth\/session(?:\?.*)?$/u, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          authenticated: true,
+          user: MOCK_PUBLIC_PROFILE.user,
+        }),
+      });
+    });
   });
 
   test("스튜디오 캔버스 드로잉, 펜/지우개 전환, 색상 변경, 줌 인터랙션 감사", async ({ page }) => {
@@ -90,7 +101,7 @@ test.describe("스튜디오 & 마켓 실 브라우저 전수 감사", () => {
     expect(consoleErrors).toHaveLength(0);
   });
 
-  test("마켓 6종 리소스 프리뷰(브러시, 팔레트, 필터, 템플릿, 3D, 에셋) 실시간 렌더링 및 조작 감사", async ({ page }) => {
+  test("마켓 브러시·3D·템플릿 mock 상세 프리뷰 렌더링 및 조작 감사", async ({ page }) => {
     const consoleErrors: string[] = [];
     page.on("pageerror", (err) => consoleErrors.push(err.message));
 
@@ -152,7 +163,9 @@ test.describe("스튜디오 & 마켓 실 브라우저 전수 감사", () => {
 
     await page.goto(`/market/resource/${brushId}`);
     await expect(page.getByRole("heading", { name: "감사용 잉크 브러시" })).toBeVisible({ timeout: 15_000 });
-    const brushCanvas = page.locator("canvas.touch-none");
+    const brushCanvas = page.getByRole("application", {
+      name: "잉크 브러시 브러시 연습 캔버스",
+    });
     await expect(brushCanvas).toBeVisible();
 
     // 브러시 캔버스에 마우스 드래그 드로잉 테스트
@@ -224,8 +237,10 @@ test.describe("스튜디오 & 마켓 실 브라우저 전수 감사", () => {
 
     await page.goto(`/market/resource/${scene3dId}`);
     await expect(page.getByRole("heading", { name: "사이버펑크 거리 3D" })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("3D 공간 & 카메라 프리셋")).toBeVisible();
-    await expect(page.getByText("시점: 3점 투시 표준 앵글")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "3D 프리셋 참고 일러스트 (사이버펑크 거리)" }),
+    ).toBeVisible();
+    await expect(page.getByText("실제 Studio 렌더 결과가 아닙니다", { exact: false })).toBeVisible();
 
     // 3. 템플릿 리소스
     const templateId = "123e4567-e89b-12d3-a456-426614174103";
@@ -285,8 +300,10 @@ test.describe("스튜디오 & 마켓 실 브라우저 전수 감사", () => {
 
     await page.goto(`/market/resource/${templateId}`);
     await expect(page.getByRole("heading", { name: "액션 4단 스크롤 템플릿" })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("템플릿 레이아웃 구조")).toBeVisible();
-    await expect(page.getByText("스크롤 배치")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "템플릿 참고 레이아웃 (액션 템플릿)" }),
+    ).toBeVisible();
+    await expect(page.getByText("스크롤 표현")).toBeVisible();
     await expect(page.getByText("메인 액션 롱 컷")).toBeVisible();
 
     expect(consoleErrors).toHaveLength(0);

@@ -10,6 +10,11 @@ import {
   creatorMarketplaceJsonByteSize,
 } from "../lib/creator-marketplace-resource-contract";
 
+import {
+  VITEST_VALIDATED_REMOTE_DATABASE_MARKER,
+  validatePostgresIntegrationUrl,
+} from "./run-postgres-integration-tests.mjs";
+
 import type {
   CreatorMarketplaceJsonValue,
   CreatorMarketplaceResourceKind,
@@ -83,8 +88,28 @@ function assertSafeTarget(): URL {
   }
   const rawUrl = process.env.DATABASE_URL;
   if (!rawUrl) throw new Error("DATABASE_URL is required.");
+  const runnerValidated =
+    process.env.TOONSPECTRUM_MARKETPLACE_DB_RUNNER_VALIDATED === "1";
+  const validatedRemoteDatabase =
+    process.env[VITEST_VALIDATED_REMOTE_DATABASE_MARKER] === "true";
+  const target = validatePostgresIntegrationUrl(rawUrl, {
+    allowRemoteTestDatabase: validatedRemoteDatabase,
+    environment: process.env,
+  });
+  const databaseName = String(target.databaseName ?? "");
+  if (
+    runnerValidated
+    && process.env.TEST_DATABASE_URL?.trim() !== rawUrl.trim()
+  ) {
+    throw new Error(
+      "The runner-validated marketplace target must match TEST_DATABASE_URL.",
+    );
+  }
   const url = new URL(rawUrl);
-  if (!/(?:^|[_-])test(?:$|[_-])/iu.test(url.pathname.slice(1))) {
+  if (
+    !runnerValidated
+    && !/(?:^|[_-])test(?:$|[_-])/iu.test(databaseName)
+  ) {
     throw new Error("Refusing to run against a database whose name is not explicitly test-scoped.");
   }
   return url;
