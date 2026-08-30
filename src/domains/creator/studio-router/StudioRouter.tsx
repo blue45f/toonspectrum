@@ -36,6 +36,13 @@ const StudioUploadPublish = lazyRetry(
   "StudioUploadPublishRoute",
 );
 
+const StudioLift3dPage = lazyRetry(
+  () => import("../lift3d/StudioLift3dPage").then((module) => ({
+    default: module.StudioLift3dPage,
+  })),
+  "StudioLift3dPage",
+);
+
 const StudioToolsCompanionPage = lazyRetry(
   () => import("../StudioToolsCompanionPage").then((module) => ({
     default: module.StudioToolsCompanionPage,
@@ -165,6 +172,14 @@ export function StudioRouter() {
   }
   if (resolution.kind === "publish") {
     return <StudioPublishRoute resolution={resolution} />;
+  }
+  if (resolution.kind === "lift3d") {
+    // 편집 문서와 무관한 도구 화면이라 문서 런타임 경계 없이 곧장 띄운다.
+    return (
+      <Suspense fallback={<StudioRouteLoading label="2D → 3D 변환 작업대를 여는 중..." />}>
+        <StudioLift3dPage initialSubject={resolution.subject} />
+      </Suspense>
+    );
   }
   if (resolution.kind === "companion") {
     return (

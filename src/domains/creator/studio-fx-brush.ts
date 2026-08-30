@@ -5,6 +5,7 @@
  * No Math.random / DOM / Konva — seed + stroke geometry only.
  */
 
+import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./brush/studio-brush-symmetry";
 import { hash2 } from "./studio-grain";
 import {
   STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
@@ -91,15 +92,44 @@ function pressureAt(pressures: unknown, progress: number): number {
   return a + (b - a) * t;
 }
 
+/**
+ * Reads point `i`'s pressure directly when the caller's journal is aligned with its point array,
+ * and falls back to the normalised resample when it is not.
+ *
+ * `pressureAt` samples a NORMALISED progress, and `(i / (n - 1)) * (n - 1)` does not round-trip to
+ * `i` in binary floating point: at n = 800 the sample for i = 357 lands on 356.99999999999994 and
+ * blends in a sliver of its neighbour. The value error is ~1e-15 and invisible on screen, but the
+ * dependence on `n` is not — every appended sample re-derived EVERY earlier sample slightly
+ * differently, so `FxOilDabPlanner`'s byte-equality verification found its prefix ending a few
+ * hundred stations in and replanned the whole rest of the bed on every pointer move. Measured on a
+ * 1600-sample oil sweep: 357 of 1458 dabs reused before, 1456 of 1458 after.
+ *
+ * Reading the slot the progress expression is trying to name removes the rounding and the
+ * dependence together. A journal whose length does NOT match the point count (legacy documents,
+ * resampled or symmetry-mirrored series) keeps the interpolating path, where the normalisation is
+ * doing real work.
+ */
+function alignedPressureJournal(
+  rawPressures: unknown,
+  pairCount: number,
+): readonly unknown[] | null {
+  return Array.isArray(rawPressures) && rawPressures.length === pairCount
+    ? rawPressures
+    : null;
+}
+
 function sanitizePoints(rawPoints: unknown, rawPressures: unknown): StrokePoint[] {
   if (!Array.isArray(rawPoints)) return [];
   const pairCount = Math.floor(rawPoints.length / 2);
+  const aligned = alignedPressureJournal(rawPressures, pairCount);
   const out: StrokePoint[] = [];
   for (let i = 0; i < pairCount; i++) {
     const x = safeCoord(rawPoints[i * 2]);
     const y = safeCoord(rawPoints[i * 2 + 1]);
     if (x === null || y === null) continue;
-    const pressure = pressureAt(rawPressures, pairCount <= 1 ? 0 : i / (pairCount - 1));
+    const pressure = aligned
+      ? clamp01(finiteNumber(aligned[i], DEFAULT_PRESSURE))
+      : pressureAt(rawPressures, pairCount <= 1 ? 0 : i / (pairCount - 1));
     const prev = out.at(-1);
     if (prev && Math.hypot(x - prev.x, y - prev.y) <= POINT_EPS) {
       prev.pressure = pressure;
@@ -507,6 +537,20 @@ interface FxPressurePoint {
   readonly pressure: number;
 }
 
+/**
+ * Point `index`'s pressure when the journal runs parallel to the points, which every live stroke's
+ * does. Same reason as `alignedPressureJournal` above: the normalised progress expression does not
+ * round-trip through binary floating point, so an earlier point's pressure came out fractionally
+ * different depending on how far the stroke had grown — enough to make the batch planner and the
+ * incremental builder disagree in the last ulp, and to defeat prefix verification downstream.
+ */
+function parallelPathPressureAt(
+  pressures: readonly number[],
+  index: number,
+): number {
+  return clamp(finiteNumber(pressures[index], 0), 0, 1);
+}
+
 function fixedPathPressureAt(
   pressures: readonly number[] | null | undefined,
   progress: number,
@@ -533,15 +577,18 @@ function sanitizeFxPressurePathPoints(
   pressures: readonly number[] | null | undefined,
 ): FxPressurePoint[] {
   const pairCount = Math.min(1_000_000, Math.floor(points.length / 2));
+  const parallel = pressures && pressures.length === pairCount ? pressures : null;
   const result: FxPressurePoint[] = [];
   for (let pointIndex = 0; pointIndex < pairCount; pointIndex += 1) {
     const x = safeCoord(points[pointIndex * 2]);
     const y = safeCoord(points[pointIndex * 2 + 1]);
     if (x === null || y === null) break;
-    const pressure = fixedPathPressureAt(
-      pressures,
-      pairCount <= 1 ? 0 : pointIndex / (pairCount - 1),
-    );
+    const pressure = parallel
+      ? parallelPathPressureAt(parallel, pointIndex)
+      : fixedPathPressureAt(
+          pressures,
+          pairCount <= 1 ? 0 : pointIndex / (pairCount - 1),
+        );
     const previous = result.at(-1);
     if (previous && Math.hypot(x - previous.x, y - previous.y) <= POINT_EPS) {
       result[result.length - 1] = { x, y, pressure };
@@ -843,10 +890,15 @@ export function createStudioIncrementalFxPressurePathBuilder(): StudioIncrementa
         const x = safeCoord(input.points[pointIndex * 2]);
         const y = safeCoord(input.points[pointIndex * 2 + 1]);
         if (x === null || y === null) break;
-        const pressure = fixedPathPressureAt(
-          pressures,
-          pairCount <= 1 ? 0 : pointIndex / (pairCount - 1),
-        );
+        // Parallel journals read their own slot, so a point consumed at one stroke length keeps
+        // exactly the value the batch planner gives it at any other — the ulp gap between the
+        // live builder and the commit replay closes rather than being documented.
+        const pressure = pressuresParallel
+          ? parallelPathPressureAt(pressures!, pointIndex)
+          : fixedPathPressureAt(
+              pressures,
+              pairCount <= 1 ? 0 : pointIndex / (pairCount - 1),
+            );
         const previous = sanitized.at(-1);
         if (previous && Math.hypot(x - previous.x, y - previous.y) <= POINT_EPS) {
           sanitized[sanitized.length - 1] = { x, y, pressure };
@@ -1787,34 +1839,6 @@ const BRISTLE_RESERVOIR_WEIGHT = 0.62;
 /** >1 이면 마른 털 쪽으로 치우친다. 갈필이 남으려면 소수가 확실히 굶어야 한다. */
 const BRISTLE_RESERVOIR_SKEW = 1.9;
 
-function bristleLoadAlongTravel(
-  stationIndex: number,
-  bristleIndex: number,
-  seed: number,
-  paintBody: FxOilPaintBody,
-): number {
-  const wavelength = BRISTLE_LOAD_WAVELENGTH_STATIONS
-    * (paintBody === "acrylic" ? ACRYLIC_LOAD_WAVELENGTH_SCALE : 1);
-  const t = stationIndex / wavelength;
-  const knot = Math.floor(t);
-  const fraction = t - knot;
-  const key = 31 + bristleIndex * 7;
-  const start = hash2(knot, key, seed);
-  const end = hash2(knot + 1, key, seed);
-  // Smoothstep so the load has no corner at a knot; a linear ramp still reads as a crease.
-  const eased = fraction * fraction * (3 - 2 * fraction);
-  const travel = start + (end - start) * eased;
-  // Each hair carries its OWN reservoir, held for the whole stroke, and the travel noise only
-  // modulates it. Without this term every hair swept the entire dry..loaded range within one
-  // wavelength, so a single hair crossed many load bands over 20 stations and got chopped into
-  // short segments scattered across different paint passes — at 4x the bed read as dashes on a
-  // slab rather than hairs dragged through paint. Real bristles differ from EACH OTHER in how
-  // much they hold; one hair does not go from dry to full and back over its own length.
-  // 균등분포를 그대로 쓰면 털들이 중간으로 몰려 갈필(마른 털이 남기는 빈 결)이 사라진다.
-  // 제곱으로 눌러 소수의 털을 확실히 마르게 만든다 — 실제 붓에서도 굶은 털은 소수다.
-  const reservoir = hash2(-1, key, seed) ** BRISTLE_RESERVOIR_SKEW;
-  return reservoir * BRISTLE_RESERVOIR_WEIGHT + travel * (1 - BRISTLE_RESERVOIR_WEIGHT);
-}
 
 /**
  * How far a hair drifts across the ribbon as it travels, in ribbon half-widths.
@@ -1900,20 +1924,6 @@ const BRISTLE_DRIFT_WAVELENGTH_STATIONS = Math.round(
   BRISTLE_DRIFT_WAVELENGTH_HEAD_WIDTHS / OIL_STATION_SPACING_RATIO,
 );
 
-function bristleDriftAlongTravel(
-  stationIndex: number,
-  bristleIndex: number,
-  seed: number,
-): number {
-  const t = stationIndex / BRISTLE_DRIFT_WAVELENGTH_STATIONS;
-  const knot = Math.floor(t);
-  const fraction = t - knot;
-  const key = 907 + bristleIndex * 13;
-  const start = hash2(knot, key, seed);
-  const end = hash2(knot + 1, key, seed);
-  const eased = fraction * fraction * (3 - 2 * fraction);
-  return (start + (end - start) * eased) * 2 - 1;
-}
 
 /**
  * Acrylic lanes carry the fast-setting body; everything else on this carrier is oil. Kept as one
@@ -2006,6 +2016,59 @@ function appendOilBrushDabs(
   bristleOffsets: readonly number[],
 ): void {
   const { baseWidth, seed, maxDabs, paintBody, tipProfile } = settings;
+  const bristleCount = bristleOffsets.length;
+  const tap = stations.length === 1;
+
+  // Per-bed constants: functions of the hair index and the seed alone.
+  //
+  // These used to be recomputed inside the hair loop, i.e. once per (station, hair). At the
+  // 4096-dab cap that is ~90k evaluations of ~22 distinct values, two of them through `Math.pow`,
+  // and the cap is exactly where the bed is rebuilt from scratch on every pointer move. Same
+  // expressions, same inputs, so the numbers are bit-for-bit what the inline versions produced.
+  const pitchByHair = new Float64Array(bristleCount);
+  const gaugeByHair = new Float64Array(bristleCount);
+  const reservoirByHair = new Float64Array(bristleCount);
+  const loadKeyByHair = new Float64Array(bristleCount);
+  const driftKeyByHair = new Float64Array(bristleCount);
+  for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
+    // PITCH breaks the lattice: each hair takes a fixed offset of its own, so neighbour spacing is
+    // irregular and two hairs can sit close together as a clump.
+    pitchByHair[bristleIndex] =
+      (hash2(bristleIndex, 613, seed) - 0.5) * 2 * BRISTLE_PITCH_JITTER;
+    // Skewed so most hairs are fine and a few are the fat ones a real ferrule always has — a bed
+    // of identical-diameter hairs is the same lattice tell as identical spacing. Hashed on the
+    // hair alone, so a hair keeps one diameter for the whole stroke and its runs stay weldable.
+    gaugeByHair[bristleIndex] = hash2(bristleIndex, 733, seed) ** 1.4;
+    const loadKey = 31 + bristleIndex * 7;
+    loadKeyByHair[bristleIndex] = loadKey;
+    // Each hair carries its OWN reservoir, held for the whole stroke; the travel noise below only
+    // modulates it. Without this term every hair swept the entire dry..loaded range within one
+    // wavelength, so a single hair crossed many load bands over 20 stations and got chopped into
+    // short segments scattered across different paint passes — at 4x the bed read as dashes on a
+    // slab rather than hairs dragged through paint. Real bristles differ from EACH OTHER in how
+    // much they hold; one hair does not go from dry to full and back over its own length.
+    // 균등분포를 그대로 쓰면 털들이 중간으로 몰려 갈필(마른 털이 남기는 빈 결)이 사라진다.
+    // 제곱으로 눌러 소수의 털을 확실히 마르게 만든다 — 실제 붓에서도 굶은 털은 소수다.
+    reservoirByHair[bristleIndex] = hash2(-1, loadKey, seed) ** BRISTLE_RESERVOIR_SKEW;
+    driftKeyByHair[bristleIndex] = 907 + bristleIndex * 13;
+  }
+
+  // Load and drift are piecewise-smoothstep between knot hashes, and a knot spans a whole
+  // wavelength of stations (103 for oil, 162 for drift). Hashing both ends once per (station,
+  // hair) meant ~360k `hash2` calls at the cap for ~2.9k distinct values; the knot index is
+  // non-decreasing along the walk, so the two ends only have to be refilled when it moves.
+  const loadWavelength = BRISTLE_LOAD_WAVELENGTH_STATIONS
+    * (paintBody === "acrylic" ? ACRYLIC_LOAD_WAVELENGTH_SCALE : 1);
+  const loadStartByHair = new Float64Array(bristleCount);
+  const loadEndByHair = new Float64Array(bristleCount);
+  const driftStartByHair = new Float64Array(bristleCount);
+  const driftEndByHair = new Float64Array(bristleCount);
+  let cachedLoadKnot = Number.NaN;
+  let cachedDriftKnot = Number.NaN;
+
+  const acrylicRidgeScale = paintBody === "acrylic" ? ACRYLIC_RIDGE_SCALE : 1;
+  const hardTipRidgeScale = tipProfile === "hard" ? HARD_TIP_RIDGE_SCALE : 1;
+
   for (let si = from; si < stations.length; si++) {
     if (dabs.length >= maxDabs) break;
     const st = stations[si]!;
@@ -2026,6 +2089,37 @@ function appendOilBrushDabs(
     // contact fans the head and loads pigment. A soft curve (0.82) keeps early stylus response
     // lively without snapping to the full filbert width.
     const pressureFeel = Math.pow(clamp(st.pressure, 0, 1), 0.82);
+
+    // Knot walk for this station: the eased fraction is per-station, not per-hair.
+    const loadT = si / loadWavelength;
+    const loadKnot = Math.floor(loadT);
+    const loadFraction = loadT - loadKnot;
+    // Smoothstep so the load has no corner at a knot; a linear ramp still reads as a crease.
+    const loadEased = loadFraction * loadFraction * (3 - 2 * loadFraction);
+    if (loadKnot !== cachedLoadKnot) {
+      for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
+        const key = loadKeyByHair[bristleIndex]!;
+        loadStartByHair[bristleIndex] = hash2(loadKnot, key, seed);
+        loadEndByHair[bristleIndex] = hash2(loadKnot + 1, key, seed);
+      }
+      cachedLoadKnot = loadKnot;
+    }
+    const driftT = si / BRISTLE_DRIFT_WAVELENGTH_STATIONS;
+    const driftKnot = Math.floor(driftT);
+    const driftFraction = driftT - driftKnot;
+    const driftEased = driftFraction * driftFraction * (3 - 2 * driftFraction);
+    if (driftKnot !== cachedDriftKnot) {
+      for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
+        const key = driftKeyByHair[bristleIndex]!;
+        driftStartByHair[bristleIndex] = hash2(driftKnot, key, seed);
+        driftEndByHair[bristleIndex] = hash2(driftKnot + 1, key, seed);
+      }
+      cachedDriftKnot = driftKnot;
+    }
+    // Per-station terms the hair loop used to recompute for every hair.
+    const contactWidth = clamp(0.18 + pressureFeel * 0.95, 0.18, 1);
+    const dryPressureTerm = 0.35 + pressureFeel * 0.65;
+    const offsetPressureScale = 0.9 + pressureFeel * 0.14;
     const size = baseWidth
       * (0.48 + pressureFeel * 0.72)
       * (0.93 + n2 * 0.14);
@@ -2036,84 +2130,93 @@ function appendOilBrushDabs(
       size * (0.34 + pressureFeel * 0.1 + n3 * 0.05),
     );
     const normalJitter = (n2 - 0.5) * baseWidth * (0.018 + pressureFeel * 0.014);
-    const tap = stations.length === 1;
-    const bristles = bristleOffsets.map(
-      (offsetRatio, bristleIndex): FxOilBristle => {
-        const rawTooth = bristleLoadAlongTravel(si, bristleIndex, seed, paintBody);
-        // A hard head pulls each hair's load toward the head's mean instead of clipping its range.
-        const tooth = tipProfile === "hard"
-          ? 0.5 + (rawTooth - 0.5) * HARD_TIP_LOAD_EVENNESS
-          : rawTooth;
-        // Pressure decides HOW MUCH OF THE FERRULE touches the paper, not how hard every hair
-        // presses. That distinction is the whole behaviour.
+    const bristles: FxOilBristle[] = new Array(bristleCount);
+    for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
+      const offsetRatio = bristleOffsets[bristleIndex]!;
+      // `bristleLoadAlongTravel`, inlined so the knot hashes and the hair's own reservoir can be
+      // lifted out of the walk. The arithmetic is written in the same order it had inside that
+      // function, so every value is bit-identical to the call it replaces.
+      const loadStart = loadStartByHair[bristleIndex]!;
+      const travel = loadStart + (loadEndByHair[bristleIndex]! - loadStart) * loadEased;
+      const rawTooth = reservoirByHair[bristleIndex]! * BRISTLE_RESERVOIR_WEIGHT
+        + travel * (1 - BRISTLE_RESERVOIR_WEIGHT);
+      // A hard head pulls each hair's load toward the head's mean instead of clipping its range.
+      const tooth = tipProfile === "hard"
+        ? 0.5 + (rawTooth - 0.5) * HARD_TIP_LOAD_EVENNESS
+        : rawTooth;
+      // Pressure decides HOW MUCH OF THE FERRULE touches the paper, not how hard every hair
+      // presses. That distinction is the whole behaviour.
+      //
+      // The old form multiplied one contact term by pressure, so a light touch scaled EVERY
+      // hair down together, every hair fell under the dry-liftoff cut at once, and the mark came
+      // out as a smooth film with no bristle in it. Measured across the ribbon at constant
+      // pressure, the cross-section standard deviation was 0.14-0.19 at working pressure and
+      // collapsed to 0.046-0.053 at a light touch — the stroke lost its hairs exactly where a
+      // real brush shows them most. A light skim rides on the middle of the head and leaves a
+      // few separated strands; it does not leave a wash.
+      //
+      // So contact is a WIDTH: hairs inside the contact band touch fully and deposit according
+      // to their own load, hairs outside it do not touch at all, and pressure moves the band's
+      // edge. The shoulder keeps the boundary from being a hard cut, and `tooth` still lets a
+      // hair's own charge modulate what it lays down once it is in contact.
+      const edge = Math.abs(offsetRatio);
+      const contact = clamp(
+        (contactWidth - edge) / OIL_CONTACT_SHOULDER + tooth * 0.12,
+        0,
+        1,
+      );
+      // Load is a CONTINUUM, not a switch.
+      //
+      // The boolean gate left a hole in the middle of the tone range - a hair was either
+      // ~0.55-0.75 (loaded) or ~0.015-0.045 (dry) and never between - and a real bristle passes
+      // through partly-loaded on its way to dry. That pass is most of what makes paint read as
+      // paint. Measured as the share of inked pixels in the two most-occupied tone bins (lower is
+      // richer), the gate and the overlap fold only work TOGETHER:
+      //   bimodal + 14 overlaps 73.1%   ·   continuum + 14 overlaps 71.1%
+      //   bimodal +  6 overlaps 77.4%   ·   continuum +  6 overlaps 54.6%
+      // Neither change alone helps; the continuum is what gives the lower fold something to
+      // spread. Note this LOWERS the load's variance (0.292 -> 0.153) while leaving its RANGE
+      // untouched (0.015-0.75) - filling a bimodal gap always does - which is why the paint-body
+      // guard asserts range and correlation rather than variance.
+      const contactGate = smoothGate(contact, 0.42, 0.18);
+      const toothGate = smoothGate(tooth, 0.38, 0.22);
+      const loadGate = contactGate * toothGate;
+      const pitch = pitchByHair[bristleIndex]!;
+      // `bristleDriftAlongTravel`, inlined on the same terms as the load above.
+      const driftStart = driftStartByHair[bristleIndex]!;
+      const drift =
+        ((driftStart + (driftEndByHair[bristleIndex]! - driftStart) * driftEased) * 2 - 1)
+        * BRISTLE_DRIFT_AMPLITUDE;
+      // Skewed so most hairs are fine and a few are the fat ones a real ferrule always has —
+      // a bed of identical-diameter hairs is the same lattice tell as identical spacing.
+      const hairGauge = gaugeByHair[bristleIndex]!;
+      // The dry floor appears twice in the opacity fold; it is one value, not two.
+      const dryFloor = 0.015 + tooth * 0.045 * dryPressureTerm;
+      bristles[bristleIndex] = {
+        offsetRatio: (offsetRatio + pitch + drift) * offsetPressureScale,
+        radiusXRatio: 0.62 + tooth * 0.28 + pressureFeel * 0.08,
+        // Ridges must remain a material fraction of radiusY after the ribbon carrier's
+        // 0.17 + ratio*1.1 width map — keep them resolvable without repainting the body.
         //
-        // The old form multiplied one contact term by pressure, so a light touch scaled EVERY
-        // hair down together, every hair fell under the dry-liftoff cut at once, and the mark came
-        // out as a smooth film with no bristle in it. Measured across the ribbon at constant
-        // pressure, the cross-section standard deviation was 0.14-0.19 at working pressure and
-        // collapsed to 0.046-0.053 at a light touch — the stroke lost its hairs exactly where a
-        // real brush shows them most. A light skim rides on the middle of the head and leaves a
-        // few separated strands; it does not leave a wash.
-        //
-        // So contact is a WIDTH: hairs inside the contact band touch fully and deposit according
-        // to their own load, hairs outside it do not touch at all, and pressure moves the band's
-        // edge. The shoulder keeps the boundary from being a hard cut, and `tooth` still lets a
-        // hair's own charge modulate what it lays down once it is in contact.
-        const edge = Math.abs(offsetRatio);
-        const contactWidth = clamp(0.18 + pressureFeel * 0.95, 0.18, 1);
-        const contact = clamp(
-          (contactWidth - edge) / OIL_CONTACT_SHOULDER + tooth * 0.12,
-          0,
-          1,
-        );
-        // Load is a CONTINUUM, not a switch.
-        //
-        // The boolean gate left a hole in the middle of the tone range - a hair was either
-        // ~0.55-0.75 (loaded) or ~0.015-0.045 (dry) and never between - and a real bristle passes
-        // through partly-loaded on its way to dry. That pass is most of what makes paint read as
-        // paint. Measured as the share of inked pixels in the two most-occupied tone bins (lower is
-        // richer), the gate and the overlap fold only work TOGETHER:
-        //   bimodal + 14 overlaps 73.1%   ·   continuum + 14 overlaps 71.1%
-        //   bimodal +  6 overlaps 77.4%   ·   continuum +  6 overlaps 54.6%
-        // Neither change alone helps; the continuum is what gives the lower fold something to
-        // spread. Note this LOWERS the load's variance (0.292 -> 0.153) while leaving its RANGE
-        // untouched (0.015-0.75) - filling a bimodal gap always does - which is why the paint-body
-        // guard asserts range and correlation rather than variance.
-        const contactGate = smoothGate(contact, 0.42, 0.18);
-        const toothGate = smoothGate(tooth, 0.38, 0.22);
-        const loadGate = contactGate * toothGate;
-        const pitch = (hash2(bristleIndex, 613, seed) - 0.5) * 2 * BRISTLE_PITCH_JITTER;
-        const drift = bristleDriftAlongTravel(si, bristleIndex, seed)
-          * BRISTLE_DRIFT_AMPLITUDE;
-        // Skewed so most hairs are fine and a few are the fat ones a real ferrule always has —
-        // a bed of identical-diameter hairs is the same lattice tell as identical spacing.
-        const hairGauge = hash2(bristleIndex, 733, seed) ** 1.4;
-        return {
-          offsetRatio: (offsetRatio + pitch + drift) * (0.9 + pressureFeel * 0.14),
-          radiusXRatio: 0.62 + tooth * 0.28 + pressureFeel * 0.08,
-          // Ridges must remain a material fraction of radiusY after the ribbon carrier's
-          // 0.17 + ratio*1.1 width map — keep them resolvable without repainting the body.
-          //
-          // A hair's DIAMETER is its own and does not change as it travels; only its footprint
-          // does, when pressure flattens it. The per-station `tooth` used to drive this, so every
-          // hair swelled and thinned along its own length and no hair could be tracked across the
-          // stroke — which also meant a hair's runs scattered across width gauges and could not be
-          // welded back into one furrow. The gauge is now hashed on the hair alone; `contact` is
-          // the only term left that varies with travel, and that one is physical.
-          radiusYRatio: (0.032 + hairGauge * 0.062 + contact * 0.03)
-            * (paintBody === "acrylic" ? ACRYLIC_RIDGE_SCALE : 1)
-            * (tipProfile === "hard" ? HARD_TIP_RIDGE_SCALE : 1),
-          // Bimodal load with pressure-gated contact: skimming hairs stay near-dry film while
-          // loaded ridges carry a clear pigment step. Self-crossings stay honest because mid-alpha
-          // stacking (worst a·(1−a)) is avoided on the dominant band.
-          opacity: (0.015 + tooth * 0.045 * (0.35 + pressureFeel * 0.65))
-            + loadGate * (
-              (0.34 + contact * 0.42 + Math.max(0, tooth - 0.38) * 0.28)
-              - (0.015 + tooth * 0.045 * (0.35 + pressureFeel * 0.65))
-            ),
-        };
-      }
-    );
+        // A hair's DIAMETER is its own and does not change as it travels; only its footprint
+        // does, when pressure flattens it. The per-station `tooth` used to drive this, so every
+        // hair swelled and thinned along its own length and no hair could be tracked across the
+        // stroke — which also meant a hair's runs scattered across width gauges and could not be
+        // welded back into one furrow. The gauge is now hashed on the hair alone; `contact` is
+        // the only term left that varies with travel, and that one is physical.
+        radiusYRatio: (0.032 + hairGauge * 0.062 + contact * 0.03)
+          * acrylicRidgeScale
+          * hardTipRidgeScale,
+        // Bimodal load with pressure-gated contact: skimming hairs stay near-dry film while
+        // loaded ridges carry a clear pigment step. Self-crossings stay honest because mid-alpha
+        // stacking (worst a·(1−a)) is avoided on the dominant band.
+        opacity: dryFloor
+          + loadGate * (
+            (0.34 + contact * 0.42 + Math.max(0, tooth - 0.38) * 0.28)
+            - dryFloor
+          ),
+      };
+    }
     dabs.push({
       x: st.x - Math.sin(ang) * normalJitter,
       y: st.y + Math.cos(ang) * normalJitter,
@@ -2249,6 +2352,56 @@ export class FxOilDabPlanner {
     this.dabs = [];
     this.lastReusedDabs = 0;
   }
+}
+
+/**
+ * Planners retained for the ONE draft currently being drawn — a single slot, not an LRU over
+ * strokes. See `planStudioOilRibbonCarrierIncremental` for why an LRU is the wrong shape here:
+ * sized below the draft's symmetry fan it never hits, and sized above it a finished stroke's beds
+ * outlive the stroke. Starting a different draft drops the previous one outright.
+ */
+interface RetainedOilDabDraft {
+  readonly draftId: string;
+  readonly planners: Map<number, FxOilDabPlanner>;
+}
+
+let retainedOilDabDraft: RetainedOilDabDraft | null = null;
+
+/**
+ * Stroke-keyed `FxOilDabPlanner`, for renderers that cannot hold one themselves.
+ *
+ * Same dabs as `planOilBrushDabs` — the planner verifies its retained prefix byte-for-byte and
+ * re-derives everything it cannot vouch for — so this is a drop-in for the ACTIVE DRAFT only.
+ * Committed and export renders keep calling the batch planner: they walk arbitrary strokes in
+ * arbitrary order and would evict each other's beds for nothing.
+ *
+ * A symmetry transform draws one element several times from different point arrays, so the copy's
+ * `variationIndex` selects its own planner; a fan wider than the retained bound falls back to the
+ * batch planner rather than retaining beds without bound.
+ */
+export function planOilBrushDabsIncremental(
+  draftId: string,
+  variationIndex: number,
+  input: FxOilPlanInput,
+): FxOilDab[] {
+  if (retainedOilDabDraft?.draftId !== draftId) {
+    retainedOilDabDraft = { draftId, planners: new Map() };
+  }
+  const planners = retainedOilDabDraft.planners;
+  let planner = planners.get(variationIndex);
+  if (!planner) {
+    if (planners.size >= STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS) {
+      return planOilBrushDabs(input);
+    }
+    planner = new FxOilDabPlanner();
+    planners.set(variationIndex, planner);
+  }
+  return planner.plan(input);
+}
+
+/** Frees `draftId`'s retained beds. A no-op once a different draft has already replaced them. */
+export function releaseOilBrushDabDraftPlanners(draftId: string): void {
+  if (retainedOilDabDraft?.draftId === draftId) retainedOilDabDraft = null;
 }
 
 // ---------------------------------------------------------------------------

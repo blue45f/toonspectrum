@@ -50,6 +50,8 @@ import {
   createStudioIncrementalFxPressurePathBuilder,
   planNeonBrushPasses,
   planOilBrushDabs,
+  planOilBrushDabsIncremental,
+  releaseOilBrushDabDraftPlanners,
   studioOilPaintBodyForBrush,
   studioOilTipProfileForBrush,
   planPastelBrushDabs,
@@ -131,6 +133,7 @@ import {
 import {
   resolveStudioStampBrushKind,
 } from "./studio-brush-stamp-engine";
+import { STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS } from "./studio-brush-symmetry";
 import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import {
@@ -149,6 +152,8 @@ import {
   paintStudioOilRibbonCarrier,
   paintStudioOilRibbonHit,
   planStudioOilRibbonCarrier,
+  planStudioOilRibbonCarrierIncremental,
+  releaseStudioOilRibbonDraftPlanners,
   studioOilRibbonProgramsForBrush,
 } from "./studio-oil-ribbon-carrier";
 import { paintStudioOilRibbonCarrierIncremental } from "./studio-oil-ribbon-incremental-paint";
@@ -420,6 +425,28 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const symmetricVariations = stampBrushKind || dynamicBrushId
     ? [el.points]
     : getSymmetricPoints(el.points, el.symmetry);
+  // 활성 초안의 대칭 카피는 매 프레임 고정 인덱스 순서로 전부 그려지므로, 획 키 캐시가 보는
+  // 작업 집합은 1이 아니라 카피 수다. 보관 한도보다 부채꼴이 넓으면 배치 플래너로 보내, 캐시가
+  // 매 프레임 전멸하며 도입 이전보다 느려지는 일이 없게 한다.
+  const oilDraftPlannersRetained = activeDraft
+    && symmetricVariations.length <= STUDIO_BRUSH_RETAINED_DRAFT_SYMMETRY_VARIATIONS;
+  // 보관 베드를 놓는 지점은 둘이다. 캡 포화 오일 획은 카피당 ~27k 런 객체를 들고 있어서, 그리기가
+  // 끝난 뒤에도 붙들고 있으면 수십만 객체가 살아 있게 된다.
+  //
+  //  1. 초안이 끝나면 이 요소가 activeDraft=false 로 다시 그려진다 — 가장 흔한 종료 경로다.
+  //  2. 그 렌더가 아예 오지 않는 종료 경로(제스처 취소, 미리보기 레이어 제거, 캔버스 언마운트)는
+  //     아래 정리가 유일한 해제 지점이다. 의존성이 el.id 뿐이라 activeDraft 가 켜질 때는 돌지
+  //     않으므로, 방금 렌더가 채운 슬롯을 지우지 않는다.
+  //
+  // 두 해제 모두 다른 초안이 이미 자리를 차지했으면 no-op 이라 순서에 안전하다.
+  if (!activeDraft) {
+    releaseStudioOilRibbonDraftPlanners(el.id);
+    releaseOilBrushDabDraftPlanners(el.id);
+  }
+  useEffect(() => () => {
+    releaseStudioOilRibbonDraftPlanners(el.id);
+    releaseOilBrushDabDraftPlanners(el.id);
+  }, [el.id]);
   const dynamicBrushPlanResult = dynamicBrushId
     ? planStudioDynamicBrushRender(el, dynamicBrushId, activeDraft, paperSurface)
     : null;
@@ -2430,7 +2457,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (brushFamily === "oil" && el.mode !== "eraser") {
-            const dabs = planOilBrushDabs({
+            const oilPlanInput = {
               points: resolveStudioFreehandRenderPath(points, {
                 sampleSpacing: el.sampleSpacing,
                 legacyMinDistance: renderSampleDistance,
@@ -2443,16 +2470,28 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               paintBody: studioOilPaintBodyForBrush(brush),
               tipProfile: studioOilTipProfileForBrush(brush),
               stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
-            });
+            };
+            // 활성 초안만 요소 id 로 키된 증분 플래너를 쓴다. 대브 베드와 캐리어 모두 이동당
+            // 전체를 다시 세우고 있었고(2906-대브 베드 기준 캐리어만 14.6ms), 두 플래너 모두
+            // 스스로 검증한 접두만 재사용하므로 플랜은 배치와 바이트 동일하다. 커밋 렌더는
+            // 배치 리플레이를 유지해 내부 점 재작성에도 항상 정본을 그린다. 대칭 변형은 같은
+            // 요소를 변형된 점 배열로 여러 번 그리므로 변형 인덱스를 획 키에 포함한다.
+            const dabs = oilDraftPlannersRetained
+              ? planOilBrushDabsIncremental(el.id, index, oilPlanInput)
+              : planOilBrushDabs(oilPlanInput);
             // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
             // dli GGX 릴리프 오버레이는 brush--impasto-relief 와 oil--impasto-ribbon 두 레인이 켠다,
             // brush--bristle-physics 레인만 WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3).
             // 옵션이 없는 다른 모든 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하며, SVG
             // 내보내기의 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다.
-            const carrier = planStudioOilRibbonCarrier(
-              dabs,
-              studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id), el.brushEnginePrograms?.oil),
+            const oilPrograms = studioOilRibbonProgramsForBrush(
+              brush,
+              fxBrushSeedFromKey(el.id),
+              el.brushEnginePrograms?.oil,
             );
+            const carrier = oilDraftPlannersRetained
+              ? planStudioOilRibbonCarrierIncremental(el.id, index, dabs, oilPrograms)
+              : planStudioOilRibbonCarrier(dabs, oilPrograms);
             return (
               <Shape
                 key={index}

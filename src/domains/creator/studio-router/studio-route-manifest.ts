@@ -1,3 +1,4 @@
+import { STUDIO_LIFT3D_SUBJECTS } from "../lift3d/studio-lift3d-contract";
 import {
   parseStudioWorkspaceRoute,
   studioWorkspaceCanonicalHref,
@@ -22,6 +23,7 @@ export type StudioRouteKind =
   | "companion"
   | "editor"
   | "invalid"
+  | "lift3d"
   | "placeholder"
   | "publish";
 
@@ -49,6 +51,12 @@ export const STUDIO_ROUTE_MANIFEST = Object.freeze([
     kind: "publish",
     ownsDocumentTitle: true,
     pattern: "/studio/(work/:workId/)?publish",
+  },
+  {
+    id: "studio-lift3d",
+    kind: "lift3d",
+    ownsDocumentTitle: true,
+    pattern: "/studio/lift3d",
   },
   {
     id: "studio-companion",
@@ -103,6 +111,12 @@ export interface StudioCompanionRouteResolution extends StudioResolvedRouteBase 
   readonly surface: StudioCompanionRouteSurface;
 }
 
+export interface StudioLift3dRouteResolution extends StudioResolvedRouteBase {
+  readonly kind: "lift3d";
+  /** 주소에 실린 피사체 프리셋. 알 수 없는 값은 정규화 단계에서 떨어진다. */
+  readonly subject: string | null;
+}
+
 export type StudioPlaceholderRouteId =
   | "assets"
   | "review"
@@ -128,6 +142,7 @@ export type StudioRouteResolution =
   | StudioCompanionRouteResolution
   | StudioEditorRouteResolution
   | StudioInvalidRouteResolution
+  | StudioLift3dRouteResolution
   | StudioPlaceholderRouteResolution
   | StudioPublishRouteResolution;
 
@@ -301,6 +316,35 @@ function resolveCompanion(
   });
 }
 
+/**
+ * 2D → 3D 리프트 작업대. 편집 문서와 독립된 도구 화면이라 문서 런타임을 열지 않는다.
+ * 알 수 없는 `subject` 값은 정규화하면서 떨어뜨려, 주소로 프리셋을 밀어 넣지 못하게 한다.
+ */
+function resolveLift3d(
+  pathname: string,
+  search: string | URLSearchParams | undefined,
+): StudioLift3dRouteResolution | null {
+  const segments = normalizedSegments(pathname);
+  if (segments === null || segments.length !== 2 || segments[1] !== "lift3d") return null;
+  const params = queryParams(search);
+  const requested = params.getAll("subject");
+  const subject = requested.length === 1
+    && (STUDIO_LIFT3D_SUBJECTS as readonly string[]).includes(requested[0]!)
+    ? requested[0]!
+    : null;
+  params.delete("subject");
+  if (subject !== null) params.set("subject", subject);
+  const canonicalPathname = "/studio/lift3d";
+  return Object.freeze({
+    canonicalHref: href(canonicalPathname, params),
+    canonicalPathname,
+    kind: "lift3d",
+    lifecycleKey: canonicalPathname,
+    ownsDocumentTitle: true,
+    subject,
+  });
+}
+
 function resolvePlaceholder(
   pathname: string,
   search: string | URLSearchParams | undefined,
@@ -366,6 +410,8 @@ export function resolveStudioRoute({
   if (publish !== null) return publish;
   const companion = resolveCompanion(pathname, search);
   if (companion !== null) return companion;
+  const lift3d = resolveLift3d(pathname, search);
+  if (lift3d !== null) return lift3d;
   const placeholder = resolvePlaceholder(pathname, search);
   if (placeholder !== null) return placeholder;
   const workScopedPlaceholder = resolveWorkScopedPlaceholder(pathname, search);
