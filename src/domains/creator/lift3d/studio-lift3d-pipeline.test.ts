@@ -14,6 +14,7 @@ import { STUDIO_LIFT3D_SYMMETRY_CONFIDENT_SCORE } from "./studio-lift3d-symmetry
 import {
   discImage,
   encodeTestPng,
+  flatImage,
   opaqueSquareImage,
   verticalGradientImage,
 } from "./studio-lift3d.test-fixture";
@@ -174,6 +175,20 @@ describe("Studio Lift 3D 파이프라인", () => {
       expect(Math.max(lifted.value.metrics.gridWidth, lifted.value.metrics.gridHeight))
         .toBeLessThan(STUDIO_LIFT3D_LIMITS.maxResolution);
     }
+  });
+
+  it("명암이 고르면 시차 레이어가 카드 한 장으로 주저앉는다", () => {
+    // 밴드는 깊이 구간으로 나눈다. 깊이가 어디서나 같으면 한 구간만 차고 나머지는 비어
+    // 버려진다. 위상은 여전히 parallax 인데 층은 하나다 — 화면이 그 사실을 감추면 안 된다.
+    const lifted = liftStudioImageTo3d(flatImage(96), {
+      subject: "background",
+      layerBands: 12,
+    });
+
+    expect(lifted.ok).toBe(true);
+    if (!lifted.ok) return;
+    expect(lifted.value.geometry.mode).toBe("parallax");
+    expect(lifted.value.metrics.layerCount).toBe(1);
   });
 
   it("가는 부위가 있어도 위상 오류 없이 닫힌 solid 로 보고한다", () => {

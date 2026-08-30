@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { discImage, verticalGradientImage } from "./studio-lift3d.test-fixture";
+import { discImage, flatImage, verticalGradientImage } from "./studio-lift3d.test-fixture";
 import { StudioLift3dPage } from "./StudioLift3dPage";
 
 const decodeStudioLift3dFile = vi.hoisted(() => vi.fn());
@@ -212,6 +212,50 @@ describe("StudioLift3dPage", () => {
     // 슬라이더 표시에도 "4층" 이 나오므로 지표 타일(dt + dd) 안에서만 확인한다.
     await waitFor(() => {
       expect(screen.getByText("레이어").parentElement?.textContent).toContain("4층");
+    });
+  });
+
+  it("레이어가 한 장으로 주저앉아도 몇 층인지 감추지 않는다", async () => {
+    // 명암이 고른 배경은 밴드가 하나로 뭉쳐 카드가 한 장만 남는다. 지표를 층 수로 고르면
+    // 그때 이 칸이 통째로 사라져, 슬라이더는 "12층" 인데 결과가 몇 층인지 알 길이 없어진다.
+    decodeStudioLift3dFile.mockResolvedValue({ ...decodedDisc(), source: flatImage(96) });
+    renderPage("background");
+    pickFile();
+    await waitFor(() => {
+      expect(downloadButton().disabled).toBe(false);
+    });
+
+    fireEvent.change(screen.getByLabelText(/시차 레이어/u), { target: { value: "12" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("레이어").parentElement?.textContent).toContain("1층");
+    });
+  });
+
+  it("등록 실패 사유에도 어느 시점의 모델인지 단서를 단다", async () => {
+    // 옛 GLB 의 실패 사유가, 이미 등록될 수 있는 새 모델 옆에 그대로 붙어 남으면
+    // 사용자는 지금 보이는 모델이 거절당한 것으로 읽는다.
+    decodeStudioLift3dFile.mockResolvedValue(decodedDisc());
+    let release: (value: unknown) => void = () => undefined;
+    saveStudioLift3dToBg3dLibrary.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    renderPage("character");
+    pickFile();
+    await waitFor(() => {
+      expect(libraryButton().disabled).toBe(false);
+    });
+
+    libraryButton().click();
+    fireEvent.change(screen.getByLabelText(/앞쪽 두께 비율/u), { target: { value: "0.8" } });
+    release({ ok: false, detail: "같은 모델이 다른 이용 권리로 이미 등록되어 있습니다." });
+
+    await waitFor(() => {
+      const notice = screen.getByRole("status").textContent ?? "";
+      expect(notice).toContain("누른 시점의 모델");
+      expect(notice).toContain("이미 등록되어 있습니다");
     });
   });
 

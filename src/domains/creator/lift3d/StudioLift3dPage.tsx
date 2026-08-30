@@ -410,14 +410,17 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
       // 남아 있어, 화면이 이미 다른 설정을 보여주는데도 "그대로" 로 읽힌다.
       const staleModel = latestResultRef.current !== target
         || latestRevisionRef.current !== targetRevision;
+      // 성공만 단서를 다는 것으로는 부족하다. 실패 사유도 **누른 시점의 모델** 이야기다 —
+      // 예를 들어 옛 GLB 의 rights-conflict 가, 이미 등록될 수 있는 새 모델 옆에 그대로 붙어
+      // 남는다. 성공·실패 모두 같은 단서를 단다.
+      const prefix = staleModel ? `등록을 누른 시점의 모델(${rightsLabel(targetRights)}) — ` : "";
       setLibraryNotice(saved.ok
         ? staleModel
           // 모델이 달라졌으면 GLB 해시도 달라, 지금 설정으로 다시 등록하는 것이 실제로 통한다.
           // 권리 표기는 저장 중 잠겨 있으므로 이 문구가 통하지 않는 조합을 권할 일이 없다.
-          ? `등록을 누른 시점의 모델을 "${rightsLabel(targetRights)}" 로 등록했습니다. `
-            + "지금 화면의 설정으로는 다시 등록해 주세요."
+          ? `${prefix}등록했습니다. 지금 화면의 설정으로는 다시 등록해 주세요.`
           : "배경 3D 편집기의 모델 목록에 등록했습니다."
-        : saved.detail);
+        : `${prefix}${saved.detail}`);
     } catch {
       setLibraryNotice("3D 모델 라이브러리를 열 수 없습니다. 대신 GLB 파일로 저장해 주세요.");
     } finally {
@@ -751,7 +754,10 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                 {[
                   ["삼각형", metrics.triangleCount.toLocaleString("ko-KR")],
                   ["정점", metrics.vertexCount.toLocaleString("ko-KR")],
-                  metrics.layerCount > 1
+                  // 층 수가 아니라 **위상**으로 고른다. 명암이 고른 배경은 밴드가 하나로 뭉쳐
+                  // 카드가 한 장만 남는데, 층 수로 고르면 그때 이 칸이 통째로 사라져 슬라이더는
+                  // "12층" 인데 결과가 몇 층인지 알 길이 없어진다.
+                  result?.lift.geometry.mode === "parallax"
                     ? ["레이어", `${metrics.layerCount}층`]
                     : metrics.symmetryScore !== null
                       ? [
