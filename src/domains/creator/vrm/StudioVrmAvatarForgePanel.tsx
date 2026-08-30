@@ -645,27 +645,40 @@ export function StudioVrmAvatarForgePanel({
           </span>
         </div>
 
+        {/* 미리보기는 편집 중인 상태가 아니라 **실제로 생성될 상태**를 보여준다. 아무것도 고르지
+            않았을 때 기본 프리셋이 대신 들어가므로 둘이 갈릴 수 있다. */}
         <div
           data-studio-vrm-generate-preview=""
           className="flex items-center gap-2 rounded-xl border border-line bg-card/70 px-3 py-2"
         >
           <span
             className="size-7 rounded-full border border-line"
-            style={{ background: state.hair.baseColor }}
+            style={{ background: previewRecipe.state.hair.baseColor }}
             aria-hidden
           />
           <span
             className="size-7 rounded-full border border-line"
-            style={{ background: state.hair.tipColor }}
+            style={{ background: previewRecipe.state.hair.tipColor }}
             aria-hidden
           />
           <div className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
             <p>
-              헤어 {state.hair.style} · 얼굴 폭 {state.face.headWidth.toFixed(2)}× · 다리{" "}
-              {state.proportions.legLength.toFixed(2)}×
+              헤어 {previewRecipe.state.hair.style} · 얼굴 폭{" "}
+              {previewRecipe.state.face.headWidth.toFixed(2)}× · 다리{" "}
+              {previewRecipe.state.proportions.legLength.toFixed(2)}×
             </p>
           </div>
         </div>
+
+        {previewRecipe.appliedDefaultPresetId ? (
+          <p
+            data-studio-vrm-generate-default-preset={previewRecipe.appliedDefaultPresetId}
+            className="rounded-xl border border-line bg-raised/60 px-3 py-2 text-[0.66rem] leading-relaxed text-fg-3"
+          >
+            아직 고른 스타일이 없어 기본 스타일 <b className="text-fg-2">{previewRecipe.label}</b>로
+            생성됩니다. 위에서 다른 스타일을 고르거나 슬라이더를 조절하면 그 설정이 그대로 쓰입니다.
+          </p>
+        ) : null}
 
         {generateResult?.status === "unavailable" ? (
           <p

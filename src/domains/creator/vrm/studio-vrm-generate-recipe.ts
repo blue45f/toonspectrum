@@ -2,6 +2,7 @@ import {
   AVATAR_FORGE_PRESETS,
   createAvatarForgeState,
   sanitizeAvatarForgeState,
+  serializeAvatarForgeState,
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
 import {
@@ -27,6 +28,64 @@ import {
 export const STUDIO_VRM_GENERATE_RECIPE_VERSION = 1 as const;
 export const STUDIO_VRM_GENERATE_GENERATOR = "ToonSpectrum Studio VRM Generate";
 
+/**
+ * 아무것도 고르지 않고 생성했을 때 대신 쓰는 스타일.
+ *
+ * 조형 상태의 헤어 기본값은 `style: "none"` 이고, 그건 **오버레이 쪽에서는 옳다** — 불러온
+ * VRM 위에 절차형 헤어를 씌우지 않는다는 뜻이고, 뷰포트의 조형 오버레이에는 다른 게이트가
+ * 없어서 이 값이 곧 스위치다. 하지만 같은 상태가 생성에도 쓰이므로, 패널을 열자마자
+ * "VRM 생성"을 누르면 머리 없는 캐릭터가 나온다. 생성 경로에서만 기본 스타일을 씌운다.
+ */
+export const STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID = "natural-short";
+
+export type StudioVrmGenerateSeed = {
+  readonly state: AvatarForgeState;
+  readonly presetId: string | null;
+  /** 순정 기본 상태라 기본 프리셋으로 갈아끼웠다면 그 id. 아니면 null. */
+  readonly appliedDefaultPresetId: string | null;
+};
+
+/**
+ * 조형 상태가 **손대지 않은 순정 기본값**인지 본다.
+ *
+ * `hair.style === "none"` 만으로는 판단할 수 없다 — "없음"은 헤어 실루엣 목록에 있는
+ * 정식 선택지라, 사용자가 프리셋을 고른 뒤 일부러 머리를 지운 상태와 구분해야 한다.
+ * 그래서 직렬화 결과 전체를 순정 기본값과 비교한다. 슬라이더 하나라도 움직였거나 프리셋을
+ * 골랐다면 순정이 아니므로 그대로 존중한다.
+ */
+function isPristineAvatarForgeState(state: AvatarForgeState): boolean {
+  return (
+    JSON.stringify(serializeAvatarForgeState(state)) ===
+    JSON.stringify(serializeAvatarForgeState(createAvatarForgeState()))
+  );
+}
+
+/**
+ * 생성에 쓸 조형 상태를 정한다. 명시적으로 고른 프리셋이나 사용자가 조정한 상태는 절대
+ * 덮어쓰지 않고, 아무 흔적도 없는 순정 기본값일 때만 기본 프리셋을 대신 넣는다.
+ */
+export function resolveStudioVrmGenerateSeed(input: {
+  readonly presetId?: string | null;
+  readonly state?: unknown;
+} = {}): StudioVrmGenerateSeed {
+  const requestedPresetId = typeof input.presetId === "string" && input.presetId.trim()
+    ? input.presetId.trim()
+    : null;
+  const state = input.state === undefined
+    ? createAvatarForgeState(requestedPresetId ?? undefined)
+    : sanitizeAvatarForgeState(input.state);
+  const presetId = state.presetId ?? requestedPresetId ?? null;
+
+  if (presetId !== null || !isPristineAvatarForgeState(state)) {
+    return { state, presetId, appliedDefaultPresetId: null };
+  }
+  return {
+    state: createAvatarForgeState(STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID),
+    presetId: STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID,
+    appliedDefaultPresetId: STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID,
+  };
+}
+
 /** 노드 0 은 아마추어, 1..15 는 본, 그 뒤가 스킨드 메시 노드다. */
 const ARMATURE_NODE = 0;
 const FIRST_BONE_NODE = 1;
@@ -38,6 +97,8 @@ export type StudioVrmGenerateRecipe = {
   readonly presetId: string | null;
   readonly label: string;
   readonly state: AvatarForgeState;
+  /** 순정 기본 상태라 기본 프리셋이 대신 적용됐다면 그 id. UI 가 이 사실을 알린다. */
+  readonly appliedDefaultPresetId: string | null;
 };
 
 export function resolveStudioVrmGeneratePresetLabel(presetId: string | null): string {
@@ -49,18 +110,13 @@ export function createStudioVrmGenerateRecipe(input: {
   readonly presetId?: string | null;
   readonly state?: unknown;
 } = {}): StudioVrmGenerateRecipe {
-  const presetId = typeof input.presetId === "string" && input.presetId.trim()
-    ? input.presetId.trim()
-    : null;
-  const state = input.state === undefined
-    ? createAvatarForgeState(presetId ?? undefined)
-    : sanitizeAvatarForgeState(input.state);
-  const resolvedPresetId = state.presetId ?? presetId;
+  const seed = resolveStudioVrmGenerateSeed(input);
   return {
     version: STUDIO_VRM_GENERATE_RECIPE_VERSION,
-    presetId: resolvedPresetId ?? null,
-    label: resolveStudioVrmGeneratePresetLabel(resolvedPresetId ?? null),
-    state,
+    presetId: seed.presetId,
+    label: resolveStudioVrmGeneratePresetLabel(seed.presetId),
+    state: seed.state,
+    appliedDefaultPresetId: seed.appliedDefaultPresetId,
   };
 }
 

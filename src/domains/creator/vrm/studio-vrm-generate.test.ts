@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { AVATAR_FORGE_PRESETS } from "./studio-vrm-avatar-forge";
+import { AVATAR_FORGE_PRESETS, createAvatarForgeState } from "./studio-vrm-avatar-forge";
 import { STUDIO_VRM_EXPORT_REQUIRED_BONES } from "./studio-vrm-export-vrm-extension";
 import {
   inspectGeneratedVrmHumanoid,
@@ -17,6 +17,8 @@ import {
   buildStudioVrmGenerateAuthoringSnapshot,
   createStudioVrmGenerateRecipe,
   exportStudioVrmFromGenerateRecipe,
+  resolveStudioVrmGenerateSeed,
+  STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID,
 } from "./studio-vrm-generate-recipe";
 import { readStudioVrmPoserImplementationSource } from "./studio-vrm-poser-implementation-source";
 import { validateVrmGlbBytes } from "./vrm-library";
@@ -69,6 +71,63 @@ describe("studio VRM generate recipe", () => {
     );
     expect(snapshotA.nodes[3]?.name).toBe("head");
     expect(snapshotA.nodes[3]?.scale).not.toEqual(snapshotB.nodes[3]?.scale);
+  });
+});
+
+describe("studio VRM generate default preset", () => {
+  it("substitutes the default preset only for the untouched state", () => {
+    // 조형 상태의 기본 헤어는 "none" 이다 — 오버레이에서는 옳지만 생성에서는 대머리가 된다.
+    expect(createAvatarForgeState().hair.style).toBe("none");
+
+    const seed = resolveStudioVrmGenerateSeed({ state: createAvatarForgeState() });
+    expect(seed.appliedDefaultPresetId).toBe(STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID);
+    expect(seed.presetId).toBe(STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID);
+    expect(seed.state.hair.style).not.toBe("none");
+
+    // 입력을 아예 주지 않은 경우도 같다(CLI 의 --preset 미지정).
+    expect(resolveStudioVrmGenerateSeed().appliedDefaultPresetId).toBe(
+      STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID,
+    );
+  });
+
+  it("respects an explicitly chosen preset", () => {
+    const seed = resolveStudioVrmGenerateSeed({ presetId: PRESET_B });
+    expect(seed.appliedDefaultPresetId).toBeNull();
+    expect(seed.presetId).toBe(PRESET_B);
+  });
+
+  it("respects a deliberate bald character — the user changed something else", () => {
+    // 프리셋을 고른 뒤 머리를 지운 상태. presetId 가 남아 있으므로 순정이 아니다.
+    const shaved = { ...createAvatarForgeState(PRESET_A), hair: { ...createAvatarForgeState(PRESET_A).hair, style: "none" as const } };
+    const seed = resolveStudioVrmGenerateSeed({ state: shaved });
+    expect(seed.appliedDefaultPresetId).toBeNull();
+    expect(seed.state.hair.style).toBe("none");
+
+    // 프리셋 없이 슬라이더만 움직인 뒤 머리를 지운 상태도 존중한다.
+    const base = createAvatarForgeState();
+    const tweaked = {
+      ...base,
+      proportions: { ...base.proportions, legLength: 1.22 },
+    };
+    const tweakedSeed = resolveStudioVrmGenerateSeed({ state: tweaked });
+    expect(tweakedSeed.appliedDefaultPresetId).toBeNull();
+    expect(tweakedSeed.state.hair.style).toBe("none");
+    expect(tweakedSeed.state.proportions.legLength).toBeCloseTo(1.22, 6);
+  });
+
+  it("gives the untouched state a hairy, named character instead of a bald custom one", () => {
+    const recipe = createStudioVrmGenerateRecipe({});
+    expect(recipe.label).not.toBe("커스텀 캐릭터");
+    expect(recipe.appliedDefaultPresetId).toBe(STUDIO_VRM_GENERATE_DEFAULT_PRESET_ID);
+    const snapshot = buildStudioVrmGenerateAuthoringSnapshot(recipe);
+    expect(snapshot.meshes?.some((mesh) => mesh.name === "Hair")).toBe(true);
+  });
+
+  it("tells the user in the panel when the default preset stands in", () => {
+    const panel = readFileSync(new URL("./StudioVrmAvatarForgePanel.tsx", import.meta.url), "utf8");
+    expect(panel).toContain("data-studio-vrm-generate-default-preset");
+    // 미리보기 스와치는 편집 상태가 아니라 실제 생성될 상태를 읽어야 한다.
+    expect(panel).toContain("previewRecipe.state.hair.baseColor");
   });
 });
 
