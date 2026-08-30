@@ -228,7 +228,7 @@ function createMemorySessionBrushLibraryProduct(): Pick<
         restoredIds.push(entry.id);
       }
       if (restoredIds.length > 0) {
-        storage.setItem(BRUSH_LIBRARY_KEY, JSON.stringify({
+        values.set(BRUSH_LIBRARY_KEY, JSON.stringify({
           version: BRUSH_LIBRARY_STORAGE_VERSION,
           brushes: [...currentById.values()],
         }));
