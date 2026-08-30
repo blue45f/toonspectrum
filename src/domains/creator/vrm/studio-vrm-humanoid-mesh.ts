@@ -26,6 +26,14 @@ import {
 } from "./studio-vrm-avatar-forge";
 import { hexToRgb, hslToRgb, rgbToHsl } from "./studio-vrm-costume";
 import {
+  buildStudioVrmHairRig,
+  shapeStudioVrmHairRig,
+  STUDIO_VRM_HAIR_ANCHOR_JOINT,
+  studioVrmHairStrandSpine,
+  type StudioVrmHairChain,
+  type StudioVrmHairRig,
+} from "./studio-vrm-hair-rig";
+import {
   addLoft,
   applyTrs,
   eulerXyzMatrix,
@@ -1190,7 +1198,7 @@ function hairPartTransform(part: AvatarForgeHairPart, head: StudioVrmRigHeadFit)
 function addHairSphere(
   builder: SurfaceBuilder,
   transform: HairTransform,
-  skin: MeshSkinBinding,
+  skin: (t: number) => MeshSkinBinding,
   uvRect: MeshUvRect,
   options: {
     readonly columns: number;
@@ -1221,7 +1229,8 @@ function addHairSphere(
             meshLerp(u0, u1, column / options.columns),
             meshLerp(v0, v1, 1 - row / options.rows),
           ],
-          skin,
+          // 로컬 Y +1(위) → −1(아래) 을 체인 파라미터 0 → 1 로 옮긴다.
+          skin((1 - cosTheta) / 2),
         ),
       );
     }
@@ -1248,14 +1257,10 @@ function addHairStrand(
   builder: SurfaceBuilder,
   part: AvatarForgeHairPart,
   transform: HairTransform,
-  skin: MeshSkinBinding,
+  skin: (t: number) => MeshSkinBinding,
   uvRect: MeshUvRect,
 ): void {
   const [u0, v0, u1, v1] = uvRect;
-  const waveAmount = part.wave ?? 0;
-  const waveFrequency = part.waveFrequency ?? 2.4;
-  const aspectX = meshClamp(part.scale[1] / Math.max(1e-4, Math.abs(part.scale[0])), 1, 10);
-  const aspectZ = meshClamp(part.scale[1] / Math.max(1e-4, Math.abs(part.scale[2])), 1, 10);
 
   const place = (unit: MeshVec3): MeshVec3 =>
     applyTrs(unit, transform.translation, transform.rotation, transform.scale);
@@ -1263,18 +1268,10 @@ function addHairStrand(
   const grid: number[][] = [];
   for (let row = 0; row <= HAIR_STRAND_LENGTH; row += 1) {
     const t = row / HAIR_STRAND_LENGTH;
-    const y = 1 - t * 2;
+    // 중심선은 헤어 리그와 **같은 식**을 쓴다 — 어긋나면 흔들릴 때 가닥이 축을 중심으로 비틀린다.
+    const [curveX, y, curveZ] = studioVrmHairStrandSpine(part, t);
     const radius = Math.max(0.08, 1 - part.taper * t ** 0.72);
-    const spineCurveX = Math.sin(t * Math.PI * 2.15) * part.curl * 0.58 * t;
-    const spineCurveZ = Math.sin(t * Math.PI) * part.curl * 0.34;
-    const curveX =
-      waveAmount > 0
-        ? spineCurveX + Math.sin(t * Math.PI * waveFrequency) * waveAmount * 0.17 * aspectX * t
-        : spineCurveX;
-    const curveZ =
-      waveAmount > 0
-        ? spineCurveZ + Math.cos(t * Math.PI * waveFrequency) * waveAmount * 0.07 * aspectZ * t
-        : spineCurveZ;
+    const rowSkin = skin(t);
 
     const line: number[] = [];
     for (let column = 0; column <= HAIR_STRAND_RADIAL; column += 1) {
@@ -1283,7 +1280,7 @@ function addHairStrand(
         builder.vertex(
           place([curveX + Math.cos(angle) * radius, y, curveZ + Math.sin(angle) * radius]),
           [meshLerp(u0, u1, column / HAIR_STRAND_RADIAL), meshLerp(v0, v1, 1 - t)],
-          skin,
+          rowSkin,
         ),
       );
     }
@@ -1301,8 +1298,8 @@ function addHairStrand(
     }
   }
 
-  const top = builder.vertex(place([0, 1, 0]), [meshLerp(u0, u1, 0.5), v1], skin);
-  const bottom = builder.vertex(place([0, -1, 0]), [meshLerp(u0, u1, 0.5), v0], skin);
+  const top = builder.vertex(place([0, 1, 0]), [meshLerp(u0, u1, 0.5), v1], skin(0));
+  const bottom = builder.vertex(place([0, -1, 0]), [meshLerp(u0, u1, 0.5), v0], skin(1));
   for (let column = 0; column < HAIR_STRAND_RADIAL; column += 1) {
     builder.triangle(top, grid[0][column], grid[0][column + 1]);
     const last = HAIR_STRAND_LENGTH;
@@ -1421,28 +1418,89 @@ function pushOutsideSkull(
   return [head.center[0] + dx * gain, translation[1], head.center[2] + dz * gain];
 }
 
-function buildHair(rig: StudioVrmRig, state: AvatarForgeState): SurfaceBuilder | null {
+/**
+ * 정점을 체인 조인트에 배분한다. `t` 0(뿌리·위) → 1(끝·아래). 이웃한 두 마디에만 실어
+ * 선형 보간한다.
+ *
+ * **뿌리 쪽은 체인의 첫 조인트가 아니라 고정 앵커에 싣는다.** VRM 스프링에서 체인의 첫
+ * 항목은 "움직이지 않는 루트"가 아니다 — three-vrm 은 (본, 자식) 쌍마다 조인트를 만들어
+ * **첫 본의 회전도 시뮬레이션한다**. 거기에 부착 링을 100% 실으면 링이 축을 중심으로
+ * 함께 돌아 두피에서 어긋난다. 앵커는 어떤 스프링에도 들어가지 않으므로 머리만 따라간다.
+ */
+function hairChainSkin(chain: StudioVrmHairChain, jointBase: number, t: number): MeshSkinBinding {
+  const span = chain.joints.length - 1;
+  const position = meshClamp(t, 0, 1) * span;
+  const lower = Math.min(span - 1, Math.floor(position));
+  const blend = position - lower;
+  const stop = (index: number): number =>
+    index === 0
+      ? jointBase + STUDIO_VRM_HAIR_ANCHOR_JOINT
+      : jointBase + chain.jointOffset + index;
+  const first = stop(lower);
+  if (blend <= 0) return [[first, 1]];
+  return [
+    [first, 1 - blend],
+    [stop(lower + 1), blend],
+  ];
+}
+
+function buildHair(
+  rig: StudioVrmRig,
+  state: AvatarForgeState,
+): { readonly builder: SurfaceBuilder; readonly hairRig: StudioVrmHairRig | null } | null {
   const parts = buildAvatarForgeHairParts(state);
   if (parts.length === 0) return null;
 
   const builder = new SurfaceBuilder();
   const skin = only(rig, "head");
+
+  // 가닥마다 두개골 적합까지 끝난 변환을 먼저 확정한다 — 체인 조인트가 그 변환 위에 놓인다.
+  // 여기까지는 **조형 스케일 이전** 좌표다.
+  const transforms = parts.map((part) =>
+    fitHairPartToSkull(part, hairPartTransform(part, rig.head), rig.head, state.hair.fringe),
+  );
+  const hairRig = shapeStudioVrmHairRig(
+    buildStudioVrmHairRig(
+      parts.map((part, index) => ({ part, transform: transforms[index] })),
+      rig.worldRest.head,
+      rig.heightScale,
+    ),
+    rig.worldRest.head,
+    rig.nodeScale.head ?? [1, 1, 1],
+    rig.heightScale,
+  );
+
+  const jointBase = rig.bones.length;
+
+  /**
+   * 파츠 하나의 스킨을 축 방향 파라미터의 함수로 준다.
+   *
+   * **헤어는 전부 헤어 조인트에 묶는다** — 흔들리지 않는 캡·정수리 파츠도 고정 앵커에
+   * 묶어 역스케일 피벗 아래에 둔다. `head` 에 직접 묶으면 그 노드의 조형 스케일이
+   * 한 번 더 걸려, 이미 조형 좌표로 저작한 헤어가 두 배로 커진다.
+   */
+  const skinFor = (partId: string): ((t: number) => MeshSkinBinding) => {
+    const binding = hairRig?.bindings.get(partId);
+    if (binding === undefined) return () => skin;
+    if (binding.kind === "rigid") {
+      const joint: MeshSkinBinding = [[jointBase + binding.jointOffset, 1]];
+      return () => joint;
+    }
+    return (t) => hairChainSkin(binding.chain, jointBase, t);
+  };
+
   parts.forEach((part, index) => {
     // 파츠마다 세로 띠 하나씩 — 같은 머티리얼을 쓰므로 UV 가 겹치면 안 된다.
     const uvRect: MeshUvRect = [0, index / parts.length, 1, (index + 1) / parts.length];
-    const transform = fitHairPartToSkull(
-      part,
-      hairPartTransform(part, rig.head),
-      rig.head,
-      state.hair.fringe,
-    );
+    const transform = transforms[index];
+    const partSkin = skinFor(part.id);
     if (part.primitive === "tapered-capsule") {
-      addHairStrand(builder, part, transform, skin, uvRect);
+      addHairStrand(builder, part, transform, partSkin, uvRect);
       return;
     }
     if (part.role === "cap") {
       // 앞은 헤어라인에서 끊고 뒤는 목덜미까지 — 대칭 캡은 눈·눈썹까지 덮어 버린다.
-      addHairSphere(builder, transform, skin, uvRect, {
+      addHairSphere(builder, transform, partSkin, uvRect, {
         columns: HAIR_CAP_COLUMNS,
         rows: HAIR_CAP_ROWS,
         thetaFront: Math.PI * 0.4,
@@ -1450,14 +1508,38 @@ function buildHair(rig: StudioVrmRig, state: AvatarForgeState): SurfaceBuilder |
       });
       return;
     }
-    addHairSphere(builder, transform, skin, uvRect, {
+    addHairSphere(builder, transform, partSkin, uvRect, {
       columns: HAIR_SPHERE_COLUMNS,
       rows: HAIR_SPHERE_ROWS,
       thetaFront: Math.PI,
       thetaBack: Math.PI,
     });
   });
-  return builder;
+
+  // 마지막에 **머리 조형 스케일**을 한 번에 얹는다.
+  //
+  // 두상 메시는 `head` 조인트에 묶여 런타임에 `T·S·T⁻¹` 로 커지지만, 헤어는 역스케일 피벗
+  // 아래라 그 스케일을 받지 않는다 — 저작 단계에서 반영하지 않으면 두신비를 키웠을 때
+  // 머리카락만 원래 크기로 남아 커진 두개골 속에 파묻힌다(두신비 2.5 에서 체인 묶임 정점의
+  // 67~100%).
+  //
+  // 파츠 스케일에 미리 곱해 넣을 수는 없다. 파츠에 회전이 있으면 `R·S ≠ S·R` 이라
+  // 파츠 로컬 TRS 로는 표현할 수 없는 변환이고, 실제로 배포 프리셋에서 0.2~1.9mm,
+  // 얼굴 비율 극단에서 4.7mm 어긋났다. 저작이 끝난 정점에 직접 적용해야 정확하다.
+  shapeAboutHead(builder, rig);
+  return { builder, hairRig };
+}
+
+/** 저작이 끝난 헤어 정점에 머리 조형 스케일(`T·S·T⁻¹`)을 얹는다. */
+function shapeAboutHead(builder: SurfaceBuilder, rig: StudioVrmRig): void {
+  const scale = rig.nodeScale.head ?? [1, 1, 1];
+  if (scale[0] === 1 && scale[1] === 1 && scale[2] === 1) return;
+  const joint = rig.worldRest.head;
+  builder.transformPositions(([x, y, z]) => [
+    joint[0] + (x - joint[0]) * scale[0],
+    joint[1] + (y - joint[1]) * scale[1],
+    joint[2] + (z - joint[2]) * scale[2],
+  ]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1584,6 +1666,11 @@ export type StudioVrmHumanoidMesh = {
   /** `parts` 안에서 표정 모프를 들고 있는 파트의 인덱스. */
   readonly facePartIndex: number;
   readonly morphTargetNames: readonly string[];
+  /**
+   * 헤어 가닥이 매달린 체인 조인트. 가닥이 없으면(짧은 머리·헤어 없음) `null`.
+   * 스킨 `joints` 는 휴머노이드 15본 **뒤에** 이 순서대로 이어 붙는다.
+   */
+  readonly hairRig: StudioVrmHairRig | null;
 };
 
 function primitiveOf(
@@ -1655,7 +1742,7 @@ export function buildStudioVrmHumanoidMesh(state: AvatarForgeState): StudioVrmHu
     parts.push({
       nodeName: "Hair",
       meshName: "Hair",
-      primitives: [primitiveOf(hair, STUDIO_VRM_HUMANOID_MATERIALS.hair)],
+      primitives: [primitiveOf(hair.builder, STUDIO_VRM_HUMANOID_MATERIALS.hair)],
     });
   }
 
@@ -1684,5 +1771,6 @@ export function buildStudioVrmHumanoidMesh(state: AvatarForgeState): StudioVrmHu
     parts,
     facePartIndex,
     morphTargetNames: STUDIO_VRM_HUMANOID_MORPH_TARGET_NAMES,
+    hairRig: hair?.hairRig ?? null,
   };
 }
