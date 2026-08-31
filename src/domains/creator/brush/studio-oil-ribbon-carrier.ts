@@ -1978,7 +1978,6 @@ class StudioImpastoReliefFieldPlanner {
       // different offset. Rounding is safe because both origins are multiples of the same cell.
       const shiftX = Math.round((previous!.originX - grid.originX) / grid.cell);
       const shiftY = Math.round((previous!.originY - grid.originY) / grid.cell);
-      probe.blit += 1;
       this.settledFilm = blitImpastoLayer(this.settledFilm!, previous!, grid, shiftX, shiftY);
       this.settledRidge = blitImpastoLayer(this.settledRidge!, previous!, grid, shiftX, shiftY);
     }
