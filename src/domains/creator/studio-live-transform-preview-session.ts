@@ -63,6 +63,14 @@ export interface CreateStudioLiveTransformPreviewSessionOptions {
   readonly onFatalError?: (error: unknown) => void;
 }
 
+type StudioLiveTransformNeutralizationResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly error: unknown };
+
+const STUDIO_LIVE_TRANSFORM_NEUTRALIZED: StudioLiveTransformNeutralizationResult = {
+  ok: true,
+};
+
 function sameAttrs(
   left: StudioLiveTransformPreviewNodeAttrs | null,
   right: StudioLiveTransformPreviewNodeAttrs,
@@ -105,18 +113,18 @@ export function createStudioLiveTransformPreviewSession(
     }
   };
 
-  const forceNeutralize = (): boolean => {
+  const forceNeutralize = (): StudioLiveTransformNeutralizationResult => {
     try {
       options.adapter.neutralize();
-      return true;
+      return STUDIO_LIVE_TRANSFORM_NEUTRALIZED;
     } catch (error) {
       reportError(error);
-      return false;
+      return { ok: false, error };
     }
   };
 
-  const neutralize = (): boolean => {
-    if (presentationKind === "none") return true;
+  const neutralize = (): StudioLiveTransformNeutralizationResult => {
+    if (presentationKind === "none") return STUDIO_LIVE_TRANSFORM_NEUTRALIZED;
     const neutralized = forceNeutralize();
     presentedAttrs = null;
     presentationKind = "none";
@@ -160,7 +168,8 @@ export function createStudioLiveTransformPreviewSession(
           }
         } catch (error) {
           reportError(error);
-          if (!forceNeutralize()) {
+          const neutralized = forceNeutralize();
+          if (!neutralized.ok) {
             failFatally(error);
             return;
           }
@@ -168,7 +177,13 @@ export function createStudioLiveTransformPreviewSession(
           presentationKind = "none";
           return;
         }
-        neutralize();
+        const neutralized = neutralize();
+        if (!neutralized.ok) {
+          // `applyExact === false` is safe only after the previously presented authority has been
+          // restored. If that handoff fails, stop accepting frames and make the gesture owner
+          // cancel; continuing could leave stale affine ink or a partially cleared exact draft.
+          failFatally(neutralized.error);
+        }
       }
       return;
     }
@@ -182,7 +197,8 @@ export function createStudioLiveTransformPreviewSession(
       reportError(error);
       // `apply` may have completed only some scene writes. Best-effort neutralization makes the
       // next frame and the caller's eventual cleanup start from the document-authored pose.
-      if (!forceNeutralize()) {
+      const neutralized = forceNeutralize();
+      if (!neutralized.ok) {
         failFatally(error);
         return;
       }
@@ -212,7 +228,8 @@ export function createStudioLiveTransformPreviewSession(
       reportError(error);
       scheduledFrame = null;
       pending = null;
-      if (!neutralize()) {
+      const neutralized = neutralize();
+      if (!neutralized.ok) {
         failFatally(error);
       } else {
         disposed = true;

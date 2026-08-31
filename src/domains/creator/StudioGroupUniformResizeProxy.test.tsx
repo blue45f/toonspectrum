@@ -110,12 +110,13 @@ function createWrapperNode(
   const layer = {
     batchDraw: vi.fn(),
     drawScene: vi.fn(),
+    getNativeCanvasElement: vi.fn(() => ({
+      // Native canvas dimensions are physical backing pixels, not CSS/logical dimensions.
+      width: 1_920,
+      height: 1_080,
+    })),
     getCanvas: vi.fn(() => ({
       getPixelRatio: vi.fn(() => 1),
-      // Exact-draft admission is fail-closed when the backing footprint is unknown. Keep this
-      // fixture representative of a normally sized, renderer-owned Konva scene canvas.
-      getWidth: vi.fn(() => 1_920),
-      getHeight: vi.fn(() => 1_080),
     })),
   };
   return {

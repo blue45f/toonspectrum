@@ -199,14 +199,18 @@ function studioLiveTransformRasterMetrics(
   node: Konva.Node,
 ): StudioLiveTransformRasterMetrics {
   const stageScale = Math.max(Math.abs(stage.scaleX()), Math.abs(stage.scaleY()));
-  const sceneCanvas = node.getLayer()?.getCanvas();
+  const sourceLayer = node.getLayer();
+  const sceneCanvas = sourceLayer?.getCanvas();
+  const nativeSceneCanvas = sourceLayer?.getNativeCanvasElement();
   const pixelRatio = sceneCanvas?.getPixelRatio() ?? studioKonvaRuntime.pixelRatio;
   return {
     rasterScale: stageScale * pixelRatio,
-    // Konva Canvas.getWidth/getHeight are the HTML canvas backing dimensions, already multiplied
-    // by pixelRatio. Missing ownership becomes NaN and is rejected by the pure admission gate.
-    sceneCanvasBackingPixels: sceneCanvas
-      ? sceneCanvas.getWidth() * sceneCanvas.getHeight()
+    // Charge the browser's actual backing allocation directly. Konva 10.3 also exposes these
+    // physical dimensions through Canvas.getWidth/getHeight, but the native element avoids
+    // mistaking that API for CSS/logical dimensions and accidentally dropping the DPR² cost.
+    // Missing ownership becomes NaN and is rejected by the pure admission gate.
+    sceneCanvasBackingPixels: nativeSceneCanvas
+      ? nativeSceneCanvas.width * nativeSceneCanvas.height
       : Number.NaN,
   };
 }

@@ -299,30 +299,83 @@ function useStudioPerfectFreehandStroker(wanted: boolean): StudioPerfectFreehand
   return wanted ? stroker : null;
 }
 
+const STUDIO_DRAW_PATTERN_IMAGE_CACHE_LIMIT = 128;
+const resolvedPatternTileImages = new Map<string, HTMLImageElement>();
+const pendingPatternTileImageLoads = new Map<string, Promise<HTMLImageElement>>();
+
+function cacheResolvedPatternTileImage(tileSrc: string, image: HTMLImageElement): void {
+  if (!resolvedPatternTileImages.has(tileSrc)) {
+    while (resolvedPatternTileImages.size >= STUDIO_DRAW_PATTERN_IMAGE_CACHE_LIMIT) {
+      const oldestTileSrc = resolvedPatternTileImages.keys().next().value;
+      if (typeof oldestTileSrc !== "string") break;
+      resolvedPatternTileImages.delete(oldestTileSrc);
+    }
+  }
+  resolvedPatternTileImages.set(tileSrc, image);
+}
+
+function loadSharedPatternTileImage(tileSrc: string): Promise<HTMLImageElement> {
+  const resolved = resolvedPatternTileImages.get(tileSrc);
+  if (resolved) return Promise.resolve(resolved);
+  const pending = pendingPatternTileImageLoads.get(tileSrc);
+  if (pending) return pending;
+
+  const request = loadPatternTileImage(tileSrc, () => new globalThis.Image()).then(
+    (image) => {
+      cacheResolvedPatternTileImage(tileSrc, image);
+      pendingPatternTileImageLoads.delete(tileSrc);
+      return image;
+    },
+    (error: unknown) => {
+      pendingPatternTileImageLoads.delete(tileSrc);
+      throw error;
+    },
+  );
+  pendingPatternTileImageLoads.set(tileSrc, request);
+  return request;
+}
+
 // 패턴 채우기 타일 이미지 훅 — 패턴 스펙의 SVG 타일(data URL)을 HTMLImage로 비동기 로드한다.
 // UrlImage의 effect 로드 방식을 훅으로 컴포넌트화한 것. 타일 src는 patternId/색에만
-// 의존하므로(배율은 fillPatternScale로 적용) 배율 조절로는 재로드되지 않는다.
+// 의존하므로(배율은 fillPatternScale로 적용) 배율 조절로는 재로드되지 않는다. 문서 노드가
+// 이미 해결한 타일은 transform-draft가 같은 이미지 객체를 첫 렌더부터 재사용한다. 캐시가
+// 차가워도 동일 src의 진행 중 요청을 공유하며, bounded cache라 문서별 색 조합이 누적되지 않는다.
 // 로드 전/실패 시 null → konvaPatternProps가 no-op이 되어 fill/그라데이션 폴백 유지.
 function usePatternFillImage(pattern: StudioPatternSpec | undefined): HTMLImageElement | null {
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [loaded, setLoaded] = useState<{
+    image: HTMLImageElement;
+    tileSrc: string;
+  } | null>(null);
   const tileSrc = pattern ? patternDataUrl(pattern) : null;
+  const image = tileSrc
+    ? (loaded?.tileSrc === tileSrc ? loaded.image : null)
+      ?? resolvedPatternTileImages.get(tileSrc)
+      ?? null
+    : null;
   useEffect(() => {
-    if (!tileSrc) {
-      setImage(null);
+    if (!tileSrc) return;
+    const resolved = resolvedPatternTileImages.get(tileSrc);
+    if (resolved) {
+      // A cache hit must be visible on the first render, but the mounted node also retains its own
+      // reference so a later bounded-cache eviction cannot make an existing pattern disappear.
+      if (loaded?.tileSrc !== tileSrc || loaded.image !== resolved) {
+        setLoaded({ image: resolved, tileSrc });
+      }
       return;
     }
+    if (loaded?.tileSrc === tileSrc) return;
     let active = true;
-    loadPatternTileImage(tileSrc, () => new globalThis.Image())
+    loadSharedPatternTileImage(tileSrc)
       .then((img) => {
-        if (active) setImage(img);
+        if (active) setLoaded({ image: img, tileSrc });
       })
       .catch(() => {
-        if (active) setImage(null);
+        // 로드 실패 시 현재 fill/gradient 폴백을 유지하고 다음 마운트가 재시도한다.
       });
     return () => {
       active = false;
     };
-  }, [tileSrc]);
+  }, [loaded, tileSrc]);
   return image;
 }
 
@@ -356,11 +409,17 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const durableDocumentRender = resolvedRenderPurpose === "document";
   const kind = el.kind ?? "freehand";
   // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
-  // A transform draft is a renderer-local copy of an already-resolved stroke. It must not start
-  // an asynchronous asset load merely because a legacy/freehand element carries a stale pattern
-  // field that its render route does not consume.
+  // 실제 fillPattern props를 쓰는 도형만 타일을 요청한다. 따라서 exact transform draft는
+  // 문서 렌더의 resolved tile을 재사용하고, legacy/freehand의 stale pattern 필드는 어떤
+  // render purpose에서도 불필요한 비동기 로드를 시작하지 않는다.
   const patternImage = usePatternFillImage(
-    resolvedRenderPurpose === "transform-draft" ? undefined : el.pattern,
+    kind === "rect"
+      || kind === "ellipse"
+      || kind === "star"
+      || kind === "triangle"
+      || kind === "polygon"
+      ? el.pattern
+      : undefined,
   );
   // Opt-in living-ink settled bake (2026-08-14 stall fix): the whole-stroke fluid solve is far
   // over the 33ms chunk budget, so committed bake-lane strokes render their byte-identical base

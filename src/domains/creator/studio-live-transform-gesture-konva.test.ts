@@ -405,10 +405,21 @@ describe("beginStudioKonvaDrawTransformGesture · exact model draft", () => {
   it("keeps a frame release-only when clearing the Layer SceneCanvas exceeds the backing cap", () => {
     // The object-local transformed AABB is under 0.5M pixels at this scale. The isolated Layer's
     // 720x1020 Retina-3 SceneCanvas is 6.6M backing pixels, so only the full-clear charge rejects.
-    scene.dragLayer.getCanvas().setPixelRatio(3);
-    expect(
-      scene.dragLayer.getCanvas().getWidth() * scene.dragLayer.getCanvas().getHeight(),
-    ).toBeGreaterThan(STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS);
+    const sceneCanvas = scene.dragLayer.getCanvas();
+    const nativeSceneCanvas = scene.dragLayer.getNativeCanvasElement();
+    sceneCanvas.setPixelRatio(3);
+
+    expect(720 * 1020).toBeLessThan(STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS);
+    expect(nativeSceneCanvas.style.width).toBe("720px");
+    expect(nativeSceneCanvas.style.height).toBe("1020px");
+    expect(nativeSceneCanvas.width).toBe(720 * 3);
+    expect(nativeSceneCanvas.height).toBe(1020 * 3);
+    expect(nativeSceneCanvas.width * nativeSceneCanvas.height).toBe(
+      720 * 1020 * 3 ** 2,
+    );
+    expect(nativeSceneCanvas.width * nativeSceneCanvas.height).toBeGreaterThan(
+      STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS,
+    );
     const { gesture, store, clock } = beginGesture();
 
     gesture.offer({

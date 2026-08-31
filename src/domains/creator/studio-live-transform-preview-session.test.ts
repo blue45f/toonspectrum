@@ -151,6 +151,56 @@ describe("createStudioLiveTransformPreviewSession", () => {
     expect(apply).not.toHaveBeenCalled();
   });
 
+  it("fails fatally when an exact rejection cannot neutralize an earlier presentation", () => {
+    const clock = manualScheduler();
+    const neutralizeError = new Error("renderer authority rollback failed");
+    const apply = vi.fn();
+    const applyExact = vi.fn(() => false);
+    const neutralize = vi.fn(() => {
+      throw neutralizeError;
+    });
+    const onError = vi.fn();
+    const onFatalError = vi.fn();
+    const session = createStudioLiveTransformPreviewSession({
+      sourceBounds,
+      scheduler: clock.scheduler,
+      adapter: { apply, applyExact, neutralize },
+      onError,
+      onFatalError,
+    });
+
+    // Establish renderer authority through a valid retained-affine presentation first.
+    session.push({
+      targetBounds: { x: 20, y: 30, width: 200, height: 100 },
+      rotationDeg: 0,
+    });
+    clock.flush();
+    expect(apply).toHaveBeenCalledTimes(1);
+
+    // This valid non-uniform frame asks the exact adapter, which rejects admission. Returning to
+    // release-only requires neutralizing the prior affine authority; that rollback now fails.
+    session.push({
+      targetBounds: { x: 30, y: 40, width: 200, height: 75 },
+      rotationDeg: 0,
+    });
+    clock.flush();
+
+    expect(applyExact).toHaveBeenCalledTimes(1);
+    expect(neutralize).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(neutralizeError);
+    expect(onFatalError).toHaveBeenCalledWith(neutralizeError);
+    expect(onFatalError).toHaveBeenCalledTimes(1);
+
+    // Fatal authority loss disposes this generation; later handle events cannot write again.
+    session.push({
+      targetBounds: { x: 40, y: 50, width: 300, height: 150 },
+      rotationDeg: 10,
+    });
+    clock.flush();
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(clock.pendingCount()).toBe(0);
+  });
+
   it("switches exact and affine presentations through adapter-owned cleanup", () => {
     const clock = manualScheduler();
     const calls: string[] = [];
