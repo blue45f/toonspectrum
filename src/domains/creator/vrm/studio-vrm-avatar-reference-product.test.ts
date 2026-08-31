@@ -126,7 +126,7 @@ describe("Avatar reference recommendation product authority", () => {
     const admitted = admitStudioVrmAvatarReferenceCatalogueEnvelope(JSON.parse(decoded));
     expect(admitted).not.toBeNull();
     expect(admitted?.catalogue.catalogueRevision)
-      .toBe("avatar-forge-reference-v1-3ad947d6f235797b");
+      .toBe("avatar-forge-reference-v1-01dcc4ab132d7920");
     expect(admitted?.catalogue.entries).toHaveLength(21);
     expect(admitted?.catalogue.entries[0]?.embedding).toMatchObject({
       headIndex: STUDIO_VRM_AVATAR_REFERENCE_EMBEDDING_AUTHORITY.headIndex,
