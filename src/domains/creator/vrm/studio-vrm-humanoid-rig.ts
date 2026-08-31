@@ -245,6 +245,8 @@ export type StudioVrmRig = {
   readonly worldRest: Readonly<Record<StudioVrmRigBone, StudioVrmRigVec3>>;
   /** 말단 본에만 붙는 조형 스케일. */
   readonly nodeScale: Readonly<Partial<Record<StudioVrmRigBone, StudioVrmRigVec3>>>;
+  /** 손 크기. 노드 스케일이 아니라 관절 간격과 메시 굵기에 굽혀 들어간다. */
+  readonly handScale: number;
   /** 스킨 `joints` 배열에서의 인덱스(= bones 배열 인덱스). */
   readonly jointIndex: Readonly<Record<StudioVrmRigBone, number>>;
   readonly head: StudioVrmRigHeadFit;
@@ -295,10 +297,11 @@ type FingerSegments = {
  * 손 노드에는 균등 `handScale` 이 붙어 있고 월드 rest 누적이 조상 스케일을 반영하므로,
  * 손가락은 손과 함께 커진다.
  */
-function fingerSegments(side: 1 | -1, height: number): FingerSegments {
+function fingerSegments(side: 1 | -1, height: number, hand: number): FingerSegments {
   const n = STUDIO_VRM_RIG_NEUTRAL;
-  const palm = n.palmLength * height;
-  const spread = n.fingerSpread * height;
+  const scale = height * hand;
+  const palm = n.palmLength * scale;
+  const spread = n.fingerSpread * scale;
   // 마디 길이(중립 m). 뿌리 → 중간 → 끝 순으로 짧아진다.
   const lengths = {
     index: [0.024, 0.015],
@@ -310,19 +313,19 @@ function fingerSegments(side: 1 | -1, height: number): FingerSegments {
   const splayX = Math.cos(n.thumbSplay);
   const splayZ = Math.sin(n.thumbSplay);
   return {
-    thumbBase: [n.thumbBase * height * side, 0, n.thumbBaseForward * height],
+    thumbBase: [n.thumbBase * scale * side, 0, n.thumbBaseForward * scale],
     thumb: (index) => [
-      lengths.thumb[index] * height * splayX * side,
+      lengths.thumb[index] * scale * splayX * side,
       0,
-      lengths.thumb[index] * height * splayZ,
+      lengths.thumb[index] * scale * splayZ,
     ],
     knuckle: (lane) => [palm * side, 0, spread * lane],
-    straight: (finger, index) => [lengths[finger][index] * height * side, 0, 0],
+    straight: (finger, index) => [lengths[finger][index] * scale * side, 0, 0],
   };
 }
 
-function leftFingerLocalTranslations(height: number) {
-  const f = fingerSegments(1, height);
+function leftFingerLocalTranslations(height: number, hand: number) {
+  const f = fingerSegments(1, height, hand);
   return {
     leftThumbMetacarpal: f.thumbBase,
     leftThumbProximal: f.thumb(0),
@@ -342,8 +345,8 @@ function leftFingerLocalTranslations(height: number) {
   };
 }
 
-function rightFingerLocalTranslations(height: number) {
-  const f = fingerSegments(-1, height);
+function rightFingerLocalTranslations(height: number, hand: number) {
+  const f = fingerSegments(-1, height, hand);
   return {
     rightThumbMetacarpal: f.thumbBase,
     rightThumbProximal: f.thumb(0),
@@ -390,6 +393,11 @@ export function buildStudioVrmRig(input: {
   const shin = n.shin * p.legLength * height;
   // 다리가 길어져도 발바닥이 지면(y=0)에 남도록 골반을 같이 올린다.
   const hipHeight = (n.hipHeight + (n.thigh + n.shin) * (p.legLength - 1)) * height;
+  // 손 크기는 **기하에 굽는다**. 노드 스케일로 두면 손가락이 그 아래에 있으므로, 저작이 이미
+  // 스케일된 관절 위치를 쓰는 데다 바인드가 관절 기준으로 스케일을 한 번 더 적용해 손바닥이
+  // 배로 늘어난다(handScale 1.5 에서 손바닥 뻗음 2.25배). 머리처럼 자식이 없는 말단이라야
+  // 노드 스케일이 안전하다.
+  const handScale = clamp(p.handScale, 0.6, 1.6);
 
   const local: Record<StudioVrmRigBone, StudioVrmRigVec3> = {
     hips: [0, hipHeight, 0],
@@ -407,8 +415,8 @@ export function buildStudioVrmRig(input: {
     rightUpperLeg: [-hipHalf, 0, 0],
     rightLowerLeg: [0, -thigh, 0],
     rightFoot: [0, -shin, 0],
-    ...leftFingerLocalTranslations(height),
-    ...rightFingerLocalTranslations(height),
+    ...leftFingerLocalTranslations(height, handScale),
+    ...rightFingerLocalTranslations(height, handScale),
   };
 
   const face = input.face ?? {};
@@ -419,8 +427,6 @@ export function buildStudioVrmRig(input: {
 
   const nodeScale: Partial<Record<StudioVrmRigBone, StudioVrmRigVec3>> = {
     head: [headWidth * headScale, headHeight * headScale, headDepth * headScale],
-    leftHand: uniform(p.handScale),
-    rightHand: uniform(p.handScale),
     leftFoot: uniform(p.footScale),
     rightFoot: uniform(p.footScale),
   };
@@ -456,6 +462,7 @@ export function buildStudioVrmRig(input: {
     localTranslation: local,
     worldRest: world,
     nodeScale,
+    handScale,
     jointIndex: Object.fromEntries(
       STUDIO_VRM_RIG_BONES.map((bone, index) => [bone, index]),
     ) as Record<StudioVrmRigBone, number>,

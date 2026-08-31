@@ -571,6 +571,39 @@ describe("studio-vrm-proportion-rig-runtime", () => {
     expect(sculpted.scale.y / 0.94).toBeCloseTo(sculpted.scale.z / 1, 12);
   });
 
+  it("rejects a non-uniform leaf scale that a non-humanoid child would inherit", () => {
+    // 휴머노이드 소속 여부는 기준이 아니다. 눈·턱 본이 없는 머리라도 액세서리나 스프링 계층을
+    // 이고 있을 수 있고, 거기서 회전이 일어나면 전단을 물려받는다. 안전한 것은 자식이 비균등
+    // 성분을 **상쇄**할 때뿐이다 — 생성 아바타의 역스케일 피벗이 하는 일이다.
+    const withChild = (childScale: readonly [number, number, number]) => {
+      const fixture = createRigFixture();
+      const leaf = [...fixture.nodes.entries()].find(
+        ([, node]) =>
+          ![...fixture.nodes.values()].some((other) => other !== node && isDescendant(other, node)),
+      );
+      expect(leaf).toBeDefined();
+      if (!leaf) return null;
+      const [, sculpted] = leaf;
+      sculpted.scale.set(1.25, 0.8, 1);
+      const child = new THREE.Object3D();
+      child.scale.set(childScale[0], childScale[1], childScale[2]);
+      sculpted.add(child);
+      sculpted.updateMatrix();
+      fixture.root.updateMatrixWorld(true);
+      return createStudioVrmProportionRigRuntime(fixture.adapter, {
+        headLength: fixture.headLength,
+      });
+    };
+
+    const bare = withChild([1, 1, 1]);
+    expect(bare?.ok, "상쇄하지 않는 자식이 있는데 비균등 조형을 허용했다").toBe(false);
+    if (bare && !bare.ok) expect(bare.code).toBe("unsafe-transform");
+
+    // 역스케일 피벗이 비균등 성분을 되돌리면 전단이 전파될 수 없다.
+    const pivoted = withChild([1 / 1.25, 1 / 0.8, 1]);
+    expect(pivoted?.ok, "역스케일 피벗이 있는데도 거부했다").toBe(true);
+  });
+
   it("rejects a non-uniform scale on a bone that carries another humanoid bone", () => {
     // The leaf licence must not extend to a carrying frame: a rotated descendant would inherit shear.
     const fixture = createRigFixture();

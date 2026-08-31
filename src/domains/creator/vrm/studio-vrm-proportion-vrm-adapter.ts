@@ -173,6 +173,7 @@ export function measureStudioVrmProportionHeadLength(
  * the live values in place would compound across slider moves.
  */
 type CapturedColliderShape = {
+  readonly collider: THREE.Object3D;
   readonly shape: {
     offset?: THREE.Vector3;
     tail?: THREE.Vector3;
@@ -180,8 +181,17 @@ type CapturedColliderShape = {
   };
   readonly offset: THREE.Vector3 | null;
   readonly tail: THREE.Vector3 | null;
-  readonly radius: number | null;
+  /** The collider node's world scale at rest, so inherited scaling can be divided back out. */
+  readonly restWorldScale: number;
 };
+
+function worldScaleOf(node: THREE.Object3D): number {
+  node.updateWorldMatrix(true, false);
+  const scale = new THREE.Vector3();
+  node.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+  const average = (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3;
+  return Number.isFinite(average) && average > 0 ? average : 1;
+}
 
 /**
  * Captures every spring-bone collider's authored shape.
@@ -191,34 +201,43 @@ type CapturedColliderShape = {
  */
 function captureSpringBoneColliderShapes(vrm: VRM): readonly CapturedColliderShape[] {
   const colliders = vrm.springBoneManager?.colliders ?? [];
+  if (colliders.length > 0) vrm.scene.updateMatrixWorld(true);
   const captured: CapturedColliderShape[] = [];
   for (const collider of colliders) {
     const shape = (collider as unknown as { shape?: CapturedColliderShape["shape"] }).shape;
     if (!shape) continue;
     captured.push({
+      collider,
       shape,
       offset: shape.offset ? shape.offset.clone() : null,
       tail: shape.tail ? shape.tail.clone() : null,
-      radius: typeof shape.radius === "number" ? shape.radius : null,
+      restWorldScale: worldScaleOf(collider),
     });
   }
   return captured;
 }
 
 /**
- * Resizes collider geometry to a body scaled by `uniformScale`.
+ * Resizes collider geometry for a body whose joint spacing changed by `uniformScale`.
  *
- * Collider shapes live in their node's local space, and the proportion runtime translates joints
- * without ever scaling the frames colliders hang from -- only `head`, the hands and the feet take a
- * scale, and a collider under those already rides it through the scene graph. So everything else
- * keeps the size it was authored at while the body grows around it: at `overallHeight` 1.6 the
- * generated torso capsule ended 17 cm below the shoulders it was authored to reach.
+ * Two things have to be kept apart.
  *
- * Only the uniform body scale is applied. Girth is not a proportion parameter -- the model is
- * "translate joints, never stretch bones" -- so a slider that only redistributes length (say
- * `torsoLength`) legitimately leaves collider geometry alone, and a capsule spanning two joints
- * then keeps its size while the span between them shifts. That residual is bounded by the
- * redistribution itself (~4 cm at the hips for `torsoLength` 1.5) and is not what this corrects.
+ * **What the scene graph already did.** A collider hanging under a node that itself took a scale
+ * rides that scale for free — the generated skull capsules sit under `HairRoot` below `head`, and
+ * `head` is one of the few bones this runtime scales. Multiplying their local values as well made
+ * them 2.56× at `overallHeight` 1.6 while the hair around them grew 1.6×. So the inherited factor
+ * is divided back out.
+ *
+ * **What the proportion model does not do.** It moves joints apart; it does not make the body
+ * thicker. Torso vertices weighted to `hips`/`spine` keep their exact cross-section at every
+ * height. So the axis moves with the joints and the **radius does not move at all** — scaling it
+ * would have made the torso capsule 60% wider than the torso it rides on, pushing hair off the back.
+ *
+ * The one thing this cannot recover is an authored inset: the generated torso capsule tucks its
+ * endpoints in by its own radius so the capsule's outer extent lands on the hips and shoulders, and
+ * with the radius now fixed that inset no longer scales. The residual is bounded by
+ * `(uniformScale - 1) x radius` — about 3.7cm at 1.6x on a 58cm torso, against the 17cm the capsule
+ * was off by before any of this.
  */
 function resizeSpringBoneColliderShapes(
   captured: readonly CapturedColliderShape[],
@@ -226,9 +245,11 @@ function resizeSpringBoneColliderShapes(
 ): boolean {
   if (!Number.isFinite(uniformScale) || uniformScale <= 0) return false;
   for (const entry of captured) {
-    if (entry.offset) entry.shape.offset?.copy(entry.offset).multiplyScalar(uniformScale);
-    if (entry.tail) entry.shape.tail?.copy(entry.tail).multiplyScalar(uniformScale);
-    if (entry.radius !== null) entry.shape.radius = entry.radius * uniformScale;
+    const inherited = worldScaleOf(entry.collider) / entry.restWorldScale;
+    if (!Number.isFinite(inherited) || inherited <= 0) return false;
+    const axis = uniformScale / inherited;
+    if (entry.offset) entry.shape.offset?.copy(entry.offset).multiplyScalar(axis);
+    if (entry.tail) entry.shape.tail?.copy(entry.tail).multiplyScalar(axis);
   }
   return true;
 }

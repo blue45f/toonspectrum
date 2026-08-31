@@ -525,7 +525,9 @@ function buildHand(
   palmRect: MeshUvRect,
   thumbRect: MeshUvRect,
 ): void {
-  const unit = bodyUnit(rig);
+  // 손 굵기는 관절 간격과 같은 배율로 굽는다 — 노드 스케일이 아니라 기하에 들어가야
+  // 손가락이 바인드에서 한 번 더 스케일되지 않는다.
+  const unit = bodyUnit(rig) * rig.handScale;
   const hand = side > 0 ? "leftHand" : "rightHand";
   const lower = side > 0 ? "leftLowerArm" : "rightLowerArm";
   const prefix = side > 0 ? "left" : "right";
@@ -535,7 +537,7 @@ function buildHand(
   const palmReach = knuckleX - wristX;
 
   const stops: readonly (readonly [t: number, ry: number, rz: number, skin: MeshSkinBinding])[] = [
-    [0, 0.0165, 0.018, mix(rig, lower, hand, 0.6)],
+    [0, 0.0165 / rig.handScale, 0.018 / rig.handScale, mix(rig, lower, hand, 0.6)],
     [0.34, 0.015, 0.024, only(rig, hand)],
     [0.78, 0.0135, 0.025, only(rig, hand)],
     [1, 0.0125, 0.024, only(rig, hand)],

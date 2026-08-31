@@ -1,5 +1,5 @@
 import { VRMLoaderPlugin, type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
-import { Vector3, type Object3D } from "three";
+import { Quaternion, SkinnedMesh, Vector3, type Object3D } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { describe, expect, it } from "vitest";
 
@@ -348,19 +348,23 @@ describe("generate recipe → .vrm file reload", () => {
       expect(spring.colliderGroups, spring.name).toEqual([0, 1]);
     }
   });
-  it("keeps the torso capsule's outer extent between the hips and the shoulders", () => {
-    // 캡슐의 겉면은 끝점에서 반경만큼 더 뻗는다. 끝점을 어깨 높이에 그대로 두면 겉면이
-    // 어깨보다 반경(12cm)만큼 위로 솟아 목과 목덜미를 통째로 감쌌다.
-    const recipe = createStudioVrmGenerateRecipe({ presetId: "action-pony" });
-    const snapshot = buildStudioVrmGenerateAuthoringSnapshot(recipe);
-    const rig = buildStudioVrmHumanoidMesh(recipe.state).rig;
-    const torso = (snapshot.springBone?.colliders ?? [])[0];
-    if (!torso || torso.shape !== "capsule" || !torso.tail) throw new Error("expected a torso capsule");
-    const spineY = rig.worldRest.spine[1];
-    const bottom = spineY + torso.offset[1] - torso.radius;
-    const top = spineY + torso.tail[1] + torso.radius;
-    expect(bottom).toBeGreaterThan(rig.worldRest.hips[1] - 0.05);
-    expect(top).toBeLessThan(rig.worldRest.leftUpperArm[1] + 0.001);
+  it("keeps the torso capsule from swallowing the neck", () => {
+    // 캡슐의 겉면은 끝점에서 반경만큼 더 뻗는다. 예전에는 반경이 12cm 라 겉면이 어깨보다
+    // 그만큼 위로 솟아 목과 목덜미를 통째로 감쌌고, 정지 상태의 나페 머리가 그 안에 들어가
+    // 첫 프레임부터 3cm 밀려났다. 지금은 `fitRadiusInsideHair` 가 정지 헤어를 기준으로 반경을
+    // 직접 줄여 같은 일을 더 정확히 한다 — 겉면이 머리 관절까지 올라오면 안 된다.
+    for (const presetId of ["action-pony", "hime-noble", "natural-short"]) {
+      const recipe = createStudioVrmGenerateRecipe({ presetId });
+      const snapshot = buildStudioVrmGenerateAuthoringSnapshot(recipe);
+      const rig = buildStudioVrmHumanoidMesh(recipe.state).rig;
+      const torso = (snapshot.springBone?.colliders ?? [])[0];
+      if (!torso || torso.shape !== "capsule" || !torso.tail) {
+        throw new Error("expected a torso capsule");
+      }
+      const spineY = rig.worldRest.spine[1];
+      const top = spineY + Math.max(torso.offset[1], torso.tail[1]) + torso.radius;
+      expect(top, `${presetId}: 몸통 캡슐이 머리까지 올라왔다`).toBeLessThan(rig.worldRest.head[1]);
+    }
   });
 
   it("keeps every skull collider inside the hair it has to protect", () => {
@@ -418,23 +422,24 @@ describe("generate recipe → .vrm file reload", () => {
     60_000,
   );
 
-  it("keeps the torso capsule on the torso after the body is resized", async () => {
-    // Collider shapes live in their node's local space and `setInitState()` never touches them, so
-    // before this the capsule kept its authored size while the body grew around it: at
-    // `overallHeight` 1.6 its top ended 17cm below the shoulders it was authored to reach.
+  it("keeps the torso capsule's axis on the torso after the body is resized", async () => {
+    // 콜라이더 도형은 노드 로컬 좌표이고 `setInitState()` 는 조인트 rest 만 다시 잡으므로,
+    // 이전에는 몸이 커져도 캡슐이 저작 당시 크기 그대로였다 — `overallHeight` 1.6 에서 캡슐
+    // 축 위쪽이 어깨보다 15cm 아래에서 끝났다. 축 끝점은 엉덩이·어깨 관절을 따라가야 한다.
     const presetId = "hime-noble";
     const spans: number[] = [];
     for (const overallHeight of [1, 1.6]) {
       const vrm = await loadVrmBytes(
         exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
       );
-      const headLength = measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2;
       const adapter = createStudioVrmProportionVrmAdapter({
         vrm,
         getCurrentModelGeneration: () => 1,
         reapplyAuthoredPose: () => true,
       });
-      const created = createStudioVrmProportionRigRuntime(adapter, { headLength });
+      const created = createStudioVrmProportionRigRuntime(adapter, {
+        headLength: measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2,
+      });
       if (!created.ok) throw new Error(`${presetId}: ${created.message}`);
       expect(created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, overallHeight }).ok).toBe(
         true,
@@ -453,19 +458,71 @@ describe("generate recipe → .vrm file reload", () => {
       torso.updateWorldMatrix(true, false);
       const a = shape.offset.clone().applyMatrix4(torso.matrixWorld);
       const b = (shape.tail ?? shape.offset).clone().applyMatrix4(torso.matrixWorld);
-      const bottom = Math.min(a.y, b.y) - shape.radius;
-      const top = Math.max(a.y, b.y) + shape.radius;
-      // The capsule's outer extent must sit on the torso, not float above or below it.
-      expect(Math.abs(bottom - hips.y), `overallHeight ${overallHeight}: 캡슐 아래가 엉덩이를 벗어났다`).toBeLessThan(
-        0.04 * overallHeight,
+      const bottom = Math.min(a.y, b.y);
+      const top = Math.max(a.y, b.y);
+      // 축 끝점은 관절에 붙어 있다(저작 시 준 2cm 여유만큼만 안쪽).
+      expect(Math.abs(bottom - hips.y), `overallHeight ${overallHeight}: 캡슐 축 아래가 엉덩이를 벗어났다`).toBeLessThan(
+        0.03 * overallHeight,
       );
-      expect(Math.abs(top - shoulder.y), `overallHeight ${overallHeight}: 캡슐 위가 어깨를 벗어났다`).toBeLessThan(
-        0.04 * overallHeight,
+      expect(Math.abs(top - shoulder.y), `overallHeight ${overallHeight}: 캡슐 축 위가 어깨를 벗어났다`).toBeLessThan(
+        0.03 * overallHeight,
       );
       spans.push(top - bottom);
     }
-    // And the span tracks the body rather than staying frozen at its authored size.
+    // 그리고 축 길이가 몸을 따라간다 — 저작 당시 크기에 얼어붙지 않는다.
     expect(spans[1] / spans[0]).toBeCloseTo(1.6, 3);
+  }, 60_000);
+
+  it("scales each collider by what the body around it actually did", async () => {
+    // 두 가지를 갈라야 한다. 두개골 캡슐은 `HairRoot` 를 거쳐 `head` 아래에 있으므로 씬 그래프가
+    // 이미 스케일을 물려준다 — 로컬 값까지 곱하면 1.6배 대신 2.56배가 된다. 반대로 몸통은
+    // 관절만 벌어지고 굵기는 그대로다 — 반경까지 키우면 캡슐이 몸보다 60% 뚱뚱해진다.
+    const presetId = "hime-noble";
+    const measured: { torsoRadius: number; skullRadius: number; torsoSpan: number }[] = [];
+    for (const overallHeight of [1, 1.6]) {
+      const vrm = await loadVrmBytes(
+        exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
+      );
+      const adapter = createStudioVrmProportionVrmAdapter({
+        vrm,
+        getCurrentModelGeneration: () => 1,
+        reapplyAuthoredPose: () => true,
+      });
+      const created = createStudioVrmProportionRigRuntime(adapter, {
+        headLength: measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2,
+      });
+      if (!created.ok) throw new Error(created.message);
+      expect(created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, overallHeight }).ok).toBe(
+        true,
+      );
+      vrm.scene.updateMatrixWorld(true);
+      const colliders = [...(vrm.springBoneManager?.colliders ?? [])];
+      expect(colliders.length).toBeGreaterThanOrEqual(3);
+      const worldOf = (collider: Object3D): { radius: number; span: number } => {
+        const shape = (collider as unknown as {
+          shape: { offset: Vector3; tail?: Vector3; radius: number };
+        }).shape;
+        collider.updateWorldMatrix(true, false);
+        const scale = new Vector3();
+        collider.matrixWorld.decompose(new Vector3(), new Quaternion(), scale);
+        const a = shape.offset.clone().applyMatrix4(collider.matrixWorld);
+        const b = (shape.tail ?? shape.offset).clone().applyMatrix4(collider.matrixWorld);
+        return { radius: shape.radius * scale.x, span: a.distanceTo(b) };
+      };
+      const torso = worldOf(colliders[0]);
+      const skull = worldOf(colliders[1]);
+      measured.push({
+        torsoRadius: torso.radius,
+        skullRadius: skull.radius,
+        torsoSpan: torso.span,
+      });
+    }
+    const [rest, tall] = measured;
+    // 몸통: 축은 관절을 따라가고 굵기는 그대로.
+    expect(tall.torsoSpan / rest.torsoSpan, "몸통 캡슐 축이 관절을 따라가지 않았다").toBeCloseTo(1.6, 3);
+    expect(tall.torsoRadius, "몸통 캡슐이 몸보다 뚱뚱해졌다").toBeCloseTo(rest.torsoRadius, 6);
+    // 두개골: 머리가 실제로 커지므로 딱 그만큼만.
+    expect(tall.skullRadius / rest.skullRadius, "두개골 콜라이더가 두 번 커졌다").toBeCloseTo(1.6, 3);
   }, 60_000);
 
   it("gives the loaded humanoid finger bones that actually drive the hand mesh", async () => {
@@ -501,5 +558,52 @@ describe("generate recipe → .vrm file reload", () => {
     expect(after.distanceTo(before), "가운뎃손가락을 굽혔는데 끝마디가 움직이지 않았다").toBeGreaterThan(
       0.01,
     );
+  }, 60_000);
+
+  it("applies the hand size once, not twice", async () => {
+    // 손가락은 손 아래에 있다. 손 크기를 노드 스케일로 두면 저작이 이미 스케일된 관절 위치를
+    // 쓰는 데다 바인드가 관절 기준으로 한 번 더 적용해, handScale 1.5 에서 손바닥이 2.25배로
+    // 늘어나 너클보다 4.6cm 튀어나왔다.
+    const reach: number[] = [];
+    for (const handScale of [1, 1.5]) {
+      const base = createAvatarForgeState("natural-short");
+      const state = { ...base, proportions: { ...base.proportions, handScale } };
+      const vrm = await loadVrmBytes(
+        exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ state })),
+      );
+      vrm.scene.updateMatrixWorld(true);
+      const wrist = vrm.humanoid?.getRawBoneNode("leftHand")?.getWorldPosition(new Vector3());
+      if (!wrist) throw new Error("no wrist");
+      let body: SkinnedMesh | null = null;
+      vrm.scene.traverse((object) => {
+        if (object instanceof SkinnedMesh && /Body/i.test(`${object.name} ${object.parent?.name ?? ""}`)) {
+          body = object;
+        }
+      });
+      const skinned = body as SkinnedMesh | null;
+      if (!skinned) throw new Error("no body mesh");
+      skinned.updateMatrixWorld(true);
+      const palmBone = skinned.skeleton.bones.findIndex((bone) => bone.name === "leftHand");
+      expect(palmBone).toBeGreaterThanOrEqual(0);
+      const skinIndex = skinned.geometry.attributes.skinIndex;
+      const skinWeight = skinned.geometry.attributes.skinWeight;
+      const point = new Vector3();
+      let furthest = 0;
+      for (let vertex = 0; vertex < skinned.geometry.attributes.position.count; vertex += 1) {
+        let weight = 0;
+        for (let slot = 0; slot < 4; slot += 1) {
+          if (skinIndex.getComponent(vertex, slot) === palmBone) {
+            weight += skinWeight.getComponent(vertex, slot);
+          }
+        }
+        if (weight < 0.999) continue;
+        skinned.getVertexPosition(vertex, point);
+        point.applyMatrix4(skinned.matrixWorld);
+        furthest = Math.max(furthest, point.x - wrist.x);
+      }
+      expect(furthest).toBeGreaterThan(0);
+      reach.push(furthest);
+    }
+    expect(reach[1] / reach[0], "손 크기가 두 번 적용됐다").toBeCloseTo(1.5, 3);
   }, 60_000);
 });

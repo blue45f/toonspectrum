@@ -331,6 +331,28 @@ function hasSafeTransform(node: THREE.Object3D) {
 }
 
 /**
+ * True when a non-uniform scale on `node` cannot reach anything rotatable below it.
+ *
+ * Humanoid membership is not the test -- a head with no eye or jaw bones can still carry an
+ * accessory or spring hierarchy, and a rotation in there would inherit the shear. What makes the
+ * sculpt safe is that every immediate child cancels the non-uniform part, which is exactly what the
+ * generated avatar's inverse-scale `HairRoot` pivot does. A node with no children at all passes
+ * vacuously.
+ */
+function containsNonUniformScale(node: THREE.Object3D) {
+  if (isUniformPositiveScale(node.scale)) return true;
+  return node.children.every((child) =>
+    isUniformPositiveScale(
+      new THREE.Vector3(
+        node.scale.x * child.scale.x,
+        node.scale.y * child.scale.y,
+        node.scale.z * child.scale.z,
+      ),
+    ),
+  );
+}
+
+/**
  * A leaf bone -- one with no humanoid bone beneath it -- may carry a non-uniform rest scale. That
  * is the sculpting convention (`studio-vrm-humanoid-rig.ts`): shape lives on leaves so no rotated
  * child inherits shear. Everything else must still be finite, positive and invertible.
@@ -485,7 +507,7 @@ function captureHierarchy(
           ? hasSafeRootTransform(frame)
           : carryingFrames.has(frame)
             ? hasSafeTransform(frame)
-            : hasSafeLeafTransform(frame);
+            : hasSafeLeafTransform(frame) && containsNonUniformScale(frame);
       if (!safe) {
         return createFailure(
           "unsafe-transform",
@@ -634,7 +656,8 @@ function writeTargets(
       : allFinite(capture.node.scale.toArray()) &&
         capture.node.scale.x > 0 &&
         capture.node.scale.y > 0 &&
-        capture.node.scale.z > 0;
+        capture.node.scale.z > 0 &&
+        containsNonUniformScale(capture.node);
     if (!allFinite(capture.node.position.toArray()) || !scaleStaysSafe) {
       return false;
     }
