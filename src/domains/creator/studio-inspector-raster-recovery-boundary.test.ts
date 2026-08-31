@@ -22,7 +22,9 @@ function functionBody(source: string, name: string): string {
 
 describe("Studio inspector raster recovery boundary", () => {
   it("keeps professional pixel routes discoverable without pretending a raster target exists", () => {
-    expect(asideSource).toContain("imageToolsAvailable={!inspectorDrawing}");
+    expect(asideSource).toContain(
+      "selectedSupportsImageInspectorTabs || unselectedImageToolsVisible",
+    );
     expect(asideSource).toContain('aria-label="전문 픽셀 도구"');
     expect(asideSource).toContain("resolveStudioRasterToolAvailability");
     expect(asideSource).toContain("<StudioInspectorFilterLauncher");

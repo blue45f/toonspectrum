@@ -182,10 +182,7 @@ export function StudioInspectorDrawingSection({
     <>
           {inspectorContentMode === "drawing" && (
             <div
-              role="tabpanel"
-              aria-label="그리기 도구 설정"
               data-testid="studio-inspector-context-drawing-panel"
-              hidden={inspectorLayout.primary !== "properties"}
               className="min-h-0 lg:flex lg:flex-1 lg:flex-col"
             >
               <Suspense
@@ -206,6 +203,7 @@ export function StudioInspectorDrawingSection({
                   mobilePrimaryPaletteId={
                     isMobile ? "tool-properties" : undefined
                   }
+                  defaultPresentation={isMobile ? "full" : "icon-popup"}
                   onLayoutChange={changeDrawingPaletteLayout}
                   onDraggingChange={setDrawingPaletteDragging}
                   subTools={

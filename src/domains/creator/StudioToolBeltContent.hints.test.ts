@@ -144,6 +144,12 @@ describe("Studio ToolBelt rich hint coverage", () => {
   });
 
   it("keeps stateful actions on purpose-built previews instead of generic fallbacks", () => {
+    expect(allSource).toContain('aria-label="템플릿·에셋"');
+    expect(allSource).toContain('className="max-[359px]:hidden">템플릿·</span>에셋');
+    expect(allSource).toContain('aria-label="컷 추가 · 만화 패널"');
+    expect(allSource).toContain('/> 컷 추가');
+    expect(allSource).toContain('"컷 패널 추가",');
+
     for (const [key, preview, variant] of [
       ["panelAdd", "panel-layout", "add"],
       ["panelSplit", "panel-layout", "split-diagonal"],

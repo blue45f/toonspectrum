@@ -41,7 +41,7 @@ export function studioToolButtonClass(active: boolean, options?: { dense?: boole
     STUDIO_EASE,
     STUDIO_FOCUS_RING,
     options?.dense
-      ? "h-9 gap-1.5 px-2.5 text-[0.72rem] pointer-coarse:h-11 pointer-coarse:min-h-11 pointer-coarse:gap-1.5 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]"
+      ? "h-9 gap-1.5 px-2.5 text-[0.72rem] max-lg:h-11 max-lg:min-h-11 pointer-coarse:h-11 pointer-coarse:min-h-11 pointer-coarse:gap-1.5 pointer-coarse:px-3 pointer-coarse:text-[0.8125rem]"
       : cn("h-9 gap-1.5 px-2.5 text-xs", STUDIO_TOUCH_TARGET, "pointer-coarse:px-3"),
     active
       ? "border-accent/50 bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.16),0_1px_4px_oklch(0.72_0.185_42/0.1)]"

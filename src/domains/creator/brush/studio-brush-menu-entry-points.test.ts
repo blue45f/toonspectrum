@@ -11,6 +11,8 @@
  *    boundary tests use, because StudioPage cannot be imported in a unit test).
  */
 
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
@@ -22,11 +24,84 @@ import {
 } from "../studio-inspector-focus";
 import { buildStudioBrushMenuItems } from "../studio-main-menu-items-brush";
 
+import type { StudioInspectorFocusTarget } from "../studio-inspector-focus";
 import type {
   StudioMainMenuBuilderState,
   StudioMainMenuEditorActions,
   StudioMainMenuUiActions,
 } from "../studio-main-menu-contract";
+
+const FOCUS_TARGET_MOUNTS = {
+  "element.text-fill": {
+    path: "../StudioInspectorShapeSection.tsx",
+    markers: ['sectionId="element.text-fill"'],
+  },
+  "element.typography": {
+    path: "../StudioInspectorTypographySection.tsx",
+    markers: ['sectionId="element.typography"'],
+  },
+  "element.text-align": {
+    path: "../StudioInspectorSelectionSection.tsx",
+    markers: ['sectionId="element.text-align"'],
+  },
+  "element.layout": {
+    path: "../StudioInspectorSelectionSection.tsx",
+    markers: ['sectionId="element.layout"'],
+  },
+  "element.order-align": {
+    path: "../StudioInspectorOrderAlignSection.tsx",
+    markers: ['sectionId="element.order-align"'],
+  },
+  "selection.geometry": {
+    path: "../StudioFigmaDesignPanel.tsx",
+    markers: [
+      'useStudioInspectorFocusRequest("selection.geometry"',
+      'data-inspector-section="selection.geometry"',
+    ],
+  },
+  "palette.sub-tools": {
+    path: "./StudioDrawingPaletteStack.tsx",
+    markers: ['"palette.sub-tools": "sub-tools"'],
+  },
+  "palette.tool-properties": {
+    path: "./StudioDrawingPaletteStack.tsx",
+    markers: ['"palette.tool-properties": "tool-properties"'],
+  },
+  "tool.brush-studio": {
+    path: "../StudioInspectorDrawingSection.tsx",
+    markers: ['sectionId="tool.brush-studio"'],
+  },
+  "tool.brush-engines": {
+    path: "../StudioInspectorDrawingSection.tsx",
+    markers: ['sectionId="tool.brush-engines"'],
+  },
+  "brush.saved-library": {
+    path: "./StudioBrushLibraryPanel.tsx",
+    markers: [
+      'useStudioInspectorFocusScroll("brush.saved-library", sectionRef)',
+      "ref={sectionRef}",
+    ],
+  },
+  "canvas.surface": {
+    path: "../StudioInspectorCanvasControls.tsx",
+    markers: ['sectionId="canvas.surface"'],
+  },
+  "canvas.resize": {
+    path: "../StudioInspectorCanvasControls.tsx",
+    markers: ['sectionId="canvas.resize"'],
+  },
+  "canvas.guide-lines": {
+    path: "../StudioInspectorCanvasControls.tsx",
+    markers: ['sectionId="canvas.guide-lines"'],
+  },
+  "canvas.style": {
+    path: "../StudioInspectorCanvasControls.tsx",
+    markers: ['sectionId="canvas.style"'],
+  },
+} satisfies Readonly<Record<
+  StudioInspectorFocusTarget,
+  { readonly path: string; readonly markers: readonly string[] }
+>>;
 
 function pageSource(): string {
   return readStudioCuttoonEditorSource();
@@ -127,11 +202,15 @@ describe("StudioPage wires the Brush rows to real surfaces", () => {
 
 describe("inspector focus bus", () => {
   it("only serves targets that have a mount", () => {
-    expect([...STUDIO_INSPECTOR_FOCUS_TARGETS]).toEqual([
-      "tool.brush-studio",
-      "tool.brush-engines",
-      "brush.saved-library",
-    ]);
+    expect(Object.keys(FOCUS_TARGET_MOUNTS)).toEqual([...STUDIO_INSPECTOR_FOCUS_TARGETS]);
+
+    for (const target of STUDIO_INSPECTOR_FOCUS_TARGETS) {
+      const contract = FOCUS_TARGET_MOUNTS[target];
+      const source = readFileSync(new URL(contract.path, import.meta.url), "utf8");
+      for (const marker of contract.markers) {
+        expect(source, `${target} must mount ${marker}`).toContain(marker);
+      }
+    }
   });
 
   it("gives a repeat request a new token, so re-selecting a row reopens", () => {

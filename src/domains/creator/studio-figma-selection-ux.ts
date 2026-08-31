@@ -29,13 +29,18 @@ export interface StudioFigmaSelectionLayoutPatch {
 }
 
 export interface StudioFigmaSelectionLayoutMetrics {
+  /** Stable identity for clearing an uncommitted number when selection changes. */
+  readonly selectionKey: string;
   readonly x: number;
   readonly y: number;
   readonly width: number;
   readonly height: number;
   readonly rotation: number;
   readonly opacity: number;
+  readonly opacityMixed: boolean;
   readonly hasFixedSize: boolean;
+  readonly supportsWidth: boolean;
+  readonly supportsHeight: boolean;
   readonly supportsOpacity: boolean;
   readonly supportsRotation: boolean;
   /**
@@ -50,6 +55,8 @@ export interface StudioFigmaSelectionLayoutMetrics {
   readonly rotationIsRelative: boolean;
   /** Why W/H is inert, for the field's tooltip. Null when the field is live. */
   readonly sizeDisabledReason: string | null;
+  readonly widthDisabledReason: string | null;
+  readonly heightDisabledReason: string | null;
   /** Why rotation is inert, for the field's tooltip. Null when the field is live. */
   readonly rotationDisabledReason: string | null;
   readonly elementCount: number;
@@ -64,6 +71,14 @@ export interface StudioFigmaSelectionLayoutMetrics {
 function studioDrawRotationSupported(element: DrawEl): boolean {
   const kind = element.kind ?? "freehand";
   return kind === "freehand" || kind === "line" || kind === "arrow";
+}
+
+/** Element kinds whose model accepts an optional stored angle even when the key is absent at 0°. */
+function studioStoredRotationSupported(element: El): boolean {
+  return element.type === "image"
+    || element.type === "text"
+    || element.type === "bubble"
+    || element.type === "sticker";
 }
 
 export function unionStudioSelectionBounds(
@@ -127,35 +142,41 @@ export function resolveStudioFigmaSelectionLayoutMetrics(
     single && "rotation" in single && typeof single.rotation === "number"
       ? single.rotation
       : 0;
-  const opacity =
-    single && typeof single.opacity === "number" && Number.isFinite(single.opacity)
-      ? Math.min(1, Math.max(0, single.opacity))
-      : 1;
+  const opacityValues = elements.map((element) =>
+    typeof element.opacity === "number" && Number.isFinite(element.opacity)
+      ? Math.min(1, Math.max(0, element.opacity))
+      : 1,
+  );
+  const opacity = opacityValues[0] ?? 1;
+  const opacityMixed = opacityValues.some((value) => Math.abs(value - opacity) > 1e-6);
   // A stroke has no width/height field, but it does have a size: the handles already scale one
   // by baking the target box into `points`. The numeric path calls that same planner, so gating
   // W/H on the presence of a stored field would disable a capability the object demonstrably has.
-  const hasFixedSize = Boolean(
-    single
-    && (single.type === "draw" || ("width" in single && "height" in single)),
-  );
+  const supportsWidth = Boolean(single && (single.type === "draw" || "width" in single));
+  const supportsHeight = Boolean(single && (single.type === "draw" || "height" in single));
+  const hasFixedSize = supportsWidth && supportsHeight;
   const supportsRotation = Boolean(
     single
     && (single.type === "draw"
       ? studioDrawRotationSupported(single)
-      : "rotation" in single),
+      : studioStoredRotationSupported(single)),
   );
   const multi = elements.length > 1;
   return {
+    selectionKey: elements.map((element) => element.id).join("\u001f"),
     x: roundLayout(bounds.x),
     y: roundLayout(bounds.y),
     width: roundLayout(bounds.w),
     height: roundLayout(bounds.h),
     rotation: roundLayout(rotation),
     opacity,
+    opacityMixed,
     hasFixedSize,
-    // Frames are the one type whose renderer ignores opacity, and the existing inspector
-    // slider already hides itself for them.
-    supportsOpacity: single !== null && single.type !== "frame",
+    supportsWidth,
+    supportsHeight,
+    // Frames are the one type whose renderer ignores opacity. Mixed selections remain editable
+    // only when every target shares the property; otherwise the field explains why it is inert.
+    supportsOpacity: elements.length > 0 && elements.every((element) => element.type !== "frame"),
     supportsRotation,
     rotationIsRelative: single?.type === "draw",
     sizeDisabledReason: hasFixedSize
@@ -163,6 +184,16 @@ export function resolveStudioFigmaSelectionLayoutMetrics(
       : multi
         ? "여러 개를 선택하면 크기는 하나씩만 입력할 수 있어요."
         : "이 요소는 크기를 숫자로 지정할 수 없어요.",
+    widthDisabledReason: supportsWidth
+      ? null
+      : multi
+        ? "여러 개의 전체 너비는 캔버스 핸들로 조절해 주세요."
+        : "이 요소는 너비를 숫자로 지정할 수 없어요.",
+    heightDisabledReason: supportsHeight
+      ? null
+      : multi
+        ? "여러 개의 전체 높이는 캔버스 핸들로 조절해 주세요."
+        : "이 요소는 높이를 숫자로 지정할 수 없어요.",
     rotationDisabledReason: supportsRotation
       ? null
       : multi
@@ -353,13 +384,18 @@ export function planStudioSelectionLayoutPatch(
     && Number.isFinite(patch.opacity)
     && element.type !== "frame"
   ) {
-    next.opacity = Math.min(1, Math.max(0, patch.opacity));
+    const opacity = Math.min(1, Math.max(0, patch.opacity));
+    const currentOpacity =
+      typeof element.opacity === "number" && Number.isFinite(element.opacity)
+        ? Math.min(1, Math.max(0, element.opacity))
+        : 1;
+    if (Math.abs(opacity - currentOpacity) > 1e-6) next.opacity = opacity;
   }
   if (
     typeof patch.rotation === "number"
     && Number.isFinite(patch.rotation)
     && element.type !== "draw"
-    && "rotation" in element
+    && studioStoredRotationSupported(element)
   ) {
     next.rotation = patch.rotation;
   }
@@ -394,6 +430,49 @@ export function planStudioSelectionLayoutPatch(
   }
 
   return Object.keys(next).length > 0 ? (next as Partial<El>) : null;
+}
+
+/**
+ * Applies the common multi-selection fields exposed by the Inspector in one durable commit.
+ * X/Y move the union box without collapsing relative spacing; opacity is shared by every
+ * compatible target. Group resize/rotation remain canvas-handle operations until their exact
+ * transform planner can be reused here.
+ */
+export function planStudioMultiSelectionLayoutPatch(
+  elements: readonly El[],
+  selectedIds: readonly string[],
+  patch: StudioFigmaSelectionLayoutPatch,
+): El[] | null {
+  const selected = new Set(selectedIds);
+  const targets = elements.filter((element) => selected.has(element.id));
+  if (targets.length < 2) return null;
+  const bounds = unionStudioSelectionBounds(targets);
+  if (!bounds) return null;
+
+  const dx = typeof patch.x === "number" && Number.isFinite(patch.x)
+    ? patch.x - bounds.x
+    : 0;
+  const dy = typeof patch.y === "number" && Number.isFinite(patch.y)
+    ? patch.y - bounds.y
+    : 0;
+  let changed = false;
+  const next = elements.map((element) => {
+    if (!selected.has(element.id)) return element;
+    // Use the same visual (stroke-padded) box the numeric panel displays. `elBounds`
+    // alone would move freehand ink by half its stroke width on a group edit.
+    const box = unionStudioSelectionBounds([element]);
+    if (!box) return element;
+    const targetPatch: StudioFigmaSelectionLayoutPatch = {
+      ...(dx !== 0 ? { x: box.x + dx } : {}),
+      ...(dy !== 0 ? { y: box.y + dy } : {}),
+      ...(typeof patch.opacity === "number" ? { opacity: patch.opacity } : {}),
+    };
+    const planned = planStudioSelectionLayoutPatch(element, targetPatch);
+    if (!planned) return element;
+    changed = true;
+    return { ...element, ...planned } as El;
+  });
+  return changed ? next : null;
 }
 
 /** How close the fixed-point solve below has to land before it stops refining. Document px. */

@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -33,6 +34,7 @@ export type StudioDrawingPalettePresentation = "full" | "icon-popup";
 export interface StudioDrawingPaletteDefinition {
   readonly id: StudioDrawingPaletteId;
   readonly label: string;
+  readonly description: string;
   readonly Icon: typeof SwatchBook;
 }
 
@@ -42,11 +44,13 @@ export const STUDIO_DRAWING_PALETTES: Readonly<
   "sub-tools": {
     id: "sub-tools",
     label: "서브 도구",
+    description: "펜·지우개·도형을 고릅니다",
     Icon: SwatchBook,
   },
   "tool-properties": {
     id: "tool-properties",
     label: "도구 속성",
+    description: "크기·농도·필압을 조절합니다",
     Icon: SlidersHorizontal,
   },
 };
@@ -71,6 +75,11 @@ export interface StudioDrawingPaletteOverlayController {
     node: HTMLButtonElement | null,
   ) => void;
   readonly toggle: (
+    overlay: StudioDrawingPaletteOverlay,
+    trigger: HTMLButtonElement,
+  ) => void;
+  /** Opens a specific overlay without the click-toggle close behavior. */
+  readonly open: (
     overlay: StudioDrawingPaletteOverlay,
     trigger: HTMLButtonElement,
   ) => void;
@@ -291,11 +300,21 @@ export function useStudioDrawingPaletteOverlay(): StudioDrawingPaletteOverlayCon
     };
   }, [openOverlay]);
 
-  const dismiss = (): void => {
+  const dismiss = useCallback((): void => {
     setOpenOverlay(null);
     setOverlayStyle(null);
     setInlineOptionsOpen(false);
-  };
+  }, []);
+
+  const open = useCallback((
+    overlay: StudioDrawingPaletteOverlay,
+    trigger: HTMLButtonElement,
+  ): void => {
+    triggerRefs.current[overlayKey(overlay)] = trigger;
+    setInlineOptionsOpen(false);
+    setOverlayStyle(paletteOverlayStyle(trigger, overlay.kind));
+    setOpenOverlay(overlay);
+  }, []);
 
   const close = (restoreTriggerFocus = false): void => {
     const trigger = openOverlay
@@ -322,10 +341,9 @@ export function useStudioDrawingPaletteOverlay(): StudioDrawingPaletteOverlayCon
         dismiss();
         return;
       }
-      setInlineOptionsOpen(false);
-      setOverlayStyle(paletteOverlayStyle(trigger, overlay.kind));
-      setOpenOverlay(overlay);
+      open(overlay, trigger);
     },
+    open,
     toggleInlineOptions() {
       setInlineOptionsOpen((open) => !open);
     },

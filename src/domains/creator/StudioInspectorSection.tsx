@@ -40,6 +40,8 @@ import {
 import type { StudioInspectorFocusTarget } from "./studio-inspector-focus";
 import type { ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
+
 export interface StudioInspectorSectionProps {
   /** Must exist in `STUDIO_INSPECTOR_DENSITY` as an advanced-tier group id. */
   sectionId: string;
@@ -71,8 +73,10 @@ export function StudioInspectorSection({
     () =>
       forceOpen || readStudioInspectorSectionOpen(sectionId, defaultOpen),
   );
+  const [focusHighlighted, setFocusHighlighted] = useState(false);
   const panelId = useId();
   const rootRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (forceOpen) setOpen(true);
@@ -94,19 +98,34 @@ export function StudioInspectorSection({
     isStudioInspectorFocusTarget(sectionId) ? sectionId : null;
   useStudioInspectorFocusRequest(focusTarget, () => {
     setOpen(true);
+    setFocusHighlighted(true);
     scrollStudioInspectorTargetIntoView(rootRef.current);
+    globalThis.requestAnimationFrame?.(() => {
+      headerRef.current?.focus({ preventScroll: true });
+    });
   });
+
+  useEffect(() => {
+    if (!focusHighlighted) return;
+    const timeout = globalThis.setTimeout(() => setFocusHighlighted(false), 1_600);
+    return () => globalThis.clearTimeout(timeout);
+  }, [focusHighlighted]);
 
   const heading = title ?? inspectorSectionLabel(sectionId) ?? sectionId;
 
   return (
     <section
       ref={rootRef}
-      className="mt-2 border-t border-line/50 pt-2"
+      className={cn(
+        "mt-2 rounded-lg border-t border-line/50 pt-2 transition-[background-color,box-shadow] duration-200",
+        focusHighlighted && "bg-accent-soft/55 shadow-[0_0_0_2px_oklch(0.72_0.185_42/0.55)]",
+      )}
       data-inspector-section={sectionId}
       data-inspector-section-open={open ? "true" : "false"}
+      data-inspector-section-highlighted={focusHighlighted ? "true" : undefined}
     >
       <button
+        ref={headerRef}
         type="button"
         aria-expanded={open}
         aria-controls={panelId}

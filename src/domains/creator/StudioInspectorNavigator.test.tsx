@@ -1,6 +1,11 @@
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
 
+import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { createStudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
 
 import type { StudioInspectorLayout } from "./studio-inspector-layout";
@@ -8,6 +13,11 @@ import type { StudioInspectorLayout } from "./studio-inspector-layout";
 const noop = () => {
   // 정적 렌더에서는 내비게이션 콜백을 실행하지 않는다.
 };
+const TAB_A11Y = createStudioInspectorTabA11y("test");
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function renderNavigator(
   layout: StudioInspectorLayout,
@@ -18,12 +28,21 @@ function renderNavigator(
     description: string;
     tone: "neutral" | "accent" | "good" | "warn";
   }>,
+  selectionCount = selectedType === null ? 0 : 1,
 ): string {
   return renderToStaticMarkup(
     <StudioInspectorNavigator
       layout={layout}
+      tabA11y={TAB_A11Y}
       selectedType={selectedType}
-      selectionLabel={selectedType ? "이미지" : null}
+      selectionLabel={
+        selectedType === "text"
+          ? "텍스트"
+          : selectedType
+            ? "이미지"
+            : null
+      }
+      selectionCount={selectionCount}
       drawing={false}
       imageToolsAvailable={imageToolsAvailable}
       imageToolsStatusLabel={imageToolsStatus?.label}
@@ -36,6 +55,40 @@ function renderNavigator(
 }
 
 describe("StudioInspectorNavigator", () => {
+  it("links every primary and image tab to stable, non-duplicated panel ids", () => {
+    const html = renderNavigator({
+      primary: "properties",
+      image: "quick",
+      document: "canvas",
+    });
+
+    for (const section of ["properties", "layers", "publish"] as const) {
+      expect(html).toContain(`id="${TAB_A11Y.primary[section].tabId}"`);
+      expect(html).toContain(`aria-controls="${TAB_A11Y.primary[section].panelId}"`);
+    }
+    expect(html).toContain(`id="${TAB_A11Y.primary.document.tabId}"`);
+    expect(html).toContain(`aria-controls="${TAB_A11Y.document.canvas.panelId}"`);
+    for (const tabId of Object.values(TAB_A11Y.imageTabs)) {
+      expect(html).toContain(`id="${tabId}"`);
+    }
+    expect(html.match(new RegExp(`aria-controls="${TAB_A11Y.imagePanels.selected}"`, "gu")))
+      .toHaveLength(5);
+    expect(TAB_A11Y.imagePanels.selected).not.toBe(TAB_A11Y.imagePanels.unselected);
+  });
+
+  it("links each document subtab to its own stable panel", () => {
+    const html = renderNavigator({
+      primary: "document",
+      image: "quick",
+      document: "grade",
+    });
+
+    for (const link of Object.values(TAB_A11Y.document)) {
+      expect(html).toContain(`id="${link.tabId}"`);
+      expect(html).toContain(`aria-controls="${link.panelId}"`);
+    }
+  });
+
   it("renders a four-tab professional dock with a capped layer badge", () => {
     const html = renderNavigator({
       primary: "properties",
@@ -155,5 +208,73 @@ describe("StudioInspectorNavigator", () => {
     expect(html.match(/(?:min-h-11|size-11)/g)?.length).toBeGreaterThanOrEqual(9);
     expect(html).toContain("sticky top-0");
     expect(html).toContain("overflow-x-auto");
+  });
+
+  it("offers a direct return to selected-object properties from another tab", () => {
+    const html = renderNavigator(
+      { primary: "layers", image: "quick", document: "canvas" },
+      "text",
+    );
+
+    expect(html).toContain("텍스트 편집");
+    expect(html).toContain("선택한 대상의 속성을 바로 엽니다");
+    expect(html).toContain("속성 열기");
+  });
+
+  it("treats a marquee count as a selection and summarizes it as generic elements", () => {
+    const html = renderNavigator(
+      { primary: "properties", image: "quick", document: "canvas" },
+      null,
+      undefined,
+      undefined,
+      3,
+    );
+
+    expect(html).toContain("3개 요소");
+    expect(html).not.toContain("3개 이미지");
+  });
+
+  it("focuses the active properties tab after the contextual CTA opens it", () => {
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    const onChange = vi.fn();
+
+    function NavigatorHarness() {
+      const [layout, setLayout] = useState<StudioInspectorLayout>({
+        primary: "layers",
+        image: "quick",
+        document: "canvas",
+      });
+      return (
+        <StudioInspectorNavigator
+          layout={layout}
+          tabA11y={TAB_A11Y}
+          selectedType={null}
+          selectionLabel={null}
+          selectionCount={2}
+          drawing={false}
+          layerCount={2}
+          onChange={(next) => {
+            onChange(next);
+            setLayout(next);
+          }}
+        />
+      );
+    }
+
+    render(<NavigatorHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /속성 열기/u }));
+
+    expect(onChange).toHaveBeenCalledWith({
+      primary: "properties",
+      image: "quick",
+      document: "canvas",
+    });
+    const propertiesTab = screen.getByRole("tab", { name: "속성" });
+    expect(propertiesTab.getAttribute("aria-selected")).toBe("true");
+    expect(propertiesTab).toBe(document.activeElement);
   });
 });

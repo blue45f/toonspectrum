@@ -1272,7 +1272,7 @@ async function runMobileDockLayout(
   const secondary = dock.locator('[data-studio-mobile-dock-scroll="secondary"]');
   const secondaryToolbar = dock.getByRole("toolbar", { name: "작업 공간", exact: true });
   const workspaceToolsToggle = dock.getByRole("button", {
-    name: "작업 공간 도구 펼치기",
+    name: "작업 메뉴",
     exact: true,
   });
   const workspaceToggleInitiallyVisible = await workspaceToolsToggle.evaluate((element) => {
@@ -1299,7 +1299,7 @@ async function runMobileDockLayout(
   await workspaceToolsToggle.click();
   await secondary.waitFor({ state: "visible", timeout: 3000 });
   const propsLauncher = dock.locator(
-    'button[aria-label="속성·레이어·페이지·작품 정보 패널 열기"]',
+    'button[aria-label="작업 패널"]',
   );
   const panelLauncherInitiallyVisible = await propsLauncher.evaluate((element) => {
     const bounds = element.getBoundingClientRect();

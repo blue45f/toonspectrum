@@ -73,6 +73,7 @@ function canvasProps(
 ): StudioInspectorCanvasControlsProps {
   return {
     background: "#ffffff",
+    backgroundGradient: null,
     canvasHeight: 12_000,
     controlsDisabled: false,
     controlsDisabledReason: null,
@@ -200,6 +201,92 @@ describe("StudioInspectorCanvasControls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "배경 편집기 · 리사이저 열기" }));
     expect(props.onOpenBackgroundEditor).toHaveBeenCalledTimes(1);
+  });
+
+  it("현재 단색·배경 그라디언트·무드 그라디언트 프리셋을 aria-pressed로 구분한다", () => {
+    const backgroundGradientPreset = BG_PRESETS.find((preset) => preset.grad)!;
+    const backgroundGradient = backgroundGradientPreset.grad!;
+    const moodGradient = gradientToBgGrad(GRADIENT_PRESETS[0]!);
+    const view = render(
+      <StudioInspectorCanvasControls
+        {...canvasProps({ paperGrainVisible: false })}
+      />,
+    );
+
+    openSection("배경·종이 질감");
+    expect(
+      screen.getByRole("button", { name: "배경 흰색" }).getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen.getByRole("button", { name: `배경 ${backgroundGradientPreset.label}` })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+
+    view.rerender(
+      <StudioInspectorCanvasControls
+        {...canvasProps({
+          background: "#FFFFFF",
+          backgroundGradient,
+          paperGrainVisible: false,
+        })}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "배경 흰색" }).getAttribute("aria-pressed"),
+    ).toBe("false");
+    expect(
+      screen.getByRole("button", { name: `배경 ${backgroundGradientPreset.label}` })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    view.rerender(
+      <StudioInspectorCanvasControls
+        {...canvasProps({ backgroundGradient: moodGradient, paperGrainVisible: false })}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: `그라디언트 ${GRADIENT_PRESETS[0]!.label}` })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen.getByRole("button", { name: `배경 ${backgroundGradientPreset.label}` })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+  });
+
+  it("접힌 배경 섹션의 activeCount가 단색과 bgGrad를 모두 반영한다", () => {
+    const view = render(
+      <StudioInspectorCanvasControls
+        {...canvasProps({ paperGrainVisible: false })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "배경·종이 질감" })).toBeTruthy();
+
+    view.rerender(
+      <StudioInspectorCanvasControls
+        {...canvasProps({
+          backgroundGradient: gradientToBgGrad(GRADIENT_PRESETS[0]!),
+          paperGrainVisible: false,
+        })}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "배경·종이 질감, 설정 1개 켜짐" }),
+    ).toBeTruthy();
+
+    view.rerender(
+      <StudioInspectorCanvasControls
+        {...canvasProps({
+          background: "#fbf3e4",
+          backgroundGradient: null,
+          paperGrainVisible: false,
+        })}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "배경·종이 질감, 설정 1개 켜짐" }),
+    ).toBeTruthy();
   });
 
   it("스냅·그리드·규격과 사용자 가이드 조작을 controlled callback으로 전달한다", () => {

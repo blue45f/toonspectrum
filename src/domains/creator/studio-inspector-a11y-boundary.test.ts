@@ -66,6 +66,22 @@ describe("Studio inspector accessibility boundary", () => {
     expect(inspectorSource).toContain('aria-label="패널 테두리 커스텀"');
   });
 
+  it("exposes exclusive text alignment and text fill choices as pressed-state buttons", () => {
+    const selectionSource = inspectorSources.find(
+      ({ file }) => file === "StudioInspectorSelectionSection.tsx",
+    )?.source;
+    const shapeSource = inspectorSources.find(
+      ({ file }) => file === "StudioInspectorShapeSection.tsx",
+    )?.source;
+
+    expect(selectionSource).toContain(
+      'aria-pressed={(selected.align ?? "center") === a.v}',
+    );
+    expect(shapeSource).toContain(
+      'aria-pressed={(selected.fillType ?? "solid") === mode.v}',
+    );
+  });
+
   it("never removes the native outline without a focus-visible replacement", () => {
     const violations = inspectorSources.flatMap(({ file, source }) =>
       source

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  planStudioMultiSelectionLayoutPatch,
   planStudioSelectionFlip,
   planStudioSelectionLayoutPatch,
   planStudioZoomToSelection,
@@ -386,5 +387,55 @@ describe("studio figma selection ux", () => {
       supportsRotation: true,
       elementCount: 1,
     });
+  });
+
+  it("allows a zero-degree text element to receive its first stored rotation", () => {
+    const element = text({ id: "t", x: 10, y: 20 });
+    expect("rotation" in element).toBe(false);
+    expect(resolveStudioFigmaSelectionLayoutMetrics([element])?.supportsRotation).toBe(true);
+    expect(planStudioSelectionLayoutPatch(element, { rotation: 30 })).toEqual({
+      rotation: 30,
+    });
+  });
+
+  it("moves a multi-selection without collapsing spacing and applies opacity once", () => {
+    const a = image({ id: "a", x: 10, y: 20, width: 40, height: 30, opacity: 0.25 });
+    const b = image({ id: "b", x: 80, y: 60, width: 20, height: 20, opacity: 0.75 });
+    const next = planStudioMultiSelectionLayoutPatch(
+      [a, b],
+      ["a", "b"],
+      { x: 40, y: 50, opacity: 0.6 },
+    );
+    expect(next).not.toBeNull();
+    const movedA = next!.find((element) => element.id === "a") as ImageEl;
+    const movedB = next!.find((element) => element.id === "b") as ImageEl;
+    expect(movedA.x).toBe(40);
+    expect(movedA.y).toBe(50);
+    expect(movedB.x - movedA.x).toBe(70);
+    expect(movedB.y - movedA.y).toBe(40);
+    expect(movedA.opacity).toBe(0.6);
+    expect(movedB.opacity).toBe(0.6);
+
+    expect(resolveStudioFigmaSelectionLayoutMetrics([a, b])).toMatchObject({
+      elementCount: 2,
+      opacityMixed: true,
+      supportsOpacity: true,
+    });
+  });
+
+  it("moves freehand ink in a group by the exact shared delta", () => {
+    const stroke = draw({ id: "s", points: [10, 20, 30, 20], strokeWidth: 8 });
+    const picture = image({ id: "i", x: 80, y: 60, width: 20, height: 20 });
+    const before = unionStudioSelectionBounds([stroke, picture])!;
+    const strokeBefore = unionStudioSelectionBounds([stroke])!;
+    const next = planStudioMultiSelectionLayoutPatch(
+      [stroke, picture],
+      ["s", "i"],
+      { x: before.x + 25, y: before.y - 10 },
+    )!;
+    const movedStroke = next.find((element) => element.id === "s")!;
+    const strokeAfter = unionStudioSelectionBounds([movedStroke])!;
+    expect(strokeAfter.x - strokeBefore.x).toBeCloseTo(25, 6);
+    expect(strokeAfter.y - strokeBefore.y).toBeCloseTo(-10, 6);
   });
 });

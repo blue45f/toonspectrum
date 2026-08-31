@@ -17,6 +17,7 @@
  * Declaration data only — no React, no store access.
  */
 
+import type { StudioInspectorFocusTarget } from "./studio-inspector-focus";
 import type {
   StudioImageInspectorSection,
   StudioInspectorPrimarySection,
@@ -37,6 +38,7 @@ export type StudioSearchTarget =
       type: "inspector";
       primary: StudioInspectorPrimarySection;
       image?: StudioImageInspectorSection;
+      focusTarget?: StudioInspectorFocusTarget;
     }
   /** Expand one of the two drawing palettes. */
   | { type: "palette"; paletteId: "sub-tools" | "tool-properties" }
@@ -166,7 +168,11 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       ],
       keywords: ["opacity", "alpha", "투명도"],
       helpNodeId: "help/property/opacity",
-      target: { type: "inspector", primary: "properties" },
+      target: {
+        type: "inspector",
+        primary: "properties",
+        focusTarget: "selection.geometry",
+      },
     },
     {
       id: "property.transform-numeric",
@@ -185,7 +191,11 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       ],
       keywords: ["transform", "x", "y", "width", "height", "회전", "배치"],
       helpNodeId: "help/property/transform-numeric",
-      target: { type: "inspector", primary: "properties" },
+      target: {
+        type: "inspector",
+        primary: "properties",
+        focusTarget: "selection.geometry",
+      },
     },
     {
       id: "property.layer-style",
@@ -324,7 +334,11 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       ],
       keywords: ["brush", "브러시", "필압", "산포", "scatter"],
       helpNodeId: "help/panel/brush-studio",
-      target: { type: "palette", paletteId: "tool-properties" },
+      target: {
+        type: "inspector",
+        primary: "properties",
+        focusTarget: "tool.brush-studio",
+      },
     },
     {
       id: "panel.layer-list",

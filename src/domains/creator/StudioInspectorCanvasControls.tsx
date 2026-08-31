@@ -1,12 +1,8 @@
 /**
  * 페이지 ▸ 캔버스.
  *
- * Wave D 는 선택 요소/도구 속성만 접었고 이 패널은 23개 컨트롤이 디스클로저 하나
- * 없이 전부 펼쳐진 채였다 — 인스펙터에서 가장 긴 스크롤이었다. 지금은
- * `studio-inspector-density.ts` 의 `document-canvas` 표가 선언한 대로 기본 6개만
- * 상시 노출하고 나머지 17개는 CSP 팔레트식 접기 뒤로 들어간다. 접힌 섹션은 열려
- * 있던 상태를 기억하고(`StudioInspectorSection`), 값이 설정돼 있으면 닫힌 헤더에
- * 배지로 그 사실을 밝힌다.
+ * 기본 6개만 상시 노출하고 나머지 17개는 CSP 팔레트식 접기 뒤로 들어간다.
+ * 접힌 섹션은 열린 상태를 기억하고, 값이 설정돼 있으면 헤더 배지로 알린다.
  */
 
 import { Droplets } from "lucide-react";
@@ -14,6 +10,7 @@ import { useId } from "react";
 
 import { BG_PRESETS, CANVAS_W, type BgPreset } from "./studio-assets";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
+import { normalizeSurfaceColor, surfaceGradientsMatch } from "./studio-inspector-surface-selection";
 import { MAGIC_RESIZE_DEFAULT_STRATEGY } from "./studio-magic-resize";
 import {
   STUDIO_TEMPLATE_GUTTER_MAX,
@@ -25,7 +22,6 @@ import { StudioInspectorSection } from "./StudioInspectorSection";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioPaperSurfacePicker } from "./StudioPaperSurfacePicker";
 import { StudioPercentGuideControls } from "./StudioPercentGuideControls";
-
 
 import type { PaperGrainKind } from "./brush/studio-paper-texture";
 import type { MagicResizePreset, MagicResizeStrategy } from "./studio-magic-resize";
@@ -41,6 +37,7 @@ export interface StudioInspectorUserGuide {
 
 export interface StudioInspectorCanvasControlsProps {
   readonly background: string;
+  readonly backgroundGradient: readonly string[] | null;
   readonly canvasHeight: number;
   readonly controlsDisabled: boolean;
   readonly controlsDisabledReason: string | null | undefined;
@@ -50,6 +47,8 @@ export interface StudioInspectorCanvasControlsProps {
   readonly magicResizeStrategy: MagicResizeStrategy;
   readonly masterEditMode: boolean;
   readonly panelGutter: number;
+  readonly panelId?: string;
+  readonly panelLabelledBy?: string;
   /** Active document paper grain (brush granulation surface). */
   readonly paperGrainKind: PaperGrainKind;
   /** Stage paper-grain fill visibility (default true when unset on page). */
@@ -133,6 +132,7 @@ const addGuideClass =
 
 export function StudioInspectorCanvasControls({
   background,
+  backgroundGradient,
   canvasHeight,
   controlsDisabled,
   controlsDisabledReason,
@@ -142,6 +142,8 @@ export function StudioInspectorCanvasControls({
   magicResizeStrategy,
   masterEditMode,
   panelGutter,
+  panelId,
+  panelLabelledBy,
   paperGrainKind,
   paperGrainVisible,
   showGrid,
@@ -184,11 +186,15 @@ export function StudioInspectorCanvasControls({
       : null;
   const guideAxisLabel = (type: StudioInspectorUserGuide["type"]) =>
     localizeText(t, type === "v" ? "세로" : "가로", `studio.canvas.guideType.${type === "v" ? "vertical" : "horizontal"}`);
+  const hasBackgroundGradient = backgroundGradient?.length === 2;
+  const hasCustomBackground = hasBackgroundGradient || normalizeSurfaceColor(background) !== "#ffffff";
 
   return (
     <div
+      id={panelId}
       role="tabpanel"
-      aria-label={localizeText(t, "캔버스 설정", "studio.canvas.aria")}
+      aria-labelledby={panelLabelledBy}
+      aria-label={panelLabelledBy ? undefined : localizeText(t, "캔버스 설정", "studio.canvas.aria")}
       hidden={hidden}
       className="rounded-xl border border-line bg-panel/40 p-3"
     >
@@ -323,7 +329,7 @@ export function StudioInspectorCanvasControls({
       {/* ---- 접히는 티어 ---- */}
       <StudioInspectorSection
         sectionId="canvas.surface"
-        activeCount={(paperGrainVisible ? 1 : 0) + (background.toLowerCase() === "#ffffff" ? 0 : 1)}
+        activeCount={(paperGrainVisible ? 1 : 0) + (hasCustomBackground ? 1 : 0)}
         loadingLabel={localizeText(t, "배경·종이 질감을 여는 중...", "studio.canvas.surfaceLoading")}
       >
         <StudioPaperSurfacePicker
@@ -335,33 +341,40 @@ export function StudioInspectorCanvasControls({
           onApplyPaperTintBackground={onApplyPaperTintBackground}
         />
         <div className="flex flex-wrap gap-1.5">
-          {BG_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              disabled={controlsDisabled}
-              onClick={() => onApplyBackgroundPreset(preset)}
-              title={localizeText(t, `배경 ${preset.label}`, "studio.canvas.backgroundPresetAria").replace("{label}", preset.label)}
-              aria-label={localizeText(t, `배경 ${preset.label}`, "studio.canvas.backgroundPresetAria").replace("{label}", preset.label)}
-              className={swatchButtonClass}
-            >
-              <span
-                aria-hidden
-                className="block size-6 rounded-md border border-line"
-                style={{
-                  background: preset.grad
-                    ? `linear-gradient(${preset.grad[0]}, ${preset.grad[1]})`
-                    : preset.fill,
-                }}
-              />
-            </button>
-          ))}
+          {BG_PRESETS.map((preset) => {
+            const isSelected = preset.grad
+              ? surfaceGradientsMatch(backgroundGradient, preset.grad)
+              : !hasBackgroundGradient && normalizeSurfaceColor(background) === normalizeSurfaceColor(preset.fill);
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                disabled={controlsDisabled}
+                onClick={() => onApplyBackgroundPreset(preset)}
+                title={localizeText(t, `배경 ${preset.label}`, "studio.canvas.backgroundPresetAria").replace("{label}", preset.label)}
+                aria-label={localizeText(t, `배경 ${preset.label}`, "studio.canvas.backgroundPresetAria").replace("{label}", preset.label)}
+                aria-pressed={isSelected}
+                className={cn(swatchButtonClass, isSelected && "bg-accent-soft ring-2 ring-inset ring-accent")}
+              >
+                <span
+                  aria-hidden
+                  className="block size-6 rounded-md border border-line"
+                  style={{
+                    background: preset.grad
+                      ? `linear-gradient(${preset.grad[0]}, ${preset.grad[1]})`
+                      : preset.fill,
+                  }}
+                />
+              </button>
+            );
+          })}
         </div>
         <div>
           <p className="mb-1 text-[0.68rem] font-medium text-fg-3">{localizeText(t, "그라디언트 배경", "studio.canvas.gradient")}</p>
           <div className="flex flex-wrap gap-1.5">
             {GRADIENT_PRESETS.map((preset) => {
               const [start, end] = gradientToBgGrad(preset);
+              const isSelected = surfaceGradientsMatch(backgroundGradient, [start, end]);
               return (
                 <button
                   key={preset.id}
@@ -370,7 +383,8 @@ export function StudioInspectorCanvasControls({
                   onClick={() => onGradientChange(gradientToBgGrad(preset))}
                   title={preset.tip}
                   aria-label={localizeText(t, `그라디언트 ${preset.label}`, "studio.canvas.gradientPresetAria").replace("{label}", preset.label)}
-                  className={swatchButtonClass}
+                  aria-pressed={isSelected}
+                  className={cn(swatchButtonClass, isSelected && "bg-accent-soft ring-2 ring-inset ring-accent")}
                 >
                   <span
                     aria-hidden

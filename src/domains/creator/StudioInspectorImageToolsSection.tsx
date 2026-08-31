@@ -66,12 +66,15 @@ import {
 
 import type { El } from "./studio-element-model";
 import type { StudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
+import type { StudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 
 
 export function StudioInspectorSelectedImageTools({
   model,
+  tabA11y,
 }: {
   model: StudioInspectorAsideModel;
+  tabA11y: StudioInspectorTabA11y;
 }) {
   const {
     activatePixelSelectionToolFromInspector,
@@ -152,6 +155,7 @@ export function StudioInspectorSelectedImageTools({
     historyBrushSourceSrc,
     historyPanelOpen,
     inspectorInteractionPolicy,
+    inspectorLayout,
     invertFilterMask,
     invertLayerMask,
     invertQuickMask,
@@ -294,7 +298,13 @@ export function StudioInspectorSelectedImageTools({
   return (
     <>
               {(selected.type === "image" || selected.type === "draw") && (
-                <>
+                <div
+                  id={tabA11y.imagePanels.selected}
+                  role="tabpanel"
+                  aria-labelledby={tabA11y.imageTabs[inspectorLayout.image]}
+                  hidden={activeImageInspectorTab === null}
+                  className="space-y-3"
+                >
                   {selected.type === "image" && (
                     <>
                       {selectedWorkAssetDestructiveEditReason ? (
@@ -893,7 +903,7 @@ export function StudioInspectorSelectedImageTools({
                     </Suspense>
                   </div>
                   ) : null}
-                </>
+                </div>
               )}
     </>
   );

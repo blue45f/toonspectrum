@@ -255,6 +255,8 @@ export function StudioInspectorPageGradeSurface({
   onExpandedChange,
   onPatch,
   onReset,
+  panelId,
+  panelLabelledBy,
 }: {
   active: boolean;
   expanded: boolean;
@@ -265,11 +267,17 @@ export function StudioInspectorPageGradeSurface({
   onExpandedChange: (expanded: boolean) => void;
   onPatch: (patch: Partial<PageGrade>) => void;
   onReset: () => void;
+  panelId?: string;
+  panelLabelledBy?: string;
 }) {
+  const contentId = useId();
+
   return (
     <div
+      id={panelId}
       role="tabpanel"
-      aria-label="페이지 색보정"
+      aria-label={panelLabelledBy ? undefined : "페이지 색보정"}
+      aria-labelledby={panelLabelledBy}
       hidden={!active}
       className="rounded-xl border border-line bg-panel/40 p-3"
     >
@@ -279,46 +287,54 @@ export function StudioInspectorPageGradeSurface({
             <button
               type="button"
               onClick={() => onExpandedChange(false)}
+              aria-expanded={true}
+              aria-controls={contentId}
               className="inline-flex items-center gap-0.5 rounded text-[0.68rem] text-fg-3 transition-colors hover:text-fg"
               title="색보정 패널 접기"
             >
-              접기 <ChevronUp size={13} />
+              접기 <ChevronUp size={13} aria-hidden />
             </button>
           </div>
-          <Suspense fallback={<StudioPanelLoading label="색보정 패널을 여는 중..." />}>
-            <fieldset
-              disabled={gate.disabled}
-              aria-disabled={gate.disabled}
-              title={gate.reason}
-              className="m-0 min-w-0 border-0 p-0 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50 disabled:[&_input]:cursor-not-allowed disabled:[&_input]:opacity-55"
-            >
-              <legend className="sr-only">페이지 색보정 설정</legend>
-              <StudioPageGradePanel
-                grade={grade}
-                onPatch={onPatch}
-                onApplyPreset={onApplyPreset}
-                onReset={onReset}
-              />
-            </fieldset>
-          </Suspense>
+          <div id={contentId}>
+            <Suspense fallback={<StudioPanelLoading label="색보정 패널을 여는 중..." />}>
+              <fieldset
+                disabled={gate.disabled}
+                aria-disabled={gate.disabled}
+                title={gate.reason}
+                className="m-0 min-w-0 border-0 p-0 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50 disabled:[&_input]:cursor-not-allowed disabled:[&_input]:opacity-55"
+              >
+                <legend className="sr-only">페이지 색보정 설정</legend>
+                <StudioPageGradePanel
+                  grade={grade}
+                  onPatch={onPatch}
+                  onApplyPreset={onApplyPreset}
+                  onReset={onReset}
+                />
+              </fieldset>
+            </Suspense>
+          </div>
         </>
       ) : (
-        <button
-          type="button"
-          onClick={() => onExpandedChange(true)}
-          aria-expanded={false}
-          className="flex w-full items-center justify-between gap-3 rounded-xl border border-line/70 bg-card/65 px-3 py-2 text-left transition-colors hover:bg-raised"
-        >
-          <span className="min-w-0">
-            <span className="block text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-              페이지 색보정
+        <>
+          <button
+            type="button"
+            onClick={() => onExpandedChange(true)}
+            aria-expanded={false}
+            aria-controls={contentId}
+            className="flex w-full items-center justify-between gap-3 rounded-xl border border-line/70 bg-card/65 px-3 py-2 text-left transition-colors hover:bg-raised"
+          >
+            <span className="min-w-0">
+              <span className="block text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
+                페이지 색보정
+              </span>
+              <span className="mt-0.5 block text-xs text-fg-2">
+                {gradeActive ? "보정 적용됨" : "무드 프리셋·밝기·대비"}
+              </span>
             </span>
-            <span className="mt-0.5 block text-xs text-fg-2">
-              {gradeActive ? "보정 적용됨" : "무드 프리셋·밝기·대비"}
-            </span>
-          </span>
-          <ChevronDown size={14} className="shrink-0 text-fg-3" />
-        </button>
+            <ChevronDown size={14} aria-hidden className="shrink-0 text-fg-3" />
+          </button>
+          <div id={contentId} hidden />
+        </>
       )}
     </div>
   );
@@ -376,6 +392,8 @@ export function StudioInspectorPublishPanel({
   onDescriptionChange,
   onTagsChange,
   onTitleChange,
+  panelId,
+  panelLabelledBy,
 }: {
   active: boolean;
   autoFocusTitle: boolean;
@@ -390,6 +408,8 @@ export function StudioInspectorPublishPanel({
   onDescriptionChange: (value: string) => void;
   onTagsChange: (value: string) => void;
   onTitleChange: (value: string) => void;
+  panelId?: string;
+  panelLabelledBy?: string;
 }) {
   const fieldId = useId();
   const titleId = `${fieldId}-title`;
@@ -419,8 +439,10 @@ export function StudioInspectorPublishPanel({
 
   return (
     <form
+      id={panelId}
       role="tabpanel"
-      aria-label="작품 정보"
+      aria-label={panelLabelledBy ? undefined : "작품 정보"}
+      aria-labelledby={panelLabelledBy}
       hidden={!active}
       className="rounded-xl border border-line bg-panel/40 p-3"
       onSubmit={(event) => {

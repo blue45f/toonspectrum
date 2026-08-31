@@ -108,7 +108,7 @@ describe("Studio layer navigator bundle boundary", () => {
     const source = moduleEdges("../StudioInspectorAsideShell.tsx").source;
 
     expect(source).toMatch(
-      /aria-label="레이어"[\s\S]*?\{inspectorLayout\.primary === "layers" \? \([\s\S]*?<Suspense/,
+      /id=\{tabA11y\.primary\.layers\.panelId\}[\s\S]*?role="tabpanel"[\s\S]*?aria-labelledby=\{tabA11y\.primary\.layers\.tabId\}[\s\S]*?hidden=\{inspectorLayout\.primary !== "layers"\}[\s\S]*?\{inspectorLayout\.primary === "layers" \? \([\s\S]*?<Suspense/,
     );
     expect(source).toMatch(
       /fallback=\{[\s\S]*?role="status"[\s\S]*?aria-live="polite"[\s\S]*?h-full min-h-72/,

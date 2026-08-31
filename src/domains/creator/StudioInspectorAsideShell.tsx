@@ -4,7 +4,6 @@ import {
 } from "lucide-react";
 import { Suspense } from "react";
 
-import { toggleStudioDrawingPalette } from "./brush/studio-drawing-palettes";
 import { StudioLayerBorderEffectPanel } from "./layer/StudioLayerBorderEffectPanel";
 import { CANVAS_W } from "./studio-assets";
 import { elBounds } from "./studio-element-geometry";
@@ -12,6 +11,11 @@ import { elementLabel } from "./studio-element-label";
 import { openStudioHelpCenter } from "./studio-help-center-channel";
 import { uid } from "./studio-id";
 import { normalizeStudioInspectorLayout } from "./studio-inspector-layout";
+import {
+  requestStudioInspectorFocus,
+  type StudioInspectorFocusTarget,
+} from "./studio-inspector-focus";
+import type { StudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { executeStudioInspectorRouteTransition } from "./studio-inspector-tool-transition";
 import { isEffectivelyHidden } from "./studio-layers";
 import { studioMobileSheetSizeStyle } from "./studio-mobile-sheet-snap";
@@ -35,15 +39,26 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+function isDrawingInspectorFocusTarget(
+  target: StudioInspectorFocusTarget,
+): boolean {
+  return target === "tool.brush-studio"
+    || target === "tool.brush-engines"
+    || target === "brush.saved-library";
+}
+
 export function StudioInspectorAsideShell({
   model,
   children,
+  tabA11y,
 }: {
   model: StudioInspectorAsideModel;
   children: ReactNode;
+  tabA11y: StudioInspectorTabA11y;
 }) {
   const {
     activeImageRasterPolicy,
+    activateCanvasTool,
     applyBgPreset,
     applyMagicResizePreset,
     applyPageGrade,
@@ -54,14 +69,13 @@ export function StudioInspectorAsideShell({
     canvasFlipH,
     canvasH,
     canvasRotation,
-    changeDrawingPaletteLayout,
     changeInspectorLayout,
     commit,
     currentPageId,
     currentTemplate,
     description,
     disarmAllPixelTools,
-    drawingPaletteLayout,
+    drawMode,
     effScale,
     elements,
     ensureWebtoonGuidesLoaded,
@@ -102,6 +116,7 @@ export function StudioInspectorAsideShell({
     scrollViewportStore,
     selectLayersFromNavigator,
     selected,
+    selectedSupportsImageInspectorTabs,
     selectedId,
     setBg,
     setBgGrad,
@@ -124,6 +139,7 @@ export function StudioInspectorAsideShell({
     setSnapEnabled,
     setTagsText,
     setTitle,
+    unselectedImageToolsVisible,
     setUserGuides,
     setWebtoonTheme,
     showAlignmentGuides,
@@ -183,6 +199,7 @@ export function StudioInspectorAsideShell({
         >
           <StudioCommandSearchHost
             hideTrigger={isMobile}
+            onRequestOpen={() => setRightPanelOpen(true)}
             trailing={
               isMobile ? null : (
                 <button
@@ -196,17 +213,43 @@ export function StudioInspectorAsideShell({
                 </button>
               )
             }
-            onNavigateInspector={(route) => {
+            onNavigateInspector={(route, focusTarget) => {
+              setRightPanelOpen(true);
+              const drawingFocusTarget = focusTarget
+                ? isDrawingInspectorFocusTarget(focusTarget)
+                : false;
+              if (drawingFocusTarget) activateCanvasTool("draw", "pen");
               changeInspectorLayout(
                 normalizeStudioInspectorLayout({ ...inspectorLayout, ...route }),
               );
+              const focusTargetAvailable = focusTarget && (
+                drawingFocusTarget
+                || focusTarget.startsWith("canvas.")
+                || inspectorContentMode === "selection"
+              );
+              if (focusTargetAvailable) {
+                globalThis.requestAnimationFrame?.(() => {
+                  requestStudioInspectorFocus(focusTarget);
+                });
+              }
             }}
             onOpenTutorial={(tutorialId) => openFeatureTutorial(tutorialId)}
             onExpandPalette={(paletteId) => {
-              if (!drawingPaletteLayout.collapsed[paletteId]) return;
-              changeDrawingPaletteLayout(
-                toggleStudioDrawingPalette(drawingPaletteLayout, paletteId),
+              setRightPanelOpen(true);
+              activateCanvasTool("draw", "pen");
+              changeInspectorLayout(
+                normalizeStudioInspectorLayout({
+                  ...inspectorLayout,
+                  primary: "properties",
+                }),
               );
+              globalThis.requestAnimationFrame?.(() => {
+                requestStudioInspectorFocus(
+                  paletteId === "sub-tools"
+                    ? "palette.sub-tools"
+                    : "palette.tool-properties",
+                );
+              });
             }}
             onOpenHelp={(_helpNodeId, commandId) =>
               openStudioHelpCenter({
@@ -217,6 +260,7 @@ export function StudioInspectorAsideShell({
           />
           <StudioInspectorNavigator
             layout={inspectorLayout}
+            tabA11y={tabA11y}
             selectedType={
               inspectorContentMode === "selection" ? selected?.type ?? null : null
             }
@@ -225,8 +269,19 @@ export function StudioInspectorAsideShell({
                 ? elementLabel(selected)
                 : null
             }
+            selectionCount={
+              inspectorContentMode === "selection"
+                ? Math.max(1, marqueeIds.length)
+                : 0
+            }
             drawing={inspectorDrawing}
-            imageToolsAvailable={!inspectorDrawing}
+            drawingToolPropertiesAvailable={
+              drawMode !== "shape" && drawMode !== "pixel"
+            }
+            imageToolsAvailable={
+              marqueeIds.length <= 1 &&
+              (selectedSupportsImageInspectorTabs || unselectedImageToolsVisible)
+            }
             imageToolsStatusLabel={activeImageRasterPolicy?.statusLabel}
             imageToolsStatusDescription={activeImageRasterPolicy?.description}
             imageToolsStatusTone={
@@ -269,6 +324,7 @@ export function StudioInspectorAsideShell({
           <StudioInspectorDisabledReasons reasons={rightPanelDisabledReasons} />
           <StudioInspectorCanvasControls
             background={bg}
+            backgroundGradient={bgGrad}
             canvasHeight={canvasH}
             controlsDisabled={canvasControlsDisabled}
             controlsDisabledReason={inspectorInteractionPolicy.page.reason}
@@ -277,6 +333,8 @@ export function StudioInspectorAsideShell({
               inspectorLayout.primary !== "document" ||
               inspectorLayout.document !== "canvas"
             }
+            panelId={tabA11y.document.canvas.panelId}
+            panelLabelledBy={`${tabA11y.primary.document.tabId} ${tabA11y.document.canvas.tabId}`}
             magicResizeStrategy={magicResizeStrategy}
             masterEditMode={masterEditMode}
             panelGutter={panelGutter}
@@ -355,6 +413,8 @@ export function StudioInspectorAsideShell({
               inspectorLayout.document === "grade"
             }
             expanded={pageGradePanelOpen}
+            panelId={tabA11y.document.grade.panelId}
+            panelLabelledBy={`${tabA11y.primary.document.tabId} ${tabA11y.document.grade.tabId}`}
             grade={pageGrade}
             gradeActive={pageGradeActive}
             gate={inspectorInteractionPolicy.page}
@@ -365,8 +425,9 @@ export function StudioInspectorAsideShell({
           />
           {children}
           <div
+            id={tabA11y.primary.layers.panelId}
             role="tabpanel"
-            aria-label="레이어"
+            aria-labelledby={tabA11y.primary.layers.tabId}
             hidden={inspectorLayout.primary !== "layers"}
             className="flex h-[min(31rem,54dvh)] min-h-72 flex-col gap-2 lg:h-[calc(100dvh-28rem)] lg:min-h-72"
           >
@@ -423,8 +484,9 @@ export function StudioInspectorAsideShell({
 
           {/* 미니맵 / 네비게이터 */}
           <div
+            id={tabA11y.document.navigator.panelId}
             role="tabpanel"
-            aria-label="미니맵과 페이지 탐색"
+            aria-labelledby={`${tabA11y.primary.document.tabId} ${tabA11y.document.navigator.tabId}`}
             hidden={
               inspectorLayout.primary !== "document" ||
               inspectorLayout.document !== "navigator"
@@ -504,6 +566,8 @@ export function StudioInspectorAsideShell({
           </div>
           <StudioInspectorPublishPanel
             active={inspectorLayout.primary === "publish"}
+            panelId={tabA11y.primary.publish.panelId}
+            panelLabelledBy={tabA11y.primary.publish.tabId}
             autoFocusTitle={
               isMobile && mobileSheet === "props" && pendingSaveIntent !== null
             }

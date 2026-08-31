@@ -1,9 +1,14 @@
 /**
- * Figma-inspired Design panel fields (X / Y / W / H / ° / opacity).
+ * Authoritative selection geometry fields (position / size / rotation / opacity).
  * Pure presentation — parent applies patches via onChange.
  */
 import { FlipHorizontal2, FlipVertical2, ScanSearch } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import {
+  scrollStudioInspectorTargetIntoView,
+  useStudioInspectorFocusRequest,
+} from "./studio-inspector-focus-effect";
 
 import type {
   StudioFigmaSelectionLayoutMetrics,
@@ -29,6 +34,7 @@ function Field({
   value,
   disabled,
   disabledReason,
+  mixed = false,
   step = 1,
   min,
   max,
@@ -40,6 +46,8 @@ function Field({
   disabled?: boolean;
   /** Shown as the field's tooltip while it is inert, so a grey box always says why. */
   disabledReason?: string | null;
+  /** Multiple selected values differ; an empty field stays editable as a shared override. */
+  mixed?: boolean;
   step?: number;
   min?: number;
   max?: number;
@@ -55,18 +63,21 @@ function Field({
 
   function commitDraft() {
     if (draft === null) return;
-    const next = Number(draft);
+    const parsed = Number(draft);
     setDraft(null);
-    if (draft.trim() === "" || !Number.isFinite(next) || next === settled) return;
+    const next = Math.min(max ?? Number.POSITIVE_INFINITY, Math.max(min ?? Number.NEGATIVE_INFINITY, parsed));
+    // A mixed field may intentionally be normalised to the first item's current value.
+    // It still needs a commit so the remaining selected items receive that shared value.
+    if (draft.trim() === "" || !Number.isFinite(parsed) || (!mixed && next === settled)) return;
     onCommit(next);
   }
 
   return (
     <label className="grid min-w-0 gap-0.5" title={inertHint}>
-      <span className="text-[0.58rem] font-bold uppercase tracking-wide text-fg-3">
+      <span className="text-xs font-bold tracking-tight text-fg-3">
         {label}
       </span>
-      <span className="flex items-center gap-0.5 rounded-lg border border-line bg-card px-1.5 py-1 focus-within:border-accent/50">
+      <span className="flex w-full min-w-0 items-center gap-0.5 overflow-hidden rounded-lg border border-line bg-card px-1.5 py-1 focus-within:border-accent/50">
         <input
           type="number"
           inputMode="decimal"
@@ -75,9 +86,10 @@ function Field({
           step={step}
           min={min}
           max={max}
-          value={draft ?? String(settled)}
+          value={draft ?? (mixed ? "" : String(settled))}
+          placeholder={mixed ? "혼합" : undefined}
           aria-label={label}
-          className="min-w-0 flex-1 bg-transparent text-[0.72rem] font-semibold tabular-nums text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
+          className="w-0 min-w-0 flex-1 bg-transparent text-[0.8rem] font-semibold tabular-nums text-fg outline-none placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
           onChange={(event) => setDraft(event.currentTarget.value)}
           onBlur={commitDraft}
           onKeyDown={(event) => {
@@ -91,7 +103,7 @@ function Field({
           }}
         />
         {suffix ? (
-          <span className="shrink-0 text-[0.58rem] font-semibold text-fg-3">{suffix}</span>
+          <span className="shrink-0 text-[0.68rem] font-semibold text-fg-3">{suffix}</span>
         ) : null}
       </span>
     </label>
@@ -107,27 +119,48 @@ export function StudioFigmaDesignPanel({
   onZoomToSelection,
   className,
 }: StudioFigmaDesignPanelProps) {
+  const rootRef = useRef<HTMLElement>(null);
+  const [focusHighlighted, setFocusHighlighted] = useState(false);
+  useStudioInspectorFocusRequest("selection.geometry", () => {
+    setFocusHighlighted(true);
+    scrollStudioInspectorTargetIntoView(rootRef.current);
+    globalThis.requestAnimationFrame?.(() => {
+      rootRef.current?.focus({ preventScroll: true });
+    });
+  });
+  useEffect(() => {
+    if (!focusHighlighted) return;
+    const timeout = globalThis.setTimeout(() => setFocusHighlighted(false), 1_600);
+    return () => globalThis.clearTimeout(timeout);
+  }, [focusHighlighted]);
+
   if (!metrics) return null;
   const multi = metrics.elementCount > 1;
 
   return (
     <section
+      ref={rootRef}
+      tabIndex={-1}
       data-studio-figma-design-panel="true"
-      aria-label="디자인 · 위치와 크기"
+      data-studio-selection-scope={multi ? "multiple" : "single"}
+      data-inspector-section="selection.geometry"
+      data-inspector-section-highlighted={focusHighlighted ? "true" : undefined}
+      aria-label="위치와 크기"
       className={cn(
-        "rounded-xl border border-line/80 bg-panel/50 p-2.5 shadow-[inset_0_1px_0_oklch(0.98_0.01_85/0.04)]",
+        "rounded-xl border border-line/80 bg-panel/50 p-2.5 shadow-[inset_0_1px_0_oklch(0.98_0.01_85/0.04)] transition-[background-color,box-shadow] duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        focusHighlighted && "bg-accent-soft/55 shadow-[0_0_0_2px_oklch(0.72_0.185_42/0.55)]",
         className,
       )}
     >
       <header className="mb-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[0.72rem] font-extrabold tracking-tight text-fg">
-            디자인
+          <p className="text-xs font-extrabold tracking-tight text-fg">
+            위치와 크기
           </p>
-          <p className="text-[0.6rem] font-medium text-fg-3">
+          <p className="text-[0.7rem] font-medium text-fg-3">
             {multi
-              ? `${metrics.elementCount}개 선택 · 공통 위치 기준`
-              : "위치 · 크기 · 투명도 (Figma 스타일)"}
+              ? `${metrics.elementCount}개 선택 · 공통 속성`
+              : "좌표 · 크기 · 회전 · 투명도"}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -141,7 +174,7 @@ export function StudioFigmaDesignPanel({
               className={buttonClass({
                 size: "sm",
                 variant: "quiet",
-                className: "size-8 gap-0 px-0",
+                className: "size-9 gap-0 px-0 pointer-coarse:size-11",
               })}
             >
               <ScanSearch size={14} aria-hidden />
@@ -157,7 +190,7 @@ export function StudioFigmaDesignPanel({
               className={buttonClass({
                 size: "sm",
                 variant: "quiet",
-                className: "size-8 gap-0 px-0",
+                className: "size-9 gap-0 px-0 pointer-coarse:size-11",
               })}
             >
               <FlipHorizontal2 size={14} aria-hidden />
@@ -173,7 +206,7 @@ export function StudioFigmaDesignPanel({
               className={buttonClass({
                 size: "sm",
                 variant: "quiet",
-                className: "size-8 gap-0 px-0",
+                className: "size-9 gap-0 px-0 pointer-coarse:size-11",
               })}
             >
               <FlipVertical2 size={14} aria-hidden />
@@ -182,39 +215,48 @@ export function StudioFigmaDesignPanel({
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2">
         <Field
-          label="X"
+          key={`x:${metrics.selectionKey}`}
+          label="가로 위치 X"
           value={metrics.x}
-          disabled={disabled || multi}
+          disabled={disabled}
+          suffix="px"
           onCommit={(x) => onChange({ x })}
         />
         <Field
-          label="Y"
+          key={`y:${metrics.selectionKey}`}
+          label="세로 위치 Y"
           value={metrics.y}
-          disabled={disabled || multi}
+          disabled={disabled}
+          suffix="px"
           onCommit={(y) => onChange({ y })}
         />
         <Field
-          label="W"
+          key={`w:${metrics.selectionKey}`}
+          label="너비 W"
           value={metrics.width}
-          disabled={disabled || multi || !metrics.hasFixedSize}
-          disabledReason={metrics.sizeDisabledReason}
+          disabled={disabled || multi || !metrics.supportsWidth}
+          disabledReason={metrics.widthDisabledReason}
           min={1}
+          suffix="px"
           onCommit={(width) => onChange({ width })}
         />
         <Field
-          label="H"
+          key={`h:${metrics.selectionKey}`}
+          label="높이 H"
           value={metrics.height}
-          disabled={disabled || multi || !metrics.hasFixedSize}
-          disabledReason={metrics.sizeDisabledReason}
+          disabled={disabled || multi || !metrics.supportsHeight}
+          disabledReason={metrics.heightDisabledReason}
           min={1}
+          suffix="px"
           onCommit={(height) => onChange({ height })}
         />
       </div>
 
       <div className="mt-1.5 grid grid-cols-2 gap-1.5">
         <Field
+          key={`rotation:${metrics.selectionKey}`}
           // A stroke has no stored angle, so the box is an "and now turn it this much" input
           // rather than a readout. Labelling it plain 회전 would promise a state that the
           // document does not carry.
@@ -227,9 +269,16 @@ export function StudioFigmaDesignPanel({
           onCommit={(rotation) => onChange({ rotation })}
         />
         <Field
+          key={`opacity:${metrics.selectionKey}`}
           label="불투명"
           value={Math.round(metrics.opacity * 100)}
-          disabled={disabled || multi || !metrics.supportsOpacity}
+          disabled={disabled || !metrics.supportsOpacity}
+          disabledReason={
+            metrics.supportsOpacity
+              ? null
+              : "프레임이 포함된 선택은 불투명도를 함께 바꿀 수 없어요."
+          }
+          mixed={metrics.opacityMixed}
           step={1}
           min={0}
           max={100}
@@ -239,19 +288,29 @@ export function StudioFigmaDesignPanel({
       </div>
 
       {multi ? (
-        <p className="mt-2 text-[0.6rem] leading-snug text-fg-3">
-          여러 개 선택 중에는 정렬·분배·반전·선택 확대를 사용하세요. 개별 X/Y/W/H는
-          하나만 선택했을 때 편집할 수 있어요.
+        <div className="mt-2 space-y-1.5 rounded-lg bg-canvas/45 px-2 py-2 text-[0.7rem] leading-relaxed text-fg-3">
+          <p>
+            가로·세로 위치는 선택 묶음 전체를 이동하고, 불투명도는 한 번에 적용합니다.
+            크기와 회전은 캔버스 핸들에서 조절해 주세요.
+          </p>
+          <p className="font-medium text-fg-2">
+            색상·글자·클리핑처럼 대상마다 다른 속성은 한 개만 선택하면 표시됩니다.
+          </p>
+        </div>
+      ) : null}
+      {!multi && (!metrics.supportsWidth || !metrics.supportsHeight) ? (
+        <p className="mt-2 rounded-md bg-canvas/45 px-2 py-1.5 text-[0.7rem] leading-relaxed text-fg-3">
+          {metrics.widthDisabledReason ?? metrics.heightDisabledReason}
         </p>
       ) : null}
       {!multi && metrics.rotationIsRelative && metrics.supportsRotation ? (
-        <p className="mt-2 text-[0.6rem] leading-snug text-fg-3">
+        <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">
           선화는 회전이 점에 그대로 구워져요. 회전 칸은 현재 각도가 아니라 &ldquo;여기서 몇 도
           더&rdquo;예요 — 15를 넣으면 15° 돌아가고 칸은 0으로 돌아옵니다.
         </p>
       ) : null}
       {!multi && metrics.rotationIsRelative && metrics.rotationDisabledReason ? (
-        <p className="mt-2 text-[0.6rem] leading-snug text-fg-3">
+        <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">
           {metrics.rotationDisabledReason}
         </p>
       ) : null}

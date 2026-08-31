@@ -210,6 +210,7 @@ export function StudioInspectorTextFillSection({
               key={mode.v}
               type="button"
               onClick={() => patchEl(selected.id, { fillType: mode.v as "solid" | "gradient" } as Partial<El>)}
+              aria-pressed={(selected.fillType ?? "solid") === mode.v}
               className={cn(
                 "flex-1 rounded py-1 text-[0.68rem] font-semibold transition-colors",
                 (selected.fillType ?? "solid") === mode.v

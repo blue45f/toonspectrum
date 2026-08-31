@@ -114,6 +114,46 @@ describe("StudioCommandSearchDialog", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("숫자 배치 결과는 실제 선택 속성 카드까지 포커스하도록 전달한다", () => {
+    const onNavigateInspector = vi.fn();
+    openDialog({ onNavigateInspector });
+    type("위치 크기");
+    fireEvent.click(screen.getByText("위치·크기"));
+    expect(onNavigateInspector).toHaveBeenCalledWith(
+      { primary: "properties" },
+      "selection.geometry",
+    );
+  });
+
+  it("도구 속성 결과는 접힘 상태가 아니라 실제 팔레트 열기 요청을 전달한다", () => {
+    const onExpandPalette = vi.fn();
+    openDialog({ onExpandPalette });
+    type("도구 속성");
+    const paletteResult = screen.getAllByRole("option").find(
+      (option) => option.getAttribute("data-action") === "palette"
+        && within(option).queryByText("도구 속성"),
+    );
+    expect(paletteResult).toBeTruthy();
+    fireEvent.click(paletteResult as HTMLElement);
+    expect(onExpandPalette).toHaveBeenCalledWith("tool-properties");
+  });
+
+  it("브러시 스튜디오 결과는 도구 속성 안의 실제 섹션까지 전달한다", () => {
+    const onNavigateInspector = vi.fn();
+    openDialog({ onNavigateInspector });
+    type("브러시 스튜디오");
+    const inspectorResult = screen.getAllByRole("option").find(
+      (option) => option.getAttribute("data-action") === "inspector"
+        && within(option).queryByText("브러시 스튜디오"),
+    );
+    expect(inspectorResult).toBeTruthy();
+    fireEvent.click(inspectorResult as HTMLElement);
+    expect(onNavigateInspector).toHaveBeenCalledWith(
+      { primary: "properties" },
+      "tool.brush-studio",
+    );
+  });
+
   it("빈 질의는 목록 대신 안내만 보여준다", () => {
     openDialog();
     expect(screen.queryAllByRole("option")).toHaveLength(0);
@@ -265,10 +305,12 @@ describe("StudioCommandSearchDialog — 스크린리더 계약", () => {
 
 describe("StudioCommandSearchHost", () => {
   it("F1 이 통합 검색을 연다 (감사 §2.8 'F1 바인딩 없음' 해소)", async () => {
-    render(<StudioCommandSearchHost />);
+    const onRequestOpen = vi.fn();
+    render(<StudioCommandSearchHost onRequestOpen={onRequestOpen} />);
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.keyDown(window, { key: "F1" });
     expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(onRequestOpen).toHaveBeenCalledOnce();
   });
 
   it("입력 중에는 F1 을 가로채지 않는다", () => {

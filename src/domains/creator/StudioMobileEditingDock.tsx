@@ -638,7 +638,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const t = useT();
   const localizedWorkspaceToggle = localizeStudioText(
     t,
-    "도구",
+    "작업 메뉴",
     "studio.mobileDock.workspaceToggle",
   );
   // 도크 라벨은 로케일 팩 키를 우선하고, 팩이 아직 안 붙었거나 키가 없으면 저작 한국어로 되돌아온다.
@@ -663,21 +663,13 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
       "브러시 설정 (굵기·색·프리셋)",
       "studio.mobileDock.brushSettings",
     ),
-    // 한국어 팩의 레거시 "작업"은 바로 옆 인스펙터 런처와 같은 이름이었다. 기존 키와
-    // 다른 로케일 번역(Tools 등)은 유지하면서 한국어 표시만 동작에 맞는 "도구"로 정리한다.
+    // 한국어 팩의 레거시 "작업"·"도구"는 무엇이 펼쳐지는지 설명하지 못했다. 기존 키의
+    // 다른 로케일 번역(Tools 등)은 유지하면서 한국어 표시만 동작에 맞는 이름으로 정리한다.
     workspaceToggle:
-      localizedWorkspaceToggle === "작업" ? "도구" : localizedWorkspaceToggle,
+      localizedWorkspaceToggle === "작업" || localizedWorkspaceToggle === "도구"
+        ? "작업 메뉴"
+        : localizedWorkspaceToggle,
     collapse: localizeStudioText(t, "접기", "studio.toolsCompanion.layoutSettings.collapse"),
-    expandWorkspaceTools: localizeStudioText(
-      t,
-      "작업 공간 도구 펼치기",
-      "studio.mobileDock.expandWorkspaceTools",
-    ),
-    collapseWorkspaceTools: localizeStudioText(
-      t,
-      "작업 공간 도구 접기",
-      "studio.mobileDock.collapseWorkspaceTools",
-    ),
   };
   // 브러시 시트는 판단 대상인 캔버스 위에 뜬다. medium 으로 열면 360×640 에서 캔버스가 126행(19.7%)만
   // 남아 굵기를 바꿔도 결과를 볼 수 없다. compact 로 열고 그래버로 승격하게 둔다.
@@ -836,8 +828,14 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             <StudioContextActionButton
               icon={SlidersHorizontal}
               label="속성"
+              data-studio-selection-properties-trigger="true"
               onClick={() => {
                 openInspectorRoute({ primary: "properties" }, "props");
+                // Keep the thumb-bar action responsive even when the shared route helper defers
+                // sheet presentation for desktop-to-mobile layout stabilization. The helper still
+                // records this button as the return-focus target; this immediate state write only
+                // removes the otherwise visible two-frame dead period.
+                setMobileSheet("props");
               }}
             />
             {/* 말풍선·글자를 고른 순간에만 뜬다. 더블탭으로도 편집에 들어가지만 그건 보이지
@@ -1589,7 +1587,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/채우기/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
             <div className="flex min-w-0 items-stretch gap-1">
               <div
-                className="relative min-w-0 flex-1"
+                className="relative min-w-0 flex-1 overflow-hidden"
                 data-studio-mobile-scroll-host="primary"
               >
                 <div
@@ -1809,7 +1807,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 type="button"
                 aria-controls={MOBILE_WORKSPACE_TOOLS_ID}
                 aria-expanded={workspaceDockExpanded}
-                aria-label={workspaceDockExpanded ? label.collapseWorkspaceTools : label.expandWorkspaceTools}
+                aria-label={workspaceDockExpanded
+                  ? `${label.collapse} · ${label.workspaceToggle}`
+                  : label.workspaceToggle}
                 title={workspaceDockExpanded ? "작업 공간 도구 접기" : "댓글·페이지·필터·새 작업·작업 패널·색각·줌 도구 펼치기"}
                 data-studio-mobile-workspace-toggle="true"
                 onFocus={preloadStudioInspectorDrawingSurface}
@@ -1882,11 +1882,14 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 >
                 <StudioDockNavButton
                   icon={Layers}
-                  label="패널"
+                  label="작업 패널"
                   aria-label={
+                    "작업 패널"
+                  }
+                  title={
                     mobileSheet === "props"
                       ? "작업 패널 닫기"
-                      : "속성·레이어·페이지·작품 정보 패널 열기"
+                      : "작업 패널 열기 · 속성·레이어·페이지·작품 정보"
                   }
                   aria-haspopup="dialog"
                   aria-expanded={mobileSheet === "props"}

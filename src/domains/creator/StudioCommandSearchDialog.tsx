@@ -24,13 +24,17 @@ import type {
   StudioSearchOutcome,
   StudioSearchResult,
 } from "./studio-command-search";
+import type { StudioInspectorFocusTarget } from "./studio-inspector-focus";
 import type { StudioInspectorRoute } from "./studio-inspector-layout";
 
 export interface StudioCommandSearchDialogProps {
   open: boolean;
   onClose: () => void;
   /** 인스펙터 라우트로 이동. 없으면 그 행은 이동한다고 광고하지 않는다. */
-  onNavigateInspector?: (route: StudioInspectorRoute) => void;
+  onNavigateInspector?: (
+    route: StudioInspectorRoute,
+    focusTarget?: StudioInspectorFocusTarget,
+  ) => void;
   /** 튜토리얼 허브 열기. */
   onOpenTutorial?: (tutorialId: string) => void;
   /** 그리기 팔레트 펼치기. */
@@ -248,7 +252,8 @@ export function StudioCommandSearchDialog({
             primary: target.primary,
             ...(target.image ? { image: target.image } : {}),
           };
-          onNavigateInspector?.(route);
+          if (target.focusTarget) onNavigateInspector?.(route, target.focusTarget);
+          else onNavigateInspector?.(route);
           onClose();
           return;
         }
