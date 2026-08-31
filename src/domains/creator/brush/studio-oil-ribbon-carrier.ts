@@ -799,14 +799,15 @@ function weldByTrack<TRun extends { readonly points: readonly number[] }>(
  * every furrow's continuity; the bed still fans under pressure because the hairs' OFFSETS scale
  * with radiusY.
  */
-function widthGauges(planned: readonly PlannedBristleRun[]): readonly BristleWidthGauge[] {
-  const byHair = new Map<number, PlannedBristleRun[]>();
-  for (const run of planned) {
-    const hair = byHair.get(run.bristleIndex);
-    if (hair) hair.push(run);
-    else byHair.set(run.bristleIndex, [run]);
-  }
-  const hairs = [...byHair.values()]
+function widthGauges(
+  runsByHair: readonly (readonly PlannedBristleRun[])[],
+): readonly BristleWidthGauge[] {
+  // Taken as it is built rather than regrouped from a flat array. Both this and the band walk
+  // below used to rebuild the same `Map<bristleIndex, runs>` from ~27k runs on every move, while
+  // the planner was already holding exactly that grouping. A hair that emitted nothing is skipped,
+  // as an absent map key was: it carries no width, and it must not count toward the group size.
+  const hairs = runsByHair
+    .filter((runs) => runs.length > 0)
     .map((runs) => ({ runs, width: meanBy(runs, (run) => run.width) }))
     .sort((left, right) => left.width - right.width);
   const gauges: BristleWidthGauge[] = [];
@@ -814,7 +815,8 @@ function widthGauges(planned: readonly PlannedBristleRun[]): readonly BristleWid
   for (let start = 0; start < hairs.length; start += size) {
     const group = hairs.slice(start, start + size);
     if (group.length === 0) continue;
-    const runs = group.flatMap(({ runs: hairRuns }) => hairRuns);
+    const runs: readonly PlannedBristleRun[] = group
+      .flatMap<PlannedBristleRun>(({ runs: hairRuns }) => hairRuns as PlannedBristleRun[]);
     gauges.push({ runs, lineWidth: meanBy(runs, (run) => run.width) });
   }
   return gauges;
@@ -848,19 +850,15 @@ const BRISTLE_BAND_HYSTERESIS = 0.4;
  * is what breaks those ribbons into the interrupted, skipping stroke that reads as bristle.
  */
 function bandRunsAlongEachHair(
-  planned: readonly PlannedBristleRun[],
+  runsByHair: readonly (readonly PlannedBristleRun[])[],
   minimumLoad: number,
   span: number,
 ): ReadonlyMap<PlannedBristleRun, number> {
-  const byHair = new Map<number, PlannedBristleRun[]>();
-  for (const run of planned) {
-    const hair = byHair.get(run.bristleIndex);
-    if (hair) hair.push(run);
-    else byHair.set(run.bristleIndex, [run]);
-  }
   const bandByRun = new Map<PlannedBristleRun, number>();
-  for (const hair of byHair.values()) {
-    hair.sort((left, right) => left.runIndex - right.runIndex);
+  // `buildBristleRunsForHair` walks one hair's run origins in order and appends, so each hair
+  // arrives sorted by `runIndex` — which is what the trigger below needs and what the regrouped
+  // copy used to re-establish with a sort per hair on every move.
+  for (const hair of runsByHair) {
     let held = -1;
     for (const run of hair) {
       const normalized = span > POINT_EPSILON ? (run.load - minimumLoad) / span : 0;
@@ -951,11 +949,12 @@ function bandAnchorDeposit(band: number): number {
 const BRISTLE_V2_FIXED_MAX_LOAD = 0.62;
 
 function planFixedAnchorBristleLanes(
-  planned: readonly PlannedBristleRun[],
+  runsByHair: readonly (readonly PlannedBristleRun[])[],
 ): readonly StudioOilRibbonBristleLane[] {
-  const bandByRun = bandRunsAlongEachHair(planned, 0, BRISTLE_V2_FIXED_MAX_LOAD);
+  const bandByRun = bandRunsAlongEachHair(runsByHair, 0, BRISTLE_V2_FIXED_MAX_LOAD);
   const runsByKey = new Map<number, PlannedBristleRun[]>();
-  for (const run of planned) {
+  // Hair-major, exactly the order the flat array this used to take was built in.
+  for (const run of runsByHair.flat()) {
     const band = bandByRun.get(run);
     if (band === undefined) continue;
     const bucket = Math.min(
@@ -1116,25 +1115,30 @@ function buildBristleRunsForHair(
  * the runs carry.
  */
 function planBristleLanesFromRuns(
-  planned: readonly PlannedBristleRun[],
+  runsByHair: readonly (readonly PlannedBristleRun[])[],
   banding: "observed-span-v1" | "fixed-anchor-v2",
 ): readonly StudioOilRibbonBristleLane[] {
-  if (planned.length === 0) return [];
-
   if (banding === "fixed-anchor-v2") {
-    return planFixedAnchorBristleLanes(planned);
+    return runsByHair.some((runs) => runs.length > 0)
+      ? planFixedAnchorBristleLanes(runsByHair)
+      : [];
   }
 
   let minimumLoad = Number.POSITIVE_INFINITY;
   let maximumLoad = Number.NEGATIVE_INFINITY;
-  for (const run of planned) {
-    minimumLoad = Math.min(minimumLoad, run.load);
-    maximumLoad = Math.max(maximumLoad, run.load);
+  let count = 0;
+  for (const hair of runsByHair) {
+    for (const run of hair) {
+      minimumLoad = Math.min(minimumLoad, run.load);
+      maximumLoad = Math.max(maximumLoad, run.load);
+      count += 1;
+    }
   }
+  if (count === 0) return [];
   const span = maximumLoad - minimumLoad;
-  const bandByRun = bandRunsAlongEachHair(planned, minimumLoad, span);
+  const bandByRun = bandRunsAlongEachHair(runsByHair, minimumLoad, span);
   const lanes: StudioOilRibbonBristleLane[] = [];
-  for (const gauge of widthGauges(planned)) {
+  for (const gauge of widthGauges(runsByHair)) {
     const bands: PlannedBristleRun[][] = Array.from(
       { length: BRISTLE_LOAD_BANDS },
       () => [],
@@ -1235,13 +1239,11 @@ function planBristleLanes(
 ): readonly StudioOilRibbonBristleLane[] {
   if (stations.length < 2) return [];
   const bristleCount = resolveBristleCount(stations);
-  const planned: PlannedBristleRun[] = [];
+  const runsByHair: PlannedBristleRun[][] = new Array(bristleCount);
   for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
-    for (const run of buildBristleRunsForHair(stations, bristleIndex, dynamics, physics)) {
-      planned.push(run);
-    }
+    runsByHair[bristleIndex] = buildBristleRunsForHair(stations, bristleIndex, dynamics, physics);
   }
-  return planBristleLanesFromRuns(planned, banding);
+  return planBristleLanesFromRuns(runsByHair, banding);
 }
 
 /**
@@ -2184,10 +2186,7 @@ class StudioImpastoReliefPlanner {
     // tail start writes. Both this move's tail and the previous one are covered by starting at
     // the smaller index, and one station back for the ridge segment that reaches into it.
     const changedFrom = Math.max(0, Math.min(this.dirtyFromStation, this.settledEnd) - 1);
-    if (reshadeRetained) {
-      const stamped = impastoStationBounds(stations, changedFrom, grid);
-      if (stamped) dirty.push(stamped);
-    }
+    if (reshadeRetained) impastoStationBounds(stations, changedFrom, grid, dirty);
     this.dirtyFromStation = this.settledEnd;
 
     this.grid = grid;
@@ -2208,37 +2207,63 @@ class StudioImpastoReliefPlanner {
 }
 
 /**
- * Cell rectangle the stations `[from, end)` can write into.
+ * Stations per dirty rectangle, and the ceiling on how many rectangles a tail may be cut into.
  *
- * Deliberately the same reach the tile margin is sized by, not the exact per-station clamp the
- * stampers compute: a superset costs a few extra cells of re-shading, an undersized one leaves a
- * stale cell that nothing will ever correct.
+ * One box over the whole tail is a poor cover of an arc. At the dab cap the lattice refits about
+ * 120 stations behind the head on every move, and a stroke that curls puts a big diagonal box
+ * over ground most of those stations never touch: measured on a curling capped bed, that box
+ * overlapped 125 of 1210 relief run indices, against about 8 that the tail actually moved. Local
+ * boxes cover the same stations and re-shade fewer cells, which is also what decides how many
+ * settled runs have to be cut again.
+ */
+const IMPASTO_RELIEF_DIRTY_CHUNK_STATIONS = 16;
+const IMPASTO_RELIEF_DIRTY_MAX_RECTS = 12;
+
+/**
+ * Cell rectangles the stations `[from, end)` can write into, appended to `into`.
+ *
+ * The reach is deliberately the same one the tile margin is sized by, not the exact per-station
+ * clamp the stampers compute: a superset costs a few extra cells of re-shading, an undersized one
+ * leaves a stale cell that nothing will ever correct.
+ *
+ * Chunks overlap by one station because the film and ridge stamps live BETWEEN stations. A box
+ * holding both ends of a segment holds the whole segment, so every consecutive pair has to fall
+ * inside one box rather than being split across two abutting ones.
  */
 function impastoStationBounds(
   stations: readonly OilCarrierStation[],
   from: number,
   grid: ImpastoReliefGrid,
-): ImpastoDirtyRect | null {
-  if (from >= stations.length) return null;
-  let minX = Number.POSITIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (let index = from; index < stations.length; index += 1) {
-    const station = stations[index]!;
-    const reach = station.radiusY * IMPASTO_RELIEF_STAMP_REACH_RADIUS_RATIO
-      + IMPASTO_RELIEF_STAMP_REACH_CELLS * grid.cell;
-    minX = Math.min(minX, station.x - reach);
-    minY = Math.min(minY, station.y - reach);
-    maxX = Math.max(maxX, station.x + reach);
-    maxY = Math.max(maxY, station.y + reach);
+  into: ImpastoDirtyRect[],
+): void {
+  const count = stations.length - from;
+  if (count <= 0) return;
+  const chunk = Math.max(
+    IMPASTO_RELIEF_DIRTY_CHUNK_STATIONS,
+    Math.ceil(count / IMPASTO_RELIEF_DIRTY_MAX_RECTS),
+  );
+  for (let start = from; start < stations.length; start += chunk) {
+    const end = Math.min(stations.length, start + chunk + 1);
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (let index = start; index < end; index += 1) {
+      const station = stations[index]!;
+      const reach = station.radiusY * IMPASTO_RELIEF_STAMP_REACH_RADIUS_RATIO
+        + IMPASTO_RELIEF_STAMP_REACH_CELLS * grid.cell;
+      minX = Math.min(minX, station.x - reach);
+      minY = Math.min(minY, station.y - reach);
+      maxX = Math.max(maxX, station.x + reach);
+      maxY = Math.max(maxY, station.y + reach);
+    }
+    if (!Number.isFinite(minX)) continue;
+    const x = Math.floor((minX - grid.originX) / grid.cell);
+    const y = Math.floor((minY - grid.originY) / grid.cell);
+    const right = Math.ceil((maxX - grid.originX) / grid.cell) + 1;
+    const bottom = Math.ceil((maxY - grid.originY) / grid.cell) + 1;
+    into.push({ x, y, width: right - x, height: bottom - y });
   }
-  if (!Number.isFinite(minX)) return null;
-  const x = Math.floor((minX - grid.originX) / grid.cell);
-  const y = Math.floor((minY - grid.originY) / grid.cell);
-  const right = Math.ceil((maxX - grid.originX) / grid.cell) + 1;
-  const bottom = Math.ceil((maxY - grid.originY) / grid.cell) + 1;
-  return { x, y, width: right - x, height: bottom - y };
 }
 
 /**
@@ -2456,7 +2481,6 @@ function planImpastoReliefOverlayLanes(
     ? retained.planner.build(stations, retained.settled)
     : buildImpastoReliefField(stations);
   if (!field) return Object.freeze([]);
-  const planned: PlannedImpastoReliefRun[] = [];
   const bristleCount = impastoBristleCount(stations);
   const runCount = Math.max(0, Math.ceil((stations.length - 1) / BRISTLE_RUN_STATIONS));
   // The stripes walk the bed on the SAME stride the height field raised its ridges on. See
@@ -2486,9 +2510,14 @@ function planImpastoReliefOverlayLanes(
     for (let index = runStart; index <= runEnd; index += 1) {
       const station = stations[index]!;
       const at = pointAt(station, side);
+      // Quantised here, not at emission. `quantizedPoints` is elementwise and welding only
+      // concatenates runs (dropping the shared joint point), so quantising a run's own points
+      // and joining them gives the same array as joining and then quantising — and this way a
+      // reused run arrives with its coordinates already on the grid instead of every welded
+      // stripe re-rounding every coordinate it is made of on every move.
       points.push(
-        station.x + station.normalX * at.geomOffset,
-        station.y + station.normalY * at.geomOffset,
+        quantize(station.x + station.normalX * at.geomOffset),
+        quantize(station.y + station.normalY * at.geomOffset),
       );
       const sampleX = station.x + station.normalX * at.sampleOffset;
       const sampleY = station.y + station.normalY * at.sampleOffset;
@@ -2502,7 +2531,7 @@ function planImpastoReliefOverlayLanes(
     }
     if (samples < 2) return undefined;
     return {
-      points,
+      points: Object.freeze(points),
       strength: strengthSum / samples,
       width: widthSum / samples,
       trackIndex,
@@ -2570,8 +2599,15 @@ function planImpastoReliefOverlayLanes(
     bounds[box + 2] = Number.NEGATIVE_INFINITY;
     bounds[box + 3] = Number.NEGATIVE_INFINITY;
   }
+  // The run indices that have to be cut again — a settled prefix leaves a few dozen of ~1.4k.
+  // Every track re-cuts the same ones, so the list is walked instead of the whole population:
+  // deciding "reuse" for each of ~26.5k (track, run) pairs individually cost more than cutting
+  // the handful that actually moved.
+  const stale: number[] = [];
+  for (let runIndex = 0; runIndex < runCount; runIndex += 1) {
+    if (reusable?.[runIndex] !== true) stale.push(runIndex);
+  }
   const tracks: (readonly (PlannedImpastoReliefRun | undefined)[])[] = [];
-  let reused = 0;
 
   // Walked track by track, not run by run: the bucketing below wants exactly this order, and a
   // cached track is a contiguous array the reuse test indexes straight into. The old loop nested
@@ -2585,12 +2621,20 @@ function planImpastoReliefOverlayLanes(
       readonly width: number;
     },
   ): void => {
-    const held = cached?.tracks[tracks.length];
+    // Every reusable index carries a run in the cached track, so the copy never leaves a hole.
+    // `reusableReliefRuns` offers an index only within its own bounds array, which is as long as
+    // the previous move's run count; and it offers index r only when 3(r+1) <= settled - 1, so
+    // 3r + 1 <= settled - 3 < settled <= the previous station count — which is exactly the
+    // condition under which the previous move's `collectRun` had two or more samples to average
+    // and returned a run rather than `undefined`.
+    const kept = cached?.tracks[tracks.length];
     const runs = new Array<PlannedImpastoReliefRun | undefined>(runCount);
-    for (let runIndex = 0; runIndex < runCount; runIndex += 1) {
-      const kept = reusable?.[runIndex] === true ? held?.[runIndex] : undefined;
-      if (kept) reused += 1;
-      const run = kept ?? collectRun(
+    if (kept !== undefined) {
+      const carry = Math.min(runCount, kept.length);
+      for (let runIndex = 0; runIndex < carry; runIndex += 1) runs[runIndex] = kept[runIndex];
+    }
+    for (const runIndex of stale) {
+      runs[runIndex] = collectRun(
         runIndex * BRISTLE_RUN_STATIONS,
         Math.min(stations.length - 1, (runIndex + 1) * BRISTLE_RUN_STATIONS),
         pointAt,
@@ -2599,8 +2643,6 @@ function planImpastoReliefOverlayLanes(
         runIndex,
         bounds,
       );
-      runs[runIndex] = run;
-      if (run) planned.push(run);
     }
     tracks.push(runs);
   };
@@ -2616,7 +2658,13 @@ function planImpastoReliefOverlayLanes(
     }
     collectTrack(trackOf(side, bristleCount), side, rimPointAt);
   }
-  retained?.planner.keepRuns(shape, tracks, bounds, reused);
+  // Runs, not run indices: `stale` is shared by every track, so each one reuses the same count.
+  retained?.planner.keepRuns(
+    shape,
+    tracks,
+    bounds,
+    cached === null ? 0 : (runCount - stale.length) * tracks.length,
+  );
 
   // Quantise into a bounded set of (kind, tone) lanes: one paint pass per lane keeps
   // self-crossings honest exactly like the load bands above.
@@ -2626,52 +2674,55 @@ function planImpastoReliefOverlayLanes(
     runs: PlannedImpastoReliefRun[];
     opacities: number[];
   }>();
-  // Walked in track order (which is the order they were cut in) so the bucket choice has a
-  // history. Independent bucketing let one ridge
+  // Walked in the order the tracks were cut in, so the bucket choice has a history. Independent
+  // bucketing let one ridge
   // flank flicker between two tone buckets from one three-station run to the next, which put the
   // two halves of a single glint in two different lanes: the weld could not rejoin them and the
   // lane rendered as a mosaic of light and dark tiles instead of a raked ridge.
   const held = new Map<number, { kind: StudioOilRibbonImpastoReliefKind; bucket: number }>();
-  for (const run of planned) {
-    const magnitude = Math.abs(run.strength);
-    if (magnitude < IMPASTO_RELIEF_MIN_STRENGTH) {
-      held.delete(run.trackIndex);
-      continue;
-    }
-    const kind: StudioOilRibbonImpastoReliefKind = run.strength > 0 ? "highlight" : "shadow";
-    const maxOpacity = kind === "highlight"
-      ? IMPASTO_RELIEF_MAX_HIGHLIGHT_OPACITY
-      : IMPASTO_RELIEF_MAX_SHADOW_OPACITY;
-    const gain = kind === "highlight"
-      ? IMPASTO_RELIEF_HIGHLIGHT_GAIN
-      : IMPASTO_RELIEF_SHADOW_GAIN;
-    const opacity = Math.min(maxOpacity, magnitude * gain);
-    const raw = opacity < maxOpacity * IMPASTO_RELIEF_BUCKET_EDGE_LOW
-      ? 0
-      : opacity < maxOpacity * IMPASTO_RELIEF_BUCKET_EDGE_HIGH
-        ? 1
-        : IMPASTO_RELIEF_OPACITY_BUCKETS - 1;
-    // A flank that flips lit/shaded is a genuinely different surface, so the trigger only holds
-    // within one kind; crossing zero always re-enters on the raw bucket.
-    const previous = held.get(run.trackIndex);
-    const ratio = opacity / maxOpacity;
-    const bucket = !previous || previous.kind !== kind
-      ? raw
-      : raw > previous.bucket
-        ? (ratio >= bucketEdgeAbove(previous.bucket) + IMPASTO_RELIEF_BUCKET_HYSTERESIS
-            ? raw : previous.bucket)
-        : raw < previous.bucket
-          ? (ratio <= bucketEdgeBelow(previous.bucket) - IMPASTO_RELIEF_BUCKET_HYSTERESIS
+  for (const track of tracks) {
+    for (const run of track) {
+      if (run === undefined) continue;
+      const magnitude = Math.abs(run.strength);
+      if (magnitude < IMPASTO_RELIEF_MIN_STRENGTH) {
+        held.delete(run.trackIndex);
+        continue;
+      }
+      const kind: StudioOilRibbonImpastoReliefKind = run.strength > 0 ? "highlight" : "shadow";
+      const maxOpacity = kind === "highlight"
+        ? IMPASTO_RELIEF_MAX_HIGHLIGHT_OPACITY
+        : IMPASTO_RELIEF_MAX_SHADOW_OPACITY;
+      const gain = kind === "highlight"
+        ? IMPASTO_RELIEF_HIGHLIGHT_GAIN
+        : IMPASTO_RELIEF_SHADOW_GAIN;
+      const opacity = Math.min(maxOpacity, magnitude * gain);
+      const raw = opacity < maxOpacity * IMPASTO_RELIEF_BUCKET_EDGE_LOW
+        ? 0
+        : opacity < maxOpacity * IMPASTO_RELIEF_BUCKET_EDGE_HIGH
+          ? 1
+          : IMPASTO_RELIEF_OPACITY_BUCKETS - 1;
+      // A flank that flips lit/shaded is a genuinely different surface, so the trigger only holds
+      // within one kind; crossing zero always re-enters on the raw bucket.
+      const previous = held.get(run.trackIndex);
+      const ratio = opacity / maxOpacity;
+      const bucket = !previous || previous.kind !== kind
+        ? raw
+        : raw > previous.bucket
+          ? (ratio >= bucketEdgeAbove(previous.bucket) + IMPASTO_RELIEF_BUCKET_HYSTERESIS
               ? raw : previous.bucket)
-          : raw;
-    held.set(run.trackIndex, { kind, bucket });
-    // Shadows first, glints last: paint order is the plan order on both surfaces.
-    const order = (kind === "shadow" ? 0 : IMPASTO_RELIEF_OPACITY_BUCKETS) + bucket;
-    const key = `${kind}:${bucket}`;
-    const entry = buckets.get(key) ?? { kind, order, runs: [], opacities: [] };
-    entry.runs.push(run);
-    entry.opacities.push(opacity);
-    buckets.set(key, entry);
+          : raw < previous.bucket
+            ? (ratio <= bucketEdgeBelow(previous.bucket) - IMPASTO_RELIEF_BUCKET_HYSTERESIS
+                ? raw : previous.bucket)
+            : raw;
+      held.set(run.trackIndex, { kind, bucket });
+      // Shadows first, glints last: paint order is the plan order on both surfaces.
+      const order = (kind === "shadow" ? 0 : IMPASTO_RELIEF_OPACITY_BUCKETS) + bucket;
+      const key = `${kind}:${bucket}`;
+      const entry = buckets.get(key) ?? { kind, order, runs: [], opacities: [] };
+      entry.runs.push(run);
+      entry.opacities.push(opacity);
+      buckets.set(key, entry);
+    }
   }
 
   const lanes = [...buckets.values()]
@@ -2679,8 +2730,10 @@ function planImpastoReliefOverlayLanes(
     .map((entry) => {
       const welded = weldReliefRuns(entry.runs);
       return Object.freeze({
+        // Already on the quantisation grid — see `collectRun`. A stripe welded from several runs
+        // owns a fresh buffer, one welded from a single run shares that run's frozen array.
         runs: Object.freeze(welded.map((run) => Object.freeze({
-          points: quantizedPoints(run.points),
+          points: Object.freeze(run.points),
         }))),
         // Width and opacity stay the bucket's means over its RUNS, not over the welded stripes:
         // welding is a geometry join and must not re-weight the tone by stripe length.
@@ -2933,7 +2986,6 @@ export class StudioOilRibbonCarrierPlanner {
       const reusableStations = programsSettled ? settledStations : 0;
       this.lastBristleCount = bristleCount;
       const runsByHair: PlannedBristleRun[][] = new Array(bristleCount);
-      const planned: PlannedBristleRun[] = [];
       for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
         const cached = this.runsByHair[bristleIndex] ?? [];
         const reusable = reusableRunCountForHair(
@@ -2952,10 +3004,12 @@ export class StudioOilRibbonCarrierPlanner {
           reusable,
         );
         runsByHair[bristleIndex] = runs;
-        for (const run of runs) planned.push(run);
       }
       this.runsByHair = runsByHair;
-      bristleLanes = planBristleLanesFromRuns(planned, options?.bristleBanding ?? "observed-span-v1");
+      bristleLanes = planBristleLanesFromRuns(
+        runsByHair,
+        options?.bristleBanding ?? "observed-span-v1",
+      );
     } else {
       this.runsByHair = [];
     }
