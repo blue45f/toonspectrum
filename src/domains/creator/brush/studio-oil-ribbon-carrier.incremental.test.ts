@@ -131,6 +131,35 @@ describe("StudioOilRibbonCarrierPlanner", () => {
     });
   }
 
+  /**
+   * The relief height field is the one stage that carries state ACROSS appends: it bakes a
+   * settled layer once and re-stamps only the mutable tail into a copy of it each move. A bake
+   * range that is off by one station, a film cursor resumed from the wrong place, or the
+   * final-station stride exemption granted to a bake's own last station are all errors the
+   * sparse checkpoints above CANNOT see — the tail pass re-covers the boundary a few appends
+   * later, so the plan is wrong only on the appends in between. Walking one sample at a time is
+   * what actually pins them.
+   */
+  it("plans every single-sample append exactly like the batch carrier — impasto relief", () => {
+    const planner = new StudioOilRibbonCarrierPlanner();
+    const dabPlanner = new FxOilDabPlanner();
+    const options = studioOilRibbonProgramsForBrush("oil--impasto-ribbon", SEED);
+    // Collected rather than asserted in place: which appends diverge is the diagnosis, and a
+    // bare first failure hides whether it is one boundary or every append past it.
+    const mismatches: number[] = [];
+    for (let sampleCount = 1; sampleCount <= 400; sampleCount += 1) {
+      const dabs = dabsAt("oil--impasto-ribbon", sampleCount, dabPlanner);
+      const incremental = planner.plan(dabs, options);
+      const batch = planStudioOilRibbonCarrier(dabs, options);
+      try {
+        expect(incremental).toEqual(batch);
+      } catch {
+        mismatches.push(sampleCount);
+      }
+    }
+    expect(mismatches).toEqual([]);
+  });
+
   it("reuses the settled prefix on an ordinary append", () => {
     const planner = new StudioOilRibbonCarrierPlanner();
     const dabPlanner = new FxOilDabPlanner();
