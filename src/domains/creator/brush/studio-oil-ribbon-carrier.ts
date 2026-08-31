@@ -1462,6 +1462,30 @@ const IMPASTO_RELIEF_EDGE_FEATHER_CELLS = 1.5;
  * stroke's growth, which is still only tens of them across thousands of appends.
  */
 const IMPASTO_RELIEF_CELL_STEP_RATIO = 2 ** (1 / 16);
+/**
+ * Slack added to the tile beyond the stations' own bounding box, so that NO stamp is ever
+ * clipped by the tile edge.
+ *
+ * This is what makes the retained field's growth purely additive, and it is not cosmetic. The
+ * stampers clamp their cell ranges to the tile (`Math.min(gridWidth - 1, …)`), so a station
+ * sitting on the boundary has the outer part of its film disc or ridge capsule thrown away. If
+ * the stroke later grows PAST that station — a long horizontal run that then turns and climbs
+ * back over its own settled prefix — the newly exposed rows are inside that old station's reach,
+ * the batch planner fills them, and a blitted layer never can: the contribution was never
+ * rasterised anywhere. Measured on exactly that L-shaped stroke before this margin existed: 185
+ * of 556 appends had a differing shading field, worst cell off by 0.294.
+ *
+ * With the margin, every station's footprint is fully materialised inside the tile, so cells that
+ * appear when the tile grows are outside every EXISTING station's reach and the blit is exact by
+ * construction. The bound covers both stampers with slack: the film reaches
+ * `radiusY + IMPASTO_RELIEF_EDGE_FEATHER_CELLS·cell`, and a ridge reaches
+ * `radiusY·|offsetRatio| + max(IMPASTO_RELIEF_RIDGE_REACH_MIN_CELLS·cell, impastoRidgeWidth/2)`
+ * where `impastoRidgeWidth` is at most ~0.3·radiusY (radiusYRatio is a few hundredths).
+ * `studio-oil-ribbon-carrier.incremental.test.ts` walks that L stroke append by append, so a
+ * margin that stops covering the stampers fails there rather than silently returning.
+ */
+const IMPASTO_RELIEF_STAMP_REACH_RADIUS_RATIO = 1.2;
+const IMPASTO_RELIEF_STAMP_REACH_CELLS = 2;
 const IMPASTO_RELIEF_CELL_MAX_RUNGS = 512;
 
 /**
@@ -1597,12 +1621,22 @@ function impastoReliefGrid(stations: readonly OilCarrierStation[]): ImpastoRelie
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
+  let centreMinX = Number.POSITIVE_INFINITY;
+  let centreMinY = Number.POSITIVE_INFINITY;
+  let centreMaxX = Number.NEGATIVE_INFINITY;
+  let centreMaxY = Number.NEGATIVE_INFINITY;
+  let maxRadiusY = 0;
   for (const station of stations) {
     const pad = Math.max(station.radiusY, station.radiusX * 0.62) + 2;
     minX = Math.min(minX, station.x - pad);
     minY = Math.min(minY, station.y - pad);
     maxX = Math.max(maxX, station.x + pad);
     maxY = Math.max(maxY, station.y + pad);
+    centreMinX = Math.min(centreMinX, station.x);
+    centreMinY = Math.min(centreMinY, station.y);
+    centreMaxX = Math.max(centreMaxX, station.x);
+    centreMaxY = Math.max(centreMaxY, station.y);
+    maxRadiusY = Math.max(maxRadiusY, station.radiusY);
   }
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
   const spanX = Math.max(1e-3, maxX - minX);
@@ -1616,6 +1650,14 @@ function impastoReliefGrid(stations: readonly OilCarrierStation[]): ImpastoRelie
     natural *= Math.sqrt(cellsAtLongSide / IMPASTO_RELIEF_GRID_MAX_CELLS);
   }
   const cell = impastoReliefCell(natural);
+  // The cell is derived from the padded box above, exactly as before, so the resolution and
+  // `impastoHairStride` are unaffected; the reach margin only widens the TILE.
+  const reach = maxRadiusY * IMPASTO_RELIEF_STAMP_REACH_RADIUS_RATIO
+    + IMPASTO_RELIEF_STAMP_REACH_CELLS * cell;
+  minX = Math.min(minX, centreMinX - reach);
+  minY = Math.min(minY, centreMinY - reach);
+  maxX = Math.max(maxX, centreMaxX + reach);
+  maxY = Math.max(maxY, centreMaxY + reach);
   // Snap the origin to a whole number of cells as well. The cell size alone is not enough: the
   // tile is addressed from its origin, and a stroke that grows leftward would drag every existing
   // sample onto a different cell centre even when the cell size has not moved. On a snapped
@@ -1921,6 +1963,13 @@ class StudioImpastoReliefFieldPlanner {
       && previous.bristleCount === grid.bristleCount
       && bakeTo >= this.settledEnd;
 
+    // @ts-expect-error probe
+    globalThis.__reliefProbe ??= { rebuild: 0, reuse: 0, incBake: 0, blit: 0, maxSettled: 0 };
+    // @ts-expect-error probe
+    const probe = globalThis.__reliefProbe as Record<string, number>;
+    if (reusable) probe.reuse += 1; else probe.rebuild += 1;
+    if (reusable && bakeTo > this.settledEnd && this.settledEnd > 0) probe.incBake += 1;
+    if (this.settledEnd > probe.maxSettled) probe.maxSettled = this.settledEnd;
     if (!reusable) {
       this.settledFilm = new Float32Array(cellCount);
       this.settledRidge = new Float32Array(cellCount);
@@ -1936,6 +1985,7 @@ class StudioImpastoReliefFieldPlanner {
       // different offset. Rounding is safe because both origins are multiples of the same cell.
       const shiftX = Math.round((previous!.originX - grid.originX) / grid.cell);
       const shiftY = Math.round((previous!.originY - grid.originY) / grid.cell);
+      probe.blit += 1;
       this.settledFilm = blitImpastoLayer(this.settledFilm!, previous!, grid, shiftX, shiftY);
       this.settledRidge = blitImpastoLayer(this.settledRidge!, previous!, grid, shiftX, shiftY);
     }
@@ -1963,6 +2013,43 @@ class StudioImpastoReliefFieldPlanner {
     const tailCursor: ImpastoFilmCursor = { ...this.cursor };
     stampImpastoFilm(film, grid, stations, this.settledEnd, stations.length, tailCursor, stations.length - 1);
     stampImpastoRidge(ridge, grid, stations, Math.max(0, this.settledEnd - 1), stations.length - 1);
+
+    // ---- PROBE: direct oracle against the batch rasters on the same grid ----
+    {
+      const bf = new Float32Array(cellCount);
+      const br = new Float32Array(cellCount);
+      stampImpastoFilm(bf, grid, stations, 0, stations.length, impastoFilmCursor(), stations.length - 1);
+      stampImpastoRidge(br, grid, stations, 0, stations.length - 1);
+      let df = 0; let dr = 0; let dfAt = -1; let drAt = -1;
+      let filmLow = 0; let filmHigh = 0; let ridgeLow = 0; let ridgeHigh = 0;
+      for (let at = 0; at < cellCount; at += 1) {
+        const a = Math.abs(film[at]! - bf[at]!);
+        if (a > df) { df = a; dfAt = at; }
+        if (film[at]! < bf[at]!) filmLow += 1;
+        if (film[at]! > bf[at]!) filmHigh += 1;
+        const b = Math.abs(ridge[at]! - br[at]!);
+        if (b > dr) { dr = b; drAt = at; }
+        if (ridge[at]! < br[at]!) ridgeLow += 1;
+        if (ridge[at]! > br[at]!) ridgeHigh += 1;
+      }
+      // @ts-expect-error probe
+      const p = globalThis.__reliefProbe as Record<string, number>;
+      if (df > (p.maxFilmDelta ?? 0)) {
+        p.maxFilmDelta = df;
+        p.filmAtX = dfAt % grid.gridWidth; p.filmAtY = Math.floor(dfAt / grid.gridWidth);
+        p.filmW = grid.gridWidth; p.filmH = grid.gridHeight; p.filmN = stations.length;
+        p.filmSettled = this.settledEnd; p.filmCell = grid.cell;
+      }
+      if (dr > (p.maxRidgeDelta ?? 0)) {
+        p.maxRidgeDelta = dr;
+        p.ridgeAtX = drAt % grid.gridWidth; p.ridgeAtY = Math.floor(drAt / grid.gridWidth);
+        p.ridgeW = grid.gridWidth; p.ridgeH = grid.gridHeight; p.ridgeN = stations.length;
+        p.ridgeSettled = this.settledEnd; p.ridgeCell = grid.cell;
+      }
+      p.filmLow = (p.filmLow ?? 0) + filmLow; p.filmHigh = (p.filmHigh ?? 0) + filmHigh;
+      p.ridgeLow = (p.ridgeLow ?? 0) + ridgeLow; p.ridgeHigh = (p.ridgeHigh ?? 0) + ridgeHigh;
+    }
+    // ---- END PROBE ----
 
     this.grid = grid;
     return shadeImpastoRelief(film, ridge, grid);
