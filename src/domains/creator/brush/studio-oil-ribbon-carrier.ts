@@ -359,6 +359,17 @@ function weightedMovingAverage(
  */
 const OIL_GEOMETRY_SMOOTHING_RADIUS = 6;
 
+/**
+ * Neighbour reach of `tangentAt`, so a station is settled this far behind the settled geometry.
+ *
+ * Shared with `tangentAt` on purpose. The reuse chain rests on the settled boundary being at
+ * least as deep as the widest window any settled entry reads, and widening the tangent stencil is
+ * an ordinary quality change — so the two must not be able to drift. The suite cannot catch that
+ * drift: the stations a one-entry-too-generous boundary reuses differ below `quantize`'s step, so
+ * every plan still compares equal while the prefix argument has stopped being true.
+ */
+const OIL_STATION_TANGENT_RADIUS = 2;
+
 function smoothGeometry(dabs: readonly FxOilDab[]): readonly SmoothedOilCarrierGeometry[] {
   return smoothGeometryFrom(dabs, [], 0);
 }
@@ -418,8 +429,10 @@ function tangentAt(
   fallbackAngle: number,
 ): readonly [number, number] {
   const current = geometry[index]!;
-  const before = geometry[Math.max(0, index - 2)] ?? current;
-  const after = geometry[Math.min(geometry.length - 1, index + 2)] ?? current;
+  const before = geometry[Math.max(0, index - OIL_STATION_TANGENT_RADIUS)] ?? current;
+  const after = geometry[
+    Math.min(geometry.length - 1, index + OIL_STATION_TANGENT_RADIUS)
+  ] ?? current;
   let dx = after.x - before.x;
   let dy = after.y - before.y;
   let length = Math.sqrt(dx * dx + dy * dy);
@@ -3004,8 +3017,9 @@ export class StudioOilRibbonCarrierPlanner {
     }
 
     const settledGeometry = Math.max(0, identical - OIL_GEOMETRY_SMOOTHING_RADIUS);
-    // `tangentAt` reaches two entries past the station it builds.
-    const settledStations = Math.max(0, settledGeometry - 2);
+    // `tangentAt` reaches this far past the station it builds, so the station boundary trails the
+    // geometry one by the same stencil the reader uses.
+    const settledStations = Math.max(0, settledGeometry - OIL_STATION_TANGENT_RADIUS);
     const geometry = smoothGeometryFrom(dabs, this.geometry, settledGeometry);
     const stations = collectStationsFrom(dabs, geometry, this.stations, settledStations);
 
