@@ -649,6 +649,48 @@ describe("generate recipe → .vrm file reload", () => {
     60_000,
   );
 
+  it("never moves a sphere collider, which carries a position and not a span", async () => {
+    // 캡슐은 끝점 두 개로 **구간**을 표현하지만, 구와 평면의 `offset` 은 본 프레임에 붙은
+    // 위치다. 어느 좌표가 구간이고 어느 좌표가 위치인지는 저작 의도이고 VRM 파일에 자리가
+    // 없다(`torsoLength` 스레드). 도형 종류가 파일이 실제로 말해 주는 유일한 구분이므로,
+    // 구간이 없는 도형은 건드리지 않는다 — 어깨가 벌어졌다고 몸통 한가운데 붙은 구를 같이
+    // 끌면 살갗에서 떨어져 나간다.
+    const vrm = await loadVrmBytes(
+      exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId: "hime-noble" })),
+    );
+    const torso = [...(vrm.springBoneManager?.colliders ?? [])][0];
+    if (!torso) throw new Error("expected a torso capsule");
+    const holder = torso as unknown as {
+      shape: { offset: Vector3; tail?: Vector3; radius: number };
+    };
+    // 임포트 VRM 이 흔히 다는 형태로 바꿔 둔다 — 꼬리가 없으면 three-vrm 은 구로 읽는다.
+    const rest = new Vector3(0.1, holder.shape.offset.y, 0.06);
+    holder.shape = { offset: rest.clone(), radius: holder.shape.radius };
+
+    const adapter = createStudioVrmProportionVrmAdapter({
+      vrm,
+      getCurrentModelGeneration: () => 1,
+      reapplyAuthoredPose: () => true,
+    });
+    const created = createStudioVrmProportionRigRuntime(adapter, {
+      headLength: measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2,
+    });
+    if (!created.ok) throw new Error(created.message);
+
+    for (const proportions of [
+      { overallHeight: 1.6 },
+      { shoulderWidth: 1.4 },
+      { overallHeight: 0.7 },
+    ]) {
+      expect(
+        created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, ...proportions }).ok,
+      ).toBe(true);
+      const label = JSON.stringify(proportions);
+      expect(holder.shape.offset.distanceTo(rest), `${label} 에서 구 콜라이더가 움직였다`)
+        .toBeLessThan(1e-9);
+    }
+  }, 60_000);
+
   it("keeps a collider's lateral offset when only the joints along it moved", async () => {
     // 임포트 VRM 은 평범한 본에 옆으로 밀어 둔 구 콜라이더를 흔히 단다. 체형 편집은 그 본을
     // 옮길 뿐 프레임을 늘리지 않으므로, 살갗은 본에서 같은 거리를 유지한다. 오프셋 벡터를

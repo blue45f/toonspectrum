@@ -332,17 +332,24 @@ function captureSpringBoneGeometry(vrm: VRM): CapturedSpringGeometry {
  * Torso vertices weighted to `hips`/`spine` keep their exact cross-section at every height, so
  * scaling the radius would have made the capsule 60% wider than the torso it rides on.
  *
- * Girth invariance binds the offset too, per axis. Inside an unscaled bone's frame the only thing
- * that moves is that bone's own child joints, so that is what the offset follows: each axis is
- * scaled by how far those children reach on it now against at rest, and an axis they never spanned
- * does not move at all. A single scalar cannot express this -- multiplying the whole vector by
- * `overallHeight` drags an imported sphere collider off the surface it was authored against (a
- * chest sphere at `z = 0.10` slid to 0.16 at height 1.6, though chest depth never changed), because
- * no joint under `spine` has a `z` component to justify it. The generated torso capsule is
- * unaffected either way: its offset and tail are pure `y`, and `spine`'s children (`head` and both
- * upper arms) reach 1.6x further in `y` at `overallHeight` 1.6, which is the same 1.6 the scalar
- * gave. Reading the joints rather than the scalar is also what keeps `headBodyRatio` alone from
- * moving the torso capsule -- it resizes `head` without moving it.
+ * Girth invariance binds the geometry too, and only a **capsule** has geometry to move here. Its
+ * `offset` and `tail` are the two ends of a span, so they have to track the joints the span reaches
+ * across. A sphere or a plane carries no span at all -- its `offset` is a position on the surface,
+ * fixed in the bone's frame the way the skin around it is -- so it is left exactly as authored.
+ * That split is the only one the file actually states; whether a *coordinate* is a span or a
+ * position is authoring intent that VRM has no place for (see the `torsoLength` thread).
+ *
+ * For a capsule the span is resolved per axis, from the bone's own child joints -- inside an
+ * unscaled frame they are the only thing that moves. Each axis is scaled by how far those children
+ * reach on it now against at rest, and an axis they never spanned does not move at all. A single
+ * scalar cannot express that: multiplying the whole vector by `overallHeight` dragged geometry off
+ * the surface it was authored against (`z = 0.10` slid to 0.16 at height 1.6, though torso depth
+ * never changed), because no joint under `spine` has a `z` component to justify it.
+ *
+ * The generated torso capsule comes out the same either way: its offset and tail are pure `y`, and
+ * `spine`'s children (`head` and both upper arms) reach 1.6x further in `y` at `overallHeight` 1.6
+ * -- the same 1.6 the scalar gave. Reading the joints rather than the scalar is also what keeps
+ * `headBodyRatio` alone from moving it: that slider resizes `head` without moving it.
  *
  * Membership, not magnitude, is what separates them. Reading the inherited factor and calling 1
  * "unscaled" gets the skull wrong whenever two edits cancel: `overallHeight` 1.25 with
@@ -378,6 +385,11 @@ function resizeSpringBoneGeometry(
 
     if (isInsideAny(entry.collider, scaledSubtreeRoots)) continue;
 
+    // A shape with no `tail` is a sphere or a plane: an authored position, not a span. Nothing
+    // here can tell whether its offset was meant to reach across the joints that moved, so it is
+    // left alone -- moving it would only detach it from the surface it was placed on.
+    if (!entry.tail) continue;
+
     const reach = childReach(entry.childBones);
     const spread = (now: number, rest: number): number => {
       if (rest <= CHILD_REACH_EPSILON) return 1;
@@ -395,13 +407,11 @@ function resizeSpringBoneGeometry(
         entry.offset.z * spreadZ,
       );
     }
-    if (entry.tail) {
-      entry.shape.tail?.set(
-        entry.tail.x * spreadX,
-        entry.tail.y * spreadY,
-        entry.tail.z * spreadZ,
-      );
-    }
+    entry.shape.tail?.set(
+      entry.tail.x * spreadX,
+      entry.tail.y * spreadY,
+      entry.tail.z * spreadZ,
+    );
   }
   for (const entry of captured.joints) {
     const inherited = rootRelativeScaleOf(root, entry.bone) / entry.restRootScale;
