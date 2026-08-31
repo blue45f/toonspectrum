@@ -1485,13 +1485,33 @@ const IMPASTO_RELIEF_CELL_STEP_RATIO = 2 ** (1 / 16);
  * where `impastoRidgeWidth` is at most ~0.3·radiusY (radiusYRatio is a few hundredths).
  * `studio-oil-ribbon-carrier.incremental.test.ts` walks that L stroke append by append, so a
  * margin that stops covering the stampers fails there rather than silently returning.
+ *
+ * The retained tile leans on this margin twice more, in ways that are not visible where they are
+ * written, so they are recorded here — `studio-oil-ribbon-carrier.relief-field.test.ts` is what
+ * actually holds them:
+ *
+ *  - `impastoStationBounds` boxes stations where they are NOW. A station that moved leaves the
+ *    cells it stamped at its old position outside that box, and the retained height would keep
+ *    the old contribution. It never happens because the box is `1.2·radiusY + 2·cell` wide while
+ *    a station moves a fraction of the station spacing per append: the new box swallows the old
+ *    position. A move large enough to escape it is a lattice rung, and a rung shares no dab at
+ *    all, so it rebuilds rather than retains.
+ *  - `impastoGrowthBands` fires only where the tile GREW. When it shrinks, cells that were
+ *    interior become border cells and their shading switches to a clamped neighbourhood. It
+ *    never changes a value because the margin keeps the outermost ring in empty paper, where
+ *    clamped and real neighbours are both zero.
  */
 const IMPASTO_RELIEF_STAMP_REACH_RADIUS_RATIO = 1.2;
 const IMPASTO_RELIEF_STAMP_REACH_CELLS = 2;
 const IMPASTO_RELIEF_CELL_MAX_RUNGS = 512;
 
 /**
- * Smallest ladder rung at or above `natural`, so the cell is stable across appends.
+ * Largest ladder rung at or BELOW `natural`, so the cell is stable across appends.
+ *
+ * The direction is load-bearing, not a rounding preference. `impastoHairStride` divides by the
+ * cell through a `floor`, so a coarser cell resolves fewer hairs: rounding to the rung ABOVE
+ * `natural` instead took a straight capped stroke from 43 rasterised ridge runs to 20 — half the
+ * relief simply stopped existing. Rounding down can only ever cost cells, never ridges.
  *
  * Computed by climbing rather than by `Math.log`, so the value is a product of the same factors
  * in the same order regardless of how the caller arrived at `natural` — two appends that land on
@@ -1690,6 +1710,16 @@ function impastoReliefGrid(stations: readonly OilCarrierStation[]): ImpastoRelie
     // other loses them — and a lamp asked which flank is lit then answers from an asymmetric bed.
     hairOffset: Math.floor((((bristleCount - 1) % hairStride) + 1) / 2),
   };
+}
+
+/** What `StudioImpastoReliefPlanner.snapshot()` hands a test. */
+export interface ImpastoReliefFieldSnapshot {
+  readonly shading: Float32Array;
+  readonly gridWidth: number;
+  readonly gridHeight: number;
+  readonly cell: number;
+  readonly originX: number;
+  readonly originY: number;
 }
 
 /** A rectangle of the tile whose heights changed since the retained shading was computed. */
@@ -2047,6 +2077,25 @@ class StudioImpastoReliefPlanner {
   /** Relief runs taken from the previous move. Diagnostics and identity tests only. */
   get reusedRuns(): number {
     return this.lastReusedRuns;
+  }
+
+  /**
+   * The retained shading tile and the grid addressing it, or `null` before the first build.
+   *
+   * Diagnostics and identity tests only. The plan quantises `lineWidth` and `opacity` on the way
+   * out, so a lane comparison cannot see a tile that has drifted by less than the quantisation
+   * step — and the whole retained-tile design is the claim that it never drifts at all.
+   */
+  snapshot(): ImpastoReliefFieldSnapshot | null {
+    if (this.shading === null || this.grid === null) return null;
+    return {
+      shading: this.shading,
+      gridWidth: this.grid.gridWidth,
+      gridHeight: this.grid.gridHeight,
+      cell: this.grid.cell,
+      originX: this.grid.originX,
+      originY: this.grid.originY,
+    };
   }
 
   reset(): void {
@@ -2893,6 +2942,11 @@ export class StudioOilRibbonCarrierPlanner {
   /** Relief runs reused from the previous call. Diagnostics and identity tests only. */
   get reusedReliefRuns(): number {
     return this.impastoRelief.reusedRuns;
+  }
+
+  /** The retained relief shading tile. Diagnostics and identity tests only. */
+  get reliefField(): ImpastoReliefFieldSnapshot | null {
+    return this.impastoRelief.snapshot();
   }
 
   reset(): void {
