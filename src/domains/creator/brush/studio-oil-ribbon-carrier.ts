@@ -1963,13 +1963,6 @@ class StudioImpastoReliefFieldPlanner {
       && previous.bristleCount === grid.bristleCount
       && bakeTo >= this.settledEnd;
 
-    // @ts-expect-error probe
-    globalThis.__reliefProbe ??= { rebuild: 0, reuse: 0, incBake: 0, blit: 0, maxSettled: 0 };
-    // @ts-expect-error probe
-    const probe = globalThis.__reliefProbe as Record<string, number>;
-    if (reusable) probe.reuse += 1; else probe.rebuild += 1;
-    if (reusable && bakeTo > this.settledEnd && this.settledEnd > 0) probe.incBake += 1;
-    if (this.settledEnd > probe.maxSettled) probe.maxSettled = this.settledEnd;
     if (!reusable) {
       this.settledFilm = new Float32Array(cellCount);
       this.settledRidge = new Float32Array(cellCount);
@@ -2013,43 +2006,6 @@ class StudioImpastoReliefFieldPlanner {
     const tailCursor: ImpastoFilmCursor = { ...this.cursor };
     stampImpastoFilm(film, grid, stations, this.settledEnd, stations.length, tailCursor, stations.length - 1);
     stampImpastoRidge(ridge, grid, stations, Math.max(0, this.settledEnd - 1), stations.length - 1);
-
-    // ---- PROBE: direct oracle against the batch rasters on the same grid ----
-    {
-      const bf = new Float32Array(cellCount);
-      const br = new Float32Array(cellCount);
-      stampImpastoFilm(bf, grid, stations, 0, stations.length, impastoFilmCursor(), stations.length - 1);
-      stampImpastoRidge(br, grid, stations, 0, stations.length - 1);
-      let df = 0; let dr = 0; let dfAt = -1; let drAt = -1;
-      let filmLow = 0; let filmHigh = 0; let ridgeLow = 0; let ridgeHigh = 0;
-      for (let at = 0; at < cellCount; at += 1) {
-        const a = Math.abs(film[at]! - bf[at]!);
-        if (a > df) { df = a; dfAt = at; }
-        if (film[at]! < bf[at]!) filmLow += 1;
-        if (film[at]! > bf[at]!) filmHigh += 1;
-        const b = Math.abs(ridge[at]! - br[at]!);
-        if (b > dr) { dr = b; drAt = at; }
-        if (ridge[at]! < br[at]!) ridgeLow += 1;
-        if (ridge[at]! > br[at]!) ridgeHigh += 1;
-      }
-      // @ts-expect-error probe
-      const p = globalThis.__reliefProbe as Record<string, number>;
-      if (df > (p.maxFilmDelta ?? 0)) {
-        p.maxFilmDelta = df;
-        p.filmAtX = dfAt % grid.gridWidth; p.filmAtY = Math.floor(dfAt / grid.gridWidth);
-        p.filmW = grid.gridWidth; p.filmH = grid.gridHeight; p.filmN = stations.length;
-        p.filmSettled = this.settledEnd; p.filmCell = grid.cell;
-      }
-      if (dr > (p.maxRidgeDelta ?? 0)) {
-        p.maxRidgeDelta = dr;
-        p.ridgeAtX = drAt % grid.gridWidth; p.ridgeAtY = Math.floor(drAt / grid.gridWidth);
-        p.ridgeW = grid.gridWidth; p.ridgeH = grid.gridHeight; p.ridgeN = stations.length;
-        p.ridgeSettled = this.settledEnd; p.ridgeCell = grid.cell;
-      }
-      p.filmLow = (p.filmLow ?? 0) + filmLow; p.filmHigh = (p.filmHigh ?? 0) + filmHigh;
-      p.ridgeLow = (p.ridgeLow ?? 0) + ridgeLow; p.ridgeHigh = (p.ridgeHigh ?? 0) + ridgeHigh;
-    }
-    // ---- END PROBE ----
 
     this.grid = grid;
     return shadeImpastoRelief(film, ridge, grid);
