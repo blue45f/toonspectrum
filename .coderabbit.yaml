@@ -1,0 +1,37 @@
+# CodeRabbit review configuration.
+# Schema: https://docs.coderabbit.ai/reference/configuration
+#
+# Before this file existed CodeRabbit ran with "Configuration used: defaults",
+# and on PR #65 it declined to review twice for two *different* reasons:
+#
+#   1. while the PR was a draft — "Draft PRs are not automatically reviewed by
+#      default", which `reviews.auto_review.drafts` below fixes;
+#   2. after it was marked ready — "This repository does not receive automatic
+#      reviews because it has fewer than 10 stars", which is a CodeRabbit
+#      account/tier decision and is NOT settable from this file.
+#
+# So this file removes reason (1). Reason (2) has to be resolved on
+# CodeRabbit's side; see docs/coderabbit-auto-review.md.
+
+language: "en-US"
+
+reviews:
+  # Explicit rather than inherited, so a future default change is visible here.
+  auto_review:
+    enabled: true
+
+    # This repository's agent workflow opens pull requests as drafts and only
+    # marks them ready once CI is green. With the default `false`, review
+    # therefore starts at the very end — exactly when the diff is most
+    # expensive to change — and on #65 a merge landed ~40s before the review
+    # that the ready-transition had kicked off finished. Reviewing drafts moves
+    # that feedback to where it is still cheap to act on.
+    drafts: true
+
+    # Re-review each push instead of only the first one, so a fix pushed in
+    # response to a finding is itself reviewed.
+    auto_incremental_review: true
+
+    # Only `main` is a merge target here; leaving this empty keeps review scoped
+    # to the default branch rather than to every long-lived branch.
+    base_branches: []
