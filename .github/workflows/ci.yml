@@ -387,14 +387,3 @@ jobs:
             exit 0
           fi
           exit "$status"
-      # The rotation gate attaches per-sample settle metrics and frames, which are the only
-      # record of why a frame never stabilized. Without this the run log keeps the message but
-      # drops the surface dimensions that explain it.
-      - name: Upload Playwright failure evidence
-        if: failure()
-        uses: actions/upload-artifact@v4 # NOSONAR S7637 신뢰된 1st-party 액션
-        with:
-          name: studio-3d-runtime-failure
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
