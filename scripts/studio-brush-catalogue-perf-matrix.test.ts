@@ -28,6 +28,7 @@ import {
   evaluateStudioBrushCrayonFamilyIncrementalChunks,
   listStudioBrushCatalogueDeterminismSampleIds,
   planStudioBrushCataloguePaintDynamics,
+  reduceStudioBrushCrayonFamilyGrowth,
   reduceStudioBrushCrayonFamilyPasses,
   studioBrushChunkSeriesFreezes,
   studioBrushCrayonFamilyCpuFreezes,
@@ -164,6 +165,79 @@ describe("soak monotonic-degradation detector", () => {
 // budget set without it failed CI on unregressed code.
 const HONEST_CRAYON = [123.8, 116.8, 130.4, 123.3, 191.5] as const;
 const HONEST_LIGHTEST = [58.7, 57.6, 55.3, 54.0] as const;
+
+describe("reduceStudioBrushCrayonFamilyGrowth", () => {
+  // The reading that red-flagged blue45f/toonspectrum#81, a PR carrying only VRM binaries and a
+  // Blender script. CI reported "13.2ms -> 107.8ms" for x8.20, and those two numbers are each
+  // side's own minimum across five passes -- so they are from DIFFERENT passes. Pass 2 has the
+  // cheapest short leg because the JIT was warm by then; its long leg is the slowest of the five
+  // because the 2000-sample working set provokes the GC that the 500-sample one does not. Pass 0
+  // holds the cheapest long leg. No single pass ever ran at x8.
+  const CI_PAIRS = [
+    { shortElapsedMs: 24.4, longElapsedMs: 107.8 },
+    { shortElapsedMs: 22.1, longElapsedMs: 109.5 },
+    { shortElapsedMs: 13.2, longElapsedMs: 112.0 },
+    { shortElapsedMs: 21.5, longElapsedMs: 108.4 },
+    { shortElapsedMs: 23.0, longElapsedMs: 110.1 },
+  ] as const;
+
+  it("earns the ratio from one pass, not from each leg's own minimum", () => {
+    // What the gate used to compute: the cheapest long over the cheapest short, two windows that
+    // never coexisted. It clears the bound and convicts an innocent tree.
+    const unpaired = Math.min(...CI_PAIRS.map((pair) => pair.longElapsedMs))
+      / Math.min(...CI_PAIRS.map((pair) => pair.shortElapsedMs));
+    expect(unpaired).toBeCloseTo(8.17, 2);
+    expect(unpaired).toBeGreaterThan(STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH);
+
+    const verdict = reduceStudioBrushCrayonFamilyGrowth(CI_PAIRS);
+    expect(verdict.growth).toBeCloseTo(107.8 / 24.4, 10);
+    expect(verdict.growth).toBeLessThanOrEqual(STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH);
+    // The legs it reports are the two that actually produced the verdict, so the printed
+    // diagnostic is one coherent observation rather than a pair assembled after the fact.
+    expect(verdict.shortElapsedMs).toBe(24.4);
+    expect(verdict.longElapsedMs).toBe(107.8);
+  });
+
+  it("still convicts a genuinely superlinear plan, which fails on every pass", () => {
+    // x16 is the quadratic blowup at these lengths -- the class the gate exists for. Pairing
+    // cannot acquit it, because no pass is clean.
+    const quadratic = CI_PAIRS.map((pair) => ({
+      shortElapsedMs: pair.shortElapsedMs,
+      longElapsedMs: pair.shortElapsedMs * 16,
+    }));
+    const { growth } = reduceStudioBrushCrayonFamilyGrowth(quadratic);
+    expect(growth).toBeCloseTo(16, 10);
+    expect(growth).toBeGreaterThan(STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH);
+  });
+
+  it("lets one clean pass acquit a row the contended passes would convict", () => {
+    // Interference is additive, so the least-disturbed pair is the honest one -- the same rule
+    // the CPU reducer already applies, now applied to the pair rather than to each leg alone.
+    const contended = [
+      { shortElapsedMs: 20.0, longElapsedMs: 200.0 },
+      { shortElapsedMs: 20.0, longElapsedMs: 88.0 },
+      { shortElapsedMs: 20.0, longElapsedMs: 260.0 },
+    ];
+    expect(reduceStudioBrushCrayonFamilyGrowth(contended).growth).toBeCloseTo(4.4, 10);
+  });
+
+  it("reports every pass's ratio cheapest-first so a row near the bound is visible", () => {
+    const { growthPasses, growth } = reduceStudioBrushCrayonFamilyGrowth(CI_PAIRS);
+    expect(growthPasses).toHaveLength(CI_PAIRS.length);
+    expect([...growthPasses]).toEqual([...growthPasses].sort((a, b) => a - b));
+    expect(growthPasses[0]).toBeCloseTo(growth, 10);
+    // Pass 2's own ratio is the one that looks alarming, and it is printed rather than hidden
+    // behind the winner: 112.0 / 13.2 is the reading a real regression would make permanent.
+    expect(growthPasses[growthPasses.length - 1]).toBeCloseTo(112.0 / 13.2, 10);
+  });
+
+  it("refuses a verdict with no passes, and survives a zero-length short leg", () => {
+    expect(() => reduceStudioBrushCrayonFamilyGrowth([])).toThrow(/at least one paired pass/u);
+    expect(
+      reduceStudioBrushCrayonFamilyGrowth([{ shortElapsedMs: 0, longElapsedMs: 90 }]).growth,
+    ).toBe(Number.POSITIVE_INFINITY);
+  });
+});
 
 describe("studioBrushCrayonFamilyCpuFreezes", () => {
   it("acquits every honest reading, on an idle machine and a heavily contended one", () => {
@@ -362,8 +436,9 @@ describe("studio brush catalogue paint performance matrix", () => {
       expect(family.cpuMs!).toBeLessThanOrEqual(STUDIO_BRUSH_CRAYON_FAMILY_LONG_CPU_BUDGET_MS);
       expect(family.elapsedMs).toBeLessThan(STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS);
       // SCALING, a separate property from the CPU budget above and machine-immune where that one
-      // is not: both sides are the same planner on the same material, so a slower runner moves
-      // neither. See STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES for why both are wanted.
+      // is not -- but only because the ratio is earned from PAIRED windows and reduced per pass.
+      // See STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES for why both are wanted, and
+      // reduceStudioBrushCrayonFamilyGrowth for what happens when the pairing is dropped.
       expect(
         family.growth,
         `${family.catalogId}: wall cost grew x${family.growth.toFixed(2)} from`
@@ -371,7 +446,8 @@ describe("studio brush catalogue paint performance matrix", () => {
           + ` ${STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES} samples`
           + ` (${family.shortElapsedMs.toFixed(1)}ms -> ${family.longElapsedMs.toFixed(1)}ms),`
           + ` allowed x${STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH};`
-          + " linear in the input would be x4, and this bound is twice that",
+          + " linear in the input would be x4, and this bound is twice that."
+          + ` Per-pass ratios: [${family.growthPasses.map((r) => `x${r.toFixed(2)}`).join(" ")}]`,
       ).toBeLessThanOrEqual(STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH);
     }
 
@@ -388,7 +464,10 @@ describe("studio brush catalogue paint performance matrix", () => {
           + `  ${family.shortElapsedMs.toFixed(1)}ms -> ${family.longElapsedMs.toFixed(1)}ms`
           + `  convicts from x${
             (STUDIO_BRUSH_CRAYON_FAMILY_MAX_GROWTH / family.growth).toFixed(2)
-          }`)
+          }`
+          // Every pass, not just the winner: a row one contended pass away from the bound is
+          // invisible in a single reduced number, and that is the reading this gate wants next.
+          + `  passes [${family.growthPasses.map((r) => r.toFixed(2)).join(" ")}]`)
         .join("\n")
       + "\n",
     );
