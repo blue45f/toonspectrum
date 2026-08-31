@@ -167,6 +167,9 @@ export function measureStudioVrmProportionHeadLength(
   });
 }
 
+/** 자식 관절이 그 축을 아예 뻗지 않은 것으로 볼 허용 오차. 관절 간격은 cm 단위다. */
+const CHILD_REACH_EPSILON = 1e-6;
+
 /**
  * A collider's authored geometry, captured once so every resize is absolute from rest. Rescaling
  * the live values in place would compound across slider moves.
@@ -183,6 +186,13 @@ type CapturedColliderShape = {
   readonly radius: number | null;
   /** The collider node's scale relative to the VRM root at rest, so inherited scaling divides out. */
   readonly restRootScale: number;
+  /**
+   * The humanoid bones parented directly to this collider's frame, and how far they reach along
+   * each axis at rest. Their motion is the only thing that changes inside this frame, so it is
+   * what an offset on an unscaled frame has to follow.
+   */
+  readonly childBones: readonly THREE.Object3D[];
+  readonly restChildReach: THREE.Vector3;
 };
 
 /**
@@ -220,6 +230,17 @@ function rootRelativeScaleOf(root: THREE.Object3D, node: THREE.Object3D): number
   return Number.isFinite(average) && average > 0 ? average : 1;
 }
 
+/** Per-axis sum of |local position| over `nodes` -- how far this frame's joints reach on each axis. */
+function childReach(nodes: readonly THREE.Object3D[]): THREE.Vector3 {
+  const reach = new THREE.Vector3();
+  for (const node of nodes) {
+    reach.x += Math.abs(node.position.x);
+    reach.y += Math.abs(node.position.y);
+    reach.z += Math.abs(node.position.z);
+  }
+  return reach;
+}
+
 /** Whether `node` sits beneath one of `roots`. A root does not contain itself here -- no collider is a bone. */
 function isInsideAny(node: THREE.Object3D, roots: ReadonlySet<THREE.Object3D>): boolean {
   if (roots.size === 0) return false;
@@ -240,10 +261,21 @@ function captureSpringBoneGeometry(vrm: VRM): CapturedSpringGeometry {
   const colliders = manager?.colliders ?? [];
   const springJoints = [...(manager?.joints ?? [])];
   if (colliders.length > 0 || springJoints.length > 0) vrm.scene.updateMatrixWorld(true);
+  const humanoid = vrm.humanoid;
+  const boneNodes = new Set<THREE.Object3D>();
+  if (humanoid) {
+    for (const bone of humanoid.humanBones ? Object.keys(humanoid.humanBones) : []) {
+      const node = humanoid.getRawBoneNode(bone as Parameters<typeof humanoid.getRawBoneNode>[0]);
+      if (node) boneNodes.add(node);
+    }
+  }
   const captured: CapturedColliderShape[] = [];
   for (const collider of colliders) {
     const shape = (collider as unknown as { shape?: CapturedColliderShape["shape"] }).shape;
     if (!shape) continue;
+    // three-vrm parents each collider to its bone node with an identity transform, so the shape's
+    // local frame is that bone's frame and the bone's own children are expressed in it directly.
+    const childBones = (collider.parent?.children ?? []).filter((child) => boneNodes.has(child));
     captured.push({
       collider,
       shape,
@@ -251,6 +283,8 @@ function captureSpringBoneGeometry(vrm: VRM): CapturedSpringGeometry {
       tail: shape.tail ? shape.tail.clone() : null,
       radius: typeof shape.radius === "number" ? shape.radius : null,
       restRootScale: rootRelativeScaleOf(vrm.scene, collider),
+      childBones,
+      restChildReach: childReach(childBones),
     });
   }
   const joints: CapturedJointRadius[] = [];
@@ -267,6 +301,11 @@ function captureSpringBoneGeometry(vrm: VRM): CapturedSpringGeometry {
 
 /**
  * Resizes spring geometry for a body whose joint spacing changed by `uniformScale`.
+ *
+ * `uniformScale` is the runtime's headline body factor. It gates the call -- a non-finite or
+ * non-positive value means the caller has nothing coherent to sync against -- but it is no longer
+ * the magnitude anything is multiplied by: the two cases below read the scene graph and the joints
+ * themselves, which is the only way per-axis girth invariance survives.
  *
  * three-vrm splits a capsule into two halves that scale by different rules, and the split is not
  * the one the shape's own fields suggest. `VRMSpringBoneColliderShapeCapsule.calculateCollision`
@@ -288,10 +327,22 @@ function captureSpringBoneGeometry(vrm: VRM): CapturedSpringGeometry {
  * `rest x inherited`. Both halves then agree.
  *
  * **A collider outside every scaled subtree** -- the torso capsule on `spine` -- is the opposite.
- * The graph carried nothing, so the axis has to pick up the joint spacing itself. Its radius must
- * *not* move: the proportion model moves joints apart, it does not make the body thicker. Torso
- * vertices weighted to `hips`/`spine` keep their exact cross-section at every height, so scaling
- * the radius would have made the capsule 60% wider than the torso it rides on.
+ * The graph carried nothing, so its geometry has to pick up the joint spacing itself. Its radius
+ * must *not* move: the proportion model moves joints apart, it does not make the body thicker.
+ * Torso vertices weighted to `hips`/`spine` keep their exact cross-section at every height, so
+ * scaling the radius would have made the capsule 60% wider than the torso it rides on.
+ *
+ * Girth invariance binds the offset too, per axis. Inside an unscaled bone's frame the only thing
+ * that moves is that bone's own child joints, so that is what the offset follows: each axis is
+ * scaled by how far those children reach on it now against at rest, and an axis they never spanned
+ * does not move at all. A single scalar cannot express this -- multiplying the whole vector by
+ * `overallHeight` drags an imported sphere collider off the surface it was authored against (a
+ * chest sphere at `z = 0.10` slid to 0.16 at height 1.6, though chest depth never changed), because
+ * no joint under `spine` has a `z` component to justify it. The generated torso capsule is
+ * unaffected either way: its offset and tail are pure `y`, and `spine`'s children (`head` and both
+ * upper arms) reach 1.6x further in `y` at `overallHeight` 1.6, which is the same 1.6 the scalar
+ * gave. Reading the joints rather than the scalar is also what keeps `headBodyRatio` alone from
+ * moving the torso capsule -- it resizes `head` without moving it.
  *
  * Membership, not magnitude, is what separates them. Reading the inherited factor and calling 1
  * "unscaled" gets the skull wrong whenever two edits cancel: `overallHeight` 1.25 with
@@ -327,8 +378,30 @@ function resizeSpringBoneGeometry(
 
     if (isInsideAny(entry.collider, scaledSubtreeRoots)) continue;
 
-    if (entry.offset) entry.shape.offset?.copy(entry.offset).multiplyScalar(uniformScale);
-    if (entry.tail) entry.shape.tail?.copy(entry.tail).multiplyScalar(uniformScale);
+    const reach = childReach(entry.childBones);
+    const spread = (now: number, rest: number): number => {
+      if (rest <= CHILD_REACH_EPSILON) return 1;
+      const ratio = now / rest;
+      return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+    };
+    const spreadX = spread(reach.x, entry.restChildReach.x);
+    const spreadY = spread(reach.y, entry.restChildReach.y);
+    const spreadZ = spread(reach.z, entry.restChildReach.z);
+
+    if (entry.offset) {
+      entry.shape.offset?.set(
+        entry.offset.x * spreadX,
+        entry.offset.y * spreadY,
+        entry.offset.z * spreadZ,
+      );
+    }
+    if (entry.tail) {
+      entry.shape.tail?.set(
+        entry.tail.x * spreadX,
+        entry.tail.y * spreadY,
+        entry.tail.z * spreadZ,
+      );
+    }
   }
   for (const entry of captured.joints) {
     const inherited = rootRelativeScaleOf(root, entry.bone) / entry.restRootScale;

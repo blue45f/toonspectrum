@@ -649,6 +649,50 @@ describe("generate recipe → .vrm file reload", () => {
     60_000,
   );
 
+  it("keeps a collider's lateral offset when only the joints along it moved", async () => {
+    // 임포트 VRM 은 평범한 본에 옆으로 밀어 둔 구 콜라이더를 흔히 단다. 체형 편집은 그 본을
+    // 옮길 뿐 프레임을 늘리지 않으므로, 살갗은 본에서 같은 거리를 유지한다. 오프셋 벡터를
+    // 통째로 `overallHeight` 배 하면 그 콜라이더가 표면에서 떨어져 나간다 — 가슴 앞 z=0.10 이
+    // 1.6 배에서 0.16 으로 밀린다. 깊이는 한 치도 변하지 않았는데도.
+    const vrm = await loadVrmBytes(
+      exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId: "hime-noble" })),
+    );
+    const torso = [...(vrm.springBoneManager?.colliders ?? [])][0];
+    if (!torso) throw new Error("expected a torso capsule");
+    const shape = (torso as unknown as {
+      shape: { offset: Vector3; tail: Vector3; radius: number };
+    }).shape;
+    // 임포트 VRM 처럼 축에서 벗어난 오프셋을 만들어 둔다. 어댑터가 rest 를 잡기 **전**이어야 한다.
+    shape.offset.set(0.04, shape.offset.y, 0.1);
+    shape.tail.set(0.04, shape.tail.y, 0.1);
+    const rest = { offset: shape.offset.clone(), tail: shape.tail.clone() };
+
+    const adapter = createStudioVrmProportionVrmAdapter({
+      vrm,
+      getCurrentModelGeneration: () => 1,
+      reapplyAuthoredPose: () => true,
+    });
+    const created = createStudioVrmProportionRigRuntime(adapter, {
+      headLength: measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2,
+    });
+    if (!created.ok) throw new Error(created.message);
+    expect(
+      created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, overallHeight: 1.6 }).ok,
+    ).toBe(true);
+
+    // `spine` 아래 어떤 관절도 z 를 뻗지 않으므로 깊이는 그대로다.
+    expect(shape.offset.z, "몸통 깊이가 변하지 않았는데 콜라이더가 앞으로 밀렸다").toBeCloseTo(
+      rest.offset.z,
+      9,
+    );
+    expect(shape.tail.z).toBeCloseTo(rest.tail.z, 9);
+    // 관절이 벌어진 축은 따라간다 — `head` 와 양 위팔이 y 로 1.6 배 멀어진다.
+    expect(shape.offset.y / rest.offset.y, "축이 관절을 따라가지 않았다").toBeCloseTo(1.6, 6);
+    expect(shape.tail.y / rest.tail.y).toBeCloseTo(1.6, 6);
+    // 어깨는 실제로 바깥으로 벌어지므로 x 는 따라가는 것이 맞다.
+    expect(shape.offset.x / rest.offset.x).toBeCloseTo(1.6, 6);
+  }, 60_000);
+
   it("leaves the skull capsule alone when height and head edits cancel out", async () => {
     // `head` 배율은 `headBodyRatio × overallHeight` 다. 1.25 와 0.8 은 정확히 1 을 만든다 —
     // 머리와 머리카락은 저작 크기 그대로인데, 상속 배율을 보고 "스케일 안 받은 콜라이더"로
