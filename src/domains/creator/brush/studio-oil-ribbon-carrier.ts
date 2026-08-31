@@ -1553,6 +1553,14 @@ interface ImpastoReliefField {
   readonly hairOffset: number;
   /** Flat-normalized dli shading multipliers (1 = flat paint). */
   readonly shading: Float32Array;
+  /**
+   * Cells of `shading` this build wrote, or `null` for "the whole tile".
+   *
+   * The lane planner reuses a run only while every cell its samples read still holds the value
+   * the cached run was measured against, so it needs the written set, not the changed one: those
+   * differ by the stencil's own ring and an undersized set leaves a stale run behind.
+   */
+  readonly writtenShading: readonly ImpastoDirtyRect[] | null;
 }
 
 /**
@@ -1894,17 +1902,24 @@ function shadeImpastoRelief(
         }
       }
     }
-    for (const rect of dirty) {
+    // The stencil reads neighbours, so a cell one ring outside a changed cell changes too.
+    const written = dirty.map((rect) => ({
+      x: rect.x - 1,
+      y: rect.y - 1,
+      width: rect.width + 2,
+      height: rect.height + 2,
+    }));
+    for (const region of written) {
       computeStudioImpastoReliefShading(height, {
         width: grid.gridWidth,
         height: grid.gridHeight,
         heightScale: IMPASTO_RELIEF_HEIGHT_SCALE,
         into: shading,
-        // The stencil reads neighbours, so a cell one ring outside a changed cell changes too.
-        region: { x: rect.x - 1, y: rect.y - 1, width: rect.width + 2, height: rect.height + 2 },
+        region,
       });
     }
     return {
+      writtenShading: written,
       gridWidth: grid.gridWidth,
       gridHeight: grid.gridHeight,
       cell: grid.cell,
@@ -1918,6 +1933,7 @@ function shadeImpastoRelief(
   const height = new Float32Array(film.length);
   for (let at = 0; at < film.length; at += 1) height[at] = film[at]! + ridge[at]!;
   return {
+    writtenShading: null,
     gridWidth: grid.gridWidth,
     gridHeight: grid.gridHeight,
     cell: grid.cell,
@@ -1978,7 +1994,7 @@ function buildImpastoReliefField(
  *    them;
  *  - the bristle count changing, for the same reason.
  */
-class StudioImpastoReliefFieldPlanner {
+class StudioImpastoReliefPlanner {
   private grid: ImpastoReliefGrid | null = null;
   private settledFilm: Float32Array | null = null;
   private settledRidge: Float32Array | null = null;
@@ -2005,6 +2021,31 @@ class StudioImpastoReliefFieldPlanner {
    * boundary advances.
    */
   private dirtyFromStation = 0;
+  /**
+   * Last move's relief runs, by track slot then run index.
+   *
+   * Sampling and cutting the flank stripes was 20.6ms of the carrier's 55.5ms per move once the
+   * height field stopped being rebuilt: ~26.5k runs, every one of them re-walked from stations
+   * that had not moved in dozens of frames. A run is a pure function of its own stations and the
+   * shading cells its samples read, and both are now known to be settled or not.
+   */
+  private runTracks: readonly (readonly (PlannedImpastoReliefRun | undefined)[])[] = [];
+  private runShape: ImpastoReliefRunShape | null = null;
+  /**
+   * Canvas-space `[minX, minY, maxX, maxY]` of the shading samples each run index read, four
+   * entries per index.
+   *
+   * Measured, not bounded: the reuse test asks whether the field rewrote a cell some sample
+   * actually reads, and a reach formula that is a hair short there leaves a stale run on the
+   * canvas. A reused run's stations have not moved, so its recorded box is still its box.
+   */
+  private runBounds: Float64Array | null = null;
+  private lastReusedRuns = 0;
+
+  /** Relief runs taken from the previous move. Diagnostics and identity tests only. */
+  get reusedRuns(): number {
+    return this.lastReusedRuns;
+  }
 
   reset(): void {
     this.grid = null;
@@ -2015,6 +2056,46 @@ class StudioImpastoReliefFieldPlanner {
     this.height = null;
     this.shading = null;
     this.dirtyFromStation = 0;
+    this.runTracks = [];
+    this.runShape = null;
+    this.runBounds = null;
+    this.lastReusedRuns = 0;
+  }
+
+  /**
+   * The cached runs, or nothing when the bed they were cut from has changed shape.
+   *
+   * Every one of these decides which stripes exist or where each one samples, so a move that
+   * moves any of them is replanning all of the runs regardless.
+   */
+  retainedRuns(shape: ImpastoReliefRunShape): {
+    readonly tracks: readonly (readonly (PlannedImpastoReliefRun | undefined)[])[];
+    readonly bounds: Float64Array;
+  } | null {
+    const held = this.runShape;
+    if (
+      held === null
+      || this.runBounds === null
+      || held.bristleCount !== shape.bristleCount
+      || held.stripeStride !== shape.stripeStride
+      || held.stripeOffset !== shape.stripeOffset
+      || held.cell !== shape.cell
+    ) {
+      return null;
+    }
+    return { tracks: this.runTracks, bounds: this.runBounds };
+  }
+
+  keepRuns(
+    shape: ImpastoReliefRunShape,
+    tracks: readonly (readonly (PlannedImpastoReliefRun | undefined)[])[],
+    bounds: Float64Array,
+    reused: number,
+  ): void {
+    this.runShape = shape;
+    this.runTracks = tracks;
+    this.runBounds = bounds;
+    this.lastReusedRuns = reused;
   }
 
   /**
@@ -2232,6 +2313,19 @@ function sampleImpastoReliefShading(field: ImpastoReliefField, x: number, y: num
   return top * (1 - ty) + bottom * ty;
 }
 
+/**
+ * Everything outside a run's own stations that decides what it contains.
+ *
+ * A move that changes any of these is cutting a different set of stripes, or sampling them at
+ * different offsets, so nothing from the previous move survives it.
+ */
+interface ImpastoReliefRunShape {
+  readonly bristleCount: number;
+  readonly stripeStride: number;
+  readonly stripeOffset: number;
+  readonly cell: number;
+}
+
 interface PlannedImpastoReliefRun {
   readonly points: readonly number[];
   /** Mean signed shading distance from flat (positive = lit flank). */
@@ -2292,6 +2386,60 @@ function weldReliefRuns(
 }
 
 /**
+ * Which runs, cut on the fixed station stride, can be taken straight from the previous move.
+ *
+ * Two things have to hold. The run's stations must be settled — the UNCLAMPED end, because a run
+ * that ends on the clamp reads the bed's last station and that one moves on every append. And no
+ * cell any of its samples read may have been rewritten: `strength` is a mean over those samples,
+ * so a single moved cell can move the run's tone bucket.
+ *
+ * No test distinguishes the first condition today, and loosening it by tens of stations still
+ * passes: a station that moved re-stamped the field around itself, so the second condition's
+ * rectangle currently swallows the first one's. That is a coincidence between two rectangles
+ * maintained for different reasons, not an argument — a run's `points` and `width` come from its
+ * stations and nothing else, so the settled test is what actually covers them.
+ *
+ * The second test is geometric, which is what lets it stay honest across a tile that moved. The
+ * blit gives a cell the same value at a new index, so a sample at an unchanged canvas point reads
+ * an unchanged value; a sample the old tile had to clamp sits outside the old footprint, and the
+ * growth bands put every such cell in the written set.
+ */
+function reusableReliefRuns(
+  stations: readonly OilCarrierStation[],
+  settled: number,
+  field: ImpastoReliefField,
+  runCount: number,
+  bounds: Float64Array,
+): boolean[] {
+  const reusable = new Array<boolean>(runCount).fill(false);
+  const written = field.writtenShading;
+  if (written === null || settled < 2) return reusable;
+  const measured = Math.min(runCount, Math.floor(bounds.length / 4));
+  for (let runIndex = 0; runIndex < measured; runIndex += 1) {
+    if ((runIndex + 1) * BRISTLE_RUN_STATIONS > settled - 1) break;
+    const box = runIndex * 4;
+    // Bilinear sampling reads the 2x2 cells around the point, so a box that stops at the sample
+    // itself is one cell short on every side.
+    const x0 = Math.floor((bounds[box]! - field.originX) / field.cell) - 1;
+    const y0 = Math.floor((bounds[box + 1]! - field.originY) / field.cell) - 1;
+    const x1 = Math.floor((bounds[box + 2]! - field.originX) / field.cell) + 2;
+    const y1 = Math.floor((bounds[box + 3]! - field.originY) / field.cell) + 2;
+    let touched = false;
+    for (const rect of written) {
+      if (
+        rect.x < x1 && rect.x + rect.width > x0
+        && rect.y < y1 && rect.y + rect.height > y0
+      ) {
+        touched = true;
+        break;
+      }
+    }
+    reusable[runIndex] = !touched;
+  }
+  return reusable;
+}
+
+/**
  * Express the shaded height field as extra deterministic geometry both surfaces can render
  * identically: flank sub-bands along every bristle ridge plus a rim band along the body edge,
  * each classified by the shading buffer sampled where that flank lives at grid resolution.
@@ -2301,7 +2449,7 @@ function weldReliefRuns(
  */
 function planImpastoReliefOverlayLanes(
   stations: readonly OilCarrierStation[],
-  retained?: { readonly planner: StudioImpastoReliefFieldPlanner; readonly settled: number },
+  retained?: { readonly planner: StudioImpastoReliefPlanner; readonly settled: number },
 ): readonly StudioOilRibbonImpastoReliefLane[] {
   if (stations.length < 2) return Object.freeze([]);
   const field = retained
@@ -2310,6 +2458,7 @@ function planImpastoReliefOverlayLanes(
   if (!field) return Object.freeze([]);
   const planned: PlannedImpastoReliefRun[] = [];
   const bristleCount = impastoBristleCount(stations);
+  const runCount = Math.max(0, Math.ceil((stations.length - 1) / BRISTLE_RUN_STATIONS));
   // The stripes walk the bed on the SAME stride the height field raised its ridges on. See
   // `impastoHairStride`: a stripe on a hair that raised no ridge would sample flat film and claim
   // a glint that is not in the field.
@@ -2327,11 +2476,13 @@ function planImpastoReliefOverlayLanes(
     side: 1 | -1,
     trackIndex: number,
     runIndex: number,
-  ): void => {
+    bounds: Float64Array,
+  ): PlannedImpastoReliefRun | undefined => {
     const points: number[] = [];
     let strengthSum = 0;
     let widthSum = 0;
     let samples = 0;
+    const box = runIndex * 4;
     for (let index = runStart; index <= runEnd; index += 1) {
       const station = stations[index]!;
       const at = pointAt(station, side);
@@ -2339,22 +2490,24 @@ function planImpastoReliefOverlayLanes(
         station.x + station.normalX * at.geomOffset,
         station.y + station.normalY * at.geomOffset,
       );
-      strengthSum += sampleImpastoReliefShading(
-        field,
-        station.x + station.normalX * at.sampleOffset,
-        station.y + station.normalY * at.sampleOffset,
-      ) - 1;
+      const sampleX = station.x + station.normalX * at.sampleOffset;
+      const sampleY = station.y + station.normalY * at.sampleOffset;
+      if (sampleX < bounds[box]!) bounds[box] = sampleX;
+      if (sampleY < bounds[box + 1]!) bounds[box + 1] = sampleY;
+      if (sampleX > bounds[box + 2]!) bounds[box + 2] = sampleX;
+      if (sampleY > bounds[box + 3]!) bounds[box + 3] = sampleY;
+      strengthSum += sampleImpastoReliefShading(field, sampleX, sampleY) - 1;
       widthSum += at.width;
       samples += 1;
     }
-    if (samples < 2) return;
-    planned.push({
+    if (samples < 2) return undefined;
+    return {
       points,
       strength: strengthSum / samples,
       width: widthSum / samples,
       trackIndex,
       runIndex,
-    });
+    };
   };
 
   // One track per (side, stripe): the flank stripes are numbered by hair and the rim takes the
@@ -2362,50 +2515,108 @@ function planImpastoReliefOverlayLanes(
   const trackOf = (side: 1 | -1, stripe: number): number =>
     (side === 1 ? 0 : bristleCount + 1) * 2 + stripe;
 
-  for (let runStart = 0; runStart < stations.length - 1; runStart += BRISTLE_RUN_STATIONS) {
-    const runEnd = Math.min(stations.length - 1, runStart + BRISTLE_RUN_STATIONS);
-    const runIndex = runStart / BRISTLE_RUN_STATIONS;
-    for (const side of [-1, 1] as const) {
-      // Ridge flanks — one lit and one shaded band per hair, clamped inside the body silhouette
-      // so a screen-blended glint can never halo outside the paint.
-      for (
-        let bristleIndex = stripeOffset;
-        bristleIndex < bristleCount;
-        bristleIndex += stripeStride
-      ) {
-        collectRun(runStart, runEnd, (station, flankSide) => {
-          const hair = station.source.bristles[bristleIndex]!;
-          const ridgeWidth = impastoRidgeWidth(station, hair);
-          const width = Math.max(0.4, ridgeWidth * 0.85);
-          const offset = station.radiusY * hair.offsetRatio;
-          const flankDelta = Math.max(ridgeWidth * 0.5, field.cell * 0.4);
-          const maxOffset =
-            station.radiusY * IMPASTO_RELIEF_MAX_OFFSET_RATIO - width * 0.5;
-          return {
-            geomOffset: clamp(offset + flankSide * flankDelta, -maxOffset, maxOffset),
-            // The flank stripe hugs the crest within one grid texel, and the next hair sits only
-            // ~0.3·radiusY away — sample exactly one texel off the crest, never further, or the
-            // probe lands on the neighbouring ridge's OPPOSITE flank and cancels the signal.
-            sampleOffset: offset + flankSide * field.cell * 0.9,
-            width,
-          };
-        }, side, trackOf(side, bristleIndex), runIndex);
-      }
-      // Body rim — thick paint catches light along its own silhouette cliff.
-      collectRun(runStart, runEnd, (station, rimSide) => {
-        const width = clamp(station.radiusY * 0.26, 0.4, 2.6);
-        const inset = Math.min(
-          station.radiusY * 0.9,
-          Math.max(station.radiusY * 0.7, station.radiusY - 1.6 * field.cell),
-        );
-        return {
-          geomOffset: rimSide * inset,
-          sampleOffset: rimSide * Math.max(station.radiusY - 0.9 * field.cell, station.radiusY * 0.5),
-          width,
-        };
-      }, side, trackOf(side, bristleCount), runIndex);
+  // Ridge flanks — one lit and one shaded band per hair, clamped inside the body silhouette
+  // so a screen-blended glint can never halo outside the paint.
+  const flankPointAt = (bristleIndex: number) =>
+    (station: OilCarrierStation, flankSide: 1 | -1) => {
+      const hair = station.source.bristles[bristleIndex]!;
+      const ridgeWidth = impastoRidgeWidth(station, hair);
+      const width = Math.max(0.4, ridgeWidth * 0.85);
+      const offset = station.radiusY * hair.offsetRatio;
+      const flankDelta = Math.max(ridgeWidth * 0.5, field.cell * 0.4);
+      const maxOffset = station.radiusY * IMPASTO_RELIEF_MAX_OFFSET_RATIO - width * 0.5;
+      return {
+        geomOffset: clamp(offset + flankSide * flankDelta, -maxOffset, maxOffset),
+        // The flank stripe hugs the crest within one grid texel, and the next hair sits only
+        // ~0.3·radiusY away — sample exactly one texel off the crest, never further, or the
+        // probe lands on the neighbouring ridge's OPPOSITE flank and cancels the signal.
+        sampleOffset: offset + flankSide * field.cell * 0.9,
+        width,
+      };
+    };
+  // Body rim — thick paint catches light along its own silhouette cliff.
+  const rimPointAt = (station: OilCarrierStation, rimSide: 1 | -1) => {
+    const width = clamp(station.radiusY * 0.26, 0.4, 2.6);
+    const inset = Math.min(
+      station.radiusY * 0.9,
+      Math.max(station.radiusY * 0.7, station.radiusY - 1.6 * field.cell),
+    );
+    return {
+      geomOffset: rimSide * inset,
+      sampleOffset: rimSide * Math.max(station.radiusY - 0.9 * field.cell, station.radiusY * 0.5),
+      width,
+    };
+  };
+
+  const shape: ImpastoReliefRunShape = { bristleCount, stripeStride, stripeOffset, cell: field.cell };
+  const cached = retained?.planner.retainedRuns(shape) ?? null;
+  const reusable = cached === null
+    ? null
+    : reusableReliefRuns(stations, retained!.settled, field, runCount, cached.bounds);
+  // A reused run's box comes back from the cache unchanged — its stations have not moved, so its
+  // samples land where they landed. A recomputed one starts empty and is filled as it is cut.
+  const bounds = new Float64Array(runCount * 4);
+  for (let runIndex = 0; runIndex < runCount; runIndex += 1) {
+    const box = runIndex * 4;
+    if (reusable?.[runIndex] === true) {
+      bounds[box] = cached!.bounds[box]!;
+      bounds[box + 1] = cached!.bounds[box + 1]!;
+      bounds[box + 2] = cached!.bounds[box + 2]!;
+      bounds[box + 3] = cached!.bounds[box + 3]!;
+      continue;
     }
+    bounds[box] = Number.POSITIVE_INFINITY;
+    bounds[box + 1] = Number.POSITIVE_INFINITY;
+    bounds[box + 2] = Number.NEGATIVE_INFINITY;
+    bounds[box + 3] = Number.NEGATIVE_INFINITY;
   }
+  const tracks: (readonly (PlannedImpastoReliefRun | undefined)[])[] = [];
+  let reused = 0;
+
+  // Walked track by track, not run by run: the bucketing below wants exactly this order, and a
+  // cached track is a contiguous array the reuse test indexes straight into. The old loop nested
+  // the other way and paid for a 26.5k-element sort per move to get back here.
+  const collectTrack = (
+    trackIndex: number,
+    side: 1 | -1,
+    pointAt: (station: OilCarrierStation, side: 1 | -1) => {
+      readonly geomOffset: number;
+      readonly sampleOffset: number;
+      readonly width: number;
+    },
+  ): void => {
+    const held = cached?.tracks[tracks.length];
+    const runs = new Array<PlannedImpastoReliefRun | undefined>(runCount);
+    for (let runIndex = 0; runIndex < runCount; runIndex += 1) {
+      const kept = reusable?.[runIndex] === true ? held?.[runIndex] : undefined;
+      if (kept) reused += 1;
+      const run = kept ?? collectRun(
+        runIndex * BRISTLE_RUN_STATIONS,
+        Math.min(stations.length - 1, (runIndex + 1) * BRISTLE_RUN_STATIONS),
+        pointAt,
+        side,
+        trackIndex,
+        runIndex,
+        bounds,
+      );
+      runs[runIndex] = run;
+      if (run) planned.push(run);
+    }
+    tracks.push(runs);
+  };
+
+  // `trackOf` numbers side +1 below side −1, so this is already ascending track order.
+  for (const side of [1, -1] as const) {
+    for (
+      let bristleIndex = stripeOffset;
+      bristleIndex < bristleCount;
+      bristleIndex += stripeStride
+    ) {
+      collectTrack(trackOf(side, bristleIndex), side, flankPointAt(bristleIndex));
+    }
+    collectTrack(trackOf(side, bristleCount), side, rimPointAt);
+  }
+  retained?.planner.keepRuns(shape, tracks, bounds, reused);
 
   // Quantise into a bounded set of (kind, tone) lanes: one paint pass per lane keeps
   // self-crossings honest exactly like the load bands above.
@@ -2415,13 +2626,13 @@ function planImpastoReliefOverlayLanes(
     runs: PlannedImpastoReliefRun[];
     opacities: number[];
   }>();
-  // Walked in track order so the bucket choice has a history. Independent bucketing let one ridge
+  // Walked in track order (which is the order they were cut in) so the bucket choice has a
+  // history. Independent bucketing let one ridge
   // flank flicker between two tone buckets from one three-station run to the next, which put the
   // two halves of a single glint in two different lanes: the weld could not rejoin them and the
   // lane rendered as a mosaic of light and dark tiles instead of a raked ridge.
   const held = new Map<number, { kind: StudioOilRibbonImpastoReliefKind; bucket: number }>();
-  for (const run of [...planned].sort((left, right) =>
-    left.trackIndex - right.trackIndex || left.runIndex - right.runIndex)) {
+  for (const run of planned) {
     const magnitude = Math.abs(run.strength);
     if (magnitude < IMPASTO_RELIEF_MIN_STRENGTH) {
       held.delete(run.trackIndex);
@@ -2566,9 +2777,10 @@ export function planStudioOilRibbonCarrier(
  *
  * The v1 load-dynamics and bristle-physics programs publish per-station arrays that are replanned
  * across the whole bed, so their runs are never reused — geometry and stations still are. The
- * impasto relief overlay reads stations only, and its height field is retained on the same
- * settled boundary (`StudioImpastoReliefFieldPlanner`); the shading, run sampling and lane
- * bucketing on top of it still run in full.
+ * impasto relief overlay reads stations only, so `StudioImpastoReliefPlanner` resumes on the same
+ * settled boundary for all three of its stages: the height rasters, the shading of the cells whose
+ * neighbourhood moved, and the flank runs sampled off them. Bucketing the runs into tone lanes is
+ * the one relief stage still run in full, for the same reason the bristle banding is.
  */
 export class StudioOilRibbonCarrierPlanner {
   private optionsKey: string | null = null;
@@ -2593,10 +2805,10 @@ export class StudioOilRibbonCarrierPlanner {
    */
   private readonly bristlePhysics = new StudioBristlePhysicsOilPlanner();
   /**
-   * Retained impasto height field. Reads stations only, and only the settled prefix is baked, so
-   * it resumes on the same boundary the bristle runs do.
+   * Retained impasto height field and the relief runs cut from it. Reads stations only, and only
+   * the settled prefix is baked, so it resumes on the same boundary the bristle runs do.
    */
-  private readonly impastoRelief = new StudioImpastoReliefFieldPlanner();
+  private readonly impastoRelief = new StudioImpastoReliefPlanner();
 
   /** Runs reused from the previous call. Diagnostics and identity tests only. */
   get reusedRuns(): number {
@@ -2606,6 +2818,11 @@ export class StudioOilRibbonCarrierPlanner {
   /** Stations proven settled on the previous call. Diagnostics and identity tests only. */
   get settledStations(): number {
     return this.lastSettledStations;
+  }
+
+  /** Relief runs reused from the previous call. Diagnostics and identity tests only. */
+  get reusedReliefRuns(): number {
+    return this.impastoRelief.reusedRuns;
   }
 
   reset(): void {

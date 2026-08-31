@@ -130,4 +130,54 @@ describe("StudioOilRibbonCarrierPlanner — retained relief tile under a moving 
       expect(diverged).toEqual([]);
     }, 600_000);
   }
+
+  // Equality alone cannot tell a working cache from one that reuses nothing: both are batch-
+  // identical, and only one of them is the point. The stride cuts a run every three stations, so
+  // a settled prefix of S stations offers roughly S/3 run indices across every track.
+  it("takes most of its runs from the previous move once the prefix settles", () => {
+    const options = studioOilRibbonProgramsForBrush(BRUSH, SEED);
+    const planner = new StudioOilRibbonCarrierPlanner();
+    const dabPlanner = new FxOilDabPlanner();
+    const points: number[] = [];
+    const pressures: number[] = [];
+    let lastPlanned = 0;
+    for (let index = 0; index < 200; index += 1) {
+      points.push(120 + index * 7, 400 + Math.sin(index / 19) * 40);
+      pressures.push(0.55);
+      const plan = planner.plan(dabsAt([...points], [...pressures], dabPlanner), options);
+      lastPlanned = (plan.impastoReliefLanes ?? []).reduce((total, lane) => total + lane.runs.length, 0);
+    }
+    expect(lastPlanned).toBeGreaterThan(0);
+    expect(planner.reusedReliefRuns).toBeGreaterThan(0);
+    // Runs are welded into stripes before they reach the plan, so the reused count is compared
+    // against the pre-weld population it comes from, not against the lane runs.
+    expect(planner.reusedReliefRuns).toBeGreaterThan(planner.settledStations);
+  });
+
+  // The bed every measurement in this effort is taken on, and the one shape the per-append walks
+  // above cannot reach: past FX_OIL_DAB_CAP the lattice refits under the stroke on every append,
+  // so the settled prefix, the tile and the hair stride all move for reasons the shorter strokes
+  // never produce. A window is compared rather than the whole climb — a batch replan at the cap
+  // is the expensive half.
+  it("stays batch-identical at every append past the dab cap", () => {
+    const options = studioOilRibbonProgramsForBrush(BRUSH, SEED);
+    const planner = new StudioOilRibbonCarrierPlanner();
+    const dabPlanner = new FxOilDabPlanner();
+    const points: number[] = [];
+    const pressures: number[] = [];
+    let capped = 0;
+    for (let index = 0; capped < 12; index += 1) {
+      const t = index / 40;
+      points.push(700 + Math.cos(t) * (140 + index * 0.7), 700 + Math.sin(t) * (140 + index * 0.7));
+      pressures.push(0.3 + 0.6 * Math.abs(Math.sin(index / 57)));
+      if (index < 3) continue;
+      const dabs = dabsAt([...points], [...pressures], dabPlanner);
+      const plan = planner.plan(dabs, options);
+      if (dabs.length < FX_OIL_DAB_CAP - 8) continue;
+      capped += 1;
+      expect(plan.impastoReliefLanes)
+        .toEqual(planStudioOilRibbonCarrier(dabs, options).impastoReliefLanes);
+    }
+    expect(capped).toBe(12);
+  }, 900_000);
 });
