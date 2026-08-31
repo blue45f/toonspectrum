@@ -286,6 +286,14 @@ const STUDIO_CRDT_LAYER_GROUP_ROOT_PREFIX = "layer-group:";
 const STUDIO_CRDT_PAGE_ORDER_ROOT = "page-order";
 const STUDIO_CRDT_DELETION_OPS_ROOT = "studio-deletion-ops";
 const STUDIO_CRDT_DELETION_ACKS_ROOT = "studio-deletion-acks";
+export const STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT =
+  "studio-shared-3d-stage-records-v1";
+export const STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT =
+  "studio-shared-3d-stage-visibility-receipts-v1";
+export const STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX =
+  "studio-shared-3d-stage-record:";
+export const STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPT_ROOT_PREFIX =
+  "studio-shared-3d-stage-visibility-receipt:";
 const STUDIO_CRDT_PROPERTY_PREFIXES = ["base:", "prop:", "unset:"] as const;
 const STUDIO_CRDT_SCENE_PAYLOAD_MAX_BYTES = 16 * 1_024;
 const STUDIO_CRDT_PAGE_PAYLOAD_MAX_BYTES = 8 * 1_024;
@@ -311,6 +319,24 @@ const STUDIO_CRDT_ADVANCED_RULER_MAX_NAME_LENGTH = 80;
 const STUDIO_CRDT_ADVANCED_RULER_MAX_OFFSET = 1_000_000;
 const STUDIO_CRDT_ADVANCED_RULER_MIN_CONTROL_POLYGON_LENGTH = 1e-6;
 const STUDIO_CRDT_DELETION_TARGET_MAX_LENGTH = 384;
+const STUDIO_CRDT_SHARED_3D_STAGE_PAYLOAD_VERSION = 1;
+const STUDIO_CRDT_SHARED_3D_STAGE_DOCUMENT_MAX_BYTES = 8 * 1_024;
+const STUDIO_CRDT_SHARED_3D_STAGE_ENTRY_MAX_BYTES = 12 * 1_024;
+const STUDIO_CRDT_SHARED_3D_STAGE_COLLECTION_MAX_BYTES = 1_024 * 1_024;
+const STUDIO_CRDT_SHARED_3D_STAGE_PAGE_SIZE = 64;
+const STUDIO_CRDT_SHARED_3D_RECEIPT_PAGE_SIZE = 256;
+const STUDIO_CRDT_SHARED_3D_MAX_PAGE_COUNT = 1_024;
+const STUDIO_CRDT_SHARED_3D_MAX_CHARACTERS = 12;
+const STUDIO_CRDT_SHARED_3D_SAFE_ID_PATTERN =
+  /^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}$/u;
+const STUDIO_CRDT_SHARED_3D_SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/u;
+const STUDIO_CRDT_SHARED_3D_MODEL_RUNTIME_KEY_PATTERN =
+  /^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}:sha256:[a-f0-9]{64}$/u;
+const STUDIO_CRDT_SHARED_3D_FORBIDDEN_IDS = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
 const STUDIO_CRDT_TEXT_ENCODER = new TextEncoder();
 const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
 const STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEY_SET = new Set<string>(
@@ -559,6 +585,900 @@ function isExactJsonObject(
   if (prototype !== Object.prototype && prototype !== null) return false;
   const keys = Object.keys(value);
   return keys.length === requiredKeys.size && keys.every((key) => requiredKeys.has(key));
+}
+
+interface StudioCrdtShared3dStageIdentity {
+  readonly key: string;
+  readonly pageId: string;
+  readonly id: string;
+}
+
+interface StudioCrdtShared3dStageCharacter {
+  readonly elementId: string;
+  readonly modelRuntimeKey: string;
+  readonly sourceHash: string;
+  readonly placement?: {
+    readonly position: readonly [number, number, number];
+    readonly rotationY: number;
+  };
+}
+
+interface StudioCrdtShared3dStageEntry {
+  readonly id: string;
+  readonly capturePolicy: "require-all-linked" | "background-only";
+  readonly background: {
+    readonly bundleId: string;
+    readonly sourceHash: string;
+  };
+  readonly characters: readonly StudioCrdtShared3dStageCharacter[];
+  readonly dccSource?: {
+    readonly sourceDocumentId: string;
+    readonly sourceStateHash: string;
+    readonly sourceWorkspaceHash: string;
+    readonly sourceBridgeSetHash: string;
+    readonly sourceCommandCount: number;
+    readonly sourceBridgeCommandSequence: number;
+  };
+}
+
+interface StudioCrdtShared3dActiveStage {
+  readonly order: number;
+  readonly entry: StudioCrdtShared3dStageEntry;
+}
+
+function compareStudioCrdtShared3dIds(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function isStudioCrdtShared3dSafeId(value: unknown): value is string {
+  return typeof value === "string" &&
+    value.length >= 1 &&
+    value.length <= 128 &&
+    STUDIO_CRDT_SHARED_3D_SAFE_ID_PATTERN.test(value) &&
+    !STUDIO_CRDT_SHARED_3D_FORBIDDEN_IDS.has(value.toLowerCase());
+}
+
+function isStudioCrdtShared3dHash(value: unknown): value is string {
+  return typeof value === "string" &&
+    value.length === 71 &&
+    STUDIO_CRDT_SHARED_3D_SHA256_PATTERN.test(value);
+}
+
+function hasStudioCrdtShared3dUnsafeText(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+      index += 1;
+      continue;
+    }
+    if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) return true;
+    const codePoint = value.codePointAt(index) ?? 0;
+    if (
+      codePoint <= 0x1f ||
+      (codePoint >= 0x7f && codePoint <= 0x9f) ||
+      (codePoint >= 0x202a && codePoint <= 0x202e) ||
+      (codePoint >= 0x2066 && codePoint <= 0x2069)
+    ) return true;
+  }
+  return false;
+}
+
+function isStudioCrdtShared3dProvenanceText(value: unknown): value is string {
+  return typeof value === "string" &&
+    value.length >= 1 &&
+    value.length <= 160 &&
+    !hasStudioCrdtShared3dUnsafeText(value);
+}
+
+function isStudioCrdtShared3dRuntimeKey(
+  value: unknown,
+  elementId: string
+): value is string {
+  return typeof value === "string" &&
+    value.length <= 200 &&
+    STUDIO_CRDT_SHARED_3D_MODEL_RUNTIME_KEY_PATTERN.test(value) &&
+    value.startsWith(`${elementId}:`);
+}
+
+function hasOnlyJsonKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
+function parseStudioCrdtShared3dPlacement(value: unknown): {
+  readonly position: readonly [number, number, number];
+  readonly rotationY: number;
+} | null {
+  if (!isExactJsonObject(value, new Set(["position", "rotationY"]))) return null;
+  if (!Array.isArray(value.position) || value.position.length !== 3) return null;
+  if (Object.keys(value.position).some((key) => key !== "0" && key !== "1" && key !== "2")) {
+    return null;
+  }
+  const position = value.position;
+  if (
+    position.some((component) => !finiteNumberInRange(component, -10, 10)) ||
+    !finiteNumberInRange(value.rotationY, -Math.PI, Math.PI)
+  ) return null;
+  return {
+    position: [
+      Object.is(position[0], -0) ? 0 : position[0] as number,
+      Object.is(position[1], -0) ? 0 : position[1] as number,
+      Object.is(position[2], -0) ? 0 : position[2] as number,
+    ],
+    rotationY: Object.is(value.rotationY, -0) ? 0 : value.rotationY as number,
+  };
+}
+
+function parseStudioCrdtShared3dStageEntry(value: unknown): StudioCrdtShared3dStageEntry | null {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    !hasOnlyJsonKeys(value as Record<string, unknown>, new Set([
+      "id",
+      "capturePolicy",
+      "background",
+      "characters",
+      "dccSource",
+    ]))
+  ) return null;
+  const candidate = value as Record<string, unknown>;
+  if (
+    !isStudioCrdtShared3dSafeId(candidate.id) ||
+    (candidate.capturePolicy !== "require-all-linked" &&
+      candidate.capturePolicy !== "background-only") ||
+    !isExactJsonObject(candidate.background, new Set(["bundleId", "sourceHash"])) ||
+    !isStudioCrdtShared3dSafeId(candidate.background.bundleId) ||
+    !isStudioCrdtShared3dHash(candidate.background.sourceHash) ||
+    !Array.isArray(candidate.characters) ||
+    candidate.characters.length > STUDIO_CRDT_SHARED_3D_MAX_CHARACTERS ||
+    (candidate.capturePolicy === "background-only" && candidate.characters.length > 0)
+  ) return null;
+
+  const characters: StudioCrdtShared3dStageCharacter[] = [];
+  const elementIds = new Set<string>();
+  for (const rawCharacter of candidate.characters) {
+    if (
+      rawCharacter === null ||
+      typeof rawCharacter !== "object" ||
+      Array.isArray(rawCharacter) ||
+      !hasOnlyJsonKeys(rawCharacter as Record<string, unknown>, new Set([
+        "elementId",
+        "modelRuntimeKey",
+        "sourceHash",
+        "placement",
+      ]))
+    ) return null;
+    const character = rawCharacter as Record<string, unknown>;
+    if (
+      !isStudioCrdtShared3dSafeId(character.elementId) ||
+      elementIds.has(character.elementId) ||
+      !isStudioCrdtShared3dRuntimeKey(character.modelRuntimeKey, character.elementId) ||
+      !isStudioCrdtShared3dHash(character.sourceHash)
+    ) return null;
+    const placement = character.placement === undefined
+      ? undefined
+      : parseStudioCrdtShared3dPlacement(character.placement);
+    if (character.placement !== undefined && !placement) return null;
+    elementIds.add(character.elementId);
+    characters.push({
+      elementId: character.elementId,
+      modelRuntimeKey: character.modelRuntimeKey,
+      sourceHash: character.sourceHash,
+      ...(placement ? { placement } : {}),
+    });
+  }
+
+  let dccSource: StudioCrdtShared3dStageEntry["dccSource"];
+  if (candidate.dccSource !== undefined) {
+    const rawDccSource = candidate.dccSource;
+    const keys = new Set([
+      "sourceDocumentId",
+      "sourceStateHash",
+      "sourceWorkspaceHash",
+      "sourceBridgeSetHash",
+      "sourceCommandCount",
+      "sourceBridgeCommandSequence",
+    ]);
+    if (
+      !isExactJsonObject(rawDccSource, keys) ||
+      !isStudioCrdtShared3dProvenanceText(rawDccSource.sourceDocumentId) ||
+      !isStudioCrdtShared3dProvenanceText(rawDccSource.sourceStateHash) ||
+      !isStudioCrdtShared3dHash(rawDccSource.sourceWorkspaceHash) ||
+      !isStudioCrdtShared3dProvenanceText(rawDccSource.sourceBridgeSetHash) ||
+      !Number.isSafeInteger(rawDccSource.sourceCommandCount) ||
+      (rawDccSource.sourceCommandCount as number) < 0 ||
+      !Number.isSafeInteger(rawDccSource.sourceBridgeCommandSequence) ||
+      (rawDccSource.sourceBridgeCommandSequence as number) < 0
+    ) return null;
+    dccSource = {
+      sourceDocumentId: rawDccSource.sourceDocumentId,
+      sourceStateHash: rawDccSource.sourceStateHash,
+      sourceWorkspaceHash: rawDccSource.sourceWorkspaceHash,
+      sourceBridgeSetHash: rawDccSource.sourceBridgeSetHash,
+      sourceCommandCount: rawDccSource.sourceCommandCount as number,
+      sourceBridgeCommandSequence: rawDccSource.sourceBridgeCommandSequence as number,
+    };
+  }
+
+  const entry: StudioCrdtShared3dStageEntry = {
+    id: candidate.id,
+    capturePolicy: candidate.capturePolicy,
+    background: {
+      bundleId: candidate.background.bundleId,
+      sourceHash: candidate.background.sourceHash,
+    },
+    characters,
+    ...(dccSource ? { dccSource } : {}),
+  };
+  // The browser collection parser first projects every placement-aware entry through its legacy
+  // reference-only v1 document. Keep that stricter 8 KiB gate as well as the v3 entry's 12 KiB
+  // envelope or the server could admit a sidecar that every client aggregate reader rejects.
+  const referenceOnlyDocument = {
+    kind: "toonspectrum.studio-shared-3d-stage",
+    version: 1,
+    authority: "page-background-with-linked-character-sources",
+    capturePolicy: entry.capturePolicy,
+    background: entry.background,
+    characters: entry.characters.map(({ placement: _placement, ...character }) => character),
+    ...(entry.dccSource ? { dccSource: entry.dccSource } : {}),
+  };
+  const referenceOnlyByteLength = encodedJsonByteLength(referenceOnlyDocument);
+  const byteLength = encodedJsonByteLength(entry);
+  return referenceOnlyByteLength !== null &&
+    referenceOnlyByteLength <= STUDIO_CRDT_SHARED_3D_STAGE_DOCUMENT_MAX_BYTES &&
+    byteLength !== null &&
+    byteLength <= STUDIO_CRDT_SHARED_3D_STAGE_ENTRY_MAX_BYTES
+    ? entry
+    : null;
+}
+
+function parseCanonicalStudioCrdtShared3dStagePayload(
+  value: unknown,
+  stageId: string
+): StudioCrdtShared3dStageEntry | null {
+  if (typeof value !== "string" || value.length === 0) return null;
+  try {
+    const entry = parseStudioCrdtShared3dStageEntry(JSON.parse(value));
+    return entry && entry.id === stageId && JSON.stringify(entry) === value ? entry : null;
+  } catch {
+    return null;
+  }
+}
+
+export function encodeStudioCrdtShared3dCompositeKey(pageId: string, id: string): string {
+  return `${pageId.length}:${pageId}${id.length}:${id}`;
+}
+
+function parseStudioCrdtShared3dCompositeKey(
+  key: string,
+  validateId: (value: unknown) => value is string
+): StudioCrdtShared3dStageIdentity | null {
+  if (key.length < 5 || key.length > 328) return null;
+  const readPart = (offset: number): { value: string; nextOffset: number } | null => {
+    const separator = key.indexOf(":", offset);
+    if (separator < 0) return null;
+    const lengthToken = key.slice(offset, separator);
+    if (!/^(?:0|[1-9][0-9]*)$/u.test(lengthToken)) return null;
+    const length = Number(lengthToken);
+    if (!Number.isSafeInteger(length) || length <= 0 || length > 160) return null;
+    const start = separator + 1;
+    const end = start + length;
+    return end <= key.length ? { value: key.slice(start, end), nextOffset: end } : null;
+  };
+  const page = readPart(0);
+  if (!page) return null;
+  const id = readPart(page.nextOffset);
+  if (
+    !id ||
+    id.nextOffset !== key.length ||
+    !isBoundedStudioCrdtId(page.value) ||
+    !validateId(id.value)
+  ) return null;
+  const canonical = encodeStudioCrdtShared3dCompositeKey(page.value, id.value);
+  return canonical === key
+    ? { key, pageId: page.value, id: id.value }
+    : null;
+}
+
+function studioCrdtShared3dPageExists(doc: Y.Doc, pageId: string): boolean {
+  const pageIndex = materializeExistingMapRoot(doc, STUDIO_CRDT_PAGE_INDEX_ROOT);
+  const page = materializeExistingMapRoot(
+    doc,
+    `${STUDIO_CRDT_PAGE_ROOT_PREFIX}${encodeURIComponent(pageId)}`
+  );
+  return pageIndex instanceof Y.Map &&
+    pageIndex.get(pageId) === true &&
+    page instanceof Y.Map &&
+    validatePageRoot(pageId, page);
+}
+
+function serializedStudioCrdtShared3dFingerprint(serialized: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function studioCrdtShared3dCollectionPageId(
+  prefix: "stage" | "receipt",
+  index: number,
+  items: unknown
+): string {
+  const serialized = JSON.stringify(items);
+  return `${prefix}-page-${index.toString(36).padStart(4, "0")}-${
+    serializedStudioCrdtShared3dFingerprint(serialized)
+  }`;
+}
+
+function chunkStudioCrdtShared3dCollection<T>(
+  values: readonly T[],
+  size: number,
+  prefix: "stage" | "receipt"
+): Array<{ readonly id: string; readonly items: readonly T[] }> {
+  const pages: Array<{ readonly id: string; readonly items: readonly T[] }> = [];
+  for (let offset = 0; offset < values.length; offset += size) {
+    const items = values.slice(offset, offset + size);
+    pages.push({ id: studioCrdtShared3dCollectionPageId(prefix, pages.length, items), items });
+  }
+  return pages;
+}
+
+function hasValidStudioCrdtShared3dAggregate(
+  stages: readonly StudioCrdtShared3dActiveStage[],
+  receipts: readonly { readonly elementId: string; readonly modelRuntimeKey: string }[]
+): boolean {
+  // The caller has already proved that this page owns at least one Stage record. Active receipts
+  // without a matching active Stage are dormant grow-only history, not an invalid receipt-only page.
+  if (stages.length === 0) return true;
+  const bundleIds = new Set<string>();
+  const characterAuthorities = new Set<string>();
+  const entries = stages
+    .slice()
+    .sort((left, right) => (
+      left.order - right.order || compareStudioCrdtShared3dIds(left.entry.id, right.entry.id)
+    ))
+    .map(({ entry }) => entry);
+  for (const entry of entries) {
+    if (bundleIds.has(entry.background.bundleId)) return false;
+    bundleIds.add(entry.background.bundleId);
+    for (const character of entry.characters) {
+      characterAuthorities.add(`${character.elementId}\0${character.modelRuntimeKey}`);
+    }
+  }
+  const orderedReceipts = receipts
+    .filter((receipt) => characterAuthorities.has(
+      `${receipt.elementId}\0${receipt.modelRuntimeKey}`
+    ))
+    .sort((left, right) => compareStudioCrdtShared3dIds(left.elementId, right.elementId));
+
+  let collection: unknown;
+  if (entries.length <= STUDIO_CRDT_SHARED_3D_STAGE_PAGE_SIZE) {
+    collection = {
+      kind: "toonspectrum.studio-shared-3d-stage-collection",
+      version: 3,
+      authority: "page-shared-3d-stage-collection",
+      stages: entries,
+      visibilityReceipts: orderedReceipts,
+    };
+  } else {
+    const stagePages = chunkStudioCrdtShared3dCollection(
+      entries,
+      STUDIO_CRDT_SHARED_3D_STAGE_PAGE_SIZE,
+      "stage"
+    );
+    const visibilityReceiptPages = chunkStudioCrdtShared3dCollection(
+      orderedReceipts,
+      STUDIO_CRDT_SHARED_3D_RECEIPT_PAGE_SIZE,
+      "receipt"
+    );
+    if (
+      stagePages.length > STUDIO_CRDT_SHARED_3D_MAX_PAGE_COUNT ||
+      visibilityReceiptPages.length > STUDIO_CRDT_SHARED_3D_MAX_PAGE_COUNT
+    ) return false;
+    collection = {
+      kind: "toonspectrum.studio-shared-3d-stage-collection",
+      version: 4,
+      authority: "page-shared-3d-stage-collection",
+      stagePages,
+      visibilityReceiptPages,
+    };
+  }
+  const byteLength = encodedJsonByteLength(collection);
+  return byteLength !== null &&
+    byteLength <= STUDIO_CRDT_SHARED_3D_STAGE_COLLECTION_MAX_BYTES;
+}
+
+const STUDIO_CRDT_SHARED_3D_STAGE_RECORD_KEYS = new Set([
+  "pageId",
+  "stageId",
+  "payloadVersion",
+  "order",
+  "payload",
+]);
+const STUDIO_CRDT_SHARED_3D_RECEIPT_RECORD_KEYS = new Set([
+  "pageId",
+  "elementId",
+  "payloadVersion",
+  "modelRuntimeKey",
+]);
+const STUDIO_CRDT_SHARED_3D_EVENT_KEY_PATTERN = /^(activate|deactivate):(0|[1-9][0-9]*)$/u;
+const STUDIO_CRDT_SHARED_3D_EVENT_MAX_PER_RECORD = 256;
+const STUDIO_CRDT_SHARED_3D_EVENT_MAX_GENERATION = 255;
+const STUDIO_CRDT_SHARED_3D_EVENT_MAX_TOTAL = STUDIO_CRDT_COLLECTION_MAX_ENTRIES;
+
+interface StudioCrdtShared3dEvents {
+  readonly eventKeys: ReadonlySet<string>;
+  readonly maxActivate: number;
+  readonly maxDeactivate: number;
+}
+
+interface StudioCrdtShared3dValidatedStageRecord extends StudioCrdtShared3dEvents {
+  readonly identity: StudioCrdtShared3dStageIdentity;
+  readonly order: number;
+  readonly entry: StudioCrdtShared3dStageEntry;
+}
+
+interface StudioCrdtShared3dValidatedReceiptRecord extends StudioCrdtShared3dEvents {
+  readonly identity: StudioCrdtShared3dStageIdentity;
+  readonly modelRuntimeKey: string;
+}
+
+function readStudioCrdtShared3dEvents(
+  record: Y.Map<unknown>,
+  fixedKeys: ReadonlySet<string>
+): StudioCrdtShared3dEvents | null {
+  const eventKeys = new Set<string>();
+  let maxActivate = -1;
+  let maxDeactivate = -1;
+  for (const [key, value] of record) {
+    if (fixedKeys.has(key)) continue;
+    const match = STUDIO_CRDT_SHARED_3D_EVENT_KEY_PATTERN.exec(key);
+    if (!match || value !== true) return null;
+    const generation = Number(match[2]);
+    if (
+      !Number.isSafeInteger(generation) ||
+      generation < 0 ||
+      generation > STUDIO_CRDT_SHARED_3D_EVENT_MAX_GENERATION
+    ) return null;
+    eventKeys.add(key);
+    if (eventKeys.size > STUDIO_CRDT_SHARED_3D_EVENT_MAX_PER_RECORD) return null;
+    if (match[1] === "activate") maxActivate = Math.max(maxActivate, generation);
+    else maxDeactivate = Math.max(maxDeactivate, generation);
+  }
+  if (eventKeys.size === 0) return null;
+  for (const key of eventKeys) {
+    const match = STUDIO_CRDT_SHARED_3D_EVENT_KEY_PATTERN.exec(key)!;
+    const generation = Number(match[2]);
+    if (
+      (match[1] === "activate" && generation > 0 &&
+        !eventKeys.has(`deactivate:${generation - 1}`)) ||
+      (match[1] === "deactivate" && generation > 0 &&
+        !eventKeys.has(`activate:${generation}`))
+    ) return null;
+  }
+  // The final bounded-history slot is reserved for a remove-wins deactivation. Accepting an active
+  // record at the cap would make that Stage/receipt impossible to unlink for the rest of the room.
+  if (
+    eventKeys.size === STUDIO_CRDT_SHARED_3D_EVENT_MAX_PER_RECORD
+    && maxActivate > maxDeactivate
+  ) return null;
+  return { eventKeys, maxActivate, maxDeactivate };
+}
+
+function isStudioCrdtShared3dRecordActive(record: StudioCrdtShared3dEvents): boolean {
+  return record.maxActivate > record.maxDeactivate;
+}
+
+function hasRequiredStudioCrdtShared3dFields(
+  record: Y.Map<unknown>,
+  requiredKeys: ReadonlySet<string>
+): boolean {
+  for (const key of requiredKeys) {
+    if (!record.has(key)) return false;
+  }
+  return true;
+}
+
+function studioCrdtShared3dDynamicRootName(prefix: string, key: string): string {
+  return `${prefix}${encodeURIComponent(key)}`;
+}
+
+function parseStudioCrdtShared3dDynamicRootIdentity(
+  rootName: string,
+  prefix: string
+): StudioCrdtShared3dStageIdentity | null {
+  if (!rootName.startsWith(prefix)) return null;
+  const encodedKey = rootName.slice(prefix.length);
+  if (!encodedKey) return null;
+  try {
+    const key = decodeURIComponent(encodedKey);
+    return encodeURIComponent(key) === encodedKey
+      ? parseStudioCrdtShared3dCompositeKey(key, isStudioCrdtShared3dSafeId)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateStudioCrdtShared3dStageRecord(
+  identity: StudioCrdtShared3dStageIdentity,
+  record: Y.Map<unknown>
+): StudioCrdtShared3dValidatedStageRecord | null {
+  const events = readStudioCrdtShared3dEvents(
+    record,
+    STUDIO_CRDT_SHARED_3D_STAGE_RECORD_KEYS
+  );
+  if (
+    !hasRequiredStudioCrdtShared3dFields(record, STUDIO_CRDT_SHARED_3D_STAGE_RECORD_KEYS) ||
+    record.get("pageId") !== identity.pageId ||
+    record.get("stageId") !== identity.id ||
+    record.get("payloadVersion") !== STUDIO_CRDT_SHARED_3D_STAGE_PAYLOAD_VERSION ||
+    !Number.isSafeInteger(record.get("order")) ||
+    (record.get("order") as number) < 0 ||
+    !events
+  ) return null;
+  const entry = parseCanonicalStudioCrdtShared3dStagePayload(record.get("payload"), identity.id);
+  return entry
+    ? { identity, order: record.get("order") as number, entry, ...events }
+    : null;
+}
+
+function validateStudioCrdtShared3dReceiptRecord(
+  identity: StudioCrdtShared3dStageIdentity,
+  record: Y.Map<unknown>
+): StudioCrdtShared3dValidatedReceiptRecord | null {
+  const events = readStudioCrdtShared3dEvents(
+    record,
+    STUDIO_CRDT_SHARED_3D_RECEIPT_RECORD_KEYS
+  );
+  const modelRuntimeKey = record.get("modelRuntimeKey");
+  return hasRequiredStudioCrdtShared3dFields(
+    record,
+    STUDIO_CRDT_SHARED_3D_RECEIPT_RECORD_KEYS
+  ) &&
+    record.get("pageId") === identity.pageId &&
+    record.get("elementId") === identity.id &&
+    record.get("payloadVersion") === STUDIO_CRDT_SHARED_3D_STAGE_PAYLOAD_VERSION &&
+    events &&
+    isStudioCrdtShared3dRuntimeKey(modelRuntimeKey, identity.id)
+    ? { identity, modelRuntimeKey, ...events }
+    : null;
+}
+
+function validateStudioCrdtShared3dStageRoots(doc: Y.Doc): boolean {
+  const stageIndex = materializeExistingMapRoot(doc, STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT);
+  const receiptIndex = materializeExistingMapRoot(
+    doc,
+    STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT
+  );
+  if (
+    stageIndex === null ||
+    receiptIndex === null ||
+    (stageIndex?.size ?? 0) > STUDIO_CRDT_COLLECTION_MAX_ENTRIES ||
+    (receiptIndex?.size ?? 0) > STUDIO_CRDT_COLLECTION_MAX_ENTRIES
+  ) return false;
+
+  const stagesByPage = new Map<string, StudioCrdtShared3dActiveStage[]>();
+  const receiptsByPage = new Map<string, Array<{
+    readonly elementId: string;
+    readonly modelRuntimeKey: string;
+  }>>();
+  const trackedStageKeys = new Set<string>();
+  const trackedReceiptKeys = new Set<string>();
+  const managedPages = new Set<string>();
+  let totalEventCount = 0;
+
+  for (const [key, tracked] of stageIndex ?? []) {
+    const identity = parseStudioCrdtShared3dCompositeKey(key, isStudioCrdtShared3dSafeId);
+    const record = identity
+      ? materializeExistingMapRoot(
+          doc,
+          studioCrdtShared3dDynamicRootName(
+            STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX,
+            key
+          )
+        )
+      : null;
+    const validated = identity && tracked === true && record instanceof Y.Map
+      ? validateStudioCrdtShared3dStageRecord(identity, record)
+      : null;
+    if (!validated) return false;
+    totalEventCount += validated.eventKeys.size;
+    if (totalEventCount > STUDIO_CRDT_SHARED_3D_EVENT_MAX_TOTAL) return false;
+    trackedStageKeys.add(key);
+    managedPages.add(validated.identity.pageId);
+    if (isStudioCrdtShared3dRecordActive(validated)) {
+      const stages = stagesByPage.get(validated.identity.pageId) ?? [];
+      stages.push({ order: validated.order, entry: validated.entry });
+      stagesByPage.set(validated.identity.pageId, stages);
+    }
+  }
+
+  for (const [key, tracked] of receiptIndex ?? []) {
+    const identity = parseStudioCrdtShared3dCompositeKey(key, isStudioCrdtShared3dSafeId);
+    const record = identity
+      ? materializeExistingMapRoot(
+          doc,
+          studioCrdtShared3dDynamicRootName(
+            STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPT_ROOT_PREFIX,
+            key
+          )
+        )
+      : null;
+    const validated = identity && tracked === true && record instanceof Y.Map
+      ? validateStudioCrdtShared3dReceiptRecord(identity, record)
+      : null;
+    if (!validated || !managedPages.has(validated.identity.pageId)) return false;
+    totalEventCount += validated.eventKeys.size;
+    if (totalEventCount > STUDIO_CRDT_SHARED_3D_EVENT_MAX_TOTAL) return false;
+    trackedReceiptKeys.add(key);
+    if (isStudioCrdtShared3dRecordActive(validated)) {
+      const receipts = receiptsByPage.get(validated.identity.pageId) ?? [];
+      receipts.push({
+        elementId: validated.identity.id,
+        modelRuntimeKey: validated.modelRuntimeKey,
+      });
+      receiptsByPage.set(validated.identity.pageId, receipts);
+    }
+  }
+
+  let dynamicStageCount = 0;
+  let dynamicReceiptCount = 0;
+  for (const [rootName, value] of doc.share) {
+    if (rootName.startsWith(STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX)) {
+      dynamicStageCount += 1;
+      const identity = parseStudioCrdtShared3dDynamicRootIdentity(
+        rootName,
+        STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX
+      );
+      if (
+        dynamicStageCount > STUDIO_CRDT_COLLECTION_MAX_ENTRIES ||
+        !identity ||
+        !trackedStageKeys.has(identity.key) ||
+        !(value instanceof Y.Map) ||
+        !validateStudioCrdtShared3dStageRecord(identity, value)
+      ) return false;
+    }
+    if (rootName.startsWith(STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPT_ROOT_PREFIX)) {
+      dynamicReceiptCount += 1;
+      const identity = parseStudioCrdtShared3dDynamicRootIdentity(
+        rootName,
+        STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPT_ROOT_PREFIX
+      );
+      if (
+        dynamicReceiptCount > STUDIO_CRDT_COLLECTION_MAX_ENTRIES ||
+        !identity ||
+        !trackedReceiptKeys.has(identity.key) ||
+        !(value instanceof Y.Map) ||
+        !validateStudioCrdtShared3dReceiptRecord(identity, value)
+      ) return false;
+    }
+  }
+  if (
+    dynamicStageCount !== trackedStageKeys.size ||
+    dynamicReceiptCount !== trackedReceiptKeys.size
+  ) return false;
+
+  for (const pageId of managedPages) {
+    if (
+      !studioCrdtShared3dPageExists(doc, pageId) ||
+      !hasValidStudioCrdtShared3dAggregate(
+        stagesByPage.get(pageId) ?? [],
+        receiptsByPage.get(pageId) ?? []
+      )
+    ) return false;
+  }
+  return true;
+}
+
+interface StudioCrdtShared3dImmutableRecordSnapshot extends StudioCrdtShared3dEvents {
+  readonly pageId: unknown;
+  readonly id: unknown;
+  readonly payloadVersion: unknown;
+}
+
+export interface StudioCrdtShared3dRootSnapshot {
+  readonly stageRootExisted: boolean;
+  readonly receiptRootExisted: boolean;
+  readonly stages: ReadonlyMap<string, StudioCrdtShared3dImmutableRecordSnapshot>;
+  readonly receipts: ReadonlyMap<string, StudioCrdtShared3dImmutableRecordSnapshot>;
+}
+
+function snapshotStudioCrdtShared3dRecord(
+  record: Y.Map<unknown>,
+  idKey: "stageId" | "elementId"
+): StudioCrdtShared3dImmutableRecordSnapshot | null {
+  const events = readStudioCrdtShared3dEvents(
+    record,
+    idKey === "stageId"
+      ? STUDIO_CRDT_SHARED_3D_STAGE_RECORD_KEYS
+      : STUDIO_CRDT_SHARED_3D_RECEIPT_RECORD_KEYS
+  );
+  return events
+    ? {
+        pageId: record.get("pageId"),
+        id: record.get(idKey),
+        payloadVersion: record.get("payloadVersion"),
+        ...events,
+      }
+    : null;
+}
+
+export function snapshotStudioCrdtShared3dStageRoots(
+  doc: Y.Doc
+): StudioCrdtShared3dRootSnapshot | null {
+  const stageIndex = materializeExistingMapRoot(doc, STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT);
+  const receiptIndex = materializeExistingMapRoot(
+    doc,
+    STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT
+  );
+  if (stageIndex === null || receiptIndex === null) return null;
+  const stages = new Map<string, StudioCrdtShared3dImmutableRecordSnapshot>();
+  for (const [key, tracked] of stageIndex ?? []) {
+    const record = materializeExistingMapRoot(
+      doc,
+      studioCrdtShared3dDynamicRootName(STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX, key)
+    );
+    const snapshot = tracked === true && record instanceof Y.Map
+      ? snapshotStudioCrdtShared3dRecord(record, "stageId")
+      : null;
+    if (!snapshot) return null;
+    stages.set(key, snapshot);
+  }
+  const receipts = new Map<string, StudioCrdtShared3dImmutableRecordSnapshot>();
+  for (const [key, tracked] of receiptIndex ?? []) {
+    const record = materializeExistingMapRoot(
+      doc,
+      studioCrdtShared3dDynamicRootName(
+        STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPT_ROOT_PREFIX,
+        key
+      )
+    );
+    const snapshot = tracked === true && record instanceof Y.Map
+      ? snapshotStudioCrdtShared3dRecord(record, "elementId")
+      : null;
+    if (!snapshot) return null;
+    receipts.set(key, snapshot);
+  }
+  return {
+    stageRootExisted: stageIndex !== undefined,
+    receiptRootExisted: receiptIndex !== undefined,
+    stages,
+    receipts,
+  };
+}
+
+function preservesStudioCrdtShared3dRecord(
+  previous: StudioCrdtShared3dImmutableRecordSnapshot,
+  current: Y.Map<unknown>,
+  idKey: "stageId" | "elementId"
+): boolean {
+  return current.get("pageId") === previous.pageId &&
+    current.get(idKey) === previous.id &&
+    current.get("payloadVersion") === previous.payloadVersion &&
+    [...previous.eventKeys].every((key) => current.get(key) === true);
+}
+
+export function preservesStudioCrdtShared3dStageRoots(
+  snapshot: StudioCrdtShared3dRootSnapshot | null,
+  doc: Y.Doc
+): boolean {
+  if (!snapshot) return false;
+  const stageIndex = materializeExistingMapRoot(doc, STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT);
+  const receiptIndex = materializeExistingMapRoot(
+    doc,
+    STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT
+  );
+  if (
+    stageIndex === null ||
+    receiptIndex === null ||
+    (snapshot.stageRootExisted && stageIndex === undefined) ||
+    (snapshot.receiptRootExisted && receiptIndex === undefined)
+  ) return false;
+  for (const [key, previous] of snapshot.stages) {
+    const current = materializeExistingMapRoot(
+      doc,
+      studioCrdtShared3dDynamicRootName(STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX, key)
+    );
+    if (
+      stageIndex?.get(key) !== true ||
+      !(current instanceof Y.Map) ||
+      !preservesStudioCrdtShared3dRecord(previous, current, "stageId")
+    ) return false;
+  }
+  for (const [key, previous] of snapshot.receipts) {
+    const current = materializeExistingMapRoot(
+      doc,
+      studioCrdtShared3dDynamicRootName(
+        STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPT_ROOT_PREFIX,
+        key
+      )
+    );
+    if (
+      receiptIndex?.get(key) !== true ||
+      !(current instanceof Y.Map) ||
+      !preservesStudioCrdtShared3dRecord(previous, current, "elementId")
+    ) return false;
+  }
+  return true;
+}
+
+function admitsStudioCrdtShared3dRecordEvents(
+  previous: StudioCrdtShared3dImmutableRecordSnapshot | undefined,
+  current: StudioCrdtShared3dEvents
+): boolean {
+  const newEventKeys = [...current.eventKeys].filter((key) => !previous?.eventKeys.has(key));
+  if (!previous) return newEventKeys.length > 0;
+  const maxBefore = Math.max(previous.maxActivate, previous.maxDeactivate);
+  for (const key of newEventKeys) {
+    const match = STUDIO_CRDT_SHARED_3D_EVENT_KEY_PATTERN.exec(key);
+    if (!match) return false;
+    const generation = Number(match[2]);
+    if (generation <= maxBefore) continue;
+    // Offline/reconnect updates may contain several complete transitions. Accept the aggregate
+    // suffix only when every event carries its causal predecessor in the same grow-only record;
+    // readStudioCrdtShared3dEvents already enforces the same shape for the full current set.
+    const predecessor = match[1] === "activate"
+      ? generation === 0 ? null : `deactivate:${generation - 1}`
+      : generation === 0 ? null : `activate:${generation}`;
+    if (predecessor && !current.eventKeys.has(predecessor)) return false;
+  }
+  return true;
+}
+
+/**
+ * Admission guard for a staged update. Call after root-schema validation and preservation checks;
+ * it rejects generation gaps while still accepting late non-winning concurrent history.
+ */
+export function admitsStudioCrdtShared3dStageEvents(
+  snapshot: StudioCrdtShared3dRootSnapshot | null,
+  doc: Y.Doc
+): boolean {
+  if (!snapshot || !preservesStudioCrdtShared3dStageRoots(snapshot, doc)) return false;
+  const stageIndex = materializeExistingMapRoot(doc, STUDIO_CRDT_SHARED_3D_STAGE_RECORDS_ROOT);
+  const receiptIndex = materializeExistingMapRoot(
+    doc,
+    STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPTS_ROOT
+  );
+  if (stageIndex === null || receiptIndex === null) return false;
+  for (const [key, tracked] of stageIndex ?? []) {
+    const record = materializeExistingMapRoot(
+      doc,
+      studioCrdtShared3dDynamicRootName(STUDIO_CRDT_SHARED_3D_STAGE_RECORD_ROOT_PREFIX, key)
+    );
+    const current = tracked === true && record instanceof Y.Map
+      ? readStudioCrdtShared3dEvents(
+          record,
+          STUDIO_CRDT_SHARED_3D_STAGE_RECORD_KEYS
+        )
+      : null;
+    if (!current || !admitsStudioCrdtShared3dRecordEvents(snapshot.stages.get(key), current)) {
+      return false;
+    }
+  }
+  for (const [key, tracked] of receiptIndex ?? []) {
+    const record = materializeExistingMapRoot(
+      doc,
+      studioCrdtShared3dDynamicRootName(
+        STUDIO_CRDT_SHARED_3D_STAGE_VISIBILITY_RECEIPT_ROOT_PREFIX,
+        key
+      )
+    );
+    const current = tracked === true && record instanceof Y.Map
+      ? readStudioCrdtShared3dEvents(
+          record,
+          STUDIO_CRDT_SHARED_3D_RECEIPT_RECORD_KEYS
+        )
+      : null;
+    if (!current || !admitsStudioCrdtShared3dRecordEvents(snapshot.receipts.get(key), current)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function isValidStudioCrdtPaperSurface(value: unknown): boolean {
@@ -896,15 +1816,21 @@ function hasImageAuxiliaryStudioCrdtReferenceProps(
   props: Record<string, unknown>
 ): boolean {
   const keys = Object.keys(props);
-  return (
-    props.elementType === "image" &&
-    keys.length > 1 &&
-    keys.every((key) => (
-      key === "elementType" ||
-      (STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS as readonly string[]).includes(key)
-    )) &&
-    isStudioFilterMaskReferenceProps(studioFilterMaskReferenceProps(props))
-  );
+  if (
+    props.elementType !== "image" ||
+    keys.length <= 1 ||
+    keys.some((key) => (
+      key !== "elementType" &&
+      key !== "hidden" &&
+      !(STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS as readonly string[]).includes(key)
+    )) ||
+    (Object.hasOwn(props, "hidden") && typeof props.hidden !== "boolean")
+  ) {
+    return false;
+  }
+  const filterMaskProps = studioFilterMaskReferenceProps(props);
+  return Object.keys(filterMaskProps).length === 0 ||
+    isStudioFilterMaskReferenceProps(filterMaskProps);
 }
 
 function hasTopologyStudioCrdtReferenceProps(
@@ -2060,7 +2986,8 @@ export function hasValidStudioCrdtRootSchema(doc: Y.Doc): boolean {
       STUDIO_CRDT_PAGE_ROOT_PREFIX,
       validatePageRoot
     ) ||
-    !validateTrackedLayerGroupRoots(doc)
+    !validateTrackedLayerGroupRoots(doc) ||
+    !validateStudioCrdtShared3dStageRoots(doc)
   ) {
     return false;
   }

@@ -43,7 +43,6 @@ import {
   readLayerGroupPayload,
   readLayerGroupRecord,
   readPagePayload,
-  readPageRecord,
   readSceneElementPayload,
   readSceneElementRecord,
   sceneElementRecord,
@@ -459,10 +458,14 @@ export function movePage(host: StudioCrdtDocumentHost, id: string, beforePageId:
 
 export function getPage(host: StudioCrdtDocumentHost, id: string, includeDeleted = false): StudioCrdtPageRecord | null {
     assertAlive(host);
-    const record = pageRecord(host, id);
-    if (!record) return null;
-    const result = readPageRecord(host, id, record, lastActivePageOrderIndex(host, id));
-    if (!result || (!includeDeleted && result.deleted)) return null;
+    drainDirtyPageIds(host);
+    const cached = host.pageRecordCache.get(id);
+    if (!cached) return null;
+    const result: StudioCrdtPageRecord = {
+      ...cached,
+      orderIndex: lastActivePageOrderIndex(host, id),
+    };
+    if (!includeDeleted && result.deleted) return null;
     return result;
   }
 

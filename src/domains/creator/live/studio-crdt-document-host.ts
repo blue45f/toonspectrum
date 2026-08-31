@@ -28,6 +28,8 @@ export interface StudioCrdtDocumentHost {
   rasterCheckpoints: Y.Map<string>;
   brushRenderProvenance: Y.Map<string>;
   brushRenderProvenanceContentIndex: Y.Map<string>;
+  shared3dStageRecords: Y.Map<boolean>;
+  shared3dStageVisibilityReceipts: Y.Map<boolean>;
   deletionOpIdsByTarget: Map<string, Set<string>>;
   cleanup: Set<() => void>;
   strokeIdByType: WeakMap<object, string>;
@@ -51,6 +53,8 @@ export interface StudioCrdtDocumentHost {
   observedSceneElementRoots: Set<string>;
   observedPageRoots: Set<string>;
   observedLayerGroupRoots: Set<string>;
+  observedShared3dStageRoots: Set<string>;
+  observedShared3dStageVisibilityReceiptRoots: Set<string>;
   destroyed: boolean;
   getStrokes(query?: StudioCrdtStrokeQuery): StudioCrdtStrokeRecord[];
   getSceneElements(query?: StudioCrdtSceneElementQuery): StudioCrdtSceneElementRecord[];

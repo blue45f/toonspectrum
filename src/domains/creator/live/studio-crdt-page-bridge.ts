@@ -11,6 +11,10 @@ import {
   isStudioMaterialPressureModel,
 } from "../studio-material-pressure-model";
 import { normalizeStudioOutlineStrokeContract } from "../studio-outline-stroke-contract";
+import {
+  studioShared3dStageVisibilityOverlayElementIds,
+  type StudioShared3dStagePersistedState,
+} from "../studio-shared-3d-stage-collection";
 
 import {
   STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
@@ -382,6 +386,15 @@ export function studioElementToCrdtSceneElement(
       if (normalized !== undefined) props[key] = normalized;
     }
   }
+  // A local image/VRM body remains topology-only, but its ordinary visibility scalar is safe and
+  // required for Shared Stage's receipt-derived visibility overlay to disappear on unlink.
+  if (
+    element.type === "image"
+    && source.hidden !== undefined
+    && typeof source.hidden === "boolean"
+  ) {
+    props.hidden = source.hidden;
+  }
   if (source.filterMaskSurfaceId !== undefined && element.type !== "image") {
     throw new Error("필터 마스크 surface는 이미지 참조에만 연결할 수 있습니다.");
   }
@@ -498,6 +511,8 @@ export interface StudioCrdtCompatibleOrderedPage<
   drawingAssist?: StudioDrawingAssistDocument;
   paperSurface?: StudioPaperSurfaceSettings;
   paperGrainVisible?: boolean;
+  /** Synchronized through the dedicated per-stage CRDT sidecar, never the 8 KiB page envelope. */
+  shared3dStage?: StudioShared3dStagePersistedState;
   groups?: StudioCrdtCompatibleLayerGroup[];
 }
 
@@ -752,12 +767,20 @@ export function reconcileStudioCrdtSceneGraphPages<
   const sourcePageById = new Map(pages.map((page) => [page.id, page]));
   const materializePage = (record: StudioCrdtPageRecord): TPage => {
     const source = sourcePageById.get(record.id);
-    return {
+    const materialized = {
       ...(source ?? { id: record.id, elements: [] }),
       ...record.payload.props,
       id: record.id,
       elements: source?.elements ?? [],
-    } as TPage;
+    } as TPage & { shared3dStage?: StudioShared3dStagePersistedState };
+    // Shared Stage state deliberately lives outside the bounded page envelope. A retained
+    // inactive sidecar is authoritative too: it must remove a stale local connection instead of
+    // allowing the source snapshot's optional property to survive the spread above.
+    if (record.shared3dStageManaged) {
+      if (record.shared3dStage === undefined) delete materialized.shared3dStage;
+      else materialized.shared3dStage = record.shared3dStage;
+    }
+    return materialized;
   };
 
   const managedPageIds = new Set<string>();
@@ -1019,8 +1042,34 @@ export function reconcileStudioCrdtSceneGraphPages<
     return { ...page, elements };
   });
 
+  // Stage-owned hiding is a receipt-derived overlay. The underlying CRDT `hidden` property remains
+  // available for ordinary user visibility edits and therefore survives a later unlink unchanged.
+  const visibilityPages = membershipPages.map((page) => {
+    const shared3dStage = (page as TPage & {
+      shared3dStage?: StudioShared3dStagePersistedState;
+    }).shared3dStage;
+    if (shared3dStage === undefined) return page;
+    const overlayIds = studioShared3dStageVisibilityOverlayElementIds(
+      shared3dStage,
+      page.elements,
+    );
+    if (overlayIds.size === 0) return page;
+    let pageChanged = false;
+    const elements = page.elements.map((element) => {
+      if (
+        !overlayIds.has(element.id)
+        || (element as TElement & { hidden?: boolean }).hidden === true
+      ) return element;
+      pageChanged = true;
+      return { ...element, hidden: true } as TElement;
+    });
+    if (!pageChanged) return page;
+    elementChanged = true;
+    return { ...page, elements };
+  });
+
   let groupChanged = false;
-  const nextPages = membershipPages.map((page) => {
+  const nextPages = visibilityPages.map((page) => {
     const legacy = (page.groups ?? []).filter((group) => {
       try {
         return !managedGroupIds.has(studioCrdtLayerGroupKey(page.id, group.id));

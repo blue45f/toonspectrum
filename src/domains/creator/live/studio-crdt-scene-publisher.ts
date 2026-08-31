@@ -1,4 +1,9 @@
 import {
+  migrateStudioShared3dStageCollectionDocument,
+  studioShared3dStageVisibilityOverlayElementIds,
+} from "../studio-shared-3d-stage-collection";
+
+import {
   studioLayerGroupToCrdtGroup,
   studioDrawElementToCrdtStroke,
   studioElementToCrdtSceneElement,
@@ -185,16 +190,58 @@ function supportedSceneInputs<
 >(pages: readonly TPage[]): Map<string, StudioCrdtSceneElementInput> {
   const result = new Map<string, StudioCrdtSceneElementInput>();
   for (const page of pages) {
+    const stageVisibilityElementIds = studioShared3dStageVisibilityOverlayElementIds(
+      page.shared3dStage,
+      page.elements,
+    );
     for (const element of page.elements) {
       if (isCompatibleDrawElement(element)) continue;
       if (result.has(element.id)) throw new Error("페이지 간에 중복된 장면 요소 식별자가 있습니다.");
+      // `hidden` remains the artist-authored visibility scalar. A Shared Stage receipt owns only a
+      // derived overlay, so connect/unlink never creates a cross-root LWW race between the element
+      // scalar and the remove-wins receipt events.
+      const persistentElement = stageVisibilityElementIds.has(element.id)
+        ? { ...element, hidden: false }
+        : element;
       result.set(
         element.id,
-        studioElementToCrdtSceneElement(page.id, element)
+        studioElementToCrdtSceneElement(page.id, persistentElement)
       );
     }
   }
   return result;
+}
+
+function sharedStageVisibilityElementIds<
+  TElement extends StudioCrdtCompatibleElement,
+  TPage extends StudioCrdtCompatibleOrderedPage<TElement>,
+>(pages: readonly TPage[]): Set<string> {
+  const result = new Set<string>();
+  for (const page of pages) {
+    for (const id of studioShared3dStageVisibilityOverlayElementIds(
+      page.shared3dStage,
+      page.elements,
+    )) result.add(id);
+  }
+  return result;
+}
+
+function removesSharedStageAuthority(
+  previous: StudioCrdtCompatibleOrderedPage<StudioCrdtCompatibleElement>["shared3dStage"],
+  next: StudioCrdtCompatibleOrderedPage<StudioCrdtCompatibleElement>["shared3dStage"],
+): boolean {
+  const before = migrateStudioShared3dStageCollectionDocument(previous);
+  if (!before) return false;
+  const after = migrateStudioShared3dStageCollectionDocument(next);
+  if (!after) return true;
+  const stageIds = new Set(after.stages.map(({ id }) => id));
+  if (before.stages.some(({ id }) => !stageIds.has(id))) return true;
+  const receiptRuntimeById = new Map(after.visibilityReceipts.map((receipt) => [
+    receipt.elementId,
+    receipt.modelRuntimeKey,
+  ]));
+  return before.visibilityReceipts.some((receipt) =>
+    receiptRuntimeById.get(receipt.elementId) !== receipt.modelRuntimeKey);
 }
 
 function supportedLayerGroupInputs<
@@ -399,7 +446,8 @@ function publishDrawTopologyRecords(
 function publishSceneElementRecords(
   document: StudioCrdtDocument,
   previous: ReadonlyMap<string, StudioCrdtSceneElementInput>,
-  next: ReadonlyMap<string, StudioCrdtSceneElementInput>
+  next: ReadonlyMap<string, StudioCrdtSceneElementInput>,
+  forceRegisterIds: ReadonlySet<string> = new Set(),
 ): number {
   let mutations = 0;
 
@@ -429,7 +477,10 @@ function publishSceneElementRecords(
       const diff = diffProperties(previousInput.payload.props, nextInput.payload.props);
       const reparented = previousInput.pageId !== nextInput.pageId ||
         previousInput.layerId !== nextInput.layerId;
-      if (diff.changed.length === 0 && diff.unset.length === 0 && !reparented) continue;
+      if (
+        diff.changed.length === 0 && diff.unset.length === 0 && !reparented
+        && !forceRegisterIds.has(id)
+      ) continue;
       document.upsertSceneElement(nextInput, {
         baselineProps: previousInput.payload.props,
         changedProps: diff.changed,
@@ -452,11 +503,23 @@ function publishSceneElementRecords(
       throw new Error("같은 장면 요소 식별자의 타입을 변경할 수 없습니다.");
     }
     const diff = diffProperties(previousInput.payload.props, nextInput.payload.props);
+    // A pre-existing topology reference may predate the synchronized image visibility scalar.
+    // Shared Stage receipts derive hidden=true in memory, so the durable scalar underneath that
+    // overlay must explicitly converge to the normalized next value before an unlink reveals it.
+    // Patch only this one scalar: peer placement/filter edits and tombstones remain untouched.
+    const forcedHidden = forceRegisterIds.has(id) &&
+      typeof nextInput.payload.props.hidden === "boolean" &&
+      current.payload.props.hidden !== nextInput.payload.props.hidden
+        ? nextInput.payload.props.hidden
+        : undefined;
     const pageChanged = previousInput.pageId !== nextInput.pageId;
     const layerChanged = previousInput.layerId !== nextInput.layerId;
-    if (diff.changed.length === 0 && diff.unset.length === 0 && !pageChanged && !layerChanged) continue;
+    if (
+      diff.changed.length === 0 && diff.unset.length === 0 && forcedHidden === undefined &&
+      !pageChanged && !layerChanged
+    ) continue;
     document.patchSceneElement(id, {
-      set: diff.set,
+      set: forcedHidden === undefined ? diff.set : { ...diff.set, hidden: forcedHidden },
       unset: diff.unset,
       pageId: pageChanged ? nextInput.pageId : undefined,
       layerId: layerChanged ? nextInput.layerId : undefined,
@@ -600,8 +663,37 @@ export function publishStudioCrdtSceneGraphDiff<
   const registerNewDraws = options.registerNewDraws ?? true;
   const previousById = new Map(previousPages.map((page) => [page.id, page]));
   const nextById = new Map(nextPages.map((page) => [page.id, page]));
+  // Validate every bounded page envelope and every unbounded Shared Stage collection before the
+  // first document mutation. Shared Stage itself is intentionally not copied into the 8 KiB page
+  // payload; it is published per entry below so independent stage edits do not become one opaque
+  // last-writer-wins value.
+  const previousPageInputs = new Map(previousPages.map((page) => [
+    page.id,
+    studioPageToCrdtPage(page),
+  ]));
+  const nextPageInputs = new Map(nextPages.map((page) => [
+    page.id,
+    studioPageToCrdtPage(page),
+  ]));
+  const canonicalSharedStageByPage = <T extends TPage>(pages: readonly T[]) => new Map(
+    pages.map((page) => {
+      const canonical = page.shared3dStage === undefined
+        ? null
+        : migrateStudioShared3dStageCollectionDocument(page.shared3dStage);
+      if (page.shared3dStage !== undefined && canonical === null) {
+        throw new Error("페이지 공유 3D 장면 연결 정보가 손상되었습니다.");
+      }
+      return [page.id, canonical] as const;
+    }),
+  );
+  const previousCanonicalSharedStageByPageId = canonicalSharedStageByPage(previousPages);
+  const nextCanonicalSharedStageByPageId = canonicalSharedStageByPage(nextPages);
   const previousSceneInputs = supportedSceneInputs(previousPages);
   const nextSceneInputs = supportedSceneInputs(nextPages);
+  const sharedStageVisibilityIds = new Set([
+    ...sharedStageVisibilityElementIds(previousPages),
+    ...sharedStageVisibilityElementIds(nextPages),
+  ]);
   const previousLayerGroupInputs = supportedLayerGroupInputs(previousPages);
   const nextLayerGroupInputs = supportedLayerGroupInputs(nextPages);
   const previousDrawInputs = supportedDrawInputs(previousPages);
@@ -611,6 +703,83 @@ export function publishStudioCrdtSceneGraphDiff<
     ...document.getSceneElements({ includeDeleted: true }).map(({ id }) => id),
   ]);
   const managedPageIdsBefore = new Set(document.getPages(true).map(({ id }) => id));
+  let pageMutations = 0;
+
+  // A first Shared Stage bootstrap needs a durable page identity before the server can admit its
+  // sidecar records. Materialize only pages that participate in Shared Stage authority; the main
+  // page diff below retains its existing lazy registration behavior for every other page.
+  const sharedStagePageIds = new Set<string>();
+  const deferredSharedStagePageIds = new Set<string>();
+  const managedSharedStagePageIds = new Set(
+    document.getShared3dStageFrontier()
+      .filter(({ managed }) => managed)
+      .map(({ pageId }) => pageId),
+  );
+  for (const pageId of new Set([...previousById.keys(), ...nextById.keys()])) {
+    const previousValue = previousById.get(pageId)?.shared3dStage;
+    const nextValue = nextById.get(pageId)?.shared3dStage;
+    const managed = managedSharedStagePageIds.has(pageId);
+    const participatesInSharedStage = previousValue !== undefined
+      || nextValue !== undefined
+      || managed;
+    const pageDeleted = !nextById.has(pageId);
+    const needsPageBootstrap = !pageDeleted
+      && participatesInSharedStage
+      && !managedPageIdsBefore.has(pageId);
+    const needsUnmanagedStageBootstrap = !managed && nextValue !== undefined;
+    const canonicalChanged = !jsonValueEqual(
+      previousCanonicalSharedStageByPageId.get(pageId) ?? null,
+      nextCanonicalSharedStageByPageId.get(pageId) ?? null,
+    );
+    const needsManagedPageDeletion = managed && pageDeleted;
+    if (
+      !canonicalChanged
+      && !needsPageBootstrap
+      && !needsUnmanagedStageBootstrap
+      && !needsManagedPageDeletion
+    ) continue;
+    sharedStagePageIds.add(pageId);
+    if (pageDeleted || removesSharedStageAuthority(previousValue, nextValue)) {
+      deferredSharedStagePageIds.add(pageId);
+    }
+  }
+  // Pure-plan every sidecar change before page bootstrap or any scene/group mutation. The actual
+  // publisher reuses the same plan and therefore cannot discover an aggregate or 48 KiB failure
+  // only after a linked source has already changed visibility.
+  for (const pageId of sharedStagePageIds) {
+    document.preflightShared3dStagePageDiff(
+      pageId,
+      previousById.get(pageId)?.shared3dStage,
+      nextById.get(pageId)?.shared3dStage,
+      { pageDeleted: !nextById.has(pageId) },
+    );
+  }
+  for (const pageId of sharedStagePageIds) {
+    if (document.getPage(pageId, true)) continue;
+    const nextInput = nextPageInputs.get(pageId);
+    const previousInput = previousPageInputs.get(pageId);
+    const pageInput = nextInput ?? previousInput;
+    if (!pageInput) continue;
+    if (nextInput && !previousInput) document.addPage(nextInput);
+    else {
+      document.upsertPage(pageInput, {
+        baselineProps: previousInput?.payload.props ?? pageInput.payload.props,
+        changedProps: [],
+      });
+    }
+    pageMutations += 1;
+  }
+  // Additive authority is published first so a peer can derive Stage-owned hiding immediately.
+  // Destructive authority is deferred until the normalized visible source record is durable below.
+  for (const pageId of sharedStagePageIds) {
+    if (deferredSharedStagePageIds.has(pageId)) continue;
+    document.publishShared3dStagePageDiff(
+      pageId,
+      previousById.get(pageId)?.shared3dStage,
+      nextById.get(pageId)?.shared3dStage,
+      { pageDeleted: !nextById.has(pageId) },
+    );
+  }
   const layerGroupMutations = publishLayerGroupRecords(
     document,
     previousLayerGroupInputs,
@@ -625,7 +794,8 @@ export function publishStudioCrdtSceneGraphDiff<
   sceneElementMutations += publishSceneElementRecords(
     document,
     previousSceneInputs,
-    nextSceneInputs
+    nextSceneInputs,
+    sharedStageVisibilityIds,
   );
   sceneElementMutations += publishDrawTopologyRecords(
     document,
@@ -633,6 +803,18 @@ export function publishStudioCrdtSceneGraphDiff<
     nextDrawInputs,
     registerNewDraws
   );
+  // Unlink after the Stage-owned `hidden` overlay has been removed from the durable scene scalar.
+  // If transport stops between these updates, an active receipt still derives hidden=true; after
+  // the tombstone arrives the already-visible scalar is revealed, so neither partial order strands
+  // a linked source in the wrong state.
+  for (const pageId of deferredSharedStagePageIds) {
+    document.publishShared3dStagePageDiff(
+      pageId,
+      previousById.get(pageId)?.shared3dStage,
+      nextById.get(pageId)?.shared3dStage,
+      { pageDeleted: !nextById.has(pageId) },
+    );
+  }
   const bootstrapElementOrderPages = new Set<string>();
   for (const page of nextPages) {
     if (page.elements.some((element) =>
@@ -657,12 +839,11 @@ export function publishStudioCrdtSceneGraphDiff<
     elementMoves += result.moves;
   }
 
-  let pageMutations = 0;
-  for (const [id, previousPage] of previousById) {
+  for (const id of previousById.keys()) {
     if (nextById.has(id)) continue;
     let current = document.getPage(id, true);
     if (!current) {
-      const previousInput = studioPageToCrdtPage(previousPage);
+      const previousInput = previousPageInputs.get(id)!;
       document.upsertPage(previousInput, {
         baselineProps: previousInput.payload.props,
         changedProps: [],
@@ -672,10 +853,9 @@ export function publishStudioCrdtSceneGraphDiff<
     }
     if (current && !current.deleted && document.deletePage(id)) pageMutations += 1;
   }
-  for (const [id, nextPage] of nextById) {
-    const nextInput = studioPageToCrdtPage(nextPage);
-    const previousPage = previousById.get(id);
-    const previousInput = previousPage ? studioPageToCrdtPage(previousPage) : null;
+  for (const id of nextById.keys()) {
+    const nextInput = nextPageInputs.get(id)!;
+    const previousInput = previousById.has(id) ? previousPageInputs.get(id)! : null;
     const current = document.getPage(id, true);
     if (!current) {
       if (!previousInput) {
@@ -718,8 +898,8 @@ export function publishStudioCrdtSceneGraphDiff<
       if (document.getPage(page.id, true)) continue;
       const previousPage = previousById.get(page.id);
       if (!previousPage) continue;
-      const previousInput = studioPageToCrdtPage(previousPage);
-      const nextInput = studioPageToCrdtPage(page);
+      const previousInput = previousPageInputs.get(page.id)!;
+      const nextInput = nextPageInputs.get(page.id)!;
       document.upsertPage(nextInput, {
         baselineProps: previousInput.payload.props,
         changedProps: [],

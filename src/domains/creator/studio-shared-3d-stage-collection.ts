@@ -821,6 +821,39 @@ function hasExactHiddenRuntimeAuthority<T extends StudioShared3dStageElementSour
     && exactRuntimeKey(elements, receipt.elementId) === receipt.modelRuntimeKey;
 }
 
+/**
+ * Resolves the exact sources whose visibility is currently owned by an active Stage receipt.
+ * Unlike `studioShared3dStageReusableHiddenCharacterElementIds`, this intentionally ignores the
+ * element's scalar `hidden` value: realtime collaboration stores the artist-authored visibility as
+ * the scalar and derives Stage-owned hiding from this receipt authority.
+ */
+export function studioShared3dStageVisibilityOverlayElementIds<
+  T extends StudioShared3dStageElementSource,
+>(
+  value: unknown,
+  elements: readonly T[],
+): ReadonlySet<string> {
+  const collection = migrateStudioShared3dStageCollectionDocument(value);
+  if (!collection) return new Set();
+  const counts = new Map<string, number>();
+  for (const element of elements) {
+    counts.set(element.id, (counts.get(element.id) ?? 0) + 1);
+  }
+  const result = new Set<string>();
+  for (const receipt of collection.visibilityReceipts) {
+    const element = elements.find((candidate) => candidate.id === receipt.elementId);
+    if (
+      counts.get(receipt.elementId) === 1
+      && element?.type === "image"
+      && element.vrmScene !== undefined
+      && exactRuntimeKey(elements, receipt.elementId) === receipt.modelRuntimeKey
+    ) {
+      result.add(receipt.elementId);
+    }
+  }
+  return result;
+}
+
 export function studioShared3dStageReusableHiddenCharacterElementIds<
   T extends StudioShared3dStageElementSource,
 >(

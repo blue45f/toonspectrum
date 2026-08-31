@@ -27,6 +27,11 @@ import {
   isDeleted,
 } from "./studio-crdt-document-tracking";
 import {
+  decoratePageWithShared3dStage,
+  getShared3dStageFrontier,
+  type StudioCrdtShared3dStagePageState,
+} from "./studio-crdt-shared-3d-stage";
+import {
   SAMPLE_ARRAY_KEYS,
   type StudioCrdtLayerGroupRecord,
   type StudioCrdtPageRecord,
@@ -197,11 +202,18 @@ export function readPagePayload(host: StudioCrdtDocumentHost, record: Y.Map<unkn
 export function readPageRecord(host: StudioCrdtDocumentHost,
     id: string,
     record: Y.Map<unknown>,
-    orderIndex: number
+    orderIndex: number,
+    shared3dStageState?: StudioCrdtShared3dStagePageState,
   ): StudioCrdtPageRecord | null {
     const payload = readPagePayload(host, record);
     if (readString(record, "id") !== id || !payload) return null;
-    return { id, payload, deleted: isDeleted(host, record, pageDeletionTarget(id)), orderIndex };
+    return decoratePageWithShared3dStage(host, {
+      id,
+      payload,
+      deleted: isDeleted(host, record, pageDeletionTarget(id)),
+      orderIndex,
+      shared3dStageManaged: false,
+    }, shared3dStageState);
   }
 
 export function readLayerGroupPayload(host: StudioCrdtDocumentHost, record: Y.Map<unknown>): StudioCrdtLayerGroupPayload | null {
@@ -278,13 +290,22 @@ export function refreshSceneElementRecordCache(host: StudioCrdtDocumentHost, id:
     );
   }
 
-export function refreshPageRecordCache(host: StudioCrdtDocumentHost, id: string): void {
+export function refreshPageRecordCache(
+    host: StudioCrdtDocumentHost,
+    id: string,
+    shared3dStageState?: StudioCrdtShared3dStagePageState,
+  ): void {
     if (!exactText(id, MAX_ID_LENGTH)) {
       host.pageRecordCache.set(id, null);
       return;
     }
     const record = pageRecord(host, id);
-    host.pageRecordCache.set(id, record ? deepFreeze(readPageRecord(host, id, record, 0)) : null);
+    host.pageRecordCache.set(
+      id,
+      record
+        ? deepFreeze(readPageRecord(host, id, record, 0, shared3dStageState))
+        : null,
+    );
   }
 
 export function refreshLayerGroupRecordCache(host: StudioCrdtDocumentHost, compositeKey: string): void {
@@ -330,9 +351,24 @@ export function drainDirtySceneElementIds(host: StudioCrdtDocumentHost): void {
 
 export function drainDirtyPageIds(host: StudioCrdtDocumentHost): void {
     if (host.dirtyPageIds.size === 0) return;
+    let shared3dStageStateByPageId: ReadonlyMap<string, StudioCrdtShared3dStagePageState>;
+    try {
+      shared3dStageStateByPageId = new Map(
+        getShared3dStageFrontier(host).map((state) => [state.pageId, state] as const),
+      );
+    } catch {
+      // Preserve the last valid cache exactly as the former per-page try/catch did when an
+      // untrusted sidecar made decoration fail. A later valid transaction will dirty the page again.
+      host.dirtyPageIds.clear();
+      return;
+    }
     for (const id of host.dirtyPageIds) {
       try {
-        refreshPageRecordCache(host, id);
+        refreshPageRecordCache(host, id, shared3dStageStateByPageId.get(id) ?? {
+          pageId: id,
+          managed: false,
+          value: undefined,
+        });
       } catch {
         // 마지막으로 성공한 캐시 값 유지 — 위 주석 참고.
       }

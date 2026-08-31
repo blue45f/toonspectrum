@@ -7,6 +7,7 @@ import {
   presentStudioAutosaveDocumentLeadership,
   studioAutosaveLeadershipAllowsLocalEdit,
 } from "../studio-autosave-document-leader";
+import { createNativePluralShared3dStageFixture } from "../studio-shared-3d-stage-test-fixture";
 
 import {
   StudioCrdtDocument,
@@ -14,6 +15,7 @@ import {
   type StudioCrdtSceneElementInput,
 } from "./studio-crdt-document";
 import { StudioCrdtRoomBinding } from "./studio-crdt-room-binding";
+import { publishStudioCrdtSceneGraphDiff } from "./studio-crdt-scene-publisher";
 import { STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION } from "./studio-crdt-scene-schema";
 import { StudioLiveRoom } from "./studio-live-collaboration-room";
 import {
@@ -21,6 +23,7 @@ import {
   createStudioMemoryLiveTransportFactory,
 } from "./studio-live-collaboration-transport";
 
+import type { StudioShared3dStagePersistedState } from "../studio-shared-3d-stage-collection";
 import type {
   StudioLiveParticipant,
 } from "./studio-live-collaboration-protocol";
@@ -348,6 +351,49 @@ describe("Studio Magma/Figma live collaboration session", () => {
     expect(afterDuplicate.sceneElements).toHaveLength(1);
     docs.close();
     duplicate.close();
+  });
+
+  it("carries Shared Stage connect and unlink through the default two-peer room binding", async () => {
+    const session = await joinDisconnectedPeers("work-magma-shared-stage");
+    const docs = await bindDocuments(session.alice, session.bob);
+    const shared3dStage = createNativePluralShared3dStageFixture();
+    const disconnected: Array<{
+      id: string;
+      elements: never[];
+      bg: string;
+      bgGrad: null;
+      canvasH: number;
+      shared3dStage?: StudioShared3dStagePersistedState;
+    }> = [{
+      id: "page-a",
+      elements: [],
+      bg: "#ffffff",
+      bgGrad: null,
+      canvasH: 1_600,
+      shared3dStage: undefined,
+    }];
+    const connected = [{ ...disconnected[0], shared3dStage }];
+
+    publishStudioCrdtSceneGraphDiff(docs.documentA, disconnected, connected);
+    await flushReplica(docs.bindingA);
+    await waitUntil(
+      () => docs.documentB.getShared3dStagePageState("page-a").value !== undefined,
+      "Shared Stage connect did not hydrate on the second room replica",
+    );
+    expect(docs.documentB.getShared3dStagePageState("page-a").value).toEqual(shared3dStage);
+
+    publishStudioCrdtSceneGraphDiff(docs.documentB, connected, disconnected);
+    await flushReplica(docs.bindingB);
+    await waitUntil(
+      () => [docs.documentA, docs.documentB].every((document) => {
+        const state = document.getShared3dStagePageState("page-a");
+        return state.managed && state.value === undefined;
+      }),
+      "Shared Stage unlink tombstone did not converge across the default room",
+    );
+
+    docs.close();
+    session.close();
   });
 
   it("wires the Studio work page to the shipped live-collaboration host and share URL", () => {
