@@ -520,7 +520,11 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
    * 닫혀 있는 동안에는 3D 배경을 캔버스에 붙이는 경로가 어디에도 없었다.
    */
   test("3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다", async ({ page }) => {
-    test.setTimeout(300_000);
+    // This case walks the whole round trip — insert, update, reopen, update again — while every
+    // frame is rendered by SwiftShader. On the CI runner the other 3D cases in this file each
+    // take 1.5–2.5 minutes, and this one does several times their work, so the 300s it inherited
+    // from the far smaller original expired mid-flight at whatever step the clock reached first.
+    test.setTimeout(600_000);
     const fatal = collectFatalErrors(page);
     // Konva Stage는 브라우저 viewport에 보이는 문서 구간만 backing canvas로 만든다. 기본
     // 1280×720에서는 삽입된 3D 배경의 하단 변화가 clip 아래에 있어, 실제 PNG와 presentation
