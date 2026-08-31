@@ -604,6 +604,33 @@ describe("studio-vrm-proportion-rig-runtime", () => {
     expect(pivoted?.ok, "역스케일 피벗이 있는데도 거부했다").toBe(true);
   });
 
+  it("rejects a cancelling pivot that also rotates", () => {
+    // `S · R · S⁻¹` 는 R 이 S 와 교환될 때만 직교다. 스케일은 정확히 되돌리면서 축을 섞어
+    // 돌리는 자식은 아래로 전단을 그대로 넘긴다.
+    const fixture = createRigFixture();
+    const leaf = [...fixture.nodes.entries()].find(
+      ([, node]) =>
+        ![...fixture.nodes.values()].some((other) => other !== node && isDescendant(other, node)),
+    );
+    expect(leaf).toBeDefined();
+    if (!leaf) return;
+    const [, sculpted] = leaf;
+    sculpted.scale.set(1.25, 0.8, 1);
+    const pivot = new THREE.Object3D();
+    pivot.scale.set(1 / 1.25, 1 / 0.8, 1);
+    pivot.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.6);
+    sculpted.add(pivot);
+    sculpted.updateMatrix();
+    fixture.root.updateMatrixWorld(true);
+
+    const created = createStudioVrmProportionRigRuntime(fixture.adapter, {
+      headLength: fixture.headLength,
+    });
+    expect(created.ok, "축을 섞어 도는 피벗인데 비균등 조형을 허용했다").toBe(false);
+    if (created.ok) return;
+    expect(created.code).toBe("unsafe-transform");
+  });
+
   it("rejects a non-uniform scale on a bone that carries another humanoid bone", () => {
     // The leaf licence must not extend to a carrying frame: a rotated descendant would inherit shear.
     const fixture = createRigFixture();

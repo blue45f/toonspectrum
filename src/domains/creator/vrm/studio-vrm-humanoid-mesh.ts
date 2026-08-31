@@ -427,7 +427,11 @@ function buildArm(
   addLoft(builder, rings, { segments: LIMB_SEGMENTS, uvRect, capStart: true });
 }
 
-/** 방향에 수직인 고리. 손가락처럼 비스듬히 뻗는 마디도 단면이 찌그러지지 않는다. */
+/**
+ * 방향에 수직인 고리. 손가락처럼 비스듬히 뻗는 마디도 단면이 찌그러지지 않는다.
+ *
+ * `flatten` 은 **손바닥 법선** 방향에 걸린다 — 손가락은 위아래로 납작하지 좌우로 좁지 않다.
+ */
 function tubeRing(
   center: MeshVec3,
   direction: MeshVec3,
@@ -438,24 +442,32 @@ function tubeRing(
 ): LoftRing {
   const length = Math.hypot(direction[0], direction[1], direction[2]) || 1;
   const axis: MeshVec3 = [direction[0] / length, direction[1] / length, direction[2] / length];
-  // 축과 가장 덜 나란한 기준축을 골라야 외적이 0 으로 무너지지 않는다.
-  const reference: MeshVec3 =
-    Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
-  const u: MeshVec3 = [
-    axis[1] * reference[2] - axis[2] * reference[1],
-    axis[2] * reference[0] - axis[0] * reference[2],
-    axis[0] * reference[1] - axis[1] * reference[0],
+  // 손바닥 법선(+Y)을 기준으로 기저를 세운다. 축과 나란해지면 외적이 0 으로 무너지므로 그때만
+  // 다른 축을 쓴다.
+  const up: MeshVec3 = Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  // `side` = axis × up — 손가락이 서로 이웃하는 방향.
+  const side: MeshVec3 = [
+    axis[1] * up[2] - axis[2] * up[1],
+    axis[2] * up[0] - axis[0] * up[2],
+    axis[0] * up[1] - axis[1] * up[0],
   ];
-  const uLength = Math.hypot(u[0], u[1], u[2]) || 1;
-  const v: MeshVec3 = [
-    axis[1] * (u[2] / uLength) - axis[2] * (u[1] / uLength),
-    axis[2] * (u[0] / uLength) - axis[0] * (u[2] / uLength),
-    axis[0] * (u[1] / uLength) - axis[1] * (u[0] / uLength),
+  const sideLength = Math.hypot(side[0], side[1], side[2]) || 1;
+  const unitSide: MeshVec3 = [side[0] / sideLength, side[1] / sideLength, side[2] / sideLength];
+  // `normal` = side × axis — 손바닥 법선. 납작함은 **이쪽**에 준다. 이웃 방향(`side`)을 눌러
+  // 버리면 손가락이 가늘어져 너클 간격만큼 벌어진 채 서로 닿지 않는다.
+  const normal: MeshVec3 = [
+    unitSide[1] * axis[2] - unitSide[2] * axis[1],
+    unitSide[2] * axis[0] - unitSide[0] * axis[2],
+    unitSide[0] * axis[1] - unitSide[1] * axis[0],
   ];
   return {
     center,
-    u: [(u[0] / uLength) * radius * flatten, (u[1] / uLength) * radius * flatten, (u[2] / uLength) * radius * flatten],
-    v: [v[0] * radius, v[1] * radius, v[2] * radius],
+    u: [
+      normal[0] * radius * flatten,
+      normal[1] * radius * flatten,
+      normal[2] * radius * flatten,
+    ],
+    v: [unitSide[0] * radius, unitSide[1] * radius, unitSide[2] * radius],
     skin,
     texV,
   };

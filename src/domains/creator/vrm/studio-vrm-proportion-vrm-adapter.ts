@@ -181,14 +181,24 @@ type CapturedColliderShape = {
   };
   readonly offset: THREE.Vector3 | null;
   readonly tail: THREE.Vector3 | null;
-  /** The collider node's world scale at rest, so inherited scaling can be divided back out. */
-  readonly restWorldScale: number;
+  /** The collider node's scale relative to the VRM root at rest, so inherited scaling divides out. */
+  readonly restRootScale: number;
 };
 
-function worldScaleOf(node: THREE.Object3D): number {
+/**
+ * A node's scale relative to `root`, never world.
+ *
+ * The lifecycle neutralizes the scene root before this runs and restores the authored TRS
+ * afterwards, so a world-space reading would count the removal of an authored root scale as a
+ * collider-local change -- a root scale of 2 would derive `inherited = 0.5` on a neutral apply,
+ * double every local offset, and then double it again in world once the root came back.
+ */
+function rootRelativeScaleOf(root: THREE.Object3D, node: THREE.Object3D): number {
+  root.updateWorldMatrix(true, false);
   node.updateWorldMatrix(true, false);
+  const relative = new THREE.Matrix4().copy(root.matrixWorld).invert().multiply(node.matrixWorld);
   const scale = new THREE.Vector3();
-  node.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+  relative.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
   const average = (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3;
   return Number.isFinite(average) && average > 0 ? average : 1;
 }
@@ -211,7 +221,7 @@ function captureSpringBoneColliderShapes(vrm: VRM): readonly CapturedColliderSha
       shape,
       offset: shape.offset ? shape.offset.clone() : null,
       tail: shape.tail ? shape.tail.clone() : null,
-      restWorldScale: worldScaleOf(collider),
+      restRootScale: rootRelativeScaleOf(vrm.scene, collider),
     });
   }
   return captured;
@@ -240,12 +250,13 @@ function captureSpringBoneColliderShapes(vrm: VRM): readonly CapturedColliderSha
  * was off by before any of this.
  */
 function resizeSpringBoneColliderShapes(
+  root: THREE.Object3D,
   captured: readonly CapturedColliderShape[],
   uniformScale: number,
 ): boolean {
   if (!Number.isFinite(uniformScale) || uniformScale <= 0) return false;
   for (const entry of captured) {
-    const inherited = worldScaleOf(entry.collider) / entry.restWorldScale;
+    const inherited = rootRelativeScaleOf(root, entry.collider) / entry.restRootScale;
     if (!Number.isFinite(inherited) || inherited <= 0) return false;
     const axis = uniformScale / inherited;
     if (entry.offset) entry.shape.offset?.copy(entry.offset).multiplyScalar(axis);
@@ -299,7 +310,7 @@ export function createStudioVrmProportionVrmAdapter(
             return true;
           },
           syncSpringBoneColliderShapes: (uniformScale: number) =>
-            resizeSpringBoneColliderShapes(capturedColliderShapes, uniformScale),
+            resizeSpringBoneColliderShapes(vrm.scene, capturedColliderShapes, uniformScale),
         }
       : {}),
     reapplyAuthoredPose: input.reapplyAuthoredPose,

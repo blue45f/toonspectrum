@@ -150,6 +150,46 @@ describe("studio VRM humanoid rig", () => {
     expect(nonUniformLeaves).toBeGreaterThan(0);
   });
 
+  it("flattens fingers along the palm normal, not across the palm", () => {
+    // 고리 기저를 손바닥 법선이 아니라 이웃 방향에서 세우면 손가락이 좌우로 좁아진다 —
+    // 너클 간격은 서로 닿도록 잡아 두었는데 그만큼 틈이 벌어지고, 단면도 세로로 선 모양이 된다.
+    const rig = buildStudioVrmRig({ proportions: NEUTRAL.proportions, face: NEUTRAL.face });
+    const mesh = buildStudioVrmHumanoidMesh(NEUTRAL);
+    const body = mesh.parts.find((part) => part.nodeName === "Body");
+    if (!body) throw new Error("expected a body part");
+    const primitive = body.primitives[0];
+    const joints = primitive.joints ?? [];
+    const weights = primitive.weights ?? [];
+    const extentsOf = (bone: StudioVrmRigBone) => {
+      const index = rig.jointIndex[bone];
+      let minY = Infinity;
+      let maxY = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      for (let vertex = 0; vertex < primitive.positions.length / 3; vertex += 1) {
+        let weight = 0;
+        for (let slot = 0; slot < 4; slot += 1) {
+          if ((joints[vertex * 4 + slot] ?? -1) === index) weight += weights[vertex * 4 + slot] ?? 0;
+        }
+        if (weight < 0.4) continue;
+        minY = Math.min(minY, primitive.positions[vertex * 3 + 1]);
+        maxY = Math.max(maxY, primitive.positions[vertex * 3 + 1]);
+        minZ = Math.min(minZ, primitive.positions[vertex * 3 + 2]);
+        maxZ = Math.max(maxZ, primitive.positions[vertex * 3 + 2]);
+      }
+      return { height: maxY - minY, width: maxZ - minZ, minZ, maxZ };
+    };
+
+    const middle = extentsOf("leftMiddleIntermediate");
+    expect(middle.height).toBeGreaterThan(0);
+    // 손가락은 위아래로 납작하다 — 손바닥 법선 방향이 좁고, 손바닥을 가로지르는 방향이 넓다.
+    expect(middle.height / middle.width, "손가락이 손바닥을 가로질러 눌렸다").toBeLessThan(1);
+
+    // 그리고 이웃 손가락이 서로 닿을 만큼 붙어 있다.
+    const index = extentsOf("leftIndexIntermediate");
+    expect(index.minZ - middle.maxZ, "이웃 손가락 사이가 벌어졌다").toBeLessThan(0.005);
+  });
+
   it("places finger joints under the hand and lets the hand scale carry them", () => {
     // 손 노드에는 균등 `handScale` 이 붙어 있고 손가락은 그 자식이다. 월드 rest 누적이 조상
     // 스케일을 반영하지 않으면 IBM(이동만 담는다)이 가리키는 위치와 씬 그래프가 놓는 위치가

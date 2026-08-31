@@ -335,21 +335,25 @@ function hasSafeTransform(node: THREE.Object3D) {
  *
  * Humanoid membership is not the test -- a head with no eye or jaw bones can still carry an
  * accessory or spring hierarchy, and a rotation in there would inherit the shear. What makes the
- * sculpt safe is that every immediate child cancels the non-uniform part, which is exactly what the
- * generated avatar's inverse-scale `HairRoot` pivot does. A node with no children at all passes
+ * sculpt safe is that every immediate child cancels the non-uniform part **without rotating**, which
+ * is exactly what the generated avatar's inverse-scale `HairRoot` pivot does. A node with no children at all passes
  * vacuously.
  */
 function containsNonUniformScale(node: THREE.Object3D) {
   if (isUniformPositiveScale(node.scale)) return true;
-  return node.children.every((child) =>
-    isUniformPositiveScale(
+  return node.children.every((child) => {
+    // The cancelling child must not rotate. `S . R . S^-1` is orthogonal only when `R` commutes with
+    // `S`, so a rotation that mixes differently scaled axes still hands shear to everything below.
+    if (!isUnitQuaternion(child.quaternion)) return false;
+    if (Math.abs(child.quaternion.w) < 1 - QUATERNION_UNIT_EPSILON) return false;
+    return isUniformPositiveScale(
       new THREE.Vector3(
         node.scale.x * child.scale.x,
         node.scale.y * child.scale.y,
         node.scale.z * child.scale.z,
       ),
-    ),
-  );
+    );
+  });
 }
 
 /**

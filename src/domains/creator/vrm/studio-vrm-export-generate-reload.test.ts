@@ -606,4 +606,44 @@ describe("generate recipe → .vrm file reload", () => {
     }
     expect(reach[1] / reach[0], "손 크기가 두 번 적용됐다").toBeCloseTo(1.5, 3);
   }, 60_000);
+
+  it("ignores an authored root scale when sizing colliders", async () => {
+    // 콜라이더 상속 배율을 월드에서 읽으면, 수명주기가 씬 루트를 항등으로 되돌리는 것을
+    // 콜라이더 자체가 줄어든 것으로 오독한다 — 루트 스케일 2 인 모델에서 중립 적용만 해도
+    // 로컬 오프셋이 두 배가 되고, 포즈가 복원되면 월드에서 다시 두 배가 된다.
+    const presetId = "hime-noble";
+    const local: number[][] = [];
+    for (const rootScale of [1, 2]) {
+      const vrm = await loadVrmBytes(
+        exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId })),
+      );
+      vrm.scene.scale.setScalar(rootScale);
+      vrm.scene.updateMatrixWorld(true);
+      const adapter = createStudioVrmProportionVrmAdapter({
+        vrm,
+        getCurrentModelGeneration: () => 1,
+        reapplyAuthoredPose: () => {
+          vrm.scene.scale.setScalar(rootScale);
+          vrm.scene.updateMatrixWorld(true);
+          return true;
+        },
+      });
+      const created = createStudioVrmProportionRigRuntime(adapter, {
+        headLength: measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2,
+      });
+      if (!created.ok) throw new Error(created.message);
+      expect(created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS }).ok).toBe(true);
+      local.push(
+        [...(vrm.springBoneManager?.colliders ?? [])].map((collider) => {
+          const shape = (collider as unknown as { shape: { radius: number; offset: Vector3 } }).shape;
+          return shape.offset.y;
+        }),
+      );
+    }
+    // 중립 적용이므로 저작 값 그대로여야 하고, 루트 스케일과 무관해야 한다.
+    expect(local[1]).toHaveLength(local[0].length);
+    local[0].forEach((value, index) => {
+      expect(local[1][index], "루트 스케일이 콜라이더 크기에 새어 들었다").toBeCloseTo(value, 9);
+    });
+  }, 60_000);
 });
