@@ -649,6 +649,68 @@ describe("generate recipe → .vrm file reload", () => {
     60_000,
   );
 
+  it("puts every collider and joint back on its authored size when the sliders return", async () => {
+    // 슬라이더는 한 런타임 위에서 여러 번 움직인다. 모든 쓰기가 rest 기준 절대값이어야
+    // 왕복이 제자리로 돌아온다. 반경을 "프레임이 스케일된" 가지 안에서만 쓰면, 한 번
+    // `headBodyRatio` 2.5 로 갔던 두개골이 중립으로 돌아온 뒤에도 2.5배 반경으로 남는다 —
+    // 상속 배율이 1 이 되면서 그 가지를 타지 않기 때문이다.
+    const vrm = await loadVrmBytes(
+      exportStudioVrmFromGenerateRecipe(createStudioVrmGenerateRecipe({ presetId: "hime-noble" })),
+    );
+    const adapter = createStudioVrmProportionVrmAdapter({
+      vrm,
+      getCurrentModelGeneration: () => 1,
+      reapplyAuthoredPose: () => true,
+    });
+    const created = createStudioVrmProportionRigRuntime(adapter, {
+      headLength: measureStudioVrmProportionHeadLength(vrm)?.value ?? 0.2,
+    });
+    if (!created.ok) throw new Error(created.message);
+
+    const shapeOf = (collider: Object3D) =>
+      (collider as unknown as { shape: { offset?: Vector3; tail?: Vector3; radius?: number } }).shape;
+    const colliders = [...(vrm.springBoneManager?.colliders ?? [])];
+    const joints = [...(vrm.springBoneManager?.joints ?? [])];
+    expect(colliders.length).toBeGreaterThanOrEqual(3);
+    expect(joints.length).toBeGreaterThan(0);
+    const snapshot = () => ({
+      colliders: colliders.map((collider) => {
+        const shape = shapeOf(collider);
+        return {
+          radius: shape.radius ?? 0,
+          offset: shape.offset?.clone() ?? new Vector3(),
+          tail: shape.tail?.clone() ?? new Vector3(),
+        };
+      }),
+      hitRadii: joints.map((joint) => joint.settings.hitRadius),
+    });
+
+    const rest = snapshot();
+    for (const detour of [{ headBodyRatio: 2.5 }, { overallHeight: 1.6 }, { overallHeight: 0.7 }]) {
+      expect(created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS, ...detour }).ok).toBe(true);
+      expect(created.runtime.apply({ ...NEUTRAL_STUDIO_VRM_PROPORTIONS }).ok).toBe(true);
+      const back = snapshot();
+      const label = JSON.stringify(detour);
+      back.colliders.forEach((entry, index) => {
+        expect(entry.radius, `${label} 왕복 후 콜라이더 ${index} 반경`).toBeCloseTo(
+          rest.colliders[index].radius,
+          9,
+        );
+        expect(
+          entry.offset.distanceTo(rest.colliders[index].offset),
+          `${label} 왕복 후 콜라이더 ${index} 오프셋`,
+        ).toBeLessThan(1e-9);
+        expect(
+          entry.tail.distanceTo(rest.colliders[index].tail),
+          `${label} 왕복 후 콜라이더 ${index} 꼬리`,
+        ).toBeLessThan(1e-9);
+      });
+      back.hitRadii.forEach((radius, index) => {
+        expect(radius, `${label} 왕복 후 마디 ${index} 굵기`).toBeCloseTo(rest.hitRadii[index], 9);
+      });
+    }
+  }, 60_000);
+
   it("keeps the skull collider earning its keep after the head is scaled up", async () => {
     // 앞의 두 테스트가 재는 비율이 실제로 무슨 일을 하는지 고정한다. 콜라이더의 값어치는
     // "콜라이더를 붙였을 때가 뗐을 때보다 얼마나 덜 파고드는가" 하나뿐이고, 그 값어치는

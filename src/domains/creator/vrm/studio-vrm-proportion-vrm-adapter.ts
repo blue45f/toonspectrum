@@ -290,6 +290,10 @@ function captureSpringBoneGeometry(vrm: VRM): CapturedSpringGeometry {
  * distances, so each one is re-derived from its own bone's inherited scale. Hair bones under a
  * scaled `head` get thicker along with the strands they model; every other joint reads 1 and is
  * left untouched.
+ *
+ * Every write is absolute from rest, so dragging a slider out and back lands on the authored
+ * values again. That is why the radius is re-derived on both branches: `inherited` is 1 on the
+ * unscaled branch, which restores the authored radius rather than leaving a stale one behind.
  */
 function resizeSpringBoneGeometry(
   root: THREE.Object3D,
@@ -301,10 +305,13 @@ function resizeSpringBoneGeometry(
     const inherited = rootRelativeScaleOf(root, entry.collider) / entry.restRootScale;
     if (!Number.isFinite(inherited) || inherited <= 0) return false;
 
-    if (Math.abs(inherited - 1) > INHERITED_SCALE_EPSILON) {
-      if (entry.radius !== null) entry.shape.radius = entry.radius * inherited;
-      continue;
-    }
+    // Unconditional, and from rest -- not inside the branch below. A slider dragged out and back
+    // has to land on the authored radius again, and `inherited` is exactly 1 when it does. Writing
+    // this only on the scaled branch left a skull that had once been at `headBodyRatio` 2.5 stuck
+    // at 2.5x radius after the slider returned to neutral.
+    if (entry.radius !== null) entry.shape.radius = entry.radius * inherited;
+
+    if (Math.abs(inherited - 1) > INHERITED_SCALE_EPSILON) continue;
 
     if (entry.offset) entry.shape.offset?.copy(entry.offset).multiplyScalar(uniformScale);
     if (entry.tail) entry.shape.tail?.copy(entry.tail).multiplyScalar(uniformScale);
