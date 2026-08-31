@@ -2045,12 +2045,19 @@ class StudioImpastoReliefPlanner {
   private height: Float32Array | null = null;
   private shading: Float32Array | null = null;
   /**
-   * First station whose stamps may differ from the ones baked into the retained height tile.
+   * First station whose stamps are NOT already in the retained height tile.
    *
-   * The working film/ridge are rebuilt each move as `settled layer + tail`, so a cell changes
-   * only where a station at or after the PREVIOUS tail start writes. Carrying that index rather
-   * than the current one is what keeps the rectangle honest across the move where the settled
-   * boundary advances.
+   * A build stamps every station into the working film and ridge, and the tile is shaded from
+   * those, so when a build finishes the tile reflects all of them — this is `stations.length`.
+   * What can differ NEXT move is only a station that MOVED, and the caller's settled boundary is
+   * what names those: everything below it is shared with this move and stamps identically,
+   * whether it was baked into the settled layer or re-stamped as tail.
+   *
+   * Recording the tail start instead is what made a ladder rung cost three frames rather than
+   * one. A rung arrives with `settled === 0`, so nothing is baked and the whole bed is stamped as
+   * tail; carrying 0 forward then marked the ENTIRE stroke dirty on the following move, which
+   * re-shaded the full tile and re-cut all ~26.5k relief runs — 144ms, of which the bake those
+   * stations actually needed was 13ms.
    */
   private dirtyFromStation = 0;
   /**
@@ -2231,12 +2238,12 @@ class StudioImpastoReliefPlanner {
     stampImpastoFilm(film, grid, stations, this.settledEnd, stations.length, tailCursor, stations.length - 1);
     stampImpastoRidge(ridge, grid, stations, Math.max(0, this.settledEnd - 1), stations.length - 1);
 
-    // A cell can differ from the retained tile only where a station at or after the previous
-    // tail start writes. Both this move's tail and the previous one are covered by starting at
-    // the smaller index, and one station back for the ridge segment that reaches into it.
+    // A cell can differ from the retained tile only where a station the previous move did not
+    // hold writes — which the settled boundary names, since everything below it is shared and
+    // stamps identically. One station back as well, for the ridge segment that reaches into it.
     const changedFrom = Math.max(0, Math.min(this.dirtyFromStation, this.settledEnd) - 1);
     if (reshadeRetained) impastoStationBounds(stations, changedFrom, grid, dirty);
-    this.dirtyFromStation = this.settledEnd;
+    this.dirtyFromStation = stations.length;
 
     this.grid = grid;
     if (reshadeRetained && this.height!.length === cellCount && this.shading!.length === cellCount) {
