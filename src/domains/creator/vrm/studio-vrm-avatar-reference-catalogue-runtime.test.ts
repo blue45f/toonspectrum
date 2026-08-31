@@ -109,7 +109,7 @@ describe("Avatar reference catalogue runtime loader", () => {
     });
     expect(result).toMatchObject({
       status: "ready",
-      catalogueRevision: "avatar-forge-reference-v1-3ad947d6f235797b",
+      catalogueRevision: "avatar-forge-reference-v1-01dcc4ab132d7920",
       diagnostic: { code: "ready" },
     });
     expect(result.catalogue?.entries).toHaveLength(21);
