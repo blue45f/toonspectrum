@@ -12,7 +12,7 @@ import {
 } from "../brush/studio-brush-alias-profile";
 import { resolveStudioCalligraphyRenderTip } from "../brush/studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "../brush/studio-calligraphy-ribbon";
-import { studioFluidPaintStationSpacingRatio } from "../brush/studio-fluid-paint-reference";
+import { studioOilFamilyPlanFields } from "../brush/studio-fluid-paint-reference";
 import { studioLiveVisibleTapDocumentRadius } from "../brush/studio-live-visible-tap";
 import {
   StudioOilRibbonCarrierPlanner,
@@ -36,8 +36,6 @@ import {
   fxBrushSeedFromKey,
   isStudioFxPressureBrushId,
   planOilBrushDabs,
-  studioOilPaintBodyForBrush,
-  studioOilTipProfileForBrush,
   type StudioIncrementalFxPressurePathBuilder,
 } from "../studio-fx-brush";
 import {
@@ -636,13 +634,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         baseWidth: Math.max(1, element.strokeWidth),
         seed: fxBrushSeedFromKey(element.id),
         maxDabs: FX_OIL_DAB_CAP,
-        paintBody: studioOilPaintBodyForBrush(brush),
-        tipProfile: studioOilTipProfileForBrush(brush),
-        stationSpacingRatio: studioFluidPaintStationSpacingRatio(brush),
-        // Oil is the family whose carrier rebuilds a whole pipeline on top of the bed, so it is
-        // the one that needs the bed to stop moving under it. The SVG export's oil branch passes
-        // the same mode; a stroke previewed here and exported there must plan the same dabs.
-        capMode: "prefix-stable-ladder-v2" as const,
+        ...studioOilFamilyPlanFields(brush),
       };
       // Same values either way: the planner re-derives the station lattice and reuses only the
       // prefix it has verified byte-equal, so a growing stroke stops rebuilding 4096 stations x
