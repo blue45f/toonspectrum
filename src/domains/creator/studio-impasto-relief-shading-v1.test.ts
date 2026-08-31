@@ -314,6 +314,79 @@ describe("studio impasto relief shading v1 (dli/paint MIT port)", () => {
         expect(emboss[name], `emboss ${name}`).toBe(0);
       }
     }
+
+    // The census above textures every cell, so it never sees the case the tile is mostly made of.
+    // A cell whose Sobel sums both vanish has the flat normal and shades to exactly one, so the
+    // BRDF is skipped for it entirely: the per-pixel slope is ZERO, and only the setup constant
+    // remains. Without this the flat path could be deleted and every count above stays green.
+    for (const [width, height] of [[16, 12], [32, 24]] as const) {
+      const flat = new Float32Array(width * height);
+      const uniform = new Float32Array(width * height).fill(0.375);
+      for (const [label, heights] of [["empty", flat], ["uniform", uniform]] as const) {
+        const counts: Record<string, number> = { sqrt: 0 };
+        const original = Math.sqrt;
+        const spy = vi.spyOn(Math, "sqrt").mockImplementation(((value: number) => {
+          counts.sqrt! += 1;
+          return original(value);
+        }) as never);
+        try {
+          computeStudioImpastoReliefShading(heights, {
+            width,
+            height,
+            into: new Float32Array(width * height),
+          });
+        } finally {
+          spy.mockRestore();
+        }
+        expect(counts.sqrt, `${label} ${width}x${height}`).toBe(4);
+      }
+    }
+  });
+
+  it("shades a tile with no gradient anywhere to exactly one", () => {
+    // Not "close to one": the flat short-circuit writes the constant the general path divides
+    // itself down to, so any drift here means the two disagree. A uniform NON-zero tile is the
+    // interesting half — its cells carry height, and still no slope.
+    for (const fill of [0, 0.375, 1, 12.5]) {
+      const heights = new Float32Array(9 * 7).fill(fill);
+      const shading = computeStudioImpastoReliefShading(heights, { width: 9, height: 7 });
+      for (const [index, value] of shading.entries()) {
+        expect(value, `fill ${fill} at ${index}`).toBe(1);
+      }
+    }
+  });
+
+  it("shades a border cell exactly like the same neighbourhood held in the interior", () => {
+    // CLAMP_TO_EDGE is skipped where it cannot bind, which is everywhere but the tile's own
+    // border. Replicating that border into a one-cell frame turns every original cell into an
+    // interior one whose real neighbours ARE what the clamp would have produced, so the two
+    // passes have to agree cell for cell — and an off-by-one row in the un-clamped read would
+    // show up here and nowhere else.
+    const width = 11;
+    const height = 9;
+    const heights = new Float32Array(width * height);
+    for (let index = 0; index < heights.length; index += 1) {
+      heights[index] = studioOssUnitHash(0x51de, index) * 2;
+    }
+    const padded = new Float32Array((width + 2) * (height + 2));
+    for (let y = -1; y <= height; y += 1) {
+      const sourceY = y < 0 ? 0 : y >= height ? height - 1 : y;
+      for (let x = -1; x <= width; x += 1) {
+        const sourceX = x < 0 ? 0 : x >= width ? width - 1 : x;
+        padded[(y + 1) * (width + 2) + (x + 1)] = heights[sourceY * width + sourceX]!;
+      }
+    }
+    const plain = computeStudioImpastoReliefShading(heights, { width, height });
+    const framed = computeStudioImpastoReliefShading(padded, {
+      width: width + 2,
+      height: height + 2,
+    });
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        expect(plain[y * width + x], `${x},${y}`)
+          .toBe(framed[(y + 1) * (width + 2) + (x + 1)]);
+      }
+    }
   });
 
 
