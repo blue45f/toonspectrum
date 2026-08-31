@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 
 import { DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS } from "./studio-advanced-fill-settings";
 import { StudioFloodFillPanel } from "./studio-page-lazy-ui";
@@ -9,13 +9,16 @@ import {
   StudioInspectorPixelSelectionLauncher,
 } from "./StudioRasterToolRecoveryPanel";
 
+import type { StudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import type { StudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 
 
 export function StudioInspectorUnselectedImageTools({
   model,
+  tabA11y,
 }: {
   model: StudioInspectorAsideModel;
+  tabA11y: StudioInspectorTabA11y;
 }) {
   const {
     activatePixelSelectionToolFromInspector,
@@ -45,6 +48,7 @@ export function StudioInspectorUnselectedImageTools({
     puppetWarpBusy,
     rasterAvailability,
     setColor,
+    setUnselectedImageToolsVisible,
     shouldMountImageInspectorTab,
     smudgeBusy,
     studioFilterPreparationBusy,
@@ -52,15 +56,48 @@ export function StudioInspectorUnselectedImageTools({
     updateAdvancedFillSettings,
     wetMixBusy,
   } = model;
+  const preparationHeadingRef = useRef<HTMLParagraphElement>(null);
+  const previousRouteVisibleRef = useRef(imageInspectorRouteWithoutImageSelection);
+
+  useEffect(() => {
+    const wasVisible = previousRouteVisibleRef.current;
+    previousRouteVisibleRef.current = imageInspectorRouteWithoutImageSelection;
+    if (imageInspectorRouteWithoutImageSelection && !wasVisible) {
+      preparationHeadingRef.current?.focus({ preventScroll: true });
+    }
+  }, [imageInspectorRouteWithoutImageSelection]);
+
   return (
     <>
           {imageInspectorRouteWithoutImageSelection ? (
             <div
+              id={tabA11y.imagePanels.unselected}
               role="tabpanel"
               aria-label="전문 픽셀 도구"
-              hidden={inspectorLayout.primary !== "properties"}
+              aria-labelledby={tabA11y.imageTabs[inspectorLayout.image]}
               className="space-y-3 rounded-xl border border-line bg-panel/40 p-3"
             >
+              <div className="flex items-start justify-between gap-2 rounded-lg bg-canvas/45 px-2.5 py-2">
+                <div className="min-w-0">
+                  <p
+                    ref={preparationHeadingRef}
+                    tabIndex={-1}
+                    className="rounded-sm text-xs font-bold text-fg focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent"
+                  >
+                    이미지 편집 대상 준비
+                  </p>
+                  <p className="mt-0.5 text-[0.68rem] leading-snug text-fg-3">
+                    이미지 레이어를 선택하거나 페이지 합성본을 만든 뒤 도구를 실행하세요.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUnselectedImageToolsVisible(false)}
+                  className="min-h-9 shrink-0 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+                >
+                  시작 안내
+                </button>
+              </div>
               {shouldMountImageInspectorTab("quick") ? (
                 <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
                   <StudioInspectorFilterLauncher

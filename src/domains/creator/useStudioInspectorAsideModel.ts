@@ -52,6 +52,10 @@ export type StudioInspectorAsideModel = StudioInspectorAsideProps &
     inspectorContentMode: ReturnType<typeof resolveStudioInspectorContentMode>;
     inspectorDrawing: boolean;
     selectedSupportsImageInspectorTabs: boolean;
+    unselectedImageToolsVisible: boolean;
+    setUnselectedImageToolsVisible: import("react").Dispatch<
+      import("react").SetStateAction<boolean>
+    >;
     activeImageInspectorTab: StudioImageInspectorSection | null;
     imageInspectorRouteWithoutImageSelection: boolean;
     inspectorTransientState: StudioInspectorTransientState;
@@ -193,6 +197,7 @@ export function useStudioInspectorAsideModel(
   // CSP식 크기 프리셋 그리드의 "최근 크기" — 슬라이더/그리드 커밋의 마지막 고유값만
   // 컴포넌트 상태로 기억한다(별도 영속화 없음). 표시 개수 제한은 그리드가 담당한다.
   const [recentBrushSizes, setRecentBrushSizes] = useState<readonly number[]>([]);
+  const [unselectedImageToolsVisible, setUnselectedImageToolsVisible] = useState(false);
   const rememberRecentBrushSize = (size: number) => {
     const next = adjustStudioBrushSize(size, 0);
     setRecentBrushSizes((prev) =>
@@ -220,7 +225,16 @@ export function useStudioInspectorAsideModel(
       : null;
   const imageInspectorRouteWithoutImageSelection =
     activeImageInspectorTab !== null &&
-    !selectedSupportsImageInspectorTabs;
+    !selectedSupportsImageInspectorTabs &&
+    unselectedImageToolsVisible;
+
+  // Keep an explicitly opened image workspace visible while the artist inspects a text/frame
+  // selection: its recovery surface explains how to choose or prepare a raster target. Starting a
+  // drawing tool is the context switch that closes that workspace; the visible "시작 안내" action
+  // remains the direct way to close it without changing tools.
+  useEffect(() => {
+    if (inspectorDrawing) setUnselectedImageToolsVisible(false);
+  }, [inspectorDrawing]);
   const inspectorTransientState: StudioInspectorTransientState = {
     advancedFillActive,
     advancedFillBusy,
@@ -537,6 +551,8 @@ export function useStudioInspectorAsideModel(
     inspectorContentMode,
     inspectorDrawing,
     selectedSupportsImageInspectorTabs,
+    unselectedImageToolsVisible,
+    setUnselectedImageToolsVisible,
     activeImageInspectorTab,
     imageInspectorRouteWithoutImageSelection,
     inspectorTransientState,

@@ -22,13 +22,30 @@ function functionBody(source: string, name: string): string {
 
 describe("Studio inspector raster recovery boundary", () => {
   it("keeps professional pixel routes discoverable without pretending a raster target exists", () => {
-    expect(asideSource).toContain("imageToolsAvailable={!inspectorDrawing}");
+    expect(asideSource).toContain(
+      "selectedSupportsImageInspectorTabs || unselectedImageToolsVisible",
+    );
     expect(asideSource).toContain('aria-label="전문 픽셀 도구"');
     expect(asideSource).toContain("resolveStudioRasterToolAvailability");
     expect(asideSource).toContain("<StudioInspectorFilterLauncher");
     expect(asideSource).toContain("<StudioRasterToolRecoveryPanel");
     expect(asideSource).toContain("canToggleSelectedReference={false}");
     expect(asideSource).not.toContain("advancedFillInspectorRouteWithoutImageSelection");
+  });
+
+  it("preserves explicit image-tool deep links when no raster layer is selected", () => {
+    expect(asideSource).toContain(
+      'route.primary === "properties" && route.image !== undefined',
+    );
+    expect(asideSource).toContain('if (inspectorDrawing) activateCanvasTool("select")');
+    expect(asideSource).toContain("!selectedSupportsImageInspectorTabs");
+    expect(asideSource).toContain("setUnselectedImageToolsVisible(true)");
+    expect(asideSource).toContain(
+      'if (inspectorDrawing) setUnselectedImageToolsVisible(false)',
+    );
+    expect(asideSource).not.toContain(
+      'if (inspectorContentMode !== "empty") setUnselectedImageToolsVisible(false)',
+    );
   });
 
   it("wires one real non-destructive raster-copy action through the lazy inspector seam", () => {

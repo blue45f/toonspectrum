@@ -639,6 +639,7 @@ export function StudioContextActionButton({
   danger = false,
   active = false,
   className,
+  onKeyDown,
   type = "button",
   ...rest
 }: {
@@ -660,6 +661,14 @@ export function StudioContextActionButton({
         !active && !danger && "text-fg-2 hover:bg-raised",
         className
       )}
+      onKeyDown={(event) => {
+        onKeyDown?.(event);
+        if (event.defaultPrevented) return;
+        // The Studio canvas owns Space/Enter shortcuts at the window boundary. Native context
+        // buttons must consume their activation keys first so reopening a sheet after focus
+        // restoration behaves exactly like a pointer click.
+        if (event.key === "Enter" || event.key === " ") event.stopPropagation();
+      }}
       {...rest}
     >
       <Icon

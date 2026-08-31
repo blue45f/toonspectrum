@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   StudioAppMenubar,
+  StudioContextActionButton,
   StudioDockButton,
   type StudioDockButtonProps,
   StudioDockNavButton,
@@ -214,6 +215,25 @@ describe("studio chrome UI", () => {
     );
     expect(html).toContain("min-h-11");
     expect(html).toContain("min-w-11");
+  });
+
+  it("keeps context-button activation keys out of global canvas shortcuts", () => {
+    const onGlobalKeyDown = vi.fn();
+    const onClick = vi.fn();
+    globalThis.addEventListener("keydown", onGlobalKeyDown);
+    try {
+      render(<StudioContextActionButton icon={Pencil} label="속성" onClick={onClick} />);
+      const button = screen.getByRole("button", { name: "속성" });
+
+      fireEvent.keyDown(button, { key: "Enter" });
+      fireEvent.keyDown(button, { key: " " });
+
+      expect(onGlobalKeyDown).not.toHaveBeenCalled();
+      fireEvent.click(button);
+      expect(onClick).toHaveBeenCalledOnce();
+    } finally {
+      globalThis.removeEventListener("keydown", onGlobalKeyDown);
+    }
   });
 
   it("keeps disabled dock and rail coaches focusable without duplicate native titles", () => {

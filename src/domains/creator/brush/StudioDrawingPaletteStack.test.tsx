@@ -1,14 +1,24 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  requestStudioInspectorFocus,
+  resetStudioInspectorFocusForTest,
+  studioInspectorFocusTokenFor,
+  type StudioInspectorFocusTarget,
+} from "../studio-inspector-focus";
+import { StudioInspectorSection } from "../StudioInspectorSection";
 
 import {
   DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
@@ -20,7 +30,9 @@ import { StudioDrawingPaletteStack } from "./StudioDrawingPaletteStack";
 
 afterEach(() => {
   cleanup();
+  resetStudioInspectorFocusForTest();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function Harness({
@@ -290,6 +302,11 @@ describe("StudioDrawingPaletteStack", () => {
     expect(
       screen.getByRole("button", { name: "도구 속성 팝업 열기" }).className,
     ).toContain("size-11");
+    expect(
+      screen.getByRole("button", { name: "서브 도구 팝업 열기" }).className,
+    ).toContain("lg:w-full");
+    expect(screen.getByText("펜·지우개·도형을 고릅니다")).toBeTruthy();
+    expect(screen.getByText("크기·농도·필압을 조절합니다")).toBeTruthy();
   });
 
   it("opens only one icon palette popup and dismisses outside or by Escape with focus return", () => {
@@ -340,6 +357,162 @@ describe("StudioDrawingPaletteStack", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(reopenedTrigger);
     expect(reopenedTrigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it.each<StudioInspectorFocusTarget>([
+    "tool.brush-studio",
+    "tool.brush-engines",
+    "brush.saved-library",
+  ])("opens the tool-properties popup before honoring the %s deep link", (target) => {
+    render(<Harness defaultPresentation="icon-popup" />);
+
+    expect(
+      screen.queryByRole("dialog", { name: "도구 속성 팝업" }),
+    ).toBeNull();
+
+    act(() => {
+      requestStudioInspectorFocus(target);
+    });
+
+    expect(
+      screen.getByRole("dialog", { name: "도구 속성 팝업" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "필압 설정" })).toBeTruthy();
+  });
+
+  it.each([
+    ["palette.sub-tools", "서브 도구 팝업", "G펜 선택"],
+    ["palette.tool-properties", "도구 속성 팝업", "필압 설정"],
+  ] as const)("opens and consumes the generic %s palette request", (
+    target,
+    dialogName,
+    bodyAction,
+  ) => {
+    render(<Harness defaultPresentation="icon-popup" />);
+
+    act(() => {
+      requestStudioInspectorFocus(target);
+    });
+
+    expect(screen.getByRole("dialog", { name: dialogName })).toBeTruthy();
+    expect(screen.getByRole("button", { name: bodyAction })).toBeTruthy();
+    expect(studioInspectorFocusTokenFor(target)).toBe(0);
+  });
+
+  it("does not trap dismissal when a nested target is unavailable", () => {
+    render(<Harness defaultPresentation="icon-popup" />);
+
+    act(() => {
+      requestStudioInspectorFocus("tool.brush-studio");
+    });
+    expect(
+      screen.getByRole("dialog", { name: "도구 속성 팝업" }),
+    ).toBeTruthy();
+
+    fireEvent.pointerDown(document.body);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("mounts, opens, focuses and consumes a nested brush-section deep link", async () => {
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    Element.prototype.scrollIntoView = vi.fn();
+
+    function DeepLinkHarness() {
+      const [layout, setLayout] = useState<StudioDrawingPaletteLayout>(
+        DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
+      );
+      return (
+        <StudioDrawingPaletteStack
+          layout={layout}
+          defaultPresentation="icon-popup"
+          subTools={<span>서브 도구</span>}
+          toolProperties={(
+            <StudioInspectorSection sectionId="tool.brush-studio">
+              <button type="button">브러시 간격</button>
+            </StudioInspectorSection>
+          )}
+          onLayoutChange={setLayout}
+        />
+      );
+    }
+
+    render(<DeepLinkHarness />);
+
+    act(() => {
+      requestStudioInspectorFocus("tool.brush-studio");
+    });
+
+    const sectionHeader = await screen.findByRole("button", {
+      name: "브러시 스튜디오",
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "도구 속성 팝업" }),
+      ).toBeTruthy();
+      expect(sectionHeader.getAttribute("aria-expanded")).toBe("true");
+      expect(document.activeElement).toBe(sectionHeader);
+      expect(studioInspectorFocusTokenFor("tool.brush-studio")).toBe(0);
+    });
+  });
+
+  it("expands collapsed tool properties before a nested inspector deep link runs", () => {
+    render(
+      <Harness
+        initial={{
+          ...DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
+          collapsed: {
+            ...DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT.collapsed,
+            "tool-properties": true,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "필압 설정" })).toBeNull();
+
+    act(() => {
+      requestStudioInspectorFocus("tool.brush-studio");
+    });
+
+    expect(screen.getByRole("button", { name: "필압 설정" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "도구 속성 접기" }).getAttribute(
+        "aria-expanded",
+      ),
+    ).toBe("true");
+  });
+
+  it("follows a responsive owner's changed default presentation without retaining an old popup", () => {
+    const { container, rerender } = render(
+      <Harness defaultPresentation="icon-popup" />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "서브 도구 팝업 열기" }),
+    );
+    expect(screen.getByRole("dialog", { name: "서브 도구 팝업" })).toBeTruthy();
+
+    rerender(<Harness defaultPresentation="full" />);
+
+    expect(
+      container.querySelector<HTMLElement>(
+        '[data-studio-drawing-palette-stack="true"]',
+      )?.dataset.studioDrawingPalettePresentation,
+    ).toBe("full");
+    expect(screen.queryByRole("dialog", { name: "서브 도구 팝업" })).toBeNull();
+    expect(screen.getByRole("button", { name: "G펜 선택" })).toBeTruthy();
+
+    rerender(<Harness defaultPresentation="icon-popup" />);
+
+    expect(
+      container.querySelector<HTMLElement>(
+        '[data-studio-drawing-palette-stack="true"]',
+      )?.dataset.studioDrawingPalettePresentation,
+    ).toBe("icon-popup");
   });
 
   it("supports precise separator keyboard resizing and default restoration", () => {

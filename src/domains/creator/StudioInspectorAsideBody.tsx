@@ -1,10 +1,11 @@
-import { Suspense } from "react";
+import { Suspense, useId } from "react";
 
 import {
   resolveStudioFigmaSelectionLayoutMetrics,
   selectStudioFigmaDesignTargets,
 } from "./studio-figma-selection-ux";
 import { StudioPathBooleanPanel } from "./studio-page-lazy-ui";
+import { createStudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 import { StudioInspectorAsideShell } from "./StudioInspectorAsideShell";
 import { StudioInspectorDrawingSection } from "./StudioInspectorDrawingSection";
@@ -17,6 +18,7 @@ import type { StudioInspectorAsideProps } from "./StudioInspectorAsideTypes";
 
 export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
   const model = useStudioInspectorAsideModel(props);
+  const tabA11y = createStudioInspectorTabA11y(useId());
   const {
     inspectorContentMode,
     inspectorLayout,
@@ -31,11 +33,24 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
     pathBooleanInspectorUnavailableReason,
     applyPathBooleanCombine,
   } = model;
+  const hasMultiSelection =
+    inspectorContentMode === "selection" && marqueeIds.length > 1;
 
   return (
-    <StudioInspectorAsideShell model={model}>
+    <StudioInspectorAsideShell model={model} tabA11y={tabA11y}>
+      <div
+        id={tabA11y.primary.properties.panelId}
+        role="tabpanel"
+        aria-labelledby={tabA11y.primary.properties.tabId}
+        hidden={inspectorLayout.primary !== "properties"}
+        className={
+          inspectorContentMode === "drawing"
+            ? "min-h-0 lg:flex lg:flex-1 lg:flex-col"
+            : "space-y-2"
+        }
+      >
           {inspectorContentMode === "selection" && (
-            <div hidden={inspectorLayout.primary !== "properties"}>
+            <div>
               <StudioFigmaDesignPanel
                 metrics={resolveStudioFigmaSelectionLayoutMetrics(
                   selectStudioFigmaDesignTargets(elements, marqueeIds, selected),
@@ -48,12 +63,12 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
               />
             </div>
           )}
-          <StudioInspectorSelectionSection model={model} />
+          {!hasMultiSelection ? (
+            <StudioInspectorSelectionSection model={model} tabA11y={tabA11y} />
+          ) : null}
           {inspectorContentMode === "selection" && marqueeIds.length === 2 && (
             <div
-              role="tabpanel"
               aria-label="도형 결합"
-              hidden={inspectorLayout.primary !== "properties"}
               className="rounded-xl border border-line bg-panel/40 p-3"
             >
               <Suspense fallback={null}>
@@ -67,7 +82,8 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
           )}
           <StudioInspectorEmptyCoachSection model={model} />
           <StudioInspectorDrawingSection model={model} />
-          <StudioInspectorUnselectedImageTools model={model} />
+          <StudioInspectorUnselectedImageTools model={model} tabA11y={tabA11y} />
+      </div>
     </StudioInspectorAsideShell>
   );
 }

@@ -31,6 +31,8 @@ export type StudioCommandSearchHostProps = Omit<
 > & {
   /** 트리거 버튼을 숨기고 F1 만 남긴다(모바일 등). */
   hideTrigger?: boolean;
+  /** Make the owning surface visible before the global search dialog opens. */
+  onRequestOpen?: () => void;
   /**
    * 트리거와 같은 줄 오른쪽에 붙는 크롬 버튼(예: 인스펙터 접기).
    *
@@ -54,11 +56,16 @@ function isEditingTarget(target: EventTarget | null): boolean {
 
 export function StudioCommandSearchHost({
   hideTrigger = false,
+  onRequestOpen,
   trailing,
   ...dialogProps
 }: StudioCommandSearchHostProps) {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
+  const openSearch = useCallback(() => {
+    onRequestOpen?.();
+    setOpen(true);
+  }, [onRequestOpen]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -66,17 +73,18 @@ export function StudioCommandSearchHost({
       if (event.defaultPrevented) return;
       if (!open && isEditingTarget(event.target)) return;
       event.preventDefault();
-      setOpen((previous) => !previous);
+      if (open) close();
+      else openSearch();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+  }, [close, open, openSearch]);
 
   // 메뉴 › 도움말 › 명령·속성 통합 검색. 메뉴 항목은 순수 데이터라 이 상태를 직접
   // 만질 수 없으므로 채널로 요청만 받는다(§15.3 Help ▸ Command Search).
   useEffect(
-    () => subscribeStudioCommandSearchRequests(() => setOpen(true)),
-    [],
+    () => subscribeStudioCommandSearchRequests(openSearch),
+    [openSearch],
   );
 
   return (
@@ -89,7 +97,7 @@ export function StudioCommandSearchHost({
           {hideTrigger ? null : (
             <button
               type="button"
-              onClick={() => setOpen(true)}
+              onClick={openSearch}
               data-testid="studio-command-search-trigger"
               title="명령·속성 통합 검색 (F1)"
               className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-xs text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-9"

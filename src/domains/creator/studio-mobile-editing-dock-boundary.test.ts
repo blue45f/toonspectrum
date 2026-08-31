@@ -252,6 +252,10 @@ describe("Studio mobile editing dock module boundary", () => {
     expect(dock.source).not.toContain("useStudioModalSheet");
     expect(page.source).toContain("dismissBrushManager: dismissBrushManagerToDraw,");
     expect(page.source).not.toContain("dismissBrushManager={dismissBrushManagerToDraw}");
+    expect(page.source).toContain("mobileInspectorSelectionReturnFocusRef");
+    expect(page.source).toContain('[data-studio-selection-properties-trigger="true"]');
+    expect(page.source).toContain('[data-studio-mobile-workspace-toggle="true"]');
+    expect(dock.source).toContain('data-studio-selection-properties-trigger="true"');
   });
 
   it("exposes draw-sheet dialog semantics only while the non-modal sheet is visible", () => {

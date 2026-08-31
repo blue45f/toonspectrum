@@ -125,6 +125,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
             <StudioToolBeltHintTarget hint={hints.assets}>
               <button
                 type="button"
+                aria-label="템플릿·에셋"
                 onClick={() => {
                   preloadStudioAssetMenuPanel();
                   setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
@@ -154,7 +155,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                     active: activeToolbarGroup === "assetGroup",
                   })}
                 />
-                템플릿·에셋
+                <span><span className="max-[359px]:hidden">템플릿·</span>에셋</span>
                 <ChevronDown
                   size={STUDIO_ICON_SIZE.subtab}
                   strokeWidth={STUDIO_ICON_STROKE}
@@ -181,13 +182,18 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
           <StudioToolbarDivider label="컷" />
           <StudioToolbarCluster label="컷 배치">
             <StudioToolBeltHintTarget hint={hints.panelAdd}>
-              <button type="button" onClick={addFrame} className={toolBtn(false)}>
+              <button
+                type="button"
+                aria-label="컷 추가 · 만화 패널"
+                onClick={addFrame}
+                className={toolBtn(false)}
+              >
                 <Plus
                   size={STUDIO_ICON_SIZE.toolCompact}
                   strokeWidth={STUDIO_ICON_STROKE}
                   aria-hidden
                   className={studioToolIconClass()}
-                /> 패널
+                /> 컷 추가
               </button>
             </StudioToolBeltHintTarget>
             <StudioToolBeltHintTarget hint={hints.panelSplit}>

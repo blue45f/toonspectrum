@@ -7,17 +7,25 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 
+import {
+  consumeStudioInspectorFocusRequest,
+  studioInspectorFocusSnapshot,
+  subscribeStudioInspectorFocus,
+  type StudioInspectorFocusTarget,
+} from "../studio-inspector-focus";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
 import {
@@ -76,6 +84,29 @@ const SPLIT_KEYBOARD_LARGE_STEP = 8;
 const DOUBLE_TAP_MAX_DELAY_MS = 350;
 const TAP_MAX_TRAVEL_PX = 8;
 const DOUBLE_TAP_MAX_DISTANCE_PX = 24;
+const DRAWING_PALETTE_FOCUS_TARGETS = {
+  "palette.sub-tools": "sub-tools",
+  "palette.tool-properties": "tool-properties",
+  "tool.brush-studio": "tool-properties",
+  "tool.brush-engines": "tool-properties",
+  "brush.saved-library": "tool-properties",
+} as const satisfies Partial<
+  Record<StudioInspectorFocusTarget, StudioDrawingPaletteId>
+>;
+
+type DrawingPaletteFocusTarget = keyof typeof DRAWING_PALETTE_FOCUS_TARGETS;
+
+function isDrawingPaletteFocusTarget(
+  target: StudioInspectorFocusTarget,
+): target is DrawingPaletteFocusTarget {
+  return target in DRAWING_PALETTE_FOCUS_TARGETS;
+}
+
+function isPaletteOnlyFocusTarget(
+  target: StudioInspectorFocusTarget,
+): target is "palette.sub-tools" | "palette.tool-properties" {
+  return target === "palette.sub-tools" || target === "palette.tool-properties";
+}
 
 interface ResizeTap {
   readonly at: number;
@@ -129,6 +160,9 @@ export function StudioDrawingPaletteStack({
   const sectionRefs = useRef<Partial<Record<StudioDrawingPaletteId, HTMLElement | null>>>({});
   const collapseButtonRefs =
     useRef<Partial<Record<StudioDrawingPaletteId, HTMLButtonElement | null>>>({});
+  const iconTriggerRefs =
+    useRef<Partial<Record<StudioDrawingPaletteId, HTMLButtonElement | null>>>({});
+  const lastAutoOpenedFocusTokenRef = useRef(0);
   const focusedBodyRef = useRef<StudioDrawingPaletteId | null>(null);
   const previousCollapsedRef = useRef<StudioDrawingPaletteLayout["collapsed"]>(
     normalizedLayout.collapsed,
@@ -146,7 +180,14 @@ export function StudioDrawingPaletteStack({
   const [uncontrolledPresentation, setUncontrolledPresentation] =
     useState<StudioDrawingPalettePresentation>(defaultPresentation);
   const paletteOverlay = useStudioDrawingPaletteOverlay();
+  const dismissPaletteOverlay = paletteOverlay.dismiss;
+  const openPaletteOverlay = paletteOverlay.open;
   const presentation = controlledPresentation ?? uncontrolledPresentation;
+  const pendingFocusRequest = useSyncExternalStore(
+    subscribeStudioInspectorFocus,
+    studioInspectorFocusSnapshot,
+    () => null,
+  );
   const openIds = normalizedLayout.order.filter((id) =>
     mobilePrimaryPaletteId
       ? id === mobilePrimaryPaletteId
@@ -155,6 +196,73 @@ export function StudioDrawingPaletteStack({
   const bothOpen = openIds.length === 2;
   const firstOpenId = openIds[0] ?? null;
   const secondOpenId = openIds[1] ?? null;
+  const emit = useCallback((next: StudioDrawingPaletteLayout): void => {
+    onLayoutChange(normalizeStudioDrawingPaletteLayout(next));
+  }, [onLayoutChange]);
+
+  useEffect(() => {
+    if (controlledPresentation !== undefined) return;
+    setUncontrolledPresentation(defaultPresentation);
+    dismissPaletteOverlay();
+  }, [controlledPresentation, defaultPresentation, dismissPaletteOverlay]);
+
+  useEffect(() => {
+    if (!pendingFocusRequest) return;
+    if (!isDrawingPaletteFocusTarget(pendingFocusRequest.target)) return;
+    const requestedPaletteId = DRAWING_PALETTE_FOCUS_TARGETS[pendingFocusRequest.target];
+    if (lastAutoOpenedFocusTokenRef.current === pendingFocusRequest.token) return;
+    lastAutoOpenedFocusTokenRef.current = pendingFocusRequest.token;
+    const paletteOnlyRequest = isPaletteOnlyFocusTarget(pendingFocusRequest.target);
+
+    if (presentation === "icon-popup") {
+      if (
+        paletteOverlay.openOverlay?.kind === "palette" &&
+        paletteOverlay.openOverlay.id === requestedPaletteId
+      ) {
+        if (paletteOnlyRequest) {
+          consumeStudioInspectorFocusRequest(
+            pendingFocusRequest.target,
+            pendingFocusRequest.token,
+          );
+        }
+        return;
+      }
+      const trigger = iconTriggerRefs.current[requestedPaletteId];
+      if (!trigger) return;
+      openPaletteOverlay(
+        { kind: "palette", id: requestedPaletteId },
+        trigger,
+      );
+      if (paletteOnlyRequest) {
+        consumeStudioInspectorFocusRequest(
+          pendingFocusRequest.target,
+          pendingFocusRequest.token,
+        );
+      }
+      return;
+    }
+
+    if (
+      !mobilePrimaryPaletteId &&
+      normalizedLayout.collapsed[requestedPaletteId]
+    ) {
+      emit(toggleStudioDrawingPalette(normalizedLayout, requestedPaletteId));
+    }
+    if (paletteOnlyRequest) {
+      consumeStudioInspectorFocusRequest(
+        pendingFocusRequest.target,
+        pendingFocusRequest.token,
+      );
+    }
+  }, [
+    mobilePrimaryPaletteId,
+    normalizedLayout,
+    emit,
+    openPaletteOverlay,
+    paletteOverlay.openOverlay,
+    pendingFocusRequest,
+    presentation,
+  ]);
 
   useEffect(() => {
     const previouslyCollapsed = previousCollapsedRef.current;
@@ -203,10 +311,6 @@ export function StudioDrawingPaletteStack({
     }
     onPresentationChange?.(nextPresentation);
     paletteOverlay.dismiss();
-  }
-
-  function emit(next: StudioDrawingPaletteLayout): void {
-    onLayoutChange(normalizeStudioDrawingPaletteLayout(next));
   }
 
   function toggleLock(
@@ -497,6 +601,7 @@ export function StudioDrawingPaletteStack({
               <button
                 key={id}
                 ref={(node) => {
+                  iconTriggerRefs.current[id] = node;
                   paletteOverlay.setTrigger(overlay, node);
                 }}
                 type="button"
@@ -504,6 +609,7 @@ export function StudioDrawingPaletteStack({
                 aria-expanded={expanded}
                 aria-controls={popupId}
                 aria-label={`${definition.label} 팝업 ${expanded ? "닫기" : "열기"}`}
+                title={`${definition.label} — ${definition.description}`}
                 data-studio-drawing-palette-icon-trigger={id}
                 data-position-locked={
                   normalizedLayout.locks[id].position ? "true" : "false"
@@ -516,12 +622,30 @@ export function StudioDrawingPaletteStack({
                 }
                 className={cn(
                   "relative grid size-11 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg lg:size-9",
+                  "lg:flex lg:h-11 lg:w-full lg:items-center lg:justify-start lg:gap-2 lg:px-2.5 lg:text-left",
                   expanded && "bg-accent-soft text-accent",
                   STUDIO_EASE,
                   STUDIO_FOCUS_RING,
                 )}
               >
-                <Icon size={17} strokeWidth={1.8} aria-hidden />
+                <Icon size={17} strokeWidth={1.8} className="shrink-0" aria-hidden />
+                <span className="hidden min-w-0 flex-1 lg:block">
+                  <span className="block text-[0.68rem] font-bold leading-tight text-fg">
+                    {definition.label}
+                  </span>
+                  <span className="mt-0.5 block truncate text-[0.58rem] font-medium leading-tight text-fg-3">
+                    {definition.description}
+                  </span>
+                </span>
+                <ChevronRight
+                  size={14}
+                  aria-hidden
+                  className={cn(
+                    "hidden shrink-0 text-fg-3 lg:block",
+                    expanded && "rotate-90 text-accent",
+                    STUDIO_EASE,
+                  )}
+                />
                 {normalizedLayout.locks[id].position ||
                 normalizedLayout.locks[id].height ? (
                   <span

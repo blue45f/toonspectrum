@@ -3,9 +3,18 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { StudioSliderRow } from "./studio-panel-ui";
+import { studioToolButtonClass, StudioSliderRow } from "./studio-panel-ui";
 
 afterEach(cleanup);
+
+describe("studioToolButtonClass", () => {
+  it("keeps dense top-toolbar controls at least 44px tall on narrow viewports", () => {
+    const className = studioToolButtonClass(false, { dense: true });
+
+    expect(className).toContain("max-lg:h-11");
+    expect(className).toContain("max-lg:min-h-11");
+  });
+});
 
 describe("StudioSliderRow", () => {
   it("preserves immediate controlled onChange behavior when onCommit is omitted", () => {

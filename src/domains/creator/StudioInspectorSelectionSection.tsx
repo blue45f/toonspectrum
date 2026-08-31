@@ -31,6 +31,7 @@ import { StudioSkewPanel } from "./StudioSkewPanel";
 
 import type { El } from "./studio-element-model";
 import type { StudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
+import type { StudioInspectorTabA11y } from "./studio-inspector-tab-a11y";
 
 
 import { buttonClass } from "@/components/ui/button-utils";
@@ -38,8 +39,10 @@ import { cn } from "@/lib/utils";
 
 export function StudioInspectorSelectionSection({
   model,
+  tabA11y,
 }: {
   model: StudioInspectorAsideModel;
+  tabA11y: StudioInspectorTabA11y;
 }) {
   const {
     activeImageInspectorTab,
@@ -78,7 +81,6 @@ export function StudioInspectorSelectionSection({
     handleRasterRecovery,
     inspectorContentMode,
     inspectorInteractionPolicy,
-    inspectorLayout,
     inspectorTransientOwners,
     masterEditMode,
     nodeEditHandles,
@@ -130,10 +132,7 @@ export function StudioInspectorSelectionSection({
     <>
           {inspectorContentMode === "selection" && selected && (
             <div
-              role="tabpanel"
-              aria-label="선택 요소 속성"
               data-testid="studio-inspector-context-selection"
-              hidden={inspectorLayout.primary !== "properties"}
               className="rounded-xl border border-line bg-panel/40 p-3"
             >
               <StudioInspectorMutationLockNotice
@@ -354,6 +353,7 @@ export function StudioInspectorSelectionSection({
                           key={a.v}
                           type="button"
                           onClick={() => patchEl(selected.id, { align: a.v } as Partial<El>)}
+                          aria-pressed={(selected.align ?? "center") === a.v}
                           className={cn(
                             "rounded-md border px-2.5 py-0.5 text-xs",
                             (selected.align ?? "center") === a.v
@@ -388,22 +388,6 @@ export function StudioInspectorSelectionSection({
                   )}
                 </div>
                 </StudioInspectorSection>
-              )}
-              {selected.type !== "frame" && (
-                <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-                  불투명도
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min={10}
-                      max={100}
-                      value={Math.round((selected.opacity ?? 1) * 100)}
-                      onChange={(e) => patchEl(selected.id, { opacity: Number(e.target.value) / 100 } as Partial<El>)}
-                      className="w-28 accent-accent cursor-pointer"
-                    />
-                    <span className="w-9 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.opacity ?? 1) * 100)}%</span>
-                  </span>
-                </label>
               )}
 
               <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2" title="바로 아래 레이어의 영역 안으로만 보이게 잘라냅니다(채색·톤 가두기).">
@@ -482,83 +466,20 @@ export function StudioInspectorSelectionSection({
                 </StudioInspectorSection>
               )}
 
-              {selected.type !== "draw" && (
-                <StudioInspectorSection sectionId="element.layout" loadingLabel="배치를 여는 중...">
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="flex flex-col gap-0.5">
-                      <span className="text-[0.66rem] text-fg-3">가로 위치 (X)</span>
-                      <input
-                        type="number"
-                        value={Math.round(selected.x)}
-                        onChange={(e) => patchEl(selected.id, { x: Number(e.target.value) } as Partial<El>)}
-                        className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-0.5">
-                      <span className="text-[0.66rem] text-fg-3">세로 위치 (Y)</span>
-                      <input
-                        type="number"
-                        value={Math.round(selected.y)}
-                        onChange={(e) => patchEl(selected.id, { y: Number(e.target.value) } as Partial<El>)}
-                        className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                      />
-                    </label>
-                    {(selected.type === "image" || selected.type === "bubble" || selected.type === "frame" || selected.type === "text") && (
-                      <label className="flex flex-col gap-0.5">
-                        <span className="text-[0.66rem] text-fg-3">너비 (Width)</span>
-                        <input
-                          type="number"
-                          value={Math.round(selected.width)}
-                          onChange={(e) => patchEl(selected.id, { width: Math.max(10, Number(e.target.value)) } as Partial<El>)}
-                          className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                        />
-                      </label>
-                    )}
-                    {(selected.type === "image" || selected.type === "bubble" || selected.type === "frame") && (
-                      <label className="flex flex-col gap-0.5">
-                        <span className="text-[0.66rem] text-fg-3">높이 (Height)</span>
-                        <input
-                          type="number"
-                          value={Math.round(selected.height)}
-                          onChange={(e) => patchEl(selected.id, { height: Math.max(10, Number(e.target.value)) } as Partial<El>)}
-                          className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                        />
-                      </label>
-                    )}
-                    {(selected.type === "image" || selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (
-                      <label className="flex flex-col gap-0.5 col-span-2">
-                        <span className="text-[0.66rem] text-fg-3">회전 (Rotation)</span>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="range"
-                            min={-180}
-                            max={180}
-                            value={Math.round(selected.rotation ?? 0)}
-                            onChange={(e) => patchEl(selected.id, { rotation: Number(e.target.value) } as Partial<El>)}
-                            className="flex-1 accent-accent"
-                          />
-                          <input
-                            type="number"
-                            value={Math.round(selected.rotation ?? 0)}
-                            onChange={(e) => patchEl(selected.id, { rotation: Number(e.target.value) } as Partial<El>)}
-                            className="w-14 rounded border border-line bg-canvas/50 px-1 py-0.5 text-center text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                          />
-                        </div>
-                      </label>
-                    )}
-                  </div>
-                </div>
-                {/* 기울이기(Skew) — 이미지/텍스트/스티커 자유 변형. 도 단위 저장, Konva 렌더 시 tangent 변환(studio-skew). */}
-                {(selected.type === "image" || selected.type === "text" || selected.type === "sticker") && (
-                  <div className="mt-3 border-t border-line/50 pt-3">
+              {/* 위치·크기·회전·불투명도는 StudioFigmaDesignPanel 한 곳에서
+                  같은 커밋 규칙으로 다룬다. 여기에는 자유 변형의 별도 축인
+                  기울이기만 남겨 서로 다른 최소값과 히스토리가 충돌하지 않게 한다. */}
+              {(selected.type === "image" || selected.type === "text" || selected.type === "sticker") && (
+                <StudioInspectorSection
+                  sectionId="element.layout"
+                  title="기울이기"
+                  loadingLabel="기울이기를 여는 중..."
+                >
                     <StudioSkewPanel
                       value={{ skewX: selected.skewX, skewY: selected.skewY }}
                       onPatch={(patch) => patchEl(selected.id, normalizeSkewPatch(patch) as Partial<El>)}
                       onReset={() => patchEl(selected.id, { skewX: undefined, skewY: undefined } as Partial<El>)}
                     />
-                  </div>
-                )}
                 </StudioInspectorSection>
               )}
 
@@ -591,7 +512,7 @@ export function StudioInspectorSelectionSection({
                 </StudioInspectorSection>
               ) : null}
 
-              <StudioInspectorSelectedImageTools model={model} />
+              <StudioInspectorSelectedImageTools model={model} tabA11y={tabA11y} />
 
               <div className="mt-3 flex flex-wrap gap-1.5 border-t border-line/50 pt-3">
                 {(selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") && (

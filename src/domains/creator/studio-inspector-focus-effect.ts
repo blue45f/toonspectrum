@@ -8,6 +8,7 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import {
+  consumeStudioInspectorFocusRequest,
   studioInspectorFocusTokenFor,
   subscribeStudioInspectorFocus,
   type StudioInspectorFocusTarget,
@@ -35,10 +36,11 @@ export function useStudioInspectorFocusRequest(
   handlerRef.current = onFocus;
 
   useEffect(() => {
-    if (token === 0 || token === handledRef.current) return;
+    if (target === null || token === 0 || token === handledRef.current) return;
     handledRef.current = token;
     handlerRef.current();
-  }, [token]);
+    consumeStudioInspectorFocusRequest(target, token);
+  }, [target, token]);
 
   return token;
 }

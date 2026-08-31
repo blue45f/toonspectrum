@@ -117,6 +117,12 @@ describe("studio inspector layout", () => {
     expect(drawActions.map((action) => action.id)).toContain("image-transform");
     expect(drawActions.map((action) => action.id)).toContain("image-mask");
     expect(drawActions.map((action) => action.id)).toContain("image-retouch");
+    expect(drawActions).toContainEqual(
+      expect.objectContaining({
+        id: "selection-layout",
+        focusTarget: "selection.geometry",
+      }),
+    );
     expect(filterStudioInspectorActions(imageActions, "참조 채우기")).toEqual([
       expect.objectContaining({ id: "image-fill" }),
     ]);
@@ -124,5 +130,82 @@ describe("studio inspector layout", () => {
       expect.objectContaining({ id: "image-transform" }),
     ]);
     expect(filterStudioInspectorActions(imageActions, "없는 메뉴")).toEqual([]);
+  });
+
+  it("routes leaf-property searches to a focusable inspector target", () => {
+    const textActions = studioInspectorActions({
+      hasSelection: true,
+      selectedType: "text",
+      drawing: false,
+    });
+    const pageActions = studioInspectorActions({
+      hasSelection: false,
+      selectedType: null,
+      drawing: false,
+    });
+
+    expect(filterStudioInspectorActions(textActions, "자간")).toEqual([
+      expect.objectContaining({
+        id: "typography",
+        focusTarget: "element.typography",
+        path: "속성 › 글자 › 타이포그래피",
+      }),
+    ]);
+    expect(textActions).toContainEqual(
+      expect.objectContaining({
+        id: "selection-layout",
+        focusTarget: "selection.geometry",
+      }),
+    );
+    expect(filterStudioInspectorActions(pageActions, "스냅")).toEqual([
+      expect.objectContaining({
+        id: "canvas-guides",
+        focusTarget: "canvas.guide-lines",
+      }),
+    ]);
+  });
+
+  it("does not advertise the text-only fill section for speech bubbles", () => {
+    const bubbleActions = studioInspectorActions({
+      hasSelection: true,
+      selectedType: "bubble",
+      drawing: false,
+    });
+    const bubbleActionIds = bubbleActions.map((action) => action.id);
+
+    expect(bubbleActionIds).not.toContain("text-fill");
+    expect(bubbleActionIds).toContain("typography");
+    expect(bubbleActionIds).toContain("text-align");
+    expect(filterStudioInspectorActions(bubbleActions, "글자 채우기")).toEqual([]);
+  });
+
+  it("does not advertise targets that are unmounted for multi-select or shape tools", () => {
+    const multiSelectionActions = studioInspectorActions({
+      hasSelection: true,
+      selectedType: null,
+      drawing: false,
+    });
+    expect(multiSelectionActions.map((action) => action.id)).not.toContain(
+      "selection-order-align",
+    );
+    expect(multiSelectionActions.map((action) => action.id)).toContain(
+      "selection-layout",
+    );
+
+    const shapeDrawingActions = studioInspectorActions({
+      hasSelection: false,
+      selectedType: null,
+      drawing: true,
+      drawingToolPropertiesAvailable: false,
+    });
+    expect(shapeDrawingActions.map((action) => action.id)).not.toContain(
+      "brush-studio",
+    );
+    expect(shapeDrawingActions.map((action) => action.id)).not.toContain(
+      "brush-engines",
+    );
+    expect(shapeDrawingActions.map((action) => action.id)).toContain(
+      "drawing-properties",
+    );
   });
 });

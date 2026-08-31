@@ -413,7 +413,10 @@ export function StudioCanvasStatusRail({
                * 붙는 순간 스테이지 원점이 통째로 내려가고, 이미 시작된 Konva 드래그·획이
                * 그만큼 튄다(선택 명령 레인이 상시 예약으로 막아 둔 것과 같은 결함).
                */
-              ? "absolute inset-x-0 top-0 z-20 max-h-[min(30dvh,12rem)] overflow-y-auto overscroll-contain px-2 [scrollbar-gutter:stable]"
+              // 우상단 presence dock은 모바일에서 44px 아이콘과 컨테이너 여백을 쓴다.
+              // 복구/비우기 같은 안전 조치가 그 아래로 들어가면 두 버튼이 동시에 눌리는
+              // 치명적 상태가 되므로 모든 고지 카드에 해당 hit-area를 구조적으로 비워 둔다.
+              ? "absolute inset-x-0 top-0 z-20 max-h-[min(30dvh,12rem)] overflow-y-auto overscroll-contain pl-2 pr-[5.25rem] [scrollbar-gutter:stable]"
               : "hidden"
             : "contents"
         )}

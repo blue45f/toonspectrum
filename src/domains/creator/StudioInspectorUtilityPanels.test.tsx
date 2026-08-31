@@ -4,7 +4,11 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { StudioInspectorPublishPanel } from "./StudioInspectorUtilityPanels";
+import { DEFAULT_PAGE_GRADE } from "./studio-page-grade";
+import {
+  StudioInspectorPageGradeSurface,
+  StudioInspectorPublishPanel,
+} from "./StudioInspectorUtilityPanels";
 
 afterEach(() => cleanup());
 
@@ -147,5 +151,41 @@ describe("StudioInspectorPublishPanel", () => {
     expect(
       (screen.getByRole("button", { name: "초안 저장 계속" }) as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+});
+
+describe("StudioInspectorPageGradeSurface", () => {
+  it("keeps aria-expanded and aria-controls complete in both disclosure directions", () => {
+    const onExpandedChange = vi.fn();
+    const baseProps: React.ComponentProps<typeof StudioInspectorPageGradeSurface> = {
+      active: true,
+      expanded: false,
+      grade: DEFAULT_PAGE_GRADE,
+      gradeActive: false,
+      gate: { disabled: false },
+      onApplyPreset: vi.fn(),
+      onExpandedChange,
+      onPatch: vi.fn(),
+      onReset: vi.fn(),
+    };
+    const view = render(<StudioInspectorPageGradeSurface {...baseProps} />);
+
+    const collapsed = screen.getByRole("button", { name: /페이지 색보정/u });
+    expect(collapsed.getAttribute("aria-expanded")).toBe("false");
+    const contentId = collapsed.getAttribute("aria-controls");
+    expect(contentId).toBeTruthy();
+    expect((document.getElementById(contentId!) as HTMLElement).hidden).toBe(true);
+    fireEvent.click(collapsed);
+    expect(onExpandedChange).toHaveBeenLastCalledWith(true);
+
+    view.rerender(
+      <StudioInspectorPageGradeSurface {...baseProps} expanded />,
+    );
+    const expanded = screen.getByRole("button", { name: "접기" });
+    expect(expanded.getAttribute("aria-expanded")).toBe("true");
+    expect(expanded.getAttribute("aria-controls")).toBe(contentId);
+    expect((document.getElementById(contentId!) as HTMLElement).hidden).toBe(false);
+    fireEvent.click(expanded);
+    expect(onExpandedChange).toHaveBeenLastCalledWith(false);
   });
 });

@@ -234,20 +234,45 @@ function record(
 }
 
 /** 기본 탭으로 이동하고 실제로 선택됐는지 확인한다. */
+function primaryTab(page: Page, tab: string): Locator {
+  return page.locator(`${NAVIGATOR} [data-studio-inspector-primary-tab="${tab}"]`).first();
+}
+
 async function selectPrimaryTab(page: Page, tab: string): Promise<boolean> {
-  const button = page.locator(`${NAVIGATOR} [data-studio-inspector-primary-tab="${tab}"]`);
+  const button = primaryTab(page, tab);
   if ((await button.count()) === 0) return false;
   if ((await button.getAttribute("aria-selected")) !== "true") await button.click();
   return (await button.getAttribute("aria-selected")) === "true";
 }
 
-async function selectDocumentTab(page: Page, label: string): Promise<boolean> {
-  const tab = page.locator(`${NAVIGATOR} [role="tablist"][aria-label="페이지 설정"] [role="tab"]`, {
+function documentTab(page: Page, label: string): Locator {
+  return page.locator(`${NAVIGATOR} [role="tablist"][aria-label="페이지 설정"] [role="tab"]`, {
     hasText: label,
-  });
+  }).first();
+}
+
+async function selectDocumentTab(page: Page, label: string): Promise<boolean> {
+  const tab = documentTab(page, label);
   if ((await tab.count()) === 0) return false;
-  if ((await tab.first().getAttribute("aria-selected")) !== "true") await tab.first().click();
-  return (await tab.first().getAttribute("aria-selected")) === "true";
+  if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
+  return (await tab.getAttribute("aria-selected")) === "true";
+}
+
+/** 탭의 실제 소유 panel을 aria-controls로 찾고, 구버전 빌드에는 aria-label을 쓴다. */
+async function controlledPanel(
+  page: Page,
+  tab: Locator,
+  fallbackLabels: readonly string[],
+): Promise<Locator> {
+  const panelId = await tab.getAttribute("aria-controls").catch(() => null);
+  if (panelId) {
+    const linked = page.locator(`${PANEL} [id=${JSON.stringify(panelId)}]`).first();
+    if ((await linked.count()) > 0) return linked;
+  }
+  const fallbackSelector = fallbackLabels
+    .map((label) => `${PANEL} [role="tabpanel"][aria-label=${JSON.stringify(label)}]`)
+    .join(", ");
+  return page.locator(fallbackSelector || `${PANEL} [data-missing-controlled-panel]`).first();
 }
 
 function sectionHeader(page: Page, sectionId: string): Locator {
@@ -347,30 +372,20 @@ async function walkDesktop(
     // 페이지 탭이 어느 하위 탭으로 착지하는지는 활성 워크스페이스가 정한다
     // (기본 '스토리보드' 프로필은 미니맵으로 연다). 그래서 세 하위 패널 중
     // 하나가 보이면 통과로 본다 — 아래에서 착지 지점을 따로 기록한다.
-    for (const [tab, label, panelLabel] of [
-      ["properties", "속성", "선택 요소 속성|시작 안내|그리기 도구 설정|전문 픽셀 도구"],
-      ["layers", "레이어", "레이어"],
-      ["document", "페이지", "캔버스 설정|페이지 색보정|미니맵과 페이지 탐색"],
-      ["publish", "작품 정보", "작품 정보"],
+    for (const [tab, label, panelLabels] of [
+      ["properties", "속성", ["선택 요소 속성", "시작 안내", "그리기 도구 설정", "전문 픽셀 도구"]],
+      ["layers", "레이어", ["레이어"]],
+      ["document", "페이지", ["캔버스 설정", "페이지 색보정", "미니맵과 페이지 탐색"]],
+      ["publish", "작품 정보", ["작품 정보"]],
     ] as const) {
       const selected = await selectPrimaryTab(page, tab);
+      const panel = await controlledPanel(page, primaryTab(page, tab), panelLabels);
       // 탭패널은 lazy 마운트/트랜지션을 지날 수 있으므로 잠깐 폴링한다.
       let visible = false;
       for (let attempt = 0; attempt < 20 && !visible; attempt += 1) {
-        visible = await page.evaluate(
-          ({ panelSelector, pattern }) => {
-            const aside = document.querySelector<HTMLElement>(panelSelector);
-            if (!aside) return false;
-            const expression = new RegExp(pattern, "u");
-            return [...aside.querySelectorAll<HTMLElement>('[role="tabpanel"]')].some(
-              (node) =>
-                !node.hidden
-                && expression.test(node.getAttribute("aria-label") ?? "")
-                && node.getBoundingClientRect().height > 2,
-            );
-          },
-          { panelSelector: PANEL, pattern: panelLabel },
-        );
+        visible = await panel.isVisible().catch(() => false)
+          && (await panel.boundingBox())?.height !== undefined
+          && ((await panel.boundingBox())?.height ?? 0) > 2;
         if (!visible) await page.waitForTimeout(250);
       }
       record(rows, {
@@ -379,7 +394,7 @@ async function walkDesktop(
         path: `인스펙터 탭 스트립 → ${label}`,
         verdict: selected && visible ? "reachable" : "blocked",
         effect: selected
-          ? `aria-selected=true, 대응 탭패널(${panelLabel.split("|")[0]}) 표시됨=${visible}`
+          ? `aria-selected=true, 대응 탭패널(${panelLabels[0]}) 표시됨=${visible}`
           : "탭이 선택되지 않음",
         defect: selected && !visible ? "탭은 선택되지만 대응 패널이 보이지 않는다" : undefined,
       });
@@ -466,7 +481,7 @@ async function walkDesktop(
     });
 
     await selectDocumentTab(page, "캔버스");
-    const canvasPanel = page.locator(`${PANEL} [role="tabpanel"][aria-label="캔버스 설정"]`);
+    const canvasPanel = await controlledPanel(page, documentTab(page, "캔버스"), ["캔버스 설정"]);
     await canvasPanel.waitFor({ state: "visible", timeout: 8_000 });
     report.desktop.canvasPanelCollapsed = (await measure(canvasPanel)).height;
 
@@ -672,7 +687,7 @@ async function walkDesktop(
     /* ---- C. 페이지 ▸ 색보정 / 미니맵 ------------------------------------ */
 
     if (await selectDocumentTab(page, "색보정")) {
-      const gradePanel = page.locator(`${PANEL} [role="tabpanel"][aria-label="페이지 색보정"]`);
+      const gradePanel = await controlledPanel(page, documentTab(page, "색보정"), ["페이지 색보정"]);
       const gradeToggle = gradePanel.locator('button[aria-expanded="false"]').first();
       const hadDisclosure = (await gradeToggle.count()) > 0;
       if (hadDisclosure) await gradeToggle.click();
@@ -737,7 +752,7 @@ async function walkDesktop(
     /* ---- E. 레이어 ------------------------------------------------------ */
 
     await selectPrimaryTab(page, "layers");
-    const layersPanel = page.locator(`${PANEL} [role="tabpanel"][aria-label="레이어"]`);
+    const layersPanel = await controlledPanel(page, primaryTab(page, "layers"), ["레이어"]);
     const layerNavigatorMounted = await layersPanel
       .locator("section, ul, [role='tree'], [role='listbox']")
       .first()
@@ -758,13 +773,19 @@ async function walkDesktop(
     const coach = page.locator('[data-testid="studio-inspector-empty-coach"]');
     const coachVisible = await coach.isVisible().catch(() => false);
     if (coachVisible) {
-      for (const name of ["펜으로 그리기", "선택 도구", "레이어 패널", "기능 튜토리얼"]) {
+      for (const [name, accessibleName] of [
+        ["펜으로 그리기", "펜으로 그리기"],
+        ["선택 도구", "선택 도구"],
+        ["레이어 패널", "레이어 패널 열기"],
+        ["이미지 편집", "이미지 편집 · 전문 도구 열기"],
+        ["사용법 따라 하기", "스튜디오 사용법 따라 하기"],
+      ] as const) {
         record(rows, {
           control: `시작 안내 · ${name}`,
           state: "속성 탭 · 선택 없음 · 그리기 아님",
           path: "속성 탭 → 카드 버튼 (2 스텝)",
           verdict:
-            (await coach.getByRole("button", { name: new RegExp(name, "u") }).count()) > 0
+            (await coach.getByRole("button", { name: accessibleName, exact: true }).count()) > 0
               ? "reachable"
               : "blocked",
           effect: "빈 상태에서 다음 행동을 제안하는 카드로 노출됨",
@@ -795,25 +816,80 @@ async function walkDesktop(
 
     const drawingPanel = page.locator('[data-testid="studio-inspector-context-drawing-panel"]');
     if (await drawingPanel.isVisible().catch(() => false)) {
-      const presetGroup = drawingPanel.getByRole("group", { name: "브러시 크기 프리셋" });
-      // 도구 속성 팔레트는 lazy 다 — Suspense fallback 동안에도 컨테이너는 보인다.
-      const presetVisible = await presetGroup
-        .waitFor({ state: "visible", timeout: 15_000 })
-        .then(() => true)
-        .catch(() => false);
+      let presetGroup = drawingPanel.getByRole("group", { name: "브러시 크기 프리셋" });
+      let presetSurface = drawingPanel;
+      // 전체 팔레트 모드에서는 컨트롤이 인라인이지만, 기본 icon-popup 모드에서는
+      // 도구 속성 런처를 먼저 열어야 한다. 숨은 DOM을 직접 찾지 말고 실제 사용자 경로를 밟는다.
+      let presetVisible = await presetGroup.isVisible().catch(() => false);
+      let presetPath = "펜 도구(B) → 속성 탭 → 프리셋 클릭 (2 스텝)";
+      if (!presetVisible) {
+        const trigger = drawingPanel.locator(
+          '[data-studio-drawing-palette-icon-trigger="tool-properties"]',
+        ).first();
+        // drawingPanel 자체가 먼저 보이고 palette stack은 lazy/Suspense 뒤에 붙을 수 있다.
+        // 즉시 isVisible 한 번으로 icon-popup 모드를 놓치지 않도록 런처를 제한 시간 기다린다.
+        const triggerVisible = await trigger
+          .waitFor({ state: "visible", timeout: 15_000 })
+          .then(() => true)
+          .catch(() => false);
+        if (triggerVisible) {
+          await trigger.click();
+          const popup = page.locator(
+            '[data-studio-drawing-palette-overlay="palette"]'
+              + '[data-studio-drawing-palette-overlay-id="tool-properties"]',
+          );
+          const popupVisible = await popup
+            .waitFor({ state: "visible", timeout: 8_000 })
+            .then(() => true)
+            .catch(() => false);
+          if (popupVisible) {
+            presetSurface = popup;
+            presetGroup = popup.getByRole("group", { name: "브러시 크기 프리셋" });
+            presetVisible = await presetGroup
+              .waitFor({ state: "visible", timeout: 15_000 })
+              .then(() => true)
+              .catch(() => false);
+            presetPath = "펜 도구(B) → 도구 속성 팝업 → 프리셋 클릭 (3 스텝)";
+          }
+        } else {
+          // 저장된 프레젠테이션이 full이면 런처 없이 인라인 팔레트가 늦게 나타난다.
+          presetVisible = await presetGroup
+            .waitFor({ state: "visible", timeout: 15_000 })
+            .then(() => true)
+            .catch(() => false);
+        }
+      }
       let sizeApplied = false;
+      let presetDiagnostics = "preset group not visible";
       if (presetVisible) {
         const target = presetGroup.getByRole("button", { name: "브러시 크기 30px" });
+        const readPresetState = async () => ({
+          pressed: await presetGroup
+            .locator('button[aria-pressed="true"]')
+            .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
+          range: await presetSurface.locator('input[type="range"]').first().inputValue(),
+        });
+        const before = await readPresetState();
         await target.scrollIntoViewIfNeeded().catch(() => undefined);
         await target.click();
-        sizeApplied = (await target.getAttribute("aria-pressed")) === "true";
+        // React가 같은 클릭에서 도구 메모리와 최근 크기 목록을 함께 갱신한다. 프로덕션
+        // 번들/느린 CI에서는 커밋이 Playwright click 반환보다 한 프레임 늦을 수 있으므로,
+        // 즉시 읽기 한 번으로 정상 동작을 실패 처리하지 않고 짧고 제한된 시간만 관찰한다.
+        const pressedDeadline = Date.now() + 2_000;
+        do {
+          sizeApplied = (await target.getAttribute("aria-pressed")) === "true";
+          if (sizeApplied) break;
+          await page.waitForTimeout(50);
+        } while (Date.now() < pressedDeadline);
+        const after = await readPresetState();
+        presetDiagnostics = `before=${JSON.stringify(before)}; after=${JSON.stringify(after)}`;
       }
       record(rows, {
         control: "브러시 크기 프리셋 그리드",
         state: "속성 탭 · 그리기 도구",
-        path: "펜 도구(B) → 속성 탭 → 프리셋 클릭 (2 스텝)",
+        path: presetPath,
         verdict: presetVisible ? "reachable" : "blocked",
-        effect: `30px 프리셋 클릭 후 aria-pressed=true 로 적용됨=${sizeApplied}`,
+        effect: `30px 프리셋 클릭 후 aria-pressed=true 로 적용됨=${sizeApplied}; ${presetDiagnostics}`,
         defect: presetVisible && !sizeApplied ? "프리셋 클릭이 활성 크기를 바꾸지 않는다" : undefined,
       });
 
@@ -1085,7 +1161,7 @@ async function walkMobile(
     });
 
     const launcher = page.locator(
-      'nav[aria-label="스튜디오 모바일 도구막대"] button[aria-label="속성·레이어·페이지·작품 정보 패널 열기"]',
+      'nav[aria-label="스튜디오 모바일 도구막대"] button[aria-label="작업 패널"]',
     );
     const launcherInitiallyVisible = await launcher.evaluate((element) => {
       const bounds = element.getBoundingClientRect();
@@ -1155,7 +1231,7 @@ async function walkMobile(
 
     await selectPrimaryTab(page, "document");
     await selectDocumentTab(page, "캔버스");
-    const canvasPanel = page.locator(`${PANEL} [role="tabpanel"][aria-label="캔버스 설정"]`);
+    const canvasPanel = await controlledPanel(page, documentTab(page, "캔버스"), ["캔버스 설정"]);
     if (await canvasPanel.isVisible().catch(() => false)) {
       report.mobile.canvasPanelCollapsed = (await measure(canvasPanel)).height;
       const collapsedHeaders = await page

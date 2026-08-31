@@ -3,6 +3,7 @@ import {
   Layers3,
   Map,
   PaintBucket,
+  PanelRightOpen,
   PanelsTopLeft,
   Search,
   Send,
@@ -18,16 +19,22 @@ import {
   type ReactNode,
 } from "react";
 
+import { requestStudioInspectorFocus } from "./studio-inspector-focus";
 import {
   filterStudioInspectorActions,
   navigateStudioInspector,
   studioInspectorActions,
   type StudioDocumentInspectorSection,
   type StudioImageInspectorSection,
+  type StudioInspectorAction,
   type StudioInspectorLayout,
   type StudioInspectorPrimarySection,
   type StudioInspectorRoute,
 } from "./studio-inspector-layout";
+import {
+  createStudioInspectorTabA11y,
+  type StudioInspectorTabA11y,
+} from "./studio-inspector-tab-a11y";
 import {
   STUDIO_FOCUS_RING,
   StudioContextPill,
@@ -38,9 +45,12 @@ import { cn } from "@/lib/utils";
 
 export interface StudioInspectorNavigatorProps {
   layout: StudioInspectorLayout;
+  tabA11y?: StudioInspectorTabA11y;
   selectedType: string | null;
   selectionLabel: string | null;
+  selectionCount?: number;
   drawing: boolean;
+  drawingToolPropertiesAvailable?: boolean;
   /**
    * CSP의 도구 팔레트처럼 대상이 아직 없어도 전문 도구를 찾고 준비 조건을 확인할 수
    * 있게 한다. 생략하면 기존 선택 타입 기반 동작을 유지한다.
@@ -96,6 +106,11 @@ function safeLayerCount(value: number): number {
   return Math.floor(value);
 }
 
+function safeSelectionCount(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.floor(value);
+}
+
 function moveTabFocus(event: ReactKeyboardEvent<HTMLButtonElement>) {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   const tabList = event.currentTarget.closest<HTMLElement>('[role="tablist"]');
@@ -125,17 +140,20 @@ function moveTabFocus(event: ReactKeyboardEvent<HTMLButtonElement>) {
 function contextualSummary({
   layout,
   selectionLabel,
+  selectionCount,
   drawing,
 }: Pick<
   StudioInspectorNavigatorProps,
-  "layout" | "selectionLabel" | "drawing"
+  "layout" | "selectionLabel" | "selectionCount" | "drawing"
 >): string {
   if (layout.primary === "layers") return "순서·그룹·표시 상태";
   if (layout.primary === "document") {
     return DOCUMENT_TABS.find((tab) => tab.id === layout.document)?.label ?? "페이지";
   }
   if (layout.primary === "publish") return "초안·게시 공통 정보";
+  if ((selectionCount ?? 0) > 1) return `${selectionCount}개 요소`;
   if (selectionLabel) return selectionLabel;
+  if ((selectionCount ?? 0) > 0) return "요소";
   if (drawing) return "그리기 도구";
   // Empty canvas coaching — competitive apps never leave a dead "select something" dead-end.
   return "B 펜 · V 선택 · 빈 화면에서 바로 그리기";
@@ -143,9 +161,12 @@ function contextualSummary({
 
 export function StudioInspectorNavigator({
   layout,
+  tabA11y: providedTabA11y,
   selectedType,
   selectionLabel,
+  selectionCount = 0,
   drawing,
+  drawingToolPropertiesAvailable,
   imageToolsAvailable,
   imageToolsStatusLabel,
   imageToolsStatusDescription,
@@ -156,18 +177,22 @@ export function StudioInspectorNavigator({
   onChange,
 }: StudioInspectorNavigatorProps) {
   const titleId = useId();
+  const tabA11y = providedTabA11y ?? createStudioInspectorTabA11y(titleId);
   const searchInputId = useId();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchToggleRef = useRef<HTMLButtonElement>(null);
+  const propertiesTabRef = useRef<HTMLButtonElement>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const hasSelection = selectedType !== null;
+  const normalizedSelectionCount = safeSelectionCount(selectionCount);
+  const hasSelection = selectedType !== null || normalizedSelectionCount > 0;
   const resolvedImageToolsAvailable =
     imageToolsAvailable ?? (selectedType === "image" || selectedType === "draw");
   const actions = studioInspectorActions({
     hasSelection,
     selectedType,
     drawing,
+    drawingToolPropertiesAvailable,
     imageToolsAvailable: resolvedImageToolsAvailable,
   });
   const results = filterStudioInspectorActions(actions, query);
@@ -176,15 +201,23 @@ export function StudioInspectorNavigator({
   const shouldShowImageInspectorTabs =
     layout.primary === "properties" && !drawing && resolvedImageToolsAvailable;
   const activeImageInspectorTab = layout.image;
+  const imagePanelId = selectedType === "image" || selectedType === "draw"
+    ? tabA11y.imagePanels.selected
+    : tabA11y.imagePanels.unselected;
   const imageToolsStatusId = `${titleId}-image-tools-status`;
 
-  function navigate(route: StudioInspectorRoute, restoreSearchFocus = false) {
+  function navigate(
+    route: StudioInspectorRoute,
+    restoreSearchFocus = false,
+    focusTarget?: StudioInspectorAction["focusTarget"],
+  ) {
     onChange(navigateStudioInspector(layout, route));
     setSearchOpen(false);
     setQuery("");
-    if (restoreSearchFocus) {
-      globalThis.requestAnimationFrame?.(() => searchToggleRef.current?.focus());
-    }
+    globalThis.requestAnimationFrame?.(() => {
+      if (focusTarget) requestStudioInspectorFocus(focusTarget);
+      else if (restoreSearchFocus) searchToggleRef.current?.focus();
+    });
   }
 
   function openSearch() {
@@ -198,7 +231,15 @@ export function StudioInspectorNavigator({
     globalThis.requestAnimationFrame?.(() => searchToggleRef.current?.focus());
   }
 
-  const summary = contextualSummary({ layout, selectionLabel, drawing });
+  const summary = contextualSummary({
+    layout,
+    selectionLabel,
+    selectionCount: normalizedSelectionCount,
+    drawing,
+  });
+  const selectionSummary = normalizedSelectionCount > 1
+    ? `${normalizedSelectionCount}개 요소`
+    : selectionLabel ?? "요소";
   const summaryTone =
     layout.primary === "publish"
       ? "accent"
@@ -237,12 +278,13 @@ export function StudioInspectorNavigator({
             aria-label={searchOpen ? "패널 찾기 닫기" : "패널과 기능 찾기"}
             title="패널과 기능 찾기"
             className={cn(
-              "grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors duration-150 hover:border-line-strong hover:bg-raised hover:text-fg lg:size-8 lg:rounded-md",
+              "inline-flex min-h-11 shrink-0 items-center justify-center gap-1 rounded-lg border border-line px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors duration-150 hover:border-line-strong hover:bg-raised hover:text-fg lg:min-h-8 lg:rounded-md",
               searchOpen && "border-accent bg-accent-soft text-accent",
               tabFocusClass
             )}
           >
             {searchOpen ? <X size={15} strokeWidth={1.75} aria-hidden /> : <Search size={15} strokeWidth={1.75} aria-hidden />}
+            <span>{searchOpen ? "닫기" : "찾기"}</span>
           </button>
           {onRequestClose ? (
             <button
@@ -261,6 +303,39 @@ export function StudioInspectorNavigator({
         </div>
       </div>
 
+      {(hasSelection || drawing) && layout.primary !== "properties" ? (
+        <button
+          type="button"
+          onClick={() => {
+            navigate({ primary: "properties" });
+            globalThis.requestAnimationFrame?.(() => {
+              propertiesTabRef.current?.focus({ preventScroll: true });
+            });
+          }}
+          className={cn(
+            "my-2 flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-accent/35 bg-accent-soft px-2.5 py-2 text-left transition-colors hover:border-accent/65 hover:bg-accent-soft/80",
+            tabFocusClass,
+          )}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="grid size-7 shrink-0 place-items-center rounded-md bg-accent text-on-accent">
+              <PanelRightOpen size={14} aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-[0.7rem] font-bold text-fg">
+                {hasSelection
+                  ? `${selectionSummary} 편집`
+                  : "현재 도구 설정"}
+              </span>
+              <span className="block truncate text-[0.6rem] text-fg-3">
+                {hasSelection ? "선택한 대상의 속성을 바로 엽니다" : "브러시와 그리기 옵션을 바로 엽니다"}
+              </span>
+            </span>
+          </span>
+          <span className="shrink-0 text-[0.65rem] font-bold text-accent">속성 열기</span>
+        </button>
+      ) : null}
+
       <div
         role="tablist"
         aria-label="스튜디오 작업 패널"
@@ -272,10 +347,17 @@ export function StudioInspectorNavigator({
           return (
             <button
               key={tab.id}
+              ref={tab.id === "properties" ? propertiesTabRef : undefined}
+              id={tabA11y.primary[tab.id].tabId}
               type="button"
               data-studio-inspector-primary-tab={tab.id}
               role="tab"
               aria-selected={active}
+              aria-controls={
+                tab.id === "document"
+                  ? tabA11y.document[layout.document].panelId
+                  : tabA11y.primary[tab.id].panelId
+              }
               tabIndex={active ? 0 : -1}
               onClick={() => navigate({ primary: tab.id })}
               onKeyDown={moveTabFocus}
@@ -317,9 +399,11 @@ export function StudioInspectorNavigator({
             return (
               <button
                 key={tab.id}
+                id={tabA11y.imageTabs[tab.id]}
                 type="button"
                 role="tab"
                 aria-selected={active}
+                aria-controls={imagePanelId}
                 aria-describedby={
                   active && imageToolsStatusLabel ? imageToolsStatusId : undefined
                 }
@@ -368,9 +452,11 @@ export function StudioInspectorNavigator({
             return (
               <button
                 key={tab.id}
+                id={tabA11y.document[tab.id].tabId}
                 type="button"
                 role="tab"
                 aria-selected={active}
+                aria-controls={tabA11y.document[tab.id].panelId}
                 tabIndex={active ? 0 : -1}
                 onClick={() => navigate({ primary: "document", document: tab.id })}
                 onKeyDown={moveTabFocus}
@@ -417,10 +503,10 @@ export function StudioInspectorNavigator({
                   closeSearch();
                 } else if (event.key === "Enter" && results[0]) {
                   event.preventDefault();
-                  navigate(results[0].route, true);
+                  navigate(results[0].route, true, results[0].focusTarget);
                 }
               }}
-              placeholder="채우기, 마스크, 게시…"
+              placeholder="속성, 도구, 도움말 검색…"
               autoComplete="off"
               className={cn(
                 "min-h-11 w-full bg-panel py-2 pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3",
@@ -437,19 +523,35 @@ export function StudioInspectorNavigator({
                 <button
                   key={action.id}
                   type="button"
-                  onClick={() => navigate(action.route, true)}
+                  onClick={() => navigate(action.route, true, action.focusTarget)}
                   className={cn(
                     "flex min-h-11 w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors duration-150 hover:bg-raised",
                     tabFocusClass
                   )}
                 >
                   <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-accent-soft text-accent">
-                    <FileUp size={13} aria-hidden />
+                    {action.kind === "property" ? (
+                      <SlidersHorizontal size={13} aria-hidden />
+                    ) : action.kind === "tool" ? (
+                      <Sparkles size={13} aria-hidden />
+                    ) : (
+                      <FileUp size={13} aria-hidden />
+                    )}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-xs font-semibold text-fg-2">
-                      {action.label}
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-xs font-semibold text-fg-2">
+                        {action.label}
+                      </span>
+                      <span className="shrink-0 rounded bg-canvas/70 px-1 py-0.5 text-[0.52rem] font-bold text-fg-3">
+                        {action.kind === "property" ? "속성" : action.kind === "tool" ? "도구" : "패널"}
+                      </span>
                     </span>
+                    {action.path ? (
+                      <span className="mt-0.5 block truncate text-[0.58rem] font-medium text-accent/85">
+                        {action.path}
+                      </span>
+                    ) : null}
                     <span className="mt-0.5 block text-[0.62rem] leading-relaxed text-fg-3">
                       {action.description}
                     </span>

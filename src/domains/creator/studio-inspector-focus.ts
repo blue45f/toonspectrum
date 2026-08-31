@@ -19,9 +19,21 @@
 
 /** Targets a menu row can point at. Extend deliberately — each needs a mount. */
 export const STUDIO_INSPECTOR_FOCUS_TARGETS = [
+  "element.text-fill",
+  "element.typography",
+  "element.text-align",
+  "element.layout",
+  "element.order-align",
+  "selection.geometry",
+  "palette.sub-tools",
+  "palette.tool-properties",
   "tool.brush-studio",
   "tool.brush-engines",
   "brush.saved-library",
+  "canvas.surface",
+  "canvas.resize",
+  "canvas.guide-lines",
+  "canvas.style",
 ] as const;
 
 export type StudioInspectorFocusTarget =
@@ -76,6 +88,23 @@ export function studioInspectorFocusTokenFor(
   target: StudioInspectorFocusTarget,
 ): number {
   return current?.target === target ? current.token : 0;
+}
+
+/**
+ * Clears one request after its target has honoured it.
+ *
+ * Both target and token must still match: a focus handler may synchronously
+ * publish a newer request, and acknowledging the older one must never erase
+ * that newer intent. Requests remain pending when no matching target is
+ * mounted because only the target binding calls this function.
+ */
+export function consumeStudioInspectorFocusRequest(
+  target: StudioInspectorFocusTarget,
+  token: number,
+): void {
+  if (current?.target !== target || current.token !== token) return;
+  current = null;
+  for (const listener of [...listeners]) listener();
 }
 
 /** Test seam — resets the bus between cases. */

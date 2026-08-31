@@ -366,13 +366,17 @@ describe("StudioMobileEditingDock", () => {
     const drawingToolbar = within(dock).getByRole("toolbar", { name: "드로잉 도구" });
     expect(drawingToolbar).toBeTruthy();
     const workspaceToggle = within(dock).getByRole<HTMLButtonElement>("button", {
-      name: "작업 공간 도구 펼치기",
+      name: "작업 메뉴",
     });
     expect(workspaceToggle.closest('[data-studio-mobile-dock-scroll="primary"]')).toBeNull();
+    expect(drawingToolbar.parentElement?.className).toContain("overflow-hidden");
     expect(drawingToolbar.parentElement?.nextElementSibling).toBe(workspaceToggle);
     expect(workspaceToggle.getAttribute("aria-controls")).toBe("studio-mobile-workspace-tools");
     expect(workspaceToggle.getAttribute("aria-expanded")).toBe("false");
-    expect(workspaceToggle.textContent).toBe("도구");
+    expect(workspaceToggle.textContent).toBe("작업 메뉴");
+    expect(workspaceToggle.getAttribute("aria-label")).toContain(
+      workspaceToggle.textContent,
+    );
     expect(workspaceToggle.className).toContain("min-h-11");
     expect(workspaceToggle.className).toContain("min-w-11");
     expect(workspaceToggle.className).toContain("flex-none");
@@ -380,10 +384,26 @@ describe("StudioMobileEditingDock", () => {
     expect(dock.querySelector("#studio-mobile-workspace-tools")?.hasAttribute("hidden")).toBe(true);
     fireEvent.click(workspaceToggle);
     expect(dock.getAttribute("data-studio-mobile-dock-expanded")).toBe("true");
-    expect(within(dock).getByRole("toolbar", { name: "작업 공간" })).toBeTruthy();
+    const workspaceToolbar = within(dock).getByRole("toolbar", { name: "작업 공간" });
+    expect(workspaceToolbar).toBeTruthy();
     expect(
-      within(dock).getByRole("button", { name: "작업 공간 도구 접기" }).getAttribute("aria-expanded"),
-    ).toBe("true");
+      within(workspaceToolbar).getByRole("button", {
+        name: "작업 패널",
+      }).textContent,
+    ).toBe("작업 패널");
+    const workspacePanelButton = within(workspaceToolbar).getByRole("button", {
+      name: "작업 패널",
+    });
+    expect(workspacePanelButton.getAttribute("aria-label")).toContain(
+      workspacePanelButton.textContent,
+    );
+    const expandedWorkspaceToggle = within(dock).getByRole("button", {
+      name: "접기 · 작업 메뉴",
+    });
+    expect(expandedWorkspaceToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(expandedWorkspaceToggle.getAttribute("aria-label")).toContain(
+      expandedWorkspaceToggle.textContent,
+    );
     fireEvent.click(within(dock).getByRole("button", { name: "선택" }));
     expect(dock.getAttribute("data-studio-mobile-dock-expanded")).toBe("false");
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "실행취소" }).disabled).toBe(true);
@@ -425,13 +445,13 @@ describe("StudioMobileEditingDock", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "작업 공간 도구 펼치기" }),
+      screen.getByRole("button", { name: "작업 메뉴" }),
     );
     const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
     const panelLauncher = within(workspace).getByRole("button", {
-      name: "속성·레이어·페이지·작품 정보 패널 열기",
+      name: "작업 패널",
     });
-    expect(panelLauncher.textContent).toBe("패널");
+    expect(panelLauncher.textContent).toBe("작업 패널");
     expect(
       panelLauncher.getAttribute("aria-haspopup"),
       panelLauncher.outerHTML,
@@ -458,7 +478,7 @@ describe("StudioMobileEditingDock", () => {
     fireEvent.click(
       within(screen.getByRole("toolbar", { name: "작업 공간" })).getByRole(
         "button",
-        { name: "속성·레이어·페이지·작품 정보 패널 열기" },
+        { name: "작업 패널" },
       ),
     );
     expect(stableHandlers.openInspectorRoute).toHaveBeenLastCalledWith(
@@ -480,7 +500,7 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     let workspace = screen.getByRole("toolbar", { name: "작업 공간" });
     const pages = within(workspace).getByRole("button", { name: "페이지 목록 열기" });
     expect(pages.textContent).toBe("페이지");
@@ -521,7 +541,7 @@ describe("StudioMobileEditingDock", () => {
     render(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
 
     const workspaceToggle = screen.getByRole("button", {
-      name: "작업 공간 도구 펼치기",
+      name: "작업 메뉴",
     });
     fireEvent.pointerEnter(workspaceToggle);
     fireEvent.pointerDown(workspaceToggle);
@@ -532,7 +552,7 @@ describe("StudioMobileEditingDock", () => {
     fireEvent.click(workspaceToggle);
     const workButton = within(
       screen.getByRole("toolbar", { name: "작업 공간" }),
-    ).getByRole("button", { name: "속성·레이어·페이지·작품 정보 패널 열기" });
+    ).getByRole("button", { name: "작업 패널" });
     fireEvent.pointerEnter(workButton);
     fireEvent.pointerDown(workButton);
     fireEvent.focus(workButton);
@@ -595,14 +615,14 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
     const comment = within(workspace).getByRole<HTMLButtonElement>("button", {
       name: "캔버스 위치 댓글",
     });
     const scrollLane = workspace.querySelector('[data-studio-mobile-dock-scroll="secondary"]');
     const panelLauncher = within(scrollLane as HTMLElement).getByRole("button", {
-      name: "속성·레이어·페이지·작품 정보 패널 열기",
+      name: "작업 패널",
     });
     const quickSlot = workspace.querySelector('[data-studio-mobile-quick-actions-slot="left"]');
     expect(workspace.getAttribute("data-studio-mobile-control-side")).toBe("left");
@@ -654,13 +674,13 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
     const comment = within(workspace).getByRole("button", { name: "캔버스 위치 댓글" });
     const quickSlot = workspace.querySelector('[data-studio-mobile-quick-actions-slot="right"]');
     const scrollLane = workspace.querySelector('[data-studio-mobile-dock-scroll="secondary"]');
     const panelLauncher = within(scrollLane as HTMLElement).getByRole("button", {
-      name: "속성·레이어·페이지·작품 정보 패널 열기",
+      name: "작업 패널",
     });
 
     expect(workspace.getAttribute("data-studio-mobile-control-side")).toBe("right");
@@ -1131,7 +1151,7 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     fireEvent.click(screen.getByRole("button", { name: "색각·명암 검수" }));
     expect(setMobileSheet).toHaveBeenCalledOnce();
 
@@ -1330,6 +1350,7 @@ describe("StudioMobileEditingDock", () => {
     within(toolbar).getByRole("button", { name: "해제" }).click();
 
     expect(stableHandlers.openInspectorRoute).toHaveBeenCalledWith({ primary: "properties" }, "props");
+    expect(setMobileSheet).toHaveBeenCalledWith("props");
     expect(stableHandlers.duplicateSelected).toHaveBeenCalledOnce();
     expect(stableHandlers.reorder).toHaveBeenNthCalledWith(1, "front");
     expect(stableHandlers.reorder).toHaveBeenNthCalledWith(2, "back");
@@ -1467,7 +1488,7 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
     const filter = within(workspace).getByRole<HTMLSelectElement>("combobox", {
       name: "현재 페이지 합성본 필터 선택",
@@ -1491,7 +1512,7 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     let unavailableFilter = within(
       screen.getByRole("toolbar", { name: "작업 공간" }),
     ).getByRole<HTMLButtonElement>("button", {

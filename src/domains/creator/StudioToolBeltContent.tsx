@@ -85,7 +85,7 @@ const TOOL_BELT_HINTS = {
     "assets"
   ),
   panelAdd: studioToolHintFromLabel(
-    "패널 추가",
+    "컷 패널 추가",
     "현재 페이지에 새 사각 패널을 추가해 다음 컷을 배치합니다.",
     undefined,
     "panel-layout",

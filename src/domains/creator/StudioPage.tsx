@@ -418,6 +418,7 @@ import { alignStudioSelection, type StudioAlignMode } from "./studio-cuttoon-edi
 import { createStudioAutoActionsController } from "./studio-auto-actions-controller";
 import { createStudioDrawingAssistHandlers } from "./studio-drawing-assist-handlers";
 import { useStudioRafPreview } from "./studio-raf-preview";
+import { shouldStartStudioSpacePan } from "./studio-space-pan-shortcut";
 import {
   markAllStudioTeamCommentThreadsRead,
   markStudioTeamCommentThreadRead,
@@ -475,6 +476,7 @@ import { pickColorFromImageData } from "./studio-eyedropper";
 import {
   planStudioSelectionFlip,
   planStudioSelectionLayoutPatch,
+  planStudioMultiSelectionLayoutPatch,
   planStudioZoomToSelection,
   selectStudioFigmaDesignTargets,
   type StudioFigmaSelectionLayoutPatch,
@@ -4646,6 +4648,9 @@ function StudioCuttoonEditor({
   const colorVisionSheetRef = useRef<HTMLElement>(null);
   const brushManagerReturnFocusRef = useRef<HTMLButtonElement>(null);
   const mobileBrushDockButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileInspectorSelectionReturnFocusRef = useRef(false);
+  const mobileInspectorNoFallbackReturnFocusRef = useRef<HTMLButtonElement>(null);
+  const previousModalMobileSheetForReturnFocusRef = useRef<StudioMobileSheet>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const studioRootRef = useRef<HTMLDivElement>(null);
   const previousMobileSheetRef = useRef<typeof mobileSheet>(null);
@@ -4687,6 +4692,13 @@ function StudioCuttoonEditor({
     route: StudioInspectorRoute,
     mobileSheetTarget: StudioMobileSheet | null = isMobile ? "props" : null
   ) {
+    if (mobileSheetTarget === "props") {
+      mobileInspectorSelectionReturnFocusRef.current =
+        document.activeElement instanceof HTMLElement
+        && document.activeElement.matches(
+          '[data-studio-selection-properties-trigger="true"]'
+        );
+    }
     selectInspectorRoute(route);
     setRightPanelOpenWithOverride(true);
     if (mobileSheetTarget !== null) {
@@ -4724,7 +4736,10 @@ function StudioCuttoonEditor({
   useStudioModalSheet({
     activeKey: modalMobileSheet,
     dialogRef: modalMobileSheetRef,
-    fallbackReturnFocusRef: mobileBrushDockButtonRef,
+    fallbackReturnFocusRef:
+      modalMobileSheet === "props" && mobileInspectorSelectionReturnFocusRef.current
+        ? mobileInspectorNoFallbackReturnFocusRef
+        : mobileBrushDockButtonRef,
     onDismiss: dismissActiveMobileSheet,
     resolveInitialFocus: (dialog) => {
       const preferredTarget =
@@ -4750,6 +4765,23 @@ function StudioCuttoonEditor({
     },
     rootRef: studioRootRef,
   });
+  useLayoutEffect(() => {
+    const previousModalMobileSheet = previousModalMobileSheetForReturnFocusRef.current;
+    previousModalMobileSheetForReturnFocusRef.current = modalMobileSheet;
+    if (previousModalMobileSheet !== "props" || modalMobileSheet !== null) return;
+    const restoreSelectionProperties = mobileInspectorSelectionReturnFocusRef.current;
+    mobileInspectorSelectionReturnFocusRef.current = false;
+    if (!restoreSelectionProperties || !isMobile || mobileSheet !== null) return;
+    const focusTarget =
+      studioRootRef.current?.querySelector<HTMLElement>(
+        '[data-studio-selection-properties-trigger="true"]'
+      )
+      ?? studioRootRef.current?.querySelector<HTMLElement>(
+        '[data-studio-mobile-workspace-toggle="true"]'
+      );
+    if (!focusTarget || focusTarget.closest("[hidden], [inert], [aria-hidden='true']")) return;
+    focusTarget.focus({ preventScroll: true });
+  }, [isMobile, mobileSheet, modalMobileSheet]);
   // 브러시 설정은 캔버스를 보며 조절하는 비모달 시트다. 포커스 루프와 배경 inert는 적용하지
   // 않되, 열고 닫을 때만 진입점과 트리거를 보존해 키보드 사용자가 숨은 시트에 남지 않게 한다.
   useLayoutEffect(() => {
@@ -8879,10 +8911,12 @@ function StudioCuttoonEditor({
   // Space 키 누름에 따른 화면 팬(Pan) 모드 활성화 리스너
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target instanceof HTMLElement ? e.target : null;
-      const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-      if (typing || editing) return;
-      if (e.code === "Space" && !isSpacePressed) {
+      if (shouldStartStudioSpacePan({
+        code: e.code,
+        editing: Boolean(editing),
+        isSpacePressed,
+        target: e.target,
+      })) {
         e.preventDefault();
         setIsSpacePressed(true);
       }
@@ -20227,7 +20261,18 @@ const puppetWarpArmed =
   }
 
   function applyFigmaSelectionLayoutPatch(patch: StudioFigmaSelectionLayoutPatch) {
-    if (!selected || marqueeIds.length > 0) return;
+    if (marqueeIds.length > 1) {
+      const targets = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
+      if (targets.some((element) => isEffectivelyLocked(element, groups))) {
+        setError("잠긴 레이어가 포함되어 있어 함께 수정할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
+        return;
+      }
+      const next = planStudioMultiSelectionLayoutPatch(elements, marqueeIds, patch);
+      if (!next || !commit(next)) return;
+      announceDrawingShortcut(`${targets.length}개 요소 속성을 함께 변경했어요`);
+      return;
+    }
+    if (!selected) return;
     if (isEffectivelyLocked(selected, groups)) {
       setError("잠긴 레이어는 수정할 수 없어요.");
       return;

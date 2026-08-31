@@ -325,7 +325,16 @@ async function measureTopChrome(page: Page, mode: ShellMode): Promise<TopChromeM
     const presenceDock = document.querySelector('[data-studio-presence-dock="true"]');
 
     const containers: Element[] = [];
-    for (const candidate of [siteHeader, menubar, statusRail, toolBelt, presenceDock]) {
+    // The bottom editing dock participates in the same overlap/hit-test pass. In particular,
+    // its fixed workspace disclosure must not sit above controls in the adjacent scroll lane.
+    for (const candidate of [
+      siteHeader,
+      menubar,
+      statusRail,
+      toolBelt,
+      presenceDock,
+      mobileDock,
+    ]) {
       if (candidate && isVisible(candidate)) containers.push(candidate);
     }
 
@@ -552,8 +561,10 @@ async function measureTopChrome(page: Page, mode: ShellMode): Promise<TopChromeM
         }
       }
       for (const row of rows) {
+        const mobileScrollHost = row.closest("[data-studio-mobile-scroll-host]");
         const hasFade = Boolean(
-          row.querySelector("[class*='bg-gradient-to-r'], [class*='bg-gradient-to-l']"),
+          row.querySelector("[class*='bg-gradient-to-r'], [class*='bg-gradient-to-l']")
+          || mobileScrollHost?.querySelector("[data-studio-mobile-scroll-cue]"),
         );
         const scrollbarVisible = getComputedStyle(row).scrollbarWidth !== "none";
         if (!hasFade && !scrollbarVisible) {

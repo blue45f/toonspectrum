@@ -299,6 +299,9 @@ describe("Studio drawing palette workspace integration boundary", () => {
     expect(inspectorDrawingSurface).toContain(
       'mobilePrimaryPaletteId={\n                    isMobile ? "tool-properties" : undefined',
     );
+    expect(inspectorDrawingSurface).toContain(
+      'defaultPresentation={isMobile ? "full" : "icon-popup"}',
+    );
     expect(inspectorDrawingSurface).toContain("mobileHeaderAction={");
     expect(stackSource).toContain("readonly cancelEpoch?: number;");
     expect(stackSource).toContain(

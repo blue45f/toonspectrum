@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import type { StudioInspectorAsideModel } from "./useStudioInspectorAsideModel";
 
 export function StudioInspectorEmptyCoachSection({
@@ -13,17 +15,31 @@ export function StudioInspectorEmptyCoachSection({
     inspectorContentMode,
     inspectorLayout,
     openFeatureTutorial,
+    setUnselectedImageToolsVisible,
     setEyedropperActive,
     setTool,
+    unselectedImageToolsVisible,
   } = model;
+  const imageEditButtonRef = useRef<HTMLButtonElement>(null);
+  const previousImageToolsVisibleRef = useRef(unselectedImageToolsVisible);
+
+  useEffect(() => {
+    const wasVisible = previousImageToolsVisibleRef.current;
+    previousImageToolsVisibleRef.current = unselectedImageToolsVisible;
+    if (
+      wasVisible &&
+      !unselectedImageToolsVisible &&
+      inspectorContentMode === "empty"
+    ) {
+      imageEditButtonRef.current?.focus({ preventScroll: true });
+    }
+  }, [inspectorContentMode, unselectedImageToolsVisible]);
+
   return (
     <>
-          {inspectorContentMode === "empty" && (
+          {inspectorContentMode === "empty" && !unselectedImageToolsVisible && (
             <div
-              role="tabpanel"
-              aria-label="시작 안내"
               data-testid="studio-inspector-empty-coach"
-              hidden={inspectorLayout.primary !== "properties"}
               className="rounded-xl border border-line bg-panel/40 p-3"
             >
               <p className="text-xs font-bold tracking-tight text-fg">캔버스에서 바로 시작</p>
@@ -70,17 +86,34 @@ export function StudioInspectorEmptyCoachSection({
                   <span className="mt-0.5 block text-[0.62rem] font-medium text-fg-3">순서·표시</span>
                 </button>
                 <button
+                  ref={imageEditButtonRef}
                   type="button"
-                  aria-label="기능 튜토리얼 열기"
+                  aria-label="이미지 편집 · 전문 도구 열기"
                   className="min-h-11 rounded-lg border border-line bg-card px-2.5 py-2 text-left text-[0.72rem] font-semibold text-fg-2 transition-colors hover:border-accent/50 hover:bg-raised hover:text-fg"
                   onClick={() => {
-                    openFeatureTutorial(null);
+                    setUnselectedImageToolsVisible(true);
+                    changeInspectorLayout({
+                      ...inspectorLayout,
+                      primary: "properties",
+                      image: "quick",
+                    });
                   }}
                 >
-                  기능 튜토리얼
-                  <span className="mt-0.5 block text-[0.62rem] font-medium text-fg-3">따라 하기</span>
+                  이미지 편집
+                  <span className="mt-0.5 block text-[0.62rem] font-medium text-fg-3">선택·합성본 준비</span>
                 </button>
               </div>
+              <button
+                type="button"
+                aria-label="스튜디오 사용법 따라 하기"
+                className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-canvas/45 px-2.5 py-2 text-left text-[0.72rem] font-semibold text-fg-2 transition-colors hover:border-accent/50 hover:bg-raised hover:text-fg"
+                onClick={() => openFeatureTutorial(null)}
+              >
+                처음이라면 사용법 따라 하기
+                <span className="mt-0.5 block text-[0.62rem] font-medium text-fg-3">
+                  핵심 도구를 화면에서 차례로 안내해요
+                </span>
+              </button>
             </div>
           )}
     </>
