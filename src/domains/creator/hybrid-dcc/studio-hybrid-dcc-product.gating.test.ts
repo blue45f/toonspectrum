@@ -233,6 +233,8 @@ describe("product UI wiring", () => {
     );
     expect(menubar).toContain("setHybridDccOpen");
     expect(handoff).toContain("exportStudioHybridDccGlbBatch");
+    expect(handoff).toContain('glbExportExecutionBackend: "worker"');
+    expect(handoff).toContain("executionBackend: ports.glbExportExecutionBackend");
     expect(handoff).not.toContain("exportStudioHybridDccAuthorityRecordGlb");
     expect(menubar).toContain('data-studio-hybrid-dcc-open="true"');
     expect(existsSync(resolve(import.meta.dirname, "./StudioHybridDccDialog.tsx"))).toBe(true);

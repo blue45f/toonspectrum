@@ -411,7 +411,8 @@ export interface SurfaceTextureDabOperation {
   readonly interpolation: number;
   /** UV-continuous run. Misses and seams start a new run. */
   readonly run: number;
-  readonly projection: "primary" | "fallback";
+  /** The selected provider is the only projection authority for this operation. */
+  readonly projection: "primary";
   readonly u: number;
   readonly v: number;
   readonly x: number;
@@ -492,16 +493,12 @@ export interface SurfaceProjectionProvider {
   }): void;
 }
 
-export type SurfaceBrushMissPolicy = "break" | "reject" | "fallback";
-export type SurfaceBrushProviderFailurePolicy = "reject" | "fallback";
+export type SurfaceBrushMissPolicy = "break" | "reject";
 
 export interface ExecuteSurfaceBrushOptions {
   readonly signal?: AbortSignal;
   /** Default `break`: keep valid hits, split the UV run, and warn. */
   readonly missPolicy?: SurfaceBrushMissPolicy;
-  /** Provider exceptions reject by default; fallback is explicitly opt-in. */
-  readonly providerFailurePolicy?: SurfaceBrushProviderFailurePolicy;
-  readonly fallbackProvider?: SurfaceProjectionProvider;
   /** Absolute UV-atlas jump gate. Default max(64, minDimension * 0.25). */
   readonly seamBreakTexels?: number;
   /** Actual/expected texel motion gate when density is known. Default 4. */
@@ -516,10 +513,8 @@ export interface ExecuteSurfaceBrushOptions {
 
 export interface SurfaceBrushExecutionReceipt {
   readonly providerId: string;
-  readonly fallbackProviderId?: string;
   readonly inputSamples: number;
   readonly projectedSamples: number;
-  readonly fallbackSamples: number;
   readonly missedSamples: number;
   readonly runs: number;
   readonly seamBreaks: number;
@@ -614,7 +609,7 @@ const SURFACE_DEFAULT_MAX_OPERATIONS = 200_000;
 interface ResolvedSurfaceHit {
   readonly sample: ModeledSampleIR;
   readonly sampleIndex: number;
-  readonly projection: "primary" | "fallback";
+  readonly projection: "primary";
   readonly hit: SurfaceProjectionHit;
   readonly x: number;
   readonly y: number;
@@ -662,7 +657,6 @@ function assertSurfaceNotAborted(
 
 function readSurfaceTextureSize(
   provider: SurfaceProjectionProvider,
-  role: "primary" | "fallback",
 ): SurfaceTextureSize {
   let value: SurfaceTextureSize;
   try {
@@ -684,7 +678,7 @@ function readSurfaceTextureSize(
   ) {
     throw new CompositionExecutionError(
       `surface.provider[${surfaceProviderId(provider)}].textureSize`,
-      `${role} texture must be positive safe integers within ${SURFACE_TEXTURE_MAX_DIMENSION}²; ` +
+      `texture must be positive safe integers within ${SURFACE_TEXTURE_MAX_DIMENSION}²; ` +
         `received ${String(value.width)}×${String(value.height)}`,
     );
   }
@@ -968,10 +962,7 @@ function appendSurfaceSegment(
       sampleIndex: current.sampleIndex,
       interpolation: t,
       run,
-      projection:
-        current.projection === "fallback" || source.projection === "fallback"
-          ? "fallback"
-          : "primary",
+      projection: "primary",
       u: surfaceLerp(source.hit.u, current.hit.u, t),
       v: surfaceLerp(source.hit.v, current.hit.v, t),
       x: surfaceLerp(source.x, current.x, t),
@@ -1083,7 +1074,8 @@ function projectSurfaceSample(
  * Projection is sequential in sample order, UV seams split interpolation runs,
  * and the returned operation list is suitable for a retained GPU texture owner.
  * The CPU reference pixels make the path independently testable and provide a
- * deterministic fallback/export surface without GPU→CPU readback.
+ * deterministic export surface without GPU→CPU readback. They are not an
+ * alternate runtime provider.
  */
 export function executeSurfaceBrushStroke(
   brushProgram: BrushProgramIR,
@@ -1115,30 +1107,27 @@ export function executeSurfaceBrushStroke(
     );
   }
 
-  const missPolicy = options.missPolicy ?? "break";
-  const failurePolicy = options.providerFailurePolicy ?? "reject";
-  const fallbackProvider = options.fallbackProvider;
+  const legacyOptions = options as unknown as Record<string, unknown>;
   if (
-    (missPolicy === "fallback" || failurePolicy === "fallback") &&
-    fallbackProvider === undefined
+    legacyOptions.fallbackProvider !== undefined ||
+    legacyOptions.providerFailurePolicy !== undefined ||
+    legacyOptions.missPolicy === "fallback"
   ) {
     throw new CompositionExecutionError(
-      "surface.fallback",
-      "fallback policy requires options.fallbackProvider",
+      "surface.options",
+      "automatic fallback options are forbidden; surface execution is single-provider and fail-closed",
     );
   }
-  const providers = fallbackProvider ? [provider, fallbackProvider] : [provider];
-  assertSurfaceNotAborted(options.signal, stroke.id, 0, providers);
-  const size = readSurfaceTextureSize(provider, "primary");
-  if (fallbackProvider) {
-    const fallbackSize = readSurfaceTextureSize(fallbackProvider, "fallback");
-    if (fallbackSize.width !== size.width || fallbackSize.height !== size.height) {
-      throw new CompositionExecutionError(
-        "surface.fallback.textureSize",
-        `fallback ${fallbackSize.width}×${fallbackSize.height} does not address primary ${size.width}×${size.height}`,
-      );
-    }
+  const missPolicy = options.missPolicy ?? "break";
+  if (missPolicy !== "break" && missPolicy !== "reject") {
+    throw new CompositionExecutionError(
+      "surface.options",
+      `missPolicy must be break or reject; received ${String(missPolicy)}`,
+    );
   }
+  const providers = [provider];
+  assertSurfaceNotAborted(options.signal, stroke.id, 0, providers);
+  const size = readSurfaceTextureSize(provider);
   const seamBreakTexels = options.seamBreakTexels ?? Math.max(64, Math.min(size.width, size.height) * 0.25);
   const seamStretchRatio = options.seamStretchRatio ?? 4;
   const maxOperations = options.maxOperations ?? SURFACE_DEFAULT_MAX_OPERATIONS;
@@ -1174,7 +1163,6 @@ export function executeSurfaceBrushStroke(
   let pendingBreak = false;
   let run = -1;
   let projectedSamples = 0;
-  let fallbackSamples = 0;
   let missedSamples = 0;
   let seamBreaks = 0;
 
@@ -1187,40 +1175,11 @@ export function executeSurfaceBrushStroke(
       ...(options.signal ? { signal: options.signal } : {}),
     };
     let hit: SurfaceProjectionHit | null;
-    let projection: ResolvedSurfaceHit["projection"] = "primary";
     try {
       hit = projectSurfaceSample(provider, sample, context);
     } catch (error) {
-      if (failurePolicy !== "fallback" || !fallbackProvider) {
-        cancelSurfaceProviders(providers, stroke.id, "projection-failed");
-        throw error;
-      }
-      warnings.push(
-        `surface.provider[${surfaceProviderId(provider)}].sample[${sampleIndex}] failed; ` +
-          `fallback[${surfaceProviderId(fallbackProvider)}] used: ${surfaceErrorMessage(error)}`,
-      );
-      try {
-        hit = projectSurfaceSample(fallbackProvider, sample, context);
-      } catch (fallbackError) {
-        cancelSurfaceProviders(providers, stroke.id, "projection-failed");
-        throw fallbackError;
-      }
-      projection = "fallback";
-    }
-    if (hit === null && missPolicy === "fallback" && fallbackProvider) {
-      try {
-        hit = projectSurfaceSample(fallbackProvider, sample, context);
-      } catch (error) {
-        cancelSurfaceProviders(providers, stroke.id, "projection-failed");
-        throw error;
-      }
-      projection = "fallback";
-      if (hit !== null) {
-        warnings.push(
-          `surface.provider[${surfaceProviderId(provider)}].sample[${sampleIndex}] missed; ` +
-            `fallback[${surfaceProviderId(fallbackProvider)}] supplied the UV hit`,
-        );
-      }
+      cancelSurfaceProviders(providers, stroke.id, "projection-failed");
+      throw error;
     }
     if (hit === null) {
       missedSamples += 1;
@@ -1238,20 +1197,18 @@ export function executeSurfaceBrushStroke(
       previous = null;
       continue;
     }
-    const hitProvider = projection === "fallback" ? (fallbackProvider as SurfaceProjectionProvider) : provider;
-    assertSurfaceHit(hit, hitProvider, sampleIndex);
+    assertSurfaceHit(hit, provider, sampleIndex);
     const dynamics = resolveSurfaceHitDynamics(program, stroke, sample, sampleIndex, hit);
     const resolved: ResolvedSurfaceHit = {
       sample,
       sampleIndex,
-      projection,
+      projection: "primary",
       hit,
       x: hit.u * size.width,
       y: hit.v * size.height,
       ...dynamics,
     };
     projectedSamples += 1;
-    if (projection === "fallback") fallbackSamples += 1;
     if (previous === null) {
       run += 1;
       pendingBreak = false;
@@ -1353,12 +1310,8 @@ export function executeSurfaceBrushStroke(
     warnings,
     receipt: {
       providerId: surfaceProviderId(provider),
-      ...(fallbackProvider
-        ? { fallbackProviderId: surfaceProviderId(fallbackProvider) }
-        : {}),
       inputSamples: stroke.samples.length,
       projectedSamples,
-      fallbackSamples,
       missedSamples,
       runs: run + 1,
       seamBreaks,

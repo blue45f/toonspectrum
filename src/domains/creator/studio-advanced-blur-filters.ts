@@ -2,9 +2,10 @@
  * Product adapter for the deterministic advanced-blur CPU oracles.
  *
  * The pure kernels deliberately accept large bounded jobs for offline/Worker execution. Product
- * rendering has a tighter main-thread policy: expensive advanced blurs are a no-op in the Konva
- * fallback and the Worker client reports an explicit worker-required error instead of freezing the
- * editor. The module Worker opts into the full bounded kernel through `advancedBlurExecution`.
+ * rendering has a tighter main-thread policy: expensive advanced blurs are rejected by the Konva
+ * compatibility lane and the Worker client reports an explicit worker-required error instead of
+ * freezing the editor. The module Worker opts into the full bounded kernel through
+ * `advancedBlurExecution`.
  */
 
 import {
@@ -27,7 +28,7 @@ export type StudioAdvancedBlurExecution = "direct" | "worker";
 
 /**
  * At most four million source-texel reads may run synchronously. A normal illustration therefore
- * uses the Worker, while tiny thumbnails and deterministic tests retain a useful direct fallback.
+ * uses the Worker, while tiny thumbnails and deterministic tests may preselect the direct lane.
  */
 export const STUDIO_ADVANCED_BLUR_DIRECT_MAX_SOURCE_SAMPLES = 4_000_000;
 

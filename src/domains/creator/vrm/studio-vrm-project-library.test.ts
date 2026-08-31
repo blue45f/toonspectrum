@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  buildStudioProjectArchive,
+  buildStudioProjectArchive as buildStudioProjectArchiveWithBackend,
   importStudioProjectArchive,
   type ImportStudioProjectArchiveResult,
   type StudioProjectArchiveAttachmentInput,
@@ -30,6 +30,16 @@ import {
   type VrmStoredModelRecord,
   type VrmStoredModelWithContentIdentity,
 } from "./vrm-library";
+
+function buildStudioProjectArchive(
+  input: Parameters<typeof buildStudioProjectArchiveWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioProjectArchiveWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioProjectArchiveWithBackend> {
+  return buildStudioProjectArchiveWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 function glbBytes(document: Record<string, unknown>): Uint8Array {
   const json = new TextEncoder().encode(JSON.stringify(document));

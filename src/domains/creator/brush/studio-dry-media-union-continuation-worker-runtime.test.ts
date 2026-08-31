@@ -56,8 +56,7 @@ function reservationToken(): Memory64CrossRealmReservationToken {
     reservationId: "epoch16-dry-worker-runtime-test",
     nonce: "e".repeat(64),
     workload: "brush",
-    preferredRuntime: "memory32-fallback",
-    memory32FallbackAllowed: true,
+    selectedRuntime: "memory32-requested",
     authorizedResidentBytes:
       STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_WINDOW_BYTE_LENGTH.toString(),
     authorizedResidentPages: SCRATCH_PAGE_COUNT.toString(),
@@ -80,7 +79,7 @@ function allocationAck(
     version: MEMORY64_CROSS_REALM_PROTOCOL_VERSION,
     reservationId: token.reservationId,
     nonce: token.nonce,
-    runtime: "memory32-fallback",
+    runtime: "memory32-requested",
     addressType: "i32",
     residentBytes: token.authorizedResidentBytes,
     residentPages: token.authorizedResidentPages,
@@ -450,7 +449,7 @@ function createHarness(options: Readonly<{
                   maximum: Number(pages),
                 }),
                 addressType: "i32",
-                selection: "memory32-fallback",
+                selection: "memory32-requested",
                 maximumPages: pages,
                 })
               ),

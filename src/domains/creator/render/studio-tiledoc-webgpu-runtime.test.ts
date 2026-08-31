@@ -188,7 +188,7 @@ function runtimeHarness(options: {
     }),
   }));
   const onFrameReady = vi.fn();
-  const onCanvas2dHandoff = vi.fn();
+  const onUnavailable = vi.fn();
   const onDeviceLost = vi.fn();
   const onStatusChange = vi.fn();
   const runtime = new StudioTileDocWebGpuRuntime({
@@ -200,7 +200,7 @@ function runtimeHarness(options: {
     createBridge: bridgeFactory,
     maxDeviceRecoveryAttempts: options.maxDeviceRecoveryAttempts,
     onFrameReady,
-    onCanvas2dHandoff,
+    onUnavailable,
     onDeviceLost,
     onStatusChange,
   });
@@ -217,7 +217,7 @@ function runtimeHarness(options: {
     consumerFactory,
     bridgeFactory,
     onFrameReady,
-    onCanvas2dHandoff,
+    onUnavailable,
     onDeviceLost,
     onStatusChange,
     loseDevice(info = { reason: "unknown", message: "test loss" } as GPUDeviceLostInfo) {
@@ -319,12 +319,13 @@ describe("StudioTileDocWebGpuRuntime", () => {
       devicePixelRatio: 2,
     })).toEqual({ status: "rejected", reason: "backing-size-limit" });
     expect(harness.runtime.stats()).toMatchObject({
-      status: "fallback",
-      fallbackActive: true,
-      fallbackCount: 1,
+      status: "unavailable",
+      unavailableActive: true,
+      unavailableCount: 1,
     });
     expect(harness.canvas.style.visibility).toBe("hidden");
-    expect(harness.onCanvas2dHandoff).toHaveBeenLastCalledWith(expect.objectContaining({
+    expect(harness.onUnavailable).toHaveBeenLastCalledWith(expect.objectContaining({
+      kind: "studio-tiledoc-webgpu-unavailable",
       reason: "invalid-resize",
       bridgeReason: "backing-size-limit",
     }));
@@ -421,7 +422,7 @@ describe("StudioTileDocWebGpuRuntime", () => {
     });
   });
 
-  it("hands off to Canvas2D after bounded recovery exhaustion", async () => {
+  it("fails closed as unavailable after bounded WebGPU recovery exhaustion", async () => {
     const harnessRef: { current?: ReturnType<typeof runtimeHarness> } = {};
     const harness = runtimeHarness({
       maxDeviceRecoveryAttempts: 1,
@@ -438,23 +439,24 @@ describe("StudioTileDocWebGpuRuntime", () => {
     harness.animationFrames.runNext();
 
     expect(await result).toMatchObject({
-      status: "fallback",
+      status: "unavailable",
       frameId: "unstable",
-      handoff: {
+      failure: {
+        kind: "studio-tiledoc-webgpu-unavailable",
         reason: "device-recovery-exhausted",
         recoverable: false,
         bridgeReason: "device-lost",
       },
     });
     expect(harness.runtime.stats()).toMatchObject({
-      status: "fallback",
-      fallbackActive: true,
+      status: "unavailable",
+      unavailableActive: true,
       deviceLossCount: 2,
-      fallbackCount: 1,
+      unavailableCount: 1,
     });
   });
 
-  it("keeps fallback sticky until explicit retry and then redraws the latest frame", async () => {
+  it("keeps unavailable sticky until an explicit same-provider retry", async () => {
     let fail = true;
     const harness = runtimeHarness({
       present: async () => (
@@ -463,31 +465,31 @@ describe("StudioTileDocWebGpuRuntime", () => {
           : readyPresentation(2)
       ),
     });
-    const first = harness.runtime.requestFrame(frame("fallback-1"));
+    const first = harness.runtime.requestFrame(frame("unavailable-1"));
     harness.animationFrames.runNext();
     expect(await first).toMatchObject({
-      status: "fallback",
-      handoff: {
+      status: "unavailable",
+      failure: {
         reason: "presentation-rejected",
         consumerReason: "webgpu-unavailable",
       },
     });
 
-    const second = await harness.runtime.requestFrame(frame("fallback-2"));
-    expect(second).toMatchObject({ status: "fallback", frameId: "fallback-2" });
+    const second = await harness.runtime.requestFrame(frame("unavailable-2"));
+    expect(second).toMatchObject({ status: "unavailable", frameId: "unavailable-2" });
     expect(harness.bridgePresent).toHaveBeenCalledTimes(1);
     fail = false;
-    expect(harness.runtime.retryWebGpu()).toBe(true);
+    expect(harness.runtime.retrySelectedWebGpu()).toBe(true);
     expect(harness.consumerInvalidate).toHaveBeenCalled();
     expect(harness.bridgeInvalidate).toHaveBeenCalled();
     harness.animationFrames.runNext();
     await vi.waitFor(() => expect(harness.onFrameReady).toHaveBeenCalledWith(
-      "fallback-2",
+      "unavailable-2",
       expect.objectContaining({ status: "ready" })
     ));
     expect(harness.runtime.stats()).toMatchObject({
       status: "ready",
-      fallbackActive: false,
+      unavailableActive: false,
     });
   });
 
@@ -518,7 +520,7 @@ describe("StudioTileDocWebGpuRuntime", () => {
   it("disposes a lazily created consumer when bridge construction fails", async () => {
     const animationFrames = new FakeAnimationFrames();
     const consumerDispose = vi.fn();
-    const onCanvas2dHandoff = vi.fn();
+    const onUnavailable = vi.fn();
     const runtime = new StudioTileDocWebGpuRuntime({
       canvas: fakeCanvas(),
       store: fakeStore(),
@@ -534,19 +536,19 @@ describe("StudioTileDocWebGpuRuntime", () => {
       createBridge: () => {
         throw new Error("bridge construction failed");
       },
-      onCanvas2dHandoff,
+      onUnavailable,
     });
     const result = runtime.requestFrame(frame("construction-failure"));
     animationFrames.runNext();
 
     expect(await result).toMatchObject({
-      status: "fallback",
-      handoff: {
+      status: "unavailable",
+      failure: {
         reason: "runtime-error",
         bridgeReason: "runtime-construction-failed",
       },
     });
     expect(consumerDispose).toHaveBeenCalledTimes(1);
-    expect(onCanvas2dHandoff).toHaveBeenCalledTimes(1);
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
   });
 });

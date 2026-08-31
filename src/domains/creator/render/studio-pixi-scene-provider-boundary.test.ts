@@ -59,17 +59,12 @@ describe("Studio Pixi scene provider source boundary", () => {
     expect(implementation).not.toContain(".appendChild(");
   });
 
-  it("prefers WebGPU, excludes Canvas2D fallback, and emits an explicit fallback receipt", () => {
-    expect(implementation).toContain(
-      'STUDIO_PIXI_RENDERER_ORDER = ["webgpu", "webgl"]',
-    );
-    expect(implementation).toContain(
-      "preference: [...STUDIO_PIXI_RENDERER_ORDER]",
-    );
-    expect(implementation).toContain('"webgpu-api-unavailable"');
-    expect(implementation).toContain(
-      '"provider-webgpu-candidate-unavailable"',
-    );
+  it("requires one renderer, excludes every alternate, and emits a fail-closed receipt", () => {
+    expect(implementation).toContain('readonly renderer: "webgpu" | "webgl"');
+    expect(implementation).toContain("preference: [options.renderer]");
+    expect(implementation).toContain('failureIsolation: "fail-closed"');
+    expect(implementation).toContain("automatic renderer substitution is forbidden");
+    expect(implementation).not.toContain("STUDIO_PIXI_RENDERER_ORDER");
     expect(implementation).toContain(
       '"Pixi selected an unsupported renderer; Studio scene overlays require WebGPU or WebGL."',
     );

@@ -375,8 +375,8 @@ export interface StudioBg3dRuntimeTopologyRequest {
   /**
    * Runtime the caller has already selected for this session (see `studio-bg3d-engine-selection`).
    * It wins the primary slot only when it is available, eligible, and supports every required
-   * capability; otherwise planning falls back to the ordinary preference order and records
-   * `preferred-runtime-unavailable`.
+   * capability. An unavailable explicit selection is terminal for this plan; it is never
+   * substituted with another runtime.
    */
   readonly preferredPrimaryRuntimeId?: StudioBg3dRuntimeId;
 }
@@ -508,6 +508,16 @@ export function planStudioBg3dRuntimeTopology(
     : primaryCandidates.find((runtime) => runtime.id === request.preferredPrimaryRuntimeId);
   if (request.preferredPrimaryRuntimeId !== undefined && !preferred) {
     diagnostics.push("preferred-runtime-unavailable");
+    diagnostics.push("no-primary-runtime");
+    return Object.freeze({
+      ok: false,
+      primaryRuntimeId: null,
+      specialists: Object.freeze([]),
+      totalActivationGzipBytes: 0,
+      diagnostics: deduplicatedDiagnostics(diagnostics),
+      boundary: "scene-document+verified-glb-snapshots",
+      singleInteractiveOwner: true,
+    });
   }
   const primary = preferred ?? primaryCandidates.sort(compareRuntime)[0];
   if (!primary) {

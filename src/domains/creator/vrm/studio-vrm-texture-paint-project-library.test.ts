@@ -2,7 +2,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  buildStudioProjectArchive,
+  buildStudioProjectArchive as buildStudioProjectArchiveWithBackend,
   importStudioProjectArchive,
   type StudioProjectArchiveImportedAttachment,
   type StudioProjectArchiveManifest,
@@ -37,6 +37,16 @@ import {
   type StudioVrmTexturePaintProjectLibraryAdapter,
   type StudioVrmTexturePaintProjectPlan,
 } from "./studio-vrm-texture-paint-project-library";
+
+function buildStudioProjectArchive(
+  input: Parameters<typeof buildStudioProjectArchiveWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioProjectArchiveWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioProjectArchiveWithBackend> {
+  return buildStudioProjectArchiveWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10] as const;
 

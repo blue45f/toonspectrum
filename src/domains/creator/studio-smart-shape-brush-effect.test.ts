@@ -4,6 +4,7 @@ import { exportPageToSvg } from "./export/studio-svg-export";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import {
   applyStudioSmartShapeBrushEffect,
+  resolveStudioSmartShapeBrushEffectAvailability,
   studioSmartShapeBrushOutline,
 } from "./studio-smart-shape-brush-effect";
 
@@ -166,34 +167,32 @@ describe("applyStudioSmartShapeBrushEffect", () => {
     ["causal stamp", source({ brush: "ink-brush", stampPipeline: "causal-walker-v2" }), "causal-stamp"],
     ["causal watercolor", source({ brush: "watercolor", watercolorPipeline: "causal-walker-v2" }), "causal-watercolor"],
     ["unknown brush", source({ brush: "future-unregistered-tip" }), "unknown-brush"],
-  ] as const)("falls back from incompatible %s semantics and strips inert metadata", (_label, effect, reason) => {
-    const result = applyStudioSmartShapeBrushEffect(shape({
+  ] as const)("reports incompatible %s semantics as unavailable without a substitute", (_label, effect, reason) => {
+    const geometric = shape({
       brush: "stale",
       brushCatalogId: "catalog-stale",
       stampPipeline: "causal-walker-v2",
       pressures: [1, 1],
       materialPressureModel: "canonical-material-v1",
       materialMinimumDiameterRatio: 0.8,
-    }), effect);
+    });
+    const result = applyStudioSmartShapeBrushEffect(geometric, effect);
 
-    expect(result).toMatchObject({ status: "fallback", reason });
-    expect(result.stroke.kind).toBe("rect");
-    expect(result.stroke.brush).toBeUndefined();
-    expect(result.stroke.brushCatalogId).toBeUndefined();
-    expect(result.stroke.pressures).toBeUndefined();
-    expect(result.stroke.materialPressureModel).toBeUndefined();
-    expect(result.stroke.materialMinimumDiameterRatio).toBeUndefined();
-    expect(result.stroke.stampPipeline).toBeUndefined();
+    expect(result).toEqual({ status: "unavailable", reason });
+    expect("stroke" in result).toBe(false);
+    expect(geometric.brush).toBe("stale");
+    expect(geometric.brushCatalogId).toBe("catalog-stale");
+    expect(geometric.stampPipeline).toBe("causal-walker-v2");
   });
 
-  it("falls back when the live-converted path has no source snapshot or valid geometry", () => {
-    expect(applyStudioSmartShapeBrushEffect(shape(), null)).toMatchObject({
-      status: "fallback",
+  it("reports missing source or invalid geometry as unavailable", () => {
+    expect(resolveStudioSmartShapeBrushEffectAvailability(null)).toEqual({
+      status: "unavailable",
       reason: "missing-source",
     });
     expect(applyStudioSmartShapeBrushEffect(
       shape({ kind: "rect", points: [0, 0, 0, 20] }),
       source(),
-    )).toMatchObject({ status: "fallback", reason: "invalid-geometry" });
+    )).toEqual({ status: "unavailable", reason: "invalid-geometry" });
   });
 });

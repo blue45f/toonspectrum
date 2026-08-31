@@ -34,11 +34,12 @@ function capability(
 ): WasmMemory64CapabilityReceipt {
   return Object.freeze({
     ...BASE_CAPABILITY,
+    requestedRuntime: selectedRuntime === "memory32-requested"
+      ? "memory32-requested"
+      : "memory64",
     selectedRuntime,
     isMemory64Supported: selectedRuntime === "memory64",
-    isMemory32FallbackSupported:
-      selectedRuntime === "memory64"
-      || selectedRuntime === "memory32-fallback",
+    isMemory32ReferenceSupported: selectedRuntime === "memory32-requested",
   });
 }
 
@@ -89,8 +90,7 @@ describe("Memory64WorkloadCoordinator", () => {
       },
     }));
 
-    if (!instance.capability.isMemory64Supported
-      && !instance.capability.isMemory32FallbackSupported) {
+    if (!instance.capability.isMemory64Supported) {
       expect(receipt).toMatchObject({
         ok: false,
         selectedRuntime: "unavailable",
@@ -101,17 +101,13 @@ describe("Memory64WorkloadCoordinator", () => {
 
     expect(receipt.ok).toBe(true);
     if (!receipt.ok) return;
-    expect(receipt.selectedRuntime).toBe(
-      instance.capability.isMemory64Supported
-        ? "memory64"
-        : "memory32-fallback",
-    );
+    expect(receipt.selectedRuntime).toBe("memory64");
     expect(receipt.lease.runtime.currentPages).toBe(BigInt(1));
     expect(receipt.lease.runtime.maximumPages).toBe(BigInt(1));
     expect(receipt.lease.release()).toBe(true);
   });
 
-  it("shares one Memory64-first capability probe across all Epoch16 product workloads", () => {
+  it("shares one exact Memory64 capability probe across all Epoch16 product workloads", () => {
     const allocate = vi.fn((_: WasmScratchAllocationRequest) => fakeRuntime());
     const { instance, probe } = coordinator(allocate);
 
@@ -198,12 +194,9 @@ describe("Memory64WorkloadCoordinator", () => {
     expect(instance.activeResidentPages).toBe(BigInt(12));
   });
 
-  it("retries geometrically smaller i64 windows before selecting memory32", () => {
-    const allocate = vi.fn((allocation) => {
-      if (allocation.addressType === "i64") {
-        throw new RangeError(`deny i64 ${allocation.initialPages}`);
-      }
-      return fakeRuntime();
+  it("fails closed after geometrically smaller windows in the selected Memory64 provider", () => {
+    const allocate = vi.fn((allocation: WasmScratchAllocationRequest) => {
+      throw new RangeError(`deny ${allocation.addressType} ${allocation.initialPages}`);
     });
     const { instance } = coordinator(allocate);
 
@@ -216,24 +209,21 @@ describe("Memory64WorkloadCoordinator", () => {
       { addressType: "i64", pages: BigInt(8) },
       { addressType: "i64", pages: BigInt(4) },
       { addressType: "i64", pages: BigInt(2) },
-      { addressType: "i32", pages: BigInt(2) },
     ]);
     expect(receipt).toMatchObject({
-      ok: true,
-      status: "feature-preserved-fallback",
-      selectedRuntime: "memory32-fallback",
-      fallback: {
-        kind: "minimum-window-fallback",
-        reason: "memory64-allocation-failed",
-        nextRuntime: "memory32-fallback",
-        allocation: {
-          status: "fallback",
-          recommendedPages: BigInt(2),
-        },
+      ok: false,
+      status: "backpressure",
+      selectedRuntime: "memory64",
+      terminal: {
+        status: "backpressure",
+        reason: "allocation-failed",
+        action: "stream-through-opfs",
+        retryRuntime: "memory64",
+        recommendedPages: BigInt(0),
       },
-      opfsSpill: { disposition: "not-required" },
+      opfsSpill: { disposition: "required" },
     });
-    expect(receipt.attempts).toHaveLength(4);
+    expect(receipt.attempts).toHaveLength(3);
     expect(Object.isFrozen(receipt.attempts)).toBe(true);
   });
 
@@ -251,7 +241,6 @@ describe("Memory64WorkloadCoordinator", () => {
       ok: true,
       status: "allocated",
       selectedRuntime: "memory64",
-      fallback: null,
       plan: { workingSetPages: BigInt(4) },
     });
     expect(allocate.mock.calls.map(([allocation]) => (
@@ -259,34 +248,30 @@ describe("Memory64WorkloadCoordinator", () => {
     ))).toEqual(["i64", "i64"]);
   });
 
-  it("uses an explicit feature-preservation receipt when Memory64 is unsupported", () => {
+  it("runs an explicit Memory32 reference selection without changing providers", () => {
     const allocate = vi.fn((_: WasmScratchAllocationRequest) => fakeRuntime());
-    const { instance, probe } = coordinator(allocate, "memory32-fallback");
+    const { instance, probe } = coordinator(allocate, "memory32-requested");
 
     const receipt = instance.coordinate(request({ workload: "scene3d" }));
 
     expect(receipt).toMatchObject({
       ok: true,
-      status: "feature-preserved-fallback",
-      selectedRuntime: "memory32-fallback",
-      fallback: {
-        kind: "capability-fallback",
-        reason: "memory64-unavailable",
-        nextRuntime: "memory32-fallback",
-      },
+      status: "allocated",
+      selectedRuntime: "memory32-requested",
       plan: {
-        runtime: "memory32-fallback",
-        fallbackReason: "memory64-unavailable",
+        status: "ready",
+        runtime: "memory32-requested",
+        addressType: "i32",
       },
     });
     expect(probe).toHaveBeenCalledTimes(1);
     expect(allocate).toHaveBeenCalledWith(expect.objectContaining({
-      runtime: "memory32-fallback",
+      runtime: "memory32-requested",
       addressType: "i32",
     }));
   });
 
-  it("preserves minimum-i64 fallback and final memory32 OPFS spill receipts", () => {
+  it("keeps a minimum-window Memory64 failure unavailable to the operation", () => {
     const allocate = vi.fn(() => {
       throw new RangeError("resident allocation denied");
     });
@@ -300,19 +285,12 @@ describe("Memory64WorkloadCoordinator", () => {
     expect(receipt).toMatchObject({
       ok: false,
       status: "backpressure",
-      selectedRuntime: "memory32-fallback",
-      fallback: {
-        kind: "minimum-window-fallback",
-        allocation: {
-          status: "fallback",
-          nextRuntime: "memory32-fallback",
-        },
-      },
+      selectedRuntime: "memory64",
       terminal: {
         status: "backpressure",
         reason: "allocation-failed",
         action: "stream-through-opfs",
-        retryRuntime: "memory32-fallback",
+        retryRuntime: "memory64",
         recommendedPages: BigInt(0),
       },
       opfsSpill: {
@@ -322,7 +300,7 @@ describe("Memory64WorkloadCoordinator", () => {
         action: "stream-through-opfs",
       },
     });
-    expect(receipt.attempts).toHaveLength(2);
+    expect(receipt.attempts).toHaveLength(1);
   });
 
   it("preserves planner backpressure and keeps OPFS available while waiting for budget", () => {
@@ -398,7 +376,7 @@ describe("Memory64WorkloadCoordinator", () => {
     expect(source).not.toMatch(/CreatorProjectIRV16/u);
     expect(source).not.toMatch(/Uint8Array\[\]|ArrayBuffer\[\]/u);
     expect(WASM_MEMORY64_ACCELERATOR_POLICY).toMatchObject({
-      selectionPriority: "memory64-first",
+      selectionPolicy: "exact-runtime-before-operation",
       wholeDocumentMaterializationAllowed: false,
       wholeJsonMaterializationAllowed: false,
     });

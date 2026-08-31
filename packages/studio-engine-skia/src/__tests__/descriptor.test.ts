@@ -15,7 +15,7 @@ import {
 
 /**
  * V13 §2.6 / V19 §3.2 role split: the CPU raster lane (render.ts,
- * MakeSurface + readPixels) is reference/export/golden/recovery scope and must
+ * MakeSurface + readPixels) is reference/export/golden scope and must
  * never claim interactive primary-surface ownership; the interactive live role
  * is the skia-canvaskit-gpu ImageBitmap island. These tests pin the honesty
  * contract as data — no CanvasKit wasm load required.
@@ -29,7 +29,7 @@ const ALL_DESCRIPTORS = [
 ] as const;
 
 describe("descriptor id stability", () => {
-  it("keeps the ids other modules bind to (asset metadata fallback, vello fallbackProviderId, gpu island)", () => {
+  it("keeps the ids other modules bind to without encoding runtime fallback", () => {
     expect(ALL_DESCRIPTORS.map((descriptor) => descriptor.id)).toEqual([
       "skia-canvaskit",
       "skia-canvaskit-gpu",
@@ -41,6 +41,7 @@ describe("descriptor id stability", () => {
   it("every descriptor round-trips the registry schema", () => {
     for (const descriptor of ALL_DESCRIPTORS) {
       expect(providerDescriptorSchema.parse(descriptor)).toEqual(descriptor);
+      expect(descriptor).not.toHaveProperty("fallbackProviderId");
     }
   });
 });
@@ -109,14 +110,16 @@ describe("live role (skia-canvaskit-gpu island)", () => {
     expect(canvasKitGpuProviderDescriptor.capabilities).not.toContain("surface.primary");
   });
 
-  it("the island falls back to the CPU reference lane by id", () => {
-    expect(canvasKitGpuProviderDescriptor.fallbackProviderId).toBe("skia-canvaskit");
+  it("the island records fail-closed behavior instead of a CPU recovery target", () => {
+    expect(canvasKitGpuProviderDescriptor.limitations.join("\n")).toMatch(
+      /failure is terminal.*never switches/u,
+    );
   });
 
-  it("the Graphite challenger stays experimental and falls back to the WebGL island", () => {
+  it("the Graphite challenger stays experimental and fail-closed", () => {
     expect(skiaGraphiteWebgpuProviderDescriptor.maturity).toBe("experimental");
-    expect(skiaGraphiteWebgpuProviderDescriptor.fallbackProviderId).toBe(
-      "skia-canvaskit-gpu",
+    expect(skiaGraphiteWebgpuProviderDescriptor.limitations.join("\n")).toMatch(
+      /fails closed.*never demotes/u,
     );
   });
 });

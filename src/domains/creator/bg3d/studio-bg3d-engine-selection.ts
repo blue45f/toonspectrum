@@ -1,20 +1,10 @@
 /**
- * Next-generation 3D engine admission policy for the background editor.
+ * Explicit, fail-closed engine admission for the Studio 3D background editor.
  *
- * The editor ships two interactive backends: the long-standing Three/WebGL2 renderer and the
- * Three WebGPU renderer. This module is the single authority that decides which one owns the
- * interactive canvas for a given session, and it is deliberately pure — no `navigator`, no
- * `GPUAdapter`, no renderer construction. Adapters probe capabilities, classify the host, and hand
- * the observations in, so a unit test, a worker, and a real in-app WebView all reach the same
- * decision.
- *
- * Two properties matter more than raw capability here:
- *
- * 1. **Fail closed.** Anything unknown resolves to WebGL2, which every supported host already runs.
- *    A wrong "WebGPU is fine" answer costs the artist a dead viewport mid-drawing; a wrong "stay on
- *    WebGL2" answer costs some frame time.
- * 2. **Explain the decision.** Every plan carries a machine-readable reason and a Korean notice so
- *    the status surface can tell the artist why the engine they see is the engine they got.
+ * The editor ships independent Three/WebGPU and Three/WebGL2 renderers. This module never changes
+ * the artist's selection: capability, feature, topology, or runtime failures keep that backend
+ * selected and make it unavailable. A WebGL2 renderer can therefore mount only after an explicit
+ * WebGL2 choice, never as a hidden fallback for WebGPU.
  */
 
 import {
@@ -28,59 +18,33 @@ import type { StudioBg3dInAppBrowserProfile } from "./studio-bg3d-inapp-browser"
 import type { StudioBg3dWebGpuProbeResult } from "./studio-bg3d-webgpu-capability";
 
 export type StudioBg3dEngineBackend = "webgl2" | "webgpu";
-export type StudioBg3dEnginePreference = "auto" | StudioBg3dEngineBackend;
+export type StudioBg3dEnginePreference = StudioBg3dEngineBackend;
+export type StudioBg3dEngineStatus = "available" | "unavailable" | "failed";
 
 export type StudioBg3dEngineSelectionReason =
-  | "auto-webgpu-promoted"
-  | "auto-webgl2-baseline"
   | "user-webgpu-override"
   | "user-webgl2-override"
   | "webgpu-runtime-unavailable"
+  | "webgpu-runtime-failed"
   | "webgpu-probe-unsupported"
   | "webgpu-compute-unavailable"
   | "inapp-browser-blocked"
   | "inapp-browser-opt-in-required"
   | "save-data-enabled"
   | "low-device-memory"
-  | "repeated-webgpu-failure"
   | "runtime-capability-unavailable"
   | "webgl-only-webxr"
   | "webgl-only-vrm-character";
 
-/**
- * Consecutive WebGPU initialization or device-loss failures after which `auto` stops retrying for
- * the rest of the session. One transient failure is worth a retry; a second is a pattern.
- */
-export const STUDIO_BG3D_WEBGPU_FAILURE_LIMIT = 2;
-
-/** A WebGPU device on a phone with less memory than this competes with the host app and loses. */
+/** Advisory threshold only. Low memory never changes an explicit engine choice. */
 export const STUDIO_BG3D_WEBGPU_MIN_DEVICE_MEMORY_GB = 4;
 
 /**
- * Editor features that only the WebGL2 renderer can serve today. These are not preferences: each
- * one would render incorrectly or fail to load on WebGPU, so any of them present forces the
- * baseline even when the artist explicitly asked for WebGPU.
+ * Features the WebGPU renderer cannot serve with product parity today.
  *
- * - `webxr`: the immersive session bridge drives `WebGLRenderer.xr`; Three's WebGPU XR path is not
- *   yet equivalent.
- * - `vrmCharacters`: MToon does not shade the same on both backends. See below.
- *
- * On VRM: a WebGPU renderer *can* now build MToon — the shared-character loader asks
- * `@pixiv/three-vrm` for `MToonNodeMaterial`, and both backends put the character on screen with
- * the same silhouette. Loading is not the problem; **shading is**. `MToonMaterial` and
- * `MToonNodeMaterial` are two independent upstream implementations of one spec, and measured
- * against each other on the same scene, lights, camera and tone mapping they disagree across the
- * whole surface (see `docs/studio-bg3d-vrm-mtoon-backend-color-divergence-2026-08-29.md`):
- * WebGPU renders ~5.7% darker in mean luminance, and rim highlights that read as near-white under
- * WebGL come back as base colour, up to 169/255 on a single channel.
- *
- * That is a delivery problem, not a preference. A project has to render the same for every
- * collaborator and on every machine, and it has to keep the colour of everything already
- * published — all of which predates WebGPU. So a document holding a VRM character runs on the
- * baseline, and the artist's poser preview (still WebGL2) matches what is delivered.
- *
- * This is a fence around an upstream difference, not a verdict on WebGPU. Backgrounds without a
- * character are unaffected and still get the next-generation engine.
+ * These observations do not force WebGL2. If WebGPU is selected, the plan becomes unavailable and
+ * the artist is told to choose WebGL2 manually. Latching avoids repeatedly changing availability
+ * while a feature is entered and left during the same editor session.
  */
 export interface StudioBg3dEngineWebglOnlyFeatures {
   readonly webxr: boolean;
@@ -90,11 +54,6 @@ export interface StudioBg3dEngineWebglOnlyFeatures {
 export const EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES: StudioBg3dEngineWebglOnlyFeatures =
   Object.freeze({ webxr: false, vrmCharacters: false });
 
-/**
- * Latches a WebGL-only demand for the rest of the session. Leaving an immersive session does not
- * release the latch on purpose: releasing it would swap the renderer and remount the canvas a
- * second time, so a session that is entered and left would rebuild the viewport every time.
- */
 export function latchStudioBg3dWebglOnlyFeatures(
   current: StudioBg3dEngineWebglOnlyFeatures,
   observed: Partial<StudioBg3dEngineWebglOnlyFeatures>,
@@ -117,23 +76,21 @@ export interface StudioBg3dEngineSelectionRequest {
   readonly webgpuRuntimeAvailable: boolean;
   readonly saveData?: boolean;
   readonly deviceMemoryGb?: number;
-  /** WebGPU initialization/device-loss failures already recorded for this session. */
-  readonly webgpuFailureCount?: number;
-  /** Features present in this session that only the WebGL2 renderer can serve. */
+  /** True after initialization or device loss fails the current explicit WebGPU selection. */
+  readonly webgpuRuntimeFailed?: boolean;
   readonly webglOnlyFeatures?: StudioBg3dEngineWebglOnlyFeatures;
 }
 
 export interface StudioBg3dEngineSelectionPlan {
+  /** The artist's normalized explicit selection. This never changes as a recovery action. */
   readonly backend: StudioBg3dEngineBackend;
   readonly runtimeId: StudioBg3dRuntimeId;
-  /** Backend the editor must switch to when the selected backend fails at runtime. */
-  readonly fallbackBackend: StudioBg3dEngineBackend | null;
+  /** Whether the selected backend may currently own the interactive canvas. */
+  readonly status: StudioBg3dEngineStatus;
   readonly reason: StudioBg3dEngineSelectionReason;
-  /** True when WebGPU is reachable by an explicit user choice even if `auto` declined it. */
-  readonly webgpuSelectable: boolean;
   /** Korean, user-facing, single sentence for the engine status surface. */
   readonly notice: string;
-  /** Secondary observations worth surfacing in diagnostics; never a decision input. */
+  /** Secondary observations worth surfacing in diagnostics; never another renderer candidate. */
   readonly diagnostics: readonly StudioBg3dEngineSelectionReason[];
 }
 
@@ -143,163 +100,131 @@ const BACKEND_RUNTIME_IDS: Readonly<Record<StudioBg3dEngineBackend, StudioBg3dRu
     webgpu: "three-webgpu",
   });
 
-/**
- * Artist-facing sentence for each reason. Exported so the panel's width budget can be asserted:
- * this box is narrow and the editor is used at 360px, so a notice that explains the engineering
- * instead of the artist's next step stops being read at all.
- */
 export const STUDIO_BG3D_ENGINE_SELECTION_NOTICES:
   Readonly<Record<StudioBg3dEngineSelectionReason, string>> = Object.freeze({
-  "auto-webgpu-promoted": "차세대 WebGPU 엔진으로 실행 중입니다.",
-  "auto-webgl2-baseline": "안정성 기준인 WebGL2 엔진으로 실행 중입니다.",
   "user-webgpu-override": "직접 선택한 WebGPU 엔진으로 실행 중입니다.",
   "user-webgl2-override": "직접 선택한 WebGL2 엔진으로 실행 중입니다.",
-  "webgpu-runtime-unavailable": "이 빌드에는 WebGPU 엔진이 포함되어 있지 않아 WebGL2로 실행합니다.",
-  "webgpu-probe-unsupported": "이 브라우저가 WebGPU를 지원하지 않아 WebGL2로 실행합니다.",
-  "webgpu-compute-unavailable": "WebGPU 컴퓨트 기능을 쓸 수 없어 WebGL2로 실행합니다.",
-  "inapp-browser-blocked": "이 인앱 브라우저에서는 WebGPU가 불안정해 WebGL2로 실행합니다.",
-  "inapp-browser-opt-in-required":
-    "인앱 브라우저에서는 WebGL2로 시작합니다. 필요하면 WebGPU를 직접 선택할 수 있습니다.",
-  "save-data-enabled": "데이터 절약 모드가 켜져 있어 가벼운 WebGL2 엔진으로 실행합니다.",
-  "low-device-memory": "기기 메모리가 충분하지 않아 WebGL2 엔진으로 실행합니다.",
-  "repeated-webgpu-failure": "WebGPU 초기화가 반복 실패해 이번 세션은 WebGL2로 실행합니다.",
+  "webgpu-runtime-unavailable":
+    "이 빌드에서는 WebGPU를 사용할 수 없습니다. WebGL2를 쓰려면 직접 선택해 주세요.",
+  "webgpu-runtime-failed":
+    "WebGPU 엔진을 시작하지 못했습니다. 다시 선택하거나 WebGL2를 직접 선택해 주세요.",
+  "webgpu-probe-unsupported":
+    "이 브라우저는 WebGPU를 지원하지 않습니다. WebGL2를 직접 선택해 주세요.",
+  "webgpu-compute-unavailable":
+    "필요한 WebGPU 기능을 사용할 수 없습니다. WebGL2를 직접 선택해 주세요.",
+  "inapp-browser-blocked":
+    "이 인앱 브라우저에서는 WebGPU를 사용할 수 없습니다. WebGL2를 직접 선택해 주세요.",
+  "inapp-browser-opt-in-required": "인앱 브라우저의 WebGPU 안정성이 제한될 수 있습니다.",
+  "save-data-enabled": "데이터 절약 모드에서는 WebGPU 시작 비용이 커질 수 있습니다.",
+  "low-device-memory": "기기 메모리가 적어 WebGPU 성능이 제한될 수 있습니다.",
   "runtime-capability-unavailable":
-    "선택한 엔진이 편집기에 필요한 기능을 모두 제공하지 않아 WebGL2로 실행합니다.",
-  "webgl-only-webxr": "몰입형(WebXR) 보기를 사용하는 동안에는 WebGL2 엔진으로 실행합니다.",
-  // 왜인지까지 말하는 이유: "빠른 엔진을 왜 못 쓰냐"가 아티스트에게 당연한 질문이라서다. 다만
-  // 이유는 아티스트의 언어로만 말한다 — MToon 이니 셰이딩 구현이니는 이 문장이 답할 질문이
-  // 아니고, 좁은 화면에서 읽히지도 않는다. 근거는 승격 문서와 색 불일치 문서에 있다.
+    "선택한 엔진에 필수 기능이 없습니다. 다른 엔진을 직접 선택해 주세요.",
+  "webgl-only-webxr":
+    "WebXR은 WebGPU에서 열 수 없습니다. WebGL2를 직접 선택해 주세요.",
   "webgl-only-vrm-character":
-    "3D 캐릭터가 있는 장면은 WebGL2 엔진으로 실행합니다. 캐릭터 편집기에서 맞춘 색을 "
-    + "출력까지 그대로 유지하기 위해서입니다.",
+    "3D 캐릭터 색을 유지하려면 WebGL2 엔진을 직접 선택해 주세요.",
 });
 
 export const STUDIO_BG3D_ENGINE_PREFERENCES: readonly StudioBg3dEnginePreference[] = Object.freeze([
-  "auto",
   "webgpu",
   "webgl2",
 ]);
 
-/** Korean labels for the engine preference control. */
 export const STUDIO_BG3D_ENGINE_PREFERENCE_LABELS: Readonly<
   Record<StudioBg3dEnginePreference, string>
 > = Object.freeze({
-  auto: "자동",
   webgpu: "WebGPU",
   webgl2: "WebGL2",
 });
 
-/** Persisted values are user data; anything unrecognized restores the safe automatic policy. */
+/** Legacy `auto` and unknown persisted values migrate to the explicit WebGPU choice. */
 export function normalizeStudioBg3dEnginePreference(value: unknown): StudioBg3dEnginePreference {
   return STUDIO_BG3D_ENGINE_PREFERENCES.includes(value as StudioBg3dEnginePreference)
     ? (value as StudioBg3dEnginePreference)
-    : "auto";
+    : "webgpu";
 }
 
 function plan(
   backend: StudioBg3dEngineBackend,
   reason: StudioBg3dEngineSelectionReason,
-  webgpuSelectable: boolean,
+  status: StudioBg3dEngineStatus,
   diagnostics: readonly StudioBg3dEngineSelectionReason[],
 ): StudioBg3dEngineSelectionPlan {
   return Object.freeze({
     backend,
     runtimeId: BACKEND_RUNTIME_IDS[backend],
-    fallbackBackend: backend === "webgpu" ? "webgl2" : null,
+    status,
     reason,
-    webgpuSelectable,
     notice: STUDIO_BG3D_ENGINE_SELECTION_NOTICES[reason],
     diagnostics: Object.freeze([...new Set(diagnostics)]),
   });
 }
 
-function normalizedFailureCount(value: number | undefined): number {
-  return Number.isFinite(value) && (value ?? 0) > 0 ? Math.floor(value ?? 0) : 0;
-}
-
-/**
- * Collects every reason WebGPU is not usable at all. An empty result means a WebGPU device can be
- * created; it does not yet mean `auto` should choose one.
- */
-function collectHardBlocks(
+function collectWebGpuBlocks(
   request: StudioBg3dEngineSelectionRequest,
 ): readonly StudioBg3dEngineSelectionReason[] {
   const blocks: StudioBg3dEngineSelectionReason[] = [];
+  if (request.webgpuRuntimeFailed === true) blocks.push("webgpu-runtime-failed");
   if (!request.webgpuRuntimeAvailable) blocks.push("webgpu-runtime-unavailable");
   if (!request.probe?.supported) blocks.push("webgpu-probe-unsupported");
   else if (!request.probe.computeSupported) blocks.push("webgpu-compute-unavailable");
   if (request.inApp?.gpuTrust === "blocked") blocks.push("inapp-browser-blocked");
-  if (normalizedFailureCount(request.webgpuFailureCount) >= STUDIO_BG3D_WEBGPU_FAILURE_LIMIT) {
-    blocks.push("repeated-webgpu-failure");
+  if (request.webglOnlyFeatures?.webxr === true) blocks.push("webgl-only-webxr");
+  if (request.webglOnlyFeatures?.vrmCharacters === true) {
+    blocks.push("webgl-only-vrm-character");
   }
-  const features = request.webglOnlyFeatures;
-  if (features?.webxr === true) blocks.push("webgl-only-webxr");
-  if (features?.vrmCharacters === true) blocks.push("webgl-only-vrm-character");
   return blocks;
 }
 
-/**
- * Collects reasons `auto` declines a WebGPU device that is otherwise available. These are advisory:
- * an explicit user choice still wins, because the artist can see the result and switch back.
- */
-function collectAutoDeclines(
+function collectAdvisories(
   request: StudioBg3dEngineSelectionRequest,
 ): readonly StudioBg3dEngineSelectionReason[] {
-  const declines: StudioBg3dEngineSelectionReason[] = [];
-  if (request.inApp?.gpuTrust === "opt-in") declines.push("inapp-browser-opt-in-required");
-  if (request.saveData === true) declines.push("save-data-enabled");
+  const advisories: StudioBg3dEngineSelectionReason[] = [];
+  if (request.inApp?.gpuTrust === "opt-in") advisories.push("inapp-browser-opt-in-required");
+  if (request.saveData === true) advisories.push("save-data-enabled");
   const memory = request.deviceMemoryGb;
   if (
     request.deviceProfile === "mobile" &&
     Number.isFinite(memory) &&
     (memory ?? 0) < STUDIO_BG3D_WEBGPU_MIN_DEVICE_MEMORY_GB
   ) {
-    declines.push("low-device-memory");
+    advisories.push("low-device-memory");
   }
-  return declines;
+  return advisories;
 }
 
-/**
- * Resolves the interactive backend for one editor session.
- *
- * A malformed request resolves to the WebGL2 baseline rather than throwing; the editor must always
- * be able to open a viewport.
- */
+/** Resolves an explicit selection without ever substituting another backend. */
 export function selectStudioBg3dEngine(
   request: StudioBg3dEngineSelectionRequest,
 ): StudioBg3dEngineSelectionPlan {
   if (!request || typeof request !== "object") {
-    return plan("webgl2", "auto-webgl2-baseline", false, []);
-  }
-  const hardBlocks = collectHardBlocks(request);
-  const autoDeclines = collectAutoDeclines(request);
-  const webgpuSelectable = hardBlocks.length === 0;
-
-  if (request.preference === "webgl2") {
-    return plan("webgl2", "user-webgl2-override", webgpuSelectable, [
-      ...hardBlocks,
-      ...autoDeclines,
+    return plan("webgpu", "webgpu-probe-unsupported", "unavailable", [
+      "webgpu-probe-unsupported",
     ]);
   }
-  if (!webgpuSelectable) {
-    // The first hard block is the headline; the rest stay as diagnostics.
-    return plan("webgl2", hardBlocks[0]!, false, [...hardBlocks, ...autoDeclines]);
+  const preference = normalizeStudioBg3dEnginePreference(request.preference);
+  const hardBlocks = collectWebGpuBlocks(request);
+  const advisories = collectAdvisories(request);
+
+  if (preference === "webgl2") {
+    return plan("webgl2", "user-webgl2-override", "available", [
+      ...hardBlocks,
+      ...advisories,
+    ]);
   }
-  if (request.preference === "webgpu") {
-    return plan("webgpu", "user-webgpu-override", true, autoDeclines);
+  if (hardBlocks.length > 0) {
+    const reason = hardBlocks[0]!;
+    return plan(
+      "webgpu",
+      reason,
+      hardBlocks.includes("webgpu-runtime-failed") ? "failed" : "unavailable",
+      [...hardBlocks, ...advisories],
+    );
   }
-  if (autoDeclines.length > 0) {
-    return plan("webgl2", autoDeclines[0]!, true, autoDeclines);
-  }
-  return plan("webgpu", "auto-webgpu-promoted", true, []);
+  return plan("webgpu", "user-webgpu-override", "available", advisories);
 }
 
-/**
- * Capabilities the interactive background editor cannot open without. `capture-rgba-depth` is on
- * the list because the line-and-tone pipeline and the studio insert flow both read the editor's
- * capture adapter; a renderer that cannot produce that raster is not a candidate, however fast it
- * draws.
- */
+/** Capabilities required before an interactive editor canvas may mount. */
 export const STUDIO_BG3D_EDITOR_REQUIRED_CAPABILITIES: readonly StudioBg3dRuntimeCapability[] =
   Object.freeze(["interactive-editing", "capture-rgba-depth"]);
 
@@ -311,42 +236,25 @@ const PRODUCTION_RUNTIME_IDS: readonly StudioBg3dRuntimeId[] = Object.freeze([
   "three-webgpu",
 ]);
 
-/**
- * Resolves the interactive engine and then confirms the choice against the runtime topology
- * policy, which owns capabilities, maturity, and the activation budget.
- *
- * Running both is the point: the selection policy knows about hosts and devices, the topology
- * policy knows what each runtime can actually do. If a runtime ever loses a capability the editor
- * depends on, this stops selecting it instead of opening a viewport that cannot capture.
- */
+/** Confirms the selected runtime against topology without accepting a different primary runtime. */
 export function resolveStudioBg3dEngineRuntime(
   request: StudioBg3dEngineSelectionRequest,
 ): StudioBg3dEngineSelectionPlan {
   const selected = selectStudioBg3dEngine(request);
+  if (selected.status !== "available") return selected;
+
   const topology = planStudioBg3dRuntimeTopology({
     availableRuntimeIds: PRODUCTION_RUNTIME_IDS,
     primaryCapabilities: STUDIO_BG3D_EDITOR_REQUIRED_CAPABILITIES,
     allowLabRuntimes: false,
-    // The device's real capability, not the choice: a WebGL2 session still confirms that the
-    // WebGPU runtime it declined would have satisfied the editor's capability requirements.
     webgpuSupported: request.probe?.supported === true,
     maximumActivationGzipBytes: STUDIO_BG3D_EDITOR_ACTIVATION_BUDGET_GZIP_BYTES,
     preferredPrimaryRuntimeId: selected.runtimeId,
   });
   if (topology.ok && topology.primaryRuntimeId === selected.runtimeId) return selected;
-  // Either the chosen runtime lost a capability the editor depends on, or the WebGL2 baseline
-  // itself failed the check. Both resolve to the baseline, but the reason is reported rather than
-  // swallowed, and WebGPU is withdrawn as a choice until the capability catalog agrees again.
-  return plan("webgl2", "runtime-capability-unavailable", false, [
+
+  return plan(selected.backend, "runtime-capability-unavailable", "unavailable", [
     ...selected.diagnostics,
     "runtime-capability-unavailable",
   ]);
-}
-
-/**
- * Records a runtime WebGPU failure and returns the next session failure count, saturating at the
- * limit so a long session cannot overflow the counter.
- */
-export function recordStudioBg3dWebGpuFailure(current: number | undefined): number {
-  return Math.min(STUDIO_BG3D_WEBGPU_FAILURE_LIMIT, normalizedFailureCount(current) + 1);
 }

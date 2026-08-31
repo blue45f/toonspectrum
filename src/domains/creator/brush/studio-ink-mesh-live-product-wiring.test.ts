@@ -22,7 +22,7 @@ describe("Google Ink mesh actual /studio product wiring", () => {
     expect(page.indexOf("armTransientPenInkSurfaces({"))
       .toBeLessThan(page.indexOf("inkMeshLivePreviewRuntimeRef.current?.begin("));
     expect(page).toContain("liveInkAdmitted: liveInkOverlayStarted");
-    expect(runtime).toContain("fallback: \"canvas2d-perfect-freehand\"");
+    expect(runtime).toContain("retainedPixelAuthority: \"canvas2d-perfect-freehand\"");
   });
 
   it("feeds authoritative coalesced suffixes and keeps predictions in a replacement-only call", () => {

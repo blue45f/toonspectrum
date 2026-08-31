@@ -39,7 +39,11 @@ vi.mock("./render/studio-webgpu-engine", () => {
     }
 
     getBackend() {
-      return "canvas2d" as const;
+      return "webgpu" as const;
+    }
+
+    isBackendAvailable() {
+      return true;
     }
 
     getPerformanceMetrics() {
@@ -56,7 +60,7 @@ vi.mock("./render/studio-webgpu-engine", () => {
     }
 
     initialize() {
-      return Promise.resolve("canvas2d" as const);
+      return Promise.resolve("webgpu" as const);
     }
 
     resize(

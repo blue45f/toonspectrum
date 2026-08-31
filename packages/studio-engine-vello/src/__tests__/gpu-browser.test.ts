@@ -27,7 +27,9 @@ describe("vello gpu-browser lane — WebGPU-absent contract (node)", () => {
 
   it("loadVelloGpuBrowser rejects with an explicit WebGPU error, not a hang or silent no-op", async () => {
     await expect(loadVelloGpuBrowser()).rejects.toThrow(/WebGPU is unavailable/);
-    await expect(loadVelloGpuBrowser()).rejects.toThrow(/vello_cpu wasm lane/);
+    await expect(loadVelloGpuBrowser()).rejects.toThrow(
+      /remains unavailable until the caller explicitly selects another provider/,
+    );
   });
 
   it("probeWebGpu resolves supported:false with a concrete reason (graceful skip surface)", async () => {
@@ -119,12 +121,12 @@ describe("local δ48 fuzzy diff (same metric as cross-renderer-diff)", () => {
 });
 
 describe("vello-gpu-browser descriptor", () => {
-  it("passes schema validation and declares the CPU-lane fallback chain", () => {
+  it("passes schema validation without declaring an automatic fallback", () => {
     const parsed = providerDescriptorSchema.parse(velloGpuBrowserProviderDescriptor);
     expect(parsed.id).toBe("vello-gpu-browser");
     expect(parsed.runtime).toBe("webgpu");
     expect(parsed.maturity).toBe("experimental");
-    expect(parsed.fallbackProviderId).toBe("vello-cpu");
+    expect(parsed).not.toHaveProperty("fallbackProviderId");
     expect(parsed.capabilities).toContain("render.gpu.webgpu");
     // The GPU lane must not claim the deterministic-export capability the CPU
     // reference lane owns.

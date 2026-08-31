@@ -335,6 +335,86 @@ describe("SVG export Worker R8 transfer protocol", () => {
     }
   });
 
+  it("keeps Worker absence and factory construction failure terminal", async () => {
+    const input: SvgExportPageInput = {
+      width: 32,
+      height: 24,
+      transparentBg: true,
+      elements: [],
+    };
+
+    await expect(runStudioSvgExportWorker(input, {
+      workerFactory: null,
+    })).rejects.toThrow("Worker를 사용할 수 없습니다");
+    await expect(runStudioSvgExportWorker(input, {
+      workerFactory: () => {
+        throw new Error("CSP blocked Worker");
+      },
+    })).rejects.toThrow("Worker를 생성하지 못했습니다");
+  });
+
+  it("keeps Worker ready timeout and pre-ready error terminal", async () => {
+    vi.useFakeTimers();
+    try {
+      const terminateTimedOut = vi.fn();
+      const neverReady: StudioSvgExportWorkerLike = {
+        onmessage: null,
+        onerror: null,
+        postMessage: vi.fn(),
+        terminate: terminateTimedOut,
+      };
+      const pending = runStudioSvgExportWorker({
+        width: 32,
+        height: 24,
+        transparentBg: true,
+        elements: [],
+      }, { workerFactory: () => neverReady });
+      const rejection = pending.catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(3_000);
+      await expect(rejection).resolves.toMatchObject({
+        message: expect.stringContaining("준비 시간이 초과되었습니다"),
+      });
+      expect(terminateTimedOut).toHaveBeenCalledOnce();
+      expect(neverReady.postMessage).not.toHaveBeenCalled();
+
+      const terminateErrored = vi.fn();
+      const errorsBeforeReady: StudioSvgExportWorkerLike = {
+        onmessage: null,
+        onerror: null,
+        postMessage: vi.fn(),
+        terminate: terminateErrored,
+      };
+      const errored = runStudioSvgExportWorker({
+        width: 32,
+        height: 24,
+        transparentBg: true,
+        elements: [],
+      }, { workerFactory: () => errorsBeforeReady });
+      errorsBeforeReady.onerror?.({ message: "startup failed", preventDefault: vi.fn() });
+      await expect(errored).rejects.toThrow("startup failed");
+      expect(terminateErrored).toHaveBeenCalledOnce();
+      expect(errorsBeforeReady.postMessage).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("runs direct serialization only when that backend is selected before work", async () => {
+    const workerFactory = vi.fn();
+    const result = await runStudioSvgExportWorker({
+      width: 32,
+      height: 24,
+      transparentBg: true,
+      elements: [],
+    }, {
+      executionBackend: "direct",
+      workerFactory,
+    });
+
+    expect(result.execution).toBe("direct");
+    expect(workerFactory).not.toHaveBeenCalled();
+  });
+
   it("rejects a malformed runtime response instead of leaving the export pending", async () => {
     const worker = new HangingSvgWorker(null);
 
@@ -451,17 +531,15 @@ describe("SVG export Worker R8 transfer protocol", () => {
     expect(resolveStudioBrushR8GrainSampler(unrelated)).not.toBeNull();
   });
 
-  it("keeps the main registry available when postMessage falls back to direct export", async () => {
+  it("keeps postMessage failure terminal without rerunning direct export", async () => {
     const source = r8Source();
     expect(hydrateStudioBrushR8GrainAsset(source, decodedBytes).status).toBe("ready");
     const worker = new ReadySvgWorker(true);
 
-    const result = await runStudioSvgExportWorker(r8ExportInput(source), {
+    await expect(runStudioSvgExportWorker(r8ExportInput(source), {
       workerFactory: () => worker,
-    });
+    })).rejects.toThrow("요청을 전달하지 못했습니다");
 
-    expect(result.execution).toBe("direct");
-    expect(result.result.skipped).toEqual([]);
     expect(resolveStudioBrushR8GrainSampler(source)).not.toBeNull();
     expect(worker.terminated).toBe(true);
     expect([...worker.posted!.r8GrainAssets[0]!.decodedBytes]).toEqual([0, 0, 0, 0]);

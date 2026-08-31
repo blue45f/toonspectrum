@@ -6,28 +6,19 @@
  * LT/pass PNG/optional PSD staging contract and remains behind the shot-batch runtime boundary.
  */
 
-import { waitForStudioBg3dCapturePhase } from "./studio-bg3d-capture-adapter";
 import { createStudioBg3dDepthRasterLayer } from "./studio-bg3d-depth-pass";
 import {
-  renderStudioBg3dLtLayers,
   type StudioBg3dLtRasterInput,
   type StudioBg3dLtRasterLayer,
   type StudioBg3dLtRenderResult,
   type StudioBg3dLtRenderSettings,
 } from "./studio-bg3d-lt-render";
-import {
-  renderStudioBg3dLtLayersInWorker,
-  StudioBg3dLtRenderWorkerError,
-} from "./studio-bg3d-lt-render-worker-client";
+import { renderStudioBg3dLtLayersInWorker } from "./studio-bg3d-lt-render-worker-client";
 import {
   STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES,
   STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
 } from "./studio-bg3d-shot-batch";
-import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
-import {
-  encodeStudioBg3dShotPngInWorker,
-  isStudioBg3dShotPngFallbackEligibleError,
-} from "./studio-bg3d-shot-png-worker-client";
+import { encodeStudioBg3dShotPngInWorker } from "./studio-bg3d-shot-png-worker-client";
 import {
   admitStudioBg3dShotPsdLayers,
   type StudioBg3dShotPsdAdmission,
@@ -45,9 +36,6 @@ import type {
   StudioBg3dShotBatchPass,
   StudioBg3dShotBatchPlannedShot,
 } from "./studio-bg3d-shot-batch-plan";
-
-const STUDIO_BG3D_LT_RENDER_SYNC_FALLBACK_MAX_PIXELS = 1_048_576;
-const STUDIO_BG3D_SHOT_PNG_MAIN_THREAD_FALLBACK_MAX_PIXELS = 1_048_576;
 
 export interface StudioBg3dShotArtifactPipelineInput {
   readonly shot: StudioBg3dShotBatchPlannedShot;
@@ -75,20 +63,12 @@ export interface StudioBg3dShotArtifactPipelineDependencies {
     settings: StudioBg3dLtRenderSettings,
     options: { readonly signal?: AbortSignal },
   ) => Promise<StudioBg3dLtRenderResult>;
-  readonly renderLtSynchronously: (
-    input: StudioBg3dLtRasterInput,
-    settings: StudioBg3dLtRenderSettings,
-  ) => StudioBg3dLtRenderResult;
   readonly createDepthLayer: (
     width: number,
     height: number,
     depth: Float32Array,
   ) => StudioBg3dLtRasterLayer;
   readonly encodePngInWorker: (
-    layers: readonly StudioBg3dLtRasterLayer[],
-    options: { readonly signal?: AbortSignal; readonly timeoutMs?: number },
-  ) => Promise<Blob>;
-  readonly encodePngOnMainThread: (
     layers: readonly StudioBg3dLtRasterLayer[],
     options: { readonly signal?: AbortSignal; readonly timeoutMs?: number },
   ) => Promise<Blob>;
@@ -109,74 +89,10 @@ interface PassLayerSelection {
   readonly skipReason: StudioBg3dShotBatchSkippedArtifact["reason"];
 }
 
-/** Small compatibility path used only after an explicit Worker/OffscreenCanvas creation failure. */
-async function encodeStudioBg3dLtCompositeToPngBlobOnMainThread(
-  layers: readonly StudioBg3dLtRasterLayer[],
-  options: { readonly signal?: AbortSignal; readonly timeoutMs?: number } = {},
-): Promise<Blob> {
-  const width = layers[0]?.width ?? 0;
-  const height = layers[0]?.height ?? 0;
-  if (
-    layers.length < 1 ||
-    width < 1 ||
-    height < 1 ||
-    width > STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION ||
-    height > STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION ||
-    layers.some((layer) => (
-      layer.width !== width ||
-      layer.height !== height ||
-      layer.data.byteLength !== width * height * 4
-    ))
-  ) {
-    throw new RangeError("컷 LT 레이어가 PNG 출력 예산과 일치하지 않습니다.");
-  }
-  const compositeCanvas = document.createElement("canvas");
-  const layerCanvas = document.createElement("canvas");
-  compositeCanvas.width = width;
-  compositeCanvas.height = height;
-  layerCanvas.width = width;
-  layerCanvas.height = height;
-  const compositeContext = compositeCanvas.getContext("2d");
-  const layerContext = layerCanvas.getContext("2d");
-  if (!compositeContext || !layerContext) {
-    throw new Error("컷 LT PNG 인코더를 준비하지 못했습니다.");
-  }
-  let blob: Blob | null;
-  try {
-    for (const layer of layers) {
-      if (options.signal?.aborted) {
-        const error = new Error("컷 일괄 렌더를 취소했습니다.");
-        error.name = "AbortError";
-        throw error;
-      }
-      layerContext.clearRect(0, 0, width, height);
-      const imageBytes = new Uint8ClampedArray(layer.data.length);
-      imageBytes.set(layer.data);
-      layerContext.putImageData(new ImageData(imageBytes, width, height), 0, 0);
-      compositeContext.drawImage(layerCanvas, 0, 0);
-    }
-    blob = await waitForStudioBg3dCapturePhase(
-      new Promise<Blob | null>((resolve) => compositeCanvas.toBlob(resolve, "image/png")),
-      options,
-    );
-  } finally {
-    layerCanvas.width = 1;
-    layerCanvas.height = 1;
-    compositeCanvas.width = 1;
-    compositeCanvas.height = 1;
-  }
-  if (!blob || blob.type !== "image/png") {
-    throw new Error("컷 LT PNG 인코딩에 실패했습니다.");
-  }
-  return blob;
-}
-
 const DEFAULT_DEPENDENCIES: StudioBg3dShotArtifactPipelineDependencies = {
   renderLtInWorker: renderStudioBg3dLtLayersInWorker,
-  renderLtSynchronously: renderStudioBg3dLtLayers,
   createDepthLayer: createStudioBg3dDepthRasterLayer,
   encodePngInWorker: encodeStudioBg3dShotPngInWorker,
-  encodePngOnMainThread: encodeStudioBg3dLtCompositeToPngBlobOnMainThread,
   admitPsdLayers: admitStudioBg3dShotPsdLayers,
   buildLayeredPsdInWorker: buildStudioBg3dShotLayeredPsdInWorker,
   workersAvailable: () => typeof Worker === "function",
@@ -258,17 +174,7 @@ export async function buildStudioBg3dShotArtifacts(
     ltRenderInput,
     input.settings,
     { signal: input.signal },
-  ).catch((cause: unknown) => {
-    if (
-      cause instanceof StudioBg3dLtRenderWorkerError &&
-      cause.code === "worker-unavailable" &&
-      input.captured.width * input.captured.height <=
-        STUDIO_BG3D_LT_RENDER_SYNC_FALLBACK_MAX_PIXELS
-    ) {
-      return dependencies.renderLtSynchronously(ltRenderInput, input.settings);
-    }
-    throw cause;
-  });
+  );
 
   const images: StudioBg3dShotBatchImage[] = [];
   const skippedArtifacts: StudioBg3dShotBatchSkippedArtifact[] = [];
@@ -295,19 +201,7 @@ export async function buildStudioBg3dShotArtifacts(
       continue;
     }
     const pngOptions = { signal: input.signal, timeoutMs: 20_000 } as const;
-    const png = await dependencies.encodePngInWorker(passLayers, pngOptions).catch(
-      (cause: unknown) => {
-        const width = passLayers[0]?.width ?? 0;
-        const height = passLayers[0]?.height ?? 0;
-        if (
-          isStudioBg3dShotPngFallbackEligibleError(cause) &&
-          width * height <= STUDIO_BG3D_SHOT_PNG_MAIN_THREAD_FALLBACK_MAX_PIXELS
-        ) {
-          return dependencies.encodePngOnMainThread(passLayers, pngOptions);
-        }
-        throw cause;
-      },
-    );
+    const png = await dependencies.encodePngInWorker(passLayers, pngOptions);
     if (
       png.size > dependencies.maxImageBytes ||
       input.committedArtifactBytes + artifactBytes + png.size > dependencies.maxTotalBytes

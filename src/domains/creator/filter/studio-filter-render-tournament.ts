@@ -251,7 +251,7 @@ export function scheduleStudioFilterRenderTournament(
         }
       } catch {
         // Shadow/tournament work is observational. Failure preserves the
-        // already-presented production pixels and the existing fallback chain.
+        // already-presented production pixels and selected provider decision.
       } finally {
         pendingRaceKeys.delete(raceKey);
         rememberCompleted(raceKey);

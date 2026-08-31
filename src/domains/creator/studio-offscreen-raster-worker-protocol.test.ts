@@ -5,6 +5,8 @@ import {
   STUDIO_OFFSCREEN_RASTER_WORKER_PROTOCOL_VERSION,
   adoptStudioOffscreenBitmap,
   adoptStudioOffscreenPixelBuffer,
+  detectStudioOffscreenRasterEncodedMime,
+  isStudioOffscreenRasterEncodedBlobExact,
   isStudioOffscreenRasterCancelMessage,
   isStudioOffscreenRasterRequestMessage,
   isStudioOffscreenRasterResponseMessage,
@@ -184,7 +186,7 @@ describe("studio offscreen raster protocol — 응답 형태 검증", () => {
     expect(isStudioOffscreenRasterResponseMessage({ ...failure, runId: 0 })).toBe(false);
   });
 
-  it("인코딩 결과는 Blob 형태를 요구한다", () => {
+  it("인코딩 결과는 요청 MIME과 같은 비어 있지 않은 Blob 라벨을 요구한다", () => {
     const base = {
       version: STUDIO_OFFSCREEN_RASTER_WORKER_PROTOCOL_VERSION,
       kind: "result" as const,
@@ -194,12 +196,41 @@ describe("studio offscreen raster protocol — 응답 형태 검증", () => {
     };
     expect(isStudioOffscreenRasterResponseMessage({
       ...base,
-      payload: { kind: "encoded", mime: "image/png", blob: new Blob([new Uint8Array([1, 2])]) },
+      payload: {
+        kind: "encoded",
+        mime: "image/png",
+        blob: new Blob([Uint8Array.of(0x89)], { type: "image/png" }),
+      },
     })).toBe(true);
+    expect(isStudioOffscreenRasterResponseMessage({
+      ...base,
+      payload: {
+        kind: "encoded",
+        mime: "image/webp",
+        blob: new Blob([Uint8Array.of(0x89)], { type: "image/png" }),
+      },
+    })).toBe(false);
     expect(isStudioOffscreenRasterResponseMessage({
       ...base,
       payload: { kind: "encoded", mime: "image/png", blob: { size: 3 } },
     })).toBe(false);
+  });
+
+  it("인코딩 컨테이너 magic까지 요청 MIME과 정확히 일치시킨다", async () => {
+    const png = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+    const jpeg = Uint8Array.of(0xff, 0xd8, 0xff, 0xe0);
+    const webp = new TextEncoder().encode("RIFF0000WEBP");
+    expect(detectStudioOffscreenRasterEncodedMime(png)).toBe("image/png");
+    expect(detectStudioOffscreenRasterEncodedMime(jpeg)).toBe("image/jpeg");
+    expect(detectStudioOffscreenRasterEncodedMime(webp)).toBe("image/webp");
+    await expect(isStudioOffscreenRasterEncodedBlobExact(
+      new Blob([webp], { type: "image/webp" }),
+      "image/webp",
+    )).resolves.toBe(true);
+    await expect(isStudioOffscreenRasterEncodedBlobExact(
+      new Blob([png], { type: "image/webp" }),
+      "image/webp",
+    )).resolves.toBe(false);
   });
 
   it("요청/응답이 서로의 검증기를 왕복 통과한다(round-trip)", () => {
@@ -287,7 +318,11 @@ describe("studio offscreen raster protocol — transfer 목록", () => {
       runId: 1,
       width: 4,
       height: 2,
-      payload: { kind: "encoded", mime: "image/png", blob: new Blob([new Uint8Array([1])]) },
+      payload: {
+        kind: "encoded",
+        mime: "image/png",
+        blob: new Blob([Uint8Array.of(0x89)], { type: "image/png" }),
+      },
     })).toEqual([]);
 
     expect(studioOffscreenRasterResponseTransfers(

@@ -34,6 +34,7 @@ import type { BrushProgramIR, ModeledSampleIR, StrokeIR } from "@toonspectrum/st
 import type { Intersection } from "three";
 
 export type StudioVrmSurfaceBrushBridgeErrorCode =
+  | "automatic-fallback-forbidden"
   | "hit-count-mismatch"
   | "no-ray-hit"
   | "provider-closed"
@@ -62,8 +63,6 @@ export interface PrepareStudioVrmSurfaceProjectionProviderInput {
   readonly stroke: StrokeIR;
   /** One real Three.js Raycaster/BVH result per retained StrokeIR sample. */
   readonly rayHits: readonly (StudioVrmTexturePaintRayHit | null)[];
-  /** Optional second real hit lane (for example a non-BVH raycaster fallback). */
-  readonly fallbackRayHits?: readonly (StudioVrmTexturePaintRayHit | null)[];
   /**
    * Optional camera/raycast differential measured by the caller. Values are
    * texels per scene-space pixel and are used only where hit deltas cannot
@@ -84,7 +83,7 @@ export interface ExecuteStudioVrmSurfaceBrushInput
   extends PrepareStudioVrmSurfaceProjectionProviderInput {
   readonly execution?: Omit<
     ExecuteSurfaceBrushOptions,
-    "commit" | "fallbackProvider" | "initialPixels" | "providerFailurePolicy" | "signal"
+    "commit" | "initialPixels" | "signal"
   >;
 }
 
@@ -95,7 +94,6 @@ interface PreparedProjection {
 
 export interface PreparedStudioVrmSurfaceProjection {
   readonly provider: StudioVrmSurfaceProjectionProvider;
-  readonly fallbackProvider?: StudioVrmSurfaceProjectionProvider;
   readonly warnings: readonly string[];
   cancel(): void;
 }
@@ -235,7 +233,6 @@ function resolveDensities(
   session: StudioVrmTexturePaintSurfaceSession,
   explicit: readonly (number | null | undefined)[] | undefined,
   worldUnitsPerCssPixel: readonly (number | null | undefined)[] | undefined,
-  lane: "primary" | "fallback",
 ): readonly (number | null)[] {
   const pairDensities: Array<number | null> = Array.from(
     { length: Math.max(0, projections.length - 1) },
@@ -261,7 +258,7 @@ function resolveDensities(
       if (!Number.isFinite(supplied) || supplied <= 0) {
         throw bridgeFailure(
           "texel-density-unavailable",
-          `${lane} sample[${sampleIndex}] supplied an invalid texel density ${String(supplied)}`,
+          `selected provider sample[${sampleIndex}] supplied an invalid texel density ${String(supplied)}`,
           sampleIndex,
         );
       }
@@ -272,7 +269,7 @@ function resolveDensities(
       if (!Number.isFinite(suppliedWorldScale) || suppliedWorldScale <= 0) {
         throw bridgeFailure(
           "texel-density-unavailable",
-          `${lane} sample[${sampleIndex}] supplied an invalid world/CSS-pixel scale ${String(suppliedWorldScale)}`,
+          `selected provider sample[${sampleIndex}] supplied an invalid world/CSS-pixel scale ${String(suppliedWorldScale)}`,
           sampleIndex,
         );
       }
@@ -290,7 +287,7 @@ function resolveDensities(
     if (adjacent.length === 0) {
       throw bridgeFailure(
         "texel-density-unavailable",
-        `${lane} sample[${sampleIndex}] has no measured screen→texel derivative; `
+        `selected provider sample[${sampleIndex}] has no measured screen→texel derivative; `
           + "provide texelDensityBySample or a camera worldUnitsPerCssPixelBySample differential",
         sampleIndex,
       );
@@ -354,12 +351,9 @@ export class StudioVrmSurfaceProjectionProvider implements SurfaceProjectionProv
     private readonly expectedStrokeId: string,
     private readonly expectedBrushProgramId: string,
     private readonly signal: AbortSignal | undefined,
-    role: "primary" | "fallback",
   ) {
-    this.id = role === "primary" ? PROVIDER_ID : `${PROVIDER_ID}-fallback`;
-    if (role === "primary") {
-      this.commitTextureOperations = (transaction) => this.commit(transaction);
-    }
+    this.id = PROVIDER_ID;
+    this.commitTextureOperations = (transaction) => this.commit(transaction);
   }
 
   projectSample(
@@ -458,7 +452,6 @@ async function resolveHitLane(
   session: StudioVrmTexturePaintSurfaceSession,
   stroke: StrokeIR,
   hits: readonly (StudioVrmTexturePaintRayHit | null)[],
-  lane: "primary" | "fallback",
 ): Promise<readonly (StudioVrmTexturePaintSurfaceProjection | null)[]> {
   const resolved: Array<StudioVrmTexturePaintSurfaceProjection | null> = [];
   for (const [sampleIndex, hit] of hits.entries()) {
@@ -472,14 +465,14 @@ async function resolveHitLane(
     if (!result.ok) {
       throw bridgeFailure(
         "runtime-projection-failed",
-        `${lane} sample[${sampleIndex}] ${runtimeFailureMessage(result.error)}`,
+        `selected provider sample[${sampleIndex}] ${runtimeFailureMessage(result.error)}`,
         sampleIndex,
       );
     }
     if (result.value.sourcePressure !== sample.pressure) {
       throw bridgeFailure(
         "runtime-projection-failed",
-        `${lane} sample[${sampleIndex}] did not preserve calibrated pressure`,
+        `selected provider sample[${sampleIndex}] did not preserve calibrated pressure`,
         sampleIndex,
       );
     }
@@ -491,11 +484,15 @@ async function resolveHitLane(
 export async function prepareStudioVrmSurfaceProjectionProvider(
   input: PrepareStudioVrmSurfaceProjectionProviderInput,
 ): Promise<PreparedStudioVrmSurfaceProjection> {
+  const legacyInput = input as unknown as Record<string, unknown>;
+  if (legacyInput.fallbackRayHits !== undefined) {
+    throw bridgeFailure(
+      "automatic-fallback-forbidden",
+      "fallbackRayHits is forbidden; choose one raycast provider before starting the stroke",
+    );
+  }
   const sampleCount = input.stroke.samples.length;
   assertHitArrayLength("rayHits", input.rayHits, sampleCount);
-  if (input.fallbackRayHits) {
-    assertHitArrayLength("fallbackRayHits", input.fallbackRayHits, sampleCount);
-  }
   if (input.texelDensityBySample) {
     assertHitArrayLength("texelDensityBySample", input.texelDensityBySample, sampleCount);
   }
@@ -506,14 +503,12 @@ export async function prepareStudioVrmSurfaceProjectionProvider(
       sampleCount,
     );
   }
-  const anchor = [...input.rayHits, ...(input.fallbackRayHits ?? [])]
+  const anchor = input.rayHits
     .find((hit): hit is StudioVrmTexturePaintRayHit => hit !== null);
   if (!anchor) {
-    throw bridgeFailure("no-ray-hit", "neither primary nor fallback raycast hit the model");
+    throw bridgeFailure("no-ray-hit", "the selected raycast provider did not hit the model");
   }
-  const anchorIndex = input.rayHits.indexOf(anchor);
-  const fallbackAnchorIndex = input.fallbackRayHits?.indexOf(anchor) ?? -1;
-  const sourceIndex = anchorIndex >= 0 ? anchorIndex : fallbackAnchorIndex;
+  const sourceIndex = input.rayHits.indexOf(anchor);
   assertTriangleIndex(anchor, sourceIndex);
   const prepared = await input.runtime.prepareSurfaceBrushSession({
     hit: anchor,
@@ -534,7 +529,6 @@ export async function prepareStudioVrmSurfaceProjectionProvider(
       session,
       input.stroke,
       input.rayHits,
-      "primary",
     );
     const primaryDensity = resolveDensities(
       primaryRaw,
@@ -542,7 +536,6 @@ export async function prepareStudioVrmSurfaceProjectionProvider(
       session,
       input.texelDensityBySample,
       input.worldUnitsPerCssPixelBySample,
-      "primary",
     );
     const primary = toProviderProjections(primaryRaw, primaryDensity);
     const warnings: string[] = [];
@@ -554,40 +547,6 @@ export async function prepareStudioVrmSurfaceProjectionProvider(
       }
     }
 
-    let fallbackProvider: StudioVrmSurfaceProjectionProvider | undefined;
-    if (input.fallbackRayHits) {
-      const fallbackRaw = await resolveHitLane(
-        input.runtime,
-        session,
-        input.stroke,
-        input.fallbackRayHits,
-        "fallback",
-      );
-      const fallbackDensity = resolveDensities(
-        fallbackRaw,
-        input.stroke,
-        session,
-        input.texelDensityBySample,
-        input.worldUnitsPerCssPixelBySample,
-        "fallback",
-      );
-      fallbackProvider = new StudioVrmSurfaceProjectionProvider(
-        input.runtime,
-        session,
-        toProviderProjections(fallbackRaw, fallbackDensity),
-        input.stroke.id,
-        input.brushProgram.id,
-        input.signal,
-        "fallback",
-      );
-      for (const [sampleIndex, projection] of fallbackRaw.entries()) {
-        if (projection?.uvWasWrapped) {
-          warnings.push(
-            `surface.adapter.fallback.sample[${sampleIndex}]: sampler wrap normalized the ray-hit UV`,
-          );
-        }
-      }
-    }
     const provider = new StudioVrmSurfaceProjectionProvider(
       input.runtime,
       session,
@@ -595,11 +554,9 @@ export async function prepareStudioVrmSurfaceProjectionProvider(
       input.stroke.id,
       input.brushProgram.id,
       input.signal,
-      "primary",
     );
     return Object.freeze({
       provider,
-      ...(fallbackProvider ? { fallbackProvider } : {}),
       warnings: Object.freeze(warnings),
       cancel: () => provider.cancel(),
     });
@@ -625,10 +582,6 @@ export async function executeStudioVrmSurfaceBrushStroke(
         {
           ...input.execution,
           ...(input.signal ? { signal: input.signal } : {}),
-          ...(prepared.fallbackProvider
-            ? { fallbackProvider: prepared.fallbackProvider }
-            : {}),
-          providerFailurePolicy: "reject",
           commit: true,
         },
       );
@@ -641,9 +594,6 @@ export async function executeStudioVrmSurfaceBrushStroke(
         "runtime provider returned without committing the texture transaction",
       );
     }
-    // The primary provider has consumed the runtime lease. Retire the optional
-    // lookup-only provider too so it cannot be reused with a stale session.
-    prepared.fallbackProvider?.cancel();
     committed = true;
     return {
       ...result,

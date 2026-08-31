@@ -27,8 +27,10 @@ describe("SVG export outline-engine preparation", () => {
     }],
   };
 
-  it("prepares perfect-freehand before a Worker-disabled first direct export", async () => {
-    const result = await runStudioSvgExportWorker(gpenInput, { workerFactory: null });
+  it("prepares perfect-freehand before an explicitly selected direct export", async () => {
+    const result = await runStudioSvgExportWorker(gpenInput, {
+      executionBackend: "direct",
+    });
 
     expect(result.execution).toBe("direct");
     expect(result.result.svg).toContain('data-brush-engine="perfect-outline"');

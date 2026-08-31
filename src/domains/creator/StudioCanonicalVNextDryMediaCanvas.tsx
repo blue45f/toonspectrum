@@ -23,9 +23,10 @@ import { cn } from "@/lib/utils";
 
 export const STUDIO_CANONICAL_VNEXT_DRY_MEDIA_CANVAS_VERSION = 1 as const;
 
-export interface StudioCanonicalVNextDryMediaCanvasAuthority {
+export interface StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority {
   readonly kind: "studio-canonical-vnext-dry-media-canvas-authority";
   readonly version: typeof STUDIO_CANONICAL_VNEXT_DRY_MEDIA_CANVAS_VERSION;
+  readonly status: "authorized";
   readonly element: DrawEl;
   readonly layoutKey: string;
   readonly canonicalPlanHash: string;
@@ -38,6 +39,22 @@ export interface StudioCanonicalVNextDryMediaCanvasAuthority {
     { readonly status: "completed" }
   >["receipt"];
 }
+
+export interface StudioCanonicalVNextDryMediaCanvasUnavailableAuthority {
+  readonly kind: "studio-canonical-vnext-dry-media-canvas-authority";
+  readonly version: typeof STUDIO_CANONICAL_VNEXT_DRY_MEDIA_CANVAS_VERSION;
+  readonly status: "unavailable";
+  readonly element: DrawEl;
+  readonly layoutKey: string;
+  readonly reason: string;
+  readonly retainsLastGoodFrame: boolean;
+  readonly lastPresented: StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority | null;
+  readonly retryPolicy: "explicit-next-selection-only";
+}
+
+export type StudioCanonicalVNextDryMediaCanvasAuthority =
+  | StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority
+  | StudioCanonicalVNextDryMediaCanvasUnavailableAuthority;
 
 export interface StudioCanonicalVNextDryMediaCanvasProps {
   readonly className?: string;
@@ -73,38 +90,11 @@ interface DryMediaGpuResources {
   tail: Promise<void>;
 }
 
-interface DryMediaRecoveryScope {
-  readonly element: DrawEl | null;
-  readonly layoutKey: string;
-  readonly surfaceLeft: number;
-  readonly surfaceTop: number;
-  readonly surfaceWidth: number;
-  readonly surfaceHeight: number;
-  readonly documentWidth: number;
-  readonly documentHeight: number;
-  readonly documentScale: number;
-  readonly flipX: boolean;
-}
-
-const STUDIO_CANONICAL_VNEXT_DRY_MEDIA_RECOVERY_DELAYS_MS = [32, 160] as const;
-
-function isSameRecoveryScope(
-  left: DryMediaRecoveryScope,
-  right: DryMediaRecoveryScope,
-): boolean {
-  return (
-    left.element === right.element
-    && left.layoutKey === right.layoutKey
-    && left.surfaceLeft === right.surfaceLeft
-    && left.surfaceTop === right.surfaceTop
-    && left.surfaceWidth === right.surfaceWidth
-    && left.surfaceHeight === right.surfaceHeight
-    && left.documentWidth === right.documentWidth
-    && left.documentHeight === right.documentHeight
-    && left.documentScale === right.documentScale
-    && left.flipX === right.flipX
-  );
-}
+type DryMediaCanvasDisplayState =
+  | "awaiting-receipt"
+  | "authorized"
+  | "last-good-unavailable"
+  | "unavailable";
 
 function preferredCanvasFormat(gpu: GPU): "bgra8unorm" | "rgba8unorm" | null {
   const format = gpu.getPreferredCanvasFormat();
@@ -265,6 +255,32 @@ function disposeResourcesAfterTail(resources: DryMediaGpuResources | null): void
   void resources.tail.finally(() => disposeResources(resources));
 }
 
+function snapshotPresentedCanvas(
+  source: HTMLCanvasElement,
+  target: HTMLCanvasElement,
+): boolean {
+  // This is a display-only copy of an already receipted WebGPU frame. It never lowers the scene,
+  // executes brush commands, or grants Canvas2D provider authority; it only survives WebGPU
+  // unconfigure/device-loss clearing the browser's current presentation texture.
+  try {
+    const context = target.getContext("2d");
+    if (!context || source.width <= 0 || source.height <= 0) return false;
+    target.width = source.width;
+    target.height = source.height;
+    context.clearRect(0, 0, target.width, target.height);
+    context.drawImage(source, 0, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearPresentedSnapshot(canvas: HTMLCanvasElement | null): void {
+  if (!canvas) return;
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
 export function StudioCanonicalVNextDryMediaCanvas({
   className,
   element,
@@ -278,20 +294,24 @@ export function StudioCanonicalVNextDryMediaCanvas({
   onAuthorityChange,
 }: StudioCanonicalVNextDryMediaCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const snapshotCanvasRef = useRef<HTMLCanvasElement>(null);
   const callbackRef = useRef(onAuthorityChange);
   const resourcesRef = useRef<DryMediaGpuResources | null>(null);
   const resourcesPromiseRef = useRef<Promise<DryMediaGpuResources | null> | null>(
     null,
   );
-  const recoveryAttemptsRef = useRef(0);
-  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const recoveryScopeRef = useRef<DryMediaRecoveryScope | null>(null);
-  const recoveryScheduleRef = useRef<() => void>(() => undefined);
   const resourceGenerationRef = useRef(0);
   const jobEpochRef = useRef(0);
   const compileEpochRef = useRef(0);
   const mountedRef = useRef(true);
-  const [recoveryEpoch, setRecoveryEpoch] = useState(0);
+  const blockedElementIdRef = useRef<string | null>(null);
+  const unavailableReasonRef = useRef<string | null>(null);
+  const lastAuthorizedRef =
+    useRef<StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority | null>(null);
+  const [display, setDisplay] = useState<Readonly<{
+    state: DryMediaCanvasDisplayState;
+    reason: string | null;
+  }>>({ state: "awaiting-receipt", reason: null });
   const surfaceLeft = surfaceBounds.left;
   const surfaceTop = surfaceBounds.top;
   const surfaceWidth = surfaceBounds.width;
@@ -301,44 +321,6 @@ export function StudioCanonicalVNextDryMediaCanvas({
     callbackRef.current = onAuthorityChange;
   }, [onAuthorityChange]);
 
-  const scheduleBoundedRecovery = () => {
-    const scope = recoveryScopeRef.current;
-    if (
-      !mountedRef.current
-      || !scope?.element
-      || !navigator.gpu
-      || recoveryTimerRef.current !== null
-      || recoveryAttemptsRef.current
-        >= STUDIO_CANONICAL_VNEXT_DRY_MEDIA_RECOVERY_DELAYS_MS.length
-    ) return;
-    const attempt = recoveryAttemptsRef.current;
-    recoveryAttemptsRef.current += 1;
-    recoveryTimerRef.current = setTimeout(() => {
-      recoveryTimerRef.current = null;
-      if (
-        mountedRef.current
-        && recoveryScopeRef.current === scope
-      ) setRecoveryEpoch((epoch) => epoch + 1);
-    }, STUDIO_CANONICAL_VNEXT_DRY_MEDIA_RECOVERY_DELAYS_MS[attempt]);
-  };
-
-  useLayoutEffect(() => {
-    recoveryScheduleRef.current = scheduleBoundedRecovery;
-  });
-
-  const revokeImmediately = (reason: string) => {
-    if (canvasRef.current) {
-      canvasRef.current.dataset.studioCanonicalVnextDryMediaState = "fallback";
-      canvasRef.current.dataset.studioCanonicalVnextDryMediaReason = reason;
-    }
-    /*
-     * Visibility is parent-owned. Emitting null lets the viewport restore the retained Konva
-     * DrawEl and hide this specialist canvas in one React commit, avoiding a child-first blank
-     * frame during resize, device loss, or a failed receipt.
-     */
-    callbackRef.current(null);
-  };
-
   useLayoutEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -346,10 +328,6 @@ export function StudioCanonicalVNextDryMediaCanvas({
       jobEpochRef.current += 1;
       resourceGenerationRef.current += 1;
       callbackRef.current(null);
-      if (recoveryTimerRef.current !== null) {
-        clearTimeout(recoveryTimerRef.current);
-        recoveryTimerRef.current = null;
-      }
       const resources = resourcesRef.current;
       resourcesRef.current = null;
       resourcesPromiseRef.current = null;
@@ -359,31 +337,9 @@ export function StudioCanonicalVNextDryMediaCanvas({
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
+    const snapshotCanvas = snapshotCanvasRef.current;
     const jobEpoch = ++jobEpochRef.current;
     const controller = new AbortController();
-    const nextRecoveryScope: DryMediaRecoveryScope = {
-      element,
-      layoutKey,
-      surfaceLeft,
-      surfaceTop,
-      surfaceWidth,
-      surfaceHeight,
-      documentWidth,
-      documentHeight,
-      documentScale,
-      flipX,
-    };
-    if (
-      !recoveryScopeRef.current
-      || !isSameRecoveryScope(recoveryScopeRef.current, nextRecoveryScope)
-    ) {
-      if (recoveryTimerRef.current !== null) {
-        clearTimeout(recoveryTimerRef.current);
-        recoveryTimerRef.current = null;
-      }
-      recoveryAttemptsRef.current = 0;
-      recoveryScopeRef.current = nextRecoveryScope;
-    }
 
     const relinquishResources = () => {
       resourceGenerationRef.current += 1;
@@ -393,13 +349,50 @@ export function StudioCanonicalVNextDryMediaCanvas({
       disposeResourcesAfterTail(resources);
     };
 
+    const publishUnavailable = (reason: string) => {
+      if (!element) return;
+      blockedElementIdRef.current = element.id;
+      unavailableReasonRef.current = reason;
+      const lastPresented = lastAuthorizedRef.current?.element === element
+        ? lastAuthorizedRef.current
+        : null;
+      const retainsLastGoodFrame = lastPresented !== null;
+      canvas?.setAttribute(
+        "data-studio-canonical-vnext-dry-media-state",
+        "unavailable",
+      );
+      if (canvas) {
+        canvas.dataset.studioCanonicalVnextDryMediaReason = reason;
+      }
+      setDisplay({
+        state: retainsLastGoodFrame ? "last-good-unavailable" : "unavailable",
+        reason,
+      });
+      callbackRef.current(Object.freeze({
+        kind: "studio-canonical-vnext-dry-media-canvas-authority",
+        version: STUDIO_CANONICAL_VNEXT_DRY_MEDIA_CANVAS_VERSION,
+        status: "unavailable",
+        element,
+        layoutKey,
+        reason,
+        retainsLastGoodFrame,
+        lastPresented,
+        retryPolicy: "explicit-next-selection-only",
+      }));
+    };
+
     const rejectAndRelease = (reason: string) => {
-      revokeImmediately(reason);
+      publishUnavailable(reason);
       relinquishResources();
     };
 
-    revokeImmediately(element ? "awaiting-receipt" : "no-candidate");
-    if (!canvas || !element) {
+    if (!canvas || !snapshotCanvas || !element) {
+      blockedElementIdRef.current = null;
+      unavailableReasonRef.current = null;
+      lastAuthorizedRef.current = null;
+      callbackRef.current(null);
+      setDisplay({ state: "awaiting-receipt", reason: null });
+      clearPresentedSnapshot(snapshotCanvas);
       /*
        * The shared RGBA16F surface can be tens or hundreds of MiB at tablet resolutions. No
        * eligible selected DrawEl means there is no specialist owner, so release immediately
@@ -407,6 +400,31 @@ export function StudioCanonicalVNextDryMediaCanvas({
        */
       relinquishResources();
       return () => controller.abort();
+    }
+
+    if (
+      blockedElementIdRef.current !== null
+      && blockedElementIdRef.current !== element.id
+    ) {
+      blockedElementIdRef.current = null;
+      unavailableReasonRef.current = null;
+      lastAuthorizedRef.current = null;
+      callbackRef.current(null);
+      clearPresentedSnapshot(snapshotCanvas);
+    }
+    if (blockedElementIdRef.current === element.id) {
+      publishUnavailable(unavailableReasonRef.current ?? "provider-unavailable");
+      return () => controller.abort();
+    }
+    canvas.dataset.studioCanonicalVnextDryMediaState = "awaiting-receipt";
+    delete canvas.dataset.studioCanonicalVnextDryMediaReason;
+    setDisplay((current) => current.state === "authorized"
+      ? current
+      : { state: "awaiting-receipt", reason: null });
+    if (lastAuthorizedRef.current?.element !== element) {
+      lastAuthorizedRef.current = null;
+      callbackRef.current(null);
+      clearPresentedSnapshot(snapshotCanvas);
     }
 
     const ensureResources = async () => {
@@ -423,7 +441,6 @@ export function StudioCanonicalVNextDryMediaCanvas({
         ) return;
         jobEpochRef.current += 1;
         rejectAndRelease("device-lost");
-        recoveryScheduleRef.current();
       });
       resourcesPromiseRef.current = pending;
 
@@ -456,8 +473,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
           !controller.signal.aborted
           && jobEpoch === jobEpochRef.current
         ) {
-          revokeImmediately("webgpu-unavailable");
-          scheduleBoundedRecovery();
+          rejectAndRelease("webgpu-unavailable");
         }
         return;
       }
@@ -532,16 +548,16 @@ export function StudioCanonicalVNextDryMediaCanvas({
           }
           return;
         }
+        if (!snapshotPresentedCanvas(canvas, snapshotCanvas)) {
+          rejectAndRelease("last-good-snapshot-unavailable");
+          return;
+        }
         canvas.dataset.studioCanonicalVnextDryMediaState = "authorized";
         delete canvas.dataset.studioCanonicalVnextDryMediaReason;
-        recoveryAttemptsRef.current = 0;
-        if (recoveryTimerRef.current !== null) {
-          clearTimeout(recoveryTimerRef.current);
-          recoveryTimerRef.current = null;
-        }
-        callbackRef.current(Object.freeze({
+        const authority = Object.freeze({
           kind: "studio-canonical-vnext-dry-media-canvas-authority",
           version: STUDIO_CANONICAL_VNEXT_DRY_MEDIA_CANVAS_VERSION,
+          status: "authorized",
           element,
           layoutKey,
           canonicalPlanHash: compiled.frame.canonicalPlanHash,
@@ -550,7 +566,11 @@ export function StudioCanonicalVNextDryMediaCanvas({
           texturedDabCount: compiled.texturedDabCount,
           laneCount: compiled.laneCount,
           parityReceipt: parity.receipt,
-        }));
+        }) satisfies StudioCanonicalVNextDryMediaCanvasAuthorizedAuthority;
+        lastAuthorizedRef.current = authority;
+        unavailableReasonRef.current = null;
+        setDisplay({ state: "authorized", reason: null });
+        callbackRef.current(authority);
       };
       const queued = resources.tail.then(run, run);
       resources.tail = queued.then(
@@ -568,29 +588,62 @@ export function StudioCanonicalVNextDryMediaCanvas({
     element,
     flipX,
     layoutKey,
-    recoveryEpoch,
     surfaceHeight,
     surfaceLeft,
     surfaceTop,
     surfaceWidth,
   ]);
 
+  const showLastGoodSnapshot = visible && display.state === "last-good-unavailable";
+  const showWebGpuCanvas = visible && display.state === "authorized";
+
   return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden="true"
-      data-studio-canonical-vnext-dry-media="true"
-      data-studio-canonical-vnext-dry-media-authorized={
-        visible ? "true" : "false"
-      }
-      className={cn("pointer-events-none absolute z-[12]", className)}
-      style={{
-        left: surfaceLeft,
-        top: surfaceTop,
-        width: surfaceWidth,
-        height: surfaceHeight,
-        visibility: visible ? "visible" : "hidden",
-      }}
-    />
+    <>
+      <canvas
+        ref={snapshotCanvasRef}
+        aria-hidden="true"
+        data-studio-canonical-vnext-dry-media-last-good="true"
+        className={cn("pointer-events-none absolute z-[12]", className)}
+        style={{
+          left: surfaceLeft,
+          top: surfaceTop,
+          width: surfaceWidth,
+          height: surfaceHeight,
+          visibility: showLastGoodSnapshot ? "visible" : "hidden",
+        }}
+      />
+      <canvas
+        ref={canvasRef}
+        aria-hidden="true"
+        data-studio-canonical-vnext-dry-media="true"
+        data-studio-canonical-vnext-dry-media-authorized={
+          showWebGpuCanvas ? "true" : "false"
+        }
+        className={cn("pointer-events-none absolute z-[12]", className)}
+        style={{
+          left: surfaceLeft,
+          top: surfaceTop,
+          width: surfaceWidth,
+          height: surfaceHeight,
+          visibility: showWebGpuCanvas ? "visible" : "hidden",
+        }}
+      />
+      {display.reason ? (
+        <div
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+          data-studio-canonical-vnext-dry-media-unavailable="true"
+          className="pointer-events-none absolute inset-x-4 top-4 z-[31] rounded-md border border-red-400/50 bg-red-950/90 px-4 py-3 text-sm font-medium text-red-50 shadow-lg"
+        >
+          선택한 WebGPU 드라이 미디어 엔진을 유지하지 못했습니다. 다른 렌더러로 자동 전환하지 않았습니다.
+          {showLastGoodSnapshot
+            ? " 마지막으로 검증된 WebGPU 프레임을 유지합니다."
+            : " 이 엔진의 프레임은 표시하지 않습니다."}
+          {" "}
+          선택을 해제한 뒤 다시 선택하면 같은 엔진을 명시적으로 재시도할 수 있습니다.
+        </div>
+      ) : null}
+    </>
   );
 }

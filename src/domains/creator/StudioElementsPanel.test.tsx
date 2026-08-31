@@ -33,21 +33,20 @@ describe("StudioElementsPanel expanded catalog UX", () => {
       _input: StudioSvgProductInput,
     ): Promise<StudioSvgProductDecision> => ({
       kind: "studio-svg-product-decision" as const,
-      revision: 1 as const,
+      revision: 2 as const,
       assetId: "shape-superellipse",
       sourceDigest: `sha256:${"0".repeat(64)}` as const,
-      providerId: "browser-native-svg" as const,
-      route: "trusted-browser-preservation" as const,
+      selectedProviderId: "vello-svg-native" as const,
+      providerId: "rejected" as const,
+      route: "fail-closed" as const,
       audit: null,
-      visualGate: null,
       pixels: null,
       sourcePreserved: true as const,
       editable: false,
       interactiveGpuReadbackBytes: 0 as const,
-      fallbackFrom: "vello-svg-native" as const,
-      reasons: ["trusted source preserved"],
+      reasons: ["selected provider unavailable"],
       warnings: [],
-      unsupported: ["element:text"],
+      unsupported: [],
     }));
     const onAdd = vi.fn();
     render(
@@ -65,8 +64,16 @@ describe("StudioElementsPanel expanded catalog UX", () => {
     expect(routedInput).toMatchObject({
       assetId: "shape-superellipse",
       trust: "bundled-catalog",
+      selectedProviderId: "vello-svg-native",
     });
     expect(routedInput?.svg).toContain("<svg");
+    const preview = tile.querySelector('[data-studio-svg-product-preview="true"]');
+    await waitFor(() => {
+      expect(preview?.getAttribute("data-studio-svg-preview-provider")).toBe("rejected");
+    });
+    expect(preview?.querySelector("img")?.className).toContain("invisible");
+    expect(preview?.querySelector("img")?.getAttribute("data-studio-svg-source-placeholder"))
+      .toBe("hidden");
 
     fireEvent.click(tile);
     expect(onAdd).toHaveBeenCalledOnce();

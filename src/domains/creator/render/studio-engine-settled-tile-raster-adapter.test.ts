@@ -36,6 +36,7 @@ const PNG_OUTPUT = Object.freeze({
   kind: "encoded",
   mime: "image/png",
 } as const);
+const PNG_SIGNATURE = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
 
 function curve() {
   return { minimum: 1, maximum: 1, exponent: 1 };
@@ -182,7 +183,7 @@ class RecordingSession implements StudioEngineSettledTileRasterSessionBoundary {
         payload: {
           kind: "encoded",
           mime: "image/png",
-          blob: new Blob([new Uint8Array([0x89])], { type: "image/png" }),
+          blob: new Blob([PNG_SIGNATURE], { type: "image/png" }),
         },
       }),
   ) {}
@@ -607,6 +608,38 @@ describe("StudioEngineSettledTileRasterAdapter", () => {
     })).resolves.toMatchObject({
       status: "rejected",
       reason: "disposed",
+    });
+  });
+
+  it("rejects a Worker result whose PNG label hides another encoded container", async () => {
+    const session = new RecordingSession((call) => ({
+      ok: true,
+      runId: 23,
+      width: call.input.target.width,
+      height: call.input.target.height,
+      payload: {
+        kind: "encoded",
+        mime: "image/png",
+        blob: new Blob([new TextEncoder().encode("RIFF0000WEBP")], { type: "image/png" }),
+      },
+    }));
+    const adapter = createStudioEngineSettledTileRasterAdapter({
+      authority: fakeAuthority({
+        tiles: [
+          { layerIndex: 0, column: 0, row: 0, channels: [0, 0, 0, 0] },
+        ],
+      }),
+      sourceColorSpace: "linear-srgb",
+      session,
+    });
+
+    await expect(adapter.render({
+      jobKey: "export:codec-substitution",
+      output: PNG_OUTPUT,
+    })).resolves.toMatchObject({
+      status: "rejected",
+      reason: "worker-failed",
+      runId: 23,
     });
   });
 });

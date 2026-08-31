@@ -9,6 +9,7 @@ import {
   loadInkMeshGenerator,
   type InkMeshIncrementalMetrics,
   type InkMeshInputPoint,
+  type InkMeshSessionBackend,
   type InkStrokeMesh,
   type InkStrokeMeshDelta,
 } from "../../../packages/studio-brush-platform/src/ink-mesh";
@@ -91,7 +92,7 @@ interface CandidateResult {
 }
 
 async function measureCandidate(
-  forceSingleShotFallback: boolean,
+  backend: InkMeshSessionBackend,
   reference: InkStrokeMesh,
 ): Promise<CandidateResult> {
   const generator = await loadInkMeshGenerator();
@@ -111,7 +112,7 @@ async function measureCandidate(
         scale: { x: 0.55, y: 1.1 },
         tiltToRotation: { minOffsetRad: -0.2, maxOffsetRad: 0.35 },
       },
-      { forceSingleShotFallback },
+      { backend },
     );
     const deltas: InkStrokeMeshDelta[] = [];
     const strokeStart = performance.now();
@@ -167,10 +168,10 @@ const params = {
   tiltToRotation: { minOffsetRad: -0.2, maxOffsetRad: 0.35 },
 } as const;
 const reference = generator.generateInkStrokeMesh(points, params);
-const upstream = await measureCandidate(false, reference);
-const fallback = await measureCandidate(true, reference);
+const upstream = await measureCandidate("upstream-in-progress", reference);
+const singleShotReference = await measureCandidate("single-shot-reference", reference);
 const report = {
-  schema: "toon-ink-mesh-incremental-benchmark-v1",
+  schema: "toon-ink-mesh-incremental-benchmark-v2",
   generatedAtUtc: new Date().toISOString(),
   runtime: {
     node: process.version,
@@ -191,17 +192,17 @@ const report = {
     measuredStrokes: MEASURED_STROKES,
     channels: ["x", "y", "tMs", "pressure", "tiltRad", "orientationRad"],
   },
-  candidates: { upstreamInProgressStroke: upstream, retainedSingleShotFallback: fallback },
+  candidates: { upstreamInProgressStroke: upstream, retainedSingleShotReference: singleShotReference },
   evidence: {
     finalMeshByteExactAcrossAllMeasuredRuns:
       upstream.exactFinalParityRuns === MEASURED_STROKES &&
-      fallback.exactFinalParityRuns === MEASURED_STROKES,
+      singleShotReference.exactFinalParityRuns === MEASURED_STROKES,
     upstreamWasmToJsPayloadReductionVsFullSnapshots:
       1 - upstream.metricsPerStroke.wasmToJsPayloadBytes /
         upstream.metricsPerStroke.fullSnapshotEquivalentBytes,
-    upstreamWasmToJsPayloadReductionVsFallback:
+    upstreamWasmToJsPayloadReductionVsSingleShotReference:
       1 - upstream.metricsPerStroke.wasmToJsPayloadBytes /
-        fallback.metricsPerStroke.wasmToJsPayloadBytes,
+        singleShotReference.metricsPerStroke.wasmToJsPayloadBytes,
     gpuReadbackCount: 0,
   },
 };

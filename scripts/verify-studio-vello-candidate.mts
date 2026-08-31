@@ -131,7 +131,7 @@ function main(): void {
   log(`limitations ${STUDIO_VELLO_OBSERVED_POC_LIMITATIONS.length}`);
   log(
     "OK: recorded aggregates are internally consistent; "
-    + "the bounded /studio VelloHub seam is active with visual-gated CPU fallback",
+    + "the bounded /studio VelloHub seam is active; CPU comparison is explicit QA-only evidence",
   );
 }
 

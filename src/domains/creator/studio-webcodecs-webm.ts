@@ -6,7 +6,7 @@
  * 입력이면 항상 같은 파일을 만든다(결정적 — Date.now/Math.random 없음, WritingApp도 고정 문자열).
  *
  * ── 왜 MP4가 아니라 WebM인가 ────────────────────────────────────────────────
- * 1) 기존 내보내기 산출물이 이미 `video/webm`(MediaRecorder vp9→vp8)이다. 컨테이너를 유지하면
+ * 1) 기존 내보내기 산출물이 이미 `video/webm`(작업 전 확정한 MediaRecorder 코덱)이다. 컨테이너를 유지하면
  *    파일명 규칙(`-motion.webm`)·패널 안내·상호운용 카탈로그(studio-interchange-capabilities의
  *    webm 엔트리)를 하나도 안 건드리고 인코더만 갈아끼울 수 있다.
  * 2) EBML은 "ID + 가변길이 크기 + 페이로드"의 단순 재귀 구조라 minimal writer가 수백 줄이면 끝난다.

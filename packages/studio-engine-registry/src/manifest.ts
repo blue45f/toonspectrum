@@ -18,7 +18,7 @@ import type { ProviderDescriptor } from "./descriptor";
  * ProviderDescriptor plus independently verified evidence accepted by
  * validateProviderActivationEvidence().
  */
-export const CANDIDATE_MANIFEST_SCHEMA_VERSION = 2 as const;
+export const CANDIDATE_MANIFEST_SCHEMA_VERSION = 3 as const;
 export const CANDIDATE_MANIFEST_CLAIM_SCOPE =
   "candidate-survey-only-not-runtime-support" as const;
 export const CANDIDATE_MANIFEST_AUTHORITY =
@@ -195,7 +195,7 @@ const exactLimitationSetSchema = uniqueStringArray(z.string().min(1), 0);
 
 export const providerActivationEvidenceSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     candidate: z
       .object({
         id: z.string().regex(/^E\d{2}$/),
@@ -278,11 +278,12 @@ export const providerActivationEvidenceSchema = z
         rawArtifact: activationArtifactSchema,
       })
       .strict(),
-    fallback: z
+    failureIsolation: z
       .object({
-        providerId: z.string().min(1).nullable(),
-        result: z.enum(["pass", "fail", "unverified", "not-applicable"]),
-        rawArtifact: activationArtifactSchema.nullable(),
+        result: z.enum(["pass", "fail", "unverified"]),
+        behavior: z.literal("fail-closed"),
+        scenarios: uniqueStringArray(z.string().min(1), 1),
+        rawArtifact: activationArtifactSchema,
       })
       .strict(),
     owner: z
@@ -464,12 +465,10 @@ function activationArtifacts(evidence: ProviderActivationEvidence): ActivationAr
     evidence.latency.rawArtifact,
     evidence.peakMemoryMb.rawArtifact,
     evidence.determinism.rawArtifact,
+    evidence.failureIsolation.rawArtifact,
     evidence.soak.rawArtifact,
     evidence.faultInjection.rawArtifact,
   ];
-  if (evidence.fallback.rawArtifact !== null) {
-    artifacts.push(evidence.fallback.rawArtifact);
-  }
   if (evidence.license.reviewArtifact !== null) {
     artifacts.push(evidence.license.reviewArtifact);
   }
@@ -646,20 +645,17 @@ export function validateProviderActivationEvidence(
     issues.push("determinism result is unverified");
   }
 
-  if (descriptor.fallbackProviderId === null) {
-    if (
-      evidence.fallback.providerId !== null ||
-      evidence.fallback.result !== "not-applicable" ||
-      evidence.fallback.rawArtifact !== null
-    ) {
-      issues.push("fallback evidence must be not-applicable when descriptor has no fallback");
-    }
-  } else if (
-    evidence.fallback.providerId !== descriptor.fallbackProviderId ||
-    evidence.fallback.result !== "pass" ||
-    evidence.fallback.rawArtifact === null
+  if (evidence.failureIsolation.result !== "pass") {
+    issues.push("failure-isolation result is not verified passing evidence");
+  }
+  if (
+    !evidence.faultInjection.scenarios.every((scenario) =>
+      evidence.failureIsolation.scenarios.includes(scenario),
+    )
   ) {
-    issues.push("declared fallback must have matching passing evidence");
+    issues.push(
+      "failure-isolation evidence must cover every fault-injection scenario",
+    );
   }
 
   if (evidence.soak.result !== "pass") {

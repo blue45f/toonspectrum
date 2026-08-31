@@ -32,18 +32,16 @@ const BACKEND_LABELS: Readonly<Record<StudioBg3dEngineBackend, string>> = Object
 });
 
 const PREFERENCE_HINTS: Readonly<Record<StudioBg3dEnginePreference, string>> = Object.freeze({
-  auto: "기기와 브라우저에 맞춰 자동으로 고릅니다.",
-  webgpu: "차세대 엔진을 항상 사용합니다.",
-  webgl2: "가장 넓게 검증된 엔진을 항상 사용합니다.",
+  webgpu: "차세대 엔진을 명시적으로 사용합니다. 실패해도 다른 엔진으로 바뀌지 않습니다.",
+  webgl2: "독립된 WebGL2 엔진을 명시적으로 사용합니다.",
 });
 
 /**
  * Engine status and selection for the 3D background editor.
  *
  * Everything the artist sees here is derived from the same plan the renderer actually used, so the
- * badge can never disagree with the running engine. WebGPU stays visible but disabled when the host
- * cannot support it — a hidden option reads as a missing feature, while a disabled one with a
- * reason reads as an answered question.
+ * badge can never disagree with the selected engine. An unavailable selection stays visible and
+ * selected, while both buttons remain manual choices; no control implies an automatic fallback.
  */
 export function StudioBg3dEnginePanel({
   plan,
@@ -60,14 +58,24 @@ export function StudioBg3dEnginePanel({
   const activeLabel = BACKEND_LABELS[plan.backend];
   // Without a number the engine choice is unfalsifiable to the artist: both options just say
   // "3D". One smoothed frame time makes switching a decision they can check.
-  const frameTimeLabel = frameTimeMs !== null && frameTimeMs > 0
+  const frameTimeLabel = plan.status === "available" && frameTimeMs !== null && frameTimeMs > 0
     ? `${frameTimeMs.toFixed(1)}ms · 약 ${Math.round(1_000 / frameTimeMs)}fps`
     : null;
   const isNextGen = plan.backend === "webgpu";
   const statusText = probing
     ? "이 기기에서 쓸 수 있는 3D 엔진을 확인하고 있습니다."
     : (deviceLostMessage ?? plan.notice);
-  const statusTone = deviceLostMessage
+  const selectionUnavailable = !probing && plan.status !== "available";
+  const activeStatusLabel = probing
+    ? "확인 중"
+    : `${activeLabel} ${
+      plan.status === "failed"
+        ? "실행 실패"
+        : plan.status === "unavailable"
+          ? "사용 불가"
+          : "사용 중"
+    }`;
+  const statusTone = deviceLostMessage || selectionUnavailable
     ? "border-danger/45 bg-danger/10 text-danger"
     : isNextGen
       ? "border-accent/45 bg-accent-soft text-accent"
@@ -92,25 +100,26 @@ export function StudioBg3dEnginePanel({
                 data-testid="studio-bg3d-engine-active-backend"
                 className={cx(
                   "rounded-full border px-2 py-0.5 text-[0.68rem] font-semibold",
-                  isNextGen
-                    ? "border-accent/45 bg-accent-soft text-accent"
-                    : "border-line bg-panel text-fg-2",
+                  selectionUnavailable
+                    ? "border-danger/45 bg-danger/10 text-danger"
+                    : isNextGen
+                      ? "border-accent/45 bg-accent-soft text-accent"
+                      : "border-line bg-panel text-fg-2",
                 )}
               >
-                {probing ? "확인 중" : `${activeLabel} 사용 중`}
+                {activeStatusLabel}
               </span>
             </div>
             <p className="mt-1 text-[0.72rem] leading-relaxed text-fg-3">
-              WebGPU는 같은 장면을 더 빠르게 그리고 컴퓨트 패스를 쓸 수 있는 차세대
-              엔진입니다. WebGL2는 모든 지원 기기에서 동작하는 기준 엔진이며, WebGPU를
-              쓸 수 없을 때 자동으로 사용합니다.
+              WebGPU와 WebGL2는 서로 독립된 엔진입니다. 선택한 엔진을 사용할 수 없으면
+              뷰포트를 열지 않으며, 다른 엔진은 여기서 직접 선택해야 합니다.
               {inApp.isInApp ? ` 지금은 ${inApp.label}에서 열려 있습니다.` : ""}
             </p>
           </div>
         </div>
 
         <div
-          className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-3"
+          className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2"
           role="group"
           aria-label="3D 렌더 엔진 선택"
           aria-describedby={`${statusId} ${hintId}`}
@@ -118,7 +127,7 @@ export function StudioBg3dEnginePanel({
           {STUDIO_BG3D_ENGINE_PREFERENCES.map((option) => {
             const optionLabel = STUDIO_BG3D_ENGINE_PREFERENCE_LABELS[option];
             const isSelected = preference === option;
-            const disabled = probing || (option === "webgpu" && !plan.webgpuSelectable);
+            const disabled = probing;
             return (
               <button
                 key={option}
@@ -163,14 +172,14 @@ export function StudioBg3dEnginePanel({
         <div
           id={statusId}
           data-testid="studio-bg3d-engine-status"
-          role={deviceLostMessage ? "alert" : "status"}
-          aria-live={deviceLostMessage ? "assertive" : "polite"}
+          role={deviceLostMessage || selectionUnavailable ? "alert" : "status"}
+          aria-live={deviceLostMessage || selectionUnavailable ? "assertive" : "polite"}
           className={cx(
             "mt-2 flex min-h-11 items-start gap-2 rounded-lg border px-2.5 py-2 text-[0.72rem] leading-relaxed",
             statusTone,
           )}
         >
-          {deviceLostMessage ? (
+          {deviceLostMessage || selectionUnavailable ? (
             <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
           ) : probing ? (
             <Loader2

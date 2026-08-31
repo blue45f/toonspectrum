@@ -1,12 +1,10 @@
 import { readFileSync } from "node:fs";
 
 import {
-  laneCrossoverMegapixels,
   PlanUnsatisfiableError,
   presentedMegapixels,
 } from "@toonspectrum/studio-engine-registry";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
 
 import {
   createStudioTournamentRuntime,
@@ -23,30 +21,68 @@ import {
   studioFilterIslandBucket,
   studioFilterLaneProviderId,
 } from "./studio-filter-island-plan";
-import { STUDIO_FILTER_LANE_COST_SEED, megapixelsOf } from "./studio-filter-lane-cost-model";
+import { megapixelsOf } from "./studio-filter-lane-cost-model";
+
+function installNoopTournamentBootstrap(): void {
+  installStudioFilterTournamentBootstrap({
+    schedule: () => undefined,
+    loadPersistence: () => Promise.resolve({
+      installStudioTournamentSqlitePersistence: () => undefined,
+    }),
+  });
+}
+
+beforeEach(() => {
+  installStudioTournamentRuntime(null);
+  installNoopTournamentBootstrap();
+  resetStudioFilterIslandCostShadowReceipt();
+});
+
+afterEach(() => {
+  installStudioFilterTournamentBootstrap(null);
+  installStudioTournamentRuntime(null);
+});
 
 /**
- * First real-path V11 delegation gate (ADR 0001 2차 개정 step c): the image
- * filter lane ladder is planner-owned and must match the shipped GPU→Worker→
- * Konva semantics exactly, and the island must stay illegal in interactive
- * mode (absolute rule 8) so nobody quietly moves it onto the hot path.
+ * The filter planner performs capability admission once. `lanes` is retained
+ * as a one-item compatibility projection, not a retry ladder; a selected
+ * provider failure is terminal for this operation.
  */
+describe("filter island singleton selection", () => {
+  it("selects only the GPU provider when the chain is eligible", () => {
+    const result = planStudioFilterIslandLanes({ gpuChainEligible: true });
 
-describe("V11 filter island plan", () => {
-  it("orders lanes GPU→worker→konva when the GPU chain is eligible", () => {
-    const { lanes, plan } = planStudioFilterIslandLanes({ gpuChainEligible: true });
-    expect(lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
-    expect(plan.mode).toBe("final-export");
-    expect(plan.primaryOwnerId).toBe("filter-lane-konva-native");
-    expect(plan.islands[0]?.transport).toBe("cpu-readback");
+    expect(result).toMatchObject({
+      lanes: ["gpu-chain"],
+      selectedLane: "gpu-chain",
+      status: "selected",
+      unavailableReason: null,
+      laneCosts: null,
+    });
+    expect(result.plan.mode).toBe("final-export");
+    expect(result.plan.primaryOwnerId).toBe("filter-lane-konva-native");
+    expect(result.plan.islands[0]).toMatchObject({
+      providerId: "filter-lane-gpu-chain",
+      transport: "cpu-readback",
+    });
+    expect(result.plan.islands[0]).not.toHaveProperty("fallbackChain");
   });
 
-  it("skips the GPU lane when ineligible (worker→konva)", () => {
-    const { lanes } = planStudioFilterIslandLanes({ gpuChainEligible: false });
-    expect(lanes).toEqual(["worker", "konva-native"]);
+  it("selects only Worker when GPU capability admission fails", () => {
+    const result = planStudioFilterIslandLanes({ gpuChainEligible: false });
+
+    expect(result).toMatchObject({
+      lanes: ["worker"],
+      selectedLane: "worker",
+      status: "selected",
+      unavailableReason: null,
+    });
+    expect(result.plan.islands[0]?.providerId).toBe("filter-lane-worker");
+    expect(result.plan.islands[0]).not.toHaveProperty("fallbackChain");
+    expect(result.lanes).not.toContain("konva-native");
   });
 
-  it("the same island is rejected in interactive mode (hot-path readback ban)", async () => {
+  it("rejects the same readback island in interactive mode", async () => {
     const { EngineCapabilityRegistry, HybridExecutionPlanner, providerDescriptorSchema } =
       await import("@toonspectrum/studio-engine-registry");
     const registry = EngineCapabilityRegistry.forTestFixtures();
@@ -66,16 +102,16 @@ describe("V11 filter island plan", () => {
         finalQuality: "production",
         determinism: "tolerance",
         memoryEstimateMb: 1,
-        fallbackProviderId: null,
         knownIssues: [],
       }),
     );
     const planner = new HybridExecutionPlanner(registry);
+
     expect(() =>
       planner.plan({
         surfaceId: "probe",
         mode: "interactive",
-        primaryCandidates: ["filter-lane-probe"],
+        primaryOwnerId: "filter-lane-probe",
         islands: [
           {
             islandId: "image-filter-chain",
@@ -87,328 +123,182 @@ describe("V11 filter island plan", () => {
       }),
     ).toThrow(PlanUnsatisfiableError);
   });
-
-  it("StudioKonvaImageNode consumes the plan for its lane decision (wiring contract)", () => {
-    const source = readFileSync(
-      new URL("../StudioKonvaImageNode.tsx", import.meta.url),
-      "utf8",
-    );
-    expect(source).toMatch(
-      /import \{[\s\S]*?planStudioFilterIslandLanes[\s\S]*?\} from "\.\/filter\/studio-filter-island-plan";/u,
-    );
-    expect(source).toMatch(
-      /const filterIslandPlan = planStudioFilterIslandLanes\(filterIslandInput\);/u,
-    );
-    expect(source).toMatch(
-      /filterIslandPlan\.lanes\[0\] === "gpu-chain" && gpuFilterModule/u,
-    );
-    // Size-aware selection only works if the node hands over its real
-    // workload — the plan silently keeps the legacy order without it.
-    expect(source).toMatch(
-      /workload: \{ width, height, chainSteps: filterChainSteps \}/u,
-    );
-    expect(source).toMatch(/const filterChainSteps = built\.filters\.length;/u);
-    // The legacy direct branch on eligibility alone must not come back.
-    expect(source).not.toMatch(
-      /if \(gpuFilterModule\?\.isStudioGpuFilterChainEligible\(elRef\.current\)\) \{/u,
-    );
-  });
 });
 
-/**
- * V12 §5 wiring: the tournament runtime (persisted winner cache + remote kill
- * switch) acts on this plan's real call path. The first case pins the
- * backwards contract — a pristine runtime changes nothing about the ladder.
- */
-describe("V12 §5 tournament wiring through the filter island plan", () => {
-  afterEach(() => {
-    // Restore lazy default creation so other suites see a pristine runtime.
-    installStudioTournamentRuntime(null);
-  });
-
-  it("a pristine runtime (empty cache, no kills) leaves the plan untouched", () => {
-    installStudioTournamentRuntime(
-      createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-test" }),
-    );
-    const eligible = planStudioFilterIslandLanes({ gpuChainEligible: true });
-    expect(eligible.lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
-    expect(eligible.killIgnoredReason).toBeNull();
-    expect(planStudioFilterIslandLanes({ gpuChainEligible: false }).lanes).toEqual([
-      "worker",
-      "konva-native",
-    ]);
-  });
-
-  it("a cached tournament winner reorders the real lane ladder per bucket", () => {
+describe("tournament denial never substitutes another filter provider", () => {
+  it("ignores a cached winner because it is observation, not selection authority", () => {
     const runtime = createStudioTournamentRuntime({
       persistence: null,
       deviceHash: "dev-test",
     });
-    runtime.recordWinner(
-      studioFilterIslandBucket({ gpuChainEligible: true }),
-      runtime.deviceHash,
-      {
-        providerId: studioFilterLaneProviderId("worker"),
-        expectedWarmMs: 3,
-        decidedAtSample: 5,
-      },
-    );
+    const input = {
+      gpuChainEligible: true,
+      workload: { width: 256, height: 256, chainSteps: 1 },
+    } as const;
+    runtime.recordWinner(studioFilterIslandBucket(input), runtime.deviceHash, {
+      providerId: studioFilterLaneProviderId("worker"),
+      expectedWarmMs: 1,
+      decidedAtSample: 10,
+    });
     installStudioTournamentRuntime(runtime);
-    expect(planStudioFilterIslandLanes({ gpuChainEligible: true }).lanes).toEqual([
-      "worker",
-      "gpu-chain",
-      "konva-native",
-    ]);
-    // Bucket separation: the win above lives in the gpu-eligible bucket only,
-    // so the ineligible ladder stays the untouched planner product.
-    expect(planStudioFilterIslandLanes({ gpuChainEligible: false }).lanes).toEqual([
-      "worker",
-      "konva-native",
-    ]);
+
+    const result = planStudioFilterIslandLanes(input);
+    expect(result.selectedLane).toBe("gpu-chain");
+    expect(result.lanes).toEqual(["gpu-chain"]);
+    expect(result.status).toBe("selected");
+    expect(result.laneCosts).toBeNull();
   });
 
-  it("a remote kill removes its lane while the fallback chain survives", () => {
+  it("reports a killed GPU selection unavailable without running Worker or Konva", () => {
     const runtime = createStudioTournamentRuntime({
       persistence: null,
       deviceHash: "dev-test",
     });
     runtime.applyKillList([studioFilterLaneProviderId("gpu-chain")], "remote flag");
     installStudioTournamentRuntime(runtime);
-    const { lanes, killIgnoredReason } = planStudioFilterIslandLanes({
-      gpuChainEligible: true,
+
+    const result = planStudioFilterIslandLanes({ gpuChainEligible: true });
+    expect(result).toMatchObject({
+      lanes: ["gpu-chain"],
+      selectedLane: "gpu-chain",
+      status: "unavailable",
+      unavailableReason: "selected-provider-killed",
     });
-    expect(lanes).toEqual(["worker", "konva-native"]);
-    expect(killIgnoredReason).toBeNull();
+    expect(result.plan.islands[0]?.providerId).toBe("filter-lane-gpu-chain");
+    expect(result.plan.islands[0]).not.toHaveProperty("fallbackChain");
+    expect(result.lanes).not.toContain("worker");
+    expect(result.lanes).not.toContain("konva-native");
   });
 
-  it("a workload-less call is byte-identical to the pre-size-aware ladder", () => {
-    installStudioTournamentRuntime(
-      createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-test" }),
-    );
-    // A caller that cannot describe its workload must never be re-ordered on
-    // a guess: no workload ⇒ no cost ranking ⇒ the original planner ladder.
-    const blind = planStudioFilterIslandLanes({ gpuChainEligible: true });
-    expect(blind.lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
-    expect(blind.laneCosts).toBeNull();
-    expect(planStudioFilterIslandLanes({ gpuChainEligible: true, workload: null }).lanes)
-      .toEqual(["gpu-chain", "worker", "konva-native"]);
+  it("reports a killed Worker selection unavailable without substituting Konva", () => {
+    const runtime = createStudioTournamentRuntime({
+      persistence: null,
+      deviceHash: "dev-test",
+    });
+    runtime.applyKillList([studioFilterLaneProviderId("worker")], "remote flag");
+    installStudioTournamentRuntime(runtime);
+
+    const result = planStudioFilterIslandLanes({ gpuChainEligible: false });
+    expect(result).toMatchObject({
+      lanes: ["worker"],
+      selectedLane: "worker",
+      status: "unavailable",
+      unavailableReason: "selected-provider-killed",
+    });
+    expect(result.plan.islands[0]?.providerId).toBe("filter-lane-worker");
+    expect(result.lanes).not.toContain("konva-native");
   });
 
-  it("killing every lane is ignored — the chain never goes empty and the reason is logged", () => {
+  it("does not let a kill on an unselected provider alter the selected lane", () => {
     const runtime = createStudioTournamentRuntime({
       persistence: null,
       deviceHash: "dev-test",
     });
     runtime.applyKillList(
-      (["gpu-chain", "worker", "konva-native"] as const).map((lane) =>
-        studioFilterLaneProviderId(lane),
+      [studioFilterLaneProviderId("worker"), studioFilterLaneProviderId("konva-native")],
+      "unrelated providers",
+    );
+    installStudioTournamentRuntime(runtime);
+
+    const result = planStudioFilterIslandLanes({ gpuChainEligible: true });
+    expect(result.selectedLane).toBe("gpu-chain");
+    expect(result.status).toBe("selected");
+    expect(result.lanes).toEqual(["gpu-chain"]);
+  });
+
+  it("does not restore an all-killed candidate set", () => {
+    const runtime = createStudioTournamentRuntime({
+      persistence: null,
+      deviceHash: "dev-test",
+    });
+    runtime.applyKillList(
+      (["gpu-chain", "worker", "konva-native"] as const).map(
+        studioFilterLaneProviderId,
       ),
       "panic",
     );
     installStudioTournamentRuntime(runtime);
-    const { lanes, killIgnoredReason } = planStudioFilterIslandLanes({
-      gpuChainEligible: true,
-    });
-    expect(lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
-    expect(killIgnoredReason).toContain("keeping the original order");
-    expect(killIgnoredReason).toContain("panic");
+
+    const result = planStudioFilterIslandLanes({ gpuChainEligible: true });
+    expect(result.selectedLane).toBe("gpu-chain");
+    expect(result.status).toBe("unavailable");
+    expect(result.lanes).toEqual(["gpu-chain"]);
   });
 });
 
-/**
- * Size-aware lane order. The GPU lane pays a submit+readback floor that barely
- * moves with the workload, so below the crossover it loses to the CPU lanes it
- * was meant to accelerate (tests/benchmarks/results/filter-lanes.json). These
- * cases pin the boundary itself, the untouched GPU-ineligible ladder, and the
- * seed → measured → tournament-winner precedence.
- */
-describe("size-aware filter lane order", () => {
-  const PRISTINE = { persistence: null, deviceHash: "dev-test" } as const;
-
-  afterEach(() => {
-    installStudioTournamentRuntime(null);
-  });
-
-  /** Pixel count where the seed model puts the GPU and CPU lanes at equal cost. */
-  function crossoverPixels(chainSteps: number, gpuDispatchCount: number): number {
-    const { gpu, cpu } = STUDIO_FILTER_LANE_COST_SEED;
-    const cpuPerMp = cpu.perMegapixelMsPerStep * chainSteps;
-    const gpuPerMp = gpu.perMegapixelMs + gpu.perMegapixelMsPerDispatch * gpuDispatchCount;
-    return (gpu.fixedMs / (cpuPerMp - gpuPerMp)) * 1e6;
+describe("StudioKonvaImageNode fail-closed wiring", () => {
+  function imageNodeSource(): string {
+    return readFileSync(
+      new URL("../StudioKonvaImageNode.tsx", import.meta.url),
+      "utf8",
+    );
   }
 
-  // chainSteps → GPU dispatches after LUT fusion, as measured by the benchmark.
-  const CHAINS: Array<{ label: string; chainSteps: number; dispatches: number }> = [
-    { label: "single", chainSteps: 1, dispatches: 1 },
-    { label: "triple", chainSteps: 3, dispatches: 2 },
-    { label: "full5", chainSteps: 6, dispatches: 4 },
-  ];
-
-  for (const chain of CHAINS) {
-    it(`${chain.label}: one pixel below the crossover puts a CPU lane at the head`, () => {
-      installStudioTournamentRuntime(createStudioTournamentRuntime(PRISTINE));
-      const pixelCount = Math.floor(crossoverPixels(chain.chainSteps, chain.dispatches)) - 1;
-      const { lanes, laneCosts } = planStudioFilterIslandLanes({
-        gpuChainEligible: true,
-        workload: { pixelCount, chainSteps: chain.chainSteps },
-      });
-      expect(lanes).toEqual(["worker", "konva-native", "gpu-chain"]);
-      expect(laneCosts?.basis).toBe("seed");
-    });
-
-    it(`${chain.label}: one pixel above the crossover keeps the GPU lane at the head`, () => {
-      installStudioTournamentRuntime(createStudioTournamentRuntime(PRISTINE));
-      const pixelCount = Math.ceil(crossoverPixels(chain.chainSteps, chain.dispatches)) + 1;
-      const { lanes } = planStudioFilterIslandLanes({
-        gpuChainEligible: true,
-        workload: { pixelCount, chainSteps: chain.chainSteps },
-      });
-      expect(lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
-    });
-  }
-
-  it("accepts width/height as well as a pixel count", () => {
-    installStudioTournamentRuntime(createStudioTournamentRuntime(PRISTINE));
-    // 256² single-step: the small-canvas case the old boolean got wrong.
-    expect(
-      planStudioFilterIslandLanes({
-        gpuChainEligible: true,
-        workload: { width: 256, height: 256, chainSteps: 1 },
-      }).lanes[0],
-    ).toBe("worker");
-    // 4096² five-step: the large-canvas case that must not regress.
-    expect(
-      planStudioFilterIslandLanes({
-        gpuChainEligible: true,
-        workload: { width: 4096, height: 4096, chainSteps: 6 },
-      }).lanes,
-    ).toEqual(["gpu-chain", "worker", "konva-native"]);
+  it("consumes selectedLane/status and dispatches Worker only when Worker was selected", () => {
+    const source = imageNodeSource();
+    expect(source).toMatch(
+      /import \{[\s\S]*?planStudioFilterIslandLanes[\s\S]*?\} from "\.\/filter\/studio-filter-island-plan";/u,
+    );
+    expect(source).toMatch(
+      /const filterIslandPlan = planStudioFilterIslandLanes\(filterIslandInput\);/u,
+    );
+    expect(source).toMatch(/const selectedFilterLane = filterIslandPlan\.selectedLane;/u);
+    expect(source).toMatch(
+      /if \(filterIslandPlan\.status === "unavailable"\) \{[\s\S]*?markSelectedFilterUnavailable\([\s\S]*?return;[\s\S]*?\}/u,
+    );
+    expect(source).toMatch(
+      /if \(selectedFilterLane === "gpu-chain" && !useRetainedGpuPreview\) \{[\s\S]*?markSelectedFilterUnavailable\([\s\S]*?return;[\s\S]*?\}/u,
+    );
+    expect(source).toMatch(
+      /if \(selectedFilterLane === "worker"\) dispatchWorkerRequest\(\);/u,
+    );
+    expect(source).not.toMatch(/filterIslandPlan\.lanes\.slice\(1\)/u);
+    expect(source).not.toMatch(/for \([^)]* of filterIslandPlan\.lanes/u);
   });
 
-  it("leaves a GPU-ineligible ladder exactly as the planner produced it", () => {
-    installStudioTournamentRuntime(createStudioTournamentRuntime(PRISTINE));
-    for (const workload of [
-      { width: 64, height: 64, chainSteps: 1 },
-      { width: 4096, height: 4096, chainSteps: 6 },
-      { pixelCount: 0, chainSteps: 3 },
-    ]) {
-      const { lanes, laneCosts } = planStudioFilterIslandLanes({
-        gpuChainEligible: false,
-        workload,
-      });
-      expect(lanes).toEqual(["worker", "konva-native"]);
-      expect(laneCosts).toBeNull();
-    }
+  it("does not require the Worker client before an eligible GPU selection can execute", () => {
+    const source = imageNodeSource();
+    expect(source).not.toMatch(
+      /const useWorkerFilterPath = workerPipelineRequested\s*&& !!filterWorkerClient/u,
+    );
+    expect(source).not.toMatch(
+      /if \(!useWorkerFilterPath \|\| !displayImg \|\| !filterWorkerClient\)/u,
+    );
   });
 
-  it("ignores a degenerate workload instead of guessing (falls back to size-blind)", () => {
-    installStudioTournamentRuntime(createStudioTournamentRuntime(PRISTINE));
-    for (const workload of [
-      { pixelCount: 0, chainSteps: 1 },
-      { pixelCount: Number.NaN, chainSteps: 1 },
-      { width: 256, height: 0, chainSteps: 1 },
-    ]) {
-      const { lanes, laneCosts } = planStudioFilterIslandLanes({
-        gpuChainEligible: true,
-        workload,
-      });
-      expect(lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
-      expect(laneCosts).toBeNull();
-    }
+  it("keeps Konva disabled when the selected filter boundary is unavailable", () => {
+    const source = imageNodeSource();
+    expect(source).toMatch(/const filterPipelineActive = workerPipelineRequested;/u);
+    expect(source).toMatch(
+      /const activeFilters:[\s\S]*?filterPipelineActive[\s\S]*?\? undefined[\s\S]*?: konvaCompatibilityFilters;/u,
+    );
+    expect(source).toMatch(
+      /if \(!gpuFilterModule\) \{[\s\S]*?markSelectedFilterUnavailable\([\s\S]*?return;[\s\S]*?\}/u,
+    );
   });
 
-  it("prefers this device's measured samples over the benchmark seed", () => {
-    const runtime = createStudioTournamentRuntime(PRISTINE);
-    const input = {
-      gpuChainEligible: true,
-      workload: { width: 256, height: 256, chainSteps: 1 },
-    };
-    // Seed alone would demote the GPU lane at 256²; a device whose GPU floor is
-    // actually cheap must win that argument with its own measurements.
-    for (let i = 0; i < 4; i += 1) {
-      runtime.recordRenderSample(
-        studioFilterLaneProviderId("gpu-chain"),
-        studioFilterIslandBucket(input),
-        0.05,
-      );
-      runtime.recordRenderSample(
-        studioFilterLaneProviderId("worker"),
-        studioFilterIslandBucket(input),
-        0.9,
-      );
-    }
-    installStudioTournamentRuntime(runtime);
-    const { lanes, laneCosts } = planStudioFilterIslandLanes(input);
-    expect(lanes[0]).toBe("gpu-chain");
-    expect(laneCosts?.basis).toBe("mixed");
-    expect(laneCosts?.entries[0]).toMatchObject({
-      lane: "gpu-chain",
-      basis: "measured",
-      costMs: 0.05,
-    });
-  });
-
-  it("the tournament winner still has the last word over the cost model", () => {
-    const runtime = createStudioTournamentRuntime(PRISTINE);
-    const input = {
-      gpuChainEligible: true,
-      workload: { width: 4096, height: 4096, chainSteps: 6 },
-    };
-    // Cost model ranks GPU first here; a persisted winner outranks it.
-    runtime.recordWinner(studioFilterIslandBucket(input), runtime.deviceHash, {
-      providerId: studioFilterLaneProviderId("konva-native"),
-      expectedWarmMs: 4,
-      decidedAtSample: 9,
-    });
-    installStudioTournamentRuntime(runtime);
-    const { lanes, laneCosts } = planStudioFilterIslandLanes(input);
-    expect(laneCosts?.lanes[0]).toBe("gpu-chain");
-    expect(lanes).toEqual(["konva-native", "gpu-chain", "worker"]);
-  });
-
-  it("a seed cost order never fabricates or records a tournament winner", () => {
-    const runtime = createStudioTournamentRuntime(PRISTINE);
-    installStudioTournamentRuntime(runtime);
-    const bucketInput = {
-      gpuChainEligible: true,
-      workload: { width: 256, height: 256, chainSteps: 1 },
-    };
-    const planned = planStudioFilterIslandLanes(bucketInput);
-    expect(planned.laneCosts?.basis).toBe("seed");
-    expect(runtime.winnerCache.get(
-      studioFilterIslandBucket(bucketInput),
-      runtime.deviceHash,
-    )).toBeNull();
-  });
-
-  it("a remote kill still outranks everything, including a cheap cost verdict", () => {
-    const runtime = createStudioTournamentRuntime(PRISTINE);
-    runtime.applyKillList([studioFilterLaneProviderId("worker")], "remote flag");
-    installStudioTournamentRuntime(runtime);
-    const { lanes } = planStudioFilterIslandLanes({
-      gpuChainEligible: true,
-      workload: { width: 256, height: 256, chainSteps: 1 },
-    });
-    expect(lanes).toEqual(["konva-native", "gpu-chain"]);
+  it("passes the real workload into initial capability selection", () => {
+    const source = imageNodeSource();
+    expect(source).toMatch(/workload: \{ width, height, chainSteps: filterChainSteps \}/u);
+    expect(source).toMatch(/const filterChainSteps = built\.filters\.length;/u);
   });
 });
 
 describe("filter island bucket key", () => {
-  it("is deterministic for the same input", () => {
-    const input = {
+  it("is deterministic for equivalent dimensions and pixel counts", () => {
+    const dimensions = {
       gpuChainEligible: true,
       workload: { width: 1024, height: 1024, chainSteps: 3 },
-    };
-    expect(studioFilterIslandBucket(input)).toBe(studioFilterIslandBucket(input));
-    expect(studioFilterIslandBucket(input)).toBe(
-      studioFilterIslandBucket({
-        gpuChainEligible: true,
-        workload: { pixelCount: 1024 * 1024, chainSteps: 3 },
-      }),
-    );
+    } as const;
+    const pixels = {
+      gpuChainEligible: true,
+      workload: { pixelCount: 1024 * 1024, chainSteps: 3 },
+    } as const;
+    expect(studioFilterIslandBucket(dimensions)).toBe(studioFilterIslandBucket(dimensions));
+    expect(studioFilterIslandBucket(dimensions)).toBe(studioFilterIslandBucket(pixels));
   });
 
-  it("separates eligibility, size class and chain-length class", () => {
+  it("separates eligibility, size class, chain length, and unknown workloads", () => {
     const keys = new Set(
       [
         { gpuChainEligible: true, workload: { width: 256, height: 256, chainSteps: 1 } },
@@ -418,12 +308,10 @@ describe("filter island bucket key", () => {
         { gpuChainEligible: true },
       ].map((input) => studioFilterIslandBucket(input)),
     );
-    // Five materially different workloads must never pool their measurements.
     expect(keys.size).toBe(5);
   });
 
-  it("pools power-of-two-adjacent sizes and marks unknown workloads apart", () => {
-    // 1024² and 1100² sit in the same quantized class — samples pool there.
+  it("pools adjacent power-of-two sizes and marks invalid workloads unknown", () => {
     expect(
       studioFilterIslandBucket({
         gpuChainEligible: true,
@@ -445,21 +333,7 @@ describe("filter island bucket key", () => {
   });
 });
 
-/**
- * Interactive-path budget (docs/perf/heavy-feature-findings.md §4-4).
- *
- * Planning used to install the SQLite/OPFS tournament persistence adapter and
- * hydrate the shared runtime synchronously, so opening the filter dialog
- * pulled `@sqlite.org/sqlite-wasm` — 928 KB of the 1.03 MB transferred, for
- * telemetry the filter feature never reads. Planning must now be a pure,
- * synchronous read of in-memory state, with persistence deferred to idle.
- */
-describe("filter island planning never touches persistence (wasm budget)", () => {
-  afterEach(() => {
-    installStudioFilterTournamentBootstrap(null);
-    installStudioTournamentRuntime(null);
-  });
-
+describe("filter island persistence bootstrap", () => {
   function spyBootstrap(): {
     tasks: Array<() => void>;
     loads: number;
@@ -482,25 +356,20 @@ describe("filter island planning never touches persistence (wasm budget)", () =>
     return state;
   }
 
-  it("does not load the persistence adapter while producing a plan", () => {
+  it("does not load persistence while producing singleton plans", () => {
     const bootstrap = spyBootstrap();
-    installStudioTournamentRuntime(
-      createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-test" }),
-    );
-    for (let i = 0; i < 5; i += 1) {
+    for (let index = 0; index < 5; index += 1) {
       planStudioFilterIslandLanes({
         gpuChainEligible: true,
         workload: { width: 512, height: 512, chainSteps: 3 },
       });
     }
-    // The loader is only ever reached from the deferred task.
     expect(bootstrap.loads).toBe(0);
     expect(bootstrap.installs).toBe(0);
-    // …and the idle task is armed exactly once, however many plans ran.
     expect(bootstrap.tasks).toHaveLength(1);
   });
 
-  it("loads persistence only once the deferred idle task runs", async () => {
+  it("loads persistence only when the deferred task runs", async () => {
     const bootstrap = spyBootstrap();
     installStudioTournamentRuntime(
       createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-test" }),
@@ -509,65 +378,55 @@ describe("filter island planning never touches persistence (wasm budget)", () =>
     expect(bootstrap.loads).toBe(0);
     bootstrap.tasks[0]?.();
     await Promise.resolve();
+    await Promise.resolve();
     expect(bootstrap.loads).toBe(1);
     expect(bootstrap.installs).toBe(1);
   });
 
-  it("plans correctly against an unbooted tournament (no runtime construction)", () => {
+  it("does not construct the shared tournament runtime during planning", () => {
     spyBootstrap();
     installStudioTournamentRuntime(null);
-    const { lanes, killIgnoredReason, laneCosts } = planStudioFilterIslandLanes({
+    const result = planStudioFilterIslandLanes({
       gpuChainEligible: true,
       workload: { width: 4096, height: 4096, chainSteps: 6 },
     });
-    // No winners and nothing killed ⇒ the ladder is the planner/cost product…
-    expect(lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
-    expect(killIgnoredReason).toBeNull();
-    expect(laneCosts?.basis).toBe("seed");
-    // …and planning did not construct the shared runtime behind our back.
+    expect(result.lanes).toEqual(["gpu-chain"]);
+    expect(result.selectedLane).toBe("gpu-chain");
+    expect(result.status).toBe("selected");
+    expect(result.laneCosts).toBeNull();
     expect(peekStudioTournamentRuntime()).toBeNull();
   });
 
-  it("keeps the sqlite persistence module out of the plan module's static graph", () => {
+  it("keeps SQLite persistence out of the plan module's static graph", () => {
     const source = readFileSync(
       new URL("./studio-filter-island-plan.ts", import.meta.url),
       "utf8",
     );
-    // A static import would put the 865 KB wasm glue in the filter chunk even
-    // if the call itself were deferred.
     expect(source).not.toMatch(/^import .*studio-tournament-sqlite-persistence/mu);
     expect(source).toMatch(/import\("\.\.\/studio-tournament-sqlite-persistence"\)/u);
   });
 });
 
-/**
- * V13 §2.5 cost shadow: the island's authority plan runs through
- * planWithCostShadow with a workload fingerprint assembled from the caller's
- * own size/chain fields. Receipts must be total (every plan recorded) and
- * deterministic, degenerate workloads must fail closed to an absent
- * fingerprint, and the lane ladder must stay byte-identical (the lane suites
- * above already run through the same wired path).
- */
-describe("V13 §2.5 cost shadow receipts (filter island)", () => {
-  beforeEach(() => {
-    resetStudioFilterIslandCostShadowReceipt();
-  });
-
-  it("a sized workload populates the fingerprint from the island's own fields", () => {
-    planStudioFilterIslandLanes({
+describe("filter island fingerprint and cost-shadow receipts", () => {
+  it("records real size and chain fields for the singleton provider", () => {
+    const result = planStudioFilterIslandLanes({
       gpuChainEligible: true,
       workload: { width: 2048, height: 2048, chainSteps: 3 },
     });
     const receipt = readStudioFilterIslandCostShadowReceipt();
+    const island = receipt.lastReceipt?.islands[0];
+
+    expect(result.selectedLane).toBe("gpu-chain");
     expect(receipt.total).toBe(1);
     expect(receipt.absentFingerprint).toBe(0);
     expect(receipt.shadowFailures).toBe(0);
     expect(receipt.agreed + receipt.disagreed).toBe(1);
-    const island = receipt.lastReceipt?.islands[0];
     expect(island?.legacyWinner).toBe("filter-lane-gpu-chain");
+    expect(island?.costs).toHaveLength(1);
+    expect(island?.costs[0]?.providerId).toBe("filter-lane-gpu-chain");
     const fingerprint = island?.fingerprint;
     if (fingerprint === undefined || fingerprint === "absent") {
-      throw new Error("expected a populated fingerprint on the receipt");
+      throw new Error("expected a populated filter-island fingerprint");
     }
     expect(fingerprint).toMatchObject({
       pathCount: 0,
@@ -578,251 +437,113 @@ describe("V13 §2.5 cost shadow receipts (filter island)", () => {
       filterNodeCount: 3,
       visibleAreaRatio: 1,
     });
-    // Area factor (visibleAreaRatio × dpr²) equals the island's megapixels.
     expect(fingerprint.dpr).toBeCloseTo(Math.sqrt(megapixelsOf(2048 * 2048)), 12);
-    expect(island?.costs.length).toBeGreaterThan(0);
-    for (const cost of island?.costs ?? []) {
-      expect(Number.isFinite(cost.total)).toBe(true);
-    }
+    expect(receipt.fullLadderQueries).toBe(0);
+    expect(receipt.lastFullLadderReceipt).toBeNull();
   });
 
-  it("workload-less calls record an absent fingerprint and keep the size-blind ladder", () => {
-    const { lanes } = planStudioFilterIslandLanes({ gpuChainEligible: false });
-    expect(lanes).toEqual(["worker", "konva-native"]);
+  it("records an absent fingerprint without changing the selected Worker", () => {
+    const result = planStudioFilterIslandLanes({ gpuChainEligible: false });
     const receipt = readStudioFilterIslandCostShadowReceipt();
-    expect(receipt.total).toBe(1);
-    expect(receipt.absentFingerprint).toBe(1);
-    expect(receipt.agreed).toBe(0);
-    expect(receipt.disagreed).toBe(0);
     const island = receipt.lastReceipt?.islands[0];
+
+    expect(result.lanes).toEqual(["worker"]);
+    expect(result.selectedLane).toBe("worker");
     expect(island?.fingerprint).toBe("absent");
     expect(island?.costs).toEqual([]);
-    expect(island?.agreed).toBe(true);
+    expect(receipt.total).toBe(1);
+    expect(receipt.absentFingerprint).toBe(1);
+    expect(receipt.fullLadderQueries).toBe(0);
   });
 
-  it("degenerate workloads fail closed to an absent fingerprint (ladder untouched)", () => {
-    expect(deriveStudioFilterIslandCostFingerprint(null)).toBeUndefined();
-    expect(deriveStudioFilterIslandCostFingerprint(undefined)).toBeUndefined();
-    expect(
-      deriveStudioFilterIslandCostFingerprint({ pixelCount: 0, chainSteps: 2 }),
-    ).toBeUndefined();
-    expect(
-      deriveStudioFilterIslandCostFingerprint({ pixelCount: Number.NaN, chainSteps: 2 }),
-    ).toBeUndefined();
-    expect(
-      deriveStudioFilterIslandCostFingerprint({ width: -128, height: 128, chainSteps: 2 }),
-    ).toBeUndefined();
-    const degenerate = planStudioFilterIslandLanes({
+  it("fails closed to an absent fingerprint for degenerate workloads", () => {
+    for (const workload of [
+      null,
+      undefined,
+      { pixelCount: 0, chainSteps: 2 },
+      { pixelCount: Number.NaN, chainSteps: 2 },
+      { width: -128, height: 128, chainSteps: 2 },
+      { pixelCount: Number.MIN_VALUE, chainSteps: 1 },
+      { pixelCount: Number.POSITIVE_INFINITY, chainSteps: 1 },
+      { width: 1e200, height: 1e200, chainSteps: 1 },
+    ] as const) {
+      expect(deriveStudioFilterIslandCostFingerprint(workload)).toBeUndefined();
+    }
+
+    const result = planStudioFilterIslandLanes({
       gpuChainEligible: true,
-      workload: { pixelCount: 0, chainSteps: 2 },
+      workload: { pixelCount: Number.MIN_VALUE, chainSteps: 1 },
     });
-    const blind = planStudioFilterIslandLanes({ gpuChainEligible: true });
-    expect(degenerate.lanes).toEqual(blind.lanes);
     const receipt = readStudioFilterIslandCostShadowReceipt();
-    expect(receipt.total).toBe(2);
-    expect(receipt.absentFingerprint).toBe(2);
+    expect(result.selectedLane).toBe("gpu-chain");
+    expect(result.lanes).toEqual(["gpu-chain"]);
+    expect(result.plan.islands[0]).not.toHaveProperty("fallbackChain");
+    expect(receipt.absentFingerprint).toBe(1);
+    expect(receipt.lastReceipt?.islands[0]?.fingerprint).toBe("absent");
+    expect(receipt.lastReceipt?.islands[0]?.costs).toEqual([]);
   });
 
-  it("sub-1 chain steps clamp to one filter node (same clamp as the cost tier)", () => {
+  it("clamps sub-one chain lengths to one filter node", () => {
     const fingerprint = deriveStudioFilterIslandCostFingerprint({
       pixelCount: 1_000_000,
       chainSteps: 0,
     });
     expect(fingerprint?.filterNodeCount).toBe(1);
-    // Exactly 1 MP is the seam of the area encoding: both regimes agree there
-    // (1 × 1² = 1), so dpr sits at its floor and the ratio is saturated.
     expect(fingerprint?.dpr).toBe(1);
     expect(fingerprint?.visibleAreaRatio).toBe(1);
   });
 
-  it("receipts are total and deterministic across identical plans", () => {
+  it("produces deterministic receipts across identical singleton plans", () => {
     const input = {
       gpuChainEligible: true,
       workload: { width: 512, height: 512, chainSteps: 2 },
     } as const;
-    planStudioFilterIslandLanes(input);
-    const first = readStudioFilterIslandCostShadowReceipt().lastReceipt;
-    planStudioFilterIslandLanes(input);
-    const second = readStudioFilterIslandCostShadowReceipt().lastReceipt;
-    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
-    const receipt = readStudioFilterIslandCostShadowReceipt();
-    expect(receipt.total).toBe(2);
-    expect(receipt.absentFingerprint).toBe(0);
-    expect(receipt.agreed + receipt.disagreed).toBe(2);
-    expect(receipt.shadowFailures).toBe(0);
+    const firstPlan = planStudioFilterIslandLanes(input);
+    const firstReceipt = readStudioFilterIslandCostShadowReceipt().lastReceipt;
+    const secondPlan = planStudioFilterIslandLanes(input);
+    const secondReceipt = readStudioFilterIslandCostShadowReceipt().lastReceipt;
+
+    expect(JSON.stringify(secondPlan.plan)).toBe(JSON.stringify(firstPlan.plan));
+    expect(secondPlan.lanes).toEqual(firstPlan.lanes);
+    expect(JSON.stringify(secondReceipt)).toBe(JSON.stringify(firstReceipt));
+    expect(readStudioFilterIslandCostShadowReceipt()).toMatchObject({
+      total: 2,
+      absentFingerprint: 0,
+      shadowFailures: 0,
+      fullLadderQueries: 0,
+    });
   });
 });
 
-/**
- * P-02c: the authority query narrows to the head lane, so its cost receipt
- * ranks a singleton and can never disagree. The second, observation-only
- * query re-ranks the full admitted ladder (never the ineligible GPU chain)
- * and feeds only the receipt — these cases pin the multi-candidate ranking,
- * the strictly-cheaper tie rule, the coarse-bucket memo, and that the plan
- * and lane ladder stay byte-identical.
- */
-describe("P-02c full-ladder cost observation (filter island)", () => {
-  beforeEach(() => {
-    resetStudioFilterIslandCostShadowReceipt();
-  });
-
-  afterEach(() => {
-    installStudioTournamentRuntime(null);
-  });
-
-  it("ranks the full three-lane ladder the singleton authority query collapses", () => {
-    planStudioFilterIslandLanes({
-      gpuChainEligible: true,
-      workload: { width: 2048, height: 2048, chainSteps: 3 },
-    });
-    const receipt = readStudioFilterIslandCostShadowReceipt();
-    // The narrowed authority receipt ranked a singleton…
-    expect(receipt.total).toBe(1);
-    expect(receipt.lastReceipt?.islands[0]?.costs.length).toBe(1);
-    // …while the observation ranked the real multi-candidate ladder.
-    expect(receipt.fullLadderQueries).toBe(1);
-    expect(receipt.fullLadderAgreed + receipt.fullLadderDisagreed).toBe(1);
-    const observation = receipt.lastFullLadderReceipt;
-    expect(observation?.islandId).toBe("image-filter-chain");
-    expect(observation?.legacyWinner).toBe("filter-lane-gpu-chain");
-    expect(observation?.costs).toHaveLength(3);
-    expect(observation?.costWinner).not.toBeNull();
-    // At 2048²×3 the shared cost model also puts the GPU chain first, so the
-    // full-ladder verdict is a genuine (not structural) agreement.
-    expect(observation?.costs[0]?.providerId).toBe("filter-lane-gpu-chain");
-    expect(observation?.costs[0]?.lane).toBe("webgpu");
-    expect(observation?.agreed).toBe(true);
-  });
-
-  it("never ranks the ineligible GPU chain, and exact ties defer to the authority winner", () => {
-    planStudioFilterIslandLanes({
-      gpuChainEligible: false,
-      workload: { width: 512, height: 512, chainSteps: 2 },
-    });
-    const observation = readStudioFilterIslandCostShadowReceipt().lastFullLadderReceipt;
-    // Two CPU lanes only — a cheaper-looking but inadmissible GPU chain must
-    // never appear as evidence (fail closed).
-    expect(observation?.costs).toHaveLength(2);
-    expect(
-      observation?.costs.every((cost) => cost.providerId !== "filter-lane-gpu-chain"),
-    ).toBe(true);
-    // The two CPU lanes cost identically; the id-sorted cheapest is
-    // konva-native, but a tie is not strictly cheaper evidence, so the
-    // authority winner stands and the observation agrees.
-    expect(observation?.costs[0]?.providerId).toBe("filter-lane-konva-native");
-    expect(observation?.legacyWinner).toBe("filter-lane-worker");
-    expect(observation?.costWinner).toBe("filter-lane-worker");
-    expect(observation?.agreed).toBe(true);
-  });
-
-  it("memoizes by island bucket and skips absent workloads entirely", () => {
-    const input = {
-      gpuChainEligible: true,
-      workload: { width: 512, height: 512, chainSteps: 2 },
-    } as const;
-    for (let i = 0; i < 5; i += 1) {
-      planStudioFilterIslandLanes(input);
-    }
-    expect(readStudioFilterIslandCostShadowReceipt().fullLadderQueries).toBe(1);
-    // A different power-of-two size class is a different bucket.
-    planStudioFilterIslandLanes({
-      gpuChainEligible: true,
-      workload: { width: 4096, height: 4096, chainSteps: 2 },
-    });
-    expect(readStudioFilterIslandCostShadowReceipt().fullLadderQueries).toBe(2);
-    // Workload-less and degenerate calls never reach the second query.
-    planStudioFilterIslandLanes({ gpuChainEligible: true });
-    planStudioFilterIslandLanes({
-      gpuChainEligible: true,
-      workload: { pixelCount: 0, chainSteps: 2 },
-    });
-    const receipt = readStudioFilterIslandCostShadowReceipt();
-    expect(receipt.fullLadderQueries).toBe(2);
-    expect(receipt.fullLadderAgreed + receipt.fullLadderDisagreed).toBe(2);
-  });
-
-  it("plan and lane ladder are byte-identical with and without the second query", () => {
-    installStudioTournamentRuntime(
-      createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-test" }),
-    );
-    const input = {
-      gpuChainEligible: true,
-      workload: { width: 4096, height: 4096, chainSteps: 6 },
-    } as const;
-    // First call: the full-ladder query runs. Second call: the memo skips it.
-    const first = planStudioFilterIslandLanes(input);
-    const second = planStudioFilterIslandLanes(input);
-    expect(readStudioFilterIslandCostShadowReceipt().fullLadderQueries).toBe(1);
-    expect(JSON.stringify(second.plan)).toBe(JSON.stringify(first.plan));
-    expect(second.lanes).toEqual(first.lanes);
-    // …and the ladder is exactly the pre-P-02c product for this workload.
-    expect(first.lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
-    expect(first.killIgnoredReason).toBeNull();
-  });
-});
-
-/**
- * R-03b: the fingerprint's area encoding must carry TRUE sub-megapixel area.
- *
- * The previous encoding was `dpr = √max(1, MP), visibleAreaRatio = 1`, and
- * that `max(1, …)` floored every sub-megapixel island to a full 1 MP. The
- * registry's calibrated `fixedMs + perMegapixelMs × MP` model has a real lane
- * crossover well below 1 MP, so the floor made the whole cpu-favouring regime
- * structurally unreachable: every small island was ranked as if it were 1 MP,
- * i.e. always on the gpu side of the crossover. These cases pin the encoding,
- * the crossover in both directions (read off the receipt, through the real
- * calibrated model), and that routing is untouched either way.
- */
-describe("R-03b filter island area encoding (sub-megapixel crossover evidence)", () => {
-  beforeEach(() => {
-    resetStudioFilterIslandCostShadowReceipt();
-  });
-
-  afterEach(() => {
-    installStudioTournamentRuntime(null);
-  });
-
+describe("filter island area encoding", () => {
   function fingerprintFor(width: number, height: number, chainSteps: number) {
-    const fingerprint = deriveStudioFilterIslandCostFingerprint({
-      width,
-      height,
-      chainSteps,
-    });
+    const fingerprint = deriveStudioFilterIslandCostFingerprint({ width, height, chainSteps });
     if (fingerprint === undefined) {
       throw new Error(`expected a fingerprint for ${width}x${height}`);
     }
     return fingerprint;
   }
 
-  it("gives every sub-megapixel island its own true area (no 1 MP floor)", () => {
-    const tiny = fingerprintFor(128, 128, 1);
-    const small = fingerprintFor(256, 256, 1);
-    const mid = fingerprintFor(512, 512, 1);
+  it("preserves true sub-megapixel area without a 1 MP floor", () => {
+    const fingerprints = [
+      fingerprintFor(128, 128, 1),
+      fingerprintFor(256, 256, 1),
+      fingerprintFor(512, 512, 1),
+    ];
+    const areas = fingerprints.map(presentedMegapixels);
 
-    // Area factor round-trips to the island's real megapixels.
-    expect(presentedMegapixels(tiny)).toBeCloseTo(megapixelsOf(128 * 128), 12);
-    expect(presentedMegapixels(small)).toBeCloseTo(megapixelsOf(256 * 256), 12);
-    expect(presentedMegapixels(mid)).toBeCloseTo(megapixelsOf(512 * 512), 12);
-
-    // Distinct — the defect this slice fixes collapsed all three onto 1 MP.
-    const areas = [tiny, small, mid].map(presentedMegapixels);
+    expect(areas[0]).toBeCloseTo(megapixelsOf(128 * 128), 12);
+    expect(areas[1]).toBeCloseTo(megapixelsOf(256 * 256), 12);
+    expect(areas[2]).toBeCloseTo(megapixelsOf(512 * 512), 12);
     expect(new Set(areas).size).toBe(3);
-    for (const area of areas) {
-      expect(area).toBeLessThan(1);
-      expect(area).toBeGreaterThan(0);
-      expect(Number.isFinite(area)).toBe(true);
-    }
-
-    // Sub-megapixel regime: dpr pinned at its registry floor, ratio carries
-    // the area (strictly positive, inside the model's [0, 1] clamp).
-    for (const fingerprint of [tiny, small, mid]) {
+    for (const fingerprint of fingerprints) {
       expect(fingerprint.dpr).toBe(1);
       expect(fingerprint.visibleAreaRatio).toBeGreaterThan(0);
       expect(fingerprint.visibleAreaRatio).toBeLessThan(1);
     }
   });
 
-  it("keeps the ≥1 MP encoding exactly as before (dpr = √MP, ratio 1)", () => {
+  it("keeps the at-least-1 MP encoding as dpr square root with saturated ratio", () => {
     for (const size of [1024, 2048, 4096]) {
       const fingerprint = fingerprintFor(size, size, 3);
       const megapixels = megapixelsOf(size * size);
@@ -832,110 +553,9 @@ describe("R-03b filter island area encoding (sub-megapixel crossover evidence)",
     }
   });
 
-  it("ranks a cpu lane cheaper on a small island and the gpu lane on a large one", () => {
-    const chainSteps = 1;
-
-    planStudioFilterIslandLanes({
-      gpuChainEligible: true,
-      workload: { width: 512, height: 512, chainSteps },
-    });
-    const small = readStudioFilterIslandCostShadowReceipt().lastFullLadderReceipt;
-    expect(small?.costs).toHaveLength(3);
-    const smallCheapest = small?.costs[0];
-    const smallGpu = small?.costs.find((cost) => cost.lane === "webgpu");
-    if (smallCheapest === undefined || smallGpu === undefined) {
-      throw new Error("expected a ranked small-island ladder");
-    }
-    // Below the crossover the gpu submit floor cannot amortize.
-    expect(smallCheapest.lane).toBe("cpu");
-    expect(smallGpu.total).toBeGreaterThan(smallCheapest.total);
-    expect(smallGpu.providerId).toBe("filter-lane-gpu-chain");
-    // Strictly cheaper evidence against the authority winner is exactly the
-    // disagreement this shadow exists to collect.
-    expect(small?.legacyWinner).toBe("filter-lane-gpu-chain");
-    expect(small?.costWinner).not.toBe("filter-lane-gpu-chain");
-    expect(small?.agreed).toBe(false);
-    expect(readStudioFilterIslandCostShadowReceipt().fullLadderDisagreed).toBe(1);
-
-    resetStudioFilterIslandCostShadowReceipt();
-    planStudioFilterIslandLanes({
-      gpuChainEligible: true,
-      workload: { width: 2048, height: 2048, chainSteps },
-    });
-    const large = readStudioFilterIslandCostShadowReceipt().lastFullLadderReceipt;
-    const largeCheapest = large?.costs[0];
-    const largeCpu = large?.costs.find((cost) => cost.lane === "cpu");
-    if (largeCheapest === undefined || largeCpu === undefined) {
-      throw new Error("expected a ranked large-island ladder");
-    }
-    // …and above it the same model flips.
-    expect(largeCheapest.lane).toBe("webgpu");
-    expect(largeCpu.total).toBeGreaterThan(largeCheapest.total);
-    expect(large?.agreed).toBe(true);
-
-    // The flip is the calibrated model's own analytic crossover, not a
-    // coincidence of two sampled sizes: it sits strictly between the two
-    // areas — and, decisively, BELOW 1 MP, which is why the old
-    // `max(1, megapixels)` floor could never let it be observed.
-    const crossover = laneCrossoverMegapixels(largeCpu, largeCheapest);
-    if (crossover === null) throw new Error("expected a finite lane crossover");
-    expect(crossover).toBeLessThan(1);
-    expect(smallGpu.areaMegapixels).toBeLessThan(crossover);
-    expect(largeCheapest.areaMegapixels).toBeGreaterThan(crossover);
-  });
-
-  it("fails closed on degenerate areas instead of fabricating one", () => {
-    // Underflows to exactly 0 MP — positive pixels, but no usable area.
-    expect(
-      deriveStudioFilterIslandCostFingerprint({
-        pixelCount: Number.MIN_VALUE,
-        chainSteps: 1,
-      }),
-    ).toBeUndefined();
-    expect(
-      deriveStudioFilterIslandCostFingerprint({
-        pixelCount: Number.POSITIVE_INFINITY,
-        chainSteps: 1,
-      }),
-    ).toBeUndefined();
-    // width × height overflowing to Infinity is degenerate the same way.
-    expect(
-      deriveStudioFilterIslandCostFingerprint({
-        width: 1e200,
-        height: 1e200,
-        chainSteps: 1,
-      }),
-    ).toBeUndefined();
-    expect(
-      deriveStudioFilterIslandCostFingerprint({
-        width: Number.NaN,
-        height: 512,
-        chainSteps: 1,
-      }),
-    ).toBeUndefined();
-
-    const degenerate = planStudioFilterIslandLanes({
-      gpuChainEligible: true,
-      workload: { pixelCount: Number.MIN_VALUE, chainSteps: 1 },
-    });
-    const receipt = readStudioFilterIslandCostShadowReceipt();
-    expect(receipt.absentFingerprint).toBe(1);
-    expect(receipt.lastReceipt?.islands[0]?.fingerprint).toBe("absent");
-    expect(receipt.lastReceipt?.islands[0]?.costs).toEqual([]);
-    expect(receipt.fullLadderQueries).toBe(0);
-    // Routing authority is untouched — the fallback chain is still the full
-    // planner ladder (the product cost tier may still reorder `lanes`, which
-    // is a separate, pre-existing mechanism this slice does not feed).
-    expect(degenerate.plan.islands[0]?.fallbackChain).toEqual([
-      "filter-lane-gpu-chain",
-      "filter-lane-worker",
-      "filter-lane-konva-native",
-    ]);
-  });
-
-  it("never lets the area encoding reach the authority plan (routing unchanged)", () => {
+  it("keeps fingerprint observations out of authority selection", () => {
     const blind = planStudioFilterIslandLanes({ gpuChainEligible: true });
-    const sub = planStudioFilterIslandLanes({
+    const small = planStudioFilterIslandLanes({
       gpuChainEligible: true,
       workload: { width: 256, height: 256, chainSteps: 1 },
     });
@@ -943,13 +563,14 @@ describe("R-03b filter island area encoding (sub-megapixel crossover evidence)",
       gpuChainEligible: true,
       workload: { width: 4096, height: 4096, chainSteps: 6 },
     });
-    // Byte-identical authority plans: the fingerprint is observation-only.
-    expect(JSON.stringify(sub.plan)).toBe(JSON.stringify(blind.plan));
+
+    expect(JSON.stringify(small.plan)).toBe(JSON.stringify(blind.plan));
     expect(JSON.stringify(large.plan)).toBe(JSON.stringify(blind.plan));
-    expect(sub.plan.islands[0]?.fallbackChain).toEqual([
-      "filter-lane-gpu-chain",
-      "filter-lane-worker",
-      "filter-lane-konva-native",
-    ]);
+    expect(small.selectedLane).toBe("gpu-chain");
+    expect(large.selectedLane).toBe("gpu-chain");
+    expect(small.lanes).toEqual(["gpu-chain"]);
+    expect(large.lanes).toEqual(["gpu-chain"]);
+    expect(small.plan.islands[0]).not.toHaveProperty("fallbackChain");
+    expect(large.plan.islands[0]).not.toHaveProperty("fallbackChain");
   });
 });

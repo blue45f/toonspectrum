@@ -21,7 +21,10 @@ async function archiveWithManifest(manifest: unknown, path = "shots/001.png"): P
   return buildStudioPackageArchiveBlob([
     { path: "manifest.json", data: new TextEncoder().encode(JSON.stringify(manifest, null, 2)) },
     { path, data: PNG },
-  ], { mimeType: "application/zip" });
+  ], {
+    mimeType: "application/zip",
+    crc32ExecutionMode: "direct-headless",
+  });
 }
 
 function legacyManifest() {
@@ -276,7 +279,10 @@ describe("Studio BG3D shot batch archive response verifier", () => {
       { path: "manifest.json", data: new TextEncoder().encode(JSON.stringify(manifest, null, 2)) },
       { path: "shots/001/beauty.png", data: PNG },
       { path: "contact/contact-sheet-001.png", data: PNG },
-    ], { mimeType: "application/zip" });
+    ], {
+      mimeType: "application/zip",
+      crc32ExecutionMode: "direct-headless",
+    });
 
     await expect(verifyStudioBg3dShotBatchArchiveBlob(archive, {
       expected: {

@@ -13,6 +13,7 @@ import {
 import type {
   StudioLivingInkExecutionConfig,
   StudioLivingInkExecutionFrame,
+  StudioLivingInkExecutionProviderId,
   StudioLivingInkExecutionReceipt,
   StudioLivingInkWorkerRequest,
 } from "../src/domains/creator/studio-living-ink-execution-protocol";
@@ -32,6 +33,16 @@ declare global {
 const WIDTH = 256;
 const HEIGHT = 160;
 const PAGE_RGBA = Object.freeze([255, 255, 255, 255] as const);
+
+function selectedProviderOptions(): Readonly<{
+  backend: StudioLivingInkExecutionProviderId;
+}> {
+  const backend = new URL(globalThis.location.href).searchParams.get("backend");
+  if (backend !== "webgpu" && backend !== "webgl2") {
+    throw new Error("Living Ink execution QA requires an explicit ?backend=webgpu|webgl2 selection.");
+  }
+  return Object.freeze({ backend });
+}
 
 const config: StudioLivingInkExecutionConfig = {
   displayWidth: WIDTH,
@@ -650,7 +661,7 @@ async function receiptOrientedHash(
 async function deterministicHash(
   color: readonly [number, number, number, number] = [0.1, 0.18, 0.38, 1],
 ): Promise<string> {
-  const provider = await createStudioLivingInkExecutionProvider(config);
+  const provider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
   try {
     const frame = await provider.apply(darkInk(1, lineMarks(color)));
     const hash = frame.receipt.displaySha256;
@@ -671,11 +682,9 @@ async function main(): Promise<void> {
   }, 4);
   const providers: StudioLivingInkExecutionProvider[] = [];
   try {
-    // Constructed by hand rather than through the factory so the harness keeps the capability
-    // record the Worker answers with: it names the runtime that actually executed (WebGL2 GLSL or
-    // the WGSL field runtime), which is what makes this probe a per-backend gate instead of a
-    // gate on whichever backend the launch flags happened to select.
-    const bloomProvider = new StudioLivingInkExecutionProvider(config);
+    // The query-selected provider is pinned into every Worker initialization. Browser launch flags
+    // only make that provider available; they never choose or substitute it.
+    const bloomProvider = new StudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(bloomProvider);
     const capabilities = await bloomProvider.initialize();
     const lineFrame = await bloomProvider.apply(darkInk(1, lineMarks()));
@@ -703,7 +712,7 @@ async function main(): Promise<void> {
     await render(bloomProvider, "water", "water-field");
     await render(bloomProvider, "flow", "flow-field");
 
-    const continuousProvider = await createStudioLivingInkExecutionProvider(config);
+    const continuousProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(continuousProvider);
     const continuousMarks = constantLongStrokeMarks();
     const continuousFrame = await continuousProvider.apply(
@@ -711,14 +720,14 @@ async function main(): Promise<void> {
     );
     const continuousImage = drawFrame(continuousFrame, "long-stroke");
 
-    const intersectionProvider = await createStudioLivingInkExecutionProvider(config);
+    const intersectionProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(intersectionProvider);
     const intersectionFrame = await intersectionProvider.apply(
       darkInk(1, figureEightMarks(), null, "pen"),
     );
     const intersectionImage = drawFrame(intersectionFrame, "self-intersection");
 
-    const radialProvider = await createStudioLivingInkExecutionProvider(config);
+    const radialProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(radialProvider);
     const radialBaseFrame = await radialProvider.apply(darkInk(1, [{
       x: WIDTH / 2,
@@ -748,7 +757,7 @@ async function main(): Promise<void> {
     });
     const radialWashImage = drawFrame(radialWashFrame, "radial-wash");
 
-    const fixProvider = await createStudioLivingInkExecutionProvider(config);
+    const fixProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(fixProvider);
     (await fixProvider.apply(darkInk(1, lineMarks([0.16, 0.12, 0.08, 1], 73)))).image.close();
     (await fixProvider.apply({ kind: "fix", version: 1, sequence: 2, scope: "all", selection: null }, { quality: "settle" })).image.close();
@@ -764,7 +773,7 @@ async function main(): Promise<void> {
     (await fixProvider.apply({ kind: "advance", version: 1, sequence: 4, fixedTicks: 36 })).image.close();
     const fixedAfter = await render(fixProvider, "fixed-pigment", "fixed-after");
 
-    const selectionProvider = await createStudioLivingInkExecutionProvider(config);
+    const selectionProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(selectionProvider);
     const selectionBeforeFrame = await selectionProvider.apply(darkInk(1, lineMarks([0.08, 0.08, 0.08, 1], 48)));
     const selectionBeforeImage = drawFrame(selectionBeforeFrame, "selection");
@@ -783,7 +792,7 @@ async function main(): Promise<void> {
     const cleared = await selectionProvider.apply({ kind: "clear", version: 1, sequence: 3, scope: "all", selection: null });
     const clearImage = drawFrame(cleared, "clear");
 
-    const whiteProvider = await createStudioLivingInkExecutionProvider(config);
+    const whiteProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(whiteProvider);
     const center = [{
       x: 128, y: 80, radius: 22, pressure: 0.9, speed: 0,
@@ -812,12 +821,12 @@ async function main(): Promise<void> {
     (await whiteProvider.apply(layeringJournal[5]!, { quality: "settle" })).image.close();
     const darkOverWhite = await render(whiteProvider, "fixed-pigment", "dark-over-white");
 
-    // This is the product restore boundary: JSON-safe operation journal -> fresh Worker -> fresh
-    // WebGL2 runtime. Half-float textures are deliberately not persisted as cross-device truth.
+    // This is the product restore boundary: JSON-safe operation journal -> fresh Worker -> the
+    // same explicitly selected provider. Half-float state is not persisted as cross-device truth.
     const persistedLayeringJournal = JSON.parse(
       JSON.stringify(layeringJournal),
     ) as StudioLivingInkOperation[];
-    const reloadedLayeringProvider = await createStudioLivingInkExecutionProvider(config);
+    const reloadedLayeringProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(reloadedLayeringProvider);
     let reloadedWhiteHash = "";
     let reloadedDarkOverWhiteHash = "";
@@ -836,7 +845,7 @@ async function main(): Promise<void> {
       }
     }
 
-    const cancelProvider = await createStudioLivingInkExecutionProvider(config);
+    const cancelProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(cancelProvider);
     const cancelInk = await cancelProvider.apply(darkInk(1, lineMarks([0.08, 0.13, 0.2, 1], 104)));
     const cancelBeforeHash = cancelInk.receipt.displaySha256;
@@ -873,6 +882,7 @@ async function main(): Promise<void> {
 
     const crashWorkers: CrashableLivingInkWorker[] = [];
     const crashProvider = new StudioLivingInkExecutionProvider(config, {
+      ...selectedProviderOptions(),
       requestTimeoutMilliseconds: 10_000,
       workerFactory: () => {
         const worker = new CrashableLivingInkWorker();
@@ -902,7 +912,7 @@ async function main(): Promise<void> {
     recoveredFrame.image.close();
 
     const interactiveElapsed: number[] = [];
-    const performanceProvider = await createStudioLivingInkExecutionProvider(config);
+    const performanceProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(performanceProvider);
     const performanceWarmup = await performanceProvider.apply(darkInk(1, [{
       x: 16, y: 132, radius: 2.4, pressure: 0.55, speed: 240,
@@ -939,7 +949,7 @@ async function main(): Promise<void> {
       pigmentMass: 0.18,
       color: [0.08, 0.12, 0.2, 1] as const,
     }], null, "pen"));
-    const presentEveryOperationProvider = await createStudioLivingInkExecutionProvider(config);
+    const presentEveryOperationProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(presentEveryOperationProvider);
     let presentEveryOperationHash = "";
     let presentEveryOperationFrames = 0;
@@ -949,7 +959,7 @@ async function main(): Promise<void> {
       presentEveryOperationFrames += 1;
       frame.image.close();
     }
-    const deferredPresentationProvider = await createStudioLivingInkExecutionProvider(config);
+    const deferredPresentationProvider = await createStudioLivingInkExecutionProvider(config, selectedProviderOptions());
     providers.push(deferredPresentationProvider);
     let deferredAckCount = 0;
     let deferredAckReadbacks = 0;
@@ -1029,16 +1039,9 @@ async function main(): Promise<void> {
       status: "ok",
       /*
        * Backend identity comes from the *receipt* — the runtime that actually executed the
-       * operation — not from the capability record.
-       *
-       * `capabilities.backend` is not a reliable witness here. When the WGSL runtime is refused,
-       * the WebGPU factory falls back to a WebGL2 runtime and stamps
-       * `backend: "webgpu-offscreen-half-float"` onto its capabilities so callers can still see
-       * that a GPU device exists. Reading identity from that stamp let a whole lane run GLSL while
-       * reporting itself as the WGSL lane: two WGSL kernels failed to compile (an invalid pipeline
-       * silently drops its dispatches), the runtime was rejected, WebGL2 answered every operation,
-       * and the visual numbers looked like near-parity because they *were* GLSL's numbers.
-       * `receipt.backend` is written by the runtime that ran, so it cannot be stamped over.
+       * operation. The provider also rejects capabilities, simulation acknowledgements, or frame
+       * receipts that differ from the query-selected backend, so this witness cannot be satisfied
+       * by an alternate runtime.
        */
       backend: lineReceiptBackend === "webgpu-offscreen-half-float"
         ? "real-chromium-dedicated-worker-offscreen-webgpu-half-float-v1"
@@ -1049,7 +1052,7 @@ async function main(): Promise<void> {
       executionContract: {
         worker: capabilities.worker,
         offscreenCanvas: capabilities.offscreenCanvas,
-        // Either GPU API is acceptable; the runner asserts which one this lane was meant to get.
+        // The runner asserts that these flags match the explicitly selected lane.
         gpuApi: capabilities.webgl2 || capabilities.webgpu,
         webgl2: capabilities.webgl2,
         webgpu: capabilities.webgpu,

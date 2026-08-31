@@ -13,6 +13,7 @@ import {
 
 import {
   requestStudioGpuBristleOverlay,
+  STUDIO_GPU_BRISTLE_BRUSH_ID_PREFIX,
   studioGpuBristleOilRequest,
 } from "../render/studio-gpu-bristle-host";
 import {
@@ -433,8 +434,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   // Opt-in GPU bristle overlay (dli position-based-dynamics chain + per-pixel impasto). The lane
   // advances in a Worker off the render path and this counter is bumped when a result lands, so
   // the compiled (React Compiler) render body re-executes the request and picks up the bitmap.
-  // Until then — and on every device without WebGPU — the request returns null and the existing
-  // oil carrier paints, byte-identically to today.
+  // A selected GPU-bristle brush owns pixels only after its bitmap is ready. Pending/unavailable
+  // states preserve the source stroke but never execute the Canvas oil carrier.
   const [gpuBristleGeneration, notifyGpuBristleReady] = useReducer(
     (generation: number) => (generation + 1) | 0,
     0,
@@ -1879,7 +1880,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 key={index}
                 sceneFunc={(context) => {
                   if (wetInkReplayPlan?.ok) {
-                    const wetInkResult = renderStudioWetInkBrushReplay(
+                    renderStudioWetInkBrushReplay(
                       context,
                       wetInkReplayPlan.value,
                       {
@@ -1888,9 +1889,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                         currentRevision: wetInkReplayPlan.value.revision,
                       },
                     );
-                    if (wetInkResult.status !== "fallback") return;
+                    // A selected wet-ink replay never changes renderer after execution starts.
+                    return;
                   }
-                  // Unsupported/legacy snapshots and every preflight failure retain exact old dabs.
+                  // Ineligible/legacy snapshots select the compatibility renderer before execution.
                   if (dabs.length === 0) return;
                   context.save();
                   if (wetRibbonPlan) {
@@ -2574,27 +2576,32 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               <Shape
                 key={index}
                 sceneFunc={(context) => {
-                  // brush--gpu-bristle 레인만 GPU 강모 오버레이를 시도한다. 아직 카탈로그에 없는
-                  // id 라 기존 유화 브러시는 전부 바이트 동일 경로를 그대로 탄다(증분 2에서 등록).
-                  const gpuBristle = durableDocumentRender
+                  // oil--gpu-bristle 레인은 GPU bitmap만 픽셀 권한을 가진다. drawing-draft와
+                  // document는 같은 Worker 상태를 이어 쓰고, renderer-local transform-draft는
+                  // 새 비동기 작업을 시작하지 않는다. 요청 생성 실패, pending, unsupported,
+                  // Worker/WebGPU decline은 source를 보존하고 Canvas carrier로 전환하지 않는다.
+                  const gpuBristleSelected = brush?.startsWith(
+                    STUDIO_GPU_BRISTLE_BRUSH_ID_PREFIX,
+                  ) ?? false;
+                  const gpuBristle = gpuBristleSelected && (durableDocumentRender || activeDraft)
                     ? studioGpuBristleOilRequest(el.id, brush, dabs, opacity, stroke)
                     : null;
-                  if (gpuBristle) {
+                  if (gpuBristleSelected) {
+                    if (!gpuBristle) return;
                     const overlay = requestStudioGpuBristleOverlay(
                       gpuBristle,
                       notifyGpuBristleReady,
                       gpuBristleGeneration,
                     );
-                    if (overlay) {
-                      context.drawImage(
-                        overlay.bitmap,
-                        overlay.dx,
-                        overlay.dy,
-                        overlay.dw,
-                        overlay.dh,
-                      );
-                      return;
-                    }
+                    if (!overlay) return;
+                    context.drawImage(
+                      overlay.bitmap,
+                      overlay.dx,
+                      overlay.dy,
+                      overlay.dw,
+                      overlay.dh,
+                    );
+                    return;
                   }
                   const paintInput = {
                     carrier,

@@ -64,7 +64,6 @@ function descriptor(
     finalQuality: "reference",
     determinism: "bit-exact",
     memoryEstimateMb: 32,
-    fallbackProviderId: "canvaskit",
     knownIssues: [],
     ...overrides,
   };
@@ -72,7 +71,7 @@ function descriptor(
 
 function evidence(): ProviderActivationEvidence {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     candidate: { id: "E04", key: "vello-cpu" },
     sourcePin: {
       providerId: "vello-cpu",
@@ -122,10 +121,11 @@ function evidence(): ProviderActivationEvidence {
       verified: true,
       rawArtifact: artifact("determinism"),
     },
-    fallback: {
-      providerId: "canvaskit",
+    failureIsolation: {
       result: "pass",
-      rawArtifact: artifact("fallback"),
+      behavior: "fail-closed",
+      scenarios: ["worker-crash", "gpu-device-loss"],
+      rawArtifact: artifact("failure-isolation"),
     },
     owner: {
       team: "studio-rendering",
@@ -157,12 +157,10 @@ function allArtifacts(value: ProviderActivationEvidence): ActivationArtifact[] {
     value.latency.rawArtifact,
     value.peakMemoryMb.rawArtifact,
     value.determinism.rawArtifact,
+    value.failureIsolation.rawArtifact,
     value.soak.rawArtifact,
     value.faultInjection.rawArtifact,
   ];
-  if (value.fallback.rawArtifact !== null) {
-    artifacts.push(value.fallback.rawArtifact);
-  }
   if (value.license.reviewArtifact !== null) {
     artifacts.push(value.license.reviewArtifact);
   }
@@ -204,6 +202,19 @@ describe("candidate survey manifest governance", () => {
     for (const field of ["id", "key", "url"] as const) {
       expect(new Set(entries.map((entry) => entry[field])).size).toBe(28);
     }
+  });
+
+  it("describes Google Ink and Perfect Freehand plus Lyon as separately selected paths", () => {
+    const googleInk = findCandidate("google-ink");
+    const perfectFreehandLyon = findCandidate("perfect-freehand-lyon");
+
+    expect(googleInk?.verdict).toBe("PoC 후 주력 후보");
+    expect(perfectFreehandLyon).toMatchObject({
+      role: "Google Ink와 별도 명시 선택, 기술 펜, 경량 vector stroke, deterministic export geometry",
+      verdict: "명시 선택 독립 경로",
+    });
+    expect(perfectFreehandLyon?.role).not.toContain("폴백");
+    expect(perfectFreehandLyon?.verdict).not.toContain("폴백");
   });
 
   it("rejects a stale generatedFrom authority path", () => {
@@ -508,7 +519,7 @@ describe("activation evidence fail-closed gates", () => {
     "latency",
     "peakMemoryMb",
     "determinism",
-    "fallback",
+    "failureIsolation",
     "owner",
     "soak",
     "faultInjection",
@@ -721,7 +732,7 @@ describe("activation evidence fail-closed gates", () => {
     ).toThrow(ProviderActivationError);
   });
 
-  it("rejects unverified fault, determinism, and fallback results", () => {
+  it("rejects unverified fault, determinism, and failure-isolation results", () => {
     const fault = evidence();
     fault.faultInjection.result = "unverified";
     expect(() =>
@@ -742,15 +753,44 @@ describe("activation evidence fail-closed gates", () => {
       ),
     ).toThrow(/determinism result is unverified/);
 
-    const fallback = evidence();
-    fallback.fallback.result = "unverified";
+    const failureIsolation = evidence();
+    failureIsolation.failureIsolation.result = "unverified";
     expect(() =>
       validateProviderActivationEvidence(
         descriptor(),
-        fallback,
-        policyFor(fallback),
+        failureIsolation,
+        policyFor(failureIsolation),
       ),
-    ).toThrow(/declared fallback must have matching passing evidence/);
+    ).toThrow(/failure-isolation result is not verified passing evidence/);
+  });
+
+  it("rejects legacy fallback evidence and incomplete failure isolation", () => {
+    const validEvidence = evidence();
+    const legacy = {
+      ...structuredClone(validEvidence),
+      fallback: {
+        providerId: "canvaskit",
+        result: "pass",
+        rawArtifact: artifact("legacy-fallback"),
+      },
+    };
+    expect(() =>
+      validateProviderActivationEvidence(
+        descriptor(),
+        legacy,
+        policyFor(validEvidence),
+      ),
+    ).toThrow(/unrecognized key.*fallback/i);
+
+    const incomplete = evidence();
+    incomplete.failureIsolation.scenarios = ["worker-crash"];
+    expect(() =>
+      validateProviderActivationEvidence(
+        descriptor(),
+        incomplete,
+        policyFor(incomplete),
+      ),
+    ).toThrow(/must cover every fault-injection scenario/);
   });
 
   it("rejects promotion capabilities outside descriptor or quality coverage", () => {

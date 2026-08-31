@@ -77,7 +77,8 @@ describe("studio safe mode runtime — recovery wiring", () => {
     const snapshot = getStudioReliabilityStatusSnapshot();
     expect(snapshot.gpu).not.toBeNull();
     expect(snapshot.gpu?.level).toBe("degraded");
-    expect(snapshot.gpu?.title).toContain("CPU 렌더링");
+    expect(snapshot.gpu?.title).toContain("GPU 렌더러");
+    expect(snapshot.gpu?.detail).toContain("자동 전환하지 않고");
     expect(snapshot.safeMode.active).toBe(true);
     expect(snapshot.safeMode.reasons).toContain("gpu-device-lost");
     expect(snapshot.safeMode.quality.gpuLanesDisabled).toBe(true);
@@ -151,8 +152,8 @@ describe("studio safe mode runtime — recovery wiring", () => {
     expect(runtime.state()).toBe("permanently-demoted");
     expect(snapshot.gpu?.level).toBe("failed");
     expect(snapshot.safeMode.reasons).toContain("gpu-permanently-demoted");
-    // 문서 의미는 그대로라는 약속이 사용자 문구에 남아 있어야 한다.
-    expect(snapshot.gpu?.detail).toContain("그림은 그대로");
+    expect(snapshot.gpu?.detail).toContain("마지막 정상 프레임은 그대로 보존");
+    expect(snapshot.gpu?.detail).toContain("다른 엔진은 직접 선택");
   });
 
   it("keeps one state machine per session across repeated ensure calls", () => {

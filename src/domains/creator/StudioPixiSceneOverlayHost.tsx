@@ -103,6 +103,7 @@ export function StudioPixiSceneOverlayHost({
     void (async () => {
       try {
         const provider = await createStudioPixiSceneProvider({
+          renderer: "webgpu",
           width: initial.width,
           height: initial.height,
           dpr: Math.max(1, Math.min(3, initial.dpr)),

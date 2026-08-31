@@ -25,13 +25,17 @@ describe("Studio CanvasKit quality provider", () => {
       strokeToPath: true,
       fontSubsetting: false,
     });
-    expect(
+    expect(() =>
       engine.shapeText({
         text: "한글",
         fontFamily: "sans-serif",
         fontSizePx: 20,
-      }).shaped,
-    ).toBe(false);
+      }),
+    ).toThrowError(expect.objectContaining({
+      name: "StudioEngineUnavailableError",
+      providerId: "canvaskit",
+      stage: "capability",
+    }));
   });
 
   it.each([

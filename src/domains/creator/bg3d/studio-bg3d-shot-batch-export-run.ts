@@ -296,13 +296,11 @@ export function createStudioBg3dShotBatchExportRunner(
       STUDIO_BG3D_SHOT_BATCH_RECOVERY_AUTHORIZATION_RECEIPT_MAX_TTL_MS,
       StudioBg3dShotBatchRecoveryError,
       buildStudioBg3dShotArtifacts,
-      buildStudioBg3dShotBatchArchive,
       buildStudioBg3dShotBatchArchiveInWorker,
       buildStudioBg3dShotContactSheetsInWorker,
       commitStudioBg3dShotBatchDownload,
       createStudioBg3dShotBatchPlan,
       createStudioBg3dShotBatchRecoveryStore,
-      isStudioBg3dShotBatchWorkerUnavailableError,
       projectStudioBg3dShotBatchPlanForPublicArchive,
       studioBg3dShotBatchQueueCompletedCount,
       waitForStudioBg3dBatchDocumentVisible,
@@ -854,18 +852,7 @@ export function createStudioBg3dShotBatchExportRunner(
           label: "ZIP 패키지 생성",
         }),
       };
-      let archive: Blob;
-      if (typeof Worker !== "function") {
-        archive = await buildStudioBg3dShotBatchArchive(images, archiveOptions);
-      } else {
-        try {
-          archive = await buildStudioBg3dShotBatchArchiveInWorker(images, archiveOptions);
-        } catch (cause) {
-          // Before Worker readiness, one bounded main-thread retry is safe; later failures are terminal.
-          if (!isStudioBg3dShotBatchWorkerUnavailableError(cause)) throw cause;
-          archive = await buildStudioBg3dShotBatchArchive(images, archiveOptions);
-        }
-      }
+      const archive = await buildStudioBg3dShotBatchArchiveInWorker(images, archiveOptions);
       if (controller.signal.aborted) throw Object.assign(new Error("취소됨"), { name: "AbortError" });
       const downloadUrl = URL.createObjectURL(archive);
       try {

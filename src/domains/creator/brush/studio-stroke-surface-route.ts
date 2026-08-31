@@ -15,7 +15,7 @@ export const STUDIO_STROKE_SURFACE_ROUTE_PRIORITY = Object.freeze([
   "stamp",
   "gpu",
   "live-ink",
-  "wet-fallback",
+  "wet-ink",
   "dynamic",
   "konva",
 ] as const);
@@ -56,11 +56,11 @@ export interface StudioStrokeSurfaceRouteSnapshotInput {
   readonly stampAdmitted: boolean;
   readonly gpuAdmitted: boolean;
   readonly liveInkAdmitted: boolean;
-  readonly wetFallbackAdmitted: boolean;
+  readonly wetInkAdmitted: boolean;
   readonly dynamicAdmitted: boolean;
 }
 
-type LivingInkFallbackReason =
+type LivingInkUnavailableReason =
   | "living-ink-capabilities-rejected"
   | "living-ink-provider-failed"
   | "living-ink-provider-invalid"
@@ -68,15 +68,15 @@ type LivingInkFallbackReason =
   | "living-ink-provider-unavailable"
   | "living-ink-start-rejected";
 
-type HokusaiFallbackReason =
+type HokusaiUnavailableReason =
   | "hokusai-flip-unsupported"
   | "hokusai-rotation-unsupported"
   | "hokusai-surface-invalid"
   | "hokusai-surface-unavailable";
 
-type StudioStrokeSurfaceFallbackReason =
-  | LivingInkFallbackReason
-  | HokusaiFallbackReason
+type StudioStrokeSurfaceSelectionReason =
+  | LivingInkUnavailableReason
+  | HokusaiUnavailableReason
   | "invalid-pointerdown-snapshot"
   | "no-specialist-route-admitted";
 
@@ -90,8 +90,8 @@ interface StudioStrokeSurfaceRouteBase<Kind extends StudioStrokeSurfaceRouteKind
   readonly selectedAt: "pointerdown";
   readonly ownership: "pinned-for-entire-stroke";
   readonly midStrokePromotion: false;
-  readonly failureFallback: "retain-pinned-route";
-  readonly retryPromotion: "next-pointerdown-only";
+  readonly failureAction: "retain-pinned-route";
+  readonly alternateSelection: "explicit-next-pointerdown-only";
 }
 
 export type StudioStrokeSurfaceRoute =
@@ -112,14 +112,14 @@ export type StudioStrokeSurfaceRoute =
   | (StudioStrokeSurfaceRouteBase<"live-ink"> & Readonly<{
       readonly reason: "live-ink-admitted";
     }>)
-  | (StudioStrokeSurfaceRouteBase<"wet-fallback"> & Readonly<{
-      readonly reason: LivingInkFallbackReason | "wet-fallback-admitted";
+  | (StudioStrokeSurfaceRouteBase<"wet-ink"> & Readonly<{
+      readonly reason: LivingInkUnavailableReason | "wet-ink-admitted";
     }>)
   | (StudioStrokeSurfaceRouteBase<"dynamic"> & Readonly<{
       readonly reason: "dynamic-admitted";
     }>)
   | (StudioStrokeSurfaceRouteBase<"konva"> & Readonly<{
-      readonly reason: StudioStrokeSurfaceFallbackReason;
+      readonly reason: StudioStrokeSurfaceSelectionReason;
     }>);
 
 function validIdentity(
@@ -133,9 +133,9 @@ function validIdentity(
     && input.strokeEpoch >= 0;
 }
 
-function livingInkFallbackReason(
+function livingInkUnavailableReason(
   input: StudioStrokeSurfaceRouteSnapshotInput["livingInk"],
-): LivingInkFallbackReason | null {
+): LivingInkUnavailableReason | null {
   if (input?.eligible !== true) return null;
   if (input.providerState === "loading") return "living-ink-provider-loading";
   if (input.providerState === "unavailable") return "living-ink-provider-unavailable";
@@ -146,9 +146,9 @@ function livingInkFallbackReason(
   return null;
 }
 
-function hokusaiFallbackReason(
+function hokusaiUnavailableReason(
   input: StudioStrokeSurfaceRouteSnapshotInput["hokusai"],
-): HokusaiFallbackReason | null {
+): HokusaiUnavailableReason | null {
   if (!input || input.surface === "supported") return null;
   if (input.surface === "flip-unsupported") return "hokusai-flip-unsupported";
   if (input.surface === "rotation-unsupported") return "hokusai-rotation-unsupported";
@@ -170,8 +170,8 @@ function routeBase<Kind extends StudioStrokeSurfaceRouteKind>(
     selectedAt: "pointerdown",
     ownership: "pinned-for-entire-stroke",
     midStrokePromotion: false,
-    failureFallback: "retain-pinned-route",
-    retryPromotion: "next-pointerdown-only",
+    failureAction: "retain-pinned-route",
+    alternateSelection: "explicit-next-pointerdown-only",
   };
 }
 
@@ -213,10 +213,10 @@ export function resolveStudioStrokeSurfaceRoute(
   if (input.liveInkAdmitted === true) {
     return Object.freeze({ ...routeBase(input, "live-ink"), reason: "live-ink-admitted" });
   }
-  if (input.wetFallbackAdmitted === true) {
+  if (input.wetInkAdmitted === true) {
     return Object.freeze({
-      ...routeBase(input, "wet-fallback"),
-      reason: livingInkFallbackReason(input.livingInk) ?? "wet-fallback-admitted",
+      ...routeBase(input, "wet-ink"),
+      reason: livingInkUnavailableReason(input.livingInk) ?? "wet-ink-admitted",
     });
   }
   if (input.dynamicAdmitted === true) {
@@ -224,8 +224,8 @@ export function resolveStudioStrokeSurfaceRoute(
   }
   return Object.freeze({
     ...routeBase(input, "konva"),
-    reason: livingInkFallbackReason(input.livingInk)
-      ?? hokusaiFallbackReason(input.hokusai)
+    reason: livingInkUnavailableReason(input.livingInk)
+      ?? hokusaiUnavailableReason(input.hokusai)
       ?? "no-specialist-route-admitted",
   });
 }
@@ -304,17 +304,17 @@ export function studioStrokeSurfaceRouteFailurePolicy(
   readonly route: StudioStrokeSurfaceRoute;
   readonly owner: StudioStrokeSurfaceRouteKind;
   readonly action: "retain-pinned-route";
-  readonly allowMidStrokeFallback: false;
-  readonly retryPromotion: "next-pointerdown-only";
-  readonly draftPresentation: "show-fail-visible-konva-shadow";
+  readonly allowProviderSubstitution: false;
+  readonly alternateSelection: "explicit-next-pointerdown-only";
+  readonly presentation: "preserve-last-presented-frame";
 }> {
   return Object.freeze({
     cause,
     route,
     owner: route.kind,
     action: "retain-pinned-route",
-    allowMidStrokeFallback: false,
-    retryPromotion: "next-pointerdown-only",
-    draftPresentation: "show-fail-visible-konva-shadow",
+    allowProviderSubstitution: false,
+    alternateSelection: "explicit-next-pointerdown-only",
+    presentation: "preserve-last-presented-frame",
   });
 }

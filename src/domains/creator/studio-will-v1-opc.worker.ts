@@ -114,7 +114,10 @@ function boundedCodecOptions(
 
 async function execute(request: StudioWillV1OpcWorkerRequest): Promise<void> {
   try {
-    const options = boundedCodecOptions(request);
+    const options = {
+      ...boundedCodecOptions(request),
+      crc32ExecutionMode: "direct-headless" as const,
+    };
     if (request.type === "studio-will-v1-opc/encode") {
       const input = unpackStudioWillV1OpcExportInput(
         request.packedInput,

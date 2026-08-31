@@ -810,7 +810,7 @@ export interface StudioVrmWardrobeAttachmentProps {
   ) => void;
 }
 
-/** Selects bounded XPBD for audited skirts and keeps the existing garment as a fail-safe. */
+/** Selects exactly one authored garment provider before the attachment operation starts. */
 export function StudioVrmWardrobeAttachment(props: StudioVrmWardrobeAttachmentProps) {
   const def = wardrobeItemById(props.equip.itemId);
   if (def?.geometrySource === "xpbd-skirt-v1") {
@@ -825,15 +825,23 @@ export function StudioVrmWardrobeAttachment(props: StudioVrmWardrobeAttachmentPr
         onSurfaceReceipt={props.onSurfaceReceipt}
         onAttachmentStatus={props.onAttachmentStatus}
         onCaptureSyncChange={props.onXpbdCaptureSyncChange}
-        fallback={<StudioVrmProceduralWardrobeAttachment {...props} />}
       />
     );
   }
-  return <StudioVrmProceduralWardrobeAttachment {...props} />;
+  if (def?.geometrySource === "skinned-procedural-v1") {
+    return <StudioVrmSelectedWardrobeAttachment {...props} mode="skinned-procedural-v1" />;
+  }
+  if (def?.geometrySource === "rigid-procedural") {
+    return <StudioVrmSelectedWardrobeAttachment {...props} mode="rigid-procedural" />;
+  }
+  return null;
 }
 
-/** Existing skinned/rigid procedural path, retained as the XPBD unavailable fallback. */
-function StudioVrmProceduralWardrobeAttachment({
+/**
+ * Mounts only the mode selected by the catalog before work starts. A failed skinned build stays
+ * unavailable; bone-local rigid geometry is constructed only for an explicit rigid selection.
+ */
+function StudioVrmSelectedWardrobeAttachment({
   vrm,
   slot,
   equip,
@@ -841,13 +849,18 @@ function StudioVrmProceduralWardrobeAttachment({
   effectiveFit,
   onSurfaceReceipt,
   onAttachmentStatus,
-}: StudioVrmWardrobeAttachmentProps) {
+  mode,
+}: StudioVrmWardrobeAttachmentProps & {
+  readonly mode: "skinned-procedural-v1" | "rigid-procedural";
+}) {
   const renderable = useMemo(() => {
     const def = wardrobeItemById(equip.itemId);
-    if (!def) return { entries: [], receipt: null, complete: false };
+    if (!def || def.geometrySource !== mode) {
+      return { entries: [], receipt: null, complete: false };
+    }
     const parts = buildGarmentParts(equip.itemId, metrics, effectiveFit);
     const name = `wardrobe:${def.slot}:${def.id}`;
-    if (def.geometrySource === "skinned-procedural-v1") {
+    if (mode === "skinned-procedural-v1") {
       const built = assembleSkinnedGarment(
         vrm,
         parts,
@@ -866,22 +879,10 @@ function StudioVrmProceduralWardrobeAttachment({
           complete: true,
         };
       }
-      const groups = assembleGarmentGroups(
-        parts,
-        def.defaultColor,
-        def.defaultFabricId,
-        name,
-      );
-      const entries: { key: string; node: THREE.Object3D; object: THREE.Object3D }[] = [];
-      for (const [bone, object] of groups) {
-        const boneNode = vrm.humanoid?.getRawBoneNode(bone as VRMHumanBoneName) ?? null;
-        if (boneNode) entries.push({ key: `${equip.itemId}:${bone}`, node: boneNode, object });
-      }
       return {
-        entries,
+        entries: [],
         receipt: built.receipt,
-        // A skinned catalog contract may render its rigid compatibility fallback for preview, but
-        // Shared Stage must not certify that downgrade as a full-fidelity attachment.
+        // The skinned selection remains unavailable and renders no rigid substitute.
         complete: false,
       };
     }
@@ -900,13 +901,9 @@ function StudioVrmProceduralWardrobeAttachment({
     return {
       entries,
       receipt: null,
-      // XPBD-authored skirts may show this rigid geometry as a local preview fallback, but it is
-      // not the authored cloth surface and must never certify Shared Stage/capture fidelity.
-      complete: def.geometrySource !== "xpbd-skirt-v1"
-        && groups.size > 0
-        && entries.length === groups.size,
+      complete: groups.size > 0 && entries.length === groups.size,
     };
-  }, [vrm, equip.itemId, effectiveFit, metrics]);
+  }, [vrm, equip.itemId, effectiveFit, metrics, mode]);
 
   const entries = renderable.entries;
 

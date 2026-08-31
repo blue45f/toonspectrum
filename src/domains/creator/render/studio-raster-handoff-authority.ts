@@ -174,10 +174,11 @@ export function studioRasterAuthorizedOperationIds(input: {
 }
 
 /**
- * Stage-only consumers cannot see pixels currently delegated to the DOM raster presenter. Revoke
- * that delegation, force Konva to paint the restored vector fallbacks, and only then perform the
- * synchronous readback. Keeping the ordering in one helper prevents capture paths from repeating
- * the animation-frame flattening bug independently.
+ * Stage-only consumers cannot see pixels currently delegated to the DOM raster presenter. This
+ * explicit stage-read operation revokes that delegation and asks the already-selected Konva
+ * compatibility/export projection to paint before synchronous readback. It is not a response to a
+ * renderer failure and never changes provider inside the captured operation. Keeping the ordering
+ * in one helper prevents capture paths from repeating the animation-frame flattening bug.
  */
 export function readStudioAuthoritativeStageFrame<T>(input: {
   readonly revokeRasterHandoff: () => void;

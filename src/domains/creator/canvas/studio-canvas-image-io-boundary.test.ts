@@ -97,6 +97,9 @@ describe("Studio canvas image I/O module boundary", () => {
     ]);
     expect(imageIo.source.match(/import\(\s*"\.\.\/render\/studio-raster-interchange-worker-client"\s*\)/gu)).toHaveLength(1);
     expect(imageIo.source).not.toContain("const { decodeStudioRasterInterchange }");
+    expect(imageIo.source).toMatch(
+      /decodeStudioRasterInterchangeAsync\([\s\S]*?\{\s*executionMode:\s*"worker"\s*\}\s*,?\s*\)/u,
+    );
     expect(imageIo.imports).not.toContain("../StudioPage");
     expect(imageIo.imports.some((specifier) => specifier === "react" || specifier.includes("konva"))).toBe(false);
   });

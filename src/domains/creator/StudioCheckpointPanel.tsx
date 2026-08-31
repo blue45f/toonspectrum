@@ -324,7 +324,7 @@ export function StudioCheckpointPanel({
           baseSnapshot: baseDetail.snapshot,
           localProject,
         },
-        { signal: controller.signal }
+        { executionBackend: "worker", signal: controller.signal }
       );
       if (!requestIsCurrent()) return;
       if (getCurrentProjectGeneration() !== projectGeneration) {

@@ -213,7 +213,7 @@ describe("canonical vNext dry-media product adapter", () => {
         strokeEpoch: 1,
         commandSequence: 1,
       })).resolves.toMatchObject({
-        status: "retained-fallback",
+        status: "unavailable",
         reason,
       });
     }

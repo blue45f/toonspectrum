@@ -8,6 +8,7 @@ import {
   type StudioLivingInkExecutionCapabilities,
   type StudioLivingInkExecutionConfig,
   type StudioLivingInkExecutionFrame,
+  type StudioLivingInkExecutionProviderId,
   type StudioLivingInkWorkerRequest,
   type StudioLivingInkWorkerResponse,
 } from "./studio-living-ink-execution-protocol";
@@ -24,6 +25,8 @@ export interface StudioLivingInkWorkerLike {
 }
 
 export interface StudioLivingInkProviderOptions {
+  /** Immutable provider selection for this Worker epoch. */
+  readonly backend: StudioLivingInkExecutionProviderId;
   readonly workerFactory?: () => StudioLivingInkWorkerLike;
   readonly requestTimeoutMilliseconds?: number;
 }
@@ -50,7 +53,7 @@ export class StudioLivingInkExecutionError extends Error {
 function defaultWorkerFactory(): StudioLivingInkWorkerLike {
   return new Worker(new URL("./studio-living-ink.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-living-ink-webgl2",
+    name: "toonspectrum-living-ink-selected-gpu",
   });
 }
 
@@ -125,9 +128,15 @@ export class StudioLivingInkExecutionProvider {
   private disposed = false;
   private initialized = false;
 
-  constructor(config: StudioLivingInkExecutionConfig, options: StudioLivingInkProviderOptions = {}) {
+  constructor(config: StudioLivingInkExecutionConfig, options: StudioLivingInkProviderOptions) {
     this.config = Object.freeze({ ...config });
-    this.options = options;
+    this.options = Object.freeze({ ...options });
+  }
+
+  private selectedReceiptBackend(): StudioLivingInkExecutionCapabilities["backend"] {
+    return this.options.backend === "webgpu"
+      ? "webgpu-offscreen-half-float"
+      : "webgl2-offscreen-half-float";
   }
 
   private nextRequestId(): number {
@@ -178,14 +187,26 @@ export class StudioLivingInkExecutionProvider {
       this.failEpoch(boundEpoch, new StudioLivingInkExecutionError(response.code, response.message));
       return;
     }
-    if (response.type === "living-ink/frame" && !validFrameResponse(response)) {
+    if (
+      response.type === "living-ink/frame"
+      && (
+        !validFrameResponse(response)
+        || response.frame.receipt.backend !== this.selectedReceiptBackend()
+      )
+    ) {
       closeFrameImage(response.frame?.image);
       const error = new Error("Living Ink Worker returned an invalid frame contract.");
       this.finishPending(response.requestId)?.reject(error);
       this.failEpoch(boundEpoch, error);
       return;
     }
-    if (response.type === "living-ink/applied" && !validAppliedResponse(response)) {
+    if (
+      response.type === "living-ink/applied"
+      && (
+        !validAppliedResponse(response)
+        || response.applied.backend !== this.selectedReceiptBackend()
+      )
+    ) {
       const error = new Error("Living Ink Worker returned an invalid simulation acknowledgement.");
       this.finishPending(response.requestId)?.reject(error);
       this.failEpoch(boundEpoch, error);
@@ -264,9 +285,19 @@ export class StudioLivingInkExecutionProvider {
       type: "living-ink/initialize",
       version: STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION,
       requestId: this.nextRequestId(),
+      backend: this.options.backend,
       config: this.config,
     });
-    if (response.type !== "living-ink/ready") throw new Error("Living Ink Worker did not initialize.");
+    if (
+      response.type !== "living-ink/ready"
+      || response.capabilities.backend !== this.selectedReceiptBackend()
+    ) {
+      const error = new Error(
+        "Living Ink Worker did not initialize the explicitly selected backend.",
+      );
+      this.failEpoch(this.epoch, error);
+      throw error;
+    }
     this.initialized = true;
     return response.capabilities;
   }
@@ -363,7 +394,7 @@ export class StudioLivingInkExecutionProvider {
 
 export async function createStudioLivingInkExecutionProvider(
   config: StudioLivingInkExecutionConfig,
-  options: StudioLivingInkProviderOptions = {},
+  options: StudioLivingInkProviderOptions,
 ): Promise<StudioLivingInkExecutionProvider> {
   const provider = new StudioLivingInkExecutionProvider(config, options);
   await provider.initialize();

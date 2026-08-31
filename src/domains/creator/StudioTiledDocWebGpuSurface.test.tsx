@@ -3,20 +3,11 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { resolveStudioTiledDocPrimarySurfaceOwner } from "./render/studio-tiledoc-primary-surface-owner";
 import {
   StudioTiledDocWebGpuSurface,
 } from "./StudioTiledDocWebGpuSurface";
 
 describe("StudioTiledDocWebGpuSurface product ownership", () => {
-  it("allows exactly one primary document owner and keeps pending frames hidden", () => {
-    expect(resolveStudioTiledDocPrimarySurfaceOwner("pending", true)).toBe("none");
-    expect(resolveStudioTiledDocPrimarySurfaceOwner("webgpu", true)).toBe("tiledoc-webgpu");
-    expect(resolveStudioTiledDocPrimarySurfaceOwner("fallback", true))
-      .toBe("canvas2d-fallback");
-    expect(resolveStudioTiledDocPrimarySurfaceOwner("webgpu", false)).toBe("none");
-  });
-
   it("renders one hidden bounded document island before two-phase authority is granted", () => {
     const html = renderToStaticMarkup(
       <StudioTiledDocWebGpuSurface
@@ -42,6 +33,7 @@ describe("StudioTiledDocWebGpuSurface product ownership", () => {
     );
     expect(html).toContain('data-studio-tiledoc-product-island="true"');
     expect(html).toContain('data-studio-primary-surface-owner="none"');
+    expect(html).toContain('data-studio-tiledoc-webgpu-status="pending"');
     expect((html.match(/data-studio-tiledoc-webgpu-canvas=/gu) ?? [])).toHaveLength(1);
     expect(html).not.toContain("canvas2d-fallback");
   });
@@ -59,6 +51,9 @@ describe("StudioTiledDocWebGpuSurface product ownership", () => {
     expect(surfaceSource).toContain("documentViewport={visibleDocumentRect}");
     expect((surfaceSource.match(/<StudioTiledDocWebGpuSurface/gu) ?? [])).toHaveLength(1);
     expect(tiledocSource).not.toContain("StudioVelloHubSurface");
+    expect(tiledocSource).not.toContain("StudioRasterCrdtCanvas");
+    expect(tiledocSource).not.toContain("canvas2d");
+    expect(tiledocSource).not.toContain("fallback");
     expect(tiledocSource).toContain('STUDIO_TILEDOC_PRODUCT_RASTER_LAYER_ID');
   });
 });

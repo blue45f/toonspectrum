@@ -341,6 +341,7 @@ export async function executeStudioPublishPackageExport(
     const finalEntries = [...archiveEntries, { path: "manifest.json", data: manifestBlob }];
     const { buildStudioPackageArchiveBlob } = await import("../studio-package-archive");
     const archiveBlob = await buildStudioPackageArchiveBlob(finalEntries, {
+      crc32ExecutionMode: "worker",
       modifiedAt: finalManifest.generatedAt,
       onProgress: ({ completedFiles, totalFiles }) => {
         setPublishPackageExportProgress({ done: completedFiles, total: totalFiles });

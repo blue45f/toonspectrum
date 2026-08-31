@@ -18,7 +18,7 @@ import {
 
 function createMemory32Kernel(maximumPages = BigInt(8)) {
   const runtime = createStudioWasmMemoryRuntime({
-    preferredMode: "i32",
+    selectedMode: "i32",
     initialPages: BigInt(1),
     maximumPages,
   });
@@ -259,8 +259,7 @@ describe("StudioWasmConnectedComponentsKernel parity", () => {
   it("executes actual i64 pointers and dimensions on Memory64 hosts", () => {
     const capability = checkStudioWasm64Capability();
     const runtime = createStudioWasmMemoryRuntime({
-      preferredMode: "i64",
-      fallbackPolicy: "deny",
+      selectedMode: "i64",
       initialPages: BigInt(1),
       maximumPages: BigInt(4),
     });
@@ -293,10 +292,10 @@ describe("StudioWasmConnectedComponentsKernel parity", () => {
   });
 });
 
-describe("persistent mask scanner fallback", () => {
-  it("prefers a lazy Memory64 kernel by default and remains byte-exact", () => {
+describe("persistent exact-backend mask scanner", () => {
+  it("runs byte-exact JS only when JS is explicitly selected", () => {
     const scanner = createStudioPersistentBinaryMaskScanner({
-      minimumWasmBytes: 0,
+      backend: "js",
     });
     const input = {
       mask: deterministicMask(43, 47, 49, 0xbadc0de),
@@ -310,15 +309,13 @@ describe("persistent mask scanner fallback", () => {
     expect(actual.ok).toBe(true);
     if (!expected.ok || !actual.ok) return;
     expect(actual.scan).toEqual(expected.scan);
-    expect(actual.backend).toBe(
-      checkStudioWasm64Capability().isWasm64Supported ? "wasm64" : "js",
-    );
+    expect(actual.backend).toBe("js");
   });
 
   it("returns the live Wasm backend while it remains healthy", () => {
     const { kernel } = createMemory32Kernel();
     const scanner = createStudioPersistentBinaryMaskScanner({
-      minimumWasmBytes: 0,
+      backend: "wasm32",
       createKernel() {
         return { ok: true, kernel };
       },
@@ -336,16 +333,17 @@ describe("persistent mask scanner fallback", () => {
     expect(actual.scan).toEqual(expected.scan);
   });
 
-  it("initializes once and disables a failed kernel for the Worker epoch", () => {
+  it("keeps a selected Wasm failure terminal without retrying JS or another Wasm", () => {
     let createCount = 0;
     let runCount = 0;
     const scanner = createStudioPersistentBinaryMaskScanner({
-      minimumWasmBytes: 0,
+      backend: "wasm32",
       createKernel() {
         createCount += 1;
         return {
           ok: true,
           kernel: {
+            runtime: { addressType: "i32" },
             copyAndScan() {
               runCount += 1;
               return { ok: false, reason: "kernel-run-failed" };
@@ -365,8 +363,8 @@ describe("persistent mask scanner fallback", () => {
       height: 19,
     };
 
-    expect(scanner.scan(first)).toEqual(scanStudioBinaryMaskJs(first));
-    expect(scanner.scan(second)).toEqual(scanStudioBinaryMaskJs(second));
+    expect(scanner.scan(first)).toEqual({ ok: false, reason: "kernel-run-failed" });
+    expect(scanner.scan(second)).toEqual({ ok: false, reason: "kernel-run-failed" });
     expect(createCount).toBe(1);
     expect(runCount).toBe(1);
   });

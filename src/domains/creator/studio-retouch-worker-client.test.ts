@@ -285,15 +285,17 @@ describe("runStudioRetouchWorker", () => {
     expect(Array.from(sentinel)).toEqual([4, 3, 2, 1]);
   });
 
-  it("falls back before transfer for unavailable and load failures and keeps input attached", async () => {
+  it("rejects unavailable and pre-ready load failures without direct execution", async () => {
     for (const workerFactory of [
       null,
+      () => { throw new Error("blocked by CSP"); },
       () => new LoadErrorWorker(),
     ] as const) {
       const input = request();
       const inputData = input.data;
-      const result = await runStudioRetouchWorker(input, { workerFactory });
-      expect(result.execution).toBe("direct");
+      await expect(runStudioRetouchWorker(input, { workerFactory })).rejects.toMatchObject({
+        name: "StudioRetouchWorkerUnavailableError",
+      });
       expect(inputData.byteLength).toBe(8 * 8 * 4);
     }
   });
@@ -366,7 +368,7 @@ describe("runStudioRetouchWorker", () => {
     }
   });
 
-  it("blocks a large direct fallback before a main-thread pixel loop can start", async () => {
+  it("blocks an oversized explicit direct mode before a main-thread pixel loop can start", async () => {
     const pixels = STUDIO_RETOUCH_DIRECT_MAX_IMAGE_PIXELS + 1;
     const base = request();
     await expect(runStudioRetouchWorker({
@@ -374,6 +376,6 @@ describe("runStudioRetouchWorker", () => {
       data: new Uint8ClampedArray(pixels * 4),
       w: pixels,
       h: 1,
-    }, { workerFactory: null })).rejects.toThrow(/직접 계산 안전 상한/u);
+    }, { executionMode: "direct" })).rejects.toThrow(/직접 계산 안전 상한/u);
   });
 });

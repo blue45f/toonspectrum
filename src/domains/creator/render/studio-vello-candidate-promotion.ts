@@ -8,7 +8,7 @@
  */
 
 export const STUDIO_VELLO_CANDIDATE_CONTRACT_VERSION =
-  "studio-vello-candidate-promotion-v1" as const;
+  "studio-vello-candidate-promotion-v2" as const;
 
 const MEBIBYTE = 1024 * 1024;
 
@@ -116,7 +116,7 @@ export const STUDIO_VELLO_PROMOTION_LIMITS = Object.freeze({
   maximumPeakGpuBytes: 256 * MEBIBYTE,
   maximumPeakHostBytes: 256 * MEBIBYTE,
   maximumPostDisposeRetainedBytes: 8 * MEBIBYTE,
-  minimumFallbackReplayTrials: 5,
+  minimumCompatibilityReplayTrials: 5,
 });
 
 export const STUDIO_VELLO_PROMOTION_GATE_IDS = Object.freeze([
@@ -126,7 +126,7 @@ export const STUDIO_VELLO_PROMOTION_GATE_IDS = Object.freeze([
   "canvas-svg-canonical-visual-parity",
   "long-stroke-latency",
   "bounded-memory",
-  "deterministic-canonical-fallback",
+  "deterministic-legacy-compatibility-boundary",
   "required-browser-support",
 ] as const);
 
@@ -189,11 +189,11 @@ readonly StudioVelloPromotionGateDefinition[] = Object.freeze([
       "A 10k-path retained scene must stay within GPU, host, and post-dispose budgets without unbounded growth.",
   }),
   Object.freeze({
-    id: "deterministic-canonical-fallback",
+    id: "deterministic-legacy-compatibility-boundary",
     hard: true,
     weight: 10,
     requirement:
-      "Fallback selection, canonical replay, Canvas2D output, and SVG export must be deterministic and receipted.",
+      "The legacy Canvas2D/SVG compatibility boundary must be selected before execution, deterministic, and receipted without runtime failover.",
   }),
   Object.freeze({
     id: "required-browser-support",
@@ -297,13 +297,13 @@ extends StudioVelloEvidenceIdentity {
   readonly unboundedGrowthDetected: boolean;
 }
 
-export interface StudioVelloFallbackDeterminismEvidence
+export interface StudioVelloLegacyCompatibilityEvidence
 extends StudioVelloEvidenceIdentity {
   readonly probe: StudioVelloProbeStatus;
-  readonly fallbackKind: "canonical-canvas2d-svg";
+  readonly compatibilityKind: "legacy-canvas2d-svg";
   readonly replayTrials: number;
   readonly uniqueReplayHashes: number;
-  readonly fallbackSelectionDeterministic: boolean;
+  readonly compatibilitySelectionDeclaredBeforeExecution: boolean;
   readonly canvas2dHashMatchesCanonical: boolean;
   readonly svgExportHashStable: boolean;
   readonly canonicalReceiptVerified: boolean;
@@ -326,7 +326,7 @@ extends StudioVelloEvidenceIdentity {
   readonly visualParity: StudioVelloVisualParityEvidence;
   readonly longStrokeLatency: StudioVelloLongStrokeLatencyEvidence;
   readonly memory: StudioVelloMemoryEvidence;
-  readonly fallbackDeterminism: StudioVelloFallbackDeterminismEvidence;
+  readonly legacyCompatibility: StudioVelloLegacyCompatibilityEvidence;
   readonly browsers: readonly StudioVelloBrowserEvidence[];
 }
 
@@ -719,7 +719,7 @@ function evaluateMemory(
   };
 }
 
-function evaluateFallbackDeterminism(
+function evaluateLegacyCompatibility(
   value: unknown,
   identity: StudioVelloEvidenceIdentity,
 ): RawGateEvaluation {
@@ -727,11 +727,11 @@ function evaluateFallbackDeterminism(
     !isRecord(value)
     || !evidenceIdentityMatches(value, identity)
     || !isEnumMember(value.probe, PROBE_STATUSES)
-    || value.fallbackKind !== "canonical-canvas2d-svg"
+    || value.compatibilityKind !== "legacy-canvas2d-svg"
     || !isNonNegativeInteger(value.replayTrials)
     || !isNonNegativeInteger(value.uniqueReplayHashes)
     || value.uniqueReplayHashes > value.replayTrials
-    || !isBoolean(value.fallbackSelectionDeterministic)
+    || !isBoolean(value.compatibilitySelectionDeclaredBeforeExecution)
     || !isBoolean(value.canvas2dHashMatchesCanonical)
     || !isBoolean(value.svgExportHashStable)
     || !isBoolean(value.canonicalReceiptVerified)
@@ -740,9 +740,9 @@ function evaluateFallbackDeterminism(
   }
   const passed = value.probe === "passed"
     && value.replayTrials
-      >= STUDIO_VELLO_PROMOTION_LIMITS.minimumFallbackReplayTrials
+      >= STUDIO_VELLO_PROMOTION_LIMITS.minimumCompatibilityReplayTrials
     && value.uniqueReplayHashes === 1
-    && value.fallbackSelectionDeterministic
+    && value.compatibilitySelectionDeclaredBeforeExecution
     && value.canvas2dHashMatchesCanonical
     && value.svgExportHashStable
     && value.canonicalReceiptVerified;
@@ -750,8 +750,8 @@ function evaluateFallbackDeterminism(
     valid: true,
     passed,
     detail: passed
-      ? "Canonical Canvas2D/SVG fallback selection and repeated output are deterministic and receipted."
-      : "Canonical Canvas2D/SVG fallback determinism or its receipt is unproven.",
+      ? "The legacy Canvas2D/SVG boundary is selected before execution, deterministic, and receipted."
+      : "Legacy Canvas2D/SVG boundary declaration, determinism, or its receipt is unproven.",
   };
 }
 
@@ -821,7 +821,7 @@ const GATE_EVALUATORS: Readonly<
   "canvas-svg-canonical-visual-parity": evaluateVisualParity,
   "long-stroke-latency": evaluateLongStrokeLatency,
   "bounded-memory": evaluateMemory,
-  "deterministic-canonical-fallback": evaluateFallbackDeterminism,
+  "deterministic-legacy-compatibility-boundary": evaluateLegacyCompatibility,
   "required-browser-support": evaluateBrowsers,
 });
 
@@ -834,7 +834,7 @@ const GATE_EVIDENCE_FIELDS: Readonly<
   "canvas-svg-canonical-visual-parity": "visualParity",
   "long-stroke-latency": "longStrokeLatency",
   "bounded-memory": "memory",
-  "deterministic-canonical-fallback": "fallbackDeterminism",
+  "deterministic-legacy-compatibility-boundary": "legacyCompatibility",
   "required-browser-support": "browsers",
 });
 
@@ -1038,13 +1038,13 @@ StudioVelloPromotionEvidence = Object.freeze({
     postDisposeRetainedBytes: 0,
     unboundedGrowthDetected: false,
   }),
-  fallbackDeterminism: Object.freeze({
+  legacyCompatibility: Object.freeze({
     ...CURRENT_RESEARCH_IDENTITY,
     probe: "not-run",
-    fallbackKind: "canonical-canvas2d-svg",
+    compatibilityKind: "legacy-canvas2d-svg",
     replayTrials: 0,
     uniqueReplayHashes: 0,
-    fallbackSelectionDeterministic: false,
+    compatibilitySelectionDeclaredBeforeExecution: false,
     canvas2dHashMatchesCanonical: false,
     svgExportHashStable: false,
     canonicalReceiptVerified: false,

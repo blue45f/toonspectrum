@@ -97,6 +97,8 @@ export interface StudioWebGpuCanvasHandle {
   ) => Promise<StudioGpuFrameReadbackResult>;
   /** Snapshot of bounded allocation/reuse counters for browser performance instrumentation. */
   readonly getPerformanceMetrics: () => StudioGpuPerformanceMetrics;
+  /** True only while the immutable selected provider can accept a new operation. */
+  readonly isBackendAvailable: () => boolean;
   /**
    * Stroke-pinned imperative feed: updates the engine without a parent React render. The pinned
    * live-ink path calls this once per pointer frame so a 30k-line parent never re-renders per
@@ -113,7 +115,7 @@ export interface StudioWebGpuCanvasHandle {
   readonly appendPinnedJournalSuffix: (
     patch: StudioGpuStrokeJournalSuffixPatch
   ) => StudioWebGpuJournalFeedOutcome;
-  /** Atomically advances a journal symmetry group without constructing full fallback strokes. */
+  /** Atomically advances a journal symmetry group without constructing a full replacement frame. */
   readonly appendPinnedJournalSuffixBatch: (
     patch: StudioGpuStrokeJournalSuffixBatchPatch
   ) => StudioWebGpuJournalFeedOutcome;
@@ -141,7 +143,7 @@ export interface StudioWebGpuCanvasHandle {
   readonly setPinnedVisible: (visible: boolean) => void;
 }
 
-/** Synchronous admission plus the exact receipt identity for a no-fallback journal command. */
+/** Synchronous admission plus the exact receipt identity for a suffix-only journal command. */
 export interface StudioWebGpuJournalFeedOutcome {
   readonly status: "accepted" | "rejected";
   readonly requestId: string;
@@ -254,7 +256,7 @@ function StudioWebGpuCanvas({
   // (the device either already initialized or will on the first stroke feed).
   const eagerInitializeRef = useRef(eagerInitialize);
   const gpuCanvasRef = useRef<HTMLCanvasElement>(null);
-  const fallbackCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvas2dCanvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<StudioWebGpuEngine | null>(null);
   const callbacksRef = useRef({
     onBackendChange,
@@ -361,6 +363,7 @@ function StudioWebGpuCanvas({
     }),
     getPerformanceMetrics: () =>
       engineRef.current?.getPerformanceMetrics() ?? EMPTY_PERFORMANCE_METRICS,
+    isBackendAvailable: () => engineRef.current?.isBackendAvailable() ?? false,
     syncPinnedStrokes: (nextStrokes) => {
       pinnedJournalActiveRef.current = false;
       const update = planStudioGpuPinnedStrokeFeedUpdate(
@@ -433,8 +436,8 @@ function StudioWebGpuCanvas({
       const root = rootRef.current;
       if (root) {
         root.style.visibility = visible ? "visible" : "hidden";
-        // The engine owns each child canvas and may set `visibility: visible` while switching
-        // WebGPU/Canvas2D backends. A visible child can override inherited `visibility: hidden`.
+        // The engine owns each child canvas and may set the selected provider's surface visible.
+        // A visible child can override inherited `visibility: hidden`.
         // Ancestor opacity cannot be resurrected by a child, so it is the hard presentation gate
         // while the parent has not authorized the matching frame receipt.
         root.style.opacity = visible ? "1" : "0";
@@ -450,7 +453,8 @@ function StudioWebGpuCanvas({
       if (!visible && pinnedStrokesRef.current !== null) {
         // Pin release is an authority transition, not just a CSS visibility change. Restore the
         // newest declarative request immediately even when React can bail out of an unchanged
-        // `false` state update (for example, a GPU failover before visibility state commits).
+        // `false` state update (for example, selected-provider cancellation before visibility
+        // state commits).
         pinnedStrokesRef.current = null;
         pinnedJournalActiveRef.current = false;
         const latest = declarativeRequestRef.current;
@@ -472,14 +476,15 @@ function StudioWebGpuCanvas({
 
   useEffect(() => {
     const canvas = gpuCanvasRef.current;
-    const fallbackCanvas = fallbackCanvasRef.current;
-    if (!canvas || !fallbackCanvas) return;
+    const canvas2dCanvas = canvas2dCanvasRef.current;
+    if (!canvas || !canvas2dCanvas) return;
 
     let mounted = true;
     let initializationRequested = false;
     const engine = new StudioWebGpuEngine({
       canvas,
-      fallbackCanvas,
+      canvas2dCanvas,
+      selectedBackend: "webgpu",
       // This component is the display-only live-draft path. Avoid one viewport-sized immutable
       // texture plus a texture copy per pointer frame; direct engine users keep readback by default.
       retainReadbackSnapshot: false,
@@ -496,7 +501,6 @@ function StudioWebGpuCanvas({
     // Suspend first so an empty Studio page neither paints a blank frame nor starts WebGPU.
     engine.suspend(desiredRequestIdRef.current);
     engine.releaseSuspendedSurfaceBackingStores();
-    callbacksRef.current.onBackendChange?.(engine.getBackend());
 
     const syncViewport = (
       observedWidth?: number,
@@ -771,7 +775,7 @@ function StudioWebGpuCanvas({
         data-studio-gpu-surface="webgpu"
       />
       <canvas
-        ref={fallbackCanvasRef}
+        ref={canvas2dCanvasRef}
         className="pointer-events-none absolute inset-0 block h-full w-full"
         data-studio-gpu-surface="canvas2d"
       />

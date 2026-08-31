@@ -3,7 +3,7 @@
  *
  * The default live path retains one upstream `InProgressStroke` and emits a
  * deterministic retain-and-replace mesh delta after each input batch. The
- * existing single-shot generator remains the final-reference and fallback.
+ * existing single-shot generator remains an explicitly selected final-reference.
  * Both use the same pinned google/ink bridge and noise seed 0.
  *
  * This module is CPU/WASM geometry only. It never reads pixels or buffers back
@@ -101,8 +101,12 @@ export type InkMeshSessionState =
   | "failed"
   | "disposed";
 
+export type InkMeshSessionBackend =
+  | "upstream-in-progress"
+  | "single-shot-reference";
+
 export interface InkMeshIncrementalMetrics {
-  backend: "upstream-in-progress" | "single-shot-fallback";
+  backend: InkMeshSessionBackend;
   updateCount: number;
   inputCount: number;
   inputPayloadBytes: number;
@@ -147,7 +151,7 @@ export interface InkMeshGenerator {
   ): InkStrokeMesh;
   createInProgressStroke(
     brushParams?: InkMeshBrushParams,
-    options?: { forceSingleShotFallback?: boolean },
+    options?: { backend?: InkMeshSessionBackend },
   ): InProgressInkStroke;
 }
 
@@ -268,10 +272,25 @@ export function loadInkMeshGenerator(options?: {
     supportsIncrementalMeshDeltas:
       typeof wasm._imk_begin === "function" && typeof wasm._imk_append === "function",
     generateInkStrokeMesh: (points, params) => generateWith(wasm, points, params),
-    createInProgressStroke: (params, sessionOptions) =>
-      sessionOptions?.forceSingleShotFallback === true
-        ? createSingleShotFallbackSession(wasm, params)
-        : createUpstreamIncrementalSession(wasm, params),
+    createInProgressStroke: (params, sessionOptions) => {
+      const unsupportedOption = Object.keys(sessionOptions ?? {}).find(
+        (key) => key !== "backend",
+      );
+      if (unsupportedOption !== undefined) {
+        throw new InkMeshError(
+          `unsupported ink-mesh session option: ${unsupportedOption}`,
+          -1,
+        );
+      }
+      const backend = sessionOptions?.backend ?? "upstream-in-progress";
+      if (backend === "single-shot-reference") {
+        return createSingleShotReferenceSession(wasm, params);
+      }
+      if (backend !== "upstream-in-progress") {
+        throw new InkMeshError(`unsupported ink-mesh session backend: ${String(backend)}`, -1);
+      }
+      return createUpstreamIncrementalSession(wasm, params);
+    },
   }));
 }
 
@@ -889,7 +908,7 @@ function diffFullMeshes(
   };
 }
 
-function createSingleShotFallbackSession(
+function createSingleShotReferenceSession(
   wasm: InkMeshWasmModule,
   initialParams?: InkMeshBrushParams,
 ): InProgressInkStroke {
@@ -898,14 +917,14 @@ function createSingleShotFallbackSession(
   let format: InputFormat | undefined;
   let replica = createEmptyInkStrokeMeshReplica();
   let sessionState: InkMeshSessionState = "active";
-  let metricsValue = freshMetrics("single-shot-fallback", wasm);
+  let metricsValue = freshMetrics("single-shot-reference", wasm);
   const ensureActive = (action: string): void => {
     if (sessionState !== "active") {
       throw new InkMeshError(`cannot ${action} an ink-mesh session in state ${sessionState}`, 9);
     }
   };
   return {
-    backend: "single-shot-fallback",
+    backend: "single-shot-reference",
     get state() {
       return sessionState;
     },
@@ -981,7 +1000,7 @@ function createSingleShotFallbackSession(
       points = [];
       format = undefined;
       replica = createEmptyInkStrokeMeshReplica();
-      metricsValue = freshMetrics("single-shot-fallback", wasm);
+      metricsValue = freshMetrics("single-shot-reference", wasm);
       sessionState = "active";
     },
     cancel() {

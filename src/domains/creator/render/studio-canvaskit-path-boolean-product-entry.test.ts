@@ -112,20 +112,17 @@ describe("CanvasKit PathOps product entry boundary", () => {
     expect(handler).toContain("reviewLocked: activeSurfaceReviewLockedRef.current");
   });
 
-  it("fails closed on semantic errors and only uses the compatibility engine for infrastructure failures", () => {
+  it("fails closed without rerunning the operation through polygon-clipping", () => {
     const handler = pathBooleanHandler();
 
-    expect(handler).toContain('"provider-capability-missing"');
-    expect(handler).toContain('"provider-init-failed"');
-    expect(handler).toContain('"worker-failed"');
-    expect(handler).toContain('"worker-unavailable"');
-    expect(handler).toContain(
-      "result = await combineStudioShapes(baseSpec, topSpec, op)",
-    );
+    expect(handler).not.toContain("fallbackAllowed");
+    expect(handler).not.toContain("polygon-clipping");
+    expect(handler).not.toContain("combineStudioShapes(baseSpec, topSpec, op)");
+    expect(handler.match(/combineStudioShapesWithCanvasKit\(/gu)).toHaveLength(1);
     expect(handler).toContain("if (!result.ok)");
-    expect(handler.indexOf("if (!result.ok)")).toBeGreaterThan(
-      handler.indexOf("result = await combineStudioShapes(baseSpec, topSpec, op)"),
-    );
+    expect(handler).toContain("pathBooleanClientRef.current?.dispose()");
+    expect(handler).toContain("원본 도형을 유지했어요");
+    expect(handler).toContain("다른 엔진은 자동으로 실행하지 않았습니다");
   });
 
   it("owns cancellation, Worker lifetime, timeline cleanup, and selection ref synchronization", () => {

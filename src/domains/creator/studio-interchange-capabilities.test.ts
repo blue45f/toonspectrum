@@ -221,6 +221,15 @@ describe("Studio interchange capability registry", () => {
     for (const id of ["pdf", "webm"]) {
       expect(studioInterchangeCapability(id)).toMatchObject({ import: "unsupported", export: "available", roundTrip: "none" });
     }
+    const webm = studioInterchangeCapability("webm")!;
+    const webmContract = [
+      ...webm.lossModel,
+      ...webm.runtimeRequirement,
+      ...webm.notes,
+    ].join(" ");
+    expect(webmContract).toContain("작업 전에");
+    expect(webmContract).toContain("재시도하지 않습니다");
+    expect(webmContract).not.toMatch(/VP9→VP8|폴백/iu);
   });
 
   it("SVG는 실제 Elements 제품 island의 부분 import와 provider 역할을 정직하게 표시한다", () => {
@@ -237,7 +246,16 @@ describe("Studio interchange capability registry", () => {
     });
     expect(svg.uiWiring.notes.join(" ")).toContain("StudioSvgAssetPreview");
     expect(svg.lossModel.join(" ")).toContain("text·image·pattern·mask·filter·marker");
-    expect(svg.lossModel.join(" ")).toContain("SceneIR/resvg");
+    const svgContract = [
+      ...svg.lossModel,
+      ...svg.runtimeRequirement,
+      ...svg.notes,
+      ...svg.implementation.notes,
+      ...(svg.recommendedBridge ?? []),
+    ].join(" ");
+    expect(svgContract).toContain("다른 provider 재시도 없이 fail-closed");
+    expect(svgContract).toContain("resvg는 비권위 QA reference");
+    expect(svgContract).not.toMatch(/resvg fallback|resvg로 .*우회/iu);
     expect(svg.externalRequirements.providers).toEqual(expect.arrayContaining([
       "vello_svg 0.10",
       "CanvasKit 0.41.1",
@@ -332,7 +350,8 @@ describe("Studio interchange capability registry", () => {
         status: "partial",
       });
       expect(capability?.lossModel.join(" ")).toContain("1,280px");
-      expect(capability?.runtimeRequirement).toContain("Web Worker");
+      expect(capability?.runtimeRequirement).toContain("exact Web Worker provider");
+      expect(capability?.runtimeRequirement.join(" ")).not.toContain("fallback");
       expect(capability?.sizeBudget.maxFileBytes).toBe(64 * 1024 * 1024);
       expect(capability?.sizeBudget.maxDecodedBytes).toBe(64 * 1024 * 1024);
     }

@@ -200,7 +200,6 @@ function unionBounds(
 
 export class StudioLivingInkWebGpuPureRuntime {
   readonly capabilities: StudioLivingInkExecutionCapabilities;
-  readonly preferredBackend = "webgpu" as const;
   readonly webGpuDevice: GPUDevice;
   readonly wgslRevision = STUDIO_LIVING_INK_WGSL_SHADER_REVISION;
   readonly coarseVelocityScale: StudioLivingInkCoarseVelocityScale;
@@ -1190,9 +1189,8 @@ export class StudioLivingInkWebGpuPureRuntime {
    * partial alpha because every canvas transfer quantizes through premultiplication.
    *
    * Fails closed on a blank readback rather than presenting it. The runtime has no second pixel
-   * source to fall back to; the recoverable fallback lives one level up, in
-   * `tryCreateStudioLivingInkWebGpuRuntime`, which admits this runtime only after it proves it can
-   * present a real frame and otherwise hands the user the WebGL2 backend.
+   * source and `tryCreateStudioLivingInkWebGpuRuntime` admits only this WebGPU implementation.
+   * Refusal leaves the selected provider unavailable; it never starts a WebGL2 operation.
    */
   private present(pixels: Uint8Array): ImageBitmap {
     if (studioLivingInkPresentedPixelsAreBlank(pixels)) {

@@ -455,7 +455,7 @@ describe("selectFilterLane", () => {
     expect(selection.lanes).toEqual([...LANES]);
     expect(selection.killedLanes).toEqual([]);
     expect(selection.promotedLane).toBeNull();
-    expect(selection.killIgnoredReason).toBeNull();
+    expect(selection.unavailableReason).toBeNull();
   });
 
   it("promotes the cached winner's lane to the head, keeping the rest stable", () => {
@@ -472,7 +472,7 @@ describe("selectFilterLane", () => {
     expect(selection.promotedLane).toBe("worker");
   });
 
-  it("excludes killed lanes while a fallback chain remains", () => {
+  it("excludes killed providers from the observation candidates", () => {
     const state = bareState();
     state.killSwitch.kill("filter-lane-gpu-chain", "remote flag");
     const selection = selectFilterLane({
@@ -484,10 +484,10 @@ describe("selectFilterLane", () => {
     });
     expect(selection.lanes).toEqual(["worker", "konva-native"]);
     expect(selection.killedLanes).toEqual(["gpu-chain"]);
-    expect(selection.killIgnoredReason).toBeNull();
+    expect(selection.unavailableReason).toBeNull();
   });
 
-  it("never empties the chain: killing every lane is ignored with a logged reason", () => {
+  it("fails closed when every observed provider is killed", () => {
     const state = bareState();
     for (const lane of LANES) state.killSwitch.kill(laneProviderId(lane), "panic");
     const selection = selectFilterLane({
@@ -497,10 +497,10 @@ describe("selectFilterLane", () => {
       ...state,
       laneProviderId,
     });
-    expect(selection.lanes).toEqual([...LANES]);
+    expect(selection.lanes).toEqual([]);
     expect(selection.killedLanes).toEqual([...LANES]);
-    expect(selection.killIgnoredReason).toContain("keeping the original order");
-    expect(selection.killIgnoredReason).toContain("filter-lane-gpu-chain: panic");
+    expect(selection.promotedLane).toBeNull();
+    expect(selection.unavailableReason).toBe("all-providers-killed");
   });
 
   it("a cached winner that is killed does not resurrect its lane", () => {

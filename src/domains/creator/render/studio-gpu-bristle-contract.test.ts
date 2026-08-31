@@ -268,10 +268,10 @@ describe("studio-gpu-bristle-contract clamps", () => {
     expect(clampStudioGpuBristleStationDtMs(1000 / 120)).toBeCloseTo(1000 / 120, 10);
     expect(clampStudioGpuBristleStationDtMs(5000)).toBe(STUDIO_GPU_BRISTLE_LIMITS.maxStationDtMs);
     expect(clampStudioGpuBristleStationDtMs(0)).toBe(
-      STUDIO_GPU_BRISTLE_LIMITS.fallbackStationDtMs,
+      STUDIO_GPU_BRISTLE_LIMITS.retainedStationDtMs,
     );
     expect(clampStudioGpuBristleStationDtMs(Number.NaN)).toBe(
-      STUDIO_GPU_BRISTLE_LIMITS.fallbackStationDtMs,
+      STUDIO_GPU_BRISTLE_LIMITS.retainedStationDtMs,
     );
   });
 });

@@ -216,6 +216,18 @@ afterEach(() => {
 });
 
 describe("runStudioLiquifyWorker", () => {
+  it.each([
+    ["null factory", null],
+    ["throwing factory", () => { throw new Error("blocked by CSP"); }],
+  ] as const)("%s is unavailable instead of direct execution", async (_label, workerFactory) => {
+    const input = fieldRequest();
+    await expect(runStudioLiquifyWorker(input, { workerFactory })).rejects.toMatchObject({
+      name: "StudioLiquifyWorkerUnavailableError",
+    });
+    expect(input.src.data.byteLength).toBe(input.src.width * input.src.height * 4);
+    expect(input.dst.data.byteLength).toBe(input.dst.width * input.dst.height * 4);
+  });
+
   it("기본 module Worker를 연속 stroke에서 재사용하고 dispose 시 한 번 종료한다", async () => {
     let worker: ApplyingWorker | null = null;
     const WorkerConstructor = vi.fn(function MockWorker() {
@@ -455,7 +467,7 @@ describe("runStudioLiquifyWorker", () => {
     expect(worker.transferCount).toBe(2);
   });
 
-  it("stroke direct fallback도 Worker 경로와 byte parity를 유지하고 no-op을 표시한다", async () => {
+  it("explicit direct mode도 Worker 경로와 byte parity를 유지하고 no-op을 표시한다", async () => {
     const src = image(20, 20);
     const request = {
       src,
@@ -478,7 +490,7 @@ describe("runStudioLiquifyWorker", () => {
     )!;
     applyLiquifyDisplacement(src, expected, field);
 
-    const direct = await runStudioLiquifyWorker(request, { workerFactory: null });
+    const direct = await runStudioLiquifyWorker(request, { executionMode: "direct" });
     expect(direct).toMatchObject({ execution: "direct", applied: true });
     expect(direct.dst.data).toEqual(expected.data);
 
@@ -486,7 +498,7 @@ describe("runStudioLiquifyWorker", () => {
       src: image(4, 4),
       dst: image(4, 4),
       stroke: { points: [{ x: 1, y: 1 }], radiusPx: 2, strength: 1 },
-    }, { workerFactory: null });
+    }, { executionMode: "direct" });
     expect(noOp).toMatchObject({ execution: "direct", applied: false });
   });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  buildStudioProjectArchive,
+  buildStudioProjectArchive as buildStudioProjectArchiveWithBackend,
   importStudioProjectArchive,
 } from "../studio-project-archive";
 
@@ -21,6 +21,16 @@ import {
   createStudioFilterMaskSurfaceSpec,
   type StudioFilterMaskSurfaceId,
 } from "@/lib/studio-filter-mask-surface-contract";
+
+function buildStudioProjectArchive(
+  input: Parameters<typeof buildStudioProjectArchiveWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioProjectArchiveWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioProjectArchiveWithBackend> {
+  return buildStudioProjectArchiveWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 const SURFACE_ID =
   "filter-mask:v1:00000000-0000-4000-8000-000000000001" as StudioFilterMaskSurfaceId;

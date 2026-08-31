@@ -18,6 +18,66 @@ export const WEBP_QUALITY = 0.92;
 // 주요 브라우저 공통으로 안전한 캔버스 한 변 상한(px) — Safari/Chrome 보수값.
 export const MAX_CANVAS_DIM = 16384;
 
+export type StudioCanvasRasterMime = "image/png" | "image/jpeg" | "image/webp";
+
+/** 브라우저가 요청 코덱 대신 다른 컨테이너를 반환했을 때의 fail-closed 오류. */
+export class StudioRasterCodecUnavailableError extends Error {
+  readonly requestedMime: string;
+  readonly actualMime: string;
+  readonly detectedMime: StudioCanvasRasterMime | null;
+
+  constructor(input: {
+    requestedMime: string;
+    actualMime: string;
+    detectedMime: StudioCanvasRasterMime | null;
+  }) {
+    super(
+      `요청한 ${input.requestedMime} 코덱이 정확한 형식으로 인코딩하지 못했어요. `
+      + "다른 형식으로 자동 저장하지 않았습니다."
+    );
+    this.name = "StudioRasterCodecUnavailableError";
+    this.requestedMime = input.requestedMime;
+    this.actualMime = input.actualMime;
+    this.detectedMime = input.detectedMime;
+  }
+}
+
+function normalizeCanvasRasterMime(type: string): StudioCanvasRasterMime | null {
+  const normalized = type.trim().toLowerCase();
+  if (normalized === "image/png") return "image/png";
+  if (normalized === "image/jpeg" || normalized === "image/jpg") return "image/jpeg";
+  if (normalized === "image/webp") return "image/webp";
+  return null;
+}
+
+function asciiAt(bytes: Uint8Array, offset: number, expected: string): boolean {
+  if (bytes.byteLength < offset + expected.length) return false;
+  for (let index = 0; index < expected.length; index += 1) {
+    if (bytes[offset + index] !== expected.charCodeAt(index)) return false;
+  }
+  return true;
+}
+
+/** MIME 라벨이 아니라 컨테이너 magic으로 실제 브라우저 출력 형식을 판별한다. */
+export function detectStudioCanvasRasterMime(bytes: Uint8Array): StudioCanvasRasterMime | null {
+  if (
+    bytes.byteLength >= 8
+    && bytes[0] === 0x89
+    && asciiAt(bytes, 1, "PNG")
+    && bytes[4] === 0x0d
+    && bytes[5] === 0x0a
+    && bytes[6] === 0x1a
+    && bytes[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  if (bytes.byteLength >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (asciiAt(bytes, 0, "RIFF") && asciiAt(bytes, 8, "WEBP")) return "image/webp";
+  return null;
+}
+
 export function exportMimeType(format: ExportFormat): string {
   if (format === "jpg") return "image/jpeg";
   if (format === "webp") return "image/webp";
@@ -111,6 +171,14 @@ export async function canvasToBlob(
   type = "image/png",
   quality?: number
 ): Promise<Blob> {
+  const requestedMime = normalizeCanvasRasterMime(type);
+  if (!requestedMime) {
+    throw new StudioRasterCodecUnavailableError({
+      requestedMime: type,
+      actualMime: "",
+      detectedMime: null,
+    });
+  }
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (result) => {
@@ -121,7 +189,17 @@ export async function canvasToBlob(
       quality
     );
   });
-  return tagStudioRasterBlobResolution(blob, type);
+  const actualMime = normalizeCanvasRasterMime(blob.type);
+  const header = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+  const detectedMime = detectStudioCanvasRasterMime(header);
+  if (actualMime !== requestedMime || detectedMime !== requestedMime) {
+    throw new StudioRasterCodecUnavailableError({
+      requestedMime,
+      actualMime: blob.type,
+      detectedMime,
+    });
+  }
+  return tagStudioRasterBlobResolution(blob, requestedMime);
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

@@ -23,7 +23,10 @@ import {
   createStudioOffscreenRasterSession,
   type StudioOffscreenRasterSession,
 } from "./studio-offscreen-raster-worker-client";
-import { adoptStudioOffscreenBitmap } from "./studio-offscreen-raster-worker-protocol";
+import {
+  adoptStudioOffscreenBitmap,
+  isStudioOffscreenRasterEncodedBlobExact,
+} from "./studio-offscreen-raster-worker-protocol";
 import { readStudioVectorReferenceSourceBudgetReceipt } from "./studio-vector-reference-source-budget-receipt";
 
 import type {
@@ -86,13 +89,39 @@ export type StudioVectorReferenceRasterizer = (
   request: StudioVectorReferenceRasterRequest,
 ) => Promise<StudioVectorReferenceRasterResult>;
 
-export interface StudioVectorReferenceRenderOptions {
+export type StudioVectorReferenceRasterExecutionBackend =
+  | "offscreen-worker"
+  | "browser-direct"
+  | "custom";
+
+type StudioVectorReferenceRasterSelection =
+  | {
+      /** Product default: one exact OffscreenCanvas Worker provider, with fail-closed errors. */
+      readonly rasterExecutionBackend?: "offscreen-worker";
+      readonly rasterize?: never;
+    }
+  | {
+      /** Explicit main-thread reference/browser provider selected before the operation starts. */
+      readonly rasterExecutionBackend: "browser-direct";
+      readonly rasterize?: never;
+    }
+  | {
+      /** Explicit test/platform provider; it is never reached after another backend fails. */
+      readonly rasterExecutionBackend: "custom";
+      readonly rasterize: StudioVectorReferenceRasterizer;
+    };
+
+interface StudioVectorReferenceCommonRenderOptions {
   readonly signal?: AbortSignal;
-  /** `null` forces the serializer's exact synchronous fallback; omitted uses its module Worker. */
+  /** `null` preselects direct serialization; omitted selects the product module Worker. */
   readonly workerFactory?: StudioSvgExportWorkerFactory | null;
-  /** Test/platform seam. Production defaults to SVG Blob -> transparent Canvas2D -> PNG Blob. */
-  readonly rasterize?: StudioVectorReferenceRasterizer;
 }
+
+export type StudioVectorReferenceRenderOptions =
+  StudioVectorReferenceCommonRenderOptions & StudioVectorReferenceRasterSelection;
+
+export type StudioVectorReferencePreparedRenderOptions =
+  Pick<StudioVectorReferenceCommonRenderOptions, "signal"> & StudioVectorReferenceRasterSelection;
 
 /**
  * Validated input plus the single authoritative SVG export produced for a vector reference.
@@ -634,18 +663,29 @@ export const rasterizeStudioVectorReferenceInBrowser: StudioVectorReferenceRaste
  * happened on the main thread and could look like a frozen canvas on long webtoon pages. Chrome's
  * ImageBitmap decoder is asynchronous; the decoded bitmap is then transferred once to the shared
  * OffscreenCanvas runtime for drawing and `convertToBlob()` encoding. Unsupported/startup/worker
- * failures return `null` so the exact legacy renderer can retry from the original SVG string.
+ * failures are terminal for this selected provider and surface as `raster-unavailable`.
  */
 export async function rasterizeStudioVectorReferenceOffscreen(
   request: StudioVectorReferenceRasterRequest,
   options: StudioVectorReferenceOffscreenOptions = {},
-): Promise<StudioVectorReferenceRasterResult | null> {
+): Promise<StudioVectorReferenceRasterResult> {
   throwIfAborted(request.signal);
   const createBitmap = options.createBitmap
     ?? (typeof globalThis.createImageBitmap === "function"
       ? (source: Blob) => globalThis.createImageBitmap(source)
       : null);
-  if (!createBitmap || typeof Worker !== "function") return null;
+  if (!createBitmap) {
+    throw new StudioVectorReferenceError(
+      "raster-unavailable",
+      "선택한 Offscreen 벡터 래스터 엔진에서 SVG 비트맵 디코더를 사용할 수 없습니다.",
+    );
+  }
+  if (typeof Worker !== "function") {
+    throw new StudioVectorReferenceError(
+      "raster-unavailable",
+      "선택한 Offscreen 벡터 래스터 Worker를 사용할 수 없습니다.",
+    );
+  }
 
   let bitmap: ImageBitmap | null = null;
   let session: StudioOffscreenRasterSession | null = null;
@@ -653,7 +693,12 @@ export async function rasterizeStudioVectorReferenceOffscreen(
   try {
     bitmap = await createBitmap(new Blob([request.svg], { type: SVG_EXPORT_MIME }));
     throwIfAborted(request.signal);
-    if (bitmap.width <= 0 || bitmap.height <= 0) return null;
+    if (bitmap.width <= 0 || bitmap.height <= 0) {
+      throw new StudioVectorReferenceError(
+        "raster-unavailable",
+        "선택한 Offscreen 벡터 래스터 엔진이 유효한 SVG 비트맵을 만들지 못했습니다.",
+      );
+    }
 
     if (options.createSession) {
       session = options.createSession();
@@ -661,7 +706,12 @@ export async function rasterizeStudioVectorReferenceOffscreen(
       session = acquireStudioVectorReferenceRasterSession();
       leasedSession = session !== null;
     }
-    if (!session) return null;
+    if (!session) {
+      throw new StudioVectorReferenceError(
+        "raster-unavailable",
+        "선택한 Offscreen 벡터 래스터 Worker를 시작하지 못했습니다.",
+      );
+    }
     sharedStudioVectorReferenceRasterRunId += 1;
     const result = await session.run(
       `vector-reference:${sharedStudioVectorReferenceRasterRunId}`,
@@ -702,15 +752,28 @@ export async function rasterizeStudioVectorReferenceOffscreen(
     ) {
       invalidateStudioVectorReferenceRasterSession(session);
     }
+    if (!result.ok) {
+      throw new StudioVectorReferenceError(
+        "raster-unavailable",
+        `선택한 Offscreen 벡터 래스터 Worker가 작업을 완료하지 못했습니다. ${result.message}`,
+      );
+    }
     if (
-      !result.ok
-      || result.width !== request.width
+      result.width !== request.width
       || result.height !== request.height
       || result.payload.kind !== "encoded"
       || result.payload.mime !== "image/png"
     ) {
-      if (result.ok && leasedSession) invalidateStudioVectorReferenceRasterSession(session);
-      return null;
+      throw new StudioVectorReferenceError(
+        "raster-unavailable",
+        "선택한 Offscreen 벡터 래스터 Worker가 유효한 PNG 결과를 반환하지 않았습니다.",
+      );
+    }
+    if (!await isStudioOffscreenRasterEncodedBlobExact(result.payload.blob, "image/png")) {
+      throw new StudioVectorReferenceError(
+        "raster-unavailable",
+        "선택한 Offscreen 벡터 래스터 Worker가 PNG 대신 다른 컨테이너를 반환했습니다.",
+      );
     }
     if (result.payload.blob.size > request.maxOutputBytes) {
       throw new StudioVectorReferenceError(
@@ -731,7 +794,12 @@ export async function rasterizeStudioVectorReferenceOffscreen(
       throw error;
     }
     if (leasedSession && session) invalidateStudioVectorReferenceRasterSession(session);
-    return null;
+    if (error instanceof StudioVectorReferenceError) throw error;
+    throw new StudioVectorReferenceError(
+      "raster-unavailable",
+      "선택한 Offscreen 벡터 래스터 엔진을 실행하지 못했습니다.",
+      { cause: error },
+    );
   } finally {
     if (leasedSession) releaseStudioVectorReferenceRasterSession();
     else session?.dispose();
@@ -743,14 +811,6 @@ export async function rasterizeStudioVectorReferenceOffscreen(
   }
 }
 
-/** OffscreenCanvas first; exact Canvas2D renderer remains the compatibility/failure fallback. */
-export const rasterizeStudioVectorReferenceHybrid: StudioVectorReferenceRasterizer = async (
-  request,
-) => (
-  await rasterizeStudioVectorReferenceOffscreen(request)
-  ?? rasterizeStudioVectorReferenceInBrowser(request)
-);
-
 /**
  * Generic SVG-export -> transparent PNG seam. Advanced Fill filters to DrawEl before calling it;
  * future attachment-less vector filters can pass their own explicit document-vector selection.
@@ -759,8 +819,14 @@ export async function renderStudioVectorReference(
   input: StudioVectorReferenceInput,
   options: StudioVectorReferenceRenderOptions = {},
 ): Promise<StudioVectorReferenceResult> {
+  throwIfAborted(options.signal);
+  const rasterize = selectedStudioVectorReferenceRasterizer(options);
   const prepared = await prepareStudioVectorReferenceExport(input, options);
-  return renderPreparedStudioVectorReference(prepared, options);
+  return renderPreparedStudioVectorReferenceWithRasterizer(
+    prepared,
+    options.signal,
+    rasterize,
+  );
 }
 
 /**
@@ -785,9 +851,11 @@ export async function prepareStudioVectorReferenceExport(
     bg: input.bg,
     bgGrad: input.bgGrad,
   };
-  const workerOptions = options.workerFactory === undefined
-    ? { signal: options.signal }
-    : { signal: options.signal, workerFactory: options.workerFactory };
+  const workerOptions = options.workerFactory === null
+    ? { signal: options.signal, executionBackend: "direct" as const }
+    : options.workerFactory === undefined
+      ? { signal: options.signal }
+      : { signal: options.signal, workerFactory: options.workerFactory };
   const { runStudioSvgExportWorker } = await loadStudioSvgExportWorkerClientModule();
   throwIfAborted(options.signal);
   const exported = await runStudioSvgExportWorker(exportInput, workerOptions);
@@ -803,25 +871,46 @@ export async function prepareStudioVectorReferenceExport(
   };
 }
 
-/** Rasterizes a previously prepared export without invoking the SVG serializer again. */
-export async function renderPreparedStudioVectorReference(
+function selectedStudioVectorReferenceRasterizer(
+  options: StudioVectorReferencePreparedRenderOptions,
+): StudioVectorReferenceRasterizer {
+  if (options.rasterize && options.rasterExecutionBackend !== "custom") {
+    throw new TypeError(
+      "studio-vector-reference: an injected rasterizer requires rasterExecutionBackend=custom",
+    );
+  }
+  const executionBackend = options.rasterExecutionBackend ?? "offscreen-worker";
+  if (executionBackend === "offscreen-worker") {
+    return rasterizeStudioVectorReferenceOffscreen;
+  }
+  if (executionBackend === "browser-direct") {
+    return rasterizeStudioVectorReferenceInBrowser;
+  }
+  if (executionBackend === "custom" && options.rasterize) return options.rasterize;
+  throw new TypeError(
+    "studio-vector-reference: invalid or incomplete rasterExecutionBackend selection",
+  );
+}
+
+async function renderPreparedStudioVectorReferenceWithRasterizer(
   prepared: StudioVectorReferencePreparedExport,
-  options: Pick<StudioVectorReferenceRenderOptions, "signal" | "rasterize"> = {},
+  signal: AbortSignal | undefined,
+  rasterize: StudioVectorReferenceRasterizer,
 ): Promise<StudioVectorReferenceResult> {
-  throwIfAborted(options.signal);
+  throwIfAborted(signal);
   const { fingerprint, svgByteLength } = assertSvgResult(
     prepared.result,
     prepared.maxSvgBytes,
     prepared.fingerprintNamespace,
   );
-  const rasterized = await (options.rasterize ?? rasterizeStudioVectorReferenceHybrid)({
+  const rasterized = await rasterize({
     svg: prepared.result.svg,
     width: prepared.width,
     height: prepared.height,
     maxOutputBytes: prepared.maxPngBytes,
-    signal: options.signal,
+    signal,
   });
-  throwIfAborted(options.signal);
+  throwIfAborted(signal);
   if (rasterized.width !== prepared.width || rasterized.height !== prepared.height) {
     throw new StudioVectorReferenceError("invalid-png-output", "벡터 선화 PNG의 페이지 크기가 일치하지 않습니다.");
   }
@@ -845,6 +934,20 @@ export async function renderPreparedStudioVectorReference(
     pngByteLength,
     execution: prepared.execution,
   };
+}
+
+/** Rasterizes a previously prepared export through one backend selected before work starts. */
+export async function renderPreparedStudioVectorReference(
+  prepared: StudioVectorReferencePreparedExport,
+  options: StudioVectorReferencePreparedRenderOptions = {},
+): Promise<StudioVectorReferenceResult> {
+  throwIfAborted(options.signal);
+  const rasterize = selectedStudioVectorReferenceRasterizer(options);
+  return renderPreparedStudioVectorReferenceWithRasterizer(
+    prepared,
+    options.signal,
+    rasterize,
+  );
 }
 
 type StudioDrawStroke = Extract<El, { type: "draw" }>;

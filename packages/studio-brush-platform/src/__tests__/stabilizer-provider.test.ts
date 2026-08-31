@@ -80,7 +80,7 @@ describe("stabilizer provider seam — registry + selection", () => {
     );
   });
 
-  it("gates the ink lane behind explicit opt-in (ADR-0009 fallback principle)", () => {
+  it("gates the ink lane behind explicit opt-in (ADR-0009 explicit-selection principle)", () => {
     expect(() => selectStabilizerBackend("ink-stroke-modeler")).toThrow(StabilizerProviderError);
     expect(() => selectStabilizerBackend("ink-stroke-modeler", { allowInk: false })).toThrow(
       /opt-in/,

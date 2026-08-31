@@ -80,4 +80,29 @@ describe("V13 RenderSceneIR / FrameGraphIR", () => {
     });
     expect(graph.passes.map((pass) => pass.kind)).toEqual(["present"]);
   });
+
+  it("rejects a legacy island fallback chain instead of silently stripping it", () => {
+    expect(() =>
+      frameGraphIRSchema.parse({
+        version: 13,
+        surfaceId: "studio",
+        deviceEpoch: 1,
+        width: 8,
+        height: 8,
+        textures: [
+          { id: "document", width: 8, height: 8, revision: 0 },
+        ],
+        islands: [
+          {
+            id: "document-island",
+            providerId: "vello-hybrid-wgpu",
+            fallbackChain: ["vello-gpu-browser", "vello-cpu"],
+            transport: "same-gpu-texture",
+            textureHandle: "document",
+          },
+        ],
+        passes: [{ id: "present", kind: "present" }],
+      }),
+    ).toThrow(/unrecognized key.*fallbackChain/i);
+  });
 });

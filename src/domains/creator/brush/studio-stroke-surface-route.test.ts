@@ -27,7 +27,7 @@ function snapshot(
     stampAdmitted: false,
     gpuAdmitted: false,
     liveInkAdmitted: false,
-    wetFallbackAdmitted: false,
+    wetInkAdmitted: false,
     dynamicAdmitted: false,
     ...overrides,
   };
@@ -41,7 +41,7 @@ describe("Studio stroke surface pointer-down route", () => {
       "stamp",
       "gpu",
       "live-ink",
-      "wet-fallback",
+      "wet-ink",
       "dynamic",
       "konva",
     ]);
@@ -61,7 +61,7 @@ describe("Studio stroke surface pointer-down route", () => {
         stampAdmitted: true,
         gpuAdmitted: true,
         liveInkAdmitted: true,
-        wetFallbackAdmitted: true,
+        wetInkAdmitted: true,
         dynamicAdmitted: true,
       }],
       ["hokusai", {
@@ -69,28 +69,28 @@ describe("Studio stroke surface pointer-down route", () => {
         stampAdmitted: true,
         gpuAdmitted: true,
         liveInkAdmitted: true,
-        wetFallbackAdmitted: true,
+        wetInkAdmitted: true,
         dynamicAdmitted: true,
       }],
       ["stamp", {
         stampAdmitted: true,
         gpuAdmitted: true,
         liveInkAdmitted: true,
-        wetFallbackAdmitted: true,
+        wetInkAdmitted: true,
         dynamicAdmitted: true,
       }],
       ["gpu", {
         gpuAdmitted: true,
         liveInkAdmitted: true,
-        wetFallbackAdmitted: true,
+        wetInkAdmitted: true,
         dynamicAdmitted: true,
       }],
       ["live-ink", {
         liveInkAdmitted: true,
-        wetFallbackAdmitted: true,
+        wetInkAdmitted: true,
         dynamicAdmitted: true,
       }],
-      ["wet-fallback", { wetFallbackAdmitted: true, dynamicAdmitted: true }],
+      ["wet-ink", { wetInkAdmitted: true, dynamicAdmitted: true }],
       ["dynamic", { dynamicAdmitted: true }],
       ["konva", {}],
     ];
@@ -114,9 +114,9 @@ describe("Studio stroke surface pointer-down route", () => {
           capabilitiesAccepted: false,
           admitted: false,
         },
-        wetFallbackAdmitted: true,
+        wetInkAdmitted: true,
       }));
-      expect(route.kind).toBe("wet-fallback");
+      expect(route.kind).toBe("wet-ink");
       expect(route.reason).toBe(`living-ink-provider-${providerState}`);
 
       const nextPointerDown = resolveStudioStrokeSurfaceRoute(snapshot({
@@ -127,10 +127,10 @@ describe("Studio stroke surface pointer-down route", () => {
           capabilitiesAccepted: true,
           admitted: true,
         },
-        wetFallbackAdmitted: true,
+        wetInkAdmitted: true,
       }));
       expect(nextPointerDown.kind).toBe("living-ink");
-      expect(route.kind).toBe("wet-fallback");
+      expect(route.kind).toBe("wet-ink");
       expect(nextPointerDown.routeKey).not.toBe(route.routeKey);
     },
   );
@@ -143,10 +143,10 @@ describe("Studio stroke surface pointer-down route", () => {
         capabilitiesAccepted: false,
         admitted: true,
       },
-      wetFallbackAdmitted: true,
+      wetInkAdmitted: true,
     }));
     expect(rejected).toMatchObject({
-      kind: "wet-fallback",
+      kind: "wet-ink",
       reason: "living-ink-capabilities-rejected",
     });
 
@@ -262,9 +262,9 @@ describe("Studio stroke surface pinned lifecycle", () => {
         cause,
         owner: "living-ink",
         action: "retain-pinned-route",
-        allowMidStrokeFallback: false,
-        retryPromotion: "next-pointerdown-only",
-        draftPresentation: "show-fail-visible-konva-shadow",
+        allowProviderSubstitution: false,
+        alternateSelection: "explicit-next-pointerdown-only",
+        presentation: "preserve-last-presented-frame",
       });
       expect(policy.route).toBe(route);
     },

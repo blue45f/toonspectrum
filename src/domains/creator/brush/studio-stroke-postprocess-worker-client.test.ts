@@ -89,18 +89,30 @@ describe("StudioStrokePostprocessWorkerClient", () => {
     expect(original).toEqual(before);
   });
 
-  it("falls back directly when Worker support is unavailable, even for a long stroke", async () => {
+  it("rejects and keeps the authoritative points unchanged when Worker support is unavailable", async () => {
     const original = points(2_048);
+    const before = [...original];
     const client = new StudioStrokePostprocessWorkerClient({ workerFactory: null });
 
-    const result = await client.postprocess(original, 10);
+    await expect(client.postprocess(original, 10)).rejects.toMatchObject({
+      code: "worker-unavailable",
+    });
+    expect(original).toEqual(before);
+  });
 
-    expect(result.execution).toBe("direct");
-    expect(result.fallbackReason).toBe("worker-unavailable");
-    expect(result.points).toEqual(smoothStrokePoints(original, 10, {
-      preserveCorners: false,
-      cornerThresholdDeg: 55,
-    }));
+  it("rejects rather than smoothing on the main thread when Worker construction throws", async () => {
+    const original = points(2_048);
+    const before = [...original];
+    const client = new StudioStrokePostprocessWorkerClient({
+      workerFactory: () => {
+        throw new Error("worker blocked");
+      },
+    });
+
+    await expect(client.postprocess(original, 10)).rejects.toMatchObject({
+      code: "worker-unavailable",
+    });
+    expect(original).toEqual(before);
   });
 
   it("transfers a Float64 snapshot and returns deterministic Worker parity without mutating input", async () => {

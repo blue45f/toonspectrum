@@ -409,6 +409,34 @@ export interface StudioPersistentCrc32ExecutorOptions {
   readonly createKernel?: () => StudioWasmCrc32KernelCreationResult;
 }
 
+export type StudioPersistentCrc32UnavailableStage = "initialization" | "run";
+
+/**
+ * Terminal failure for the preselected Memory64 CRC provider. The Worker may report this failure
+ * to its caller, but it must not recompute the same bytes with the JavaScript reference kernel.
+ */
+export class StudioPersistentCrc32UnavailableError extends Error {
+  readonly stage: StudioPersistentCrc32UnavailableStage;
+  readonly reason:
+    | StudioWasmCrc32KernelCreationFailureReason
+    | StudioWasmCrc32RunFailureReason;
+  override readonly cause?: unknown;
+
+  constructor(input: {
+    readonly stage: StudioPersistentCrc32UnavailableStage;
+    readonly reason:
+      | StudioWasmCrc32KernelCreationFailureReason
+      | StudioWasmCrc32RunFailureReason;
+    readonly cause?: unknown;
+  }) {
+    super(`Selected Memory64 CRC32 provider is unavailable (${input.stage}:${input.reason}).`);
+    this.name = "StudioPersistentCrc32UnavailableError";
+    this.stage = input.stage;
+    this.reason = input.reason;
+    this.cause = input.cause;
+  }
+}
+
 function createDefaultMemory64Kernel(): StudioWasmCrc32KernelCreationResult {
   const requiredBytes =
     STUDIO_WASM_CRC32_INPUT_OFFSET
@@ -417,8 +445,7 @@ function createDefaultMemory64Kernel(): StudioWasmCrc32KernelCreationResult {
     (requiredBytes + STUDIO_WASM_PAGE_BYTES - BigInt(1))
     / STUDIO_WASM_PAGE_BYTES;
   const runtime = createStudioWasmMemoryRuntime({
-    preferredMode: "i64",
-    fallbackPolicy: "deny",
+    selectedMode: "i64",
     initialPages: BigInt(1),
     maximumPages,
   });
@@ -435,9 +462,9 @@ function createDefaultMemory64Kernel(): StudioWasmCrc32KernelCreationResult {
 }
 
 /**
- * Persistent, lazy and fail-safe executor used by the CRC Worker. Initialization
- * is attempted once on the first large input. Any unsupported/init/run failure
- * permanently selects the byte-exact JS implementation for that Worker epoch.
+ * Persistent, lazy executor used by the CRC Worker. Input size selects the provider before any
+ * work begins: small inputs use the JS reference, while large inputs use Memory64 WASM. A large
+ * operation's unsupported/init/run failure is terminal and never re-executes those bytes in JS.
  */
 export function createStudioPersistentCrc32Executor(
   options: StudioPersistentCrc32ExecutorOptions = {},
@@ -452,7 +479,8 @@ export function createStudioPersistentCrc32Executor(
     throw new RangeError("minimumWasmBytes is outside the CRC32 protocol budget");
   }
   const kernelFactory = options.createKernel ?? createDefaultMemory64Kernel;
-  let kernel: StudioWasmCrc32KernelLike | null | undefined;
+  let kernel: StudioWasmCrc32KernelLike | undefined;
+  let unavailable: StudioPersistentCrc32UnavailableError | null = null;
 
   return Object.freeze({
     calculate(bytes: Uint8Array): number {
@@ -466,16 +494,28 @@ export function createStudioPersistentCrc32Executor(
         return calculateStudioCrc32(bytes);
       }
 
+      if (unavailable) throw unavailable;
       if (kernel === undefined) {
         const created = kernelFactory();
-        kernel = created.ok ? created.kernel : null;
+        if (!created.ok) {
+          unavailable = new StudioPersistentCrc32UnavailableError({
+            stage: "initialization",
+            reason: created.reason,
+            cause: created.cause,
+          });
+          throw unavailable;
+        }
+        kernel = created.kernel;
       }
-      if (kernel) {
-        const result = kernel.copyAndCalculate(bytes);
-        if (result.ok) return result.crc32;
-        kernel = null;
-      }
-      return calculateStudioCrc32(bytes);
+      const result = kernel.copyAndCalculate(bytes);
+      if (result.ok) return result.crc32;
+      unavailable = new StudioPersistentCrc32UnavailableError({
+        stage: "run",
+        reason: result.reason,
+        cause: result.cause,
+      });
+      kernel = undefined;
+      throw unavailable;
     },
   });
 }

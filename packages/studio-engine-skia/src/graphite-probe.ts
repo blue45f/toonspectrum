@@ -2,16 +2,16 @@
  * Skia Graphite adoption probe (ADR 0017).
  *
  * "Graphite를 적극적으로 사용한다"를 활성화 한 단계짜리 스위치로 만든다: this probe answers, per
- * device and per build, whether the WebGPU-native Graphite challenger can be admitted to the
- * tournament right now, and names the exact missing precondition when it cannot. Today the
+ * device and per build, whether the WebGPU-native Graphite provider can be selected by an
+ * explicit evidence plan right now, and names the exact missing precondition when it cannot. Today the
  * blocking precondition is upstream: `canvaskit-wasm` ships the Ganesh (WebGL) backend only and
  * Skia does not publish a Graphite web artifact, so there is nothing to load — inventing a loader
  * here would be a placeholder claim, the thing the descriptor module explicitly forbids.
  *
  * The moment a Graphite-enabled CanvasKit build exists, `registerSkiaGraphiteArtifact` flips the
- * probe to `adoptable`, and from there stability is governed by the tournament plus the declared
- * demotion chain (skia-graphite-webgpu → skia-canvaskit-gpu → skia-canvaskit): an unstable
- * Graphite is quarantined and demoted automatically, never swapped by hand.
+ * probe to `adoptable`. This only makes an exact Graphite selection possible; it does not grant a
+ * runtime demotion path. A selected Graphite provider that later fails is unavailable until the
+ * caller explicitly selects another provider for a new operation.
  */
 
 export const SKIA_GRAPHITE_PROVIDER_ID = "skia-graphite-webgpu" as const;
@@ -67,7 +67,7 @@ function defaultEnvironment(): SkiaGraphiteProbeEnvironment {
 
 /**
  * Same honesty contract as `createSkiaGpuIslandBackend`: callers must treat anything but
- * `adoptable` as "keep the current lane" — the challenger simply does not enter the tournament.
+ * `adoptable` as a denied Graphite selection. The probe never chooses another provider.
  */
 export async function probeSkiaGraphiteAdoption(
   environment: SkiaGraphiteProbeEnvironment = defaultEnvironment()

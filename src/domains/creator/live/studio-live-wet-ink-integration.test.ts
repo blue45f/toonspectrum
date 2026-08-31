@@ -53,7 +53,7 @@ describe("live wet-ink product boundary", () => {
       "renderer.appendFrom(next,",
     );
     expect(studioPageSource).toContain(
-      "const seal = renderer.end(finalWetInkStroke",
+      "liveWetInkOverlayRendererRef.current.end(finished",
     );
     expect(studioPageSource).toContain(
       "liveWetInkOverlayRendererRef.current.resetActive()",
@@ -73,25 +73,53 @@ describe("live wet-ink product boundary", () => {
     expect(overlaySource).toContain("revision: exact.value.revision");
     expect(overlaySource).toContain("seed: exact.value.seed");
     expect(overlaySource).toContain("consumeStudioWetInkDirtyBounds");
+    expect(overlaySource).not.toContain('status: "fallback"');
   });
 
-  it("commits the settled Konva layer before releasing the transient wet canvas", () => {
+  it("requires wet-ink seal before commit and never settles a rejected/unavailable operation", () => {
+    const beginStart = studioPageSource.indexOf("const wetInkOverlayStarted =");
+    const beginEnd = studioPageSource.indexOf("const retainedMediaDirect =", beginStart);
+    const begin = studioPageSource.slice(beginStart, beginEnd);
+    expect(begin).toContain("if (wetMediaSelected && !wetInkOverlayStarted)");
+    expect(begin).toContain('return rejectSelectedSurface("습식 매체"');
+
+    const finishStart = studioPageSource.indexOf("function finishDrawingPointer(");
+    const finishEnd = studioPageSource.indexOf("function onStagePointerCancel", finishStart);
+    const finish = studioPageSource.slice(finishStart, finishEnd);
+    const seal = finish.indexOf("liveWetInkOverlayRendererRef.current.end(finished");
+    const sealGuard = finish.indexOf(
+      'selectedOverlaySeal.result.status !== "settled"',
+      seal,
+    );
+    const discard = finish.indexOf("discardDrawingPointerSession();", sealGuard);
+    const deferredCommit = finish.indexOf("queueDeferredStrokeCommit(finished)", seal);
+    const immediateCommit = finish.indexOf("commit([...baseElements, finished])", seal);
+
+    expect(seal).toBeGreaterThan(0);
+    expect(sealGuard).toBeGreaterThan(seal);
+    expect(discard).toBeGreaterThan(sealGuard);
+    expect(deferredCommit).toBeGreaterThan(discard);
+    expect(immediateCommit).toBeGreaterThan(discard);
+    expect(finish.slice(sealGuard, deferredCommit)).toContain("return;");
+
     const clearStart = studioPageSource.indexOf("const clearDraftPreview =");
     const clearEnd = studioPageSource.indexOf(
       "const DEFERRED_STROKE_COMMIT_IDLE_MS",
       clearStart,
     );
     const clear = studioPageSource.slice(clearStart, clearEnd);
-    const seal = clear.indexOf("const seal = renderer.end(finalWetInkStroke");
+    const wetStart = clear.indexOf("if (wasWetInkDirect)");
+    const wet = clear.slice(wetStart, clear.indexOf("if (gpuLiveInkPinnedRef.current)", wetStart));
     const settle = clear.indexOf(
       "draftPreviewStoreRef.current.settle(finalWetInkStroke)",
-      seal,
+      wetStart,
     );
     const flushReceipt = clear.lastIndexOf("flushSync(() => {", settle);
     const release = clear.indexOf("renderer.releaseSettledPrefix(1)", settle);
 
-    expect(seal).toBeGreaterThan(0);
-    expect(flushReceipt).toBeGreaterThan(seal);
+    expect(wet).toContain("!renderer.isActive && renderer.hasSettledStrokes");
+    expect(wet).not.toContain("renderer.end(finalWetInkStroke");
+    expect(flushReceipt).toBeGreaterThan(wetStart);
     expect(settle).toBeGreaterThan(flushReceipt);
     expect(release).toBeGreaterThan(settle);
     expect(clear.slice(settle, release)).not.toContain(
@@ -99,9 +127,9 @@ describe("live wet-ink product boundary", () => {
     );
   });
 
-  it("keeps the exact vector fail-visible when a canonical Living Ink frame is blank", () => {
-    const fallback = studioPageSource.slice(
-      studioPageSource.indexOf("function commitStudioLivingInkFallbackVector"),
+  it("fails closed without committing a vector when a canonical Living Ink frame is blank", () => {
+    const rejection = studioPageSource.slice(
+      studioPageSource.indexOf("function rejectStudioLivingInkFailedStroke"),
       studioPageSource.indexOf("async function finishStudioLivingInkStroke"),
     );
     const finish = studioPageSource.slice(
@@ -109,14 +137,31 @@ describe("live wet-ink product boundary", () => {
       studioPageSource.indexOf("async function finishStudioHokusaiLiveStroke"),
     );
     expect(finish).toContain("studioLivingInkCoverageIntersectsStroke({");
-    expect(finish).toContain("원본 벡터를 유지합니다");
-    expect(fallback).toContain("flushSync(() => {");
-    expect(fallback).toContain("draftPreviewStoreRef.current.settle(finished)");
-    expect(fallback.indexOf("draftPreviewStoreRef.current.settle(finished)"))
-      .toBeLessThan(fallback.indexOf("livingInkOverlaySurfaceRef.current?.renderer.clear()"));
+    expect(finish).not.toContain("원본 벡터를 유지합니다");
+    expect(rejection).toContain("다른 렌더러로 자동 전환하지 않습니다");
+    expect(rejection).not.toContain("commit(");
+    expect(rejection).not.toContain("draftPreviewStoreRef.current.settle");
+    expect(rejection).not.toContain("restorePendingStrokeCommits");
   });
 
-  it("restores a fast Living Ink contact until its first material presentation receipt", () => {
+  it("fails closed when Hokusai finalization fails instead of publishing its vector shadow", () => {
+    const rejection = studioPageSource.slice(
+      studioPageSource.indexOf("function rejectStudioHokusaiFailedStroke"),
+      studioPageSource.indexOf("function completeStudioLivingInkRejectedNoop"),
+    );
+    const finishRouting = studioPageSource.slice(
+      studioPageSource.indexOf("function finishStudioSpecialistStroke"),
+      studioPageSource.indexOf("api.releaseEndpointPointerSample"),
+    );
+    expect(rejection).toContain("다른 렌더러로 자동 전환하지 않습니다");
+    expect(rejection).not.toContain("commit(");
+    expect(rejection).not.toContain("draftPreviewStoreRef.current.settle");
+    expect(rejection).not.toContain("restorePendingStrokeCommits");
+    expect(finishRouting).toContain("rejectStudioHokusaiFailedStroke(");
+    expect(finishRouting).toContain('return "handled";');
+  });
+
+  it("does not restore a Konva shadow for a fast Living Ink contact", () => {
     const finish = studioPageSource.slice(
       studioPageSource.indexOf("function finishDrawingPointer"),
       studioPageSource.indexOf("function onStagePointerCancel"),
@@ -124,11 +169,9 @@ describe("live wet-ink product boundary", () => {
     const clear = finish.indexOf(
       "clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup })",
     );
-    const restore = finish.indexOf("showStudioLivingInkVectorShadow(", clear);
-    const hokusai = finish.indexOf("const finishingHokusai", clear);
     expect(clear).toBeGreaterThan(0);
-    expect(restore).toBeGreaterThan(clear);
-    expect(restore).toBeLessThan(hokusai);
-    expect(finish.slice(clear, restore)).toContain("!finishingLivingInk.overlayPresented");
+    expect(finish.slice(clear)).toContain("canvas\n      // intentionally remains hidden");
+    expect(finish.slice(clear)).not.toContain("showStudioLivingInkVectorShadow(");
+    expect(finish.slice(clear)).not.toContain("showStudioHokusaiVectorShadow(");
   });
 });

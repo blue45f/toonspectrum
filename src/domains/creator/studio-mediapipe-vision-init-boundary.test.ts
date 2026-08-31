@@ -20,6 +20,21 @@ describe("MediaPipe Vision global initialization boundary", () => {
     expect(source).not.toMatch(/await import\([\s\n]*["']@mediapipe\/tasks-vision["']/u);
   });
 
+  it("never retries a selected task with another delegate or Wasm variant", () => {
+    expect(vrmTrackingSource.match(/\.createFromOptions\(/gu)).toHaveLength(5);
+    expect(mannequinTrackingSource.match(/\.createFromOptions\(/gu)).toHaveLength(1);
+    expect(backgroundRemovalSource.match(/\.createFromOptions\(/gu)).toHaveLength(1);
+    for (const source of [
+      vrmTrackingSource,
+      mannequinTrackingSource,
+      backgroundRemovalSource,
+    ]) {
+      expect(source).not.toContain("falling back to CPU");
+      expect(source).not.toContain("compatibilityVision");
+      expect(source).not.toMatch(/delegate:\s*["'](?:GPU|CPU)["']/u);
+    }
+  });
+
   it("fences every live VRM singleton against dispose-during-initialization resurrection", () => {
     expect(vrmTrackingSource).toContain("faceLandmarkerGeneration += 1");
     expect(vrmTrackingSource).toContain("livePoseLandmarkerGeneration += 1");

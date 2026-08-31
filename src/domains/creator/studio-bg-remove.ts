@@ -1,6 +1,10 @@
 // AI 배경 제거 — 이미지 픽셀은 브라우저 안에서만 MediaPipe에 전달한다.
 // 모델은 지연 로드하고 WASM은 Studio와 같은 출처의 Vite hashed 자산을 사용한다.
-import { resolveStudioMediaPipeVisionWasmFileset } from "./studio-mediapipe-vision-assets";
+import {
+  resolveStudioMediaPipeVisionWasmFileset,
+  type StudioMediaPipeVisionDelegate,
+  type StudioMediaPipeVisionProviderSelection,
+} from "./studio-mediapipe-vision-assets";
 import {
   loadStudioMediaPipeVisionModule,
   runStudioMediaPipeVisionTaskCreation,
@@ -12,7 +16,7 @@ const SELFIE_MODEL_URL =
 export const STUDIO_BG_REMOVE_MAX_DECODED_AXIS = 8_192;
 export const STUDIO_BG_REMOVE_MAX_DECODED_PIXELS = 16_777_216;
 
-export type StudioLocalForegroundDelegate = "GPU" | "CPU";
+export type StudioLocalForegroundDelegate = StudioMediaPipeVisionDelegate;
 
 export interface StudioLocalForegroundModelReceipt {
   readonly providerId: "mediapipe-image-segmenter";
@@ -25,14 +29,10 @@ export interface StudioLocalForegroundModelReceipt {
   }>;
   readonly execution: "local-device";
   readonly imageUpload: false;
-  readonly preferredDelegate: "GPU";
-  readonly attemptedDelegates: readonly StudioLocalForegroundDelegate[];
+  readonly selectedDelegate: StudioLocalForegroundDelegate;
+  readonly providerSelection: StudioMediaPipeVisionProviderSelection;
+  readonly attemptedDelegates: readonly [StudioLocalForegroundDelegate];
   readonly activeDelegate: StudioLocalForegroundDelegate;
-  readonly fallback: Readonly<{
-    readonly from: "GPU";
-    readonly to: "CPU";
-    readonly reason: "gpu-initialization-failed";
-  }> | null;
 }
 
 export interface StudioForegroundConfidenceMask {
@@ -67,9 +67,10 @@ export interface StudioLocalForegroundSegmenter {
 
 export interface StudioLocalForegroundSegmenterRuntime {
   readonly segmenter: StudioLocalForegroundSegmenter;
+  readonly selectedDelegate: StudioLocalForegroundDelegate;
   readonly activeDelegate: StudioLocalForegroundDelegate;
-  /** True only when GPU creation was attempted once and CPU is the bounded fallback. */
-  readonly gpuFallback: boolean;
+  readonly providerSelection: StudioMediaPipeVisionProviderSelection;
+  readonly attemptedDelegates: readonly [StudioLocalForegroundDelegate];
 }
 
 export type StudioLocalForegroundImageLoader = (
@@ -81,6 +82,8 @@ export type StudioLocalForegroundRuntimeLoader =
   () => Promise<StudioLocalForegroundSegmenterRuntime>;
 
 export interface CreateStudioLocalForegroundConfidenceProviderOptions {
+  /** Fixed before image/model work begins. CPU is available only through this explicit option. */
+  readonly delegate?: StudioLocalForegroundDelegate;
   /** Dependency seam for decoded-image loading; production uses the DOM Image API. */
   readonly loadImage?: StudioLocalForegroundImageLoader;
   /** Dependency seam for inference; production dynamically imports MediaPipe. */
@@ -115,6 +118,8 @@ export interface StudioForegroundPixelAlpha {
 export interface RemoveBackgroundOptions {
   readonly threshold?: number;
   readonly signal?: AbortSignal;
+  /** Fixed before decoding/model work. Omission selects the product-default GPU provider. */
+  readonly delegate?: StudioLocalForegroundDelegate;
 }
 
 const SELFIE_MODEL_RECEIPT = Object.freeze({
@@ -124,7 +129,10 @@ const SELFIE_MODEL_RECEIPT = Object.freeze({
   assetUrl: SELFIE_MODEL_URL,
 } as const);
 
-let segmenterPromise: Promise<StudioLocalForegroundSegmenterRuntime> | null = null;
+const segmenterPromises = new Map<
+  `${StudioMediaPipeVisionProviderSelection}:${StudioLocalForegroundDelegate}`,
+  Promise<StudioLocalForegroundSegmenterRuntime>
+>();
 
 function createAbortError(): Error {
   if (typeof DOMException === "function") {
@@ -211,86 +219,95 @@ function modelReceipt(
   runtime: StudioLocalForegroundSegmenterRuntime,
 ): StudioLocalForegroundModelReceipt {
   if (
-    (runtime.activeDelegate === "GPU" && runtime.gpuFallback)
-    || (runtime.activeDelegate === "CPU" && !runtime.gpuFallback)
+    (runtime.selectedDelegate !== "GPU" && runtime.selectedDelegate !== "CPU")
+    || runtime.selectedDelegate !== runtime.activeDelegate
+    || (
+      runtime.providerSelection !== "product-default-gpu"
+      && runtime.providerSelection !== "explicit-before-execution"
+    )
+    || (
+      runtime.providerSelection === "product-default-gpu"
+      && runtime.activeDelegate !== "GPU"
+    )
+    || runtime.attemptedDelegates.length !== 1
+    || runtime.attemptedDelegates[0] !== runtime.selectedDelegate
+    || (
+      runtime.activeDelegate === "CPU"
+      && runtime.providerSelection !== "explicit-before-execution"
+    )
   ) {
     throw new Error("전경 분리 실행 경로 영수증이 올바르지 않습니다.");
   }
-  const cpuFallback = runtime.activeDelegate === "CPU";
   return Object.freeze({
     providerId: "mediapipe-image-segmenter",
     providerVersion: "0.10.35",
     model: SELFIE_MODEL_RECEIPT,
     execution: "local-device",
     imageUpload: false,
-    preferredDelegate: "GPU",
-    attemptedDelegates: Object.freeze(
-      cpuFallback ? ["GPU", "CPU"] as const : ["GPU"] as const,
-    ),
+    selectedDelegate: runtime.selectedDelegate,
+    providerSelection: runtime.providerSelection,
+    attemptedDelegates: Object.freeze([
+      runtime.attemptedDelegates[0],
+    ]) as readonly [StudioLocalForegroundDelegate],
     activeDelegate: runtime.activeDelegate,
-    fallback: cpuFallback
-      ? Object.freeze({
-          from: "GPU",
-          to: "CPU",
-          reason: "gpu-initialization-failed",
-        } as const)
-      : null,
   });
 }
 
-async function loadMediaPipeRuntime(): Promise<StudioLocalForegroundSegmenterRuntime> {
+async function loadMediaPipeRuntime(
+  delegate: StudioLocalForegroundDelegate,
+  providerSelection: StudioMediaPipeVisionProviderSelection,
+): Promise<StudioLocalForegroundSegmenterRuntime> {
   const { FilesetResolver, ImageSegmenter } = await loadStudioMediaPipeVisionModule();
   const { fileset: vision } = await resolveStudioMediaPipeVisionWasmFileset({
     isSimdSupported: () => FilesetResolver.isSimdSupported(false),
   });
-  const create = (delegate: StudioLocalForegroundDelegate) =>
-    runStudioMediaPipeVisionTaskCreation({
-      owner: "foreground-image-segmenter",
-      create: () => ImageSegmenter.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: SELFIE_MODEL_URL,
-          delegate,
-        },
-        runningMode: "IMAGE",
-        outputCategoryMask: false,
-        outputConfidenceMasks: true,
-      }),
-    });
-
-  try {
-    const segmenter = await create("GPU");
-    return Object.freeze({
-      segmenter,
-      activeDelegate: "GPU",
-      gpuFallback: false,
-    });
-  } catch (gpuError) {
-    try {
-      const segmenter = await create("CPU");
-      return Object.freeze({
-        segmenter,
-        activeDelegate: "CPU",
-        gpuFallback: true,
-      });
-    } catch (cpuError) {
-      throw new AggregateError(
-        [gpuError, cpuError],
-        "MediaPipe GPU와 CPU 전경 분리기를 초기화하지 못했습니다.",
-        { cause: cpuError },
-      );
-    }
-  }
+  const segmenter = await runStudioMediaPipeVisionTaskCreation({
+    owner: "foreground-image-segmenter",
+    create: () => ImageSegmenter.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: SELFIE_MODEL_URL,
+        delegate,
+      },
+      runningMode: "IMAGE",
+      outputCategoryMask: false,
+      outputConfidenceMasks: true,
+    }),
+  });
+  return Object.freeze({
+    segmenter,
+    selectedDelegate: delegate,
+    activeDelegate: delegate,
+    providerSelection,
+    attemptedDelegates: Object.freeze([delegate]) as readonly [
+      StudioLocalForegroundDelegate,
+    ],
+  });
 }
 
-export function getStudioLocalForegroundSegmenterRuntime(): Promise<
+export interface StudioLocalForegroundRuntimeOptions {
+  /** Omission is the product-default GPU provider; CPU must be explicit before execution. */
+  readonly delegate?: StudioLocalForegroundDelegate;
+}
+
+export function getStudioLocalForegroundSegmenterRuntime(
+  options: StudioLocalForegroundRuntimeOptions = {},
+): Promise<
   StudioLocalForegroundSegmenterRuntime
 > {
-  if (segmenterPromise) return segmenterPromise;
-  segmenterPromise = loadMediaPipeRuntime().catch((error: unknown) => {
-    segmenterPromise = null;
+  const delegate = options.delegate ?? "GPU";
+  const providerSelection: StudioMediaPipeVisionProviderSelection =
+    options.delegate === undefined
+      ? "product-default-gpu"
+      : "explicit-before-execution";
+  const key = `${providerSelection}:${delegate}` as const;
+  const existing = segmenterPromises.get(key);
+  if (existing) return existing;
+  const pending = loadMediaPipeRuntime(delegate, providerSelection).catch((error: unknown) => {
+    if (segmenterPromises.get(key) === pending) segmenterPromises.delete(key);
     throw error;
   });
-  return segmenterPromise;
+  segmenterPromises.set(key, pending);
+  return pending;
 }
 
 function loadImage(
@@ -452,9 +469,30 @@ async function loadAndSegmentSource(
 export function createStudioLocalForegroundConfidenceProvider(
   options: CreateStudioLocalForegroundConfidenceProviderOptions = {},
 ): StudioLocalForegroundConfidenceProvider {
+  const selectedDelegate = options.delegate ?? "GPU";
+  const providerSelection: StudioMediaPipeVisionProviderSelection =
+    options.delegate === undefined
+      ? "product-default-gpu"
+      : "explicit-before-execution";
   const imageLoader = options.loadImage ?? loadImage;
-  const runtimeLoader =
-    options.loadRuntime ?? getStudioLocalForegroundSegmenterRuntime;
+  const loadSelectedRuntime = options.loadRuntime ?? (() => (
+    options.delegate === undefined
+      ? getStudioLocalForegroundSegmenterRuntime()
+      : getStudioLocalForegroundSegmenterRuntime({ delegate: selectedDelegate })
+  ));
+  const runtimeLoader: StudioLocalForegroundRuntimeLoader = async () => {
+    const runtime = await loadSelectedRuntime();
+    if (
+      runtime.selectedDelegate !== selectedDelegate
+      || runtime.activeDelegate !== selectedDelegate
+      || runtime.providerSelection !== providerSelection
+      || runtime.attemptedDelegates.length !== 1
+      || runtime.attemptedDelegates[0] !== selectedDelegate
+    ) {
+      throw new Error("선택한 전경 분리 delegate와 runtime identity가 일치하지 않습니다.");
+    }
+    return runtime;
+  };
   return Object.freeze({
     async getForegroundConfidenceMask(
       src: string,
@@ -561,7 +599,9 @@ export async function removeBackground(
     src,
     { signal: options.signal },
     loadImage,
-    getStudioLocalForegroundSegmenterRuntime,
+    () => options.delegate === undefined
+      ? getStudioLocalForegroundSegmenterRuntime()
+      : getStudioLocalForegroundSegmenterRuntime({ delegate: options.delegate }),
   );
   throwIfAborted(options.signal);
 

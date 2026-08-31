@@ -2,8 +2,9 @@
  * Studio Motion Export — 효과툰(모션툰)을 WebM 영상으로 내보내는 엔진(코미포 무빙툰 내보내기급).
  *
  * WebtoonFxPlayer(인앱 리더)의 연출 — 컷 리빌·강조·분위기 파티클·BGM — 을 오프스크린
- * 캔버스에 타임라인 리플레이하면서 canvas.captureStream() + MediaRecorder(webm; vp9→vp8
- * 폴백)로 실시간 인코딩한다. BGM은 Web Audio MediaStreamDestination으로 같은 스트림에 믹스.
+ * 캔버스에 타임라인 리플레이하면서 canvas.captureStream() + MediaRecorder로 실시간
+ * 인코딩한다. 작업 전에 지원되는 WebM MIME 하나를 확정하며 녹화 실패 뒤 다른 코덱으로
+ * 재실행하지 않는다. BGM은 Web Audio MediaStreamDestination으로 같은 스트림에 믹스.
  *
  * 구조는 두 층으로 나뉜다.
  * 1) 순수 타임라인 플래너(planMotionExport·frameSpecAt·포즈 보간) — DOM 무의존, 단위 테스트 대상.
@@ -331,14 +332,80 @@ export function motionFramePose(frame: MotionFrameSpec): MotionPose {
 
 // ── 인코딩 스펙(MIME/비트레이트/파일명) ──────────────────────────────
 
-// vp9 우선, 미지원이면 vp8, 최후엔 컨테이너만 지정(브라우저 기본 코덱).
+// 작업 전 capability preflight 순서. 인코딩을 시도하는 목록이 아니며 선택 뒤에는 바뀌지 않는다.
 export const MOTION_VIDEO_MIME_CANDIDATES = [
   "video/webm;codecs=vp9,opus",
   "video/webm;codecs=vp8,opus",
-  "video/webm",
 ] as const;
 
-/** 지원 판별 함수를 주입받아 첫 지원 MIME을 고른다(vp9→vp8 폴백). 없으면 null. 순수. */
+export type MotionVideoMime = (typeof MOTION_VIDEO_MIME_CANDIDATES)[number];
+
+export class MotionExportCodecUnavailableError extends Error {
+  readonly selectedMime: string;
+  readonly recorderMime: string;
+  readonly reason: "codec-identity" | "container-magic";
+
+  constructor(input: {
+    selectedMime: string;
+    recorderMime: string;
+    reason: "codec-identity" | "container-magic";
+  }) {
+    super(
+      input.reason === "codec-identity"
+        ? "선택한 WebM 코덱과 MediaRecorder의 실제 코덱 영수증이 일치하지 않아 저장하지 않았어요."
+        : "MediaRecorder 결과가 유효한 WebM 컨테이너가 아니어서 저장하지 않았어요.",
+    );
+    this.name = "MotionExportCodecUnavailableError";
+    this.selectedMime = input.selectedMime;
+    this.recorderMime = input.recorderMime;
+    this.reason = input.reason;
+  }
+}
+
+function normalizeMotionVideoMime(mime: string): MotionVideoMime | null {
+  const match = mime.trim().match(
+    /^video\/webm\s*;\s*codecs\s*=\s*["']?\s*(vp8|vp9)\s*,\s*opus\s*["']?\s*$/i,
+  );
+  if (!match) return null;
+  return match[1]?.toLowerCase() === "vp9"
+    ? "video/webm;codecs=vp9,opus"
+    : "video/webm;codecs=vp8,opus";
+}
+
+/** 선택 codec identity와 EBML/WebM magic이 모두 맞는 경우에만 최종 Blob을 만든다. */
+export async function materializeExactMotionWebm(
+  chunks: readonly Blob[],
+  selectedMime: string,
+  recorderMime: string,
+): Promise<Readonly<{ blob: Blob; mimeType: MotionVideoMime }>> {
+  const selected = normalizeMotionVideoMime(selectedMime);
+  const actual = normalizeMotionVideoMime(recorderMime);
+  if (!selected || actual !== selected) {
+    throw new MotionExportCodecUnavailableError({
+      selectedMime,
+      recorderMime,
+      reason: "codec-identity",
+    });
+  }
+  const blob = new Blob([...chunks], { type: actual });
+  const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+  if (
+    header.byteLength < 4
+    || header[0] !== 0x1a
+    || header[1] !== 0x45
+    || header[2] !== 0xdf
+    || header[3] !== 0xa3
+  ) {
+    throw new MotionExportCodecUnavailableError({
+      selectedMime,
+      recorderMime,
+      reason: "container-magic",
+    });
+  }
+  return Object.freeze({ blob, mimeType: actual });
+}
+
+/** 인코딩 전에 첫 지원 MIME 하나를 확정한다. 선택된 recorder 실패 시 이 함수를 재호출하지 않는다. */
 export function pickMotionVideoMime(isSupported: (mime: string) => boolean): string | null {
   for (const mime of MOTION_VIDEO_MIME_CANDIDATES) {
     if (isSupported(mime)) return mime;
@@ -591,6 +658,8 @@ export interface MotionCanvasLike {
 }
 
 export interface MotionRecorderLike {
+  /** MediaRecorder가 실제로 확정한 MIME/codec 영수증. */
+  readonly mimeType?: string;
   start(timesliceMs?: number): void;
   stop(): void;
   ondataavailable: ((event: { data: Blob }) => void) | null;
@@ -953,9 +1022,10 @@ async function runMotionExport(
     if (state.cancelled) throw new MotionExportCancelledError();
     if (recorderError) throw new Error("영상 인코딩 중 오류가 발생했어요. 다시 시도해주세요.");
     if (chunks.length === 0) throw new Error("녹화된 영상 데이터가 없어요. 다시 시도해주세요.");
+    const encoded = await materializeExactMotionWebm(chunks, mimeType, recorder.mimeType ?? "");
     return {
-      blob: new Blob(chunks, { type: mimeType }),
-      mimeType,
+      blob: encoded.blob,
+      mimeType: encoded.mimeType,
       durationSec: plan.durationSec,
       audio: audioState,
     };

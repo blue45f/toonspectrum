@@ -97,9 +97,12 @@ const SIMD128_PROBE_MODULE = new Uint8Array([
 export type StudioWasmAddressType = "i64" | "i32";
 export type StudioWasmRuntimeSelection =
   | "memory64"
-  | "memory32-fallback"
   | "memory32-requested"
   | "unavailable";
+export type StudioWasmExactRuntimeSelection = Exclude<
+  StudioWasmRuntimeSelection,
+  "unavailable"
+>;
 
 export type StudioWasmProbeFailureReason =
   | "webassembly-unavailable"
@@ -124,13 +127,15 @@ export interface StudioWasmAddressProbeReport {
 }
 
 export interface StudioWasm64CapabilityReport {
+  /** Exact provider selected before this capability check began. */
+  readonly requestedRuntime: StudioWasmExactRuntimeSelection;
   /** True only after validation, instantiation and a real one-page bigint grow. */
   readonly isWasm64Supported: boolean;
-  /** True only after the equivalent memory32 allocate/grow probe. */
-  readonly isWasm32FallbackSupported: boolean;
+  /** Reference evidence only; this never authorizes switching a Memory64 operation. */
+  readonly isWasm32ReferenceSupported: boolean;
   /** SIMD128 module validation result. */
   readonly isSimdSupported: boolean;
-  /** Which path should be selected when Memory64 is preferred. */
+  /** The requested provider when operational, otherwise unavailable. */
   readonly selectedRuntime: StudioWasmRuntimeSelection;
   readonly memory64: StudioWasmAddressProbeReport;
   readonly memory32: StudioWasmAddressProbeReport;
@@ -150,9 +155,14 @@ export interface StudioWasmCapabilityCheckOptions {
    * namespace.
    */
   readonly webAssembly?: typeof WebAssembly | null;
+  /** Defaults to the product Memory64 provider; Memory32 must be selected explicitly. */
+  readonly selectedMode?: StudioWasmAddressType;
 }
 
-let cachedDefaultCapabilityReport: StudioWasm64CapabilityReport | null = null;
+const cachedDefaultCapabilityReports = new Map<
+  StudioWasmAddressType,
+  StudioWasm64CapabilityReport
+>();
 
 interface StudioWasmMemoryLike {
   readonly buffer: ArrayBufferLike;
@@ -318,9 +328,11 @@ function probeAddressType(
 export function checkStudioWasm64Capability(
   options: StudioWasmCapabilityCheckOptions = {},
 ): StudioWasm64CapabilityReport {
+  const selectedMode = options.selectedMode ?? "i64";
   const usesDefaultHost = options.webAssembly === undefined;
-  if (usesDefaultHost && cachedDefaultCapabilityReport) {
-    return cachedDefaultCapabilityReport;
+  const cached = cachedDefaultCapabilityReports.get(selectedMode);
+  if (usesDefaultHost && cached) {
+    return cached;
   }
 
   const webAssembly = resolveWebAssembly(options.webAssembly);
@@ -336,15 +348,20 @@ export function checkStudioWasm64Capability(
     }
   }
 
-  const selectedRuntime: StudioWasmRuntimeSelection = memory64.operational
+  const requestedRuntime: StudioWasmExactRuntimeSelection = selectedMode === "i64"
     ? "memory64"
-    : memory32.operational
-      ? "memory32-fallback"
-      : "unavailable";
+    : "memory32-requested";
+  const requestedRuntimeOperational = selectedMode === "i64"
+    ? memory64.operational
+    : memory32.operational;
+  const selectedRuntime: StudioWasmRuntimeSelection = requestedRuntimeOperational
+    ? requestedRuntime
+    : "unavailable";
 
   const report = Object.freeze({
+    requestedRuntime,
     isWasm64Supported: memory64.operational,
-    isWasm32FallbackSupported: memory32.operational,
+    isWasm32ReferenceSupported: memory32.operational,
     isSimdSupported,
     selectedRuntime,
     memory64,
@@ -354,18 +371,12 @@ export function checkStudioWasm64Capability(
     wasm32AddressSpaceLimitGiB: 4,
   });
   if (usesDefaultHost) {
-    cachedDefaultCapabilityReport = report;
+    cachedDefaultCapabilityReports.set(selectedMode, report);
   }
   return report;
 }
 
-export type StudioWasmFallbackPolicy = "deny" | "memory32";
-
 export interface StudioWasmMemoryRuntimeOptions extends StudioWasmCapabilityCheckOptions {
-  /** Memory64 is the default and primary high-performance path. */
-  readonly preferredMode?: StudioWasmAddressType;
-  /** No silent fallback: callers must opt in to legacy memory32. */
-  readonly fallbackPolicy?: StudioWasmFallbackPolicy;
   /** Small by default; pages are committed only when explicitly requested. */
   readonly initialPages?: bigint;
   /**
@@ -706,39 +717,33 @@ export class StudioWasmLinearMemoryRuntime {
 }
 
 /**
- * Creates a bounded runtime. Memory64 is attempted first by default. A memory32
- * fallback only occurs when the caller explicitly requests it.
+ * Creates one bounded, preselected runtime. An unsupported or failed Memory64
+ * request never attempts Memory32 in the same operation.
  */
 export function createStudioWasmMemoryRuntime(
   options: StudioWasmMemoryRuntimeOptions = {},
 ): StudioWasmMemoryRuntimeResult {
+  const selectedMode = options.selectedMode ?? "i64";
   const capability = checkStudioWasm64Capability({
     webAssembly: options.webAssembly,
+    selectedMode,
   });
   const webAssembly = resolveWebAssembly(options.webAssembly);
   if (!webAssembly) {
     return { ok: false, reason: "webassembly-unavailable", capability };
   }
 
-  const preferredMode = options.preferredMode ?? "i64";
-  const fallbackPolicy = options.fallbackPolicy ?? "deny";
   let addressType: StudioWasmAddressType;
   let selection: Exclude<StudioWasmRuntimeSelection, "unavailable">;
 
-  if (preferredMode === "i64") {
+  if (selectedMode === "i64") {
     if (capability.isWasm64Supported) {
       addressType = "i64";
       selection = "memory64";
-    } else if (
-      fallbackPolicy === "memory32" &&
-      capability.isWasm32FallbackSupported
-    ) {
-      addressType = "i32";
-      selection = "memory32-fallback";
     } else {
       return { ok: false, reason: "memory64-unsupported", capability };
     }
-  } else if (capability.isWasm32FallbackSupported) {
+  } else if (capability.isWasm32ReferenceSupported) {
     addressType = "i32";
     selection = "memory32-requested";
   } else {

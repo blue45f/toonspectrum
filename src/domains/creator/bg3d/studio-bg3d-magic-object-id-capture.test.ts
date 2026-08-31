@@ -71,7 +71,7 @@ function input(
   createRuntime: (
     backend: StudioBg3dMagicBabylonBackend,
   ) => StudioBg3dRuntimeAdapter,
-  backends: readonly StudioBg3dMagicBabylonBackend[] = ["webgpu", "webgl2"],
+  backends: readonly StudioBg3dMagicBabylonBackend[] = ["webgpu"],
 ) {
   return {
     snapshot,
@@ -109,12 +109,11 @@ describe("captureStudioBg3dMagicObjectIds", () => {
       width: 3,
       height: 2,
       backend: "webgpu",
-      fallbackUsed: false,
       legend: [{ id: 1, stableId: "obj/selected", label: "Selected" }],
       attempts: [{ runtimeId: "babylon-webgpu-lab", outcome: "succeeded" }],
     });
     expect([...result.objectIds]).toEqual([0, 0, 0, 1, 0, 0]);
-    expect(request.createRuntime).toHaveBeenCalledTimes(2);
+    expect(request.createRuntime).toHaveBeenCalledTimes(1);
     for (const [factoryInput] of request.createRuntime.mock.calls) {
       expect(factoryInput.capabilities)
         .toBe(STUDIO_BG3D_MAGIC_OBJECT_ID_RUNTIME_CAPABILITIES);
@@ -144,10 +143,11 @@ describe("captureStudioBg3dMagicObjectIds", () => {
     source.data.fill(9);
     expect([...result.objectIds]).toEqual([0, 0, 0, 1, 0, 0]);
     expect(disposeWebGpu).toHaveBeenCalledOnce();
-    expect(disposeWebGl).toHaveBeenCalledOnce();
+    expect(disposeWebGl).not.toHaveBeenCalled();
   });
 
-  it("falls back atomically to WebGL2 only for an eligible WebGPU failure", async () => {
+  it("fails closed on an eligible WebGPU failure without constructing WebGL2", async () => {
+    const webGlRun = vi.fn(async () => successResult(3, 2));
     const request = input((backend) =>
       adapter(backend, async () => {
         if (backend === "webgpu") {
@@ -155,22 +155,31 @@ describe("captureStudioBg3dMagicObjectIds", () => {
             code: "engine-init-failed",
           });
         }
-        return successResult(3, 2);
+        return webGlRun();
       })
     );
 
-    const result = await captureStudioBg3dMagicObjectIds(request);
+    await expect(captureStudioBg3dMagicObjectIds(request)).rejects.toMatchObject({
+      code: "capture-failed",
+    });
+    expect(request.createRuntime).toHaveBeenCalledTimes(1);
+    expect(request.createRuntime).toHaveBeenCalledWith(expect.objectContaining({
+      backend: "webgpu",
+    }));
+    expect(webGlRun).not.toHaveBeenCalled();
+  });
 
-    expect(result.backend).toBe("webgl2");
-    expect(result.fallbackUsed).toBe(true);
-    expect(result.attempts).toEqual([
-      {
-        runtimeId: "babylon-webgpu-lab",
-        outcome: "failed",
-        errorCode: "engine-init-failed",
-      },
-      { runtimeId: "babylon-webgl-lab", outcome: "succeeded" },
-    ]);
+  it("runs WebGL2 when it is the one explicit backend", async () => {
+    const request = input(
+      (backend) => adapter(backend, async () => successResult(3, 2)),
+      ["webgl2"],
+    );
+    const result = await captureStudioBg3dMagicObjectIds(request);
+    expect(result).toMatchObject({
+      backend: "webgl2",
+      attempts: [{ runtimeId: "babylon-webgl-lab", outcome: "succeeded" }],
+    });
+    expect(request.createRuntime).toHaveBeenCalledTimes(1);
   });
 
   it("keeps unknown failures terminal instead of hiding them behind fallback", async () => {
@@ -192,7 +201,7 @@ describe("captureStudioBg3dMagicObjectIds", () => {
     expect(webGlRun).not.toHaveBeenCalled();
   });
 
-  it("fails closed on malformed dimensions, backend order, or returned artifact", async () => {
+  it("fails closed on malformed dimensions, multiple backends, or returned artifact", async () => {
     const valid = input((backend) => adapter(backend, async () => successResult(3, 2)));
     await expect(captureStudioBg3dMagicObjectIds({
       ...valid,
@@ -201,6 +210,10 @@ describe("captureStudioBg3dMagicObjectIds", () => {
     await expect(captureStudioBg3dMagicObjectIds({
       ...valid,
       backends: ["webgl2", "webgl2"],
+    })).rejects.toMatchObject({ code: "invalid-input" });
+    await expect(captureStudioBg3dMagicObjectIds({
+      ...valid,
+      backends: ["webgpu", "webgl2"],
     })).rejects.toMatchObject({ code: "invalid-input" });
 
     const malformed = input((backend) =>
@@ -231,7 +244,7 @@ describe("captureStudioBg3dMagicObjectIds", () => {
       signal: controller.signal,
     })).rejects.toMatchObject({ code: "aborted", name: "AbortError" });
     expect(disposers[0]).toHaveBeenCalledOnce();
-    expect(disposers[1]).toHaveBeenCalledOnce();
+    expect(disposers[1]).not.toHaveBeenCalled();
   });
 
   it("sizes every caller-owned canvas before constructing its runtime", async () => {
@@ -247,10 +260,6 @@ describe("captureStudioBg3dMagicObjectIds", () => {
 
     await captureStudioBg3dMagicObjectIds(request);
 
-    expect(canvasRecords).toHaveLength(2);
-    expect(canvasRecords).toEqual([
-      { width: 3, height: 2 },
-      { width: 3, height: 2 },
-    ]);
+    expect(canvasRecords).toEqual([{ width: 3, height: 2 }]);
   });
 });

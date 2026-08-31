@@ -94,7 +94,7 @@ export function bindStudioBg3dEditorLayoutViewModel(h) {
     DEFAULT_LT_USER_PRESET_DESCRIPTION, EMPTY_THREE_ANIMATION_CLIPS, EMPTY_THREE_JOINTS, EMPTY_THREE_MORPH_TARGETS,
     loadStudioBg3dBabylonSpecialistEntry, loadStudioBg3dModelThumbnailRuntime, LT_EXPORT_HEIGHTS, LT_TONE_MODE_LABELS,
     LT_TONE_PATTERN_LABELS, LT_TONE_TYPE_LABELS, SEMANTIC_MATERIAL_CONFIDENCE_LABELS, SEMANTIC_MATERIAL_SLOT_LABELS,
-    STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS, STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS, TRANSFORM_MODES, VIEW_EDITOR_SECTIONS,
+    STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS, TRANSFORM_MODES, VIEW_EDITOR_SECTIONS,
     VIEWPORT_BTN, StudioBg3dActionFooter, StudioBg3dDirectionalShadowLight, StudioBg3dImmersivePanel,
     StudioBg3dLtPanel, StudioBg3dMeasurementPanel, StudioBg3dMeasurementViewport, StudioBg3dPhysicsPanel,
     StudioBg3dPhysicsTransport, StudioBg3dPlacementPointerController, StudioBg3dRoomBuilderPanel, StudioBg3dSceneFog,
@@ -605,8 +605,8 @@ export function bindStudioBg3dEditorLayoutViewModel(h) {
 
   // 몰입형 브리지는 `WebGLRenderer.xr` 을 구동한다. WebGPU 세션에서 시작을 허용하면
   // `controller.start()` 가 WebGPU canvas 의 controller 로 네이티브 세션을 이미 요청한 뒤에야
-  // 엔진 정책이 WebGL2 를 latch 하고, 그 latch 가 canvasKey 를 바꿔 요청 중인 controller 를
-  // 파괴한다 — 아티스트의 첫 시도가 조용히 취소된다. 먼저 remount 한 뒤 start 를 부르는 것도
+  // 엔진 정책이 선택된 WebGPU 를 사용 불가로 만들고 Canvas 를 내리면서 요청 중인 controller 를
+  // 파괴한다 — 아티스트의 첫 시도가 조용히 취소된다. 먼저 엔진 선택을 바꾼 뒤 start 를 부르는 것도
   // 답이 아니다: 클릭의 user activation 이 그 사이에 사라진다. 그래서 시작 자체를 막고,
   // 무엇을 해야 하는지 말해 준다.
   const webXrDisabledReason = engineRuntime?.plan?.backend === "webgpu"

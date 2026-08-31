@@ -7,8 +7,8 @@
  * visibility/abort/revision authority, and applies the element opacity exactly once.
  *
  * Only explicitly versioned, causal `watercolor` and `ink-wash` snapshots opt in. Legacy
- * watercolor, gouache, erasers, shapes, malformed imports and every budget failure return an exact
- * fallback result so StudioDrawNode can retain its frozen dab renderer.
+ * watercolor, gouache, erasers, shapes, malformed imports and every budget failure are declared
+ * ineligible before rendering so StudioDrawNode can select its compatibility renderer up front.
  */
 
 import { parseStudioGpuColor } from "../render/studio-webgpu-color";
@@ -64,7 +64,7 @@ export interface StudioWetInkBrushReplayOptions {
   readonly phase: StudioWetInkBrushReplayPhase;
 }
 
-export type StudioWetInkBrushPlanFallbackReason =
+export type StudioWetInkBrushPlanUnavailableReason =
   | "unsupported-snapshot"
   | "invalid-geometry"
   | "invalid-style"
@@ -161,7 +161,7 @@ export type StudioWetInkBrushReplayPlanResult =
     }
   | {
       readonly ok: false;
-      readonly reason: StudioWetInkBrushPlanFallbackReason;
+      readonly reason: StudioWetInkBrushPlanUnavailableReason;
       readonly detail: string;
     };
 
@@ -234,7 +234,7 @@ export type StudioWetInkBrushRenderResult =
       readonly reason: "hidden" | "aborted" | "stale-revision";
     }
   | {
-      readonly status: "fallback";
+      readonly status: "unavailable";
       readonly reason:
         | "native-scale-unsupported"
         | "surface-budget"
@@ -301,7 +301,7 @@ export function studioWetInkBrushRuntimeSupportsElement(
 }
 
 function planFailure(
-  reason: StudioWetInkBrushPlanFallbackReason,
+  reason: StudioWetInkBrushPlanUnavailableReason,
   detail: string,
 ): StudioWetInkBrushReplayPlanResult {
   return { ok: false, reason, detail };
@@ -820,7 +820,7 @@ export function renderStudioWetInkBrushReplay(
     nativeScale === null
     || nativeScale > STUDIO_WET_INK_BRUSH_MAX_PHYSICAL_SCALE
   ) {
-    return { status: "fallback", reason: "native-scale-unsupported" };
+    return { status: "unavailable", reason: "native-scale-unsupported" };
   }
   const surfaceBytes = plan.uploads.reduce(
     (sum, upload) => sum + upload.width * upload.height * 4,
@@ -834,14 +834,14 @@ export function renderStudioWetInkBrushReplay(
     || maximumSurfaceBytes <= 0
     || surfaceBytes > maximumSurfaceBytes
   ) {
-    return { status: "fallback", reason: "surface-budget" };
+    return { status: "unavailable", reason: "surface-budget" };
   }
 
   const factory = options.surfaceFactory ?? defaultSurfaceFactory;
   const prepared = prepareUploads(plan.uploads, factory);
   if (!prepared) {
     return {
-      status: "fallback",
+      status: "unavailable",
       reason: options.surfaceFactory
         ? "surface-preparation-failed"
         : "surface-unavailable",
@@ -877,12 +877,12 @@ export function renderStudioWetInkBrushReplay(
     try {
       context.restore();
     } catch {
-      // The partial result keeps the exact fallback from double-painting an unknown prefix.
+      // The partial result prevents a second renderer from double-painting an unknown prefix.
     }
     releasePreparedUploads(prepared);
     return destinationStarted
       ? { status: "partial", reason: "destination-composite-failed" }
-      : { status: "fallback", reason: "surface-preparation-failed" };
+      : { status: "unavailable", reason: "surface-preparation-failed" };
   }
   releasePreparedUploads(prepared);
   return {

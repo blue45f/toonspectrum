@@ -3,12 +3,18 @@ import type { SceneIR, SceneNodeIR } from "@toonspectrum/studio-project-model";
 /**
  * Renderer Tournament (V12 §5).
  *
- * Candidates are never chosen by name: the tournament measures real render
+ * Evidence-only candidate comparison. It measures real render
  * timings per scene-complexity bucket, caches the winner per device, applies
  * hysteresis (<12% expected gain = no switch; never switch while pen-down),
  * verifies challengers through a visual equivalence gate, runs shadow renders
  * that can never affect production output, and gates promotion on evidence.
  * A remote kill switch removes a provider from candidacy immediately.
+ *
+ * This module never owns a product surface and cannot execute or replace a
+ * renderer. `winnerId` and `switched` describe a cached recommendation for
+ * QA/benchmark or an explicit future selection boundary only. Product code
+ * must not treat a tournament result as permission to retry a failed operation
+ * with another provider.
  */
 
 /* ------------------------------------------------------------------ */
@@ -1534,6 +1540,7 @@ export interface TournamentCandidate {
   render: () => Uint8Array;
 }
 
+/** `switched` means the evidence cache changed; no renderer is switched here. */
 export type TournamentDecision = "cached" | "cold-race" | "hysteresis-hold" | "switched";
 
 export interface RaceTiming {
@@ -1666,6 +1673,10 @@ function runColdRace(
   };
 }
 
+/**
+ * Runs a synchronous evidence tournament. The returned winner is advisory and
+ * must never replace a selected provider for an operation already in flight.
+ */
 export function runTournament(request: TournamentRequest): TournamentResult {
   const penDown = request.penDown ?? false;
   const hysteresis = request.hysteresis ?? new HysteresisPolicy();

@@ -67,6 +67,15 @@ interface StudioRevisionCompareNativeWorkerLike {
 }
 
 export type StudioRevisionCompareWorkerFactory = () => StudioRevisionCompareWorkerLike | null;
+export type StudioRevisionCompareExecutionBackend = "worker" | "direct";
+
+export interface StudioRevisionCompareRunOptions {
+  /** Fixed before projection/comparison begins. Browser product callers select `worker`. */
+  readonly executionBackend?: StudioRevisionCompareExecutionBackend;
+  readonly signal?: AbortSignal;
+  /** Test/platform seam for the selected Worker backend. */
+  readonly workerFactory?: StudioRevisionCompareWorkerFactory | null;
+}
 
 interface StudioRevisionCompareWorkerRequest {
   type: "studio-revision-compare/run";
@@ -380,12 +389,21 @@ function runDirect(
   throwIfAborted(signal);
   if (complexity.elements > STUDIO_REVISION_COMPARE_DIRECT_MAX_ELEMENTS) {
     throw new RangeError(
-      `이 브라우저는 버전 비교 Worker를 사용할 수 없어 직접 비교 안전 상한(${STUDIO_REVISION_COMPARE_DIRECT_MAX_ELEMENTS.toLocaleString("en-US")}개 요소)을 적용합니다.`
+      `선택한 direct 버전 비교는 안전 상한(${STUDIO_REVISION_COMPARE_DIRECT_MAX_ELEMENTS.toLocaleString("en-US")}개 요소)을 적용합니다.`
     );
   }
   const comparison = buildStudioServerRevisionComparison(input);
   throwIfAborted(signal);
   return comparison;
+}
+
+function revisionWorkerFailure(
+  message: string,
+  name = "StudioRevisionCompareWorkerError",
+): Error {
+  const error = new Error(message);
+  error.name = name;
+  return error;
 }
 
 function workerError(response: StudioRevisionCompareWorkerFailure): Error {
@@ -737,13 +755,15 @@ async function projectStudioRevisionComparisonInput(
 function runWithWorker(
   worker: StudioRevisionCompareWorkerLike,
   input: StudioServerRevisionComparisonInput,
-  complexity: StudioRevisionCompareInputComplexity,
   signal?: AbortSignal
 ): Promise<StudioServerRevisionComparison> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const timeout = setTimeout(() => {
-      finish(() => reject(new Error("버전 비교 시간이 너무 오래 걸려 중단했습니다.")));
+      finish(() => reject(revisionWorkerFailure(
+        "버전 비교 시간이 너무 오래 걸려 중단했습니다.",
+        "TimeoutError",
+      )));
     }, 30_000);
     const cleanup = () => {
       clearTimeout(timeout);
@@ -759,13 +779,6 @@ function runWithWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
-    const directFallback = () => finish(() => {
-      try {
-        resolve(runDirect(input, complexity, signal));
-      } catch (error) {
-        reject(error);
-      }
-    });
 
     worker.onmessage = (event) => {
       let response: StudioRevisionCompareWorkerResponse;
@@ -787,7 +800,9 @@ function runWithWorker(
     };
     worker.onerror = (event) => {
       event.preventDefault?.();
-      directFallback();
+      finish(() => reject(revisionWorkerFailure(
+        "버전 비교 Worker 실행에 실패했습니다.",
+      )));
     };
     signal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted) {
@@ -801,7 +816,9 @@ function runWithWorker(
         input,
       });
     } catch {
-      directFallback();
+      finish(() => reject(revisionWorkerFailure(
+        "버전 비교 Worker 요청을 시작하지 못했습니다.",
+      )));
     }
   });
 }
@@ -809,8 +826,12 @@ function runWithWorker(
 /** Runs the potentially large semantic comparison away from the canvas/UI main thread. */
 export async function runStudioRevisionComparison(
   input: StudioServerRevisionComparisonInput,
-  options: { signal?: AbortSignal; workerFactory?: StudioRevisionCompareWorkerFactory | null } = {}
+  options: StudioRevisionCompareRunOptions = {},
 ): Promise<StudioServerRevisionComparison> {
+  const executionBackend = options.executionBackend ?? "worker";
+  if (executionBackend !== "worker" && executionBackend !== "direct") {
+    throw new TypeError("버전 비교 실행 backend가 올바르지 않습니다.");
+  }
   throwIfAborted(options.signal);
   // Validate the raw graph before the projection itself allocates, then ensure no data:/blob:
   // resource string can cross the Worker boundary or diverge from projected server revisions.
@@ -818,19 +839,26 @@ export async function runStudioRevisionComparison(
   const projectedInput = await projectStudioRevisionComparisonInput(input);
   throwIfAborted(options.signal);
   assertStudioRevisionCompareInputComplexity(projectedInput);
+  if (executionBackend === "direct") {
+    return runDirect(projectedInput, complexity, options.signal);
+  }
   const factory = options.workerFactory === undefined
     ? createStudioRevisionCompareModuleWorker
     : options.workerFactory;
-  if (!factory) return runDirect(projectedInput, complexity, options.signal);
+  if (!factory) {
+    throw revisionWorkerFailure("버전 비교 Worker를 사용할 수 없습니다.");
+  }
 
   let worker: StudioRevisionCompareWorkerLike | null;
   try {
     worker = factory();
   } catch {
-    return runDirect(projectedInput, complexity, options.signal);
+    throw revisionWorkerFailure("버전 비교 Worker를 생성하지 못했습니다.");
   }
-  if (!worker) return runDirect(projectedInput, complexity, options.signal);
-  return runWithWorker(worker, projectedInput, complexity, options.signal);
+  if (!worker) {
+    throw revisionWorkerFailure("버전 비교 Worker를 사용할 수 없습니다.");
+  }
+  return runWithWorker(worker, projectedInput, options.signal);
 }
 
 export type {

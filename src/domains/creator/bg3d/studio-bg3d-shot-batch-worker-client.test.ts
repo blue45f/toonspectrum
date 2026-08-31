@@ -92,7 +92,10 @@ async function validLegacyArchive(): Promise<Blob> {
   return buildStudioPackageArchiveBlob([
     { path: "manifest.json", data: new TextEncoder().encode(JSON.stringify(manifest, null, 2)) },
     { path: "shots/001.png", data: PNG_BYTES },
-  ], { mimeType: "application/zip" });
+  ], {
+    mimeType: "application/zip",
+    crc32ExecutionMode: "direct-headless",
+  });
 }
 
 function image() {

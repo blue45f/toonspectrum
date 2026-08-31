@@ -13,7 +13,7 @@ import type { ModeledSampleIR, StabilizerGraphIR } from "@toonspectrum/studio-pr
  * - "ema" / "spring" — the shipped first-party lanes, delegating verbatim to
  *   ./stabilizer.ts (ADR 0005).
  * - "ink-stroke-modeler" — the quarantined Google Ink wasm lane, delegating
- *   to ./ink-modeler.ts. Opt-in only (ADR-0009 fallback principle): selecting
+ *   to ./ink-modeler.ts. Opt-in only (ADR-0009 explicit-selection principle): selecting
  *   it requires `allowInk: true`, and processing requires a preloaded wasm
  *   modeler injected by the host — this module never loads wasm itself and
  *   stays pure/synchronous.
@@ -69,7 +69,7 @@ export interface StabilizerBackend {
 
 export interface SelectStabilizerBackendOptions {
   /**
-   * ADR-0009 fallback principle: the ink lane must be explicitly opted into.
+   * ADR-0009 explicit-selection principle: the ink lane must be explicitly opted into.
    * First-party lanes ignore this flag.
    */
   allowInk?: boolean;
@@ -97,7 +97,7 @@ export function selectStabilizerBackend(
     if (options?.allowInk !== true) {
       throw new StabilizerProviderError(
         'stabilizer backend "ink-stroke-modeler" is quarantined opt-in (ADR-0009 ' +
-          "fallback principle / ADR-0011 lane 3) — pass { allowInk: true } to select it",
+          "explicit-selection principle / ADR-0011 lane 3) — pass { allowInk: true } to select it",
       );
     }
     return createInkBackend(options.inkModeler);

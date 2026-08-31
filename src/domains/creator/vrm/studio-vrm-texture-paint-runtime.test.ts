@@ -1798,6 +1798,11 @@ describe("Studio VRM texture-paint runtime", () => {
     });
 
     await vi.waitFor(() => expect(precomputeGeometryIndex).toHaveBeenCalledTimes(1));
+    expect(precomputeGeometryIndex).toHaveBeenNthCalledWith(
+      1,
+      mesh.geometry,
+      expect.objectContaining({ executionBackend: "worker" }),
+    );
     expect(uvAttributes).toEqual(["uv"]);
     expect(activeJobs).toBe(1);
     releases[0]?.();
@@ -1988,7 +1993,7 @@ describe("Studio VRM texture-paint runtime", () => {
     material.dispose();
   });
 
-  it("preserves synchronous island parity for small meshes when prewarm is unavailable", async () => {
+  it("keeps face-local painting without synchronous topology when Worker prewarm fails", async () => {
     const scene = new THREE.Group();
     const source = new THREE.Texture();
     const { mesh, material } = meshWithMap(source);
@@ -2017,11 +2022,11 @@ describe("Studio VRM texture-paint runtime", () => {
     }));
     unwrap(runtime.moveStroke({
       pointerId: 709,
-      hit: hit(mesh, 0.9, 0.9, 0, 1),
+      hit: hit(mesh, 0.9, 0.9, 0, 0),
     }));
     expect(canvas.canvases[0]!.frame[(16 * 32 + 16) * 4 + 3]).toBeGreaterThan(0);
-    expect(positionRead).toHaveBeenCalled();
-    expect(uvRead).toHaveBeenCalled();
+    expect(positionRead).not.toHaveBeenCalled();
+    expect(uvRead).not.toHaveBeenCalled();
     unwrap(runtime.cancelStroke(709));
     runtime.dispose();
     mesh.geometry.dispose();
@@ -2036,6 +2041,9 @@ describe("Studio VRM texture-paint runtime", () => {
       source.repeat.set(repeatX, 1);
       source.center.set(0.5, 0.5);
       const { mesh } = meshWithMap(source);
+      expect(getStudioVrmTextureGeometryIndex(mesh.geometry, {
+        maxTriangles: STUDIO_VRM_TEXTURE_PAINT_STANDARD_GEOMETRY_MAX_TRIANGLES,
+      })).not.toBeNull();
       scene.add(mesh);
       const canvas = canvasHarness();
       const runtime = createStudioVrmTexturePaintRuntime(scene, {

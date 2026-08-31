@@ -7,6 +7,18 @@ import {
   type SceneNodeIR,
 } from "@toonspectrum/studio-project-model";
 
+import { drawBounds } from "../brush/studio-draw-rendering";
+import {
+  effectiveCornerRadius,
+  lineArrowHeadGeoms,
+  normalizeShapeParams,
+  normalizeStrokeStyle,
+  polygonPathPointsInBounds,
+  starPathPoints,
+  type StrokeLineCap,
+} from "../brush/studio-stroke-shapes";
+import { containingPanel } from "../studio-element-geometry";
+
 import {
   placeStudioLineSegment,
   planStudioFocusLineSegments,
@@ -16,14 +28,15 @@ import {
   type StudioLineSegment,
 } from "./studio-radial-line-geometry";
 
-import type { El } from "../studio-element-model";
+import type { DrawEl, El } from "../studio-element-model";
 
 /**
  * Lower the product element model into a V13 RenderSceneIR.
  *
- * Vello owns only path-heavy vector chrome (frames, focus/speed lines).
- * Freehand brushes stay on Konva / raster WebGPU — flattening them to a
- * single polyline would erase pressure, wash, stamp, and media appearance.
+ * Vello owns path-heavy vector chrome plus a deliberately narrow set of clean
+ * geometric DrawEl shapes. Freehand/media brushes and styled shape variants
+ * stay on the explicit legacy renderer boundary — flattening them would erase
+ * pressure, wash, pattern, sketch, dash, mask, or blend semantics.
  */
 
 export interface StudioDocumentLowerOptions {
@@ -37,8 +50,8 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-export function parseCssColorToIR(value: string | undefined, fallback: ColorIR): ColorIR {
-  if (!value) return fallback;
+export function parseSupportedCssColorToIR(value: string | undefined): ColorIR | null {
+  if (!value) return null;
   const trimmed = value.trim();
   if (trimmed === "transparent") return { r: 0, g: 0, b: 0, a: 0 };
   const hex = trimmed.startsWith("#") ? trimmed.slice(1) : null;
@@ -57,6 +70,10 @@ export function parseCssColorToIR(value: string | undefined, fallback: ColorIR):
   }
   const rgb = trimmed.match(/^rgba?\((.+)\)$/u);
   if (rgb?.[1]) {
+    // Percentage channels need CSS Color parsing semantics (including a percentage alpha).
+    // Treat them as unsupported until the shared color parser can preserve those semantics;
+    // Number("50%") would otherwise silently turn a valid authored color into the wrong pixels.
+    if (rgb[1].includes("%")) return null;
     const parts = rgb[1].split(/[\s,/]+/u).filter(Boolean).map(Number);
     if (parts.length >= 3 && parts.every(Number.isFinite)) {
       return {
@@ -67,7 +84,11 @@ export function parseCssColorToIR(value: string | undefined, fallback: ColorIR):
       };
     }
   }
-  return fallback;
+  return null;
+}
+
+export function parseCssColorToIR(value: string | undefined, fallback: ColorIR): ColorIR {
+  return parseSupportedCssColorToIR(value) ?? fallback;
 }
 
 function pairs(points: readonly number[]): Array<readonly [number, number]> {
@@ -88,6 +109,61 @@ function rectPath(x: number, y: number, width: number, height: number) {
     ],
     true,
   );
+}
+
+function roundedRectPath(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): PathIR {
+  const safeWidth = Math.max(0.1, Math.abs(width));
+  const safeHeight = Math.max(0.1, Math.abs(height));
+  const r = effectiveCornerRadius(safeWidth, safeHeight, radius);
+  if (r <= 0) return rectPath(x, y, safeWidth, safeHeight);
+  const right = x + safeWidth;
+  const bottom = y + safeHeight;
+  const kappa = 0.5522847498307936;
+  const control = r * kappa;
+  return {
+    verbs: [
+      { v: "M", x: x + r, y },
+      { v: "L", x: right - r, y },
+      { v: "C", c1x: right - r + control, c1y: y, c2x: right, c2y: y + r - control, x: right, y: y + r },
+      { v: "L", x: right, y: bottom - r },
+      { v: "C", c1x: right, c1y: bottom - r + control, c2x: right - r + control, c2y: bottom, x: right - r, y: bottom },
+      { v: "L", x: x + r, y: bottom },
+      { v: "C", c1x: x + r - control, c1y: bottom, c2x: x, c2y: bottom - r + control, x, y: bottom - r },
+      { v: "L", x, y: y + r },
+      { v: "C", c1x: x, c1y: y + r - control, c2x: x + r - control, c2y: y, x: x + r, y },
+      { v: "Z" },
+    ],
+  };
+}
+
+function ellipsePath(x: number, y: number, width: number, height: number): PathIR {
+  const safeWidth = Math.max(0.1, Math.abs(width));
+  const safeHeight = Math.max(0.1, Math.abs(height));
+  const cx = x + safeWidth / 2;
+  const cy = y + safeHeight / 2;
+  const rx = safeWidth / 2;
+  const ry = safeHeight / 2;
+  const kappa = 0.5522847498307936;
+  return {
+    verbs: [
+      { v: "M", x: cx, y: cy - ry },
+      { v: "C", c1x: cx + rx * kappa, c1y: cy - ry, c2x: cx + rx, c2y: cy - ry * kappa, x: cx + rx, y: cy },
+      { v: "C", c1x: cx + rx, c1y: cy + ry * kappa, c2x: cx + rx * kappa, c2y: cy + ry, x: cx, y: cy + ry },
+      { v: "C", c1x: cx - rx * kappa, c1y: cy + ry, c2x: cx - rx, c2y: cy + ry * kappa, x: cx - rx, y: cy },
+      { v: "C", c1x: cx - rx, c1y: cy - ry * kappa, c2x: cx - rx * kappa, c2y: cy - ry, x: cx, y: cy - ry },
+      { v: "Z" },
+    ],
+  };
+}
+
+function flatPointsPath(points: readonly number[], closed = false): PathIR {
+  return polylineToPath(pairs(points), closed);
 }
 
 function fillNode(
@@ -113,6 +189,8 @@ function strokeNode(
   color: ColorIR,
   width: number,
   opacity: number,
+  cap: StrokeLineCap = "round",
+  join: "round" | "miter" | "bevel" = "round",
 ): SceneNodeIR {
   return {
     id,
@@ -120,22 +198,215 @@ function strokeNode(
     path,
     paint: { kind: "solid", color },
     strokeWidth: Math.max(0.5, width),
-    cap: "round",
-    join: "round",
+    cap,
+    join,
     miterLimit: 4,
     opacity,
     blend: "src-over",
   };
 }
 
+const STUDIO_VELLO_GEOMETRIC_DRAW_KINDS = new Set<NonNullable<DrawEl["kind"]>>([
+  "line",
+  "rect",
+  "ellipse",
+  "triangle",
+  "polygon",
+  "star",
+  "arrow",
+]);
+
+function hasFiniteShapePoints(points: readonly number[]): boolean {
+  return points.length >= 4
+    && points.length % 2 === 0
+    && points.every((value) => Number.isFinite(value));
+}
+
+function hasDrawableSegment(points: readonly number[]): boolean {
+  for (let index = 2; index + 1 < points.length; index += 2) {
+    if (points[index] !== points[index - 2] || points[index + 1] !== points[index - 1]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasDrawableFinalSegment(points: readonly number[]): boolean {
+  const end = points.length - 2;
+  return end >= 2
+    && (points[end] !== points[end - 2] || points[end + 1] !== points[end - 1]);
+}
+
+/**
+ * Fail-closed admission for the first product DrawEl slice. The admitted
+ * shapes use only geometry and solid src-over paint that PathIR can preserve.
+ */
+export function isStudioVelloDocumentGeometricDrawElement(
+  element: El,
+): element is DrawEl & El {
+  if (element.type !== "draw") return false;
+  const kind = element.kind;
+  if (!kind || !STUDIO_VELLO_GEOMETRIC_DRAW_KINDS.has(kind)) return false;
+  if (element.mode === "eraser" || !hasFiniteShapePoints(element.points)) return false;
+  if ((kind === "line" || kind === "arrow") && !hasDrawableSegment(element.points)) return false;
+  if (kind === "arrow" && !hasDrawableFinalSegment(element.points)) return false;
+  if (!Number.isFinite(element.strokeWidth) || element.strokeWidth <= 0) return false;
+  if (element.opacity !== undefined && !Number.isFinite(element.opacity)) return false;
+  if (element.gradient || element.pattern || element.sketch?.enabled === true) return false;
+  if (element.symmetry && element.symmetry.type !== "none") return false;
+  if (element.paintModel !== undefined) return false;
+  if (element.maskEnabled || element.maskSrc || element.clipBelow || element.alphaLocked) return false;
+  if (element.blendMode && element.blendMode !== "source-over") return false;
+
+  const style = normalizeStrokeStyle(element.strokeStyle);
+  if (style.dash !== "solid") return false;
+  const stroke = parseSupportedCssColorToIR(element.stroke);
+  if (!stroke) return false;
+  const fill = element.fill ? parseSupportedCssColorToIR(element.fill) : null;
+  if (element.fill && !fill) return false;
+  if (kind === "line" || kind === "arrow") return stroke.a > 0;
+  return stroke.a > 0 || (fill?.a ?? 0) > 0;
+}
+
+function geometricDrawNodes(element: DrawEl & El, opacity: number): RenderNodeIR[] {
+  const kind = element.kind!;
+  const style = normalizeStrokeStyle(element.strokeStyle);
+  const shape = normalizeShapeParams(element.shapeParams);
+  const strokeWidth = Math.max(1, element.strokeWidth);
+  const stroke = parseSupportedCssColorToIR(element.stroke)!;
+  const fill = element.fill ? parseSupportedCssColorToIR(element.fill) : null;
+  const box = drawBounds(element.points);
+  let path: PathIR;
+
+  if (kind === "rect") {
+    path = roundedRectPath(box.x, box.y, box.width, box.height, shape.cornerRadius);
+  } else if (kind === "ellipse") {
+    path = ellipsePath(box.x, box.y, box.width, box.height);
+  } else if (kind === "star") {
+    const size = Math.max(0.1, Math.min(box.width, box.height));
+    path = flatPointsPath(starPathPoints(
+      box.x + box.width / 2,
+      box.y + box.height / 2,
+      size / 2,
+      shape,
+    ), true);
+  } else if (kind === "triangle" || kind === "polygon") {
+    path = flatPointsPath(polygonPathPointsInBounds(
+      box.x,
+      box.y,
+      box.width,
+      box.height,
+      kind === "triangle" ? 3 : shape.polygonSides,
+    ), true);
+  } else {
+    path = flatPointsPath(element.points);
+  }
+
+  const nodes: RenderNodeIR[] = [];
+  if (kind !== "line" && kind !== "arrow" && fill && fill.a > 0) {
+    nodes.push(fillNode(`${element.id}:fill`, path, fill, opacity));
+  }
+  if (stroke.a > 0) {
+    nodes.push(strokeNode(
+      `${element.id}:stroke`,
+      path,
+      stroke,
+      strokeWidth,
+      opacity,
+      style.lineCap,
+      kind === "arrow" ? "miter" : "round",
+    ));
+  }
+
+  if (kind === "line") {
+    for (const [index, head] of lineArrowHeadGeoms(element.points, style, strokeWidth).entries()) {
+      const headPath = head.kind === "dot"
+        ? ellipsePath(head.cx - head.r, head.cy - head.r, head.r * 2, head.r * 2)
+        : flatPointsPath(head.points, true);
+      nodes.push(fillNode(`${element.id}:head-${index}`, headPath, stroke, opacity));
+    }
+  } else if (kind === "arrow" && element.points.length >= 4) {
+    const end = element.points.length - 2;
+    const x = element.points[end]!;
+    const y = element.points[end + 1]!;
+    const previousX = element.points[end - 2]!;
+    const previousY = element.points[end - 1]!;
+    const angle = Math.atan2(y - previousY, x - previousX);
+    const pointer = Math.max(8, strokeWidth * 2);
+    const baseX = x - pointer * Math.cos(angle);
+    const baseY = y - pointer * Math.sin(angle);
+    const perpendicularX = (pointer / 2) * Math.cos(angle + Math.PI / 2);
+    const perpendicularY = (pointer / 2) * Math.sin(angle + Math.PI / 2);
+    const headPath = flatPointsPath([
+      x,
+      y,
+      baseX + perpendicularX,
+      baseY + perpendicularY,
+      baseX - perpendicularX,
+      baseY - perpendicularY,
+    ], true);
+    nodes.push(fillNode(`${element.id}:head-fill`, headPath, stroke, opacity));
+    nodes.push(strokeNode(
+      `${element.id}:head-stroke`,
+      headPath,
+      stroke,
+      strokeWidth,
+      opacity,
+      style.lineCap,
+      "miter",
+    ));
+  }
+  return nodes;
+}
+
 /**
  * True when the element is authored as a Vello-safe vector island.
  * Brush strokes, images, and lettering stay with Konva / raster providers.
  */
+export function isStudioVelloDocumentRadialLineElement(element: El): boolean {
+  if (element.type !== "focusLines" && element.type !== "speedLines") return false;
+  const numbers = [
+    element.x,
+    element.y,
+    element.width,
+    element.height,
+    element.lineCount,
+    element.strokeWidth,
+    element.rotation,
+    element.opacity ?? 1,
+    ...(element.type === "focusLines"
+      ? [
+          element.innerRadius,
+          element.outerRadius,
+          element.noise,
+          element.centerXRatio ?? STUDIO_FOCUS_LINE_DEFAULTS.centerXRatio,
+          element.centerYRatio ?? STUDIO_FOCUS_LINE_DEFAULTS.centerYRatio,
+        ]
+      : [element.noise ?? 0]),
+  ];
+  if (
+    numbers.some((value) => !Number.isFinite(value))
+    || element.width <= 0
+    || element.height <= 0
+    || element.lineCount < 0
+    || element.strokeWidth <= 0
+  ) return false;
+  if (!parseSupportedCssColorToIR(
+    element.stroke
+      ?? (element.type === "focusLines"
+        ? STUDIO_FOCUS_LINE_DEFAULTS.stroke
+        : STUDIO_SPEED_LINE_DEFAULTS.stroke),
+  )) return false;
+  if (element.blendMode && element.blendMode !== "source-over") return false;
+  if (element.maskEnabled || element.maskSrc || element.clipBelow || element.alphaLocked) {
+    return false;
+  }
+  return true;
+}
+
 export function isStudioVelloDocumentVectorElement(element: El): boolean {
-  return element.type === "frame"
-    || element.type === "focusLines"
-    || element.type === "speedLines";
+  return isStudioVelloDocumentRadialLineElement(element)
+    || isStudioVelloDocumentGeometricDrawElement(element);
 }
 
 /**
@@ -149,16 +420,16 @@ export function studioDocumentAllowsKonvaHide(
   if (ownedDocumentIds.length === 0) return false;
   const owned = new Set(ownedDocumentIds);
   for (const element of elements) {
-    if (element.hidden) continue;
+    if (element.hidden || (element.opacity ?? 1) <= 0) continue;
+    if (!isStudioVelloDocumentVectorElement(element)) return false;
+    // Konva clips non-frame vector content whose centre belongs to a frame.
+    // This first Vello slice intentionally has no clip stack, so such pages
+    // remain legacy regardless of which supported vector kind is inside.
     if (
-      element.type === "draw"
-      || element.type === "image"
-      || element.type === "text"
-      || element.type === "bubble"
-      || element.type === "sticker"
-    ) {
-      return false;
-    }
+      element.type !== "frame"
+      && isStudioVelloDocumentVectorElement(element)
+      && containingPanel(element, elements)
+    ) return false;
     if (isStudioVelloDocumentVectorElement(element) && !owned.has(element.id)) {
       return false;
     }
@@ -184,9 +455,11 @@ function lineSegmentNodes(
   },
   segments: readonly StudioLineSegment[],
   fallbackStrokeWidth: number,
+  fallbackStroke: string,
   opacity: number,
 ): RenderNodeIR[] {
-  const color = parseCssColorToIR(element.stroke, { r: 0, g: 0, b: 0, a: 1 });
+  const color = parseSupportedCssColorToIR(element.stroke ?? fallbackStroke);
+  if (!color) return [];
   const placement = { x: element.x, y: element.y, rotationDeg: element.rotation };
   const width = element.strokeWidth ?? fallbackStrokeWidth;
   return segments.map((segment, index) => {
@@ -197,6 +470,7 @@ function lineSegmentNodes(
       color,
       width,
       opacity,
+      "butt",
     );
   });
 }
@@ -221,9 +495,9 @@ function lowerElement(element: El): RenderNodeIR[] {
       return nodes;
     }
     case "draw":
-      // Brush/media strokes and even geometric draw-nodes keep Konva appearance
-      // (pressure, wash, stamp, sketch, gradient, pattern). Do not polyline them.
-      return [];
+      return isStudioVelloDocumentGeometricDrawElement(element)
+        ? geometricDrawNodes(element, opacity)
+        : [];
     // Focus/speed lines share ONE planner with the Konva nodes, the SVG
     // exporter, and page thumbnails. Do not reimplement the geometry here — a
     // GPU-vs-CPU pixel gate cannot see a geometry divergence, because both
@@ -233,6 +507,7 @@ function lowerElement(element: El): RenderNodeIR[] {
         element,
         planStudioFocusLineSegments(element),
         STUDIO_FOCUS_LINE_DEFAULTS.strokeWidth,
+        STUDIO_FOCUS_LINE_DEFAULTS.stroke,
         opacity,
       );
     case "speedLines":
@@ -240,6 +515,7 @@ function lowerElement(element: El): RenderNodeIR[] {
         element,
         planStudioSpeedLineSegments(element),
         STUDIO_SPEED_LINE_DEFAULTS.strokeWidth,
+        STUDIO_SPEED_LINE_DEFAULTS.stroke,
         opacity,
       );
     case "text":

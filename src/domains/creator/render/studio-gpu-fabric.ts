@@ -47,7 +47,7 @@ export interface StudioGpuDeviceLease {
   readonly device: GPUDevice;
   /** lease 가 속한 디바이스 epoch. */
   readonly epoch: number;
-  /** true 면 이 디바이스는 손실됐다 — 보유자는 즉시 폴백해야 한다. */
+  /** true 면 이 디바이스는 손실됐고 선택한 작업은 마지막 정상 상태를 유지해야 한다. */
   readonly lost: boolean;
   /** release 후 true. release 는 멱등이다. */
   readonly released: boolean;
@@ -213,7 +213,7 @@ function mintLease(state: FabricState): StudioGpuDeviceLease {
 }
 
 /**
- * 공유 GPUDevice lease 획득 — 미지원/실패/획득 중 dispose 는 전부 null(호출부 CPU 폴백).
+ * 공유 GPUDevice lease 획득 — 미지원/실패/획득 중 dispose 는 전부 null(선택 경로 unavailable).
  * 살아있는 디바이스가 있으면 새 lease 로 공유하고, 없으면 한 번만 생성한다(동시 호출은
  * 같은 생성을 기다린다).
  */
@@ -309,7 +309,7 @@ let fabricFilterAcquisition: Promise<StudioGpuFilterRuntime | null> | null = nul
  * fabric 디바이스 위에 올린 공유 필터 런타임 획득. 파이프라인/버퍼 풀 캐시를 가진
  * 런타임 싱글턴을 fabric 이 소유한다 — 반환된 런타임의 dispose() 는 lease 해제일 뿐
  * 공유 디바이스를 파괴하지 않으므로 호출해도 안전하지만, 통상 호출부는 그대로 쓰면 된다.
- * 실패/loss 시 null — 호출부는 CPU 폴백. (호출부 컷오버 전까지 기존
+ * 실패/loss 시 null — 선택한 GPU 작업은 마지막 정상 화면을 유지하고 닫힌다. (기존
  * acquireStudioGpuFilterRuntime() 무옵션 경로와 공존한다 — 모듈 헤더의 공유 계약 참조.)
  */
 export async function acquireStudioGpuFilterRuntimeOnFabric(

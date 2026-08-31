@@ -14,7 +14,7 @@ import {
   STUDIO_BG3D_SHOT_BATCH_ARCHIVE_PROFILE_V1,
   STUDIO_BG3D_SHOT_BATCH_CONTACT_SHEET_PROFILE_V1,
   STUDIO_BG3D_SHOT_BATCH_DEPTH_ENCODING_V1,
-  buildStudioBg3dShotBatchArchive,
+  buildStudioBg3dShotBatchArchive as buildStudioBg3dShotBatchArchiveWithBackend,
   createStudioBg3dShotBatchPublicRenderPlan,
   isStudioBg3dShotBatchManifestContext,
   projectStudioBg3dShotBatchPlanForPublicArchive,
@@ -27,6 +27,16 @@ import {
   type StudioBg3dShotBatchPlan,
 } from "./studio-bg3d-shot-batch-plan";
 import { buildStudioBg3dShotLayeredPsd } from "./studio-bg3d-shot-psd";
+
+function buildStudioBg3dShotBatchArchive(
+  images: Parameters<typeof buildStudioBg3dShotBatchArchiveWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioBg3dShotBatchArchiveWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioBg3dShotBatchArchiveWithBackend> {
+  return buildStudioBg3dShotBatchArchiveWithBackend(images, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 const PNG_CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -525,7 +535,7 @@ describe("Studio BG3D shot batch archive", () => {
       wasReduced: true,
       png: new Blob([pngHeader(1_920, 1_080)], { type: "image/png" }),
     }], {
-      allowLargeDirectArchiveCrcInHeadless: true,
+      crc32ExecutionMode: "direct-headless",
       manifest: {
         shots: [{ id: "shot-a", name: "첫 컷" }],
         requestedPasses: ["beauty"],
@@ -577,7 +587,7 @@ describe("Studio BG3D shot batch archive", () => {
       { ...image("shot-a", "첫 컷"), pass: "lt-composite" },
       { ...image("shot-b", "둘째 컷"), pass: "lt-composite" },
     ], {
-      allowLargeDirectArchiveCrcInHeadless: true,
+      crc32ExecutionMode: "direct-headless",
       contactSheets: [{
         sheetNumber: 1,
         fileName: "contact-sheet-001.png",

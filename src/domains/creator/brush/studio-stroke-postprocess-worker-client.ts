@@ -30,6 +30,7 @@ export type StudioStrokePostprocessWorkerClientErrorCode =
   | "post-failed"
   | "protocol"
   | "timeout"
+  | "worker-unavailable"
   | "worker-failed";
 
 export class StudioStrokePostprocessWorkerClientError extends Error {
@@ -171,14 +172,6 @@ function directResult(
   };
 }
 
-function workerUnavailablePlan(plan: StudioStrokePostprocessPlan): StudioStrokePostprocessPlan {
-  return {
-    ...plan,
-    kind: "direct",
-    reason: "worker-unavailable",
-  };
-}
-
 function safely(callback: () => void): void {
   try {
     callback();
@@ -249,19 +242,30 @@ export class StudioStrokePostprocessWorkerClient {
       if (plan.reason === "worker-worthy") {
         return Promise.reject(createClientError("protocol", "Direct 획 후보정 계획의 이유가 올바르지 않습니다."));
       }
+      if (plan.reason === "worker-unavailable") {
+        return Promise.reject(createClientError(
+          "worker-unavailable",
+          "획 후보정 Worker를 사용할 수 없어 원본 획을 유지합니다.",
+        ));
+      }
       return Promise.resolve(directResult(points, plan, options, plan.reason));
     }
 
     let worker: StudioStrokePostprocessWorkerLike | null;
     try {
       worker = this.#workerFactory?.() ?? null;
-    } catch {
-      const fallbackPlan = workerUnavailablePlan(plan);
-      return Promise.resolve(directResult(points, fallbackPlan, options, "worker-unavailable"));
+    } catch (error) {
+      return Promise.reject(createClientError(
+        "worker-unavailable",
+        "획 후보정 Worker를 만들지 못해 원본 획을 유지합니다.",
+        error,
+      ));
     }
     if (!worker) {
-      const fallbackPlan = workerUnavailablePlan(plan);
-      return Promise.resolve(directResult(points, fallbackPlan, options, "worker-unavailable"));
+      return Promise.reject(createClientError(
+        "worker-unavailable",
+        "획 후보정 Worker를 사용할 수 없어 원본 획을 유지합니다.",
+      ));
     }
 
     const requestId = this.#allocateRequestId();
@@ -411,7 +415,7 @@ export interface PostprocessStudioStrokePointsOptions
   extends StudioStrokePostprocessWorkerClientOptions,
     StudioStrokePostprocessRunOptions {}
 
-/** One-shot integration helper. The result records whether Worker or explicit direct fallback ran. */
+/** One-shot integration helper. The result records the Worker or direct backend selected up front. */
 export async function postprocessStudioStrokePoints(
   points: readonly number[],
   strength: number,

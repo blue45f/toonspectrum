@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { openStudioLocalDatabase } from "../studio-local-database";
 import { StudioLocalDatabaseCommitOutcomeUnknownError } from "../studio-local-database-commit-outcome";
@@ -30,6 +30,8 @@ import {
   updateStudioBg3dAssetFavorite,
 } from "./studio-bg3d-asset-metadata-store";
 import { STUDIO_BG3D_GLB_MIME_TYPE } from "./studio-bg3d-glb-validation";
+import { disposeSharedStudioBg3dValidationWorker } from "./studio-bg3d-glb-validation-worker-client";
+import { StudioBg3dValidationWorkerTestFixture } from "./studio-bg3d-glb-validation-worker.test-fixture";
 import {
   STUDIO_BG3D_LIBRARIES_SQLITE_NAMESPACE,
   STUDIO_BG3D_LIBRARY_MANIFEST_KEYS,
@@ -186,7 +188,12 @@ function metadata(hash: `sha256:${string}`, now = 10) {
   };
 }
 
+beforeEach(() => {
+  vi.stubGlobal("Worker", StudioBg3dValidationWorkerTestFixture);
+});
+
 afterEach(async () => {
+  disposeSharedStudioBg3dValidationWorker();
   vi.unstubAllGlobals();
   await Promise.all([...databases].map((database) => database.close().catch(() => undefined)));
   databases.clear();

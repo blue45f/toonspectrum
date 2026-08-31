@@ -212,10 +212,11 @@ describe("Studio ONNX inference provider", () => {
         sha256: `sha256:${sha256HexPortable(MODEL_BYTES)}`,
         byteLength: MODEL_BYTES.byteLength,
       },
-      preferredExecutionProvider: "webgpu",
-      attemptedExecutionProviders: ["webgpu", "wasm"],
+      selectedExecutionProvider: "webgpu",
+      attemptedExecutionProviders: ["webgpu"],
       activeExecutionProvider: "webgpu",
-      fallback: null,
+      attemptCount: 1,
+      failureIsolation: "fail-closed",
     });
     expect(fixture.createSpy).toHaveBeenCalledTimes(1);
     expect(fixture.createSpy.mock.calls[0][1]).toMatchObject({
@@ -248,54 +249,59 @@ describe("Studio ONNX inference provider", () => {
     expect(session.release).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back deterministically when WebGPU session creation fails or its API is absent", async () => {
-    const fallbackSession = new FakeSession();
-    const fixture = fakeRuntime(async (_bytes, options) => {
-      const executionProviders = (
-        options as { executionProviders: readonly unknown[] }
-      ).executionProviders;
-      if (typeof executionProviders[0] === "object") {
-        throw new Error("adapter unavailable");
-      }
-      return fallbackSession;
+  it("fails closed after one selected WebGPU session attempt", async () => {
+    const fixture = fakeRuntime(async () => {
+      throw new Error("adapter unavailable");
     });
     const provider = createStudioOnnxInferenceProvider({
       registry: createStudioOnnxModelRegistry([descriptor()]),
       loadRuntime: async () => fixture.runtime,
       webGpuApiAvailable: () => true,
     });
-    const receipt = await provider.loadModel({
+    await expect(provider.loadModel({
       modelId: "selection-mask",
       version: "1.0.0",
       source: { kind: "bytes", bytes: MODEL_BYTES },
-    });
+    })).rejects.toMatchObject({ code: "session-create-failed" });
+    expect(fixture.createSpy).toHaveBeenCalledTimes(1);
 
-    expect(receipt.activeExecutionProvider).toBe("wasm");
-    expect(receipt.fallback).toEqual({
-      from: "webgpu",
-      to: "wasm",
-      reason: "webgpu-session-create-failed",
-    });
-    expect(fixture.createSpy).toHaveBeenCalledTimes(2);
-    expect(fixture.createSpy.mock.calls[1][1]).toMatchObject({
-      executionProviders: ["wasm"],
-    });
-
-    const noGpuSession = new FakeSession();
-    const noGpuFixture = fakeRuntime(async () => noGpuSession);
+    const noGpuFixture = fakeRuntime(async () => new FakeSession());
     const noGpuProvider = createStudioOnnxInferenceProvider({
       registry: createStudioOnnxModelRegistry([descriptor()]),
       loadRuntime: async () => noGpuFixture.runtime,
       webGpuApiAvailable: () => false,
     });
-    const noGpuReceipt = await noGpuProvider.loadModel({
+    await expect(noGpuProvider.loadModel({
+      modelId: "selection-mask",
+      version: "1.0.0",
+      source: { kind: "bytes", bytes: MODEL_BYTES },
+    })).rejects.toMatchObject({ code: "session-create-failed" });
+    expect(noGpuFixture.createSpy).not.toHaveBeenCalled();
+  });
+
+  it("uses WASM only when it was selected before model loading", async () => {
+    const wasmSession = new FakeSession();
+    const fixture = fakeRuntime(async () => wasmSession);
+    const provider = createStudioOnnxInferenceProvider({
+      registry: createStudioOnnxModelRegistry([descriptor()]),
+      executionProvider: "wasm",
+      loadRuntime: async () => fixture.runtime,
+      webGpuApiAvailable: () => false,
+    });
+    const receipt = await provider.loadModel({
       modelId: "selection-mask",
       version: "1.0.0",
       source: { kind: "bytes", bytes: MODEL_BYTES },
     });
-    expect(noGpuReceipt.fallback?.reason).toBe("webgpu-api-unavailable");
-    expect(noGpuFixture.createSpy).toHaveBeenCalledTimes(1);
-    expect(noGpuFixture.createSpy.mock.calls[0][1]).toMatchObject({
+    expect(receipt).toMatchObject({
+      selectedExecutionProvider: "wasm",
+      attemptedExecutionProviders: ["wasm"],
+      activeExecutionProvider: "wasm",
+      attemptCount: 1,
+      failureIsolation: "fail-closed",
+    });
+    expect(fixture.createSpy).toHaveBeenCalledTimes(1);
+    expect(fixture.createSpy.mock.calls[0][1]).toMatchObject({
       executionProviders: ["wasm"],
     });
   });
@@ -395,6 +401,7 @@ describe("Studio ONNX inference provider", () => {
     const malformedFixture = fakeRuntime(async () => malformedSession);
     const malformedProvider = createStudioOnnxInferenceProvider({
       registry: createStudioOnnxModelRegistry([descriptor()]),
+      executionProvider: "wasm",
       loadRuntime: async () => malformedFixture.runtime,
       initialEpoch: EPOCH,
     });
@@ -460,6 +467,7 @@ describe("Studio ONNX inference provider", () => {
         descriptor("first"),
         descriptor("second"),
       ]),
+      executionProvider: "wasm",
       loadRuntime: async () => fixture.runtime,
     });
     await provider.loadModel({
@@ -488,6 +496,7 @@ describe("Studio ONNX inference provider", () => {
     const fixture = fakeRuntime(async () => session);
     const provider = createStudioOnnxInferenceProvider({
       registry: createStudioOnnxModelRegistry([descriptor()]),
+      executionProvider: "wasm",
       loadRuntime: async () => fixture.runtime,
       initialEpoch: EPOCH,
     });
@@ -518,6 +527,7 @@ describe("Studio ONNX inference provider", () => {
     const outputFixture = fakeRuntime(async () => outputSession);
     const outputProvider = createStudioOnnxInferenceProvider({
       registry: createStudioOnnxModelRegistry([descriptor()]),
+      executionProvider: "wasm",
       loadRuntime: async () => outputFixture.runtime,
       budgets: { maxResultBytes: 4 },
       initialEpoch: EPOCH,
@@ -558,6 +568,7 @@ describe("Studio ONNX inference provider", () => {
     } as unknown as StudioOnnxRuntime;
     const partialProvider = createStudioOnnxInferenceProvider({
       registry: createStudioOnnxModelRegistry([twoInputDescriptor]),
+      executionProvider: "wasm",
       loadRuntime: async () => runtime,
       initialEpoch: EPOCH,
     });

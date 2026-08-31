@@ -13,7 +13,7 @@ function sourceBetween(startMarker: string, endMarker: string): string {
 }
 
 describe("Living Ink retained live-draft boundary", () => {
-  it("keeps sparse ink strokes current until a material presentation receipt owns pixels", () => {
+  it("keeps sparse input non-presented until a material presentation receipt owns pixels", () => {
     const flush = sourceBetween(
       "const flushDirectLiveDraft =",
       "const flushDirectLiveDraftNow =",
@@ -23,12 +23,11 @@ describe("Living Ink retained live-draft boundary", () => {
 
     expect(livingInkBranch).toBeGreaterThanOrEqual(0);
     expect(livingInkBranch).toBeLessThan(genericInkBranch);
-    expect(flush).toContain("!livingInkStroke.overlayPresented");
-    expect(flush).toContain('livingInkStroke.mode === "ink"');
-    expect(flush).toContain(
-      "liveDraftVisualRef.current = studioLivingInkVectorShadowElement(next);",
-    );
-    expect(flush).toContain("liveDraftLayerRef.current?.drawScene();");
+    expect(flush).toContain("selected physical provider owns every pixel");
+    expect(flush).toContain("liveDraftVisualRef.current = null;");
+    expect(flush).not.toContain("studioLivingInkVectorShadowElement");
+    expect(flush).not.toContain("liveDraftLayerRef.current?.drawScene();");
+    expect(studioPageSource).not.toContain("function showStudioLivingInkVectorShadow(");
   });
 
   it("admits Living Ink at pointer-up even though it is not a generic direct ink preset", () => {

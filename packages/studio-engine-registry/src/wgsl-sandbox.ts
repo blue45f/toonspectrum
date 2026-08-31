@@ -144,8 +144,8 @@ function inspectShaderSource(
 /**
  * Checks a generated shader against its manifest, exact device limits and a
  * caller-supplied working-set/pipeline budget. A rejection is data, not a
- * crash: the planner can quarantine this provider and select its CPU/reference
- * fallback without losing the document.
+ * crash: the selected provider becomes unavailable for this operation. This
+ * function never selects a CPU/reference provider in its place.
  */
 export function evaluateWgslVariantAdmission(
   variant: ComposedWgslVariant,

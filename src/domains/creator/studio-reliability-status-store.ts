@@ -136,9 +136,9 @@ export function composeStudioSafeModeQuality(
 export function describeStudioSafeModeReason(reason: StudioSafeModeReason): string {
   switch (reason) {
     case "gpu-device-lost":
-      return "GPU 연결이 끊겨 CPU 렌더링으로 전환했습니다";
+      return "GPU 연결이 끊겨 선택한 GPU 기능을 사용할 수 없습니다";
     case "gpu-permanently-demoted":
-      return "GPU가 반복해서 끊겨 이번 세션 동안 CPU 렌더링을 유지합니다";
+      return "GPU가 반복해서 끊겨 이번 세션의 GPU 기능을 중단했습니다";
     case "storage-pressure":
       return "저장 공간이 부족해 임시 렌더 품질을 낮췄습니다";
     case "manual":

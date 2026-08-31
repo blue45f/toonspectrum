@@ -28,7 +28,6 @@ import type {
 export const STUDIO_PIXI_SCENE_ROOT_LABEL = "studio-pixi-scene-root" as const;
 export const STUDIO_PIXI_SCENE_CANVAS_MARKER = "dedicated-pixi-overlay" as const;
 export const STUDIO_PIXI_SCENE_LABEL_PREFIX = "studio-document:" as const;
-export const STUDIO_PIXI_RENDERER_ORDER = ["webgpu", "webgl"] as const;
 
 const DEFAULT_FILL = Object.freeze({ color: 0x2563eb, alpha: 0.08 });
 const DEFAULT_STROKE = Object.freeze({
@@ -51,10 +50,10 @@ export type StudioPixiRuntimeLoader = () => Promise<StudioPixiRuntime>;
 
 export interface CreateStudioPixiSceneProviderOptions
   extends StudioSceneViewportMetrics {
+  /** One renderer is selected before initialization; Pixi must not choose an alternate. */
+  readonly renderer: "webgpu" | "webgl";
   /** Injection seam for deterministic unit tests. Production always uses the lazy loader. */
   readonly loadRuntime?: StudioPixiRuntimeLoader;
-  /** Injection seam for the fallback receipt; it never selects or exposes a context. */
-  readonly webGpuApiAvailable?: () => boolean;
   /** A document may be supplied by an iframe host or a DOM test environment. */
   readonly ownerDocument?: Document;
 }
@@ -63,10 +62,6 @@ interface StudioPixiOverlayEntry {
   readonly label: string;
   readonly graphics: Graphics;
   overlay: StudioSceneSelectableOverlay;
-}
-
-function defaultWebGpuApiAvailable(): boolean {
-  return typeof navigator !== "undefined" && "gpu" in navigator;
 }
 
 async function loadStudioPixiRuntime(): Promise<StudioPixiRuntime> {
@@ -205,24 +200,15 @@ function configureGraphicsShape(
 }
 
 function rendererReceipt(
-  activeRenderer: "webgpu" | "webgl",
-  webGpuApiAvailable: boolean,
+  selectedRenderer: "webgpu" | "webgl",
 ): StudioSceneRendererReceipt {
   return Object.freeze({
     providerId: "pixi",
-    requestedRenderer: "webgpu",
-    attemptedRendererOrder: STUDIO_PIXI_RENDERER_ORDER,
-    activeRenderer,
-    fallback:
-      activeRenderer === "webgpu"
-        ? null
-        : Object.freeze({
-            from: "webgpu",
-            to: "webgl",
-            reason: webGpuApiAvailable
-              ? "provider-webgpu-candidate-unavailable"
-              : "webgpu-api-unavailable",
-          }),
+    selectedRenderer,
+    attemptedRenderer: selectedRenderer,
+    activeRenderer: selectedRenderer,
+    attemptCount: 1,
+    failureIsolation: "fail-closed",
     surface: Object.freeze({
       ownership: "exclusive-dedicated-overlay",
       contextSharing: "forbidden",
@@ -460,10 +446,6 @@ export async function createStudioPixiSceneProvider(
   const loadRuntime = options.loadRuntime ?? loadStudioPixiRuntime;
   const runtime = await loadRuntime();
   const app = new runtime.Application();
-  const webGpuApiAvailable = (
-    options.webGpuApiAvailable ?? defaultWebGpuApiAvailable
-  )();
-
   try {
     await app.init({
       canvas,
@@ -475,7 +457,10 @@ export async function createStudioPixiSceneProvider(
       backgroundAlpha: 0,
       autoStart: false,
       sharedTicker: false,
-      preference: [...STUDIO_PIXI_RENDERER_ORDER],
+      // Pixi's string form appends its default renderer order. A one-item array
+      // excludes every alternate renderer and therefore preserves the selected
+      // provider for the whole initialization operation.
+      preference: [options.renderer],
       powerPreference: "high-performance",
     });
   } catch (error) {
@@ -488,6 +473,12 @@ export async function createStudioPixiSceneProvider(
     destroyFailedApplication(app, canvas);
     throw new Error(
       "Pixi selected an unsupported renderer; Studio scene overlays require WebGPU or WebGL.",
+    );
+  }
+  if (activeRenderer !== options.renderer) {
+    destroyFailedApplication(app, canvas);
+    throw new Error(
+      `Pixi activated ${activeRenderer} after ${options.renderer} was selected; automatic renderer substitution is forbidden.`,
     );
   }
 
@@ -505,6 +496,6 @@ export async function createStudioPixiSceneProvider(
     runtime,
     canvas,
     viewport,
-    receipt: rendererReceipt(activeRenderer, webGpuApiAvailable),
+    receipt: rendererReceipt(options.renderer),
   });
 }

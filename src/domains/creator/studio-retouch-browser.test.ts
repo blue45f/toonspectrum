@@ -1,11 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { wetMixStroke } from "./brush/studio-wet-mix";
 import {
   clearStudioRasterEditSurfaces,
   getStudioRasterEditSurfaceSnapshot,
 } from "./render/studio-raster-edit-surface-cache";
-import { dodgeBurnStroke } from "./studio-dodge-burn";
 import {
   encodeStudioRetouchCanvasPng,
   loadStudioRetouchSourceImage,
@@ -40,7 +38,7 @@ afterEach(() => {
 });
 
 describe("Studio retouch browser orchestration", () => {
-  it("keeps dodge/burn and wet-mix output identical in the bounded direct fallback", async () => {
+  it("keeps the product Worker authority exact when Worker is unavailable", async () => {
     vi.stubGlobal("Worker", undefined);
     const dodgeData = opaquePixels(8, 8);
     const dodgePoints = [{ x: 4, y: 4 }];
@@ -62,40 +60,23 @@ describe("Studio retouch browser orchestration", () => {
       pickup: 0.35,
       paintColor: { r: 220, g: 40, b: 80 },
     };
-    const expectedDodge = dodgeBurnStroke(
-      new Uint8ClampedArray(dodgeData),
-      8,
-      8,
-      dodgePoints,
-      dodgeSettings,
-    );
-    const expectedWet = wetMixStroke(
-      new Uint8ClampedArray(wetData),
-      8,
-      8,
-      wetPoints,
-      wetSettings,
-    );
-
-    const dodgeResult = await runStudioDodgeBurnRetouch(
+    await expect(runStudioDodgeBurnRetouch(
       dodgeData,
       8,
       8,
       dodgePoints,
       dodgeSettings,
-    );
-    const wetResult = await runStudioWetMixRetouch(
+    )).rejects.toMatchObject({ name: "StudioRetouchWorkerUnavailableError" });
+    await expect(runStudioWetMixRetouch(
       wetData,
       8,
       8,
       wetPoints,
       wetSettings,
-    );
+    )).rejects.toMatchObject({ name: "StudioRetouchWorkerUnavailableError" });
 
-    expect(dodgeResult).toBe(dodgeData);
-    expect(dodgeData).toEqual(expectedDodge);
-    expect(wetResult).toBe(wetData);
-    expect(wetData).toEqual(expectedWet);
+    expect(dodgeData.byteLength).toBe(8 * 8 * 4);
+    expect(wetData.byteLength).toBe(8 * 8 * 4);
   });
 
   it("encodes PNG asynchronously without calling synchronous toDataURL", async () => {

@@ -164,12 +164,12 @@ describe("quality floor — 품질이 성능보다 우선 (§3.2 최소 통과 �
     expect(plan.groups[0]?.providerId).toBe("canvaskit-imagefilter");
   });
 
-  it("keeps unmeasured candidates only as a last-resort fallback", async () => {
+  it("does not substitute an unmeasured provider when measured candidates miss the floor", async () => {
     const { ProviderBenchmarkRegistry } = await import("../benchmark-registry");
     const registry = filterRegistry();
     const benchmarks = new ProviderBenchmarkRegistry();
     // canvaskit/opencv measured below floor; wasm-vips (also a gaussian-blur
-    // final provider) is unmeasured → explicit evidence-first fallback.
+    // final provider) is unmeasured and therefore has no passing evidence.
     benchmarks.record("canvaskit-imagefilter", { visualQuality: 0.3 });
     benchmarks.record("opencv-image-worker", { visualQuality: 0.2 });
     const graph: EffectGraphIR = {
@@ -178,12 +178,11 @@ describe("quality floor — 품질이 성능보다 우선 (§3.2 최소 통과 �
       ],
       output: "b",
     };
-    const plan = compileEffectGraph(graph, registry, {
+    expect(() => compileEffectGraph(graph, registry, {
       mode: "final",
       benchmarks,
       minVisualQuality: 0.9,
-    });
-    expect(plan.groups[0]?.providerId).toBe("wasm-vips-pipeline");
+    })).toThrow(/below quality floor/);
   });
 
   it("fails loudly when every candidate is measured below the floor", async () => {

@@ -22,7 +22,7 @@ export type StudioVelloHubAuthorityStatus =
   | "idle"
   | "starting"
   | "active"
-  | "fallback";
+  | "unavailable";
 
 export interface StudioVelloHubAuthority {
   readonly status: StudioVelloHubAuthorityStatus;
@@ -42,7 +42,7 @@ export interface StudioVelloHubSurfaceProps {
   readonly documentTransform?: StudioSceneDocumentTransform;
   readonly documentWidth?: number;
   readonly documentHeight?: number;
-  /** Reads the live pointer session; a ref snapshot is insufficient during async fallback. */
+  /** Reads the live pointer session; a ref snapshot is insufficient during async rendering. */
   readonly isPenDown?: () => boolean;
   readonly onAuthorityChange?: (authority: StudioVelloHubAuthority) => void;
 }
@@ -103,7 +103,7 @@ export function StudioVelloHubSurface({
     }
     if (!admitted) {
       authoritySinkRef.current?.({
-        status: admissionReason === "empty-island" ? "idle" : "fallback",
+        status: admissionReason === "empty-island" ? "idle" : "unavailable",
         backendId: null,
         decision: null,
         reason: admissionReason,
@@ -127,15 +127,11 @@ export function StudioVelloHubSurface({
       mountParent,
     );
     let hub: StudioVelloHub | null = null;
-    const fallBackToPixi = (reason: string) => {
+    const markUnavailable = (reason: string) => {
       if (generationRef.current !== generation) return;
       renderGenerationRef.current += 1;
-      hub?.dispose();
-      target.destroy();
-      if (hubRef.current === hub) hubRef.current = null;
-      if (targetRef.current === target) targetRef.current = null;
       authoritySinkRef.current?.({
-        status: "fallback",
+        status: "unavailable",
         backendId: null,
         decision: null,
         reason,
@@ -144,8 +140,8 @@ export function StudioVelloHubSurface({
     hub = createStudioVelloHub({
       target,
       isPenDown,
-      onUnrecoverableFallback(failure) {
-        fallBackToPixi(
+      onUnavailable(failure) {
+        markUnavailable(
           `${failure.source}:${failure.reason}`,
         );
       },
@@ -189,7 +185,7 @@ export function StudioVelloHubSurface({
           status: "active",
           backendId: receipt.backendId,
           decision: receipt.decision,
-          reason: receipt.fallback?.reason ?? null,
+          reason: null,
         });
       },
       (error: unknown) => {
@@ -198,12 +194,8 @@ export function StudioVelloHubSurface({
           || renderGeneration !== renderGenerationRef.current
           || hubRef.current !== hub
         ) return;
-        hub.dispose();
-        target.destroy();
-        hubRef.current = null;
-        targetRef.current = null;
         authoritySinkRef.current?.({
-          status: "fallback",
+          status: "unavailable",
           backendId: null,
           decision: null,
           reason: error instanceof Error ? error.message : String(error),

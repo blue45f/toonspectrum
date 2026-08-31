@@ -30,7 +30,7 @@ export type StudioVrmSkinnedGarmentTemplateKind =
   | "merged-parts-v1"
   | null;
 
-export type StudioVrmSkinnedGarmentFallbackReason =
+export type StudioVrmSkinnedGarmentUnavailableReason =
   | "empty"
   | "material-mismatch"
   | "missing-required-bone"
@@ -49,7 +49,7 @@ export type StudioVrmSkinnedGarmentFallbackReason =
 export interface StudioVrmSkinnedGarmentReceipt {
   kind: "studio-vrm-skinned-garment-receipt";
   version: typeof STUDIO_VRM_SKINNED_GARMENT_VERSION;
-  mode: "skinned-shell-v1" | "rigid-fallback";
+  mode: "skinned-shell-v1" | "unavailable";
   signature: string;
   vertexCount: number;
   triangleCount: number;
@@ -61,7 +61,7 @@ export interface StudioVrmSkinnedGarmentReceipt {
   continuousSleeveCount: number;
   usedBones: readonly StudioVrmGarmentSkinBone[];
   missingBones: readonly StudioVrmGarmentSkinBone[];
-  fallbackReason: StudioVrmSkinnedGarmentFallbackReason | null;
+  unavailableReason: StudioVrmSkinnedGarmentUnavailableReason | null;
 }
 
 export interface StudioVrmSkinnedGarmentSurface {
@@ -69,10 +69,19 @@ export interface StudioVrmSkinnedGarmentSurface {
   receipt: StudioVrmSkinnedGarmentReceipt;
 }
 
-export interface StudioVrmSkinnedGarmentBuildResult {
-  surface: StudioVrmSkinnedGarmentSurface | null;
-  receipt: StudioVrmSkinnedGarmentReceipt;
-}
+export type StudioVrmSkinnedGarmentBuildResult =
+  | {
+      readonly ok: true;
+      readonly status: "ready";
+      readonly surface: StudioVrmSkinnedGarmentSurface;
+      readonly receipt: StudioVrmSkinnedGarmentReceipt;
+    }
+  | {
+      readonly ok: false;
+      readonly status: "unavailable";
+      readonly surface: null;
+      readonly receipt: StudioVrmSkinnedGarmentReceipt;
+    };
 
 interface StudioVrmSkinnedGarmentBuildInput {
   name: string;
@@ -389,9 +398,9 @@ function receiptSignature(input: {
   }))}`;
 }
 
-function fallbackReceipt(
+function unavailableReceipt(
   input: Pick<StudioVrmSkinnedGarmentBuildInput, "name" | "parts">,
-  reason: StudioVrmSkinnedGarmentFallbackReason,
+  reason: StudioVrmSkinnedGarmentUnavailableReason,
   missingBones: readonly StudioVrmGarmentSkinBone[] = [],
   stats: ReceiptStats = {},
 ): StudioVrmSkinnedGarmentReceipt {
@@ -403,7 +412,7 @@ function fallbackReceipt(
   return {
     kind: "studio-vrm-skinned-garment-receipt",
     version: STUDIO_VRM_SKINNED_GARMENT_VERSION,
-    mode: "rigid-fallback",
+    mode: "unavailable",
     signature: receiptSignature({
       name: input.name,
       parts: input.parts,
@@ -423,8 +432,14 @@ function fallbackReceipt(
     continuousSleeveCount: stats.continuousSleeveCount ?? 0,
     usedBones,
     missingBones: [...missingBones],
-    fallbackReason: reason,
+    unavailableReason: reason,
   };
+}
+
+function unavailableBuildResult(
+  receipt: StudioVrmSkinnedGarmentReceipt,
+): StudioVrmSkinnedGarmentBuildResult {
+  return { ok: false, status: "unavailable", surface: null, receipt };
 }
 
 function isSkeletonBone(node: THREE.Object3D | null): node is THREE.Bone {
@@ -981,48 +996,48 @@ export function buildStudioVrmSkinnedGarment(
   input: StudioVrmSkinnedGarmentBuildInput,
 ): StudioVrmSkinnedGarmentBuildResult {
   if (input.parts.length === 0) {
-    const receipt = fallbackReceipt(input, "empty");
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "empty");
+    return unavailableBuildResult(receipt);
   }
   if (input.materials.length !== input.parts.length) {
-    const receipt = fallbackReceipt(input, "material-mismatch");
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "material-mismatch");
+    return unavailableBuildResult(receipt);
   }
   for (const part of input.parts) {
     const reason = partValidationReason(part);
     if (reason) {
-      const receipt = fallbackReceipt(input, reason);
-      return { surface: null, receipt };
+      const receipt = unavailableReceipt(input, reason);
+      return unavailableBuildResult(receipt);
     }
   }
 
   const upperBodyItem = requestedUpperBodyTemplate(input.name);
   const upperTemplateParts = upperBodyItem ? findUpperBodyTemplateParts(input.parts) : null;
   if (upperBodyItem && !upperTemplateParts) {
-    const receipt = fallbackReceipt(input, "upper-template-incomplete");
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "upper-template-incomplete");
+    return unavailableBuildResult(receipt);
   }
 
   input.root.updateMatrixWorld(true);
   if (!matrixIsFiniteAndInvertible(input.root.matrixWorld)) {
-    const receipt = fallbackReceipt(input, "invalid-root-transform");
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "invalid-root-transform");
+    return unavailableBuildResult(receipt);
   }
 
   const requiredBones = [...new Set(input.parts.map((part) => part.bone as StudioVrmGarmentSkinBone))];
   const requiredNodes = new Map(requiredBones.map((bone) => [bone, input.resolveBone(bone)]));
   const missingBones = requiredBones.filter((bone) => !requiredNodes.get(bone));
   if (missingBones.length > 0) {
-    const receipt = fallbackReceipt(input, "missing-required-bone", missingBones);
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "missing-required-bone", missingBones);
+    return unavailableBuildResult(receipt);
   }
   const invalidBones = requiredBones.filter((bone) => {
     const node = requiredNodes.get(bone) ?? null;
     return !isSkeletonBone(node) || !belongsToRoot(node, input.root);
   });
   if (invalidBones.length > 0) {
-    const receipt = fallbackReceipt(input, "invalid-bone-node", invalidBones);
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "invalid-bone-node", invalidBones);
+    return unavailableBuildResult(receipt);
   }
 
   const candidateBones = new Set<StudioVrmGarmentSkinBone>(requiredBones);
@@ -1059,11 +1074,11 @@ export function buildStudioVrmSkinnedGarment(
   const availableBones = new Set(usedBones);
   for (const bone of uniqueBones) bone.updateWorldMatrix(true, false);
   if (uniqueBones.some((bone) => !matrixIsFiniteAndInvertible(bone.matrixWorld))) {
-    const receipt = fallbackReceipt(input, "invalid-bone-transform", [], {
+    const receipt = unavailableReceipt(input, "invalid-bone-transform", [], {
       boneCount: uniqueBones.length,
       usedBones,
     });
-    return { surface: null, receipt };
+    return unavailableBuildResult(receipt);
   }
 
   const rootInverse = input.root.matrixWorld.clone().invert();
@@ -1153,11 +1168,11 @@ export function buildStudioVrmSkinnedGarment(
       }
     }
   } catch {
-    const receipt = fallbackReceipt(input, "invalid-topology", [], {
+    const receipt = unavailableReceipt(input, "invalid-topology", [], {
       boneCount: uniqueBones.length,
       usedBones,
     });
-    return { surface: null, receipt };
+    return unavailableBuildResult(receipt);
   }
 
   const vertexCount = assembly.positions.length / 3;
@@ -1178,25 +1193,25 @@ export function buildStudioVrmSkinnedGarment(
 
   const vertexBudget = normalizedBudget(input.vertexBudget, STUDIO_VRM_SKINNED_GARMENT_VERTEX_BUDGET);
   if (vertexCount > vertexBudget) {
-    const receipt = fallbackReceipt(input, "vertex-budget", [], receiptStats);
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "vertex-budget", [], receiptStats);
+    return unavailableBuildResult(receipt);
   }
   const triangleBudget = normalizedBudget(input.triangleBudget, STUDIO_VRM_SKINNED_GARMENT_TRIANGLE_BUDGET);
   if (triangleCount > triangleBudget) {
-    const receipt = fallbackReceipt(input, "triangle-budget", [], receiptStats);
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "triangle-budget", [], receiptStats);
+    return unavailableBuildResult(receipt);
   }
 
   const assemblyFailure = validateAssembly(assembly, uniqueBones.length);
   if (assemblyFailure) {
-    const receipt = fallbackReceipt(input, assemblyFailure, [], receiptStats);
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, assemblyFailure, [], receiptStats);
+    return unavailableBuildResult(receipt);
   }
   const componentCount = connectedComponentCount(vertexCount, assembly.indices);
   receiptStats.connectedComponentCount = componentCount;
   if (upperTopology && !upperBodyIsConnected(vertexCount, assembly.indices, upperTopology)) {
-    const receipt = fallbackReceipt(input, "upper-template-disconnected", [], receiptStats);
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "upper-template-disconnected", [], receiptStats);
+    return unavailableBuildResult(receipt);
   }
 
   const positions = new Float32Array(assembly.positions);
@@ -1205,8 +1220,8 @@ export function buildStudioVrmSkinnedGarment(
   const skinIndices = new Uint16Array(assembly.skinIndices);
   const skinWeights = new Float32Array(assembly.skinWeights);
   if (![positions, normals, uvs, skinWeights].every((array) => Array.from(array).every(Number.isFinite))) {
-    const receipt = fallbackReceipt(input, "non-finite-geometry", [], receiptStats);
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "non-finite-geometry", [], receiptStats);
+    return unavailableBuildResult(receipt);
   }
   for (let vertex = 0; vertex < vertexCount; vertex += 1) {
     const total = skinWeights[vertex * 4]!
@@ -1214,8 +1229,8 @@ export function buildStudioVrmSkinnedGarment(
       + skinWeights[vertex * 4 + 2]!
       + skinWeights[vertex * 4 + 3]!;
     if (Math.abs(total - 1) > 2e-6) {
-      const receipt = fallbackReceipt(input, "invalid-skin-weights", [], receiptStats);
-      return { surface: null, receipt };
+      const receipt = unavailableReceipt(input, "invalid-skin-weights", [], receiptStats);
+      return unavailableBuildResult(receipt);
     }
   }
 
@@ -1234,8 +1249,8 @@ export function buildStudioVrmSkinnedGarment(
   const boneInverses = uniqueBones.map((bone) => bone.matrixWorld.clone().invert());
   if (boneInverses.some((inverse) => !matrixIsFiniteAndInvertible(inverse))) {
     geometry.dispose();
-    const receipt = fallbackReceipt(input, "invalid-bone-transform", [], receiptStats);
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "invalid-bone-transform", [], receiptStats);
+    return unavailableBuildResult(receipt);
   }
   const skeleton = new THREE.Skeleton(uniqueBones, boneInverses);
   const mesh = new THREE.SkinnedMesh(geometry, [...input.materials]);
@@ -1249,8 +1264,8 @@ export function buildStudioVrmSkinnedGarment(
   if (!validateBindPose(mesh)) {
     geometry.dispose();
     skeleton.dispose();
-    const receipt = fallbackReceipt(input, "bind-validation", [], receiptStats);
-    return { surface: null, receipt };
+    const receipt = unavailableReceipt(input, "bind-validation", [], receiptStats);
+    return unavailableBuildResult(receipt);
   }
 
   const receipt: StudioVrmSkinnedGarmentReceipt = {
@@ -1276,11 +1291,11 @@ export function buildStudioVrmSkinnedGarment(
     continuousSleeveCount: upperTopology ? 2 : 0,
     usedBones: [...usedBones],
     missingBones: [],
-    fallbackReason: null,
+    unavailableReason: null,
   };
   mesh.userData.studioVrmSkinnedGarmentReceipt = receipt;
   mesh.userData.studioVrmGarmentMountRootUuid = input.root.uuid;
-  return { surface: { mesh, receipt }, receipt };
+  return { ok: true, status: "ready", surface: { mesh, receipt }, receipt };
 }
 
 export function disposeStudioVrmSkinnedGarment(surface: StudioVrmSkinnedGarmentSurface): void {

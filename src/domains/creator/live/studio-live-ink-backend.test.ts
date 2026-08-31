@@ -12,7 +12,7 @@ function eligible(
   overrides: Partial<StudioLiveInkBackendDecisionInput> = {}
 ): StudioLiveInkBackendDecisionInput {
   return {
-    preference: "auto",
+    preference: "webgpu",
     resolvedBackend: "webgpu",
     direct: true,
     postCorrectionActive: false,
@@ -38,34 +38,42 @@ function prepared(
 }
 
 describe("studio live-ink backend policy", () => {
-  it("uses capability-driven WebGPU selection when configuration is absent", () => {
-    expect(resolveStudioLiveInkBackendPreference(undefined)).toBe("auto");
-    expect(resolveStudioLiveInkBackendPreference(null)).toBe("auto");
-    expect(resolveStudioLiveInkBackendPreference("")).toBe("auto");
-    expect(resolveStudioLiveInkBackendPreference("auto")).toBe("auto");
+  it("selects WebGPU for absent and legacy auto configuration", () => {
+    expect(resolveStudioLiveInkBackendPreference(undefined)).toBe("webgpu");
+    expect(resolveStudioLiveInkBackendPreference(null)).toBe("webgpu");
+    expect(resolveStudioLiveInkBackendPreference("")).toBe("webgpu");
+    expect(resolveStudioLiveInkBackendPreference("auto")).toBe("webgpu");
     expect(decideStudioLiveInkBackend(eligible())).toEqual({
+      status: "ready",
       backend: "webgpu",
+      selectedBackend: "webgpu",
       reason: "webgpu-ready",
     });
   });
 
-  it("preserves explicit renderer rollout controls and fails closed on typos", () => {
+  it("keeps Canvas2D explicit and does not turn typos into a fallback", () => {
     expect(resolveStudioLiveInkBackendPreference("webgpu")).toBe("webgpu");
     expect(resolveStudioLiveInkBackendPreference("canvas2d")).toBe("canvas2d");
-    expect(resolveStudioLiveInkBackendPreference("web-gpu")).toBe("canvas2d");
+    expect(resolveStudioLiveInkBackendPreference("web-gpu")).toBe("webgpu");
     expect(decideStudioLiveInkBackend(eligible({ preference: "canvas2d" }))).toEqual({
+      status: "ready",
       backend: "canvas2d",
-      reason: "canvas2d-forced",
+      selectedBackend: "canvas2d",
+      reason: "canvas2d-explicit",
     });
   });
 
-  it("falls back without hiding ink while the adapter is unavailable or initialization failed", () => {
+  it("reports selected WebGPU unavailable without starting Canvas2D", () => {
     expect(decideStudioLiveInkBackend(eligible({ resolvedBackend: null }))).toEqual({
-      backend: "canvas2d",
+      status: "unavailable",
+      backend: null,
+      selectedBackend: "webgpu",
       reason: "backend-unavailable",
     });
     expect(decideStudioLiveInkBackend(eligible({ resolvedBackend: "canvas2d" }))).toEqual({
-      backend: "canvas2d",
+      status: "unavailable",
+      backend: null,
+      selectedBackend: "webgpu",
       reason: "backend-unavailable",
     });
   });
@@ -78,20 +86,26 @@ describe("studio live-ink backend policy", () => {
     ["translucency", { opacity: 0.7 }, "opacity"],
     ["invalid opacity", { opacity: Number.NaN }, "opacity"],
     ["symmetry", { symmetryType: "vertical" }, "symmetry"],
-  ] as const)("keeps %s on the authoritative Canvas2D path", (_label, overrides, reason) => {
+  ] as const)("marks selected WebGPU unavailable for %s", (_label, overrides, reason) => {
     expect(decideStudioLiveInkBackend(eligible(overrides))).toEqual({
-      backend: "canvas2d",
+      status: "unavailable",
+      backend: null,
+      selectedBackend: "webgpu",
       reason,
     });
   });
 
-  it("treats both auto and explicit WebGPU as capability-gated rather than forced visibility", () => {
-    expect(decideStudioLiveInkBackend(eligible({ preference: "auto" })).backend).toBe("webgpu");
+  it("keeps explicit WebGPU capability-gated rather than substituting Canvas2D", () => {
     expect(decideStudioLiveInkBackend(eligible({ preference: "webgpu" })).backend).toBe("webgpu");
     expect(decideStudioLiveInkBackend(eligible({
       preference: "webgpu",
       resolvedBackend: "canvas2d",
-    }))).toEqual({ backend: "canvas2d", reason: "backend-unavailable" });
+    }))).toEqual({
+      status: "unavailable",
+      backend: null,
+      selectedBackend: "webgpu",
+      reason: "backend-unavailable",
+    });
   });
 
   it.each([
@@ -125,7 +139,9 @@ describe("studio live-ink backend policy", () => {
     ],
   ] as const)("selects WebGPU for %s only after exact stroke preparation", (_label, overrides) => {
     expect(decideStudioLiveInkBackend(eligible(overrides))).toEqual({
+      status: "ready",
       backend: "webgpu",
+      selectedBackend: "webgpu",
       reason: "webgpu-ready",
     });
   });
@@ -157,7 +173,9 @@ describe("studio live-ink backend policy", () => {
     reason
   ) => {
     expect(decideStudioLiveInkBackend(eligible(overrides))).toEqual({
-      backend: "canvas2d",
+      status: "unavailable",
+      backend: null,
+      selectedBackend: "webgpu",
       reason,
     });
   });
@@ -168,7 +186,12 @@ describe("studio live-ink backend policy", () => {
         ...prepared(),
         geometry: "predicted",
       } as unknown as StudioGpuLiveStrokePreparation,
-    }))).toEqual({ backend: "canvas2d", reason: "invalid-preparation" });
+    }))).toEqual({
+      status: "unavailable",
+      backend: null,
+      selectedBackend: "webgpu",
+      reason: "invalid-preparation",
+    });
   });
 
   it("keeps an eraser off a transparent overlay that cannot punch through committed pixels", () => {
@@ -176,6 +199,11 @@ describe("studio live-ink backend policy", () => {
       direct: false,
       mode: "eraser",
       preparedStroke: prepared({ composite: "erase" }),
-    }))).toEqual({ backend: "canvas2d", reason: "eraser" });
+    }))).toEqual({
+      status: "unavailable",
+      backend: null,
+      selectedBackend: "webgpu",
+      reason: "eraser",
+    });
   });
 });

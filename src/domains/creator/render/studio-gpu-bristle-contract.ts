@@ -111,7 +111,7 @@ export const STUDIO_GPU_BRISTLE_LIMITS = Object.freeze({
   minStationDtMs: 1 / 16,
   maxStationDtMs: 64,
   /** Used only when a caller supplies a non-finite `dtMs`; never derived from the station index. */
-  fallbackStationDtMs: 1000 / 60,
+  retainedStationDtMs: 1000 / 60,
 } as const);
 
 /* -------------------------------------------------------------------------------------------- */
@@ -568,7 +568,7 @@ export function clampStudioGpuBristleCount(requested: number): number {
 /** Clamp a per-station timestep into the integrator's stable window, in milliseconds. */
 export function clampStudioGpuBristleStationDtMs(requested: number): number {
   if (!Number.isFinite(requested) || requested <= 0) {
-    return STUDIO_GPU_BRISTLE_LIMITS.fallbackStationDtMs;
+    return STUDIO_GPU_BRISTLE_LIMITS.retainedStationDtMs;
   }
   if (requested < STUDIO_GPU_BRISTLE_LIMITS.minStationDtMs) {
     return STUDIO_GPU_BRISTLE_LIMITS.minStationDtMs;

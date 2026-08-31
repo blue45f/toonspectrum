@@ -31,7 +31,6 @@ describe("studio low latency surface policy", () => {
       "live-stamp-overlay",
       "live-prediction-overlay",
       "webgl-live-ink",
-      "webgpu-fallback-2d",
     ]);
   });
 
@@ -52,14 +51,6 @@ describe("studio low latency surface policy", () => {
     expect(resolveStudioLowLatencySurfacePolicy("offscreen-worker")).toMatchObject({
       desynchronized: false,
       reason: "not-composited",
-    });
-  });
-
-  it("keeps the WebGPU Canvas2D fallback on the low-latency path", () => {
-    // Device loss demotes live ink onto this surface; it must not silently become a slow path.
-    expect(resolveStudioLowLatencySurfacePolicy("webgpu-fallback-2d")).toMatchObject({
-      desynchronized: true,
-      reason: "transient-write-only",
     });
   });
 

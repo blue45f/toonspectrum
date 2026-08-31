@@ -371,27 +371,21 @@ describe("Studio VRM SurfaceProjectionProvider product bridge", () => {
     disposeFixture(fixture);
   });
 
-  it("uses a second real ray-hit lane as an explicit same-target miss fallback", async () => {
+  it("rejects the removed second ray-hit lane instead of retrying a miss", async () => {
     const fixture = createFixture();
     const inputStroke = stroke();
     const first = rayHit(fixture.mesh, 0.25, 0.4, 0);
     const second = rayHit(fixture.mesh, 0.65, 0.4, 0);
-    const result = await executeStudioVrmSurfaceBrushStroke({
+    await expect(executeStudioVrmSurfaceBrushStroke({
       runtime: fixture.runtime,
       brushProgram: PROGRAM,
       stroke: inputStroke,
       rayHits: [first, null],
       fallbackRayHits: [null, second],
       texelDensityBySample: [1, 1],
-      execution: { missPolicy: "fallback" },
-    });
-
-    expect(result.receipt.projectedSamples).toBe(2);
-    expect(result.receipt.fallbackSamples).toBe(1);
-    expect(result.operations.at(-1)?.projection).toBe("fallback");
-    expect(result.warnings.some((warning) => warning.includes("supplied the UV hit"))).toBe(true);
-    expect(nonZeroAlphaCount(unwrap(fixture.runtime.exportPaintedTargets())[0]!.pixels))
-      .toBeGreaterThan(0);
+    } as unknown as Parameters<typeof executeStudioVrmSurfaceBrushStroke>[0]))
+      .rejects.toMatchObject({ code: "automatic-fallback-forbidden" });
+    expect(unwrap(fixture.runtime.exportPaintedTargets())).toEqual([]);
     disposeFixture(fixture);
   });
 

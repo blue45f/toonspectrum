@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   CANVASKIT_ADOPTION_NOTE,
   CANVASKIT_BUNDLE_FACTS,
-  createFallbackQualityEngine,
+  createBasicQualityEngine,
   estimateAdvanceEm,
   qualityEngineLoadError,
   qualityEngineNow,
@@ -47,11 +47,11 @@ describe("폭 추정", () => {
   });
 });
 
-describe("폴백 엔진 — 셰이핑", () => {
-  const engine = createFallbackQualityEngine();
+describe("명시적 basic-reference 엔진 — 셰이핑", () => {
+  const engine = createBasicQualityEngine();
 
   it("자기 능력을 정직하게 신고한다", () => {
-    expect(engine.id).toBe("fallback");
+    expect(engine.id).toBe("basic-reference");
     expect(engine.capabilities).toEqual({
       textShaping: false,
       pathBoolean: false,
@@ -93,7 +93,7 @@ describe("폴백 엔진 — 셰이핑", () => {
     const run = engine.shapeText({ text: "A", fontFamily: "sans", fontSizePx: 100 });
     expect(run.ascentPx).toBe(88);
     expect(run.descentPx).toBe(22);
-    const custom = createFallbackQualityEngine({ ascentRatio: 0.75, descentRatio: 0.25 }).shapeText({
+    const custom = createBasicQualityEngine({ ascentRatio: 0.75, descentRatio: 0.25 }).shapeText({
       text: "A",
       fontFamily: "sans",
       fontSizePx: 100,
@@ -102,14 +102,14 @@ describe("폴백 엔진 — 셰이핑", () => {
   });
 
   it("주입한 측정기를 쓴다(브라우저 measureText 연결점)", () => {
-    const measured = createFallbackQualityEngine({ measureAdvance: () => 7 });
+    const measured = createBasicQualityEngine({ measureAdvance: () => 7 });
     const run = measured.shapeText({ text: "가나다", fontFamily: "sans", fontSizePx: 20 });
     expect(run.widthPx).toBe(21);
   });
 });
 
-describe("폴백 엔진 — 줄바꿈", () => {
-  const engine = createFallbackQualityEngine();
+describe("명시적 basic-reference 엔진 — 줄바꿈", () => {
+  const engine = createBasicQualityEngine();
 
   it("maxWidth가 없으면 개행 문자만으로 나눈다", () => {
     const run = engine.shapeText({ text: "가나\n다", fontFamily: "sans", fontSizePx: 10 });
@@ -154,8 +154,8 @@ describe("폴백 엔진 — 줄바꿈", () => {
   });
 });
 
-describe("폴백 엔진 — 패스 연산 미지원", () => {
-  const engine = createFallbackQualityEngine();
+describe("명시적 basic-reference 엔진 — 패스 연산 미지원", () => {
+  const engine = createBasicQualityEngine();
 
   it("불리언은 못 한다고 말하고 대안을 알린다", () => {
     const result = engine.pathOp("M0 0 L10 0", "M5 0 L15 0", "union");
@@ -178,9 +178,12 @@ describe("폴백 엔진 — 패스 연산 미지원", () => {
 });
 
 describe("엔진 해석 — lazy 로더", () => {
-  it("로더가 없으면 폴백을 돌려준다", async () => {
-    const engine = await resolveQualityEngine();
-    expect(engine.id).toBe("fallback");
+  it("로더가 없으면 선택한 CanvasKit을 unavailable로 닫는다", async () => {
+    await expect(resolveQualityEngine()).rejects.toMatchObject({
+      name: "StudioEngineUnavailableError",
+      providerId: "canvaskit",
+      stage: "initialization",
+    });
     expect(qualityEngineLoadError()).toBeNull();
   });
 
@@ -203,14 +206,17 @@ describe("엔진 해석 — lazy 로더", () => {
     expect(b).toBe(c);
   });
 
-  it("로드가 실패해도 던지지 않고 폴백으로 계속한다", async () => {
+  it("로드가 실패하면 다른 엔진 없이 unavailable로 닫는다", async () => {
     registerQualityEngineLoader(async () => {
       throw new Error("WASM 404");
     });
-    const engine = await resolveQualityEngine();
-    expect(engine.id).toBe("fallback");
+    await expect(resolveQualityEngine()).rejects.toMatchObject({
+      name: "StudioEngineUnavailableError",
+      providerId: "canvaskit",
+      stage: "initialization",
+    });
     expect(qualityEngineLoadError()).toContain("WASM 404");
-    expect(qualityEngineLoadError()).toContain("기본 엔진으로 계속합니다");
+    expect(qualityEngineLoadError()).toContain("선택한 엔진을 사용할 수 없습니다");
   });
 
   it("실패 후 다시 시도할 수 있다(캐시가 실패를 굳히지 않는다)", async () => {
@@ -220,35 +226,41 @@ describe("엔진 해석 — lazy 로더", () => {
       if (attempt === 1) throw new Error("일시 오류");
       return fakeCanvasKitEngine();
     });
-    expect((await resolveQualityEngine()).id).toBe("fallback");
+    await expect(resolveQualityEngine()).rejects.toMatchObject({
+      providerId: "canvaskit",
+    });
     expect((await resolveQualityEngine()).id).toBe("canvaskit");
     expect(attempt).toBe(2);
   });
 
-  it("동기 접근은 로드 전에는 폴백, 로드 후에는 고품질 엔진이다", async () => {
+  it("동기 접근은 로드 전 null, 성공 후 선택한 CanvasKit이다", async () => {
     registerQualityEngineLoader(async () => fakeCanvasKitEngine());
-    expect(qualityEngineNow().id).toBe("fallback");
+    expect(qualityEngineNow()).toBeNull();
     await resolveQualityEngine();
-    expect(qualityEngineNow().id).toBe("canvaskit");
+    expect(qualityEngineNow()?.id).toBe("canvaskit");
   });
 
   it("reset은 등록·캐시·오류를 모두 지운다", async () => {
     registerQualityEngineLoader(async () => fakeCanvasKitEngine());
     await resolveQualityEngine();
     resetQualityEngine();
-    expect(qualityEngineNow().id).toBe("fallback");
+    expect(qualityEngineNow()).toBeNull();
     expect(qualityEngineLoadError()).toBeNull();
-    expect((await resolveQualityEngine()).id).toBe("fallback");
+    await expect(resolveQualityEngine()).rejects.toMatchObject({
+      providerId: "canvaskit",
+    });
   });
 
   it("로더를 null로 등록하면 해제된다", async () => {
     registerQualityEngineLoader(async () => fakeCanvasKitEngine());
     await resolveQualityEngine();
     registerQualityEngineLoader(null);
-    expect((await resolveQualityEngine()).id).toBe("fallback");
+    await expect(resolveQualityEngine()).rejects.toMatchObject({
+      providerId: "canvaskit",
+    });
   });
 
-  it("꽂힌 엔진은 폴백과 같은 인터페이스로 호출된다(드롭인 계약)", async () => {
+  it("등록된 exact CanvasKit 엔진만 같은 인터페이스로 호출된다", async () => {
     registerQualityEngineLoader(async () => fakeCanvasKitEngine());
     const engine = await resolveQualityEngine();
     const run = engine.shapeText({ text: "가", fontFamily: "sans", fontSizePx: 20 });
@@ -257,6 +269,16 @@ describe("엔진 해석 — lazy 로더", () => {
     expect(run.glyphs[0]!.glyphId).toBe(42);
     const boolean = engine.pathOp("A", "B", "difference");
     expect(boolean).toEqual({ ok: true, pathData: "A|B|difference" });
+  });
+
+  it("로더가 다른 provider를 반환하면 자동 대체로 받아들이지 않는다", async () => {
+    registerQualityEngineLoader(async () => createBasicQualityEngine());
+    await expect(resolveQualityEngine()).rejects.toMatchObject({
+      name: "StudioEngineUnavailableError",
+      providerId: "canvaskit",
+      stage: "initialization",
+    });
+    expect(qualityEngineNow()).toBeNull();
   });
 });
 

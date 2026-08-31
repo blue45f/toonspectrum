@@ -48,7 +48,7 @@ function memory32Bridge(input: {
   >;
 } {
   const result = createStudioWasmMemoryRuntime({
-    preferredMode: "i32",
+    selectedMode: "i32",
     initialPages: input.initialPages ?? BigInt(1),
     maximumPages: input.maximumPages ?? BigInt(4),
   });
@@ -411,7 +411,7 @@ describe("StudioLargeDocumentMemory64Runtime actual Memory64 path", () => {
 
   it("refuses chunk sizes above the 64 MiB transfer boundary", () => {
     const result = createStudioWasmMemoryRuntime({
-      preferredMode: "i32",
+      selectedMode: "i32",
       initialPages: BigInt(1),
       maximumPages: BigInt(2),
     });

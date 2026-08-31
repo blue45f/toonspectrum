@@ -18,6 +18,7 @@ import type {
   StudioLivingInkExecutionApplyResult,
   StudioLivingInkExecutionConfig,
   StudioLivingInkExecutionFrame,
+  StudioLivingInkExecutionProviderId,
   StudioLivingInkExecutionReceipt,
 } from "./studio-living-ink-execution-protocol";
 
@@ -79,9 +80,10 @@ export interface StudioLivingInkCoordinatorProvider {
 export interface StudioLivingInkStudioCoordinatorOptions {
   readonly onStateChange?: (state: StudioLivingInkStudioState, message?: string) => void;
   readonly onCapacityDiagnostic?: (message: string) => void;
-  /** Test seam. Production always uses the isolated Worker/WebGL2 provider factory. */
+  /** Test seam. Production uses one explicitly selected isolated Worker GPU provider. */
   readonly providerFactory?: (
     config: StudioLivingInkExecutionConfig,
+    backend: StudioLivingInkExecutionProviderId,
   ) => Promise<StudioLivingInkCoordinatorProvider>;
 }
 
@@ -197,6 +199,7 @@ export class StudioLivingInkStudioCoordinator {
   /** Provider owned while persisted operations replay, before physical authority is accepted. */
   #activatingProvider: StudioLivingInkCoordinatorProvider | null = null;
   #config: StudioLivingInkExecutionConfig | null = null;
+  #backend: StudioLivingInkExecutionProviderId | null = null;
   #pageId: string | null = null;
   #state: StudioLivingInkStudioState = "unavailable";
   #epoch = 0;
@@ -235,6 +238,7 @@ export class StudioLivingInkStudioCoordinator {
 
   async activate(input: Readonly<{
     pageId: string;
+    backend: StudioLivingInkExecutionProviderId;
     config: StudioLivingInkExecutionConfig;
     journal?: readonly StudioLivingInkOperation[];
     expectedFinalReceipt?: StudioLivingInkExecutionReceipt | null;
@@ -255,6 +259,7 @@ export class StudioLivingInkStudioCoordinator {
     this.#pendingActionRouteKey = null;
     this.#pageId = input.pageId;
     this.#config = structuredClone(input.config);
+    this.#backend = input.backend;
     this.#capacityDiagnostic = null;
     this.#setState("loading");
     // Revoke the old Worker first. The provider rejects every pending request before terminating
@@ -276,9 +281,19 @@ export class StudioLivingInkStudioCoordinator {
     }
     let candidate: StudioLivingInkCoordinatorProvider | null = null;
     try {
+      const receiptBackend = input.expectedFinalReceipt?.backend === "webgl2-offscreen-half-float"
+        ? "webgl2"
+        : input.expectedFinalReceipt?.backend === "webgpu-offscreen-half-float"
+          ? "webgpu"
+          : null;
+      if (receiptBackend && receiptBackend !== input.backend) {
+        throw new Error(
+          "Living Ink persisted receipt backend differs from the explicitly selected provider.",
+        );
+      }
       const provider = await (
-        this.#options.providerFactory?.(input.config)
-        ?? createStudioLivingInkExecutionProvider(input.config)
+        this.#options.providerFactory?.(input.config, input.backend)
+        ?? createStudioLivingInkExecutionProvider(input.config, { backend: input.backend })
       );
       candidate = provider;
       if (epoch !== this.#epoch) {
@@ -647,13 +662,15 @@ export class StudioLivingInkStudioCoordinator {
 
   async #rebuildCommitted(): Promise<void> {
     const config = this.#config;
+    const backend = this.#backend;
     const pageId = this.#pageId;
-    if (!config || !pageId) {
+    if (!config || !backend || !pageId) {
       this.#setState("unavailable");
       return;
     }
     await this.activate({
       pageId,
+      backend,
       config,
       journal: this.#committedJournal,
       expectedFinalReceipt: this.#committedReceipt,
@@ -700,6 +717,7 @@ export class StudioLivingInkStudioCoordinator {
     this.#activatingProvider = null;
     this.#pageId = null;
     this.#config = null;
+    this.#backend = null;
     this.#committedJournal = [];
     this.#committedReceipt = null;
     this.#workingJournal = [];

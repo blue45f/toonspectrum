@@ -18,8 +18,10 @@ import {
 
 export const STUDIO_VRM_TEXTURE_GEOMETRY_WORKER_DEFAULT_TIMEOUT_MS = 30_000;
 export const STUDIO_VRM_TEXTURE_GEOMETRY_WORKER_MAX_TIMEOUT_MS = 120_000;
-export const STUDIO_VRM_TEXTURE_GEOMETRY_SYNC_FALLBACK_MAX_TRIANGLES = 4_096;
-export const STUDIO_VRM_TEXTURE_GEOMETRY_SYNC_FALLBACK_MAX_INPUT_BYTES = 1_048_576;
+export const STUDIO_VRM_TEXTURE_GEOMETRY_DIRECT_MAX_TRIANGLES = 4_096;
+export const STUDIO_VRM_TEXTURE_GEOMETRY_DIRECT_MAX_INPUT_BYTES = 1_048_576;
+
+export type StudioVrmTextureGeometryExecutionBackend = "worker" | "direct";
 
 export type StudioVrmTextureGeometryFloatSource =
   | Float32Array<ArrayBufferLike>
@@ -73,22 +75,24 @@ export type StudioVrmTextureGeometryWorkerFactory =
 export interface StudioVrmTextureGeometryWorkerBuildOptions {
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
+  /** Selected once before topology work starts. Omission selects the product Worker. */
+  readonly executionBackend?: StudioVrmTextureGeometryExecutionBackend;
   readonly workerFactory?: StudioVrmTextureGeometryWorkerFactory | null;
-  /**
-   * Defaults to true, but only ≤4,096-triangle/≤1 MiB snapshots are eligible. Larger meshes fail
-   * closed when Worker is unavailable instead of blocking pointer input on the main thread.
-   */
-  readonly allowSynchronousFallback?: boolean;
 }
 
 export interface StudioVrmTextureGeometryWorkerBuildResult {
-  readonly execution: "worker" | "sync-fallback";
+  readonly execution: StudioVrmTextureGeometryExecutionBackend;
+  readonly selectedExecutionBackend: StudioVrmTextureGeometryExecutionBackend;
+  readonly attemptedExecutionBackends:
+    readonly [StudioVrmTextureGeometryExecutionBackend];
   readonly topology: StudioVrmTextureGeometryWorkerTopology;
 }
 
 export type StudioVrmTextureGeometryWorkerClientErrorCode =
   | StudioVrmTextureGeometryWorkerFailureCode
   | "aborted"
+  | "direct-failed"
+  | "direct-input-too-large"
   | "invalid-input"
   | "protocol"
   | "timeout"
@@ -98,7 +102,6 @@ export type StudioVrmTextureGeometryWorkerClientErrorCode =
 export class StudioVrmTextureGeometryWorkerClientError extends Error {
   constructor(
     readonly code: StudioVrmTextureGeometryWorkerClientErrorCode,
-    readonly fallbackEligible = false,
     options?: ErrorOptions,
   ) {
     super(code, options);
@@ -126,12 +129,10 @@ function nextPositiveId(kind: "request" | "generation"): number {
 
 function clientError(
   code: StudioVrmTextureGeometryWorkerClientErrorCode,
-  fallbackEligible = false,
   cause?: unknown,
 ): StudioVrmTextureGeometryWorkerClientError {
   return new StudioVrmTextureGeometryWorkerClientError(
     code,
-    fallbackEligible,
     cause === undefined ? undefined : { cause },
   );
 }
@@ -296,11 +297,11 @@ export function createStudioVrmTextureGeometryWorkerRequest(
   });
 }
 
-export function isStudioVrmTextureGeometrySynchronousFallbackEligible(
+export function studioVrmTextureGeometrySupportsDirectExecution(
   request: StudioVrmTextureGeometryWorkerRequest,
 ): boolean {
-  return request.triangleCount <= STUDIO_VRM_TEXTURE_GEOMETRY_SYNC_FALLBACK_MAX_TRIANGLES &&
-    request.inputByteLength <= STUDIO_VRM_TEXTURE_GEOMETRY_SYNC_FALLBACK_MAX_INPUT_BYTES;
+  return request.triangleCount <= STUDIO_VRM_TEXTURE_GEOMETRY_DIRECT_MAX_TRIANGLES &&
+    request.inputByteLength <= STUDIO_VRM_TEXTURE_GEOMETRY_DIRECT_MAX_INPUT_BYTES;
 }
 
 function responseIdentity(
@@ -317,34 +318,53 @@ function responseIdentity(
     : null;
 }
 
-function synchronousFallback(
+function executionResult(
+  executionBackend: StudioVrmTextureGeometryExecutionBackend,
+  topology: StudioVrmTextureGeometryWorkerTopology,
+): StudioVrmTextureGeometryWorkerBuildResult {
+  return Object.freeze({
+    execution: executionBackend,
+    selectedExecutionBackend: executionBackend,
+    attemptedExecutionBackends: Object.freeze([
+      executionBackend,
+    ]) as readonly [StudioVrmTextureGeometryExecutionBackend],
+    topology,
+  });
+}
+
+function buildDirect(
   request: StudioVrmTextureGeometryWorkerRequest,
 ): StudioVrmTextureGeometryWorkerBuildResult {
   try {
-    return Object.freeze({
-      execution: "sync-fallback" as const,
-      topology: computeStudioVrmTextureGeometryWorkerTopology(request),
-    });
+    return executionResult(
+      "direct",
+      computeStudioVrmTextureGeometryWorkerTopology(request),
+    );
   } catch (cause) {
     if (
       cause instanceof Error &&
       "code" in cause &&
       typeof cause.code === "string"
     ) {
-      throw clientError(cause.code as StudioVrmTextureGeometryWorkerFailureCode, true, cause);
+      throw clientError(cause.code as StudioVrmTextureGeometryWorkerFailureCode, cause);
     }
-    throw clientError("worker-failed", true, cause);
+    throw clientError("direct-failed", cause);
   }
 }
 
 /**
- * Builds one topology in a fresh Worker realm. Every terminal path removes listeners and terminates
- * the Worker, so aborts/timeouts/crashes cannot leak stale state into a later geometry.
+ * Selects one topology backend before execution. The default Worker is fail-closed: construction,
+ * post, protocol, timeout, and runtime failure never replay the request through direct execution.
+ * Direct execution is available only by explicit selection and remains bounded.
  */
 export function buildStudioVrmTextureGeometryTopologyInWorker(
   input: StudioVrmTextureGeometryWorkerInput,
   options: StudioVrmTextureGeometryWorkerBuildOptions = {},
 ): Promise<StudioVrmTextureGeometryWorkerBuildResult> {
+  const executionBackend = options.executionBackend ?? "worker";
+  if (executionBackend !== "worker" && executionBackend !== "direct") {
+    return Promise.reject(clientError("invalid-input"));
+  }
   let request: StudioVrmTextureGeometryWorkerRequest;
   let timeoutMs: number;
   try {
@@ -354,15 +374,18 @@ export function buildStudioVrmTextureGeometryTopologyInWorker(
     return Promise.reject(
       cause instanceof StudioVrmTextureGeometryWorkerClientError
         ? cause
-        : clientError("invalid-input", false, cause),
+        : clientError("invalid-input", cause),
     );
   }
   if (options.signal?.aborted) {
     return Promise.reject(clientError("aborted"));
   }
-  const fallbackEligible =
-    options.allowSynchronousFallback !== false &&
-    isStudioVrmTextureGeometrySynchronousFallbackEligible(request);
+  if (executionBackend === "direct") {
+    if (!studioVrmTextureGeometrySupportsDirectExecution(request)) {
+      return Promise.reject(clientError("direct-input-too-large"));
+    }
+    return Promise.resolve().then(() => buildDirect(request));
+  }
   const factory = options.workerFactory === undefined
     ? defaultWorkerFactory
     : options.workerFactory;
@@ -375,9 +398,7 @@ export function buildStudioVrmTextureGeometryTopologyInWorker(
     }
   }
   if (!worker) {
-    return fallbackEligible
-      ? Promise.resolve().then(() => synchronousFallback(request))
-      : Promise.reject(clientError("worker-unavailable", false));
+    return Promise.reject(clientError("worker-unavailable"));
   }
 
   return new Promise<StudioVrmTextureGeometryWorkerBuildResult>((resolve, reject) => {
@@ -401,17 +422,17 @@ export function buildStudioVrmTextureGeometryTopologyInWorker(
       cleanup();
       if (error) reject(error);
       else if (result) resolve(result);
-      else reject(clientError("worker-failed", fallbackEligible));
+      else reject(clientError("worker-failed"));
     };
-    const handleAbort = () => finish(undefined, clientError("aborted", fallbackEligible));
+    const handleAbort = () => finish(undefined, clientError("aborted"));
     const handleWorkerFailure = (event: WorkerErrorEventLike) => {
       safeCall(() => event.preventDefault?.());
-      finish(undefined, clientError("worker-failed", fallbackEligible));
+      finish(undefined, clientError("worker-failed"));
     };
     const handleMessage = (event: WorkerMessageEventLike) => {
       const identity = responseIdentity(event.data);
       if (!identity) {
-        finish(undefined, clientError("protocol", fallbackEligible));
+        finish(undefined, clientError("protocol"));
         return;
       }
       if (
@@ -422,11 +443,11 @@ export function buildStudioVrmTextureGeometryTopologyInWorker(
         return;
       }
       if (!isStudioVrmTextureGeometryWorkerResponse(event.data)) {
-        finish(undefined, clientError("protocol", fallbackEligible));
+        finish(undefined, clientError("protocol"));
         return;
       }
       if (event.data.kind === "error") {
-        finish(undefined, clientError(event.data.code, fallbackEligible));
+        finish(undefined, clientError(event.data.code));
         return;
       }
       const topology = event.data.topology;
@@ -435,10 +456,10 @@ export function buildStudioVrmTextureGeometryTopologyInWorker(
         topology.uvAttribute !== request.uvAttribute ||
         !hasValidStudioVrmTextureGeometryWorkerTopologyNumbers(topology)
       ) {
-        finish(undefined, clientError("protocol", fallbackEligible));
+        finish(undefined, clientError("protocol"));
         return;
       }
-      finish(Object.freeze({ execution: "worker", topology }));
+      finish(executionResult("worker", topology));
     };
 
     worker.addEventListener("message", handleMessage);
@@ -446,7 +467,7 @@ export function buildStudioVrmTextureGeometryTopologyInWorker(
     worker.addEventListener("messageerror", handleWorkerFailure);
     options.signal?.addEventListener("abort", handleAbort, { once: true });
     timeout = setTimeout(
-      () => finish(undefined, clientError("timeout", fallbackEligible)),
+      () => finish(undefined, clientError("timeout")),
       timeoutMs,
     );
     try {
@@ -455,7 +476,7 @@ export function buildStudioVrmTextureGeometryTopologyInWorker(
         studioVrmTextureGeometryWorkerRequestTransfers(request),
       );
     } catch (cause) {
-      finish(undefined, clientError("worker-failed", fallbackEligible, cause));
+      finish(undefined, clientError("worker-failed", cause));
     }
   });
 }

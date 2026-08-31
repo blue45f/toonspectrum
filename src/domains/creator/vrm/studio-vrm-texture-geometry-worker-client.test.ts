@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildStudioVrmTextureGeometryTopologyInWorker,
   createStudioVrmTextureGeometryWorkerRequest,
-  isStudioVrmTextureGeometrySynchronousFallbackEligible,
+  studioVrmTextureGeometrySupportsDirectExecution,
   type StudioVrmTextureGeometryWorkerLike,
 } from "./studio-vrm-texture-geometry-worker-client";
 import {
@@ -126,7 +126,11 @@ describe("studio-vrm-texture-geometry-worker-client", () => {
     worker.emitMessage(resultFor(request));
 
     const result = await pending;
-    expect(result.execution).toBe("worker");
+    expect(result).toMatchObject({
+      execution: "worker",
+      selectedExecutionBackend: "worker",
+      attemptedExecutionBackends: ["worker"],
+    });
     expect([...result.topology.triangleIslandIds]).toEqual([0, 0]);
     expect(worker.terminateCalls).toBe(1);
     expect(worker.messages.size).toBe(0);
@@ -255,18 +259,38 @@ describe("studio-vrm-texture-geometry-worker-client", () => {
     },
   );
 
-  it("uses the deterministic synchronous fallback only for bounded small snapshots", async () => {
+  it("uses bounded direct execution only when selected before work", async () => {
     const request = createStudioVrmTextureGeometryWorkerRequest(square());
-    expect(isStudioVrmTextureGeometrySynchronousFallbackEligible(request)).toBe(true);
+    expect(studioVrmTextureGeometrySupportsDirectExecution(request)).toBe(true);
+    const workerFactory = vi.fn(() => new FakeWorker());
     const result = await buildStudioVrmTextureGeometryTopologyInWorker(square(), {
-      workerFactory: null,
+      executionBackend: "direct",
+      workerFactory,
     });
 
-    expect(result.execution).toBe("sync-fallback");
+    expect(result).toMatchObject({
+      execution: "direct",
+      selectedExecutionBackend: "direct",
+      attemptedExecutionBackends: ["direct"],
+    });
     expect([...result.topology.triangleIslandIds]).toEqual([0, 0]);
+    expect(workerFactory).not.toHaveBeenCalled();
   });
 
-  it("fails closed when Worker is unavailable for a large mesh", async () => {
+  it("fails closed when the selected Worker is unavailable for every input size", async () => {
+    await expect(buildStudioVrmTextureGeometryTopologyInWorker(
+      square(),
+      { workerFactory: null },
+    )).rejects.toMatchObject({ code: "worker-unavailable" });
+    await expect(buildStudioVrmTextureGeometryTopologyInWorker(
+      square(),
+      {
+        workerFactory: () => {
+          throw new Error("startup failed");
+        },
+      },
+    )).rejects.toMatchObject({ code: "worker-unavailable" });
+
     const triangles = 4_097;
     const positions = new Float32Array(triangles * 3 * 3);
     const uvs = new Float32Array(triangles * 3 * 2);
@@ -275,15 +299,27 @@ describe("studio-vrm-texture-geometry-worker-client", () => {
       { workerFactory: null },
     )).rejects.toMatchObject({
       code: "worker-unavailable",
-      fallbackEligible: false,
     });
   });
 
-  it("honors explicit fallback disablement even for tiny geometry", async () => {
+  it("rejects oversized explicit direct work without trying a Worker", async () => {
+    const triangles = 4_097;
+    const factory = vi.fn(() => new FakeWorker());
     await expect(buildStudioVrmTextureGeometryTopologyInWorker(square(), {
-      workerFactory: null,
-      allowSynchronousFallback: false,
-    })).rejects.toMatchObject({ code: "worker-unavailable" });
+      executionBackend: "invalid" as never,
+      workerFactory: factory,
+    })).rejects.toMatchObject({ code: "invalid-input" });
+    await expect(buildStudioVrmTextureGeometryTopologyInWorker(
+      {
+        positions: new Float32Array(triangles * 3 * 3),
+        uvs: new Float32Array(triangles * 3 * 2),
+      },
+      {
+        executionBackend: "direct",
+        workerFactory: factory,
+      },
+    )).rejects.toMatchObject({ code: "direct-input-too-large" });
+    expect(factory).not.toHaveBeenCalled();
   });
 
   it("rejects pre-abort and invalid timeout before creating a Worker", async () => {

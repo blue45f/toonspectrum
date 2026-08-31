@@ -205,7 +205,7 @@ describe("deriveAssetMetadata", () => {
     ]);
     expect(card.rendererVariants.map(({ id, qualityStatus }) => ({ id, qualityStatus }))).toEqual([
       { id: "stable-hokusai", qualityStatus: "unmeasured" },
-      { id: "stable-perfect-freehand-fallback", qualityStatus: "unmeasured" },
+      { id: "stable-perfect-freehand", qualityStatus: "unmeasured" },
     ]);
     expect(card.realStrokePreviews).toEqual([]);
     expect(card.deviceProfiles).toEqual([]);
@@ -220,11 +220,11 @@ describe("deriveAssetMetadata", () => {
       artifactRef: null,
       rendererVariantId: null,
     });
-    expect(card.fallback).toMatchObject({
-      strategy: "renderer-variant",
-      rendererVariantId: "stable-perfect-freehand-fallback",
-      providerId: "perfect-freehand",
-      preservesNormalizedIr: true,
+    expect(card.providerUnavailable).toMatchObject({
+      status: "unavailable",
+      retainsNormalizedIr: true,
+      nextOperation: "select-provider",
+      selectableRendererVariantIds: ["stable-hokusai", "stable-perfect-freehand"],
     });
     expect(card.replacementCondition?.requiredEvidence).toContain("real-device-stroke");
     expect(card.marketplace).toMatchObject({
@@ -268,8 +268,8 @@ describe("deriveAssetMetadata", () => {
     expect(card.previewVariants.stable?.status).toBe("not-generated");
     expect(card.previewVariants.studioMax?.status).toBe("not-generated");
     expect(card.visualEquivalenceReport).toBeNull();
-    expect(card.fallback?.limitations).toContain(
-      "Fallback does not claim Krita or CSP stroke equivalence.",
+    expect(card.providerUnavailable?.limitations).toContain(
+      "An explicit provider selection does not claim Krita or CSP stroke equivalence.",
     );
     expect(card.marketplace?.status).toBe("not-listed");
     expect(card.provenance.warnings).toEqual(result.warnings);
@@ -311,13 +311,13 @@ describe("deriveAssetMetadata", () => {
       status: "not-generated",
       rendererVariantId: "stable-google-ink-mesh",
     });
-    // Fail-closed: the fallback stays on the mesh lane itself — no outline or
-    // natural-media substitution without a visual-equivalence certification.
-    expect(card.fallback).toMatchObject({
-      strategy: "renderer-variant",
-      rendererVariantId: "stable-google-ink-mesh",
-      providerId: "google-ink-mesh",
-      preservesNormalizedIr: true,
+    // Fail-closed: an unavailable mesh provider preserves BrushProgramIR and
+    // offers its provider only as a later, explicit selection.
+    expect(card.providerUnavailable).toMatchObject({
+      status: "unavailable",
+      retainsNormalizedIr: true,
+      nextOperation: "select-provider",
+      selectableRendererVariantIds: ["stable-google-ink-mesh"],
     });
     expect(card.visualEquivalenceReport).toBeNull();
   });
@@ -370,10 +370,11 @@ describe("deriveAssetMetadata", () => {
       rendererVariantId: "studio-max-vello-gpu",
     });
     expect(card.visualEquivalenceReport).toBeNull();
-    expect(card.fallback).toMatchObject({
-      rendererVariantId: "stable-canvaskit",
-      providerId: "skia-canvaskit",
-      preservesNormalizedIr: true,
+    expect(card.providerUnavailable).toMatchObject({
+      status: "unavailable",
+      retainsNormalizedIr: true,
+      nextOperation: "select-provider",
+      selectableRendererVariantIds: ["stable-canvaskit", "studio-max-vello-gpu"],
     });
     expect(card.marketplace).toMatchObject({
       status: "not-listed",
@@ -407,6 +408,14 @@ describe("deriveAssetMetadata", () => {
       expect(card.realStrokePreviews).toEqual([]);
       expect(card.deviceProfiles).toEqual([]);
       expect(card.visualEquivalenceReport).toBeNull();
+      expect(card.providerUnavailable).toMatchObject({
+        status: "unavailable",
+        retainsNormalizedIr: true,
+        nextOperation: "select-provider",
+      });
+      expect(card.replacementCondition?.requiredEvidence).toContain(
+        "explicit-provider-selection",
+      );
     }
   });
 

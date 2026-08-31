@@ -101,6 +101,14 @@ function segmentedCausalOverlayRoute(): number[] {
   ]).flat();
 }
 
+function operationResultLabel(
+  result: { readonly status: string; readonly reason?: string },
+): string {
+  return result.status === "unavailable" || result.status === "rejected"
+    ? result.reason ?? result.status
+    : result.status;
+}
+
 /**
  * How much more a stroke's late appends draw than its early ones -- the O(1) claim as a number.
  *
@@ -401,15 +409,15 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     }))).toMatchObject({ status: "started" });
 
     let successfulFrames = 0;
-    let fallback: ReturnType<typeof renderer.appendFrom> | null = null;
+    let failure: ReturnType<typeof renderer.appendFrom> | null = null;
     for (let index = 1; index <= 96; index += 1) {
       points.push(10 + index, 20);
       const result = renderer.appendFrom(drawElement("r8-live-budget", points, {
         brush: "dry-media",
         brushDynamics: dynamics,
       }));
-      if (result.status === "fallback") {
-        fallback = result;
+      if (result.status === "unavailable" || result.status === "rejected") {
+        failure = result;
         break;
       }
       successfulFrames += 1;
@@ -422,7 +430,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     ).toBe(64);
     expect(successfulFrames).toBeGreaterThan(1);
     expect(successfulFrames).toBeLessThanOrEqual(63);
-    expect(fallback).toEqual({ status: "fallback", reason: "material-plan" });
+    expect(failure).toEqual({ status: "rejected", reason: "material-plan" });
   });
 
   it("keeps legacy texture grids adaptive while causal-v2 starts and seals on grid3", () => {
@@ -491,7 +499,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
 
       expect(renderer.begin(element).status).toBe("started");
       const appended = renderer.appendFrom(element);
-      expect(appended.status === "fallback" ? appended.reason : appended.status)
+      expect(operationResultLabel(appended))
         .toBe("appended");
       const liveMarks = structuredClone(activeCanvas.recordedMarks);
       expect(liveMarks.length).toBeGreaterThan(4);
@@ -532,9 +540,9 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     });
 
     const started = renderer.begin(element);
-    expect(started.status === "fallback" ? started.reason : started.status).toBe("started");
+    expect(operationResultLabel(started)).toBe("started");
     const appended = renderer.appendFrom(element);
-    expect(appended.status === "fallback" ? appended.reason : appended.status)
+    expect(operationResultLabel(appended))
       .toBe("appended");
     expect(activeCanvas.recordedMarks.length).toBeGreaterThan(0);
 
@@ -604,7 +612,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(nearerToKit.length).toBeGreaterThan(liveMarks.length / 2);
 
     const sealed = renderer.end(element);
-    expect(sealed.status === "fallback" ? sealed.reason : sealed.status).toBe("settled");
+    expect(operationResultLabel(sealed)).toBe("settled");
   });
 
   it("keeps a long causal G-pen on the append-only surface beyond the old 1,024-dab ceiling", () => {
@@ -624,7 +632,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
 
     expect(renderer.begin(element).status).toBe("started");
     const appended = renderer.appendFrom(element);
-    expect(appended.status === "fallback" ? appended.reason : appended.status)
+    expect(operationResultLabel(appended))
       .toBe("appended");
     expect(activeCanvas.recordedMarks.length).toBeGreaterThan(1_024);
     const acceptedLiveMarks = structuredClone(activeCanvas.recordedMarks);
@@ -637,7 +645,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       opacity: element.opacity,
       marks: acceptedLiveMarks,
     }]);
-    expect(renderer.lastFallbackReason).toBeNull();
+    expect(renderer.lastOperationFailureReason).toBeNull();
   });
 
   it("streams v3 beyond 65,536 dabs, seals one opacity composite and releases it atomically", () => {
@@ -679,7 +687,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
     );
     expect(activeCanvas.recordedMarks.length).toBe(appended.appendedDabs);
-    expect(renderer.lastFallbackReason).toBeNull();
+    expect(renderer.lastOperationFailureReason).toBeNull();
 
     const selectedIndexes = [
       0,
@@ -776,8 +784,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
 
     const firstBatch = elementAt(200);
     const begun = renderer.begin(firstBatch);
-    expect(begun.status === "fallback" ? begun.reason : begun.status).toBe("started");
-    if (begun.status === "fallback") return;
+    expect(operationResultLabel(begun)).toBe("started");
+    if (begun.status !== "started") return;
     expect(begun.markCount).toBe(64 * 3);
     expect(activeCanvas.recordedMarks).toHaveLength(64 * 3);
     expect(renderer.appendFrom(firstBatch).status).toBe("appended");
@@ -787,7 +795,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     const complete = elementAt(360);
     const appended = renderer.appendFrom(complete);
     expect(appended.status).toBe("appended");
-    if (appended.status === "fallback") return;
+    if (appended.status !== "appended" && appended.status !== "noop") return;
     expect(appended.acceptedPrefixReceipt).toMatchObject({
       policy: "accepted-prefix-v1",
       acceptedDabsPerVariation: Math.floor(
@@ -799,7 +807,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     // Zero-alpha dabs still own causal prefix slots. The late visible suffix cannot borrow their
     // unused mark storage and then disappear when pointer-up replay applies the global ceiling.
     expect(activeCanvas.recordedMarks).toEqual(visiblePrefix);
-    expect(renderer.lastFallbackReason).toBeNull();
+    expect(renderer.lastOperationFailureReason).toBeNull();
 
     const sealed = renderer.end(complete);
     expect(sealed.status).toBe("settled");
@@ -868,7 +876,9 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         .toBe("started");
       const prefixResult = renderer.appendFrom(prefix);
       expect(prefixResult.status, `${descriptor.catalogId}: prefix`)
-        .not.toBe("fallback");
+        .not.toBe("unavailable");
+      expect(prefixResult.status, `${descriptor.catalogId}: prefix rejected`)
+        .not.toBe("rejected");
       const clearsAfterPrefix = activeCanvas.clearCount();
       const numericReads: number[] = [];
       const points = new Proxy(
@@ -894,7 +904,9 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
 
       const result = renderer.appendFrom(extended);
       expect(result.status, `${descriptor.catalogId}: suffix`)
-        .not.toBe("fallback");
+        .not.toBe("unavailable");
+      expect(result.status, `${descriptor.catalogId}: suffix rejected`)
+        .not.toBe("rejected");
       if (wholePrefixRibbonIds.has(descriptor.catalogId)) {
         expect(
           activeCanvas.clearCount(),
@@ -937,7 +949,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     );
 
     const begun = renderer.begin(element);
-    expect(begun.status === "fallback" ? begun.reason : begun.status).toBe("started");
+    expect(operationResultLabel(begun)).toBe("started");
     expect(renderer.appendFrom(element).status).toBe("appended");
     expect(activeCanvas.radialGradientCount()).toBe(0);
     expect(activeCanvas.recordedMarks.length).toBeGreaterThan(0);
@@ -1036,7 +1048,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
 
       expect(renderer.begin(element).status).toBe("started");
       const appended = renderer.appendFrom(element);
-      expect(appended.status === "fallback" ? appended.reason : appended.status)
+      expect(operationResultLabel(appended))
         .toBe("appended");
       const liveMarks = structuredClone(activeCanvas.recordedMarks);
       if (brushId === "dry-media") {
@@ -1492,7 +1504,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         const prefix = elementAt(count);
         const appended = live.renderer.appendFrom(prefix);
         expect(
-          appended.status === "fallback" ? appended.reason : appended.status,
+          operationResultLabel(appended),
           `${catalogId}: live prefix ${count}`,
         ).toBe("appended");
         const midContactMarks = structuredClone(live.activeCanvas.recordedMarks);
@@ -2416,7 +2428,15 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         ...element.brushDynamics,
         grain: { amount: 0 },
       }),
-    })).toEqual({ status: "fallback", reason: "stroke-identity" });
+    })).toEqual({ status: "rejected", reason: "stroke-identity" });
+    expect(renderer.isActive).toBe(true);
+    expect(renderer.lastOperationFailureReason).toBe("stroke-identity");
+    expect(renderer.appendFrom(element)).toEqual({
+      status: "rejected",
+      reason: "stroke-identity",
+    });
+    expect(renderer.resetActive()).toBe(true);
+    expect(renderer.isActive).toBe(false);
   });
 
   it("preserves complex tip, grain, dual, colour, symmetry and stroke opacity through seal and replay", () => {
@@ -2640,7 +2660,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
 
     expect([activeCanvas.width, activeCanvas.height]).toEqual([1, 1]);
     expect(renderer.begin(drawElement("missing-presentation-context", [24, 28]))).toEqual({
-      status: "fallback",
+      status: "unavailable",
       reason: "surface-unavailable",
     });
     expect([activeCanvas.width, activeCanvas.height]).toEqual([1, 1]);
@@ -2673,7 +2693,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
 
     renderer.setSurface(null);
     expect(renderer.appendFrom(element)).toEqual({
-      status: "fallback",
+      status: "unavailable",
       reason: "surface-budget",
     });
     expect(renderer.hasPendingBegin).toBe(false);
@@ -2697,7 +2717,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       documentWidth: dimension,
     });
     expect(renderer.begin(drawElement("native-budget", [4, 4]))).toEqual({
-      status: "fallback",
+      status: "unavailable",
       reason: "surface-budget",
     });
     expect(renderer.backingPixelCount).toBe(3);
@@ -2714,7 +2734,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(settledCanvas.recordedComposites).toEqual([]);
   });
 
-  it("releases an existing 64MiB-class backing allocation on surface-budget fallback", () => {
+  it("releases an existing 64MiB-class backing allocation when the surface is unavailable", () => {
     vi.stubGlobal("devicePixelRatio", 1);
     const dimension = Math.floor(
       Math.sqrt(STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS / 3),
@@ -2740,7 +2760,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     });
 
     expect(renderer.begin(drawElement("surface-budget-release", [4, 4]))).toEqual({
-      status: "fallback",
+      status: "unavailable",
       reason: "surface-budget",
     });
     expect(renderer.backingPixelCount).toBe(3);
@@ -2783,7 +2803,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     });
 
     expect(renderer.begin(drawElement("native-dpr-release", [4, 4]))).toEqual({
-      status: "fallback",
+      status: "unavailable",
       reason: "surface-budget",
     });
     expect(renderer.backingPixelCount).toBe(3);
@@ -2882,7 +2902,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(settledCanvas.recordedCopies).toEqual([]);
     expect(settledCanvas.recordedComposites).toHaveLength(1);
     expect(settledCanvas.recordedComposites[0]!.opacity).toBe(element.opacity);
-    expect(renderer.lastFallbackReason).toBeNull();
+    expect(renderer.lastOperationFailureReason).toBeNull();
   });
 
   it("does not seal an active stroke after its backing surface is released", () => {
@@ -2908,7 +2928,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
 
     expect(renderer.backingPixelCount).toBe(3);
     expect(renderer.end(element)).toEqual({
-      status: "fallback",
+      status: "unavailable",
       reason: "surface-budget",
     });
     expect(settledCanvas.recordedComposites).toEqual([]);

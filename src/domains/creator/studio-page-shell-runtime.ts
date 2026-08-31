@@ -31,6 +31,8 @@ export const STUDIO_VISIBLE_LIVE_INK_ROLLOUT = resolveStudioLiveInkRollout(
 );
 
 export const STUDIO_VISIBLE_LIVE_INK_PREFERENCE = STUDIO_VISIBLE_LIVE_INK_ROLLOUT.preference;
+export const STUDIO_VISIBLE_LIVE_INK_SELECTION_ENABLED =
+  STUDIO_VISIBLE_LIVE_INK_ROLLOUT.status === "selected";
 
 export const STUDIO_POINTER_PREDICTION_ENABLED = supportsStudioPointerPrediction(
   resolveStudioPointerPredictionPreference(import.meta.env.VITE_STUDIO_POINTER_PREDICTION),

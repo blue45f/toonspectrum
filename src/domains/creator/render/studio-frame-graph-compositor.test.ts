@@ -15,10 +15,8 @@ function receipt(): StudioVelloHubRenderReceipt {
     backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
     decision: "gpu-first",
     expectedGainPct: null,
-    fallback: null,
-    preservedLastGoodFrame: false,
-    visualGate: null,
-    admissionMode: "gpu-first-shadow-candidate",
+    referenceOnly: false,
+    admissionMode: "selected-gpu-provider",
     productWidePromoted: false,
   };
 }
@@ -44,6 +42,7 @@ describe("StudioFrameGraphCompositor", () => {
     expect(graph.passes.some((pass) => pass.kind === "vello-classic")).toBe(true);
     expect(graph.passes.at(-1)?.kind).toBe("present");
     expect(graph.islands.every((island) => island.transport !== "cpu-readback")).toBe(true);
+    expect(graph.islands.every((island) => !("fallbackChain" in island))).toBe(true);
 
     const hub = {
       render: vi.fn(async () => receipt()),

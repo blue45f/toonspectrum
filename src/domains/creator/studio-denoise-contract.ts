@@ -56,8 +56,9 @@
  *        공간 분산 추정보다 정확한 분산 가이드가 쓰인다).
  *
  *  C. GPU 고속 경로
- *     `denoiseStudioFrameOnGpu(frame, { runtime })` 가 **null** 을 돌려주면 그 프레임은
- *     `denoiseStudioFrame(frame)` 로 폴백한다. 런타임은 프레임마다 재획득하지 말고
+ *     `denoiseStudioFrameOnGpu(frame, { runtime })` 가 **null** 을 돌려주면 선택한 GPU 작업은
+ *     unavailable이다. 그 프레임은 마지막 정상 결과를 유지하고, CPU 참조 경로는 다음 작업
+ *     전에 명시 선택해야 한다. 런타임은 프레임마다 재획득하지 말고
  *     `acquireStudioDenoiseGpuRuntime()` 결과를 보관해 재사용한다.
  *
  *  D. 적응 샘플링 되먹임(선택)

@@ -5,12 +5,12 @@ import type { ProviderDescriptor } from "@toonspectrum/studio-engine-registry";
 /**
  * Vello CPU provider descriptor (matrix E04, ADR 0004).
  *
- * Role: deterministic CPU lane — cross-renderer diff, golden images, GPU-loss
- * recovery, background export, and (ADR-0010 승격) vector-island preview
+ * Role: deterministic CPU lane — cross-renderer diff, golden images,
+ * background export, and (ADR-0010 승격) vector-island preview
  * rendering. It does not claim the whole-canvas `surface.primary`; the product
- * VelloHub grants it only CPU fallback/reference ownership inside the bounded
+ * may bind it explicitly as a reference provider inside the bounded
  * selection-overlay island. Wider ownership still moves through the Classic/
- * Hybrid validation track and remains gated by quality + fallback evidence.
+ * Hybrid validation track and remains gated by quality and failure-isolation evidence.
  */
 /**
  * Vello GPU browser (WebGPU wasm) provider descriptor — ADR-0011 lane 2,
@@ -18,8 +18,8 @@ import type { ProviderDescriptor } from "@toonspectrum/studio-engine-registry";
  *
  * Conditions of use (enforced by the gpu-browser wrapper, not by hope):
  * - Requires `navigator.gpu`; `loadVelloGpuBrowser()` rejects with an explicit
- *   error and `probeWebGpu()` reports `{ supported: false }` when absent —
- *   callers route to the vello_cpu wasm lane (fallbackProviderId).
+ *   error and `probeWebGpu()` reports `{ supported: false }` when absent. The
+ *   selected plan fails closed and never switches to the vello_cpu wasm lane.
  * - Ships as the separate `pkg-gpu/` artifact (`wasm-pack --features gpu`,
  *   INTEGRITY-pinned); the default CPU artifact never carries GPU code.
  * - Parity contract: δ48 3×3 fuzzy mismatch vs vello_cpu ≤ 0.6% (the native
@@ -72,7 +72,6 @@ export const velloGpuBrowserProviderDescriptor: ProviderDescriptor =
     finalQuality: "preview",
     determinism: "tolerance",
     memoryEstimateMb: 64,
-    fallbackProviderId: "vello-cpu",
     knownIssues: [
       "upstream vello repository declares alpha status; adapter pins vello 0.9.0 + wgpu 29.0.4",
       "browser WebGPU availability varies by OS/driver; probeWebGpu() is the runtime gate",
@@ -106,13 +105,12 @@ export const velloSvgNativeProviderDescriptor: ProviderDescriptor =
       "text, raster images, patterns, masks, filters, markers, use/symbol, nested SVG and external references reject before rendering",
       "clipPath must contain exactly one direct geometry path after usvg normalization; no bbox approximation is accepted",
       "GPU pixel return is an evidence/export readback surface, never the interactive hot path",
-      "unsupported SVG routes through an explicit provider tournament; this adapter performs no automatic fallback",
+      "unsupported SVG rejects explicitly; a caller may make a new explicit plan but this adapter never changes providers",
     ],
     previewQuality: "production",
     finalQuality: "preview",
     determinism: "tolerance",
     memoryEstimateMb: 72,
-    fallbackProviderId: "skia-canvaskit",
     knownIssues: [
       "vello_svg documents conformance gaps and recommends resvg for correctness; the source/tree audits intentionally expose a narrower subset",
       "vello_svg 0.10 complex-clip and unsupported-paint approximations are bypassed by strict rejection gates",
@@ -148,13 +146,12 @@ export const velloCpuProviderDescriptor: ProviderDescriptor =
     limitations: [
       "bounded single-style vertical glyph-path shaping uses HarfRust TTB vert/vrt2 plus Skrifa (including tate-chu-yoko); rich paragraph editing still routes to Parley/CanvasKit",
       "single-threaded baseline SIMD level pinned for bit-stable golden images",
-      "V13 quality reference / GPU-loss recovery only — not the visible first frame when WebGPU is available",
+      "V13 quality reference only — not the visible first frame when WebGPU is available and never an automatic recovery target",
     ],
     previewQuality: "production",
     finalQuality: "reference",
     determinism: "bit-exact",
     memoryEstimateMb: 12,
-    fallbackProviderId: "skia-canvaskit",
     knownIssues: [
       "upstream vello repository declares alpha status; adapter pins vello_cpu 0.2.0",
     ],
@@ -198,13 +195,13 @@ export const velloHybridWgpuProviderDescriptor: ProviderDescriptor =
     limitations: [
       "Hybrid here is compositor + Classic path islands + external texture binding",
       "upstream vello_hybrid 0.2 sparse GPU remains a separate unavailable candidate",
-      "paragraph, complex mask, ImageFilter and backdrop blends route to Skia islands",
+      "paragraph, complex mask, ImageFilter and backdrop blends require separately planned Skia islands",
+      "runtime failure is terminal for this provider binding; it never demotes to Vello Classic",
     ],
     previewQuality: "production",
     finalQuality: "preview",
     determinism: "tolerance",
     memoryEstimateMb: 80,
-    fallbackProviderId: "vello-gpu-browser",
     knownIssues: [],
   });
 

@@ -21,10 +21,13 @@ export interface StudioSmudgeWorkerLike {
 }
 
 export type StudioSmudgeWorkerFactory = () => StudioSmudgeWorkerLike | null;
+export type StudioSmudgeExecutionMode = "worker" | "direct";
 
 export interface StudioSmudgeWorkerClientOptions {
   signal?: AbortSignal;
-  /** `null` explicitly selects the synchronous fallback; omitted uses the Vite module worker. */
+  /** Execution authority is selected before the operation starts and never changes afterward. */
+  executionMode?: StudioSmudgeExecutionMode;
+  /** Test/integration seam for Worker mode. `null` means unavailable, not direct execution. */
   workerFactory?: StudioSmudgeWorkerFactory | null;
   readyTimeoutMilliseconds?: number;
   operationTimeoutMilliseconds?: number;
@@ -63,6 +66,12 @@ function createAbortError(): Error {
 function createTimeoutError(): Error {
   const error = new Error("문지르기 Worker가 제한 시간 안에 완료되지 않았습니다.");
   error.name = "TimeoutError";
+  return error;
+}
+
+function createWorkerUnavailableError(message: string, cause?: unknown): Error {
+  const error = new Error(message, cause === undefined ? undefined : { cause });
+  error.name = "StudioSmudgeWorkerUnavailableError";
   return error;
 }
 
@@ -172,13 +181,9 @@ function runSmudgeWithWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
-    const resolveDirectFallback = () => finish(() => {
-      try {
-        resolve(runSmudgeDirect(request, signal));
-      } catch (error) {
-        reject(error);
-      }
-    });
+    const rejectWorkerUnavailable = (message: string, cause?: unknown) => finish(() => reject(
+      createWorkerUnavailableError(message, cause),
+    ));
 
     const onOperationTimeout = () => finish(() => reject(createTimeoutError()));
 
@@ -253,7 +258,10 @@ function runSmudgeWithWorker(
     worker.onerror = (event) => {
       event.preventDefault?.();
       if (!requestPosted) {
-        resolveDirectFallback();
+        rejectWorkerUnavailable(
+          "문지르기 Worker가 준비되기 전에 사용할 수 없게 되었습니다.",
+          event.error ?? event.message,
+        );
         return;
       }
       // 픽셀 버퍼가 이미 전송(detach)돼 직접 실행으로 되돌릴 데이터가 없다.
@@ -274,7 +282,7 @@ function runSmudgeWithWorker(
       postRequest();
     } else {
       readyTimer = setTimeout(
-        resolveDirectFallback,
+        () => rejectWorkerUnavailable("문지르기 Worker 준비 시간이 초과되었습니다."),
         boundedTimeout(options.readyTimeoutMilliseconds, DEFAULT_READY_TIMEOUT_MS),
       );
     }
@@ -358,17 +366,21 @@ function runSmudgeWithSharedModuleWorker(
     clearSharedSmudgeIdleTimer();
     if (disposeGeneration !== sharedSmudgeDisposeGeneration) throw createAbortError();
     throwIfAborted(options.signal);
+    let creationError: unknown;
     if (!sharedSmudgeWorker) {
       try {
         sharedSmudgeWorker = createStudioSmudgeModuleWorker();
-      } catch {
+      } catch (error) {
+        creationError = error;
         sharedSmudgeWorker = null;
       }
       sharedSmudgeWorkerReady = false;
       if (sharedSmudgeWorker) sharedSmudgeWorkerEpoch += 1;
     }
     const worker = sharedSmudgeWorker;
-    if (!worker) return runSmudgeDirect(request, options.signal);
+    if (!worker) {
+      throw createWorkerUnavailableError("문지르기 Worker를 만들 수 없습니다.", creationError);
+    }
     const epoch = sharedSmudgeWorkerEpoch;
     const controller = new AbortController();
     sharedSmudgeFlight = { worker, epoch, controller };
@@ -401,7 +413,7 @@ function runSmudgeWithSharedModuleWorker(
 /**
  * 문지르기 브러시의 스탬프 블렌드 루프를 직렬화된 모듈 Worker 작업으로 실행한다. 기본 Worker는
  * 다음 스트로크에서도 재사용하며, ArrayBuffer 픽셀 소유권은 요청마다 이전(detach)된다. Worker를
- * 만들지 못하면 안전 크기 안에서만 동일한 smudgeStroke 직접 실행으로 폴백한다.
+ * 만들지 못하면 선택한 Worker 실행을 unavailable로 종료하고 같은 요청을 직접 재실행하지 않는다.
  */
 export async function runStudioSmudgeWorker(
   request: StudioSmudgeWorkerRunRequest,
@@ -409,18 +421,20 @@ export async function runStudioSmudgeWorker(
 ): Promise<StudioSmudgeWorkerClientResult> {
   throwIfAborted(options.signal);
   const cloneSafe = cloneSafeRequest(request);
+  const executionMode = options.executionMode ?? "worker";
+  if (executionMode === "direct") return runSmudgeDirect(cloneSafe, options.signal);
   if (options.workerFactory === undefined) {
     return runSmudgeWithSharedModuleWorker(cloneSafe, options);
   }
   const factory = options.workerFactory;
-  if (!factory) return runSmudgeDirect(cloneSafe, options.signal);
+  if (!factory) throw createWorkerUnavailableError("문지르기 Worker를 만들 수 없습니다.");
 
   let worker: StudioSmudgeWorkerLike | null;
   try {
     worker = factory();
-  } catch {
-    return runSmudgeDirect(cloneSafe, options.signal);
+  } catch (error) {
+    throw createWorkerUnavailableError("문지르기 Worker를 만들 수 없습니다.", error);
   }
-  if (!worker) return runSmudgeDirect(cloneSafe, options.signal);
+  if (!worker) throw createWorkerUnavailableError("문지르기 Worker를 만들 수 없습니다.");
   return runSmudgeWithWorker(worker, cloneSafe, options);
 }

@@ -29,8 +29,7 @@ function reservationToken(): Memory64CrossRealmReservationToken {
     reservationId: "epoch16-xrealm-dry-media-scratch-test",
     nonce: "d".repeat(64),
     workload: "brush",
-    preferredRuntime: "memory32-fallback",
-    memory32FallbackAllowed: true,
+    selectedRuntime: "memory32-requested",
     authorizedResidentBytes: STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_WINDOW_BYTE_LENGTH
       .toString(),
     authorizedResidentPages: WINDOW_PAGES.toString(),
@@ -58,7 +57,7 @@ function createArena(): Readonly<{
         maximum: Number(pages),
       }),
       addressType: "i32",
-      selection: "memory32-fallback",
+      selection: "memory32-requested",
       maximumPages: pages,
     })
   ));
@@ -289,7 +288,7 @@ describe("Studio dry-media union continuation Memory64 scratch arena", () => {
               maximum: Number(pages),
             }),
             addressType: "i32",
-            selection: "memory32-fallback",
+            selection: "memory32-requested",
             maximumPages: pages,
           })
         ),

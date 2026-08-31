@@ -5,7 +5,6 @@
 // React Compiler 옵트아웃: 가변 호스트 백(h) 을 렌더마다 재대입해 공유하는 추출 패턴이라,
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
-import { flushSync } from "react-dom";
 
 import { resolveStudioCapturedBrushDynamicsPresetId } from "../brush/studio-brush-dynamics";
 import {
@@ -116,7 +115,6 @@ import {
   type StudioLivingInkCanonicalResult,
 } from "../studio-living-ink-document";
 import { studioLivingInkCoverageIntersectsStroke } from "../studio-living-ink-overlay";
-import { studioLivingInkFailureDisposition } from "../studio-living-ink-product-admission";
 import type { StudioLivingInkFinishedWork } from "../studio-living-ink-studio-coordinator";
 import {
   beginNodeDrag,
@@ -247,12 +245,11 @@ export function bindStudioCuttoonStagePointersRelease(
     appendStudioLivingInkAuthoritativeSuffix,
     armStudioLivingInkCanonicalHandoffTimeout,
     causalPostCorrectionStateRef,
-    clearStudioHokusaiVectorShadow,
-    clearStudioLivingInkVectorShadow,
+    clearStudioHokusaiRetainedDraftPixels,
+    clearStudioLivingInkRetainedDraftPixels,
     collaborationAccessRef,
     commit,
     currentPageIdRef,
-    draftPreviewStoreRef,
     drawingCrdtPublisherRef,
     drawingFixedRateFilterRef,
     drawingInkTimeOriginRef,
@@ -284,9 +281,7 @@ export function bindStudioCuttoonStagePointersRelease(
     pagesHistoryRef,
     pressureCurve,
     pressureMinSize,
-    queueCommittedStrokeSurfaceHandoff,
     releaseLivingInkInputPointer,
-    restorePendingStrokeCommits,
     session,
     setError,
     setLivingInkBusy,
@@ -297,6 +292,7 @@ export function bindStudioCuttoonStagePointersRelease(
     canvasH,
     elements,
     flushDirectLiveDraftNow,
+    gpuLiveInkPinnedRef,
     pages,
     sealCausalPostCorrectionState,
   } = h;
@@ -351,55 +347,31 @@ export function bindStudioCuttoonStagePointersRelease(
     return next;
   }
 
-  function commitStudioHokusaiFallbackVector(
+  function rejectStudioHokusaiFailedStroke(
     state: StudioHokusaiPinnedLiveStroke,
-    finished: DrawEl,
     reason: string,
   ): void {
-    const fallbackElements = withStudioHokusaiSource(
-      studioPageElementsFromHistory(state.pageId),
-      finished,
-    );
-    const currentPage = currentPageIdRef.current === state.pageId;
-    if (currentPage) {
-      // The pointerup finally-block has already cleared the direct DrawEl refs. Install an exact
-      // settled copy before removing the material overlay so async Worker failure never flashes a
-      // blank frame while the React history commit reaches the main layer.
-      flushSync(() => {
-        draftPreviewStoreRef.current.settle(finished);
-      });
-    }
-    const committed = commit(fallbackElements, undefined, state.pageId);
+    state.failed = true;
+    state.abortController.abort();
     hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
     hokusaiLiveOverlayVisibleRef.current = false;
-    hokusaiLiveStrokeRef.current = null;
+    if (hokusaiLiveStrokeRef.current === state) hokusaiLiveStrokeRef.current = null;
     hokusaiLiveFinalizingRef.current = false;
-    clearStudioHokusaiVectorShadow(state);
-    if (committed) {
-      if (currentPage) {
-        setSelectedId(finished.id);
-        queueCommittedStrokeSurfaceHandoff(state.pageId, [finished.id]);
-      }
-      announceDrawingShortcut("자연매체 표면 복구 · 원본 벡터 획 저장");
-      setError(`자연매체 획을 원본 벡터로 저장했습니다. ${reason}`);
-    } else {
-      restorePendingStrokeCommits({
-        pageId: state.pageId,
-        strokes: [finished],
-        retryCount: 0,
-      });
-      // There is no active surface for an inactive page. Its bounded recovery queue remains the
-      // sole authority until that page is opened and the commit retry succeeds.
-      setError(`자연매체 결과와 벡터 저장을 즉시 확정하지 못했습니다. 복구 큐에 보존했습니다. ${reason}`);
-    }
+    studioStrokeSurfaceRouteRef.current = null;
+    clearStudioHokusaiRetainedDraftPixels(state);
     liveDraftLayerRef.current?.drawScene();
+    announceDrawingShortcut("Hokusai 자연매체 획 취소 · 문서 보존");
+    setError(
+      `선택한 Hokusai 엔진이 결과를 확정하지 못해 획을 저장하지 않았습니다. 다른 렌더러로 자동 전환하지 않습니다. ${reason}`,
+    );
   }
 
-  function completeStudioLivingInkWaterNoop(strokeId: string, reason: string): void {
+  function completeStudioLivingInkRejectedNoop(strokeId: string, reason: string): void {
     livingInkWaterNoopStrokeIdsRef.current.delete(strokeId);
     const state = livingInkStrokeRef.current;
     if (state?.strokeId === strokeId) livingInkStrokeRef.current = null;
     livingInkOverlaySurfaceRef.current?.renderer.clear();
+    if (state) clearStudioLivingInkRetainedDraftPixels(state);
     livingInkOverlayVisibleRef.current = false;
     livingInkFinalizingRef.current = false;
     studioStrokeSurfaceRouteRef.current = null;
@@ -409,19 +381,14 @@ export function bindStudioCuttoonStagePointersRelease(
     setLivingInkBusy(false);
     void livingInkCoordinatorRef.current.cancelStroke(strokeId);
     liveDraftLayerRef.current?.drawScene();
-    announceDrawingShortcut("수채 번짐 물 도구 · 변경 없음");
-    setError(`수채 번짐 물 도구를 적용하지 못해 기존 PNG와 문서를 그대로 보존했습니다. ${reason}`);
+    announceDrawingShortcut("Living Ink 시작 거부 · 문서 보존");
+    setError(`선택한 Living Ink 작업을 시작하지 않아 문서를 변경하지 않았습니다. ${reason}`);
   }
 
-  function commitStudioLivingInkFallbackVector(
+  function rejectStudioLivingInkFailedStroke(
     state: StudioLivingInkPinnedStroke,
-    finished: DrawEl,
     reason: string,
   ): void {
-    if (studioLivingInkFailureDisposition(state.mode) === "preserve-document-noop") {
-      completeStudioLivingInkWaterNoop(state.strokeId, reason);
-      return;
-    }
     const cancelClaim = claimStudioStrokeSurfaceLifecycle(state.route, {
       phase: "cancel",
       routeKey: state.route.routeKey,
@@ -429,44 +396,21 @@ export function bindStudioCuttoonStagePointersRelease(
       kind: "living-ink",
     });
     if (cancelClaim.status !== "owned") return;
-    const fallbackElements = withStudioHokusaiSource(
-      studioPageElementsFromHistory(state.pageId),
-      finished,
-    );
-    const currentPage = currentPageIdRef.current === state.pageId;
-    if (currentPage) {
-      // A failed/blank physical frame must transfer to the newly mounted settled-run layer before
-      // the Worker canvas is cleared. Merely mutating the external store is not a paint receipt.
-      flushSync(() => {
-        draftPreviewStoreRef.current.settle(finished);
-      });
-      clearStudioLivingInkVectorShadow(state);
-    }
-    const committed = commit(fallbackElements, undefined, state.pageId);
+    livingInkWaterNoopStrokeIdsRef.current.delete(state.strokeId);
     livingInkOverlaySurfaceRef.current?.renderer.clear();
+    clearStudioLivingInkRetainedDraftPixels(state);
     livingInkOverlayVisibleRef.current = false;
-    livingInkStrokeRef.current = null;
+    if (livingInkStrokeRef.current === state) livingInkStrokeRef.current = null;
     releaseLivingInkInputPointer();
     livingInkFinalizingRef.current = false;
     studioStrokeSurfaceRouteRef.current = null;
     setLivingInkBusy(false);
     void livingInkCoordinatorRef.current.cancelStroke(state.strokeId);
-    if (committed) {
-      if (currentPage) {
-        setSelectedId(finished.id);
-        queueCommittedStrokeSurfaceHandoff(state.pageId, [finished.id]);
-      }
-      announceDrawingShortcut("수채 번짐 복구 · 원본 벡터 획 저장");
-      setError(`수채 번짐 결과를 원본 벡터로 저장했습니다. ${reason}`);
-    } else {
-      restorePendingStrokeCommits({
-        pageId: state.pageId,
-        strokes: [finished],
-        retryCount: 0,
-      });
-      setError(`수채 번짐 결과를 즉시 저장하지 못해 복구 큐에 보존했습니다. ${reason}`);
-    }
     liveDraftLayerRef.current?.drawScene();
+    announceDrawingShortcut("Living Ink 획 취소 · 문서 보존");
+    setError(
+      `선택한 Living Ink 엔진이 결과를 확정하지 못해 획을 저장하지 않았습니다. 다른 렌더러로 자동 전환하지 않습니다. ${reason}`,
+    );
   }
 
   async function finishStudioLivingInkStroke(
@@ -510,7 +454,7 @@ export function bindStudioCuttoonStagePointersRelease(
         diameter: studioLiveBrushEffectiveDiameter(finished),
       })) {
         throw new Error(
-          "Living Ink canonical PNG가 원본 획의 위치에 표시 가능한 안료를 만들지 못해 원본 벡터를 유지합니다.",
+          "Living Ink canonical PNG가 원본 획의 위치에 표시 가능한 안료를 만들지 못했습니다.",
         );
       }
       const result: StudioLivingInkCanonicalResult = Object.freeze({
@@ -606,9 +550,8 @@ export function bindStudioCuttoonStagePointersRelease(
     } catch (cause) {
       if (state.transactionCommitted || livingInkStrokeRef.current !== state) return;
       if (work) await livingInkCoordinatorRef.current.rollbackFinishedStroke(work).catch(() => undefined);
-      commitStudioLivingInkFallbackVector(
+      rejectStudioLivingInkFailedStroke(
         state,
-        finished,
         cause instanceof Error ? cause.message : "최종 물리 프레임을 검증하지 못했습니다.",
       );
     }
@@ -680,9 +623,8 @@ export function bindStudioCuttoonStagePointersRelease(
         (state.abortController.signal.aborted && hokusaiLiveStrokeRef.current !== state)
         || state.transactionCommitted
       ) return;
-      commitStudioHokusaiFallbackVector(
+      rejectStudioHokusaiFailedStroke(
         state,
-        finished,
         cause instanceof Error ? cause.message : "최종 질감 결과를 검증하지 못했습니다.",
       );
     }
@@ -695,6 +637,7 @@ export function bindStudioCuttoonStagePointersRelease(
   ): DrawEl | null {
     const inputSettings = drawingInputSettingsRef.current;
     let authoritativeLiveStroke: DrawEl | null = null;
+    let selectedGpuFinalCrdtFlushDeferred = false;
     if (
       consumeReleaseSample
       && drawingRef.current
@@ -793,11 +736,19 @@ export function bindStudioCuttoonStagePointersRelease(
       // release/coalesced sample과 stabilizer endpoint를 live surface에 동기적으로 반영한다.
       // clearDraftPreview가 예약 rAF를 취소하기 전에 이 호출이 반드시 완료되어야 한다.
       flushDirectLiveDraftNow(authoritativeLiveStroke);
-      drawingCrdtPublisherRef.current.flush(authoritativeLiveStroke.id);
+      if (gpuLiveInkPinnedRef.current) {
+        // Keep canonical/input geometry local while the exact terminal GPU request is pending.
+        // Cancelling the scheduled suffix also prevents its post-paint timer from racing the
+        // receipt watchdog; StudioPage publishes the completed CRDT record only after acceptance.
+        drawingCrdtPublisherRef.current.cancel(authoritativeLiveStroke.id);
+        selectedGpuFinalCrdtFlushDeferred = true;
+      } else {
+        drawingCrdtPublisherRef.current.flush(authoritativeLiveStroke.id);
+      }
     }
     // Shapes do not append freehand suffixes, but their deferred begin must still precede the
     // final scene publication (or deletion of an intentionally incomplete gesture).
-    if (drawingRef.current) {
+    if (drawingRef.current && !selectedGpuFinalCrdtFlushDeferred) {
       drawingCrdtPublisherRef.current.flush(drawingRef.current.id);
     }
     return authoritativeLiveStroke;
@@ -819,16 +770,11 @@ export function bindStudioCuttoonStagePointersRelease(
         void finishStudioLivingInkStroke(livingInkStroke, finished);
         return "handled-preserve-ink";
       }
-      if (studioLivingInkFailureDisposition(livingInkStroke.mode) === "preserve-document-noop") {
-        completeStudioLivingInkWaterNoop(
-          livingInkStroke.strokeId,
-          "물리 계산 또는 표시 영수증이 중단되었습니다.",
-        );
-        return "handled";
-      }
-      livingInkStrokeRef.current = null;
-      livingInkOverlayVisibleRef.current = false;
-      studioStrokeSurfaceRouteRef.current = null;
+      rejectStudioLivingInkFailedStroke(
+        livingInkStroke,
+        "물리 계산 또는 표시 영수증이 중단되었습니다.",
+      );
+      return "handled";
     }
     const hokusaiStroke = hokusaiLiveStrokeRef.current;
     if (hokusaiStroke?.strokeId === finished.id) {
@@ -846,19 +792,20 @@ export function bindStudioCuttoonStagePointersRelease(
         void finishStudioHokusaiLiveStroke(hokusaiStroke, finished);
         return "handled-preserve-ink";
       }
-      // A boundary/Worker/surface failure already restored the exact retained DrawEl. From
-      // here the ordinary synchronous commit path owns this whole stroke.
-      hokusaiLiveStrokeRef.current = null;
-      hokusaiLiveOverlayVisibleRef.current = false;
+      rejectStudioHokusaiFailedStroke(
+        hokusaiStroke,
+        "Worker 또는 표면 영수증이 중단되었습니다.",
+      );
+      return "handled";
     }
     return "ordinary";
   }
   api.releaseEndpointPointerSample = releaseEndpointPointerSample;
   api.studioPageElementsFromHistory = studioPageElementsFromHistory;
   api.withStudioHokusaiSource = withStudioHokusaiSource;
-  api.commitStudioHokusaiFallbackVector = commitStudioHokusaiFallbackVector;
-  api.completeStudioLivingInkWaterNoop = completeStudioLivingInkWaterNoop;
-  api.commitStudioLivingInkFallbackVector = commitStudioLivingInkFallbackVector;
+  api.rejectStudioHokusaiFailedStroke = rejectStudioHokusaiFailedStroke;
+  api.completeStudioLivingInkRejectedNoop = completeStudioLivingInkRejectedNoop;
+  api.rejectStudioLivingInkFailedStroke = rejectStudioLivingInkFailedStroke;
   api.finishStudioLivingInkStroke = finishStudioLivingInkStroke;
   api.finishStudioHokusaiLiveStroke = finishStudioHokusaiLiveStroke;
   api.sealStudioDrawReleaseInput = sealStudioDrawReleaseInput;

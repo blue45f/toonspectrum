@@ -25,7 +25,7 @@ const UNSUPPORTED_PROBE: StudioBg3dWebGpuProbeResult = Object.freeze({
 });
 
 const DESKTOP = classifyStudioBg3dInAppBrowser({
-  userAgent: "Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/133.0.0.0 Safari/537.36",
+  userAgent: "Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/133 Safari/537.36",
 });
 const KAKAOTALK = classifyStudioBg3dInAppBrowser({
   userAgent: "Mozilla/5.0 (Linux; Android 15; wv) Mobile Safari/537.36 KAKAOTALK 10.6.5",
@@ -33,7 +33,7 @@ const KAKAOTALK = classifyStudioBg3dInAppBrowser({
 
 function planFor(overrides: Partial<Parameters<typeof selectStudioBg3dEngine>[0]> = {}) {
   return selectStudioBg3dEngine({
-    preference: "auto",
+    preference: "webgpu",
     probe: SUPPORTED_PROBE,
     inApp: DESKTOP,
     deviceProfile: "desktop",
@@ -45,11 +45,11 @@ function planFor(overrides: Partial<Parameters<typeof selectStudioBg3dEngine>[0]
 afterEach(cleanup);
 
 describe("StudioBg3dEnginePanel", () => {
-  it("names the running engine and explains why it was chosen", () => {
+  it("names the available explicitly selected engine", () => {
     render(
       <StudioBg3dEnginePanel
         plan={planFor()}
-        preference="auto"
+        preference="webgpu"
         inApp={DESKTOP}
         probing={false}
         deviceLostMessage={null}
@@ -61,34 +61,40 @@ describe("StudioBg3dEnginePanel", () => {
     expect(screen.getByTestId("studio-bg3d-engine-active-backend").textContent)
       .toContain("WebGPU 사용 중");
     expect(screen.getByTestId("studio-bg3d-engine-status").textContent)
-      .toContain("차세대 WebGPU 엔진");
+      .toContain("직접 선택한 WebGPU");
+    expect(screen.queryByTestId("studio-bg3d-engine-preference-auto")).toBeNull();
   });
 
-  it("keeps WebGPU visible but disabled when the host cannot run it", () => {
+  it("keeps unsupported WebGPU selected and offers an explicit WebGL2 choice", () => {
+    const onPreferenceChange = vi.fn();
     render(
       <StudioBg3dEnginePanel
         plan={planFor({ probe: UNSUPPORTED_PROBE })}
-        preference="auto"
+        preference="webgpu"
         inApp={DESKTOP}
         probing={false}
         deviceLostMessage={null}
         frameTimeMs={null}
-        onPreferenceChange={() => undefined}
+        onPreferenceChange={onPreferenceChange}
       />,
     );
 
-    const webgpuButton = screen.getByTestId("studio-bg3d-engine-preference-webgpu");
-    expect(webgpuButton).toBeTruthy();
-    expect((webgpuButton as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByTestId("studio-bg3d-engine-status").textContent)
-      .toContain("WebGPU를 지원하지 않아");
+    expect(screen.getByTestId("studio-bg3d-engine-active-backend").textContent)
+      .toContain("WebGPU 사용 불가");
+    const status = screen.getByTestId("studio-bg3d-engine-status");
+    expect(status.getAttribute("role")).toBe("alert");
+    expect(status.textContent).toContain("WebGL2를 직접 선택");
+    expect((screen.getByTestId("studio-bg3d-engine-preference-webgpu") as HTMLButtonElement)
+      .disabled).toBe(false);
+
+    fireEvent.click(screen.getByTestId("studio-bg3d-engine-preference-webgl2"));
+    expect(onPreferenceChange).toHaveBeenCalledWith("webgl2");
   });
 
-  it("says why a character scene cannot leave the baseline, in the artist's terms", () => {
+  it("reports a VRM requirement without relabeling the selection as WebGL2", () => {
     render(
       <StudioBg3dEnginePanel
         plan={planFor({
-          preference: "webgpu",
           webglOnlyFeatures: { webxr: false, vrmCharacters: true },
         })}
         preference="webgpu"
@@ -100,49 +106,37 @@ describe("StudioBg3dEnginePanel", () => {
       />,
     );
 
-    // The artist asked for WebGPU and did not get it. Saying only "WebGL2 사용 중" would read as
-    // the control being broken, so the reason has to be on screen next to it.
     expect(screen.getByTestId("studio-bg3d-engine-active-backend").textContent)
-      .toContain("WebGL2 사용 중");
+      .toContain("WebGPU 사용 불가");
     const status = screen.getByTestId("studio-bg3d-engine-status").textContent ?? "";
-    expect(status).toContain("3D 캐릭터가 있는 장면");
-    expect(status).toContain("색");
-    // In the artist's terms: the shading implementations behind this are not a thing they can act
-    // on, and naming them here would spend a narrow status box on vocabulary.
+    expect(status).toContain("3D 캐릭터 색");
+    expect(status).toContain("WebGL2 엔진을 직접 선택");
     expect(status).not.toContain("MToon");
-    expect(status).not.toContain("셰이더");
-
-    expect((screen.getByTestId("studio-bg3d-engine-preference-webgpu") as HTMLButtonElement)
-      .disabled).toBe(true);
   });
 
-  it("tells the artist which in-app browser they are in and offers the opt-in", () => {
-    const onPreferenceChange = vi.fn();
+  it("does not auto-demote an opt-in in-app browser", () => {
     render(
       <StudioBg3dEnginePanel
         plan={planFor({ inApp: KAKAOTALK })}
-        preference="auto"
+        preference="webgpu"
         inApp={KAKAOTALK}
         probing={false}
         deviceLostMessage={null}
         frameTimeMs={null}
-        onPreferenceChange={onPreferenceChange}
+        onPreferenceChange={() => undefined}
       />,
     );
 
     expect(screen.getByText(/카카오톡 인앱 브라우저/u)).toBeTruthy();
-    const webgpuButton = screen.getByTestId("studio-bg3d-engine-preference-webgpu");
-    expect((webgpuButton as HTMLButtonElement).disabled).toBe(false);
-
-    fireEvent.click(webgpuButton);
-    expect(onPreferenceChange).toHaveBeenCalledWith("webgpu");
+    expect(screen.getByTestId("studio-bg3d-engine-active-backend").textContent)
+      .toContain("WebGPU 사용 중");
   });
 
-  it("raises a device loss as an assertive alert instead of a quiet status", () => {
+  it("announces a runtime failure assertively and keeps the selected backend", () => {
     render(
       <StudioBg3dEnginePanel
-        plan={planFor()}
-        preference="auto"
+        plan={planFor({ webgpuRuntimeFailed: true })}
+        preference="webgpu"
         inApp={DESKTOP}
         probing={false}
         deviceLostMessage="WebGPU 디바이스 연결이 끊어졌습니다."
@@ -151,16 +145,18 @@ describe("StudioBg3dEnginePanel", () => {
       />,
     );
 
+    expect(screen.getByTestId("studio-bg3d-engine-active-backend").textContent)
+      .toContain("WebGPU 실행 실패");
     const status = screen.getByTestId("studio-bg3d-engine-status");
     expect(status.getAttribute("role")).toBe("alert");
     expect(status.textContent).toContain("끊어졌습니다");
   });
 
-  it("locks every choice while the capability probe is still running", () => {
+  it("locks the two manual choices only while capability probing runs", () => {
     render(
       <StudioBg3dEnginePanel
         plan={planFor()}
-        preference="auto"
+        preference="webgpu"
         inApp={DESKTOP}
         probing
         deviceLostMessage={null}
@@ -169,11 +165,13 @@ describe("StudioBg3dEnginePanel", () => {
       />,
     );
 
-    for (const option of ["auto", "webgpu", "webgl2"] as const) {
-      const button = screen.getByTestId(`studio-bg3d-engine-preference-${option}`);
-      expect((button as HTMLButtonElement).disabled).toBe(true);
+    for (const option of ["webgpu", "webgl2"] as const) {
+      expect((screen.getByTestId(`studio-bg3d-engine-preference-${option}`) as HTMLButtonElement)
+        .disabled).toBe(true);
     }
-    expect(screen.getByTestId("studio-bg3d-engine-active-backend").textContent).toContain("확인 중");
+    expect(screen.queryByTestId("studio-bg3d-engine-preference-auto")).toBeNull();
+    expect(screen.getByTestId("studio-bg3d-engine-active-backend").textContent)
+      .toContain("확인 중");
   });
 
   it("marks the selected preference for assistive technology", () => {
@@ -191,28 +189,15 @@ describe("StudioBg3dEnginePanel", () => {
 
     expect(screen.getByTestId("studio-bg3d-engine-preference-webgl2").getAttribute("aria-pressed"))
       .toBe("true");
-    expect(screen.getByTestId("studio-bg3d-engine-preference-auto").getAttribute("aria-pressed"))
+    expect(screen.getByTestId("studio-bg3d-engine-preference-webgpu").getAttribute("aria-pressed"))
       .toBe("false");
   });
 
-  it("shows a measured frame time only once the governor has a usable average", () => {
+  it("shows frame timing only while a renderer is available", () => {
     const { rerender } = render(
       <StudioBg3dEnginePanel
         plan={planFor()}
-        preference="auto"
-        inApp={DESKTOP}
-        probing={false}
-        deviceLostMessage={null}
-        frameTimeMs={null}
-        onPreferenceChange={() => undefined}
-      />,
-    );
-    expect(screen.queryByTestId("studio-bg3d-engine-frame-time")).toBeNull();
-
-    rerender(
-      <StudioBg3dEnginePanel
-        plan={planFor()}
-        preference="auto"
+        preference="webgpu"
         inApp={DESKTOP}
         probing={false}
         deviceLostMessage={null}
@@ -222,5 +207,18 @@ describe("StudioBg3dEnginePanel", () => {
     );
     expect(screen.getByTestId("studio-bg3d-engine-frame-time").textContent)
       .toContain("12.5ms · 약 80fps");
+
+    rerender(
+      <StudioBg3dEnginePanel
+        plan={planFor({ probe: UNSUPPORTED_PROBE })}
+        preference="webgpu"
+        inApp={DESKTOP}
+        probing={false}
+        deviceLostMessage={null}
+        frameTimeMs={12.5}
+        onPreferenceChange={() => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("studio-bg3d-engine-frame-time")).toBeNull();
   });
 });

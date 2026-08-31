@@ -234,6 +234,7 @@ export function createStudioBg3dModelImportActions(
         return "glb";
       }));
       const canonicalInputs = await modelImportRuntime.convertStudioBg3dModelFilesToGlb(files, {
+        executionBackend: "worker",
         profile: policy.profile,
         budgets: policy.budgets,
         signal: importController.signal,
@@ -247,9 +248,10 @@ export function createStudioBg3dModelImportActions(
       const imported = await importVerifiedBg3dModelsAtomically(
         canonicalInputs.map((file) => ({ file, rights })),
         {
-        profile: policy.profile,
-        budgets: policy.budgets,
-        signal: importController.signal,
+          executionBackend: "worker",
+          profile: policy.profile,
+          budgets: policy.budgets,
+          signal: importController.signal,
         },
       );
       const saved: Bg3dVerifiedStoredRecord[] = [];

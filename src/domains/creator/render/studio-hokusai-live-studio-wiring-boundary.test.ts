@@ -47,11 +47,13 @@ describe("Studio Hokusai live UI authority wiring", () => {
       "const [livingInkState, setLivingInkState]",
     );
     expect(begin).toContain(
-      "!studioHokusaiProductLivePreset(element.brush ?? \"pen\", element.brushCatalogId)",
+      "!studioHokusaiLiveStrokeSelected(element)",
     );
     expect(begin).toContain(
       "if (!studioHokusaiProductLivePreset(brush, activeCatalogBrush.id)) return;",
     );
+    expect(begin).toContain('if (route.status !== "ready") return false;');
+    expect(begin).not.toContain("existing-exact-route");
   });
 
   it("releases the live overlay only after the exact decoded canonical PNG is drawn", () => {
@@ -84,17 +86,7 @@ describe("Studio Hokusai live UI authority wiring", () => {
     expect(PAGE_SOURCE).not.toContain("settleStudioHokusaiOverlayAfterCommit");
   });
 
-  it("never paints an old-page fallback shadow onto the newly active page", () => {
-    const shadow = sourceSection(
-      PAGE_SOURCE,
-      "function showStudioHokusaiVectorShadow(",
-      "function failStudioHokusaiLiveStroke(",
-    );
-    expect(shadow).toContain("if (pageId !== currentPageIdRef.current) return;");
-    expect(PAGE_SOURCE).toContain(
-      "showStudioHokusaiVectorShadow(state.finalDrawing, state.pageId);",
-    );
-
+  it("fails closed on surface replacement without painting an old-page vector shadow", () => {
     const surface = sourceSection(
       PAGE_SOURCE,
       "function setHokusaiLiveOverlaySurface(",
@@ -102,12 +94,15 @@ describe("Studio Hokusai live UI authority wiring", () => {
     );
     expect(surface).toContain("if (active.transactionCommitted)");
     expect(surface).toContain("releaseStudioHokusaiLivePresentation(active);");
+    expect(surface).toContain("failStudioHokusaiLiveStroke(");
+    expect(PAGE_SOURCE).not.toContain("function showStudioHokusaiVectorShadow(");
+    expect(PAGE_SOURCE).not.toContain("showStudioHokusaiVectorShadow(");
   });
 
-  it("keeps the exact vector visible until the first material frame owns presentation", () => {
+  it("keeps retained geometry hidden until an exact Hokusai material frame owns presentation", () => {
     const shadowLifecycle = sourceSection(
       PAGE_SOURCE,
-      "function clearStudioHokusaiVectorShadow(",
+      "function clearStudioHokusaiRetainedDraftPixels(",
       "function failStudioHokusaiLiveStroke(",
     );
     expect(shadowLifecycle).toContain(
@@ -120,7 +115,6 @@ describe("Studio Hokusai live UI authority wiring", () => {
       "draftPreviewStoreRef.current.getSnapshot().active?.id === state.strokeId",
     );
     expect(shadowLifecycle).toContain("draftPreviewStoreRef.current.setActive(null);");
-    expect(shadowLifecycle).toContain("liveDraftDirectRef.current = true;");
     expect(shadowLifecycle).toContain("liveDraftLayerRef.current?.drawScene();");
 
     const firstFrame = sourceSection(
@@ -129,19 +123,16 @@ describe("Studio Hokusai live UI authority wiring", () => {
       "      },\n    });",
     );
     expect(firstFrame.indexOf("hokusaiLiveOverlayVisibleRef.current = true;"))
-      .toBeLessThan(firstFrame.indexOf("clearStudioHokusaiVectorShadow(state);"));
+      .toBeLessThan(firstFrame.indexOf("clearStudioHokusaiRetainedDraftPixels(state);"));
 
     const releaseCleanup = sourceSection(
       PAGE_SOURCE,
       "clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });",
       "// Re-rasterize the newest settled overlay stroke",
     );
-    expect(releaseCleanup).toContain("finishingHokusai?.finishing");
-    expect(releaseCleanup).toContain("!finishingHokusai.overlayPresented");
-    expect(releaseCleanup).toContain("finishingHokusai.finalDrawing");
-    expect(releaseCleanup).toContain("showStudioHokusaiVectorShadow(");
-    expect(releaseCleanup).toContain("finishingHokusai.finalDrawing");
-    expect(releaseCleanup).toContain("finishingHokusai.pageId");
+    expect(releaseCleanup).toContain("canvas\n      // intentionally remains hidden");
+    expect(releaseCleanup).not.toContain("showStudioHokusaiVectorShadow(");
+    expect(releaseCleanup).not.toContain("refreshStudioHokusaiVectorTailShadow(");
 
     const directDraft = sourceSection(
       VIEWPORT_SOURCE,
@@ -167,21 +158,10 @@ describe("Studio Hokusai live UI authority wiring", () => {
       "const flushDirectLiveDraftNow =",
     );
     expect(directFlush).toContain("hokusaiStroke.strokeId === next.id");
-    expect(directFlush).toContain("if (hokusaiStroke.overlayPresented)");
-    expect(directFlush).toContain(
-      "refreshStudioHokusaiVectorTailShadow(hokusaiStroke, next);",
-    );
-
-    const tailShadow = sourceSection(
-      PAGE_SOURCE,
-      "function studioHokusaiVectorTailShadow(",
-      "function showStudioHokusaiVectorShadow(",
-    );
-    expect(tailShadow).toContain("state.materialCompositeBounds");
-    expect(tailShadow).toContain("presentedSampleCount - 1");
-    expect(tailShadow).toContain("points: element.points.slice(start * 2)");
-    expect(tailShadow).toContain("(element.opacity ?? 1) * 0.6");
-    expect(tailShadow).toContain("liveDraftVisualRef.current = tail;");
+    expect(directFlush).toContain("liveDraftVisualRef.current = null;");
+    expect(directFlush).not.toContain("refreshStudioHokusaiVectorTailShadow(");
+    expect(PAGE_SOURCE).not.toContain("function studioHokusaiVectorTailShadow(");
+    expect(PAGE_SOURCE).not.toContain("function showStudioHokusaiVectorShadow(");
 
     const specialistRelease = sourceSection(
       PAGE_SOURCE,

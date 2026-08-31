@@ -175,12 +175,12 @@ beforeAll(async () => {
   generator = await loadInkMeshGenerator();
 });
 
-function runtimeHarness() {
+function runtimeHarness(generatorOverride: InkMeshGenerator = generator) {
   const sink = new RecordingSink();
   let released = 0;
   let lossListener: ((event: { epoch: number; reason: string }) => void) | null = null;
   const prepared: StudioInkMeshPreparedResources = {
-    generator,
+    generator: generatorOverride,
     sink,
     deviceEpoch: 7,
     release: () => {
@@ -208,6 +208,24 @@ function runtimeHarness() {
 }
 
 describe("Studio Google Ink live product coordinator", () => {
+  it("rejects an injected single-shot reference session instead of adopting it", async () => {
+    const referenceGenerator: InkMeshGenerator = {
+      ...generator,
+      createInProgressStroke: (params) => generator.createInProgressStroke(params, {
+        backend: "single-shot-reference",
+      }),
+    };
+    const harness = runtimeHarness(referenceGenerator);
+    await harness.prepared;
+    const receipt = harness.runtime.begin(prefix(stroke(12), 4));
+    expect(receipt).toMatchObject({
+      status: "unavailable",
+      code: "runtime-error",
+    });
+    if (receipt.status !== "unavailable") throw new Error("expected unavailable reference receipt");
+    expect(receipt.detail).toContain("requires the upstream-in-progress backend");
+  });
+
   it("finishes byte-identically to the pinned single-shot mesh across product suffixes", async () => {
     const source = stroke(160);
     const harness = runtimeHarness();
@@ -310,7 +328,7 @@ describe("Studio Google Ink live product coordinator", () => {
     expect(authority.points).toEqual(originalAuthority);
   });
 
-  it("rejects a predicted prefix mutation and keeps the verified fallback explicit", async () => {
+  it("rejects a predicted prefix mutation and keeps unavailability explicit", async () => {
     const source = stroke(30);
     const authority = prefix(source, 20);
     const harness = runtimeHarness();
@@ -321,9 +339,9 @@ describe("Studio Google Ink live product coordinator", () => {
     predicted.points[4] = predicted.points[4]! + 1;
     const receipt = harness.runtime.previewPredicted(predicted, 20);
     expect(receipt).toMatchObject({
-      status: "fallback",
+      status: "unavailable",
       code: "predicted-prefix-mismatch",
-      fallback: "canvas2d-perfect-freehand",
+      retainedPixelAuthority: "canvas2d-perfect-freehand",
     });
     expect(harness.runtime.active).toBe(false);
   });
@@ -335,7 +353,7 @@ describe("Studio Google Ink live product coordinator", () => {
     harness.runtime.begin(prefix(source, 12));
     const receipt = harness.runtime.synchronizeAuthoritative(prefix(source, 8));
     expect(receipt).toMatchObject({
-      status: "fallback",
+      status: "unavailable",
       code: "authoritative-prefix-rewritten",
     });
   });
@@ -347,22 +365,22 @@ describe("Studio Google Ink live product coordinator", () => {
     harness.runtime.begin(prefix(source, 8));
     harness.lose();
     expect(harness.runtime.active).toBe(false);
-    expect(harness.runtime.lastFallback).toMatchObject({
+    expect(harness.runtime.lastUnavailable).toMatchObject({
       code: "device-lost",
-      fallback: "canvas2d-perfect-freehand",
+      retainedPixelAuthority: "canvas2d-perfect-freehand",
     });
     expect(harness.sink.resetCount).toBeGreaterThan(0);
     expect(harness.sink.disposeCount).toBe(1);
     expect(harness.released()).toBe(1);
   });
 
-  it("fails closed on NaN and admission overflow without blocking the product fallback", async () => {
+  it("fails closed on NaN and admission overflow without corrupting product authority", async () => {
     const source = stroke(2);
     source.points[0] = Number.NaN;
     const harness = runtimeHarness();
     await harness.prepared;
     expect(harness.runtime.begin(source)).toMatchObject({
-      status: "fallback",
+      status: "unavailable",
       code: "invalid-input",
     });
 
@@ -727,5 +745,16 @@ describe("Studio Google Ink shared-derivation parity", () => {
     // The pressureToSize response, tilt clamp, and azimuth wrap now live only
     // in @toonspectrum/studio-brush-platform's ink-mesh-derivation module.
     expect(source).not.toMatch(/minMultiplier|maxMultiplier|Math\.hypot|Math\.atan2|TWO_PI/u);
+  });
+
+  it("never selects the single-shot reference backend on the product live path", () => {
+    const source = readFileSync(
+      new URL("./studio-ink-mesh-live-preview.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("createInProgressStroke(params)");
+    expect(source).toContain('session.backend !== "upstream-in-progress"');
+    expect(source).not.toMatch(/createInProgressStroke\s*\(\s*params\s*,/u);
+    expect(source).not.toContain("forceSingleShotFallback");
   });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeProviderScore,
   evaluateLicenseGate,
+  providerDescriptorSchema,
   SCORE_WEIGHTS,
 } from "../descriptor";
 import { loadCandidateManifest, findCandidate } from "../manifest";
@@ -30,7 +31,6 @@ function descriptor(overrides: Partial<ProviderDescriptor>): ProviderDescriptor 
     finalQuality: "production",
     determinism: "tolerance",
     memoryEstimateMb: 16,
-    fallbackProviderId: null,
     knownIssues: [],
     ...overrides,
   };
@@ -89,26 +89,33 @@ describe("score weights (V11 §3.2)", () => {
 });
 
 describe("EngineCapabilityRegistry", () => {
-  it("queries by kind + capabilities and resolves fallback chains", () => {
+  it("queries by kind + capabilities without exposing a fallback chain", () => {
     const registry = EngineCapabilityRegistry.forTestFixtures();
     registry.registerTestFixture(
       descriptor({
         id: "canvaskit",
         capabilities: ["render.vector.fill", "render.text.paragraph"],
-        fallbackProviderId: null,
       }),
     );
     registry.registerTestFixture(
       descriptor({
         id: "vello-cpu",
         capabilities: ["render.vector.fill", "export.deterministic"],
-        fallbackProviderId: "canvaskit",
       }),
     );
 
     const textCapable = registry.query("vector-renderer", ["render.text.paragraph"]);
     expect(textCapable.map((p) => p.descriptor.id)).toEqual(["canvaskit"]);
-    expect(registry.fallbackChain("vello-cpu")).toEqual(["vello-cpu", "canvaskit"]);
+    expect(registry).not.toHaveProperty("fallbackChain");
+  });
+
+  it("rejects the removed fallbackProviderId field instead of stripping it", () => {
+    expect(
+      providerDescriptorSchema.safeParse({
+        ...descriptor({ id: "legacy-provider" }),
+        fallbackProviderId: "canvaskit",
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects duplicate registration", () => {
@@ -138,7 +145,6 @@ describe("HybridExecutionPlanner", () => {
       descriptor({
         id: "vello-cpu",
         capabilities: ["render.vector.fill", "render.vector.stroke", "export.deterministic"],
-        fallbackProviderId: "canvaskit",
       }),
     );
     return registry;
@@ -149,7 +155,7 @@ describe("HybridExecutionPlanner", () => {
     const plan = planner.plan({
       surfaceId: "main",
       mode: "interactive",
-      primaryCandidates: ["canvaskit"],
+      primaryOwnerId: "canvaskit",
       islands: [
         {
           islandId: "balloon-text",
@@ -170,6 +176,7 @@ describe("HybridExecutionPlanner", () => {
     expect(balloon?.providerId).toBe("canvaskit");
     const lineart = plan.islands.find((i) => i.islandId === "lineart");
     expect(lineart?.transport).toBe("image-bitmap");
+    expect(lineart).not.toHaveProperty("fallbackChain");
   });
 
   it("prefers a WebGPU vector provider over a CPU one when both can stroke", () => {
@@ -192,7 +199,7 @@ describe("HybridExecutionPlanner", () => {
     const plan = planner.plan({
       surfaceId: "main",
       mode: "interactive",
-      primaryCandidates: ["canvaskit"],
+      primaryOwnerId: "canvaskit",
       islands: [
         {
           islandId: "lineart",
@@ -207,12 +214,56 @@ describe("HybridExecutionPlanner", () => {
     expect(plan.islands[0]?.transport).toBe("same-gpu-texture");
   });
 
+  it("binds an explicitly selected island provider exactly and never substitutes another", () => {
+    const registry = registryWithRenderers();
+    const planner = new HybridExecutionPlanner(registry);
+    const request = {
+      surfaceId: "main",
+      mode: "interactive" as const,
+      primaryOwnerId: "canvaskit",
+      islands: [
+        {
+          islandId: "lineart",
+          kind: "vector-renderer" as const,
+          requiredCapabilities: ["render.vector.stroke" as const],
+          availableTransports: ["image-bitmap" as const],
+          selectedProviderId: "vello-cpu",
+          preferAccelerator: "webgl" as const,
+        },
+      ],
+    };
+
+    expect(planner.plan(request).islands[0]?.providerId).toBe("vello-cpu");
+    expect(() => planner.plan({
+      ...request,
+      islands: [{ ...request.islands[0]!, selectedProviderId: "missing-provider" }],
+    })).toThrow(PlanUnsatisfiableError);
+  });
+
+  it("fails when the exact primary owner is absent even if another owner is registered", () => {
+    const planner = new HybridExecutionPlanner(registryWithRenderers());
+    try {
+      planner.plan({
+        surfaceId: "main",
+        mode: "interactive",
+        primaryOwnerId: "missing-owner",
+        islands: [],
+      });
+      throw new Error("expected exact primary owner selection to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(PlanUnsatisfiableError);
+      expect((error as PlanUnsatisfiableError).violations).toContain(
+        "selected primary surface owner missing-owner is not registered",
+      );
+    }
+  });
+
   it("forbids cpu-readback transports on the interactive hot path (rule 8)", () => {
     const planner = new HybridExecutionPlanner(registryWithRenderers());
     const request = {
       surfaceId: "main",
       mode: "interactive" as const,
-      primaryCandidates: ["canvaskit"],
+      primaryOwnerId: "canvaskit",
       islands: [
         {
           islandId: "bad-island",

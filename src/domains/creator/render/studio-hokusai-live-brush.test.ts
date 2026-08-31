@@ -380,18 +380,18 @@ describe("Studio Hokusai live brush vertical slice", () => {
       .toContain("break-live-commit-undo-save-parity");
   });
 
-  it("pins an exact fallback for the whole first stroke and retries promotion only next stroke", () => {
+  it("rejects a not-ready selected provider before input transfer and permits only a next-stroke retry", () => {
     expect(resolveStudioHokusaiLiveRoute({
       ...routeInput(),
       providerState: "loading",
       capabilities: null,
     })).toEqual({
-      status: "fallback",
+      status: "unavailable",
       reason: "provider-loading",
-      backendId: "existing-exact-route",
-      ownership: "pinned-for-entire-stroke",
-      retryPromotion: "next-stroke-only",
-      selectedStrokeConversionAvailable: true,
+      selectedBackendId: "hokusai-myb-worker",
+      retainedInput: false,
+      lastGoodFrame: null,
+      nextStrokeOnly: true,
     });
     const incomplete = { ...CAPABILITIES, liveCommitParityReceipt: false };
     expect(resolveStudioHokusaiLiveRoute({
@@ -399,10 +399,12 @@ describe("Studio Hokusai live brush vertical slice", () => {
       providerState: "ready",
       capabilities: incomplete as unknown as StudioHokusaiLiveBrushCapabilities,
     })).toMatchObject({
-      status: "fallback",
+      status: "unavailable",
       reason: "runtime-capability-rejected",
-      ownership: "pinned-for-entire-stroke",
-      retryPromotion: "next-stroke-only",
+      selectedBackendId: "hokusai-myb-worker",
+      retainedInput: false,
+      lastGoodFrame: null,
+      nextStrokeOnly: true,
     });
   });
 
@@ -622,9 +624,12 @@ describe("Studio Hokusai live brush vertical slice", () => {
       finishTimeoutMs: 1_000,
     });
     expect(provider.admitStroke(routeInput())).toMatchObject({
-      status: "fallback",
+      status: "unavailable",
       reason: "provider-loading",
-      retryPromotion: "next-stroke-only",
+      selectedBackendId: "hokusai-myb-worker",
+      retainedInput: false,
+      lastGoodFrame: null,
+      nextStrokeOnly: true,
     });
     const warming = provider.prewarm();
     worker.ready();

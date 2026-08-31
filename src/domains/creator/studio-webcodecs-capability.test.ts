@@ -16,13 +16,13 @@ import {
 // ── 가짜 VideoEncoder 프로브 ────────────────────────────────────────────
 //
 // 실제 브라우저 구현처럼 (a) 코덱 문자열 접두사와 (b) hardwareAcceleration 요청을 함께 본다.
-// "prefer-hardware"로 물었을 때만 true를 주는 코덱 = 하드웨어 인코더가 있는 코덱이다.
+// "prefer-hardware"로 물었을 때만 true를 주는 코덱 = 해당 preference 설정이 수락되는 코덱이다.
 
 interface FakeProbeRule {
   prefix: string;
   hardware: boolean;
   software: boolean;
-  /** 이 픽셀 수를 넘으면 미지원(하드웨어 인코더 해상도 상한 흉내). */
+  /** 이 픽셀 수를 넘으면 미지원(prefer-hardware 설정의 해상도 상한 흉내). */
   maxPixels?: number;
   /** true면 지원 여부 대신 예외를 던진다(일부 구현의 잘못된 코덱 문자열 처리). */
   throws?: boolean;
@@ -125,9 +125,9 @@ describe("코덱 탐지", () => {
       { prefix: "vp8", hardware: false, software: true },
     ]);
     const results = await probeStudioVideoCodecs(REQUEST, probe);
-    expect(results.map((result) => `${result.id}:${result.hardwareAccelerated}`)).toEqual([
-      "vp9:true", // 하드웨어 패스에서 확정
-      "vp8:false", // 소프트웨어 패스 — softwareRank 순
+    expect(results.map((result) => `${result.id}:${result.hardwarePreferenceAccepted}`)).toEqual([
+      "vp9:true", // prefer-hardware 패스에서 확정
+      "vp8:false", // no-preference 패스 — softwareRank 순
       "av1:false",
     ]);
     // vp9는 하드웨어에서 이미 확정됐으므로 소프트웨어 패스에서 재질의하지 않는다.
@@ -144,7 +144,7 @@ describe("코덱 탐지", () => {
     ]);
     const selected = await selectStudioVideoCodec(REQUEST, probe);
     expect(selected?.id).toBe("av1");
-    expect(selected?.hardwareAccelerated).toBe(true);
+    expect(selected?.hardwarePreferenceAccepted).toBe(true);
     expect(selected?.webmCodecId).toBe("V_AV1");
   });
 
@@ -156,10 +156,10 @@ describe("코덱 탐지", () => {
     ]);
     const selected = await selectStudioVideoCodec(REQUEST, probe);
     expect(selected?.id).toBe("vp9");
-    expect(selected?.hardwareAccelerated).toBe(false);
+    expect(selected?.hardwarePreferenceAccepted).toBe(false);
   });
 
-  it("하드웨어 인코더 해상도 상한을 넘으면 소프트웨어 후보로 내려간다", async () => {
+  it("prefer-hardware 설정 상한을 넘으면 no-preference 후보만 남긴다", async () => {
     const { probe } = fakeProbe([
       { prefix: "vp09", hardware: true, software: true, maxPixels: 1920 * 1080 },
     ]);
@@ -195,7 +195,7 @@ describe("코덱 탐지", () => {
   });
 });
 
-// ── 폴백 계약 ───────────────────────────────────────────────────────────
+// ── exact 파이프라인 계약 ───────────────────────────────────────────────
 
 const WEBCODECS_CODEC: StudioCodecProbeResult = {
   id: "vp9",
@@ -203,37 +203,38 @@ const WEBCODECS_CODEC: StudioCodecProbeResult = {
   codecString: "vp09.00.40.08",
   webmCodecId: "V_VP9",
   bitrate: 5_000_000,
-  hardwareAccelerated: true,
+  hardwarePreferenceAccepted: true,
 };
 
-describe("폴백 계약", () => {
-  it("WebCodecs가 되면 그 경로를 쓰고 degraded가 아니다", () => {
+describe("exact 파이프라인 계약", () => {
+  it("선택한 WebCodecs가 되면 그 경로만 승인한다", () => {
     const decision = selectExportPipeline({
+      selectedPipeline: "webcodecs-webm",
       webCodecsCodec: WEBCODECS_CODEC,
       mediaRecorderSupported: true,
       pureEncoderSupported: true,
     });
     expect(decision.pipeline).toBe("webcodecs-webm");
-    expect(decision.degraded).toBe(false);
     expect(decision.available).toBe(true);
     expect(decision.codec?.id).toBe("vp9");
-    expect(decision.reason).toContain("하드웨어");
+    expect(decision.reason).toContain("prefer-hardware");
   });
 
-  it("WebCodecs가 없으면 기존 MediaRecorder 경로로 내려간다(하드 실패 아님)", () => {
+  it("선택한 WebCodecs가 없으면 다른 사용 가능 provider로 전환하지 않는다", () => {
     const decision = selectExportPipeline({
+      selectedPipeline: "webcodecs-webm",
       webCodecsCodec: null,
       mediaRecorderSupported: true,
       pureEncoderSupported: true,
     });
-    expect(decision.pipeline).toBe("mediarecorder-webm");
-    expect(decision.available).toBe(true);
-    expect(decision.degraded).toBe(true);
-    expect(decision.reason).toContain("실시간 녹화");
+    expect(decision.pipeline).toBe("webcodecs-webm");
+    expect(decision.available).toBe(false);
+    expect(decision.reason).toContain("전환하지 않았어요");
   });
 
-  it("영상 녹화도 없으면 순수 TS 인코더(GIF/APNG)로 내려간다", () => {
+  it("GIF와 APNG도 호출자가 각각 명시한 경우에만 판정한다", () => {
     const gif = selectExportPipeline({
+      selectedPipeline: "gif",
       webCodecsCodec: null,
       mediaRecorderSupported: false,
       pureEncoderSupported: true,
@@ -242,34 +243,37 @@ describe("폴백 계약", () => {
     expect(gif.available).toBe(true);
 
     const apng = selectExportPipeline({
+      selectedPipeline: "apng",
       webCodecsCodec: null,
       mediaRecorderSupported: false,
       pureEncoderSupported: true,
-      preferredImageFormat: "apng",
     });
     expect(apng.pipeline).toBe("apng");
     expect(apng.reason).toContain("APNG");
   });
 
-  it("아무 경로도 없으면 available=false 결정을 돌려준다(throw 금지)", () => {
+  it("선택한 경로가 없으면 available=false 결정을 돌려준다", () => {
     const decision = selectExportPipeline({
+      selectedPipeline: "mediarecorder-webm",
       webCodecsCodec: null,
       mediaRecorderSupported: false,
       pureEncoderSupported: false,
     });
     expect(decision.available).toBe(false);
-    expect(decision.degraded).toBe(true);
-    expect(decision.reason).toContain("쓸 수 없어요");
+    expect(decision.pipeline).toBe("mediarecorder-webm");
+    expect(decision.reason).toContain("전환하지 않았어요");
   });
 
-  it("킬스위치가 켜지면 WebCodecs가 가능해도 기존 경로를 쓴다", () => {
+  it("킬스위치가 켜진 선택 WebCodecs는 unavailable이며 다른 경로를 쓰지 않는다", () => {
     const decision = selectExportPipeline({
+      selectedPipeline: "webcodecs-webm",
       webCodecsCodec: WEBCODECS_CODEC,
       mediaRecorderSupported: true,
       pureEncoderSupported: true,
       disableWebCodecs: true,
     });
-    expect(decision.pipeline).toBe("mediarecorder-webm");
-    expect(decision.reason).toContain("설정에서 꺼져");
+    expect(decision.pipeline).toBe("webcodecs-webm");
+    expect(decision.available).toBe(false);
+    expect(decision.reason).toContain("비활성화");
   });
 });

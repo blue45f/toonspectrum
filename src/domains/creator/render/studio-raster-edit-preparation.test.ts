@@ -787,6 +787,7 @@ describe("Worker-fused editable raster preparation", () => {
       renderPreparedStudioVectorReference,
       {
         workerFactory: null,
+        rasterExecutionBackend: "custom",
         rasterize: async (request) => ({
           dataUrl: PNG,
           width: request.width,
@@ -849,6 +850,7 @@ describe("Worker-fused editable raster preparation", () => {
       renderPreparedStudioVectorReference,
       {
         workerFactory: null,
+        rasterExecutionBackend: "custom",
         rasterize: async (request) => {
           rasterizedSvg = request.svg;
           return { dataUrl: PNG, width: request.width, height: request.height };
@@ -1053,6 +1055,7 @@ describe("editable raster copy rendering", () => {
       renderStudioVectorReference,
       {
         workerFactory: null,
+        rasterExecutionBackend: "custom",
         rasterize,
       },
     );
@@ -1103,7 +1106,7 @@ describe("editable raster copy rendering", () => {
     await renderStudioEditableRasterCopy(
       planned.plan,
       renderStudioVectorReference,
-      { workerFactory: null, rasterize },
+      { workerFactory: null, rasterExecutionBackend: "custom", rasterize },
     );
     expect(rasterize).toHaveBeenCalledOnce();
     expect(rasterize.mock.calls[0]?.[0].svg).toContain("#f3e9d2");
@@ -1404,6 +1407,7 @@ describe("editable raster copy commit contract", () => {
       renderStudioVectorReference,
       {
         workerFactory: null,
+        rasterExecutionBackend: "custom",
         rasterize: async (request) => ({ dataUrl: PNG, width: request.width, height: request.height }),
       },
     );
@@ -1432,6 +1436,7 @@ describe("editable raster copy commit contract", () => {
       renderStudioVectorReference,
       {
         workerFactory: null,
+        rasterExecutionBackend: "custom",
         rasterize: async (request) => ({ dataUrl: PNG, width: request.width, height: request.height }),
       },
     );
@@ -1475,6 +1480,7 @@ describe("editable raster copy commit contract", () => {
       renderStudioVectorReference,
       {
         workerFactory: null,
+        rasterExecutionBackend: "custom",
         rasterize: async (request) => ({
           dataUrl: PNG,
           width: request.width,
@@ -1524,6 +1530,7 @@ describe("editable raster copy commit contract", () => {
       renderStudioVectorReference,
       {
         workerFactory: null,
+        rasterExecutionBackend: "custom",
         rasterize: async (request) => ({ dataUrl: PNG, width: request.width, height: request.height }),
       },
     );
@@ -1562,6 +1569,7 @@ describe("editable raster copy commit contract", () => {
       renderStudioVectorReference,
       {
         workerFactory: null,
+        rasterExecutionBackend: "custom",
         rasterize: async (request) => ({ dataUrl: PNG, width: request.width, height: request.height }),
       },
     );

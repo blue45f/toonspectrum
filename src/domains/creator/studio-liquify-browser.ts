@@ -5,7 +5,10 @@ import {
   type StudioLiquifyBrushDynamics,
   type StudioLiquifyMode,
 } from "./studio-liquify-contract";
-import { runStudioLiquifyWorker } from "./studio-liquify-worker-client";
+import {
+  runStudioLiquifyWorker,
+  type StudioLiquifyExecutionMode,
+} from "./studio-liquify-worker-client";
 import { flipNormalizedPoint } from "./studio-magic-wand";
 
 import type { StudioImageDataLike } from "./studio-filters";
@@ -175,7 +178,7 @@ export function liquifyRasterRegionWorkerBytes(region: LiquifyRasterRegion): num
  * Structured-cloning an ImageData-like payload through a Worker preserves its typed pixel buffer,
  * but browsers are not required to recreate the ImageData prototype. Canvas putImageData is stricter
  * than our pure pixel engines and rejects that otherwise-valid plain object, so restore the native
- * wrapper at the browser boundary while keeping non-DOM test/fallback environments supported.
+ * wrapper at the browser boundary while keeping non-DOM test environments supported.
  */
 function restoreCanvasImageData(image: StudioImageDataLike): StudioImageDataLike {
   if (typeof globalThis.ImageData !== "function" || image instanceof globalThis.ImageData) {
@@ -209,13 +212,24 @@ export async function bakeLiquifyFieldToCanvas(
   height: number,
   field: LiquifyDisplacementField,
   createCanvas: LiquifyCanvasFactory,
-  options: { readonly signal?: AbortSignal } = {}
+  options: {
+    readonly executionMode?: StudioLiquifyExecutionMode;
+    readonly signal?: AbortSignal;
+  } = {}
 ): Promise<(MaskCanvasLike & MaskImageSource) | null> {
   throwIfLiquifyAborted(options.signal);
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
   const w = Math.max(1, Math.round(width));
   const h = Math.max(1, Math.round(height));
-  return bakeLiquifyRequestToCanvas(source, w, h, { field }, createCanvas, options.signal);
+  return bakeLiquifyRequestToCanvas(
+    source,
+    w,
+    h,
+    { field },
+    createCanvas,
+    options.signal,
+    options.executionMode ?? "worker",
+  );
 }
 
 async function bakeLiquifyRequestToCanvas(
@@ -225,6 +239,7 @@ async function bakeLiquifyRequestToCanvas(
   operation: { readonly field: LiquifyDisplacementField } | { readonly stroke: StudioLiquifyWorkerStrokePlan },
   createCanvas: LiquifyCanvasFactory,
   signal: AbortSignal | undefined,
+  executionMode: StudioLiquifyExecutionMode,
 ): Promise<(MaskCanvasLike & MaskImageSource) | null> {
   throwIfLiquifyAborted(signal);
   const region = "field" in operation
@@ -259,7 +274,7 @@ async function bakeLiquifyRequestToCanvas(
       };
   const { applied, dst } = await runStudioLiquifyWorker(
     request,
-    { signal }
+    { executionMode, signal }
   );
   if (!applied) return null;
 
@@ -276,8 +291,8 @@ async function bakeLiquifyRequestToCanvas(
  * flipNormalizedPoint로 원본(비반전) 좌표계에 되돌리고, 다시 자연 px로 스케일해 순수 코어에 넘긴다.
  *
  * 변위 필드 생성(buildLiquifyDisplacementField)과 적용(applyLiquifyDisplacement)은 대형 이미지에서
- * 모두 무거우므로 points+settings만 넘겨 Worker 안에서 연속 실행한다(Worker를 못 만드는 환경에선
- * 클라이언트 내부에서 동일 엔진으로 동기 폴백).
+ * 모두 무거우므로 points+settings만 넘겨 Worker 안에서 연속 실행한다. 제품 기본값은 Worker이며,
+ * Worker 실패 뒤 같은 요청을 direct로 다시 실행하지 않는다.
  */
 function prepareLiquifyStrokePoints(
   points: readonly LiquifyPixelPoint[],
@@ -364,6 +379,8 @@ export async function bakeLiquifyStrokeToCanvas(
     flipY?: boolean;
     /** 생략하면 기존과 동일한 Push 모드. */
     mode?: StudioLiquifyMode;
+    /** Independent test/tooling mode selected before work. Product callers omit this for Worker. */
+    executionMode?: StudioLiquifyExecutionMode;
     /** 필드 생성과 Worker 실행을 모두 취소한다. */
     signal?: AbortSignal;
   }
@@ -373,7 +390,7 @@ export async function bakeLiquifyStrokeToCanvas(
 
   return bakeLiquifyRequestToCanvas(source, prepared.w, prepared.h, {
     stroke: prepared.stroke,
-  }, createCanvas, opts?.signal);
+  }, createCanvas, opts?.signal, opts?.executionMode ?? "worker");
 }
 
 /**
@@ -393,6 +410,7 @@ export async function bakeLiquifyStrokeRoiPreview(
     flipX?: boolean;
     flipY?: boolean;
     mode?: StudioLiquifyMode;
+    executionMode?: StudioLiquifyExecutionMode;
     signal?: AbortSignal;
     /** Soft cap on ROI pixels; oversized ROIs are rejected so the caller can fall back. */
     maxRoiPixels?: number;
@@ -465,7 +483,10 @@ export async function bakeLiquifyStrokeRoiPreview(
     },
     stroke: prepared.stroke,
   };
-  const { applied, dst } = await runStudioLiquifyWorker(request, { signal: opts?.signal });
+  const { applied, dst } = await runStudioLiquifyWorker(request, {
+    executionMode: opts?.executionMode ?? "worker",
+    signal: opts?.signal,
+  });
   if (!applied) return null;
   work.ctx.putImageData(restoreCanvasImageData(dst), 0, 0);
   return {

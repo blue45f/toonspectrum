@@ -372,7 +372,13 @@ describe("exportStudioHybridDccGlbBatch", () => {
 
     const response = successResponse(request);
     worker.emitMessage(response);
-    const results = await pending;
+    const outcome = await pending;
+    const results = outcome.results;
+    expect(outcome).toMatchObject({
+      execution: "worker",
+      selectedExecutionBackend: "worker",
+      attemptedExecutionBackends: ["worker"],
+    });
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ ok: true, mimeType: "model/gltf-binary" });
     expect(results[0]?.ok && results[0].bytes).toBeInstanceOf(Uint8Array);
@@ -395,7 +401,7 @@ describe("exportStudioHybridDccGlbBatch", () => {
     const response = successResponse(worker.requests[0]!);
     expect(isStudioHybridDccGlbExportWorkerResponse(response)).toBe(true);
     worker.emitMessage(response);
-    const transported = await pending;
+    const transported = (await pending).results;
 
     expect(transported[0]?.report).toEqual(synchronous.report);
     expect(transported[0]?.report.losses[0]?.faceIds).toHaveLength(
@@ -491,42 +497,63 @@ describe("exportStudioHybridDccGlbBatch", () => {
     });
     await expect(overBudget).rejects.toMatchObject({ code: "response-budget-exceeded" });
 
-    // Oversize product handoffs are chunked into worker-sized windows rather than rejected.
-    vi.stubGlobal("Worker", undefined);
+    // Oversize explicitly-direct handoffs are chunked into protocol-sized windows.
     const oversizeCount = STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH + 3;
     const oversize = Array.from(
       { length: oversizeCount },
       (_, index) => input(`chunk-${index}`),
     );
-    const oversizeResults = await exportStudioHybridDccGlbBatch(oversize);
+    const oversizeOutcome = await exportStudioHybridDccGlbBatch(oversize, {
+      executionBackend: "direct",
+    });
+    const oversizeResults = oversizeOutcome.results;
     expect(oversizeResults).toHaveLength(oversizeCount);
     expect(oversizeResults.every((result) => result.ok)).toBe(true);
+    expect(oversizeOutcome).toMatchObject({
+      selectedExecutionBackend: "direct",
+      attemptedExecutionBackends: ["direct"],
+    });
   });
 
-  it("uses the deterministic exporter only when the host genuinely has no Worker API", async () => {
+  it("uses direct only when selected before work and defaults to fail-closed Worker", async () => {
     vi.stubGlobal("Worker", undefined);
-    const exportInput = input("node-fallback");
+    const exportInput = input("node-direct");
     const direct = exportStudioHybridDccMeshGlb(exportInput);
-    const results = await exportStudioHybridDccGlbBatch([exportInput]);
+    const workerFactory = vi.fn(() => {
+      throw new Error("must not construct");
+    });
+    const outcome = await exportStudioHybridDccGlbBatch([exportInput], {
+      executionBackend: "direct",
+      workerFactory,
+    });
+    const results = outcome.results;
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       ok: true,
-      report: { source: { assetId: "node-fallback" } },
+      report: { source: { assetId: "node-direct" } },
     });
     expect(results[0]).toEqual(direct);
+    expect(outcome).toMatchObject({
+      execution: "direct",
+      selectedExecutionBackend: "direct",
+      attemptedExecutionBackends: ["direct"],
+    });
+    expect(workerFactory).not.toHaveBeenCalled();
 
     const staleInput = { ...input("node-stale"), sourceHash: "mesh:00000000" };
     const staleDirect = exportStudioHybridDccMeshGlb(staleInput);
-    const stalePacked = await exportStudioHybridDccGlbBatch([staleInput]);
-    expect(stalePacked[0]).toEqual(staleDirect);
-    expect(stalePacked[0]).toMatchObject({
+    const stalePacked = await exportStudioHybridDccGlbBatch([staleInput], {
+      executionBackend: "direct",
+    });
+    expect(stalePacked.results[0]).toEqual(staleDirect);
+    expect(stalePacked.results[0]).toMatchObject({
       ok: false,
       report: { errors: [{ code: "source-hash-mismatch" }] },
     });
 
-    await expect(exportStudioHybridDccGlbBatch([input("no-fallback")], {
-      allowSynchronousFallback: false,
-    })).rejects.toMatchObject({ code: "worker-unavailable" });
+    await expect(
+      exportStudioHybridDccGlbBatch([input("no-fallback")]),
+    ).rejects.toMatchObject({ code: "worker-unavailable" });
   });
 
   it("uses a static production Worker URL and never falls back after a browser Worker fault", async () => {
@@ -538,6 +565,8 @@ describe("exportStudioHybridDccGlbBatch", () => {
       'new URL("./studio-hybrid-dcc-glb-export.worker.ts", import.meta.url)',
     );
     expect(source).not.toMatch(/new URL\(`[^`]*(?:test|spec)[^`]*`/u);
+    expect(source).not.toContain("allowSynchronousFallback");
+    expect(source).not.toContain("isNodeEnvironment");
 
     const failure = exportStudioHybridDccGlbBatch([input("constructor-fault")], {
       workerFactory: () => {

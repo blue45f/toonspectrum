@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildStudioOpenRasterBlob,
-  buildStudioOpenRasterBytes,
+  buildStudioOpenRasterBlob as buildStudioOpenRasterBlobWithBackend,
+  buildStudioOpenRasterBytes as buildStudioOpenRasterBytesWithBackend,
   importStudioOpenRaster,
   STUDIO_OPENRASTER_BLEND_MODES,
   STUDIO_OPENRASTER_LIMITS,
@@ -10,11 +10,43 @@ import {
   StudioOpenRasterError,
   type StudioOpenRasterErrorCode,
 } from "./studio-openraster-interchange";
-import { buildStudioPackageArchiveBytes } from "./studio-package-archive";
+import {
+  buildStudioPackageArchiveBytes as buildStudioPackageArchiveBytesWithBackend,
+} from "./studio-package-archive";
 import { readStudioZipArchive } from "./studio-zip-reader";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+function buildStudioOpenRasterBytes(
+  input: Parameters<typeof buildStudioOpenRasterBytesWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioOpenRasterBytesWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioOpenRasterBytesWithBackend> {
+  return buildStudioOpenRasterBytesWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
+
+function buildStudioOpenRasterBlob(
+  input: Parameters<typeof buildStudioOpenRasterBlobWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioOpenRasterBlobWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioOpenRasterBlobWithBackend> {
+  return buildStudioOpenRasterBlobWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
+
+function buildStudioPackageArchiveBytes(
+  entries: Parameters<typeof buildStudioPackageArchiveBytesWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioPackageArchiveBytesWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioPackageArchiveBytesWithBackend> {
+  return buildStudioPackageArchiveBytesWithBackend(entries, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 function png(seed: number, width = 1, height = 1): Uint8Array {
   const bytes = new Uint8Array(33);

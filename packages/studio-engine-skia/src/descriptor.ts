@@ -14,12 +14,11 @@ import type {
  * split by role (V13 §2.6 / V19 §3.2):
  *
  * - `skia-canvaskit` — the CPU raster lane implemented by render.ts
- *   (MakeSurface + readPixels). Reference, golden, export and GPU-loss
- *   recovery scope; worker-friendly; readPixels is allowed here precisely
+ *   (MakeSurface + readPixels). Reference, golden and export scope;
+ *   worker-friendly; readPixels is allowed here precisely
  *   because this lane never presents the interactive visible frame. The id is
- *   kept stable because asset metadata fallbacks and the vello descriptors
- *   name it; the honesty fix is the capability set + execution contract, not
- *   a rename.
+ *   kept stable because asset metadata and evidence bind it; the honesty fix
+ *   is the capability set + execution contract, not a rename.
  * - `skia-canvaskit-gpu` — the interactive live role: OffscreenCanvas WebGL
  *   island transported as ImageBitmap into the FrameGraph. No readPixels on
  *   the hot path.
@@ -56,14 +55,14 @@ export const canvasKitProviderDescriptor: ProviderDescriptor =
     ],
     limitations: [
       "render.text.paragraph requires a registered font asset (no bundled fonts in canvaskit-wasm npm)",
-      "CPU raster MakeSurface + readPixels lane — reference, golden, export and GPU-loss recovery scope only",
+      "CPU raster MakeSurface + readPixels lane — reference, golden and export scope only",
       "never the interactive visible frame; interactive Skia completion routes to skia-canvaskit-gpu (ImageBitmap island, no readPixels)",
+      "interactive provider failure is never redirected to this CPU lane",
     ],
     previewQuality: "production",
     finalQuality: "production",
     determinism: "tolerance",
     memoryEstimateMb: 34,
-    fallbackProviderId: null,
     knownIssues: [],
   });
 
@@ -107,12 +106,12 @@ export const canvasKitGpuProviderDescriptor: ProviderDescriptor =
     limitations: [
       "Ganesh WebGL queue cannot share GPUTexture with Vello; dirty ImageBitmap bridge only",
       "interactive path must not readPixels; island transfer happens on revision change",
+      "provider failure is terminal for the bound island and never switches to the CPU reference lane",
     ],
     previewQuality: "production",
     finalQuality: "production",
     determinism: "tolerance",
     memoryEstimateMb: 48,
-    fallbackProviderId: "skia-canvaskit",
     knownIssues: [],
   });
 
@@ -162,12 +161,12 @@ export const skiaGraphiteWebgpuProviderDescriptor: ProviderDescriptor =
     ],
     limitations: [
       "same-device Graphite is gated until the visual/performance tournament passes",
+      "a selected Graphite island fails closed; it never demotes to CanvasKit WebGL",
     ],
     previewQuality: "preview",
     finalQuality: "preview",
     determinism: "tolerance",
     memoryEstimateMb: 64,
-    fallbackProviderId: "skia-canvaskit-gpu",
     knownIssues: ["not wired as a production provider"],
   });
 

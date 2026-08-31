@@ -51,7 +51,7 @@ const BUFFER_USAGE_UNIFORM = 0x0040;
 const FLOAT_BYTES = Float32Array.BYTES_PER_ELEMENT;
 const INDEX_BYTES = Uint32Array.BYTES_PER_ELEMENT;
 
-export type StudioInkMeshFallbackCode =
+export type StudioInkMeshUnavailableCode =
   | "authoritative-prefix-rewritten"
   | "buffer-admission-rejected"
   | "device-lost"
@@ -61,11 +61,12 @@ export type StudioInkMeshFallbackCode =
   | "runtime-error"
   | "surface-unavailable";
 
-export interface StudioInkMeshFallbackReceipt {
-  readonly status: "fallback";
-  readonly code: StudioInkMeshFallbackCode;
+export interface StudioInkMeshUnavailableReceipt {
+  readonly status: "unavailable";
+  readonly code: StudioInkMeshUnavailableCode;
   readonly detail: string;
-  readonly fallback: "canvas2d-perfect-freehand";
+  /** This renderer already owned the authoritative stroke before the optional mesh preview ran. */
+  readonly retainedPixelAuthority: "canvas2d-perfect-freehand";
   readonly strokeId: string | null;
 }
 
@@ -101,7 +102,7 @@ export interface StudioInkMeshAuthoritativeReceipt {
   readonly strokeId: string;
   readonly authoritativePointCount: number;
   readonly revision: number;
-  readonly backend: "upstream-in-progress" | "single-shot-fallback";
+  readonly backend: "upstream-in-progress";
   readonly gpu: StudioInkMeshGpuApplyReceipt;
 }
 
@@ -110,13 +111,13 @@ export interface StudioInkMeshFinishReceipt {
   readonly strokeId: string;
   readonly authoritativePointCount: number;
   readonly finalMesh: InkStrokeMeshReplica;
-  readonly backend: "upstream-in-progress" | "single-shot-fallback";
+  readonly backend: "upstream-in-progress";
   readonly gpuReadbackCount: 0;
 }
 
 export type StudioInkMeshLiveReceipt =
   | StudioInkMeshAuthoritativeReceipt
-  | StudioInkMeshFallbackReceipt
+  | StudioInkMeshUnavailableReceipt
   | StudioInkMeshFinishReceipt
   | StudioInkMeshPreviewReceipt
   | Readonly<{ status: "inactive" }>;
@@ -169,7 +170,7 @@ export interface StudioInkMeshLivePreviewRuntimeOptions {
   readonly subscribeDeviceLoss?: (
     listener: (event: StudioGpuDeviceLossEvent) => void,
   ) => () => void;
-  readonly onFallback?: (receipt: StudioInkMeshFallbackReceipt) => void;
+  readonly onUnavailable?: (receipt: StudioInkMeshUnavailableReceipt) => void;
 }
 
 /**
@@ -234,9 +235,9 @@ export function expandStudioInkMeshPredictedSuffix<T extends StudioInkMeshStroke
 }
 
 export class StudioInkMeshPreviewError extends Error {
-  readonly code: StudioInkMeshFallbackCode;
+  readonly code: StudioInkMeshUnavailableCode;
 
-  constructor(code: StudioInkMeshFallbackCode, message: string) {
+  constructor(code: StudioInkMeshUnavailableCode, message: string) {
     super(message);
     this.name = "StudioInkMeshPreviewError";
     this.code = code;
@@ -1021,21 +1022,21 @@ function inputPointEqual(left: InkMeshInputPoint, right: InkMeshInputPoint): boo
     && left.orientationRad === right.orientationRad;
 }
 
-function fallbackReceipt(
-  code: StudioInkMeshFallbackCode,
+function unavailableReceipt(
+  code: StudioInkMeshUnavailableCode,
   detail: string,
   strokeId: string | null,
-): StudioInkMeshFallbackReceipt {
+): StudioInkMeshUnavailableReceipt {
   return {
-    status: "fallback",
+    status: "unavailable",
     code,
     detail,
-    fallback: "canvas2d-perfect-freehand",
+    retainedPixelAuthority: "canvas2d-perfect-freehand",
     strokeId,
   };
 }
 
-function errorCode(error: unknown): StudioInkMeshFallbackCode {
+function errorCode(error: unknown): StudioInkMeshUnavailableCode {
   if (error instanceof StudioInkMeshPreviewError) return error.code;
   if (error instanceof InkMeshError) return "invalid-input";
   return "runtime-error";
@@ -1050,7 +1051,7 @@ export class StudioInkMeshLivePreviewRuntime {
   private readonly prepareResources: NonNullable<
     StudioInkMeshLivePreviewRuntimeOptions["prepareResources"]
   >;
-  private readonly onFallback?: (receipt: StudioInkMeshFallbackReceipt) => void;
+  private readonly onUnavailable?: (receipt: StudioInkMeshUnavailableReceipt) => void;
   private readonly unsubscribeLoss: () => void;
   private canvas: HTMLCanvasElement | null = null;
   private surface: StudioLiveInkSurface | null = null;
@@ -1064,11 +1065,11 @@ export class StudioInkMeshLivePreviewRuntime {
   private activeParams: InkMeshBrushParams | null = null;
   private consumedAuthoritativePoints = 0;
   private predictedPointCount = 0;
-  private lastFallbackValue: StudioInkMeshFallbackReceipt | null = null;
+  private lastUnavailableValue: StudioInkMeshUnavailableReceipt | null = null;
 
   constructor(options: StudioInkMeshLivePreviewRuntimeOptions = {}) {
     this.prepareResources = options.prepareResources ?? prepareDefaultResources;
-    this.onFallback = options.onFallback;
+    this.onUnavailable = options.onUnavailable;
     const subscribe = options.subscribeDeviceLoss ?? onStudioGpuDeviceLost;
     this.unsubscribeLoss = subscribe((event) => this.handleDeviceLoss(event));
   }
@@ -1085,8 +1086,8 @@ export class StudioInkMeshLivePreviewRuntime {
     return this.activeStrokeId;
   }
 
-  get lastFallback(): StudioInkMeshFallbackReceipt | null {
-    return this.lastFallbackValue;
+  get lastUnavailable(): StudioInkMeshUnavailableReceipt | null {
+    return this.lastUnavailableValue;
   }
 
   attach(canvas: HTMLCanvasElement | null): void {
@@ -1128,7 +1129,7 @@ export class StudioInkMeshLivePreviewRuntime {
         prepared.sink.dispose();
         prepared.release();
         this.prepared = null;
-        this.lastFallbackValue = fallbackReceipt(
+        this.lastUnavailableValue = unavailableReceipt(
           errorCode(error),
           error instanceof Error ? error.message : String(error),
           null,
@@ -1147,7 +1148,7 @@ export class StudioInkMeshLivePreviewRuntime {
     pressures?: readonly number[],
   ): StudioInkMeshLiveReceipt {
     if (!this.prepared || !this.surface) {
-      return fallbackReceipt(
+      return unavailableReceipt(
         this.canvas ? "gpu-unavailable" : "surface-unavailable",
         "Google Ink WebGPU live-tail resources are not ready; existing Canvas2D ink remains active.",
         stroke.id,
@@ -1164,7 +1165,7 @@ export class StudioInkMeshLivePreviewRuntime {
         && !this.prepared.sink.setColor(stroke.stroke, stroke.opacity ?? 1)
       )
     ) {
-      return fallbackReceipt(
+      return unavailableReceipt(
         "invalid-input",
         "Google Ink live-tail admission accepts one opaque, unsymmetrical freehand pen stroke with a supported solid color.",
         stroke.id,
@@ -1175,6 +1176,13 @@ export class StudioInkMeshLivePreviewRuntime {
       const count = pointCount(stroke);
       const params = brushParams(stroke);
       const session = this.prepared.generator.createInProgressStroke(params);
+      if (session.backend !== "upstream-in-progress") {
+        session.dispose();
+        throw new StudioInkMeshPreviewError(
+          "runtime-error",
+          `Studio product live ink requires the upstream-in-progress backend; received ${session.backend}.`,
+        );
+      }
       this.authoritativeSession = session;
       this.activeStrokeId = stroke.id;
       this.activeParams = params;
@@ -1190,7 +1198,7 @@ export class StudioInkMeshLivePreviewRuntime {
         strokeId: stroke.id,
         authoritativePointCount: this.consumedAuthoritativePoints,
         revision: this.authoritativeReplica.revision,
-        backend: session.backend,
+        backend: "upstream-in-progress",
         gpu,
       };
     } catch (error) {
@@ -1227,7 +1235,7 @@ export class StudioInkMeshLivePreviewRuntime {
         strokeId: stroke.id,
         authoritativePointCount: this.consumedAuthoritativePoints,
         revision: this.authoritativeReplica.revision,
-        backend: this.authoritativeSession.backend,
+        backend: "upstream-in-progress",
         gpu,
       };
     } catch (error) {
@@ -1303,7 +1311,7 @@ export class StudioInkMeshLivePreviewRuntime {
     pressures?: readonly number[],
   ): StudioInkMeshLiveReceipt {
     const synchronized = this.synchronizeAuthoritative(stroke, pressures);
-    if (synchronized.status === "fallback" || synchronized.status === "inactive") {
+    if (synchronized.status === "unavailable" || synchronized.status === "inactive") {
       return synchronized;
     }
     const session = this.authoritativeSession;
@@ -1325,7 +1333,6 @@ export class StudioInkMeshLivePreviewRuntime {
         revision: snapshot.revision,
         finished: true,
       };
-      const backend = session.backend;
       const authoritativePointCount = this.consumedAuthoritativePoints;
       session.dispose();
       this.authoritativeSession = null;
@@ -1341,7 +1348,7 @@ export class StudioInkMeshLivePreviewRuntime {
         strokeId,
         authoritativePointCount,
         finalMesh,
-        backend,
+        backend: "upstream-in-progress",
         gpuReadbackCount: 0,
       };
     } catch (error) {
@@ -1406,18 +1413,18 @@ export class StudioInkMeshLivePreviewRuntime {
   }
 
   private fail(
-    code: StudioInkMeshFallbackCode,
+    code: StudioInkMeshUnavailableCode,
     detail: string,
-  ): StudioInkMeshFallbackReceipt {
-    const receipt = fallbackReceipt(code, detail, this.activeStrokeId);
-    this.lastFallbackValue = receipt;
+  ): StudioInkMeshUnavailableReceipt {
+    const receipt = unavailableReceipt(code, detail, this.activeStrokeId);
+    this.lastUnavailableValue = receipt;
     this.reset(code, false);
-    this.onFallback?.(receipt);
+    this.onUnavailable?.(receipt);
     return receipt;
   }
 
   private reset(
-    _code: StudioInkMeshFallbackCode,
+    _code: StudioInkMeshUnavailableCode,
     notify: boolean,
   ): void {
     const strokeId = this.activeStrokeId;
@@ -1444,24 +1451,24 @@ export class StudioInkMeshLivePreviewRuntime {
       // Device loss can make the final transparent clear unavailable.
     }
     if (notify && strokeId) {
-      const receipt = fallbackReceipt(_code, "Google Ink live-tail session reset.", strokeId);
-      this.lastFallbackValue = receipt;
-      this.onFallback?.(receipt);
+      const receipt = unavailableReceipt(_code, "Google Ink live-tail session reset.", strokeId);
+      this.lastUnavailableValue = receipt;
+      this.onUnavailable?.(receipt);
     }
   }
 
   private handleDeviceLoss(event: StudioGpuDeviceLossEvent): void {
     if (!this.prepared || this.prepared.deviceEpoch !== event.epoch) return;
     const strokeId = this.activeStrokeId;
-    const receipt = fallbackReceipt(
+    const receipt = unavailableReceipt(
       "device-lost",
       `Studio GPU fabric epoch ${event.epoch} was lost (${event.reason}); retained Perfect Freehand remains authoritative.`,
       strokeId,
     );
-    this.lastFallbackValue = receipt;
+    this.lastUnavailableValue = receipt;
     this.reset("device-lost", false);
     this.releasePreparedResources();
-    this.onFallback?.(receipt);
+    this.onUnavailable?.(receipt);
   }
 
   private releasePreparedResources(): void {

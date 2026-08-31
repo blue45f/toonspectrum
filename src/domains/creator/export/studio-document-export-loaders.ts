@@ -22,9 +22,9 @@ export function loadStudioSvgExportModule(): Promise<StudioSvgExportModule> {
   return svgExportModulePromise;
 }
 
-/** 실제 직렬화(exportPageToSvg)는 이 Worker 클라이언트를 통해서만 부른다 — 무거운 페이지를
- * 메인 스레드에서 막지 않고, Worker를 못 만드는 환경에서는 클라이언트 내부에서 동일 엔진으로
- * 폴백한다. MIME/파일명 등 가벼운 메타데이터는 여전히 loadStudioSvgExportModule을 쓴다. */
+/** 실제 직렬화(exportPageToSvg)는 이 Worker 클라이언트를 통해서만 부른다. 제품 기본 Worker가
+ * unavailable이면 fail-closed하며, direct 실행은 호출자가 작업 전에 명시한 경우에만 허용한다.
+ * MIME/파일명 등 가벼운 메타데이터는 여전히 loadStudioSvgExportModule을 쓴다. */
 export function loadStudioSvgExportWorkerClientModule(): Promise<StudioSvgExportWorkerClientModule> {
   svgExportWorkerClientModulePromise ??= import("./studio-svg-export-worker-client").catch((error: unknown) => {
     svgExportWorkerClientModulePromise = null;

@@ -31,6 +31,7 @@ const ROUTE_ROOTS = [
 ] as const;
 
 const HOST = "src/domains/creator/render/studio-gpu-bristle-host.ts";
+const DRAW_NODE = "src/domains/creator/brush/StudioDrawNode.tsx";
 const ADMISSION = "src/domains/creator/render/studio-gpu-bristle-admission.ts";
 const WGSL = "src/domains/creator/render/studio-gpu-bristle-wgsl.ts";
 const RUNTIME = "src/domains/creator/render/studio-gpu-bristle-runtime.ts";
@@ -141,5 +142,30 @@ describe("gpu-bristle route import boundary", () => {
     const wgsl = readFileSync(path.join(ROOT, WGSL), "utf8");
     expect(wgsl).toContain("@compute");
     expect(staticImportSpecifiers(wgsl)).toEqual(["./studio-webgpu-r8-grain-native"]);
+  });
+
+  it("never executes the Canvas oil carrier for a selected GPU-bristle brush", () => {
+    const drawNode = readFileSync(path.join(ROOT, DRAW_NODE), "utf8");
+    const selection = drawNode.indexOf("const gpuBristleSelected =");
+    const carrier = drawNode.indexOf("const paintInput =", selection);
+    expect(selection).toBeGreaterThan(-1);
+    expect(carrier).toBeGreaterThan(selection);
+    const selectedBranch = drawNode.slice(selection, carrier);
+    expect(selectedBranch).toContain("if (gpuBristleSelected) {");
+    expect(selectedBranch).toContain("if (!gpuBristle) return;");
+    expect(selectedBranch).toContain("if (!overlay) return;");
+    expect(selectedBranch).not.toContain("paintStudioOilRibbonCarrier");
+  });
+
+  it("requests the selected GPU lane for pointer drafts without enabling transform-draft jobs", () => {
+    const drawNode = readFileSync(path.join(ROOT, DRAW_NODE), "utf8");
+    const selection = drawNode.indexOf("const gpuBristleSelected =");
+    const selectedBranch = drawNode.slice(
+      selection,
+      drawNode.indexOf("const paintInput =", selection),
+    );
+    expect(selectedBranch).toContain("gpuBristleSelected && (durableDocumentRender || activeDraft)");
+    expect(selectedBranch).not.toContain("gpuBristleSelected && durableDocumentRender");
+    expect(selectedBranch).toContain("if (!gpuBristle) return;");
   });
 });

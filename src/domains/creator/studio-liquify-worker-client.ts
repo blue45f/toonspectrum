@@ -24,10 +24,13 @@ export interface StudioLiquifyWorkerLike {
 }
 
 export type StudioLiquifyWorkerFactory = () => StudioLiquifyWorkerLike | null;
+export type StudioLiquifyExecutionMode = "worker" | "direct";
 
 export interface StudioLiquifyWorkerClientOptions {
   signal?: AbortSignal;
-  /** `null` explicitly selects the synchronous fallback; omitted uses the Vite module worker. */
+  /** Execution authority is selected before the operation starts and never changes afterward. */
+  executionMode?: StudioLiquifyExecutionMode;
+  /** Test/integration seam for Worker mode. `null` means unavailable, not direct execution. */
   workerFactory?: StudioLiquifyWorkerFactory | null;
   readyTimeoutMilliseconds?: number;
   operationTimeoutMilliseconds?: number;
@@ -65,6 +68,12 @@ function createAbortError(): Error {
 function createTimeoutError(): Error {
   const error = new Error("리퀴파이 Worker가 제한 시간 안에 완료되지 않았습니다.");
   error.name = "TimeoutError";
+  return error;
+}
+
+function createWorkerUnavailableError(message: string, cause?: unknown): Error {
+  const error = new Error(message, cause === undefined ? undefined : { cause });
+  error.name = "StudioLiquifyWorkerUnavailableError";
   return error;
 }
 
@@ -147,8 +156,7 @@ async function runLiquifyDirect(
   signal: AbortSignal | undefined,
 ): Promise<StudioLiquifyWorkerClientResult> {
   throwIfAborted(signal);
-  // 정상 브라우저 경로는 Worker chunk만 실행한다. 순수 픽셀 엔진은 Worker 생성/CSP 실패 시에만
-  // main thread fallback chunk로 로드해 첫 정상 stroke의 parse/compile 비용까지 격리한다.
+  // Direct is an independently selected mode and is never entered after Worker failure.
   const { applyLiquifyDisplacement, buildLiquifyDisplacementField } = await import("./studio-liquify");
   throwIfAborted(signal);
   const field = "stroke" in request
@@ -216,9 +224,9 @@ function runLiquifyWithWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
-    const resolveDirectFallback = () => finish(() => {
-      void runLiquifyDirect(request, signal).then(resolve, reject);
-    });
+    const rejectWorkerUnavailable = (message: string, cause?: unknown) => finish(() => reject(
+      createWorkerUnavailableError(message, cause),
+    ));
 
     const onOperationTimeout = () => finish(() => reject(createTimeoutError()));
 
@@ -239,7 +247,7 @@ function runLiquifyWithWorker(
         }
       } catch (error) {
         // postMessage 구현은 소유권을 detach한 뒤 예외를 던질 수도 있다. 이 경계 뒤에는 direct
-        // fallback이 안전하지 않으므로 실패로 닫고 공유 Worker epoch를 폐기한다.
+        // 실행이 안전하지 않으므로 실패로 닫고 공유 Worker epoch를 폐기한다.
         finish(() => reject(
           error instanceof Error
             ? error
@@ -303,7 +311,10 @@ function runLiquifyWithWorker(
     worker.onerror = (event) => {
       event.preventDefault?.();
       if (!requestPosted) {
-        resolveDirectFallback();
+        rejectWorkerUnavailable(
+          "리퀴파이 Worker가 준비되기 전에 사용할 수 없게 되었습니다.",
+          event.error ?? event.message,
+        );
         return;
       }
       // 픽셀 버퍼가 이미 전송(detach)돼 직접 실행으로 되돌릴 데이터가 없다.
@@ -324,7 +335,7 @@ function runLiquifyWithWorker(
       postRequest();
     } else {
       readyTimer = setTimeout(
-        resolveDirectFallback,
+        () => rejectWorkerUnavailable("리퀴파이 Worker 준비 시간이 초과되었습니다."),
         boundedTimeout(options.readyTimeoutMilliseconds, DEFAULT_READY_TIMEOUT_MS),
       );
     }
@@ -411,17 +422,21 @@ function runLiquifyWithSharedModuleWorker(
     clearSharedLiquifyIdleTimer();
     if (disposeGeneration !== sharedLiquifyDisposeGeneration) throw createAbortError();
     throwIfAborted(options.signal);
+    let creationError: unknown;
     if (!sharedLiquifyWorker) {
       try {
         sharedLiquifyWorker = createStudioLiquifyModuleWorker();
-      } catch {
+      } catch (error) {
+        creationError = error;
         sharedLiquifyWorker = null;
       }
       sharedLiquifyWorkerReady = false;
       if (sharedLiquifyWorker) sharedLiquifyWorkerEpoch += 1;
     }
     const worker = sharedLiquifyWorker;
-    if (!worker) return runLiquifyDirect(request, options.signal);
+    if (!worker) {
+      throw createWorkerUnavailableError("리퀴파이 Worker를 만들 수 없습니다.", creationError);
+    }
     const epoch = sharedLiquifyWorkerEpoch;
     const controller = new AbortController();
     sharedLiquifyFlight = { worker, epoch, controller };
@@ -455,7 +470,7 @@ function runLiquifyWithSharedModuleWorker(
  * 리퀴파이 필드 생성과 변위 적용(backward mapping + bilinear 샘플링)을 capacity 1 모듈 Worker
  * 큐에서 실행한다. 기본 Worker는 첫 ready 이후 스트로크 간 유지되며, 명시적 workerFactory만 기존
  * 격리된 one-shot 수명을 사용한다. Reconstruct/Smooth의 field 요청도 기존대로 지원한다. Worker를
- * 만들지 못하면 동일한 build/apply 엔진을 메인 스레드에서 동기 실행해 폴백한다.
+ * 만들지 못하거나 실행이 실패하면 해당 요청은 unavailable/reject로 끝나며 backend를 바꾸지 않는다.
  */
 export async function runStudioLiquifyWorker(
   request: StudioLiquifyWorkerRunRequest,
@@ -463,18 +478,20 @@ export async function runStudioLiquifyWorker(
 ): Promise<StudioLiquifyWorkerClientResult> {
   throwIfAborted(options.signal);
   const cloneSafeRequest = cloneSafeLiquifyRequest(request);
+  const executionMode = options.executionMode ?? "worker";
+  if (executionMode === "direct") return runLiquifyDirect(cloneSafeRequest, options.signal);
   if (options.workerFactory === undefined) {
     return runLiquifyWithSharedModuleWorker(cloneSafeRequest, options);
   }
   const factory = options.workerFactory;
-  if (!factory) return runLiquifyDirect(cloneSafeRequest, options.signal);
+  if (!factory) throw createWorkerUnavailableError("리퀴파이 Worker를 만들 수 없습니다.");
 
   let worker: StudioLiquifyWorkerLike | null;
   try {
     worker = factory();
-  } catch {
-    return runLiquifyDirect(cloneSafeRequest, options.signal);
+  } catch (error) {
+    throw createWorkerUnavailableError("리퀴파이 Worker를 만들 수 없습니다.", error);
   }
-  if (!worker) return runLiquifyDirect(cloneSafeRequest, options.signal);
+  if (!worker) throw createWorkerUnavailableError("리퀴파이 Worker를 만들 수 없습니다.");
   return runLiquifyWithWorker(worker, cloneSafeRequest, options);
 }

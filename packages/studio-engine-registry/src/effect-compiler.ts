@@ -96,8 +96,8 @@ export interface EffectCompileOptions {
   /**
    * §3.2 "최소 통과 조건" + 제품 오너 지시(2026-08-07): 품질·손맛·정밀함이
    * 성능보다 우선한다. 측정된 visualQuality가 이 바닥선 미만인 후보는 아무리
-   * 빨라도 탈락한다. 측정 없는 후보는 측정 통과 후보가 하나라도 있으면
-   * 제외(증거 우선), 아무도 통과 못 하면 폴백으로 유지된다.
+   * 빨라도 탈락한다. 측정 없는 후보도 기준 통과 증거가 아니므로 선택되지
+   * 않는다. 통과 후보가 없으면 컴파일은 실패하고 provider를 바꾸지 않는다.
    */
   minVisualQuality?: number;
 }
@@ -149,8 +149,8 @@ export function compileEffectGraph(
           })()
         : phased;
     // Quality floor (성능보다 품질 우선): measured sub-floor candidates are
-    // out regardless of speed; unmeasured ones survive only when no measured
-    // candidate passes.
+    // out regardless of speed; unmeasured candidates have not passed the
+    // requested floor and cannot become an implicit substitute.
     let gatedPool = pool;
     const floor = options.minVisualQuality;
     const benchmarks = options.benchmarks;
@@ -160,12 +160,7 @@ export function compileEffectGraph(
           benchmarks.hasMeasurements(candidate.descriptor.id) &&
           benchmarks.axisScores(candidate.descriptor.id).visualQuality >= floor,
       );
-      gatedPool =
-        passing.length > 0
-          ? passing
-          : pool.filter(
-              (candidate) => !benchmarks.hasMeasurements(candidate.descriptor.id),
-            );
+      gatedPool = passing;
       if (gatedPool.length === 0) {
         missingOps.push(`${node.op} (below quality floor ${floor})`);
         continue;

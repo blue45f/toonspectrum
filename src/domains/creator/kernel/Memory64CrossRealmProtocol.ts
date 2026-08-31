@@ -1,15 +1,12 @@
 import {
   WASM_MEMORY64_ACCELERATOR_POLICY,
-  type WasmMemoryRuntimeSelection,
+  type WasmExactMemoryRuntime,
   type WasmScratchWorkload,
 } from "./WasmMemory64Capability";
 
-export const MEMORY64_CROSS_REALM_PROTOCOL_VERSION = 1 as const;
+export const MEMORY64_CROSS_REALM_PROTOCOL_VERSION = 2 as const;
 
-export type Memory64CrossRealmRuntime = Exclude<
-  WasmMemoryRuntimeSelection,
-  "unavailable"
->;
+export type Memory64CrossRealmRuntime = WasmExactMemoryRuntime;
 
 export interface Memory64CrossRealmReservationToken {
   readonly kind: "epoch16-memory64/cross-realm-reservation";
@@ -18,8 +15,8 @@ export interface Memory64CrossRealmReservationToken {
   /** Opaque capability nonce. The Worker can echo it but cannot mint a valid reservation. */
   readonly nonce: string;
   readonly workload: WasmScratchWorkload;
-  readonly preferredRuntime: Memory64CrossRealmRuntime;
-  readonly memory32FallbackAllowed: boolean;
+  /** Exact runtime selected in the main realm before this reservation exists. */
+  readonly selectedRuntime: Memory64CrossRealmRuntime;
   /** Canonical base-10 strings keep the contract structured-clone/JSON safe. */
   readonly authorizedResidentBytes: string;
   readonly authorizedResidentPages: string;
@@ -59,8 +56,7 @@ const TOKEN_KEYS = new Set([
   "reservationId",
   "nonce",
   "workload",
-  "preferredRuntime",
-  "memory32FallbackAllowed",
+  "selectedRuntime",
   "authorizedResidentBytes",
   "authorizedResidentPages",
   "minimumResidentPages",
@@ -110,7 +106,7 @@ function decimal(value: unknown, positive = true): value is string {
 }
 
 function runtime(value: unknown): value is Memory64CrossRealmRuntime {
-  return value === "memory64" || value === "memory32-fallback";
+  return value === "memory64" || value === "memory32-requested";
 }
 
 function workload(value: unknown): value is WasmScratchWorkload {
@@ -147,8 +143,7 @@ export function snapshotMemory64CrossRealmReservationToken(
     || typeof value.nonce !== "string"
     || !NONCE_PATTERN.test(value.nonce)
     || !workload(value.workload)
-    || !runtime(value.preferredRuntime)
-    || typeof value.memory32FallbackAllowed !== "boolean"
+    || !runtime(value.selectedRuntime)
     || !decimal(value.authorizedResidentBytes)
     || !decimal(value.authorizedResidentPages)
     || !decimal(value.minimumResidentPages)
@@ -164,8 +159,7 @@ export function snapshotMemory64CrossRealmReservationToken(
     reservationId: value.reservationId,
     nonce: value.nonce,
     workload: value.workload,
-    preferredRuntime: value.preferredRuntime,
-    memory32FallbackAllowed: value.memory32FallbackAllowed,
+    selectedRuntime: value.selectedRuntime,
     authorizedResidentBytes: value.authorizedResidentBytes,
     authorizedResidentPages: value.authorizedResidentPages,
     minimumResidentPages: value.minimumResidentPages,

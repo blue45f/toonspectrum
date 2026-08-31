@@ -68,6 +68,7 @@ describe("Studio live-ink progressive rollout", () => {
       random: fixedRandom(1),
     })).toEqual({
       preference: "webgpu",
+      status: "selected",
       reason: "cohort-included",
       rolloutPercent: STUDIO_LIVE_INK_DEFAULT_ROLLOUT_PERCENT,
       bucket: null,
@@ -75,7 +76,7 @@ describe("Studio live-ink progressive rollout", () => {
     expect(getItem).not.toHaveBeenCalled();
   });
 
-  it("keeps malformed explicit configuration fail-closed on Canvas2D", () => {
+  it("disables malformed rollout configuration without selecting Canvas2D", () => {
     const storage = memoryStorage();
     const getItem = vi.spyOn(storage, "getItem");
 
@@ -85,36 +86,38 @@ describe("Studio live-ink progressive rollout", () => {
       webgpuApiAvailable: true,
       storage,
       random: fixedRandom(1),
-    }).preference).toBe("canvas2d");
+    })).toMatchObject({ preference: "webgpu", status: "unavailable" });
     expect(resolveStudioLiveInkRollout({
       backendPreference: "auto",
       rolloutPercent: true,
       webgpuApiAvailable: true,
       storage,
       random: fixedRandom(1),
-    }).preference).toBe("canvas2d");
+    })).toMatchObject({ preference: "webgpu", status: "unavailable" });
     expect(getItem).not.toHaveBeenCalled();
   });
 
-  it("falls back from the quality-first default when WebGPU is unavailable", () => {
+  it("reports the selected WebGPU lane unavailable without backend substitution", () => {
     expect(resolveStudioLiveInkRollout({
       webgpuApiAvailable: false,
     })).toEqual({
-      preference: "canvas2d",
+      preference: "webgpu",
+      status: "unavailable",
       reason: "webgpu-api-unavailable",
       rolloutPercent: STUDIO_LIVE_INK_DEFAULT_ROLLOUT_PERCENT,
       bucket: null,
     });
   });
 
-  it("preserves explicit force and emergency rollback controls", () => {
+  it("keeps manual selection explicit and kill-switch failure closed", () => {
     expect(resolveStudioLiveInkRollout({
       backendPreference: "webgpu",
       rolloutPercent: 100,
       killSwitch: "on",
       webgpuApiAvailable: true,
     })).toMatchObject({
-      preference: "canvas2d",
+      preference: "webgpu",
+      status: "unavailable",
       reason: "kill-switch",
     });
     expect(resolveStudioLiveInkRollout({
@@ -123,6 +126,7 @@ describe("Studio live-ink progressive rollout", () => {
       webgpuApiAvailable: false,
     })).toMatchObject({
       preference: "webgpu",
+      status: "selected",
       reason: "webgpu-explicit",
     });
     expect(resolveStudioLiveInkRollout({
@@ -131,13 +135,14 @@ describe("Studio live-ink progressive rollout", () => {
       webgpuApiAvailable: true,
     })).toMatchObject({
       preference: "canvas2d",
-      reason: "canvas2d-forced",
+      status: "selected",
+      reason: "canvas2d-explicit",
     });
     expect(resolveStudioLiveInkRollout({
       backendPreference: "web-gpu",
       rolloutPercent: 100,
       webgpuApiAvailable: true,
-    }).preference).toBe("canvas2d");
+    })).toMatchObject({ preference: "webgpu", status: "selected" });
   });
 
   it("requires a WebGPU API before enrolling an automatic cohort", () => {
@@ -148,7 +153,8 @@ describe("Studio live-ink progressive rollout", () => {
       storage: memoryStorage("0"),
       random: fixedRandom(0),
     })).toEqual({
-      preference: "canvas2d",
+      preference: "webgpu",
+      status: "unavailable",
       reason: "webgpu-api-unavailable",
       rolloutPercent: 20,
       bucket: null,
@@ -165,12 +171,14 @@ describe("Studio live-ink progressive rollout", () => {
     } as const;
 
     expect(resolveStudioLiveInkRollout({ ...base, rolloutPercent: 24.99 })).toMatchObject({
-      preference: "canvas2d",
+      preference: "webgpu",
+      status: "unavailable",
       reason: "cohort-excluded",
       bucket: 2499,
     });
     expect(resolveStudioLiveInkRollout({ ...base, rolloutPercent: 25 })).toMatchObject({
       preference: "webgpu",
+      status: "selected",
       reason: "cohort-included",
       bucket: 2499,
     });
@@ -209,7 +217,8 @@ describe("Studio live-ink progressive rollout", () => {
       storage: throwingStorage,
       random: fixedRandom(0),
     })).toMatchObject({
-      preference: "canvas2d",
+      preference: "webgpu",
+      status: "unavailable",
       reason: "cohort-unavailable",
     });
 
@@ -225,7 +234,8 @@ describe("Studio live-ink progressive rollout", () => {
         },
       },
     })).toMatchObject({
-      preference: "canvas2d",
+      preference: "webgpu",
+      status: "unavailable",
       reason: "cohort-unavailable",
     });
   });
@@ -237,6 +247,7 @@ describe("Studio live-ink progressive rollout", () => {
       webgpuApiAvailable: true,
     })).toEqual({
       preference: "webgpu",
+      status: "selected",
       reason: "cohort-included",
       rolloutPercent: 100,
       bucket: null,

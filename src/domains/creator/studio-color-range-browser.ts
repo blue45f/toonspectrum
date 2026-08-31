@@ -26,7 +26,9 @@ import type {
 let defaultColorRangeWorkerSession: StudioColorRangeWorkerSession | null = null;
 
 function colorRangeWorkerSession(): StudioColorRangeWorkerSession {
-  defaultColorRangeWorkerSession ??= createStudioColorRangeWorkerSession();
+  defaultColorRangeWorkerSession ??= createStudioColorRangeWorkerSession({
+    executionMode: "worker",
+  });
   return defaultColorRangeWorkerSession;
 }
 

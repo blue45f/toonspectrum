@@ -12,6 +12,7 @@
 import {
   MOTION_RESOLUTION_PRESETS,
   isMotionExportSupported,
+  materializeExactMotionWebm,
   pickMotionVideoMime,
   recommendVideoBitsPerSecond,
   type MotionCanvasLike,
@@ -506,9 +507,10 @@ async function runTimelapseExport(
     if (state.cancelled) throw new TimelapseExportCancelledError();
     if (recorderError) throw new Error("영상 인코딩 중 오류가 발생했어요. 다시 시도해주세요.");
     if (chunks.length === 0) throw new Error("녹화된 영상 데이터가 없어요. 다시 시도해주세요.");
+    const encoded = await materializeExactMotionWebm(chunks, mimeType, recorder.mimeType ?? "");
     return {
-      blob: new Blob(chunks, { type: mimeType }),
-      mimeType,
+      blob: encoded.blob,
+      mimeType: encoded.mimeType,
       durationSec: plan.durationSec,
       stepCount: plan.segments.length,
     };

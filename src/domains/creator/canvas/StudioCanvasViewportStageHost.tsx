@@ -5,7 +5,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { Stage, Layer, Rect, Shape } from "react-konva/lib/ReactKonvaCore";
+import { Stage, Layer, Rect, Shape, Group } from "react-konva/lib/ReactKonvaCore";
 
 import { drawLiveFreehandDraftToContext } from "../brush/studio-draw-rendering";
 import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "../render/studio-raster-publication-feature";
@@ -285,6 +285,9 @@ export function StudioCanvasViewportStageHost({
     webtoonTheme: viewport.webtoonTheme,
     wetMixArmed: viewport.wetMixArmed,
   };
+  const documentLayer = (
+    <StudioCanvasViewportDocumentLayer {...documentLayerProps} />
+  );
   const toolLayerProps: StudioCanvasViewportToolLayersProps = {
     activeSurfaceReviewLocked: viewport.activeSurfaceReviewLocked,
     advancedRulers: viewport.advancedRulers,
@@ -423,14 +426,15 @@ export function StudioCanvasViewportStageHost({
   };
   const domOverlayProps: StudioCanvasViewportDomOverlaysProps = {
     acceleratedSceneSelectedIds: live.acceleratedSceneSelectedIds,
-    canonicalDryMediaAuthorized: live.canonicalDryMediaAuthorized,
+    canonicalDryMediaCanvasVisible: live.canonicalDryMediaCanvasVisible,
     canonicalDryMediaCandidate: live.canonicalDryMediaCandidate,
     canonicalDryMediaLayoutKey: live.canonicalDryMediaLayoutKey,
     canvasFlipH: viewport.canvasFlipH,
     canvasH: viewport.canvasH,
     velloHubAuthority: live.velloHubAuthority,
+    velloDocumentSurfaceEnabled: live.velloDocumentSurfaceEnabled,
     effScale: viewport.effScale,
-    elements: viewport.elements,
+    elements: live.velloDocumentElements,
     hokusaiLiveCanvasRef: live.hokusaiLiveCanvasRef,
     inkMeshLivePreviewRuntime: viewport.inkMeshLivePreviewRuntime,
     liveDynamicBrushOverlayRenderer: viewport.liveDynamicBrushOverlayRenderer,
@@ -447,6 +451,9 @@ export function StudioCanvasViewportStageHost({
     onWebGpuFrameRequest: viewport.stableHandlers.onWebGpuFrameRequest,
     pixiMountParent: live.pixiMountParent,
     pixiSceneDocumentTransform: live.pixiSceneDocumentTransform,
+    velloSceneDocumentTransform: live.velloSceneDocumentTransform,
+    velloSceneRevision: live.velloSceneRevision,
+    velloSurfaceDpr: live.velloSurfaceDpr,
     readVelloHubPenDown: live.readVelloHubPenDown,
     setCanonicalDryMediaCanvasAuthority: live.setCanonicalDryMediaCanvasAuthority,
     setVelloHubAuthority: live.setVelloHubAuthority,
@@ -642,7 +649,17 @@ export function StudioCanvasViewportStageHost({
                 showWebtoonGuides={showWebtoonGuides}
                 webtoonGuides={webtoonGuides}
               />
-              <StudioCanvasViewportDocumentLayer {...documentLayerProps} />
+              {frameGraphOwnsDocumentPixels ? (
+                <Group
+                  name="studio-konva-document-shadow"
+                  opacity={0}
+                  listening={false}
+                >
+                  {documentLayer}
+                </Group>
+              ) : (
+                documentLayer
+              )}
               {renderStudioCanvasSelectionDecorations({
                 activeGroupId,
                 activeSurfaceReviewLocked,

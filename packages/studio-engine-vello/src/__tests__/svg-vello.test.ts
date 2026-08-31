@@ -111,6 +111,6 @@ describe("Vello-native SVG provider descriptor", () => {
     expect(descriptor.capabilities).toContain("render.svg.vello-native");
     expect(descriptor.limitations.join(" ")).toMatch(/text.*reject/i);
     expect(descriptor.limitations.join(" ")).toMatch(/clipPath.*exactly one/i);
-    expect(descriptor.fallbackProviderId).toBe("skia-canvaskit");
+    expect(descriptor).not.toHaveProperty("fallbackProviderId");
   });
 });

@@ -45,7 +45,10 @@ export interface StudioFrameGraphExecuteReceipt {
   readonly interactiveCpuReadback: 0;
 }
 
-const HINT_TO_BACKEND: Record<string, StudioVelloHubBackendId | null> = {
+const HINT_TO_BACKEND: Record<
+  string,
+  Exclude<StudioVelloHubBackendId, "vello-cpu"> | null
+> = {
   "vello-classic": STUDIO_VELLO_CLASSIC_BACKEND_ID,
   "vello-hybrid": STUDIO_VELLO_HYBRID_BACKEND_ID,
   "skia-gpu": null,
@@ -104,7 +107,6 @@ export class StudioFrameGraphCompositor {
       islands.push({
         id: island.id,
         providerId: island.providerHint,
-        fallbackChain: [],
         transport: island.transport,
         textureHandle: island.id,
         documentIds: [...island.documentIds],

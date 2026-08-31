@@ -24,6 +24,7 @@ const BASE: StudioVideoExportPlanRequest = {
   width: 720,
   height: 1280,
   fps: 30,
+  selectedPipeline: "webcodecs-webm",
   mediaRecorderSupported: true,
   pureEncoderSupported: true,
 };
@@ -72,7 +73,7 @@ describe("실행 계획 확정", () => {
       probeFor(["vp09"])
     );
     expect(plan.decision.pipeline).toBe("webcodecs-webm");
-    expect(plan.decision.degraded).toBe(false);
+    expect(plan.decision.available).toBe(true);
     expect(plan.webCodecs).not.toBeNull();
     expect(plan.webCodecs!.webmCodecId).toBe("V_VP9");
     expect(plan.webCodecs!.config.codec).toBe("vp09.00.31.08");
@@ -100,16 +101,17 @@ describe("실행 계획 확정", () => {
     expect(plan.webCodecs!.config.hardwareAcceleration).toBe("no-preference");
   });
 
-  it("WebCodecs가 없으면 기존 경로 결정만 채우고 실행 스펙은 비운다", async () => {
+  it("선택한 WebCodecs가 없으면 unavailable이며 실행 스펙을 비운다", async () => {
     const plan = await resolveStudioVideoExportPlan({ ...BASE, frameCount: 60 }, null);
-    expect(plan.decision.pipeline).toBe("mediarecorder-webm");
+    expect(plan.decision.pipeline).toBe("webcodecs-webm");
+    expect(plan.decision.available).toBe(false);
     expect(plan.webCodecs).toBeNull();
-    // 폴백 경로도 예상 길이·프레임 수는 그대로 쓸 수 있어야 한다(진행률 UI 공유).
+    // unavailable 상태에서도 예상 길이·프레임 수는 UI가 그대로 쓸 수 있어야 한다.
     expect(plan.estimatedFrameCount).toBe(60);
     expect(plan.estimatedDurationSec).toBe(2);
   });
 
-  it("킬스위치가 켜지면 탐지 자체를 건너뛴다", async () => {
+  it("킬스위치가 켜지면 탐지 자체를 건너뛰고 선택 WebCodecs를 unavailable 처리한다", async () => {
     let probed = false;
     const probe: StudioVideoEncoderProbe = {
       isConfigSupported() {
@@ -122,19 +124,26 @@ describe("실행 계획 확정", () => {
       probe
     );
     expect(probed).toBe(false);
-    expect(plan.decision.pipeline).toBe("mediarecorder-webm");
+    expect(plan.decision.pipeline).toBe("webcodecs-webm");
+    expect(plan.decision.available).toBe(false);
   });
 
-  it("영상 경로가 전부 막히면 GIF로 내려가고, 그것마저 없으면 available=false다", async () => {
+  it("GIF는 명시 선택한 경우에만 승인하고 없으면 같은 선택을 unavailable 처리한다", async () => {
     const gif = await resolveStudioVideoExportPlan(
-      { ...BASE, frameCount: 10, mediaRecorderSupported: false },
+      { ...BASE, frameCount: 10, selectedPipeline: "gif", mediaRecorderSupported: false },
       null
     );
     expect(gif.decision.pipeline).toBe("gif");
     expect(gif.decision.available).toBe(true);
 
     const none = await resolveStudioVideoExportPlan(
-      { ...BASE, frameCount: 10, mediaRecorderSupported: false, pureEncoderSupported: false },
+      {
+        ...BASE,
+        frameCount: 10,
+        selectedPipeline: "gif",
+        mediaRecorderSupported: false,
+        pureEncoderSupported: false,
+      },
       null
     );
     expect(none.decision.available).toBe(false);

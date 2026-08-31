@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { MEMORY64_CROSS_REALM_PROTOCOL_VERSION } from "../kernel/Memory64CrossRealmProtocol";
 import {
   Memory64WorkloadCoordinator,
 } from "../kernel/Memory64WorkloadCoordinator";
@@ -121,9 +122,10 @@ const BASE_CAPABILITY = probeWasmMemory64Capability({ webAssembly: null });
 function memory32Capability(): WasmMemory64CapabilityReceipt {
   return Object.freeze({
     ...BASE_CAPABILITY,
-    selectedRuntime: "memory32-fallback" as const,
+    requestedRuntime: "memory32-requested" as const,
+    selectedRuntime: "memory32-requested" as const,
     isMemory64Supported: false,
-    isMemory32FallbackSupported: true,
+    isMemory32ReferenceSupported: true,
   });
 }
 
@@ -154,11 +156,11 @@ function readyFor(
     strokeId: request.strokeId,
     scratchAllocationAck: {
       kind: "epoch16-memory64/cross-realm-allocation-ack",
-      version: 1,
+      version: MEMORY64_CROSS_REALM_PROTOCOL_VERSION,
       reservationId: token.reservationId,
       nonce: token.nonce,
-      runtime: token.preferredRuntime,
-      addressType: token.preferredRuntime === "memory64" ? "i64" : "i32",
+      runtime: token.selectedRuntime,
+      addressType: token.selectedRuntime === "memory64" ? "i64" : "i32",
       residentBytes: token.authorizedResidentBytes,
       residentPages: token.authorizedResidentPages,
       ...overrides,

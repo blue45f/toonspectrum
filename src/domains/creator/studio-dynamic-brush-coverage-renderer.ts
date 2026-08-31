@@ -588,17 +588,24 @@ export type StudioDynamicBrushCoverageRenderResult =
       readonly status: "empty";
     }
   | {
-      readonly status: "fallback";
+      /** The selected coverage surface cannot execute this operation. */
+      readonly status: "unavailable";
+      readonly reason: "surface-unavailable" | "surface-render-failed";
+    }
+  | {
+      /** The selected coverage renderer rejected this source before destination mutation. */
+      readonly status: "rejected";
       readonly reason:
-        | "surface-unavailable"
+        | "invalid-mark"
+        | "planning-failed"
         | "surface-budget"
-        | "tile-mark-budget"
-        | "surface-render-failed";
+        | "tile-mark-budget";
     }
   | {
       /**
        * Destination composition started before the browser threw. Replaying legacy marks would
-       * double-paint the completed prefix, so callers must not fallback for this result.
+       * double-paint the completed prefix, so callers must not select another renderer for this
+       * operation.
        */
       readonly status: "partial";
       readonly reason:
@@ -2668,9 +2675,10 @@ function compositeCommittedCoverageStreaming(
 }
 
 /**
- * Renders v2 coverage. Every fallback result is returned before destination mutation, so callers
- * can safely execute the frozen direct compositor. A partial destination failure is explicitly
- * non-fallback to prevent double-painting.
+ * Renders v2 coverage. Rejected/unavailable results are returned before destination mutation.
+ * They deliberately do not authorize a same-operation renderer substitution: the caller keeps
+ * the immutable source and may select a different renderer only for a later operation. A partial
+ * destination failure remains explicit so a completed prefix cannot be double-painted.
  */
 export function renderStudioDynamicBrushCoverage(
   context: StudioDynamicBrushCoverageDestinationContext,
@@ -2680,7 +2688,7 @@ export function renderStudioDynamicBrushCoverage(
   const opacity = clampAlpha(options.opacity);
   if (marks.length === 0 || opacity <= 0) return { status: "empty" };
   if (!marks.every(markIsValid)) {
-    return { status: "fallback", reason: "surface-render-failed" };
+    return { status: "rejected", reason: "invalid-mark" };
   }
 
   const byteBudget = options.activeDraft
@@ -2710,7 +2718,7 @@ export function renderStudioDynamicBrushCoverage(
       // compact plan—a large pointer-up memory spike for exactly the strokes that need streaming.
       const committedPlan = planCommittedStreamingTilesAtScale(marks, scale);
       if (!committedPlan) {
-        return { status: "fallback", reason: "surface-render-failed" };
+        return { status: "rejected", reason: "planning-failed" };
       }
       if (
         committedPlan.allocatedBytes <= byteBudget
@@ -2730,10 +2738,8 @@ export function renderStudioDynamicBrushCoverage(
         return streamed.status === "partial"
           ? { status: "partial", reason: streamed.reason }
           : {
-              status: "fallback",
-              reason: streamed.reason === "destination-composite-failed"
-                ? "surface-render-failed"
-                : streamed.reason,
+              status: "unavailable",
+              reason: "surface-render-failed",
             };
       }
       return {
@@ -2757,13 +2763,13 @@ export function renderStudioDynamicBrushCoverage(
     selectedPlan = candidate;
     break;
   }
-  if (!selectedPlan) return { status: "fallback", reason: lastFailure };
+  if (!selectedPlan) return { status: "rejected", reason: lastFailure };
 
   const prepared = selectedCacheEntry?.prepared
     ?? prepareTileSurfaces(selectedPlan, marks, factory);
   if (!prepared) {
     return {
-      status: "fallback",
+      status: "unavailable",
       reason: options.surfaceFactory ? "surface-render-failed" : "surface-unavailable",
     };
   }
@@ -2787,7 +2793,7 @@ export function renderStudioDynamicBrushCoverage(
   if (composite !== "rendered") {
     return composite === "partial"
       ? { status: "partial", reason: "destination-composite-failed" }
-      : { status: "fallback", reason: "surface-render-failed" };
+      : { status: "unavailable", reason: "surface-render-failed" };
   }
   return {
     status: "rendered",
@@ -2798,7 +2804,7 @@ export function renderStudioDynamicBrushCoverage(
   };
 }
 
-/** Frozen direct compositor used for omitted/legacy paint models and every v2 preflight failure. */
+/** Frozen direct compositor used only when an omitted/legacy paint model selects it up front. */
 export function renderStudioDynamicBrushLegacyMarks(
   context: StudioDynamicBrushLegacyDestinationContext,
   marks: readonly StudioDynamicBrushCoverageMark[],

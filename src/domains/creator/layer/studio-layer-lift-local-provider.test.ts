@@ -74,7 +74,7 @@ function engine(
       providerVersion: "0.10.35",
       modelId: "selfie-segmenter",
       modelVersion: "latest",
-      executionRoute: "gpu-cpu-fallback",
+      executionRoute: "gpu",
     },
     infer: inferOverride ?? (async () => ({
       width: 2,
@@ -137,7 +137,7 @@ describe("Studio Layer Lift local person/character foreground provider", () => {
         providerId:
           "mediapipe-image-segmenter.selfie-segmenter",
         providerVersion: expect.stringMatching(
-          /^0\.10\.35\+latest\+gpu-cpu-fallback\+o\.[0-9a-f]{16}$/u,
+          /^0\.10\.35\+latest\+gpu\+o\.[0-9a-f]{16}$/u,
         ),
         execution: "local-device",
         networkUsed: false,

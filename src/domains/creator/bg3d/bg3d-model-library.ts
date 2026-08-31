@@ -24,6 +24,7 @@ import {
 import {
   StudioBg3dValidationWorkerError,
   validateStudioBg3dGlbOffMainThread,
+  type StudioBg3dGlbValidationExecutionBackend,
 } from "./studio-bg3d-glb-validation-worker-client";
 import { getStudioBg3dLibrariesAuthority } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 import { STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS } from "./studio-bg3d-meshopt";
@@ -246,6 +247,8 @@ export interface Bg3dModelVerificationOptions {
   readonly maximumCumulativeBytes?: number;
   readonly supportedRequiredExtensions?: readonly string[];
   readonly digest?: StudioBg3dGlbDigest;
+  /** Selected before validation starts. Omission selects the product Worker. */
+  readonly executionBackend?: StudioBg3dGlbValidationExecutionBackend;
   /** Cancels worker validation before any IndexedDB write transaction starts. */
   readonly signal?: AbortSignal;
   /** Deterministic clocks/IDs are useful to importers and tests; neither value enters scene docs. */
@@ -913,7 +916,10 @@ async function prepareVerifiedBg3dModelRecordInternal(
     digest: options.digest,
     supportedRequiredExtensions: options.supportedRequiredExtensions
       ?? STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS,
-  }, options.signal);
+  }, {
+    executionBackend: options.executionBackend ?? "worker",
+    signal: options.signal,
+  });
   const validation = validationOutcome.result;
   if (!validation.ok) throw createLibraryError("validation-failed", validation.code);
 
@@ -1306,7 +1312,10 @@ export async function revalidateStoredBg3dModelForRendering(
     digest: options.digest,
     supportedRequiredExtensions: options.supportedRequiredExtensions
       ?? STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS,
-  }, options.signal);
+  }, {
+    executionBackend: options.executionBackend ?? "worker",
+    signal: options.signal,
+  });
   const validation = validationOutcome.result;
   if (!validation.ok) {
     const code = STORED_METADATA_FAILURE_CODES.has(validation.code)

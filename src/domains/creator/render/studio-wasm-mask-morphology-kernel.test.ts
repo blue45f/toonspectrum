@@ -21,8 +21,7 @@ function createKernel(
   addressType: "i64" | "i32",
 ): StudioWasmMaskMorphologyKernelCreationResult {
   const runtime = createStudioWasmMemoryRuntime({
-    preferredMode: addressType,
-    fallbackPolicy: "deny",
+    selectedMode: addressType,
     initialPages: BigInt(1),
     maximumPages:
       BigInt(STUDIO_WASM_MASK_MORPHOLOGY_WORKING_SET_BYTES)
@@ -218,7 +217,7 @@ describe.each(["i32", "i64"] as const)(
 );
 
 describe("persistent studio mask morphology executor", () => {
-  it("prefers Memory64 and retains the successful persistent kernel", () => {
+  it("retains one explicitly selected Memory64 kernel", () => {
     const memory64Kernel = createKernel("i64");
     const report = checkStudioWasm64Capability();
     if (!report.isWasm64Supported) {
@@ -229,10 +228,9 @@ describe("persistent studio mask morphology executor", () => {
     if (!memory64Kernel.ok) return;
 
     const memory64Factory = vi.fn(() => memory64Kernel);
-    const memory32Factory = vi.fn(() => createKernel("i32"));
     const executor = createStudioPersistentMaskMorphologyExecutor({
-      minimumWasmBytes: 0,
-      kernelFactories: [memory64Factory, memory32Factory],
+      backend: "wasm-memory64",
+      createKernel: memory64Factory,
     });
     const mask = deterministicMask(9, 9);
     const first = executor.process(mask, 9, 9, "dilate");
@@ -241,48 +239,38 @@ describe("persistent studio mask morphology executor", () => {
     expect(first.ok && first.backend).toBe("wasm-memory64");
     expect(second.ok && second.backend).toBe("wasm-memory64");
     expect(memory64Factory).toHaveBeenCalledTimes(1);
-    expect(memory32Factory).not.toHaveBeenCalled();
   });
 
-  it("quarantines a failed Memory64 kernel and falls through to memory32", () => {
+  it("keeps a selected Wasm failure terminal without trying another backend", () => {
+    let runCount = 0;
     const failedKernel: StudioWasmMaskMorphologyKernelLike = {
       addressType: "i64",
-      process: () => ({ ok: false, reason: "kernel-run-failed" }),
+      process: () => {
+        runCount += 1;
+        return { ok: false, reason: "kernel-run-failed" };
+      },
     };
-    const memory32Kernel = createKernel("i32");
-    expect(memory32Kernel.ok).toBe(true);
-    if (!memory32Kernel.ok) return;
-
     const memory64Factory = vi.fn(() => ({
       ok: true as const,
       kernel: failedKernel,
     }));
-    const memory32Factory = vi.fn(() => memory32Kernel);
     const executor = createStudioPersistentMaskMorphologyExecutor({
-      minimumWasmBytes: 0,
-      kernelFactories: [memory64Factory, memory32Factory],
+      backend: "wasm-memory64",
+      createKernel: memory64Factory,
     });
     const mask = deterministicMask(7, 7);
-    const result = executor.process(mask, 7, 7, "dilate");
+    const first = executor.process(mask, 7, 7, "dilate");
+    const second = executor.process(mask, 7, 7, "erode");
 
-    expect(result.ok && result.backend).toBe("wasm-memory32");
-    if (result.ok) {
-      expect(result.pixels).toEqual(
-        applyStudioMaskMorphology3x3Reference(mask, 7, 7, "dilate"),
-      );
-    }
+    expect(first).toEqual({ ok: false, reason: "kernel-run-failed" });
+    expect(second).toEqual({ ok: false, reason: "kernel-run-failed" });
     expect(memory64Factory).toHaveBeenCalledOnce();
-    expect(memory32Factory).toHaveBeenCalledOnce();
+    expect(runCount).toBe(1);
   });
 
-  it("falls back byte-exactly to JS when no Wasm kernel is available", () => {
-    const unavailable = vi.fn(() => ({
-      ok: false as const,
-      reason: "webassembly-unavailable" as const,
-    }));
+  it("runs byte-exact JS only when JS is selected before execution", () => {
     const executor = createStudioPersistentMaskMorphologyExecutor({
-      minimumWasmBytes: 0,
-      kernelFactories: [unavailable],
+      backend: "js",
     });
     const mask = deterministicMask(8, 6);
     const result = executor.process(mask, 8, 6, "erode");
@@ -293,14 +281,13 @@ describe("persistent studio mask morphology executor", () => {
         applyStudioMaskMorphology3x3Reference(mask, 8, 6, "erode"),
       );
     }
-    expect(unavailable).toHaveBeenCalledOnce();
   });
 
   it("fails closed before selecting a backend for invalid or oversized input", () => {
     const factory = vi.fn(() => createKernel("i32"));
     const executor = createStudioPersistentMaskMorphologyExecutor({
-      minimumWasmBytes: 0,
-      kernelFactories: [factory],
+      backend: "wasm-memory32",
+      createKernel: factory,
     });
     expect(executor.process(
       new Uint8Array(5),

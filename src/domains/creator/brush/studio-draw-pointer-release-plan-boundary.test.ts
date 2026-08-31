@@ -136,10 +136,9 @@ describe("studio draw pointer-release planning ownership boundary", () => {
     expect(reauthorCall).not.toContain("pressures: releaseAuthoritativeStroke.pressures");
   });
 
-  it("keeps a short Living Ink stroke visible until canonical handoff without leaking its shadow", () => {
+  it("keeps a short Living Ink stroke hidden until its own receipt without a vector substitute", () => {
     const page = moduleFacts("../StudioPage.tsx").source;
-    const showStart = page.indexOf("function showStudioLivingInkVectorShadow");
-    const clearStart = page.indexOf("function clearStudioLivingInkVectorShadow", showStart);
+    const clearStart = page.indexOf("function clearStudioLivingInkRetainedDraftPixels");
     const failStart = page.indexOf("function failStudioLivingInkStroke", clearStart);
     const discardStart = page.indexOf("function discardStudioLivingInkStroke", failStart);
     const releaseStart = page.indexOf("function releaseStudioLivingInkPresentation", discardStart);
@@ -147,21 +146,18 @@ describe("studio draw pointer-release planning ownership boundary", () => {
     const finishStart = page.indexOf("function finishDrawingPointer");
     const finishEnd = page.indexOf("function onStagePointerCancel", finishStart);
 
-    expect(showStart).toBeGreaterThan(-1);
-    expect(clearStart).toBeGreaterThan(showStart);
+    expect(clearStart).toBeGreaterThan(-1);
     expect(failStart).toBeGreaterThan(clearStart);
     expect(discardStart).toBeGreaterThan(failStart);
     expect(releaseStart).toBeGreaterThan(discardStart);
     expect(releaseEnd).toBeGreaterThan(releaseStart);
     expect(finishEnd).toBeGreaterThan(finishStart);
 
-    const showShadow = page.slice(showStart, clearStart);
     const clearShadow = page.slice(clearStart, failStart);
     const discardStroke = page.slice(discardStart, releaseStart);
     const releasePresentation = page.slice(releaseStart, releaseEnd);
     const finishPointer = page.slice(finishStart, finishEnd);
 
-    expect(showShadow).toContain("if (pageId !== currentPageIdRef.current) return");
     expectTokenOrder(clearShadow, [
       "liveDraftVisualRef.current?.id === state.strokeId",
       "liveDraftVisualRef.current = null",
@@ -170,20 +166,25 @@ describe("studio draw pointer-release planning ownership boundary", () => {
     ]);
     expectTokenOrder(discardStroke, [
       "livingInkOverlaySurfaceRef.current?.renderer.clear()",
-      "clearStudioLivingInkVectorShadow(state)",
+      "clearStudioLivingInkRetainedDraftPixels(state)",
       "livingInkStrokeRef.current = null",
     ]);
     expectTokenOrder(releasePresentation, [
       'if (!handoff || handoff.kind === "stroke")',
       "const state = livingInkStrokeRef.current",
-      "if (state) clearStudioLivingInkVectorShadow(state)",
+      "if (state) clearStudioLivingInkRetainedDraftPixels(state)",
       "livingInkStrokeRef.current = null",
     ]);
-    expectTokenOrder(finishPointer, [
-      "clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup })",
-      "const finishingLivingInk = livingInkStrokeRef.current",
-      "&& !finishingLivingInk.overlayPresented",
-      "showStudioLivingInkVectorShadow(",
-    ]);
+    expect(finishPointer).toContain(
+      "pointer-up never restores a Konva vector shadow",
+    );
+    expect(finishPointer).not.toContain("showStudioLivingInkVectorShadow(");
+    expect(page).not.toContain("function showStudioLivingInkVectorShadow(");
+    const liveFlush = page.slice(
+      page.indexOf("const flushDirectLiveDraft ="),
+      page.indexOf("const flushDirectLiveDraftNow ="),
+    );
+    expect(liveFlush).toContain("liveDraftVisualRef.current = null;");
+    expect(liveFlush).not.toContain("studioLivingInkVectorShadowElement");
   });
 });

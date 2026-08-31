@@ -72,13 +72,41 @@ export type StudioLiveRetainedMediaKind =
   | "highlighter"
   | "eraser";
 
+export type StudioLiveRetainedMediaUnavailableReason = "surface-unavailable";
+export type StudioLiveRetainedMediaRejectedReason = "unsupported" | "stroke-identity";
+export type StudioLiveRetainedMediaFailureReason =
+  | StudioLiveRetainedMediaUnavailableReason
+  | StudioLiveRetainedMediaRejectedReason;
+
+export type StudioLiveRetainedMediaOperationFailure =
+  | {
+      readonly status: "unavailable";
+      readonly reason: StudioLiveRetainedMediaUnavailableReason;
+    }
+  | {
+      readonly status: "rejected";
+      readonly reason: StudioLiveRetainedMediaRejectedReason;
+    };
+
+function retainedMediaOperationFailure(
+  reason: StudioLiveRetainedMediaFailureReason,
+): StudioLiveRetainedMediaOperationFailure {
+  return reason === "surface-unavailable"
+    ? { status: "unavailable", reason }
+    : { status: "rejected", reason };
+}
+
 export type StudioLiveRetainedMediaBeginResult =
   | { readonly status: "started"; readonly kind: StudioLiveRetainedMediaKind }
-  | { readonly status: "fallback"; readonly reason: "unsupported" | "surface-unavailable" };
+  | StudioLiveRetainedMediaOperationFailure;
 
 export type StudioLiveRetainedMediaAppendResult =
   | { readonly status: "appended" | "noop" }
-  | { readonly status: "fallback"; readonly reason: "surface-unavailable" | "stroke-identity" };
+  | StudioLiveRetainedMediaOperationFailure;
+
+export type StudioLiveRetainedMediaEndResult =
+  | { readonly status: "settled" }
+  | StudioLiveRetainedMediaOperationFailure;
 
 export function studioLiveRetainedMediaOverlaySupportsElement(
   element: DrawEl,
@@ -339,6 +367,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   private settled: DrawEl[] = [];
   private settledHasPixels = false;
   private activePaintedOntoSettled = false;
+  private lastFailureReason: StudioLiveRetainedMediaFailureReason | null = null;
 
   /** Pending wake-up for a capped repaint this overlay deferred. */
   private capRepaintWake: unknown = null;
@@ -415,6 +444,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     return this.settled.length;
   }
 
+  get lastOperationFailureReason(): StudioLiveRetainedMediaFailureReason | null {
+    return this.lastFailureReason;
+  }
+
   get isNativeSurfaceReady(): boolean {
     return this.activeContext !== null
       && this.surface !== null
@@ -423,13 +456,13 @@ export class StudioLiveRetainedMediaOverlayRenderer {
 
   begin(element: DrawEl): StudioLiveRetainedMediaBeginResult {
     if (!studioLiveRetainedMediaOverlaySupportsElement(element)) {
-      return { status: "fallback", reason: "unsupported" };
+      return retainedMediaOperationFailure("unsupported");
     }
     if (!this.isNativeSurfaceReady) {
-      return { status: "fallback", reason: "surface-unavailable" };
+      return retainedMediaOperationFailure("surface-unavailable");
     }
     const kind = retainedKind(element);
-    if (!kind) return { status: "fallback", reason: "unsupported" };
+    if (!kind) return retainedMediaOperationFailure("unsupported");
     if (this.active) {
       this.resetActiveState();
       this.replay();
@@ -452,9 +485,9 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     this.activePaintedOntoSettled = false;
     const painted = this.paintSuffix(this.active, element, this.activeContext);
     if (!painted) {
-      this.resetActiveState();
-      return { status: "fallback", reason: "surface-unavailable" };
+      return this.failActive("surface-unavailable");
     }
+    this.lastFailureReason = null;
     return { status: "started", kind };
   }
 
@@ -463,13 +496,16 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     /** Internal: pointer-up, so the capped-repaint budget must not defer this paint. */
     finalize = false,
   ): StudioLiveRetainedMediaAppendResult {
+    if (this.lastFailureReason) {
+      return retainedMediaOperationFailure(this.lastFailureReason);
+    }
     const active = this.active;
-    if (!active) return { status: "fallback", reason: "surface-unavailable" };
+    if (!active) return retainedMediaOperationFailure("stroke-identity");
     if (element.id !== active.id || retainedKind(element) !== active.kind) {
-      return { status: "fallback", reason: "stroke-identity" };
+      return this.failActive("stroke-identity");
     }
     if (!this.isNativeSurfaceReady) {
-      return { status: "fallback", reason: "surface-unavailable" };
+      return this.failActive("surface-unavailable");
     }
     active.element = element;
     // The oil pass counter is read on its own rather than added to the others. `paintedDabs` can
@@ -480,7 +516,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     const before = active.paintedDabs
       + active.paintedPencilMarks + active.paintedSourceSegments;
     if (!this.paintSuffix(active, element, this.activeContext, finalize)) {
-      return { status: "fallback", reason: "surface-unavailable" };
+      return this.failActive("surface-unavailable");
     }
     const after = active.paintedDabs
       + active.paintedPencilMarks + active.paintedSourceSegments;
@@ -488,8 +524,12 @@ export class StudioLiveRetainedMediaOverlayRenderer {
     return { status: painted ? "appended" : "noop" };
   }
 
-  end(element: DrawEl): { readonly status: "settled" | "fallback" } {
-    if (!this.active || !this.isNativeSurfaceReady) return { status: "fallback" };
+  end(element: DrawEl): StudioLiveRetainedMediaEndResult {
+    if (this.lastFailureReason) {
+      return retainedMediaOperationFailure(this.lastFailureReason);
+    }
+    if (!this.active) return retainedMediaOperationFailure("stroke-identity");
+    if (!this.isNativeSurfaceReady) return this.failActive("surface-unavailable");
     this.active.element = element;
     if (this.active.kind === "highlighter") {
       this.clearCanvas(this.activeContext, this.activeCanvas);
@@ -509,17 +549,17 @@ export class StudioLiveRetainedMediaOverlayRenderer {
         oilCarrierPlanner: null,
       };
       if (!this.paintSuffix(fullActive, element, this.activeContext)) {
-        return { status: "fallback" };
+        return this.failActive("surface-unavailable");
       }
     } else {
       // Pointer-up seals whatever is on the active canvas into settled, so a capped bed that is
       // still holding a deferred tail has to flush it here. It stays a normal append otherwise:
       // a bed that already matches this element is still skipped rather than rebuilt for nothing.
       const appended = this.appendFrom(element, true);
-      if (appended.status === "fallback") return { status: "fallback" };
+      if (appended.status === "unavailable" || appended.status === "rejected") return appended;
     }
     if (!this.activePaintedOntoSettled && !this.flattenActiveToSettled()) {
-      return { status: "fallback" };
+      return this.failActive("surface-unavailable");
     }
     this.settled.push(this.active.element);
     this.resetActiveState();
@@ -541,8 +581,10 @@ export class StudioLiveRetainedMediaOverlayRenderer {
   }
 
   resetActive(): boolean {
-    if (!this.active) return false;
+    const hadOperation = this.active !== null || this.lastFailureReason !== null;
+    if (!hadOperation) return false;
     this.resetActiveState();
+    this.lastFailureReason = null;
     this.replay();
     return true;
   }
@@ -561,6 +603,7 @@ export class StudioLiveRetainedMediaOverlayRenderer {
 
   clear(): void {
     this.resetActiveState();
+    this.lastFailureReason = null;
     this.settled = [];
     this.clearActiveRect();
     this.clearSettledRect();
@@ -1195,7 +1238,18 @@ export class StudioLiveRetainedMediaOverlayRenderer {
       if (canvas.height !== decision.backingHeight) canvas.height = decision.backingHeight;
     }
     this.dpr = decision?.ok ? decision.devicePixelRatio : 1;
-    if (!decision?.ok) this.resetActiveState();
+    if (!decision?.ok && this.active) {
+      // Canvas resizing may release pixels, but the accepted DrawEl remains intact until the host
+      // explicitly cancels this operation or begins another one.
+      this.lastFailureReason = "surface-unavailable";
+    }
+  }
+
+  private failActive(
+    reason: StudioLiveRetainedMediaFailureReason,
+  ): StudioLiveRetainedMediaOperationFailure {
+    this.lastFailureReason = reason;
+    return retainedMediaOperationFailure(reason);
   }
 
   private resetActiveState(): void {

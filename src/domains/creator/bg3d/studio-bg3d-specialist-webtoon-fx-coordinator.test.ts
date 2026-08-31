@@ -198,7 +198,6 @@ describe("Studio BG3D specialist Webtoon FX coordinator", () => {
     expect(result.result.depthFloat32).toEqual(new Float32Array([0, 1]));
     expect(result.provenance).toMatchObject({
       runtimeId: "babylon-webgl-lab",
-      fallbackUsed: false,
       attempts: [{
         runtimeId: "babylon-webgl-lab",
         outcome: "succeeded",
@@ -221,28 +220,16 @@ describe("Studio BG3D specialist Webtoon FX coordinator", () => {
     await registry.dispose();
   });
 
-  it("uses one complete fallback bundle and reports the real runtime without merging attempts", async () => {
-    let firstSettled = false;
+  it("rejects a multi-runtime capture plan before either runtime executes", async () => {
     const first = vi.fn(async () => {
-      await Promise.resolve();
-      firstSettled = true;
-      throw Object.assign(new Error("renderer unavailable"), {
-        code: "renderer-unavailable",
-      });
+      throw new Error("must not execute");
     });
-    const second = vi.fn(async (job: StudioBg3dRuntimeAdapterJob) => {
-      expect(firstSettled).toBe(true);
-      expect(
-        job.request.kind === "artifact-capture-v2" &&
-        job.request.artifacts.map((artifact) => artifact.kind),
-      ).toEqual(["beauty", "emission"]);
-      return artifactResult(3, 1, [beauty(3, 1), emission(3, 1)]);
-    });
+    const second = vi.fn(async () => artifactResult(3, 1, [beauty(3, 1)]));
     const registry = new StudioBg3dRuntimeAdapterRegistry();
     registry.register(adapter("babylon-webgpu-lab", first));
     registry.register(adapter("babylon-webgl-lab", second));
 
-    const result = await runStudioBg3dSpecialistWebtoonFxCoordinator({
+    await expect(runStudioBg3dSpecialistWebtoonFxCoordinator({
       ...coordinatorInput(
         registry,
         fxRequest([{
@@ -253,25 +240,14 @@ describe("Studio BG3D specialist Webtoon FX coordinator", () => {
         }], { width: 3 }),
         ["babylon-webgpu-lab", "babylon-webgl-lab"],
       ),
-      jobId: "webtoon-fx-fallback",
+      jobId: "webtoon-fx-multi-runtime-rejected",
+    })).rejects.toMatchObject({
+      code: "artifact-capture-failed",
+      attempts: [],
     });
 
-    expect(first).toHaveBeenCalledTimes(1);
-    expect(second).toHaveBeenCalledTimes(1);
-    expect(result.provenance.runtimeId).toBe("babylon-webgl-lab");
-    expect(result.provenance.fallbackUsed).toBe(true);
-    expect(result.provenance.attempts).toEqual([
-      {
-        runtimeId: "babylon-webgpu-lab",
-        outcome: "failed",
-        errorCode: "renderer-unavailable",
-      },
-      {
-        runtimeId: "babylon-webgl-lab",
-        outcome: "succeeded",
-      },
-    ]);
-    expect(result.result.rgba.some((value) => value > 0)).toBe(true);
+    expect(first).not.toHaveBeenCalled();
+    expect(second).not.toHaveBeenCalled();
     await registry.dispose();
   });
 
@@ -419,7 +395,7 @@ describe("Studio BG3D specialist Webtoon FX coordinator", () => {
           color: "#ffffff",
           opacity: 1,
         }]),
-        ["babylon-webgpu-lab", "babylon-webgl-lab"],
+        ["babylon-webgpu-lab"],
       ),
     )).rejects.toMatchObject({
       code: "artifact-capture-failed",
@@ -464,7 +440,7 @@ describe("Studio BG3D specialist Webtoon FX coordinator", () => {
     await registry.dispose();
   });
 
-  it("snapshots the recipe before fallback and preserves the original CPU plan", async () => {
+  it("snapshots the recipe before the selected runtime and preserves the original CPU plan", async () => {
     const effects: StudioBg3dWebtoonFxPass[] = [{
       kind: "emissive-bloom",
       threshold: 0,
@@ -472,7 +448,7 @@ describe("Studio BG3D specialist Webtoon FX coordinator", () => {
       radiusPx: 0,
     }];
     const mutableRequest = fxRequest(effects);
-    const first = vi.fn(async () => {
+    const selected = vi.fn(async () => {
       effects[0] = {
         kind: "speed-lines",
         density: 0.5,
@@ -482,20 +458,16 @@ describe("Studio BG3D specialist Webtoon FX coordinator", () => {
         opacity: 1,
         seed: 1,
       };
-      throw Object.assign(new Error("context lost"), { code: "context-lost" });
+      return artifactResult(2, 1, [beauty(2, 1), emission(2, 1)]);
     });
-    const second = vi.fn(async () =>
-      artifactResult(2, 1, [beauty(2, 1), emission(2, 1)])
-    );
     const registry = new StudioBg3dRuntimeAdapterRegistry();
-    registry.register(adapter("babylon-webgpu-lab", first));
-    registry.register(adapter("babylon-webgl-lab", second));
+    registry.register(adapter("babylon-webgpu-lab", selected));
 
     const result = await runStudioBg3dSpecialistWebtoonFxCoordinator(
       coordinatorInput(
         registry,
         mutableRequest,
-        ["babylon-webgpu-lab", "babylon-webgl-lab"],
+        ["babylon-webgpu-lab"],
       ),
     );
 
@@ -505,7 +477,7 @@ describe("Studio BG3D specialist Webtoon FX coordinator", () => {
       intensity: 1,
       radiusPx: 0,
     }]);
-    expect(second).toHaveBeenCalledTimes(1);
+    expect(selected).toHaveBeenCalledTimes(1);
     await registry.dispose();
   });
 
@@ -535,7 +507,7 @@ describe("Studio BG3D specialist Webtoon FX coordinator", () => {
             color: "#ffffff",
             opacity: 1,
           }]),
-          ["babylon-webgpu-lab", "babylon-webgl-lab"],
+          ["babylon-webgpu-lab"],
           controller.signal,
         ),
       );

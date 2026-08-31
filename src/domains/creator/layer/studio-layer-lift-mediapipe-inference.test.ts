@@ -25,8 +25,12 @@ function runtime(
   segment: StudioLocalForegroundSegmenterRuntime["segmenter"]["segment"],
 ): StudioLocalForegroundSegmenterRuntime {
   return {
+    selectedDelegate: delegate,
     activeDelegate: delegate,
-    gpuFallback: delegate === "CPU",
+    providerSelection: delegate === "GPU"
+      ? "product-default-gpu"
+      : "explicit-before-execution",
+    attemptedDelegates: [delegate],
     segmenter: { segment },
   };
 }
@@ -93,9 +97,10 @@ describe("Studio Layer Lift MediaPipe inference bridge", () => {
     expect(rasterDispose).toHaveBeenCalledOnce();
   });
 
-  it("publishes the bounded CPU fallback route without claiming GPU execution", async () => {
+  it("publishes CPU only for an explicitly preselected CPU loader", async () => {
     const foreground = mask([1, 1]);
     const loader = createStudioLayerLiftMediaPipeInferenceLoader({
+      delegate: "CPU",
       loadRuntime: async () => runtime("CPU", () => ({
         confidenceMasks: [foreground],
       })),
@@ -105,7 +110,17 @@ describe("Studio Layer Lift MediaPipe inference bridge", () => {
 
     const engine = await loader(controller.signal);
 
-    expect(engine.model.executionRoute).toBe("gpu-cpu-fallback");
+    expect(engine.model.executionRoute).toBe("cpu-explicit");
+  });
+
+  it("rejects a runtime whose delegate differs from the loader selection", async () => {
+    const loader = createStudioLayerLiftMediaPipeInferenceLoader({
+      loadRuntime: async () => runtime("CPU", vi.fn()),
+      createRaster: () => ({ source: {} as TexImageSource }),
+    });
+    const controller = new AbortController();
+
+    await expect(loader(controller.signal)).rejects.toThrow(/identity mismatch/u);
   });
 
   it("fails closed before model loading and after raster creation when cancelled", async () => {

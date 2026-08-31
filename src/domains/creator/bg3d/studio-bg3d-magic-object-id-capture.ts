@@ -56,7 +56,6 @@ export interface StudioBg3dMagicObjectIdCaptureResult {
   readonly objectIds: Uint32Array;
   readonly legend: readonly StudioBg3dStableIdLegendEntry[];
   readonly backend: StudioBg3dMagicBabylonBackend;
-  readonly fallbackUsed: boolean;
   readonly attempts: readonly StudioBg3dAtomicSpecialistAttempt[];
 }
 
@@ -93,8 +92,7 @@ function validateBackends(
 ): readonly StudioBg3dMagicBabylonBackend[] {
   if (
     !Array.isArray(backends) ||
-    backends.length < 1 ||
-    backends.length > 2 ||
+    backends.length !== 1 ||
     backends.some((backend) => backend !== "webgpu" && backend !== "webgl2") ||
     new Set(backends).size !== backends.length
   ) {
@@ -142,8 +140,9 @@ function validateInput(
 /**
  * Captures one authoritative object-ID plane from an isolated Babylon specialist transaction.
  *
- * The function owns every runtime it creates. WebGPU and WebGL2 are attempted sequentially through
- * the existing atomic failover boundary, so pixels from different engines can never be combined.
+ * The function owns the one runtime it creates. Its backend is an explicit product choice; runtime
+ * failure is terminal and never advances to another engine. The generic atomic coordinator remains
+ * reusable by diagnostics that intentionally run engines as separate, manually selected jobs.
  */
 export async function captureStudioBg3dMagicObjectIds(
   input: CaptureStudioBg3dMagicObjectIdsInput,
@@ -210,7 +209,6 @@ export async function captureStudioBg3dMagicObjectIds(
         Object.freeze({ ...entry })
       )),
       backend,
-      fallbackUsed: captured.fallbackUsed,
       attempts: Object.freeze(captured.attempts.map((attempt) =>
         Object.freeze({ ...attempt })
       )),

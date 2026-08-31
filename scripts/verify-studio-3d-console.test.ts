@@ -267,12 +267,12 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(babylonProof).toContain(
       "console.warn(`${webGpuDiagnosticPrefix}${JSON.stringify(diagnostic)}`);",
     );
-    expect(magicProof).toContain('onDiagnostic: backend === "webgpu"');
+    expect(magicProof).toContain('onDiagnostic: createdBackend === "webgpu"');
     expect(magicProof).toContain(
       "`${webGpuDiagnosticPrefix}${JSON.stringify(diagnostic)}`",
     );
     expect(magicProof).toContain(
-      "product Magic object-ID capture failed: ${errorChain(cause)}",
+      "product Magic ${backend} object-ID capture failed: ` +",
     );
     expect(magicProof).toContain("Object.getOwnPropertyDescriptor(value, key)");
     expect(magicProof).toContain("return Reflect.get(value, key);");
@@ -283,9 +283,8 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(magicProof).toContain("JSON.stringify({ runtimeId, outcome, errorCode })");
     expect(magicProof).toContain('entries.push("[circular cause]")');
     expect(magicProof).toContain('entries.join(" <- ").slice(0, 4_096)');
-    expect(magicProof).toContain(
-      "[${webGpuAttempt.errorCode}] before WebGL2 fallback",
-    );
+    expect(magicProof).toContain("receipts here so a WebGPU device loss remains retryable");
+    expect(magicProof).toContain("without starting WebGL2");
     expect(listenerIndex).toBeGreaterThanOrEqual(0);
     expect(proofIndex).toBeGreaterThan(listenerIndex);
     expect(webGpuAttempt).toContain(
@@ -390,7 +389,7 @@ describe("3D WebGPU conformance browser boundary", () => {
     [
       "Playwright-transported Magic device loss",
       new Error(
-        "page.evaluate: product Magic object-ID capture failed: " +
+        "page.evaluate: product Magic webgpu object-ID capture failed: " +
           "StudioBg3dBabylonSpecialistError[device-lost]: GPU watchdog timeout",
       ),
       "context-or-device-lost",
@@ -798,7 +797,7 @@ describe("3D Magic production-preview product boundary", () => {
       "productionProofEntry.createStudioBg3dRuntimeSnapshot(",
     );
     const capture = alignmentProof.indexOf(
-      "productionProofEntry.captureStudioBg3dMagicObjectIds({",
+      "productionProofEntry.captureStudioBg3dMagicObjectIds!({",
     );
 
     expect(magicProductionProofSource).toContain(
@@ -817,15 +816,30 @@ describe("3D Magic production-preview product boundary", () => {
     expect(snapshot).toBeGreaterThan(sameOriginNavigation);
     expect(snapshot).toBeGreaterThanOrEqual(0);
     expect(capture).toBeGreaterThan(snapshot);
-    expect(alignmentProof).toContain('backends: ["webgpu", "webgl2"]');
+    expect(alignmentProof).toContain("backends: [backend]");
+    expect(alignmentProof).not.toContain('backends: ["webgpu", "webgl2"]');
+    const explicitWebGpuCapture = alignmentProof.indexOf(
+      'captureObjectIdsForBackend("webgpu")',
+    );
+    const explicitWebGl2Capture = alignmentProof.indexOf(
+      'captureObjectIdsForBackend("webgl2")',
+    );
+    expect(explicitWebGpuCapture).toBeGreaterThan(capture);
+    expect(explicitWebGl2Capture).toBeGreaterThan(explicitWebGpuCapture);
     expect(alignmentProof).toContain(
-      "createRuntime: ({ backend, canvas, capabilities, settings }) =>",
+      "createRuntime: ({ backend: createdBackend, canvas, capabilities, settings }) =>",
     );
     expect(alignmentProof).toContain("capabilities,");
-    expect(alignmentProof).toContain('objectIdCapture.backend !== "webgpu"');
-    expect(alignmentProof).toContain("objectIdCapture.fallbackUsed");
+    expect(alignmentProof).toContain("capture.backend !== backend");
+    expect(alignmentProof).not.toContain("capture.fallbackUsed");
     expect(alignmentProof).toContain(
-      'objectIdCapture.attempts[0]?.outcome !== "succeeded"',
+      'capture.attempts[0]?.outcome !== "succeeded"',
+    );
+    expect(alignmentProof).toContain('backends: ["webgpu"]');
+    expect(alignmentProof).toContain('failedRuntimeCreations[0] !== "webgpu"');
+    expect(alignmentProof).toContain('failedRuntimeCreations.includes("webgl2")');
+    expect(alignmentProof).toContain(
+      "product Magic WebGPU failure invoked WebGL2 instead of failing closed",
     );
     expect(alignmentProof).not.toContain(".runIsolated(");
     expect(alignmentProof).not.toContain('kind: "artifact-capture-v2"');

@@ -3,7 +3,10 @@ import { STUDIO_GPU_PIN_REQUEST_TIMEOUT_MS } from "../studio-page-shell-runtime"
 
 import { StudioGpuPinReceiptWatchdog } from "./studio-webgpu-pin-receipt-watchdog";
 
-import type { StudioLiveStrokeGpuFailureReason } from "../live/studio-live-stroke-render-backend";
+import type {
+  StudioLiveStrokeGpuFailureReason,
+  StudioLiveStrokeUnavailableReason,
+} from "../live/studio-live-stroke-render-backend";
 import type { StudioLiveStrokeBackendAuditSession } from "../studio-page-editor-types";
 import type { StudioWebGpuCanvasHandle, StudioWebGpuSurfaceFrameRequest } from "../StudioWebGpuCanvas";
 import type { StudioWebGpuAuthorityFrame } from "./studio-webgpu-authority";
@@ -20,9 +23,9 @@ import type { MutableRefObject, RefObject } from "react";
  * - 이 팩토리는 훅도 컴포넌트도 아니라 react-compiler 컴파일 경계 밖이다. 반환 클로저의 ref 변이는
  *   추출 전 StudioPage 본문과 텍스트·순서가 동일하다(ref 읽기는 ref 읽기 그대로, 가드는 자기가
  *   지키던 코드와 함께 이동, teardown 순서 보존).
- * - GPU 권위 승격/반납(`promotePendingGpuAuthoritiesToKonva`·`relinquishGpuLiveInkToKonva`)은 이웃
- *   gpu-live-journal 군집 소유라 옮기지 않고 콜백으로 주입받는다.
- * - `failOverGpuAuthorityAfterSurfaceLoss`·`setWebGpuCanvasHandle`·`onWebGpuBackendChange`·
+ * - 선택된 GPU가 실패하면 같은 획을 다른 렌더러에 넘기지 않는다. 이 모듈은 unavailable
+ *   상태를 기록하고 StudioPage 에 해당 작업의 취소/오류 표시만 요청한다.
+ * - `rejectActiveSelectedLiveSurface`·`setWebGpuCanvasHandle`·`onWebGpuBackendChange`·
  *   `onWebGpuDeviceLost`·`onWebGpuFrameReady` 는 StudioPage 에 남는다(소스 경계 테스트가 그 다섯
  *   함수의 인접 슬라이스와 `import("./render/studio-webgpu-live-stroke-plan")` 청크 경계를 페이지
  *   파일에서 직접 읽는다). 남은 다섯도 여기 멤버를 런타임에 그대로 호출한다.
@@ -43,10 +46,10 @@ export interface StudioLiveStrokeGpuAuditContext {
     MutableRefObject<Map<string, StudioLiveStrokeBackendAuditSession>>;
   readonly pendingGpuDrawAuthoritiesRef: MutableRefObject<StudioGpuPendingDrawAuthority[]>;
   readonly pendingGpuStrokesRef: MutableRefObject<StudioGpuStroke[]>;
-  readonly promotePendingGpuAuthoritiesToKonva: (
-    explicitUncommittedOrderIds?: readonly string[]
-  ) => boolean;
-  readonly relinquishGpuLiveInkToKonva: (disableWebGpuForSession?: boolean) => boolean;
+  readonly onSelectedEngineUnavailable: (
+    reason: StudioLiveStrokeUnavailableReason,
+    strokeId: string,
+  ) => void;
   readonly setWebGpuAuthority: (frame: StudioWebGpuAuthorityFrame | null) => void;
   readonly webGpuCanvasHandleRef: MutableRefObject<StudioWebGpuCanvasHandle | null>;
 }
@@ -73,7 +76,7 @@ export interface StudioLiveStrokeGpuAudit {
   readonly cancelAllLiveStrokeBackendAudits: () => void;
   readonly cancelGpuPinnedRequestWatchdog: () => void;
   readonly cancelLiveStrokeBackendAudit: (strokeId: string) => void;
-  readonly failActiveLiveStrokeBackendAuditForCanvasFallback: () => void;
+  readonly markActiveLiveStrokeBackendCancelled: () => void;
   readonly finalizeLiveStrokeBackendAudit: (
     strokeId: string | null,
     awaitCanonicalCanvas: boolean
@@ -117,13 +120,13 @@ export function createStudioLiveStrokeGpuAudit(
     liveStrokeBackendAuditSessionsRef,
     pendingGpuDrawAuthoritiesRef,
     pendingGpuStrokesRef,
-    promotePendingGpuAuthoritiesToKonva,
-    relinquishGpuLiveInkToKonva,
+    onSelectedEngineUnavailable,
     setWebGpuAuthority,
     webGpuCanvasHandleRef,
   } = context;
 
   function applyLiveStrokeBackendPresentationEffects(): void {
+    const currentSurfaceRequestId = gpuLiveAcceptedRequestIdRef.current;
     const activeId = liveStrokeBackendAuditActiveIdRef.current;
     const activeSession = activeId
       ? liveStrokeBackendAuditSessionsRef.current.get(activeId)
@@ -133,6 +136,7 @@ export function createStudioLiveStrokeGpuAudit(
       ? activeSnapshot.acceptedGpuRequest
       : null;
     const activeGpuReceiptExact = activeAcceptedRequest !== null
+      && activeAcceptedRequest.requestId === currentSurfaceRequestId
       && gpuPinReceiptWatchdogRef.current?.hasExactReceipt(
         activeAcceptedRequest.requestId
       ) === true;
@@ -143,25 +147,26 @@ export function createStudioLiveStrokeGpuAudit(
       && activeGpuReceiptExact
     );
 
-    // If coordinator acceptance raced ahead of the imperative receipt watchdog, fail visible.
-    // The exact retained vector stays in liveDraftVisualRef and is merely redrawn/hidden; it is
-    // never deleted at the backend transition.
+    // Canvas is visible only for an explicitly Canvas-pinned operation. A WebGPU miss is an
+    // unavailable selected engine, not permission to reveal the retained canonical DrawEl.
     const canvasShadowVisible = Boolean(
       activeSnapshot
       && activeSnapshot.phase !== "idle"
+      && activeSnapshot.pinnedBackend === "canvas2d"
       && (
         activeSnapshot.canvasShadowVisible
         || (activeSnapshot.gpuOverlayVisible && !activeGpuAuthorized)
       )
     );
 
-    const receiptedSessionVisible = [
+    const receiptedSessionVisible = currentSurfaceRequestId !== null && [
       ...liveStrokeBackendAuditSessionsRef.current.values(),
     ].some((session) => {
       const snapshot = session.coordinator.getSnapshot();
       if (snapshot.phase === "idle" || !snapshot.gpuOverlayVisible) return false;
-      if (session.strokeId !== activeId) return true;
-      return activeGpuAuthorized;
+      const accepted = snapshot.acceptedGpuRequest;
+      return accepted?.requestId === currentSurfaceRequestId
+        && gpuPinReceiptWatchdogRef.current?.hasExactReceipt(currentSurfaceRequestId) === true;
     });
     // Pending geometry alone is never a visibility capability. Every surface rewrite invalidates
     // the prior pixels, so only a coordinator session holding an exact GPU receipt may reopen it.
@@ -186,12 +191,12 @@ export function createStudioLiveStrokeGpuAudit(
       !session
       || snapshot?.phase !== "drawing"
       || snapshot.pinnedBackend !== "webgpu"
-      || snapshot.canvasFallbackReason !== null
+      || snapshot.unavailableReason !== null
     ) return false;
-    // Submission mutates the shared surface before its request id can be returned. Restore the
-    // exact vector synchronously first, then perform a compositor-only hide that preserves the
-    // journal. Registration below binds the returned id to the coordinator token.
-    gpuCanvasShadowVisibleRef.current = true;
+    // Submission mutates the shared surface before its request id can be returned. Hide the prior
+    // GPU receipt until registration proves the new exact request; do not reveal another renderer.
+    gpuLiveAcceptedRequestIdRef.current = null;
+    gpuCanvasShadowVisibleRef.current = false;
     liveDraftLayerRef.current?.drawScene();
     webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false);
     return true;
@@ -389,13 +394,17 @@ export function createStudioLiveStrokeGpuAudit(
       session.gpuRequest = null;
     }
     applyLiveStrokeBackendPresentationEffects();
+    if (reason !== "cancelled") {
+      onSelectedEngineUnavailable(reason, session.strokeId);
+    }
     return true;
   }
 
   function reportAllLiveStrokeGpuAuditFailures(
     reason: "device-lost" | "surface-lost"
   ): void {
-    for (const session of liveStrokeBackendAuditSessionsRef.current.values()) {
+    const unavailableStrokeIds: string[] = [];
+    for (const session of [...liveStrokeBackendAuditSessionsRef.current.values()]) {
       const snapshot = session.coordinator.getSnapshot();
       if (snapshot.phase === "idle" || snapshot.pinnedBackend !== "webgpu") continue;
       const transition = session.coordinator.reportGpuFailure({
@@ -408,11 +417,15 @@ export function createStudioLiveStrokeGpuAudit(
         liveStrokeBackendAuditGpuOwnersRef.current.delete(session.gpuRequest.requestId);
         session.gpuRequest = null;
       }
+      unavailableStrokeIds.push(session.strokeId);
     }
     applyLiveStrokeBackendPresentationEffects();
+    for (const strokeId of unavailableStrokeIds) {
+      onSelectedEngineUnavailable(reason, strokeId);
+    }
   }
 
-  function failActiveLiveStrokeBackendAuditForCanvasFallback(): void {
+  function markActiveLiveStrokeBackendCancelled(): void {
     const activeId = liveStrokeBackendAuditActiveIdRef.current;
     const session = activeId
       ? liveStrokeBackendAuditSessionsRef.current.get(activeId)
@@ -422,9 +435,9 @@ export function createStudioLiveStrokeGpuAudit(
       reportLiveStrokeGpuAuditFailure("cancelled", session.gpuRequest.requestId);
       return;
     }
-    // No request is pending, but an already-receipted GPU frame may still be visible. Treat the
-    // deliberate authority-surface relinquish as epoch-scoped surface loss.
-    reportLiveStrokeGpuAuditFailure("surface-lost");
+    // No request is pending, but an already-receipted GPU frame may still be visible. Cancellation
+    // closes only this selected-provider operation and never authorizes another renderer.
+    reportLiveStrokeGpuAuditFailure("cancelled", undefined, session.strokeId);
   }
 
   function sealLiveStrokeBackendAudit(strokeId: string): boolean {
@@ -488,14 +501,12 @@ export function createStudioLiveStrokeGpuAudit(
       if (transition.status !== "accepted") continue;
       session.canonicalCanvasRequest = null;
       if (outcome !== "drawn") {
-        // The active live ref has already been sealed/cleared by this phase. Restore the durable
-        // whole-DrawEl authority into the settled Konva FIFO before hiding its GPU surface.
-        const targetStillOwnsGpuAuthority =
-          pendingGpuDrawAuthoritiesRef.current.some(
-            (authority) => authority.element.id === strokeId
-          );
-        if (targetStillOwnsGpuAuthority) promotePendingGpuAuthoritiesToKonva();
+        // Failed canonical presentation keeps the last selected-provider frame/data installed.
+        // A later canonical retry may release it, but this outcome cannot promote a substitute.
         applyLiveStrokeBackendPresentationEffects();
+        if (outcome === "failed") {
+          onSelectedEngineUnavailable("canonical-commit-failed", strokeId);
+        }
       }
       if (outcome !== "failed") retireLiveStrokeBackendAudit(strokeId);
     }
@@ -509,7 +520,7 @@ export function createStudioLiveStrokeGpuAudit(
       snapshot.phase !== "idle"
       && snapshot.pinnedBackend === "webgpu"
       && session.gpuRequest
-      && snapshot.canvasFallbackReason === null
+      && snapshot.unavailableReason === null
     ) {
       session.coordinator.reportGpuFailure({
         epoch: session.epoch,
@@ -565,7 +576,7 @@ export function createStudioLiveStrokeGpuAudit(
         !prepareLiveStrokeGpuSubmission(activeStrokeId)
         || !registerLiveStrokeGpuRequest(activeStrokeId, request.requestId)
       ) {
-        relinquishGpuLiveInkToKonva(true);
+        reportLiveStrokeGpuAuditFailure("surface-lost", undefined, activeStrokeId);
         return;
       }
       gpuLiveAcceptedRequestIdRef.current = request.requestId;
@@ -574,17 +585,18 @@ export function createStudioLiveStrokeGpuAudit(
       return;
     }
 
-    // A pointer-up surface cannot mint a new stroke receipt by coordinator contract. The child has
-    // already hidden the backing surface synchronously; migrate the retained DrawEls after this
-    // resize callback unwinds so no imperative handle request re-enters the resize transaction.
+    // A pointer-up surface cannot mint a new stroke receipt by coordinator contract, and resize has
+    // already destroyed its backing pixels. Keep it hidden, retain canonical queues, and report the
+    // selected provider unavailable instead of exposing stale pixels or migrating renderers.
     if (
       pendingGpuStrokesRef.current.length > 0
       || pendingGpuDrawAuthoritiesRef.current.length > 0
     ) {
       globalThis.queueMicrotask(() => {
         if (liveStrokeBackendAuditActiveIdRef.current !== null) return;
-        if (!promotePendingGpuAuthoritiesToKonva()) {
-          webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false);
+        webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false);
+        for (const authority of pendingGpuDrawAuthoritiesRef.current) {
+          onSelectedEngineUnavailable("surface-lost", authority.element.id);
         }
       });
     }
@@ -593,8 +605,9 @@ export function createStudioLiveStrokeGpuAudit(
     gpuPinReceiptWatchdogRef.current ??= new StudioGpuPinReceiptWatchdog({
       timeoutMs: STUDIO_GPU_PIN_REQUEST_TIMEOUT_MS,
       onTimeout: (_reason, requestId) => {
+        // Pointer-up may already have cleared the contact pin while the exact final request still
+        // owns a deferred canonical candidate. Its deadline remains authoritative until receipt.
         reportLiveStrokeGpuAuditFailure("timeout", requestId);
-        if (gpuLiveInkPinnedRef.current) relinquishGpuLiveInkToKonva(true);
       },
     });
     return gpuPinReceiptWatchdogRef.current;
@@ -620,7 +633,7 @@ export function createStudioLiveStrokeGpuAudit(
     cancelAllLiveStrokeBackendAudits,
     cancelGpuPinnedRequestWatchdog,
     cancelLiveStrokeBackendAudit,
-    failActiveLiveStrokeBackendAuditForCanvasFallback,
+    markActiveLiveStrokeBackendCancelled,
     finalizeLiveStrokeBackendAudit,
     gpuPinReceiptWatchdog,
     onWebGpuFrameInvalid,

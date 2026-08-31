@@ -155,7 +155,7 @@ describe("probeSkiaGraphiteAdoption", () => {
     );
   });
 
-  it("pins the challenger provider id the tournament and fallback chain use", () => {
+  it("pins the challenger provider id used by explicit tournament plans", () => {
     expect(SKIA_GRAPHITE_PROVIDER_ID).toBe("skia-graphite-webgpu");
   });
 });

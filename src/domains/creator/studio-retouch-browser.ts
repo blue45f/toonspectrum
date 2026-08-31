@@ -66,7 +66,7 @@ export async function runStudioDodgeBurnRetouch(
 ): Promise<Uint8ClampedArray> {
   const result = await runStudioRetouchWorker(
     { kind: "dodge-burn", data, w, h, points, settings },
-    { signal: options.signal },
+    { executionMode: "worker", signal: options.signal },
   );
   return result.data;
 }
@@ -81,7 +81,7 @@ export async function runStudioWetMixRetouch(
 ): Promise<Uint8ClampedArray> {
   const result = await runStudioRetouchWorker(
     { kind: "wet-mix", data, w, h, points, settings },
-    { signal: options.signal },
+    { executionMode: "worker", signal: options.signal },
   );
   return result.data;
 }

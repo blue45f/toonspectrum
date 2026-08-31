@@ -812,7 +812,9 @@ export interface StudioPersistentBinaryMaskScanner {
 }
 
 export interface StudioPersistentBinaryMaskScannerOptions {
-  readonly minimumWasmBytes?: number;
+  /** One backend is selected before this scanner accepts its first input. */
+  readonly backend: "js" | "wasm32" | "wasm64";
+  /** Test seam for the selected Wasm backend; it never authorizes another backend. */
   readonly createKernel?: () => StudioWasmConnectedComponentsKernelCreationResult;
 }
 
@@ -824,16 +826,23 @@ export type StudioPersistentBinaryMaskScanResult =
       readonly scan: StudioBinaryMaskScan;
       readonly spanBytes: number;
       readonly generation: number;
+    }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | StudioWasmConnectedComponentsKernelCreationFailureReason
+        | StudioWasmConnectedComponentsRunFailureReason;
+      readonly cause?: unknown;
     };
 
-function createDefaultMemory64MaskScanner(
+function createDefaultMaskScanner(
+  addressType: StudioWasmAddressType,
 ): StudioWasmConnectedComponentsKernelCreationResult {
   const maximumPages =
     BigInt(STUDIO_WASM_COMPONENT_SCAN_WINDOW_BYTES)
     / STUDIO_WASM_PAGE_BYTES;
   const runtime = createStudioWasmMemoryRuntime({
-    preferredMode: "i64",
-    fallbackPolicy: "deny",
+    selectedMode: addressType,
     initialPages: BigInt(1),
     maximumPages,
   });
@@ -850,26 +859,33 @@ function createDefaultMemory64MaskScanner(
 }
 
 /**
- * Persistent, lazy, byte-exact fallback policy for a Worker epoch. Invalid input
- * remains an error; unsupported or failed Wasm transparently uses the JS scan.
+ * Persistent, lazy, exact-backend scanner for one Worker epoch. Unsupported or
+ * failed Wasm remains terminal for the selected backend; no JS/other-Wasm retry occurs.
  */
 export function createStudioPersistentBinaryMaskScanner(
-  options: StudioPersistentBinaryMaskScannerOptions = {},
+  options: StudioPersistentBinaryMaskScannerOptions,
 ): StudioPersistentBinaryMaskScanner {
-  const minimumWasmBytes = options.minimumWasmBytes ?? 256 * 1024;
   if (
-    !Number.isSafeInteger(minimumWasmBytes)
-    || minimumWasmBytes < 0
-    || minimumWasmBytes > STUDIO_WASM_COMPONENT_SCAN_MAX_INPUT_BYTES
+    options.backend !== "js"
+    && options.backend !== "wasm32"
+    && options.backend !== "wasm64"
   ) {
-    throw new RangeError("minimumWasmBytes is outside the mask scan budget");
+    throw new TypeError("A supported connected-components backend must be selected explicitly");
   }
-  const kernelFactory =
-    options.createKernel ?? createDefaultMemory64MaskScanner;
-  let kernel:
-    | StudioWasmConnectedComponentsKernel
-    | null
-    | undefined;
+  const addressType: StudioWasmAddressType | null = options.backend === "wasm32"
+    ? "i32"
+    : options.backend === "wasm64"
+      ? "i64"
+      : null;
+  const kernelFactory = options.createKernel
+    ?? (addressType ? () => createDefaultMaskScanner(addressType) : undefined);
+  let kernel: StudioWasmConnectedComponentsKernel | undefined;
+  let terminalFailure: {
+    readonly reason:
+      | StudioWasmConnectedComponentsKernelCreationFailureReason
+      | StudioWasmConnectedComponentsRunFailureReason;
+    readonly cause?: unknown;
+  } | null = null;
 
   return Object.freeze({
     scan(
@@ -879,29 +895,46 @@ export function createStudioPersistentBinaryMaskScanner(
       if (typeof dimensions === "string") {
         return { ok: false, reason: dimensions };
       }
-      if (dimensions.spanBytes < minimumWasmBytes) {
+      if (options.backend === "js") {
         return scanStudioBinaryMaskJs(input);
       }
-      if (kernel === undefined) {
-        const created = kernelFactory();
-        kernel = created.ok ? created.kernel : null;
-      }
-      if (kernel) {
-        const result = kernel.copyAndScan(input);
-        if (result.ok) {
-          return {
-            ok: true,
-            backend: result.backend,
-            scan: result.scan,
-            spanBytes: result.spanBytes,
-            generation: result.generation,
-          };
+      if (terminalFailure) return { ok: false, ...terminalFailure };
+      if (!kernel) {
+        let created: StudioWasmConnectedComponentsKernelCreationResult;
+        try {
+          created = kernelFactory!();
+        } catch (cause) {
+          terminalFailure = { reason: "kernel-run-failed", cause };
+          return { ok: false, ...terminalFailure };
         }
-        kernel = null;
+        if (!created.ok) {
+          terminalFailure = {
+            reason: created.reason,
+            ...(created.cause === undefined ? {} : { cause: created.cause }),
+          };
+          return { ok: false, ...terminalFailure };
+        }
+        if (created.kernel.runtime.addressType !== addressType) {
+          terminalFailure = { reason: "kernel-run-failed" };
+          return { ok: false, ...terminalFailure };
+        }
+        kernel = created.kernel;
       }
-      // Only pay for the JS O(width×height) scan after an unsupported or failed
-      // WASM path. Computing it eagerly would erase the Memory64 speedup.
-      return scanStudioBinaryMaskJs(input);
+      const result = kernel.copyAndScan(input);
+      if (!result.ok) {
+        kernel = undefined;
+        terminalFailure = {
+          reason: result.reason,
+          ...(result.cause === undefined ? {} : { cause: result.cause }),
+        };
+        return { ok: false, ...terminalFailure };
+      }
+      if (result.backend !== options.backend) {
+        kernel = undefined;
+        terminalFailure = { reason: "kernel-run-failed" };
+        return { ok: false, ...terminalFailure };
+      }
+      return result;
     },
   });
 }

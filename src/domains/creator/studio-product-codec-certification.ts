@@ -104,6 +104,20 @@ export interface StudioProductCodecCertificateEvidence
   readonly mediaType: string;
 }
 
+export type StudioProductCodecExecutionProvider = "direct" | "worker";
+
+/**
+ * Exact execution-provider selection bound into a product certificate. A one-element attempted
+ * tuple is intentional: certification never authorizes a second provider after the selected one
+ * fails.
+ */
+export interface StudioProductCodecExecutionProviderReceipt {
+  readonly schemaVersion: 1;
+  readonly kind: "toonspectrum-codec-execution-provider-selection";
+  readonly selectedProvider: StudioProductCodecExecutionProvider;
+  readonly attemptedProviders: readonly [StudioProductCodecExecutionProvider];
+}
+
 export interface StudioProductCodecCertificate {
   readonly schemaVersion: typeof STUDIO_PRODUCT_CODEC_CERTIFICATE_VERSION;
   readonly kind: typeof STUDIO_PRODUCT_CODEC_CERTIFICATE_KIND;
@@ -116,6 +130,8 @@ export interface StudioProductCodecCertificate {
   }>;
   readonly nonce: string;
   readonly receipt: StudioCodecExecutionReceipt;
+  readonly executionProviderReceipt?:
+    StudioProductCodecExecutionProviderReceipt;
   readonly receiptSha256: `sha256:${string}`;
   readonly output: StudioProductCodecCertificateDigest;
   readonly evidence: StudioProductCodecCertificateEvidence;
@@ -139,6 +155,8 @@ export interface StudioProductCodecCertificationSigner {
 
 export interface IssueStudioProductCodecCertificateInput {
   readonly receipt: StudioCodecExecutionReceipt;
+  readonly executionProviderReceipt?:
+    StudioProductCodecExecutionProviderReceipt;
   readonly outputBytes: Uint8Array;
   readonly evidenceBytes: Uint8Array;
   readonly evidenceMediaType: string;
@@ -214,6 +232,10 @@ const ROOT_KEYS = [
   "certificateId",
   "signature",
 ] as const;
+const ROOT_KEYS_WITH_EXECUTION_PROVIDER_RECEIPT = [
+  ...ROOT_KEYS,
+  "executionProviderReceipt",
+] as const;
 const CERTIFICATION_KEYS = [
   "authority",
   "program",
@@ -260,6 +282,16 @@ const RECEIPT_OFFICIAL_CLAIMS_KEYS = [
   "certified",
   "trademarkAuthorized",
 ] as const;
+const EXECUTION_PROVIDER_RECEIPT_KEYS = [
+  "schemaVersion",
+  "kind",
+  "selectedProvider",
+  "attemptedProviders",
+] as const;
+const EXECUTION_PROVIDERS = new Set<StudioProductCodecExecutionProvider>([
+  "direct",
+  "worker",
+]);
 
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,127}$/u;
 const SCOPE_PATTERN = /^[a-z][a-z0-9]*(?:[.:/_-][a-z0-9]+)+$/u;
@@ -575,6 +607,40 @@ function parseReceipt(value: unknown): StudioCodecExecutionReceipt | null {
   });
 }
 
+function parseExecutionProviderReceipt(
+  value: unknown,
+): StudioProductCodecExecutionProviderReceipt | null {
+  const record = ownDataRecord(value, EXECUTION_PROVIDER_RECEIPT_KEYS);
+  const attemptedProviders = exactDenseArray(
+    record?.attemptedProviders,
+    1,
+  );
+  if (
+    !record
+    || record.schemaVersion !== 1
+    || record.kind !== "toonspectrum-codec-execution-provider-selection"
+    || typeof record.selectedProvider !== "string"
+    || !EXECUTION_PROVIDERS.has(
+      record.selectedProvider as StudioProductCodecExecutionProvider,
+    )
+    || !attemptedProviders
+    || attemptedProviders.length !== 1
+    || attemptedProviders[0] !== record.selectedProvider
+  ) {
+    return null;
+  }
+  const selectedProvider =
+    record.selectedProvider as StudioProductCodecExecutionProvider;
+  return Object.freeze({
+    schemaVersion: 1,
+    kind: "toonspectrum-codec-execution-provider-selection",
+    selectedProvider,
+    attemptedProviders: Object.freeze([
+      selectedProvider,
+    ]) as readonly [StudioProductCodecExecutionProvider],
+  });
+}
+
 function receiptJson(receipt: StudioCodecExecutionReceipt): JsonValue {
   return receipt as unknown as JsonValue;
 }
@@ -589,6 +655,12 @@ function certificateCoreJson(
   return {
     certification: certificate.certification as unknown as JsonValue,
     evidence: certificate.evidence as unknown as JsonValue,
+    ...(certificate.executionProviderReceipt
+      ? {
+          executionProviderReceipt:
+            certificate.executionProviderReceipt as unknown as JsonValue,
+        }
+      : {}),
     kind: certificate.kind,
     nonce: certificate.nonce,
     output: certificate.output as unknown as JsonValue,
@@ -660,7 +732,17 @@ function isAlgorithm(
 function normalizeCertificate(
   value: unknown
 ): StudioProductCodecCertificate | null {
-  const record = ownDataRecord(value, ROOT_KEYS);
+  const record = ownDataRecord(value, ROOT_KEYS)
+    ?? ownDataRecord(value, ROOT_KEYS_WITH_EXECUTION_PROVIDER_RECEIPT);
+  const hasExecutionProviderReceipt =
+    record !== null
+    && Object.prototype.hasOwnProperty.call(
+      record,
+      "executionProviderReceipt",
+    );
+  const executionProviderReceipt = hasExecutionProviderReceipt
+    ? parseExecutionProviderReceipt(record?.executionProviderReceipt)
+    : undefined;
   const certification = normalizeCertification(record?.certification);
   const validity = ownDataRecord(record?.validity, VALIDITY_KEYS);
   const receipt = parseReceipt(record?.receipt);
@@ -683,6 +765,7 @@ function normalizeCertificate(
     || typeof record.nonce !== "string"
     || !NONCE_PATTERN.test(record.nonce)
     || !receipt
+    || (hasExecutionProviderReceipt && !executionProviderReceipt)
     || typeof record.receiptSha256 !== "string"
     || !SHA256_PATTERN.test(record.receiptSha256)
     || !output
@@ -719,6 +802,7 @@ function normalizeCertificate(
     validity: Object.freeze({ issuedAt, notBefore, expiresAt }),
     nonce: record.nonce,
     receipt,
+    ...(executionProviderReceipt ? { executionProviderReceipt } : {}),
     receiptSha256: record.receiptSha256 as `sha256:${string}`,
     output,
     evidence,
@@ -951,6 +1035,9 @@ export async function issueStudioProductCodecCertificate(
 ): Promise<Uint8Array> {
   const scope = safeScope(input.scope) ? input.scope : null;
   const receipt = parseReceipt(input.receipt);
+  const executionProviderReceipt = input.executionProviderReceipt === undefined
+    ? undefined
+    : parseExecutionProviderReceipt(input.executionProviderReceipt);
   const issuedEpoch = parseCanonicalTimestamp(input.issuedAt);
   const notBefore = input.notBefore ?? input.issuedAt;
   const notBeforeEpoch = parseCanonicalTimestamp(notBefore);
@@ -958,6 +1045,10 @@ export async function issueStudioProductCodecCertificate(
   if (
     !scope
     || !receipt
+    || (
+      input.executionProviderReceipt !== undefined
+      && !executionProviderReceipt
+    )
     || issuedEpoch === null
     || notBeforeEpoch === null
     || expiresEpoch === null
@@ -1033,6 +1124,7 @@ export async function issueStudioProductCodecCertificate(
     }),
     nonce: base64Url(nonceBytes),
     receipt,
+    ...(executionProviderReceipt ? { executionProviderReceipt } : {}),
     receiptSha256: hashBytes(receiptBytes),
     output,
     evidence: Object.freeze({

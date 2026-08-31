@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactElement } from "react";
 
 import { svgToDataUrl } from "./studio-characters";
 import {
+  STUDIO_SVG_PRODUCT_SELECTED_PROVIDER_ID,
   studioSvgProductTournament,
   type StudioSvgProductDecision,
   type StudioSvgProductTournament,
@@ -35,16 +36,10 @@ function schedulePreview(task: () => void): () => void {
 }
 
 function decisionLabel(decision: StudioSvgProductDecision | null): string {
-  if (!decision) return "브라우저 SVG 미리보기";
+  if (!decision) return "SVG 미리보기 준비 중";
   switch (decision.providerId) {
     case "vello-svg-native":
-      return "Vello SVG 품질 검증 미리보기";
-    case "skia-canvaskit-scene-ir":
-      return "편집 가능한 SceneIR 미리보기";
-    case "resvg-wasm":
-      return "resvg 기준 미리보기";
-    case "browser-native-svg":
-      return "원본 SVG 보존 미리보기";
+      return "Vello SVG 미리보기";
     case "rejected":
       return "안전하지 않거나 지원되지 않는 SVG";
   }
@@ -53,9 +48,9 @@ function decisionLabel(decision: StudioSvgProductDecision | null): string {
 /**
  * Bounded product island for catalog SVG thumbnails.
  *
- * The original SVG image remains mounted until a complete routed frame is
- * ready. Vello uses its deterministic CPU sibling here, so this interactive
- * caller never invokes the GPU pixel-readback evidence API.
+ * The original SVG image is only a pre-request catalog placeholder. Once the
+ * product request preselects Vello, pending and failed epochs never present
+ * that browser-rendered image or re-execute the SVG through another provider.
  */
 export function StudioSvgAssetPreview({
   assetId,
@@ -68,10 +63,11 @@ export function StudioSvgAssetPreview({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [decision, setDecision] = useState<StudioSvgProductDecision | null>(null);
   const [painted, setPainted] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [resolveMs, setResolveMs] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!requested || decision) return;
+    if (!requested || decision || failed) return;
     let live = true;
     const cancel = schedulePreview(() => {
       const started = performance.now();
@@ -81,21 +77,22 @@ export function StudioSvgAssetPreview({
         width,
         height,
         trust: "bundled-catalog",
+        selectedProviderId: STUDIO_SVG_PRODUCT_SELECTED_PROVIDER_ID,
       }).then((next) => {
         if (!live) return;
         setResolveMs(performance.now() - started);
         setDecision(next);
       }).catch(() => {
-        // Keep the original SVG image visible if an unexpected provider bug
-        // escapes the router's explicit fallback decisions.
-        if (live) setResolveMs(performance.now() - started);
+        if (!live) return;
+        setResolveMs(performance.now() - started);
+        setFailed(true);
       });
     });
     return () => {
       live = false;
       cancel();
     };
-  }, [assetId, decision, height, requested, svg, tournament, width]);
+  }, [assetId, decision, failed, height, requested, svg, tournament, width]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -108,39 +105,44 @@ export function StudioSvgAssetPreview({
     const ImageDataConstructor = globalThis.ImageData;
     if (!context || !ImageDataConstructor) {
       setPainted(false);
+      setFailed(true);
       return;
     }
-    canvas.width = pixels.width;
-    canvas.height = pixels.height;
-    context.putImageData(
-      new ImageDataConstructor(
-        new Uint8ClampedArray(pixels.bytes),
-        pixels.width,
-        pixels.height,
-      ),
-      0,
-      0,
-    );
-    setPainted(true);
+    try {
+      canvas.width = pixels.width;
+      canvas.height = pixels.height;
+      context.putImageData(
+        new ImageDataConstructor(
+          new Uint8ClampedArray(pixels.bytes),
+          pixels.width,
+          pixels.height,
+        ),
+        0,
+        0,
+      );
+      setPainted(true);
+    } catch {
+      setPainted(false);
+      setFailed(true);
+    }
   }, [decision]);
 
   const providerId = painted
-    ? decision?.providerId ?? "browser-native-svg"
+    ? decision?.providerId ?? STUDIO_SVG_PRODUCT_SELECTED_PROVIDER_ID
     : decision?.providerId === "rejected"
       ? "rejected"
-      : "browser-native-svg";
-  const rejected = providerId === "rejected";
+      : failed
+        ? "unavailable"
+        : "pending";
+  const rejected = providerId === "rejected" || providerId === "unavailable";
+  const sourcePlaceholderVisible = !requested && !painted && !rejected;
 
   return (
     <span
       className="relative flex h-full w-full items-center justify-center overflow-hidden"
       data-studio-svg-product-preview="true"
       data-studio-svg-preview-provider={providerId}
-      data-studio-svg-preview-route={decision?.route ?? "pending"}
-      data-studio-svg-preview-visual-gate={
-        decision?.visualGate ? String(decision.visualGate.pass) : "not-run"
-      }
-      data-studio-svg-preview-mismatch-pct={decision?.visualGate?.mismatchPct ?? ""}
+      data-studio-svg-preview-route={rejected ? "fail-closed" : decision?.route ?? "pending"}
       data-studio-svg-preview-gpu-readback-bytes={
         decision?.interactiveGpuReadbackBytes ?? 0
       }
@@ -153,9 +155,10 @@ export function StudioSvgAssetPreview({
         aria-hidden
         loading="lazy"
         decoding="async"
+        data-studio-svg-source-placeholder={sourcePlaceholderVisible ? "visible" : "hidden"}
         className={
           `h-full w-full object-contain transition-transform group-hover:scale-105 ${
-            painted || rejected ? "invisible" : "visible"
+            sourcePlaceholderVisible ? "visible" : "invisible"
           }`
         }
       />
@@ -174,7 +177,11 @@ export function StudioSvgAssetPreview({
         </span>
       ) : null}
       <span className="sr-only" aria-live="polite">
-        {requested ? decisionLabel(decision) : "SVG 미리보기 대기"}
+        {failed
+          ? "선택한 Vello SVG 미리보기를 사용할 수 없음"
+          : requested
+            ? decisionLabel(decision)
+            : "SVG 미리보기 대기"}
       </span>
     </span>
   );

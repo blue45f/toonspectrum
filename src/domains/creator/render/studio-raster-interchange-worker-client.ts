@@ -45,8 +45,10 @@ export interface StudioRasterInterchangeWorkerLike {
 export type StudioRasterInterchangeWorkerFactory = () => StudioRasterInterchangeWorkerLike | null;
 
 export interface StudioRasterInterchangeAsyncOptions {
+  /** Selected once before work begins. Browser product callers must select `worker`. */
+  readonly executionMode: "worker" | "direct";
   readonly signal?: AbortSignal;
-  /** `null` explicitly selects the budgeted direct fallback. */
+  /** Test/platform seam for the selected Worker backend. */
   readonly workerFactory?: StudioRasterInterchangeWorkerFactory | null;
   /** Legacy-compatible Worker startup/ready deadline. It never limits codec execution. */
   readonly readyTimeoutMs?: number;
@@ -65,7 +67,6 @@ export interface StudioRasterDecodeAsyncResult {
 }
 
 interface StudioRasterWorkerRunResult {
-  readonly execution: "direct" | "worker";
   readonly response: StudioRasterInterchangeWorkerSuccessResponse;
 }
 
@@ -148,12 +149,23 @@ function directDecode(
 
 function createWorker(
   factory: StudioRasterInterchangeWorkerFactory | null
-): StudioRasterInterchangeWorkerLike | null {
+): StudioRasterInterchangeWorkerLike {
+  let worker: StudioRasterInterchangeWorkerLike | null;
   try {
-    return factory?.() ?? null;
+    worker = factory?.() ?? null;
   } catch {
-    return null;
+    throw workerFailure(
+      "래스터 Worker를 생성하지 못했습니다.",
+      "StudioRasterInterchangeWorkerError",
+    );
   }
+  if (!worker) {
+    throw workerFailure(
+      "래스터 Worker를 사용할 수 없습니다.",
+      "StudioRasterInterchangeWorkerError",
+    );
+  }
+  return worker;
 }
 
 function boundedTimeout(
@@ -186,7 +198,6 @@ function workerProtocolFailure(): Error {
 async function runStudioRasterInterchangeWorker(
   worker: StudioRasterInterchangeWorkerLike,
   request: StudioRasterInterchangeWorkerRequest,
-  directFallback: () => StudioRasterInterchangeWorkerSuccessResponse,
   options: StudioRasterInterchangeAsyncOptions
 ): Promise<StudioRasterWorkerRunResult> {
   const readyTimeoutMs = boundedTimeout(
@@ -203,7 +214,6 @@ async function runStudioRasterInterchangeWorker(
   return await new Promise<StudioRasterWorkerRunResult>((resolve, reject) => {
     let settled = false;
     let posted = false;
-    let ready = false;
     let readyTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
     let operationTimer: ReturnType<typeof globalThis.setTimeout> | null =
       null;
@@ -233,15 +243,13 @@ async function runStudioRasterInterchangeWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(abortError()));
-    const fallback = () => finish(() => {
-      try {
-        resolve({ execution: "direct", response: directFallback() });
-      } catch (error) {
-        reject(error);
-      }
-    });
     readyTimer = globalThis.setTimeout(
-      fallback,
+      () => finish(() => reject(
+        workerFailure(
+          "래스터 Worker 준비 시간이 초과되었습니다.",
+          "TimeoutError",
+        ),
+      )),
       readyTimeoutMs,
     );
     options.signal?.addEventListener("abort", onAbort, { once: true });
@@ -251,10 +259,6 @@ async function runStudioRasterInterchangeWorker(
     }
     worker.onerror = (event) => {
       event.preventDefault?.();
-      if (!ready) {
-        fallback();
-        return;
-      }
       finish(() => reject(
         workerFailure(
           "래스터 Worker 실행을 안전하게 완료하지 못했습니다.",
@@ -270,8 +274,7 @@ async function runStudioRasterInterchangeWorker(
         return;
       }
       if (response.type === "studio-raster-interchange/ready") {
-        if (ready) return;
-        ready = true;
+        if (posted) return;
         if (readyTimer !== null) {
           globalThis.clearTimeout(readyTimer);
           readyTimer = null;
@@ -339,7 +342,7 @@ async function runStudioRasterInterchangeWorker(
         finish(() => reject(workerProtocolFailure()));
         return;
       }
-      finish(() => resolve({ execution: "worker", response }));
+      finish(() => resolve({ response }));
     };
     worker.onmessageerror = () => {
       finish(() => reject(
@@ -355,18 +358,21 @@ async function runStudioRasterInterchangeWorker(
 export async function encodeStudioRasterInterchangeAsync(
   format: StudioRasterInterchangeFormat,
   bitmap: StudioRgbaBitmap,
-  options: StudioRasterInterchangeAsyncOptions = {}
+  options: StudioRasterInterchangeAsyncOptions,
 ): Promise<StudioRasterInterchangeAsyncResult> {
   if (options.signal?.aborted) throw abortError();
   const requestId = crypto.randomUUID();
+  if (options.executionMode === "direct") {
+    const response = directEncode(format, bitmap, requestId);
+    return { execution: "direct", encoded: response.result };
+  }
+  if (options.executionMode !== "worker") {
+    throw new TypeError("래스터 인코딩 실행 모드가 올바르지 않습니다.");
+  }
   const factory = options.workerFactory === undefined
     ? createStudioRasterInterchangeModuleWorker
     : options.workerFactory;
   const worker = createWorker(factory);
-  if (!worker) {
-    const response = directEncode(format, bitmap, requestId);
-    return { execution: "direct", encoded: response.result };
-  }
 
   // Caller-owned ImageData and subarrays must never be detached at the Worker boundary.
   const data = new Uint8ClampedArray(bitmap.data);
@@ -382,31 +388,33 @@ export async function encodeStudioRasterInterchangeAsync(
   const result = await runStudioRasterInterchangeWorker(
     worker,
     request,
-    () => directEncode(format, bitmap, requestId),
     options
   );
   if (result.response.type !== "studio-raster-interchange/encode-success") {
     throw new Error("래스터 Worker가 인코딩 요청에 잘못된 응답을 반환했습니다.");
   }
-  return { execution: result.execution, encoded: result.response.result };
+  return { execution: "worker", encoded: result.response.result };
 }
 
 export async function decodeStudioRasterInterchangeAsync(
   source: Uint8Array | ArrayBuffer,
-  expectedFormat?: StudioRasterInterchangeFormat,
-  options: StudioRasterInterchangeAsyncOptions = {}
+  expectedFormat: StudioRasterInterchangeFormat | undefined,
+  options: StudioRasterInterchangeAsyncOptions,
 ): Promise<StudioRasterDecodeAsyncResult> {
   if (options.signal?.aborted) throw abortError();
   const bytes = source instanceof Uint8Array ? source : new Uint8Array(source);
   const requestId = crypto.randomUUID();
+  if (options.executionMode === "direct") {
+    const response = directDecode(bytes, expectedFormat, requestId);
+    return { execution: "direct", decoded: response.result };
+  }
+  if (options.executionMode !== "worker") {
+    throw new TypeError("래스터 디코딩 실행 모드가 올바르지 않습니다.");
+  }
   const factory = options.workerFactory === undefined
     ? createStudioRasterInterchangeModuleWorker
     : options.workerFactory;
   const worker = createWorker(factory);
-  if (!worker) {
-    const response = directDecode(bytes, expectedFormat, requestId);
-    return { execution: "direct", decoded: response.result };
-  }
 
   // Copy every view (including offset subarrays) so transferring cannot detach caller memory.
   const workerBytes = new Uint8Array(bytes);
@@ -420,11 +428,10 @@ export async function decodeStudioRasterInterchangeAsync(
   const result = await runStudioRasterInterchangeWorker(
     worker,
     request,
-    () => directDecode(bytes, expectedFormat, requestId),
     options
   );
   if (result.response.type !== "studio-raster-interchange/decode-success") {
     throw new Error("래스터 Worker가 디코딩 요청에 잘못된 응답을 반환했습니다.");
   }
-  return { execution: result.execution, decoded: result.response.result };
+  return { execution: "worker", decoded: result.response.result };
 }

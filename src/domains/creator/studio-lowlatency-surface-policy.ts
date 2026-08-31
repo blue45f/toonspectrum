@@ -46,8 +46,6 @@ export type StudioLowLatencySurfaceRole =
   | "webgl-live-ink"
   /** WebGPU live-ink surface (configured through GPUCanvasConfiguration). */
   | "webgpu-live-ink"
-  /** Canvas2D surface the WebGPU engine falls back to after device loss. */
-  | "webgpu-fallback-2d"
   /** Konva main/document layer holding already-committed art. */
   | "committed-document-layer"
   /** Konva hit-test canvas. */
@@ -107,14 +105,6 @@ const SURFACE_POLICY: Readonly<Record<StudioLowLatencySurfaceRole, StudioLowLate
       desynchronized: false,
       willReadFrequently: false,
       reason: "not-expressible",
-    } as const),
-    // Device loss demotes live ink onto this Canvas2D surface. It stays transient and write-only,
-    // so it must inherit the same low-latency presentation as the primary live surface.
-    "webgpu-fallback-2d": Object.freeze({
-      role: "webgpu-fallback-2d",
-      desynchronized: true,
-      willReadFrequently: false,
-      reason: "transient-write-only",
     } as const),
     "committed-document-layer": Object.freeze({
       role: "committed-document-layer",

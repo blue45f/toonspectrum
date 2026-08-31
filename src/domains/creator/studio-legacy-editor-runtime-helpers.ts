@@ -212,13 +212,10 @@ export async function encodeStudioPixelEditResultPng(
   canvas: HTMLCanvasElement,
   signal?: AbortSignal,
 ): Promise<string> {
-  // Load failures fall back to the pure async encoder. Encode-time failures must surface.
-  const runtime = await loadStudioPixelEditBrushRuntime().catch(() => null);
-  if (runtime) {
-    return runtime.encodeStudioRetouchCanvasPng(canvas, { signal });
-  }
-  const { encodeStudioPixelEditCanvasPng } = await import("./studio-pixel-edit-async");
-  return encodeStudioPixelEditCanvasPng(canvas, { signal });
+  // The product operation preselects the pixel-edit runtime encoder. Module-load and encode
+  // failures are terminal for this operation; the same canvas is never re-encoded elsewhere.
+  const runtime = await loadStudioPixelEditBrushRuntime();
+  return runtime.encodeStudioRetouchCanvasPng(canvas, { signal });
 }
 
 export async function yieldStudioPixelEditMainThread(): Promise<void> {

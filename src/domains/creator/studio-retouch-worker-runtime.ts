@@ -12,7 +12,7 @@ export interface StudioRetouchWorkerRuntimeResult {
   readonly h: number;
 }
 
-/** Pure single-operation runtime shared by the module Worker and bounded direct fallback. */
+/** Pure single-operation runtime shared by the module Worker and explicitly selected direct lane. */
 export function applyStudioRetouchWorkerRequest(
   request: StudioRetouchWorkerRunRequest,
 ): StudioRetouchWorkerRuntimeResult {

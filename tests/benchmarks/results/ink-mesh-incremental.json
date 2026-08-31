@@ -1,5 +1,5 @@
 {
-  "schema": "toon-ink-mesh-incremental-benchmark-v1",
+  "schema": "toon-ink-mesh-incremental-benchmark-v2",
   "generatedAtUtc": "2026-08-08T21:00:12.428Z",
   "runtime": {
     "node": "v24.16.0",
@@ -63,8 +63,8 @@
       "deltaSha256": "ba8f554cab35609eb979b7bb50eb0b7a314052e9aa1899a20754173df5b201ee",
       "exactFinalParityRuns": 40
     },
-    "retainedSingleShotFallback": {
-      "backend": "single-shot-fallback",
+    "retainedSingleShotReference": {
+      "backend": "single-shot-reference",
       "updateLatencyMs": {
         "p50": 0.590625,
         "p95": 1.110459,
@@ -78,7 +78,7 @@
         "max": 18.884375
       },
       "metricsPerStroke": {
-        "backend": "single-shot-fallback",
+        "backend": "single-shot-reference",
         "updateCount": 31,
         "inputCount": 240,
         "inputPayloadBytes": 11520,
@@ -102,7 +102,7 @@
   "evidence": {
     "finalMeshByteExactAcrossAllMeasuredRuns": true,
     "upstreamWasmToJsPayloadReductionVsFullSnapshots": 0.8669733383402178,
-    "upstreamWasmToJsPayloadReductionVsFallback": 0.8589979600975173,
+    "upstreamWasmToJsPayloadReductionVsSingleShotReference": 0.8589979600975173,
     "gpuReadbackCount": 0
   }
 }

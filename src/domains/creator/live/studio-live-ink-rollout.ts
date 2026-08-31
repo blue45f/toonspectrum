@@ -20,9 +20,9 @@ export const STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY =
  * Quality-first engine policy.
  *
  * The WebGPU path still has stroke-scoped capability, exact-output, first-frame receipt and
- * device-loss gates, so selecting it here never removes the Canvas2D recovery path. A missing
- * deployment percentage now means “admit every capable browser” instead of silently disabling
- * the already-bounded GPU engine. Malformed explicit values remain fail-closed at 0%.
+ * device-loss gates. Those gates report the selected engine unavailable; they do not grant
+ * Canvas2D ownership. A missing deployment percentage admits every capable browser. Malformed
+ * percentages disable the selected lane without substituting a different renderer.
  */
 export const STUDIO_LIVE_INK_DEFAULT_ROLLOUT_PERCENT = 100;
 
@@ -36,7 +36,7 @@ export interface StudioLiveInkRolloutRandom {
 }
 
 export type StudioLiveInkRolloutReason =
-  | "canvas2d-forced"
+  | "canvas2d-explicit"
   | "webgpu-explicit"
   | "kill-switch"
   | "rollout-disabled"
@@ -46,7 +46,9 @@ export type StudioLiveInkRolloutReason =
   | "cohort-unavailable";
 
 export interface StudioLiveInkRolloutDecision {
-  readonly preference: Exclude<StudioLiveInkBackendPreference, "auto">;
+  readonly preference: StudioLiveInkBackendPreference;
+  /** `unavailable` disables this selection; it never means “run the other backend”. */
+  readonly status: "selected" | "unavailable";
   readonly reason: StudioLiveInkRolloutReason;
   readonly rolloutPercent: number;
   /** Null for forced/off decisions that do not need to create or read a local cohort. */
@@ -98,7 +100,8 @@ export function resolveStudioLiveInkRollout(
 
   if (parseKillSwitch(input.killSwitch)) {
     return {
-      preference: "canvas2d",
+      preference: configuredPreference,
+      status: "unavailable",
       reason: "kill-switch",
       rolloutPercent,
       bucket: null,
@@ -107,22 +110,27 @@ export function resolveStudioLiveInkRollout(
   if (configuredPreference === "canvas2d") {
     return {
       preference: "canvas2d",
-      reason: "canvas2d-forced",
+      status: "selected",
+      reason: "canvas2d-explicit",
       rolloutPercent,
       bucket: null,
     };
   }
   if (configuredPreference === "webgpu") {
-    return {
-      preference: "webgpu",
-      reason: "webgpu-explicit",
-      rolloutPercent,
-      bucket: null,
-    };
+    if (input.backendPreference === "webgpu") {
+      return {
+        preference: "webgpu",
+        status: "selected",
+        reason: "webgpu-explicit",
+        rolloutPercent,
+        bucket: null,
+      };
+    }
   }
   if (rolloutPercent <= 0) {
     return {
-      preference: "canvas2d",
+      preference: "webgpu",
+      status: "unavailable",
       reason: "rollout-disabled",
       rolloutPercent,
       bucket: null,
@@ -130,7 +138,8 @@ export function resolveStudioLiveInkRollout(
   }
   if (!input.webgpuApiAvailable) {
     return {
-      preference: "canvas2d",
+      preference: "webgpu",
+      status: "unavailable",
       reason: "webgpu-api-unavailable",
       rolloutPercent,
       bucket: null,
@@ -139,6 +148,7 @@ export function resolveStudioLiveInkRollout(
   if (rolloutPercent >= 100) {
     return {
       preference: "webgpu",
+      status: "selected",
       reason: "cohort-included",
       rolloutPercent,
       bucket: null,
@@ -166,7 +176,8 @@ export function resolveStudioLiveInkRollout(
   });
   if (rollout.reason === "cohort-unavailable") {
     return {
-      preference: "canvas2d",
+      preference: "webgpu",
+      status: "unavailable",
       reason: "cohort-unavailable",
       rolloutPercent,
       bucket: null,
@@ -175,12 +186,14 @@ export function resolveStudioLiveInkRollout(
   return rollout.enabled
     ? {
         preference: "webgpu",
+        status: "selected",
         reason: "cohort-included",
         rolloutPercent,
         bucket: rollout.bucket,
       }
     : {
-        preference: "canvas2d",
+        preference: "webgpu",
+        status: "unavailable",
         reason: "cohort-excluded",
         rolloutPercent,
         bucket: rollout.bucket,

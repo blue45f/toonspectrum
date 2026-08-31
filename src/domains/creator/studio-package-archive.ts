@@ -6,7 +6,10 @@
  * inputs, unsafe paths, ambiguous duplicate names, and browser-hostile package sizes.
  */
 
-import { createStudioCrc32WorkerSession } from "./studio-crc32-worker-client";
+import {
+  createStudioCrc32WorkerSession,
+  type StudioCrc32ExecutionMode,
+} from "./studio-crc32-worker-client";
 
 const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
 const ZIP_CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
@@ -69,11 +72,8 @@ export interface StudioPackageArchiveBuildOptions {
   mimeType?: string;
   /** Cancels Blob reads between awaits and terminates an in-flight CRC Worker epoch. */
   signal?: AbortSignal;
-  /**
-   * CLI/headless exporters may opt into direct CRC for large entries. This is ignored whenever a
-   * DOM is present, so browser exports still require the Worker above the 1 MiB direct budget.
-   */
-  allowLargeDirectFallbackInHeadless?: boolean;
+  /** Fixed before archive construction. Browser product callers select `worker`. */
+  crc32ExecutionMode?: StudioCrc32ExecutionMode;
 }
 
 export type StudioPackageArchiveErrorCode =
@@ -545,7 +545,7 @@ export async function buildStudioPackageArchiveBytes(
   const prepared: PreparedEntry[] = [];
   let processedBytes = 0;
   const crc32Session = createStudioCrc32WorkerSession({
-    allowLargeDirectFallbackInHeadless: options.allowLargeDirectFallbackInHeadless,
+    executionMode: options.crc32ExecutionMode ?? "worker",
   });
   try {
     for (let index = 0; index < plan.entries.length; index += 1) {
@@ -677,7 +677,7 @@ export async function buildStudioPackageArchiveBlob(
   const centralParts: Array<ArrayBuffer> = [];
   let processedBytes = 0;
   const crc32Session = createStudioCrc32WorkerSession({
-    allowLargeDirectFallbackInHeadless: options.allowLargeDirectFallbackInHeadless,
+    executionMode: options.crc32ExecutionMode ?? "worker",
   });
   try {
     for (let index = 0; index < plan.entries.length; index += 1) {

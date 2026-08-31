@@ -28,7 +28,10 @@ const UNSUPPORTED_PROBE: StudioBg3dWebGpuProbeResult = Object.freeze({
 });
 
 const DESKTOP_USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36";
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/133 Safari/537.36";
+const defaultProbe = async () => SUPPORTED_PROBE;
+const defaultLoadPreference = async (): Promise<StudioBg3dEnginePreference> => "webgpu";
+const defaultSavePreference = async () => undefined;
 
 function options(
   overrides: Partial<UseStudioBg3dEngineRuntimeOptions> = {},
@@ -37,9 +40,9 @@ function options(
     enabled: true,
     deviceProfile: "desktop",
     antialias: true,
-    probe: async () => SUPPORTED_PROBE,
-    loadPreference: async () => "auto",
-    savePreference: async () => undefined,
+    probe: defaultProbe,
+    loadPreference: defaultLoadPreference,
+    savePreference: defaultSavePreference,
     ...overrides,
   };
 }
@@ -51,25 +54,40 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe("useStudioBg3dEngineRuntime", () => {
-  it("starts in the probing phase and settles on the selected engine", async () => {
+  it("starts without a renderer and admits the explicit WebGPU selection after probing", async () => {
     const { result } = renderHook(() => useStudioBg3dEngineRuntime(options()));
 
     expect(result.current.phase).toBe("probing");
-    expect(result.current.plan.backend).toBe("webgl2");
+    expect(result.current.plan).toMatchObject({
+      backend: "webgpu",
+      status: "unavailable",
+    });
+    expect(result.current.glFactory).toBeNull();
 
     await waitFor(() => expect(result.current.phase).toBe("ready"));
     expect(result.current.plan).toMatchObject({
       backend: "webgpu",
-      reason: "auto-webgpu-promoted",
+      status: "available",
+      reason: "user-webgpu-override",
     });
     expect(result.current.glFactory).toBeTypeOf("function");
   });
 
-  it("never touches the GPU while the editor is closed", async () => {
+  it("normalizes a legacy persisted auto preference to explicit WebGPU", async () => {
+    const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
+      loadPreference: async () => "auto" as StudioBg3dEnginePreference,
+    })));
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    expect(result.current.preference).toBe("webgpu");
+    expect(result.current.plan.backend).toBe("webgpu");
+  });
+
+  it("never probes or exposes a renderer while the editor is closed", async () => {
     const probe = vi.fn(async () => SUPPORTED_PROBE);
     const { result } = renderHook(() =>
       useStudioBg3dEngineRuntime(options({ enabled: false, probe })));
@@ -80,16 +98,15 @@ describe("useStudioBg3dEngineRuntime", () => {
     expect(result.current.glFactory).toBeNull();
   });
 
-  it("restores the persisted preference and writes back an artist choice", async () => {
+  it("restores and persists an independent explicit WebGL2 choice", async () => {
     const savePreference = vi.fn(async () => undefined);
     const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
-      loadPreference: async () => "webgl2" as StudioBg3dEnginePreference,
+      loadPreference: async () => "webgl2",
       savePreference,
     })));
 
     await waitFor(() => expect(result.current.phase).toBe("ready"));
-    expect(result.current.preference).toBe("webgl2");
-    expect(result.current.plan.backend).toBe("webgl2");
+    expect(result.current.plan).toMatchObject({ backend: "webgl2", status: "available" });
     expect(result.current.glFactory).toBeNull();
 
     act(() => result.current.setPreference("webgpu"));
@@ -97,72 +114,77 @@ describe("useStudioBg3dEngineRuntime", () => {
     expect(savePreference).toHaveBeenCalledWith("webgpu");
   });
 
-  it("changes the canvas key on a backend switch and holds it steady otherwise", async () => {
-    const { result } = renderHook(() => useStudioBg3dEngineRuntime(options()));
-    expect(result.current.canvasKey).toBe("webgl2#0");
+  it("does not make explicit WebGL2 wait for the independent WebGPU probe", async () => {
+    let releaseProbe: (value: StudioBg3dWebGpuProbeResult) => void = () => undefined;
+    const probe = vi.fn(() => new Promise<StudioBg3dWebGpuProbeResult>((resolve) => {
+      releaseProbe = resolve;
+    }));
+    const loadPreference = async (): Promise<StudioBg3dEnginePreference> => "webgl2";
+    const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
+      loadPreference,
+      probe,
+    })));
 
-    await waitFor(() => expect(result.current.plan.backend).toBe("webgpu"));
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    expect(result.current.plan).toMatchObject({ backend: "webgl2", status: "available" });
+    expect(result.current.glFactory).toBeNull();
+    expect(probe).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      releaseProbe(UNSUPPORTED_PROBE);
+      await Promise.resolve();
+    });
+    expect(result.current.plan).toMatchObject({ backend: "webgl2", status: "available" });
+  });
+
+  it("changes the canvas key only for an engine switch or an explicit failed retry", async () => {
+    const { result } = renderHook(() => useStudioBg3dEngineRuntime(options()));
+    await waitFor(() => expect(result.current.plan.status).toBe("available"));
     expect(result.current.canvasKey).toBe("webgpu#0");
 
     act(() => result.current.setPreference("webgl2"));
-    await waitFor(() => expect(result.current.canvasKey).toBe("webgl2#0"));
-
-    // Re-choosing the same engine must not throw away a live renderer.
+    expect(result.current.canvasKey).toBe("webgl2#0");
     act(() => result.current.setPreference("webgl2"));
     expect(result.current.canvasKey).toBe("webgl2#0");
   });
 
-  it("rebuilds the canvas after a device loss even when the backend is unchanged", async () => {
+  it("keeps WebGPU selected and failed when renderer initialization fails", async () => {
     const createWebGpuRenderer = vi.fn(async () => {
       throw new Error("device-lost-during-init");
     });
     const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
       createWebGpuRenderer: createWebGpuRenderer as never,
     })));
-    await waitFor(() => expect(result.current.canvasKey).toBe("webgpu#0"));
+    await waitFor(() => expect(result.current.glFactory).toBeTypeOf("function"));
 
     await act(async () => {
       await result.current.glFactory!({ canvas: document.createElement("canvas") })
         .catch(() => undefined);
     });
 
-    // Still WebGPU — the policy allows one retry — but on a fresh canvas.
-    await waitFor(() => expect(result.current.canvasKey).toBe("webgpu#1"));
-    // The notice has to describe the retry that is actually happening. Saying "switching to
-    // WebGL2" here contradicted both the plan and the badge, which still read WebGPU.
-    expect(result.current.deviceLostMessage).toContain("WebGPU로 한 번 더 시도합니다");
-    expect(result.current.deviceLostMessage).not.toContain("WebGL2로 전환");
-    expect(result.current.plan.backend).toBe("webgpu");
+    await waitFor(() => expect(result.current.plan.status).toBe("failed"));
+    expect(result.current.plan).toMatchObject({
+      backend: "webgpu",
+      reason: "webgpu-runtime-failed",
+    });
+    expect(result.current.canvasKey).toBe("webgpu#0");
+    expect(result.current.glFactory).toBeNull();
+    expect(result.current.deviceLostMessage).toContain("WebGL2를 직접 선택");
+    expect(result.current.deviceLostMessage).not.toContain("전환");
+
+    act(() => result.current.setPreference("webgpu"));
+    await waitFor(() => expect(result.current.plan.status).toBe("available"));
+    expect(result.current.canvasKey).toBe("webgpu#1");
+    expect(result.current.glFactory).toBeTypeOf("function");
   });
 
-  it("falls back to WebGL2 and reports the loss when the renderer cannot start", async () => {
-    const createWebGpuRenderer = vi.fn(async () => {
-      throw new Error("device-lost-during-init");
-    });
-    const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
-      createWebGpuRenderer: createWebGpuRenderer as never,
-    })));
-    await waitFor(() => expect(result.current.plan.backend).toBe("webgpu"));
-
-    const factory = result.current.glFactory!;
-    await act(async () => {
-      await factory({ canvas: document.createElement("canvas") }).catch(() => undefined);
-      // A single failure keeps `auto` on WebGPU; the second one retires it for the session.
-      await factory({ canvas: document.createElement("canvas") }).catch(() => undefined);
-    });
-
-    await waitFor(() => expect(result.current.plan.backend).toBe("webgl2"));
-    expect(result.current.plan.reason).toBe("repeated-webgpu-failure");
-    expect(result.current.deviceLostMessage).toContain("WebGL2로 전환");
-  });
-
-  it("reports a device loss raised after the renderer was already running", async () => {
+  it("marks a live device loss failed without mounting WebGL2", async () => {
     const createWebGpuRenderer = vi.fn(async (
       _canvas: HTMLCanvasElement,
       rendererOptions?: { onDeviceLost?: (loss: { reason: string; message: string }) => void },
     ) => {
       queueMicrotask(() => rendererOptions?.onDeviceLost?.({
-        reason: "destroyed",
+        reason: "unknown",
         message: "GPU 프로세스가 종료되었습니다.",
       }));
       return { renderer: { render: () => undefined }, dispose: async () => undefined };
@@ -170,73 +192,35 @@ describe("useStudioBg3dEngineRuntime", () => {
     const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
       createWebGpuRenderer: createWebGpuRenderer as never,
     })));
-    await waitFor(() => expect(result.current.plan.backend).toBe("webgpu"));
+    await waitFor(() => expect(result.current.glFactory).toBeTypeOf("function"));
 
     await act(async () => {
       await result.current.glFactory!({ canvas: document.createElement("canvas") });
       await Promise.resolve();
     });
 
-    // The renderer reports the cause; the hook appends the outcome it is about to take.
-    await waitFor(() => expect(result.current.deviceLostMessage)
-      .toBe("GPU 프로세스가 종료되었습니다. WebGPU로 한 번 더 시도합니다."));
+    await waitFor(() => expect(result.current.plan.status).toBe("failed"));
+    expect(result.current.plan.backend).toBe("webgpu");
+    expect(result.current.deviceLostMessage).toContain("GPU 프로세스가 종료되었습니다");
+    expect(result.current.glFactory).toBeNull();
   });
 
-  it("keeps a choice made while a reopen's restored preference is still loading", async () => {
-    // Reopening a retained editor restarts the bootstrap. The restored value can land after the
-    // artist has already picked an engine in the reopened panel; applying it then would remount
-    // onto a backend nobody asked for and leave the panel disagreeing with what it just saved.
-    let releaseRestored: (value: StudioBg3dEnginePreference) => void = () => undefined;
-    const loadPreference = vi.fn(() => new Promise<StudioBg3dEnginePreference>((resolve) => {
-      releaseRestored = resolve;
-    }));
-    const probe = async () => SUPPORTED_PROBE;
-    const savePreference = vi.fn(async () => undefined);
-
-    const { result, rerender } = renderHook(
-      (props: { enabled: boolean }) => useStudioBg3dEngineRuntime(options({
-        enabled: props.enabled,
-        loadPreference,
-        probe,
-        savePreference,
-      })),
-      { initialProps: { enabled: true } },
-    );
-
-    // Close, then reopen: the bootstrap runs again with the restored value still in flight.
-    rerender({ enabled: false });
-    rerender({ enabled: true });
-    await waitFor(() => expect(result.current.phase).toBe("probing"));
-
-    act(() => result.current.setPreference("webgl2"));
-    expect(result.current.preference).toBe("webgl2");
-
-    await act(async () => {
-      releaseRestored("webgpu");
-      await Promise.resolve();
-    });
-    await waitFor(() => expect(result.current.phase).toBe("ready"));
-
-    // The stale restored value must not win over the newer explicit choice.
-    expect(result.current.preference).toBe("webgl2");
-    expect(savePreference).toHaveBeenCalledWith("webgl2");
-  });
-
-  it("keeps WebGL2 when the probe refuses the host", async () => {
+  it("keeps an unavailable WebGPU selection when the probe refuses the host", async () => {
     const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
       probe: async () => UNSUPPORTED_PROBE,
     })));
 
     await waitFor(() => expect(result.current.phase).toBe("ready"));
     expect(result.current.plan).toMatchObject({
-      backend: "webgl2",
+      backend: "webgpu",
+      status: "unavailable",
       reason: "webgpu-probe-unsupported",
-      webgpuSelectable: false,
     });
-    expect(result.current.canvasKey).toBe("webgl2#0");
+    expect(result.current.canvasKey).toBe("webgpu#0");
+    expect(result.current.glFactory).toBeNull();
   });
 
-  it("classifies the embedding in-app browser from the live user agent", async () => {
+  it("does not auto-demote an opt-in in-app browser", async () => {
     vi.stubGlobal("navigator", {
       userAgent: "Mozilla/5.0 (Linux; Android 15; wv) Mobile Safari/537.36 KAKAOTALK 10.6.5",
     });
@@ -244,59 +228,72 @@ describe("useStudioBg3dEngineRuntime", () => {
 
     await waitFor(() => expect(result.current.phase).toBe("ready"));
     expect(result.current.inApp).toMatchObject({ id: "kakaotalk", isInApp: true });
-    expect(result.current.plan).toMatchObject({
-      backend: "webgl2",
-      reason: "inapp-browser-opt-in-required",
-      webgpuSelectable: true,
+    expect(result.current.plan).toMatchObject({ backend: "webgpu", status: "available" });
+    expect(result.current.plan.diagnostics).toContain("inapp-browser-opt-in-required");
+  });
+
+  it("keeps a choice made while restored storage is still loading", async () => {
+    let releaseRestored: (value: StudioBg3dEnginePreference) => void = () => undefined;
+    const loadPreference = vi.fn(() => new Promise<StudioBg3dEnginePreference>((resolve) => {
+      releaseRestored = resolve;
+    }));
+    const savePreference = vi.fn(async () => undefined);
+    const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
+      loadPreference,
+      savePreference,
+    })));
+
+    act(() => result.current.setPreference("webgl2"));
+    await act(async () => {
+      releaseRestored("webgpu");
+      await Promise.resolve();
     });
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    expect(result.current.preference).toBe("webgl2");
+    expect(savePreference).toHaveBeenCalledWith("webgl2");
   });
 
-  it("stops announcing a device loss once the notice window passes", async () => {
+  it("expires the detailed loss banner but retains the failed selection", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      const createWebGpuRenderer = vi.fn(async () => {
-        throw new Error("device-lost-during-init");
-      });
-      const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
-        createWebGpuRenderer: createWebGpuRenderer as never,
-      })));
-      await waitFor(() => expect(result.current.plan.backend).toBe("webgpu"));
+    const createWebGpuRenderer = vi.fn(async () => {
+      throw new Error("device-lost-during-init");
+    });
+    const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
+      createWebGpuRenderer: createWebGpuRenderer as never,
+    })));
+    await waitFor(() => expect(result.current.glFactory).toBeTypeOf("function"));
+    await act(async () => {
+      await result.current.glFactory!({ canvas: document.createElement("canvas") })
+        .catch(() => undefined);
+    });
+    await waitFor(() => expect(result.current.deviceLostMessage).not.toBeNull());
 
-      await act(async () => {
-        await result.current.glFactory!({ canvas: document.createElement("canvas") })
-          .catch(() => undefined);
-      });
-      await waitFor(() => expect(result.current.deviceLostMessage).not.toBeNull());
-
-      await act(async () => {
-        vi.advanceTimersByTime(STUDIO_BG3D_DEVICE_LOSS_NOTICE_MS + 1);
-      });
-      expect(result.current.deviceLostMessage).toBeNull();
-      // The fallback itself is not undone by the banner expiring.
-      expect(result.current.canvasKey).toBe("webgpu#1");
-    } finally {
-      vi.useRealTimers();
-    }
+    await act(async () => {
+      vi.advanceTimersByTime(STUDIO_BG3D_DEVICE_LOSS_NOTICE_MS + 1);
+    });
+    expect(result.current.deviceLostMessage).toBeNull();
+    expect(result.current.plan).toMatchObject({ backend: "webgpu", status: "failed" });
   });
 
-  it("pins WebGL2 while a WebGL-only feature is present and keeps it after it is gone", async () => {
+  it("makes WebGPU unavailable for a latched requirement until WebGL2 is chosen", async () => {
     const { result, rerender } = renderHook(
-      (props: { xr: boolean }) => useStudioBg3dEngineRuntime(options({
-        observedWebglOnlyFeatures: { webxr: props.xr },
+      (props: { vrm: boolean }) => useStudioBg3dEngineRuntime(options({
+        observedWebglOnlyFeatures: { vrmCharacters: props.vrm },
       })),
-      { initialProps: { xr: false } },
+      { initialProps: { vrm: false } },
     );
-    await waitFor(() => expect(result.current.plan.backend).toBe("webgpu"));
+    await waitFor(() => expect(result.current.plan.status).toBe("available"));
 
-    rerender({ xr: true });
-    await waitFor(() => expect(result.current.plan.backend).toBe("webgl2"));
-    expect(result.current.plan.reason).toBe("webgl-only-webxr");
-    expect(result.current.plan.webgpuSelectable).toBe(false);
+    rerender({ vrm: true });
+    await waitFor(() => expect(result.current.plan.status).toBe("unavailable"));
+    expect(result.current.plan).toMatchObject({
+      backend: "webgpu",
+      reason: "webgl-only-vrm-character",
+    });
+    expect(result.current.canvasKey).toBe("webgpu#0");
+    expect(result.current.glFactory).toBeNull();
 
-    // Leaving the session must not swap the renderer back and remount the canvas a second time.
-    rerender({ xr: false });
-    await waitFor(() => expect(result.current.canvasKey).toBe("webgl2#0"));
-    expect(result.current.plan.backend).toBe("webgl2");
-    expect(result.current.plan.reason).toBe("webgl-only-webxr");
+    act(() => result.current.setPreference("webgl2"));
+    expect(result.current.plan).toMatchObject({ backend: "webgl2", status: "available" });
   });
 });

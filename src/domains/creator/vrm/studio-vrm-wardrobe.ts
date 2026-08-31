@@ -313,7 +313,7 @@ export interface WardrobeItemDef {
   catalogStatus: "selectable" | "legacy-only";
   /** 신규 선택 시 제안할 같은 슬롯의 대체 아이템. */
   replacementId: string | null;
-  /** Runtime deformation authority. Dynamic skirts use bounded XPBD with a rigid preview fallback. */
+  /** Runtime deformation authority selected before attachment; providers never replace each other. */
   geometrySource: "xpbd-skirt-v1" | "skinned-procedural-v1" | "rigid-procedural";
   defaultFabricId: WardrobeFabricId;
   fitProfile: WardrobeFitProfile;

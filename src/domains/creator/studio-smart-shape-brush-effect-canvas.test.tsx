@@ -86,18 +86,14 @@ describe("smart-shape selected brush Canvas route", () => {
     expect(new Set(lines.map((line) => line.props.strokeWidth)).size).toBeGreaterThan(1);
   });
 
-  it("keeps an incompatible causal stamp as the stable native geometric node", () => {
+  it("does not expose a native geometric Canvas substitute for an unavailable causal stamp", () => {
     const result = applyStudioSmartShapeBrushEffect(geometric(), source({
       brush: "ink-brush",
       stampPipeline: "causal-walker-v2",
     }));
-    expect(result).toMatchObject({ status: "fallback", reason: "causal-stamp" });
+    expect(result).toEqual({ status: "unavailable", reason: "causal-stamp" });
+    expect("stroke" in result).toBe(false);
 
-    render(<StudioDrawNode el={result.stroke} />);
-
-    expect(capture.nodes.filter((entry) => entry.kind === "Rect")).toHaveLength(1);
-    expect(capture.nodes.filter((entry) => entry.kind === "Group")).toHaveLength(1);
-    expect(capture.nodes.some((entry) => entry.kind === "Line")).toBe(false);
-    expect(capture.nodes.some((entry) => entry.kind === "Shape")).toBe(false);
+    expect(capture.nodes).toEqual([]);
   });
 });

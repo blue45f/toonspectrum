@@ -291,6 +291,23 @@ describe("photo-pose landmarker lifecycle", () => {
     disposePhotoPoseLandmarker();
     expect(closeFresh).toHaveBeenCalledOnce();
   });
+
+  it("keeps an explicitly selected CPU provider separate from the GPU singleton", async () => {
+    type PhotoPoseLandmarker = Awaited<ReturnType<typeof initPhotoPoseLandmarker>>;
+    const cpu = { close: vi.fn() } as unknown as PhotoPoseLandmarker;
+    const cpuFactory = vi.fn(async () => cpu);
+    const gpuFactory = vi.fn(async () => cpu);
+
+    await expect(initPhotoPoseLandmarker(
+      cpuFactory,
+      { delegate: "CPU" },
+    )).resolves.toBe(cpu);
+    expect(cpuFactory).toHaveBeenCalledWith("CPU");
+    await expect(initPhotoPoseLandmarker(gpuFactory)).rejects.toMatchObject({
+      name: "StudioVrmMediaPipeDelegateIdentityError",
+    });
+    expect(gpuFactory).not.toHaveBeenCalled();
+  });
 });
 
 describe("photo-hand landmarker lifecycle", () => {
@@ -328,5 +345,21 @@ describe("photo-hand landmarker lifecycle", () => {
     disposePhotoHandLandmarker();
     disposePhotoHandLandmarker();
     expect(closeFresh).toHaveBeenCalledOnce();
+  });
+
+  it("deduplicates only within the selected photo-hand delegate", async () => {
+    type PhotoHandLandmarker = Awaited<ReturnType<typeof initPhotoHandLandmarker>>;
+    const cpu = { close: vi.fn() } as unknown as PhotoHandLandmarker;
+    const cpuFactory = vi.fn(async () => cpu);
+
+    const first = initPhotoHandLandmarker(cpuFactory, { delegate: "CPU" });
+    const second = initPhotoHandLandmarker(cpuFactory, { delegate: "CPU" });
+    await expect(first).resolves.toBe(cpu);
+    await expect(second).resolves.toBe(cpu);
+    expect(cpuFactory).toHaveBeenCalledOnce();
+    expect(cpuFactory).toHaveBeenCalledWith("CPU");
+    await expect(initPhotoHandLandmarker()).rejects.toMatchObject({
+      name: "StudioVrmMediaPipeDelegateIdentityError",
+    });
   });
 });

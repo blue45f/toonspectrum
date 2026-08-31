@@ -29,6 +29,10 @@ import {
 } from "../studio-scene-provider";
 
 import {
+  StudioEngineUnavailableError,
+  type StudioEngineFailureStage,
+} from "./studio-engine-failure-policy";
+import {
   acquireStudioGpuDevice,
   onStudioGpuDeviceLost,
   type StudioGpuDeviceLease,
@@ -53,10 +57,10 @@ export {
 /**
  * Product Vello Hub (V13).
  *
- * Visible first frames are Vello Classic or Hybrid GPU. Vello CPU is a
- * quality reference and GPU-loss recovery lane — never the general first
- * paint. FrameGraphCompositor owns the swapchain; this hub renders islands
- * onto fabric textures.
+ * Visible product frames are Vello Classic or Hybrid GPU. Vello CPU is an
+ * explicitly requested QA reference lane only. Product render/present/device
+ * loss failures fail closed and never select another pixel renderer. Product
+ * rendering never schedules comparison or reference work after presentation.
  */
 
 export const STUDIO_VELLO_CLASSIC_BACKEND_ID =
@@ -66,7 +70,6 @@ export const STUDIO_VELLO_HYBRID_BACKEND_ID =
 export const STUDIO_VELLO_CPU_BACKEND_ID = "vello-cpu" as const;
 export const STUDIO_VELLO_HUB_ENGINE_HASH =
   "vello-hub-v13:vello-0.9.0:hybrid-compositor:vello_cpu-0.2.0" as const;
-const STUDIO_VELLO_VALIDATED_SCENE_LIMIT = 128;
 
 export type StudioVelloHubBackendId =
   | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
@@ -574,8 +577,7 @@ export interface StudioVelloHubPresentationTarget {
   /** Must not clear or hide the current primary frame. */
   holdLastGood(reason: string): void;
   /**
-   * Drops every GPU resource still bound to a device that the browser lost, so
-   * the CPU recovery frame cannot be presented against the destroyed device.
+   * Drops every GPU resource still bound to a device that the browser lost.
    * Like `holdLastGood` it must not clear or hide the current primary frame.
    * Only targets that adopt a `GPUDevice` need to implement it; a target that
    * never holds one has nothing to release.
@@ -585,19 +587,10 @@ export interface StudioVelloHubPresentationTarget {
 
 export type StudioVelloHubDecision =
   | "gpu-first"
-  | "initial-reference"
+  | "reference"
   | "cached"
   | "hysteresis-hold"
-  | "switched"
-  | "fallback";
-
-export interface StudioVelloHubFallback {
-  readonly from:
-    | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
-    | typeof STUDIO_VELLO_HYBRID_BACKEND_ID;
-  readonly to: typeof STUDIO_VELLO_CPU_BACKEND_ID;
-  readonly reason: string;
-}
+  | "switched";
 
 export interface StudioVelloHubRenderReceipt {
   readonly requestId: number;
@@ -606,12 +599,7 @@ export interface StudioVelloHubRenderReceipt {
   readonly backendId: StudioVelloHubBackendId;
   readonly decision: StudioVelloHubDecision;
   readonly expectedGainPct: number | null;
-  readonly fallback: StudioVelloHubFallback | null;
-  readonly preservedLastGoodFrame: boolean;
-  readonly visualGate: {
-    readonly pass: boolean;
-    readonly mismatchPct: number;
-  } | null;
+  readonly referenceOnly: boolean;
   /** Never implies PromotionRegistry approval or durable product-wide promotion. */
   readonly admissionMode: typeof STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.admissionMode;
   readonly productWidePromoted: false;
@@ -621,7 +609,6 @@ export interface StudioVelloHubSnapshot {
   readonly disposed: boolean;
   readonly lastGoodFrame: StudioVelloHubRenderReceipt | null;
   readonly killedBackends: ReadonlyArray<{ providerId: string; reason: string }>;
-  readonly pendingShadowCount: number;
   readonly hybridSparseCandidate: typeof STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE;
   readonly hybridCompositor: typeof STUDIO_VELLO_HYBRID_COMPOSITOR;
   readonly admissionMode: typeof STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.admissionMode;
@@ -638,18 +625,60 @@ export interface StudioVelloHubOptions {
   readonly deviceHash?: string;
   /** Live input-state reader. A read failure is treated as pen-down (fail-closed). */
   readonly isPenDown?: () => boolean;
-  readonly onUnrecoverableFallback?: (
-    failure: StudioVelloHubUnrecoverableFallback,
+  readonly onUnavailable?: (
+    failure: StudioVelloHubUnavailable,
   ) => void;
   readonly subscribeDeviceLoss?: (
     listener: (event: StudioGpuDeviceLossEvent) => void,
   ) => () => void;
 }
 
-export interface StudioVelloHubUnrecoverableFallback {
-  readonly source: "device-loss-fallback" | "shadow-fallback";
+export interface StudioVelloHubUnavailable {
+  readonly source:
+    | "selection"
+    | "render"
+    | "presentation"
+    | "device-loss";
+  readonly backendId:
+    | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
+    | typeof STUDIO_VELLO_HYBRID_BACKEND_ID
+    | null;
   readonly reason: string;
   readonly cause: unknown;
+}
+
+const STUDIO_VELLO_FAILURE_STAGE: Record<
+  StudioVelloHubUnavailable["source"],
+  StudioEngineFailureStage
+> = {
+  selection: "capability",
+  render: "render",
+  presentation: "presentation",
+  "device-loss": "device-loss",
+};
+
+export interface StudioVelloQaReferenceComparison {
+  readonly backendId:
+    | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
+    | typeof STUDIO_VELLO_HYBRID_BACKEND_ID;
+  readonly pass: boolean;
+  readonly mismatchPct: number;
+  readonly error: string | null;
+}
+
+export class StudioVelloHubUnavailableError extends StudioEngineUnavailableError {
+  readonly failure: StudioVelloHubUnavailable;
+
+  constructor(failure: StudioVelloHubUnavailable) {
+    super({
+      providerId: failure.backendId ?? "studio-gpu-fabric",
+      stage: STUDIO_VELLO_FAILURE_STAGE[failure.source],
+      message: `Studio Vello unavailable (${failure.source}): ${failure.reason}`,
+      cause: failure.cause,
+    });
+    this.name = "StudioVelloHubUnavailableError";
+    this.failure = failure;
+  }
 }
 
 export class StudioVelloHubRenderSupersededError extends Error {
@@ -665,18 +694,14 @@ function defaultDeviceHash(): string {
   return `${navigator.userAgent}|dpr:${dpr}`;
 }
 
-function sceneKey(scene: SceneIR): string {
-  return JSON.stringify(scene);
-}
-
 function discardFrame(frame: StudioVelloBackendFrame): void {
   if (frame.kind === "texture") frame.release();
 }
 
 /**
- * GPU-first runtime tournament. Classic/Hybrid paint immediately; CPU shadow
- * is reference-only. A switch is impossible while pen-down. Visual-gate
- * failure kills the GPU backends and recovers on CPU without a second canvas.
+ * Selected-GPU runtime. CPU is explicit QA/reference only. A switch is
+ * impossible while pen-down. Any selected GPU-path failure kills the product
+ * lane and is surfaced as unavailable without pixel fallback.
  */
 export class StudioVelloHub {
   private readonly target: StudioVelloHubPresentationTarget;
@@ -687,24 +712,17 @@ export class StudioVelloHub {
   private readonly now: () => number;
   private readonly deviceHash: string;
   private readonly isPenDown: (() => boolean) | undefined;
-  private readonly onUnrecoverableFallback:
-    | StudioVelloHubOptions["onUnrecoverableFallback"];
+  private readonly onUnavailable: StudioVelloHubOptions["onUnavailable"];
   private readonly costModel = new ProviderCostModel();
   private readonly winnerCache = new WinnerCache();
   private readonly hysteresis = new HysteresisPolicy(12);
   private readonly killSwitch = new RemoteKillSwitch();
   private readonly renderCounts = new Map<StudioVelloHubBackendId, number>();
-  private readonly visualEvidence = new Map<
-    string,
-    { pass: boolean; mismatchPct: number }
-  >();
-  private readonly validatedScenes = new Set<string>();
-  private readonly shadowFlights = new Map<string, Promise<void>>();
   private readonly unsubscribeDeviceLoss: () => void;
   private requestId = 0;
+  private productRenderEpoch = 0;
   private disposed = false;
-  private latestScene: SceneIR | null = null;
-  private latestPenDown = false;
+  private hasProductGpuAttempt = false;
   private lastGoodFrame: StudioVelloHubRenderReceipt | null = null;
 
   constructor(options: StudioVelloHubOptions) {
@@ -718,14 +736,10 @@ export class StudioVelloHub {
     this.now = options.now ?? (() => performance.now());
     this.deviceHash = `${options.deviceHash ?? defaultDeviceHash()}|${STUDIO_VELLO_HUB_ENGINE_HASH}`;
     this.isPenDown = options.isPenDown;
-    this.onUnrecoverableFallback = options.onUnrecoverableFallback;
+    this.onUnavailable = options.onUnavailable;
     const subscribe = options.subscribeDeviceLoss ?? onStudioGpuDeviceLost;
     this.unsubscribeDeviceLoss = subscribe((event) => {
-      void this.handleDeviceLoss(`device-lost:${event.epoch}:${event.reason}`).catch(
-        (error: unknown) => {
-          this.reportUnrecoverableFallback("device-loss-fallback", error);
-        },
-      );
+      void this.handleDeviceLoss(`device-lost:${event.epoch}:${event.reason}`);
     });
   }
 
@@ -739,14 +753,36 @@ export class StudioVelloHub {
     }
   }
 
-  private reportUnrecoverableFallback(
-    source: StudioVelloHubUnrecoverableFallback["source"],
+  private markUnavailable(
+    source: StudioVelloHubUnavailable["source"],
+    backendId: StudioVelloHubUnavailable["backendId"],
+    reason: string,
     cause: unknown,
-  ): void {
-    if (this.disposed || cause instanceof StudioVelloHubRenderSupersededError) return;
-    const reason = cause instanceof Error ? cause.message : String(cause);
-    this.target.holdLastGood(`unrecoverable-${source}:${reason}`);
-    this.onUnrecoverableFallback?.({ source, reason, cause });
+  ): StudioVelloHubUnavailableError {
+    const failure: StudioVelloHubUnavailable = { source, backendId, reason, cause };
+    if (!this.disposed && !(cause instanceof StudioVelloHubRenderSupersededError)) {
+      this.invalidatePendingProductRender();
+      this.killGpuBackends(`${source}:${reason}`);
+      this.target.holdLastGood(`unavailable-${source}:${reason}`);
+      try {
+        this.onUnavailable?.(failure);
+      } catch {
+        // Product unavailability must not be hidden by an observer failure.
+      }
+    }
+    return new StudioVelloHubUnavailableError(failure);
+  }
+
+  /**
+   * Invalidates product GPU work that has not completed presentation yet.
+   *
+   * Canvas-island, document-revision, and parked-surface transitions call this
+   * before changing target state. Explicit CPU reference work has a separate
+   * contract and is not cancelled by a product-surface transition.
+   */
+  invalidatePendingProductRender(): void {
+    if (this.disposed) return;
+    this.productRenderEpoch += 1;
   }
 
   private recordDuration(
@@ -760,16 +796,6 @@ export class StudioVelloHub {
       this.costModel.record(backendId, bucket, { coldMs: milliseconds });
     } else {
       this.costModel.record(backendId, bucket, { warmMs: milliseconds });
-    }
-  }
-
-  private markSceneValidated(key: string): void {
-    this.validatedScenes.delete(key);
-    this.validatedScenes.add(key);
-    while (this.validatedScenes.size > STUDIO_VELLO_VALIDATED_SCENE_LIMIT) {
-      const oldest = this.validatedScenes.values().next().value;
-      if (typeof oldest !== "string") break;
-      this.validatedScenes.delete(oldest);
     }
   }
 
@@ -788,31 +814,24 @@ export class StudioVelloHub {
   private liveGpuBackend(
     preferred: typeof STUDIO_VELLO_CLASSIC_BACKEND_ID | typeof STUDIO_VELLO_HYBRID_BACKEND_ID,
   ): typeof STUDIO_VELLO_CLASSIC_BACKEND_ID | typeof STUDIO_VELLO_HYBRID_BACKEND_ID | null {
-    if (!this.killSwitch.isKilled(preferred)) return preferred;
-    const other = preferred === STUDIO_VELLO_CLASSIC_BACKEND_ID
-      ? STUDIO_VELLO_HYBRID_BACKEND_ID
-      : STUDIO_VELLO_CLASSIC_BACKEND_ID;
-    return this.killSwitch.isKilled(other) ? null : other;
+    return this.killSwitch.isKilled(preferred) ? null : preferred;
   }
 
   private chooseBackend(
     scene: SceneIR,
     penDown: boolean,
-    preferred?: StudioVelloHubBackendId,
+    preferred?: typeof STUDIO_VELLO_CLASSIC_BACKEND_ID | typeof STUDIO_VELLO_HYBRID_BACKEND_ID,
   ): {
-    backendId: StudioVelloHubBackendId;
-    decision: Exclude<StudioVelloHubDecision, "fallback">;
+    backendId:
+      | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
+      | typeof STUDIO_VELLO_HYBRID_BACKEND_ID;
+    decision: Exclude<StudioVelloHubDecision, "reference">;
     expectedGainPct: number | null;
-  } {
+  } | null {
     const bucket = computeSceneFingerprint(scene).bucket;
-    const visual = this.visualEvidence.get(bucket);
     const gpuId = this.liveGpuBackend(this.preferredGpuBackend(scene, preferred));
-    if (!gpuId || visual?.pass === false) {
-      return {
-        backendId: STUDIO_VELLO_CPU_BACKEND_ID,
-        decision: "initial-reference",
-        expectedGainPct: null,
-      };
+    if (!gpuId) {
+      return null;
     }
     const cached = this.winnerCache.get(bucket, this.deviceHash);
     if (!cached || !isStudioVelloGpuBackendId(
@@ -875,18 +894,40 @@ export class StudioVelloHub {
     return frame;
   }
 
+  private renderWasSuperseded(
+    requestId: number,
+    productRenderEpoch: number,
+    referenceOnly: boolean,
+  ): boolean {
+    return this.disposed
+      || requestId !== this.requestId
+      || (!referenceOnly && productRenderEpoch !== this.productRenderEpoch);
+  }
+
   async render(
     scene: SceneIR,
     options: {
       readonly penDown?: boolean;
-      readonly preferredBackend?: StudioVelloHubBackendId;
+      readonly preferredBackend?:
+        | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
+        | typeof STUDIO_VELLO_HYBRID_BACKEND_ID;
     } = {},
   ): Promise<StudioVelloHubRenderReceipt> {
     return this.renderInternal(sceneIRSchema.parse(scene), {
       penDown: this.resolvePenDown(options.penDown ?? false),
-      forceCpu: false,
-      fallback: null,
+      referenceOnly: false,
       preferredBackend: options.preferredBackend,
+    });
+  }
+
+  /** Explicit golden/reference render. Product code must never call this as recovery. */
+  async renderReference(
+    scene: SceneIR,
+    options: { readonly penDown?: boolean } = {},
+  ): Promise<StudioVelloHubRenderReceipt> {
+    return this.renderInternal(sceneIRSchema.parse(scene), {
+      penDown: this.resolvePenDown(options.penDown ?? false),
+      referenceOnly: true,
     });
   }
 
@@ -895,27 +936,6 @@ export class StudioVelloHub {
     this.killSwitch.kill(STUDIO_VELLO_HYBRID_BACKEND_ID, reason);
     this.winnerCache.evictProvider(STUDIO_VELLO_CLASSIC_BACKEND_ID);
     this.winnerCache.evictProvider(STUDIO_VELLO_HYBRID_BACKEND_ID);
-  }
-
-  private async recoverGpuIslandToCpu(reason: string): Promise<void> {
-    const from = this.lastGoodFrame && isStudioVelloGpuBackendId(this.lastGoodFrame.backendId)
-      ? this.lastGoodFrame.backendId
-      : STUDIO_VELLO_CLASSIC_BACKEND_ID;
-    this.killGpuBackends(reason);
-    if (!this.lastGoodFrame || !isStudioVelloGpuBackendId(this.lastGoodFrame.backendId)) {
-      return;
-    }
-    this.target.holdLastGood(reason);
-    if (!this.latestScene) return;
-    await this.renderInternal(this.latestScene, {
-      penDown: this.resolvePenDown(this.latestPenDown),
-      forceCpu: true,
-      fallback: {
-        from,
-        to: STUDIO_VELLO_CPU_BACKEND_ID,
-        reason,
-      },
-    });
   }
 
   private backendFor(id: StudioVelloHubBackendId): StudioVelloHubBackend {
@@ -928,72 +948,97 @@ export class StudioVelloHub {
     scene: SceneIR,
     options: {
       readonly penDown: boolean;
-      readonly forceCpu: boolean;
-      readonly fallback: StudioVelloHubFallback | null;
-      readonly preferredBackend?: StudioVelloHubBackendId;
+      readonly referenceOnly: boolean;
+      readonly preferredBackend?:
+        | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
+        | typeof STUDIO_VELLO_HYBRID_BACKEND_ID;
     },
   ): Promise<StudioVelloHubRenderReceipt> {
     if (this.disposed) throw new Error("StudioVelloHub is disposed");
     const penDown = this.resolvePenDown(options.penDown);
-    this.latestScene = scene;
-    this.latestPenDown = penDown;
     this.requestId += 1;
     const requestId = this.requestId;
+    const productRenderEpoch = this.productRenderEpoch;
     const fingerprint = computeSceneFingerprint(scene);
-    const selection = options.forceCpu
+    const selection = options.referenceOnly
       ? {
           backendId: STUDIO_VELLO_CPU_BACKEND_ID,
-          decision: "fallback" as const,
+          decision: "reference" as const,
           expectedGainPct: null,
         }
       : this.chooseBackend(scene, penDown, options.preferredBackend);
+    if (!selection) {
+      const preferred = this.preferredGpuBackend(scene, options.preferredBackend);
+      const reason = `backend-killed:${preferred}`;
+      throw this.markUnavailable("selection", preferred, reason, new Error(reason));
+    }
+    const selectedGpuBackendId = isStudioVelloGpuBackendId(selection.backendId)
+      ? selection.backendId
+      : null;
     const backend = this.backendFor(selection.backendId);
+    if (backend.id !== selection.backendId) {
+      const reason = `selected backend ${selection.backendId} resolved ${backend.id}`;
+      const error = new Error(reason);
+      if (options.referenceOnly) throw error;
+      throw this.markUnavailable("render", selectedGpuBackendId, reason, error);
+    }
+    if (!options.referenceOnly) this.hasProductGpuAttempt = true;
     let frame: StudioVelloBackendFrame;
     try {
       frame = await this.renderBackend(backend, scene, fingerprint.bucket);
     } catch (error) {
-      if (!isStudioVelloGpuBackendId(backend.id)) throw error;
+      // An older request may reject after a newer product render already owns this hub. That
+      // rejection belongs to the discarded request; it must not kill the selected provider,
+      // invalidate the newer epoch, or cover the newer scene with an unavailable state.
+      if (this.renderWasSuperseded(requestId, productRenderEpoch, options.referenceOnly)) {
+        throw new StudioVelloHubRenderSupersededError();
+      }
+      if (options.referenceOnly) throw error;
       const reason = error instanceof Error ? error.message : String(error);
-      this.killGpuBackends(reason);
-      this.target.holdLastGood(reason);
-      return this.renderInternal(scene, {
-        penDown,
-        forceCpu: true,
-        fallback: {
-          from: backend.id,
-          to: STUDIO_VELLO_CPU_BACKEND_ID,
-          reason,
-        },
-        preferredBackend: options.preferredBackend,
-      });
+      throw this.markUnavailable("render", selectedGpuBackendId, reason, error);
     }
 
-    if (this.disposed || requestId !== this.requestId) {
+    if (this.renderWasSuperseded(requestId, productRenderEpoch, options.referenceOnly)) {
       discardFrame(frame);
       throw new StudioVelloHubRenderSupersededError();
     }
+
+    const frameContractError = options.referenceOnly
+      ? frame.kind !== "pixels" || frame.backendId !== STUDIO_VELLO_CPU_BACKEND_ID
+        ? `explicit CPU reference returned ${frame.kind}:${frame.backendId}`
+        : null
+      : frame.kind !== "texture" || frame.backendId !== selection.backendId
+        ? `selected GPU ${selection.backendId} returned ${frame.kind}:${frame.backendId}`
+        : null;
+    if (frameContractError) {
+      discardFrame(frame);
+      const error = new Error(frameContractError);
+      if (options.referenceOnly) throw error;
+      throw this.markUnavailable(
+        "render",
+        selectedGpuBackendId,
+        frameContractError,
+        error,
+      );
+    }
+
     try {
       await this.target.present(frame);
     } catch (error) {
       discardFrame(frame);
-      if (!isStudioVelloGpuBackendId(backend.id)) throw error;
+      if (this.renderWasSuperseded(requestId, productRenderEpoch, options.referenceOnly)) {
+        throw new StudioVelloHubRenderSupersededError();
+      }
+      if (options.referenceOnly) throw error;
       const reason = error instanceof Error ? error.message : String(error);
-      this.killGpuBackends(reason);
-      this.target.holdLastGood(reason);
-      return this.renderInternal(scene, {
-        penDown,
-        forceCpu: true,
-        fallback: {
-          from: backend.id,
-          to: STUDIO_VELLO_CPU_BACKEND_ID,
-          reason,
-        },
-        preferredBackend: options.preferredBackend,
-      });
+      throw this.markUnavailable("presentation", selectedGpuBackendId, reason, error);
+    }
+    if (this.renderWasSuperseded(requestId, productRenderEpoch, options.referenceOnly)) {
+      throw new StudioVelloHubRenderSupersededError();
     }
 
     const existingWinner = this.winnerCache.get(fingerprint.bucket, this.deviceHash);
-    if (!existingWinner || options.forceCpu) {
+    if (!options.referenceOnly && !existingWinner) {
       const estimate = this.costModel.estimate(backend.id, fingerprint.bucket);
       this.winnerCache.set(fingerprint.bucket, this.deviceHash, {
         providerId: backend.id,
@@ -1008,163 +1053,72 @@ export class StudioVelloHub {
       backendId: backend.id,
       decision: selection.decision,
       expectedGainPct: selection.expectedGainPct,
-      fallback: options.fallback,
-      preservedLastGoodFrame: options.fallback !== null && this.lastGoodFrame !== null,
-      visualGate: this.visualEvidence.get(fingerprint.bucket) ?? null,
+      referenceOnly: options.referenceOnly,
       admissionMode: STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.admissionMode,
       productWidePromoted: false,
     };
     this.lastGoodFrame = receipt;
-
-    const key = sceneKey(scene);
-    const classicWarm = this.costModel
-      .estimate(STUDIO_VELLO_CLASSIC_BACKEND_ID, fingerprint.bucket)?.warmP50Ms;
-    if (
-      !options.forceCpu
-      && !this.killSwitch.isKilled(STUDIO_VELLO_CLASSIC_BACKEND_ID)
-      && (!this.validatedScenes.has(key) || classicWarm === null || classicWarm === undefined)
-    ) {
-      this.scheduleClassicShadow(scene, fingerprint.bucket, key);
-    }
     return receipt;
   }
 
-  private scheduleClassicShadow(scene: SceneIR, bucket: string, key: string): void {
-    if (this.shadowFlights.has(key)) return;
-    const flight = this.runClassicShadow(scene, bucket, key)
-      .catch((error: unknown) => {
-        this.reportUnrecoverableFallback("shadow-fallback", error);
-      })
-      .finally(() => {
-        this.shadowFlights.delete(key);
-      });
-    this.shadowFlights.set(key, flight);
-  }
-
-  private async runClassicShadow(
+  /**
+   * Explicit QA-only GPU/CPU comparison.
+   *
+   * This method never presents pixels, records product selection evidence,
+   * invalidates pending product work, kills a provider, or emits unavailable.
+   * Product surfaces must not call it from render or recovery paths.
+   */
+  async compareToReferenceForQa(
     scene: SceneIR,
-    bucket: string,
-    key: string,
-  ): Promise<void> {
-    let availability: StudioVelloBackendAvailability;
-    try {
-      availability = await this.classicBackend.availability();
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      await this.recoverGpuIslandToCpu(`availability-probe-failed:${reason}`);
-      return;
-    }
-    if (!availability.available || !this.classicBackend.compareToReference) {
-      const reason = availability.available
-        ? "shadow-comparison-unavailable"
-        : `backend-unavailable:${availability.reason ?? "unknown"}`;
-      await this.recoverGpuIslandToCpu(reason);
-      return;
-    }
-    let timingFrame: StudioVelloBackendFrame | null = null;
-    try {
-      const startedAt = this.now();
-      timingFrame = await this.classicBackend.render(scene);
-      if (
-        timingFrame.kind === "texture"
-        && typeof timingFrame.device.queue?.onSubmittedWorkDone === "function"
-      ) {
-        await timingFrame.device.queue.onSubmittedWorkDone();
-      }
-      this.recordDuration(
-        this.classicBackend.id,
-        bucket,
-        Math.max(0, this.now() - startedAt),
+    options: {
+      readonly backendId?:
+        | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
+        | typeof STUDIO_VELLO_HYBRID_BACKEND_ID;
+    } = {},
+  ): Promise<StudioVelloQaReferenceComparison> {
+    if (this.disposed) throw new Error("StudioVelloHub is disposed");
+    const parsedScene = sceneIRSchema.parse(scene);
+    const backendId = options.backendId ?? STUDIO_VELLO_CLASSIC_BACKEND_ID;
+    const backend = this.backendFor(backendId);
+    const availability = await backend.availability();
+    if (!availability.available) {
+      throw new Error(
+        `QA comparison backend unavailable:${backendId}:${availability.reason ?? "unknown"}`,
       );
-      discardFrame(timingFrame);
-      timingFrame = null;
-      const comparison = await this.classicBackend.compareToReference(scene);
-      const gate = createFuzzyNeighborhoodGate({
-        fuzzyDelta: 48,
-        mismatchPctGate: STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.visualMismatchPctGate,
-      });
-      const report = await new Promise<ShadowComparisonReport>((resolve) => {
-        void runShadowComparison({
-          winnerRender: () => comparison.cpuPixels,
-          shadowRender: () => comparison.gpuPixels,
-          gate,
-          width: comparison.width,
-          height: comparison.height,
-          onReport: resolve,
-        });
-      });
-      if (!report.gate?.pass) {
-        const reason = report.error
-          ?? `visual-gate-failed:${report.gate?.mismatchPct ?? "unknown"}`;
-        this.visualEvidence.set(bucket, {
-          pass: false,
-          mismatchPct: report.gate?.mismatchPct ?? Number.POSITIVE_INFINITY,
-        });
-        this.killGpuBackends(reason);
-        if (this.lastGoodFrame && isStudioVelloGpuBackendId(this.lastGoodFrame.backendId)) {
-          this.target.holdLastGood(reason);
-          if (this.latestScene) {
-            await this.renderInternal(this.latestScene, {
-              penDown: this.resolvePenDown(this.latestPenDown),
-              forceCpu: true,
-              fallback: {
-                from: this.lastGoodFrame.backendId,
-                to: STUDIO_VELLO_CPU_BACKEND_ID,
-                reason,
-              },
-            });
-          }
-        }
-        return;
-      }
-      this.visualEvidence.set(bucket, report.gate);
-      this.markSceneValidated(key);
-    } catch (error) {
-      if (timingFrame) discardFrame(timingFrame);
-      const reason = error instanceof Error ? error.message : String(error);
-      this.killGpuBackends(reason);
-      if (this.lastGoodFrame && isStudioVelloGpuBackendId(this.lastGoodFrame.backendId)) {
-        this.target.holdLastGood(reason);
-        if (this.latestScene) {
-          await this.renderInternal(this.latestScene, {
-            penDown: this.resolvePenDown(this.latestPenDown),
-            forceCpu: true,
-            fallback: {
-              from: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-              to: STUDIO_VELLO_CPU_BACKEND_ID,
-              reason,
-            },
-          });
-        }
-      }
     }
-  }
-
-  async handleDeviceLoss(reason: string): Promise<StudioVelloHubRenderReceipt | null> {
-    if (this.disposed) return null;
-    this.killGpuBackends(reason);
-    // The adopted device is gone: the target must forget it before the CPU
-    // recovery frame is presented, or the frame is uploaded into a destroyed
-    // swapchain instead of taking the CPU path. Only device loss releases it —
-    // a killed backend on a live device still recovers through that device.
-    this.target.releaseLostDevice?.(reason);
-    this.target.holdLastGood(reason);
-    if (!this.latestScene) return null;
-    return this.renderInternal(this.latestScene, {
-      penDown: this.resolvePenDown(this.latestPenDown),
-      forceCpu: true,
-      fallback: {
-        from: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-        to: STUDIO_VELLO_CPU_BACKEND_ID,
-        reason,
-      },
+    if (!backend.compareToReference) {
+      throw new Error(`QA comparison unsupported:${backendId}`);
+    }
+    const comparison = await backend.compareToReference(parsedScene);
+    const gate = createFuzzyNeighborhoodGate({
+      fuzzyDelta: 48,
+      mismatchPctGate: STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.qaVisualMismatchPctGate,
     });
+    const report = await new Promise<ShadowComparisonReport>((resolve) => {
+      void runShadowComparison({
+        winnerRender: () => comparison.cpuPixels,
+        shadowRender: () => comparison.gpuPixels,
+        gate,
+        width: comparison.width,
+        height: comparison.height,
+        onReport: resolve,
+      });
+    });
+    return {
+      backendId,
+      pass: report.gate?.pass ?? false,
+      mismatchPct: report.gate?.mismatchPct ?? Number.POSITIVE_INFINITY,
+      error: report.error ?? null,
+    };
   }
 
-  async flushShadowWork(): Promise<void> {
-    while (this.shadowFlights.size > 0) {
-      await Promise.all([...this.shadowFlights.values()]);
-    }
+  async handleDeviceLoss(reason: string): Promise<null> {
+    if (this.disposed || !this.hasProductGpuAttempt) return null;
+    // The adopted device is gone: release it, retain the last completed frame,
+    // and surface an explicit unavailable state. No CPU frame is presented.
+    this.target.releaseLostDevice?.(reason);
+    this.markUnavailable("device-loss", null, reason, new Error(reason));
+    return null;
   }
 
   snapshot(): StudioVelloHubSnapshot {
@@ -1172,7 +1126,6 @@ export class StudioVelloHub {
       disposed: this.disposed,
       lastGoodFrame: this.lastGoodFrame,
       killedBackends: this.killSwitch.listKilled(),
-      pendingShadowCount: this.shadowFlights.size,
       hybridSparseCandidate: STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE,
       hybridCompositor: STUDIO_VELLO_HYBRID_COMPOSITOR,
       admissionMode: STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.admissionMode,
@@ -1183,6 +1136,7 @@ export class StudioVelloHub {
 
   dispose(): void {
     if (this.disposed) return;
+    this.invalidatePendingProductRender();
     this.disposed = true;
     this.requestId += 1;
     this.unsubscribeDeviceLoss();

@@ -38,6 +38,7 @@ describe("Studio inspector raster recovery boundary", () => {
     expect(implementation).toContain("prepareAndRenderStudioEditableRasterCopy");
     expect(implementation).toContain("prepareStudioVectorReferenceExport");
     expect(implementation).toContain("renderPreparedStudioVectorReference");
+    expect(implementation).toContain('rasterExecutionBackend: "offscreen-worker"');
     expect(implementation).not.toContain("planStudioEditableRasterCopy");
     expect(implementation).not.toContain("renderStudioEditableRasterCopy");
     expect(implementation).not.toContain("isStudioEditableRasterCopyPlanCurrent");

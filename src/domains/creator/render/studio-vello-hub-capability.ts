@@ -8,10 +8,12 @@ export const STUDIO_VELLO_HUB_PRODUCT_CAPABILITY = Object.freeze({
   brushPixelAuthority: false,
   canonicalDocumentAuthority: false,
   maxCssDimension: 8_192,
+  /** Conservative cross-device WebGPU `maxTextureDimension2D` admission. */
+  maxBackingDimension: 8_192,
   maxBackingPixelArea: 67_108_864,
-  visualMismatchPctGate: 0.6,
-  /** GPU-first visible frame; CPU is reference/shadow only. */
-  admissionMode: "gpu-first-shadow-candidate",
+  qaVisualMismatchPctGate: 0.6,
+  /** One selected GPU provider owns each admitted product render. */
+  admissionMode: "selected-gpu-provider",
   persistentWinnerStorage: false,
   productWidePromotionRequiresSoak: true,
 });

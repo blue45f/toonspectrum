@@ -42,7 +42,10 @@ import { sha256HexPortable } from "../studio-sha256";
 import { createStudioDefaultSolidBooleanBackend } from "../studio-solid-boolean-backend";
 
 import { deriveStudioHybridDccAssetLayout } from "./studio-hybrid-dcc-asset-layout";
-import { exportStudioHybridDccGlbBatch } from "./studio-hybrid-dcc-glb-export-worker-client";
+import {
+  exportStudioHybridDccGlbBatch,
+  type StudioHybridDccGlbExportExecutionBackend,
+} from "./studio-hybrid-dcc-glb-export-worker-client";
 
 import type {
   StudioHybridDccGlbIssue,
@@ -152,6 +155,9 @@ export interface StudioHybridDccBg3dPersistedAttachment {
 }
 
 export interface StudioHybridDccBg3dHandoffPorts {
+  /** Explicit export backend selected before the handoff begins. Product ports select Worker. */
+  readonly glbExportExecutionBackend:
+    StudioHybridDccGlbExportExecutionBackend;
   /**
    * Commits the complete request list as one all-or-nothing transaction. Implementations must not
    * resolve until every returned attachment is durable and must leave no new record when rejecting.
@@ -516,7 +522,10 @@ async function persistAttachmentsWithModelLibrary(
 }
 
 export const DEFAULT_STUDIO_HYBRID_DCC_BG3D_HANDOFF_PORTS: StudioHybridDccBg3dHandoffPorts =
-  Object.freeze({ persistAttachments: persistAttachmentsWithModelLibrary });
+  Object.freeze({
+    glbExportExecutionBackend: "worker",
+    persistAttachments: persistAttachmentsWithModelLibrary,
+  });
 
 function materializeProceduralBridgeObjects(
   workspace: StudioHybridDccWorkspace,
@@ -734,6 +743,7 @@ export async function handoffStudioHybridDccWorkspaceToBg3d(
     readonly ports?: StudioHybridDccBg3dHandoffPorts;
   } = {},
 ): Promise<StudioHybridDccBg3dHandoffResult> {
+  const ports = options.ports ?? DEFAULT_STUDIO_HYBRID_DCC_BG3D_HANDOFF_PORTS;
   const authorityRecords = Object.values(workspace.session.state.geometry.records)
     .sort((left, right) => compareCodeUnits(left.assetId, right.assetId));
   const procedural = materializeProceduralBridgeObjects(workspace);
@@ -771,14 +781,18 @@ export async function handoffStudioHybridDccWorkspaceToBg3d(
   }> = [];
   let exportResults: readonly StudioHybridDccMeshGlbExportResult[];
   try {
-    exportResults = records.length > 0
+    const exportOutcome = records.length > 0
       ? await exportStudioHybridDccGlbBatch(records.map((record) => ({
           assetId: record.assetId,
           mesh: record.mesh,
           sourceHash: record.meshHash,
           sourceRevision: record.revision,
-        })), { signal: options.signal })
-      : [];
+        })), {
+          signal: options.signal,
+          executionBackend: ports.glbExportExecutionBackend,
+        })
+      : null;
+    exportResults = exportOutcome?.results ?? [];
   } catch (error) {
     if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
       throw new StudioHybridDccBg3dHandoffError("aborted", "DCC handoff was cancelled");
@@ -992,8 +1006,7 @@ export async function handoffStudioHybridDccWorkspaceToBg3d(
   let persisted: readonly StudioHybridDccBg3dPersistedAttachment[];
   try {
     persisted = requests.length > 0
-      ? await (options.ports ?? DEFAULT_STUDIO_HYBRID_DCC_BG3D_HANDOFF_PORTS)
-        .persistAttachments(requests, options.signal)
+      ? await ports.persistAttachments(requests, options.signal)
       : [];
   } catch (error) {
     if (error instanceof StudioHybridDccBg3dHandoffError) throw error;

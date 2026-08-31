@@ -1,13 +1,14 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  // Studio live ink: auto(default) stays on the low-latency Canvas2D overlay. `webgpu` is an
-  // explicit measured rollout; device/pipeline failure still falls back to Canvas2D.
+  // Studio live ink: auto(default) selects the low-latency Canvas2D overlay before an operation.
+  // `webgpu` is an explicit measured rollout; device/pipeline failure ends as unavailable.
   readonly VITE_STUDIO_LIVE_INK_BACKEND?: "auto" | "webgpu" | "canvas2d";
   // Percentage of locally bucketed, WebGPU-capable browsers admitted when the backend is `auto`.
-  // Missing/invalid values are 0; explicit backend controls remain the emergency override.
+  // Missing/invalid values are 0; explicit backend controls remain the pre-operation override.
   readonly VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT?: string;
-  // Emergency build-time off switch. `1`, `true`, or `on` always forces Canvas2D.
+  // Emergency build-time off switch. `1`, `true`, or `on` marks live ink unavailable without
+  // selecting another renderer.
   readonly VITE_STUDIO_LIVE_INK_KILL_SWITCH?: string;
   // 장기 실행 Nest Socket.IO origin. Vercel serverless HTTP API와 realtime을 분리할 때 사용.
   readonly VITE_STUDIO_LIVE_ORIGIN?: string;

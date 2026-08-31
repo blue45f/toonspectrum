@@ -5,7 +5,7 @@ import {
   validateVelloCapabilityGapCoverage,
   VELLO_GAP_CHALLENGER_PROVIDER_ID,
   VELLO_GAP_COMPLETION_PROVIDER_ID,
-  VELLO_GAP_TERMINAL_PROVIDER_ID,
+  VELLO_GAP_REFERENCE_PROVIDER_ID,
 } from "../capability-gap-plan";
 
 /**
@@ -23,8 +23,8 @@ const GAP_CAPABILITIES = [
 
 const FULL_UNIVERSE = [
   { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
-  // The terminal declares only what its CPU renderer implements — see the validator's note.
-  { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
+  // The reference lane declares only what its CPU renderer implements.
+  { id: VELLO_GAP_REFERENCE_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
   { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
 ];
 
@@ -58,10 +58,10 @@ describe("planVelloCapabilityGaps", () => {
     });
   });
 
-  it("names the challenger and both fallback lanes as stable provider ids", () => {
+  it("names explicit completion, reference, and challenger providers", () => {
     const plan = planVelloCapabilityGaps();
     expect(plan.completionProviderId).toBe("skia-canvaskit-gpu");
-    expect(plan.terminalProviderId).toBe("skia-canvaskit");
+    expect(plan.referenceProviderId).toBe("skia-canvaskit");
     expect(plan.challengerProviderId).toBe("skia-graphite-webgpu");
   });
 });
@@ -75,7 +75,7 @@ describe("validateVelloCapabilityGapCoverage", () => {
     // The terminal is fully declared for what it can render, so this assertion stays about
     // MISSING providers rather than also catching an under-declared terminal.
     const issues = validateVelloCapabilityGapCoverage([
-      { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
+      { id: VELLO_GAP_REFERENCE_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
     ]);
     expect(issues.map((issue) => issue.subject).sort()).toEqual(
       [VELLO_GAP_CHALLENGER_PROVIDER_ID, VELLO_GAP_COMPLETION_PROVIDER_ID].sort()
@@ -93,7 +93,7 @@ describe("validateVelloCapabilityGapCoverage", () => {
     // under-declaration is covered by the next test.
     const issues = validateVelloCapabilityGapCoverage([
       { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
-      { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
+      { id: VELLO_GAP_REFERENCE_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
       { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
     ]);
 
@@ -114,7 +114,7 @@ describe("validateVelloCapabilityGapCoverage", () => {
     // being eligible for any of it.
     const issues = validateVelloCapabilityGapCoverage([
       { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
-      { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
+      { id: VELLO_GAP_REFERENCE_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
       {
         id: VELLO_GAP_CHALLENGER_PROVIDER_ID,
         capabilities: ["surface.island.skia-complete"],
@@ -130,18 +130,18 @@ describe("validateVelloCapabilityGapCoverage", () => {
   });
 });
 
-describe("terminal fallback coverage", () => {
-  it("fails when the terminal drops a gap its own renderer implements", () => {
-    // Only paragraph text survives to the CPU terminal, so that is the one the chain must not
-    // lose. The other four terminate at the completion lane by the renderer's own limits.
+describe("reference-provider coverage", () => {
+  it("fails when the reference provider drops a gap its own renderer implements", () => {
+    // Only paragraph text has a CPU reference implementation. The other four
+    // remain live-provider-only and fail closed when that provider fails.
     const issues = validateVelloCapabilityGapCoverage([
       { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
       { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
-      { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: [] },
+      { id: VELLO_GAP_REFERENCE_PROVIDER_ID, capabilities: [] },
     ]);
 
     expect(issues.map((issue) => issue.subject)).toEqual([
-      `${VELLO_GAP_TERMINAL_PROVIDER_ID}:render.text.paragraph`,
+      `${VELLO_GAP_REFERENCE_PROVIDER_ID}:render.text.paragraph`,
     ]);
     expect(issues[0]?.reason).toContain("its own renderer implements");
   });
@@ -154,7 +154,7 @@ describe("terminal fallback coverage", () => {
       validateVelloCapabilityGapCoverage([
         { id: VELLO_GAP_COMPLETION_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
         { id: VELLO_GAP_CHALLENGER_PROVIDER_ID, capabilities: GAP_CAPABILITIES },
-        { id: VELLO_GAP_TERMINAL_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
+        { id: VELLO_GAP_REFERENCE_PROVIDER_ID, capabilities: ["render.text.paragraph"] },
       ]),
     ).toEqual([]);
   });

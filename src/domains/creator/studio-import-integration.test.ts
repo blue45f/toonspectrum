@@ -657,25 +657,28 @@ describe("PSD 가져오기(ag-psd 실바이트 왕복)", () => {
 
 describe("OpenRaster(.ora) 왕복", () => {
   it("레이어 이름·오프셋·불투명도·블렌드·가시성을 보존한다", async () => {
-    const built = await buildStudioOpenRasterBytes({
-      width: 8,
-      height: 8,
-      layers: [
-        { name: "배경", png: pngHeaderBytes(8, 8, 11), x: 0, y: 0 },
-        {
-          name: "라인아트",
-          png: pngHeaderBytes(2, 2, 12),
-          x: 3,
-          y: 4,
-          opacity: 0.5,
-          blendMode: "multiply",
-          visible: false,
-        },
-      ],
-      mergedImage: pngHeaderBytes(8, 8, 13),
-      thumbnail: pngHeaderBytes(1, 1, 14),
-      name: "통합 테스트 문서",
-    });
+    const built = await buildStudioOpenRasterBytes(
+      {
+        width: 8,
+        height: 8,
+        layers: [
+          { name: "배경", png: pngHeaderBytes(8, 8, 11), x: 0, y: 0 },
+          {
+            name: "라인아트",
+            png: pngHeaderBytes(2, 2, 12),
+            x: 3,
+            y: 4,
+            opacity: 0.5,
+            blendMode: "multiply",
+            visible: false,
+          },
+        ],
+        mergedImage: pngHeaderBytes(8, 8, 13),
+        thumbnail: pngHeaderBytes(1, 1, 14),
+        name: "통합 테스트 문서",
+      },
+      { crc32ExecutionMode: "direct-headless" },
+    );
     expect(built.warnings).toHaveLength(0);
 
     const imported = await importStudioOpenRaster(built.bytes);
@@ -703,10 +706,13 @@ describe("OpenRaster(.ora) 왕복", () => {
   });
 
   it("mimetype 항목이 틀린 아카이브를 한국어 오류로 거부한다", async () => {
-    const forged = await buildStudioPackageArchiveBytes([
-      { path: "mimetype", data: encoder.encode("image/not-openraster") },
-      { path: "stack.xml", data: encoder.encode("<image w='1' h='1'/>") },
-    ]);
+    const forged = await buildStudioPackageArchiveBytes(
+      [
+        { path: "mimetype", data: encoder.encode("image/not-openraster") },
+        { path: "stack.xml", data: encoder.encode("<image w='1' h='1'/>") },
+      ],
+      { crc32ExecutionMode: "direct-headless" },
+    );
     const failure = await importStudioOpenRaster(forged).then(
       () => null,
       (cause: unknown) => cause
@@ -718,20 +724,23 @@ describe("OpenRaster(.ora) 왕복", () => {
 
 describe("CBZ(ComicInfo 포함) 왕복", () => {
   it("페이지 순서·크기·ComicInfo 메타데이터를 보존한다", async () => {
-    const built = await buildStudioCbzBytes({
-      pages: [
-        { image: pngHeaderBytes(4, 6, 21) },
-        { image: pngHeaderBytes(3, 5, 22) },
-        { image: pngHeaderBytes(2, 9, 23) },
-      ],
-      metadata: {
-        title: "통합 테스트 1화",
-        series: "통합 테스트",
-        writer: "에이치준",
-        genre: ["판타지"],
-        languageISO: "ko",
+    const built = await buildStudioCbzBytes(
+      {
+        pages: [
+          { image: pngHeaderBytes(4, 6, 21) },
+          { image: pngHeaderBytes(3, 5, 22) },
+          { image: pngHeaderBytes(2, 9, 23) },
+        ],
+        metadata: {
+          title: "통합 테스트 1화",
+          series: "통합 테스트",
+          writer: "에이치준",
+          genre: ["판타지"],
+          languageISO: "ko",
+        },
       },
-    });
+      { crc32ExecutionMode: "direct-headless" },
+    );
 
     const imported = await importStudioCbz(built.bytes);
     expect(imported.pages).toHaveLength(3);
@@ -797,7 +806,10 @@ describe("프로젝트 백업 가져오기", () => {
     const project = sampleProject([
       { id: "image-1", type: "image", src: embedded, x: 0, y: 0, width: 2, height: 2 },
     ]);
-    const built = await buildStudioProjectArchive({ project });
+    const built = await buildStudioProjectArchive(
+      { project },
+      { crc32ExecutionMode: "direct-headless" },
+    );
     expect(built.manifest.attachments).toHaveLength(1);
 
     const imported = await importStudioProjectArchive(built.blob);
@@ -809,9 +821,14 @@ describe("프로젝트 백업 가져오기", () => {
 
   it("손상된 아카이브 바이트는 자산을 복원하지 않고 한국어 오류를 던진다", async () => {
     const embedded = dataUrlOf("image/png", pngHeaderBytes(2, 2, 32));
-    const built = await buildStudioProjectArchive({
-      project: sampleProject([{ id: "image-1", type: "image", src: embedded, x: 0, y: 0, width: 2, height: 2 }]),
-    });
+    const built = await buildStudioProjectArchive(
+      {
+        project: sampleProject([
+          { id: "image-1", type: "image", src: embedded, x: 0, y: 0, width: 2, height: 2 },
+        ]),
+      },
+      { crc32ExecutionMode: "direct-headless" },
+    );
     const bytes = new Uint8Array(await built.blob.arrayBuffer());
     bytes[Math.floor(bytes.length / 2)] ^= 0xff;
     const failure = await importStudioProjectArchive(new Blob([bytes as BlobPart])).then(
@@ -827,7 +844,9 @@ describe("프로젝트 백업 가져오기", () => {
       { path: "mimetype", data: encoder.encode("application/vnd.toonspectrum.project+zip") },
       { path: "assets/one.bin", data: Uint8Array.from({ length: 128 }, (_, index) => index % 251) },
     ];
-    const bytes = await buildStudioPackageArchiveBytes(entries);
+    const bytes = await buildStudioPackageArchiveBytes(entries, {
+      crc32ExecutionMode: "direct-headless",
+    });
     const archive = await readStudioZipArchive(bytes);
     expect(archive.entries.map((entry) => entry.path).sort()).toEqual([
       "assets/one.bin",

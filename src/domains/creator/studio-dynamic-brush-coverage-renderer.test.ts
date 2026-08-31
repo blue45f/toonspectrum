@@ -1319,7 +1319,7 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     });
 
     expect(active).toMatchObject({
-      status: "fallback",
+      status: "rejected",
       reason: "tile-mark-budget",
     });
     expect(activeDestination.draws).toHaveLength(0);
@@ -1541,9 +1541,11 @@ describe("studio dynamic brush bounded coverage renderer", () => {
 
   it("fails before destination mutation when a mark exceeds the surface/reference budget", () => {
     const destination = new RecordingDestination();
+    const marks = [mark({ radiusX: 1_000_000, radiusY: 1_000_000 })];
+    const sourceSnapshot = structuredClone(marks);
     const result = renderStudioDynamicBrushCoverage(
       destination,
-      [mark({ radiusX: 1_000_000, radiusY: 1_000_000 })],
+      marks,
       {
         activeDraft: true,
         opacity: 0.5,
@@ -1551,18 +1553,12 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       },
     );
 
-    expect(result).toMatchObject({ status: "fallback" });
+    expect(result).toMatchObject({ status: "rejected" });
     expect(destination.draws).toHaveLength(0);
-    // Budget pressure never silently lowers coverage resolution. The exact source mark remains
-    // available to the frozen direct compositor.
-    renderStudioDynamicBrushLegacyMarks(
-      destination,
-      [mark({ radiusX: 1_000_000, radiusY: 1_000_000 })],
-      0.5,
-    );
-    expect(destination.legacyFills).toEqual([
-      { alpha: 0.8 * 0.5 * 0.5, color: "#336699" },
-    ]);
+    expect(destination.legacyFills).toHaveLength(0);
+    // Rejection never mutates the authoritative source or implicitly selects the legacy
+    // compositor for the same operation.
+    expect(marks).toEqual(sourceSnapshot);
   });
 
   it("keeps a complete visible legacy plan when coverage mark preflight exhausts its budget", () => {

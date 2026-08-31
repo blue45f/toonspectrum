@@ -219,7 +219,7 @@ describe("animated GIF live-frame loop", () => {
     expect(clock.pending).toHaveLength(0);
   });
 
-  it("reports a cache failure once and continues drawing the raw animation", () => {
+  it("reports a cache failure once and never redraws the raw animation", () => {
     const clock = frameHarness();
     const node = fakeNode();
     const error = new Error("canvas allocation failed");
@@ -240,12 +240,12 @@ describe("animated GIF live-frame loop", () => {
 
     expect(onRuntimeFailure).toHaveBeenCalledOnce();
     expect(onRuntimeFailure).toHaveBeenCalledWith(error);
-    expect(node.layer.batchDraw).toHaveBeenCalledTimes(1);
-    clock.fireNext(80);
-    expect(onRuntimeFailure).toHaveBeenCalledOnce();
+    expect(node.layer.batchDraw).not.toHaveBeenCalled();
     expect(node.cache).toHaveBeenCalledOnce();
-    expect(node.layer.batchDraw).toHaveBeenCalledTimes(2);
+    expect(clock.pending).toHaveLength(0);
 
     loop.stop();
+    expect(node.clearCache).toHaveBeenCalledTimes(1);
+    expect(node.layer.batchDraw).not.toHaveBeenCalled();
   });
 });

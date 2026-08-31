@@ -20,61 +20,62 @@ function sourceSection(source: string, start: string, end: string): string {
 }
 
 describe("Studio stroke surface route wiring boundary", () => {
-  it("resolves one product route after strict-priority, short-circuited admissions", () => {
-    // V12 §5 cutover: the tournament projection is resolved once per stroke start, BEFORE any
-    // side-effecting begin call, and every specialist admission is gated by it. Each gate token
-    // is pinned immediately before its lane's begin call so the ladder order and the "gate
-    // precedes the side effect" contract are both machine-checked.
+  it("selects exactly one product route before side effects and fails closed", () => {
     const pointerDown = sourceSection(
       PAGE_SOURCE,
       "function beginStudioDrawLiveSurfaces(",
       "function onStageDown(",
     );
-    const admissions = [
-      "const strokeRouteTournamentRuntime = peekBootedStudioTournamentRuntime()",
-      "resolveStudioStrokeRoutePointerDownGate({",
-      "lanes: STUDIO_STROKE_ROUTE_TOURNAMENT_LANES",
-      "strokeRouteTournamentGate.selection.killIgnoredReason",
-      '(strokeRouteTournamentGate?.admits("living-ink") ?? true)',
+    const selectionAndAdmissions = [
+      "const livingInkSelected =",
+      "const hokusaiSelected = !livingInkSelected",
+      "const stampSelected = !livingInkSelected",
+      "const wetMediaSelected = !livingInkSelected",
+      "const retainedMediaSelected = !livingInkSelected",
+      "const dynamicSelected = !livingInkSelected",
+      "const genericDirectSelected = !livingInkSelected",
+      "const gpuSelected = genericDirectSelected",
+      "const canvas2dSelected = genericDirectSelected",
+      "const livingInkAdmitted = livingInkSelected",
       "beginStudioLivingInkStroke(next, pointerSample)",
-      '(strokeRouteTournamentGate?.admits("hokusai") ?? true)',
+      "if (livingInkSelected && !livingInkAdmitted)",
+      "const hokusaiPinned = hokusaiSelected",
       "beginStudioHokusaiLiveStroke(next)",
-      '(strokeRouteTournamentGate?.admits("stamp") ?? true)',
+      "if (hokusaiSelected && !hokusaiPinned)",
+      "const stampDirect = Boolean(stampSelected",
       "liveStampOverlayRendererRef.current.begin(",
-      '(strokeRouteTournamentGate?.admits("gpu") ?? true)',
+      "if (stampSelected && !stampDirect)",
+      "const gpuStartEligible = gpuSelected",
+      "if (gpuSelected && liveInkBackendDecision.status !== \"ready\")",
       "beginLiveStrokeBackendAudit(next.id, \"webgpu\")",
-      '(strokeRouteTournamentGate?.admits("live-ink") ?? true)',
+      "if (canvas2dSelected",
       "liveInkOverlayRendererRef.current.begin(",
-      '(strokeRouteTournamentGate?.admits("wet-fallback") ?? true)',
+      "if (canvas2dSelected && !liveInkOverlayStarted)",
+      "const wetInkOverlayStarted = wetMediaSelected",
       "liveWetInkOverlayRendererRef.current.begin(next",
-      '(strokeRouteTournamentGate?.admits("dynamic") ?? true)',
+      "if (wetMediaSelected && !wetInkOverlayStarted)",
+      "const dynamicBrushDirect = dynamicSelected",
       "liveDynamicBrushOverlayRendererRef.current.begin(next)",
+      "if (dynamicSelected && !dynamicBrushDirect)",
       "resolveStudioStrokeSurfaceRoute({",
     ] as const;
 
     let previous = -1;
-    for (const admission of admissions) {
+    for (const admission of selectionAndAdmissions) {
       const index = pointerDown.indexOf(admission);
-      expect(index, `missing strict route admission: ${admission}`).toBeGreaterThan(previous);
+      expect(index, `missing explicit route boundary: ${admission}`).toBeGreaterThan(previous);
       previous = index;
     }
-    expect(pointerDown).toMatch(
-      /const hokusaiPinned = \(strokeRouteTournamentGate\?\.admits\("hokusai"\) \?\? true\)\s*&& pendingGpuAuthorityPromoted\s*&& !livingInkAdmitted\s*&& beginStudioHokusaiLiveStroke\(next\);/u,
-    );
-    expect(pointerDown).toMatch(
-      /const gpuStartEligible = \(strokeRouteTournamentGate\?\.admits\("gpu"\) \?\? true\)\s*&& pendingGpuAuthorityPromoted\s*&& !livingInkAdmitted\s*&& !hokusaiPinned\s*&& !stampDirect\s*&& STUDIO_VISIBLE_LIVE_INK_PREFERENCE/u,
-    );
-    // The terminal Konva fallback is never tournament-gated: no admits("konva") call may exist.
-    expect(pointerDown).not.toContain('admits("konva")');
-    // One projection per stroke start (the pointer-down hot-path budget): the gate is resolved
-    // exactly once inside the admission ladder.
-    expect(pointerDown.match(/resolveStudioStrokeRoutePointerDownGate\(/gu)?.length).toBe(1);
-    expect(pointerDown).not.toContain("getStudioTournamentRuntime()");
+    expect(pointerDown).not.toContain("strokeRouteTournamentGate");
+    expect(pointerDown).not.toContain("resolveStudioStrokeRoutePointerDownGate");
+    expect(pointerDown).not.toContain("STUDIO_STROKE_ROUTE_TOURNAMENT_LANES");
+    expect(pointerDown).not.toContain("peekBootedStudioTournamentRuntime");
+    expect(pointerDown).not.toContain("relinquishGpuLiveInkToKonva");
+    expect(pointerDown).not.toContain("promotePendingGpuAuthoritiesToKonva");
+    expect(pointerDown).toContain("return rejectSelectedSurface(");
     expect(pointerDown).toContain("studioStrokeSurfaceRouteRef.current = strokeSurfaceRoute");
     expect(pointerDown).toContain("livingInkCoordinatorRef.current.pinActiveRoute(");
     expect(pointerDown).toContain("strokeSurfaceRoute = resolveStudioStrokeSurfaceRoute({");
-    expect(pointerDown).toContain("admitted: false");
-    expect(pointerDown).toContain("dynamicAdmitted: false");
   });
 
   it("keeps canonical stroke/action handoff token-scoped and input-exclusive", () => {
@@ -127,7 +128,7 @@ describe("Studio stroke surface route wiring boundary", () => {
       "stamp",
       "gpu",
       "live-ink",
-      "wet-fallback",
+      "wet-ink",
       "dynamic",
       "konva",
     ] as const) {

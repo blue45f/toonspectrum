@@ -8,6 +8,7 @@
 
 import {
   resolveStudioMediaPipeVisionWasmFileset,
+  type StudioMediaPipeVisionDelegate,
   type StudioMediaPipeVisionWasmSelection,
 } from "../studio-mediapipe-vision-assets";
 import {
@@ -62,10 +63,13 @@ export interface StudioMannequinPoseLandmarker {
 
 export type StudioMannequinPoseLandmarkerFactory = (
   signal?: AbortSignal,
+  delegate?: StudioMediaPipeVisionDelegate,
 ) => Promise<StudioMannequinPoseLandmarker>;
 
 export interface StudioMannequinPoseLandmarkerInitOptions {
   readonly signal?: AbortSignal;
+  /** Fixed before model/task work. Omission selects the product-default GPU provider. */
+  readonly delegate?: StudioMediaPipeVisionDelegate;
   /** Test/host injection. Production callers should leave this unset. */
   readonly factory?: StudioMannequinPoseLandmarkerFactory;
 }
@@ -175,7 +179,7 @@ export function getStudioMannequinWebcamErrorMessage(
     return "브라우저가 동작 인식 엔진 파일을 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.";
   }
   if (name === "StudioMannequinPoseEngineCreationError") {
-    return "그래픽 가속·CPU·호환 모드에서 동작 인식 엔진을 준비하지 못했습니다. 다른 탭을 닫고 페이지를 새로고침한 뒤 다시 시도해 주세요.";
+    return "선택한 동작 인식 엔진을 준비하지 못했습니다. 다른 탭을 닫고 페이지를 새로고침한 뒤 다시 시도해 주세요.";
   }
   return "실시간 동작 인식 엔진을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
@@ -299,6 +303,7 @@ async function fetchPoseModelBuffer(signal?: AbortSignal): Promise<Uint8Array> {
 
 async function createStudioMannequinPoseLandmarker(
   signal?: AbortSignal,
+  delegate: StudioMediaPipeVisionDelegate = "GPU",
 ): Promise<StudioMannequinPoseLandmarker> {
   if (signal?.aborted) throw createDisposedError();
 
@@ -318,72 +323,38 @@ async function createStudioMannequinPoseLandmarker(
     minTrackingConfidence: 0.5,
   } as const;
 
-  const failures: unknown[] = [];
   try {
     return await runStudioMediaPipeVisionTaskCreation({
       owner: "mannequin-video-pose",
       signal,
       create: () => PoseLandmarker.createFromOptions(visionSelection.fileset, {
-        baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "GPU" },
+        baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate },
         ...poseOptions,
       }),
     });
-  } catch (gpuError) {
-    failures.push(gpuError);
+  } catch (cause) {
     if (signal?.aborted) throw createDisposedError();
-    console.warn(
-      "Studio mannequin PoseLandmarker GPU delegate failed, falling back to CPU:",
-      gpuError,
+    throw createNamedError(
+      "StudioMannequinPoseEngineCreationError",
+      `Failed to create the selected ${delegate} mannequin PoseLandmarker.`,
+      cause,
     );
-    try {
-      return await runStudioMediaPipeVisionTaskCreation({
-        owner: "mannequin-video-pose",
-        signal,
-        create: () => PoseLandmarker.createFromOptions(visionSelection.fileset, {
-          baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "CPU" },
-          ...poseOptions,
-        }),
-      });
-    } catch (cpuError) {
-      failures.push(cpuError);
-    }
   }
-
-  // SIMD loader/compile 단계는 createFromOptions 내부에서 실행된다. GPU와 CPU가 모두
-  // 실패한 SIMD 환경은 package-matched non-SIMD+CPU를 딱 한 번 시도해 실제 WASM
-  // 호환 실패까지 복구한다. 모델·권한 실패여도 시도 횟수는 이 경계로 제한된다.
-  if (visionSelection.variant === "simd") {
-    try {
-      const compatibilityVision = await resolveLocalVisionWasmFileset(async () => false);
-      return await runStudioMediaPipeVisionTaskCreation({
-        owner: "mannequin-video-pose",
-        signal,
-        create: () => PoseLandmarker.createFromOptions(compatibilityVision.fileset, {
-          baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "CPU" },
-          ...poseOptions,
-        }),
-      });
-    } catch (compatibilityError) {
-      failures.push(compatibilityError);
-    }
-  }
-
-  const cause = new AggregateError(
-    failures,
-    "GPU, CPU, non-SIMD 호환 경로에서 PoseLandmarker를 만들지 못했습니다.",
-    { cause: failures.at(-1) },
-  );
-  throw createNamedError(
-    "StudioMannequinPoseEngineCreationError",
-    "Failed to create the mannequin PoseLandmarker.",
-    cause,
-  );
 }
 
 let cachedPoseLandmarker: StudioMannequinPoseLandmarker | null = null;
+let cachedPoseLandmarkerDelegate: StudioMediaPipeVisionDelegate | null = null;
 let initPoseLandmarkerPromise: Promise<StudioMannequinPoseLandmarker> | null = null;
 let initPoseLandmarkerPromiseGeneration: number | null = null;
+let initPoseLandmarkerPromiseDelegate: StudioMediaPipeVisionDelegate | null = null;
 let poseLandmarkerGeneration = 0;
+
+function mannequinDelegateIdentityError(): Error {
+  return createNamedError(
+    "StudioMannequinDelegateIdentityError",
+    "The mannequin MediaPipe singleton is already owned by another delegate.",
+  );
+}
 
 /**
  * Dedicated VIDEO-mode singleton for the mannequin. It deliberately does not share the VRM poser
@@ -393,9 +364,18 @@ export async function initStudioMannequinPoseLandmarker(
   options: StudioMannequinPoseLandmarkerInitOptions = {},
 ): Promise<StudioMannequinPoseLandmarker> {
   if (options.signal?.aborted) throw createDisposedError();
-  if (cachedPoseLandmarker) return cachedPoseLandmarker;
+  const delegate = options.delegate ?? "GPU";
+  if (cachedPoseLandmarker) {
+    if (cachedPoseLandmarkerDelegate !== delegate) {
+      throw mannequinDelegateIdentityError();
+    }
+    return cachedPoseLandmarker;
+  }
   if (initPoseLandmarkerPromise) {
     if (initPoseLandmarkerPromiseGeneration === poseLandmarkerGeneration) {
+      if (initPoseLandmarkerPromiseDelegate !== delegate) {
+        throw mannequinDelegateIdentityError();
+      }
       return initPoseLandmarkerPromise;
     }
     // dispose 직후 재시도가 이전 MediaPipe ModuleFactory 초기화와 겹치면 전역 WASM
@@ -406,23 +386,30 @@ export async function initStudioMannequinPoseLandmarker(
       // Stale generation is expected to reject with AbortError.
     }
     if (options.signal?.aborted) throw createDisposedError();
-    if (cachedPoseLandmarker) return cachedPoseLandmarker;
+    if (cachedPoseLandmarker) {
+      if (cachedPoseLandmarkerDelegate !== delegate) {
+        throw mannequinDelegateIdentityError();
+      }
+      return cachedPoseLandmarker;
+    }
     return initStudioMannequinPoseLandmarker(options);
   }
 
   const generation = poseLandmarkerGeneration;
   const factory = options.factory ?? createStudioMannequinPoseLandmarker;
   const pending = (async () => {
-    const landmarker = await factory(options.signal);
+    const landmarker = await factory(options.signal, delegate);
     if (generation !== poseLandmarkerGeneration || options.signal?.aborted) {
       safelyClosePoseLandmarker(landmarker);
       throw createDisposedError();
     }
     cachedPoseLandmarker = landmarker;
+    cachedPoseLandmarkerDelegate = delegate;
     return landmarker;
   })();
   initPoseLandmarkerPromise = pending;
   initPoseLandmarkerPromiseGeneration = generation;
+  initPoseLandmarkerPromiseDelegate = delegate;
 
   try {
     return await pending;
@@ -430,6 +417,7 @@ export async function initStudioMannequinPoseLandmarker(
     if (initPoseLandmarkerPromise === pending) {
       initPoseLandmarkerPromise = null;
       initPoseLandmarkerPromiseGeneration = null;
+      initPoseLandmarkerPromiseDelegate = null;
     }
   }
 }
@@ -439,6 +427,7 @@ export function disposeStudioMannequinPoseLandmarker(): void {
   poseLandmarkerGeneration += 1;
   const landmarker = cachedPoseLandmarker;
   cachedPoseLandmarker = null;
+  cachedPoseLandmarkerDelegate = null;
   // 진행 중 factory는 실제 취소할 수 없으므로 promise 권위를 유지한다. 다음 retry는 위
   // init 경로에서 settlement까지 기다려 global MediaPipe 초기화를 절대 중첩하지 않는다.
   if (landmarker) safelyClosePoseLandmarker(landmarker);

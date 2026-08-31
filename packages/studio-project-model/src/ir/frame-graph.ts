@@ -41,20 +41,23 @@ export const frameGraphPassIRSchema = z.object({
 });
 export type FrameGraphPassIR = z.infer<typeof frameGraphPassIRSchema>;
 
-export const frameGraphIslandIRSchema = z.object({
-  id: z.string().min(1),
-  providerId: z.string().min(1),
-  fallbackChain: z.array(z.string()).default([]),
-  transport: z.enum([
-    "same-gpu-texture",
-    "encoded-command-buffer",
-    "image-bitmap",
-    "shared-array-buffer-tile",
-    "cpu-readback",
-  ]),
-  textureHandle: z.string().min(1),
-  documentIds: z.array(z.string()).default([]),
-});
+export const frameGraphIslandIRSchema = z
+  .object({
+    id: z.string().min(1),
+    providerId: z.string().min(1),
+    transport: z.enum([
+      "same-gpu-texture",
+      "encoded-command-buffer",
+      "image-bitmap",
+      "shared-array-buffer-tile",
+      "cpu-readback",
+    ]),
+    textureHandle: z.string().min(1),
+    documentIds: z.array(z.string()).default([]),
+  })
+  // An island binds exactly one provider for its lifetime. Unknown legacy
+  // fallbackChain data is rejected instead of being ignored during parsing.
+  .strict();
 export type FrameGraphIslandIR = z.infer<typeof frameGraphIslandIRSchema>;
 
 export const frameGraphIRSchema = z.object({

@@ -24,10 +24,13 @@ export interface StudioAdvancedFillWorkerLike {
 }
 
 export type StudioAdvancedFillWorkerFactory = () => StudioAdvancedFillWorkerLike | null;
+export type StudioAdvancedFillExecutionMode = "worker" | "direct";
 
 export interface StudioAdvancedFillWorkerClientOptions {
   signal?: AbortSignal;
-  /** `null` explicitly selects the synchronous fallback; omitted uses the Vite module worker. */
+  /** Selects one execution authority before the request starts. It never changes mid-request. */
+  executionMode?: StudioAdvancedFillExecutionMode;
+  /** Test/integration seam for Worker mode. `null` means unavailable, not direct execution. */
   workerFactory?: StudioAdvancedFillWorkerFactory | null;
 }
 
@@ -62,10 +65,19 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createAbortError();
 }
 
+function createWorkerUnavailableError(message: string, cause?: unknown): Error {
+  const error = new Error(
+    message,
+    cause === undefined ? undefined : { cause },
+  );
+  error.name = "StudioAdvancedFillWorkerUnavailableError";
+  return error;
+}
+
 /**
  * Narrows browser-owned pixel wrappers to the protocol's clone-safe data contract. Callers may
  * attach lifecycle helpers such as `release()` to their ImageData-like objects; posting those
- * functions would raise DataCloneError and silently force the expensive main-thread fallback.
+ * functions would raise DataCloneError and make the selected Worker request fail closed.
  */
 function cloneSafeWorkerRequest(
   request: StudioAdvancedFillWorkerRunRequest,
@@ -159,14 +171,6 @@ function runAdvancedFillWithWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
-    const resolveDirectFallback = () => finish(() => {
-      try {
-        resolve(runAdvancedFillDirect(request, signal));
-      } catch (error) {
-        reject(error);
-      }
-    });
-
     worker.onmessage = (event) => {
       const response = event.data;
       if (response.version !== STUDIO_ADVANCED_FILL_WORKER_PROTOCOL_VERSION) {
@@ -182,9 +186,12 @@ function runAdvancedFillWithWorker(
         try {
           worker.postMessage(message, studioAdvancedFillRequestTransfers(message));
           requestPosted = true;
-        } catch {
+        } catch (error) {
           // No ownership transfer occurs when postMessage throws synchronously.
-          resolveDirectFallback();
+          finish(() => reject(createWorkerUnavailableError(
+            "고급 채우기 Worker에 요청을 전달하지 못했습니다.",
+            error,
+          )));
         }
         return;
       }
@@ -206,16 +213,14 @@ function runAdvancedFillWithWorker(
     };
     worker.onerror = (event) => {
       event.preventDefault?.();
-      if (!requestPosted) {
-        // Module load/CSP/chunk failures happen before the ready handshake, so all input buffers
-        // are still owned by the caller and can safely take the bounded direct fallback.
-        resolveDirectFallback();
-        return;
-      }
       const error =
         event.error instanceof Error
           ? event.error
-          : new Error(event.message || "고급 채우기 Worker 실행 중 오류가 발생했습니다.");
+          : createWorkerUnavailableError(
+              event.message || (requestPosted
+                ? "고급 채우기 Worker 실행 중 오류가 발생했습니다."
+                : "고급 채우기 Worker를 준비하지 못했습니다."),
+            );
       finish(() => reject(error));
     };
 
@@ -224,7 +229,12 @@ function runAdvancedFillWithWorker(
       onAbort();
       return;
     }
-    readyTimer = setTimeout(resolveDirectFallback, 3_000);
+    readyTimer = setTimeout(
+      () => finish(() => reject(createWorkerUnavailableError(
+        "고급 채우기 Worker가 준비 시간 안에 응답하지 않았습니다.",
+      ))),
+      3_000,
+    );
   });
 }
 
@@ -239,18 +249,26 @@ export async function runStudioAdvancedFillWorker(
 ): Promise<StudioAdvancedFillWorkerClientResult> {
   throwIfAborted(options.signal);
   const cloneSafeRequest = cloneSafeWorkerRequest(request);
+  const executionMode = options.executionMode ?? "worker";
+  if (executionMode === "direct") {
+    return runAdvancedFillDirect(cloneSafeRequest, options.signal);
+  }
   const factory =
     options.workerFactory === undefined
       ? createStudioAdvancedFillModuleWorker
       : options.workerFactory;
-  if (!factory) return runAdvancedFillDirect(cloneSafeRequest, options.signal);
+  if (!factory) {
+    throw createWorkerUnavailableError("고급 채우기 Worker를 사용할 수 없습니다.");
+  }
 
   let worker: StudioAdvancedFillWorkerLike | null;
   try {
     worker = factory();
-  } catch {
-    return runAdvancedFillDirect(cloneSafeRequest, options.signal);
+  } catch (error) {
+    throw createWorkerUnavailableError("고급 채우기 Worker를 만들지 못했습니다.", error);
   }
-  if (!worker) return runAdvancedFillDirect(cloneSafeRequest, options.signal);
+  if (!worker) {
+    throw createWorkerUnavailableError("고급 채우기 Worker를 사용할 수 없습니다.");
+  }
   return runAdvancedFillWithWorker(worker, cloneSafeRequest, options.signal);
 }

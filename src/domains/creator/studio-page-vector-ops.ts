@@ -17,7 +17,6 @@ import { selectionShapeForIds, type GroupSelectionState } from "./studio-group-s
 import { uid } from "./studio-id";
 import { isEffectivelyLocked, type LayerGroup } from "./studio-layers";
 import {
-  combineStudioShapes,
   drawElToStudioPathBooleanSpec,
   studioPathBooleanOpLabel,
   studioPathBooleanPieceToDrawElSeed,
@@ -313,7 +312,9 @@ export function createStudioPageVectorOps(
 
   // 벡터 패스 불리언 결합 — 마퀴로 고른 도형 2개를 합치기/빼기/교차/제외로 치환한다.
   // CanvasKit PathOps는 전용 module Worker에서 곡선을 계산하고 portable contour만 반환한다.
-  // Worker 자체를 시작할 수 없는 환경만 기존 polygon-clipping으로 fail-soft 처리한다.
+  // 이 제품 명령은 작업 시작 전 CanvasKit PathOps module Worker를 단일 provider로
+  // 선택한다. Worker 생성·초기화·통신·실행이 실패하면 원본 도형을 보존하고
+  // unavailable로 종료하며, 같은 요청을 polygon-clipping으로 재실행하지 않는다.
   // 계산은 lazy geometry 청크를 기다리므로 시작 시점의 render closure를 그대로 커밋하면 안 된다.
   // 페이지/Undo/선택/원본/잠금이 하나라도 바뀐 결과는 authority 없는 suggestion으로 폐기하고,
   // 최신 ref-backed surface가 정확히 같은 때에만 단일 undo commit으로 소비한다.
@@ -397,50 +398,25 @@ export function createStudioPageVectorOps(
       const top = indexed[1]!.el; // 위
       const baseSpec = drawElToStudioPathBooleanSpec(base)!;
       const topSpec = drawElToStudioPathBooleanSpec(top)!;
-      let result: StudioPathBooleanCombineResult;
-      let provider: "canvaskit" | "polygon-clipping" = "canvaskit";
-      try {
-        const qualityModule = await import("./studio-quality-worker-client");
-        if (
-          controller.signal.aborted
-          || !pathBooleanActiveRef.current
-          || pathBooleanRunIdRef.current !== runId
-        ) {
-          return;
-        }
-        const client = pathBooleanClientRef.current
-          ?? new qualityModule.StudioQualityWorkerClient();
-        pathBooleanClientRef.current = client;
-        result = await combineStudioShapesWithCanvasKit(
+      const qualityModule = await import("./studio-quality-worker-client");
+      if (
+        controller.signal.aborted
+        || !pathBooleanActiveRef.current
+        || pathBooleanRunIdRef.current !== runId
+      ) {
+        return;
+      }
+      const client = pathBooleanClientRef.current
+        ?? new qualityModule.StudioQualityWorkerClient();
+      pathBooleanClientRef.current = client;
+      const result: StudioPathBooleanCombineResult =
+        await combineStudioShapesWithCanvasKit(
           client,
           baseSpec,
           topSpec,
           op,
           { signal: controller.signal },
         );
-      } catch (cause) {
-        if (controller.signal.aborted) return;
-        const code = (
-          typeof cause === "object"
-          && cause !== null
-          && "code" in cause
-          && typeof cause.code === "string"
-        ) ? cause.code : null;
-        const fallbackAllowed = code === null || [
-          "post-failed",
-          "provider-capability-missing",
-          "provider-init-failed",
-          "protocol",
-          "unsupported-protocol",
-          "worker-failed",
-          "worker-unavailable",
-        ].includes(code);
-        if (!fallbackAllowed) throw cause;
-        pathBooleanClientRef.current?.dispose();
-        pathBooleanClientRef.current = null;
-        provider = "polygon-clipping";
-        result = await combineStudioShapes(baseSpec, topSpec, op);
-      }
       if (
         controller.signal.aborted
         || !pathBooleanActiveRef.current
@@ -541,17 +517,19 @@ export function createStudioPageVectorOps(
       });
       setError(null);
       announceDrawingShortcut(
-        `${studioPathBooleanOpLabel(op)} 완료 · 2개 → ${pieceEls.length}개${
-          provider === "canvaskit" ? " · Skia 고품질 경로" : " · 호환 경로"
-        }`,
+        `${studioPathBooleanOpLabel(op)} 완료 · 2개 → ${pieceEls.length}개 · Skia 고품질 경로`,
       );
     } catch (err) {
       if (!controller.signal.aborted) {
+        // A failed Worker must not stay reusable as if it were healthy. Disposing it prepares a
+        // later, explicitly initiated operation; it does not authorize another provider now.
+        pathBooleanClientRef.current?.dispose();
+        pathBooleanClientRef.current = null;
         console.error("Failed to apply path boolean combine:", err);
         setError(
           err instanceof Error && err.name === "TimeoutError"
-            ? "고품질 도형 결합 시간이 초과됐어요. 도형을 단순화한 뒤 다시 시도해 주세요."
-            : "도형 결합에 실패했습니다.",
+            ? "선택한 Skia 도형 결합 시간이 초과되어 원본 도형을 유지했어요. 다음 작업 전에 provider를 다시 선택해 주세요."
+            : "선택한 Skia 도형 결합 provider를 사용할 수 없어 원본 도형을 유지했어요. 다른 엔진은 자동으로 실행하지 않았습니다.",
         );
       }
     } finally {

@@ -5,15 +5,13 @@
 //    전혀 건드리지 않는다(pristine — 기존 drawImage 경로 바이트 불변).
 // 2) 예산 초과(그리고 규격 폭 < 원본 폭) 페이지만 wasm-vips lanczos3 로 선축소해
 //    슬라이스 합성이 1:1 blit 이 되게 한다.
-// 3) vips 로드/리샘플 실패는 기존 경로 폴백 + qualityWarning 표면화(조용한 저하 금지).
+// 3) vips/out-of-core가 선택된 뒤 실패하면 다운로드 전 중단하고 다른 provider로 재실행하지 않는다.
 // 4) 품질 게이트: 실 wasm-vips 로 quality-lab 기준(2048→512 PSNR>25.31dB
 //    canvaskit-linear 기록치)을 컷오버 경로 그대로 재현한다.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
-  PRESET_VIPS_LOAD_FALLBACK_WARNING,
-  PRESET_VIPS_OUT_OF_CORE_WARNING,
-  PRESET_VIPS_PAGE_FALLBACK_WARNING,
+  PresetVipsUnavailableError,
   exportPresetSlices,
   findExportPreset,
   planPresetSliceExport,
@@ -91,7 +89,7 @@ class FakeCanvas {
     return this.ctx;
   }
 
-  toBlob(callback: (blob: Blob | null) => void): void {
+  toBlob(callback: (blob: Blob | null) => void, type = "image/png"): void {
     // 그려진 op 목록을 그대로 인코딩 — drawImage 입력이 곧 출력 바이트가 된다.
     const payload = JSON.stringify({
       width: this.width,
@@ -104,7 +102,12 @@ class FakeCanvas {
         destHeight: op.destHeight,
       })),
     });
-    callback(new Blob([payload]));
+    const prefix = type === "image/jpeg"
+      ? Uint8Array.of(0xff, 0xd8, 0xff)
+      : type === "image/webp"
+        ? new TextEncoder().encode("RIFF0000WEBP")
+        : Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+    callback(new Blob([prefix, payload], { type }));
   }
 }
 
@@ -200,7 +203,6 @@ describe("vips 라우팅 경계 — exportPresetSlices 실배선", () => {
       extra: poisonedVipsDeps(),
     });
     expect(result.vipsRoutedPages).toBeUndefined();
-    expect(result.qualityWarning).toBeUndefined();
   });
 
   it(`${EDGE}px edge(예산 경계 포함)도 기존 경로다`, async () => {
@@ -209,7 +211,6 @@ describe("vips 라우팅 경계 — exportPresetSlices 실배선", () => {
       extra: poisonedVipsDeps(),
     });
     expect(result.vipsRoutedPages).toBeUndefined();
-    expect(result.qualityWarning).toBeUndefined();
   });
 
   it(`${EDGE + 1}px edge(예산 +1)는 vips 레인으로 라우팅된다`, async () => {
@@ -227,7 +228,6 @@ describe("vips 라우팅 경계 — exportPresetSlices 실배선", () => {
       },
     });
     expect(result.vipsRoutedPages).toBe(1);
-    expect(result.qualityWarning).toBeUndefined();
     // 목표 크기 = 슬라이스 계획과 동일한 반올림: round(8193×690/720) = 7852.
     expect(log.resizes).toEqual([{ from: [720, EDGE + 1], to: [690, 7852] }]);
     expect(resampled[0]).toMatchObject({ width: 690, height: 7852 });
@@ -271,7 +271,6 @@ describe("pristine 계약 — 예산 이하 문서는 바이트 불변", () => {
     expect(baseline.downloads.map((d) => d.name)).toEqual(guarded.downloads.map((d) => d.name));
     // 결과 shape 도 기존 그대로 — 새 키가 존재하지 않는다.
     expect("vipsRoutedPages" in guarded.result).toBe(false);
-    expect("qualityWarning" in guarded.result).toBe(false);
   });
 
   it("라우팅된 페이지의 슬라이스 합성은 1:1 blit(리샘플 결과가 화질을 소유)", async () => {
@@ -298,23 +297,28 @@ describe("pristine 계약 — 예산 이하 문서는 바이트 불변", () => {
   });
 });
 
-// ─────────────────────────────── 폴백 표면화 ───────────────────────────────
+// ─────────────────────────────── fail-closed ───────────────────────────────
 
-describe("폴백 — 실패는 기존 경로 + 한글 경고로 표면화", () => {
-  it("vips 로드 실패 시 저장은 기존 경로로 완료되고 qualityWarning 이 남는다", async () => {
-    const { result, downloads } = await runPresetExport({
+describe("vips exact provider — 실패 시 다운로드 전에 중단", () => {
+  it("vips 로드 실패 시 Canvas2D로 재실행하지 않고 다운로드하지 않는다", async () => {
+    const download = vi.fn();
+    const failure = await runPresetExport({
       pages: [new FakeCanvas(720, EDGE + 1)],
       extra: {
         loadVipsRuntime: () => Promise.reject(new Error("wasm import blocked")),
+        download,
       },
+    }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(PresetVipsUnavailableError);
+    expect(failure).toMatchObject({
+      name: "PresetVipsUnavailableError",
+      stage: "load",
+      pageIndex: null,
     });
-    expect(downloads.length).toBeGreaterThan(0);
-    expect(result.vipsRoutedPages).toBeUndefined();
-    expect(result.qualityWarning).toBe(PRESET_VIPS_LOAD_FALLBACK_WARNING);
-    expect(presetExportResultMessage(result, naver)).toContain(PRESET_VIPS_LOAD_FALLBACK_WARNING);
+    expect(download).not.toHaveBeenCalled();
   });
 
-  it("페이지 단위 리샘플 실패는 그 페이지만 폴백하고 나머지는 vips 로 처리한다", async () => {
+  it("첫 페이지 리샘플 실패 시 뒤 페이지를 처리하거나 다운로드하지 않는다", async () => {
     let call = 0;
     const runtime = {
       vips: {
@@ -330,39 +334,77 @@ describe("폴백 — 실패는 기존 경로 + 한글 경고로 표면화", () =
         concurrency: () => undefined,
       },
     } as unknown as StudioVipsExportRuntime;
-    const { result } = await runPresetExport({
+    const download = vi.fn();
+    await expect(runPresetExport({
       pages: [new FakeCanvas(720, EDGE + 1, "a"), new FakeCanvas(720, EDGE + 2, "b")],
       extra: {
         loadVipsRuntime: () => Promise.resolve(runtime),
         readPageRgba: (page) => makeRgba(page.width, page.height),
         createResampledPage: (raster) => asCanvas(new FakeCanvas(raster.width, raster.height, "vips")),
+        download,
       },
+    })).rejects.toMatchObject({
+      name: "PresetVipsUnavailableError",
+      stage: "resample",
+      pageIndex: 0,
     });
-    expect(result.vipsRoutedPages).toBe(1);
-    expect(result.qualityWarning).toBe(PRESET_VIPS_PAGE_FALLBACK_WARNING);
+    expect(call).toBe(1);
+    expect(download).not.toHaveBeenCalled();
   });
 
-  it("페이지 픽셀을 읽을 수 없으면(readPageRgba null) 폴백 + 경고", async () => {
-    const { result, downloads } = await runPresetExport({
+  it("페이지 픽셀을 읽을 수 없으면 다른 provider로 재실행하지 않는다", async () => {
+    const download = vi.fn();
+    await expect(runPresetExport({
       pages: [new FakeCanvas(720, EDGE + 1)],
       extra: {
         loadVipsRuntime: () => Promise.resolve(fakeVipsRuntime()),
         readPageRgba: () => null,
+        download,
       },
+    })).rejects.toMatchObject({
+      name: "PresetVipsUnavailableError",
+      stage: "read",
+      pageIndex: 0,
     });
-    expect(downloads.length).toBeGreaterThan(0);
-    expect(result.vipsRoutedPages).toBeUndefined();
-    expect(result.qualityWarning).toBe(PRESET_VIPS_PAGE_FALLBACK_WARNING);
+    expect(download).not.toHaveBeenCalled();
   });
 
-  it("단일 처리 한계(16384²px) 초과 페이지는 손대지 않고 경고만 표면화한다", async () => {
-    // 16385×16384 = maxInputPixels + 16384 → out-of-core 라우트.
-    const { result } = await runPresetExport({
-      pages: [new FakeCanvas(16_385, 16_384)],
-      extra: poisonedVipsDeps(), // out-of-core 는 vips 로드조차 없어야 한다
+  it("vips 결과 표면을 만들 수 없으면 다운로드하지 않는다", async () => {
+    const download = vi.fn();
+    await expect(runPresetExport({
+      pages: [new FakeCanvas(720, EDGE + 1)],
+      extra: {
+        loadVipsRuntime: () => Promise.resolve(fakeVipsRuntime()),
+        readPageRgba: (page) => makeRgba(page.width, page.height),
+        createResampledPage: () => null,
+        download,
+      },
+    })).rejects.toMatchObject({
+      name: "PresetVipsUnavailableError",
+      stage: "materialize",
+      pageIndex: 0,
     });
-    expect(result.vipsRoutedPages).toBeUndefined();
-    expect(result.qualityWarning).toBe(PRESET_VIPS_OUT_OF_CORE_WARNING);
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("단일 처리 한계(16384²px) 초과 페이지는 타일 provider 필요 상태로 중단한다", async () => {
+    // 16385×16384 = maxInputPixels + 16384 → out-of-core 라우트.
+    const loadVipsRuntime = vi.fn();
+    const readPageRgba = vi.fn();
+    const createResampledPage = vi.fn();
+    const download = vi.fn();
+    await expect(runPresetExport({
+      pages: [new FakeCanvas(16_385, 16_384)],
+      extra: { loadVipsRuntime, readPageRgba, createResampledPage, download },
+    })).rejects.toMatchObject({
+      name: "PresetVipsUnavailableError",
+      stage: "out-of-core",
+      pageIndex: 0,
+    });
+    expect(loadVipsRuntime).not.toHaveBeenCalled();
+    expect(readPageRgba).not.toHaveBeenCalled();
+    expect(createResampledPage).not.toHaveBeenCalled();
+    expect(download).not.toHaveBeenCalled();
   });
 
   it("규격 폭이 원본 폭 이상이면(업스케일) vips 레인을 쓰지 않는다 — 다운스케일 전용", async () => {
@@ -375,7 +417,6 @@ describe("폴백 — 실패는 기존 경로 + 한글 경고로 표면화", () =
       extra: poisonedVipsDeps(),
     });
     expect(result.vipsRoutedPages).toBeUndefined();
-    expect(result.qualityWarning).toBeUndefined();
   });
 });
 
@@ -390,20 +431,6 @@ describe("presetExportResultMessage — vips 레인 안내", () => {
     expect(message).toContain("고해상 페이지 2장은 고품질 축소(wasm-vips)로 저장했어요.");
   });
 
-  it("품질 폴백 경고를 안내 끝에 덧붙인다(기존 문구는 그대로)", () => {
-    const message = presetExportResultMessage(
-      {
-        files: 1,
-        oversized: 0,
-        format: "jpg",
-        targetWidth: 690,
-        qualityWarning: PRESET_VIPS_LOAD_FALLBACK_WARNING,
-      },
-      naver
-    );
-    expect(message.startsWith("폭 690px JPG 1장으로 저장했어요.")).toBe(true);
-    expect(message.endsWith(PRESET_VIPS_LOAD_FALLBACK_WARNING)).toBe(true);
-  });
 });
 
 // ─────────────────────── 품질 게이트(실 wasm-vips 런타임) ───────────────────────
@@ -508,7 +535,6 @@ describe("품질 게이트 — 컷오버 경로가 quality-lab 승자 품질을 
       }
     );
     expect(prepared.vipsRoutedPages).toBe(1);
-    expect(prepared.qualityWarning).toBeNull();
     const raster = rasters[0];
     expect(raster).toBeDefined();
     if (!raster) return;

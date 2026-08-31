@@ -469,8 +469,9 @@ readonly StudioBrushBackendIntegrationAudit[] = Object.freeze([
     evidence:
       "The normal Studio viewport conditionally promotes one selected, top-most, unclipped "
       + "dry-media DrawEl to the shared RGBA16F surface only after exact final-live/commit and "
-      + "presentation receipts. Konva remains an atomic recoverable fallback; pointer-live "
-      + "drawing and the default shelf are not yet routed through this specialist.",
+      + "presentation receipts. Konva remains a separately selected compatibility and input/hit-test "
+      + "boundary; once this WebGPU provider owns pixels, failure preserves the last good frame and "
+      + "never reveals Konva as a same-operation replacement.",
   },
   {
     id: "canonical-webgpu-wet-specialist",
@@ -564,8 +565,8 @@ readonly StudioBrushBackendIntegrationAudit[] = Object.freeze([
     evidence:
       "The selected-stroke inspector exposes Hokusai as an explicit experimental conversion. "
       + "Automatic pencil, charcoal and oil routing is blocked because the committed full-size "
-      + "corpus failed quality parity and the 1.2x throughput gate. The existing exact product "
-      + "route remains authoritative; libmypaint is a benchmark reference, not a product fallback.",
+      + "corpus failed quality parity and the 1.2x throughput gate. A selected Hokusai stroke is "
+      + "rejected when unavailable; libmypaint is a benchmark reference, not a product fallback.",
   },
   {
     id: "vnext-provider-router",

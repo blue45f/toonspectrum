@@ -2,7 +2,6 @@ import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
 import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
 import {
   encodeStudioBg3dShotPngInWorker,
-  isStudioBg3dShotPngFallbackEligibleError,
   type StudioBg3dShotPngWorkerOptions,
 } from "./studio-bg3d-shot-png-worker-client";
 import { STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES } from "./studio-bg3d-shot-png-worker-protocol";
@@ -11,7 +10,9 @@ import type { StudioBg3dLtRasterLayer } from "./studio-bg3d-lt-render";
 
 export const STUDIO_BG3D_MAGIC_MASK_PNG_DATA_URL_PREFIX =
   "data:image/png;base64," as const;
-export const STUDIO_BG3D_MAGIC_MASK_DOM_FALLBACK_MAX_PIXELS = 1_048_576;
+export const STUDIO_BG3D_MAGIC_MASK_MAIN_THREAD_MAX_PIXELS = 1_048_576;
+
+export type StudioBg3dMagicMaskPngEncoderBackend = "worker" | "main-thread";
 
 export interface StudioBg3dMagicMaskPngInput {
   readonly width: number;
@@ -27,9 +28,11 @@ type EncodePngInWorker = typeof encodeStudioBg3dShotPngInWorker;
 type ReadBlobAsDataUrl = (blob: Blob, signal?: AbortSignal) => Promise<string>;
 
 export interface StudioBg3dMagicMaskPngOptions extends StudioBg3dShotPngWorkerOptions {
+  /** Selected once before encoding starts. Omission selects the product Worker backend. */
+  readonly encoderBackend?: StudioBg3dMagicMaskPngEncoderBackend;
   /** Test/runtime seam; production callers omit it and use the shared short-lived PNG Worker. */
   readonly encodePngInWorker?: EncodePngInWorker;
-  /** Test/runtime seam for hosts that provide their own DOM canvas owner. */
+  /** Test/runtime seam for the explicitly selected main-thread backend. */
   readonly createCanvas?: () => HTMLCanvasElement | null;
   /** Test/runtime seam; production callers omit it and use an abort-aware FileReader. */
   readonly readBlobAsDataUrl?: ReadBlobAsDataUrl;
@@ -38,11 +41,12 @@ export interface StudioBg3dMagicMaskPngOptions extends StudioBg3dShotPngWorkerOp
 export type StudioBg3dMagicMaskPngErrorCode =
   | "aborted"
   | "data-url-failed"
-  | "dom-fallback-too-large"
-  | "dom-fallback-unavailable"
   | "encode-failed"
+  | "invalid-backend"
   | "invalid-input"
-  | "invalid-png";
+  | "invalid-png"
+  | "main-thread-too-large"
+  | "main-thread-unavailable";
 
 export class StudioBg3dMagicMaskPngError extends Error {
   constructor(
@@ -161,14 +165,14 @@ function createDefaultCanvas(): HTMLCanvasElement | null {
   return document.createElement("canvas");
 }
 
-function encodeWithDomCanvas(
+function encodeOnMainThread(
   snapshot: StudioBg3dMagicMaskPngSnapshot,
   createCanvas: () => HTMLCanvasElement | null,
   signal: AbortSignal | undefined,
 ): Promise<Blob> {
   abortIfRequested(signal);
-  if (snapshot.pixels > STUDIO_BG3D_MAGIC_MASK_DOM_FALLBACK_MAX_PIXELS) {
-    return Promise.reject(new StudioBg3dMagicMaskPngError("dom-fallback-too-large"));
+  if (snapshot.pixels > STUDIO_BG3D_MAGIC_MASK_MAIN_THREAD_MAX_PIXELS) {
+    return Promise.reject(new StudioBg3dMagicMaskPngError("main-thread-too-large"));
   }
 
   let canvas: HTMLCanvasElement | null;
@@ -176,12 +180,12 @@ function encodeWithDomCanvas(
     canvas = createCanvas();
   } catch (error) {
     return Promise.reject(new StudioBg3dMagicMaskPngError(
-      "dom-fallback-unavailable",
+      "main-thread-unavailable",
       error,
     ));
   }
   if (!canvas || typeof canvas.getContext !== "function" || typeof canvas.toBlob !== "function") {
-    return Promise.reject(new StudioBg3dMagicMaskPngError("dom-fallback-unavailable"));
+    return Promise.reject(new StudioBg3dMagicMaskPngError("main-thread-unavailable"));
   }
 
   canvas.width = snapshot.width;
@@ -194,14 +198,14 @@ function encodeWithDomCanvas(
     ownedCanvas.width = 1;
     ownedCanvas.height = 1;
     return Promise.reject(new StudioBg3dMagicMaskPngError(
-      "dom-fallback-unavailable",
+      "main-thread-unavailable",
       error,
     ));
   }
   if (!context) {
     ownedCanvas.width = 1;
     ownedCanvas.height = 1;
-    return Promise.reject(new StudioBg3dMagicMaskPngError("dom-fallback-unavailable"));
+    return Promise.reject(new StudioBg3dMagicMaskPngError("main-thread-unavailable"));
   }
 
   try {
@@ -362,8 +366,8 @@ function validateDataUrl(value: unknown): string {
 
 /**
  * Encodes one canonical Magic Layer RGBA mask without ever transferring or detaching caller-owned
- * storage. Worker/OffscreenCanvas capability absence alone may enter the bounded DOM fallback;
- * protocol, timeout, runtime, transfer, and encode failures remain terminal.
+ * storage. The backend is selected exactly once before execution; a Worker failure never reruns
+ * the request on the main thread. Product callers omit `encoderBackend` and therefore use Worker.
  */
 export async function encodeStudioBg3dMagicMaskPngDataUrl(
   input: StudioBg3dMagicMaskPngInput,
@@ -371,29 +375,28 @@ export async function encodeStudioBg3dMagicMaskPngDataUrl(
 ): Promise<string> {
   abortIfRequested(options.signal);
   const snapshot = snapshotMaskFailClosed(input);
+  const encoderBackend = options.encoderBackend ?? "worker";
+  if (encoderBackend !== "worker" && encoderBackend !== "main-thread") {
+    return fail("invalid-backend");
+  }
   const layer: StudioBg3dLtRasterLayer = Object.freeze({
     role: "color",
     width: snapshot.width,
     height: snapshot.height,
     data: snapshot.data,
   });
-  const encodePng = options.encodePngInWorker ?? encodeStudioBg3dShotPngInWorker;
-  let png: Blob;
-  try {
-    png = await encodePng([layer], {
+  const png = encoderBackend === "main-thread"
+    ? await encodeOnMainThread(
+      snapshot,
+      options.createCanvas ?? createDefaultCanvas,
+      options.signal,
+    )
+    : await (options.encodePngInWorker ?? encodeStudioBg3dShotPngInWorker)([layer], {
       signal: options.signal,
       timeoutMs: options.timeoutMs,
       startupTimeoutMs: options.startupTimeoutMs,
       workerFactory: options.workerFactory,
     });
-  } catch (error) {
-    if (!isStudioBg3dShotPngFallbackEligibleError(error)) throw error;
-    png = await encodeWithDomCanvas(
-      snapshot,
-      options.createCanvas ?? createDefaultCanvas,
-      options.signal,
-    );
-  }
   await validatePngBlob(png, snapshot.width, snapshot.height, options.signal);
   const dataUrl = await (options.readBlobAsDataUrl ?? readBlobAsDataUrl)(
     png,

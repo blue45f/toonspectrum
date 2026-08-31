@@ -6,7 +6,9 @@
  * BrushProgramIR + StrokeIR contracts, then gives the whole transaction to the existing
  * StudioVrmSurfaceProjectionProvider/StudioVrmTexturePaintRuntime bridge. The runtime remains the
  * only atlas, upload, and undo owner, so a completed pointer gesture produces exactly one canonical
- * atlas commit and cancellation never needs a GPU readback.
+ * atlas commit and cancellation never needs a GPU readback. Once this tool/provider is selected,
+ * admission failures fail closed: the source atlas and last successful receipt stay intact, and an
+ * alternate provider or tool can be selected only for a later operation by an explicit caller.
  */
 
 import { modelRawInput } from "@toonspectrum/studio-brush-platform";
@@ -29,10 +31,19 @@ import type {
 } from "@toonspectrum/studio-project-model";
 
 export const STUDIO_VRM_SURFACE_PAINT_TOOL_ID = "studio-vrm-surface-round-v12";
+export const STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID = "three-vrm-texture-paint";
 export const STUDIO_VRM_SURFACE_PAINT_MAX_SAMPLES = 2_048;
 export const STUDIO_VRM_SURFACE_PAINT_MAX_OPERATIONS = 50_000;
 
+export const STUDIO_VRM_SURFACE_PAINT_FAILURE_POLICY = Object.freeze({
+  automaticAlternateBrushSelectionAllowed: false,
+  sourceState: "preserved",
+  lastCommit: "preserved",
+  nextOperation: "select-provider-or-tool",
+} as const);
+
 export const STUDIO_VRM_SURFACE_PAINT_CAPABILITIES = Object.freeze({
+  providerId: STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID,
   tip: Object.freeze({
     round: "supported",
     stamp: "unsupported",
@@ -43,7 +54,7 @@ export const STUDIO_VRM_SURFACE_PAINT_CAPABILITIES = Object.freeze({
     smudge: "unsupported",
     wet: "unsupported",
   }),
-  fallback: "round-tip",
+  failurePolicy: STUDIO_VRM_SURFACE_PAINT_FAILURE_POLICY,
   hotPathGpuReadback: false,
 } as const);
 
@@ -52,8 +63,8 @@ export type StudioVrmSurfacePaintToolStatus =
   | "collecting"
   | "committing"
   | "cancelling"
-  | "fallback"
-  | "unsupported"
+  | "unavailable"
+  | "rejected"
   | "error";
 
 export type StudioVrmSurfacePaintToolErrorCode =
@@ -62,7 +73,10 @@ export type StudioVrmSurfacePaintToolErrorCode =
   | "invalid-input"
   | "memory"
   | "runtime"
+  | "runtime-invalid"
+  | "runtime-unavailable"
   | "sample-budget"
+  | "tool-disposed"
   | "unsupported-face-index"
   | "unsupported-mixing"
   | "unsupported-tip"
@@ -110,17 +124,47 @@ export interface StudioVrmSurfacePaintPointerSample {
 }
 
 export interface StudioVrmSurfacePaintToolBeginInput {
-  readonly runtime: StudioVrmTexturePaintRuntime;
+  /** Null is an explicit unavailable prerequisite, never permission to select another tool. */
+  readonly runtime: StudioVrmTexturePaintRuntime | null;
   readonly settings: StudioVrmSurfacePaintBrushSettings;
   readonly sample: StudioVrmSurfacePaintPointerSample;
 }
 
-export type StudioVrmSurfacePaintToolBeginResult =
-  | Readonly<{ readonly route: "surface-brush" }>
+export type StudioVrmSurfacePaintToolBeginFailureReason =
+  | "busy"
+  | "invalid-input"
+  | "runtime-invalid"
+  | "runtime-unavailable"
+  | "tool-disposed"
+  | "unsupported-face-index";
+
+interface StudioVrmSurfacePaintToolBeginFailureReceiptBase {
+  readonly ok: false;
+  readonly selectedToolId: typeof STUDIO_VRM_SURFACE_PAINT_TOOL_ID;
+  readonly selectedProviderId: typeof STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID;
+  readonly reason: StudioVrmSurfacePaintToolBeginFailureReason;
+  readonly message: string;
+  readonly sourceState: "preserved";
+  readonly lastCommit: StudioVrmSurfacePaintToolSnapshot["lastCommit"];
+  readonly alternateBrushSelected: false;
+  /** A caller may choose a provider/tool only before a later operation, never for this pointerdown. */
+  readonly nextOperation: "select-provider-or-tool";
+}
+
+export type StudioVrmSurfacePaintToolBeginReceipt =
   | Readonly<{
-      readonly route: "round-tip-fallback";
-      readonly reason: string;
-    }>;
+      readonly ok: true;
+      readonly status: "accepted";
+      readonly route: "surface-brush";
+      readonly selectedToolId: typeof STUDIO_VRM_SURFACE_PAINT_TOOL_ID;
+      readonly selectedProviderId: typeof STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID;
+    }>
+  | Readonly<{
+      readonly status: "unavailable" | "rejected";
+    } & StudioVrmSurfacePaintToolBeginFailureReceiptBase>;
+
+/** Public compatibility name: the result is the complete admission receipt. */
+export type StudioVrmSurfacePaintToolBeginResult = StudioVrmSurfacePaintToolBeginReceipt;
 
 export type StudioVrmSurfacePaintToolFinishResult =
   | Readonly<{
@@ -390,7 +434,7 @@ function classifyExecutionError(error: unknown): Readonly<{
   ) {
     return Object.freeze({
       code: "upload",
-      message: "아틀라스 업로드가 실패해 획 전체를 되돌렸습니다. 호환 브러시를 사용하거나 다시 시도하세요.",
+      message: "아틀라스 업로드가 실패해 획 전체를 되돌리고 마지막 성공 결과를 유지했습니다. 다음 작업 전에 provider 또는 도구를 명시적으로 선택하세요.",
     });
   }
   if (error instanceof StudioVrmSurfaceBrushBridgeError) {
@@ -405,9 +449,65 @@ function classifyExecutionError(error: unknown): Readonly<{
   });
 }
 
-function normalizedLimit(value: number | undefined, fallback: number): number {
-  if (!Number.isSafeInteger(value) || (value as number) <= 0) return fallback;
+function normalizedLimit(value: number | undefined, defaultValue: number): number {
+  if (!Number.isSafeInteger(value) || (value as number) <= 0) return defaultValue;
   return value as number;
+}
+
+interface StudioVrmSurfacePaintAdmissionFailure {
+  readonly status: "unavailable" | "rejected";
+  readonly reason: StudioVrmSurfacePaintToolBeginFailureReason;
+  readonly message: string;
+}
+
+function inspectRuntimeAdmission(
+  runtime: StudioVrmTexturePaintRuntime,
+): StudioVrmSurfacePaintAdmissionFailure | null {
+  const snapshot = runtime.getSnapshot();
+  if (snapshot.status === "disposed") {
+    return Object.freeze({
+      status: "unavailable",
+      reason: "runtime-unavailable",
+      message: "선택한 V12 UV 표면 브러시 runtime이 이미 종료됐습니다.",
+    });
+  }
+  if (
+    snapshot.activeOperation !== null
+    || snapshot.status === "loading"
+    || snapshot.status === "painting"
+  ) {
+    return Object.freeze({
+      status: "unavailable",
+      reason: "busy",
+      message: "선택한 V12 UV 표면 브러시 runtime이 다른 표면 작업을 처리 중입니다.",
+    });
+  }
+  if (snapshot.status === "invalid") {
+    return Object.freeze({
+      status: "unavailable",
+      reason: "runtime-invalid",
+      message: "선택한 V12 UV 표면 브러시 runtime의 현재 텍스처 대상이 유효하지 않습니다.",
+    });
+  }
+  return null;
+}
+
+function createBeginFailureReceipt(
+  failure: StudioVrmSurfacePaintAdmissionFailure,
+  lastCommit: StudioVrmSurfacePaintToolSnapshot["lastCommit"],
+): Exclude<StudioVrmSurfacePaintToolBeginReceipt, { readonly ok: true }> {
+  return Object.freeze({
+    ok: false,
+    status: failure.status,
+    selectedToolId: STUDIO_VRM_SURFACE_PAINT_TOOL_ID,
+    selectedProviderId: STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID,
+    reason: failure.reason,
+    message: `${failure.message} 원본과 마지막 성공 결과를 유지했습니다. 다음 작업 전에 provider 또는 도구를 명시적으로 선택하세요.`,
+    sourceState: "preserved",
+    lastCommit,
+    alternateBrushSelected: false,
+    nextOperation: "select-provider-or-tool",
+  });
 }
 
 export class StudioVrmSurfacePaintTool {
@@ -434,54 +534,89 @@ export class StudioVrmSurfacePaintTool {
     return this.snapshot;
   }
 
-  begin(input: StudioVrmSurfacePaintToolBeginInput): StudioVrmSurfacePaintToolBeginResult {
-    if (this.disposed || this.active) {
-      this.publish({
-        status: "error",
-        activePointerId: this.active?.pointerId ?? null,
-        sampleCount: this.active?.samples.length ?? 0,
-        message: "이전 표면 획이 끝나기 전에는 새 획을 시작할 수 없습니다.",
-        errorCode: "busy",
-      });
-      return Object.freeze({
-        route: "round-tip-fallback",
-        reason: "surface brush transaction is busy",
-      });
+  begin(input: StudioVrmSurfacePaintToolBeginInput): StudioVrmSurfacePaintToolBeginReceipt {
+    if (this.disposed) {
+      return createBeginFailureReceipt({
+        status: "unavailable",
+        reason: "tool-disposed",
+        message: "선택한 V12 UV 표면 브러시 도구가 이미 종료됐습니다.",
+      }, this.snapshot.lastCommit);
     }
-    if (!validPointerSample(input.sample) || !validSettings(input.settings)) {
+    if (this.active) {
+      // Do not replace the active transaction's collecting/committing snapshot with the rejected
+      // pointerdown. That snapshot and its last-good receipt still own this operation.
+      return createBeginFailureReceipt({
+        status: "unavailable",
+        reason: "busy",
+        message: "이전 V12 UV 표면 획이 아직 끝나지 않았습니다.",
+      }, this.snapshot.lastCommit);
+    }
+    const runtime = input.runtime;
+    if (runtime === null) {
+      const receipt = createBeginFailureReceipt({
+        status: "unavailable",
+        reason: "runtime-unavailable",
+        message: "선택한 V12 UV 표면 브러시 provider가 연결되지 않았습니다.",
+      }, this.snapshot.lastCommit);
       this.publish({
-        status: "error",
+        status: receipt.status,
         activePointerId: null,
         sampleCount: 0,
-        message: "포인터 또는 브러시 값이 유효하지 않아 표면 획을 시작하지 않았습니다.",
-        errorCode: "invalid-input",
+        message: receipt.message,
+        errorCode: receipt.reason,
       });
-      return Object.freeze({
-        route: "round-tip-fallback",
-        reason: "invalid surface brush input",
+      return receipt;
+    }
+    const runtimeFailure = inspectRuntimeAdmission(runtime);
+    if (runtimeFailure) {
+      const receipt = createBeginFailureReceipt(runtimeFailure, this.snapshot.lastCommit);
+      this.publish({
+        status: receipt.status,
+        activePointerId: null,
+        sampleCount: 0,
+        message: receipt.message,
+        errorCode: receipt.reason,
       });
+      return receipt;
+    }
+    if (!validPointerSample(input.sample) || !validSettings(input.settings)) {
+      const receipt = createBeginFailureReceipt({
+        status: "rejected",
+        reason: "invalid-input",
+        message: "포인터 또는 브러시 값이 유효하지 않아 선택한 표면 획을 거부했습니다.",
+      }, this.snapshot.lastCommit);
+      this.publish({
+        status: receipt.status,
+        activePointerId: null,
+        sampleCount: 0,
+        message: receipt.message,
+        errorCode: receipt.reason,
+      });
+      return receipt;
     }
     if (
       !Number.isSafeInteger(input.sample.hit.faceIndex)
       || (input.sample.hit.faceIndex as number) < 0
     ) {
+      const receipt = createBeginFailureReceipt({
+        status: "rejected",
+        reason: "unsupported-face-index",
+        message: "UV seam을 증명할 faceIndex가 없어 선택한 표면 획을 거부했습니다.",
+      }, this.snapshot.lastCommit);
       this.publish({
-        status: "fallback",
+        status: receipt.status,
         activePointerId: null,
         sampleCount: 0,
-        message: "이 표면은 UV seam을 증명할 faceIndex가 없어 호환 라운드 브러시로 처리합니다.",
-        errorCode: "unsupported-face-index",
+        message: receipt.message,
+        errorCode: receipt.reason,
       });
-      return Object.freeze({
-        route: "round-tip-fallback",
-        reason: "ray hit has no seam-safe faceIndex",
-      });
+      return receipt;
     }
 
     this.sequence = Math.min(Number.MAX_SAFE_INTEGER, this.sequence + 1);
     this.active = {
       pointerId: input.sample.pointerId,
-      runtime: input.runtime,
+      runtime,
       settings: Object.freeze({ ...input.settings }),
       samples: [Object.freeze({ ...input.sample })],
       abortController: new AbortController(),
@@ -495,7 +630,13 @@ export class StudioVrmSurfacePaintTool {
       message: "V12 UV 획을 수집 중입니다. 포인터를 놓으면 한 번에 아틀라스에 저장합니다.",
       errorCode: null,
     });
-    return Object.freeze({ route: "surface-brush" });
+    return Object.freeze({
+      ok: true,
+      status: "accepted",
+      route: "surface-brush",
+      selectedToolId: STUDIO_VRM_SURFACE_PAINT_TOOL_ID,
+      selectedProviderId: STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID,
+    });
   }
 
   append(sample: StudioVrmSurfacePaintPointerSample): boolean {
@@ -556,7 +697,7 @@ export class StudioVrmSurfacePaintTool {
       if (!support.supported) {
         this.active = null;
         this.publish({
-          status: "unsupported",
+          status: "rejected",
           activePointerId: null,
           sampleCount: 0,
           message: support.message,
@@ -679,7 +820,7 @@ export class StudioVrmSurfacePaintTool {
         activePointerId: null,
         sampleCount: 0,
         message: deviceFailure
-          ? "그래픽 장치 연결이 끊겨 진행 중인 표면 획을 취소했습니다. 장치를 복구한 뒤 다시 시도하세요."
+          ? "그래픽 장치 연결이 끊겨 진행 중인 표면 획을 취소하고 마지막 성공 결과를 유지했습니다. 다음 작업 전에 복구된 provider 또는 다른 도구를 명시적으로 선택하세요."
           : "V12 UV 획을 취소해 아틀라스와 실행 취소 기록을 그대로 유지했습니다.",
         errorCode: deviceFailure ? "device-failure" : null,
       });

@@ -5,8 +5,8 @@ import {
   STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION,
   studioLivingInkWorkerResponseTransfers,
   type StudioLivingInkExecutionApplyOptions,
-  type StudioLivingInkExecutionCapabilities,
   type StudioLivingInkExecutionConfig,
+  type StudioLivingInkExecutionProviderId,
   type StudioLivingInkWorkerRequest,
   type StudioLivingInkWorkerResponse,
 } from "./studio-living-ink-execution-protocol";
@@ -49,6 +49,7 @@ const cancelAcknowledgements = new Map<number, number>();
 const queuedApplyRequests = new Set<number>();
 let runtime: StudioLivingInkWorkerRuntime | null = null;
 let config: StudioLivingInkExecutionConfig | null = null;
+let selectedBackend: StudioLivingInkExecutionProviderId | null = null;
 let journal: JournalEntry[] = [];
 let queue = Promise.resolve();
 let disposed = false;
@@ -97,11 +98,12 @@ function isRequest(value: unknown): value is StudioLivingInkWorkerRequest {
     const actual = Object.keys(candidate);
     return actual.length === keys.length && keys.every((key) => Object.hasOwn(candidate, key));
   };
-  if (candidate.type === "living-ink/probe" || candidate.type === "living-ink/dispose") {
+  if (candidate.type === "living-ink/dispose") {
     return exact(["type", "version", "requestId"]);
   }
   if (candidate.type === "living-ink/initialize") {
-    return exact(["type", "version", "requestId", "config"]);
+    return exact(["type", "version", "requestId", "backend", "config"])
+      && (candidate.backend === "webgpu" || candidate.backend === "webgl2");
   }
   if (candidate.type === "living-ink/apply") {
     return exact(["type", "version", "requestId", "operation", "options"]);
@@ -120,79 +122,17 @@ function isRequest(value: unknown): value is StudioLivingInkWorkerRequest {
   return false;
 }
 
-function probeWebGl2Capabilities(): StudioLivingInkExecutionCapabilities {
-  if (typeof OffscreenCanvas !== "function") throw new Error("OffscreenCanvas is unavailable.");
-  const canvas = new OffscreenCanvas(8, 8);
-  const gl = canvas.getContext("webgl2", {
-    alpha: false,
-    antialias: false,
-    depth: false,
-    preserveDrawingBuffer: false,
-    stencil: false,
-  });
-  if (!gl || !gl.getExtension("EXT_color_buffer_float")) {
-    throw new Error("Worker WebGL2 half-float rendering is unavailable.");
-  }
-  const webgpu = Boolean((globalThis as { navigator?: { gpu?: GPU } }).navigator?.gpu);
-  return Object.freeze({
-    backend: webgpu ? "webgpu-offscreen-half-float" : "webgl2-offscreen-half-float",
-    worker: true,
-    offscreenCanvas: true,
-    webgl2: true,
-    webgpu,
-    halfFloatRenderable: true,
-    rgba16Float: true,
-    rg16Float: true,
-    r16Float: true,
-    maximumTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
-    pressureIterations: Object.freeze({
-      interactive: STUDIO_LIVING_INK_EXECUTION_LIMITS.interactivePressureIterations,
-      settle: STUDIO_LIVING_INK_EXECUTION_LIMITS.settlePressureIterations,
-    }),
-  });
-}
-
-function probeCapabilities(): StudioLivingInkExecutionCapabilities {
-  return probeWebGl2Capabilities();
-}
-
-/**
- * Backend preference policy: **picture first, frame time second.**
- *
- * The material policy for this studio is explicit that handfeel and texture outrank throughput, and
- * that performance may only ever veto — never win on its own. This function is where that ordering
- * becomes code, because it is the only place a user's backend is chosen.
- *
- * The WGSL field runtime is roughly twice as fast as the GLSL one (7.7 ms against 14.7 ms per
- * interactive operation on the reference Chromium probe). That is not, by itself, a reason to give
- * anyone that runtime. When the WGSL display resolve was a bare `exp(-density)` it measured 0 paper
- * texture standard deviation against the GLSL runtime's 3.6, and 0.67 ink darkness against 22.8 —
- * so on a machine with a WebGPU adapter, "faster" meant "visibly worse", and the user had no way
- * back. The preference is therefore conditional, and the condition is a demonstration rather than a
- * capability flag: `tryCreateStudioLivingInkWebGpuRuntime` admits the WGSL runtime only after it
- * has drawn a reference stroke on textured paper and measured both signals
- * (`STUDIO_LIVING_INK_WGSL_ADMISSION`). A runtime that cannot meet those floors is disposed and
- * this function falls through to WebGL2, whatever the adapter says it supports.
- *
- * The inverse direction matters just as much: WGSL must stay reachable, because on a machine
- * without a usable WebGL2 context a faint picture is still better than no picture. So this ladder
- * is "prove, else WebGL2, else WGSL-as-last-resort" — never "WebGL2 only".
- *
- * Flip conditions, both directions, in one place:
- *  - WGSL is preferred while it passes the admission proof at runtime *and* the WebGPU lane of
- *    `pnpm run verify:studio-living-ink-execution` reports `failures: []` — that lane runs the same
- *    visual gates as the certified WebGL2 lane, so an empty list is the parity evidence.
- *  - WGSL is demoted the moment either of those stops holding. Raising the admission floors toward
- *    the GLSL-measured values (paper stddev ~3.6, stroke darkness ~22.8) is the intended way to
- *    tighten this over time; lowering them to keep the faster backend is the one change this
- *    comment exists to forbid.
- */
-async function createPreferredRuntime(
+/** Construct exactly the provider selected by the caller before this execution epoch starts. */
+async function createSelectedRuntime(
   nextConfig: StudioLivingInkExecutionConfig,
+  backend: StudioLivingInkExecutionProviderId,
 ): Promise<StudioLivingInkWorkerRuntime> {
+  if (backend === "webgl2") return new StudioLivingInkWebGl2Runtime(nextConfig);
   const webgpu = await tryCreateStudioLivingInkWebGpuRuntime(nextConfig);
   if (webgpu) return webgpu;
-  return new StudioLivingInkWebGl2Runtime(nextConfig);
+  throw new Error(
+    "Selected Living Ink WebGPU backend is unavailable; no automatic WebGL2 substitution was attempted.",
+  );
 }
 
 async function yieldControl(): Promise<void> {
@@ -200,10 +140,12 @@ async function yieldControl(): Promise<void> {
 }
 
 async function rebuildAcceptedJournal(): Promise<void> {
-  if (!config) throw new Error("Living Ink cannot rebuild before initialization.");
+  if (!config || !selectedBackend) {
+    throw new Error("Living Ink cannot rebuild before an explicit backend is initialized.");
+  }
   runtime?.dispose();
   runtime = null;
-  const replacement = await createPreferredRuntime(config);
+  const replacement = await createSelectedRuntime(config, selectedBackend);
   try {
     for (let index = 0; index < journal.length; index += 1) {
       const entry = journal[index]!;
@@ -260,20 +202,15 @@ async function applyRequest(request: Extract<StudioLivingInkWorkerRequest, { typ
   }
   const cancelled = () => cancelledRequests.has(request.requestId) || disposed;
   try {
-    let result;
-    try {
-      result = await runtime.apply(request.requestId, operation, options, cancelled, yieldControl);
-    } catch (error) {
-      // A cancelled 72-tick fixation or a context loss may have partially mutated half-float
-      // surfaces. Rebuild the last accepted state before any acknowledgement or retry.
-      await rebuildAcceptedJournal();
-      if (cancelled()) throw new DOMException("Living Ink request cancelled.", "AbortError");
-      if (errorCode(error) !== "unavailable" && errorCode(error) !== "gpu-failure") throw error;
-      result = await runtime!.apply(request.requestId, operation, options, cancelled, yieldControl);
-    }
+    const result = await runtime.apply(
+      request.requestId,
+      operation,
+      options,
+      cancelled,
+      yieldControl,
+    );
     if (cancelled()) {
       if ("image" in result) result.image.close();
-      await rebuildAcceptedJournal();
       throw new DOMException("Living Ink request cancelled.", "AbortError");
     }
     journal.push(Object.freeze({ operation, options }));
@@ -293,6 +230,7 @@ async function applyRequest(request: Extract<StudioLivingInkWorkerRequest, { typ
       runtime?.dispose();
       runtime = null;
       config = null;
+      selectedBackend = null;
       journal = [];
       reportedError = new Error(
         `Living Ink rollback failed and the runtime was sealed unavailable: ${safeMessage(rollbackError)}`,
@@ -315,14 +253,6 @@ async function applyRequest(request: Extract<StudioLivingInkWorkerRequest, { typ
 }
 
 async function handle(request: StudioLivingInkWorkerRequest): Promise<void> {
-  if (request.type === "living-ink/probe") {
-    try {
-      message(request.requestId, { type: "living-ink/capabilities", capabilities: probeCapabilities() });
-    } catch (error) {
-      message(request.requestId, { type: "living-ink/error", code: "unavailable", message: safeMessage(error) });
-    }
-    return;
-  }
   if (request.type === "living-ink/initialize") {
     try {
       const parsed = parseStudioLivingInkExecutionConfig(request.config);
@@ -336,13 +266,15 @@ async function handle(request: StudioLivingInkWorkerRequest): Promise<void> {
       }
       runtime?.dispose();
       config = parsed.value;
-      runtime = await createPreferredRuntime(config);
+      selectedBackend = request.backend;
+      runtime = await createSelectedRuntime(config, selectedBackend);
       journal = [];
       disposed = false;
       message(request.requestId, { type: "living-ink/ready", capabilities: runtime.capabilities });
     } catch (error) {
       runtime = null;
       config = null;
+      selectedBackend = null;
       message(request.requestId, { type: "living-ink/error", code: "unavailable", message: safeMessage(error) });
     }
     return;
@@ -360,12 +292,24 @@ async function handle(request: StudioLivingInkWorkerRequest): Promise<void> {
       const frame = await runtime.renderFrame(request.requestId, request.displayMode);
       message(request.requestId, { type: "living-ink/frame", frame });
     } catch (error) {
+      let reportedError = error;
       try {
         await rebuildAcceptedJournal();
-      } catch {
-        // The original failure remains the useful diagnostic.
+      } catch (rollbackError) {
+        runtime?.dispose();
+        runtime = null;
+        config = null;
+        selectedBackend = null;
+        journal = [];
+        reportedError = new Error(
+          `Living Ink rollback failed and the runtime was sealed unavailable: ${safeMessage(rollbackError)}`,
+        );
       }
-      message(request.requestId, { type: "living-ink/error", code: errorCode(error), message: safeMessage(error) });
+      message(request.requestId, {
+        type: "living-ink/error",
+        code: errorCode(reportedError),
+        message: safeMessage(reportedError),
+      });
     }
     return;
   }
@@ -374,6 +318,7 @@ async function handle(request: StudioLivingInkWorkerRequest): Promise<void> {
     runtime?.dispose();
     runtime = null;
     config = null;
+    selectedBackend = null;
     journal = [];
     message(request.requestId, { type: "living-ink/disposed" });
     workerScope.close();
@@ -418,6 +363,7 @@ workerScope.onmessageerror = (): void => {
   runtime?.dispose();
   runtime = null;
   config = null;
+  selectedBackend = null;
   journal = [];
   workerScope.close();
 };

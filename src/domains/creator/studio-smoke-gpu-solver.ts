@@ -405,7 +405,8 @@ export function encodeStudioSmokeGpuStep(
     endPass();
     runtime.device.queue.submit([encoder.finish()]);
   } catch {
-    // 인코딩/제출 실패는 조용히 CPU 폴백으로 강등한다(예외를 밖으로 흘리지 않는다).
+    // 인코딩/제출 실패는 선택한 GPU 작업의 unavailable 결과다. 호출부는 같은 작업에서
+    // CPU solver를 시작하지 않고 마지막 정상 상태를 유지해야 한다.
     return null;
   }
 

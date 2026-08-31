@@ -61,14 +61,6 @@ export class StudioBg3dShotPngWorkerError extends Error {
   }
 }
 
-/** Only these two creation/capability failures may enter the bounded main-thread fallback. */
-export function isStudioBg3dShotPngFallbackEligibleError(
-  value: unknown,
-): value is StudioBg3dShotPngWorkerError {
-  return value instanceof StudioBg3dShotPngWorkerError &&
-    (value.code === "worker-unavailable" || value.code === "offscreen-unavailable");
-}
-
 export function createStudioBg3dShotPngModuleWorker(): StudioBg3dShotPngWorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-bg3d-shot-png.worker.ts", import.meta.url), {

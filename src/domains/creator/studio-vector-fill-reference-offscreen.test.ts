@@ -12,6 +12,13 @@ import type {
 } from "./studio-offscreen-raster-worker-client";
 
 const PNG_DATA_URL = "data:image/png;base64,iVBORw0KGgo=";
+const PNG_SIGNATURE = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+
+function pngBlob(size: number): Blob {
+  const bytes = new Uint8Array(Math.max(size, PNG_SIGNATURE.byteLength));
+  bytes.set(PNG_SIGNATURE);
+  return new Blob([bytes], { type: "image/png" });
+}
 
 class FakeFileReader {
   result: string | ArrayBuffer | null = null;
@@ -62,7 +69,7 @@ describe("Studio vector reference OffscreenCanvas rasterizer", () => {
           payload: {
             kind: "encoded" as const,
             mime: "image/png" as const,
-            blob: new Blob([new Uint8Array(24)], { type: "image/png" }),
+            blob: pngBlob(24),
           },
         };
       }),
@@ -96,13 +103,54 @@ describe("Studio vector reference OffscreenCanvas rasterizer", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it("returns null before decoding when Worker acceleration is unavailable", async () => {
+  it("rejects a mislabeled non-PNG Worker result instead of accepting codec substitution", async () => {
+    vi.stubGlobal("Worker", class Worker {});
+    const close = vi.fn();
+    const session: StudioOffscreenRasterSession = {
+      warm: vi.fn(() => true),
+      run: vi.fn(async () => ({
+        ok: true as const,
+        runId: 1,
+        width: 320,
+        height: 240,
+        payload: {
+          kind: "encoded" as const,
+          mime: "image/png" as const,
+          blob: new Blob([new TextEncoder().encode("RIFF0000WEBP")], { type: "image/png" }),
+        },
+      })),
+      dispose: vi.fn(),
+    };
+
+    await expect(rasterizeStudioVectorReferenceOffscreen(request(), {
+      createBitmap: async () => ({ width: 320, height: 240, close }) as unknown as ImageBitmap,
+      createSession: () => session,
+    })).rejects.toMatchObject({ code: "raster-unavailable" });
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed before decoding when the selected Worker provider is unavailable", async () => {
     const createBitmap = vi.fn();
 
     await expect(rasterizeStudioVectorReferenceOffscreen(request(), {
       createBitmap,
-    })).resolves.toBeNull();
+    })).rejects.toMatchObject({ code: "raster-unavailable" });
     expect(createBitmap).not.toHaveBeenCalled();
+  });
+
+  it("does not switch providers when the selected Worker session fails to start", async () => {
+    vi.stubGlobal("Worker", class Worker {});
+    const close = vi.fn();
+    const browserCanvas = vi.fn();
+    vi.stubGlobal("document", { createElement: browserCanvas });
+
+    await expect(rasterizeStudioVectorReferenceOffscreen(request(), {
+      createBitmap: async () => ({ width: 320, height: 240, close }) as unknown as ImageBitmap,
+      createSession: () => { throw new Error("startup failed"); },
+    })).rejects.toMatchObject({ code: "raster-unavailable" });
+
+    expect(browserCanvas).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it("keeps the PNG output budget authoritative on the accelerated path", async () => {
@@ -118,7 +166,7 @@ describe("Studio vector reference OffscreenCanvas rasterizer", () => {
         payload: {
           kind: "encoded" as const,
           mime: "image/png" as const,
-          blob: new Blob([new Uint8Array(64)], { type: "image/png" }),
+          blob: pngBlob(64),
         },
       })),
       dispose: vi.fn(),
@@ -167,7 +215,7 @@ describe("Studio vector reference OffscreenCanvas rasterizer", () => {
           payload: {
             kind: "encoded" as const,
             mime: "image/png" as const,
-            blob: new Blob([new Uint8Array(24)], { type: "image/png" }),
+            blob: pngBlob(24),
           },
         })),
         dispose,
@@ -219,7 +267,7 @@ describe("Studio vector reference OffscreenCanvas rasterizer", () => {
         payload: {
           kind: "encoded" as const,
           mime: "image/png" as const,
-          blob: new Blob([new Uint8Array(24)], { type: "image/png" }),
+          blob: pngBlob(24),
         },
       })),
       dispose: vi.fn(),
@@ -234,7 +282,7 @@ describe("Studio vector reference OffscreenCanvas rasterizer", () => {
     await expect(rasterizeStudioVectorReferenceOffscreen(
       request(),
       { createBitmap },
-    )).resolves.toBeNull();
+    )).rejects.toMatchObject({ code: "raster-unavailable" });
     expect(firstDispose).toHaveBeenCalledOnce();
 
     expect(preloadStudioVectorReferenceRasterizer(() => second)).toBe(true);

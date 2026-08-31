@@ -23,9 +23,6 @@ export {
   studioBg3dShotBatchQueueCompletedCount,
   waitForStudioBg3dBatchDocumentVisible,
 } from "./studio-bg3d-shot-batch-queue";
-export {
-  buildStudioBg3dShotBatchArchiveInWorker,
-  isStudioBg3dShotBatchWorkerUnavailableError,
-} from "./studio-bg3d-shot-batch-worker-client";
+export { buildStudioBg3dShotBatchArchiveInWorker } from "./studio-bg3d-shot-batch-worker-client";
 export { buildStudioBg3dShotArtifacts } from "./studio-bg3d-shot-artifact-pipeline";
 export { buildStudioBg3dShotContactSheetsInWorker } from "./studio-bg3d-shot-contact-sheet-worker-client";

@@ -18,7 +18,7 @@ import {
 } from "./studio-linked-3d-render-document";
 import { createStudioLinked3dRenderPageFixture } from "./studio-linked-3d-render-test-fixture";
 import {
-  buildStudioProjectArchive,
+  buildStudioProjectArchive as buildStudioProjectArchiveWithBackend,
   importStudioProjectArchive,
 } from "./studio-project-archive";
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
@@ -27,6 +27,16 @@ import { studioShared3dStageEntryAsDocument } from "./studio-shared-3d-stage-col
 
 const PNG_DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zcy8AAAAASUVORK5CYII=";
+
+function buildStudioProjectArchive(
+  input: Parameters<typeof buildStudioProjectArchiveWithBackend>[0],
+  options: NonNullable<Parameters<typeof buildStudioProjectArchiveWithBackend>[1]> = {},
+): ReturnType<typeof buildStudioProjectArchiveWithBackend> {
+  return buildStudioProjectArchiveWithBackend(input, {
+    crc32ExecutionMode: "direct-headless",
+    ...options,
+  });
+}
 
 function createAuthority() {
   const blobs = new Map<string, Uint8Array>();

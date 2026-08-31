@@ -12,8 +12,8 @@ import { executeStudioColorRangeWorkerRequest } from "./studio-color-range-worke
 import type { PixelSelection } from "./studio-selection-tools";
 
 /**
- * Synchronous fallback stays below a quarter-size trace raster. On larger rasters, blocking the
- * editor to emulate a missing Worker would reintroduce the exact long task this boundary removes.
+ * Explicit synchronous mode stays below a quarter-size trace raster. On larger rasters, blocking
+ * the editor would reintroduce the exact long task this boundary removes.
  */
 export const STUDIO_COLOR_RANGE_DIRECT_MAX_PIXELS = 256 * 256;
 
@@ -34,6 +34,7 @@ export interface StudioColorRangeWorkerLike {
 }
 
 export type StudioColorRangeWorkerFactory = () => StudioColorRangeWorkerLike | null;
+export type StudioColorRangeExecutionMode = "worker" | "direct";
 
 export interface StudioColorRangeWorkerRunOptions {
   signal?: AbortSignal;
@@ -53,7 +54,9 @@ export interface StudioColorRangeWorkerSession {
 }
 
 export interface StudioColorRangeWorkerSessionOptions {
-  /** `null` explicitly selects the bounded synchronous fallback. */
+  /** Execution authority is selected when the session is created and never changes afterward. */
+  executionMode?: StudioColorRangeExecutionMode;
+  /** Test/integration seam for Worker mode. `null` means unavailable, not direct execution. */
   workerFactory?: StudioColorRangeWorkerFactory | null;
 }
 
@@ -186,6 +189,15 @@ function directUnavailableError(pixelCount: number, cause?: unknown): Error {
   );
 }
 
+function workerUnavailableError(cause?: unknown): Error {
+  const error = new Error(
+    "색상 범위 계산 Worker를 사용할 수 없습니다.",
+    cause === undefined ? undefined : { cause },
+  );
+  error.name = "StudioColorRangeWorkerUnavailableError";
+  return error;
+}
+
 function runDirect(
   request: StudioColorRangeWorkerRunRequest,
   signal: AbortSignal | undefined,
@@ -219,6 +231,7 @@ function deserializeWorkerError(
 export function createStudioColorRangeWorkerSession(
   options: StudioColorRangeWorkerSessionOptions = {},
 ): StudioColorRangeWorkerSession {
+  const executionMode = options.executionMode ?? "worker";
   const factory = options.workerFactory === undefined
     ? createStudioColorRangeModuleWorker
     : options.workerFactory;
@@ -261,20 +274,9 @@ export function createStudioColorRangeWorkerSession(
     closeWorker();
     settle(task, () => task.reject(error));
   };
-  const resolveDirectOrReject = (task: ActiveTask, cause?: unknown) => {
+  const rejectWorkerUnavailable = (task: ActiveTask, cause?: unknown) => {
     closeWorker();
-    settle(task, () => {
-      try {
-        const pixelCount = pixelCountOf(task.request);
-        if (pixelCount > STUDIO_COLOR_RANGE_DIRECT_MAX_PIXELS) {
-          task.reject(directUnavailableError(pixelCount, cause));
-          return;
-        }
-        task.resolve(runDirect(task.request, task.signal));
-      } catch (error) {
-        task.reject(error);
-      }
-    });
+    settle(task, () => task.reject(workerUnavailableError(cause)));
   };
   const postActive = () => {
     const task = active;
@@ -297,7 +299,7 @@ export function createStudioColorRangeWorkerSession(
         rejectAndReset(task, new Error("색상 범위 Worker 계산 시간이 초과되었습니다."));
       }, STUDIO_COLOR_RANGE_WORKER_RUN_TIMEOUT_MS);
     } catch (error) {
-      resolveDirectOrReject(task, error);
+      rejectWorkerUnavailable(task, error);
     }
   };
   const attachWorker = (nextWorker: StudioColorRangeWorkerLike) => {
@@ -360,7 +362,7 @@ export function createStudioColorRangeWorkerSession(
         return;
       }
       if (!wasPosted) {
-        resolveDirectOrReject(task, error);
+        rejectWorkerUnavailable(task, error);
         return;
       }
       rejectAndReset(task, error);
@@ -368,14 +370,14 @@ export function createStudioColorRangeWorkerSession(
     readyTimer = setTimeout(() => {
       const task = active;
       if (!task || ready) return;
-      resolveDirectOrReject(task, new Error("Worker 준비 시간이 초과되었습니다."));
+      rejectWorkerUnavailable(task, new Error("Worker 준비 시간이 초과되었습니다."));
     }, STUDIO_COLOR_RANGE_WORKER_READY_TIMEOUT_MS);
   };
   const ensureWorker = () => {
     const task = active;
     if (!task || disposed) return;
     if (!factory) {
-      resolveDirectOrReject(task);
+      rejectWorkerUnavailable(task);
       return;
     }
     if (worker) {
@@ -385,12 +387,12 @@ export function createStudioColorRangeWorkerSession(
     try {
       const nextWorker = factory();
       if (!nextWorker) {
-        resolveDirectOrReject(task);
+        rejectWorkerUnavailable(task);
         return;
       }
       attachWorker(nextWorker);
     } catch (error) {
-      resolveDirectOrReject(task, error);
+      rejectWorkerUnavailable(task, error);
     }
   };
 
@@ -400,6 +402,9 @@ export function createStudioColorRangeWorkerSession(
       try {
         throwIfAborted(runOptions.signal);
         assertStudioColorRangeWorkerRequest(request);
+        if (executionMode === "direct") {
+          return Promise.resolve(runDirect(request, runOptions.signal));
+        }
       } catch (error) {
         return Promise.reject(error);
       }

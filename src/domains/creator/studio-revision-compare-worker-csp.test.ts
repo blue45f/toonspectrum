@@ -290,15 +290,20 @@ describe("revision comparison Worker strict-CSP bootstrap", () => {
 
   it("revokes exactly once when the Worker errors before bootstrap ready", async () => {
     const harness = installWorkerLifecycleHarness();
-    const pending = runStudioRevisionComparison(revisionComparisonInput());
+    const pending = runStudioRevisionComparison(revisionComparisonInput(), {
+      executionBackend: "worker",
+    });
+    const rejection = expect(pending).rejects.toMatchObject({
+      name: "StudioRevisionCompareWorkerError",
+      message: "버전 비교 Worker 실행에 실패했습니다.",
+    });
     const nativeWorker = await harness.constructed;
     await nativeWorker.posted;
 
     const errorEvent = nativeWorker.emitError();
-    const comparison = await pending;
+    await rejection;
 
     expect(errorEvent.preventDefault).toHaveBeenCalledOnce();
-    expect(comparison.targetRevision).toBe(2);
     expect(nativeWorker.terminateCount).toBe(1);
     expect(harness.revokedUrls).toEqual([CAPTURED_BOOTSTRAP_URL]);
   });

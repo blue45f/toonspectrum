@@ -5,9 +5,11 @@ import {
   lowerStudioSceneOverlaysToVelloIsland,
   resolveStudioVelloHubProductCapability,
   StudioVelloHub,
+  StudioVelloHubRenderSupersededError,
   STUDIO_VELLO_CLASSIC_BACKEND_ID,
   STUDIO_VELLO_CPU_BACKEND_ID,
   STUDIO_VELLO_HUB_PRODUCT_CAPABILITY,
+  STUDIO_VELLO_HYBRID_BACKEND_ID,
   STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE,
   type StudioVelloBackendFrame,
   type StudioVelloHubBackend,
@@ -15,6 +17,16 @@ import {
 } from "./studio-vello-hub";
 
 import type { SceneIR } from "@toonspectrum/studio-project-model";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, resolve, reject };
+}
 
 function scene(id = "shape"): SceneIR {
   return {
@@ -118,8 +130,10 @@ function fakeTarget() {
     | { kind: "hold"; reason: string; activeBackendId: string | null }
   > = [];
   let activeBackendId: string | null = null;
+  const control = { failPresent: false };
   const target: StudioVelloHubPresentationTarget = {
     async present(frame) {
+      if (control.failPresent) throw new Error("presentation-failed");
       activeBackendId = frame.backendId;
       events.push({ kind: "present", backendId: frame.backendId });
       if (frame.kind === "texture") frame.release();
@@ -130,6 +144,7 @@ function fakeTarget() {
   };
   return {
     target,
+    control,
     events,
     get activeBackendId() {
       return activeBackendId;
@@ -165,8 +180,8 @@ function harness(options?: { mismatch?: boolean; isPenDown?: () => boolean }) {
   );
   const presentation = fakeTarget();
   let lossListener: ((event: { epoch: number; reason: string }) => void) | null = null;
-  const unrecoverableFallbacks: Array<{
-    source: "device-loss-fallback" | "shadow-fallback";
+  const unavailableEvents: Array<{
+    source: "selection" | "render" | "presentation" | "device-loss";
     reason: string;
   }> = [];
   const hub = new StudioVelloHub({
@@ -176,8 +191,8 @@ function harness(options?: { mismatch?: boolean; isPenDown?: () => boolean }) {
     now: () => now,
     deviceHash: "test-device",
     isPenDown: options?.isPenDown,
-    onUnrecoverableFallback(failure) {
-      unrecoverableFallbacks.push({
+    onUnavailable(failure) {
+      unavailableEvents.push({
         source: failure.source,
         reason: failure.reason,
       });
@@ -196,7 +211,7 @@ function harness(options?: { mismatch?: boolean; isPenDown?: () => boolean }) {
     cpuControl,
     classicControl,
     presentation,
-    unrecoverableFallbacks,
+    unavailableEvents,
     emitLoss(reason = "destroyed") {
       lossListener?.({ epoch: 7, reason });
     },
@@ -205,9 +220,7 @@ function harness(options?: { mismatch?: boolean; isPenDown?: () => boolean }) {
 
 async function promoteClassic(runtime: ReturnType<typeof harness>) {
   await runtime.hub.render(scene());
-  await runtime.hub.flushShadowWork();
   await runtime.hub.render(scene());
-  await runtime.hub.flushShadowWork();
   return runtime.hub.render(scene());
 }
 
@@ -227,7 +240,7 @@ describe("VelloHub product capability and SceneIR island", () => {
       inputAuthority: false,
       brushPixelAuthority: false,
       primarySurfaceOwnership: "frame-graph-compositor",
-      admissionMode: "gpu-first-shadow-candidate",
+      admissionMode: "selected-gpu-provider",
       persistentWinnerStorage: false,
       productWidePromotionRequiresSoak: true,
     });
@@ -305,21 +318,269 @@ describe("VelloHub product capability and SceneIR island", () => {
 });
 
 describe("VelloHub runtime tournament", () => {
-  it("starts on Classic GPU, shadows CPU, and holds the GPU path while pen-down", async () => {
+  it("invalidates an in-flight product epoch before its stale texture can present", async () => {
+    const frameFlight = deferred<StudioVelloBackendFrame>();
+    const release = vi.fn();
+    const presentation = fakeTarget();
+    const backend: StudioVelloHubBackend = {
+      id: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      async availability() {
+        return { available: true, reason: null };
+      },
+      render: vi.fn(() => frameFlight.promise),
+      dispose: vi.fn(),
+    };
+    const hub = new StudioVelloHub({
+      target: presentation.target,
+      classicBackend: backend,
+      subscribeDeviceLoss: () => () => undefined,
+    });
+
+    const pending = hub.render(scene());
+    await vi.waitFor(() => expect(backend.render).toHaveBeenCalledOnce());
+    hub.invalidatePendingProductRender();
+    frameFlight.resolve({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      kind: "texture",
+      width: 16,
+      height: 16,
+      device: {} as GPUDevice,
+      texture: {} as GPUTexture,
+      release,
+    });
+
+    await expect(pending).rejects.toBeInstanceOf(
+      StudioVelloHubRenderSupersededError,
+    );
+    expect(release).toHaveBeenCalledOnce();
+    expect(presentation.events).toEqual([]);
+    hub.dispose();
+  });
+
+  it("ignores a superseded render rejection without invalidating the newer scene", async () => {
+    const oldFlight = deferred<StudioVelloBackendFrame>();
+    const currentFlight = deferred<StudioVelloBackendFrame>();
+    const currentRelease = vi.fn();
+    const presentation = fakeTarget();
+    const onUnavailable = vi.fn();
+    let renderCount = 0;
+    const backend: StudioVelloHubBackend = {
+      id: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      async availability() {
+        return { available: true, reason: null };
+      },
+      render: vi.fn(() => {
+        renderCount += 1;
+        return renderCount === 1 ? oldFlight.promise : currentFlight.promise;
+      }),
+      dispose: vi.fn(),
+    };
+    const hub = new StudioVelloHub({
+      target: presentation.target,
+      classicBackend: backend,
+      onUnavailable,
+      subscribeDeviceLoss: () => () => undefined,
+    });
+
+    const oldRender = hub.render(scene("old"));
+    await vi.waitFor(() => expect(backend.render).toHaveBeenCalledTimes(1));
+    const currentRender = hub.render(scene("current"));
+    await vi.waitFor(() => expect(backend.render).toHaveBeenCalledTimes(2));
+    oldFlight.reject(new Error("old-render-failed"));
+
+    await expect(oldRender).rejects.toBeInstanceOf(
+      StudioVelloHubRenderSupersededError,
+    );
+    expect(onUnavailable).not.toHaveBeenCalled();
+    expect(presentation.events).toEqual([]);
+    expect(hub.snapshot().killedBackends).toEqual([]);
+
+    currentFlight.resolve({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      kind: "texture",
+      width: 16,
+      height: 16,
+      device: {} as GPUDevice,
+      texture: {} as GPUTexture,
+      release: currentRelease,
+    });
+    await expect(currentRender).resolves.toMatchObject({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+    });
+    expect(currentRelease).toHaveBeenCalledOnce();
+    expect(presentation.events).toEqual([
+      { kind: "present", backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID },
+    ]);
+    hub.dispose();
+  });
+
+  it("ignores a superseded presentation rejection without killing the newer scene", async () => {
+    const oldPresentation = deferred<void>();
+    const oldRelease = vi.fn();
+    const currentRelease = vi.fn();
+    const onUnavailable = vi.fn();
+    let renderCount = 0;
+    let presentationCount = 0;
+    const backend: StudioVelloHubBackend = {
+      id: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      async availability() {
+        return { available: true, reason: null };
+      },
+      async render() {
+        renderCount += 1;
+        return {
+          backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+          kind: "texture" as const,
+          width: 16,
+          height: 16,
+          device: {} as GPUDevice,
+          texture: {} as GPUTexture,
+          release: renderCount === 1 ? oldRelease : currentRelease,
+        };
+      },
+      dispose: vi.fn(),
+    };
+    const present = vi.fn((frame: StudioVelloBackendFrame) => {
+      presentationCount += 1;
+      if (presentationCount === 1) return oldPresentation.promise;
+      if (frame.kind === "texture") frame.release();
+      return Promise.resolve();
+    });
+    const holdLastGood = vi.fn();
+    const hub = new StudioVelloHub({
+      target: { present, holdLastGood },
+      classicBackend: backend,
+      onUnavailable,
+      subscribeDeviceLoss: () => () => undefined,
+    });
+
+    const oldRender = hub.render(scene("old-present"));
+    await vi.waitFor(() => expect(present).toHaveBeenCalledTimes(1));
+    const currentRender = hub.render(scene("current-present"));
+    await expect(currentRender).resolves.toMatchObject({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+    });
+    oldPresentation.reject(new Error("old-present-failed"));
+
+    await expect(oldRender).rejects.toBeInstanceOf(
+      StudioVelloHubRenderSupersededError,
+    );
+    expect(oldRelease).toHaveBeenCalledOnce();
+    expect(currentRelease).toHaveBeenCalledOnce();
+    expect(onUnavailable).not.toHaveBeenCalled();
+    expect(holdLastGood).not.toHaveBeenCalled();
+    expect(hub.snapshot().killedBackends).toEqual([]);
+    hub.dispose();
+  });
+
+  it("invalidates pending product work when device loss makes the lane unavailable", async () => {
+    const frameFlight = deferred<StudioVelloBackendFrame>();
+    const release = vi.fn();
+    const presentation = fakeTarget();
+    presentation.target.releaseLostDevice = vi.fn();
+    const backend: StudioVelloHubBackend = {
+      id: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      async availability() {
+        return { available: true, reason: null };
+      },
+      render: vi.fn(() => frameFlight.promise),
+      dispose: vi.fn(),
+    };
+    const hub = new StudioVelloHub({
+      target: presentation.target,
+      classicBackend: backend,
+      subscribeDeviceLoss: () => () => undefined,
+    });
+
+    const pending = hub.render(scene());
+    await vi.waitFor(() => expect(backend.render).toHaveBeenCalledOnce());
+    await hub.handleDeviceLoss("device-lost:9:reset");
+    frameFlight.resolve({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      kind: "texture",
+      width: 16,
+      height: 16,
+      device: {} as GPUDevice,
+      texture: {} as GPUTexture,
+      release,
+    });
+
+    await expect(pending).rejects.toBeInstanceOf(
+      StudioVelloHubRenderSupersededError,
+    );
+    expect(release).toHaveBeenCalledOnce();
+    expect(presentation.target.releaseLostDevice).toHaveBeenCalledWith(
+      "device-lost:9:reset",
+    );
+    expect(presentation.events).toEqual([
+      {
+        kind: "hold",
+        reason: "unavailable-device-loss:device-lost:9:reset",
+        activeBackendId: null,
+      },
+    ]);
+    hub.dispose();
+  });
+
+  it("keeps an in-flight product frame valid when explicit QA comparison fails", async () => {
+    const comparisonFlight = deferred<never>();
+    const productFlight = deferred<StudioVelloBackendFrame>();
+    const release = vi.fn();
+    const presentation = fakeTarget();
+    const backend: StudioVelloHubBackend = {
+      id: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      async availability() {
+        return { available: true, reason: null };
+      },
+      render: vi.fn(() => productFlight.promise),
+      compareToReference: vi.fn(() => comparisonFlight.promise),
+      dispose: vi.fn(),
+    };
+    const hub = new StudioVelloHub({
+      target: presentation.target,
+      classicBackend: backend,
+      subscribeDeviceLoss: () => () => undefined,
+    });
+
+    const qa = hub.compareToReferenceForQa(scene());
+    await vi.waitFor(() => expect(backend.compareToReference).toHaveBeenCalledOnce());
+    const pending = hub.render(scene());
+    await vi.waitFor(() => expect(backend.render).toHaveBeenCalledOnce());
+    comparisonFlight.reject(new Error("qa-readback-failed"));
+    await expect(qa).rejects.toThrow("qa-readback-failed");
+    productFlight.resolve({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      kind: "texture",
+      width: 16,
+      height: 16,
+      device: {} as GPUDevice,
+      texture: {} as GPUTexture,
+      release,
+    });
+
+    await expect(pending).resolves.toMatchObject({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+    });
+    expect(release).toHaveBeenCalledOnce();
+    expect(presentation.events.filter(({ kind }) => kind === "present")).toHaveLength(1);
+    expect(presentation.events.filter(({ kind }) => kind === "hold")).toEqual([]);
+    expect(hub.snapshot().killedBackends).toEqual([]);
+    hub.dispose();
+  });
+
+  it("renders only the selected Classic GPU provider and holds it while pen-down", async () => {
     const runtime = harness();
+    const compareToReference = vi.spyOn(runtime.classic, "compareToReference");
     const first = await runtime.hub.render(scene());
     expect(first).toMatchObject({
       backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
       decision: "gpu-first",
       primarySurfaceOwner: "vello-hub",
-      admissionMode: "gpu-first-shadow-candidate",
+      admissionMode: "selected-gpu-provider",
       productWidePromoted: false,
     });
-    await runtime.hub.flushShadowWork();
-
     const warm = await runtime.hub.render(scene());
     expect(warm.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
-    await runtime.hub.flushShadowWork();
 
     const penDown = await runtime.hub.render(scene(), { penDown: true });
     expect(penDown).toMatchObject({
@@ -330,13 +591,15 @@ describe("VelloHub runtime tournament", () => {
     const held = await runtime.hub.render(scene(), { penDown: false });
     expect(held).toMatchObject({
       backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-      visualGate: { pass: true, mismatchPct: 0 },
     });
+    expect(runtime.classic.renderCount).toBe(4);
+    expect(runtime.cpu.renderCount).toBe(0);
+    expect(compareToReference).not.toHaveBeenCalled();
     expect(runtime.presentation.activeBackendId).toBe(
       STUDIO_VELLO_CLASSIC_BACKEND_ID,
     );
     expect(runtime.hub.snapshot()).toMatchObject({
-      admissionMode: "gpu-first-shadow-candidate",
+      admissionMode: "selected-gpu-provider",
       persistentWinnerStorage: false,
       productWidePromoted: false,
       hybridCompositor: expect.objectContaining({ eligible: true }),
@@ -348,9 +611,7 @@ describe("VelloHub runtime tournament", () => {
     let livePenDown = true;
     const runtime = harness({ isPenDown: () => livePenDown });
     await runtime.hub.render(scene());
-    await runtime.hub.flushShadowWork();
     await runtime.hub.render(scene());
-    await runtime.hub.flushShadowWork();
 
     const held = await runtime.hub.render(scene(), { penDown: false });
     expect(held).toMatchObject({
@@ -366,79 +627,76 @@ describe("VelloHub runtime tournament", () => {
     runtime.hub.dispose();
   });
 
-  it("never promotes a Classic shadow that fails the visual equivalence gate", async () => {
+  it("keeps QA visual mismatch out of product authority and provider health", async () => {
     const runtime = harness({ mismatch: true });
-    await runtime.hub.render(scene());
-    await runtime.hub.flushShadowWork();
-    await runtime.hub.render(scene());
-    const snapshot = runtime.hub.snapshot();
-    expect(snapshot.lastGoodFrame?.backendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
-    expect(snapshot.killedBackends.some((entry) =>
-      entry.providerId === STUDIO_VELLO_CLASSIC_BACKEND_ID
-      && entry.reason.includes("visual-gate-failed"),
-    )).toBe(true);
+    const first = await runtime.hub.render(scene());
+    const qa = await runtime.hub.compareToReferenceForQa(scene());
+    expect(qa).toMatchObject({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      pass: false,
+      mismatchPct: 100,
+      error: null,
+    });
+    const second = await runtime.hub.render(scene("after-qa-mismatch"));
+    expect(first.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+    expect(second.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+    expect(runtime.cpu.renderCount).toBe(0);
+    expect(runtime.unavailableEvents).toEqual([]);
+    expect(runtime.hub.snapshot().killedBackends).toEqual([]);
     runtime.hub.dispose();
   });
 
-  it("records an unavailable Classic candidate explicitly and remains on CPU", async () => {
+  it("keeps an unavailable QA comparison probe out of product provider health", async () => {
     const runtime = harness();
     runtime.classicControl.available = false;
-    const first = await runtime.hub.render(scene());
-    expect(first.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
-    await runtime.hub.flushShadowWork();
-
-    expect(runtime.hub.snapshot().lastGoodFrame?.backendId).toBe(
-      STUDIO_VELLO_CPU_BACKEND_ID,
+    await expect(runtime.hub.compareToReferenceForQa(scene())).rejects.toThrow(
+      `QA comparison backend unavailable:${STUDIO_VELLO_CLASSIC_BACKEND_ID}:fake-unavailable`,
     );
-    expect(runtime.hub.snapshot().killedBackends).toEqual(
-      expect.arrayContaining([
-        {
-          providerId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-          reason: "backend-unavailable:fake-unavailable",
-        },
-      ]),
-    );
-    expect(runtime.presentation.activeBackendId).toBe(STUDIO_VELLO_CPU_BACKEND_ID);
+    const product = await runtime.hub.render(scene());
+    expect(product.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+    expect(runtime.hub.snapshot().killedBackends).toEqual([]);
+    expect(runtime.unavailableEvents).toEqual([]);
+    expect(runtime.presentation.activeBackendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
+    expect(runtime.cpu.renderCount).toBe(0);
     runtime.hub.dispose();
   });
 
-  it("preserves the last good GPU frame until CPU fallback completes", async () => {
+  it("fails closed on GPU render failure and never presents CPU", async () => {
     const runtime = harness();
     const promoted = await promoteClassic(runtime);
     expect(promoted.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
     runtime.classicControl.failRender = true;
 
-    const fallback = await runtime.hub.render(scene());
-    expect(fallback).toMatchObject({
-      backendId: STUDIO_VELLO_CPU_BACKEND_ID,
-      decision: "fallback",
-      preservedLastGoodFrame: true,
-      fallback: {
-        from: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-        to: STUDIO_VELLO_CPU_BACKEND_ID,
+    await expect(runtime.hub.render(scene())).rejects.toMatchObject({
+      name: "StudioVelloHubUnavailableError",
+      failure: {
+        source: "render",
+        backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
         reason: `${STUDIO_VELLO_CLASSIC_BACKEND_ID}-render-failed`,
       },
     });
-    const tail = runtime.presentation.events.slice(-2);
-    expect(tail).toEqual([
+    expect(runtime.presentation.events.at(-1)).toEqual(
       {
         kind: "hold",
-        reason: `${STUDIO_VELLO_CLASSIC_BACKEND_ID}-render-failed`,
+        reason: `unavailable-render:${STUDIO_VELLO_CLASSIC_BACKEND_ID}-render-failed`,
         activeBackendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
       },
-      { kind: "present", backendId: STUDIO_VELLO_CPU_BACKEND_ID },
-    ]);
+    );
+    expect(runtime.cpu.renderCount).toBe(0);
     runtime.hub.dispose();
   });
 
-  it("reacts to fabric device loss with an explicit last-good-to-CPU transaction", async () => {
+  it("reacts to fabric device loss with explicit unavailability and no CPU transaction", async () => {
     const runtime = harness();
     await promoteClassic(runtime);
     runtime.emitLoss("reset");
     await vi.waitFor(() => {
       expect(runtime.hub.snapshot().lastGoodFrame).toMatchObject({
-        backendId: STUDIO_VELLO_CPU_BACKEND_ID,
-        fallback: { reason: "device-lost:7:reset" },
+        backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      });
+      expect(runtime.unavailableEvents.at(-1)).toMatchObject({
+        source: "device-loss",
+        reason: "device-lost:7:reset",
       });
     });
     const hold = runtime.presentation.events.findLast(
@@ -446,49 +704,150 @@ describe("VelloHub runtime tournament", () => {
     );
     expect(hold).toMatchObject({
       activeBackendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-      reason: "device-lost:7:reset",
+      reason: "unavailable-device-loss:device-lost:7:reset",
     });
+    expect(runtime.cpu.renderCount).toBe(0);
     runtime.hub.dispose();
   });
 
-  it("does not borrow visual approval for a new scene in the same fingerprint bucket", async () => {
+  it("does not mutate product state when an explicit QA comparison throws", async () => {
     const runtime = harness();
-    await promoteClassic(runtime);
-    runtime.classicControl.compareError = "shadow-readback-failed";
-    const unvalidatedScene = await runtime.hub.render(scene("new-shape"));
-    expect(unvalidatedScene.backendId).toBe(STUDIO_VELLO_CLASSIC_BACKEND_ID);
-    await runtime.hub.flushShadowWork();
-    expect(runtime.hub.snapshot().lastGoodFrame).toMatchObject({
-      backendId: STUDIO_VELLO_CPU_BACKEND_ID,
-    });
-    expect(runtime.hub.snapshot().killedBackends).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ reason: "shadow-readback-failed" }),
-      ]),
+    const product = await runtime.hub.render(scene());
+    runtime.classicControl.compareError = "qa-readback-failed";
+    await expect(runtime.hub.compareToReferenceForQa(scene())).rejects.toThrow(
+      "qa-readback-failed",
     );
+    expect(runtime.hub.snapshot().lastGoodFrame).toMatchObject({
+      requestId: product.requestId,
+    });
+    expect(runtime.hub.snapshot().killedBackends).toEqual([]);
+    expect(runtime.unavailableEvents).toEqual([]);
+    await expect(runtime.hub.render(scene("after-qa-error"))).resolves.toMatchObject({
+      backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+    });
     runtime.hub.dispose();
   });
 
-  it("surfaces an unrecoverable device-loss fallback instead of hiding CPU failure", async () => {
+  it("uses the CPU backend only for an explicit reference request", async () => {
     const runtime = harness();
-    await promoteClassic(runtime);
-    runtime.cpuControl.failRender = true;
-    runtime.emitLoss("reset-without-cpu");
-
-    await vi.waitFor(() => {
-      expect(runtime.unrecoverableFallbacks).toEqual([
-        {
-          source: "device-loss-fallback",
-          reason: `${STUDIO_VELLO_CPU_BACKEND_ID}-render-failed`,
-        },
-      ]);
+    const receipt = await runtime.hub.renderReference(scene());
+    expect(receipt).toMatchObject({
+      backendId: STUDIO_VELLO_CPU_BACKEND_ID,
+      decision: "reference",
+      referenceOnly: true,
     });
-    expect(runtime.presentation.events.at(-1)).toMatchObject({
-      kind: "hold",
-      reason: expect.stringContaining("unrecoverable-device-loss-fallback"),
-      activeBackendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
-    });
+    expect(runtime.cpu.renderCount).toBe(1);
+    expect(runtime.classic.renderCount).toBe(0);
+    expect(runtime.unavailableEvents).toEqual([]);
     runtime.hub.dispose();
+  });
+
+  it("ignores fabric device loss before this hub has attempted product GPU work", () => {
+    const runtime = harness();
+    runtime.emitLoss("unowned-device");
+    expect(runtime.unavailableEvents).toEqual([]);
+    expect(runtime.presentation.events).toEqual([]);
+    expect(runtime.cpu.renderCount).toBe(0);
+    runtime.hub.dispose();
+  });
+
+  it("fails closed when the GPU frame cannot be presented", async () => {
+    const runtime = harness();
+    runtime.presentation.control.failPresent = true;
+    await expect(runtime.hub.render(scene())).rejects.toMatchObject({
+      failure: {
+        source: "presentation",
+        reason: "presentation-failed",
+      },
+    });
+    expect(runtime.cpu.renderCount).toBe(0);
+    expect(runtime.presentation.activeBackendId).toBeNull();
+    runtime.hub.dispose();
+  });
+
+  it.each([
+    {
+      name: "pixel frame from the selected GPU backend",
+      frame: {
+        backendId: STUDIO_VELLO_CPU_BACKEND_ID,
+        kind: "pixels",
+        width: 16,
+        height: 16,
+        pixels: new Uint8Array(16 * 16 * 4),
+      } as StudioVelloBackendFrame,
+      reason: `selected GPU ${STUDIO_VELLO_CLASSIC_BACKEND_ID} returned pixels:${STUDIO_VELLO_CPU_BACKEND_ID}`,
+    },
+    {
+      name: "texture frame carrying a different GPU backend id",
+      frame: {
+        backendId: STUDIO_VELLO_HYBRID_BACKEND_ID,
+        kind: "texture",
+        width: 16,
+        height: 16,
+        device: {} as GPUDevice,
+        texture: {} as GPUTexture,
+        release: vi.fn(),
+      } as StudioVelloBackendFrame,
+      reason: `selected GPU ${STUDIO_VELLO_CLASSIC_BACKEND_ID} returned texture:${STUDIO_VELLO_HYBRID_BACKEND_ID}`,
+    },
+  ])("rejects $name before presentation", async ({ frame, reason }) => {
+    const presentation = fakeTarget();
+    const backend: StudioVelloHubBackend = {
+      id: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+      async availability() {
+        return { available: true, reason: null };
+      },
+      async render() {
+        return frame;
+      },
+      dispose: vi.fn(),
+    };
+    const hub = new StudioVelloHub({
+      target: presentation.target,
+      classicBackend: backend,
+      subscribeDeviceLoss: () => () => undefined,
+    });
+
+    await expect(hub.render(scene())).rejects.toMatchObject({
+      failure: { source: "render", reason },
+    });
+    expect(presentation.events.filter(({ kind }) => kind === "present")).toEqual([]);
+    hub.dispose();
+  });
+
+  it("rejects a texture returned by the explicit CPU reference lane", async () => {
+    const release = vi.fn();
+    const presentation = fakeTarget();
+    const cpuBackend: StudioVelloHubBackend = {
+      id: STUDIO_VELLO_CPU_BACKEND_ID,
+      async availability() {
+        return { available: true, reason: null };
+      },
+      async render() {
+        return {
+          backendId: STUDIO_VELLO_CLASSIC_BACKEND_ID,
+          kind: "texture",
+          width: 16,
+          height: 16,
+          device: {} as GPUDevice,
+          texture: {} as GPUTexture,
+          release,
+        };
+      },
+      dispose: vi.fn(),
+    };
+    const hub = new StudioVelloHub({
+      target: presentation.target,
+      cpuBackend,
+      subscribeDeviceLoss: () => () => undefined,
+    });
+
+    await expect(hub.renderReference(scene())).rejects.toThrow(
+      `explicit CPU reference returned texture:${STUDIO_VELLO_CLASSIC_BACKEND_ID}`,
+    );
+    expect(release).toHaveBeenCalledOnce();
+    expect(presentation.events).toEqual([]);
+    hub.dispose();
   });
 
   it("disposes both backends and unregisters the device-loss listener", () => {

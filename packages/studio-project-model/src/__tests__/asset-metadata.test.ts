@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   UnknownAssetCapabilityError,
+  AssetMetadataMigrationError,
   assertAssetCapabilitiesKnown,
   assetMetadataIRSchema,
   computeAssetContentDigest,
@@ -89,7 +90,7 @@ describe("assetMetadataIRSchema", () => {
     expect(metadata.visualEquivalenceReport).toBeNull();
     expect(metadata.dependencies).toEqual([]);
     expect(metadata.previewVariants).toEqual({ stable: null, studioMax: null });
-    expect(metadata.fallback).toBeNull();
+    expect(metadata.providerUnavailable).toBeNull();
     expect(metadata.replacementCondition).toBeNull();
     expect(metadata.marketplace).toBeNull();
   });
@@ -261,12 +262,12 @@ describe("assetMetadataIRSchema", () => {
           reason: "Studio Max evidence has not been captured on this device.",
         },
       },
-      fallback: {
-        strategy: "renderer-variant",
-        rendererVariantId: "stable-hokusai",
-        providerId: "hokusai-natural-media",
-        preservesNormalizedIr: true,
-        reason: "Return to the verified stable lane.",
+      providerUnavailable: {
+        status: "unavailable",
+        retainsNormalizedIr: true,
+        nextOperation: "select-provider",
+        selectableRendererVariantIds: ["stable-hokusai", "studio-max-vello"],
+        reason: "The selected provider is unavailable; choose a provider explicitly.",
         limitations: [],
       },
       replacementCondition: {
@@ -320,6 +321,59 @@ describe("assetMetadataIRSchema", () => {
         license: { spdx: "MIT", secretPolicy: "drop-me" },
       }),
     ).toThrow(/unrecognized/i);
+  });
+
+  it("rejects new automatic renderer-substitution metadata but migrates retained legacy cards to unavailable", () => {
+    const normalizedIrRef = {
+      digest: computeAssetStructuredDigest({ kind: "brush", value: 1 }),
+      schema: "toonspectrum.brush-program-ir",
+      schemaVersion: 11,
+      mediaType: "application/vnd.toonspectrum.brush-program+json",
+      locator: null,
+    };
+    const legacyCard = {
+      ...validMetadata(),
+      normalizedIrRef,
+      rendererVariants: [
+        {
+          id: "stable-hokusai",
+          tier: "stable",
+          providerId: "hokusai-natural-media",
+          providerVersion: null,
+          normalizedIrRef,
+          requiredCapabilities: [],
+          qualityStatus: "unmeasured",
+          determinism: "unmeasured",
+          limitations: [],
+        },
+      ],
+      fallback: {
+        strategy: "renderer-variant",
+        rendererVariantId: "stable-hokusai",
+        providerId: "hokusai-natural-media",
+        preservesNormalizedIr: true,
+        reason: "Legacy instruction.",
+        limitations: ["No automatic substitution after migration."],
+      },
+    };
+    expect(() => assetMetadataIRSchema.parse(legacyCard)).toThrow(/unrecognized/i);
+    const migrated = parseAssetMetadata(legacyCard);
+    expect(migrated).not.toHaveProperty("fallback");
+    expect(migrated.providerUnavailable).toMatchObject({
+      status: "unavailable",
+      retainsNormalizedIr: true,
+      nextOperation: "select-provider",
+      selectableRendererVariantIds: ["stable-hokusai"],
+    });
+    expect(parseAssetMetadata({ ...validMetadata(), fallback: null })).not.toHaveProperty(
+      "fallback",
+    );
+    expect(() =>
+      parseAssetMetadata({
+        ...legacyCard,
+        fallback: { ...legacyCard.fallback, preservesNormalizedIr: false },
+      }),
+    ).toThrow(AssetMetadataMigrationError);
   });
 
   it("rejects non-namespaced capability tokens at the schema layer", () => {

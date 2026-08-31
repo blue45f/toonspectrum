@@ -33,9 +33,23 @@ interface FakeHost extends StudioOffscreenRasterHost {
   releasedSurfaces: number;
 }
 
+function exactEncodedBlob(
+  mime: "image/png" | "image/jpeg" | "image/webp",
+): Blob {
+  if (mime === "image/png") {
+    return new Blob([
+      Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
+    ], { type: mime });
+  }
+  if (mime === "image/jpeg") {
+    return new Blob([Uint8Array.of(0xff, 0xd8, 0xff, 0xe0)], { type: mime });
+  }
+  return new Blob([new TextEncoder().encode("RIFF0000WEBP")], { type: mime });
+}
+
 function createFakeHost(overrides: {
   createSurface?: () => never;
-  encode?: () => Promise<Blob>;
+  encode?: (mime: "image/png" | "image/jpeg" | "image/webp", quality?: number) => Promise<Blob>;
   onDraw?: () => void;
 } = {}): FakeHost {
   const draws: RecordedDraw[] = [];
@@ -71,8 +85,7 @@ function createFakeHost(overrides: {
         transferToBitmap() {
           return { width, height, close: () => {} } as unknown as StudioOffscreenOwnedBitmap;
         },
-        encode: overrides.encode
-          ?? (async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" })),
+        encode: overrides.encode ?? (async (mime) => exactEncodedBlob(mime)),
         release() {
           host.releasedSurfaces += 1;
         },
@@ -171,6 +184,30 @@ describe("studio offscreen raster runtime — 합성 실행", () => {
     }
   });
 
+  it("브라우저가 요청한 WebP 대신 PNG를 반환하면 encode-failed로 닫는다", async () => {
+    const host = createFakeHost({
+      encode: async () => exactEncodedBlob("image/png"),
+    });
+    const response = await executeStudioOffscreenRasterJob({
+      host,
+      request: request({ output: { kind: "encoded", mime: "image/webp", quality: 0.9 } }),
+    });
+    expect(response).toMatchObject({ kind: "failure", code: "encode-failed" });
+  });
+
+  it("요청 MIME 라벨만 맞고 실제 컨테이너가 다르면 encode-failed로 닫는다", async () => {
+    const host = createFakeHost({
+      encode: async () => new Blob([
+        Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
+      ], { type: "image/jpeg" }),
+    });
+    const response = await executeStudioOffscreenRasterJob({
+      host,
+      request: request({ output: { kind: "encoded", mime: "image/jpeg", quality: 0.9 } }),
+    });
+    expect(response).toMatchObject({ kind: "failure", code: "encode-failed" });
+  });
+
   it("비트맵 출력은 표면 백킹을 그대로 이관한다", async () => {
     const host = createFakeHost();
     const response = await executeStudioOffscreenRasterJob({
@@ -190,7 +227,7 @@ describe("studio offscreen raster runtime — 정직한 타입 실패", () => {
     expect(host.draws).toEqual([]);
   });
 
-  it("표면 생성 실패는 unsupported 로 환원되어 메인스레드 폴백 판단을 가능하게 한다", async () => {
+  it("표면 생성 실패는 선택된 provider의 typed unsupported로 환원한다", async () => {
     const host = createFakeHost({
       createSurface: () => {
         throw new Error("no offscreen");

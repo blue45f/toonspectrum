@@ -143,6 +143,8 @@ describe("live-ink stabilizer plan — pristine reproduction of the shipped disp
     expect(plan.params).toEqual({ strength: 0.35, predictionMs: 0 });
     expect(plan.providerId).toBe("stabilizer-lane-ema");
     expect(plan.reason).toBe("first-party-current");
+    expect(plan.status).toBe("selected");
+    expect(plan.unavailableReason).toBeNull();
     expect(plan.inkExclusion).toBe("not-opted-in");
   });
 
@@ -272,6 +274,8 @@ describe("live-ink stabilizer plan — ink lane gates", () => {
       backendId: "ink-stroke-modeler",
       providerId: "stabilizer-lane-ink-stroke-modeler",
       reason: "ink-opt-in",
+      status: "selected",
+      unavailableReason: null,
       inkExclusion: null,
       params: { ink: { minOutputRate: 180 } },
     });
@@ -289,11 +293,11 @@ describe("live-ink stabilizer plan — ink lane gates", () => {
     expect(plan.inkExclusion).toBe("rollout-missing");
   });
 
-  it("excludes ink for every real canvas2d rollout decision and admits every webgpu one", () => {
+  it("admits only a selected WebGPU rollout and never interprets unavailable as Canvas2D", () => {
     const decisions: ReadonlyArray<readonly [string, StudioLiveInkRolloutDecision]> = [
       ["kill-switch", resolveStudioLiveInkRollout({ killSwitch: true, webgpuApiAvailable: true })],
       [
-        "canvas2d-forced",
+        "canvas2d-explicit",
         resolveStudioLiveInkRollout({ backendPreference: "canvas2d", webgpuApiAvailable: true }),
       ],
       [
@@ -337,7 +341,7 @@ describe("live-ink stabilizer plan — ink lane gates", () => {
     for (const [expectedReason, rollout] of decisions) {
       expect(rollout.reason).toBe(expectedReason);
       const plan = planLiveInkStabilizer(planInput({ inkOptIn: true, rollout }));
-      if (rollout.preference === "webgpu") {
+      if (rollout.preference === "webgpu" && rollout.status === "selected") {
         expect(plan.lane).toBe("ink-stroke-modeler");
         expect(plan.inkExclusion).toBeNull();
       } else {
@@ -351,38 +355,87 @@ describe("live-ink stabilizer plan — ink lane gates", () => {
     const base = planInput({ inkOptIn: true, rollout: admittedRollout() });
     const excluded = planLiveInkStabilizer({
       ...base,
-      liveInkBackend: { backend: "canvas2d", reason: "eraser" },
+      liveInkBackend: {
+        status: "unavailable",
+        backend: null,
+        selectedBackend: "webgpu",
+        reason: "eraser",
+      },
     });
     expect(excluded.lane).toBe("ema");
     expect(excluded.inkExclusion).toBe("backend-not-webgpu");
 
     const admitted = planLiveInkStabilizer({
       ...base,
-      liveInkBackend: { backend: "webgpu", reason: "webgpu-ready" },
+      liveInkBackend: {
+        status: "ready",
+        backend: "webgpu",
+        selectedBackend: "webgpu",
+        reason: "webgpu-ready",
+      },
     });
     expect(admitted.lane).toBe("ink-stroke-modeler");
   });
 
-  it("excludes a tournament-killed ink lane and restores it on revive; first-party kills are extinction-guarded", () => {
+  it("marks the exact killed provider unavailable without selecting another stabilizer", () => {
     const killSwitch = new RemoteKillSwitch();
     const inkProviderId = studioLiveInkStabilizerProviderId("ink-stroke-modeler");
     const base = planInput({ inkOptIn: true, rollout: admittedRollout(), killSwitch });
 
     killSwitch.kill(inkProviderId, "canary regression");
     const killed = planLiveInkStabilizer(base);
-    expect(killed.lane).toBe("ema");
-    expect(killed.inkExclusion).toBe("tournament-killed");
+    expect(killed).toMatchObject({
+      lane: "ink-stroke-modeler",
+      providerId: inkProviderId,
+      status: "unavailable",
+      unavailableReason: "selected-provider-killed",
+      inkExclusion: null,
+    });
+    expect(() => runStudioLiveInkStabilizerPlan(killed, rampSamples(8))).toThrow(
+      /selected Studio stabilizer provider is unavailable/iu,
+    );
+    expect(observeLiveInkPlanParity({
+      plan: killed,
+      graph: graph(),
+      samples: rampSamples(8),
+    })).toEqual({
+      comparable: false,
+      reason: "selected-provider-unavailable",
+      sampleCount: 8,
+    });
 
     killSwitch.revive(inkProviderId);
-    expect(planLiveInkStabilizer(base).lane).toBe("ink-stroke-modeler");
+    expect(planLiveInkStabilizer(base)).toMatchObject({
+      lane: "ink-stroke-modeler",
+      status: "selected",
+      unavailableReason: null,
+    });
 
-    // The recovery chain must always remain (selectFilterLane anti-extinction rule):
-    // killing a first-party stabilizer provider never changes the plan.
-    killSwitch.kill(studioLiveInkStabilizerProviderId("ema"), "should be ignored");
-    killSwitch.kill(studioLiveInkStabilizerProviderId("spring"), "should be ignored");
-    const pristine = planLiveInkStabilizer(planInput({ killSwitch }));
-    expect(pristine.lane).toBe("ema");
-    expect(pristine.params).toEqual({ strength: 0.35, predictionMs: 0 });
+    const emaProviderId = studioLiveInkStabilizerProviderId("ema");
+    killSwitch.kill(emaProviderId, "ema fault");
+    const ema = planLiveInkStabilizer(planInput({ killSwitch }));
+    expect(ema).toMatchObject({
+      lane: "ema",
+      providerId: emaProviderId,
+      status: "unavailable",
+      unavailableReason: "selected-provider-killed",
+    });
+    expect(ema.lane).not.toBe("spring");
+
+    const springProviderId = studioLiveInkStabilizerProviderId("spring");
+    killSwitch.kill(springProviderId, "spring fault");
+    const spring = planLiveInkStabilizer(
+      planInput({ stabilizer: graph({ kind: "spring" }), killSwitch }),
+    );
+    expect(spring).toMatchObject({
+      lane: "spring",
+      providerId: springProviderId,
+      status: "unavailable",
+      unavailableReason: "selected-provider-killed",
+    });
+    expect(() => runStudioLiveInkStabilizerPlan(spring, rampSamples(8))).toThrow(
+      /selected-provider-killed/u,
+    );
   });
 
   it("never lets ink resurrect smoothing an artist disabled", () => {

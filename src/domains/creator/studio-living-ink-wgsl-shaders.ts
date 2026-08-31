@@ -247,10 +247,10 @@ function wgslFloat(value: number): string {
  * This list exists because of how such a mistake fails. `createShaderModule` does not throw;
  * `createComputePipeline` does not throw either — it returns a pipeline object that is merely
  * *invalid*, so every dispatch using it is silently dropped. The runtime then computes nothing,
- * the display resolve still paints paper, and the frame looks plausible. Downstream, the WebGPU
- * factory's fallback stamps `backend: "webgpu-offscreen-half-float"` onto a WebGL2 runtime, so even
- * the backend-identity gate reads as if WGSL ran. Two shipped shaders were dead this way and the
- * whole visual gate agreed with itself.
+ * the display resolve still paints paper, and the frame looks plausible. A historical WebGPU
+ * factory also relabelled WebGL2 after failed admission, so even the backend-identity gate once
+ * agreed. Explicit provider selection now forbids that substitution; this lexical gate catches the
+ * shader failure itself before runtime admission.
  *
  * The full WGSL reserved list is much longer; this is the subset that collides with plausible
  * identifiers in this file's vocabulary. Add to it rather than removing from it.

@@ -47,13 +47,11 @@ function receipt(requestId: number): StudioVelloHubRenderReceipt {
     requestId,
     primarySurfaceOwner: "vello-hub",
     islandScope: "document-vector-hybrid",
-    backendId: "vello-cpu",
-    decision: "initial-reference",
+    backendId: "vello-gpu-browser",
+    decision: "gpu-first",
     expectedGainPct: null,
-    fallback: null,
-    preservedLastGoodFrame: false,
-    visualGate: null,
-    admissionMode: "gpu-first-shadow-candidate",
+    referenceOnly: false,
+    admissionMode: "selected-gpu-provider",
     productWidePromoted: false,
   };
 }
@@ -131,7 +129,7 @@ describe("StudioVelloHubSurface product lifecycle", () => {
     });
     expect(disposeHub).not.toHaveBeenCalled();
     expect(destroyTarget).not.toHaveBeenCalled();
-    expect(authorities.at(-1)?.status).not.toBe("fallback");
+    expect(authorities.at(-1)?.status).not.toBe("unavailable");
 
     await act(async () => {
       second.resolve(receipt(2));
@@ -140,12 +138,12 @@ describe("StudioVelloHubSurface product lifecycle", () => {
     await waitFor(() => {
       expect(authorities.at(-1)).toMatchObject({
         status: "active",
-        backendId: "vello-cpu",
+        backendId: "vello-gpu-browser",
       });
     });
   });
 
-  it("turns an unrecoverable Hub fallback into an explicit Pixi ownership handoff", async () => {
+  it("surfaces Hub unavailability without destroying the retained Vello surface", async () => {
     renderHub.mockResolvedValue(receipt(1));
     const authorities: StudioVelloHubAuthority[] = [];
     const mountParent = document.createElement("div");
@@ -174,20 +172,21 @@ describe("StudioVelloHubSurface product lifecycle", () => {
     const options = mocks.createHub.mock.calls[0]?.[0] as StudioVelloHubOptions;
 
     act(() => {
-      options.onUnrecoverableFallback?.({
-        source: "device-loss-fallback",
-        reason: "vello-cpu-render-failed",
-        cause: new Error("vello-cpu-render-failed"),
+      options.onUnavailable?.({
+        source: "device-loss",
+        backendId: null,
+        reason: "GPUDevice lost",
+        cause: new Error("GPUDevice lost"),
       });
     });
 
-    expect(disposeHub).toHaveBeenCalledOnce();
-    expect(destroyTarget).toHaveBeenCalledOnce();
+    expect(disposeHub).not.toHaveBeenCalled();
+    expect(destroyTarget).not.toHaveBeenCalled();
     expect(authorities.at(-1)).toEqual({
-      status: "fallback",
+      status: "unavailable",
       backendId: null,
       decision: null,
-      reason: "device-loss-fallback:vello-cpu-render-failed",
+      reason: "device-loss:GPUDevice lost",
     });
   });
 });

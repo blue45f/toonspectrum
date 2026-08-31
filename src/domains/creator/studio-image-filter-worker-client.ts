@@ -46,9 +46,13 @@ export interface StudioImageFilterWorkerLike {
 
 export type StudioImageFilterWorkerFactory = () => StudioImageFilterWorkerLike | null;
 
+export type StudioImageFilterExecutionMode = "worker" | "direct";
+
 export interface StudioImageFilterWorkerClientOptions {
   signal?: AbortSignal;
-  /** `null` explicitly selects the synchronous fallback; omitted uses the Vite module worker. */
+  /** Execution authority is selected before the request starts and never changes afterward. */
+  executionMode?: StudioImageFilterExecutionMode;
+  /** Test/integration seam for the selected Worker mode. `null` means unavailable, not direct. */
   workerFactory?: StudioImageFilterWorkerFactory | null;
 }
 
@@ -105,6 +109,15 @@ function createAbortError(): Error {
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createAbortError();
+}
+
+function createWorkerUnavailableError(message: string, cause?: unknown): Error {
+  const error = new Error(
+    message,
+    cause === undefined ? undefined : { cause },
+  );
+  error.name = "StudioImageFilterWorkerUnavailableError";
+  return error;
 }
 
 type ExhaustiveImageFilterFieldProjection = ImageFilterFields & Record<keyof ImageFilterFields, unknown>;
@@ -311,14 +324,6 @@ function runImageFilterWithWorker(
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
-    const resolveDirectFallback = () => finish(() => {
-      try {
-        resolve(runImageFilterDirect(request, signal));
-      } catch (error) {
-        reject(error);
-      }
-    });
-
     worker.onmessage = (event) => {
       const response = event.data;
       if (
@@ -338,9 +343,12 @@ function runImageFilterWithWorker(
         try {
           requestPosted = true;
           worker.postMessage(message, studioImageFilterRequestTransfers(message));
-        } catch {
+        } catch (error) {
           requestPosted = false;
-          resolveDirectFallback();
+          finish(() => reject(createWorkerUnavailableError(
+            "이미지 필터 Worker에 요청을 전달하지 못했습니다.",
+            error,
+          )));
         }
         return;
       }
@@ -366,14 +374,14 @@ function runImageFilterWithWorker(
     };
     worker.onerror = (event) => {
       event.preventDefault?.();
-      if (!requestPosted) {
-        resolveDirectFallback();
-        return;
-      }
       const error =
         event.error instanceof Error
           ? event.error
-          : new Error(event.message || "이미지 필터 Worker 실행 중 오류가 발생했습니다.");
+          : createWorkerUnavailableError(
+              event.message || (requestPosted
+                ? "이미지 필터 Worker 실행 중 오류가 발생했습니다."
+                : "이미지 필터 Worker를 준비하지 못했습니다."),
+            );
       finish(() => reject(error));
     };
 
@@ -382,14 +390,19 @@ function runImageFilterWithWorker(
       onAbort();
       return;
     }
-    readyTimer = setTimeout(resolveDirectFallback, 3_000);
+    readyTimer = setTimeout(
+      () => finish(() => reject(createWorkerUnavailableError(
+        "이미지 필터 Worker가 준비 시간 안에 응답하지 않았습니다.",
+      ))),
+      3_000,
+    );
   });
 }
 
 /**
- * 이미지 보정 필터 체인을 한 번의 모듈 Worker 호출로 실행한다. ArrayBuffer 기반 imageData는
- * 소유권이 이전(detach)되어 전송된다. Worker를 못 만들면(구형 브라우저·CSP) 동일한
- * buildImageFilters/applyImageFilters 경로를 메인 스레드에서 동기 실행해 폴백한다.
+ * 이미지 보정 필터 체인을 요청 전에 선택한 단일 실행 모드로 처리한다. Worker 모드는
+ * ArrayBuffer 소유권을 이전하며, 준비/전송/실행 실패 뒤 direct 모드로 바뀌지 않는다.
+ * Direct 모드는 호출자가 `executionMode: "direct"`를 명시한 독립 요청에서만 허용된다.
  */
 export async function runStudioImageFilterWorker(
   request: StudioImageFilterWorkerRunRequest,
@@ -397,17 +410,25 @@ export async function runStudioImageFilterWorker(
 ): Promise<StudioImageFilterWorkerClientResult> {
   throwIfAborted(options.signal);
   const cloneSafeRequest = cloneSafeWorkerRequest(request);
+  const executionMode = options.executionMode ?? "worker";
+  if (executionMode === "direct") {
+    return runImageFilterDirect(cloneSafeRequest, options.signal);
+  }
   const factory =
     options.workerFactory === undefined ? createStudioImageFilterModuleWorker : options.workerFactory;
-  if (!factory) return runImageFilterDirect(cloneSafeRequest, options.signal);
+  if (!factory) {
+    throw createWorkerUnavailableError("이미지 필터 Worker를 사용할 수 없습니다.");
+  }
 
   let worker: StudioImageFilterWorkerLike | null;
   try {
     worker = factory();
-  } catch {
-    return runImageFilterDirect(cloneSafeRequest, options.signal);
+  } catch (error) {
+    throw createWorkerUnavailableError("이미지 필터 Worker를 만들지 못했습니다.", error);
   }
-  if (!worker) return runImageFilterDirect(cloneSafeRequest, options.signal);
+  if (!worker) {
+    throw createWorkerUnavailableError("이미지 필터 Worker를 사용할 수 없습니다.");
+  }
   return runImageFilterWithWorker(worker, cloneSafeRequest, options.signal);
 }
 
@@ -428,8 +449,9 @@ type StudioImageFilterSessionTask = {
  * recovers from a genuinely wedged runtime.
  */
 export function createStudioImageFilterWorkerSession(
-  options: Pick<StudioImageFilterWorkerClientOptions, "workerFactory"> = {},
+  options: Pick<StudioImageFilterWorkerClientOptions, "executionMode" | "workerFactory"> = {},
 ): StudioImageFilterWorkerSession {
+  const executionMode = options.executionMode ?? "worker";
   const factory = options.workerFactory === undefined
     ? createStudioImageFilterModuleWorker
     : options.workerFactory;
@@ -437,7 +459,6 @@ export function createStudioImageFilterWorkerSession(
   let current: StudioImageFilterSessionTask | null = null;
   let worker: StudioImageFilterWorkerLike | null = null;
   let ready = false;
-  let directOnly = factory === null;
   let disposed = false;
   let readyTimer: ReturnType<typeof setTimeout> | null = null;
   let runTimer: ReturnType<typeof setTimeout> | null = null;
@@ -496,11 +517,12 @@ export function createStudioImageFilterWorkerSession(
     });
   };
 
-  const switchToDirect = () => {
-    directOnly = true;
+  const rejectCurrentWorkerUnavailable = (message: string, cause?: unknown) => {
     closeWorker();
-    if (current) runCurrentDirect();
-    else queueMicrotask(pump);
+    completeCurrent((task) => settle(
+      task,
+      () => task.reject(createWorkerUnavailableError(message, cause)),
+    ));
   };
 
   const postCurrent = () => {
@@ -528,9 +550,12 @@ export function createStudioImageFilterWorkerSession(
           () => pending.reject(new Error("이미지 필터 Worker 계산 시간이 초과되었습니다.")),
         ));
       }, 30_000);
-    } catch {
+    } catch (error) {
       task.posted = false;
-      switchToDirect();
+      rejectCurrentWorkerUnavailable(
+        "이미지 필터 Worker에 요청을 전달하지 못했습니다.",
+        error,
+      );
     }
   };
 
@@ -598,36 +623,37 @@ export function createStudioImageFilterWorkerSession(
     };
     worker.onerror = (event) => {
       event.preventDefault?.();
-      const task = current;
-      const wasPosted = task?.posted === true;
       const error = event.error instanceof Error
         ? event.error
-        : new Error(event.message || "이미지 필터 Worker 실행 중 오류가 발생했습니다.");
+        : createWorkerUnavailableError(
+            event.message || "이미지 필터 Worker 실행 중 오류가 발생했습니다.",
+          );
       closeWorker();
-      if (!wasPosted) {
-        directOnly = true;
-        if (current) runCurrentDirect();
-        else queueMicrotask(pump);
-        return;
-      }
       completeCurrent((pending) => settle(pending, () => pending.reject(error)));
     };
-    readyTimer = setTimeout(switchToDirect, 3_000);
+    readyTimer = setTimeout(
+      () => rejectCurrentWorkerUnavailable(
+        "이미지 필터 Worker가 준비 시간 안에 응답하지 않았습니다.",
+      ),
+      3_000,
+    );
   };
 
   const ensureWorker = () => {
-    if (directOnly || worker || disposed || !factory) return;
+    if (worker || disposed) return;
+    if (!factory) {
+      rejectCurrentWorkerUnavailable("이미지 필터 Worker를 사용할 수 없습니다.");
+      return;
+    }
     try {
       const nextWorker = factory();
       if (!nextWorker) {
-        directOnly = true;
-        queueMicrotask(pump);
+        rejectCurrentWorkerUnavailable("이미지 필터 Worker를 사용할 수 없습니다.");
         return;
       }
       attachWorker(nextWorker);
-    } catch {
-      directOnly = true;
-      queueMicrotask(pump);
+    } catch (error) {
+      rejectCurrentWorkerUnavailable("이미지 필터 Worker를 만들지 못했습니다.", error);
     }
   };
 
@@ -643,7 +669,7 @@ export function createStudioImageFilterWorkerSession(
       break;
     }
     if (!current) return;
-    if (directOnly) {
+    if (executionMode === "direct") {
       runCurrentDirect();
       return;
     }
@@ -758,8 +784,9 @@ function residentSourceMatchesTask(
  * from another source; Worker generation/request correlation rejects stale responses fail-closed.
  */
 export function createStudioImageFilterResidentWorkerSession(
-  options: Pick<StudioImageFilterWorkerClientOptions, "workerFactory"> = {},
+  options: Pick<StudioImageFilterWorkerClientOptions, "executionMode" | "workerFactory"> = {},
 ): StudioImageFilterResidentWorkerSession {
+  const executionMode = options.executionMode ?? "worker";
   const factory = options.workerFactory === undefined
     ? createStudioImageFilterModuleWorker
     : options.workerFactory;
@@ -767,7 +794,6 @@ export function createStudioImageFilterResidentWorkerSession(
   let current: StudioImageFilterResidentSessionTask | null = null;
   let worker: StudioImageFilterWorkerLike | null = null;
   let ready = false;
-  let directOnly = factory === null;
   let disposed = false;
   let readyTimer: ReturnType<typeof setTimeout> | null = null;
   let runTimer: ReturnType<typeof setTimeout> | null = null;
@@ -843,11 +869,12 @@ export function createStudioImageFilterResidentWorkerSession(
     });
   };
 
-  const switchToDirect = () => {
-    directOnly = true;
+  const rejectCurrentWorkerUnavailable = (message: string, cause?: unknown) => {
     closeWorker();
-    if (current) runCurrentDirect();
-    else queueMicrotask(pump);
+    completeCurrent((task) => settle(
+      task,
+      () => task.reject(createWorkerUnavailableError(message, cause)),
+    ));
   };
 
   const rejectCurrentProtocol = (message: string) => {
@@ -894,11 +921,14 @@ export function createStudioImageFilterResidentWorkerSession(
     try {
       armRunTimer();
       worker.postMessage(message, []);
-    } catch {
+    } catch (error) {
       if (runTimer !== null) clearTimeout(runTimer);
       runTimer = null;
       task.phase = "queued";
-      switchToDirect();
+      rejectCurrentWorkerUnavailable(
+        "이미지 필터 Worker에 실행 요청을 전달하지 못했습니다.",
+        error,
+      );
     }
   };
 
@@ -942,12 +972,15 @@ export function createStudioImageFilterResidentWorkerSession(
     try {
       armRunTimer();
       worker.postMessage(message, studioImageFilterSourceLoadTransfers(message));
-    } catch {
+    } catch (error) {
       if (runTimer !== null) clearTimeout(runTimer);
       runTimer = null;
       task.phase = "queued";
       loadingSource = null;
-      switchToDirect();
+      rejectCurrentWorkerUnavailable(
+        "이미지 필터 Worker에 원본을 전달하지 못했습니다.",
+        error,
+      );
     }
   };
 
@@ -1061,36 +1094,37 @@ export function createStudioImageFilterResidentWorkerSession(
     };
     worker.onerror = (event) => {
       event.preventDefault?.();
-      const task = current;
-      const wasPosted = task != null && task.phase !== "queued";
       const error = event.error instanceof Error
         ? event.error
-        : new Error(event.message || "이미지 필터 Worker 실행 중 오류가 발생했습니다.");
+        : createWorkerUnavailableError(
+            event.message || "이미지 필터 Worker 실행 중 오류가 발생했습니다.",
+          );
       closeWorker();
-      if (!wasPosted) {
-        directOnly = true;
-        if (current) runCurrentDirect();
-        else queueMicrotask(pump);
-        return;
-      }
       completeCurrent((pending) => settle(pending, () => pending.reject(error)));
     };
-    readyTimer = setTimeout(switchToDirect, 3_000);
+    readyTimer = setTimeout(
+      () => rejectCurrentWorkerUnavailable(
+        "이미지 필터 Worker가 준비 시간 안에 응답하지 않았습니다.",
+      ),
+      3_000,
+    );
   };
 
   const ensureWorker = () => {
-    if (directOnly || worker || disposed || !factory) return;
+    if (worker || disposed) return;
+    if (!factory) {
+      rejectCurrentWorkerUnavailable("이미지 필터 Worker를 사용할 수 없습니다.");
+      return;
+    }
     try {
       const nextWorker = factory();
       if (!nextWorker) {
-        directOnly = true;
-        queueMicrotask(pump);
+        rejectCurrentWorkerUnavailable("이미지 필터 Worker를 사용할 수 없습니다.");
         return;
       }
       attachWorker(nextWorker);
-    } catch {
-      directOnly = true;
-      queueMicrotask(pump);
+    } catch (error) {
+      rejectCurrentWorkerUnavailable("이미지 필터 Worker를 만들지 못했습니다.", error);
     }
   };
 
@@ -1106,7 +1140,7 @@ export function createStudioImageFilterResidentWorkerSession(
       break;
     }
     if (!current) return;
-    if (directOnly) {
+    if (executionMode === "direct") {
       runCurrentDirect();
       return;
     }

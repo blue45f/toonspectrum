@@ -212,16 +212,21 @@ export type StudioHokusaiLiveRouteResult =
       }>;
     }>
   | Readonly<{
-      readonly status: "fallback";
+      /** The pre-stroke admission was rejected; no alternative provider ran. */
+      readonly status: "unavailable";
       readonly reason:
         | "provider-failed"
         | "provider-loading"
         | "provider-unavailable"
         | "runtime-capability-rejected";
-      readonly backendId: "existing-exact-route";
-      readonly ownership: "pinned-for-entire-stroke";
-      readonly retryPromotion: "next-stroke-only";
-      readonly selectedStrokeConversionAvailable: true;
+      /** The provider that the caller selected before the attempted stroke. */
+      readonly selectedBackendId: "hokusai-myb-worker";
+      /** The rejection happens before the first sample is retained or transferred. */
+      readonly retainedInput: false;
+      /** No Hokusai frame exists for a stroke that never began. */
+      readonly lastGoodFrame: null;
+      /** The selected provider can only be tried again at a new stroke boundary. */
+      readonly nextStrokeOnly: true;
     }>
   | Readonly<{
       readonly status: "not-applicable";
@@ -459,26 +464,26 @@ export function resolveStudioHokusaiLiveRoute(
   ) return { status: "not-applicable", reason: "invalid-input" };
   if (input.providerState !== "ready") {
     return {
-      status: "fallback",
+      status: "unavailable",
       reason: input.providerState === "loading"
         ? "provider-loading"
         : input.providerState === "failed"
           ? "provider-failed"
           : "provider-unavailable",
-      backendId: "existing-exact-route",
-      ownership: "pinned-for-entire-stroke",
-      retryPromotion: "next-stroke-only",
-      selectedStrokeConversionAvailable: true,
+      selectedBackendId: "hokusai-myb-worker",
+      retainedInput: false,
+      lastGoodFrame: null,
+      nextStrokeOnly: true,
     };
   }
   if (!studioHokusaiLiveCapabilitiesAreAdmissible(input.capabilities)) {
     return {
-      status: "fallback",
+      status: "unavailable",
       reason: "runtime-capability-rejected",
-      backendId: "existing-exact-route",
-      ownership: "pinned-for-entire-stroke",
-      retryPromotion: "next-stroke-only",
-      selectedStrokeConversionAvailable: true,
+      selectedBackendId: "hokusai-myb-worker",
+      retainedInput: false,
+      lastGoodFrame: null,
+      nextStrokeOnly: true,
     };
   }
   return {

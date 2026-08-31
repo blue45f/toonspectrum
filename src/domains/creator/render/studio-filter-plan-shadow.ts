@@ -9,34 +9,17 @@ import {
 import type { StudioFilterLane } from "../filter/studio-filter-lane-cost-model";
 
 /**
- * V11 strangler bridge — 필터 planner 위임, shadow step (ADR 0001 pattern).
+ * Observation-only parity bridge for the selected image-filter provider.
  *
- * studio-filter-island-plan.ts (step c) already lets the HybridExecutionPlanner
- * produce the image-filter *fallback ladder*, but the execution-route head —
- * "does the retained WebGPU preview run this request, or does the CPU pipeline"
- * — is still an inline legacy gate in StudioKonvaImageNode
- * (`useRetainedGpuPreview`). This module expresses that decision as planner
- * capability queries and is checked for exhaustive parity against
- * resolveStudioFilterExecutionRoute, the same way studio-surface-plan-shadow
- * checks the 8-lane stroke ladder. It renders nothing, dispatches no GPU work,
- * and never takes authority: the legacy gate keeps deciding, the planner's
- * decision is computed alongside and compared, and the comparison is
- * observable as a receipt/counter (recordStudioFilterExecutionShadow).
- *
- * Parity here is the delegation precondition: only after the planner provably
- * reproduces the execution-route contract — exhaustively in CI and without
- * live drift in the receipts — may a later slice flip authority.
- *
- * Fail closed: incomplete or malformed planner inputs are recorded as a miss
- * and resolve to the CPU lane; nothing in this module may ever throw into the
- * filter path, and an input gap can never grant the GPU lane.
+ * It snapshots the pre-execution capability decision, asks the registry for
+ * that same single provider, and records divergence. It renders no pixels and
+ * cannot choose a replacement provider. Malformed input records a miss and
+ * never grants WebGPU execution.
  */
 
 /**
- * Filter execution route lanes, ladder order (head candidate first).
- * `konva-native` is the terminal fallback of the ladder; at this planning
- * seam it is never the head — the Konva synchronous cache takes over only via
- * runtime failure keys, which are not planning inputs.
+ * Filter execution route identities. Exactly one is selected for an operation; this order is
+ * stable identity/inspection order and is not an execution fallback ladder.
  */
 export const STUDIO_FILTER_EXECUTION_ROUTE_PRIORITY = [
   "gpu-chain",
@@ -52,7 +35,7 @@ const EXEC_PROVIDER_PREFIX = "filter-exec-";
  * field is enumerable so the parity test can walk the full state space.
  */
 export interface StudioFilterExecutionRouteSnapshotInput {
-  /** Head of the (already planner-produced) island ladder after cost/tournament. */
+  /** Exact island lane selected by the planner before execution. */
   readonly islandHeadLane: StudioFilterLane;
   /** The dynamically imported GPU filter module resolved to a module object. */
   readonly gpuModuleReady: boolean;
@@ -136,12 +119,12 @@ function isValidSnapshot(
 }
 
 /**
- * Legacy execution-route contract, replicated verbatim from the
+ * Execution-route contract, replicated from the
  * `useRetainedGpuPreview` gate in StudioKonvaImageNode: the GPU chain heads
  * the request only when the island ladder elected it AND the module, both
  * presentation entry points, and a mask-free program all hold. Everything
- * else runs the CPU pipeline (the Worker lane; Konva-native is reached only
- * through runtime failure keys, never at planning time).
+ * else selects the CPU Worker compatibility boundary before execution. A later
+ * GPU failure does not authorize Worker or Konva execution.
  *
  * The live recorder compares this replica against the actual inline gate on
  * every real request, so a drift between the two is observable in the receipt
@@ -168,29 +151,13 @@ export function resolveStudioFilterExecutionRoute(
 export function admittedStudioFilterExecutionLanes(
   input: StudioFilterExecutionRouteSnapshotInput,
 ): StudioFilterLane[] {
-  const lanes: StudioFilterLane[] = [];
-  if (
-    input.islandHeadLane === "gpu-chain" &&
-    input.gpuModuleReady &&
-    !input.maskActive &&
-    input.presentChainAvailable &&
-    input.presentationSurfaceAvailable
-  ) {
-    lanes.push("gpu-chain");
-  }
-  // The observation seam sits inside the Worker-admitted effect, so the CPU
-  // pipeline is admitted by construction; Konva-native stays the terminal
-  // ladder tail (runtime-failure fallback, not a planning-time head).
-  lanes.push("worker");
-  lanes.push("konva-native");
-  return lanes;
+  return [resolveStudioFilterExecutionRoute(input)];
 }
 
-/** Execution lanes as V11 providers, ladder order = registration order. */
+/** Execution lanes as V11 observation providers; registration order has no execution authority. */
 function buildShadowRegistry(): EngineCapabilityRegistry {
   const registry = new EngineCapabilityRegistry();
-  STUDIO_FILTER_EXECUTION_ROUTE_PRIORITY.forEach((lane, index) => {
-    const next = STUDIO_FILTER_EXECUTION_ROUTE_PRIORITY[index + 1] ?? null;
+  STUDIO_FILTER_EXECUTION_ROUTE_PRIORITY.forEach((lane) => {
     const descriptor = providerDescriptorSchema.parse({
       id: `${EXEC_PROVIDER_PREFIX}${lane}`,
       kind: "filter",
@@ -206,7 +173,6 @@ function buildShadowRegistry(): EngineCapabilityRegistry {
       finalQuality: "production",
       determinism: "tolerance",
       memoryEstimateMb: lane === "gpu-chain" ? 24 : 8,
-      fallbackProviderId: next === null ? null : `${EXEC_PROVIDER_PREFIX}${next}`,
       knownIssues: [],
     });
     registry.registerTrustedBootstrap(
@@ -267,12 +233,13 @@ export function planStudioFilterExecutionShadow(
       // mode — same reasoning as studio-filter-island-plan.ts, which keeps
       // absolute rule 8 (no interactive readback) machine-checked.
       mode: "final-export",
-      primaryCandidates: [`${EXEC_PROVIDER_PREFIX}konva-native`],
+      primaryOwnerId: `${EXEC_PROVIDER_PREFIX}konva-native`,
       islands: [
         {
           islandId: "image-filter-execution",
           kind: "filter",
           requiredCapabilities: [`filter.exec.${targetLane ?? "worker"}`],
+          selectedProviderId: `${EXEC_PROVIDER_PREFIX}${targetLane ?? "worker"}`,
           availableTransports: ["cpu-readback"],
         },
       ],

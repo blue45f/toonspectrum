@@ -133,6 +133,9 @@ describe("pending stroke lifecycle source contract", () => {
 
     expect(persistence).toContain("hasDirtyStableState");
     expect(persistence).toContain("hasDirtyPendingState");
+    expect(persistence).toContain("receiptEligiblePendingStrokes");
+    expect(persistence).toContain("hasExactSelectedGpuFinalReceipt(stroke.id)");
+    expect(persistence).toContain("pending: durableEffectivePendingBatch");
     expect(persistence).toContain("createStudioLifecycleEmergencyAutosave");
     expect(persistence).not.toContain("writeStudioLifecycleAutosave");
     expect(persistence).not.toContain("localStorage.setItem");
@@ -148,6 +151,8 @@ describe("pending stroke lifecycle source contract", () => {
 
     expect(queue).toContain("setUnloadGuardArmed(true)");
     expect(queue).toContain("globalThis.queueMicrotask(() => {");
+    expect(queue).toContain("selectedGpuStrokeRequiresFinalReceipt(finished.id)");
+    expect(queue).toContain("!hasExactSelectedGpuFinalReceipt(finished.id)");
     expect(queue).toContain('persistPendingStrokeEmergencyAutosaveRef.current("pointerup")');
     expect(queue.indexOf("setUnloadGuardArmed(true)")).toBeLessThan(
       queue.indexOf("globalThis.queueMicrotask(() => {")
@@ -182,6 +187,11 @@ describe("pending stroke lifecycle source contract", () => {
     expect(drawingStart).toContain("!flushPendingStrokeCommitsRef.current()");
     expect(flushPipeline).toContain("return false");
     expect(flushPipeline).toContain("return true");
+    expect(flushPipeline).toContain(
+      "pendingBatchAwaitsSelectedGpuFinalReceipt(pendingBeforeReceiptGate)",
+    );
+    expect(flushPipeline.indexOf("pendingBatchAwaitsSelectedGpuFinalReceipt"))
+      .toBeLessThan(flushPipeline.indexOf("takePendingStrokeCommits()"));
     expect(pageCommit).toContain("pendingBatch && !flushPendingStrokeCommitsRef.current()");
     expect(pageCommit).toContain("options.pendingStrokePolicy !== \"drop\"");
     expect(pageCommit).toContain("projectStudioPendingStrokes(nextPages");

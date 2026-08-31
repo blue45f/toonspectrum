@@ -466,17 +466,22 @@ describe("studio-vrm-texture-geometry-index Worker precompute", () => {
     expect(budgetWorker.terminateCalls).toBe(1);
   });
 
-  it("uses only the bounded unavailable-Worker fallback and keeps sync guards compatible", async () => {
+  it("uses bounded direct only when selected and keeps Worker default fail-closed", async () => {
     const geometry = unitQuad();
-    const fallback = await precomputeStudioVrmTextureGeometryIndex(geometry, {
+    await expect(precomputeStudioVrmTextureGeometryIndex(geometry, {
+      workerFactory: null,
+    })).rejects.toMatchObject({ code: "worker-unavailable" });
+
+    const direct = await precomputeStudioVrmTextureGeometryIndex(geometry, {
+      executionBackend: "direct",
       workerFactory: null,
     });
-    expect(fallback.getIsland(1)).toEqual({
+    expect(direct.getIsland(1)).toEqual({
       id: 0,
       key: "uv:0",
       anchorFaceIndex: 0,
     });
-    expect(getStudioVrmTextureGeometryIndex(geometry)).toBe(fallback);
+    expect(getStudioVrmTextureGeometryIndex(geometry)).toBe(direct);
 
     invalidateStudioVrmTextureGeometryIndex(geometry);
     await expect(precomputeStudioVrmTextureGeometryIndex(geometry, {

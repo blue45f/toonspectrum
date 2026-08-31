@@ -3,8 +3,9 @@
 ## Decision
 
 Use the pinned upstream `InProgressStroke` as the default live geometry owner
-and retain `generateInkStrokeMesh` as both the exact final oracle and runtime
-fallback. The stable ToonStudio protocol is
+and retain `generateInkStrokeMesh` as the exact final oracle and an explicitly
+selected QA/benchmark reference. It is never entered after a product-path
+failure. The stable ToonStudio protocol is
 `toon-ink-mesh-delta-v1`; no engine object enters project IR.
 
 ## Incremental flow
@@ -47,15 +48,15 @@ through size behavior and tilt through rotation behavior. All values are
 validated before allocation; float overflow, NaN, infinity, invalid ranges,
 and reverse time are rejected.
 
-## Failure and fallback
+## Failure and explicit reference mode
 
-- Loader/ABI/provider policy can select the explicit
-  `single-shot-fallback` session.
+- QA and benchmark callers can explicitly select the
+  `single-shot-reference` session. Product initialization never selects it after a failure.
 - A negative C status faults and destroys the retained handle; no poisoned
   stroke is reused.
 - `reset()` reuses upstream allocations and restarts revision 0.
 - `cancel()` and `dispose()` destroy the handle and reject later use.
-- The fallback retains all input points, runs the existing single-shot API for
+- The reference backend retains all input points, runs the existing single-shot API for
   each prefix, and derives the same v1 delta in TypeScript. It is slower and
   crosses more WASM bytes, but its final result is the reference.
 
@@ -89,7 +90,8 @@ so device loss cannot erase or corrupt the user's authoritative ink.
 Admission is bounded to 32,768 input points, 524,288 vertices, 1,048,576
 triangles, 32 MiB resident geometry, 16 MiB per delta, and 16,777,216 backing
 pixels. Revision, count, length, finite-value, index, subrange offset, and
-device-buffer limits produce explicit fallback receipts rather than no-ops.
+device-buffer limits produce explicit preview-unavailable receipts rather than
+starting another geometry backend.
 
 ## Boundaries and quarantine
 

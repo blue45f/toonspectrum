@@ -12,6 +12,7 @@ import {
   createStudioPersistentCrc32Executor,
   createStudioWasmCrc32Kernel,
   STUDIO_WASM_CRC32_INPUT_OFFSET,
+  StudioPersistentCrc32UnavailableError,
   type StudioWasmCrc32KernelCreationResult,
 } from "./studio-wasm-crc32-kernel";
 
@@ -27,7 +28,7 @@ function deterministicBytes(byteLength: number, seed: number): Uint8Array {
 
 function createMemory32Kernel(maximumPages = BigInt(8)) {
   const runtime = createStudioWasmMemoryRuntime({
-    preferredMode: "i32",
+    selectedMode: "i32",
     initialPages: BigInt(1),
     maximumPages,
   });
@@ -210,7 +211,7 @@ describe("persistent CRC32 executor policy", () => {
     expect(runCount).toBe(2);
   });
 
-  it("falls back exactly to JS after initialization or run failure without retrying", () => {
+  it("fails closed after Memory64 initialization or run failure without executing JS", () => {
     let initializationAttempts = 0;
     const initFailureExecutor = createStudioPersistentCrc32Executor({
       minimumWasmBytes: 0,
@@ -221,11 +222,11 @@ describe("persistent CRC32 executor policy", () => {
     });
     const first = deterministicBytes(32, 10);
     const second = deterministicBytes(64, 11);
-    expect(initFailureExecutor.calculate(first)).toBe(
-      calculateStudioCrc32(first),
+    expect(() => initFailureExecutor.calculate(first)).toThrowError(
+      StudioPersistentCrc32UnavailableError,
     );
-    expect(initFailureExecutor.calculate(second)).toBe(
-      calculateStudioCrc32(second),
+    expect(() => initFailureExecutor.calculate(second)).toThrowError(
+      StudioPersistentCrc32UnavailableError,
     );
     expect(initializationAttempts).toBe(1);
 
@@ -244,11 +245,11 @@ describe("persistent CRC32 executor policy", () => {
         };
       },
     });
-    expect(runFailureExecutor.calculate(first)).toBe(
-      calculateStudioCrc32(first),
+    expect(() => runFailureExecutor.calculate(first)).toThrowError(
+      StudioPersistentCrc32UnavailableError,
     );
-    expect(runFailureExecutor.calculate(second)).toBe(
-      calculateStudioCrc32(second),
+    expect(() => runFailureExecutor.calculate(second)).toThrowError(
+      StudioPersistentCrc32UnavailableError,
     );
     expect(runAttempts).toBe(1);
   });

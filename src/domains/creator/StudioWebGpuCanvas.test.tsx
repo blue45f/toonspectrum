@@ -133,6 +133,12 @@ describe("StudioWebGpuCanvas", () => {
       "engineRef.current?.getPerformanceMetrics() ?? EMPTY_PERFORMANCE_METRICS",
     );
     expect(webGpuCanvasSource).not.toContain("setPerformanceMetrics");
+    expect(webGpuCanvasSource).toContain(
+      "readonly isBackendAvailable: () => boolean",
+    );
+    expect(webGpuCanvasSource).toContain(
+      "engineRef.current?.isBackendAvailable() ?? false",
+    );
   });
 
   it("exposes one atomic suffix-batch command for live symmetry groups", () => {
@@ -147,7 +153,7 @@ describe("StudioWebGpuCanvas", () => {
     );
   });
 
-  it("exposes suffix-only journal commands without retaining a full fallback frame", () => {
+  it("exposes suffix-only journal commands without retaining a full replacement frame", () => {
     expect(webGpuCanvasSource).toContain(
       ") => StudioWebGpuJournalFeedOutcome",
     );

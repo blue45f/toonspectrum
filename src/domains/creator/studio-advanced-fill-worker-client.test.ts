@@ -133,11 +133,11 @@ class LoadErrorWorker extends HangingWorker {
 }
 
 describe("runStudioAdvancedFillWorker", () => {
-  it("falls back directly without detaching input when a worker is unavailable", async () => {
+  it("runs direct without detaching input only when direct mode is selected explicitly", async () => {
     const request = requestFixture();
     const targetData = request.target.data;
 
-    const output = await runStudioAdvancedFillWorker(request, { workerFactory: null });
+    const output = await runStudioAdvancedFillWorker(request, { executionMode: "direct" });
 
     expect(output.execution).toBe("direct");
     expect(output.originalTarget.data).toBe(targetData);
@@ -239,26 +239,21 @@ describe("runStudioAdvancedFillWorker", () => {
     expect(worker.terminateCount).toBe(1);
   });
 
-  it("uses the direct fallback when worker construction is blocked", async () => {
-    const output = await runStudioAdvancedFillWorker(requestFixture(), {
+  it("rejects when Worker construction is blocked without running direct", async () => {
+    await expect(runStudioAdvancedFillWorker(requestFixture(), {
       workerFactory: () => {
         throw new Error("worker blocked by policy");
       },
-    });
-
-    expect(output.execution).toBe("direct");
-    expect(output.result.diagnostics.status).toBe("applied");
+    })).rejects.toMatchObject({ name: "StudioAdvancedFillWorkerUnavailableError" });
   });
 
-  it("falls back after an asynchronous module-load error before ownership transfer", async () => {
+  it("rejects after an asynchronous module-load error before ownership transfer", async () => {
     const request = requestFixture();
     const targetData = request.target.data;
     const worker = new LoadErrorWorker();
 
-    const output = await runStudioAdvancedFillWorker(request, { workerFactory: () => worker });
-
-    expect(output.execution).toBe("direct");
-    expect(output.originalTarget.data).toBe(targetData);
+    await expect(runStudioAdvancedFillWorker(request, { workerFactory: () => worker }))
+      .rejects.toThrow("worker chunk failed to load");
     expect(targetData.byteLength).toBe(12);
     expect(worker.terminateCount).toBe(1);
   });
@@ -271,19 +266,21 @@ describe("runStudioAdvancedFillWorker", () => {
     };
 
     await expect(
-      runStudioAdvancedFillWorker(oversized, { workerFactory: null }),
+      runStudioAdvancedFillWorker(oversized, { executionMode: "direct" }),
     ).rejects.toThrow("직접 계산 안전 상한");
   });
 
-  it("uses the direct fallback when posting to the worker is synchronously blocked", async () => {
+  it("rejects when posting to the Worker is synchronously blocked", async () => {
     const worker = new ThrowingPostWorker();
-    const output = await runStudioAdvancedFillWorker(requestFixture(), {
+    await expect(runStudioAdvancedFillWorker(requestFixture(), {
       workerFactory: () => worker,
-    });
-
-    expect(output.execution).toBe("direct");
-    expect(output.result.diagnostics.status).toBe("applied");
+    })).rejects.toMatchObject({ name: "StudioAdvancedFillWorkerUnavailableError" });
     expect(worker.terminateCount).toBe(1);
+  });
+
+  it("rejects when the selected Worker authority is unavailable", async () => {
+    await expect(runStudioAdvancedFillWorker(requestFixture(), { workerFactory: null }))
+      .rejects.toMatchObject({ name: "StudioAdvancedFillWorkerUnavailableError" });
   });
 
   it("preserves a serialized worker error name and message", async () => {

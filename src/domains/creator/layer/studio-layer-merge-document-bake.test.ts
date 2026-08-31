@@ -75,6 +75,7 @@ describe("mixed document layer merge bake", () => {
       renderStudioVectorReference,
       {
         workerFactory: null,
+        rasterExecutionBackend: "custom",
         rasterize,
       },
     );

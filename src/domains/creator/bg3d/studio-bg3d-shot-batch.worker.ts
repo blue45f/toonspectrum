@@ -29,6 +29,7 @@ scope.addEventListener("message", (event: MessageEvent<unknown>) => {
   }
   const request = event.data;
   void buildStudioBg3dShotBatchArchive(request.images, {
+    crc32ExecutionMode: "direct-headless",
     ...(request.manifest ? { manifest: request.manifest } : {}),
     ...(request.layeredPsds ? { layeredPsds: request.layeredPsds } : {}),
     ...(request.contactSheets ? { contactSheets: request.contactSheets } : {}),

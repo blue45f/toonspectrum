@@ -295,36 +295,37 @@ describe("Studio VRM raster capture", () => {
     expect(HangingFileReader.last?.abort).toHaveBeenCalledOnce();
   });
 
-  it("uses the bounded compatibility encoder only for Worker capability failures", async () => {
-    const fallback = vi.fn(async (_rgba, dimensions) => png(dimensions.width, dimensions.height));
-    const deps = dependencies({
+  it("keeps Worker failure terminal and uses main-thread encoding only when preselected", async () => {
+    const encodePngOnMainThread = vi.fn(
+      async (_rgba, dimensions) => png(dimensions.width, dimensions.height),
+    );
+    const workerUnavailable = dependencies({
       encodePngInWorker: vi.fn(async () => {
         throw new StudioBg3dShotPngWorkerError("worker-unavailable");
       }),
-      encodePngOnMainThread: fallback,
+      encodePngOnMainThread,
     });
 
     await expect(encodeStudioVrmCapturePngDataUrl(
       new Uint8ClampedArray(8),
       { width: 2, height: 1 },
       {},
-      deps,
+      workerUnavailable,
+    )).rejects.toMatchObject({ code: "worker-unavailable" });
+    expect(encodePngOnMainThread).not.toHaveBeenCalled();
+
+    const explicitMainThread = dependencies({
+      encodePngInWorker: vi.fn(),
+      encodePngOnMainThread,
+    });
+    await expect(encodeStudioVrmCapturePngDataUrl(
+      new Uint8ClampedArray(8),
+      { width: 2, height: 1 },
+      { encoderBackend: "main-thread" },
+      explicitMainThread,
     )).resolves.toBe("data:image/png;base64,verified");
-    expect(fallback).toHaveBeenCalledOnce();
-
-    const failClosed = dependencies({
-      encodePngInWorker: vi.fn(async () => {
-        throw new StudioBg3dShotPngWorkerError("encode-failed");
-      }),
-      encodePngOnMainThread: fallback,
-    });
-    await expect(encodeStudioVrmCapturePngDataUrl(
-      new Uint8ClampedArray(8),
-      { width: 2, height: 1 },
-      {},
-      failClosed,
-    )).rejects.toMatchObject({ code: "encode-failed" });
-    expect(fallback).toHaveBeenCalledOnce();
+    expect(encodePngOnMainThread).toHaveBeenCalledOnce();
+    expect(explicitMainThread.encodePngInWorker).not.toHaveBeenCalled();
   });
 
   it("rejects malformed output, oversized requests, and already-aborted work", async () => {

@@ -31,6 +31,8 @@ import {
   STUDIO_BG3D_SHOT_PSD_MIME,
 } from "./studio-bg3d-shot-psd-contract";
 
+import type { StudioCrc32ExecutionMode } from "../studio-crc32-worker-client";
+
 export const STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS = 64;
 export const STUDIO_BG3D_SHOT_BATCH_MAX_ARTIFACTS = STUDIO_BG3D_SHOT_BATCH_MAX_FILES;
 export const STUDIO_BG3D_SHOT_BATCH_MAX_ARCHIVE_ARTIFACTS =
@@ -233,8 +235,8 @@ export interface StudioBg3dShotBatchBuildOptions {
   readonly manifest?: StudioBg3dShotBatchManifestContext;
   readonly layeredPsds?: readonly StudioBg3dShotBatchLayeredPsd[];
   readonly contactSheets?: readonly StudioBg3dShotBatchContactSheet[];
-  /** CLI/test-only escape hatch; browser runtimes still require the large-entry CRC Worker. */
-  readonly allowLargeDirectArchiveCrcInHeadless?: boolean;
+  /** Fixed before ZIP construction. The archive Worker selects `direct-headless`. */
+  readonly crc32ExecutionMode?: StudioCrc32ExecutionMode;
 }
 
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,79}$/u;
@@ -1543,7 +1545,7 @@ export async function buildStudioBg3dShotBatchArchive(
     })),
   ], {
     mimeType: "application/zip",
-    allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
+    crc32ExecutionMode: options.crc32ExecutionMode ?? "worker",
     signal,
     limits: {
       maxFiles: STUDIO_BG3D_SHOT_BATCH_MAX_ARCHIVE_ARTIFACTS + 1,

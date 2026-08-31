@@ -254,10 +254,10 @@ describe("studio-living-ink-wgsl-shaders", () => {
    * A WGSL reserved word in a declaration is the worst kind of shader bug, because nothing throws:
    * `createComputePipeline` hands back an *invalid* pipeline and every dispatch against it is
    * silently dropped. The runtime then computes nothing while still presenting a plausible frame,
-   * and — because the WebGPU factory's fallback stamps the WebGPU backend name onto a WebGL2
-   * runtime — even the backend-identity gate reads as if WGSL had run. Two shipped kernels (`splat`
-   * and `splat-velocity`, both declaring `from: vec2f`) were dead exactly this way while the visual
-   * gate reported near-parity.
+   * and a historical WebGPU factory could then relabel a WebGL2 runtime after failed admission.
+   * Explicit provider selection now rejects that substitution, while this test catches the shader
+   * defect itself. Two shipped kernels (`splat` and `splat-velocity`, both declaring `from: vec2f`)
+   * were dead exactly this way while the old visual gate reported near-parity.
    */
   it("declares no WGSL reserved word as an identifier", () => {
     const reserved = new Set(STUDIO_LIVING_INK_WGSL_RESERVED_IDENTIFIERS);

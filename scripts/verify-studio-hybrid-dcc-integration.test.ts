@@ -496,6 +496,40 @@ describe("Studio Hybrid DCC production-preview integration evidence", () => {
     expect(source).not.toMatch(/(?:pnpm|npm|yarn)[^\n]*\bbuild\b/u);
   });
 
+  it("preselects one explicit BG3D backend before inspecting the handed-off layer", () => {
+    const source = readFileSync(
+      new URL("./verify-studio-hybrid-dcc-integration.mts", import.meta.url),
+      "utf8",
+    );
+    const viewTabIndex = source.indexOf('const viewTab = bg3dDialog.getByRole("tab"');
+    const selectionIndex = source.indexOf(
+      'getByTestId("studio-bg3d-engine-preference-webgl2")',
+      viewTabIndex,
+    );
+    const activeIndex = source.indexOf(
+      '[data-testid="studio-bg3d-engine-active-backend"]',
+      selectionIndex,
+    );
+    const canvasIndex = source.indexOf(
+      'getByTestId("studio-bg3d-viewport").locator("canvas")',
+      activeIndex,
+    );
+    const layersIndex = source.indexOf("const layersTab =", canvasIndex);
+    const identityIndex = source.indexOf(
+      'getByRole("button", { name: assetId, exact: true })',
+      layersIndex,
+    );
+
+    expect(viewTabIndex).toBeGreaterThan(-1);
+    expect(selectionIndex).toBeGreaterThan(viewTabIndex);
+    expect(source).toContain("await webgl2.click();");
+    expect(source).not.toContain("if (await webgl2");
+    expect(activeIndex).toBeGreaterThan(selectionIndex);
+    expect(canvasIndex).toBeGreaterThan(activeIndex);
+    expect(layersIndex).toBeGreaterThan(canvasIndex);
+    expect(identityIndex).toBeGreaterThan(layersIndex);
+  });
+
   it("anchors a durable receipt and OPFS signature before Redo, then requires a matching generation", () => {
     const source = readFileSync(
       new URL("./verify-studio-hybrid-dcc-integration.mts", import.meta.url),

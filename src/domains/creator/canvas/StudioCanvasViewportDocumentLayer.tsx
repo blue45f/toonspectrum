@@ -31,6 +31,8 @@ import { StudioKonvaImageNode } from "../StudioKonvaImageNode";
 import { StudioFocusLinesNode, StudioFramePanel, StudioSpeedLinesNode, StudioWorkAssetPlaceholderNode } from "../StudioKonvaPrimitiveNodes";
 import { StudioKonvaStickerNode, StudioKonvaTextNode } from "../StudioKonvaTextNodes";
 
+import { studioCanonicalDryMediaOwnsDocumentElement } from "./studio-canonical-dry-media-authority";
+
 import type {
   StudioCanvasViewportHandlers,
   StudioCanvasViewportProps,
@@ -828,9 +830,13 @@ export function StudioCanvasViewportDocumentLayer({
                   if (studioRasterHiddenOperationIds.has(el.id)) return null;
                   // The canonical-vNext dry-media canvas receives authority only after its
                   // RGBA16F producer fence and exact live/final/commit parity receipt complete.
-                  // This derived id and the child's `visible` prop flip in the same React commit,
-                  // so one stroke never exposes two tips or a transparent handoff frame.
-                  if (canonicalDryMediaHiddenElementId === el.id) return null;
+                  // This derived id stays owned when an unavailable specialist carries the exact
+                  // last-good WebGPU snapshot. Provider failure therefore cannot reveal Konva as
+                  // an automatic renderer fallback.
+                  if (studioCanonicalDryMediaOwnsDocumentElement(
+                    el.id,
+                    canonicalDryMediaHiddenElementId,
+                  )) return null;
                   const base = el.clipBelow && idx > 0 ? canvasRenderElements[idx - 1] : null;
                   // 자기 완결형 마스크(el.maskSrc) — clipBelow와 별개 축, 교집합으로 합성해야 하므로
                   // clipBelow보다 먼저 적용해 "이미 마스크 적용된 노드"를 만든다.

@@ -16,70 +16,28 @@ import {
 import {
   getStudioTournamentRuntime,
   peekStudioTournamentRuntime,
-  selectFilterLane,
 } from "../studio-renderer-tournament-runtime";
 
 import {
-  chooseLaneByCost,
-  gpuDispatchCountForChainSteps,
   megapixelsOf,
   type StudioFilterLane,
   type StudioFilterLaneCostRanking,
 } from "./studio-filter-lane-cost-model";
 
 /**
- * V11 strangler step (c) — first real-path delegation (ADR 0001 2차 개정).
+ * One-provider image-filter planning boundary.
  *
- * The image-filter island already follows V11 semantics: the GPU chain runs
- * with zero intermediate readbacks and exactly one final readback, `null`
- * means "lane declined, fall through", and the Konva-native synchronous cache
- * is the terminal fallback. This module makes that ladder an explicit
- * HybridExecutionPlanner product: lane order and the fallback chain come from
- * the registry, and the final readback is legal because the island plans in
- * "final-export" mode — the same request in "interactive" mode is rejected,
- * which keeps absolute rule 8 (no hot-path readback) machine-checked.
+ * Capability inspection selects WebGPU for a supported chain or the dedicated
+ * Worker for a chain that is unsupported before execution starts. `lanes` is
+ * retained only as a one-item compatibility projection for existing receipts;
+ * it is not a retry list. A killed or failed selected provider is unavailable
+ * and cannot grant Konva or another provider permission to execute the same
+ * operation.
  *
- * V12 §5 wiring: the planner ladder then passes through selectFilterLane so
- * the renderer tournament's persisted winner cache and remote kill switch act
- * on this real call path (StudioKonvaImageNode consumes `lanes`). With an
- * empty winner cache and nothing killed the ladder is byte-identical to the
- * planner output — the pre-tournament contract is preserved exactly.
- *
- * Size-aware lane order (this step): the head lane used to come from one
- * boolean, which made small canvases pay the GPU lane's ~2.4 ms submit +
- * readback floor for work the CPU lanes finish in a fraction of that. When the
- * caller supplies a workload the ladder is now cost-ordered by
- * studio-filter-lane-cost-model.ts. Three tiers, weakest first:
- *
- *   1. seed      — measured constants from tests/benchmarks/results/filter-lanes.json
- *   2. measured  — this device's own ProviderCostModel samples for this bucket
- *   3. winner    — the persisted tournament winner (selectFilterLane), applied last
- *
- * plus the remote kill switch, which always has the final word. Callers that
- * pass no workload keep the exact pre-existing size-blind ladder, and a
- * GPU-ineligible ladder is never reordered at all (the CPU lanes measured
- * identical, so there is nothing to decide and nothing to destabilise).
- *
- * V13 §2.5 (GPU planning, cost shadow): the authority plan is produced through
- * planWithCostShadow so a real workload fingerprint — assembled from the
- * island's own size/chain fields — feeds the observation-only cost ranking.
- * Disagreement receipts accumulate module-level
- * (readStudioFilterIslandCostShadowReceipt) as promotion evidence. Fail
- * closed: a missing or degenerate workload records an absent fingerprint and
- * ranks nothing; a cost-shadow failure falls back to the legacy planner; the
- * legacy winner keeps sole routing authority either way. Assembly is O(1)
- * arithmetic on fields already in hand — no scene walk, no GPU work, no
- * readbacks.
- *
- * P-02c (full-ladder observation): the authority query is capability-narrowed
- * to the head lane, so its cost receipt ranks a singleton and disagreement
- * evidence is structurally zero. A SECOND, observation-only query therefore
- * re-ranks the cost model over the FULL admitted ladder (the
- * "filter.phase.final" candidates restricted to the planner's fallback
- * chain) and feeds only the receipt — never the returned plan or lanes. It
- * runs at most once per island bucket (studioFilterIslandBucket) so the
- * dialog-open hot path pays one Set lookup after the first plan, and absent
- * workloads skip it entirely.
+ * The workload fingerprint and cost receipt remain observation-only evidence.
+ * They may describe the selected provider but never reorder or replace it.
+ * The final readback is explicit in the selected island's `final-export`
+ * contract; there are no intermediate interactive-path readbacks.
  */
 
 export type { StudioFilterLane } from "./studio-filter-lane-cost-model";
@@ -92,32 +50,28 @@ function buildFilterRegistry(): EngineCapabilityRegistry {
     lane: StudioFilterLane;
     displayName: string;
     runtime: "webgpu" | "js";
-    fallback: StudioFilterLane | null;
     limitations: string[];
   }> = [
     {
       lane: "gpu-chain",
       displayName: "WebGPU filter chain (M1, single terminal readback)",
       runtime: "webgpu",
-      fallback: "worker",
       limitations: [
         "supported 5-field chains only — isStudioGpuFilterChainEligible gates admission",
-        "returns null on unsupported chain/device loss; caller advances to the next lane",
+        "unsupported chain or device loss reports this selected lane unavailable",
       ],
     },
     {
       lane: "worker",
       displayName: "Dedicated-worker CPU filter pipeline",
       runtime: "js",
-      fallback: "konva-native",
-      limitations: ["worker-required chains fail closed instead of falling back"],
+      limitations: ["worker-required chains fail closed and preserve the last presented frame"],
     },
     {
       lane: "konva-native",
       displayName: "Konva synchronous cache filters",
       runtime: "js",
-      fallback: null,
-      limitations: ["static snapshot cache — animated GIF filters are a known no-op"],
+      limitations: ["manual compatibility/reference lane; never selected after another lane fails"],
     },
   ];
   for (const entry of lanes) {
@@ -136,8 +90,6 @@ function buildFilterRegistry(): EngineCapabilityRegistry {
       finalQuality: "production",
       determinism: "tolerance",
       memoryEstimateMb: entry.runtime === "webgpu" ? 24 : 8,
-      fallbackProviderId:
-        entry.fallback === null ? null : `${LANE_PROVIDER_PREFIX}${entry.fallback}`,
       knownIssues: [],
     });
     registry.registerTrustedBootstrap(
@@ -233,8 +185,8 @@ function scheduleTournamentBootstrap(): void {
         }
       })
       .catch((error: unknown) => {
-        // Do not construct a fallback-backed runtime after a failed module
-        // load. The planner ladder remains unchanged and the failure is
+        // Do not construct a replacement runtime after a failed module load.
+        // The selected provider remains unchanged and the failure is
         // observable for Studio reliability status/telemetry.
         console.warn("studio tournament persistence bootstrap skipped", error);
       });
@@ -259,25 +211,24 @@ export interface StudioFilterIslandPlanInput {
   gpuChainEligible: boolean;
   /**
    * Size + chain length of the work. Omitted/null keeps the historical
-   * size-blind ladder byte-for-byte (callers that cannot measure their
-   * workload must not be silently re-ordered).
+   * size-blind selection byte-for-byte (callers that cannot measure their
+   * workload must not be silently reassigned).
    */
   workload?: StudioFilterIslandWorkload | null;
 }
 
 export interface StudioFilterIslandPlan {
-  /** Ordered lanes; runtime advances on decline/failure of the current lane. */
-  lanes: StudioFilterLane[];
+  /** Compatibility projection of the one selected lane; it is never a retry ladder. */
+  lanes: readonly [StudioFilterLane];
+  /** The only provider allowed to execute this filter operation. */
+  selectedLane: StudioFilterLane;
+  /** A killed selected provider is unavailable; another provider is not substituted. */
+  status: "selected" | "unavailable";
+  unavailableReason: "selected-provider-killed" | null;
   plan: SurfacePlan;
   /**
-   * V12 §5 audit field: non-null only when the remote kill switch would have
-   * emptied the ladder and was therefore ignored (a fallback chain always
-   * survives). Null on the normal path.
-   */
-  killIgnoredReason: string | null;
-  /**
    * Cost ranking that produced the pre-tournament order, or null when the
-   * caller passed no workload / the ladder had no GPU lane to weigh.
+   * caller passed no workload or the selected provider has no useful comparison.
    */
   laneCosts: StudioFilterLaneCostRanking | null;
 }
@@ -486,8 +437,8 @@ function recordFilterIslandCostShadowReceipt(receipt: SurfaceCostShadowReceipt):
 
 /**
  * P-02c second query — observation only. Re-ranks the cost model over the
- * FULL admitted ladder (the "filter.phase.final" candidates restricted to
- * the authority plan's fallback chain) against the authority winner, and
+ * full admitted observation set (the "filter.phase.final" candidates restricted to
+ * the providers admitted before execution) against the authority winner, and
  * records the outcome into the receipt counters. Nothing here can reach the
  * returned plan or lane ladder: the function has no return value and no
  * caller reads its effects on the planning path. Ranking only admitted lanes
@@ -612,91 +563,48 @@ export function planStudioFilterIslandLanes(
     // Terminal single readback is part of this island's contract, so it must
     // plan as final-export; "interactive" would (correctly) refuse the plan.
     mode: "final-export",
-    primaryCandidates: [`${LANE_PROVIDER_PREFIX}konva-native`],
+    primaryOwnerId: `${LANE_PROVIDER_PREFIX}konva-native`,
     islands: [
       {
         islandId: "image-filter-chain",
         kind: "filter",
         requiredCapabilities: [`filter.lane.${headLane}`],
+        selectedProviderId: `${LANE_PROVIDER_PREFIX}${headLane}`,
         availableTransports: ["cpu-readback"],
         ...(fingerprint === undefined ? {} : { fingerprint }),
       },
     ],
   });
-  const plannedLanes = (plan.islands[0]?.fallbackChain ?? []).map(
-    (providerId) => providerId.slice(LANE_PROVIDER_PREFIX.length) as StudioFilterLane,
-  );
-  // V12 §5: tournament conclusions (persisted winners, remote kills) reorder
-  // or prune the planner ladder on this real call path. Empty cache + no
-  // kills ⇒ `selection.lanes` equals `plannedLanes` exactly.
-  //
-  // `peek`, never `get`: creating the shared runtime starts hydration, and
-  // hydration is what loads the persistence adapter's wasm. Planning stays a
-  // pure read of in-memory state; the adapter is installed and hydrated by
-  // the idle bootstrap scheduled at the end of this function.
+  const plannedProviderId = plan.islands[0]?.providerId;
+  if (!plannedProviderId?.startsWith(LANE_PROVIDER_PREFIX)) {
+    throw new Error("Studio filter planner returned an invalid selected provider.");
+  }
+  const selectedLane = plannedProviderId.slice(LANE_PROVIDER_PREFIX.length) as StudioFilterLane;
+  if (selectedLane !== "gpu-chain" && selectedLane !== "worker" && selectedLane !== "konva-native") {
+    throw new Error(`Studio filter planner selected an unknown lane: ${selectedLane}`);
+  }
+  // Tournament telemetry may deny this exact provider, but cached winners and cost observations
+  // cannot reorder or replace it. `peek` keeps persistence off the synchronous planning path.
   const runtime = peekStudioTournamentRuntime();
   const bucket = studioFilterIslandBucket(input);
-
-  // P-02c: second, observation-only query over the full admitted ladder.
-  // Feeds only the receipt counters; the plan and lanes below are computed
-  // exactly as if this call did not exist.
   observeFilterFullLadderCosts(
     bucket,
-    plannedLanes,
-    plan.islands[0]?.providerId ?? `${LANE_PROVIDER_PREFIX}konva-native`,
+    [selectedLane],
+    plannedProviderId,
     fingerprint,
   );
-
-  // Cost tier (seed, upgraded per lane by this device's measured samples).
-  // Only runs when there is a GPU lane in the ladder and a known workload:
-  // without a GPU lane the remaining CPU lanes measured identical, so any
-  // reorder would be noise, and without a workload we must not guess.
-  const pixelCount = input.workload ? resolvePixelCount(input.workload) : Number.NaN;
-  const costOrderable =
-    input.workload != null &&
-    Number.isFinite(pixelCount) &&
-    pixelCount > 0 &&
-    plannedLanes.includes("gpu-chain");
-  let laneCosts: StudioFilterLaneCostRanking | null = null;
-  if (costOrderable && input.workload) {
-    const chainSteps = Math.max(
-      1,
-      Number.isFinite(input.workload.chainSteps) ? input.workload.chainSteps : 1,
-    );
-    laneCosts = chooseLaneByCost(plannedLanes, {
-      megapixels: megapixelsOf(pixelCount),
-      chainSteps,
-      gpuDispatchCount:
-        input.workload.gpuDispatchCount ?? gpuDispatchCountForChainSteps(chainSteps),
-      measured: runtime
-        ? (lane) => runtime.costModel.estimate(studioFilterLaneProviderId(lane), bucket)
-        : null,
-    });
-  }
-
-  const orderedLanes = laneCosts?.lanes ?? plannedLanes;
-  // An unbooted tournament has no winners and nothing killed, so its
-  // projection is the identity — skipping it costs nothing and keeps this
-  // path from constructing (and hydrating) the runtime.
-  const selection = runtime
-    ? selectFilterLane({
-        lanes: orderedLanes,
-        bucket,
-        deviceHash: runtime.deviceHash,
-        winnerCache: runtime.winnerCache,
-        killSwitch: runtime.killSwitch,
-        laneProviderId: studioFilterLaneProviderId,
-      })
-    : { lanes: orderedLanes, killIgnoredReason: null };
+  const selectedProviderKilled = runtime?.killSwitch.isKilled(plannedProviderId) === true;
 
   // Last statement on purpose: everything above already produced the plan, so
   // the bootstrap can only ever run after this call returned.
   scheduleTournamentBootstrap();
 
   return {
-    lanes: selection.lanes,
+    lanes: [selectedLane],
+    selectedLane,
+    status: selectedProviderKilled ? "unavailable" : "selected",
+    unavailableReason: selectedProviderKilled ? "selected-provider-killed" : null,
     plan,
-    killIgnoredReason: selection.killIgnoredReason,
-    laneCosts,
+    laneCosts: null,
   };
 }

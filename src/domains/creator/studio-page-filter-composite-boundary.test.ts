@@ -224,6 +224,7 @@ describe("StudioPage page-composite filter integration boundary", () => {
     expect(text).toContain("const historyIndex = pagesHiRef.current");
     expect(text).toContain("const pageId = currentPageIdRef.current");
     expect(text).toContain("const controller = new AbortController()");
+    expect(text).toContain('rasterExecutionBackend: "offscreen-worker"');
     expect(text).toContain("signal: controller.signal");
     expect(text).toContain("pagesHiRef.current !== historyIndex");
     expect(text).toContain("currentPageIdRef.current !== pageId");

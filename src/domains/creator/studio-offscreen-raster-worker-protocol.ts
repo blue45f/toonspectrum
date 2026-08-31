@@ -42,7 +42,7 @@ export type StudioOffscreenRasterEncodeMime = (typeof STUDIO_OFFSCREEN_RASTER_EN
 export const STUDIO_OFFSCREEN_RASTER_FAILURE_CODES = [
   /** 메시지 형태가 계약과 다르다(어느 쪽에서든). */
   "protocol",
-  /** 이 런타임에 OffscreenCanvas / 2D 컨텍스트가 없다. 호출자는 메인스레드로 폴백할 수 있다. */
+  /** 이 런타임에 선택된 OffscreenCanvas / 2D 컨텍스트가 없다. 호출자는 명시적 unavailable 로 처리한다. */
   "unsupported",
   /** 치수·픽셀 수·소스 수 예산 초과. */
   "oversized",
@@ -269,11 +269,59 @@ function isBlobLike(value: unknown): value is Blob {
   if (!value || typeof value !== "object") return false;
   const BlobConstructor = (globalThis as { Blob?: unknown }).Blob;
   if (typeof BlobConstructor === "function" && value instanceof (BlobConstructor as never)) return true;
-  const candidate = value as { size?: unknown; type?: unknown; arrayBuffer?: unknown };
+  const candidate = value as { size?: unknown; type?: unknown; arrayBuffer?: unknown; slice?: unknown };
   return typeof candidate.size === "number"
     && candidate.size >= 0
     && typeof candidate.type === "string"
-    && typeof candidate.arrayBuffer === "function";
+    && typeof candidate.arrayBuffer === "function"
+    && typeof candidate.slice === "function";
+}
+
+function asciiAt(bytes: Uint8Array, offset: number, expected: string): boolean {
+  if (bytes.byteLength < offset + expected.length) return false;
+  for (let index = 0; index < expected.length; index += 1) {
+    if (bytes[offset + index] !== expected.charCodeAt(index)) return false;
+  }
+  return true;
+}
+
+/** MIME 라벨이 아니라 컨테이너 magic으로 Worker 인코더의 실제 출력 형식을 판별한다. */
+export function detectStudioOffscreenRasterEncodedMime(
+  bytes: Uint8Array,
+): StudioOffscreenRasterEncodeMime | null {
+  if (
+    bytes.byteLength >= 8
+    && bytes[0] === 0x89
+    && asciiAt(bytes, 1, "PNG")
+    && bytes[4] === 0x0d
+    && bytes[5] === 0x0a
+    && bytes[6] === 0x1a
+    && bytes[7] === 0x0a
+  ) return "image/png";
+  if (bytes.byteLength >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (asciiAt(bytes, 0, "RIFF") && asciiAt(bytes, 8, "WEBP")) return "image/webp";
+  return null;
+}
+
+/** 요청 MIME, Blob MIME, 실제 컨테이너가 모두 같은 경우에만 인코딩 성공으로 인정한다. */
+export async function isStudioOffscreenRasterEncodedBlobExact(
+  blob: unknown,
+  expectedMime: StudioOffscreenRasterEncodeMime,
+): Promise<boolean> {
+  if (
+    !ENCODE_MIME_SET.has(expectedMime)
+    || !isBlobLike(blob)
+    || blob.size <= 0
+    || blob.type.trim().toLowerCase() !== expectedMime
+  ) return false;
+  try {
+    const header = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+    return detectStudioOffscreenRasterEncodedMime(header) === expectedMime;
+  } catch {
+    return false;
+  }
 }
 
 function isPlacement(value: unknown): value is StudioOffscreenRasterPlacement {
@@ -385,7 +433,9 @@ function isResultPayload(value: unknown): value is StudioOffscreenRasterResultPa
   return hasExactKeys(value, ["kind", "mime", "blob"])
     && typeof value.mime === "string"
     && ENCODE_MIME_SET.has(value.mime)
-    && isBlobLike(value.blob);
+    && isBlobLike(value.blob)
+    && value.blob.size > 0
+    && value.blob.type.trim().toLowerCase() === value.mime;
 }
 
 export function isStudioOffscreenRasterResponseMessage(

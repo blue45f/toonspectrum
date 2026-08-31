@@ -2,9 +2,9 @@
  * Renderer-neutral coordinator for the first production-safe specialist Webtoon FX slice.
  *
  * The coordinator snapshots one bounded FX recipe, derives one exact multi-artifact request, and
- * delegates the whole capture transaction to the atomic runtime failover. It never mixes artifacts
- * from multiple engines. Only after one runtime returns a complete canonical bundle does the
- * bounded CPU compositor receive it.
+ * delegates the whole capture transaction to the preselected atomic runtime. It never mixes
+ * artifacts from multiple engines or retries another engine. Only after that runtime returns a
+ * complete canonical bundle does the bounded CPU compositor receive it.
  */
 
 import {
@@ -66,7 +66,6 @@ export interface StudioBg3dSpecialistWebtoonFxCpuPlan {
 export interface StudioBg3dSpecialistWebtoonFxProvenance {
   /** The runtime that produced every source artifact in this result. */
   readonly runtimeId: StudioBg3dRuntimeId;
-  readonly fallbackUsed: boolean;
   readonly attempts: readonly StudioBg3dAtomicSpecialistAttempt[];
   readonly cpuEffectPlan: StudioBg3dSpecialistWebtoonFxCpuPlan;
 }
@@ -368,7 +367,6 @@ export async function runStudioBg3dSpecialistWebtoonFxCoordinator(
     result,
     provenance: Object.freeze({
       runtimeId: atomicResult.runtimeId,
-      fallbackUsed: atomicResult.fallbackUsed,
       attempts: freezeAttempts(atomicResult.attempts),
       cpuEffectPlan,
     }),

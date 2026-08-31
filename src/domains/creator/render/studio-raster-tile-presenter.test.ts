@@ -129,7 +129,7 @@ function fakeContext(): FakeCanvasContext {
 }
 
 function fakePresentationCanvases() {
-  const fallbackContext = fakeContext();
+  const canvas2dContext = fakeContext();
   const scratchContext = fakeContext();
   const ownerDocument = {
     createElement: vi.fn(() => ({
@@ -140,12 +140,12 @@ function fakePresentationCanvases() {
       getContext: () => scratchContext,
     })),
   };
-  const fallbackCanvas = {
+  const canvas2dCanvas = {
     width: 1,
     height: 1,
     style: {},
     ownerDocument,
-    getContext: () => fallbackContext,
+    getContext: () => canvas2dContext,
   } as unknown as HTMLCanvasElement;
   const gpuCanvas = {
     width: 1,
@@ -154,7 +154,71 @@ function fakePresentationCanvases() {
     ownerDocument,
     getContext: vi.fn(() => null),
   } as unknown as HTMLCanvasElement;
-  return { fallbackCanvas, fallbackContext, gpuCanvas };
+  return { canvas2dCanvas, canvas2dContext, gpuCanvas };
+}
+
+function fakeWebGpuPresenterHarness(options: { readonly failSubmit?: boolean } = {}) {
+  const canvases = fakePresentationCanvases();
+  let resolveDeviceLost!: (info: GPUDeviceLostInfo) => void;
+  const lost = new Promise<GPUDeviceLostInfo>((resolve) => {
+    resolveDeviceLost = resolve;
+  });
+  const context = {
+    configure: vi.fn(),
+    unconfigure: vi.fn(),
+    getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({})) })),
+  };
+  canvases.gpuCanvas.getContext = vi.fn((kind: string) => (
+    kind === "webgpu" ? context : null
+  )) as unknown as HTMLCanvasElement["getContext"];
+  const renderPass = {
+    setPipeline: vi.fn(),
+    setVertexBuffer: vi.fn(),
+    setBindGroup: vi.fn(),
+    draw: vi.fn(),
+    end: vi.fn(),
+  };
+  const vertexBuffer = {
+    getMappedRange: vi.fn(() => new ArrayBuffer(24 * 4)),
+    unmap: vi.fn(),
+    destroy: vi.fn(),
+  };
+  const texture = {
+    createView: vi.fn(() => ({})),
+    destroy: vi.fn(),
+  };
+  const device = {
+    lost,
+    queue: {
+      writeTexture: vi.fn(),
+      submit: options.failSubmit
+        ? vi.fn(() => { throw new Error("submit failed"); })
+        : vi.fn(),
+      onSubmittedWorkDone: vi.fn(async () => undefined),
+    },
+    createShaderModule: vi.fn(() => ({})),
+    createRenderPipeline: vi.fn(() => ({ getBindGroupLayout: vi.fn(() => ({})) })),
+    createSampler: vi.fn(() => ({})),
+    createTexture: vi.fn(() => texture),
+    createBindGroup: vi.fn(() => ({})),
+    createBuffer: vi.fn(() => vertexBuffer),
+    createCommandEncoder: vi.fn(() => ({
+      beginRenderPass: vi.fn(() => renderPass),
+      finish: vi.fn(() => ({})),
+    })),
+    destroy: vi.fn(),
+  };
+  const requestDevice = vi.fn(async () => device as unknown as GPUDevice);
+  const requestAdapter = vi.fn(async () => ({ requestDevice }) as unknown as GPUAdapter);
+  const gpu = { requestAdapter } as unknown as GPU;
+  return {
+    ...canvases,
+    context,
+    device,
+    gpu,
+    requestAdapter,
+    resolveDeviceLost,
+  };
 }
 
 describe("studio raster tile presentation planner", () => {
@@ -383,13 +447,13 @@ describe("studio raster tile presentation planner", () => {
     expect(digest).not.toHaveBeenCalled();
   });
 
-  it("renders a fully verified frame through Canvas2D with identical document geometry", async () => {
+  it("renders through Canvas2D only when it is explicitly selected at construction", async () => {
     const canvases = fakePresentationCanvases();
     const onFrameReady = vi.fn();
     const onBackendChange = vi.fn();
     const presenter = new StudioRasterTilePresenter({
       gpuCanvas: canvases.gpuCanvas,
-      fallbackCanvas: canvases.fallbackCanvas,
+      canvas2dCanvas: canvases.canvas2dCanvas,
       gpu: null,
       sha256: async () => "a".repeat(64),
       onFrameReady,
@@ -403,42 +467,44 @@ describe("studio raster tile presentation planner", () => {
       visibleTileCount: 1,
     });
 
-    expect(canvases.fallbackCanvas.width).toBe(600);
-    expect(canvases.fallbackCanvas.height).toBe(520);
-    expect(canvases.fallbackContext.setTransform).toHaveBeenLastCalledWith(2, 0, 0, 2, 0, 0);
-    expect(canvases.fallbackContext.imageSmoothingEnabled).toBe(false);
-    expect(canvases.fallbackContext.drawImage).toHaveBeenCalledOnce();
-    expect(canvases.fallbackCanvas.style.visibility).toBe("visible");
+    expect(canvases.canvas2dCanvas.width).toBe(600);
+    expect(canvases.canvas2dCanvas.height).toBe(520);
+    expect(canvases.canvas2dContext.setTransform).toHaveBeenLastCalledWith(2, 0, 0, 2, 0, 0);
+    expect(canvases.canvas2dContext.imageSmoothingEnabled).toBe(false);
+    expect(canvases.canvas2dContext.drawImage).toHaveBeenCalledOnce();
+    expect(canvases.canvas2dCanvas.style.visibility).toBe("visible");
     expect(canvases.gpuCanvas.style.visibility).toBe("hidden");
     expect(onBackendChange).toHaveBeenCalledWith("canvas2d");
     expect(onFrameReady).toHaveBeenCalledExactlyOnceWith(1);
     presenter.dispose();
   });
 
-  it("backs off unavailable WebGPU locally instead of requesting an adapter for every frame", async () => {
+  it("keeps WebGPU selected and unavailable without executing Canvas2D during retry cooldown", async () => {
     const canvases = fakePresentationCanvases();
     let now = 1_000;
     const requestAdapter = vi.fn(async () => null);
+    const onFrameInvalid = vi.fn();
     const presenter = new StudioRasterTilePresenter({
       gpuCanvas: canvases.gpuCanvas,
-      fallbackCanvas: canvases.fallbackCanvas,
+      canvas2dCanvas: canvases.canvas2dCanvas,
       gpu: { requestAdapter } as unknown as GPU,
       sha256: async () => "a".repeat(64),
       now: () => now,
+      onFrameInvalid,
     });
 
     await expect(presenter.present(request([tile(surface, 0, 0)]))).resolves.toMatchObject({
-      status: "ready",
-      backend: "canvas2d",
+      status: "rejected",
+      reason: "webgpu-unavailable",
     });
     now += 29_999;
     await expect(presenter.present(request([tile(surface, 0, 0)], { generation: 2 })))
-      .resolves.toMatchObject({ status: "ready", backend: "canvas2d" });
+      .resolves.toMatchObject({ status: "rejected", reason: "webgpu-unavailable" });
     expect(requestAdapter).toHaveBeenCalledTimes(1);
 
     now += 1;
     await expect(presenter.present(request([tile(surface, 0, 0)], { generation: 3 })))
-      .resolves.toMatchObject({ status: "ready", backend: "canvas2d" });
+      .resolves.toMatchObject({ status: "rejected", reason: "webgpu-unavailable" });
     expect(requestAdapter).toHaveBeenCalledTimes(2);
 
     now += 119_999;
@@ -448,6 +514,61 @@ describe("studio raster tile presentation planner", () => {
     await presenter.present(request([tile(surface, 0, 0)], { generation: 5 }));
     expect(requestAdapter).toHaveBeenCalledTimes(3);
     expect(requestAdapter).toHaveBeenLastCalledWith();
+    expect(presenter.getBackend()).toBe("unavailable");
+    expect(onFrameInvalid).toHaveBeenCalledWith(1, "webgpu-unavailable");
+    expect(canvases.canvas2dContext.drawImage).not.toHaveBeenCalled();
+    expect(canvases.canvas2dCanvas.style.visibility).toBe("hidden");
+    presenter.dispose();
+  });
+
+  it("fails closed after a WebGPU render error without drawing the frame through Canvas2D", async () => {
+    const harness = fakeWebGpuPresenterHarness({ failSubmit: true });
+    const onFrameInvalid = vi.fn();
+    const presenter = new StudioRasterTilePresenter({
+      gpuCanvas: harness.gpuCanvas,
+      canvas2dCanvas: harness.canvas2dCanvas,
+      gpu: harness.gpu,
+      sha256: async () => "a".repeat(64),
+      onFrameInvalid,
+    });
+
+    await expect(presenter.present(request([tile(surface, 0, 0)]))).resolves.toEqual({
+      status: "rejected",
+      generation: 1,
+      reason: "presentation-failed",
+    });
+    expect(presenter.getBackend()).toBe("unavailable");
+    expect(onFrameInvalid).toHaveBeenCalledWith(1, "presentation-failed");
+    expect(harness.canvas2dContext.drawImage).not.toHaveBeenCalled();
+    expect(harness.canvas2dCanvas.style.visibility).toBe("hidden");
+    presenter.dispose();
+  });
+
+  it("marks a presented WebGPU frame unavailable on device loss without Canvas2D re-execution", async () => {
+    const harness = fakeWebGpuPresenterHarness();
+    const onFrameInvalid = vi.fn();
+    const onDeviceLost = vi.fn();
+    const presenter = new StudioRasterTilePresenter({
+      gpuCanvas: harness.gpuCanvas,
+      canvas2dCanvas: harness.canvas2dCanvas,
+      gpu: harness.gpu,
+      sha256: async () => "a".repeat(64),
+      onFrameInvalid,
+      onDeviceLost,
+    });
+
+    await expect(presenter.present(request([tile(surface, 0, 0)]))).resolves.toMatchObject({
+      status: "ready",
+      backend: "webgpu",
+    });
+    harness.resolveDeviceLost({ reason: "unknown", message: "test loss" } as GPUDeviceLostInfo);
+    await vi.waitFor(() => expect(presenter.getBackend()).toBe("unavailable"));
+
+    expect(onDeviceLost).toHaveBeenCalledTimes(1);
+    expect(onFrameInvalid).toHaveBeenCalledWith(1, "device-lost");
+    expect(harness.gpuCanvas.style.visibility).toBe("hidden");
+    expect(harness.canvas2dCanvas.style.visibility).toBe("hidden");
+    expect(harness.canvas2dContext.drawImage).not.toHaveBeenCalled();
     presenter.dispose();
   });
 
@@ -461,7 +582,7 @@ describe("studio raster tile presentation planner", () => {
     let digestCall = 0;
     const presenter = new StudioRasterTilePresenter({
       gpuCanvas: canvases.gpuCanvas,
-      fallbackCanvas: canvases.fallbackCanvas,
+      canvas2dCanvas: canvases.canvas2dCanvas,
       gpu: null,
       sha256: async () => {
         digestCall += 1;

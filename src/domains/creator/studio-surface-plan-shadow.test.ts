@@ -72,7 +72,7 @@ function snapshot(
     stampAdmitted: false,
     gpuAdmitted: false,
     liveInkAdmitted: false,
-    wetFallbackAdmitted: false,
+    wetInkAdmitted: false,
     dynamicAdmitted: false,
     ...overrides,
   };
@@ -91,7 +91,7 @@ describe("V11 shadow planner parity (existing studio ladder)", () => {
                 for (const stampAdmitted of BOOLEANS) {
                   for (const gpuAdmitted of BOOLEANS) {
                     for (const liveInkAdmitted of BOOLEANS) {
-                      for (const wetFallbackAdmitted of BOOLEANS) {
+                      for (const wetInkAdmitted of BOOLEANS) {
                         for (const dynamicAdmitted of BOOLEANS) {
                           const input = snapshot({
                             livingInk: {
@@ -104,7 +104,7 @@ describe("V11 shadow planner parity (existing studio ladder)", () => {
                             stampAdmitted,
                             gpuAdmitted,
                             liveInkAdmitted,
-                            wetFallbackAdmitted,
+                            wetInkAdmitted,
                             dynamicAdmitted,
                           });
                           const result = planStudioStrokeSurfaceShadow(input);
@@ -146,18 +146,16 @@ describe("V11 shadow planner parity (existing studio ladder)", () => {
     expect(result.agrees).toBe(true);
   });
 
-  it("planner output carries the ladder as an explicit fallback chain", () => {
+  it("planner output binds only the initially selected capability lane", () => {
     const result = planStudioStrokeSurfaceShadow(
       snapshot({ gpuAdmitted: true, dynamicAdmitted: true }),
     );
     expect(result.plannedKind).toBe("gpu");
-    expect(result.plan.islands[0]?.fallbackChain).toEqual([
-      "stroke-route-gpu",
-      "stroke-route-live-ink",
-      "stroke-route-wet-fallback",
-      "stroke-route-dynamic",
-      "stroke-route-konva",
-    ]);
+    expect(result.plan.islands[0]).toMatchObject({
+      islandId: "live-stroke",
+      providerId: "stroke-route-gpu",
+    });
+    expect(result.plan.islands[0]).not.toHaveProperty("fallbackChain");
   });
 });
 
@@ -196,16 +194,13 @@ describe("V11 descriptor bridge (backend audit → ProviderDescriptor)", () => {
     }
   });
 
-  it("fallback chains reference registered backend ids only", () => {
+  it("derived descriptors declare terminal provider failure without fallback links", () => {
     const descriptors = deriveStudioV11BackendDescriptors();
-    const ids = new Set(descriptors.map((descriptor) => descriptor.id));
     for (const descriptor of descriptors) {
-      if (descriptor.fallbackProviderId !== null) {
-        expect(
-          ids.has(descriptor.fallbackProviderId),
-          `${descriptor.id} fallback ${descriptor.fallbackProviderId}`,
-        ).toBe(true);
-      }
+      expect(descriptor).not.toHaveProperty("fallbackProviderId");
+      expect(descriptor.limitations).toContain(
+        "provider failure is terminal for this binding; no automatic backend substitution",
+      );
     }
   });
 });
@@ -229,7 +224,7 @@ function* allAdmissionSnapshots(): Generator<StudioStrokeSurfaceRouteSnapshotInp
               for (const stampAdmitted of BOOLEANS) {
                 for (const gpuAdmitted of BOOLEANS) {
                   for (const liveInkAdmitted of BOOLEANS) {
-                    for (const wetFallbackAdmitted of BOOLEANS) {
+                    for (const wetInkAdmitted of BOOLEANS) {
                       for (const dynamicAdmitted of BOOLEANS) {
                         yield snapshot({
                           livingInk: {
@@ -242,7 +237,7 @@ function* allAdmissionSnapshots(): Generator<StudioStrokeSurfaceRouteSnapshotInp
                           stampAdmitted,
                           gpuAdmitted,
                           liveInkAdmitted,
-                          wetFallbackAdmitted,
+                          wetInkAdmitted,
                           dynamicAdmitted,
                         });
                       }
@@ -303,7 +298,7 @@ describe("V12 §5 tournament probe on the shadow planner (observation only)", ()
         observation.lanes.join(",") !== admitted.join(",") ||
         observation.killedLanes.length !== 0 ||
         observation.promotedLane !== null ||
-        observation.killIgnoredReason !== null
+        observation.unavailableReason !== null
       ) {
         throw new Error(
           `pristine probe altered the admitted ladder for ${JSON.stringify(input)}`,
@@ -333,13 +328,8 @@ describe("V12 §5 tournament probe on the shadow planner (observation only)", ()
     expect(result.legacyKind).toBe("gpu");
     expect(result.plannedKind).toBe("gpu");
     expect(result.agrees).toBe(true);
-    expect(result.plan.islands[0]?.fallbackChain).toEqual([
-      "stroke-route-gpu",
-      "stroke-route-live-ink",
-      "stroke-route-wet-fallback",
-      "stroke-route-dynamic",
-      "stroke-route-konva",
-    ]);
+    expect(result.plan.islands[0]?.providerId).toBe("stroke-route-gpu");
+    expect(result.plan.islands[0]).not.toHaveProperty("fallbackChain");
     expect(result.tournament?.lanes).toEqual(["dynamic", "gpu", "konva"]);
     expect(result.tournament?.promotedLane).toBe("dynamic");
     expect(result.tournament?.bucket).toBe(studioStrokeRouteBucket(TRAITS));
@@ -356,10 +346,10 @@ describe("V12 §5 tournament probe on the shadow planner (observation only)", ()
     expect(result.plannedKind).toBe("gpu");
     expect(result.tournament?.lanes).toEqual(["dynamic", "konva"]);
     expect(result.tournament?.killedLanes).toEqual(["gpu"]);
-    expect(result.tournament?.killIgnoredReason).toBeNull();
+    expect(result.tournament?.unavailableReason).toBeNull();
   });
 
-  it("killing every admitted lane is ignored in the observation with the reason logged", () => {
+  it("all-killed observation is unavailable without changing legacy authority", () => {
     const probe = pristineProbe();
     for (const kind of ["gpu", "dynamic", "konva"] as const) {
       probe.state.killSwitch.kill(studioStrokeRouteProviderId(kind), "panic");
@@ -369,9 +359,10 @@ describe("V12 §5 tournament probe on the shadow planner (observation only)", ()
       probe,
     );
     expect(result.legacyKind).toBe("gpu");
-    expect(result.tournament?.lanes).toEqual(["gpu", "dynamic", "konva"]);
-    expect(result.tournament?.killIgnoredReason).toContain("keeping the original order");
-    expect(result.tournament?.killIgnoredReason).toContain("panic");
+    expect(result.plannedKind).toBe("gpu");
+    expect(result.tournament?.lanes).toEqual([]);
+    expect(result.tournament?.killedLanes).toEqual(["gpu", "dynamic", "konva"]);
+    expect(result.tournament?.unavailableReason).toBe("all-providers-killed");
   });
 });
 
@@ -500,10 +491,8 @@ describe("V13 §2.5 cost shadow receipts (observation only)", () => {
     const fingerprinted = planStudioStrokeSurfaceShadow(input, costProbe(COST_TRAITS));
     expect(fingerprinted.legacyKind).toBe(bare.legacyKind);
     expect(fingerprinted.plannedKind).toBe(bare.plannedKind);
-    expect(fingerprinted.plan.islands[0]?.providerId).toBe(bare.plan.islands[0]?.providerId);
-    expect(fingerprinted.plan.islands[0]?.fallbackChain).toEqual(
-      bare.plan.islands[0]?.fallbackChain,
-    );
+    expect(fingerprinted.plan.islands[0]).toEqual(bare.plan.islands[0]);
+    expect(fingerprinted.plan.islands[0]).not.toHaveProperty("fallbackChain");
   });
 });
 
