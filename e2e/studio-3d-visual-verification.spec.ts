@@ -582,6 +582,9 @@ test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
     const insertedLayer = page.getByRole("treeitem", { name: /^3D LT 배경 · 병합,/ }).first();
     const insertedLayerId = await insertedLayer.getAttribute("id");
     expect(insertedLayerId).toMatch(/^studio-layer-.+/);
+    // CI can keep the child row outside the navigator viewport. Scrolling the treeitem also
+    // materializes its content-visibility:auto subtree before clicking the non-control label.
+    await insertedLayer.scrollIntoViewIfNeeded();
     await insertedLayer.getByText("3D LT 배경 · 병합", { exact: true }).click();
     await expect(insertedLayer).toHaveAttribute("aria-selected", "true");
 
