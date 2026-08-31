@@ -135,7 +135,12 @@ export const STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS = 2_000;
  * A ratio answers a different question -- "does this plan still scale linearly" -- and answers it
  * with no machine in the numerator or denominator, because both sides are the same planner on the
  * same material moments apart. It convicts the superlinear class from ~1.8x on EVERY row rather
- * than on one, and it cannot be moved by a slower runner at all.
+ * than on one, and a slower runner cannot move it.
+ *
+ * That immunity is a property of the PAIRING, not of the ratio, and it is only as good as the
+ * reduction downstream: dividing the cheapest short leg by the cheapest long leg across different
+ * passes compares two windows that never coexisted and hands the scheduler the verdict back. See
+ * `reduceStudioBrushCrayonFamilyGrowth`, which is where that was lost once already.
  */
 export const STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES = 500;
 /**
@@ -200,12 +205,58 @@ export function studioBrushCrayonFamilyCpuFreezes(
  * `cpuMs`/`elapsedMs` stay the full-stroke costs, so every existing reader is unchanged.
  */
 export interface StudioBrushCrayonFamilyRow extends StudioBrushCataloguePerfRow {
-  /** Cheapest wall cost of the same plan at `STUDIO_BRUSH_CRAYON_FAMILY_SHORT_SAMPLES`. */
+  /** Quarter-stroke wall cost of the pass `growth` was earned on. */
   readonly shortElapsedMs: number;
-  /** Cheapest wall cost at the full length, which is what `growth` divides. */
+  /** Full-stroke wall cost of that same pass, which is what `growth` divides. */
   readonly longElapsedMs: number;
   /** Full-stroke wall cost over quarter-stroke wall cost. Linear in the input would be x4. */
   readonly growth: number;
+  /** Every pass's own paired ratio, cheapest first in the log so the spread is visible. */
+  readonly growthPasses: readonly number[];
+}
+
+/** One pass's paired windows: the quarter stroke and the full stroke measured back to back. */
+export interface StudioBrushCrayonFamilyPair {
+  readonly shortElapsedMs: number;
+  readonly longElapsedMs: number;
+}
+
+/**
+ * Earn one scaling verdict from paired passes, the way `judgeStudioCalibratedBudget` does.
+ *
+ * The ratio is minimised over PASSES, not assembled from each side's own minimum. That
+ * distinction is the whole gate: the measurement loop deliberately puts the quarter stroke beside
+ * the full one within a pass, and reducing the two legs independently throws that pairing away
+ * again -- the cheapest short leg and the cheapest long leg need not come from the same pass, and
+ * dividing them compares two windows that never coexisted.
+ *
+ * It is not a theoretical concern. On CI this shipped an x8.20 verdict against an x8 bound from
+ * short 13.2ms and long 107.8ms, while main measured x4.37 from 21.5ms and 94.0ms on the same
+ * tree: the long legs differ by 15%, and the ratio only cleared the bound because some pass's
+ * short leg ran 39% FASTER than main's. A gate that fires when the machine behaves WELL on the
+ * numerator's denominator is reporting the scheduler, not the planner -- and it red-flagged a PR
+ * that changed only VRM binaries and a Blender script.
+ *
+ * Pure, so the rule can be pinned against recorded series instead of only through a live run.
+ */
+export function reduceStudioBrushCrayonFamilyGrowth(
+  pairs: readonly StudioBrushCrayonFamilyPair[],
+): Pick<StudioBrushCrayonFamilyRow, "shortElapsedMs" | "longElapsedMs" | "growth" | "growthPasses"> {
+  if (pairs.length === 0) {
+    throw new Error("A crayon-family scaling verdict needs at least one paired pass.");
+  }
+  const ratioOf = (pair: StudioBrushCrayonFamilyPair): number => (
+    pair.shortElapsedMs > 0 ? pair.longElapsedMs / pair.shortElapsedMs : Number.POSITIVE_INFINITY
+  );
+  // Cheapest pass wins, for the reducer's standing reason: interference is additive, so the
+  // least-disturbed pass is the honest one. Here it is the least-disturbed PAIR.
+  const best = pairs.reduce((a, b) => (ratioOf(b) < ratioOf(a) ? b : a));
+  return {
+    shortElapsedMs: best.shortElapsedMs,
+    longElapsedMs: best.longElapsedMs,
+    growth: ratioOf(best),
+    growthPasses: [...pairs].map(ratioOf).sort((a, b) => a - b),
+  };
 }
 
 export function reduceStudioBrushCrayonFamilyPasses(
@@ -934,8 +985,7 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
   // that wins on CPU; `reduceStudioBrushCrayonFamilyPasses` carries the reasoning for both.
   const crayonFamily = STUDIO_BRUSH_CRAYON_FAMILY_IDS.map((catalogId) => {
     const passes: StudioBrushCataloguePerfRow[] = [];
-    let shortElapsedMs = Number.POSITIVE_INFINITY;
-    let longElapsedMs = Number.POSITIVE_INFINITY;
+    const pairs: StudioBrushCrayonFamilyPair[] = [];
     for (let pass = 0; pass < STUDIO_BRUSH_CRAYON_FAMILY_LONG_PASSES; pass += 1) {
       // The quarter stroke is measured beside the full one on every pass, not in a loop of its
       // own. Two separate loops are a ratio in name only: a contended stretch lands inside one of
@@ -947,24 +997,21 @@ export function evaluateStudioBrushCataloguePaintPerfMatrix(): StudioBrushCatalo
         budgetMs: STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS,
         packById,
       });
-      shortElapsedMs = Math.min(shortElapsedMs, short.elapsedMs);
       const long = evaluateStudioBrushCataloguePaintPerfRow(catalogId, {
         sampleCount: STUDIO_BRUSH_CRAYON_FAMILY_LONG_SAMPLES,
         budgetMs: STUDIO_BRUSH_CRAYON_FAMILY_LONG_WALL_BLOWUP_MS,
         packById,
       });
-      longElapsedMs = Math.min(longElapsedMs, long.elapsedMs);
+      pairs.push({ shortElapsedMs: short.elapsedMs, longElapsedMs: long.elapsedMs });
       passes.push(long);
     }
-    // Minimum over passes on BOTH sides, for the reducer's own reason: interference is additive,
-    // so the cheapest pass is the honest one. Taken independently of the CPU reduction above,
+    // The scaling verdict is minimised over PAIRS, not over each leg on its own -- see
+    // `reduceStudioBrushCrayonFamilyGrowth`. The CPU reduction below stays independent of it,
     // because the pass with the least concurrent GC need not be the pass with the least
     // preemption.
     return {
       ...reduceStudioBrushCrayonFamilyPasses(passes),
-      shortElapsedMs,
-      longElapsedMs,
-      growth: shortElapsedMs > 0 ? longElapsedMs / shortElapsedMs : Number.POSITIVE_INFINITY,
+      ...reduceStudioBrushCrayonFamilyGrowth(pairs),
     } satisfies StudioBrushCrayonFamilyRow;
   });
   const observed = new Set(rows.map((row) => row.catalogId));
