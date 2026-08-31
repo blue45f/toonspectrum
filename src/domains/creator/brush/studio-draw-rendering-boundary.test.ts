@@ -67,6 +67,37 @@ function moduleEdges(relativePath: string): ModuleEdges {
   return { allImports, dynamicImports, source, typeImports, valueImports };
 }
 
+function namedFunctionSource(relativePath: string, functionName: string): string {
+  const fileUrl = new URL(relativePath, import.meta.url);
+  const rawSource = readFileSync(fileUrl, "utf8");
+  const file = ts.createSourceFile(
+    fileUrl.pathname,
+    rawSource,
+    ts.ScriptTarget.Latest,
+    true,
+    relativePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  let source: string | null = null;
+
+  function visit(node: ts.Node): void {
+    if (source !== null) return;
+    if (
+      ts.isFunctionDeclaration(node)
+      && node.name?.text === functionName
+    ) {
+      source = node.getText(file);
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(file);
+  if (source === null) {
+    throw new Error(`Missing function ${functionName} in ${relativePath}`);
+  }
+  return source;
+}
+
 const EXTRACTED_FUNCTIONS = [
   "drawBounds",
   "getSymmetricPoints",
@@ -237,9 +268,67 @@ describe("studio draw rendering ownership boundary", () => {
   it("locks the stamp, watercolor, pattern, and memo routing seams in the extracted node", () => {
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
     const stampShape = moduleEdges("../StudioStampDrawShape.tsx");
+    const cacheResolvedPatternTileImage = namedFunctionSource(
+      "./StudioDrawNode.tsx",
+      "cacheResolvedPatternTileImage",
+    );
+    const loadSharedPatternTileImage = namedFunctionSource(
+      "./StudioDrawNode.tsx",
+      "loadSharedPatternTileImage",
+    );
+    const usePatternFillImage = namedFunctionSource(
+      "./StudioDrawNode.tsx",
+      "usePatternFillImage",
+    );
 
     expect(drawNode.source).toContain("const tileSrc = pattern ? patternDataUrl(pattern) : null;");
-    expect(drawNode.source).toContain("if (active) setImage(img);");
+    expect(drawNode.source).toContain(
+      "const resolvedPatternTileImages = new Map<string, HTMLImageElement>();",
+    );
+    expect(drawNode.source).toContain(
+      "const pendingPatternTileImageLoads = new Map<string, Promise<HTMLImageElement>>();",
+    );
+    expect(cacheResolvedPatternTileImage).toContain(
+      "while (resolvedPatternTileImages.size >= STUDIO_DRAW_PATTERN_IMAGE_CACHE_LIMIT)",
+    );
+    expect(cacheResolvedPatternTileImage).toContain(
+      "resolvedPatternTileImages.delete(oldestTileSrc);",
+    );
+    expect(loadSharedPatternTileImage).toContain(
+      "if (resolved) return Promise.resolve(resolved);",
+    );
+    expect(loadSharedPatternTileImage).toContain("if (pending) return pending;");
+    expect(loadSharedPatternTileImage).toContain(
+      "cacheResolvedPatternTileImage(tileSrc, image);",
+    );
+    expect(
+      loadSharedPatternTileImage.match(
+        /pendingPatternTileImageLoads\.delete\(tileSrc\)/gu,
+      ),
+    ).toHaveLength(2);
+    expect(loadSharedPatternTileImage).toContain(
+      "pendingPatternTileImageLoads.set(tileSrc, request);",
+    );
+
+    // A mounted hook owns the resolved image independently from the bounded shared cache. The
+    // tile identity guard prevents a prior pattern's image from appearing after a prop change,
+    // while the effect cleanup keeps stale or unmounted async completions from updating state.
+    const localImageIndex = usePatternFillImage.indexOf(
+      "loaded?.tileSrc === tileSrc ? loaded.image : null",
+    );
+    const resolvedCacheIndex = usePatternFillImage.indexOf(
+      "resolvedPatternTileImages.get(tileSrc)",
+    );
+    expect(localImageIndex).toBeGreaterThanOrEqual(0);
+    expect(resolvedCacheIndex).toBeGreaterThan(localImageIndex);
+    expect(usePatternFillImage).toContain("setLoaded({ image: resolved, tileSrc });");
+    expect(usePatternFillImage).toContain("let active = true;");
+    expect(usePatternFillImage).toContain(
+      "if (active) setLoaded({ image: img, tileSrc });",
+    );
+    expect(usePatternFillImage).toContain("active = false;");
+    expect(usePatternFillImage).toContain("}, [loaded, tileSrc]);");
+    expect(usePatternFillImage).toContain("return image;");
     expect(drawNode.source).toContain("const symmetricVariations = stampBrushKind");
     expect(drawNode.source).toContain("<StudioStampDrawShape");
     expect(drawNode.valueImports).toContain("../StudioStampDrawShape");
